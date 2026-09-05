@@ -467,6 +467,9 @@
     <string name="swipe_done_back">Retour à Organiser</string>
     <string name="swipe_empty">Rien à trier — bravo !</string>
     <string name="swipe_undo_cd">Annuler la dernière décision</string>
+    <string name="swipe_pending_commit">%1$d éléments en attente de mise à la corbeille</string>
+    <string name="swipe_retry">Réessayer</string>
+    <string name="swipe_discard">Abandonner</string>
 
     <!-- Media Pager -->
     <string name="media_source">Source : %1$s</string>

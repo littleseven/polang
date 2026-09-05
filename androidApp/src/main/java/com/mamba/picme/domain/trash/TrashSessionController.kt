@@ -37,6 +37,9 @@ sealed interface TrashOutcome {
  * 授权回调 [onTrashResult]/[onRestoreResult] 只同步清 pending（授权回调在主线程），
  * queryExisting 残留复查（逐 uri ContentResolver binder IPC，批量可达成百上千次）
  * 移入 ioDispatcher 执行（[PERF] 红线，2026-09-05 审查修复），结果经 [outcomes] 流抛出。
+ * API<30（!isSupported）不拉起授权：errorEvent 置位（UI snackbar）+ [TrashOutcome.Unsupported]
+ * 入流（VM 编排层据此回滚在途提交状态，2026-09-05 F2 审查修复——此前仅 errorEvent，VM 侧
+ * commitInFlight/finishing 永久悬挂死锁）。
  */
 class TrashSessionController(
     private val backend: TrashBackend,
@@ -53,7 +56,7 @@ class TrashSessionController(
     private val _errorEvent = MutableStateFlow(false)
     val errorEvent: StateFlow<Boolean> = _errorEvent
 
-    /** 授权结果流（含 Cancelled）；buffer 8 防连点丢事件。 */
+    /** 授权结果流（含 Cancelled / Unsupported）；buffer 8 防连点丢事件。 */
     private val _outcomes = MutableSharedFlow<TrashOutcome>(extraBufferCapacity = 8)
     val outcomes: SharedFlow<TrashOutcome> = _outcomes
 
@@ -68,7 +71,9 @@ class TrashSessionController(
     private fun request(uris: List<String>, isRestore: Boolean, tag: String?) {
         if (uris.isEmpty() || _pendingRequest.value != null) return
         if (!backend.isSupported) {
+            // API<30：errorEvent 供 UI snackbar；Unsupported outcome 供 VM 编排层回滚在途提交状态
             _errorEvent.value = true
+            _outcomes.tryEmit(TrashOutcome.Unsupported)
             return
         }
         scope.launch {

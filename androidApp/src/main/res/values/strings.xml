@@ -480,6 +480,9 @@
     <string name="swipe_done_back">Back to Organize</string>
     <string name="swipe_empty">Nothing to tidy — nice!</string>
     <string name="swipe_undo_cd">Undo last decision</string>
+    <string name="swipe_pending_commit">%1$d items pending trash</string>
+    <string name="swipe_retry">Retry</string>
+    <string name="swipe_discard">Discard</string>
 
     <!-- Media Pager -->
     <string name="media_source">Source: %1$s</string>

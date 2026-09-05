@@ -54,7 +54,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `PhotoEditor` | `photo_editor/{sourceUri}?recipeUri={recipeUri}&autoOptimize={autoOptimize}` | 图片编辑器 — 从相册 MediaPager 进入；`recipeUri` 重新编辑已保存副本，`autoOptimize` 进入时自动触发 AI 一键优化 |
 | `IDPhoto` | `id_photo/{sourceUri}` | 证件照制作 |
 | `OrganizeCategory` | `organize_category/{category}` | 整理中心类目详情（F1，2026-09-05）— AI 预选网格 + 批量回收站清理/恢复；路由段为 `domain.organize.OrganizeCategory` 枚举名，非法值弹栈；VM 经 `AppContainer.createOrganizeCategoryViewModelFactory(category)` 构建（TrashSessionController 在 VM 内 new，backend = DedupTrashBackend 包装 dedupTrashManager） |
-| `SwipeReview` | `swipe_review` | 手势快速整理全屏页（F2，2026-09-05）— 右滑保留 / 左滑跳过 / 上滑删除（点按=跳过），DELETE 批量提交系统回收站；hub「Quick tidy up」主按钮点亮；VM 经 `AppContainer.createSwipeReviewViewModelFactory()` 构建 |
+| `SwipeReview` | `swipe_review` | 手势快速整理全屏页（F2，2026-09-05）— 右滑保留 / 左滑跳过 / 上滑删除（点按=跳过），DELETE 批量提交系统回收站；KEEP 决策写入 30 天抑制历史（DataStore `swipe_keep_history`）不再入队；hub「Quick tidy up」主按钮点亮；VM 经 `AppContainer.createSwipeReviewViewModelFactory()` 构建 |
 | `Settings` | `settings` | 设置 — 主菜单（2026-08-26 列表式改版：账号 Hero 卡 + 个性化/功能/AI 与系统/其他四组列表行） |
 | `SettingsCategory` | `settings/{category}` | 设置二级分类页 — 路由段为枚举名小写：`account`、`gallery`（dormant）、`camera`、`system`、`remote_model`、`local_model`、`sandbox`、`developer`（2026-08-16 `camera_beauty` 更名 `camera`，承载相机状态记忆与重置） |
 | `AddRemoteProvider` | `settings/add_remote_provider` | 添加远程模型 — 供应商列表页（精确路由，优先于 `settings/{category}` 占位匹配；2026-08-21 替代原 AddProviderModelDialog 弹窗） |

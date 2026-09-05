@@ -7,6 +7,8 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Spring
@@ -19,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,7 +58,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,6 +78,7 @@ import coil.request.ImageRequest
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import com.mamba.picme.core.designsystem.PoLangForcedDarkTheme
+import com.mamba.picme.core.designsystem.appShapes
 import com.mamba.picme.domain.swipe.SwipeCandidate
 import com.mamba.picme.domain.swipe.SwipeReason
 import com.mamba.picme.features.common.topbar.AppTopBar
@@ -86,12 +90,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
-
-/** 品牌渐变（青玉）：Done 态主按钮与整理中心 hub 同源。 */
-private val swipeBrandGradient: Brush
-    get() = Brush.linearGradient(
-        listOf(ChatBubbleTokens.brandGradientStart, ChatBubbleTokens.brandGradientEnd)
-    )
 
 private const val IMAGE_LOAD_SIZE = 1080
 private const val PRELOAD_AHEAD = 3
@@ -120,6 +118,7 @@ fun SwipeReviewScreen(
             topBar = {
                 SwipeTopBar(
                     state = uiState,
+                    canUndo = viewModel.canUndo,
                     onNavigateBack = onNavigateBack,
                     onUndo = { viewModel.undo() },
                 )
@@ -136,7 +135,10 @@ fun SwipeReviewScreen(
                     )
                     is SwipeUiState.Reviewing -> SwipeReviewingContent(
                         state = state,
+                        pendingDeleteCount = viewModel.pendingDeleteCount(),
                         onDecide = { decision -> viewModel.decide(decision) },
+                        onRetryCommit = { viewModel.finish() },
+                        onDiscardPending = { viewModel.discardPendingDeletes() },
                     )
                     is SwipeUiState.Done -> {
                         if (state.kept == 0 && state.deleted == 0 && state.skipped == 0) {
@@ -178,12 +180,12 @@ private fun SwipeTrashAuthEffects(
     val trashLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result: ActivityResult ->
-        viewModel.onTrashResult(result.resultCode == Activity.RESULT_OK)
+        viewModel.trashController.onTrashResult(result.resultCode == Activity.RESULT_OK)
     }
     val restoreLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result: ActivityResult ->
-        viewModel.onRestoreResult(result.resultCode == Activity.RESULT_OK)
+        viewModel.trashController.onRestoreResult(result.resultCode == Activity.RESULT_OK)
     }
 
     // 授权拉起：token 即 IntentSender（DedupTrashBackend 生产适配），isRestore 分流 launcher
@@ -219,10 +221,11 @@ private fun SwipeTrashAuthEffects(
 
 // ---------- 顶栏 ----------
 
-/** 顶栏：返回 + 居中进度「N / M」+ 副行「X freed」+ 右 undo（无决策时禁用）。 */
+/** 顶栏：返回 + 居中进度「N / M」+ 副行「X freed」+ 右 undo（尾条决策已提交回收站时禁用）。 */
 @Composable
 private fun SwipeTopBar(
     state: SwipeUiState,
+    canUndo: Boolean,
     onNavigateBack: () -> Unit,
     onUndo: () -> Unit,
 ) {
@@ -256,7 +259,7 @@ private fun SwipeTopBar(
                 AppTopBarAction(
                     icon = Icons.AutoMirrored.Filled.Undo,
                     contentDescription = stringResource(R.string.swipe_undo_cd),
-                    enabled = reviewing.decisions.isNotEmpty(),
+                    enabled = canUndo,
                     onClick = onUndo,
                 )
             }
@@ -269,7 +272,10 @@ private fun SwipeTopBar(
 @Composable
 private fun SwipeReviewingContent(
     state: SwipeUiState.Reviewing,
+    pendingDeleteCount: Int,
     onDecide: (SwipeDecision) -> Unit,
+    onRetryCommit: () -> Unit,
+    onDiscardPending: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -295,13 +301,76 @@ private fun SwipeReviewingContent(
         ) {
             val candidate = state.current
             if (candidate == null) {
-                // 末张决策后 finish 在途（等待回收站授权结算），state 仍停在 Reviewing
-                CircularProgressIndicator()
+                // 末张决策后 finish 在途 / 授权被拒（state 停在 Reviewing）：
+                // 给「待提交 + 重试/放弃」出口，不留裸 spinner
+                SwipePendingCommitPanel(
+                    pendingCount = pendingDeleteCount,
+                    onRetry = onRetryCommit,
+                    onDiscard = onDiscardPending,
+                )
             } else {
                 SwipeCard(candidate = candidate, index = state.index, onDecide = onDecide)
             }
         }
-        SwipeHintRow()
+        // 底部三列手势 hint：← Skip / ↑ Delete / Keep →（Keep 用 primary 强调）
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.swipe_hint_skip),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.swipe_hint_delete),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.swipe_hint_keep),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/** 授权被拒后的待提交出口：N 张待提交 + 重试（重新发起授权）/ 放弃（改记 SKIP 进 Done）。 */
+@Composable
+private fun SwipePendingCommitPanel(
+    pendingCount: Int,
+    onRetry: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.swipe_pending_commit, pendingCount),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            TextButton(onClick = onDiscard) {
+                Text(
+                    text = stringResource(R.string.swipe_discard),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Button(onClick = onRetry) {
+                Text(text = stringResource(R.string.swipe_retry))
+            }
+        }
     }
 }
 
@@ -361,76 +430,55 @@ private fun SwipeCard(
                 )
             },
     ) {
-        AnimatedContent(
-            targetState = candidate.uri,
-            transitionSpec = { fadeIn(tween(FLY_OUT_MS)) togetherWith fadeOut(tween(FLY_OUT_MS)) },
-            label = "swipeCardImage",
-        ) { uri ->
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(uri)
-                    .size(IMAGE_LOAD_SIZE)
-                    // Coil 铁律：禁 crossfade，防 recycled bitmap 崩溃
-                    .crossfade(false)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.fillMaxSize(),
+        SwipeCardImage(index = index, uri = candidate.uri)
+        // 左上角入列原因角标 capsule（surfaceVariant 底）
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text = reasonLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
-        SwipeReasonBadge(label = reasonLabel, modifier = Modifier.align(Alignment.TopStart))
     }
 }
 
-/** 左上角入列原因角标 capsule（surfaceVariant 底）。 */
+/**
+ * 卡面大图：方向感知换图——前进（decide 后卡片已飞出屏外）直接换图不 crossfade
+ * （防旧图中央淡出闪回）；回退（undo，卡片在原位）保留淡入。
+ */
 @Composable
-private fun SwipeReasonBadge(label: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .padding(12.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-/** 底部三列手势 hint：← Skip / ↑ Delete / Keep →（Keep 用 primary 强调）。 */
-@Composable
-private fun SwipeHintRow() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.swipe_hint_skip),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(R.string.swipe_hint_delete),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(R.string.swipe_hint_keep),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f),
+private fun SwipeCardImage(index: Int, uri: String) {
+    val context = LocalContext.current
+    AnimatedContent(
+        targetState = index to uri,
+        transitionSpec = {
+            if (targetState.first > initialState.first) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else {
+                fadeIn(tween(FLY_OUT_MS)) togetherWith fadeOut(tween(FLY_OUT_MS))
+            }
+        },
+        label = "swipeCardImage",
+    ) { (_, targetUri) ->
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(targetUri)
+                .size(IMAGE_LOAD_SIZE)
+                // Coil 铁律：禁 crossfade，防 recycled bitmap 崩溃
+                .crossfade(false)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }
@@ -494,7 +542,7 @@ private fun settleCardDrag(
 
 // ---------- Done 态 ----------
 
-/** 完成态：✓ 圆标 + Round complete + 三数字统计卡 + 渐变主按钮（再来一轮）+ 文本钮（整批恢复/返回）。 */
+/** 完成态：✓ 圆标 + Round complete + 三数字统计卡 + 实色主按钮（再来一轮）+ 文本钮（整批恢复/返回）。 */
 @Composable
 private fun SwipeDoneContent(
     state: SwipeUiState.Done,
@@ -509,17 +557,18 @@ private fun SwipeDoneContent(
             .padding(16.dp),
     ) {
         Spacer(modifier = Modifier.height(24.dp))
+        // ✓ 圆标：深青底 + primary 勾线（对齐 Ardot 基准稿）
         Box(
             modifier = Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary),
+                .background(ChatBubbleTokens.brandGradientStart),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Rounded.Check,
                 contentDescription = null,
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(28.dp),
             )
         }
@@ -538,22 +587,28 @@ private fun SwipeDoneContent(
         Spacer(modifier = Modifier.height(24.dp))
         SwipeDoneStatsCard(state = state)
         Spacer(modifier = Modifier.weight(1f))
-        SwipeGradientButton(
+        SwipePrimaryButton(
             text = stringResource(R.string.swipe_done_more),
             onClick = onOneMoreRound,
         )
         if (state.deleted > 0 && state.trashedUris.isNotEmpty()) {
             TextButton(onClick = onUndoAll, modifier = Modifier.fillMaxWidth()) {
-                Text(text = stringResource(R.string.org_undo))
+                Text(
+                    text = stringResource(R.string.org_undo),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(R.string.swipe_done_back))
+            Text(
+                text = stringResource(R.string.swipe_done_back),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
-/** 统计卡：45 Kept / 38 Deleted（error 粉）/ 3 Skipped + 「Space freed this round X」高亮数值。 */
+/** 统计卡：45 Kept / 38 Deleted（error 粉）/ 3 Skipped + 「Space freed this round X」数值同色加粗。 */
 @Composable
 private fun SwipeDoneStatsCard(state: SwipeUiState.Done) {
     Card(
@@ -583,20 +638,15 @@ private fun SwipeDoneStatsCard(state: SwipeUiState.Done) {
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            // 「Space freed this round 45 MB」：数值段加粗 + primary 高亮（其余随 onSurfaceVariant）
+            // 「Space freed this round 45 MB」：数值段同色加粗（不做 mint 高亮，对齐基准稿）
             val freed = formatBytes(state.freedBytes)
             val fullText = stringResource(R.string.swipe_done_freed, freed)
-            val accent = MaterialTheme.colorScheme.primary
-            val annotated = remember(fullText, freed, accent) {
+            val annotated = remember(fullText, freed) {
                 buildAnnotatedString {
                     append(fullText)
                     val start = fullText.indexOf(freed)
                     if (start >= 0) {
-                        addStyle(
-                            SpanStyle(fontWeight = FontWeight.Bold, color = accent),
-                            start,
-                            start + freed.length,
-                        )
+                        addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, start + freed.length)
                     }
                 }
             }
@@ -633,15 +683,15 @@ private fun SwipeDoneStat(
     }
 }
 
-/** 渐变主按钮（与整理中心 OrganizeUndoBar 同造型）。 */
+/** 实色主按钮（primary 底 + onPrimary 文字 + AppShapes.card，对齐 Ardot 基准稿）。 */
 @Composable
-private fun SwipeGradientButton(text: String, onClick: () -> Unit) {
+private fun SwipePrimaryButton(text: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(swipeBrandGradient)
+            .clip(MaterialTheme.appShapes.card)
+            .background(MaterialTheme.colorScheme.primary)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -649,7 +699,7 @@ private fun SwipeGradientButton(text: String, onClick: () -> Unit) {
             text = text,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onPrimary,
         )
     }
 }

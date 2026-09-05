@@ -467,6 +467,9 @@
     <string name="swipe_done_back">Volver a Organizar</string>
     <string name="swipe_empty">Nada que ordenar — ¡genial!</string>
     <string name="swipe_undo_cd">Deshacer la última decisión</string>
+    <string name="swipe_pending_commit">%1$d elementos pendientes de enviar a la papelera</string>
+    <string name="swipe_retry">Reintentar</string>
+    <string name="swipe_discard">Descartar</string>
 
     <!-- Media Pager -->
     <string name="media_source">Origen: %1$s</string>

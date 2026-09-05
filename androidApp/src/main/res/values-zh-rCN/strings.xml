@@ -464,6 +464,9 @@
     <string name="swipe_done_back">返回整理中心</string>
     <string name="swipe_empty">没有需要整理的内容——很棒！</string>
     <string name="swipe_undo_cd">撤销上一步决策</string>
+    <string name="swipe_pending_commit">%1$d 张待移入回收站</string>
+    <string name="swipe_retry">重试</string>
+    <string name="swipe_discard">放弃</string>
 
     <string name="screenshot">截图</string>
     <string name="screenshot_saved">截图已保存至 %1$s</string>

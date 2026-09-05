@@ -194,6 +194,8 @@ class OrganizeCategoryViewModel(
                 // 计数清零——项已回到库中，不算已释放
                 reload(preselect = true)
             }
+            // Cancelled：留在原地可重试；Unsupported（API<30）：errorEvent 链路已弹 snackbar，
+            // VM 无在途提交状态需回滚（deleteSelected 不挂前置标记），行为同改动前
             else -> Unit
         }
     }

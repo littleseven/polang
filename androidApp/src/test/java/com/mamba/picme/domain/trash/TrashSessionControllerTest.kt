@@ -89,13 +89,18 @@ class TrashSessionControllerTest {
     }
 
     @Test
-    fun `unsupported backend sets error event without pending request`() = runTest {
+    fun `unsupported backend sets error event and emits unsupported outcome`() = runTest {
         val c = newController(this, UnsupportedBackend())
         assertFalse(c.isSupported)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        advanceUntilIdle() // 先激活订阅：SharedFlow replay=0，无订阅者时 tryEmit 即丢
         c.requestTrash(listOf("a"))
         advanceUntilIdle()
         assertNull(c.pendingRequest.value)
         assertTrue(c.errorEvent.value)
+        // Unsupported outcome 供 VM 编排层回滚在途提交状态（F2 死锁修复）
+        assertEquals(listOf(TrashOutcome.Unsupported), received)
         c.consumeErrorEvent()
         assertFalse(c.errorEvent.value)
         // 恢复同理短路
@@ -103,6 +108,11 @@ class TrashSessionControllerTest {
         advanceUntilIdle()
         assertNull(c.pendingRequest.value)
         assertTrue(c.errorEvent.value)
+        assertEquals(
+            listOf(TrashOutcome.Unsupported, TrashOutcome.Unsupported),
+            received,
+        )
+        job.cancel()
     }
 
     @Test

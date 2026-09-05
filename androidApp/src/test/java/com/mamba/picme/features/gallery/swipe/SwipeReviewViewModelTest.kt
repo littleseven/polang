@@ -2,16 +2,20 @@ package com.mamba.picme.features.gallery.swipe
 
 import com.mamba.picme.domain.organize.OrganizeItem
 import com.mamba.picme.domain.repository.OrganizeRepository
+import com.mamba.picme.domain.swipe.SwipeKeepHistory
+import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.swipe.SwipeReason
 import com.mamba.picme.domain.trash.TrashBackend
 import io.mockk.coEvery
 import io.mockk.mockk
+import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,13 +44,34 @@ class SwipeReviewViewModelTest {
     private class FakeBackend : TrashBackend {
         override val isSupported: Boolean = true
         val trashed = mutableSetOf<String>()
+        var failNextBuild = false
 
-        override fun buildTrashToken(uris: List<String>): Any = "trash-token"
+        override fun buildTrashToken(uris: List<String>): Any {
+            if (failNextBuild) throw IOException("ipc fail")
+            return "trash-token"
+        }
+
         override fun buildRestoreToken(uris: List<String>): Any = "restore-token"
 
         // 已 trash 的不算残留（IS_TRASHED 语义，同 TrashSessionControllerTest.FakeBackend）
         override fun queryExisting(uris: List<String>): List<String> =
             uris.filter { uri -> uri !in trashed }
+    }
+
+    /** API<30 语义：不支持回收站授权。 */
+    private class UnsupportedBackend : TrashBackend {
+        override val isSupported: Boolean = false
+        override fun buildTrashToken(uris: List<String>): Any = error("unreachable")
+        override fun buildRestoreToken(uris: List<String>): Any = error("unreachable")
+        override fun queryExisting(uris: List<String>): List<String> = emptyList()
+    }
+
+    private class FakeKeepHistory : SwipeKeepHistoryStore {
+        var entries: Set<String> = emptySet()
+        override suspend fun load(): Set<String> = entries
+        override suspend fun save(entries: Set<String>) {
+            this.entries = entries
+        }
     }
 
     /** JVM 单测无 Room/MediaStore：mockk 拦截 loadItems，answers 读 var 支持 restart 重载。 */
@@ -60,16 +85,20 @@ class SwipeReviewViewModelTest {
     private fun viewModel(
         scope: TestScope,
         repo: FakeRepo,
-        backend: FakeBackend,
+        backend: TrashBackend,
+        keepHistory: FakeKeepHistory = FakeKeepHistory(),
+        nowMs: () -> Long = { 1_000_000_000_000L },
     ): SwipeReviewViewModel {
-        // VM 内 outcomes collect 是无限订阅：挂独立 TestScope（非 runTest 子作用域），
+        // VM 内 outcomes/errorEvent collect 是无限订阅：挂独立 TestScope（非 runTest 子作用域），
         // 避免 runTest teardown 等待永活 collector 报 UncompletedCoroutinesError
         val vmScope = TestScope(scope.testScheduler)
         return SwipeReviewViewModel(
             organizeRepository = repo.mock,
             trashBackend = backend,
+            keepHistoryStore = keepHistory,
             coroutineScope = vmScope,
             ioDispatcher = StandardTestDispatcher(scope.testScheduler),
+            nowMs = nowMs,
         )
     }
 
@@ -186,13 +215,15 @@ class SwipeReviewViewModelTest {
         val pending = vm.trashController.pendingRequest.value
         assertEquals(20, pending?.uris?.size)
         assertEquals(false, pending?.isRestore)
-        // 已提交批次不可 undo
+        // 已提交批次不可 undo（canUndo 同步为 false）
+        assertFalse(vm.canUndo)
         vm.undo()
         val state = reviewing(vm)
         assertEquals(20, state.index)
         assertEquals(20, state.decisions.size)
         // 未提交部分仍可 undo
         vm.decide(SwipeDecision.DELETE)
+        assertTrue(vm.canUndo)
         vm.undo()
         assertEquals(20, reviewing(vm).decisions.size)
         assertEquals(20, reviewing(vm).index)
@@ -209,12 +240,13 @@ class SwipeReviewViewModelTest {
         advanceUntilIdle()
         assertEquals(listOf("p3"), vm.trashController.pendingRequest.value?.uris)
 
-        vm.onTrashResult(ok = false) // 用户拒绝
+        vm.trashController.onTrashResult(ok = false) // 用户拒绝
         advanceUntilIdle()
         val state = reviewing(vm) // 回到 Reviewing 原地
         assertEquals(1, state.index)
         assertEquals(listOf("p3" to SwipeDecision.DELETE), state.decisions)
         assertEquals(1_000_000L, state.freedBytes) // 未提交批保留
+        assertEquals(1, vm.pendingDeleteCount())
 
         vm.finish() // 可重试
         advanceUntilIdle()
@@ -241,7 +273,7 @@ class SwipeReviewViewModelTest {
         assertEquals(listOf("b"), vm.trashController.pendingRequest.value?.uris)
 
         backend.trashed.add("b") // 用户允许
-        vm.onTrashResult(ok = true)
+        vm.trashController.onTrashResult(ok = true)
         advanceUntilIdle()
         val state = done(vm)
         assertEquals(1, state.kept)
@@ -262,7 +294,7 @@ class SwipeReviewViewModelTest {
         vm.finish()
         advanceUntilIdle()
         backend.trashed.add("p2")
-        vm.onTrashResult(ok = true)
+        vm.trashController.onTrashResult(ok = true)
         advanceUntilIdle()
         assertEquals(listOf("p2"), done(vm).trashedUris)
 
@@ -273,7 +305,7 @@ class SwipeReviewViewModelTest {
         assertEquals(listOf("p2"), restorePending?.uris)
 
         backend.trashed.clear() // 用户允许恢复
-        vm.onRestoreResult(ok = true)
+        vm.trashController.onRestoreResult(ok = true)
         advanceUntilIdle()
         val state = reviewing(vm) // restart 重载建队
         assertEquals(0, state.index)
@@ -283,7 +315,7 @@ class SwipeReviewViewModelTest {
     }
 
     @Test
-    fun `oneMoreRound restarts queue from done`() = runTest {
+    fun `oneMoreRound suppresses freshly kept uris and lands in done when nothing left`() = runTest {
         val repo = FakeRepo().apply { items = photos(2) }
         val vm = viewModel(this, repo, FakeBackend())
         advanceUntilIdle()
@@ -292,12 +324,13 @@ class SwipeReviewViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.uiState.value is SwipeUiState.Done)
 
+        // KEEP 30 天抑制：两张刚 KEEP 过，再来一轮队列空 → 直落 Done
         vm.oneMoreRound()
         advanceUntilIdle()
-        val state = reviewing(vm)
-        assertEquals(0, state.index)
-        assertTrue(state.decisions.isEmpty())
-        assertEquals(2, state.queue.size)
+        val state = done(vm)
+        assertEquals(0, state.kept)
+        assertEquals(0, state.deleted)
+        assertEquals(0, state.skipped)
     }
 
     @Test
@@ -311,7 +344,7 @@ class SwipeReviewViewModelTest {
         val firstBatch = vm.trashController.pendingRequest.value?.uris.orEmpty()
         assertEquals(20, firstBatch.size)
         backend.trashed.addAll(firstBatch) // 首批授权通过，会话继续
-        vm.onTrashResult(ok = true)
+        vm.trashController.onTrashResult(ok = true)
         advanceUntilIdle()
         assertTrue(vm.uiState.value is SwipeUiState.Reviewing)
 
@@ -320,13 +353,204 @@ class SwipeReviewViewModelTest {
         advanceUntilIdle()
         assertEquals(listOf(reviewingQueueUri(vm, 20)), vm.trashController.pendingRequest.value?.uris)
         backend.trashed.add(reviewingQueueUri(vm, 20))
-        vm.onTrashResult(ok = true)
+        vm.trashController.onTrashResult(ok = true)
         advanceUntilIdle()
         val state = done(vm)
         assertEquals(21, state.deleted)
         assertEquals(1, state.skipped)
         assertEquals(210L, state.freedBytes)
         assertEquals(21, state.trashedUris.size)
+    }
+
+    // ---------- 2026-09-05 审查修复回归 ----------
+
+    /** ① finish 时另一批在途：commitInFlight 吞并 → 首批 Trashed 后补提交剩余 → Done。 */
+    @Test
+    fun `finish while earlier batch in flight chains commits before done`() = runTest {
+        val repo = FakeRepo().apply { items = photos(21, sizeBytes = 10L) }
+        val backend = FakeBackend()
+        val vm = viewModel(this, repo, backend)
+        advanceUntilIdle()
+        repeat(20) { vm.decide(SwipeDecision.DELETE) }
+        advanceUntilIdle()
+        val firstBatch = vm.trashController.pendingRequest.value?.uris.orEmpty()
+        assertEquals(20, firstBatch.size)
+
+        vm.decide(SwipeDecision.DELETE) // 第 21 张，队列走完自动 finish，但首批在途
+        advanceUntilIdle()
+        // commitInFlight 吞并：pending 仍是首批，无二批
+        assertEquals(firstBatch, vm.trashController.pendingRequest.value?.uris)
+
+        backend.trashed.addAll(firstBatch)
+        vm.trashController.onTrashResult(ok = true)
+        advanceUntilIdle()
+        // 首批结算后补提交剩余 1 张
+        val secondBatch = vm.trashController.pendingRequest.value?.uris.orEmpty()
+        assertEquals(1, secondBatch.size)
+        assertFalse(firstBatch.containsAll(secondBatch))
+
+        backend.trashed.addAll(secondBatch)
+        vm.trashController.onTrashResult(ok = true)
+        advanceUntilIdle()
+        val state = done(vm)
+        assertEquals(21, state.deleted)
+        assertEquals(0, state.skipped)
+        assertEquals(210L, state.freedBytes)
+    }
+
+    /** ② 末张后取消授权 → 卡住态（current==null）有重试出口，重试成功进 Done。 */
+    @Test
+    fun `cancelled final auth keeps pending deletes retryable from stuck state`() = runTest {
+        val repo = FakeRepo().apply { items = photos(1) }
+        val backend = FakeBackend()
+        val vm = viewModel(this, repo, backend)
+        advanceUntilIdle()
+        vm.decide(SwipeDecision.DELETE) // 末张 → 自动 finish
+        advanceUntilIdle()
+        assertEquals(listOf("p1"), vm.trashController.pendingRequest.value?.uris)
+
+        vm.trashController.onTrashResult(ok = false) // 用户拒绝
+        advanceUntilIdle()
+        val stuck = reviewing(vm)
+        assertNull(stuck.current) // 队列走完，停在 Reviewing
+        assertEquals(1, vm.pendingDeleteCount())
+        assertTrue(vm.canUndo) // 回滚后尾条决策可 undo
+
+        vm.finish() // 重试出口
+        advanceUntilIdle()
+        assertEquals(listOf("p1"), vm.trashController.pendingRequest.value?.uris)
+        backend.trashed.add("p1")
+        vm.trashController.onTrashResult(ok = true)
+        advanceUntilIdle()
+        val state = done(vm)
+        assertEquals(1, state.deleted)
+        assertEquals(0, state.skipped)
+        assertEquals(1_000_000L, state.freedBytes)
+    }
+
+    /** ② 末张后取消授权 → 放弃出口：未提交 DELETE 改记 SKIP 进 Done。 */
+    @Test
+    fun `discard pending deletes lands in done as skipped`() = runTest {
+        val repo = FakeRepo().apply { items = photos(1, sizeBytes = 100L) }
+        val backend = FakeBackend()
+        val vm = viewModel(this, repo, backend)
+        advanceUntilIdle()
+        vm.decide(SwipeDecision.DELETE)
+        advanceUntilIdle()
+        vm.trashController.onTrashResult(ok = false)
+        advanceUntilIdle()
+        assertEquals(1, vm.pendingDeleteCount())
+
+        vm.discardPendingDeletes()
+        advanceUntilIdle()
+        val state = done(vm)
+        assertEquals(0, state.kept)
+        assertEquals(0, state.deleted)
+        assertEquals(1, state.skipped)
+        assertEquals(0L, state.freedBytes)
+        assertTrue(state.trashedUris.isEmpty())
+        assertTrue(backend.trashed.isEmpty())
+    }
+
+    /** ③ API<30 不支持：finish 直接结算 Done（不死锁），未提交 DELETE 以 skipped 口径统计。 */
+    @Test
+    fun `unsupported device finishes into done without deadlock`() = runTest {
+        val repo = FakeRepo().apply { items = photos(2, sizeBytes = 100L) }
+        val vm = viewModel(this, repo, UnsupportedBackend())
+        advanceUntilIdle()
+        vm.decide(SwipeDecision.DELETE) // p2
+        vm.finish()
+        advanceUntilIdle()
+        val state = done(vm)
+        assertEquals(0, state.deleted)
+        assertEquals(1, state.skipped)
+        assertEquals(0L, state.freedBytes)
+        assertTrue(state.trashedUris.isEmpty())
+        assertNull(vm.trashController.pendingRequest.value)
+        assertTrue(vm.trashController.errorEvent.value) // UI snackbar 链路
+    }
+
+    /** ③ token 构建失败（无 outcome）：errorEvent collect 回滚在途提交，修复后可重试。 */
+    @Test
+    fun `token build failure rolls back in-flight commit via error event`() = runTest {
+        val repo = FakeRepo().apply { items = photos(1) }
+        val backend = FakeBackend().apply { failNextBuild = true }
+        val vm = viewModel(this, repo, backend)
+        advanceUntilIdle()
+        vm.decide(SwipeDecision.DELETE) // 末张 → 自动 finish → token 构建失败
+        advanceUntilIdle()
+        assertNull(vm.trashController.pendingRequest.value)
+        assertTrue(vm.trashController.errorEvent.value)
+        // 回滚后不死锁：尾条决策回到未提交，可 undo / 可重试
+        assertTrue(vm.canUndo)
+        assertEquals(1, vm.pendingDeleteCount())
+
+        backend.failNextBuild = false
+        vm.finish()
+        advanceUntilIdle()
+        assertEquals(listOf("p1"), vm.trashController.pendingRequest.value?.uris)
+    }
+
+    /** ⑥ KEEP 30 天抑制：再来一轮不重喂刚 KEEP 的 uri；SKIP 不抑制。 */
+    @Test
+    fun `kept uris are suppressed from next round queue`() = runTest {
+        val repo = FakeRepo().apply { items = photos(2) }
+        val history = FakeKeepHistory()
+        val now = 1_000_000_000_000L
+        val vm = viewModel(this, repo, FakeBackend(), history) { now }
+        advanceUntilIdle()
+        vm.decide(SwipeDecision.KEEP) // p2（captureDate 倒序队首）
+        advanceUntilIdle()
+        assertTrue(history.entries.any { entry -> entry.startsWith("p2|") })
+        vm.decide(SwipeDecision.SKIP) // p1 → 走完 → Done
+        advanceUntilIdle()
+        assertEquals(1, done(vm).kept)
+
+        vm.oneMoreRound()
+        advanceUntilIdle()
+        val state = reviewing(vm) // p2 抑制，p1（SKIP）不抑制
+        assertEquals(listOf("p1"), state.queue.map { candidate -> candidate.uri })
+    }
+
+    /** ⑥ 过期条目（>30 天）不再抑制，且读取时被裁剪写回。 */
+    @Test
+    fun `expired keep entries are pruned and stop suppressing`() = runTest {
+        val repo = FakeRepo().apply { items = photos(2) }
+        val now = 1_000_000_000_000L
+        val history = FakeKeepHistory().apply {
+            entries = setOf(
+                SwipeKeepHistory.encode("p3", now - SwipeKeepHistory.TTL_MS), // 恰好过期边界
+                "dirty-entry-without-timestamp",
+            )
+        }
+        val vm = viewModel(this, repo, FakeBackend(), history) { now }
+        advanceUntilIdle()
+        val state = reviewing(vm) // p3 不再被抑制
+        assertEquals(2, state.queue.size)
+        assertTrue(history.entries.isEmpty()) // 过期 + 脏条目已裁剪写回
+    }
+
+    /** ⑥ undo(KEEP) 回滚本会话抑制条目：再来一轮该 uri 重新入队。 */
+    @Test
+    fun `undo of keep removes session suppression entry`() = runTest {
+        val repo = FakeRepo().apply { items = photos(2) }
+        val history = FakeKeepHistory()
+        val vm = viewModel(this, repo, FakeBackend(), history)
+        advanceUntilIdle()
+        vm.decide(SwipeDecision.KEEP) // p2（captureDate 倒序队首）
+        advanceUntilIdle()
+        assertTrue(history.entries.any { entry -> entry.startsWith("p2|") })
+
+        vm.undo()
+        advanceUntilIdle()
+        assertTrue(history.entries.none { entry -> entry.startsWith("p2|") })
+
+        vm.decide(SwipeDecision.SKIP) // p2
+        vm.decide(SwipeDecision.SKIP) // p1 → Done
+        advanceUntilIdle()
+        vm.oneMoreRound()
+        advanceUntilIdle()
+        assertEquals(2, reviewing(vm).queue.size) // 无 KEEP 抑制残留
     }
 
     /** 队列第 index 张的 uri（Reviewing 态辅助）。 */

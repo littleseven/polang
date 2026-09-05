@@ -95,6 +95,8 @@ import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.dedup.MediaStoreDedupMediaSource
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
 import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
+import com.mamba.picme.data.preferences.DataStoreSwipeKeepHistoryStore
+import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.trash.DedupTrashBackend
 import androidx.lifecycle.ViewModel
 import com.mamba.picme.domain.organize.OrganizeCategory
@@ -196,10 +198,11 @@ class OrganizeCategoryViewModelFactory(
     }
 }
 
-/** 手势快速整理（F2）VM 工厂：同 F1，TrashSessionController 在 VM 内构造。 */
+/** 手势快速整理（F2）VM 工厂：同 F1，TrashSessionController 在 VM 内构造；附 KEEP 抑制历史存储。 */
 class SwipeReviewViewModelFactory(
     private val organizeRepository: OrganizeRepository,
     private val trashManager: DedupTrashManager,
+    private val keepHistoryStore: SwipeKeepHistoryStore,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -208,6 +211,7 @@ class SwipeReviewViewModelFactory(
             return SwipeReviewViewModel(
                 organizeRepository = organizeRepository,
                 trashBackend = DedupTrashBackend(trashManager),
+                keepHistoryStore = keepHistoryStore,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -851,6 +855,7 @@ class AppContainerImpl(
         return SwipeReviewViewModelFactory(
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
+            keepHistoryStore = DataStoreSwipeKeepHistoryStore(context),
         )
     }
 
