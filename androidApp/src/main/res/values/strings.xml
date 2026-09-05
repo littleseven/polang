@@ -459,6 +459,28 @@
     <string name="org_trash_unsupported">Trash needs Android 11+; please delete from the gallery</string>
     <string name="org_empty_category">Nothing to clean here</string>
 
+    <!-- Swipe review（F2 手势快速整理全屏页） -->
+    <string name="swipe_title">Quick tidy</string>
+    <string name="swipe_progress">%1$d / %2$d</string>
+    <string name="swipe_freed">%1$s freed</string>
+    <string name="swipe_hint_skip">← Skip</string>
+    <string name="swipe_hint_delete">↑ Delete</string>
+    <string name="swipe_hint_keep">Keep →</string>
+    <string name="swipe_reason_screenshot">Screenshot</string>
+    <string name="swipe_reason_blurry">Blurry</string>
+    <string name="swipe_reason_portrait">Low-quality portrait</string>
+    <string name="swipe_reason_recent">Recent</string>
+    <string name="swipe_done_title">Round complete</string>
+    <string name="swipe_done_subtitle">Nice pace — your library is lighter already</string>
+    <string name="swipe_done_kept">Kept</string>
+    <string name="swipe_done_deleted">Deleted</string>
+    <string name="swipe_done_skipped">Skipped</string>
+    <string name="swipe_done_freed">Space freed this round %1$s</string>
+    <string name="swipe_done_more">One more round</string>
+    <string name="swipe_done_back">Back to Organize</string>
+    <string name="swipe_empty">Nothing to tidy — nice!</string>
+    <string name="swipe_undo_cd">Undo last decision</string>
+
     <!-- Media Pager -->
     <string name="media_source">Source: %1$s</string>
     <string name="landmark_overlay">Face Landmarks</string>

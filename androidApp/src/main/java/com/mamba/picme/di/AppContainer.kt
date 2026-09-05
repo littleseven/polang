@@ -94,6 +94,7 @@ import com.mamba.picme.features.gallery.dedup.DedupMediaSource
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.dedup.MediaStoreDedupMediaSource
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
 import com.mamba.picme.domain.trash.DedupTrashBackend
 import androidx.lifecycle.ViewModel
 import com.mamba.picme.domain.organize.OrganizeCategory
@@ -195,6 +196,24 @@ class OrganizeCategoryViewModelFactory(
     }
 }
 
+/** 手势快速整理（F2）VM 工厂：同 F1，TrashSessionController 在 VM 内构造。 */
+class SwipeReviewViewModelFactory(
+    private val organizeRepository: OrganizeRepository,
+    private val trashManager: DedupTrashManager,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(SwipeReviewViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return SwipeReviewViewModel(
+                organizeRepository = organizeRepository,
+                trashBackend = DedupTrashBackend(trashManager),
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
 interface AppContainer {
     val repository: AndroidMediaRepository
     val userPreferencesRepository: UserSettingsRepository
@@ -279,6 +298,9 @@ interface AppContainer {
 
     /** 整理中心（F1）类目详情 ViewModel 工厂（按类目参数化） */
     fun createOrganizeCategoryViewModelFactory(category: OrganizeCategory): ViewModelProvider.Factory
+
+    /** 手势快速整理（F2）ViewModel 工厂（无参数：队列由 VM 自建） */
+    fun createSwipeReviewViewModelFactory(): ViewModelProvider.Factory
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
@@ -820,6 +842,13 @@ class AppContainerImpl(
     ): ViewModelProvider.Factory {
         return OrganizeCategoryViewModelFactory(
             category = category,
+            organizeRepository = organizeRepository,
+            trashManager = dedupTrashManager,
+        )
+    }
+
+    override fun createSwipeReviewViewModelFactory(): ViewModelProvider.Factory {
+        return SwipeReviewViewModelFactory(
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
         )

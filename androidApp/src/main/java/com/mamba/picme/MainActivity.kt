@@ -58,6 +58,8 @@ import com.mamba.picme.features.idphoto.IDPhotoScreen
 import com.mamba.picme.features.idphoto.IDPhotoViewModel
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.swipe.SwipeReviewScreen
+import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
 import com.mamba.picme.features.search.SearchTestScreen
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.TagGenerationControlScreen
@@ -300,8 +302,12 @@ class MainActivity : ComponentActivity() {
                                         gallerySearchRequest = query to personId
                                         switchMainPage(MAIN_PAGE_GALLERY)
                                     },
-                                    // 整理中心 hub 出口：F2 Quick tidy 未点亮占位；类目卡 → Task 5 类目详情路由
-                                    onQuickTidy = {},
+                                    // 整理中心 hub 出口：F2 Quick tidy → 手势整理页；类目卡 → F1 类目详情路由
+                                    onQuickTidy = {
+                                        navController.navigate(Screen.SwipeReview.route) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onOpenCategory = { category ->
                                         navController.navigate(
                                             Screen.OrganizeCategory.createRoute(category.name)
@@ -403,6 +409,15 @@ class MainActivity : ComponentActivity() {
                                         onNavigateBack = { navController.popBackStack() }
                                     )
                                 }
+                            }
+                            composable(Screen.SwipeReview.route) {
+                                val viewModel: SwipeReviewViewModel = viewModel(
+                                    factory = app.container.createSwipeReviewViewModelFactory()
+                                )
+                                SwipeReviewScreen(
+                                    viewModel = viewModel,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
                             }
                             composable(Screen.TagControl.route) {
                                 DisposableEffect(Unit) {

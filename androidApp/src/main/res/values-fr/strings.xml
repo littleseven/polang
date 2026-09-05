@@ -446,6 +446,28 @@
     <string name="org_trash_unsupported">La corbeille nécessite Android 11+ ; supprimez depuis la galerie</string>
     <string name="org_empty_category">Rien à nettoyer ici</string>
 
+    <!-- Swipe review（F2 page de tri rapide par gestes） -->
+    <string name="swipe_title">Tri rapide</string>
+    <string name="swipe_progress">%1$d / %2$d</string>
+    <string name="swipe_freed">%1$s libérés</string>
+    <string name="swipe_hint_skip">← Ignorer</string>
+    <string name="swipe_hint_delete">↑ Supprimer</string>
+    <string name="swipe_hint_keep">Garder →</string>
+    <string name="swipe_reason_screenshot">Capture d\'écran</string>
+    <string name="swipe_reason_blurry">Floue</string>
+    <string name="swipe_reason_portrait">Portrait de mauvaise qualité</string>
+    <string name="swipe_reason_recent">Récente</string>
+    <string name="swipe_done_title">Manche terminée</string>
+    <string name="swipe_done_subtitle">Bon rythme — votre bibliothèque est déjà plus légère</string>
+    <string name="swipe_done_kept">Conservées</string>
+    <string name="swipe_done_deleted">Supprimées</string>
+    <string name="swipe_done_skipped">Ignorées</string>
+    <string name="swipe_done_freed">Espace libéré cette manche : %1$s</string>
+    <string name="swipe_done_more">Encore une manche</string>
+    <string name="swipe_done_back">Retour à Organiser</string>
+    <string name="swipe_empty">Rien à trier — bravo !</string>
+    <string name="swipe_undo_cd">Annuler la dernière décision</string>
+
     <!-- Media Pager -->
     <string name="media_source">Source : %1$s</string>
     <string name="landmark_overlay">Points de repère du visage</string>

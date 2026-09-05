@@ -446,6 +446,28 @@
     <string name="org_trash_unsupported">La papelera requiere Android 11+; elimina desde la galería</string>
     <string name="org_empty_category">Nada que limpiar aquí</string>
 
+    <!-- Swipe review（F2 página de organización rápida por gestos） -->
+    <string name="swipe_title">Limpieza rápida</string>
+    <string name="swipe_progress">%1$d / %2$d</string>
+    <string name="swipe_freed">%1$s liberados</string>
+    <string name="swipe_hint_skip">← Omitir</string>
+    <string name="swipe_hint_delete">↑ Eliminar</string>
+    <string name="swipe_hint_keep">Conservar →</string>
+    <string name="swipe_reason_screenshot">Captura</string>
+    <string name="swipe_reason_blurry">Borrosa</string>
+    <string name="swipe_reason_portrait">Retrato de baja calidad</string>
+    <string name="swipe_reason_recent">Reciente</string>
+    <string name="swipe_done_title">Ronda completada</string>
+    <string name="swipe_done_subtitle">Buen ritmo: tu biblioteca ya es más ligera</string>
+    <string name="swipe_done_kept">Conservadas</string>
+    <string name="swipe_done_deleted">Eliminadas</string>
+    <string name="swipe_done_skipped">Omitidas</string>
+    <string name="swipe_done_freed">Espacio liberado esta ronda: %1$s</string>
+    <string name="swipe_done_more">Una ronda más</string>
+    <string name="swipe_done_back">Volver a Organizar</string>
+    <string name="swipe_empty">Nada que ordenar — ¡genial!</string>
+    <string name="swipe_undo_cd">Deshacer la última decisión</string>
+
     <!-- Media Pager -->
     <string name="media_source">Origen: %1$s</string>
     <string name="landmark_overlay">Puntos faciales</string>

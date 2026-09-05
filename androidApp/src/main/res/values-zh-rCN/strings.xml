@@ -443,6 +443,28 @@
     <string name="org_trash_unsupported">回收站需 Android 11 及以上；请在相册中删除</string>
     <string name="org_empty_category">这里无需清理</string>
 
+    <!-- Swipe review（F2 手势快速整理全屏页） -->
+    <string name="swipe_title">快速整理</string>
+    <string name="swipe_progress">%1$d / %2$d</string>
+    <string name="swipe_freed">已释放 %1$s</string>
+    <string name="swipe_hint_skip">← 跳过</string>
+    <string name="swipe_hint_delete">↑ 删除</string>
+    <string name="swipe_hint_keep">保留 →</string>
+    <string name="swipe_reason_screenshot">截图</string>
+    <string name="swipe_reason_blurry">模糊</string>
+    <string name="swipe_reason_portrait">低质量人像</string>
+    <string name="swipe_reason_recent">最近</string>
+    <string name="swipe_done_title">本轮整理完成</string>
+    <string name="swipe_done_subtitle">节奏不错——图库已经更轻盈了</string>
+    <string name="swipe_done_kept">已保留</string>
+    <string name="swipe_done_deleted">已删除</string>
+    <string name="swipe_done_skipped">已跳过</string>
+    <string name="swipe_done_freed">本轮释放空间 %1$s</string>
+    <string name="swipe_done_more">再来一轮</string>
+    <string name="swipe_done_back">返回整理中心</string>
+    <string name="swipe_empty">没有需要整理的内容——很棒！</string>
+    <string name="swipe_undo_cd">撤销上一步决策</string>
+
     <string name="screenshot">截图</string>
     <string name="screenshot_saved">截图已保存至 %1$s</string>
     <string name="screenshot_failed">截图失败</string>

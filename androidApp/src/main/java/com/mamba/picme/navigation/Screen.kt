@@ -49,6 +49,9 @@ sealed class Screen(val route: String) {
         fun createRoute(category: String): String = "organize_category/$category"
     }
 
+    /** 手势快速整理（F2）：全屏滑动决策页（右滑保留 / 左滑跳过 / 上滑删除，点按=跳过） */
+    data object SwipeReview : Screen("swipe_review")
+
     data object ModelCenter : Screen("model_center/{categoryTag}") {
         fun createRoute(categoryTag: String): String {
             return if (categoryTag.isNotBlank()) {
