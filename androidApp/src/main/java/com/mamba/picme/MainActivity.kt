@@ -771,9 +771,9 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * 回忆详情（F3）路由注册：数据取自 Activity 级 [MemoriesViewModel] 未过滤全集
- * （已隐藏条目直达也可复原）；订阅 memories 保持 stateIn 生成链活跃，随媒体库变化重组复原；
- * id 失效（媒体清空等）→ 空态。抽为 NavGraphBuilder 扩展避免 MainActivity 类体超限。
+ * 回忆详情（F3）路由注册：数据取自 Activity 级 [MemoriesViewModel.observeMemory] 未过滤全集
+ * Flow（已隐藏条目直达也可复原；冷恢复/列表刷新随流更新，取代 remember 反查）；id 失效
+ * （媒体清空等）→ 空态。抽为 NavGraphBuilder 扩展避免 MainActivity 类体超限。
  */
 private fun NavGraphBuilder.memoryDetailRoute(
     memoriesViewModel: MemoriesViewModel,
@@ -787,8 +787,8 @@ private fun NavGraphBuilder.memoryDetailRoute(
     ) { backStackEntry ->
         // Navigation 已对路径参数解码一次：此处直接取原始 id，不再手工二次解码（% 残留会抛 IAE）
         val memoryId = backStackEntry.arguments?.getString("memoryId").orEmpty()
-        val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
-        val memory = remember(memories, memoryId) { memoriesViewModel.getMemory(memoryId) }
+        val memory by memoriesViewModel.observeMemory(memoryId)
+            .collectAsStateWithLifecycle(initialValue = null)
         MemoryDetailScreen(
             memory = memory,
             onNavigateBack = onNavigateBack

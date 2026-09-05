@@ -16,10 +16,14 @@ import com.mamba.picme.domain.memories.NamedPerson
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -63,16 +67,36 @@ class MemoriesViewModel(
             .flowOn(ioDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** 隐藏一条回忆（幂等持久化；展示层经 [memories] 重发自动消失）。 */
+    /** 隐藏持久化失败一次性标志（UI 提示用，消费经 [consumeHideError]；仿 TrashSessionController.errorEvent 模式）。 */
+    private val _hideError = MutableStateFlow(false)
+
+    val hideError: StateFlow<Boolean> = _hideError
+
+    /** 隐藏一条回忆（幂等持久化；展示层经 [memories] 重发自动消失）。DataStore 写入失败置位 [hideError]，不崩溃。 */
     fun hideMemory(id: String) {
         scope.launch(ioDispatcher) {
-            hiddenStore.hide(id)
-            Logger.d(TAG, "memory hidden: $id")
+            runCatching { hiddenStore.hide(id) }
+                .onSuccess { Logger.d(TAG, "memory hidden: $id") }
+                .onFailure { error ->
+                    _hideError.value = true
+                    Logger.e(TAG, "hide memory failed: $id", error)
+                }
         }
+    }
+
+    /** 消费（清除）隐藏失败标志。 */
+    fun consumeHideError() {
+        _hideError.value = false
     }
 
     /** 按 id 查回忆（未过滤全集：已隐藏条目仍可查，供详情页直达复原）。 */
     fun getMemory(id: String): Memory? = allGenerated.value.firstOrNull { memory -> memory.id == id }
+
+    /** 按 id 观察单条回忆（未过滤全集 Flow：详情页随媒体库变化重组复原，列表刷新不 stale、冷恢复不依赖列表 remember 反查）。 */
+    fun observeMemory(id: String): Flow<Memory?> =
+        allGenerated
+            .map { generated -> generated.firstOrNull { memory -> memory.id == id } }
+            .distinctUntilChanged()
 
     /** 仅照片参与回忆；personId = 媒体 faceId（人物聚类归属）。 */
     private fun MediaEntity.toMemoryInput(): MemoryInput? {

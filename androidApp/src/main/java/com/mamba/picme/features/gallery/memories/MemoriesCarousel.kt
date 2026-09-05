@@ -61,6 +61,8 @@ fun MemoriesCarousel(
     onMemoryClick: (Memory) -> Unit,
     onHide: (Memory) -> Unit,
     modifier: Modifier = Modifier,
+    /** 交互开关：相册多选模式下关闭点按/长按（避免与批量选择手势冲突）。 */
+    enabled: Boolean = true,
 ) {
     var pendingHide by remember { mutableStateOf<Memory?>(null) }
 
@@ -90,6 +92,7 @@ fun MemoriesCarousel(
             items(memories, key = { memory -> memory.id }) { memory ->
                 MemoryCard(
                     memory = memory,
+                    enabled = enabled,
                     onClick = { onMemoryClick(memory) },
                     onLongClick = { pendingHide = memory },
                 )
@@ -128,6 +131,7 @@ private fun MemoryCard(
     memory: Memory,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    enabled: Boolean,
 ) {
     val placeholder = ColorPainter(MaterialTheme.colorScheme.surface)
     val title = memoryTitle(memory)
@@ -138,7 +142,7 @@ private fun MemoryCard(
             .height(ChatCarouselTokens.cardHeight)
             .clip(AppShapes.card)
             .background(MaterialTheme.colorScheme.surface)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick)
             .semantics { contentDescription = "$title · $subtitle" },
     ) {
         AsyncImage(

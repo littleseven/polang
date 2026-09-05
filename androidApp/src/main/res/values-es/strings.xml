@@ -475,7 +475,7 @@
     <string name="memory_title">Recuerdos</string>
     <string name="memory_privacy_note">En el dispositivo · privado</string>
     <string name="memory_hide">Ocultar este recuerdo</string>
-    <string name="memory_hide_confirm">¿Ocultar este recuerdo? Puedes volver a activar los recuerdos cuando quieras.</string>
+    <string name="memory_hide_confirm">¿Ocultar este recuerdo? Ya no se mostrará.</string>
     <string name="memory_hide_cancel">Cancelar</string>
     <string name="memory_best_shots">%1$d mejores fotos</string>
     <string name="memory_share">Compartir recuerdo</string>

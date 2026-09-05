@@ -53,13 +53,13 @@ object MemoriesGenerator {
         return memories.take(maxCarousel)
     }
 
-    /** 那年今日：与 now 同月同日、不同年份的照片跨年聚合。 */
+    /** 那年今日：与 now 同月同日的往年（year < now）照片跨年聚合，未来年份（时钟异常/EXIF 未来）不混入。 */
     private fun onThisDay(inputs: List<MemoryInput>, nowDate: LocalDate, zoneId: ZoneId): Memory? {
         val hits = inputs.filter { input ->
             val date = input.localDate(zoneId)
             date.monthValue == nowDate.monthValue &&
                 date.dayOfMonth == nowDate.dayOfMonth &&
-                date.year != nowDate.year
+                date.year < nowDate.year
         }
         if (hits.size < MIN_ON_THIS_DAY) return null
         return buildMemory(

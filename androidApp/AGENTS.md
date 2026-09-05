@@ -55,7 +55,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `IDPhoto` | `id_photo/{sourceUri}` | 证件照制作 |
 | `OrganizeCategory` | `organize_category/{category}` | 整理中心类目详情（F1，2026-09-05）— AI 预选网格 + 批量回收站清理/恢复；路由段为 `domain.organize.OrganizeCategory` 枚举名，非法值弹栈；VM 经 `AppContainer.createOrganizeCategoryViewModelFactory(category)` 构建（TrashSessionController 在 VM 内 new，backend = DedupTrashBackend 包装 dedupTrashManager） |
 | `SwipeReview` | `swipe_review` | 手势快速整理全屏页（F2，2026-09-05）— 右滑保留 / 左滑跳过 / 上滑删除（点按=跳过），DELETE 批量提交系统回收站；KEEP 决策写入 30 天抑制历史（DataStore `swipe_keep_history`）不再入队；hub「Quick tidy up」主按钮点亮；VM 经 `AppContainer.createSwipeReviewViewModelFactory()` 构建 |
-| `MemoryDetail` | `memory_detail/{memoryId}` | 回忆详情页（F3，2026-09-05）— 封面大图 + 精选网格 + ACTION_SEND_MULTIPLE 分享；路由段为 Memory.id（URL 编码），数据取自 Activity 级 `MemoriesViewModel.getMemory(id)`（未过滤全集，已隐藏条目可复原），id 失效 → 空态；VM 经 `AppContainer.createMemoriesViewModelFactory()` 构建 |
+| `MemoryDetail` | `memory_detail/{memoryId}` | 回忆详情页（F3，2026-09-05）— 封面大图 + 精选网格 + ACTION_SEND_MULTIPLE 分享；路由段为 Memory.id（`Uri.encode`，Navigation 自动解码一次），数据取自 Activity 级 `MemoriesViewModel.observeMemory(id)` Flow（未过滤全集，已隐藏条目可复原，冷恢复不闪空态），id 失效 → 空态；VM 经 `AppContainer.createMemoriesViewModelFactory()` 构建 |
 | `Settings` | `settings` | 设置 — 主菜单（2026-08-26 列表式改版：账号 Hero 卡 + 个性化/功能/AI 与系统/其他四组列表行） |
 | `SettingsCategory` | `settings/{category}` | 设置二级分类页 — 路由段为枚举名小写：`account`、`gallery`（dormant）、`camera`、`system`、`remote_model`、`local_model`、`sandbox`、`developer`（2026-08-16 `camera_beauty` 更名 `camera`，承载相机状态记忆与重置） |
 | `AddRemoteProvider` | `settings/add_remote_provider` | 添加远程模型 — 供应商列表页（精确路由，优先于 `settings/{category}` 占位匹配；2026-08-21 替代原 AddProviderModelDialog 弹窗） |

@@ -843,7 +843,7 @@ fun GalleryScreen(
                             }
                         },
                         personNameMap = personNameMap,
-                        // F3 回忆 carousel 挂网格顶部 header 槽；无回忆整体不占位
+                        // F3 回忆 carousel 挂网格顶部 header 槽；无回忆整体不占位；多选模式下卡片不可点
                         header = if (memories.isEmpty()) {
                             null
                         } else {
@@ -852,6 +852,7 @@ fun GalleryScreen(
                                     memories = memories,
                                     onMemoryClick = { memory -> onNavigateToMemoryDetail(memory.id) },
                                     onHide = { memory -> memoriesViewModel.hideMemory(memory.id) },
+                                    enabled = !isSelectionMode,
                                 )
                             }
                         }

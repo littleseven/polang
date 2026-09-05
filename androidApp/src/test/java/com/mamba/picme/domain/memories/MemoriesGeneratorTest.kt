@@ -73,6 +73,53 @@ class MemoriesGeneratorTest {
     }
 
     @Test
+    fun `future year photos do not join on this day`() {
+        val inputs = listOf(
+            photo("p1", at(2023, 9, 5)),
+            photo("p2", at(2024, 9, 5)),
+            photo("p3", at(2025, 9, 5)),
+            photo("p4", at(2025, 9, 5, 20)),
+            photo("future1", at(2027, 9, 5)),
+            photo("future2", at(2030, 9, 5)),
+        )
+        val memory = generate(inputs).single()
+        assertEquals(4, memory.hitCount)
+        assertEquals(2025, memory.latestYear)
+        assertTrue(memory.itemUris.none { uri -> uri.startsWith("future") })
+
+        // 仅未来年份照片（时钟异常/EXIF 未来）不足以成卡
+        val futureOnly = listOf(
+            photo("f1", at(2027, 9, 5)),
+            photo("f2", at(2027, 9, 5, 10)),
+            photo("f3", at(2028, 9, 5)),
+            photo("f4", at(2030, 9, 5)),
+        )
+        assertTrue(generate(futureOnly).isEmpty())
+    }
+
+    /**
+     * Documenting test（记录现状，非断言理想行为）：2月29日照片仅在闰年 2月29日 当天命中
+     * 「那年今日」；非闰年（如 2026-02-28）不做 2月29日 → 2月28日 的兜底映射，当天不会出现闰日回忆。
+     */
+    @Test
+    fun `leap day photos surface only on leap day of leap years`() {
+        val leapDayPhotos = listOf(
+            photo("l1", at(2024, 2, 29)),
+            photo("l2", at(2024, 2, 29, 10)),
+            photo("l3", at(2020, 2, 29)),
+            photo("l4", at(2016, 2, 29)),
+        )
+        val leapNow = LocalDateTime.of(2028, 2, 29, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+        val leapMemory = MemoriesGenerator.generate(leapDayPhotos, emptyList(), leapNow, zone).single()
+        assertEquals(MonthDay.of(2, 29), leapMemory.monthDay)
+        assertEquals(2024, leapMemory.latestYear)
+        assertEquals(4, leapMemory.hitCount)
+
+        val nonLeapNow = LocalDateTime.of(2026, 2, 28, 12, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+        assertTrue(MemoriesGenerator.generate(leapDayPhotos, emptyList(), nonLeapNow, zone).isEmpty())
+    }
+
+    @Test
     fun `recent highlights from scored photos in window, null score excluded`() {
         val scored = (1..6).map { index ->
             photo("r$index", at(2026, 8, 20) + index, score = 5f + index)

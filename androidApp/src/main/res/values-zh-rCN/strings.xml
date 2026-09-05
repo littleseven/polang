@@ -472,7 +472,7 @@
     <string name="memory_title">回忆</string>
     <string name="memory_privacy_note">端侧生成 · 私密</string>
     <string name="memory_hide">隐藏这条回忆</string>
-    <string name="memory_hide_confirm">隐藏这条回忆？你可以随时重新启用回忆功能。</string>
+    <string name="memory_hide_confirm">隐藏这条回忆？隐藏后将不再显示。</string>
     <string name="memory_hide_cancel">取消</string>
     <string name="memory_best_shots">%1$d 张精选</string>
     <string name="memory_share">分享回忆</string>

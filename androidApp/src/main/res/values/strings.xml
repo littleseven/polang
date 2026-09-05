@@ -488,7 +488,7 @@
     <string name="memory_title">Memories</string>
     <string name="memory_privacy_note">On-device · private</string>
     <string name="memory_hide">Hide this memory</string>
-    <string name="memory_hide_confirm">Hide this memory? You can re-enable memories anytime.</string>
+    <string name="memory_hide_confirm">Hide this memory? It will no longer be shown.</string>
     <string name="memory_hide_cancel">Cancel</string>
     <string name="memory_best_shots">%1$d best shots</string>
     <string name="memory_share">Share memory</string>

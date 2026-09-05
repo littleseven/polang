@@ -405,7 +405,7 @@ python3 scripts/ui_driver.py dump
 **模块定位**: 相册首页顶部「回忆」carousel + 回忆详情页；纯端侧规则生成，零推理零上传（[PRIVACY]）。
 
 **生成规则（`domain/memories/MemoriesGenerator.kt` 纯函数，now/zoneId 注入确定性，JVM 可测）**:
-- 四类回忆：ON_THIS_DAY（与 now 同月同日跨年 ≥4 张）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2）；总量截 `MAX_CAROUSEL`(10)
+- 四类回忆：ON_THIS_DAY（与 now 同月同日的往年 ≥4 张，year < now 未来年份排除）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2）；总量截 `MAX_CAROUSEL`(10)
 - 精选排序：美学分降序（null 排最后）→ 拍摄时间新的在前，截 `DETAIL_LIMIT`(12) 张，封面取首张
 - 仅 `MediaType.PHOTO` 参与；`MemoryInput.personId` = 媒体 `faceId`（`media_assets.faceId` 为 personId 的 TEXT 形态）
 - **结构化文案（I18N 红线，2026-09-06 审查修复）**：`Memory` 不再携带拼好文案，改为结构化字段 type + label（人物/城市名）+ hitCount（命中总数）+ latestYear + monthDay（`java.time.MonthDay`）；UI 层 `features/gallery/memories/MemoryTexts.kt`（`memoryTitle`/`memorySubtitle`）经 stringResource 还原（`memory_on_this_day`/`memory_recent_highlights`/`memory_person_title`/`memory_photo_count` 等键，五语同步），月日按 skeleton "MMMd" 取当前 Locale 最佳 pattern 本地化（不硬编码英文 pattern）
@@ -420,13 +420,15 @@ python3 scripts/ui_driver.py dump
 - GalleryScreen 经 `collectAsStateWithLifecycle` 订阅；`memories.isEmpty()` 时传 `header = null`，无数据整体不占位
 
 **隐藏持久化**:
-- 长按卡片 → 确认弹窗（`memory_hide` / `memory_hide_confirm` / `memory_hide_cancel`）→ `hideMemory(id)`
+- 长按卡片 → 确认弹窗（`memory_hide` / `memory_hide_confirm` / `memory_hide_cancel`）→ `hideMemory(id)`（runCatching 包 DataStore 写入，失败置位 `hideError` 一次性标志不崩溃，`consumeHideError` 消费）
 - `MemoryHiddenStore`（domain 接口）/ `DataStoreMemoryHiddenStore`（data/preferences 实现）：user_preferences DataStore `memory_hidden_ids` stringSet，存 Memory.id；carousel 经 combine 重发自动消失
-- v1 无「重新启用」入口（确认弹窗文案已预留该语义）
+- v1 无「重新启用」入口，隐藏确认文案不承诺恢复（`memory_hide_confirm` 2026-09-06 校准）
 
-**详情页（`MemoryDetailScreen`，NavHost 路由 `memory_detail/{memoryId}`，id URL 编码）**:
+**详情页（`MemoryDetailScreen`，NavHost 路由 `memory_detail/{memoryId}`，id Uri.encode + Navigation 自动解码一次）**:
 - AppTopBar（返回 + `Memories` + 右上分享图标）→ 全宽 16:9 封面（Coil size(1080) crossfade(false)，左下渐变蒙层白字：标题 + `%1$d best shots · subtitle` 副行）→ 3 列精选网格（r8，Coil size(360)，`memory_photo_cd` 无障碍描述）→ 底部品牌渐变主按钮「Share memory」（`ACTION_SEND_MULTIPLE` + `FLAG_GRANT_READ_URI_PERMISSION`，写法同 `GalleryUtils.shareMediaAssets`）
-- MainActivity 路由内订阅 `memories`（保持 stateIn 生成链活跃）后经 `getMemory(id)` 复原；id 失效（媒体清空等）→ `memory_detail_empty` 空态
+- MainActivity 路由内 collect `observeMemory(id)`（未过滤全集 Flow，2026-09-06 取代 remember 反查：列表刷新不 stale、冷恢复随流复原不闪空态）；id 失效（媒体清空等）→ `memory_detail_empty` 空态
+
+**carousel 交互**: 相册多选模式下卡片不可点（`MemoriesCarousel(enabled = !isSelectionMode)`，GalleryScreen header 槽传入）
 
 **v1 不落表说明**: 回忆不建 Room 表/快照，每次由媒体 + 人物流实时生成，无 DB 迁移成本；隐藏集仅存 DataStore stringSet（id 字符串，个位数量级）。若未来需要跨设备同步或「那年今日回顾历史」，再评估落表。
 
