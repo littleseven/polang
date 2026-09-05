@@ -44,6 +44,11 @@ sealed class Screen(val route: String) {
     data object SentencePieceTest : Screen("sentencepiece_test")
     data object TagViewer : Screen("tag_viewer")
 
+    /** 整理中心类目详情（F1）：AI 预选网格 + 批量回收站清理；路由段为 domain OrganizeCategory 枚举名 */
+    data object OrganizeCategory : Screen("organize_category/{category}") {
+        fun createRoute(category: String): String = "organize_category/$category"
+    }
+
     data object ModelCenter : Screen("model_center/{categoryTag}") {
         fun createRoute(categoryTag: String): String {
             return if (categoryTag.isNotBlank()) {

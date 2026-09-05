@@ -435,6 +435,18 @@
     <string name="org_cat_documents">Documents et reçus</string>
     <string name="org_cat_meta">%1$d éléments · %2$s</string>
     <string name="org_privacy_note">Toute l\'analyse s\'exécute sur l\'appareil · vos photos ne quittent jamais ce téléphone</string>
+    <string name="org_ai_preselect_on">Présélection IA activée</string>
+    <string name="org_ai_preselect_off">Présélection IA désactivée</string>
+    <string name="org_ai_preselected">%1$d présélectionnés par l\'IA</string>
+    <string name="org_move_to_trash">Déplacer vers la corbeille %1$d éléments · Libérer %2$s</string>
+    <string name="org_trash_note">Les éléments restent dans la corbeille pendant 30 jours</string>
+    <string name="org_cleaned_title">Tout est propre !</string>
+    <string name="org_cleaned_meta">%1$d éléments déplacés vers la corbeille</string>
+    <string name="org_cleaned_freed">%1$s libérés</string>
+    <string name="org_undo">Annuler</string>
+    <string name="org_partial_trash">Certains éléments nécessitent une autorisation supplémentaire et ont été conservés</string>
+    <string name="org_trash_unsupported">La corbeille nécessite Android 11+ ; supprimez depuis la galerie</string>
+    <string name="org_empty_category">Rien à nettoyer ici</string>
 
     <!-- Media Pager -->
     <string name="media_source">Source : %1$s</string>

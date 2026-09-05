@@ -435,6 +435,18 @@
     <string name="org_cat_documents">Documentos y recibos</string>
     <string name="org_cat_meta">%1$d elementos · %2$s</string>
     <string name="org_privacy_note">Todo el análisis se ejecuta en el dispositivo · tus fotos nunca salen de este teléfono</string>
+    <string name="org_ai_preselect_on">Preselección de IA activada</string>
+    <string name="org_ai_preselect_off">Preselección de IA desactivada</string>
+    <string name="org_ai_preselected">%1$d preseleccionados por IA</string>
+    <string name="org_move_to_trash">Mover a la papelera %1$d elementos · Liberar %2$s</string>
+    <string name="org_trash_note">Los elementos permanecen en la papelera 30 días</string>
+    <string name="org_cleaned_title">¡Todo limpio!</string>
+    <string name="org_cleaned_meta">%1$d elementos movidos a la papelera</string>
+    <string name="org_cleaned_freed">%1$s liberados</string>
+    <string name="org_undo">Deshacer</string>
+    <string name="org_partial_trash">Algunos elementos necesitan permiso adicional y se conservaron</string>
+    <string name="org_trash_unsupported">La papelera requiere Android 11+; elimina desde la galería</string>
+    <string name="org_empty_category">Nada que limpiar aquí</string>
 
     <!-- Media Pager -->
     <string name="media_source">Origen: %1$s</string>

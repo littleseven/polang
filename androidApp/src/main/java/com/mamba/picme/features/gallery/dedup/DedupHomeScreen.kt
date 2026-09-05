@@ -87,7 +87,7 @@ fun DedupHomeRoute(
     onNavigateBack: () -> Unit,
     /** 整理中心 hub「Quick tidy up」（F2 路由未点亮，调用方先传空占位）。 */
     onQuickTidy: () -> Unit = {},
-    /** 整理中心 hub 类目卡点击（Task 5 点亮，调用方先传空占位）。 */
+    /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()

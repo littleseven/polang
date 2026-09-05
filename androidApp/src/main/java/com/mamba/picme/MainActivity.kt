@@ -44,6 +44,7 @@ import com.mamba.picme.core.designsystem.PoLangTheme
 import com.mamba.picme.data.preferences.UserPreferencesRepository
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.ThemeMode
+import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.common.avatar.AvatarCaptureController
 import com.mamba.picme.features.common.avatar.AvatarCaptureOrigin
 import com.mamba.picme.features.common.avatar.AvatarCaptureTarget
@@ -55,6 +56,8 @@ import com.mamba.picme.features.editor.PhotoEditorScreen
 import com.mamba.picme.features.editor.PhotoEditorViewModel
 import com.mamba.picme.features.idphoto.IDPhotoScreen
 import com.mamba.picme.features.idphoto.IDPhotoViewModel
+import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
+import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
 import com.mamba.picme.features.search.SearchTestScreen
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.TagGenerationControlScreen
@@ -297,10 +300,15 @@ class MainActivity : ComponentActivity() {
                                         gallerySearchRequest = query to personId
                                         switchMainPage(MAIN_PAGE_GALLERY)
                                     },
-                                    // 整理中心 hub 两个出口：F2 Quick tidy / Task 5 类目详情路由
-                                    // 均未点亮，先空 lambda 占位
+                                    // 整理中心 hub 出口：F2 Quick tidy 未点亮占位；类目卡 → Task 5 类目详情路由
                                     onQuickTidy = {},
-                                    onOpenCategory = {}
+                                    onOpenCategory = { category ->
+                                        navController.navigate(
+                                            Screen.OrganizeCategory.createRoute(category.name)
+                                        ) {
+                                            launchSingleTop = true
+                                        }
+                                    }
                                 )
                             }
                             // 相机：2026-08-26 起为 NavHost 全屏路由（原 Pager 页 0 席位由相册整理接替），
@@ -372,6 +380,29 @@ class MainActivity : ComponentActivity() {
                                     onNavigateBack = { navController.popBackStack() },
                                     onSaved = { navController.popBackStack() }
                                 )
+                            }
+                            composable(
+                                route = Screen.OrganizeCategory.route,
+                                arguments = listOf(
+                                    navArgument("category") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                val categoryName = backStackEntry.arguments?.getString("category").orEmpty()
+                                val category = runCatching {
+                                    OrganizeCategory.valueOf(categoryName)
+                                }.getOrNull()
+                                if (category == null) {
+                                    // 非法类目参数（旧版本路由/手写 deep link）：直接弹栈不崩溃
+                                    LaunchedEffect(Unit) { navController.popBackStack() }
+                                } else {
+                                    val viewModel: OrganizeCategoryViewModel = viewModel(
+                                        factory = app.container.createOrganizeCategoryViewModelFactory(category)
+                                    )
+                                    OrganizeCategoryScreen(
+                                        viewModel = viewModel,
+                                        onNavigateBack = { navController.popBackStack() }
+                                    )
+                                }
                             }
                             composable(Screen.TagControl.route) {
                                 DisposableEffect(Unit) {

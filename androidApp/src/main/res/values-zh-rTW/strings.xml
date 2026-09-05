@@ -432,6 +432,18 @@
     <string name="org_cat_documents">文件與票據</string>
     <string name="org_cat_meta">%1$d 個項目 · %2$s</string>
     <string name="org_privacy_note">所有分析皆在裝置端完成 · 照片不會離開此手機</string>
+    <string name="org_ai_preselect_on">AI 預選已開啟</string>
+    <string name="org_ai_preselect_off">AI 預選已關閉</string>
+    <string name="org_ai_preselected">AI 已預選 %1$d 項</string>
+    <string name="org_move_to_trash">移入回收站 %1$d 個項目 · 釋放 %2$s</string>
+    <string name="org_trash_note">項目將在回收站保留 30 天</string>
+    <string name="org_cleaned_title">全部清理完成！</string>
+    <string name="org_cleaned_meta">已將 %1$d 個項目移入回收站</string>
+    <string name="org_cleaned_freed">已釋放 %1$s</string>
+    <string name="org_undo">復原</string>
+    <string name="org_partial_trash">部分項目需要額外授權，已保留</string>
+    <string name="org_trash_unsupported">回收站需 Android 11 以上版本；請在相簿中刪除</string>
+    <string name="org_empty_category">這裡無需清理</string>
 
     <string name="screenshot">截圖</string>
     <string name="screenshot_saved">截圖已儲存至 %1$s</string>

@@ -432,6 +432,18 @@
     <string name="org_cat_documents">文档与票据</string>
     <string name="org_cat_meta">%1$d 个项目 · %2$s</string>
     <string name="org_privacy_note">所有分析均在设备端完成 · 照片不会离开此手机</string>
+    <string name="org_ai_preselect_on">AI 预选已开启</string>
+    <string name="org_ai_preselect_off">AI 预选已关闭</string>
+    <string name="org_ai_preselected">AI 已预选 %1$d 项</string>
+    <string name="org_move_to_trash">移入回收站 %1$d 个项目 · 释放 %2$s</string>
+    <string name="org_trash_note">项目将在回收站保留 30 天</string>
+    <string name="org_cleaned_title">全部清理完成！</string>
+    <string name="org_cleaned_meta">已将 %1$d 个项目移入回收站</string>
+    <string name="org_cleaned_freed">已释放 %1$s</string>
+    <string name="org_undo">撤销</string>
+    <string name="org_partial_trash">部分项目需要额外授权，已保留</string>
+    <string name="org_trash_unsupported">回收站需 Android 11 及以上；请在相册中删除</string>
+    <string name="org_empty_category">这里无需清理</string>
 
     <string name="screenshot">截图</string>
     <string name="screenshot_saved">截图已保存至 %1$s</string>

@@ -92,7 +92,10 @@ import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.dedup.DedupMediaSource
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.dedup.MediaStoreDedupMediaSource
+import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.domain.trash.DedupTrashBackend
 import androidx.lifecycle.ViewModel
+import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.tag.FaceClusterEngine
 import com.mamba.picme.domain.tag.TagGenerationScheduler
 import com.mamba.picme.domain.tag.TagScanProgress
@@ -166,6 +169,26 @@ class ChatViewModelFactory(
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return ChatViewModel(dependencies) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+/** 整理中心类目详情（F1）VM 工厂：TrashSessionController 在 VM 内构造，这里注入 backend 原料。 */
+class OrganizeCategoryViewModelFactory(
+    private val category: OrganizeCategory,
+    private val organizeRepository: OrganizeRepository,
+    private val trashManager: DedupTrashManager,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(OrganizeCategoryViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return OrganizeCategoryViewModel(
+                category = category,
+                organizeRepository = organizeRepository,
+                trashBackend = DedupTrashBackend(trashManager),
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -252,6 +275,9 @@ interface AppContainer {
     fun createDedupViewModelFactory(
         legacyDeleter: ((List<String>) -> Unit)? = null
     ): ViewModelProvider.Factory
+
+    /** 整理中心（F1）类目详情 ViewModel 工厂（按类目参数化） */
+    fun createOrganizeCategoryViewModelFactory(category: OrganizeCategory): ViewModelProvider.Factory
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
@@ -786,6 +812,16 @@ class AppContainerImpl(
 
     override fun createPhotoEditorViewModelFactory(): ViewModelProvider.Factory {
         return photoEditorViewModelFactory
+    }
+
+    override fun createOrganizeCategoryViewModelFactory(
+        category: OrganizeCategory
+    ): ViewModelProvider.Factory {
+        return OrganizeCategoryViewModelFactory(
+            category = category,
+            organizeRepository = organizeRepository,
+            trashManager = dedupTrashManager,
+        )
     }
 
     override fun createIDPhotoViewModelFactory(): ViewModelProvider.Factory {

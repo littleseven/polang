@@ -448,6 +448,18 @@
     <string name="org_cat_documents">Documents &amp; receipts</string>
     <string name="org_cat_meta">%1$d items · %2$s</string>
     <string name="org_privacy_note">All analysis runs on-device · your photos never leave this phone</string>
+    <string name="org_ai_preselect_on">AI preselect on</string>
+    <string name="org_ai_preselect_off">AI preselect off</string>
+    <string name="org_ai_preselected">%1$d AI-preselected</string>
+    <string name="org_move_to_trash">Move to trash %1$d items · Free %2$s</string>
+    <string name="org_trash_note">Items stay in Trash for 30 days</string>
+    <string name="org_cleaned_title">All clean!</string>
+    <string name="org_cleaned_meta">%1$d items moved to Trash</string>
+    <string name="org_cleaned_freed">%1$s freed</string>
+    <string name="org_undo">Undo</string>
+    <string name="org_partial_trash">Some items need extra permission and were kept</string>
+    <string name="org_trash_unsupported">Trash needs Android 11+; please delete from the gallery</string>
+    <string name="org_empty_category">Nothing to clean here</string>
 
     <!-- Media Pager -->
     <string name="media_source">Source: %1$s</string>
