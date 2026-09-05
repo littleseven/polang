@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.navOptions
 import com.mamba.picme.agent.core.runtime.state.SceneManager
+import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.chat.ChatScreen
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.gallery.GalleryScreen
@@ -56,7 +57,11 @@ fun MainPagerHost(
     onSwitchPage: (Int) -> Unit,
     gallerySearchRequest: Pair<String, Long>?,
     onGallerySearchRequestConsumed: () -> Unit,
-    onRequestGallerySearch: (query: String, personId: Long) -> Unit
+    onRequestGallerySearch: (query: String, personId: Long) -> Unit,
+    /** 整理中心 hub「Quick tidy up」（F2 路由未点亮，先空占位）。 */
+    onQuickTidy: () -> Unit = {},
+    /** 整理中心 hub 类目卡点击（Task 5 点亮，先空占位）。 */
+    onOpenCategory: (OrganizeCategory) -> Unit = {},
 ) {
     var gallerySwipeEnabled by remember { mutableStateOf(true) }
     var chatSwipeEnabled by remember { mutableStateOf(true) }
@@ -125,7 +130,9 @@ fun MainPagerHost(
             // 返回（顶栏/系统返回键由外层 BackHandler 兜底）切回相册页，不弹栈
             MAIN_PAGE_DEDUP -> DedupHomeRoute(
                 viewModel = dedupViewModel,
-                onNavigateBack = { onSwitchPage(MAIN_PAGE_GALLERY) }
+                onNavigateBack = { onSwitchPage(MAIN_PAGE_GALLERY) },
+                onQuickTidy = onQuickTidy,
+                onOpenCategory = onOpenCategory
             )
 
             MAIN_PAGE_CHAT -> ChatScreen(

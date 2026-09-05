@@ -296,7 +296,11 @@ class MainActivity : ComponentActivity() {
                                     onRequestGallerySearch = { query, personId ->
                                         gallerySearchRequest = query to personId
                                         switchMainPage(MAIN_PAGE_GALLERY)
-                                    }
+                                    },
+                                    // 整理中心 hub 两个出口：F2 Quick tidy / Task 5 类目详情路由
+                                    // 均未点亮，先空 lambda 占位
+                                    onQuickTidy = {},
+                                    onOpenCategory = {}
                                 )
                             }
                             // 相机：2026-08-26 起为 NavHost 全屏路由（原 Pager 页 0 席位由相册整理接替），

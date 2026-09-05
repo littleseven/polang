@@ -138,6 +138,7 @@ class DedupViewModelFactory(
     private val mediaSource: DedupMediaSource,
     private val scanner: DedupScanController,
     private val trashManager: DedupTrashManager,
+    private val organizeRepository: OrganizeRepository,
     /** API < 30 无回收站授权接口，由调用方（MainActivity）注入旧删除流回调兜底。 */
     private val legacyDeleter: ((List<String>) -> Unit)?,
 ) : ViewModelProvider.Factory {
@@ -149,6 +150,7 @@ class DedupViewModelFactory(
                 mediaSource = mediaSource,
                 scanner = scanner,
                 trashManager = trashManager,
+                organizeRepository = organizeRepository,
                 legacyDeleter = legacyDeleter,
             ) as T
         }
@@ -777,6 +779,7 @@ class AppContainerImpl(
             mediaSource = dedupMediaSource,
             scanner = dedupScanner,
             trashManager = dedupTrashManager,
+            organizeRepository = organizeRepository,
             legacyDeleter = legacyDeleter,
         )
     }

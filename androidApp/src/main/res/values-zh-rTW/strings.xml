@@ -418,6 +418,21 @@
     <string name="dedup_thumb_delete_cd">照片，待刪除</string>
     <string name="dedup_thumb_neutral_cd">照片，未預選</string>
 
+    <!-- Organize hub（Pager 頁 1 Config 態整理中心） -->
+    <string name="org_title">整理</string>
+    <string name="org_hero_label">預計可釋放</string>
+    <string name="org_hero_across">涵蓋 %1$d 個類別</string>
+    <string name="org_quick_tidy">一鍵整理</string>
+    <string name="org_categories">類別</string>
+    <string name="org_cat_duplicates">重複與相似照片</string>
+    <string name="org_cat_screenshots">截圖</string>
+    <string name="org_cat_blurry">模糊與低品質</string>
+    <string name="org_cat_portraits">低品質人像</string>
+    <string name="org_cat_large_videos">大型影片</string>
+    <string name="org_cat_documents">文件與票據</string>
+    <string name="org_cat_meta">%1$d 個項目 · %2$s</string>
+    <string name="org_privacy_note">所有分析皆在裝置端完成 · 照片不會離開此手機</string>
+
     <string name="screenshot">截圖</string>
     <string name="screenshot_saved">截圖已儲存至 %1$s</string>
     <string name="screenshot_failed">截圖失敗</string>

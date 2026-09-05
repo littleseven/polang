@@ -420,6 +420,22 @@
     <string name="dedup_thumb_kept_cd">Photo, conservée</string>
     <string name="dedup_thumb_delete_cd">Photo, marquée pour suppression</string>
     <string name="dedup_thumb_neutral_cd">Photo, non sélectionnée</string>
+
+    <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
+    <string name="org_title">Organiser</string>
+    <string name="org_hero_label">Espace récupérable estimé</string>
+    <string name="org_hero_across">Sur %1$d catégories</string>
+    <string name="org_quick_tidy">Nettoyage rapide</string>
+    <string name="org_categories">Catégories</string>
+    <string name="org_cat_duplicates">Doublons et similaires</string>
+    <string name="org_cat_screenshots">Captures d\'écran</string>
+    <string name="org_cat_blurry">Floues et de basse qualité</string>
+    <string name="org_cat_portraits">Portraits de basse qualité</string>
+    <string name="org_cat_large_videos">Vidéos volumineuses</string>
+    <string name="org_cat_documents">Documents et reçus</string>
+    <string name="org_cat_meta">%1$d éléments · %2$s</string>
+    <string name="org_privacy_note">Toute l\'analyse s\'exécute sur l\'appareil · vos photos ne quittent jamais ce téléphone</string>
+
     <!-- Media Pager -->
     <string name="media_source">Source : %1$s</string>
     <string name="landmark_overlay">Points de repère du visage</string>

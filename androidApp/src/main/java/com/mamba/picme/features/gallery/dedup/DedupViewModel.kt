@@ -4,6 +4,7 @@ import android.content.IntentSender
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.data.repository.OrganizeRepository
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.DedupScanConfig
@@ -12,14 +13,19 @@ import com.mamba.picme.domain.dedup.DedupScanEvent
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.KeepPolicyEngine
+import com.mamba.picme.domain.organize.CategoryStat
+import com.mamba.picme.domain.organize.OrganizeCategorizer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -69,6 +75,8 @@ class DedupViewModel(
     private val mediaSource: DedupMediaSource,
     private val scanner: DedupScanController,
     private val trashManager: DedupTrashManager,
+    /** 整理中心 hub（Config 态）类目统计数据源。 */
+    private val organizeRepository: OrganizeRepository,
     /** API < 30 无回收站授权接口，由 UI 层注入旧删除流回调兜底。 */
     private val legacyDeleter: ((List<String>) -> Unit)? = null,
     /** 测试注入作用域（避开 Dispatchers.Main）；生产为 null → viewModelScope。 */
@@ -80,6 +88,13 @@ class DedupViewModel(
 
     private val _uiState = MutableStateFlow<DedupUiState>(DedupUiState.Config())
     val uiState: StateFlow<DedupUiState> = _uiState.asStateFlow()
+
+    /** 整理中心 hub 类目统计（Config 态展示；DUPLICATES 不在其中，hub 卡用 dedup 摘要）。 */
+    val categoryStats: StateFlow<List<CategoryStat>> =
+        organizeRepository.observeItems()
+            .map { items -> OrganizeCategorizer.stats(items) }
+            .flowOn(ioDispatcher)
+            .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** VM 级保留策略（Config/Results 共用）：Config 规则行与规则弹层改它；进入 Results 时带入 state.policy。 */
     private val _policy = MutableStateFlow(KeepPolicy.BEST_QUALITY)

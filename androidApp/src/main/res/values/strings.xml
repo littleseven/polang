@@ -434,6 +434,21 @@
     <string name="dedup_thumb_delete_cd">Photo, marked for deletion</string>
     <string name="dedup_thumb_neutral_cd">Photo, unselected</string>
 
+    <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
+    <string name="org_title">Organize</string>
+    <string name="org_hero_label">Estimated reclaimable</string>
+    <string name="org_hero_across">Across %1$d categories</string>
+    <string name="org_quick_tidy">Quick tidy up</string>
+    <string name="org_categories">Categories</string>
+    <string name="org_cat_duplicates">Duplicates &amp; similar</string>
+    <string name="org_cat_screenshots">Screenshots</string>
+    <string name="org_cat_blurry">Blurry &amp; low quality</string>
+    <string name="org_cat_portraits">Low-quality portraits</string>
+    <string name="org_cat_large_videos">Large videos</string>
+    <string name="org_cat_documents">Documents &amp; receipts</string>
+    <string name="org_cat_meta">%1$d items · %2$s</string>
+    <string name="org_privacy_note">All analysis runs on-device · your photos never leave this phone</string>
+
     <!-- Media Pager -->
     <string name="media_source">Source: %1$s</string>
     <string name="landmark_overlay">Face Landmarks</string>

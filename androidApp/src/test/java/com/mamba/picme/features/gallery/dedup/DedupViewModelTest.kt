@@ -1,6 +1,7 @@
 package com.mamba.picme.features.gallery.dedup
 
 import android.content.IntentSender
+import com.mamba.picme.data.repository.OrganizeRepository
 import com.mamba.picme.domain.dedup.DedupContentType
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
@@ -20,6 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -111,6 +113,11 @@ class DedupViewModelTest {
         advanceUntilIdle()
     }
 
+    /** 整理中心统计源替身：JVM 单测无 Room/MediaStore，恒空流（WhileSubscribed 未订阅时不上游）。 */
+    private fun fakeOrganizeRepository(): OrganizeRepository = mockk {
+        every { observeItems() } returns flowOf(emptyList())
+    }
+
     private fun viewModel(
         scanner: DedupScanController,
         trashManager: DedupTrashManager = fakeTrashManager(),
@@ -120,6 +127,7 @@ class DedupViewModelTest {
         mediaSource = DedupMediaSource { emptyList() },
         scanner = scanner,
         trashManager = trashManager,
+        organizeRepository = fakeOrganizeRepository(),
         coroutineScope = scope,
         ioDispatcher = ioDispatcher,
     )
