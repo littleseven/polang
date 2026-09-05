@@ -435,6 +435,15 @@ interface MediaDao {
     @Query("SELECT COUNT(*) > 0 FROM media_assets WHERE labels IS NOT NULL AND labels != '' AND semanticEmbedding IS NULL")
     suspend fun hasPendingSemanticEncoding(): Boolean
 
+    // ── 整理中心（F1）────────────────────────────────────────
+
+    /**
+     * 整理中心类目判定的轻量投影（避开 semanticEmbedding/faceRoiResult 等大列）。
+     * type 列存枚举名（Room 内建 enum 转换），投影按 String 读。
+     */
+    @Query("SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore, faceQualityScore FROM media_assets")
+    fun observeOrganizeRows(): Flow<List<OrganizeRow>>
+
     /** 重置所有语义 embedding（用于强制重新编码/清理污染数据） */
     @Query("UPDATE media_assets SET semanticEmbedding = NULL")
     suspend fun resetAllSemanticEmbeddings()
@@ -654,4 +663,16 @@ data class FaceGroupCount(
 data class CityGroupCount(
     val city: String,
     val cnt: Int
+)
+
+/** 整理中心轻量投影行：仅类目判定所需列（大列 embedding/faceRoiResult 不加载）。 */
+data class OrganizeRow(
+    val uri: String,
+    val type: String,
+    val captureDate: Long,
+    val ocrText: String?,
+    val labels: String?,
+    val hasFace: Boolean,
+    val aestheticScore: Float?,
+    val faceQualityScore: Float?,
 )

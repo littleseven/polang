@@ -27,6 +27,7 @@ import com.mamba.picme.data.repository.ChatImageStoreImpl
 import com.mamba.picme.data.repository.MediaFeedbackRepository
 import com.mamba.picme.data.repository.MediaFeedbackRepositoryImpl
 import com.mamba.picme.data.repository.MediaRepositoryImpl
+import com.mamba.picme.data.repository.OrganizeRepository
 import com.mamba.picme.data.repository.PhotoEditRecipeRepository
 import com.mamba.picme.domain.aesthetic.AestheticScoreWorker
 import com.mamba.picme.domain.repository.ChatImageStore
@@ -99,6 +100,7 @@ import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.data.indexing.MediaChangeEvent
 import com.mamba.picme.service.tag.TagGenerationService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 
 data class MediaViewModelDependencies(
@@ -234,6 +236,9 @@ interface AppContainer {
     val dedupScanner: DedupScanner
     /** 去重 2.0：回收站删除/恢复授权管理 */
     val dedupTrashManager: DedupTrashManager
+
+    /** 整理中心（F1）：Room + MediaStore 按 uri 合并的类目数据源 */
+    val organizeRepository: OrganizeRepository
 
     fun createMediaViewModelFactory(): ViewModelProvider.Factory
     fun createChatViewModelFactory(): ViewModelProvider.Factory
@@ -667,6 +672,15 @@ class AppContainerImpl(
 
     private val dedupMediaSource: DedupMediaSource by lazy {
         MediaStoreDedupMediaSource(context, repository)
+    }
+
+    override val organizeRepository: OrganizeRepository by lazy {
+        OrganizeRepository(
+            context = context,
+            mediaDao = database.mediaDao(),
+            dedupHashDao = dedupHashDao,
+            ioDispatcher = Dispatchers.IO,
+        )
     }
 
     private val photoEditorViewModelFactory: ViewModelProvider.Factory by lazy {
