@@ -78,8 +78,10 @@ private fun isDocumentText(ocrText: String?, pixelArea: Long?): Boolean {
  *
  * @param path RELATIVE_PATH（API 29+）或 DATA 列兜底路径，用于截图目录判定。
  * @param pixelArea 图片像素面积（WIDTH×HEIGHT），未知时传 null。
+ *
+ * public：整理中心（domain/organize）DOCUMENT 类目判定复用同一实现。
  */
-internal fun detectContentType(
+fun detectContentType(
     path: String?,
     ocrText: String?,
     pixelArea: Long?,
