@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -53,6 +54,8 @@ import com.mamba.picme.features.gallery.components.GalleryPermissionMessage
 import com.mamba.picme.features.gallery.components.GalleryTopBar
 import com.mamba.picme.features.gallery.components.MediaGrid
 import com.mamba.picme.features.gallery.components.MediaPager
+import com.mamba.picme.features.gallery.memories.MemoriesCarousel
+import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.gallery.components.galleryReadPermissions
 import com.mamba.picme.features.gallery.components.hasGalleryPermission
 import androidx.core.net.toUri
@@ -135,11 +138,16 @@ fun GalleryScreen(
     /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
-    isActivePage: Boolean = true
+    isActivePage: Boolean = true,
+    /** F3 回忆 carousel 数据源（Activity 级 VM，详情页直达查询共用同一实例） */
+    memoriesViewModel: MemoriesViewModel,
+    /** 回忆卡点击 → 回忆详情页（Task 11 点亮路由） */
+    onNavigateToMemoryDetail: (String) -> Unit = {},
 ) {
     val groupedMedia by viewModel.groupedMedia.collectAsState()
     val groupingMode by viewModel.groupingMode.collectAsState()
     val debugUiEnabled by settingsViewModel.debugUiEnabled.collectAsState()
+    val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
 
     var selectedMediaIndex by remember { mutableStateOf<Int?>(null) }
     var isSelectionMode by remember { mutableStateOf(false) }
@@ -834,7 +842,19 @@ fun GalleryScreen(
                                 infoPersonId = group.titleValue.toLongOrNull()
                             }
                         },
-                        personNameMap = personNameMap
+                        personNameMap = personNameMap,
+                        // F3 回忆 carousel 挂网格顶部 header 槽；无回忆整体不占位
+                        header = if (memories.isEmpty()) {
+                            null
+                        } else {
+                            {
+                                MemoriesCarousel(
+                                    memories = memories,
+                                    onMemoryClick = { memory -> onNavigateToMemoryDetail(memory.id) },
+                                    onHide = { memory -> memoriesViewModel.hideMemory(memory.id) },
+                                )
+                            }
+                        }
                     )
                 }
             }

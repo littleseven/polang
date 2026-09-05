@@ -58,6 +58,7 @@ import com.mamba.picme.features.idphoto.IDPhotoScreen
 import com.mamba.picme.features.idphoto.IDPhotoViewModel
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.gallery.swipe.SwipeReviewScreen
 import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
 import com.mamba.picme.features.search.SearchTestScreen
@@ -148,6 +149,10 @@ class MainActivity : ComponentActivity() {
                     app.container.llmModelDownloadManager,
                     context
                 )
+            )
+            // 回忆（F3）：Activity 级作用域——carousel（Pager 页 0）与回忆详情路由共用同一实例
+            val memoriesViewModel: MemoriesViewModel = viewModel(
+                factory = app.container.createMemoriesViewModelFactory()
             )
 
             val themeMode by settingsViewModel.themeMode.collectAsState()
@@ -294,6 +299,7 @@ class MainActivity : ComponentActivity() {
                                     settingsViewModel = settingsViewModel,
                                     personViewModel = personViewModel,
                                     dedupViewModel = dedupViewModel,
+                                    memoriesViewModel = memoriesViewModel,
                                     navController = navController,
                                     onSwitchPage = switchMainPage,
                                     gallerySearchRequest = gallerySearchRequest,

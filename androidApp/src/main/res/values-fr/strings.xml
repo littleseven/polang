@@ -471,6 +471,13 @@
     <string name="swipe_retry">Réessayer</string>
     <string name="swipe_discard">Abandonner</string>
 
+    <!-- Memories（F3 相册首页回忆 carousel） -->
+    <string name="memory_title">Souvenirs</string>
+    <string name="memory_privacy_note">Sur l\'appareil · privé</string>
+    <string name="memory_hide">Masquer ce souvenir</string>
+    <string name="memory_hide_confirm">Masquer ce souvenir ? Vous pouvez réactiver les souvenirs à tout moment.</string>
+    <string name="memory_hide_cancel">Annuler</string>
+
     <!-- Media Pager -->
     <string name="media_source">Source : %1$s</string>
     <string name="landmark_overlay">Points de repère du visage</string>

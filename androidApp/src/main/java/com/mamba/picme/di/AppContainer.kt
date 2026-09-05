@@ -13,6 +13,7 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.DedupHashDao
+import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.beauty.api.facedetect.FaceDetector
 import com.mamba.picme.beauty.api.facedetect.FaceDetectorFactory
@@ -94,8 +95,11 @@ import com.mamba.picme.features.gallery.dedup.DedupMediaSource
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.dedup.MediaStoreDedupMediaSource
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
+import com.mamba.picme.data.preferences.DataStoreMemoryHiddenStore
 import com.mamba.picme.data.preferences.DataStoreSwipeKeepHistoryStore
+import com.mamba.picme.domain.memories.MemoryHiddenStore
 import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.trash.DedupTrashBackend
 import androidx.lifecycle.ViewModel
@@ -218,6 +222,26 @@ class SwipeReviewViewModelFactory(
     }
 }
 
+/** 回忆 carousel（F3）VM 工厂：媒体/人物 DAO + 隐藏集存储，VM 内 combine 生成。 */
+class MemoriesViewModelFactory(
+    private val mediaDao: MediaDao,
+    private val personDao: PersonDao,
+    private val hiddenStore: MemoryHiddenStore,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MemoriesViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MemoriesViewModel(
+                mediaDao = mediaDao,
+                personDao = personDao,
+                hiddenStore = hiddenStore,
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
 interface AppContainer {
     val repository: AndroidMediaRepository
     val userPreferencesRepository: UserSettingsRepository
@@ -305,6 +329,9 @@ interface AppContainer {
 
     /** 手势快速整理（F2）ViewModel 工厂（无参数：队列由 VM 自建） */
     fun createSwipeReviewViewModelFactory(): ViewModelProvider.Factory
+
+    /** 回忆 carousel（F3）ViewModel 工厂（无参数：数据源与隐藏集由容器注入） */
+    fun createMemoriesViewModelFactory(): ViewModelProvider.Factory
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
@@ -856,6 +883,14 @@ class AppContainerImpl(
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
             keepHistoryStore = DataStoreSwipeKeepHistoryStore(context),
+        )
+    }
+
+    override fun createMemoriesViewModelFactory(): ViewModelProvider.Factory {
+        return MemoriesViewModelFactory(
+            mediaDao = database.mediaDao(),
+            personDao = database.personDao(),
+            hiddenStore = DataStoreMemoryHiddenStore(context),
         )
     }
 

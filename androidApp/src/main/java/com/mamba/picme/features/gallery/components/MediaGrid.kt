@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridItemScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -62,6 +63,7 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 
+@Suppress("LongParameterList") // 拖拽批选回调集 + F3 header 槽；待重构：抽参数 holder
 @Composable
 fun MediaGrid(
     context: Context,
@@ -78,7 +80,9 @@ fun MediaGrid(
     onDragSelectionItem: (MediaAsset) -> Unit,
     onDragSelectionEnd: () -> Unit,
     onGroupTitleClick: ((GroupedMedia) -> Unit)? = null,
-    personNameMap: Map<String, String>? = null
+    personNameMap: Map<String, String>? = null,
+    /** 网格顶部全宽 header 槽（F3 回忆 carousel；null = 不占位） */
+    header: (@Composable LazyGridItemScope.() -> Unit)? = null
 ) {
     var gridPositionInWindow by remember { mutableStateOf(Offset.Zero) }
     val selectedIdSet by remember { derivedStateOf { selectedIds.toSet() } }
@@ -160,6 +164,11 @@ fun MediaGrid(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
+        if (header != null) {
+            item(key = "memories_header", span = { GridItemSpan(maxLineSpan) }) {
+                header()
+            }
+        }
         groupedMedia.forEach { group ->
             val groupTitle = resolveGroupTitle(context, group, personNameMap)
             if (groupTitle.isNotEmpty()) {

@@ -22,6 +22,7 @@ import com.mamba.picme.features.gallery.GalleryScreen
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.dedup.DedupHomeRoute
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
+import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.person.PersonScreen
 import com.mamba.picme.features.person.PersonViewModel
 import com.mamba.picme.features.settings.SettingsViewModel
@@ -53,6 +54,8 @@ fun MainPagerHost(
     settingsViewModel: SettingsViewModel,
     personViewModel: PersonViewModel,
     dedupViewModel: DedupViewModel,
+    /** F3 回忆 carousel / 详情页共用的 Activity 级 VM */
+    memoriesViewModel: MemoriesViewModel,
     navController: NavHostController,
     onSwitchPage: (Int) -> Unit,
     gallerySearchRequest: Pair<String, Long>?,
@@ -62,6 +65,8 @@ fun MainPagerHost(
     onQuickTidy: () -> Unit = {},
     /** 整理中心 hub 类目卡点击（Task 5 点亮，先空占位）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
+    /** 回忆卡点击 → 回忆详情页（Task 11 点亮 memory_detail 路由，先空占位）。 */
+    onNavigateToMemoryDetail: (String) -> Unit = {},
 ) {
     var gallerySwipeEnabled by remember { mutableStateOf(true) }
     var chatSwipeEnabled by remember { mutableStateOf(true) }
@@ -123,7 +128,9 @@ fun MainPagerHost(
                 searchRequest = gallerySearchRequest,
                 onSearchRequestConsumed = onGallerySearchRequestConsumed,
                 onHorizontalSwipeEnabledChange = { enabled -> gallerySwipeEnabled = enabled },
-                isActivePage = pagerState.currentPage == MAIN_PAGE_GALLERY
+                isActivePage = pagerState.currentPage == MAIN_PAGE_GALLERY,
+                memoriesViewModel = memoriesViewModel,
+                onNavigateToMemoryDetail = onNavigateToMemoryDetail
             )
 
             // 相册整理（去重 2.0）Pager 托管：内部 Config→Scanning→Results→Cleaned 四态不变；

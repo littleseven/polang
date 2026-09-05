@@ -468,6 +468,13 @@
     <string name="swipe_retry">重試</string>
     <string name="swipe_discard">放棄</string>
 
+    <!-- Memories（F3 相册首页回忆 carousel） -->
+    <string name="memory_title">回憶</string>
+    <string name="memory_privacy_note">端側生成 · 私密</string>
+    <string name="memory_hide">隱藏這則回憶</string>
+    <string name="memory_hide_confirm">隱藏這則回憶？你可以隨時重新啟用回憶功能。</string>
+    <string name="memory_hide_cancel">取消</string>
+
     <string name="screenshot">截圖</string>
     <string name="screenshot_saved">截圖已儲存至 %1$s</string>
     <string name="screenshot_failed">截圖失敗</string>
