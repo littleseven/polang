@@ -1,7 +1,7 @@
 package com.mamba.picme.domain.organize
 
 import com.mamba.picme.domain.dedup.DedupContentType
-import com.mamba.picme.features.gallery.dedup.detectContentType
+import com.mamba.picme.domain.dedup.detectContentType
 
 /** MediaStore 截图目录约定（路径 contains，大小写不敏感；与 dedup 侧同一规则）。 */
 private const val SCREENSHOT_DIR_KEYWORD = "screenshots"

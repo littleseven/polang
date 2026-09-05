@@ -336,7 +336,6 @@
     <!-- Duplicate Management（设置入口文案；清理页 UI 键见 Dedup 2.0 区块） -->
     <!-- Dedup 2.0 -->
     <string name="dedup_title">Limpieza de duplicados</string>
-    <string name="dedup_estimate_label">Espacio recuperable estimado</string>
     <string name="dedup_last_scan">Último escaneo: %1$s · %2$d grupos encontrados</string>
     <string name="dedup_never_scanned">Nunca escaneado</string>
     <string name="dedup_scale_section">Alcance del escaneo (niveles de duplicación)</string>
@@ -356,7 +355,6 @@
     <string name="dedup_policy_latest">Conservar la más reciente</string>
     <string name="dedup_policy_latest_desc">Prioriza lo guardado más recientemente</string>
     <string name="dedup_start_scan">Iniciar escaneo</string>
-    <string name="dedup_privacy_caption">El escaneo se ejecuta completamente en el dispositivo; las fotos nunca salen de él</string>
     <string name="dedup_scanning_title">Escaneando</string>
     <string name="dedup_phase_format">Fase %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">Escaneadas %1$d / %2$d</string>

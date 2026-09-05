@@ -4,7 +4,7 @@ import android.content.IntentSender
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.core.common.Logger
-import com.mamba.picme.data.repository.OrganizeRepository
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.DedupScanConfig
@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -89,10 +90,12 @@ class DedupViewModel(
     private val _uiState = MutableStateFlow<DedupUiState>(DedupUiState.Config())
     val uiState: StateFlow<DedupUiState> = _uiState.asStateFlow()
 
-    /** 整理中心 hub 类目统计（Config 态展示；DUPLICATES 不在其中，hub 卡用 dedup 摘要）。 */
+    /** 整理中心 hub 类目统计（仅 Config 态由 UI 订阅；DUPLICATES 不在其中，hub 卡用 dedup 摘要）。 */
     val categoryStats: StateFlow<List<CategoryStat>> =
         organizeRepository.observeItems()
             .map { items -> OrganizeCategorizer.stats(items) }
+            // 媒体库任何写都会触发 observeItems 重算，相同统计结果不下发（防抖重组）
+            .distinctUntilChanged()
             .flowOn(ioDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 

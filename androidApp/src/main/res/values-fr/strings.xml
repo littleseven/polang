@@ -336,7 +336,6 @@
     <!-- Duplicate Management（设置入口文案；清理页 UI 键见 Dedup 2.0 区块） -->
     <!-- Dedup 2.0 -->
     <string name="dedup_title">Nettoyage des doublons</string>
-    <string name="dedup_estimate_label">Espace récupérable estimé</string>
     <string name="dedup_last_scan">Dernière analyse : %1$s · %2$d groupes trouvés</string>
     <string name="dedup_never_scanned">Jamais analysé</string>
     <string name="dedup_scale_section">Portée de l\'analyse (niveaux de doublons)</string>
@@ -356,7 +355,6 @@
     <string name="dedup_policy_latest">Conserver la plus récente</string>
     <string name="dedup_policy_latest_desc">L\'enregistrement le plus récent en priorité</string>
     <string name="dedup_start_scan">Lancer l\'analyse</string>
-    <string name="dedup_privacy_caption">L\'analyse s\'exécute entièrement sur l\'appareil ; les photos ne le quittent jamais</string>
     <string name="dedup_scanning_title">Analyse en cours</string>
     <string name="dedup_phase_format">Phase %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">%1$d / %2$d analysées</string>

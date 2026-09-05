@@ -1,7 +1,7 @@
 package com.mamba.picme.features.gallery.dedup
 
 import android.content.IntentSender
-import com.mamba.picme.data.repository.OrganizeRepository
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.dedup.DedupContentType
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel

@@ -1,6 +1,9 @@
 package com.mamba.picme.domain.trash
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -34,8 +37,21 @@ class TrashSessionControllerTest {
         }
     }
 
-    private fun newController(scope: TestScope, backend: FakeBackend): TrashSessionController =
+    private class UnsupportedBackend : TrashBackend {
+        override val isSupported: Boolean = false
+        override fun buildTrashToken(uris: List<String>): Any = error("unreachable")
+        override fun buildRestoreToken(uris: List<String>): Any = error("unreachable")
+        override fun queryExisting(uris: List<String>): List<String> = emptyList()
+    }
+
+    private fun newController(scope: TestScope, backend: TrashBackend): TrashSessionController =
         TrashSessionController(backend, scope, StandardTestDispatcher(scope.testScheduler))
+
+    /** 收集 outcomes 流；测试尾必须 cancel（runTest 会等待子协程）。 */
+    private fun TestScope.collectOutcomes(
+        controller: TrashSessionController,
+        sink: MutableList<TrashOutcome>,
+    ): Job = launch { controller.outcomes.toList(sink) }
 
     @Test
     fun `requestTrash exposes pending request with uris and token`() = runTest {
@@ -67,62 +83,110 @@ class TrashSessionControllerTest {
         c.requestTrash(listOf("a"))
         advanceUntilIdle()
         assertNull(c.pendingRequest.value)
-        assertTrue(c.consumeErrorEvent())
-        assertFalse(c.consumeErrorEvent()) // 一次性
+        assertTrue(c.errorEvent.value)
+        c.consumeErrorEvent()
+        assertFalse(c.errorEvent.value) // 一次性
     }
 
     @Test
-    fun `user allowed with full success clears pending and reports trashed uris`() = runTest {
+    fun `unsupported backend sets error event without pending request`() = runTest {
+        val c = newController(this, UnsupportedBackend())
+        assertFalse(c.isSupported)
+        c.requestTrash(listOf("a"))
+        advanceUntilIdle()
+        assertNull(c.pendingRequest.value)
+        assertTrue(c.errorEvent.value)
+        c.consumeErrorEvent()
+        assertFalse(c.errorEvent.value)
+        // 恢复同理短路
+        c.requestRestore(listOf("a"))
+        advanceUntilIdle()
+        assertNull(c.pendingRequest.value)
+        assertTrue(c.errorEvent.value)
+    }
+
+    @Test
+    fun `user allowed with full success clears pending and emits trashed outcome`() = runTest {
         val backend = FakeBackend()
         val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
         c.requestTrash(listOf("a", "b"))
         advanceUntilIdle()
         backend.simulateUserAllowed(listOf("a", "b"))
-        val outcome = c.onTrashResult(ok = true)
+        c.onTrashResult(ok = true)
         advanceUntilIdle()
         assertNull(c.pendingRequest.value)
-        assertEquals(listOf("a", "b"), (outcome as? TrashOutcome.Trashed)?.trashedUris)
+        val outcome = received.single() as TrashOutcome.Trashed
+        assertEquals(listOf("a", "b"), outcome.trashedUris)
+        assertNull(outcome.tag) // 未传 tag 透传 null
         assertFalse(c.partialNotice.value)
+        job.cancel()
     }
 
     @Test
-    fun `partial rejection sets notice and reports only actually trashed`() = runTest {
+    fun `partial rejection sets notice and emits only actually trashed`() = runTest {
         val backend = FakeBackend()
         val c = newController(this, backend)
-        c.requestTrash(listOf("a", "b"))
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestTrash(listOf("a", "b"), tag = "cat:x")
         advanceUntilIdle()
         backend.simulateUserAllowed(listOf("a")) // b 被拒
-        val outcome = c.onTrashResult(ok = true)
+        c.onTrashResult(ok = true)
         advanceUntilIdle()
-        assertEquals(listOf("a"), (outcome as? TrashOutcome.Trashed)?.trashedUris)
+        val outcome = received.single() as TrashOutcome.Trashed
+        assertEquals(listOf("a"), outcome.trashedUris)
+        assertEquals("cat:x", outcome.tag)
         assertTrue(c.partialNotice.value)
         c.consumePartialNotice()
         assertFalse(c.partialNotice.value)
+        job.cancel()
     }
 
     @Test
-    fun `user denied keeps nothing trashed and no notice`() = runTest {
+    fun `user denied emits cancelled and no notice`() = runTest {
         val backend = FakeBackend()
         val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
         c.requestTrash(listOf("a"))
         advanceUntilIdle()
-        val outcome = c.onTrashResult(ok = false)
+        c.onTrashResult(ok = false)
         advanceUntilIdle()
-        assertEquals(TrashOutcome.Cancelled, outcome)
+        assertEquals(listOf(TrashOutcome.Cancelled), received)
         assertFalse(c.partialNotice.value)
+        job.cancel()
     }
 
     @Test
-    fun `restore flow trashes back to library`() = runTest {
+    fun `restore flow emits restored uris`() = runTest {
         val backend = FakeBackend()
         val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
         c.requestRestore(listOf("a"))
         advanceUntilIdle()
         assertEquals("restore-token", c.pendingRequest.value?.token)
         backend.trashed.remove("a")
-        val outcome = c.onRestoreResult(ok = true)
+        c.onRestoreResult(ok = true)
         advanceUntilIdle()
-        assertEquals(listOf("a"), (outcome as? TrashOutcome.Restored)?.restoredUris)
+        assertEquals(listOf("a"), (received.single() as TrashOutcome.Restored).restoredUris)
         assertNull(c.pendingRequest.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `restore denied emits cancelled`() = runTest {
+        val backend = FakeBackend()
+        val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestRestore(listOf("a"))
+        advanceUntilIdle()
+        c.onRestoreResult(ok = false)
+        advanceUntilIdle()
+        assertEquals(listOf(TrashOutcome.Cancelled), received)
+        job.cancel()
     }
 }

@@ -27,11 +27,12 @@ import com.mamba.picme.data.repository.ChatImageStoreImpl
 import com.mamba.picme.data.repository.MediaFeedbackRepository
 import com.mamba.picme.data.repository.MediaFeedbackRepositoryImpl
 import com.mamba.picme.data.repository.MediaRepositoryImpl
-import com.mamba.picme.data.repository.OrganizeRepository
+import com.mamba.picme.data.repository.OrganizeRepositoryImpl
 import com.mamba.picme.data.repository.PhotoEditRecipeRepository
 import com.mamba.picme.domain.aesthetic.AestheticScoreWorker
 import com.mamba.picme.domain.repository.ChatImageStore
 import com.mamba.picme.domain.repository.AndroidMediaRepository
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import com.mamba.picme.domain.search.ExplicitFirstSearchPipeline
 import com.mamba.picme.domain.search.MediaFeedbackUseCase
@@ -703,7 +704,7 @@ class AppContainerImpl(
     }
 
     override val organizeRepository: OrganizeRepository by lazy {
-        OrganizeRepository(
+        OrganizeRepositoryImpl(
             context = context,
             mediaDao = database.mediaDao(),
             dedupHashDao = dedupHashDao,

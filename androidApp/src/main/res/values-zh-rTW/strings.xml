@@ -333,7 +333,6 @@
 
     <!-- Dedup 2.0 -->
     <string name="dedup_title">重複照片清理</string>
-    <string name="dedup_estimate_label">預計可釋放空間</string>
     <string name="dedup_last_scan">上次掃描：%1$s · 發現 %2$d 組重複</string>
     <string name="dedup_never_scanned">從未掃描</string>
     <string name="dedup_scale_section">掃描範圍（重複的尺度）</string>
@@ -353,7 +352,6 @@
     <string name="dedup_policy_latest">保留最新</string>
     <string name="dedup_policy_latest_desc">最近儲存的優先</string>
     <string name="dedup_start_scan">開始掃描</string>
-    <string name="dedup_privacy_caption">掃描全程在裝置端完成，照片不會上傳</string>
     <string name="dedup_scanning_title">正在掃描</string>
     <string name="dedup_phase_format">階段 %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">已掃描 %1$d / %2$d 張</string>

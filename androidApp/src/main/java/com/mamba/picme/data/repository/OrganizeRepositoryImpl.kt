@@ -12,6 +12,7 @@ import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.OrganizeRow
 import com.mamba.picme.domain.organize.OrganizeItem
+import com.mamba.picme.domain.repository.OrganizeRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -22,27 +23,27 @@ import kotlinx.coroutines.withContext
 private const val DEDUP_HASH_BATCH_SIZE = 500
 
 /**
- * 整理中心（F1）类目数据源：Room `media_assets` 轻量投影 + MediaStore 批量 meta
+ * 整理中心（F1）类目数据源生产实现：Room `media_assets` 轻量投影 + MediaStore 批量 meta
  * （path/sizeBytes/尺寸）按 **content uri 字符串** 合并为 [OrganizeItem] 快照。
  *
  * join key 不能用媒体 id：`MediaAsset.id` 是 MediaRepositoryImpl 的负值合成编码，
  * 与 MediaStore `_ID` 不相等（与 MediaStoreDedupMediaSource 同一约束）。
  */
-class OrganizeRepository(
+class OrganizeRepositoryImpl(
     context: Context,
     private val mediaDao: MediaDao,
     private val dedupHashDao: DedupHashDao,
     private val ioDispatcher: CoroutineDispatcher,
-) {
+) : OrganizeRepository {
 
     private val appContext = context.applicationContext
 
     /** hub 统计流：Room 行 + MediaStore meta 按 uri 合并；媒体库任何写触发重算。 */
-    fun observeItems(): Flow<List<OrganizeItem>> =
+    override fun observeItems(): Flow<List<OrganizeItem>> =
         mediaDao.observeOrganizeRows().map { rows -> mergeRows(rows) }
 
     /** 类目详情全量（一次性）。 */
-    suspend fun loadItems(): List<OrganizeItem> =
+    override suspend fun loadItems(): List<OrganizeItem> =
         mergeRows(mediaDao.observeOrganizeRows().first())
 
     private suspend fun mergeRows(rows: List<OrganizeRow>): List<OrganizeItem> = withContext(ioDispatcher) {

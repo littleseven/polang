@@ -77,7 +77,6 @@ import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.OrganizeItem
 import com.mamba.picme.features.gallery.dedup.formatBytes
-import kotlinx.coroutines.delay
 
 /** 品牌渐变（青玉）：完成态大数字 / Undo 主按钮与 hub 同源。 */
 private val orgBrandGradient: Brush
@@ -86,9 +85,6 @@ private val orgBrandGradient: Brush
     )
 
 private val CleanGreen = Color(0xFF4CAF50)
-
-/** errorEvent 为一次性轮询槽位（非流），UI 轮询消费间隔。 */
-private const val ERROR_EVENT_POLL_MS = 500L
 
 /**
  * 整理中心类目详情页（F1）：AI 预选网格 + 批量回收站清理。
@@ -139,14 +135,13 @@ fun OrganizeCategoryScreen(
         }
     }
 
-    // 回收站不可用（API<30）/ token 构建失败：controller 暴露的是一次性轮询槽位而非流，轮询消费
+    // 回收站不可用（API<30）/ token 构建失败：errorEvent 一次性置位 → 消费 → snackbar
+    val trashError by viewModel.trashController.errorEvent.collectAsState()
     val unsupportedMessage = stringResource(R.string.org_trash_unsupported)
-    LaunchedEffect(Unit) {
-        while (true) {
-            if (viewModel.trashController.consumeErrorEvent()) {
-                snackbarHostState.showSnackbar(unsupportedMessage)
-            }
-            delay(ERROR_EVENT_POLL_MS)
+    LaunchedEffect(trashError) {
+        if (trashError) {
+            viewModel.trashController.consumeErrorEvent()
+            snackbarHostState.showSnackbar(unsupportedMessage)
         }
     }
 

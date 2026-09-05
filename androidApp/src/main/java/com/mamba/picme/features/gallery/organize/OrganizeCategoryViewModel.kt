@@ -3,7 +3,7 @@ package com.mamba.picme.features.gallery.organize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.core.common.Logger
-import com.mamba.picme.data.repository.OrganizeRepository
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.OrganizeCategorizer
 import com.mamba.picme.domain.organize.OrganizeItem
@@ -68,6 +68,10 @@ class OrganizeCategoryViewModel(
     val aiPreselectEnabled: StateFlow<Boolean> = _aiPreselectEnabled.asStateFlow()
 
     init {
+        // outcome 结算独立于当前 UI state：授权回调只负责清 pending（controller 内同步完成），
+        // 复查结果经 outcomes 流异步到达，避免「非 Ready 态提前 return 导致 pendingRequest
+        // 永不清空」的陷阱
+        scope.launch { trashController.outcomes.collect { outcome -> onTrashOutcome(outcome) } }
         reload(preselect = true)
     }
 
@@ -131,11 +135,41 @@ class OrganizeCategoryViewModel(
         trashController.requestTrash(ready.selected.toList(), tag = category.name)
     }
 
-    /** UI 授权回调：ok=false → Cancelled 不变；ok=true → 剔除实际已回收项，清空则进完成态。 */
+    /** UI 授权回调：只转发给 controller（清 pending + 触发复查）；状态迁移由 outcomes 流驱动。 */
     fun onTrashResult(ok: Boolean) {
+        trashController.onTrashResult(ok)
+    }
+
+    fun undoLastTrash() {
         val ready = currentReady() ?: return
-        when (val outcome = trashController.onTrashResult(ok)) {
+        if (ready.lastTrashedUris.isEmpty()) return
+        Logger.d(TAG, "request restore: ${ready.lastTrashedUris.size} uris")
+        trashController.requestRestore(ready.lastTrashedUris)
+    }
+
+    /** 恢复授权回调：只转发；恢复成功后的重载在 outcomes 流的 Restored 分支。 */
+    fun onRestoreResult(ok: Boolean) {
+        trashController.onRestoreResult(ok)
+    }
+
+    /**
+     * outcome 结算（不论到达时 state 是否 Ready 都先结算）：
+     * Trashed → 剔除实际已回收项，清空则进完成态；Restored → 重载类目回非完成态；
+     * Cancelled / Unsupported → 不动。Loading 态到达的 Trashed 理论不可达
+     * （deleteSelected 需 Ready），丢弃并记日志——init 的 reload 会带出最新库快照。
+     */
+    private fun onTrashOutcome(outcome: TrashOutcome) {
+        when (outcome) {
             is TrashOutcome.Trashed -> {
+                val ready = currentReady()
+                if (ready == null) {
+                    Logger.w(
+                        TAG,
+                        "trashed outcome in non-ready state, dropped: " +
+                            "${outcome.trashedUris.size} uris (tag=${outcome.tag})"
+                    )
+                    return
+                }
                 val trashedSet = outcome.trashedUris.toSet()
                 val bytes = ready.items
                     .filter { item -> item.uri in trashedSet }
@@ -149,26 +183,18 @@ class OrganizeCategoryViewModel(
                     trashedBytes = ready.trashedBytes + bytes,
                     lastTrashedUris = outcome.trashedUris,
                 )
-                Logger.d(TAG, "trashed ${outcome.trashedUris.size} items, remaining=${remaining.size}")
+                Logger.d(
+                    TAG,
+                    "trashed ${outcome.trashedUris.size} items (tag=${outcome.tag}), " +
+                        "remaining=${remaining.size}"
+                )
             }
-            // Cancelled / Unsupported / Restored（恢复走 onRestoreResult）均不改选中态
+            is TrashOutcome.Restored -> {
+                Logger.d(TAG, "restored ${outcome.restoredUris.size} uris, reloading category")
+                // 计数清零——项已回到库中，不算已释放
+                reload(preselect = true)
+            }
             else -> Unit
-        }
-    }
-
-    fun undoLastTrash() {
-        val ready = currentReady() ?: return
-        if (ready.lastTrashedUris.isEmpty()) return
-        Logger.d(TAG, "request restore: ${ready.lastTrashedUris.size} uris")
-        trashController.requestRestore(ready.lastTrashedUris)
-    }
-
-    /** 恢复授权回调：成功后重载类目，回到非完成态（计数清零——项已回到库中，不算已释放）。 */
-    fun onRestoreResult(ok: Boolean) {
-        val outcome = trashController.onRestoreResult(ok)
-        if (outcome is TrashOutcome.Restored) {
-            Logger.d(TAG, "restored ${outcome.restoredUris.size} uris, reloading category")
-            reload(preselect = true)
         }
     }
 

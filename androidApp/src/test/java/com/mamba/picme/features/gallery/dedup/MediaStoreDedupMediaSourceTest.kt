@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.domain.dedup.DedupContentType
+import com.mamba.picme.domain.dedup.DOCUMENT_OCR_CHAR_THRESHOLD
 import com.mamba.picme.domain.repository.AndroidMediaRepository
 import io.mockk.CapturingSlot
 import io.mockk.every

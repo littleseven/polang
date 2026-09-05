@@ -349,7 +349,6 @@
 
     <!-- Dedup 2.0 -->
     <string name="dedup_title">Duplicate cleanup</string>
-    <string name="dedup_estimate_label">Estimated reclaimable</string>
     <string name="dedup_last_scan">Last scan: %1$s · %2$d groups found</string>
     <string name="dedup_never_scanned">Never scanned</string>
     <string name="dedup_scale_section">Scan scope (levels of duplication)</string>
@@ -369,7 +368,6 @@
     <string name="dedup_policy_latest">Keep latest</string>
     <string name="dedup_policy_latest_desc">Most recently saved first</string>
     <string name="dedup_start_scan">Start scan</string>
-    <string name="dedup_privacy_caption">Scan runs entirely on-device; photos never leave it</string>
     <string name="dedup_scanning_title">Scanning</string>
     <string name="dedup_phase_format">Phase %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">Scanned %1$d / %2$d</string>

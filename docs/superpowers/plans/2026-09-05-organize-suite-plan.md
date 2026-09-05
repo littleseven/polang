@@ -17,6 +17,7 @@
 - F1「闭眼人像」用 `faceQualityScore` 低分代理（无显式闭眼信号，探索已确认），类目命名与文案按「Low-quality portraits」口径。
 - F2 连拍桶依赖 dedup SCENE 现算：v1 不做（SCENE 组不持久化），队列桶 = 截图 > 低美学分 > 低人脸质量 > 普通（时间倒序）。
 - F1 Hero 的「预计可释放总量」= 各类目 sizeBytes 之和（截图/大视频有 MediaStore SIZE；模糊/人像用估算：该类目命中媒体的 SIZE 之和；同一媒体跨类目不去重——Hero 文案用 "Estimated reclaimable" 已是估算口径，可接受）。
+- F1「数据覆盖不足时类目卡显示需要先扫描引导」v1 不做——未打标时 BLURRY/LOW_QUALITY_PORTRAITS 卡不渲染；后续版本补引导卡。
 
 **关键现状事实（探索已核实，执行者必须知道）：**
 
@@ -954,6 +955,6 @@ if (header != null) {
 ## Self-Review 记录（写计划时已执行）
 
 - **Spec 覆盖**：F1 hub（Task 4）/类目详情（Task 5）/回收站通路（Task 1）；F2 队列（Task 6）/会话（Task 7）/UI（Task 8）；F3 生成（Task 9）/carousel（Task 10）/详情分享（Task 11）。F4/F5 明确不在范围。✅
-- **v1 偏离 spec 处**（均在计划头「V1 明确不做」声明，Task 12 回填 spec）：F3 Room 表→内存态+DataStore 隐藏；AC-F3-3 设置页隐藏列表→不做；闭眼→代理分；F2 连拍桶→不做；Hero 并集去重→不做。
+- **v1 偏离 spec 处**（均在计划头「V1 明确不做」声明，Task 12 回填 spec）：F3 Room 表→内存态+DataStore 隐藏；AC-F3-3 设置页隐藏列表→不做；闭眼→代理分；F2 连拍桶→不做；Hero 并集去重→不做；F1 未打标引导卡→不做（2026-09-05 审查回填，spec 已加校准注记）。
 - **类型一致性**：`TrashSessionController`（Task 1）被 Task 5/7 注入使用；`OrganizeItem`（Task 2）被 Task 3/6 复用；`SwipeCandidate/SwipeReason`（Task 6）被 Task 7/8 复用；`Memory`（Task 9）被 Task 10/11 复用。✅
 - **风险点**：① Task 3 的 MediaStore meta 全量查询在大库上的耗时——hub 统计流首次发射可能 >1s（AC-F1-3 风险），缓解：首帧先渲染骨架、统计异步填充；② `mediaDao.getAllMedia()` 全表用于 memories 生成——9000 张级别内存可承受（DedupMediaSource 现状同样全量过 allMedia），实测关注。

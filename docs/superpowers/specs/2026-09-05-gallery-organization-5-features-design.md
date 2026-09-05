@@ -43,7 +43,7 @@
   | 文档/单据照片 | dedup contentType=DOCUMENT | 网格批量选删 |
 - 每张类目卡：数量 + 占用空间 + 缩略图条（前 4 张）+ chevron；点击进类目详情网格（长按批选/全选/AI 预选切换），底部 CTA「移入回收站 N 张 · 释放 X MB」。
 - 删除通路 100% 复用去重 2.0：`DedupTrashManager` 系统回收站 + 授权残留复查（IS_TRASHED 口径），完成页可 undo。
-- 数据覆盖不足（TAG/美学分未扫描）时类目卡显示「需要先扫描」引导，跳转 TAG 控制页。
+- 数据覆盖不足（TAG/美学分未扫描）时类目卡显示「需要先扫描」引导，跳转 TAG 控制页。（校准注记：v1 不做引导卡——未打标时 BLURRY/LOW_QUALITY_PORTRAITS 卡不渲染（categorizer 对未评分项不判定、空类目不生成统计卡）；后续版本补引导卡。）
 
 ### 屏清单（Ardot）
 

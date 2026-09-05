@@ -1,6 +1,6 @@
 package com.mamba.picme.features.gallery.organize
 
-import com.mamba.picme.data.repository.OrganizeRepository
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.OrganizeItem
 import com.mamba.picme.domain.trash.TrashBackend
@@ -63,13 +63,18 @@ class OrganizeCategoryViewModelTest {
         scope: TestScope,
         repo: FakeRepo,
         backend: FakeBackend,
-    ) = OrganizeCategoryViewModel(
-        category = OrganizeCategory.SCREENSHOTS,
-        organizeRepository = repo.mock,
-        trashBackend = backend,
-        coroutineScope = scope,
-        ioDispatcher = StandardTestDispatcher(scope.testScheduler),
-    )
+    ): OrganizeCategoryViewModel {
+        // VM 内 outcomes collect 是无限订阅：挂独立 TestScope（非 runTest 子作用域），
+        // 避免 runTest teardown 等待永活 collector 报 UncompletedCoroutinesError
+        val vmScope = TestScope(scope.testScheduler)
+        return OrganizeCategoryViewModel(
+            category = OrganizeCategory.SCREENSHOTS,
+            organizeRepository = repo.mock,
+            trashBackend = backend,
+            coroutineScope = vmScope,
+            ioDispatcher = StandardTestDispatcher(scope.testScheduler),
+        )
+    }
 
     private fun ready(vm: OrganizeCategoryViewModel): OrganizeCategoryUiState.Ready =
         vm.uiState.value as OrganizeCategoryUiState.Ready

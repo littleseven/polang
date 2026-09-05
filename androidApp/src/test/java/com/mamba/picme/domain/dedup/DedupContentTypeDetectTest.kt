@@ -1,6 +1,5 @@
-package com.mamba.picme.features.gallery.dedup
+package com.mamba.picme.domain.dedup
 
-import com.mamba.picme.domain.dedup.DedupContentType
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

@@ -91,7 +91,6 @@ fun DedupHomeRoute(
     onOpenCategory: (OrganizeCategory) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val categoryStats by viewModel.categoryStats.collectAsState()
     val pendingTrash by viewModel.pendingTrash.collectAsState()
     val pendingRestore by viewModel.pendingRestore.collectAsState()
     val partialTrashNotice by viewModel.partialTrashNotice.collectAsState()
@@ -186,15 +185,20 @@ fun DedupHomeRoute(
                 .fillMaxSize()
         ) {
             when (val state = uiState) {
-                is DedupUiState.Config -> DedupHubContent(
-                    config = state.config,
-                    policy = policy,
-                    stats = categoryStats,
-                    onQuickTidy = onQuickTidy,
-                    onOpenCategory = onOpenCategory,
-                    onStartScan = { config -> viewModel.startScan(config) },
-                    onOpenKeepRules = { showKeepRules = true },
-                )
+                is DedupUiState.Config -> {
+                    // 类目统计流仅 Config 态订阅（2026-09-05 审查修复）：Scanning/Results/Cleaned
+                    // 态不再挂着全量 Room+MediaStore 合并统计
+                    val categoryStats by viewModel.categoryStats.collectAsState()
+                    DedupHubContent(
+                        config = state.config,
+                        policy = policy,
+                        stats = categoryStats,
+                        onQuickTidy = onQuickTidy,
+                        onOpenCategory = onOpenCategory,
+                        onStartScan = { config -> viewModel.startScan(config) },
+                        onOpenKeepRules = { showKeepRules = true },
+                    )
+                }
                 is DedupUiState.Scanning -> DedupScanningContent(
                     state = state,
                     onOpenGroupDetail = { groupId -> detailGroupId = groupId },
