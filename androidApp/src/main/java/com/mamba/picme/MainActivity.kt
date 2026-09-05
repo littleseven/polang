@@ -36,6 +36,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -152,10 +153,7 @@ class MainActivity : ComponentActivity() {
                     context
                 )
             )
-            // 回忆（F3）：Activity 级作用域——carousel（Pager 页 0）与回忆详情路由共用同一实例
-            val memoriesViewModel: MemoriesViewModel = viewModel(
-                factory = app.container.createMemoriesViewModelFactory()
-            )
+            val memoriesViewModel: MemoriesViewModel = viewModel(factory = app.container.createMemoriesViewModelFactory())
 
             val themeMode by settingsViewModel.themeMode.collectAsState()
             val appLanguage by settingsViewModel.appLanguage.collectAsState()
@@ -323,7 +321,6 @@ class MainActivity : ComponentActivity() {
                                             launchSingleTop = true
                                         }
                                     },
-                                    // 回忆卡点击 → 回忆详情页（F3）
                                     onNavigateToMemoryDetail = { memoryId ->
                                         navController.navigate(Screen.MemoryDetail.createRoute(memoryId)) {
                                             launchSingleTop = true
@@ -433,24 +430,7 @@ class MainActivity : ComponentActivity() {
                                     onNavigateBack = { navController.popBackStack() }
                                 )
                             }
-                            // 回忆详情（F3）：数据取自 Activity 级 memoriesViewModel 未过滤全集，
-                            // 已隐藏条目直达也可复原；id 失效（媒体清空等）→ 空态
-                            composable(
-                                route = Screen.MemoryDetail.route,
-                                arguments = listOf(
-                                    navArgument("memoryId") { type = NavType.StringType }
-                                )
-                            ) { backStackEntry ->
-                                val encodedId = backStackEntry.arguments?.getString("memoryId").orEmpty()
-                                val memoryId = java.net.URLDecoder.decode(encodedId, "UTF-8")
-                                // 订阅保持生成链活跃（stateIn WhileSubscribed），随媒体库变化重组复原
-                                val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
-                                val memory = remember(memories, memoryId) { memoriesViewModel.getMemory(memoryId) }
-                                MemoryDetailScreen(
-                                    memory = memory,
-                                    onNavigateBack = { navController.popBackStack() }
-                                )
-                            }
+                            memoryDetailRoute(memoriesViewModel) { navController.popBackStack() }
                             composable(Screen.TagControl.route) {
                                 DisposableEffect(Unit) {
                                     SceneManager.getInstance().transitionTo(SceneManager.Scene.GALLERY)
@@ -787,5 +767,31 @@ class MainActivity : ComponentActivity() {
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
 
         return context.createConfigurationContext(config)
+    }
+}
+
+/**
+ * 回忆详情（F3）路由注册：数据取自 Activity 级 [MemoriesViewModel] 未过滤全集
+ * （已隐藏条目直达也可复原）；订阅 memories 保持 stateIn 生成链活跃，随媒体库变化重组复原；
+ * id 失效（媒体清空等）→ 空态。抽为 NavGraphBuilder 扩展避免 MainActivity 类体超限。
+ */
+private fun NavGraphBuilder.memoryDetailRoute(
+    memoriesViewModel: MemoriesViewModel,
+    onNavigateBack: () -> Unit,
+) {
+    composable(
+        route = Screen.MemoryDetail.route,
+        arguments = listOf(
+            navArgument("memoryId") { type = NavType.StringType }
+        )
+    ) { backStackEntry ->
+        val encodedId = backStackEntry.arguments?.getString("memoryId").orEmpty()
+        val memoryId = java.net.URLDecoder.decode(encodedId, "UTF-8")
+        val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
+        val memory = remember(memories, memoryId) { memoriesViewModel.getMemory(memoryId) }
+        MemoryDetailScreen(
+            memory = memory,
+            onNavigateBack = onNavigateBack
+        )
     }
 }

@@ -132,33 +132,10 @@ fun MediaGrid(
             .onGloballyPositioned { coordinates ->
                 gridPositionInWindow = coordinates.positionInWindow()
             }
-            .pointerInput(isSelectionMode) {
-                if (isSelectionMode) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            resolveDraggedAsset(offset)?.let(onDragSelectionStart)
-                        },
-                        onDragEnd = onDragSelectionEnd,
-                        onDragCancel = onDragSelectionEnd,
-                        onDrag = { change, _ ->
-                            change.consume()
-                            resolveDraggedAsset(change.position)?.let(onDragSelectionItem)
-                        }
-                    )
-                } else {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = { offset ->
-                            resolveDraggedAsset(offset)?.let(onDragSelectionStart)
-                        },
-                        onDragEnd = onDragSelectionEnd,
-                        onDragCancel = onDragSelectionEnd,
-                        onDrag = { change, _ ->
-                            change.consume()
-                            resolveDraggedAsset(change.position)?.let(onDragSelectionItem)
-                        }
-                    )
-                }
-            },
+            .mediaDragSelection(
+                isSelectionMode, ::resolveDraggedAsset,
+                onDragSelectionStart, onDragSelectionItem, onDragSelectionEnd
+            ),
         columns = GridCells.Adaptive(110.dp),
         contentPadding = PaddingValues(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -200,6 +177,44 @@ fun MediaGrid(
 }
 
 private fun IntSize.toSize() = Size(width.toFloat(), height.toFloat())
+
+/**
+ * 网格拖拽批选手势：选择模式下直接拖拽，非选择模式长按后拖拽；
+ * [resolveDraggedAsset] 命中未注册位置（如 header 槽）返回 null，自然不启动批选。
+ */
+private fun Modifier.mediaDragSelection(
+    isSelectionMode: Boolean,
+    resolveDraggedAsset: (Offset) -> MediaAsset?,
+    onDragSelectionStart: (MediaAsset) -> Unit,
+    onDragSelectionItem: (MediaAsset) -> Unit,
+    onDragSelectionEnd: () -> Unit
+): Modifier = pointerInput(isSelectionMode) {
+    if (isSelectionMode) {
+        detectDragGestures(
+            onDragStart = { offset ->
+                resolveDraggedAsset(offset)?.let(onDragSelectionStart)
+            },
+            onDragEnd = onDragSelectionEnd,
+            onDragCancel = onDragSelectionEnd,
+            onDrag = { change, _ ->
+                change.consume()
+                resolveDraggedAsset(change.position)?.let(onDragSelectionItem)
+            }
+        )
+    } else {
+        detectDragGesturesAfterLongPress(
+            onDragStart = { offset ->
+                resolveDraggedAsset(offset)?.let(onDragSelectionStart)
+            },
+            onDragEnd = onDragSelectionEnd,
+            onDragCancel = onDragSelectionEnd,
+            onDrag = { change, _ ->
+                change.consume()
+                resolveDraggedAsset(change.position)?.let(onDragSelectionItem)
+            }
+        )
+    }
+}
 
 private val ThumbnailCornerRadius: Dp = 2.dp
 
