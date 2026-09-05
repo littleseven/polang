@@ -152,6 +152,7 @@ private fun shareMediaAssets(context: Context, assets: List<MediaAsset>) {
 - **UI 组件清单（`features/gallery/dedup/`）**: `DedupHomeScreen`（页面 + Route）、`DedupSheets`（`DedupGroupDetailPage` 全屏组详情页——点「保留这张」改选后立即收起回结果列表（2026-09-05 交互修正），删除仍走详情 CTA/批量 CTA——+ 组内全屏对比预览 + `KeepRulesSheet` 保留规则底部弹层——组详情 2026-08-27 起由半屏弹层改全屏页）、`DedupComponents`（组卡片/缩略图等）、`DedupMediaSource`（扫描输入供数，`MediaType.PHOTO` 元数据 + modifiedAt）
 - **整理中心类目详情（F1，`features/gallery/organize/`，2026-09-05）**: `OrganizeCategoryScreen`（NavHost 二级页 `organize_category/{category}`：副行统计 + 3 列 AI 预选勾选网格 + 底部回收站 CTA；完成态 All clean + Undo）+ `OrganizeCategoryViewModel`（类目过滤 + 选中集 + `TrashSessionController` 删除/恢复编排，测试注入 coroutineScope 范式同 DedupViewModel）；hub 类目卡点击经 `onOpenCategory` 点亮该路由
 - **手势快速整理（F2，`features/gallery/swipe/`，2026-09-05）**: `SwipeReviewScreen`（NavHost 二级页 `swipe_review`：全屏大图卡手势决策——右滑保留 / 左滑跳过 / 上滑删除、点按=跳过，卡片跟手位移 + 超阈值（宽 25%）飞出落决策，预加载后续 3 张；完成态统计卡 + 再来一轮 + 整批恢复）+ `SwipeReviewViewModel`（`SwipeQueueBuilder` 废片优先建队、undo 栈、未提交 DELETE 累计 20 张自动提交一批系统回收站授权，Done 态整批 undoAll 恢复）；hub「Quick tidy up」渐变主按钮经 `onQuickTidy` 点亮该路由；队列入列原因（Screenshot/Blurry/Low-quality portrait/Recent）为卡片角标，视频永不入队。**审查修复语义（2026-09-05 二轮）**：KEEP 30 天抑制——decide(KEEP) 即时写入 `SwipeKeepHistory`（`domain/swipe/SwipeKeepHistory.kt` 纯函数：`uri|epochMs` 编码 + 30 天 TTL 裁剪；`data/preferences/DataStoreSwipeKeepHistoryStore.kt` 持久化到 user_preferences DataStore `swipe_keep_history` stringSet），restart 建队时过滤活跃条目并顺带清理过期写回，undo(KEEP) 只回滚本会话新增条目；防死锁——API<30（TrashBackend `!isSupported`）提交短路不挂在途状态、`finish` 直接 settleDone（未提交 DELETE 以 skipped 口径进 Done，三桶守恒），token 构建失败经 errorEvent 回滚提交状态；授权被拒（Cancelled）批次回滚为未提交可重试，末张决策后（current==null）显示「待提交 N 张 + 重试/放弃」出口面板（放弃 = 未提交 DELETE 改记 SKIP 进 Done）；freedBytes 为 Reviewing 存储字段，decide/undo/discard 增量维护（O(1)）；换图为方向感知（前进无过渡防闪回，undo 保留淡入）
+- **回忆 Memories（F3，`features/gallery/memories/`，2026-09-05）**: 相册首页顶部回忆 carousel（MediaGrid header 槽）+ 详情页路由 `memory_detail/{memoryId}`；生成规则、隐藏持久化与 v1 不落表说明见 §2.12
 - **Pager 页单根铁律（2026-09-04 事故修复）**: `DedupHomeRoute` 必须以单个 `Box(fillMaxSize)` 包裹 Scaffold + 详情页 + 预览层——HorizontalPager 会把 page 内容的多个根节点沿主轴顺序平铺（`MeasuredPage` 按 child 宽度累加 offset，非 Box 式堆叠），多根会导致详情页/预览层被排到屏外，点击「没反应」。Gallery/Person/Chat 页均为单根模式；页内新增全屏覆盖层一律挂进该 Box，不得作为独立根节点
 
 **代码示例**:
@@ -398,6 +399,35 @@ python3 scripts/ui_driver.py dump
 [android.view.View] 照片，TEST_PERSON_林依晨_1782859757911.jpg clickable, bounds=(...)
 [android.view.View] 视频，share_xxx.mp4 clickable, bounds=(...)
 ```
+
+### 2.12 回忆 Memories（F3，2026-09-05）
+
+**模块定位**: 相册首页顶部「回忆」carousel + 回忆详情页；纯端侧规则生成，零推理零上传（[PRIVACY]）。
+
+**生成规则（`domain/memories/MemoriesGenerator.kt` 纯函数，now/zoneId 注入确定性，JVM 可测）**:
+- 四类回忆：ON_THIS_DAY（与 now 同月同日跨年 ≥4 张）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2）；总量截 `MAX_CAROUSEL`(10)
+- 精选排序：美学分降序（null 排最后）→ 拍摄时间新的在前，截 `DETAIL_LIMIT`(12) 张，封面取首张
+- 仅 `MediaType.PHOTO` 参与；`MemoryInput.personId` = 媒体 `faceId`（`media_assets.faceId` 为 personId 的 TEXT 形态）
+
+**数据链（`MemoriesViewModel`，Activity 级 VM）**:
+- `combine(MediaDao.getAllMedia, PersonDao.observeAll（本特性新增）, MemoryHiddenStore.ids)` → generate → `flowOn(ioDispatcher).stateIn(WhileSubscribed(5000))`
+- **隐藏过滤只在展示层**：`allGenerated`（未过滤全集）为 `getMemory(id)` 数据源，详情页直达/刷新后 id 稳定可复原（含已隐藏条目）；`memories` 为剔除隐藏后的展示集
+- 人物映射只取已命名人物（`PersonEntity.name` 非空），`NamedPerson(personId.toString(), name, isSelf)`
+
+**header 槽（`MediaGrid`）**:
+- 签名末尾追加可选 `header: (@Composable LazyGridItemScope.() -> Unit)? = null`，以全 span item 挂网格顶部（key `memories_header`）；默认 null 不影响既有调用方（搜索结果网格不传）
+- GalleryScreen 经 `collectAsStateWithLifecycle` 订阅；`memories.isEmpty()` 时传 `header = null`，无数据整体不占位
+
+**隐藏持久化**:
+- 长按卡片 → 确认弹窗（`memory_hide` / `memory_hide_confirm` / `memory_hide_cancel`）→ `hideMemory(id)`
+- `MemoryHiddenStore`（domain 接口）/ `DataStoreMemoryHiddenStore`（data/preferences 实现）：user_preferences DataStore `memory_hidden_ids` stringSet，存 Memory.id；carousel 经 combine 重发自动消失
+- v1 无「重新启用」入口（确认弹窗文案已预留该语义）
+
+**详情页（`MemoryDetailScreen`，NavHost 路由 `memory_detail/{memoryId}`，id URL 编码）**:
+- AppTopBar（返回 + `Memories` + 右上分享图标）→ 全宽 16:9 封面（Coil size(1080) crossfade(false)，左下渐变蒙层白字：标题 + `%1$d best shots · subtitle` 副行）→ 3 列精选网格（r8，Coil size(360)，`memory_photo_cd` 无障碍描述）→ 底部品牌渐变主按钮「Share memory」（`ACTION_SEND_MULTIPLE` + `FLAG_GRANT_READ_URI_PERMISSION`，写法同 `GalleryUtils.shareMediaAssets`）
+- MainActivity 路由内订阅 `memories`（保持 stateIn 生成链活跃）后经 `getMemory(id)` 复原；id 失效（媒体清空等）→ `memory_detail_empty` 空态
+
+**v1 不落表说明**: 回忆不建 Room 表/快照，每次由媒体 + 人物流实时生成，无 DB 迁移成本；隐藏集仅存 DataStore stringSet（id 字符串，个位数量级）。若未来需要跨设备同步或「那年今日回顾历史」，再评估落表。
 
 ## 3. adb 自动化测试命令 (Gallery Test Commands)
 
