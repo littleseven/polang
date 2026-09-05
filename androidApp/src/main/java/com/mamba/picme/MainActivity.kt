@@ -785,8 +785,8 @@ private fun NavGraphBuilder.memoryDetailRoute(
             navArgument("memoryId") { type = NavType.StringType }
         )
     ) { backStackEntry ->
-        val encodedId = backStackEntry.arguments?.getString("memoryId").orEmpty()
-        val memoryId = java.net.URLDecoder.decode(encodedId, "UTF-8")
+        // Navigation 已对路径参数解码一次：此处直接取原始 id，不再手工二次解码（% 残留会抛 IAE）
+        val memoryId = backStackEntry.arguments?.getString("memoryId").orEmpty()
         val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
         val memory = remember(memories, memoryId) { memoriesViewModel.getMemory(memoryId) }
         MemoryDetailScreen(

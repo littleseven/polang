@@ -127,6 +127,7 @@ fun MemoryDetailScreen(
 /** 全宽 16:9 封面：大图 + 底部黑色渐变蒙层 + 左下白字标题行/副行。 */
 @Composable
 private fun MemoryCover(memory: Memory) {
+    val title = memoryTitle(memory)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -138,7 +139,7 @@ private fun MemoryCover(memory: Memory) {
                 .size(1080)
                 .crossfade(false)
                 .build(),
-            contentDescription = memory.title,
+            contentDescription = title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceContainer),
@@ -161,14 +162,14 @@ private fun MemoryCover(memory: Memory) {
                 .padding(16.dp),
         ) {
             Text(
-                text = memory.title,
+                text = title,
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = stringResource(R.string.memory_best_shots, memory.itemUris.size) +
-                    " · " + memory.subtitle,
+                    " · " + memorySubtitle(memory),
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 13.sp,
             )

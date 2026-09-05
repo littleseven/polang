@@ -408,6 +408,7 @@ python3 scripts/ui_driver.py dump
 - 四类回忆：ON_THIS_DAY（与 now 同月同日跨年 ≥4 张）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2）；总量截 `MAX_CAROUSEL`(10)
 - 精选排序：美学分降序（null 排最后）→ 拍摄时间新的在前，截 `DETAIL_LIMIT`(12) 张，封面取首张
 - 仅 `MediaType.PHOTO` 参与；`MemoryInput.personId` = 媒体 `faceId`（`media_assets.faceId` 为 personId 的 TEXT 形态）
+- **结构化文案（I18N 红线，2026-09-06 审查修复）**：`Memory` 不再携带拼好文案，改为结构化字段 type + label（人物/城市名）+ hitCount（命中总数）+ latestYear + monthDay（`java.time.MonthDay`）；UI 层 `features/gallery/memories/MemoryTexts.kt`（`memoryTitle`/`memorySubtitle`）经 stringResource 还原（`memory_on_this_day`/`memory_recent_highlights`/`memory_person_title`/`memory_photo_count` 等键，五语同步），月日按 skeleton "MMMd" 取当前 Locale 最佳 pattern 本地化（不硬编码英文 pattern）
 
 **数据链（`MemoriesViewModel`，Activity 级 VM）**:
 - `combine(MediaDao.getAllMedia, PersonDao.observeAll（本特性新增）, MemoryHiddenStore.ids)` → generate → `flowOn(ioDispatcher).stateIn(WhileSubscribed(5000))`

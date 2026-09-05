@@ -191,7 +191,8 @@ class MemoriesViewModelTest {
         val memories = values.last()
         assertEquals(1, memories.size)
         assertEquals(MemoryType.PERSON, memories[0].type)
-        assertEquals("Moments with Mom", memories[0].title)
+        assertEquals("Mom", memories[0].label)
+        assertEquals(6, memories[0].hitCount)
         assertTrue(memories[0].itemUris.all { uri -> uri.startsWith("mom") })
         assertEquals("person:11", memories[0].id)
     }

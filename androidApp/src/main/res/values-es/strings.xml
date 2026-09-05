@@ -481,6 +481,12 @@
     <string name="memory_share">Compartir recuerdo</string>
     <string name="memory_detail_empty">Este recuerdo ya no está disponible</string>
     <string name="memory_photo_cd">Foto del recuerdo %1$d</string>
+    <string name="memory_on_this_day">Un día como hoy</string>
+    <string name="memory_on_this_day_subtitle">%1$s · %2$d</string>
+    <string name="memory_recent_highlights">Momentos destacados recientes</string>
+    <string name="memory_recent_highlights_subtitle">Últimos 30 días</string>
+    <string name="memory_person_title">Momentos con %1$s</string>
+    <string name="memory_photo_count">%1$d fotos</string>
 
     <!-- Media Pager -->
     <string name="media_source">Origen: %1$s</string>

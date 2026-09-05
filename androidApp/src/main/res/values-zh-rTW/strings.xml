@@ -478,6 +478,12 @@
     <string name="memory_share">分享回憶</string>
     <string name="memory_detail_empty">這則回憶已不可用</string>
     <string name="memory_photo_cd">回憶照片 %1$d</string>
+    <string name="memory_on_this_day">那年今日</string>
+    <string name="memory_on_this_day_subtitle">%1$s · %2$d</string>
+    <string name="memory_recent_highlights">近期精選</string>
+    <string name="memory_recent_highlights_subtitle">近 30 天</string>
+    <string name="memory_person_title">與 %1$s 的時刻</string>
+    <string name="memory_photo_count">%1$d 張照片</string>
 
     <string name="screenshot">截圖</string>
     <string name="screenshot_saved">截圖已儲存至 %1$s</string>

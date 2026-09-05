@@ -1,9 +1,11 @@
 package com.mamba.picme.domain.memories
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
+import java.time.MonthDay
 import java.time.ZoneId
 import java.time.ZoneOffset
 
@@ -38,7 +40,7 @@ class MemoriesGeneratorTest {
     ) = MemoriesGenerator.generate(inputs, persons, now, zone, maxCarousel)
 
     @Test
-    fun `on this day aggregates across years with latest year in subtitle`() {
+    fun `on this day aggregates across years carrying month day and latest year`() {
         val inputs = listOf(
             photo("a", at(2023, 9, 5), score = 5f),
             photo("b", at(2024, 9, 5), score = 6f),
@@ -52,8 +54,10 @@ class MemoriesGeneratorTest {
         val memory = memories.single()
         assertEquals(MemoryType.ON_THIS_DAY, memory.type)
         assertEquals("on_this_day:09-05", memory.id)
-        assertEquals("On this day", memory.title)
-        assertEquals("Sep 5 · 2025", memory.subtitle)
+        assertNull(memory.label)
+        assertEquals(MonthDay.of(9, 5), memory.monthDay)
+        assertEquals(2025, memory.latestYear)
+        assertEquals(4, memory.hitCount)
         assertEquals(4, memory.itemUris.size)
         assertTrue("same-year" !in memory.itemUris)
     }
@@ -82,8 +86,10 @@ class MemoriesGeneratorTest {
         val memory = memories.single()
         assertEquals(MemoryType.RECENT_HIGHLIGHTS, memory.type)
         assertEquals("recent:2026-09", memory.id)
-        assertEquals("Recent highlights", memory.title)
-        assertEquals("Past 30 days", memory.subtitle)
+        assertNull(memory.label)
+        assertNull(memory.monthDay)
+        assertNull(memory.latestYear)
+        assertEquals(6, memory.hitCount)
         assertEquals(6, memory.itemUris.size)
         assertEquals("r6", memory.itemUris.first())
         assertEquals("r6", memory.coverUri)
@@ -109,8 +115,10 @@ class MemoriesGeneratorTest {
         val memory = memories.single()
         assertEquals(MemoryType.PERSON, memory.type)
         assertEquals("person:p1", memory.id)
-        assertEquals("Moments with 妈妈", memory.title)
-        assertEquals("6 photos", memory.subtitle)
+        assertEquals("妈妈", memory.label)
+        assertNull(memory.monthDay)
+        assertNull(memory.latestYear)
+        assertEquals(6, memory.hitCount)
         assertEquals(6, memory.itemUris.size)
     }
 
@@ -156,9 +164,10 @@ class MemoriesGeneratorTest {
         }
         val memories = generate(inputs)
         assertEquals(2, memories.size)
-        assertEquals(listOf("Tokyo", "Paris"), memories.map { memory -> memory.title })
+        assertEquals(listOf("Tokyo", "Paris"), memories.map { memory -> memory.label })
         assertEquals("city:Tokyo", memories[0].id)
-        assertEquals("7 photos", memories[0].subtitle)
+        assertEquals(7, memories[0].hitCount)
+        assertNull(memories[0].monthDay)
         assertTrue(memories.all { memory -> memory.type == MemoryType.CITY })
     }
 

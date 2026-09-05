@@ -1,5 +1,7 @@
 package com.mamba.picme.domain.memories
 
+import java.time.MonthDay
+
 /** 回忆类型：那年今日 / 近期高光 / 人物合集 / 地点足迹。 */
 enum class MemoryType { ON_THIS_DAY, RECENT_HIGHLIGHTS, PERSON, CITY }
 
@@ -19,12 +21,21 @@ data class NamedPerson(
     val isSelf: Boolean,
 )
 
-/** 一条回忆：稳定 id + 展示文案 + 精选内容（封面在首）。 */
+/**
+ * 一条回忆：稳定 id + 类型化展示参数 + 精选内容（封面在首）。
+ * 文案不在此层拼接（I18N 红线）：UI 按 [type] + 参数经 stringResource 还原本地化 title/subtitle。
+ */
 data class Memory(
     val id: String,
     val type: MemoryType,
-    val title: String,
-    val subtitle: String,
+    /** 人物名（PERSON）/城市名（CITY）；ON_THIS_DAY、RECENT_HIGHLIGHTS 为 null。 */
+    val label: String?,
+    /** 命中总张数（PERSON/CITY 副行「N photos」）；精选 [itemUris] 截 [MemoriesGenerator.DETAIL_LIMIT] 后可能小于该值。 */
+    val hitCount: Int,
+    /** ON_THIS_DAY：命中照片中的最大年份；其余类型为 null。 */
+    val latestYear: Int?,
+    /** ON_THIS_DAY：与 now 同月同日；其余类型为 null。展示由 UI 按 Locale 本地化。 */
+    val monthDay: MonthDay?,
     val coverUri: String,
     val itemUris: List<String>,
 )

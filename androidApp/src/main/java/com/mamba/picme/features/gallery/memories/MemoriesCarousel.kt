@@ -130,6 +130,8 @@ private fun MemoryCard(
     onLongClick: () -> Unit,
 ) {
     val placeholder = ColorPainter(MaterialTheme.colorScheme.surface)
+    val title = memoryTitle(memory)
+    val subtitle = memorySubtitle(memory)
     Box(
         modifier = Modifier
             .width(ChatCarouselTokens.cardWidth)
@@ -137,7 +139,7 @@ private fun MemoryCard(
             .clip(AppShapes.card)
             .background(MaterialTheme.colorScheme.surface)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .semantics { contentDescription = "${memory.title} · ${memory.subtitle}" },
+            .semantics { contentDescription = "$title · $subtitle" },
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
@@ -170,7 +172,7 @@ private fun MemoryCard(
                 .padding(8.dp),
         ) {
             Text(
-                text = memory.title,
+                text = title,
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
@@ -178,7 +180,7 @@ private fun MemoryCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = memory.subtitle,
+                text = subtitle,
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 11.sp,
                 maxLines = 1,

@@ -2,9 +2,8 @@ package com.mamba.picme.domain.memories
 
 import java.time.Instant
 import java.time.LocalDate
+import java.time.MonthDay
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * 首页「回忆」carousel 生成器（纯函数，零 Android 依赖、零推理，可 JVM 单测）。
@@ -38,8 +37,6 @@ object MemoriesGenerator {
     /** 近期高光窗口：30 天。 */
     const val RECENT_WINDOW_MS: Long = 30L * 24 * 60 * 60 * 1000
 
-    private val monthDayFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
-
     fun generate(
         inputs: List<MemoryInput>,
         persons: List<NamedPerson>,
@@ -65,14 +62,12 @@ object MemoriesGenerator {
                 date.year != nowDate.year
         }
         if (hits.size < MIN_ON_THIS_DAY) return null
-        val latestYear = hits.maxOf { input -> input.localDate(zoneId).year }
-        val monthDay = monthDayFormatter.format(nowDate)
         return buildMemory(
             id = "on_this_day:${twoDigit(nowDate.monthValue)}-${twoDigit(nowDate.dayOfMonth)}",
             type = MemoryType.ON_THIS_DAY,
-            title = "On this day",
-            subtitle = "$monthDay · $latestYear",
             hits = hits,
+            latestYear = hits.maxOf { input -> input.localDate(zoneId).year },
+            monthDay = MonthDay.from(nowDate),
         )
     }
 
@@ -85,8 +80,6 @@ object MemoriesGenerator {
         return buildMemory(
             id = "recent:${nowDate.year}-${twoDigit(nowDate.monthValue)}",
             type = MemoryType.RECENT_HIGHLIGHTS,
-            title = "Recent highlights",
-            subtitle = "Past 30 days",
             hits = hits,
         )
     }
@@ -106,9 +99,8 @@ object MemoriesGenerator {
                 buildMemory(
                     id = "person:${pair.first.personId}",
                     type = MemoryType.PERSON,
-                    title = "Moments with ${pair.first.name}",
-                    subtitle = "${pair.second.size} photos",
                     hits = pair.second,
+                    label = pair.first.name,
                 )
             }
     }
@@ -128,14 +120,20 @@ object MemoriesGenerator {
                 buildMemory(
                     id = "city:${pair.first}",
                     type = MemoryType.CITY,
-                    title = pair.first,
-                    subtitle = "${pair.second.size} photos",
                     hits = pair.second,
+                    label = pair.first,
                 )
             }
 
     /** 精选排序：美学分降序（null 排最后），同分拍摄时间新的在前；截 [DETAIL_LIMIT]，封面取首张。 */
-    private fun buildMemory(id: String, type: MemoryType, title: String, subtitle: String, hits: List<MemoryInput>): Memory {
+    private fun buildMemory(
+        id: String,
+        type: MemoryType,
+        hits: List<MemoryInput>,
+        label: String? = null,
+        latestYear: Int? = null,
+        monthDay: MonthDay? = null,
+    ): Memory {
         val selected = hits
             .sortedWith(
                 compareByDescending<MemoryInput> { input -> input.aestheticScore ?: Float.NEGATIVE_INFINITY }
@@ -145,8 +143,10 @@ object MemoriesGenerator {
         return Memory(
             id = id,
             type = type,
-            title = title,
-            subtitle = subtitle,
+            label = label,
+            hitCount = hits.size,
+            latestYear = latestYear,
+            monthDay = monthDay,
             coverUri = selected.first().uri,
             itemUris = selected.map { input -> input.uri },
         )
