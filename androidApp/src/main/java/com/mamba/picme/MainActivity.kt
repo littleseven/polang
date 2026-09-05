@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -59,6 +60,7 @@ import com.mamba.picme.features.idphoto.IDPhotoViewModel
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
 import com.mamba.picme.features.gallery.memories.MemoriesViewModel
+import com.mamba.picme.features.gallery.memories.MemoryDetailScreen
 import com.mamba.picme.features.gallery.swipe.SwipeReviewScreen
 import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
 import com.mamba.picme.features.search.SearchTestScreen
@@ -320,6 +322,12 @@ class MainActivity : ComponentActivity() {
                                         ) {
                                             launchSingleTop = true
                                         }
+                                    },
+                                    // 回忆卡点击 → 回忆详情页（F3）
+                                    onNavigateToMemoryDetail = { memoryId ->
+                                        navController.navigate(Screen.MemoryDetail.createRoute(memoryId)) {
+                                            launchSingleTop = true
+                                        }
                                     }
                                 )
                             }
@@ -422,6 +430,24 @@ class MainActivity : ComponentActivity() {
                                 )
                                 SwipeReviewScreen(
                                     viewModel = viewModel,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
+                            // 回忆详情（F3）：数据取自 Activity 级 memoriesViewModel 未过滤全集，
+                            // 已隐藏条目直达也可复原；id 失效（媒体清空等）→ 空态
+                            composable(
+                                route = Screen.MemoryDetail.route,
+                                arguments = listOf(
+                                    navArgument("memoryId") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                val encodedId = backStackEntry.arguments?.getString("memoryId").orEmpty()
+                                val memoryId = java.net.URLDecoder.decode(encodedId, "UTF-8")
+                                // 订阅保持生成链活跃（stateIn WhileSubscribed），随媒体库变化重组复原
+                                val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
+                                val memory = remember(memories, memoryId) { memoriesViewModel.getMemory(memoryId) }
+                                MemoryDetailScreen(
+                                    memory = memory,
                                     onNavigateBack = { navController.popBackStack() }
                                 )
                             }

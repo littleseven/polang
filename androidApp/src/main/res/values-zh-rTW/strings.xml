@@ -474,6 +474,10 @@
     <string name="memory_hide">隱藏這則回憶</string>
     <string name="memory_hide_confirm">隱藏這則回憶？你可以隨時重新啟用回憶功能。</string>
     <string name="memory_hide_cancel">取消</string>
+    <string name="memory_best_shots">%1$d 張精選</string>
+    <string name="memory_share">分享回憶</string>
+    <string name="memory_detail_empty">這則回憶已不可用</string>
+    <string name="memory_photo_cd">回憶照片 %1$d</string>
 
     <string name="screenshot">截圖</string>
     <string name="screenshot_saved">截圖已儲存至 %1$s</string>

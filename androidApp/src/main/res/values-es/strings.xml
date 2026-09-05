@@ -477,6 +477,10 @@
     <string name="memory_hide">Ocultar este recuerdo</string>
     <string name="memory_hide_confirm">¿Ocultar este recuerdo? Puedes volver a activar los recuerdos cuando quieras.</string>
     <string name="memory_hide_cancel">Cancelar</string>
+    <string name="memory_best_shots">%1$d mejores fotos</string>
+    <string name="memory_share">Compartir recuerdo</string>
+    <string name="memory_detail_empty">Este recuerdo ya no está disponible</string>
+    <string name="memory_photo_cd">Foto del recuerdo %1$d</string>
 
     <!-- Media Pager -->
     <string name="media_source">Origen: %1$s</string>

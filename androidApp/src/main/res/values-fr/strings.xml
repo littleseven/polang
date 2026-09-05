@@ -477,6 +477,10 @@
     <string name="memory_hide">Masquer ce souvenir</string>
     <string name="memory_hide_confirm">Masquer ce souvenir ? Vous pouvez réactiver les souvenirs à tout moment.</string>
     <string name="memory_hide_cancel">Annuler</string>
+    <string name="memory_best_shots">%1$d meilleures photos</string>
+    <string name="memory_share">Partager le souvenir</string>
+    <string name="memory_detail_empty">Ce souvenir n\'est plus disponible</string>
+    <string name="memory_photo_cd">Photo du souvenir %1$d</string>
 
     <!-- Media Pager -->
     <string name="media_source">Source : %1$s</string>

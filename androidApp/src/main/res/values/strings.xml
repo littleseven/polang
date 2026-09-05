@@ -490,6 +490,10 @@
     <string name="memory_hide">Hide this memory</string>
     <string name="memory_hide_confirm">Hide this memory? You can re-enable memories anytime.</string>
     <string name="memory_hide_cancel">Cancel</string>
+    <string name="memory_best_shots">%1$d best shots</string>
+    <string name="memory_share">Share memory</string>
+    <string name="memory_detail_empty">This memory is no longer available</string>
+    <string name="memory_photo_cd">Memory photo %1$d</string>
 
     <!-- Media Pager -->
     <string name="media_source">Source: %1$s</string>

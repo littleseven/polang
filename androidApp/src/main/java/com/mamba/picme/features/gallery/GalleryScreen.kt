@@ -141,7 +141,7 @@ fun GalleryScreen(
     isActivePage: Boolean = true,
     /** F3 回忆 carousel 数据源（Activity 级 VM，详情页直达查询共用同一实例） */
     memoriesViewModel: MemoriesViewModel,
-    /** 回忆卡点击 → 回忆详情页（Task 11 点亮路由） */
+    /** 回忆卡点击 → 回忆详情页（memory_detail/{memoryId}） */
     onNavigateToMemoryDetail: (String) -> Unit = {},
 ) {
     val groupedMedia by viewModel.groupedMedia.collectAsState()

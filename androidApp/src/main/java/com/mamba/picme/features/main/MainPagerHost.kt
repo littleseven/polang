@@ -65,7 +65,7 @@ fun MainPagerHost(
     onQuickTidy: () -> Unit = {},
     /** 整理中心 hub 类目卡点击（Task 5 点亮，先空占位）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
-    /** 回忆卡点击 → 回忆详情页（Task 11 点亮 memory_detail 路由，先空占位）。 */
+    /** 回忆卡点击 → 回忆详情页（memory_detail/{memoryId} 路由）。 */
     onNavigateToMemoryDetail: (String) -> Unit = {},
 ) {
     var gallerySwipeEnabled by remember { mutableStateOf(true) }
