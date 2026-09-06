@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,10 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +36,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,20 +47,14 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.AppShapes
-import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import com.mamba.picme.domain.memories.Memory
 import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.features.common.topbar.AppTopBarAction
 
-/** 品牌渐变（青玉）：详情页主按钮与 hub「Quick tidy up」同源。 */
-private val memoryBrandGradient: Brush
-    get() = Brush.linearGradient(
-        listOf(ChatBubbleTokens.brandGradientStart, ChatBubbleTokens.brandGradientEnd),
-    )
-
 /**
- * 回忆详情页（F3，设计稿 memories/detail）：顶栏（返回 + Memories + 分享）→
- * 全宽 16:9 封面（左下蒙层白字标题/副行）→ 3 列精选网格（r8）→ 底部渐变「Share memory」。
+ * 回忆详情页（F3，2026-09-06 升级，对标小米）：顶栏（返回 + Memories + 分享图标）→
+ * 约屏高 55% 封面（左下蒙层白字标题/副行）→ 3 列网格（精选/全部跟随分段开关）→
+ * 底部居中胶囊分段开关（精选 = 美学分截 12；全部 = 全部命中时间降序）。分享集合跟随开关。
  * [memory] 为 null（id 已失效，如媒体清空后）时显示空态文案。
  */
 @Composable
@@ -63,6 +63,9 @@ fun MemoryDetailScreen(
     onNavigateBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    // 精选/全部开关：按 memory id 记忆，切回忆时重置回精选
+    var showAll by remember(memory?.id) { mutableStateOf(false) }
+    val displayUris = if (showAll) memory?.allItemUris.orEmpty() else memory?.itemUris.orEmpty()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -76,7 +79,7 @@ fun MemoryDetailScreen(
                     AppTopBarAction(
                         icon = Icons.Outlined.Share,
                         contentDescription = stringResource(R.string.memory_share),
-                        onClick = { shareMemoryPhotos(context, memory.itemUris) },
+                        onClick = { shareMemoryPhotos(context, displayUris) },
                     )
                 }
             },
@@ -98,40 +101,62 @@ fun MemoryDetailScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                itemsIndexed(memory.itemUris, key = { _, uri -> uri }) { index, uri ->
+                itemsIndexed(displayUris, key = { _, uri -> uri }) { index, uri ->
                     MemoryGridItem(uri = uri, index = index)
                 }
             }
-            Box(
+            // 精选/全部分段开关（对标小米「显示优选/全部显示」）
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .navigationBarsPadding()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(memoryBrandGradient)
-                    .clickable { shareMemoryPhotos(context, memory.itemUris) },
-                contentAlignment = Alignment.Center,
+                    .navigationBarsPadding(),
+                horizontalArrangement = Arrangement.Center,
             ) {
-                Text(
-                    text = stringResource(R.string.memory_share),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    listOf(false to R.string.memory_detail_best, true to R.string.memory_detail_all)
+                        .forEach { pair ->
+                            val selected = showAll == pair.first
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary
+                                        else Color.Transparent,
+                                    )
+                                    .clickable { showAll = pair.first }
+                                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(pair.second),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
+                        }
+                }
             }
         }
     }
 }
 
-/** 全宽 16:9 封面：大图 + 底部黑色渐变蒙层 + 左下白字标题行/副行。 */
+/** 约屏高 55% 封面：大图 + 底部黑色渐变蒙层 + 左下白字标题行/副行。 */
 @Composable
 private fun MemoryCover(memory: Memory) {
     val title = memoryTitle(memory)
+    val coverHeight = (LocalConfiguration.current.screenHeightDp * 0.55f).dp
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 9f),
+            .height(coverHeight),
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
@@ -168,7 +193,7 @@ private fun MemoryCover(memory: Memory) {
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = stringResource(R.string.memory_best_shots, memory.itemUris.size) +
+                text = stringResource(R.string.memory_items_count, memory.hitCount) +
                     " · " + memorySubtitle(memory),
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 13.sp,
@@ -177,7 +202,7 @@ private fun MemoryCover(memory: Memory) {
     }
 }
 
-/** 精选网格小卡：1:1 方图 r8。 */
+/** 网格小卡：1:1 方图 r8。 */
 @Composable
 private fun MemoryGridItem(uri: String, index: Int) {
     val placeholder = ColorPainter(MaterialTheme.colorScheme.surface)
@@ -199,7 +224,7 @@ private fun MemoryGridItem(uri: String, index: Int) {
 }
 
 /**
- * 分享整条回忆精选（多图）：ACTION_SEND_MULTIPLE + FLAG_GRANT_READ_URI_PERMISSION，
+ * 分享当前展示集合（多图）：ACTION_SEND_MULTIPLE + FLAG_GRANT_READ_URI_PERMISSION，
  * 写法同 Gallery 现有 shareMediaAssets（features/gallery/components/GalleryUtils.kt）。
  */
 private fun shareMemoryPhotos(context: Context, uris: List<String>) {
