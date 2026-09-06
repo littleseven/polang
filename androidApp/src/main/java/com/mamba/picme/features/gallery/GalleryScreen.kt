@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -54,8 +53,8 @@ import com.mamba.picme.features.gallery.components.GalleryPermissionMessage
 import com.mamba.picme.features.gallery.components.GalleryTopBar
 import com.mamba.picme.features.gallery.components.MediaGrid
 import com.mamba.picme.features.gallery.components.MediaPager
-import com.mamba.picme.features.gallery.memories.MemoriesCarousel
-import com.mamba.picme.features.gallery.memories.MemoriesViewModel
+import com.mamba.picme.features.common.components.FloatingBottomTab
+import com.mamba.picme.features.common.components.FloatingBottomTabItem
 import com.mamba.picme.features.gallery.components.galleryReadPermissions
 import com.mamba.picme.features.gallery.components.hasGalleryPermission
 import androidx.core.net.toUri
@@ -63,8 +62,6 @@ import com.mamba.picme.features.gallery.components.shareMediaAssets
 import com.mamba.picme.features.gallery.components.SearchTopBar
 import com.mamba.picme.features.gallery.components.toMediaAsset
 import com.mamba.picme.features.common.chat.rememberAgentChatConfig
-import com.mamba.picme.features.common.components.FloatingBottomTab
-import com.mamba.picme.features.common.components.FloatingBottomTabItem
 import com.mamba.picme.features.settings.SettingsViewModel
 import android.app.Activity
 import com.mamba.picme.features.gallery.capability.GalleryCapability
@@ -111,6 +108,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.BurstMode
 import androidx.compose.material.icons.outlined.ChatBubble
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Sell
 
 private const val TAG = "Gallery"
@@ -139,15 +137,12 @@ fun GalleryScreen(
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
     isActivePage: Boolean = true,
-    /** F3 回忆 carousel 数据源（Activity 级 VM，详情页直达查询共用同一实例） */
-    memoriesViewModel: MemoriesViewModel,
-    /** 回忆卡点击 → 回忆详情页（memory_detail/{memoryId}） */
-    onNavigateToMemoryDetail: (String) -> Unit = {},
+    /** Memory 页入口：悬浮底部 Tab 第 5 项（回忆） */
+    onNavigateToMemory: () -> Unit = {},
 ) {
     val groupedMedia by viewModel.groupedMedia.collectAsState()
     val groupingMode by viewModel.groupingMode.collectAsState()
     val debugUiEnabled by settingsViewModel.debugUiEnabled.collectAsState()
-    val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
 
     var selectedMediaIndex by remember { mutableStateOf<Int?>(null) }
     var isSelectionMode by remember { mutableStateOf(false) }
@@ -842,20 +837,7 @@ fun GalleryScreen(
                                 infoPersonId = group.titleValue.toLongOrNull()
                             }
                         },
-                        personNameMap = personNameMap,
-                        // F3 回忆 carousel 挂网格顶部 header 槽；无回忆整体不占位；多选模式下卡片不可点
-                        header = if (memories.isEmpty()) {
-                            null
-                        } else {
-                            {
-                                MemoriesCarousel(
-                                    memories = memories,
-                                    onMemoryClick = { memory -> onNavigateToMemoryDetail(memory.id) },
-                                    onHide = { memory -> memoriesViewModel.hideMemory(memory.id) },
-                                    enabled = !isSelectionMode,
-                                )
-                            }
-                        }
+                        personNameMap = personNameMap
                     )
                 }
             }
@@ -863,7 +845,7 @@ fun GalleryScreen(
             val activeMedia = selectedMediaIndex?.let { previewMediaList.getOrNull(it) }
             val rect by remember { derivedStateOf { activeMedia?.let { thumbnailPositions[it.id] } } }
 
-            // 悬浮底部 Tab — 相册整理 / 聊天 / 打标 / 人物（纯图标）
+            // 悬浮底部 Tab — 相册整理 / 聊天 / 打标 / 人物 / 回忆（纯图标）
             // 2026-08-26：相机 tab 移除（相机已路由化，仅头像拍摄进入）；第一项为相册整理——
             // 相册整理是相邻 Pager 页（页 1），相册页左滑即达，手势由外层 HorizontalPager 原生承载
             if (selectedMediaIndex == null) {
@@ -887,6 +869,11 @@ fun GalleryScreen(
                         icon = Icons.Outlined.AccountCircle,
                         contentDescription = stringResource(R.string.gallery_people_entry),
                         onClick = onNavigateToPeople
+                    ),
+                    FloatingBottomTabItem(
+                        icon = Icons.Outlined.Collections,
+                        contentDescription = stringResource(R.string.tab_memories),
+                        onClick = onNavigateToMemory
                     )
                 )
                 FloatingBottomTab(
