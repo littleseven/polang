@@ -9,7 +9,10 @@ package com.mamba.picme.domain.organize
  */
 object BlurAnalyzer {
 
-    /** Laplacian 方差；尺寸非法或像素数不足返回 0。 */
+    /**
+     * Laplacian 方差；尺寸非法或像素数不足返回 0。
+     * ⚠️ 0 = 退化输入哨兵（与极模糊/纯黑真值重合），调用方解码失败必须写 null 入库，不可写 0。
+     */
     fun laplacianVariance(gray: IntArray, width: Int, height: Int): Float {
         if (width < 3 || height < 3 || gray.size < width * height) return 0.0f
         var sum = 0.0
@@ -32,7 +35,10 @@ object BlurAnalyzer {
         return (sumSq / count - mean * mean).toFloat()
     }
 
-    /** 平均亮度归一（0~1）；空输入返回 0。 */
+    /**
+     * 平均亮度归一（0~1）；空输入返回 0。
+     * ⚠️ 0 = 退化输入哨兵（与极模糊/纯黑真值重合），调用方解码失败必须写 null 入库，不可写 0。
+     */
     fun meanLuminance(gray: IntArray): Float {
         if (gray.isEmpty()) return 0.0f
         var sum = 0L
