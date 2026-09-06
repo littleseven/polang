@@ -18,17 +18,19 @@ class SwipeQueueBuilderTest {
         faceQualityScore: Float? = null,
         hasFace: Boolean = false,
         isFavorite: Boolean = false,
+        exactDupGroupSize: Int = 0,
     ) = OrganizeItem(
         uri = uri, isVideo = isVideo, captureDate = captureDate, sizeBytes = 1_000_000,
         relativePath = relativePath, ocrText = null, pixelArea = 12_000_000, labels = null,
         hasFace = hasFace, aestheticScore = null, faceQualityScore = faceQualityScore,
-        blurScore = blurScore, isFavorite = isFavorite,
+        blurScore = blurScore, isFavorite = isFavorite, exactDupGroupSize = exactDupGroupSize,
     )
 
     @Test
     fun `buckets ordered screenshot then blurry then recent`() {
         val queue = SwipeQueueBuilder.build(
             listOf(
+                // 无类目命中（entry==null）→ RECENT
                 item("recent"),
                 item("blur", blurScore = 10.0f),
                 item("shot", relativePath = "Pictures/Screenshots/"),
@@ -81,6 +83,31 @@ class SwipeQueueBuilderTest {
             now = now,
         )
         assertEquals(listOf("new", "mid", "old"), queue.map { candidate -> candidate.uri })
+    }
+
+    @Test
+    fun `duplicates photo falls back to RECENT bucket`() {
+        // DUPLICATES 不是 F2 废片桶（去重走类目页/去重主页），照片落 RECENT 兜底
+        val queue = SwipeQueueBuilder.build(
+            listOf(item("dup", exactDupGroupSize = 2)),
+            now = now,
+        )
+        assertEquals(SwipeReason.RECENT, queue.single().reason)
+    }
+
+    @Test
+    fun `duplicate uri rows produce single candidate`() {
+        // media_assets.uri 非唯一索引：重复行进队列只出一张卡（保留最后一条快照）
+        val queue = SwipeQueueBuilder.build(
+            listOf(
+                item("dup", captureDate = now - 1_000),
+                item("dup", captureDate = now - 2_000),
+                item("other", captureDate = now - 3_000),
+            ),
+            now = now,
+        )
+        assertEquals(listOf("dup", "other"), queue.map { candidate -> candidate.uri })
+        assertEquals(now - 2_000, queue.first().captureDate)
     }
 
     @Test
