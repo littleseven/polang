@@ -230,6 +230,13 @@ class MediaViewModel(
         }
     }
 
+    /** 查看器页切换/打开时回写查看时间（fire-and-forget，不阻塞 UI）。 */
+    fun markMediaViewed(uri: String) {
+        viewModelScope.launch {
+            repository.markMediaViewed(uri)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         Logger.d(TAG, "MediaViewModel cleared, releasing OCR resources")

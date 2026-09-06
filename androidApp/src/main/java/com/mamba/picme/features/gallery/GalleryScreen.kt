@@ -876,6 +876,7 @@ fun GalleryScreen(
                         assets = previewMediaList,
                         initialIndex = selectedMediaIndex!!,
                         onTriggerSummary = viewModel::triggerSummaryOnDemand,
+                        onPageViewed = { uri -> viewModel.markMediaViewed(uri) },
                         onClose = { selectedMediaIndex = null },
                         onDelete = { asset ->
                             viewModel.deleteMediaByIds(listOf(asset.id))
