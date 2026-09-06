@@ -1,8 +1,11 @@
 package com.mamba.picme.features.gallery.organize
 
 import com.mamba.picme.domain.repository.OrganizeRepository
+import com.mamba.picme.domain.organize.ClassifiedItem
 import com.mamba.picme.domain.organize.OrganizeCategory
+import com.mamba.picme.domain.organize.OrganizeConfidence
 import com.mamba.picme.domain.organize.OrganizeItem
+import com.mamba.picme.domain.organize.ProtectReason
 import com.mamba.picme.domain.trash.TrashBackend
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -20,7 +23,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class OrganizeCategoryViewModelTest {
 
-    /** 截图类目样例：relativePath 命中 Screenshots 即归 SCREENSHOTS。 */
+    /** 截图类目样例：relativePath 命中 Screenshots 即归 SCREEN_CONTENT（路径强信号，恒 HIGH）。 */
     private fun shot(uri: String, sizeBytes: Long = 1_000_000L) = OrganizeItem(
         uri = uri,
         isVideo = false,
@@ -37,6 +40,28 @@ class OrganizeCategoryViewModelTest {
 
     /** 非截图样例（DCIM 相机目录），用于验证类目过滤。 */
     private fun photo(uri: String) = shot(uri).copy(relativePath = "DCIM/Camera/")
+
+    /**
+     * 低质照片样例：blurScore < BLUR_VARIANCE_LOW(100) 裁定归 LOW_QUALITY_PHOTOS；
+     * blur < 50（0.5×阈值）= HIGH，50 ≤ blur < 100 = MEDIUM。captureDate 显式传入
+     * ——ValueGuard 保守偏置会把 1970 老时间戳判 OLD_PHOTO 保护，非保护用例必须给近期时间。
+     */
+    private fun blurPhoto(uri: String, captureDate: Long, blurScore: Float) = photo(uri).copy(
+        captureDate = captureDate,
+        blurScore = blurScore,
+    )
+
+    /** ClassifiedItem 夹具：category 不参与 toSections 分组，固定取值即可。 */
+    private fun classified(
+        uri: String,
+        confidence: OrganizeConfidence,
+        protectReasons: Set<ProtectReason> = emptySet(),
+    ) = ClassifiedItem(
+        item = photo(uri),
+        category = OrganizeCategory.SCREEN_CONTENT,
+        confidence = confidence,
+        protectReasons = protectReasons,
+    )
 
     private class FakeBackend : TrashBackend {
         override val isSupported: Boolean = true
@@ -62,12 +87,13 @@ class OrganizeCategoryViewModelTest {
         scope: TestScope,
         repo: FakeRepo,
         backend: FakeBackend,
+        category: OrganizeCategory = OrganizeCategory.SCREEN_CONTENT,
     ): OrganizeCategoryViewModel {
         // VM 内 outcomes collect 是无限订阅：挂独立 TestScope（非 runTest 子作用域），
         // 避免 runTest teardown 等待永活 collector 报 UncompletedCoroutinesError
         val vmScope = TestScope(scope.testScheduler)
         return OrganizeCategoryViewModel(
-            category = OrganizeCategory.SCREENSHOTS,
+            category = category,
             organizeRepository = repo.mock,
             trashBackend = backend,
             coroutineScope = vmScope,
@@ -79,14 +105,50 @@ class OrganizeCategoryViewModelTest {
         vm.uiState.value as OrganizeCategoryUiState.Ready
 
     @Test
-    fun `init filters category items and ai-preselects all`() = runTest {
+    fun `init filters category items and ai-preselects high confidence non-protected`() = runTest {
         val repo = FakeRepo().apply { items = listOf(shot("a"), shot("b"), photo("c")) }
         val vm = viewModel(this, repo, FakeBackend())
         advanceUntilIdle()
         val state = ready(vm)
-        assertEquals(listOf("a", "b"), state.items.map { item -> item.uri })
+        assertEquals(listOf("a", "b"), state.items.map { entry -> entry.item.uri })
+        // SCREEN_CONTENT 路径判定恒 HIGH 且该类目不设保护 → 全部预选
         assertEquals(setOf("a", "b"), state.selected)
         assertFalse(state.trashed)
+    }
+
+    @Test
+    fun `preselect only picks HIGH confidence non-protected items`() = runTest {
+        val now = System.currentTimeMillis()
+        val repo = FakeRepo().apply {
+            items = listOf(
+                // HIGH：强模糊（blur=10 < 0.5×BLUR_VARIANCE_LOW=50），近期拍摄非保护
+                blurPhoto("high", captureDate = now, blurScore = 10.0f),
+                // MEDIUM：边界模糊（50 < blur=80 < 100）
+                blurPhoto("medium", captureDate = now, blurScore = 80.0f),
+                // HIGH（blur=10 强模糊）但 protected：6 年前 → OLD_PHOTO
+                blurPhoto("old", captureDate = now - 6 * 365L * 24 * 3600 * 1000, blurScore = 10.0f),
+            )
+        }
+        val vm = viewModel(this, repo, FakeBackend(), OrganizeCategory.LOW_QUALITY_PHOTOS)
+        advanceUntilIdle()
+        val state = ready(vm)
+        assertEquals(listOf("high", "medium", "old"), state.items.map { entry -> entry.item.uri })
+        assertEquals(setOf("high"), state.selected)
+    }
+
+    @Test
+    fun `toSections splits suggested review protected disjoint and complete`() {
+        val entries = listOf(
+            classified("a", OrganizeConfidence.HIGH),
+            classified("b", OrganizeConfidence.MEDIUM),
+            classified("c", OrganizeConfidence.LOW),
+            classified("d", OrganizeConfidence.HIGH, protectReasons = setOf(ProtectReason.OLD_PHOTO)),
+        )
+        val sections = entries.toSections()
+        assertEquals(listOf("a"), sections.suggested.map { entry -> entry.item.uri })
+        assertEquals(listOf("b", "c"), sections.review.map { entry -> entry.item.uri })
+        assertEquals(listOf("d"), sections.protectedItems.map { entry -> entry.item.uri })
+        assertEquals(entries.size, sections.suggested.size + sections.review.size + sections.protectedItems.size)
     }
 
     @Test
@@ -121,7 +183,7 @@ class OrganizeCategoryViewModelTest {
         advanceUntilIdle()
         val pending = vm.trashController.pendingRequest.value
         assertEquals(listOf("a"), pending?.uris)
-        assertEquals(OrganizeCategory.SCREENSHOTS.name, pending?.tag)
+        assertEquals(OrganizeCategory.SCREEN_CONTENT.name, pending?.tag)
         assertFalse(pending?.isRestore ?: true)
     }
 
@@ -159,7 +221,7 @@ class OrganizeCategoryViewModelTest {
         advanceUntilIdle()
         val state = ready(vm)
         assertFalse(state.trashed)
-        assertEquals(listOf("b"), state.items.map { item -> item.uri })
+        assertEquals(listOf("b"), state.items.map { entry -> entry.item.uri })
         assertEquals(setOf("b"), state.selected) // 已删项从选中集剔除
         assertTrue(vm.trashController.partialNotice.value) // 部分拒绝提示由 UI 消费
     }
@@ -175,7 +237,7 @@ class OrganizeCategoryViewModelTest {
         advanceUntilIdle()
         val state = ready(vm)
         assertFalse(state.trashed)
-        assertEquals(listOf("a", "b"), state.items.map { item -> item.uri })
+        assertEquals(listOf("a", "b"), state.items.map { entry -> entry.item.uri })
         assertEquals(setOf("a", "b"), state.selected)
     }
 
@@ -203,7 +265,7 @@ class OrganizeCategoryViewModelTest {
         advanceUntilIdle()
         val state = ready(vm)
         assertFalse(state.trashed)
-        assertEquals(listOf("a", "b"), state.items.map { item -> item.uri })
+        assertEquals(listOf("a", "b"), state.items.map { entry -> entry.item.uri })
         assertEquals(setOf("a", "b"), state.selected)
         assertEquals(0, state.trashedCount)
         assertEquals(0L, state.trashedBytes)
@@ -211,7 +273,7 @@ class OrganizeCategoryViewModelTest {
     }
 
     @Test
-    fun `ai preselect off loads without selection, toggling on selects all`() = runTest {
+    fun `ai preselect off loads without selection, toggling on selects high non-protected`() = runTest {
         val repo = FakeRepo().apply { items = listOf(shot("a"), shot("b")) }
         val vm = viewModel(this, repo, FakeBackend())
         // init 的 load 在 StandardTestDispatcher 上未推进，先关开关模拟「进入时不预选」
