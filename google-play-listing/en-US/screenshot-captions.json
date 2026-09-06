@@ -1,5 +1,5 @@
 {
-  "note": "Google Play screenshot marketing copy (en-US, default locale). Frames in Ardot page 'Play Store Assets' named <nn>-<scene>/en-US. image = real screenshot from docs-site/assets/shots-src/en-US/ (2026-08-23 device capture, DarkMode English UI, 1200x2670). Spare unused: spare-gallery2.jpg (second gallery grid; Play Console caps phone screenshots at 8). Re-shoot candidate: 03-chat.jpg has a「有脸」chip (Chinese remnant in EN UI). 06 slot swapped library→chat-welcome (2026-08-23, user decision; old 06-library source removed).",
+  "note": "Google Play screenshot marketing copy (en-US, default locale). Frames in Ardot page 'Play Store Assets' named <nn>-<scene>/en-US-design. 2026-09-06: en-US 8 slots switched from device screenshots to canvas design renders (jade-green gradient frames; Screens filled from app-accurate store01 frames on Gallery/Chat/People pages + vault PNG), chrome = real-device status bar + light 3-key nav bar cropped from 2026-08-23 captures. Old device captures remain at docs-site/assets/shots-src/en-US/. zh-CN/zh-TW slots still use the 2026-08-23 dark screenshot set (design-frame refresh pending).",
   "shots": [
     {
       "id": "01-gallery",
