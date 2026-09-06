@@ -284,4 +284,31 @@ class MemoriesGeneratorTest {
     fun `empty input yields empty list`() {
         assertTrue(generate(emptyList()).isEmpty())
     }
+
+    @Test
+    fun `memory carries all hits while best shots stay capped`() {
+        // 同城 15 张照片：精选截 12，allItemUris 全量 15
+        val inputs = (1..15).map { index ->
+            photo("city$index", at(2025, 5, 1, index), city = "北京", score = index.toFloat())
+        }
+        val memory = generate(inputs).single()
+        assertEquals(15, memory.hitCount)
+        assertEquals(12, memory.itemUris.size)
+        assertEquals(15, memory.allItemUris.size)
+        // 精选是全量的子集；封面 = 精选首张（美学分最高）
+        assertTrue(memory.allItemUris.containsAll(memory.itemUris))
+        assertEquals(memory.itemUris.first(), memory.coverUri)
+    }
+
+    @Test
+    fun `all uris ordered by capture time descending`() {
+        val inputs = listOf(
+            photo("old", at(2025, 5, 1, 8), city = "北京", score = 1f),
+            photo("new", at(2025, 5, 1, 20), city = "北京", score = 2f),
+            photo("mid", at(2025, 5, 1, 12), city = "北京", score = 9f),
+        ) + (1..5).map { index -> photo("pad$index", at(2025, 4, 1, index), city = "北京") }
+        val memory = generate(inputs).single { memory -> memory.type == MemoryType.CITY }
+        val all = memory.allItemUris
+        assertEquals(listOf("new", "mid", "old"), all.take(3))
+    }
 }

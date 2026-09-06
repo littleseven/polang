@@ -149,6 +149,9 @@ object MemoriesGenerator {
             monthDay = monthDay,
             coverUri = selected.first().uri,
             itemUris = selected.map { input -> input.uri },
+            allItemUris = hits
+                .sortedByDescending { input -> input.captureDate }
+                .map { input -> input.uri },
         )
     }
 

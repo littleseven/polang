@@ -37,5 +37,8 @@ data class Memory(
     /** ON_THIS_DAY：与 now 同月同日；其余类型为 null。展示由 UI 按 Locale 本地化。 */
     val monthDay: MonthDay?,
     val coverUri: String,
+    /** 精选 URI（美学分降序截 [MemoriesGenerator.DETAIL_LIMIT]），封面在首。 */
     val itemUris: List<String>,
+    /** 全部命中 URI（拍摄时间降序，不截断；详情页「全部」开关与分享全集用）。 */
+    val allItemUris: List<String>,
 )
