@@ -631,7 +631,8 @@ interface MediaDao {
      * 一次性写入 labels / mlKitLabels / mlKitLabelsZh / ocrText / 地理位置 /
      * faceRoiResult / semanticEmbedding / lastTagScanAt / lastTagScanPasses /
      * hasFace / faceId / city / faceFocusY / aestheticScore / faceQualityScore /
-     * blurScore / exposureScore / lastViewedAt（整理中心 v2 信号，旧备份缺省为 null 覆盖），
+     * blurScore / exposureScore / lastViewedAt（整理中心 v2 信号，COALESCE 语义：
+     * 旧备份缺字段（null）不冲掉本机已算值——lastViewedAt 是保护信号不可再生），
      * 避免还原时多次 UPDATE。
      */
     @Query(
@@ -656,9 +657,9 @@ interface MediaDao {
             faceFocusY = :faceFocusY,
             aestheticScore = :aestheticScore,
             faceQualityScore = :faceQualityScore,
-            blurScore = :blurScore,
-            exposureScore = :exposureScore,
-            lastViewedAt = :lastViewedAt
+            blurScore = COALESCE(:blurScore, blurScore),
+            exposureScore = COALESCE(:exposureScore, exposureScore),
+            lastViewedAt = COALESCE(:lastViewedAt, lastViewedAt)
         WHERE id = :mediaId
         """
     )

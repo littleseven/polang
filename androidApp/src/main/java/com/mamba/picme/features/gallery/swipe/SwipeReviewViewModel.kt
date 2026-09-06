@@ -156,15 +156,16 @@ class SwipeReviewViewModel(
         _uiState.value = SwipeUiState.Loading
         scope.launch {
             val queue = withContext(ioDispatcher) {
+                // 单一时钟：keep-history 裁剪与管线分类共用同一 now（测试 fake 时钟生效）
+                val now = nowMs()
                 val history = keepHistoryStore.load()
-                keepEntries = SwipeKeepHistory.activeEntries(history, nowMs()).toMutableSet()
+                keepEntries = SwipeKeepHistory.activeEntries(history, now).toMutableSet()
                 if (keepEntries.size != history.size) {
                     // 读取顺带清理过期/脏条目并写回
                     keepHistoryStore.save(keepEntries.toSet())
                 }
                 val suppressed = SwipeKeepHistory.activeUris(keepEntries)
-                // now 显式注入同一时钟：与 keep-history 的 nowMs() 统一（测试 fake 时钟生效）
-                SwipeQueueBuilder.build(organizeRepository.loadItems(), now = nowMs())
+                SwipeQueueBuilder.build(organizeRepository.loadItems(), now = now)
                     .filterNot { candidate -> candidate.uri in suppressed }
             }
             _uiState.value = if (queue.isEmpty()) {

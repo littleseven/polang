@@ -103,19 +103,21 @@ class DedupViewModel(
         // 整理中心 v2：后台分批补算模糊/曝光分（缺分即 LOW 覆盖，hub 引导态承接；补算回写经 Room Flow 自动刷新）
         scope.launch(ioDispatcher) {
             runCatching {
-                var remaining = organizeRepository.backfillQualitySignals()
+                var batch = organizeRepository.backfillQualitySignals()
                 var batches = 1
+                var failedResidual = batch.attempted - batch.written
                 // BACKFILL_MAX_BATCHES 兜底：防御永久失败行放大为死循环；正常 200/批 × 1000 = 20 万张覆盖
-                while (remaining > 0 && batches < BACKFILL_MAX_BATCHES) {
-                    remaining = organizeRepository.backfillQualitySignals()
+                while (batch.written > 0 && batches < BACKFILL_MAX_BATCHES) {
+                    batch = organizeRepository.backfillQualitySignals()
                     batches++
+                    failedResidual += batch.attempted - batch.written
                 }
-                if (remaining > 0) {
-                    // 命中上限仍有产出：可能存在永久失败行残留未补算，真机排查看此日志
+                if (batch.written > 0 && failedResidual > 0) {
+                    // 命中上限且累计有失败残留：永久失败行可能未补算，真机排查看此日志
                     Logger.w(
                         ORGANIZE_TAG,
                         "backfill hit BACKFILL_MAX_BATCHES=$BACKFILL_MAX_BATCHES " +
-                            "(last batch=$remaining); residual rows may stay uncomputed"
+                            "with $failedResidual failed rows; residual rows may stay uncomputed"
                     )
                 }
             }.onFailure { error -> Logger.w(TAG, "backfill quality signals failed", error) }

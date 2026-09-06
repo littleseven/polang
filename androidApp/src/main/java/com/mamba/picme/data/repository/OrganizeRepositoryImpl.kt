@@ -17,6 +17,7 @@ import com.mamba.picme.domain.organize.BlurAnalyzer
 import com.mamba.picme.domain.organize.DuplicateGrouper
 import com.mamba.picme.domain.organize.OrganizeItem
 import com.mamba.picme.domain.organize.computeInSampleSize
+import com.mamba.picme.domain.repository.BackfillBatchResult
 import com.mamba.picme.domain.repository.OrganizeRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -218,7 +219,7 @@ class OrganizeRepositoryImpl(
         }.onFailure { error -> Logger.w(TAG, "query mediastore meta failed: $collection", error) }
     }
 
-    override suspend fun backfillQualitySignals(batchLimit: Int): Int = withContext(ioDispatcher) {
+    override suspend fun backfillQualitySignals(batchLimit: Int): BackfillBatchResult = withContext(ioDispatcher) {
         val pending = mediaDao.observeOrganizeRows().first()
             .filter { row -> row.blurScore == null && row.type != MediaType.VIDEO.name }
             .take(batchLimit)
@@ -231,7 +232,7 @@ class OrganizeRepositoryImpl(
             mediaDao.updateQualityScoresBatch(entries)
             Logger.d(TAG, "backfill quality signals: ${entries.size}/${pending.size}")
         }
-        entries.size
+        BackfillBatchResult(attempted = pending.size, written = entries.size)
     }
 
     /**

@@ -17,7 +17,10 @@ interface OrganizeRepository {
 
     /**
      * 惰性补算模糊/曝光分：对 blurScore 为 null 的图片分批计算并回写 Room
-     * （Room Flow 自动驱动 UI 刷新）。返回本次补算张数。幂等，可反复调用。
+     * （Room Flow 自动驱动 UI 刷新）。幂等，可反复调用。
      */
-    suspend fun backfillQualitySignals(batchLimit: Int = 200): Int
+    suspend fun backfillQualitySignals(batchLimit: Int = 200): BackfillBatchResult
 }
+
+/** 单批补算产出：attempted = 本批待算张数，written = 成功回写张数；attempted − written = 失败残留数。 */
+data class BackfillBatchResult(val attempted: Int, val written: Int)

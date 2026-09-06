@@ -1,6 +1,7 @@
 package com.mamba.picme.features.gallery.dedup
 
 import android.content.IntentSender
+import com.mamba.picme.domain.repository.BackfillBatchResult
 import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.dedup.DedupContentType
 import com.mamba.picme.domain.dedup.DedupGroup
@@ -118,8 +119,8 @@ class DedupViewModelTest {
     /** 整理中心统计源替身：JVM 单测无 Room/MediaStore，恒空流（WhileSubscribed 未订阅时不上游）。 */
     private fun fakeOrganizeRepository(): OrganizeRepository = mockk {
         every { observeItems() } returns flowOf(emptyList())
-        // init 后台补算桩：恒 0 立即退出循环，消除既有测试静默走 onFailure 失败分支
-        coEvery { backfillQualitySignals(any()) } returns 0
+        // init 后台补算桩：恒空批次立即退出循环，消除既有测试静默走 onFailure 失败分支
+        coEvery { backfillQualitySignals(any()) } returns BackfillBatchResult(attempted = 0, written = 0)
     }
 
     private fun viewModel(
@@ -141,7 +142,10 @@ class DedupViewModelTest {
     fun `backfill loop exits when batch returns zero`() = runTest {
         val organizeRepository = mockk<OrganizeRepository> {
             every { observeItems() } returns flowOf(emptyList())
-            coEvery { backfillQualitySignals(any()) } returnsMany listOf(200, 0)
+            coEvery { backfillQualitySignals(any()) } returnsMany listOf(
+                BackfillBatchResult(attempted = 200, written = 200),
+                BackfillBatchResult(attempted = 0, written = 0),
+            )
         }
         viewModel(
             FakeScanner(events = emptyList()),

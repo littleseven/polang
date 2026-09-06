@@ -215,15 +215,17 @@ private fun OrgHeroCard(board: OrganizeBoard) {
             // board 恒 6 卡后 size 恒为 6 语义失真；口径改为有内容的类目数
             // （原 +1 是固定重复卡的旧口径，v2 重复卡已并入 board，不再 +1）
             val heroAcrossCount = board.categories.count { card -> card.totalCount > 0 }
-            Text(
-                text = pluralStringResource(
-                    R.plurals.org_hero_across,
-                    heroAcrossCount,
-                    heroAcrossCount
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (heroAcrossCount > 0) {
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.org_hero_across,
+                        heroAcrossCount,
+                        heroAcrossCount
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             if (board.heroReviewCount > 0) {
                 Text(
                     text = stringResource(R.string.org_hero_review, board.heroReviewCount),
