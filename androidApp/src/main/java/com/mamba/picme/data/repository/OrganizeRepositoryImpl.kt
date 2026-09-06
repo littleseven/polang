@@ -3,6 +3,7 @@ package com.mamba.picme.data.repository
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -11,6 +12,8 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.OrganizeRow
+import com.mamba.picme.domain.organize.BlurAnalyzer
+import com.mamba.picme.domain.organize.DuplicateGrouper
 import com.mamba.picme.domain.organize.OrganizeItem
 import com.mamba.picme.domain.repository.OrganizeRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -50,8 +53,12 @@ class OrganizeRepositoryImpl(
         if (rows.isEmpty()) return@withContext emptyList()
         val metaByUri = queryMediaStoreMeta(appContext.contentResolver)
         val pixelAreaByUri = queryCachedPixelAreas(rows.map { row -> row.uri })
+        val dupInfoByUri = queryDuplicateInfo()
+        val personCountByFaceId = mediaDao.getPersonPhotoCounts()
+            .associate { count -> count.faceId to count.cnt }
         rows.map { row ->
             val meta = metaByUri[row.uri]
+            val dup = dupInfoByUri[row.uri]
             OrganizeItem(
                 uri = row.uri,
                 // isVideo 以 Room type 为准（MediaStore collection 来源仅作 meta 补充）
@@ -65,9 +72,40 @@ class OrganizeRepositoryImpl(
                 hasFace = row.hasFace,
                 aestheticScore = row.aestheticScore,
                 faceQualityScore = row.faceQualityScore,
+                blurScore = row.blurScore,
+                exposureScore = row.exposureScore,
+                lastViewedAt = row.lastViewedAt,
+                isFavorite = meta?.isFavorite ?: false,
+                personPhotoCount = row.faceId?.let { faceId -> personCountByFaceId[faceId] },
+                exactDupGroupSize = dup?.exactGroupSize ?: 0,
+                similarDupGroupSize = dup?.similarGroupSize ?: 0,
             )
         }
     }
+
+    /**
+     * dedup_hash 全量哈希 → 重复组成员信息（空表/未扫描时全零，类目自然不出现）。
+     * ⚠️ pHash 聚类为 O(n²)（DuplicateGrouper.group），全表数万行可能秒级；
+     * 此处打点观察耗时，真机验证后再定是否优化。
+     */
+    private suspend fun queryDuplicateInfo(): Map<String, DuplicateGrouper.DupInfo> =
+        runCatching {
+            val hashes = dedupHashDao.getAllHashes()
+            if (hashes.isEmpty()) {
+                emptyMap()
+            } else {
+                val startNanos = System.nanoTime()
+                val result = DuplicateGrouper.group(
+                    hashes.map { row -> DuplicateGrouper.HashInput(row.uri, row.md5, row.phash) }
+                )
+                val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
+                Logger.d(TAG, "queryDuplicateInfo: ${hashes.size} hashes in ${elapsedMs}ms")
+                result
+            }
+        }.getOrElse { error ->
+            Logger.w(TAG, "query duplicate info failed", error)
+            emptyMap()
+        }
 
     /** dedup_hash 缓存的像素面积（>0 有效），分批 500 防 SQLite IN 上限。 */
     private suspend fun queryCachedPixelAreas(uris: List<String>): Map<String, Long> =
@@ -84,6 +122,8 @@ class OrganizeRepositoryImpl(
         val path: String?,
         /** 像素面积（WIDTH×HEIGHT；列缺失或脏值 ≤0 为 null，OCR 判定退回绝对阈值）。 */
         val pixelArea: Long?,
+        /** MediaStore 收藏标记（API 29+；低版本恒 false）。 */
+        val isFavorite: Boolean,
     )
 
     /** Images + Video 两个 collection 各查一次，key = content uri 字符串（withAppendedId 重建）。 */
@@ -97,7 +137,7 @@ class OrganizeRepositoryImpl(
     @Suppress("DEPRECATION") // DATA 列 API 29 起废弃，但查询仍返回路径，作 API<29 截图识别兜底
     private fun queryCollectionMeta(resolver: ContentResolver, collection: Uri, out: MutableMap<String, MediaMeta>) {
         val hasQColumns = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-        // RELATIVE_PATH 是 Q-only 列，低版本入 projection 会抛 IllegalArgumentException
+        // RELATIVE_PATH / IS_FAVORITE 是 Q-only 列，低版本入 projection 会抛 IllegalArgumentException
         val projection = mutableListOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.SIZE,
@@ -107,6 +147,7 @@ class OrganizeRepositoryImpl(
         ).apply {
             if (hasQColumns) {
                 add(MediaStore.MediaColumns.RELATIVE_PATH)
+                add(MediaStore.MediaColumns.IS_FAVORITE)
             }
         }.toTypedArray()
         runCatching {
@@ -117,6 +158,11 @@ class OrganizeRepositoryImpl(
                 val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
                 val pathCol = if (hasQColumns) {
                     cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                } else {
+                    -1
+                }
+                val favoriteCol = if (hasQColumns) {
+                    cursor.getColumnIndex(MediaStore.MediaColumns.IS_FAVORITE)
                 } else {
                     -1
                 }
@@ -133,10 +179,61 @@ class OrganizeRepositoryImpl(
                         sizeBytes = if (size > 0) size else 0L,
                         path = relativePath ?: dataPath,
                         pixelArea = if (width > 0 && height > 0) width * height else null,
+                        isFavorite = favoriteCol >= 0 && cursor.getInt(favoriteCol) != 0,
                     )
                 }
             }
         }.onFailure { error -> Logger.w(TAG, "query mediastore meta failed: $collection", error) }
+    }
+
+    override suspend fun backfillQualitySignals(batchLimit: Int): Int = withContext(ioDispatcher) {
+        val pending = mediaDao.observeOrganizeRows().first()
+            .filter { row -> row.blurScore == null && row.type != MediaType.VIDEO.name }
+            .take(batchLimit)
+        var done = 0
+        pending.forEach { row ->
+            val scores = runCatching { computeQualityScores(row.uri) }.getOrNull()
+            if (scores != null) {
+                mediaDao.updateQualityScores(row.uri, scores.first, scores.second)
+                done++
+            }
+        }
+        if (done > 0) Logger.d(TAG, "backfill quality signals: $done/${pending.size}")
+        done
+    }
+
+    /**
+     * 解码 ≤256px 灰度图 → (blurScore, exposureScore)；解码失败返回 null（不阻断批次）。
+     * ⚠️ 解码失败必须回 null 跳过回写——BlurAnalyzer 的 0 是退化输入哨兵，不可入库。
+     */
+    private fun computeQualityScores(uri: String): Pair<Float, Float>? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
+            BitmapFactory.decodeStream(input, null, bounds)
+        } ?: return null
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= 256 || bounds.outHeight / (sample * 2) >= 256) {
+            sample *= 2
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        val bitmap = appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
+            BitmapFactory.decodeStream(input, null, options)
+        } ?: return null
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        bitmap.recycle()
+        // BT.601 灰度化
+        val gray = IntArray(pixels.size) { index ->
+            val pixel = pixels[index]
+            val r = pixel shr 16 and 0xFF
+            val g = pixel shr 8 and 0xFF
+            val b = pixel and 0xFF
+            (299 * r + 587 * g + 114 * b) / 1000
+        }
+        return BlurAnalyzer.laplacianVariance(gray, width, height) to BlurAnalyzer.meanLuminance(gray)
     }
 
     private companion object {

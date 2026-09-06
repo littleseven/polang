@@ -14,4 +14,10 @@ interface OrganizeRepository {
 
     /** 类目详情全量（一次性）。 */
     suspend fun loadItems(): List<OrganizeItem>
+
+    /**
+     * 惰性补算模糊/曝光分：对 blurScore 为 null 的图片分批计算并回写 Room
+     * （Room Flow 自动驱动 UI 刷新）。返回本次补算张数。幂等，可反复调用。
+     */
+    suspend fun backfillQualitySignals(batchLimit: Int = 200): Int
 }
