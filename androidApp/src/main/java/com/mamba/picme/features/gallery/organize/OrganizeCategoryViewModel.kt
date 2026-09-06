@@ -3,11 +3,11 @@ package com.mamba.picme.features.gallery.organize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.core.common.Logger
-import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.organize.ClassifiedItem
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.OrganizeCategorizer
 import com.mamba.picme.domain.organize.OrganizeConfidence
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.trash.TrashBackend
 import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.domain.trash.TrashSessionController
@@ -100,9 +100,8 @@ class OrganizeCategoryViewModel(
             _uiState.value = OrganizeCategoryUiState.Ready(
                 items = items,
                 selected = if (preselect && _aiPreselectEnabled.value) {
-                    items.filter { entry ->
-                        entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
-                    }.map { entry -> entry.item.uri }.toSet()
+                    // 与三段分组同源：预选集 = suggested 段（HIGH 置信非保护）
+                    items.toSections().suggested.map { entry -> entry.item.uri }.toSet()
                 } else {
                     emptySet()
                 },
@@ -123,10 +122,14 @@ class OrganizeCategoryViewModel(
         )
     }
 
+    /** 全选（用户显式行为）：仅圈选非保护项——protected「永不预选」含显式全选（spec §6.3）。 */
     fun selectAll() {
         val ready = currentReady() ?: return
         if (ready.trashed) return
-        _uiState.value = ready.copy(selected = ready.items.map { entry -> entry.item.uri }.toSet())
+        _uiState.value = ready.copy(
+            selected = ready.items.filter { entry -> !entry.isProtected }
+                .map { entry -> entry.item.uri }.toSet()
+        )
     }
 
     fun deselectAll() {
@@ -142,9 +145,8 @@ class OrganizeCategoryViewModel(
         if (ready.trashed) return
         _uiState.value = ready.copy(
             selected = if (enabled) {
-                ready.items.filter { entry ->
-                    entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
-                }.map { entry -> entry.item.uri }.toSet()
+                // 与三段分组同源：预选集 = suggested 段（HIGH 置信非保护）
+                ready.items.toSections().suggested.map { entry -> entry.item.uri }.toSet()
             } else {
                 emptySet()
             }

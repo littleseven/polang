@@ -1,11 +1,12 @@
 package com.mamba.picme.features.gallery.organize
 
-import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.organize.ClassifiedItem
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.OrganizeConfidence
 import com.mamba.picme.domain.organize.OrganizeItem
+import com.mamba.picme.domain.organize.OrganizeThresholds
 import com.mamba.picme.domain.organize.ProtectReason
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.trash.TrashBackend
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -41,9 +42,21 @@ class OrganizeCategoryViewModelTest {
     /** 非截图样例（DCIM 相机目录），用于验证类目过滤。 */
     private fun photo(uri: String) = shot(uri).copy(relativePath = "DCIM/Camera/")
 
+    /** 强模糊：HIGH 档（blur < BLUR_VARIANCE_LOW × STRONG_SIGNAL_FACTOR）内取中点，阈值校准不过期。 */
+    private val strongBlur: Float =
+        OrganizeThresholds.BLUR_VARIANCE_LOW * OrganizeThresholds.STRONG_SIGNAL_FACTOR / 2
+
+    /** 边界模糊：MEDIUM 档（0.5×阈值 ~ 1×阈值）内取中点。 */
+    private val borderlineBlur: Float =
+        OrganizeThresholds.BLUR_VARIANCE_LOW * (1 + OrganizeThresholds.STRONG_SIGNAL_FACTOR) / 2
+
+    /** 老照片拍摄时间：早于 now − OLD_PHOTO_YEARS 年（多一年余量，远离边界）。 */
+    private fun oldCaptureDate(now: Long): Long =
+        now - (OrganizeThresholds.OLD_PHOTO_YEARS + 1) * 365L * 24 * 3600 * 1000
+
     /**
-     * 低质照片样例：blurScore < BLUR_VARIANCE_LOW(100) 裁定归 LOW_QUALITY_PHOTOS；
-     * blur < 50（0.5×阈值）= HIGH，50 ≤ blur < 100 = MEDIUM。captureDate 显式传入
+     * 低质照片样例：blurScore < BLUR_VARIANCE_LOW 裁定归 LOW_QUALITY_PHOTOS；
+     * blur < BLUR_VARIANCE_LOW × STRONG_SIGNAL_FACTOR = HIGH，其间 = MEDIUM。captureDate 显式传入
      * ——ValueGuard 保守偏置会把 1970 老时间戳判 OLD_PHOTO 保护，非保护用例必须给近期时间。
      */
     private fun blurPhoto(uri: String, captureDate: Long, blurScore: Float) = photo(uri).copy(
@@ -121,12 +134,12 @@ class OrganizeCategoryViewModelTest {
         val now = System.currentTimeMillis()
         val repo = FakeRepo().apply {
             items = listOf(
-                // HIGH：强模糊（blur=10 < 0.5×BLUR_VARIANCE_LOW=50），近期拍摄非保护
-                blurPhoto("high", captureDate = now, blurScore = 10.0f),
-                // MEDIUM：边界模糊（50 < blur=80 < 100）
-                blurPhoto("medium", captureDate = now, blurScore = 80.0f),
-                // HIGH（blur=10 强模糊）但 protected：6 年前 → OLD_PHOTO
-                blurPhoto("old", captureDate = now - 6 * 365L * 24 * 3600 * 1000, blurScore = 10.0f),
+                // HIGH：强模糊（HIGH 档中点），近期拍摄非保护
+                blurPhoto("high", captureDate = now, blurScore = strongBlur),
+                // MEDIUM：边界模糊（MEDIUM 档中点）
+                blurPhoto("medium", captureDate = now, blurScore = borderlineBlur),
+                // HIGH（强模糊）但 protected：老照片 → OLD_PHOTO
+                blurPhoto("old", captureDate = oldCaptureDate(now), blurScore = strongBlur),
             )
         }
         val vm = viewModel(this, repo, FakeBackend(), OrganizeCategory.LOW_QUALITY_PHOTOS)
@@ -143,11 +156,13 @@ class OrganizeCategoryViewModelTest {
             classified("b", OrganizeConfidence.MEDIUM),
             classified("c", OrganizeConfidence.LOW),
             classified("d", OrganizeConfidence.HIGH, protectReasons = setOf(ProtectReason.OLD_PHOTO)),
+            // MEDIUM + protected：保护优先于 review 段
+            classified("e", OrganizeConfidence.MEDIUM, protectReasons = setOf(ProtectReason.USER_ENGAGED)),
         )
         val sections = entries.toSections()
         assertEquals(listOf("a"), sections.suggested.map { entry -> entry.item.uri })
         assertEquals(listOf("b", "c"), sections.review.map { entry -> entry.item.uri })
-        assertEquals(listOf("d"), sections.protectedItems.map { entry -> entry.item.uri })
+        assertEquals(listOf("d", "e"), sections.protectedItems.map { entry -> entry.item.uri })
         assertEquals(entries.size, sections.suggested.size + sections.review.size + sections.protectedItems.size)
     }
 
@@ -164,8 +179,16 @@ class OrganizeCategoryViewModelTest {
 
     @Test
     fun `selectAll and deselectAll`() = runTest {
-        val repo = FakeRepo().apply { items = listOf(shot("a"), shot("b")) }
-        val vm = viewModel(this, repo, FakeBackend())
+        val now = System.currentTimeMillis()
+        val repo = FakeRepo().apply {
+            items = listOf(
+                blurPhoto("a", captureDate = now, blurScore = strongBlur),
+                blurPhoto("b", captureDate = now, blurScore = strongBlur),
+                // protected（OLD_PHOTO）：selectAll 不得勾穿保护段（spec §6.3 永不预选）
+                blurPhoto("p", captureDate = oldCaptureDate(now), blurScore = strongBlur),
+            )
+        }
+        val vm = viewModel(this, repo, FakeBackend(), OrganizeCategory.LOW_QUALITY_PHOTOS)
         advanceUntilIdle()
         vm.deselectAll()
         assertTrue(ready(vm).selected.isEmpty())
