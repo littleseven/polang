@@ -790,6 +790,7 @@ class ConfidenceGraderTest {
 
     @Suppress("LongParameterList")
     private fun item(
+        uri: String = "a",
         isVideo: Boolean = false,
         sizeBytes: Long = 1_000_000,
         relativePath: String? = "DCIM/Camera/",
@@ -804,7 +805,7 @@ class ConfidenceGraderTest {
         exactDupGroupSize: Int = 0,
         similarDupGroupSize: Int = 0,
     ) = OrganizeItem(
-        uri = "a", isVideo = isVideo, captureDate = 1_000L, sizeBytes = sizeBytes,
+        uri = uri, isVideo = isVideo, captureDate = 1_000L, sizeBytes = sizeBytes,
         relativePath = relativePath, ocrText = ocrText, pixelArea = pixelArea,
         labels = labels, hasFace = hasFace, aestheticScore = aestheticScore,
         faceQualityScore = faceQualityScore, blurScore = blurScore,
@@ -849,6 +850,26 @@ class ConfidenceGraderTest {
             OrganizeConfidence.MEDIUM,
             ConfidenceGrader.grade(item(labels = """["文档","纸张"]"""), OrganizeCategory.DOCUMENTS)
         )
+        // sub-MP 回归：0.9MP 真阈值 0.9×20×2=36 字符，20 < 36 → MEDIUM（旧先除后乘实现阈值塌缩为 0 会误判 HIGH）
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(
+                item(ocrText = "x".repeat(20), pixelArea = 900_000), OrganizeCategory.DOCUMENTS
+            )
+        )
+        // pixelArea=null 兜底分支：500 ≥ 200×2=400 → HIGH；300 < 400 → MEDIUM
+        assertEquals(
+            OrganizeConfidence.HIGH,
+            ConfidenceGrader.grade(
+                item(ocrText = "x".repeat(500), pixelArea = null), OrganizeCategory.DOCUMENTS
+            )
+        )
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(
+                item(ocrText = "x".repeat(300), pixelArea = null), OrganizeCategory.DOCUMENTS
+            )
+        )
     }
 
     @Test
@@ -881,7 +902,17 @@ class ConfidenceGraderTest {
             OrganizeConfidence.MEDIUM,
             ConfidenceGrader.grade(item(exposureScore = 0.05f), OrganizeCategory.LOW_QUALITY_PHOTOS)
         )
-        // 美学分低但模糊/曝光正常 → LOW（不默认勾选，仅列出）
+        // 过曝侧（OR 右半边）
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(item(exposureScore = 0.9f), OrganizeCategory.LOW_QUALITY_PHOTOS)
+        )
+        // 等值边界锁定：blur = 100×0.5=50 时 `<` 严格不命中 HIGH → MEDIUM
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(item(blurScore = 50.0f), OrganizeCategory.LOW_QUALITY_PHOTOS)
+        )
+        // 防御性兜底分支单测（该输入经 arbiter 不会进此类目，此处锁定 grader 独立语义）
         assertEquals(
             OrganizeConfidence.LOW,
             ConfidenceGrader.grade(
@@ -903,6 +934,26 @@ class ConfidenceGraderTest {
             OrganizeConfidence.MEDIUM,
             ConfidenceGrader.grade(
                 item(isVideo = true, sizeBytes = 120L * 1024 * 1024), OrganizeCategory.LARGE_FILES
+            )
+        )
+        // 照片分支：≥2×20MB → HIGH；1.25× → MEDIUM
+        assertEquals(
+            OrganizeConfidence.HIGH,
+            ConfidenceGrader.grade(
+                item(pixelArea = 60_000_000, sizeBytes = 45L * 1024 * 1024), OrganizeCategory.LARGE_FILES
+            )
+        )
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(
+                item(pixelArea = 60_000_000, sizeBytes = 25L * 1024 * 1024), OrganizeCategory.LARGE_FILES
+            )
+        )
+        // 等值边界锁定：2×100MiB=200MiB 时 `>=` 恰等命中 HIGH
+        assertEquals(
+            OrganizeConfidence.HIGH,
+            ConfidenceGrader.grade(
+                item(isVideo = true, sizeBytes = 200L * 1024 * 1024), OrganizeCategory.LARGE_FILES
             )
         )
     }
@@ -961,19 +1012,23 @@ object ConfidenceGrader {
         val chars = item.ocrText?.length ?: 0
         if (chars == 0) return OrganizeConfidence.MEDIUM // labels 关键词命中（无 OCR 佐证）
         val area = item.pixelArea
-        val strongThreshold = if (area != null && area > 0) {
-            // 与 DedupContentTypeDetector 同一面积归一口径的 2×
-            area / 1_000_000L * OrganizeThresholds.OCR_DENSITY_PER_MEGAPIXEL * OrganizeThresholds.OCR_STRONG_FACTOR
+        return if (area != null && area > 0) {
+            // 与 DedupContentTypeDetector 同一面积归一口径的 2×（先乘后除，避免 sub-MP 整数截断塌缩为 0）
+            if (chars.toLong() * 1_000_000L >= area * OrganizeThresholds.OCR_DENSITY_PER_MEGAPIXEL * OrganizeThresholds.OCR_STRONG_FACTOR) {
+                OrganizeConfidence.HIGH
+            } else {
+                OrganizeConfidence.MEDIUM
+            }
         } else {
-            OrganizeThresholds.OCR_DENSITY_FALLBACK_CHARS.toLong() * OrganizeThresholds.OCR_STRONG_FACTOR
-        }
-        return if (chars.toLong() >= strongThreshold) {
-            OrganizeConfidence.HIGH
-        } else {
-            OrganizeConfidence.MEDIUM
+            if (chars.toLong() >= OrganizeThresholds.OCR_DENSITY_FALLBACK_CHARS.toLong() * OrganizeThresholds.OCR_STRONG_FACTOR) {
+                OrganizeConfidence.HIGH
+            } else {
+                OrganizeConfidence.MEDIUM
+            }
         }
     }
 
+    /** 模糊强命中 HIGH；模糊/曝光任一边界命中 MEDIUM；其余（含 null 信号）LOW。 */
     private fun gradeLowQualityPhoto(item: OrganizeItem): OrganizeConfidence {
         val blur = item.blurScore
         if (blur != null && blur < OrganizeThresholds.BLUR_VARIANCE_LOW * OrganizeThresholds.STRONG_SIGNAL_FACTOR) {
@@ -984,10 +1039,11 @@ object ConfidenceGrader {
         val badExposure = exposure != null &&
             (exposure < OrganizeThresholds.EXPOSURE_UNDER || exposure > OrganizeThresholds.EXPOSURE_OVER)
         if (blurred || badExposure) return OrganizeConfidence.MEDIUM
-        // 模糊/曝光正常或未计算，仅 NIMA 低分 → 弱信号
+        // 防御性兜底：arbiter 不定类 NIMA-only 项，正常管线不可达；null 信号落最低档方向安全
         return OrganizeConfidence.LOW
     }
 
+    /** 大文件主阈值：视频按字节，照片按字节（像素面积门槛已在 CategoryArbiter 裁定）。 */
     private fun largeFileThreshold(item: OrganizeItem): Long =
         if (item.isVideo) {
             OrganizeThresholds.LARGE_VIDEO_BYTES
