@@ -29,7 +29,10 @@ object OrganizeThresholds {
     /** 平均亮度（0~1）高于判过曝。 */
     const val EXPOSURE_OVER = 0.85f
 
-    /** 置信度分级：强命中 = 主阈值 × 该系数（blur/faceQuality 等越低越差型信号）。 */
+    /**
+     * 置信度分级：强命中 = 主阈值 × 该系数（blur/faceQuality 等越低越差型信号）。
+     * 适用于「越低越差」型信号（blur/faceQuality）；「越高越强」型用 OCR_STRONG_FACTOR / LARGE_FILE_STRONG_FACTOR。
+     */
     const val STRONG_SIGNAL_FACTOR = 0.5f
 
     // ── 新增：大文件（超分辨率照片）──────────────────────────
@@ -38,6 +41,9 @@ object OrganizeThresholds {
 
     /** 超分辨率照片大小阈值（20 MB，与像素面积同时满足才判大文件）。 */
     const val LARGE_PHOTO_BYTES = 20L * 1024 * 1024
+
+    /** LARGE_FILES 强命中倍数：大小 ≥ 主阈值 × 该系数 → HIGH 置信。 */
+    const val LARGE_FILE_STRONG_FACTOR = 2
 
     // ── 价值保护 ────────────────────────────────────────────
     /** 年代久远：拍摄时间早于 now − 该年数判老照片。 */
@@ -48,7 +54,13 @@ object OrganizeThresholds {
 
     /** OCR 强命中倍数：文字密度 ≥ 主阈值 × 该系数 → HIGH 置信。 */
     const val OCR_STRONG_FACTOR = 2
-}
 
-/** 一年毫秒数（365 天，ValueGuard 老照片判定用，避免引入 java.time 依赖）。 */
-internal const val YEAR_MILLIS = 365L * 24 * 60 * 60 * 1000
+    /** DOCUMENT OCR 文字密度主阈值（字符数/百万像素，与 dedup 侧同口径）。 */
+    const val OCR_DENSITY_PER_MEGAPIXEL = 20
+
+    /** DOCUMENT OCR 绝对字符数兜底阈值（尺寸未知时）。 */
+    const val OCR_DENSITY_FALLBACK_CHARS = 200
+
+    /** 一年毫秒数（365 天近似，老照片判定用，避免引入 java.time）。 */
+    internal const val YEAR_MILLIS = 365L * 24 * 60 * 60 * 1000
+}

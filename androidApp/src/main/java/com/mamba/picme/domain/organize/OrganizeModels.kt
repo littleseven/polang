@@ -20,7 +20,7 @@ enum class OrganizeCategory {
 data class OrganizeItem(
     val uri: String,
     val isVideo: Boolean,
-    val captureDate: Long,
+    val captureDate: Long,                // epoch 毫秒
     val sizeBytes: Long,                // 未知 = 0
     val relativePath: String?,
     val ocrText: String?,
@@ -30,11 +30,14 @@ data class OrganizeItem(
     val aestheticScore: Float?,         // null = 未评分
     val faceQualityScore: Float?,       // null = 未评分
     // ── v2 新增信号 ──────────────────────────────────────────
-    val blurScore: Float? = null,       // Laplacian 方差；null = 未计算
+    val blurScore: Float? = null,       // Laplacian 方差，越大越清晰；null = 未计算
     val exposureScore: Float? = null,   // 平均亮度 0~1；null = 未计算
-    val lastViewedAt: Long? = null,     // null = 从未在查看器打开
+    val lastViewedAt: Long? = null,     // epoch 毫秒；null = 从未在查看器打开
     val isFavorite: Boolean = false,    // MediaStore IS_FAVORITE
-    /** 所属人物聚类的照片总数；null/0 = 无人脸或未聚类。 */
+    /**
+     * 所属人物聚类的照片总数；null = 无 faceId（无人脸或聚类未跑），此信号不参与保护判定
+     * ——与类级「null=未覆盖不判定」契约一致；「无人脸」已由 hasFace=false 表达。
+     */
     val personPhotoCount: Int? = null,
     /** 精确重复组大小（同 MD5 组成员数）；< 2 = 不在重复组。 */
     val exactDupGroupSize: Int = 0,
@@ -53,9 +56,11 @@ data class ClassifiedItem(
     val item: OrganizeItem,
     val category: OrganizeCategory,
     val confidence: OrganizeConfidence,
-    val protected: Boolean,
     val protectReasons: Set<ProtectReason> = emptySet(),
-)
+) {
+    /** 是否受价值保护（由保护原因集派生，单一事实来源）。 */
+    val isProtected: Boolean get() = protectReasons.isNotEmpty()
+}
 
 /** 类目信号覆盖度：驱动 hub 类目卡「需先扫描」引导态（修复 v1 类目静默消失）。 */
 enum class SignalCoverage { READY, NEEDS_SCAN }
