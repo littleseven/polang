@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=132%3A2"
+    "url": "cocraft://localhost/file/715061534788814?node_id=171%3A14"
   },
   "pages": [
     {
@@ -12,40 +12,7 @@
           "tree": {
             "nodes": [
               {
-                "children": [
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:111",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 17,
-                    "y": 72.5
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:112",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:133"
-                    },
-                    "name": "ic/flip",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 311,
-                    "y": 737
-                  }
-                ],
+                "children": [],
                 "clipsContent": true,
                 "fills": [
                   "$2:118"
@@ -68,40 +35,7 @@
           "tree": {
             "nodes": [
               {
-                "children": [
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:113",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 17,
-                    "y": 72.5
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:114",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:133"
-                    },
-                    "name": "ic/flip",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 311,
-                    "y": 737
-                  }
-                ],
+                "children": [],
                 "clipsContent": true,
                 "fills": [
                   "$2:118"
@@ -124,40 +58,7 @@
           "tree": {
             "nodes": [
               {
-                "children": [
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:115",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 17,
-                    "y": 72.5
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:116",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:133"
-                    },
-                    "name": "ic/flip",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 311,
-                    "y": 737
-                  }
-                ],
+                "children": [],
                 "clipsContent": true,
                 "fills": [
                   "$2:118"
@@ -180,40 +81,7 @@
           "tree": {
             "nodes": [
               {
-                "children": [
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:117",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 17,
-                    "y": 72.5
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:118",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:133"
-                    },
-                    "name": "ic/flip",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 311,
-                    "y": 737
-                  }
-                ],
+                "children": [],
                 "clipsContent": true,
                 "fills": [
                   "$2:118"
@@ -236,40 +104,7 @@
           "tree": {
             "nodes": [
               {
-                "children": [
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:119",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 17,
-                    "y": 72.5
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:120",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:133"
-                    },
-                    "name": "ic/flip",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 311,
-                    "y": 737
-                  }
-                ],
+                "children": [],
                 "clipsContent": true,
                 "fills": [
                   "$2:118"
@@ -326,38 +161,6 @@
                     "width": 2,
                     "x": 195.5,
                     "y": 342
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:121",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 17,
-                    "y": 72.5
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:122",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:133"
-                    },
-                    "name": "ic/flip",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 311,
-                    "y": 737
                   }
                 ],
                 "clipsContent": true,
@@ -382,40 +185,7 @@
           "tree": {
             "nodes": [
               {
-                "children": [
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:109",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 17,
-                    "y": 72.5
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:110",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:133"
-                    },
-                    "name": "ic/flip",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 311,
-                    "y": 737
-                  }
-                ],
+                "children": [],
                 "clipsContent": true,
                 "fills": [
                   "$2:118"
@@ -9001,15 +8771,15 @@
                         "visible": true
                       }
                     ],
-                    "gap": 101,
+                    "gap": 61,
                     "height": 48,
                     "id": "300:204",
                     "layout": "horizontal",
                     "name": "system_nav_bar",
                     "padding": {
                       "bottom": 0,
-                      "left": 67,
-                      "right": 67,
+                      "left": 99.5,
+                      "right": 99.5,
                       "top": 0
                     },
                     "type": "FRAME",
@@ -18568,24 +18338,7 @@
                                     "y": "auto"
                                   },
                                   {
-                                    "children": [
-                                      {
-                                        "componentProperties": {},
-                                        "gap": 0,
-                                        "height": "$2:15",
-                                        "id": "192:139",
-                                        "layout": "none",
-                                        "mainComponent": {
-                                          "componentPropertyDefinitions": {},
-                                          "id": "132:73"
-                                        },
-                                        "name": "ic/camera",
-                                        "type": "INSTANCE",
-                                        "width": "$2:15",
-                                        "x": 4,
-                                        "y": 4
-                                      }
-                                    ],
+                                    "children": [],
                                     "clipsContent": true,
                                     "cornerRadius": 10,
                                     "fills": [
@@ -28185,102 +27938,6 @@
                     "y": 712
                   },
                   {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:17",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 15,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:18",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:125"
-                    },
-                    "name": "ic/cutout",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 218,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:19",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:113"
-                    },
-                    "name": "ic/auto_fix",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 254,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:20",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:117"
-                    },
-                    "name": "ic/undo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 290,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:21",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:121"
-                    },
-                    "name": "ic/redo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 326,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:22",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:33"
-                    },
-                    "name": "ic/check",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 362,
-                    "y": 47
-                  },
-                  {
                     "children": [
                       {
                         "children": [
@@ -29254,102 +28911,6 @@
                     "width": 18,
                     "x": 187.5,
                     "y": 736
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:23",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:14"
-                    },
-                    "name": "ic/back",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 15,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:24",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:125"
-                    },
-                    "name": "ic/cutout",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 218,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:25",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:113"
-                    },
-                    "name": "ic/auto_fix",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 254,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:26",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:117"
-                    },
-                    "name": "ic/undo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 290,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:27",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:121"
-                    },
-                    "name": "ic/redo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 326,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:28",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:33"
-                    },
-                    "name": "ic/check",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 362,
-                    "y": 47
                   },
                   {
                     "children": [
@@ -30953,38 +30514,6 @@
                     "width": 60,
                     "x": 326,
                     "y": 738
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:30",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:117"
-                    },
-                    "name": "ic/undo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 227,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:31",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:121"
-                    },
-                    "name": "ic/redo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 261,
-                    "y": 47
                   }
                 ],
                 "clipsContent": true,
@@ -32156,38 +31685,6 @@
                     "width": 54,
                     "x": 321,
                     "y": 644
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:40",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:117"
-                    },
-                    "name": "ic/undo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 227,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:41",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:121"
-                    },
-                    "name": "ic/redo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 261,
-                    "y": 47
                   }
                 ],
                 "clipsContent": true,
@@ -33551,38 +33048,6 @@
                     "width": 44,
                     "x": 334,
                     "y": 628
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:50",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:117"
-                    },
-                    "name": "ic/undo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 227,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:51",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:121"
-                    },
-                    "name": "ic/redo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 261,
-                    "y": 47
                   }
                 ],
                 "clipsContent": true,
@@ -34235,38 +33700,6 @@
                     "width": 60,
                     "x": 326,
                     "y": 738
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:76",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:117"
-                    },
-                    "name": "ic/undo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 227,
-                    "y": 47
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "$2:15",
-                    "id": "133:77",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "132:121"
-                    },
-                    "name": "ic/redo",
-                    "type": "INSTANCE",
-                    "width": "$2:15",
-                    "x": 261,
-                    "y": 47
                   }
                 ],
                 "clipsContent": true,
@@ -34293,158 +33726,9 @@
               {
                 "children": [
                   {
-                    "characters": "编辑页底部 tab 条 —— EN 折行/裁字修复方案",
-                    "fills": [
-                      {
-                        "blendMode": "NORMAL",
-                        "color": {
-                          "b": 1,
-                          "g": 1,
-                          "r": 1
-                        },
-                        "opacity": 1,
-                        "type": "SOLID",
-                        "visible": true
-                      }
-                    ],
-                    "fontName": {
-                      "family": "Inter",
-                      "style": "SemiBold"
-                    },
-                    "fontSize": 14,
-                    "height": "hug_contents",
-                    "id": "182:94",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "cap_title",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": "hug_contents",
-                    "x": "auto",
-                    "y": "auto"
-                  },
-                  {
-                    "characters": "0 · 现状（EN）：等宽 68px 槽位 + M3 内距 16，Adjust/Beauty/Filter/Markup 折行且第二行被裁",
-                    "fills": [
-                      {
-                        "blendMode": "NORMAL",
-                        "color": {
-                          "b": 1,
-                          "g": 1,
-                          "r": 1
-                        },
-                        "opacity": 0.550000011920929,
-                        "type": "SOLID",
-                        "visible": true
-                      }
-                    ],
-                    "fontName": {
-                      "family": "Inter",
-                      "style": "Regular"
-                    },
-                    "fontSize": 11,
-                    "height": "hug_contents",
-                    "id": "182:95",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "cap_bug",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": "fill_container",
-                    "x": "auto",
-                    "y": "auto"
-                  },
-                  {
                     "children": [
                       {
                         "children": [
-                          {
-                            "characters": "Crop",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:98",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:97",
-                        "layout": "horizontal",
-                        "name": "bug_crop",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 16,
-                          "right": 16,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": 68,
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "componentProperties": {},
-                            "gap": 0,
-                            "height": "$2:15",
-                            "id": "182:100",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:33"
-                            },
-                            "name": "ic_check",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
-                            "x": "auto",
-                            "y": "auto"
-                          },
                           {
                             "characters": "Adjust",
                             "fills": [
@@ -34489,207 +33773,6 @@
                         "width": 68,
                         "x": "auto",
                         "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "Beauty",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:103",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:102",
-                        "layout": "horizontal",
-                        "name": "bug_beauty",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 16,
-                          "right": 16,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": 68,
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "Filter",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:105",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:104",
-                        "layout": "horizontal",
-                        "name": "bug_filter",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 16,
-                          "right": 16,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": 68,
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "Markup",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:107",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:106",
-                        "layout": "horizontal",
-                        "name": "bug_markup",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 16,
-                          "right": 16,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": 68,
-                        "x": "auto",
-                        "y": "auto"
                       }
                     ],
                     "clipsContent": true,
@@ -34710,107 +33793,7 @@
                     "y": "auto"
                   },
                   {
-                    "characters": "方案A（上轮已选）· 自适应宽度+紧凑内距 8+间距 6 居中；选中态去✓靠底色区分",
-                    "fills": [
-                      {
-                        "blendMode": "NORMAL",
-                        "color": {
-                          "b": 1,
-                          "g": 1,
-                          "r": 1
-                        },
-                        "opacity": 0.550000011920929,
-                        "type": "SOLID",
-                        "visible": true
-                      }
-                    ],
-                    "fontName": {
-                      "family": "Inter",
-                      "style": "Regular"
-                    },
-                    "fontSize": 11,
-                    "height": "hug_contents",
-                    "id": "182:108",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "cap_optA_en",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": "fill_container",
-                    "x": "auto",
-                    "y": "auto"
-                  },
-                  {
                     "children": [
-                      {
-                        "children": [
-                          {
-                            "characters": "Crop",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:111",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:110",
-                        "layout": "horizontal",
-                        "name": "optA_crop",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
                       {
                         "children": [
                           {
@@ -34857,207 +33840,6 @@
                         "width": "hug_contents",
                         "x": "auto",
                         "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "Beauty",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:115",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:114",
-                        "layout": "horizontal",
-                        "name": "optA_beauty",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "Filter",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:117",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:116",
-                        "layout": "horizontal",
-                        "name": "optA_filter",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "Markup",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:119",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:118",
-                        "layout": "horizontal",
-                        "name": "optA_markup",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
                       }
                     ],
                     "clipsContent": true,
@@ -35078,107 +33860,7 @@
                     "y": "auto"
                   },
                   {
-                    "characters": "方案A · 中文（同布局自然收窄，EN/zh/zh-TW 三语单行放下）",
-                    "fills": [
-                      {
-                        "blendMode": "NORMAL",
-                        "color": {
-                          "b": 1,
-                          "g": 1,
-                          "r": 1
-                        },
-                        "opacity": 0.550000011920929,
-                        "type": "SOLID",
-                        "visible": true
-                      }
-                    ],
-                    "fontName": {
-                      "family": "Inter",
-                      "style": "Regular"
-                    },
-                    "fontSize": 11,
-                    "height": "hug_contents",
-                    "id": "182:120",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "cap_optA_zh",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": "fill_container",
-                    "x": "auto",
-                    "y": "auto"
-                  },
-                  {
                     "children": [
-                      {
-                        "children": [
-                          {
-                            "characters": "构图",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:123",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:122",
-                        "layout": "horizontal",
-                        "name": "optAz_crop",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
                       {
                         "children": [
                           {
@@ -35215,207 +33897,6 @@
                         "id": "182:124",
                         "layout": "horizontal",
                         "name": "optAz_adjust_sel",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "美颜",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:127",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:126",
-                        "layout": "horizontal",
-                        "name": "optAz_beauty",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "滤镜",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:129",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:128",
-                        "layout": "horizontal",
-                        "name": "optAz_filter",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 8,
-                          "right": 8,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "characters": "标记",
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "color": {
-                                  "b": 1,
-                                  "g": 1,
-                                  "r": 1
-                                },
-                                "opacity": 1,
-                                "type": "SOLID",
-                                "visible": true
-                              }
-                            ],
-                            "fontName": {
-                              "family": "Inter",
-                              "style": "Regular"
-                            },
-                            "fontSize": 14,
-                            "height": "hug_contents",
-                            "id": "182:131",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "lbl",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 8,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3100000023841858,
-                              "g": 0.27000001072883606,
-                              "r": 0.28999999165534973
-                            },
-                            "opacity": 0.5,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 36,
-                        "id": "182:130",
-                        "layout": "horizontal",
-                        "name": "optAz_markup",
                         "padding": {
                           "bottom": 0,
                           "left": 8,
@@ -36451,7 +34932,17 @@
                                     "id": "300:124",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 10.050000190734863,
@@ -36463,7 +34954,17 @@
                                     "id": "300:125",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 10.359999656677246,
@@ -36472,7 +34973,17 @@
                                   },
                                   {
                                     "fills": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "height": 3.0699996948242188,
                                     "id": "300:126",
@@ -36559,7 +35070,17 @@
                                     "id": "300:131",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 2.8199996948242188,
@@ -36571,7 +35092,17 @@
                                     "id": "300:132",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 11.279999732971191,
@@ -36655,7 +35186,17 @@
                                     "id": "300:137",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 13.319999694824219,
@@ -36667,7 +35208,17 @@
                                     "id": "300:138",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 3.700000762939453,
@@ -36679,7 +35230,17 @@
                                     "id": "300:139",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 8.139999389648438,
@@ -36763,7 +35324,17 @@
                                     "id": "300:144",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 8.559999465942383,
@@ -36775,7 +35346,17 @@
                                     "id": "300:145",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 3.1200008392333984,
@@ -36787,7 +35368,17 @@
                                     "id": "300:146",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
                                     "width": 2.339999198913574,
@@ -36941,34 +35532,54 @@
                               {
                                 "children": [
                                   {
-                                    "height": 8.399999618530273,
-                                    "id": "300:379",
+                                    "height": 12.520000457763672,
+                                    "id": "300:518",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
-                                    "width": 0,
-                                    "x": 6.769999980926514,
-                                    "y": 6.800000190734863
+                                    "width": 2.40000057220459,
+                                    "x": 5.25,
+                                    "y": 6.170000076293945
                                   },
                                   {
-                                    "height": 8.399999618530273,
-                                    "id": "300:380",
+                                    "height": 12.520000457763672,
+                                    "id": "300:519",
                                     "name": "Vector",
                                     "strokes": [
-                                      "$2:130"
+                                      {
+                                        "blendMode": "NORMAL",
+                                        "color": {
+                                          "b": 0.7764706015586853,
+                                          "g": 0.8392156958580017,
+                                          "r": 0.5607843399047852
+                                        },
+                                        "opacity": 1,
+                                        "type": "SOLID",
+                                        "visible": true
+                                      }
                                     ],
                                     "type": "VECTOR",
-                                    "width": 0,
-                                    "x": 15.229999542236328,
-                                    "y": 6.800000190734863
+                                    "width": 2.3999996185302734,
+                                    "x": 14.350000381469727,
+                                    "y": 6.170000076293945
                                   }
                                 ],
                                 "clipsContent": true,
                                 "gap": 0,
                                 "height": 22,
-                                "id": "300:378",
+                                "id": "300:517",
                                 "layout": "none",
                                 "name": "glyph",
                                 "type": "FRAME",
@@ -37299,30 +35910,6 @@
                                     "width": 11.350000381469727,
                                     "x": 6.260000228881836,
                                     "y": 5.78000020980835
-                                  },
-                                  {
-                                    "height": 6.960000038146973,
-                                    "id": "300:394",
-                                    "name": "Vector",
-                                    "strokes": [
-                                      "$2:149"
-                                    ],
-                                    "type": "VECTOR",
-                                    "width": 0,
-                                    "x": 9.260000228881836,
-                                    "y": 7.960000038146973
-                                  },
-                                  {
-                                    "height": 6.960000038146973,
-                                    "id": "300:395",
-                                    "name": "Vector",
-                                    "strokes": [
-                                      "$2:149"
-                                    ],
-                                    "type": "VECTOR",
-                                    "width": 0,
-                                    "x": 12.739999771118164,
-                                    "y": 7.960000038146973
                                   }
                                 ],
                                 "clipsContent": true,
@@ -37379,6 +35966,234 @@
                         "id": "300:388",
                         "layout": "horizontal",
                         "name": "pair_delete",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "hug_contents",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "height": 7.635783672332764,
+                                    "id": "300:490",
+                                    "name": "Vector",
+                                    "strokes": [
+                                      "$2:149"
+                                    ],
+                                    "type": "VECTOR",
+                                    "width": 13,
+                                    "x": 4.499999523162842,
+                                    "y": 4.494216442108154
+                                  },
+                                  {
+                                    "height": 3.6999998092651367,
+                                    "id": "300:491",
+                                    "name": "Vector",
+                                    "strokes": [
+                                      "$2:149"
+                                    ],
+                                    "type": "VECTOR",
+                                    "width": 2.8999996185302734,
+                                    "x": 14.5,
+                                    "y": 11.5
+                                  },
+                                  {
+                                    "height": 7.6357831954956055,
+                                    "id": "300:492",
+                                    "name": "Vector",
+                                    "strokes": [
+                                      "$2:149"
+                                    ],
+                                    "type": "VECTOR",
+                                    "width": 13.000001907348633,
+                                    "x": 4.499999523162842,
+                                    "y": 9.869999885559082
+                                  },
+                                  {
+                                    "height": 3.6999998092651367,
+                                    "id": "300:493",
+                                    "name": "Vector",
+                                    "strokes": [
+                                      "$2:149"
+                                    ],
+                                    "type": "VECTOR",
+                                    "width": 2.9000000953674316,
+                                    "x": 4.599999904632568,
+                                    "y": 6.800000190734863
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 0,
+                                "height": 22,
+                                "id": "300:489",
+                                "layout": "none",
+                                "name": "glyph",
+                                "type": "FRAME",
+                                "width": 22,
+                                "x": 0,
+                                "y": 0
+                              }
+                            ],
+                            "componentPropertyDefinitions": {},
+                            "description": "",
+                            "gap": 0,
+                            "height": "$2:15",
+                            "id": "300:488",
+                            "layout": "none",
+                            "name": "ic/autorenew",
+                            "type": "COMPONENT",
+                            "width": "$2:15",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "characters": "autorenew\narrow.triangle.2.circlepath\nAutorenew（重聚类）",
+                            "fills": [
+                              "$2:151"
+                            ],
+                            "fontName": {
+                              "family": "Inter",
+                              "style": "Regular"
+                            },
+                            "fontSize": 9,
+                            "height": "hug_contents",
+                            "id": "300:494",
+                            "lineHeight": {
+                              "unit": "AUTO"
+                            },
+                            "name": "lbl_ic/autorenew",
+                            "textAlignHorizontal": "LEFT",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 8,
+                        "height": 45,
+                        "id": "300:487",
+                        "layout": "horizontal",
+                        "name": "pair_autorenew",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "hug_contents",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "height": 0,
+                                    "id": "300:523",
+                                    "name": "Vector",
+                                    "strokes": [
+                                      "$2:149"
+                                    ],
+                                    "type": "VECTOR",
+                                    "width": 14.210000991821289,
+                                    "x": 4.139999866485596,
+                                    "y": 7.179999828338623
+                                  },
+                                  {
+                                    "height": 0,
+                                    "id": "300:524",
+                                    "name": "Vector",
+                                    "strokes": [
+                                      "$2:149"
+                                    ],
+                                    "type": "VECTOR",
+                                    "width": 9.860000610351562,
+                                    "x": 6.579999923706055,
+                                    "y": 11.279999732971191
+                                  },
+                                  {
+                                    "height": 0,
+                                    "id": "300:525",
+                                    "name": "Vector",
+                                    "strokes": [
+                                      "$2:149"
+                                    ],
+                                    "type": "VECTOR",
+                                    "width": 3.2899999618530273,
+                                    "x": 9.869999885559082,
+                                    "y": 15.399999618530273
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 0,
+                                "height": 22,
+                                "id": "300:522",
+                                "layout": "none",
+                                "name": "glyph",
+                                "type": "FRAME",
+                                "width": 22,
+                                "x": 0,
+                                "y": 0
+                              }
+                            ],
+                            "componentPropertyDefinitions": {},
+                            "description": "",
+                            "gap": 0,
+                            "height": "$2:15",
+                            "id": "300:521",
+                            "layout": "none",
+                            "name": "ic/filter_list",
+                            "type": "COMPONENT",
+                            "width": "$2:15",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "characters": "filter_list\nline.3.horizontal.decrease\nFilterList（人物过滤）",
+                            "fills": [
+                              "$2:151"
+                            ],
+                            "fontName": {
+                              "family": "Inter",
+                              "style": "Regular"
+                            },
+                            "fontSize": 9,
+                            "height": "hug_contents",
+                            "id": "300:526",
+                            "lineHeight": {
+                              "unit": "AUTO"
+                            },
+                            "name": "lbl_ic/filter_list",
+                            "textAlignHorizontal": "LEFT",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 8,
+                        "height": 45,
+                        "id": "300:520",
+                        "layout": "horizontal",
+                        "name": "pair_filter_list",
                         "padding": {
                           "bottom": 0,
                           "left": 0,
@@ -37679,46 +36494,46 @@
                               {
                                 "children": [
                                   {
-                                    "height": 8.450355529785156,
-                                    "id": "300:367",
+                                    "height": 7.050527572631836,
+                                    "id": "300:514",
                                     "name": "Vector",
                                     "strokes": [
                                       "$2:149"
                                     ],
                                     "type": "VECTOR",
-                                    "width": 14.677178382873535,
-                                    "x": 3.42472767829895,
-                                    "y": 7.449644565582275
+                                    "width": 13.453145980834961,
+                                    "x": 4.149366855621338,
+                                    "y": 7.629472732543945
                                   },
                                   {
-                                    "height": 6.799999713897705,
-                                    "id": "300:368",
+                                    "height": 4.099999904632568,
+                                    "id": "300:515",
                                     "name": "Vector",
                                     "strokes": [
                                       "$2:149"
                                     ],
                                     "type": "VECTOR",
                                     "width": 0,
-                                    "x": 11,
-                                    "y": 5.599999904632568
+                                    "x": 12.470000267028809,
+                                    "y": 4.400000095367432
                                   },
                                   {
-                                    "height": 2.5,
-                                    "id": "300:369",
+                                    "height": 2.469999313354492,
+                                    "id": "300:516",
                                     "name": "Vector",
                                     "strokes": [
                                       "$2:149"
                                     ],
                                     "type": "VECTOR",
-                                    "width": 5,
-                                    "x": 8.5,
-                                    "y": 10
+                                    "width": 4.930000305175781,
+                                    "x": 9.329999923706055,
+                                    "y": 8.510000228881836
                                   }
                                 ],
                                 "clipsContent": true,
                                 "gap": 0,
                                 "height": 22,
-                                "id": "300:366",
+                                "id": "300:513",
                                 "layout": "none",
                                 "name": "glyph",
                                 "type": "FRAME",
@@ -47520,7 +46335,7 @@
                               "temperature": 0,
                               "tint": 0
                             },
-                            "imageHash": "676eac185eb7b584c62f450951f9c3f992fd4f10",
+                            "imageHash": "40e225a348adc973796a6bcdd5e2d0ec411c146d",
                             "imageTransform": [
                               [
                                 1,
@@ -47808,7 +46623,7 @@
                               "temperature": 0,
                               "tint": 0
                             },
-                            "imageHash": "f120b8791352668b512eb19cca45c4aebbc9ff39",
+                            "imageHash": "b7ea431f50a00e6f2a0c7b75d852244083ce6f9e",
                             "imageTransform": [
                               [
                                 1,
@@ -48010,66 +46825,123 @@
                       {
                         "children": [
                           {
-                            "componentProperties": {},
+                            "children": [
+                              {
+                                "componentProperties": {},
+                                "gap": 0,
+                                "height": "$2:15",
+                                "id": "300:527",
+                                "layout": "none",
+                                "mainComponent": {
+                                  "componentPropertyDefinitions": {},
+                                  "id": "300:521"
+                                },
+                                "name": "ic/filter_list",
+                                "type": "INSTANCE",
+                                "width": "$2:15",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 18,
                             "gap": 0,
-                            "height": "$2:15",
-                            "id": "171:11",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:101"
+                            "height": 36,
+                            "id": "171:10",
+                            "layout": "horizontal",
+                            "name": "btn_filter",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
                             },
-                            "name": "ic/filter",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
+                            "type": "FRAME",
+                            "width": 36,
                             "x": "auto",
                             "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 22,
-                        "gap": 0,
-                        "height": 44,
-                        "id": "171:10",
-                        "layout": "horizontal",
-                        "name": "btn_filter",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 0,
-                          "right": 0,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": 44,
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [
+                          },
                           {
-                            "componentProperties": {},
+                            "children": [
+                              {
+                                "componentProperties": {},
+                                "gap": 0,
+                                "height": "$2:15",
+                                "id": "300:496",
+                                "layout": "none",
+                                "mainComponent": {
+                                  "componentPropertyDefinitions": {},
+                                  "id": "300:488"
+                                },
+                                "name": "ic/autorenew",
+                                "type": "INSTANCE",
+                                "width": "$2:15",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 18,
                             "gap": 0,
-                            "height": "$2:15",
-                            "id": "171:13",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:93"
+                            "height": 36,
+                            "id": "171:12",
+                            "layout": "horizontal",
+                            "name": "btn_recluster",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
                             },
-                            "name": "ic/tune",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
+                            "type": "FRAME",
+                            "width": 36,
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "componentProperties": {},
+                                "gap": 0,
+                                "height": "$2:15",
+                                "id": "300:498",
+                                "layout": "none",
+                                "mainComponent": {
+                                  "componentPropertyDefinitions": {},
+                                  "id": "132:101"
+                                },
+                                "name": "ic/auto_awesome",
+                                "type": "INSTANCE",
+                                "width": "$2:15",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 18,
+                            "gap": 0,
+                            "height": 36,
+                            "id": "300:497",
+                            "layout": "horizontal",
+                            "name": "btn_score",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": 36,
                             "x": "auto",
                             "y": "auto"
                           }
                         ],
                         "clipsContent": true,
-                        "cornerRadius": 22,
-                        "gap": 0,
-                        "height": 44,
-                        "id": "171:12",
+                        "gap": 8,
+                        "height": "hug_contents",
+                        "id": "300:495",
                         "layout": "horizontal",
-                        "name": "btn_recluster",
+                        "name": "actions",
                         "padding": {
                           "bottom": 0,
                           "left": 0,
@@ -48077,7 +46949,7 @@
                           "top": 0
                         },
                         "type": "FRAME",
-                        "width": 44,
+                        "width": "hug_contents",
                         "x": "auto",
                         "y": "auto"
                       }
@@ -50670,6 +49542,53 @@
                           {
                             "children": [
                               {
+                                "children": [],
+                                "clipsContent": true,
+                                "cornerRadius": 60,
+                                "fills": [
+                                  {
+                                    "blendMode": "NORMAL",
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "b36fec85fba03dae18a4c646eca3314ef01520ab",
+                                    "imageTransform": [
+                                      [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      [
+                                        0,
+                                        1,
+                                        0
+                                      ]
+                                    ],
+                                    "opacity": 1,
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
+                                    "visible": true
+                                  }
+                                ],
+                                "gap": 0,
+                                "height": 120,
+                                "id": "171:97",
+                                "layout": "none",
+                                "name": "avatar",
+                                "type": "FRAME",
+                                "width": 120,
+                                "x": 0,
+                                "y": 0
+                              },
+                              {
                                 "children": [
                                   {
                                     "componentProperties": {},
@@ -52183,7 +51102,7 @@
                                 "type": "FRAME",
                                 "width": "hug_contents",
                                 "x": 130,
-                                "y": 144
+                                "y": 166
                               }
                             ],
                             "clipsContent": true,
@@ -52221,7 +51140,7 @@
                               }
                             ],
                             "gap": 0,
-                            "height": 174,
+                            "height": 200,
                             "id": "300:237",
                             "layout": "none",
                             "name": "cover",
@@ -52550,7 +51469,7 @@
                                 "type": "FRAME",
                                 "width": "hug_contents",
                                 "x": 130,
-                                "y": 144
+                                "y": 166
                               }
                             ],
                             "clipsContent": true,
@@ -52588,7 +51507,7 @@
                               }
                             ],
                             "gap": 0,
-                            "height": 174,
+                            "height": 200,
                             "id": "300:239",
                             "layout": "none",
                             "name": "cover",
@@ -52917,7 +51836,7 @@
                                 "type": "FRAME",
                                 "width": "hug_contents",
                                 "x": 130,
-                                "y": 144
+                                "y": 166
                               }
                             ],
                             "clipsContent": true,
@@ -52955,7 +51874,7 @@
                               }
                             ],
                             "gap": 0,
-                            "height": 174,
+                            "height": 200,
                             "id": "300:241",
                             "layout": "none",
                             "name": "cover",
@@ -53284,7 +52203,7 @@
                                 "type": "FRAME",
                                 "width": "hug_contents",
                                 "x": 130,
-                                "y": 144
+                                "y": 166
                               }
                             ],
                             "clipsContent": true,
@@ -53322,7 +52241,7 @@
                               }
                             ],
                             "gap": 0,
-                            "height": 174,
+                            "height": 200,
                             "id": "300:243",
                             "layout": "none",
                             "name": "cover",
@@ -53586,72 +52505,10 @@
                                 "visible": false
                               },
                               {
-                                "children": [
-                                  {
-                                    "characters": "$184:17",
-                                    "fills": [
-                                      {
-                                        "blendMode": "NORMAL",
-                                        "color": {
-                                          "b": 1,
-                                          "g": 1,
-                                          "r": 1
-                                        },
-                                        "opacity": 1,
-                                        "type": "SOLID",
-                                        "visible": true
-                                      }
-                                    ],
-                                    "fontName": {
-                                      "family": "Sarasa Gothic SC",
-                                      "style": "Semi Bold"
-                                    },
-                                    "fontSize": 11,
-                                    "height": "hug_contents",
-                                    "id": "300:298",
-                                    "lineHeight": {
-                                      "unit": "PIXELS",
-                                      "value": 14
-                                    },
-                                    "name": "9P",
-                                    "textAlignHorizontal": "LEFT",
-                                    "textAlignVertical": "TOP",
-                                    "type": "TEXT",
-                                    "width": "hug_contents",
-                                    "x": "auto",
-                                    "y": "auto"
-                                  }
-                                ],
-                                "clipsContent": true,
-                                "cornerRadius": 100,
-                                "fills": [
-                                  {
-                                    "blendMode": "NORMAL",
-                                    "color": {
-                                      "b": 0,
-                                      "g": 0,
-                                      "r": 0
-                                    },
-                                    "opacity": 0.6000000238418579,
-                                    "type": "SOLID",
-                                    "visible": true
-                                  }
-                                ],
-                                "gap": 0,
-                                "height": "hug_contents",
                                 "id": "300:271",
-                                "layout": "horizontal",
                                 "name": "count_badge",
-                                "padding": {
-                                  "bottom": 4,
-                                  "left": 8,
-                                  "right": 8,
-                                  "top": 4
-                                },
                                 "type": "FRAME",
-                                "width": "hug_contents",
-                                "x": 130,
-                                "y": 144
+                                "visible": false
                               }
                             ],
                             "clipsContent": true,
@@ -53689,7 +52546,7 @@
                               }
                             ],
                             "gap": 0,
-                            "height": 174,
+                            "height": 200,
                             "id": "300:245",
                             "layout": "none",
                             "name": "cover",
@@ -53960,75 +52817,13 @@
                                 "type": "INSTANCE",
                                 "width": "$2:15",
                                 "x": 59,
-                                "y": 59
+                                "y": 72
                               },
                               {
-                                "children": [
-                                  {
-                                    "characters": "$184:18",
-                                    "fills": [
-                                      {
-                                        "blendMode": "NORMAL",
-                                        "color": {
-                                          "b": 1,
-                                          "g": 1,
-                                          "r": 1
-                                        },
-                                        "opacity": 1,
-                                        "type": "SOLID",
-                                        "visible": true
-                                      }
-                                    ],
-                                    "fontName": {
-                                      "family": "Sarasa Gothic SC",
-                                      "style": "Semi Bold"
-                                    },
-                                    "fontSize": 11,
-                                    "height": "hug_contents",
-                                    "id": "300:303",
-                                    "lineHeight": {
-                                      "unit": "PIXELS",
-                                      "value": 14
-                                    },
-                                    "name": "12P",
-                                    "textAlignHorizontal": "LEFT",
-                                    "textAlignVertical": "TOP",
-                                    "type": "TEXT",
-                                    "width": "hug_contents",
-                                    "x": "auto",
-                                    "y": "auto"
-                                  }
-                                ],
-                                "clipsContent": true,
-                                "cornerRadius": 100,
-                                "fills": [
-                                  {
-                                    "blendMode": "NORMAL",
-                                    "color": {
-                                      "b": 0,
-                                      "g": 0,
-                                      "r": 0
-                                    },
-                                    "opacity": 0.6000000238418579,
-                                    "type": "SOLID",
-                                    "visible": true
-                                  }
-                                ],
-                                "gap": 0,
-                                "height": "hug_contents",
                                 "id": "300:275",
-                                "layout": "horizontal",
                                 "name": "count_badge",
-                                "padding": {
-                                  "bottom": 4,
-                                  "left": 8,
-                                  "right": 8,
-                                  "top": 4
-                                },
                                 "type": "FRAME",
-                                "width": "hug_contents",
-                                "x": 130,
-                                "y": 144
+                                "visible": false
                               }
                             ],
                             "clipsContent": true,
@@ -54036,7 +52831,7 @@
                               "$2:150"
                             ],
                             "gap": 0,
-                            "height": 174,
+                            "height": 200,
                             "id": "300:247",
                             "layout": "none",
                             "name": "cover",
@@ -54524,11 +53319,78 @@
                   {
                     "children": [
                       {
-                        "children": [],
+                        "children": [
+                          {
+                            "fills": [
+                              {
+                                "blendMode": "NORMAL",
+                                "color": {
+                                  "b": 0.8509804010391235,
+                                  "g": 0.8509804010391235,
+                                  "r": 0.8509804010391235
+                                },
+                                "opacity": 1,
+                                "type": "SOLID",
+                                "visible": true
+                              }
+                            ],
+                            "height": 2.200000047683716,
+                            "id": "300:530",
+                            "name": "Rectangle",
+                            "type": "RECTANGLE",
+                            "width": 16,
+                            "x": 4,
+                            "y": 5.5
+                          },
+                          {
+                            "fills": [
+                              {
+                                "blendMode": "NORMAL",
+                                "color": {
+                                  "b": 0.8509804010391235,
+                                  "g": 0.8509804010391235,
+                                  "r": 0.8509804010391235
+                                },
+                                "opacity": 1,
+                                "type": "SOLID",
+                                "visible": true
+                              }
+                            ],
+                            "height": 2.200000047683716,
+                            "id": "300:531",
+                            "name": "Rectangle",
+                            "type": "RECTANGLE",
+                            "width": 16,
+                            "x": 4,
+                            "y": 10.899999618530273
+                          },
+                          {
+                            "fills": [
+                              {
+                                "blendMode": "NORMAL",
+                                "color": {
+                                  "b": 0.8509804010391235,
+                                  "g": 0.8509804010391235,
+                                  "r": 0.8509804010391235
+                                },
+                                "opacity": 1,
+                                "type": "SOLID",
+                                "visible": true
+                              }
+                            ],
+                            "height": 2.200000047683716,
+                            "id": "300:532",
+                            "name": "Rectangle",
+                            "type": "RECTANGLE",
+                            "width": 16,
+                            "x": 4,
+                            "y": 16.299999237060547
+                          }
+                        ],
                         "clipsContent": true,
                         "gap": 0,
                         "height": 24,
-                        "id": "300:440",
+                        "id": "300:529",
                         "layout": "none",
                         "name": "nav_recents",
                         "type": "FRAME",
@@ -54537,11 +53399,34 @@
                         "y": "auto"
                       },
                       {
-                        "children": [],
+                        "children": [
+                          {
+                            "fills": [
+                              {
+                                "blendMode": "NORMAL",
+                                "color": {
+                                  "b": 0.8509804010391235,
+                                  "g": 0.8509804010391235,
+                                  "r": 0.8509804010391235
+                                },
+                                "opacity": 1,
+                                "type": "SOLID",
+                                "visible": true
+                              }
+                            ],
+                            "height": 12,
+                            "id": "300:534",
+                            "name": "Vector",
+                            "type": "VECTOR",
+                            "width": 12,
+                            "x": 6,
+                            "y": 6
+                          }
+                        ],
                         "clipsContent": true,
                         "gap": 0,
                         "height": 24,
-                        "id": "300:441",
+                        "id": "300:533",
                         "layout": "none",
                         "name": "nav_home",
                         "type": "FRAME",
@@ -54550,11 +53435,58 @@
                         "y": "auto"
                       },
                       {
-                        "children": [],
+                        "children": [
+                          {
+                            "fills": [
+                              {
+                                "blendMode": "NORMAL",
+                                "color": {
+                                  "b": 0.8509804010391235,
+                                  "g": 0.8509804010391235,
+                                  "r": 0.8509804010391235
+                                },
+                                "opacity": 1,
+                                "type": "SOLID",
+                                "visible": true
+                              }
+                            ],
+                            "height": 2.200000047683716,
+                            "id": "300:536",
+                            "name": "Rectangle",
+                            "rotation": -45,
+                            "type": "RECTANGLE",
+                            "width": 10.5,
+                            "x": 6.2221832275390625,
+                            "y": 11.222182273864746
+                          },
+                          {
+                            "fills": [
+                              {
+                                "blendMode": "NORMAL",
+                                "color": {
+                                  "b": 0.8509804010391235,
+                                  "g": 0.8509804010391235,
+                                  "r": 0.8509804010391235
+                                },
+                                "opacity": 1,
+                                "type": "SOLID",
+                                "visible": true
+                              }
+                            ],
+                            "height": 2.200000047683716,
+                            "id": "300:537",
+                            "name": "Rectangle",
+                            "rotation": 45,
+                            "type": "RECTANGLE",
+                            "width": 10.5,
+                            "x": 7.777817726135254,
+                            "y": 11.222182273864746
+                          }
+                        ],
                         "clipsContent": true,
                         "gap": 0,
                         "height": 24,
-                        "id": "300:442",
+                        "id": "300:535",
                         "layout": "none",
                         "name": "nav_back",
                         "type": "FRAME",
@@ -54577,15 +53509,15 @@
                         "visible": true
                       }
                     ],
-                    "gap": 101,
+                    "gap": 61,
                     "height": 48,
-                    "id": "300:439",
+                    "id": "300:528",
                     "layout": "horizontal",
                     "name": "system_nav_bar",
                     "padding": {
                       "bottom": 0,
-                      "left": 67,
-                      "right": 67,
+                      "left": 99.5,
+                      "right": 99.5,
                       "top": 0
                     },
                     "type": "FRAME",
@@ -63115,58 +62047,7 @@
                                 "y": "auto"
                               },
                               {
-                                "children": [
-                                  {
-                                    "children": [
-                                      {
-                                        "componentProperties": {},
-                                        "gap": 0,
-                                        "height": "$2:15",
-                                        "id": "189:120",
-                                        "layout": "none",
-                                        "mainComponent": {
-                                          "componentPropertyDefinitions": {},
-                                          "id": "132:26"
-                                        },
-                                        "name": "ic/close",
-                                        "type": "INSTANCE",
-                                        "width": "$2:15",
-                                        "x": "auto",
-                                        "y": "auto"
-                                      }
-                                    ],
-                                    "clipsContent": true,
-                                    "cornerRadius": 10,
-                                    "fills": [
-                                      {
-                                        "blendMode": "NORMAL",
-                                        "color": {
-                                          "b": 0,
-                                          "g": 0,
-                                          "r": 0
-                                        },
-                                        "opacity": 0.550000011920929,
-                                        "type": "SOLID",
-                                        "visible": true
-                                      }
-                                    ],
-                                    "gap": 0,
-                                    "height": 20,
-                                    "id": "189:119",
-                                    "layout": "horizontal",
-                                    "name": "del_mark",
-                                    "padding": {
-                                      "bottom": 0,
-                                      "left": 0,
-                                      "right": 0,
-                                      "top": 0
-                                    },
-                                    "type": "FRAME",
-                                    "width": 20,
-                                    "x": 83,
-                                    "y": 4
-                                  }
-                                ],
+                                "children": [],
                                 "clipsContent": true,
                                 "cornerRadius": 8,
                                 "fills": [
@@ -63213,58 +62094,7 @@
                                 "y": "auto"
                               },
                               {
-                                "children": [
-                                  {
-                                    "children": [
-                                      {
-                                        "componentProperties": {},
-                                        "gap": 0,
-                                        "height": "$2:15",
-                                        "id": "189:123",
-                                        "layout": "none",
-                                        "mainComponent": {
-                                          "componentPropertyDefinitions": {},
-                                          "id": "132:26"
-                                        },
-                                        "name": "ic/close",
-                                        "type": "INSTANCE",
-                                        "width": "$2:15",
-                                        "x": "auto",
-                                        "y": "auto"
-                                      }
-                                    ],
-                                    "clipsContent": true,
-                                    "cornerRadius": 10,
-                                    "fills": [
-                                      {
-                                        "blendMode": "NORMAL",
-                                        "color": {
-                                          "b": 0,
-                                          "g": 0,
-                                          "r": 0
-                                        },
-                                        "opacity": 0.550000011920929,
-                                        "type": "SOLID",
-                                        "visible": true
-                                      }
-                                    ],
-                                    "gap": 0,
-                                    "height": 20,
-                                    "id": "189:122",
-                                    "layout": "horizontal",
-                                    "name": "del_mark",
-                                    "padding": {
-                                      "bottom": 0,
-                                      "left": 0,
-                                      "right": 0,
-                                      "top": 0
-                                    },
-                                    "type": "FRAME",
-                                    "width": 20,
-                                    "x": 83,
-                                    "y": 4
-                                  }
-                                ],
+                                "children": [],
                                 "clipsContent": true,
                                 "cornerRadius": 8,
                                 "fills": [
@@ -63787,56 +62617,6 @@
                               },
                               {
                                 "children": [
-                                  {
-                                    "children": [
-                                      {
-                                        "componentProperties": {},
-                                        "gap": 0,
-                                        "height": "$2:15",
-                                        "id": "189:140",
-                                        "layout": "none",
-                                        "mainComponent": {
-                                          "componentPropertyDefinitions": {},
-                                          "id": "132:26"
-                                        },
-                                        "name": "ic/close",
-                                        "type": "INSTANCE",
-                                        "width": "$2:15",
-                                        "x": "auto",
-                                        "y": "auto"
-                                      }
-                                    ],
-                                    "clipsContent": true,
-                                    "cornerRadius": 10,
-                                    "fills": [
-                                      {
-                                        "blendMode": "NORMAL",
-                                        "color": {
-                                          "b": 0,
-                                          "g": 0,
-                                          "r": 0
-                                        },
-                                        "opacity": 0.550000011920929,
-                                        "type": "SOLID",
-                                        "visible": true
-                                      }
-                                    ],
-                                    "gap": 0,
-                                    "height": 20,
-                                    "id": "189:139",
-                                    "layout": "horizontal",
-                                    "name": "del_mark",
-                                    "padding": {
-                                      "bottom": 0,
-                                      "left": 0,
-                                      "right": 0,
-                                      "top": 0
-                                    },
-                                    "type": "FRAME",
-                                    "width": 20,
-                                    "x": 141,
-                                    "y": 4
-                                  },
                                   {
                                     "children": [
                                       {
@@ -64530,22 +63310,6 @@
                       {
                         "children": [
                           {
-                            "componentProperties": {},
-                            "gap": 0,
-                            "height": "$2:15",
-                            "id": "267:164",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:14"
-                            },
-                            "name": "ic/back",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
                             "characters": "Screenshots",
                             "fills": [
                               "$2:149"
@@ -64583,19 +63347,6 @@
                         },
                         "type": "FRAME",
                         "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [],
-                        "clipsContent": true,
-                        "gap": 0,
-                        "height": 1,
-                        "id": "267:733",
-                        "layout": "none",
-                        "name": "spacer",
-                        "type": "FRAME",
-                        "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
                       },
@@ -64667,19 +63418,6 @@
                             "textAlignVertical": "TOP",
                             "type": "TEXT",
                             "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "gap": 0,
-                            "height": 1,
-                            "id": "267:243",
-                            "layout": "none",
-                            "name": "spacer",
-                            "type": "FRAME",
-                            "width": "fill_container",
                             "x": "auto",
                             "y": "auto"
                           },
@@ -65984,191 +64722,6 @@
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
-                      },
-                      {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.38999998569488525,
-                                      "g": 0.28999999165534973,
-                                      "r": 0.18000000715255737
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.23999999463558197,
-                                      "g": 0.1599999964237213,
-                                      "r": 0.10000000149011612
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
-                                  [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
-                                  ],
-                                  [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
-                                "visible": true
-                              }
-                            ],
-                            "gap": 0,
-                            "height": 127,
-                            "id": "267:820",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.28999999165534973,
-                                      "g": 0.27000001072883606,
-                                      "r": 0.27000001072883606
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.17000000178813934,
-                                      "g": 0.15000000596046448,
-                                      "r": 0.15000000596046448
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
-                                  [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
-                                  ],
-                                  [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
-                                "visible": true
-                              }
-                            ],
-                            "gap": 0,
-                            "height": 127,
-                            "id": "267:821",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.3499999940395355,
-                                      "g": 0.25,
-                                      "r": 0.20999999344348907
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.20000000298023224,
-                                      "g": 0.12999999523162842,
-                                      "r": 0.10999999940395355
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
-                                  [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
-                                  ],
-                                  [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
-                                "visible": true
-                              }
-                            ],
-                            "gap": 0,
-                            "height": 127,
-                            "id": "267:822",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "gap": 2,
-                        "height": 127,
-                        "id": "267:819",
-                        "layout": "horizontal",
-                        "name": "row_5",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 0,
-                          "right": 0,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": "fill_container",
-                        "x": "auto",
-                        "y": "auto"
                       }
                     ],
                     "clipsContent": true,
@@ -66316,21 +64869,120 @@
                       {
                         "children": [
                           {
-                            "componentProperties": {},
-                            "gap": 0,
-                            "height": "$2:15",
-                            "id": "267:35",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:14"
+                            "characters": "Organize",
+                            "fills": [
+                              "$2:131"
+                            ],
+                            "fontName": {
+                              "family": "Sarasa Gothic SC",
+                              "style": "Semi Bold"
                             },
-                            "name": "ic/back",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
+                            "fontSize": 14,
+                            "height": "hug_contents",
+                            "id": "300:502",
+                            "lineHeight": {
+                              "unit": "AUTO"
+                            },
+                            "name": "label",
+                            "textAlignHorizontal": "CENTER",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "hug_contents",
                             "x": "auto",
                             "y": "auto"
-                          },
+                          }
+                        ],
+                        "clipsContent": true,
+                        "cornerRadius": 24,
+                        "fills": [
+                          "$2:130"
+                        ],
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "300:501",
+                        "layout": "horizontal",
+                        "name": "tab_organize",
+                        "padding": {
+                          "bottom": 10,
+                          "left": 24,
+                          "right": 24,
+                          "top": 10
+                        },
+                        "type": "FRAME",
+                        "width": "hug_contents",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "characters": "Scan",
+                            "fills": [
+                              "$2:151"
+                            ],
+                            "fontName": {
+                              "family": "Sarasa Gothic SC",
+                              "style": "Regular"
+                            },
+                            "fontSize": 14,
+                            "height": "hug_contents",
+                            "id": "300:504",
+                            "lineHeight": {
+                              "unit": "AUTO"
+                            },
+                            "name": "label",
+                            "textAlignHorizontal": "CENTER",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "cornerRadius": 24,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "300:503",
+                        "layout": "horizontal",
+                        "name": "tab_scan",
+                        "padding": {
+                          "bottom": 10,
+                          "left": 24,
+                          "right": 24,
+                          "top": 10
+                        },
+                        "type": "FRAME",
+                        "width": "hug_contents",
+                        "x": "auto",
+                        "y": "auto"
+                      }
+                    ],
+                    "clipsContent": true,
+                    "cornerRadius": 24,
+                    "fills": [
+                      "$2:150"
+                    ],
+                    "gap": 0,
+                    "height": "hug_contents",
+                    "id": "300:500",
+                    "layout": "horizontal",
+                    "name": "capsule_switch",
+                    "padding": {
+                      "bottom": 0,
+                      "left": 0,
+                      "right": 0,
+                      "top": 0
+                    },
+                    "type": "FRAME",
+                    "width": "hug_contents",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
                           {
                             "characters": "Organize",
                             "fills": [
@@ -66400,7 +65052,7 @@
                     "name": "top_bar",
                     "padding": {
                       "bottom": 0,
-                      "left": 12,
+                      "left": 16,
                       "right": 12,
                       "top": 0
                     },
@@ -69005,7 +67657,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:108",
+                            "id": "300:459",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -69113,13 +67765,13 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:111",
+                            "id": "300:460",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
                               "id": "300:18"
                             },
-                            "name": "ic/people",
+                            "name": "ic/account",
                             "type": "INSTANCE",
                             "width": "$2:15",
                             "x": "auto",
@@ -69234,56 +67886,6 @@
                   {
                     "children": [
                       {
-                        "children": [
-                          {
-                            "componentProperties": {},
-                            "gap": 0,
-                            "height": "$2:15",
-                            "id": "267:288",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:33"
-                            },
-                            "name": "ic/check",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
-                        "cornerRadius": 32,
-                        "fills": [
-                          {
-                            "blendMode": "NORMAL",
-                            "color": {
-                              "b": 0.3140000104904175,
-                              "g": 0.6859999895095825,
-                              "r": 0.2980000078678131
-                            },
-                            "opacity": 0.15000000596046448,
-                            "type": "SOLID",
-                            "visible": true
-                          }
-                        ],
-                        "gap": 0,
-                        "height": 64,
-                        "id": "267:282",
-                        "layout": "horizontal",
-                        "name": "success_icon",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 0,
-                          "right": 0,
-                          "top": 0
-                        },
-                        "type": "FRAME",
-                        "width": 64,
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
                         "characters": "All clean!",
                         "fills": [
                           "$2:149"
@@ -69357,22 +67959,6 @@
                           {
                             "children": [
                               {
-                                "componentProperties": {},
-                                "gap": 0,
-                                "height": "$2:15",
-                                "id": "267:294",
-                                "layout": "none",
-                                "mainComponent": {
-                                  "componentPropertyDefinitions": {},
-                                  "id": "132:69"
-                                },
-                                "name": "ic/delete_sweep",
-                                "type": "INSTANCE",
-                                "width": "$2:15",
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
                                 "characters": "Trash",
                                 "fills": [
                                   "$2:149"
@@ -69438,174 +68024,6 @@
                           },
                           {
                             "children": [
-                              {
-                                "children": [],
-                                "clipsContent": true,
-                                "cornerRadius": 8,
-                                "fills": [
-                                  {
-                                    "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.3499999940395355,
-                                          "g": 0.25,
-                                          "r": 0.20999999344348907
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.20000000298023224,
-                                          "g": 0.12999999523162842,
-                                          "r": 0.10999999940395355
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
-                                      [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
-                                      ],
-                                      [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
-                                      ]
-                                    ],
-                                    "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
-                                    "visible": true
-                                  }
-                                ],
-                                "gap": 0,
-                                "height": 64,
-                                "id": "267:297",
-                                "layout": "none",
-                                "name": "thumb_1",
-                                "type": "FRAME",
-                                "width": 64,
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
-                                "children": [],
-                                "clipsContent": true,
-                                "cornerRadius": 8,
-                                "fills": [
-                                  {
-                                    "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.38999998569488525,
-                                          "g": 0.28999999165534973,
-                                          "r": 0.18000000715255737
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.23999999463558197,
-                                          "g": 0.1599999964237213,
-                                          "r": 0.10000000149011612
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
-                                      [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
-                                      ],
-                                      [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
-                                      ]
-                                    ],
-                                    "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
-                                    "visible": true
-                                  }
-                                ],
-                                "gap": 0,
-                                "height": 64,
-                                "id": "267:298",
-                                "layout": "none",
-                                "name": "thumb_2",
-                                "type": "FRAME",
-                                "width": 64,
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
-                                "children": [],
-                                "clipsContent": true,
-                                "cornerRadius": 8,
-                                "fills": [
-                                  {
-                                    "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.28999999165534973,
-                                          "g": 0.27000001072883606,
-                                          "r": 0.27000001072883606
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.17000000178813934,
-                                          "g": 0.15000000596046448,
-                                          "r": 0.15000000596046448
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
-                                      [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
-                                      ],
-                                      [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
-                                      ]
-                                    ],
-                                    "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
-                                    "visible": true
-                                  }
-                                ],
-                                "gap": 0,
-                                "height": 64,
-                                "id": "267:299",
-                                "layout": "none",
-                                "name": "thumb_3",
-                                "type": "FRAME",
-                                "width": 64,
-                                "x": "auto",
-                                "y": "auto"
-                              },
                               {
                                 "children": [
                                   {
@@ -69690,19 +68108,6 @@
                         },
                         "type": "FRAME",
                         "width": "fill_container",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [],
-                        "clipsContent": true,
-                        "gap": 0,
-                        "height": "fill_container",
-                        "id": "267:286",
-                        "layout": "none",
-                        "name": "spacer",
-                        "type": "FRAME",
-                        "width": 1,
                         "x": "auto",
                         "y": "auto"
                       },
@@ -70894,19 +69299,6 @@
                         "y": "auto"
                       },
                       {
-                        "children": [],
-                        "clipsContent": true,
-                        "gap": 0,
-                        "height": 18,
-                        "id": "267:654",
-                        "layout": "none",
-                        "name": "sp",
-                        "type": "FRAME",
-                        "width": 1,
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
                         "characters": "Private Vault",
                         "fills": [
                           "$2:149"
@@ -70930,19 +69322,6 @@
                         "y": "auto"
                       },
                       {
-                        "children": [],
-                        "clipsContent": true,
-                        "gap": 0,
-                        "height": 8,
-                        "id": "267:656",
-                        "layout": "none",
-                        "name": "sp",
-                        "type": "FRAME",
-                        "width": 1,
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
                         "characters": "Enter your 6-digit PIN",
                         "fills": [
                           "$2:151"
@@ -70962,19 +69341,6 @@
                         "textAlignVertical": "TOP",
                         "type": "TEXT",
                         "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [],
-                        "clipsContent": true,
-                        "gap": 0,
-                        "height": 26,
-                        "id": "267:658",
-                        "layout": "none",
-                        "name": "sp",
-                        "type": "FRAME",
-                        "width": 1,
                         "x": "auto",
                         "y": "auto"
                       },
@@ -71097,19 +69463,6 @@
                         },
                         "type": "FRAME",
                         "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [],
-                        "clipsContent": true,
-                        "gap": 0,
-                        "height": 34,
-                        "id": "267:666",
-                        "layout": "none",
-                        "name": "sp",
-                        "type": "FRAME",
-                        "width": 1,
                         "x": "auto",
                         "y": "auto"
                       },
@@ -71601,24 +69954,7 @@
                           {
                             "children": [
                               {
-                                "children": [
-                                  {
-                                    "componentProperties": {},
-                                    "gap": 0,
-                                    "height": "$2:15",
-                                    "id": "267:697",
-                                    "layout": "none",
-                                    "mainComponent": {
-                                      "componentPropertyDefinitions": {},
-                                      "id": "132:97"
-                                    },
-                                    "name": "ic/face",
-                                    "type": "INSTANCE",
-                                    "width": "$2:15",
-                                    "x": "auto",
-                                    "y": "auto"
-                                  }
-                                ],
+                                "children": [],
                                 "clipsContent": true,
                                 "cornerRadius": 31,
                                 "fills": [
@@ -71767,19 +70103,6 @@
                         },
                         "type": "FRAME",
                         "width": "hug_contents",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "children": [],
-                        "clipsContent": true,
-                        "gap": 0,
-                        "height": 22,
-                        "id": "267:695",
-                        "layout": "none",
-                        "name": "sp",
-                        "type": "FRAME",
-                        "width": 1,
                         "x": "auto",
                         "y": "auto"
                       },
@@ -74554,7 +72877,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:69",
+                            "id": "300:467",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74570,7 +72893,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "300:68",
+                        "id": "300:462",
                         "layout": "vertical",
                         "name": "tab_gallery",
                         "padding": {
@@ -74590,13 +72913,13 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:170",
+                            "id": "300:468",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
                               "id": "300:12"
                             },
-                            "name": "ic/cleaning",
+                            "name": "ic/organize",
                             "type": "INSTANCE",
                             "width": "$2:15",
                             "x": "auto",
@@ -74606,7 +72929,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:60",
+                        "id": "300:463",
                         "layout": "vertical",
                         "name": "tab_organize",
                         "padding": {
@@ -74626,7 +72949,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "297:119",
+                            "id": "300:469",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74642,7 +72965,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:61",
+                        "id": "300:464",
                         "layout": "vertical",
                         "name": "tab_chat",
                         "padding": {
@@ -74662,7 +72985,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:171",
+                            "id": "300:483",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74678,7 +73001,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:63",
+                        "id": "300:465",
                         "layout": "vertical",
                         "name": "tab_people",
                         "padding": {
@@ -74698,7 +73021,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:149",
+                            "id": "300:484",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74714,7 +73037,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:64",
+                        "id": "300:466",
                         "layout": "vertical",
                         "name": "tab_memory",
                         "padding": {
@@ -74736,7 +73059,7 @@
                     ],
                     "gap": 0,
                     "height": 56,
-                    "id": "297:59",
+                    "id": "300:461",
                     "layout": "horizontal",
                     "name": "floating_tab",
                     "padding": {
@@ -74788,7 +73111,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:66",
+                            "id": "300:478",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74804,7 +73127,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "300:65",
+                        "id": "300:473",
                         "layout": "vertical",
                         "name": "tab_gallery",
                         "padding": {
@@ -74824,7 +73147,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "297:122",
+                            "id": "300:479",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74840,7 +73163,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:89",
+                        "id": "300:474",
                         "layout": "vertical",
                         "name": "tab_organize",
                         "padding": {
@@ -74860,7 +73183,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "297:123",
+                            "id": "300:480",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74876,7 +73199,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:90",
+                        "id": "300:475",
                         "layout": "vertical",
                         "name": "tab_chat",
                         "padding": {
@@ -74896,13 +73219,13 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "297:125",
+                            "id": "300:485",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
                               "id": "300:18"
                             },
-                            "name": "ic/people",
+                            "name": "ic/account",
                             "type": "INSTANCE",
                             "width": "$2:15",
                             "x": "auto",
@@ -74912,7 +73235,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:92",
+                        "id": "300:476",
                         "layout": "vertical",
                         "name": "tab_people",
                         "padding": {
@@ -74932,7 +73255,7 @@
                             "componentProperties": {},
                             "gap": 0,
                             "height": "$2:15",
-                            "id": "300:148",
+                            "id": "300:486",
                             "layout": "none",
                             "mainComponent": {
                               "componentPropertyDefinitions": {},
@@ -74948,7 +73271,7 @@
                         "clipsContent": true,
                         "gap": 0,
                         "height": "fill_container",
-                        "id": "297:93",
+                        "id": "300:477",
                         "layout": "vertical",
                         "name": "tab_memory",
                         "padding": {
@@ -74970,7 +73293,7 @@
                     ],
                     "gap": 0,
                     "height": 56,
-                    "id": "297:88",
+                    "id": "300:472",
                     "layout": "horizontal",
                     "name": "floating_tab",
                     "padding": {
@@ -74981,8 +73304,8 @@
                     },
                     "type": "FRAME",
                     "width": 300,
-                    "x": "auto",
-                    "y": "auto"
+                    "x": 46.5,
+                    "y": 32
                   }
                 ],
                 "clipsContent": true,
