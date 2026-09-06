@@ -64,6 +64,14 @@ class OrganizeCategoryViewModelTest {
         blurScore = blurScore,
     )
 
+    /** 精确重复组成员：exactDupGroupSize ≥ 2 裁定归 DUPLICATES 且恒 HIGH 非保护。 */
+    private fun dupPhoto(uri: String, groupKey: String, groupSize: Int, captureDate: Long = 1_000L) =
+        photo(uri).copy(
+            captureDate = captureDate,
+            exactDupGroupSize = groupSize,
+            exactDupGroupKey = groupKey,
+        )
+
     /** ClassifiedItem 夹具：category 不参与 toSections 分组，固定取值即可。 */
     private fun classified(
         uri: String,
@@ -205,6 +213,42 @@ class OrganizeCategoryViewModelTest {
         assertTrue(ready(vm).selected.isEmpty())
         vm.selectAll()
         assertEquals(setOf("a", "b"), ready(vm).selected)
+    }
+
+    @Test
+    fun `duplicates preselect keeps one keeper per exact group - latest captureDate`() = runTest {
+        // 3 张同组精确重复：预选只含 2 张，keeper = 组内 captureDate 最大者（d3）
+        val repo = FakeRepo().apply {
+            items = listOf(
+                dupPhoto("d1", "md5a", 3, captureDate = 100L),
+                dupPhoto("d2", "md5a", 3, captureDate = 200L),
+                dupPhoto("d3", "md5a", 3, captureDate = 300L),
+            )
+        }
+        val vm = viewModel(this, repo, FakeBackend(), OrganizeCategory.DUPLICATES)
+        advanceUntilIdle()
+        val state = ready(vm)
+        assertEquals(3, state.items.size)
+        assertEquals(setOf("d1", "d2"), state.selected)
+    }
+
+    @Test
+    fun `duplicates selectAll keeps one keeper per group, keyless similar-only member unaffected`() = runTest {
+        // selectAll 同样每组留 1 张（keeper=d3）；无组标识的 similar-only 成员（MEDIUM 请确认段）
+        // 不参与 keeper 排除，仍随全选被圈选
+        val repo = FakeRepo().apply {
+            items = listOf(
+                dupPhoto("d1", "md5a", 3, captureDate = 100L),
+                dupPhoto("d2", "md5a", 3, captureDate = 200L),
+                dupPhoto("d3", "md5a", 3, captureDate = 300L),
+                photo("s1").copy(similarDupGroupSize = 3),
+            )
+        }
+        val vm = viewModel(this, repo, FakeBackend(), OrganizeCategory.DUPLICATES)
+        advanceUntilIdle()
+        vm.deselectAll()
+        vm.selectAll()
+        assertEquals(setOf("d1", "d2", "s1"), ready(vm).selected)
     }
 
     @Test
