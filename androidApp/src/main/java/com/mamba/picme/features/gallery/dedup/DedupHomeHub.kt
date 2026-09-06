@@ -1,6 +1,7 @@
 package com.mamba.picme.features.gallery.dedup
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -63,8 +66,10 @@ import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.DedupScanConfig
 import com.mamba.picme.domain.dedup.KeepPolicy
-import com.mamba.picme.domain.organize.CategoryStat
+import com.mamba.picme.domain.organize.CategoryBoard
+import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategory
+import com.mamba.picme.domain.organize.SignalCoverage
 
 /** 品牌渐变（青玉）：hub 大数字 / 主按钮同源（与 tagcontrol 设计稿同一口径）。 */
 private val orgBrandGradient: Brush
@@ -73,9 +78,14 @@ private val orgBrandGradient: Brush
     )
 
 /**
- * 整理中心 hub（F1，Pager 页 1 的 Config 态）：Hero 可释放估算 → Quick tidy up 主按钮 →
- * 类目卡列表。「重复与相似照片」卡固定渲染（categorizer 不判定 DUPLICATES），点击展开
- * 内嵌原去重 Config（尺度勾选 + 保留规则 + 开始扫描），原功能零回归。
+ * 整理中心 hub（F1，Pager 页 1 的 Config 态）：Hero 可释放估算（HIGH 置信非保护去重并集）→
+ * Quick tidy up 主按钮 → 类目卡列表（board 恒 6 卡，按 highBytes 建议优先级降序）。
+ * 「重复与相似照片」卡固定渲染为可展开入口（展开 = 原去重 Config：尺度勾选 + 保留规则 +
+ * 开始扫描），原功能零回归；board 的 DUPLICATES 卡由该卡承接（meta 行同源），列表内不重复渲染。
+ *
+ * 渲染契约（Task 7 审查修正）：零命中且信号 READY 的类目不渲染；NEEDS_SCAN 渲染半透明
+ * 引导卡（点击经 onOpenScan 切 SCAN tab）；board.categories 为空 = 看板未加载（stateIn
+ * 初值），此时 Hero 与类目卡不渲染，避免 0B 假数据。
  *
  * 布局结构自上而下：
  * Hero 卡 → 渐变主按钮 → Categories 分组标题 → 重复卡（可展开）→ 类目卡 → 隐私 caption。
@@ -84,13 +94,19 @@ private val orgBrandGradient: Brush
 fun DedupHubContent(
     config: DedupScanConfig,
     policy: KeepPolicy,
-    stats: List<CategoryStat>,
+    board: OrganizeBoard,
     onQuickTidy: () -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
+    onOpenScan: () -> Unit,
     onStartScan: (DedupScanConfig) -> Unit,
     onOpenKeepRules: () -> Unit,
 ) {
     var dedupExpanded by rememberSaveable { mutableStateOf(false) }
+    // 看板未加载（stateIn 初值空列表）：Hero 与类目卡不渲染，防 0B 假 Hero
+    val boardLoaded = board.categories.isNotEmpty()
+    val duplicatesCard = board.categories.firstOrNull { card ->
+        card.category == OrganizeCategory.DUPLICATES
+    }
 
     Column(
         modifier = Modifier
@@ -101,7 +117,9 @@ fun DedupHubContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        OrgHeroCard(stats = stats)
+        if (boardLoaded) {
+            OrgHeroCard(board = board)
+        }
 
         // Quick tidy up 渐变主按钮（F2 路由未点亮，回调当前为空占位）
         Box(
@@ -130,7 +148,8 @@ fun DedupHubContent(
         // 「重复与相似照片」卡固定渲染：收起 = 单行摘要卡；展开 = 原去重 Config 三件套
         DedupCategoryCard(
             expanded = dedupExpanded,
-            onToggle = { dedupExpanded = !dedupExpanded }
+            onToggle = { dedupExpanded = !dedupExpanded },
+            board = duplicatesCard,
         )
         if (dedupExpanded) {
             DedupScanOptions(
@@ -141,11 +160,23 @@ fun DedupHubContent(
             )
         }
 
-        stats.forEach { stat ->
-            OrganizeCategoryCard(
-                stat = stat,
-                onClick = { onOpenCategory(stat.category) }
-            )
+        if (boardLoaded) {
+            board.categories.forEach { card ->
+                // DUPLICATES 由上方可展开卡承接，列表内不重复渲染
+                if (card.category == OrganizeCategory.DUPLICATES) return@forEach
+                // 零命中且信号已就绪的类目不渲染（已扫描无内容）；NEEDS_SCAN 渲染引导卡
+                if (card.totalCount == 0 && card.coverage == SignalCoverage.READY) return@forEach
+                OrganizeCategoryCard(
+                    card = card,
+                    onClick = {
+                        if (card.coverage == SignalCoverage.NEEDS_SCAN) {
+                            onOpenScan()
+                        } else {
+                            onOpenCategory(card.category)
+                        }
+                    }
+                )
+            }
         }
 
         Text(
@@ -158,9 +189,9 @@ fun DedupHubContent(
     }
 }
 
-/** Hero 卡：label + 品牌渐变大数字（各类目可释放并集估算）+ 覆盖类目数。 */
+/** Hero 卡：label + 品牌渐变大数字（HIGH 置信非保护去重并集）+ 待确认副行 + 有内容的覆盖类目数。 */
 @Composable
-private fun OrgHeroCard(stats: List<CategoryStat>) {
+private fun OrgHeroCard(board: OrganizeBoard) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.lg,
@@ -178,7 +209,7 @@ private fun OrgHeroCard(stats: List<CategoryStat>) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = formatBytes(stats.sumOf { stat -> stat.totalBytes }),
+                text = formatBytes(board.heroReclaimBytes),
                 style = TextStyle(
                     fontSize = 34.sp,
                     fontWeight = FontWeight.Bold,
@@ -186,21 +217,36 @@ private fun OrgHeroCard(stats: List<CategoryStat>) {
                 )
             )
             Text(
-                // +1 = 固定渲染的「重复与相似照片」卡
-                text = stringResource(R.string.org_hero_across, stats.size + 1),
+                // board 恒 6 卡后 size 恒为 6 语义失真；口径改为有内容的类目数
+                // （原 +1 是固定重复卡的旧口径，v2 重复卡已并入 board，不再 +1）
+                text = stringResource(
+                    R.string.org_hero_across,
+                    board.categories.count { card -> card.totalCount > 0 }
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (board.heroReviewCount > 0) {
+                Text(
+                    text = stringResource(R.string.org_hero_review, board.heroReviewCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
 
-/** 「重复与相似照片」单行卡（64dp 紧凑行）：图标块 + 标题/摘要 + chevron；点击展开/收起。 */
+/**
+ * 「重复与相似照片」单行卡（64dp 紧凑行）：图标块 + 标题/摘要 + chevron；点击展开/收起。
+ * 摘要行同源 board 的 DUPLICATES 卡：已有扫描结果时显示真实统计，否则沿用「从未扫描」口径。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DedupCategoryCard(
     expanded: Boolean,
     onToggle: () -> Unit,
+    board: CategoryBoard?,
 ) {
     Card(
         onClick = onToggle,
@@ -226,9 +272,17 @@ private fun DedupCategoryCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                // dedup 摘要：V1 无扫描历史数据源，沿用原 Config Hero 的「从未扫描」口径
+                // dedup 摘要：board 已有重复组统计时显示真实口径，否则沿用「从未扫描」
                 Text(
-                    text = stringResource(R.string.dedup_never_scanned),
+                    text = if (board != null && board.totalCount > 0) {
+                        stringResource(
+                            R.string.org_cat_meta,
+                            board.totalCount,
+                            formatBytes(board.totalBytes)
+                        )
+                    } else {
+                        stringResource(R.string.dedup_never_scanned)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -248,20 +302,27 @@ private fun DedupCategoryCard(
     }
 }
 
-/** 类目卡（64dp 紧凑行）：图标块 + 标题/meta + 4×30dp 预览缩略图条 + chevron。 */
+/**
+ * 类目卡 v2：图标块 + 标题 + meta 行 + 置信度徽标行（● 高置信 / ○ 需确认）+ 4 缩略图条 + chevron。
+ * NEEDS_SCAN 引导态：半透明 + 「需先扫描」徽标，点击跳 SCAN tab（修复 v1 类目静默消失）。
+ * material3 Card 无 alpha 形参，半透明用 Modifier.alpha 兜底。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OrganizeCategoryCard(
-    stat: CategoryStat,
+    card: CategoryBoard,
     onClick: () -> Unit,
 ) {
+    val needsScan = card.coverage == SignalCoverage.NEEDS_SCAN
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (needsScan) 0.6f else 1f),
         shape = AppShapes.card,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
+        ),
     ) {
         Row(
             modifier = Modifier
@@ -270,29 +331,76 @@ private fun OrganizeCategoryCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OrgCategoryIconBlock(icon = organizeCategoryIcon(stat.category))
+            OrgCategoryIconBlock(icon = organizeCategoryIcon(card.category))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(organizeCategoryLabelRes(stat.category)),
+                    text = stringResource(organizeCategoryLabelRes(card.category)),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = stringResource(
-                        R.string.org_cat_meta,
-                        stat.count,
-                        formatBytes(stat.totalBytes)
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (needsScan) {
+                    Text(
+                        text = stringResource(R.string.org_needs_scan),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
+                    )
+                } else {
+                    Text(
+                        text = stringResource(
+                            R.string.org_cat_meta,
+                            card.totalCount,
+                            formatBytes(card.totalBytes)
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    // 置信度徽标行：高置信（primary 实心点）+ 需确认（空心点）+ 保护数
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ConfidenceDot(filled = true)
+                        Text(
+                            text = stringResource(R.string.org_confidence_high, card.highCount),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (card.reviewCount > 0) {
+                            ConfidenceDot(filled = false)
+                            Text(
+                                text = stringResource(R.string.org_confidence_review, card.reviewCount),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (card.protectedCount > 0) {
+                            Text(
+                                text = stringResource(R.string.org_protected_count, card.protectedCount),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                stat.previewUris.forEach { uri -> OrgPreviewThumb(uri = uri) }
+            if (!needsScan) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        card.previewUris.forEach { uri -> OrgPreviewThumb(uri = uri) }
+                    }
+                    if (card.highBytes > 0) {
+                        Text(
+                            text = stringResource(R.string.org_cat_reclaim, formatBytes(card.highBytes)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
             Icon(
                 Icons.AutoMirrored.Rounded.KeyboardArrowRight,
@@ -301,6 +409,20 @@ private fun OrganizeCategoryCard(
             )
         }
     }
+}
+
+/** 置信度小圆点：filled=高置信（primary 实色），否则描边空心。 */
+@Composable
+private fun ConfidenceDot(filled: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(6.dp)
+            .clip(CircleShape)
+            .background(
+                if (filled) MaterialTheme.colorScheme.primary else Color.Transparent
+            )
+            .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
+    )
 }
 
 /** 类目图标块：surfaceVariant 圆角方块 + Material Icon。 */
@@ -467,18 +589,18 @@ private fun DedupLevelRow(
 
 private fun organizeCategoryIcon(category: OrganizeCategory): ImageVector = when (category) {
     OrganizeCategory.DUPLICATES -> Icons.Outlined.BurstMode
-    OrganizeCategory.SCREENSHOTS -> Icons.Outlined.ScreenshotMonitor
-    OrganizeCategory.BLURRY -> Icons.Outlined.BlurOn
-    OrganizeCategory.LOW_QUALITY_PORTRAITS -> Icons.Outlined.Face
-    OrganizeCategory.LARGE_VIDEOS -> Icons.Outlined.Videocam
+    OrganizeCategory.SCREEN_CONTENT -> Icons.Outlined.ScreenshotMonitor
     OrganizeCategory.DOCUMENTS -> Icons.Outlined.Description
+    OrganizeCategory.LOW_QUALITY_PORTRAITS -> Icons.Outlined.Face
+    OrganizeCategory.LOW_QUALITY_PHOTOS -> Icons.Outlined.BlurOn
+    OrganizeCategory.LARGE_FILES -> Icons.Outlined.Videocam
 }
 
 private fun organizeCategoryLabelRes(category: OrganizeCategory): Int = when (category) {
     OrganizeCategory.DUPLICATES -> R.string.org_cat_duplicates
-    OrganizeCategory.SCREENSHOTS -> R.string.org_cat_screenshots
-    OrganizeCategory.BLURRY -> R.string.org_cat_blurry
-    OrganizeCategory.LOW_QUALITY_PORTRAITS -> R.string.org_cat_portraits
-    OrganizeCategory.LARGE_VIDEOS -> R.string.org_cat_large_videos
+    OrganizeCategory.SCREEN_CONTENT -> R.string.org_cat_screen_content
     OrganizeCategory.DOCUMENTS -> R.string.org_cat_documents
+    OrganizeCategory.LOW_QUALITY_PORTRAITS -> R.string.org_cat_portraits
+    OrganizeCategory.LOW_QUALITY_PHOTOS -> R.string.org_cat_blurry
+    OrganizeCategory.LARGE_FILES -> R.string.org_cat_large_files
 }

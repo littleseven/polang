@@ -444,6 +444,14 @@
     <string name="org_cat_portraits">Low-quality portraits</string>
     <string name="org_cat_large_videos">Large videos</string>
     <string name="org_cat_documents">Documents &amp; receipts</string>
+    <string name="org_cat_screen_content">Screenshots &amp; recordings</string>
+    <string name="org_cat_large_files">Large files</string>
+    <string name="org_hero_review">%1$d more to review</string>
+    <string name="org_needs_scan">Run a scan first</string>
+    <string name="org_confidence_high">%1$d high confidence</string>
+    <string name="org_confidence_review">%1$d to review</string>
+    <string name="org_protected_count">%1$d protected</string>
+    <string name="org_cat_reclaim">Free %1$s</string>
     <string name="org_cat_meta">%1$d items · %2$s</string>
     <string name="org_privacy_note">All analysis runs on-device · your photos never leave this phone</string>
     <string name="org_ai_preselect_on">AI preselect on</string>
