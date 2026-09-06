@@ -2,6 +2,7 @@ package com.mamba.picme.features.gallery.memories
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.MediaDao
@@ -13,6 +14,7 @@ import com.mamba.picme.domain.memories.Memory
 import com.mamba.picme.domain.memories.MemoryHiddenStore
 import com.mamba.picme.domain.memories.MemoryInput
 import com.mamba.picme.domain.memories.NamedPerson
+import com.mamba.picme.features.gallery.components.toMediaAsset
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +68,18 @@ class MemoriesViewModel(
         }
             .flowOn(ioDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * uri → [MediaAsset] 全库索引：详情页网格点击进 MediaPager 预览时按 uri 反查完整资产
+     *（[Memory] 只存 uri 字符串，MediaPager 需要 id/type/captureDate 等完整字段）。
+     * 映射经 `MediaEntity.toMediaAsset()`（GalleryUtils），faceFocusY 等字段完整传递；
+     * 媒体库变化（如预览内删除）随流重发，UI 侧预览集合自动收缩。
+     */
+    val assetsByUri: StateFlow<Map<String, MediaAsset>> =
+        mediaDao.getAllMedia()
+            .map { entities -> entities.associate { entity -> entity.uri to entity.toMediaAsset() } }
+            .flowOn(ioDispatcher)
+            .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     /** 隐藏持久化失败一次性标志（VM 层防御标志，UI 暂不消费；消费经 [consumeHideError]；仿 TrashSessionController.errorEvent 模式）。 */
     private val _hideError = MutableStateFlow(false)

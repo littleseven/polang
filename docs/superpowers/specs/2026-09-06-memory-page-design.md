@@ -60,6 +60,7 @@ F3 v1 把回忆 carousel 挂在相册网格 header 槽，用户判断**产品形
 | 网格 | 仅精选 12 张 | 底部分段开关「精选 / 全部」：精选 = 现有 12 张；全部 = 全部命中项 |
 | 分享 | 右上分享图标（ACTION_SEND_MULTIPLE） | 不变，分享集合跟随开关：精选态分享精选 12 张，全部态分享全部命中（量级受生成阈值约束，通常数十张，不设截断） |
 | 播放按钮 | 无 | 不做（v2 候选） |
+| 图片预览 | 网格/封面点击无响应 | **2026-09-06 补齐**：封面与网格照片点击打开全屏 `MediaPager`（内嵌 overlay，同 Gallery/Chat 宿主范式，非路由）——`Memory` 只存 uri，`MemoriesViewModel.assetsByUri`（uri → MediaAsset 全库索引）反查完整资产，按 uri 定位初始页；预览内删除/OCR/跳编辑器/证件照走 Activity 级 `MediaViewModel`，删除授权（API 29 RecoverableSecurityException / API 30+ createDeleteRequest）写法同 ChatScreen；删除后预览集合随媒体库流自动收缩、删空自动收起；系统返回键优先关预览再弹栈；精选/全部开关切换收起预览（索引口径已变） |
 
 ## 5. 数据层变更
 
@@ -96,6 +97,7 @@ zh-TW/ES/FR 同步翻译；日期沿用 Locale 本地化（MemoryTexts.kt 已有
 - [ ] 相册页横滑可按页序滑到 Memory 页（页 4），反向可滑回
 - [ ] Memory 页三分区按数据出现/消失；卡片点击进详情；长按出隐藏弹窗
 - [ ] 详情页封面约 55% 屏高；「精选/全部」开关切换网格内容；分享随开关集合
+- [ ] 详情页网格照片/封面点击进全屏预览（可翻页/删除/跳编辑器）；预览内删除后集合自动收缩；返回键先关预览再回 Memory 页
 - [ ] 返回键从 Memory 页回相册页
 - [ ] 五语无硬编码；detekt 零新增；JVM 单测全绿（Generator allItemUris/分组用例）
 

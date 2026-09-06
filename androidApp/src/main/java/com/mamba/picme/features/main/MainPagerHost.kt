@@ -7,9 +7,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -20,10 +22,11 @@ import com.mamba.picme.features.chat.ChatScreen
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.gallery.GalleryScreen
 import com.mamba.picme.features.gallery.MediaViewModel
-import com.mamba.picme.features.gallery.dedup.DedupHomeRoute
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.gallery.memories.MemoryScreen
+import com.mamba.picme.features.gallery.organize.OrganizeHomeRoute
+import com.mamba.picme.features.gallery.organize.OrganizeTab
 import com.mamba.picme.features.person.PersonScreen
 import com.mamba.picme.features.person.PersonViewModel
 import com.mamba.picme.features.settings.SettingsViewModel
@@ -38,13 +41,16 @@ const val MAIN_PAGE_MEMORY = 4
 const val MAIN_PAGE_COUNT = 5
 
 /**
- * 主页面容器：以 HorizontalPager 承载 相册/相册整理/聊天/人物/回忆 5 页。
+ * 主页面容器：以 HorizontalPager 承载 相册/整理+扫描/聊天/人物/回忆 5 页。
  *
- * - 拖动跟手：横滑实时跟随手指，松手物理吸附；相册页左滑即达相册整理（页 1）
+ * - 拖动跟手：横滑实时跟随手指，松手物理吸附；相册页左滑即达整理+扫描合并页（页 1）
  * - 页面常驻：beyondViewportPageCount = 4，5 页全部常驻组合，相册滚动/搜索状态滑走不丢
  * - 相机不在 Pager：2026-08-26 起相机改为 NavHost 全屏路由（Screen.Camera），
  *   仅头像拍摄与 Agent 指令进入，相机会话按路由生命周期门控
  * - 横滑使能：相册（详情/多选）与聊天（全屏预览）通过回调上报，局部禁用外层滑动
+ * - 整理+扫描合并页（2026-09-06）：页 1 为 OrganizeHomeRoute 双 Tab 容器（整理/扫描），
+ *   页内 Tab 选择由本宿主持有（rememberSaveable）；外部入口（设置页等 NavHost 路由）
+ *   经 [organizeTabRequest] 一次性请求驱动，消费后清零
  */
 @Suppress("LongParameterList")
 @OptIn(ExperimentalFoundationApi::class)
@@ -63,15 +69,30 @@ fun MainPagerHost(
     gallerySearchRequest: Pair<String, Long>?,
     onGallerySearchRequestConsumed: () -> Unit,
     onRequestGallerySearch: (query: String, personId: Long) -> Unit,
-    /** 整理中心 hub「Quick tidy up」（F2 路由未点亮，先空占位）。 */
+    /** 整理中心 hub「Quick tidy up」（F2 已点亮：swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
-    /** 整理中心 hub 类目卡点击（Task 5 点亮，先空占位）。 */
+    /** 整理中心 hub 类目卡点击（organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
     /** Memory 页大卡点击 → 回忆详情页（memory_detail/{memoryId} 路由）。 */
     onNavigateToMemoryDetail: (String) -> Unit = {},
+    /** 整理+扫描合并页扫描 Tab 内「查看标签」出口（tag_viewer 路由）。 */
+    onNavigateToTagViewer: () -> Unit = {},
+    /** 外部入口（设置页）一次性请求合并页 Tab；null = 无请求。 */
+    organizeTabRequest: OrganizeTab? = null,
+    onOrganizeTabRequestConsumed: () -> Unit = {},
 ) {
     var gallerySwipeEnabled by remember { mutableStateOf(true) }
     var chatSwipeEnabled by remember { mutableStateOf(true) }
+    // 合并页扫描 Tab 的 OpenCL 开关（原 tag_control 路由在 MainActivity 采集，并入后收口此处）
+    val tagGenerationUseOpencl by settingsViewModel.tagGenerationUseOpencl.collectAsState()
+    // 合并页 Tab 选择：页内手动切换直接写；外部入口经请求一次性驱动
+    var organizeTab by rememberSaveable { mutableStateOf(OrganizeTab.ORGANIZE) }
+    LaunchedEffect(organizeTabRequest) {
+        organizeTabRequest?.let { requested ->
+            organizeTab = requested
+            onOrganizeTabRequestConsumed()
+        }
+    }
 
     // 场景管理：跟随 Pager 稳定页切换（相册整理与回忆页沿用相册场景，人物页无独立场景沿用进入前的场景）
     LaunchedEffect(pagerState.settledPage) {
@@ -122,10 +143,15 @@ fun MainPagerHost(
                     navController.navigate(Screen.Debug.route, navOptions { launchSingleTop = true })
                 },
                 onNavigateToTagControl = {
-                    navController.navigate(Screen.TagControl.route, navOptions { launchSingleTop = true })
+                    // 扫描已并入整理+扫描合并页（页 1）SCAN Tab：切页并预选 Tab
+                    organizeTab = OrganizeTab.SCAN
+                    onSwitchPage(MAIN_PAGE_DEDUP)
                 },
-                // 相册整理是相邻 Pager 页：切页而非导航（与底部 Tab 瞬时切页风格一致）
-                onNavigateToDedupHome = { onSwitchPage(MAIN_PAGE_DEDUP) },
+                // 整理+扫描合并页是相邻 Pager 页：切页而非导航（与底部 Tab 瞬时切页风格一致）
+                onNavigateToDedupHome = {
+                    organizeTab = OrganizeTab.ORGANIZE
+                    onSwitchPage(MAIN_PAGE_DEDUP)
+                },
                 onNavigateToPeople = { onSwitchPage(MAIN_PAGE_PEOPLE) },
                 searchRequest = gallerySearchRequest,
                 onSearchRequestConsumed = onGallerySearchRequestConsumed,
@@ -134,13 +160,20 @@ fun MainPagerHost(
                 onNavigateToMemory = { onSwitchPage(MAIN_PAGE_MEMORY) }
             )
 
-            // 相册整理（去重 2.0）Pager 托管：内部 Config→Scanning→Results→Cleaned 四态不变；
+            // 整理+扫描合并页（2026-09-06）：双 Tab 容器承载去重 2.0（四态不变）与 TAG 扫描控制；
             // 返回（顶栏/系统返回键由外层 BackHandler 兜底）切回相册页，不弹栈
-            MAIN_PAGE_DEDUP -> DedupHomeRoute(
-                viewModel = dedupViewModel,
+            MAIN_PAGE_DEDUP -> OrganizeHomeRoute(
+                dedupViewModel = dedupViewModel,
+                selectedTab = organizeTab,
+                onSelectTab = { tab -> organizeTab = tab },
+                useOpencl = tagGenerationUseOpencl,
+                onUseOpenclChange = { enabled ->
+                    settingsViewModel.setTagGenerationUseOpencl(enabled)
+                },
                 onNavigateBack = { onSwitchPage(MAIN_PAGE_GALLERY) },
                 onQuickTidy = onQuickTidy,
-                onOpenCategory = onOpenCategory
+                onOpenCategory = onOpenCategory,
+                onNavigateToTagViewer = onNavigateToTagViewer
             )
 
             MAIN_PAGE_CHAT -> ChatScreen(
@@ -181,10 +214,15 @@ fun MainPagerHost(
             MAIN_PAGE_MEMORY -> MemoryScreen(
                 memoriesViewModel = memoriesViewModel,
                 onNavigateToMemoryDetail = onNavigateToMemoryDetail,
-                onNavigateToDedupHome = { onSwitchPage(MAIN_PAGE_DEDUP) },
+                onNavigateToDedupHome = {
+                    organizeTab = OrganizeTab.ORGANIZE
+                    onSwitchPage(MAIN_PAGE_DEDUP)
+                },
                 onNavigateToChat = { onSwitchPage(MAIN_PAGE_CHAT) },
                 onNavigateToTagControl = {
-                    navController.navigate(Screen.TagControl.route, navOptions { launchSingleTop = true })
+                    // 扫描已并入整理+扫描合并页（页 1）SCAN Tab：切页并预选 Tab
+                    organizeTab = OrganizeTab.SCAN
+                    onSwitchPage(MAIN_PAGE_DEDUP)
                 },
                 onNavigateToPeople = { onSwitchPage(MAIN_PAGE_PEOPLE) },
             )

@@ -23,7 +23,7 @@ sealed class Screen(val route: String) {
             return if (params.isEmpty()) route else "$route?${params.joinToString("&")}"
         }
     }
-    data object TagControl : Screen("tag_control")
+    // 注：原 tag_control 路由已于 2026-09-06 并入整理+扫描合并页（Pager 页 1 SCAN Tab）
     data object Settings : Screen("settings")
     data object SettingsCategory : Screen("settings/{category}") {
         fun createRoute(category: String): String = "settings/$category"

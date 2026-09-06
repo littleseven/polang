@@ -1,5 +1,6 @@
 package com.mamba.picme.features.gallery.memories
 
+import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
@@ -208,5 +209,28 @@ class MemoriesViewModelTest {
         data.media.value = onThisDayPhotos()
         advanceUntilIdle()
         assertEquals(MemoryType.ON_THIS_DAY, values.last().single().type)
+    }
+
+    @Test
+    fun `assetsByUri resolves full media assets and shrinks on library deletion`() = runTest {
+        val data = FakeData().apply {
+            media.value = recentPhotos(6) + video("v1", at(2026, 9, 2))
+        }
+        val vm = viewModel(this, data)
+        val values = mutableListOf<Map<String, MediaAsset>>()
+        // 与 collectMemories 同理：WhileSubscribed 需订阅者，收集器挂独立 TestScope
+        TestScope(testScheduler).launch { vm.assetsByUri.collect { map -> values += map } }
+        advanceUntilIdle()
+        val map = values.last()
+        assertEquals(7, map.size)
+        val asset = map.getValue("r1")
+        assertEquals("r1.jpg", asset.fileName)
+        assertEquals(MediaType.PHOTO, asset.type)
+        assertEquals(MediaType.VIDEO, map.getValue("v1").type)
+
+        // 媒体库删除随流重发：详情页预览集合据此自动收缩
+        data.media.value = recentPhotos(6)
+        advanceUntilIdle()
+        assertTrue("v1" !in values.last())
     }
 }

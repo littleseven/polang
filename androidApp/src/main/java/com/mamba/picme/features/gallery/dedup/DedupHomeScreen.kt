@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,6 +55,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -84,10 +86,12 @@ private val KeepGreen = Color(0xFF4CAF50)
 fun DedupHomeRoute(
     viewModel: DedupViewModel,
     onNavigateBack: () -> Unit,
-    /** 整理中心 hub「Quick tidy up」（F2 路由未点亮，调用方先传空占位）。 */
+    /** 整理中心 hub「Quick tidy up」（F2 已点亮：MainActivity 导航 swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
     /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
+    /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）。 */
+    embedded: Boolean = false,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingTrash by viewModel.pendingTrash.collectAsState()
@@ -142,6 +146,7 @@ fun DedupHomeRoute(
                 onNavigateBack = onNavigateBack,
                 onCancelScan = { viewModel.cancelScan() },
                 onOpenKeepRules = { showKeepRules = true },
+                embedded = embedded,
             )
         },
         bottomBar = {
@@ -257,8 +262,11 @@ private fun DedupTopBar(
     onNavigateBack: () -> Unit,
     onCancelScan: () -> Unit,
     onOpenKeepRules: () -> Unit,
+    embedded: Boolean = false,
 ) {
     TopAppBar(
+        // 嵌入合并页时状态栏避让由外层胶囊条统一处理，顶栏 inset 归零防双避让
+        windowInsets = if (embedded) WindowInsets(0, 0, 0, 0) else TopAppBarDefaults.windowInsets,
         title = {
             Text(
                 text = stringResource(

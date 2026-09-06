@@ -37,7 +37,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | 页索引 | 页面 | 定位 |
 |--------|------|------|
 | 0 | `Gallery` | **默认首页** — 智能相册、媒体浏览、AI 搜索、分类管理；底部悬浮 Tab 以纯图标聚合 相册整理/Chat/打标/People/回忆 入口；设置入口在顶部栏最右侧 |
-| 1 | `Dedup`（相册整理） | 去重 2.0 主页（`DedupHomeRoute`，2026-08-26 自 NavHost 路由迁入 Pager）— 三级尺度重复/相似照片扫描、保留规则与回收站清理；相册页左滑即达，返回切回相册页不弹栈 |
+| 1 | `Organize`（整理+扫描合并页） | 整理+扫描双 Tab 容器（`OrganizeHomeRoute`，2026-09-06 合并）— Tab「整理」= 去重 2.0 主页（`DedupHomeRoute` embedded，三级尺度重复/相似照片扫描、保留规则与回收站清理），Tab「扫描」= TAG 生成控制（`TagGenerationControlScreen` embedded，原 `tag_control` 路由并入）；相册页左滑即达，返回切回相册页不弹栈；外部入口（设置页）经 `organizeTabRequest` 一次性预选 Tab |
 | 2 | `Chat` | AI 对话主页，仅远程模型 |
 | 3 | `People` | 人物聚类页 |
 | 4 | `Memory`（回忆） | 回忆独立页（2026-09-06，对标小米系统相册）— 三分区大卡 feed（时光/旅程/人物，空分区不占位）+ 回忆详情页 `memory_detail/{memoryId}`；纯端侧规则生成零上传，实现细节见 `features/gallery/AGENTS.md` §2.12 |
@@ -45,6 +45,8 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 > **2026-07 主页面 Pager 化**：主页面由 `HorizontalPager`（`beyondViewportPageCount = MAIN_PAGE_COUNT - 1`，页面全部常驻组合）承载，横滑跟手、线性顺序、无循环回绕；底部 Tab/编程入口经 `switchMainPage` 瞬时切页（无滑动动画）；相册（详情/多选）与聊天（全屏预览）通过 `onHorizontalSwipeEnabledChange` 局部禁用外层滑动；Chat/人物页跳相册搜索经 `searchRequest` 状态驱动（不再走 `gallery?query=` 路由参数）。原 `MainPageSwipeWrapper` 已删除。
 >
 > **2026-09-06 Memory 独立页**：Pager 追加第 5 页「回忆」（index 4，`MAIN_PAGE_MEMORY`，`beyondViewportPageCount` 随之 = 4），对标小米系统相册分区 feed；实现细节见 `features/gallery/AGENTS.md` §2.12。
+>
+> **2026-09-06 整理+扫描合并页**：原 Pager 页 1（去重 2.0 `DedupHomeRoute`）与 NavHost 路由 `tag_control`（TAG 生成控制）合并为页 1 双 Tab 容器 `OrganizeHomeRoute`（顶部胶囊分段开关「整理/扫描」，两子页以 `embedded` 模式嵌入保留各自顶栏 actions）；`tag_control` 路由删除，悬浮底栏两图标与设置入口均切页并预选对应 Tab（页内 Tab 态由 MainPagerHost `rememberSaveable` 持有，外部经 `organizeTabRequest` 驱动）。
 >
 > **2026-08-26 相机路由化**：相机页从 Pager 移出（原页 0 席位由相册整理接替），改为 NavHost 全屏路由 `Screen.Camera`——唯一用户入口为头像拍摄（`AvatarCaptureController` 登记 pending 后 navigate），Agent `navigate_to(camera)` 由 `NavigationCapability` 直接 navigate 该路由；相机会话门控由 Pager `isActivePage` 改为路由生命周期（`backStackEntry.lifecycle ≥ RESUMED`）驱动，离开即解绑释放。
 
@@ -58,13 +60,12 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `IDPhoto` | `id_photo/{sourceUri}` | 证件照制作 |
 | `OrganizeCategory` | `organize_category/{category}` | 整理中心类目详情（F1，2026-09-05）— AI 预选网格 + 批量回收站清理/恢复；路由段为 `domain.organize.OrganizeCategory` 枚举名，非法值弹栈；VM 经 `AppContainer.createOrganizeCategoryViewModelFactory(category)` 构建（TrashSessionController 在 VM 内 new，backend = DedupTrashBackend 包装 dedupTrashManager） |
 | `SwipeReview` | `swipe_review` | 手势快速整理全屏页（F2，2026-09-05）— 右滑保留 / 左滑跳过 / 上滑删除（点按=跳过），DELETE 批量提交系统回收站；KEEP 决策写入 30 天抑制历史（DataStore `swipe_keep_history`）不再入队；hub「Quick tidy up」主按钮点亮；VM 经 `AppContainer.createSwipeReviewViewModelFactory()` 构建 |
-| `MemoryDetail` | `memory_detail/{memoryId}` | 回忆详情页（F3，2026-09-06 升级对标小米）— 约屏高 55% 封面（左下蒙层白字标题 + hitCount·分类型副行）+ 3 列网格 + 底部「精选/全部」分段开关（`displayUris` = `itemUris`/`allItemUris` 跟随切换，分享集合同步跟随，ACTION_SEND_MULTIPLE）；路由段为 Memory.id（`Uri.encode`，Navigation 自动解码一次），数据取自 Activity 级 `MemoriesViewModel.observeMemory(id)` Flow（未过滤全集，已隐藏条目可复原，冷恢复不闪空态），id 失效 → 空态；VM 经 `AppContainer.createMemoriesViewModelFactory()` 构建 |
+| `MemoryDetail` | `memory_detail/{memoryId}` | 回忆详情页（F3，2026-09-06 升级对标小米）— 约屏高 55% 封面（左下蒙层白字标题 + hitCount·分类型副行）+ 3 列网格 + 底部「精选/全部」分段开关（`displayUris` = `itemUris`/`allItemUris` 跟随切换，分享集合同步跟随，ACTION_SEND_MULTIPLE）；封面/网格照片点击进全屏 MediaPager 预览（2026-09-06 补齐：`MemoriesViewModel.assetsByUri` uri→MediaAsset 反查，预览内删除/OCR/跳编辑器/证件照经 Activity 级 MediaViewModel，删除授权同 ChatScreen 写法，删空自动收起，返回键优先关预览）；路由段为 Memory.id（`Uri.encode`，Navigation 自动解码一次），数据取自 Activity 级 `MemoriesViewModel.observeMemory(id)` Flow（未过滤全集，已隐藏条目可复原，冷恢复不闪空态），id 失效 → 空态；VM 经 `AppContainer.createMemoriesViewModelFactory()` 构建 |
 | `Settings` | `settings` | 设置 — 主菜单（2026-08-26 列表式改版：账号 Hero 卡 + 个性化/功能/AI 与系统/其他四组列表行） |
 | `SettingsCategory` | `settings/{category}` | 设置二级分类页 — 路由段为枚举名小写：`account`、`gallery`（dormant）、`camera`、`system`、`remote_model`、`local_model`、`sandbox`、`developer`（2026-08-16 `camera_beauty` 更名 `camera`，承载相机状态记忆与重置） |
 | `AddRemoteProvider` | `settings/add_remote_provider` | 添加远程模型 — 供应商列表页（精确路由，优先于 `settings/{category}` 占位匹配；2026-08-21 替代原 AddProviderModelDialog 弹窗） |
 | `ProviderConfig` | `settings/provider_config/{providerId}` | 供应商配置页 — API Key + 模型单选 + 自定义模型 ID；`providerId=custom` 为自定义供应商形态（含 Base URL）；保存后确定性弹回远程模型列表 |
 | `ModelCenter` | `model_center/{categoryTag}` | 模型中心 — 按服务功能分类管理本地模型 |
-| `TagControl` | `tag_control` | TAG 生成控制 — 3-Pass 进度、按类别/时间范围重新生成 |
 | `TagViewer` | `tag_viewer` | 标签查看页 |
 | `MemoryFacts` | `memory_facts` | 设置子页 — AI 记忆（人物关系区 + 事实记忆区的查看/编辑/删除/清空），从设置主菜单「功能」组「AI 记忆」列表行进入 |
 | `DataPrivacy` | `data_privacy` | 数据隐私说明页 |
@@ -75,7 +76,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `SentencePieceTest` | `sentencepiece_test` | SentencePiece 翻译测试页 |
 | `LlmLog` | `llm_log` | LLM 调用日志查看页 |
 
-> Chat/Gallery/Dedup/People/Memory 为 `Main` 内部 Pager 页，不单独注册 destination；相机为 NavHost 全屏路由（`camera`）；完整路由定义以 `navigation/Screen.kt` 为准。
+> Chat/Gallery/Organize(整理+扫描)/People/Memory 为 `Main` 内部 Pager 页，不单独注册 destination；相机为 NavHost 全屏路由（`camera`）；完整路由定义以 `navigation/Screen.kt` 为准。
 
 > **2026-06 产品重心转移**：Gallery 为默认首页，Camera/Chat/ModelCenter 作为纯图标入口从 Gallery 底部悬浮 Tab 进入，Settings 从顶部栏进入；设置页已拆分为 6 个二级分类页，主菜单保持一屏可见；Model Center 内置于 Settings 的 AI 助手卡片第一项，分类按服务功能（必须/聊天/相册打标/美颜相机）重排，聊天分类聚合文字与语音模型，并提供必须模型一键下载；重复照片管理已升级为设置主菜单「相册整理」一级入口与主页面 Pager 页 1（2026-08-26，原「Settings 相册功能卡片」入口废弃）；Camera 页已移除设置入口。
 >

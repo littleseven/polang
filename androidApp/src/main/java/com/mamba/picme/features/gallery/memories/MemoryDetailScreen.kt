@@ -1,7 +1,14 @@
 package com.mamba.picme.features.gallery.memories
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.provider.MediaStore
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +32,8 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,117 +59,235 @@ import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mamba.picme.R
+import com.mamba.picme.agent.core.model.context.MediaAsset
+import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.domain.memories.Memory
 import com.mamba.picme.domain.memories.MemoryType
 import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.features.common.topbar.AppTopBarAction
+import com.mamba.picme.features.gallery.MediaViewModel
+import com.mamba.picme.features.gallery.components.MediaPager
 
 /**
  * 回忆详情页（F3，2026-09-06 升级，对标小米）：顶栏（返回 + Memories + 分享图标）→
  * 约屏高 55% 封面（左下蒙层白字标题/副行）→ 3 列网格（精选/全部跟随分段开关）→
  * 底部居中胶囊分段开关（精选 = 美学分截 12；全部 = 全部命中时间降序）。分享集合跟随开关。
  * [memory] 为 null（id 已失效，如媒体清空后）时显示空态文案。
+ *
+ * 图片预览（2026-09-06 补齐）：封面与网格照片点击均打开全屏 [MediaPager]（初始页按 uri
+ * 在 [assetsByUri] 反查后的预览集合中定位，未解析项自动剔除）；预览内删除/授权链路复用
+ * [mediaViewModel]（写法同 ChatScreen 图片预览），删除后预览集合随媒体库流自动收缩，
+ * 删空自动收起预览；系统返回键优先关闭预览再弹栈。
  */
-@Suppress("LongMethod") // 待重构：封面/网格/分段开关可抽子组合函数
+@Suppress("LongMethod", "LongParameterList") // 待重构：封面/网格/分段开关可抽子组合函数
 @Composable
 fun MemoryDetailScreen(
     memory: Memory?,
+    assetsByUri: Map<String, MediaAsset>,
+    mediaViewModel: MediaViewModel,
+    onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -> Unit,
+    onNavigateToIDPhoto: (uri: String) -> Unit,
     onNavigateBack: () -> Unit,
 ) {
     val context = LocalContext.current
     // 精选/全部开关：按 memory id 记忆，切回忆时重置回精选
     var showAll by remember(memory?.id) { mutableStateOf(false) }
     val displayUris = if (showAll) memory?.allItemUris.orEmpty() else memory?.itemUris.orEmpty()
-    Column(
+    // 预览集合：displayUris 顺序经全库 uri 索引反查完整 MediaAsset（MediaPager 需要
+    // id/type/captureDate 等字段）；媒体库变化（如预览内删除）随流重发自动收缩
+    val previewAssets = remember(displayUris, assetsByUri) {
+        displayUris.mapNotNull { uri -> assetsByUri[uri] }
+    }
+    // 全屏预览页索引（null = 关闭）；切回忆时重置，精选/全部开关切换也收起（索引口径已变）
+    var previewIndex by remember(memory?.id) { mutableStateOf<Int?>(null) }
+    LaunchedEffect(showAll) { previewIndex = null }
+    // 预览集合删空（或回忆随媒体清空失效）→ 自动收起，避免停留在空 Pager
+    LaunchedEffect(previewAssets.isEmpty()) {
+        if (previewAssets.isEmpty()) previewIndex = null
+    }
+
+    // ── 预览内删除授权（API 29 恢复性删除 / API 30+ 批量删除请求），写法同 ChatScreen ──
+    val deleteAuthRequest by mediaViewModel.deleteAuthRequest.collectAsState()
+    val api29DeleteLauncher = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartIntentSenderForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                Logger.d(TAG, "User granted API 29 delete permission")
+                mediaViewModel.executePendingDeletes()
+            } else {
+                Logger.w(TAG, "User denied API 29 delete permission")
+                mediaViewModel.clearPendingRecoverable()
+                mediaViewModel.clearPendingDeleteUris()
+            }
+        }
+    } else {
+        null
+    }
+    val deletePermissionLauncher = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartIntentSenderForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                Logger.d(TAG, "User granted delete permission")
+                mediaViewModel.executePendingDeletes()
+            } else {
+                Logger.w(TAG, "User denied delete permission")
+                mediaViewModel.clearPendingDeleteUris()
+            }
+        }
+    } else {
+        null
+    }
+    LaunchedEffect(deleteAuthRequest) {
+        deleteAuthRequest?.let { request ->
+            when (request) {
+                is MediaViewModel.DeleteAuthRequest.Api29 -> {
+                    api29DeleteLauncher?.launch(
+                        IntentSenderRequest.Builder(request.intentSender).build()
+                    )
+                }
+                is MediaViewModel.DeleteAuthRequest.Api30 -> {
+                    val intent = MediaStore.createDeleteRequest(
+                        context.contentResolver,
+                        request.uris
+                    )
+                    deletePermissionLauncher?.launch(
+                        IntentSenderRequest.Builder(intent).build()
+                    )
+                }
+            }
+            mediaViewModel.consumeDeleteAuthRequest()
+        }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        AppTopBar(
-            title = stringResource(R.string.memory_title),
-            onBack = onNavigateBack,
-            actions = {
-                if (memory != null) {
-                    AppTopBarAction(
-                        icon = Icons.Outlined.Share,
-                        contentDescription = stringResource(R.string.memory_share),
-                        onClick = { shareMemoryPhotos(context, displayUris) },
+        Column(modifier = Modifier.fillMaxSize()) {
+            AppTopBar(
+                title = stringResource(R.string.memory_title),
+                onBack = onNavigateBack,
+                actions = {
+                    if (memory != null) {
+                        AppTopBarAction(
+                            icon = Icons.Outlined.Share,
+                            contentDescription = stringResource(R.string.memory_share),
+                            onClick = { shareMemoryPhotos(context, displayUris) },
+                        )
+                    }
+                },
+            )
+            if (memory == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = stringResource(R.string.memory_detail_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            },
-        )
-        if (memory == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = stringResource(R.string.memory_detail_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            } else {
+                MemoryCover(
+                    memory = memory,
+                    onClick = {
+                        previewIndex = previewAssets
+                            .indexOfFirst { asset -> asset.uri == memory.coverUri }
+                            .takeIf { index -> index >= 0 }
+                    },
                 )
-            }
-        } else {
-            MemoryCover(memory = memory)
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                itemsIndexed(displayUris, key = { _, uri -> uri }) { index, uri ->
-                    MemoryGridItem(uri = uri, index = index)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    itemsIndexed(displayUris, key = { _, uri -> uri }) { index, uri ->
+                        MemoryGridItem(
+                            uri = uri,
+                            index = index,
+                            onClick = {
+                                previewIndex = previewAssets
+                                    .indexOfFirst { asset -> asset.uri == uri }
+                                    .takeIf { found -> found >= 0 }
+                            },
+                        )
+                    }
                 }
-            }
-            // 精选/全部分段开关（对标小米「显示优选/全部显示」）
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .navigationBarsPadding(),
-                horizontalArrangement = Arrangement.Center,
-            ) {
+                // 精选/全部分段开关（对标小米「显示优选/全部显示」）
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.Center,
                 ) {
-                    listOf(false to R.string.memory_detail_best, true to R.string.memory_detail_all)
-                        .forEach { pair ->
-                            val isSelected = showAll == pair.first
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else Color.Transparent,
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        listOf(false to R.string.memory_detail_best, true to R.string.memory_detail_all)
+                            .forEach { pair ->
+                                val isSelected = showAll == pair.first
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else Color.Transparent,
+                                        )
+                                        .clickable { showAll = pair.first }
+                                        .semantics {
+                                            role = Role.Button
+                                            selected = isSelected
+                                        }
+                                        .padding(horizontal = 24.dp, vertical = 10.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(pair.second),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (isSelected) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                     )
-                                    .clickable { showAll = pair.first }
-                                    .semantics {
-                                        role = Role.Button
-                                        selected = isSelected
-                                    }
-                                    .padding(horizontal = 24.dp, vertical = 10.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(pair.second),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = if (isSelected) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                )
+                                }
                             }
-                        }
+                    }
                 }
             }
+        }
+
+        // 全屏图片预览覆盖层（内嵌 MediaPager，同 Gallery/Chat 宿主范式）
+        val currentPreviewIndex = previewIndex
+        if (currentPreviewIndex != null && previewAssets.isNotEmpty()) {
+            BackHandler { previewIndex = null }
+            MediaPager(
+                assets = previewAssets,
+                initialIndex = currentPreviewIndex.coerceIn(0, previewAssets.lastIndex),
+                onClose = { previewIndex = null },
+                onDelete = { asset -> mediaViewModel.deleteMediaByIds(listOf(asset.id)) },
+                onStartOcr = { uriString ->
+                    mediaViewModel.recognizeTextFromCurrentImage(context, uriString.toUri())
+                },
+                onDismissOcr = { mediaViewModel.clearOcrResult() },
+                ocrState = mediaViewModel.ocrState,
+                onNavigateToEditor = { asset -> onNavigateToPhotoEditor(asset.uri, false) },
+                onAiOptimize = { asset -> onNavigateToPhotoEditor(asset.uri, true) },
+                onIdPhoto = { asset -> onNavigateToIDPhoto(asset.uri) },
+            )
         }
     }
 }
 
-/** 约屏高 55% 封面：大图 + 底部黑色渐变蒙层 + 左下白字标题行/副行。 */
+/** 约屏高 55% 封面：大图 + 底部黑色渐变蒙层 + 左下白字标题行/副行；点击打开全屏预览。 */
 @Composable
-private fun MemoryCover(memory: Memory) {
+private fun MemoryCover(memory: Memory, onClick: () -> Unit) {
     val title = memoryTitle(memory)
     // 副行后缀：ON_THIS_DAY/RECENT_HIGHLIGHTS 接原 subtitle；CITY 接旅程日期范围；
     // PERSON 不接（hitCount 与「N 张照片」重复计数）
@@ -173,7 +300,8 @@ private fun MemoryCover(memory: Memory) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(coverHeight),
+            .height(coverHeight)
+            .clickable(onClick = onClick),
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
@@ -219,9 +347,9 @@ private fun MemoryCover(memory: Memory) {
     }
 }
 
-/** 网格小卡：1:1 方图 r8。 */
+/** 网格小卡：1:1 方图 r8；点击打开全屏预览（按 uri 定位页索引）。 */
 @Composable
-private fun MemoryGridItem(uri: String, index: Int) {
+private fun MemoryGridItem(uri: String, index: Int, onClick: () -> Unit) {
     val placeholder = ColorPainter(MaterialTheme.colorScheme.surface)
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
@@ -233,7 +361,8 @@ private fun MemoryGridItem(uri: String, index: Int) {
         modifier = Modifier
             .aspectRatio(1f)
             .clip(AppShapes.small)
-            .background(MaterialTheme.colorScheme.surface),
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick),
         contentScale = ContentScale.Crop,
         placeholder = placeholder,
         error = placeholder,
@@ -256,3 +385,5 @@ private fun shareMemoryPhotos(context: Context, uris: List<String>) {
     }
     context.startActivity(Intent.createChooser(shareIntent, null))
 }
+
+private const val TAG = "PoLang:Memories"

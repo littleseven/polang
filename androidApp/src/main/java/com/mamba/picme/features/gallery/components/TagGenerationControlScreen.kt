@@ -77,7 +77,9 @@ fun TagGenerationControlScreen(
     onNavigateBack: () -> Unit,
     onNavigateToTagViewer: () -> Unit = {},
     useOpencl: Boolean,
-    onUseOpenclChange: (Boolean) -> Unit
+    onUseOpenclChange: (Boolean) -> Unit,
+    /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）。 */
+    embedded: Boolean = false,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as PoLangApplication
@@ -276,7 +278,8 @@ fun TagGenerationControlScreen(
         topBar = {
             AppTopBar(
                 title = { Text(stringResource(R.string.gallery_settings)) },
-                navigationIcon = { AppTopBarNavBack(onClick = onNavigateBack) }
+                navigationIcon = { AppTopBarNavBack(onClick = onNavigateBack) },
+                includeStatusBarPadding = !embedded
             )
         }
     ) { padding ->

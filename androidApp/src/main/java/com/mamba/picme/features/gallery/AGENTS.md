@@ -136,7 +136,7 @@ private fun shareMediaAssets(context: Context, assets: List<MediaAsset>) {
 > 旧实现（`DuplicateManager` 页 / `FindDuplicateMediaUseCase` / `DuplicateImageDetector`）已于 2026-08-26 Task 11 整体下线删除；`core/common/PerceptualHash.kt`（MD5/pHash 纯算法，零 Android 依赖、可 JVM 单测）保留，由新扫描器复用。
 
 **技术规范**:
-- **入口（2026-08-26 二轮升级）**: 相册整理为**主页面 Pager 页 1**（页序 相册(0)/相册整理(1)/聊天(2)/人物(3)/回忆(4)，见 `features/main/MainPagerHost.kt`；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全）——相册页左滑经外层 HorizontalPager 原生手势进入，悬浮底部 Tab 第一项（`Icons.Outlined.BurstMode`）与设置主菜单「相册整理」一级入口均经 `switchMainPage(MAIN_PAGE_DEDUP)` 瞬时切页；原 `Screen.DedupHome`（route `dedup_home`）NavHost 路由已删除（避免双宿主）。返回（顶栏返回/系统返回键）切回相册页不弹栈；TagControl 头部「管理重复照片」行已移除
+- **入口（2026-09-06 整理+扫描合并页）**: 整理+扫描合并页为主页面 Pager 页 1（页序 相册(0)/整理+扫描(1)/聊天(2)/人物(3)/回忆(4)，见 `features/main/MainPagerHost.kt`；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全）——合并页 `OrganizeHomeRoute`（`features/gallery/organize/OrganizeHomeScreen.kt`）以顶部胶囊分段开关承载「整理」（本页 embedded）/「扫描」（TagGenerationControlScreen embedded）双 Tab；相册页左滑经外层 HorizontalPager 原生手势进入，悬浮底部 Tab 第一项（`Icons.Outlined.BurstMode`）与设置主菜单「相册整理」一级入口均切到页 1 并预选整理 Tab（设置入口经 `organizeTabRequest` 一次性请求驱动）。返回（顶栏返回/系统返回键）切回相册页不弹栈
 - **三级尺度（`DedupLevel`，`domain/dedup/DedupModels.kt`）**:
   - `EXACT` 精确重复：`(sizeBytes, mime)` 分桶 → 流式 MD5 相同成组
   - `VISUAL` 视觉重复：32×32 降采样 64-bit pHash，汉明距离 ≤ `visualThreshold`(=5) 并查集聚类；与 EXACT 组完全重合（全员同 MD5）的簇跳过
@@ -225,7 +225,7 @@ SearchTopBar(
 **底部悬浮 Tab**:
 - 使用共享组件 `FloatingBottomTab`（`features/common/components/FloatingBottomTab.kt`）
 - 位置：底部居中，底部 padding 16.dp，悬浮于媒体网格之上
-- 入口项（从左到右）：相册整理（BurstMode，切到 Pager 页 1）、Chat、Tag 打标控制、人物（AccountCircle）、回忆（Collections，切到 Pager 页 4，2026-09-06 新增）
+- 入口项（从左到右）：相册整理（BurstMode，切到 Pager 页 1 整理 Tab）、Chat、TAG 扫描（切到 Pager 页 1 扫描 Tab，2026-09-06 并入整理+扫描合并页）、人物（AccountCircle）、回忆（Collections，切到 Pager 页 4，2026-09-06 新增）
 - 每项仅显示图标，无文字标签
 - 点击经 `switchMainPage` 瞬时切主页面 Pager 页（无滑动动画）
 - `FloatingBottomTabItem.selected` 高亮态（图标着色 primary）：Memory 页底 bar 的回忆项置 true 标识当前页（点击空操作），其余页保持默认 false
@@ -322,7 +322,7 @@ override fun onCleared() {
 
 ### 2.9 TAG 生成精细控制（2026-06 新增）
 
-**入口**: `TagGenerationControlScreen`（设置 → AI Agent → TAG 生成控制）
+**入口**: `TagGenerationControlScreen`（2026-09-06 起并入整理+扫描合并页 SCAN Tab：主页面 Pager 页 1 `OrganizeHomeRoute`，原 `tag_control` NavHost 路由已删除；入口 = 悬浮底栏 TAG 图标（预选 SCAN Tab 切页）/ 设置主菜单「AI 与系统」组「TAG 生成控制」列表行（经 `organizeTabRequest` 预选 SCAN Tab）；embedded 模式下顶栏关闭内置状态栏避让，由合并页胶囊条统一避让）
 
 **技术规范**:
 - **3-Pass 混合管道**（另有 legacy `MOBILE_CLIP_ENCODING` Pass，仅保留用于历史任务兼容及单独重编码场景，不在常规扫描链中）:
@@ -345,7 +345,7 @@ override fun onCleared() {
 - **全量二次确认**：选 Reprocess everything 先弹 AlertDialog 确认再下发 intent（`intentScanPass1/2/3Full`、`intentScoreAestheticFull`）
 - **Regenerate 区块**：类别/时间范围 chips + 「Overwrite existing」开关（关 = 仅补齐缺失），替代旧「模式: X」单选
 - 已删除：Pipeline overview 卡、StatsCard 底部阶段进度条、行内增量/全量按钮
-- **视觉规格对齐 Ardot 稿 `gallery/tag_control` / `gallery/tag_stage_sheet`**：卡片=surfaceContainer r16、瓦片/轨道/Cancel=surfaceVariant、弹层/确认框=surfaceContainerHighest、描边=outlineVariant、强调=primary（#8FD6C6）、渐变按钮/大数字=ChatBubbleTokens 品牌渐变；Stats 瓦片无图标（数值 17sp + 标签 11sp）、覆盖环为实色 primary 弧；弹层选项卡带单选圈（推荐项选中态，点卡片直接执行）+ 通栏 Cancel；自定义 44×26 TagSwitch 与 h28 chip（选中=primary 14% 底+描边）
+- **视觉规格对齐 Ardot 稿 `gallery/tag_control` / `gallery/tag_stage_sheet`**（两帧 2026-09-06 随 Ardot 页面整合迁至 `Organize` 页，帧名与 node id 171:273/172:113 未变）：卡片=surfaceContainer r16、瓦片/轨道/Cancel=surfaceVariant、弹层/确认框=surfaceContainerHighest、描边=outlineVariant、强调=primary（#8FD6C6）、渐变按钮/大数字=ChatBubbleTokens 品牌渐变；Stats 瓦片无图标（数值 17sp + 标签 11sp）、覆盖环为实色 primary 弧；弹层选项卡带单选圈（推荐项选中态，点卡片直接执行）+ 通栏 Cancel；自定义 44×26 TagSwitch 与 h28 chip（选中=primary 14% 底+描边）
 - 文案规范：按钮/标题一律短文案（Faces、Scan new、Rescan all、Regenerate），五语（EN/zh-CN/zh-TW/ES/FR）键同步，新增键以 `tag_section_*` / `tag_stage_*` / `tag_scan_*` / `tag_overwrite_*` 前缀
 
 **代码示例**:
@@ -430,6 +430,7 @@ python3 scripts/ui_driver.py dump
 
 **详情页（`MemoryDetailScreen`，2026-09-06 升级对标小米）**:
 - AppTopBar（返回 + Memories + 右上分享图标）→ 约屏高 55% 封面（Coil size(1080) crossfade(false)，底部渐变蒙层 + 左下 20sp Bold 白字标题 + 13sp 副行：`memory_items_count`(hitCount) · 分类型后缀——ON_THIS_DAY/RECENT_HIGHLIGHTS 接 `memorySubtitle`、CITY 接 `cityDateRange`、PERSON 不接（与 hitCount 重复计数））→ 3 列网格（1:1 方图 r8，Coil size(360)，`memory_photo_cd` 无障碍描述）
+- **图片预览（2026-09-06 补齐）**：封面与网格照片点击打开全屏 `MediaPager` overlay（同 Gallery/Chat 宿主范式，非路由；页面根为单 Box 承载 Column + 预览层）；`Memory` 只存 uri，经 `MemoriesViewModel.assetsByUri`（uri → MediaAsset 全库索引，`MediaEntity.toMediaAsset()` 完整映射）反查，按 uri 定位初始页，未解析项剔除；预览内删除/OCR/跳编辑器/证件照经 Activity 级 `MediaViewModel` 与导航回调（`memoryDetailRoute` 注入），删除授权（API 29 / API 30+ createDeleteRequest launcher）写法同 ChatScreen；删除后预览集合随媒体库流自动收缩、删空自动收起；`BackHandler` 优先关预览再弹栈；精选/全部开关切换收起预览（索引口径已变）
 - **精选/全部分段开关**：底部居中胶囊（`memory_detail_best` / `memory_detail_all`），`showAll` 按 `remember(memory?.id)` 切回忆时重置回精选；`displayUris = showAll ? allItemUris : itemUris`；分段项带 `role = Button` + `selected` 语义
 - **分享集合跟随开关**：分享图标按当前 `displayUris` 发 `ACTION_SEND_MULTIPLE` + `FLAG_GRANT_READ_URI_PERMISSION`（写法同 `GalleryUtils.shareMediaAssets`）
 - MainActivity 路由内 collect `observeMemory(id)`（未过滤全集 Flow，列表刷新不 stale、冷恢复随流复原不闪空态）；id 失效（媒体清空等）→ `memory_detail_empty` 空态

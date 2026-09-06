@@ -60,13 +60,13 @@ import com.mamba.picme.features.idphoto.IDPhotoScreen
 import com.mamba.picme.features.idphoto.IDPhotoViewModel
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.organize.OrganizeTab
 import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.gallery.memories.MemoryDetailScreen
 import com.mamba.picme.features.gallery.swipe.SwipeReviewScreen
 import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
 import com.mamba.picme.features.search.SearchTestScreen
 import com.mamba.picme.features.gallery.MediaViewModel
-import com.mamba.picme.features.gallery.components.TagGenerationControlScreen
 import com.mamba.picme.features.camera.CameraScreen
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.translation.SentencePieceTestScreen
@@ -207,6 +207,8 @@ class MainActivity : ComponentActivity() {
                     )
                     val scope = rememberCoroutineScope()
                     var gallerySearchRequest by remember { mutableStateOf<Pair<String, Long>?>(null) }
+                    // 整理+扫描合并页（Pager 页 1）Tab 一次性请求：设置页等 NavHost 路由入口经此预选 Tab
+                    var organizeTabRequest by remember { mutableStateOf<OrganizeTab?>(null) }
 
                     // 主页面切换（底部 Tab / 编程入口）：瞬时跳转，无横滑动画；手指拖动由 Pager 跟手处理
                     val switchMainPage: (Int) -> Unit = { index ->
@@ -325,7 +327,15 @@ class MainActivity : ComponentActivity() {
                                         navController.navigate(Screen.MemoryDetail.createRoute(memoryId)) {
                                             launchSingleTop = true
                                         }
-                                    }
+                                    },
+                                    onNavigateToTagViewer = {
+                                        navController.navigate(
+                                            Screen.TagViewer.route,
+                                            navOptions { launchSingleTop = true }
+                                        )
+                                    },
+                                    organizeTabRequest = organizeTabRequest,
+                                    onOrganizeTabRequestConsumed = { organizeTabRequest = null }
                                 )
                             }
                             // 相机：2026-08-26 起为 NavHost 全屏路由（原 Pager 页 0 席位由相册整理接替），
@@ -430,29 +440,25 @@ class MainActivity : ComponentActivity() {
                                     onNavigateBack = { navController.popBackStack() }
                                 )
                             }
-                            memoryDetailRoute(memoriesViewModel) { navController.popBackStack() }
-                            composable(Screen.TagControl.route) {
-                                DisposableEffect(Unit) {
-                                    SceneManager.getInstance().transitionTo(SceneManager.Scene.GALLERY)
-                                    onDispose {
-                                        SceneManager.getInstance().leaveScene(SceneManager.Scene.GALLERY)
-                                    }
+                            memoryDetailRoute(
+                                memoriesViewModel = memoriesViewModel,
+                                mediaViewModel = mediaViewModel,
+                                onNavigateToPhotoEditor = { uri, autoOptimize ->
+                                    navController.navigate(
+                                        Screen.PhotoEditor.createRoute(
+                                            sourceUri = uri,
+                                            autoOptimize = autoOptimize
+                                        ),
+                                        navOptions { launchSingleTop = true }
+                                    )
+                                },
+                                onNavigateToIDPhoto = { uri ->
+                                    navController.navigate(
+                                        Screen.IDPhoto.createRoute(sourceUri = uri),
+                                        navOptions { launchSingleTop = true }
+                                    )
                                 }
-                                val useOpencl by settingsViewModel.tagGenerationUseOpencl.collectAsState()
-                                TagGenerationControlScreen(
-                                    onNavigateBack = { navController.popBackStack() },
-                                    onNavigateToTagViewer = {
-                                        navController.navigate(
-                                            Screen.TagViewer.route,
-                                            navOptions { launchSingleTop = true }
-                                        )
-                                    },
-                                    useOpencl = useOpencl,
-                                    onUseOpenclChange = { enabled ->
-                                        settingsViewModel.setTagGenerationUseOpencl(enabled)
-                                    }
-                                )
-                            }
+                            ) { navController.popBackStack() }
                             composable(Screen.TagViewer.route) {
                                 TagViewerTestScreen(onNavigateBack = { navController.popBackStack() })
                             }
@@ -472,7 +478,9 @@ class MainActivity : ComponentActivity() {
                                         navController.navigate(Screen.ModelCenter.createRoute(categoryTag), navOptions { launchSingleTop = true })
                                     },
                                     onNavigateToTagControl = {
-                                        navController.navigate(Screen.TagControl.route, navOptions { launchSingleTop = true })
+                                        // 扫描已并入整理+扫描合并页（Pager 页 1）SCAN Tab：预选 Tab 并切页弹回 Main
+                                        organizeTabRequest = OrganizeTab.SCAN
+                                        switchMainPage(MAIN_PAGE_DEDUP)
                                     },
                                     onNavigateToTagViewer = {
                                         navController.navigate(Screen.TagViewer.route, navOptions { launchSingleTop = true })
@@ -506,7 +514,8 @@ class MainActivity : ComponentActivity() {
                                         switchMainPage(MAIN_PAGE_PEOPLE)
                                     },
                                     onNavigateToDedupHome = {
-                                        // 相册整理已是主页面 Pager 页 1：切页并弹回 Main
+                                        // 整理+扫描合并页是主页面 Pager 页 1：预选整理 Tab 并切页弹回 Main
+                                        organizeTabRequest = OrganizeTab.ORGANIZE
                                         switchMainPage(MAIN_PAGE_DEDUP)
                                     },
                                     onNavigateToAddProvider = {
@@ -552,7 +561,9 @@ class MainActivity : ComponentActivity() {
                                         navController.navigate(Screen.ModelCenter.createRoute(categoryTag), navOptions { launchSingleTop = true })
                                     },
                                     onNavigateToTagControl = {
-                                        navController.navigate(Screen.TagControl.route, navOptions { launchSingleTop = true })
+                                        // 扫描已并入整理+扫描合并页（Pager 页 1）SCAN Tab：预选 Tab 并切页弹回 Main
+                                        organizeTabRequest = OrganizeTab.SCAN
+                                        switchMainPage(MAIN_PAGE_DEDUP)
                                     },
                                     onNavigateToTagViewer = {
                                         navController.navigate(Screen.TagViewer.route, navOptions { launchSingleTop = true })
@@ -586,7 +597,8 @@ class MainActivity : ComponentActivity() {
                                         switchMainPage(MAIN_PAGE_PEOPLE)
                                     },
                                     onNavigateToDedupHome = {
-                                        // 相册整理已是主页面 Pager 页 1：切页并弹回 Main
+                                        // 整理+扫描合并页是主页面 Pager 页 1：预选整理 Tab 并切页弹回 Main
+                                        organizeTabRequest = OrganizeTab.ORGANIZE
                                         switchMainPage(MAIN_PAGE_DEDUP)
                                     },
                                     onNavigateToAddProvider = {
@@ -773,10 +785,15 @@ class MainActivity : ComponentActivity() {
 /**
  * 回忆详情（F3）路由注册：数据取自 Activity 级 [MemoriesViewModel.observeMemory] 未过滤全集
  * Flow（已隐藏条目直达也可复原；冷恢复/列表刷新随流更新，取代 remember 反查）；id 失效
- * （媒体清空等）→ 空态。抽为 NavGraphBuilder 扩展避免 MainActivity 类体超限。
+ * （媒体清空等）→ 空态。[MemoriesViewModel.assetsByUri] 供详情页网格/封面点击进 MediaPager
+ * 全屏预览时按 uri 反查完整 MediaAsset；预览内删除/OCR/跳编辑器与证件照经 [mediaViewModel]
+ * 与导航回调落地。抽为 NavGraphBuilder 扩展避免 MainActivity 类体超限。
  */
 private fun NavGraphBuilder.memoryDetailRoute(
     memoriesViewModel: MemoriesViewModel,
+    mediaViewModel: MediaViewModel,
+    onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -> Unit,
+    onNavigateToIDPhoto: (uri: String) -> Unit,
     onNavigateBack: () -> Unit,
 ) {
     composable(
@@ -789,8 +806,13 @@ private fun NavGraphBuilder.memoryDetailRoute(
         val memoryId = backStackEntry.arguments?.getString("memoryId").orEmpty()
         val memory by memoriesViewModel.observeMemory(memoryId)
             .collectAsStateWithLifecycle(initialValue = null)
+        val assetsByUri by memoriesViewModel.assetsByUri.collectAsStateWithLifecycle()
         MemoryDetailScreen(
             memory = memory,
+            assetsByUri = assetsByUri,
+            mediaViewModel = mediaViewModel,
+            onNavigateToPhotoEditor = onNavigateToPhotoEditor,
+            onNavigateToIDPhoto = onNavigateToIDPhoto,
             onNavigateBack = onNavigateBack
         )
     }
