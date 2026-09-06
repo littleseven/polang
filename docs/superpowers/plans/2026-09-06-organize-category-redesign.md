@@ -651,13 +651,14 @@ class ValueGuardTest {
         val old = ValueGuard.assess(
             item(captureDate = fiveYearsAgo - 1), OrganizeCategory.LOW_QUALITY_PHOTOS, now
         )
-        assertTrue(old.protected)
+        assertTrue(old.isProtected)
         assertEquals(setOf(ProtectReason.OLD_PHOTO), old.reasons)
         // 边界：恰好 5 年不保护（判定为「早于」）
         val boundary = ValueGuard.assess(
             item(captureDate = fiveYearsAgo), OrganizeCategory.LOW_QUALITY_PHOTOS, now
         )
         assertTrue(ProtectReason.OLD_PHOTO !in boundary.reasons)
+        assertTrue(!boundary.isProtected)
     }
 
     @Test
@@ -669,6 +670,9 @@ class ValueGuardTest {
         // 无人物信息不触发
         val noPerson = ValueGuard.assess(item(personPhotoCount = null), OrganizeCategory.LOW_QUALITY_PORTRAITS, now)
         assertTrue(ProtectReason.SCARCE_PERSON !in noPerson.reasons)
+        // 0 = 异常数据（计数不可能为 0），视为无信号
+        val zero = ValueGuard.assess(item(personPhotoCount = 0), OrganizeCategory.LOW_QUALITY_PORTRAITS, now)
+        assertTrue(ProtectReason.SCARCE_PERSON !in zero.reasons)
     }
 
     @Test
@@ -685,7 +689,7 @@ class ValueGuardTest {
         val screenshot = ValueGuard.assess(
             item(captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS), OrganizeCategory.SCREEN_CONTENT, now
         )
-        assertTrue(!screenshot.protected && screenshot.reasons.isEmpty())
+        assertTrue(!screenshot.isProtected && screenshot.reasons.isEmpty())
     }
 
     @Test
@@ -714,15 +718,19 @@ package com.mamba.picme.domain.organize
 
 /** 价值保护判定结果。 */
 data class ProtectVerdict(
-    val protected: Boolean,
     val reasons: Set<ProtectReason>,
-)
+) {
+    /** 派生属性：命中任一保护原因即 protected（与 ClassifiedItem.isProtected 同口径）。 */
+    val isProtected: Boolean get() = reasons.isNotEmpty()
+}
 
 /**
  * 价值保护（用户决策 2026-09-06：低质 ≠ 可删，老照片/稀缺照片有情感价值）：
  * 仅对 [OrganizeCategory.LOW_QUALITY_PHOTOS] / [OrganizeCategory.LOW_QUALITY_PORTRAITS]
  * 生效；命中任一保护信号 → protected（不默认勾选、不计入 Hero、排详情页保护区）。
  * 纯函数，[now] 注入保证测试确定性。
+ * 注：captureDate = 0（未知时间戳，下载件常见）会恒判老照片进入保护区——
+ * 保守方向是有意为之：宁可不预选，不可误删。
  */
 object ValueGuard {
 
@@ -732,19 +740,20 @@ object ValueGuard {
     )
 
     fun assess(item: OrganizeItem, category: OrganizeCategory, now: Long): ProtectVerdict {
-        if (category !in GUARDED_CATEGORIES) return ProtectVerdict(protected = false, reasons = emptySet())
+        if (category !in GUARDED_CATEGORIES) return ProtectVerdict(reasons = emptySet())
         val reasons = mutableSetOf<ProtectReason>()
         if (item.captureDate < now - OrganizeThresholds.OLD_PHOTO_YEARS * OrganizeThresholds.YEAR_MILLIS) {
             reasons += ProtectReason.OLD_PHOTO
         }
         val personCount = item.personPhotoCount
+        // 下界 1：personPhotoCount = 0 为异常数据（计数不可能为 0），视为无信号
         if (personCount != null && personCount in 1..OrganizeThresholds.PERSON_SCARCE_MAX) {
             reasons += ProtectReason.SCARCE_PERSON
         }
         if (item.isFavorite || item.lastViewedAt != null) {
             reasons += ProtectReason.USER_ENGAGED
         }
-        return ProtectVerdict(protected = reasons.isNotEmpty(), reasons = reasons)
+        return ProtectVerdict(reasons = reasons)
     }
 }
 ```
