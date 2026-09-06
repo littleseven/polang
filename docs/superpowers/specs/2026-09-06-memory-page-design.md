@@ -106,4 +106,12 @@ zh-TW/ES/FR 同步翻译；日期沿用 Locale 本地化（MemoryTexts.kt 已有
 
 ## 10. Ardot 设计稿帧清单
 
-（Ardot 稿完成后回填：Memory 页 / 详情页 v2 / 底 bar 5 图标态 三帧 node id + 截图路径）
+新页 `Memory Page v2`（page id `297:1`，polang-ui-spec fileId 715061534788814），3 帧横向排开：
+
+| 帧 | node id | 截图（`tmp/ardot-org/shots/`） |
+|---|---|---|
+| `memory/feed`（Memory 独立页：时光/旅程/人物分区大卡 + 5 图标底 bar） | `297:7` | `screenshot-297_7-20260906_093211260.png` |
+| `memory/detail`（详情页 v2：55% 封面 + 精选/全部分段开关） | `297:65` | `screenshot-297_65-20260906_093211421.png` |
+| `memory/bottombar`（底 bar 5 图标特写，回忆高亮） | `297:87` | `screenshot-297_87-20260906_093211518.png` |
+
+绘制说明：回忆图标用 `ic/auto_fix`（魔法棒+星花）描边绑 `scheme/primary` 作高亮态（IconSet 无专用回忆组件，沿用 vault/lock 用 `ic/face` 替代先例）；卡片截断/标题阴影为有意设计。构建脚本留档 `tmp/ardot-org/build_memory_v2.py`、`t_fixicons.py`。
