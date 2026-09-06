@@ -512,6 +512,15 @@
     "feedbackBgColor": "#66000000",
     "viewAllCornerRadius": 12
   },
+  "memoryPage": {
+    "_comment": "Memory 独立页（2026-09-06，对标小米相册时光大卡）：竖版 3:4 大卡横滑行。",
+    "cardWidth": 168,
+    "cardHeight": 224,
+    "cardCornerRadius": 16,
+    "cardSpacing": 12,
+    "sectionHorizontalPadding": 16,
+    "sectionTitleSpacing": 12
+  },
   "chatContext": {
     "_comment": "聊天上下文附件暂存区（选图后输入栏上方）。ios-follow chat 2026-08-12 新增（B1）。72dp 缩略图 + 三意图 chip。",
     "thumbSize": 72,
