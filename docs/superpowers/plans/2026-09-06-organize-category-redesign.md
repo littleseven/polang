@@ -1109,7 +1109,8 @@ class DuplicateGrouperTest {
     @Test
     fun `close phash forms similar group, far phash does not`() {
         // 汉明距离 ≤5 成簇（与去重 2.0 VISUAL 阈值一致）
-        val base = 0b1111000011110000111100001111000011110000111100001111000011110000L
+        // 计划原文的 64bit 字面量超出 Long 范围，降 4bit 为 60bit 等价模式
+        val base = 0b000011110000111100001111000011110000111100001111000011110000L
         val close = base xor 0b11L          // 距离 2
         val far = base xor 0b1111111111L    // 距离 10
         val groups = DuplicateGrouper.group(
@@ -1126,6 +1127,33 @@ class DuplicateGrouperTest {
         assertEquals(0, groups.getValue("a").exactGroupSize)
         assertEquals(0, groups.getValue("a").similarGroupSize)
     }
+
+    @Test
+    fun `exact subset of similar and transitive chaining forms one cluster`() {
+        // 验算（python3 复核）：base 为 56bit 模式，b=base^0b1111 距 4，c=b^0b11110000 距 4，
+        // base^c=0b11111111 距 8（>5 不直接相连，经 b 链式并入）；d 的 phash=base 距 a 为 0
+        val base = 0b11110000111100001111000011110000111100001111000011110000L
+        val b = base xor 0b1111L
+        val c = b xor 0b11110000L
+        val groups = DuplicateGrouper.group(
+            listOf(
+                row("a", phash = base),
+                row("b", phash = b),
+                row("c", phash = c),
+                row("d", md5 = "x", phash = base),
+                row("e", md5 = "x"),  // 与 d 组成 exact 组，无 phash 不进 similar 簇
+            )
+        )
+        // 链式传递：a/b/c/d 并为一簇 size=4
+        assertEquals(4, groups.getValue("a").similarGroupSize)
+        assertEquals(4, groups.getValue("b").similarGroupSize)
+        assertEquals(4, groups.getValue("c").similarGroupSize)
+        // exact ⊂ similar：d 同时进 exact 组（d/e 同 md5，size=2）与 similar 簇（size=4）
+        assertEquals(2, groups.getValue("d").exactGroupSize)
+        assertEquals(4, groups.getValue("d").similarGroupSize)
+        // a 无 md5，不进 exact 组
+        assertEquals(0, groups.getValue("a").exactGroupSize)
+    }
 }
 ```
 
@@ -1141,6 +1169,7 @@ import com.mamba.picme.core.common.PerceptualHash
  * 精确组 = 同 MD5 且成员 ≥2；相似组 = pHash 汉明距离 ≤ [PerceptualHash.SIMILAR_HAMMING_THRESHOLD]
  * 并查集聚类且成员 ≥2（与去重 2.0 VISUAL 同一阈值口径）。
  * 输入仅依赖 data 层投影出的 uri/md5/phash 三元组，不依赖 Room 实体（保持 domain 纯净）。
+ * 前置：[inputs] 的 uri 唯一（dedup_hash 表 PK 保证）；重复 uri 会被静默折叠。
  */
 object DuplicateGrouper {
 
@@ -1164,13 +1193,15 @@ object DuplicateGrouper {
         }
         val similarSizeByUri = mutableMapOf<String, Int>()
         if (phashUris.size >= 2) {
+            // clusterByHamming 返回成员下标簇（仅保留 size≥2 的组），按下标回映 uri
             val clusters = PerceptualHash.clusterByHamming(
-                items = phashUris,
+                hashes = phashUris.map { pair -> pair.second },
                 threshold = PerceptualHash.SIMILAR_HAMMING_THRESHOLD,
-                hash = { pair -> pair.second },
             )
-            clusters.filter { cluster -> cluster.size >= 2 }.forEach { cluster ->
-                cluster.forEach { pair -> similarSizeByUri[pair.first] = cluster.size }
+            clusters.forEach { cluster ->
+                cluster.forEach { index ->
+                    similarSizeByUri[phashUris[index].first] = cluster.size
+                }
             }
         }
 
@@ -1189,7 +1220,7 @@ object DuplicateGrouper {
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "com.mamba.picme.domain.organize.DuplicateGrouperTest"`
-Expected: 3 tests PASS
+Expected: 4 tests PASS（含审查补充的 exact⊂similar+链式传递用例）
 
 - [ ] **Step 5: Commit**
 
