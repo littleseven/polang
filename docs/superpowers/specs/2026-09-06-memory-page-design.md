@@ -108,7 +108,7 @@ zh-TW/ES/FR 同步翻译；日期沿用 Locale 本地化（MemoryTexts.kt 已有
 
 ## 10. Ardot 设计稿帧清单
 
-新页 `Memory Page v2`（page id `297:1`，polang-ui-spec fileId 715061534788814），3 帧横向排开：
+新页 `Memories`（page id `297:1`，polang-ui-spec fileId 715061534788814；2026-09-06 由 `Memory Page v2` 更名，旧 F3 carousel/detail 稿所在页 267:22 已整体删除），3 帧横向排开：
 
 | 帧 | node id | 截图（`tmp/ardot-org/shots/`） |
 |---|---|---|

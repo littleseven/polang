@@ -203,8 +203,8 @@ NavHost 新增路由：
 | `organize/cleaned` | 267:280 | Organize |
 | `swipe/review` | 267:312 | Organize |
 | `swipe/done` | 267:329 | Organize |
-| `memories/carousel` | 267:356 | Memories（267:22） |
-| `memories/detail` | 267:407 | Memories |
+| `memories/carousel` | ~~267:356~~ | 已被 Memory 独立页取代，2026-09-06 随旧 Memories 页（267:22）整体删除；新稿见 `2026-09-06-memory-page-design.md` §10（297:7/297:65/297:87） |
+| `memories/detail` | ~~267:407~~ | 同上，已删除 |
 | `chat/cleanup_confirm` | 267:437 | Chat（111:319） |
 | `chat/cleanup_done` | 267:518 | Chat |
 | `vault/lock` | 267:649 | Vault（267:23） |
