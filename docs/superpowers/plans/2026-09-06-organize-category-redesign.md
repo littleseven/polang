@@ -2368,7 +2368,7 @@ fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
                 },
 ```
 
-`setAiPreselect`（:122-129）同步改为同口径（开 = 选 HIGH 非保护；关 = 清空）。`selectAll` 保持全选（用户显式行为），`toggle`/`deleteSelected`/outcome 结算逻辑不变，仅把 `item.uri` 取值改为 `entry.item.uri`、`sumOf { item -> item.sizeBytes }` 改为 `sumOf { entry -> entry.item.sizeBytes }`。
+`setAiPreselect`（:122-129）同步改为同口径（开 = 选 HIGH 非保护；关 = 清空）。~~`selectAll` 保持全选（用户显式行为）~~ **【审查修正 38cec614c】`selectAll` 改为排除 protected 项**（spec §6.3：全选按钮仅挂「建议删除」段，protected 永不预选含显式全选；测试已补 protected 样本防勾穿）；另 reload/setAiPreselect 预选谓词统一复用 `toSections().suggested` 同源。`toggle`/`deleteSelected`/outcome 结算逻辑不变，仅把 `item.uri` 取值改为 `entry.item.uri`、`sumOf { item -> item.sizeBytes }` 改为 `sumOf { entry -> entry.item.sizeBytes }`。
 
 - [ ] **Step 3: 更新既有 VM 测试 + 新增三段用例**
 
