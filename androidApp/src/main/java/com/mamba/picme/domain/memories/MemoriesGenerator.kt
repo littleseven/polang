@@ -128,6 +128,7 @@ object MemoriesGenerator {
             }
 
     /** 精选排序：美学分降序（null 排最后），同分拍摄时间新的在前；截 [DETAIL_LIMIT]，封面取首张。 */
+    @Suppress("LongParameterList") // 各类型可选参数平铺（label/latestYear/monthDay/日期范围），默认 null；抽配置类收益低于可读性损耗
     private fun buildMemory(
         id: String,
         type: MemoryType,

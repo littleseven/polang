@@ -62,6 +62,7 @@ import com.mamba.picme.features.common.topbar.AppTopBarAction
  * 底部居中胶囊分段开关（精选 = 美学分截 12；全部 = 全部命中时间降序）。分享集合跟随开关。
  * [memory] 为 null（id 已失效，如媒体清空后）时显示空态文案。
  */
+@Suppress("LongMethod") // 待重构：封面/网格/分段开关可抽子组合函数
 @Composable
 fun MemoryDetailScreen(
     memory: Memory?,

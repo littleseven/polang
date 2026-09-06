@@ -187,7 +187,6 @@ fun MainPagerHost(
                     navController.navigate(Screen.TagControl.route, navOptions { launchSingleTop = true })
                 },
                 onNavigateToPeople = { onSwitchPage(MAIN_PAGE_PEOPLE) },
-                isActivePage = pagerState.currentPage == MAIN_PAGE_MEMORY,
             )
         }
     }

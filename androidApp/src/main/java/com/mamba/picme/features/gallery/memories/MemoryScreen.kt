@@ -87,9 +87,8 @@ private fun buildSections(memories: List<Memory>): List<MemorySection> = listOf(
  * Memory 独立 Pager 页（2026-09-06，对标小米相册）：顶栏（标题「回忆」+ 副标「端侧生成 · 私密」）→
  * 三分区大卡 feed（时光/旅程/人物，空分区不占位）→ 整页空态；长按大卡弹隐藏确认；
  * 底部悬浮 5 图标底 bar（回忆项 selected 高亮，出口与 GalleryScreen 同源）。
- *
- * @param isActivePage 预留参数：与其他 Pager 页签名对齐（本页无内部 BackHandler，暂未消费）。
  */
+@Suppress("LongMethod") // 待重构：顶栏/分区 feed/底 bar/隐藏弹窗可抽子组合函数
 @Composable
 fun MemoryScreen(
     memoriesViewModel: MemoriesViewModel,
@@ -99,7 +98,6 @@ fun MemoryScreen(
     onNavigateToChat: () -> Unit,
     onNavigateToTagControl: () -> Unit,
     onNavigateToPeople: () -> Unit,
-    isActivePage: Boolean,
 ) {
     val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
     var pendingHide by remember { mutableStateOf<Memory?>(null) }
