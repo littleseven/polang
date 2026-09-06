@@ -25,8 +25,9 @@
 | 助手 | 聊天（输入驱动对话面） | 「模式」——沉浸对话 |
 
 **页面身份规则（新增，入 AGENTS.md）**：
-- **根页**：无顶栏返回箭头；渲染悬浮 bar 并高亮自身项；系统返回 = 默认行为（退出应用）。
+- **根页**：无顶栏返回箭头；渲染悬浮 bar 并高亮自身项；系统返回经 MainPagerHost 既有 BackHandler 回相册页（相册页再返回退出应用），语义不变。
 - **二级/沉浸页**：有返回出路，不渲染 bar。
+- **bar 可见性门控**：页面自身有底部 UI/全屏态时隐藏悬浮 bar（先例：相册页 `selectedMediaIndex != null` 隐藏）。整理页据此在 Dedup 子页 Scanning/Results/Cleaned 态（自带底部 CTA）隐藏，Config（hub）态与 SCAN tab 显示。
 
 ## 3. 方案选型（已批 A）
 
@@ -52,7 +53,7 @@
 
 ### 4.2 共享组件
 
-新建 `MainFloatingBottomBar(selectedMainPage: Int, onSwitchPage: (Int) -> Unit)`（`features/common/components/`）：
+新建 `MainFloatingBottomBar(selectedMainPage: Int, onSwitchPage: (Int) -> Unit)`（`features/main/MainFloatingBottomBar.kt`，与 `MAIN_PAGE_*` 常量同包；回调经 MainPagerHost 包装：目标为整理页时预选 ORGANIZE tab）：
 
 - 内部 5 个 `FloatingBottomTabItem` 定长表驱动：icon + contentDescription（stringResource）+ 页索引常量（`MAIN_PAGE_*`）。
 - `selectedMainPage == 自身` → `selected = true`、点击 no-op；未选中 → `onSwitchPage(index)`（既有 `switchMainPage` 瞬时切页）。
@@ -70,7 +71,7 @@
 | 页面 | 改动 |
 |---|---|
 | 相册 | bar 换共享组件；相册项高亮（`MAIN_PAGE_GALLERY`） |
-| 整理中心 | 挂 bar（整理项高亮）；双图标收敛为 1；embedded 子页（Dedup/TagControl）顶栏返回箭头按根页规则去除 |
+| 整理中心 | 挂 bar（整理项高亮，Scanning/Results/Cleaned 态门控隐藏）；双图标收敛为 1；embedded 子页（Dedup/TagControl）顶栏返回箭头按根页规则去除（Dedup「后台运行」按钮的离页语义保留，回调更名 `onLeaveToGallery`） |
 | 聊天 | **零改动**（沉浸身份：顶栏返回/无 bar/横滑） |
 | 人物 | 升根页：移除 `AppTopBarNavBack`；挂 bar（人物项高亮）；列表底部 contentPadding 对齐 Memory 的 96dp 避让；标题/统计副标/三 actions（过滤/打分/重聚类）保留 |
 | 回忆 | icon → `AutoAwesome`；bar 换共享组件 |
