@@ -89,8 +89,9 @@ ConfidenceGrader   置信度分级：HIGH / MEDIUM / LOW（见 §5）
 |---|---|---|
 | 年代久远 | captureDate < now − 5 年 | `OLD_PHOTO_YEARS = 5` |
 | 人物稀缺 | 所属人物聚类（faceId → persons）照片总数 ≤ 3 | `PERSON_SCARCE_MAX = 3` |
-| 无替代品 | 同一相似组（pHash 组）内无 blurScore/aestheticScore 更高的其他照片 | — |
 | 用户互动过 | isFavorite（MediaStore IS_FAVORITE，API 29+）或 lastViewedAt ≠ null | — |
+
+> 「无替代品」信号不落入 ValueGuard：互斥裁定下，有相似组的照片已进入 DUPLICATES 类目，其「保留组内最佳」由去重 2.0 的 `KeepPolicyEngine` 负责（BEST_QUALITY 规则），不在本层重复判定。
 
 **protected 项的 UI 语义**：不默认勾选、排详情页末尾「可能是珍贵照片」区、带保护角标、**不计入 Hero 建议清理数字**（仍计入类目浏览总数）。
 
@@ -159,7 +160,7 @@ protected=true 的项无论置信度一律不默认勾选（§4 优先）。
 
 | 信号 | 来源 | Schema 变更 |
 |---|---|---|
-| blurScore / exposureScore | `BlurAnalyzer` 惰性计算：整理页加载时对缺分图片补算（≤256px 缩略图，毫秒级/张），结果回写缓存 | `media_assets` 新增 `blurScore REAL`、`exposureScore REAL`（可空）→ **Room v20，MIGRATION_19_20** |
+| blurScore / exposureScore | `BlurAnalyzer` 惰性计算：整理页加载后对缺分图片后台分批补算（≤256px 缩略图，毫秒级/张），结果回写缓存 | `media_assets` 新增 `blurScore REAL`、`exposureScore REAL`（可空）→ **Room v22，MIGRATION_21_22**（当前库已 v21：v20=optimize_feedback、v21=dedup_hash） |
 | lastViewedAt | 图片查看器打开时回写当前时间戳 | `media_assets` 新增 `lastViewedAt INTEGER`（可空，同一迁移） |
 | isFavorite | MediaStore `IS_FAVORITE`（API 29+），查询时合并 | 无 |
 | 录屏判定 | MediaStore 路径 + 分辨率规则 | 无 |
@@ -184,7 +185,7 @@ protected=true 的项无论置信度一律不默认勾选（§4 优先）。
 全部四层管线纯函数 JVM 单测（`androidApp/src/test/.../domain/organize/`）：
 
 - **CategoryArbiterTest**：互斥性（构造多命中 item 断言唯一桶）、优先级序、空信号不判定
-- **ValueGuardTest**：四条保护信号各自命中/边界（5 年 ±1 天、3 张 ±1）、仅适用于质量两类的断言
+- **ValueGuardTest**：三条保护信号各自命中/边界（5 年 ±1 天、3 张 ±1、收藏/查看）、仅适用于质量两类的断言
 - **ConfidenceGraderTest**：HIGH/MEDIUM/LOW 阈值边界、protected 压制勾选
 - **OrganizeCategorizerTest**（管线集成）：Hero 并集口径回归（多属 item 只计一次，AC-F1-1 防回归）
 - **BlurAnalyzerTest**：固定样本图（清晰/运动模糊/欠曝/过曝各若干）分数分桶正确
