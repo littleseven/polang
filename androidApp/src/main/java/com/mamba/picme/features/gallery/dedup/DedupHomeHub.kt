@@ -43,7 +43,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -304,8 +303,8 @@ private fun DedupCategoryCard(
 
 /**
  * 类目卡 v2：图标块 + 标题 + meta 行 + 置信度徽标行（● 高置信 / ○ 需确认）+ 4 缩略图条 + chevron。
- * NEEDS_SCAN 引导态：半透明 + 「需先扫描」徽标，点击跳 SCAN tab（修复 v1 类目静默消失）。
- * material3 Card 无 alpha 形参，半透明用 Modifier.alpha 兜底。
+ * NEEDS_SCAN 引导态：底色降档（surfaceContainerLow）+「需先扫描」徽标，点击跳 SCAN tab
+ * （修复 v1 类目静默消失）；不压整卡 alpha，标题/引导文案保持全不透明（WCAG AA 对比度）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -316,13 +315,15 @@ private fun OrganizeCategoryCard(
     val needsScan = card.coverage == SignalCoverage.NEEDS_SCAN
     Card(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (needsScan) 0.6f else 1f),
+        modifier = Modifier.fillMaxWidth(),
         shape = AppShapes.card,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
+            containerColor = if (needsScan) {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            }
+        )
     ) {
         Row(
             modifier = Modifier
@@ -364,12 +365,14 @@ private fun OrganizeCategoryCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ConfidenceDot(filled = true)
-                        Text(
-                            text = stringResource(R.string.org_confidence_high, card.highCount),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        if (card.highCount > 0) {
+                            ConfidenceDot(filled = true)
+                            Text(
+                                text = stringResource(R.string.org_confidence_high, card.highCount),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         if (card.reviewCount > 0) {
                             ConfidenceDot(filled = false)
                             Text(
