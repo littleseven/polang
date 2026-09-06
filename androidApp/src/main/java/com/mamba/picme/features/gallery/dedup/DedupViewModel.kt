@@ -104,8 +104,11 @@ class DedupViewModel(
         scope.launch(ioDispatcher) {
             runCatching {
                 var remaining = organizeRepository.backfillQualitySignals()
-                while (remaining > 0) {
+                var batches = 1
+                // BACKFILL_MAX_BATCHES 兜底：防御永久失败行放大为死循环；正常 200/批 × 1000 = 20 万张覆盖
+                while (remaining > 0 && batches < BACKFILL_MAX_BATCHES) {
                     remaining = organizeRepository.backfillQualitySignals()
+                    batches++
                 }
             }.onFailure { error -> Logger.w(TAG, "backfill quality signals failed", error) }
         }
@@ -464,5 +467,8 @@ class DedupViewModel(
 
     private companion object {
         const val TAG = "Dedup"
+
+        /** init 质量分补算循环批次上限：200/批 × 1000 = 20 万张覆盖，防御永久失败行死循环。 */
+        const val BACKFILL_MAX_BATCHES = 1000
     }
 }

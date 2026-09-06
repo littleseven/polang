@@ -56,7 +56,7 @@ import com.mamba.picme.data.model.MediaEntity
         OptimizeFeedbackEntity::class,
         DedupHashEntity::class
     ],
-    version = 22,
+    version = 23,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -95,7 +95,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
                         MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
-                        MIGRATION_20_21, MIGRATION_21_22
+                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23
                     )
                     .build()
                 INSTANCE = instance
@@ -478,6 +478,19 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE `media_assets` ADD COLUMN `blurScore` REAL")
                 database.execSQL("ALTER TABLE `media_assets` ADD COLUMN `exposureScore` REAL")
                 database.execSQL("ALTER TABLE `media_assets` ADD COLUMN `lastViewedAt` INTEGER")
+            }
+        }
+
+        /**
+         * Migration 22 → 23：media_assets 新增 uri 非唯一索引
+         * （updateLastViewedAt/updateQualityScores 的 WHERE 键，消除全表扫描）。
+         * 索引名按 Room 默认规则 index_<tableName>_<columnName>，与 @Entity(indices) 声明一致。
+         */
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_media_assets_uri` ON `media_assets`(`uri`)"
+                )
             }
         }
     }

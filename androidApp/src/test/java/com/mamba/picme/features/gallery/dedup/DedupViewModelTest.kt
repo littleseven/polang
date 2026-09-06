@@ -13,6 +13,8 @@ import com.mamba.picme.domain.dedup.DedupScanner
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.VersionRole
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
@@ -116,21 +118,42 @@ class DedupViewModelTest {
     /** 整理中心统计源替身：JVM 单测无 Room/MediaStore，恒空流（WhileSubscribed 未订阅时不上游）。 */
     private fun fakeOrganizeRepository(): OrganizeRepository = mockk {
         every { observeItems() } returns flowOf(emptyList())
+        // init 后台补算桩：恒 0 立即退出循环，消除既有测试静默走 onFailure 失败分支
+        coEvery { backfillQualitySignals(any()) } returns 0
     }
 
     private fun viewModel(
         scanner: DedupScanController,
         trashManager: DedupTrashManager = fakeTrashManager(),
+        organizeRepository: OrganizeRepository = fakeOrganizeRepository(),
         scope: CoroutineScope,
         ioDispatcher: CoroutineDispatcher,
     ) = DedupViewModel(
         mediaSource = DedupMediaSource { emptyList() },
         scanner = scanner,
         trashManager = trashManager,
-        organizeRepository = fakeOrganizeRepository(),
+        organizeRepository = organizeRepository,
         coroutineScope = scope,
         ioDispatcher = ioDispatcher,
     )
+
+    @Test
+    fun `backfill loop exits when batch returns zero`() = runTest {
+        val organizeRepository = mockk<OrganizeRepository> {
+            every { observeItems() } returns flowOf(emptyList())
+            coEvery { backfillQualitySignals(any()) } returnsMany listOf(200, 0)
+        }
+        viewModel(
+            FakeScanner(events = emptyList()),
+            scope = backgroundScope,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            organizeRepository = organizeRepository,
+        )
+        settle()
+
+        // 首批满批 200 → 次批 0 → 循环退出，共 2 次调用
+        coVerify(exactly = 2) { organizeRepository.backfillQualitySignals(any()) }
+    }
 
     @Test
     fun `GroupFound events appear in Scanning state progressively`() = runTest {

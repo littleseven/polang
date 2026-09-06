@@ -458,8 +458,9 @@ interface MediaDao {
     }
 
     /**
-     * 回写最近一次查看时间（查看器打开时调用）。60s 节流窗（60000ms）消除每次翻页
-     * 触发 mergeRows 重算：ValueGuard 只判 != null，守卫零语义损失。
+     * 回写最近一次查看时间（查看器打开时调用）。60s 节流窗（60000ms）消除 60s 内重复
+     * 查看同一媒体的无效触发（新照片首看仍各触发一次，属固有信号更新）：
+     * ValueGuard 只判 != null，守卫零语义损失。
      */
     @Query("UPDATE media_assets SET lastViewedAt = :timestamp WHERE uri = :uri AND (lastViewedAt IS NULL OR lastViewedAt < :timestamp - 60000)")
     suspend fun updateLastViewedAt(uri: String, timestamp: Long)
