@@ -630,7 +630,8 @@ interface MediaDao {
      * 从备份批量更新 TAG 相关元数据字段。
      * 一次性写入 labels / mlKitLabels / mlKitLabelsZh / ocrText / 地理位置 /
      * faceRoiResult / semanticEmbedding / lastTagScanAt / lastTagScanPasses /
-     * hasFace / faceId / city / faceFocusY / aestheticScore / faceQualityScore，
+     * hasFace / faceId / city / faceFocusY / aestheticScore / faceQualityScore /
+     * blurScore / exposureScore / lastViewedAt（整理中心 v2 信号，旧备份缺省为 null 覆盖），
      * 避免还原时多次 UPDATE。
      */
     @Query(
@@ -654,7 +655,10 @@ interface MediaDao {
             city = :city,
             faceFocusY = :faceFocusY,
             aestheticScore = :aestheticScore,
-            faceQualityScore = :faceQualityScore
+            faceQualityScore = :faceQualityScore,
+            blurScore = :blurScore,
+            exposureScore = :exposureScore,
+            lastViewedAt = :lastViewedAt
         WHERE id = :mediaId
         """
     )
@@ -679,7 +683,10 @@ interface MediaDao {
         city: String?,
         faceFocusY: Float?,
         aestheticScore: Float?,
-        faceQualityScore: Float?
+        faceQualityScore: Float?,
+        blurScore: Float?,
+        exposureScore: Float?,
+        lastViewedAt: Long?
     )
 }
 

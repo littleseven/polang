@@ -43,6 +43,14 @@ class OrganizeRepositoryImpl(
 
     private val appContext = context.applicationContext
 
+    /**
+     * 重复组聚类缓存（失效键见 queryDuplicateInfo）：mergeRows 每次重发射都会调聚类，
+     * 输入不变则复用结果，避免 media_assets 无关行写放大为全表 O(n²) 重聚类。
+     */
+    private val dupCacheLock = Any()
+    private var dupCacheInputs: List<DuplicateGrouper.HashInput>? = null
+    private var dupCacheResult: Map<String, DuplicateGrouper.DupInfo> = emptyMap()
+
     /** hub 统计流：Room 行 + MediaStore meta 按 uri 合并；媒体库任何写触发重算。 */
     override fun observeItems(): Flow<List<OrganizeItem>> =
         mediaDao.observeOrganizeRows().map { rows -> mergeRows(rows) }
@@ -90,20 +98,33 @@ class OrganizeRepositoryImpl(
      * dedup_hash 全量哈希 → 重复组成员信息（空表/未扫描时全零，类目自然不出现）。
      * ⚠️ pHash 聚类为 O(n²)（DuplicateGrouper.group），全表数万行可能秒级；
      * 此处打点观察耗时，真机验证后再定是否优化。
+     *
+     * 失效键 = 聚类输入（uri/md5/phash 集合）本身：media_assets 行写（TAG 逐行回写标签、
+     * lastViewedAt 60s 节流回写、质量分合批）虽触发 observeOrganizeRows 重发射，但不改变
+     * dedup_hash 内容 → 命中缓存复用结果，不再每次全表 O(n²) 重聚类（Task 18a 收窄）。
      */
     private suspend fun queryDuplicateInfo(): Map<String, DuplicateGrouper.DupInfo> =
         runCatching {
-            val startNanos = System.nanoTime()
-            val hashes = dedupHashDao.getAllHashes()
-            if (hashes.isEmpty()) {
-                emptyMap()
-            } else {
-                val result = DuplicateGrouper.group(
-                    hashes.map { row -> DuplicateGrouper.HashInput(row.uri, row.md5, row.phash) }
-                )
-                val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
-                Logger.d(TAG, "queryDuplicateInfo: ${hashes.size} hashes in ${elapsedMs}ms")
-                result
+            // getAllHashes 无 ORDER BY，先按 uri 排序固定序，失效键只依赖集合内容
+            val inputs = dedupHashDao.getAllHashes()
+                .map { row -> DuplicateGrouper.HashInput(row.uri, row.md5, row.phash) }
+                .sortedBy { input -> input.uri }
+            synchronized(dupCacheLock) {
+                if (inputs == dupCacheInputs) {
+                    dupCacheResult
+                } else {
+                    val startNanos = System.nanoTime()
+                    val result = if (inputs.isEmpty()) {
+                        emptyMap()
+                    } else {
+                        DuplicateGrouper.group(inputs)
+                    }
+                    val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
+                    Logger.d(TAG, "queryDuplicateInfo: ${inputs.size} hashes in ${elapsedMs}ms")
+                    dupCacheInputs = inputs
+                    dupCacheResult = result
+                    result
+                }
             }
         }.getOrElse { error ->
             Logger.w(TAG, "query duplicate info failed", error)

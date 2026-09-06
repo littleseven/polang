@@ -110,6 +110,14 @@ class DedupViewModel(
                     remaining = organizeRepository.backfillQualitySignals()
                     batches++
                 }
+                if (remaining > 0) {
+                    // 命中上限仍有产出：可能存在永久失败行残留未补算，真机排查看此日志
+                    Logger.w(
+                        ORGANIZE_TAG,
+                        "backfill hit BACKFILL_MAX_BATCHES=$BACKFILL_MAX_BATCHES " +
+                            "(last batch=$remaining); residual rows may stay uncomputed"
+                    )
+                }
             }.onFailure { error -> Logger.w(TAG, "backfill quality signals failed", error) }
         }
     }
@@ -467,6 +475,9 @@ class DedupViewModel(
 
     private companion object {
         const val TAG = "Dedup"
+
+        /** 整理中心补算日志标签（与 OrganizeRepositoryImpl 一致，便于真机按 organize 域过滤）。 */
+        const val ORGANIZE_TAG = "PoLang:Organize"
 
         /** init 质量分补算循环批次上限：200/批 × 1000 = 20 万张覆盖，防御永久失败行死循环。 */
         const val BACKFILL_MAX_BATCHES = 1000

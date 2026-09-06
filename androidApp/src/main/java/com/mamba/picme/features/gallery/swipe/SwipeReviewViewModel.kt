@@ -163,7 +163,8 @@ class SwipeReviewViewModel(
                     keepHistoryStore.save(keepEntries.toSet())
                 }
                 val suppressed = SwipeKeepHistory.activeUris(keepEntries)
-                SwipeQueueBuilder.build(organizeRepository.loadItems())
+                // now 显式注入同一时钟：与 keep-history 的 nowMs() 统一（测试 fake 时钟生效）
+                SwipeQueueBuilder.build(organizeRepository.loadItems(), now = nowMs())
                     .filterNot { candidate -> candidate.uri in suppressed }
             }
             _uiState.value = if (queue.isEmpty()) {

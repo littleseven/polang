@@ -9,7 +9,8 @@ import com.mamba.picme.domain.organize.OrganizeItem
  * 手势快速整理（F2）队列构建纯函数：与整理中心类目页同一管线产出（口径同源，
  * 修复 v1 桶规则与类目页口径漂移）。废片桶只收 HIGH/MEDIUM 且非 protected 项
  * （LOW 弱信号与受保护项落 RECENT 兜底，由用户全手动决策）。
- * 桶内 captureDate 倒序；视频永不入队（LARGE_FILES 走类目页）。
+ * 桶内 captureDate 倒序；视频永不入队（在类目页处理：LARGE_FILES / 录屏落 SCREEN_CONTENT /
+ * 重复视频落 DUPLICATES）。
  * 非三类废片类目（DUPLICATES/DOCUMENTS/LARGE_FILES）的照片同样落 RECENT 兜底
  * ——F2 只收截图与低质两类废片。
  */
