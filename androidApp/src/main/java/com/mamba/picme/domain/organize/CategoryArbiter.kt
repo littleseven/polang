@@ -1,10 +1,8 @@
 package com.mamba.picme.domain.organize
 
 import com.mamba.picme.domain.dedup.DedupContentType
+import com.mamba.picme.domain.dedup.SCREENSHOT_DIR_KEYWORD
 import com.mamba.picme.domain.dedup.detectContentType
-
-/** MediaStore 截图目录约定（路径 contains，大小写不敏感；与 dedup 侧同一规则）。 */
-private const val SCREENSHOT_DIR_KEYWORD = "screenshots"
 
 /** 录屏目录/文件名关键词（各 ROM 录屏应用目录约定，大小写不敏感）。 */
 private val SCREEN_RECORDING_KEYWORDS = listOf("screenrecord", "screen_record", "录屏")
@@ -16,7 +14,10 @@ private val SCREEN_RECORDING_KEYWORDS = listOf("screenrecord", "screen_record", 
  */
 object CategoryArbiter {
 
-    /** 返回唯一命中类目；无任何命中返回 null（不属任何清理类目）。 */
+    /**
+     * 返回唯一命中类目；无任何命中返回 null（不属任何清理类目）。
+     * ⚠️ [OrganizeCategory] 声明序变更必须同步本方法的 if 序列（有顺序守卫测试）。
+     */
     fun classify(item: OrganizeItem): OrganizeCategory? {
         // 1. 重复与相似
         if (item.exactDupGroupSize >= 2 || item.similarDupGroupSize >= 2) {

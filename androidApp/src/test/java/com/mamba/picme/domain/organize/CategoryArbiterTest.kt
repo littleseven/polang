@@ -6,7 +6,7 @@ import org.junit.Test
 
 class CategoryArbiterTest {
 
-    @Suppress("LongParameterList") // 测试夹具工厂：与 OrganizeItem 构造参数一一对应
+    @Suppress("LongParameterList") // 测试夹具工厂：除保护信号（lastViewedAt/isFavorite/personPhotoCount，不参与裁定）外与 OrganizeItem 构造参数一一对应
     private fun item(
         uri: String = "a",
         isVideo: Boolean = false,
@@ -122,6 +122,18 @@ class CategoryArbiterTest {
             faceQualityScore = 0.1f, hasFace = true, blurScore = 1.0f, sizeBytes = 1_000,
         )
         assertNull(CategoryArbiter.classify(video))
+    }
+
+    @Test
+    fun `category declaration order matches arbitration priority`() {
+        // 声明序 = 裁定优先级（先命中先得）；变更须同步 CategoryArbiter.classify 的 if 序列
+        assertEquals(
+            listOf(
+                "DUPLICATES", "SCREEN_CONTENT", "DOCUMENTS",
+                "LOW_QUALITY_PORTRAITS", "LOW_QUALITY_PHOTOS", "LARGE_FILES",
+            ),
+            OrganizeCategory.entries.map { entry -> entry.name }
+        )
     }
 
     @Test
