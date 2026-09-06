@@ -2063,6 +2063,8 @@ git add androidApp/src/main/java/com/mamba/picme/features/gallery/dedup/
 git commit -m "refactor(organize): DedupViewModel hub 数据流切 OrganizeBoard + 后台质量分补算"
 ```
 
+（审查修正：753f53b9 — updateLastViewedAt 加 60s 节流守卫；media_assets.uri 加非唯一索引 + Room v23 MIGRATION_22_23；init 补算循环加 BACKFILL_MAX_BATCHES=1000 兜底；DedupHomeScreen 暂注释 DedupHubContent 调用留 TODO(Task 12)；DedupViewModelTest 补 backfill 桩 + 循环终止测试）
+
 ---
 
 ## Task 12: DedupHomeHub UI v2（类目卡置信度徽标 + 优先级排序 + 引导态 + Hero 修正）
