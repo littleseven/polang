@@ -2318,6 +2318,8 @@ git add androidApp/src/main/java/com/mamba/picme/features/gallery/dedup/DedupHom
 git commit -m "feat(organize): hub 类目卡 v2——置信度徽标/建议优先级排序/引导态/Hero 真实并集口径"
 ```
 
+> **落地注记（2026-09-07 Task 18b）**：本 Task Step 2 的 Hero KDoc 口径「HIGH 置信非保护去重并集」在后续审查修正中收紧——`heroReclaimBytes` 与 `highBytes` 对 DUPLICATES 额外按精确组（`exactDupGroupKey`）每组扣 1 张 keeper 字节（hub 侧 c07c218db、详情页对偶 bf7734c7f；与去重结果页 reclaimBytes 口径一致）。残留口径差：`highCount` 徽标张数含 keeper、字节不含。另：Step 2 片段的 `org_hero_across` 由 string 改为 plurals（c0ed5b3d6），且副行按「有内容的类目数」计（board 恒 6 卡后 size 恒 6 语义失真，原 +1 固定重复卡口径作废）。
+
 ---
 
 ## Task 13: OrganizeCategoryViewModel v2（三段分组 + 置信筛选）
@@ -2715,6 +2717,8 @@ class SwipeQueueBuilderTest {
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "com.mamba.picme.domain.swipe.SwipeQueueBuilderTest"`
 Expected: 3 tests PASS。`SwipeReviewViewModel` 中 `SwipeQueueBuilder.build(...)` 调用处编译自适应（新参数有默认值），若有旧 bucket 常量引用则同步清理。
+
+> **落地注记（2026-09-07 Task 18b）**：实际调用处并非「编译自适应不动」——`SwipeReviewViewModel` 显式传 `now`（`SwipeQueueBuilder.build(organizeRepository.loadItems(), now = now)`，双时钟统一审查修正 b391c4cfc 收口）；且实现版 `build` 增重复 uri 去重防线（d3447103d，media_assets.uri 非唯一索引）与非废片类目照片落 RECENT 的 KDoc 括注。本 Task KDoc「视频永不入队（LARGE_FILES 走类目页）」实际扩写为「LARGE_FILES / 录屏落 SCREEN_CONTENT / 重复视频落 DUPLICATES」。
 
 - [ ] **Step 4: Commit**
 

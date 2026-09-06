@@ -10,7 +10,8 @@
 | **`adb backup/restore`** | release / debug | 是 | 应用数据（数据库、SharedPreferences、DataStore） | 整机应用数据迁移、脚本化 |
 | **`scripts/app-data-backup.sh`** | 仅 debug | 是 | 备份模型 v5（同 SAF） | 开发脚本、CI/自动化 |
 
-> **备份模型 v5 覆盖范围**：TAG 数据库（标签、媒体 TAG 元数据含 city/faceFocusY/aestheticScore/faceQualityScore、媒体-标签关联、扫描任务）、人脸 Embedding 与人物聚类、OCR 倒排索引、地理位置关系、媒体反馈、人物关系图谱（person_relations）、事实记忆（memory_facts）、聊天会话与消息（chat_sessions/chat_messages）、编辑配方（photo_edit_recipes）、DataStore 用户偏好。
+> **备份模型 v5 覆盖范围**：TAG 数据库（标签、媒体 TAG 元数据含 city/faceFocusY/aestheticScore/faceQualityScore/blurScore/exposureScore/lastViewedAt、媒体-标签关联、扫描任务）、人脸 Embedding 与人物聚类、OCR 倒排索引、地理位置关系、媒体反馈、人物关系图谱（person_relations）、事实记忆（memory_facts）、聊天会话与消息（chat_sessions/chat_messages）、编辑配方（photo_edit_recipes）、DataStore 用户偏好。
+> **恢复语义（v5 增补三列）**：`blurScore`/`exposureScore`/`lastViewedAt`（整理中心 v2 信号，2026-09-07 起随备份导出）恢复时走 COALESCE——旧备份缺这三字段（JSON 反序列化回退 null）时**不覆盖本机已算值**；`lastViewedAt` 是价值保护信号（查看器打开记录），不可再生，必须防冲。
 > **不覆盖**：`polang_llm_log.db`（LLM/tool/JS 日志）、`chat_image_cache`（可重建缓存）、`device_id`。
 
 ## 一、应用内 SAF 导入/导出（推荐，无需 adb）
