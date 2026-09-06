@@ -1587,7 +1587,7 @@ class BlurAnalyzerTest {
 
     /** 随机噪点图：高频纹理，方差应很大。 */
     private fun noisyImage(seed: Int = 42): IntArray =
-        IntArray(size * size) { Random(seed + it).nextInt(256) }
+        IntArray(size * size) { index -> Random(seed + index).nextInt(256) }
 
     /** 棋盘格：强边缘，方差大。 */
     private fun checkerImage(): IntArray = IntArray(size * size) { index ->
@@ -1618,6 +1618,41 @@ class BlurAnalyzerTest {
     }
 
     @Test
+    fun `non-square, short array and border-only inputs handled`() {
+        // 非方阵 8×4 竖直边缘图（左半 255 / 右半 0，非对称图案锁 width/height 不传反）。
+        val w = 8
+        val h = 4
+        val verticalEdge = IntArray(w * h) { index -> if (index % w < w / 2) 255 else 0 }
+        val edgeVariance = BlurAnalyzer.laplacianVariance(verticalEdge, w, h)
+        assertTrue("edge=$edgeVariance", edgeVariance > OrganizeThresholds.BLUR_VARIANCE_LOW)
+        // 手算：内部每行 lap=[0,0,255,-255,0,0]，共 2 行 → 方差 = 260100/12 = 21675；
+        // 转置传参（w=4,h=8）得到不同值 260100，借此锁参数顺序。
+        assertEquals(21675.0f, edgeVariance, 0.5f)
+        assertEquals(260100.0f, BlurAnalyzer.laplacianVariance(verticalEdge, h, w), 0.5f)
+
+        // 短数组：10 < 8*4=32 → 哨兵 0。
+        assertEquals(0.0f, BlurAnalyzer.laplacianVariance(IntArray(10), w, h), 0.0f)
+
+        // 8×8 仅四角非零、内部纯色：角像素既不作卷积中心，
+        // 也不落在任何内部中心的 4 邻域 → 方差恰为 0（锁最外圈不参与卷积）。
+        val cornerOnly = IntArray(64)
+        cornerOnly[0] = 255
+        cornerOnly[7] = 255
+        cornerOnly[56] = 255
+        cornerOnly[63] = 255
+        assertEquals(0.0f, BlurAnalyzer.laplacianVariance(cornerOnly, 8, 8), 0.0f)
+
+        // 8×8 整圈边界 255、内部纯色：边界不作中心但作为最内圈中心的邻域参与，
+        // 手算方差 = 2080800/36 - 170² = 28900（精确锁边界口径）。
+        val ring = IntArray(64) { index ->
+            val x = index % 8
+            val y = index / 8
+            if (x == 0 || x == 7 || y == 0 || y == 7) 255 else 0
+        }
+        assertEquals(28900.0f, BlurAnalyzer.laplacianVariance(ring, 8, 8), 0.5f)
+    }
+
+    @Test
     fun `degenerate inputs do not crash`() {
         assertEquals(0.0f, BlurAnalyzer.laplacianVariance(IntArray(0), 0, 0), 0.0f)
         assertEquals(0.0f, BlurAnalyzer.meanLuminance(IntArray(0)), 0.0f)
@@ -1644,7 +1679,10 @@ package com.mamba.picme.domain.organize
  */
 object BlurAnalyzer {
 
-    /** Laplacian 方差；尺寸非法或像素数不足返回 0。 */
+    /**
+     * Laplacian 方差；尺寸非法或像素数不足返回 0。
+     * ⚠️ 0 = 退化输入哨兵（与极模糊/纯黑真值重合），调用方解码失败必须写 null 入库，不可写 0。
+     */
     fun laplacianVariance(gray: IntArray, width: Int, height: Int): Float {
         if (width < 3 || height < 3 || gray.size < width * height) return 0.0f
         var sum = 0.0
@@ -1667,7 +1705,10 @@ object BlurAnalyzer {
         return (sumSq / count - mean * mean).toFloat()
     }
 
-    /** 平均亮度归一（0~1）；空输入返回 0。 */
+    /**
+     * 平均亮度归一（0~1）；空输入返回 0。
+     * ⚠️ 0 = 退化输入哨兵（与极模糊/纯黑真值重合），调用方解码失败必须写 null 入库，不可写 0。
+     */
     fun meanLuminance(gray: IntArray): Float {
         if (gray.isEmpty()) return 0.0f
         var sum = 0L
@@ -1680,7 +1721,7 @@ object BlurAnalyzer {
 - [ ] **Step 4: 跑测试确认通过并按需校准阈值**
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "com.mamba.picme.domain.organize.BlurAnalyzerTest"`
-Expected: 4 tests PASS。若 noisy/checker 未超阈值 10×，检查实现；不要在测试里放水改断言。
+Expected: 5 tests PASS（审查补充非方阵/短数组/边界用例）。若 noisy/checker 未超阈值 10×，检查实现；不要在测试里放水改断言。
 
 - [ ] **Step 5: Commit**
 
