@@ -68,6 +68,7 @@
 | `person.yaml` | 386 | ✅ 已建 |
 | `idphoto.yaml` | 418 | ✅ 已建（2026-08-16 /ios-follow idphoto 反向提取；含 FUSION 抠图管线/构图数学/修补契约全量） |
 | `tag-control.yaml` | 152 | ✅ 已建 |
+| `organize.yaml` | 454 | ✅ 已建（2026-09-07 整理中心类目体系 v2 落地固化：hub/类目详情/cleaned/swipe 口径 + 已知残留口径差台账） |
 | `topbar.yaml` | 106 | ✅ 已建 |
 | `tag(photo-info)` / `memory` | — | ❌ 按需待建（对应屏启动 iOS 对齐时先补 spec） |
 

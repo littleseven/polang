@@ -1,0 +1,454 @@
+# ============================================================================
+# 整理中心完整产品规格书（Organize Screen Spec，类目体系 v2）
+# ============================================================================
+# 基准端：Android DedupHomeHub.kt / OrganizeCategoryScreen.kt /
+#        OrganizeCategoryViewModel.kt / OrganizeHomeRoute.kt /
+#        SwipeReviewScreen.kt / domain/organize/* / domain/swipe/SwipeQueueBuilder.kt
+# 用途：iOS 实现的唯一输入，不读 Android 源码（[PARITY] 红线）
+# 值引用：颜色引用 Material colorScheme 语义色 / design-tokens.json token 名
+# 版本：v2（2026-09-07 落地固化）；设计 spec：docs/superpowers/specs/2026-09-06-organize-category-redesign-design.md
+# 覆盖四屏：hub（§2）/ category_grid（§3）/ cleaned（§4）/ swipe_review 口径（§5）
+
+# ============================================================================
+# 0. 页面定位与入口
+# ============================================================================
+root:
+  position: main_pager_page_1          # 主页面 Pager 页 1（相册(0)/整理+扫描(1)/聊天(2)/人物(3)/回忆(4)）
+  container: organize_home_route       # 整理+扫描合并页：顶部胶囊分段开关「整理 / 扫描」双 Tab
+  tab_organize: dedup_home_route       # 本 spec 覆盖「整理」Tab 内嵌内容
+  entries:
+    - gallery_left_swipe               # 相册页左滑（外层 HorizontalPager 原生手势）
+    - floating_bottom_bar_organize     # 悬浮底栏整理项（CleaningServices 图标）
+    - settings_menu_entry              # 设置主菜单「相册整理」一级入口
+  bottom_bar: main_floating_bottom_bar # 根页挂底 bar（整理项高亮）；Dedup Scanning/Results/Cleaned 态门控隐藏
+  back_behavior: switch_to_gallery_page # 系统返回切回相册页，不弹栈（根页无顶栏返回箭头）
+  privacy: all_on_device               # [PRIVACY] 全部判定端侧完成，媒体零上传
+
+# ============================================================================
+# 1. 领域口径（六类目互斥管线 —— UI 数值的语义 SSOT）
+# ============================================================================
+# 管线：CategoryArbiter（互斥裁定，先命中先得）→ ValueGuard（价值保护）→
+#       ConfidenceGrader（置信分级）→ OrganizeCategorizer Facade 聚合。
+# 互斥：一张媒体只进一个桶；未命中任何类目不属清理范畴（不出现在任何屏）。
+pipeline:
+  categories:                          # 声明序 = 裁定优先级
+    - id: DUPLICATES                   # 重复与相似
+      label_key: org_cat_duplicates    # "Duplicates & similar"
+      icon: burst_mode
+      signals: "dedup_hash 缓存聚类：精确组=同 MD5 且成员 ≥2；相似组=pHash 汉明距离 ≤5 并查集簇且成员 ≥2"
+      video_allowed: true
+    - id: SCREEN_CONTENT               # 屏幕内容（截图 + 录屏）
+      label_key: org_cat_screen_content # "Screenshots & recordings"
+      icon: screenshot_monitor
+      signals: "路径含 screenshots（RELATIVE_PATH，API<29 用 DATA 兜底）；录屏=视频且路径含 screenrecord/screen_record/录屏"
+      video_allowed: true              # 仅录屏形态
+    - id: DOCUMENTS                    # 文档与票据
+      label_key: org_cat_documents     # "Documents & receipts"
+      icon: description
+      signals: "OCR 文字密度 > 20 字符/MP（尺寸未知退回 >200 字符绝对兜底）或 labels 命中文档关键词（沿用 dedup detectContentType）"
+      video_allowed: false
+    - id: LOW_QUALITY_PORTRAITS        # 低质人像
+      label_key: org_cat_portraits     # "Low-quality portraits"
+      icon: face
+      signals: "hasFace 且 faceQualityScore < 0.35（eDifFIQA 0~1）"
+      video_allowed: false
+    - id: LOW_QUALITY_PHOTOS           # 低质量照片（真模糊/曝光异常）
+      label_key: org_cat_blurry        # "Blurry & low quality"
+      icon: blur_on
+      signals: "blurScore（256px 灰度 Laplacian 方差）< 100.0；或 exposureScore（平均亮度 0~1）< 0.15（欠曝）或 > 0.85（过曝）。NIMA 美学分（<3.5）仅作置信辅助，不再单独定类"
+      video_allowed: false
+    - id: LARGE_FILES                  # 大文件
+      label_key: org_cat_large_files   # "Large files"
+      icon: videocam
+      signals: "视频 ≥ 100 MiB；或照片像素面积 ≥ 50MP 且大小 ≥ 20MB（两条件同时满足）"
+      video_allowed: true
+  confidence:                          # ConfidenceGrader：决定三段分组与预选
+    HIGH: "强信号命中 → 默认勾选（建议删除段）。各类目定义：DUPLICATES=精确组成员；SCREEN_CONTENT=恒 HIGH（路径判定为确定性信号）；DOCUMENTS=OCR 密度 ≥ 2×裁定阈值；LOW_QUALITY_PORTRAITS=faceQualityScore < 0.175（0.35×0.5 强命中系数）；LOW_QUALITY_PHOTOS=blurScore < 50.0（100×0.5）；LARGE_FILES=大小 ≥ 2×主阈值"
+    MEDIUM: "单信号命中接近阈值：DUPLICATES=仅相似组成员；DOCUMENTS=OCR 命中未达 2× 或仅 labels 命中；低质两类=边界命中；LARGE_FILES=达主阈值未达 2×"
+    LOW: "弱信号（正常管线仅理论兜底：arbiter 不定类的 NIMA-only 项）"
+  value_guard:                         # 价值保护：仅 LOW_QUALITY_PHOTOS / LOW_QUALITY_PORTRAITS 生效
+    scope: [LOW_QUALITY_PHOTOS, LOW_QUALITY_PORTRAITS]
+    rules:
+      - { reason: OLD_PHOTO,     rule: "captureDate < now − 5 年（captureDate=0 未知时间戳恒判老照片，保守偏置有意为之）" }
+      - { reason: SCARCE_PERSON, rule: "所属人物聚类照片总数 ∈ 1..3（0=异常数据视为无信号；null=无人脸不参与）" }
+      - { reason: USER_ENGAGED,  rule: "isFavorite（MediaStore，API 29+）或 lastViewedAt ≠ null（查看器打开过）" }
+    effect: "protected=true → 不默认勾选（含显式全选）、不计入 Hero、排详情页保护区、带盾牌角标；仍计入类目浏览总数"
+  hero_formula: "Estimated reclaimable = 全类目 HIGH 且非 protected 项的并集字节（互斥裁定保证天然去重）；DUPLICATES 额外按精确组扣 1 张 keeper 字节（组全员进建议集才扣，扣组内最大 sizeBytes）——与去重结果页 reclaimBytes 口径一致"
+  thresholds_ssot: OrganizeThresholds  # object，校准只改这里
+
+# ============================================================================
+# 2. hub 屏（整理 Tab 主页，DedupHubContent）
+# ============================================================================
+hub:
+  layout: column_scrollable            # verticalScroll + navigationBarsPadding（Config 态无 bottomBar）
+  padding: 16
+  item_spacing: 12
+  board_contract:                      # board.categories 恒 6 卡（含零命中）
+    not_loaded: "board.categories 为空 = stateIn 初值未加载 → Hero 与类目卡列表均不渲染（防 0B 假数据）"
+    zero_hit_ready: "totalCount == 0 且 coverage == READY → 该类目卡不渲染（已扫描无内容）"
+    needs_scan: "coverage == NEEDS_SCAN → 渲染引导卡（见下），点击切「扫描」Tab（onOpenScan）"
+
+  # ---- Hero 卡 ----
+  hero_card:
+    shape: { corner_radius: appShapes_lg }
+    background: surfaceContainer
+    padding: 20
+    content_spacing: 4
+    label:
+      text_key: org_hero_label         # "Estimated reclaimable"
+      font: bodySmall
+      color: onSurfaceVariant
+    big_number:
+      text: "formatBytes(heroReclaimBytes)"   # 口径见 §1.hero_formula
+      font: { size: 34, weight: bold }
+      color: brandGradient             # 品牌渐变着色文字（青玉，与 tagcontrol 同源）
+    across_line:
+      show_when: "有内容的类目数（totalCount > 0 的卡数）> 0"
+      text_key: org_hero_across        # plurals："Across N category/categories"
+      font: bodySmall
+      color: onSurfaceVariant
+    review_line:
+      show_when: "heroReviewCount > 0" # MEDIUM+LOW 非 protected 总数
+      text_key: org_hero_review        # "N more to review"
+      font: bodySmall
+      color: onSurfaceVariant
+
+  # ---- 主按钮 ----
+  quick_tidy_button:
+    text_key: org_quick_tidy           # "Quick tidy up"
+    height: 48
+    corner_radius: 24
+    background: brandGradient          # 品牌渐变实底
+    text_style: { font: titleMedium, weight: semibold, color: white }
+    action: open_swipe_review          # → swipe_review 路由（§5）
+
+  categories_header:
+    text_key: org_categories           # "Categories"
+    font: titleSmall
+    color: onSurfaceVariant
+
+  # ---- 固定重复卡（钉首位，豁免排序）----
+  dedup_category_card:
+    position: always_first             # 钉在类目列表首位，不参与 highBytes 排序
+    expands_to: dedup_scan_options     # 展开 = 原去重 2.0 Config 三件套：尺度勾选（EXACT/VISUAL/SCENE）+ 保留规则行 + 开始扫描按钮；功能零回归
+    layout: row_center_v
+    padding: { horizontal: 12, vertical: 12 }
+    spacing: 12
+    background: surfaceContainer
+    shape: { corner_radius: appShapes_card }
+    title: { text_key: org_cat_duplicates, font: bodyLarge, weight: medium, max_lines: 1 }
+    summary:                           # 单行摘要，与 board 的 DUPLICATES 卡同源
+      has_results: "org_cat_meta（totalCount · totalBytes）"
+      no_results: "dedup_never_scanned" # "从未扫描"口径
+      font: bodySmall
+      color: onSurfaceVariant
+    chevron: { icon: "keyboard_arrow_right ↔ keyboard_arrow_down（展开态）", tint: onSurfaceVariant }
+
+  # ---- 类目卡 v2 ----
+  category_card:
+    sort: "highBytes 降序（建议优先级）；固定重复卡除外"
+    layout: row_center_v
+    padding: { horizontal: 12, vertical: 12 }
+    spacing: 12
+    background: surfaceContainer       # NEEDS_SCAN 引导态降为 surfaceContainerLow（降档底色，不压整卡 alpha —— 标题/引导文案保持全不透明，WCAG AA）
+    shape: { corner_radius: appShapes_card }
+    icon_block:
+      size: 40
+      corner_radius: 10
+      background: surfaceVariant
+      icon_size: 22
+      icon_tint: onSurfaceVariant
+    title: { font: bodyLarge, weight: medium, max_lines: 1, ellipsis: true }
+    meta_row:
+      show_when: "coverage == READY"
+      text_key: org_cat_meta           # "N items · X MB"（该类目全量，含 protected）
+      font: bodySmall
+      color: onSurfaceVariant
+      max_lines: 1
+    confidence_badge_row:              # 置信度徽标行（meta 行下方）
+      show_when: "coverage == READY"
+      spacing: 8
+      items:
+        - high_badge:
+            show_when: "highCount > 0"
+            dot: { size: 6, filled: true, color: primary }   # ● 实心圆点
+            text_key: org_confidence_high                    # "N confident"
+            font: labelSmall
+            color: primary
+            note: "highCount = HIGH 非保护张数（含 DUPLICATES keeper 张数——与 highBytes 口径差见 §8）"
+        - review_badge:
+            show_when: "reviewCount > 0"
+            dot: { size: 6, filled: false, border: { width: 1, color: primary } }  # ○ 空心描边圆点
+            text_key: org_confidence_review                  # "N to review"
+            font: labelSmall
+            color: onSurfaceVariant
+        - protected_count:
+            show_when: "protectedCount > 0"
+            text_key: org_protected_count                    # "N protected"
+            font: labelSmall
+            color: onSurfaceVariant
+    preview_thumbs:                    # 右侧缩略图条 + 可释放数
+      show_when: "coverage == READY"
+      count: 4                         # 前 4 张（PREVIEW_LIMIT）
+      size: 30
+      corner_radius: 6
+      spacing: 4
+      scale: crop
+      placeholder: surfaceVariant
+    reclaim_label:
+      show_when: "highBytes > 0"
+      text_key: org_cat_reclaim        # "Free X MB"（HIGH 非保护字节；DUPLICATES 已扣 keeper）
+      font: labelSmall
+      color: primary
+    chevron: { icon: keyboard_arrow_right, tint: onSurfaceVariant }
+    tap_action:
+      ready: "open_category_detail(category)"   # → §3
+      needs_scan: "switch_to_scan_tab"          # 仅切 Tab；spec §6.1 原文「预选对应扫描项」未实现（裁剪项，见 §8）
+    needs_scan_badge:
+      text_key: org_needs_scan         # "Scan needed · tap to scan"
+      font: bodySmall
+      color: primary
+
+  privacy_caption:
+    text_key: org_privacy_note         # "All analysis runs on-device · your photos never leave this phone"
+    font: bodySmall
+    color: onSurfaceVariant
+    align: center
+    fill_width: true
+
+# ============================================================================
+# 3. category_grid 屏（类目详情页，OrganizeCategoryScreen）
+# ============================================================================
+# 路由：organize_category/{category}（NavHost 二级页，枚举名即路由段）
+category_grid:
+  states: [loading, ready_grid, empty, cleaned]   # Loading=居中 spinner；empty=居中 org_empty_category "Nothing to clean here"
+  top_bar:
+    type: top_app_bar
+    title: "organizeCategoryLabelRes(category)"   # 类目名（与 hub 卡同源）
+    navigation_icon: { icon: arrow_back, cd_key: back }
+    actions:
+      - ai_preselect_toggle:                     # ⚠️ 文案为「AI 预选」（spec 原文「置信筛选」作废）
+          show_when: "ready && !trashed"
+          type: text_button
+          text_on_key: org_ai_preselect_on       # "AI preselect on"
+          text_off_key: org_ai_preselect_off     # "AI preselect off"
+          behavior: "开 = 立即勾选 HIGH 置信非保护项（DUPLICATES 按组留 keeper）；关 = 立即清空（语义对称，手选项需重新点选）"
+  subtitle_row:
+    padding: { horizontal: 16, vertical: 4 }
+    left:
+      text_key: org_cat_meta                     # "N items · X MB"（该类目全量）
+      font: bodySmall
+      color: onSurfaceVariant
+      weight: 1
+    right:
+      text_key: org_ai_preselected               # "N AI-preselected"（当前选中数）
+      font: bodySmall
+      color: primary
+      align: end
+  grid:
+    columns: 3
+    content_padding: { horizontal: 16, vertical: 8 }
+    spacing: 2                                   # 横纵均 2dp
+    thumb:
+      aspect: "1:1"
+      corner_radius: 2
+      background: surfaceVariant
+      scale: crop
+      coil: { size_px: 360, crossfade: false }   # recycled bitmap 红线
+      tap_action: toggle_selection
+      semantics:
+        content_description: "media_type_photo / media_type_video（按 isVideo）"
+        state_description: "media_state_selected / media_state_unselected"
+    selection_badge:                             # 右上角选中勾
+      position: top_end
+      margin: 6
+      size: 22
+      shape: circle
+      background: "selected → primary | unselected → black.opacity(0.2)"
+      border: "selected → none | unselected → 1.5dp white.opacity(0.8)"
+      check_icon: { show_when: selected, size: 14, tint: white }
+    protected_badge:                             # 盾牌角标（protected 项）
+      show_when: "protectReasons 非空"
+      position: bottom_start
+      margin: 4                                  # 距边 4dp
+      icon: shield_outline
+      icon_size: 16
+      icon_tint: white
+      scrim: { color: "black.opacity(0.4)", shape: circle, inner_padding: 2 }  # 黑 40% 圆底 + 2dp 内 padding
+      cd_key: org_protected_badge                # "Possibly precious photo"
+    sections:                                    # 三段分组（互斥且完备；空段不占位）
+      - id: suggested                            # 建议删除 = HIGH 置信且非 protected
+        header_key: org_section_suggested        # "Suggested (N)"
+        header_style: { font: titleSmall, color: onSurface, padding_v: 8 }
+        preselected: true                        # AI 预选开时默认勾选
+        select_all_button: none                  # ⚠️ 段级全选未实装（VM selectAll 就绪暂无 UI 调用方，spec §6.3 裁剪项）
+      - id: review                               # 请确认 = MEDIUM+LOW 且非 protected
+        header_key: org_section_review           # "Review (N)"
+        header_style: { font: titleSmall, color: onSurface, padding_v: 8 }
+        preselected: false
+      - id: protected                            # 可能是珍贵照片 = protected（无论置信度）
+        header_key: org_section_protected        # "Likely precious (N)"
+        header_style: { font: titleSmall, color: tertiary, padding_v: 8 }  # tertiary 强调价值保护
+        preselected: never                       # 永不预选（含显式全选 selectAll 也排除）
+        badge: protected_badge
+    selection_semantics:                         # 预选/全选口径
+      preselect: "selected = suggested 段（HIGH 非保护）；DUPLICATES 再按 exactDupGroupKey 每组排除 1 张 keeper"
+      keeper_rule: "keeper = 组内 captureDate 最新者（同值按 uri 字典序取大求稳定）；精确组内容逐字节相同，选谁无质量差；无组标识成员（similar-only）不参与排除"
+      select_all: "仅圈非 protected 项；DUPLICATES 同按组留 keeper（与 hub 可释放口径对偶，防全选删光整组）"
+      duplicates_guard: "按 media_assets.uri 去重（非唯一索引防线，重复行会同 key 硬崩网格）"
+  bottom_bar:
+    nav_bar_padding: true
+    delete_bar:
+      show_when: "ready && !trashed && items 非空"
+      padding: { horizontal: 16, vertical: 12 }
+      spacing: 4
+      button:
+        text_key: org_move_to_trash              # "Move to trash N items · Free X MB"
+        fill_width: true
+        enabled_when: "selectedCount > 0"
+        background: error                        # error 色通栏按钮
+      caption:
+        text_key: org_trash_note                 # "Items stay in Trash for 30 days"
+        font: bodySmall
+        color: onSurfaceVariant
+        align: center
+    trash_flow:                                  # 删除 = 系统回收站（30 天可恢复）
+      backend: trash_session_controller          # API 30+ createTrashRequest；API <30 → errorEvent → snackbar org_trash_unsupported
+      auth: start_intent_sender_for_result
+      partial_notice: "授权后仍有残留 → snackbar org_partial_trash（一次性事件）"
+      outcome: "Trashed → 剔除已回收项；清空则进 cleaned 态；Cancelled → 留原地可重试"
+
+# ============================================================================
+# 4. cleaned 屏（完成态，category_grid 的 trashed 分支）
+# ============================================================================
+cleaned:
+  layout: column_scrollable_centered
+  padding: 16
+  spacing: 16
+  top_spacer: 24
+  icon: { name: check_circle, size: 64, tint: "#4CAF50" }   # CleanGreen 硬编码（双端对齐用此值）
+  title:
+    text_key: org_cleaned_title                  # "All clean!"
+    font: headlineSmall
+    weight: bold
+  meta:
+    text_key: org_cleaned_meta                   # "N items moved to Trash"
+    font: bodyMedium
+    color: onSurfaceVariant
+  freed_number:
+    text_key: org_cleaned_freed                  # "X freed"（formatBytes(trashedBytes)）
+    font: { size: 34, weight: bold }
+    color: brandGradient
+  recycle_preview_card:
+    shape: { corner_radius: 16 }
+    background: surfaceContainer
+    padding: 16
+    spacing: 12
+    header_row:
+      left: { text_key: dedup_recycle_bin, font: titleSmall }       # 回收站
+      right: { text_key: dedup_auto_clear, font: bodySmall, color: onSurfaceVariant }  # 30 天自动清空
+    thumbs_row:
+      spacing: 8
+      thumb: { size: 64, corner_radius: 8, scale: crop, coil: { size_px: 360, crossfade: false } }
+      count: "lastTrashedUris 前 3 张"           # 已回收 uri 仍可直读
+      overflow_text: "dedup_more_count（+N）titleMedium onSurfaceVariant（>3 时）"
+  undo_bar:                                      # 底部栏（替代 delete_bar）
+    text_key: org_undo                           # "Undo"
+    height: 48
+    corner_radius: 24
+    background: brandGradient
+    text_style: { font: titleMedium, weight: semibold, color: white }
+    padding: { horizontal: 16, vertical: 12 }
+    behavior: "恢复 lastTrashedUris（系统回收站恢复授权）→ 成功后重载类目回网格态，trashedCount/Bytes 清零"
+
+# ============================================================================
+# 5. swipe_review 屏口径（手势快速整理 F2，SwipeReviewScreen）
+# ============================================================================
+# 路由：swipe_review（NavHost 二级页）；入口 = hub「Quick tidy up」主按钮。
+# 本屏 UI 细节沿用现状（v1 已定稿），本节固化与类目体系的【口径契约】。
+swipe_review:
+  queue_source: "SwipeQueueBuilder 消费与类目页同一管线产出（OrganizeCategorizer.classifyAll）——口径同源，同一张图两处判定一致（spec AC-R2-7）"
+  admission:
+    photos_only: true                            # 视频永不入队（视频在类目页处理：LARGE_FILES / 录屏落 SCREEN_CONTENT / 重复视频落 DUPLICATES）
+    waste_buckets: "废片桶只收 HIGH/MEDIUM 且非 protected 项；LOW 弱信号与 protected 项落 RECENT 兜底（用户全手动决策）"
+    non_waste_categories: "DUPLICATES/DOCUMENTS/LARGE_FILES 类目的照片也落 RECENT 兜底（F2 只收截图与低质两类废片）"
+    dedup_by_uri: "重复 uri 只出一张卡（保留最后一条快照，与类目详情页同防线）"
+    sort_within_bucket: captureDate_desc
+  bucket_order:                                  # 声明序即出队顺序
+    buckets:
+      - { reason: SCREENSHOT,           category: SCREEN_CONTENT,         badge_key: swipe_reason_screenshot }
+      - { reason: BLURRY,               category: LOW_QUALITY_PHOTOS,     badge_key: swipe_reason_blurry }
+      - { reason: LOW_QUALITY_PORTRAIT, category: LOW_QUALITY_PORTRAITS,  badge_key: swipe_reason_portrait }
+      - { reason: RECENT,               category: null,                   badge_key: swipe_reason_recent }  # 兜底桶
+    note: "⚠️ 有意偏差：桶序 BLURRY 先于 LOW_QUALITY_PORTRAIT 延续 v1 UX；spec §5「桶序沿用类目优先级」句面作废（类目优先级 PORTRAITS > PHOTOS）"
+  gestures:
+    right: keep                                  # 保留（写入 SwipeKeepHistory，30 天抑制不再入队）
+    left: skip                                   # 跳过
+    up: delete                                   # 删除（标记不即时删；累计 20 张自动提交一批系统回收站授权）
+    tap: skip
+    threshold: "卡片宽 25%（SWIPE_THRESHOLD_FRACTION=0.25）超阈值飞出落决策，未超弹回；主位移轴定方向（水平主导判 KEEP/SKIP，垂直向上判 DELETE）"
+    preload: 3                                   # 预加载后续 3 张
+  top_bar: "返回 + 居中进度「N / M」+ 副行 freed + 右 undo（尾条已提交时禁用）"
+  states: [loading, reviewing, done]             # Done = 统计卡（Kept/Deleted/Skipped + Space freed）+ 再来一轮 + 整批恢复
+  keep_history: "KEEP 30 天抑制：decide(KEEP) 即时写 DataStore（swipe_keep_history stringSet，uri|epochMs 编码 + TTL 裁剪）；restart 建队过滤活跃条目；undo(KEEP) 只回滚本会话新增"
+  trash_flow: "同 category_grid（TrashSessionController 回收站编排）；授权被拒批次回滚可重试，末张决策后显示「待提交 N 张 + 重试/放弃」出口面板；API<30 提交短路，未提交 DELETE 以 skipped 口径进 Done"
+
+# ============================================================================
+# 6. i18n 键清单（五语同步 EN/zh-CN/zh-TW/ES/FR，[I18N] 红线）
+# ============================================================================
+i18n_keys:
+  hub: [org_hero_label, org_hero_across, org_hero_review, org_quick_tidy, org_categories,
+        org_cat_duplicates, org_cat_screen_content, org_cat_documents, org_cat_portraits, org_cat_blurry, org_cat_large_files,
+        org_cat_meta, org_confidence_high, org_confidence_review, org_protected_count, org_cat_reclaim,
+        org_needs_scan, org_privacy_note]
+  # 注：org_hero_across 为 plurals 资源（one/other），其余为 string
+  category_grid: [org_ai_preselect_on, org_ai_preselect_off, org_ai_preselected,
+                  org_section_suggested, org_section_review, org_section_protected, org_protected_badge,
+                  org_move_to_trash, org_trash_note, org_empty_category, org_partial_trash, org_trash_unsupported]
+  cleaned: [org_cleaned_title, org_cleaned_meta, org_cleaned_freed, org_undo,
+            dedup_recycle_bin, dedup_auto_clear, dedup_more_count]
+  swipe_review: [swipe_reason_screenshot, swipe_reason_blurry, swipe_reason_portrait, swipe_reason_recent]
+  removed_v1_keys: [org_cat_screenshots, org_cat_large_videos]   # v2 已删除（枚举改名收口）
+
+# ============================================================================
+# 7. 颜色与主题参考（与 chat.yaml §10 同 SSOT：design-tokens.json）
+# ============================================================================
+colors:
+  scheme_refs: [primary, onSurfaceVariant, surfaceContainer, surfaceContainerLow, surfaceVariant, tertiary, error]
+  brand_gradient: "chatBubble/brandGradient*（青玉；Hero 大数字 / 主按钮 / Undo 钮 / freed 数字同源）"
+  clean_green: "#4CAF50"                         # cleaned 态 ✓ 圆标（硬编码值，双端对齐）
+  badge_scrim: "black.opacity(0.4)"              # protected 盾牌圆底
+  selection_unselected: "black.opacity(0.2) 底 + white.opacity(0.8) 1.5dp 描边"
+  note: "本期语义色直接用 colorScheme（primary/tertiary/error），未新增 design token（spec §6.4 token 化降级，见设计 spec 落地校准注记）"
+
+# ============================================================================
+# 8. 平台差异与已知残留口径差（iOS 实现前必读）
+# ============================================================================
+platform_differences:
+  allowed:
+    - "图标具体形状（Material Icons vs SF Symbols / mat_* 资产）"
+    - "字体回退（Roboto vs SF Pro）"
+    - "回收站机制（Android MediaStore createTrashRequest 30 天 vs iOS PHAsset ChangeRequest 最近删除）"
+    - "Coil 缩略图管线参数（size 360 crossfade false）为 Android 工程约束，iOS 用等效缩略图加载"
+  capability_matrix:
+    - { feature: "六类目互斥管线",  android: supported, ios: "TODO（iOS 整理页零实现，本 spec 即翻译 SSOT）" }
+    - { feature: "hub + 详情页 + cleaned", android: supported, ios: "TODO" }
+    - { feature: "swipe_review",   android: supported, ios: "TODO" }
+    - { feature: "dedup Config 展开卡", android: supported, ios: "TODO（依赖去重 2.0 扫描器移植）" }
+known_residuals:                                 # 已登记的口径差/裁剪项（非 bug，勿「修复」对齐）
+  - id: highCount_vs_highBytes
+    desc: "hub 徽标 highCount（建议删除张数）含 DUPLICATES keeper 张数，而 highBytes（可释放字节）与 Hero 已扣 keeper 字节——张数与字节存在 1 张/组的口径差，有意保留（徽标表达「建议集规模」，字节表达「真实可释放」）"
+  - id: exact_group_divergence
+    desc: "EXACT 成组条件分叉：hub/整理侧 = 纯 MD5（dedup_hash 缓存聚类）；去重结果页 = (sizeBytes, mime) 分桶内 MD5——理论上同字节异扩展名文件 hub 成组而去重页不成组，实践影响忽略"
+  - id: spec_6_1_preselect_scan_item
+    desc: "设计 spec §6.1「引导卡点击跳 SCAN tab（预选对应扫描项）」的「预选」未实现——onOpenScan 仅切 Tab 不预选扫描项，明示裁剪为后续项"
+  - id: spec_6_3_section_select_all
+    desc: "设计 spec §6.3 段级「全选」按钮未实装——VM selectAll/deselectAll 就绪（排除 protected + DUPLICATES 留 keeper）但无 UI 调用方，明示裁剪"
+  - id: top_bar_copy
+    desc: "详情页顶栏开关文案以实现的「AI 预选」（org_ai_preselect_on/off）为准，spec 原文「置信筛选」作废"
+  - id: bucket_order_v1_ux
+    desc: "swipe 桶序 BLURRY 先于 LOW_QUALITY_PORTRAIT 延续 v1 UX；spec §5「桶序沿用类目优先级」句面作废"
+  - id: blur_threshold_calibration
+    desc: "BLUR_VARIANCE_LOW=100.0（256px 降采样口径）为初始值：256px 降采样压缩高频，真机实拍分布待采集定标（BlurAnalyzerTest 样本校准待办）"
+  - id: deleteByUri_not_wired
+    desc: "dedup_hash 的 deleteByUri 有意不接线：媒体删除后哈希行残留由「聚类输入按库内 uri 收敛」兜底（幽灵行不参与成组）；回收站 30 天可恢复 + 过滤后无危害"
