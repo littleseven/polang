@@ -457,8 +457,11 @@ interface MediaDao {
         entries.forEach { entry -> updateQualityScores(entry.uri, entry.blurScore, entry.exposureScore) }
     }
 
-    /** 回写最近一次查看时间（查看器打开时调用）。 */
-    @Query("UPDATE media_assets SET lastViewedAt = :timestamp WHERE uri = :uri")
+    /**
+     * 回写最近一次查看时间（查看器打开时调用）。60s 节流窗（60000ms）消除每次翻页
+     * 触发 mergeRows 重算：ValueGuard 只判 != null，守卫零语义损失。
+     */
+    @Query("UPDATE media_assets SET lastViewedAt = :timestamp WHERE uri = :uri AND (lastViewedAt IS NULL OR lastViewedAt < :timestamp - 60000)")
     suspend fun updateLastViewedAt(uri: String, timestamp: Long)
 
     /** 各人物聚类的照片总数（faceId → 计数），整理中心 v2 人物稀缺信号。 */

@@ -13,7 +13,7 @@ import com.mamba.picme.domain.dedup.DedupScanEvent
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.KeepPolicyEngine
-import com.mamba.picme.domain.organize.CategoryStat
+import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategorizer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -90,14 +90,26 @@ class DedupViewModel(
     private val _uiState = MutableStateFlow<DedupUiState>(DedupUiState.Config())
     val uiState: StateFlow<DedupUiState> = _uiState.asStateFlow()
 
-    /** 整理中心 hub 类目统计（仅 Config 态由 UI 订阅；DUPLICATES 不在其中，hub 卡用 dedup 摘要）。 */
-    val categoryStats: StateFlow<List<CategoryStat>> =
+    /** 整理中心 hub 看板（Config 态由 UI 订阅）：类目卡聚合 + Hero 口径，管线单一事实来源。 */
+    val organizeBoard: StateFlow<OrganizeBoard> =
         organizeRepository.observeItems()
-            .map { items -> OrganizeCategorizer.stats(items) }
-            // 媒体库任何写都会触发 observeItems 重算，相同统计结果不下发（防抖重组）
+            .map { items -> OrganizeCategorizer.board(items, now = System.currentTimeMillis()) }
+            // 媒体库任何写都会触发 observeItems 重算，相同结果不下发（防抖重组）
             .distinctUntilChanged()
             .flowOn(ioDispatcher)
-            .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
+            .stateIn(scope, SharingStarted.WhileSubscribed(5000), OrganizeBoard(emptyList(), 0L, 0))
+
+    init {
+        // 整理中心 v2：后台分批补算模糊/曝光分（缺分即 LOW 覆盖，hub 引导态承接；补算回写经 Room Flow 自动刷新）
+        scope.launch(ioDispatcher) {
+            runCatching {
+                var remaining = organizeRepository.backfillQualitySignals()
+                while (remaining > 0) {
+                    remaining = organizeRepository.backfillQualitySignals()
+                }
+            }.onFailure { error -> Logger.w(TAG, "backfill quality signals failed", error) }
+        }
+    }
 
     /** VM 级保留策略（Config/Results 共用）：Config 规则行与规则弹层改它；进入 Results 时带入 state.policy。 */
     private val _policy = MutableStateFlow(KeepPolicy.BEST_QUALITY)

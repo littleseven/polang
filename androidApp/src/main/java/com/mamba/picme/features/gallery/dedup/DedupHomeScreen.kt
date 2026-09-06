@@ -189,18 +189,21 @@ fun DedupHomeRoute(
         ) {
             when (val state = uiState) {
                 is DedupUiState.Config -> {
-                    // 类目统计流仅 Config 态订阅（2026-09-05 审查修复）：Scanning/Results/Cleaned
-                    // 态不再挂着全量 Room+MediaStore 合并统计
-                    val categoryStats by viewModel.categoryStats.collectAsState()
-                    DedupHubContent(
-                        config = state.config,
-                        policy = policy,
-                        stats = categoryStats,
-                        onQuickTidy = onQuickTidy,
-                        onOpenCategory = onOpenCategory,
-                        onStartScan = { config -> viewModel.startScan(config) },
-                        onOpenKeepRules = { showKeepRules = true },
-                    )
+                    // 看板流仅 Config 态订阅：Scanning/Results/Cleaned 态不再挂着
+                    // 全量 Room+MediaStore 合并聚合
+                    val board by viewModel.organizeBoard.collectAsState()
+                    // TODO(Task 12): DedupHubContent 切 OrganizeBoard 签名后恢复调用
+                    // （DedupHomeHub.kt 仍引旧 CategoryStat API，Task 11 不动该文件；
+                    // 形参 board 届时消费，当前暂存仅承接新类型）
+                    // DedupHubContent(
+                    //     config = state.config,
+                    //     policy = policy,
+                    //     board = board,
+                    //     onQuickTidy = onQuickTidy,
+                    //     onOpenCategory = onOpenCategory,
+                    //     onStartScan = { config -> viewModel.startScan(config) },
+                    //     onOpenKeepRules = { showKeepRules = true },
+                    // )
                 }
                 is DedupUiState.Scanning -> DedupScanningContent(
                     state = state,
