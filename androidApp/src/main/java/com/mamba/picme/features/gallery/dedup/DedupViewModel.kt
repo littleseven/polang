@@ -103,21 +103,32 @@ class DedupViewModel(
         // 整理中心 v2：后台分批补算模糊/曝光分（缺分即 LOW 覆盖，hub 引导态承接；补算回写经 Room Flow 自动刷新）
         scope.launch(ioDispatcher) {
             runCatching {
-                var batch = organizeRepository.backfillQualitySignals()
+                // 跨批累计永久失败行（解码失败/云端占位符），下一批排除——否则失败行永久占据
+                // 批次头部，后续待补算行静默停摆（written=0 即退出的旧逻辑）
+                val failedUris = LinkedHashSet<String>()
+                var batch = organizeRepository.backfillQualitySignals(excludeUris = failedUris)
+                failedUris += batch.failedUris
                 var batches = 1
-                var failedResidual = batch.attempted - batch.written
-                // BACKFILL_MAX_BATCHES 兜底：防御永久失败行放大为死循环；正常 200/批 × 1000 = 20 万张覆盖
-                while (batch.written > 0 && batches < BACKFILL_MAX_BATCHES) {
-                    batch = organizeRepository.backfillQualitySignals()
+                // 循环条件按 attempted（排除已知失败后仍有待算行）：全败批次不再提前退出；
+                // BACKFILL_MAX_BATCHES 兜底防永久失败行反复入批放大为死循环（200/批 × 1000 = 20 万张覆盖）
+                while (batch.attempted > 0 && batches < BACKFILL_MAX_BATCHES) {
+                    batch = organizeRepository.backfillQualitySignals(excludeUris = failedUris)
                     batches++
-                    failedResidual += batch.attempted - batch.written
+                    failedUris += batch.failedUris
+                    // 排除集容量封顶：只保留最近 500 个失败 uri（超出则最早逐出，
+                    // 被逐出行下轮可能重试一次后再次入集，不会死循环——attempted 终为 0）
+                    while (failedUris.size > BACKFILL_FAILED_URIS_CAP) {
+                        failedUris.remove(failedUris.first())
+                    }
                 }
-                if (batch.written > 0 && failedResidual > 0) {
-                    // 命中上限且累计有失败残留：永久失败行可能未补算，真机排查看此日志
+                if (failedUris.isNotEmpty() || batch.attempted > 0) {
+                    // 循环结束仍有未补算残留：失败行 blurScore 恒 null 不进 LOW_QUALITY_PHOTOS，
+                    // 或命中批次上限仍有积压——如实上报，真机排查看此日志
                     Logger.w(
                         ORGANIZE_TAG,
-                        "backfill hit BACKFILL_MAX_BATCHES=$BACKFILL_MAX_BATCHES " +
-                            "with $failedResidual failed rows; residual rows may stay uncomputed"
+                        "backfill residual: ${failedUris.size} rows failed decode (skipped, " +
+                            "blurScore stays null); lastBatch attempted=${batch.attempted} " +
+                            "written=${batch.written}, batches=$batches"
                     )
                 }
             }.onFailure { error -> Logger.w(TAG, "backfill quality signals failed", error) }
@@ -483,5 +494,8 @@ class DedupViewModel(
 
         /** init 质量分补算循环批次上限：200/批 × 1000 = 20 万张覆盖，防御永久失败行死循环。 */
         const val BACKFILL_MAX_BATCHES = 1000
+
+        /** 永久失败行排除集容量：只保留最近 500 个失败 uri（防无界增长；逐出行重试一次后仍败再入集）。 */
+        const val BACKFILL_FAILED_URIS_CAP = 500
     }
 }

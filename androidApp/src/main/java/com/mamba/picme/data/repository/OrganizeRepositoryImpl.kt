@@ -219,9 +219,14 @@ class OrganizeRepositoryImpl(
         }.onFailure { error -> Logger.w(TAG, "query mediastore meta failed: $collection", error) }
     }
 
-    override suspend fun backfillQualitySignals(batchLimit: Int): BackfillBatchResult = withContext(ioDispatcher) {
+    override suspend fun backfillQualitySignals(
+        batchLimit: Int,
+        excludeUris: Set<String>,
+    ): BackfillBatchResult = withContext(ioDispatcher) {
+        // 排除集 Kotlin 侧过滤（行集已在内存，绕开 SQLite IN 变量上限 999 的分批复杂度）
         val pending = mediaDao.observeOrganizeRows().first()
             .filter { row -> row.blurScore == null && row.type != MediaType.VIDEO.name }
+            .filter { row -> row.uri !in excludeUris }
             .take(batchLimit)
         // 先逐张算分收集成功项，最后单事务合批回写（避免 observe 流逐行重发射触发 O(n²) 重聚类）
         val entries = pending.mapNotNull { row ->
@@ -232,7 +237,12 @@ class OrganizeRepositoryImpl(
             mediaDao.updateQualityScoresBatch(entries)
             Logger.d(TAG, "backfill quality signals: ${entries.size}/${pending.size}")
         }
-        BackfillBatchResult(attempted = pending.size, written = entries.size)
+        val writtenUris = entries.mapTo(HashSet()) { entry -> entry.uri }
+        BackfillBatchResult(
+            attempted = pending.size,
+            written = entries.size,
+            failedUris = pending.map { row -> row.uri }.filter { uri -> uri !in writtenUris },
+        )
     }
 
     /**

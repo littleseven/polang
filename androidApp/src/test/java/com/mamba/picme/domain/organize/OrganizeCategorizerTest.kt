@@ -260,14 +260,15 @@ class OrganizeCategorizerTest {
     }
 
     @Test
-    fun `preview uris truncated to 4 in input order`() {
+    fun `preview uris truncated to 4 in stable uri-sorted order`() {
+        // 乱序输入：预览不随 rows rowid 序漂移，恒按 uri 字典序取前 4
         val board = OrganizeCategorizer.board(
             listOf(
-                item("s1", relativePath = "Pictures/Screenshots/"),
-                item("s2", relativePath = "Pictures/Screenshots/"),
-                item("s3", relativePath = "Pictures/Screenshots/"),
-                item("s4", relativePath = "Pictures/Screenshots/"),
                 item("s5", relativePath = "Pictures/Screenshots/"),
+                item("s2", relativePath = "Pictures/Screenshots/"),
+                item("s4", relativePath = "Pictures/Screenshots/"),
+                item("s1", relativePath = "Pictures/Screenshots/"),
+                item("s3", relativePath = "Pictures/Screenshots/"),
             ),
             now = now,
         )

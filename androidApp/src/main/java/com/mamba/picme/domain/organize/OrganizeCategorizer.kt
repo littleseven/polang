@@ -55,7 +55,10 @@ object OrganizeCategorizer {
                     highBytes = highBytes,
                     reviewCount = review.size,
                     protectedCount = entries.count { entry -> entry.isProtected },
-                    previewUris = entries.take(PREVIEW_LIMIT).map { entry -> entry.item.uri },
+                    // 按 uri 排序取前 4：rows 无序（rowid 序漂移），稳定序防预览缩略图闪换
+                    previewUris = entries.sortedBy { entry -> entry.item.uri }
+                        .take(PREVIEW_LIMIT)
+                        .map { entry -> entry.item.uri },
                     coverage = coverageOf(category, items),
                 )
             }
