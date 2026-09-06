@@ -3,7 +3,7 @@
 > **版本**：1.2
 > **日期**：2026-08-25（v1.1：2026-08-26 新增 §10 内容类型差异化策略；v1.2：2026-09-04 状态与实现校准）
 > **状态**：全量已落地 Android（含 §10 内容类型差异化、§11 入口与导航、§12 按 Tab 细分批量）；两处 v1.0 目标未落地，见 §5.4/§5.5 校准注记；iOS 对等跟随中（AC-5）
-> **设计稿**：Ardot 文件 `Dedup` 页（6 屏流程稿 + 内容类型 badge 变体）
+> **设计稿**：Ardot 文件 `Organize` 页（2026-09-06 起：原 `Dedup` 页 6 屏流程稿迁入 `Organize` 页第二行，`Dedup` 页删除；`dedup/overview` 帧因被 `organize/hub` 取代同步删除，存档见 git 历史）
 > **现状 SSOT**：`androidApp/.../features/gallery/AGENTS.md` §2.4、`domain/dedup/`
 
 ---
@@ -91,7 +91,7 @@ L2 组内按「版本链」标注每张图的身份 badge：
                  └─ dedup/cleaned       完成页 + 回收站撤销
 ```
 
-设计稿共 6 屏（393×852，Dark，PoLang Tokens），见 Ardot `Dedup` 页。
+设计稿共 6 屏（393×852，Dark，PoLang Tokens），见 Ardot `Organize` 页（2026-09-06 自 `Dedup` 页迁入，overview 帧已删，现存 5 屏）。
 
 ## 8. 技术要点（落实现状差距）
 

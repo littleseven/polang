@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-05T13:34:59+08:00",
+  "exportedAt": "2026-09-06T13:12:55+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=108%3A1"
+    "url": "cocraft://localhost/file/715061534788814?node_id=267%3A21"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -93,16 +93,6 @@
           "png": "gallery-selection.png"
         },
         {
-          "id": "171:273",
-          "name": "gallery/tag_control",
-          "png": "gallery-tag_control.png"
-        },
-        {
-          "id": "172:113",
-          "name": "gallery/tag_stage_sheet",
-          "png": "gallery-tag_stage_sheet.png"
-        },
-        {
           "id": "182:63",
           "name": "gallery/viewer-bottombar-preview",
           "png": "gallery-viewer-bottombar-preview.png"
@@ -142,6 +132,16 @@
           "id": "171:187",
           "name": "chat/empty-v2-guest",
           "png": "chat-empty-v2-guest.png"
+        },
+        {
+          "id": "267:437",
+          "name": "chat/cleanup_confirm",
+          "png": "chat-cleanup_confirm.png"
+        },
+        {
+          "id": "267:518",
+          "name": "chat/cleanup_done",
+          "png": "chat-cleanup_done.png"
         }
       ],
       "id": "111:319",
@@ -415,9 +415,29 @@
     {
       "frames": [
         {
-          "id": "189:2",
-          "name": "dedup/overview",
-          "png": "dedup-overview.png"
+          "id": "267:24",
+          "name": "organize/hub",
+          "png": "organize-hub.png"
+        },
+        {
+          "id": "267:150",
+          "name": "organize/category_grid",
+          "png": "organize-category_grid.png"
+        },
+        {
+          "id": "267:280",
+          "name": "organize/cleaned",
+          "png": "organize-cleaned.png"
+        },
+        {
+          "id": "267:312",
+          "name": "swipe/review",
+          "png": "swipe-review.png"
+        },
+        {
+          "id": "267:329",
+          "name": "swipe/done",
+          "png": "swipe-done.png"
         },
         {
           "id": "189:48",
@@ -443,12 +463,59 @@
           "id": "189:216",
           "name": "dedup/cleaned",
           "png": "dedup-cleaned.png"
+        },
+        {
+          "id": "171:273",
+          "name": "gallery/tag_control",
+          "png": "gallery-tag_control.png"
+        },
+        {
+          "id": "172:113",
+          "name": "gallery/tag_stage_sheet",
+          "png": "gallery-tag_stage_sheet.png"
         }
       ],
-      "id": "189:1",
-      "name": "Dedup"
+      "id": "267:21",
+      "name": "Organize"
+    },
+    {
+      "frames": [
+        {
+          "id": "267:649",
+          "name": "vault/lock",
+          "png": "vault-lock.png"
+        },
+        {
+          "id": "267:698",
+          "name": "vault/grid",
+          "png": "vault-grid.png"
+        }
+      ],
+      "id": "267:23",
+      "name": "Vault"
+    },
+    {
+      "frames": [
+        {
+          "id": "297:7",
+          "name": "memory/feed",
+          "png": "memory-feed.png"
+        },
+        {
+          "id": "297:65",
+          "name": "memory/detail",
+          "png": "memory-detail.png"
+        },
+        {
+          "id": "297:87",
+          "name": "memory/bottombar",
+          "png": "memory-bottombar.png"
+        }
+      ],
+      "id": "297:1",
+      "name": "Memories"
     }
   ],
   "scale": 1,
-  "structureSha256": "bff4ff9c23f5f3f2e6e2aeacd303a67fe9bcfe89479d2e71c59864877b49015f"
+  "structureSha256": "a544489ceb861affd0e78539128aacc92eb5dc4dda0b9ba46e51bd3e92e308ee"
 }

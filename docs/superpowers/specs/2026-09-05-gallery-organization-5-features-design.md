@@ -190,6 +190,7 @@ NavHost 新增路由：
 ## 设计稿规格（Ardot）
 
 - 文件：`polang-ui-spec`（id 715061534788814）；新建页 `Organize`（F1+F2）、`Memories`（F3）、`Vault`（F5）；F4 两帧加入既有 `Chat` 页
+- **2026-09-06 页面整合**：配合 App 整理+扫描合并页（Pager 页 1 双 Tab），原 `Dedup` 页（189:1）5 屏流程稿（scanning/results/group_detail/keep_rules/cleaned）与 Gallery 页 2 帧扫描稿（`gallery/tag_control` 171:273 / `gallery/tag_stage_sheet` 172:113）迁入 `Organize` 页第二行；`dedup/overview` 帧被 `organize/hub` 取代删除；`Dedup` 页整体删除。全文件现 11 页：Camera/Gallery/Chat/Settings/Editor/IconSet/Play Store Assets/People/Organize/Vault/Memories
 - 帧规格：393×852，Dark mode，PoLang Tokens 变量集（`scheme/*` 语义色 + typography/spacing/radius 变量），命名 `feature/screen_state`
 - 视觉基线对齐既有稿：卡片=surfaceContainer r16、弹层=surfaceContainerHighest、描边=outlineVariant、强调=primary（#8FD6C6）、品牌渐变=ChatBubbleTokens
 - 文案：英文为准（英文体验优先原则），键名前缀规划 `org_*`（F1）/ `swipe_*`（F2）/ `memory_*`（F3）/ `chat_cleanup_*`（F4）/ `vault_*`（F5）
