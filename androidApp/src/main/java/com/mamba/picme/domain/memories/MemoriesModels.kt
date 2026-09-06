@@ -41,4 +41,8 @@ data class Memory(
     val itemUris: List<String>,
     /** 全部命中 URI（拍摄时间降序，不截断；详情页「全部」开关与分享全集用）。 */
     val allItemUris: List<String>,
+    /** CITY：命中照片最早拍摄时间（epoch ms）；其余类型为 null。旅程卡日期范围副行用。 */
+    val earliestCaptureDate: Long? = null,
+    /** CITY：命中照片最晚拍摄时间（epoch ms）；其余类型为 null。 */
+    val latestCaptureDate: Long? = null,
 )

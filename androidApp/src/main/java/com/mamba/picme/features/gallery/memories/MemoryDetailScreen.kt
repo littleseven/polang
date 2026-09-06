@@ -39,6 +39,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +52,7 @@ import coil.request.ImageRequest
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.domain.memories.Memory
+import com.mamba.picme.domain.memories.MemoryType
 import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.features.common.topbar.AppTopBarAction
 
@@ -120,21 +125,25 @@ fun MemoryDetailScreen(
                 ) {
                     listOf(false to R.string.memory_detail_best, true to R.string.memory_detail_all)
                         .forEach { pair ->
-                            val selected = showAll == pair.first
+                            val isSelected = showAll == pair.first
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(24.dp))
                                     .background(
-                                        if (selected) MaterialTheme.colorScheme.primary
+                                        if (isSelected) MaterialTheme.colorScheme.primary
                                         else Color.Transparent,
                                     )
                                     .clickable { showAll = pair.first }
+                                    .semantics {
+                                        role = Role.Button
+                                        selected = isSelected
+                                    }
                                     .padding(horizontal = 24.dp, vertical = 10.dp),
                             ) {
                                 Text(
                                     text = stringResource(pair.second),
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = if (selected) {
+                                    color = if (isSelected) {
                                         MaterialTheme.colorScheme.onPrimary
                                     } else {
                                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -152,6 +161,13 @@ fun MemoryDetailScreen(
 @Composable
 private fun MemoryCover(memory: Memory) {
     val title = memoryTitle(memory)
+    // 副行后缀：ON_THIS_DAY/RECENT_HIGHLIGHTS 接原 subtitle；CITY 接旅程日期范围；
+    // PERSON 不接（hitCount 与「N 张照片」重复计数）
+    val subtitleSuffix = when (memory.type) {
+        MemoryType.ON_THIS_DAY, MemoryType.RECENT_HIGHLIGHTS -> memorySubtitle(memory)
+        MemoryType.CITY -> cityDateRange(memory)
+        MemoryType.PERSON -> null
+    }
     val coverHeight = (LocalConfiguration.current.screenHeightDp * 0.55f).dp
     Box(
         modifier = Modifier
@@ -194,7 +210,7 @@ private fun MemoryCover(memory: Memory) {
             )
             Text(
                 text = stringResource(R.string.memory_items_count, memory.hitCount) +
-                    " · " + memorySubtitle(memory),
+                    subtitleSuffix?.let { suffix -> " · $suffix" }.orEmpty(),
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 13.sp,
             )

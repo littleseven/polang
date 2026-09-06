@@ -67,7 +67,7 @@ class MemoriesViewModel(
             .flowOn(ioDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** 隐藏持久化失败一次性标志（UI 提示用，消费经 [consumeHideError]；仿 TrashSessionController.errorEvent 模式）。 */
+    /** 隐藏持久化失败一次性标志（VM 层防御标志，UI 暂不消费；消费经 [consumeHideError]；仿 TrashSessionController.errorEvent 模式）。 */
     private val _hideError = MutableStateFlow(false)
 
     val hideError: StateFlow<Boolean> = _hideError

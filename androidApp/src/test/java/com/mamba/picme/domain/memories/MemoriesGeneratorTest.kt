@@ -311,4 +311,24 @@ class MemoriesGeneratorTest {
         val all = memory.allItemUris
         assertEquals(listOf("new", "mid", "old"), all.take(3))
     }
+
+    @Test
+    fun `city memory carries earliest and latest capture dates`() {
+        // 北京：同年跨月（2025-03 ～ 2025-08）；上海：跨年（2024-12 ～ 2026-01）
+        val inputs = buildList {
+            add(photo("bj-min", at(2025, 3, 10), city = "北京"))
+            add(photo("bj-max", at(2025, 8, 20), city = "北京"))
+            repeat(5) { index -> add(photo("bj$index", at(2025, 5, 1) + index, city = "北京")) }
+            add(photo("sh-min", at(2024, 12, 1), city = "上海"))
+            add(photo("sh-max", at(2026, 1, 1), city = "上海"))
+            repeat(5) { index -> add(photo("sh$index", at(2025, 6, 1) + index, city = "上海")) }
+        }
+        val memories = generate(inputs)
+        val beijing = memories.single { memory -> memory.id == "city:北京" }
+        assertEquals(at(2025, 3, 10), beijing.earliestCaptureDate)
+        assertEquals(at(2025, 8, 20), beijing.latestCaptureDate)
+        val shanghai = memories.single { memory -> memory.id == "city:上海" }
+        assertEquals(at(2024, 12, 1), shanghai.earliestCaptureDate)
+        assertEquals(at(2026, 1, 1), shanghai.latestCaptureDate)
+    }
 }

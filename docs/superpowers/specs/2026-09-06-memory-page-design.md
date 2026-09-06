@@ -40,6 +40,7 @@ F3 v1 把回忆 carousel 挂在相册网格 header 槽，用户判断**产品形
 │    内容 = ON_THIS_DAY + RECENT_HIGHLIGHTS 类回忆
 ├─ 分区「旅程」：同款大卡行
 │    卡片 = 封面 + 城市名大字 + 日期范围小字（CITY 类）
+│    日期范围 = 同年月本地化 yMMMM（如 en "May 2025"、zh "2025年5月"），跨月/年显示 startYear · endYear（如「2025 · 2026」，与小米一致）
 ├─ 分区「人物」：同款大卡行
 │    卡片 = 封面 + 「与 XX 的时刻」+ N 张照片（PERSON 类）
 └─ 空分区不占位；整页空态：「照片积累后会自动生成回忆」
@@ -63,6 +64,7 @@ F3 v1 把回忆 carousel 挂在相册网格 header 槽，用户判断**产品形
 ## 5. 数据层变更
 
 - `MemoriesGenerator`：`Memory` 增加 `allItemUris: List<String>`（全部命中 URI，精选 `itemUris` 仍是其前 12 子集）；输出按 type 供 UI 分组，每类上限放宽（PERSON 前 3、CITY 前 2 保持不变，ON_THIS_DAY/RECENT 各 1 条不变）
+- `Memory` 另增 `earliestCaptureDate: Long?` / `latestCaptureDate: Long?`（epoch ms，仅 CITY 填 hits 的 min/max，其余类型 null）——旅程卡与详情页封面的日期范围副行数据源（`cityDateRange`）
 - `MemoriesViewModel`：现有 `memories`（过滤隐藏后）不变，UI 层按 `MemoryType` 分组；`observeMemory(id)` 不变
 - 隐藏存储（DataStore `memory_hidden_ids`）不变
 

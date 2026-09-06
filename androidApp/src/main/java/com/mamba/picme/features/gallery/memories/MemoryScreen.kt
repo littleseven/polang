@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -106,7 +107,11 @@ fun MemoryScreen(
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 顶栏：大标题 + 副标（对齐相册页「相册」标题风格）
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Column(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
                 Text(
                     text = stringResource(R.string.memory_title),
                     style = MaterialTheme.typography.headlineMedium,
@@ -118,7 +123,7 @@ fun MemoryScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            val sections = buildSections(memories)
+            val sections = remember(memories) { buildSections(memories) }
             if (sections.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
@@ -178,30 +183,29 @@ fun MemoryScreen(
                 .padding(bottom = 16.dp)
                 .navigationBarsPadding(),
         )
-    }
-
-    // 隐藏确认弹窗（从旧 MemoriesCarousel 平移，文案键不变）
-    pendingHide?.let { memory ->
-        AlertDialog(
-            onDismissRequest = { pendingHide = null },
-            title = { Text(stringResource(R.string.memory_hide)) },
-            text = { Text(stringResource(R.string.memory_hide_confirm)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pendingHide = null
-                        memoriesViewModel.hideMemory(memory.id)
-                    },
-                ) {
-                    Text(stringResource(R.string.memory_hide))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingHide = null }) {
-                    Text(stringResource(R.string.memory_hide_cancel))
-                }
-            },
-        )
+        // 隐藏确认弹窗（从旧 MemoriesCarousel 平移，文案键不变）
+        pendingHide?.let { memory ->
+            AlertDialog(
+                onDismissRequest = { pendingHide = null },
+                title = { Text(stringResource(R.string.memory_hide)) },
+                text = { Text(stringResource(R.string.memory_hide_confirm)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingHide = null
+                            memoriesViewModel.hideMemory(memory.id)
+                        },
+                    ) {
+                        Text(stringResource(R.string.memory_hide))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingHide = null }) {
+                        Text(stringResource(R.string.memory_hide_cancel))
+                    }
+                },
+            )
+        }
     }
 }
 

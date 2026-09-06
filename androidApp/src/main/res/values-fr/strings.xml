@@ -477,7 +477,6 @@
     <string name="memory_hide">Masquer ce souvenir</string>
     <string name="memory_hide_confirm">Masquer ce souvenir ? Il ne sera plus affiché.</string>
     <string name="memory_hide_cancel">Annuler</string>
-    <string name="memory_best_shots">%1$d meilleures photos</string>
     <string name="memory_share">Partager le souvenir</string>
     <string name="memory_detail_empty">Ce souvenir n\'est plus disponible</string>
     <string name="memory_section_time">Temps</string>

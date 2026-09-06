@@ -6,7 +6,7 @@ import java.time.MonthDay
 import java.time.ZoneId
 
 /**
- * 首页「回忆」carousel 生成器（纯函数，零 Android 依赖、零推理，可 JVM 单测）。
+ * Memory 页「回忆」生成器（纯函数，零 Android 依赖、零推理，可 JVM 单测）。
  *
  * 输入契约：所有 [MemoryInput] 视为照片——视频由上游（数据源查询）过滤，生成器不再判定类型。
  * 确定性：`now` 与 `zoneId` 由调用方注入，测试可固定；生产默认 [ZoneId.systemDefault]。
@@ -122,6 +122,8 @@ object MemoriesGenerator {
                     type = MemoryType.CITY,
                     hits = pair.second,
                     label = pair.first,
+                    earliestCaptureDate = pair.second.minOf { input -> input.captureDate },
+                    latestCaptureDate = pair.second.maxOf { input -> input.captureDate },
                 )
             }
 
@@ -133,6 +135,8 @@ object MemoriesGenerator {
         label: String? = null,
         latestYear: Int? = null,
         monthDay: MonthDay? = null,
+        earliestCaptureDate: Long? = null,
+        latestCaptureDate: Long? = null,
     ): Memory {
         val selected = hits
             .sortedWith(
@@ -152,6 +156,8 @@ object MemoriesGenerator {
             allItemUris = hits
                 .sortedByDescending { input -> input.captureDate }
                 .map { input -> input.uri },
+            earliestCaptureDate = earliestCaptureDate,
+            latestCaptureDate = latestCaptureDate,
         )
     }
 

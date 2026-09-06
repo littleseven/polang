@@ -474,7 +474,6 @@
     <string name="memory_hide">隱藏這則回憶</string>
     <string name="memory_hide_confirm">隱藏這則回憶？隱藏後將不再顯示。</string>
     <string name="memory_hide_cancel">取消</string>
-    <string name="memory_best_shots">%1$d 張精選</string>
     <string name="memory_share">分享回憶</string>
     <string name="memory_detail_empty">這則回憶已不可用</string>
     <string name="memory_section_time">時光</string>
