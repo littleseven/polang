@@ -1858,38 +1858,39 @@ import 追加 `com.mamba.picme.domain.organize.DuplicateGrouper`。
         val pending = mediaDao.observeOrganizeRows().first()
             .filter { row -> row.blurScore == null && row.type != MediaType.VIDEO.name }
             .take(batchLimit)
-        var done = 0
-        pending.forEach { row ->
-            val scores = runCatching { computeQualityScores(row.uri) }.getOrNull()
-            if (scores != null) {
-                mediaDao.updateQualityScores(row.uri, scores.first, scores.second)
-                done++
-            }
+        // 先算后写、合批一次事务提交（避免逐行 UPDATE 触发 200 次 Flow 重发射）
+        val entries = pending.mapNotNull { row ->
+            runCatching { computeQualityScores(row.uri) }.getOrNull()
+                ?.let { scores -> QualityScoreEntry(row.uri, scores.first, scores.second) }
         }
-        if (done > 0) Logger.d(TAG, "backfill quality signals: $done/${pending.size}")
-        done
+        if (entries.isNotEmpty()) {
+            mediaDao.updateQualityScoresBatch(entries)
+            Logger.d(TAG, "backfill quality signals: ${entries.size}/${pending.size}")
+        }
+        entries.size
     }
 
     /** 解码 ≤256px 灰度图 → (blurScore, exposureScore)；解码失败返回 null（不阻断批次）。 */
     private fun computeQualityScores(uri: String): Pair<Float, Float>? {
-        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        // 注意：inJustDecodeBounds=true 时 decodeStream 恒返回 null，不可作失败判据（审查修正）
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
-            android.graphics.BitmapFactory.decodeStream(input, null, bounds)
-        } ?: return null
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= 256 || bounds.outHeight / (sample * 2) >= 256) {
-            sample *= 2
+            BitmapFactory.decodeStream(input, null, bounds)
         }
-        val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        // computeInSampleSize：BlurAnalyzer.kt 顶层 internal 纯函数（w/s > target 循环，退出时长边 ≤256）
+        val sample = computeInSampleSize(bounds.outWidth, bounds.outHeight)
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
         val bitmap = appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
-            android.graphics.BitmapFactory.decodeStream(input, null, options)
+            BitmapFactory.decodeStream(input, null, options)
         } ?: return null
         val width = bitmap.width
         val height = bitmap.height
+        // 退化图（<3px）不写库：0 是 BlurAnalyzer 退化哨兵，入库会被误判极致模糊
+        if (width < 3 || height < 3) return null
         val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        bitmap.recycle()
+        try {
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         // BT.601 灰度化
         val gray = IntArray(pixels.size) { index ->
             val pixel = pixels[index]
@@ -1898,9 +1899,14 @@ import 追加 `com.mamba.picme.domain.organize.DuplicateGrouper`。
             val b = pixel and 0xFF
             (299 * r + 587 * g + 114 * b) / 1000
         }
-        return BlurAnalyzer.laplacianVariance(gray, width, height) to BlurAnalyzer.meanLuminance(gray)
+            return BlurAnalyzer.laplacianVariance(gray, width, height) to BlurAnalyzer.meanLuminance(gray)
+        } finally {
+            bitmap.recycle()
+        }
     }
 ```
+
+> 审查修正（6924c947d）：① bounds 探测段删除 `?: return null` 死路（inJustDecodeBounds 恒返回 null）；② inSampleSize 抽为 BlurAnalyzer.computeInSampleSize（长边 ≤256 口径）；③ 退化图 <3px 不写 0 哨兵入库；④ backfill 改合批回写（MediaDao `@Transaction updateQualityScoresBatch(List<QualityScoreEntry>)`，一批一次 invalidation，消除逐行写 × O(n²) 重聚类放大）；⑤ getPixels/灰度化段 try/finally 保证 recycle。
 
 import 追加 `com.mamba.picme.domain.organize.BlurAnalyzer`、`kotlinx.coroutines.flow.first`（若已有则跳过）。
 
