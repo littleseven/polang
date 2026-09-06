@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-06T18:33:09+08:00",
+  "exportedAt": "2026-09-06T20:04:40+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=171%3A14"
+    "url": "cocraft://localhost/file/715061534788814?node_id=267%3A21"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -106,6 +106,11 @@
           "id": "300:29",
           "name": "gallery/grid-store01",
           "png": "gallery-grid-store01.png"
+        },
+        {
+          "id": "300:539",
+          "name": "search/store01",
+          "png": "search-store01.png"
         }
       ],
       "id": "103:1",
@@ -147,6 +152,16 @@
           "id": "267:518",
           "name": "chat/cleanup_done",
           "png": "chat-cleanup_done.png"
+        },
+        {
+          "id": "300:570",
+          "name": "chat/store01-conversation",
+          "png": "chat-store01-conversation.png"
+        },
+        {
+          "id": "300:651",
+          "name": "chat/store01-welcome",
+          "png": "chat-store01-welcome.png"
         }
       ],
       "id": "111:319",
@@ -406,6 +421,36 @@
           "id": "300:339",
           "name": "04-people/en-US-design",
           "png": "04-people-en-US-design.png"
+        },
+        {
+          "id": "300:1000",
+          "name": "02-search/en-US-design",
+          "png": "02-search-en-US-design.png"
+        },
+        {
+          "id": "300:1008",
+          "name": "03-chat/en-US-design",
+          "png": "03-chat-en-US-design.png"
+        },
+        {
+          "id": "300:1016",
+          "name": "05-person-groups/en-US-design",
+          "png": "05-person-groups-en-US-design.png"
+        },
+        {
+          "id": "300:1024",
+          "name": "06-chat-welcome/en-US-design",
+          "png": "06-chat-welcome-en-US-design.png"
+        },
+        {
+          "id": "300:1032",
+          "name": "07-insight/en-US-design",
+          "png": "07-insight-en-US-design.png"
+        },
+        {
+          "id": "300:1040",
+          "name": "08-privacy/en-US-design",
+          "png": "08-privacy-en-US-design.png"
         }
       ],
       "id": "152:1",
@@ -427,6 +472,36 @@
           "id": "300:215",
           "name": "people/grid-store01",
           "png": "people-grid-store01.png"
+        },
+        {
+          "id": "300:723",
+          "name": "people/detail-store01",
+          "png": "people-detail-store01.png"
+        },
+        {
+          "id": "300:1048",
+          "name": "cast/mom",
+          "png": "cast-mom.png"
+        },
+        {
+          "id": "300:1049",
+          "name": "cast/dad",
+          "png": "cast-dad.png"
+        },
+        {
+          "id": "300:1050",
+          "name": "cast/alex",
+          "png": "cast-alex.png"
+        },
+        {
+          "id": "300:1051",
+          "name": "cast/lin",
+          "png": "cast-lin.png"
+        },
+        {
+          "id": "300:1052",
+          "name": "cast/chris",
+          "png": "cast-chris.png"
         }
       ],
       "id": "171:1",
@@ -501,22 +576,6 @@
     {
       "frames": [
         {
-          "id": "267:649",
-          "name": "vault/lock",
-          "png": "vault-lock.png"
-        },
-        {
-          "id": "267:698",
-          "name": "vault/grid",
-          "png": "vault-grid.png"
-        }
-      ],
-      "id": "267:23",
-      "name": "Vault"
-    },
-    {
-      "frames": [
-        {
           "id": "297:7",
           "name": "memory/feed",
           "png": "memory-feed.png"
@@ -530,6 +589,11 @@
           "id": "297:87",
           "name": "memory/bottombar",
           "png": "memory-bottombar.png"
+        },
+        {
+          "id": "300:782",
+          "name": "memory/store01-feed",
+          "png": "memory-store01-feed.png"
         }
       ],
       "id": "297:1",
@@ -537,5 +601,5 @@
     }
   ],
   "scale": 1,
-  "structureSha256": "11ba0247ef267aa455c44622aa83bd0bbc476df927ddb884ba63a01b3540c115"
+  "structureSha256": "3302cde65250c7900d88a8bfde3f9ade4910656e783d2c9b4b0d2be24da80699"
 }
