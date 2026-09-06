@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-06T22:17:38+08:00",
+  "exportedAt": "2026-09-07T00:03:21+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=111%3A319"
+    "url": "cocraft://localhost/file/715061534788814?node_id=152%3A1"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -152,11 +152,6 @@
           "id": "267:518",
           "name": "chat/cleanup_done",
           "png": "chat-cleanup_done.png"
-        },
-        {
-          "id": "300:570",
-          "name": "chat/store01-conversation",
-          "png": "chat-store01-conversation.png"
         },
         {
           "id": "300:651",
@@ -461,6 +456,86 @@
           "id": "300:1040",
           "name": "08-privacy/en-US-design",
           "png": "08-privacy-en-US-design.png"
+        },
+        {
+          "id": "302:39",
+          "name": "01-gallery/zh-CN-design",
+          "png": "01-gallery-zh-CN-design.png"
+        },
+        {
+          "id": "302:47",
+          "name": "02-search/zh-CN-design",
+          "png": "02-search-zh-CN-design.png"
+        },
+        {
+          "id": "302:55",
+          "name": "03-chat/zh-CN-design",
+          "png": "03-chat-zh-CN-design.png"
+        },
+        {
+          "id": "302:63",
+          "name": "04-people/zh-CN-design",
+          "png": "04-people-zh-CN-design.png"
+        },
+        {
+          "id": "302:71",
+          "name": "05-person-groups/zh-CN-design",
+          "png": "05-person-groups-zh-CN-design.png"
+        },
+        {
+          "id": "302:79",
+          "name": "06-chat-welcome/zh-CN-design",
+          "png": "06-chat-welcome-zh-CN-design.png"
+        },
+        {
+          "id": "302:87",
+          "name": "07-insight/zh-CN-design",
+          "png": "07-insight-zh-CN-design.png"
+        },
+        {
+          "id": "302:95",
+          "name": "08-privacy/zh-CN-design",
+          "png": "08-privacy-zh-CN-design.png"
+        },
+        {
+          "id": "302:103",
+          "name": "01-gallery/zh-TW-design",
+          "png": "01-gallery-zh-TW-design.png"
+        },
+        {
+          "id": "302:111",
+          "name": "02-search/zh-TW-design",
+          "png": "02-search-zh-TW-design.png"
+        },
+        {
+          "id": "302:119",
+          "name": "03-chat/zh-TW-design",
+          "png": "03-chat-zh-TW-design.png"
+        },
+        {
+          "id": "302:127",
+          "name": "04-people/zh-TW-design",
+          "png": "04-people-zh-TW-design.png"
+        },
+        {
+          "id": "302:135",
+          "name": "05-person-groups/zh-TW-design",
+          "png": "05-person-groups-zh-TW-design.png"
+        },
+        {
+          "id": "302:143",
+          "name": "06-chat-welcome/zh-TW-design",
+          "png": "06-chat-welcome-zh-TW-design.png"
+        },
+        {
+          "id": "302:151",
+          "name": "07-insight/zh-TW-design",
+          "png": "07-insight-zh-TW-design.png"
+        },
+        {
+          "id": "302:159",
+          "name": "08-privacy/zh-TW-design",
+          "png": "08-privacy-zh-TW-design.png"
         }
       ],
       "id": "152:1",
@@ -611,5 +686,5 @@
     }
   ],
   "scale": 1,
-  "structureSha256": "50a19ab3d16f5d983bbf37b1961afb010a610ac38f6548508551627bcf89f165"
+  "structureSha256": "fa1b3d9152c5fec5388ea7cff51669977660902bb830ea9434bf02d2f566b4d4"
 }

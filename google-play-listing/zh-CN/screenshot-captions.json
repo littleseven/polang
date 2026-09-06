@@ -1,5 +1,5 @@
 {
-  "note": "Google Play 截图营销文案（zh-CN）。与 Ardot 页面「Play Store Assets」中的 frame 一一对应，frame 命名 <序号>-<scene>/zh-CN。image = docs-site/assets/shots-src/zh-CN/（2026-08-23 用户拍板：直接复用 zh-TW 繁体 UI 截图，文案为简体；后续如需简体 UI 截图重截替换即可）。⚠️ 重截候选：07-insight 回复含简体「相册」残留（源自繁体会话）；03-chat 上方历史消息为简体、02/03 可见调试统计行。",
+  "note": "Google Play screenshot marketing copy (zh-CN). 2026-09-06: switched to canvas design renders (jade-green frames, Ardot page 'Play Store Assets' zh-CN-design row) — same pipeline as en-US: store01 source frames rendered in Chinese (zh-CN = lang 中文 mode; zh-TW = hand-converted Traditional literals per values-zh-rTW vocabulary), real-device status bar + black 3-key nav chrome. Old dark screenshot set replaced; sources remain at docs-site/assets/shots-src/.",
   "shots": [
     {
       "id": "01-gallery",
