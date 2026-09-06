@@ -451,6 +451,12 @@ interface MediaDao {
     @Query("UPDATE media_assets SET blurScore = :blur, exposureScore = :exposure WHERE uri = :uri")
     suspend fun updateQualityScores(uri: String, blur: Float?, exposure: Float?)
 
+    /** 批量回写模糊/曝光分：单事务一次 invalidation，避免 observe 流逐行重发射（整理中心 v2 惰性补算合批）。 */
+    @Transaction
+    suspend fun updateQualityScoresBatch(entries: List<QualityScoreEntry>) {
+        entries.forEach { entry -> updateQualityScores(entry.uri, entry.blurScore, entry.exposureScore) }
+    }
+
     /** 回写最近一次查看时间（查看器打开时调用）。 */
     @Query("UPDATE media_assets SET lastViewedAt = :timestamp WHERE uri = :uri")
     suspend fun updateLastViewedAt(uri: String, timestamp: Long)
@@ -703,4 +709,11 @@ data class OrganizeRow(
 data class PersonPhotoCount(
     val faceId: String,
     val cnt: Int,
+)
+
+/** 模糊/曝光分批量回写条目（整理中心 v2 惰性补算产出，计算成功的非空分）。 */
+data class QualityScoreEntry(
+    val uri: String,
+    val blurScore: Float,
+    val exposureScore: Float,
 )

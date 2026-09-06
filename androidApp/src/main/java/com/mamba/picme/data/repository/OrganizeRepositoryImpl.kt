@@ -12,9 +12,11 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.OrganizeRow
+import com.mamba.picme.data.local.QualityScoreEntry
 import com.mamba.picme.domain.organize.BlurAnalyzer
 import com.mamba.picme.domain.organize.DuplicateGrouper
 import com.mamba.picme.domain.organize.OrganizeItem
+import com.mamba.picme.domain.organize.computeInSampleSize
 import com.mamba.picme.domain.repository.OrganizeRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -90,11 +92,11 @@ class OrganizeRepositoryImpl(
      */
     private suspend fun queryDuplicateInfo(): Map<String, DuplicateGrouper.DupInfo> =
         runCatching {
+            val startNanos = System.nanoTime()
             val hashes = dedupHashDao.getAllHashes()
             if (hashes.isEmpty()) {
                 emptyMap()
             } else {
-                val startNanos = System.nanoTime()
                 val result = DuplicateGrouper.group(
                     hashes.map { row -> DuplicateGrouper.HashInput(row.uri, row.md5, row.phash) }
                 )
@@ -190,16 +192,16 @@ class OrganizeRepositoryImpl(
         val pending = mediaDao.observeOrganizeRows().first()
             .filter { row -> row.blurScore == null && row.type != MediaType.VIDEO.name }
             .take(batchLimit)
-        var done = 0
-        pending.forEach { row ->
-            val scores = runCatching { computeQualityScores(row.uri) }.getOrNull()
-            if (scores != null) {
-                mediaDao.updateQualityScores(row.uri, scores.first, scores.second)
-                done++
-            }
+        // 先逐张算分收集成功项，最后单事务合批回写（避免 observe 流逐行重发射触发 O(n²) 重聚类）
+        val entries = pending.mapNotNull { row ->
+            runCatching { computeQualityScores(row.uri) }.getOrNull()
+                ?.let { scores -> QualityScoreEntry(row.uri, scores.first, scores.second) }
         }
-        if (done > 0) Logger.d(TAG, "backfill quality signals: $done/${pending.size}")
-        done
+        if (entries.isNotEmpty()) {
+            mediaDao.updateQualityScoresBatch(entries)
+            Logger.d(TAG, "backfill quality signals: ${entries.size}/${pending.size}")
+        }
+        entries.size
     }
 
     /**
@@ -208,32 +210,37 @@ class OrganizeRepositoryImpl(
      */
     private fun computeQualityScores(uri: String): Pair<Float, Float>? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        // inJustDecodeBounds 模式 decodeStream 恒返回 null，不可作失败判据；
+        // openInputStream 失败时 bounds.outWidth 保持 -1，由下一行尺寸检查拦住
         appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
             BitmapFactory.decodeStream(input, null, bounds)
-        } ?: return null
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= 256 || bounds.outHeight / (sample * 2) >= 256) {
-            sample *= 2
         }
-        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = computeInSampleSize(bounds.outWidth, bounds.outHeight)
+        }
         val bitmap = appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
             BitmapFactory.decodeStream(input, null, options)
         } ?: return null
-        val width = bitmap.width
-        val height = bitmap.height
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        bitmap.recycle()
-        // BT.601 灰度化
-        val gray = IntArray(pixels.size) { index ->
-            val pixel = pixels[index]
-            val r = pixel shr 16 and 0xFF
-            val g = pixel shr 8 and 0xFF
-            val b = pixel and 0xFF
-            (299 * r + 587 * g + 114 * b) / 1000
+        try {
+            val width = bitmap.width
+            val height = bitmap.height
+            // 退化位图（<3×3）直接跳过：BlurAnalyzer 会回 0 哨兵，不可入库
+            if (width < 3 || height < 3) return null
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            // BT.601 灰度化
+            val gray = IntArray(pixels.size) { index ->
+                val pixel = pixels[index]
+                val r = pixel shr 16 and 0xFF
+                val g = pixel shr 8 and 0xFF
+                val b = pixel and 0xFF
+                (299 * r + 587 * g + 114 * b) / 1000
+            }
+            return BlurAnalyzer.laplacianVariance(gray, width, height) to BlurAnalyzer.meanLuminance(gray)
+        } finally {
+            bitmap.recycle()
         }
-        return BlurAnalyzer.laplacianVariance(gray, width, height) to BlurAnalyzer.meanLuminance(gray)
     }
 
     private companion object {

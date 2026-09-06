@@ -84,4 +84,18 @@ class BlurAnalyzerTest {
         assertEquals(0.0f, BlurAnalyzer.laplacianVariance(IntArray(0), 0, 0), 0.0f)
         assertEquals(0.0f, BlurAnalyzer.meanLuminance(IntArray(0)), 0.0f)
     }
+
+    @Test
+    fun `inSampleSize downsamples so long edge is at most target`() {
+        // 4000×3000：4000/16=250、3000/16=187，长边 ≤256 → sample=16（8 时 500>256 继续翻倍）
+        assertEquals(16, computeInSampleSize(4000, 3000))
+        // 500×400：500/2=250、400/2=200 → sample=2
+        assertEquals(2, computeInSampleSize(500, 400))
+        // 恰好 target：不放大（256>256 为 false）
+        assertEquals(1, computeInSampleSize(256, 256))
+        // 小于 target：保持 1
+        assertEquals(1, computeInSampleSize(100, 80))
+        // 自定义 target：4000/8=500 ≤512 停（/4=1000>512 需再翻倍）→ sample=8
+        assertEquals(8, computeInSampleSize(4000, 3000, target = 512))
+    }
 }

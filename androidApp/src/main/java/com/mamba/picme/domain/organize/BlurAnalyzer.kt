@@ -46,3 +46,15 @@ object BlurAnalyzer {
         return sum.toFloat() / gray.size / 255.0f
     }
 }
+
+/**
+ * 解码降采样倍率（BitmapFactory.inSampleSize 语义，2 的幂）：退出时长边 ≤ [target]。
+ * 抽出为纯函数便于 JVM 单测锁定口径。
+ */
+internal fun computeInSampleSize(outWidth: Int, outHeight: Int, target: Int = 256): Int {
+    var sample = 1
+    while (outWidth / sample > target || outHeight / sample > target) {
+        sample *= 2
+    }
+    return sample
+}
