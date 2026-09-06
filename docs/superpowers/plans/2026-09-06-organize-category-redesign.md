@@ -254,8 +254,17 @@ object OrganizeThresholds {
     const val OCR_STRONG_FACTOR = 2
 }
 
-/** 一年毫秒数（365 天，ValueGuard 老照片判定用，避免引入 java.time 依赖）。 */
-internal const val YEAR_MILLIS = 365L * 24 * 60 * 60 * 1000
+    /** OCR 文字密度阈值基数：每百万像素的 OCR 字符数（ConfidenceGrader 用）。 */
+    const val OCR_DENSITY_PER_MEGAPIXEL = 20
+
+    /** OCR 兜底字符数阈值：无法计算像素面积时使用（ConfidenceGrader 用）。 */
+    const val OCR_DENSITY_FALLBACK_CHARS = 200
+
+    /** 大文件强命中倍数：sizeBytes ≥ 类目阈值 × 该系数 → HIGH 置信。 */
+    const val LARGE_FILE_STRONG_FACTOR = 2
+
+    /** 一年毫秒数（365 天，ValueGuard 老照片判定用，避免引入 java.time 依赖）。 */
+    internal const val YEAR_MILLIS = 365L * 24 * 60 * 60 * 1000
 ```
 
 - [ ] **Step 2: 全量重写 OrganizeModels.kt**
@@ -316,9 +325,11 @@ data class ClassifiedItem(
     val item: OrganizeItem,
     val category: OrganizeCategory,
     val confidence: OrganizeConfidence,
-    val protected: Boolean,
     val protectReasons: Set<ProtectReason> = emptySet(),
-)
+) {
+    /** 派生属性：命中任一保护原因即 protected（不默认勾选、不计入 Hero）。 */
+    val isProtected: Boolean get() = protectReasons.isNotEmpty()
+}
 
 /** 类目信号覆盖度：驱动 hub 类目卡「需先扫描」引导态（修复 v1 类目静默消失）。 */
 enum class SignalCoverage { READY, NEEDS_SCAN }
@@ -636,7 +647,7 @@ class ValueGuardTest {
 
     @Test
     fun `old photo protected with boundary`() {
-        val fiveYearsAgo = now - OrganizeThresholds.OLD_PHOTO_YEARS * YEAR_MILLIS
+        val fiveYearsAgo = now - OrganizeThresholds.OLD_PHOTO_YEARS * OrganizeThresholds.YEAR_MILLIS
         val old = ValueGuard.assess(
             item(captureDate = fiveYearsAgo - 1), OrganizeCategory.LOW_QUALITY_PHOTOS, now
         )
@@ -672,7 +683,7 @@ class ValueGuardTest {
     fun `protection only applies to quality categories`() {
         // 5 年前的截图不保护（价值保护只适用 LOW_QUALITY_PHOTOS / LOW_QUALITY_PORTRAITS）
         val screenshot = ValueGuard.assess(
-            item(captureDate = now - 6 * YEAR_MILLIS), OrganizeCategory.SCREEN_CONTENT, now
+            item(captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS), OrganizeCategory.SCREEN_CONTENT, now
         )
         assertTrue(!screenshot.protected && screenshot.reasons.isEmpty())
     }
@@ -680,7 +691,7 @@ class ValueGuardTest {
     @Test
     fun `multiple reasons accumulate`() {
         val verdict = ValueGuard.assess(
-            item(captureDate = now - 6 * YEAR_MILLIS, isFavorite = true, personPhotoCount = 1),
+            item(captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS, isFavorite = true, personPhotoCount = 1),
             OrganizeCategory.LOW_QUALITY_PHOTOS, now,
         )
         assertEquals(
@@ -723,7 +734,7 @@ object ValueGuard {
     fun assess(item: OrganizeItem, category: OrganizeCategory, now: Long): ProtectVerdict {
         if (category !in GUARDED_CATEGORIES) return ProtectVerdict(protected = false, reasons = emptySet())
         val reasons = mutableSetOf<ProtectReason>()
-        if (item.captureDate < now - OrganizeThresholds.OLD_PHOTO_YEARS * YEAR_MILLIS) {
+        if (item.captureDate < now - OrganizeThresholds.OLD_PHOTO_YEARS * OrganizeThresholds.YEAR_MILLIS) {
             reasons += ProtectReason.OLD_PHOTO
         }
         val personCount = item.personPhotoCount
@@ -929,7 +940,7 @@ object ConfidenceGrader {
             OrganizeCategory.LOW_QUALITY_PHOTOS -> gradeLowQualityPhoto(item)
 
             OrganizeCategory.LARGE_FILES ->
-                if (item.sizeBytes >= 2 * largeFileThreshold(item)) {
+                if (item.sizeBytes >= OrganizeThresholds.LARGE_FILE_STRONG_FACTOR * largeFileThreshold(item)) {
                     OrganizeConfidence.HIGH
                 } else {
                     OrganizeConfidence.MEDIUM
@@ -943,9 +954,9 @@ object ConfidenceGrader {
         val area = item.pixelArea
         val strongThreshold = if (area != null && area > 0) {
             // 与 DedupContentTypeDetector 同一面积归一口径的 2×
-            area / 1_000_000L * 20 * OrganizeThresholds.OCR_STRONG_FACTOR
+            area / 1_000_000L * OrganizeThresholds.OCR_DENSITY_PER_MEGAPIXEL * OrganizeThresholds.OCR_STRONG_FACTOR
         } else {
-            200L * OrganizeThresholds.OCR_STRONG_FACTOR
+            OrganizeThresholds.OCR_DENSITY_FALLBACK_CHARS.toLong() * OrganizeThresholds.OCR_STRONG_FACTOR
         }
         return if (chars.toLong() >= strongThreshold) {
             OrganizeConfidence.HIGH
@@ -1207,7 +1218,7 @@ class OrganizeCategorizerTest {
             listOf(
                 // 6 年前的模糊老照片：HIGH 置信但 protected → 不进 Hero、不进 highCount
                 item(
-                    "old", captureDate = now - 6 * YEAR_MILLIS,
+                    "old", captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS,
                     blurScore = 10.0f, sizeBytes = 500,
                 ),
             ),
@@ -1299,7 +1310,6 @@ object OrganizeCategorizer {
                 item = item,
                 category = category,
                 confidence = ConfidenceGrader.grade(item, category),
-                protected = verdict.protected,
                 protectReasons = verdict.reasons,
             )
         }
@@ -1311,10 +1321,10 @@ object OrganizeCategorizer {
             .groupBy { entry -> entry.category }
             .map { (category, entries) ->
                 val high = entries.filter { entry ->
-                    entry.confidence == OrganizeConfidence.HIGH && !entry.protected
+                    entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
                 }
                 val review = entries.filter { entry ->
-                    entry.confidence != OrganizeConfidence.HIGH && !entry.protected
+                    entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected
                 }
                 CategoryBoard(
                     category = category,
@@ -1323,7 +1333,7 @@ object OrganizeCategorizer {
                     highCount = high.size,
                     highBytes = high.sumOf { entry -> entry.item.sizeBytes },
                     reviewCount = review.size,
-                    protectedCount = entries.count { entry -> entry.protected },
+                    protectedCount = entries.count { entry -> entry.isProtected },
                     previewUris = entries.take(PREVIEW_LIMIT).map { entry -> entry.item.uri },
                     coverage = coverageOf(category, items),
                 )
@@ -2114,9 +2124,9 @@ data class CategorySections(
 )
 
 fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
-    suggested = filter { entry -> entry.confidence == OrganizeConfidence.HIGH && !entry.protected },
-    review = filter { entry -> entry.confidence != OrganizeConfidence.HIGH && !entry.protected },
-    protectedItems = filter { entry -> entry.protected },
+    suggested = filter { entry -> entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected },
+    review = filter { entry -> entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected },
+    protectedItems = filter { entry -> entry.isProtected },
 )
 ```
 
@@ -2136,7 +2146,7 @@ fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
 ```kotlin
                 selected = if (preselect && _aiPreselectEnabled.value) {
                     items.filter { entry ->
-                        entry.confidence == OrganizeConfidence.HIGH && !entry.protected
+                        entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
                     }.map { entry -> entry.item.uri }.toSet()
                 } else {
                     emptySet()
@@ -2175,11 +2185,12 @@ fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
     @Test
     fun `toSections splits suggested review protected disjoint and complete`() {
         val now = System.currentTimeMillis()
+        // 夹具 classified(uri, confidence, protectReasons) 构造 ClassifiedItem（protectReasons 默认 emptySet()）
         val entries = listOf(
-            classified("a", OrganizeConfidence.HIGH, protected = false),
-            classified("b", OrganizeConfidence.MEDIUM, protected = false),
-            classified("c", OrganizeConfidence.LOW, protected = false),
-            classified("d", OrganizeConfidence.HIGH, protected = true),
+            classified("a", OrganizeConfidence.HIGH),
+            classified("b", OrganizeConfidence.MEDIUM),
+            classified("c", OrganizeConfidence.LOW),
+            classified("d", OrganizeConfidence.HIGH, protectReasons = setOf(ProtectReason.OLD_PHOTO)),
         )
         val sections = entries.toSections()
         assertEquals(listOf("a"), sections.suggested.map { entry -> entry.item.uri })
@@ -2397,7 +2408,7 @@ object SwipeQueueBuilder {
         for (item in items) {
             if (item.isVideo) continue
             val entry = classifiedByUri[item.uri]
-            val wasteHit = entry != null && !entry.protected &&
+            val wasteHit = entry != null && !entry.isProtected &&
                 entry.confidence != OrganizeConfidence.LOW
             val reason = BUCKETS.first { bucket ->
                 bucket.category == null || (wasteHit && entry?.category == bucket.category)
