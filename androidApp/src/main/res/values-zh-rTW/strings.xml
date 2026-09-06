@@ -419,15 +419,23 @@
     <!-- Organize hub（Pager 頁 1 Config 態整理中心） -->
     <string name="org_title">整理</string>
     <string name="org_hero_label">預計可釋放</string>
-    <string name="org_hero_across">涵蓋 %1$d 個類別</string>
+    <plurals name="org_hero_across">
+        <item quantity="other">涵蓋 %1$d 個類別</item>
+    </plurals>
     <string name="org_quick_tidy">一鍵整理</string>
     <string name="org_categories">類別</string>
     <string name="org_cat_duplicates">重複與相似照片</string>
-    <string name="org_cat_screenshots">截圖</string>
     <string name="org_cat_blurry">模糊與低品質</string>
     <string name="org_cat_portraits">低品質人像</string>
-    <string name="org_cat_large_videos">大型影片</string>
     <string name="org_cat_documents">文件與票據</string>
+    <string name="org_cat_screen_content">截圖與錄影</string>
+    <string name="org_cat_large_files">大型檔案</string>
+    <string name="org_hero_review">另有 %1$d 項待確認</string>
+    <string name="org_needs_scan">需先掃描 · 點擊前往</string>
+    <string name="org_confidence_high">%1$d 高信心</string>
+    <string name="org_confidence_review">%1$d 待確認</string>
+    <string name="org_protected_count">%1$d 受保護</string>
+    <string name="org_cat_reclaim">可釋放 %1$s</string>
     <string name="org_cat_meta">%1$d 個項目 · %2$s</string>
     <string name="org_privacy_note">所有分析皆在裝置端完成 · 照片不會離開此手機</string>
     <string name="org_ai_preselect_on">AI 預選已開啟</string>
@@ -442,6 +450,10 @@
     <string name="org_partial_trash">部分項目需要額外授權，已保留</string>
     <string name="org_trash_unsupported">回收站需 Android 11 以上版本；請在相簿中刪除</string>
     <string name="org_empty_category">這裡無需清理</string>
+    <string name="org_section_suggested">建議刪除（%1$d）</string>
+    <string name="org_section_review">請確認（%1$d）</string>
+    <string name="org_section_protected">可能是珍貴照片（%1$d）</string>
+    <string name="org_protected_badge">可能是珍貴照片</string>
 
     <!-- Swipe review（F2 手勢快速整理全螢幕頁） -->
     <string name="swipe_title">快速整理</string>

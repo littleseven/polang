@@ -435,20 +435,21 @@
     <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
     <string name="org_title">Organize</string>
     <string name="org_hero_label">Estimated reclaimable</string>
-    <string name="org_hero_across">Across %1$d categories</string>
+    <plurals name="org_hero_across">
+        <item quantity="one">Across %1$d category</item>
+        <item quantity="other">Across %1$d categories</item>
+    </plurals>
     <string name="org_quick_tidy">Quick tidy up</string>
     <string name="org_categories">Categories</string>
     <string name="org_cat_duplicates">Duplicates &amp; similar</string>
-    <string name="org_cat_screenshots">Screenshots</string>
     <string name="org_cat_blurry">Blurry &amp; low quality</string>
     <string name="org_cat_portraits">Low-quality portraits</string>
-    <string name="org_cat_large_videos">Large videos</string>
     <string name="org_cat_documents">Documents &amp; receipts</string>
     <string name="org_cat_screen_content">Screenshots &amp; recordings</string>
     <string name="org_cat_large_files">Large files</string>
     <string name="org_hero_review">%1$d more to review</string>
-    <string name="org_needs_scan">Run a scan first</string>
-    <string name="org_confidence_high">%1$d high confidence</string>
+    <string name="org_needs_scan">Scan needed · tap to scan</string>
+    <string name="org_confidence_high">%1$d confident</string>
     <string name="org_confidence_review">%1$d to review</string>
     <string name="org_protected_count">%1$d protected</string>
     <string name="org_cat_reclaim">Free %1$s</string>

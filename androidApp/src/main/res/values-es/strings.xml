@@ -422,15 +422,24 @@
     <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
     <string name="org_title">Organizar</string>
     <string name="org_hero_label">Espacio recuperable estimado</string>
-    <string name="org_hero_across">En %1$d categorías</string>
+    <plurals name="org_hero_across">
+        <item quantity="one">En %1$d categoría</item>
+        <item quantity="other">En %1$d categorías</item>
+    </plurals>
     <string name="org_quick_tidy">Limpieza rápida</string>
     <string name="org_categories">Categorías</string>
     <string name="org_cat_duplicates">Duplicados y similares</string>
-    <string name="org_cat_screenshots">Capturas de pantalla</string>
     <string name="org_cat_blurry">Borrosas y de baja calidad</string>
     <string name="org_cat_portraits">Retratos de baja calidad</string>
-    <string name="org_cat_large_videos">Videos grandes</string>
     <string name="org_cat_documents">Documentos y recibos</string>
+    <string name="org_cat_screen_content">Capturas y grabaciones</string>
+    <string name="org_cat_large_files">Archivos grandes</string>
+    <string name="org_hero_review">%1$d más por revisar</string>
+    <string name="org_needs_scan">Escaneo necesario</string>
+    <string name="org_confidence_high">%1$d fiables</string>
+    <string name="org_confidence_review">%1$d por revisar</string>
+    <string name="org_protected_count">%1$d protegidos</string>
+    <string name="org_cat_reclaim">Libera %1$s</string>
     <string name="org_cat_meta">%1$d elementos · %2$s</string>
     <string name="org_privacy_note">Todo el análisis se ejecuta en el dispositivo · tus fotos nunca salen de este teléfono</string>
     <string name="org_ai_preselect_on">Preselección de IA activada</string>
@@ -445,6 +454,10 @@
     <string name="org_partial_trash">Algunos elementos necesitan permiso adicional y se conservaron</string>
     <string name="org_trash_unsupported">La papelera requiere Android 11+; elimina desde la galería</string>
     <string name="org_empty_category">Nada que limpiar aquí</string>
+    <string name="org_section_suggested">Sugeridos (%1$d)</string>
+    <string name="org_section_review">Revisar (%1$d)</string>
+    <string name="org_section_protected">Posiblemente valiosas (%1$d)</string>
+    <string name="org_protected_badge">Foto posiblemente valiosa</string>
 
     <!-- Swipe review（F2 página de organización rápida por gestos） -->
     <string name="swipe_title">Limpieza rápida</string>
