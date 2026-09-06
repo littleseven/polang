@@ -2,7 +2,7 @@
 
 > **版本**：1.0
 > **日期**：2026-09-06
-> **状态**：设计已确认（用户「好的」批准），Ardot 稿绘制中，待实现
+> **状态**：已落地（编译 + JVM 单测 1247 全绿；真机验证进行中）
 > **前置**：`docs/superpowers/specs/2026-09-05-gallery-organization-5-features-design.md`（F3 回忆 v1 已落地）
 > **形态参考**：小米 HyperOS 系统相册「相册」tab 分区 feed（时光/旅程/人物）+ 回忆详情页（真机截图调研，2026-09-06）
 > **红线约束**：端侧生成零上传（[PRIVACY]）；五语同步（[I18N]）；新页面 Android 定稿后 iOS 经 /ios-follow 对齐（[PARITY]）

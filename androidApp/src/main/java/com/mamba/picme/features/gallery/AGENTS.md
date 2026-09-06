@@ -7,12 +7,12 @@
 > - 相册自然语言搜索的完整链路以 `docs/03-TECHNICAL-SPECS/GALLERY_SEARCH.md` 为唯一事实来源（SSOT）。
 > - 禁止将模块级实现细节回填到顶层 `AGENTS.md`；跨模块或专项技术内容应下沉到对应模块文档或 `docs/*_TECH_SPEC.md`。
 
-> **版本**: 1.4  
+> **版本**: 1.5  
 > **状态**: 生效中  
-> **最后更新**: 2026-08-26  
+> **最后更新**: 2026-09-06  
 > **维护者**: 项目开发者
 
-**模块定位**: 应用默认首页，提供智能聚类相册浏览、媒体查看器、批量操作功能；支持端侧自然语言搜索；语音 Agent 面板提供自然语言交互入口。二级能力入口：悬浮底部 Tab（相册整理/聊天/打标/人物，切主页面 Pager 页）+ 顶栏（模型中心/设置）+ 相册页左滑（相册整理）。「相册整理」（去重 2.0）为主页面 Pager 页 1（相册页左滑即达），另有悬浮底部 Tab 第一项 + 设置主菜单一级入口（2026-08-26 二轮升级）；相机已路由化，无常驻入口。
+**模块定位**: 应用默认首页，提供智能聚类相册浏览、媒体查看器、批量操作功能；支持端侧自然语言搜索；语音 Agent 面板提供自然语言交互入口。二级能力入口：悬浮底部 Tab（相册整理/聊天/打标/人物/回忆，切主页面 Pager 页）+ 顶栏（模型中心/设置）+ 相册页左滑（相册整理）。「相册整理」（去重 2.0）为主页面 Pager 页 1（相册页左滑即达），另有悬浮底部 Tab 第一项 + 设置主菜单一级入口（2026-08-26 二轮升级）；相机已路由化，无常驻入口。
 
 **主要维护者**: 项目开发者
 
@@ -136,7 +136,7 @@ private fun shareMediaAssets(context: Context, assets: List<MediaAsset>) {
 > 旧实现（`DuplicateManager` 页 / `FindDuplicateMediaUseCase` / `DuplicateImageDetector`）已于 2026-08-26 Task 11 整体下线删除；`core/common/PerceptualHash.kt`（MD5/pHash 纯算法，零 Android 依赖、可 JVM 单测）保留，由新扫描器复用。
 
 **技术规范**:
-- **入口（2026-08-26 二轮升级）**: 相册整理为**主页面 Pager 页 1**（页序 相册(0)/相册整理(1)/聊天(2)/人物(3)，见 `features/main/MainPagerHost.kt`；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全）——相册页左滑经外层 HorizontalPager 原生手势进入，悬浮底部 Tab 第一项（`Icons.Outlined.BurstMode`）与设置主菜单「相册整理」一级入口均经 `switchMainPage(MAIN_PAGE_DEDUP)` 瞬时切页；原 `Screen.DedupHome`（route `dedup_home`）NavHost 路由已删除（避免双宿主）。返回（顶栏返回/系统返回键）切回相册页不弹栈；TagControl 头部「管理重复照片」行已移除
+- **入口（2026-08-26 二轮升级）**: 相册整理为**主页面 Pager 页 1**（页序 相册(0)/相册整理(1)/聊天(2)/人物(3)/回忆(4)，见 `features/main/MainPagerHost.kt`；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全）——相册页左滑经外层 HorizontalPager 原生手势进入，悬浮底部 Tab 第一项（`Icons.Outlined.BurstMode`）与设置主菜单「相册整理」一级入口均经 `switchMainPage(MAIN_PAGE_DEDUP)` 瞬时切页；原 `Screen.DedupHome`（route `dedup_home`）NavHost 路由已删除（避免双宿主）。返回（顶栏返回/系统返回键）切回相册页不弹栈；TagControl 头部「管理重复照片」行已移除
 - **三级尺度（`DedupLevel`，`domain/dedup/DedupModels.kt`）**:
   - `EXACT` 精确重复：`(sizeBytes, mime)` 分桶 → 流式 MD5 相同成组
   - `VISUAL` 视觉重复：32×32 降采样 64-bit pHash，汉明距离 ≤ `visualThreshold`(=5) 并查集聚类；与 EXACT 组完全重合（全员同 MD5）的簇跳过
@@ -152,7 +152,7 @@ private fun shareMediaAssets(context: Context, assets: List<MediaAsset>) {
 - **UI 组件清单（`features/gallery/dedup/`）**: `DedupHomeScreen`（页面 + Route）、`DedupSheets`（`DedupGroupDetailPage` 全屏组详情页——点「保留这张」改选后立即收起回结果列表（2026-09-05 交互修正），删除仍走详情 CTA/批量 CTA——+ 组内全屏对比预览 + `KeepRulesSheet` 保留规则底部弹层——组详情 2026-08-27 起由半屏弹层改全屏页）、`DedupComponents`（组卡片/缩略图等）、`DedupMediaSource`（扫描输入供数，`MediaType.PHOTO` 元数据 + modifiedAt）
 - **整理中心类目详情（F1，`features/gallery/organize/`，2026-09-05）**: `OrganizeCategoryScreen`（NavHost 二级页 `organize_category/{category}`：副行统计 + 3 列 AI 预选勾选网格 + 底部回收站 CTA；完成态 All clean + Undo）+ `OrganizeCategoryViewModel`（类目过滤 + 选中集 + `TrashSessionController` 删除/恢复编排，测试注入 coroutineScope 范式同 DedupViewModel）；hub 类目卡点击经 `onOpenCategory` 点亮该路由
 - **手势快速整理（F2，`features/gallery/swipe/`，2026-09-05）**: `SwipeReviewScreen`（NavHost 二级页 `swipe_review`：全屏大图卡手势决策——右滑保留 / 左滑跳过 / 上滑删除、点按=跳过，卡片跟手位移 + 超阈值（宽 25%）飞出落决策，预加载后续 3 张；完成态统计卡 + 再来一轮 + 整批恢复）+ `SwipeReviewViewModel`（`SwipeQueueBuilder` 废片优先建队、undo 栈、未提交 DELETE 累计 20 张自动提交一批系统回收站授权，Done 态整批 undoAll 恢复）；hub「Quick tidy up」渐变主按钮经 `onQuickTidy` 点亮该路由；队列入列原因（Screenshot/Blurry/Low-quality portrait/Recent）为卡片角标，视频永不入队。**审查修复语义（2026-09-05 二轮）**：KEEP 30 天抑制——decide(KEEP) 即时写入 `SwipeKeepHistory`（`domain/swipe/SwipeKeepHistory.kt` 纯函数：`uri|epochMs` 编码 + 30 天 TTL 裁剪；`data/preferences/DataStoreSwipeKeepHistoryStore.kt` 持久化到 user_preferences DataStore `swipe_keep_history` stringSet），restart 建队时过滤活跃条目并顺带清理过期写回，undo(KEEP) 只回滚本会话新增条目；防死锁——API<30（TrashBackend `!isSupported`）提交短路不挂在途状态、`finish` 直接 settleDone（未提交 DELETE 以 skipped 口径进 Done，三桶守恒），token 构建失败经 errorEvent 回滚提交状态；授权被拒（Cancelled）批次回滚为未提交可重试，末张决策后（current==null）显示「待提交 N 张 + 重试/放弃」出口面板（放弃 = 未提交 DELETE 改记 SKIP 进 Done）；freedBytes 为 Reviewing 存储字段，decide/undo/discard 增量维护（O(1)）；换图为方向感知（前进无过渡防闪回，undo 保留淡入）
-- **回忆 Memories（F3，`features/gallery/memories/`，2026-09-05）**: 相册首页顶部回忆 carousel（MediaGrid header 槽）+ 详情页路由 `memory_detail/{memoryId}`；生成规则、隐藏持久化与 v1 不落表说明见 §2.12
+- **回忆 Memories（F3 独立页，`features/gallery/memories/`，2026-09-06 重设计）**: Memory 独立主页面 Pager 页 4 + 底 bar 第 5 图标（Collections）+ 详情页路由 `memory_detail/{memoryId}`；生成规则、隐藏持久化与 v1 不落表说明见 §2.12
 - **Pager 页单根铁律（2026-09-04 事故修复）**: `DedupHomeRoute` 必须以单个 `Box(fillMaxSize)` 包裹 Scaffold + 详情页 + 预览层——HorizontalPager 会把 page 内容的多个根节点沿主轴顺序平铺（`MeasuredPage` 按 child 宽度累加 offset，非 Box 式堆叠），多根会导致详情页/预览层被排到屏外，点击「没反应」。Gallery/Person/Chat 页均为单根模式；页内新增全屏覆盖层一律挂进该 Box，不得作为独立根节点
 
 **代码示例**:
@@ -225,9 +225,10 @@ SearchTopBar(
 **底部悬浮 Tab**:
 - 使用共享组件 `FloatingBottomTab`（`features/common/components/FloatingBottomTab.kt`）
 - 位置：底部居中，底部 padding 16.dp，悬浮于媒体网格之上
-- 入口项（从左到右）：相册整理（BurstMode，切到 Pager 页 1）、Chat、Tag 打标控制、人物（AccountCircle）
+- 入口项（从左到右）：相册整理（BurstMode，切到 Pager 页 1）、Chat、Tag 打标控制、人物（AccountCircle）、回忆（Collections，切到 Pager 页 4，2026-09-06 新增）
 - 每项仅显示图标，无文字标签
 - 点击经 `switchMainPage` 瞬时切主页面 Pager 页（无滑动动画）
+- `FloatingBottomTabItem.selected` 高亮态（图标着色 primary）：Memory 页底 bar 的回忆项置 true 标识当前页（点击空操作），其余页保持默认 false
 
 **设置入口**:
 - 统一放在 `GalleryTopBar` 动作区最右侧
@@ -400,35 +401,38 @@ python3 scripts/ui_driver.py dump
 [android.view.View] 视频，share_xxx.mp4 clickable, bounds=(...)
 ```
 
-### 2.12 回忆 Memories（F3，2026-09-05）
+### 2.12 回忆 Memories（F3 独立页，2026-09-06 重设计）
 
-**模块定位**: 相册首页顶部「回忆」carousel + 回忆详情页；纯端侧规则生成，零推理零上传（[PRIVACY]）。
+**模块定位**: Memory 独立主页面 Pager 页（index 4，`MAIN_PAGE_MEMORY`）+ 回忆详情页（NavHost 路由 `memory_detail/{memoryId}`）；纯端侧规则生成，零推理零上传（[PRIVACY]）。原「相册首页顶部 carousel（MediaGrid header 槽）」形态已拆除（2026-09-06，`MediaGrid` 无调用方 header 参数随之删除），对标小米系统相册分区 feed。设计 spec：`docs/superpowers/specs/2026-09-06-memory-page-design.md`。
+
+**页面结构（`features/gallery/memories/MemoryScreen.kt`）**:
+- 顶栏：`statusBarsPadding()` 状态栏避让（edge-to-edge 防标题被状态栏压住）+ 大标题「回忆」（`memory_title`）+ 副标「端侧生成 · 私密」（`memory_privacy_note`）
+- 三分区 feed（`buildSections`）：时光（ON_THIS_DAY + RECENT_HIGHLIGHTS，`memory_section_time`）→ 旅程（CITY，`memory_section_journey`）→ 人物（PERSON，`memory_section_people`）；空分区剔除不占位，三分区全空显示整页空态 `memory_empty_page`；LazyColumn 底部 contentPadding 96.dp 预留底 bar 悬浮遮挡
+- 竖版大卡（`MemoryBigCard`）：168×224 dp 圆角 16（`MemoryPageTokens`：cardWidth/cardHeight/cardCornerRadius/cardSpacing/sectionHorizontalPadding/sectionTitleSpacing，经 `design-tokens.json` SSOT codegen 双端同步）；封面 Coil size(512) crossfade(false)（recycled bitmap 红线）；底部渐变蒙层 + 左下 17sp Bold 白字标题 + 12sp 80% 副行；`contentDescription = "title · subtitle"`；点击进详情页、长按弹隐藏确认
+- 底 bar：悬浮 5 图标（出口与 GalleryScreen 同源）；本页回忆项（Collections 图标）`FloatingBottomTabItem.selected = true` 高亮（图标着色 primary，点击空操作）；相册页底 bar 第 5 图标经 `onNavigateToMemory` → `switchMainPage(MAIN_PAGE_MEMORY)` 瞬时切页
 
 **生成规则（`domain/memories/MemoriesGenerator.kt` 纯函数，now/zoneId 注入确定性，JVM 可测）**:
-- 四类回忆：ON_THIS_DAY（与 now 同月同日的往年 ≥4 张，year < now 未来年份排除）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2）；总量截 `MAX_CAROUSEL`(10)
-- 精选排序：美学分降序（null 排最后）→ 拍摄时间新的在前，截 `DETAIL_LIMIT`(12) 张，封面取首张
+- 四类回忆：ON_THIS_DAY（与 now 同月同日的往年 ≥4 张，year < now 未来年份排除）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2，仅 CITY 填 `earliestCaptureDate`/`latestCaptureDate` 供旅程日期范围）；总量截 `MAX_CAROUSEL`(10)
+- 精选排序：美学分降序（null 排最后）→ 拍摄时间新的在前，截 `DETAIL_LIMIT`(12) 张，封面取首张；`Memory.allItemUris` = 全部命中按拍摄时间降序不截断（详情页「全部」开关与分享全集用）
 - 仅 `MediaType.PHOTO` 参与；`MemoryInput.personId` = 媒体 `faceId`（`media_assets.faceId` 为 personId 的 TEXT 形态）
-- **结构化文案（I18N 红线，2026-09-06 审查修复）**：`Memory` 不再携带拼好文案，改为结构化字段 type + label（人物/城市名）+ hitCount（命中总数）+ latestYear + monthDay（`java.time.MonthDay`）；UI 层 `features/gallery/memories/MemoryTexts.kt`（`memoryTitle`/`memorySubtitle`）经 stringResource 还原（`memory_on_this_day`/`memory_recent_highlights`/`memory_person_title`/`memory_photo_count` 等键，五语同步），月日按 skeleton "MMMd" 取当前 Locale 最佳 pattern 本地化（不硬编码英文 pattern）
+- **结构化文案（I18N 红线）**：`Memory` 只携带结构化字段（type + label（人物/城市名）+ hitCount + latestYear + monthDay（`java.time.MonthDay`）+ 旅程日期范围字段）；UI 层 `features/gallery/memories/MemoryTexts.kt`（`memoryTitle`/`memorySubtitle`）经 stringResource 还原（`memory_on_this_day`/`memory_recent_highlights`/`memory_person_title`/`memory_photo_count` 等键，五语同步），月日按 skeleton "MMMd" 取当前 Locale 最佳 pattern 本地化（不硬编码英文 pattern）
+- **旅程卡副行 `cityDateRange`**（`MemoryTexts.kt`，对齐小米）：同年月 → 本地化 yMMMM（skeleton 经 `getBestDateTimePattern` 取当前 Locale 最佳 pattern，en "May 2025"、zh "2025年5月"）；跨月/跨年 → "startYear · endYear"（如「2025 · 2026」）；字段缺失（非 CITY）容错返回空串
 
-**数据链（`MemoriesViewModel`，Activity 级 VM）**:
-- `combine(MediaDao.getAllMedia, PersonDao.observeAll（本特性新增）, MemoryHiddenStore.ids)` → generate → `flowOn(ioDispatcher).stateIn(WhileSubscribed(5000))`
-- **隐藏过滤只在展示层**：`allGenerated`（未过滤全集）为 `getMemory(id)` 数据源，详情页直达/刷新后 id 稳定可复原（含已隐藏条目）；`memories` 为剔除隐藏后的展示集
+**数据链（`MemoriesViewModel`，Activity 级 VM，Memory 页与详情页共用）**:
+- `combine(MediaDao.getAllMedia, PersonDao.observeAll, MemoryHiddenStore.ids)` → generate → `flowOn(ioDispatcher).stateIn(WhileSubscribed(5000))`
+- **隐藏过滤只在展示层**：`allGenerated`（未过滤全集）为 `observeMemory(id)` 数据源，详情页直达/刷新后 id 稳定可复原（含已隐藏条目）；`memories` 为剔除隐藏后的展示集
 - 人物映射只取已命名人物（`PersonEntity.name` 非空），`NamedPerson(personId.toString(), name, isSelf)`
 
-**header 槽（`MediaGrid`）**:
-- 签名末尾追加可选 `header: (@Composable LazyGridItemScope.() -> Unit)? = null`，以全 span item 挂网格顶部（key `memories_header`）；默认 null 不影响既有调用方（搜索结果网格不传）
-- GalleryScreen 经 `collectAsStateWithLifecycle` 订阅；`memories.isEmpty()` 时传 `header = null`，无数据整体不占位
-
-**隐藏持久化**:
-- 长按卡片 → 确认弹窗（`memory_hide` / `memory_hide_confirm` / `memory_hide_cancel`）→ `hideMemory(id)`（runCatching 包 DataStore 写入，失败置位 `hideError` 一次性标志不崩溃，`consumeHideError` 消费）
-- `MemoryHiddenStore`（domain 接口）/ `DataStoreMemoryHiddenStore`（data/preferences 实现）：user_preferences DataStore `memory_hidden_ids` stringSet，存 Memory.id；carousel 经 combine 重发自动消失
+**隐藏持久化（自 carousel 平移，逻辑不变）**:
+- 长按大卡 → 根 Box 内 `AlertDialog` 确认（`memory_hide` / `memory_hide_confirm` / `memory_hide_cancel`，文案键不变）→ `hideMemory(id)`（runCatching 包 DataStore 写入，失败置位 `hideError` 一次性标志不崩溃，`consumeHideError` 消费）
+- `MemoryHiddenStore`（domain 接口）/ `DataStoreMemoryHiddenStore`（data/preferences 实现）：user_preferences DataStore `memory_hidden_ids` stringSet，存 Memory.id；展示集经 combine 重发自动消失
 - v1 无「重新启用」入口，隐藏确认文案不承诺恢复（`memory_hide_confirm` 2026-09-06 校准）
 
-**详情页（`MemoryDetailScreen`，NavHost 路由 `memory_detail/{memoryId}`，id Uri.encode + Navigation 自动解码一次）**:
-- AppTopBar（返回 + `Memories` + 右上分享图标）→ 全宽 16:9 封面（Coil size(1080) crossfade(false)，左下渐变蒙层白字：标题 + `%1$d best shots · subtitle` 副行）→ 3 列精选网格（r8，Coil size(360)，`memory_photo_cd` 无障碍描述）→ 底部品牌渐变主按钮「Share memory」（`ACTION_SEND_MULTIPLE` + `FLAG_GRANT_READ_URI_PERMISSION`，写法同 `GalleryUtils.shareMediaAssets`）
-- MainActivity 路由内 collect `observeMemory(id)`（未过滤全集 Flow，2026-09-06 取代 remember 反查：列表刷新不 stale、冷恢复随流复原不闪空态）；id 失效（媒体清空等）→ `memory_detail_empty` 空态
-
-**carousel 交互**: 相册多选模式下卡片不可点（`MemoriesCarousel(enabled = !isSelectionMode)`，GalleryScreen header 槽传入）
+**详情页（`MemoryDetailScreen`，2026-09-06 升级对标小米）**:
+- AppTopBar（返回 + Memories + 右上分享图标）→ 约屏高 55% 封面（Coil size(1080) crossfade(false)，底部渐变蒙层 + 左下 20sp Bold 白字标题 + 13sp 副行：`memory_items_count`(hitCount) · 分类型后缀——ON_THIS_DAY/RECENT_HIGHLIGHTS 接 `memorySubtitle`、CITY 接 `cityDateRange`、PERSON 不接（与 hitCount 重复计数））→ 3 列网格（1:1 方图 r8，Coil size(360)，`memory_photo_cd` 无障碍描述）
+- **精选/全部分段开关**：底部居中胶囊（`memory_detail_best` / `memory_detail_all`），`showAll` 按 `remember(memory?.id)` 切回忆时重置回精选；`displayUris = showAll ? allItemUris : itemUris`；分段项带 `role = Button` + `selected` 语义
+- **分享集合跟随开关**：分享图标按当前 `displayUris` 发 `ACTION_SEND_MULTIPLE` + `FLAG_GRANT_READ_URI_PERMISSION`（写法同 `GalleryUtils.shareMediaAssets`）
+- MainActivity 路由内 collect `observeMemory(id)`（未过滤全集 Flow，列表刷新不 stale、冷恢复随流复原不闪空态）；id 失效（媒体清空等）→ `memory_detail_empty` 空态
 
 **v1 不落表说明**: 回忆不建 Room 表/快照，每次由媒体 + 人物流实时生成，无 DB 迁移成本；隐藏集仅存 DataStore stringSet（id 字符串，个位数量级）。若未来需要跨设备同步或「那年今日回顾历史」，再评估落表。
 
