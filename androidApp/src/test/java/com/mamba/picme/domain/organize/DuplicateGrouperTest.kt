@@ -19,6 +19,18 @@ class DuplicateGrouperTest {
     }
 
     @Test
+    fun `exact group key is the shared md5, set only for group members`() {
+        // 组标识供 hub 聚合按组扣 keeper：成员 = 组内共享 MD5；非成员/未成组为 null
+        val groups = DuplicateGrouper.group(
+            listOf(row("a", md5 = "x"), row("b", md5 = "x"), row("c", md5 = "y"), row("d"))
+        )
+        assertEquals("x", groups.getValue("a").exactGroupKey)
+        assertEquals("x", groups.getValue("b").exactGroupKey)
+        assertEquals(null, groups.getValue("c").exactGroupKey)
+        assertEquals(null, groups.getValue("d").exactGroupKey)
+    }
+
+    @Test
     fun `close phash forms similar group, far phash does not`() {
         // 汉明距离 ≤5 成簇（与去重 2.0 VISUAL 阈值一致）
         // 计划原文的 64bit 字面量超出 Long 范围，降 4bit 为 60bit 等价模式

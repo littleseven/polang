@@ -81,6 +81,7 @@ class OrganizeRepositoryImpl(
                 personPhotoCount = row.faceId?.let { faceId -> personCountByFaceId[faceId] },
                 exactDupGroupSize = dup?.exactGroupSize ?: 0,
                 similarDupGroupSize = dup?.similarGroupSize ?: 0,
+                exactDupGroupKey = dup?.exactGroupKey,
             )
         }
     }

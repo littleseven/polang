@@ -24,7 +24,8 @@ object OrganizeCategorizer {
         }
 
     /**
-     * hub 聚合：类目卡（按建议优先级 highBytes 降序）+ Hero 口径（HIGH 非 protected 去重并集）。
+     * hub 聚合：类目卡（按建议优先级 highBytes 降序）+ Hero 口径（HIGH 非 protected 去重并集；
+     * DUPLICATES 按精确组扣 1 张 keeper，与去重结果页只计非 keeper 口径一致）。
      * 六类目全量产卡（含零命中类目：计数/字节全零、coverage 正常计算），
      * NEEDS_SCAN 引导卡与空卡是否渲染由 UI 层决定（spec P3/AC-R2-4：类目不再静默消失）。
      */
@@ -40,12 +41,18 @@ object OrganizeCategorizer {
                 val review = entries.filter { entry ->
                     entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected
                 }
+                val highBytes = high.sumOf { entry -> entry.item.sizeBytes } -
+                    if (category == OrganizeCategory.DUPLICATES) {
+                        duplicatesKeeperBytes(high)
+                    } else {
+                        0L
+                    }
                 CategoryBoard(
                     category = category,
                     totalCount = entries.size,
                     totalBytes = entries.sumOf { entry -> entry.item.sizeBytes },
                     highCount = high.size,
-                    highBytes = high.sumOf { entry -> entry.item.sizeBytes },
+                    highBytes = highBytes,
                     reviewCount = review.size,
                     protectedCount = entries.count { entry -> entry.isProtected },
                     previewUris = entries.take(PREVIEW_LIMIT).map { entry -> entry.item.uri },
@@ -60,6 +67,21 @@ object OrganizeCategorizer {
             heroReviewCount = cards.sumOf { card -> card.reviewCount },
         )
     }
+
+    /**
+     * DUPLICATES keeper 扣减：精确组**全员**都进建议集时须保留 1 张（删光即丢内容），
+     * 扣回一张字节——组内同 MD5 → 同 sizeBytes，任取一张。
+     * 组内成员未全部在列（如dedup_hash 残留已删文件的幽灵成员）时不扣，退回全组字节：
+     * 保守方向宁可低估；组标识缺失（老数据）同理不扣。
+     * 注：DUPLICATES 不经 ValueGuard（见 ValueGuard.GUARDED_CATEGORIES），
+     * 精确组成员恒 HIGH 非 protected，「全员在列」即「组未被建议集拆散」。
+     */
+    private fun duplicatesKeeperBytes(high: List<ClassifiedItem>): Long =
+        high.groupBy { entry -> entry.item.exactDupGroupKey }
+            .filterKeys { key -> key != null }
+            .values
+            .filter { group -> group.size == group.first().item.exactDupGroupSize }
+            .sumOf { group -> group.first().item.sizeBytes }
 
     /**
      * 类目信号覆盖度：全库任一媒体持有该类目关键信号 → READY，否则 NEEDS_SCAN

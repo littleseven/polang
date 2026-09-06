@@ -16,14 +16,16 @@ object DuplicateGrouper {
     data class DupInfo(
         val exactGroupSize: Int = 0,
         val similarGroupSize: Int = 0,
+        /** 精确组标识（组内共享 MD5）；仅 exactGroupSize ≥ 2 时非空，供聚合侧按组去重扣 keeper。 */
+        val exactGroupKey: String? = null,
     )
 
     fun group(inputs: List<HashInput>): Map<String, DupInfo> {
-        val exactSizeByUri = inputs
+        val exactByUri = inputs
             .filter { input -> input.md5 != null }
             .groupBy { input -> input.md5!! }
             .filterValues { group -> group.size >= 2 }
-            .flatMap { (_, group) -> group.map { input -> input.uri to group.size } }
+            .flatMap { (md5, group) -> group.map { input -> input.uri to (group.size to md5) } }
             .toMap()
 
         val phashUris = inputs.mapNotNull { input ->
@@ -44,9 +46,11 @@ object DuplicateGrouper {
         }
 
         return inputs.associate { input ->
+            val exact = exactByUri[input.uri]
             input.uri to DupInfo(
-                exactGroupSize = exactSizeByUri[input.uri] ?: 0,
+                exactGroupSize = exact?.first ?: 0,
                 similarGroupSize = similarSizeByUri[input.uri] ?: 0,
+                exactGroupKey = exact?.second,
             )
         }
     }

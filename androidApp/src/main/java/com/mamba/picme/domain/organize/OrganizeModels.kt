@@ -43,6 +43,8 @@ data class OrganizeItem(
     val exactDupGroupSize: Int = 0,
     /** 视觉相似组大小（pHash 簇成员数）；< 2 = 不在相似组。 */
     val similarDupGroupSize: Int = 0,
+    /** 精确组标识（组内共享 MD5，仅 exactDupGroupSize ≥ 2 时非空）；hub 聚合按组扣 keeper 用。 */
+    val exactDupGroupKey: String? = null,
 )
 
 /** 置信度分级（详情页三段分组 + 预选口径）。 */
@@ -72,6 +74,7 @@ data class CategoryBoard(
     val totalBytes: Long,
     /** HIGH 置信且非 protected：建议删除数。 */
     val highCount: Int,
+    /** 建议删除字节；DUPLICATES 额外按精确组扣 1 张 keeper（全员进建议集时保留一张不可删）。 */
     val highBytes: Long,
     /** MEDIUM+LOW 且非 protected：待确认数。 */
     val reviewCount: Int,
@@ -84,7 +87,7 @@ data class CategoryBoard(
 data class OrganizeBoard(
     /** 按 highBytes 降序（建议优先级）。 */
     val categories: List<CategoryBoard>,
-    /** Hero 主数字：全类目 HIGH 且非 protected 去重并集字节（互斥裁定保证天然去重）。 */
+    /** Hero 主数字：全类目 HIGH 且非 protected 去重并集字节（互斥裁定保证天然去重；DUPLICATES 已扣 keeper）。 */
     val heroReclaimBytes: Long,
     /** Hero 副行：MEDIUM+LOW 且非 protected 总数。 */
     val heroReviewCount: Int,

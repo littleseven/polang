@@ -27,6 +27,7 @@ class OrganizeCategorizerTest {
         personPhotoCount: Int? = null,
         exactDupGroupSize: Int = 0,
         similarDupGroupSize: Int = 0,
+        exactDupGroupKey: String? = null,
     ) = OrganizeItem(
         uri = uri, isVideo = isVideo, captureDate = captureDate, sizeBytes = sizeBytes,
         relativePath = relativePath, ocrText = ocrText, pixelArea = pixelArea,
@@ -34,7 +35,7 @@ class OrganizeCategorizerTest {
         faceQualityScore = faceQualityScore, blurScore = blurScore,
         exposureScore = exposureScore, lastViewedAt = lastViewedAt, isFavorite = isFavorite,
         personPhotoCount = personPhotoCount, exactDupGroupSize = exactDupGroupSize,
-        similarDupGroupSize = similarDupGroupSize,
+        similarDupGroupSize = similarDupGroupSize, exactDupGroupKey = exactDupGroupKey,
     )
 
     private fun cardOf(board: OrganizeBoard, category: OrganizeCategory): CategoryBoard =
@@ -117,6 +118,69 @@ class OrganizeCategorizerTest {
         val photosCard = cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS)
         assertEquals(100L, photosCard.highBytes)
         assertEquals(5100L, photosCard.totalBytes)
+    }
+
+    @Test
+    fun `duplicates keeper deduction - exact group of 3 same size yields 2x highBytes`() {
+        // 3 张同 MD5 精确重复各 5MB：Hero/类目卡只应计 2 张可释放（保留 1 张 keeper），
+        // 与去重结果页只计非 keeper 口径一致（修复全组 15MB 虚高）
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("d1", sizeBytes = 5_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5a"),
+                item("d2", sizeBytes = 5_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5a"),
+                item("d3", sizeBytes = 5_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5a"),
+            ),
+            now = now,
+        )
+        val card = cardOf(board, OrganizeCategory.DUPLICATES)
+        assertEquals(3, card.highCount)
+        assertEquals(3, card.totalCount)
+        assertEquals(15_000_000L, card.totalBytes)
+        assertEquals(10_000_000L, card.highBytes)
+        assertEquals(10_000_000L, board.heroReclaimBytes)
+    }
+
+    @Test
+    fun `duplicates keeper deduction scopes per group - two groups deduct independently`() {
+        // 两组精确重复（2×5MB + 3×2MB）各扣 1 张：(5 + 2×2) = 9MB
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("a1", sizeBytes = 5_000_000, exactDupGroupSize = 2, exactDupGroupKey = "md5a"),
+                item("a2", sizeBytes = 5_000_000, exactDupGroupSize = 2, exactDupGroupKey = "md5a"),
+                item("b1", sizeBytes = 2_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5b"),
+                item("b2", sizeBytes = 2_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5b"),
+                item("b3", sizeBytes = 2_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5b"),
+            ),
+            now = now,
+        )
+        assertEquals(9_000_000L, cardOf(board, OrganizeCategory.DUPLICATES).highBytes)
+    }
+
+    @Test
+    fun `duplicates keeper not deducted when group partially listed - phantom member conservative`() {
+        // 组声明 3 张但仅 2 张在库（dedup_hash 残留已删文件）：无法确认有副本留存，
+        // 保守不扣，退回全组字节（宁可低估可释放，不可鼓励删光）
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("d1", sizeBytes = 5_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5a"),
+                item("d2", sizeBytes = 5_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5a"),
+            ),
+            now = now,
+        )
+        assertEquals(10_000_000L, cardOf(board, OrganizeCategory.DUPLICATES).highBytes)
+    }
+
+    @Test
+    fun `duplicates keeper not deducted without group key - legacy data fallback`() {
+        // 老数据/异常：有组大小无组标识，无法按组去重扣减 → 不扣（旧口径）
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("d1", sizeBytes = 5_000_000, exactDupGroupSize = 2),
+                item("d2", sizeBytes = 5_000_000, exactDupGroupSize = 2),
+            ),
+            now = now,
+        )
+        assertEquals(10_000_000L, cardOf(board, OrganizeCategory.DUPLICATES).highBytes)
     }
 
     @Test
