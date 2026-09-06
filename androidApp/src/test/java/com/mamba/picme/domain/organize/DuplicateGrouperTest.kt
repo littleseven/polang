@@ -39,4 +39,31 @@ class DuplicateGrouperTest {
         assertEquals(0, groups.getValue("a").exactGroupSize)
         assertEquals(0, groups.getValue("a").similarGroupSize)
     }
+
+    @Test
+    fun `exact subset of similar and transitive chaining forms one cluster`() {
+        // 验算（python3 复核）：base 为 56bit 模式，b=base^0b1111 距 4，c=b^0b11110000 距 4，
+        // base^c=0b11111111 距 8（>5 不直接相连，经 b 链式并入）；d 的 phash=base 距 a 为 0
+        val base = 0b11110000111100001111000011110000111100001111000011110000L
+        val b = base xor 0b1111L
+        val c = b xor 0b11110000L
+        val groups = DuplicateGrouper.group(
+            listOf(
+                row("a", phash = base),
+                row("b", phash = b),
+                row("c", phash = c),
+                row("d", md5 = "x", phash = base),
+                row("e", md5 = "x"),  // 与 d 组成 exact 组，无 phash 不进 similar 簇
+            )
+        )
+        // 链式传递：a/b/c/d 并为一簇 size=4
+        assertEquals(4, groups.getValue("a").similarGroupSize)
+        assertEquals(4, groups.getValue("b").similarGroupSize)
+        assertEquals(4, groups.getValue("c").similarGroupSize)
+        // exact ⊂ similar：d 同时进 exact 组（d/e 同 md5，size=2）与 similar 簇（size=4）
+        assertEquals(2, groups.getValue("d").exactGroupSize)
+        assertEquals(4, groups.getValue("d").similarGroupSize)
+        // a 无 md5，不进 exact 组
+        assertEquals(0, groups.getValue("a").exactGroupSize)
+    }
 }

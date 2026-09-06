@@ -7,6 +7,7 @@ import com.mamba.picme.core.common.PerceptualHash
  * 精确组 = 同 MD5 且成员 ≥2；相似组 = pHash 汉明距离 ≤ [PerceptualHash.SIMILAR_HAMMING_THRESHOLD]
  * 并查集聚类且成员 ≥2（与去重 2.0 VISUAL 同一阈值口径）。
  * 输入仅依赖 data 层投影出的 uri/md5/phash 三元组，不依赖 Room 实体（保持 domain 纯净）。
+ * 前置：[inputs] 的 uri 唯一（dedup_hash 表 PK 保证）；重复 uri 会被静默折叠。
  */
 object DuplicateGrouper {
 
