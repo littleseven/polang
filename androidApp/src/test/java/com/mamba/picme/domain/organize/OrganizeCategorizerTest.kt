@@ -1,7 +1,6 @@
 package com.mamba.picme.domain.organize
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OrganizeCategorizerTest {
@@ -38,6 +37,9 @@ class OrganizeCategorizerTest {
         similarDupGroupSize = similarDupGroupSize,
     )
 
+    private fun cardOf(board: OrganizeBoard, category: OrganizeCategory): CategoryBoard =
+        board.categories.single { card -> card.category == category }
+
     @Test
     fun `mutex - screenshot with low scores lands only in SCREEN_CONTENT`() {
         val classified = OrganizeCategorizer.classifyAll(
@@ -58,7 +60,10 @@ class OrganizeCategorizerTest {
         // 同一张图在 v1 会被截图+模糊+文档计 3 次；v2 互斥后 Hero 只计 1 次
         val board = OrganizeCategorizer.board(
             listOf(
-                item("shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
+                item(
+                    "shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100,
+                    blurScore = 1.0f, ocrText = "x".repeat(600),
+                ),
                 item("big", isVideo = true, sizeBytes = 250L * 1024 * 1024),
                 item("normal"),
             ),
@@ -80,7 +85,7 @@ class OrganizeCategorizerTest {
             now = now,
         )
         assertEquals(0L, board.heroReclaimBytes)
-        val card = board.categories.single { card -> card.category == OrganizeCategory.LOW_QUALITY_PHOTOS }
+        val card = cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS)
         assertEquals(1, card.totalCount)
         assertEquals(0, card.highCount)
         assertEquals(1, card.protectedCount)
@@ -88,26 +93,48 @@ class OrganizeCategorizerTest {
 
     @Test
     fun `categories sorted by high confidence bytes descending`() {
+        // 区分点：排序键是 highBytes 而非 totalBytes——
+        // SCREEN_CONTENT 两截图全 HIGH（highBytes=150=totalBytes）；
+        // LOW_QUALITY_PHOTOS highBytes=100（HIGH 项 100B）但 totalBytes=5100（含 MEDIUM 项 5000B）。
+        // 按 highBytes 排序 → [SCREEN_CONTENT, LOW_QUALITY_PHOTOS]；若误用 totalBytes 则顺序相反。
         val board = OrganizeCategorizer.board(
             listOf(
-                item("shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
-                item("big", isVideo = true, sizeBytes = 250L * 1024 * 1024),
+                item("s1", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
+                item("s2", relativePath = "Pictures/Screenshots/", sizeBytes = 50),
+                item("blurHigh", blurScore = 10.0f, sizeBytes = 100),   // HIGH
+                item("blurMid", blurScore = 80.0f, sizeBytes = 5000),   // MEDIUM
             ),
             now = now,
         )
         assertEquals(
-            listOf(OrganizeCategory.LARGE_FILES, OrganizeCategory.SCREEN_CONTENT),
-            board.categories.map { card -> card.category },
+            listOf(OrganizeCategory.SCREEN_CONTENT, OrganizeCategory.LOW_QUALITY_PHOTOS),
+            board.categories.take(2).map { card -> card.category },
         )
+        // 锁定两键语义，防止排序键被误换
+        val screenCard = cardOf(board, OrganizeCategory.SCREEN_CONTENT)
+        assertEquals(150L, screenCard.highBytes)
+        assertEquals(150L, screenCard.totalBytes)
+        val photosCard = cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS)
+        assertEquals(100L, photosCard.highBytes)
+        assertEquals(5100L, photosCard.totalBytes)
     }
 
     @Test
     fun `needs-scan coverage when no library item has the signal`() {
         val board = OrganizeCategorizer.board(
-            listOf(item("a")), // 全库无 blurScore
+            listOf(item("a")), // 全库无 blurScore/exposureScore
             now = now,
         )
-        // 无命中时类目卡不渲染（totalCount=0 不生成卡），但覆盖度可查询
+        // 六类目全量产卡：零命中类目以 totalCount=0 + NEEDS_SCAN 引导态呈现，不再静默消失
+        assertEquals(OrganizeCategory.entries.size, board.categories.size)
+        val photosCard = cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS)
+        assertEquals(0, photosCard.totalCount)
+        assertEquals(SignalCoverage.NEEDS_SCAN, photosCard.coverage)
+        assertEquals(
+            SignalCoverage.READY,
+            cardOf(board, OrganizeCategory.SCREEN_CONTENT).coverage,
+        )
+        // 覆盖度亦可绕开 board 直查
         assertEquals(
             SignalCoverage.NEEDS_SCAN,
             OrganizeCategorizer.coverageOf(OrganizeCategory.LOW_QUALITY_PHOTOS, listOf(item("a"))),
@@ -116,11 +143,10 @@ class OrganizeCategorizerTest {
             SignalCoverage.READY,
             OrganizeCategorizer.coverageOf(OrganizeCategory.SCREEN_CONTENT, listOf(item("a"))),
         )
-        assertTrue(board.categories.isEmpty())
     }
 
     @Test
-    fun `review count aggregates MEDIUM and LOW non-protected`() {
+    fun `review count aggregates non-HIGH non-protected`() {
         val board = OrganizeCategorizer.board(
             listOf(
                 item("borderline", blurScore = 80.0f, sizeBytes = 10),       // MEDIUM
@@ -130,5 +156,40 @@ class OrganizeCategorizerTest {
             now = now,
         )
         assertEquals(1, board.heroReviewCount)
+        assertEquals(1, cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS).reviewCount)
+    }
+
+    @Test
+    fun `preview uris truncated to 4 in input order`() {
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("s1", relativePath = "Pictures/Screenshots/"),
+                item("s2", relativePath = "Pictures/Screenshots/"),
+                item("s3", relativePath = "Pictures/Screenshots/"),
+                item("s4", relativePath = "Pictures/Screenshots/"),
+                item("s5", relativePath = "Pictures/Screenshots/"),
+            ),
+            now = now,
+        )
+        assertEquals(
+            listOf("s1", "s2", "s3", "s4"),
+            cardOf(board, OrganizeCategory.SCREEN_CONTENT).previewUris,
+        )
+    }
+
+    @Test
+    fun `empty input yields six zero cards and zero hero`() {
+        val board = OrganizeCategorizer.board(emptyList(), now = now)
+        assertEquals(OrganizeCategory.entries.size, board.categories.size)
+        board.categories.forEach { card ->
+            assertEquals(0, card.totalCount)
+            assertEquals(0, card.highCount)
+            assertEquals(0, card.reviewCount)
+            assertEquals(0, card.protectedCount)
+            assertEquals(0L, card.totalBytes)
+            assertEquals(0L, card.highBytes)
+        }
+        assertEquals(0L, board.heroReclaimBytes)
+        assertEquals(0, board.heroReviewCount)
     }
 }

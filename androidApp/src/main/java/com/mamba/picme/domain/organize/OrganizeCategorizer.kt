@@ -23,12 +23,17 @@ object OrganizeCategorizer {
             )
         }
 
-    /** hub 聚合：类目卡（按建议优先级降序）+ Hero 口径（HIGH 非 protected 去重并集）。 */
+    /**
+     * hub 聚合：类目卡（按建议优先级 highBytes 降序）+ Hero 口径（HIGH 非 protected 去重并集）。
+     * 六类目全量产卡（含零命中类目：计数/字节全零、coverage 正常计算），
+     * NEEDS_SCAN 引导卡与空卡是否渲染由 UI 层决定（spec P3/AC-R2-4：类目不再静默消失）。
+     */
     fun board(items: List<OrganizeItem>, now: Long): OrganizeBoard {
         val classified = classifyAll(items, now)
-        val cards = classified
-            .groupBy { entry -> entry.category }
-            .map { (category, entries) ->
+        val entriesByCategory = classified.groupBy { entry -> entry.category }
+        val cards = OrganizeCategory.entries
+            .map { category ->
+                val entries = entriesByCategory[category].orEmpty()
                 val high = entries.filter { entry ->
                     entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
                 }
@@ -80,7 +85,8 @@ object OrganizeCategorizer {
                     SignalCoverage.NEEDS_SCAN
                 }
             OrganizeCategory.LOW_QUALITY_PHOTOS ->
-                if (items.any { item -> item.blurScore != null }) {
+                // 信号集与 CategoryArbiter 准入一致（blur 或 exposure 任一持有即已覆盖）
+                if (items.any { item -> item.blurScore != null || item.exposureScore != null }) {
                     SignalCoverage.READY
                 } else {
                     SignalCoverage.NEEDS_SCAN
