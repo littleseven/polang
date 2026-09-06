@@ -130,6 +130,17 @@ class OrganizeCategoryViewModelTest {
     }
 
     @Test
+    fun `duplicate uri rows are deduped to single item`() = runTest {
+        // media_assets.uri 非唯一索引：重复行必须去重，否则网格同 key 硬崩 LazyVerticalGrid
+        val repo = FakeRepo().apply { items = listOf(shot("a"), shot("a"), shot("b")) }
+        val vm = viewModel(this, repo, FakeBackend())
+        advanceUntilIdle()
+        val state = ready(vm)
+        assertEquals(listOf("a", "b"), state.items.map { entry -> entry.item.uri })
+        assertEquals(setOf("a", "b"), state.selected)
+    }
+
+    @Test
     fun `preselect only picks HIGH confidence non-protected items`() = runTest {
         val now = System.currentTimeMillis()
         val repo = FakeRepo().apply {

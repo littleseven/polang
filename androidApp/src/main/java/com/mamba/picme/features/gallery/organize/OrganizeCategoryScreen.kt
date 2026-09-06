@@ -234,7 +234,7 @@ private fun OrganizeGridContent(
     state: OrganizeCategoryUiState.Ready,
     onToggle: (String) -> Unit,
 ) {
-    val sections = state.items.toSections()
+    val sections = remember(state.items) { state.items.toSections() }
     Column(modifier = Modifier.fillMaxSize()) {
         // 副行：左「N items · X MB」（该类目全量）+ 右「N AI-preselected」（当前选中）
         Row(
@@ -269,12 +269,16 @@ private fun OrganizeGridContent(
         ) {
             // 三段分组（spec §6.3）：建议删除（HIGH 非保护）/ 请确认（MEDIUM+LOW 非保护）/ 珍贵保护
             if (sections.suggested.isNotEmpty()) {
-                item(key = "header_suggested", span = { GridItemSpan(3) }) {
+                item(key = "header_suggested", span = { GridItemSpan(maxLineSpan) }) {
                     OrganizeSectionHeader(
                         text = stringResource(R.string.org_section_suggested, sections.suggested.size)
                     )
                 }
-                items(items = sections.suggested, key = { entry -> entry.item.uri }) { entry ->
+                items(
+                    items = sections.suggested,
+                    key = { entry -> entry.item.uri },
+                    contentType = { "organize_thumb" }
+                ) { entry ->
                     OrganizeThumb(
                         item = entry.item,
                         selected = entry.item.uri in state.selected,
@@ -284,12 +288,16 @@ private fun OrganizeGridContent(
                 }
             }
             if (sections.review.isNotEmpty()) {
-                item(key = "header_review", span = { GridItemSpan(3) }) {
+                item(key = "header_review", span = { GridItemSpan(maxLineSpan) }) {
                     OrganizeSectionHeader(
                         text = stringResource(R.string.org_section_review, sections.review.size)
                     )
                 }
-                items(items = sections.review, key = { entry -> entry.item.uri }) { entry ->
+                items(
+                    items = sections.review,
+                    key = { entry -> entry.item.uri },
+                    contentType = { "organize_thumb" }
+                ) { entry ->
                     OrganizeThumb(
                         item = entry.item,
                         selected = entry.item.uri in state.selected,
@@ -299,7 +307,7 @@ private fun OrganizeGridContent(
                 }
             }
             if (sections.protectedItems.isNotEmpty()) {
-                item(key = "header_protected", span = { GridItemSpan(3) }) {
+                item(key = "header_protected", span = { GridItemSpan(maxLineSpan) }) {
                     OrganizeSectionHeader(
                         text = stringResource(
                             R.string.org_section_protected, sections.protectedItems.size
@@ -307,7 +315,11 @@ private fun OrganizeGridContent(
                         isProtected = true,
                     )
                 }
-                items(items = sections.protectedItems, key = { entry -> entry.item.uri }) { entry ->
+                items(
+                    items = sections.protectedItems,
+                    key = { entry -> entry.item.uri },
+                    contentType = { "organize_thumb" }
+                ) { entry ->
                     OrganizeThumb(
                         item = entry.item,
                         selected = entry.item.uri in state.selected,

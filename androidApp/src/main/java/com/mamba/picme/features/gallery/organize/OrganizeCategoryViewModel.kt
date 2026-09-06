@@ -112,6 +112,8 @@ class OrganizeCategoryViewModel(
     private suspend fun loadCategoryItems(): List<ClassifiedItem> = withContext(ioDispatcher) {
         OrganizeCategorizer.classifyAll(organizeRepository.loadItems(), now = System.currentTimeMillis())
             .filter { entry -> entry.category == category }
+            // media_assets.uri 非唯一索引，重复行会同段同 key 硬崩 LazyVerticalGrid
+            .distinctBy { entry -> entry.item.uri }
     }
 
     fun toggle(uri: String) {
