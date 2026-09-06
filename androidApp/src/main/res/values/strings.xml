@@ -466,6 +466,10 @@
     <string name="org_partial_trash">Some items need extra permission and were kept</string>
     <string name="org_trash_unsupported">Trash needs Android 11+; please delete from the gallery</string>
     <string name="org_empty_category">Nothing to clean here</string>
+    <string name="org_section_suggested">Suggested for deletion · %1$d</string>
+    <string name="org_section_review">Needs your review · %1$d</string>
+    <string name="org_section_protected">Protected keepsakes · %1$d</string>
+    <string name="org_protected_badge">Protected</string>
 
     <!-- Swipe review（F2 手势快速整理全屏页） -->
     <string name="swipe_title">Quick tidy</string>

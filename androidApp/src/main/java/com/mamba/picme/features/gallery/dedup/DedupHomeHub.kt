@@ -20,12 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.BlurOn
-import androidx.compose.material.icons.outlined.BurstMode
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Face
-import androidx.compose.material.icons.outlined.ScreenshotMonitor
-import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -69,6 +63,8 @@ import com.mamba.picme.domain.organize.CategoryBoard
 import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.SignalCoverage
+import com.mamba.picme.features.gallery.organize.organizeCategoryIcon
+import com.mamba.picme.features.gallery.organize.organizeCategoryLabelRes
 
 /** 品牌渐变（青玉）：hub 大数字 / 主按钮同源（与 tagcontrol 设计稿同一口径）。 */
 private val orgBrandGradient: Brush
@@ -586,24 +582,4 @@ private fun DedupLevelRow(
             Checkbox(checked = selected, onCheckedChange = onToggle)
         }
     }
-}
-
-// ---------- 资源映射 ----------
-
-private fun organizeCategoryIcon(category: OrganizeCategory): ImageVector = when (category) {
-    OrganizeCategory.DUPLICATES -> Icons.Outlined.BurstMode
-    OrganizeCategory.SCREEN_CONTENT -> Icons.Outlined.ScreenshotMonitor
-    OrganizeCategory.DOCUMENTS -> Icons.Outlined.Description
-    OrganizeCategory.LOW_QUALITY_PORTRAITS -> Icons.Outlined.Face
-    OrganizeCategory.LOW_QUALITY_PHOTOS -> Icons.Outlined.BlurOn
-    OrganizeCategory.LARGE_FILES -> Icons.Outlined.Videocam
-}
-
-private fun organizeCategoryLabelRes(category: OrganizeCategory): Int = when (category) {
-    OrganizeCategory.DUPLICATES -> R.string.org_cat_duplicates
-    OrganizeCategory.SCREEN_CONTENT -> R.string.org_cat_screen_content
-    OrganizeCategory.DOCUMENTS -> R.string.org_cat_documents
-    OrganizeCategory.LOW_QUALITY_PORTRAITS -> R.string.org_cat_portraits
-    OrganizeCategory.LOW_QUALITY_PHOTOS -> R.string.org_cat_blurry
-    OrganizeCategory.LARGE_FILES -> R.string.org_cat_large_files
 }
