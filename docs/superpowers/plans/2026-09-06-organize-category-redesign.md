@@ -254,11 +254,14 @@ object OrganizeThresholds {
     const val OCR_STRONG_FACTOR = 2
 }
 
-    /** OCR 文字密度阈值基数：每百万像素的 OCR 字符数（ConfidenceGrader 用）。 */
-    const val OCR_DENSITY_PER_MEGAPIXEL = 20
+    /** OCR 文字密度阈值基数：每百万像素的 OCR 字符数（ConfidenceGrader 用）。
+     *  注：审查修正后为 const 别名，SSOT 在 DedupContentTypeDetector.kt 顶层
+     *  （DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL），保持强命中=2×裁定阈值不变式。 */
+    const val OCR_DENSITY_PER_MEGAPIXEL = DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL
 
-    /** OCR 兜底字符数阈值：无法计算像素面积时使用（ConfidenceGrader 用）。 */
-    const val OCR_DENSITY_FALLBACK_CHARS = 200
+    /** OCR 兜底字符数阈值：无法计算像素面积时使用（ConfidenceGrader 用）。
+     *  注：同上，别名列 DOCUMENT_OCR_CHAR_THRESHOLD。 */
+    const val OCR_DENSITY_FALLBACK_CHARS = DOCUMENT_OCR_CHAR_THRESHOLD
 
     /** 大文件强命中倍数：sizeBytes ≥ 类目阈值 × 该系数 → HIGH 置信。 */
     const val LARGE_FILE_STRONG_FACTOR = 2
