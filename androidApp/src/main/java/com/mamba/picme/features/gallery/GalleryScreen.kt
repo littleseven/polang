@@ -53,6 +53,8 @@ import com.mamba.picme.features.gallery.components.GalleryPermissionMessage
 import com.mamba.picme.features.gallery.components.GalleryTopBar
 import com.mamba.picme.features.gallery.components.MediaGrid
 import com.mamba.picme.features.gallery.components.MediaPager
+import com.mamba.picme.features.common.components.FloatingBottomTab
+import com.mamba.picme.features.common.components.FloatingBottomTabItem
 import com.mamba.picme.features.gallery.components.galleryReadPermissions
 import com.mamba.picme.features.gallery.components.hasGalleryPermission
 import androidx.core.net.toUri
@@ -60,8 +62,6 @@ import com.mamba.picme.features.gallery.components.shareMediaAssets
 import com.mamba.picme.features.gallery.components.SearchTopBar
 import com.mamba.picme.features.gallery.components.toMediaAsset
 import com.mamba.picme.features.common.chat.rememberAgentChatConfig
-import com.mamba.picme.features.common.components.FloatingBottomTab
-import com.mamba.picme.features.common.components.FloatingBottomTabItem
 import com.mamba.picme.features.settings.SettingsViewModel
 import android.app.Activity
 import com.mamba.picme.features.gallery.capability.GalleryCapability
@@ -108,6 +108,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.BurstMode
 import androidx.compose.material.icons.outlined.ChatBubble
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Sell
 
 private const val TAG = "Gallery"
@@ -135,7 +136,9 @@ fun GalleryScreen(
     /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
-    isActivePage: Boolean = true
+    isActivePage: Boolean = true,
+    /** Memory 页入口：悬浮底部 Tab 第 5 项（回忆） */
+    onNavigateToMemory: () -> Unit = {},
 ) {
     val groupedMedia by viewModel.groupedMedia.collectAsState()
     val groupingMode by viewModel.groupingMode.collectAsState()
@@ -842,7 +845,7 @@ fun GalleryScreen(
             val activeMedia = selectedMediaIndex?.let { previewMediaList.getOrNull(it) }
             val rect by remember { derivedStateOf { activeMedia?.let { thumbnailPositions[it.id] } } }
 
-            // 悬浮底部 Tab — 相册整理 / 聊天 / 打标 / 人物（纯图标）
+            // 悬浮底部 Tab — 相册整理 / 聊天 / 打标 / 人物 / 回忆（纯图标）
             // 2026-08-26：相机 tab 移除（相机已路由化，仅头像拍摄进入）；第一项为相册整理——
             // 相册整理是相邻 Pager 页（页 1），相册页左滑即达，手势由外层 HorizontalPager 原生承载
             if (selectedMediaIndex == null) {
@@ -866,6 +869,11 @@ fun GalleryScreen(
                         icon = Icons.Outlined.AccountCircle,
                         contentDescription = stringResource(R.string.gallery_people_entry),
                         onClick = onNavigateToPeople
+                    ),
+                    FloatingBottomTabItem(
+                        icon = Icons.Outlined.Collections,
+                        contentDescription = stringResource(R.string.tab_memories),
+                        onClick = onNavigateToMemory
                     )
                 )
                 FloatingBottomTab(

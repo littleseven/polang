@@ -32,16 +32,19 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 
 ### 1.2 页面导航（主页面 Pager + NavHost 二级页，Gallery 为默认首页）
 
-**主页面（`Screen.Main` 单 destination，`features/main/MainPagerHost.kt` 以 HorizontalPager 承载 4 页）**：
+**主页面（`Screen.Main` 单 destination，`features/main/MainPagerHost.kt` 以 HorizontalPager 承载 5 页）**：
 
 | 页索引 | 页面 | 定位 |
 |--------|------|------|
-| 0 | `Gallery` | **默认首页** — 智能相册、媒体浏览、AI 搜索、分类管理；底部悬浮 Tab 以纯图标聚合 相册整理/Chat/打标/People 入口；设置入口在顶部栏最右侧 |
+| 0 | `Gallery` | **默认首页** — 智能相册、媒体浏览、AI 搜索、分类管理；底部悬浮 Tab 以纯图标聚合 相册整理/Chat/打标/People/回忆 入口；设置入口在顶部栏最右侧 |
 | 1 | `Dedup`（相册整理） | 去重 2.0 主页（`DedupHomeRoute`，2026-08-26 自 NavHost 路由迁入 Pager）— 三级尺度重复/相似照片扫描、保留规则与回收站清理；相册页左滑即达，返回切回相册页不弹栈 |
 | 2 | `Chat` | AI 对话主页，仅远程模型 |
 | 3 | `People` | 人物聚类页 |
+| 4 | `Memory`（回忆） | 回忆独立页（2026-09-06，对标小米系统相册）— 三分区大卡 feed（时光/旅程/人物，空分区不占位）+ 回忆详情页 `memory_detail/{memoryId}`；纯端侧规则生成零上传，实现细节见 `features/gallery/AGENTS.md` §2.12 |
 
-> **2026-07 主页面 Pager 化**：4 个主页面由 `HorizontalPager`（`beyondViewportPageCount = 3`，页面常驻组合）承载，横滑跟手、线性顺序、无循环回绕；底部 Tab/编程入口经 `switchMainPage` 瞬时切页（无滑动动画）；相册（详情/多选）与聊天（全屏预览）通过 `onHorizontalSwipeEnabledChange` 局部禁用外层滑动；Chat/人物页跳相册搜索经 `searchRequest` 状态驱动（不再走 `gallery?query=` 路由参数）。原 `MainPageSwipeWrapper` 已删除。
+> **2026-07 主页面 Pager 化**：主页面由 `HorizontalPager`（`beyondViewportPageCount = MAIN_PAGE_COUNT - 1`，页面全部常驻组合）承载，横滑跟手、线性顺序、无循环回绕；底部 Tab/编程入口经 `switchMainPage` 瞬时切页（无滑动动画）；相册（详情/多选）与聊天（全屏预览）通过 `onHorizontalSwipeEnabledChange` 局部禁用外层滑动；Chat/人物页跳相册搜索经 `searchRequest` 状态驱动（不再走 `gallery?query=` 路由参数）。原 `MainPageSwipeWrapper` 已删除。
+>
+> **2026-09-06 Memory 独立页**：Pager 追加第 5 页「回忆」（index 4，`MAIN_PAGE_MEMORY`，`beyondViewportPageCount` 随之 = 4），对标小米系统相册分区 feed；实现细节见 `features/gallery/AGENTS.md` §2.12。
 >
 > **2026-08-26 相机路由化**：相机页从 Pager 移出（原页 0 席位由相册整理接替），改为 NavHost 全屏路由 `Screen.Camera`——唯一用户入口为头像拍摄（`AvatarCaptureController` 登记 pending 后 navigate），Agent `navigate_to(camera)` 由 `NavigationCapability` 直接 navigate 该路由；相机会话门控由 Pager `isActivePage` 改为路由生命周期（`backStackEntry.lifecycle ≥ RESUMED`）驱动，离开即解绑释放。
 
@@ -49,10 +52,13 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 
 | Screen | Route | 定位 |
 |--------|-------|------|
-| `Main` | `main` | **startDestination** — 主页面 Pager 容器（上表 4 页） |
+| `Main` | `main` | **startDestination** — 主页面 Pager 容器（上表 5 页） |
 | `Camera` | `camera` | 相机全屏页（2026-08-26 路由化）— 拍照、美颜预览、语音控制；仅头像拍摄与 Agent `navigate_to(camera)` 进入，会话按路由生命周期（≥RESUMED）门控 |
 | `PhotoEditor` | `photo_editor/{sourceUri}?recipeUri={recipeUri}&autoOptimize={autoOptimize}` | 图片编辑器 — 从相册 MediaPager 进入；`recipeUri` 重新编辑已保存副本，`autoOptimize` 进入时自动触发 AI 一键优化 |
 | `IDPhoto` | `id_photo/{sourceUri}` | 证件照制作 |
+| `OrganizeCategory` | `organize_category/{category}` | 整理中心类目详情（F1，2026-09-05）— AI 预选网格 + 批量回收站清理/恢复；路由段为 `domain.organize.OrganizeCategory` 枚举名，非法值弹栈；VM 经 `AppContainer.createOrganizeCategoryViewModelFactory(category)` 构建（TrashSessionController 在 VM 内 new，backend = DedupTrashBackend 包装 dedupTrashManager） |
+| `SwipeReview` | `swipe_review` | 手势快速整理全屏页（F2，2026-09-05）— 右滑保留 / 左滑跳过 / 上滑删除（点按=跳过），DELETE 批量提交系统回收站；KEEP 决策写入 30 天抑制历史（DataStore `swipe_keep_history`）不再入队；hub「Quick tidy up」主按钮点亮；VM 经 `AppContainer.createSwipeReviewViewModelFactory()` 构建 |
+| `MemoryDetail` | `memory_detail/{memoryId}` | 回忆详情页（F3，2026-09-06 升级对标小米）— 约屏高 55% 封面（左下蒙层白字标题 + hitCount·分类型副行）+ 3 列网格 + 底部「精选/全部」分段开关（`displayUris` = `itemUris`/`allItemUris` 跟随切换，分享集合同步跟随，ACTION_SEND_MULTIPLE）；路由段为 Memory.id（`Uri.encode`，Navigation 自动解码一次），数据取自 Activity 级 `MemoriesViewModel.observeMemory(id)` Flow（未过滤全集，已隐藏条目可复原，冷恢复不闪空态），id 失效 → 空态；VM 经 `AppContainer.createMemoriesViewModelFactory()` 构建 |
 | `Settings` | `settings` | 设置 — 主菜单（2026-08-26 列表式改版：账号 Hero 卡 + 个性化/功能/AI 与系统/其他四组列表行） |
 | `SettingsCategory` | `settings/{category}` | 设置二级分类页 — 路由段为枚举名小写：`account`、`gallery`（dormant）、`camera`、`system`、`remote_model`、`local_model`、`sandbox`、`developer`（2026-08-16 `camera_beauty` 更名 `camera`，承载相机状态记忆与重置） |
 | `AddRemoteProvider` | `settings/add_remote_provider` | 添加远程模型 — 供应商列表页（精确路由，优先于 `settings/{category}` 占位匹配；2026-08-21 替代原 AddProviderModelDialog 弹窗） |
@@ -69,7 +75,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `SentencePieceTest` | `sentencepiece_test` | SentencePiece 翻译测试页 |
 | `LlmLog` | `llm_log` | LLM 调用日志查看页 |
 
-> Chat/Gallery/Dedup/People 为 `Main` 内部 Pager 页，不单独注册 destination；相机为 NavHost 全屏路由（`camera`）；完整路由定义以 `navigation/Screen.kt` 为准。
+> Chat/Gallery/Dedup/People/Memory 为 `Main` 内部 Pager 页，不单独注册 destination；相机为 NavHost 全屏路由（`camera`）；完整路由定义以 `navigation/Screen.kt` 为准。
 
 > **2026-06 产品重心转移**：Gallery 为默认首页，Camera/Chat/ModelCenter 作为纯图标入口从 Gallery 底部悬浮 Tab 进入，Settings 从顶部栏进入；设置页已拆分为 6 个二级分类页，主菜单保持一屏可见；Model Center 内置于 Settings 的 AI 助手卡片第一项，分类按服务功能（必须/聊天/相册打标/美颜相机）重排，聊天分类聚合文字与语音模型，并提供必须模型一键下载；重复照片管理已升级为设置主菜单「相册整理」一级入口与主页面 Pager 页 1（2026-08-26，原「Settings 相册功能卡片」入口废弃）；Camera 页已移除设置入口。
 >
@@ -103,7 +109,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | **Gallery** | `features/gallery/` | `GalleryScreen`, `MediaViewModel` | 智能相册浏览、AI 搜索 |
 | **Editor** | `features/editor/` | `ImageEditScreen` | 图片编辑（美颜/滤镜/风格） |
 | **IDPhoto** | `features/idphoto/` | `IDPhotoScreen`, `IDPhotoViewModel` | 证件照制作二级页（`id_photo/{sourceUri}`）；底部 4-tab（底色/尺寸/边缘/修补），修补 tab 涂抹手势 + 覆盖层，边缘 tab 三滑块（对比度/收缩扩张/羽化）松手触发预览更新 |
-| **Main** | `features/main/` | `MainPagerHost` | 主页面 Pager 容器（Gallery/Dedup/Chat/People 4 页横滑） |
+| **Main** | `features/main/` | `MainPagerHost` | 主页面 Pager 容器（Gallery/Dedup/Chat/People/Memory 5 页横滑） |
 | **Person** | `features/person/` | `PersonScreen`, `PersonViewModel`, `PersonCoverResolver` | 人物聚类独立页 |
 | **Settings** | `features/settings/` | `SettingsScreen`, `SettingsViewModel`, `LlmModelManagerScreen`（含 `ModelCenterScreen` composable）, `MemoryFactsScreen` | 设置与模型管理；`MemoryFactsScreen` 为「AI 记忆」管理二级页（人物关系区查看/编辑/删除 + 事实记忆区查看/编辑/删除/清空） |
 | **TagViewer** | `features/tagviewer/` | `TagViewerTestScreen`, `TagAggregator`, `TagJsonParser` | 标签查看页 |
@@ -268,5 +274,5 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-08-08
+> **最后更新**：2026-09-06
 > **状态**：生效中

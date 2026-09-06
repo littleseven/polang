@@ -85,6 +85,7 @@
     <ID>InvalidPackageDeclaration:ToolSpecificationTest.kt$package com.mamba.picme.agent.core.inference.remote.tool</ID>
     <ID>LargeClass:GpuBeautyProcessor.kt$GpuBeautyProcessor : BeautyProcessor</ID>
     <ID>LargeClass:LlmModelDownloadManager.kt$LlmModelDownloadManager</ID>
+    <ID>LargeClass:MainActivity.kt$MainActivity : ComponentActivity</ID>
     <ID>LargeClass:RemoteControlToolService.kt$RemoteControlToolService : ToolSet</ID>
     <ID>LargeClass:SettingsViewModel.kt$SettingsViewModel : ViewModel</ID>
     <ID>LargeClass:TagDataBackupRepository.kt$TagDataBackupRepository</ID>

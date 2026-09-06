@@ -31,6 +31,10 @@ interface PersonDao {
     @Query("SELECT * FROM persons ORDER BY faceCount DESC")
     suspend fun getAllPersons(): List<PersonEntity>
 
+    /** 观察全部人物（回忆生成器输入：命名/self 标记变化均触发重发）。 */
+    @Query("SELECT * FROM persons")
+    fun observeAll(): Flow<List<PersonEntity>>
+
     @Query("SELECT COUNT(*) FROM persons")
     suspend fun getPersonCount(): Int
 

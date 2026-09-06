@@ -38,7 +38,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -75,9 +74,8 @@ import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
-import com.mamba.picme.domain.dedup.DedupScanConfig
-import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.VersionRole
+import com.mamba.picme.domain.organize.OrganizeCategory
 
 private val KeepGreen = Color(0xFF4CAF50)
 
@@ -86,6 +84,10 @@ private val KeepGreen = Color(0xFF4CAF50)
 fun DedupHomeRoute(
     viewModel: DedupViewModel,
     onNavigateBack: () -> Unit,
+    /** 整理中心 hub「Quick tidy up」（F2 路由未点亮，调用方先传空占位）。 */
+    onQuickTidy: () -> Unit = {},
+    /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */
+    onOpenCategory: (OrganizeCategory) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val pendingTrash by viewModel.pendingTrash.collectAsState()
@@ -182,12 +184,20 @@ fun DedupHomeRoute(
                 .fillMaxSize()
         ) {
             when (val state = uiState) {
-                is DedupUiState.Config -> DedupConfigContent(
-                    config = state.config,
-                    policy = policy,
-                    onStartScan = { config -> viewModel.startScan(config) },
-                    onOpenKeepRules = { showKeepRules = true },
-                )
+                is DedupUiState.Config -> {
+                    // 类目统计流仅 Config 态订阅（2026-09-05 审查修复）：Scanning/Results/Cleaned
+                    // 态不再挂着全量 Room+MediaStore 合并统计
+                    val categoryStats by viewModel.categoryStats.collectAsState()
+                    DedupHubContent(
+                        config = state.config,
+                        policy = policy,
+                        stats = categoryStats,
+                        onQuickTidy = onQuickTidy,
+                        onOpenCategory = onOpenCategory,
+                        onStartScan = { config -> viewModel.startScan(config) },
+                        onOpenKeepRules = { showKeepRules = true },
+                    )
+                }
                 is DedupUiState.Scanning -> DedupScanningContent(
                     state = state,
                     onOpenGroupDetail = { groupId -> detailGroupId = groupId },
@@ -252,10 +262,11 @@ private fun DedupTopBar(
         title = {
             Text(
                 text = stringResource(
-                    if (state is DedupUiState.Scanning) {
-                        R.string.dedup_scanning_title
-                    } else {
-                        R.string.dedup_title
+                    when (state) {
+                        is DedupUiState.Scanning -> R.string.dedup_scanning_title
+                        // Config 态已升级为整理中心 hub（dedup_title 键保留不删，向后兼容）
+                        is DedupUiState.Config -> R.string.org_title
+                        else -> R.string.dedup_title
                     }
                 )
             )
@@ -273,7 +284,8 @@ private fun DedupTopBar(
                 is DedupUiState.Scanning -> TextButton(onClick = onCancelScan) {
                     Text(stringResource(R.string.cancel))
                 }
-                is DedupUiState.Results -> IconButton(onClick = onOpenKeepRules) {
+                // hub（Config）与 Results 均提供保留规则入口（Tune 图标），行为不变
+                is DedupUiState.Config, is DedupUiState.Results -> IconButton(onClick = onOpenKeepRules) {
                     Icon(Icons.Rounded.Tune, contentDescription = stringResource(R.string.dedup_keep_rule))
                 }
                 else -> Unit
@@ -284,163 +296,8 @@ private fun DedupTopBar(
 
 // ---------- Config ----------
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DedupConfigContent(
-    config: DedupScanConfig,
-    policy: KeepPolicy,
-    onStartScan: (DedupScanConfig) -> Unit,
-    onOpenKeepRules: () -> Unit,
-) {
-    var selectedLevels by remember { mutableStateOf(config.levels) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            // Config 态无 bottomBar（Scaffold Unit）：滚动内容自行让出底部虚拟导航栏，
-            // 否则滚到底时「开始扫描/隐私说明」被三键导航遮挡（同 6d483d9e2 的口径）
-            .navigationBarsPadding()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Hero 卡：V1 无上次数值，简单显示「从未扫描」
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.dedup_estimate_label),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = stringResource(R.string.dedup_never_scanned),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        Text(
-            text = stringResource(R.string.dedup_scale_section),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        DedupLevel.entries.forEach { level ->
-            DedupLevelRow(
-                level = level,
-                selected = level in selectedLevels,
-                onToggle = { checked ->
-                    selectedLevels = if (checked) {
-                        selectedLevels + level
-                    } else {
-                        selectedLevels - level
-                    }
-                }
-            )
-        }
-
-        // 保留规则行（Task 8：打开规则弹层，当前值为 VM 级 policy）
-        Card(
-            onClick = onOpenKeepRules,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.dedup_keep_rule),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = stringResource(keepPolicyLabelRes(policy)),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Icon(
-                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Button(
-            onClick = { onStartScan(config.copy(levels = selectedLevels)) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = selectedLevels.isNotEmpty()
-        ) {
-            Text(stringResource(R.string.dedup_start_scan))
-        }
-
-        Text(
-            text = stringResource(R.string.dedup_privacy_caption),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DedupLevelRow(
-    level: DedupLevel,
-    selected: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    Card(
-        onClick = { onToggle(!selected) },
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = dedupLevelIcon(level),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(dedupLevelLabelRes(level)),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = stringResource(dedupLevelDescRes(level)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Checkbox(checked = selected, onCheckedChange = onToggle)
-        }
-    }
-}
+// Config 态已升级为整理中心 hub：见 DedupHomeHub.kt（DedupHubContent / DedupScanOptions /
+// DedupLevelRow 均迁往该文件；dedup_title 字符串键保留不删，向后兼容）。
 
 // ---------- Scanning ----------
 
@@ -1046,19 +903,19 @@ private fun DedupCleanedBottomBar(
 
 // ---------- 资源映射 ----------
 
-private fun dedupLevelIcon(level: DedupLevel): ImageVector = when (level) {
+internal fun dedupLevelIcon(level: DedupLevel): ImageVector = when (level) {
     DedupLevel.EXACT -> Icons.Rounded.ContentCopy
     DedupLevel.VISUAL -> Icons.Rounded.Image
     DedupLevel.SCENE -> Icons.Rounded.PhotoLibrary
 }
 
-private fun dedupLevelLabelRes(level: DedupLevel): Int = when (level) {
+internal fun dedupLevelLabelRes(level: DedupLevel): Int = when (level) {
     DedupLevel.EXACT -> R.string.dedup_level_exact
     DedupLevel.VISUAL -> R.string.dedup_level_visual
     DedupLevel.SCENE -> R.string.dedup_level_scene
 }
 
-private fun dedupLevelDescRes(level: DedupLevel): Int = when (level) {
+internal fun dedupLevelDescRes(level: DedupLevel): Int = when (level) {
     DedupLevel.EXACT -> R.string.dedup_scale_exact_desc
     DedupLevel.VISUAL -> R.string.dedup_scale_visual_desc
     DedupLevel.SCENE -> R.string.dedup_scale_scene_desc

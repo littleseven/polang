@@ -33,8 +33,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -44,6 +46,7 @@ import com.mamba.picme.core.designsystem.PoLangTheme
 import com.mamba.picme.data.preferences.UserPreferencesRepository
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.ThemeMode
+import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.common.avatar.AvatarCaptureController
 import com.mamba.picme.features.common.avatar.AvatarCaptureOrigin
 import com.mamba.picme.features.common.avatar.AvatarCaptureTarget
@@ -55,6 +58,12 @@ import com.mamba.picme.features.editor.PhotoEditorScreen
 import com.mamba.picme.features.editor.PhotoEditorViewModel
 import com.mamba.picme.features.idphoto.IDPhotoScreen
 import com.mamba.picme.features.idphoto.IDPhotoViewModel
+import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
+import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.memories.MemoriesViewModel
+import com.mamba.picme.features.gallery.memories.MemoryDetailScreen
+import com.mamba.picme.features.gallery.swipe.SwipeReviewScreen
+import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
 import com.mamba.picme.features.search.SearchTestScreen
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.TagGenerationControlScreen
@@ -144,6 +153,7 @@ class MainActivity : ComponentActivity() {
                     context
                 )
             )
+            val memoriesViewModel: MemoriesViewModel = viewModel(factory = app.container.createMemoriesViewModelFactory())
 
             val themeMode by settingsViewModel.themeMode.collectAsState()
             val appLanguage by settingsViewModel.appLanguage.collectAsState()
@@ -289,6 +299,7 @@ class MainActivity : ComponentActivity() {
                                     settingsViewModel = settingsViewModel,
                                     personViewModel = personViewModel,
                                     dedupViewModel = dedupViewModel,
+                                    memoriesViewModel = memoriesViewModel,
                                     navController = navController,
                                     onSwitchPage = switchMainPage,
                                     gallerySearchRequest = gallerySearchRequest,
@@ -296,6 +307,24 @@ class MainActivity : ComponentActivity() {
                                     onRequestGallerySearch = { query, personId ->
                                         gallerySearchRequest = query to personId
                                         switchMainPage(MAIN_PAGE_GALLERY)
+                                    },
+                                    // 整理中心 hub 出口：F2 Quick tidy → 手势整理页；类目卡 → F1 类目详情路由
+                                    onQuickTidy = {
+                                        navController.navigate(Screen.SwipeReview.route) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onOpenCategory = { category ->
+                                        navController.navigate(
+                                            Screen.OrganizeCategory.createRoute(category.name)
+                                        ) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onNavigateToMemoryDetail = { memoryId ->
+                                        navController.navigate(Screen.MemoryDetail.createRoute(memoryId)) {
+                                            launchSingleTop = true
+                                        }
                                     }
                                 )
                             }
@@ -369,6 +398,39 @@ class MainActivity : ComponentActivity() {
                                     onSaved = { navController.popBackStack() }
                                 )
                             }
+                            composable(
+                                route = Screen.OrganizeCategory.route,
+                                arguments = listOf(
+                                    navArgument("category") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                val categoryName = backStackEntry.arguments?.getString("category").orEmpty()
+                                val category = runCatching {
+                                    OrganizeCategory.valueOf(categoryName)
+                                }.getOrNull()
+                                if (category == null) {
+                                    // 非法类目参数（旧版本路由/手写 deep link）：直接弹栈不崩溃
+                                    LaunchedEffect(Unit) { navController.popBackStack() }
+                                } else {
+                                    val viewModel: OrganizeCategoryViewModel = viewModel(
+                                        factory = app.container.createOrganizeCategoryViewModelFactory(category)
+                                    )
+                                    OrganizeCategoryScreen(
+                                        viewModel = viewModel,
+                                        onNavigateBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
+                            composable(Screen.SwipeReview.route) {
+                                val viewModel: SwipeReviewViewModel = viewModel(
+                                    factory = app.container.createSwipeReviewViewModelFactory()
+                                )
+                                SwipeReviewScreen(
+                                    viewModel = viewModel,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
+                            memoryDetailRoute(memoriesViewModel) { navController.popBackStack() }
                             composable(Screen.TagControl.route) {
                                 DisposableEffect(Unit) {
                                     SceneManager.getInstance().transitionTo(SceneManager.Scene.GALLERY)
@@ -705,5 +767,31 @@ class MainActivity : ComponentActivity() {
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
 
         return context.createConfigurationContext(config)
+    }
+}
+
+/**
+ * 回忆详情（F3）路由注册：数据取自 Activity 级 [MemoriesViewModel.observeMemory] 未过滤全集
+ * Flow（已隐藏条目直达也可复原；冷恢复/列表刷新随流更新，取代 remember 反查）；id 失效
+ * （媒体清空等）→ 空态。抽为 NavGraphBuilder 扩展避免 MainActivity 类体超限。
+ */
+private fun NavGraphBuilder.memoryDetailRoute(
+    memoriesViewModel: MemoriesViewModel,
+    onNavigateBack: () -> Unit,
+) {
+    composable(
+        route = Screen.MemoryDetail.route,
+        arguments = listOf(
+            navArgument("memoryId") { type = NavType.StringType }
+        )
+    ) { backStackEntry ->
+        // Navigation 已对路径参数解码一次：此处直接取原始 id，不再手工二次解码（% 残留会抛 IAE）
+        val memoryId = backStackEntry.arguments?.getString("memoryId").orEmpty()
+        val memory by memoriesViewModel.observeMemory(memoryId)
+            .collectAsStateWithLifecycle(initialValue = null)
+        MemoryDetailScreen(
+            memory = memory,
+            onNavigateBack = onNavigateBack
+        )
     }
 }

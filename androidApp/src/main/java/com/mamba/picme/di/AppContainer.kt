@@ -13,6 +13,7 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.DedupHashDao
+import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.beauty.api.facedetect.FaceDetector
 import com.mamba.picme.beauty.api.facedetect.FaceDetectorFactory
@@ -27,10 +28,12 @@ import com.mamba.picme.data.repository.ChatImageStoreImpl
 import com.mamba.picme.data.repository.MediaFeedbackRepository
 import com.mamba.picme.data.repository.MediaFeedbackRepositoryImpl
 import com.mamba.picme.data.repository.MediaRepositoryImpl
+import com.mamba.picme.data.repository.OrganizeRepositoryImpl
 import com.mamba.picme.data.repository.PhotoEditRecipeRepository
 import com.mamba.picme.domain.aesthetic.AestheticScoreWorker
 import com.mamba.picme.domain.repository.ChatImageStore
 import com.mamba.picme.domain.repository.AndroidMediaRepository
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import com.mamba.picme.domain.search.ExplicitFirstSearchPipeline
 import com.mamba.picme.domain.search.MediaFeedbackUseCase
@@ -91,7 +94,16 @@ import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.dedup.DedupMediaSource
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.dedup.MediaStoreDedupMediaSource
+import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.memories.MemoriesViewModel
+import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
+import com.mamba.picme.data.preferences.DataStoreMemoryHiddenStore
+import com.mamba.picme.data.preferences.DataStoreSwipeKeepHistoryStore
+import com.mamba.picme.domain.memories.MemoryHiddenStore
+import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
+import com.mamba.picme.domain.trash.DedupTrashBackend
 import androidx.lifecycle.ViewModel
+import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.tag.FaceClusterEngine
 import com.mamba.picme.domain.tag.TagGenerationScheduler
 import com.mamba.picme.domain.tag.TagScanProgress
@@ -99,6 +111,7 @@ import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.data.indexing.MediaChangeEvent
 import com.mamba.picme.service.tag.TagGenerationService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 
 data class MediaViewModelDependencies(
@@ -136,6 +149,7 @@ class DedupViewModelFactory(
     private val mediaSource: DedupMediaSource,
     private val scanner: DedupScanController,
     private val trashManager: DedupTrashManager,
+    private val organizeRepository: OrganizeRepository,
     /** API < 30 无回收站授权接口，由调用方（MainActivity）注入旧删除流回调兜底。 */
     private val legacyDeleter: ((List<String>) -> Unit)?,
 ) : ViewModelProvider.Factory {
@@ -147,6 +161,7 @@ class DedupViewModelFactory(
                 mediaSource = mediaSource,
                 scanner = scanner,
                 trashManager = trashManager,
+                organizeRepository = organizeRepository,
                 legacyDeleter = legacyDeleter,
             ) as T
         }
@@ -162,6 +177,66 @@ class ChatViewModelFactory(
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return ChatViewModel(dependencies) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+/** 整理中心类目详情（F1）VM 工厂：TrashSessionController 在 VM 内构造，这里注入 backend 原料。 */
+class OrganizeCategoryViewModelFactory(
+    private val category: OrganizeCategory,
+    private val organizeRepository: OrganizeRepository,
+    private val trashManager: DedupTrashManager,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(OrganizeCategoryViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return OrganizeCategoryViewModel(
+                category = category,
+                organizeRepository = organizeRepository,
+                trashBackend = DedupTrashBackend(trashManager),
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+/** 手势快速整理（F2）VM 工厂：同 F1，TrashSessionController 在 VM 内构造；附 KEEP 抑制历史存储。 */
+class SwipeReviewViewModelFactory(
+    private val organizeRepository: OrganizeRepository,
+    private val trashManager: DedupTrashManager,
+    private val keepHistoryStore: SwipeKeepHistoryStore,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(SwipeReviewViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return SwipeReviewViewModel(
+                organizeRepository = organizeRepository,
+                trashBackend = DedupTrashBackend(trashManager),
+                keepHistoryStore = keepHistoryStore,
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+/** 回忆 carousel（F3）VM 工厂：媒体/人物 DAO + 隐藏集存储，VM 内 combine 生成。 */
+class MemoriesViewModelFactory(
+    private val mediaDao: MediaDao,
+    private val personDao: PersonDao,
+    private val hiddenStore: MemoryHiddenStore,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MemoriesViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MemoriesViewModel(
+                mediaDao = mediaDao,
+                personDao = personDao,
+                hiddenStore = hiddenStore,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -235,6 +310,9 @@ interface AppContainer {
     /** 去重 2.0：回收站删除/恢复授权管理 */
     val dedupTrashManager: DedupTrashManager
 
+    /** 整理中心（F1）：Room + MediaStore 按 uri 合并的类目数据源 */
+    val organizeRepository: OrganizeRepository
+
     fun createMediaViewModelFactory(): ViewModelProvider.Factory
     fun createChatViewModelFactory(): ViewModelProvider.Factory
     fun createPhotoEditorViewModelFactory(): ViewModelProvider.Factory
@@ -245,6 +323,15 @@ interface AppContainer {
     fun createDedupViewModelFactory(
         legacyDeleter: ((List<String>) -> Unit)? = null
     ): ViewModelProvider.Factory
+
+    /** 整理中心（F1）类目详情 ViewModel 工厂（按类目参数化） */
+    fun createOrganizeCategoryViewModelFactory(category: OrganizeCategory): ViewModelProvider.Factory
+
+    /** 手势快速整理（F2）ViewModel 工厂（无参数：队列由 VM 自建） */
+    fun createSwipeReviewViewModelFactory(): ViewModelProvider.Factory
+
+    /** 回忆 carousel（F3）ViewModel 工厂（无参数：数据源与隐藏集由容器注入） */
+    fun createMemoriesViewModelFactory(): ViewModelProvider.Factory
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
@@ -669,6 +756,15 @@ class AppContainerImpl(
         MediaStoreDedupMediaSource(context, repository)
     }
 
+    override val organizeRepository: OrganizeRepository by lazy {
+        OrganizeRepositoryImpl(
+            context = context,
+            mediaDao = database.mediaDao(),
+            dedupHashDao = dedupHashDao,
+            ioDispatcher = Dispatchers.IO,
+        )
+    }
+
     private val photoEditorViewModelFactory: ViewModelProvider.Factory by lazy {
         PhotoEditorViewModelFactory(
             appContext = context,
@@ -763,12 +859,39 @@ class AppContainerImpl(
             mediaSource = dedupMediaSource,
             scanner = dedupScanner,
             trashManager = dedupTrashManager,
+            organizeRepository = organizeRepository,
             legacyDeleter = legacyDeleter,
         )
     }
 
     override fun createPhotoEditorViewModelFactory(): ViewModelProvider.Factory {
         return photoEditorViewModelFactory
+    }
+
+    override fun createOrganizeCategoryViewModelFactory(
+        category: OrganizeCategory
+    ): ViewModelProvider.Factory {
+        return OrganizeCategoryViewModelFactory(
+            category = category,
+            organizeRepository = organizeRepository,
+            trashManager = dedupTrashManager,
+        )
+    }
+
+    override fun createSwipeReviewViewModelFactory(): ViewModelProvider.Factory {
+        return SwipeReviewViewModelFactory(
+            organizeRepository = organizeRepository,
+            trashManager = dedupTrashManager,
+            keepHistoryStore = DataStoreSwipeKeepHistoryStore(context),
+        )
+    }
+
+    override fun createMemoriesViewModelFactory(): ViewModelProvider.Factory {
+        return MemoriesViewModelFactory(
+            mediaDao = database.mediaDao(),
+            personDao = database.personDao(),
+            hiddenStore = DataStoreMemoryHiddenStore(context),
+        )
     }
 
     override fun createIDPhotoViewModelFactory(): ViewModelProvider.Factory {

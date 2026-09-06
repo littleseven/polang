@@ -1,5 +1,7 @@
 package com.mamba.picme.navigation
 
+import android.net.Uri
+
 sealed class Screen(val route: String) {
     /** 主页面容器：内部以 HorizontalPager 承载 相册/相册整理/聊天/人物 4 页 */
     data object Main : Screen("main")
@@ -43,6 +45,22 @@ sealed class Screen(val route: String) {
     data object CommunicationChannel : Screen("communication_channel")
     data object SentencePieceTest : Screen("sentencepiece_test")
     data object TagViewer : Screen("tag_viewer")
+
+    /** 整理中心类目详情（F1）：AI 预选网格 + 批量回收站清理；路由段为 domain OrganizeCategory 枚举名 */
+    data object OrganizeCategory : Screen("organize_category/{category}") {
+        fun createRoute(category: String): String = "organize_category/$category"
+    }
+
+    /** 手势快速整理（F2）：全屏滑动决策页（右滑保留 / 左滑跳过 / 上滑删除，点按=跳过） */
+    data object SwipeReview : Screen("swipe_review")
+
+    /** 回忆详情（F3）：封面大图 + 精选网格 + 分享；路由段为 Memory.id（Uri.encode，Navigation 自动解码一次） */
+    data object MemoryDetail : Screen("memory_detail/{memoryId}") {
+        fun createRoute(memoryId: String): String {
+            val encoded = Uri.encode(memoryId)
+            return "memory_detail/$encoded"
+        }
+    }
 
     data object ModelCenter : Screen("model_center/{categoryTag}") {
         fun createRoute(categoryTag: String): String {

@@ -276,6 +276,16 @@ object ChatCarouselTokens {
     val viewAllCornerRadius = 12.dp
 }
 
+/** Memory 独立页（2026-09-06，对标小米相册时光大卡）：竖版 3:4 大卡横滑行。 */
+object MemoryPageTokens {
+    val cardWidth = 168.dp
+    val cardHeight = 224.dp
+    val cardCornerRadius = 16.dp
+    val cardSpacing = 12.dp
+    val sectionHorizontalPadding = 16.dp
+    val sectionTitleSpacing = 12.dp
+}
+
 /** 聊天上下文附件暂存区（选图后输入栏上方）。ios-follow chat 2026-08-12 新增（B1）。72dp 缩略图 + 三意图 chip。 */
 object ChatContextTokens {
     val thumbSize = 72.dp

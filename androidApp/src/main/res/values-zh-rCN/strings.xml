@@ -333,7 +333,6 @@
 
     <!-- Dedup 2.0 -->
     <string name="dedup_title">重复照片清理</string>
-    <string name="dedup_estimate_label">预计可释放空间</string>
     <string name="dedup_last_scan">上次扫描：%1$s · 发现 %2$d 组重复</string>
     <string name="dedup_never_scanned">从未扫描</string>
     <string name="dedup_scale_section">扫描范围（重复的尺度）</string>
@@ -353,7 +352,6 @@
     <string name="dedup_policy_latest">保留最新</string>
     <string name="dedup_policy_latest_desc">最近保存的优先</string>
     <string name="dedup_start_scan">开始扫描</string>
-    <string name="dedup_privacy_caption">扫描全程在设备端完成，照片不会上传</string>
     <string name="dedup_scanning_title">正在扫描</string>
     <string name="dedup_phase_format">阶段 %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">已扫描 %1$d / %2$d 张</string>
@@ -417,6 +415,82 @@
     <string name="dedup_thumb_kept_cd">照片，保留</string>
     <string name="dedup_thumb_delete_cd">照片，待删除</string>
     <string name="dedup_thumb_neutral_cd">照片，未预选</string>
+
+    <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
+    <string name="org_title">整理</string>
+    <string name="org_hero_label">预计可释放</string>
+    <string name="org_hero_across">覆盖 %1$d 个类目</string>
+    <string name="org_quick_tidy">一键整理</string>
+    <string name="org_categories">类目</string>
+    <string name="org_cat_duplicates">重复与相似照片</string>
+    <string name="org_cat_screenshots">截图</string>
+    <string name="org_cat_blurry">模糊与低质量</string>
+    <string name="org_cat_portraits">低质量人像</string>
+    <string name="org_cat_large_videos">大视频</string>
+    <string name="org_cat_documents">文档与票据</string>
+    <string name="org_cat_meta">%1$d 个项目 · %2$s</string>
+    <string name="org_privacy_note">所有分析均在设备端完成 · 照片不会离开此手机</string>
+    <string name="org_ai_preselect_on">AI 预选已开启</string>
+    <string name="org_ai_preselect_off">AI 预选已关闭</string>
+    <string name="org_ai_preselected">AI 已预选 %1$d 项</string>
+    <string name="org_move_to_trash">移入回收站 %1$d 个项目 · 释放 %2$s</string>
+    <string name="org_trash_note">项目将在回收站保留 30 天</string>
+    <string name="org_cleaned_title">全部清理完成！</string>
+    <string name="org_cleaned_meta">已将 %1$d 个项目移入回收站</string>
+    <string name="org_cleaned_freed">已释放 %1$s</string>
+    <string name="org_undo">撤销</string>
+    <string name="org_partial_trash">部分项目需要额外授权，已保留</string>
+    <string name="org_trash_unsupported">回收站需 Android 11 及以上；请在相册中删除</string>
+    <string name="org_empty_category">这里无需清理</string>
+
+    <!-- Swipe review（F2 手势快速整理全屏页） -->
+    <string name="swipe_title">快速整理</string>
+    <string name="swipe_progress">%1$d / %2$d</string>
+    <string name="swipe_freed">已释放 %1$s</string>
+    <string name="swipe_hint_skip">← 跳过</string>
+    <string name="swipe_hint_delete">↑ 删除</string>
+    <string name="swipe_hint_keep">保留 →</string>
+    <string name="swipe_reason_screenshot">截图</string>
+    <string name="swipe_reason_blurry">模糊</string>
+    <string name="swipe_reason_portrait">低质量人像</string>
+    <string name="swipe_reason_recent">最近</string>
+    <string name="swipe_done_title">本轮整理完成</string>
+    <string name="swipe_done_subtitle">节奏不错——图库已经更轻盈了</string>
+    <string name="swipe_done_kept">已保留</string>
+    <string name="swipe_done_deleted">已删除</string>
+    <string name="swipe_done_skipped">已跳过</string>
+    <string name="swipe_done_freed">本轮释放空间 %1$s</string>
+    <string name="swipe_done_more">再来一轮</string>
+    <string name="swipe_done_back">返回整理中心</string>
+    <string name="swipe_empty">没有需要整理的内容——很棒！</string>
+    <string name="swipe_undo_cd">撤销上一步决策</string>
+    <string name="swipe_pending_commit">%1$d 张待移入回收站</string>
+    <string name="swipe_retry">重试</string>
+    <string name="swipe_discard">放弃</string>
+
+    <!-- Memories（F3 相册首页回忆 carousel） -->
+    <string name="memory_title">回忆</string>
+    <string name="memory_privacy_note">端侧生成 · 私密</string>
+    <string name="memory_hide">隐藏这条回忆</string>
+    <string name="memory_hide_confirm">隐藏这条回忆？隐藏后将不再显示。</string>
+    <string name="memory_hide_cancel">取消</string>
+    <string name="memory_share">分享回忆</string>
+    <string name="memory_detail_empty">这条回忆已不可用</string>
+    <string name="memory_section_time">时光</string>
+    <string name="memory_section_journey">旅程</string>
+    <string name="memory_section_people">人物</string>
+    <string name="memory_empty_page">照片积累后会自动生成回忆</string>
+    <string name="memory_detail_best">精选</string>
+    <string name="memory_detail_all">全部</string>
+    <string name="memory_items_count">%1$d 项</string>
+    <string name="tab_memories">回忆</string>
+    <string name="memory_photo_cd">回忆照片 %1$d</string>
+    <string name="memory_on_this_day">那年今日</string>
+    <string name="memory_on_this_day_subtitle">%1$s · %2$d</string>
+    <string name="memory_recent_highlights">近期高光</string>
+    <string name="memory_recent_highlights_subtitle">近 30 天</string>
+    <string name="memory_person_title">与 %1$s 的时刻</string>
+    <string name="memory_photo_count">%1$d 张照片</string>
 
     <string name="screenshot">截图</string>
     <string name="screenshot_saved">截图已保存至 %1$s</string>

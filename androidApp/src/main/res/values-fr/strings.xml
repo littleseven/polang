@@ -336,7 +336,6 @@
     <!-- Duplicate Management（设置入口文案；清理页 UI 键见 Dedup 2.0 区块） -->
     <!-- Dedup 2.0 -->
     <string name="dedup_title">Nettoyage des doublons</string>
-    <string name="dedup_estimate_label">Espace récupérable estimé</string>
     <string name="dedup_last_scan">Dernière analyse : %1$s · %2$d groupes trouvés</string>
     <string name="dedup_never_scanned">Jamais analysé</string>
     <string name="dedup_scale_section">Portée de l\'analyse (niveaux de doublons)</string>
@@ -356,7 +355,6 @@
     <string name="dedup_policy_latest">Conserver la plus récente</string>
     <string name="dedup_policy_latest_desc">L\'enregistrement le plus récent en priorité</string>
     <string name="dedup_start_scan">Lancer l\'analyse</string>
-    <string name="dedup_privacy_caption">L\'analyse s\'exécute entièrement sur l\'appareil ; les photos ne le quittent jamais</string>
     <string name="dedup_scanning_title">Analyse en cours</string>
     <string name="dedup_phase_format">Phase %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">%1$d / %2$d analysées</string>
@@ -420,6 +418,83 @@
     <string name="dedup_thumb_kept_cd">Photo, conservée</string>
     <string name="dedup_thumb_delete_cd">Photo, marquée pour suppression</string>
     <string name="dedup_thumb_neutral_cd">Photo, non sélectionnée</string>
+
+    <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
+    <string name="org_title">Organiser</string>
+    <string name="org_hero_label">Espace récupérable estimé</string>
+    <string name="org_hero_across">Sur %1$d catégories</string>
+    <string name="org_quick_tidy">Nettoyage rapide</string>
+    <string name="org_categories">Catégories</string>
+    <string name="org_cat_duplicates">Doublons et similaires</string>
+    <string name="org_cat_screenshots">Captures d\'écran</string>
+    <string name="org_cat_blurry">Floues et de basse qualité</string>
+    <string name="org_cat_portraits">Portraits de basse qualité</string>
+    <string name="org_cat_large_videos">Vidéos volumineuses</string>
+    <string name="org_cat_documents">Documents et reçus</string>
+    <string name="org_cat_meta">%1$d éléments · %2$s</string>
+    <string name="org_privacy_note">Toute l\'analyse s\'exécute sur l\'appareil · vos photos ne quittent jamais ce téléphone</string>
+    <string name="org_ai_preselect_on">Présélection IA activée</string>
+    <string name="org_ai_preselect_off">Présélection IA désactivée</string>
+    <string name="org_ai_preselected">%1$d présélectionnés par l\'IA</string>
+    <string name="org_move_to_trash">Déplacer vers la corbeille %1$d éléments · Libérer %2$s</string>
+    <string name="org_trash_note">Les éléments restent dans la corbeille pendant 30 jours</string>
+    <string name="org_cleaned_title">Tout est propre !</string>
+    <string name="org_cleaned_meta">%1$d éléments déplacés vers la corbeille</string>
+    <string name="org_cleaned_freed">%1$s libérés</string>
+    <string name="org_undo">Annuler</string>
+    <string name="org_partial_trash">Certains éléments nécessitent une autorisation supplémentaire et ont été conservés</string>
+    <string name="org_trash_unsupported">La corbeille nécessite Android 11+ ; supprimez depuis la galerie</string>
+    <string name="org_empty_category">Rien à nettoyer ici</string>
+
+    <!-- Swipe review（F2 page de tri rapide par gestes） -->
+    <string name="swipe_title">Tri rapide</string>
+    <string name="swipe_progress">%1$d / %2$d</string>
+    <string name="swipe_freed">%1$s libérés</string>
+    <string name="swipe_hint_skip">← Ignorer</string>
+    <string name="swipe_hint_delete">↑ Supprimer</string>
+    <string name="swipe_hint_keep">Garder →</string>
+    <string name="swipe_reason_screenshot">Capture d\'écran</string>
+    <string name="swipe_reason_blurry">Floue</string>
+    <string name="swipe_reason_portrait">Portrait de mauvaise qualité</string>
+    <string name="swipe_reason_recent">Récente</string>
+    <string name="swipe_done_title">Manche terminée</string>
+    <string name="swipe_done_subtitle">Bon rythme — votre bibliothèque est déjà plus légère</string>
+    <string name="swipe_done_kept">Conservées</string>
+    <string name="swipe_done_deleted">Supprimées</string>
+    <string name="swipe_done_skipped">Ignorées</string>
+    <string name="swipe_done_freed">Espace libéré cette manche : %1$s</string>
+    <string name="swipe_done_more">Encore une manche</string>
+    <string name="swipe_done_back">Retour à Organiser</string>
+    <string name="swipe_empty">Rien à trier — bravo !</string>
+    <string name="swipe_undo_cd">Annuler la dernière décision</string>
+    <string name="swipe_pending_commit">%1$d éléments en attente de mise à la corbeille</string>
+    <string name="swipe_retry">Réessayer</string>
+    <string name="swipe_discard">Abandonner</string>
+
+    <!-- Memories（F3 相册首页回忆 carousel） -->
+    <string name="memory_title">Souvenirs</string>
+    <string name="memory_privacy_note">Sur l\'appareil · privé</string>
+    <string name="memory_hide">Masquer ce souvenir</string>
+    <string name="memory_hide_confirm">Masquer ce souvenir ? Il ne sera plus affiché.</string>
+    <string name="memory_hide_cancel">Annuler</string>
+    <string name="memory_share">Partager le souvenir</string>
+    <string name="memory_detail_empty">Ce souvenir n\'est plus disponible</string>
+    <string name="memory_section_time">Temps</string>
+    <string name="memory_section_journey">Voyages</string>
+    <string name="memory_section_people">Personnes</string>
+    <string name="memory_empty_page">Les souvenirs apparaîtront au fur et à mesure de votre photothèque</string>
+    <string name="memory_detail_best">Sélection</string>
+    <string name="memory_detail_all">Toutes</string>
+    <string name="memory_items_count">%1$d éléments</string>
+    <string name="tab_memories">Souvenirs</string>
+    <string name="memory_photo_cd">Photo du souvenir %1$d</string>
+    <string name="memory_on_this_day">Ce jour-là</string>
+    <string name="memory_on_this_day_subtitle">%1$s · %2$d</string>
+    <string name="memory_recent_highlights">Temps forts récents</string>
+    <string name="memory_recent_highlights_subtitle">30 derniers jours</string>
+    <string name="memory_person_title">Moments avec %1$s</string>
+    <string name="memory_photo_count">%1$d photos</string>
+
     <!-- Media Pager -->
     <string name="media_source">Source : %1$s</string>
     <string name="landmark_overlay">Points de repère du visage</string>

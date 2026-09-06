@@ -490,6 +490,17 @@ enum ChatCarouselTokens {
     static let viewAllCornerRadius: CGFloat = 12
 }
 
+// MARK: - Memory Page（回忆独立页分区大卡）
+
+enum MemoryPageTokens {
+    static let cardWidth: CGFloat = 168
+    static let cardHeight: CGFloat = 224
+    static let cardCornerRadius: CGFloat = 16
+    static let cardSpacing: CGFloat = 12
+    static let sectionHorizontalPadding: CGFloat = 16
+    static let sectionTitleSpacing: CGFloat = 12
+}
+
 // MARK: - Chat Context（上下文附件暂存区）
 
 enum ChatContextTokens {
