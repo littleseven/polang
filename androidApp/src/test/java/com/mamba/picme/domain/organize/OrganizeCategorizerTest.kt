@@ -157,22 +157,58 @@ class OrganizeCategorizerTest {
     }
 
     @Test
-    fun `duplicates keeper not deducted when group partially listed - phantom member conservative`() {
-        // 组声明 3 张但仅 2 张在库（dedup_hash 残留已删文件）：无法确认有副本留存，
-        // 保守不扣，退回全组字节（宁可低估可释放，不可鼓励删光）
+    fun `duplicates keeper deducted after in-library convergence - 3 hashes 2 alive becomes pair`() {
+        // Task 18b：聚类输入已按库内 uri 收敛（repository 过滤 dedup_hash 残留行），
+        // 「3 hash / 2 在库」到达领域层时已是 2 人组（exactDupGroupSize=2）→ 正常扣 1 张
         val board = OrganizeCategorizer.board(
             listOf(
-                item("d1", sizeBytes = 5_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5a"),
-                item("d2", sizeBytes = 5_000_000, exactDupGroupSize = 3, exactDupGroupKey = "md5a"),
+                item("d1", sizeBytes = 5_000_000, exactDupGroupSize = 2, exactDupGroupKey = "md5a"),
+                item("d2", sizeBytes = 5_000_000, exactDupGroupSize = 2, exactDupGroupKey = "md5a"),
             ),
             now = now,
         )
-        assertEquals(10_000_000L, cardOf(board, OrganizeCategory.DUPLICATES).highBytes)
+        assertEquals(5_000_000L, cardOf(board, OrganizeCategory.DUPLICATES).highBytes)
+        assertEquals(5_000_000L, board.heroReclaimBytes)
     }
 
     @Test
-    fun `duplicates keeper not deducted without group key - legacy data fallback`() {
-        // 老数据/异常：有组大小无组标识，无法按组去重扣减 → 不扣（旧口径）
+    fun `sole surviving keeper is not suggested - group collapses below 2 after deletion`() {
+        // Task 18b 根治「删光唯一副本」引导：组内其余已删、唯一幸存 keeper 经库内收敛后
+        // exactDupGroupSize 塌缩为 1 → 不成组、不进 DUPLICATES（归宿类目视其他信号，
+        // 此处 DCIM 普通照不命中任何类目）
+        val board = OrganizeCategorizer.board(
+            listOf(item("keeper", sizeBytes = 5_000_000, exactDupGroupSize = 0)),
+            now = now,
+        )
+        val card = cardOf(board, OrganizeCategory.DUPLICATES)
+        assertEquals(0, card.totalCount)
+        assertEquals(0L, card.highBytes)
+        assertEquals(0L, board.heroReclaimBytes)
+    }
+
+    @Test
+    fun `duplicates keeper deduction with mixed group - similar-only member stays in review`() {
+        // 混合组：2 exact（同 key，HIGH）+ 1 similar-only（无 key，MEDIUM 落请确认段）同卡，
+        // highBytes 仍只按 exact 组扣 1 张；similar-only 成员不进 high 不参与扣减
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("d1", sizeBytes = 5_000_000, exactDupGroupSize = 2, exactDupGroupKey = "md5a"),
+                item("d2", sizeBytes = 5_000_000, exactDupGroupSize = 2, exactDupGroupKey = "md5a"),
+                item("s1", sizeBytes = 4_000_000, similarDupGroupSize = 3),
+            ),
+            now = now,
+        )
+        val card = cardOf(board, OrganizeCategory.DUPLICATES)
+        assertEquals(3, card.totalCount)
+        assertEquals(2, card.highCount)
+        assertEquals(1, card.reviewCount)
+        assertEquals(5_000_000L, card.highBytes)
+    }
+
+    @Test
+    fun `duplicates keeper not deducted without group key - defensive fallback`() {
+        // 防御分支：有组大小无组标识无法按组去重扣减 → 不扣（按全组字节计）。
+        // 生产管线库内收敛后组恒带标识，仅直调 board 的异常输入可达
         val board = OrganizeCategorizer.board(
             listOf(
                 item("d1", sizeBytes = 5_000_000, exactDupGroupSize = 2),

@@ -63,7 +63,7 @@ class OrganizeRepositoryImpl(
         if (rows.isEmpty()) return@withContext emptyList()
         val metaByUri = queryMediaStoreMeta(appContext.contentResolver)
         val pixelAreaByUri = queryCachedPixelAreas(rows.map { row -> row.uri })
-        val dupInfoByUri = queryDuplicateInfo()
+        val dupInfoByUri = queryDuplicateInfo(rows.map { row -> row.uri })
         val personCountByFaceId = mediaDao.getPersonPhotoCounts()
             .associate { count -> count.faceId to count.cnt }
         rows.map { row ->
@@ -99,14 +99,22 @@ class OrganizeRepositoryImpl(
      * ⚠️ pHash 聚类为 O(n²)（DuplicateGrouper.group），全表数万行可能秒级；
      * 此处打点观察耗时，真机验证后再定是否优化。
      *
-     * 失效键 = 聚类输入（uri/md5/phash 集合）本身：media_assets 行写（TAG 逐行回写标签、
-     * lastViewedAt 60s 节流回写、质量分合批）虽触发 observeOrganizeRows 重发射，但不改变
-     * dedup_hash 内容 → 命中缓存复用结果，不再每次全表 O(n²) 重聚类（Task 18a 收窄）。
+     * 库内收敛（Task 18b 审查修复）：dedup_hash 行在媒体删除后残留（系统相册/回收站到期
+     * 删除无钩子，deleteByUri 无全量接线点），先按当前 media_assets 行集过滤再聚类——
+     * 组大小/组标识只反映真实库内组：幽灵成员不再虚增组，唯一幸存 keeper（组内其余
+     * 已删）组大小塌缩为 1 自然不成组，不进 DUPLICATES 建议删除段。
+     *
+     * 失效键 = 过滤后的库内聚类输入（uri/md5/phash 集合）本身：media_assets 行写
+     * （TAG 逐行回写标签、lastViewedAt 60s 节流回写、质量分合批）虽触发
+     * observeOrganizeRows 重发射，但不改变本输入 → 命中缓存复用结果，不再每次全表
+     * O(n²) 重聚类；媒体删除 → uri 从行集消失 → 键变 → 重算，删除路径自然失效。
      */
-    private suspend fun queryDuplicateInfo(): Map<String, DuplicateGrouper.DupInfo> =
+    private suspend fun queryDuplicateInfo(libraryUris: List<String>): Map<String, DuplicateGrouper.DupInfo> =
         runCatching {
+            val libraryUriSet = libraryUris.toSet()
             // getAllHashes 无 ORDER BY，先按 uri 排序固定序，失效键只依赖集合内容
             val inputs = dedupHashDao.getAllHashes()
+                .filter { row -> row.uri in libraryUriSet }
                 .map { row -> DuplicateGrouper.HashInput(row.uri, row.md5, row.phash) }
                 .sortedBy { input -> input.uri }
             synchronized(dupCacheLock) {

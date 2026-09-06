@@ -69,10 +69,13 @@ object OrganizeCategorizer {
     }
 
     /**
-     * DUPLICATES keeper 扣减：精确组**全员**都进建议集时须保留 1 张（删光即丢内容），
-     * 扣回一张字节——组内同 MD5 → 同 sizeBytes，任取一张。
-     * 组内成员未全部在列（如dedup_hash 残留已删文件的幽灵成员）时不扣，退回全组字节：
-     * 保守方向宁可低估；组标识缺失（老数据）同理不扣。
+     * DUPLICATES keeper 扣减：hub「可释放」按每精确组留 1 张计（与详情页预选/全选按组
+     * 排除 1 张 keeper 同口径）。组内同 MD5 内容相同，扣组内最大 sizeBytes
+     * （防 first 落到 0 字节异常行）。
+     * 守卫 `group.size == exactDupGroupSize`：组全员都在建议集才扣。生产管线中聚类输入
+     * 已按库内 uri 收敛（OrganizeRepositoryImpl.queryDuplicateInfo），组必然全员在列，
+     * 本守卫仅防御直调 [board] 传部分列表的异常输入——不扣时按全组字节计（高估方向，
+     * 仅展示口径偏差，无安全风险）。
      * 注：DUPLICATES 不经 ValueGuard（见 ValueGuard.GUARDED_CATEGORIES），
      * 精确组成员恒 HIGH 非 protected，「全员在列」即「组未被建议集拆散」。
      */
@@ -81,7 +84,7 @@ object OrganizeCategorizer {
             .filterKeys { key -> key != null }
             .values
             .filter { group -> group.size == group.first().item.exactDupGroupSize }
-            .sumOf { group -> group.first().item.sizeBytes }
+            .sumOf { group -> group.maxOf { entry -> entry.item.sizeBytes } }
 
     /**
      * 类目信号覆盖度：全库任一媒体持有该类目关键信号 → READY，否则 NEEDS_SCAN
