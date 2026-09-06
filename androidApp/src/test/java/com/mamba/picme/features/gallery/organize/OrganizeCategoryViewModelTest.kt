@@ -6,7 +6,6 @@ import com.mamba.picme.domain.organize.OrganizeItem
 import com.mamba.picme.domain.trash.TrashBackend
 import io.mockk.coEvery
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope

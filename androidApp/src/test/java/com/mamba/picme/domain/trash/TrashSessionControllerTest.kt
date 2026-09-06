@@ -17,13 +17,15 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TrashSessionControllerTest {
 
+    private class FakeIpcException(message: String) : Exception(message)
+
     private class FakeBackend : TrashBackend {
         override val isSupported: Boolean = true
         var trashed = mutableSetOf<String>()
         var failNextBuild = false
 
         override fun buildTrashToken(uris: List<String>): Any {
-            if (failNextBuild) throw RuntimeException("ipc fail")
+            if (failNextBuild) throw FakeIpcException("ipc fail")
             return "trash-token"
         }
 

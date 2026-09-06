@@ -91,6 +91,7 @@ private val CleanGreen = Color(0xFF4CAF50)
  * 三态：Loading → 网格（副行统计 + 3 列勾选缩略图 + 底部删除 CTA）→ trashed 完成态（可 Undo）。
  * 系统授权经 TrashSessionController.pendingRequest 以 StartIntentSenderForResult 拉起。
  */
+@Suppress("LongMethod") // 待重构：三态分支（Loading/网格/完成态）可抽子组合函数
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrganizeCategoryScreen(
@@ -388,6 +389,7 @@ private fun OrganizeDeleteBar(
 // ---------- 完成态 ----------
 
 /** 完成态：✅ 圆标 + All clean! + 回收预览卡（前 3 缩略图 + 多余计数）；Undo 在底部栏。 */
+@Suppress("LongMethod") // 待重构：预览卡可抽子组合函数
 @Composable
 private fun OrganizeCleanedContent(state: OrganizeCategoryUiState.Ready) {
     Column(

@@ -1,8 +1,15 @@
 # 相册整理五大核心 Feature 产品与设计规范（竞品借鉴版）
 
-> **版本**：1.0
-> **日期**：2026-09-05
-> **状态**：设计稿阶段（Ardot 绘制中），未动工
+> **版本**：1.1
+> **日期**：2026-09-05（2026-09-06 更新）
+> **状态**：F1/F2/F3 已落地（分支 `feat/organize-suite`，编译 + JVM 单测 + 交叉审查修复全绿；**未真机验证**）；F4 暂缓、F5 明确不做（2026-09-05 用户决策）
+> **落地校准注记**（相对本稿设计稿阶段的偏差）：
+> - F3 回忆不落 Room 表，每次由媒体 + 人物流实时生成；隐藏集仅存 DataStore `memory_hidden_ids`，**v1 无恢复入口**（确认文案不承诺恢复）
+> - F3 闭眼/模糊筛选用 `faceQualityScore` 代理，未单独训练闭眼模型
+> - F3 文案 I18N：`Memory` 模型携带结构化字段（type/label/hitCount/latestYear/monthDay），UI 层 `MemoryTexts.kt` 经 stringResource 还原，五语同步
+> - F2 v1 无连拍桶预分组；KEEP 决策写入 30 天抑制历史（DataStore `swipe_keep_history`）
+> - F1/F2 删除走系统回收站（API 30+ `MediaStore.createTrashRequest`），API<30 降级为应用内软删除标记
+> - 回忆 id `recent:YYYY-MM` 随月漂移（接受现状，见 gallery AGENTS §2.12）
 > **竞品调研依据**：`docs/reviews/2026-09-05-photo-organizer-competitor-research.md`
 > **现状 SSOT**：`androidApp/.../features/gallery/AGENTS.md`（§2.4 去重 2.0、§2.9 TAG 控制）、`docs/superpowers/specs/2026-08-25-album-dedup-design.md`
 > **红线约束**：全部媒体处理端侧完成，零上传（[PRIVACY]）；五语同步（[I18N]）
@@ -18,9 +25,9 @@
 | 相似/重复照片分组 + 智能选最佳 | ✅ 去重 2.0 已全量落地（三级尺度 + 保留规则 + 回收站） | **不重复做**，作为整理中心的一个类目收口 |
 | 智能清理看板 | ❌ 无（数据已备：contentType/美学分/文件大小） | **F1 本期做** |
 | 手势清理模式 | ❌ 无 | **F2 本期做**，加 AI 预排序差异化 |
-| 自然语言整理指令 | ⚠️ 链路已在（Chat→capability.dispatch→写确认），缺媒体预览确认卡 | **F4 本期做** |
+| 自然语言整理指令 | ⚠️ 链路已在（Chat→capability.dispatch→写确认），缺媒体预览确认卡 | **F4 暂缓**（2026-09-05 用户决策，先落 F1-F3） |
 | On This Day / 回忆 | ❌ 无（数据已备：TAG + 时间 + 美学分） | **F3 本期做** |
-| 私密相册 | ❌ 无 | **F5 本期做**（Keepsafe 验证的最大单点付费项） |
+| 私密相册 | ❌ 无 | **F5 不做**（2026-09-05 用户决策忽略） |
 
 五个 feature 共用一条主线：**「端侧 AI 帮你把相册越用越干净」**，全部建立在已有资产（TAG 3-Pass、美学/人脸质量分、dedup contentType、MediaSearchEngine、回收站删除通路、Chat 写确认链路）之上。
 

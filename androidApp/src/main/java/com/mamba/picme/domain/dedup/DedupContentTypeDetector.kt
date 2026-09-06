@@ -10,6 +10,9 @@ internal const val DOCUMENT_OCR_CHAR_THRESHOLD = 200
  */
 internal const val DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL = 20
 
+/** 百万像素归一因子（pixelArea → MP）。 */
+private const val PIXELS_PER_MEGAPIXEL = 1_000_000L
+
 /** MediaStore 截图目录约定（路径 contains，大小写不敏感）。 */
 private const val SCREENSHOT_DIR_KEYWORD = "screenshots"
 
@@ -43,7 +46,7 @@ private fun isDocumentText(ocrText: String?, pixelArea: Long?): Boolean {
     val chars = ocrText?.length ?: 0
     if (chars == 0) return false
     return if (pixelArea != null && pixelArea > 0) {
-        chars.toLong() * 1_000_000L > pixelArea * DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL
+        chars.toLong() * PIXELS_PER_MEGAPIXEL > pixelArea * DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL
     } else {
         chars > DOCUMENT_OCR_CHAR_THRESHOLD
     }

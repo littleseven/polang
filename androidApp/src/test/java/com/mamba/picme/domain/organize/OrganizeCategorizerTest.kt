@@ -6,6 +6,7 @@ import org.junit.Test
 
 class OrganizeCategorizerTest {
 
+    @Suppress("LongParameterList") // 测试夹具工厂：与 OrganizeItem 构造参数一一对应，默认值覆盖避免每用例全列
     private fun item(
         uri: String,
         isVideo: Boolean = false,
