@@ -6,10 +6,13 @@ import org.junit.Test
 
 class OrganizeCategorizerTest {
 
-    @Suppress("LongParameterList") // 测试夹具工厂：与 OrganizeItem 构造参数一一对应，默认值覆盖避免每用例全列
+    private val now = 1_800_000_000_000L
+
+    @Suppress("LongParameterList")
     private fun item(
         uri: String,
         isVideo: Boolean = false,
+        captureDate: Long = now,
         sizeBytes: Long = 1_000_000,
         relativePath: String? = "DCIM/Camera/",
         ocrText: String? = null,
@@ -18,79 +21,114 @@ class OrganizeCategorizerTest {
         hasFace: Boolean = false,
         aestheticScore: Float? = null,
         faceQualityScore: Float? = null,
-    ) = OrganizeItem(uri, isVideo, 1_000L, sizeBytes, relativePath, ocrText, pixelArea, labels, hasFace, aestheticScore, faceQualityScore)
-
-    private fun categoriesOf(vararg items: OrganizeItem): Map<String, Set<OrganizeCategory>> =
-        items.associate { item -> item.uri to OrganizeCategorizer.categoriesOf(item) }
-
-    @Test
-    fun `screenshot path detected case-insensitively`() {
-        val cats = categoriesOf(item("a", relativePath = "Pictures/Screenshots/"))
-        assertTrue(OrganizeCategory.SCREENSHOTS in cats.getValue("a"))
-    }
-
-    @Test
-    fun `null aesthetic score is not blurry`() {
-        val cats = categoriesOf(item("a", aestheticScore = null))
-        assertTrue(OrganizeCategory.BLURRY !in cats.getValue("a"))
-    }
-
-    @Test
-    fun `low aesthetic score below threshold is blurry`() {
-        val cats = categoriesOf(item("a", aestheticScore = 2.1f), item("b", aestheticScore = 3.5f))
-        assertTrue(OrganizeCategory.BLURRY in cats.getValue("a"))
-        assertTrue(OrganizeCategory.BLURRY !in cats.getValue("b"))
-    }
+        blurScore: Float? = null,
+        exposureScore: Float? = null,
+        lastViewedAt: Long? = null,
+        isFavorite: Boolean = false,
+        personPhotoCount: Int? = null,
+        exactDupGroupSize: Int = 0,
+        similarDupGroupSize: Int = 0,
+    ) = OrganizeItem(
+        uri = uri, isVideo = isVideo, captureDate = captureDate, sizeBytes = sizeBytes,
+        relativePath = relativePath, ocrText = ocrText, pixelArea = pixelArea,
+        labels = labels, hasFace = hasFace, aestheticScore = aestheticScore,
+        faceQualityScore = faceQualityScore, blurScore = blurScore,
+        exposureScore = exposureScore, lastViewedAt = lastViewedAt, isFavorite = isFavorite,
+        personPhotoCount = personPhotoCount, exactDupGroupSize = exactDupGroupSize,
+        similarDupGroupSize = similarDupGroupSize,
+    )
 
     @Test
-    fun `low face quality portrait detected, null excluded`() {
-        val cats = categoriesOf(
-            item("a", hasFace = true, faceQualityScore = 0.2f),
-            item("b", hasFace = true, faceQualityScore = null),
-            item("c", hasFace = false, faceQualityScore = 0.2f),
+    fun `mutex - screenshot with low scores lands only in SCREEN_CONTENT`() {
+        val classified = OrganizeCategorizer.classifyAll(
+            listOf(
+                item(
+                    "shot", relativePath = "Pictures/Screenshots/",
+                    aestheticScore = 1.0f, blurScore = 1.0f, ocrText = "x".repeat(600),
+                )
+            ),
+            now = now,
         )
-        assertTrue(OrganizeCategory.LOW_QUALITY_PORTRAITS in cats.getValue("a"))
-        assertTrue(OrganizeCategory.LOW_QUALITY_PORTRAITS !in cats.getValue("b"))
-        assertTrue(OrganizeCategory.LOW_QUALITY_PORTRAITS !in cats.getValue("c"))
+        assertEquals(1, classified.size)
+        assertEquals(OrganizeCategory.SCREEN_CONTENT, classified[0].category)
     }
 
     @Test
-    fun `large video threshold`() {
-        val big = item("a", isVideo = true, sizeBytes = 150L * 1024 * 1024)
-        val small = item("b", isVideo = true, sizeBytes = 50L * 1024 * 1024)
-        val photo = item("c", isVideo = false, sizeBytes = 150L * 1024 * 1024)
-        val cats = categoriesOf(big, small, photo)
-        assertTrue(OrganizeCategory.LARGE_VIDEOS in cats.getValue("a"))
-        assertTrue(OrganizeCategory.LARGE_VIDEOS !in cats.getValue("b"))
-        assertTrue(OrganizeCategory.LARGE_VIDEOS !in cats.getValue("c"))
-    }
-
-    @Test
-    fun `document by ocr density and fallback`() {
-        val dense = item("a", ocrText = "x".repeat(500), pixelArea = 12_000_000)
-        val unknownArea = item("b", ocrText = "x".repeat(250), pixelArea = null)
-        val sparse = item("c", ocrText = "hi", pixelArea = 12_000_000)
-        val byLabel = item("d", labels = """["receipt","shop"]""")
-        val cats = categoriesOf(dense, unknownArea, sparse, byLabel)
-        assertTrue(OrganizeCategory.DOCUMENTS in cats.getValue("a"))
-        assertTrue(OrganizeCategory.DOCUMENTS in cats.getValue("b"))
-        assertTrue(OrganizeCategory.DOCUMENTS !in cats.getValue("c"))
-        assertTrue(OrganizeCategory.DOCUMENTS in cats.getValue("d"))
-    }
-
-    @Test
-    fun `stats aggregate count bytes and previews`() {
-        val items = listOf(
-            item("s1", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
-            item("s2", relativePath = "Pictures/Screenshots/", sizeBytes = 200),
-            item("p1"),
+    fun `hero reclaim is HIGH non-protected union - no double count regression AC-F1-1`() {
+        // 同一张图在 v1 会被截图+模糊+文档计 3 次；v2 互斥后 Hero 只计 1 次
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
+                item("big", isVideo = true, sizeBytes = 250L * 1024 * 1024),
+                item("normal"),
+            ),
+            now = now,
         )
-        val stats = OrganizeCategorizer.stats(items)
-        val shot = stats.first { stat -> stat.category == OrganizeCategory.SCREENSHOTS }
-        assertEquals(2, shot.count)
-        assertEquals(300, shot.totalBytes)
-        assertEquals(listOf("s1", "s2"), shot.previewUris)
-        assertTrue(stats.none { stat -> stat.category == OrganizeCategory.DUPLICATES })
-        assertTrue(stats.none { stat -> stat.count == 0 })
+        assertEquals(100L + 250L * 1024 * 1024, board.heroReclaimBytes)
+    }
+
+    @Test
+    fun `protected items excluded from hero and never high-counted`() {
+        val board = OrganizeCategorizer.board(
+            listOf(
+                // 6 年前的模糊老照片：HIGH 置信但 protected → 不进 Hero、不进 highCount
+                item(
+                    "old", captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS,
+                    blurScore = 10.0f, sizeBytes = 500,
+                ),
+            ),
+            now = now,
+        )
+        assertEquals(0L, board.heroReclaimBytes)
+        val card = board.categories.single { card -> card.category == OrganizeCategory.LOW_QUALITY_PHOTOS }
+        assertEquals(1, card.totalCount)
+        assertEquals(0, card.highCount)
+        assertEquals(1, card.protectedCount)
+    }
+
+    @Test
+    fun `categories sorted by high confidence bytes descending`() {
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
+                item("big", isVideo = true, sizeBytes = 250L * 1024 * 1024),
+            ),
+            now = now,
+        )
+        assertEquals(
+            listOf(OrganizeCategory.LARGE_FILES, OrganizeCategory.SCREEN_CONTENT),
+            board.categories.map { card -> card.category },
+        )
+    }
+
+    @Test
+    fun `needs-scan coverage when no library item has the signal`() {
+        val board = OrganizeCategorizer.board(
+            listOf(item("a")), // 全库无 blurScore
+            now = now,
+        )
+        // 无命中时类目卡不渲染（totalCount=0 不生成卡），但覆盖度可查询
+        assertEquals(
+            SignalCoverage.NEEDS_SCAN,
+            OrganizeCategorizer.coverageOf(OrganizeCategory.LOW_QUALITY_PHOTOS, listOf(item("a"))),
+        )
+        assertEquals(
+            SignalCoverage.READY,
+            OrganizeCategorizer.coverageOf(OrganizeCategory.SCREEN_CONTENT, listOf(item("a"))),
+        )
+        assertTrue(board.categories.isEmpty())
+    }
+
+    @Test
+    fun `review count aggregates MEDIUM and LOW non-protected`() {
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("borderline", blurScore = 80.0f, sizeBytes = 10),       // MEDIUM
+                item("aesthetic", blurScore = 500.0f, exposureScore = 0.5f,
+                    aestheticScore = 2.0f, sizeBytes = 10),                 // 不进类目（无强信号）
+            ),
+            now = now,
+        )
+        assertEquals(1, board.heroReviewCount)
     }
 }

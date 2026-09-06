@@ -1,74 +1,89 @@
 package com.mamba.picme.domain.organize
 
-import com.mamba.picme.domain.dedup.DedupContentType
-import com.mamba.picme.domain.dedup.detectContentType
-
-/** MediaStore 截图目录约定（路径 contains，大小写不敏感；与 dedup 侧同一规则）。 */
-private const val SCREENSHOT_DIR_KEYWORD = "screenshots"
-
 /** hub 卡片预览缩略图张数。 */
 private const val PREVIEW_LIMIT = 4
 
 /**
- * 整理中心类目判定纯函数（零额外推理，可 JVM 单测）。
- * DUPLICATES 不在此判定——去重分组由 DedupScanner 产出，hub 卡只展示其摘要。
- * 一条媒体可同时属于多个类目（集合语义），阈值一律常量化。
+ * 整理中心 v2 管线编排 Facade（纯函数，对外唯一入口）：
+ * CategoryArbiter（互斥裁定）→ ValueGuard（价值保护）→ ConfidenceGrader（置信分级）。
+ * 旧集合语义 categoriesOf/stats/CategoryStat 已删除——类目页与 SwipeReview 同源消费本管线。
  */
 object OrganizeCategorizer {
 
-    /** NIMA 美学分（1~10）低于该值判模糊低质；null = 未评分，绝不参与判定。 */
-    const val AESTHETIC_LOW_THRESHOLD = 3.5f
-
-    /** eDifFIQA 人脸质量分（0~1）低于该值判低质量人像；null = 未评分，绝不参与判定。 */
-    const val FACE_QUALITY_LOW_THRESHOLD = 0.35f
-
-    /** 大视频阈值（100 MiB）。 */
-    const val LARGE_VIDEO_BYTES = 100L * 1024 * 1024
-
-    fun categoriesOf(item: OrganizeItem): Set<OrganizeCategory> {
-        val categories = mutableSetOf<OrganizeCategory>()
-        if (item.relativePath?.contains(SCREENSHOT_DIR_KEYWORD, ignoreCase = true) == true) {
-            categories += OrganizeCategory.SCREENSHOTS
-        }
-        if (item.isVideo) {
-            if (item.sizeBytes >= LARGE_VIDEO_BYTES) {
-                categories += OrganizeCategory.LARGE_VIDEOS
-            }
-        } else {
-            val aesthetic = item.aestheticScore
-            if (aesthetic != null && aesthetic < AESTHETIC_LOW_THRESHOLD) {
-                categories += OrganizeCategory.BLURRY
-            }
-            val faceQuality = item.faceQualityScore
-            if (item.hasFace && faceQuality != null && faceQuality < FACE_QUALITY_LOW_THRESHOLD) {
-                categories += OrganizeCategory.LOW_QUALITY_PORTRAITS
-            }
-            val contentType = detectContentType(
-                path = item.relativePath,
-                ocrText = item.ocrText,
-                pixelArea = item.pixelArea,
-                labels = item.labels,
-                hasFace = item.hasFace,
-                faceQualityScore = item.faceQualityScore,
+    /** 逐媒体裁定（类目详情页输入）。未命中任何类目的媒体不出现在结果中。 */
+    fun classifyAll(items: List<OrganizeItem>, now: Long): List<ClassifiedItem> =
+        items.mapNotNull { item ->
+            val category = CategoryArbiter.classify(item) ?: return@mapNotNull null
+            val verdict = ValueGuard.assess(item, category, now)
+            ClassifiedItem(
+                item = item,
+                category = category,
+                confidence = ConfidenceGrader.grade(item, category),
+                protectReasons = verdict.reasons,
             )
-            if (contentType == DedupContentType.DOCUMENT) {
-                categories += OrganizeCategory.DOCUMENTS
-            }
         }
-        return categories
+
+    /** hub 聚合：类目卡（按建议优先级降序）+ Hero 口径（HIGH 非 protected 去重并集）。 */
+    fun board(items: List<OrganizeItem>, now: Long): OrganizeBoard {
+        val classified = classifyAll(items, now)
+        val cards = classified
+            .groupBy { entry -> entry.category }
+            .map { (category, entries) ->
+                val high = entries.filter { entry ->
+                    entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
+                }
+                val review = entries.filter { entry ->
+                    entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected
+                }
+                CategoryBoard(
+                    category = category,
+                    totalCount = entries.size,
+                    totalBytes = entries.sumOf { entry -> entry.item.sizeBytes },
+                    highCount = high.size,
+                    highBytes = high.sumOf { entry -> entry.item.sizeBytes },
+                    reviewCount = review.size,
+                    protectedCount = entries.count { entry -> entry.isProtected },
+                    previewUris = entries.take(PREVIEW_LIMIT).map { entry -> entry.item.uri },
+                    coverage = coverageOf(category, items),
+                )
+            }
+            .sortedByDescending { card -> card.highBytes }
+        return OrganizeBoard(
+            categories = cards,
+            // 互斥裁定保证一媒体一卡，high 求和即并集（AC-F1-1 回归防线）
+            heroReclaimBytes = cards.sumOf { card -> card.highBytes },
+            heroReviewCount = cards.sumOf { card -> card.reviewCount },
+        )
     }
 
-    /** 按枚举声明顺序聚合，过滤空类目；previewUris 取该类目前 [PREVIEW_LIMIT] 个。 */
-    fun stats(items: List<OrganizeItem>): List<CategoryStat> =
-        OrganizeCategory.entries.mapNotNull { category ->
-            if (category == OrganizeCategory.DUPLICATES) return@mapNotNull null
-            val matched = items.filter { item -> category in categoriesOf(item) }
-            if (matched.isEmpty()) return@mapNotNull null
-            CategoryStat(
-                category = category,
-                count = matched.size,
-                totalBytes = matched.sumOf { item -> item.sizeBytes },
-                previewUris = matched.take(PREVIEW_LIMIT).map { item -> item.uri },
-            )
+    /**
+     * 类目信号覆盖度：全库任一媒体持有该类目关键信号 → READY，否则 NEEDS_SCAN
+     * （驱动 hub「需先扫描」引导态，修复 v1 类目静默消失）。
+     * 路径/大小类信号（SCREEN_CONTENT/LARGE_FILES/DUPLICATES）MediaStore 常备，恒 READY。
+     */
+    fun coverageOf(category: OrganizeCategory, items: List<OrganizeItem>): SignalCoverage =
+        when (category) {
+            OrganizeCategory.DUPLICATES,
+            OrganizeCategory.SCREEN_CONTENT,
+            OrganizeCategory.LARGE_FILES,
+            -> SignalCoverage.READY
+            OrganizeCategory.DOCUMENTS ->
+                if (items.any { item -> item.ocrText != null || item.labels != null }) {
+                    SignalCoverage.READY
+                } else {
+                    SignalCoverage.NEEDS_SCAN
+                }
+            OrganizeCategory.LOW_QUALITY_PORTRAITS ->
+                if (items.any { item -> item.faceQualityScore != null }) {
+                    SignalCoverage.READY
+                } else {
+                    SignalCoverage.NEEDS_SCAN
+                }
+            OrganizeCategory.LOW_QUALITY_PHOTOS ->
+                if (items.any { item -> item.blurScore != null }) {
+                    SignalCoverage.READY
+                } else {
+                    SignalCoverage.NEEDS_SCAN
+                }
         }
 }
