@@ -441,8 +441,26 @@ interface MediaDao {
      * 整理中心类目判定的轻量投影（避开 semanticEmbedding/faceRoiResult 等大列）。
      * type 列存枚举名（Room 内建 enum 转换），投影按 String 读。
      */
-    @Query("SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore, faceQualityScore FROM media_assets")
+    @Query(
+        "SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore, " +
+            "faceQualityScore, blurScore, exposureScore, lastViewedAt, faceId FROM media_assets"
+    )
     fun observeOrganizeRows(): Flow<List<OrganizeRow>>
+
+    /** 回写模糊/曝光分（整理中心 v2 惰性补算产出）。 */
+    @Query("UPDATE media_assets SET blurScore = :blur, exposureScore = :exposure WHERE uri = :uri")
+    suspend fun updateQualityScores(uri: String, blur: Float?, exposure: Float?)
+
+    /** 回写最近一次查看时间（查看器打开时调用）。 */
+    @Query("UPDATE media_assets SET lastViewedAt = :timestamp WHERE uri = :uri")
+    suspend fun updateLastViewedAt(uri: String, timestamp: Long)
+
+    /** 各人物聚类的照片总数（faceId → 计数），整理中心 v2 人物稀缺信号。 */
+    @Query(
+        "SELECT faceId, COUNT(*) AS cnt FROM media_assets " +
+            "WHERE faceId IS NOT NULL AND faceId != '' GROUP BY faceId"
+    )
+    suspend fun getPersonPhotoCounts(): List<PersonPhotoCount>
 
     /** 重置所有语义 embedding（用于强制重新编码/清理污染数据） */
     @Query("UPDATE media_assets SET semanticEmbedding = NULL")
@@ -675,4 +693,14 @@ data class OrganizeRow(
     val hasFace: Boolean,
     val aestheticScore: Float?,
     val faceQualityScore: Float?,
+    val blurScore: Float?,
+    val exposureScore: Float?,
+    val lastViewedAt: Long?,
+    val faceId: String?,
+)
+
+/** 人物聚类照片计数投影（整理中心 v2 人物稀缺信号）。 */
+data class PersonPhotoCount(
+    val faceId: String,
+    val cnt: Int,
 )
