@@ -55,7 +55,7 @@ pipeline:
     - id: LOW_QUALITY_PHOTOS           # 低质量照片（真模糊/曝光异常）
       label_key: org_cat_blurry        # "Blurry & low quality"
       icon: blur_on
-      signals: "blurScore（256px 灰度 Laplacian 方差）< 100.0；或 exposureScore（平均亮度 0~1）< 0.15（欠曝）或 > 0.85（过曝）。NIMA 美学分（<3.5）仅作置信辅助，不再单独定类"
+      signals: "blurScore（256px 灰度 Laplacian 方差）< 100.0；或 exposureScore（平均亮度 0~1）< 0.15（欠曝）或 > 0.85（过曝）。AESTHETIC_LOW=3.5（NIMA 美学分 1~10）为预留常量，当前管线未消费（不定类、不参与置信分级）"
       video_allowed: false
     - id: LARGE_FILES                  # 大文件
       label_key: org_cat_large_files   # "Large files"
@@ -65,7 +65,7 @@ pipeline:
   confidence:                          # ConfidenceGrader：决定三段分组与预选
     HIGH: "强信号命中 → 默认勾选（建议删除段）。各类目定义：DUPLICATES=精确组成员；SCREEN_CONTENT=恒 HIGH（路径判定为确定性信号）；DOCUMENTS=OCR 密度 ≥ 2×裁定阈值；LOW_QUALITY_PORTRAITS=faceQualityScore < 0.175（0.35×0.5 强命中系数）；LOW_QUALITY_PHOTOS=blurScore < 50.0（100×0.5）；LARGE_FILES=大小 ≥ 2×主阈值"
     MEDIUM: "单信号命中接近阈值：DUPLICATES=仅相似组成员；DOCUMENTS=OCR 命中未达 2× 或仅 labels 命中；低质两类=边界命中；LARGE_FILES=达主阈值未达 2×"
-    LOW: "弱信号（正常管线仅理论兜底：arbiter 不定类的 NIMA-only 项）"
+    LOW: "弱信号（防御性兜底：信号全 null 等异常输入落最低档；正常管线不可达，arbiter 不定类 NIMA-only 项——NIMA 未接入管线）"
   value_guard:                         # 价值保护：仅 LOW_QUALITY_PHOTOS / LOW_QUALITY_PORTRAITS 生效
     scope: [LOW_QUALITY_PHOTOS, LOW_QUALITY_PORTRAITS]
     rules:
@@ -396,11 +396,13 @@ swipe_review:
 # ============================================================================
 # 6. i18n 键清单（五语同步 EN/zh-CN/zh-TW/ES/FR，[I18N] 红线）
 # ============================================================================
+# 口径说明：本节清单 = 本 spec 正文引用的键（屏内整理域文案）；共享无障碍/通用键
+# （media_type_*/media_state_*/back 等）由 gallery-grid.yaml / topbar.yaml 等承接，不在此列。
 i18n_keys:
   hub: [org_hero_label, org_hero_across, org_hero_review, org_quick_tidy, org_categories,
         org_cat_duplicates, org_cat_screen_content, org_cat_documents, org_cat_portraits, org_cat_blurry, org_cat_large_files,
         org_cat_meta, org_confidence_high, org_confidence_review, org_protected_count, org_cat_reclaim,
-        org_needs_scan, org_privacy_note]
+        org_needs_scan, org_privacy_note, dedup_never_scanned]
   # 注：org_hero_across 为 plurals 资源（one/other），其余为 string
   category_grid: [org_ai_preselect_on, org_ai_preselect_off, org_ai_preselected,
                   org_section_suggested, org_section_review, org_section_protected, org_protected_badge,

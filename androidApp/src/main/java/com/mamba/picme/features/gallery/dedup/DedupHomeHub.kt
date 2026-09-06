@@ -79,8 +79,8 @@ private val orgBrandGradient: Brush
  * 「重复与相似照片」卡固定渲染为可展开入口（展开 = 原去重 Config：尺度勾选 + 保留规则 +
  * 开始扫描），原功能零回归；board 的 DUPLICATES 卡由该卡承接（meta 行同源），列表内不重复渲染。
  *
- * 渲染契约（Task 7 审查修正）：零命中且信号 READY 的类目不渲染；NEEDS_SCAN 渲染半透明
- * 引导卡（点击经 onOpenScan 切 SCAN tab）；board.categories 为空 = 看板未加载（stateIn
+ * 渲染契约（Task 7 审查修正）：零命中且信号 READY 的类目不渲染；NEEDS_SCAN 渲染底色降档
+ * 引导卡（surfaceContainerLow，不压整卡 alpha；点击经 onOpenScan 切 SCAN tab）；board.categories 为空 = 看板未加载（stateIn
  * 初值），此时 Hero 与类目卡不渲染，避免 0B 假数据。
  *
  * 布局结构自上而下：
@@ -117,7 +117,7 @@ fun DedupHubContent(
             OrgHeroCard(board = board)
         }
 
-        // Quick tidy up 渐变主按钮（F2 路由未点亮，回调当前为空占位）
+        // Quick tidy up 渐变主按钮（F2 已点亮：onQuickTidy 经 MainPagerHost 接 swipe_review 路由）
         Box(
             modifier = Modifier
                 .fillMaxWidth()

@@ -233,7 +233,7 @@ protected=true 的项无论置信度一律不默认勾选（§4 优先）。
     | `BLUR_VARIANCE_LOW` | 100.0 | Laplacian 方差（256px 灰度口径）低于判真模糊 |
     | `EXPOSURE_UNDER` / `EXPOSURE_OVER` | 0.15 / 0.85 | 平均亮度（0~1）越界判欠曝/过曝 |
     | `STRONG_SIGNAL_FACTOR` | 0.5 | 「越低越差」型信号强命中 = 主阈值 × 0.5 |
-    | `AESTHETIC_LOW` | 3.5 | NIMA（1~10）仅作 LOW 置信辅助，不定类 |
+    | `AESTHETIC_LOW` | 3.5 | 预留常量（沿用 v1 定义保留），当前管线未消费——不定类、不参与置信分级（主源码除定义外零引用，ConfidenceGrader 无 NIMA 分支） |
     | `LARGE_VIDEO_BYTES` | 100 MiB | 大视频阈值 |
     | `LARGE_PHOTO_PIXEL_AREA` / `LARGE_PHOTO_BYTES` | 50 MP / 20 MB | 超分辨率照片（两条件同时满足） |
     | `LARGE_FILE_STRONG_FACTOR` | 2 | 大文件强命中 = 大小 ≥ 2× 主阈值 |
