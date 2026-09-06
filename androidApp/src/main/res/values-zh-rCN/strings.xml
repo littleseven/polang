@@ -477,6 +477,14 @@
     <string name="memory_best_shots">%1$d 张精选</string>
     <string name="memory_share">分享回忆</string>
     <string name="memory_detail_empty">这条回忆已不可用</string>
+    <string name="memory_section_time">时光</string>
+    <string name="memory_section_journey">旅程</string>
+    <string name="memory_section_people">人物</string>
+    <string name="memory_empty_page">照片积累后会自动生成回忆</string>
+    <string name="memory_detail_best">精选</string>
+    <string name="memory_detail_all">全部</string>
+    <string name="memory_items_count">%1$d 项</string>
+    <string name="tab_memories">回忆</string>
     <string name="memory_photo_cd">回忆照片 %1$d</string>
     <string name="memory_on_this_day">那年今日</string>
     <string name="memory_on_this_day_subtitle">%1$s · %2$d</string>
