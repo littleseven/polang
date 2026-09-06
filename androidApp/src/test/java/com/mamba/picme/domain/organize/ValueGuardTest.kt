@@ -28,13 +28,14 @@ class ValueGuardTest {
         val old = ValueGuard.assess(
             item(captureDate = fiveYearsAgo - 1), OrganizeCategory.LOW_QUALITY_PHOTOS, now
         )
-        assertTrue(old.protected)
+        assertTrue(old.isProtected)
         assertEquals(setOf(ProtectReason.OLD_PHOTO), old.reasons)
         // 边界：恰好 5 年不保护（判定为「早于」）
         val boundary = ValueGuard.assess(
             item(captureDate = fiveYearsAgo), OrganizeCategory.LOW_QUALITY_PHOTOS, now
         )
         assertTrue(ProtectReason.OLD_PHOTO !in boundary.reasons)
+        assertTrue(!boundary.isProtected)
     }
 
     @Test
@@ -46,6 +47,9 @@ class ValueGuardTest {
         // 无人物信息不触发
         val noPerson = ValueGuard.assess(item(personPhotoCount = null), OrganizeCategory.LOW_QUALITY_PORTRAITS, now)
         assertTrue(ProtectReason.SCARCE_PERSON !in noPerson.reasons)
+        // 计数 0 = 异常数据（计数不可能为 0），视为无信号不触发
+        val zeroCount = ValueGuard.assess(item(personPhotoCount = 0), OrganizeCategory.LOW_QUALITY_PORTRAITS, now)
+        assertTrue(ProtectReason.SCARCE_PERSON !in zeroCount.reasons)
     }
 
     @Test
@@ -62,7 +66,7 @@ class ValueGuardTest {
         val screenshot = ValueGuard.assess(
             item(captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS), OrganizeCategory.SCREEN_CONTENT, now
         )
-        assertTrue(!screenshot.protected && screenshot.reasons.isEmpty())
+        assertTrue(!screenshot.isProtected && screenshot.reasons.isEmpty())
     }
 
     @Test
