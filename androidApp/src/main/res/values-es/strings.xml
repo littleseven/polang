@@ -486,6 +486,7 @@
     <string name="memory_detail_best">Destacadas</string>
     <string name="memory_detail_all">Todas</string>
     <string name="memory_items_count">%1$d elementos</string>
+    <string name="tab_gallery">Galería</string>
     <string name="tab_memories">Recuerdos</string>
     <string name="memory_photo_cd">Foto del recuerdo %1$d</string>
     <string name="memory_on_this_day">Un día como hoy</string>
@@ -1099,7 +1100,6 @@
     <string name="data_privacy_clear_guest">Borrar datos de invitado</string>
     <string name="data_privacy_clear_guest_success">Datos de invitado borrados</string>
     <string name="data_privacy_clear_guest_failed">No se pudieron borrar los datos de invitado</string>
-    <string name="tag_scan_control">Control de escaneo de etiquetas</string>
     <string name="start_scan">Iniciar escaneo</string>
     <string name="search_photos">Buscar fotos</string>
     <string name="group_by">Agrupar por</string>

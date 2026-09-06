@@ -26,7 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -85,6 +84,7 @@ private val KeepGreen = Color(0xFF4CAF50)
 @Composable
 fun DedupHomeRoute(
     viewModel: DedupViewModel,
+    /** 离页回调：仅服务扫描态「后台运行」按钮（根页无返回箭头，2026-09-06 导航统一）。 */
     onNavigateBack: () -> Unit,
     /** 整理中心 hub「Quick tidy up」（F2 已点亮：MainActivity 导航 swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
@@ -143,7 +143,6 @@ fun DedupHomeRoute(
         topBar = {
             DedupTopBar(
                 state = uiState,
-                onNavigateBack = onNavigateBack,
                 onCancelScan = { viewModel.cancelScan() },
                 onOpenKeepRules = { showKeepRules = true },
                 embedded = embedded,
@@ -259,7 +258,6 @@ fun DedupHomeRoute(
 @Composable
 private fun DedupTopBar(
     state: DedupUiState,
-    onNavigateBack: () -> Unit,
     onCancelScan: () -> Unit,
     onOpenKeepRules: () -> Unit,
     embedded: Boolean = false,
@@ -279,14 +277,7 @@ private fun DedupTopBar(
                 )
             )
         },
-        navigationIcon = {
-            IconButton(onClick = onNavigateBack) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = stringResource(R.string.back),
-                )
-            }
-        },
+        // 根页无返回箭头（2026-09-06 导航统一）；离页经悬浮底 bar / 系统返回（回相册页）
         actions = {
             when (state) {
                 is DedupUiState.Scanning -> TextButton(onClick = onCancelScan) {

@@ -53,8 +53,9 @@ import com.mamba.picme.features.gallery.components.GalleryPermissionMessage
 import com.mamba.picme.features.gallery.components.GalleryTopBar
 import com.mamba.picme.features.gallery.components.MediaGrid
 import com.mamba.picme.features.gallery.components.MediaPager
-import com.mamba.picme.features.common.components.FloatingBottomTab
-import com.mamba.picme.features.common.components.FloatingBottomTabItem
+import com.mamba.picme.features.main.MAIN_PAGE_GALLERY
+import com.mamba.picme.features.main.MAIN_PAGE_PEOPLE
+import com.mamba.picme.features.main.MainFloatingBottomBar
 import com.mamba.picme.features.gallery.components.galleryReadPermissions
 import com.mamba.picme.features.gallery.components.hasGalleryPermission
 import androidx.core.net.toUri
@@ -104,12 +105,6 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.BurstMode
-import androidx.compose.material.icons.outlined.ChatBubble
-import androidx.compose.material.icons.outlined.Collections
-import androidx.compose.material.icons.outlined.Sell
 
 private const val TAG = "Gallery"
 private const val TAG_AGENT = "GalleryAgent"
@@ -121,15 +116,12 @@ fun GalleryScreen(
     navController: NavController,
     viewModel: MediaViewModel,
     settingsViewModel: SettingsViewModel,
-    onNavigateToChat: () -> Unit,
     onNavigateToCamera: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToModelCenter: () -> Unit,
     onNavigateToDebug: () -> Unit,
-    onNavigateToTagControl: () -> Unit = {},
-    onNavigateToPeople: () -> Unit = {},
-    /** 相册整理（去重 2.0）入口：悬浮底部 Tab 第一项 */
-    onNavigateToDedupHome: () -> Unit = {},
+    /** 底 bar 页切换出口（整理/聊天/人物/回忆；相册为本页，选中项空操作；人物过滤态返回也复用） */
+    onSwitchMainPage: (Int) -> Unit = {},
     /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */
     searchRequest: Pair<String, Long>? = null,
     onSearchRequestConsumed: () -> Unit = {},
@@ -137,8 +129,6 @@ fun GalleryScreen(
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
     isActivePage: Boolean = true,
-    /** Memory 页入口：悬浮底部 Tab 第 5 项（回忆） */
-    onNavigateToMemory: () -> Unit = {},
 ) {
     val groupedMedia by viewModel.groupedMedia.collectAsState()
     val groupingMode by viewModel.groupingMode.collectAsState()
@@ -597,7 +587,7 @@ fun GalleryScreen(
                             searchResultMedia = emptyList()
                             isSearchActive = false
                             isSearchLoading = false
-                            if (returnToPeople) onNavigateToPeople()
+                            if (returnToPeople) onSwitchMainPage(MAIN_PAGE_PEOPLE)
                         },
                         resultCount = if (searchQuery.isNotBlank()) searchResultMedia.size else null
                     )
@@ -845,39 +835,12 @@ fun GalleryScreen(
             val activeMedia = selectedMediaIndex?.let { previewMediaList.getOrNull(it) }
             val rect by remember { derivedStateOf { activeMedia?.let { thumbnailPositions[it.id] } } }
 
-            // 悬浮底部 Tab — 相册整理 / 聊天 / 打标 / 人物 / 回忆（纯图标）
-            // 2026-08-26：相机 tab 移除（相机已路由化，仅头像拍摄进入）；第一项为相册整理——
-            // 相册整理是相邻 Pager 页（页 1），相册页左滑即达，手势由外层 HorizontalPager 原生承载
+            // 悬浮底 bar — 相册/整理/聊天/人物/回忆（纯图标，与 Pager 页序 1:1；详情态隐藏）
+            // 2026-09-06 导航统一：新增相册项（本页高亮）；打标图标移除（已并入整理页 SCAN tab）
             if (selectedMediaIndex == null) {
-                val tabItems = listOf(
-                    FloatingBottomTabItem(
-                        icon = Icons.Outlined.BurstMode,
-                        contentDescription = stringResource(R.string.gallery_cleanup),
-                        onClick = onNavigateToDedupHome
-                    ),
-                    FloatingBottomTabItem(
-                        icon = Icons.Outlined.ChatBubble,
-                        contentDescription = stringResource(R.string.chat),
-                        onClick = onNavigateToChat
-                    ),
-                    FloatingBottomTabItem(
-                        icon = Icons.Outlined.Sell,
-                        contentDescription = stringResource(R.string.tag_scan_control),
-                        onClick = onNavigateToTagControl
-                    ),
-                    FloatingBottomTabItem(
-                        icon = Icons.Outlined.AccountCircle,
-                        contentDescription = stringResource(R.string.gallery_people_entry),
-                        onClick = onNavigateToPeople
-                    ),
-                    FloatingBottomTabItem(
-                        icon = Icons.Outlined.Collections,
-                        contentDescription = stringResource(R.string.tab_memories),
-                        onClick = onNavigateToMemory
-                    )
-                )
-                FloatingBottomTab(
-                    items = tabItems,
+                MainFloatingBottomBar(
+                    selectedMainPage = MAIN_PAGE_GALLERY,
+                    onSwitchPage = onSwitchMainPage,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 16.dp)

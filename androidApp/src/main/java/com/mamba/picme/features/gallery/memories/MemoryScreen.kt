@@ -19,12 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.BurstMode
-import androidx.compose.material.icons.outlined.ChatBubble
-import androidx.compose.material.icons.outlined.Collections
-import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,8 +50,8 @@ import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.MemoryPageTokens
 import com.mamba.picme.domain.memories.Memory
 import com.mamba.picme.domain.memories.MemoryType
-import com.mamba.picme.features.common.components.FloatingBottomTab
-import com.mamba.picme.features.common.components.FloatingBottomTabItem
+import com.mamba.picme.features.main.MAIN_PAGE_MEMORY
+import com.mamba.picme.features.main.MainFloatingBottomBar
 
 /** 分区枚举 → 展示模型（内部）：标题资源 + 该分区回忆列表。 */
 private data class MemorySection(
@@ -86,18 +80,15 @@ private fun buildSections(memories: List<Memory>): List<MemorySection> = listOf(
 /**
  * Memory 独立 Pager 页（2026-09-06，对标小米相册）：顶栏（标题「回忆」+ 副标「端侧生成 · 私密」）→
  * 三分区大卡 feed（时光/旅程/人物，空分区不占位）→ 整页空态；长按大卡弹隐藏确认；
- * 底部悬浮 5 图标底 bar（回忆项 selected 高亮，出口与 GalleryScreen 同源）。
+ * 底部悬浮底 bar（共享 [MainFloatingBottomBar]，回忆项高亮；2026-09-06 导航统一五项与 Pager 页序 1:1）。
  */
 @Suppress("LongMethod") // 待重构：顶栏/分区 feed/底 bar/隐藏弹窗可抽子组合函数
 @Composable
 fun MemoryScreen(
     memoriesViewModel: MemoriesViewModel,
     onNavigateToMemoryDetail: (String) -> Unit,
-    // 底 bar 五个出口（与 GalleryScreen 同源）
-    onNavigateToDedupHome: () -> Unit,
-    onNavigateToChat: () -> Unit,
-    onNavigateToTagControl: () -> Unit,
-    onNavigateToPeople: () -> Unit,
+    /** 底 bar 页切换出口（相册/整理/聊天/人物；回忆为本页，选中项空操作） */
+    onSwitchMainPage: (Int) -> Unit,
 ) {
     val memories by memoriesViewModel.memories.collectAsStateWithLifecycle()
     var pendingHide by remember { mutableStateOf<Memory?>(null) }
@@ -146,36 +137,10 @@ fun MemoryScreen(
             }
         }
 
-        // 悬浮底 bar：5 图标，回忆项 selected 高亮
-        FloatingBottomTab(
-            items = listOf(
-                FloatingBottomTabItem(
-                    icon = Icons.Outlined.BurstMode,
-                    contentDescription = stringResource(R.string.gallery_cleanup),
-                    onClick = onNavigateToDedupHome,
-                ),
-                FloatingBottomTabItem(
-                    icon = Icons.Outlined.ChatBubble,
-                    contentDescription = stringResource(R.string.chat),
-                    onClick = onNavigateToChat,
-                ),
-                FloatingBottomTabItem(
-                    icon = Icons.Outlined.Sell,
-                    contentDescription = stringResource(R.string.tag_scan_control),
-                    onClick = onNavigateToTagControl,
-                ),
-                FloatingBottomTabItem(
-                    icon = Icons.Outlined.AccountCircle,
-                    contentDescription = stringResource(R.string.gallery_people_entry),
-                    onClick = onNavigateToPeople,
-                ),
-                FloatingBottomTabItem(
-                    icon = Icons.Outlined.Collections,
-                    contentDescription = stringResource(R.string.tab_memories),
-                    selected = true,
-                    onClick = { /* 当前页，空操作 */ },
-                ),
-            ),
+        // 悬浮底 bar：回忆项 selected 高亮（共享组件，五项与 Pager 页序 1:1）
+        MainFloatingBottomBar(
+            selectedMainPage = MAIN_PAGE_MEMORY,
+            onSwitchPage = onSwitchMainPage,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 16.dp)

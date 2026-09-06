@@ -12,7 +12,7 @@
 > **最后更新**: 2026-09-06  
 > **维护者**: 项目开发者
 
-**模块定位**: 应用默认首页，提供智能聚类相册浏览、媒体查看器、批量操作功能；支持端侧自然语言搜索；语音 Agent 面板提供自然语言交互入口。二级能力入口：悬浮底部 Tab（相册整理/聊天/打标/人物/回忆，切主页面 Pager 页）+ 顶栏（模型中心/设置）+ 相册页左滑（相册整理）。「相册整理」（去重 2.0）为主页面 Pager 页 1（相册页左滑即达），另有悬浮底部 Tab 第一项 + 设置主菜单一级入口（2026-08-26 二轮升级）；相机已路由化，无常驻入口。
+**模块定位**: 应用默认首页，提供智能聚类相册浏览、媒体查看器、批量操作功能；支持端侧自然语言搜索；语音 Agent 面板提供自然语言交互入口。二级能力入口：悬浮底部 Tab（共享 `MainFloatingBottomBar`，相册/整理/聊天/人物/回忆五项与 Pager 页序 1:1，2026-09-06 导航统一；相册项本页高亮）+ 顶栏（模型中心/设置）+ 相册页左滑（整理）。「相册整理」（去重 2.0）为主页面 Pager 页 1（相册页左滑即达），另有悬浮底部 Tab 整理项 + 设置主菜单一级入口；相机已路由化，无常驻入口。
 
 **主要维护者**: 项目开发者
 
@@ -136,7 +136,7 @@ private fun shareMediaAssets(context: Context, assets: List<MediaAsset>) {
 > 旧实现（`DuplicateManager` 页 / `FindDuplicateMediaUseCase` / `DuplicateImageDetector`）已于 2026-08-26 Task 11 整体下线删除；`core/common/PerceptualHash.kt`（MD5/pHash 纯算法，零 Android 依赖、可 JVM 单测）保留，由新扫描器复用。
 
 **技术规范**:
-- **入口（2026-09-06 整理+扫描合并页）**: 整理+扫描合并页为主页面 Pager 页 1（页序 相册(0)/整理+扫描(1)/聊天(2)/人物(3)/回忆(4)，见 `features/main/MainPagerHost.kt`；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全）——合并页 `OrganizeHomeRoute`（`features/gallery/organize/OrganizeHomeScreen.kt`）以顶部胶囊分段开关承载「整理」（本页 embedded）/「扫描」（TagGenerationControlScreen embedded）双 Tab；相册页左滑经外层 HorizontalPager 原生手势进入，悬浮底部 Tab 第一项（`Icons.Outlined.BurstMode`）与设置主菜单「相册整理」一级入口均切到页 1 并预选整理 Tab（设置入口经 `organizeTabRequest` 一次性请求驱动）。返回（顶栏返回/系统返回键）切回相册页不弹栈
+- **入口（2026-09-06 整理+扫描合并页）**: 整理+扫描合并页为主页面 Pager 页 1（页序 相册(0)/整理+扫描(1)/聊天(2)/人物(3)/回忆(4)，见 `features/main/MainPagerHost.kt`；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全）——合并页 `OrganizeHomeRoute`（`features/gallery/organize/OrganizeHomeScreen.kt`）以顶部胶囊分段开关承载「整理」（本页 embedded）/「扫描」（TagGenerationControlScreen embedded）双 Tab；相册页左滑经外层 HorizontalPager 原生手势进入，悬浮底部 Tab 整理项（`Icons.Outlined.CleaningServices`，2026-09-06 导航统一换标）与设置主菜单「相册整理」一级入口均切到页 1 并预选整理 Tab（设置入口经 `organizeTabRequest` 一次性请求驱动）。系统返回键切回相册页不弹栈（根页无顶栏返回箭头，Dedup 扫描态「后台运行」按钮经 `onLeaveToGallery` 离页）
 - **三级尺度（`DedupLevel`，`domain/dedup/DedupModels.kt`）**:
   - `EXACT` 精确重复：`(sizeBytes, mime)` 分桶 → 流式 MD5 相同成组
   - `VISUAL` 视觉重复：32×32 降采样 64-bit pHash，汉明距离 ≤ `visualThreshold`(=5) 并查集聚类；与 EXACT 组完全重合（全员同 MD5）的簇跳过
@@ -152,7 +152,7 @@ private fun shareMediaAssets(context: Context, assets: List<MediaAsset>) {
 - **UI 组件清单（`features/gallery/dedup/`）**: `DedupHomeScreen`（页面 + Route）、`DedupSheets`（`DedupGroupDetailPage` 全屏组详情页——点「保留这张」改选后立即收起回结果列表（2026-09-05 交互修正），删除仍走详情 CTA/批量 CTA——+ 组内全屏对比预览 + `KeepRulesSheet` 保留规则底部弹层——组详情 2026-08-27 起由半屏弹层改全屏页）、`DedupComponents`（组卡片/缩略图等）、`DedupMediaSource`（扫描输入供数，`MediaType.PHOTO` 元数据 + modifiedAt）
 - **整理中心类目详情（F1，`features/gallery/organize/`，2026-09-05）**: `OrganizeCategoryScreen`（NavHost 二级页 `organize_category/{category}`：副行统计 + 3 列 AI 预选勾选网格 + 底部回收站 CTA；完成态 All clean + Undo）+ `OrganizeCategoryViewModel`（类目过滤 + 选中集 + `TrashSessionController` 删除/恢复编排，测试注入 coroutineScope 范式同 DedupViewModel）；hub 类目卡点击经 `onOpenCategory` 点亮该路由
 - **手势快速整理（F2，`features/gallery/swipe/`，2026-09-05）**: `SwipeReviewScreen`（NavHost 二级页 `swipe_review`：全屏大图卡手势决策——右滑保留 / 左滑跳过 / 上滑删除、点按=跳过，卡片跟手位移 + 超阈值（宽 25%）飞出落决策，预加载后续 3 张；完成态统计卡 + 再来一轮 + 整批恢复）+ `SwipeReviewViewModel`（`SwipeQueueBuilder` 废片优先建队、undo 栈、未提交 DELETE 累计 20 张自动提交一批系统回收站授权，Done 态整批 undoAll 恢复）；hub「Quick tidy up」渐变主按钮经 `onQuickTidy` 点亮该路由；队列入列原因（Screenshot/Blurry/Low-quality portrait/Recent）为卡片角标，视频永不入队。**审查修复语义（2026-09-05 二轮）**：KEEP 30 天抑制——decide(KEEP) 即时写入 `SwipeKeepHistory`（`domain/swipe/SwipeKeepHistory.kt` 纯函数：`uri|epochMs` 编码 + 30 天 TTL 裁剪；`data/preferences/DataStoreSwipeKeepHistoryStore.kt` 持久化到 user_preferences DataStore `swipe_keep_history` stringSet），restart 建队时过滤活跃条目并顺带清理过期写回，undo(KEEP) 只回滚本会话新增条目；防死锁——API<30（TrashBackend `!isSupported`）提交短路不挂在途状态、`finish` 直接 settleDone（未提交 DELETE 以 skipped 口径进 Done，三桶守恒），token 构建失败经 errorEvent 回滚提交状态；授权被拒（Cancelled）批次回滚为未提交可重试，末张决策后（current==null）显示「待提交 N 张 + 重试/放弃」出口面板（放弃 = 未提交 DELETE 改记 SKIP 进 Done）；freedBytes 为 Reviewing 存储字段，decide/undo/discard 增量维护（O(1)）；换图为方向感知（前进无过渡防闪回，undo 保留淡入）
-- **回忆 Memories（F3 独立页，`features/gallery/memories/`，2026-09-06 重设计）**: Memory 独立主页面 Pager 页 4 + 底 bar 第 5 图标（Collections）+ 详情页路由 `memory_detail/{memoryId}`；生成规则、隐藏持久化与 v1 不落表说明见 §2.12
+- **回忆 Memories（F3 独立页，`features/gallery/memories/`，2026-09-06 重设计）**: Memory 独立主页面 Pager 页 4 + 底 bar 回忆项（AutoAwesome，2026-09-06 导航统一换标）+ 详情页路由 `memory_detail/{memoryId}`；生成规则、隐藏持久化与 v1 不落表说明见 §2.12
 - **Pager 页单根铁律（2026-09-04 事故修复）**: `DedupHomeRoute` 必须以单个 `Box(fillMaxSize)` 包裹 Scaffold + 详情页 + 预览层——HorizontalPager 会把 page 内容的多个根节点沿主轴顺序平铺（`MeasuredPage` 按 child 宽度累加 offset，非 Box 式堆叠），多根会导致详情页/预览层被排到屏外，点击「没反应」。Gallery/Person/Chat 页均为单根模式；页内新增全屏覆盖层一律挂进该 Box，不得作为独立根节点
 
 **代码示例**:
@@ -223,9 +223,8 @@ SearchTopBar(
 - 系统返回键在相册无内部状态（无选择/Pager）时退出应用；主页面其他页按返回键切回相册页（`MainPagerHost` BackHandler）
 
 **底部悬浮 Tab**:
-- 使用共享组件 `FloatingBottomTab`（`features/common/components/FloatingBottomTab.kt`）
-- 位置：底部居中，底部 padding 16.dp，悬浮于媒体网格之上
-- 入口项（从左到右）：相册整理（BurstMode，切到 Pager 页 1 整理 Tab）、Chat、TAG 扫描（切到 Pager 页 1 扫描 Tab，2026-09-06 并入整理+扫描合并页）、人物（AccountCircle）、回忆（Collections，切到 Pager 页 4，2026-09-06 新增）
+- 使用共享组件 `MainFloatingBottomBar`（`features/main/MainFloatingBottomBar.kt`，2026-09-06 导航统一；底层仍为 `FloatingBottomTab`）——五项与 Pager 页序 1:1：相册（PhotoLibrary，本页高亮）、整理（CleaningServices）、聊天（ChatBubble）、人物（AccountCircle）、回忆（AutoAwesome）；打标项已移除（扫描深链走 `organizeTabRequest`）
+- 位置：底部居中，底部 padding 16.dp，悬浮于媒体网格之上；相册详情态（`selectedMediaIndex != null`）隐藏
 - 每项仅显示图标，无文字标签
 - 点击经 `switchMainPage` 瞬时切主页面 Pager 页（无滑动动画）
 - `FloatingBottomTabItem.selected` 高亮态（图标着色 primary）：Memory 页底 bar 的回忆项置 true 标识当前页（点击空操作），其余页保持默认 false
@@ -322,7 +321,7 @@ override fun onCleared() {
 
 ### 2.9 TAG 生成精细控制（2026-06 新增）
 
-**入口**: `TagGenerationControlScreen`（2026-09-06 起并入整理+扫描合并页 SCAN Tab：主页面 Pager 页 1 `OrganizeHomeRoute`，原 `tag_control` NavHost 路由已删除；入口 = 悬浮底栏 TAG 图标（预选 SCAN Tab 切页）/ 设置主菜单「AI 与系统」组「TAG 生成控制」列表行（经 `organizeTabRequest` 预选 SCAN Tab）；embedded 模式下顶栏关闭内置状态栏避让，由合并页胶囊条统一避让）
+**入口**: `TagGenerationControlScreen`（2026-09-06 起并入整理+扫描合并页 SCAN Tab：主页面 Pager 页 1 `OrganizeHomeRoute`，原 `tag_control` NavHost 路由已删除；入口 = 设置主菜单「AI 与系统」组「TAG 生成控制」列表行（经 `organizeTabRequest` 预选 SCAN Tab）+ 整理页胶囊开关直接切换——悬浮底栏 TAG 图标已随 2026-09-06 导航统一移除；embedded 模式下顶栏关闭内置状态栏避让且无返回箭头（根页规则），由合并页胶囊条统一避让）
 
 **技术规范**:
 - **3-Pass 混合管道**（另有 legacy `MOBILE_CLIP_ENCODING` Pass，仅保留用于历史任务兼容及单独重编码场景，不在常规扫描链中）:
@@ -409,7 +408,7 @@ python3 scripts/ui_driver.py dump
 - 顶栏：`statusBarsPadding()` 状态栏避让（edge-to-edge 防标题被状态栏压住）+ 大标题「回忆」（`memory_title`）+ 副标「端侧生成 · 私密」（`memory_privacy_note`）
 - 三分区 feed（`buildSections`）：时光（ON_THIS_DAY + RECENT_HIGHLIGHTS，`memory_section_time`）→ 旅程（CITY，`memory_section_journey`）→ 人物（PERSON，`memory_section_people`）；空分区剔除不占位，三分区全空显示整页空态 `memory_empty_page`；LazyColumn 底部 contentPadding 96.dp 预留底 bar 悬浮遮挡
 - 竖版大卡（`MemoryBigCard`）：168×224 dp 圆角 16（`MemoryPageTokens`：cardWidth/cardHeight/cardCornerRadius/cardSpacing/sectionHorizontalPadding/sectionTitleSpacing，经 `design-tokens.json` SSOT codegen 双端同步）；封面 Coil size(512) crossfade(false)（recycled bitmap 红线）；底部渐变蒙层 + 左下 17sp Bold 白字标题 + 12sp 80% 副行；`contentDescription = "title · subtitle"`；点击进详情页、长按弹隐藏确认
-- 底 bar：悬浮 5 图标（出口与 GalleryScreen 同源）；本页回忆项（Collections 图标）`FloatingBottomTabItem.selected = true` 高亮（图标着色 primary，点击空操作）；相册页底 bar 第 5 图标经 `onNavigateToMemory` → `switchMainPage(MAIN_PAGE_MEMORY)` 瞬时切页
+- 底 bar：共享 `MainFloatingBottomBar`（2026-09-06 导航统一，五项与 Pager 页序 1:1）；本页回忆项（AutoAwesome 图标）selected 高亮（图标着色 primary，点击空操作）；其他页经 `onSwitchMainPage` → `onBarSwitchPage` → `switchMainPage(index)` 瞬时切页（目标为整理页时预选 ORGANIZE tab）
 
 **生成规则（`domain/memories/MemoriesGenerator.kt` 纯函数，now/zoneId 注入确定性，JVM 可测）**:
 - 四类回忆：ON_THIS_DAY（与 now 同月同日的往年 ≥4 张，year < now 未来年份排除）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2，仅 CITY 填 `earliestCaptureDate`/`latestCaptureDate` 供旅程日期范围）；总量截 `MAX_CAROUSEL`(10)

@@ -94,6 +94,13 @@ fun MainPagerHost(
         }
     }
 
+    // 底 bar 页切换（2026-09-06 导航统一）：目标为整理页时预选 ORGANIZE tab
+    // （扫描不再是独立 bar 项，深链仍走 organizeTabRequest）
+    val onBarSwitchPage: (Int) -> Unit = { index ->
+        if (index == MAIN_PAGE_DEDUP) organizeTab = OrganizeTab.ORGANIZE
+        onSwitchPage(index)
+    }
+
     // 场景管理：跟随 Pager 稳定页切换（相册整理与回忆页沿用相册场景，人物页无独立场景沿用进入前的场景）
     LaunchedEffect(pagerState.settledPage) {
         val scene = when (pagerState.settledPage) {
@@ -128,7 +135,6 @@ fun MainPagerHost(
                 navController = navController,
                 viewModel = mediaViewModel,
                 settingsViewModel = settingsViewModel,
-                onNavigateToChat = { onSwitchPage(MAIN_PAGE_CHAT) },
                 // 相机已是 NavHost 路由：头像拍摄登记 pending 后全屏进入
                 onNavigateToCamera = {
                     navController.navigate(Screen.Camera.route, navOptions { launchSingleTop = true })
@@ -142,22 +148,11 @@ fun MainPagerHost(
                 onNavigateToDebug = {
                     navController.navigate(Screen.Debug.route, navOptions { launchSingleTop = true })
                 },
-                onNavigateToTagControl = {
-                    // 扫描已并入整理+扫描合并页（页 1）SCAN Tab：切页并预选 Tab
-                    organizeTab = OrganizeTab.SCAN
-                    onSwitchPage(MAIN_PAGE_DEDUP)
-                },
-                // 整理+扫描合并页是相邻 Pager 页：切页而非导航（与底部 Tab 瞬时切页风格一致）
-                onNavigateToDedupHome = {
-                    organizeTab = OrganizeTab.ORGANIZE
-                    onSwitchPage(MAIN_PAGE_DEDUP)
-                },
-                onNavigateToPeople = { onSwitchPage(MAIN_PAGE_PEOPLE) },
+                onSwitchMainPage = onBarSwitchPage,
                 searchRequest = gallerySearchRequest,
                 onSearchRequestConsumed = onGallerySearchRequestConsumed,
                 onHorizontalSwipeEnabledChange = { enabled -> gallerySwipeEnabled = enabled },
                 isActivePage = pagerState.currentPage == MAIN_PAGE_GALLERY,
-                onNavigateToMemory = { onSwitchPage(MAIN_PAGE_MEMORY) }
             )
 
             // 整理+扫描合并页（2026-09-06）：双 Tab 容器承载去重 2.0（四态不变）与 TAG 扫描控制；
@@ -170,10 +165,11 @@ fun MainPagerHost(
                 onUseOpenclChange = { enabled ->
                     settingsViewModel.setTagGenerationUseOpencl(enabled)
                 },
-                onNavigateBack = { onSwitchPage(MAIN_PAGE_GALLERY) },
+                onLeaveToGallery = { onSwitchPage(MAIN_PAGE_GALLERY) },
                 onQuickTidy = onQuickTidy,
                 onOpenCategory = onOpenCategory,
-                onNavigateToTagViewer = onNavigateToTagViewer
+                onNavigateToTagViewer = onNavigateToTagViewer,
+                onSwitchMainPage = onBarSwitchPage
             )
 
             MAIN_PAGE_CHAT -> ChatScreen(
@@ -203,28 +199,17 @@ fun MainPagerHost(
 
             MAIN_PAGE_PEOPLE -> PersonScreen(
                 viewModel = personViewModel,
-                onNavigateBack = { onSwitchPage(MAIN_PAGE_GALLERY) },
                 onNavigateToGallery = { personId -> onRequestGallerySearch("", personId) },
                 onNavigateToCamera = {
                     navController.navigate(Screen.Camera.route, navOptions { launchSingleTop = true })
                 },
-                isActivePage = pagerState.currentPage == MAIN_PAGE_PEOPLE
+                onSwitchMainPage = onBarSwitchPage
             )
 
             MAIN_PAGE_MEMORY -> MemoryScreen(
                 memoriesViewModel = memoriesViewModel,
                 onNavigateToMemoryDetail = onNavigateToMemoryDetail,
-                onNavigateToDedupHome = {
-                    organizeTab = OrganizeTab.ORGANIZE
-                    onSwitchPage(MAIN_PAGE_DEDUP)
-                },
-                onNavigateToChat = { onSwitchPage(MAIN_PAGE_CHAT) },
-                onNavigateToTagControl = {
-                    // 扫描已并入整理+扫描合并页（页 1）SCAN Tab：切页并预选 Tab
-                    organizeTab = OrganizeTab.SCAN
-                    onSwitchPage(MAIN_PAGE_DEDUP)
-                },
-                onNavigateToPeople = { onSwitchPage(MAIN_PAGE_PEOPLE) },
+                onSwitchMainPage = onBarSwitchPage,
             )
         }
     }

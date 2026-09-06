@@ -483,6 +483,7 @@
     <string name="memory_detail_best">精选</string>
     <string name="memory_detail_all">全部</string>
     <string name="memory_items_count">%1$d 项</string>
+    <string name="tab_gallery">相册</string>
     <string name="tab_memories">回忆</string>
     <string name="memory_photo_cd">回忆照片 %1$d</string>
     <string name="memory_on_this_day">那年今日</string>
@@ -1131,7 +1132,6 @@
     <string name="data_privacy_clear_guest">清除访客数据</string>
     <string name="data_privacy_clear_guest_success">访客数据已清除</string>
     <string name="data_privacy_clear_guest_failed">清除访客数据失败</string>
-    <string name="tag_scan_control">TAG 扫描控制</string>
     <string name="start_scan">开始扫描</string>
     <string name="search_photos">搜索照片</string>
     <string name="group_by">分组</string>

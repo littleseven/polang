@@ -36,15 +36,17 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 
 | 页索引 | 页面 | 定位 |
 |--------|------|------|
-| 0 | `Gallery` | **默认首页** — 智能相册、媒体浏览、AI 搜索、分类管理；底部悬浮 Tab 以纯图标聚合 相册整理/Chat/打标/People/回忆 入口；设置入口在顶部栏最右侧 |
-| 1 | `Organize`（整理+扫描合并页） | 整理+扫描双 Tab 容器（`OrganizeHomeRoute`，2026-09-06 合并）— Tab「整理」= 去重 2.0 主页（`DedupHomeRoute` embedded，三级尺度重复/相似照片扫描、保留规则与回收站清理），Tab「扫描」= TAG 生成控制（`TagGenerationControlScreen` embedded，原 `tag_control` 路由并入）；相册页左滑即达，返回切回相册页不弹栈；外部入口（设置页）经 `organizeTabRequest` 一次性预选 Tab |
-| 2 | `Chat` | AI 对话主页，仅远程模型 |
-| 3 | `People` | 人物聚类页 |
+| 0 | `Gallery` | **默认首页** — 智能相册、媒体浏览、AI 搜索、分类管理；底部悬浮 Tab（共享 `MainFloatingBottomBar`）以纯图标聚合 相册/整理/Chat/People/回忆 五项（与 Pager 页序 1:1，相册项本页高亮）；设置入口在顶部栏最右侧 |
+| 1 | `Organize`（整理+扫描合并页） | 整理+扫描双 Tab 容器（`OrganizeHomeRoute`，2026-09-06 合并）— Tab「整理」= 去重 2.0 主页（`DedupHomeRoute` embedded，三级尺度重复/相似照片扫描、保留规则与回收站清理），Tab「扫描」= TAG 生成控制（`TagGenerationControlScreen` embedded，原 `tag_control` 路由并入）；相册页左滑即达，系统返回切回相册页不弹栈；外部入口（设置页）经 `organizeTabRequest` 一次性预选 Tab；根页挂底 bar（整理项高亮，Dedup Scanning/Results/Cleaned 态门控隐藏防 CTA 遮挡） |
+| 2 | `Chat` | AI 对话主页，仅远程模型；沉浸式二级身份（无底 bar、顶栏返回相册、横滑可达） |
+| 3 | `People` | 人物聚类页；2026-09-06 升根页（去顶栏返回箭头、挂底 bar 人物项高亮、网格 96dp 底部避让） |
 | 4 | `Memory`（回忆） | 回忆独立页（2026-09-06，对标小米系统相册）— 三分区大卡 feed（时光/旅程/人物，空分区不占位）+ 回忆详情页 `memory_detail/{memoryId}`；纯端侧规则生成零上传，实现细节见 `features/gallery/AGENTS.md` §2.12 |
 
 > **2026-07 主页面 Pager 化**：主页面由 `HorizontalPager`（`beyondViewportPageCount = MAIN_PAGE_COUNT - 1`，页面全部常驻组合）承载，横滑跟手、线性顺序、无循环回绕；底部 Tab/编程入口经 `switchMainPage` 瞬时切页（无滑动动画）；相册（详情/多选）与聊天（全屏预览）通过 `onHorizontalSwipeEnabledChange` 局部禁用外层滑动；Chat/人物页跳相册搜索经 `searchRequest` 状态驱动（不再走 `gallery?query=` 路由参数）。原 `MainPageSwipeWrapper` 已删除。
 >
 > **2026-09-06 Memory 独立页**：Pager 追加第 5 页「回忆」（index 4，`MAIN_PAGE_MEMORY`，`beyondViewportPageCount` 随之 = 4），对标小米系统相册分区 feed；实现细节见 `features/gallery/AGENTS.md` §2.12。
+>
+> **2026-09-06 导航统一（五页一面、聊天沉浸）**：底 bar 五项与 Pager 页序 1:1（相册 PhotoLibrary / 整理 CleaningServices / 聊天 / 人物 / 回忆 AutoAwesome），收敛为共享组件 `MainFloatingBottomBar`（`features/main/`）。**页面身份规则**：根页（相册/整理/人物/回忆）= 无顶栏返回箭头 + 渲染底 bar 高亮自身项 + 系统返回经 MainPagerHost BackHandler 回相册页；沉浸二级页（聊天）= 有返回出路、不渲染 bar。页面自身有底部 UI/全屏态时隐藏 bar（先例：相册详情态、Dedup CTA 三态）。打标 bar 项移除（深链仍走 `organizeTabRequest`）；`Screen.People` 死声明删除。spec：`docs/superpowers/specs/2026-09-06-main-nav-unification-design.md`。
 >
 > **2026-09-06 整理+扫描合并页**：原 Pager 页 1（去重 2.0 `DedupHomeRoute`）与 NavHost 路由 `tag_control`（TAG 生成控制）合并为页 1 双 Tab 容器 `OrganizeHomeRoute`（顶部胶囊分段开关「整理/扫描」，两子页以 `embedded` 模式嵌入保留各自顶栏 actions）；`tag_control` 路由删除，悬浮底栏两图标与设置入口均切页并预选对应 Tab（页内 Tab 态由 MainPagerHost `rememberSaveable` 持有，外部经 `organizeTabRequest` 驱动）。
 >

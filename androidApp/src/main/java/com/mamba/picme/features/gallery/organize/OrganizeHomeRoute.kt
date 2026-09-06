@@ -8,12 +8,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -27,17 +31,24 @@ import com.mamba.picme.R
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.gallery.components.TagGenerationControlScreen
 import com.mamba.picme.features.gallery.dedup.DedupHomeRoute
+import com.mamba.picme.features.gallery.dedup.DedupUiState
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
+import com.mamba.picme.features.main.MAIN_PAGE_DEDUP
+import com.mamba.picme.features.main.MainFloatingBottomBar
 
 /**
  * 整理 + 扫描合并页（2026-09-06，主页面 Pager 页 1）：顶部居中胶囊分段开关切换
  * 「整理」（[DedupHomeRoute]，去重 2.0 四态 hub）与「扫描」（[TagGenerationControlScreen]，
- * TAG 3-Pass 控制）。原 `tag_control` NavHost 路由已并入本页；悬浮底栏「相册整理」
- * 「TAG 扫描」两图标与设置入口均落到本页对应 Tab（外部经 organizeTabRequest 驱动）。
+ * TAG 3-Pass 控制）。原 `tag_control` NavHost 路由已并入本页；外部入口（设置页等）经
+ * organizeTabRequest 预选 Tab。2026-09-06 导航统一：升根页挂悬浮底 bar（整理项高亮，
+ * 五项与 Pager 页序 1:1）。
  *
  * - 单根 Box：HorizontalPager 会把 page 多根节点沿主轴平铺到屏外（Pager 页单根铁律）
  * - 子页 embedded 模式：两子页保留各自顶栏（标题/取消扫描/保留规则等 actions 零丢失），
- *   仅关闭内置状态栏避让，由本页胶囊条统一避让
+ *   仅关闭内置状态栏避让，由本页胶囊条统一避让；根页无返回箭头（DedupTopBar/TagGen
+ *   顶栏 navigationIcon 已移除）
+ * - bar 可见性门控：Dedup 子页 Scanning/Results/Cleaned 态自带底部 CTA，此时隐藏悬浮
+ *   bar 防遮挡（对齐相册页详情态隐藏先例）；hub（Config）态与 SCAN tab 显示
  * - 子页条件组合：SCAN tab 的进页副作用（启动前台 Service + 刷新统计）只在切到该 tab
  *   时执行，避免 Pager 常驻组合导致 app 启动即拉起扫描服务；切 tab 销毁子页组合，状态由
  *   Activity 级 DedupViewModel / Service 会话态承载，重组后恢复
@@ -50,11 +61,18 @@ fun OrganizeHomeRoute(
     onSelectTab: (OrganizeTab) -> Unit,
     useOpencl: Boolean,
     onUseOpenclChange: (Boolean) -> Unit,
-    onNavigateBack: () -> Unit,
+    /** Dedup 扫描态「后台运行」按钮离页回相册（根页无返回箭头，此回调仅服务该按钮语义） */
+    onLeaveToGallery: () -> Unit,
     onQuickTidy: () -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
     onNavigateToTagViewer: () -> Unit,
+    /** 底 bar 页切换出口（整理项=本页，高亮且点击空操作） */
+    onSwitchMainPage: (Int) -> Unit,
 ) {
+    // bar 可见性：Dedup 自带底部 CTA 的三态隐藏；hub（Config）与 SCAN tab 显示
+    val dedupState by dedupViewModel.uiState.collectAsState()
+    val showBottomBar = selectedTab == OrganizeTab.SCAN || dedupState is DedupUiState.Config
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -69,17 +87,21 @@ fun OrganizeHomeRoute(
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
             )
-            Box(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    // bar 显示时内容底部避让（对齐 Memory 页 96dp 预留）；CTA 态 bar 隐藏时归零
+                    .padding(bottom = if (showBottomBar) 96.dp else 0.dp),
+            ) {
                 when (selectedTab) {
                     OrganizeTab.ORGANIZE -> DedupHomeRoute(
                         viewModel = dedupViewModel,
-                        onNavigateBack = onNavigateBack,
+                        onNavigateBack = onLeaveToGallery,
                         onQuickTidy = onQuickTidy,
                         onOpenCategory = onOpenCategory,
                         embedded = true,
                     )
                     OrganizeTab.SCAN -> TagGenerationControlScreen(
-                        onNavigateBack = onNavigateBack,
                         onNavigateToTagViewer = onNavigateToTagViewer,
                         useOpencl = useOpencl,
                         onUseOpenclChange = onUseOpenclChange,
@@ -87,6 +109,18 @@ fun OrganizeHomeRoute(
                     )
                 }
             }
+        }
+
+        // 悬浮底 bar：整理项高亮（门控见 showBottomBar）
+        if (showBottomBar) {
+            MainFloatingBottomBar(
+                selectedMainPage = MAIN_PAGE_DEDUP,
+                onSwitchPage = onSwitchMainPage,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
+                    .navigationBarsPadding(),
+            )
         }
     }
 }

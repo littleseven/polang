@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -47,7 +48,8 @@ import com.mamba.picme.features.common.avatar.AvatarCaptureOrigin
 import com.mamba.picme.features.common.avatar.AvatarCaptureTarget
 import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.features.common.topbar.AppTopBarAction
-import com.mamba.picme.features.common.topbar.AppTopBarNavBack
+import com.mamba.picme.features.main.MAIN_PAGE_PEOPLE
+import com.mamba.picme.features.main.MainFloatingBottomBar
 import com.mamba.picme.features.person.components.PersonInfoScreen
 import com.mamba.picme.features.person.components.PersonListItem
 import com.mamba.picme.service.tag.TagGenerationService
@@ -56,16 +58,17 @@ import kotlinx.coroutines.launch
 /**
  * 「人物」页：双列网格展示全部人脸聚类。
  * 支持行内改名、展开式 Bottom Sheet 编辑关系/「我」标记、底部 Sheet 选择封面。
+ * 2026-09-06 升根页：去顶栏返回箭头、挂悬浮底 bar（人物项高亮），系统返回经
+ * MainPagerHost BackHandler 回相册页。
  */
 @Composable
 fun PersonScreen(
     viewModel: PersonViewModel,
-    onNavigateBack: () -> Unit,
     onNavigateToGallery: (Long) -> Unit,
     /** 人物编辑页相机角标：登记 pending 头像拍摄后切到相机页（Pager 页 0） */
     onNavigateToCamera: () -> Unit = {},
-    /** 是否为当前激活的主页面 page（非激活时禁用顶栏 BackHandler，避免跨页抢占系统返回键） */
-    isActivePage: Boolean = true
+    /** 底 bar 页切换出口（相册/整理/聊天/回忆；人物为本页，选中项空操作） */
+    onSwitchMainPage: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
     LaunchedEffect(Unit) { viewModel.reconcileAndLoad() }
@@ -145,9 +148,6 @@ fun PersonScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    AppTopBarNavBack(onClick = onNavigateBack, enabled = isActivePage)
-                },
                 actions = {
                     // 显示全部 / 隐藏单张未命名单人分组
                     AppTopBarAction(
@@ -210,7 +210,8 @@ fun PersonScreen(
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                // 底部 96dp：悬浮底 bar 遮挡预留（对齐 Memory 页做法）
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 96.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -234,6 +235,16 @@ fun PersonScreen(
             }
         }
     }
+
+    // 悬浮底 bar：人物项 selected 高亮（2026-09-06 升根页，对齐相册/整理/回忆）
+    MainFloatingBottomBar(
+        selectedMainPage = MAIN_PAGE_PEOPLE,
+        onSwitchPage = onSwitchMainPage,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 16.dp)
+            .navigationBarsPadding(),
+    )
 
     infoTarget?.let { person ->
         PersonInfoScreen(

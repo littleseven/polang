@@ -41,7 +41,6 @@ sealed class Screen(val route: String) {
     data object LlmLog : Screen("llm_log")
     data object DataPrivacy : Screen("data_privacy")
     data object MemoryFacts : Screen("memory_facts")
-    data object People : Screen("people")
     data object CommunicationChannel : Screen("communication_channel")
     data object SentencePieceTest : Screen("sentencepiece_test")
     data object TagViewer : Screen("tag_viewer")

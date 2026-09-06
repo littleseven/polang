@@ -56,7 +56,6 @@ import com.mamba.picme.domain.tag.scan.ScanSessionState
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.domain.tag.scan.TagScanOrchestrator
 import com.mamba.picme.features.common.topbar.AppTopBar
-import com.mamba.picme.features.common.topbar.AppTopBarNavBack
 import com.mamba.picme.service.tag.TagGenerationService
 import com.mamba.picme.util.permission.BackgroundScanGuard
 import kotlinx.coroutines.delay
@@ -74,11 +73,10 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TagGenerationControlScreen(
-    onNavigateBack: () -> Unit,
     onNavigateToTagViewer: () -> Unit = {},
     useOpencl: Boolean,
     onUseOpenclChange: (Boolean) -> Unit,
-    /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）。 */
+    /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）；根页无返回箭头（2026-09-06 导航统一移除）。 */
     embedded: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -278,7 +276,6 @@ fun TagGenerationControlScreen(
         topBar = {
             AppTopBar(
                 title = { Text(stringResource(R.string.gallery_settings)) },
-                navigationIcon = { AppTopBarNavBack(onClick = onNavigateBack) },
                 includeStatusBarPadding = !embedded
             )
         }
