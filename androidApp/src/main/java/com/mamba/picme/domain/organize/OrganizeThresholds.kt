@@ -1,5 +1,8 @@
 package com.mamba.picme.domain.organize
 
+import com.mamba.picme.domain.dedup.DOCUMENT_OCR_CHAR_THRESHOLD
+import com.mamba.picme.domain.dedup.DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL
+
 /**
  * 整理中心 v2 全部判定阈值（单一事实来源，校准只改这里）。
  * 置信度边界以「×主阈值」的倍数表达（见 ConfidenceGrader）。
@@ -55,11 +58,19 @@ object OrganizeThresholds {
     /** OCR 强命中倍数：文字密度 ≥ 主阈值 × 该系数 → HIGH 置信。 */
     const val OCR_STRONG_FACTOR = 2
 
-    /** DOCUMENT OCR 文字密度主阈值（字符数/百万像素，与 dedup 侧同口径）。 */
-    const val OCR_DENSITY_PER_MEGAPIXEL = 20
+    /**
+     * DOCUMENT OCR 文字密度主阈值（字符数/百万像素）。
+     * SSOT 在 dedup 侧（DedupContentTypeDetector.DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL），
+     * 此处为别名保持「强命中 = 2× 裁定阈值」不变式。
+     */
+    const val OCR_DENSITY_PER_MEGAPIXEL = DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL
 
-    /** DOCUMENT OCR 绝对字符数兜底阈值（尺寸未知时）。 */
-    const val OCR_DENSITY_FALLBACK_CHARS = 200
+    /**
+     * DOCUMENT OCR 绝对字符数兜底阈值（尺寸未知时）。
+     * SSOT 在 dedup 侧（DedupContentTypeDetector.DOCUMENT_OCR_CHAR_THRESHOLD），
+     * 此处为别名保持「强命中 = 2× 裁定阈值」不变式。
+     */
+    const val OCR_DENSITY_FALLBACK_CHARS = DOCUMENT_OCR_CHAR_THRESHOLD
 
     /** 一年毫秒数（365 天近似，老照片判定用，避免引入 java.time）。 */
     internal const val YEAR_MILLIS = 365L * 24 * 60 * 60 * 1000

@@ -42,19 +42,23 @@ object ConfidenceGrader {
         val chars = item.ocrText?.length ?: 0
         if (chars == 0) return OrganizeConfidence.MEDIUM // labels 关键词命中（无 OCR 佐证）
         val area = item.pixelArea
-        val strongThreshold = if (area != null && area > 0) {
-            // 与 DedupContentTypeDetector 同一面积归一口径的 2×
-            area / 1_000_000L * OrganizeThresholds.OCR_DENSITY_PER_MEGAPIXEL * OrganizeThresholds.OCR_STRONG_FACTOR
+        return if (area != null && area > 0) {
+            // 与 DedupContentTypeDetector 同一面积归一口径的 2×（先乘后除，避免 sub-MP 整数截断塌缩为 0）
+            if (chars.toLong() * 1_000_000L >= area * OrganizeThresholds.OCR_DENSITY_PER_MEGAPIXEL * OrganizeThresholds.OCR_STRONG_FACTOR) {
+                OrganizeConfidence.HIGH
+            } else {
+                OrganizeConfidence.MEDIUM
+            }
         } else {
-            OrganizeThresholds.OCR_DENSITY_FALLBACK_CHARS.toLong() * OrganizeThresholds.OCR_STRONG_FACTOR
-        }
-        return if (chars.toLong() >= strongThreshold) {
-            OrganizeConfidence.HIGH
-        } else {
-            OrganizeConfidence.MEDIUM
+            if (chars.toLong() >= OrganizeThresholds.OCR_DENSITY_FALLBACK_CHARS.toLong() * OrganizeThresholds.OCR_STRONG_FACTOR) {
+                OrganizeConfidence.HIGH
+            } else {
+                OrganizeConfidence.MEDIUM
+            }
         }
     }
 
+    /** 模糊强命中 HIGH；模糊/曝光任一边界命中 MEDIUM；其余（含 null 信号）LOW。 */
     private fun gradeLowQualityPhoto(item: OrganizeItem): OrganizeConfidence {
         val blur = item.blurScore
         if (blur != null && blur < OrganizeThresholds.BLUR_VARIANCE_LOW * OrganizeThresholds.STRONG_SIGNAL_FACTOR) {
@@ -65,10 +69,11 @@ object ConfidenceGrader {
         val badExposure = exposure != null &&
             (exposure < OrganizeThresholds.EXPOSURE_UNDER || exposure > OrganizeThresholds.EXPOSURE_OVER)
         if (blurred || badExposure) return OrganizeConfidence.MEDIUM
-        // 模糊/曝光正常或未计算，仅 NIMA 低分 → 弱信号
+        // 防御性兜底：arbiter 不定类 NIMA-only 项，正常管线不可达；null 信号落最低档方向安全
         return OrganizeConfidence.LOW
     }
 
+    /** 大文件主阈值：视频按字节，照片按字节（像素面积门槛已在 CategoryArbiter 裁定）。 */
     private fun largeFileThreshold(item: OrganizeItem): Long =
         if (item.isVideo) {
             OrganizeThresholds.LARGE_VIDEO_BYTES
