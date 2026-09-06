@@ -87,7 +87,11 @@ data class BackupMediaTagMetadata(
     val city: String? = null,
     val faceFocusY: Float? = null,
     val aestheticScore: Float? = null,
-    val faceQualityScore: Float? = null
+    val faceQualityScore: Float? = null,
+    // 整理中心 v2 信号（Task 18a 补入；旧备份无此三字段，Moshi 缺省回退 null 默认值）
+    val blurScore: Float? = null,
+    val exposureScore: Float? = null,
+    val lastViewedAt: Long? = null
 )
 
 @JsonClass(generateAdapter = true)

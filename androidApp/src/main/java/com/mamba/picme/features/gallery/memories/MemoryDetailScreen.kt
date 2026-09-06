@@ -271,6 +271,7 @@ fun MemoryDetailScreen(
                 assets = previewAssets,
                 initialIndex = currentPreviewIndex.coerceIn(0, previewAssets.lastIndex),
                 onClose = { previewIndex = null },
+                onPageViewed = { uri -> mediaViewModel.markMediaViewed(uri) },
                 onDelete = { asset -> mediaViewModel.deleteMediaByIds(listOf(asset.id)) },
                 onStartOcr = { uriString ->
                     mediaViewModel.recognizeTextFromCurrentImage(context, uriString.toUri())

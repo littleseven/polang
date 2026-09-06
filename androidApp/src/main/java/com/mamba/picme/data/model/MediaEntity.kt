@@ -10,7 +10,9 @@ import com.mamba.picme.domain.model.AppLanguage
     tableName = "media_assets",
     indices = [
         Index("captureDate"),
-        Index("hasFace")
+        Index("hasFace"),
+        // uri 是 updateLastViewedAt/updateQualityScores 的 WHERE 键，非唯一索引消除全表扫描
+        Index("uri")
     ]
 )
 data class MediaEntity(
@@ -48,6 +50,12 @@ data class MediaEntity(
     val aestheticScore: Float? = null,
     /** eDifFIQA 人脸质量评分（~0~1；null=未评分）。人脸封面选择的主信号。 */
     val faceQualityScore: Float? = null,
+    /** Laplacian 方差模糊分（越大越清晰；null=未计算）。整理中心 v2 LOW_QUALITY_PHOTOS 主信号。 */
+    val blurScore: Float? = null,
+    /** 平均亮度归一（0~1，0.5 附近为正常曝光；null=未计算）。 */
+    val exposureScore: Float? = null,
+    /** 用户在查看器最近一次打开时间戳（null=从未查看）。整理中心 v2 价值保护信号。 */
+    val lastViewedAt: Long? = null,
 
     // MobileCLIP 语义 embedding（512 维 FloatArray 的 Base64，供语义搜索）
     val semanticEmbedding: String? = null,

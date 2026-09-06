@@ -1,6 +1,7 @@
 package com.mamba.picme.features.gallery.dedup
 
 import android.content.IntentSender
+import com.mamba.picme.domain.repository.BackfillBatchResult
 import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.dedup.DedupContentType
 import com.mamba.picme.domain.dedup.DedupGroup
@@ -13,6 +14,8 @@ import com.mamba.picme.domain.dedup.DedupScanner
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.VersionRole
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
@@ -116,21 +119,97 @@ class DedupViewModelTest {
     /** 整理中心统计源替身：JVM 单测无 Room/MediaStore，恒空流（WhileSubscribed 未订阅时不上游）。 */
     private fun fakeOrganizeRepository(): OrganizeRepository = mockk {
         every { observeItems() } returns flowOf(emptyList())
+        // init 后台补算桩：恒空批次立即退出循环，消除既有测试静默走 onFailure 失败分支
+        coEvery { backfillQualitySignals(any(), any()) } returns BackfillBatchResult(attempted = 0, written = 0)
     }
 
     private fun viewModel(
         scanner: DedupScanController,
         trashManager: DedupTrashManager = fakeTrashManager(),
+        organizeRepository: OrganizeRepository = fakeOrganizeRepository(),
         scope: CoroutineScope,
         ioDispatcher: CoroutineDispatcher,
     ) = DedupViewModel(
         mediaSource = DedupMediaSource { emptyList() },
         scanner = scanner,
         trashManager = trashManager,
-        organizeRepository = fakeOrganizeRepository(),
+        organizeRepository = organizeRepository,
         coroutineScope = scope,
         ioDispatcher = ioDispatcher,
     )
+
+    @Test
+    fun `backfill loop exits when batch returns zero`() = runTest {
+        val organizeRepository = mockk<OrganizeRepository> {
+            every { observeItems() } returns flowOf(emptyList())
+            coEvery { backfillQualitySignals(any(), any()) } returnsMany listOf(
+                BackfillBatchResult(attempted = 200, written = 200),
+                BackfillBatchResult(attempted = 0, written = 0),
+            )
+        }
+        viewModel(
+            FakeScanner(events = emptyList()),
+            scope = backgroundScope,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            organizeRepository = organizeRepository,
+        )
+        settle()
+
+        // 首批满批 200 → 次批 0 → 循环退出，共 2 次调用
+        coVerify(exactly = 2) { organizeRepository.backfillQualitySignals(any(), any()) }
+    }
+
+    @Test
+    fun `backfill permanently failed rows are excluded so later rows proceed`() = runTest {
+        val organizeRepository = mockk<OrganizeRepository> {
+            every { observeItems() } returns flowOf(emptyList())
+            coEvery { backfillQualitySignals(any(), any()) } returnsMany listOf(
+                // 批 1：bad1 解码失败（attempted=2, written=1）——旧逻辑 written>0 续批但坏行仍在头部
+                BackfillBatchResult(attempted = 2, written = 1, failedUris = listOf("bad1")),
+                // 批 2：排除 bad1 后后续行正常补算
+                BackfillBatchResult(attempted = 1, written = 1),
+                // 批 3：无残留（attempted=0）→ 退出
+                BackfillBatchResult(attempted = 0, written = 0),
+            )
+        }
+        viewModel(
+            FakeScanner(events = emptyList()),
+            scope = backgroundScope,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            organizeRepository = organizeRepository,
+        )
+        settle()
+
+        coVerify(exactly = 3) { organizeRepository.backfillQualitySignals(any(), any()) }
+        // 第 2/3 批必须携带排除集（bad1 不再占批次头部）
+        coVerify { organizeRepository.backfillQualitySignals(any(), match { excluded -> "bad1" in excluded }) }
+    }
+
+    @Test
+    fun `backfill all-failed batch does not stop the loop early`() = runTest {
+        val organizeRepository = mockk<OrganizeRepository> {
+            every { observeItems() } returns flowOf(emptyList())
+            coEvery { backfillQualitySignals(any(), any()) } returnsMany listOf(
+                // 批 1 全败（written=0）：旧逻辑在此退出，后续行永远补不上
+                BackfillBatchResult(attempted = 2, written = 0, failedUris = listOf("bad1", "bad2")),
+                // 批 2：排除后新行补算成功
+                BackfillBatchResult(attempted = 1, written = 1),
+                BackfillBatchResult(attempted = 0, written = 0),
+            )
+        }
+        viewModel(
+            FakeScanner(events = emptyList()),
+            scope = backgroundScope,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            organizeRepository = organizeRepository,
+        )
+        settle()
+
+        coVerify(exactly = 3) { organizeRepository.backfillQualitySignals(any(), any()) }
+        coVerify {
+            organizeRepository.backfillQualitySignals(any(), match { excluded -> excluded.containsAll(listOf("bad1", "bad2")) })
+        }
+    }
 
     @Test
     fun `GroupFound events appear in Scanning state progressively`() = runTest {

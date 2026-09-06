@@ -441,8 +441,36 @@ interface MediaDao {
      * 整理中心类目判定的轻量投影（避开 semanticEmbedding/faceRoiResult 等大列）。
      * type 列存枚举名（Room 内建 enum 转换），投影按 String 读。
      */
-    @Query("SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore, faceQualityScore FROM media_assets")
+    @Query(
+        "SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore, " +
+            "faceQualityScore, blurScore, exposureScore, lastViewedAt, faceId FROM media_assets"
+    )
     fun observeOrganizeRows(): Flow<List<OrganizeRow>>
+
+    /** 回写模糊/曝光分（整理中心 v2 惰性补算产出）。 */
+    @Query("UPDATE media_assets SET blurScore = :blur, exposureScore = :exposure WHERE uri = :uri")
+    suspend fun updateQualityScores(uri: String, blur: Float?, exposure: Float?)
+
+    /** 批量回写模糊/曝光分：单事务一次 invalidation，避免 observe 流逐行重发射（整理中心 v2 惰性补算合批）。 */
+    @Transaction
+    suspend fun updateQualityScoresBatch(entries: List<QualityScoreEntry>) {
+        entries.forEach { entry -> updateQualityScores(entry.uri, entry.blurScore, entry.exposureScore) }
+    }
+
+    /**
+     * 回写最近一次查看时间（查看器打开时调用）。60s 节流窗（60000ms）消除 60s 内重复
+     * 查看同一媒体的无效触发（新照片首看仍各触发一次，属固有信号更新）：
+     * ValueGuard 只判 != null，守卫零语义损失。
+     */
+    @Query("UPDATE media_assets SET lastViewedAt = :timestamp WHERE uri = :uri AND (lastViewedAt IS NULL OR lastViewedAt < :timestamp - 60000)")
+    suspend fun updateLastViewedAt(uri: String, timestamp: Long)
+
+    /** 各人物聚类的照片总数（faceId → 计数），整理中心 v2 人物稀缺信号。 */
+    @Query(
+        "SELECT faceId, COUNT(*) AS cnt FROM media_assets " +
+            "WHERE faceId IS NOT NULL AND faceId != '' GROUP BY faceId"
+    )
+    suspend fun getPersonPhotoCounts(): List<PersonPhotoCount>
 
     /** 重置所有语义 embedding（用于强制重新编码/清理污染数据） */
     @Query("UPDATE media_assets SET semanticEmbedding = NULL")
@@ -602,7 +630,9 @@ interface MediaDao {
      * 从备份批量更新 TAG 相关元数据字段。
      * 一次性写入 labels / mlKitLabels / mlKitLabelsZh / ocrText / 地理位置 /
      * faceRoiResult / semanticEmbedding / lastTagScanAt / lastTagScanPasses /
-     * hasFace / faceId / city / faceFocusY / aestheticScore / faceQualityScore，
+     * hasFace / faceId / city / faceFocusY / aestheticScore / faceQualityScore /
+     * blurScore / exposureScore / lastViewedAt（整理中心 v2 信号，COALESCE 语义：
+     * 旧备份缺字段（null）不冲掉本机已算值——lastViewedAt 是保护信号不可再生），
      * 避免还原时多次 UPDATE。
      */
     @Query(
@@ -626,7 +656,10 @@ interface MediaDao {
             city = :city,
             faceFocusY = :faceFocusY,
             aestheticScore = :aestheticScore,
-            faceQualityScore = :faceQualityScore
+            faceQualityScore = :faceQualityScore,
+            blurScore = COALESCE(:blurScore, blurScore),
+            exposureScore = COALESCE(:exposureScore, exposureScore),
+            lastViewedAt = COALESCE(:lastViewedAt, lastViewedAt)
         WHERE id = :mediaId
         """
     )
@@ -651,7 +684,10 @@ interface MediaDao {
         city: String?,
         faceFocusY: Float?,
         aestheticScore: Float?,
-        faceQualityScore: Float?
+        faceQualityScore: Float?,
+        blurScore: Float?,
+        exposureScore: Float?,
+        lastViewedAt: Long?
     )
 }
 
@@ -675,4 +711,21 @@ data class OrganizeRow(
     val hasFace: Boolean,
     val aestheticScore: Float?,
     val faceQualityScore: Float?,
+    val blurScore: Float?,
+    val exposureScore: Float?,
+    val lastViewedAt: Long?,
+    val faceId: String?,
+)
+
+/** 人物聚类照片计数投影（整理中心 v2 人物稀缺信号）。 */
+data class PersonPhotoCount(
+    val faceId: String,
+    val cnt: Int,
+)
+
+/** 模糊/曝光分批量回写条目（整理中心 v2 惰性补算产出，计算成功的非空分）。 */
+data class QualityScoreEntry(
+    val uri: String,
+    val blurScore: Float,
+    val exposureScore: Float,
 )

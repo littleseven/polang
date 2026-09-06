@@ -435,15 +435,24 @@
     <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
     <string name="org_title">Organize</string>
     <string name="org_hero_label">Estimated reclaimable</string>
-    <string name="org_hero_across">Across %1$d categories</string>
+    <plurals name="org_hero_across">
+        <item quantity="one">Across %1$d category</item>
+        <item quantity="other">Across %1$d categories</item>
+    </plurals>
     <string name="org_quick_tidy">Quick tidy up</string>
     <string name="org_categories">Categories</string>
     <string name="org_cat_duplicates">Duplicates &amp; similar</string>
-    <string name="org_cat_screenshots">Screenshots</string>
     <string name="org_cat_blurry">Blurry &amp; low quality</string>
     <string name="org_cat_portraits">Low-quality portraits</string>
-    <string name="org_cat_large_videos">Large videos</string>
     <string name="org_cat_documents">Documents &amp; receipts</string>
+    <string name="org_cat_screen_content">Screenshots &amp; recordings</string>
+    <string name="org_cat_large_files">Large files</string>
+    <string name="org_hero_review">%1$d more to review</string>
+    <string name="org_needs_scan">Scan needed · tap to scan</string>
+    <string name="org_confidence_high">%1$d confident</string>
+    <string name="org_confidence_review">%1$d to review</string>
+    <string name="org_protected_count">%1$d protected</string>
+    <string name="org_cat_reclaim">Free %1$s</string>
     <string name="org_cat_meta">%1$d items · %2$s</string>
     <string name="org_privacy_note">All analysis runs on-device · your photos never leave this phone</string>
     <string name="org_ai_preselect_on">AI preselect on</string>
@@ -458,6 +467,10 @@
     <string name="org_partial_trash">Some items need extra permission and were kept</string>
     <string name="org_trash_unsupported">Trash needs Android 11+; please delete from the gallery</string>
     <string name="org_empty_category">Nothing to clean here</string>
+    <string name="org_section_suggested">Suggested (%1$d)</string>
+    <string name="org_section_review">Review (%1$d)</string>
+    <string name="org_section_protected">Likely precious (%1$d)</string>
+    <string name="org_protected_badge">Possibly precious photo</string>
 
     <!-- Swipe review（F2 手势快速整理全屏页） -->
     <string name="swipe_title">Quick tidy</string>

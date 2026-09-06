@@ -1,74 +1,123 @@
 package com.mamba.picme.domain.organize
 
-import com.mamba.picme.domain.dedup.DedupContentType
-import com.mamba.picme.domain.dedup.detectContentType
-
-/** MediaStore 截图目录约定（路径 contains，大小写不敏感；与 dedup 侧同一规则）。 */
-private const val SCREENSHOT_DIR_KEYWORD = "screenshots"
-
 /** hub 卡片预览缩略图张数。 */
 private const val PREVIEW_LIMIT = 4
 
 /**
- * 整理中心类目判定纯函数（零额外推理，可 JVM 单测）。
- * DUPLICATES 不在此判定——去重分组由 DedupScanner 产出，hub 卡只展示其摘要。
- * 一条媒体可同时属于多个类目（集合语义），阈值一律常量化。
+ * 整理中心 v2 管线编排 Facade（纯函数，对外唯一入口）：
+ * CategoryArbiter（互斥裁定）→ ValueGuard（价值保护）→ ConfidenceGrader（置信分级）。
+ * 旧集合语义 categoriesOf/stats/CategoryStat 已删除——类目页与 SwipeReview 同源消费本管线。
  */
 object OrganizeCategorizer {
 
-    /** NIMA 美学分（1~10）低于该值判模糊低质；null = 未评分，绝不参与判定。 */
-    const val AESTHETIC_LOW_THRESHOLD = 3.5f
-
-    /** eDifFIQA 人脸质量分（0~1）低于该值判低质量人像；null = 未评分，绝不参与判定。 */
-    const val FACE_QUALITY_LOW_THRESHOLD = 0.35f
-
-    /** 大视频阈值（100 MiB）。 */
-    const val LARGE_VIDEO_BYTES = 100L * 1024 * 1024
-
-    fun categoriesOf(item: OrganizeItem): Set<OrganizeCategory> {
-        val categories = mutableSetOf<OrganizeCategory>()
-        if (item.relativePath?.contains(SCREENSHOT_DIR_KEYWORD, ignoreCase = true) == true) {
-            categories += OrganizeCategory.SCREENSHOTS
-        }
-        if (item.isVideo) {
-            if (item.sizeBytes >= LARGE_VIDEO_BYTES) {
-                categories += OrganizeCategory.LARGE_VIDEOS
-            }
-        } else {
-            val aesthetic = item.aestheticScore
-            if (aesthetic != null && aesthetic < AESTHETIC_LOW_THRESHOLD) {
-                categories += OrganizeCategory.BLURRY
-            }
-            val faceQuality = item.faceQualityScore
-            if (item.hasFace && faceQuality != null && faceQuality < FACE_QUALITY_LOW_THRESHOLD) {
-                categories += OrganizeCategory.LOW_QUALITY_PORTRAITS
-            }
-            val contentType = detectContentType(
-                path = item.relativePath,
-                ocrText = item.ocrText,
-                pixelArea = item.pixelArea,
-                labels = item.labels,
-                hasFace = item.hasFace,
-                faceQualityScore = item.faceQualityScore,
+    /** 逐媒体裁定（类目详情页输入）。未命中任何类目的媒体不出现在结果中。 */
+    fun classifyAll(items: List<OrganizeItem>, now: Long): List<ClassifiedItem> =
+        items.mapNotNull { item ->
+            val category = CategoryArbiter.classify(item) ?: return@mapNotNull null
+            val verdict = ValueGuard.assess(item, category, now)
+            ClassifiedItem(
+                item = item,
+                category = category,
+                confidence = ConfidenceGrader.grade(item, category),
+                protectReasons = verdict.reasons,
             )
-            if (contentType == DedupContentType.DOCUMENT) {
-                categories += OrganizeCategory.DOCUMENTS
-            }
         }
-        return categories
+
+    /**
+     * hub 聚合：类目卡（按建议优先级 highBytes 降序）+ Hero 口径（HIGH 非 protected 去重并集；
+     * DUPLICATES 按精确组扣 1 张 keeper，与去重结果页只计非 keeper 口径一致）。
+     * 六类目全量产卡（含零命中类目：计数/字节全零、coverage 正常计算），
+     * NEEDS_SCAN 引导卡与空卡是否渲染由 UI 层决定（spec P3/AC-R2-4：类目不再静默消失）。
+     */
+    fun board(items: List<OrganizeItem>, now: Long): OrganizeBoard {
+        val classified = classifyAll(items, now)
+        val entriesByCategory = classified.groupBy { entry -> entry.category }
+        val cards = OrganizeCategory.entries
+            .map { category ->
+                val entries = entriesByCategory[category].orEmpty()
+                val high = entries.filter { entry ->
+                    entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
+                }
+                val review = entries.filter { entry ->
+                    entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected
+                }
+                val highBytes = high.sumOf { entry -> entry.item.sizeBytes } -
+                    if (category == OrganizeCategory.DUPLICATES) {
+                        duplicatesKeeperBytes(high)
+                    } else {
+                        0L
+                    }
+                CategoryBoard(
+                    category = category,
+                    totalCount = entries.size,
+                    totalBytes = entries.sumOf { entry -> entry.item.sizeBytes },
+                    highCount = high.size,
+                    highBytes = highBytes,
+                    reviewCount = review.size,
+                    protectedCount = entries.count { entry -> entry.isProtected },
+                    // 按 uri 排序取前 4：rows 无序（rowid 序漂移），稳定序防预览缩略图闪换
+                    previewUris = entries.sortedBy { entry -> entry.item.uri }
+                        .take(PREVIEW_LIMIT)
+                        .map { entry -> entry.item.uri },
+                    coverage = coverageOf(category, items),
+                )
+            }
+            .sortedByDescending { card -> card.highBytes }
+        return OrganizeBoard(
+            categories = cards,
+            // 互斥裁定保证一媒体一卡，high 求和即并集（AC-F1-1 回归防线）
+            heroReclaimBytes = cards.sumOf { card -> card.highBytes },
+            heroReviewCount = cards.sumOf { card -> card.reviewCount },
+        )
     }
 
-    /** 按枚举声明顺序聚合，过滤空类目；previewUris 取该类目前 [PREVIEW_LIMIT] 个。 */
-    fun stats(items: List<OrganizeItem>): List<CategoryStat> =
-        OrganizeCategory.entries.mapNotNull { category ->
-            if (category == OrganizeCategory.DUPLICATES) return@mapNotNull null
-            val matched = items.filter { item -> category in categoriesOf(item) }
-            if (matched.isEmpty()) return@mapNotNull null
-            CategoryStat(
-                category = category,
-                count = matched.size,
-                totalBytes = matched.sumOf { item -> item.sizeBytes },
-                previewUris = matched.take(PREVIEW_LIMIT).map { item -> item.uri },
-            )
+    /**
+     * DUPLICATES keeper 扣减：hub「可释放」按每精确组留 1 张计（与详情页预选/全选按组
+     * 排除 1 张 keeper 同口径）。组内同 MD5 内容相同，扣组内最大 sizeBytes
+     * （防 first 落到 0 字节异常行）。
+     * 守卫 `group.size == exactDupGroupSize`：组全员都在建议集才扣。生产管线中聚类输入
+     * 已按库内 uri 收敛（OrganizeRepositoryImpl.queryDuplicateInfo），组必然全员在列，
+     * 本守卫仅防御直调 [board] 传部分列表的异常输入——不扣时按全组字节计（高估方向，
+     * 仅展示口径偏差，无安全风险）。
+     * 注：DUPLICATES 不经 ValueGuard（见 ValueGuard.GUARDED_CATEGORIES），
+     * 精确组成员恒 HIGH 非 protected，「全员在列」即「组未被建议集拆散」。
+     */
+    private fun duplicatesKeeperBytes(high: List<ClassifiedItem>): Long =
+        high.groupBy { entry -> entry.item.exactDupGroupKey }
+            .filterKeys { key -> key != null }
+            .values
+            .filter { group -> group.size == group.first().item.exactDupGroupSize }
+            .sumOf { group -> group.maxOf { entry -> entry.item.sizeBytes } }
+
+    /**
+     * 类目信号覆盖度：全库任一媒体持有该类目关键信号 → READY，否则 NEEDS_SCAN
+     * （驱动 hub「需先扫描」引导态，修复 v1 类目静默消失）。
+     * 路径/大小类信号（SCREEN_CONTENT/LARGE_FILES/DUPLICATES）MediaStore 常备，恒 READY。
+     */
+    fun coverageOf(category: OrganizeCategory, items: List<OrganizeItem>): SignalCoverage =
+        when (category) {
+            OrganizeCategory.DUPLICATES,
+            OrganizeCategory.SCREEN_CONTENT,
+            OrganizeCategory.LARGE_FILES,
+            -> SignalCoverage.READY
+            OrganizeCategory.DOCUMENTS ->
+                if (items.any { item -> item.ocrText != null || item.labels != null }) {
+                    SignalCoverage.READY
+                } else {
+                    SignalCoverage.NEEDS_SCAN
+                }
+            OrganizeCategory.LOW_QUALITY_PORTRAITS ->
+                if (items.any { item -> item.faceQualityScore != null }) {
+                    SignalCoverage.READY
+                } else {
+                    SignalCoverage.NEEDS_SCAN
+                }
+            OrganizeCategory.LOW_QUALITY_PHOTOS ->
+                // 信号集与 CategoryArbiter 准入一致（blur 或 exposure 任一持有即已覆盖）
+                if (items.any { item -> item.blurScore != null || item.exposureScore != null }) {
+                    SignalCoverage.READY
+                } else {
+                    SignalCoverage.NEEDS_SCAN
+                }
         }
 }

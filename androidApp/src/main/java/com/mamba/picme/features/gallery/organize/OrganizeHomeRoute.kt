@@ -99,6 +99,8 @@ fun OrganizeHomeRoute(
                         onNavigateBack = onLeaveToGallery,
                         onQuickTidy = onQuickTidy,
                         onOpenCategory = onOpenCategory,
+                        // hub 引导态类目卡（NEEDS_SCAN）点击切到 SCAN tab
+                        onOpenScan = { onSelectTab(OrganizeTab.SCAN) },
                         embedded = true,
                     )
                     OrganizeTab.SCAN -> TagGenerationControlScreen(

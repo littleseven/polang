@@ -20,4 +20,7 @@ interface AndroidMediaRepository : MediaRepository {
      * 清除 Android 10 的恢复性删除状态
      */
     fun clearPendingRecoverable()
+
+    /** 记录媒体在查看器被打开（整理中心 v2 价值保护「用户互动」信号）。 */
+    suspend fun markMediaViewed(uri: String)
 }

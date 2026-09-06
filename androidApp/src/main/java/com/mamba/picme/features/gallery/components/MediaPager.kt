@@ -143,6 +143,7 @@ fun MediaPager(
     onReTag: suspend (Uri) -> String? = { null },
     onDescribeImage: suspend (Uri) -> String? = { null },
     onTriggerSummary: (Long) -> Unit = {},
+    onPageViewed: (String) -> Unit = {},
     onDetectLandmarks: suspend (String) -> MediaViewModel.FaceLandmarkResult? = { null },
     debugUiEnabled: Boolean = false
 ) {
@@ -209,6 +210,7 @@ fun MediaPager(
             if (currentAsset?.type != MediaType.PHOTO) {
                 showLandmarkOverlay = false
             }
+            currentAsset?.let { asset -> onPageViewed(asset.uri) }
             // 按需触发 summary：批量用 ML Kit（无 summary），此处单张 tagger（默认 Florence-2）生成并缓存
             currentAsset?.let { asset -> onTriggerSummary(asset.id) }
         }

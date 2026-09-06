@@ -90,6 +90,8 @@ fun DedupHomeRoute(
     onQuickTidy: () -> Unit = {},
     /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
+    /** hub 引导态类目卡点击：切到合并页 SCAN tab（embedded 模式由 OrganizeHomeRoute 注入 tab 切换）。 */
+    onOpenScan: () -> Unit = {},
     /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）。 */
     embedded: Boolean = false,
 ) {
@@ -189,15 +191,16 @@ fun DedupHomeRoute(
         ) {
             when (val state = uiState) {
                 is DedupUiState.Config -> {
-                    // 类目统计流仅 Config 态订阅（2026-09-05 审查修复）：Scanning/Results/Cleaned
-                    // 态不再挂着全量 Room+MediaStore 合并统计
-                    val categoryStats by viewModel.categoryStats.collectAsState()
+                    // 看板流仅 Config 态订阅：Scanning/Results/Cleaned 态不再挂着
+                    // 全量 Room+MediaStore 合并聚合
+                    val board by viewModel.organizeBoard.collectAsState()
                     DedupHubContent(
                         config = state.config,
                         policy = policy,
-                        stats = categoryStats,
+                        board = board,
                         onQuickTidy = onQuickTidy,
                         onOpenCategory = onOpenCategory,
+                        onOpenScan = onOpenScan,
                         onStartScan = { config -> viewModel.startScan(config) },
                         onOpenKeepRules = { showKeepRules = true },
                     )

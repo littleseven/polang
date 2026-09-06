@@ -13,7 +13,7 @@ import com.mamba.picme.domain.dedup.DedupScanEvent
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.KeepPolicyEngine
-import com.mamba.picme.domain.organize.CategoryStat
+import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategorizer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -90,14 +90,50 @@ class DedupViewModel(
     private val _uiState = MutableStateFlow<DedupUiState>(DedupUiState.Config())
     val uiState: StateFlow<DedupUiState> = _uiState.asStateFlow()
 
-    /** 整理中心 hub 类目统计（仅 Config 态由 UI 订阅；DUPLICATES 不在其中，hub 卡用 dedup 摘要）。 */
-    val categoryStats: StateFlow<List<CategoryStat>> =
+    /** 整理中心 hub 看板（Config 态由 UI 订阅）：类目卡聚合 + Hero 口径，管线单一事实来源。 */
+    val organizeBoard: StateFlow<OrganizeBoard> =
         organizeRepository.observeItems()
-            .map { items -> OrganizeCategorizer.stats(items) }
-            // 媒体库任何写都会触发 observeItems 重算，相同统计结果不下发（防抖重组）
+            .map { items -> OrganizeCategorizer.board(items, now = System.currentTimeMillis()) }
+            // 媒体库任何写都会触发 observeItems 重算，相同结果不下发（防抖重组）
             .distinctUntilChanged()
             .flowOn(ioDispatcher)
-            .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
+            .stateIn(scope, SharingStarted.WhileSubscribed(5000), OrganizeBoard(emptyList(), 0L, 0))
+
+    init {
+        // 整理中心 v2：后台分批补算模糊/曝光分（缺分即 LOW 覆盖，hub 引导态承接；补算回写经 Room Flow 自动刷新）
+        scope.launch(ioDispatcher) {
+            runCatching {
+                // 跨批累计永久失败行（解码失败/云端占位符），下一批排除——否则失败行永久占据
+                // 批次头部，后续待补算行静默停摆（written=0 即退出的旧逻辑）
+                val failedUris = LinkedHashSet<String>()
+                var batch = organizeRepository.backfillQualitySignals(excludeUris = failedUris)
+                failedUris += batch.failedUris
+                var batches = 1
+                // 循环条件按 attempted（排除已知失败后仍有待算行）：全败批次不再提前退出；
+                // BACKFILL_MAX_BATCHES 兜底防永久失败行反复入批放大为死循环（200/批 × 1000 = 20 万张覆盖）
+                while (batch.attempted > 0 && batches < BACKFILL_MAX_BATCHES) {
+                    batch = organizeRepository.backfillQualitySignals(excludeUris = failedUris)
+                    batches++
+                    failedUris += batch.failedUris
+                    // 排除集容量封顶：只保留最近 500 个失败 uri（超出则最早逐出，
+                    // 被逐出行下轮可能重试一次后再次入集，不会死循环——attempted 终为 0）
+                    while (failedUris.size > BACKFILL_FAILED_URIS_CAP) {
+                        failedUris.remove(failedUris.first())
+                    }
+                }
+                if (failedUris.isNotEmpty() || batch.attempted > 0) {
+                    // 循环结束仍有未补算残留：失败行 blurScore 恒 null 不进 LOW_QUALITY_PHOTOS，
+                    // 或命中批次上限仍有积压——如实上报，真机排查看此日志
+                    Logger.w(
+                        ORGANIZE_TAG,
+                        "backfill residual: ${failedUris.size} rows failed decode (skipped, " +
+                            "blurScore stays null); lastBatch attempted=${batch.attempted} " +
+                            "written=${batch.written}, batches=$batches"
+                    )
+                }
+            }.onFailure { error -> Logger.w(TAG, "backfill quality signals failed", error) }
+        }
+    }
 
     /** VM 级保留策略（Config/Results 共用）：Config 规则行与规则弹层改它；进入 Results 时带入 state.policy。 */
     private val _policy = MutableStateFlow(KeepPolicy.BEST_QUALITY)
@@ -452,5 +488,14 @@ class DedupViewModel(
 
     private companion object {
         const val TAG = "Dedup"
+
+        /** 整理中心补算日志标签（与 OrganizeRepositoryImpl 一致，便于真机按 organize 域过滤）。 */
+        const val ORGANIZE_TAG = "PoLang:Organize"
+
+        /** init 质量分补算循环批次上限：200/批 × 1000 = 20 万张覆盖，防御永久失败行死循环。 */
+        const val BACKFILL_MAX_BATCHES = 1000
+
+        /** 永久失败行排除集容量：只保留最近 500 个失败 uri（防无界增长；逐出行重试一次后仍败再入集）。 */
+        const val BACKFILL_FAILED_URIS_CAP = 500
     }
 }

@@ -14,7 +14,7 @@ internal const val DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL = 20
 private const val PIXELS_PER_MEGAPIXEL = 1_000_000L
 
 /** MediaStore 截图目录约定（路径 contains，大小写不敏感）。 */
-private const val SCREENSHOT_DIR_KEYWORD = "screenshots"
+internal const val SCREENSHOT_DIR_KEYWORD = "screenshots"
 
 /**
  * DOCUMENT 标签关键词启发式：labels 为 TAG Pass 3 产出的自由文本（中英混合）。

@@ -3,10 +3,11 @@ package com.mamba.picme.features.gallery.organize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.core.common.Logger
-import com.mamba.picme.domain.repository.OrganizeRepository
+import com.mamba.picme.domain.organize.ClassifiedItem
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.OrganizeCategorizer
-import com.mamba.picme.domain.organize.OrganizeItem
+import com.mamba.picme.domain.organize.OrganizeConfidence
+import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.trash.TrashBackend
 import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.domain.trash.TrashSessionController
@@ -28,8 +29,8 @@ sealed interface OrganizeCategoryUiState {
     data object Loading : OrganizeCategoryUiState
 
     data class Ready(
-        val items: List<OrganizeItem>,
-        /** 选中 uri 集合；AI 预选 = 默认全选该类目命中项。 */
+        val items: List<ClassifiedItem>,
+        /** 选中 uri 集合；AI 预选 = 默认勾选 HIGH 置信且非保护项（修复 v1「预选=全选」）；DUPLICATES 每组留 1 张 keeper。 */
         val selected: Set<String>,
         /** 完成态：该类目已清空（区别于「本来就空」的空态）。 */
         val trashed: Boolean = false,
@@ -38,6 +39,42 @@ sealed interface OrganizeCategoryUiState {
         /** 最近一批已回收 uri（undo 恢复对象）。 */
         val lastTrashedUris: List<String> = emptyList(),
     ) : OrganizeCategoryUiState
+}
+
+/** 详情页三段分组（spec §6.3）：建议删除（HIGH 非保护）/ 请确认（MEDIUM+LOW 非保护）/ 珍贵保护。 */
+data class CategorySections(
+    val suggested: List<ClassifiedItem>,
+    val review: List<ClassifiedItem>,
+    val protectedItems: List<ClassifiedItem>,
+)
+
+/** 三段分组派生（UI/VM 共享纯函数）：三段互斥且完备。 */
+fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
+    suggested = filter { entry -> entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected },
+    review = filter { entry -> entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected },
+    protectedItems = filter { entry -> entry.isProtected },
+)
+
+/**
+ * DUPLICATES 选中集收口（hub「可释放」按组留 1 张口径的详情页对偶）：按 exactDupGroupKey
+ * 每组排除 1 张 keeper，防预选/全选把整组内容删光。keeper 确定性取组内 captureDate 最大者
+ * （精确组内容逐字节相同，留最新一张；同值按 uri 字典序取大仅图稳定）。
+ * KeepPolicyEngine 作用于去重 2.0 的 DedupMember 模型（像素/美学分/版本角色），
+ * 与 OrganizeItem 不同构，不复用；精确组内容相同，keeper 选谁无质量差。
+ * 无组标识成员（similar-only / 异常数据）不参与排除。
+ */
+private fun List<ClassifiedItem>.excludingDuplicateKeepers(): List<ClassifiedItem> {
+    val keeperUris = mapNotNull { entry ->
+        entry.item.exactDupGroupKey?.let { key -> key to entry }
+    }
+        .groupBy({ pair -> pair.first }, { pair -> pair.second })
+        .values
+        .mapTo(HashSet()) { group ->
+            group.maxWith(
+                compareBy({ entry -> entry.item.captureDate }, { entry -> entry.item.uri })
+            ).item.uri
+        }
+    return filter { entry -> entry.item.uri !in keeperUris }
 }
 
 /**
@@ -63,7 +100,7 @@ class OrganizeCategoryViewModel(
     private val _uiState = MutableStateFlow<OrganizeCategoryUiState>(OrganizeCategoryUiState.Loading)
     val uiState: StateFlow<OrganizeCategoryUiState> = _uiState.asStateFlow()
 
-    /** AI 预选开关（右上角切换）：开 = 进入时全选该类目命中项；关 = 空选由用户手点。 */
+    /** AI 预选开关（右上角切换）：开 = 默认勾选 HIGH 置信非保护项；关 = 空选由用户手点。 */
     private val _aiPreselectEnabled = MutableStateFlow(true)
     val aiPreselectEnabled: StateFlow<Boolean> = _aiPreselectEnabled.asStateFlow()
 
@@ -78,6 +115,10 @@ class OrganizeCategoryViewModel(
     private fun currentReady(): OrganizeCategoryUiState.Ready? =
         _uiState.value as? OrganizeCategoryUiState.Ready
 
+    /** 选中集候选收口：DUPLICATES 按组排除 keeper（hub 留 1 张口径对偶），其余类目原样。 */
+    private fun List<ClassifiedItem>.selectionCandidates(): List<ClassifiedItem> =
+        if (category == OrganizeCategory.DUPLICATES) excludingDuplicateKeepers() else this
+
     /** 重新拉取类目快照；preselect=true 时按当前预选开关决定初始选中集。 */
     private fun reload(preselect: Boolean) {
         scope.launch {
@@ -85,7 +126,9 @@ class OrganizeCategoryViewModel(
             _uiState.value = OrganizeCategoryUiState.Ready(
                 items = items,
                 selected = if (preselect && _aiPreselectEnabled.value) {
-                    items.map { item -> item.uri }.toSet()
+                    // 与三段分组同源：预选集 = suggested 段（HIGH 置信非保护），DUPLICATES 再按组留 keeper
+                    items.toSections().suggested.selectionCandidates()
+                        .map { entry -> entry.item.uri }.toSet()
                 } else {
                     emptySet()
                 },
@@ -93,9 +136,11 @@ class OrganizeCategoryViewModel(
         }
     }
 
-    private suspend fun loadCategoryItems(): List<OrganizeItem> = withContext(ioDispatcher) {
-        organizeRepository.loadItems()
-            .filter { item -> category in OrganizeCategorizer.categoriesOf(item) }
+    private suspend fun loadCategoryItems(): List<ClassifiedItem> = withContext(ioDispatcher) {
+        OrganizeCategorizer.classifyAll(organizeRepository.loadItems(), now = System.currentTimeMillis())
+            .filter { entry -> entry.category == category }
+            // media_assets.uri 非唯一索引，重复行会同段同 key 硬崩 LazyVerticalGrid
+            .distinctBy { entry -> entry.item.uri }
     }
 
     fun toggle(uri: String) {
@@ -106,10 +151,18 @@ class OrganizeCategoryViewModel(
         )
     }
 
+    /**
+     * 全选（用户显式行为）：仅圈选非保护项——protected「永不预选」含显式全选（spec §6.3）；
+     * DUPLICATES 再按组排除 1 张 keeper（与 hub 可释放口径一致，防全选删光整组）。
+     */
     fun selectAll() {
         val ready = currentReady() ?: return
         if (ready.trashed) return
-        _uiState.value = ready.copy(selected = ready.items.map { item -> item.uri }.toSet())
+        _uiState.value = ready.copy(
+            selected = ready.items.filter { entry -> !entry.isProtected }
+                .selectionCandidates()
+                .map { entry -> entry.item.uri }.toSet()
+        )
     }
 
     fun deselectAll() {
@@ -118,13 +171,19 @@ class OrganizeCategoryViewModel(
         _uiState.value = ready.copy(selected = emptySet())
     }
 
-    /** 预选开关：开 = 立即全选；关 = 立即清空（「AI 预选」语义对称，手选项需重新点选）。 */
+    /** 预选开关：开 = 立即勾选 HIGH 置信非保护项；关 = 立即清空（「AI 预选」语义对称，手选项需重新点选）。 */
     fun setAiPreselect(enabled: Boolean) {
         _aiPreselectEnabled.value = enabled
         val ready = currentReady() ?: return
         if (ready.trashed) return
         _uiState.value = ready.copy(
-            selected = if (enabled) ready.items.map { item -> item.uri }.toSet() else emptySet()
+            selected = if (enabled) {
+                // 与三段分组同源：预选集 = suggested 段（HIGH 置信非保护），DUPLICATES 再按组留 keeper
+                ready.items.toSections().suggested.selectionCandidates()
+                    .map { entry -> entry.item.uri }.toSet()
+            } else {
+                emptySet()
+            }
         )
     }
 
@@ -172,9 +231,9 @@ class OrganizeCategoryViewModel(
                 }
                 val trashedSet = outcome.trashedUris.toSet()
                 val bytes = ready.items
-                    .filter { item -> item.uri in trashedSet }
-                    .sumOf { item -> item.sizeBytes }
-                val remaining = ready.items.filterNot { item -> item.uri in trashedSet }
+                    .filter { entry -> entry.item.uri in trashedSet }
+                    .sumOf { entry -> entry.item.sizeBytes }
+                val remaining = ready.items.filterNot { entry -> entry.item.uri in trashedSet }
                 _uiState.value = ready.copy(
                     items = remaining,
                     selected = ready.selected - trashedSet,

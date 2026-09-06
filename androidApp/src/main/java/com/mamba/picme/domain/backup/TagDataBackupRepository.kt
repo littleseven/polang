@@ -184,7 +184,10 @@ class TagDataBackupRepository(
                 city = media.city,
                 faceFocusY = media.faceFocusY,
                 aestheticScore = media.aestheticScore,
-                faceQualityScore = media.faceQualityScore
+                faceQualityScore = media.faceQualityScore,
+                blurScore = media.blurScore,
+                exposureScore = media.exposureScore,
+                lastViewedAt = media.lastViewedAt
             )
         }
 
@@ -546,7 +549,10 @@ class TagDataBackupRepository(
                     city = meta.city,
                     faceFocusY = meta.faceFocusY,
                     aestheticScore = meta.aestheticScore,
-                    faceQualityScore = meta.faceQualityScore
+                    faceQualityScore = meta.faceQualityScore,
+                    blurScore = meta.blurScore,
+                    exposureScore = meta.exposureScore,
+                    lastViewedAt = meta.lastViewedAt
                 )
                 restoredMetadataCount++
             }
@@ -879,5 +885,8 @@ class TagDataBackupRepository(
             city.isNullOrBlank() &&
             faceFocusY == null &&
             aestheticScore == null &&
-            faceQualityScore == null
+            faceQualityScore == null &&
+            blurScore == null &&
+            exposureScore == null &&
+            lastViewedAt == null
 }

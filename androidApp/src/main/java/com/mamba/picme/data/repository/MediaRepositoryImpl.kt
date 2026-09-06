@@ -108,6 +108,14 @@ class MediaRepositoryImpl(
         pendingRecoverableIntentSender = null
     }
 
+    /** 记录媒体在查看器被打开（整理中心 v2 价值保护「用户互动」信号）；失败静默 + 日志，不影响查看体验。 */
+    override suspend fun markMediaViewed(uri: String) {
+        withContext(Dispatchers.IO) {
+            runCatching { mediaDao.updateLastViewedAt(uri, System.currentTimeMillis()) }
+                .onFailure { error -> Logger.w(TAG, "markMediaViewed failed: $uri", error) }
+        }
+    }
+
     /**
      * 在用户授权后执行删除操作
      * 注意：对于 Android 11+，MediaStore.createDeleteRequest 已经处理了删除

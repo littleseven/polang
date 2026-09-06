@@ -2,7 +2,7 @@
 
 > **版本**：1.0
 > **日期**：2026-09-06
-> **状态**：设计已获用户确认（方案 1：信号分层管线），待实现
+> **状态**：已落地（2026-09-07，Task 1-18b 完成；落地与设计的偏差见文末「落地校准注记」）
 > **前置 spec**：`docs/superpowers/specs/2026-09-05-gallery-organization-5-features-design.md`（F1 整理中心 v1）
 > **现状 SSOT**：`androidApp/.../features/gallery/AGENTS.md` §2.4、`androidApp/.../domain/organize/OrganizeCategorizer.kt`
 > **红线约束**：全部媒体处理端侧完成，零上传（[PRIVACY]）；五语同步（[I18N]）；交互 < 100ms（[PERF]）；本期仅 Android，定稿后固化 UI spec 供 iOS 翻译（[PARITY]）
@@ -209,3 +209,42 @@ protected=true 的项无论置信度一律不默认勾选（§4 优先）。
 - **不做**浏览式分类（人物/时间/地点浏览在相册页 GroupingMode，不动）
 - **不做**用户可调阈值 UI（阈值常量化集中管理，校准后发布；可调 UI 留后续）
 - 删除通路、回收站、Undo 完全复用现有 `DedupTrashManager`/`TrashSessionController`，不重写
+
+---
+
+## 12. 落地校准注记（2026-09-07，Task 1-18b 实际实现 vs 本 spec）
+
+> 本节为落地的唯一事实补充：spec 正文描述设计意图，实现与正文冲突处**以本节为准**。
+
+1. **Hero keeper 扣减与残留口径差**：Hero「Estimated reclaimable」= 全类目 HIGH 非保护并集字节，DUPLICATES 额外按精确组（`exactDupGroupKey`）每组扣 1 张 keeper 字节（扣组内最大 sizeBytes；守卫「组全员都在建议集才扣」），与去重结果页 `reclaimBytes`（只计非 keeper）口径一致（AC-F1-1 扩展）。**已知残留口径差**：hub 徽标 `highCount`（建议删除张数）含 keeper 张数，而 `highBytes` 与 Hero 不含 keeper 字节——张数与字节存在每组 1 张的口径差，有意保留（张数表达建议集规模，字节表达真实可释放）。
+2. **聚类库内收敛 + deleteByUri 不接线**：`OrganizeRepositoryImpl.queryDuplicateInfo` 聚类输入先按当前 `media_assets` 库内 uri 过滤（dedup_hash 行在媒体删除后残留：系统相册/回收站到期删除无钩子）——幽灵成员不再虚增组大小，唯一幸存 keeper 组大小塌缩为 1 自然不成组、不进建议删除段。`DedupHashDao.deleteByUri` **有意不接线**：回收站 30 天可恢复 + 库内收敛过滤后残留行无危害，删除侧零改动。
+3. **详情页 DUPLICATES 留 keeper 口径**：预选（reload/setAiPreselect）与 selectAll 均按 `exactDupGroupKey` 每组排除 1 张 keeper——keeper = 组内 `captureDate` 最新者（同值按 uri 字典序取大求稳定；精确组内容逐字节相同，选谁无质量差，故不复用 `KeepPolicyEngine`）；无组标识成员（similar-only）不参与排除。与 hub 扣减口径互为对偶，防全选/预选删光整组。
+4. **§6.1「预选对应扫描项」裁剪**：引导卡点击仅切 SCAN Tab（`onOpenScan = onSelectTab(SCAN)`），不预选对应扫描项——明示裁剪为后续项。
+5. **§6.3 段级全选裁剪**：「建议删除」段的段级「全选」按钮未实装；VM `selectAll`/`deselectAll` 就绪（排除 protected + DUPLICATES 留 keeper）但暂无 UI 调用方——明示裁剪为后续项。
+6. **顶栏文案**：详情页顶栏开关以实现的「AI 预选」（`org_ai_preselect_on/off`）为准，§6.3 原文「置信筛选」作废；开关语义：开 = 立即勾选 HIGH 非保护项，关 = 立即清空（对称语义，手选项需重新点选）。
+7. **桶序偏差**：`SwipeQueueBuilder` 桶序 SCREENSHOT → BLURRY → LOW_QUALITY_PORTRAIT → RECENT，延续 v1 UX；§5/§6.3「桶序沿用类目优先级」句面作废（类目优先级 PORTRAITS > PHOTOS，实现有意让 BLURRY 先出队）。
+8. **备份三列 + COALESCE**：备份模型 v5 的 `mediaTagMetadata` 增 `blurScore`/`exposureScore`/`lastViewedAt` 三列；恢复侧 `MediaDao.updateTagMetadataFromBackup` 用 `COALESCE(:new, existing)`——旧备份缺字段（null）不冲掉本机已算值（`lastViewedAt` 是保护信号不可再生）。
+9. **queryDuplicateInfo 失效键缓存（PERF）**：聚类缓存失效键 = 过滤后库内聚类输入（uri/md5/phash 排序集合）本身——media_assets 无关行写（TAG 回写、lastViewedAt 节流回写、质量分合批）不再触发全表 O(n²) 重聚类；媒体删除自然失效。原「真机验证后再定是否优化」已落地为缓存方案（耗时打点 `queryDuplicateInfo: N hashes in Xms` 保留观察）。
+10. **实际阈值表**（`OrganizeThresholds` 源码抄录，校准只改这里）：
+
+    | 常量 | 值 | 用途 |
+    |---|---|---|
+    | `FACE_QUALITY_LOW` | 0.35 | eDifFIQA（0~1）低于判低质人像 |
+    | `BLUR_VARIANCE_LOW` | 100.0 | Laplacian 方差（256px 灰度口径）低于判真模糊 |
+    | `EXPOSURE_UNDER` / `EXPOSURE_OVER` | 0.15 / 0.85 | 平均亮度（0~1）越界判欠曝/过曝 |
+    | `STRONG_SIGNAL_FACTOR` | 0.5 | 「越低越差」型信号强命中 = 主阈值 × 0.5 |
+    | `AESTHETIC_LOW` | 3.5 | 预留常量（沿用 v1 定义保留），当前管线未消费——不定类、不参与置信分级（主源码除定义外零引用，ConfidenceGrader 无 NIMA 分支） |
+    | `LARGE_VIDEO_BYTES` | 100 MiB | 大视频阈值 |
+    | `LARGE_PHOTO_PIXEL_AREA` / `LARGE_PHOTO_BYTES` | 50 MP / 20 MB | 超分辨率照片（两条件同时满足） |
+    | `LARGE_FILE_STRONG_FACTOR` | 2 | 大文件强命中 = 大小 ≥ 2× 主阈值 |
+    | `OLD_PHOTO_YEARS` | 5 | 老照片保护（captureDate < now − 5 年） |
+    | `PERSON_SCARCE_MAX` | 3 | 人物聚类 ≤3 张判稀缺保护 |
+    | `OCR_STRONG_FACTOR` | 2 | DOCUMENT 强命中 = 密度 ≥ 2× 裁定阈值 |
+    | OCR 裁定阈值 | 20 字符/MP（兜底 200 字符） | SSOT 在 dedup 侧 `DedupContentTypeDetector`，此处别名保持 2× 不变式 |
+    | pHash 相似阈值 | 汉明 ≤ 5 | `PerceptualHash.SIMILAR_HAMMING_THRESHOLD`，与去重 2.0 VISUAL 同口径 |
+
+11. **EXACT 成组条件分叉**：hub/整理侧 EXACT 成组 = 纯 MD5（`DuplicateGrouper` 消费 dedup_hash 缓存）；去重结果页 EXACT = `(sizeBytes, mime)` 分桶内 MD5——理论上同字节异扩展名文件 hub 成组而去重页不成组，实践影响忽略，注记即可。
+12. **BLUR_VARIANCE_LOW 真机定标待办**：100.0 为初始值（按典型手机实拍分布取）；256px 降采样会压缩高频成分，真机实拍模糊分布待采集后用 `BlurAnalyzerTest` 样本校准。
+13. **其他已登记偏差**（计划在录，不重复展开）：`SignalCollector.kt` 不单列（采集职责由 `OrganizeRepositoryImpl.mergeRows` + `DuplicateGrouper` 承担）；§6.4 语义色 token 化本期降级为 Compose `colorScheme` 直用（primary/tertiary/error）。
+
+**落地产物索引**：UI SSOT `docs/08-UI-SPECS/screens/organize.yaml`（iOS 翻译唯一输入，[PARITY]）；模块实现规范 `features/gallery/AGENTS.md` §2.4；i18n 12 个 `org_*` 新键 + `org_hero_across` plurals 五语同步（旧键 `org_cat_screenshots`/`org_cat_large_videos` 已删）。

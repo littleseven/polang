@@ -712,6 +712,7 @@ fun ChatScreen(
                     assets = previewAssets,
                     initialIndex = previewIndex,
                     onClose = { previewAssets = emptyList() },
+                    onPageViewed = { uri -> mediaViewModel.markMediaViewed(uri) },
                     onDelete = { asset ->
                         previewAssets = previewAssets.filter { it.id != asset.id }
                         pendingDeletedIds = pendingDeletedIds + asset.id

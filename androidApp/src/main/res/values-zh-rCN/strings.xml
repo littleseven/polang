@@ -419,15 +419,23 @@
     <!-- Organize hub（Pager 页 1 Config 态整理中心） -->
     <string name="org_title">整理</string>
     <string name="org_hero_label">预计可释放</string>
-    <string name="org_hero_across">覆盖 %1$d 个类目</string>
+    <plurals name="org_hero_across">
+        <item quantity="other">覆盖 %1$d 个类目</item>
+    </plurals>
     <string name="org_quick_tidy">一键整理</string>
     <string name="org_categories">类目</string>
     <string name="org_cat_duplicates">重复与相似照片</string>
-    <string name="org_cat_screenshots">截图</string>
     <string name="org_cat_blurry">模糊与低质量</string>
     <string name="org_cat_portraits">低质量人像</string>
-    <string name="org_cat_large_videos">大视频</string>
     <string name="org_cat_documents">文档与票据</string>
+    <string name="org_cat_screen_content">截图与录屏</string>
+    <string name="org_cat_large_files">大文件</string>
+    <string name="org_hero_review">另有 %1$d 张待确认</string>
+    <string name="org_needs_scan">需先扫描 · 点击前往</string>
+    <string name="org_confidence_high">%1$d 高置信</string>
+    <string name="org_confidence_review">%1$d 待确认</string>
+    <string name="org_protected_count">%1$d 受保护</string>
+    <string name="org_cat_reclaim">可释放 %1$s</string>
     <string name="org_cat_meta">%1$d 个项目 · %2$s</string>
     <string name="org_privacy_note">所有分析均在设备端完成 · 照片不会离开此手机</string>
     <string name="org_ai_preselect_on">AI 预选已开启</string>
@@ -442,6 +450,10 @@
     <string name="org_partial_trash">部分项目需要额外授权，已保留</string>
     <string name="org_trash_unsupported">回收站需 Android 11 及以上；请在相册中删除</string>
     <string name="org_empty_category">这里无需清理</string>
+    <string name="org_section_suggested">建议删除（%1$d）</string>
+    <string name="org_section_review">请确认（%1$d）</string>
+    <string name="org_section_protected">可能是珍贵照片（%1$d）</string>
+    <string name="org_protected_badge">可能是珍贵照片</string>
 
     <!-- Swipe review（F2 手势快速整理全屏页） -->
     <string name="swipe_title">快速整理</string>

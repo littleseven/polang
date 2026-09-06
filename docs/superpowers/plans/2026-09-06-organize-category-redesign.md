@@ -254,8 +254,20 @@ object OrganizeThresholds {
     const val OCR_STRONG_FACTOR = 2
 }
 
-/** 一年毫秒数（365 天，ValueGuard 老照片判定用，避免引入 java.time 依赖）。 */
-internal const val YEAR_MILLIS = 365L * 24 * 60 * 60 * 1000
+    /** OCR 文字密度阈值基数：每百万像素的 OCR 字符数（ConfidenceGrader 用）。
+     *  注：审查修正后为 const 别名，SSOT 在 DedupContentTypeDetector.kt 顶层
+     *  （DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL），保持强命中=2×裁定阈值不变式。 */
+    const val OCR_DENSITY_PER_MEGAPIXEL = DOCUMENT_OCR_DENSITY_PER_MEGAPIXEL
+
+    /** OCR 兜底字符数阈值：无法计算像素面积时使用（ConfidenceGrader 用）。
+     *  注：同上，别名列 DOCUMENT_OCR_CHAR_THRESHOLD。 */
+    const val OCR_DENSITY_FALLBACK_CHARS = DOCUMENT_OCR_CHAR_THRESHOLD
+
+    /** 大文件强命中倍数：sizeBytes ≥ 类目阈值 × 该系数 → HIGH 置信。 */
+    const val LARGE_FILE_STRONG_FACTOR = 2
+
+    /** 一年毫秒数（365 天，ValueGuard 老照片判定用，避免引入 java.time 依赖）。 */
+    internal const val YEAR_MILLIS = 365L * 24 * 60 * 60 * 1000
 ```
 
 - [ ] **Step 2: 全量重写 OrganizeModels.kt**
@@ -316,9 +328,11 @@ data class ClassifiedItem(
     val item: OrganizeItem,
     val category: OrganizeCategory,
     val confidence: OrganizeConfidence,
-    val protected: Boolean,
     val protectReasons: Set<ProtectReason> = emptySet(),
-)
+) {
+    /** 派生属性：命中任一保护原因即 protected（不默认勾选、不计入 Hero）。 */
+    val isProtected: Boolean get() = protectReasons.isNotEmpty()
+}
 
 /** 类目信号覆盖度：驱动 hub 类目卡「需先扫描」引导态（修复 v1 类目静默消失）。 */
 enum class SignalCoverage { READY, NEEDS_SCAN }
@@ -636,17 +650,18 @@ class ValueGuardTest {
 
     @Test
     fun `old photo protected with boundary`() {
-        val fiveYearsAgo = now - OrganizeThresholds.OLD_PHOTO_YEARS * YEAR_MILLIS
+        val fiveYearsAgo = now - OrganizeThresholds.OLD_PHOTO_YEARS * OrganizeThresholds.YEAR_MILLIS
         val old = ValueGuard.assess(
             item(captureDate = fiveYearsAgo - 1), OrganizeCategory.LOW_QUALITY_PHOTOS, now
         )
-        assertTrue(old.protected)
+        assertTrue(old.isProtected)
         assertEquals(setOf(ProtectReason.OLD_PHOTO), old.reasons)
         // 边界：恰好 5 年不保护（判定为「早于」）
         val boundary = ValueGuard.assess(
             item(captureDate = fiveYearsAgo), OrganizeCategory.LOW_QUALITY_PHOTOS, now
         )
         assertTrue(ProtectReason.OLD_PHOTO !in boundary.reasons)
+        assertTrue(!boundary.isProtected)
     }
 
     @Test
@@ -658,6 +673,9 @@ class ValueGuardTest {
         // 无人物信息不触发
         val noPerson = ValueGuard.assess(item(personPhotoCount = null), OrganizeCategory.LOW_QUALITY_PORTRAITS, now)
         assertTrue(ProtectReason.SCARCE_PERSON !in noPerson.reasons)
+        // 0 = 异常数据（计数不可能为 0），视为无信号
+        val zero = ValueGuard.assess(item(personPhotoCount = 0), OrganizeCategory.LOW_QUALITY_PORTRAITS, now)
+        assertTrue(ProtectReason.SCARCE_PERSON !in zero.reasons)
     }
 
     @Test
@@ -672,15 +690,15 @@ class ValueGuardTest {
     fun `protection only applies to quality categories`() {
         // 5 年前的截图不保护（价值保护只适用 LOW_QUALITY_PHOTOS / LOW_QUALITY_PORTRAITS）
         val screenshot = ValueGuard.assess(
-            item(captureDate = now - 6 * YEAR_MILLIS), OrganizeCategory.SCREEN_CONTENT, now
+            item(captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS), OrganizeCategory.SCREEN_CONTENT, now
         )
-        assertTrue(!screenshot.protected && screenshot.reasons.isEmpty())
+        assertTrue(!screenshot.isProtected && screenshot.reasons.isEmpty())
     }
 
     @Test
     fun `multiple reasons accumulate`() {
         val verdict = ValueGuard.assess(
-            item(captureDate = now - 6 * YEAR_MILLIS, isFavorite = true, personPhotoCount = 1),
+            item(captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS, isFavorite = true, personPhotoCount = 1),
             OrganizeCategory.LOW_QUALITY_PHOTOS, now,
         )
         assertEquals(
@@ -703,15 +721,19 @@ package com.mamba.picme.domain.organize
 
 /** 价值保护判定结果。 */
 data class ProtectVerdict(
-    val protected: Boolean,
     val reasons: Set<ProtectReason>,
-)
+) {
+    /** 派生属性：命中任一保护原因即 protected（与 ClassifiedItem.isProtected 同口径）。 */
+    val isProtected: Boolean get() = reasons.isNotEmpty()
+}
 
 /**
  * 价值保护（用户决策 2026-09-06：低质 ≠ 可删，老照片/稀缺照片有情感价值）：
  * 仅对 [OrganizeCategory.LOW_QUALITY_PHOTOS] / [OrganizeCategory.LOW_QUALITY_PORTRAITS]
  * 生效；命中任一保护信号 → protected（不默认勾选、不计入 Hero、排详情页保护区）。
  * 纯函数，[now] 注入保证测试确定性。
+ * 注：captureDate = 0（未知时间戳，下载件常见）会恒判老照片进入保护区——
+ * 保守方向是有意为之：宁可不预选，不可误删。
  */
 object ValueGuard {
 
@@ -721,19 +743,20 @@ object ValueGuard {
     )
 
     fun assess(item: OrganizeItem, category: OrganizeCategory, now: Long): ProtectVerdict {
-        if (category !in GUARDED_CATEGORIES) return ProtectVerdict(protected = false, reasons = emptySet())
+        if (category !in GUARDED_CATEGORIES) return ProtectVerdict(reasons = emptySet())
         val reasons = mutableSetOf<ProtectReason>()
-        if (item.captureDate < now - OrganizeThresholds.OLD_PHOTO_YEARS * YEAR_MILLIS) {
+        if (item.captureDate < now - OrganizeThresholds.OLD_PHOTO_YEARS * OrganizeThresholds.YEAR_MILLIS) {
             reasons += ProtectReason.OLD_PHOTO
         }
         val personCount = item.personPhotoCount
+        // 下界 1：personPhotoCount = 0 为异常数据（计数不可能为 0），视为无信号
         if (personCount != null && personCount in 1..OrganizeThresholds.PERSON_SCARCE_MAX) {
             reasons += ProtectReason.SCARCE_PERSON
         }
         if (item.isFavorite || item.lastViewedAt != null) {
             reasons += ProtectReason.USER_ENGAGED
         }
-        return ProtectVerdict(protected = reasons.isNotEmpty(), reasons = reasons)
+        return ProtectVerdict(reasons = reasons)
     }
 }
 ```
@@ -770,6 +793,7 @@ class ConfidenceGraderTest {
 
     @Suppress("LongParameterList")
     private fun item(
+        uri: String = "a",
         isVideo: Boolean = false,
         sizeBytes: Long = 1_000_000,
         relativePath: String? = "DCIM/Camera/",
@@ -784,7 +808,7 @@ class ConfidenceGraderTest {
         exactDupGroupSize: Int = 0,
         similarDupGroupSize: Int = 0,
     ) = OrganizeItem(
-        uri = "a", isVideo = isVideo, captureDate = 1_000L, sizeBytes = sizeBytes,
+        uri = uri, isVideo = isVideo, captureDate = 1_000L, sizeBytes = sizeBytes,
         relativePath = relativePath, ocrText = ocrText, pixelArea = pixelArea,
         labels = labels, hasFace = hasFace, aestheticScore = aestheticScore,
         faceQualityScore = faceQualityScore, blurScore = blurScore,
@@ -829,6 +853,26 @@ class ConfidenceGraderTest {
             OrganizeConfidence.MEDIUM,
             ConfidenceGrader.grade(item(labels = """["文档","纸张"]"""), OrganizeCategory.DOCUMENTS)
         )
+        // sub-MP 回归：0.9MP 真阈值 0.9×20×2=36 字符，20 < 36 → MEDIUM（旧先除后乘实现阈值塌缩为 0 会误判 HIGH）
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(
+                item(ocrText = "x".repeat(20), pixelArea = 900_000), OrganizeCategory.DOCUMENTS
+            )
+        )
+        // pixelArea=null 兜底分支：500 ≥ 200×2=400 → HIGH；300 < 400 → MEDIUM
+        assertEquals(
+            OrganizeConfidence.HIGH,
+            ConfidenceGrader.grade(
+                item(ocrText = "x".repeat(500), pixelArea = null), OrganizeCategory.DOCUMENTS
+            )
+        )
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(
+                item(ocrText = "x".repeat(300), pixelArea = null), OrganizeCategory.DOCUMENTS
+            )
+        )
     }
 
     @Test
@@ -861,7 +905,17 @@ class ConfidenceGraderTest {
             OrganizeConfidence.MEDIUM,
             ConfidenceGrader.grade(item(exposureScore = 0.05f), OrganizeCategory.LOW_QUALITY_PHOTOS)
         )
-        // 美学分低但模糊/曝光正常 → LOW（不默认勾选，仅列出）
+        // 过曝侧（OR 右半边）
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(item(exposureScore = 0.9f), OrganizeCategory.LOW_QUALITY_PHOTOS)
+        )
+        // 等值边界锁定：blur = 100×0.5=50 时 `<` 严格不命中 HIGH → MEDIUM
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(item(blurScore = 50.0f), OrganizeCategory.LOW_QUALITY_PHOTOS)
+        )
+        // 防御性兜底分支单测（该输入经 arbiter 不会进此类目，此处锁定 grader 独立语义）
         assertEquals(
             OrganizeConfidence.LOW,
             ConfidenceGrader.grade(
@@ -883,6 +937,26 @@ class ConfidenceGraderTest {
             OrganizeConfidence.MEDIUM,
             ConfidenceGrader.grade(
                 item(isVideo = true, sizeBytes = 120L * 1024 * 1024), OrganizeCategory.LARGE_FILES
+            )
+        )
+        // 照片分支：≥2×20MB → HIGH；1.25× → MEDIUM
+        assertEquals(
+            OrganizeConfidence.HIGH,
+            ConfidenceGrader.grade(
+                item(pixelArea = 60_000_000, sizeBytes = 45L * 1024 * 1024), OrganizeCategory.LARGE_FILES
+            )
+        )
+        assertEquals(
+            OrganizeConfidence.MEDIUM,
+            ConfidenceGrader.grade(
+                item(pixelArea = 60_000_000, sizeBytes = 25L * 1024 * 1024), OrganizeCategory.LARGE_FILES
+            )
+        )
+        // 等值边界锁定：2×100MiB=200MiB 时 `>=` 恰等命中 HIGH
+        assertEquals(
+            OrganizeConfidence.HIGH,
+            ConfidenceGrader.grade(
+                item(isVideo = true, sizeBytes = 200L * 1024 * 1024), OrganizeCategory.LARGE_FILES
             )
         )
     }
@@ -929,7 +1003,7 @@ object ConfidenceGrader {
             OrganizeCategory.LOW_QUALITY_PHOTOS -> gradeLowQualityPhoto(item)
 
             OrganizeCategory.LARGE_FILES ->
-                if (item.sizeBytes >= 2 * largeFileThreshold(item)) {
+                if (item.sizeBytes >= OrganizeThresholds.LARGE_FILE_STRONG_FACTOR * largeFileThreshold(item)) {
                     OrganizeConfidence.HIGH
                 } else {
                     OrganizeConfidence.MEDIUM
@@ -941,19 +1015,23 @@ object ConfidenceGrader {
         val chars = item.ocrText?.length ?: 0
         if (chars == 0) return OrganizeConfidence.MEDIUM // labels 关键词命中（无 OCR 佐证）
         val area = item.pixelArea
-        val strongThreshold = if (area != null && area > 0) {
-            // 与 DedupContentTypeDetector 同一面积归一口径的 2×
-            area / 1_000_000L * 20 * OrganizeThresholds.OCR_STRONG_FACTOR
+        return if (area != null && area > 0) {
+            // 与 DedupContentTypeDetector 同一面积归一口径的 2×（先乘后除，避免 sub-MP 整数截断塌缩为 0）
+            if (chars.toLong() * 1_000_000L >= area * OrganizeThresholds.OCR_DENSITY_PER_MEGAPIXEL * OrganizeThresholds.OCR_STRONG_FACTOR) {
+                OrganizeConfidence.HIGH
+            } else {
+                OrganizeConfidence.MEDIUM
+            }
         } else {
-            200L * OrganizeThresholds.OCR_STRONG_FACTOR
-        }
-        return if (chars.toLong() >= strongThreshold) {
-            OrganizeConfidence.HIGH
-        } else {
-            OrganizeConfidence.MEDIUM
+            if (chars.toLong() >= OrganizeThresholds.OCR_DENSITY_FALLBACK_CHARS.toLong() * OrganizeThresholds.OCR_STRONG_FACTOR) {
+                OrganizeConfidence.HIGH
+            } else {
+                OrganizeConfidence.MEDIUM
+            }
         }
     }
 
+    /** 模糊强命中 HIGH；模糊/曝光任一边界命中 MEDIUM；其余（含 null 信号）LOW。 */
     private fun gradeLowQualityPhoto(item: OrganizeItem): OrganizeConfidence {
         val blur = item.blurScore
         if (blur != null && blur < OrganizeThresholds.BLUR_VARIANCE_LOW * OrganizeThresholds.STRONG_SIGNAL_FACTOR) {
@@ -964,10 +1042,11 @@ object ConfidenceGrader {
         val badExposure = exposure != null &&
             (exposure < OrganizeThresholds.EXPOSURE_UNDER || exposure > OrganizeThresholds.EXPOSURE_OVER)
         if (blurred || badExposure) return OrganizeConfidence.MEDIUM
-        // 模糊/曝光正常或未计算，仅 NIMA 低分 → 弱信号
+        // 防御性兜底：arbiter 不定类 NIMA-only 项，正常管线不可达；null 信号落最低档方向安全
         return OrganizeConfidence.LOW
     }
 
+    /** 大文件主阈值：视频按字节，照片按字节（像素面积门槛已在 CategoryArbiter 裁定）。 */
     private fun largeFileThreshold(item: OrganizeItem): Long =
         if (item.isVideo) {
             OrganizeThresholds.LARGE_VIDEO_BYTES
@@ -1030,7 +1109,8 @@ class DuplicateGrouperTest {
     @Test
     fun `close phash forms similar group, far phash does not`() {
         // 汉明距离 ≤5 成簇（与去重 2.0 VISUAL 阈值一致）
-        val base = 0b1111000011110000111100001111000011110000111100001111000011110000L
+        // 计划原文的 64bit 字面量超出 Long 范围，降 4bit 为 60bit 等价模式
+        val base = 0b000011110000111100001111000011110000111100001111000011110000L
         val close = base xor 0b11L          // 距离 2
         val far = base xor 0b1111111111L    // 距离 10
         val groups = DuplicateGrouper.group(
@@ -1047,6 +1127,33 @@ class DuplicateGrouperTest {
         assertEquals(0, groups.getValue("a").exactGroupSize)
         assertEquals(0, groups.getValue("a").similarGroupSize)
     }
+
+    @Test
+    fun `exact subset of similar and transitive chaining forms one cluster`() {
+        // 验算（python3 复核）：base 为 56bit 模式，b=base^0b1111 距 4，c=b^0b11110000 距 4，
+        // base^c=0b11111111 距 8（>5 不直接相连，经 b 链式并入）；d 的 phash=base 距 a 为 0
+        val base = 0b11110000111100001111000011110000111100001111000011110000L
+        val b = base xor 0b1111L
+        val c = b xor 0b11110000L
+        val groups = DuplicateGrouper.group(
+            listOf(
+                row("a", phash = base),
+                row("b", phash = b),
+                row("c", phash = c),
+                row("d", md5 = "x", phash = base),
+                row("e", md5 = "x"),  // 与 d 组成 exact 组，无 phash 不进 similar 簇
+            )
+        )
+        // 链式传递：a/b/c/d 并为一簇 size=4
+        assertEquals(4, groups.getValue("a").similarGroupSize)
+        assertEquals(4, groups.getValue("b").similarGroupSize)
+        assertEquals(4, groups.getValue("c").similarGroupSize)
+        // exact ⊂ similar：d 同时进 exact 组（d/e 同 md5，size=2）与 similar 簇（size=4）
+        assertEquals(2, groups.getValue("d").exactGroupSize)
+        assertEquals(4, groups.getValue("d").similarGroupSize)
+        // a 无 md5，不进 exact 组
+        assertEquals(0, groups.getValue("a").exactGroupSize)
+    }
 }
 ```
 
@@ -1062,6 +1169,7 @@ import com.mamba.picme.core.common.PerceptualHash
  * 精确组 = 同 MD5 且成员 ≥2；相似组 = pHash 汉明距离 ≤ [PerceptualHash.SIMILAR_HAMMING_THRESHOLD]
  * 并查集聚类且成员 ≥2（与去重 2.0 VISUAL 同一阈值口径）。
  * 输入仅依赖 data 层投影出的 uri/md5/phash 三元组，不依赖 Room 实体（保持 domain 纯净）。
+ * 前置：[inputs] 的 uri 唯一（dedup_hash 表 PK 保证）；重复 uri 会被静默折叠。
  */
 object DuplicateGrouper {
 
@@ -1085,13 +1193,15 @@ object DuplicateGrouper {
         }
         val similarSizeByUri = mutableMapOf<String, Int>()
         if (phashUris.size >= 2) {
+            // clusterByHamming 返回成员下标簇（仅保留 size≥2 的组），按下标回映 uri
             val clusters = PerceptualHash.clusterByHamming(
-                items = phashUris,
+                hashes = phashUris.map { pair -> pair.second },
                 threshold = PerceptualHash.SIMILAR_HAMMING_THRESHOLD,
-                hash = { pair -> pair.second },
             )
-            clusters.filter { cluster -> cluster.size >= 2 }.forEach { cluster ->
-                cluster.forEach { pair -> similarSizeByUri[pair.first] = cluster.size }
+            clusters.forEach { cluster ->
+                cluster.forEach { index ->
+                    similarSizeByUri[phashUris[index].first] = cluster.size
+                }
             }
         }
 
@@ -1110,7 +1220,7 @@ object DuplicateGrouper {
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "com.mamba.picme.domain.organize.DuplicateGrouperTest"`
-Expected: 3 tests PASS
+Expected: 4 tests PASS（含审查补充的 exact⊂similar+链式传递用例）
 
 - [ ] **Step 5: Commit**
 
@@ -1127,7 +1237,7 @@ git commit -m "feat(organize): DuplicateGrouper——dedup_hash 缓存聚合重�
 - Modify: `androidApp/src/main/java/com/mamba/picme/domain/organize/OrganizeCategorizer.kt`（全量重写）
 - Test: `androidApp/src/test/java/com/mamba/picme/domain/organize/OrganizeCategorizerTest.kt`（全量重写）
 
-**说明**：对外唯一入口两个方法——`classifyAll`（详情页用，逐媒体裁定结果）与 `board`（hub 用，聚合卡片 + Hero 口径）。旧 `categoriesOf`/`stats`/`CategoryStat` 删除，调用方（DedupViewModel/SwipeQueueBuilder/OrganizeCategoryViewModel）在 Task 10/12/13 切换。
+**说明**：对外唯一入口两个方法——`classifyAll`（详情页用，逐媒体裁定结果）与 `board`（hub 用，聚合卡片 + Hero 口径）。旧 `categoriesOf`/`stats`/`CategoryStat` 删除，调用方（DedupViewModel/SwipeQueueBuilder/OrganizeCategoryViewModel）在 Task 10/12/13 切换。（审查修正：`board` 对六类目全量产卡含零命中，NEEDS_SCAN/空卡渲染策略由 UI 层决定；`coverageOf` PHOTOS 信号集 = blurScore 或 exposureScore）
 
 - [ ] **Step 1: 全量重写测试为管线集成测试**
 
@@ -1135,7 +1245,6 @@ git commit -m "feat(organize): DuplicateGrouper——dedup_hash 缓存聚合重�
 package com.mamba.picme.domain.organize
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OrganizeCategorizerTest {
@@ -1172,6 +1281,9 @@ class OrganizeCategorizerTest {
         similarDupGroupSize = similarDupGroupSize,
     )
 
+    private fun cardOf(board: OrganizeBoard, category: OrganizeCategory): CategoryBoard =
+        board.categories.single { card -> card.category == category }
+
     @Test
     fun `mutex - screenshot with low scores lands only in SCREEN_CONTENT`() {
         val classified = OrganizeCategorizer.classifyAll(
@@ -1192,7 +1304,10 @@ class OrganizeCategorizerTest {
         // 同一张图在 v1 会被截图+模糊+文档计 3 次；v2 互斥后 Hero 只计 1 次
         val board = OrganizeCategorizer.board(
             listOf(
-                item("shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
+                item(
+                    "shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100,
+                    blurScore = 1.0f, ocrText = "x".repeat(600),
+                ),
                 item("big", isVideo = true, sizeBytes = 250L * 1024 * 1024),
                 item("normal"),
             ),
@@ -1207,14 +1322,14 @@ class OrganizeCategorizerTest {
             listOf(
                 // 6 年前的模糊老照片：HIGH 置信但 protected → 不进 Hero、不进 highCount
                 item(
-                    "old", captureDate = now - 6 * YEAR_MILLIS,
+                    "old", captureDate = now - 6 * OrganizeThresholds.YEAR_MILLIS,
                     blurScore = 10.0f, sizeBytes = 500,
                 ),
             ),
             now = now,
         )
         assertEquals(0L, board.heroReclaimBytes)
-        val card = board.categories.single { card -> card.category == OrganizeCategory.LOW_QUALITY_PHOTOS }
+        val card = cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS)
         assertEquals(1, card.totalCount)
         assertEquals(0, card.highCount)
         assertEquals(1, card.protectedCount)
@@ -1222,26 +1337,48 @@ class OrganizeCategorizerTest {
 
     @Test
     fun `categories sorted by high confidence bytes descending`() {
+        // 区分点：排序键是 highBytes 而非 totalBytes——
+        // SCREEN_CONTENT 两截图全 HIGH（highBytes=150=totalBytes）；
+        // LOW_QUALITY_PHOTOS highBytes=100（HIGH 项 100B）但 totalBytes=5100（含 MEDIUM 项 5000B）。
+        // 按 highBytes 排序 → [SCREEN_CONTENT, LOW_QUALITY_PHOTOS]；若误用 totalBytes 则顺序相反。
         val board = OrganizeCategorizer.board(
             listOf(
-                item("shot", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
-                item("big", isVideo = true, sizeBytes = 250L * 1024 * 1024),
+                item("s1", relativePath = "Pictures/Screenshots/", sizeBytes = 100),
+                item("s2", relativePath = "Pictures/Screenshots/", sizeBytes = 50),
+                item("blurHigh", blurScore = 10.0f, sizeBytes = 100),   // HIGH
+                item("blurMid", blurScore = 80.0f, sizeBytes = 5000),   // MEDIUM
             ),
             now = now,
         )
         assertEquals(
-            listOf(OrganizeCategory.LARGE_FILES, OrganizeCategory.SCREEN_CONTENT),
-            board.categories.map { card -> card.category },
+            listOf(OrganizeCategory.SCREEN_CONTENT, OrganizeCategory.LOW_QUALITY_PHOTOS),
+            board.categories.take(2).map { card -> card.category },
         )
+        // 锁定两键语义，防止排序键被误换
+        val screenCard = cardOf(board, OrganizeCategory.SCREEN_CONTENT)
+        assertEquals(150L, screenCard.highBytes)
+        assertEquals(150L, screenCard.totalBytes)
+        val photosCard = cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS)
+        assertEquals(100L, photosCard.highBytes)
+        assertEquals(5100L, photosCard.totalBytes)
     }
 
     @Test
     fun `needs-scan coverage when no library item has the signal`() {
         val board = OrganizeCategorizer.board(
-            listOf(item("a")), // 全库无 blurScore
+            listOf(item("a")), // 全库无 blurScore/exposureScore
             now = now,
         )
-        // 无命中时类目卡不渲染（totalCount=0 不生成卡），但覆盖度可查询
+        // 六类目全量产卡：零命中类目以 totalCount=0 + NEEDS_SCAN 引导态呈现，不再静默消失
+        assertEquals(OrganizeCategory.entries.size, board.categories.size)
+        val photosCard = cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS)
+        assertEquals(0, photosCard.totalCount)
+        assertEquals(SignalCoverage.NEEDS_SCAN, photosCard.coverage)
+        assertEquals(
+            SignalCoverage.READY,
+            cardOf(board, OrganizeCategory.SCREEN_CONTENT).coverage,
+        )
+        // 覆盖度亦可绕开 board 直查
         assertEquals(
             SignalCoverage.NEEDS_SCAN,
             OrganizeCategorizer.coverageOf(OrganizeCategory.LOW_QUALITY_PHOTOS, listOf(item("a"))),
@@ -1250,11 +1387,10 @@ class OrganizeCategorizerTest {
             SignalCoverage.READY,
             OrganizeCategorizer.coverageOf(OrganizeCategory.SCREEN_CONTENT, listOf(item("a"))),
         )
-        assertTrue(board.categories.isEmpty())
     }
 
     @Test
-    fun `review count aggregates MEDIUM and LOW non-protected`() {
+    fun `review count aggregates non-HIGH non-protected`() {
         val board = OrganizeCategorizer.board(
             listOf(
                 item("borderline", blurScore = 80.0f, sizeBytes = 10),       // MEDIUM
@@ -1264,6 +1400,41 @@ class OrganizeCategorizerTest {
             now = now,
         )
         assertEquals(1, board.heroReviewCount)
+        assertEquals(1, cardOf(board, OrganizeCategory.LOW_QUALITY_PHOTOS).reviewCount)
+    }
+
+    @Test
+    fun `preview uris truncated to 4 in input order`() {
+        val board = OrganizeCategorizer.board(
+            listOf(
+                item("s1", relativePath = "Pictures/Screenshots/"),
+                item("s2", relativePath = "Pictures/Screenshots/"),
+                item("s3", relativePath = "Pictures/Screenshots/"),
+                item("s4", relativePath = "Pictures/Screenshots/"),
+                item("s5", relativePath = "Pictures/Screenshots/"),
+            ),
+            now = now,
+        )
+        assertEquals(
+            listOf("s1", "s2", "s3", "s4"),
+            cardOf(board, OrganizeCategory.SCREEN_CONTENT).previewUris,
+        )
+    }
+
+    @Test
+    fun `empty input yields six zero cards and zero hero`() {
+        val board = OrganizeCategorizer.board(emptyList(), now = now)
+        assertEquals(OrganizeCategory.entries.size, board.categories.size)
+        board.categories.forEach { card ->
+            assertEquals(0, card.totalCount)
+            assertEquals(0, card.highCount)
+            assertEquals(0, card.reviewCount)
+            assertEquals(0, card.protectedCount)
+            assertEquals(0L, card.totalBytes)
+            assertEquals(0L, card.highBytes)
+        }
+        assertEquals(0L, board.heroReclaimBytes)
+        assertEquals(0, board.heroReviewCount)
     }
 }
 ```
@@ -1299,22 +1470,26 @@ object OrganizeCategorizer {
                 item = item,
                 category = category,
                 confidence = ConfidenceGrader.grade(item, category),
-                protected = verdict.protected,
                 protectReasons = verdict.reasons,
             )
         }
 
-    /** hub 聚合：类目卡（按建议优先级降序）+ Hero 口径（HIGH 非 protected 去重并集）。 */
+    /**
+     * hub 聚合：类目卡（按建议优先级 highBytes 降序）+ Hero 口径（HIGH 非 protected 去重并集）。
+     * 六类目全量产卡（含零命中类目：计数/字节全零、coverage 正常计算），
+     * NEEDS_SCAN 引导卡与空卡是否渲染由 UI 层决定（spec P3/AC-R2-4：类目不再静默消失）。
+     */
     fun board(items: List<OrganizeItem>, now: Long): OrganizeBoard {
         val classified = classifyAll(items, now)
-        val cards = classified
-            .groupBy { entry -> entry.category }
-            .map { (category, entries) ->
+        val entriesByCategory = classified.groupBy { entry -> entry.category }
+        val cards = OrganizeCategory.entries
+            .map { category ->
+                val entries = entriesByCategory[category].orEmpty()
                 val high = entries.filter { entry ->
-                    entry.confidence == OrganizeConfidence.HIGH && !entry.protected
+                    entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
                 }
                 val review = entries.filter { entry ->
-                    entry.confidence != OrganizeConfidence.HIGH && !entry.protected
+                    entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected
                 }
                 CategoryBoard(
                     category = category,
@@ -1323,7 +1498,7 @@ object OrganizeCategorizer {
                     highCount = high.size,
                     highBytes = high.sumOf { entry -> entry.item.sizeBytes },
                     reviewCount = review.size,
-                    protectedCount = entries.count { entry -> entry.protected },
+                    protectedCount = entries.count { entry -> entry.isProtected },
                     previewUris = entries.take(PREVIEW_LIMIT).map { entry -> entry.item.uri },
                     coverage = coverageOf(category, items),
                 )
@@ -1361,7 +1536,8 @@ object OrganizeCategorizer {
                     SignalCoverage.NEEDS_SCAN
                 }
             OrganizeCategory.LOW_QUALITY_PHOTOS ->
-                if (items.any { item -> item.blurScore != null }) {
+                // 信号集与 CategoryArbiter 准入一致（blur 或 exposure 任一持有即已覆盖）
+                if (items.any { item -> item.blurScore != null || item.exposureScore != null }) {
                     SignalCoverage.READY
                 } else {
                     SignalCoverage.NEEDS_SCAN
@@ -1373,7 +1549,7 @@ object OrganizeCategorizer {
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "com.mamba.picme.domain.organize.OrganizeCategorizerTest"`
-Expected: 6 tests PASS（模块整体编译仍红：DedupViewModel/SwipeQueueBuilder/OrganizeCategoryViewModel/DedupHomeHub/OrganizeCategoryScreen 引用旧 API——后续 Task 收口，JVM 测试任务可能因整模块编译失败而无法运行，此时先推进 Task 8-13 再统一回归；或在 Task 10-13 完成后再执行本步。执行者按实际编译状态选择顺序，不要为此返工本 Task 代码）
+Expected: 8 tests PASS（审查修正：六类目全量产卡 + previewUris/空输入/排序键区分用例）（模块整体编译仍红：DedupViewModel/SwipeQueueBuilder/OrganizeCategoryViewModel/DedupHomeHub/OrganizeCategoryScreen 引用旧 API——后续 Task 收口，JVM 测试任务可能因整模块编译失败而无法运行，此时先推进 Task 8-13 再统一回归；或在 Task 10-13 完成后再执行本步。执行者按实际编译状态选择顺序，不要为此返工本 Task 代码）
 
 - [ ] **Step 5: Commit**
 
@@ -1411,7 +1587,7 @@ class BlurAnalyzerTest {
 
     /** 随机噪点图：高频纹理，方差应很大。 */
     private fun noisyImage(seed: Int = 42): IntArray =
-        IntArray(size * size) { Random(seed + it).nextInt(256) }
+        IntArray(size * size) { index -> Random(seed + index).nextInt(256) }
 
     /** 棋盘格：强边缘，方差大。 */
     private fun checkerImage(): IntArray = IntArray(size * size) { index ->
@@ -1442,6 +1618,41 @@ class BlurAnalyzerTest {
     }
 
     @Test
+    fun `non-square, short array and border-only inputs handled`() {
+        // 非方阵 8×4 竖直边缘图（左半 255 / 右半 0，非对称图案锁 width/height 不传反）。
+        val w = 8
+        val h = 4
+        val verticalEdge = IntArray(w * h) { index -> if (index % w < w / 2) 255 else 0 }
+        val edgeVariance = BlurAnalyzer.laplacianVariance(verticalEdge, w, h)
+        assertTrue("edge=$edgeVariance", edgeVariance > OrganizeThresholds.BLUR_VARIANCE_LOW)
+        // 手算：内部每行 lap=[0,0,255,-255,0,0]，共 2 行 → 方差 = 260100/12 = 21675；
+        // 转置传参（w=4,h=8）得到不同值 260100，借此锁参数顺序。
+        assertEquals(21675.0f, edgeVariance, 0.5f)
+        assertEquals(260100.0f, BlurAnalyzer.laplacianVariance(verticalEdge, h, w), 0.5f)
+
+        // 短数组：10 < 8*4=32 → 哨兵 0。
+        assertEquals(0.0f, BlurAnalyzer.laplacianVariance(IntArray(10), w, h), 0.0f)
+
+        // 8×8 仅四角非零、内部纯色：角像素既不作卷积中心，
+        // 也不落在任何内部中心的 4 邻域 → 方差恰为 0（锁最外圈不参与卷积）。
+        val cornerOnly = IntArray(64)
+        cornerOnly[0] = 255
+        cornerOnly[7] = 255
+        cornerOnly[56] = 255
+        cornerOnly[63] = 255
+        assertEquals(0.0f, BlurAnalyzer.laplacianVariance(cornerOnly, 8, 8), 0.0f)
+
+        // 8×8 整圈边界 255、内部纯色：边界不作中心但作为最内圈中心的邻域参与，
+        // 手算方差 = 2080800/36 - 170² = 28900（精确锁边界口径）。
+        val ring = IntArray(64) { index ->
+            val x = index % 8
+            val y = index / 8
+            if (x == 0 || x == 7 || y == 0 || y == 7) 255 else 0
+        }
+        assertEquals(28900.0f, BlurAnalyzer.laplacianVariance(ring, 8, 8), 0.5f)
+    }
+
+    @Test
     fun `degenerate inputs do not crash`() {
         assertEquals(0.0f, BlurAnalyzer.laplacianVariance(IntArray(0), 0, 0), 0.0f)
         assertEquals(0.0f, BlurAnalyzer.meanLuminance(IntArray(0)), 0.0f)
@@ -1468,7 +1679,10 @@ package com.mamba.picme.domain.organize
  */
 object BlurAnalyzer {
 
-    /** Laplacian 方差；尺寸非法或像素数不足返回 0。 */
+    /**
+     * Laplacian 方差；尺寸非法或像素数不足返回 0。
+     * ⚠️ 0 = 退化输入哨兵（与极模糊/纯黑真值重合），调用方解码失败必须写 null 入库，不可写 0。
+     */
     fun laplacianVariance(gray: IntArray, width: Int, height: Int): Float {
         if (width < 3 || height < 3 || gray.size < width * height) return 0.0f
         var sum = 0.0
@@ -1491,7 +1705,10 @@ object BlurAnalyzer {
         return (sumSq / count - mean * mean).toFloat()
     }
 
-    /** 平均亮度归一（0~1）；空输入返回 0。 */
+    /**
+     * 平均亮度归一（0~1）；空输入返回 0。
+     * ⚠️ 0 = 退化输入哨兵（与极模糊/纯黑真值重合），调用方解码失败必须写 null 入库，不可写 0。
+     */
     fun meanLuminance(gray: IntArray): Float {
         if (gray.isEmpty()) return 0.0f
         var sum = 0L
@@ -1504,7 +1721,7 @@ object BlurAnalyzer {
 - [ ] **Step 4: 跑测试确认通过并按需校准阈值**
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "com.mamba.picme.domain.organize.BlurAnalyzerTest"`
-Expected: 4 tests PASS。若 noisy/checker 未超阈值 10×，检查实现；不要在测试里放水改断言。
+Expected: 5 tests PASS（审查补充非方阵/短数组/边界用例）。若 noisy/checker 未超阈值 10×，检查实现；不要在测试里放水改断言。
 
 - [ ] **Step 5: Commit**
 
@@ -1641,38 +1858,39 @@ import 追加 `com.mamba.picme.domain.organize.DuplicateGrouper`。
         val pending = mediaDao.observeOrganizeRows().first()
             .filter { row -> row.blurScore == null && row.type != MediaType.VIDEO.name }
             .take(batchLimit)
-        var done = 0
-        pending.forEach { row ->
-            val scores = runCatching { computeQualityScores(row.uri) }.getOrNull()
-            if (scores != null) {
-                mediaDao.updateQualityScores(row.uri, scores.first, scores.second)
-                done++
-            }
+        // 先算后写、合批一次事务提交（避免逐行 UPDATE 触发 200 次 Flow 重发射）
+        val entries = pending.mapNotNull { row ->
+            runCatching { computeQualityScores(row.uri) }.getOrNull()
+                ?.let { scores -> QualityScoreEntry(row.uri, scores.first, scores.second) }
         }
-        if (done > 0) Logger.d(TAG, "backfill quality signals: $done/${pending.size}")
-        done
+        if (entries.isNotEmpty()) {
+            mediaDao.updateQualityScoresBatch(entries)
+            Logger.d(TAG, "backfill quality signals: ${entries.size}/${pending.size}")
+        }
+        entries.size
     }
 
     /** 解码 ≤256px 灰度图 → (blurScore, exposureScore)；解码失败返回 null（不阻断批次）。 */
     private fun computeQualityScores(uri: String): Pair<Float, Float>? {
-        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        // 注意：inJustDecodeBounds=true 时 decodeStream 恒返回 null，不可作失败判据（审查修正）
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
-            android.graphics.BitmapFactory.decodeStream(input, null, bounds)
-        } ?: return null
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= 256 || bounds.outHeight / (sample * 2) >= 256) {
-            sample *= 2
+            BitmapFactory.decodeStream(input, null, bounds)
         }
-        val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        // computeInSampleSize：BlurAnalyzer.kt 顶层 internal 纯函数（w/s > target 循环，退出时长边 ≤256）
+        val sample = computeInSampleSize(bounds.outWidth, bounds.outHeight)
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
         val bitmap = appContext.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
-            android.graphics.BitmapFactory.decodeStream(input, null, options)
+            BitmapFactory.decodeStream(input, null, options)
         } ?: return null
         val width = bitmap.width
         val height = bitmap.height
+        // 退化图（<3px）不写库：0 是 BlurAnalyzer 退化哨兵，入库会被误判极致模糊
+        if (width < 3 || height < 3) return null
         val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        bitmap.recycle()
+        try {
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         // BT.601 灰度化
         val gray = IntArray(pixels.size) { index ->
             val pixel = pixels[index]
@@ -1681,9 +1899,14 @@ import 追加 `com.mamba.picme.domain.organize.DuplicateGrouper`。
             val b = pixel and 0xFF
             (299 * r + 587 * g + 114 * b) / 1000
         }
-        return BlurAnalyzer.laplacianVariance(gray, width, height) to BlurAnalyzer.meanLuminance(gray)
+            return BlurAnalyzer.laplacianVariance(gray, width, height) to BlurAnalyzer.meanLuminance(gray)
+        } finally {
+            bitmap.recycle()
+        }
     }
 ```
+
+> 审查修正（6924c947d）：① bounds 探测段删除 `?: return null` 死路（inJustDecodeBounds 恒返回 null）；② inSampleSize 抽为 BlurAnalyzer.computeInSampleSize（长边 ≤256 口径）；③ 退化图 <3px 不写 0 哨兵入库；④ backfill 改合批回写（MediaDao `@Transaction updateQualityScoresBatch(List<QualityScoreEntry>)`，一批一次 invalidation，消除逐行写 × O(n²) 重聚类放大）；⑤ getPixels/灰度化段 try/finally 保证 recycle。
 
 import 追加 `com.mamba.picme.domain.organize.BlurAnalyzer`、`kotlinx.coroutines.flow.first`（若已有则跳过）。
 
@@ -1839,6 +2062,8 @@ Route 内 `val stats by viewModel.categoryStats.collectAsState()` 改为 `organi
 git add androidApp/src/main/java/com/mamba/picme/features/gallery/dedup/
 git commit -m "refactor(organize): DedupViewModel hub 数据流切 OrganizeBoard + 后台质量分补算"
 ```
+
+（审查修正：753f53b9 — updateLastViewedAt 加 60s 节流守卫；media_assets.uri 加非唯一索引 + Room v23 MIGRATION_22_23；init 补算循环加 BACKFILL_MAX_BATCHES=1000 兜底；DedupHomeScreen 暂注释 DedupHubContent 调用留 TODO(Task 12)；DedupViewModelTest 补 backfill 桩 + 循环终止测试）
 
 ---
 
@@ -2093,6 +2318,8 @@ git add androidApp/src/main/java/com/mamba/picme/features/gallery/dedup/DedupHom
 git commit -m "feat(organize): hub 类目卡 v2——置信度徽标/建议优先级排序/引导态/Hero 真实并集口径"
 ```
 
+> **落地注记（2026-09-07 Task 18b）**：本 Task Step 2 的 Hero KDoc 口径「HIGH 置信非保护去重并集」在后续审查修正中收紧——`heroReclaimBytes` 与 `highBytes` 对 DUPLICATES 额外按精确组（`exactDupGroupKey`）每组扣 1 张 keeper 字节（hub 侧 c07c218db、详情页对偶 bf7734c7f；与去重结果页 reclaimBytes 口径一致）。残留口径差：`highCount` 徽标张数含 keeper、字节不含。另：Step 2 片段的 `org_hero_across` 由 string 改为 plurals（c0ed5b3d6），且副行按「有内容的类目数」计（board 恒 6 卡后 size 恒 6 语义失真，原 +1 固定重复卡口径作废）。
+
 ---
 
 ## Task 13: OrganizeCategoryViewModel v2（三段分组 + 置信筛选）
@@ -2114,9 +2341,9 @@ data class CategorySections(
 )
 
 fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
-    suggested = filter { entry -> entry.confidence == OrganizeConfidence.HIGH && !entry.protected },
-    review = filter { entry -> entry.confidence != OrganizeConfidence.HIGH && !entry.protected },
-    protectedItems = filter { entry -> entry.protected },
+    suggested = filter { entry -> entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected },
+    review = filter { entry -> entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected },
+    protectedItems = filter { entry -> entry.isProtected },
 )
 ```
 
@@ -2136,14 +2363,14 @@ fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
 ```kotlin
                 selected = if (preselect && _aiPreselectEnabled.value) {
                     items.filter { entry ->
-                        entry.confidence == OrganizeConfidence.HIGH && !entry.protected
+                        entry.confidence == OrganizeConfidence.HIGH && !entry.isProtected
                     }.map { entry -> entry.item.uri }.toSet()
                 } else {
                     emptySet()
                 },
 ```
 
-`setAiPreselect`（:122-129）同步改为同口径（开 = 选 HIGH 非保护；关 = 清空）。`selectAll` 保持全选（用户显式行为），`toggle`/`deleteSelected`/outcome 结算逻辑不变，仅把 `item.uri` 取值改为 `entry.item.uri`、`sumOf { item -> item.sizeBytes }` 改为 `sumOf { entry -> entry.item.sizeBytes }`。
+`setAiPreselect`（:122-129）同步改为同口径（开 = 选 HIGH 非保护；关 = 清空）。~~`selectAll` 保持全选（用户显式行为）~~ **【审查修正 38cec614c】`selectAll` 改为排除 protected 项**（spec §6.3：全选按钮仅挂「建议删除」段，protected 永不预选含显式全选；测试已补 protected 样本防勾穿）；另 reload/setAiPreselect 预选谓词统一复用 `toSections().suggested` 同源。`toggle`/`deleteSelected`/outcome 结算逻辑不变，仅把 `item.uri` 取值改为 `entry.item.uri`、`sumOf { item -> item.sizeBytes }` 改为 `sumOf { entry -> entry.item.sizeBytes }`。
 
 - [ ] **Step 3: 更新既有 VM 测试 + 新增三段用例**
 
@@ -2175,11 +2402,12 @@ fun List<ClassifiedItem>.toSections(): CategorySections = CategorySections(
     @Test
     fun `toSections splits suggested review protected disjoint and complete`() {
         val now = System.currentTimeMillis()
+        // 夹具 classified(uri, confidence, protectReasons) 构造 ClassifiedItem（protectReasons 默认 emptySet()）
         val entries = listOf(
-            classified("a", OrganizeConfidence.HIGH, protected = false),
-            classified("b", OrganizeConfidence.MEDIUM, protected = false),
-            classified("c", OrganizeConfidence.LOW, protected = false),
-            classified("d", OrganizeConfidence.HIGH, protected = true),
+            classified("a", OrganizeConfidence.HIGH),
+            classified("b", OrganizeConfidence.MEDIUM),
+            classified("c", OrganizeConfidence.LOW),
+            classified("d", OrganizeConfidence.HIGH, protectReasons = setOf(ProtectReason.OLD_PHOTO)),
         )
         val sections = entries.toSections()
         assertEquals(listOf("a"), sections.suggested.map { entry -> entry.item.uri })
@@ -2397,7 +2625,7 @@ object SwipeQueueBuilder {
         for (item in items) {
             if (item.isVideo) continue
             val entry = classifiedByUri[item.uri]
-            val wasteHit = entry != null && !entry.protected &&
+            val wasteHit = entry != null && !entry.isProtected &&
                 entry.confidence != OrganizeConfidence.LOW
             val reason = BUCKETS.first { bucket ->
                 bucket.category == null || (wasteHit && entry?.category == bucket.category)
@@ -2489,6 +2717,8 @@ class SwipeQueueBuilderTest {
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "com.mamba.picme.domain.swipe.SwipeQueueBuilderTest"`
 Expected: 3 tests PASS。`SwipeReviewViewModel` 中 `SwipeQueueBuilder.build(...)` 调用处编译自适应（新参数有默认值），若有旧 bucket 常量引用则同步清理。
+
+> **落地注记（2026-09-07 Task 18b）**：实际调用处并非「编译自适应不动」——`SwipeReviewViewModel` 显式传 `now`（`SwipeQueueBuilder.build(organizeRepository.loadItems(), now = now)`，双时钟统一审查修正 b391c4cfc 收口）；且实现版 `build` 增重复 uri 去重防线（d3447103d，media_assets.uri 非唯一索引）与非废片类目照片落 RECENT 的 KDoc 括注。本 Task KDoc「视频永不入队（LARGE_FILES 走类目页）」实际扩写为「LARGE_FILES / 录屏落 SCREEN_CONTENT / 重复视频落 DUPLICATES」。
 
 - [ ] **Step 4: Commit**
 

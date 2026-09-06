@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
@@ -74,8 +76,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.ChatBubbleTokens
-import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.OrganizeItem
+import com.mamba.picme.domain.organize.ProtectReason
 import com.mamba.picme.features.gallery.dedup.formatBytes
 
 /** 品牌渐变（青玉）：完成态大数字 / Undo 主按钮与 hub 同源。 */
@@ -187,8 +189,8 @@ fun OrganizeCategoryScreen(
                         state.items.isNotEmpty() -> OrganizeDeleteBar(
                             selectedCount = state.selected.size,
                             selectedBytes = state.items
-                                .filter { item -> item.uri in state.selected }
-                                .sumOf { item -> item.sizeBytes },
+                                .filter { entry -> entry.item.uri in state.selected }
+                                .sumOf { entry -> entry.item.sizeBytes },
                             onDelete = { viewModel.deleteSelected() },
                         )
                         else -> Unit
@@ -232,6 +234,7 @@ private fun OrganizeGridContent(
     state: OrganizeCategoryUiState.Ready,
     onToggle: (String) -> Unit,
 ) {
+    val sections = remember(state.items) { state.items.toSections() }
     Column(modifier = Modifier.fillMaxSize()) {
         // 副行：左「N items · X MB」（该类目全量）+ 右「N AI-preselected」（当前选中）
         Row(
@@ -244,7 +247,7 @@ private fun OrganizeGridContent(
                 text = stringResource(
                     R.string.org_cat_meta,
                     state.items.size,
-                    formatBytes(state.items.sumOf { item -> item.sizeBytes })
+                    formatBytes(state.items.sumOf { entry -> entry.item.sizeBytes })
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -264,25 +267,92 @@ private fun OrganizeGridContent(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            items(
-                items = state.items,
-                key = { item -> item.uri }
-            ) { item ->
-                OrganizeThumb(
-                    item = item,
-                    selected = item.uri in state.selected,
-                    onToggle = { onToggle(item.uri) },
-                )
+            // 三段分组（spec §6.3）：建议删除（HIGH 非保护）/ 请确认（MEDIUM+LOW 非保护）/ 珍贵保护
+            if (sections.suggested.isNotEmpty()) {
+                item(key = "header_suggested", span = { GridItemSpan(maxLineSpan) }) {
+                    OrganizeSectionHeader(
+                        text = stringResource(R.string.org_section_suggested, sections.suggested.size)
+                    )
+                }
+                items(
+                    items = sections.suggested,
+                    key = { entry -> entry.item.uri },
+                    contentType = { "organize_thumb" }
+                ) { entry ->
+                    OrganizeThumb(
+                        item = entry.item,
+                        selected = entry.item.uri in state.selected,
+                        protectReasons = emptySet(),
+                        onToggle = { onToggle(entry.item.uri) },
+                    )
+                }
+            }
+            if (sections.review.isNotEmpty()) {
+                item(key = "header_review", span = { GridItemSpan(maxLineSpan) }) {
+                    OrganizeSectionHeader(
+                        text = stringResource(R.string.org_section_review, sections.review.size)
+                    )
+                }
+                items(
+                    items = sections.review,
+                    key = { entry -> entry.item.uri },
+                    contentType = { "organize_thumb" }
+                ) { entry ->
+                    OrganizeThumb(
+                        item = entry.item,
+                        selected = entry.item.uri in state.selected,
+                        protectReasons = emptySet(),
+                        onToggle = { onToggle(entry.item.uri) },
+                    )
+                }
+            }
+            if (sections.protectedItems.isNotEmpty()) {
+                item(key = "header_protected", span = { GridItemSpan(maxLineSpan) }) {
+                    OrganizeSectionHeader(
+                        text = stringResource(
+                            R.string.org_section_protected, sections.protectedItems.size
+                        ),
+                        isProtected = true,
+                    )
+                }
+                items(
+                    items = sections.protectedItems,
+                    key = { entry -> entry.item.uri },
+                    contentType = { "organize_thumb" }
+                ) { entry ->
+                    OrganizeThumb(
+                        item = entry.item,
+                        selected = entry.item.uri in state.selected,
+                        protectReasons = entry.protectReasons,
+                        onToggle = { onToggle(entry.item.uri) },
+                    )
+                }
             }
         }
     }
 }
 
-/** 网格缩略图：右上角选中勾（primary 实色圆 + 白 ✓；未选中为描边空心圈）。 */
+/** 三段分组标题行（GridItemSpan 整行）；protected 段用 tertiary 色强调价值保护。 */
+@Composable
+private fun OrganizeSectionHeader(text: String, isProtected: Boolean = false) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = if (isProtected) {
+            MaterialTheme.colorScheme.tertiary
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        modifier = Modifier.padding(vertical = 8.dp)
+    )
+}
+
+/** 网格缩略图：右上角选中勾（primary 实色圆 + 白 ✓；未选中为描边空心圈）；受保护项左下角盾牌角标。 */
 @Composable
 private fun OrganizeThumb(
     item: OrganizeItem,
     selected: Boolean,
+    protectReasons: Set<ProtectReason>,
     onToggle: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -316,6 +386,19 @@ private fun OrganizeThumb(
             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier.fillMaxSize()
         )
+        if (protectReasons.isNotEmpty()) {
+            Icon(
+                Icons.Outlined.Shield,
+                contentDescription = stringResource(R.string.org_protected_badge),
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .size(16.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    .padding(2.dp)
+            )
+        }
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -513,15 +596,4 @@ private fun OrganizeUndoBar(onUndo: () -> Unit) {
             color = Color.White
         )
     }
-}
-
-// ---------- 资源映射 ----------
-
-private fun organizeCategoryLabelRes(category: OrganizeCategory): Int = when (category) {
-    OrganizeCategory.DUPLICATES -> R.string.org_cat_duplicates
-    OrganizeCategory.SCREENSHOTS -> R.string.org_cat_screenshots
-    OrganizeCategory.BLURRY -> R.string.org_cat_blurry
-    OrganizeCategory.LOW_QUALITY_PORTRAITS -> R.string.org_cat_portraits
-    OrganizeCategory.LARGE_VIDEOS -> R.string.org_cat_large_videos
-    OrganizeCategory.DOCUMENTS -> R.string.org_cat_documents
 }
