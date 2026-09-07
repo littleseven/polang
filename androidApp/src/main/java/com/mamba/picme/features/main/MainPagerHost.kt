@@ -69,7 +69,7 @@ fun MainPagerHost(
     gallerySearchRequest: Pair<String, Long>?,
     onGallerySearchRequestConsumed: () -> Unit,
     onRequestGallerySearch: (query: String, personId: Long) -> Unit,
-    /** 整理中心 hub「Quick tidy up」（F2 已点亮：swipe_review 路由）。 */
+    /** 整理中心 hub「滑动整理」(Swipe to tidy)（F2 已点亮：swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
     /** 整理中心 hub 类目卡点击（organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
