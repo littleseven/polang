@@ -369,7 +369,8 @@ private fun OrganizeCategoryCard(
                 // Row2：meta 行（weight 1f 保完整显示）+ 右侧「可释放 X」
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = stringResource(
@@ -389,8 +390,7 @@ private fun OrganizeCategoryCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.padding(start = 8.dp)
+                            softWrap = false
                         )
                     }
                 }
@@ -403,21 +403,21 @@ private fun OrganizeCategoryCard(
                     ) {
                         if (card.highCount > 0) {
                             OrgConfidenceBadge(
-                                dotFilled = true,
+                                dot = OrgBadgeDot.FILLED,
                                 text = stringResource(R.string.org_confidence_high, card.highCount),
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
                         if (card.reviewCount > 0) {
                             OrgConfidenceBadge(
-                                dotFilled = false,
+                                dot = OrgBadgeDot.OUTLINE,
                                 text = stringResource(R.string.org_confidence_review, card.reviewCount),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         if (card.protectedCount > 0) {
                             OrgConfidenceBadge(
-                                dotFilled = null,
+                                dot = OrgBadgeDot.NONE,
                                 text = stringResource(R.string.org_protected_count, card.protectedCount),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -435,17 +435,24 @@ private fun OrganizeCategoryCard(
     }
 }
 
+/** 置信度徽标圆点三态：FILLED=高置信（primary 实心）、OUTLINE=待确认（描边空心）、NONE=无圆点（保护数纯文案）。 */
+private enum class OrgBadgeDot { FILLED, OUTLINE, NONE }
+
 /**
  * 置信度徽标单元：dot + 文案为不可拆整体（FlowRow 内按徽标粒度折行）；
- * 文案 maxLines=1 + softWrap=false，杜绝逐字竖排。dotFilled=null 时无圆点（保护数纯文案）。
+ * 文案 maxLines=1 + softWrap=false，杜绝逐字竖排。dot=NONE 时无圆点（保护数纯文案）。
  */
 @Composable
-private fun OrgConfidenceBadge(dotFilled: Boolean?, text: String, color: Color) {
+private fun OrgConfidenceBadge(dot: OrgBadgeDot, text: String, color: Color) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        if (dotFilled != null) ConfidenceDot(filled = dotFilled)
+        when (dot) {
+            OrgBadgeDot.FILLED -> ConfidenceDot(filled = true)
+            OrgBadgeDot.OUTLINE -> ConfidenceDot(filled = false)
+            OrgBadgeDot.NONE -> Unit
+        }
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,

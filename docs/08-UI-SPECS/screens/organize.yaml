@@ -161,7 +161,7 @@ hub:
         background: surfaceVariant
         icon_size: 22
         icon_tint: onSurfaceVariant
-      title: { font: bodyLarge, weight: medium, layout_weight: 1, max_lines: 1, ellipsis: true }   # ellipsize 仅兜底，常态不截断（最长类目名 7 字）
+      title: { font: bodyLarge, weight: medium, layout_weight: 1, max_lines: 1, ellipsis: true }   # zh 常态不截断；EN 长类目名窄屏走 ellipsis 兜底
       chevron: { icon: keyboard_arrow_right, tint: onSurfaceVariant }
     needs_scan_line:               # NEEDS_SCAN 引导卡副行（替代 row2~row4，引导态无缩略图/徽标）
       show_when: "coverage == NEEDS_SCAN"
@@ -171,6 +171,7 @@ hub:
       max_lines: 1
     row2_meta:                     # meta 行 + 右侧可释放（同行两端）
       show_when: "coverage == READY"
+      spacing: 8                   # meta ↔ reclaim 间距（Arrangement.spacedBy）
       meta:
         text_key: org_cat_meta           # "N items · X MB"（该类目全量，含 protected）
         font: bodySmall
@@ -189,6 +190,7 @@ hub:
       show_when: "coverage == READY 且任一计数 > 0"
       flow: { horizontal_spacing: 12, vertical_spacing: 4 }
       badge_unit: "dot + 文案为不可拆整体单元；每徽标文案 max_lines: 1 + soft_wrap: false"
+      dot_text_spacing: 4          # 徽标单元内 dot ↔ 文案间距
       items:
         - high_badge:
             show_when: "highCount > 0"
