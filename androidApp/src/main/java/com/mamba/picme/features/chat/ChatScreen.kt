@@ -187,6 +187,10 @@ import com.mamba.picme.features.chat.components.MediaResultsCarousel
 import androidx.core.net.toUri
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.MediaPager
+import com.mamba.picme.features.gallery.components.TRASH_TAG_PREVIEW_CHAT
+import com.mamba.picme.features.gallery.components.TrashAuthEffects
+import com.mamba.picme.domain.trash.PreviewTrashRouting
+import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.service.tag.TagGenerationService
 import com.mamba.picme.agent.core.platform.voice.AsrEngine
 import androidx.compose.runtime.mutableIntStateOf
@@ -348,6 +352,21 @@ fun ChatScreen(
                 }
             }
             viewModel.consumeDeleteAuthRequest()
+        }
+    }
+
+    // ── 预览页上滑删除（回收站 30 天可恢复）：授权拉起 + Trashed outcome 后收缩预览列表 ──
+    TrashAuthEffects(controller = mediaViewModel.trashController, tag = TRASH_TAG_PREVIEW_CHAT)
+    LaunchedEffect(Unit) {
+        mediaViewModel.trashController.outcomes.collect { outcome ->
+            if (outcome is TrashOutcome.Trashed && outcome.tag == TRASH_TAG_PREVIEW_CHAT) {
+                val trashed = outcome.trashedUris.toSet()
+                // 聊天流内联结果图同步清理，防死图（同 pendingDeletedIds 确认管线口径）
+                previewAssets.filter { it.uri in trashed }.forEach { asset ->
+                    viewModel.removeMediaResultAsset(asset.id)
+                }
+                previewAssets = previewAssets.filter { it.uri !in trashed }
+            }
         }
     }
 
@@ -713,6 +732,14 @@ fun ChatScreen(
                     initialIndex = previewIndex,
                     onClose = { previewAssets = emptyList() },
                     onPageViewed = { uri -> mediaViewModel.markMediaViewed(uri) },
+                    onSwipeUpDelete = { asset ->
+                        val route = mediaViewModel.requestTrash(asset, TRASH_TAG_PREVIEW_CHAT)
+                        if (route == PreviewTrashRouting.Route.LEGACY_DELETE) {
+                            // API<30 降级永久删除：记入 pendingDeletedIds，复用既有确认管线清理聊天内联图
+                            pendingDeletedIds = pendingDeletedIds + asset.id
+                        }
+                    },
+                    isTrashSupported = mediaViewModel.isTrashSupported,
                     onDelete = { asset ->
                         previewAssets = previewAssets.filter { it.id != asset.id }
                         pendingDeletedIds = pendingDeletedIds + asset.id

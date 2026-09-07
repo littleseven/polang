@@ -19,6 +19,10 @@ import com.mamba.picme.domain.model.GroupingMode
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.domain.repository.AndroidMediaRepository
 import com.mamba.picme.domain.repository.UserSettingsRepository
+import com.mamba.picme.domain.trash.PreviewTrashRouting
+import com.mamba.picme.domain.trash.TrashBackend
+import com.mamba.picme.domain.trash.TrashOutcome
+import com.mamba.picme.domain.trash.TrashSessionController
 import com.mamba.picme.domain.usecase.GenerateSummaryOnDemandUseCase
 import com.mamba.picme.domain.usecase.GetGroupedMediaUseCase
 import com.mamba.picme.domain.usecase.OcrProcessor
@@ -46,11 +50,33 @@ class MediaViewModel(
     private val photoProcessor: PhotoProcessor,
     private val faceDetector: FaceDetector,
     private val generateSummaryOnDemandUseCase: GenerateSummaryOnDemandUseCase,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userSettingsRepository: UserSettingsRepository,
+    trashBackend: TrashBackend
 ) : ViewModel() {
 
     companion object {
         private const val TAG = "Gallery"
+    }
+
+    /**
+     * 预览页上滑删除的回收站编排（系统回收站 30 天可恢复）。
+     * 授权 IntentSender 的拉起与结果回调在 UI 层（共享组件 `TrashAuthEffects`，按 tag 分桶路由）。
+     */
+    val trashController = TrashSessionController(trashBackend, viewModelScope, Dispatchers.IO)
+
+    /** 系统回收站可用性（API 30+）；宿主据此选择上滑删除提示文案。 */
+    val isTrashSupported: Boolean get() = trashController.isSupported
+
+    init {
+        // 回收站授权成功（Trashed）后刷新媒体库：MediaStore 默认查询不含已回收项，
+        // Gallery/Chat/Memory 三宿主的预览列表随流自动收缩
+        viewModelScope.launch {
+            trashController.outcomes.collect { outcome ->
+                if (outcome is TrashOutcome.Trashed && outcome.trashedUris.isNotEmpty()) {
+                    repository.refreshMediaLibrary()
+                }
+            }
+        }
     }
 
     private val _groupingMode = MutableStateFlow(GroupingMode.DATE)
@@ -300,6 +326,27 @@ class MediaViewModel(
             Logger.d(TAG, "Refreshing media library")
             repository.refreshMediaLibrary()
         }
+    }
+
+    /**
+     * 预览页上滑删除入口（[tag] 为宿主分桶标识，供 TrashAuthEffects 路由授权与 outcome）：
+     * API 30+ → 系统回收站（Trashed outcome 授权成功后才由宿主收缩列表）；
+     * API < 30 → 降级走既有 [deleteMediaByIds] 永久删除 + 系统授权框通路。
+     * 返回实际走通的 [PreviewTrashRouting.Route]，宿主据此补 legacy 分支的本地状态（如 Chat 死图清理）。
+     */
+    fun requestTrash(asset: MediaAsset, tag: String): PreviewTrashRouting.Route {
+        val route = PreviewTrashRouting.resolve(trashController.isSupported)
+        when (route) {
+            PreviewTrashRouting.Route.TRASH -> {
+                Logger.d(TAG, "Request trash from preview: ${asset.id} (tag=$tag)")
+                trashController.requestTrash(listOf(asset.uri), tag = tag)
+            }
+            PreviewTrashRouting.Route.LEGACY_DELETE -> {
+                Logger.d(TAG, "Trash unsupported (API<30), fallback to legacy delete: ${asset.id}")
+                deleteMediaByIds(listOf(asset.id))
+            }
+        }
+        return route
     }
 
     fun deleteMediaByIds(ids: List<Long>) {

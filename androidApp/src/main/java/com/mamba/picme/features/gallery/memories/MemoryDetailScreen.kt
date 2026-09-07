@@ -68,6 +68,9 @@ import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.features.common.topbar.AppTopBarAction
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.MediaPager
+import com.mamba.picme.features.gallery.components.TRASH_TAG_PREVIEW_MEMORY
+import com.mamba.picme.features.gallery.components.TrashAuthEffects
+import com.mamba.picme.domain.trash.TrashOutcome
 
 /**
  * 回忆详情页（F3，2026-09-06 升级，对标小米）：顶栏（返回 + Memories + 分享图标）→
@@ -95,9 +98,11 @@ fun MemoryDetailScreen(
     var showAll by remember(memory?.id) { mutableStateOf(false) }
     val displayUris = if (showAll) memory?.allItemUris.orEmpty() else memory?.itemUris.orEmpty()
     // 预览集合：displayUris 顺序经全库 uri 索引反查完整 MediaAsset（MediaPager 需要
-    // id/type/captureDate 等字段）；媒体库变化（如预览内删除）随流重发自动收缩
-    val previewAssets = remember(displayUris, assetsByUri) {
-        displayUris.mapNotNull { uri -> assetsByUri[uri] }
+    // id/type/captureDate 等字段）；媒体库变化（如预览内删除）随流重发自动收缩；
+    // swipeTrashedUris 为上滑回收站删除授权成功后的本地即时收缩集
+    var swipeTrashedUris by remember(memory?.id) { mutableStateOf<Set<String>>(emptySet()) }
+    val previewAssets = remember(displayUris, assetsByUri, swipeTrashedUris) {
+        displayUris.filter { uri -> uri !in swipeTrashedUris }.mapNotNull { uri -> assetsByUri[uri] }
     }
     // 全屏预览页索引（null = 关闭）；切回忆时重置，精选/全部开关切换也收起（索引口径已变）
     var previewIndex by remember(memory?.id) { mutableStateOf<Int?>(null) }
@@ -159,6 +164,16 @@ fun MemoryDetailScreen(
                 }
             }
             mediaViewModel.consumeDeleteAuthRequest()
+        }
+    }
+
+    // ── 预览页上滑删除（回收站 30 天可恢复）：授权拉起 + Trashed outcome 后本地收缩预览集合 ──
+    TrashAuthEffects(controller = mediaViewModel.trashController, tag = TRASH_TAG_PREVIEW_MEMORY)
+    LaunchedEffect(Unit) {
+        mediaViewModel.trashController.outcomes.collect { outcome ->
+            if (outcome is TrashOutcome.Trashed && outcome.tag == TRASH_TAG_PREVIEW_MEMORY) {
+                swipeTrashedUris = swipeTrashedUris + outcome.trashedUris.toSet()
+            }
         }
     }
 
@@ -272,6 +287,10 @@ fun MemoryDetailScreen(
                 initialIndex = currentPreviewIndex.coerceIn(0, previewAssets.lastIndex),
                 onClose = { previewIndex = null },
                 onPageViewed = { uri -> mediaViewModel.markMediaViewed(uri) },
+                onSwipeUpDelete = { asset ->
+                    mediaViewModel.requestTrash(asset, TRASH_TAG_PREVIEW_MEMORY)
+                },
+                isTrashSupported = mediaViewModel.isTrashSupported,
                 onDelete = { asset -> mediaViewModel.deleteMediaByIds(listOf(asset.id)) },
                 onStartOcr = { uriString ->
                     mediaViewModel.recognizeTextFromCurrentImage(context, uriString.toUri())

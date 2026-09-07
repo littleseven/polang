@@ -478,6 +478,8 @@
     <string name="swipe_freed">%1$s freed</string>
     <string name="swipe_hint_skip">← Skip</string>
     <string name="swipe_hint_delete">↑ Delete</string>
+    <string name="preview_swipe_delete_hint">Release to move to Trash</string>
+    <string name="preview_delete_hint">Release to delete</string>
     <string name="swipe_hint_keep">Keep →</string>
     <string name="swipe_reason_screenshot">Screenshot</string>
     <string name="swipe_reason_blurry">Blurry</string>

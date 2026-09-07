@@ -542,6 +542,35 @@ media_pager:
       缩放/平移手势激活时，拦截横向翻页手势；
       回到 1.0 scale 后恢复翻页。
 
+  # ── 16b. 上滑删除手势（回收站，2026-09-08）──
+  # 与「滑动整理」（SwipeReview）↑删除 同一手势语言；iOS 待跟随（platform difference）。
+  swipe_up_delete:
+    gesture: swipe_up                      # 向上拖动跟手上移（只跟向上，向下钳制不跟手）
+    available_when:                        # 全部满足才响应，否则行为与无手势一致
+      - callback_attached                  # 宿主传入 onSwipeUpDelete（三宿主均传：相册/Chat 搜图/回忆详情）
+      - not_zoomed                         # 放大态（scale > 1.02）不响应
+      - is_photo                           # 仅照片页（与底栏删除按钮可见条件一致；视频不响应）
+      - vertical_dominant                  # 竖直位移主导（abs(dy) > abs(dx)）才 consume，不抢横向翻页
+    threshold: page_height * 0.25          # 松手结算阈值 = 页高 25%（同 SwipeReview SWIPE_THRESHOLD_FRACTION）
+    feedback:
+      hint_overlay:                        # 拖动中图片上方浮现胶囊提示
+        icon: delete
+        text_key: preview_swipe_delete_hint   # 「松开移入回收站 / Release to move to Trash」五语
+        text_key_legacy: preview_delete_hint  # API<30 降级永久删除时改用中性「松开删除 / Release to delete」
+        armed_style: error_color_highlight    # 超阈值后胶囊变为 error 色高亮
+        suppressed_when: ocr_or_vision_overlay_visible  # OCR/Vision 浮层可见时手势不响应
+      commit_animation: fly_up_and_fade_out   # 超阈值：向上飞出屏外 + 淡出 220ms 后回调
+      cancel_animation: spring_back           # 未超阈值/授权取消：弹回原位
+    delete_path:
+      api_30_plus: system_trash            # MediaStore.createTrashRequest 系统回收站，30 天可恢复
+      api_below_30: legacy_delete_fallback # 降级走既有永久删除 + 系统授权框通路（PreviewTrashRouting 分流）
+      auth_ui: TrashAuthEffects            # 共享授权拉起组件（StartIntentSenderForResult + tag 分桶路由）
+      list_shrink: on_trashed_outcome_only # 🔴 只在授权成功（Trashed outcome）后收缩预览列表；
+                                           # 授权取消/失败用户仍停在原图；删空自动收起预览
+    ios_note: |
+      iOS 待跟随：PhotoLibrary PUA 或自实现回收站（30 天可恢复语义需保留）；
+      手势阈值/飞出时长/提示文案口径以本节为准。
+
   # ── 17. 顶栏（动画显隐）──
   # 🔴 gap #21 / P0-1：iOS 无顶栏，无法返回。
   top_controls:
