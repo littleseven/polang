@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -303,11 +305,14 @@ private fun DedupCategoryCard(
 }
 
 /**
- * 类目卡 v2：图标块 + 标题 + meta 行 + 置信度徽标行（● 高置信 / ○ 需确认）+ 4 缩略图条 + chevron。
- * NEEDS_SCAN 引导态：底色降档（surfaceContainerLow）+「需先扫描」徽标，点击跳 SCAN tab
+ * 类目卡 v3（竖向分行，治真机挤压折行）：卡内 Column 四行结构——
+ * Row1 图标块 + 标题（weight 1f）+ chevron；Row2 meta 行（weight 1f）+ 右侧「可释放 X」；
+ * Row3 置信度徽标行（● 高置信 / ○ 需确认 / N 受保护，FlowRow 按徽标粒度折行）；
+ * Row4 4 缩略图条（独占一行，文字永不与缩略图竞争横向宽度）。
+ * NEEDS_SCAN 引导态：底色降档（surfaceContainerLow）+「需先扫描」副行，点击跳 SCAN tab
  * （修复 v1 类目静默消失）；不压整卡 alpha，标题/引导文案保持全不透明（WCAG AA 对比度）。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun OrganizeCategoryCard(
     card: CategoryBoard,
@@ -326,30 +331,46 @@ private fun OrganizeCategoryCard(
             }
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OrgCategoryIconBlock(icon = organizeCategoryIcon(card.category))
-            Column(modifier = Modifier.weight(1f)) {
+            // Row1：图标块 + 标题（独占剩余宽度）+ chevron
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OrgCategoryIconBlock(icon = organizeCategoryIcon(card.category))
                 Text(
                     text = stringResource(organizeCategoryLabelRes(card.category)),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                if (needsScan) {
-                    Text(
-                        text = stringResource(R.string.org_needs_scan),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1
-                    )
-                } else {
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (needsScan) {
+                Text(
+                    text = stringResource(R.string.org_needs_scan),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1
+                )
+            } else {
+                // Row2：meta 行（weight 1f 保完整显示）+ 右侧「可释放 X」
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = stringResource(
                             R.string.org_cat_meta,
@@ -359,59 +380,79 @@ private fun OrganizeCategoryCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
-                    // 置信度徽标行：高置信（primary 实心点）+ 需确认（空心点）+ 保护数
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (card.highCount > 0) {
-                            ConfidenceDot(filled = true)
-                            Text(
-                                text = stringResource(R.string.org_confidence_high, card.highCount),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        if (card.reviewCount > 0) {
-                            ConfidenceDot(filled = false)
-                            Text(
-                                text = stringResource(R.string.org_confidence_review, card.reviewCount),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (card.protectedCount > 0) {
-                            Text(
-                                text = stringResource(R.string.org_protected_count, card.protectedCount),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-            if (!needsScan) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        card.previewUris.forEach { uri -> OrgPreviewThumb(uri = uri) }
-                    }
                     if (card.highBytes > 0) {
                         Text(
                             text = stringResource(R.string.org_cat_reclaim, formatBytes(card.highBytes)),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(start = 8.dp)
                         )
                     }
                 }
+                // Row3：置信度徽标行——高置信（primary 实心点）+ 需确认（空心点）+ 保护数。
+                // FlowRow 按徽标粒度整体折行；每徽标 dot+文案为不可拆单元（softWrap=false 防逐字竖排）。
+                if (card.highCount > 0 || card.reviewCount > 0 || card.protectedCount > 0) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (card.highCount > 0) {
+                            OrgConfidenceBadge(
+                                dotFilled = true,
+                                text = stringResource(R.string.org_confidence_high, card.highCount),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        if (card.reviewCount > 0) {
+                            OrgConfidenceBadge(
+                                dotFilled = false,
+                                text = stringResource(R.string.org_confidence_review, card.reviewCount),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (card.protectedCount > 0) {
+                            OrgConfidenceBadge(
+                                dotFilled = null,
+                                text = stringResource(R.string.org_protected_count, card.protectedCount),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                // Row4：缩略图条独占一行
+                if (card.previewUris.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        card.previewUris.forEach { uri -> OrgPreviewThumb(uri = uri) }
+                    }
+                }
             }
-            Icon(
-                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
+    }
+}
+
+/**
+ * 置信度徽标单元：dot + 文案为不可拆整体（FlowRow 内按徽标粒度折行）；
+ * 文案 maxLines=1 + softWrap=false，杜绝逐字竖排。dotFilled=null 时无圆点（保护数纯文案）。
+ */
+@Composable
+private fun OrgConfidenceBadge(dotFilled: Boolean?, text: String, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (dotFilled != null) ConfidenceDot(filled = dotFilled)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 
@@ -448,7 +489,7 @@ private fun OrgCategoryIconBlock(icon: ImageVector) {
     }
 }
 
-/** 类目卡 30dp 预览缩略图（Coil 铁律：size(360) + crossfade(false) 防 recycled bitmap 崩溃）。 */
+/** 类目卡 44dp 预览缩略图（Coil 铁律：size(360) + crossfade(false) 防 recycled bitmap 崩溃）。 */
 @Composable
 private fun OrgPreviewThumb(uri: String) {
     AsyncImage(
@@ -462,8 +503,8 @@ private fun OrgPreviewThumb(uri: String) {
         placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
         error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier
-            .size(30.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .size(44.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
     )
 }

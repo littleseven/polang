@@ -144,30 +144,51 @@ hub:
       color: onSurfaceVariant
     chevron: { icon: "keyboard_arrow_right ↔ keyboard_arrow_down（展开态）", tint: onSurfaceVariant }
 
-  # ---- 类目卡 v2 ----
+  # ---- 类目卡 v3（2026-09-07 布局重设计：竖向分行，治真机挤压折行）----
   category_card:
     sort: "highBytes 降序（建议优先级）；固定重复卡除外"
-    layout: row_center_v
+    layout: column                 # 卡内竖向 Column 四行结构；文字永不与缩略图条竞争横向宽度
     padding: { horizontal: 12, vertical: 12 }
-    spacing: 12
+    row_spacing: 8
     background: surfaceContainer       # NEEDS_SCAN 引导态降为 surfaceContainerLow（降档底色，不压整卡 alpha —— 标题/引导文案保持全不透明，WCAG AA）
     shape: { corner_radius: appShapes_card }
-    icon_block:
-      size: 40
-      corner_radius: 10
-      background: surfaceVariant
-      icon_size: 22
-      icon_tint: onSurfaceVariant
-    title: { font: bodyLarge, weight: medium, max_lines: 1, ellipsis: true }
-    meta_row:
-      show_when: "coverage == READY"
-      text_key: org_cat_meta           # "N items · X MB"（该类目全量，含 protected）
+    row1_title:                    # 图标块 + 标题 + chevron
+      layout: row_center_v
+      spacing: 12
+      icon_block:
+        size: 40
+        corner_radius: 10
+        background: surfaceVariant
+        icon_size: 22
+        icon_tint: onSurfaceVariant
+      title: { font: bodyLarge, weight: medium, layout_weight: 1, max_lines: 1, ellipsis: true }   # ellipsize 仅兜底，常态不截断（最长类目名 7 字）
+      chevron: { icon: keyboard_arrow_right, tint: onSurfaceVariant }
+    needs_scan_line:               # NEEDS_SCAN 引导卡副行（替代 row2~row4，引导态无缩略图/徽标）
+      show_when: "coverage == NEEDS_SCAN"
+      text_key: org_needs_scan     # "Scan needed · tap to scan"
       font: bodySmall
-      color: onSurfaceVariant
+      color: primary
       max_lines: 1
-    confidence_badge_row:              # 置信度徽标行（meta 行下方）
+    row2_meta:                     # meta 行 + 右侧可释放（同行两端）
       show_when: "coverage == READY"
-      spacing: 8
+      meta:
+        text_key: org_cat_meta           # "N items · X MB"（该类目全量，含 protected）
+        font: bodySmall
+        color: onSurfaceVariant
+        layout_weight: 1                 # 单行完整显示；极端挤压时 meta 省略而非 reclaim 折行
+        max_lines: 1
+        ellipsis: true
+      reclaim_label:
+        show_when: "highBytes > 0"
+        text_key: org_cat_reclaim        # "Free X MB"（HIGH 非保护字节；DUPLICATES 已扣 keeper）
+        font: labelSmall
+        color: primary
+        max_lines: 1
+        soft_wrap: false
+    row3_badges:                   # 置信度徽标行（FlowRow 按徽标粒度整体折行，严禁 Text 逐字竖排）
+      show_when: "coverage == READY 且任一计数 > 0"
+      flow: { horizontal_spacing: 12, vertical_spacing: 4 }
+      badge_unit: "dot + 文案为不可拆整体单元；每徽标文案 max_lines: 1 + soft_wrap: false"
       items:
         - high_badge:
             show_when: "highCount > 0"
@@ -184,30 +205,22 @@ hub:
             color: onSurfaceVariant
         - protected_count:
             show_when: "protectedCount > 0"
+            dot: none                                        # 纯文案无圆点
             text_key: org_protected_count                    # "N protected"
             font: labelSmall
             color: onSurfaceVariant
-    preview_thumbs:                    # 右侧缩略图条 + 可释放数
-      show_when: "coverage == READY"
+    row4_thumbs:                   # 缩略图条独占一行（v3 起不再与文字行竞争宽度）
+      show_when: "coverage == READY 且 previewUris 非空"
       count: 4                         # 前 4 张（PREVIEW_LIMIT）
-      size: 30
-      corner_radius: 6
-      spacing: 4
+      size: 44
+      corner_radius: 8
+      spacing: 6
       scale: crop
       placeholder: surfaceVariant
-    reclaim_label:
-      show_when: "highBytes > 0"
-      text_key: org_cat_reclaim        # "Free X MB"（HIGH 非保护字节；DUPLICATES 已扣 keeper）
-      font: labelSmall
-      color: primary
-    chevron: { icon: keyboard_arrow_right, tint: onSurfaceVariant }
+      coil: { size_px: 360, crossfade: false }   # recycled bitmap 红线
     tap_action:
       ready: "open_category_detail(category)"   # → §3
       needs_scan: "switch_to_scan_tab"          # 仅切 Tab；spec §6.1 原文「预选对应扫描项」未实现（裁剪项，见 §8）
-    needs_scan_badge:
-      text_key: org_needs_scan         # "Scan needed · tap to scan"
-      font: bodySmall
-      color: primary
 
   privacy_caption:
     text_key: org_privacy_note         # "All analysis runs on-device · your photos never leave this phone"
