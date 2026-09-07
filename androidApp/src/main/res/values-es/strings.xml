@@ -465,6 +465,8 @@
     <string name="swipe_freed">%1$s liberados</string>
     <string name="swipe_hint_skip">← Omitir</string>
     <string name="swipe_hint_delete">↑ Eliminar</string>
+    <string name="preview_swipe_delete_hint">Suelta para mover a la papelera</string>
+    <string name="preview_delete_hint">Suelta para eliminar</string>
     <string name="swipe_hint_keep">Conservar →</string>
     <string name="swipe_reason_screenshot">Captura</string>
     <string name="swipe_reason_blurry">Borrosa</string>

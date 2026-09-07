@@ -1,11 +1,5 @@
 package com.mamba.picme.features.gallery.swipe
 
-import android.app.Activity
-import android.content.IntentSender
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.ActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -84,6 +78,7 @@ import com.mamba.picme.domain.swipe.SwipeReason
 import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.features.common.topbar.AppTopBarAction
 import com.mamba.picme.features.common.topbar.AppTopBarNavBack
+import com.mamba.picme.features.gallery.components.TrashAuthEffects
 import com.mamba.picme.features.gallery.dedup.formatBytes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
@@ -101,7 +96,7 @@ private const val FLY_OUT_DISTANCE_FACTOR = 1.5f
  * 手势快速整理（F2）全屏页：右滑保留 / 左滑跳过 / 上滑删除（点按 = 跳过）。
  * 三态：Loading → Reviewing（大图卡 + 手势 + 顶栏进度/undo）→ Done（统计 + 再来一轮/整批恢复）。
  * 系统回收站授权经 TrashSessionController.pendingRequest 以 StartIntentSenderForResult 拉起
- * （同 OrganizeCategoryScreen 范式）。
+ * （共享组件 `components/TrashAuthEffects`）。
  */
 @Composable
 fun SwipeReviewScreen(
@@ -111,7 +106,10 @@ fun SwipeReviewScreen(
     PoLangForcedDarkTheme {
         val uiState by viewModel.uiState.collectAsState()
         val snackbarHostState = remember { SnackbarHostState() }
-        SwipeTrashAuthEffects(viewModel = viewModel, snackbarHostState = snackbarHostState)
+        TrashAuthEffects(
+            controller = viewModel.trashController,
+            snackbarHostState = snackbarHostState,
+        )
 
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -159,62 +157,6 @@ fun SwipeReviewScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-/**
- * 回收站授权拉起 + 一次性事件 snackbar（同 OrganizeCategoryScreen 范式）：
- * pendingRequest → StartIntentSenderForResult（isRestore 分流）；
- * partialNotice / errorEvent → 置位即消费并提示。
- */
-@Composable
-private fun SwipeTrashAuthEffects(
-    viewModel: SwipeReviewViewModel,
-    snackbarHostState: SnackbarHostState,
-) {
-    val pendingRequest by viewModel.trashController.pendingRequest.collectAsState()
-    val partialNotice by viewModel.trashController.partialNotice.collectAsState()
-    val trashError by viewModel.trashController.errorEvent.collectAsState()
-
-    val trashLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartIntentSenderForResult()
-    ) { result: ActivityResult ->
-        viewModel.trashController.onTrashResult(result.resultCode == Activity.RESULT_OK)
-    }
-    val restoreLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartIntentSenderForResult()
-    ) { result: ActivityResult ->
-        viewModel.trashController.onRestoreResult(result.resultCode == Activity.RESULT_OK)
-    }
-
-    // 授权拉起：token 即 IntentSender（DedupTrashBackend 生产适配），isRestore 分流 launcher
-    LaunchedEffect(pendingRequest) {
-        pendingRequest?.let { pending ->
-            val request = IntentSenderRequest.Builder(pending.token as IntentSender).build()
-            if (pending.isRestore) {
-                restoreLauncher.launch(request)
-            } else {
-                trashLauncher.launch(request)
-            }
-        }
-    }
-
-    // 部分拒绝一次性提示（置位 → 消费 → snackbar）
-    val partialMessage = stringResource(R.string.org_partial_trash)
-    LaunchedEffect(partialNotice) {
-        if (partialNotice) {
-            viewModel.trashController.consumePartialNotice()
-            snackbarHostState.showSnackbar(partialMessage)
-        }
-    }
-
-    // 回收站不可用（API<30）/ token 构建失败
-    val unsupportedMessage = stringResource(R.string.org_trash_unsupported)
-    LaunchedEffect(trashError) {
-        if (trashError) {
-            viewModel.trashController.consumeErrorEvent()
-            snackbarHostState.showSnackbar(unsupportedMessage)
         }
     }
 }

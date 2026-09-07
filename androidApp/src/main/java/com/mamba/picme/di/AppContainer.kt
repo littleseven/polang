@@ -102,6 +102,7 @@ import com.mamba.picme.data.preferences.DataStoreSwipeKeepHistoryStore
 import com.mamba.picme.domain.memories.MemoryHiddenStore
 import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.trash.DedupTrashBackend
+import com.mamba.picme.domain.trash.TrashBackend
 import androidx.lifecycle.ViewModel
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.tag.FaceClusterEngine
@@ -121,7 +122,8 @@ data class MediaViewModelDependencies(
     val photoProcessor: PhotoProcessor,
     val faceDetector: FaceDetector,
     val generateSummaryOnDemandUseCase: GenerateSummaryOnDemandUseCase,
-    val userSettingsRepository: UserSettingsRepository
+    val userSettingsRepository: UserSettingsRepository,
+    val trashBackend: TrashBackend
 )
 
 class MediaViewModelFactory(
@@ -138,7 +140,8 @@ class MediaViewModelFactory(
                 photoProcessor = dependencies.photoProcessor,
                 faceDetector = dependencies.faceDetector,
                 generateSummaryOnDemandUseCase = dependencies.generateSummaryOnDemandUseCase,
-                userSettingsRepository = dependencies.userSettingsRepository
+                userSettingsRepository = dependencies.userSettingsRepository,
+                trashBackend = dependencies.trashBackend
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -731,7 +734,8 @@ class AppContainerImpl(
             photoProcessor = photoProcessor,
             faceDetector = faceDetector,
             generateSummaryOnDemandUseCase = generateSummaryOnDemandUseCase,
-            userSettingsRepository = userPreferencesRepository
+            userSettingsRepository = userPreferencesRepository,
+            trashBackend = DedupTrashBackend(dedupTrashManager)
         )
     }
 

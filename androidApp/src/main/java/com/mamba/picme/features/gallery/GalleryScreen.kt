@@ -53,6 +53,8 @@ import com.mamba.picme.features.gallery.components.GalleryPermissionMessage
 import com.mamba.picme.features.gallery.components.GalleryTopBar
 import com.mamba.picme.features.gallery.components.MediaGrid
 import com.mamba.picme.features.gallery.components.MediaPager
+import com.mamba.picme.features.gallery.components.TRASH_TAG_PREVIEW_GALLERY
+import com.mamba.picme.features.gallery.components.TrashAuthEffects
 import com.mamba.picme.features.main.MAIN_PAGE_GALLERY
 import com.mamba.picme.features.main.MAIN_PAGE_PEOPLE
 import com.mamba.picme.features.main.MainFloatingBottomBar
@@ -83,6 +85,7 @@ import com.mamba.picme.domain.model.GroupingMode
 import com.mamba.picme.domain.person.PersonEditSnapshot
 import com.mamba.picme.domain.person.PersonRepository
 import com.mamba.picme.domain.person.RelationSource
+import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.R
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.entity.PersonEntity
@@ -251,14 +254,20 @@ fun GalleryScreen(
 
     val allFlatMedia by remember { derivedStateOf { groupedMedia.flatMap { group -> group.items } } }
     val mediaById = remember(allFlatMedia) { allFlatMedia.associateBy { it.id } }
+    // 上滑回收站删除的即时收缩集（媒体库流刷新前的本地过滤；关闭预览时清空）
+    var swipeTrashedUris by remember { mutableStateOf<Set<String>>(emptySet()) }
+    LaunchedEffect(selectedMediaIndex) {
+        if (selectedMediaIndex == null) swipeTrashedUris = emptySet()
+    }
     // 预览媒体列表：搜索状态下仅显示搜索结果，非搜索显示全量列表
     val previewMediaList by remember {
         derivedStateOf {
-            if (isSearchActive && searchQuery.isNotBlank() && searchResultMedia.isNotEmpty()) {
+            val base = if (isSearchActive && searchQuery.isNotBlank() && searchResultMedia.isNotEmpty()) {
                 searchResultMedia
             } else {
                 allFlatMedia
             }
+            if (swipeTrashedUris.isEmpty()) base else base.filter { it.uri !in swipeTrashedUris }
         }
     }
 
@@ -402,6 +411,22 @@ fun GalleryScreen(
                 }
             }
             viewModel.consumeDeleteAuthRequest()
+        }
+    }
+
+    // ── 预览页上滑删除（回收站 30 天可恢复）：授权拉起 + Trashed outcome 后收缩预览列表 ──
+    TrashAuthEffects(controller = viewModel.trashController, tag = TRASH_TAG_PREVIEW_GALLERY)
+    LaunchedEffect(Unit) {
+        viewModel.trashController.outcomes.collect { outcome ->
+            if (outcome is TrashOutcome.Trashed && outcome.tag == TRASH_TAG_PREVIEW_GALLERY) {
+                val trashed = outcome.trashedUris.toSet()
+                swipeTrashedUris = swipeTrashedUris + trashed
+                // 删空收起（与 onDelete 的 newPreview.isEmpty() 口径统一；
+                // previewMediaList 已被刚写入的 swipeTrashedUris 过滤）
+                if (selectedMediaIndex != null && previewMediaList.isEmpty()) {
+                    selectedMediaIndex = null
+                }
+            }
         }
     }
 
@@ -878,6 +903,10 @@ fun GalleryScreen(
                         onTriggerSummary = viewModel::triggerSummaryOnDemand,
                         onPageViewed = { uri -> viewModel.markMediaViewed(uri) },
                         onClose = { selectedMediaIndex = null },
+                        onSwipeUpDelete = { asset ->
+                            viewModel.requestTrash(asset, TRASH_TAG_PREVIEW_GALLERY)
+                        },
+                        isTrashSupported = viewModel.isTrashSupported,
                         onDelete = { asset ->
                             viewModel.deleteMediaByIds(listOf(asset.id))
                             // 搜索状态下同步更新搜索结果列表

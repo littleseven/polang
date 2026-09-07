@@ -9,6 +9,11 @@ import java.net.URLEncoder
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -17,6 +22,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +38,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -75,20 +82,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -98,6 +110,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -114,7 +128,9 @@ import com.mamba.picme.domain.tag.i18n.BilingualVocab
 import com.mamba.picme.domain.tag.i18n.TagTranslator
 import com.mamba.picme.features.gallery.MediaViewModel
 import dev.jeziellago.compose.markdowntext.MarkdownText
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -123,6 +139,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private const val TAG = "Gallery"
 
@@ -134,6 +151,9 @@ fun MediaPager(
     initialIndex: Int,
     onClose: () -> Unit,
     onDelete: (MediaAsset) -> Unit,
+    onSwipeUpDelete: ((MediaAsset) -> Unit)? = null,
+    /** 系统回收站可用性（API 30+）；false（API<30 降级永久删除）时上滑提示用中性「删除」文案。 */
+    isTrashSupported: Boolean = true,
     onStartOcr: (String) -> Unit,
     onDismissOcr: () -> Unit,
     ocrState: StateFlow<MediaViewModel.OcrResult?>,
@@ -159,6 +179,25 @@ fun MediaPager(
         val haptic = LocalHapticFeedback.current
         val scope = rememberCoroutineScope()
         val currentAsset = assets.getOrNull(pagerState.currentPage)
+
+        // ── 上滑删除手势状态（onSwipeUpDelete 为 null 时不挂手势，行为与现状一致）──
+        val swipeUpOffsetY = remember { Animatable(0f) }
+        val swipeUpAlpha = remember { Animatable(1f) }
+        var swipeUpPagerSize by remember { mutableStateOf(IntSize.Zero) }
+        var swipeUpDragX by remember { mutableStateOf(0f) }
+        var swipeUpDragY by remember { mutableStateOf(0f) }
+        val currentAssetState = rememberUpdatedState(currentAsset)
+        val onSwipeUpDeleteState = rememberUpdatedState(onSwipeUpDelete)
+        // OCR/Vision 浮层可见时手势不响应（浮层只 clickable，竖直拖动会下传到根 Box）
+        val ocrOverlayResult by ocrState.collectAsState()
+        val overlaysActiveState = rememberUpdatedState(
+            ocrOverlayResult != null || visionResult != null || isVisionLoading
+        )
+        // 翻页/列表变化后手势状态归位（currentPage 不变但列表收缩时由松手结算的弹回兜底）
+        LaunchedEffect(pagerState.currentPage) {
+            swipeUpOffsetY.snapTo(0f)
+            swipeUpAlpha.snapTo(1f)
+        }
 
         val landmarkImageUri = currentAsset?.uri.orEmpty()
         val landmarkEnabled = showLandmarkOverlay && currentAsset?.type == MediaType.PHOTO
@@ -215,10 +254,88 @@ fun MediaPager(
             currentAsset?.let { asset -> onTriggerSummary(asset.id) }
         }
 
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .onSizeChanged { size -> swipeUpPagerSize = size }
+                .then(
+                    // 上滑 = 移入回收站（同 SwipeReview ↑删除手势语言）；竖直位移主导才
+                    // consume，避免抢 HorizontalPager 横滑；放大态/视频页不响应
+                    if (onSwipeUpDelete != null) {
+                        Modifier.pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    swipeUpDragX = 0f
+                                    swipeUpDragY = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    swipeUpDragX += dragAmount.x
+                                    swipeUpDragY += dragAmount.y
+                                    val asset = currentAssetState.value
+                                    val verticalDominant = SwipeUpDeleteGesture.isVerticalDominant(
+                                        swipeUpDragX,
+                                        swipeUpDragY
+                                    )
+                                    val gestureEnabled = !currentPageZoomed &&
+                                        !overlaysActiveState.value &&
+                                        asset?.type == MediaType.PHOTO &&
+                                        verticalDominant
+                                    if (gestureEnabled) {
+                                        change.consume()
+                                        scope.launch {
+                                            swipeUpOffsetY.snapTo(
+                                                SwipeUpDeleteGesture.followOffset(
+                                                    swipeUpOffsetY.value,
+                                                    dragAmount.y
+                                                )
+                                            )
+                                        }
+                                    } else if (swipeUpOffsetY.value < 0f && !verticalDominant) {
+                                        // 拖动中主导性丢失（转为横拖）：立即归位，松手不再结算
+                                        scope.launch { swipeUpOffsetY.snapTo(0f) }
+                                    }
+                                },
+                                onDragCancel = {
+                                    scope.launch {
+                                        swipeUpOffsetY.animateTo(
+                                            0f,
+                                            spring(stiffness = Spring.StiffnessMediumLow)
+                                        )
+                                    }
+                                },
+                                onDragEnd = {
+                                    settleSwipeUpDelete(
+                                        pageHeight = swipeUpPagerSize.height.toFloat(),
+                                        scope = scope,
+                                        offsetY = swipeUpOffsetY,
+                                        alpha = swipeUpAlpha,
+                                        asset = currentAssetState.value,
+                                        enabled = !currentPageZoomed && !overlaysActiveState.value,
+                                        onCommit = onSwipeUpDeleteState.value,
+                                    )
+                                },
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
+                // onSwipeUpDelete 为 null 时不挂 offset/alpha，与现状完全等价
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (onSwipeUpDelete != null) {
+                            Modifier
+                                .offset { IntOffset(0, swipeUpOffsetY.value.roundToInt()) }
+                                .alpha(swipeUpAlpha.value)
+                        } else {
+                            Modifier
+                        }
+                    ),
                 pageSpacing = 16.dp,
                 userScrollEnabled = !currentPageZoomed
             ) { pageIndex ->
@@ -243,6 +360,63 @@ fun MediaPager(
                             }
                         }
                     )
+                }
+            }
+
+            // 上滑删除提示浮层：跟手浮现，超阈值（页高 25%）高亮为删除色
+            if (onSwipeUpDelete != null) {
+                val swipeUpHint by remember {
+                    derivedStateOf {
+                        when {
+                            swipeUpOffsetY.value >= -1f -> SwipeUpDeleteHint.HIDDEN
+                            swipeUpPagerSize.height > 0 &&
+                                SwipeUpDeleteGesture.shouldCommit(
+                                    swipeUpOffsetY.value,
+                                    swipeUpPagerSize.height.toFloat()
+                                ) -> SwipeUpDeleteHint.ARMED
+                            else -> SwipeUpDeleteHint.VISIBLE
+                        }
+                    }
+                }
+                if (swipeUpHint != SwipeUpDeleteHint.HIDDEN) {
+                    val armed = swipeUpHint == SwipeUpDeleteHint.ARMED
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(top = 88.dp)
+                            .background(
+                                color = if (armed) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    Color.White.copy(alpha = 0.16f)
+                                },
+                                shape = RoundedCornerShape(percent = 50)
+                            )
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = null,
+                            tint = if (armed) MaterialTheme.colorScheme.onError else Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = stringResource(
+                                // API<30 降级为永久删除（PreviewTrashRouting），提示用中性「删除」文案
+                                if (isTrashSupported) {
+                                    R.string.preview_swipe_delete_hint
+                                } else {
+                                    R.string.preview_delete_hint
+                                }
+                            ),
+                            color = if (armed) MaterialTheme.colorScheme.onError else Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
@@ -379,6 +553,47 @@ fun MediaPager(
 }
 
 // ZoomableImage 已抽出至本包 ZoomableImage.kt（相册查看器与去重对比预览共享）
+
+/** 上滑删除提示浮层三态（超阈值高亮）。 */
+private enum class SwipeUpDeleteHint { HIDDEN, VISIBLE, ARMED }
+
+/**
+ * 上滑删除松手结算：超阈值（页高 25%）向上飞出 + 淡出（220ms）后回调 [onCommit]；
+ * 未超阈值弹回。回调后无论授权结果如何先弹回原位——宿主只在回收站授权成功
+ * （Trashed outcome）后才收缩列表，授权取消/失败用户仍停在原图。
+ */
+private fun settleSwipeUpDelete(
+    pageHeight: Float,
+    scope: CoroutineScope,
+    offsetY: Animatable<Float, AnimationVector1D>,
+    alpha: Animatable<Float, AnimationVector1D>,
+    asset: MediaAsset?,
+    enabled: Boolean,
+    onCommit: ((MediaAsset) -> Unit)?,
+) {
+    val commit = enabled &&
+        asset?.type == MediaType.PHOTO &&
+        onCommit != null &&
+        SwipeUpDeleteGesture.shouldCommit(offsetY.value, pageHeight)
+    scope.launch {
+        if (commit && asset != null && onCommit != null) {
+            coroutineScope {
+                launch {
+                    offsetY.animateTo(
+                        SwipeUpDeleteGesture.flyOutTargetY(pageHeight),
+                        tween(SwipeUpDeleteGesture.FLY_OUT_MS)
+                    )
+                }
+                launch { alpha.animateTo(0f, tween(SwipeUpDeleteGesture.FLY_OUT_MS)) }
+            }
+            onCommit(asset)
+        }
+        coroutineScope {
+            launch { offsetY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow)) }
+            launch { alpha.animateTo(1f, tween(SwipeUpDeleteGesture.FLY_OUT_MS)) }
+        }
+    }
+}
 
 @Composable
 private fun OcrResultOverlay(

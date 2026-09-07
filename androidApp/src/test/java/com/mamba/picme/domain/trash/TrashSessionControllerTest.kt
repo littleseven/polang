@@ -201,4 +201,58 @@ class TrashSessionControllerTest {
         assertEquals(listOf(TrashOutcome.Cancelled), received)
         job.cancel()
     }
+
+    @Test
+    fun `second request during token build is ignored (in-flight guard)`() = runTest {
+        val backend = FakeBackend()
+        val c = newController(this, backend)
+        c.requestTrash(listOf("a"))
+        // token 构建协程未调度前 in-flight 已同步置位：第二个 request 被拒绝，不覆盖第一个 pending
+        c.requestTrash(listOf("b"))
+        advanceUntilIdle()
+        assertEquals(listOf("a"), c.pendingRequest.value?.uris)
+    }
+
+    @Test
+    fun `cancelPendingRequest clears matching pending and emits cancelled`() = runTest {
+        val backend = FakeBackend()
+        val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        advanceUntilIdle() // 先激活订阅
+        c.requestTrash(listOf("a"), tag = "preview_swipe_chat")
+        advanceUntilIdle()
+        // 非匹配 tag 不动 pending
+        c.cancelPendingRequest("preview_swipe_gallery")
+        assertEquals(listOf("a"), c.pendingRequest.value?.uris)
+        // 匹配 tag：清 pending + Cancelled 入流，单槽释放后可再请求
+        c.cancelPendingRequest("preview_swipe_chat")
+        advanceUntilIdle()
+        assertNull(c.pendingRequest.value)
+        assertEquals(listOf(TrashOutcome.Cancelled), received)
+        c.requestTrash(listOf("b"), tag = "preview_swipe_chat")
+        advanceUntilIdle()
+        assertEquals(listOf("b"), c.pendingRequest.value?.uris)
+        job.cancel()
+    }
+
+    @Test
+    fun `cancelPendingRequest during token build prevents pending and frees the slot`() = runTest {
+        val backend = FakeBackend()
+        val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        advanceUntilIdle() // 先激活订阅
+        c.requestTrash(listOf("a"), tag = "preview_swipe_memory")
+        // 宿主在 token 构建完成前解绑：取消在途请求
+        c.cancelPendingRequest("preview_swipe_memory")
+        advanceUntilIdle()
+        // 不落 pending、按 Cancelled 结算、单槽已释放
+        assertNull(c.pendingRequest.value)
+        assertEquals(listOf(TrashOutcome.Cancelled), received)
+        c.requestTrash(listOf("b"), tag = "preview_swipe_memory")
+        advanceUntilIdle()
+        assertEquals(listOf("b"), c.pendingRequest.value?.uris)
+        job.cancel()
+    }
 }

@@ -465,6 +465,8 @@
     <string name="swipe_freed">%1$s libérés</string>
     <string name="swipe_hint_skip">← Ignorer</string>
     <string name="swipe_hint_delete">↑ Supprimer</string>
+    <string name="preview_swipe_delete_hint">Relâchez pour mettre à la corbeille</string>
+    <string name="preview_delete_hint">Relâchez pour supprimer</string>
     <string name="swipe_hint_keep">Garder →</string>
     <string name="swipe_reason_screenshot">Capture d\'écran</string>
     <string name="swipe_reason_blurry">Floue</string>

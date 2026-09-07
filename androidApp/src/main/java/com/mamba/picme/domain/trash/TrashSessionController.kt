@@ -62,6 +62,15 @@ class TrashSessionController(
 
     val isSupported: Boolean get() = backend.isSupported
 
+    /**
+     * token 构建在途标志（2026-09-08 审查修复单槽竞态）：request 同步置位，
+     * 构建协程落定（成功置 pending / 失败 / 被取消）时清位；在途期间后续 request 一律拒绝，
+     * 杜绝「同步查 pending 为空 → 异步构建窗口内第二次 request 覆盖第一个 pending」的错配。
+     */
+    private var requestInFlight = false
+    private var requestInFlightTag: String? = null
+    private var requestInFlightCancelled = false
+
     fun requestTrash(uris: List<String>, tag: String? = null) =
         request(uris, isRestore = false, tag = tag)
 
@@ -69,24 +78,48 @@ class TrashSessionController(
         request(uris, isRestore = true, tag = null)
 
     private fun request(uris: List<String>, isRestore: Boolean, tag: String?) {
-        if (uris.isEmpty() || _pendingRequest.value != null) return
+        if (uris.isEmpty() || _pendingRequest.value != null || requestInFlight) return
         if (!backend.isSupported) {
             // API<30：errorEvent 供 UI snackbar；Unsupported outcome 供 VM 编排层回滚在途提交状态
             _errorEvent.value = true
             _outcomes.tryEmit(TrashOutcome.Unsupported)
             return
         }
+        requestInFlight = true
+        requestInFlightTag = tag
+        requestInFlightCancelled = false
         scope.launch {
             val token = withContext(ioDispatcher) {
                 runCatching {
                     if (isRestore) backend.buildRestoreToken(uris) else backend.buildTrashToken(uris)
                 }.getOrNull()
             }
-            if (token == null) {
-                _errorEvent.value = true
-            } else {
-                _pendingRequest.value = PendingTrashRequest(uris, token, isRestore, tag)
+            val cancelled = requestInFlightCancelled
+            requestInFlight = false
+            requestInFlightTag = null
+            requestInFlightCancelled = false
+            when {
+                // 宿主在 token 构建期间解绑取消：不落 pending，按 Cancelled 结算（防单槽悬挂）
+                cancelled -> _outcomes.tryEmit(TrashOutcome.Cancelled)
+                token == null -> _errorEvent.value = true
+                else -> _pendingRequest.value = PendingTrashRequest(uris, token, isRestore, tag)
             }
+        }
+    }
+
+    /**
+     * tag 宿主解绑清理（2026-09-08 审查修复悬挂）：仅清空匹配 [tag] 的 pending；
+     * token 仍在构建则标记取消（构建完成后不落 pending）。两种情况均按 Cancelled 入流——
+     * 用户未响应即视为取消，调用方编排层据此回滚在途状态。
+     */
+    fun cancelPendingRequest(tag: String) {
+        val pending = _pendingRequest.value
+        if (pending != null && pending.tag == tag) {
+            _pendingRequest.value = null
+            _outcomes.tryEmit(TrashOutcome.Cancelled)
+        }
+        if (requestInFlight && requestInFlightTag == tag) {
+            requestInFlightCancelled = true
         }
     }
 
