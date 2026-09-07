@@ -115,7 +115,7 @@ hub:
 
   # ---- 主按钮 ----
   quick_tidy_button:
-    text_key: org_quick_tidy           # "Quick tidy up"
+    text_key: org_quick_tidy           # "Swipe to tidy"（滑动整理）
     height: 48
     corner_radius: 24
     background: brandGradient          # 品牌渐变实底
@@ -379,7 +379,7 @@ cleaned:
 # ============================================================================
 # 5. swipe_review 屏口径（手势快速整理 F2，SwipeReviewScreen）
 # ============================================================================
-# 路由：swipe_review（NavHost 二级页）；入口 = hub「Quick tidy up」主按钮。
+# 路由：swipe_review（NavHost 二级页）；入口 = hub「滑动整理」(Swipe to tidy) 主按钮。
 # 本屏 UI 细节沿用现状（v1 已定稿），本节固化与类目体系的【口径契约】。
 swipe_review:
   queue_source: "SwipeQueueBuilder 消费与类目页同一管线产出（OrganizeCategorizer.classifyAll）——口径同源，同一张图两处判定一致（spec AC-R2-7）"

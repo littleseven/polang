@@ -426,7 +426,7 @@
         <item quantity="one">En %1$d categoría</item>
         <item quantity="other">En %1$d categorías</item>
     </plurals>
-    <string name="org_quick_tidy">Limpieza rápida</string>
+    <string name="org_quick_tidy">Desliza para ordenar</string>
     <string name="org_categories">Categorías</string>
     <string name="org_cat_duplicates">Duplicados y similares</string>
     <string name="org_cat_blurry">Borrosas y de baja calidad</string>

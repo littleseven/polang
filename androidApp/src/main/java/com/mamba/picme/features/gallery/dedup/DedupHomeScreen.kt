@@ -86,7 +86,7 @@ fun DedupHomeRoute(
     viewModel: DedupViewModel,
     /** 离页回调：仅服务扫描态「后台运行」按钮（根页无返回箭头，2026-09-06 导航统一）。 */
     onNavigateBack: () -> Unit,
-    /** 整理中心 hub「Quick tidy up」（F2 已点亮：MainActivity 导航 swipe_review 路由）。 */
+    /** 整理中心 hub「滑动整理」(Swipe to tidy)（F2 已点亮：MainActivity 导航 swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
     /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},

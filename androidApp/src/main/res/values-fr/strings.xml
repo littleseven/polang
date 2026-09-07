@@ -426,7 +426,7 @@
         <item quantity="one">Sur %1$d catégorie</item>
         <item quantity="other">Sur %1$d catégories</item>
     </plurals>
-    <string name="org_quick_tidy">Nettoyage rapide</string>
+    <string name="org_quick_tidy">Glisser pour trier</string>
     <string name="org_categories">Catégories</string>
     <string name="org_cat_duplicates">Doublons et similaires</string>
     <string name="org_cat_blurry">Floues et de basse qualité</string>

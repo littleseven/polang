@@ -422,7 +422,7 @@
     <plurals name="org_hero_across">
         <item quantity="other">覆盖 %1$d 个类目</item>
     </plurals>
-    <string name="org_quick_tidy">一键整理</string>
+    <string name="org_quick_tidy">滑动整理</string>
     <string name="org_categories">类目</string>
     <string name="org_cat_duplicates">重复与相似照片</string>
     <string name="org_cat_blurry">模糊与低质量</string>

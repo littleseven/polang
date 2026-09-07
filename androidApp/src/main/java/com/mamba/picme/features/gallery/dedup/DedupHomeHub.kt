@@ -77,7 +77,7 @@ private val orgBrandGradient: Brush
 
 /**
  * 整理中心 hub（F1，Pager 页 1 的 Config 态）：Hero 可释放估算（HIGH 置信非保护去重并集）→
- * Quick tidy up 主按钮 → 类目卡列表（board 恒 6 卡，按 highBytes 建议优先级降序）。
+ * 「滑动整理」(Swipe to tidy) 主按钮 → 类目卡列表（board 恒 6 卡，按 highBytes 建议优先级降序）。
  * 「重复与相似照片」卡固定渲染为可展开入口（展开 = 原去重 Config：尺度勾选 + 保留规则 +
  * 开始扫描），原功能零回归；board 的 DUPLICATES 卡由该卡承接（meta 行同源），列表内不重复渲染。
  *
@@ -119,7 +119,7 @@ fun DedupHubContent(
             OrgHeroCard(board = board)
         }
 
-        // Quick tidy up 渐变主按钮（F2 已点亮：onQuickTidy 经 MainPagerHost 接 swipe_review 路由）
+        // 「滑动整理」(Swipe to tidy) 渐变主按钮（F2 已点亮：onQuickTidy 经 MainPagerHost 接 swipe_review 路由）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
