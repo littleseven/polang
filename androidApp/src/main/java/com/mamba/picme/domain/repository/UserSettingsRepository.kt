@@ -155,6 +155,13 @@ interface UserSettingsRepository {
     val aiChatEntryEnabledFlow: Flow<Boolean>
     suspend fun updateAiChatEntryEnabled(enabled: Boolean)
 
+    /**
+     * 「删除不再询问」开关，默认 false。开关开 + 持 MANAGE_MEDIA（API 31+）时
+     * 回收站删除直写 IS_TRASHED 静默执行（零系统弹框）；否则维持 createTrashRequest 系统授权框。
+     */
+    val mediaManageSilentTrashFlow: Flow<Boolean>
+    suspend fun updateMediaManageSilentTrash(enabled: Boolean)
+
     val localAsrModelFlow: Flow<String>
     suspend fun updateLocalAsrModel(modelId: String)
 

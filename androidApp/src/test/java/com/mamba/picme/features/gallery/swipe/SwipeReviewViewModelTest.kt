@@ -56,6 +56,8 @@ class SwipeReviewViewModelTest {
         // 已 trash 的不算残留（IS_TRASHED 语义，同 TrashSessionControllerTest.FakeBackend）
         override fun queryExisting(uris: List<String>): List<String> =
             uris.filter { uri -> uri !in trashed }
+
+        override suspend fun trySilentTrash(uris: List<String>): List<String>? = null
     }
 
     /** API<30 语义：不支持回收站授权。 */
@@ -64,6 +66,7 @@ class SwipeReviewViewModelTest {
         override fun buildTrashToken(uris: List<String>): Any = error("unreachable")
         override fun buildRestoreToken(uris: List<String>): Any = error("unreachable")
         override fun queryExisting(uris: List<String>): List<String> = emptyList()
+        override suspend fun trySilentTrash(uris: List<String>): List<String>? = null
     }
 
     private class FakeKeepHistory : SwipeKeepHistoryStore {

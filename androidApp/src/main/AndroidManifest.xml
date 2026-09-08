@@ -16,6 +16,8 @@
     <!-- Android 10+:声明此项,系统才不 redact MediaStore 图片的 EXIF GPS(LocationIndexer 读位置依赖) -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- 媒体管理（API 31+ 可检查）：持有后回收站/删除直写 IS_TRASHED 不再弹系统授权框（设置页「删除不再询问」开关门控） -->
+    <uses-permission android:name="android.permission.MANAGE_MEDIA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- onTimeout 兜底:AlarmManager 精确闹钟唤醒扫描续跑(API 31+) -->

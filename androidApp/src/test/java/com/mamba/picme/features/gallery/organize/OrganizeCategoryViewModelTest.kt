@@ -94,6 +94,8 @@ class OrganizeCategoryViewModelTest {
         // 已 trash 的不算残留（IS_TRASHED 语义，同 TrashSessionControllerTest.FakeBackend）
         override fun queryExisting(uris: List<String>): List<String> =
             uris.filter { uri -> uri !in trashed }
+
+        override suspend fun trySilentTrash(uris: List<String>): List<String>? = null
     }
 
     /** JVM 单测无 Room/MediaStore：mockk 拦截 loadItems，answers 读 var 支持恢复后重载换数据。 */

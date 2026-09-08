@@ -966,6 +966,9 @@
     <string name="gallery_permission_system">Permiso de galería (sistema)</string>
     <string name="permission_system_subtitle">Abre los ajustes del sistema para gestionar los permisos.</string>
     <string name="permission_system_value">Ajustes del sistema</string>
+    <string name="settings_silent_trash_title">Eliminar sin preguntar</string>
+    <string name="settings_silent_trash_summary_granted">Eliminar y mover a la papelera ya no mostrará una confirmación del sistema.</string>
+    <string name="settings_silent_trash_summary_denied">Permite la gestión de contenido multimedia en los ajustes del sistema.</string>
     <string name="gallery_debug_features">Funciones de depuración de la galería</string>
     <string name="gallery_debug_features_desc">Herramientas de prueba y conmutadores de modo de backend para el etiquetado de la galería.</string>
     <string name="debug_image_download">Depuración de descarga de imágenes</string>

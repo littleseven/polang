@@ -23,8 +23,12 @@ class TrashSessionControllerTest {
         override val isSupported: Boolean = true
         var trashed = mutableSetOf<String>()
         var failNextBuild = false
+        var buildTrashCalls = 0
+        /** 静默快路径结果；null = 快路径不可用（开关关/无权限），回落系统授权框 */
+        var silentTrashResult: List<String>? = null
 
         override fun buildTrashToken(uris: List<String>): Any {
+            buildTrashCalls++
             if (failNextBuild) throw FakeIpcException("ipc fail")
             return "trash-token"
         }
@@ -33,6 +37,8 @@ class TrashSessionControllerTest {
 
         override fun queryExisting(uris: List<String>): List<String> =
             uris.filter { uri -> uri !in trashed } // 已 trash 的不算残留（IS_TRASHED 语义）
+
+        override suspend fun trySilentTrash(uris: List<String>): List<String>? = silentTrashResult
 
         fun simulateUserAllowed(uris: List<String>) {
             trashed.addAll(uris)
@@ -44,6 +50,7 @@ class TrashSessionControllerTest {
         override fun buildTrashToken(uris: List<String>): Any = error("unreachable")
         override fun buildRestoreToken(uris: List<String>): Any = error("unreachable")
         override fun queryExisting(uris: List<String>): List<String> = emptyList()
+        override suspend fun trySilentTrash(uris: List<String>): List<String>? = null
     }
 
     private fun newController(scope: TestScope, backend: TrashBackend): TrashSessionController =
@@ -254,5 +261,86 @@ class TrashSessionControllerTest {
         advanceUntilIdle()
         assertEquals(listOf("b"), c.pendingRequest.value?.uris)
         job.cancel()
+    }
+
+    // ── 静默快路径（MANAGE_MEDIA + 「删除不再询问」开关）──
+
+    @Test
+    fun `silent trash full success bypasses pending and emits trashed outcome`() = runTest {
+        val backend = FakeBackend().apply { silentTrashResult = listOf("a", "b") }
+        val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestTrash(listOf("a", "b"), tag = "cat:x")
+        advanceUntilIdle()
+        // 零弹框：不产生 pendingRequest、不构建 token
+        assertNull(c.pendingRequest.value)
+        assertEquals(0, backend.buildTrashCalls)
+        val outcome = received.single() as TrashOutcome.Trashed
+        assertEquals(listOf("a", "b"), outcome.trashedUris)
+        assertEquals("cat:x", outcome.tag)
+        assertFalse(c.partialNotice.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `silent trash partial success sets partial notice and emits only succeeded`() = runTest {
+        val backend = FakeBackend().apply { silentTrashResult = listOf("a") } // b 写失败
+        val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestTrash(listOf("a", "b"), tag = "cat:x")
+        advanceUntilIdle()
+        assertNull(c.pendingRequest.value)
+        assertEquals(0, backend.buildTrashCalls)
+        val outcome = received.single() as TrashOutcome.Trashed
+        assertEquals(listOf("a"), outcome.trashedUris)
+        assertTrue(c.partialNotice.value)
+        c.consumePartialNotice()
+        assertFalse(c.partialNotice.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `silent trash all failed emits empty trashed with partial notice`() = runTest {
+        val backend = FakeBackend().apply { silentTrashResult = emptyList() } // 空集 ≠ null：快路径已生效但全失败
+        val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestTrash(listOf("a"))
+        advanceUntilIdle()
+        assertNull(c.pendingRequest.value)
+        assertEquals(0, backend.buildTrashCalls)
+        val outcome = received.single() as TrashOutcome.Trashed
+        assertEquals(emptyList<String>(), outcome.trashedUris)
+        assertTrue(c.partialNotice.value)
+        job.cancel()
+    }
+
+    @Test
+    fun `silent trash unavailable falls back to system pending path`() = runTest {
+        val backend = FakeBackend() // silentTrashResult = null：开关关/无权限
+        val c = newController(this, backend)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestTrash(listOf("a", "b"), tag = "cat:x")
+        advanceUntilIdle()
+        // 回落既有系统授权框通路
+        assertEquals(1, backend.buildTrashCalls)
+        val pending = c.pendingRequest.value
+        assertEquals(listOf("a", "b"), pending?.uris)
+        assertEquals("trash-token", pending?.token)
+        assertTrue(received.isEmpty())
+        job.cancel()
+    }
+
+    @Test
+    fun `restore never uses silent path`() = runTest {
+        val backend = FakeBackend().apply { silentTrashResult = listOf("a") }
+        val c = newController(this, backend)
+        c.requestRestore(listOf("a"))
+        advanceUntilIdle()
+        // 恢复仍走系统授权 token（静默快路径仅覆盖 trash）
+        assertEquals("restore-token", c.pendingRequest.value?.token)
     }
 }

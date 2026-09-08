@@ -112,6 +112,9 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         // 相机页 AI 对话入口（悬浮 FAB），默认关闭（2026-08-19 语音/AI 悬浮入口全面默认隐藏）
         val AI_CHAT_ENTRY_ENABLED = booleanPreferencesKey("ai_chat_entry_enabled")
 
+        // 「删除不再询问」：持 MANAGE_MEDIA 后回收站删除静默执行（零系统弹框），默认关闭
+        val MEDIA_MANAGE_SILENT_TRASH = booleanPreferencesKey("media_manage_silent_trash")
+
         // 相机参数记忆
         val CAMERA_MEMORY_USE_FRONT_CAMERA = booleanPreferencesKey("camera_memory_use_front_camera")
         val CAMERA_MEMORY_CAPTURE_MODE = stringPreferencesKey("camera_memory_capture_mode")
@@ -947,6 +950,24 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
     override suspend fun updateAiChatEntryEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.AI_CHAT_ENTRY_ENABLED] = enabled
+        }
+    }
+
+    override val mediaManageSilentTrashFlow: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.MEDIA_MANAGE_SILENT_TRASH] ?: false
+        }
+
+    override suspend fun updateMediaManageSilentTrash(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.MEDIA_MANAGE_SILENT_TRASH] = enabled
         }
     }
 

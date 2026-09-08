@@ -994,6 +994,9 @@
     <string name="gallery_permission_system">相簿權限（系統）</string>
     <string name="permission_system_subtitle">開啟系統應用設定管理權限。</string>
     <string name="permission_system_value">系統設定</string>
+    <string name="settings_silent_trash_title">刪除不再詢問</string>
+    <string name="settings_silent_trash_summary_granted">刪除與移入回收站不再彈出系統確認框</string>
+    <string name="settings_silent_trash_summary_denied">需要在系統設定中允許媒體管理權限</string>
     <string name="gallery_debug_features">相簿除錯功能</string>
     <string name="gallery_debug_features_desc">相簿打標的測試工具與後端模式切換。</string>
     <string name="debug_image_download">圖片下載調試</string>

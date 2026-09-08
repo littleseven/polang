@@ -966,6 +966,9 @@
     <string name="gallery_permission_system">Autorisation galerie (système)</string>
     <string name="permission_system_subtitle">Ouvrez les réglages système de l\'app pour gérer les autorisations.</string>
     <string name="permission_system_value">Réglages système</string>
+    <string name="settings_silent_trash_title">Supprimer sans demander</string>
+    <string name="settings_silent_trash_summary_granted">La suppression et la mise à la corbeille n\'affichent plus de confirmation système.</string>
+    <string name="settings_silent_trash_summary_denied">Autorisez la gestion des médias dans les réglages système.</string>
     <string name="gallery_debug_features">Fonctionnalités de débogage de la galerie</string>
     <string name="gallery_debug_features_desc">Outils de test et sélecteurs de modes backend pour l\'étiquetage de la galerie.</string>
     <string name="debug_image_download">Débogage du téléchargement d\'images</string>
