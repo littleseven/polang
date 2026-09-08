@@ -72,3 +72,4 @@ google-play-listing/<locale>/
 
 > 策略与关键词地图见 `docs/superpowers/specs/2026-08-08-google-play-aso-design.md`（第二轮迭代见其 §7）。
 > 检索词台账（词表分层/覆盖计数/双周搜索词报告记录）：`google-play-listing/keyword-ledger.md`（2026-08-24 起）。
+- 🈶 **zh 烘焙帧（2026-09-08 新增）**：变量模式无法经 MCP 切换（`explicitVariableModes` 空操作），zh 界面图改从「复制帧 + 文本覆盖」烘焙——Gallery 页 `search/store01-zhCN`、Settings 页 `settings/main_list-zhCN`（简体）、Gallery 页 `gallery/grid-store01-zhTW`（繁体）；改完导出 3x 经 `upload_images`（fileUrl 须带 `?node_id=<PlayStoreAssets页id>` 锚定，否则报 node not found）灌入 Play 帧 Screen 节点再整帧导出。灌图后先编辑器内截图确认非空白再导出（上传完成有空窗期）
