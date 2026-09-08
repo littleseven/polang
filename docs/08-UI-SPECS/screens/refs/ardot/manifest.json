@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-07T00:03:21+08:00",
+  "exportedAt": "2026-09-07T23:39:08+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=152%3A1"
+    "url": "cocraft://localhost/file/715061534788814?node_id=108%3A1"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -283,96 +283,6 @@
     {
       "frames": [
         {
-          "id": "152:2",
-          "name": "02-search/zh-CN",
-          "png": "02-search-zh-CN.png"
-        },
-        {
-          "id": "152:9",
-          "name": "01-gallery/zh-CN",
-          "png": "01-gallery-zh-CN.png"
-        },
-        {
-          "id": "152:16",
-          "name": "03-chat/zh-CN",
-          "png": "03-chat-zh-CN.png"
-        },
-        {
-          "id": "152:23",
-          "name": "04-people/zh-CN",
-          "png": "04-people-zh-CN.png"
-        },
-        {
-          "id": "152:30",
-          "name": "08-privacy/zh-CN",
-          "png": "08-privacy-zh-CN.png"
-        },
-        {
-          "id": "152:37",
-          "name": "07-insight/zh-CN",
-          "png": "07-insight-zh-CN.png"
-        },
-        {
-          "id": "152:44",
-          "name": "01-gallery/en-US",
-          "png": "01-gallery-en-US.png"
-        },
-        {
-          "id": "152:51",
-          "name": "02-search/en-US",
-          "png": "02-search-en-US.png"
-        },
-        {
-          "id": "152:58",
-          "name": "03-chat/en-US",
-          "png": "03-chat-en-US.png"
-        },
-        {
-          "id": "152:65",
-          "name": "04-people/en-US",
-          "png": "04-people-en-US.png"
-        },
-        {
-          "id": "152:72",
-          "name": "08-privacy/en-US",
-          "png": "08-privacy-en-US.png"
-        },
-        {
-          "id": "152:79",
-          "name": "07-insight/en-US",
-          "png": "07-insight-en-US.png"
-        },
-        {
-          "id": "152:86",
-          "name": "01-gallery/zh-TW",
-          "png": "01-gallery-zh-TW.png"
-        },
-        {
-          "id": "152:93",
-          "name": "02-search/zh-TW",
-          "png": "02-search-zh-TW.png"
-        },
-        {
-          "id": "152:100",
-          "name": "03-chat/zh-TW",
-          "png": "03-chat-zh-TW.png"
-        },
-        {
-          "id": "152:107",
-          "name": "04-people/zh-TW",
-          "png": "04-people-zh-TW.png"
-        },
-        {
-          "id": "152:114",
-          "name": "08-privacy/zh-TW",
-          "png": "08-privacy-zh-TW.png"
-        },
-        {
-          "id": "152:121",
-          "name": "07-insight/zh-TW",
-          "png": "07-insight-zh-TW.png"
-        },
-        {
           "id": "152:128",
           "name": "feature-graphic/zh-CN",
           "png": "feature-graphic-zh-CN.png"
@@ -386,36 +296,6 @@
           "id": "152:140",
           "name": "feature-graphic/zh-TW",
           "png": "feature-graphic-zh-TW.png"
-        },
-        {
-          "id": "185:1",
-          "name": "05-person-groups/en-US",
-          "png": "05-person-groups-en-US.png"
-        },
-        {
-          "id": "185:9",
-          "name": "06-chat-welcome/en-US",
-          "png": "06-chat-welcome-en-US.png"
-        },
-        {
-          "id": "185:33",
-          "name": "05-person-groups/zh-TW",
-          "png": "05-person-groups-zh-TW.png"
-        },
-        {
-          "id": "185:41",
-          "name": "06-chat-welcome/zh-TW",
-          "png": "06-chat-welcome-zh-TW.png"
-        },
-        {
-          "id": "185:49",
-          "name": "05-person-groups/zh-CN",
-          "png": "05-person-groups-zh-CN.png"
-        },
-        {
-          "id": "185:57",
-          "name": "06-chat-welcome/zh-CN",
-          "png": "06-chat-welcome-zh-CN.png"
         },
         {
           "id": "300:113",
@@ -686,5 +566,5 @@
     }
   ],
   "scale": 1,
-  "structureSha256": "fa1b3d9152c5fec5388ea7cff51669977660902bb830ea9434bf02d2f566b4d4"
+  "structureSha256": "786a4b42cce54e6efc6ec5be690207be3cf573a38c0063f80ffa386e5f01a054"
 }

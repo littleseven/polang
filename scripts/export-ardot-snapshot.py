@@ -77,6 +77,9 @@ def main():
     ap.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
     ap.add_argument("--scale", type=int, default=1,
                     help="渲染倍率；默认 1x 控制仓库体积，偶需高清审查时传 2")
+    ap.add_argument("--pages", default=None,
+                    help="逗号分隔页面ID列表，绕过 fetch_editor_state 的 pageList"
+                         "（新会话偶发只返回已激活页；页面名以 batch_read 结果为准）")
     args = ap.parse_args()
     out = os.path.abspath(args.out).rstrip("/")  # outputDir 须绝对路径（客户端按自身 cwd 解析相对路径）
 
@@ -102,8 +105,12 @@ def main():
     file_url = info["fileUrl"]
     state = call_tool(args.endpoint, sid, "fetch_editor_state", {}, rid=11)
     rid = 11
+    if args.pages:
+        page_refs = [{"id": p.strip(), "name": p.strip()} for p in args.pages.split(",") if p.strip()]
+    else:
+        page_refs = state.get("pageList", [state["currentPage"]])
     pages = []
-    for pg in state.get("pageList", [state["currentPage"]]):
+    for pg in page_refs:
         rid += 1
         pg_data = call_tool(args.endpoint, sid, "batch_read",
                             {"nodeIds": [pg["id"]], "readDepth": 1}, rid=rid)
@@ -111,7 +118,7 @@ def main():
         frames = [child for child in pg_node.get("children", [])
                   if isinstance(child, dict) and child.get("type") == "FRAME"]
         if frames:
-            pages.append({"id": pg["id"], "name": pg["name"], "frames": frames})
+            pages.append({"id": pg["id"], "name": pg_node.get("name", pg["name"]), "frames": frames})
     if not pages:
         raise SystemExit("❌ 所有页面均没有顶层帧")
     total = sum(len(pg["frames"]) for pg in pages)

@@ -61,6 +61,7 @@ google-play-listing/<locale>/
 ```
 
 - 设计与产出在 Ardot 文件页面 **Play Store Assets**：改文案改图在 Ardot 里改 frame（命名 `<序号>-<scene>/<locale>`），`export_nodes` 重新导出即可；文案以 `screenshot-captions.json` 为准同步
+- 🖼️ **商店图 SSOT = 设计稿**（2026-09-08 原则）：01/02 的照片内容改 Gallery 页设计帧 `gallery/grid-store01` / `search/store01`，达标后导出灌 Play 帧 Screen 节点（不再直接动烘焙截图）。01 的人像素材源图 = `assets/gallery-faces/`（CogView-4 生成，白富美/高富帅方向，含瓦片映射表）；en/中文双模式导出经设计帧 variableModes 切换
 - **en-US 源截图 = `docs-site/assets/shots-src/en-US/`**（2026-08-23 真机重截，DarkMode 英文 UI，1200×2670；spare-gallery2.jpg 第二张相册网格备用未上槽）。成品 JPG 镜像同步于 `docs-site/assets/shots/en-US/`（官网 At a Glance 区引用）
 - ⚠️ **重截候选**（i18n 残留/杂质）：en 03-chat 含「有脸」小标签；zh-TW 07-insight 回复含简体「相册」、03-chat 历史消息为简体、02/03 可见调试统计行（18895 7573ms 类）——上架前建议重截替换
 - 📌 **识别教训（2026-08-23）**：批量并行读图时内联渲染顺序会乱，场景识别必须以 OCR 逐张核对为准，勿目测指认（本次曾据乱序目测错配全部槽位，用户发现图文不符后修正）
