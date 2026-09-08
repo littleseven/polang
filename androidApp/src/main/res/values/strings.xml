@@ -1003,6 +1003,9 @@
     <string name="gallery_permission_system">Gallery Permission (System)</string>
     <string name="permission_system_subtitle">Open system app settings to manage permissions.</string>
     <string name="permission_system_value">System Settings</string>
+    <string name="settings_silent_trash_title">Delete Without Asking</string>
+    <string name="settings_silent_trash_summary_granted">Deleting and moving to Trash no longer shows a system confirmation.</string>
+    <string name="settings_silent_trash_summary_denied">Allow media management in system settings to enable silent deletion.</string>
     <string name="gallery_debug_features">Gallery Debug Features</string>
     <string name="gallery_debug_features_desc">Testing tools and backend mode switches for gallery tagging.</string>
     <string name="debug_image_download">Image Download Debug</string>

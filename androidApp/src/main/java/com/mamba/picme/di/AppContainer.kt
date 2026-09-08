@@ -114,6 +114,7 @@ import com.mamba.picme.service.tag.TagGenerationService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.flow.first
 
 data class MediaViewModelDependencies(
     val repository: AndroidMediaRepository,
@@ -190,6 +191,7 @@ class OrganizeCategoryViewModelFactory(
     private val category: OrganizeCategory,
     private val organizeRepository: OrganizeRepository,
     private val trashManager: DedupTrashManager,
+    private val silentTrashEnabled: suspend () -> Boolean = { false },
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -198,7 +200,7 @@ class OrganizeCategoryViewModelFactory(
             return OrganizeCategoryViewModel(
                 category = category,
                 organizeRepository = organizeRepository,
-                trashBackend = DedupTrashBackend(trashManager),
+                trashBackend = DedupTrashBackend(trashManager, silentTrashEnabled),
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -210,6 +212,7 @@ class SwipeReviewViewModelFactory(
     private val organizeRepository: OrganizeRepository,
     private val trashManager: DedupTrashManager,
     private val keepHistoryStore: SwipeKeepHistoryStore,
+    private val silentTrashEnabled: suspend () -> Boolean = { false },
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -217,7 +220,7 @@ class SwipeReviewViewModelFactory(
             @Suppress("UNCHECKED_CAST")
             return SwipeReviewViewModel(
                 organizeRepository = organizeRepository,
-                trashBackend = DedupTrashBackend(trashManager),
+                trashBackend = DedupTrashBackend(trashManager, silentTrashEnabled),
                 keepHistoryStore = keepHistoryStore,
             ) as T
         }
@@ -735,7 +738,10 @@ class AppContainerImpl(
             faceDetector = faceDetector,
             generateSummaryOnDemandUseCase = generateSummaryOnDemandUseCase,
             userSettingsRepository = userPreferencesRepository,
-            trashBackend = DedupTrashBackend(dedupTrashManager)
+            trashBackend = DedupTrashBackend(
+                trashManager = dedupTrashManager,
+                silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
+            )
         )
     }
 
@@ -879,6 +885,7 @@ class AppContainerImpl(
             category = category,
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
+            silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
         )
     }
 
@@ -887,6 +894,7 @@ class AppContainerImpl(
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
             keepHistoryStore = DataStoreSwipeKeepHistoryStore(context),
+            silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
         )
     }
 

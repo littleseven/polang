@@ -994,6 +994,9 @@
     <string name="gallery_permission_system">相册权限（系统）</string>
     <string name="permission_system_subtitle">打开系统应用设置管理权限。</string>
     <string name="permission_system_value">系统设置</string>
+    <string name="settings_silent_trash_title">删除不再询问</string>
+    <string name="settings_silent_trash_summary_granted">删除与移入回收站不再弹系统确认框</string>
+    <string name="settings_silent_trash_summary_denied">需要在系统设置中允许媒体管理权限</string>
     <string name="gallery_debug_features">相册调试功能</string>
     <string name="gallery_debug_features_desc">相册打标的测试工具与后端模式切换。</string>
     <string name="debug_image_download">图片下载调试</string>

@@ -242,12 +242,13 @@ internal fun DebugOptionRow(
     horizontalPadding: Dp = 12.dp,
     rowHeight: Dp = SettingsTokens.toggleRowHeight,
     icon: ImageVector? = null,
-    iconBlockColor: Color = Color.Transparent
+    iconBlockColor: Color = Color.Transparent,
+    subtitle: String? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(rowHeight)
+            .height(if (subtitle != null) SettingsTokens.rowHeightWithSubtitle else rowHeight)
             .padding(horizontal = horizontalPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SettingsTokens.rowElementGap)
@@ -268,12 +269,23 @@ internal fun DebugOptionRow(
                 )
             }
         }
-        Text(
-            text = title,
-            fontSize = SettingsTokens.listTitleFontSize.value.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = SettingsTokens.listTitleFontSize.value.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Switch(
             checked = checked,
             onCheckedChange = { enabled -> onCheckedChange(enabled) }

@@ -15,6 +15,13 @@ interface TrashBackend {
     fun buildTrashToken(uris: List<String>): Any
     fun buildRestoreToken(uris: List<String>): Any
     fun queryExisting(uris: List<String>): List<String>
+
+    /**
+     * 静默回收快路径（MANAGE_MEDIA 持权 + 用户开关开）：直写 IS_TRASHED 零系统弹框。
+     * 返回 null 表示快路径不可用（开关关 / 无权限），调用方回落系统授权框；
+     * 非 null 为实际回收成功集（空集 ≠ null：快路径已生效但全部写失败）。
+     */
+    suspend fun trySilentTrash(uris: List<String>): List<String>?
 }
 
 data class PendingTrashRequest(
@@ -40,6 +47,9 @@ sealed interface TrashOutcome {
  * API<30（!isSupported）不拉起授权：errorEvent 置位（UI snackbar）+ [TrashOutcome.Unsupported]
  * 入流（VM 编排层据此回滚在途提交状态，2026-09-05 F2 审查修复——此前仅 errorEvent，VM 侧
  * commitInFlight/finishing 永久悬挂死锁）。
+ * 静默快路径（2026-09-08，MANAGE_MEDIA）：trash 请求在 token 构建前先试
+ * [TrashBackend.trySilentTrash]——用户开关「删除不再询问」开 + 持 MANAGE_MEDIA（API 31+）时
+ * 直写 IS_TRASHED 零弹框，Trashed 直接入流、不产生 pendingRequest；返回 null 回落系统授权框通路。
  */
 class TrashSessionController(
     private val backend: TrashBackend,
@@ -89,6 +99,29 @@ class TrashSessionController(
         requestInFlightTag = tag
         requestInFlightCancelled = false
         scope.launch {
+            // 静默快路径（仅 trash）：MANAGE_MEDIA 持权 + 用户开关开 → 直写 IS_TRASHED，
+            // 完全绕过 pendingRequest/系统授权框；返回 null（开关关/无权限/执行异常）回落既有 token 通路
+            if (!isRestore) {
+                val silentTrashed = withContext(ioDispatcher) {
+                    runCatching { backend.trySilentTrash(uris) }.getOrNull()
+                }
+                if (silentTrashed != null) {
+                    val silentCancelled = requestInFlightCancelled
+                    requestInFlight = false
+                    requestInFlightTag = null
+                    requestInFlightCancelled = false
+                    if (silentCancelled) {
+                        // 宿主在静默执行期间解绑：已回收不回滚（回收站 30 天可恢复），
+                        // 按 Cancelled 结算供编排层复位在途状态（与 token 在途取消同语义）
+                        _outcomes.tryEmit(TrashOutcome.Cancelled)
+                    } else {
+                        // 部分/全部写失败沿用 partialNotice 语义（对齐授权回流残留复查口径）
+                        if (silentTrashed.size < uris.size) _partialNotice.value = true
+                        _outcomes.emit(TrashOutcome.Trashed(silentTrashed, tag))
+                    }
+                    return@launch
+                }
+            }
             val token = withContext(ioDispatcher) {
                 runCatching {
                     if (isRestore) backend.buildRestoreToken(uris) else backend.buildTrashToken(uris)

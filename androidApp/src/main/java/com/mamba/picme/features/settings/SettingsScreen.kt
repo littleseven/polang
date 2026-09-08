@@ -2,6 +2,8 @@ package com.mamba.picme.features.settings
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.rounded.ListAlt
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.KeyboardVoice
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Lock
@@ -83,6 +86,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -98,6 +102,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.mamba.picme.BuildConfig
 import com.mamba.picme.PoLangApplication
@@ -212,6 +219,7 @@ fun SettingsScreen(
     val voiceCommandMode by viewModel.voiceCommandMode.collectAsState()
     val voiceEntryEnabled by viewModel.voiceEntryEnabled.collectAsState()
     val aiChatEntryEnabled by viewModel.aiChatEntryEnabled.collectAsState()
+    val mediaManageSilentTrashEnabled by viewModel.mediaManageSilentTrashEnabled.collectAsState()
     val localAsrModel by viewModel.localAsrModel.collectAsState()
     val localKwsModel by viewModel.localKwsModel.collectAsState()
     val logModuleConfig by viewModel.logModuleConfig.collectAsState()
@@ -334,6 +342,8 @@ fun SettingsScreen(
             onVoiceEntryEnabledChange = { viewModel.setVoiceEntryEnabled(it) },
             aiChatEntryEnabled = aiChatEntryEnabled,
             onAiChatEntryEnabledChange = { viewModel.setAiChatEntryEnabled(it) },
+            mediaManageSilentTrashEnabled = mediaManageSilentTrashEnabled,
+            onMediaManageSilentTrashEnabledChange = { viewModel.setMediaManageSilentTrashEnabled(it) },
             localAsrModel = localAsrModel,
             onLocalAsrModelChange = { viewModel.setLocalAsrModel(it) },
             localKwsModel = localKwsModel,
@@ -407,6 +417,8 @@ private fun SettingsContent(
     onVoiceEntryEnabledChange: (Boolean) -> Unit,
     aiChatEntryEnabled: Boolean,
     onAiChatEntryEnabledChange: (Boolean) -> Unit,
+    mediaManageSilentTrashEnabled: Boolean,
+    onMediaManageSilentTrashEnabledChange: (Boolean) -> Unit,
     localAsrModel: String,
     onLocalAsrModelChange: (String) -> Unit,
     localKwsModel: String,
@@ -764,6 +776,47 @@ private fun SettingsContent(
                         iconBlockColor = AppColors.vibrantBlue,
                         valueText = stringResource(R.string.permission_system_value)
                     )
+                    // 「删除不再询问」（MANAGE_MEDIA 静默回收站）：canManageMedia 检查口为 API 31+ 新增，低版本不显示
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val lifecycleOwner = LocalLifecycleOwner.current
+                        // 权限状态跟随 ON_RESUME 刷新（从系统授权页返回即更新 summary），不做一次性 remember 缓存
+                        val canManageMedia by produceState(
+                            initialValue = MediaStore.canManageMedia(context),
+                            lifecycleOwner
+                        ) {
+                            val observer = LifecycleEventObserver { _, event ->
+                                if (event == Lifecycle.Event.ON_RESUME) {
+                                    value = MediaStore.canManageMedia(context)
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(observer)
+                            awaitDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                        }
+                        SettingsListDivider()
+                        DebugOptionRow(
+                            title = stringResource(R.string.settings_silent_trash_title),
+                            subtitle = stringResource(
+                                if (canManageMedia) R.string.settings_silent_trash_summary_granted
+                                else R.string.settings_silent_trash_summary_denied
+                            ),
+                            checked = mediaManageSilentTrashEnabled,
+                            onCheckedChange = { enabled ->
+                                onMediaManageSilentTrashEnabledChange(enabled)
+                                // 开关状态照存；未授权时引导跳系统媒体管理授权页，权限到位后自然生效
+                                if (enabled && !canManageMedia) {
+                                    val intent = Intent(
+                                        Settings.ACTION_REQUEST_MANAGE_MEDIA,
+                                        Uri.parse("package:${context.packageName}")
+                                    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                    runCatching { context.startActivity(intent) }
+                                }
+                            },
+                            horizontalPadding = SettingsTokens.listRowPaddingH,
+                            rowHeight = SettingsTokens.listRowHeight,
+                            icon = Icons.Rounded.DeleteSweep,
+                            iconBlockColor = AppColors.vibrantBlue
+                        )
+                    }
                 }
 
                 // ── 组3 语音 ──
@@ -1795,6 +1848,8 @@ fun SettingsScreenPreview() {
             onVoiceEntryEnabledChange = {},
             aiChatEntryEnabled = false,
             onAiChatEntryEnabledChange = {},
+            mediaManageSilentTrashEnabled = false,
+            onMediaManageSilentTrashEnabledChange = {},
             localAsrModel = "",
             onLocalAsrModelChange = {},
             localKwsModel = "",

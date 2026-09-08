@@ -282,6 +282,14 @@ class SettingsViewModel(
             initialValue = false
         )
 
+    /** 「删除不再询问」开关（MANAGE_MEDIA 静默回收站），默认关闭 */
+    val mediaManageSilentTrashEnabled: StateFlow<Boolean> = repository.mediaManageSilentTrashFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     val localAsrModel: StateFlow<String> = repository.localAsrModelFlow
         .stateIn(
             scope = viewModelScope,
@@ -1058,6 +1066,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             Logger.d("UX", "AI chat entry enabled changed: $enabled")
             repository.updateAiChatEntryEnabled(enabled)
+        }
+    }
+
+    fun setMediaManageSilentTrashEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            Logger.d("UX", "Media manage silent trash changed: $enabled")
+            repository.updateMediaManageSilentTrash(enabled)
         }
     }
 

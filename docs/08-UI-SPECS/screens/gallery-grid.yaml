@@ -563,6 +563,9 @@ media_pager:
       cancel_animation: spring_back           # 未超阈值/授权取消：弹回原位
     delete_path:
       api_30_plus: system_trash            # MediaStore.createTrashRequest 系统回收站，30 天可恢复
+      silent_when: manage_media_granted_and_toggle_on  # 设置页「删除不再询问」开关开 + 持 MANAGE_MEDIA
+                                           # （API 31+，MediaStore.canManageMedia）时直写 IS_TRASHED+DATE_EXPIRES
+                                           # 静默回收（零系统弹框，不产生 pendingRequest）；开关关/无权限回落上行系统授权框
       api_below_30: legacy_delete_fallback # 降级走既有永久删除 + 系统授权框通路（PreviewTrashRouting 分流）
       auth_ui: TrashAuthEffects            # 共享授权拉起组件（StartIntentSenderForResult + tag 分桶路由）
       list_shrink: on_trashed_outcome_only # 🔴 只在授权成功（Trashed outcome）后收缩预览列表；
@@ -770,6 +773,11 @@ media_pager:
   # ── 26. 平台差异台账（ios-follow 2026-08-11：放开全部入口）──
   # 登记 more_menu 三项 + 底栏 id_photo 的双端实际路径与隐私披露对齐。
   platform_differences:
+
+    swipe_up_delete_silent_trash:
+      android_actual: "MANAGE_MEDIA 持权 + 设置页「删除不再询问」开关开 → 直写 IS_TRASHED 静默回收（零系统弹框，API 31+）；否则 createTrashRequest 系统授权框"
+      ios_actual: "iOS PhotoLibrary 删除无系统确认框（PHPhotoLibrary 直接删除），天然静默，无需跟随该开关；30 天可恢复语义（Recently Deleted）保留"
+      note: "Android 专属能力（系统授权框为 Android Scoped Storage 产物），iOS 不登记跟随任务"
 
     image_understanding:
       android_actual:
