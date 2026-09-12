@@ -564,8 +564,9 @@ media_pager:
     delete_path:
       api_30_plus: system_trash            # MediaStore.createTrashRequest 系统回收站，30 天可恢复
       silent_when: manage_media_granted_and_toggle_on  # 设置页「删除不再询问」开关开 + 持 MANAGE_MEDIA
-                                           # （API 31+，MediaStore.canManageMedia）时直写 IS_TRASHED+DATE_EXPIRES
-                                           # 静默回收（零系统弹框，不产生 pendingRequest）；开关关/无权限回落上行系统授权框
+                                           # （API 31+，MediaStore.canManageMedia）时直写 IS_TRASHED 单列
+                                           # 静默回收（零系统弹框，不产生 pendingRequest）；开关关/无权限回落上行系统授权框；
+                                           # 直写失败子集回落 token 通路（持权时免弹框自动通过，2026-09-12）
       api_below_30: legacy_delete_fallback # 降级走既有永久删除 + 系统授权框通路（PreviewTrashRouting 分流）
       auth_ui: TrashAuthEffects            # 共享授权拉起组件（StartIntentSenderForResult + tag 分桶路由）
       list_shrink: on_trashed_outcome_only # 🔴 只在授权成功（Trashed outcome）后收缩预览列表；
