@@ -284,36 +284,41 @@ class TrashSessionControllerTest {
     }
 
     @Test
-    fun `silent trash partial success sets partial notice and emits only succeeded`() = runTest {
+    fun `silent trash partial success emits succeeded and falls back failed subset to token path`() = runTest {
         val backend = FakeBackend().apply { silentTrashResult = listOf("a") } // b 写失败
         val c = newController(this, backend)
         val received = mutableListOf<TrashOutcome>()
         val job = collectOutcomes(c, received)
         c.requestTrash(listOf("a", "b"), tag = "cat:x")
         advanceUntilIdle()
-        assertNull(c.pendingRequest.value)
-        assertEquals(0, backend.buildTrashCalls)
+        // 成功集立即入流；失败子集回落 token 通路（持权时同样免弹框），不再置 partialNotice
         val outcome = received.single() as TrashOutcome.Trashed
         assertEquals(listOf("a"), outcome.trashedUris)
-        assertTrue(c.partialNotice.value)
-        c.consumePartialNotice()
+        assertEquals("cat:x", outcome.tag)
+        assertEquals(1, backend.buildTrashCalls)
+        val pending = c.pendingRequest.value
+        assertEquals(listOf("b"), pending?.uris)
+        assertEquals("trash-token", pending?.token)
+        assertEquals("cat:x", pending?.tag)
         assertFalse(c.partialNotice.value)
         job.cancel()
     }
 
     @Test
-    fun `silent trash all failed emits empty trashed with partial notice`() = runTest {
+    fun `silent trash all failed falls back whole batch to token path`() = runTest {
         val backend = FakeBackend().apply { silentTrashResult = emptyList() } // 空集 ≠ null：快路径已生效但全失败
         val c = newController(this, backend)
         val received = mutableListOf<TrashOutcome>()
         val job = collectOutcomes(c, received)
         c.requestTrash(listOf("a"))
         advanceUntilIdle()
-        assertNull(c.pendingRequest.value)
-        assertEquals(0, backend.buildTrashCalls)
-        val outcome = received.single() as TrashOutcome.Trashed
-        assertEquals(emptyList<String>(), outcome.trashedUris)
-        assertTrue(c.partialNotice.value)
+        // 全失败：无 Trashed 入流、无 partialNotice，整批回落 token 通路
+        assertTrue(received.isEmpty())
+        assertEquals(1, backend.buildTrashCalls)
+        val pending = c.pendingRequest.value
+        assertEquals(listOf("a"), pending?.uris)
+        assertEquals("trash-token", pending?.token)
+        assertFalse(c.partialNotice.value)
         job.cancel()
     }
 

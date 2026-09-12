@@ -50,6 +50,8 @@ sealed interface TrashOutcome {
  * 静默快路径（2026-09-08，MANAGE_MEDIA）：trash 请求在 token 构建前先试
  * [TrashBackend.trySilentTrash]——用户开关「删除不再询问」开 + 持 MANAGE_MEDIA（API 31+）时
  * 直写 IS_TRASHED 零弹框，Trashed 直接入流、不产生 pendingRequest；返回 null 回落系统授权框通路。
+ * 失败子集回落（2026-09-12）：直写被 ROM 拒绝时成功集照常入流，失败子集改走 token 通路
+ * （持 MANAGE_MEDIA 时 createTrashRequest 免弹框自动通过），无感兜底不丢图。
  */
 class TrashSessionController(
     private val backend: TrashBackend,
@@ -99,32 +101,42 @@ class TrashSessionController(
         requestInFlightTag = tag
         requestInFlightCancelled = false
         scope.launch {
+            var targetUris = uris
             // 静默快路径（仅 trash）：MANAGE_MEDIA 持权 + 用户开关开 → 直写 IS_TRASHED，
-            // 完全绕过 pendingRequest/系统授权框；返回 null（开关关/无权限/执行异常）回落既有 token 通路
+            // 完全绕过 pendingRequest/系统授权框；返回 null（开关关/无权限/执行异常）回落既有 token 通路。
+            // 部分写失败（ROM 拒写直写列等）：成功集先按 Trashed 入流，失败子集回落 token 通路——
+            // 持 MANAGE_MEDIA 时 createTrashRequest 同样免弹框自动通过，无感兜底；
+            // 未持权则退化为功能上线前的系统授权框行为。
             if (!isRestore) {
                 val silentTrashed = withContext(ioDispatcher) {
                     runCatching { backend.trySilentTrash(uris) }.getOrNull()
                 }
                 if (silentTrashed != null) {
-                    val silentCancelled = requestInFlightCancelled
-                    requestInFlight = false
-                    requestInFlightTag = null
-                    requestInFlightCancelled = false
-                    if (silentCancelled) {
+                    if (requestInFlightCancelled) {
                         // 宿主在静默执行期间解绑：已回收不回滚（回收站 30 天可恢复），
                         // 按 Cancelled 结算供编排层复位在途状态（与 token 在途取消同语义）
+                        requestInFlight = false
+                        requestInFlightTag = null
+                        requestInFlightCancelled = false
                         _outcomes.tryEmit(TrashOutcome.Cancelled)
-                    } else {
-                        // 部分/全部写失败沿用 partialNotice 语义（对齐授权回流残留复查口径）
-                        if (silentTrashed.size < uris.size) _partialNotice.value = true
+                        return@launch
+                    }
+                    if (silentTrashed.isNotEmpty()) {
                         _outcomes.emit(TrashOutcome.Trashed(silentTrashed, tag))
                     }
-                    return@launch
+                    val failed = uris - silentTrashed.toSet()
+                    if (failed.isEmpty()) {
+                        requestInFlight = false
+                        requestInFlightTag = null
+                        requestInFlightCancelled = false
+                        return@launch
+                    }
+                    targetUris = failed
                 }
             }
             val token = withContext(ioDispatcher) {
                 runCatching {
-                    if (isRestore) backend.buildRestoreToken(uris) else backend.buildTrashToken(uris)
+                    if (isRestore) backend.buildRestoreToken(targetUris) else backend.buildTrashToken(targetUris)
                 }.getOrNull()
             }
             val cancelled = requestInFlightCancelled
@@ -135,7 +147,7 @@ class TrashSessionController(
                 // 宿主在 token 构建期间解绑取消：不落 pending，按 Cancelled 结算（防单槽悬挂）
                 cancelled -> _outcomes.tryEmit(TrashOutcome.Cancelled)
                 token == null -> _errorEvent.value = true
-                else -> _pendingRequest.value = PendingTrashRequest(uris, token, isRestore, tag)
+                else -> _pendingRequest.value = PendingTrashRequest(targetUris, token, isRestore, tag)
             }
         }
     }

@@ -6,7 +6,7 @@ import android.content.IntentSender
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import java.util.concurrent.TimeUnit
+import android.util.Log
 
 class DedupTrashManager(private val context: Context) {
 
@@ -20,23 +20,26 @@ class DedupTrashManager(private val context: Context) {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && MediaStore.canManageMedia(context)
 
     /**
-     * 静默移入回收站：持 MANAGE_MEDIA 后直写 IS_TRASHED=1 不弹系统授权框；
-     * 同写 DATE_EXPIRES = 当前 +30 天（秒级 unix，对齐 createTrashRequest 的 30 天保留期语义）。
-     * 逐 uri 独立执行，单个失败（行不存在/写被拒）不中断其余；返回成功集（可能为空集）。
+     * 静默移入回收站：持 MANAGE_MEDIA 后直写 IS_TRASHED=1 不弹系统授权框。
+     * 只写 IS_TRASHED 单列——DATE_EXPIRES 属系统管理列，实测同写会导致整个 update 在
+     * 部分 ROM（HyperOS）上失败；trash 行缺省保留期由系统兜底。逐 uri 独立执行，
+     * 单个失败（行不存在/写被拒）记警告日志、不中断其余；返回成功集（可能为空集）。
      */
     fun silentTrash(uris: List<String>): List<String> {
-        val dateExpires = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()) +
-            TimeUnit.DAYS.toSeconds(30)
         val trashed = mutableListOf<String>()
         for (uri in uris) {
             runCatching {
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.IS_TRASHED, 1)
-                    put(MediaStore.MediaColumns.DATE_EXPIRES, dateExpires)
                 }
-                if (context.contentResolver.update(Uri.parse(uri), values, null, null) > 0) {
+                val rows = context.contentResolver.update(Uri.parse(uri), values, null, null)
+                if (rows > 0) {
                     trashed += uri
+                } else {
+                    Log.w(TAG, "silentTrash: update matched 0 rows, uri=$uri")
                 }
+            }.onFailure { e ->
+                Log.w(TAG, "silentTrash: update failed, uri=$uri", e)
             }
         }
         return trashed
@@ -73,5 +76,9 @@ class DedupTrashManager(private val context: Context) {
             }
         }
         return existing
+    }
+
+    private companion object {
+        const val TAG = "PoLang:DedupTrash"
     }
 }
