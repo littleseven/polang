@@ -75,6 +75,9 @@ class MediaViewModel(
         viewModelScope.launch {
             trashController.outcomes.collect { outcome ->
                 if (outcome is TrashOutcome.Trashed && outcome.trashedUris.isNotEmpty()) {
+                    // 先乐观本地移除（内存缓存 + Room 行 + 重发射），网格即时收缩；
+                    // 再全量重扫兜底最终一致（双端点过滤 trashed，不会复活已回收项）
+                    repository.removeTrashedFromLocalCache(outcome.trashedUris)
                     repository.refreshMediaLibrary()
                 }
             }

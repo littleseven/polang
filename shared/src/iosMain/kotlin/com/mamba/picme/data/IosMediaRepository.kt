@@ -53,6 +53,9 @@ class IosMediaRepository(
     /** iOS 无 MediaStore scan 等价物：数据新鲜度由 PHPhotoLibraryObserver 驱动，无需主动刷新。 */
     override suspend fun refreshMediaLibrary() = Unit
 
+    /** iOS 无 Room/内存缓存双层镜像，allMedia 由 PHPhotoLibraryObserver 即时驱动，乐观移除为空操作。 */
+    override suspend fun removeTrashedFromLocalCache(uris: List<String>) = Unit
+
     /** iOS 无标签库（TAG 属 Phase 6），无刷新等价物。 */
     override fun refreshLabels() = Unit
 

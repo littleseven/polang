@@ -299,6 +299,36 @@ class MediaRepositoryImpl(
         refreshVersion.value = refreshVersion.value + 1
     }
 
+    /**
+     * 回收站 Trashed 后的乐观本地移除（网格即时收缩，不等全量重扫）：
+     * ① 内存 systemMediaCache 剔除这些 URI；② Room 行删除（复用 sync 过期清理同款的
+     * DAO 删除 + Coil 缓存清理通路，id 经 getMediaByUri 反查）；③ refreshVersion +1 触发
+     * allMedia 重发射。与 refreshMediaLibrary 并发安全：重扫查询侧 IS_TRASHED=0 过滤下
+     * loadSystemMedia 本就不含这些 URI，整体赋值覆盖也不会把它们带回来，无需加锁。
+     */
+    override suspend fun removeTrashedFromLocalCache(uris: List<String>) {
+        if (uris.isEmpty()) return
+        val uriSet = uris.toSet()
+        Logger.d(TAG, "Optimistically removing ${uriSet.size} trashed media from local cache")
+        withContext(Dispatchers.IO) {
+            systemMediaCache.value = systemMediaCache.value.filterNot { asset -> asset.uri in uriSet }
+
+            val staleIds = mutableListOf<Long>()
+            val imageLoader = coil.Coil.imageLoader(appContext)
+            for (uri in uris) {
+                val entity = mediaDao.getMediaByUri(uri) ?: continue
+                staleIds.add(entity.id)
+                imageLoader.diskCache?.remove(entity.uri)
+                imageLoader.memoryCache?.remove(coil.memory.MemoryCache.Key(entity.uri))
+            }
+            if (staleIds.isNotEmpty()) {
+                mediaDao.deleteMediaByIds(staleIds)
+                Logger.i(TAG, "Removed ${staleIds.size} trashed media rows from local DB")
+            }
+        }
+        refreshVersion.value = refreshVersion.value + 1
+    }
+
     override suspend fun refreshMediaLibrary() {
         withContext(Dispatchers.IO) {
             val systemMedia = loadSystemMedia()
