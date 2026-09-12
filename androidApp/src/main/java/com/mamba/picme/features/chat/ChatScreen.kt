@@ -1447,7 +1447,7 @@ private fun ChatMessageItem(
                         if (isImage) {
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                         } else if (isUser) {
-                            // 用户气泡：品牌实色（青玉 #0F766E，双模式一致，设计稿定稿）
+                            // 用户气泡：品牌实色能量绿 #2FE385（双模式一致，v2.2.3）；文字走 userBubbleOn 深绿黑
                             ChatBubbleTokens.userBubbleBg
                         } else {
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
@@ -1480,7 +1480,7 @@ private fun ChatMessageItem(
                         )
                         Text(
                             text = message.content,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 16.sp,
                             lineHeight = 24.sp,
                             modifier = Modifier.padding(top = 6.dp)
@@ -1533,9 +1533,10 @@ private fun ChatMessageItem(
                         }
                     }
                     isUser -> {
+                        // 用户气泡文字：userBubbleOn 深绿黑字（对齐设计稿 $143:12；#2FE385 亮绿底上对比度 ~8:1）
                         Text(
                             text = message.content,
-                            color = Color.White,
+                            color = ChatBubbleTokens.userBubbleOn,
                             fontSize = 16.sp,
                             lineHeight = 24.sp
                         )
@@ -1613,7 +1614,7 @@ private fun AgentMessageExtras(
 @Composable
 private fun MessagePerformanceRow(perf: LlmPerformance, isUser: Boolean) {
     val metricTint = if (isUser) {
-        Color.White.copy(alpha = 0.55f)
+        ChatBubbleTokens.userBubbleOn.copy(alpha = 0.55f)
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
     }
