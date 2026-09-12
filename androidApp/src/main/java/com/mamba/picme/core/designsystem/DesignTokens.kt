@@ -198,7 +198,7 @@ object CameraTokens {
     val filterSelectedBorderWidth = 2.5.dp
     val filterLabelFontSize = 10.dp
     val panelBackground = Color(0xB81C1A1F)
-    val cameraAccent = Color(0xFF0F766E)
+    val cameraAccent = Color(0xFF2FE385)
     val cameraAccentOn = Color.White
     val toolBarUnselectedBg = Color(0x00000000)
     val inlineFilterPanelHeight = 200.dp
@@ -255,10 +255,10 @@ object ChatBubbleTokens {
     val blinkMs = 500
     val circularButtonSize = 36.dp
     val circularButtonIconSize = 22.dp
-    val brandGradientStart = Color(0xFF0F766E)
-    val brandGradientEnd = Color(0xFF5EA88F)
-    val userBubbleBg = Color(0xFF0F766E)
-    val userBubbleOn = Color.White
+    val brandGradientStart = Color(0xFF1EA75B)
+    val brandGradientEnd = Color(0xFF7CEFA8)
+    val userBubbleBg = Color(0xFF2FE385)
+    val userBubbleOn = Color(0xFF062B18)
     val tryChipHeight = 44.dp
     val inputBottomPadding = 28.dp
     val messageGap = 14.dp
@@ -272,7 +272,7 @@ object ChatCarouselTokens {
     val cardSpacing = 8.dp
     val feedbackButtonSize = 24.dp
     val feedbackIconColor = Color.White
-    val feedbackBgColor = Color(0x66000000)
+    val feedbackBgColor = Color(0xFF0F2B1B)
     val viewAllCornerRadius = 12.dp
 }
 
