@@ -1,5 +1,6 @@
 package com.mamba.picme.data.repository
 
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
@@ -36,6 +37,29 @@ class MediaRepositoryImpl(
 
     companion object {
         private const val TAG = "Gallery"
+
+        /**
+         * stale 探活：行不存在或已入回收站（IS_TRASHED != 0）均视为「不存在」，
+         * 让 Room 行走过期删除。HyperOS/Android 16 对已 trash 行的 item-URI 直查
+         * 仍返回该行（AOSP 默认查询会过滤 trash 行），故必须显式读 IS_TRASHED 列
+         * 区分（判法同 DedupTrashManager.queryExisting）。IS_TRASHED 为 API 29+ 列；
+         * 低版本不投影该列，列缺失时保守视为真存在（不误删 Room 行）。
+         */
+        internal fun isSystemMediaLive(resolver: ContentResolver, uri: Uri): Boolean {
+            val projection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.IS_TRASHED)
+            } else {
+                null
+            }
+            return runCatching {
+                resolver.query(uri, projection, null, null, null)?.use { cursor ->
+                    if (!cursor.moveToFirst()) return@use false
+                    val trashedIndex = cursor.getColumnIndex(MediaStore.MediaColumns.IS_TRASHED)
+                    val trashed = trashedIndex >= 0 && cursor.getInt(trashedIndex) != 0
+                    !trashed
+                } ?: false
+            }.getOrDefault(false)
+        }
     }
 
     private val appContext = context.applicationContext
@@ -321,10 +345,8 @@ class MediaRepositoryImpl(
             val imageLoader = coil.Coil.imageLoader(appContext)
             for (entry in staleEntries) {
                 val uri = entry.uri.toUri()
-                val exists = runCatching {
-                    appContext.contentResolver.query(uri, null, null, null, null)
-                        ?.use { it.moveToFirst() } ?: false
-                }.getOrDefault(false)
+                // 已入回收站按「不存在」处理：HyperOS 直查 trashed 行仍返回，靠探活读列兜住
+                val exists = isSystemMediaLive(appContext.contentResolver, uri)
                 if (!exists) {
                     staleIds.add(entry.id)
                     // 同时清理 Coil 缓存，避免脏缩略图残留
@@ -350,6 +372,20 @@ class MediaRepositoryImpl(
         media.sortedByDescending { asset -> asset.captureDate }
     }
 
+    /**
+     * trashed 过滤 selection：HyperOS/Android 16 的 MediaStore 普通查询不过滤回收站行
+     * （AOSP 默认过滤），必须显式排除，否则上滑删除进回收站后网格仍显示该照片。
+     * IS_TRASHED 为 API 29+ 可查列（回收站概念 30+，29 上过滤无害），低版本保持无过滤。
+     * 用 selection 字符串而非 Bundle QUERY_ARG_MATCH_TRASHED：与现有 5 参 query 调用形态一致，
+     * 且 QUERY_ARG_MATCH_TRASHED 常量 30+ 才有（29 需写字面量），selection 在 29+ 统一生效。
+     */
+    private fun notTrashedSelection(): String? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            "${MediaStore.MediaColumns.IS_TRASHED} = 0"
+        } else {
+            null
+        }
+
     private fun queryImagesFromMediaStore(): List<MediaAsset> {
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -363,7 +399,7 @@ class MediaRepositoryImpl(
             appContext.contentResolver.query(
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                 projection,
-                null,
+                notTrashedSelection(),
                 null,
                 "${MediaStore.Images.Media.DATE_TAKEN} DESC, ${MediaStore.Images.Media.DATE_ADDED} DESC"
             )?.use { cursor ->
@@ -416,7 +452,7 @@ class MediaRepositoryImpl(
             appContext.contentResolver.query(
                 MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 projection,
-                null,
+                notTrashedSelection(),
                 null,
                 "${MediaStore.Video.Media.DATE_TAKEN} DESC, ${MediaStore.Video.Media.DATE_ADDED} DESC"
             )?.use { cursor ->

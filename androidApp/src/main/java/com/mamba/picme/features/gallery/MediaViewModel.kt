@@ -68,8 +68,10 @@ class MediaViewModel(
     val isTrashSupported: Boolean get() = trashController.isSupported
 
     init {
-        // 回收站授权成功（Trashed）后刷新媒体库：MediaStore 默认查询不含已回收项，
-        // Gallery/Chat/Memory 三宿主的预览列表随流自动收缩
+        // 回收站授权成功（Trashed）后刷新媒体库。注意：仅 AOSP 的 MediaStore 默认查询
+        // 会过滤已回收行，HyperOS/Android 16 普查会照常返回 trashed 行——过滤责任在
+        // repository 查询侧（IS_TRASHED=0 selection + stale 探活视 trashed 为不存在），
+        // 刷新后 Gallery/Chat/Memory 三宿主的预览列表随流自动收缩
         viewModelScope.launch {
             trashController.outcomes.collect { outcome ->
                 if (outcome is TrashOutcome.Trashed && outcome.trashedUris.isNotEmpty()) {
