@@ -228,6 +228,9 @@ class ChatViewModel(
     /** JS eval 互斥锁（QuickJS 非线程安全，需串行化 eval）。 */
     private val jsEvalMutex = Mutex()
 
+    /** media_results 卡片读-改-写（查上一张 + upsert）互斥锁，防并发双查 null 产生重复行 */
+    private val mediaResultsMutex = Mutex()
+
     // ── capability.dispatch（JS → CapabilityRegistry 写通路）─────────────────
 
     /**
@@ -880,11 +883,7 @@ class ChatViewModel(
                             .filter { it.id in action.mediaIds }
                             .take(MAX_CARDS)
                         if (assets.isNotEmpty()) {
-                            // ReAct 多轮搜索只保留最后一个卡片：替换上一个 MediaResultsUi
-                            val currentMsgs = _messages.value
-                            if (currentMsgs.lastOrNull() is MediaResultsUi) {
-                                _messages.value = currentMsgs.dropLast(1)
-                            }
+                            // 同一用户回合多轮搜索由 insertMediaResultsMessage 内部 upsert 去重，仅保留最新卡片
                             insertMediaResultsMessage(
                                 sid,
                                 MediaResultsUi(
@@ -1335,7 +1334,10 @@ class ChatViewModel(
                         // 检测 LLM 安全对齐误触发：用户想搜相册但 LLM 拒绝了
                         val replyText = (streamResult.commands.firstOrNull() as? AgentCommand.TextReply)?.message
                             ?: streamResult.fullResponse
-                        if (isRefusedSearchRequest(text, replyText)) {
+                        // ReAct 已出过卡片时（总结文本带拒绝措辞属常见误报），跳过回退直搜，避免重复卡片
+                        if (isRefusedSearchRequest(text, replyText) &&
+                            chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId) == null
+                        ) {
                             Logger.w(TAG, "LLM refused search request, falling back to direct gallery search")
                             val outcome = onSearchMedia(text)
                             val assets = lastResultAssets[sessionId].orEmpty().take(MAX_CARDS)
@@ -2178,18 +2180,37 @@ class ChatViewModel(
         }
     }
 
-    private suspend fun insertMediaResultsMessage(sessionId: String, ui: MediaResultsUi) {
-        chatMessageDao.insertMessage(
-            ChatMessageEntity(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                type = "media_results",
-                content = ChatGallerySearch.serializeContent(ui.assets),
-                modelUsed = "gallery_search",
-                metadata = ChatGallerySearch.serializeMetadata(ui.query, ui.totalCount, ui.isRefinement)
+    /**
+     * 插入搜索结果卡片。
+     * 同一用户回合内可能多次产出 MediaResults（ReAct 多轮 search_media/refine_media_search、
+     * 拒绝措辞回退直搜等）：[replacePreviousInTurn] 为 true 时复用本回合上一张卡片行的 id
+     * 做 REPLACE upsert，保证一个用户回合至多一张横滑卡片；以图搜图等自成新回合的入口传
+     * false，追加新卡而非覆盖上一回合的结果。
+     */
+    private suspend fun insertMediaResultsMessage(
+        sessionId: String,
+        ui: MediaResultsUi,
+        replacePreviousInTurn: Boolean = true
+    ) {
+        mediaResultsMutex.withLock {
+            val previousCard = if (replacePreviousInTurn) {
+                chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId)
+            } else {
+                null
+            }
+            chatMessageDao.insertMessage(
+                ChatMessageEntity(
+                    id = previousCard?.id ?: UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    type = "media_results",
+                    content = ChatGallerySearch.serializeContent(ui.assets),
+                    timestamp = previousCard?.timestamp ?: System.currentTimeMillis(),
+                    modelUsed = "gallery_search",
+                    metadata = ChatGallerySearch.serializeMetadata(ui.query, ui.totalCount, ui.isRefinement)
+                )
             )
-        )
-        chatSessionDao.touchSession(sessionId)
+            chatSessionDao.touchSession(sessionId)
+        }
     }
 
     private suspend fun ensureSessionExists(sessionId: String) {
@@ -2482,6 +2503,7 @@ class ChatViewModel(
                         }
                         _isProcessing.value = false
                         if (assets.isNotEmpty()) {
+                            // 以图搜图不插 user 消息、自成新回合：追加新卡，不覆盖上一回合的搜索结果
                             insertMediaResultsMessage(
                                 sessionId,
                                 MediaResultsUi(
@@ -2489,7 +2511,8 @@ class ChatViewModel(
                                     assets = assets.take(MAX_CARDS),
                                     totalCount = assets.size,
                                     isRefinement = false
-                                )
+                                ),
+                                replacePreviousInTurn = false
                             )
                         } else {
                             insertAgentMessage(
