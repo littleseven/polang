@@ -38,6 +38,21 @@ interface ChatMessageDao {
     suspend fun getLastMessageForSession(sessionId: String): ChatMessageEntity?
 
     /**
+     * 获取当前用户回合（最近一条 user_* 消息之后）最新的一张搜索结果卡片。
+     * 用于 ReAct 多轮搜索 / 回退直搜时的卡片替换去重。
+     */
+    @Query("""
+        SELECT * FROM chat_messages
+        WHERE sessionId = :sessionId AND type = 'media_results'
+          AND timestamp > (
+              SELECT MAX(timestamp) FROM chat_messages
+              WHERE sessionId = :sessionId AND type LIKE 'user\_%' ESCAPE '\'
+          )
+        ORDER BY timestamp DESC LIMIT 1
+    """)
+    suspend fun getLatestMediaResultsSinceLastUserMessage(sessionId: String): ChatMessageEntity?
+
+    /**
      * 插入单条消息
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
