@@ -2776,6 +2776,165 @@
    "en": "winter",
    "status": "created",
    "ardotId": null
+  },
+  "chat.cleanup.intro": {
+   "zh": "好的——我已在设备端搜索了你的图库,以下是匹配结果:",
+   "en": "Got it — I searched your library on-device. Here's what matches:",
+   "status": "created",
+   "ardotId": "343:58"
+  },
+  "chat.cleanup.request": {
+   "zh": "清理上个月的截图和模糊照片",
+   "en": "Clean up last month's screenshots and blurry photos",
+   "status": "created",
+   "ardotId": "343:59"
+  },
+  "chat.cleanup.found": {
+   "zh": "找到 86 项 · 312 MB",
+   "en": "Found 86 items · 312 MB",
+   "status": "created",
+   "ardotId": "343:60"
+  },
+  "chat.cleanup.breakdown": {
+   "zh": "截图 52 · 模糊 34",
+   "en": "Screenshots 52 · Blurry 34",
+   "status": "created",
+   "ardotId": "343:61"
+  },
+  "chat.cleanup.move": {
+   "zh": "移入回收站",
+   "en": "Move to trash",
+   "status": "created",
+   "ardotId": "343:62"
+  },
+  "chat.cleanup.review": {
+   "zh": "去确认",
+   "en": "Review",
+   "status": "created",
+   "ardotId": "343:63"
+  },
+  "chat.cleanup.note": {
+   "zh": "删除进入回收站 · 30 天内可恢复",
+   "en": "Deletes go to Trash · restorable within 30 days",
+   "status": "created",
+   "ardotId": "343:64"
+  },
+  "chat.cleanup.request2": {
+   "zh": "把它们移入回收站",
+   "en": "Move them to trash",
+   "status": "created",
+   "ardotId": "343:65"
+  },
+  "chat.cleanup.moved": {
+   "zh": "已移入回收站",
+   "en": "Moved to trash",
+   "status": "created",
+   "ardotId": "343:66"
+  },
+  "chat.cleanup.freed": {
+   "zh": "已清理 84 项 · 释放 305 MB",
+   "en": "84 items · 305 MB freed",
+   "status": "created",
+   "ardotId": "343:67"
+  },
+  "chat.cleanup.restore": {
+   "zh": "回收站内 30 天可恢复",
+   "en": "Restorable within 30 days from Trash",
+   "status": "created",
+   "ardotId": "343:68"
+  },
+  "store.chat.q1": {
+   "zh": "按人物整理我的照片",
+   "en": "Group my photos by person",
+   "status": "created",
+   "ardotId": "343:69"
+  },
+  "store.chat.a1": {
+   "zh": "完成——已生成 36 个人物聚类,全程端侧处理。",
+   "en": "Done — 36 people clusters, processed entirely on-device.",
+   "status": "created",
+   "ardotId": "343:70"
+  },
+  "store.chat.q2": {
+   "zh": "谁出镜最多?",
+   "en": "Who appears in most of them?",
+   "status": "created",
+   "ardotId": "343:71"
+  },
+  "store.chat.a2": {
+   "zh": "大宝有 262 张照片——在所有已命名人物中最多。",
+   "en": "Dabao has 262 photos — the highest count among all named people.",
+   "status": "created",
+   "ardotId": "343:72"
+  },
+  "store.chat.card": {
+   "zh": "找到 189 张匹配「去年的大宝」的照片",
+   "en": "Found 189 photos matching \"Dabao from last year\"",
+   "status": "created",
+   "ardotId": "343:73"
+  },
+  "store.chat.a3": {
+   "zh": "找到啦!去年的大宝共 189 张,已在卡片中展示。要我缩小范围吗——只看周末、室内或合影?",
+   "en": "Found them! 189 photos of Dabao from last year, now shown in the card for you to browse. Want me to narrow it down — weekends only, indoors, or group shots?",
+   "status": "created",
+   "ardotId": "343:74"
+  },
+  "store.insight.q1": {
+   "zh": "我的照片里有多少个人物?",
+   "en": "How many people are in my photos?",
+   "status": "created",
+   "ardotId": "343:75"
+  },
+  "store.insight.a1": {
+   "zh": "图库中共出现 6 个人物——妈妈以 48 张居首,全程端侧完成。",
+   "en": "6 people appear across your gallery — Mom leads with 48 photos, all on-device.",
+   "status": "created",
+   "ardotId": "343:76"
+  },
+  "store.insight.card": {
+   "zh": "你的 2025 图像年鉴:1,284 张照片 · 6 个人物 · 12 次旅行 · 9 个事件——全部端侧统计。",
+   "en": "Your 2025 in photos: 1,284 shots · 6 people · 12 trips · 9 events — all counted on-device.",
+   "status": "created",
+   "ardotId": "343:77"
+  },
+  "store.insight.q2": {
+   "zh": "总结我的 2025 图库",
+   "en": "Summarize my 2025 gallery",
+   "status": "created",
+   "ardotId": "343:78"
+  },
+  "store.insight.title": {
+   "zh": "2025 年度高光",
+   "en": "Top moments of 2025",
+   "status": "created",
+   "ardotId": "343:79"
+  },
+  "store.insight.a2": {
+   "zh": "12 月是你最活跃的月份,共 214 张。出镜最多:妈妈。想深入看看吗?",
+   "en": "December was your busiest month with 214 photos. Most-seen person: Mom. Want a deeper look?",
+   "status": "created",
+   "ardotId": "343:80"
+  },
+  "viewer.send": {
+   "zh": "发送",
+   "en": "Send",
+   "status": "created",
+   "ardotId": "343:81",
+   "key": "chat_send"
+  },
+  "viewer.idphoto": {
+   "zh": "证件照",
+   "en": "ID Photo",
+   "status": "created",
+   "ardotId": "343:82",
+   "key": "id_photo_action"
+  },
+  "viewer.delete": {
+   "zh": "删除",
+   "en": "Delete",
+   "status": "created",
+   "ardotId": "343:83",
+   "key": "delete"
   }
  }
 }

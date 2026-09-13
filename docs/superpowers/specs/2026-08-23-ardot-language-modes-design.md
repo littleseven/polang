@@ -173,3 +173,30 @@ MCP 仍回 success）——失效帧连 override 都不落盘。对照实验证�
 **遗留**（不在本批）：chat/cleanup_confirm + cleanup_done（Chat 页 Organize 族帧）与
 chat/store01-conversation + insight（Play 源帧）仍字面量——Chat 页不在本批批准范围；
 Editor 页 current_*/concept_a* 字面量 fills 的 light 半切换缺口（独立批次）；Camera 7 帧空壳第三次丢失（另行拍板）。
+
+## 10. 全页生效批次（2026-09-13 晚，用户拍板「要对全部页面生效」）
+
+在 §9 基础上收掉全部剩余缺口：
+
+- **Chat 页文本补绑**（36 绑定 / 26 新变量 / 4 复用 cancel·org.undo·gallery.today·edit）：
+  cleanup_confirm + cleanup_done（AI 对话/按钮，debug tok 串与 ✓ 跳过）、store01-conversation + insight
+  （Play 营销文案独立 store.* 槽位，EN 冻结）、viewer-bottombar-preview 的 UI 串（Send/Edit/ID Photo/Delete，
+  注释散文跳过）。zh 抽查 OCR 全中文零英文残留。
+- **全页字面量 fills/strokes 重绑**（136 处，Gallery 2/Chat 10/Settings 14/Editor 47/People 12/Organize 51）：
+  83 处与双模式 token 暗色值精确匹配零视觉差绑定；51 处旧「青玉绿」调色盘残留按角色映射
+  （#8FD6C6/C7·#0F756E→scheme/primary、#45403B·#968F86·#CCC7BD·#938F99→outlineVariant、
+  #9AA0A6·#6E7278·#A8A399→secondary、#2E2B29·#252B28→surfaceContainerHigh、#381E72→color/vibrantPurple
+  ——同时完成 A/B 换装扫尾，消除帧内 bound=B/literal=青玉绿的混色）；
+  白/黑统一中性 token（color/white 143:3 / editor/canvasPureBlack 143:23）。
+  **保留不绑**：VECTOR svg 烘焙色（引擎不可绑）、opacity<1 半透明（绑定丢 alpha）、
+  渐变 stop 144 处（照片占位/装饰渐变，按设计不随主题）、#CFC9BF/#BFC7CC/#0F0F0F 三处存疑色待设计判断。
+- **🔴 fills 绑定形式铁律再实证**：字符串式 `fills:"$id"` 是**整体 no-op**（颜色原样保留 + potentialIssues
+  警告，MCP 仍回 success）；**只有数组式 `fills:["$id"]` 真绑定**（echo 回显引用串为判据）。
+- **ardot-preview-mode.sh v1.2 页级切换**：页根 id（manifest pages[].id）从「拒绝」改为按 manifest 帧清单
+  展开逐帧写入（≤25/批），页模式自动带 `fileUrl?node_id=<页id>`（裸调用按编辑器当前页解析会跨页全 not found）；
+  --shot 页模式取首帧，带 fileUrl 时截图落 `{fileId}/` 子目录已兼容。
+- **全页验收**：6 页页级切 light+zh，Gallery/Chat/People/Memories 角采样 #F1FAF5 ✓；Settings 85% 浅色像素 ✓
+  （角采样命中状态栏深条）；Editor 黑画布+暗 chrome 属双模式同色设计（底栏 primaryContainer 已切 #C9EEDD）。
+  gallery/selection zh 定点「已选择 3 项」+浅色 ✓。全部还原 Dark+English。
+- **豁免**：PlayStore 27 帧逐语言烘焙营销帧（by-design）；Camera 7 帧空壳（无内容可切，恢复另行拍板）；
+  IconSet spec_sheet 图标文档页。

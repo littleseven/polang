@@ -94,3 +94,11 @@ gallery/tag_control,267:13,t,GPU,GPU,reuse,device.preference.force.gpu,bind,分�
 gallery/selection,107:355,3,已选择 3 项,3 Selected,matched,gallery.selected.3,bind,slot;key=selected_items,已选择 3 项,107:355
 gallery/info,105:44,sample,2026 夏日假期 · 北戴河,Summer vacation 2026 · Beidaihe,manual-fixed,gallery.album.sample,bind,slot,2026 夏日假期 · 北戴河,105:44
 search/store01,300:545,count18,18 张照片,18 photos,manual-fixed,store.search.count18,bind,slot,18 张照片,300:545
+gallery/viewer-bottombar-preview,182:69,send,发送,Send,matched,viewer.send,bind,slot;key=chat_send,发送,182:69
+gallery/viewer-bottombar-preview,182:72,edit,编辑,Edit,matched,edit,bind,reuse:183:37,编辑,182:72
+gallery/viewer-bottombar-preview,182:75,idphoto,证件照,ID Photo,matched,viewer.idphoto,bind,slot;key=id_photo_action,证件照,182:75
+gallery/viewer-bottombar-preview,182:78,delete,删除,Delete,matched,viewer.delete,bind,slot;key=delete,删除,182:78
+gallery/viewer-bottombar-preview,182:83,send,发送,Send,matched,viewer.send,bind,slot;key=chat_send,发送,182:83
+gallery/viewer-bottombar-preview,182:86,edit,编辑,Edit,matched,edit,bind,reuse:183:37,编辑,182:86
+gallery/viewer-bottombar-preview,182:89,idphoto,证件照,ID Photo,matched,viewer.idphoto,bind,slot;key=id_photo_action,证件照,182:89
+gallery/viewer-bottombar-preview,182:92,delete,删除,Delete,matched,viewer.delete,bind,slot;key=delete,删除,182:92

@@ -42,3 +42,31 @@ chat/guest-nudge-sheet,171:178,desc,注册领取免费额度，或配置自己�
 chat/guest-nudge-sheet,171:181,label,邮箱注册 · 领免费额度,Sign up with email · Get free quota,matched,chat.guest.nudge.register,bind,,邮箱注册 · 领免费额度,171:181
 chat/guest-nudge-sheet,171:184,label,配置自己的 Token,Use my own Token,matched,chat.guest.nudge.own.key,bind,,配置自己的 Token,171:184
 chat/guest-nudge-sheet,171:186,note,已免费体验 20 轮对话 · 也可随时在「设置 → AI 助手」中管理,20 free conversations used · Manage anytime in Settings → AI Assistant,manual,chat.guest.nudge.note,bind,"manual→key chat_guest_nudge_note(%1$d=20 实例); layout-fix: width hug→fill_container (EN 416>393 卡片被裁,note 换行)",已免费体验 20 轮对话 · 也可随时在「设置 → AI 助手」中管理,171:186
+chat/cleanup_confirm,267:459,intro,"好的——我已在设备端搜索了你的图库,以下是匹配结果:",Got it — I searched your library on-device. Here's what matches:,manual-fixed,chat.cleanup.intro,bind,slot,"好的——我已在设备端搜索了你的图库,以下是匹配结果:",267:459
+chat/cleanup_confirm,267:461,request,清理上个月的截图和模糊照片,Clean up last month's screenshots and blurry photos,manual-fixed,chat.cleanup.request,bind,slot,清理上个月的截图和模糊照片,267:461
+chat/cleanup_confirm,267:600,found,找到 86 项 · 312 MB,Found 86 items · 312 MB,manual-fixed,chat.cleanup.found,bind,slot,找到 86 项 · 312 MB,267:600
+chat/cleanup_confirm,267:601,breakdown,截图 52 · 模糊 34,Screenshots 52 · Blurry 34,manual-fixed,chat.cleanup.breakdown,bind,slot,截图 52 · 模糊 34,267:601
+chat/cleanup_confirm,267:632,move,移入回收站,Move to trash,manual-fixed,chat.cleanup.move,bind,slot,移入回收站,267:632
+chat/cleanup_confirm,267:634,review,去确认,Review,manual-fixed,chat.cleanup.review,bind,slot,去确认,267:634
+chat/cleanup_confirm,267:636,cancel,取消,Cancel,matched,cancel,bind,reuse:182:174,取消,267:636
+chat/cleanup_confirm,267:637,note,删除进入回收站 · 30 天内可恢复,Deletes go to Trash · restorable within 30 days,manual-fixed,chat.cleanup.note,bind,slot,删除进入回收站 · 30 天内可恢复,267:637
+chat/cleanup_done,267:540,intro,"好的——我已在设备端搜索了你的图库,以下是匹配结果:",Got it — I searched your library on-device. Here's what matches:,manual-fixed,chat.cleanup.intro,bind,slot,"好的——我已在设备端搜索了你的图库,以下是匹配结果:",267:540
+chat/cleanup_done,267:542,request2,把它们移入回收站,Move them to trash,manual-fixed,chat.cleanup.request2,bind,slot,把它们移入回收站,267:542
+chat/cleanup_done,267:643,moved,已移入回收站,Moved to trash,manual-fixed,chat.cleanup.moved,bind,slot,已移入回收站,267:643
+chat/cleanup_done,267:644,freed,已清理 84 项 · 释放 305 MB,84 items · 305 MB freed,manual-fixed,chat.cleanup.freed,bind,slot,已清理 84 项 · 释放 305 MB,267:644
+chat/cleanup_done,267:645,restore,回收站内 30 天可恢复,Restorable within 30 days from Trash,manual-fixed,chat.cleanup.restore,bind,slot,回收站内 30 天可恢复,267:645
+chat/cleanup_done,267:647,undo,撤销,Undo,matched,org.undo,bind,reuse:343:39,撤销,267:647
+chat/store01-conversation,302:28,today,今天,Today,matched,gallery.today,bind,reuse:182:136,今天,302:28
+chat/store01-conversation,302:31,q1,按人物整理我的照片,Group my photos by person,manual-fixed,store.chat.q1,bind,slot,按人物整理我的照片,302:31
+chat/store01-conversation,302:34,a1,"完成——已生成 36 个人物聚类,全程端侧处理。","Done — 36 people clusters, processed entirely on-device.",manual-fixed,store.chat.a1,bind,slot,"完成——已生成 36 个人物聚类,全程端侧处理。",302:34
+chat/store01-conversation,302:38,q2,谁出镜最多?,Who appears in most of them?,manual-fixed,store.chat.q2,bind,slot,谁出镜最多?,302:38
+chat/store01-conversation,301:37,a2,大宝有 262 张照片——在所有已命名人物中最多。,Dabao has 262 photos — the highest count among all named people.,manual-fixed,store.chat.a2,bind,slot,大宝有 262 张照片——在所有已命名人物中最多。,301:37
+chat/store01-conversation,301:32,card,找到 189 张匹配「去年的大宝」的照片,"Found 189 photos matching ""Dabao from last year""",manual-fixed,store.chat.card,bind,slot,找到 189 张匹配「去年的大宝」的照片,301:32
+chat/store01-conversation,301:43,a3,"找到啦!去年的大宝共 189 张,已在卡片中展示。要我缩小范围吗——只看周末、室内或合影?","Found them! 189 photos of Dabao from last year, now shown in the card for you to browse. Want me to narrow it down — weekends only, indoors, or group shots?",manual-fixed,store.chat.a3,bind,slot,"找到啦!去年的大宝共 189 张,已在卡片中展示。要我缩小范围吗——只看周末、室内或合影?",301:43
+chat/store01-insight,302:18,today,今天,Today,matched,gallery.today,bind,reuse:182:136,今天,302:18
+chat/store01-insight,302:21,q1,我的照片里有多少个人物?,How many people are in my photos?,manual-fixed,store.insight.q1,bind,slot,我的照片里有多少个人物?,302:21
+chat/store01-insight,302:24,a1,"图库中共出现 6 个人物——妈妈以 48 张居首,全程端侧完成。","6 people appear across your gallery — Mom leads with 48 photos, all on-device.",manual-fixed,store.insight.a1,bind,slot,"图库中共出现 6 个人物——妈妈以 48 张居首,全程端侧完成。",302:24
+chat/store01-insight,301:120,card,"你的 2025 图像年鉴:1,284 张照片 · 6 个人物 · 12 次旅行 · 9 个事件——全部端侧统计。","Your 2025 in photos: 1,284 shots · 6 people · 12 trips · 9 events — all counted on-device.",manual-fixed,store.insight.card,bind,slot,"你的 2025 图像年鉴:1,284 张照片 · 6 个人物 · 12 次旅行 · 9 个事件——全部端侧统计。",301:120
+chat/store01-insight,301:122,q2,总结我的 2025 图库,Summarize my 2025 gallery,manual-fixed,store.insight.q2,bind,slot,总结我的 2025 图库,301:122
+chat/store01-insight,301:115,title,2025 年度高光,Top moments of 2025,manual-fixed,store.insight.title,bind,slot,2025 年度高光,301:115
+chat/store01-insight,301:126,a2,"12 月是你最活跃的月份,共 214 张。出镜最多:妈妈。想深入看看吗?",December was your busiest month with 214 photos. Most-seen person: Mom. Want a deeper look?,manual-fixed,store.insight.a2,bind,slot,"12 月是你最活跃的月份,共 214 张。出镜最多:妈妈。想深入看看吗?",301:126

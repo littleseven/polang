@@ -6,13 +6,16 @@
 # ⚠️ 仅影响该帧的变量解析（预览用）；refs 快照/双端代码不受影响。
 #
 # 用法：
-#   scripts/ardot-preview-mode.sh <frameId> <light|dark|auto> [--lang en|zh|auto] [--shot out.png]
-#   ⚠️ <frameId> 仅帧 id，页根 id（manifest pages[].id，如 103:1/111:319）不支持——脚本拒绝并 exit 2
+#   scripts/ardot-preview-mode.sh <frameId|pageId> <light|dark|auto> [--lang en|zh|auto] [--shot out.png]
+#   页根 id（manifest pages[].id，如 103:1/111:319）= 整页逐帧切换（PAGE 节点无 variableModes，
+#   引擎不支持页级 override；2026-09-13 起脚本按 manifest 帧清单展开逐帧写入）
 #   scripts/ardot-preview-mode.sh 105:45 dark --lang zh --shot /tmp/x.png  # 深色+中文预览
 #   scripts/ardot-preview-mode.sh <frameId> light   # 切浅色预览
 #   scripts/ardot-preview-mode.sh <frameId> dark    # 切深色预览
 #   scripts/ardot-preview-mode.sh <frameId> auto    # 还原主题（写回默认 Dark）；--lang auto 同理写回 English
 #   scripts/ardot-preview-mode.sh <frameId> light --shot /tmp/x.png  # 切换并截图
+#   scripts/ardot-preview-mode.sh 267:21 light --lang zh   # 整页(Organize)浅色+中文
+#   scripts/ardot-preview-mode.sh 267:21 auto --lang auto  # 整页还原 Dark+English
 #
 # 常用帧 id（docs/08-UI-SPECS/screens/refs/ardot/manifest.json 可查全量）：
 #   settings/main_list=108:94  gallery/grid=105:45  chat/empty=111:321
@@ -37,24 +40,38 @@ shift 2 || true
 SHOT=""
 if [ "${1:-}" = "--shot" ]; then SHOT="${2:?--shot 需要输出路径}"; fi
 
-# 页根防呆（Task 8 实证：PAGE 节点无 variableModes 属性，对页 id 写 override 引擎静默忽略）。
-# 权威判定=manifest pages[].id；manifest 不可读时退回 N:1 页根惯例正则兜底
+# 页根 = 整页模式：PAGE 节点无 variableModes（Task 8 实证），改为按 manifest 展开该页全部帧逐帧写入。
+# FRAME_IDS 为待写帧 id 空格串（单帧时即原参）；非页根原样透传。--shot 页模式下取该页首帧截图。
 MANIFEST="$(cd "$(dirname "$0")/.." && pwd)/docs/08-UI-SPECS/screens/refs/ardot/manifest.json"
-if [ "$(/usr/bin/python3 - "$FRAME" "$MANIFEST" <<'GUARD'
+FRAME_IDS="$(/usr/bin/python3 - "$FRAME" "$MANIFEST" <<'GUARD'
 import json, re, sys
 frame, manifest = sys.argv[1], sys.argv[2]
-page_ids = []
+pages = []
 try:
     with open(manifest) as fh:
-        page_ids = [str(p.get('id')) for p in json.load(fh).get('pages', [])]
+        pages = json.load(fh).get('pages', [])
 except Exception:
     pass
-if frame in page_ids or (not page_ids and re.fullmatch(r'\d+:1', frame)):
-    print('PAGE-ROOT')
+page = next((p for p in pages if str(p.get('id')) == frame), None)
+if page is not None:
+    ids = [str(f.get('id')) for f in (page.get('frames') or []) if f.get('id')]
+    print(' '.join(ids) if ids else frame)
+elif not pages and re.fullmatch(r'\d+:1', frame):
+    # manifest 不可读：无法展开页帧清单，保守降级为单帧（页根会被引擎忽略）
+    print(frame)
+else:
+    print(frame)
 GUARD
-)" = "PAGE-ROOT" ]; then
-  echo "⚠️ 页根节点不支持 variableModes override（引擎忽略，Task 8 实证）——请逐帧调用" >&2
-  exit 2
+)"
+# --shot 的截图目标：页模式取首帧（页级整页截图引擎不支持）
+SHOT_FRAME="${FRAME_IDS%% *}"
+# 页模式必须带 fileUrl?node_id=<页id>（裸调用按编辑器当前页解析节点，跨页全 not found）
+PAGE_FILEURL=""
+if [ "$FRAME_IDS" != "$FRAME" ]; then
+  FILE_ID="$(/usr/bin/python3 -c "import json;print(json.load(open('$MANIFEST'))['file']['id'])" 2>/dev/null || true)"
+  if [ -n "$FILE_ID" ]; then
+    PAGE_FILEURL="cocraft://localhost/file/${FILE_ID}?node_id=$(printf '%s' "$FRAME" | sed 's/:/%3A/')"
+  fi
 fi
 
 SET_ID="2:2"; DARK_ID="2:0"; LIGHT_ID="79:1"; ENDPOINT="http://127.0.0.1:50501/api/v1/mcp"
@@ -81,9 +98,10 @@ case "${LANG_MODE:-}" in
 esac
 MODE_JSON="[$entries]"
 
-/usr/bin/python3 - "$FRAME" "$MODE_JSON" "$ENDPOINT" "$SHOT" <<'PYEOF'
+/usr/bin/python3 - "$FRAME_IDS" "$MODE_JSON" "$ENDPOINT" "$SHOT" "$SHOT_FRAME" "$PAGE_FILEURL" <<'PYEOF'
 import glob, json, os, sys, time, urllib.request
-frame, mode_json, endpoint, shot = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+frame_ids, mode_json, endpoint, shot, shot_frame, page_fileurl = (
+    sys.argv[1].split(), sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
 
 # SSE 解析对齐 ardot-lang-driver.rpc 健壮版：
 # 1) 每次调用独立递增 id（initialize=1、batch_edit=2、screenshot=3…），响应按 id 回显匹配——
@@ -130,54 +148,65 @@ def rpc(method, params, retry=(30, 60, 90)):
     sys.exit(1)
 
 rpc("initialize", {"protocolVersion":"2024-11-05","capabilities":{},
-    "clientInfo":{"name":"ardot-preview-mode","version":"1.1"}})
-r = rpc("tools/call", {"name":"batch_edit","arguments":{
-    "operations": f'U("{frame}", {{variableModes: {mode_json}}})'}})
-# 判定须基于 result.content[0].text（真实文本，已解转义一层）；
-# 对整个 response json.dumps 会把内层 JSON 二次转义成 \"success\":true，子串永不匹配（旧版 OK 永假的根因）
-content = r.get('result', {}).get('content', [])
-body = content[0].get('text', '') if content else ''
-# ⚠️ no-op 也回 success——批量场景还原后须 --shot 截图复核，不能只看退出码/OK
-try:
-    data = json.loads(body)
-except ValueError:
-    data = None
-items = None
-if isinstance(data, list):
-    items = data
-elif isinstance(data, dict):
-    # 实测响应形如 {"success":true,"data":{"operations":[...]}}——operations 嵌在 data 键下，须多挖一层
-    probes = [data]
-    inner = data.get('data')
-    if isinstance(inner, dict):
-        probes.append(inner)
-    items = next((v for probe in probes
-                  for v in (probe.get('results'), probe.get('operations'))
-                  if isinstance(v, list)), None)
-if items is not None:
-    # 成败统计同 driver run_ops：error 真值 / success is False / status=='failed' 记失败
-    fails = [x for x in items if isinstance(x, dict) and
-             (x.get('error') or x.get('success') is False or x.get('status') == 'failed')]
-    ok = not fails
-    detail = f"ops={len(items)} failed={len(fails)}"
-    if fails:
-        detail += ' ' + json.dumps(fails, ensure_ascii=False)[:400]
+    "clientInfo":{"name":"ardot-preview-mode","version":"1.2"}})
+
+# 页模式=逐帧写入（≤25/批，批间不sleep，引擎顺序执行）；单帧即一批
+for i in range(0, len(frame_ids), 25):
+    chunk = frame_ids[i:i+25]
+    ops = '\n'.join(f'U("{f}", {{variableModes: {mode_json}}})' for f in chunk)
+    args = {"operations": ops}
+    if page_fileurl:
+        args["fileUrl"] = page_fileurl
+    r = rpc("tools/call", {"name":"batch_edit","arguments": args})
+    # 判定须基于 result.content[0].text（真实文本，已解转义一层）；
+    # 对整个 response json.dumps 会把内层 JSON 二次转义成 \"success\":true，子串永不匹配（旧版 OK 永假的根因）
+    content = r.get('result', {}).get('content', [])
+    body = content[0].get('text', '') if content else ''
+    try:
+        data = json.loads(body)
+    except ValueError:
+        data = None
+    items = None
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict):
+        # 实测响应形如 {"success":true,"data":{"operations":[...]}}——operations 嵌在 data 键下，须多挖一层
+        probes = [data]
+        inner = data.get('data')
+        if isinstance(inner, dict):
+            probes.append(inner)
+        items = next((v for probe in probes
+                      for v in (probe.get('results'), probe.get('operations'))
+                      if isinstance(v, list)), None)
+    if items is not None:
+        fails = [x for x in items if isinstance(x, dict) and
+                 (x.get('error') or x.get('success') is False or x.get('status') == 'failed')]
+        ok = not fails
+        detail = f"ops={len(items)} failed={len(fails)}"
+        if fails:
+            detail += ' ' + json.dumps(fails, ensure_ascii=False)[:400]
+    else:
+        ok = '"success"' in body
+        detail = body[:120]
     print(("OK " if ok else "FAIL ") + detail)
-else:
-    ok = '"success"' in body
-    print(("OK " if ok else "FAIL ") + body[:120])
-if not ok:
-    sys.exit(1)
+    if not ok:
+        sys.exit(1)
+if len(frame_ids) > 1:
+    print(f"PAGE-DONE frames={len(frame_ids)} batches={(len(frame_ids)+24)//25}")
 
 if shot:
     os.makedirs('/tmp/ardot-mode-shot', exist_ok=True)
     # 记录调用前已有文件，只接受本次新生成的截图——防止误取历史残留文件
-    pat = f"/tmp/ardot-mode-shot/screenshot-{frame.replace(':','_')}-*.png"
-    before = set(glob.glob(pat))
-    rpc("tools/call", {"name":"capture_screenshot","arguments":{
-        "nodeIds":[frame], "screenShotDir":"/tmp/ardot-mode-shot"}})
+    # ⚠️ 带 fileUrl 时实际落盘多一层 {fileId}/ 子目录（2026-09-13 实证），两种路径都要扫
+    stem = f"screenshot-{shot_frame.replace(':','_')}-*.png"
+    pats = [f"/tmp/ardot-mode-shot/{stem}", f"/tmp/ardot-mode-shot/*/{stem}"]
+    before = set(p for pat in pats for p in glob.glob(pat))
+    sc_args = {"nodeIds":[shot_frame], "screenShotDir":"/tmp/ardot-mode-shot"}
+    if page_fileurl:
+        sc_args["fileUrl"] = page_fileurl
+    rpc("tools/call", {"name":"capture_screenshot","arguments": sc_args})
     # 截图落在 /tmp/ardot-mode-shot/（带时间戳），取最新的本次新生成文件移到目标
-    fresh = sorted((f for f in glob.glob(pat) if f not in before), key=os.path.getmtime)
+    fresh = sorted((f for pat in pats for f in glob.glob(pat) if f not in before), key=os.path.getmtime)
     if fresh:
         os.replace(fresh[-1], shot); print("SHOT " + shot)
     else:
