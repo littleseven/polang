@@ -135,3 +135,6 @@ settings/provider_config,167:26;167:20,desc,旗舰模型 · 支持工具调用,F
 settings/provider_config,167:29;167:20,desc,更快、更低成本,"Faster, more cost-effective",manual,settings.model.gpt5mini.desc,bind,manual:data desc; INSTANCE slot (Task 8.2),更快、更低成本,167:29;167:20
 settings/provider_config,167:32;167:20,desc,100 万 token 长上下文,1M-token context,manual,settings.model.gpt41.desc,bind,manual:data desc; INSTANCE slot (Task 8.2),100 万 token 长上下文,167:32;167:20
 settings/provider_config,167:35;167:20,desc,多模态 · 成熟稳定,Multimodal · Mature and stable,manual,settings.model.gpt4o.desc,bind,manual:data desc; INSTANCE slot (Task 8.2),多模态 · 成熟稳定,167:35;167:20
+settings/main_list,108:242,scan,相册扫描,Gallery Scan,matched,settings.gallery.scan,bind,slot;key=gallery_settings,相册扫描,108:242
+settings/main_list,192:130,cleanup,相册整理,Gallery Cleanup,matched,settings.gallery.cleanup,bind,slot;key=gallery_cleanup,相册整理,192:130
+settings/developer,111:177,normal,正常,Normal,manual-fixed,settings.dev.normal,bind,slot,正常,111:177

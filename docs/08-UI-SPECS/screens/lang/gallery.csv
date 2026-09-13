@@ -91,3 +91,6 @@ gallery/tag_control,267:8,title,TAG 生成 GPU 加速,TAG Generation GPU Accel,r
 gallery/tag_control,267:9,subtitle,加速标签生成，卡顿时可关闭,Faster tagging; disable if it hangs,manual,tag.gen.use.opencl.subtitle,bind,新变量(267:1)→app 新 key tag_gen_use_opencl_subtitle;替代原双 desc 冗余,加速标签生成，卡顿时可关闭,267:9
 gallery/tag_control,267:11,optCpu,CPU,CPU,reuse,device.preference.force.cpu,bind,分段控件左项,CPU,267:11
 gallery/tag_control,267:13,t,GPU,GPU,reuse,device.preference.force.gpu,bind,分段控件右项(选中态);弃 OpenCL(GPU) 长标签换取文本列宽(标题/副标题单行),GPU,267:13
+gallery/selection,107:355,3,已选择 3 项,3 Selected,matched,gallery.selected.3,bind,slot;key=selected_items,已选择 3 项,107:355
+gallery/info,105:44,sample,2026 夏日假期 · 北戴河,Summer vacation 2026 · Beidaihe,manual-fixed,gallery.album.sample,bind,slot,2026 夏日假期 · 北戴河,105:44
+search/store01,300:545,count18,18 张照片,18 photos,manual-fixed,store.search.count18,bind,slot,18 张照片,300:545

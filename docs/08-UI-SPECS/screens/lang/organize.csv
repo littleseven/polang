@@ -1,0 +1,47 @@
+frame,node_id,name,zh,en,source,var,action,note,text,id
+organize/hub,300:502,title,整理,Organize,matched,org.title,bind,slot;key=org_title,整理,300:502
+organize/hub,300:504,label,扫描,Scan,manual-fixed,org.scan.label,bind,slot,扫描,300:504
+organize/hub,267:36,title,整理,Organize,matched,org.title,bind,slot;key=org_title,整理,267:36
+organize/hub,267:143,label,预计可释放,Estimated reclaimable,matched,org.hero.label,bind,slot;key=org_hero_label,预计可释放,267:143
+organize/hub,267:39,sub,覆盖 6 个类目 · 并集估算,Across 6 categories · union estimate,manual-fixed,org.hero.sub,bind,slot,覆盖 6 个类目 · 并集估算,267:39
+organize/hub,267:48,tidy,滑动整理,Swipe to tidy,matched,org.quick.tidy,bind,slot;key=org_quick_tidy,滑动整理,267:48
+organize/hub,267:70,categories,类目,Categories,matched,org.categories,bind,slot;key=org_categories,类目,267:70
+organize/hub,267:737,duplicates,重复与相似照片,Duplicates & similar,matched,org.cat.duplicates,bind,slot;key=org_cat_duplicates,重复与相似照片,267:737
+organize/hub,267:738,groups132,132 组 · 1.2 GB,132 groups · 1.2 GB,manual-fixed,org.meta.groups132,bind,slot,132 组 · 1.2 GB,267:738
+organize/hub,267:748,screen,截图与录屏,Screenshots & recordings,matched,org.cat.screen,bind,slot;key=org_cat_screen_content,截图与录屏,267:748
+organize/hub,267:749,items86,86 个项目 · 312 MB,86 items · 312 MB,matched,org.meta.items86,bind,slot;key=org_cat_meta,86 个项目 · 312 MB,267:749
+organize/hub,267:759,blurry,模糊与低质量,Blurry & low quality,matched,org.cat.blurry,bind,slot;key=org_cat_blurry,模糊与低质量,267:759
+organize/hub,267:760,items45,45 个项目 · 128 MB,45 items · 128 MB,matched,org.meta.items45,bind,slot;key=org_cat_meta,45 个项目 · 128 MB,267:760
+organize/hub,267:770,portraits,低质量人像,Low-quality portraits,matched,org.cat.portraits,bind,slot;key=org_cat_portraits,低质量人像,267:770
+organize/hub,267:771,items23,23 个项目 · 64 MB,23 items · 64 MB,matched,org.meta.items23,bind,slot;key=org_cat_meta,23 个项目 · 64 MB,267:771
+organize/hub,267:781,large,大文件,Large files,matched,org.cat.large,bind,slot;key=org_cat_large_files,大文件,267:781
+organize/hub,267:782,items12,12 个项目 · 1.6 GB,12 items · 1.6 GB,matched,org.meta.items12,bind,slot;key=org_cat_meta,12 个项目 · 1.6 GB,267:782
+organize/hub,267:792,documents,文档与票据,Documents & receipts,matched,org.cat.documents,bind,slot;key=org_cat_documents,文档与票据,267:792
+organize/hub,267:793,items31,31 个项目 · 45 MB,31 items · 45 MB,matched,org.meta.items31,bind,slot;key=org_cat_meta,31 个项目 · 45 MB,267:793
+organize/hub,267:34,note,所有分析均在设备端完成 · 照片不会离开此手机,All analysis runs on-device · your photos never leave this phone,matched,org.privacy.note,bind,slot;key=org_privacy_note,所有分析均在设备端完成 · 照片不会离开此手机,267:34
+organize/category_grid,267:165,screen,截图与录屏,Screenshots & recordings,matched,org.cat.screen,bind,slot;key=org_cat_screen_content,截图与录屏,267:165
+organize/category_grid,267:240,on,AI 预选已开启,AI preselect on,matched,org.ai.preselect.on,bind,slot;key=org_ai_preselect_on,AI 预选已开启,267:240
+organize/category_grid,267:242,items86,86 个项目 · 312 MB,86 items · 312 MB,matched,org.meta.items86,bind,slot;key=org_cat_meta,86 个项目 · 312 MB,267:242
+organize/category_grid,267:244,preselected52,AI 已预选 52 项,52 AI-preselected,matched,org.ai.preselected52,bind,slot;key=org_ai_preselected,AI 已预选 52 项,267:244
+organize/category_grid,267:180,trash86,移入回收站 86 个项目 · 释放 312 MB,Move to trash 86 items · Free 312 MB,matched,org.move.trash86,bind,slot;key=org_move_to_trash,移入回收站 86 个项目 · 释放 312 MB,267:180
+organize/category_grid,267:163,note,项目将在回收站保留 30 天,Items stay in Trash for 30 days,matched,org.trash.note,bind,slot;key=org_trash_note,项目将在回收站保留 30 天,267:163
+organize/cleaned,267:283,title,全部清理完成！,All clean!,matched,org.cleaned.title,bind,slot;key=org_cleaned_title,全部清理完成！,267:283
+organize/cleaned,267:284,meta86,已将 86 个项目移入回收站,86 items moved to Trash,matched,org.cleaned.meta86,bind,slot;key=org_cleaned_meta,已将 86 个项目移入回收站,267:284
+organize/cleaned,267:309,freed312,已释放 312 MB,312 MB freed,matched,org.cleaned.freed312,bind,slot;key=org_cleaned_freed,已释放 312 MB,267:309
+organize/cleaned,267:310,label,回收站,Trash,manual-fixed,org.trash.label,bind,slot,回收站,267:310
+organize/cleaned,267:296,delete30,30 天后自动删除,Items auto-delete after 30 days,manual-fixed,org.auto.delete30,bind,slot,30 天后自动删除,267:296
+organize/cleaned,267:303,undo,撤销,Undo,matched,org.undo,bind,slot;key=org_undo,撤销,267:303
+organize/cleaned,267:311,recycle,查看回收站,View trash,matched,dedup.view.recycle,bind,reuse:230:69;key=dedup_view_recycle,查看回收站,267:311
+swipe/review,267:317,freed45,已释放 45 MB,45 MB freed,matched,swipe.freed45,bind,slot;key=swipe_freed,已释放 45 MB,267:317
+swipe/review,267:322,screenshot,截图,Screenshot,matched,dedup.type.screenshot,bind,reuse:230:67;key=swipe_reason_screenshot,截图,267:322
+swipe/review,267:324,skip,← 跳过,← Skip,matched,swipe.hint.skip,bind,slot;key=swipe_hint_skip,← 跳过,267:324
+swipe/review,267:325,delete,↑ 删除,↑ Delete,matched,swipe.hint.delete,bind,slot;key=swipe_hint_delete,↑ 删除,267:325
+swipe/review,267:326,keep,保留 →,Keep →,matched,swipe.hint.keep,bind,slot;key=swipe_hint_keep,保留 →,267:326
+swipe/done,267:333,title,本轮整理完成,Round complete,matched,swipe.done.title,bind,slot;key=swipe_done_title,本轮整理完成,267:333
+swipe/done,267:334,subtitle,节奏不错——图库已经更轻盈了,Nice pace — your library is lighter already,matched,swipe.done.subtitle,bind,slot;key=swipe_done_subtitle,节奏不错——图库已经更轻盈了,267:334
+swipe/done,267:339,kept,已保留,Kept,matched,swipe.done.kept,bind,slot;key=swipe_done_kept,已保留,267:339
+swipe/done,267:342,deleted,已删除,Deleted,matched,swipe.done.deleted,bind,slot;key=swipe_done_deleted,已删除,267:342
+swipe/done,267:345,skipped,已跳过,Skipped,matched,swipe.done.skipped,bind,slot;key=swipe_done_skipped,已跳过,267:345
+swipe/done,267:347,label,本轮释放空间,Space freed this round,matched,swipe.done.freed.label,bind,slot;key=swipe_done_freed,本轮释放空间,267:347
+swipe/done,267:353,more,再来一轮,One more round,matched,swipe.done.more,bind,slot;key=swipe_done_more,再来一轮,267:353
+swipe/done,267:355,back,返回整理中心,Back to Organize,matched,swipe.done.back,bind,slot;key=swipe_done_back,返回整理中心,267:355

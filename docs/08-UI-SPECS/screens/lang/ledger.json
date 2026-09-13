@@ -2372,6 +2372,410 @@
    "status": "created",
    "key": "tag_gen_use_opencl_subtitle",
    "ardotId": "267:1"
+  },
+  "memory.title": {
+   "zh": "回忆",
+   "en": "Memories",
+   "status": "created",
+   "ardotId": "343:1",
+   "key": "memory_title"
+  },
+  "memory.privacy": {
+   "zh": "端侧生成 · 私密",
+   "en": "On-device · private",
+   "status": "created",
+   "ardotId": "343:2",
+   "key": "memory_privacy_note"
+  },
+  "memory.section.time": {
+   "zh": "时光",
+   "en": "Time",
+   "status": "created",
+   "ardotId": "343:3",
+   "key": "memory_section_time"
+  },
+  "memory.section.journey": {
+   "zh": "旅程",
+   "en": "Journeys",
+   "status": "created",
+   "ardotId": "343:4",
+   "key": "memory_section_journey"
+  },
+  "memory.detail.best": {
+   "zh": "精选",
+   "en": "Best",
+   "status": "created",
+   "ardotId": "343:5",
+   "key": "memory_detail_best"
+  },
+  "store.memories.title": {
+   "zh": "回忆",
+   "en": "Memories",
+   "status": "created",
+   "ardotId": "343:6"
+  },
+  "store.memories.privacy": {
+   "zh": "端侧生成 · 私密",
+   "en": "On-device · Private",
+   "status": "created",
+   "ardotId": "343:7"
+  },
+  "store.memories.moments": {
+   "zh": "时光",
+   "en": "Moments",
+   "status": "created",
+   "ardotId": "343:8"
+  },
+  "store.memories.trips": {
+   "zh": "旅程",
+   "en": "Trips",
+   "status": "created",
+   "ardotId": "343:9"
+  },
+  "store.memories.people": {
+   "zh": "人物",
+   "en": "People",
+   "status": "created",
+   "ardotId": "343:10"
+  },
+  "org.title": {
+   "zh": "整理",
+   "en": "Organize",
+   "status": "created",
+   "ardotId": "343:11",
+   "key": "org_title"
+  },
+  "org.scan.label": {
+   "zh": "扫描",
+   "en": "Scan",
+   "status": "created",
+   "ardotId": "343:12"
+  },
+  "org.hero.label": {
+   "zh": "预计可释放",
+   "en": "Estimated reclaimable",
+   "status": "created",
+   "ardotId": "343:13",
+   "key": "org_hero_label"
+  },
+  "org.hero.sub": {
+   "zh": "覆盖 6 个类目 · 并集估算",
+   "en": "Across 6 categories · union estimate",
+   "status": "created",
+   "ardotId": "343:14"
+  },
+  "org.quick.tidy": {
+   "zh": "滑动整理",
+   "en": "Swipe to tidy",
+   "status": "created",
+   "ardotId": "343:15",
+   "key": "org_quick_tidy"
+  },
+  "org.categories": {
+   "zh": "类目",
+   "en": "Categories",
+   "status": "created",
+   "ardotId": "343:16",
+   "key": "org_categories"
+  },
+  "org.cat.duplicates": {
+   "zh": "重复与相似照片",
+   "en": "Duplicates & similar",
+   "status": "created",
+   "ardotId": "343:17",
+   "key": "org_cat_duplicates"
+  },
+  "org.meta.groups132": {
+   "zh": "132 组 · 1.2 GB",
+   "en": "132 groups · 1.2 GB",
+   "status": "created",
+   "ardotId": "343:18"
+  },
+  "org.cat.screen": {
+   "zh": "截图与录屏",
+   "en": "Screenshots & recordings",
+   "status": "created",
+   "ardotId": "343:19",
+   "key": "org_cat_screen_content"
+  },
+  "org.meta.items86": {
+   "zh": "86 个项目 · 312 MB",
+   "en": "86 items · 312 MB",
+   "status": "created",
+   "ardotId": "343:20",
+   "key": "org_cat_meta"
+  },
+  "org.cat.blurry": {
+   "zh": "模糊与低质量",
+   "en": "Blurry & low quality",
+   "status": "created",
+   "ardotId": "343:21",
+   "key": "org_cat_blurry"
+  },
+  "org.meta.items45": {
+   "zh": "45 个项目 · 128 MB",
+   "en": "45 items · 128 MB",
+   "status": "created",
+   "ardotId": "343:22",
+   "key": "org_cat_meta"
+  },
+  "org.cat.portraits": {
+   "zh": "低质量人像",
+   "en": "Low-quality portraits",
+   "status": "created",
+   "ardotId": "343:23",
+   "key": "org_cat_portraits"
+  },
+  "org.meta.items23": {
+   "zh": "23 个项目 · 64 MB",
+   "en": "23 items · 64 MB",
+   "status": "created",
+   "ardotId": "343:24",
+   "key": "org_cat_meta"
+  },
+  "org.cat.large": {
+   "zh": "大文件",
+   "en": "Large files",
+   "status": "created",
+   "ardotId": "343:25",
+   "key": "org_cat_large_files"
+  },
+  "org.meta.items12": {
+   "zh": "12 个项目 · 1.6 GB",
+   "en": "12 items · 1.6 GB",
+   "status": "created",
+   "ardotId": "343:26",
+   "key": "org_cat_meta"
+  },
+  "org.cat.documents": {
+   "zh": "文档与票据",
+   "en": "Documents & receipts",
+   "status": "created",
+   "ardotId": "343:27",
+   "key": "org_cat_documents"
+  },
+  "org.meta.items31": {
+   "zh": "31 个项目 · 45 MB",
+   "en": "31 items · 45 MB",
+   "status": "created",
+   "ardotId": "343:28",
+   "key": "org_cat_meta"
+  },
+  "org.privacy.note": {
+   "zh": "所有分析均在设备端完成 · 照片不会离开此手机",
+   "en": "All analysis runs on-device · your photos never leave this phone",
+   "status": "created",
+   "ardotId": "343:29",
+   "key": "org_privacy_note"
+  },
+  "org.ai.preselect.on": {
+   "zh": "AI 预选已开启",
+   "en": "AI preselect on",
+   "status": "created",
+   "ardotId": "343:30",
+   "key": "org_ai_preselect_on"
+  },
+  "org.ai.preselected52": {
+   "zh": "AI 已预选 52 项",
+   "en": "52 AI-preselected",
+   "status": "created",
+   "ardotId": "343:31",
+   "key": "org_ai_preselected"
+  },
+  "org.move.trash86": {
+   "zh": "移入回收站 86 个项目 · 释放 312 MB",
+   "en": "Move to trash 86 items · Free 312 MB",
+   "status": "created",
+   "ardotId": "343:32",
+   "key": "org_move_to_trash"
+  },
+  "org.trash.note": {
+   "zh": "项目将在回收站保留 30 天",
+   "en": "Items stay in Trash for 30 days",
+   "status": "created",
+   "ardotId": "343:33",
+   "key": "org_trash_note"
+  },
+  "org.cleaned.title": {
+   "zh": "全部清理完成！",
+   "en": "All clean!",
+   "status": "created",
+   "ardotId": "343:34",
+   "key": "org_cleaned_title"
+  },
+  "org.cleaned.meta86": {
+   "zh": "已将 86 个项目移入回收站",
+   "en": "86 items moved to Trash",
+   "status": "created",
+   "ardotId": "343:35",
+   "key": "org_cleaned_meta"
+  },
+  "org.cleaned.freed312": {
+   "zh": "已释放 312 MB",
+   "en": "312 MB freed",
+   "status": "created",
+   "ardotId": "343:36",
+   "key": "org_cleaned_freed"
+  },
+  "org.trash.label": {
+   "zh": "回收站",
+   "en": "Trash",
+   "status": "created",
+   "ardotId": "343:37"
+  },
+  "org.auto.delete30": {
+   "zh": "30 天后自动删除",
+   "en": "Items auto-delete after 30 days",
+   "status": "created",
+   "ardotId": "343:38"
+  },
+  "org.undo": {
+   "zh": "撤销",
+   "en": "Undo",
+   "status": "created",
+   "ardotId": "343:39",
+   "key": "org_undo"
+  },
+  "swipe.freed45": {
+   "zh": "已释放 45 MB",
+   "en": "45 MB freed",
+   "status": "created",
+   "ardotId": "343:40",
+   "key": "swipe_freed"
+  },
+  "swipe.hint.skip": {
+   "zh": "← 跳过",
+   "en": "← Skip",
+   "status": "created",
+   "ardotId": "343:41",
+   "key": "swipe_hint_skip"
+  },
+  "swipe.hint.delete": {
+   "zh": "↑ 删除",
+   "en": "↑ Delete",
+   "status": "created",
+   "ardotId": "343:42",
+   "key": "swipe_hint_delete"
+  },
+  "swipe.hint.keep": {
+   "zh": "保留 →",
+   "en": "Keep →",
+   "status": "created",
+   "ardotId": "343:43",
+   "key": "swipe_hint_keep"
+  },
+  "swipe.done.title": {
+   "zh": "本轮整理完成",
+   "en": "Round complete",
+   "status": "created",
+   "ardotId": "343:44",
+   "key": "swipe_done_title"
+  },
+  "swipe.done.subtitle": {
+   "zh": "节奏不错——图库已经更轻盈了",
+   "en": "Nice pace — your library is lighter already",
+   "status": "created",
+   "ardotId": "343:45",
+   "key": "swipe_done_subtitle"
+  },
+  "swipe.done.kept": {
+   "zh": "已保留",
+   "en": "Kept",
+   "status": "created",
+   "ardotId": "343:46",
+   "key": "swipe_done_kept"
+  },
+  "swipe.done.deleted": {
+   "zh": "已删除",
+   "en": "Deleted",
+   "status": "created",
+   "ardotId": "343:47",
+   "key": "swipe_done_deleted"
+  },
+  "swipe.done.skipped": {
+   "zh": "已跳过",
+   "en": "Skipped",
+   "status": "created",
+   "ardotId": "343:48",
+   "key": "swipe_done_skipped"
+  },
+  "swipe.done.freed.label": {
+   "zh": "本轮释放空间",
+   "en": "Space freed this round",
+   "status": "created",
+   "ardotId": "343:49",
+   "key": "swipe_done_freed"
+  },
+  "swipe.done.more": {
+   "zh": "再来一轮",
+   "en": "One more round",
+   "status": "created",
+   "ardotId": "343:50",
+   "key": "swipe_done_more"
+  },
+  "swipe.done.back": {
+   "zh": "返回整理中心",
+   "en": "Back to Organize",
+   "status": "created",
+   "ardotId": "343:51",
+   "key": "swipe_done_back"
+  },
+  "gallery.selected.3": {
+   "zh": "已选择 3 项",
+   "en": "3 Selected",
+   "status": "created",
+   "ardotId": "343:52",
+   "key": "selected_items"
+  },
+  "gallery.album.sample": {
+   "zh": "2026 夏日假期 · 北戴河",
+   "en": "Summer vacation 2026 · Beidaihe",
+   "status": "created",
+   "ardotId": "343:53"
+  },
+  "store.search.count18": {
+   "zh": "18 张照片",
+   "en": "18 photos",
+   "status": "created",
+   "ardotId": "343:54"
+  },
+  "settings.gallery.scan": {
+   "zh": "相册扫描",
+   "en": "Gallery Scan",
+   "status": "created",
+   "ardotId": "343:55",
+   "key": "gallery_settings"
+  },
+  "settings.gallery.cleanup": {
+   "zh": "相册整理",
+   "en": "Gallery Cleanup",
+   "status": "created",
+   "ardotId": "343:56",
+   "key": "gallery_cleanup"
+  },
+  "settings.dev.normal": {
+   "zh": "正常",
+   "en": "Normal",
+   "status": "created",
+   "ardotId": "343:57"
+  },
+  "gallery.search.count.zero": {
+   "zh": "0 张",
+   "en": "0 photos",
+   "status": "created",
+   "ardotId": null
+  },
+  "gallery.search.query": {
+   "zh": "海边",
+   "en": "Seaside",
+   "status": "created",
+   "ardotId": null
+  },
+  "gallery.search.query.noresult": {
+   "zh": "冬天",
+   "en": "winter",
+   "status": "created",
+   "ardotId": null
   }
  }
 }

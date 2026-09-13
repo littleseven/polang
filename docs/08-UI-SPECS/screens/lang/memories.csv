@@ -1,0 +1,13 @@
+frame,node_id,name,zh,en,source,var,action,note,text,id
+memory/feed,297:9,title,回忆,Memories,matched,memory.title,bind,slot;key=memory_title,回忆,297:9
+memory/feed,297:10,privacy,端侧生成 · 私密,On-device · private,matched,memory.privacy,bind,slot;key=memory_privacy_note,端侧生成 · 私密,297:10
+memory/feed,297:13,time,时光,Time,matched,memory.section.time,bind,slot;key=memory_section_time,时光,297:13
+memory/feed,297:29,journey,旅程,Journeys,matched,memory.section.journey,bind,slot;key=memory_section_journey,旅程,297:29
+memory/feed,297:45,entry,人物,People,matched,people.entry,bind,reuse:182:212;key=people_entry,人物,297:45
+memory/detail,297:84,best,精选,Best,matched,memory.detail.best,bind,slot;key=memory_detail_best,精选,297:84
+memory/detail,297:86,none,全部,All,manual-fixed,group.none,bind,reuse:182:148,全部,297:86
+memory/store01-feed,300:788,title,回忆,Memories,manual-fixed,store.memories.title,bind,slot,回忆,300:788
+memory/store01-feed,300:789,privacy,端侧生成 · 私密,On-device · Private,manual-fixed,store.memories.privacy,bind,slot,端侧生成 · 私密,300:789
+memory/store01-feed,300:801,moments,时光,Moments,manual-fixed,store.memories.moments,bind,slot,时光,300:801
+memory/store01-feed,300:805,trips,旅程,Trips,manual-fixed,store.memories.trips,bind,slot,旅程,300:805
+memory/store01-feed,300:809,people,人物,People,manual-fixed,store.memories.people,bind,slot,人物,300:809

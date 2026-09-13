@@ -144,3 +144,32 @@ Step 5 people 2 帧补绑 + 命名收敛 + 删 _zh 物理帧
 | 绑定后画布直改文案工效变化 | 探针项 ⑤；若直改即破坏绑定，约定「文案改动走变量面板」并写入 spec。**该项延后**：需桌面端人工协助，Step 0 未验证（2026-08-23 控制器安排），工效约定待补 |
 | export 渲染缓存冷致空白帧 | 已知问题，终局 stat <5KB 检查 + MCP capture 恢复套路 |
 | 相机帧 refs 中 PNG 空白（camera-idle.png 3.2KB） | 既有问题非本任务引入，另行处理 |
+
+## 9. 覆盖扩展批次（2026-09-13，用户报「切中文经常无效」根因修复）
+
+**根因**：2026-08-27 全量落地后新增/演进的帧未补绑。引擎语义实证：帧内未绑定某集任何变量时，
+对该集写 `variableModes` 会被引擎直接跳过（`potentialIssues: "Variable set ... not available"`，
+MCP 仍回 success）——失效帧连 override 都不落盘。对照实验证明机制本身正常（gallery/grid 双切换全生效）。
+
+**本批补绑**（64 绑定 / 57 新变量 / 4 复用，ledger 360→420 含 3 个补录游离 search 槽位）：
+
+- **Organize 5 帧**：hub / category_grid / cleaned / swipe review / swipe done 全字面量文本 → 绑定；
+  文案落后于 app 演进处按 strings.xml canonical 对齐（`Quick tidy up`→`Swipe to tidy`[8b2372ddc]、
+  `Eyes-closed portraits`→`Low-quality portraits`、`Large videos`→`Large files`、
+  `Screenshots`→`Screenshots & recordings`）
+- **Memories 3 帧**：feed/detail 原为中文烘焙（违反 EN 默认约定）→ 绑定后 EN 正稿化
+  （`回忆`→`Memories`、`精选`→`Best`）；store01-feed 为 Play 商店源帧，文案冻结用独立 store.* 槽位
+  （`Moments`/`Trips` 不并 canonical 变量——Play 线上 en-US 资产已定稿）
+- **散点**：gallery/selection 中文残留 `已选 3 项`→`3 Selected`（key=selected_items）、
+  settings `Gallery Scan`/`Gallery Cleanup`、developer `Normal`、gallery/info 专辑样例文案、
+  search/store01 `18 photos`
+- **甄别豁免**：纯数字/单位/符号（`3.4 GB`/`✓`/`›`/`(6)`/`1:1`）、语言自名（`English`/`中文`/`Español`）、
+  品牌/型号自名（`OpenAI`/`deepseek-v4-flash`/`MNN 2D106`）、注释/预览帧（annotation_nav_change、
+  viewer-bottombar-preview、editor/tabbar-en-preview）、PlayStore 27 帧烘焙合成帧
+
+**验收**：zh 模式 OCR 抽查 hub/feed/done 全中文零英文残留（单位除外）；EN 默认渲染 canonical 无裁断；
+测试 override 已显式写回 English 默认。台账：organize.csv / memories.csv 新建，gallery.csv / settings.csv 追加。
+
+**遗留**（不在本批）：chat/cleanup_confirm + cleanup_done（Chat 页 Organize 族帧）与
+chat/store01-conversation + insight（Play 源帧）仍字面量——Chat 页不在本批批准范围；
+Editor 页 current_*/concept_a* 字面量 fills 的 light 半切换缺口（独立批次）；Camera 7 帧空壳第三次丢失（另行拍板）。
