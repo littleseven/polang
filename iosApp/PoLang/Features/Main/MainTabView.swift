@@ -2,8 +2,10 @@ import SwiftUI
 import UIKit
 import SharedKit
 
-/// 对标 Android MainPagerHost：5 页 Pager（相机/相册/整理+扫描/聊天/人物）
-/// 相册(1)为初始页，悬浮 Tab 切换页
+/// iOS 主页面 5 页 Pager：Camera(0)/相册(1)/整理+扫描(2)/聊天(3)/人物(4)，相册(1)为初始页，
+/// 悬浮 Tab 切换页。
+/// ⚠️ 页序与 Android MainPagerHost 不对位：Android 相机为独立入口不在 Pager 内
+/// （Pager = 相册(0)/整理+扫描(1)/聊天(2)/人物(3)/回忆(4)），平台差异见 organize.yaml §8。
 struct MainTabView: View {
     // 初始页 = 相册（对标 Android）；UI 自动化可用 launch arg `-startPage <0-4>` 指定起始页
     @State private var currentPage: Int = {

@@ -576,6 +576,8 @@ media_pager:
       手势阈值/飞出时长/提示文案口径以本节为准。
       实现校正（2026-09-15）：`PHAssetChangeRequest.deleteAssets` 系统强制弹确认框
       （"Delete Photo?"），iOS 无零弹框通路；静默删除开关在 iOS 不适用（见 §26 台账）。
+      宿主覆盖（2026-09-16）：本批仅相册大图页（MediaPagerView）接入；Chat 搜图预览与
+      回忆详情两宿主缺整层预览，随宿主层落地接入同一手势组件。
 
   # ── 16c. 网格 trashed 过滤与乐观移除（2026-09-15 补节，Android f249da1e2 + 4ed758d55）──
   grid_trashed_filter:

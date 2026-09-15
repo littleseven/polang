@@ -31,21 +31,6 @@ private let organizeBrandGradient = LinearGradient(
     endPoint: .bottomTrailing
 )
 
-/// 字节格式化（Android formatBytes 的 iOS 等价：ByteCountFormatter .file 自适应）。
-enum OrganizeByteFormat {
-    private static let formatter: ByteCountFormatter = {
-        let f = ByteCountFormatter()
-        f.countStyle = .file
-        f.isAdaptive = true
-        f.allowedUnits = [.useKB, .useMB, .useGB]
-        return f
-    }()
-
-    static func string(_ bytes: Int64) -> String {
-        formatter.string(fromByteCount: max(0, bytes))
-    }
-}
-
 // MARK: - hub 屏
 
 struct OrganizeHubView: View {

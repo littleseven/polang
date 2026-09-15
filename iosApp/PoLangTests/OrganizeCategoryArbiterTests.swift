@@ -65,6 +65,20 @@ final class OrganizeCategoryArbiterTests: XCTestCase {
         XCTAssertEqual(result, .documents)
     }
 
+    func testDocumentViaOcrDensityCountsUtf16Units() {
+        // 🟡-6 分解重音边界（é = e + U+0301）：Kotlin String.length 按 UTF-16 code unit
+        // 计 2，Swift .count 按 grapheme cluster 计 1——口径必须对齐 Android，否则
+        // 重音符密集的 OCR 文本（法语等）字符数被少计一半。
+        let decomposed = String(repeating: "e\u{0301}", count: 150)
+        XCTAssertEqual(decomposed.count, 150)
+        XCTAssertEqual(decomposed.utf16.count, 300)
+        // 无 pixelArea 兜底分支：300 > 200 命中 DOCUMENT（.count 口径 150 不命中，锁口径）
+        XCTAssertTrue(CategoryArbiter.isDocumentText(ocrText: decomposed, pixelArea: nil))
+        // 等值边界锁定：100 个 é = 200 UTF-16 units，`>` 严格不命中
+        XCTAssertFalse(CategoryArbiter.isDocumentText(
+            ocrText: String(repeating: "e\u{0301}", count: 100), pixelArea: nil))
+    }
+
     func testDocumentViaLabelsKeywords() {
         // labels 中文子串 / 英文整词双通道（沿用 dedup detectContentType 口径）
         XCTAssertEqual(.documents, CategoryArbiter.classify(item(labels: #"["文档","纸张"]"#)))

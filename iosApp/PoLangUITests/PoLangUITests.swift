@@ -43,23 +43,26 @@ final class PoLangUITests: XCTestCase {
         app.swipeLeft()
         try requireElement("gallery_grid", timeout: 12, "相机左滑应回相册页")
 
-        // 相册 → 左滑 → Chat 页（page 2，已是真实 Chat 页非占位）
+        // 相册 → 左滑 2 次 → Chat 页（页序 Camera(0)/Gallery(1)/Organize(2)/Chat(3)/Person(4)，
+        // 需越过整理+扫描页）
         app.swipeLeft()
-        try requireElement("chat_input", timeout: 12, "相册左滑应到 Chat 页")
+        app.swipeLeft()
+        try requireElement("chat_input", timeout: 12, "相册左滑两次应到 Chat 页")
         attachScreenshot(name: "swipe_chat")
     }
 
-    // MARK: - 用例 2：占位页悬浮 Tab 可跳出（回归：chat 占位页点相机无反应）
+    // MARK: - 用例 2：人物页悬浮 Tab 可跳出（回归：早期 chat 占位页点相机无反应）
 
     func testTabNavigationFromPlaceholder() throws {
         try requireElement("gallery_grid", timeout: 12, "初始页应为相册网格")
 
-        // 到人物占位页（page 3，仍为占位页），点相机 Tab 必须能跳到相机页
+        // 到人物页（page 4，真实人物页非占位），点相机 Tab 必须能跳到相机页
         app.swipeLeft()
         app.swipeLeft()
-        try requireElement("page_placeholder", timeout: 12, "应在人物占位页")
+        app.swipeLeft()
+        try requireElement("person_root", timeout: 12, "应在人物页")
         app.buttons["tab_camera"].tap()
-        try requireElement("camera_preview", timeout: 12, "占位页点相机 Tab 应跳相机页")
+        try requireElement("camera_preview", timeout: 12, "人物页点相机 Tab 应跳相机页")
 
         // 相机页无悬浮 Tab（沉浸式），滑回相册再验证 Tab 跳转到真实 Chat 页
         app.swipeLeft()

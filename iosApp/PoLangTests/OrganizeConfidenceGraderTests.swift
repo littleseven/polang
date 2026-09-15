@@ -60,6 +60,19 @@ final class OrganizeConfidenceGraderTests: XCTestCase {
                        ConfidenceGrader.grade(item(ocrText: String(repeating: "x", count: 300), pixelArea: nil), category: .documents))
     }
 
+    func testDocumentsUtf16UnitCountingOnDecomposedAccents() {
+        // 🟡-6 分解重音边界（é = e + U+0301，UTF-16 计 2 / grapheme 计 1）：
+        // pixelArea=nil 兜底分支强命中阈值 = 200×2 = 400 UTF-16 units。
+        // 250 个 é = 500 units ≥ 400 → HIGH（.count 口径 250 会误降 MEDIUM，锁口径）。
+        XCTAssertEqual(.high, ConfidenceGrader.grade(
+            item(ocrText: String(repeating: "e\u{0301}", count: 250), pixelArea: nil),
+            category: .documents))
+        // 150 个 é = 300 units < 400 → MEDIUM
+        XCTAssertEqual(.medium, ConfidenceGrader.grade(
+            item(ocrText: String(repeating: "e\u{0301}", count: 150), pixelArea: nil),
+            category: .documents))
+    }
+
     func testLowQualityPortraitsStrongFaceQualityHighElseMedium() {
         XCTAssertEqual(.high,
                        ConfidenceGrader.grade(item(hasFace: true, faceQualityScore: 0.1), category: .lowQualityPortraits))

@@ -51,7 +51,16 @@ enum SwipeQueueBuilder {
             ))
         }
         return buckets.flatMap { bucket in
-            (grouped[bucket.reason] ?? []).sorted { $0.captureDate > $1.captureDate }
+            // captureDate 倒序；平局回退入桶下标（Swift sort 不稳定，显式 tie-breaker
+            // 对齐 OrganizeCategorizer.board 的做法，防同秒照片建队次序漂移）
+            (grouped[bucket.reason] ?? []).enumerated()
+                .sorted { lhs, rhs in
+                    if lhs.element.captureDate != rhs.element.captureDate {
+                        return lhs.element.captureDate > rhs.element.captureDate
+                    }
+                    return lhs.offset < rhs.offset
+                }
+                .map(\.element)
         }
     }
 }

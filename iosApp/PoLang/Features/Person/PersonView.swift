@@ -34,6 +34,8 @@ struct PersonView: View {
             }
         }
         .navigationBarHidden(true)
+        // UI 自动化页锚点（对标 gallery_grid / chat_input；人物页无占位符，挂真实页根）
+        .accessibilityIdentifier("person_root")
         .task { vm.onAppear() }
         .task(id: vm.toast) {
             guard vm.toast != nil else { return }

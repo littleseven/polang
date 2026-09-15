@@ -239,14 +239,15 @@ message_bubble:
 
   # 圆角（不同角色不同切角）
   corner_radius:
-    user: [20, 20, 4, 20]           # topLeft=20, topRight=20, bottomLeft=4, bottomRight=20
-    agent: [20, 20, 20, 4]          # topLeft=20, topRight=20, bottomLeft=20, bottomRight=4
+    user: [20, 20, 4, 20]           # Compose RoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)：右气泡切角在 bottomEnd
+    agent: [20, 20, 20, 4]          # 左气泡切角在 bottomStart
 
-  # 背景色（2026-08-18 豆包范式定稿，Android 已落地）
+  # 背景色（2026-08-18 豆包范式定稿；2026-09-13 v2.2.3 换色 + 946a36db4 对比度修复）
   background:
     user_text: "userBubbleBg"            # 品牌实色能量绿 #2FE385（token chatBubble/userBubbleBg，双模式一致，v2.2.3）
+    user_image_text: "userBubbleBg"      # 用户「图+文」气泡同绿底（Android isUser 含 USER_IMAGE_TEXT；caption 文字走 onSurface）
     agent_text: "none"                   # ⚠️ AI 文本无气泡：通栏纯文本流（2026-08-18 二修：去 28dp 渐变头像，用户定稿——头像多余）
-    image: "surfaceVariant.opacity(0.4)"
+    image: "surfaceVariant.opacity(0.4)" # 纯图气泡（USER_IMAGE/AGENT_IMAGE）
     error: "none"                        # 同 AI 正常（无气泡范式）
 
   # 内边距（用户气泡 18/14；AI 无气泡故无 padding，通栏无头像缩进）
@@ -690,8 +691,8 @@ media_results_ios_gaps:
   - "查看全部尾卡：totalCount > 显示数时，同尺寸 ViewAllCard → 跳相册"
   - "manifest 须暴露 record_feedback（+ more_like_this）以支撑反馈回路"
   - "全屏预览 HorizontalPager：tap 卡 → pinch-zoom 预览（iOS 缺整层）"
-  - "用户气泡接 token：底色 userBubbleBg + 文字/性能行 userBubbleOn（v2.2.3 对比度契约，946a36db4）"
-  - "回合内 upsert 去重：原位替换语义（§9 per_turn_upsert；iOS 现为 remove+append 位移，须对齐）"
+  - "refine_template 未接线：ChatUiActionDto 丢 isRefinement 字段，upsert 后标题恒用 found 模板（2026-09-15 审查登记；Android MediaResultsCarousel 按 isRefinement 切换）"
+  # 已对齐（ios-follow-batch-20260915，b914f62e3）：用户气泡接 token（userBubbleBg/userBubbleOn）；回合内原位 upsert（§9 per_turn_upsert）
 
 # ============================================================================
 # 16. 平台差异台账（platform_differences）— 契约层

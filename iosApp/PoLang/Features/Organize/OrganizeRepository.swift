@@ -64,10 +64,23 @@ final class OrganizeRepository: @unchecked Sendable {
     private func loadItemsBlocking() -> [OrganizeItem] {
         let metaById = media.fetchOrganizeAssetMeta()
         guard !metaById.isEmpty else { return [] }
-        let rowsByUri = Dictionary(uniqueKeysWithValues: db.allOrganizeRows().map { ($0.uri, $0) })
+        // media_assets.uri 非唯一索引：重复行 last-wins（保留最新快照，
+        // 对齐 SwipeQueueBuilder 的 uri 去重语义；uniqueKeysWithValues 撞重复 uri 会崩）
+        let rowsByUri = Dictionary(
+            db.allOrganizeRows().map { ($0.uri, $0) },
+            uniquingKeysWith: { _, new in new })
         let personCountByFaceId = db.personPhotoCounts()
+        // captureDate 降序；平局回退枚举下标（Swift sort 不稳定，显式 tie-breaker
+        // 对齐 OrganizeCategorizer.board 的做法，防同秒照片每次加载互换）
         return metaById.values
-            .sorted { $0.captureDateMs > $1.captureDateMs }
+            .enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.captureDateMs != rhs.element.captureDateMs {
+                    return lhs.element.captureDateMs > rhs.element.captureDateMs
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
             .map { meta in
                 let row = rowsByUri[meta.localIdentifier]
                 return OrganizeItem(

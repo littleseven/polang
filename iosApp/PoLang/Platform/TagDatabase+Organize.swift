@@ -5,7 +5,8 @@ import SQLite3
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
 // MARK: - organize v2 存储读写（对齐 Android MediaDao organize 段 + DedupHashDao）
-// 全部经既有串行 queue；批量写单事务（对齐 Android @Transaction 合批语义）。
+// 全部经既有串行 queue；批量写单事务（对齐 Android @Transaction 合批语义）；
+// prepare 失败一律 guard + assertionFailure 提前返回（对齐 TagDatabase.getUnassignedEmbeddings 既有模式）。
 
 /// dedup_hash 行（uri 主键；字段可空 = 对应哈希尚未算出，T8 扫描器分阶段回填）。
 struct DedupHashEntry: Equatable {
@@ -36,11 +37,16 @@ extension TagDatabase {
             exec("BEGIN TRANSACTION;")
             defer { exec("COMMIT;") }
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(
+            guard sqlite3_prepare_v2(
                 db,
                 "UPDATE media_assets SET blurScore = ?, exposureScore = ? WHERE uri = ?;",
                 -1, &stmt, nil
-            )
+            ) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare updateQualitySignals: \(String(cString: sqlite3_errmsg(db)))")
+                return
+            }
+            defer { sqlite3_finalize(stmt) }
             for entry in entries {
                 if let blur = entry.blurScore { sqlite3_bind_double(stmt, 1, blur) } else { sqlite3_bind_null(stmt, 1) }
                 if let exposure = entry.exposureScore { sqlite3_bind_double(stmt, 2, exposure) } else { sqlite3_bind_null(stmt, 2) }
@@ -49,7 +55,6 @@ extension TagDatabase {
                 sqlite3_reset(stmt)
                 sqlite3_clear_bindings(stmt)
             }
-            sqlite3_finalize(stmt)
         }
     }
 
@@ -60,15 +65,19 @@ extension TagDatabase {
         queue.sync {
             guard let db = db else { return }
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(db, """
+            guard sqlite3_prepare_v2(db, """
             UPDATE media_assets SET lastViewedAt = ?
             WHERE uri = ? AND (lastViewedAt IS NULL OR lastViewedAt < ? - 60000);
-            """, -1, &stmt, nil)
+            """, -1, &stmt, nil) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare updateLastViewedAt: \(String(cString: sqlite3_errmsg(db)))")
+                return
+            }
+            defer { sqlite3_finalize(stmt) }
             sqlite3_bind_int64(stmt, 1, epochMs)
             sqlite3_bind_text(stmt, 2, uri, -1, SQLITE_TRANSIENT)
             sqlite3_bind_int64(stmt, 3, epochMs)
             sqlite3_step(stmt)
-            sqlite3_finalize(stmt)
         }
     }
 
@@ -79,11 +88,16 @@ extension TagDatabase {
             guard let db = db else { return [:] }
             var out: [String: QualitySignalEntry] = [:]
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(
+            guard sqlite3_prepare_v2(
                 db,
                 "SELECT uri, blurScore, exposureScore FROM media_assets WHERE uri IN (\(uris.map { _ in "?" }.joined(separator: ",")));",
                 -1, &stmt, nil
-            )
+            ) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare qualitySignals: \(String(cString: sqlite3_errmsg(db)))")
+                return [:]
+            }
+            defer { sqlite3_finalize(stmt) }
             for (index, uri) in uris.enumerated() {
                 sqlite3_bind_text(stmt, Int32(index + 1), uri, -1, SQLITE_TRANSIENT)
             }
@@ -94,7 +108,6 @@ extension TagDatabase {
                 let exposure = sqlite3_column_type(stmt, 2) == SQLITE_NULL ? nil : sqlite3_column_double(stmt, 2)
                 out[uri] = QualitySignalEntry(uri: uri, blurScore: blur, exposureScore: exposure)
             }
-            sqlite3_finalize(stmt)
             return out
         }
     }
@@ -123,11 +136,16 @@ extension TagDatabase {
             guard let db = db else { return [] }
             var out: [OrganizeDbRow] = []
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(db, """
+            guard sqlite3_prepare_v2(db, """
                 SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore,
                        faceQualityScore, blurScore, exposureScore, lastViewedAt, faceId
                 FROM media_assets;
-                """, -1, &stmt, nil)
+                """, -1, &stmt, nil) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare allOrganizeRows: \(String(cString: sqlite3_errmsg(db)))")
+                return []
+            }
+            defer { sqlite3_finalize(stmt) }
             while sqlite3_step(stmt) == SQLITE_ROW {
                 func text(_ i: Int32) -> String? {
                     sqlite3_column_text(stmt, i).map { String(cString: $0) }
@@ -151,7 +169,6 @@ extension TagDatabase {
                     faceId: text(11)
                 ))
             }
-            sqlite3_finalize(stmt)
             return out
         }
     }
@@ -165,16 +182,20 @@ extension TagDatabase {
             guard let db = db else { return [:] }
             var out: [String: Int] = [:]
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(db, """
+            guard sqlite3_prepare_v2(db, """
                 SELECT faceId, COUNT(*) FROM media_assets
                 WHERE faceId IS NOT NULL AND faceId != '' GROUP BY faceId;
-                """, -1, &stmt, nil)
+                """, -1, &stmt, nil) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare personPhotoCounts: \(String(cString: sqlite3_errmsg(db)))")
+                return [:]
+            }
+            defer { sqlite3_finalize(stmt) }
             while sqlite3_step(stmt) == SQLITE_ROW {
                 if let cs = sqlite3_column_text(stmt, 0) {
                     out[String(cString: cs)] = Int(sqlite3_column_int(stmt, 1))
                 }
             }
-            sqlite3_finalize(stmt)
             return out
         }
     }
@@ -186,13 +207,17 @@ extension TagDatabase {
             guard let db = db else { return [] }
             var out: [String] = []
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(db, """
+            guard sqlite3_prepare_v2(db, """
                 SELECT uri FROM media_assets WHERE type != 'VIDEO' AND blurScore IS NULL;
-                """, -1, &stmt, nil)
+                """, -1, &stmt, nil) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare pendingQualitySignalUris: \(String(cString: sqlite3_errmsg(db)))")
+                return []
+            }
+            defer { sqlite3_finalize(stmt) }
             while sqlite3_step(stmt) == SQLITE_ROW {
                 if let cs = sqlite3_column_text(stmt, 0) { out.append(String(cString: cs)) }
             }
-            sqlite3_finalize(stmt)
             return out
         }
     }
@@ -207,10 +232,15 @@ extension TagDatabase {
             exec("BEGIN TRANSACTION;")
             defer { exec("COMMIT;") }
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(db, """
+            guard sqlite3_prepare_v2(db, """
             INSERT OR REPLACE INTO dedup_hash (uri, md5, phash, pixelArea, sizeBytes)
             VALUES (?, ?, ?, ?, ?);
-            """, -1, &stmt, nil)
+            """, -1, &stmt, nil) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare upsertDedupHashes: \(String(cString: sqlite3_errmsg(db)))")
+                return
+            }
+            defer { sqlite3_finalize(stmt) }
             for entry in entries {
                 sqlite3_bind_text(stmt, 1, entry.uri, -1, SQLITE_TRANSIENT)
                 if let md5 = entry.md5 { sqlite3_bind_text(stmt, 2, md5, -1, SQLITE_TRANSIENT) } else { sqlite3_bind_null(stmt, 2) }
@@ -221,7 +251,6 @@ extension TagDatabase {
                 sqlite3_reset(stmt)
                 sqlite3_clear_bindings(stmt)
             }
-            sqlite3_finalize(stmt)
         }
     }
 
@@ -231,7 +260,12 @@ extension TagDatabase {
             guard let db = db else { return [] }
             var out: [DedupHashEntry] = []
             var stmt: OpaquePointer?
-            sqlite3_prepare_v2(db, "SELECT uri, md5, phash, pixelArea, sizeBytes FROM dedup_hash;", -1, &stmt, nil)
+            guard sqlite3_prepare_v2(db, "SELECT uri, md5, phash, pixelArea, sizeBytes FROM dedup_hash;", -1, &stmt, nil) == SQLITE_OK
+            else {
+                assertionFailure("[TagDatabase] Failed to prepare allDedupHashes: \(String(cString: sqlite3_errmsg(db)))")
+                return []
+            }
+            defer { sqlite3_finalize(stmt) }
             while sqlite3_step(stmt) == SQLITE_ROW {
                 let uri = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
                 let md5 = sqlite3_column_text(stmt, 1).map { String(cString: $0) }
@@ -240,7 +274,6 @@ extension TagDatabase {
                 let size = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? nil : sqlite3_column_int64(stmt, 4)
                 out.append(DedupHashEntry(uri: uri, md5: md5, phash: phash, pixelArea: area, sizeBytes: size))
             }
-            sqlite3_finalize(stmt)
             return out
         }
     }

@@ -166,10 +166,11 @@ struct MediaPagerView: View {
             analysisOverlay
         }
         .overlay(alignment: .top) {
-            // §16b 上滑删除提示胶囊：拖动中浮现于图片上方；armed（超阈值）转 error 色高亮
+            // §16b 上滑删除提示胶囊：拖动中浮现于图片上方；armed（超阈值）转 error 色高亮。
+            // 顶边 = 安全区 + 68pt 顶栏（顶栏起始于安全区下沿，胶囊须同基准避让）
             if case .dragging = swipePhase {
                 swipeDeleteHint
-                    .padding(.top, 68 + Spacing.md)  // 避让 68pt 顶栏（topBar 内容高）
+                    .padding(.top, realSafeTop + 68 + Spacing.md)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showCopiedToast)
@@ -179,7 +180,12 @@ struct MediaPagerView: View {
         }
         // 相邻页缩略图预热（相-13，对齐 Android ±3 页预加载；PHCachingImageManager 窗口取 ±2 页）
         .onAppear { preloadAround(); markCurrentPageViewed() }
-        .onChange(of: index) { _ in preloadAround(); markCurrentPageViewed() }
+        .onChange(of: index) { _ in
+            // 手势中断/翻页恢复路径：翻页即复位上滑删除手势（拖拽中横滑翻页不带位移跨页）
+            if swipePhase != .idle { swipePhase = .idle }
+            preloadAround()
+            markCurrentPageViewed()
+        }
     }
 
     /// 整理中心 USER_ENGAGED 信号回写（organize.yaml §1 value_guard）：当前页曝光即记
@@ -359,6 +365,16 @@ struct MediaPagerView: View {
     /// 松手结算阈值 = 页高 25%（§16b threshold，同 SwipeReview SWIPE_THRESHOLD_FRACTION）
     private var swipeThreshold: CGFloat { max(pagerHeight, 1) * 0.25 }
 
+    /// 真实顶部安全区（刘海/灵动岛）。🔴 不能读 `GeometryProxy.safeAreaInsets`：本页根链
+    /// `Color.black.ignoresSafeArea()` 已扩张 ZStack 至全屏、安全区被消费，proxy 恒报 0
+    /// （同 CameraPreviewView.realSafeTop 陷阱），只能从 UIKit keyWindow 拿真实值。
+    private var realSafeTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?.safeAreaInsets.top ?? 0
+    }
+
     /// armed：上移量已达阈值，松手即提交；胶囊转 error 色高亮（§16b armed_style）
     private var isSwipeArmed: Bool {
         if case .dragging(let offset) = swipePhase { return -offset >= swipeThreshold }
@@ -461,13 +477,16 @@ struct MediaPagerView: View {
     private func shrinkAfterSwipeDelete(_ asset: MediaAsset) {
         if let i = liveItems.firstIndex(where: { $0.uri == asset.uri }) {
             liveItems.remove(at: i)
+            // 删除张在当前页之前 → 下标前移一位保持当前媒体不跳张
+            // （原 min 钳制对左删场景会静默跳过一张）
+            if i < index { index -= 1 }
         }
         guard !liveItems.isEmpty else {
             swipePhase = .idle
             dismiss()
             return
         }
-        index = min(index, liveItems.count - 1)
+        index = min(max(0, index), liveItems.count - 1)
         swipePhase = .idle
         preloadAround()
     }

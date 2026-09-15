@@ -76,6 +76,9 @@ final class SwipeReviewViewModel: ObservableObject {
     @Published private(set) var decisions: [SwipeDecisionRecord] = []
     /// 批次提交中（系统确认框等待）。
     @Published private(set) var isSubmitting = false
+    /// 卡片飞出动画进行中（deck 手势状态机置位）：飞行窗口内 undo 禁用
+    /// （🔴-3 竞态防线——飞行中 undo 会回滚 index，落账闭包把决策写错卡片）。
+    @Published var isFlying = false
 
     /// 授权被拒后暂停会话内自动提交（防确认框连环弹）；重试出口仅剩 Done 出口面板。
     private var autoSubmitSuspended = false
@@ -112,10 +115,11 @@ final class SwipeReviewViewModel: ObservableObject {
             .reduce(0) { $0 + $1.candidate.sizeBytes }
     }
 
-    /// 顶栏 undo 可用性：提交中、无决策或尾条已提交（committed/discarded 均 resolved）时禁用
-    /// （spec §5 top_bar「尾条已提交时禁用」；iOS 已删除项无程序化恢复通路）。
+    /// 顶栏 undo 可用性：提交中、卡片飞行中、无决策或尾条已提交（committed/discarded
+    /// 均 resolved）时禁用（spec §5 top_bar「尾条已提交时禁用」；iOS 已删除项无程序化
+    /// 恢复通路；飞行窗口 220ms 内 undo 会落错卡——🔴-3）。
     var canUndo: Bool {
-        guard !isSubmitting else { return false }
+        guard !isSubmitting, !isFlying else { return false }
         guard let last = decisions.last else { return false }
         if last.decision == .delete { return last.deleteResolution == .pending }
         return true
@@ -145,15 +149,19 @@ final class SwipeReviewViewModel: ObservableObject {
         index = 0
         decisions = []
         autoSubmitSuspended = false
+        isFlying = false
         phase = next.isEmpty ? .empty : .reviewing
     }
 
     // MARK: - 决策 / undo
 
-    /// 落一条决策（卡片飞出动画完成后由视图调用）。
-    func decide(_ decision: SwipeDecision) {
+    /// 落一条决策（卡片飞出动画完成后由视图调用）。expectedUri 非nil 时校验当前候选
+    /// 一致才落账（🔴-3 二道防线：飞行窗口内状态若已漂移——undo/回合重置——丢弃本次决策，
+    /// 宁可少落不错落）。
+    func decide(_ decision: SwipeDecision, expectedUri: String? = nil) {
         guard phase == .reviewing, index < queue.count else { return }
         let candidate = queue[index]
+        if let expectedUri, expectedUri != candidate.uri { return }
         var keepEntry: String?
         if decision == .keep {
             let now = Self.nowMs()
@@ -186,8 +194,10 @@ final class SwipeReviewViewModel: ObservableObject {
 
     // MARK: - 批提交 / 回滚
 
-    /// 20 张边界自动提交：pending 数达 batchSize 整数倍且未被拒绝暂停时触发；
-    /// 被拒回滚后不立刻重弹（下次整数倍边界再试），防确认框连环弹。
+    /// 20 张边界自动提交：pending 数达 batchSize 整数倍且未被拒绝暂停时触发。
+    /// ⚠️ 被拒后 autoSubmitSuspended 持续为 true 至回合结束（startNewRound 才复位）——
+    /// 自动提交不再重弹（含后续整数倍边界；`% batchSize` 仅约束未暂停路径），
+    /// 重试出口仅剩 Done 出口面板「重试」（直达 submitPendingDeletes，不经本守卫）。
     private func maybeAutoSubmitBatch() {
         guard !autoSubmitSuspended, !isSubmitting, pendingDeleteCount > 0,
               pendingDeleteCount % Self.batchSize == 0 else { return }
@@ -298,7 +308,7 @@ struct SwipeReviewScreen: View {
                         .foregroundStyle(s.onSurface)
                     if vm.freedBytes > 0 {
                         Text(String(format: String(localized: "swipe_freed"),
-                                    SwipeByteFormatter.format(vm.freedBytes)))
+                                    OrganizeByteFormat.string(vm.freedBytes)))
                             .font(AppTypography.bodySmall.font)
                             .foregroundStyle(s.onSurfaceVariant)
                     }
@@ -387,7 +397,7 @@ struct SwipeReviewScreen: View {
                     .multilineTextAlignment(.center)
                 statRow
                 Text(String(format: String(localized: "swipe_done_freed"),
-                            SwipeByteFormatter.format(vm.freedBytes)))
+                            OrganizeByteFormat.string(vm.freedBytes)))
                     .font(AppTypography.titleMedium.font.weight(AppTypography.WeightOverride.semibold))
                     .foregroundStyle(tagControlBrandGradient)
                 if vm.pendingDeleteCount > 0 { pendingCommitPanel }
@@ -509,8 +519,9 @@ struct SwipeReviewScreen: View {
 /// - dragging：跟手位移 + 轻微跟手旋转（水平位移 / 20 度，anchor 底部），决策预告章随进度淡入；
 /// - released：主位移轴定方向（|ty|>|tx| 且向上 → DELETE；水平主导 tx>0 → KEEP、tx<0 → SKIP），
 ///   主轴位移超卡片宽 25% → 飞出落决策；未超弹回（spring）；
-/// - flying（isFlying == true）：卡片向决策方向飞出（easeIn 200ms），动画结束后 vm.decide 落账、
-///   后卡 spring 上位；飞行中忽略新手势，落账后复位 idle。
+/// - flying（vm.isFlying == true，状态存 VM 供 canUndo 感知）：卡片向决策方向飞出
+///   （easeIn 200ms），动画结束后 vm.decide（带起飞时目标 uri 复核）落账、后卡 spring
+///   上位；飞行中忽略新手势且 undo 禁用，落账后复位 idle。
 /// 堆内渲染当前卡 + 后 3 张（spec §5 preload: 3），后卡缩进可视化即预载触发。
 private struct SwipeCardDeck: View {
     @ObservedObject var vm: SwipeReviewViewModel
@@ -518,7 +529,6 @@ private struct SwipeCardDeck: View {
     let cardHeight: CGFloat
 
     @State private var dragOffset: CGSize = .zero
-    @State private var isFlying = false
 
     @Environment(\.colorScheme) private var cs
 
@@ -556,7 +566,7 @@ private struct SwipeCardDeck: View {
         // 手势挂载在静止容器上（卡片自身被 dragOffset 平移会引入位移反馈，拖拽不再 1:1 跟手）
         .gesture(drag)
         .onTapGesture {
-            guard !isFlying else { return }
+            guard !vm.isFlying else { return }
             commit(.skip)   // spec §5 gestures: tap = skip
         }
     }
@@ -566,7 +576,7 @@ private struct SwipeCardDeck: View {
     private var drag: some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
-                guard !isFlying else { return }
+                guard !vm.isFlying else { return }
                 dragOffset = value.translation
             }
             .onEnded { value in
@@ -575,7 +585,7 @@ private struct SwipeCardDeck: View {
     }
 
     private func handleDragEnd(_ value: DragGesture.Value) {
-        guard !isFlying else { return }
+        guard !vm.isFlying else { return }
         let tx = value.translation.width
         let ty = value.translation.height
         // 主位移轴定方向：垂直向上主导 → DELETE；水平主导 → 右 KEEP / 左 SKIP
@@ -601,19 +611,22 @@ private struct SwipeCardDeck: View {
     }
 
     /// 决策落账前的飞出动画（easeIn 200ms），完成后 vm.decide + 后卡 spring 上位。
+    /// 落账闭包捕获起飞时的目标 uri 并交 decide 复核（🔴-3：飞行窗口内 undo 已被
+    /// canUndo 禁用，此处 uri 校验为二道防线——候选不匹配即丢弃，不落错卡）。
     private func commit(_ decision: SwipeDecision) {
-        guard !isFlying else { return }
-        isFlying = true
+        guard !vm.isFlying, vm.phase == .reviewing, vm.index < vm.queue.count else { return }
+        vm.isFlying = true
+        let targetUri = vm.queue[vm.index].uri
         let target = flyTarget(for: decision)
         withAnimation(.easeIn(duration: 0.2)) {
             dragOffset = target
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
-                vm.decide(decision)
+                vm.decide(decision, expectedUri: targetUri)
             }
             dragOffset = .zero
-            isFlying = false
+            vm.isFlying = false
         }
     }
 
@@ -711,17 +724,3 @@ private enum SwipeReasonBadge {
     }
 }
 
-// MARK: - 字节格式化（1024 进制，口径同 ModelCatalog.formattedSize）
-
-private enum SwipeByteFormatter {
-    static func format(_ bytes: Int64) -> String {
-        if bytes >= 1024 * 1024 * 1024 {
-            return String(format: "%.2f GB", Double(bytes) / (1024 * 1024 * 1024))
-        } else if bytes >= 1024 * 1024 {
-            return String(format: "%.2f MB", Double(bytes) / (1024 * 1024))
-        } else if bytes >= 1024 {
-            return String(format: "%.2f KB", Double(bytes) / 1024)
-        }
-        return "\(bytes) B"
-    }
-}

@@ -279,22 +279,6 @@ extension OrganizeCategory {
     }
 }
 
-// MARK: - 字节格式化
-
-/// 对齐 Android formatBytes 口径：自适应单位；0 字节兜底 "0 B"（ByteCountFormatter 0 值文案不可控）。
-private enum OrganizeByteFormatter {
-    private static let formatter: ByteCountFormatter = {
-        let f = ByteCountFormatter()
-        f.countStyle = .file
-        f.isAdaptive = true
-        return f
-    }()
-
-    static func string(_ bytes: Int64) -> String {
-        bytes > 0 ? formatter.string(fromByteCount: bytes) : "0 B"
-    }
-}
-
 // MARK: - Screen（对外契约：T4 以 OrganizeCategoryScreen(category:) 引用）
 
 struct OrganizeCategoryScreen: View {
@@ -428,7 +412,7 @@ struct OrganizeCategoryScreen: View {
         return HStack(spacing: Spacing.md) {
             Text(String(
                 format: String(localized: "org_cat_meta"),
-                vm.totalCount, OrganizeByteFormatter.string(vm.totalBytes)))
+                vm.totalCount, OrganizeByteFormat.string(vm.totalBytes)))
                 .font(AppTypography.bodySmall.font)
                 .foregroundColor(s.onSurfaceVariant)
                 .lineLimit(1)
@@ -487,7 +471,7 @@ struct OrganizeCategoryScreen: View {
             } label: {
                 Text(String(
                     format: String(localized: "org_move_to_trash"),
-                    vm.selectedCount, OrganizeByteFormatter.string(vm.selectedBytes)))
+                    vm.selectedCount, OrganizeByteFormat.string(vm.selectedBytes)))
                     .font(AppTypography.titleMedium.font.weight(.semibold))
                     .foregroundColor(s.onError)
                     .frame(maxWidth: .infinity)
@@ -526,7 +510,7 @@ struct OrganizeCategoryScreen: View {
                     .foregroundColor(s.onSurfaceVariant)
                 Text(String(
                     format: String(localized: "org_cleaned_freed"),
-                    OrganizeByteFormatter.string(vm.freedBytes)))
+                    OrganizeByteFormat.string(vm.freedBytes)))
                     .font(.system(size: OrganizeCategoryTokens.freedNumberFontSize, weight: .bold))
                     .foregroundStyle(brandGradient)   // freed 数字品牌渐变着色（与 Hero 大数字同源，spec §4/§7）
             }

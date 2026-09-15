@@ -78,8 +78,10 @@ extension CategoryArbiter {
 
     /// OCR 文字密度判定（spec §10.2 面积归一）：pixelArea 可用时按字符数/图面积，
     /// 否则（尺寸列缺失或脏值）退回绝对字符数兜底。
+    /// 字符数按 UTF-16 code unit 口径（对齐 Kotlin String.length；Swift .count 是
+    /// grapheme cluster 口径，分解重音 é(e+U+0301) 会少数一半，🟡-6）。
     static func isDocumentText(ocrText: String?, pixelArea: Int64?) -> Bool {
-        let chars = Int64(ocrText?.count ?? 0)
+        let chars = Int64(ocrText?.utf16.count ?? 0)
         if chars == 0 { return false }
         if let area = pixelArea, area > 0 {
             return chars * 1_000_000 > area * OrganizeThresholds.ocrDensityPerMegapixel

@@ -34,8 +34,9 @@ enum ConfidenceGrader {
     }
 
     /// OCR 强命中（≥2×密度阈值）HIGH；OCR 命中或仅标签命中 MEDIUM。
+    /// 字符数按 UTF-16 code unit 口径（对齐 Kotlin String.length，见 CategoryArbiter.isDocumentText）。
     private static func gradeDocument(_ item: OrganizeItem) -> OrganizeConfidence {
-        let chars = Int64(item.ocrText?.count ?? 0)
+        let chars = Int64(item.ocrText?.utf16.count ?? 0)
         if chars == 0 { return .medium } // labels 关键词命中（无 OCR 佐证）
         if let area = item.pixelArea, area > 0 {
             // 与 Android 同一面积归一口径的 2×（先乘后除，避免 sub-MP 整数截断塌缩为 0）

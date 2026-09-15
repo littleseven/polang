@@ -647,7 +647,8 @@ private struct MessageBubble: View {
     }
 
     // §5 text：用户正文 userBubbleOn（v2.2.3 对比度契约 946a36db4：亮绿底白字 ~1.9:1 → 深字 ~8:1）；
-    // 图文说明（USER_IMAGE_TEXT text_below）走 onSurface（图类气泡底是 surfaceVariant 0.4，非能量绿）
+    // 图文说明（USER_IMAGE_TEXT text_below）保持 onSurface——底虽随 Android 定稿转绿
+    // （bubbleBackground），图上说明文字对比度契约不变
     private var textColor: Color {
         if message.role == .user {
             return message.type == .userImageText ? s.onSurface : ChatBubbleTokens.userBubbleOn
@@ -671,10 +672,12 @@ private struct MessageBubble: View {
     }
 
     private var bubbleBackground: Color {
-        // 图类气泡（用户图+文 / agent 单发图）→ surfaceVariant 0.4（chat.yaml §5 background.image，
-        // 用户图+文配 onSurface 图文说明）；用户文本 → userBubbleBg 实色（§5 background.user_text，
+        // 纯图气泡（agent 单发图；userImage 未接入，接入时同口径）→ surfaceVariant 0.4
+        // （chat.yaml §5 background.image）；用户气泡（USER_IMAGE_TEXT 含图+文）→
+        // userBubbleBg 实色（Android ChatScreen.kt isUser 含 USER_IMAGE_TEXT → 绿底，
+        // text_below 仍走 onSurface）；用户纯文本 → userBubbleBg（§5 background.user_text，
         // v2.2.3：去 0.9 alpha，双模式一致）
-        if message.type == .agentImage || message.type == .userImageText {
+        if message.type == .agentImage {
             return s.surfaceVariant.opacity(0.4)
         }
         if message.role == .user {

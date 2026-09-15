@@ -86,9 +86,17 @@ import SharedKit
     /// 取消/失败停留原图（§16b list_shrink: on_trashed_outcome_only）。
     func deleteMediaAwaitingOutcome(localIdentifiers: [String],
                                     completion: @escaping (Bool) -> Void) -> Bool {
-        guard !localIdentifiers.isEmpty else { return false }
+        // guard 路径也必须回传 outcome（主线程）：调用方（§16b list_shrink）靠 completion
+        // 收敛状态，缺席即永久挂起——空入参/查无资产按失败回传，不静默 return。
+        guard !localIdentifiers.isEmpty else {
+            DispatchQueue.main.async { completion(false) }
+            return false
+        }
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: localIdentifiers, options: nil)
-        guard assets.count > 0 else { return false }
+        guard assets.count > 0 else {
+            DispatchQueue.main.async { completion(false) }
+            return false
+        }
         PHPhotoLibrary.shared().performChanges({
             PHAssetChangeRequest.deleteAssets(assets)
         }, completionHandler: { success, _ in
