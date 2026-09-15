@@ -574,6 +574,17 @@ media_pager:
     ios_note: |
       iOS 待跟随：PhotoLibrary PUA 或自实现回收站（30 天可恢复语义需保留）；
       手势阈值/飞出时长/提示文案口径以本节为准。
+      实现校正（2026-09-15）：`PHAssetChangeRequest.deleteAssets` 系统强制弹确认框
+      （"Delete Photo?"），iOS 无零弹框通路；静默删除开关在 iOS 不适用（见 §26 台账）。
+
+  # ── 16c. 网格 trashed 过滤与乐观移除（2026-09-15 补节，Android f249da1e2 + 4ed758d55）──
+  grid_trashed_filter:
+    problem: "Android HyperOS MediaStore 普查不过滤 trashed 行 → 已回收照片残留网格"
+    android_actual:
+      query_filter: "MediaStore 查询侧加 IS_TRASHED=0 过滤（API 29+），stale 探活显式读 IS_TRASHED 列（MediaRepositoryImpl.notTrashedSelection）"
+      optimistic_removal: "上滑删除成功后 Room+内存双层缓存乐观移除并重发射（removeTrashedFromLocalCache），全量重扫兜底"
+    shared_contract: "MediaRepository.removeTrashedFromLocalCache(uris)（commonMain）；iOS actual 为空操作（PHPhotoLibraryObserver 即时驱动刷新，契约允许）"
+    ios_note: "iOS 天然免疫：PHFetchResult 默认不含 Recently Deleted 资产；本小节对 iOS 无实现任务，仅登记契约"
 
   # ── 17. 顶栏（动画显隐）──
   # 🔴 gap #21 / P0-1：iOS 无顶栏，无法返回。
@@ -777,8 +788,8 @@ media_pager:
 
     swipe_up_delete_silent_trash:
       android_actual: "MANAGE_MEDIA 持权 + 设置页「删除不再询问」开关开 → 直写 IS_TRASHED 静默回收（零系统弹框，API 31+）；否则 createTrashRequest 系统授权框"
-      ios_actual: "iOS PhotoLibrary 删除无系统确认框（PHPhotoLibrary 直接删除），天然静默，无需跟随该开关；30 天可恢复语义（Recently Deleted）保留"
-      note: "Android 专属能力（系统授权框为 Android Scoped Storage 产物），iOS 不登记跟随任务"
+      ios_actual: "PHAssetChangeRequest.deleteAssets → 系统 Recently Deleted（30 天可恢复）；系统强制确认框（Apple 无零弹框通路），故「删除不再询问」开关 iOS 不适用、不登记跟随任务"
+      note: "Android 专属能力（MANAGE_MEDIA 直写为 Android Scoped Storage 产物）；2026-09-15 校正：iOS 删除必走系统确认框，原「天然静默」表述作废"
 
     image_understanding:
       android_actual:

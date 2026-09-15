@@ -244,7 +244,7 @@ message_bubble:
 
   # 背景色（2026-08-18 豆包范式定稿，Android 已落地）
   background:
-    user_text: "userBubbleBg"            # 品牌实色青玉 #0F766E（token chatBubble/userBubbleBg，双模式一致）
+    user_text: "userBubbleBg"            # 品牌实色能量绿 #2FE385（token chatBubble/userBubbleBg，双模式一致，v2.2.3）
     agent_text: "none"                   # ⚠️ AI 文本无气泡：通栏纯文本流（2026-08-18 二修：去 28dp 渐变头像，用户定稿——头像多余）
     image: "surfaceVariant.opacity(0.4)"
     error: "none"                        # 同 AI 正常（无气泡范式）
@@ -257,9 +257,10 @@ message_bubble:
   # 文字样式（2026-08-18 三修：14/20 → 16/24，配合去头像通栏排版，用户定稿）
   text:
     user:
-      color: white                  # 硬编码白色
+      color: "userBubbleOn"         # token chatBubble/userBubbleOn 深绿黑 #062B18（946a36db4：亮绿底白字对比度 ~1.9:1 → 深字 ~8:1）
       font_size: 16
       line_height: 24
+      performance_line: "userBubbleOn.opacity(0.55)"   # 性能行 tint 同源（Android AgentMessageExtras）
     agent:
       color: "onSurface"
       font_size: 16
@@ -280,7 +281,7 @@ message_bubble:
       scale: fill_width                  # ContentScale.FillWidth：宽撑满气泡内容区，高随原始宽高比，零裁切
       fixed_height: none                 # ⚠️ 禁固定高 + Crop（会砍头；2026-08-16 真机反馈回归点）
       corner_radius: 12                  # 图自身圆角（≠气泡圆角 20）
-      text_below: { color: white, size: 16, line_height: 24, top_padding: 6 }
+      text_below: { color: onSurface, size: 16, line_height: 24, top_padding: 6 }  # 946a36db4：图文说明 white→onSurface
     agent_image:                         # AGENT_IMAGE（单发结果图）
       scale: fill_width                  # 同上；过期 → ExpiredImagePlaceholder
       corner_radius: 12
@@ -429,6 +430,17 @@ media_results:
     card_feedback_buttons: [thumb_up, thumb_down, refresh]
     card_date_label: "yyyy-MM-dd"
 
+  # 回合内 upsert 去重（c4cea4995，2026-09-13；Android ChatViewModel.insertMediaResultsMessage 定稿口径）
+  per_turn_upsert:
+    rule: "同一用户回合（最后一条 user 消息之后）至多一张横滑卡片"
+    trigger: "ReAct 多轮 search_media / refine_media_search / 拒绝措辞回退直搜均可能同回合多次产出"
+    upsert_semantics: "replacePreviousInTurn=true（默认）：查本回合上一张卡片行，复用其 id 与 timestamp 原位替换（卡片位置不移动）"
+    append_exception: "以图搜图（FIND_SIMILAR）自成新回合，replacePreviousInTurn=false 追加新卡，不覆盖上一回合结果"
+    refused_search_guard: "LLM 拒绝措辞回退直搜前须先查本回合是否已出卡；已出卡则跳过回退（避免重复卡片）"
+    empty_result: "空结果不出卡（回退路径改为插入 agent 文本消息）"
+    concurrency: "Android 用 mutex 串行化；iOS 单 actor 天然满足，无需额外锁"
+    ios_note: "iOS 内存态实现须为原位替换（禁 remove+append 把卡移到回合底部）；以图搜图引擎 iOS 未落地，追加分支随引擎落地补齐"
+
 # ============================================================================
 # 9.1 交互模型（Interaction Model）
 # ============================================================================
@@ -467,7 +479,7 @@ interaction_model:
 
   # 消息类型渲染分发
   message_type_rendering:
-    USER_TEXT: "right bubble, primary bg, white text"
+    USER_TEXT: "right bubble, userBubbleBg bg, userBubbleOn text"
     AGENT_TEXT: "left bubble, surfaceVariant bg, segmented Markdown (text+table+code)"
     MEDIA_RESULTS: "⚠️ separate full-width message (MediaResultsCarousel), NOT inline in text bubble"
     CHART: "separate full-width message (SVG card)"
@@ -499,30 +511,30 @@ interaction_model:
     right: [report_issue, new_chat, clear_chat]  # new_chat = 新建会话（非清空）；clear_chat = 清当前会话
 
 # ============================================================================
-# 10. 颜色参考（2026-08-18 定稿「青玉绿×Cloud Dancer」，SSOT=design-tokens.json v2.2.2）
+# 10. 颜色参考（v2.2.3「A 氧气薄荷(Light)/B 能量绿(Dark)」，SSOT=design-tokens.json v2.2.3，2026-09-13）
 # ============================================================================
 colors:
-  primary: "#1F5C54"                # 深松绿（青玉）
+  primary: "#0E9F6E"                # light 氧气薄荷绿
   onPrimary: "#FFFFFF"
-  primaryContainer: "#A8D5CC"
-  surface: "#F0EEE9"                # Cloud Dancer 暖乳白（潘通 2026 年度色）
-  onSurface: "#1D1A16"
-  surfaceVariant: "#E4DFD6"
-  surfaceContainerLowest: "#FBF9F5"
-  background: "#F0EEE9"
+  primaryContainer: "#C9EEDD"
+  surface: "#F1FAF5"                # light 薄荷白
+  onSurface: "#0F3D2E"
+  surfaceVariant: "#E0F4E8"
+  surfaceContainerLowest: "#FFFFFF"
+  background: "#F1FAF5"
   error: "#B32610"
   model_dot_official: "#2196F3"
   model_dot_user_key: "#FF9800"
   voice_cancel: "#E53935"
   # 品牌渐变（设计稿字面量，Agent 头像/Logo/发送钮/大数字）：
-  #   dark: #0F766E → #5EA88F（深松绿→鼠尾草玉，135°）
-  #   light 深端: #43937E
+  #   v2.2.3: #1EA75B → #7CEFA8（token chatBubble/brandGradientStart→End，135°）
+  # 用户气泡：底 userBubbleBg #2FE385（双模式一致）+ 字 userBubbleOn #062B18
   # Dark mode 对应（iOS 默认 .dark）
-  # primary → #8FD6C6（薄荷玉）
-  # onSurface → #EDE9E3（暖白）
-  # surfaceVariant → #46413A
-  # surface → #171412（暖黑）
-  # background → #171412
+  # primary → #2FE385（能量绿）
+  # onSurface → #DFF5E9（薄荷白）
+  # surfaceVariant → #0F2B1B
+  # surface → #071510（墨绿黑）
+  # background → #071510
 
 # ============================================================================
 # 11. 允许的平台差异
@@ -678,6 +690,8 @@ media_results_ios_gaps:
   - "查看全部尾卡：totalCount > 显示数时，同尺寸 ViewAllCard → 跳相册"
   - "manifest 须暴露 record_feedback（+ more_like_this）以支撑反馈回路"
   - "全屏预览 HorizontalPager：tap 卡 → pinch-zoom 预览（iOS 缺整层）"
+  - "用户气泡接 token：底色 userBubbleBg + 文字/性能行 userBubbleOn（v2.2.3 对比度契约，946a36db4）"
+  - "回合内 upsert 去重：原位替换语义（§9 per_turn_upsert；iOS 现为 remove+append 位移，须对齐）"
 
 # ============================================================================
 # 16. 平台差异台账（platform_differences）— 契约层

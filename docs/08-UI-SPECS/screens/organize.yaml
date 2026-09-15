@@ -330,6 +330,7 @@ category_grid:
     trash_flow:                                  # 删除 = 系统回收站（30 天可恢复）
       backend: trash_session_controller          # API 30+ createTrashRequest；API <30 → errorEvent → snackbar org_trash_unsupported
       auth: start_intent_sender_for_result
+      silent_when: manage_media_granted_and_toggle_on  # 静默通路同 gallery-grid.yaml §16b（MANAGE_MEDIA+「删除不再询问」直写 IS_TRASHED，失败子集回落 token 通路）
       partial_notice: "授权后仍有残留 → snackbar org_partial_trash（一次性事件）"
       outcome: "Trashed → 剔除已回收项；清空则进 cleaned 态；Cancelled → 留原地可重试"
 
@@ -452,6 +453,8 @@ platform_differences:
     - { feature: "hub + 详情页 + cleaned", android: supported, ios: "TODO" }
     - { feature: "swipe_review",   android: supported, ios: "TODO" }
     - { feature: "dedup Config 展开卡", android: supported, ios: "TODO（依赖去重 2.0 扫描器移植）" }
+    - { feature: "删除通路", android: "TrashSessionController（createTrashRequest / MANAGE_MEDIA 静默直写 IS_TRASHED）", ios: "PHAssetChangeRequest.deleteAssets（最近删除 30 天；系统强制确认框，无静默等价——台账裁剪项）" }
+    - { feature: "信号存储（blur/exposure/lastViewedAt/dedup_hash）", android: "Room v22/v23 信号列", ios: "TODO（iOS 移植时需定存储方案，登记技术债：纯 Kotlin 管线下沉 shared commonMain 候选）" }
 known_residuals:                                 # 已登记的口径差/裁剪项（非 bug，勿「修复」对齐）
   - id: highCount_vs_highBytes
     desc: "hub 徽标 highCount（建议删除张数）含 DUPLICATES keeper 张数，而 highBytes（可释放字节）与 Hero 已扣 keeper 字节——张数与字节存在 1 张/组的口径差，有意保留（徽标表达「建议集规模」，字节表达「真实可释放」）"
