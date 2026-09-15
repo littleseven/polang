@@ -9,9 +9,14 @@ struct FloatingBottomTab: View {
     var body: some View {
         HStack(spacing: 0) {
             tabItem(icon: "mat_o_photo_camera", page: 0) // 字形切换 camera_alt→photo_camera（对齐 Android 2278d6f7a）
-            tabItem(icon: "mat_o_chat_bubble", page: 2) // Chat 已落地（Phase 6.2）
+            // 整理+扫描页（spec organize.yaml §0 floating_bottom_bar_organize，Android 图标 CleaningServices）
+            // ⚠️ 资产缺口登记：Assets.xcassets 暂无 mat_cleaning_services 系资产——
+            // 过渡用语义最近既有资产 mat_o_delete_sweep（扫除/清扫同义，且与本栏 mat_o_* 描边族一致）；
+            // 资产落地后把此名换成 mat_o_cleaning_services 即可。
+            tabItem(icon: "mat_o_delete_sweep", page: 2)
+            tabItem(icon: "mat_o_chat_bubble", page: 3) // Chat 已落地（Phase 6.2）；页索引位移 2→3
             tabItem(icon: "mat_o_sell", page: -1, isPlaceholder: true) // 打标无独立页
-            tabItem(icon: "mat_o_account_circle", page: 3)
+            tabItem(icon: "mat_o_account_circle", page: 4) // 页索引位移 3→4
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -44,6 +49,7 @@ struct FloatingBottomTab: View {
     private func tabId(for icon: String) -> String {
         switch icon {
         case "mat_o_photo_camera": return "camera"
+        case "mat_o_delete_sweep": return "organize"
         case "mat_o_chat_bubble": return "chat"
         case "mat_o_sell": return "tag"
         case "mat_o_account_circle": return "person"

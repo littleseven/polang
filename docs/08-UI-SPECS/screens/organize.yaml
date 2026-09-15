@@ -456,6 +456,8 @@ platform_differences:
     - { feature: "删除通路", android: "TrashSessionController（createTrashRequest / MANAGE_MEDIA 静默直写 IS_TRASHED）", ios: "PHAssetChangeRequest.deleteAssets（最近删除 30 天；系统强制确认框，无静默等价——台账裁剪项）" }
     - { feature: "信号存储（blur/exposure/lastViewedAt/dedup_hash）", android: "Room v22/v23 信号列", ios: "TODO（iOS 移植时需定存储方案，登记技术债：纯 Kotlin 管线下沉 shared commonMain 候选）" }
 known_residuals:                                 # 已登记的口径差/裁剪项（非 bug，勿「修复」对齐）
+  - id: ios_screen_recording_undetectable
+    desc: "iOS 公开 SDK（≤18.5）无 PHAssetMediaSubtype.videoScreenRecording 亦无录屏智能相册公开 subtype——SCREEN_CONTENT 类目在 iOS 仅覆盖截图（photoScreenshot），录屏不命中；Android 靠路径关键词覆盖录屏。明示裁剪，待 Apple 开放判定 API"
   - id: highCount_vs_highBytes
     desc: "hub 徽标 highCount（建议删除张数）含 DUPLICATES keeper 张数，而 highBytes（可释放字节）与 Hero 已扣 keeper 字节——张数与字节存在 1 张/组的口径差，有意保留（徽标表达「建议集规模」，字节表达「真实可释放」）"
   - id: exact_group_divergence

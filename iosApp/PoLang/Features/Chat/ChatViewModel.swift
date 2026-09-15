@@ -442,22 +442,39 @@ final class ChatViewModel: ObservableObject {
             // 空结果不出卡片：Android uiActions 收集器以 assets.isNotEmpty() 为门，
             // 空结果由 LLM 在最终回复里说明（避免多轮空搜索刷出多条「未找到」气泡）
             guard dto.totalCount > 0, !dto.mediaIds.isEmpty else { return }
-            // ReAct 多轮搜索只保留最后一张卡片：替换本次发送（最后一条 user 消息之后）
-            // 的上一张媒体卡（对齐 Android dropLast 替换语义）
-            if let lastUser = messages.lastIndex(where: { $0.role == .user }),
-               let prevCard = messages[lastUser...].lastIndex(where: { $0.type == .mediaResults }) {
-                messages.remove(at: prevCard)
-            }
             let ids = dto.mediaIds.map { $0.int64Value }
             let header = String(localized: "Found \(dto.totalCount) results for「\(dto.query)」")
-            messages.append(ChatMessage(
-                role: .assistant,
-                text: header,
-                type: .mediaResults,
-                mediaIds: ids,
-                mediaQuery: dto.query,
-                mediaTotalCount: Int(truncatingIfNeeded: dto.totalCount)
-            ))
+            // 回合内 upsert 去重（chat.yaml §9 per_turn_upsert，c4cea4995 定稿口径）：
+            // 同一用户回合（最后一条 user 消息之后）至多一张横滑卡——查本回合上一张卡，
+            // 复用其 id/timestamp 原位替换，卡片位置不动（禁 remove+append 把卡移到回合底部）。
+            // TODO(ios-follow): FIND_SIMILAR 以图搜图自成新回合（replacePreviousInTurn=false，
+            // 追加新卡不覆盖上一回合结果）；iOS 引擎为 stub（send() 直接出不可用提示），
+            // 追加分支随引擎落地补齐。
+            // 注：LLM 拒绝措辞回退直搜 iOS 无此路径（media_results 仅本入口单一来源），
+            // 「本回合已出卡则跳过回退」守卫无从挂载；后续引入回退直搜时须补。
+            if let lastUser = messages.lastIndex(where: { $0.role == .user }),
+               let prevCard = messages[lastUser...].lastIndex(where: { $0.type == .mediaResults }) {
+                let previous = messages[prevCard]
+                messages[prevCard] = ChatMessage(
+                    id: previous.id,
+                    role: .assistant,
+                    text: header,
+                    timestamp: previous.timestamp,
+                    type: .mediaResults,
+                    mediaIds: ids,
+                    mediaQuery: dto.query,
+                    mediaTotalCount: Int(truncatingIfNeeded: dto.totalCount)
+                )
+            } else {
+                messages.append(ChatMessage(
+                    role: .assistant,
+                    text: header,
+                    type: .mediaResults,
+                    mediaIds: ids,
+                    mediaQuery: dto.query,
+                    mediaTotalCount: Int(truncatingIfNeeded: dto.totalCount)
+                ))
+            }
             touchThread(preview: header)
             persist()
         case "text_reply":
