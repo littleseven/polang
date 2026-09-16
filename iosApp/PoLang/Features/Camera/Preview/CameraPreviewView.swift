@@ -1,6 +1,7 @@
 import SwiftUI
 import MetalKit
 import Photos
+import AVFoundation
 
 /// 相机主页面（对标 Android CameraPreviewContent.kt）
 /// 🔴 预览全出血 edge-to-edge + 控件锚 safe area
@@ -11,7 +12,16 @@ struct CameraPreviewView: View {
     /// 🔴 相机激活门控（对标 Android `isActivePage = currentPage == CAMERA`）：全常驻 pager 下相机页
     /// 不会 disappear，改由 MainTabView 传 `currentPage == 0` 驱动 start/stop——
     /// true→授权/start/resume；false→stop 省电防发热。
+    /// 2026-09-16 导航统一后相机为 fullScreenCover 路由，MainTabView 恒传 true。
     var isActive: Bool = false
+    /// 头像拍摄完成回调（MainTabView 注入：dismiss 相机 cover 落回来源页，main-nav.yaml §3）
+    var onAvatarCaptureDone: () -> Void = {}
+    /// 头像拍摄会话（进程内单例观察；pending 非空时本页进入头像拍摄态）
+    @ObservedObject private var avatarCapture = AvatarCaptureController.shared
+    /// 头像拍摄快门时间戳下界（onSaved 反查新照片用）
+    @State private var avatarShutterDate: Date? = nil
+    /// 进入头像态时是否从后置切到了前置（退出/完成时恢复）
+    @State private var avatarRestoreBack = false
     @State private var authorized = false
     @State private var controller = CaptureSessionController()
     @State private var photoController = PhotoCaptureController()
@@ -155,6 +165,24 @@ struct CameraPreviewView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .animation(.easeOut(duration: ShutterTokens.flashFadeMs / 1000), value: shutterFlash)
+
+                // 头像拍摄态提示胶囊（main-nav.yaml §3：surface 0.85 圆角 16、top 120、labelMedium）
+                if avatarCapture.pending != nil {
+                    VStack {
+                        Text(L("avatar_capture_hint"))
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(.label))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color(.systemBackground).opacity(0.85))
+                            )
+                            .padding(.top, 120)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
+                }
             }
         }
         .ignoresSafeArea(.all) // 🔴 全出血：整个 GeometryReader 忽略 safe area
@@ -180,10 +208,18 @@ struct CameraPreviewView: View {
                         }
                     }
                 }
+                // 头像拍摄态激活（cover 弹出时 pending 已登记，需等授权+配置完成后切前置）
+                activateAvatarModeIfNeeded()
             } else if authorized {
                 controller.stop()         // 滑离相机页：腾出相机给系统
             }
         }
+        // 头像拍摄 pending 在相机已激活后登记（防御路径：正常时序是先 pending 后弹 cover）
+        .onChange(of: avatarCapture.pending != nil) { hasPending in
+            if hasPending { activateAvatarModeIfNeeded() }
+        }
+        // 离开相机（dismiss/取消）：恢复镜头朝向（完成路径在 handleAvatarCaptureIfNeeded 内恢复）
+        .onDisappear { restoreLensAfterAvatarIfNeeded() }
         // 🔴 一次性配置（不随进出相机页重复）：MNN 自检 / Debug 叠加层 / 引擎 / 美颜参数 / 缩略图
         .task {
             // MNN 端侧推理离线自检（-mnnSelfTest 时跑；写 Documents/mnn-verify.txt 供验收拉取）
@@ -246,6 +282,40 @@ struct CameraPreviewView: View {
     // MARK: - 权限页
 
     /// 拉取相册最新一张照片缩略图（48pt@3x），显示在左下相册入口上
+    // MARK: - 头像拍摄态（main-nav.yaml §3，对标 Android AvatarCaptureController/Finisher 契约）
+
+    /// 进入头像拍摄态：记录原镜头朝向 → 有前置则切前置（无前置静默保持）→ 标记激活。
+    private func activateAvatarModeIfNeeded() {
+        guard avatarCapture.pending != nil, isActive else { return }
+        if controller.position != .front,
+           AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil {
+            avatarRestoreBack = true
+            controller.switchToPosition(.front)
+        }
+        avatarCapture.markActivated()
+    }
+
+    /// 拍照落库后的头像收尾：设封面 → clear → 恢复镜头 → 通知宿主 dismiss 回来源页。
+    private func handleAvatarCaptureIfNeeded() {
+        guard let pending = avatarCapture.pending, avatarCapture.activated else { return }
+        let shutter = avatarShutterDate ?? Date()
+        Task {
+            await AvatarCaptureFinisher.finish(target: pending.target, shutterDate: shutter)
+            await MainActor.run {
+                avatarCapture.clear()
+                restoreLensAfterAvatarIfNeeded()
+                onAvatarCaptureDone()
+            }
+        }
+    }
+
+    /// 头像态退出恢复后置（仅当本次激活时确实从后置切过前置）。
+    private func restoreLensAfterAvatarIfNeeded() {
+        guard avatarRestoreBack else { return }
+        avatarRestoreBack = false
+        controller.switchToPosition(.back)
+    }
+
     private func refreshLatestThumb() {
         let opts = PHFetchOptions()
         opts.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
@@ -512,13 +582,18 @@ struct CameraPreviewView: View {
                     // 白闪反馈（确认点击注册，对标 Android 拍照闪屏）
                     shutterFlash = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { shutterFlash = false }
+                    // 头像拍摄态：记录快门时间戳下界（落库反查新照片用）
+                    if avatarCapture.pending != nil { avatarShutterDate = Date() }
                     guard let renderer = sharedRenderer else {
                         print("[PoLang] shutter.FAIL: sharedRenderer nil")
                         DebugOverlayState.shared.set("camera.shutter", "error: renderer nil")
                         return
                     }
                     let flow = CaptureFlow(photoController: photoController, renderer: renderer, cropHPerW: captureCropHPerW)
-                    flow.onSaved = { refreshLatestThumb() }
+                    flow.onSaved = {
+                        refreshLatestThumb()
+                        handleAvatarCaptureIfNeeded()
+                    }
                     flow.captureAndSave()
                 }
 

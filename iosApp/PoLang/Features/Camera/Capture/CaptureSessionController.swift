@@ -84,6 +84,18 @@ final class CaptureSessionController: NSObject {
     private var currentPosition: AVCaptureDevice.Position = .back
     private var currentDeviceInput: AVCaptureDeviceInput?
 
+    /// 当前朝向（只读，供头像拍摄态记录/恢复，main-nav.yaml §3）
+    var position: AVCaptureDevice.Position { currentPosition }
+
+    /// 程序化切到指定朝向（已在该朝向则 no-op；无该朝向设备静默保持——
+    /// 对齐 Android hasSystemFeature(FEATURE_CAMERA_FRONT) 检查，避免 flipCamera 无设备时
+    /// 停在 stopRunning 态）。复用 flipCamera 通路（含人脸引擎 isFrontCamera 同步）。
+    func switchToPosition(_ position: AVCaptureDevice.Position) {
+        guard position != currentPosition else { return }
+        guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) != nil else { return }
+        flipCamera()
+    }
+
     /// 把额外 output（如拍照 photoOutput）串行挂到 session。
     /// 🔴 必须走 capture 队列：与 start()/flipCamera() 的 beginConfiguration 块保序，
     /// 禁止从主线程直接 addOutput（与配置块竞态 → capturePhoto 无回调）
