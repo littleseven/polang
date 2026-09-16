@@ -20,7 +20,7 @@ final class CameraSpecUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-uitest"]
+        app.launchArguments = ["-uitest", "-openCamera"]
         addUIInterruptionMonitor(withDescription: "permission alerts") { alert in
             for label in ["Allow Full Access", "Allow", "OK", "允许完全访问", "允许", "好"] {
                 let button = alert.buttons[label]
@@ -249,8 +249,8 @@ final class CameraSpecUITests: XCTestCase {
     // MARK: - helpers
 
     private func navigateToCamera(file: StaticString = #filePath, line: UInt = #line) throws {
-        try requireElement("gallery_grid", timeout: 10, "初始页应为相册网格", file: file, line: line)
-        app.swipeRight()
+        // 2026-09-16 导航统一：相机移出 Pager 改 fullScreenCover（无滑动/底栏入口），
+        // setUp 已带 `-openCamera` 启动直弹相机 cover——此处只等相机就绪
         try requireElement("camera_preview", timeout: 12, "应到相机页", file: file, line: line)
         usleep(1_000_000)
         attachScreenshot(name: "navigate_to_camera")

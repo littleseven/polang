@@ -392,17 +392,12 @@ final class ChatSpecUITests: XCTestCase {
         }
     }
 
-    /// 从相册导航到相机页（参考 PoLangUITests/CameraSpecUITests 的写法）。
+    /// 从相册导航到相机页（2026-09-16 导航统一：相机移出 Pager 改 fullScreenCover 路由，
+    /// 底栏/滑动均无入口——自动化经 launch arg `-openCamera` 重启直弹相机 cover）。
     private func navigateToCamera(file: StaticString = #filePath, line: UInt = #line) throws {
-        let gallery = app.descendants(matching: .any)["gallery_grid"].firstMatch
-        XCTAssertTrue(gallery.waitForExistence(timeout: 10),
-                      "初始页应为相册网格", file: file, line: line)
-
-        // 点相机 Tab（比滑动更可靠——worktree 的 MainTabView 无滑动手势）
-        let cameraTab = app.buttons["tab_camera"]
-        XCTAssertTrue(cameraTab.waitForExistence(timeout: 5),
-                      "相机 Tab 应存在", file: file, line: line)
-        cameraTab.tap()
+        app.terminate()
+        app.launchArguments = ["-uitest", "-openCamera"]
+        app.launch()
 
         // 处理可能弹出的相机权限弹窗（interruption monitor 需要主线程 yield）
         usleep(3_000_000)

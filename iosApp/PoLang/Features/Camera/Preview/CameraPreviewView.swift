@@ -186,9 +186,9 @@ struct CameraPreviewView: View {
             }
         }
         .ignoresSafeArea(.all) // 🔴 全出血：整个 GeometryReader 忽略 safe area
-        // 🔴 相机硬件由 isActive 门控（对标 Android `isActivePage`）：全常驻 pager 下相机页不会 disappear，
-        // 改由 MainTabView 传 `currentPage == 0` 驱动 start/stop——滑离相机页 stop 省电防发热，滑回 resume。
-        // 用 .task(id:) 而非 onChange：首次 view 组合也会跑（onChange 不触发初值），-startPage 0 直进相机页也覆盖。
+        // 🔴 相机硬件由 isActive 门控（对标 Android 路由生命周期 ≥RESUMED）：2026-09-16 导航统一后
+        // 相机为 fullScreenCover 路由，MainTabView 恒传 true；dismiss 即 disappear → stop 释放（见 .onDisappear）。
+        // 用 .task(id:) 而非 onChange：首次 view 组合也会跑（onChange 不触发初值），cover 打开即覆盖。
         .task(id: isActive) {
             if isActive {
                 if authorized {
@@ -218,8 +218,11 @@ struct CameraPreviewView: View {
         .onChange(of: avatarCapture.pending != nil) { hasPending in
             if hasPending { activateAvatarModeIfNeeded() }
         }
-        // 离开相机（dismiss/取消）：恢复镜头朝向（完成路径在 handleAvatarCaptureIfNeeded 内恢复）
-        .onDisappear { restoreLensAfterAvatarIfNeeded() }
+        // 离开相机（cover dismiss）：显式 stop 释放会话（不再依赖 controller dealloc）。
+        // 不做头像镜头 restore——switchToPosition 会在濒死 session 上再 enqueue flip（含 startRunning），
+        // dismiss 后相机多跑数百 ms；下次 cover 打开是全新 controller（默认后置），无需恢复。
+        // 完成路径的 restore 在 handleAvatarCaptureIfNeeded 内、session 存活时已做。
+        .onDisappear { controller.stop() }
         // 🔴 一次性配置（不随进出相机页重复）：MNN 自检 / Debug 叠加层 / 引擎 / 美颜参数 / 缩略图
         .task {
             // MNN 端侧推理离线自检（-mnnSelfTest 时跑；写 Documents/mnn-verify.txt 供验收拉取）
@@ -275,8 +278,7 @@ struct CameraPreviewView: View {
             // 色温持久化（WB chip 映射与手动滑杆共用此通路；恢复时写入同值，幂等无环）
             UserDefaults.standard.set(temp, forKey: "camera_color_temperature")
         }
-        // 相机 stop 改由 isActive 门控（见 .task(id: isActive)）：全常驻 pager 下相机页不会 disappear，
-        // onDisappear 不触发，故移除——滑离相机页由 isActive=false → controller.stop()。
+        // 相机 stop：cover 路由下 dismiss 即 disappear → .onDisappear 显式 controller.stop()（见上）
     }
 
     // MARK: - 权限页
@@ -302,11 +304,22 @@ struct CameraPreviewView: View {
         Task {
             await AvatarCaptureFinisher.finish(target: pending.target, shutterDate: shutter)
             await MainActor.run {
+                // 同一性复检（对齐 Android pending === pendingCapture）：finish 期间 pending
+                // 被取消/替换则放弃收尾，不替别人的会话 clear/dismiss
+                guard avatarCapture.pending == pending else { return }
                 avatarCapture.clear()
                 restoreLensAfterAvatarIfNeeded()
                 onAvatarCaptureDone()
             }
         }
+    }
+
+    /// 拍照/保存失败的头像收尾（对齐 Android finish(success=false)：clear + 返回来源页，
+    /// 用户可从来源页重新发起；非头像态拍照失败保持现状——错误上屏不 dismiss）。
+    private func handleAvatarCaptureFailureIfNeeded() {
+        guard avatarCapture.pending != nil else { return }
+        avatarCapture.clear()
+        onAvatarCaptureDone()
     }
 
     /// 头像态退出恢复后置（仅当本次激活时确实从后置切过前置）。
@@ -594,6 +607,9 @@ struct CameraPreviewView: View {
                         refreshLatestThumb()
                         handleAvatarCaptureIfNeeded()
                     }
+                    // 拍照/保存失败也收尾（对齐 Android finish(success=false)：clear + 返回来源页），
+                    // 否则头像态 pending 残留、用户困在相机页
+                    flow.onFailure = { handleAvatarCaptureFailureIfNeeded() }
                     flow.captureAndSave()
                 }
 

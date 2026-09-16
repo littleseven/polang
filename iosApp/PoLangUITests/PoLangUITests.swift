@@ -34,39 +34,37 @@ final class PoLangUITests: XCTestCase {
     func testSwipeBetweenPages() throws {
         try requireElement("gallery_grid", timeout: 10, "初始页应为相册网格")
 
-        // 相册 → 右滑 → 相机（page 0）
-        app.swipeRight()
-        try requireElement("camera_preview", timeout: 12, "相册右滑应到相机页")
-        attachScreenshot(name: "swipe_camera")
+        // 相册 → 左滑 → 整理页（page 1）
+        app.swipeLeft()
+        try requireElement("organize_segment_organize", timeout: 12, "相册左滑应到整理页")
+        attachScreenshot(name: "swipe_organize")
 
-        // 相机 → 左滑 → 回相册
+        // 整理 → 左滑 → Chat 页（page 2）
         app.swipeLeft()
-        try requireElement("gallery_grid", timeout: 12, "相机左滑应回相册页")
-
-        // 相册 → 左滑 2 次 → Chat 页（页序 Camera(0)/Gallery(1)/Organize(2)/Chat(3)/Person(4)，
-        // 需越过整理+扫描页）
-        app.swipeLeft()
-        app.swipeLeft()
-        try requireElement("chat_input", timeout: 12, "相册左滑两次应到 Chat 页")
+        try requireElement("chat_input", timeout: 12, "整理左滑应到 Chat 页")
         attachScreenshot(name: "swipe_chat")
+
+        // Chat → 右滑两次 → 回相册（页序 Gallery(0)/Organize(1)/Chat(2)/Person(3)/Memories(4)；
+        // 相机已移出 Pager 改 fullScreenCover 路由，不在滑动序列中）
+        app.swipeRight()
+        app.swipeRight()
+        try requireElement("gallery_grid", timeout: 12, "右滑两次应回相册页")
     }
 
-    // MARK: - 用例 2：人物页悬浮 Tab 可跳出（回归：早期 chat 占位页点相机无反应）
+    // MARK: - 用例 2：人物页悬浮 Tab 可跳出（回归：早期 chat 占位页点 Tab 无反应）
 
     func testTabNavigationFromPlaceholder() throws {
         try requireElement("gallery_grid", timeout: 12, "初始页应为相册网格")
 
-        // 到人物页（page 4，真实人物页非占位），点相机 Tab 必须能跳到相机页
+        // 到人物页（page 3，真实人物页非占位），点回忆 Tab 必须能跳到回忆页
         app.swipeLeft()
         app.swipeLeft()
         app.swipeLeft()
         try requireElement("person_root", timeout: 12, "应在人物页")
-        app.buttons["tab_camera"].tap()
-        try requireElement("camera_preview", timeout: 12, "人物页点相机 Tab 应跳相机页")
+        app.buttons["tab_memories"].tap()
+        try requireElement("memories_root", timeout: 12, "人物页点回忆 Tab 应跳回忆页")
 
-        // 相机页无悬浮 Tab（沉浸式），滑回相册再验证 Tab 跳转到真实 Chat 页
-        app.swipeLeft()
-        try requireElement("gallery_grid", timeout: 12, "应回相册页")
+        // 回忆页点聊天 Tab 验证跳转到真实 Chat 页（聊天页沉浸式不渲染底 bar）
         app.buttons["tab_chat"].tap()
         try requireElement("chat_input", timeout: 12, "点 chat Tab 应到 Chat 页")
     }
@@ -117,8 +115,11 @@ final class PoLangUITests: XCTestCase {
     // MARK: - helpers
 
     private func navigateToCamera(file: StaticString = #filePath, line: UInt = #line) throws {
-        try requireElement("gallery_grid", timeout: 10, "初始页应为相册网格", file: file, line: line)
-        app.swipeRight()
+        // 2026-09-16 导航统一：相机移出 Pager 改 fullScreenCover（无滑动/底栏入口），
+        // 自动化经 launch arg `-openCamera` 重启直弹相机 cover
+        app.terminate()
+        app.launchArguments = ["-uitest", "-openCamera"]
+        app.launch()
         try requireElement("camera_preview", timeout: 12, "应到相机页", file: file, line: line)
         // camera_preview 根视图在授权回调前就存在——必须等快门出现才算控件就绪
         // 等待前先存档：若快门缺席，截图直接显示当时屏幕真容（权限弹窗/权限页/控件未渲染）

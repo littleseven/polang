@@ -13,8 +13,8 @@ final class SlimOffUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        // 同一相机页 + 同一 MNN 引擎，仅瘦脸强度置 0（基线 / 无形变）
-        app.launchArguments = ["-startPage", "0", "-mnnEngine", "-slim", "0"]
+        // 同一相机 cover（-openCamera，2026-09-16 相机已路由化）+ 同一 MNN 引擎，仅瘦脸强度置 0（基线 / 无形变）
+        app.launchArguments = ["-openCamera", "-mnnEngine", "-slim", "0"]
         addUIInterruptionMonitor(withDescription: "permission alerts") { alert in
             for label in ["Allow", "OK", "允许", "好"] {
                 let button = alert.buttons[label]

@@ -25,6 +25,11 @@ final class MainNavigationRouter: ObservableObject {
         } else {
             currentPage = 0
         }
+        // UI 自动化直进相机通路（2026-09-16 相机路由化后 Pager 无相机入口）：
+        // launch arg `-openCamera` → 启动即弹相机 fullScreenCover（供 UI 测试进相机）
+        if args.contains("-openCamera") {
+            showCamera = true
+        }
     }
 }
 
@@ -159,9 +164,14 @@ struct MainTabView: View {
     /// camera→相机 cover / gallery→切 Pager 页 0 / settings→设置 cover；其余（含 debug）不受理。
     private func bindNavigationBridge() {
         let router = router
+        let editing = $editingImage
         NavigationBridge.shared.handler = { destination in
+            // 同视图三 cover（camera/settings/editing）互斥：开一个前复位其余，
+            // 防 Agent 单轮连发 navigate_to 并发呈现（SwiftUI 同视图并发 cover 行为未定义）
             switch destination {
             case "camera":
+                router.showSettings = false
+                editing.wrappedValue = nil
                 router.showCamera = true
                 return true
             case "gallery":
@@ -170,6 +180,8 @@ struct MainTabView: View {
                 withTransaction(transaction) { router.currentPage = 0 }
                 return true
             case "settings":
+                router.showCamera = false
+                editing.wrappedValue = nil
                 router.showSettings = true
                 return true
             default:

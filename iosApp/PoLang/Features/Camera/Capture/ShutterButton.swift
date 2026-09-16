@@ -73,6 +73,8 @@ final class CaptureFlow: ObservableObject {
 
     /// 保存成功回调（主线程，供相机页刷新相册入口缩略图）
     var onSaved: (() -> Void)?
+    /// 拍照/保存失败回调（主线程；相机页用于头像拍摄失败收尾，对齐 Android finish(success=false)）
+    var onFailure: (() -> Void)?
 
     init(photoController: PhotoCaptureController, renderer: BeautyRenderer?, cropHPerW: CGFloat? = nil) {
         self.photoController = photoController
@@ -175,5 +177,6 @@ final class CaptureFlow: ObservableObject {
     private func setError(_ msg: String) {
         lastError = msg
         DebugOverlayState.shared.set("camera.shutter", "error: \(msg)")
+        onFailure?()
     }
 }
