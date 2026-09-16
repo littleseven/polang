@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 import SharedKit
 
 // MARK: - 回忆详情页（spec memories.yaml §3 detail_page，路由 memory_detail/{memoryId}）
@@ -19,7 +20,9 @@ struct MemoryDetailView: View {
 
     @State private var showAll = false
     @State private var preview: MemoryPreview?
-    @State private var sharePayload: SharePayload?
+    @State private var sharePayload: MemorySharePayload?
+    /// 分享导出进行中（防重入：期间分享按钮禁用）
+    @State private var isPreparingShare = false
 
     private var memory: Memory? { viewModel.memory(id: memoryId) }
 
@@ -72,7 +75,9 @@ struct MemoryDetailView: View {
             MediaPagerView(items: previewAssets, initial: target.uri)
         }
         .sheet(item: $sharePayload) { payload in
-            ActivityView(activityItems: payload.images)
+            ActivityView(activityItems: payload.urls)
+                // sheet 关闭（手势/分享完成）→ 清理 tmp 导出子目录；item 由 SwiftUI 自动置 nil
+                .onDisappear { payload.cleanup() }
         }
     }
 
@@ -102,6 +107,7 @@ struct MemoryDetailView: View {
                     .frame(width: TopBarTokens.buttonSize, height: TopBarTokens.buttonSize)
             }
             .buttonStyle(.plain)
+            .disabled(isPreparingShare)
             .accessibilityLabel(Text(L("memory_share")))
         }
         .padding(.leading, TopBarTokens.horizontalPadding)
@@ -221,22 +227,88 @@ struct MemoryDetailView: View {
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
-    // MARK: 分享（UIActivityViewController；集合 = 当前 displayUris 跟随开关）
+    // MARK: 分享（文件 URL 导出：逐张导出原片到 tmp 子目录 → UIActivityViewController 传文件 URL，
+    // sheet 关闭即清理 tmp。零位图驻留、集合不截断——「全部」= allItemUris 全集直传，对齐
+    // Android ACTION_SEND_MULTIPLE 传 uri 不解码的语义；集合 = 当前 displayUris 跟随开关）
 
     private func share() {
+        guard !isPreparingShare else { return }
         let uris = displayUris
         guard !uris.isEmpty else { return }
-        Task { @MainActor in
-            // PHAsset 反查 → UIImage（对齐 MediaPagerView 分享通路：2000px 高清档，端侧零网络）
-            var images: [UIImage] = []
-            for uri in uris {
-                if let image = await ThumbnailLoader.shared.thumbnail(
-                    for: uri, size: CGSize(width: 2000, height: 2000), highQuality: true) {
-                    images.append(image)
+        isPreparingShare = true
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("memory-share-\(UUID().uuidString)")
+        Task.detached(priority: .userInitiated) {
+            // 后台逐张顺序导出（控内存/IO 峰值）；全部完成后一次性回主线程弹 sheet
+            let urls = await Self.exportShareFiles(uris: uris, to: directory)
+            await MainActor.run {
+                isPreparingShare = false
+                guard !urls.isEmpty else {
+                    // 全部失败 → 清理空目录、不弹 sheet
+                    try? FileManager.default.removeItem(at: directory)
+                    return
+                }
+                sharePayload = MemorySharePayload(urls: urls) {
+                    try? FileManager.default.removeItem(at: directory)
                 }
             }
-            guard !images.isEmpty else { return }
-            sharePayload = SharePayload(images: images)
+        }
+    }
+
+    /// 逐张导出到 tmp 子目录；单张失败（资源缺失/iCloud 云端-only）跳过不中断。
+    private static func exportShareFiles(uris: [String], to directory: URL) async -> [URL] {
+        let fileManager = FileManager.default
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return []
+        }
+        var urls: [URL] = []
+        for uri in uris {
+            guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [uri], options: nil).firstObject,
+                let resource = primaryShareResource(for: asset)
+            else { continue }
+            let fileName = shareFileName(for: resource)
+            var target = directory.appendingPathComponent(fileName)
+            if fileManager.fileExists(atPath: target.path) {
+                // 同名不同资产 → uuid 前缀防覆盖
+                target = directory.appendingPathComponent("\(UUID().uuidString)-\(fileName)")
+            }
+            do {
+                try await writeResourceData(resource, to: target)
+                urls.append(target)
+            } catch {
+                try? fileManager.removeItem(at: target)
+            }
+        }
+        return urls
+    }
+
+    /// 主资源：照片取 type == .photo，否则首个（与 PhMediaBridge.fetchAllMedia 的
+    /// fileName .first 同源口径）。
+    private static func primaryShareResource(for asset: PHAsset) -> PHAssetResource? {
+        let resources = PHAssetResource.assetResources(for: asset)
+        return resources.first(where: { $0.type == .photo }) ?? resources.first
+    }
+
+    private static func shareFileName(for resource: PHAssetResource) -> String {
+        let raw = resource.originalFilename.replacingOccurrences(of: "/", with: "_")
+        return raw.isEmpty ? "\(UUID().uuidString).jpg" : raw
+    }
+
+    /// PHAssetResourceManager.writeData 的 completionHandler API → async 包装（恰 resume 一次）。
+    private static func writeResourceData(_ resource: PHAssetResource, to url: URL) async throws {
+        let options = PHAssetResourceRequestOptions()
+        // [PRIVACY] 端侧零网络口径（同 ThumbnailLoader）：iCloud 云端-only 资产失败 → 跳过
+        options.isNetworkAccessAllowed = false
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            PHAssetResourceManager.default().writeData(for: resource, toFile: url, options: options) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
         }
     }
 }
@@ -245,6 +317,14 @@ struct MemoryDetailView: View {
 private struct MemoryPreview: Identifiable {
     let uri: String
     var id: String { uri }
+}
+
+/// 回忆分享载体（文件 URL 版；sheet(item:) 需 Identifiable）：tmp 导出子目录内文件 URL 列表 +
+/// sheet 关闭后的目录清理闭包。与 Gallery 侧 SharePayload(images:) 位图通路相互独立、互不影响。
+private struct MemorySharePayload: Identifiable {
+    let id = UUID()
+    let urls: [URL]
+    let cleanup: () -> Void
 }
 
 /// 详情封面图（裁切填满；大图请求；占位/失败 = surfaceContainer 色块，禁交叉淡入）。

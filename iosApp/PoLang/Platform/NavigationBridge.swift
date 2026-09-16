@@ -12,7 +12,9 @@ import SharedKit
     static let shared = NavigationBridge()
 
     /// MainTabView 在 onAppear 绑定（主线程）：camera→相机 cover / gallery→切 Pager 页 0 /
-    /// settings→设置 cover；返回 false = 目的地不支持（含 debug）。nil → 一律不受理。
+    /// settings→设置 cover / model_center→模型中心 cover；别名与 Android
+    /// NavigationCapability.parseDestination 1:1（lowercase + 中文别名）。
+    /// 返回 false = 目的地不支持（含 debug——iOS 无 Debug 页，平台差异已登记）。nil → 一律不受理。
     var handler: ((String) -> Bool)?
 
     private override init() {}

@@ -189,8 +189,8 @@ platform_differences:
       ios: UserDefaults string array
       shared_semantics: "id 集合整体读写、幂等 hide、响应式重发"
     - feature: 分享
-      android: "ACTION_SEND_MULTIPLE + FLAG_GRANT_READ_URI_PERMISSION"
-      ios: "UIActivityViewController（PHAsset 本地标识反查 UIImage/URL）"
+      android: "ACTION_SEND_MULTIPLE + FLAG_GRANT_READ_URI_PERMISSION（uri 流式不解码位图）"
+      ios: "UIActivityViewController + PHAssetResourceManager 导出 tmp 文件 URL（2026-09-17 改：零位图驻留、集合不截断、sheet 关闭即清理 tmp 目录）"
       shared_semantics: "分享集合 = 当前 displayUris 跟随开关"
     - feature: 预览删除授权
       android: "API29 恢复性删除 / API30+ createDeleteRequest + 上滑回收站"

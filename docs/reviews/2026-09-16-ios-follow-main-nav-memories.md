@@ -61,12 +61,19 @@ MemoriesGenerator / MemoriesViewModel / TagDatabase+Memories 全绿，仅两个 
 - 截图比对浅色+深色双跑（SSIM ≥ 0.80）；回忆页/底栏五项像素级对齐
 - XCTest（MemoriesGeneratorTests 12 例）+ UITest 全量跑批（MNN.framework arm64-only，本机 Intel 宿主模拟器链接不过，只能真机）
 - 回忆页生成观感（照片质量分/人物聚类数据依赖真机库）
+- 【清零轮新增】设置 Hero 卡角标只弹相机 cover 不跳账号页；拍照后 hero 头像刷新
+- 【清零轮新增】相机记忆水合体感（重开 cover 镜头/变焦/比例/网格恢复；头像拍摄结束恢复记录朝向）
+- 【清零轮新增】回忆分享文件 URL 导出（大集合内存表现 + 临时文件清理）
+- 【清零轮新增】UITest 用例5 testPersonAvatarCaptureEntry 真机跑批（人脸聚类数据依赖真机库）
+- 【清零轮新增】navigate_to(model_center) 真机链路（cover 打开/返回键退出）+ 多选态底 bar 隐藏体感
 
-### 📋 技术债清单
-1. 设置页 Hero 卡头像拍摄入口（Android 有，iOS v1 不做，main-nav.yaml allowed_differences 已登记）
-2. Agent navigate_to 其余目的地（debug 等 6 个）iOS N/A——debug 返回 INVALID_REQUEST，其余未受理
-3. Y3 相机记忆水合（CameraMemoryState 移植：镜头朝向/变焦/比例/网格跨会话记忆）
-4. B5 person_avatar_capture 锚点 e2e 用例（需人脸聚类测试夹具）
-5. B4 底 bar 页内态隐藏门控（相册详情/整理二级态）
-6. B3 Scene.CAMERA 切换（待相机域 Agent 能力移植时一并做）
-7. 回忆分享大集合内存风险（详情页分享拼图全量渲染，未做分页/降采样）
+### 📋 技术债清单（2026-09-17 清零轮全部清偿 ✅，见本分支最新提交「fix(ios): 技术债清零轮」）
+1. ~~设置页 Hero 卡头像拍摄入口~~ ✅ 已做：SettingsScreen hero 卡 + 角标入口（settings_avatar_capture → selfTarget）
+2. ~~Agent navigate_to 其余目的地~~ ✅ 已做：model_center 落地（router + NavigationBridge + 模型中心 cover）；别名双端 1:1（lowercase + 中文别名）；debug 转为正式平台差异（登记 §4/§5，非债）
+3. ~~Y3 相机记忆水合~~ ✅ 已做：镜头朝向/变焦/比例/网格四个 UserDefaults 键水合（camera_lens_front/camera_zoom_preset/camera_ratio/camera_grid，camera.yaml §2.5）
+4. ~~B5 person_avatar_capture 锚点 e2e 用例~~ ✅ 已做：person_cell_<id> 锚点 + PoLangUITests testPersonAvatarCaptureEntry（无人脸聚类数据时 XCTSkip）
+5. ~~B4 底 bar 页内态隐藏门控~~ ✅ 已做：GalleryGridView onSelectionModeChanged 上报 → MainTabView overlay 门控；搜索网格多选态横滑阻断（审查 🟡 修复）
+6. ~~B3 Scene.CAMERA 切换~~ ✅ 已做：IosAgentComposition.onCameraRouteChanged（打开暂存进入前场景→CAMERA，关闭恢复暂存 + 页映射兜底）
+7. ~~回忆分享大集合内存风险~~ ✅ 已做：MemoryDetailView 分享改 MemorySharePayload 文件 URL 导出（PHAssetResourceManager 临时文件，sheet 关闭清理）
+
+> 清零轮另消化交叉审查 1🔴/3🟡/2🔵：model_center cover 补 NavigationStack（🔴）、人物页相机 dismiss 场景滞留修复（🟡）、搜索网格多选横滑阻断（🟡）、navigate_to lowercase+中文别名对齐（🟡）、gallery 分支四 cover 互斥（🔵）、NavigationBridge 注释同步（🔵）。

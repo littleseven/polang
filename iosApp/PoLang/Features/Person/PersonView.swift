@@ -250,6 +250,8 @@ private struct PersonCardView: View {
         .clipShape(UnevenRoundedRectangle(cornerRadii: .init(
             topLeading: PersonTokens.cardRadius, topTrailing: PersonTokens.cardRadius)))
         .accessibilityLabel(Text(person.name ?? String(format: L("Person #%1$d"), Int(person.id))))
+        // UI 自动化格锚点（对标 gallery cell_；封面点击经 onCoverTap 进人物信息页）
+        .accessibilityIdentifier("person_cell_\(person.id)")
     }
 
     /// 张数角标（黑 60% 全圆角胶囊，白 11 SemiBold 紧凑式计数）

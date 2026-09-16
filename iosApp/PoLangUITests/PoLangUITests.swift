@@ -112,6 +112,49 @@ final class PoLangUITests: XCTestCase {
         attachScreenshot(name: "gallery_after_entry") // 左上角最新格可肉眼核对拍照方向
     }
 
+    // MARK: - 用例 5：人物页头像拍摄入口（main-nav.yaml §3 entries_ui.people_page）
+
+    /// 人物卡片 → PersonInfoView 头像相机角标 → 相机 fullScreenCover → dismiss 落回来源页；
+    /// 不拍照（避免污染相册），pending 未消费由 App 侧在 cover 关闭时自动清除。
+    /// 依赖真机人脸聚类数据，CI 无人脸库时 XCTSkip 是预期行为。
+    func testPersonAvatarCaptureEntry() throws {
+        // 1. 初始页相册 → 点底栏 tab_person 到人物页（page 3）
+        try requireElement("gallery_grid", timeout: 10, "初始页应为相册网格")
+        app.buttons["tab_person"].tap()
+        try requireElementOrDump("person_root", timeout: 12, "点底栏人物 Tab 应到人物页")
+        attachScreenshot(name: "person_page")
+
+        // 2. 找第一个人物卡片（封面锚点 person_cell_<id>）；5s 不出现 → 无人脸聚类数据，按套件先例跳过
+        let cell = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'person_cell_'")).firstMatch
+        guard cell.waitForExistence(timeout: 5) else {
+            throw XCTSkip("无人脸聚类数据，跳过头像入口测试")
+        }
+
+        // 3. 点卡片 → PersonInfoView 打开（fullScreenCover 非 push），头像区带相机角标
+        cell.tap()
+        try requireElementOrDump("person_avatar_capture", timeout: 8, "人物信息页应带头像拍摄角标")
+        attachScreenshot(name: "person_info_avatar_badge")
+
+        // 4. 点角标 → 相机 fullScreenCover 弹出（pending 登记经 MainTabView 弹层；
+        //    权限弹窗由 setUp 的 interruption monitor 自动允许）。
+        //    camera_preview 根视图在授权回调前就存在，须等左下相册入口出现才算控件就绪
+        element("person_avatar_capture").tap()
+        try requireElementOrDump("camera_preview", timeout: 12, "点头像角标应弹出相机 fullScreenCover")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).tap() // 点预览驱动 interruption monitor（若权限弹窗在顶）
+        try requireElementOrDump("camera_gallery_thumb", timeout: 8, "相机 cover 控件未就绪")
+        attachScreenshot(name: "avatar_capture_camera_cover")
+
+        // 5. 收尾：点左下相册入口 = dismiss 相机 cover，落回来源页 PersonInfoView；不拍照
+        element("camera_gallery_thumb").tap()
+        try requireElementOrDump("person_avatar_capture", timeout: 8, "dismiss 相机 cover 应落回人物信息页")
+
+        // 关 PersonInfoView：顶栏返回箭头（person_info_back 锚点）
+        element("person_info_back").tap()
+        // 终点断言：person_root 再现（相机 → 信息页 → 人物页整条弹层链退净）
+        try requireElementOrDump("person_root", timeout: 8, "关闭信息页后应回人物页（person_root 再现）")
+    }
+
     // MARK: - helpers
 
     private func navigateToCamera(file: StaticString = #filePath, line: UInt = #line) throws {
@@ -143,6 +186,18 @@ final class PoLangUITests: XCTestCase {
                                 file: StaticString = #filePath, line: UInt = #line) throws {
         let query = app.descendants(matching: .any)[id]
         XCTAssertTrue(query.waitForExistence(timeout: timeout), message, file: file, line: line)
+    }
+
+    /// requireElement + 失败时 dump 无障碍树（新用例逐步排查；参照 navigateToCamera 的 A11Y-DUMP 写法）
+    private func requireElementOrDump(_ id: String, timeout: TimeInterval, _ message: String,
+                                      file: StaticString = #filePath, line: UInt = #line) throws {
+        guard app.descendants(matching: .any)[id].waitForExistence(timeout: timeout) else {
+            print("A11Y-DUMP-BEGIN (missing: \(id))")
+            print(app.debugDescription.prefix(12000))
+            print("A11Y-DUMP-END")
+            XCTFail(message, file: file, line: line)
+            return
+        }
     }
 
     private func attachScreenshot(name: String) {

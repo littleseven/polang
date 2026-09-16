@@ -17,7 +17,9 @@ import kotlinx.coroutines.CancellationException
  * 层真实切页/弹出（此前 iOS 无执行端，命令折叠成「✅ 已执行」展示串不生效）。
  *
  * 支持目的地（main-nav.yaml §4）：camera（相机 fullScreenCover）/ gallery（切 Pager 页 0）/
- * settings（设置 fullScreenCover）；debug 及其余目的地返回 [AgentErrorCode.INVALID_REQUEST]。
+ * settings（设置 fullScreenCover）/ model_center（模型中心 cover，含 Android 别名
+ * llm_model_manager/asr_model_manager 与中文别名，由 Swift 桥层归一映射）；
+ * debug 及其余目的地返回 [AgentErrorCode.INVALID_REQUEST]（iOS 无 Debug 页，平台差异已登记）。
  *
  * 场景：应用级能力，沿用 [BaseCapability] 默认（全场景可用）。
  */
@@ -28,14 +30,14 @@ class IosNavigationCapability(
     private val tag = "PoLang:IosNavigationCapability"
 
     override val name: String = "ios_navigation"
-    override val description: String = "导航到指定页面：相机/相册/设置"
+    override val description: String = "导航到指定页面：相机/相册/设置/模型中心"
 
     override fun supportedCommands(): List<String> = listOf(COMMAND_NAVIGATE_TO)
 
     override fun isAvailable(): Boolean = bridge != null
 
     override fun getCommandDescription(command: String): String = when (command) {
-        COMMAND_NAVIGATE_TO -> "导航到页面，参数: destination (camera/gallery/settings)"
+        COMMAND_NAVIGATE_TO -> "导航到页面，参数: destination (camera/gallery/settings/model_center)"
         else -> super.getCommandDescription(command)
     }
 

@@ -96,6 +96,16 @@ back_stack:
     action: exit_camera         # Back 退出相机
 
 # ============================================================================
+# 2.5 相机状态记忆（CameraMemoryState；跨会话水合，2026-09-17 iOS 补齐对齐）
+# ============================================================================
+state_memory:
+  scope: [lens_position, zoom_preset, aspect_ratio, composition_grid, white_balance]  # WB 既有（camera_wb_mode）
+  android: DataStore CameraMemoryState（CameraScreen isCameraMemoryHydrated 水合）
+  ios: "UserDefaults：camera_lens_front(Bool) / camera_zoom_preset(Double) / camera_ratio(full|ratio43|ratio169) / camera_grid(off|thirds|golden)；cover 打开授权后水合"
+  launch_arg_priority: "验收启动参数 > 持久值 > 默认（-ratio43/-ratio169/-slim 等既有模式）"
+  avatar_capture_exclusion: "头像拍摄临时切前置不写记忆；完成/取消恢复到进入头像态前的朝向（avatarRestorePosition）"
+
+# ============================================================================
 # 3. 顶部左侧控件组（CameraLeftControls）
 # ============================================================================
 # 位置：Alignment.TopStart，避让状态栏/刘海区域

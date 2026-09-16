@@ -181,4 +181,28 @@ object IosAgentComposition {
         }
         orchestrator.transitionToScene(scene, saveToHistory = false)
     }
+
+    /// 相机 cover 打开前的场景暂存（关闭时恢复；人物页无场景映射，重发页映射恢复不到来源场景）
+    private var sceneBeforeCamera: SceneManager.Scene? = null
+
+    /**
+     * 相机 fullScreenCover 路由同步 SceneManager（2026-09-17 补齐，main-nav.yaml §2）：
+     * cover 打开 → CAMERA 场景（对齐 Android 相机路由 ≥RESUMED 时 Scene.CAMERA；
+     * iOS 此前 cover 期间沿用来源页场景，navigate_to(camera) 等相机域命令会被错误入队）。
+     * cover 关闭 → 恢复暂存场景；MainTabView 随后重发 [onMainPageChanged] 页映射兜底纠偏
+     * （页 0/1/2/4 两者一致；人物页页映射为 no-op，全靠暂存恢复，防场景滞留 CAMERA）。
+     *
+     * @param active 相机 cover 是否呈现中
+     */
+    fun onCameraRouteChanged(active: Boolean) {
+        val orchestrator = AgentOrchestrator.getInstance()
+        if (active) {
+            sceneBeforeCamera = orchestrator.currentScene.value
+                .takeIf { it != SceneManager.Scene.CAMERA }
+            orchestrator.transitionToScene(SceneManager.Scene.CAMERA, saveToHistory = false)
+        } else {
+            sceneBeforeCamera?.let { orchestrator.transitionToScene(it, saveToHistory = false) }
+            sceneBeforeCamera = null
+        }
+    }
 }

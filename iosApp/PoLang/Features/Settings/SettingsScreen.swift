@@ -23,6 +23,9 @@ struct SettingsScreen: View {
     @State private var heroQuotaUsed = 0
     @State private var heroQuotaLimit = 0
     @State private var heroQuotaLoaded = false
+    /// 「我」的人物封面（hero 头像；main-nav.yaml §3 entries_ui.settings_hero，对齐 Android AccountHeroCard）
+    @State private var selfAvatarLid: String?
+    @State private var selfAvatarFocusY: Float?
     private var loggedIn: Bool { !authToken.isEmpty }
 
     var body: some View {
@@ -51,11 +54,16 @@ struct SettingsScreen: View {
             TagScanScreen(onDismiss: { showGalleryConsole = false })
         }
         .task {
+            loadSelfAvatar()
             guard loggedIn else { return }
             // hero 额度查询失败静默（详情页会重试）
             if let q = try? await PoLangAuthClient.shared.getQuota(token: authToken) {
                 heroQuotaUsed = q.llmCallsUsed; heroQuotaLimit = q.llmCallsLimit; heroQuotaLoaded = true
             }
+        }
+        // 头像拍摄完成（相机 cover 落回本页）→ 重查「我」的封面刷新头像
+        .onReceive(NotificationCenter.default.publisher(for: .avatarCoverUpdated)) { _ in
+            loadSelfAvatar()
         }
     }
 
@@ -76,18 +84,56 @@ struct SettingsScreen: View {
 
     // MARK: - ① Account Hero Card
 
+    /// 「我」封面解析：selfPersonId → person.coverMediaId → coverInfo。
+    /// Task.detached 查库（TagDatabase/PersonRepository 走内部串行队列，任意线程可调）、主线程回填；
+    /// 无「我」标记人物或无封面时静默保持静态图标兜底。
+    private func loadSelfAvatar() {
+        Task.detached(priority: .userInitiated) {
+            let cover = TagDatabase.shared.selfPersonId()
+                .flatMap { PersonRepository.shared.person($0)?.coverMediaId }
+                .flatMap { TagDatabase.shared.coverInfo(mediaId: $0) }
+            await MainActor.run {
+                selfAvatarLid = cover?.localIdentifier
+                selfAvatarFocusY = cover?.faceFocusY
+            }
+        }
+    }
+
     private var accountHeroCard: some View {
         NavigationLink {
             AccountSettingsView()
         } label: {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle()
-                        .fill(Color.accentColor.opacity(0.15))
-                        .frame(width: 48, height: 48)
-                    Image(matIcon: "person")
-                        .font(.system(size: 24))
-                        .foregroundColor(.accentColor)
+                    if let lid = selfAvatarLid {
+                        ThumbnailView(localIdentifier: lid, faceFocusY: selfAvatarFocusY, cornerRadius: 0)
+                            .frame(width: 48, height: 48)
+                            .clipShape(Circle())
+                    } else {
+                        // 无「我」封面兜底：静态人像图标
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.15))
+                            .frame(width: 48, height: 48)
+                        Image(matIcon: "person")
+                            .font(.system(size: 24))
+                            .foregroundColor(.accentColor)
+                    }
+                }
+                // 相机角标 = 「拍摄头像」入口（PersonInfoView cameraBadge 等比缩小）；
+                // 内层 Button 优先命中，不触发整卡 NavigationLink 跳转账号页
+                .overlay(alignment: .bottomTrailing) {
+                    Button {
+                        AvatarCaptureController.shared.begin(target: .selfTarget, origin: .settingsPage)
+                    } label: {
+                        MatIcon(name: "mat_o_photo_camera", size: 10)
+                            .foregroundColor(s.onPrimary)
+                            .frame(width: 20, height: 20)
+                            .background(Circle().fill(s.primary))
+                            .overlay(Circle().stroke(s.background, lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings_avatar_capture")
+                    .accessibilityLabel(Text(L("avatar_capture_hint")))
                 }
 
                 VStack(alignment: .leading, spacing: 2) {

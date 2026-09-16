@@ -20,8 +20,8 @@ struct CameraPreviewView: View {
     @ObservedObject private var avatarCapture = AvatarCaptureController.shared
     /// 头像拍摄快门时间戳下界（onSaved 反查新照片用）
     @State private var avatarShutterDate: Date? = nil
-    /// 进入头像态时是否从后置切到了前置（退出/完成时恢复）
-    @State private var avatarRestoreBack = false
+    /// 进入头像态前的镜头朝向（完成时恢复到该朝向；对标 Android CameraMemoryState 记忆语义，不再硬编码后置）
+    @State private var avatarRestorePosition: AVCaptureDevice.Position? = nil
     @State private var authorized = false
     @State private var controller = CaptureSessionController()
     @State private var photoController = PhotoCaptureController()
@@ -60,12 +60,30 @@ struct CameraPreviewView: View {
         return v
     }
 
-    /// 比例启动覆盖（验收/诊断用；-ratio43 / -ratio169，否则 FULL）
+    /// 比例解析（对标 Android CameraMemoryState 水合）：启动参数覆盖（验收/诊断用）> UserDefaults "camera_ratio" > 默认 FULL
     private static func resolveRatio() -> AspectMode {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-ratio43") { return .ratio43 }
         if args.contains("-ratio169") { return .ratio169 }
-        return .full
+        switch UserDefaults.standard.string(forKey: "camera_ratio") {
+        case "ratio43": return .ratio43
+        case "ratio169": return .ratio169
+        default: return .full
+        }
+    }
+
+    /// 构图网格记忆水合（对标 Android CameraMemoryState）：UserDefaults "camera_grid" > 默认关闭
+    private static func resolveGrid() -> GridType {
+        switch UserDefaults.standard.string(forKey: "camera_grid") {
+        case "thirds": return .thirds
+        case "golden": return .golden
+        default: return .off
+        }
+    }
+
+    /// 变焦预设记忆水合（对标 Android CameraMemoryState）：UserDefaults "camera_zoom_preset" > 默认 1x
+    private static func resolveZoomPreset() -> CGFloat {
+        CGFloat(UserDefaults.standard.object(forKey: "camera_zoom_preset") as? Double ?? 1.0)
     }
 
     /// 面板启动覆盖（自动化验收用）：-openPanel beauty|filter|grid|ratio|pro，
@@ -94,12 +112,14 @@ struct CameraPreviewView: View {
     @State private var activePanel: ActivePanel? = Self.resolveInitialPanel()
     // 🔴 renderer 提到视图层直持：快门链路不再依赖 representable 回调往返（nil 则拍照静默失败）
     @State private var sharedRenderer: BeautyRenderer? = CameraPreviewView.makeRenderer()
-    @State private var zoomPreset: CGFloat = 1.0
+    // 变焦预设记忆水合（对标 Android CameraMemoryState）：初始值读 UserDefaults "camera_zoom_preset"
+    @State private var zoomPreset: CGFloat = Self.resolveZoomPreset()
     @State private var selectedMode: CameraMode = .photo
     @State private var shutterFlash = false
     @State private var lastThumb: UIImage?
-    // 构图网格（对标 Android currentGrid）
-    @State private var currentGrid: GridType = .off
+    // 构图网格（对标 Android currentGrid；记忆水合对标 Android CameraMemoryState）
+    @State private var currentGrid: GridType = Self.resolveGrid()
+    // 画面比例记忆水合（对标 Android CameraMemoryState）：resolveRatio 启动参数 > 持久值 > FULL
     @State private var currentRatio: AspectMode = Self.resolveRatio()
     @State private var exposureComp: Double = 0      // EV -2..2（AVCapture setExposureBias）
     // WB 模式持久化（对标 Android CameraMemoryState.whiteBalanceMode；色温值经 camera_color_temperature 持久化）
@@ -117,10 +137,31 @@ struct CameraPreviewView: View {
             }
         }
     }
-    // 构图网格（对标 Android GridType）
-    enum GridType: Equatable { case off, thirds, golden }
-    // 画面比例（对标 Android CameraAspectRatio：FULL=填充裁剪，4:3/16:9=FIT 留黑边）
-    enum AspectMode: Equatable { case full, ratio43, ratio169 }
+    // 构图网格（对标 Android GridType）；persistKey = 记忆持久化字符串（对标 Android CameraMemoryState 水合）
+    enum GridType: Equatable {
+        case off, thirds, golden
+
+        var persistKey: String {
+            switch self {
+            case .off: return "off"
+            case .thirds: return "thirds"
+            case .golden: return "golden"
+            }
+        }
+    }
+    // 画面比例（对标 Android CameraAspectRatio：FULL=填充裁剪，4:3/16:9=FIT 留黑边）；
+    // persistKey = 记忆持久化字符串（对标 Android CameraMemoryState 水合）
+    enum AspectMode: Equatable {
+        case full, ratio43, ratio169
+
+        var persistKey: String {
+            switch self {
+            case .full: return "full"
+            case .ratio43: return "ratio43"
+            case .ratio169: return "ratio169"
+            }
+        }
+    }
 
     /// 视图层直建 renderer（failable init，失败时快门报错而非静默）
     private static func makeRenderer() -> BeautyRenderer? {
@@ -208,6 +249,14 @@ struct CameraPreviewView: View {
                         }
                     }
                 }
+                // 镜头朝向记忆水合（对标 Android CameraMemoryState）：授权+配置完成后恢复前置；🔴 头像临时切前置不入记忆（pending 非空时跳过）
+                if (UserDefaults.standard.object(forKey: "camera_lens_front") as? Bool) ?? false,
+                   controller.position != .front,
+                   avatarCapture.pending == nil {
+                    controller.switchToPosition(.front)
+                }
+                // 变焦预设水合应用（对标 Android CameraMemoryState）：恢复硬件变焦，否则仅胶囊高亮
+                if zoomPreset != 1.0 { controller.setZoom(zoomPreset) }
                 // 头像拍摄态激活（cover 弹出时 pending 已登记，需等授权+配置完成后切前置）
                 activateAvatarModeIfNeeded()
             } else if authorized {
@@ -291,7 +340,8 @@ struct CameraPreviewView: View {
         guard avatarCapture.pending != nil, isActive else { return }
         if controller.position != .front,
            AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil {
-            avatarRestoreBack = true
+            // 记录进入头像态前朝向（对标 Android CameraMemoryState 语义：恢复到记忆朝向而非硬编码后置）
+            avatarRestorePosition = controller.position
             controller.switchToPosition(.front)
         }
         avatarCapture.markActivated()
@@ -322,11 +372,11 @@ struct CameraPreviewView: View {
         onAvatarCaptureDone()
     }
 
-    /// 头像态退出恢复后置（仅当本次激活时确实从后置切过前置）。
+    /// 头像态退出恢复进入前朝向（仅当本次激活时确实切过前置；对标 Android CameraMemoryState 记忆语义）。
     private func restoreLensAfterAvatarIfNeeded() {
-        guard avatarRestoreBack else { return }
-        avatarRestoreBack = false
-        controller.switchToPosition(.back)
+        guard let restore = avatarRestorePosition else { return }
+        avatarRestorePosition = nil
+        controller.switchToPosition(restore)
     }
 
     private func refreshLatestThumb() {
@@ -372,6 +422,20 @@ struct CameraPreviewView: View {
     }
 
     private func closePanel() { withAnimation { activePanel = nil } }
+
+    /// 比例选择 + 写回记忆（对标 Android CameraMemoryState 水合，UserDefaults "camera_ratio"）
+    private func selectRatio(_ ratio: AspectMode) {
+        currentRatio = ratio
+        UserDefaults.standard.set(ratio.persistKey, forKey: "camera_ratio")
+        closePanel()
+    }
+
+    /// 构图网格选择 + 写回记忆（对标 Android CameraMemoryState 水合，UserDefaults "camera_grid"）
+    private func selectGrid(_ grid: GridType) {
+        currentGrid = grid
+        UserDefaults.standard.set(grid.persistKey, forKey: "camera_grid")
+        closePanel()
+    }
 
     /// 当前比例对应的拍照裁剪 h/w（FULL=nil 不裁；4:3→4/3，16:9→16/9，对标 Android 拍照 aspect crop）
     private var captureCropHPerW: CGFloat? {
@@ -550,6 +614,8 @@ struct CameraPreviewView: View {
                     Button {
                         zoomPreset = val
                         controller.setZoom(val)
+                        // 变焦预设写回记忆（对标 Android CameraMemoryState 水合）
+                        UserDefaults.standard.set(Double(val), forKey: "camera_zoom_preset")
                     } label: {
                         Text(label)
                             .font(.system(size: 12, weight: .bold))
@@ -618,7 +684,15 @@ struct CameraPreviewView: View {
                 ShutterSideButton(
                     identifier: "camera_flip",
                     label: String(localized: "Flip"),
-                    action: { controller.flipCamera() }
+                    action: {
+                        // 镜头朝向记忆写回（对标 Android CameraMemoryState 水合）：flip 即 back↔front 互换，直接取反持久化
+                        let flippedToFront = controller.position != .front
+                        controller.flipCamera()
+                        // 🔴 头像拍摄态下的手动 flip 不入记忆（临时朝向，收尾时恢复进入前朝向）
+                        if avatarCapture.pending == nil {
+                            UserDefaults.standard.set(flippedToFront, forKey: "camera_lens_front")
+                        }
+                    }
                 ) {
                     Circle()
                         .fill(Color.white.opacity(0.2))
@@ -639,16 +713,18 @@ struct CameraPreviewView: View {
         InlineControlPanel(fillWidth: panel != .ratio && panel != .grid) {
             switch panel {
             case .ratio:
+                // 比例选择写回记忆（对标 Android CameraMemoryState 水合）
                 selectorChipRow([
-                    ("4:3", currentRatio == .ratio43, { currentRatio = .ratio43; closePanel() }),
-                    ("16:9", currentRatio == .ratio169, { currentRatio = .ratio169; closePanel() }),
-                    ("Fullscreen", currentRatio == .full, { currentRatio = .full; closePanel() }),
+                    ("4:3", currentRatio == .ratio43, { selectRatio(.ratio43) }),
+                    ("16:9", currentRatio == .ratio169, { selectRatio(.ratio169) }),
+                    ("Fullscreen", currentRatio == .full, { selectRatio(.full) }),
                 ])
             case .grid:
+                // 构图网格选择写回记忆（对标 Android CameraMemoryState 水合）
                 selectorChipRow([
-                    ("Off Grid", currentGrid == .off, { currentGrid = .off; closePanel() }),
-                    ("Nine Grid", currentGrid == .thirds, { currentGrid = .thirds; closePanel() }),
-                    ("Golden Ratio", currentGrid == .golden, { currentGrid = .golden; closePanel() }),
+                    ("Off Grid", currentGrid == .off, { selectGrid(.off) }),
+                    ("Nine Grid", currentGrid == .thirds, { selectGrid(.thirds) }),
+                    ("Golden Ratio", currentGrid == .golden, { selectGrid(.golden) }),
                 ])
             case .filter:
                 ScrollView {

@@ -119,6 +119,7 @@ struct PersonInfoView: View {
                     .foregroundColor(s.onBackground)
                     .frame(width: 36, height: 36)
             }
+            .accessibilityIdentifier("person_info_back")
             Text(L("Edit person"))
                 .font(.system(size: CGFloat(TopBarTokens.titleFontSize), weight: .medium))
                 .foregroundColor(s.onBackground)
