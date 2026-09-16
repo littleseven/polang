@@ -1,0 +1,218 @@
+# ============================================================================
+# 回忆 Memories 完整产品规格书（Memories Screen Spec）
+# ============================================================================
+# 基准端：Android features/gallery/memories/{MemoryScreen,MemoryDetailScreen,MemoryTexts}.kt
+#        + domain/memories/{MemoriesGenerator,MemoriesModels,MemoryHiddenStore}.kt
+#        + features/gallery/memories/MemoriesViewModel.kt
+# 用途：iOS 实现的唯一输入，不读 Android 源码（[PARITY] 红线）
+# 版本：v1（2026-09-16 反向提取固化）；设计 spec：docs/superpowers/specs/2026-09-06-memory-page-design.md
+# 覆盖两屏：回忆根页（§2，Pager 页 4）/ 回忆详情页（§3，路由 memory_detail/{memoryId}）
+# 导航框架（页序/底 bar/页面身份）见 main-nav.yaml
+
+# ============================================================================
+# 0. 页面定位与红线
+# ============================================================================
+root:
+  position: main_pager_page_4          # 主页面 Pager 页 4（相册0/整理1/聊天2/人物3/回忆4）
+  entries:
+    - floating_bottom_bar_memories     # 悬浮底栏回忆项（AutoAwesome 图标）
+    - gallery_right_swipe_x4           # 横滑 pager 线性可达（无循环回绕）
+  bottom_bar: main_floating_bottom_bar # 根页挂底 bar（回忆项高亮选中、点击空操作）
+  back_behavior: switch_to_gallery_page # 系统返回/回退出路切回相册页，不弹栈（根页无顶栏返回箭头）
+  privacy: all_on_device               # [PRIVACY] 纯端侧规则生成，零推理零上传
+  detail_route: memory_detail/{memoryId} # 详情页为二级路由（iOS：fullScreenCover），id 经 URI 编解码一次
+
+# ============================================================================
+# 1. 领域口径（生成规则 —— UI 数值的语义 SSOT，纯函数确定性）
+# ============================================================================
+# MemoriesGenerator：纯函数，零平台依赖；now/zoneId 注入确定性（测试可固定时钟）。
+# 输入契约：所有输入视为照片——视频由上游数据源过滤，生成器不判定类型。
+domain:
+  input_model:                         # MemoryInput：单条媒体最小投影
+    fields: [uri, captureDate(epochMs), aestheticScore(Float?), city(String?), personId(String?)] # personId=媒体 faceId
+  person_model:                        # NamedPerson：仅已命名人物参与（name 非空白）；isSelf 本人不进人物回忆
+    fields: [personId, name, isSelf]
+  output_model:                        # Memory：稳定 id + 结构化展示参数（不含文案串，I18N 红线）
+    fields:
+      id: "类型前缀稳定 id：on_this_day:MM-DD / recent:yyyy-MM / person:{personId} / city:{cityName}"
+      type: "ON_THIS_DAY | RECENT_HIGHLIGHTS | PERSON | CITY"
+      label: "人物名(PERSON)/城市名(CITY)；其余 null"
+      hitCount: "命中总张数（精选截断后 itemUris 可能小于它）"
+      latestYear: "仅 ON_THIS_DAY：命中照片最大年份"
+      monthDay: "仅 ON_THIS_DAY：与 now 同月同日（UI 按 Locale 本地化展示）"
+      coverUri: "精选首张"
+      itemUris: "精选 URI：美学分降序（null 排最后）→ 同分拍摄时间新在前，截 12"
+      allItemUris: "全部命中 URI，拍摄时间降序不截断（详情页「全部」开关与分享全集用）"
+      earliestCaptureDate: "仅 CITY：命中最早拍摄 epochMs（旅程日期范围副行）"
+      latestCaptureDate: "仅 CITY：命中最晚拍摄 epochMs"
+  rules:
+    on_this_day: "与 now 同月同日的往年照片（year < now，未来年份排除）跨年聚合，≥4 张生成，至多 1 条"
+    recent_highlights: "近 30 天（captureDate ∈ (now-30d, now]）且 aestheticScore 非 null，≥6 张生成，至多 1 条"
+    person: "已命名非本人人物，命中 ≥6 张，按命中数降序取前 3"
+    city: "city 非空白同城聚合，≥6 张，按张数降序取前 2"
+    output_order: "ON_THIS_DAY > RECENT_HIGHLIGHTS > PERSON(媒体数降序) > CITY(媒体数降序)；总量截 10（MAX_CAROUSEL）"
+  constants: { MAX_CAROUSEL: 10, DETAIL_LIMIT: 12, MIN_ON_THIS_DAY: 4, MIN_GROUP: 6, MAX_PERSON: 3, MAX_CITY: 2, RECENT_WINDOW_MS: 2592000000 }
+  hidden_store:
+    semantics: "隐藏集 = Memory.id 字符串集合，整体读写，幂等 hide；展示层过滤（生成全集不过滤——详情页直达/已隐藏条目可复原）"
+    android: "DataStore user_preferences memory_hidden_ids stringSet"
+    ios: "UserDefaults string array（suite 默认 standard，key memory_hidden_ids）"
+  data_chain:
+    android: "combine(MediaDao.getAllMedia, PersonDao.observeAll, hiddenStore.ids) → generate → flowOn(IO) stateIn(WhileSubscribed(5000))"
+    ios: "TagDatabase.media_assets（type=PHOTO 且非回收站）+ persons 表（name 非空）轮询/观察 → generate（后台队列）→ 主线程发布；隐藏集变更即时重发"
+  hidden_filter_display_only: "allGenerated（未过滤全集）为 observeMemory(id) 数据源；memories 展示集剔除隐藏 id"
+  assets_by_uri: "详情页预览需 uri→完整媒体资产反查索引（Memory 只存 uri）；媒体库变化随流重发、预览集合自动收缩"
+  v1_no_table: "回忆不落表/快照，每次由媒体+人物流实时生成；隐藏集仅存偏好存储"
+
+# ============================================================================
+# 2. 回忆根页（Memory 独立 Pager 页，对标小米相册分区 feed）
+# ============================================================================
+root_page:
+  layout: vertical
+  background: surface                   # 语义色：Material colorScheme.surface / iOS AppColors 对应
+  top_bar:
+    safe_area: status_bar_avoid         # 状态栏避让（edge-to-edge 防标题被压）
+    padding: { horizontal: 16, vertical: 12 }
+    title: { key: memory_title, style: headlineMedium, weight: SemiBold }   # "回忆"
+    subtitle: { key: memory_privacy_note, style: labelSmall, color: onSurfaceVariant } # "端侧生成 · 私密"
+  sections:                             # buildSections：空分区剔除不占位
+    order: [time, journey, people]      # time=ON_THIS_DAY+RECENT_HIGHLIGHTS；journey=CITY；people=PERSON
+    title_keys: { time: memory_section_time, journey: memory_section_journey, people: memory_section_people } # 时光/旅程/人物
+    section_title: { style: titleMedium, weight: SemiBold, padding_horizontal: token.memoryPage.sectionHorizontalPadding, spacing_top: token.memoryPage.sectionTitleSpacing }
+    card_row: horizontal_scroll         # LazyRow/ScrollView+LazyHStack，内容两侧 16 内边距，垂直 8
+    card_spacing: token.memoryPage.cardSpacing
+  big_card:                             # MemoryBigCard 竖版大卡
+    size: { width: token.memoryPage.cardWidth, height: token.memoryPage.cardHeight } # 168×224
+    corner_radius: token.memoryPage.cardCornerRadius # 16
+    cover: "封面图裁切填满（ Coil size(512) / iOS 缩略图 ≥512px）；加载/失败占位 = surface 色块；禁交叉淡入（Android recycled bitmap 红线）"
+    scrim: "底部 50% 高黑色渐变蒙层（透明 → 黑 0.6）"
+    title: { position: bottom_start, padding: 12, fontSize: 17, weight: Bold, color: white, maxLines: 1, ellipsis: true }
+    subtitle: { fontSize: 12, color: "white 80%", maxLines: 1, ellipsis: true }
+    a11y: "contentDescription = \"title · subtitle\""
+    tap: navigate_detail                # onNavigateToMemoryDetail(memory.id)
+    long_press: show_hide_confirm       # 弹隐藏确认对话框
+  empty_state:                          # 三分区全空 → 整页空态
+    key: memory_empty_page              # "照片积累后会自动生成回忆"
+    style: { bodyMedium, onSurfaceVariant, center }
+  feed_bottom_padding: 96               # LazyColumn contentPadding bottom=96dp 预留底 bar 悬浮遮挡
+  hide_dialog:                          # 长按大卡确认（v1 无恢复入口，文案不承诺恢复）
+    title_key: memory_hide              # "隐藏这条回忆"
+    text_key: memory_hide_confirm       # "隐藏这条回忆？隐藏后将不再显示。"
+    confirm_key: memory_hide            # 确认执行 hideMemory(id)，失败静默置错误标志不崩溃
+    dismiss_key: memory_hide_cancel     # "取消"
+
+# ============================================================================
+# 3. 回忆详情页（memory_detail/{memoryId}，对标小米）
+# ============================================================================
+detail_page:
+  container: single_root_stack          # 单根容器承载 内容列 + 预览覆盖层（Pager 多根平铺事故铁律同构）
+  background: surface
+  data_source: "observeMemory(id) 未过滤全集 Flow（已隐藏条目可复原、冷恢复不闪空态）；id 失效 → 空态"
+  top_bar:
+    back: navigate_back                 # 返回键/返回箭头弹栈（iOS dismiss）
+    title_key: memory_title             # "回忆"
+    action_share:                       # 仅 memory 非 null 时显示
+      icon: mat_share                   # Icons.Outlined.Share / mat_share
+      cd_key: memory_share              # "分享回忆"
+      behavior: "分享当前展示集合 displayUris（跟随精选/全部开关）；Android ACTION_SEND_MULTIPLE+读授权 / iOS UIActivityViewController"
+  empty_state: { key: memory_detail_empty, style: [bodyMedium, onSurfaceVariant, center] } # "这条回忆已不可用"
+  cover:                                # 约屏高 55% 封面
+    height: "screenHeight * 0.55"
+    image: "封面裁切填满（Coil size(1080) / iOS 大图请求）；占位/失败 = surfaceContainer 色块；禁交叉淡入"
+    scrim: "底部 50% 黑渐变（透明 → 黑 0.6）"
+    title: { position: bottom_start, padding: 16, fontSize: 20, weight: Bold, color: white } # 同根页 memoryTitle 口径
+    subtitle: { fontSize: 13, color: "white 80%" } # "N items" + 类型后缀（见下）
+    subtitle_suffix:
+      ON_THIS_DAY: " · {memorySubtitle}"          # 本地化月日 · 最晚年份
+      RECENT_HIGHLIGHTS: " · {memorySubtitle}"    # "近 30 天"
+      CITY: " · {cityDateRange}"                  # 旅程日期范围
+      PERSON: null                                # 不接（与 hitCount 重复计数）
+    tap: open_preview_at_cover          # 按 coverUri 在预览集合定位初始页
+  grid:                                 # 3 列方图网格
+    columns: 3
+    aspect_ratio: "1:1"
+    corner_radius: token.shapes.small   # r8（AppShapes.small）
+    spacing: 4
+    padding: { horizontal: 16, vertical: 8 }
+    image: "裁切填满（Coil size(360) / iOS 缩略图）；占位/失败 = surface 色块；禁交叉淡入"
+    cd_key: memory_photo_cd             # "回忆照片 %1$d"（序号 1 起）
+    tap: open_preview_at_index          # 按 uri 定位初始页；未解析项剔除
+    items_source: displayUris           # 跟随分段开关
+  segmented_toggle:                     # 精选/全部胶囊分段开关（底部居中，对标小米「显示优选/全部显示」）
+    position: bottom_center
+    padding: { horizontal: 16, vertical: 12, bottom_safe_area: true }
+    capsule: { corner: 24, background: surfaceVariant }
+    options:
+      - { key: memory_detail_best, value: false }  # "精选"（默认）
+      - { key: memory_detail_all, value: true }    # "全部"
+    selected_style: { background: primary, text: onPrimary }
+    unselected_style: { background: transparent, text: onSurfaceVariant }
+    option_padding: { horizontal: 24, vertical: 10 }
+    text_style: labelLarge
+    a11y: "role=Button + selected 语义"
+    state_reset: "showAll 按 memory.id 记忆——切回忆时重置回精选；开关切换收起预览（索引口径已变）"
+    display_semantics: "displayUris = showAll ? allItemUris : itemUris；分享集合同步跟随"
+  preview_overlay:                      # 全屏 MediaPager 预览（内嵌 overlay，非路由）
+    host_pattern: same_as_gallery_chat  # 同 Gallery/Chat 宿主范式；iOS 复用 MediaPagerView(items:initial:)
+    initial_position: "按点击 uri 在 previewAssets（displayUris 经 assetsByUri 反查、剔除未解析）中定位"
+    capabilities: [delete_with_system_auth, swipe_up_trash_delete, ocr, navigate_editor, ai_optimize, id_photo] # 全量复用宿主级媒体能力
+    auto_collapse: "预览集合删空（或回忆随媒体清空失效）→ 自动收起；返回键优先关预览再弹栈"
+
+# ============================================================================
+# 4. 文案口径（I18N 红线：Memory 只带结构化字段，UI 层按类型还原）
+# ============================================================================
+texts:
+  title_by_type:
+    ON_THIS_DAY: { key: memory_on_this_day }                    # "那年今日"
+    RECENT_HIGHLIGHTS: { key: memory_recent_highlights }        # "近期高光"
+    PERSON: { key: memory_person_title, args: [label] }         # "与 %1$s 的时刻"
+    CITY: { literal: label }                                    # 城市名直出
+  subtitle_by_type:
+    ON_THIS_DAY: { key: memory_on_this_day_subtitle, args: [localizedMonthDay, latestYear] } # "%1$s · %2$d"
+    RECENT_HIGHLIGHTS: { key: memory_recent_highlights_subtitle } # "近 30 天"
+    PERSON: { key: memory_photo_count, args: [hitCount] }       # "%1$d 张照片"
+    CITY: { computed: cityDateRange }                           # 见下
+  cityDateRange: "同年月 → 本地化年月（skeleton yMMMM 取 Locale 最佳 pattern：en 'May 2025'、zh '2025年5月'；iOS 用 DateFormatter 带 locale 的 'yyyy年M月'/'MMMM yyyy' 等效模板）；跨月/跨年 → \"{startYear} · {endYear}\"；字段缺失（非 CITY）容错返回空串"
+  localizedMonthDay: "月日本地化：skeleton MMMd 取 Locale 最佳 pattern（en 'MMM d'、zh 'M月d日'、es 'd MMM'；iOS DateFormatter.dateFormat(fromTemplate: 'MMMd') 等效）；null 容错返回空串"
+  i18n_format_args: "iOS xcstrings 用 %@/%d 占位（%1$s→%@，%1$d→%d），五语值与 Android strings.xml 对齐"
+
+# ============================================================================
+# 5. 平台差异台账（platform_differences）
+# ============================================================================
+platform_differences:
+  capabilities:
+    - feature: 媒体数据源
+      android: "Room MediaDao.getAllMedia Flow（含 aestheticScore/city/faceId 列）"
+      ios: "TagDatabase media_assets 表直查（SQLite）；SharedKit IosMediaRepository 只映射 6 基础字段不可用"
+      shared_semantics: "MemoryInput 五字段口径一致；仅 PHOTO 且非回收站参与"
+    - feature: 隐藏持久化
+      android: DataStore stringSet
+      ios: UserDefaults string array
+      shared_semantics: "id 集合整体读写、幂等 hide、响应式重发"
+    - feature: 分享
+      android: "ACTION_SEND_MULTIPLE + FLAG_GRANT_READ_URI_PERMISSION"
+      ios: "UIActivityViewController（PHAsset 本地标识反查 UIImage/URL）"
+      shared_semantics: "分享集合 = 当前 displayUris 跟随开关"
+    - feature: 预览删除授权
+      android: "API29 恢复性删除 / API30+ createDeleteRequest + 上滑回收站"
+      ios: "PHAssetChangeRequest 系统删除确认弹窗 + 上滑删除手势（MediaPagerView 内置）"
+      shared_semantics: 删除后预览集合随媒体库流自动收缩、删空自动收起
+    - feature: 日期本地化
+      android: "DateFormat.getBestDateTimePattern(locale, skeleton)"
+      ios: "DateFormatter.dateFormat(fromTemplate:options:locale:)"
+      shared_semantics: "MMMd / yMMMM skeleton 语义等价"
+  permission: 无新增权限（读已授权相册数据；删除走系统确认）
+  privacy_disclosure: "纯端侧规则生成零上传，双端一致；无新增披露项"
+
+# ============================================================================
+# 6. 验收口径
+# ============================================================================
+acceptance:
+  - "空库/不足阈值：整页空态文案 memory_empty_page"
+  - "那年今日 ≥4 张往年同月同日照片 → 时光分区出现 ON_THIS_DAY 卡，标题本地化"
+  - "三分区顺序 时光→旅程→人物，空分区不占位"
+  - "长按大卡 → 隐藏确认 → 确认后卡片从展示集消失且冷启动不复发"
+  - "详情页封面 55% 屏高 + 精选(默认)/全部开关切集合 + 分享跟随开关"
+  - "网格/封面点击 → 全屏预览按点击项定位；预览内删除后集合收缩、删空自动收起"
+  - "id 失效（媒体清空）→ 详情页空态不崩溃"
+  - "深浅色双模式：蒙层白字可读、语义色跟随主题"
+</content>

@@ -1,0 +1,142 @@
+# ============================================================================
+# 主导航统一规格书（Main Navigation Spec，五页一面 · 聊天沉浸 · 相机路由化）
+# ============================================================================
+# 基准端：Android features/main/{MainPagerHost,MainFloatingBottomBar}.kt + MainActivity.kt
+#        + navigation/Screen.kt + features/common/avatar/AvatarCaptureController.kt
+# 用途：iOS 实现的唯一输入，不读 Android 源码（[PARITY] 红线）
+# 版本：v1（2026-09-16 反向提取固化）；设计 spec：docs/superpowers/specs/2026-09-06-main-nav-unification-design.md
+# 各屏内部结构见各自 yaml（gallery-grid / organize / chat / person / memories / camera）
+
+# ============================================================================
+# 0. 页面拓扑
+# ============================================================================
+pager:
+  page_count: 5
+  order:                               # 页索引线性、无循环回绕；底 bar 五项与页序 1:1
+    - { index: 0, page: gallery,  identity: root }      # 相册（默认首页）
+    - { index: 1, page: organize, identity: root }      # 整理+扫描合并页（胶囊分段 整理/扫描）
+    - { index: 2, page: chat,     identity: immersive } # 聊天：沉浸二级身份
+    - { index: 3, page: person,   identity: root }      # 人物
+    - { index: 4, page: memories, identity: root }      # 回忆
+  resident: all_pages_composed         # 全部常驻组合（Android beyondViewportPageCount=4；iOS TabView(.page) 常驻）
+  swipe: follow_finger                 # 横滑跟手、松手物理吸附；相册（详情/多选）与聊天（全屏预览）局部禁用外层滑动
+  switch_animation: none               # 底 bar/编程入口切页 = 瞬时（无滑动动画）
+camera_route:
+  form: fullscreen_route               # Android NavHost Screen.Camera / iOS fullScreenCover；不在 Pager
+  entries:                             # 仅有的两个用户/Agent 入口
+    - avatar_capture                   # 头像拍摄：登记 pending 后进入（契约见 §3）
+    - agent_navigate_to_camera         # Agent navigate_to(camera) 指令（契约见 §4）
+  session_gating: route_lifecycle      # Android：backStackEntry.lifecycle ≥ RESUMED；iOS：cover 展示期间 isActive=true，消失即 stop 释放
+  default_page: 无                      # 相机不是任何 Pager 页；返回落回来源页
+page_identity_rules:
+  root_pages: [gallery, organize, person, memories]
+    # 无顶栏返回箭头 + 渲染悬浮底 bar（高亮自身项）+ 系统返回/回退出路 = 切回相册页不弹栈
+  immersive_pages: [chat]
+    # 有返回出路（顶栏返回相册）、不渲染底 bar（胶囊与键盘避让冲突）
+  hide_bar_when: "页面自身有底部 UI/全屏态时隐藏 bar（先例：相册详情态、Dedup Scanning/Results/Cleaned 三态门控）"
+back_stack:
+  non_gallery_root_back: switch_to_gallery_page  # 根页系统返回 = 切相册页（Android BackHandler；iOS 无系统返回键，出路=底bar/页内返回）
+  inner_page_handlers_guard: active_page_only    # 各页内部返回处理（预览/多选）仅激活页消费，防跨页 LIFO 抢占
+
+# ============================================================================
+# 1. 悬浮底 bar（MainFloatingBottomBar 共享组件）
+# ============================================================================
+bottom_bar:
+  form: floating_capsule               # 底部居中悬浮胶囊，纯图标无文字
+  container: { corner: 28, background: "surface（iOS 现状 ultraThinMaterial 材质，见 allowed_differences）", padding: { horizontal: 12, vertical: 8 }, shadow: subtle }
+  items:                               # 表驱动；选中项高亮且点击空操作；未选中点击瞬时切页
+    - { page: 0, icon: mat_o_photo_library,     label_key: tab_gallery,          a11y_id: tab_gallery }   # 相册
+    - { page: 1, icon: mat_o_cleaning_services, label_key: gallery_cleanup,      a11y_id: tab_organize }  # 整理
+    - { page: 2, icon: mat_o_chat_bubble,       label_key: chat,                 a11y_id: tab_chat }      # 聊天
+    - { page: 3, icon: mat_o_account_circle,    label_key: gallery_people_entry, a11y_id: tab_person }    # 人物
+    - { page: 4, icon: mat_o_auto_awesome,      label_key: tab_memories,         a11y_id: tab_memories }  # 回忆
+  item_layout: { icon_size: 24, padding: { horizontal: 16, vertical: 10 }, distribution: space_evenly }
+  selected_style: "图标着色 = primary/accent；未选中 = onSurface/primary 默认色；仅 tint 区分无背景块"
+  removed_items: [camera, tag_sell]    # 相机项移除（路由化）；打标 Sell 项移除（扫描并入整理页胶囊）
+  special_routing: "点击整理项时预选整理页 ORGANIZE tab（扫描深链走独立一次性请求机制 organizeTabRequest）"
+  visibility: "渲染于四个根页；聊天页不渲染；页面自身底部 UI/全屏态门控隐藏"
+
+# ============================================================================
+# 2. 场景映射（SceneManager：chat 工具按场景路由，不同步会被入队不执行）
+# ============================================================================
+scene_mapping:
+  gallery: GALLERY
+  organize: GALLERY                    # 整理页沿用相册场景
+  chat: CHAT
+  person: keep_previous                # 人物页无独立场景，沿用进入前场景（Android 不 transition）
+  memories: GALLERY                    # 回忆页沿用相册场景
+  trigger: settled_page_change         # 稳定页切换时同步（非拖动中）
+
+# ============================================================================
+# 3. 头像拍摄契约（相机唯一用户入口）
+# ============================================================================
+avatar_capture:
+  intent_passing: process_singleton    # 路由无法传参 → 进程内单例登记「待拍头像」意图
+  pending_model: { target: "person(personId) | self", origin: "people_page | gallery_page | settings_page", beginMs: epochMs }
+  origin_semantics: 诊断记录专用        # 完成/失败后返回栈自然落回来源页，不按 origin 分别切页
+  camera_state:
+    on_enter: "观察 pending 非空 → 激活头像态：记录原镜头朝向 → 有前置则切前置（无前置静默保持）→ 顶部胶囊提示文案 avatar_capture_hint（'拍摄头像'，surface 0.85 圆角 16，top 120 padding）"
+    activation_guard: "登记 pending 到激活前的窗口内页面失活不得误清 pending（activated 标志前置条件）"
+    shutter: "任意拍照触发（UI 快门/Agent/语音共用）记录快门时间戳下界"
+    on_photo_saved: "查「快门时刻之后新入库的最新照片」→ 设为目标人物封面（person 直用；self 需已标记本人否则放弃）→ clear + 返回来源页"
+    on_leave_unconsumed: "离开相机且 pending 未消费 → clear（取消）；恢复原镜头朝向"
+  cover_update:
+    android: "AvatarCaptureFinisher 轮询 Room getLatestCapturedAfter(快门下界) 10×200ms → PersonRepository.updateCover(personId, mediaId)"
+    ios: "CaptureFlow.onSaved 后主线程查 Photos（creationDate ≥ 快门时刻最新资产）→ localIdentifier 反查 TagDatabase media_assets.id → PersonRepository.updateCover → TagDatabase.updatePersonCover"
+  entries_ui:
+    people_page: 人物信息编辑页头像相机角标 # Android PersonScreen onCaptureAvatar；iOS PersonInfoView avatarHeader 相机角标（现开 sheet → 改为/新增直达拍摄入口）
+    settings_hero: 设置页账号 Hero 卡头像（Android 已有；iOS 无此入口 → 登记差异，v1 不做）
+
+# ============================================================================
+# 4. Agent navigate_to 契约
+# ============================================================================
+agent_navigation:
+  tool: "ChatToolService.navigate_to(destination) → CapabilityRegistry.dispatch(AgentCommand.NavigateTo)"
+  destinations:
+    camera:   { android: Screen.Camera 全屏路由, ios: 相机 fullScreenCover }
+    gallery:  { android: 切 Pager 页 0, ios: 切 Pager 页 0 }
+    settings: { android: Screen.Settings, ios: 设置 fullScreenCover（先例已存在） }
+    debug:    { android: Screen.Debug, ios: N/A（无 Debug 页 → 返回不支持错误） }
+  capability: "各端注册 NavigationCapability（activeScenes 含 CHAT）；未注册时 dispatch 返回 Error('暂不支持此操作')——iOS 本批次新增 IosNavigationCapability"
+  queue_semantics: "场景不匹配/不可用 → 入 commandQueue + TextReply 提示（引擎层既有行为，端侧不动）"
+
+# ============================================================================
+# 5. 平台差异台账（platform_differences）
+# ============================================================================
+platform_differences:
+  capabilities:
+    - feature: 页容器
+      android: "HorizontalPager（Compose），返回键 BackHandler 切相册页"
+      ios: "TabView(.page, indexDisplayMode:.never)，无系统返回键——根页回相册出路 = 底 bar 相册项"
+      shared_semantics: "5 页线性无回绕、常驻组合、瞬时切页"
+    - feature: 相机全出血
+      android: "edge-to-edge 路由页"
+      ios: "fullScreenCover + 自身 ignoresSafeArea(.all)；Pager 容器不再为相机页保留底部出血例外（原 tag0 例外删除）"
+      shared_semantics: 相机全屏沉浸
+    - feature: 相机会话门控
+      android: 路由生命周期 ≥RESUMED
+      ios: "cover 呈现期间 isActive=true，dismiss 即 stop"
+      shared_semantics: 离开即解绑释放
+    - feature: Agent 导航目的地
+      android: "camera/gallery/settings/debug 等 9 个"
+      ios: "camera/gallery/settings 三个（debug N/A 返回错误；其余目的地登记技术债）"
+      shared_semantics: "navigate_to 工具语义一致"
+  permission: 无新增权限项（相机权限既有）
+  privacy_disclosure: 无变化
+allowed_differences:
+  - "iOS 底 bar 容器用 ultraThinMaterial 材质（既有组件风格），Android 为 surface 纯色+阴影；选中态着色语义一致"
+  - "iOS 无系统返回键：根页「返回相册」由底 bar 承担，不做手势模拟"
+  - "iOS 设置页 Hero 卡头像拍摄入口 v1 不做（Android 有），登记技术债"
+
+# ============================================================================
+# 6. 验收口径
+# ============================================================================
+acceptance:
+  - "Pager 恰 5 页且页序 = 相册/整理/聊天/人物/回忆；底 bar 五项 1:1 高亮"
+  - "相机不出现在 Pager 与底 bar；仅能经头像拍摄或 Agent 指令全屏进入；dismiss 后落回来源页"
+  - "聊天页不渲染底 bar；四个根页渲染且自身项高亮、点击空操作"
+  - "根页横滑跟手、线性无回绕；相册详情/多选态外层滑动禁用"
+  - "头像拍摄：人物编辑页入口 → 相机默认前置 + 顶部提示 → 拍照落库 → 该人物封面更新 → 返回来源页"
+  - "Agent navigate_to(camera/gallery/settings) 在 iOS 真实切页/弹出；debug 返回不支持"
+  - "SceneManager 页→场景映射：相册/整理/回忆=GALLERY、聊天=CHAT"
+</content>
