@@ -101,7 +101,7 @@ PREVIEW_PASS=$(cut -d: -f2 ~/.config/xuxing-preview-auth)
 HASH=$(ssh xuxing "openssl passwd -apr1 '$PREVIEW_PASS'")
 printf 'guoshuai:%s\n' "$HASH" | ssh xuxing 'sudo tee /etc/nginx/.htpasswd-xuxing >/dev/null'
 scp infra/xuxing/nginx-preview.conf xuxing:/tmp/nginx-preview.conf
-ssh xuxing 'sudo mv /tmp/nginx-preview.conf /etc/nginx/sites-available/xuxingzhiyuan-preview && sudo ln -sf /etc/nginx/sites-available/xuxingzhiyuan-preview /etc/nginx/sites-enabled/ && sudo chown root:root /etc/nginx/.htpasswd-xuxing && sudo chmod 640 /etc/nginx/.htpasswd-xuxing && sudo nginx -t && sudo systemctl reload nginx'
+ssh xuxing 'sudo mv /tmp/nginx-preview.conf /etc/nginx/sites-available/xuxingzhiyuan-preview && sudo ln -sf /etc/nginx/sites-available/xuxingzhiyuan-preview /etc/nginx/sites-enabled/ && sudo chown root:www-data /etc/nginx/.htpasswd-xuxing && sudo chmod 640 /etc/nginx/.htpasswd-xuxing && sudo nginx -t && sudo systemctl reload nginx'
 ```
 
 预期：`syntax is ok` / `test is successful`。
