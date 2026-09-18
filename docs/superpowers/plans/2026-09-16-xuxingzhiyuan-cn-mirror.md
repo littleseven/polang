@@ -27,7 +27,7 @@ ssh xuxing 'sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-g
 - [ ] **Step 2: 创建站点目录并禁用默认站**
 
 ```bash
-ssh xuxing 'sudo mkdir -p /var/www/xuxingzhiyuan/docs-site && sudo rm -f /etc/nginx/sites-enabled/default && sudo nginx -t && sudo systemctl reload nginx && echo "<h1>xuxingzhiyuan placeholder</h1>" | sudo tee /var/www/xuxingzhiyuan/docs-site/index.html'
+ssh xuxing 'sudo mkdir -p /var/www/xuxingzhiyuan/docs-site && sudo chown -R ubuntu:ubuntu /var/www/xuxingzhiyuan && sudo rm -f /etc/nginx/sites-enabled/default && sudo nginx -t && sudo systemctl reload nginx && echo "<h1>xuxingzhiyuan placeholder</h1>" | sudo tee /var/www/xuxingzhiyuan/docs-site/index.html'
 ```
 
 预期：`syntax is ok` / `test is successful`。
