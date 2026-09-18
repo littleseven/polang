@@ -9,7 +9,7 @@
 ## 背景
 
 PoLang 项目中存在两套 Chat UI 实现：
-1. **Camera 页面** (`AiAgentPanel.kt`) - 完整功能，设计精美
+1. **Camera 页面** (`features/camera/agent/`) - 完整功能，设计精美
 2. **Gallery 页面** (`AiChatPanel.kt`) - 基础功能，设计简单
 
 为了提供一致的用户体验，本次改造将 Gallery 页面的 Chat UI 升级为与 Camera 页面相同的统一设计。
@@ -23,7 +23,8 @@ PoLang 项目中存在两套 Chat UI 实现：
 #### 文件列表：
 - **AiChatScreen.kt** - 主聊天界面组件
 - **AgentMessage.kt** - 消息类型定义
-- **README.md** - 使用文档
+- **AgentChatComponents.kt** - 气泡/消息渲染组件
+- **AGENTS.md** - 模块使用文档
 
 #### 核心功能：
 ```kotlin
@@ -189,8 +190,8 @@ AiChatScreen(
 ### 添加新消息类型
 
 1. 在 `AgentMessage.kt` 中添加新的 sealed class 分支
-2. 在 `ChatBubble.kt` 的 when 表达式中添加对应处理
-3. 在 `README.md` 中更新文档
+2. 在 `AgentChatComponents.kt` 的 when 表达式中添加对应处理
+3. 在 `AGENTS.md` 中更新文档
 
 ### 自定义样式
 

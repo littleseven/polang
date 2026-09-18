@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PoLang 隐私政策</title>
+    <link rel="alternate" hreflang="zh-CN" href="https://polang.net/privacy-policy/">
+    <link rel="alternate" hreflang="en" href="https://polang.net/en/privacy-policy/">
+    <link rel="alternate" hreflang="zh-TW" href="https://polang.net/tw/privacy-policy/">
+    <link rel="alternate" hreflang="x-default" href="https://polang.net/">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -28,6 +32,12 @@
             text-align: center;
         }
         .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .lang-switch {
             text-align: center;
             color: #888;
             font-size: 14px;
@@ -113,10 +123,11 @@
 <body>
     <div class="container">
         <h1>PoLang 隐私政策</h1>
-        <p class="subtitle">最后更新日期：2026年6月11日 | 生效日期：2026年6月11日</p>
+        <p class="subtitle">最后更新日期：2026年9月18日 | 生效日期：2026年9月18日</p>
+        <p class="lang-switch"><a href="../en/privacy-policy/index.html" hreflang="en" lang="en">View in English</a> · <a href="../tw/privacy-policy/index.html" hreflang="zh-TW" lang="zh-Hant">繁體中文</a></p>
 
         <div class="highlight-box">
-            <p><strong>核心承诺：</strong>PoLang 是一款以隐私优先为设计原则的智能相机应用。我们坚信您的照片、人脸数据和语音信息是高度敏感的个人隐私。因此，PoLang 采用<strong>端侧优先（On-Device First）</strong>架构，所有敏感数据均在您的设备本地处理，<strong>不会上传至任何云端服务器</strong>。</p>
+            <p><strong>核心承诺：</strong>PoLang 是一款以隐私优先为设计原则的智能相册应用（含拍照能力）。我们坚信您的照片、人脸数据和语音信息是高度敏感的个人隐私。因此，PoLang 采用<strong>端侧优先（On-Device First）</strong>架构，照片、视频、人脸、语音等媒体数据均在您的设备本地处理，<strong>不会上传至任何云端服务器</strong>。</p>
         </div>
 
         <h2>1. 我们收集哪些信息</h2>
@@ -142,7 +153,7 @@
             <tr>
                 <td><span class="data-type">人脸关键点</span></td>
                 <td>驱动美颜效果（瘦脸、大眼等）</td>
-                <td>本地 MediaPipe/NCNN 实时计算，不上传</td>
+                <td>本地 MediaPipe/MNN 实时计算，不上传</td>
             </tr>
             <tr>
                 <td><span class="data-type">相册图片/视频</span></td>
@@ -194,6 +205,26 @@
             </tr>
         </table>
 
+        <h3>1.4 账号数据（邮箱注册）</h3>
+        <table>
+            <tr><th>数据类型</th><th>用途</th><th>处理方式</th></tr>
+            <tr>
+                <td><span class="data-type">邮箱地址</span></td>
+                <td>账号注册与登录标识、LLM 免费试用额度计费（默认 100 次/账户）</td>
+                <td>存于 <strong>api.polang.net</strong>，仅保存邮箱与登录 token 的 SHA-256 哈希；<strong>不收集明文密码</strong>（验证码登录）</td>
+            </tr>
+        </table>
+
+        <h3>1.5 设备标识（访客试用额度）</h3>
+        <table>
+            <tr><th>数据类型</th><th>用途</th><th>处理方式</th></tr>
+            <tr>
+                <td><span class="data-type">设备标识（Android 设备 ID / 本地生成 ID）</span></td>
+                <td>未注册访客的 LLM 免费试用额度计数</td>
+                <td>发送至 <strong>api.polang.net</strong>，仅按标识统计调用次数；不用于识别个人身份，不与第三方共享。可在 app「设置 → 数据与隐私 → 清除访客数据」删除</td>
+            </tr>
+        </table>
+
         <h2>2. 应用权限说明</h2>
         <p>PoLang 申请以下 Android 系统权限，每项权限均与具体功能直接对应：</p>
 
@@ -219,14 +250,26 @@
             <tr>
                 <td><span class="permission-tag">READ_MEDIA_IMAGES</span></td>
                 <td>危险权限</td>
-                <td>读取相册图片进行编辑</td>
-                <td>否（相册功能可选）</td>
+                <td>读取相册图片进行整理、搜索与编辑</td>
+                <td>是（相册核心功能）</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">READ_MEDIA_VIDEO</span></td>
                 <td>危险权限</td>
-                <td>读取相册视频进行编辑</td>
-                <td>否（相册功能可选）</td>
+                <td>读取相册视频进行整理与播放</td>
+                <td>是（相册核心功能）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_MEDIA_LOCATION</span></td>
+                <td>危险权限</td>
+                <td>读取照片 EXIF 位置信息，用于地点分组与地点搜索（仅本地处理，不上传）</td>
+                <td>否（地点功能可选）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">MANAGE_MEDIA</span></td>
+                <td>危险权限</td>
+                <td>「删除不再询问」开关（默认关闭）：开启后删除/回收操作免系统确认弹窗，仍移入系统回收站可恢复</td>
+                <td>否（默认关闭，需用户手动授权）</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">READ_EXTERNAL_STORAGE</span></td>
@@ -249,14 +292,56 @@
             <tr>
                 <td><span class="permission-tag">INTERNET</span></td>
                 <td>普通权限</td>
-                <td>远程 LLM 编排（用户主动配置）</td>
-                <td>否（可完全离线使用）</td>
+                <td>AI 对话远程推理（仅文本/元数据，不含照片视频）</td>
+                <td>否（媒体功能可离线；AI 对话需联网）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_NETWORK_STATE</span></td>
+                <td>普通权限</td>
+                <td>网络状态检测（如仅 WiFi 下静默预下载模型）</td>
+                <td>是</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">POST_NOTIFICATIONS</span></td>
+                <td>普通权限</td>
+                <td>模型下载与相册扫描进度/完成通知</td>
+                <td>否（通知可选）</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">FOREGROUND_SERVICE</span></td>
                 <td>普通权限</td>
                 <td>后台模型下载服务</td>
                 <td>是（模型下载）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">FOREGROUND_SERVICE_DATA_SYNC</span></td>
+                <td>普通权限</td>
+                <td>相册打标扫描前台服务（数据同步类型，全部本地处理）</td>
+                <td>是（打标扫描）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SCHEDULE_EXACT_ALARM</span></td>
+                <td>普通权限</td>
+                <td>闲时自动扫描的定时调度</td>
+                <td>否（自动扫描可选）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">WAKE_LOCK</span></td>
+                <td>普通权限</td>
+                <td>扫描/下载执行期间保持 CPU 唤醒，防止任务中断</td>
+                <td>是（后台任务）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SYSTEM_ALERT_WINDOW</span></td>
+                <td>危险权限</td>
+                <td>悬浮聊天气泡（在其他应用上层显示 AI 助手入口，默认关闭）</td>
+                <td>否（悬浮气泡可选，需用户手动授权）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</span></td>
+                <td>普通权限</td>
+                <td>后台扫描保活（请求加入电池优化白名单，默认不请求）</td>
+                <td>否（可选，需用户手动授权）</td>
             </tr>
         </table>
 
@@ -265,8 +350,8 @@
         <h3>3.1 端侧优先原则</h3>
         <p>PoLang 的核心架构设计遵循<strong>端侧优先</strong>原则：</p>
         <ul>
-            <li><strong>本地 LLM 推理</strong>：Qwen3.5-2B 大语言模型通过 MNN-LLM 在设备本地运行，您的对话内容不会离开设备</li>
-            <li><strong>本地人脸检测</strong>：MediaPipe / NCNN / MNN 多引擎人脸检测全部在本地 GPU/CPU 执行</li>
+            <li><strong>本地 VLM 打标</strong>：Qwen3-VL-2B 视觉语言模型在设备本地为图片生成标签，图片内容不上传</li>
+            <li><strong>本地人脸检测</strong>：MediaPipe / MNN 多引擎人脸检测全部在本地 GPU/CPU 执行</li>
             <li><strong>本地 OCR 识别</strong>：ML Kit 文字识别在端侧完成</li>
             <li><strong>本地美颜渲染</strong>：OpenGL ES 渲染管线完全本地运行</li>
         </ul>
@@ -296,13 +381,13 @@
             </tr>
         </table>
 
-        <h3>3.3 远程模式（可选）</h3>
-        <p>PoLang 支持用户<strong>主动配置</strong>远程 LLM API（如 Kimi/OpenAI 兼容接口）：</p>
+        <h3>3.3 AI 对话推理（远程）</h3>
+        <p>AI 对话与指令解析通过<strong>远程大模型</strong>（DeepSeek / 通义等 OpenAI 兼容接口）完成，需联网：</p>
         <ul>
-            <li>远程模式<strong>默认关闭</strong>，需用户手动在设置中配置 API Token</li>
-            <li>即使开启远程模式，<strong>RESTRICTED 和 SENSITIVE 级别指令仍强制本地执行</strong></li>
-            <li>仅 PUBLIC 级别指令（如相机控制）可路由至远程</li>
-            <li>远程 API 调用使用用户自行配置的 Token，PoLang 不持有、不中转任何 API 凭证</li>
+            <li>对话文本、指令等<strong>非媒体数据</strong>会发送至远程推理服务以生成回复；<strong>用户图片/视频文件绝不上传</strong></li>
+            <li>人脸检测、OCR、美颜、打标、抠图等媒体处理<strong>始终在端侧执行</strong>，不受远程推理影响</li>
+            <li>登录 PoLang 账号后，可使用官方 <strong>api.polang.net</strong> 网关享免费推理额度；该网关仅记录调用次数与 Token 用量，<strong>不存储对话内容</strong></li>
+            <li>您也可在设置中自行配置其它 OpenAI 兼容 API（使用您自己的 Token，PoLang 不持有、不中转任何凭证）</li>
         </ul>
 
         <h2>4. 数据存储与保留</h2>
@@ -316,8 +401,8 @@
 
         <h3>4.2 对话记忆</h3>
         <ul>
-            <li>Agent 对话上下文存储在设备本地数据库中</li>
-            <li>最大保留最近 10 轮对话历史</li>
+            <li>Agent 对话历史完整存储在设备本地数据库中，支持跨会话查看，不出设备</li>
+            <li>发送给远程模型的上下文最多携带最近 10 条消息（仅文本）</li>
             <li>用户可在设置中清除所有对话记忆</li>
             <li>卸载应用后，所有本地数据将被系统清除</li>
         </ul>
@@ -327,6 +412,12 @@
             <li>AI 模型文件（LLM、人脸检测、ASR 等）下载后存储在应用私有目录</li>
             <li>模型文件仅在本地用于推理，不会上传</li>
             <li>用户可在设置中删除已下载的模型以释放空间</li>
+        </ul>
+
+        <h3>4.4 账号数据保留</h3>
+        <ul>
+            <li>您删除账号后，账号数据将<strong>保留 90 天</strong>（用于反欺诈与误删找回），期满后<strong>彻底删除</strong>，包括用量日志</li>
+            <li>删除入口见 app「设置 → 账号 → 删除账号」，亦可邮件 <a href="mailto:budao.gs@gmail.com">budao.gs@gmail.com</a> 申请删除</li>
         </ul>
 
         <h2>5. 数据共享与第三方</h2>
@@ -348,7 +439,7 @@
                 <td>完全本地运行，无网络通信</td>
             </tr>
             <tr>
-                <td>MNN / NCNN</td>
+                <td>MNN</td>
                 <td>神经网络推理引擎</td>
                 <td>完全本地运行，无网络通信</td>
             </tr>
@@ -368,9 +459,9 @@
         <p>作为 PoLang 用户，您拥有以下权利：</p>
         <ul>
             <li><strong>访问权</strong>：您拍摄的所有照片和视频均存储在本地，您可随时访问</li>
-            <li><strong>删除权</strong>：您可随时删除照片、清除对话记忆、删除下载的模型</li>
+            <li><strong>删除权</strong>：您可随时删除照片、清除对话记忆、删除下载的模型；登录账号的用户可在 app「设置 → 账号 → 删除账号」删除账号及关联数据；未注册访客可在「设置 → 数据与隐私 → 清除访客数据」删除设备级访客记录；亦可邮件申请删除</li>
             <li><strong>撤回同意权</strong>：您可随时在系统设置中撤销任何已授予的权限</li>
-            <li><strong>离线使用权</strong>：PoLang 的核心功能无需网络即可完整使用</li>
+            <li><strong>离线使用权</strong>：打标、人脸检测、美颜、相册搜索等媒体功能可离线使用；AI 对话需联网</li>
             <li><strong>数据可携带权</strong>：您的照片存储在标准相册中，可自由导出</li>
         </ul>
 
@@ -383,7 +474,7 @@
             <li><strong>本地处理架构</strong>：敏感数据不出设备，从根本上降低泄露风险</li>
             <li><strong>最小权限原则</strong>：仅申请功能必需的权限，不过度索取</li>
             <li><strong>开源可审计</strong>：核心代码开源，接受社区安全审计</li>
-            <li><strong>无账户系统</strong>：无需注册登录，不收集身份信息</li>
+            <li><strong>账号数据最小化</strong>：邮箱注册仅保存邮箱与 token 的 SHA-256 哈希，不收集明文密码（验证码登录），并提供账号删除入口</li>
         </ul>
 
         <h2>9. 政策更新</h2>
@@ -392,12 +483,13 @@
         <h2>10. 联系我们</h2>
         <p>如果您对本隐私政策有任何疑问或建议，请通过以下方式联系我们：</p>
         <ul>
-            <li>GitHub Issues：<a href="https://github.com/littleseven/PoLang/issues" target="_blank">https://github.com/littleseven/PoLang/issues</a></li>
-            <li>项目主页：<a href="https://github.com/littleseven/PoLang" target="_blank">https://github.com/littleseven/PoLang</a></li>
+            <li>GitHub Issues：<a href="https://github.com/littleseven/polang/issues" target="_blank">https://github.com/littleseven/polang/issues</a></li>
+            <li>项目主页：<a href="https://github.com/littleseven/polang" target="_blank">https://github.com/littleseven/polang</a></li>
+            <li>邮箱：<a href="mailto:budao.gs@gmail.com">budao.gs@gmail.com</a></li>
         </ul>
 
         <div class="footer">
-            <p>PoLang — 让相机听懂你说的话</p>
+            <p>PoLang — 雕刻时光，瞬间永恒。</p>
             <p>本隐私政策遵循 Google Play 数据安全表单要求编制</p>
         </div>
     </div>

@@ -1,7 +1,7 @@
 # PoLang 服务端实现方案（Ktor）
 
 > **文档状态**：已上线（v0.6.3），服务端已在 `api.polang.net` 运行。文档与代码已对齐，编码时以代码为事实来源。
-> **最后更新**：2026-08-03（AI 工程师与问题上报路由对齐：`/v1/claude-chat`、`/v1/claude-tool-result`、`/v1/claude-deliver`、`/v1/claude-engineer/available`、`/v1/report-issue`；管理后台设置页白名单/问题诊断页；migrations 001~009）
+> **最后更新**：2026-08-03（AI 工程师与问题上报路由对齐：`/v1/claude-chat`、`/v1/claude-tool-result`、`/v1/claude-deliver`、`/v1/claude-engineer/available`、`/v1/report-issue`；管理后台设置页白名单/问题诊断页；migrations 001~010，含 010_anonymous_device_platform.sql）
 > **P0 阻断项**：✅ 已修复并本地端到端验证（2026-07-12）——WAL/busy_timeout/poolSize=1、seed 幂等加载（补 `rule(scene,locale,version)` 唯一索引让 `INSERT OR IGNORE` 真正生效）、StatusPages（Ktor 3 `(call,cause)` 双参数 handler）、`newSuspendedTransaction(Dispatchers.IO)`、systemd `JAVA_OPTS=-Xmx256m`。
 > **维护者**：RD Agent
 > **关联**：`PRODUCT.md`、`OVERSEAS_SERVER_DEPLOYMENT.md`、`AI_OPTIMIZATION.md`

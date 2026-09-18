@@ -123,7 +123,7 @@ empty_state:
     logo:
       box_size: 48                  # 48dp（72→56→48 两次密度优化）
       corner_radius: 16             # 随盒尺寸两档下调（22→18→16）
-      background: "brandGradient"   # 品牌渐变 #0F766E→#5EA88F（chatBubble/brandGradient*），45° 对角，衬在图标残余透明角下
+      background: "brandGradient"   # 品牌渐变 #1EA75B→#7CEFA8（chatBubble/brandGradient*），45° 对角，衬在图标残余透明角下
       border: none
       # 2026-08-18 二修（用户定稿）：内嵌图 = App launcher 前景（ic_launcher_foreground，108dp adaptive 画布，
       # 不透明内容 190/324 宽），1.75 倍放大居中 + ContentScale.Crop，透明边全部裁出框外、插画填满 LogoBox。
@@ -147,7 +147,7 @@ empty_state:
       show_when: "isGuestMode"
       text: "Not registered? Sign up or use your Token →"  # 未注册？注册领免费额度，或配置自己的 Token →（EN 两次缩短：真机 48 字符仍折行，44 字符防箭头孤行）
       font: { size: 13 }
-      color: "brandGradientStart"  # 青玉 #0F766E
+      color: "brandGradientStart"  # 能量绿 #1EA75B
       action: open_registration_sheet
     groups_spacer: 16               # 链接/副标题与示例分组之间的固定间距（可滚动容器不可用 weight；v3 12→16）
     example_groups:
@@ -244,7 +244,7 @@ message_bubble:
 
   # 背景色（2026-08-18 豆包范式定稿，Android 已落地）
   background:
-    user_text: "userBubbleBg"            # 品牌实色青玉 #0F766E（token chatBubble/userBubbleBg，双模式一致）
+    user_text: "userBubbleBg"            # 品牌实色 #2FE385（token chatBubble/userBubbleBg，双模式一致）；文字色 userBubbleOn #062B18（2026-09-13 起用户气泡文字接 token chatBubble/userBubbleOn）
     agent_text: "none"                   # ⚠️ AI 文本无气泡：通栏纯文本流（2026-08-18 二修：去 28dp 渐变头像，用户定稿——头像多余）
     image: "surfaceVariant.opacity(0.4)"
     error: "none"                        # 同 AI 正常（无气泡范式）
@@ -356,6 +356,22 @@ input_bar:
       keyboard: send
 
     # 行 2：按钮栏（SpaceBetween）
+    # YAML 锚点须定义于首次引用之前（原 §8 定义导致 safe_load 报 undefined alias，2026-09-18 前移至此）：
+    capsule_style: &capsule_style
+      shape: { corner_radius: 16 }
+      background: "surfaceVariant.opacity(0.5)"
+      active_background: "primary.opacity(0.12)"
+      padding: { horizontal: 10, vertical: 6 }
+      icon_size: 16
+      text_font: { size: 12 }
+      text_color: "onSurface.opacity(0.7)"
+      active_color: "primary"
+
+    circular_button: &circular_button
+      size: 36                      # 36dp 圆形
+      icon_size: 22
+      default_tint: "onSurface.opacity(0.6)"
+
     button_bar:
       layout: row
       alignment: space_between
@@ -394,20 +410,7 @@ input_bar:
 # ============================================================================
 # 8. 复用组件规格
 # ============================================================================
-capsule_style: &capsule_style
-  shape: { corner_radius: 16 }
-  background: "surfaceVariant.opacity(0.5)"
-  active_background: "primary.opacity(0.12)"
-  padding: { horizontal: 10, vertical: 6 }
-  icon_size: 16
-  text_font: { size: 12 }
-  text_color: "onSurface.opacity(0.7)"
-  active_color: "primary"
-
-circular_button: &circular_button
-  size: 36                          # 36dp 圆形
-  icon_size: 22
-  default_tint: "onSurface.opacity(0.6)"
+# capsule_style / circular_button 锚点定义已前移至 §7 button_bar 之前（YAML 锚点必须先定义后引用）。
 
 # ============================================================================
 # 9. 媒体结果轮播（MediaResultsCarousel）
@@ -499,30 +502,34 @@ interaction_model:
     right: [report_issue, new_chat, clear_chat]  # new_chat = 新建会话（非清空）；clear_chat = 清当前会话
 
 # ============================================================================
-# 10. 颜色参考（2026-08-18 定稿「青玉绿×Cloud Dancer」，SSOT=design-tokens.json v2.2.2）
+# 10. 颜色参考（2026-09-13 定稿「A 氧气薄荷(Light) / B 能量绿(Dark)」，SSOT=design-tokens.json v2.2.3；
+#     v2.2.2「青玉绿×Cloud Dancer」已退役）
 # ============================================================================
 colors:
-  primary: "#1F5C54"                # 深松绿（青玉）
+  # Light（氧气薄荷）：
+  primary: "#0E9F6E"                # 能量绿
   onPrimary: "#FFFFFF"
-  primaryContainer: "#A8D5CC"
-  surface: "#F0EEE9"                # Cloud Dancer 暖乳白（潘通 2026 年度色）
-  onSurface: "#1D1A16"
-  surfaceVariant: "#E4DFD6"
-  surfaceContainerLowest: "#FBF9F5"
-  background: "#F0EEE9"
-  error: "#B32610"
+  primaryContainer: "#C9EEDD"
+  surface: "#F1FAF5"                # 薄荷白
+  onSurface: "#0F3D2E"
+  surfaceVariant: "#E0F4E8"
+  surfaceContainerLowest: "#FFFFFF"
+  background: "#F1FAF5"
+  error: "#B3261E"
   model_dot_official: "#2196F3"
   model_dot_user_key: "#FF9800"
   voice_cancel: "#E53935"
-  # 品牌渐变（设计稿字面量，Agent 头像/Logo/发送钮/大数字）：
-  #   dark: #0F766E → #5EA88F（深松绿→鼠尾草玉，135°）
-  #   light 深端: #43937E
-  # Dark mode 对应（iOS 默认 .dark）
-  # primary → #8FD6C6（薄荷玉）
-  # onSurface → #EDE9E3（暖白）
-  # surfaceVariant → #46413A
-  # surface → #171412（暖黑）
-  # background → #171412
+  # 品牌渐变（主题无关单值，取 Dark 侧；Agent 头像/Logo/发送钮/大数字）：
+  #   #1EA75B → #7CEFA8（token chatBubble/brandGradientStart→End，45° 对角）
+  # 用户气泡：实色 userBubbleBg #2FE385 + 文字 userBubbleOn #062B18（双模式一致）
+  # Dark mode 对应（能量绿；iOS 默认 .dark）
+  # primary → #2FE385（发光绿）
+  # onPrimary → #062B18
+  # onSurface → #DFF5E9
+  # surfaceVariant → #0F2B1B
+  # surface → #071510（近黑绿）
+  # background → #071510
+  # error → #F2B8B5
 
 # ============================================================================
 # 11. 允许的平台差异

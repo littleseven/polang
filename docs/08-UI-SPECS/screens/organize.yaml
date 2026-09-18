@@ -101,7 +101,7 @@ hub:
     big_number:
       text: "formatBytes(heroReclaimBytes)"   # 口径见 §1.hero_formula
       font: { size: 34, weight: bold }
-      color: brandGradient             # 品牌渐变着色文字（青玉，与 tagcontrol 同源）
+      color: brandGradient             # 品牌渐变（v2.2.3 能量绿）着色文字，与 tagcontrol 同源
     across_line:
       show_when: "有内容的类目数（totalCount > 0 的卡数）> 0"
       text_key: org_hero_across        # plurals："Across N category/categories"
@@ -118,7 +118,7 @@ hub:
     text_key: org_quick_tidy           # "Swipe to tidy"（滑动整理）
     height: 48
     corner_radius: 24
-    background: brandGradient          # 品牌渐变实底
+    background: brandGradient          # 品牌渐变（v2.2.3 能量绿）实底
     text_style: { font: titleMedium, weight: semibold, color: white }
     action: open_swipe_review          # → swipe_review 路由（§5）
 
@@ -432,7 +432,7 @@ i18n_keys:
 # ============================================================================
 colors:
   scheme_refs: [primary, onSurfaceVariant, surfaceContainer, surfaceContainerLow, surfaceVariant, tertiary, error]
-  brand_gradient: "chatBubble/brandGradient*（青玉；Hero 大数字 / 主按钮 / Undo 钮 / freed 数字同源）"
+  brand_gradient: "chatBubble/brandGradient*（品牌渐变 v2.2.3 能量绿；Hero 大数字 / 主按钮 / Undo 钮 / freed 数字同源）"
   clean_green: "#4CAF50"                         # cleaned 态 ✓ 圆标（硬编码值，双端对齐）
   badge_scrim: "black.opacity(0.4)"              # protected 盾牌圆底
   selection_unselected: "black.opacity(0.2) 底 + white.opacity(0.8) 1.5dp 描边"

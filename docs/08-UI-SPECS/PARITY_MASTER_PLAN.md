@@ -55,20 +55,20 @@
 
 **载体**：`docs/08-UI-SPECS/screens/*.yaml`。
 
-### 4.1 当前覆盖（2026-09-04 行数核验）
+### 4.1 当前覆盖（2026-09-18 行数核验）
 
 | Spec | 行数 | 状态 |
 |------|------|------|
 | `camera.yaml` | 1170 | ✅ 完整（gap analysis 全部 P0/P1/P2；2026-08-26 相机路由化/头像拍摄链路已同步） |
-| `gallery-grid.yaml` | 981 | ✅ 完整（相册整理一级入口/悬浮 Tab 已同步） |
-| `chat.yaml` | 771 | ✅ 已建 |
+| `gallery-grid.yaml` | 1026 | ✅ 完整（相册整理一级入口/悬浮 Tab 已同步） |
+| `chat.yaml` | 778 | ✅ 已建 |
 | `editor.yaml` | 646 | ✅ 已建 |
 | `settings.yaml` | 507 | ✅ 已建（2026-08-26 列表式主菜单改版已同步） |
 | `model-download-center.yaml` | 390 | ✅ 已建 |
 | `person.yaml` | 386 | ✅ 已建 |
 | `idphoto.yaml` | 418 | ✅ 已建（2026-08-16 /ios-follow idphoto 反向提取；含 FUSION 抠图管线/构图数学/修补契约全量） |
-| `tag-control.yaml` | 152 | ✅ 已建 |
-| `organize.yaml` | 454 | ✅ 已建（2026-09-07 整理中心类目体系 v2 落地固化：hub/类目详情/cleaned/swipe 口径 + 已知残留口径差台账） |
+| `tag-control.yaml` | 181 | ✅ 已建 |
+| `organize.yaml` | 471 | ✅ 已建（2026-09-07 整理中心类目体系 v2 落地固化：hub/类目详情/cleaned/swipe 口径 + 已知残留口径差台账） |
 | `topbar.yaml` | 106 | ✅ 已建 |
 | `tag(photo-info)` / `memory` | — | ❌ 按需待建（对应屏启动 iOS 对齐时先补 spec） |
 
@@ -135,7 +135,7 @@ Android 截图（adb screencap）+ iOS 截图（XCUITest / App 内捕获）
 | **流程** | `docs/08-UI-SPECS/README.md` | Vibe Coding 研发模式 SSOT（新页面/老页面/三同步） |
 | **方法论** | `docs/03-TECHNICAL-SPECS/IOS_ANDROID_UI_PARITY.md` | 度量体系/系统栏/Back/无障碍/深色/动效/RTL/键盘 |
 | **Token SSOT** | `docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md` | token 工作流 + iOS 应用指南 + 内容色板 + 漂移记录 |
-| **Spec** | `docs/08-UI-SPECS/screens/*.yaml`（7 份）+ `refs/`（双端地面真值） | 逐屏完整规格 |
+| **Spec** | `docs/08-UI-SPECS/screens/*.yaml`（11 份）+ `refs/`（双端地面真值） | 逐屏完整规格 |
 | **Skill** | `skills/ui-parity-guard/SKILL.md`（镜像 `.claude/commands/ui-parity-guard.md`） | UI 任务硬规则约束层 |
 | **Skill** | `skills/compose-ui-expert/SKILL.md` [PARITY] 段 / `skills/swiftui-expert/SKILL.md` [PARITY] 段 | 双端各自约束 |
 | **编排** | `skills/ios-follow/SKILL.md`（镜像 `.claude/commands/ios-follow.md`） | /ios-follow 六阶段管线；设计 SSOT `docs/superpowers/specs/2026-08-10-ios-follow-command-design.md` |

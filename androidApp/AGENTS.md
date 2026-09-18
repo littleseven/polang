@@ -61,10 +61,10 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `PhotoEditor` | `photo_editor/{sourceUri}?recipeUri={recipeUri}&autoOptimize={autoOptimize}` | 图片编辑器 — 从相册 MediaPager 进入；`recipeUri` 重新编辑已保存副本，`autoOptimize` 进入时自动触发 AI 一键优化 |
 | `IDPhoto` | `id_photo/{sourceUri}` | 证件照制作 |
 | `OrganizeCategory` | `organize_category/{category}` | 整理中心类目详情（F1，2026-09-05）— AI 预选网格 + 批量回收站清理/恢复；路由段为 `domain.organize.OrganizeCategory` 枚举名，非法值弹栈；VM 经 `AppContainer.createOrganizeCategoryViewModelFactory(category)` 构建（TrashSessionController 在 VM 内 new，backend = DedupTrashBackend 包装 dedupTrashManager） |
-| `SwipeReview` | `swipe_review` | 手势快速整理全屏页（F2，2026-09-05）— 右滑保留 / 左滑跳过 / 上滑删除（点按=跳过），DELETE 批量提交系统回收站；KEEP 决策写入 30 天抑制历史（DataStore `swipe_keep_history`）不再入队；hub「Quick tidy up」主按钮点亮；VM 经 `AppContainer.createSwipeReviewViewModelFactory()` 构建 |
+| `SwipeReview` | `swipe_review` | 手势快速整理全屏页（F2，2026-09-05）— 右滑保留 / 左滑跳过 / 上滑删除（点按=跳过），DELETE 批量提交系统回收站；KEEP 决策写入 30 天抑制历史（DataStore `swipe_keep_history`）不再入队；hub「滑动整理 / Swipe to tidy」（`org_quick_tidy`）主按钮点亮；VM 经 `AppContainer.createSwipeReviewViewModelFactory()` 构建 |
 | `MemoryDetail` | `memory_detail/{memoryId}` | 回忆详情页（F3，2026-09-06 升级对标小米）— 约屏高 55% 封面（左下蒙层白字标题 + hitCount·分类型副行）+ 3 列网格 + 底部「精选/全部」分段开关（`displayUris` = `itemUris`/`allItemUris` 跟随切换，分享集合同步跟随，ACTION_SEND_MULTIPLE）；封面/网格照片点击进全屏 MediaPager 预览（2026-09-06 补齐：`MemoriesViewModel.assetsByUri` uri→MediaAsset 反查，预览内删除/OCR/跳编辑器/证件照经 Activity 级 MediaViewModel，删除授权同 ChatScreen 写法，删空自动收起，返回键优先关预览）；路由段为 Memory.id（`Uri.encode`，Navigation 自动解码一次），数据取自 Activity 级 `MemoriesViewModel.observeMemory(id)` Flow（未过滤全集，已隐藏条目可复原，冷恢复不闪空态），id 失效 → 空态；VM 经 `AppContainer.createMemoriesViewModelFactory()` 构建 |
 | `Settings` | `settings` | 设置 — 主菜单（2026-08-26 列表式改版：账号 Hero 卡 + 个性化/功能/AI 与系统/其他四组列表行） |
-| `SettingsCategory` | `settings/{category}` | 设置二级分类页 — 路由段为枚举名小写：`account`、`gallery`（dormant）、`camera`、`system`、`remote_model`、`local_model`、`sandbox`、`developer`（2026-08-16 `camera_beauty` 更名 `camera`，承载相机状态记忆与重置） |
+| `SettingsCategory` | `settings/{category}` | 设置二级分类页 — 路由段为枚举名小写：`account`、`camera`、`system`、`remote_model`、`local_model`、`sandbox`、`developer`（2026-08-16 `camera_beauty` 更名 `camera`，承载相机状态记忆与重置；休眠 `gallery` 分类已于 2026-09-05 整块删除） |
 | `AddRemoteProvider` | `settings/add_remote_provider` | 添加远程模型 — 供应商列表页（精确路由，优先于 `settings/{category}` 占位匹配；2026-08-21 替代原 AddProviderModelDialog 弹窗） |
 | `ProviderConfig` | `settings/provider_config/{providerId}` | 供应商配置页 — API Key + 模型单选 + 自定义模型 ID；`providerId=custom` 为自定义供应商形态（含 Base URL）；保存后确定性弹回远程模型列表 |
 | `ModelCenter` | `model_center/{categoryTag}` | 模型中心 — 按服务功能分类管理本地模型 |
@@ -136,6 +136,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `dedup/` | `DedupModels`（DedupLevel/DedupGroup/DedupScanConfig）, `DedupScanner`, `DedupScanEvent`, `DedupScanController`, `KeepPolicyEngine`, `DedupTrashManager` | 去重 2.0 领域层：三级尺度流式扫描（dedup_hash 缓存）、保留规则引擎、系统回收站删除/恢复 |
 | `organize/` | `OrganizeModels`（OrganizeCategory/OrganizeItem/ClassifiedItem/CategoryBoard/OrganizeBoard）, `CategoryArbiter`, `ValueGuard`, `ConfidenceGrader`, `DuplicateGrouper`, `OrganizeCategorizer`, `OrganizeThresholds`, `BlurAnalyzer` | 整理中心 v2 领域层（2026-09-07）：六类目互斥裁定 → 价值保护 → 置信分级纯函数管线（Facade=OrganizeCategorizer），阈值集中 OrganizeThresholds；实现细节见 `features/gallery/AGENTS.md` §2.4 |
 | `swipe/` | `SwipeModels`（SwipeReason/SwipeCandidate）, `SwipeQueueBuilder`, `SwipeKeepHistory` | 手势快速整理（F2）建队：与整理中心同管线产出（口径同源），KEEP 30 天抑制纯函数 |
+| `trash/` | `TrashBackend`（接口，`TrashSessionController.kt` 内）, `TrashSessionController`, `DedupTrashBackend`, `PreviewTrashRouting` | 回收站删除编排域（2026-09-08）：API 30+ 走系统回收站 30 天可恢复（`MediaStore.createTrashRequest`），API<30 经 `PreviewTrashRouting` 纯函数降级永久删除；静默快路径 `TrashBackend.trySilentTrash`（MANAGE_MEDIA 直写 IS_TRASHED）；去重/整理中心/滑动整理/预览上滑删除四宿主共用 |
 | `model/` | `AiAgentCommand`, `MediaAsset`, `UserPreferences`, `ChatEditRecipeBuilder` 等 | 领域数据模型；`ChatEditRecipeBuilder` 将 LLM 编辑意图转换为 `EditRecipe`（delta 相对调整带单次步进上限保护：美颜 ±10、slim_face ±5、亮度/曝光 ±15、对比度/饱和度 ±15、色温 ±500K、tint ±15；绝对值视为显式数值请求不限幅） |
 | `matting/` | `MattingEngine`, `MaskPostProcessor`, `StrokeLayer`, `EdgeParams`, `IDPhotoComposer`, `BackgroundComposer` 等 | 抠图与证件照合成：融合管线不再固定 sharpen（边缘锐化已迁移参数层，`EdgeParams.DEFAULT_CONTRAST=2.5` 复现旧行为，MIN/MAX 常量供 UI 钳制）；`MaskPostProcessor` 参数层 `erode/dilate/adjustEdges`（对比度→收缩扩张→羽化，各环节默认值自然短路）；`StrokeLayer` 矢量描边层（RESTORE/ERASE、undo/redo，撤销=移除尾条重放；`snapshot` + companion `replay` 纯函数保证跨线程安全） |
 | `search/` | `MediaSearchEngine`, `ExplicitFirstSearchPipeline`, `QuerySegmenter`, `QueryParser`, `SegmentedQuery`, `ExplicitFilter`, `ContentFilter` | 自然语言图片搜索：显式约束优先分段检索 + 规则/LLM/语义混合排序；Chat 场景由 `SearchIntent` 直接驱动 `MediaSearchEngine.search(filter)` |
@@ -145,6 +146,8 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `person/` | `RelationPredicate`, `KinshipLexicon`, `PersonRepository`, `PersonQueryResolver`, `RelationSnapshotRestorer` | 人物关系图谱（两层模型）：谓词封闭枚举（粗谓词机器逻辑，性别/长幼细分 + 中/英/日标签）+ `customLabel` 自定义称呼（用户语言，展示/查询优先）；称谓词表（声明归一具体谓词 + 谓词族查询扩展）；关系与"我"标记收口仓库（`observeSelfAvatar` 同时是设置页账户头像的数据源）；查询串→personId 解析器；重聚快照恢复纯函数 |
 | `memory/` | `MemoryRepository` | 通用事实记忆仓库（"帮我记住…"收口，remember/update/forget/唯一匹配删/observeAll） |
 | `preview/` | `BeautyPreviewProvider` | 美颜预览提供者接口 |
+
+> **2026-09-08 相册删除链路**：① 预览页（MediaPager）全局上滑删除手势——纯判定逻辑收口 `features/gallery/components/SwipeUpDeleteGesture.kt`（竖直位移主导 + 页高 25% 阈值），默认移入回收站，API<30 降级永久删除；② 「删除不再询问」MANAGE_MEDIA 静默删除开关（删除不再弹系统授权框，`UserSettingsRepository.mediaManageSilentTrashFlow`，默认 false），开启且持权时直写 IS_TRASHED 静默回收。实现细节见 `features/gallery/AGENTS.md`。
 
 ### 2.3 数据层 (`data/`)
 
@@ -163,11 +166,10 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 |------|------|------|
 | `di/` | `AppContainer`、`AppContainerImpl` | 手动 DI（无 Hilt/Dagger） |
 | `core/common/` | `Logger`、`PerceptualHash` | 共享工具（`PerceptualHash` 为 MD5/pHash 纯算法，供去重 2.0 `DedupScanner` 复用） |
-| `core/designsystem/` | `Color`、`Theme`、`Typography` | Compose 设计系统 |
+| `core/designsystem/` | `Color`、`Theme`、`Typography`、`DesignTokens`、`AppShapes`、`Spacing`、`components/`（`AppSlider` 等） | Compose 设计系统 |
 | `core/image/` | `CoilConfig`、`GpuBeautyProcessor`、`ImageProcessor` | 图片加载与处理 |
 | `service/chat/` | `FloatingChatBubbleService` | 悬浮聊天气泡 |
 | `service/accessibility/` | `PoLangAccessibilityService` | Agent 自动化辅助服务 |
-| `testing/` | Agent 自动化测试框架 | 测试基础设施 |
 
 ---
 
@@ -181,7 +183,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
  ├── :engines:beauty-api    ← 美颜 API 契约
  ├── :engines:beauty-engine ← 美颜引擎实现
  └── :engines:sentencepiece ← SentencePiece tokenizer
-（:engines:agent-native / :engines:mnn-core 经 :shared androidMain 传递，不直接依赖）
+（:engines:agent-native 经 :shared androidMain 传递；:engines:mnn-core 由 androidApp 直接依赖 —— build.gradle.kts `implementation(project(":engines:mnn-core"))`）
 ```
 
 ### 3.1.1 Agent 组合根（Phase 4 KMP 抽取新增）
@@ -194,7 +196,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 
 | 路径 | 内容 |
 |------|------|
-| `agent/core/inference/remote/tool/` | `RemoteControlToolService`（飞书 RPA @Tool 集，11 个 suspend 工具方法，实现 JVM-only `reflect.ToolSet`，由组合根懒构建 ToolRegistry） |
+| `agent/core/inference/remote/tool/` | `RemoteControlToolService`（飞书 RPA @Tool 集，23 个 @Tool 工具方法（16 个 suspend），实现 JVM-only `reflect.ToolSet`，由组合根懒构建 ToolRegistry） |
 | `agent/core/tool/perception/` | `ViewHierarchyExtractor`（WindowManager 视图层级抽取） |
 | `agent/core/tool/accessibility/` | `AccessibilityServiceHolder` / `AccessibilityActionPerformer` / `AccessibilityNodeDumper`（无障碍服务桥） |
 
@@ -262,7 +264,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 - `core/designsystem/AGENTS.md` — 设计系统
 - `data/AGENTS.md` — 数据层
 - `di/AGENTS.md` — 依赖注入
-- `domain/agent/capability/AGENTS.md` — Agent Capability 实现
+- `domain/agent/capability/AGENTS.md` — Agent Capability 实现（已冻结，历史设计参考）
 
 ---
 
@@ -279,5 +281,5 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-09-06
+> **最后更新**：2026-09-18
 > **状态**：生效中

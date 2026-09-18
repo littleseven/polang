@@ -354,7 +354,7 @@ OPUS-MT 原始训练基于 SentencePiece，但导出的 ONNX 模型输入/输出
 - `docs/03-TECHNICAL-SPECS/TAG_GENERATION.md` — TAG 国际化与 OPUS-MT 翻译回退
 - `docs/06-QA/research/OPUS_MT_TRANSLATION_VALIDATION.md` — OPUS-MT 端侧推理验证记录
 - `docs/03-TECHNICAL-SPECS/VOICE_STACK.md` — KWS 唤醒词迁移
-- `docs/06-QA/perf_trace_2026-06-06_ncnn_llm_comparison.md` — LLM 开启前后性能对比（历史文件名，含 NCNN 基线）
+- ~~`docs/06-QA/perf_trace_2026-06-06_ncnn_llm_comparison.md`~~ — LLM 开启前后性能对比（已删，commit 412dd27c1，git 历史可查；历史文件名，含 NCNN 基线）
 - `androidApp/src/main/res/raw/llm_models.json` — 模型清单与下载配置
 - `androidApp/src/main/java/com/mamba/picme/features/settings/AGENTS.md` — 模型中心与设置
 

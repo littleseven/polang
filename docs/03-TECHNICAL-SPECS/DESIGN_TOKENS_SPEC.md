@@ -3,7 +3,7 @@
 > **工作流（2026-08-15 起，codegen 版；2026-08-19 起双向）**：`design-tokens.json` 是唯一 SSOT；双端镜像**全部由 `scripts/gen-design-tokens.py` 生成，禁止手改**。改 token = 改 JSON → 重跑生成器 → CI（`ai-gate.sh`）跑 `--check` 门禁（生成物与 JSON 不一致即 fail）。Ardot 画布为「token 活体预览 + 辅助精修面」：生成器输出 `build/design-tokens/ardot-variables.json`，由 `scripts/sync-ardot-variables.py` 与画布**双向同步**（`--push`/`--pull`/`--check` 语义见 §9；300+ 变量勿经 agent 手抄内联 `apply_variables`，易错）。
 >
 > 配套文件：
-> - SSOT：`shared/src/commonMain/resources/design-tokens.json`（v2.0.0）
+> - SSOT：`shared/src/commonMain/resources/design-tokens.json`（v2.2.3，_updated 2026-09-13）
 > - 生成器：`scripts/gen-design-tokens.py`（含 `--check` 校验模式）
 > - Ardot 双向同步：`scripts/sync-ardot-variables.py`（用法/故障排查见 `.kimi-code/ARDOT_MCP.md` §Token 同步工作流；三向语义见 §9）
 > - Ardot 快照入库：`scripts/export-ardot-snapshot.py` → `docs/08-UI-SPECS/screens/refs/ardot/`（云端文档导不出可编辑源文件，结构 JSON + PNG 快照是本地 git 管理形态；改画布后重跑、diff 审查）
@@ -56,15 +56,25 @@
 - 美颜面板高度唯一 SSOT = `beautyPanel.heightRatio`（0.35 → **0.40**，容下磨皮/美白/瘦脸/大眼 4 行 + Tab 栏）；iOS 由 `CameraTokens.beautyPanelHeightRatio`（手写）切换到 `BeautyPanelTokens.heightRatio`（生成）。
 - 生成器新增 `RAW_SWIFT_VALUES` 直出表：JSON 中 `"@xxx"` 占位字符串（语义引用，classify=skip）可经该表为 Swift 生成原始属性行（如 `cameraAccent = Color.accentColor`——系统动态色不可冻结为 hex）；Android 侧不生成（对应语义走 colorScheme 角色，如相机 accent=primary）。`SWIFT_CG_FLOAT_KEYS` 增补 `beautyPanel.heightRatio`（iOS `ControlPanel(heightRatio:)` 形参为 CGFloat）。
 
+**v2.2.2（2026-08-18，「青玉绿×Cloud Dancer」，已退役为历史）：**
+- scheme 25 角色切换青玉系：中性轴=潘通 2026 年度色 Cloud Dancer 暖乳白 `#F0EEE9`（暗色暖黑 `#171412`）；primary=青玉绿家族（Light `#1F5C54` / Dark `#8FD6C6`）；tertiary=翡翠绿（commit 276caa49c）。
+- 主题无关单值：cameraAccent `#0F766E`；chatBubble 品牌渐变 `#0F766E→#5EA88F`（暗帧）/`#43937E`（浅帧深端）；用户气泡 userBubbleBg `#0F766E` + 白字。
+- 已被 v2.2.3 整体取代，仅存 git 历史。
+
+**v2.2.3（2026-09-13，「A 氧气薄荷(Light) / B 能量绿(Dark)」，现行）：**
+- scheme 25 角色重写：Light=薄荷白底 surface `#F1FAF5` + primary `#0E9F6E`；Dark=近黑绿底 surface `#071510` + 发光绿 primary `#2FE385`；容器梯度/outline 全套跟进（commit 457a854da）。
+- 主题无关单值（取 Dark 侧）：cameraAccent 单值 `#2FE385`；chatBubble 品牌渐变 brandGradient `#1EA75B→#7CEFA8`；用户气泡 userBubbleBg `#2FE385`、深字 userBubbleOn `#062B18`。
+- 产线：Ardot 画布调色 → `sync --pull` 回流 → `gen-design-tokens` 双端镜像 → `--push` 零漂移收敛；Android 真机双模式像素级验收通过。
+
 ---
 
-## 3. ⚠️ Android 代码缺陷（动态取色掩盖，iOS 须规避）
+## 3. Android 代码缺陷（已修复历史记录：2026-08-19 关闭 dynamicColor + Color.kt 纳入 codegen）
 
-> Android 12+ 默认 `dynamicColor=true`，`LightColorScheme`/`DarkColorScheme` 静态值被 Material You 覆盖，故以下 bug 在真机上不易察觉。iOS 无动态取色，**必须用 SSOT 已修正的标准值**。
+> 原前提已不成立：`PoLangTheme` 自 2026-08-19 起全局 `dynamicColor=false`（Android 12+ 默认 Material You 动态取色已关闭，双端一致），且 `Color.kt` 已纳入 codegen 生成物——#1/#2 已修复，仅作历史记录。iOS 无动态取色，仍**必须用 SSOT 标准值**。
 
-1. **`Color.kt:21` `ErrorLight = Color(0xB32610)`** — 6 位 int 被当作 ARGB → `0x00B32610` → **alpha=00 全透明**。SSOT 已用 M3 标准 `#B3261E`。
-2. **`Theme.kt:64-65` Dark scheme** — `tertiaryContainer = TertiaryDark`、`onTertiaryContainer = TertiaryDark`（应为 `TertiaryContainerDark` #633B48 / `OnTertiaryContainerDark` #FFD8E4）。SSOT 已修正。
-3. **`Theme.kt` 未显式设置** `surfaceVariant` / `outline` / `outlineVariant` / `surfaceContainer*` — 走 M3 默认。SSOT 已补全 M3 baseline 值（iOS 直接用，不再猜）。
+1. ~~**`Color.kt:21` `ErrorLight = Color(0xB32610)`** — 6 位 int 被当作 ARGB → `0x00B32610` → **alpha=00 全透明**~~。**已修复**：`Color.kt` 现为生成物（`ErrorLight = Color(0xFFB3261E)`，文件头 GENERATED 标记，色值随 SSOT 自动同步）。
+2. ~~**`Theme.kt:64-65` Dark scheme** — `tertiaryContainer = TertiaryDark`、`onTertiaryContainer = TertiaryDark`~~。**已修复**：现为 `tertiaryContainer = TertiaryContainerDark` / `onTertiaryContainer = OnTertiaryContainerDark`，引用 Color.kt 生成值，色值随 SSOT 自动同步。
+3. **`Theme.kt` 未显式设置** `surfaceVariant` / `outline` / `outlineVariant` / `surfaceContainer*` — 走 M3 默认（**仍属实，2026-09-18 核验**）。SSOT 已补全 baseline 值（iOS 直接用，不再猜）。
 
 ---
 
@@ -189,4 +199,4 @@ photo-info tag chip `primary@0.2`/corner6/12sp/White/8h-4v；section header 14sp
 
 ---
 
-_提取日期：2026-08-09 · SSOT v2.0.0 · 10 页全量抽取_
+_提取日期：2026-08-09 · SSOT v2.2.3（_updated 2026-09-13）· 10 页全量抽取_

@@ -27,7 +27,7 @@
 - Java/Kotlin JNI 封装：`engines/sentencepiece/src/main/java/com/mamba/picme/sentencepiece/`
 - Native 源码与 CMake：`engines/sentencepiece/src/main/cpp/`
 - CMake 目标：`libsentencepiece_android.so`
-- 预编译库目录：`engines/sentencepiece/src/main/jniLibs/`（当前为空，SO 由 CMake 构建产出）
+- 预编译库目录：`engines/sentencepiece/src/main/jniLibs/`（目录可不存在，SO 由 CMake 构建产出）
 
 ---
 

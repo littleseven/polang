@@ -246,4 +246,4 @@ Ardot/Figma 画布为 token **可视化预览层**（非 SSOT），由 `sync-ard
 - [Swift by Sundell：Defining Dynamic Colors in Swift](https://www.swiftbysundell.com/articles/defining-dynamic-colors-in-swift)
 - [Appy Pie：200ms Rule for Mobile Animation](https://www.appypie.com/blog/mobile-app-animation-guide)
 - [Bitrise：Introduction to App Localization in iOS and Android](https://bitrise.com/blog/post/introduction-to-app-localization-in-ios-and-android)
-- 本项目实证（2026-08-08 快照；相机/相册视图层已大幅重构，多数 gap 已关闭，勿用于当前规划，见 [`2026-08-10-ios-kmp-doc-drift-audit.md`](../reviews/2026-08-10-ios-kmp-doc-drift-audit.md)）：`docs/reviews/2026-08-08-ios-camera-ui-gap-analysis.md`、`docs/reviews/2026-08-08-ios-gallery-ui-gap-analysis.md`
+- 本项目实证（2026-08-08 快照；相机/相册视图层已大幅重构，多数 gap 已关闭，勿用于当前规划，见 [`2026-08-10-ios-kmp-doc-drift-audit.md`](../reviews/2026-08-10-ios-kmp-doc-drift-audit.md)）

@@ -178,7 +178,7 @@ object BadgeTokens {
     val listHeight = 26.dp
 }
 
-/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定深青玉 #0F766E（非 colorScheme.primary，白字对比度保障）。 */
+/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役）。 */
 object CameraTokens {
     val focusRingDiameter = 100.dp
     val focusRingStrokeWidth = 3.dp
@@ -399,7 +399,7 @@ object SearchFieldTokens {
     val height = 36.dp
 }
 
-/** 4 页 App Shell（Camera=0/Gallery=1/Chat=2/People=3）HorizontalPager。overlayMaxWidth 2026-08-19 迁移 iPhone 15 画布宽 400→393。 */
+/** 5 页 App Shell（Gallery=0/Organize=1/Chat=2/People=3/Memory=4）HorizontalPager（2026-09-06 主导航统一，相机已移出 Pager 改全屏路由）。overlayMaxWidth 2026-08-19 迁移 iPhone 15 画布宽 400→393。 */
 object PagerTokens {
     val pageSpacing = 16.dp
     val actionIconSize = 32.dp

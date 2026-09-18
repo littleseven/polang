@@ -28,8 +28,8 @@
 # ⑤ 相册钮 #404040+浅色 Photo 占位图标、翻转钮白@20%+深色 #1C1B1F 图标；
 #   两钮下方各 11sp 白标签（相册/翻转，gap 4dp）。
 # ⑥ 返回箭头融入工具栏行：icon 中心 x=28dp、距「美颜」胶囊 8dp、与胶囊行垂直居中。
-# ⑦ 相机 accent 固定深青玉 #0F766E（camera.cameraAccent，替代 colorScheme.primary，
-#   白字对比度保障）——选中工具栏胶囊/选中 chip/WB 选中/滑杆激活段统一使用。
+# ⑦ 相机 accent 固定能量绿 #2FE385（camera.cameraAccent，主题无关单值；2026-09-13 v2.2.3 起，
+#   原固定深青玉 #0F766E 退役）——选中工具栏胶囊/选中 chip/WB 选中/滑杆激活段统一使用。
 # ⑧ 内联面板：圆角 16、#1C1A1F@72%、无描边、统一宽 = 屏宽−2×28(≤420)；
 #   chip 34 高/13sp/间距10/paddingH14（老版尺寸，08-18 画布加大版经真机否决回退）。
 # ⑨ 滤镜面板回 5 列圆形小缩略图（老版结构）+ accent 选中态（渐变边框/check/1.08x）。
@@ -178,8 +178,8 @@ top_left_controls:
 # 每个入口 = 文字胶囊：字号 12sp，选中 Bold/未选中 Medium，
 #   padding = H camera.topToolBarItemPaddingH(10) V camera.topToolBarItemPaddingV(9)，
 #   圆角 camera.topToolBarItemRadius(10)
-# 选中态：底 camera.toolBarSelectedBg(=cameraAccent #0F766E 固定深青玉，2026-08-18 起
-#   替代 colorScheme.primary——暗色主题下浅青玉与白字对比度不足)，字 camera.cameraAccentOn(白)
+# 选中态：底 camera.toolBarSelectedBg(=cameraAccent #2FE385 固定能量绿，主题无关单值；
+#   2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役)，字 camera.cameraAccentOn(白)
 # 未选中：底 camera.toolBarUnselectedBg(透明)，字 白色
 # ⚠️ 与 §3 左列（back/debug）垂直错开：左列需额外 top padding 避让工具栏高度
 # 2026-08-18 七修：back 融入本行后与美颜挤压（369dp 屏组宽 304 → 美颜左缘仅 32.5dp），
@@ -228,7 +228,7 @@ top_tool_bar:
 # chip 行样式（ratio/grid 用）：胶囊高 camera.chipHeight(34)、
 #   paddingH camera.chipPaddingH(14)、间距 camera.chipSpacing(10)、字号 chipFontSize(13) Medium
 #   （08-18 画布曾放大至 40/18/12/15，真机反馈偏大回退老版尺寸）；
-#   选中=cameraAccent(#0F766E) 底+白字，未选中=白 15% 底+白字；选择后立即收起面板
+#   选中=cameraAccent(#2FE385) 底+白字，未选中=白 15% 底+白字；选择后立即收起面板
 # pro 面板 WB chips（2026-08-18 Ardot）：全圆胶囊 h34 / wbChipFontSize 12sp / 间距 wbChipSpacing(8) /
 #   paddingH wbChipPaddingH(10)；选中=cameraAccent+白字，未选中=白 15% 底——双端同构
 inline_panels:
@@ -461,7 +461,7 @@ beauty_panel:
     exit: slide_out_vertically + fade_out
   # ── 2026-08-18 三修：几何全回老版（顶部圆角 beautyPanel.topCornerRadius=24、高 heightRatio=0.4、
   #    0.5dp 描边、16dp 阴影、黑色渐变 scrim 透明→黑55→黑82、底部 icon-only Tab 栏），
-  #    仅色系换 cameraAccent(#0F766E)：Tab 选中 accent@12% 底+accent 图标、滑杆已调值 accent、
+  #    仅色系换 cameraAccent(#2FE385)：Tab 选中 accent@12% 底+accent 图标、滑杆已调值 accent、
   #    AppSlider 走 CameraOverlay 档（白@15% 轨道+accent 激活段+纯白 thumb 无描边）。
   #    08-18 曾试直角抽屉+浅色 scrim+顶部大 Tab（画布方案），真机否决回退。──
   scrollable: true                   # 内容可垂直滚动(行为)

@@ -27,7 +27,7 @@ tag_control:
     stats_card:
       hero_number:
         text: "<语义索引覆盖率 %>"                  # 大数字，品牌渐变前景
-        foreground: "brandGradient #0F766E→#5EA88F"
+        foreground: "brandGradient #1EA75B→#7CEFA8"
         caption: "stats_hero_caption = %1$d%% semantically indexed"
       progress_ring:
         style: "实色 primary 弧（非渐变）；尺寸对齐 ardot 帧 tag_control_v2"
@@ -155,7 +155,7 @@ tag_control:
     sheet_confirm: surfaceContainerHighest
     stroke: outlineVariant
     emphasis: "primary（dark = #8FD6C6）"
-    gradient: "brandGradient #0F766E→#5EA88F（渐变按钮/大数字/轨道）"
+    gradient: "brandGradient #1EA75B→#7CEFA8（渐变按钮/大数字/轨道）"
     accent_literals:                               # v2 新增字面量（未入 token，双端按本文对齐）
       status_green: "#00E676"
       status_orange: "#FFB020"

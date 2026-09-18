@@ -17,12 +17,12 @@
 
 ```
 shared/src/
-├── commonMain/    ← 引擎无关层（96 个 Kotlin 文件，见 §2）
-├── androidMain/   ← Android 平台实现（VLM/语音/DataStore/dispatcher actual，13 文件）
-├── iosMain/       ← iOS actual + Phase 6.2 chat 全链路（16 文件）：IosAgentComposition 组合根/ChatAgentBridge（Swift↔Kotlin 桥，多会话 setSessionId/clearHistory(sessionId:) 按 koog_memory_<sessionId> 分键隔离）/IosChatGalleryCapability（+IosChatGallerySearch 纯逻辑、IosChatSearchBridge 搜索引擎桥，契约 tmp/ios-follow/gallery-search/contracts.md §9）/IosKoogMessageMemoryStore（NSUserDefaults）/IosMediaRepository(+Bridge)/FlowWatchers/ChatUiActionDto/IosChatPrompt；唯一 stub 为 IosUnavailableImageInferenceEngine（端侧 VLM 未落地，显式空契约）
-├── jvmMain/       ← JVM actual（4 文件，同 android 三项 actual + Platform）
-├── commonTest/    ← 多平台测试（kotlin.test，25 文件）
-├── iosTest/       ← iOS 测试（5 文件）
+├── commonMain/    ← 引擎无关层（102 个 Kotlin 文件，见 §2）
+├── androidMain/   ← Android 平台实现（VLM/语音/DataStore/dispatcher actual，14 文件）
+├── iosMain/       ← iOS actual + Phase 6.2 chat 全链路（26 文件）：IosAgentComposition 组合根/ChatAgentBridge（Swift↔Kotlin 桥，多会话 setSessionId/clearHistory(sessionId:) 按 koog_memory_<sessionId> 分键隔离）/IosChatGalleryCapability（+IosChatGallerySearch 纯逻辑、IosChatSearchBridge 搜索引擎桥，契约 tmp/ios-follow/gallery-search/contracts.md §9）/IosKoogMessageMemoryStore（NSUserDefaults）/IosMediaRepository(+Bridge)/FlowWatchers/ChatUiActionDto/IosChatPrompt/IosAiOptimizeCapability(+IosAiOptimizeBridge)/IosChartCapability(+IosChartBridge)/IosRunScriptCapability(+IosRunScriptBridge)/IosJsRuntimeSupport/IosDiagnosticLogStore/domain/chat/StreamingPacingControllerFactory/TimeProvider；唯一 stub 为 IosUnavailableImageInferenceEngine（端侧 VLM 未落地，显式空契约）
+├── jvmMain/       ← JVM actual（5 文件：Platform/DispatcherProvider/AgentIdGenerator/KoogHttpClientFactoryProvider actual + domain/chat/TimeProvider.kt）
+├── commonTest/    ← 多平台测试（kotlin.test，32 文件）
+├── iosTest/       ← iOS 测试（6 文件）
 └── jvmTest/       ← JVM-only 测试（@Tool 反射清单/prompt golden/守卫扫描，7 文件）
 ```
 
@@ -98,5 +98,5 @@ JITPACK=true ./gradlew :shared:assembleSharedKitDebugXCFramework
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-08-09
+> **最后更新**：2026-09-18
 > **状态**：生效中

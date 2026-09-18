@@ -11,7 +11,7 @@
 #   设计稿几何   = Ardot canvas 各帧 top_bar（393×852 帧内坐标）
 #                 2026-08-19 迁移 iPhone 15 尺寸（相机页除外，重建中）
 # 本文件为规格源；实现与设计稿向此对齐，发现漂移先改这里。
-# 代码落地：2026-08-19 Android 侧 icons.platforms/变体图标已切 Material Outlined（bf23003d9+2278d6f7a）；dynamicColor 全局关闭钉青玉（2c37c4bfd）
+# 代码落地：2026-08-19 Android 侧 icons.platforms/变体图标已切 Material Outlined（bf23003d9+2278d6f7a）；dynamicColor 全局关闭钉青玉（2c37c4bfd）；2026-09-13 起钉 v2.2.3 色板（氧气薄荷/能量绿）
 
 topbar:
   height: 48                       # dp（帧内 48px）；token topBar.height

@@ -13,9 +13,9 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.1
+**版本**：0.9.3
 
-**最后更新**：2026-07-25
+**最后更新**：2026-09-18
 
 **状态**：生效中 / 已上线
 
@@ -45,18 +45,24 @@ server/
 ├── settings.gradle.kts           # rootProject.name = "picme-server"
 ├── src/main/kotlin/com/mamba/picme/server/
 │   ├── Application.kt            # Ktor 入口：插件装配（Routing/ContentNegotiation/Auth/StatusPages/CallLogging）
-│   ├── config/AppConfig.kt       # 环境变量读取（非 HOCON，无 application.conf）
+│   ├── config/
+│   │   ├── AppConfig.kt          # 环境变量读取（非 HOCON，无 application.conf）
+│   │   └── SettingsService.kt    # server_setting 内存快照（额度默认值/白名单，热路径零 DB 读）
 │   ├── routes/
 │   │   ├── HealthzRoute.kt       # GET /healthz — 存活探活
 │   │   ├── RecommendRoute.kt     # POST /recommend — 场景推荐
 │   │   ├── TelemetryRoute.kt     # POST /telemetry — 遥测收集
-│   │   ├── AuthRoute.kt          # POST /auth/email/{send,verify} — 邮箱认证
-│   │   ├── LlmRoute.kt           # POST /v1/chat/completions — LLM 代理
-│   │   └── DownloadRoute.kt      # GET /download — 资源下载
+│   │   ├── AuthRoute.kt          # POST /auth/email/{send,verify}、GET /auth/quota、DELETE /auth/account、DELETE /guest/device
+│   │   ├── ClaudeChatRoute.kt    # POST /v1/claude-chat、/v1/claude-deliver、GET /v1/claude-engineer/available
+│   │   ├── ClaudeToolResultRoute.kt # POST /v1/claude-tool-result — App tool 结果回传
+│   │   ├── IssueReportRoute.kt   # POST /v1/report-issue — 用户问题上报
+│   │   └── DownloadRoute.kt      # GET /download — 资源下载 + iOS 安装（/download/ios、manifest.plist、udid 注册）
 │   ├── auth/
 │   │   ├── AccountService.kt     # 账号 CRUD + token 生成/校验
 │   │   ├── AppTokenAuth.kt       # X-App-Token 认证插件
-│   │   └── EmailService.kt       # 验证码发送（SMTP）
+│   │   ├── EmailService.kt       # 验证码发送（SMTP）
+│   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理
+│   │   └── AiEngineerWhitelistService.kt # AI 工程师交付白名单
 │   ├── admin/
 │   │   ├── AdminRoutes.kt        # /admin/** 路由注册（含 /admin/diagnosis 问题诊断页）
 │   │   ├── AdminAuth.kt          # ADMIN_TOKEN + cookie 认证
@@ -70,6 +76,7 @@ server/
 │   │   ├── ChannelConfig.kt      # 供应商配置（baseUrl/apiKey/model/routing）
 │   │   ├── ChannelRegistry.kt    # 多供应商注册表
 │   │   ├── ChannelRepository.kt  # 配置持久化/加载
+│   │   ├── ChannelBalanceService.kt # 渠道上游余额查询/缓存
 │   │   ├── LlmProxy.kt           # 流式代理 + 上游路由
 │   │   └── LlmRoute.kt           # /v1/chat/completions 端点
 │   ├── recommend/RuleEngine.kt   # 规则查询 + 参数组装
@@ -82,14 +89,20 @@ server/
 │       ├── Db.kt                 # HikariCP + Exposed 数据库连接
 │       ├── Tables.kt             # Exposed Table 定义（含 ReportedIssues）
 │       └── Migrations.kt         # Schema 创建 + seed 幂等加载
-├── migrations/
-│   ├── 001_init.sql              # 初始建表
-│   ├── 002_account.sql           # 账号表
-│   ├── 003_llm_log.sql           # LLM 调用日志
-│   ├── 004_admin.sql             # 管理后台相关
-│   ├── 005_account_token_plain.sql # Token 明文兼容
+├── migrations/                   # 迁移文件以 server/migrations/ 目录为准
+│   ├── 001_init.sql
+│   ├── 002_llm_call_log.sql
+│   ├── 003_llm_channel.sql
+│   ├── 004_llm_channel_default_model.sql
+│   ├── 005_account_token_plain.sql
+│   ├── 006_account_soft_delete.sql
+│   ├── 006_llm_call_log_platform.sql
+│   ├── 007_server_setting.sql
+│   ├── 008_llm_channel_balance.sql
+│   ├── 009_drop_diag_jobs.sql
+│   ├── 010_anonymous_device_platform.sql
 │   └── seed_rules.sql            # 初始推荐规则
-├── src/test/kotlin/              # 测试基建
+├── src/test/kotlin/              # 测试基建（下列为示意，实际 40 个 *Test.kt + 2 个辅助类）
 │   ├── ChannelRepositoryTest.kt
 │   ├── AdminRoutesTest.kt
 │   └── TokenUsageTest.kt
@@ -133,6 +146,18 @@ server/
 | POST | `/v1/claude-tool-result` | P1 | ✅ | X-App-Token | AI 工程师 App tool 结果回传 |
 | POST | `/v1/claude-deliver` | P1 | ✅ | X-App-Token + 白名单 | AI 工程师代码交付 |
 | GET | `/v1/claude-engineer/available` | P1 | ✅ | X-App-Token | 返回 {available, canDeliver} |
+| GET | `/auth/quota` | P1 | ✅ | X-App-Token | 查询账号剩余额度 |
+| DELETE | `/auth/account` | P1 | ✅ | X-App-Token | 注销账号（软删除） |
+| DELETE | `/guest/device` | P1 | ✅ | X-App-Token | 清除访客设备记录（X-Device-Id 定位） |
+| GET | `/download/ios` | P1 | ✅ | 无 | iOS 安装下载页 |
+| GET | `/download/ios/manifest.plist` | P1 | ✅ | 无 | iOS OTA 安装 manifest（itms-services） |
+| POST | `/download/ios/udid` | P1 | ✅ | 无 | iOS UDID 注册（mobileconfig 回传表单） |
+| GET | `/admin/users/{id}/token` | P1 | ✅ | ADMIN_TOKEN | 查看账号 token |
+| GET | `/admin/channels` | P1 | ✅ | ADMIN_TOKEN | 渠道管理列表页 |
+| GET | `/admin/channels/new` | P1 | ✅ | ADMIN_TOKEN | 新建渠道页 |
+| GET | `/admin/channels/{id}/edit` | P1 | ✅ | ADMIN_TOKEN | 编辑渠道页 |
+| GET | `/admin/channels/{id}/token` | P1 | ✅ | ADMIN_TOKEN | 查看渠道上游 token |
+| GET | `/admin/release` | P1 | ✅ | ADMIN_TOKEN | 发布页（APK/IPA 上传管理） |
 | GET | `/assets/{manifest,url}` | P1 | 🚧 | X-App-Token | COS 预签名 — 待实现 |
 | GET | `/agent/config` | P1 | 🚧 | X-App-Token | 供应商适配参数下发 — 待实现 |
 
@@ -215,5 +240,5 @@ systemd `picme-api.service`：`JAVA_OPTS=-Xmx256m` + `MemoryMax=450M`，与 Open
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-08-01
+> **最后更新**：2026-09-18
 > **状态**：生效中

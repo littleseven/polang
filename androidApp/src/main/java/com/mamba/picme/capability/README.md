@@ -12,7 +12,7 @@ Capability 是 PoLang 的**独立业务能力接口层**，提供标准化的能
 ## 目录结构
 
 ```
-app/src/main/java/com/picme/capability/
+androidApp/src/main/java/com/mamba/picme/capability/
 ├── README.md                    # 本文档
 ├── BeautyCapability.kt          # 美颜业务能力
 └── (未来扩展)

@@ -454,29 +454,36 @@ grid_page:
       shadow_elevation: 6                   # dp，投影深度
 
     items:
-      # 2026-08-26：首项由相机改为相册整理（去重 2.0）——相机自主页面 Pager 移出、
-      # 路由化（无常驻入口），相册整理升为主页面 Pager 页 1，瞬时切相邻页。
-      # 详见 docs/superpowers/specs/2026-08-25-album-dedup-design.md §11.1
-      - id: cleanup_tab
-        material_icon: burst_mode
-        sf_symbol: "square.stack.3d.up.fill"
+      # 2026-09-06 主导航统一（d301f0554）：底 bar 五项与主页面 Pager 1:1——
+      # 相册(0)/整理(1)/聊天(2)/人物(3)/回忆(4)，点击瞬时切页；打标图标已移除
+      # （TAG 扫描并入整理页 SCAN tab）。早前 2026-08-26 的四项版（含 tag_tab）作废。
+      # iOS 图标资产 mat_o_photo_library / mat_o_cleaning_services 由 ios-follow
+      # main-nav-memories 批次引入（分支 feat/ios-follow-batch-20260915）。
+      - id: gallery_tab
+        material_icon: photo_library
+        ios_asset: "mat_o_photo_library"
         size: icon.lg                       # 24dp
-        behavior: switch_main_page_dedup    # switchMainPage(MAIN_PAGE_DEDUP)，切 Pager 页 1
+        behavior: switch_main_page          # 切 Pager 页 0（相册）
+      - id: cleanup_tab
+        material_icon: cleaning_services
+        ios_asset: "mat_o_cleaning_services"
+        size: icon.lg
+        behavior: switch_main_page          # 切 Pager 页 1（整理：去重 2.0 hub / 扫描）
       - id: chat_tab
         material_icon: chat_bubble
-        sf_symbol: "message.fill"
+        ios_asset: "mat_o_chat_bubble"
         size: icon.lg
-        behavior: navigate_to_chat
-      - id: tag_tab
-        material_icon: sell
-        sf_symbol: "tag.fill"
-        size: icon.lg
-        behavior: navigate_to_tag_management
+        behavior: switch_main_page          # 切 Pager 页 2（聊天）
       - id: people_tab
         material_icon: account_circle
-        sf_symbol: "person.2.fill"
+        ios_asset: "mat_o_account_circle"
         size: icon.lg
-        behavior: navigate_to_people
+        behavior: switch_main_page          # 切 Pager 页 3（人物）
+      - id: memories_tab
+        material_icon: auto_awesome
+        ios_asset: "mat_o_auto_awesome"
+        size: icon.lg
+        behavior: switch_main_page          # 切 Pager 页 4（回忆）
 
 # ============================================================================
 # 第二部分：大图页（Media Pager / 详情页）

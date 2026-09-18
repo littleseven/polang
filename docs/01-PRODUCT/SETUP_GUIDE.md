@@ -2,7 +2,7 @@
 
 > **定位**：新用户「如何把 PoLang 真正用起来」的唯一事实来源（SSOT），供官网帮助页 / Google Play 商店说明复用。
 > **维护**：与 [`FEATURES.md`](./FEATURES.md)、[`03-TECHNICAL-SPECS/TAG_GENERATION.md`](../03-TECHNICAL-SPECS/TAG_GENERATION.md) 保持一致；模型清单以 `androidApp/src/main/res/raw/llm_models.json` 为准。
-> **最后更新**：2026-08-03
+> **最后更新**：2026-09-18（Pass 扫描入口改为「整理」页 SCAN tab）
 
 ---
 
@@ -58,7 +58,7 @@ PoLang 的智能搜索 / AI 对话 / 人物识别**不是「装完即用」**的
 
 ## ② 执行 Pass 1 扫描（最小可用，~1.5 h / 万张）
 
-**入口**：相册 → **TAG 生成控制**页（可从「设置 → 相册功能」进入）。
+**入口**：底部 Tab「整理」→「扫描」（即 TAG 生成控制页；2026-09-06 起打标入口并入整理页 SCAN tab，不再从设置进入）。
 
 Pass 1 = UI 中的 **第一步：人脸检测与语义编码**。它对每张照片做人脸检测 + 人脸特征 + MobileCLIP 语义向量，并自动衔接 **第二步：人物聚类**（把同一个人的脸归成一类）。这是让「找人」「按语义搜图」能工作的**最低门槛**。
 

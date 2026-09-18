@@ -23,6 +23,7 @@
 
 - `MnnResourceManager`：MNN 模型资源路径管理
 - `MnnGlobalReleaseLock`：MNN 资源释放全局锁
+- `MnnLogger`：模块内部日志封装（避免依赖 `:shared` 的 Logger 造成反向依赖）
 
 ## 3. Native 库
 
@@ -39,9 +40,8 @@
 
 - ABI：`arm64-v8a`
 - minSdk：24
-- STL：`c++_shared`
-- CMake：3.22.1
 - ndkVersion：28.2.13676358
+- 预编译 `.so` 打包模块（`src/main/jniLibs/arm64-v8a/`），无 native 编译（无 CMake / externalNativeBuild / STL 配置）
 
 ## 6. 编译验证
 

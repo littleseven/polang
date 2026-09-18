@@ -20,7 +20,7 @@ python3 scripts/check_product_features_alignment.py
 
 # 2. 检查模块 AGENTS.md 第 5 章完整性
 echo "✅ 检查模块 AGENTS.md Product Alignment 章节..."
-for agents_file in $(find androidApp engines runtime-core -name "AGENTS.md"); do
+for agents_file in $(find androidApp engines -name "AGENTS.md"); do
     if ! grep -q "## 5. 与产品文档对照" "$agents_file"; then
         echo "⚠️  缺少第 5 章: $agents_file"
     fi

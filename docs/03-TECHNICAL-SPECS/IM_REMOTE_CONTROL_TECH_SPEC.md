@@ -475,7 +475,7 @@ class RemoteCommandDispatcher(
 
 > **核心设计原则（2026-06-18）**：远程推理原生支持 OpenAI tool_calls 格式，与本地 LLM 的 method/params 格式完全隔离，不产生任何耦合。
 
-> ⚠️ **历史记录（2026-08-02 更新）**：端侧**文本** LLM 链路已移除，下文「本地推理链路（端侧 LLM）」/ `LocalCommandParser` / method/params 协议仅为隔离设计的历史参考。当前命令解析统一走远程 `ToolCallCommandParser`（标准 OpenAI tool_calls）。
+> ⚠️ **历史记录（2026-08-02 更新）**：端侧**文本** LLM 链路已移除，下文「本地推理链路（端侧 LLM）」/ `LocalCommandParser` / method/params 协议仅为隔离设计的历史参考。命令解析曾走远程 ~~`ToolCallCommandParser`~~（标准 OpenAI tool_calls，已随 Phase 5 删除），tool_calls 现由 Koog agent 循环内直接 `CapabilityRegistry.dispatch` 执行。
 
 ### 12.1 协议分层
 
@@ -533,13 +533,13 @@ class RemoteCommandDispatcher(
 | `mergeParamsIntoRoot()` | 合并 params 到根对象 | 已删除 |
 | 在 Prompt 中混合 `method`/`params` | L3 Plan 使用 `command` 字段 | 已更新 |
 | `CameraToolHelper` 调用 `LocalCommandParser` | 直接构建 AgentCommand | 已重构 |
-| `parseToolCalls` 回退到 method/params | 直接使用 `ToolCallCommandParser` | 已重构 |
+| `parseToolCalls` 回退到 method/params | ~~直接使用 `ToolCallCommandParser`~~（已随 Phase 5 删除；tool_calls 由 Koog agent 循环内直接 `CapabilityRegistry.dispatch`） | 已重构 |
 
 ### 12.4 实现文件
 
 | 文件 | 职责 | 协议 |
 |------|------|------|
-| `ToolCallCommandParser.kt` | 远程 tool_calls 解析 | `name` + `arguments` → `AgentCommand` |
+| ~~`ToolCallCommandParser.kt`~~ | ~~远程 tool_calls 解析~~（已随 Phase 5 删除；tool_calls 由 Koog agent 循环内直接 `CapabilityRegistry.dispatch`） | — |
 | ~~`LocalCommandParser.kt`~~ | ~~本地 method/params 解析~~（已随端侧文本 LLM 移除） | — |
 | ~~`RemoteOrchestrator.kt`~~ | ~~远程编排器~~（类不存在；现由 `RemoteChatEngine`/`AgentConfigurator` 承担） | — |
 | `RemotePromptBuilder.kt` | 远程 Prompt 构建 | `name` + `arguments` 格式 |
@@ -580,7 +580,7 @@ class RemoteCommandDispatcher(
 >
 > 本章节总结 ToolSpec 实现过程中的关键陷阱与最佳实践，供后续批量补充工具时参考。
 >
-> ⚠️ **失效提示（2026-08-03）**：本节为历史复盘记录。其中引用的 `InAppLlmClient` / `InAppAgentConfig` / `InAppAgentService` / `LangChain4jToolBridge` / `ToolRegistry` / `BaseUiTool` / `NavigateToTool` 等类已在 Agent 架构重构中移除；当前工具面为 `CameraToolService` / `ChatToolService`（@Tool 方法）→ `ToolCallCommandParser` → `CapabilityRegistry.dispatch`。本节的方法论（Prompt 设计、空字符串处理、content 回退解析）仍有参考价值，文件路径不再有效。
+> ⚠️ **失效提示（2026-08-03 更新）**：本节为历史复盘记录。其中引用的 `InAppLlmClient` / `InAppAgentConfig` / `InAppAgentService` / `LangChain4jToolBridge` / `ToolRegistry` / `BaseUiTool` / `NavigateToTool` 等类已在 Agent 架构重构中移除；当前工具面为 `CameraToolService` / `ChatToolService`（@Tool 方法）→ Koog agent 循环内直接 `CapabilityRegistry.dispatch`（~~`ToolCallCommandParser`~~ 已随 Phase 5 删除）。本节的方法论（Prompt 设计、空字符串处理、content 回退解析）仍有参考价值，文件路径不再有效。
 
 ### 14.1 问题复盘
 

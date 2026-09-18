@@ -118,7 +118,7 @@ grep -E "交互|反馈|动效|动画" docs/01-PRODUCT/FEATURES.md
 #### Step 3: 验证模块 AGENTS.md 实现完整性
 ```bash
 # 遍历所有模块 AGENTS.md
-find androidApp engines runtime-core -name "AGENTS.md" -exec grep -l "Product Alignment" {} \;
+find androidApp engines -name "AGENTS.md" -exec grep -l "Product Alignment" {} \;
 ```
 
 **检查项**：
@@ -140,7 +140,7 @@ find androidApp engines runtime-core -name "AGENTS.md" -exec grep -l "Product Al
 
 ### ⚠️ 警告项 (3/15)
 1. **缺失链接**: PRODUCT.md 提到"背景虚化"但 FEATURES.md 未展开交互细节
-2. **过时内容**: Camera AGENTS.md 引用 GPUPixel（已移除，需改为单引擎描述）
+2. **过时内容**: 文档美颜链路仍按双引擎描述（GPUPixel 已移除，需改为 beauty-engine 单引擎口径）
 3. **不一致**: FEATURES.md 唇色色号数量(12种)与 AGENTS.md 实现(8种)不符
 
 ### ❌ 错误项 (0/15)
@@ -282,7 +282,7 @@ git commit -m "docs: 更新拍照 GPU 化技术决策文档
 #### Step 1: 识别冗余内容
 ```bash
 # 查找重复内容
-grep -r "拍照后处理" docs/*.md $(find androidApp engines runtime-core -name "AGENTS.md")
+grep -r "拍照后处理" docs/*.md $(find androidApp engines -name "AGENTS.md")
 
 # 检查顶层 AGENTS.md 是否包含模块级细节
 wc -l AGENTS.md  # 如果超过 500 行，可能需要瘦身
@@ -313,7 +313,7 @@ wc -l AGENTS.md  # 如果超过 500 行，可能需要瘦身
 📦 移动: EGL 离屏渲染架构 -> `docs/02-ARCHITECTURE/ADR/ADR-002-opengl-offscreen-unified-pipeline.md`
 
 ### 标记为废弃
-🗑️ 清理: GPUPixel 相关文档引用 -> 彻底移除或标注"已于 2026-05 移除"
+🗑️ 清理: 已删除模块的路径引用（如 runtime-core）-> 彻底移除或标注"已删除，git 历史可查"
 ```
 
 #### Step 3: 更新双向链接

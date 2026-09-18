@@ -91,8 +91,8 @@ engines/beauty-engine/src/main/java/com/mamba/picme/beauty/
   │       ├── Face106ToWarpParams.kt
   │       ├── RoiDetector.kt / MnnRoiDetector.kt（AtomicBoolean CAS 非阻塞初始化）
   │       ├── LandmarkDetector.kt / MnnLandmarkDetector.kt（AtomicBoolean CAS 非阻塞初始化）
-  │       ├── mnn/MnnFaceDetector.kt / MnnFaceEmbedder.kt（通用 MNN 人脸 embedding 提取器，支持 OpenCL GPU）
-  │       └── adapter/ (FaceLandmarkAdapter, MediaPipe468Adapter, MnnLandmarkAdapter)
+  │       ├── mnn/MnnFaceDetector.kt / MnnFaceEmbedder.kt（通用 MNN 人脸 embedding 提取器，支持 OpenCL GPU）/ FaceBox.kt（检测框数据）
+  │       └── adapter/ (FaceLandmarkAdapter, FaceLandmarkAdapterRegistry, MediaPipe468Adapter, MnnLandmarkAdapter)
 ├── log/                               # 结构化日志
 │   ├── BeautyLog.kt
 │   └── BeautyLogProxy.kt
@@ -331,7 +331,7 @@ if (fps < 25 || processingMs > 20) {
 
 ### 3.4 Shader 开发规范
 
-- GLSL 源码集中管理在 `engines/beauty-engine/src/main/assets/shaders/`，通过 `ShaderModuleLoader` 按需加载，而非硬编码在 `BeautyShaders.kt` 中
+- GLSL 源码集中管理在 `engines/beauty-engine/src/main/assets/shaders/`（当前 25 个 .glsl：根目录 18 + `style/` 7），通过 `ShaderModuleLoader` 按需加载，而非硬编码在 `BeautyShaders.kt` 中
 - BeautyShaders.kt 仅保留 Shader 常量定义和调试 Shader（`FRAGMENT_SHADER_DEBUG_RED`、`FRAGMENT_SHADER_DEBUG_TEXTURE_R`）
 - Shader 模块划分：`header.glsl`（OES 扩展）、`pass_smoothing.glsl`（磨皮）、`main.glsl`（主美颜）、`warp.glsl`（美型）、`lip.glsl`（唇色）、`blush.glsl`（腮红）、`makeup_*.glsl`（妆容）、`colorgrade.glsl`（调色/色温 tint，uniform `uTemperature`——白平衡预设与专业模式色温滑杆的唯一生效通道，`BeautySettings.temperature` 经系数 0.05 映射）、`style/*.glsl`（风格特效 7 个）
 - Shader 必须声明 `precision mediump float;`
@@ -532,7 +532,7 @@ CameraPreviewRenderer（渲染线程）
 - `PRODUCT.md` - 产品需求规格说明书（大美丽 产品策略）
 - `docs/01-PRODUCT/FEATURES.md` - 功能交互规范
 - `docs/03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md` - 大美丽 渲染链路、容灾回退、冷却恢复与观测指标
-- `docs/06-QA/QA_EXECUTION_CHECKLIST.md` - QA 验收测试清单
+- `docs/06-QA/PERFORMANCE_BASELINE_REPORT.md` - 性能基线报告
 - `androidApp/src/main/java/com/mamba/picme/features/camera/AGENTS.md` - Camera 模块实现规范
 - `engines/beauty-engine/src/main/java/com/mamba/picme/beauty/api/` - 对外稳定 API
 - `engines/beauty-engine/src/main/java/com/mamba/picme/beauty/render/` - OpenGL ES 渲染管线实现

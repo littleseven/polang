@@ -17,7 +17,7 @@
 ## 1. 设计原则 (Design Principles)
 
 ### 1.1 零依赖
-`:engines:beauty-api` 不引入任何第三方库，仅依赖 Kotlin stdlib 和 Android `graphics` 基础类型（`Bitmap`、`PointF`、`Rect`）。这保证了所有消费者（包括纯 JVM 测试）均可零成本引用。
+`:engines:beauty-api` 不直接引入第三方库，仅依赖 Kotlin stdlib 和 Android `graphics` 基础类型（`Bitmap`、`PointF`、`Rect`）；模块级依赖 `:shared`（经 `api(project(":shared"))` 透出 `BeautySettings` 等已迁 commonMain 的公开 API）。这保证了所有消费者（包括纯 JVM 测试）均可零成本引用。
 
 ### 1.2 纯契约
 模块内任何文件不得包含算法实现、IO 操作、网络请求或 Android Context 引用。所有类必须是 `interface`、`data class`、`enum class`、`object`（常量）或 `value class`。
@@ -29,26 +29,26 @@ API 变更必须保证源级兼容（source-compatible）。破坏性变更需�
 
 ## 2. 包结构与类型清单 (Package Structure & Type Index)
 
-共有 **17 个 Kotlin 文件**，分为两个包：
+共有 **15 个 Kotlin 文件**，分为两个包：
 
-### 2.1 根包：`com.mamba.picme.beauty.api`（8 文件）
+### 2.1 根包：`com.mamba.picme.beauty.api`（5 文件）
 
 | 类型 | 文件 | 说明 |
 |------|------|------|
-| `BeautySettings` | `BeautySettings.kt` | **核心配置对象** — 包含所有美颜参数：磨皮、美白、瘦脸、大眼、唇色、腮红、眉毛、美体、长腿、曝光、对比度、饱和度、色温、色调、亮度、RGB、色彩滤镜、风格滤镜。提供 `hasAnyEffect()` 检测是否有非默认效果 |
 | `BeautyProcessor` | `BeautyProcessor.kt` | **CPU 后处理接口** — 10 个 `suspend` 方法的 post-processing 契约（拍照后处理用）；默认实现 `applyAllEffects()` 按序链式调用 |
 | `Face` | `Face.kt` | **人脸数据模型** — 替代 ML Kit 的轻量 `data class`（boundingBox + landmarks + contours）；伴生对象定义 `FaceLandmark` 和 `FaceContour` 常量 |
-| `FilterType` | `FilterType.kt` | **色彩滤镜枚举** — ColorMatrix 基色调滤镜：徕卡经典/鲜艳/黑白、胶片金/富士、复古、冷调、暖调 |
-| `StyleFilter` | `StyleFilter.kt` | **风格特效枚举** — GPU Shader 高级效果：卡通、素描、色块、浮雕、交叉线 |
 | `FrameId` | `FrameId.kt` | **帧标识** — `inline value class` 包装 `Long`，线程安全递增（`AtomicLong`），`INVALID = 0L` |
 | `FrameSyncConfig` | `FrameSyncConfig.kt` | **帧同步配置** — 检测到渲染的同步参数（maxStoredResults、missingThresholdFrames、predictionMaxRatio、syncMode） |
 | `FrameSyncResult` | `FrameSyncResult.kt` | **帧同步结果** — 含 `syncStatus` 枚举（EXACT_MATCH / HISTORICAL_FALLBACK / PREDICTED / MISSING） |
 
-### 2.2 子包：`com.mamba.picme.beauty.api.facedetect`（9 文件）
+> `BeautySettings.kt` / `FilterType.kt` / `StyleFilter.kt` 已迁 `shared/src/commonMain/kotlin/com/mamba/picme/beauty/api/`（FQN 不变，经 `api(project(":shared"))` 透出），不在本模块根包内。
+
+### 2.2 子包：`com.mamba.picme.beauty.api.facedetect`（10 文件）
 
 | 类型 | 文件 | 说明 |
 |------|------|------|
 | `FaceDetector` | `FaceDetector.kt` | **人脸检测公共接口** — `detect()`（预览）、`detectPhoto()`（拍照）、`setEngineMode()`、`updatePipelineConfig()`、`release()` |
+| `FaceDetection` | `FaceDetection.kt` | **单人脸检测结果** — ROI 矩形 + RetinaFace/ArcFace 标准 5 点（`landmarks5` FloatArray，长度 10，未对齐可空），供人脸识别/聚类对齐 |
 | `FaceDetectionResult` | `FaceDetectionResult.kt` | **检测输出** — `landmarks106`（FloatArray）、`detectionSource`、roi 矩形、检测器名称和 GPU 标志 |
 | `FaceDetectionSource` | `FaceDetectionSource.kt` | **检测来源枚举** — NONE、MEDIAPIPE、MNN |
 | `EngineType` | `EngineType.kt` | **引擎模式枚举** — MEDIAPIPE、MNN（供外部设置） |

@@ -1,9 +1,9 @@
 # PoLang 产品定义与路线图
 
 > **试验性应用** | 以 AI Agent 对话为核心，以相册+图像编辑为技术试验场  
-> **版本**：3.0（破浪相册）· 应用版本 v1.0.34 (10034)  
+> **版本**：3.0（破浪相册）· 应用版本 v1.0.39 (10039)  
 > **状态**：生效中  
-**最后更新**：2026-08-16
+**最后更新**：2026-09-18
 **维护者**：项目开发者
 **实验状态**：进行中 · 相册核心能力已大规模落地（自然语言搜索、对话式图片编辑、智能抠图、证件照、Florence-2 + Qwen3-VL-2B 标签扫描、JS 沙盒脚本、相册摘要）· 人物记忆与关系图谱能力已落地（MemoryCapability/PersonRelationCapability 已注册进 main，体验完善中）
 
@@ -86,7 +86,7 @@ PoLang 的实验目标是探索**右侧范式的工程可行性**。
 **相册+编辑层（核心产品，资源优先投入）**
 - 相册浏览：时间轴 + 缩略图，120fps 滑动
 - 静态图美颜编辑：复用相机美颜管线，GPU 离屏渲染（PhotoProcessorImpl）
-- AI 一键优化：智能识别场景，一键推荐参数
+- AI 一键优化：抽卡闭环（4 候选 → 端侧 NIMA 评分 + 退化守卫选优），先预览后应用
 - 精准局部美颜：左眼/右眼/左脸/右脸独立调节
 - **对话式编辑** ✅：通过聊天指令调节编辑参数（"磨皮再强一点"），经远程 ReAct（edit_image）执行，结果回渲染至对话（`ChatEditProcessor` / `ImageEditCapability`）
 - **智能抠图 / 背景去除** ✅：三后端路由（U2Netp 通用抠图 / ModNet 人像 / MediaPipe 自拍分割，`MattingRouter`），支持纯背景、换背景
@@ -96,7 +96,7 @@ PoLang 的实验目标是探索**右侧范式的工程可行性**。
 
 **AI 对话层（二级页，相册内的助手能力）**
 - 用户通过自然语言与 AI 进行多轮对话，作为相册/编辑操作的自然语言加速器
-- 支持远程模型（DeepSeek 等）进行多轮对话与指令路由（tool_calls），系统根据网络状态智能路由
+- 支持远程模型（DeepSeek 等）进行多轮对话与指令路由（tool_calls）；BYOK 自定义供应商已落地（设置页 `ProviderConfigScreen`，OpenAI 兼容协议 + Anthropic 原生协议按 `RemoteProtocol` 分流，用户自带 API Key 直连）
 - 对话历史持久化（Room `ChatMessageDao`），支持跨会话查看历史记录 ✅
 - **发送图片进行 AI 分析 / 对话式编辑** ✅：图片选择器 → edit_image 远程 ReAct → 编辑结果回渲染（`AGENT_EDIT_RESULT` / `MediaResultsCarousel`）
 - **相册摘要工具** ✅：自然语言生成相册概况（`GetGallerySummaryUseCase` / `ChatGallerySummaryCapability`）
@@ -125,8 +125,8 @@ PoLang 的实验目标是探索**右侧范式的工程可行性**。
 - **AI 相机功能降级为 P2**：语音拍照、实时调节等 Agent 功能不新增投入
 - **❄️ 相机线冻结（2026-08-16 决策）**：双端相机页 UI 一致性问题收敛后冻结——代码保留、不新增功能（原 Phase 2/3 规划全部取消，见 §6.3）。冻结前收尾待办：Android 场景面板按产品方案移除（`SceneSelector`/`ScenePreset`/`scene_*` strings）。冻结后相机继续承担：实时渲染引擎试验场 + 编辑流内容采集入口
 
-**IM 远程控制层（实验性融合入口 - P2）**
-- 定位为低频实验场景，不占用 P0/P1 资源
+**IM 远程控制层（❄️ 冻结 · 低优先实验线）**
+- 冻结（2026-07）的低优先实验线，2026-07-27 曾重新激活为低优先级；不占用 P0/P1 资源
 - 飞书机器人接入：通过 IM 消息执行相册浏览/编辑/管理
 - LLM 语义解析：将 IM 自然语言指令转为设备可执行命令
 - 设备直连飞书：设备端与飞书平台建立 WebSocket 长连接，无需云端中转
@@ -216,7 +216,7 @@ AgentOrchestrator (:shared commonMain)
 
 ### 4.3 端侧优先与云端增强
 
-- **LLM**：远程模型（DeepSeek 等），经**自建 Ktor 网关**（`api.polang.net`）代理：按模型自动路由（Cloudflare AI Gateway / 腾讯 TokenHub），邮箱注册动态 Token + 免费额度管控，上游密钥仅在服务端持有（详见 `server/README.md`）
+- **LLM**：远程模型（DeepSeek 等），经**自建 Ktor 网关**（`api.polang.net`）代理：按模型自动路由（Cloudflare AI Gateway / 腾讯 TokenHub），邮箱注册动态 Token + 免费额度管控，上游密钥仅在服务端持有（详见 `server/README.md`）；BYOK 自定义供应商已落地——OpenAI 兼容协议 + Anthropic 原生协议分流（设置页 `ProviderConfigScreen`），用户自带 API Key 直连
 - 人脸检测：MediaPipe Face Mesh / MNN 端侧模型（106 点统一输出）
 - OCR：ML Kit 端侧识别
 - 图像编辑：端侧 GPU 处理为主
@@ -246,6 +246,10 @@ AgentOrchestrator (:shared commonMain)
 | **图片消息** | ✅ | 聊天发送图片 → AI 分析 / 对话式编辑 |
 | **智能抠图 / 背景去除** | ✅ | U2Netp / ModNet / MediaPipe 三后端 + `MattingRouter` |
 | **证件照制作** | ✅ | `IDPhotoComposer` + `IDPhotoSpecs` 多规格，`features/idphoto` |
+| **整理中心 v2** | ✅ | 六互斥清理类目 / 三级置信度 / 价值保护 / 滑动整理（`domain/organize/` + `features/gallery/organize/`） |
+| **回收站通用编排** | ✅ | `TrashSessionController` 统一回收站会话；「MANAGE_MEDIA 静默删除」开关（默认关闭） |
+| **回忆页** | ✅ | `features/gallery/memories/`：feed 大卡 + 详情页精选/全部分段 + 分享集合（`ACTION_SEND_MULTIPLE`） |
+| **预览页上滑删除** | ✅ | `SwipeUpDeleteGesture`：移入系统回收站，API < 30 降级永久删除 |
 | **标签自动生成** | ✅ | Florence-2 / Qwen3-VL-2B 端侧打标 3-Pass（`domain/tag/`，详见 `TAG_GENERATION.md`） |
 | **JS 沙盒脚本** | ✅ | QuickJS + JSBridge，对话内运行相册分析脚本（`run_gallery_script`） |
 | **相册摘要** | ✅ | `GetGallerySummaryUseCase` / `ChatGallerySummaryCapability` |
@@ -319,7 +323,7 @@ PoLang 以技术探索与能力验证为核心目标，**聚焦 Gallery/Editor +
 **演进路线**：
 - **Phase 1（近期）✅ 基本完成**：相册首页 AI 助手入口；对话持久化；模型状态可视化；图片消息；标签扫描；相册摘要
 - **Phase 2（中期）🔄 部分提前**：对话式编辑 ✅ 已提前；JS 沙盒脚本 ✅ 已提前；相册/编辑能力通过对话触发；主动建议
-- **Phase 3（长期）**：多会话管理；对话搜索；导出聊天记录；个性化对话风格
+- **Phase 3（长期）**：对话搜索；导出聊天记录；个性化对话风格（多会话管理 ✅ 已提前落地）
 
 ### 6.3 拍照线（Camera）— ❄️ 冻结（2026-08-16 决策，双端 UI 对齐后生效）
 
@@ -371,11 +375,12 @@ GPU 管线性能优化（P2）→ 1080p@30fps 不丢帧
 |------|------|--------|------|
 | 相册浏览 | ✅ 已落地 | P0 | 时间轴 + 缩略图，120fps 滑动，应用默认首页 |
 | 静态图美颜编辑 | ✅ 已落地 | P0 | 复用相机美颜管线，GPU 离屏渲染 |
-| **AI 一键优化** | 🔄 部分落地 | P0 | fastOptimize（场景分类→固定 recipe）✅；smartOptimize（VLM 看图推荐）待实现（设计稿 `SMART_OPTIMIZE_VLM_DESIGN.md`）|
+| **AI 一键优化** | ✅ 已落地 | P0 | 抽卡闭环（`AiOptimizeUseCase.optimizeWithGacha`）：4 候选 → 端侧 NIMA 评分 + 退化守卫选优，先预览后应用；远程 Smart 路径（VLM 看图推荐）仍为规划 |
 | **精准局部美颜** | 🔄 开发中 | P0 | 左眼/右眼/左脸/右脸 独立调节 |
 | **智能消除** | 🔄 开发中 | P1 | 圈选物体自动消除，AI 填充 |
 | **智能抠图 / 背景去除** | ✅ 已落地 | P1 | U2Netp / ModNet / MediaPipe 三后端 + `MattingRouter`，纯背景/换背景 |
 | 智能分组 | ✅ 已落地 | P1 | 人脸聚类 + Florence-2 场景标签 |
+| **整理中心 v2** | ✅ 已落地 | P0 | 六互斥清理类目 / 三级置信度 / 价值保护 / 滑动整理（`domain/organize/`），主页面 Pager 页 1「整理」双 Tab（整理 + 扫描） |
 | **智能搜索** | ✅ 已落地 | P1 | 自然语言搜索相册（"找出去年夏天的照片"，`ExplicitFirstSearchPipeline`）|
 | 专业调色面板 | 📋 规划中 | P1 | 曲线、HSL、分区调色 |
 | 批量编辑 | 📋 规划中 | P1 | 多图批量应用同一套参数 |
@@ -390,7 +395,7 @@ GPU 管线性能优化（P2）→ 1080p@30fps 不丢帧
 
 ### 6.6 IM 远程控制线（IM Remote Control）— ❄️ 冻结（Phase 3+ 按需解冻）
 
-> **状态（2026-07）**：IM 远程控制冻结。现有飞书 SDK 集成代码保留不删，新功能停止开发，待核心产品验证后按需重启。
+> **状态（2026-07 冻结 · 低优先实验线）**：IM 远程控制冻结，2026-07-27 曾重新激活为低优先级实验线。现有飞书 SDK 集成代码保留不删，新功能停止开发，待核心产品验证后按需重启。
 > **定位调整**：原 P2 实验线进一步降级为冻结状态，不占用核心产品研发资源。
 
 | 功能 | 状态 | 优先级 | 说明 |

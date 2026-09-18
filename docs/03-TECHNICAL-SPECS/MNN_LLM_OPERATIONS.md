@@ -19,52 +19,54 @@
 
 > **注意**：`LocalLlmEngine` 名称中保留 "Llm" 是历史遗留——当前该引擎**仅用于 VLM 打标**（`imageInference`），不再承载文本聊天/Agent 指令推理（已改走远程 tool_calls）。
 
-### 1.2 全局模型加载调用点（共 8 处）
+### 1.2 全局模型加载调用点（LocalModelService 收口，2026-09-18 核验）
 
-| # | 调用位置 | 调用方式 | 场景 | 是否已做加载检查 |
-|---|----------|----------|------|------------------|
-| 1 | `AgentOrchestrator.loadModel()` | `localLlmEngine.loadModel()` | 通用入口 | 内部处理 |
-| ~~2~~ | ~~`ChatViewModel.kt:583`~~ | ~~`orchestrator.loadModel()`~~ | ~~聊天页进入~~ | **已移除**（文本 LLM 删除，聊天改走远程推理） |
-| ~~3~~ | ~~`AiAgentUseCase.kt:157`~~ | ~~`orchestrator.loadModel()`~~ | ~~Agent 推理~~ | **已移除**（本地 Agent 改走远程 tool_calls） |
-| 4 | `TagGenerationScheduler.kt:1040` | `engine.loadModel(..., useOpencl=true)` | Pass 3 OpenCL 尝试 | 有（完整 `ensureModelLoaded` 流程） |
-| 5 | `TagGenerationScheduler.kt:1059` | `engine.loadModel(..., useOpencl=false)` | Pass 3 CPU 回退 | 有（完整 `ensureModelLoaded` 流程） |
-| 6 | `OpenClGuardian.kt:188` | `engine.loadModel(...)` | OpenCL warmup | 有（Guardian 内部检查） |
-| 7 | `ImageTagIndexingWorker.kt:209` | `localLlmEngine.loadModel()` | 后台标签索引 | 有（Worker 内部检查） |
-| 8 | `MediaPager.kt:400` | `engine.loadModel(...)` | 相册图像理解 | **修复后添加**（此前缺失） |
+全库 `engine.loadModel(` 直调**仅剩一处**：`shared/.../inference/local/LocalModelService.kt:127`（`ensureModelLoaded` 内部，含 `[ModelLoadAudit]` 审计日志、模型下载检查、`isModelLoading` 状态流）。其余调用方一律经 `LocalModelService` 收口（`ensureModelLoaded` / `withModelLoaded` / `loadModel`，后者为前者的别名入口）：
 
-**关键发现**：所有调用最终都汇聚到 `AgentOrchestrator.getLlmEngine()` 返回的**同一个** `LocalLlmEngine` 实例。
+| # | 调用位置 | 调用方式 | 场景 | 说明 |
+|---|----------|----------|------|------|
+| 1 | `LocalModelService.kt:127` | `imageEngine.loadModel(targetModel, targetUseOpencl)` | 唯一直调点 | `ensureModelLoaded` 内部；`loadModel(modelId)` 即其别名（caller="loadModel"） |
+| 2 | `TagGenerationScheduler.kt:1116`（私有 `ensureModelLoaded`） | `orchestrator.localModelService.ensureModelLoaded(...)`（:1146 OpenCL / :1169 CPU 回退） | Pass 3 打标 | :316 / :345 / :398 / :1508 / :1580（`prepareTaggerModel`）全走此私有封装 |
+| 3 | `OpenClGuardian.kt:211` | `orchestrator.localModelService.ensureModelLoaded(...)` | OpenCL warmup | Guardian 内部检查 |
+| 4 | `TagScanOrchestrator.kt:672-673` | 委托 `scheduler.executeImageTagging`（内部 ensureModelLoaded） | 后台标签扫描 Pass 3 | 不直接触模型 |
+
+已失效调用点（历史参考）：~~`ChatViewModel.kt:583`~~ / ~~`AiAgentUseCase.kt:157`~~（文本 LLM 删除，聊天/Agent 改远程 tool_calls）；~~`AgentOrchestrator.loadModel()`~~（facade 已移除，见 §1.3）；~~`ImageTagIndexingWorker.kt:209`~~（文件已不存在，TAG 域现为 `domain/tag/scan/TagScanOrchestrator.kt`）；~~`MediaPager.kt:400`~~（MediaPager 已无任何 loadModel 调用）。
+
+**关键事实**：所有调用最终汇聚到 `AgentConfigurator` 持有的**同一个** `LocalLlmEngine` 实例（接口视图 `ImageInferenceEngine`，经 `LocalModelService.getLlmEngine()` 暴露，`LocalModelService.kt:71`）；androidApp TAG 域经组合根 `AndroidAgentComposition.localLlmEngine` 取同一实例的具体类型。
 
 ### 1.3 单例架构链路
 
 ```
-调用方（8处）
+调用方（TagGenerationScheduler / OpenClGuardian / TagScanOrchestrator）
     │
     ▼
-AgentOrchestrator.getInstance(context)  ←── 进程级单例（Double-Check Locking）
+AgentOrchestrator.getInstance()  ←── 进程级单例（组合根 Application.onCreate 经 initialize(deps) 完成初始化，无参 getInstance() 取实例）
     │
-    ├── getLlmEngine() ───────────────────────→ LocalLlmEngine（单例，由 AgentConfigurator 持有）
-    │                                                   │
-    │                                                   ▼
-    │                                           MnnLlmClient（成员变量，唯一实例）
-    │                                                   │
-    │                                                   ▼
-    │                                           nativeHandle: Long（指向 C++ Llm 对象）
-    │
-    └── loadModel(modelId) ─────────────────────→ LocalLlmEngine.loadModel(modelId)
-                                                        │
-                                                        ▼
-                                                engineMutex.withLock（协程 Mutex）
-                                                        │
-                                                        ▼
-                                                MnnLlmClient.load(modelId)
-                                                        │
-                                                        ▼
-                                                if (isLoaded) return true（幂等守卫）
-                                                        │
-                                                        ▼
-                                                MnnGlobalReleaseLock.withOperation {
-                                                    nativeHandle = nativeCreate(configPath)
-                                                }
+    └── localModelService（AgentOrchestrator.kt:134 持有 LocalModelService）
+            │
+            ├── getLlmEngine()（LocalModelService.kt:71）──→ ImageInferenceEngine（Android actual = LocalLlmEngine，由 AgentConfigurator 持有）
+            │                                                       │
+            │                                                       ▼
+            │                                               MnnLlmClient（成员变量，唯一实例）
+            │                                                       │
+            │                                                       ▼
+            │                                               nativeHandle: Long（指向 C++ Llm 对象）
+            │
+            └── ensureModelLoaded / withModelLoaded ──→ imageEngine.loadModel(modelId, useOpencl)（LocalModelService.kt:127，唯一直调）
+                                                            │
+                                                            ▼
+                                                    engineMutex.withLock（协程 Mutex + modelDispatcher）
+                                                            │
+                                                            ▼
+                                                    MnnLlmClient.load(modelId)
+                                                            │
+                                                            ▼
+                                                    if (isLoaded) return true（幂等守卫）
+                                                            │
+                                                            ▼
+                                                    MnnGlobalReleaseLock.withOperation {
+                                                        nativeHandle = nativeCreate(configPath)
+                                                    }
 ```
 
 ### 1.4 MNN 多实例安全性判断：安全（在当前架构下）
