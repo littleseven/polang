@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoLang 隱私政策</title>
+    <link rel="alternate" hreflang="zh-TW" href="https://polang.net/tw/privacy-policy/">
+    <link rel="alternate" hreflang="zh-CN" href="https://polang.net/privacy-policy/">
+    <link rel="alternate" hreflang="en" href="https://polang.net/en/privacy-policy/">
+    <link rel="alternate" hreflang="x-default" href="https://polang.net/">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 28px;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .lang-switch {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+        h2 {
+            font-size: 20px;
+            color: #222;
+            margin-top: 28px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e8e8e8;
+        }
+        h3 {
+            font-size: 16px;
+            color: #333;
+            margin-top: 18px;
+            margin-bottom: 8px;
+        }
+        p, li {
+            font-size: 15px;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        ul, ol {
+            margin-left: 24px;
+            margin-bottom: 12px;
+        }
+        li { margin-bottom: 6px; }
+        .highlight-box {
+            background: #f0f7ff;
+            border-left: 4px solid #4a90d9;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .highlight-box p { margin-bottom: 0; }
+        .permission-tag {
+            display: inline-block;
+            background: #e8f0e8;
+            color: #2d6a2d;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin: 2px 4px 2px 0;
+        }
+        .data-type {
+            display: inline-block;
+            background: #fff3e0;
+            color: #8c5e00;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin: 2px 4px 2px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px 12px;
+            text-align: left;
+        }
+        th {
+            background: #f8f8f8;
+            font-weight: 600;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e8e8e8;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+        a { color: #4a90d9; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PoLang 隱私政策</h1>
+        <p class="subtitle">最後更新日期：2026年9月18日 | 生效日期：2026年9月18日</p>
+        <p class="lang-switch"><a href="../../privacy-policy/index.html" hreflang="zh-Hans" lang="zh-Hans">查看简体版</a> · <a href="../../en/privacy-policy/index.html" hreflang="en" lang="en">View in English</a></p>
+
+        <div class="highlight-box">
+            <p><strong>核心承諾：</strong>PoLang 是一款以隱私優先為設計原則的智慧相簿應用（含拍照能力）。我們堅信您的照片、人臉資料和語音資訊是高度敏感的個人隱私。因此，PoLang 採用<strong>端側優先（On-Device First）</strong>架構，照片、影片、人臉、語音等媒體資料均在您的裝置本機處理，<strong>不會上傳至任何雲端伺服器</strong>。</p>
+        </div>
+
+        <h2>1. 我們蒐集哪些資訊</h2>
+        <p>PoLang 僅在功能必需的最小範圍內存取您的裝置和資料。根據您使用的功能，可能涉及以下資訊類型：</p>
+
+        <h3>1.1 相機與圖像資料</h3>
+        <table>
+            <tr>
+                <th>資料類型</th>
+                <th>用途</th>
+                <th>處理方式</th>
+            </tr>
+            <tr>
+                <td><span class="data-type">相機預覽幀</span></td>
+                <td>即時美顏預覽、拍照</td>
+                <td>僅本機 GPU 處理，不上傳</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">拍攝照片</span></td>
+                <td>儲存至相簿、本機編輯</td>
+                <td>儲存於裝置本機相簿，不上傳</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">人臉關鍵點</span></td>
+                <td>驅動美顏效果（瘦臉、大眼等）</td>
+                <td>本機 MediaPipe/MNN 即時運算，不上傳</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">相簿圖片/影片</span></td>
+                <td>相簿瀏覽、編輯既有照片</td>
+                <td>僅本機讀取，不上傳</td>
+            </tr>
+        </table>
+
+        <h3>1.2 語音資料</h3>
+        <table>
+            <tr>
+                <th>資料類型</th>
+                <th>用途</th>
+                <th>處理方式</th>
+            </tr>
+            <tr>
+                <td><span class="data-type">語音指令錄音</span></td>
+                <td>語音控制相機功能</td>
+                <td>本機 ASR 辨識後即刻丟棄，不上傳</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">喚醒詞音訊</span></td>
+                <td>喚醒詞觸發語音互動</td>
+                <td>本機即時偵測，不上傳</td>
+            </tr>
+        </table>
+
+        <h3>1.3 裝置與網路資訊</h3>
+        <table>
+            <tr>
+                <th>資料類型</th>
+                <th>用途</th>
+                <th>處理方式</th>
+            </tr>
+            <tr>
+                <td><span class="data-type">網路連線狀態</span></td>
+                <td>判斷能否使用遠端 LLM 編排（可選）</td>
+                <td>僅本機判斷，不蒐集網路詳情</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">藍牙狀態</span></td>
+                <td>偵測藍牙配件（如遙控器）</td>
+                <td>僅本機偵測，不上傳</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">裝置儲存空間</span></td>
+                <td>模型下載前檢查可用空間</td>
+                <td>僅本機判斷，不上傳</td>
+            </tr>
+        </table>
+
+        <h3>1.4 帳號資料（信箱註冊）</h3>
+        <table>
+            <tr><th>資料類型</th><th>用途</th><th>處理方式</th></tr>
+            <tr>
+                <td><span class="data-type">電子郵件地址</span></td>
+                <td>帳號註冊與登入識別、LLM 免費試用額度計費（預設 100 次/帳戶）</td>
+                <td>儲存於 <strong>api.polang.net</strong>，僅保存電子郵件與登入 token 的 SHA-256 雜湊；<strong>不蒐集明文密碼</strong>（驗證碼登入）</td>
+            </tr>
+        </table>
+
+        <h3>1.5 設備識別（訪客試用額度）</h3>
+        <table>
+            <tr><th>資料類型</th><th>用途</th><th>處理方式</th></tr>
+            <tr>
+                <td><span class="data-type">設備識別（Android 裝置 ID / 本機產生 ID）</span></td>
+                <td>未註冊訪客的 LLM 免費試用額度計數</td>
+                <td>傳送至 <strong>api.polang.net</strong>，僅按識別統計呼叫次數；不用於識別個人身分，不與第三方共享。可在 app「設定 → 資料與隱私 → 清除訪客資料」刪除</td>
+            </tr>
+        </table>
+
+        <h2>2. 應用程式權限說明</h2>
+        <p>PoLang 申請以下 Android 系統權限，每項權限均與具體功能直接對應：</p>
+
+        <table>
+            <tr>
+                <th>權限名稱</th>
+                <th>權限級別</th>
+                <th>功能用途</th>
+                <th>是否必需</th>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">CAMERA</span></td>
+                <td>危險權限</td>
+                <td>相機預覽、拍照、錄影</td>
+                <td>是（核心功能）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">RECORD_AUDIO</span></td>
+                <td>危險權限</td>
+                <td>語音指令錄製、影片錄音</td>
+                <td>否（語音功能可選）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">READ_MEDIA_IMAGES</span></td>
+                <td>危險權限</td>
+                <td>讀取相簿圖片進行整理、搜尋與編輯</td>
+                <td>是（相簿核心功能）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">READ_MEDIA_VIDEO</span></td>
+                <td>危險權限</td>
+                <td>讀取相簿影片進行整理與播放</td>
+                <td>是（相簿核心功能）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_MEDIA_LOCATION</span></td>
+                <td>危險權限</td>
+                <td>讀取照片 EXIF 位置資訊，用於地點分組與地點搜尋（僅本機處理，不上傳）</td>
+                <td>否（地點功能可選）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">MANAGE_MEDIA</span></td>
+                <td>危險權限</td>
+                <td>「刪除不再詢問」開關（預設關閉）：開啟後刪除/回收操作免系統確認彈窗，仍移入系統垃圾桶可復原</td>
+                <td>否（預設關閉，需使用者手動授權）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">READ_EXTERNAL_STORAGE</span></td>
+                <td>危險權限</td>
+                <td>Android 12 及以下讀取相簿</td>
+                <td>否（相簿功能可選）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">WRITE_EXTERNAL_STORAGE</span></td>
+                <td>危險權限</td>
+                <td>Android 9 及以下儲存照片</td>
+                <td>否（僅舊系統）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">BLUETOOTH_CONNECT</span></td>
+                <td>一般權限</td>
+                <td>連接藍牙配件（如拍照遙控器）</td>
+                <td>否（配件功能可選）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">INTERNET</span></td>
+                <td>一般權限</td>
+                <td>AI 對話遠端推論（僅文字/中繼資料，不含照片影片）</td>
+                <td>否（媒體功能可離線；AI 對話需連網）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_NETWORK_STATE</span></td>
+                <td>一般權限</td>
+                <td>網路狀態偵測（如僅 WiFi 下靜默預先下載模型）</td>
+                <td>是</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">POST_NOTIFICATIONS</span></td>
+                <td>一般權限</td>
+                <td>模型下載與相簿掃描進度/完成通知</td>
+                <td>否（通知可選）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">FOREGROUND_SERVICE</span></td>
+                <td>一般權限</td>
+                <td>背景模型下載服務</td>
+                <td>是（模型下載）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">FOREGROUND_SERVICE_DATA_SYNC</span></td>
+                <td>一般權限</td>
+                <td>相簿打標掃描前台服務（資料同步類型，全部本機處理）</td>
+                <td>是（打標掃描）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SCHEDULE_EXACT_ALARM</span></td>
+                <td>一般權限</td>
+                <td>閒時自動掃描的定時調度</td>
+                <td>否（自動掃描可選）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">WAKE_LOCK</span></td>
+                <td>一般權限</td>
+                <td>掃描/下載執行期間保持 CPU 喚醒，防止任務中斷</td>
+                <td>是（背景任務）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SYSTEM_ALERT_WINDOW</span></td>
+                <td>危險權限</td>
+                <td>懸浮聊天氣泡（在其他應用程式上層顯示 AI 助手入口，預設關閉）</td>
+                <td>否（懸浮氣泡可選，需使用者手動授權）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</span></td>
+                <td>一般權限</td>
+                <td>背景掃描保活（請求加入電池最佳化白名單，預設不請求）</td>
+                <td>否（可選，需使用者手動授權）</td>
+            </tr>
+        </table>
+
+        <h2>3. 資料處理方式</h2>
+
+        <h3>3.1 端側優先原則</h3>
+        <p>PoLang 的核心架構設計遵循<strong>端側優先</strong>原則：</p>
+        <ul>
+            <li><strong>本機 VLM 打標</strong>：Qwen3-VL-2B 視覺語言模型在裝置本機為圖片生成標籤，圖片內容不上傳</li>
+            <li><strong>本機人臉偵測</strong>：MediaPipe / MNN 多引擎人臉偵測全部在本機 GPU/CPU 執行</li>
+            <li><strong>本機 OCR 辨識</strong>：ML Kit 文字辨識在端側完成</li>
+            <li><strong>本機美顏渲染</strong>：OpenGL ES 渲染管線完全本機執行</li>
+        </ul>
+
+        <h3>3.2 隱私分級守衛</h3>
+        <p>PoLang 內建 PrivacyGuard 隱私分級系統，自動對指令進行分級處理：</p>
+        <table>
+            <tr>
+                <th>分級</th>
+                <th>資料類型</th>
+                <th>處理策略</th>
+            </tr>
+            <tr>
+                <td><span class="data-type">RESTRICTED</span></td>
+                <td>座標、人臉資料</td>
+                <td><strong>強制本機執行</strong>，絕不允許網路傳輸</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">SENSITIVE</span></td>
+                <td>照片、OCR 內容</td>
+                <td><strong>強制本機執行</strong>，絕不允許網路傳輸</td>
+            </tr>
+            <tr>
+                <td><span class="data-type">PUBLIC</span></td>
+                <td>相機控制指令（如「拍一張」）</td>
+                <td>本機優先，使用者可設定是否允許遠端編排</td>
+            </tr>
+        </table>
+
+        <h3>3.3 AI 對話推論（遠端）</h3>
+        <p>AI 對話與指令解析透過<strong>遠端大模型</strong>（DeepSeek / 通義等 OpenAI 相容介面）完成，需連網：</p>
+        <ul>
+            <li>對話文字、指令等<strong>非媒體資料</strong>會傳送至遠端推論服務以生成回覆；<strong>使用者圖片/影片檔案絕不上傳</strong></li>
+            <li>人臉偵測、OCR、美顏、打標、去背等媒體處理<strong>始終在端側執行</strong>，不受遠端推論影響</li>
+            <li>登入 PoLang 帳號後，可使用官方 <strong>api.polang.net</strong> 閘道享免費推論額度；該閘道僅記錄呼叫次數與 Token 用量，<strong>不儲存對話內容</strong></li>
+            <li>您也可在設定中自行配置其它 OpenAI 相容 API（使用您自己的 Token，PoLang 不持有、不中轉任何憑證）</li>
+        </ul>
+
+        <h2>4. 資料儲存與保留</h2>
+
+        <h3>4.1 照片與影片</h3>
+        <ul>
+            <li>拍攝的照片和影片儲存在裝置系統相簿中，由 Android 系統管理</li>
+            <li>PoLang 不會在應用程式私有目錄中保留額外的照片副本</li>
+            <li>使用者可隨時透過系統相簿刪除照片</li>
+        </ul>
+
+        <h3>4.2 對話記憶</h3>
+        <ul>
+            <li>Agent 對話歷史完整儲存在裝置本機資料庫中，支援跨會話查看，不出裝置</li>
+            <li>傳送給遠端模型的上下文最多攜帶最近 10 則訊息（僅文字）</li>
+            <li>使用者可在設定中清除所有對話記憶</li>
+            <li>解除安裝應用程式後，所有本機資料將被系統清除</li>
+        </ul>
+
+        <h3>4.3 模型檔案</h3>
+        <ul>
+            <li>AI 模型檔案（LLM、人臉偵測、ASR 等）下載後儲存在應用程式私有目錄</li>
+            <li>模型檔案僅在本機用於推論，不會上傳</li>
+            <li>使用者可在設定中刪除已下載的模型以釋放空間</li>
+        </ul>
+
+        <h3>4.4 帳號資料保留</h3>
+        <ul>
+            <li>您刪除帳號後，帳號資料將<strong>保留 90 天</strong>（用於反詐騙與誤刪找回），期滿後<strong>徹底刪除</strong>，包括用量日誌</li>
+            <li>刪除入口見 app「設定 → 帳號 → 刪除帳號」，亦可電子郵件 <a href="mailto:budao.gs@gmail.com">budao.gs@gmail.com</a> 申請刪除</li>
+        </ul>
+
+        <h2>5. 資料共享與第三方</h2>
+
+        <div class="highlight-box">
+            <p><strong>重要聲明：PoLang 不會將您的任何資料出售、出租或共享給任何第三方。</strong></p>
+        </div>
+
+        <p>PoLang 使用的第三方開源元件及其資料處理情況：</p>
+        <table>
+            <tr>
+                <th>元件</th>
+                <th>用途</th>
+                <th>資料處理方式</th>
+            </tr>
+            <tr>
+                <td>MediaPipe</td>
+                <td>人臉關鍵點偵測</td>
+                <td>完全本機執行，無網路通訊</td>
+            </tr>
+            <tr>
+                <td>MNN</td>
+                <td>神經網路推論引擎</td>
+                <td>完全本機執行，無網路通訊</td>
+            </tr>
+            <tr>
+                <td>ML Kit</td>
+                <td>OCR 文字辨識</td>
+                <td>完全本機執行，無網路通訊</td>
+            </tr>
+            <tr>
+                <td>Sherpa-ONNX</td>
+                <td>語音辨識（ASR）</td>
+                <td>完全本機執行，無網路通訊</td>
+            </tr>
+        </table>
+
+        <h2>6. 使用者權利</h2>
+        <p>作為 PoLang 使用者，您擁有以下權利：</p>
+        <ul>
+            <li><strong>存取權</strong>：您拍攝的所有照片和影片均儲存在本機，您可隨時存取</li>
+            <li><strong>刪除權</strong>：您可隨時刪除照片、清除對話記憶、刪除下載的模型；登入帳號的使用者可在 app「設定 → 帳號 → 刪除帳號」刪除帳號及關聯資料；未註冊訪客可在「設定 → 資料與隱私 → 清除訪客資料」刪除裝置級訪客記錄；亦可電子郵件申請刪除</li>
+            <li><strong>撤回同意權</strong>：您可隨時在系統設定中撤銷任何已授予的權限</li>
+            <li><strong>離線使用權</strong>：打標、人臉偵測、美顏、相簿搜尋等媒體功能可離線使用；AI 對話需連網</li>
+            <li><strong>資料可攜帶權</strong>：您的照片儲存在標準相簿中，可自由匯出</li>
+        </ul>
+
+        <h2>7. 兒童隱私</h2>
+        <p>PoLang 不面向 13 歲以下兒童。我們不會故意蒐集 13 歲以下兒童的個人資料。如果您發現我們可能蒐集了兒童的資訊，請立即聯絡我們，我們將儘快刪除相關資料。</p>
+
+        <h2>8. 安全措施</h2>
+        <p>PoLang 採取以下技術和組織措施保護您的資料：</p>
+        <ul>
+            <li><strong>本機處理架構</strong>：敏感資料不出裝置，從根本上降低外洩風險</li>
+            <li><strong>最小權限原則</strong>：僅申請功能必需的權限，不過度索取</li>
+            <li><strong>開源可稽核</strong>：核心程式碼開源，接受社群安全稽核</li>
+            <li><strong>帳號資料最小化</strong>：信箱註冊僅保存電子郵件與 token 的 SHA-256 雜湊，不蒐集明文密碼（驗證碼登入），並提供帳號刪除入口</li>
+        </ul>
+
+        <h2>9. 政策更新</h2>
+        <p>我們可能會不定時更新本隱私政策。任何重大變更將透過應用程式內通知或更新日誌告知使用者。繼續使用 PoLang 即表示您同意修訂後的政策。</p>
+
+        <h2>10. 聯絡我們</h2>
+        <p>如果您對本隱私政策有任何疑問或建議，請透過以下方式聯絡我們：</p>
+        <ul>
+            <li>GitHub Issues：<a href="https://github.com/littleseven/polang/issues" target="_blank">https://github.com/littleseven/polang/issues</a></li>
+            <li>專案首頁：<a href="https://github.com/littleseven/polang" target="_blank">https://github.com/littleseven/polang</a></li>
+            <li>電子郵件：<a href="mailto:budao.gs@gmail.com">budao.gs@gmail.com</a></li>
+        </ul>
+
+        <div class="footer">
+            <p>PoLang — 雕刻時光，瞬間永恆。</p>
+            <p>本隱私政策遵循 Google Play 資料安全表單要求編製</p>
+        </div>
+    </div>
+</body>
+</html>

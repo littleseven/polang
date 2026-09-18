@@ -51,8 +51,10 @@
       <h2 class="section-title">核心功能</h2>
       <p class="section-sub">一个会用自然语言沟通的智能相册</p>
       <div class="grid">
+        <div class="card"><div class="icon">🧹</div><h3>自动整理</h3><p>重复、相似照片自动找出,一键清理;删除进回收站,30 天内可恢复。整理中心六大类目 + 滑动快速整理,全在本地完成。</p></div>
         <div class="card"><div class="icon">🤖</div><h3>对话式 AI 助手</h3><p>像聊天一样管理相册:"找去年夏天的照片""把这张调暖一点",AI 听懂就做。</p></div>
         <div class="card"><div class="icon">🖼️</div><h3>智能相册</h3><p>自动给照片打标签(场景/人物/物体/活动),端侧语义搜索 + 以图搜图,模糊描述也能命中。</p></div>
+        <div class="card"><div class="icon">💫</div><h3>回忆</h3><p>照片自动生成精选回忆集:时光、旅程、人物,每一段好时光都值得重看。端侧生成,私密不外传。</p></div>
         <div class="card"><div class="icon">✨</div><h3>AI 美颜编辑</h3><p>GPU 加速专业美颜:磨皮、美白、瘦脸、大眼、唇色、腮红,一键 AI 智能优化。</p></div>
         <div class="card"><div class="icon">🎨</div><h3>创意滤镜</h3><p>徕卡(经典/鲜艳/黑白)、胶片(金/富士/复古)、实时 GPU 特效,支持批量。</p></div>
         <div class="card"><div class="icon">🔒</div><h3>隐私优先</h3><p>人脸检测、美颜、打标等媒体处理在本地完成,照片不上传、不采集任何数据。</p></div>
@@ -88,7 +90,7 @@
         <div class="guide-viewport">
           <div class="guide-track">
             <div class="guide-slide"><img src="assets/setup-1.jpg" alt="下载必备模型"><div class="guide-cap"><span class="gs">第 1 步</span><h3>📦 下载必备模型</h3><p>相册的打标、人脸识别、语义搜索都依赖端侧 AI 模型。在「模型中心 → 必须」一键下载，共 <b>7 个模型、约 1.5 GB</b>。</p><div class="gtags"><span class="gtag must">必需</span><span class="gtag">≈ 1.5 GB</span><span class="gtag">建议 WiFi</span></div></div></div>
-            <div class="guide-slide"><img src="assets/setup-2.jpg" alt="跑一次扫描"><div class="guide-cap"><span class="gs">第 2 步</span><h3>🔄 跑一次扫描</h3><p>进入「TAG 生成控制」开始扫描，让 App 认识相册里的人和画面（人脸 + 语义），约 <b>1.5 小时 / 万张</b>。记得开启<b>后台保活</b>。</p><div class="gtags"><span class="gtag must">必需</span><span class="gtag">~1.5 h / 万张</span></div></div></div>
+            <div class="guide-slide"><img src="assets/setup-2.jpg" alt="跑一次扫描"><div class="guide-cap"><span class="gs">第 2 步</span><h3>🔄 跑一次扫描</h3><p>进入底部 Tab「相册整理」→「扫描」开始扫描，让 App 认识相册里的人和画面（人脸 + 语义），约 <b>1.5 小时 / 万张</b>。记得开启<b>后台保活</b>。</p><div class="gtags"><span class="gtag must">必需</span><span class="gtag">~1.5 h / 万张</span></div></div></div>
             <div class="guide-slide"><img src="assets/setup-3.jpg" alt="理解图片内容"><div class="guide-cap"><span class="gs">第 3 步</span><h3>🧠 理解图片内容</h3><p>想让「搜海边」「找夜景」更准？再跑一遍图片内容理解，生成场景、物体、活动标签，约 <b>24 小时 / 万张</b>，建议插电过夜。</p><div class="gtags"><span class="gtag opt">可选增强</span><span class="gtag">~24 h / 万张</span></div></div></div>
             <div class="guide-slide"><img src="assets/setup-4.jpg" alt="注册账号领额度"><div class="guide-cap"><span class="gs">第 4 步</span><h3>🔑 注册账号领额度</h3><p>AI 对话默认走远程大模型，邮箱注册即享<b>更高的免费额度</b>（访客额度较少），对话需联网。</p><div class="gtags"><span class="gtag">远程对话</span><span class="gtag">免费额度</span></div></div></div>
             <div class="guide-slide"><img src="assets/setup-5.jpg" alt="教 AI 认识你的人"><div class="guide-cap"><span class="gs">第 5 步</span><h3>👥 教 AI 认识你的人</h3><p>给识别出的人物<b>命名、标注关系</b>（家人 / 朋友…），并在「<b>AI 记忆</b>」补充事实，AI 在对话中会越来越懂你。</p><div class="gtags"><span class="gtag opt">让 AI 更聪明</span><span class="gtag">人物关系</span></div></div></div>
@@ -140,7 +142,7 @@
         <div class="faq-item"><h3>完全免费吗?</h3><p>是。无广告、无订阅、无内购,全部功能免费。</p></div>
         <div class="faq-item"><h3>没有网络能用吗?</h3><p>打标、人脸识别、场景识别等端侧能力可离线使用;AI 对话走远程大模型,需联网。</p></div>
         <div class="faq-item"><h3>支持哪些机型?</h3><p>Android 7.0(API 24)及以上,美颜与本地推理推荐 arm64 机型;iOS 版本开发中,即将支持。</p></div>
-        <div class="faq-item"><h3>数据会被收集吗?</h3><p>不会。不采集任何用户数据,详见<a href="privacy-policy/index.html">隐私政策</a>。</p></div>
+        <div class="faq-item"><h3>数据会被收集吗?</h3><p>不会。不采集照片等媒体数据、不出售数据;邮箱/访客设备标识仅用于免费额度计数,详见<a href="privacy-policy/index.html">隐私政策</a>。</p></div>
       </div>
     </div>
   </section>

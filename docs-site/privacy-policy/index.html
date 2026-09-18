@@ -6,6 +6,7 @@
     <title>PoLang 隐私政策</title>
     <link rel="alternate" hreflang="zh-CN" href="https://polang.net/privacy-policy/">
     <link rel="alternate" hreflang="en" href="https://polang.net/en/privacy-policy/">
+    <link rel="alternate" hreflang="zh-TW" href="https://polang.net/tw/privacy-policy/">
     <link rel="alternate" hreflang="x-default" href="https://polang.net/">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -122,11 +123,11 @@
 <body>
     <div class="container">
         <h1>PoLang 隐私政策</h1>
-        <p class="subtitle">最后更新日期：2026年7月17日 | 生效日期：2026年7月17日</p>
-        <p class="lang-switch"><a href="../en/privacy-policy/index.html" hreflang="en" lang="en">View in English</a></p>
+        <p class="subtitle">最后更新日期：2026年9月18日 | 生效日期：2026年9月18日</p>
+        <p class="lang-switch"><a href="../en/privacy-policy/index.html" hreflang="en" lang="en">View in English</a> · <a href="../tw/privacy-policy/index.html" hreflang="zh-TW" lang="zh-Hant">繁體中文</a></p>
 
         <div class="highlight-box">
-            <p><strong>核心承诺：</strong>PoLang 是一款以隐私优先为设计原则的智能相机应用。我们坚信您的照片、人脸数据和语音信息是高度敏感的个人隐私。因此，PoLang 采用<strong>端侧优先（On-Device First）</strong>架构，所有敏感数据均在您的设备本地处理，<strong>不会上传至任何云端服务器</strong>。</p>
+            <p><strong>核心承诺：</strong>PoLang 是一款以隐私优先为设计原则的智能相册应用（含拍照能力）。我们坚信您的照片、人脸数据和语音信息是高度敏感的个人隐私。因此，PoLang 采用<strong>端侧优先（On-Device First）</strong>架构，照片、视频、人脸、语音等媒体数据均在您的设备本地处理，<strong>不会上传至任何云端服务器</strong>。</p>
         </div>
 
         <h2>1. 我们收集哪些信息</h2>
@@ -249,14 +250,26 @@
             <tr>
                 <td><span class="permission-tag">READ_MEDIA_IMAGES</span></td>
                 <td>危险权限</td>
-                <td>读取相册图片进行编辑</td>
-                <td>否（相册功能可选）</td>
+                <td>读取相册图片进行整理、搜索与编辑</td>
+                <td>是（相册核心功能）</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">READ_MEDIA_VIDEO</span></td>
                 <td>危险权限</td>
-                <td>读取相册视频进行编辑</td>
-                <td>否（相册功能可选）</td>
+                <td>读取相册视频进行整理与播放</td>
+                <td>是（相册核心功能）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_MEDIA_LOCATION</span></td>
+                <td>危险权限</td>
+                <td>读取照片 EXIF 位置信息，用于地点分组与地点搜索（仅本地处理，不上传）</td>
+                <td>否（地点功能可选）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">MANAGE_MEDIA</span></td>
+                <td>危险权限</td>
+                <td>「删除不再询问」开关（默认关闭）：开启后删除/回收操作免系统确认弹窗，仍移入系统回收站可恢复</td>
+                <td>否（默认关闭，需用户手动授权）</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">READ_EXTERNAL_STORAGE</span></td>
@@ -279,14 +292,56 @@
             <tr>
                 <td><span class="permission-tag">INTERNET</span></td>
                 <td>普通权限</td>
-                <td>AI 对话远程推理</td>
+                <td>AI 对话远程推理（仅文本/元数据，不含照片视频）</td>
                 <td>否（媒体功能可离线；AI 对话需联网）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_NETWORK_STATE</span></td>
+                <td>普通权限</td>
+                <td>网络状态检测（如仅 WiFi 下静默预下载模型）</td>
+                <td>是</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">POST_NOTIFICATIONS</span></td>
+                <td>普通权限</td>
+                <td>模型下载与相册扫描进度/完成通知</td>
+                <td>否（通知可选）</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">FOREGROUND_SERVICE</span></td>
                 <td>普通权限</td>
                 <td>后台模型下载服务</td>
                 <td>是（模型下载）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">FOREGROUND_SERVICE_DATA_SYNC</span></td>
+                <td>普通权限</td>
+                <td>相册打标扫描前台服务（数据同步类型，全部本地处理）</td>
+                <td>是（打标扫描）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SCHEDULE_EXACT_ALARM</span></td>
+                <td>普通权限</td>
+                <td>闲时自动扫描的定时调度</td>
+                <td>否（自动扫描可选）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">WAKE_LOCK</span></td>
+                <td>普通权限</td>
+                <td>扫描/下载执行期间保持 CPU 唤醒，防止任务中断</td>
+                <td>是（后台任务）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SYSTEM_ALERT_WINDOW</span></td>
+                <td>危险权限</td>
+                <td>悬浮聊天气泡（在其他应用上层显示 AI 助手入口，默认关闭）</td>
+                <td>否（悬浮气泡可选，需用户手动授权）</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</span></td>
+                <td>普通权限</td>
+                <td>后台扫描保活（请求加入电池优化白名单，默认不请求）</td>
+                <td>否（可选，需用户手动授权）</td>
             </tr>
         </table>
 
@@ -346,8 +401,8 @@
 
         <h3>4.2 对话记忆</h3>
         <ul>
-            <li>Agent 对话上下文存储在设备本地数据库中</li>
-            <li>最大保留最近 10 轮对话历史</li>
+            <li>Agent 对话历史完整存储在设备本地数据库中，支持跨会话查看，不出设备</li>
+            <li>发送给远程模型的上下文最多携带最近 10 条消息（仅文本）</li>
             <li>用户可在设置中清除所有对话记忆</li>
             <li>卸载应用后，所有本地数据将被系统清除</li>
         </ul>

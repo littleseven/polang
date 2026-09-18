@@ -6,6 +6,7 @@
     <title>PoLang Privacy Policy</title>
     <link rel="alternate" hreflang="en" href="https://polang.net/en/privacy-policy/">
     <link rel="alternate" hreflang="zh-CN" href="https://polang.net/privacy-policy/">
+    <link rel="alternate" hreflang="zh-TW" href="https://polang.net/tw/privacy-policy/">
     <link rel="alternate" hreflang="x-default" href="https://polang.net/">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -122,11 +123,11 @@
 <body>
     <div class="container">
         <h1>PoLang Privacy Policy</h1>
-        <p class="subtitle">Last updated: July 17, 2026 | Effective: July 17, 2026</p>
-        <p class="lang-switch"><a href="../../privacy-policy/index.html" hreflang="zh-Hans" lang="zh-Hans">查看中文版</a></p>
+        <p class="subtitle">Last updated: September 18, 2026 | Effective: September 18, 2026</p>
+        <p class="lang-switch"><a href="../../privacy-policy/index.html" hreflang="zh-Hans" lang="zh-Hans">查看中文版</a> · <a href="../../tw/privacy-policy/index.html" hreflang="zh-TW" lang="zh-Hant">繁體中文</a></p>
 
         <div class="highlight-box">
-            <p><strong>Core promise:</strong> PoLang is a smart camera app built privacy-first. We believe your photos, face data, and voice are highly sensitive personal information. That's why PoLang adopts an <strong>On-Device First</strong> architecture — all sensitive data is processed locally on your device and <strong>never uploaded to any cloud server</strong>.</p>
+            <p><strong>Core promise:</strong> PoLang is a smart photo gallery app (with camera capability) built privacy-first. We believe your photos, face data, and voice are highly sensitive personal information. That's why PoLang adopts an <strong>On-Device First</strong> architecture — photos, videos, faces, voice and other media data are processed locally on your device and <strong>never uploaded to any cloud server</strong>.</p>
         </div>
 
         <h2>1. Information We Collect</h2>
@@ -249,14 +250,26 @@
             <tr>
                 <td><span class="permission-tag">READ_MEDIA_IMAGES</span></td>
                 <td>Dangerous</td>
-                <td>Read gallery images for editing</td>
-                <td>No (gallery optional)</td>
+                <td>Read gallery images for organizing, search and editing</td>
+                <td>Yes (gallery core)</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">READ_MEDIA_VIDEO</span></td>
                 <td>Dangerous</td>
-                <td>Read gallery videos for editing</td>
-                <td>No (gallery optional)</td>
+                <td>Read gallery videos for organizing and playback</td>
+                <td>Yes (gallery core)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_MEDIA_LOCATION</span></td>
+                <td>Dangerous</td>
+                <td>Read photo EXIF location for place grouping and place search (local only, never uploaded)</td>
+                <td>No (place features optional)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">MANAGE_MEDIA</span></td>
+                <td>Dangerous</td>
+                <td>"No more delete prompts" switch (off by default): when enabled, delete/trash actions skip system confirmation; items still go to the system recycle bin and can be restored</td>
+                <td>No (off by default, requires manual grant)</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">READ_EXTERNAL_STORAGE</span></td>
@@ -279,14 +292,56 @@
             <tr>
                 <td><span class="permission-tag">INTERNET</span></td>
                 <td>Normal</td>
-                <td>AI chat remote inference</td>
+                <td>AI chat remote inference (text/metadata only, never photos or videos)</td>
                 <td>No (media works offline; AI chat needs network)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">ACCESS_NETWORK_STATE</span></td>
+                <td>Normal</td>
+                <td>Network status detection (e.g. silent model pre-download on WiFi only)</td>
+                <td>Yes</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">POST_NOTIFICATIONS</span></td>
+                <td>Normal</td>
+                <td>Model download and gallery scan progress/completion notifications</td>
+                <td>No (notifications optional)</td>
             </tr>
             <tr>
                 <td><span class="permission-tag">FOREGROUND_SERVICE</span></td>
                 <td>Normal</td>
                 <td>Background model download service</td>
                 <td>Yes (model download)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">FOREGROUND_SERVICE_DATA_SYNC</span></td>
+                <td>Normal</td>
+                <td>Gallery tagging scan foreground service (data sync type, all processing on-device)</td>
+                <td>Yes (tagging scan)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SCHEDULE_EXACT_ALARM</span></td>
+                <td>Normal</td>
+                <td>Scheduled dispatch for idle-time automatic scanning</td>
+                <td>No (auto scan optional)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">WAKE_LOCK</span></td>
+                <td>Normal</td>
+                <td>Keep CPU awake during scan/download to prevent task interruption</td>
+                <td>Yes (background tasks)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">SYSTEM_ALERT_WINDOW</span></td>
+                <td>Dangerous</td>
+                <td>Floating chat bubble (AI assistant entry over other apps, off by default)</td>
+                <td>No (floating bubble optional, requires manual grant)</td>
+            </tr>
+            <tr>
+                <td><span class="permission-tag">REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</span></td>
+                <td>Normal</td>
+                <td>Background scan keep-alive (request battery optimization whitelist, not requested by default)</td>
+                <td>No (optional, requires manual grant)</td>
             </tr>
         </table>
 
@@ -346,8 +401,8 @@
 
         <h3>4.2 Conversation Memory</h3>
         <ul>
-            <li>Agent conversation context is stored in the on-device database</li>
-            <li>At most the last 10 turns of history are retained</li>
+            <li>Full Agent conversation history is stored in the on-device database and can be viewed across sessions; it never leaves the device</li>
+            <li>The context sent to the remote model carries at most the last 10 messages (text only)</li>
             <li>You can clear all conversation memory in Settings</li>
             <li>Uninstalling the app clears all local data</li>
         </ul>

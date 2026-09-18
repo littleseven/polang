@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Getting Started · PoLang</title>
-  <meta name="description" content="PoLang setup prerequisites: download models, scan your gallery, sign up for quota, tag people, and remote control. Three steps to get started, so the AI truly understands you.">
-  <link rel="alternate" hreflang="en" href="https://polang.net/en/getting-started.html">
+  <title>上手指南 · PoLang 破浪相簿</title>
+  <meta name="description" content="破浪相簿使用前提與首次設定：下載模型、掃描相簿、註冊額度、人物標註與遠端控制。三步即可用，AI 才真正「懂事」。">
+  <link rel="alternate" hreflang="zh-TW" href="https://polang.net/tw/getting-started.html">
   <link rel="alternate" hreflang="zh-CN" href="https://polang.net/getting-started.html">
+  <link rel="alternate" hreflang="en" href="https://polang.net/en/getting-started.html">
+  <link rel="alternate" hreflang="x-default" href="https://polang.net/getting-started.html">
   <style>
     :root {
       --bg: #ffffff;
@@ -25,14 +27,14 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
       color: var(--text); background: var(--bg); line-height: 1.7;
       -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
     }
     a { color: inherit; text-decoration: none; }
     .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
 
-    /* Top nav */
+    /* 頂欄 */
     .topnav { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.82); backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border); }
     .topnav-inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
@@ -43,7 +45,7 @@
     .nav-links .active { color: var(--primary); }
     .lang-switch { border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text-soft); }
 
-    /* Page head */
+    /* 頁頭 */
     .page-head { padding: 56px 24px 32px; text-align: center; background: radial-gradient(125% 100% at 50% 0%, #efeefe 0%, #ffffff 60%); }
     .page-head .eyebrow { display:inline-block; color: var(--primary); background: var(--primary-soft); border-radius: 999px; padding: 5px 14px; font-size: 13px; font-weight: 600; margin-bottom: 16px; }
     .page-head h1 { font-size: 36px; line-height: 1.18; letter-spacing: -.02em; font-weight: 800; margin-bottom: 12px; }
@@ -54,13 +56,13 @@
     .section-title { font-size: 28px; font-weight: 800; text-align: center; letter-spacing: -.02em; margin-bottom: 10px; }
     .section-sub { text-align: center; color: var(--text-muted); font-size: 15.5px; margin-bottom: 34px; }
 
-    /* Entry */
+    /* 入口提示 */
     .entry { display:grid; grid-template-columns: 1fr 240px; gap: 28px; align-items: center; background:#fff; border:1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; margin-bottom: 30px; }
     .entry h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
     .entry p { font-size: 14.5px; color: var(--text-muted); }
     .entry .shot { width:100%; height:auto; border-radius: 10px; border:1px solid var(--border); box-shadow: var(--shadow-sm); }
 
-    /* Steps */
+    /* 步驟卡片 */
     .steps { display: flex; flex-direction: column; gap: 22px; }
     .step { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; transition: box-shadow .18s, transform .18s; }
     .step:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
@@ -78,7 +80,7 @@
     .tag.must { background: #fff1f2; color: #e11d48; border-color: #ffe4e6; }
     .tag.opt { background: var(--primary-soft); color: var(--primary); border-color: #e0e7ff; }
 
-    /* Outcome */
+    /* 結果預覽 */
     .outcome { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
     .outcome .step-img { grid-area: img; }
     .outcome .say { color: var(--primary); font-weight: 600; font-size: 17px; margin-bottom: 8px; }
@@ -94,13 +96,13 @@
     .cta-row .btn:hover { box-shadow: var(--shadow-md); border-color: #cbd5e1; }
     .btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
-    /* Footer */
+    /* 頁尾 */
     footer { background: #0b1220; color: #94a3b8; padding: 36px 0; }
     footer .inner { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
     footer .nav-links a { transition: color .12s; }
     footer .nav-links a:hover { color: #fff; }
 
-    /* Mobile: compact list (thumb + text) */
+    /* 行動端：緊湊列表（縮圖 + 文字），適合手機閱讀 */
     @media (max-width: 768px) {
       :root { --section-py: 34px; }
       .container { padding: 0 15px; }
@@ -138,10 +140,11 @@
     <div class="container topnav-inner">
       <a class="brand" href="index.html"><img src="../assets/icon.png" alt="PoLang">PoLang</a>
       <div class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="index.html#features">Features</a>
-        <a class="active" href="getting-started.html">Guide</a>
-        <a class="lang-switch" href="../getting-started.html" hreflang="zh-Hans" lang="zh-Hans">中文</a>
+        <a href="index.html">首頁</a>
+        <a href="index.html#features">功能</a>
+        <a class="active" href="getting-started.html">上手指南</a>
+        <a class="lang-switch" href="../getting-started.html" hreflang="zh-Hans" lang="zh-Hans">简体</a>
+        <a class="lang-switch" href="../en/getting-started.html" hreflang="en" lang="en">English</a>
         <a href="https://github.com/littleseven/polang" target="_blank" rel="noopener">GitHub</a>
       </div>
     </div>
@@ -149,9 +152,9 @@
 
   <header class="page-head">
     <div class="container">
-      <span class="eyebrow">Before you start · Must-read</span>
-      <h1>3 Steps to Make the AI Truly Get You</h1>
-      <p>PoLang's smart search and AI chat rely on on-device models and a one-time gallery scan. Finish the steps below so the app can actually understand you.</p>
+      <span class="eyebrow">首次使用 · 必讀</span>
+      <h1>讓 AI 真正「懂事」的三步</h1>
+      <p>破浪相簿的智慧搜尋與 AI 對話依賴端側模型和一次相簿掃描。完成下面幾步，App 才能聽懂你的話。</p>
     </div>
   </header>
 
@@ -159,70 +162,70 @@
     <div class="container">
       <div class="entry">
         <div>
-          <h3>📦 It all starts in Settings &amp; the Organize tab</h3>
-          <p>Model downloads, account, people, and remote channels live in the app's Settings; the scan entry is at the bottom tab "Gallery Cleanup → Scan". Each step below points you to the right screen — the UI may differ slightly in the latest version.</p>
+          <h3>📦 一切從「設定」和底部「相簿整理」開始</h3>
+          <p>模型下載、帳號、人物與遠端通道在 App 的「設定」裡；掃描入口在底部 Tab「相簿整理」→「掃描」。下面每一步都標註了具體入口，介面以最新版本為準。</p>
         </div>
-        <img class="shot" src="../assets/setup-entry.jpg" alt="Settings overview">
+        <img class="shot" src="../assets/setup-entry.jpg" alt="設定頁入口總覽">
       </div>
 
       <div class="steps">
         <!-- Step 1 -->
         <div class="step">
           <div class="step-text">
-            <div class="step-head"><span class="step-num">1</span><span class="step-title">Download required models</span></div>
-            <p class="step-desc">Tagging, face recognition, and semantic search all rely on on-device AI models. Go to <b>Model Center → Required</b> and download them all (7 models, ~1.5 GB). The Recommended models (matting, voice) are optional.</p>
-            <div class="tags"><span class="tag must">Required</span><span class="tag">≈ 1.5 GB</span><span class="tag">Wi-Fi recommended</span></div>
+            <div class="step-head"><span class="step-num">1</span><span class="step-title">下載必備模型</span></div>
+            <p class="step-desc">相簿的打標、人臉辨識、語意搜尋都依賴端側 AI 模型。進入<b>「模型中心 → 必須」</b>一鍵下載（共 7 個，約 1.5 GB）。「推薦」裡的去背、語音模型可按需下載。</p>
+            <div class="tags"><span class="tag must">必需</span><span class="tag">≈ 1.5 GB</span><span class="tag">建議 WiFi</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-1.jpg" alt="Model Center · Required models"></div>
+          <div class="step-img"><img src="../assets/setup-1.jpg" alt="模型中心 · 必須模型"></div>
         </div>
 
         <!-- Step 2 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-2.jpg" alt="TAG Generation · scanning"></div>
+          <div class="step-img"><img src="../assets/setup-2.jpg" alt="掃描控制 · 掃描中"></div>
           <div class="step-text">
-            <div class="step-head"><span class="step-num">2</span><span class="step-title">Run a Pass 1 scan</span></div>
-            <p class="step-desc">Let the app learn the <b>people and scenes</b> in your gallery. Go to the bottom tab <b>Gallery Cleanup → Scan</b> and start scanning (face detection + semantic encoding, ~1.5h / 10k photos). Remember to enable <b>background activity</b> when prompted, or it may be paused in the background. The UI may differ slightly in the latest version.</p>
-            <div class="tags"><span class="tag must">Required</span><span class="tag">~1.5h / 10k</span></div>
+            <div class="step-head"><span class="step-num">2</span><span class="step-title">跑一次 Pass 1 掃描</span></div>
+            <p class="step-desc">讓 App 認識你相簿裡的<b>人和畫面</b>。進入底部 Tab<b>「相簿整理」→「掃描」</b>開始掃描（人臉偵測 + 語意編碼，約 1.5 小時 / 萬張）。記得按提示開啟<b>背景保活</b>，否則退到背景可能被系統暫停。介面以最新版本為準。</p>
+            <div class="tags"><span class="tag must">必需</span><span class="tag">~1.5 h / 萬張</span></div>
           </div>
         </div>
 
         <!-- Step 3 -->
         <div class="step">
           <div class="step-text">
-            <div class="step-head"><span class="step-num">3</span><span class="step-title">(Optional) Understand image content</span></div>
-            <p class="step-desc">Want searches like "beach", "night scene", or "family picnic" to be sharper? Run <b>Image Understanding</b> to generate scene, object, and activity tags for every photo. ~24h / 10k, <b>best overnight while charging</b>. Pause anytime — already-processed photos won't repeat.</p>
-            <div class="tags"><span class="tag opt">Optional</span><span class="tag">~24h / 10k</span></div>
+            <div class="step-head"><span class="step-num">3</span><span class="step-title">（可選）理解圖片內容</span></div>
+            <p class="step-desc">想讓「搜海邊」「找夜景」「一家人野餐」搜得更準？再跑一遍<b>「圖片內容理解」</b>，為每張照片生成場景、物體、活動標籤。約 24 小時 / 萬張，<b>建議插電過夜</b>。可隨時暫停，已處理的不重複。</p>
+            <div class="tags"><span class="tag opt">可選增強</span><span class="tag">~24 h / 萬張</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-3.jpg" alt="TAG Generation · 3-stage overview"></div>
+          <div class="step-img"><img src="../assets/setup-3.jpg" alt="掃描控制 · 三階段總覽"></div>
         </div>
 
         <!-- Step 4 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-4.jpg" alt="Account · free quota"></div>
+          <div class="step-img"><img src="../assets/setup-4.jpg" alt="帳號 · 免費額度"></div>
           <div class="step-text">
-            <div class="step-head"><span class="step-num">4</span><span class="step-title">Sign up for quota</span></div>
-            <p class="step-desc">AI chat <b>runs on a cloud-based model</b> for the best experience. Sign in with email for a <b>higher free quota</b> (guests get less). A network connection is all you need.</p>
-            <div class="tags"><span class="tag">Cloud AI chat</span><span class="tag">Free quota</span></div>
+            <div class="step-head"><span class="step-num">4</span><span class="step-title">註冊帳號領額度</span></div>
+            <p class="step-desc">AI 對話<b>預設走遠端大模型</b>，體驗最佳。用信箱註冊帳號即可獲得更高的<b>免費額度</b>（訪客額度較少），用完會有降級提示。</p>
+            <div class="tags"><span class="tag">遠端對話</span><span class="tag">免費額度</span></div>
           </div>
         </div>
 
         <!-- Step 5 -->
         <div class="step">
           <div class="step-text">
-            <div class="step-head"><span class="step-num">5</span><span class="step-title">Teach AI your people</span></div>
-            <p class="step-desc">After scanning, people are detected automatically. <b>Name each person and set relationships</b> (family / friends / colleagues…), then add facts in <b>AI Memory</b> — PoLang gets smarter in every conversation.</p>
-            <div class="tags"><span class="tag opt">Smarter AI</span><span class="tag">People & relationships</span></div>
+            <div class="step-head"><span class="step-num">5</span><span class="step-title">教 AI 認識你的人</span></div>
+            <p class="step-desc">掃描後會自動辨識人物。給每個人<b>命名、標註關係</b>（家人 / 朋友 / 同事…），再在<b>「AI 記憶」</b>裡補充一些事實，AI 在對話中就會越來越懂你。</p>
+            <div class="tags"><span class="tag opt">讓 AI 更聰明</span><span class="tag">人物關係</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-5.jpg" alt="Edit person · name & relationship"></div>
+          <div class="step-img"><img src="../assets/setup-5.jpg" alt="編輯人物 · 名稱與關係"></div>
         </div>
 
         <!-- Step 6 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-6.jpg" alt="Channels · Feishu / Telegram"></div>
+          <div class="step-img"><img src="../assets/setup-6.jpg" alt="通訊通道 · 飛書 / Telegram"></div>
           <div class="step-text">
-            <div class="step-head"><span class="step-num">6</span><span class="step-title">(Optional) Remote control</span></div>
-            <p class="step-desc">Connect <b>Feishu / Telegram</b> to drive your gallery from IM (e.g. "send me yesterday's landscapes") — results come right back to the chat. Telegram uses long-polling, <b>no public IP needed</b>.</p>
-            <div class="tags"><span class="tag opt">Advanced</span><span class="tag">Feishu / Telegram</span></div>
+            <div class="step-head"><span class="step-num">6</span><span class="step-title">（可選）遠端控制</span></div>
+            <p class="step-desc">設定<b>飛書 / Telegram</b> 通道，就能在 IM 裡用自然語言指揮相簿（如「把昨天的風景照傳給我」），結果直接回到聊天。Telegram 長輪詢連線，<b>無需公網 IP</b>。</p>
+            <div class="tags"><span class="tag opt">進階</span><span class="tag">飛書 / Telegram</span></div>
           </div>
         </div>
       </div>
@@ -231,44 +234,44 @@
 
   <section class="alt">
     <div class="container">
-      <h2 class="section-title">Once You're Set Up</h2>
-      <p class="section-sub">Just say something to the AI</p>
+      <h2 class="section-title">準備就緒後</h2>
+      <p class="section-sub">對 AI 助理說一句話，它就懂</p>
       <div class="outcome">
         <div>
-          <p class="say">"Find last summer's beach photos"</p>
-          <p class="do">🗂️ Matching photos, grouped smartly by time — all search, face, and scene recognition happens on-device; photos are never uploaded.</p>
+          <p class="say">「找去年夏天在海邊的照片」</p>
+          <p class="do">🗂️ 命中相關照片，按時間智慧分組 —— 一切搜尋、人物、場景辨識都在你的手機本機完成，照片不會上傳。</p>
         </div>
-        <div class="step-img"><img src="../assets/setup-preview.jpg" alt="AI assistant · natural-language search"></div>
+        <div class="step-img"><img src="../assets/setup-preview.jpg" alt="AI 助理小浪 · 自然語言搜尋"></div>
       </div>
     </div>
   </section>
 
   <section>
     <div class="container cta-wrap">
-      <h2 class="section-title">Get Started</h2>
-      <p class="section-sub">Free · No ads · On-device privacy</p>
+      <h2 class="section-title">開始體驗</h2>
+      <p class="section-sub">免費 · 無廣告 · 本機隱私</p>
       <div class="cta-row">
-        <a class="btn" href="https://play.google.com/store/apps/details?id=com.mamba.picme" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z"/></svg>Google Play</a>
-        <a class="btn" href="https://api.polang.net/download" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#3DDC84" d="M18.4395 5.5586c-.675 1.1664-1.352 2.3318-2.0274 3.498-.0366-.0155-.0742-.0286-.1113-.043-1.8249-.6957-3.484-.8-4.42-.787-1.8551.0185-3.3544.4643-4.2597.8203-.084-.1494-1.7526-3.021-2.0215-3.4864a1.1451 1.1451 0 0 0-.1406-.1914c-.3312-.364-.9054-.4859-1.379-.203-.475.282-.7136.9361-.3886 1.5019 1.9466 3.3696-.0966-.2158 1.9473 3.3593.0172.031-.4946.2642-1.3926 1.0177C2.8987 12.176.452 14.772 0 18.9902h24c-.119-1.1108-.3686-2.099-.7461-3.0683-.7438-1.9118-1.8435-3.2928-2.7402-4.1836a12.1048 12.1048 0 0 0-2.1309-1.6875c.6594-1.122 1.312-2.2559 1.9649-3.3848.2077-.3615.1886-.7956-.0079-1.1191a1.1001 1.1001 0 0 0-.8515-.5332c-.5225-.0536-.9392.3128-1.0488.5449zm-.0391 8.461c.3944.5926.324 1.3306-.1563 1.6503-.4799.3197-1.188.0985-1.582-.4941-.3944-.5927-.324-1.3307.1563-1.6504.4727-.315 1.1812-.1086 1.582.4941zM7.207 13.5273c.4803.3197.5506 1.0577.1563 1.6504-.394.5926-1.1038.8138-1.584.4941-.48-.3197-.5503-1.0577-.1563-1.6504.4008-.6021 1.1087-.8106 1.584-.4941z"/></svg>APK</a>
-        <a class="btn" href="https://github.com/littleseven/polang" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#181717" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>GitHub</a>
+        <a class="btn" href="https://play.google.com/store/apps/details?id=com.mamba.picme" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z"/></svg>Google Play 下載</a>
+        <a class="btn" href="https://api.polang.net/download" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#3DDC84" d="M18.4395 5.5586c-.675 1.1664-1.352 2.3318-2.0274 3.498-.0366-.0155-.0742-.0286-.1113-.043-1.8249-.6957-3.484-.8-4.42-.787-1.8551.0185-3.3544.4643-4.2597.8203-.084-.1494-1.7526-3.021-2.0215-3.4864a1.1451 1.1451 0 0 0-.1406-.1914c-.3312-.364-.9054-.4859-1.379-.203-.475.282-.7136.9361-.3886 1.5019 1.9466 3.3696-.0966-.2158 1.9473 3.3593.0172.031-.4946.2642-1.3926 1.0177C2.8987 12.176.452 14.772 0 18.9902h24c-.119-1.1108-.3686-2.099-.7461-3.0683-.7438-1.9118-1.8435-3.2928-2.7402-4.1836a12.104 12.104 0 0 0-2.1309-1.6875c.6594-1.122 1.312-2.2559 1.9649-3.3848.2077-.3615.1886-.7956-.0079-1.1191a1.1001 1.1001 0 0 0-.8515-.5332c-.5225-.0536-.9392.3128-1.0488.5449zm-.0391 8.461c.3944.5926.324 1.3306-.1563 1.6503-.4799.3197-1.188.0985-1.582-.4941-.3944-.5927-.324-1.3307.1563-1.6504.4727-.315 1.1812-.1086 1.582.4941zM7.207 13.5273c.4803.3197.5506 1.0577.1563 1.6504-.394.5926-1.1038.8138-1.584.4941-.48-.3197-.5503-1.0577-.1563-1.6504.4008-.6021 1.1087-.8106 1.584-.4941z"/></svg>APK 下載</a>
+        <a class="btn" href="https://github.com/littleseven/polang" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#181717" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>GitHub 倉庫</a>
       </div>
     </div>
   </section>
 
   <footer>
     <div class="container inner">
-      <span>© PoLang — Carving time, capturing the eternal.</span>
+      <span>© PoLang — 雕刻時光，瞬間永恆。</span>
       <div class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="getting-started.html">Guide</a>
-        <a href="privacy-policy/index.html">Privacy Policy</a>
-        <a href="../docs/">Technical Docs (中文)</a>
+        <a href="index.html">首頁</a>
+        <a href="getting-started.html">上手指南</a>
+        <a href="privacy-policy/index.html">隱私政策</a>
+        <a href="../docs/">技術文件</a>
         <a href="https://github.com/littleseven/polang" target="_blank" rel="noopener">GitHub</a>
       </div>
     </div>
   </footer>
   <script>
-    // Mobile: tap a thumbnail to open the full image
+    // 行動端：點擊縮圖開啟原圖查看
     if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
       document.querySelectorAll('.step-img img, .outcome .step-img img, .entry .shot').forEach(function (img) {
         img.style.cursor = 'zoom-in';
