@@ -429,10 +429,11 @@ python3 scripts/ui_driver.py dump
 - `MemoryHiddenStore`（domain 接口）/ `DataStoreMemoryHiddenStore`（data/preferences 实现）：user_preferences DataStore `memory_hidden_ids` stringSet，存 Memory.id；展示集经 combine 重发自动消失
 - v1 无「重新启用」入口，隐藏确认文案不承诺恢复（`memory_hide_confirm` 2026-09-06 校准）
 
-**详情页（`MemoryDetailScreen`，2026-09-06 升级对标小米）**:
-- AppTopBar（返回 + Memories + 右上分享图标）→ 约屏高 55% 封面（Coil size(1080) crossfade(false)，底部渐变蒙层 + 左下 20sp Bold 白字标题 + 13sp 副行：`memory_items_count`(hitCount) · 分类型后缀——ON_THIS_DAY/RECENT_HIGHLIGHTS 接 `memorySubtitle`、CITY 接 `cityDateRange`、PERSON 不接（与 hitCount 重复计数））→ 3 列网格（1:1 方图 r8，Coil size(360)，`memory_photo_cd` 无障碍描述）
+**详情页（`MemoryDetailScreen`，2026-09-18 蒙德里安重设计）**:
+- 整页一条竖向滚动长列表（LazyColumn，头图/开关均随列表滚动不钉顶不悬浮）：AppTopBar（返回 + Memories + 右上分享图标）→ 16:9 头图（宽撑满、高 = 屏宽×9/16，Coil size(1080) crossfade(false)，底部渐变蒙层 + 左下 20sp Bold 白字标题 + 13sp 副行：`memory_items_count`(hitCount) · 分类型后缀——ON_THIS_DAY/RECENT_HIGHLIGHTS 接 `memorySubtitle`、CITY 接 `cityDateRange`、PERSON 不接）→ 元信息行（左 = 精选/全部胶囊分段开关，右 = `memory_items_count`(displayUris.size) 计数）→ 蒙德里安拼贴网格（五种卡块：2×2 大卡左/右、2×1 横幅左/右、三方卡行；单元 = (屏宽-32-8)/3，间距 4，r8；大卡/横幅 Coil size(720)、方卡 size(360)，`memory_photo_cd` 无障碍序号跨卡块连续）
+- **拼贴洗牌（`domain/memories/MemoryMosaic.kt` 纯函数，JVM 可测）**：seed = FNV-1a 32bit(memory.id) → xorshift32 逐块等概率抽取五种卡块，与上一块同向（左/右）重抽至多 3 次仍冲突取方卡行；大卡块耗 3 项、横幅 2 项；尾行剩余 ≤3 一律方卡行补齐；同 id 同 URI 集输出恒定，媒体增删序列自然顺延不承诺稳定
 - **图片预览（2026-09-06 补齐）**：封面与网格照片点击打开全屏 `MediaPager` overlay（同 Gallery/Chat 宿主范式，非路由；页面根为单 Box 承载 Column + 预览层）；`Memory` 只存 uri，经 `MemoriesViewModel.assetsByUri`（uri → MediaAsset 全库索引，`MediaEntity.toMediaAsset()` 完整映射）反查，按 uri 定位初始页，未解析项剔除；预览内删除/OCR/跳编辑器/证件照经 Activity 级 `MediaViewModel` 与导航回调（`memoryDetailRoute` 注入），删除授权（API 29 / API 30+ createDeleteRequest launcher）写法同 ChatScreen；删除后预览集合随媒体库流自动收缩、删空自动收起；`BackHandler` 优先关预览再弹栈；精选/全部开关切换收起预览（索引口径已变）
-- **精选/全部分段开关**：底部居中胶囊（`memory_detail_best` / `memory_detail_all`），`showAll` 按 `remember(memory?.id)` 切回忆时重置回精选；`displayUris = showAll ? allItemUris : itemUris`；分段项带 `role = Button` + `selected` 语义
+- **精选/全部分段开关**：内联于网格区顶部元信息行（`memory_detail_best` / `memory_detail_all`，2026-09-18 起废弃底部悬浮），`showAll` 按 `remember(memory?.id)` 切回忆时重置回精选；`displayUris = showAll ? allItemUris : itemUris`；分段项带 `role = Button` + `selected` 语义
 - **分享集合跟随开关**：分享图标按当前 `displayUris` 发 `ACTION_SEND_MULTIPLE` + `FLAG_GRANT_READ_URI_PERMISSION`（写法同 `GalleryUtils.shareMediaAssets`）
 - MainActivity 路由内 collect `observeMemory(id)`（未过滤全集 Flow，列表刷新不 stale、冷恢复随流复原不闪空态）；id 失效（媒体清空等）→ `memory_detail_empty` 空态
 

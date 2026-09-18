@@ -20,12 +20,11 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Share
@@ -53,6 +52,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -63,7 +63,10 @@ import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.domain.memories.Memory
+import com.mamba.picme.domain.memories.MemoryMosaic
 import com.mamba.picme.domain.memories.MemoryType
+import com.mamba.picme.domain.memories.MosaicBlock
+import com.mamba.picme.domain.memories.MosaicBlockType
 import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.features.common.topbar.AppTopBarAction
 import com.mamba.picme.features.gallery.MediaViewModel
@@ -73,9 +76,11 @@ import com.mamba.picme.features.gallery.components.TrashAuthEffects
 import com.mamba.picme.domain.trash.TrashOutcome
 
 /**
- * 回忆详情页（F3，2026-09-06 升级，对标小米）：顶栏（返回 + Memories + 分享图标）→
- * 约屏高 55% 封面（左下蒙层白字标题/副行）→ 3 列网格（精选/全部跟随分段开关）→
- * 底部居中胶囊分段开关（精选 = 美学分截 12；全部 = 全部命中时间降序）。分享集合跟随开关。
+ * 回忆详情页（F3，2026-09-18 蒙德里安重设计）：顶栏（返回 + Memories + 分享图标）→
+ * 整页一条竖向滚动长列表：16:9 头图（左下蒙层白字标题/副行，随列表滚动不钉顶）→
+ * 元信息行（左 = 精选/全部胶囊分段开关，右 = 当前集合计数，内联随列表滚动）→
+ * 蒙德里安拼贴网格（五种卡块按 memory.id 种子确定性洗牌、同向不相邻，[MemoryMosaic]
+ * 纯函数；精选 = 美学分截 12，全部 = 全部命中时间降序）。分享集合跟随开关。
  * [memory] 为 null（id 已失效，如媒体清空后）时显示空态文案。
  *
  * 图片预览（2026-09-06 补齐）：封面与网格照片点击均打开全屏 [MediaPager]（初始页按 uri
@@ -83,7 +88,7 @@ import com.mamba.picme.domain.trash.TrashOutcome
  * [mediaViewModel]（写法同 ChatScreen 图片预览），删除后预览集合随媒体库流自动收缩，
  * 删空自动收起预览；系统返回键优先关闭预览再弹栈。
  */
-@Suppress("LongMethod", "LongParameterList") // 待重构：封面/网格/分段开关可抽子组合函数
+@Suppress("LongParameterList")
 @Composable
 fun MemoryDetailScreen(
     memory: Memory?,
@@ -205,74 +210,54 @@ fun MemoryDetailScreen(
                     )
                 }
             } else {
-                MemoryCover(
-                    memory = memory,
-                    onClick = {
-                        previewIndex = previewAssets
-                            .indexOfFirst { asset -> asset.uri == memory.coverUri }
-                            .takeIf { index -> index >= 0 }
-                    },
-                )
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                val mosaicBlocks = remember(memory.id, displayUris) {
+                    MemoryMosaic.layout(memory.id, displayUris)
+                }
+                // 各卡块首张照片序号（无障碍 contentDescription 用）
+                val blockStartIndices = remember(mosaicBlocks) {
+                    var start = 0
+                    mosaicBlocks.map { block ->
+                        val current = start
+                        start += block.uris.size
+                        current
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .navigationBarsPadding(),
+                    contentPadding = PaddingValues(bottom = 16.dp),
                 ) {
-                    itemsIndexed(displayUris, key = { _, uri -> uri }) { index, uri ->
-                        MemoryGridItem(
-                            uri = uri,
-                            index = index,
+                    item(key = "cover") {
+                        MemoryCover(
+                            memory = memory,
                             onClick = {
+                                previewIndex = previewAssets
+                                    .indexOfFirst { asset -> asset.uri == memory.coverUri }
+                                    .takeIf { index -> index >= 0 }
+                            },
+                        )
+                    }
+                    item(key = "meta") {
+                        MemoryMetaRow(
+                            showAll = showAll,
+                            count = displayUris.size,
+                            onShowAllChange = { all -> showAll = all },
+                        )
+                    }
+                    itemsIndexed(
+                        mosaicBlocks,
+                        key = { index, block -> "block_${index}_${block.uris.first()}" },
+                    ) { index, block ->
+                        MosaicBlockRow(
+                            block = block,
+                            startIndex = blockStartIndices[index],
+                            onOpenUri = { uri ->
                                 previewIndex = previewAssets
                                     .indexOfFirst { asset -> asset.uri == uri }
                                     .takeIf { found -> found >= 0 }
                             },
                         )
-                    }
-                }
-                // 精选/全部分段开关（对标小米「显示优选/全部显示」）
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    ) {
-                        listOf(false to R.string.memory_detail_best, true to R.string.memory_detail_all)
-                            .forEach { pair ->
-                                val isSelected = showAll == pair.first
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(24.dp))
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else Color.Transparent,
-                                        )
-                                        .clickable { showAll = pair.first }
-                                        .semantics {
-                                            role = Role.Button
-                                            selected = isSelected
-                                        }
-                                        .padding(horizontal = 24.dp, vertical = 10.dp),
-                                ) {
-                                    Text(
-                                        text = stringResource(pair.second),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = if (isSelected) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                    )
-                                }
-                            }
                     }
                 }
             }
@@ -305,7 +290,7 @@ fun MemoryDetailScreen(
     }
 }
 
-/** 约屏高 55% 封面：大图 + 底部黑色渐变蒙层 + 左下白字标题行/副行；点击打开全屏预览。 */
+/** 16:9 头图（宽撑满、高 = 屏宽 × 9/16）：大图 + 底部黑色渐变蒙层 + 左下白字标题行/副行；点击打开全屏预览。 */
 @Composable
 private fun MemoryCover(memory: Memory, onClick: () -> Unit) {
     val title = memoryTitle(memory)
@@ -316,11 +301,10 @@ private fun MemoryCover(memory: Memory, onClick: () -> Unit) {
         MemoryType.CITY -> cityDateRange(memory)
         MemoryType.PERSON -> null
     }
-    val coverHeight = (LocalConfiguration.current.screenHeightDp * 0.55f).dp
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(coverHeight)
+            .aspectRatio(16f / 9f)
             .clickable(onClick = onClick),
     ) {
         AsyncImage(
@@ -367,22 +351,128 @@ private fun MemoryCover(memory: Memory, onClick: () -> Unit) {
     }
 }
 
-/** 网格小卡：1:1 方图 r8；点击打开全屏预览（按 uri 定位页索引）。 */
+/** 元信息行：左 = 精选/全部胶囊分段开关（内联随列表滚动，不再底部悬浮），右 = 当前展示集合计数。 */
 @Composable
-private fun MemoryGridItem(uri: String, index: Int, onClick: () -> Unit) {
+private fun MemoryMetaRow(showAll: Boolean, count: Int, onShowAllChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = GRID_HORIZONTAL_PADDING.dp)
+            .padding(top = 12.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(4.dp),
+        ) {
+            listOf(false to R.string.memory_detail_best, true to R.string.memory_detail_all)
+                .forEach { pair ->
+                    val isSelected = showAll == pair.first
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else Color.Transparent,
+                            )
+                            .clickable { onShowAllChange(pair.first) }
+                            .semantics {
+                                role = Role.Button
+                                selected = isSelected
+                            }
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(pair.second),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+        }
+        Text(
+            text = stringResource(R.string.memory_items_count, count),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** 蒙德里安拼贴卡块行：五种卡块（2×2 大卡左/右、2×1 横幅左/右、三方卡行）；单元 = (屏宽-32-8)/3。 */
+@Composable
+private fun MosaicBlockRow(block: MosaicBlock, startIndex: Int, onOpenUri: (String) -> Unit) {
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val cell = ((screenWidthDp - GRID_HORIZONTAL_PADDING * 2 - GRID_SPACING * 2) / 3f).dp
+    val bigSize = cell * 2 + GRID_SPACING.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = GRID_HORIZONTAL_PADDING.dp)
+            .padding(bottom = GRID_SPACING.dp),
+        horizontalArrangement = Arrangement.spacedBy(GRID_SPACING.dp),
+    ) {
+        when (block.type) {
+            MosaicBlockType.BIG_LEFT -> {
+                MosaicTile(block.uris[0], startIndex, bigSize, bigSize, REQUEST_SIZE_LARGE, onOpenUri)
+                Column(verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp)) {
+                    MosaicTile(block.uris[1], startIndex + 1, cell, cell, REQUEST_SIZE_SMALL, onOpenUri)
+                    MosaicTile(block.uris[2], startIndex + 2, cell, cell, REQUEST_SIZE_SMALL, onOpenUri)
+                }
+            }
+            MosaicBlockType.BIG_RIGHT -> {
+                Column(verticalArrangement = Arrangement.spacedBy(GRID_SPACING.dp)) {
+                    MosaicTile(block.uris[0], startIndex, cell, cell, REQUEST_SIZE_SMALL, onOpenUri)
+                    MosaicTile(block.uris[1], startIndex + 1, cell, cell, REQUEST_SIZE_SMALL, onOpenUri)
+                }
+                MosaicTile(block.uris[2], startIndex + 2, bigSize, bigSize, REQUEST_SIZE_LARGE, onOpenUri)
+            }
+            MosaicBlockType.BANNER_LEFT -> {
+                MosaicTile(block.uris[0], startIndex, bigSize, cell, REQUEST_SIZE_LARGE, onOpenUri)
+                MosaicTile(block.uris[1], startIndex + 1, cell, cell, REQUEST_SIZE_SMALL, onOpenUri)
+            }
+            MosaicBlockType.BANNER_RIGHT -> {
+                MosaicTile(block.uris[0], startIndex, cell, cell, REQUEST_SIZE_SMALL, onOpenUri)
+                MosaicTile(block.uris[1], startIndex + 1, bigSize, cell, REQUEST_SIZE_LARGE, onOpenUri)
+            }
+            MosaicBlockType.SQUARE_ROW -> {
+                block.uris.forEachIndexed { offset, uri ->
+                    MosaicTile(uri, startIndex + offset, cell, cell, REQUEST_SIZE_SMALL, onOpenUri)
+                }
+            }
+        }
+    }
+}
+
+/** 拼贴瓦片：定宽定高 r8；点击打开全屏预览（按 uri 定位页索引）。 */
+@Composable
+private fun MosaicTile(
+    uri: String,
+    index: Int,
+    width: Dp,
+    height: Dp,
+    requestSize: Int,
+    onOpenUri: (String) -> Unit,
+) {
     val placeholder = ColorPainter(MaterialTheme.colorScheme.surface)
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(uri)
-            .size(360)
+            .size(requestSize)
             .crossfade(false)
             .build(),
         contentDescription = stringResource(R.string.memory_photo_cd, index + 1),
         modifier = Modifier
-            .aspectRatio(1f)
+            .size(width, height)
             .clip(AppShapes.small)
             .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick),
+            .clickable { onOpenUri(uri) },
         contentScale = ContentScale.Crop,
         placeholder = placeholder,
         error = placeholder,
@@ -407,3 +497,7 @@ private fun shareMemoryPhotos(context: Context, uris: List<String>) {
 }
 
 private const val TAG = "PoLang:Memories"
+private const val GRID_HORIZONTAL_PADDING = 16
+private const val GRID_SPACING = 4
+private const val REQUEST_SIZE_LARGE = 720
+private const val REQUEST_SIZE_SMALL = 360

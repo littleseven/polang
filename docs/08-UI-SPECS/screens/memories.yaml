@@ -106,6 +106,7 @@ root_page:
 detail_page:
   container: single_root_stack          # 单根容器承载 内容列 + 预览覆盖层（Pager 多根平铺事故铁律同构）
   background: surface
+  layout: single_scrollable_list        # 整页一条竖向滚动长列表：16:9 头图 + 元信息行 + 网格全部随列表滚动（头图不钉顶、分段开关不悬浮）
   data_source: "observeMemory(id) 未过滤全集 Flow（已隐藏条目可复原、冷恢复不闪空态）；id 失效 → 空态"
   top_bar:
     back: navigate_back                 # 返回键/返回箭头弹栈（iOS dismiss）
@@ -115,8 +116,9 @@ detail_page:
       cd_key: memory_share              # "分享回忆"
       behavior: "分享当前展示集合 displayUris（跟随精选/全部开关）；Android ACTION_SEND_MULTIPLE+读授权 / iOS UIActivityViewController"
   empty_state: { key: memory_detail_empty, style: [bodyMedium, onSurfaceVariant, center] } # "这条回忆已不可用"
-  cover:                                # 约屏高 55% 封面
-    height: "screenHeight * 0.55"
+  cover:                                # 16:9 头图（宽撑满屏宽，高 = screenWidth * 9/16；2026-09-18 起废弃 55% 屏高大头图）
+    aspect_ratio: "16:9"
+    height: "screenWidth * 9 / 16"
     image: "封面裁切填满（Coil size(1080) / iOS 大图请求）；占位/失败 = surfaceContainer 色块；禁交叉淡入"
     scrim: "底部 50% 黑渐变（透明 → 黑 0.6）"
     title: { position: bottom_start, padding: 16, fontSize: 20, weight: Bold, color: white } # 同根页 memoryTitle 口径
@@ -127,19 +129,22 @@ detail_page:
       CITY: " · {cityDateRange}"                  # 旅程日期范围
       PERSON: null                                # 不接（与 hitCount 重复计数）
     tap: open_preview_at_cover          # 按 coverUri 在预览集合定位初始页
-  grid:                                 # 3 列方图网格
-    columns: 3
-    aspect_ratio: "1:1"
+  grid:                                 # 蒙德里安拼贴网格（2026-09-18 起废弃统一 3 列方格：大卡+小卡混排）
+    base_unit: "3 列基准格：单元宽 = (屏宽-32-8)/3，单元高 = 单元宽，间距 4，圆角 r8"
+    pattern: "五种卡块（大卡块A 左2×2+右列2方卡 / 大卡块B 镜像 / 横幅块C 左2×1+右方卡 / 横幅块D 镜像 / 三方卡行Sq）按确定性洗牌排布，同向（左/右）不相邻，Sq 为中性可与任意相邻"
+    shuffle_rule: "seed = 稳定哈希(memory.id)（FNV-1a 32bit）；xorshift32 PRNG 逐块抽取：五种卡块等概率取一块，与上一块同向则重抽（至多 3 次，仍冲突取 Sq）；同 id 同媒体集输出恒定——纯函数确定性，测试可断言；媒体增删导致集合变化时序列自然顺延不保证稳定"
+    item_consumption: "A/B/Sq 各耗 3 项、C/D 各耗 2 项；尾行不足按方卡行补齐"
+    featured_mapping: "itemUris 精选序（美学分降序）按洗牌后卡块出现顺序依次落位——每块首项进 2×2 大卡位/2×1 横幅位，封面即第 1 项"
     corner_radius: token.shapes.small   # r8（AppShapes.small）
     spacing: 4
-    padding: { horizontal: 16, vertical: 8 }
-    image: "裁切填满（Coil size(360) / iOS 缩略图）；占位/失败 = surface 色块；禁交叉淡入"
+    padding: { horizontal: 16 }         # 垂直间距由长列表统一承担（元信息行下 gap 12，列表底 padding 预留安全区）
+    image: "裁切填满（大卡 Coil size(720) / 方卡 size(360) / iOS 等效缩略图）；占位/失败 = surface 色块；禁交叉淡入"
     cd_key: memory_photo_cd             # "回忆照片 %1$d"（序号 1 起）
     tap: open_preview_at_index          # 按 uri 定位初始页；未解析项剔除
     items_source: displayUris           # 跟随分段开关
-  segmented_toggle:                     # 精选/全部胶囊分段开关（底部居中，对标小米「显示优选/全部显示」）
-    position: bottom_center
-    padding: { horizontal: 16, vertical: 12, bottom_safe_area: true }
+  segmented_toggle:                     # 精选/全部胶囊分段开关（内联在网格区顶部元信息行，随列表滚动；2026-09-18 起废弃底部悬浮）
+    position: inline_grid_header        # 元信息行：左 = 分段开关，右 = 计数（"共 N 项"）
+    padding: { horizontal: 16, top: 12 }
     capsule: { corner: 24, background: surfaceVariant }
     options:
       - { key: memory_detail_best, value: false }  # "精选"（默认）
@@ -211,7 +216,9 @@ acceptance:
   - "那年今日 ≥4 张往年同月同日照片 → 时光分区出现 ON_THIS_DAY 卡，标题本地化"
   - "三分区顺序 时光→旅程→人物，空分区不占位"
   - "长按大卡 → 隐藏确认 → 确认后卡片从展示集消失且冷启动不复发"
-  - "详情页封面 55% 屏高 + 精选(默认)/全部开关切集合 + 分享跟随开关"
+  - "详情页整页一条竖向滚动长列表：16:9 头图（宽撑满、高=屏宽×9/16）随内容滚动不钉顶"
+  - "详情页网格为蒙德里安拼贴：五种卡块按 memory.id 种子确定性洗牌（同向不相邻），同 id 输出恒定、不同回忆序列各异"
+  - "详情页精选(默认)/全部开关内联于网格区顶部（左开关右计数），切集合 + 分享跟随开关"
   - "网格/封面点击 → 全屏预览按点击项定位；预览内删除后集合收缩、删空自动收起"
   - "id 失效（媒体清空）→ 详情页空态不崩溃"
   - "深浅色双模式：蒙层白字可读、语义色跟随主题"
