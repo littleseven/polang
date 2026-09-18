@@ -11,14 +11,14 @@
   <link rel="alternate" hreflang="x-default" href="https://polang.net/getting-started.html">
   <style>
     :root {
-      --bg: #ffffff;
-      --bg-alt: #f7f8fb;
-      --text: #0f172a;
-      --text-soft: #334155;
-      --text-muted: #64748b;
-      --border: #e6e8ee;
-      --primary: #4f46e5;
-      --primary-soft: #eef2ff;
+      --bg: #071510;
+      --bg-alt: #0a1b13;
+      --text: #dff5e9;
+      --text-soft: #8fbba6;
+      --text-muted: #5c8371;
+      --border: rgba(47, 227, 133, .14);
+      --primary: #2fe385;
+      --primary-soft: rgba(47, 227, 133, .10);
       --radius: 16px;
       --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 2px 6px rgba(15,23,42,.05);
       --shadow-md: 0 14px 34px rgba(15,23,42,.10);
@@ -35,7 +35,7 @@
     .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
 
     /* 頂欄 */
-    .topnav { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.82); backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border); }
+    .topnav { position: sticky; top: 0; z-index: 20; background: rgba(7,21,16,.78); backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border); }
     .topnav-inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
     .brand img { width: 30px; height: 30px; border-radius: 8px; }
@@ -46,7 +46,7 @@
     .lang-switch { border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text-soft); }
 
     /* 頁頭 */
-    .page-head { padding: 56px 24px 32px; text-align: center; background: radial-gradient(125% 100% at 50% 0%, #efeefe 0%, #ffffff 60%); }
+    .page-head { padding: 56px 24px 32px; text-align: center; background: radial-gradient(125% 100% at 50% 0%, rgba(47,227,133,.10) 0%, #071510 60%); }
     .page-head .eyebrow { display:inline-block; color: var(--primary); background: var(--primary-soft); border-radius: 999px; padding: 5px 14px; font-size: 13px; font-weight: 600; margin-bottom: 16px; }
     .page-head h1 { font-size: 36px; line-height: 1.18; letter-spacing: -.02em; font-weight: 800; margin-bottom: 12px; }
     .page-head p { font-size: 18px; color: var(--text-soft); max-width: 620px; margin: 0 auto; }
@@ -57,14 +57,14 @@
     .section-sub { text-align: center; color: var(--text-muted); font-size: 15.5px; margin-bottom: 34px; }
 
     /* 入口提示 */
-    .entry { display:grid; grid-template-columns: 1fr 240px; gap: 28px; align-items: center; background:#fff; border:1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; margin-bottom: 30px; }
+    .entry { display:grid; grid-template-columns: 1fr 240px; gap: 28px; align-items: center; background:#0d2318; border:1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; margin-bottom: 30px; }
     .entry h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
     .entry p { font-size: 14.5px; color: var(--text-muted); }
     .entry .shot { width:100%; height:auto; border-radius: 10px; border:1px solid var(--border); box-shadow: var(--shadow-sm); }
 
     /* 步驟卡片 */
     .steps { display: flex; flex-direction: column; gap: 22px; }
-    .step { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; transition: box-shadow .18s, transform .18s; }
+    .step { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #0d2318; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; transition: box-shadow .18s, transform .18s; }
     .step:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
     .step.alt { grid-template-columns: 250px 1fr; grid-template-areas: "img text"; }
     .step-text { grid-area: text; }
@@ -77,11 +77,11 @@
     .step-desc b { color: var(--text-soft); font-weight: 600; }
     .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .tag { background: var(--bg-alt); color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 600; }
-    .tag.must { background: #fff1f2; color: #e11d48; border-color: #ffe4e6; }
-    .tag.opt { background: var(--primary-soft); color: var(--primary); border-color: #e0e7ff; }
+    .tag.must { background: rgba(242,184,181,.10); color: #f2b8b5; border-color: rgba(242,184,181,.25); }
+    .tag.opt { background: var(--primary-soft); color: var(--primary); border-color: rgba(47,227,133,.25); }
 
     /* 結果預覽 */
-    .outcome { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
+    .outcome { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #0d2318; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
     .outcome .step-img { grid-area: img; }
     .outcome .say { color: var(--primary); font-weight: 600; font-size: 17px; margin-bottom: 8px; }
     .outcome .say::before { content: "💬 "; }
@@ -92,15 +92,15 @@
     .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
     .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 12px; font-weight: 600; font-size: 15px; transition: transform .12s, box-shadow .12s, border-color .12s; }
     .btn:hover { transform: translateY(-1px); }
-    .cta-row .btn { background: #fff; color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow-sm); flex: 1 1 0; max-width: 230px; justify-content: center; }
-    .cta-row .btn:hover { box-shadow: var(--shadow-md); border-color: #cbd5e1; }
+    .cta-row .btn { background: #0d2318; color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow-sm); flex: 1 1 0; max-width: 230px; justify-content: center; }
+    .cta-row .btn:hover { box-shadow: var(--shadow-md); border-color: rgba(47,227,133,.35); }
     .btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
     /* 頁尾 */
-    footer { background: #0b1220; color: #94a3b8; padding: 36px 0; }
+    footer { background: #04100a; color: #5c8371; padding: 36px 0; }
     footer .inner { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
     footer .nav-links a { transition: color .12s; }
-    footer .nav-links a:hover { color: #fff; }
+    footer .nav-links a:hover { color: #dff5e9; }
 
     /* 行動端：緊湊列表（縮圖 + 文字），適合手機閱讀 */
     @media (max-width: 768px) {
@@ -165,7 +165,7 @@
           <h3>📦 一切從「設定」和底部「相簿整理」開始</h3>
           <p>模型下載、帳號、人物與遠端通道在 App 的「設定」裡；掃描入口在底部 Tab「相簿整理」→「掃描」。下面每一步都標註了具體入口，介面以最新版本為準。</p>
         </div>
-        <img class="shot" src="../assets/setup-entry.jpg" alt="設定頁入口總覽">
+        <img class="shot" src="../assets/tw/setup-entry.jpg" alt="設定頁入口總覽">
       </div>
 
       <div class="steps">
@@ -176,12 +176,12 @@
             <p class="step-desc">相簿的打標、人臉辨識、語意搜尋都依賴端側 AI 模型。進入<b>「模型中心 → 必須」</b>一鍵下載（共 7 個，約 1.5 GB）。「推薦」裡的去背、語音模型可按需下載。</p>
             <div class="tags"><span class="tag must">必需</span><span class="tag">≈ 1.5 GB</span><span class="tag">建議 WiFi</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-1.jpg" alt="模型中心 · 必須模型"></div>
+          <div class="step-img"><img src="../assets/tw/setup-1.jpg" alt="模型中心 · 必須模型"></div>
         </div>
 
         <!-- Step 2 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-2.jpg" alt="掃描控制 · 掃描中"></div>
+          <div class="step-img"><img src="../assets/tw/setup-2.jpg" alt="掃描控制 · 掃描中"></div>
           <div class="step-text">
             <div class="step-head"><span class="step-num">2</span><span class="step-title">跑一次 Pass 1 掃描</span></div>
             <p class="step-desc">讓 App 認識你相簿裡的<b>人和畫面</b>。進入底部 Tab<b>「相簿整理」→「掃描」</b>開始掃描（人臉偵測 + 語意編碼，約 1.5 小時 / 萬張）。記得按提示開啟<b>背景保活</b>，否則退到背景可能被系統暫停。介面以最新版本為準。</p>
@@ -196,12 +196,12 @@
             <p class="step-desc">想讓「搜海邊」「找夜景」「一家人野餐」搜得更準？再跑一遍<b>「圖片內容理解」</b>，為每張照片生成場景、物體、活動標籤。約 24 小時 / 萬張，<b>建議插電過夜</b>。可隨時暫停，已處理的不重複。</p>
             <div class="tags"><span class="tag opt">可選增強</span><span class="tag">~24 h / 萬張</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-3.jpg" alt="掃描控制 · 三階段總覽"></div>
+          <div class="step-img"><img src="../assets/tw/setup-3.jpg" alt="掃描控制 · 三階段總覽"></div>
         </div>
 
         <!-- Step 4 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-4.jpg" alt="帳號 · 免費額度"></div>
+          <div class="step-img"><img src="../assets/tw/setup-4.jpg" alt="帳號 · 免費額度"></div>
           <div class="step-text">
             <div class="step-head"><span class="step-num">4</span><span class="step-title">註冊帳號領額度</span></div>
             <p class="step-desc">AI 對話<b>預設走遠端大模型</b>，體驗最佳。用信箱註冊帳號即可獲得更高的<b>免費額度</b>（訪客額度較少），用完會有降級提示。</p>
@@ -216,12 +216,12 @@
             <p class="step-desc">掃描後會自動辨識人物。給每個人<b>命名、標註關係</b>（家人 / 朋友 / 同事…），再在<b>「AI 記憶」</b>裡補充一些事實，AI 在對話中就會越來越懂你。</p>
             <div class="tags"><span class="tag opt">讓 AI 更聰明</span><span class="tag">人物關係</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-5.jpg" alt="編輯人物 · 名稱與關係"></div>
+          <div class="step-img"><img src="../assets/tw/setup-5.jpg" alt="編輯人物 · 名稱與關係"></div>
         </div>
 
         <!-- Step 6 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-6.jpg" alt="通訊通道 · 飛書 / Telegram"></div>
+          <div class="step-img"><img src="../assets/tw/setup-6.jpg" alt="通訊通道 · 飛書 / Telegram"></div>
           <div class="step-text">
             <div class="step-head"><span class="step-num">6</span><span class="step-title">（可選）遠端控制</span></div>
             <p class="step-desc">設定<b>飛書 / Telegram</b> 通道，就能在 IM 裡用自然語言指揮相簿（如「把昨天的風景照傳給我」），結果直接回到聊天。Telegram 長輪詢連線，<b>無需公網 IP</b>。</p>
@@ -241,7 +241,7 @@
           <p class="say">「找去年夏天在海邊的照片」</p>
           <p class="do">🗂️ 命中相關照片，按時間智慧分組 —— 一切搜尋、人物、場景辨識都在你的手機本機完成，照片不會上傳。</p>
         </div>
-        <div class="step-img"><img src="../assets/setup-preview.jpg" alt="AI 助理小浪 · 自然語言搜尋"></div>
+        <div class="step-img"><img src="../assets/tw/setup-preview.jpg" alt="AI 助理小浪 · 自然語言搜尋"></div>
       </div>
     </div>
   </section>

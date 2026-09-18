@@ -9,14 +9,14 @@
   <link rel="alternate" hreflang="zh-CN" href="https://polang.net/getting-started.html">
   <style>
     :root {
-      --bg: #ffffff;
-      --bg-alt: #f7f8fb;
-      --text: #0f172a;
-      --text-soft: #334155;
-      --text-muted: #64748b;
-      --border: #e6e8ee;
-      --primary: #4f46e5;
-      --primary-soft: #eef2ff;
+      --bg: #071510;
+      --bg-alt: #0a1b13;
+      --text: #dff5e9;
+      --text-soft: #8fbba6;
+      --text-muted: #5c8371;
+      --border: rgba(47, 227, 133, .14);
+      --primary: #2fe385;
+      --primary-soft: rgba(47, 227, 133, .10);
       --radius: 16px;
       --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 2px 6px rgba(15,23,42,.05);
       --shadow-md: 0 14px 34px rgba(15,23,42,.10);
@@ -33,7 +33,7 @@
     .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
 
     /* Top nav */
-    .topnav { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.82); backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border); }
+    .topnav { position: sticky; top: 0; z-index: 20; background: rgba(7,21,16,.78); backdrop-filter: saturate(180%) blur(12px); -webkit-backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border); }
     .topnav-inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
     .brand img { width: 30px; height: 30px; border-radius: 8px; }
@@ -44,7 +44,7 @@
     .lang-switch { border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--text-soft); }
 
     /* Page head */
-    .page-head { padding: 56px 24px 32px; text-align: center; background: radial-gradient(125% 100% at 50% 0%, #efeefe 0%, #ffffff 60%); }
+    .page-head { padding: 56px 24px 32px; text-align: center; background: radial-gradient(125% 100% at 50% 0%, rgba(47,227,133,.10) 0%, #071510 60%); }
     .page-head .eyebrow { display:inline-block; color: var(--primary); background: var(--primary-soft); border-radius: 999px; padding: 5px 14px; font-size: 13px; font-weight: 600; margin-bottom: 16px; }
     .page-head h1 { font-size: 36px; line-height: 1.18; letter-spacing: -.02em; font-weight: 800; margin-bottom: 12px; }
     .page-head p { font-size: 18px; color: var(--text-soft); max-width: 620px; margin: 0 auto; }
@@ -55,14 +55,14 @@
     .section-sub { text-align: center; color: var(--text-muted); font-size: 15.5px; margin-bottom: 34px; }
 
     /* Entry */
-    .entry { display:grid; grid-template-columns: 1fr 240px; gap: 28px; align-items: center; background:#fff; border:1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; margin-bottom: 30px; }
+    .entry { display:grid; grid-template-columns: 1fr 240px; gap: 28px; align-items: center; background:#0d2318; border:1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; margin-bottom: 30px; }
     .entry h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
     .entry p { font-size: 14.5px; color: var(--text-muted); }
     .entry .shot { width:100%; height:auto; border-radius: 10px; border:1px solid var(--border); box-shadow: var(--shadow-sm); }
 
     /* Steps */
     .steps { display: flex; flex-direction: column; gap: 22px; }
-    .step { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; transition: box-shadow .18s, transform .18s; }
+    .step { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #0d2318; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; transition: box-shadow .18s, transform .18s; }
     .step:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
     .step.alt { grid-template-columns: 250px 1fr; grid-template-areas: "img text"; }
     .step-text { grid-area: text; }
@@ -75,11 +75,11 @@
     .step-desc b { color: var(--text-soft); font-weight: 600; }
     .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .tag { background: var(--bg-alt); color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 600; }
-    .tag.must { background: #fff1f2; color: #e11d48; border-color: #ffe4e6; }
-    .tag.opt { background: var(--primary-soft); color: var(--primary); border-color: #e0e7ff; }
+    .tag.must { background: rgba(242,184,181,.10); color: #f2b8b5; border-color: rgba(242,184,181,.25); }
+    .tag.opt { background: var(--primary-soft); color: var(--primary); border-color: rgba(47,227,133,.25); }
 
     /* Outcome */
-    .outcome { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
+    .outcome { display: grid; grid-template-columns: 1fr 250px; grid-template-areas: "text img"; gap: 30px; align-items: center; background: #0d2318; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
     .outcome .step-img { grid-area: img; }
     .outcome .say { color: var(--primary); font-weight: 600; font-size: 17px; margin-bottom: 8px; }
     .outcome .say::before { content: "💬 "; }
@@ -90,15 +90,15 @@
     .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
     .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 12px; font-weight: 600; font-size: 15px; transition: transform .12s, box-shadow .12s, border-color .12s; }
     .btn:hover { transform: translateY(-1px); }
-    .cta-row .btn { background: #fff; color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow-sm); flex: 1 1 0; max-width: 230px; justify-content: center; }
-    .cta-row .btn:hover { box-shadow: var(--shadow-md); border-color: #cbd5e1; }
+    .cta-row .btn { background: #0d2318; color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow-sm); flex: 1 1 0; max-width: 230px; justify-content: center; }
+    .cta-row .btn:hover { box-shadow: var(--shadow-md); border-color: rgba(47,227,133,.35); }
     .btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
     /* Footer */
-    footer { background: #0b1220; color: #94a3b8; padding: 36px 0; }
+    footer { background: #04100a; color: #5c8371; padding: 36px 0; }
     footer .inner { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
     footer .nav-links a { transition: color .12s; }
-    footer .nav-links a:hover { color: #fff; }
+    footer .nav-links a:hover { color: #dff5e9; }
 
     /* Mobile: compact list (thumb + text) */
     @media (max-width: 768px) {
@@ -162,7 +162,7 @@
           <h3>📦 It all starts in Settings &amp; the Organize tab</h3>
           <p>Model downloads, account, people, and remote channels live in the app's Settings; the scan entry is at the bottom tab "Gallery Cleanup → Scan". Each step below points you to the right screen — the UI may differ slightly in the latest version.</p>
         </div>
-        <img class="shot" src="../assets/setup-entry.jpg" alt="Settings overview">
+        <img class="shot" src="../assets/en/setup-entry.jpg" alt="Settings overview">
       </div>
 
       <div class="steps">
@@ -173,12 +173,12 @@
             <p class="step-desc">Tagging, face recognition, and semantic search all rely on on-device AI models. Go to <b>Model Center → Required</b> and download them all (7 models, ~1.5 GB). The Recommended models (matting, voice) are optional.</p>
             <div class="tags"><span class="tag must">Required</span><span class="tag">≈ 1.5 GB</span><span class="tag">Wi-Fi recommended</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-1.jpg" alt="Model Center · Required models"></div>
+          <div class="step-img"><img src="../assets/en/setup-1.jpg" alt="Model Center · Required models"></div>
         </div>
 
         <!-- Step 2 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-2.jpg" alt="TAG Generation · scanning"></div>
+          <div class="step-img"><img src="../assets/en/setup-2.jpg" alt="TAG Generation · scanning"></div>
           <div class="step-text">
             <div class="step-head"><span class="step-num">2</span><span class="step-title">Run a Pass 1 scan</span></div>
             <p class="step-desc">Let the app learn the <b>people and scenes</b> in your gallery. Go to the bottom tab <b>Gallery Cleanup → Scan</b> and start scanning (face detection + semantic encoding, ~1.5h / 10k photos). Remember to enable <b>background activity</b> when prompted, or it may be paused in the background. The UI may differ slightly in the latest version.</p>
@@ -193,12 +193,12 @@
             <p class="step-desc">Want searches like "beach", "night scene", or "family picnic" to be sharper? Run <b>Image Understanding</b> to generate scene, object, and activity tags for every photo. ~24h / 10k, <b>best overnight while charging</b>. Pause anytime — already-processed photos won't repeat.</p>
             <div class="tags"><span class="tag opt">Optional</span><span class="tag">~24h / 10k</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-3.jpg" alt="TAG Generation · 3-stage overview"></div>
+          <div class="step-img"><img src="../assets/en/setup-3.jpg" alt="TAG Generation · 3-stage overview"></div>
         </div>
 
         <!-- Step 4 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-4.jpg" alt="Account · free quota"></div>
+          <div class="step-img"><img src="../assets/en/setup-4.jpg" alt="Account · free quota"></div>
           <div class="step-text">
             <div class="step-head"><span class="step-num">4</span><span class="step-title">Sign up for quota</span></div>
             <p class="step-desc">AI chat <b>runs on a cloud-based model</b> for the best experience. Sign in with email for a <b>higher free quota</b> (guests get less). A network connection is all you need.</p>
@@ -213,12 +213,12 @@
             <p class="step-desc">After scanning, people are detected automatically. <b>Name each person and set relationships</b> (family / friends / colleagues…), then add facts in <b>AI Memory</b> — PoLang gets smarter in every conversation.</p>
             <div class="tags"><span class="tag opt">Smarter AI</span><span class="tag">People & relationships</span></div>
           </div>
-          <div class="step-img"><img src="../assets/setup-5.jpg" alt="Edit person · name & relationship"></div>
+          <div class="step-img"><img src="../assets/en/setup-5.jpg" alt="Edit person · name & relationship"></div>
         </div>
 
         <!-- Step 6 -->
         <div class="step alt">
-          <div class="step-img"><img src="../assets/setup-6.jpg" alt="Channels · Feishu / Telegram"></div>
+          <div class="step-img"><img src="../assets/en/setup-6.jpg" alt="Channels · Feishu / Telegram"></div>
           <div class="step-text">
             <div class="step-head"><span class="step-num">6</span><span class="step-title">(Optional) Remote control</span></div>
             <p class="step-desc">Connect <b>Feishu / Telegram</b> to drive your gallery from IM (e.g. "send me yesterday's landscapes") — results come right back to the chat. Telegram uses long-polling, <b>no public IP needed</b>.</p>
@@ -238,7 +238,7 @@
           <p class="say">"Find last summer's beach photos"</p>
           <p class="do">🗂️ Matching photos, grouped smartly by time — all search, face, and scene recognition happens on-device; photos are never uploaded.</p>
         </div>
-        <div class="step-img"><img src="../assets/setup-preview.jpg" alt="AI assistant · natural-language search"></div>
+        <div class="step-img"><img src="../assets/en/setup-preview.jpg" alt="AI assistant · natural-language search"></div>
       </div>
     </div>
   </section>
