@@ -144,6 +144,28 @@ final class TagDatabase {
         exec("CREATE INDEX IF NOT EXISTS idx_media_assets_captureDate ON media_assets(captureDate);")
         exec("CREATE INDEX IF NOT EXISTS idx_media_assets_hasFace ON media_assets(hasFace);")
 
+        // ── organize v2 信号列轻迁移（对齐 Android Room MIGRATION_21_22；
+        //   全部可空，老数据 NULL = 未计算/未查看。幂等：已存在则跳过）──
+        ensureColumn(table: "media_assets", column: "blurScore",
+                     ddl: "ALTER TABLE media_assets ADD COLUMN blurScore REAL;")
+        ensureColumn(table: "media_assets", column: "exposureScore",
+                     ddl: "ALTER TABLE media_assets ADD COLUMN exposureScore REAL;")
+        ensureColumn(table: "media_assets", column: "lastViewedAt",
+                     ddl: "ALTER TABLE media_assets ADD COLUMN lastViewedAt INTEGER;")
+
+        // ── dedup_hash ──（organize v2 重复/相似聚类缓存；本批只建表+读写，T8 扫描器消费。
+        //   对齐 Android DedupHashEntity 的 uri 主键语义；无 FK 级联——媒体删除后哈希行残留
+        //   由「聚类输入按库内 uri 收敛」兜底，见 organize.yaml §8 deleteByUri_not_wired。）
+        exec("""
+            CREATE TABLE IF NOT EXISTS dedup_hash (
+                uri       TEXT PRIMARY KEY,
+                md5       TEXT,
+                phash     INTEGER,
+                pixelArea INTEGER,
+                sizeBytes INTEGER
+            );
+            """)
+
         // ── tag_scan_tasks ──（对齐 Android TagScanTaskEntity + 3 索引）
         exec("""
             CREATE TABLE IF NOT EXISTS tag_scan_tasks (
@@ -354,6 +376,22 @@ final class TagDatabase {
     }
 
     // MARK: - SQL Helpers
+
+    /// 幂等轻迁移：`PRAGMA table_info` 检测列缺失才 `ALTER TABLE ADD COLUMN`。
+    /// （对齐 Android Room Migration 的增量加列语义；SQLite 不支持 IF NOT EXISTS 加列。）
+    private func ensureColumn(table: String, column: String, ddl: String) {
+        guard let db = db else { return }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA table_info(\(table));", -1, &stmt, nil) == SQLITE_OK else { return }
+        var exists = false
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let cName = sqlite3_column_text(stmt, 1), String(cString: cName) == column {
+                exists = true
+            }
+        }
+        sqlite3_finalize(stmt)
+        if !exists { exec(ddl) }
+    }
 
     /// 执行无需返回结果 / 无参数的 SQL（CREATE TABLE / BEGIN / COMMIT / PRAGMA 等）。
     /// （internal：供同模块扩展 TagDatabase+Scan 使用。）

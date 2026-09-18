@@ -239,14 +239,15 @@ message_bubble:
 
   # 圆角（不同角色不同切角）
   corner_radius:
-    user: [20, 20, 4, 20]           # topLeft=20, topRight=20, bottomLeft=4, bottomRight=20
-    agent: [20, 20, 20, 4]          # topLeft=20, topRight=20, bottomLeft=20, bottomRight=4
+    user: [20, 20, 4, 20]           # Compose RoundedCornerShape(topStart, topEnd, bottomEnd, bottomStart)：右气泡切角在 bottomEnd
+    agent: [20, 20, 20, 4]          # 左气泡切角在 bottomStart
 
-  # 背景色（2026-08-18 豆包范式定稿，Android 已落地）
+  # 背景色（2026-08-18 豆包范式定稿；2026-09-13 v2.2.3 换色 + 946a36db4 对比度修复）
   background:
     user_text: "userBubbleBg"            # 品牌实色 #2FE385（token chatBubble/userBubbleBg，双模式一致）；文字色 userBubbleOn #062B18（2026-09-13 起用户气泡文字接 token chatBubble/userBubbleOn）
+    user_image_text: "userBubbleBg"      # 用户「图+文」气泡同绿底（Android isUser 含 USER_IMAGE_TEXT；caption 文字走 onSurface）
     agent_text: "none"                   # ⚠️ AI 文本无气泡：通栏纯文本流（2026-08-18 二修：去 28dp 渐变头像，用户定稿——头像多余）
-    image: "surfaceVariant.opacity(0.4)"
+    image: "surfaceVariant.opacity(0.4)" # 纯图气泡（USER_IMAGE/AGENT_IMAGE）
     error: "none"                        # 同 AI 正常（无气泡范式）
 
   # 内边距（用户气泡 18/14；AI 无气泡故无 padding，通栏无头像缩进）
@@ -257,9 +258,10 @@ message_bubble:
   # 文字样式（2026-08-18 三修：14/20 → 16/24，配合去头像通栏排版，用户定稿）
   text:
     user:
-      color: white                  # 硬编码白色
+      color: "userBubbleOn"         # token chatBubble/userBubbleOn 深绿黑 #062B18（946a36db4：亮绿底白字对比度 ~1.9:1 → 深字 ~8:1）
       font_size: 16
       line_height: 24
+      performance_line: "userBubbleOn.opacity(0.55)"   # 性能行 tint 同源（Android AgentMessageExtras）
     agent:
       color: "onSurface"
       font_size: 16
@@ -280,7 +282,7 @@ message_bubble:
       scale: fill_width                  # ContentScale.FillWidth：宽撑满气泡内容区，高随原始宽高比，零裁切
       fixed_height: none                 # ⚠️ 禁固定高 + Crop（会砍头；2026-08-16 真机反馈回归点）
       corner_radius: 12                  # 图自身圆角（≠气泡圆角 20）
-      text_below: { color: white, size: 16, line_height: 24, top_padding: 6 }
+      text_below: { color: onSurface, size: 16, line_height: 24, top_padding: 6 }  # 946a36db4：图文说明 white→onSurface
     agent_image:                         # AGENT_IMAGE（单发结果图）
       scale: fill_width                  # 同上；过期 → ExpiredImagePlaceholder
       corner_radius: 12
@@ -432,6 +434,17 @@ media_results:
     card_feedback_buttons: [thumb_up, thumb_down, refresh]
     card_date_label: "yyyy-MM-dd"
 
+  # 回合内 upsert 去重（c4cea4995，2026-09-13；Android ChatViewModel.insertMediaResultsMessage 定稿口径）
+  per_turn_upsert:
+    rule: "同一用户回合（最后一条 user 消息之后）至多一张横滑卡片"
+    trigger: "ReAct 多轮 search_media / refine_media_search / 拒绝措辞回退直搜均可能同回合多次产出"
+    upsert_semantics: "replacePreviousInTurn=true（默认）：查本回合上一张卡片行，复用其 id 与 timestamp 原位替换（卡片位置不移动）"
+    append_exception: "以图搜图（FIND_SIMILAR）自成新回合，replacePreviousInTurn=false 追加新卡，不覆盖上一回合结果"
+    refused_search_guard: "LLM 拒绝措辞回退直搜前须先查本回合是否已出卡；已出卡则跳过回退（避免重复卡片）"
+    empty_result: "空结果不出卡（回退路径改为插入 agent 文本消息）"
+    concurrency: "Android 用 mutex 串行化；iOS 单 actor 天然满足，无需额外锁"
+    ios_note: "iOS 内存态实现须为原位替换（禁 remove+append 把卡移到回合底部）；以图搜图引擎 iOS 未落地，追加分支随引擎落地补齐"
+
 # ============================================================================
 # 9.1 交互模型（Interaction Model）
 # ============================================================================
@@ -470,7 +483,7 @@ interaction_model:
 
   # 消息类型渲染分发
   message_type_rendering:
-    USER_TEXT: "right bubble, primary bg, white text"
+    USER_TEXT: "right bubble, userBubbleBg bg, userBubbleOn text"
     AGENT_TEXT: "left bubble, surfaceVariant bg, segmented Markdown (text+table+code)"
     MEDIA_RESULTS: "⚠️ separate full-width message (MediaResultsCarousel), NOT inline in text bubble"
     CHART: "separate full-width message (SVG card)"
@@ -685,6 +698,8 @@ media_results_ios_gaps:
   - "查看全部尾卡：totalCount > 显示数时，同尺寸 ViewAllCard → 跳相册"
   - "manifest 须暴露 record_feedback（+ more_like_this）以支撑反馈回路"
   - "全屏预览 HorizontalPager：tap 卡 → pinch-zoom 预览（iOS 缺整层）"
+  - "refine_template 未接线：ChatUiActionDto 丢 isRefinement 字段，upsert 后标题恒用 found 模板（2026-09-15 审查登记；Android MediaResultsCarousel 按 isRefinement 切换）"
+  # 已对齐（ios-follow-batch-20260915，b914f62e3）：用户气泡接 token（userBubbleBg/userBubbleOn）；回合内原位 upsert（§9 per_turn_upsert）
 
 # ============================================================================
 # 16. 平台差异台账（platform_differences）— 契约层

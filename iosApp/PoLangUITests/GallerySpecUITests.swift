@@ -58,14 +58,16 @@ final class GallerySpecUITests: XCTestCase {
 
     // MARK: - §12 悬浮底部 Tab
 
-    /// gallery-grid.yaml §12 floating_bottom_tab：相机/聊天/标签/人物 4 项
+    /// main-nav.yaml §1 bottom_bar：相册/整理/聊天/人物/回忆 5 项
+    ///（2026-09-16 主导航统一：相机路由化移出底栏，标签项并入整理页）
     func testFloatingBottomTabControlsExist() throws {
         try requireElement("gallery_grid", timeout: 10, "初始页应为相册网格")
 
-        try requireElement("tab_camera", timeout: 5, "相机 Tab 应存在")
+        try requireElement("tab_gallery", timeout: 5, "相册 Tab 应存在")
+        try requireElement("tab_organize", timeout: 3, "整理 Tab 应存在")
         try requireElement("tab_chat", timeout: 3, "聊天 Tab 应存在")
-        try requireElement("tab_tag", timeout: 3, "标签 Tab 应存在")
         try requireElement("tab_person", timeout: 3, "人物 Tab 应存在")
+        try requireElement("tab_memories", timeout: 3, "回忆 Tab 应存在")
 
         attachScreenshot(name: "floating_bottom_tab")
     }

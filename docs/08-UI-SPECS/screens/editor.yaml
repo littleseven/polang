@@ -225,13 +225,15 @@ crop_transform_overlay:           # 仅 CROP tab，小米相册风：浮在预�
 adjust_panel:
   layout: column, max_height 220（editor.adjustPanelMaxHeight）, pad(h16, v8)
   # 当前选中参数行
-  header_row: row, spaceBetween, vCenter
-    - label: current.param.label, style titleMedium
-    - value_group: row[ Text("%.0f".format(value), bodyLarge, pad h8), TextButton(重置→resetValue) ]
-      reset_text_key: reset      # 「重置」/「重設」
+  header_row:
+    layout: "row, spaceBetween, vCenter"
+    children:
+      - "label: current.param.label, style titleMedium"
+      - "value_group: row[ Text(\"%.0f\".format(value), bodyLarge, pad h8), TextButton(重置→resetValue) ]"
+    reset_text_key: reset      # 「重置」/「重設」
   slider:                         # appSlider 节点（全 app 统一滑杆）
     component: AppSlider
-    track_height: 6, track_shape: capsule
+    track_height: "6, track_shape: capsule"
     thumb: 18dp white circle, primary 2dp border, pressed scale 1.15
     fill_width: true
   param_selector:                 # 横向滚动的参数切换条
@@ -280,12 +282,14 @@ filter_panel:
       - EMBOSS            # 浮雕
       - CROSSHATCH        # 交叉影线
   item_layout:                   # 每个 item：column, width 72（editor.filterItemWidth）, clickable, pad h4
-    thumb: circle 64dp（editor.filterThumbSize）
-      border_selected: 3dp（editor.filterSelectedBorderWidth）, gradient primary→onSurface
-      border_unselected: 1dp（editor.filterUnselectedBorderWidth）, onSurface@0.3→@0.1
+    thumb:                          # circle 64dp（editor.filterThumbSize）
+      shape: "circle 64dp（editor.filterThumbSize）"
+      border_selected: "3dp（editor.filterSelectedBorderWidth）, gradient primary→onSurface"
+      border_unselected: "1dp（editor.filterUnselectedBorderWidth）, onSurface@0.3→@0.1"
       content: 滤镜缩略图（assets filters/*.jpg，圆裁剪 Crop）或占位渐变（缩略图缺失时）
       selected_overlay: 底部 primary@0.25 横条
-    label: fontSize 10（editor.filterLabelSize）, center, maxLines 1, pad top4
+    label:                          # fontSize 10（editor.filterLabelSize）, center, maxLines 1, pad top4
+      font: "fontSize 10（editor.filterLabelSize）, center, maxLines 1, pad top4"
       color_selected: primary
       color_unselected: onSurface @ 0.85
     content_description: "Filter {label}"
@@ -299,13 +303,18 @@ markup_tool_state:                # 屏幕层 remember，驱动面板与预览�
   stroke_width: Float（默认 0.015，归一化图片宽度比例）
 markup_panel:
   layout: column, pad(h16, v8)
-  tool_row: row, spaceEvenly, vCenter   # 3 个 FilterChip（icon-only label）
-    - { tool: DOODLE, icon: brush,   sf: "paintbrush", cd_key: doodle,         zh: 涂鸦 }
-    - { tool: MOSAIC, icon: blur_on, sf: "circle.hexagongrid", cd_key: mosaic, zh: 马赛克 }
-    - { tool: TEXT,   icon: title,   sf: "textformat", cd_key: markup_tool_text, zh: 文字 }
-  color_row: row, spaceEvenly, vCenter, pad top12   # 7 色 swatch
-    swatch: circle, selected 32dp（editor.markupSwatchSelected）/ unselected 24dp（markupSwatchUnselected）
-      border_selected: 2dp primary / border_unselected: 1dp outline
+  tool_row:                       # 3 个 FilterChip（icon-only label）
+    layout: "row, spaceEvenly, vCenter"
+    items:
+      - { tool: DOODLE, icon: brush,   sf: "paintbrush", cd_key: doodle,         zh: 涂鸦 }
+      - { tool: MOSAIC, icon: blur_on, sf: "circle.hexagongrid", cd_key: mosaic, zh: 马赛克 }
+      - { tool: TEXT,   icon: title,   sf: "textformat", cd_key: markup_tool_text, zh: 文字 }
+  color_row:                      # 7 色 swatch
+    layout: "row, spaceEvenly, vCenter, pad top12"
+    swatch:                       # circle
+      shape: "circle, selected 32dp（editor.markupSwatchSelected）/ unselected 24dp（markupSwatchUnselected）"
+      border_selected: 2dp primary
+      border_unselected: 1dp outline
     colors:                        # MARKUP_COLORS（产品内容色，不入 design token）
       - red    FFFF3B30
       - orange FFFF9500
@@ -314,10 +323,12 @@ markup_panel:
       - blue   FF0A84FF
       - white  FFFFFFFF
       - black  FF000000
-  stroke_row: row, vCenter
-    - label: markup_stroke_width（「笔画粗细」）, labelLarge, pad(top8, end8)
-    - AppSlider: value=stroke_width, range [0.005, 0.06]（MARKUP_STROKE_MIN..MAX，归一化）, weight 1
-    - TextButton: markup_clear（「清除」）, enabled_when: actions.notEmpty, click→ actions=emptyList
+  stroke_row:                     # row, vCenter
+    layout: "row, vCenter"
+    items:
+      - "label: markup_stroke_width（「笔画粗细」）, labelLarge, pad(top8, end8)"
+      - "AppSlider: value=stroke_width, range [0.005, 0.06]（MARKUP_STROKE_MIN..MAX，归一化）, weight 1"
+      - "TextButton: markup_clear（「清除」）, enabled_when: actions.notEmpty, click→ actions=emptyList"
 markup_drawing_overlay:           # MARKUP 模式叠加在预览上，接管手势
   visible_when: markup_mode       # selected_tab==MARKUP 且 gachaRun==null
   coordinate: 归一化 0..1（相对处理后图片宽高，见 §13 NormPoint）
@@ -327,7 +338,7 @@ markup_drawing_overlay:           # MARKUP 模式叠加在预览上，接管手�
     Text:   { id, text: String, position: NormPoint, color: Int, size: Float（归一化, default 0.05） }
   commit_flow:
     - DOODLE/MOSAIC: 拖拽成笔 → onCommit → 先入 pendingActions（覆盖层继续画，避免烘焙空窗闪一下）
-      → 新 previewBitmap 到达（重渲染产物）→ 清 pendingActions
+        → 新 previewBitmap 到达（重渲染产物）→ 清 pendingActions
     - TEXT: 点按 → 弹输入框（MarkupTextInputDialog）→ onConfirm 生成 MarkupAction.Text(default size 0.05)
   known_limitation: 先标记再改裁剪/旋转时标记不跟随（与多数相册「裁剪即压平」取舍一致）
 
@@ -337,15 +348,15 @@ markup_drawing_overlay:           # MARKUP 模式叠加在预览上，接管手�
 render_pipeline:
   order:                          # 处理顺序（全分辨率保存与降采样预览共用同一管线）
     1_apply_crop:    先旋转/翻转，再按 AspectRatio 自动居中裁剪
-    2_apply_effects: 调节 + 滤镜（Android: PhotoProcessor GPU；iOS lite: CoreImage，见下）
+    2_apply_effects: "调节 + 滤镜（Android: PhotoProcessor GPU；iOS lite: CoreImage，见下）"
     3_apply_markup:  最后叠加标记（坐标系=裁剪+效果后的最终图片，归一化）
   debounce_ms: 200                # 参数调节后 200ms 触发预览
   ios_lite_actual:                # 本轮 iOS 实现路径（无 GPU 美颜引擎）
-    apply_crop: CGAffineTransform rotate/flip + CIImage cropped(to: aspectRect)
-    apply_adjust: CIFilter 链
-      brightness/exposure → CIColorControls.brightness / CIExposure
-      contrast/saturation → CIColorControls.contrast / saturation
-      temperature/tint     → CITemperatureAndTint
+    apply_crop: "CGAffineTransform rotate/flip + CIImage cropped(to: aspectRect)"
+    apply_adjust:                   # CIFilter 链
+      - "brightness/exposure → CIColorControls.brightness / CIExposure"
+      - "contrast/saturation → CIColorControls.contrast / saturation"
+      - "temperature/tint → CITemperatureAndTint"
     apply_filter_color: CIColorMatrix（FilterType→4x5 矩阵，对齐 Android ColorMatrix）
     apply_filter_style: Metal kernel / CIFilter（StyleFilter→卡通/素描/...；复用相机 lut.metal 思路）
     apply_beauty: ⏸️ no-op（DEFER，模型仍存档）
@@ -370,11 +381,9 @@ recipe_model:
     markup: List<MarkupAction> = []
     cutout: CutoutRecipe? = null                            # 🔴 DEFER（恒 null）
     version: Int = 2
-  CropRecipe: { rotation:Int=0, flippedH:Boolean=false, flippedV:Boolean=false,
-                straightenAngle:Float=0, cropRect:RectF?=null, aspectRatio:AspectRatio=FREE }
-  AdjustmentRecipe: { brightness:Float=0, exposure:Float=0, contrast:Float=50,
-                      saturation:Float=100, temperature:Float=5000, tint:Float=0, vignette:Float=0 }
-  NormPoint: { x:Float, y:Float }（归一化 0..1）
+  CropRecipe: "{ rotation:Int=0, flippedH:Boolean=false, flippedV:Boolean=false, straightenAngle:Float=0, cropRect:RectF?=null, aspectRatio:AspectRatio=FREE }"
+  AdjustmentRecipe: "{ brightness:Float=0, exposure:Float=0, contrast:Float=50, saturation:Float=100, temperature:Float=5000, tint:Float=0, vignette:Float=0 }"
+  NormPoint: "{ x:Float, y:Float }（归一化 0..1）"
   AspectRatio: FREE(null) | ORIGINAL(-1) | SQUARE(1) | RATIO_4_3 | RATIO_3_4 | RATIO_16_9 | RATIO_9_16
   EditHistory: stack maxSize=30, push/undo/redo/reset
   # 🍎 iOS 实现：EditRecipe/CropRecipe/AdjustmentRecipe/MarkupAction/AspectRatio/EditHistory
@@ -605,7 +614,8 @@ gacha:
 #             / 标记态 / AI 抽卡态（待补）
 # 参照竞品：醒图（Hypic）——底部图标工具轨 + 面板浮层化 + 顶栏极简化
 redesign_a:
-  design_language: glass-noir
+  design_language:                  # glass-noir
+    name: glass-noir
     canvas: "#0F0E0E"               # 近黑底（非纯黑，比现状 #000 更柔）
     overlay_primary: white @ 0.06   # 浮层底（工具轨块/参数 tile 未选中）
     overlay_hover: white @ 0.08
@@ -616,12 +626,14 @@ redesign_a:
   frame: 393×852 绝对布局（dp≈pt 度量）
   layout_slots:                    # y 坐标为设计稿值
     status_bar: y=12
-    top_bar: y=42                   # 左 ✕ 关闭(32 圆) / undo·redo x=227/261@47（0.35 灰禁用态）/ 「保存」白胶囊 x=311 y=42(w66)
+    top_bar:                        # 左 ✕ 关闭(32 圆) / undo·redo x=227/261@47（0.35 灰禁用态）/ 「保存」白胶囊 x=311 y=42(w66)
+      position: "y=42"
       note: 现状 §3 的标题「编辑」+ 5 图标 → 简化为 ✕/undo/redo/保存胶囊；去背景与 AI 优化入口收进工具轨
     photo: x=21 y=82 w=351 h=440    # 照片卡（现状为全宽黑底 Fit；方案 A 改为带边距卡片式）
     panel_slot: y=522..662          # 各 tab 面板（滤镜缩略图流/调节滑杆+参数流/美颜滑杆+参数 tile/标记工具行）
-    tool_rail: y=686                # 🔑 核心变更：7 项 44×44 圆角 12 图标块（x=16/69/122/175/228/281/334，step 53），
+    tool_rail:                      # 🔑 核心变更：7 项 44×44 圆角 12 图标块（x=16/69/122/175/228/281/334，step 53），
                                     #   标签 y=738（x=14/67/120/173/226/279/330）w48 fs10；替代现状 §5 的 5 个文字 FilterChip tab
+      position: "y=686"
       items: [构图(crop), 调节(tune), 美颜(face), 滤镜(filter), 标记(brush), 消除(erase·DEFER), AI(auto_fix_high)]
       note: 比现状多 2 项入口（消除=去背景 DEFER 占位 / AI=抽卡），tab 数 5→7
     home_indicator: y=828           # x=129.5

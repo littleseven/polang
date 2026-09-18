@@ -2,7 +2,7 @@ import XCTest
 
 /// MNN 端侧推理 · 真机实拍验收（「0 的突破」可视化证据）。
 ///
-/// 启动参数固定：相机页(`-startPage 0`) + MNN 引擎(`-mnnEngine`) + 瘦脸40(`-slim 40`)。
+/// 启动参数固定：相机 cover(`-openCamera`，2026-09-16 相机已路由化) + MNN 引擎(`-mnnEngine`) + 瘦脸40(`-slim 40`)。
 /// 镜头前放置人脸照片 → MNN 两阶段端侧推理(RetinaFace det_500m → 2d106)检测人脸 →
 /// BeautyRenderer 应用瘦脸形变。展开 DebugOverlay 使 `face.mnn: 106pts` 等遥测写入截图，
 /// 作为「iOS 端 MNN 实时人脸检测 + 瘦脸」的客观证据。
@@ -17,8 +17,8 @@ final class CameraMnnLiveUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        // 直达相机页 + MNN 引擎 + 瘦脸强度 40（range -50..50，80% 满档，肉眼可辨）
-        app.launchArguments = ["-startPage", "0", "-mnnEngine", "-slim", "40"]
+        // 直达相机 cover（-openCamera）+ MNN 引擎 + 瘦脸强度 40（range -50..50，80% 满档，肉眼可辨）
+        app.launchArguments = ["-openCamera", "-mnnEngine", "-slim", "40"]
         // 防御：相机权限弹窗（已授权时不出现）
         addUIInterruptionMonitor(withDescription: "permission alerts") { alert in
             for label in ["Allow", "OK", "允许", "好"] {
@@ -66,7 +66,7 @@ final class CameraMnnLiveUITests: XCTestCase {
 
         // B: 重启 = slim40 + warpStrength 5.0（放大形变）
         app.terminate()
-        app.launchArguments = ["-startPage", "0", "-mnnEngine", "-slim", "40", "-warpStrength", "5"]
+        app.launchArguments = ["-openCamera", "-mnnEngine", "-slim", "40", "-warpStrength", "5"]
         app.launch()
         XCTAssertTrue(preview.waitForExistence(timeout: 20), "相机预览应就绪（重启后）")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).tap()
@@ -88,7 +88,7 @@ final class CameraMnnLiveUITests: XCTestCase {
 
         // C: slim0（无形变基线）
         app.terminate()
-        app.launchArguments = ["-startPage", "0", "-mnnEngine", "-slim", "0"]
+        app.launchArguments = ["-openCamera", "-mnnEngine", "-slim", "0"]
         app.launch()
         XCTAssertTrue(preview.waitForExistence(timeout: 20), "相机预览应就绪（重启后）")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).tap()
@@ -146,7 +146,7 @@ final class CameraMnnLiveUITests: XCTestCase {
     /// 自检失败(faceFound=0)→ 检测本身在 iOS 上失效（预处理/格式/模型），需深查。
     func testRunMnnSelfTest() throws {
         app.terminate()
-        app.launchArguments = ["-startPage", "0", "-mnnEngine", "-mnnSelfTest"]
+        app.launchArguments = ["-openCamera", "-mnnEngine", "-mnnSelfTest"]
         app.launch()
         let preview = app.descendants(matching: .any)["camera_preview"].firstMatch
         _ = preview.waitForExistence(timeout: 20)

@@ -37,6 +37,8 @@ struct GalleryGridView: View {
     private let permissionOverride: GalleryAccessState?
     /// 外部注入的待搜索词（chat「查看全部」回相册用）；消费后置 nil
     @Binding var pendingQuery: String?
+    /// 选择模式开关回调（main-nav.yaml §0 hide_bar_when：多选态隐藏悬浮底 bar）
+    var onSelectionModeChanged: ((Bool) -> Void)? = nil
 
     /// 固定 3 列（dump：1200px 屏宽 3×391px 列 + 7px 间距/边距 ≈ 2dp）
     private let columns = [GridItem(.flexible(), spacing: 2),
@@ -44,10 +46,12 @@ struct GalleryGridView: View {
                            GridItem(.flexible(), spacing: 2)]
 
     init(repository: IosMediaRepository, permissionOverride: GalleryAccessState? = nil,
-         pendingQuery: Binding<String?> = .constant(nil)) {
+         pendingQuery: Binding<String?> = .constant(nil),
+         onSelectionModeChanged: ((Bool) -> Void)? = nil) {
         _vm = StateObject(wrappedValue: GalleryViewModel(repository: repository))
         self.permissionOverride = permissionOverride
         self._pendingQuery = pendingQuery
+        self.onSelectionModeChanged = onSelectionModeChanged
     }
 
     private var accessState: GalleryAccessState { permissionOverride ?? permission.state }
@@ -79,6 +83,9 @@ struct GalleryGridView: View {
             // §1.3：状态栏区填 surface 色（勿露黑底）
             Color(.systemBackground).ignoresSafeArea()
         )
+        .onChange(of: isSelectionMode) { active in
+            onSelectionModeChanged?(active)
+        }
         .fullScreenCover(isPresented: Binding(
             get: { pagerInitial != nil },
             set: { if !$0 { pagerInitial = nil } })) {
@@ -271,6 +278,13 @@ struct GalleryGridView: View {
             .padding(GridTokens.spacing)
         }
         .accessibilityIdentifier("search_results_grid")
+        // 多选态纯阻断手势（不做拖选：cellFrames 以主网格为坐标系，拖选语义在搜索结果上不可靠）——
+        // 仅消费横向拖拽，挡住外层 TabView 翻页把手势（spec §0：相册详情/多选局部禁用外层滑动，
+        // 对齐 Android GalleryScreen onHorizontalSwipeEnabledChange 恒生效）；纵向滚动仍归 ScrollView
+        .gesture(
+            DragGesture(minimumDistance: 8).onChanged { _ in },
+            isEnabled: isSelectionMode
+        )
     }
 
     private var gridBody: some View {

@@ -330,6 +330,7 @@ category_grid:
     trash_flow:                                  # 删除 = 系统回收站（30 天可恢复）
       backend: trash_session_controller          # API 30+ createTrashRequest；API <30 → errorEvent → snackbar org_trash_unsupported
       auth: start_intent_sender_for_result
+      silent_when: manage_media_granted_and_toggle_on  # 静默通路同 gallery-grid.yaml §16b（MANAGE_MEDIA+「删除不再询问」直写 IS_TRASHED，失败子集回落 token 通路）
       partial_notice: "授权后仍有残留 → snackbar org_partial_trash（一次性事件）"
       outcome: "Trashed → 剔除已回收项；清空则进 cleaned 态；Cancelled → 留原地可重试"
 
@@ -404,7 +405,7 @@ swipe_review:
     threshold: "卡片宽 25%（SWIPE_THRESHOLD_FRACTION=0.25）超阈值飞出落决策，未超弹回；主位移轴定方向（水平主导判 KEEP/SKIP，垂直向上判 DELETE）"
     preload: 3                                   # 预加载后续 3 张
   top_bar: "返回 + 居中进度「N / M」+ 副行 freed + 右 undo（尾条已提交时禁用）"
-  states: [loading, reviewing, done]             # Done = 统计卡（Kept/Deleted/Skipped + Space freed）+ 再来一轮 + 整批恢复
+  states: [loading, reviewing, empty, done]        # 2026-09-15 补 empty：建队为空（含 KEEP 抑制后）→ swipe_empty；Done = 统计卡（Kept/Deleted/Skipped + Space freed）+ 再来一轮；iOS「整批恢复」裁剪（无最近删除恢复 API，§8）
   keep_history: "KEEP 30 天抑制：decide(KEEP) 即时写 DataStore（swipe_keep_history stringSet，uri|epochMs 编码 + TTL 裁剪）；restart 建队过滤活跃条目；undo(KEEP) 只回滚本会话新增"
   trash_flow: "同 category_grid（TrashSessionController 回收站编排）；授权被拒批次回滚可重试，末张决策后显示「待提交 N 张 + 重试/放弃」出口面板；API<30 提交短路，未提交 DELETE 以 skipped 口径进 Done"
 
@@ -452,7 +453,15 @@ platform_differences:
     - { feature: "hub + 详情页 + cleaned", android: supported, ios: "TODO" }
     - { feature: "swipe_review",   android: supported, ios: "TODO" }
     - { feature: "dedup Config 展开卡", android: supported, ios: "TODO（依赖去重 2.0 扫描器移植）" }
+    - { feature: "删除通路", android: "TrashSessionController（createTrashRequest / MANAGE_MEDIA 静默直写 IS_TRASHED）", ios: "PHAssetChangeRequest.deleteAssets（最近删除 30 天；系统强制确认框，无静默等价——台账裁剪项）" }
+    - { feature: "信号存储（blur/exposure/lastViewedAt/dedup_hash）", android: "Room v22/v23 信号列", ios: "TODO（iOS 移植时需定存储方案，登记技术债：纯 Kotlin 管线下沉 shared commonMain 候选）" }
 known_residuals:                                 # 已登记的口径差/裁剪项（非 bug，勿「修复」对齐）
+  - id: ios_screen_recording_undetectable
+    desc: "iOS 公开 SDK（≤18.5）无 PHAssetMediaSubtype.videoScreenRecording 亦无录屏智能相册公开 subtype——SCREEN_CONTENT 类目在 iOS 仅覆盖截图（photoScreenshot），录屏不命中；Android 靠路径关键词覆盖录屏。明示裁剪，待 Apple 开放判定 API"
+  - id: ios_duplicates_card_downgrade
+    desc: "iOS 本批（ios-follow-batch-20260915）DUPLICATES 类目裁剪（T8 dedup_hash 扫描器独立后续阶段）：hub 去重卡由 UI 层 override 为 NEEDS_SCAN 引导卡（OrganizeHubView.swift:178），不渲染 summary/Config 展开；T8 落地后删 override 恢复 board 原生渲染；dedup_never_scanned/org_undo 等键已预置 xcstrings"
+  - id: ios_cleaned_undo_cut
+    desc: "iOS 无 API 从「最近删除」程序化恢复——cleaned 屏 Undo 按钮与回收站预览卡整段裁剪不显示；swipe Done 态「整批恢复」同理裁剪。待用户裁决是否改「打开系统相册最近删除」引导"
   - id: highCount_vs_highBytes
     desc: "hub 徽标 highCount（建议删除张数）含 DUPLICATES keeper 张数，而 highBytes（可释放字节）与 Hero 已扣 keeper 字节——张数与字节存在 1 张/组的口径差，有意保留（徽标表达「建议集规模」，字节表达「真实可释放」）"
   - id: exact_group_divergence

@@ -4,6 +4,7 @@ import ai.koog.agents.core.tools.ToolRegistry
 import com.mamba.picme.agent.core.capability.IosAiOptimizeCapability
 import com.mamba.picme.agent.core.capability.IosChartCapability
 import com.mamba.picme.agent.core.capability.IosChatGalleryCapability
+import com.mamba.picme.agent.core.capability.IosNavigationCapability
 import com.mamba.picme.agent.core.capability.IosRunScriptCapability
 import com.mamba.picme.agent.core.facade.AgentDependencies
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
@@ -20,6 +21,7 @@ import com.mamba.picme.data.IosChartBridge
 import com.mamba.picme.data.IosChatSearchBridge
 import com.mamba.picme.data.IosMediaRepository
 import com.mamba.picme.data.IosMediaRepositoryBridge
+import com.mamba.picme.data.IosNavigationBridge
 import com.mamba.picme.data.IosRunScriptBridge
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -81,6 +83,8 @@ object IosAgentComposition {
      *                        run_gallery_script 命令不可用（IosRunScriptCapability.isAvailable=false）
      * @param aiOptimizeBridge Swift 侧 AI 优化桥（AiOptimizeBridge → AiOptimizeService 固定预设路径）；
      *                         null 时 ai_optimize 命令不可用（IosAiOptimizeCapability.isAvailable=false）
+     * @param navigationBridge Swift 侧导航桥（2026-09-16 主导航统一）→ 真实切页/弹出；
+     *                         null 时 navigate_to 命令不可用（IosNavigationCapability.isAvailable=false）
      * @param debugBuild Swift `#if DEBUG` 传入；true 时诊断日志记全文（captureContent），
      *                   false 仅纯指标（隐私红线，对标 Android BuildConfig.DEBUG 注入）
      */
@@ -91,6 +95,7 @@ object IosAgentComposition {
         chartBridge: IosChartBridge? = null,
         runScriptBridge: IosRunScriptBridge? = null,
         aiOptimizeBridge: IosAiOptimizeBridge? = null,
+        navigationBridge: IosNavigationBridge? = null,
         debugBuild: Boolean = false
     ) {
         if (!initialized.compareAndSet(false, true)) {
@@ -145,6 +150,9 @@ object IosAgentComposition {
         // 注册 iOS AI 优化能力（ai_optimize 执行端 → AiOptimizeService 固定预设；gacha 由 Swift UI 层分流）
         orchestrator.registerCapability(IosAiOptimizeCapability(aiOptimizeBridge))
 
+        // 注册 iOS 导航能力（2026-09-16 主导航统一：navigate_to 执行端 → Swift 真实切页/弹出）
+        orchestrator.registerCapability(IosNavigationCapability(navigationBridge))
+
         // 创建 chat 桥
         chatBridge = ChatAgentBridge(orchestrator)
 
@@ -158,16 +166,43 @@ object IosAgentComposition {
      * 场景激活；iOS 此前从不切场景（恒 UNKNOWN），所有 chat 工具命令被入队并回复
      * 「正在为您切换到对应页面执行操作...」——真机四链路工具层全废的根因（T7 gap）。
      *
-     * @param page 0=camera, 1=gallery, 2=chat, 3=people
+     * 页序契约（2026-09-16 主导航统一，对齐 Android MainPagerHost，相机已移出 Pager）：
+     * 0=gallery(GALLERY) / 1=organize(GALLERY 沿用) / 2=chat(CHAT) /
+     * 3=person（无独立场景，沿用进入前场景，不 transition）/ 4=memories(GALLERY 沿用)。
+     *
+     * @param page 主 Pager 页索引（0-4）
      */
     fun onMainPageChanged(page: Long) {
         val orchestrator = AgentOrchestrator.getInstance()
         val scene = when (page.toInt()) {
-            0 -> SceneManager.Scene.CAMERA
-            1 -> SceneManager.Scene.GALLERY
+            0, 1, 4 -> SceneManager.Scene.GALLERY
             2 -> SceneManager.Scene.CHAT
-            else -> SceneManager.Scene.UNKNOWN
+            else -> return // person 页沿用进入前场景（对齐 Android MainPagerHost 不 transition）
         }
         orchestrator.transitionToScene(scene, saveToHistory = false)
+    }
+
+    /// 相机 cover 打开前的场景暂存（关闭时恢复；人物页无场景映射，重发页映射恢复不到来源场景）
+    private var sceneBeforeCamera: SceneManager.Scene? = null
+
+    /**
+     * 相机 fullScreenCover 路由同步 SceneManager（2026-09-17 补齐，main-nav.yaml §2）：
+     * cover 打开 → CAMERA 场景（对齐 Android 相机路由 ≥RESUMED 时 Scene.CAMERA；
+     * iOS 此前 cover 期间沿用来源页场景，navigate_to(camera) 等相机域命令会被错误入队）。
+     * cover 关闭 → 恢复暂存场景；MainTabView 随后重发 [onMainPageChanged] 页映射兜底纠偏
+     * （页 0/1/2/4 两者一致；人物页页映射为 no-op，全靠暂存恢复，防场景滞留 CAMERA）。
+     *
+     * @param active 相机 cover 是否呈现中
+     */
+    fun onCameraRouteChanged(active: Boolean) {
+        val orchestrator = AgentOrchestrator.getInstance()
+        if (active) {
+            sceneBeforeCamera = orchestrator.currentScene.value
+                .takeIf { it != SceneManager.Scene.CAMERA }
+            orchestrator.transitionToScene(SceneManager.Scene.CAMERA, saveToHistory = false)
+        } else {
+            sceneBeforeCamera?.let { orchestrator.transitionToScene(it, saveToHistory = false) }
+            sceneBeforeCamera = null
+        }
     }
 }

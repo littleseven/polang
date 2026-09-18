@@ -15,9 +15,11 @@ final class CompletenessDumpUITests: XCTestCase {
     }
 
     func testDumpCameraIdle() throws {
-        // 进相机页(默认相册,点 tab_camera)
-        let cameraTab = app.buttons["tab_camera"]
-        if cameraTab.waitForExistence(timeout: 10) { cameraTab.tap() }
+        // 进相机页（2026-09-16 导航统一：相机为 fullScreenCover 路由，底栏无相机项——
+        // launch arg -openCamera 重启直弹相机 cover）
+        app.terminate()
+        app.launchArguments = ["-openCamera"]
+        app.launch()
         XCTAssertTrue(
             app.descendants(matching: .any)["camera_preview"].firstMatch.waitForExistence(timeout: 15),
             "相机预览未出现"
@@ -38,10 +40,8 @@ final class CompletenessDumpUITests: XCTestCase {
     /// 仅截图 idle 态（Ardot 预览地面真值）：-openPanel none → 无面板启动，相机 idle。
     func testShotIdle() throws {
         app.terminate()
-        app.launchArguments = ["-openPanel", "none"]
+        app.launchArguments = ["-openPanel", "none", "-openCamera"]
         app.launch()
-        let cameraTab = app.buttons["tab_camera"]
-        if cameraTab.waitForExistence(timeout: 10) { cameraTab.tap() }
         XCTAssertTrue(
             app.descendants(matching: .any)["camera_preview"].firstMatch.waitForExistence(timeout: 15),
             "相机预览未出现(idle shot)"
@@ -54,8 +54,11 @@ final class CompletenessDumpUITests: XCTestCase {
     }
 
     /// dump 美颜面板态(点 mat_autofix 开美颜面板 → FACE tab)
-    func testDumpCameraBeautyFace() throws {        let cameraTab = app.buttons["tab_camera"]
-        if cameraTab.waitForExistence(timeout: 10) { cameraTab.tap() }
+    func testDumpCameraBeautyFace() throws {
+        // 相机 cover 路由（2026-09-16 导航统一）：-openCamera 重启直弹
+        app.terminate()
+        app.launchArguments = ["-openCamera"]
+        app.launch()
         XCTAssertTrue(
             app.descendants(matching: .any)["camera_preview"].firstMatch.waitForExistence(timeout: 15),
             "相机预览未出现"
@@ -84,10 +87,8 @@ final class CompletenessDumpUITests: XCTestCase {
         ]
         for (arg, state) in panels {
             app.terminate()
-            app.launchArguments = ["-openPanel", arg]
+            app.launchArguments = ["-openPanel", arg, "-openCamera"]
             app.launch()
-            let cameraTab = app.buttons["tab_camera"]
-            if cameraTab.waitForExistence(timeout: 10) { cameraTab.tap() }
             XCTAssertTrue(
                 app.descendants(matching: .any)["camera_preview"].firstMatch.waitForExistence(timeout: 15),
                 "相机预览未出现(\(state))"

@@ -78,9 +78,25 @@ import SharedKit
     /// iOS 删除走 PHAssetChangeRequest（系统弹确认窗），免 Android 11+ IntentSender 授权队列。
     /// 系统确认删除成功后同步清理 TagDatabase 的 media_assets 快照（防线1，对齐 Android deleteMediaByIds）。
     func deleteMedia(localIdentifiers: [String]) -> Bool {
-        guard !localIdentifiers.isEmpty else { return false }
+        deleteMediaAwaitingOutcome(localIdentifiers: localIdentifiers) { _ in }
+    }
+
+    /// 上滑删除通路（spec gallery-grid.yaml §16b swipe_up_delete）：与 deleteMedia 同路，
+    /// 但把系统确认结果回传（主线程）——大图页仅在 success（用户确认删除）后收缩预览列表，
+    /// 取消/失败停留原图（§16b list_shrink: on_trashed_outcome_only）。
+    func deleteMediaAwaitingOutcome(localIdentifiers: [String],
+                                    completion: @escaping (Bool) -> Void) -> Bool {
+        // guard 路径也必须回传 outcome（主线程）：调用方（§16b list_shrink）靠 completion
+        // 收敛状态，缺席即永久挂起——空入参/查无资产按失败回传，不静默 return。
+        guard !localIdentifiers.isEmpty else {
+            DispatchQueue.main.async { completion(false) }
+            return false
+        }
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: localIdentifiers, options: nil)
-        guard assets.count > 0 else { return false }
+        guard assets.count > 0 else {
+            DispatchQueue.main.async { completion(false) }
+            return false
+        }
         PHPhotoLibrary.shared().performChanges({
             PHAssetChangeRequest.deleteAssets(assets)
         }, completionHandler: { success, _ in
@@ -89,8 +105,68 @@ import SharedKit
             if success {
                 TagDatabase.shared.deleteMediaByLocalIdentifiers(localIdentifiers)
             }
+            DispatchQueue.main.async { completion(success) }
         })
         return true
+    }
+
+    // MARK: - 整理中心数据源扩展（organize v2 T2）
+
+    /// 整理中心资产 meta：`fetchAllMedia` 五字段之外的扩展投影（对应 Android
+    /// `OrganizeRepositoryImpl.queryMediaStoreMeta` 的 MediaStore meta）。
+    /// join key = localIdentifier（对齐 Android uri 语义：iOS media_assets.uri = localIdentifier）。
+    struct OrganizeAssetMeta {
+        let localIdentifier: String
+        let isVideo: Bool
+        /// creationDate epoch 毫秒；nil → 0（对齐 Android 未知时间戳=0 保守口径，ValueGuard OLD_PHOTO 偏置）。
+        let captureDateMs: Int64
+        /// PHAssetResource "fileSize"（未公开 KVC key；取不到 → 0，与 Android SIZE 未知=0 同口径）。
+        /// ⚠️ 不回退 requestImageDataAndOrientation 全量读取（代价太高，organize-port-plan 风险 3）。
+        let sizeBytes: Int64
+        /// pixelWidth × pixelHeight（零代价字段）；任一 ≤0 → nil（对齐 Android 脏值 null 口径，
+        /// OCR 密度判定退回绝对阈值）。
+        let pixelArea: Int64?
+        let isFavorite: Bool
+        /// mediaSubtypes 含 .photoScreenshot（iOS 截图判定口径，替代 Android 路径关键词，
+        /// organize.yaml §8 platform_differences 已登记）。
+        let isScreenshot: Bool
+        /// 录屏判定：iOS 公开 SDK（≤18.5）无 PHAssetMediaSubtype.videoScreenRecording，
+        /// 亦无录屏智能相册公开 subtype——恒 false，SCREEN_CONTENT 视频子类不覆盖录屏
+        ///（organize.yaml §8 platform_differences 已登记裁剪）。
+        let isScreenRecording: Bool
+    }
+
+    /// 全库（image+video）整理 meta 枚举，key = localIdentifier。
+    /// 纯枚举：PHAssetResource fileSize / pixelWidth / isFavorite / mediaSubtypes 均为本地元数据，
+    /// 不触发任何网络请求（iCloud 云端-only 资产的跳过由解码侧 isNetworkAccessAllowed=false 承接，
+    /// 见 OrganizeRepository 回填器；规划风险 2/3）。
+    func fetchOrganizeAssetMeta() -> [String: OrganizeAssetMeta] {
+        let opts = PHFetchOptions()
+        opts.predicate = NSPredicate(
+            format: "mediaType == %d OR mediaType == %d",
+            PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue)
+        let result = PHAsset.fetchAssets(with: opts)
+        var out: [String: OrganizeAssetMeta] = [:]
+        out.reserveCapacity(result.count)
+        result.enumerateObjects { asset, _, _ in
+            // 主资源（与 fetchAllMedia 的 fileName 同源 .first）；配对资源不求和，防双计。
+            let size = (PHAssetResource.assetResources(for: asset).first?
+                .value(forKey: "fileSize") as? NSNumber)?.int64Value ?? 0
+            let width = asset.pixelWidth
+            let height = asset.pixelHeight
+            out[asset.localIdentifier] = OrganizeAssetMeta(
+                localIdentifier: asset.localIdentifier,
+                isVideo: asset.mediaType == .video,
+                captureDateMs: Int64((asset.creationDate?.timeIntervalSince1970 ?? 0) * 1000),
+                sizeBytes: max(0, size),
+                pixelArea: (width > 0 && height > 0) ? Int64(width) * Int64(height) : nil,
+                isFavorite: asset.isFavorite,
+                isScreenshot: asset.mediaType == .image
+                    && asset.mediaSubtypes.contains(.photoScreenshot),
+                isScreenRecording: false
+            )
+        }
+        return out
     }
 
     /// 收藏/取消收藏（PHAssetChangeRequest 改 isFavorite，无系统确认窗）。

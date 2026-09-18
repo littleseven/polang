@@ -149,73 +149,7 @@ must_have_header:
         padding: { horizontal: 16, vertical: 8 }
 
 # ============================================================================
-# 5. 模型卡片（ModelDownloadCard）
-# ============================================================================
-model_card:
-  shape: card                  # radius.card = 12dp
-  background: "secondarySystemBackground"  # surface
-  elevation: 1
-  padding: 14
-  long_press: show_properties  # 长按 → 属性弹窗
-
-  # 上部布局：Row（SpaceBetween）
-  layout:
-    type: row
-    alignment: top
-    left_column:
-      weight: 1
-      spacing: 4
-    right_column:
-      type: action_buttons
-
-  # ── 左列内容 ──────────────────────────────────────────
-  left_column:
-    # 行 1：模型名 + TagBadge
-    - name_row:
-        layout: row
-        spacing: 8
-        alignment: center
-        items:
-          - model_name:
-              font: { size: 15, weight: semibold }  # titleMedium
-              max_lines: 1
-              ellipsis: true
-          - tag_badge: *tag_badge_spec
-
-    # 行 2：描述
-    - description:
-        font: { size: 12 }       # bodySmall
-        color: secondary         # onSurfaceVariant
-        max_lines: 2
-        ellipsis: true
-
-    # 行 3：信息行
-    - info_row:
-        layout: row
-        spacing: 8
-        alignment: center
-        padding_top: 2
-        items:
-          - file_size:
-              font: { size: 12, weight: medium }  # labelMedium
-              color: accentColor    # primary
-              value_template: "formatFileSize(model.size)"
-              # ≥1GiB → "%.2f GB", ≥1MiB → "%.2f MB", ≥1KiB → "%.2f KB", else "N B"
-          - lightweight_badge: *lightweight_badge_spec
-              show_when: "model.size < 50MB"
-          - required_badge: *required_badge_spec
-              show_when: "model.isRequired"
-
-  # ── 右列：操作按钮 ──────────────────────────────────
-  right_column:
-    type: column
-    spacing: 4
-    items:
-      - primary_action: *action_button_states
-      - delete_button: *delete_button_spec
-
-# ============================================================================
-# 6. Badge 规格
+# 5. Badge 规格
 # ============================================================================
 tag_badge_spec: &tag_badge_spec
   shape: rounded_corner        # RoundedCornerShape(6dp)
@@ -265,7 +199,7 @@ required_badge_spec: &required_badge_spec
   padding: { horizontal: 6, vertical: 2 }
 
 # ============================================================================
-# 7. 操作按钮状态机（ModelActionButton）
+# 6. 操作按钮状态机（ModelActionButton）
 # ============================================================================
 action_button_states: &action_button_states
   # 主操作按钮：按下载状态切换
@@ -327,6 +261,72 @@ delete_button_spec: &delete_button_spec
     color: "error.opacity(0.6)"  # error @ 60% alpha
   button_size: 36
   action: confirm_delete
+
+# ============================================================================
+# 7. 模型卡片（ModelDownloadCard）
+# ============================================================================
+model_card:
+  shape: card                  # radius.card = 12dp
+  background: "secondarySystemBackground"  # surface
+  elevation: 1
+  padding: 14
+  long_press: show_properties  # 长按 → 属性弹窗
+
+  # 上部布局：Row（SpaceBetween）
+  layout:
+    type: row
+    alignment: top
+    left_column:
+      weight: 1
+      spacing: 4
+    right_column:
+      type: action_buttons
+
+  # ── 左列内容 ──────────────────────────────────────────
+  left_column:
+    # 行 1：模型名 + TagBadge
+    - name_row:
+        layout: row
+        spacing: 8
+        alignment: center
+        items:
+          - model_name:
+              font: { size: 15, weight: semibold }  # titleMedium
+              max_lines: 1
+              ellipsis: true
+          - tag_badge: *tag_badge_spec
+
+    # 行 2：描述
+    - description:
+        font: { size: 12 }       # bodySmall
+        color: secondary         # onSurfaceVariant
+        max_lines: 2
+        ellipsis: true
+
+    # 行 3：信息行
+    - info_row:
+        layout: row
+        spacing: 8
+        alignment: center
+        padding_top: 2
+        items:
+          - file_size:
+              font: { size: 12, weight: medium }  # labelMedium
+              color: accentColor    # primary
+              value_template: "formatFileSize(model.size)"
+              # ≥1GiB → "%.2f GB", ≥1MiB → "%.2f MB", ≥1KiB → "%.2f KB", else "N B"
+          - lightweight_badge: *lightweight_badge_spec
+            show_when: "model.size < 50MB"
+          - required_badge: *required_badge_spec
+            show_when: "model.isRequired"
+
+  # ── 右列：操作按钮 ──────────────────────────────────
+  right_column:
+    type: column
+    spacing: 4
+    items:
+      - primary_action: *action_button_states
+      - delete_button: *delete_button_spec
 
 # ============================================================================
 # 8. 进度条（仅 DOWNLOADING / PAUSED / FAILED）

@@ -159,12 +159,12 @@ edge_panel:
   sliders:                                       # 三个 AppSlider 行
     - id: feather                                # 羽化
       label: "id_photo_edge_feather"
-      range: [0, 20] px                          # 步进连续（steps=0）
+      range: "[0, 20] px"                        # 步进连续（steps=0）
       default: 0
       display: "'%d px'"
     - id: shrink_expand                          # 收缩 / 扩张
       label: "id_photo_edge_shrink_expand"
-      range: [-20, 20] px
+      range: "[-20, 20] px"
       default: 0
       display: "'%d px'"
     - id: edge_contrast                          # 边缘对比度
@@ -193,7 +193,7 @@ repair_panel:
     - { id: erase,   label: "id_photo_repair_erase",   stroke_mode: ERASE, default: true }
   brush_size:                                    # 行2
     label: "id_photo_repair_brush_size"
-    slider: { range: [8, 80] px, default: 32, display: "'%d px'", commit: 实时（拖动即生效） }
+    slider: { range: "[8, 80] px", default: 32, display: "'%d px'", commit: 实时（拖动即生效） }
   soft_edge:                                     # 行3
     label: "id_photo_repair_soft_edge"
     control: switch
@@ -331,34 +331,35 @@ framing_math:
 # ============================================================================
 strings:
   #            key                          en                              zh-CN                  zh-TW
-  - { key: id_photo_title,               en: "ID Photo",                          cn: "证件照",                tw: "證件照" }
-  - { key: id_photo_action,              en: "ID Photo",                          cn: "证件照",                tw: "證件照" }
-  - { key: id_photo_action_short,        en: "ID",                                cn: "证照",                  tw: "證照" }
-  - { key: id_photo_matting_failed,      en: "Portrait matting failed",           cn: "人像抠图失败",          tw: "人像去背失敗" }
-  - { key: id_photo_drag_hint,           en: "Drag or pinch to adjust framing",   cn: "拖动或双指缩放调整构图", tw: "拖動或雙指縮放調整構圖" }
-  - { key: id_photo_size_1in,            en: "1 inch",                            cn: "1寸",                   tw: "1寸" }
-  - { key: id_photo_size_2in,            en: "2 inch",                            cn: "2寸",                   tw: "2寸" }
-  - { key: id_photo_size_small_1in,      en: "Small 1 inch",                      cn: "小1寸",                 tw: "小1寸" }
-  - { key: id_photo_size_small_2in,      en: "Small 2 inch",                      cn: "小2寸",                 tw: "小2寸" }
-  - { key: id_photo_color_blue,          en: "Blue",                              cn: "标准蓝",                tw: "標準藍" }
-  - { key: id_photo_color_red,           en: "Red",                               cn: "标准红",                tw: "標準紅" }
-  - { key: id_photo_color_white,         en: "White",                             cn: "白",                    tw: "白" }
-  - { key: id_photo_tab_color,           en: "Color",                             cn: "底色",                  tw: "底色" }
-  - { key: id_photo_tab_size,            en: "Size",                              cn: "尺寸",                  tw: "尺寸" }
-  - { key: id_photo_tab_edge,            en: "Edge",                              cn: "边缘",                  tw: "邊緣" }
-  - { key: id_photo_tab_repair,          en: "Repair",                            cn: "修补",                  tw: "修補" }
-  - { key: id_photo_edge_feather,        en: "Feather",                           cn: "羽化",                  tw: "羽化" }
-  - { key: id_photo_edge_shrink_expand,  en: "Shrink / Expand",                   cn: "收缩 / 扩张",           tw: "收縮 / 擴張" }
-  - { key: id_photo_edge_contrast,       en: "Edge contrast",                     cn: "边缘对比度",            tw: "邊緣對比度" }
-  - { key: id_photo_edge_reset,          en: "Reset",                             cn: "重置参数",              tw: "重設參數" }
-  - { key: id_photo_repair_restore,      en: "Restore",                           cn: "恢复",                  tw: "恢復" }
-  - { key: id_photo_repair_erase,        en: "Erase",                             cn: "擦除",                  tw: "擦除" }
-  - { key: id_photo_repair_brush_size,   en: "Brush size",                        cn: "笔刷大小",              tw: "筆刷大小" }
-  - { key: id_photo_repair_soft_edge,    en: "Soft edge",                         cn: "软边",                  tw: "軟邊" }
-  - { key: id_photo_repair_undo,         en: "Undo",                              cn: "撤销",                  tw: "復原" }
-  - { key: id_photo_repair_redo,         en: "Redo",                              cn: "重做",                  tw: "重做" }
-  - { key: id_photo_repair_clear,        en: "Clear strokes",                     cn: "清除描边",              tw: "清除筆畫" }
-  - { key: id_photo_repair_hint,         en: "Paint on the photo to restore or erase areas", cn: "在照片上涂抹，恢复或擦除局部区域", tw: "在照片上塗抹，恢復或擦除局部區域" }
+  new:                                        # 本页新增键
+    - { key: id_photo_title,               en: "ID Photo",                          cn: "证件照",                tw: "證件照" }
+    - { key: id_photo_action,              en: "ID Photo",                          cn: "证件照",                tw: "證件照" }
+    - { key: id_photo_action_short,        en: "ID",                                cn: "证照",                  tw: "證照" }
+    - { key: id_photo_matting_failed,      en: "Portrait matting failed",           cn: "人像抠图失败",          tw: "人像去背失敗" }
+    - { key: id_photo_drag_hint,           en: "Drag or pinch to adjust framing",   cn: "拖动或双指缩放调整构图", tw: "拖動或雙指縮放調整構圖" }
+    - { key: id_photo_size_1in,            en: "1 inch",                            cn: "1寸",                   tw: "1寸" }
+    - { key: id_photo_size_2in,            en: "2 inch",                            cn: "2寸",                   tw: "2寸" }
+    - { key: id_photo_size_small_1in,      en: "Small 1 inch",                      cn: "小1寸",                 tw: "小1寸" }
+    - { key: id_photo_size_small_2in,      en: "Small 2 inch",                      cn: "小2寸",                 tw: "小2寸" }
+    - { key: id_photo_color_blue,          en: "Blue",                              cn: "标准蓝",                tw: "標準藍" }
+    - { key: id_photo_color_red,           en: "Red",                               cn: "标准红",                tw: "標準紅" }
+    - { key: id_photo_color_white,         en: "White",                             cn: "白",                    tw: "白" }
+    - { key: id_photo_tab_color,           en: "Color",                             cn: "底色",                  tw: "底色" }
+    - { key: id_photo_tab_size,            en: "Size",                              cn: "尺寸",                  tw: "尺寸" }
+    - { key: id_photo_tab_edge,            en: "Edge",                              cn: "边缘",                  tw: "邊緣" }
+    - { key: id_photo_tab_repair,          en: "Repair",                            cn: "修补",                  tw: "修補" }
+    - { key: id_photo_edge_feather,        en: "Feather",                           cn: "羽化",                  tw: "羽化" }
+    - { key: id_photo_edge_shrink_expand,  en: "Shrink / Expand",                   cn: "收缩 / 扩张",           tw: "收縮 / 擴張" }
+    - { key: id_photo_edge_contrast,       en: "Edge contrast",                     cn: "边缘对比度",            tw: "邊緣對比度" }
+    - { key: id_photo_edge_reset,          en: "Reset",                             cn: "重置参数",              tw: "重設參數" }
+    - { key: id_photo_repair_restore,      en: "Restore",                           cn: "恢复",                  tw: "恢復" }
+    - { key: id_photo_repair_erase,        en: "Erase",                             cn: "擦除",                  tw: "擦除" }
+    - { key: id_photo_repair_brush_size,   en: "Brush size",                        cn: "笔刷大小",              tw: "筆刷大小" }
+    - { key: id_photo_repair_soft_edge,    en: "Soft edge",                         cn: "软边",                  tw: "軟邊" }
+    - { key: id_photo_repair_undo,         en: "Undo",                              cn: "撤销",                  tw: "復原" }
+    - { key: id_photo_repair_redo,         en: "Redo",                              cn: "重做",                  tw: "重做" }
+    - { key: id_photo_repair_clear,        en: "Clear strokes",                     cn: "清除描边",              tw: "清除筆畫" }
+    - { key: id_photo_repair_hint,         en: "Paint on the photo to restore or erase areas", cn: "在照片上涂抹，恢复或擦除局部区域", tw: "在照片上塗抹，恢復或擦除局部區域" }
   reused:                                        # 复用既有键（iOS 已有或需补）
     - { key: done,   en: "Done",   cn: "完成", tw: "完成" }
     - { key: editor_load_failed,             en: "Failed to load image", cn: "图片加载失败", tw: "圖片載入失敗" }

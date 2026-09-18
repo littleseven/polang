@@ -238,12 +238,12 @@ object CameraTokens {
 object ChatBubbleTokens {
     val bubbleMaxWidth = 360.dp
     val imageMaxWidth = 240.dp
-    val paddingH = 16.dp
-    val paddingV = 12.dp
+    val paddingH = 18.dp
+    val paddingV = 14.dp
     val cornerRadius = 20.dp
     val tailCornerRadius = 4.dp
-    val textSize = 14.dp
-    val textLineHeight = 20.dp
+    val textSize = 16.dp
+    val textLineHeight = 24.dp
     val inputCornerRadius = 28.dp
     val inputShadowElevation = 4.dp
     val capsuleCornerRadius = 16.dp

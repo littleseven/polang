@@ -97,6 +97,16 @@ ai_agent:
             title: "Mode"
             options: [remote]
             default: remote
+        - silent_trash:                 # 「删除不再询问」2026-09-12 新增（37a9e4c6d；Android 位于 agent_gallery_access 权限行之后）
+            type: switch
+            title: "Delete Without Asking"        # settings_silent_trash_title
+            default: false
+            show_when: "android_api >= 31"        # canManageMedia 检查口为 API 31+ 新增，低版本不显示该行
+            summary:
+              granted: "Deleting and moving to Trash no longer shows a system confirmation."   # settings_silent_trash_summary_granted
+              denied: "Allow media management in system settings to enable silent deletion."   # settings_silent_trash_summary_denied
+            behavior: "开 + 持 MANAGE_MEDIA → 上滑删除/整理删除直写 IS_TRASHED 静默回收（零系统弹框，失败子集回落 token 通路）；开关照存，未授权开启时引导跳 ACTION_REQUEST_MANAGE_MEDIA 系统授权页；权限状态 ON_RESUME 刷新"
+            ios: not_applicable          # iOS deleteAssets 系统强制确认框，无静默等价（gallery-grid.yaml §16b/§26 台账）
 
     - title: "Remote Models"           # 远程推理
       items:

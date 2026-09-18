@@ -70,6 +70,10 @@ struct PersonInfoView: View {
         }
         .navigationBarHidden(true)
         .task { vm.load() }
+        // 头像拍摄完成（相机 cover 落在本页之上，本页不 disappear）→ 重新加载刷新封面
+        .onReceive(NotificationCenter.default.publisher(for: .avatarCoverUpdated)) { _ in
+            vm.load()
+        }
         .onChange(of: vm.isLoading) { loading in
             if !loading, !didSync { syncLocalFromVm() }
         }
@@ -115,6 +119,7 @@ struct PersonInfoView: View {
                     .foregroundColor(s.onBackground)
                     .frame(width: 36, height: 36)
             }
+            .accessibilityIdentifier("person_info_back")
             Text(L("Edit person"))
                 .font(.system(size: CGFloat(TopBarTokens.titleFontSize), weight: .medium))
                 .foregroundColor(s.onBackground)
@@ -137,28 +142,39 @@ struct PersonInfoView: View {
         .padding(.bottom, 8)
     }
 
-    // MARK: ① 头像（120 圆形人脸感知封面 + 右下相机角标，点击换封面）
+    // MARK: ① 头像（120 圆形人脸感知封面 + 右下相机角标=拍摄头像入口，点图换封面）
 
     private var avatarHeader: some View {
-        Button { showCoverPicker = true } label: {
-            ZStack(alignment: .bottomTrailing) {
-                if let lid = coverLocalId {
-                    ThumbnailView(localIdentifier: lid, faceFocusY: coverFocusY, cornerRadius: 0)
+        ZStack(alignment: .bottomTrailing) {
+            Button { showCoverPicker = true } label: {
+                Group {
+                    if let lid = coverLocalId {
+                        ThumbnailView(localIdentifier: lid, faceFocusY: coverFocusY, cornerRadius: 0)
+                            .frame(width: 120, height: 120)
+                            .clipShape(Circle())
+                    } else {
+                        // 无封面占位：灰底 + 人脸图标
+                        ZStack {
+                            Circle().fill(s.surfaceVariant)
+                            MatIcon(name: "face.smiling", size: 48)
+                                .foregroundColor(s.onSurfaceVariant)
+                        }
                         .frame(width: 120, height: 120)
-                        .clipShape(Circle())
-                } else {
-                    // 无封面占位：灰底 + 人脸图标
-                    ZStack {
-                        Circle().fill(s.surfaceVariant)
-                        MatIcon(name: "face.smiling", size: 48)
-                            .foregroundColor(s.onSurfaceVariant)
                     }
-                    .frame(width: 120, height: 120)
                 }
+            }
+            .buttonStyle(.plain)
+            // 相机角标 = 「拍摄头像」入口（2026-09-16 主导航统一，main-nav.yaml §3）：
+            // 登记 pending → MainTabView 观察后弹出相机 fullScreenCover（默认前置+提示文案），
+            // 拍照落库自动设为本人物封面并落回本页（avatarCoverUpdated 通知刷新封面显示）。
+            Button {
+                AvatarCaptureController.shared.begin(target: .person(vm.personId), origin: .peoplePage)
+            } label: {
                 cameraBadge
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("person_avatar_capture")
         }
-        .buttonStyle(.plain)
         .padding(.top, 16)
     }
 

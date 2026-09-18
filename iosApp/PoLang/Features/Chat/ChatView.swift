@@ -526,6 +526,8 @@ private struct MessageBubble: View {
     var onGachaReroll: (() -> Void)? = nil
     var onGachaConfirm: (() -> Void)? = nil
     var onGachaCardTap: ((String?) -> Void)? = nil
+    @Environment(\.colorScheme) private var cs
+    private var s: SchemeColors { appScheme(cs) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -573,7 +575,7 @@ private struct MessageBubble: View {
                                 }
                                 .font(.system(size: ChatBubbleTokens.textSize))
                                 .lineSpacing(ChatBubbleTokens.textLineHeight - ChatBubbleTokens.textSize)
-                                .foregroundColor(message.role == .user ? .white : Color(.label))
+                                .foregroundColor(textColor)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier(message.role == .user ? "chat_user_bubble" : "chat_ai_bubble")
 
@@ -644,6 +646,16 @@ private struct MessageBubble: View {
         }
     }
 
+    // §5 text：用户正文 userBubbleOn（v2.2.3 对比度契约 946a36db4：亮绿底白字 ~1.9:1 → 深字 ~8:1）；
+    // 图文说明（USER_IMAGE_TEXT text_below）保持 onSurface——底虽随 Android 定稿转绿
+    // （bubbleBackground），图上说明文字对比度契约不变
+    private var textColor: Color {
+        if message.role == .user {
+            return message.type == .userImageText ? s.onSurface : ChatBubbleTokens.userBubbleOn
+        }
+        return Color(.label)
+    }
+
     private var bubbleShape: UnevenRoundedRectangle {
         let r = ChatBubbleTokens.cornerRadius, sharp = ChatBubbleTokens.tailCornerRadius
         if message.role == .user {
@@ -660,13 +672,16 @@ private struct MessageBubble: View {
     }
 
     private var bubbleBackground: Color {
-        // 图类气泡（用户图+文）保持 primary 0.9；agent 单发图 → surfaceVariant 0.4
-        // （Android isImage/isUser 分支，chat.yaml §5 background）
+        // 纯图气泡（agent 单发图；userImage 未接入，接入时同口径）→ surfaceVariant 0.4
+        // （chat.yaml §5 background.image）；用户气泡（USER_IMAGE_TEXT 含图+文）→
+        // userBubbleBg 实色（Android ChatScreen.kt isUser 含 USER_IMAGE_TEXT → 绿底，
+        // text_below 仍走 onSurface）；用户纯文本 → userBubbleBg（§5 background.user_text，
+        // v2.2.3：去 0.9 alpha，双模式一致）
         if message.type == .agentImage {
-            return Color(.secondarySystemBackground).opacity(0.4)
+            return s.surfaceVariant.opacity(0.4)
         }
         if message.role == .user {
-            return Color.accentColor.opacity(0.9)
+            return ChatBubbleTokens.userBubbleBg
         } else {
             return Color(.secondarySystemBackground).opacity(0.85)
         }

@@ -103,6 +103,17 @@ final class TagScanOrchestrator: @unchecked Sendable {
 
     // MARK: - 公共控制（UI 在 MainActor 调）
 
+    /// 整理中心质量分回填错峰门（organize-port-plan 风险 2）：会话活跃（含暂停中——
+    /// 随时可恢复）时回填整体让路，避免与 Pass1/3 争 IO 与 TagDatabase 串行队列。
+    var isSessionActive: Bool {
+        read { box in
+            switch box.sessionState {
+            case .running, .pausing, .paused, .cancelling: return true
+            case .idle, .cancelled, .completed: return false
+            }
+        }
+    }
+
     /// 启动新扫描会话。
     func start(mode: ScanMode) {
         NSLog("PoLang:TagScan start mode=\(mode.rawValue) isMain=\(Thread.isMainThread)")

@@ -34,6 +34,8 @@ struct PersonView: View {
             }
         }
         .navigationBarHidden(true)
+        // UI 自动化页锚点（对标 gallery_grid / chat_input；人物页无占位符，挂真实页根）
+        .accessibilityIdentifier("person_root")
         .task { vm.onAppear() }
         .task(id: vm.toast) {
             guard vm.toast != nil else { return }
@@ -248,6 +250,8 @@ private struct PersonCardView: View {
         .clipShape(UnevenRoundedRectangle(cornerRadii: .init(
             topLeading: PersonTokens.cardRadius, topTrailing: PersonTokens.cardRadius)))
         .accessibilityLabel(Text(person.name ?? String(format: L("Person #%1$d"), Int(person.id))))
+        // UI 自动化格锚点（对标 gallery cell_；封面点击经 onCoverTap 进人物信息页）
+        .accessibilityIdentifier("person_cell_\(person.id)")
     }
 
     /// 张数角标（黑 60% 全圆角胶囊，白 11 SemiBold 紧凑式计数）

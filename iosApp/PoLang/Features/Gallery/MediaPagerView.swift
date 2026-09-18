@@ -18,12 +18,24 @@ private struct ShareText: Identifiable {
     let text: String
 }
 
+/// 上滑删除手势状态机（spec gallery-grid.yaml §16b swipe_up_delete）：
+/// idle → dragging(offset ≤ 0：跟手上移，向下钳 0 不跟手；|offset| ≥ 页高 25% 即 armed)
+/// → flyingOut（220ms 向上飞出屏外 + 淡出）→ 成功收缩列表 / 取消·未超阈值弹回 idle。
+private enum SwipeDeletePhase: Equatable {
+    case idle
+    case dragging(offset: CGFloat)
+    case flyingOut
+}
+
 /// 大图浏览（对齐 Android `MediaPager.kt`，量化基准 = dump gallery_pager，密度 3.33）：
 /// 黑底横滑分页（去系统 page dots，页间距 16）、双指缩放 1–4x + 平移（clamp 公式对齐
 /// `ZoomableImage:344-417`）、单击切换顶/底栏显隐（缩放时强制隐藏）。
 /// 顶栏（dump：关闭/日期/图片信息/更多 4 项，按钮 48dp、栏内容高 68dp）；
 /// 底栏（dump：发送/编辑/证照/删除 4 位 SpaceEvenly）——编辑/证照 iOS 无对应功能（Phase 6），
 /// 保持 4 位布局节奏灰置占位，不假造交互；删除走 PHAssetChangeRequest 系统确认窗。
+/// 上滑删除（§16b swipe_up_delete）：竖直主导跟手上移、页高 25% 阈值 armed（胶囊转 error 色）、
+/// 220ms 飞出淡出后走系统删除——仅确认成功收缩列表/跳相邻张/删空收起，取消弹回停留原图；
+/// 缩放态、视频页、OCR/Vision 浮层可见时不响应。
 /// 系统栏（§1.3 登记）：状态栏显、黑底 → preferredColorScheme(.dark) 白内容色。
 struct MediaPagerView: View {
     let items: [MediaAsset]
@@ -50,23 +62,31 @@ struct MediaPagerView: View {
     @AppStorage("debug_ui_enabled") private var debugEnabled = false
     @State private var showFaceOverlay = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     /// 删除直调 Swift 桥（PHAssetChangeRequest 自带系统确认；成功后观察者驱动网格刷新）
     private let bridge = PhMediaBridge()
+    /// 存活列表（§16b list_shrink）：仅删除成功后从这里收缩；删空自动收起预览回网格
+    @State private var liveItems: [MediaAsset]
+    /// 上滑删除手势阶段（只作用于当前页；详见 SwipeDeletePhase）
+    @State private var swipePhase: SwipeDeletePhase = .idle
+    /// 分页全屏高（§16b：结算阈值 = 页高 25%、飞出距离基准）
+    @State private var pagerHeight: CGFloat = 0
 
     init(items: [MediaAsset], initial: String) {
         self.items = items
+        _liveItems = State(initialValue: items)
         _index = State(initialValue: max(0, items.firstIndex(where: { $0.uri == initial }) ?? 0))
     }
 
     private var currentAsset: MediaAsset? {
-        items.indices.contains(index) ? items[index] : nil
+        liveItems.indices.contains(index) ? liveItems[index] : nil
     }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             TabView(selection: $index) {
-                ForEach(Array(items.enumerated()), id: \.element.uri) { i, asset in
+                ForEach(Array(liveItems.enumerated()), id: \.element.uri) { i, asset in
                     ZoomablePagerPage(
                         localIdentifier: asset.uri,
                         isActive: i == index,
@@ -81,6 +101,9 @@ struct MediaPagerView: View {
                             if zoomed { isZoomed = true } else if i == index { isZoomed = false }
                         })
                     .padding(.horizontal, 8)  // 对齐 Android pageSpacing 16dp
+                    // §16b 上滑删除：跟手位移 / 飞出淡出只作用于当前页
+                    .offset(y: i == index ? swipeVisualOffset : 0)
+                    .opacity(i == index ? swipeVisualOpacity : 1)
                     .tag(i)
                 }
             }
@@ -88,6 +111,16 @@ struct MediaPagerView: View {
             .ignoresSafeArea()
             // 🔴 标识符挂 TabView（页内容叶子侧）：挂根 ZStack 会传播覆盖 pager_back/info/more 等全部子标识符
             .accessibilityIdentifier("media_pager")
+            // §16b 上滑删除：与横滑翻页共存（simultaneous），竖直主导才 consume（手势内部判定）
+            .simultaneousGesture(swipeUpDeleteGesture)
+            // 页全屏几何（挂在 ignoresSafeArea 之后 → 全屏高）；§16b 阈值 = 页高 25%
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { pagerHeight = geo.size.height }
+                        .onChange(of: geo.size.height) { pagerHeight = $0 }
+                }
+            )
 
             if barsVisible && !isZoomed {
                 VStack(spacing: 0) {
@@ -132,20 +165,40 @@ struct MediaPagerView: View {
             // 按需分析结果卡（图像理解 / OCR；同时只一条活跃）
             analysisOverlay
         }
+        .overlay(alignment: .top) {
+            // §16b 上滑删除提示胶囊：拖动中浮现于图片上方；armed（超阈值）转 error 色高亮。
+            // 顶边 = 安全区 + 68pt 顶栏（顶栏起始于安全区下沿，胶囊须同基准避让）
+            if case .dragging = swipePhase {
+                swipeDeleteHint
+                    .padding(.top, realSafeTop + 68 + Spacing.md)
+            }
+        }
         .animation(.easeInOut(duration: 0.2), value: showCopiedToast)
         .onChange(of: showCopiedToast) { onset in
             guard onset else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { showCopiedToast = false }
         }
         // 相邻页缩略图预热（相-13，对齐 Android ±3 页预加载；PHCachingImageManager 窗口取 ±2 页）
-        .onAppear { preloadAround() }
-        .onChange(of: index) { _ in preloadAround() }
+        .onAppear { preloadAround(); markCurrentPageViewed() }
+        .onChange(of: index) { _ in
+            // 手势中断/翻页恢复路径：翻页即复位上滑删除手势（拖拽中横滑翻页不带位移跨页）
+            if swipePhase != .idle { swipePhase = .idle }
+            preloadAround()
+            markCurrentPageViewed()
+        }
+    }
+
+    /// 整理中心 USER_ENGAGED 信号回写（organize.yaml §1 value_guard）：当前页曝光即记
+    /// lastViewedAt；60s 节流在 TagDatabase.updateLastViewedAt 内（60s 内重复翻页零写放大）。
+    private func markCurrentPageViewed() {
+        guard let uri = currentAsset?.uri else { return }
+        OrganizeRepository.shared.markMediaViewed(uri: uri)
     }
 
     /// 当前页 ±2 页预热 1600×1600 aspectFill 请求（与 ZoomablePagerPage 实际加载参数一致），
     /// 降低翻页首帧白块。
     private func preloadAround() {
-        let ids = items.indices.filter { abs($0 - index) <= 2 }.map { items[$0].uri }
+        let ids = liveItems.indices.filter { abs($0 - index) <= 2 }.map { liveItems[$0].uri }
         guard !ids.isEmpty else { return }
         ThumbnailLoader.shared.startCaching(identifiers: ids, size: CGSize(width: 1600, height: 1600))
     }
@@ -296,6 +349,153 @@ struct MediaPagerView: View {
         guard let asset = currentAsset else { return }
         _ = bridge.deleteMedia(localIdentifiers: [asset.uri])
         dismiss()  // 删除后退出大图页；网格经 PHPhotoLibraryObserver 自动刷新
+    }
+
+    // MARK: - 上滑删除（spec gallery-grid.yaml §16b swipe_up_delete）
+
+    /// §16b available_when / suppressed_when：缩放态（scale > 1.02 → isZoomed）、
+    /// 视频页（与底栏删除按钮可见条件一致）、OCR/Vision 浮层可见时均不响应。
+    private var swipeUpAvailable: Bool {
+        !isZoomed
+            && currentAsset?.type != MediaType.video
+            && visionState == .idle
+            && ocrState == .idle
+    }
+
+    /// 松手结算阈值 = 页高 25%（§16b threshold，同 SwipeReview SWIPE_THRESHOLD_FRACTION）
+    private var swipeThreshold: CGFloat { max(pagerHeight, 1) * 0.25 }
+
+    /// 真实顶部安全区（刘海/灵动岛）。🔴 不能读 `GeometryProxy.safeAreaInsets`：本页根链
+    /// `Color.black.ignoresSafeArea()` 已扩张 ZStack 至全屏、安全区被消费，proxy 恒报 0
+    /// （同 CameraPreviewView.realSafeTop 陷阱），只能从 UIKit keyWindow 拿真实值。
+    private var realSafeTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }?.safeAreaInsets.top ?? 0
+    }
+
+    /// armed：上移量已达阈值，松手即提交；胶囊转 error 色高亮（§16b armed_style）
+    private var isSwipeArmed: Bool {
+        if case .dragging(let offset) = swipePhase { return -offset >= swipeThreshold }
+        return false
+    }
+
+    private var swipeVisualOffset: CGFloat {
+        switch swipePhase {
+        case .idle: return 0
+        case .dragging(let offset): return offset
+        case .flyingOut: return -max(pagerHeight, 1) * 1.2  // 向上飞出屏外
+        }
+    }
+
+    private var swipeVisualOpacity: Double {
+        if case .flyingOut = swipePhase { return 0 }
+        return 1
+    }
+
+    /// 手势本体：竖直主导（abs(dy) > abs(dx)）才 consume，不抢横向翻页；
+    /// offset = min(0, dy)——只跟向上，向下钳制不跟手（§16b gesture: swipe_up）。
+    private var swipeUpDeleteGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                switch swipePhase {
+                case .flyingOut:
+                    return  // 提交动画中忽略新手势
+                case .dragging:
+                    break  // 跟手继续
+                case .idle:
+                    guard swipeUpAvailable else { return }
+                }
+                let t = value.translation
+                guard abs(t.height) > abs(t.width) else { return }
+                swipePhase = .dragging(offset: min(0, t.height))
+            }
+            .onEnded { _ in
+                switch swipePhase {
+                case .dragging(let offset) where -offset >= swipeThreshold:
+                    commitSwipeUpDelete()
+                case .dragging:
+                    springBackSwipe()
+                case .idle, .flyingOut:
+                    break
+                }
+            }
+    }
+
+    /// 提示胶囊（§16b hint_overlay）：delete 图标 + preview_swipe_delete_hint 五语；
+    /// 中性态黑底白字，armed 转 error 色高亮（tokens：scheme.error/onError）。
+    private var swipeDeleteHint: some View {
+        let scheme = appScheme(colorScheme)
+        let armed = isSwipeArmed
+        return HStack(spacing: Spacing.sm) {
+            MatIcon(name: "mat_delete", size: IconSize.sm)
+            Text(String(localized: "preview_swipe_delete_hint"))
+                .font(AppTypography.titleSmall.font)
+                .lineLimit(1)
+        }
+        .foregroundStyle(armed ? scheme.onError : AppColors.white)
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.sm)
+        .background(armed ? scheme.error : AppColors.panelBackground)
+        .clipShape(Capsule())
+        .animation(.easeInOut(duration: 0.15), value: armed)
+    }
+
+    /// 提交动画时长（§16b commit_animation 定值 220ms；DesignTokens 为生成文件勿手改，
+    /// Motion 阶无 220 档，就地常量化）
+    private static let swipeCommitDuration: TimeInterval = 0.22
+
+    /// 提交：向上飞出屏外 + 淡出 220ms 后回调删除通路（§16b commit_animation: fly_up_and_fade_out）
+    private func commitSwipeUpDelete() {
+        guard let asset = currentAsset else {
+            springBackSwipe()
+            return
+        }
+        withAnimation(.easeOut(duration: Self.swipeCommitDuration)) {
+            swipePhase = .flyingOut
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.swipeCommitDuration) {
+            performSwipeUpDelete(asset)
+        }
+    }
+
+    /// 删除通路（§16b ios_note / §26 台账）：PHAssetChangeRequest.deleteAssets 系统强制
+    /// 确认框（iOS 无静默通路）；确认成功才收缩列表，取消弹回停留原图。
+    private func performSwipeUpDelete(_ asset: MediaAsset) {
+        _ = bridge.deleteMediaAwaitingOutcome(localIdentifiers: [asset.uri]) { confirmed in
+            if confirmed {
+                shrinkAfterSwipeDelete(asset)
+            } else {
+                springBackSwipe()
+            }
+        }
+    }
+
+    /// 🔴 列表收缩语义（§16b list_shrink: on_trashed_outcome_only）：仅删除成功后收缩；
+    /// 跳相邻张（删中间→停下一张，删末张→回退上一张）；删空自动收起预览回网格。
+    private func shrinkAfterSwipeDelete(_ asset: MediaAsset) {
+        if let i = liveItems.firstIndex(where: { $0.uri == asset.uri }) {
+            liveItems.remove(at: i)
+            // 删除张在当前页之前 → 下标前移一位保持当前媒体不跳张
+            // （原 min 钳制对左删场景会静默跳过一张）
+            if i < index { index -= 1 }
+        }
+        guard !liveItems.isEmpty else {
+            swipePhase = .idle
+            dismiss()
+            return
+        }
+        index = min(max(0, index), liveItems.count - 1)
+        swipePhase = .idle
+        preloadAround()
+    }
+
+    /// 未超阈值 / 系统确认取消：弹回原位（§16b cancel_animation: spring_back）
+    private func springBackSwipe() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+            swipePhase = .idle
+        }
     }
 
     // MARK: - 按需分析（图像理解 / OCR）

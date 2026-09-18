@@ -27,6 +27,10 @@ final class AppContainer: ObservableObject {
     /// 场景分析路径，产出 observation 给远程 LLM；抽卡由 Chat UI 层另行触发，editor.yaml §17）
     let aiOptimizeBridge: AiOptimizeBridge
 
+    /// chat 导航桥（IosNavigationCapability navigate_to 执行端 → MainTabView 真实切页/弹出，
+    /// 2026-09-16 主导航统一，main-nav.yaml §4）
+    let navigationBridge: NavigationBridge
+
     /// 美颜渲染参数（全局共享，BeautyPanelView ↔ BeautyRenderer 双向绑定）
     @Published var beautyParams = BeautyRenderer.Params()
 
@@ -49,6 +53,7 @@ final class AppContainer: ObservableObject {
         self.chartBridge = ChartRendererBridge.shared
         self.runScriptBridge = RunScriptBridge.shared
         self.aiOptimizeBridge = AiOptimizeBridge.shared
+        self.navigationBridge = NavigationBridge.shared
         setupAgentComposition()
     }
 
@@ -62,6 +67,7 @@ final class AppContainer: ObservableObject {
             chartBridge: chartBridge,
             runScriptBridge: runScriptBridge,
             aiOptimizeBridge: aiOptimizeBridge,
+            navigationBridge: navigationBridge,
             debugBuild: isDebugBuild   // 诊断日志 captureContent：DEBUG 记全文 / Release 仅指标
         )
         chatBridge = IosAgentComposition.shared.chatBridge
