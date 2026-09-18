@@ -68,3 +68,10 @@ polang 仓库 docs-site/（唯一源，含 sync-docs.sh 产物 docsify 文档）
 - 微信小程序备案、iOS App 备案（App Store 中国区上架要求）—— 同一企业主体，同一备案系统
 - 小程序服务端立项（形态届时定：平移 server/ Ktor 或新起）
 - www 与主域的 HTTPS/跳转细节在 Phase 2 一并处理
+
+## 9. 状态变更（2026-09-18）：备案期域名临时托管 HK
+
+- **事实变化**：`xuxingzhiyuan.cn` / `www.xuxingzhiyuan.cn` 的 DNS 当前解析到 **HK 43.161.201.142**（非设计时记载的 82.157.166.5——§0 中「已解析到本机」已过时）。
+- **故障与修复**：HK nginx 无该域名 server 块 → 根路径 404。已在 HK 新增 `/etc/nginx/sites-available/xuxingzhiyuan.conf`（80 端口，root 与 polang.net 同为 `/var/www/picme/docs-site`，deploy-docs-site.sh 每次发布自动同步两域内容），并用 certbot --nginx 签发证书 + 80→443 跳转。当前 `https://xuxingzhiyuan.cn/` 与 `https://www.xuxingzhiyuan.cn/` 正常（内容与 polang.net 一致）。
+- **备案期双通道**：域名通道 = HK 临时托管（无需备案）；国内 8100 basic-auth 预览通道（`http://82.157.166.5:8100/`）不变。
+- **Phase 2 切换时追加一步**：DNS 改指 82.157.166.5 后，删除 HK 的 `xuxingzhiyuan.conf`（sites-available + sites-enabled 软链）并 `sudo nginx -t && systemctl reload nginx`，避免双机同时应答。
