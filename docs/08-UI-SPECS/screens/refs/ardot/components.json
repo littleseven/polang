@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "updated": "2026-09-19",
+  "components": [
+    {
+      "name": "component/floating_tab",
+      "nodeId": "385:95",
+      "page": "Components",
+      "purpose": "全局悬浮胶囊底栏(相册/回忆/人物/设置四 Tab)",
+      "darkPng": "components/floating_tab-dark.png",
+      "lightPng": "components/floating_tab-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "所有主页面底栏一律用实例, 禁止手画底栏"
+    },
+    {
+      "name": "component/status_bar",
+      "nodeId": "385:106",
+      "page": "Components",
+      "purpose": "系统状态栏(时间/信号/电量), sysbar-dark/sysbar-light 布尔双图层自适应",
+      "darkPng": "components/status_bar-dark.png",
+      "lightPng": "components/status_bar-light.png",
+      "tokenBound": true,
+      "variants": ["sysbar-dark", "sysbar-light"],
+      "rules": "每帧顶部必放; 勿改内部布尔图层名"
+    },
+    {
+      "name": "component/system_nav_bar",
+      "nodeId": "385:107",
+      "page": "Components",
+      "purpose": "系统导航条(手势条), 布尔双图层自适应",
+      "darkPng": "components/system_nav_bar-dark.png",
+      "lightPng": "components/system_nav_bar-light.png",
+      "tokenBound": true,
+      "variants": ["sysbar-dark", "sysbar-light"],
+      "rules": "每帧底部必放; 勿改内部布尔图层名"
+    },
+    {
+      "name": "component/provider_row",
+      "nodeId": "166:17",
+      "page": "Components",
+      "purpose": "设置-模型中心 provider 列表行",
+      "darkPng": "components/provider_row-dark.png",
+      "lightPng": "components/provider_row-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "模型中心 provider 列表一律用实例"
+    },
+    {
+      "name": "component/model_row",
+      "nodeId": "167:17",
+      "page": "Components",
+      "purpose": "设置-模型中心单模型列表行(含下载态)",
+      "darkPng": "components/model_row-dark.png",
+      "lightPng": "components/model_row-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "模型列表一律用实例"
+    }
+  ]
+}

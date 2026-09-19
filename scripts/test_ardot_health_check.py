@@ -161,6 +161,14 @@ def test_fingerprint_handles_mixed_fill_types_in_sibling_ties():
     assert list(kids) == sorted(kids, key=str), kids  # 两子树指纹可排序比较
 
 
+def test_repo_components_json_is_valid_catalog():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
+                        "docs/08-UI-SPECS/screens/refs/ardot/components.json")
+    comps = hc.load_catalog(os.path.abspath(path))
+    assert len(comps) >= 5
+    assert all(c["page"] == "Components" for c in comps)
+
+
 if __name__ == "__main__":
     import traceback
     _tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
