@@ -1,6 +1,6 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-19T22:23:53+08:00",
+  "exportedAt": "2026-09-19T22:25:12+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
@@ -91,6 +91,16 @@
           "id": "107:353",
           "name": "gallery/selection",
           "png": "gallery-selection.png"
+        },
+        {
+          "id": "171:273",
+          "name": "gallery/tag_control",
+          "png": "gallery-tag_control.png"
+        },
+        {
+          "id": "172:113",
+          "name": "gallery/tag_stage_sheet",
+          "png": "gallery-tag_stage_sheet.png"
         }
       ],
       "id": "103:1",
@@ -302,16 +312,6 @@
           "id": "189:216",
           "name": "dedup/cleaned",
           "png": "dedup-cleaned.png"
-        },
-        {
-          "id": "171:273",
-          "name": "gallery/tag_control",
-          "png": "gallery-tag_control.png"
-        },
-        {
-          "id": "172:113",
-          "name": "gallery/tag_stage_sheet",
-          "png": "gallery-tag_stage_sheet.png"
         }
       ],
       "id": "267:21",
@@ -366,5 +366,5 @@
     }
   ],
   "scale": 1,
-  "structureSha256": "56a369a83278ec92547e311022ff4c3686aaefefb9310c3c2cba296642efaf51"
+  "structureSha256": "af6dcbce58950146d6223d7d69b850f3ac5afd6efc6f9f892037ebec37a922e9"
 }
