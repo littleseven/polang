@@ -21,7 +21,10 @@
       "darkPng": "components/status_bar-dark.png",
       "lightPng": "components/status_bar-light.png",
       "tokenBound": true,
-      "variants": ["sysbar-dark", "sysbar-light"],
+      "variants": [
+        "sysbar-dark",
+        "sysbar-light"
+      ],
       "rules": "每帧顶部必放; 勿改内部布尔图层名"
     },
     {
@@ -32,7 +35,10 @@
       "darkPng": "components/system_nav_bar-dark.png",
       "lightPng": "components/system_nav_bar-light.png",
       "tokenBound": true,
-      "variants": ["sysbar-dark", "sysbar-light"],
+      "variants": [
+        "sysbar-dark",
+        "sysbar-light"
+      ],
       "rules": "每帧底部必放; 勿改内部布尔图层名"
     },
     {
@@ -78,6 +84,17 @@
       "tokenBound": true,
       "variants": [],
       "rules": "搜索框一律用实例放 top_bar 中位; 查询文字覆写走变量重绑"
+    },
+    {
+      "name": "component/grid_row",
+      "nodeId": "387:94",
+      "page": "Components",
+      "purpose": "三图横排网格行(相册/搜索/扫描/回忆/整理分类网格共用, 3 cell IMAGE fills)",
+      "darkPng": "components/grid_row-dark.png",
+      "lightPng": "components/grid_row-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "三列图片行一律用实例; cell 图覆写 U(inst+\"<cellId>\",{fills:[IMAGE]}); 行高/间距差异走实例 height/gap 覆写(数值先 U(null) 解绑); 子树零颜色 token, 双模 PNG 一致属预期"
     }
   ]
 }

@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=387%3A86"
+    "url": "cocraft://localhost/file/715061534788814?node_id=387%3A94"
   },
   "pages": [
     {
@@ -6454,7 +6454,7 @@
                   {
                     "componentProperties": {},
                     "height": 51,
-                    "id": "387:38",
+                    "id": "387:105",
                     "layout": "none",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -7535,148 +7535,15 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "9d001aa5f7e7d0c08d6c750a41e2b3ccee53848c",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:55",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "85ff28fb3037135343880f884d952ab757d89df5",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:56",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "cda557b1a05d075f691ef609abe319904e7b99c6",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:57",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": "hug_contents",
-                        "id": "105:54",
+                        "id": "387:95",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_1",
                         "padding": {
                           "bottom": 0,
@@ -7684,154 +7551,21 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "d1131ee6aa40be1cf4dc48b93495d6292f5e6d35",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:59",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "cb9aa8a31914384df216b4c144ea34c0bb9f2377",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:60",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "bdac2fcd69db78c5fe778bc3afadd3befc7e6a6a",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:61",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": "hug_contents",
-                        "id": "105:58",
+                        "id": "387:96",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_2",
                         "padding": {
                           "bottom": 0,
@@ -7839,7 +7573,7 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -7911,148 +7645,15 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "775d46a53808da8c0cf7c29364fc42a4771c8ded",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:65",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "f78e99c601880b7dfc709dd70f4c52102e709d45",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:66",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "818e8b6c0ebe47f321670b184826c06ece9e9342",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "105:67",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": "hug_contents",
-                        "id": "105:64",
+                        "id": "387:97",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_3",
                         "padding": {
                           "bottom": 0,
@@ -8060,7 +7661,7 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -8308,151 +7909,15 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 2,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "85ff28fb3037135343880f884d952ab757d89df5",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 128.3300018310547,
-                            "id": "107:129",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 2,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "d1131ee6aa40be1cf4dc48b93495d6292f5e6d35",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 128.3300018310547,
-                            "id": "107:130",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 2,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "bdac2fcd69db78c5fe778bc3afadd3befc7e6a6a",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 128.3300018310547,
-                            "id": "107:131",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": 128.3300018310547,
-                        "id": "107:128",
+                        "id": "387:98",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_1",
                         "padding": {
                           "bottom": 0,
@@ -8460,157 +7925,21 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 2,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "775d46a53808da8c0cf7c29364fc42a4771c8ded",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 128.3300018310547,
-                            "id": "107:133",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 2,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "f78e99c601880b7dfc709dd70f4c52102e709d45",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 128.3300018310547,
-                            "id": "107:134",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 2,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "818e8b6c0ebe47f321670b184826c06ece9e9342",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 128.3300018310547,
-                            "id": "107:135",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": 128.3300018310547,
-                        "id": "107:132",
+                        "id": "387:99",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_2",
                         "padding": {
                           "bottom": 0,
@@ -8618,7 +7947,7 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -9111,148 +8440,15 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "9d001aa5f7e7d0c08d6c750a41e2b3ccee53848c",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:233",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "85ff28fb3037135343880f884d952ab757d89df5",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:234",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "cda557b1a05d075f691ef609abe319904e7b99c6",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:235",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": "hug_contents",
-                        "id": "107:227",
+                        "id": "387:100",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_1",
                         "padding": {
                           "bottom": 0,
@@ -9260,154 +8456,21 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "d1131ee6aa40be1cf4dc48b93495d6292f5e6d35",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:236",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "cb9aa8a31914384df216b4c144ea34c0bb9f2377",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:237",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "bdac2fcd69db78c5fe778bc3afadd3befc7e6a6a",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:238",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": "hug_contents",
-                        "id": "107:228",
+                        "id": "387:101",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_2",
                         "padding": {
                           "bottom": 0,
@@ -9415,7 +8478,7 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -9487,148 +8550,15 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "775d46a53808da8c0cf7c29364fc42a4771c8ded",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:241",
-                            "layout": "none",
-                            "name": "cell",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "f78e99c601880b7dfc709dd70f4c52102e709d45",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:242",
-                            "layout": "none",
-                            "name": "cell2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "818e8b6c0ebe47f321670b184826c06ece9e9342",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 127,
-                            "id": "107:243",
-                            "layout": "none",
-                            "name": "cell3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 2,
                         "height": "hug_contents",
-                        "id": "107:230",
+                        "id": "387:102",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_3",
                         "padding": {
                           "bottom": 0,
@@ -9636,7 +8566,7 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -11393,7 +10323,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-5ljc-20260920_005722970.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-blzf-20260920_015326934.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -13069,7 +11999,7 @@
         "111:383": {
           "name": "chat/conversation",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_383-gfde-20260920_005723716.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:383 chat/conversation (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_383-y50y-20260920_015327821.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:383 chat/conversation (FRAME)"
           }
         },
         "111:492": {
@@ -15338,7 +14268,7 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-30w8-20260920_005724546.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-m7by-20260920_015328772.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
           }
         },
         "267:518": {
@@ -16194,13 +15124,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-38bh-20260920_005725800.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-f1lq-20260920_015330002.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-5x4f-20260920_005725367.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-kkex-20260920_015329556.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -17085,7 +16015,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-gl9w-20260920_005726879.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-unkj-20260920_015330987.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -18417,7 +17347,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-fvgj-20260920_005726329.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-25ei-20260920_015330556.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -24595,7 +23525,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-zats-20260920_005729848.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-nias-20260920_015334068.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -24607,13 +23537,13 @@
         "171:3": {
           "name": "people/grid",
           "tree": {
-            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_3-puti-20260920_005730296.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:3 people/grid (FRAME)"
+            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_3-3a89-20260920_015334516.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:3 people/grid (FRAME)"
           }
         },
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-ajna-20260920_005730567.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-816e-20260920_015334782.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -27968,19 +26898,19 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-m2wo-20260920_005732405.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-upx4-20260920_015336474.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-shaf-20260920_005731277.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-59zv-20260920_015335450.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
           "name": "organize/hub",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_24-voav-20260920_005731008.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:24 organize/hub (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_24-sf2k-20260920_015335204.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:24 organize/hub (FRAME)"
           }
         },
         "267:280": {
@@ -30310,151 +29240,15 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 8,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "d6e1dfc62f38e617848d6ad1833d76fd3fcbfa41",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 117,
-                            "id": "297:75",
-                            "layout": "none",
-                            "name": "tile_1",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 8,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "9e76a00c7909673a7c0e00867b082c050aa9582d",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 117,
-                            "id": "297:76",
-                            "layout": "none",
-                            "name": "tile_2",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "cornerRadius": 8,
-                            "fills": [
-                              {
-                                "blendMode": "NORMAL",
-                                "filters": {
-                                  "contrast": 0,
-                                  "exposure": 0,
-                                  "highlights": 0,
-                                  "saturation": 0,
-                                  "shadows": 0,
-                                  "temperature": 0,
-                                  "tint": 0
-                                },
-                                "imageHash": "26004bab6c0544daab7c757ddd73f6bf3faed2e0",
-                                "imageTransform": [
-                                  [
-                                    1,
-                                    0,
-                                    0
-                                  ],
-                                  [
-                                    0,
-                                    1,
-                                    0
-                                  ]
-                                ],
-                                "opacity": 1,
-                                "rotation": 0,
-                                "scaleMode": "FILL",
-                                "scalingFactor": 1,
-                                "type": "IMAGE",
-                                "visible": true
-                              }
-                            ],
-                            "height": 117,
-                            "id": "297:77",
-                            "layout": "none",
-                            "name": "tile_3",
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "gap": 4,
                         "height": 117,
-                        "id": "297:74",
+                        "id": "387:103",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:94"
+                        },
                         "name": "row_2",
                         "padding": {
                           "bottom": 0,
@@ -30462,7 +29256,7 @@
                           "right": 0,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -30705,7 +29499,7 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-usuo-20260920_005733170.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-fljk-20260920_015337263.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
           }
         }
       },
