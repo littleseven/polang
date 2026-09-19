@@ -219,7 +219,11 @@ Expected: ImportError/AttributeError（`ardot-health-check.py` 尚不存在或�
 用法:
   ardot-health-check.py --jsonl <batch_read.jsonl>... --vars <fetch_variables.jsonl> \
       --components docs/08-UI-SPECS/screens/refs/ardot/components.json \
-      [--out-dir tmp/ardot-health] [--min-dup-nodes 4] [--ignore 子串]...
+      [--out-dir tmp/ardot-health] [--min-dup-nodes 4] [--ignore 子串]... [--ignore-file 清单.txt]
+豁免: --ignore 子串与 --ignore-file(每行一个子串, 空行与 # 开头行跳过)合并生效;
+  path 命中任一豁免子串的节点, 从检测 1/2/3 的判定中排除(检测 4 目录漂移不受豁免影响)。
+  豁免计数写入 health.json 的 "ignored"(口径: literal=被豁免 findings 数,
+  boolean_gaps=被豁免帧数, duplicate_groups=locations 全部落在豁免路径的重复组数)。
 检测项:
   1. literal 泄漏   — 未绑 token 的 SOLID/GRADIENT-stop 色(IMAGE 除外)
   2. 组件化违规     — ≥2 棵同构子树(节点数≥min-dup-nodes)且非组件实例
@@ -304,17 +308,24 @@ def load_catalog(path):
     return comps
 
 
-def check_literals(roots, kernel):
-    findings = []
+def check_literals(roots, kernel, ignore=(), ignored=None):
+    """literal findings; path 命中豁免子串的 finding 排除并计数(经 ignored dict 回传)"""
+    findings, exempt = [], 0
     for root, label in roots:
         acc = []
         kernel.walk(root, label, acc)
         for path, nd in acc:
+            hit = any(s in path for s in ignore)
             for kind in ("fills", "strokes"):
                 _b, _i, lits = kernel.classify_paints(nd.get(kind))
                 for _p, rgb in lits:
+                    if hit:
+                        exempt += 1
+                        continue
                     findings.append({"frame": label, "id": nd.get("id"), "path": path,
                                      "kind": kind, "rgb": list(rgb)})
+    if ignored is not None:
+        ignored["literal"] = exempt
     return findings
 
 
@@ -369,17 +380,19 @@ def _is_instance(nd):
     return str(nd.get("type", "")).lower() == "instance" or bool(nd.get("componentId"))
 
 
-def find_duplicates(roots, var_rgb, kernel, min_nodes, ignore):
-    groups = {}
+def find_duplicates(roots, var_rgb, kernel, min_nodes, ignore, ignored=None):
+    """重复组; 命中豁免子串的子树单独入 ex_groups, locations≥2 的豁免组数经 ignored 回传"""
+    groups, ex_groups = {}, {}
 
     def visit(nd, path, record=True):
-        if _is_instance(nd) or any(s in path for s in ignore):
+        if _is_instance(nd):
             return
+        target = ex_groups if any(s in path for s in ignore) else groups
         acc = []
         kernel.walk(nd, path, acc)
         if record and len(acc) >= min_nodes:
             fp = repr(fingerprint(nd, var_rgb, kernel))
-            g = groups.setdefault(fp, {"locations": [], "nodes": len(acc)})
+            g = target.setdefault(fp, {"locations": [], "nodes": len(acc)})
             g["locations"].append(path)
         for c in (nd.get("children") or []):
             if isinstance(c, dict):
@@ -388,17 +401,25 @@ def find_duplicates(roots, var_rgb, kernel, min_nodes, ignore):
     for root, label in roots:
         visit(root, label, record=False)  # 顶层帧自身不入组: 整屏同构属正常, 目标是内部重复子树
     dups = [g for g in groups.values() if len(g["locations"]) >= 2]
+    if ignored is not None:
+        ignored["duplicate_groups"] = sum(1 for g in ex_groups.values() if len(g["locations"]) >= 2)
     return sorted(dups, key=lambda g: -g["nodes"])
 
 
-def find_boolean_gaps(roots, kernel):
-    gaps = []
+def find_boolean_gaps(roots, kernel, ignore=(), ignored=None):
+    """缺 sysbar-light 的帧 label; 帧 label 命中豁免子串的排除并计数(经 ignored dict 回传)"""
+    gaps, exempt = [], 0
     for root, label in roots:
         acc = []
         kernel.walk(root, label, acc)
         names = {str(nd.get("name", "")) for _p, nd in acc}
         if any("sysbar-dark" in n for n in names) and not any("sysbar-light" in n for n in names):
-            gaps.append(label)
+            if any(s in label for s in ignore):
+                exempt += 1
+            else:
+                gaps.append(label)
+    if ignored is not None:
+        ignored["boolean_gaps"] = exempt
     return sorted(gaps)
 
 
@@ -429,8 +450,20 @@ def main(argv=None):
     ap.add_argument("--out-dir", default="tmp/ardot-health")
     ap.add_argument("--min-dup-nodes", type=int, default=4)
     ap.add_argument("--ignore", action="append", default=[])
+    ap.add_argument("--ignore-file", default=None,
+                    help="豁免清单文件: 每行一个 path 子串, 空行与 # 开头行跳过")
     a = ap.parse_args(argv)
     os.makedirs(a.out_dir, exist_ok=True)
+
+    ignore = list(a.ignore)
+    if a.ignore_file:
+        try:
+            with open(a.ignore_file) as f:
+                ignore += [ln.strip() for ln in f
+                           if ln.strip() and not ln.strip().startswith("#")]
+        except OSError as e:
+            print(f"ignore-file 错误: {e}")
+            return 2
 
     kernel = load_kernel()
     try:
@@ -441,22 +474,27 @@ def main(argv=None):
     roots = load_roots(a.jsonl, kernel)
     var_rgb = load_var_rgb(a.vars, kernel)
 
+    ignored = {"literal": 0, "boolean_gaps": 0, "duplicate_groups": 0}
     report = {
-        "literal": check_literals(roots, kernel),
-        "duplicates": find_duplicates(roots, var_rgb, kernel, a.min_dup_nodes, a.ignore),
-        "boolean_gaps": find_boolean_gaps(roots, kernel),
+        "literal": check_literals(roots, kernel, ignore, ignored),
+        "duplicates": find_duplicates(roots, var_rgb, kernel, a.min_dup_nodes, ignore, ignored),
+        "boolean_gaps": find_boolean_gaps(roots, kernel, ignore, ignored),
         "catalog_drift": check_catalog(comps, build_node_index(roots), kernel),
     }
     unhealthy = any(report[k] for k in report)
+    report["ignored"] = ignored
     json.dump(report, open(os.path.join(a.out_dir, "health.json"), "w"), ensure_ascii=False, indent=1)
     with open(os.path.join(a.out_dir, "health.md"), "w") as md:
         md.write(f"| 检测项 | 发现数 |\n|---|---|\n"
                  f"| literal 泄漏 | {len(report['literal'])} |\n"
                  f"| 组件化违规(重复组) | {len(report['duplicates'])} |\n"
                  f"| 布尔图层漏适配 | {len(report['boolean_gaps'])} |\n"
-                 f"| 目录漂移 | {len(report['catalog_drift'])} |\n")
+                 f"| 目录漂移 | {len(report['catalog_drift'])} |\n"
+                 f"| 豁免(literal/dup组/boolean帧) | {ignored['literal']}/"
+                 f"{ignored['duplicate_groups']}/{ignored['boolean_gaps']} |\n")
     print(f"literal={len(report['literal'])} dup_groups={len(report['duplicates'])} "
           f"boolean_gaps={len(report['boolean_gaps'])} drift={len(report['catalog_drift'])} "
+          f"ignored={ignored['literal']}/{ignored['boolean_gaps']}/{ignored['duplicate_groups']} "
           f"-> {a.out_dir}/health.(json|md) {'UNHEALTHY' if unhealthy else 'OK'}")
     return 1 if unhealthy else 0
 

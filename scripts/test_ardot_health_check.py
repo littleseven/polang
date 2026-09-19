@@ -161,6 +161,39 @@ def test_fingerprint_handles_mixed_fill_types_in_sibling_ties():
     assert list(kids) == sorted(kids, key=str), kids  # 两子树指纹可排序比较
 
 
+def test_ignore_file_exempts_literal_and_boolean_and_dups():
+    # 1) literal 豁免: 帧内一个 SOLID literal, path 命中豁免子串
+    lit_frame = node("70:1", "Camera/camera/panel_filter/inline_panel/thumb_1",
+                     children=[node("70:2", "swatch", fills=[solid(1, 1, 1)])])
+    # 2) boolean 豁免: sysbar-dark 无 sysbar-light, 帧 path 命中豁免
+    bool_frame = node("71:1", "Exempt/page", children=[node("71:2", "sysbar-dark")])
+    # 3) dup 豁免: 两棵同构 4 节点子树, 路径含豁免子串(复用 card())
+    dup_a = node("72:1", "Play Store Assets/x", children=[card("72:2")])
+    dup_b = node("73:1", "Play Store Assets/y", children=[card("73:2")])
+    jf = write_jsonl([lit_frame, bool_frame, dup_a, dup_b])
+    ign = tempfile.mktemp()
+    with open(ign, "w") as f:
+        f.write("# 豁免清单\n\nCamera/camera/panel_filter\nExempt/\nPlay Store Assets/\n")
+    cat = tempfile.mktemp(suffix=".json")
+    json.dump({"version": 1, "updated": "2026-09-20", "components": []}, open(cat, "w"))
+    out = tempfile.mkdtemp()
+    rc = hc.main(["--jsonl", jf, "--vars", VARS, "--components", cat,
+                  "--out-dir", out, "--ignore-file", ign])
+    assert rc == 0, "全部豁免后应健康"
+    rep = json.load(open(os.path.join(out, "health.json")))
+    assert rep["ignored"]["literal"] == 1 and rep["ignored"]["boolean_gaps"] == 1 \
+        and rep["ignored"]["duplicate_groups"] == 1, rep["ignored"]
+
+
+def test_ignore_file_missing_returns_2():
+    cat = tempfile.mktemp(suffix=".json")
+    json.dump({"version": 1, "updated": "2026-09-20", "components": []}, open(cat, "w"))
+    jf = write_jsonl([node("74:1", "ok/frame")])
+    rc = hc.main(["--jsonl", jf, "--vars", VARS, "--components", cat,
+                  "--out-dir", tempfile.mkdtemp(), "--ignore-file", "/nonexistent/x.txt"])
+    assert rc == 2
+
+
 def test_repo_components_json_is_valid_catalog():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
                         "docs/08-UI-SPECS/screens/refs/ardot/components.json")
