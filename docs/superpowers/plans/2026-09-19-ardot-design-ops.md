@@ -353,8 +353,9 @@ def paint_rgbs(v, var_rgb, kernel):
 def fingerprint(nd, var_rgb, kernel):
     """结构指纹: 忽略 id/name/文本, 保留 type/尺寸/色/子树"""
     kids = tuple(sorted(
-        fingerprint(c, var_rgb, kernel)
-        for c in (nd.get("children") or []) if isinstance(c, dict)))
+        (fingerprint(c, var_rgb, kernel)
+         for c in (nd.get("children") or []) if isinstance(c, dict)),
+        key=str))
     try:
         size = (round(float(nd.get("width") or 0)), round(float(nd.get("height") or 0)))
     except (TypeError, ValueError):

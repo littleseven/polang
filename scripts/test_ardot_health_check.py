@@ -146,6 +146,21 @@ def test_main_exit_code_clean_vs_findings():
     assert hc.main(["--jsonl", dirty, "--vars", VARS, "--components", cat, "--out-dir", out]) == 1
 
 
+def test_fingerprint_handles_mixed_fill_types_in_sibling_ties():
+    """回归: 兄弟节点同 type+size、fills 混合 SOLID literal 与 IMAGE 哨兵时,
+    fingerprint 的 sorted(kids) 不得在 RGB int 元组与 str 哨兵间比较(str < int TypeError)"""
+    kernel = hc.load_kernel()
+    var_rgb = hc.load_var_rgb(VARS, kernel)
+    f = node("70:1", "gallery/grid", children=[
+        node("70:2", "solid_bg", fills=[solid(0.5, 0.5, 0.5)], ntype="RECTANGLE"),
+        node("70:3", "image_bg", fills=[{"type": "IMAGE"}], ntype="RECTANGLE"),
+    ])
+    fp = hc.fingerprint(f, var_rgb, kernel)  # 修复前此处抛 TypeError
+    kids = fp[4]
+    assert len(kids) == 2 and kids[0] != kids[1], kids
+    assert list(kids) == sorted(kids, key=str), kids  # 两子树指纹可排序比较
+
+
 if __name__ == "__main__":
     import traceback
     _tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
