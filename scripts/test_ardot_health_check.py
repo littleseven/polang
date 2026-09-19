@@ -161,6 +161,19 @@ def test_fingerprint_handles_mixed_fill_types_in_sibling_ties():
     assert list(kids) == sorted(kids, key=str), kids  # 两子树指纹可排序比较
 
 
+def test_ignore_file_exempts_catalog_drift():
+    kernel = hc.load_kernel()
+    comp = node("80:1", "component/brand_row",
+                children=[node("80:2", "tag", fills=[solid(0, 0.78, 0.29)])])
+    jf = write_jsonl([comp])
+    comps = [{"name": "component/brand_row", "nodeId": "80:1", "page": "Components",
+              "purpose": "x", "darkPng": "d.png", "lightPng": "l.png",
+              "tokenBound": True, "variants": [], "rules": "r"}]
+    idx = hc.build_node_index(hc.load_roots([jf], kernel))
+    assert len(hc.check_catalog(comps, idx, kernel)) == 1                      # 无豁免报 drift
+    assert hc.check_catalog(comps, idx, kernel, ("component/brand_row/tag",)) == []  # 豁免后归零
+
+
 def test_ignore_file_exempts_literal_and_boolean_and_dups():
     # 1) literal 豁免: 帧内一个 SOLID literal, path 命中豁免子串
     lit_frame = node("70:1", "Camera/camera/panel_filter/inline_panel/thumb_1",
@@ -170,19 +183,28 @@ def test_ignore_file_exempts_literal_and_boolean_and_dups():
     # 3) dup 豁免: 两棵同构 4 节点子树, 路径含豁免子串(复用 card())
     dup_a = node("72:1", "Play Store Assets/x", children=[card("72:2")])
     dup_b = node("73:1", "Play Store Assets/y", children=[card("73:2")])
-    jf = write_jsonl([lit_frame, bool_frame, dup_a, dup_b])
+    # 4) catalog 豁免: tokenBound 组件子树唯一 literal 落在豁免路径 → drift 归零并计数
+    comp = node("75:1", "component/brand_row",
+                children=[node("75:2", "tag", fills=[solid(0, 0.78, 0.29)])])
+    jf = write_jsonl([lit_frame, bool_frame, dup_a, dup_b, comp])
     ign = tempfile.mktemp()
     with open(ign, "w") as f:
-        f.write("# 豁免清单\n\nCamera/camera/panel_filter\nExempt/\nPlay Store Assets/\n")
+        f.write("# 豁免清单\n\nCamera/camera/panel_filter\nExempt/\nPlay Store Assets/\n"
+                "component/brand_row/tag\n")
     cat = tempfile.mktemp(suffix=".json")
-    json.dump({"version": 1, "updated": "2026-09-20", "components": []}, open(cat, "w"))
+    json.dump({"version": 1, "updated": "2026-09-20", "components": [
+        {"name": "component/brand_row", "nodeId": "75:1", "page": "Components",
+         "purpose": "x", "darkPng": "d.png", "lightPng": "l.png",
+         "tokenBound": True, "variants": [], "rules": "r"}]}, open(cat, "w"))
     out = tempfile.mkdtemp()
     rc = hc.main(["--jsonl", jf, "--vars", VARS, "--components", cat,
                   "--out-dir", out, "--ignore-file", ign])
     assert rc == 0, "全部豁免后应健康"
     rep = json.load(open(os.path.join(out, "health.json")))
-    assert rep["ignored"]["literal"] == 1 and rep["ignored"]["boolean_gaps"] == 1 \
-        and rep["ignored"]["duplicate_groups"] == 1, rep["ignored"]
+    assert rep["catalog_drift"] == [], rep["catalog_drift"]
+    assert rep["ignored"]["literal"] == 2 and rep["ignored"]["boolean_gaps"] == 1 \
+        and rep["ignored"]["duplicate_groups"] == 1 \
+        and rep["ignored"]["catalog_drift"] == 1, rep["ignored"]
 
 
 def test_ignore_file_missing_returns_2():

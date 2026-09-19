@@ -221,9 +221,10 @@ Expected: ImportError/AttributeError（`ardot-health-check.py` 尚不存在或�
       --components docs/08-UI-SPECS/screens/refs/ardot/components.json \
       [--out-dir tmp/ardot-health] [--min-dup-nodes 4] [--ignore 子串]... [--ignore-file 清单.txt]
 豁免: --ignore 子串与 --ignore-file(每行一个子串, 空行与 # 开头行跳过)合并生效;
-  path 命中任一豁免子串的节点, 从检测 1/2/3 的判定中排除(检测 4 目录漂移不受豁免影响)。
+  path 命中任一豁免子串的节点, 从全部四项检测的判定中排除(检测 4 目录漂移同样适用)。
   豁免计数写入 health.json 的 "ignored"(口径: literal=被豁免 findings 数,
-  boolean_gaps=被豁免帧数, duplicate_groups=locations 全部落在豁免路径的重复组数)。
+  boolean_gaps=被豁免帧数, duplicate_groups=locations 全部落在豁免路径的重复组数,
+  catalog_drift=因豁免而 literal 计数降至 0 的组件条目数)。
 检测项:
   1. literal 泄漏   — 未绑 token 的 SOLID/GRADIENT-stop 色(IMAGE 除外)
   2. 组件化违规     — ≥2 棵同构子树(节点数≥min-dup-nodes)且非组件实例
@@ -423,8 +424,10 @@ def find_boolean_gaps(roots, kernel, ignore=(), ignored=None):
     return sorted(gaps)
 
 
-def check_catalog(comps, node_index, kernel):
-    drift = []
+def check_catalog(comps, node_index, kernel, ignore=(), ignored=None):
+    """目录漂移; path 命中豁免子串的节点不计入 literal 统计,
+    因豁免使 literal 计数降至 0 的 tokenBound 条目数经 ignored dict 回传(catalog_drift)"""
+    drift, exempt = [], 0
     for c in comps:
         nd = node_index.get(c["nodeId"])
         if nd is None:
@@ -432,13 +435,22 @@ def check_catalog(comps, node_index, kernel):
             continue
         acc = []
         kernel.walk(nd, c["name"], acc)
-        lit = 0
-        for _p, n in acc:
+        lit = raw = 0
+        for p, n in acc:
+            hit = any(s in p for s in ignore)
             for kind in ("fills", "strokes"):
                 _b, _i, lits = kernel.classify_paints(n.get(kind))
-                lit += len(lits)
-        if lit > 0 and c.get("tokenBound"):
+                raw += len(lits)
+                if not hit:
+                    lit += len(lits)
+        if not c.get("tokenBound"):
+            continue
+        if lit > 0:
             drift.append({"name": c["name"], "nodeId": c["nodeId"], "issue": f"literal={lit}"})
+        elif raw > 0:
+            exempt += 1
+    if ignored is not None:
+        ignored["catalog_drift"] = exempt
     return drift
 
 
@@ -474,12 +486,12 @@ def main(argv=None):
     roots = load_roots(a.jsonl, kernel)
     var_rgb = load_var_rgb(a.vars, kernel)
 
-    ignored = {"literal": 0, "boolean_gaps": 0, "duplicate_groups": 0}
+    ignored = {"literal": 0, "boolean_gaps": 0, "duplicate_groups": 0, "catalog_drift": 0}
     report = {
         "literal": check_literals(roots, kernel, ignore, ignored),
         "duplicates": find_duplicates(roots, var_rgb, kernel, a.min_dup_nodes, ignore, ignored),
         "boolean_gaps": find_boolean_gaps(roots, kernel, ignore, ignored),
-        "catalog_drift": check_catalog(comps, build_node_index(roots), kernel),
+        "catalog_drift": check_catalog(comps, build_node_index(roots), kernel, ignore, ignored),
     }
     unhealthy = any(report[k] for k in report)
     report["ignored"] = ignored
@@ -490,11 +502,13 @@ def main(argv=None):
                  f"| 组件化违规(重复组) | {len(report['duplicates'])} |\n"
                  f"| 布尔图层漏适配 | {len(report['boolean_gaps'])} |\n"
                  f"| 目录漂移 | {len(report['catalog_drift'])} |\n"
-                 f"| 豁免(literal/dup组/boolean帧) | {ignored['literal']}/"
-                 f"{ignored['duplicate_groups']}/{ignored['boolean_gaps']} |\n")
+                 f"| 豁免(literal/dup组/boolean帧/drift条目) | {ignored['literal']}/"
+                 f"{ignored['duplicate_groups']}/{ignored['boolean_gaps']}/"
+                 f"{ignored['catalog_drift']} |\n")
     print(f"literal={len(report['literal'])} dup_groups={len(report['duplicates'])} "
           f"boolean_gaps={len(report['boolean_gaps'])} drift={len(report['catalog_drift'])} "
-          f"ignored={ignored['literal']}/{ignored['boolean_gaps']}/{ignored['duplicate_groups']} "
+          f"ignored={ignored['literal']}/{ignored['boolean_gaps']}/{ignored['duplicate_groups']}/"
+          f"{ignored['catalog_drift']} "
           f"-> {a.out_dir}/health.(json|md) {'UNHEALTHY' if unhealthy else 'OK'}")
     return 1 if unhealthy else 0
 
