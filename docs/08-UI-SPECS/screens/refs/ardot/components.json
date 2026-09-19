@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-19",
+  "updated": "2026-09-20",
   "components": [
     {
       "name": "component/floating_tab",
@@ -56,6 +56,28 @@
       "tokenBound": true,
       "variants": [],
       "rules": "模型列表一律用实例"
+    },
+    {
+      "name": "component/input_bar",
+      "nodeId": "387:22",
+      "page": "Components",
+      "purpose": "Chat 输入栏(InputCard+占位文本+相册/工程师胶囊+语音/发送钮)",
+      "darkPng": "components/input_bar-dark.png",
+      "lightPng": "components/input_bar-light.png",
+      "tokenBound": false,
+      "variants": [],
+      "rules": "Chat 各帧输入栏一律用实例; 文字覆写必须走变量重绑(字面量会被绑定弹回); 2026-09-20 快赢收编已绑 8 处, VoiceButton 图标 3 处 #7CA591 最近匹配 d=35>24 暂停待决策, 决策后转 tokenBound=true"
+    },
+    {
+      "name": "component/search_field",
+      "nodeId": "387:86",
+      "page": "Components",
+      "purpose": "相册搜索输入框(gallery/search 与 search_no_result 共用, 284x36 自适应)",
+      "darkPng": "components/search_field-dark.png",
+      "lightPng": "components/search_field-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "搜索框一律用实例放 top_bar 中位; 查询文字覆写走变量重绑"
     }
   ]
 }
