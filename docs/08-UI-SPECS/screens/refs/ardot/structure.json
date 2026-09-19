@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=152%3A1"
+    "url": "cocraft://localhost/file/715061534788814?node_id=386%3A45"
   },
   "pages": [
     {
@@ -6450,6 +6450,21 @@
                     "width": 300,
                     "x": 46.5,
                     "y": 734
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:38",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -7286,6 +7301,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:39",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 377
                   }
                 ],
                 "clipsContent": true,
@@ -8077,6 +8107,21 @@
                     "width": 300,
                     "x": 46.5,
                     "y": 734
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:40",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -8674,6 +8719,21 @@
                     "width": 300,
                     "x": 46.5,
                     "y": 734
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:41",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -8889,6 +8949,21 @@
                     "width": 300,
                     "x": 46.5,
                     "y": 734
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:42",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -9710,6 +9785,21 @@
                     "width": 300,
                     "x": 46.5,
                     "y": 734
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:43",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -10572,6 +10662,21 @@
                     "width": 300,
                     "x": 46.5,
                     "y": 734
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:44",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -11347,6 +11452,21 @@
                     "width": 393,
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:45",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -11375,7 +11495,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-ddgs-20260919_231528393.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-c32i-20260919_234424774.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -12999,7 +13119,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
@@ -13008,6 +13128,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:47",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -13036,16 +13171,864 @@
         "111:383": {
           "name": "chat/conversation",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_383-nc0x-20260919_231529329.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:383 chat/conversation (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_383-o23v-20260919_234425934.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:383 chat/conversation (FRAME)"
           }
         },
         "111:492": {
           "name": "chat/sidebar",
           "tree": {
-            "fileId": "715061534788814",
-            "fileName": "polang-ui-spec",
-            "fileUrl": "cocraft://localhost/file/715061534788814?node_id=152%3A1",
-            "permission": "readwrite"
+            "nodes": [
+              {
+                "children": [
+                  {
+                    "fills": [
+                      "$143:23"
+                    ],
+                    "height": 852,
+                    "id": "111:493",
+                    "name": "Scrim",
+                    "type": "RECTANGLE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "characters": "$183:6",
+                            "fills": [
+                              "$2:149"
+                            ],
+                            "fontName": {
+                              "family": "Sarasa Gothic SC",
+                              "style": "Semi Bold"
+                            },
+                            "fontSize": "$143:18",
+                            "height": "hug_contents",
+                            "id": "111:496",
+                            "lineHeight": {
+                              "unit": "AUTO"
+                            },
+                            "name": "SidebarTitle",
+                            "textAlignHorizontal": "LEFT",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [],
+                            "clipsContent": true,
+                            "height": 1,
+                            "id": "111:497",
+                            "layout": "none",
+                            "name": "spacer",
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "fills": [
+                                  "$386:55"
+                                ],
+                                "height": 12.833333969116211,
+                                "id": "111:499",
+                                "name": "Vector",
+                                "type": "VECTOR",
+                                "width": 12.833333969116211,
+                                "x": 4.583333492279053,
+                                "y": 4.583332061767578
+                              }
+                            ],
+                            "clipsContent": true,
+                            "height": 22,
+                            "id": "111:498",
+                            "layout": "none",
+                            "name": "ic/add",
+                            "type": "FRAME",
+                            "width": 22,
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "fills": [
+                                  "$386:55"
+                                ],
+                                "height": 12.833333969116211,
+                                "id": "111:501",
+                                "name": "Vector",
+                                "type": "VECTOR",
+                                "width": 12.833333969116211,
+                                "x": 4.583333492279053,
+                                "y": 4.583332061767578
+                              }
+                            ],
+                            "clipsContent": true,
+                            "height": 22,
+                            "id": "111:500",
+                            "layout": "none",
+                            "name": "ic/close",
+                            "type": "FRAME",
+                            "width": 22,
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 8,
+                        "height": "hug_contents",
+                        "id": "111:495",
+                        "layout": "horizontal",
+                        "name": "SidebarHeader",
+                        "padding": {
+                          "bottom": 12,
+                          "left": 16,
+                          "right": 16,
+                          "top": 16
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "fills": [
+                                      "$386:53"
+                                    ],
+                                    "height": 12.000000953674316,
+                                    "id": "111:505",
+                                    "name": "Vector",
+                                    "type": "VECTOR",
+                                    "width": 12.000000953674316,
+                                    "x": 2,
+                                    "y": 1.9999990463256836
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "height": 16,
+                                "id": "111:504",
+                                "layout": "none",
+                                "name": "ic/search",
+                                "type": "FRAME",
+                                "width": 16,
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "characters": "$183:7",
+                                "fills": [
+                                  "$2:151"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:10",
+                                "height": "hug_contents",
+                                "id": "111:506",
+                                "lineHeight": {
+                                  "unit": "AUTO"
+                                },
+                                "name": "SearchPlaceholder",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "fills": [
+                              "$2:150"
+                            ],
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "111:503",
+                            "layout": "horizontal",
+                            "name": "SearchField",
+                            "padding": {
+                              "bottom": 8,
+                              "left": 12,
+                              "right": 12,
+                              "top": 8
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "111:502",
+                        "layout": "vertical",
+                        "name": "SearchWrap",
+                        "padding": {
+                          "bottom": 12,
+                          "left": 16,
+                          "right": 16,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "characters": "$183:19",
+                                    "fills": [
+                                      "$2:130"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Semi Bold"
+                                    },
+                                    "fontSize": "$143:17",
+                                    "height": "hug_contents",
+                                    "id": "111:510",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadTitle",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "characters": "$183:30",
+                                    "fills": [
+                                      "$2:151"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$79:167",
+                                    "height": "hug_contents",
+                                    "id": "111:511",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadPreview",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": 196,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 2,
+                                "height": "hug_contents",
+                                "id": "111:509",
+                                "layout": "vertical",
+                                "name": "ThreadTextCol",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "fills": [
+                                      "$386:53"
+                                    ],
+                                    "height": 13.333333969116211,
+                                    "id": "111:513",
+                                    "name": "Vector",
+                                    "type": "VECTOR",
+                                    "width": 3.3333334922790527,
+                                    "x": 8.333333969116211,
+                                    "y": 3.333332061767578
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "height": 20,
+                                "id": "111:512",
+                                "layout": "none",
+                                "name": "ic/more_vert",
+                                "type": "FRAME",
+                                "width": 20,
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 14,
+                            "fills": [
+                              "$2:157"
+                            ],
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "111:508",
+                            "layout": "horizontal",
+                            "name": "ThreadItemSelected",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "characters": "$183:8",
+                                    "fills": [
+                                      "$2:149"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$143:17",
+                                    "height": "hug_contents",
+                                    "id": "111:516",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadTitle",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": "hug_contents",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "characters": "$183:31",
+                                    "fills": [
+                                      "$2:151"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$79:167",
+                                    "height": "hug_contents",
+                                    "id": "111:517",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadPreview",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": 196,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 2,
+                                "height": "hug_contents",
+                                "id": "111:515",
+                                "layout": "vertical",
+                                "name": "ThreadTextCol",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "fills": [
+                                      "$386:53"
+                                    ],
+                                    "height": 13.333333969116211,
+                                    "id": "111:519",
+                                    "name": "Vector",
+                                    "type": "VECTOR",
+                                    "width": 3.3333334922790527,
+                                    "x": 8.333333969116211,
+                                    "y": 3.333332061767578
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "height": 20,
+                                "id": "111:518",
+                                "layout": "none",
+                                "name": "ic/more_vert",
+                                "type": "FRAME",
+                                "width": 20,
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 14,
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "111:514",
+                            "layout": "horizontal",
+                            "name": "ThreadItem",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "characters": "$183:17",
+                                    "fills": [
+                                      "$2:149"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$143:17",
+                                    "height": "hug_contents",
+                                    "id": "111:522",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadTitle",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": "hug_contents",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "characters": "$183:32",
+                                    "fills": [
+                                      "$2:151"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$79:167",
+                                    "height": "hug_contents",
+                                    "id": "111:523",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadPreview",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": 196,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 2,
+                                "height": "hug_contents",
+                                "id": "111:521",
+                                "layout": "vertical",
+                                "name": "ThreadTextCol",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "fills": [
+                                      "$386:53"
+                                    ],
+                                    "height": 13.333333969116211,
+                                    "id": "111:525",
+                                    "name": "Vector",
+                                    "type": "VECTOR",
+                                    "width": 3.3333334922790527,
+                                    "x": 8.333333969116211,
+                                    "y": 3.333332061767578
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "height": 20,
+                                "id": "111:524",
+                                "layout": "none",
+                                "name": "ic/more_vert",
+                                "type": "FRAME",
+                                "width": 20,
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 14,
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "111:520",
+                            "layout": "horizontal",
+                            "name": "ThreadItem",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "characters": "$183:9",
+                                    "fills": [
+                                      "$2:149"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$143:17",
+                                    "height": "hug_contents",
+                                    "id": "111:528",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadTitle",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": "hug_contents",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "characters": "$183:33",
+                                    "fills": [
+                                      "$2:151"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$79:167",
+                                    "height": "hug_contents",
+                                    "id": "111:529",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadPreview",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": 196,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 2,
+                                "height": "hug_contents",
+                                "id": "111:527",
+                                "layout": "vertical",
+                                "name": "ThreadTextCol",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "fills": [
+                                      "$386:53"
+                                    ],
+                                    "height": 13.333333969116211,
+                                    "id": "111:531",
+                                    "name": "Vector",
+                                    "type": "VECTOR",
+                                    "width": 3.3333334922790527,
+                                    "x": 8.333333969116211,
+                                    "y": 3.333332061767578
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "height": 20,
+                                "id": "111:530",
+                                "layout": "none",
+                                "name": "ic/more_vert",
+                                "type": "FRAME",
+                                "width": 20,
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 14,
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "111:526",
+                            "layout": "horizontal",
+                            "name": "ThreadItem",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "characters": "$183:16",
+                                    "fills": [
+                                      "$2:149"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$143:17",
+                                    "height": "hug_contents",
+                                    "id": "111:534",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadTitle",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "characters": "$183:34",
+                                    "fills": [
+                                      "$2:151"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Regular"
+                                    },
+                                    "fontSize": "$79:167",
+                                    "height": "hug_contents",
+                                    "id": "111:535",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "ThreadPreview",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": 196,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 2,
+                                "height": "hug_contents",
+                                "id": "111:533",
+                                "layout": "vertical",
+                                "name": "ThreadTextCol",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "fills": [
+                                      "$386:53"
+                                    ],
+                                    "height": 13.333333969116211,
+                                    "id": "111:537",
+                                    "name": "Vector",
+                                    "type": "VECTOR",
+                                    "width": 3.3333334922790527,
+                                    "x": 8.333333969116211,
+                                    "y": 3.333332061767578
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "height": 20,
+                                "id": "111:536",
+                                "layout": "none",
+                                "name": "ic/more_vert",
+                                "type": "FRAME",
+                                "width": 20,
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 14,
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "111:532",
+                            "layout": "horizontal",
+                            "name": "ThreadItem",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 4,
+                        "height": "fill_container",
+                        "id": "111:507",
+                        "layout": "vertical",
+                        "name": "ThreadList",
+                        "padding": {
+                          "bottom": 8,
+                          "left": 8,
+                          "right": 8,
+                          "top": 8
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      }
+                    ],
+                    "clipsContent": true,
+                    "effects": [
+                      {
+                        "blendMode": "NORMAL",
+                        "color": {
+                          "a": 0.5,
+                          "b": 0,
+                          "g": 0,
+                          "r": 0
+                        },
+                        "offset": {
+                          "x": 8,
+                          "y": 0
+                        },
+                        "radius": 24,
+                        "showShadowBehindNode": true,
+                        "spread": 0,
+                        "type": "DROP_SHADOW",
+                        "visible": true
+                      }
+                    ],
+                    "fills": [
+                      "$2:148"
+                    ],
+                    "gap": 0,
+                    "height": 852,
+                    "id": "111:494",
+                    "layout": "vertical",
+                    "name": "SidebarPanel",
+                    "padding": {
+                      "bottom": 0,
+                      "left": 0,
+                      "right": 0,
+                      "top": 0
+                    },
+                    "type": "FRAME",
+                    "width": 280,
+                    "x": 0,
+                    "y": 0
+                  }
+                ],
+                "clipsContent": true,
+                "fills": [
+                  "$2:146"
+                ],
+                "height": 852,
+                "id": "111:492",
+                "layout": "none",
+                "name": "chat/sidebar",
+                "type": "FRAME",
+                "width": 393,
+                "x": 2052,
+                "y": 0
+              }
+            ]
           }
         },
         "171:171": {
@@ -14405,7 +15388,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
@@ -14414,6 +15397,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:49",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -14442,7 +15440,7 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-6uj5-20260919_231530538.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-vzxm-20260919_234427180.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
           }
         },
         "267:518": {
@@ -15240,7 +16238,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
@@ -15249,6 +16247,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:51",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -15283,13 +16296,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-xg1v-20260919_231532366.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-lvgm-20260919_234429427.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-yiqf-20260919_231531678.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-dfeu-20260919_234428691.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -16131,6 +17144,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:53",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -16159,7 +17187,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-ieii-20260919_231533627.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-h0xv-20260919_234430868.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -17491,7 +18519,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-4ylm-20260919_231533018.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-exf0-20260919_234430194.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -18327,6 +19355,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:56",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 902
                   }
                 ],
                 "clipsContent": true,
@@ -19122,6 +20165,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:57",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 678
                   }
                 ],
                 "clipsContent": true,
@@ -19903,6 +20961,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:58",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -20747,20 +21820,19 @@
                     "y": 738
                   },
                   {
-                    "children": [],
-                    "clipsContent": true,
-                    "cornerRadius": 2.5,
-                    "fills": [
-                      "$143:3"
-                    ],
-                    "height": 5,
-                    "id": "118:311",
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:73",
                     "layout": "none",
-                    "name": "home_indicator",
-                    "type": "FRAME",
-                    "width": 134,
-                    "x": 129.5,
-                    "y": 828
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -21304,22 +22376,6 @@
                     "width": 60,
                     "x": 326,
                     "y": 738
-                  },
-                  {
-                    "children": [],
-                    "clipsContent": true,
-                    "cornerRadius": 2.5,
-                    "fills": [
-                      "$143:3"
-                    ],
-                    "height": 5,
-                    "id": "118:411",
-                    "layout": "none",
-                    "name": "home_indicator",
-                    "type": "FRAME",
-                    "width": 134,
-                    "x": 129.5,
-                    "y": 828
                   },
                   {
                     "characters": "$183:46",
@@ -21912,6 +22968,21 @@
                     "width": 54,
                     "x": 321,
                     "y": 644
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:74",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -22455,22 +23526,6 @@
                     "width": 60,
                     "x": 326,
                     "y": 738
-                  },
-                  {
-                    "children": [],
-                    "clipsContent": true,
-                    "cornerRadius": 2.5,
-                    "fills": [
-                      "$143:3"
-                    ],
-                    "height": 5,
-                    "id": "118:519",
-                    "layout": "none",
-                    "name": "home_indicator",
-                    "type": "FRAME",
-                    "width": 134,
-                    "x": 129.5,
-                    "y": 828
                   },
                   {
                     "characters": "$183:41",
@@ -23042,6 +24097,21 @@
                     "width": 44,
                     "x": 334,
                     "y": 628
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:75",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -23587,20 +24657,19 @@
                     "y": 738
                   },
                   {
-                    "children": [],
-                    "clipsContent": true,
-                    "cornerRadius": 2.5,
-                    "fills": [
-                      "$143:3"
-                    ],
-                    "height": 5,
-                    "id": "118:622",
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:76",
                     "layout": "none",
-                    "name": "home_indicator",
-                    "type": "FRAME",
-                    "width": 134,
-                    "x": 129.5,
-                    "y": 828
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -23628,7 +24697,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-r7ub-20260919_231537676.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-77l1-20260919_234435599.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -23640,13 +24709,13 @@
         "171:3": {
           "name": "people/grid",
           "tree": {
-            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_3-zqvu-20260919_231538255.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:3 people/grid (FRAME)"
+            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_3-0v1x-20260919_234436904.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:3 people/grid (FRAME)"
           }
         },
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-fgq3-20260919_231538588.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-5au0-20260919_234437327.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -24518,6 +25587,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:70",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -25168,6 +26252,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:71",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -25862,6 +26961,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:72",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -26913,6 +28027,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:68",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -26941,19 +28070,19 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-svxm-20260919_231540636.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-j46y-20260919_234440223.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (20KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-ll4n-20260919_231539438.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (20KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-gpvg-20260919_234438396.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
           "name": "organize/hub",
           "tree": {
-            "_raw": "Read 1 node(s) (33KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_24-hs84-20260919_231539124.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:24 organize/hub (FRAME)"
+            "_raw": "Read 1 node(s) (33KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_24-28qu-20260919_234438047.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:24 organize/hub (FRAME)"
           }
         },
         "267:280": {
@@ -27569,6 +28698,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:65",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -27954,6 +29098,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:66",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -28552,6 +29711,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:67",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -29752,6 +30926,21 @@
                     "width": "fill_container",
                     "x": "auto",
                     "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "387:62",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -29780,7 +30969,7 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-1xny-20260919_231541573.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-3s5h-20260919_234443446.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
           }
         }
       },
