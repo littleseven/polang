@@ -161,7 +161,7 @@ data class TimeRange(
 
 - **时间标准化**：Prompt 明确告知 LLM 当前时间（`now=`），要求把“近半年”“去年”“上个月”“近 3 个月”等相对表达换算为毫秒时间戳。例如 `近半年小孩的照片` → `TimeRange(startMs=1735689600000, endMs=1751327999999)`。
 - **与本地字段对齐**：`keywords` 对应 `labels/mlKitLabels/ocrText/fileName`；`locationKeywords` 对应 `locationName`；`hasFaces` 对应 `hasFace`；`personName` 对应人脸聚类后的 `persons`。
-- **命令层传递**：远程链路在 `RemotePromptBuilder` 的 Tool Spec 中定义 `intent` 参数，由 `ToolCallCommandParser` 负责把 JSON 反序列化为 `SearchIntent`（端侧文本链路 `LocalPromptBuilder`/`LocalCommandParser` 已于 2026-08-02 移除）。
+- **命令层传递**：远程链路 `search_media` @Tool（`ChatToolService`）当前只透传自然语言 `query`，直接构造 `AgentCommand.SearchMedia(query)`；`SearchIntent` 结构化字段现仅 `refine_media_search` 的时间维（fromMs/toMs）在填充，完整 intent 标准化已退化为字符串路径（`RemotePromptBuilder` Tool Spec + `ToolCallCommandParser` 链路已随 Phase 5 删除）。
 - **退化策略**：当 LLM 未输出 `intent` 或所有结构化字段为空时，`SearchIntent? = null`，下游自动回退到 `QueryParser` 规则解析。
 
 **Chat 链路**：
@@ -173,7 +173,7 @@ data class TimeRange(
 AgentOrchestrator.streamChat()
     │
     ▼
-远程 LLM（RemoteReActAgent）→ AgentCommand.SearchMedia(
+远程 LLM（KoogChatAgent）→ AgentCommand.SearchMedia(
     query = "近半年小孩的照片",
     intent = SearchIntent(
         timeRange = TimeRange(...),   // 近半年

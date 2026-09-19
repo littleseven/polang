@@ -125,10 +125,10 @@ ALTER TABLE media_assets ADD COLUMN indexedAt INTEGER;  -- 索引时间
 AgentOrchestrator.dispatch()
     │
     ├── LOCAL mode → LocalLlmEngine → 输出 [{"method":"search_media","params":{"query":"..."}}]   # ⚠️ 已废止（2026-08-02 端侧文本 LLM 移除）
-    └── REMOTE mode → RemoteReActAgent → tool_calls → search_media
+    └── REMOTE mode → KoogChatAgent（原 RemoteReActAgent）→ tool_calls → search_media
     │
     ▼
-LocalCommandParser / ToolCallCommandParser → AgentCommand.SearchMedia
+~~LocalCommandParser / ToolCallCommandParser~~（均已删除；现为 @Tool 方法直接构造）→ AgentCommand.SearchMedia
     │
     ▼
 CapabilityRegistry.dispatch() → GalleryCapability.execute()
