@@ -371,12 +371,12 @@ def _is_instance(nd):
 def find_duplicates(roots, var_rgb, kernel, min_nodes, ignore):
     groups = {}
 
-    def visit(nd, path):
+    def visit(nd, path, record=True):
         if _is_instance(nd) or any(s in path for s in ignore):
             return
         acc = []
         kernel.walk(nd, path, acc)
-        if len(acc) >= min_nodes:
+        if record and len(acc) >= min_nodes:
             fp = repr(fingerprint(nd, var_rgb, kernel))
             g = groups.setdefault(fp, {"locations": [], "nodes": len(acc)})
             g["locations"].append(path)
@@ -385,7 +385,7 @@ def find_duplicates(roots, var_rgb, kernel, min_nodes, ignore):
                 visit(c, path + "/" + str(c.get("name", c.get("id"))))
 
     for root, label in roots:
-        visit(root, label)
+        visit(root, label, record=False)  # 顶层帧自身不入组: 整屏同构属正常, 目标是内部重复子树
     dups = [g for g in groups.values() if len(g["locations"]) >= 2]
     return sorted(dups, key=lambda g: -g["nodes"])
 
