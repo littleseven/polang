@@ -117,6 +117,17 @@
       "tokenBound": true,
       "variants": [],
       "rules": "相册类帧顶栏一律用实例; gallery/empty 父帧绝对定位需覆写 layoutPositioning:ABSOLUTE+x:0+y:0+width:393; 根透明底, 双模判定走语义判据(不透明像素 dark≈239→light≈50); 变体候选未收: scanning(ic/pause 换 ic/scan)、search 4-node 组(back+search_field+result_count, 宜独立组件)、People detail(btn_back+title+btn_save)"
+    },
+    {
+      "name": "component/chat_photo_card",
+      "nodeId": "387:143",
+      "page": "Components",
+      "purpose": "Chat 媒体结果轮播照片卡(120x150, IMAGE 照片底 + FeedbackCol 三反馈钮 + DateChip 日期角标)",
+      "darkPng": "components/chat_photo_card-dark.png",
+      "lightPng": "components/chat_photo_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "Chat 媒体结果卡一律用实例; 照片覆写 U(inst,{fills:[IMAGE]}), 日期覆写 U(inst+\"387:136\",{characters}); 子树颜色 token(color/white、canvasPureBlack、chatCarousel/feedbackBgColor)双模同值, 双模 PNG 一致属预期; 变体未收: chat/conversation Carousel 首卡(15-node, thumb_up 叠 3 重复 Vector, 渲染等价, 待清理)"
     }
   ]
 }
