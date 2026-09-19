@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-19T22:22:12+08:00",
+  "exportedAt": "2026-09-19T22:23:53+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=132%3A2"
+    "url": "cocraft://localhost/file/715061534788814?node_id=118%3A104"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -91,21 +91,6 @@
           "id": "107:353",
           "name": "gallery/selection",
           "png": "gallery-selection.png"
-        },
-        {
-          "id": "300:29",
-          "name": "gallery/grid-store01",
-          "png": "gallery-grid-store01.png"
-        },
-        {
-          "id": "300:539",
-          "name": "search/store01",
-          "png": "search-store01.png"
-        },
-        {
-          "id": "306:197",
-          "name": "gallery/grid-store01-zhTW",
-          "png": "gallery-grid-store01-zhTW.png"
         }
       ],
       "id": "103:1",
@@ -147,21 +132,6 @@
           "id": "267:518",
           "name": "chat/cleanup_done",
           "png": "chat-cleanup_done.png"
-        },
-        {
-          "id": "300:651",
-          "name": "chat/store01-welcome",
-          "png": "chat-store01-welcome.png"
-        },
-        {
-          "id": "301:13",
-          "name": "chat/store01-conversation",
-          "png": "chat-store01-conversation.png"
-        },
-        {
-          "id": "301:96",
-          "name": "chat/store01-insight",
-          "png": "chat-store01-insight.png"
         }
       ],
       "id": "111:319",
@@ -223,21 +193,6 @@
           "id": "379:100",
           "name": "settings/account",
           "png": "settings-account.png"
-        },
-        {
-          "id": "385:1",
-          "name": "settings/privacy-store01-zh",
-          "png": "settings-privacy-store01-zh.png"
-        },
-        {
-          "id": "385:32",
-          "name": "settings/privacy-store01-en",
-          "png": "settings-privacy-store01-en.png"
-        },
-        {
-          "id": "385:63",
-          "name": "settings/privacy-store01-tw",
-          "png": "settings-privacy-store01-tw.png"
         }
       ],
       "id": "108:1",
@@ -291,16 +246,6 @@
           "id": "171:87",
           "name": "people/detail",
           "png": "people-detail.png"
-        },
-        {
-          "id": "300:215",
-          "name": "people/grid-store01",
-          "png": "people-grid-store01.png"
-        },
-        {
-          "id": "300:723",
-          "name": "people/detail-store01",
-          "png": "people-detail-store01.png"
         }
       ],
       "id": "171:1",
@@ -383,11 +328,6 @@
           "id": "297:65",
           "name": "memory/detail",
           "png": "memory-detail.png"
-        },
-        {
-          "id": "300:782",
-          "name": "memory/store01-feed",
-          "png": "memory-store01-feed.png"
         }
       ],
       "id": "297:1",
@@ -426,5 +366,5 @@
     }
   ],
   "scale": 1,
-  "structureSha256": "4cdd73a5dab6c864488db019e2d36b039b8133e742be212fe6e7aecee77e05f1"
+  "structureSha256": "56a369a83278ec92547e311022ff4c3686aaefefb9310c3c2cba296642efaf51"
 }
