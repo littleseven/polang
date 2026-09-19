@@ -13,8 +13,10 @@ import java.io.File
  * 本测试锁死该函数对 Android 工具清单的输出逐字节不变——任何 prompt 文本/拼接顺序/
  * ToolInventory 格式改动（含 chatPromptBuilder 接线改错默认值）都会变红。
  *
- * golden 生成/更新：`-Dpolang.writeGolden=true ./gradlew :shared:jvmTest --tests "*ChatSystemPromptGoldenTest*"`
+ * golden 生成/更新：`POLANG_WRITE_GOLDEN=1 ./gradlew :shared:jvmTest --tests "*ChatSystemPromptGoldenTest*"`
  * （仅限 deliberate prompt 变更后；生成结果必须人工 review 再提交）。
+ * 注意必须用环境变量——`-Dpolang.writeGolden=true` 只作用于 Gradle 守护进程 JVM，
+ * 不透传 fork 出的测试 JVM（实测 2026-09-19 写入未生效）。
  */
 class ChatSystemPromptGoldenTest {
 

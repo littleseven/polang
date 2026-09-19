@@ -17,11 +17,11 @@
 
 ```
 shared/src/
-├── commonMain/    ← 引擎无关层（102 个 Kotlin 文件，见 §2）
+├── commonMain/    ← 引擎无关层（104 个 Kotlin 文件，见 §2）
 ├── androidMain/   ← Android 平台实现（VLM/语音/DataStore/dispatcher actual，14 文件）
 ├── iosMain/       ← iOS actual + Phase 6.2 chat 全链路（26 文件）：IosAgentComposition 组合根/ChatAgentBridge（Swift↔Kotlin 桥，多会话 setSessionId/clearHistory(sessionId:) 按 koog_memory_<sessionId> 分键隔离）/IosChatGalleryCapability（+IosChatGallerySearch 纯逻辑、IosChatSearchBridge 搜索引擎桥，契约 tmp/ios-follow/gallery-search/contracts.md §9）/IosKoogMessageMemoryStore（NSUserDefaults）/IosMediaRepository(+Bridge)/FlowWatchers/ChatUiActionDto/IosChatPrompt/IosAiOptimizeCapability(+IosAiOptimizeBridge)/IosChartCapability(+IosChartBridge)/IosRunScriptCapability(+IosRunScriptBridge)/IosJsRuntimeSupport/IosDiagnosticLogStore/domain/chat/StreamingPacingControllerFactory/TimeProvider；唯一 stub 为 IosUnavailableImageInferenceEngine（端侧 VLM 未落地，显式空契约）
 ├── jvmMain/       ← JVM actual（5 文件：Platform/DispatcherProvider/AgentIdGenerator/KoogHttpClientFactoryProvider actual + domain/chat/TimeProvider.kt）
-├── commonTest/    ← 多平台测试（kotlin.test，32 文件）
+├── commonTest/    ← 多平台测试（kotlin.test，34 文件）
 ├── iosTest/       ← iOS 测试（6 文件）
 └── jvmTest/       ← JVM-only 测试（@Tool 反射清单/prompt golden/守卫扫描，7 文件）
 ```
@@ -40,7 +40,8 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 | 子包 | 内容 |
 |------|------|
 | `facade/` | `AgentOrchestrator`（initialize(AgentDependencies) + 无参 getInstance）、`AgentConfigurator`、`AgentDependencies`（9 字段注入契约）、`LocalModelService` |
-| `inference/remote/` | `KoogChatAgent`/`KoogReActAgent`/`KoogReActStrategy`（koog/）、`ChatToolService`/`CameraToolService`/`ToolInventory`/`MemoryContextProvider`（tool/）、`RemotePromptBuilder`（prompt/）、`RemoteChatEngine`、`LlmCallRecorder` |
+| `inference/remote/` | `KoogChatAgent`/`KoogReActAgent`/`KoogReActStrategy`（koog/）、`ChatToolService`/`CameraToolService`/`ToolInventory`/`MemoryContextProvider`（tool/）、`RemotePromptBuilder`（prompt/，L2/L3/L4 遗留模板）、`ChatPromptRules`（prompt/，chat system prompt 行为规则段分节拼装）、`RemoteChatEngine`、`LlmCallRecorder` |
+| `intent/` | `IntentGuard`（意图守卫层：LLM 误拒搜索回退判定、chat 页模糊跳转拦截；纯函数确定性规则，自 ChatViewModel 私有 guard 收口，双端可复用） |
 | `inference/local/` | `ImageInferenceEngine` 接口（端侧 VLM 抽象）、`LocalModelService` |
 | `js/` | JS 引擎无关层（JsEngine/JsValue/JsBridge/JsRuntime/NativeHandler/BuiltInHandlers/GallerySummaryJs） |
 | `runtime/` | `CapabilityRegistry`/`CommandExecutor`/`CrossPageCommandQueue`（capability/）、`PrivacyGuard`（policy/）、`SceneManager`（state/）、`ExecutionEngine`（execution/） |

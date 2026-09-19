@@ -109,7 +109,7 @@
 
 > 路由定位（详见 `AGENT_ARCHITECTURE.md` §2.4）：JS 沙箱**不是与 tool_call 平级的第二条链路**，而是 `run_gallery_script` 工具的执行体。JS 内通过 `await bridge.callAsync(name, args)` 调用两类 handler：
 > - **只读 handler**（下表 A）：直连 `QueryGalleryMediaUseCase` 等，**绕开 CapabilityRegistry**，属独立"能力表面"。无对应 AgentCommand，仅服务于盘点/统计。
-> - **写 handler**（下表 B，统一入口 `capability.dispatch`）：回环进 `CapabilityRegistry`，复用 AgentCommand/Capability，经 Tier A 应用内确认（见 §2.4.4）。
+> - **写 handler**（下表 B，统一入口 `capability.dispatch`）：回环进 `CapabilityRegistry`，复用 AgentCommand/Capability，经 Tier A 应用内确认（见 §2.4.5）。
 
 **表 A — 只读 handler（`bridge.callAsync`，不进注册表，数据不出端）**
 
@@ -238,7 +238,7 @@
 ### 4.2 关键设计
 
 - 通过 `WeakReference<Delegate>` 绑定到 `ChatViewModel`，避免页面销毁后内存泄漏。
-- `SearchIntent` 由本地/远程 LLM 生成，`ChatViewModel` 负责将其转换为 `StructuredFilter` 后调用 `MediaSearchEngine.search(filter)`。
+- `SearchIntent` 由远程 LLM 生成，`ChatViewModel` 负责将其转换为 `StructuredFilter` 后调用 `MediaSearchEngine.search(filter)`。
 - `refine_media_search` 在上轮结果集的 ID 集合内执行 in-set 过滤，避免全库重搜破坏多轮收敛。
 
 ### 4.3 生命周期
@@ -622,19 +622,9 @@ class PromptBuilder(private val sceneManager: SceneManager) {
 }
 ```
 
-#### 步骤 5: 添加自然语言映射（可选）
+#### 步骤 5: 自然语言 → 命令的映射（架构说明）
 
-```kotlin
-object NaturalLanguageMapper {
-    fun parseToCommand(input: String): AgentCommand? {
-        return when {
-            input.contains("你的功能") -> AgentCommand.YourCommand("default", 0)
-            input.contains("参数 1") -> AgentCommand.YourCommand("value1", 42)
-            else -> null
-        }
-    }
-}
-```
+**当前架构不设关键词映射器**（历史上曾有 `NaturalLanguageMapper` 式示例，为愿景形态，从未落地）。自然语言到 `AgentCommand` 的结构化由远程 LLM 的 tool_calls 一步完成：LLM 按 `@Tool` schema 输出类型化参数，`@Tool` 方法一行薄封装构造 `AgentCommand`。需要本地化兜底时，使用 `:shared` commonMain `agent/core/intent/IntentGuard` 的确定性守卫（误拒回退 / 模糊跳转拦截），勿新增关键词解析器。
 
 ### 2. Capability 接口详解
 

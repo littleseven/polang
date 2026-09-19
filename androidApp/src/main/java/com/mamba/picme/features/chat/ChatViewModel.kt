@@ -27,6 +27,7 @@ import com.mamba.picme.agent.core.model.context.toReplyLanguage
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
+import com.mamba.picme.agent.core.intent.IntentGuard
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.agent.core.inference.local.llm.LlmGenerationMetrics
@@ -1335,7 +1336,7 @@ class ChatViewModel(
                         val replyText = (streamResult.commands.firstOrNull() as? AgentCommand.TextReply)?.message
                             ?: streamResult.fullResponse
                         // ReAct 已出过卡片时（总结文本带拒绝措辞属常见误报），跳过回退直搜，避免重复卡片
-                        if (isRefusedSearchRequest(text, replyText) &&
+                        if (IntentGuard.isRefusedSearchRequest(text, replyText) &&
                             chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId) == null
                         ) {
                             Logger.w(TAG, "LLM refused search request, falling back to direct gallery search")
@@ -1357,7 +1358,11 @@ class ChatViewModel(
                             // 有命令需要执行：通过 CapabilityRegistry 分发
                             Logger.i(TAG, "Executing ${streamResult.commands.size} commands from streaming response")
                             // 聊天页拦截模糊跳转：只有明确说"去相机/去相册/去设置/返回"等口令时才放行
-                            val commands = sanitizeNavigationCommands(streamResult.commands, text)
+                            val commands = IntentGuard.sanitizeNavigationCommands(
+                                streamResult.commands,
+                                text,
+                                blockedMessage = stringContext().getString(R.string.chat_nav_blocked_in_chat)
+                            )
                             val finalCommand = if (commands.size > 1) {
                                 AgentCommand.BatchExecute(commands = commands)
                             } else {
@@ -1434,25 +1439,6 @@ class ChatViewModel(
                 _isProcessing.value = false
             }
         }
-    }
-
-    /**
-     * 检测 LLM 是否拒绝了用户的相册搜索意图（安全对齐误触发）。
-     *
-     * 当用户输入包含搜索关键词（照片/图片/搜/找…）且 LLM 仅返回 TextReply
-     * 且回复包含拒绝关键词（不能/无法/抱歉…搜索/推荐/内容）时，
-     * 判定为安全对齐误触发，应回退到直接搜索本地相册。
-     */
-    private fun isRefusedSearchRequest(userInput: String, replyText: String): Boolean {
-        val searchKeywords = listOf("照片", "图片", "照", "搜", "找")
-        val refusalKeywords = listOf("不能", "无法", "抱歉", "不合适", "不当", "拒绝")
-        val refusalTargets = listOf("搜索", "推荐", "此类", "内容", "提供")
-
-        val hasSearchIntent = searchKeywords.any { keyword -> userInput.contains(keyword) }
-        val hasRefusal = refusalKeywords.any { keyword -> replyText.contains(keyword) } &&
-            refusalTargets.any { keyword -> replyText.contains(keyword) }
-
-        return hasSearchIntent && hasRefusal
     }
 
     private fun currentModelLabel(): String {
@@ -2957,50 +2943,6 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * 判断用户输入是否包含明确的页面跳转口令。
-     *
-     * 仅当匹配以下模式时才允许在 chat 页执行 navigate_to / go_back：
-     * - "去/回/打开 + 相机/相册/设置/调试/模型中心"
-     * - "返回/后退/上一页"
-     *
-     * 模糊表述（如"我想看看相册""帮我打开相机""想去拍照"）应被拦截。
-     */
-    private fun isExplicitNavigationRequest(input: String): Boolean {
-        val trimmed = input.trim()
-        if (trimmed.isEmpty()) return false
-        val explicitPatterns = listOf(
-            Regex("""(去|回|打开)\s*(相机|相册|设置|调试|模型中心|model_center)"""),
-            Regex("""(返回|后退|上一页|回去)""")
-        )
-        return explicitPatterns.any { it.containsMatchIn(trimmed) }
-    }
-
-    /**
-     * 在 chat 页拦截模糊跳转命令。
-     *
-     * 如果命令是 navigate_to / go_back 但用户输入不匹配明确跳转口令，
-     * 则将其替换为 text_reply，避免聊天中因 LLM 误判而突然跳转页面。
-     */
-    private fun sanitizeNavigationCommands(
-        commands: List<AgentCommand>,
-        userInput: String
-    ): List<AgentCommand> {
-        if (commands.isEmpty()) return commands
-        val hasNavigation = commands.any { it is AgentCommand.NavigateTo || it is AgentCommand.GoBack }
-        if (!hasNavigation) return commands
-        // 明确跳转口令：放行
-        if (isExplicitNavigationRequest(userInput)) return commands
-        // 否则把所有导航命令替换为提示文本
-        return commands.map { cmd ->
-            when (cmd) {
-                is AgentCommand.NavigateTo, is AgentCommand.GoBack -> AgentCommand.TextReply(
-                    message = stringContext().getString(R.string.chat_nav_blocked_in_chat)
-                )
-                else -> cmd
-            }
-        }
-    }
 }
 
 /** Chat 问题上报 UI 状态。 */

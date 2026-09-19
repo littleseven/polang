@@ -53,8 +53,8 @@
 
 ```
 用户输入 → AgentOrchestrator
-    ├── chat/相册 → streamChat → RemoteReActAgent + ChatToolService → tool_calls → Capability 执行
-    └── 相机指令  → processCameraInput → RemoteReActAgent + CameraToolService → tool_calls → Capability 执行
+    ├── chat/相册 → streamChat → KoogChatAgent + ChatToolService → tool_calls → Capability 执行
+    └── 相机指令  → processCameraInput → KoogReActAgent + CameraToolService → tool_calls → Capability 执行
 ```
 
 > 历史：ADR-005 的「本地/远程双链路」（Qwen3.5-2B 端侧推理 + 自定义 JSON 数组协议）已于 2026-08-02 随端侧文本 LLM 一并移除，见本节「已移除组件」与 ADR-005 的「状态更新（2026-08-02）」块（历史 ADR-009/010 已于 2026-08-23 删除，见 [ADR 索引](./ADR/README.md)）。
@@ -64,8 +64,8 @@
 | 组件 | 职责 | 状态 |
 |------|------|------|
 | `AgentOrchestrator` | 统一入口：chat 走 `streamChat`，相机走 `processCameraInput`，均为远程推理 | ✅ 已落地 |
-| `RemoteReActAgent` / `RemoteChatEngine` | 远程推理链路：OpenAI Chat Completions API（tool_calls·流式·多轮）；相机走 ReAct，chat 走 ChatEngine | ✅ 已落地 |
-| `AgentConfigurator` / `StreamingSyncChatModel` | 远程推理装配与编排：`createRemoteChatModel()` 构建 Koog `OpenAILLMClient`，`StreamingSyncChatModel` 承载 SSE 流式 + ChatMemory 多轮 | ✅ 已落地 |
+| `KoogChatAgent` / `KoogReActAgent` / `RemoteChatEngine` | 远程推理链路：OpenAI Chat Completions API（tool_calls·流式·多轮）；chat 走 `RemoteChatEngine` + `KoogChatAgent`，相机走 `KoogReActAgent` | ✅ 已落地 |
+| `AgentConfigurator` / Koog `ChatMemory` | 远程推理装配与编排：`createRemoteChatModel()` 构建 Koog `OpenAILLMClient`，多轮记忆由 Koog ChatMemory feature + 组合根注入的 ChatMemoryStore 承担 | ✅ 已落地 |
 | `CameraToolService` | 相机场域 @Tool 工具集（capture/adjust_beauty/switch_filter/adjust_zoom/flip_camera 等），相机指令远程 tool_calls 入口 | ✅ 已落地 |
 | `LocalLlmEngine` | 仅存 `imageInference`：Qwen3-VL-2B 端侧 VLM 打标（TAG Pass3），不再承担文本推理 | ✅ 已落地（仅打标） |
 | `:shared` (KMP 模块) | Kotlin Multiplatform Library，提供 Koog Agent 框架封装：ChatModel、@Tool、AIAgent、ChatMemory、OpenAI Client、流式客户端 | ✅ 已落地 |
@@ -142,7 +142,7 @@
 │  │ CameraScreen→AiAgentUseCase│  │  RemoteChatEngine                     │   │
 │  │ →processCameraInput (远程) │  │  ┌────────────────────────────────┐  │   │
 │  │  ┌──────────────────────┐  │  │  │ AgentConfigurator              │  │   │
-│  │  │RemoteReActAgent +    │  │  │  │ Koog OpenAILLMClient         │  │   │
+│  │  │KoogReActAgent +     │  │  │  │ Koog OpenAILLMClient         │  │   │
 │  │  │CameraToolService@Tool│  │  │  │ OpenAI Chat Completions API   │  │   │
 │  │  └──────────────────────┘  │  │  │ DeepSeek V4 适配               │  │   │
 │  └────────────────────────────┘  │  │ L2 Batch / L3 Plan / L4 Chat   │  │   │
@@ -210,8 +210,8 @@ AgentOrchestrator（chat: streamChat · 相机: processCameraInput）
         │
         └── REMOTE（端侧文本 LLM 已移除，全场景远程）
             │
-            ├── chat/相册 → RemoteReActAgent + ChatToolService（@Tool）
-            ├── 相机指令 → RemoteReActAgent + CameraToolService（@Tool 相机场域工具集）
+            ├── chat/相册 → KoogChatAgent + ChatToolService（@Tool）
+            ├── 相机指令 → KoogReActAgent + CameraToolService（@Tool 相机场域工具集）
             │
             └── :shared (KMP Library, Koog 驱动)
                 ├── OpenAILLMClient (ChatLanguageModel)
@@ -272,10 +272,10 @@ AgentOrchestrator.dispatch("拍张照") → Capability 执行
                     └─────────────────────────────────────────────┘
 
                     ┌─ 相机场景（远程 tool_calls）─────────────────┐
-                    │ processCameraInput → RemoteReActAgent       │
+                    │ processCameraInput → KoogReActAgent         │
                     │ + CameraToolService @Tool（capture/         │ ← 与 chat 同一
-                    │   adjust_beauty/switch_filter/…）           │   ADR-005 协议，
-                    │ → ToolCallCommandParser                     │   也收敛到注册表
+                    │   adjust_beauty/switch_filter/…）           │   ADR-005 协议；
+                    │ @Tool 直接构造 AgentCommand                  │   也收敛到注册表
                     │ → CapabilityRegistry.dispatch               │
                     └─────────────────────────────────────────────┘
 
@@ -295,7 +295,7 @@ AgentOrchestrator.dispatch("拍张照") → Capability 执行
 |---|---|---|---|
 | 远程 Chat ReAct（`ChatToolService`） | CHAT 场景（相册助理）；`streamChat` 固定走此 | OpenAI `tool_calls` | 每个 `@Tool` → `dispatchCommand(AgentCommand)` → `CapabilityRegistry` |
 | 远程飞书 RPA（`RemoteControlToolService`） | 飞书 IM 远程控制（`processRemoteImInput`） | OpenAI `tool_calls` | 语义工具 → `CapabilityRegistry`；UI 工具（click/scroll/input）→ Accessibility（旁路） |
-| 相机远程 tool_calls（`CameraToolService`） | CAMERA 场景的语音/文字指令（`processCameraInput`） | OpenAI `tool_calls` | `ToolCallCommandParser` → `AgentCommand` → `CapabilityRegistry`（写操作复用 CommandRisk/确认机制与 JS `capability.dispatch` 通路） |
+| 相机远程 tool_calls（`CameraToolService`） | CAMERA 场景的语音/文字指令（`processCameraInput` → `KoogReActAgent`） | OpenAI `tool_calls` | 每个 `@Tool` → `dispatchCommand(AgentCommand)` → `CapabilityRegistry`（写操作复用 CommandRisk/确认机制与 JS `capability.dispatch` 通路） |
 
 > `streamChatLocal` / `streamChatRemote`（曾与 ReAct 并存的文本协议路径）已删除；CHAT 场景统一走远程 ReAct（ADR-005 远程协议分离）。
 
@@ -316,9 +316,18 @@ AgentOrchestrator.dispatch("拍张照") → Capability 执行
 | 多维组合查询 / 趋势 / 占比 / 统计 / 数学计算 | `run_gallery_script`（取数）+ `draw_chart`（画图） | tool → JS 沙箱 → `gallery.*` 读 / `capability.dispatch` 写 |
 | 飞书 IM 远程操控 UI（点按 / 输入 / 滑动） | `click` / `scroll` / `input_text` | tool → Accessibility（旁路，不进注册表） |
 
-判定边界（已固化于 `AgentConfigurator.chatSystemPrompt`）：单一维度用独立 tool；≥2 维度组合 / 趋势 / 占比 / 计算，才用 `run_gallery_script`。**`run_gallery_script` / `draw_chart` 仅 chat 场景（`ChatToolService`）暴露**——相机工具集（`CameraToolService`）不含 JS 工具。
+判定边界（已固化于 chat system prompt 行为规则段 `ChatPromptRules`，由 `RemoteChatEngine.buildChatSystemPrompt` 拼装）：单一维度用独立 tool；≥2 维度组合 / 趋势 / 占比 / 计算，才用 `run_gallery_script`。**`run_gallery_script` / `draw_chart` 仅 chat 场景（`ChatToolService`）暴露**——相机工具集（`CameraToolService`）不含 JS 工具。
 
-#### 2.4.4 写操作确认两层策略
+#### 2.4.4 意图理解：LLM 单步路由 + IntentGuard 确定性护栏
+
+意图理解**不设前置意图分类器**：用户自然语言原样进入 Koog agent 循环，远程 LLM 在 system prompt（角色段 + `ToolInventory` 工具清单段 + `ChatPromptRules` 行为规则段）与原生 `@Tool` schema 引导下，一步完成「理解 → 选工具 → 出类型化参数」；`@Tool` 方法薄封装构造 `AgentCommand`（历史上的中心化解析器 `ToolCallCommandParser` 已随 Phase 5 Koog 迁移删除，本地 `LocalCommandParser` 已随端侧文本 LLM 移除）。
+
+LLM 之外的确定性护栏收口在 `:shared` commonMain `agent/core/intent/IntentGuard`（纯函数、可单测、双端可复用），只做保守的误伤修正、不替代 LLM 的开放语义理解：
+
+- **误拒回退**：`isRefusedSearchRequest` 检测 LLM 安全对齐误拒相册搜索 → 调用方回退直搜本地相册（Android 接线：`ChatViewModel`）。
+- **模糊跳转拦截**：`sanitizeNavigationCommands` 在 chat 页把非明确口令（`isExplicitNavigationRequest`）触发的 navigate_to / go_back 替换为文本提示，拦截文案由平台侧按 i18n 注入。
+
+#### 2.4.5 写操作确认两层策略
 
 同一写命令可由两条链路触发，**确认手段不同是刻意设计**（风险分级 SSOT：`CommandRisk`）：
 
@@ -345,7 +354,7 @@ ChatViewModel.sendMessage()
 AgentOrchestrator / AiAgentUseCase（固定远程 REMOTE，端侧文本 LLM 已移除）
         │
         ▼
-RemoteChatEngine ──► StreamingSyncChatModel ──► Koog OpenAILLMClient
+RemoteChatEngine ──► KoogChatAgent ──► Koog OpenAILLMClient
         │
         ▼
 OpenAI Chat Completions (tool_calls)
@@ -540,7 +549,7 @@ class RemotePromptBuilder {
 
 #### 3.2.1 被动记忆注入（chat + 飞书，2026-07）
 
-`RemoteReActAgent` 的 `systemMessageProvider` 每轮重调，在固定 system prompt 后追加 `MemoryContextProvider.snapshot()` 返回的【关于用户】快照（已记住的事实 + 与"我"的人物关系）。快照由 app 层 `MemoryContextProviderImpl` 用 Room Flow（`observeAllFacts` + `observeRelationsToSelf`）预热 `@Volatile` 缓存，按 ~1500 字符预算截断、超出用 `recall_memory` 兜底。chat 与飞书 agent 共用同一份设备本机记忆（设计稿已随交付清理，git 历史可查）。
+Koog agent（`KoogChatAgent` / `KoogReActAgent`）的 system prompt 在 agent 构建期拼接，在固定 system prompt 后追加 `MemoryContextProvider.snapshot()` 返回的【关于用户】快照（已记住的事实 + 与"我"的人物关系）。快照由 app 层 `MemoryContextProviderImpl` 用 Room Flow（`observeAllFacts` + `observeRelationsToSelf`）预热 `@Volatile` 缓存，按 ~1500 字符预算截断、超出用 `recall_memory` 兜底。chat 与飞书 agent 共用同一份设备本机记忆（设计稿已随交付清理，git 历史可查）。
 
 ### 3.3 Capability 接口扩展
 
@@ -717,7 +726,7 @@ class NavigationCapability(
 
 ### 4.1 文本推理全远程，端侧仅 VLM 打标（2026-08-02 最终状态）
 
-**最终决策**：端侧文本 LLM（Qwen3.5-2B）已完全移除。chat 与相机指令统一走远程 OpenAI Chat Completions（tool_calls），与 ADR-005 远程协议一致；相机链路为 `AgentOrchestrator.processCameraInput` → `RemoteReActAgent` + `CameraToolService`（相机场域 @Tool 工具集）→ `ToolCallCommandParser` → `CapabilityRegistry.dispatch`，写操作复用 CommandRisk/确认机制与 JS `capability.dispatch` 通路。
+**最终决策**：端侧文本 LLM（Qwen3.5-2B）已完全移除。chat 与相机指令统一走远程 OpenAI Chat Completions（tool_calls），与 ADR-005 远程协议一致；相机链路为 `AgentOrchestrator.processCameraInput` → `KoogReActAgent` + `CameraToolService`（相机场域 @Tool 工具集）→ @Tool 方法直接构造 `AgentCommand` → `CapabilityRegistry.dispatch`（`ToolCallCommandParser` 已随 Phase 5 Koog 迁移删除），写操作复用 CommandRisk/确认机制与 JS `capability.dispatch` 通路。
 
 **端侧保留**：仅 Qwen3-VL-2B VLM 打标（`LocalLlmEngine` 仅存 `imageInference`，TAG Pass3）、Florence-2 打标、人脸检测（`:engines:mnn-core`）、OPUS-MT 翻译（`:engines:sentencepiece`）——均为媒体/视觉处理，不承担文本对话与指令解析。
 
@@ -844,25 +853,17 @@ class RemoteChatEngine(config: RemoteModelConfig) {  // 实际由 AgentConfigura
 
 远程推理使用 Koog `OpenAILLMClient`，支持所有兼容 OpenAI API 的服务（DeepSeek、通义千问等）；通过 Koog `AIAgent` + `ChatMemory` 实现多轮对话。
 
-**命令解析（ToolCallCommandParser）**：
+**命令解析（@Tool 方法内联构造，2026-08 Phase 5 起）**：
+
+中心化解析器 `ToolCallCommandParser`（langchain4j 期，`ToolExecutionRequest` + JSON args → `AgentCommand` 的巨型 when）已随 Phase 5 Koog 迁移删除。Koog 下 LLM 的 tool_calls 由 Koog agent 循环直接派发到 `@Tool` 方法，类型化参数在方法签名就位，每个 `@Tool` 方法一行薄封装构造 `AgentCommand`：
+
 ```kotlin
-object ToolCallCommandParser {
-    fun parse(request: ToolExecutionRequest, context: AgentContext): AgentCommand {
-        val name = request.name()      // 工具名 → 命令类型映射
-        val args = request.arguments() // 标准 JSON 参数
-        
-        return when (name) {
-            "switch_filter" -> AgentCommand.SwitchFilter(filterType = parseFilterType(args))
-            "adjust_beauty" -> AgentCommand.AdjustBeauty(settings = parseBeautySettings(args))
-            // ... 其他命令
-            else -> AgentCommand.TextReply("未知命令: $name")
-        }
-    }
-}
+@Tool(customName = "switch_filter")
+suspend fun switchFilter(filter: String): String =
+    dispatchCommand(AgentCommand.SwitchFilter(filterType = parseFilterType(filter)))
 ```
 
-命令解析统一使用 `ToolCallCommandParser`（本地 `LocalCommandParser` 已随端侧文本 LLM 移除，2026-08-02）：
-- `ToolCallCommandParser` — 解析 `name` + `arguments` → `AgentCommand`（chat 与相机链路共用）
+- `@Tool` 方法 — 类型化参数 → `AgentCommand`（chat `ChatToolService` 与相机 `CameraToolService` 各自场域工具集，同一薄封装模式）
 
 ### 4.5 DeepSeek 适配
 
@@ -1087,7 +1088,7 @@ class AiAgentUseCase(
         }
     }
 
-    // 相机入口：远程 tool_calls（RemoteReActAgent + CameraToolService）
+    // 相机入口：远程 tool_calls（KoogReActAgent + CameraToolService）
     suspend fun processCameraInput(userInput: String, context: AgentContext): InferenceResult =
         orchestrator.processCameraInput(userInput, context)
 }
@@ -1095,7 +1096,7 @@ class AiAgentUseCase(
 
 ### 6.5 IM 远程控制集成
 
-飞书/Telegram 远程控制复用同一远程推理链路（`RemoteChatEngine`/`RemoteReActAgent`，经 `RemoteChannelManager` 分发）：
+飞书/Telegram 远程控制复用同一远程推理链路（`RemoteChatEngine`/`KoogReActAgent`，经 `RemoteChannelManager` 分发）：
 
 ```
 飞书消息 → FeishuChannelHandler → RemoteCommandDispatcher
@@ -1117,7 +1118,7 @@ class AiAgentUseCase(
 - **模型加载**: 快速连续调用需加并发锁，避免触发多次加载
 - **隐私拦截**: `PrivacyGuard` 必须接入 LLM 输入输出流和 Capability 执行链路，禁止仅做断言
 - **日志规范**: 统一使用 `PoLang:[Module]` 前缀，禁止各组件标签不一致
-- **协议统一**: 全链路使用 OpenAI tool_calls（chat/相机/飞书共用 `ToolCallCommandParser`；原本地 method/params 协议已随端侧文本 LLM 移除）
+- **协议统一**: 全链路使用 OpenAI tool_calls（chat/相机/飞书统一 Koog `@Tool` + tool_calls；原中心化解析器 `ToolCallCommandParser` 已随 Phase 5 删除，本地 method/params 协议已随端侧文本 LLM 移除）
 
 ---
 
@@ -1158,7 +1159,7 @@ class AiAgentUseCase(
 ### Phase 1: 基础设施 (RD) — 已完成
 - [x] `agent-task:remote-infra-001` 实现 `RemoteInferencePipeline`（标准 OpenAI 协议）
 - [x] `agent-task:remote-infra-002` 引入 Koog `OpenAILLMClient` 标准化
-- [x] `agent-task:remote-infra-003` 实现 `ToolCallCommandParser`（tool_calls → AgentCommand）
+- [x] `agent-task:remote-infra-003` 实现 `ToolCallCommandParser`（tool_calls → AgentCommand）（该解析器已随 Phase 5 Koog 迁移删除，职责内联进各 `@Tool` 方法）
 - [x] `agent-task:remote-infra-004` 删除 `InferenceRouter`、`AdaptiveStrategySelector` 等冗余组件
 
 ### Phase 2: L2 Batch 模式 (RD) — 已完成
