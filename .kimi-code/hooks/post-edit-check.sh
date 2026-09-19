@@ -12,7 +12,7 @@ try:
     d = json.loads(os.environ.get("HOOK_JSON", "") or "{}")
 except Exception:
     d = {}
-print((d.get("tool_input") or {}).get("path") or "")
+print((d.get("tool_input") or {}).get("file_path") or (d.get("tool_input") or {}).get("path") or "")
 ')"
 
 [ -n "$PATH_" ] || exit 0

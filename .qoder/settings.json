@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x .kimi-code/hooks/post-edit-check.sh ] && .kimi-code/hooks/post-edit-check.sh || true",
+            "name": "post-edit-check",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x .kimi-code/hooks/stop-auto-review.sh ] && .kimi-code/hooks/stop-auto-review.sh || true",
+            "name": "stop-auto-review",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x .kimi-code/hooks/notify.sh ] && .kimi-code/hooks/notify.sh subagent || true",
+            "name": "notify-subagent",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x .kimi-code/hooks/notify.sh ] && .kimi-code/hooks/notify.sh notification || true",
+            "name": "notify",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
