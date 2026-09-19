@@ -30,6 +30,7 @@ Design token 画布双向同步（design-tokens.json ↔ Ardot 画布变量）�
 import argparse
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import urllib.request
@@ -89,6 +90,41 @@ def mcp_connect(endpoint):
     return sid
 
 
+# fetch_variables 大结果缓存路径正则（允许文件名含空格，
+# 如 ".../fetch_variables-PoLang Tokens_5-xxxx.jsonl"，不跨行）
+CACHE_PATH_RE = r"(/[^\n\"']*\.ardot/reads/[^\n\"']+?\.jsonl)"
+
+
+def parse_fetch_variables(text):
+    """fetch_variables 响应文本 → 内联响应同构 dict。
+
+    MCP 大结果（当前 947 变量约 225KB 即触发）不落内联 JSON，响应文本只给
+    $TMPDIR/.ardot/reads/*.jsonl 路径（缓存路径正则回退，同 scripts/ardot-scan.py）：
+    JSONL 首行 _meta，随后每个集合一行 {"_variableSet": {...}}，其后该集合变量逐行
+    （带 setId/collection 字段，集合头恒在其变量之前）。在此重组为
+    {"success": True, "data": {"variableSets": [...]}}，与内联响应结构一致。
+    """
+    m = re.search(CACHE_PATH_RE, text)
+    if not m:
+        return json.loads(text)
+    sets, by_id = [], {}
+    with open(m.group(1), encoding="utf-8") as f:
+        for ln in f:
+            row = json.loads(ln)
+            if "_meta" in row:
+                continue
+            if "_variableSet" in row:
+                s = dict(row["_variableSet"])
+                s["variables"] = []
+                sets.append(s)
+                by_id[s.get("id")] = s
+            else:
+                s = by_id.get(row.get("setId"))
+                if s is not None:
+                    s["variables"].append(row)
+    return {"success": True, "data": {"variableSets": sets}}
+
+
 def fetch_canvas(endpoint):
     """取画布 "PoLang Tokens" 集合 → {变量全名: {type, scopes, valuesByMode(键=mode 名)}}。
 
@@ -101,7 +137,7 @@ def fetch_canvas(endpoint):
         "arguments": {},
     }, rid=2, sid=sid)
     text = result["result"]["content"][0]["text"]
-    data = json.loads(text)
+    data = parse_fetch_variables(text)
     if not data.get("success"):
         print(f"❌ fetch_variables 失败: {text}")
         sys.exit(1)

@@ -216,6 +216,15 @@ def test_ignore_file_missing_returns_2():
     assert rc == 2
 
 
+def test_main_missing_jsonl_returns_2():
+    """--jsonl/--vars/--components 路径不存在不得抛裸 FileNotFoundError(exit 1 与 unhealthy 混淆), 应 rc=2"""
+    cat = tempfile.mktemp(suffix=".json")
+    json.dump({"version": 1, "updated": "2026-09-20", "components": []}, open(cat, "w"))
+    rc = hc.main(["--jsonl", "/nonexistent/x.jsonl", "--vars", VARS, "--components", cat,
+                  "--out-dir", tempfile.mkdtemp()])
+    assert rc == 2
+
+
 def test_repo_components_json_is_valid_catalog():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
                         "docs/08-UI-SPECS/screens/refs/ardot/components.json")

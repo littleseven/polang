@@ -7,8 +7,9 @@
 豁免: --ignore 子串与 --ignore-file(每行一个子串, 空行与 # 开头行跳过)合并生效;
   path 命中任一豁免子串的节点, 从全部四项检测的判定中排除(检测 4 目录漂移同样适用)。
   豁免计数写入 health.json 的 "ignored"(口径: literal=被豁免 findings 数,
-  boolean_gaps=被豁免帧数, duplicate_groups=locations 全部落在豁免路径的重复组数,
-  catalog_drift=因豁免而 literal 计数降至 0 的组件条目数)。
+  boolean_gaps=被豁免帧数, duplicate_groups=同指纹重复组按 location 是否豁免拆分,
+  全部 location 豁免(豁免侧 locations>=2)的组才计入本项, 混合组仅非豁免 locations 入报告
+  (非豁免 locations<2 则整组消失), catalog_drift=因豁免而 literal 计数降至 0 的组件条目数)。
 检测项:
   1. literal 泄漏   — 未绑 token 的 SOLID/GRADIENT-stop 色(IMAGE 除外)
   2. 组件化违规     — ≥2 棵同构子树(节点数≥min-dup-nodes)且非组件实例
@@ -257,7 +258,7 @@ def main(argv=None):
             with open(a.ignore_file) as f:
                 ignore += [ln.strip() for ln in f
                            if ln.strip() and not ln.strip().startswith("#")]
-        except OSError as e:
+        except (OSError, UnicodeDecodeError) as e:
             print(f"ignore-file 错误: {e}")
             return 2
 
@@ -267,8 +268,15 @@ def main(argv=None):
     except (ValueError, KeyError, json.JSONDecodeError) as e:
         print(f"catalog 错误: {e}")
         return 2
-    roots = load_roots(a.jsonl, kernel)
-    var_rgb = load_var_rgb(a.vars, kernel)
+    except OSError as e:
+        print(f"components 文件错误: {e}")
+        return 2
+    try:
+        roots = load_roots(a.jsonl, kernel)
+        var_rgb = load_var_rgb(a.vars, kernel)
+    except OSError as e:
+        print(f"输入文件错误: {e}")
+        return 2
 
     ignored = {"literal": 0, "boolean_gaps": 0, "duplicate_groups": 0, "catalog_drift": 0}
     report = {
@@ -286,8 +294,8 @@ def main(argv=None):
                  f"| 组件化违规(重复组) | {len(report['duplicates'])} |\n"
                  f"| 布尔图层漏适配 | {len(report['boolean_gaps'])} |\n"
                  f"| 目录漂移 | {len(report['catalog_drift'])} |\n"
-                 f"| 豁免(literal/dup组/boolean帧/drift条目) | {ignored['literal']}/"
-                 f"{ignored['duplicate_groups']}/{ignored['boolean_gaps']}/"
+                 f"| 豁免(literal/boolean帧/dup组/drift条目) | {ignored['literal']}/"
+                 f"{ignored['boolean_gaps']}/{ignored['duplicate_groups']}/"
                  f"{ignored['catalog_drift']} |\n")
     print(f"literal={len(report['literal'])} dup_groups={len(report['duplicates'])} "
           f"boolean_gaps={len(report['boolean_gaps'])} drift={len(report['catalog_drift'])} "

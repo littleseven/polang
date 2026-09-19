@@ -1,7 +1,7 @@
 ---
 name: ardot-design-ops
 description: Ardot 设计稿资产治理——新建页面/帧、token 样式变更、健康审计三场景编排,保障 Light/Dark 全域可切与组件化不腐败。Use when creating/modifying Ardot frames or components, syncing design tokens to canvas, exporting snapshots, or auditing design health (ardot, 设计稿, Light/Dark, 组件化).
-version: 1.1.0
+version: 1.1.1
 created: 2026-09-19
 updated: 2026-09-20
 maintainer: [RD] 全栈工程师
@@ -42,7 +42,7 @@ tags: [ardot, design-system, light-dark, ui-consistency]
 2. batch_edit 建帧(≤25 ops/批;非当前页带 fileUrl,`:`→`%3A`),颜色一律绑 `PoLang Tokens` 变量
 3. 自检:对该页 batch_read(readDepth=-1) + fetch_variables,跑健康检查:
 
-> 落盘方式:MCP 大结果自动写 `$TMPDIR/.ardot/reads/*.jsonl`,响应文本给路径;封装可参考 `tmp/ardot-health/baseline_scan.py` 模式或 `scripts/sync-ardot-variables.py` 的 `mcp_connect`。
+> 落盘方式:MCP 大结果自动写 `$TMPDIR/.ardot/reads/*.jsonl`,响应文本给路径;已入库封装 `scripts/ardot-scan.py`(`--pages`/`--out-dir`/`--vars-out` 可配,含缓存路径正则回退),底层模式同 `scripts/sync-ardot-variables.py` 的 `mcp_connect`。
 
 ```bash
 python3 scripts/ardot-health-check.py --jsonl tmp/ardot-health/read.jsonl \
@@ -127,3 +127,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 |------|------|------|
 | 1.0.0 | 2026-09-19 | 初始版本(三场景 + 入库标准 + 陷阱表) |
 | 1.1.0 | 2026-09-20 | Task 4 实战坑回填(陷阱表 +6 行/落盘方式/ignore-file 门禁/豁免清单索引) |
+| 1.1.1 | 2026-09-20 | 落盘封装入库:`tmp/ardot-health/baseline_scan.py` 提升为 `scripts/ardot-scan.py`(CLI 可配),S1 引用改指入库脚本 |
