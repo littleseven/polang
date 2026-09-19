@@ -139,6 +139,17 @@
       "tokenBound": true,
       "variants": [],
       "rules": "People grid 人物卡一律用实例; 覆写路径(主组件子id): cover 图 U(inst+\"387:147\",{fills:[IMAGE]}), 角标 U(inst+\"387:152\",{characters:\"$184:xx\"}), 人名 U(inst+\"387:157\",{characters:\"$184:xx\"}[,fontSize]), chip 底/文 U(inst+\"387:154\"/inst+\"387:158\",{fills:[\"$2:xx\"]})+chip 文案 U(inst+\"387:158\",{characters:\"$184:x\"}); 文本全绑字符串变量(people.grid.count.*/people.grid.name.*/person.relation.*), 实例按卡重绑变量, 勿写文本字面量; 已收 5 实例 card_mom/dad/alex/lin/chris(387:161-165), 仅数据级差异(图/文案/chip 色对/chris 人名 fontSize=13); 根 DROP_SHADOW 色为效果字面量(检测器豁免, 现状沿用); 变体未收: card_unnamed(171:75, cover 无照片+ic/face_placeholder 占位+chip 描边样式, 结构不同构)"
+    },
+    {
+      "name": "component/category_card",
+      "nodeId": "387:181",
+      "page": "Components",
+      "purpose": "Organize hub 六分类卡(横条 64 高, icon_block 28x28 圆角图标底 + title_col(title 13pt/meta 11pt) + thumbs 四连缩略图 + chevron ›)",
+      "darkPng": "components/category_card-dark.png",
+      "lightPng": "components/category_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "Organize hub 分类卡一律用实例; 覆写路径(主组件子id): 图标换主组件 U(inst+\"387:174\",{ref:\"132:xx\"})(实例 swap 通路, 4c-5 实证 U 可改 ref, 官方文档误称不可), 标题 U(inst+\"387:175\",{characters:\"$343:xx\"}), 副标题 U(inst+\"387:176\",{characters:\"$343:xx\"}), 缩略图 U(inst+\"387:177\"..\"387:180\",{fills:[IMAGE]}); 文本全绑字符串变量(org.cat.*/org.meta.*), 实例按卡重绑变量, 勿写文本字面量; 已收 6 实例 cat_duplicates/screenshots/blurry/eyesclosed/videos/documents(387:182-187), 仅数据级差异(图标/文案/缩略图); 图标主组件映射: duplicates=ic/grid(132:137) screenshots=ic/crop(132:89) blurry=ic/erase(132:109) eyesclosed=ic/face(132:97) videos=ic/camera(132:73) documents=ic/sort(132:49)"
     }
   ]
 }
