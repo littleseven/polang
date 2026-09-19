@@ -1,0 +1,87 @@
+# ardot 健康检查豁免清单(path 子串,随收编递减;机制见 scripts/ardot-health-check.py --ignore-file)
+# Play Store 营销素材: 固定深色不参与双模(2026-09-19 reorg spec)
+Play Store Assets/
+# IconSet 图标素材页: 矢量本色非主题色
+IconSet/
+# Camera 滤镜样本色: 内容色(滤镜样本)非主题色
+Camera/camera/panel_filter/inline_panel/thumb
+# 待品牌色 token 决策(2026-09-20, d>24 无就近匹配,留用户拍板;决策后移除)
+component/provider_row/tag
+component/input_bar/InputCard/InputButtonRow/VoiceButton
+# 待收编重复组(2026-09-20 P0-P4 后剩余 30 组,增量收编时逐行移除;子串经全画布路径核验,除注释注明外零族外命中)
+# Gallery tag_control 统计瓦片行+瓦片(dup 组 g0+g16 嵌套,一行覆盖两组)
+tag_control/Body/CardStats/tileRow
+# Gallery 网格内容行(grid/scanning 两帧,grid_row 收编后残余整行变体)
+gallery/grid/grid_content
+gallery/scanning/grid_content
+# Organize 分类网格行 row_2/row_3(category_card 收编后残余变体)
+category_grid/body/row_2
+category_grid/body/row_3
+# Settings 对话框选项行族(dup 组 g3+g29: stage/theme/language 三对话框)
+dialog_stage/grp_device
+dialog_theme/options
+dialog_language/options/opt_chinese_sel
+# Settings 本地模型检测模型行(dup 组 g4+g5: roi/embedding/tagger/semantic)
+sec_detect_models/row_roi
+sec_detect_models/row_embedding
+sec_detect_models/row_tagger
+sec_detect_models/row_semantic
+# Settings 语音行(local_models row_kws + sandbox row_voice_control)
+sec_voice/row_kws
+sec_voice/row_voice_control
+# Settings 设备权限行(camera/gallery 两行)
+sec_device_access/row_
+# Settings developer 调试/诊断行(shader_debug/module_log)
+sec_preview_debug/row_shader_debug
+sec_diagnostics/row_module_log
+# Settings main_list 功能入口行(gallery/channels)
+sec_features/row_gallery
+sec_ai_system/row_channels
+# Settings 开发者入口行 + LLM 日志行
+sec_more/row_developer
+sec_diagnostics/row_llm_log
+# Chat 侧栏会话项(ThreadItem x4)
+SidebarPanel/ThreadList/ThreadItem
+# Organize/dedup 回收站卡缩略图组(两帧)
+cleaned/body/recycle_card/thumbs
+# Camera 相册入口图标(icon_photo x7;含 focusing 未入组同族变体,收编时一并转换)
+/icon_photo
+# Chat 空态建议 chips 行+chip(dup 组 g14+g20 嵌套,chipsRow3/4/Night)
+chat/empty/EmptyState/ChipsGrid/chipsRow3
+chat/empty/EmptyState/ChipsGrid/chipsRow4
+chat/empty/EmptyState/ChipsGrid/chipsRowNight
+# Gallery 选择态网格 cell(row_1 cell_sel/sel2 + row_2 cell_sel3)
+grid_area/row_1/cell_sel
+grid_area/row_2/cell_sel3
+# Memories 详情媒体行(row_1/row_3)
+memory/detail/scroll_content/row_1
+memory/detail/scroll_content/row_3
+# Organize dedup 结果页 tab(visual/scene)
+dedup/results/body/tabs/tab_visual
+dedup/results/body/tabs/tab_scene
+# Organize dedup 保留规则选项(original/edited/latest)
+keep_rules/sheet/opt_original
+keep_rules/sheet/opt_edited
+keep_rules/sheet/opt_latest
+# Chat Agent 消息行(conversation Msg1/Msg2 + cleanup_done Msg1)
+chat/conversation/MessageList/AgentMsg1
+chat/conversation/MessageList/AgentMsg2
+chat/cleanup_done/MessageList/AgentMsg1
+# Chat 空态 v2(guest)示例 chips(search/ask 两组)
+/chipsFlow/chip
+# Gallery 搜索页顶栏变体(search + search_no_result,top_bar 收编后残余)
+gallery/search/top_bar
+gallery/search_no_result/top_bar
+# Gallery 排序菜单网格行(row_1/2/3)
+sort_menu/grid_content/row_
+# Memories 行程 carousel 卡(card_trip_1/3)
+memory/feed/sec_trip/carousel/card_trip_1
+memory/feed/sec_trip/carousel/card_trip_3
+# Organize 统计行(category meta_row + swipe freed_row)
+category_grid/body/meta_row
+swipe/done/body/stats_card/freed_row
+# Organize/dedup 回收站卡头(两帧)
+cleaned/body/recycle_card/header
+# Organize dedup 进度行 + 组元信息行
+dedup/scanning/body/progress_card/phase_row
+dedup/group_detail/body/group_meta

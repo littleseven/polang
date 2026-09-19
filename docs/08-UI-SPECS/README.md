@@ -161,6 +161,15 @@ spec 是"当前事实的记录"。改的时候三处一起改，不允许只改�
 
 ---
 
+## Ardot 设计稿资产（`refs/ardot` 快照管线）
+
+`docs/08-UI-SPECS/screens/refs/ardot/` 承载画布快照（PNG/structure.json）与组件目录，完整编排见 `skills/ardot-design-ops/SKILL.md`：
+
+- 组件目录 SSOT:`refs/ardot/components.json`(新组件入库标准见 `skills/ardot-design-ops/SKILL.md`)
+- 设计健康检查:`scripts/ardot-health-check.py`(literal/组件化违规/布尔漏适配/目录漂移,事件驱动必跑)
+
+---
+
 ## 相关文件
 
 - `docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md` — Token 工作流 SSOT（codegen + Ardot 预览层）

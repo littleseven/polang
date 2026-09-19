@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "updated": "2026-09-20",
+  "components": [
+    {
+      "name": "component/floating_tab",
+      "nodeId": "385:95",
+      "page": "Components",
+      "purpose": "全局悬浮胶囊底栏(相册/回忆/人物/设置四 Tab)",
+      "darkPng": "components/floating_tab-dark.png",
+      "lightPng": "components/floating_tab-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "所有主页面底栏一律用实例, 禁止手画底栏"
+    },
+    {
+      "name": "component/status_bar",
+      "nodeId": "385:106",
+      "page": "Components",
+      "purpose": "系统状态栏(时间/信号/电量), sysbar-dark/sysbar-light 布尔双图层自适应",
+      "darkPng": "components/status_bar-dark.png",
+      "lightPng": "components/status_bar-light.png",
+      "tokenBound": true,
+      "variants": [
+        "sysbar-dark",
+        "sysbar-light"
+      ],
+      "rules": "每帧顶部必放; 勿改内部布尔图层名"
+    },
+    {
+      "name": "component/system_nav_bar",
+      "nodeId": "385:107",
+      "page": "Components",
+      "purpose": "系统导航条(手势条), 布尔双图层自适应",
+      "darkPng": "components/system_nav_bar-dark.png",
+      "lightPng": "components/system_nav_bar-light.png",
+      "tokenBound": true,
+      "variants": [
+        "sysbar-dark",
+        "sysbar-light"
+      ],
+      "rules": "每帧底部必放; 勿改内部布尔图层名"
+    },
+    {
+      "name": "component/provider_row",
+      "nodeId": "166:17",
+      "page": "Components",
+      "purpose": "设置-模型中心 provider 列表行",
+      "darkPng": "components/provider_row-dark.png",
+      "lightPng": "components/provider_row-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "模型中心 provider 列表一律用实例"
+    },
+    {
+      "name": "component/model_row",
+      "nodeId": "167:17",
+      "page": "Components",
+      "purpose": "设置-模型中心单模型列表行(含下载态)",
+      "darkPng": "components/model_row-dark.png",
+      "lightPng": "components/model_row-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "模型列表一律用实例"
+    },
+    {
+      "name": "component/input_bar",
+      "nodeId": "387:22",
+      "page": "Components",
+      "purpose": "Chat 输入栏(InputCard+占位文本+相册/工程师胶囊+语音/发送钮)",
+      "darkPng": "components/input_bar-dark.png",
+      "lightPng": "components/input_bar-light.png",
+      "tokenBound": false,
+      "variants": [],
+      "rules": "Chat 各帧输入栏一律用实例; 文字覆写必须走变量重绑(字面量会被绑定弹回); 2026-09-20 快赢收编已绑 8 处, VoiceButton 图标 3 处 #7CA591 最近匹配 d=35>24 暂停待决策, 决策后转 tokenBound=true"
+    },
+    {
+      "name": "component/search_field",
+      "nodeId": "387:86",
+      "page": "Components",
+      "purpose": "相册搜索输入框(gallery/search 与 search_no_result 共用, 284x36 自适应)",
+      "darkPng": "components/search_field-dark.png",
+      "lightPng": "components/search_field-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "搜索框一律用实例放 top_bar 中位; 查询文字覆写走变量重绑"
+    },
+    {
+      "name": "component/grid_row",
+      "nodeId": "387:94",
+      "page": "Components",
+      "purpose": "三图横排网格行(相册/搜索/扫描/回忆/整理分类网格共用, 3 cell IMAGE fills)",
+      "darkPng": "components/grid_row-dark.png",
+      "lightPng": "components/grid_row-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "三列图片行一律用实例; cell 图覆写 U(inst+\"<cellId>\",{fills:[IMAGE]}); 行高/间距差异走实例 height/gap 覆写(数值先 U(null) 解绑); 子树零颜色 token, 双模 PNG 一致属预期"
+    },
+    {
+      "name": "component/top_bar",
+      "nodeId": "387:113",
+      "page": "Components",
+      "purpose": "Chat 顶栏(返回+菜单+spacer+问题上报/追加/清理三动作位, empty/conversation/empty-v2-guest/cleanup_confirm/cleanup_done 5 帧全同构)",
+      "darkPng": "components/top_bar-dark.png",
+      "lightPng": "components/top_bar-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "Chat 各帧顶栏一律用实例(替换: I(parent,{type:\"ref\",ref:\"387:113\",width:\"fill_container\"}) → M 到原索引 → D 旧节点); 全帧零覆写; 相册类顶栏用 top_bar_gallery, 勿混用"
+    },
+    {
+      "name": "component/top_bar_gallery",
+      "nodeId": "387:121",
+      "page": "Components",
+      "purpose": "相册类顶栏(相册标题+模型中心/扫描/搜索/排序/设置五动作位, grid/sort_menu/empty 3 帧同构)",
+      "darkPng": "components/top_bar_gallery-dark.png",
+      "lightPng": "components/top_bar_gallery-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "相册类帧顶栏一律用实例; gallery/empty 父帧绝对定位需覆写 layoutPositioning:ABSOLUTE+x:0+y:0+width:393; 根透明底, 双模判定走语义判据(不透明像素 dark≈239→light≈50); 变体候选未收: scanning(ic/pause 换 ic/scan)、search 4-node 组(back+search_field+result_count, 宜独立组件)、People detail(btn_back+title+btn_save)"
+    },
+    {
+      "name": "component/chat_photo_card",
+      "nodeId": "387:143",
+      "page": "Components",
+      "purpose": "Chat 媒体结果轮播照片卡(120x150, IMAGE 照片底 + FeedbackCol 三反馈钮 + DateChip 日期角标)",
+      "darkPng": "components/chat_photo_card-dark.png",
+      "lightPng": "components/chat_photo_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "Chat 媒体结果卡一律用实例; 照片覆写 U(inst,{fills:[IMAGE]}), 日期覆写 U(inst+\"387:136\",{characters}); 子树颜色 token(color/white、canvasPureBlack、chatCarousel/feedbackBgColor)双模同值, 双模 PNG 一致属预期; 变体未收: chat/conversation Carousel 首卡(15-node, thumb_up 叠 3 重复 Vector, 渲染等价, 待清理)"
+    },
+    {
+      "name": "component/person_card",
+      "nodeId": "387:160",
+      "page": "Components",
+      "purpose": "People 人物网格卡(174宽竖卡, cover 174x174 IMAGE + count_badge 照片数角标 + info 区 person_name + relation_chip + btn_more)",
+      "darkPng": "components/person_card-dark.png",
+      "lightPng": "components/person_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "People grid 人物卡一律用实例; 覆写路径(主组件子id): cover 图 U(inst+\"387:147\",{fills:[IMAGE]}), 角标 U(inst+\"387:152\",{characters:\"$184:xx\"}), 人名 U(inst+\"387:157\",{characters:\"$184:xx\"}[,fontSize]), chip 底/文 U(inst+\"387:154\"/inst+\"387:158\",{fills:[\"$2:xx\"]})+chip 文案 U(inst+\"387:158\",{characters:\"$184:x\"}); 文本全绑字符串变量(people.grid.count.*/people.grid.name.*/person.relation.*), 实例按卡重绑变量, 勿写文本字面量; 已收 5 实例 card_mom/dad/alex/lin/chris(387:161-165), 仅数据级差异(图/文案/chip 色对/chris 人名 fontSize=13); 根 DROP_SHADOW 色为效果字面量(检测器豁免, 现状沿用); 变体未收: card_unnamed(171:75, cover 无照片+ic/face_placeholder 占位+chip 描边样式, 结构不同构)"
+    },
+    {
+      "name": "component/category_card",
+      "nodeId": "387:181",
+      "page": "Components",
+      "purpose": "Organize hub 六分类卡(横条 64 高, icon_block 28x28 圆角图标底 + title_col(title 13pt/meta 11pt) + thumbs 四连缩略图 + chevron ›)",
+      "darkPng": "components/category_card-dark.png",
+      "lightPng": "components/category_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "Organize hub 分类卡一律用实例; 覆写路径(主组件子id): 图标换主组件 U(inst+\"387:174\",{ref:\"132:xx\"})(实例 swap 通路, 4c-5 实证 U 可改 ref, 官方文档误称不可), 标题 U(inst+\"387:175\",{characters:\"$343:xx\"}), 副标题 U(inst+\"387:176\",{characters:\"$343:xx\"}), 缩略图 U(inst+\"387:177\"..\"387:180\",{fills:[IMAGE]}); 文本全绑字符串变量(org.cat.*/org.meta.*), 实例按卡重绑变量, 勿写文本字面量; 已收 6 实例 cat_duplicates/screenshots/blurry/eyesclosed/videos/documents(387:182-187), 仅数据级差异(图标/文案/缩略图); 图标主组件映射: duplicates=ic/grid(132:137) screenshots=ic/crop(132:89) blurry=ic/erase(132:109) eyesclosed=ic/face(132:97) videos=ic/camera(132:73) documents=ic/sort(132:49)"
+    }
+  ]
+}
