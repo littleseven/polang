@@ -1,9 +1,9 @@
 ---
 name: ardot-design-ops
 description: Ardot 设计稿资产治理——新建页面/帧、token 样式变更、健康审计三场景编排,保障 Light/Dark 全域可切与组件化不腐败。Use when creating/modifying Ardot frames or components, syncing design tokens to canvas, exporting snapshots, or auditing design health (ardot, 设计稿, Light/Dark, 组件化).
-version: 1.0.0
+version: 1.1.0
 created: 2026-09-19
-updated: 2026-09-19
+updated: 2026-09-20
 maintainer: [RD] 全栈工程师
 tags: [ardot, design-system, light-dark, ui-consistency]
 ---
@@ -42,6 +42,8 @@ tags: [ardot, design-system, light-dark, ui-consistency]
 2. batch_edit 建帧(≤25 ops/批;非当前页带 fileUrl,`:`→`%3A`),颜色一律绑 `PoLang Tokens` 变量
 3. 自检:对该页 batch_read(readDepth=-1) + fetch_variables,跑健康检查:
 
+> 落盘方式:MCP 大结果自动写 `$TMPDIR/.ardot/reads/*.jsonl`,响应文本给路径;封装可参考 `tmp/ardot-health/baseline_scan.py` 模式或 `scripts/sync-ardot-variables.py` 的 `mcp_connect`。
+
 ```bash
 python3 scripts/ardot-health-check.py --jsonl tmp/ardot-health/read.jsonl \
   --vars tmp/ardot-health/vars.jsonl \
@@ -74,6 +76,8 @@ python3 scripts/sync-ardot-variables.py --push
 ## S3 健康审计 / 快照入库
 
 1. 全量 batch_read(逐页带 fileUrl, readDepth=-1) + fetch_variables → 跑 health-check
+
+> 健康检查须带 `--ignore-file docs/08-UI-SPECS/screens/refs/ardot/health-ignore.txt`;豁免清单是「待收编/待决策」台账,增量收编时逐行移除,退出码归零才算过。
 2. 按 health.json 修:literal→就近绑 token(色距≤24)或新增语义变量;重复组→收编组件;布尔漏→补 sysbar-light 图层;漂移→修 catalog 或修画布
 3. 修复后重跑归零,快照收口:
 
@@ -101,6 +105,12 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | export 冷缓存空白 | 导出 PNG 全白 | 预热重试 |
 | Light 误判 | 视觉模型把 Dark 帧报成浅色 | 只用 ardot-light-verify.py 像素采样判据 |
 | 并发会话互相覆盖 | 改动被恢复 | 全程单会话串行 |
+| I 绑定字符串自带尾分号 | 覆写路径加 ";" 后绑定失配 | 覆写时原样使用,勿追加分号 |
+| potentialIssues 静默跳过 | batch_edit 部分 op 未生效无报错 | 响应逐条核对 potentialIssues,中断即逐 op 回读 |
+| 实例不可写 variableModes | 对实例钉 Light 报错 | 钉宿主帧或主组件,勿钉实例 |
+| 绝对定位宿主帧 I 忽略 x/y | 实例插入后位置错乱(flex 父) | I 显式带 layoutPositioning:ABSOLUTE |
+| 隐形损坏子实例 Copy 丢弃 | mainComponent=None 的子实例复制后消失 | Copy 前 batch_read 查 mainComponent,损坏者先修 |
+| 复扫漏页致 dup 假消失 | health-check JSONL 未含全 11 页 | 11 页全量重读,缺一页结论无效 |
 
 ## 相关文件
 
@@ -109,9 +119,11 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 - [DESIGN_TOKENS_SPEC](docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md) - token codegen 规范
 - [ARDOT_MCP](.kimi-code/ARDOT_MCP.md) - MCP 工具速查与坑
 - [ui-parity-guard](skills/ui-parity-guard/SKILL.md) - 双端一致性守卫(代码侧)
+- [豁免清单](docs/08-UI-SPECS/screens/refs/ardot/health-ignore.txt) - 待收编/待决策台账
 
 ## 版本历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.0.0 | 2026-09-19 | 初始版本(三场景 + 入库标准 + 陷阱表) |
+| 1.1.0 | 2026-09-20 | Task 4 实战坑回填(陷阱表 +6 行/落盘方式/ignore-file 门禁/豁免清单索引) |

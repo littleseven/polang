@@ -79,6 +79,7 @@
 | 查找空白区域 | `mcp__ardot__locate_available_space` |
 | 新增页面 | `mcp__ardot__create_new_page` |
 | 导出资源 | `mcp__ardot__scan_exportable_resources` → `mcp__ardot__export_nodes` |
+| 设计健康审计 | `scripts/ardot-health-check.py`(batch_read JSONL + fetch_variables + components.json) |
 
 ---
 
@@ -131,3 +132,8 @@ Ardot 降级为「token 活体预览层」，SSOT 是 `shared/src/commonMain/res
 - 校验反向漂移：`fetch_variables` 对比 `ardot-variables.json`，以 JSON 为准回写
 - 为什么不直接让 agent 调 MCP `apply_variables` 工具：337 个变量需内联 JSON，手抄易错；
   `sync-ardot-variables.py` 直连本地 MCP HTTP 端点，payload 文件原样上送，零转录误差
+
+## 设计资产治理（2026-09-19 起）
+
+组件目录 SSOT = `docs/08-UI-SPECS/screens/refs/ardot/components.json`;新建页面/改帧/token sync/快照入库前必跑
+`scripts/ardot-health-check.py` 归零。完整工作流见 `skills/ardot-design-ops/SKILL.md`。
