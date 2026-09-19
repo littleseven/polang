@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=103%3A1"
+    "url": "cocraft://localhost/file/715061534788814?node_id=387%3A86"
   },
   "pages": [
     {
@@ -8171,69 +8171,18 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "componentProperties": {},
-                            "height": "$2:15",
-                            "id": "133:11",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:22"
-                            },
-                            "name": "ic/search",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "characters": "$303:3",
-                            "fills": [
-                              "$2:149"
-                            ],
-                            "fontName": {
-                              "family": "Sarasa Gothic SC",
-                              "style": "Regular"
-                            },
-                            "fontSize": "$79:10",
-                            "height": "hug_contents",
-                            "id": "107:120",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "placeholder",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "componentProperties": {},
-                            "height": "$2:15",
-                            "id": "133:12",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:37"
-                            },
-                            "name": "ic/clear",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "fills": [
                           "$2:150"
                         ],
                         "gap": 8,
                         "height": "$143:9",
-                        "id": "107:116",
+                        "id": "387:88",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:86"
+                        },
                         "name": "search_field",
                         "padding": {
                           "bottom": 0,
@@ -8241,7 +8190,7 @@
                           "right": 12,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -8783,69 +8732,18 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "componentProperties": {},
-                            "height": "$2:15",
-                            "id": "133:69",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:22"
-                            },
-                            "name": "ic/search",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "characters": "$303:4",
-                            "fills": [
-                              "$2:149"
-                            ],
-                            "fontName": {
-                              "family": "Sarasa Gothic SC",
-                              "style": "Regular"
-                            },
-                            "fontSize": "$79:10",
-                            "height": "hug_contents",
-                            "id": "107:163",
-                            "lineHeight": {
-                              "unit": "AUTO"
-                            },
-                            "name": "placeholder",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "hug_contents",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "componentProperties": {},
-                            "height": "$2:15",
-                            "id": "133:70",
-                            "layout": "none",
-                            "mainComponent": {
-                              "componentPropertyDefinitions": {},
-                              "id": "132:37"
-                            },
-                            "name": "ic/clear",
-                            "type": "INSTANCE",
-                            "width": "$2:15",
-                            "x": "auto",
-                            "y": "auto"
-                          }
-                        ],
-                        "clipsContent": true,
+                        "componentProperties": {},
                         "fills": [
                           "$2:150"
                         ],
                         "gap": 8,
                         "height": "$143:9",
-                        "id": "107:159",
+                        "id": "387:89",
                         "layout": "horizontal",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "387:86"
+                        },
                         "name": "search_field",
                         "padding": {
                           "bottom": 0,
@@ -8853,7 +8751,7 @@
                           "right": 12,
                           "top": 0
                         },
-                        "type": "FRAME",
+                        "type": "INSTANCE",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -11495,7 +11393,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-9064-20260919_235918138.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-mamz-20260920_001527502.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -13171,7 +13069,7 @@
         "111:383": {
           "name": "chat/conversation",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_383-ucrl-20260919_235921419.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:383 chat/conversation (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_383-5puc-20260920_001528409.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:383 chat/conversation (FRAME)"
           }
         },
         "111:492": {
@@ -15440,7 +15338,7 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-p3z4-20260919_235922904.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-mybm-20260920_001529449.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
           }
         },
         "267:518": {
@@ -16296,13 +16194,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-982n-20260919_235924802.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-vko6-20260920_001531094.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-ipog-20260919_235924154.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-mzlr-20260920_001530453.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -17187,7 +17085,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-emc0-20260919_235926240.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-rdsi-20260920_001532236.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -18519,7 +18417,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-ywrn-20260919_235925544.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-h3mx-20260920_001531736.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -24697,7 +24595,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-9g0s-20260919_235930317.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-linn-20260920_001535985.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -24709,13 +24607,13 @@
         "171:3": {
           "name": "people/grid",
           "tree": {
-            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_3-flto-20260919_235930916.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:3 people/grid (FRAME)"
+            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_3-oxzi-20260920_001536568.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:3 people/grid (FRAME)"
           }
         },
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-4169-20260919_235931253.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-9d10-20260920_001537107.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -28070,19 +27968,19 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-y571-20260919_235933503.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-ocjn-20260920_001539155.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (20KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-ujpo-20260919_235932187.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-flbi-20260920_001537953.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
           "name": "organize/hub",
           "tree": {
-            "_raw": "Read 1 node(s) (33KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_24-35e2-20260919_235931812.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:24 organize/hub (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_24-ende-20260920_001537636.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:24 organize/hub (FRAME)"
           }
         },
         "267:280": {
@@ -28293,42 +28191,33 @@
                                 "fills": [
                                   {
                                     "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.3499999940395355,
-                                          "g": 0.25,
-                                          "r": 0.20999999344348907
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.20000000298023224,
-                                          "g": 0.12999999523162842,
-                                          "r": 0.10999999940395355
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "657682206de9950ae31ab855e3e326cf1ca5db7b",
+                                    "imageTransform": [
                                       [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
+                                        1,
+                                        0,
+                                        0
                                       ],
                                       [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
+                                        0,
+                                        1,
+                                        0
                                       ]
                                     ],
                                     "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
                                     "visible": true
                                   }
                                 ],
@@ -28348,42 +28237,33 @@
                                 "fills": [
                                   {
                                     "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.38999998569488525,
-                                          "g": 0.28999999165534973,
-                                          "r": 0.18000000715255737
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.23999999463558197,
-                                          "g": 0.1599999964237213,
-                                          "r": 0.10000000149011612
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "239c3cfc911da05d0265d9b06f53d9548a02e74a",
+                                    "imageTransform": [
                                       [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
+                                        1,
+                                        0,
+                                        0
                                       ],
                                       [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
+                                        0,
+                                        1,
+                                        0
                                       ]
                                     ],
                                     "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
                                     "visible": true
                                   }
                                 ],
@@ -28403,42 +28283,33 @@
                                 "fills": [
                                   {
                                     "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.28999999165534973,
-                                          "g": 0.27000001072883606,
-                                          "r": 0.27000001072883606
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.17000000178813934,
-                                          "g": 0.15000000596046448,
-                                          "r": 0.15000000596046448
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "8cb8723fe667ad285372728c25f83f3fd0ab8ea3",
+                                    "imageTransform": [
                                       [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
+                                        1,
+                                        0,
+                                        0
                                       ],
                                       [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
+                                        0,
+                                        1,
+                                        0
                                       ]
                                     ],
                                     "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
                                     "visible": true
                                   }
                                 ],
@@ -28944,42 +28815,33 @@
                         "fills": [
                           {
                             "blendMode": "NORMAL",
-                            "gradientStops": [
-                              {
-                                "boundVariables": {},
-                                "color": {
-                                  "a": 1,
-                                  "b": 0.38999998569488525,
-                                  "g": 0.28999999165534973,
-                                  "r": 0.18000000715255737
-                                },
-                                "position": 0
-                              },
-                              {
-                                "boundVariables": {},
-                                "color": {
-                                  "a": 1,
-                                  "b": 0.23999999463558197,
-                                  "g": 0.1599999964237213,
-                                  "r": 0.10000000149011612
-                                },
-                                "position": 1
-                              }
-                            ],
-                            "gradientTransform": [
+                            "filters": {
+                              "contrast": 0,
+                              "exposure": 0,
+                              "highlights": 0,
+                              "saturation": 0,
+                              "shadows": 0,
+                              "temperature": 0,
+                              "tint": 0
+                            },
+                            "imageHash": "f48178dec1aa4310db82126fff90b1a02cd39bb2",
+                            "imageTransform": [
                               [
-                                0.6000000238418579,
-                                -0.800000011920929,
-                                0.6499999761581421
+                                1,
+                                0,
+                                0
                               ],
                               [
-                                0.800000011920929,
-                                0.6000000238418579,
-                                -0.15000000596046448
+                                0,
+                                1,
+                                0
                               ]
                             ],
                             "opacity": 1,
-                            "type": "GRADIENT_LINEAR",
+                            "rotation": 0,
+                            "scaleMode": "FILL",
+                            "scalingFactor": 1,
+                            "type": "IMAGE",
                             "visible": true
                           }
                         ],
@@ -29766,6 +29628,36 @@
                   {
                     "children": [
                       {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "297:116",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:14"
+                        },
+                        "name": "ic/back",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": 16,
+                        "y": 14
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "297:117",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:149"
+                        },
+                        "name": "ic/share",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": 355,
+                        "y": 14
+                      },
+                      {
                         "characters": "相聚时光",
                         "fills": [
                           "$143:3"
@@ -29816,42 +29708,33 @@
                     "fills": [
                       {
                         "blendMode": "NORMAL",
-                        "gradientStops": [
-                          {
-                            "boundVariables": {},
-                            "color": {
-                              "a": 1,
-                              "b": 0.3199999928474426,
-                              "g": 0.3499999940395355,
-                              "r": 0.1599999964237213
-                            },
-                            "position": 0
-                          },
-                          {
-                            "boundVariables": {},
-                            "color": {
-                              "a": 1,
-                              "b": 0.18000000715255737,
-                              "g": 0.1899999976158142,
-                              "r": 0.07999999821186066
-                            },
-                            "position": 1
-                          }
-                        ],
-                        "gradientTransform": [
+                        "filters": {
+                          "contrast": 0,
+                          "exposure": 0,
+                          "highlights": 0,
+                          "saturation": 0,
+                          "shadows": 0,
+                          "temperature": 0,
+                          "tint": 0
+                        },
+                        "imageHash": "be92ec129f52caa0b6056ebc08a72339e74355ba",
+                        "imageTransform": [
                           [
-                            0.6000000238418579,
-                            -0.800000011920929,
-                            0.6499999761581421
+                            1,
+                            0,
+                            0
                           ],
                           [
-                            0.800000011920929,
-                            0.6000000238418579,
-                            -0.15000000596046448
+                            0,
+                            1,
+                            0
                           ]
                         ],
                         "opacity": 1,
-                        "type": "GRADIENT_LINEAR",
+                        "rotation": 0,
+                        "scaleMode": "FILL",
+                        "scalingFactor": 1,
+                        "type": "IMAGE",
                         "visible": true
                       }
                     ],
@@ -30033,42 +29916,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.3499999940395355,
-                                      "g": 0.25,
-                                      "r": 0.20999999344348907
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.20000000298023224,
-                                      "g": 0.12999999523162842,
-                                      "r": 0.10999999940395355
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "240d99fb20acaeb688cef6591d2fa97e7cb0a26e",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30090,42 +29964,33 @@
                                 "fills": [
                                   {
                                     "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.20000000298023224,
-                                          "g": 0.27000001072883606,
-                                          "r": 0.3499999940395355
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.11999999731779099,
-                                          "g": 0.15000000596046448,
-                                          "r": 0.20000000298023224
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "ddca5646520e47ffdd11e5d150d556bd595c16c2",
+                                    "imageTransform": [
                                       [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
+                                        1,
+                                        0,
+                                        0
                                       ],
                                       [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
+                                        0,
+                                        1,
+                                        0
                                       ]
                                     ],
                                     "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
                                     "visible": true
                                   }
                                 ],
@@ -30145,42 +30010,33 @@
                                 "fills": [
                                   {
                                     "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.38999998569488525,
-                                          "g": 0.28999999165534973,
-                                          "r": 0.18000000715255737
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.23999999463558197,
-                                          "g": 0.1599999964237213,
-                                          "r": 0.10000000149011612
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "1372e7e0911b6083f408c9f1c46667c6ec3eb325",
+                                    "imageTransform": [
                                       [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
+                                        1,
+                                        0,
+                                        0
                                       ],
                                       [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
+                                        0,
+                                        1,
+                                        0
                                       ]
                                     ],
                                     "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
                                     "visible": true
                                   }
                                 ],
@@ -30238,42 +30094,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.3499999940395355,
-                                      "g": 0.25,
-                                      "r": 0.20999999344348907
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.20000000298023224,
-                                      "g": 0.12999999523162842,
-                                      "r": 0.10999999940395355
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "7a33cb029e3901a8ddf39f01246b55365ac698fa",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30293,42 +30140,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.20000000298023224,
-                                      "g": 0.27000001072883606,
-                                      "r": 0.3499999940395355
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.11999999731779099,
-                                      "g": 0.15000000596046448,
-                                      "r": 0.20000000298023224
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "2132ed0ab64c91f2c99155f64030a7ab12c12ac2",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30368,42 +30206,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.3499999940395355,
-                                      "g": 0.25,
-                                      "r": 0.20999999344348907
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.20000000298023224,
-                                      "g": 0.12999999523162842,
-                                      "r": 0.10999999940395355
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "8e5b97b1c1834285ce706114a44007cb9680e91d",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30423,42 +30252,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.20000000298023224,
-                                      "g": 0.27000001072883606,
-                                      "r": 0.3499999940395355
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.11999999731779099,
-                                      "g": 0.15000000596046448,
-                                      "r": 0.20000000298023224
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "7ae974347954f6bed678eecb0829b6c88d3bcd05",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30498,42 +30318,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.3700000047683716,
-                                      "g": 0.23000000417232513,
-                                      "r": 0.28999999165534973
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.2199999988079071,
-                                      "g": 0.12999999523162842,
-                                      "r": 0.1599999964237213
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "5410ded9f2b34b543d7d7f948c388d2de362e7bf",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30553,42 +30364,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.2199999988079071,
-                                      "g": 0.33000001311302185,
-                                      "r": 0.23000000417232513
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.12999999523162842,
-                                      "g": 0.1899999976158142,
-                                      "r": 0.12999999523162842
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "9e76a00c7909673a7c0e00867b082c050aa9582d",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30608,42 +30410,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.27000001072883606,
-                                      "g": 0.25,
-                                      "r": 0.3700000047683716
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.1599999964237213,
-                                      "g": 0.14000000059604645,
-                                      "r": 0.2199999988079071
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "497a2dfa080b309130bdf589ac09c22c79729c25",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30683,42 +30476,33 @@
                             "fills": [
                               {
                                 "blendMode": "NORMAL",
-                                "gradientStops": [
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.38999998569488525,
-                                      "g": 0.28999999165534973,
-                                      "r": 0.18000000715255737
-                                    },
-                                    "position": 0
-                                  },
-                                  {
-                                    "boundVariables": {},
-                                    "color": {
-                                      "a": 1,
-                                      "b": 0.23999999463558197,
-                                      "g": 0.1599999964237213,
-                                      "r": 0.10000000149011612
-                                    },
-                                    "position": 1
-                                  }
-                                ],
-                                "gradientTransform": [
+                                "filters": {
+                                  "contrast": 0,
+                                  "exposure": 0,
+                                  "highlights": 0,
+                                  "saturation": 0,
+                                  "shadows": 0,
+                                  "temperature": 0,
+                                  "tint": 0
+                                },
+                                "imageHash": "7443c59cdedfc015bedb6f05b76000a41f7bdb6b",
+                                "imageTransform": [
                                   [
-                                    0.6000000238418579,
-                                    -0.800000011920929,
-                                    0.6499999761581421
+                                    1,
+                                    0,
+                                    0
                                   ],
                                   [
-                                    0.800000011920929,
-                                    0.6000000238418579,
-                                    -0.15000000596046448
+                                    0,
+                                    1,
+                                    0
                                   ]
                                 ],
                                 "opacity": 1,
-                                "type": "GRADIENT_LINEAR",
+                                "rotation": 0,
+                                "scaleMode": "FILL",
+                                "scalingFactor": 1,
+                                "type": "IMAGE",
                                 "visible": true
                               }
                             ],
@@ -30740,42 +30524,33 @@
                                 "fills": [
                                   {
                                     "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.28999999165534973,
-                                          "g": 0.27000001072883606,
-                                          "r": 0.27000001072883606
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.17000000178813934,
-                                          "g": 0.15000000596046448,
-                                          "r": 0.15000000596046448
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "f3b37628a934b8755a2914d6a954ec718b24fecd",
+                                    "imageTransform": [
                                       [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
+                                        1,
+                                        0,
+                                        0
                                       ],
                                       [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
+                                        0,
+                                        1,
+                                        0
                                       ]
                                     ],
                                     "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
                                     "visible": true
                                   }
                                 ],
@@ -30795,42 +30570,33 @@
                                 "fills": [
                                   {
                                     "blendMode": "NORMAL",
-                                    "gradientStops": [
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.1599999964237213,
-                                          "g": 0.30000001192092896,
-                                          "r": 0.3799999952316284
-                                        },
-                                        "position": 0
-                                      },
-                                      {
-                                        "boundVariables": {},
-                                        "color": {
-                                          "a": 1,
-                                          "b": 0.09000000357627869,
-                                          "g": 0.17000000178813934,
-                                          "r": 0.2199999988079071
-                                        },
-                                        "position": 1
-                                      }
-                                    ],
-                                    "gradientTransform": [
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "990900be43d9f45248027dc6e3e2f284ca179063",
+                                    "imageTransform": [
                                       [
-                                        0.6000000238418579,
-                                        -0.800000011920929,
-                                        0.6499999761581421
+                                        1,
+                                        0,
+                                        0
                                       ],
                                       [
-                                        0.800000011920929,
-                                        0.6000000238418579,
-                                        -0.15000000596046448
+                                        0,
+                                        1,
+                                        0
                                       ]
                                     ],
                                     "opacity": 1,
-                                    "type": "GRADIENT_LINEAR",
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
                                     "visible": true
                                   }
                                 ],
@@ -30939,7 +30705,7 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-i45r-20260919_235934633.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-qws5-20260920_001540077.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
           }
         }
       },
