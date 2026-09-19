@@ -22,6 +22,11 @@ Design token 画布双向同步（design-tokens.json ↔ Ardot 画布变量）�
   python3 scripts/sync-ardot-variables.py --pull --prune  # 同上，并删除 JSON 有而画布无的键
   可选：--payload PATH（push 输入，默认 build/design-tokens/ardot-variables.json）
         --endpoint URL（默认 http://127.0.0.1:50501/api/v1/mcp）
+        --ignore-file PATH（画布独有变量豁免清单，默认
+          docs/08-UI-SPECS/screens/refs/ardot/sync-ignore.txt；每行一个变量全名，
+          # 开头为注释。豁免项不进 NEW 漂移计数、--pull 不回流——
+          用于画布机制变量（如 sysbar-* 布尔开关，codegen 无 BOOLEAN 域）
+          与已迁移画布侧无法删除的残留变量）
 
 逆变换对齐：--pull/--check 的 JSON↔画布映射精确镜像 gen-design-tokens.gen_ardot_payload
 （scheme/* 双 mode、color|statusColor/*、typography/role/field、其余 group/flatten 拍平名）。
@@ -45,9 +50,22 @@ MODES = ("Dark", "Light")
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:50501/api/v1/mcp"
 DEFAULT_PAYLOAD = "build/design-tokens/ardot-variables.json"
+DEFAULT_IGNORE = "docs/08-UI-SPECS/screens/refs/ardot/sync-ignore.txt"
 
 # 变量 kind（JSON 侧语义）→ Ardot type
 KIND_TO_TYPE = {"number": "FLOAT", "color": "COLOR", "weight": "STRING"}
+
+
+def load_ignore(path):
+    """画布独有变量豁免清单 → (names set, 实际路径 or None)。文件不存在等同空清单。"""
+    p = Path(path)
+    if not p.is_absolute():
+        p = PROJECT_ROOT / p
+    if not p.exists():
+        return set(), None
+    names = {ln.strip() for ln in p.read_text(encoding="utf-8").splitlines()}
+    names = {n for n in names if n and not n.startswith("#")}
+    return names, p
 
 
 # ── MCP 直连 ──────────────────────────────────────────────────────────────────
@@ -387,7 +405,7 @@ def delete_setter(tokens, st):
             del parent[path[-2]]
 
 
-def do_pull(endpoint, prune):
+def do_pull(endpoint, prune, ignore=frozenset()):
     gen = load_gen()
     tokens = json.loads(TOKENS_JSON.read_text(encoding="utf-8"))
     canvas = fetch_canvas(endpoint)
@@ -436,7 +454,7 @@ def do_pull(endpoint, prune):
             changed.append(f"  {cname}: {old} → {value}")
 
     missing = [name for name in sorted(setters) if name not in canvas]
-    for cname in [name for name in sorted(canvas) if name not in setters]:
+    for cname in [name for name in sorted(canvas) if name not in setters and name not in ignore]:
         spot = insert_new_key(tokens, cname, canvas[cname], warnings)
         if spot:
             new_keys.append(f"  {cname} → {spot}")
@@ -467,6 +485,9 @@ def do_pull(endpoint, prune):
     print("\n".join(changed) if changed else "  （无）")
     print(f"\nNEW（画布有 JSON 无，已归入对应域）（{len(new_keys)}）:")
     print("\n".join(new_keys) if new_keys else "  （无）")
+    skipped = sorted(set(canvas) & set(ignore))
+    if skipped:
+        print(f"豁免（sync-ignore，不回流）（{len(skipped)}）: " + ", ".join(skipped))
     print(f"\nMISSING（JSON 有画布无，保留未动；确认后 --pull --prune 才删）（{len(missing)}）:")
     if missing:
         print("\n".join(f"  {n}" for n in missing))
@@ -509,7 +530,7 @@ def fmt_side(vtype, v):
     return repr(v)
 
 
-def do_check(endpoint):
+def do_check(endpoint, ignore=frozenset()):
     gen = load_gen()
     tokens = json.loads(TOKENS_JSON.read_text(encoding="utf-8"))
     payload = gen.gen_ardot_payload(tokens)["PoLang Tokens"]["variables"]
@@ -548,7 +569,8 @@ def do_check(endpoint):
             d_scope.append(f"  {name}: JSON={p.get('scopes')} vs 画布={c.get('scopes')}")
 
     missing = [name for name in sorted(set(payload) - set(canvas))]
-    news = [name for name in sorted(set(canvas) - set(payload))]
+    news = [name for name in sorted(set(canvas) - set(payload)) if name not in ignore]
+    ignored = sorted(set(canvas) & set(ignore))
 
     total_drift = len(d_value) + len(d_scope) + len(d_type) + len(d_mode) + len(missing) + len(news)
     print(f"漂移门禁：JSON payload {len(payload)} 个变量 vs 画布 {len(canvas)} 个变量\n")
@@ -579,6 +601,8 @@ def do_check(endpoint):
     if news:
         print(f"\nNEW（画布有 JSON 无；--pull 回流）（{len(news)}）:")
         print("\n".join(f"  {n}" for n in news))
+    if ignored:
+        print(f"\n豁免（sync-ignore，不计漂移）（{len(ignored)}）: " + ", ".join(ignored))
 
     if total_drift:
         print(f"\n❌ 检出漂移 {total_drift} 项（显式选方向：--push 以 JSON 为准 / --pull 以画布为准）")
@@ -593,15 +617,20 @@ def main():
     ap.add_argument("--pull", action="store_true", help="画布→JSON 回流 SSOT（并重跑 gen-design-tokens.py）")
     ap.add_argument("--check", action="store_true", help="只读漂移门禁，不一致 exit 1")
     ap.add_argument("--prune", action="store_true", help="配合 --pull：删除 JSON 有而画布无的键")
+    ap.add_argument("--ignore-file", default=DEFAULT_IGNORE,
+                    help="画布独有变量豁免清单（默认 %(default)s）")
     args = ap.parse_args()
 
     if args.check and args.pull:
         print("❌ --check 与 --pull 互斥（check 只读不写）")
         sys.exit(2)
+    ignore, ignore_path = load_ignore(args.ignore_file)
+    if ignore_path:
+        print(f"豁免清单：{ignore_path}（{len(ignore)} 项）")
     if args.check:
-        do_check(args.endpoint)
+        do_check(args.endpoint, ignore)
     elif args.pull:
-        do_pull(args.endpoint, args.prune)
+        do_pull(args.endpoint, args.prune, ignore)
     else:
         do_push(args.endpoint, args.payload)
 

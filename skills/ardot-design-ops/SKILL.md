@@ -1,7 +1,7 @@
 ---
 name: ardot-design-ops
 description: Ardot 设计稿资产治理——新建页面/帧、token 样式变更、健康审计三场景编排,保障 Light/Dark 全域可切与组件化不腐败。Use when creating/modifying Ardot frames or components, syncing design tokens to canvas, exporting snapshots, or auditing design health (ardot, 设计稿, Light/Dark, 组件化).
-version: 1.1.1
+version: 1.1.2
 created: 2026-09-19
 updated: 2026-09-20
 maintainer: [RD] 全栈工程师
@@ -111,6 +111,9 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 绝对定位宿主帧 I 忽略 x/y | 实例插入后位置错乱(flex 父) | I 显式带 layoutPositioning:ABSOLUTE |
 | 隐形损坏子实例 Copy 丢弃 | mainComponent=None 的子实例复制后消失 | Copy 前 batch_read 查 mainComponent,损坏者先修 |
 | 复扫漏页致 dup 假消失 | health-check JSONL 未含全 11 页 | 11 页全量重读,缺一页结论无效 |
+| 变量删除/重命名无 API | 已迁移变量旧名残留画布,--check 永久 NEW | 登记 sync-ignore.txt 豁免;勿用 apply_variables replace=true(会误删 sysbar-* 等机制变量) |
+| 画布手建色值精度渣 | UI 取色存 0.0590003 式 float,--check 假值漂移(hex 相同) | pull 回流后再 push 一次归一;像素影响 ≤1 LSB,视觉零变化 |
+| 双模式色勿入 color/ 组 | pull 按单值域取 Dark 弃 Light,Light 值丢失 | 主题相关色入 colorScheme(scheme/* 双 mode),或迁移:JSON 加 colorScheme 键→push→重绑→旧名豁免 |
 
 ## 相关文件
 
@@ -120,6 +123,7 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 - [ARDOT_MCP](.kimi-code/ARDOT_MCP.md) - MCP 工具速查与坑
 - [ui-parity-guard](skills/ui-parity-guard/SKILL.md) - 双端一致性守卫(代码侧)
 - [豁免清单](docs/08-UI-SPECS/screens/refs/ardot/health-ignore.txt) - 待收编/待决策台账
+- [sync 豁免清单](docs/08-UI-SPECS/screens/refs/ardot/sync-ignore.txt) - 画布独有变量(token 同步侧)
 
 ## 版本历史
 
@@ -128,3 +132,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 1.0.0 | 2026-09-19 | 初始版本(三场景 + 入库标准 + 陷阱表) |
 | 1.1.0 | 2026-09-20 | Task 4 实战坑回填(陷阱表 +6 行/落盘方式/ignore-file 门禁/豁免清单索引) |
 | 1.1.1 | 2026-09-20 | 落盘封装入库:`tmp/ardot-health/baseline_scan.py` 提升为 `scripts/ardot-scan.py`(CLI 可配),S1 引用改指入库脚本 |
+| 1.1.2 | 2026-09-20 | token 漂移收敛实战回填:sync-ignore 豁免机制(陷阱表 +3 行/相关文件 +1) |

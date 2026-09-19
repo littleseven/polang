@@ -178,7 +178,7 @@ object BadgeTokens {
     val listHeight = 26.dp
 }
 
-/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役）。 */
+/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。 */
 object CameraTokens {
     val focusRingDiameter = 100.dp
     val focusRingStrokeWidth = 3.dp
@@ -232,6 +232,8 @@ object CameraTokens {
     val albumPlaceholderIconColor = Color(0xFFE4E4E4)
     val flipIconColor = Color(0xFF1C1B1F)
     val wbChipFontSize = 12.dp
+    val tealAccent = Color(0xFF0F766E)
+    val toolChipBg = Color(0xFF4A454F)
 }
 
 /** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 */

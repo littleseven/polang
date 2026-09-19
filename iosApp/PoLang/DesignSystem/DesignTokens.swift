@@ -53,6 +53,8 @@ enum IconSize {
 enum AppColors {
     static let focusRing = Color(hex: "FF00E5FF")
     static let panelBackground = Color(hex: "CC000000")
+    static let providerTagBg = Color(hex: "FF00C74A")
+    static let providerTagLabel = Color(hex: "FF0B9E4A")
     static let shutterRing = Color(hex: "FFE4E4E4")
     static let sliderThumb = Color.white
     static let vibrantGreen = Color(hex: "FF00E676")
@@ -62,7 +64,18 @@ enum AppColors {
     static let vibrantPurple = Color(hex: "FF4F378B")
     static let vibrantAmber = Color(hex: "FFFFA000")
     static let iconOnVibrant = Color.white
+    static let voiceButtonIcon = Color(hex: "FF7CA591")
     static let white = Color.white
+    static let amber = Color(hex: "FFFFB020")
+    static let lavender = Color(hex: "FFD0BCFF")
+    static let mint = Color(hex: "FF8FD6C6")
+    static let paperWarm = Color(hex: "FFEDE9E3")
+    static let softBlue = Color(hex: "FF6BA6FF")
+    static let tagChipLine = Color(hex: "FF46413A")
+    static let tagCyan = Color(hex: "FF22D3EE")
+    static let tagGreen = Color(hex: "FF4ADE80")
+    static let tagPink = Color(hex: "FFFF7DB0")
+    static let tagPurple = Color(hex: "FF9C8CFF")
 }
 
 // MARK: - Typography（M3 baseline 字号阶梯，仅 bodyLarge 为定制）
@@ -135,6 +148,7 @@ struct SchemeColors {
     let surfaceContainer: Color
     let surfaceContainerHigh: Color
     let surfaceContainerHighest: Color
+    let warmGrayIcon: Color
 }
 
 enum AppColorScheme {
@@ -167,7 +181,8 @@ enum AppColorScheme {
         surfaceContainerLow: Color(hex: "FFEAF6EF"),
         surfaceContainer: Color(hex: "FFE8F8EF"),
         surfaceContainerHigh: Color(hex: "FFE0F4E8"),
-        surfaceContainerHighest: Color(hex: "FFD5EDDF")
+        surfaceContainerHighest: Color(hex: "FFD5EDDF"),
+        warmGrayIcon: Color(hex: "FF6E675E")
     )
 
     static let dark = SchemeColors(
@@ -199,7 +214,8 @@ enum AppColorScheme {
         surfaceContainerLow: Color(hex: "FF0A1B13"),
         surfaceContainer: Color(hex: "FF0D2318"),
         surfaceContainerHigh: Color(hex: "FF0F2B1B"),
-        surfaceContainerHighest: Color(hex: "FF123B26")
+        surfaceContainerHighest: Color(hex: "FF123B26"),
+        warmGrayIcon: Color(hex: "FFCFC9BF")
     )
 }
 
@@ -443,6 +459,8 @@ enum CameraTokens {
     static let albumPlaceholderIconColor = Color(hex: "FFE4E4E4")
     static let flipIconColor = Color(hex: "FF1C1B1F")
     static let wbChipFontSize: CGFloat = 12
+    static let tealAccent = Color(hex: "FF0F766E")
+    static let toolChipBg = Color(hex: "FF4A454F")
     static let toolBarSelectedBg: Color = CameraTokens.cameraAccent
 }
 
