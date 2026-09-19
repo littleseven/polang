@@ -1,0 +1,14 @@
+# Ardot 画布独有变量豁免清单（sync-ardot-variables.py --check/--pull 不计较）
+# 每行一个画布变量全名；# 开头为注释。
+# 入库原则：画布机制变量（非 app token，codegen 无对应域）或已迁移但画布侧无删除 API 的残留。
+# 与 health-ignore.txt 分工：那边豁免「画布图层健康」，这边豁免「token 双向同步漂移」。
+
+# sysbar-dark / sysbar-light（BOOLEAN，2026-09-19 Task 2 status_bar/system_nav_bar 组件化引入）：
+# 帧内 status bar 图层 Light/Dark 可见性切换的画布机制开关，非 app 设计 token，
+# codegen 无双端 BOOLEAN 域，永不回流。
+sysbar-dark
+sysbar-light
+
+# color/warmGrayIcon（2026-09-20 迁移）：实为双模式主题色，已迁入 colorScheme（scheme/warmGrayIcon，
+# Dark #CFC9BF / Light #6E675E）并重绑全部 14 处引用；旧变量因 MCP 无变量删除 API 残留画布，豁免。
+color/warmGrayIcon

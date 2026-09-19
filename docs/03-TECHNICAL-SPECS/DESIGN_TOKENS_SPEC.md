@@ -193,6 +193,7 @@ photo-info tag chip `primary@0.2`/corner6/12sp/White/8h-4v；section header 14sp
 | `sync-ardot-variables.py --check` | 只读比对 | 值 + mode + scope 三维比对，漂移清单 + exit 1 |
 
 - **冲突语义 = 显式方向，不自动合并**：两侧同键不同值时无自动裁决；`--check` 的漂移清单就是「显式选方向」的决策输入（`--push` 以 JSON 为准 / `--pull` 以画布为准）。
+- **画布独有变量豁免（2026-09-20）**：`--ignore-file`（默认 `docs/08-UI-SPECS/screens/refs/ardot/sync-ignore.txt`）登记「画布机制变量/已迁移残留」，不计 NEW 漂移、`--pull` 不回流。典型：sysbar-dark/light（status bar 图层可见性布尔开关，codegen 无 BOOLEAN 域）；已迁移变量的画布残留（MCP 无变量删除 API）。注意 `apply_variables` 默认 merge 模式不删画布变量，`replace=true` 会删除未提及变量——**禁用**。
 - **CI 门禁建议**：`ai-gate.sh` 在 `gen --check` 之外**并列 `sync --check`**（前者守护 生成物↔JSON，后者守护 JSON↔画布），任一红即 fail；收口基线 440=440 零漂移。
 - **绑定原则**（2026-08-19 绑定清扫收口：五页 + IconSet ~600 处、零像素回归）：字面量先比对「== 变量当前 mode 解析值」再绑，等值绑定前后像素 diff 必须 = 0；豁免（不绑）= 坐标、内容色（§6）、派生值、一次性值。
 - **已知限制**（绑定面之外，保持字面量、以像素零回归为准）：auto-layout `gap`/`padding`；fills 内 paint 级 `opacity`（仅 paint.color 可绑，绑后 opacity 保字面或换 alpha token）；渐变 `stop` 色；整帧 `cornerRadius` 简写不可绑，圆角须走四角逐角键（topLeft/topRight/bottomLeft/bottomRight，如 chatBubble 20/20/4 不对称尾角）。token JSON **新增组**须同步注册 `gen-design-tokens.py` 的 `ENUM_NAMES` / `IOS_ORDER`（及按需 `RAW_SWIFT_VALUES` / `SWIFT_CG_FLOAT_KEYS`），否则不进双端生成物与 push payload。

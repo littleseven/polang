@@ -1,7 +1,7 @@
 {
   "_comment": "PoLang 双端 Design Token SSOT。Android/iOS 各自从此文件同步到代码常量。修改 token 时先改此文件，再两端同步。完整提取方法学/漂移记录见 docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md。",
   "_version": "2.2.3",
-  "_updated": "2026-09-13",
+  "_updated": "2026-09-20",
   "spacing": {
     "_comment": "语义间距阶梯。屏幕级 padding 多为 md(12)/lg(16)，组件内 gap 多为 sm(8)。",
     "xs": 4,
@@ -97,9 +97,11 @@
     "overlayMaxHeight": 500
   },
   "color": {
-    "_comment": "不随主题切换的固定功能色。随主题切换的语义色见 colorScheme。vibrantAmber/iconOnVibrant/white 2026-08-19 绑定清扫候选入库（vibrantAmber 值同 statusColor.warningAmber；iconOnVibrant=vibrant 块上图标白）。",
+    "_comment": "不随主题切换的固定功能色。随主题切换的语义色见 colorScheme。vibrantAmber/iconOnVibrant/white 2026-08-19 绑定清扫候选入库（vibrantAmber 值同 statusColor.warningAmber；iconOnVibrant=vibrant 块上图标白）。providerTagBg/providerTagLabel=设置页来源行绿色 tag（2026-09-20 收编，原画布 literal #00C74A/#0B9E4A）；voiceButtonIcon=聊天输入栏语音钮图标灰绿（原 #7CA591）。",
     "focusRing": "#FF00E5FF",
     "panelBackground": "#CC000000",
+    "providerTagBg": "#FF00C74A",
+    "providerTagLabel": "#FF0B9E4A",
     "shutterRing": "#FFE4E4E4",
     "sliderThumb": "#FFFFFFFF",
     "vibrantGreen": "#FF00E676",
@@ -109,7 +111,18 @@
     "vibrantPurple": "#FF4F378B",
     "vibrantAmber": "#FFFFA000",
     "iconOnVibrant": "#FFFFFFFF",
-    "white": "#FFFFFFFF"
+    "voiceButtonIcon": "#FF7CA591",
+    "white": "#FFFFFFFF",
+    "amber": "#FFFFB020",
+    "lavender": "#FFD0BCFF",
+    "mint": "#FF8FD6C6",
+    "paperWarm": "#FFEDE9E3",
+    "softBlue": "#FF6BA6FF",
+    "tagChipLine": "#FF46413A",
+    "tagCyan": "#FF22D3EE",
+    "tagGreen": "#FF4ADE80",
+    "tagPink": "#FFFF7DB0",
+    "tagPurple": "#FF9C8CFF"
   },
   "typography": {
     "_comment": "M3 baseline 字号阶梯。仅 bodyLarge 为定制（Typography.kt），其余皆为 M3 默认。size/lineHeight/letterSpacing 单位 sp。iOS 映射：role→(size, weight→SwiftUI Font.Weight: Normal=.regular, Medium=.medium)。",
@@ -235,7 +248,8 @@
       "surfaceContainerLow": "#FFEAF6EF",
       "surfaceContainer": "#FFE8F8EF",
       "surfaceContainerHigh": "#FFE0F4E8",
-      "surfaceContainerHighest": "#FFD5EDDF"
+      "surfaceContainerHighest": "#FFD5EDDF",
+      "warmGrayIcon": "#FF6E675E"
     },
     "dark": {
       "primary": "#FF2FE385",
@@ -266,7 +280,8 @@
       "surfaceContainerLow": "#FF0A1B13",
       "surfaceContainer": "#FF0D2318",
       "surfaceContainerHigh": "#FF0F2B1B",
-      "surfaceContainerHighest": "#FF123B26"
+      "surfaceContainerHighest": "#FF123B26",
+      "warmGrayIcon": "#FFCFC9BF"
     }
   },
   "alpha": {
@@ -409,7 +424,7 @@
     "listHeight": 26
   },
   "camera": {
-    "_comment": "相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役）。",
+    "_comment": "相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。",
     "focusRingDiameter": 100,
     "focusRingStrokeWidth": 3,
     "focusRingCornerRadius": 20,
@@ -463,7 +478,9 @@
     "albumThumbColor": "#FF404040",
     "albumPlaceholderIconColor": "#FFE4E4E4",
     "flipIconColor": "#FF1C1B1F",
-    "wbChipFontSize": 12
+    "wbChipFontSize": 12,
+    "tealAccent": "#FF0F766E",
+    "toolChipBg": "#FF4A454F"
   },
   "chatBubble": {
     "_comment": "聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。",

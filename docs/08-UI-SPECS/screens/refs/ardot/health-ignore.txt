@@ -5,9 +5,6 @@ Play Store Assets/
 IconSet/
 # Camera 滤镜样本色: 内容色(滤镜样本)非主题色
 Camera/camera/panel_filter/inline_panel/thumb
-# 待品牌色 token 决策(2026-09-20, d>24 无就近匹配,留用户拍板;决策后移除)
-component/provider_row/tag
-component/input_bar/InputCard/InputButtonRow/VoiceButton
 # 待收编重复组(2026-09-20 P0-P4 后剩余 30 组,增量收编时逐行移除;子串经全画布路径核验,除注释注明外零族外命中)
 # Gallery tag_control 统计瓦片行+瓦片(dup 组 g0+g16 嵌套,一行覆盖两组)
 tag_control/Body/CardStats/tileRow

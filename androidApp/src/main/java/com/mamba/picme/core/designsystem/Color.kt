@@ -37,6 +37,7 @@ val SurfaceContainerLowLight = Color(0xFFEAF6EF)
 val SurfaceContainerLight = Color(0xFFE8F8EF)
 val SurfaceContainerHighLight = Color(0xFFE0F4E8)
 val SurfaceContainerHighestLight = Color(0xFFD5EDDF)
+val WarmGrayIconLight = Color(0xFF6E675E)
 
 val PrimaryDark = Color(0xFF2FE385)
 val OnPrimaryDark = Color(0xFF062B18)
@@ -67,10 +68,13 @@ val SurfaceContainerLowDark = Color(0xFF0A1B13)
 val SurfaceContainerDark = Color(0xFF0D2318)
 val SurfaceContainerHighDark = Color(0xFF0F2B1B)
 val SurfaceContainerHighestDark = Color(0xFF123B26)
+val WarmGrayIconDark = Color(0xFFCFC9BF)
 
 // ── 功能色（color 组，不随主题切换）。引用方式：MaterialTheme.appColors.focusRing ──────────
 val FocusRingColor = Color(0xFF00E5FF)
 val PanelBackgroundColor = Color(0xCC000000)
+val ProviderTagBgColor = Color(0xFF00C74A)
+val ProviderTagLabelColor = Color(0xFF0B9E4A)
 val ShutterRingColor = Color(0xFFE4E4E4)
 val SliderThumbColor = Color.White
 val VibrantGreen = Color(0xFF00E676)
@@ -80,12 +84,25 @@ val VibrantPink = Color(0xFFFF4081)
 val VibrantPurple = Color(0xFF4F378B)
 val VibrantAmber = Color(0xFFFFA000)
 val IconOnVibrantColor = Color.White
+val VoiceButtonIconColor = Color(0xFF7CA591)
 val WhiteColor = Color.White
+val AmberColor = Color(0xFFFFB020)
+val LavenderColor = Color(0xFFD0BCFF)
+val MintColor = Color(0xFF8FD6C6)
+val PaperWarmColor = Color(0xFFEDE9E3)
+val SoftBlueColor = Color(0xFF6BA6FF)
+val TagChipLineColor = Color(0xFF46413A)
+val TagCyanColor = Color(0xFF22D3EE)
+val TagGreenColor = Color(0xFF4ADE80)
+val TagPinkColor = Color(0xFFFF7DB0)
+val TagPurpleColor = Color(0xFF9C8CFF)
 
 /** 功能色集合，通过 [MaterialTheme.appColors] 访问。 */
 object AppColors {
     val focusRing = FocusRingColor
     val panelBackground = PanelBackgroundColor
+    val providerTagBg = ProviderTagBgColor
+    val providerTagLabel = ProviderTagLabelColor
     val shutterRing = ShutterRingColor
     val sliderThumb = SliderThumbColor
     val vibrantGreen = VibrantGreen
@@ -95,5 +112,16 @@ object AppColors {
     val vibrantPurple = VibrantPurple
     val vibrantAmber = VibrantAmber
     val iconOnVibrant = IconOnVibrantColor
+    val voiceButtonIcon = VoiceButtonIconColor
     val white = WhiteColor
+    val amber = AmberColor
+    val lavender = LavenderColor
+    val mint = MintColor
+    val paperWarm = PaperWarmColor
+    val softBlue = SoftBlueColor
+    val tagChipLine = TagChipLineColor
+    val tagCyan = TagCyanColor
+    val tagGreen = TagGreenColor
+    val tagPink = TagPinkColor
+    val tagPurple = TagPurpleColor
 }
