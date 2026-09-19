@@ -10035,7 +10035,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-7p9u-20260920_070014176.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-osep-20260920_073805233.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -14764,7 +14764,7 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-bzgq-20260920_070015614.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-uloi-20260920_073806698.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
           }
         },
         "267:518": {
@@ -15535,13 +15535,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-oy3k-20260920_070016814.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-1ae3-20260920_073807960.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-wkgz-20260920_070016378.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-5zku-20260920_073807507.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -16426,7 +16426,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-dzac-20260920_070017887.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-hd2p-20260920_073808937.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -17758,7 +17758,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-1pvz-20260920_070017368.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-1qjd-20260920_073808515.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -23936,7 +23936,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-bl42-20260920_070021143.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-21rg-20260920_073812226.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -24787,7 +24787,7 @@
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-7c2a-20260920_070021634.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-1uss-20260920_073812750.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -28142,13 +28142,13 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-t6bk-20260920_070023032.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-zepv-20260920_073814192.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-4wa1-20260920_070022062.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-mwpl-20260920_073813191.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
@@ -31359,7 +31359,7 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-ly6g-20260920_070023817.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-4csw-20260920_073814957.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
           }
         }
       },

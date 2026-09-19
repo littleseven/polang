@@ -114,6 +114,11 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 变量删除/重命名无 API | 已迁移变量旧名残留画布,--check 永久 NEW | 登记 sync-ignore.txt 豁免;勿用 apply_variables replace=true(会误删 sysbar-* 等机制变量) |
 | 画布手建色值精度渣 | UI 取色存 0.0590003 式 float,--check 假值漂移(hex 相同) | pull 回流后再 push 一次归一;像素影响 ≤1 LSB,视觉零变化 |
 | 双模式色勿入 color/ 组 | pull 按单值域取 Dark 弃 Light,Light 值丢失 | 主题相关色入 colorScheme(scheme/* 双 mode),或迁移:JSON 加 colorScheme 键→push→重绑→旧名豁免 |
+| 帧钉 Light 不穿透实例 | 钉 variableModes 后帧内实例子树仍按页模式(Dark)渲染 | 实证限制(chat/empty 钉 Light,top_bar/InputBar/nav 实例区全深色);Light 验证只对非实例内容有效,实例区别信钉定预览 |
+| visible 绑布尔语法 | boundVariables 对象/`$:Set:Name` 均被静默忽略 | U 用 `{visible: "$<varId>"}`(如 `$386:38`);回读 boundVariables 确认 |
+| 绑 false 值布尔不生效 | 绑当前模式解析为 false 的变量(如 Dark 下绑 sysbar-light)后回读无绑定 | 引擎疑似 bug,无绕过;bar_light 侧绑定需在 Light 默认模式下做或等引擎修复 |
+| export-ardot-snapshot 漏页 | 快照只导 10/11 页(缺 PlayStoreAssets),海报 PNG 不更新 | 海报/guide 帧须单独 export_nodes(scale 1)按帧名落 refs |
+| 海报烘焙图更新通道 | 设计海报内嵌截图是静态 IMAGE fill,不随组件更新 | download_source_media→本地 PIL 修补→upload_images 回传同节点(≤10/批) |
 
 ## 相关文件
 
@@ -133,3 +138,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 1.1.0 | 2026-09-20 | Task 4 实战坑回填(陷阱表 +6 行/落盘方式/ignore-file 门禁/豁免清单索引) |
 | 1.1.1 | 2026-09-20 | 落盘封装入库:`tmp/ardot-health/baseline_scan.py` 提升为 `scripts/ardot-scan.py`(CLI 可配),S1 引用改指入库脚本 |
 | 1.1.2 | 2026-09-20 | token 漂移收敛实战回填:sync-ignore 豁免机制(陷阱表 +3 行/相关文件 +1) |
+| 1.2.0 | 2026-09-20 | 虚拟键统一实战回填:陷阱表 +5 行(钉 Light 不穿透实例/visible 绑布尔语法/false 布尔绑定失效/快照漏 PlayStoreAssets 页/烘焙图更新通道) |
