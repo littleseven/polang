@@ -95,6 +95,28 @@
       "tokenBound": true,
       "variants": [],
       "rules": "三列图片行一律用实例; cell 图覆写 U(inst+\"<cellId>\",{fills:[IMAGE]}); 行高/间距差异走实例 height/gap 覆写(数值先 U(null) 解绑); 子树零颜色 token, 双模 PNG 一致属预期"
+    },
+    {
+      "name": "component/top_bar",
+      "nodeId": "387:113",
+      "page": "Components",
+      "purpose": "Chat 顶栏(返回+菜单+spacer+问题上报/追加/清理三动作位, empty/conversation/empty-v2-guest/cleanup_confirm/cleanup_done 5 帧全同构)",
+      "darkPng": "components/top_bar-dark.png",
+      "lightPng": "components/top_bar-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "Chat 各帧顶栏一律用实例(替换: I(parent,{type:\"ref\",ref:\"387:113\",width:\"fill_container\"}) → M 到原索引 → D 旧节点); 全帧零覆写; 相册类顶栏用 top_bar_gallery, 勿混用"
+    },
+    {
+      "name": "component/top_bar_gallery",
+      "nodeId": "387:121",
+      "page": "Components",
+      "purpose": "相册类顶栏(相册标题+模型中心/扫描/搜索/排序/设置五动作位, grid/sort_menu/empty 3 帧同构)",
+      "darkPng": "components/top_bar_gallery-dark.png",
+      "lightPng": "components/top_bar_gallery-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "相册类帧顶栏一律用实例; gallery/empty 父帧绝对定位需覆写 layoutPositioning:ABSOLUTE+x:0+y:0+width:393; 根透明底, 双模判定走语义判据(不透明像素 dark≈239→light≈50); 变体候选未收: scanning(ic/pause 换 ic/scan)、search 4-node 组(back+search_field+result_count, 宜独立组件)、People detail(btn_back+title+btn_save)"
     }
   ]
 }
