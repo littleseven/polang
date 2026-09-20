@@ -1,6 +1,8 @@
 # ardot 健康检查豁免清单(path 子串,随收编递减;机制见 scripts/ardot-health-check.py --ignore-file)
-# Play Store 营销素材: 固定深色不参与双模(2026-09-19 reorg spec)
-Play Store Assets/
+# Play Store 营销素材: 固定样式不参与双模(2026-09-19 reorg spec;2026-09-21 拆为三页,页名同步)
+PlayStorePosters/
+PlayStoreScreens/
+PlayStoreGuides/
 # IconSet 图标素材页: 矢量本色非主题色
 IconSet/
 # Camera 滤镜样本色: 内容色(滤镜样本)非主题色

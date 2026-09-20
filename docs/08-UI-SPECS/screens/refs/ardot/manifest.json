@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-20T08:10:30+08:00",
+  "exportedAt": "2026-09-21T02:20:08+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=387%3A181"
+    "url": "cocraft://localhost/file/715061534788814?node_id=267%3A21"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -363,8 +363,261 @@
       ],
       "id": "386:45",
       "name": "Components"
+    },
+    {
+      "frames": [
+        {
+          "id": "152:128",
+          "name": "feature-graphic/zh-CN",
+          "png": "feature-graphic-zh-CN.png"
+        },
+        {
+          "id": "152:134",
+          "name": "feature-graphic/en-US",
+          "png": "feature-graphic-en-US.png"
+        },
+        {
+          "id": "152:140",
+          "name": "feature-graphic/zh-TW",
+          "png": "feature-graphic-zh-TW.png"
+        },
+        {
+          "id": "300:113",
+          "name": "01-gallery/en-US-design",
+          "png": "01-gallery-en-US-design.png"
+        },
+        {
+          "id": "300:339",
+          "name": "04-people/en-US-design",
+          "png": "04-people-en-US-design.png"
+        },
+        {
+          "id": "300:1000",
+          "name": "02-search/en-US-design",
+          "png": "02-search-en-US-design.png"
+        },
+        {
+          "id": "300:1008",
+          "name": "03-chat/en-US-design",
+          "png": "03-chat-en-US-design.png"
+        },
+        {
+          "id": "300:1016",
+          "name": "05-person-groups/en-US-design",
+          "png": "05-person-groups-en-US-design.png"
+        },
+        {
+          "id": "300:1024",
+          "name": "06-chat-welcome/en-US-design",
+          "png": "06-chat-welcome-en-US-design.png"
+        },
+        {
+          "id": "300:1032",
+          "name": "07-insight/en-US-design",
+          "png": "07-insight-en-US-design.png"
+        },
+        {
+          "id": "300:1040",
+          "name": "08-privacy/en-US-design",
+          "png": "08-privacy-en-US-design.png"
+        },
+        {
+          "id": "302:39",
+          "name": "01-gallery/zh-CN-design",
+          "png": "01-gallery-zh-CN-design.png"
+        },
+        {
+          "id": "302:47",
+          "name": "02-search/zh-CN-design",
+          "png": "02-search-zh-CN-design.png"
+        },
+        {
+          "id": "302:55",
+          "name": "03-chat/zh-CN-design",
+          "png": "03-chat-zh-CN-design.png"
+        },
+        {
+          "id": "302:63",
+          "name": "04-people/zh-CN-design",
+          "png": "04-people-zh-CN-design.png"
+        },
+        {
+          "id": "302:71",
+          "name": "05-person-groups/zh-CN-design",
+          "png": "05-person-groups-zh-CN-design.png"
+        },
+        {
+          "id": "302:79",
+          "name": "06-chat-welcome/zh-CN-design",
+          "png": "06-chat-welcome-zh-CN-design.png"
+        },
+        {
+          "id": "302:87",
+          "name": "07-insight/zh-CN-design",
+          "png": "07-insight-zh-CN-design.png"
+        },
+        {
+          "id": "302:95",
+          "name": "08-privacy/zh-CN-design",
+          "png": "08-privacy-zh-CN-design.png"
+        },
+        {
+          "id": "302:103",
+          "name": "01-gallery/zh-TW-design",
+          "png": "01-gallery-zh-TW-design.png"
+        },
+        {
+          "id": "302:111",
+          "name": "02-search/zh-TW-design",
+          "png": "02-search-zh-TW-design.png"
+        },
+        {
+          "id": "302:119",
+          "name": "03-chat/zh-TW-design",
+          "png": "03-chat-zh-TW-design.png"
+        },
+        {
+          "id": "302:127",
+          "name": "04-people/zh-TW-design",
+          "png": "04-people-zh-TW-design.png"
+        },
+        {
+          "id": "302:135",
+          "name": "05-person-groups/zh-TW-design",
+          "png": "05-person-groups-zh-TW-design.png"
+        },
+        {
+          "id": "302:143",
+          "name": "06-chat-welcome/zh-TW-design",
+          "png": "06-chat-welcome-zh-TW-design.png"
+        },
+        {
+          "id": "302:151",
+          "name": "07-insight/zh-TW-design",
+          "png": "07-insight-zh-TW-design.png"
+        },
+        {
+          "id": "302:159",
+          "name": "08-privacy/zh-TW-design",
+          "png": "08-privacy-zh-TW-design.png"
+        }
+      ],
+      "id": "392:22",
+      "name": "PlayStorePosters"
+    },
+    {
+      "frames": [
+        {
+          "id": "300:29",
+          "name": "gallery/grid-store01",
+          "png": "gallery-grid-store01.png"
+        },
+        {
+          "id": "306:197",
+          "name": "gallery/grid-store01-zhTW",
+          "png": "gallery-grid-store01-zhTW.png"
+        },
+        {
+          "id": "300:539",
+          "name": "search/store01",
+          "png": "search-store01.png"
+        },
+        {
+          "id": "300:651",
+          "name": "chat/store01-welcome",
+          "png": "chat-store01-welcome.png"
+        },
+        {
+          "id": "301:13",
+          "name": "chat/store01-conversation",
+          "png": "chat-store01-conversation.png"
+        },
+        {
+          "id": "301:96",
+          "name": "chat/store01-insight",
+          "png": "chat-store01-insight.png"
+        },
+        {
+          "id": "300:215",
+          "name": "people/grid-store01",
+          "png": "people-grid-store01.png"
+        },
+        {
+          "id": "300:723",
+          "name": "people/detail-store01",
+          "png": "people-detail-store01.png"
+        },
+        {
+          "id": "300:782",
+          "name": "memory/store01-feed",
+          "png": "memory-store01-feed.png"
+        },
+        {
+          "id": "395:1",
+          "name": "settings/localmodels-store01-zh",
+          "png": "settings-localmodels-store01-zh.png"
+        },
+        {
+          "id": "395:106",
+          "name": "settings/localmodels-store01-en",
+          "png": "settings-localmodels-store01-en.png"
+        },
+        {
+          "id": "395:211",
+          "name": "settings/localmodels-store01-tw",
+          "png": "settings-localmodels-store01-tw.png"
+        }
+      ],
+      "id": "392:23",
+      "name": "PlayStoreScreens"
+    },
+    {
+      "frames": [
+        {
+          "id": "363:1",
+          "name": "guide-promo/01",
+          "png": "guide-promo-01.png"
+        },
+        {
+          "id": "364:1",
+          "name": "guide-promo/02",
+          "png": "guide-promo-02.png"
+        },
+        {
+          "id": "364:7",
+          "name": "guide-promo/03",
+          "png": "guide-promo-03.png"
+        },
+        {
+          "id": "364:13",
+          "name": "guide-promo/04",
+          "png": "guide-promo-04.png"
+        },
+        {
+          "id": "364:19",
+          "name": "guide-promo/05",
+          "png": "guide-promo-05.png"
+        },
+        {
+          "id": "364:25",
+          "name": "guide-promo/06",
+          "png": "guide-promo-06.png"
+        },
+        {
+          "id": "364:31",
+          "name": "guide-promo/entry",
+          "png": "guide-promo-entry.png"
+        },
+        {
+          "id": "364:37",
+          "name": "guide-promo/preview",
+          "png": "guide-promo-preview.png"
+        }
+      ],
+      "id": "392:24",
+      "name": "PlayStoreGuides"
     }
   ],
   "scale": 1,
-  "structureSha256": "ecc58c413494ba092de2efd08a9912697701d929ed9261976c953e966a8e9e2a"
+  "structureSha256": "fa4bc436d0acff6ca09365b64a3571dd38b966c6d54571f2d59c3efccd2cc7df"
 }

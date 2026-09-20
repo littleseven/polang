@@ -42,7 +42,7 @@ def rpc(endpoint, method, params=None, rid=1, sid=None):
     if sid:
         headers["Mcp-Session-Id"] = sid
     req = urllib.request.Request(endpoint, data=json.dumps(body).encode(), headers=headers)
-    resp = urllib.request.urlopen(req, timeout=300)
+    resp = urllib.request.urlopen(req, timeout=600)
     sid_out = resp.headers.get("Mcp-Session-Id", sid)
     raw = resp.read().decode()
     for line in raw.splitlines():
