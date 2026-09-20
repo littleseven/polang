@@ -22,7 +22,8 @@ echo "==> [2/3] rsync $LOCAL_DIR -> $HOST:$REMOTE_DIR (--delete 镜像)"
 rsync -avz --delete "$LOCAL_DIR/" "$HOST:$REMOTE_DIR/"
 
 echo "==> [3/3] 校验线上首页标记: $MARKER"
-if curl -s --max-time 20 https://polang.net/ | grep -q "$MARKER"; then
+# 注意: / 会 302 到 /en/（英文页无中文标记），须直接校验 /index.html
+if curl -s --max-time 20 https://polang.net/index.html | grep -q "$MARKER"; then
   echo "✅ 部署成功: https://polang.net/"
 else
   echo "❌ 校验失败:首页未检测到标记。回滚命令:"
