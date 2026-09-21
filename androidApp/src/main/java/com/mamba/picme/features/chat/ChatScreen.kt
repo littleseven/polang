@@ -1447,7 +1447,7 @@ private fun ChatMessageItem(
                         if (isImage) {
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                         } else if (isUser) {
-                            // 用户气泡：品牌实色能量绿 #2FE385（双模式一致，v2.2.3）；文字走 userBubbleOn 深绿黑
+                            // 用户气泡：微信绿 #95EC69（token userBubbleBg，v3.0）；文字走 userBubbleOn 深字
                             ChatBubbleTokens.userBubbleBg
                         } else {
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
@@ -1533,7 +1533,7 @@ private fun ChatMessageItem(
                         }
                     }
                     isUser -> {
-                        // 用户气泡文字：userBubbleOn 深绿黑字（对齐设计稿 $143:12；#2FE385 亮绿底上对比度 ~8:1）
+                        // 用户气泡文字：userBubbleOn 深字（对齐设计稿 $143:12；#95EC69 绿底上深字对比度充足）
                         Text(
                             text = message.content,
                             color = ChatBubbleTokens.userBubbleOn,
