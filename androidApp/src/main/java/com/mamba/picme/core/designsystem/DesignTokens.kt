@@ -178,7 +178,7 @@ object BadgeTokens {
     val listHeight = 26.dp
 }
 
-/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。 */
+/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。 2026-09-22 v3.0 cameraAccent 换微信绿 #07C160。 */
 object CameraTokens {
     val focusRingDiameter = 100.dp
     val focusRingStrokeWidth = 3.dp
@@ -198,7 +198,7 @@ object CameraTokens {
     val filterSelectedBorderWidth = 2.5.dp
     val filterLabelFontSize = 10.dp
     val panelBackground = Color(0xB81C1A1F)
-    val cameraAccent = Color(0xFF2FE385)
+    val cameraAccent = Color(0xFF07C160)
     val cameraAccentOn = Color.White
     val toolBarUnselectedBg = Color(0x00000000)
     val inlineFilterPanelHeight = 200.dp
@@ -236,7 +236,7 @@ object CameraTokens {
     val toolChipBg = Color(0xFF4A454F)
 }
 
-/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 */
+/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。 */
 object ChatBubbleTokens {
     val bubbleMaxWidth = 360.dp
     val imageMaxWidth = 240.dp
@@ -257,10 +257,10 @@ object ChatBubbleTokens {
     val blinkMs = 500
     val circularButtonSize = 36.dp
     val circularButtonIconSize = 22.dp
-    val brandGradientStart = Color(0xFF1EA75B)
-    val brandGradientEnd = Color(0xFF7CEFA8)
-    val userBubbleBg = Color(0xFF2FE385)
-    val userBubbleOn = Color(0xFF062B18)
+    val brandGradientStart = Color(0xFF07C160)
+    val brandGradientEnd = Color(0xFF06AD56)
+    val userBubbleBg = Color(0xFF95EC69)
+    val userBubbleOn = Color(0xFF181818)
     val tryChipHeight = 44.dp
     val inputBottomPadding = 28.dp
     val messageGap = 14.dp

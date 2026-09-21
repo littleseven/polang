@@ -53,8 +53,8 @@ enum IconSize {
 enum AppColors {
     static let focusRing = Color(hex: "FF00E5FF")
     static let panelBackground = Color(hex: "CC000000")
-    static let providerTagBg = Color(hex: "FF00C74A")
-    static let providerTagLabel = Color(hex: "FF0B9E4A")
+    static let providerTagBg = Color(hex: "FF07C160")
+    static let providerTagLabel = Color(hex: "FF067045")
     static let shutterRing = Color(hex: "FFE4E4E4")
     static let sliderThumb = Color.white
     static let vibrantGreen = Color(hex: "FF00E676")
@@ -64,7 +64,7 @@ enum AppColors {
     static let vibrantPurple = Color(hex: "FF4F378B")
     static let vibrantAmber = Color(hex: "FFFFA000")
     static let iconOnVibrant = Color.white
-    static let voiceButtonIcon = Color(hex: "FF7CA591")
+    static let voiceButtonIcon = Color(hex: "FF888888")
     static let white = Color.white
     static let amber = Color(hex: "FFFFB020")
     static let lavender = Color(hex: "FFD0BCFF")
@@ -98,14 +98,14 @@ enum AppTypography {
     static let headlineMedium = TypeStyle(size: 28, lineHeight: 36, weight: .regular, letterSpacing: 0)
     static let headlineSmall = TypeStyle(size: 24, lineHeight: 32, weight: .regular, letterSpacing: 0)
     static let titleLarge = TypeStyle(size: 22, lineHeight: 28, weight: .regular, letterSpacing: 0)
-    static let titleMedium = TypeStyle(size: 16, lineHeight: 24, weight: .medium, letterSpacing: 0.15)
+    static let titleMedium = TypeStyle(size: 17, lineHeight: 24, weight: .medium, letterSpacing: 0.15)
     static let titleSmall = TypeStyle(size: 14, lineHeight: 20, weight: .medium, letterSpacing: 0.1)
     static let bodyLarge = TypeStyle(size: 16, lineHeight: 24, weight: .regular, letterSpacing: 0.5)
     static let bodyMedium = TypeStyle(size: 14, lineHeight: 20, weight: .regular, letterSpacing: 0.25)
     static let bodySmall = TypeStyle(size: 12, lineHeight: 16, weight: .regular, letterSpacing: 0.4)
     static let labelLarge = TypeStyle(size: 14, lineHeight: 20, weight: .medium, letterSpacing: 0.1)
     static let labelMedium = TypeStyle(size: 12, lineHeight: 16, weight: .medium, letterSpacing: 0.5)
-    static let labelSmall = TypeStyle(size: 11, lineHeight: 16, weight: .medium, letterSpacing: 0.5)
+    static let labelSmall = TypeStyle(size: 10, lineHeight: 16, weight: .medium, letterSpacing: 0.5)
 
     /// 内联字重覆盖（Android 在 M3 role 之上叠加：模型卡名 SemiBold、必备徽章 Bold 等）。
     enum WeightOverride {
@@ -153,69 +153,69 @@ struct SchemeColors {
 
 enum AppColorScheme {
     static let light = SchemeColors(
-        primary: Color(hex: "FF0E9F6E"),
+        primary: Color(hex: "FF07C160"),
         onPrimary: Color.white,
-        primaryContainer: Color(hex: "FFC9EEDD"),
-        onPrimaryContainer: Color(hex: "FF0B5C42"),
-        secondary: Color(hex: "FF5F9684"),
+        primaryContainer: Color(hex: "FFD7F2E2"),
+        onPrimaryContainer: Color(hex: "FF0A6B3F"),
+        secondary: Color(hex: "FF888888"),
         onSecondary: Color.white,
-        secondaryContainer: Color(hex: "FFDCF2E5"),
-        onSecondaryContainer: Color(hex: "FF124A38"),
-        tertiary: Color(hex: "FF0B7A54"),
+        secondaryContainer: Color(hex: "FFF2F2F2"),
+        onSecondaryContainer: Color(hex: "FF4D4D4D"),
+        tertiary: Color(hex: "FF576B95"),
         onTertiary: Color.white,
-        tertiaryContainer: Color(hex: "FFB9EAD3"),
-        onTertiaryContainer: Color(hex: "FF053826"),
-        error: Color(hex: "FFB3261E"),
+        tertiaryContainer: Color(hex: "FFE9EDF5"),
+        onTertiaryContainer: Color(hex: "FF3A4A6B"),
+        error: Color(hex: "FFFA5151"),
         onError: Color.white,
-        errorContainer: Color(hex: "FFF9DEDC"),
-        onErrorContainer: Color(hex: "FF410E0B"),
-        background: Color(hex: "FFF1FAF5"),
-        onBackground: Color(hex: "FF0F3D2E"),
-        surface: Color(hex: "FFF1FAF5"),
-        onSurface: Color(hex: "FF0F3D2E"),
-        surfaceVariant: Color(hex: "FFE0F4E8"),
-        onSurfaceVariant: Color(hex: "FF5F9684"),
-        outline: Color(hex: "FF8CC0AC"),
-        outlineVariant: Color(hex: "FFC8E5D4"),
+        errorContainer: Color(hex: "FFFDEBEB"),
+        onErrorContainer: Color(hex: "FF8F1F1F"),
+        background: Color(hex: "FFEDEDED"),
+        onBackground: Color(hex: "FF181818"),
+        surface: Color(hex: "FFEDEDED"),
+        onSurface: Color(hex: "FF181818"),
+        surfaceVariant: Color(hex: "FFF2F2F2"),
+        onSurfaceVariant: Color(hex: "FF888888"),
+        outline: Color(hex: "FFB2B2B2"),
+        outlineVariant: Color(hex: "FFE5E5E5"),
         surfaceContainerLowest: Color.white,
-        surfaceContainerLow: Color(hex: "FFEAF6EF"),
-        surfaceContainer: Color(hex: "FFE8F8EF"),
-        surfaceContainerHigh: Color(hex: "FFE0F4E8"),
-        surfaceContainerHighest: Color(hex: "FFD5EDDF"),
-        warmGrayIcon: Color(hex: "FF6E675E")
+        surfaceContainerLow: Color(hex: "FFF7F7F7"),
+        surfaceContainer: Color(hex: "FFF2F2F2"),
+        surfaceContainerHigh: Color(hex: "FFEDEDED"),
+        surfaceContainerHighest: Color(hex: "FFE5E5E5"),
+        warmGrayIcon: Color(hex: "FF888888")
     )
 
     static let dark = SchemeColors(
-        primary: Color(hex: "FF2FE385"),
-        onPrimary: Color(hex: "FF062B18"),
-        primaryContainer: Color(hex: "FF1EA75B"),
-        onPrimaryContainer: Color(hex: "FFC8F7DC"),
-        secondary: Color(hex: "FF8FBBA6"),
-        onSecondary: Color(hex: "FF06281A"),
-        secondaryContainer: Color(hex: "FF10291C"),
-        onSecondaryContainer: Color(hex: "FFCFEBDC"),
-        tertiary: Color(hex: "FF6FD8A5"),
-        onTertiary: Color(hex: "FF042416"),
-        tertiaryContainer: Color(hex: "FF123B26"),
-        onTertiaryContainer: Color(hex: "FFB2EFCB"),
-        error: Color(hex: "FFF2B8B5"),
-        onError: Color(hex: "FF601410"),
-        errorContainer: Color(hex: "FF8C1D18"),
+        primary: Color(hex: "FF07C160"),
+        onPrimary: Color.white,
+        primaryContainer: Color(hex: "FF14562F"),
+        onPrimaryContainer: Color(hex: "FFB7E9C9"),
+        secondary: Color(hex: "FF7F7F7F"),
+        onSecondary: Color.white,
+        secondaryContainer: Color(hex: "FF2C2C2C"),
+        onSecondaryContainer: Color(hex: "FFC9C9C9"),
+        tertiary: Color(hex: "FF7D90B0"),
+        onTertiary: Color.white,
+        tertiaryContainer: Color(hex: "FF2A3346"),
+        onTertiaryContainer: Color(hex: "FFC6D0E2"),
+        error: Color(hex: "FFFA5151"),
+        onError: Color.white,
+        errorContainer: Color(hex: "FF3A1F1F"),
         onErrorContainer: Color(hex: "FFF9DEDC"),
-        background: Color(hex: "FF071510"),
-        onBackground: Color(hex: "FFDFF5E9"),
-        surface: Color(hex: "FF071510"),
-        onSurface: Color(hex: "FFDFF5E9"),
-        surfaceVariant: Color(hex: "FF0F2B1B"),
-        onSurfaceVariant: Color(hex: "FF8FBBA6"),
-        outline: Color(hex: "FF3E6B54"),
-        outlineVariant: Color(hex: "FF1E4630"),
-        surfaceContainerLowest: Color(hex: "FF04100A"),
-        surfaceContainerLow: Color(hex: "FF0A1B13"),
-        surfaceContainer: Color(hex: "FF0D2318"),
-        surfaceContainerHigh: Color(hex: "FF0F2B1B"),
-        surfaceContainerHighest: Color(hex: "FF123B26"),
-        warmGrayIcon: Color(hex: "FFCFC9BF")
+        background: Color(hex: "FF111111"),
+        onBackground: Color(hex: "FFD5D5D5"),
+        surface: Color(hex: "FF111111"),
+        onSurface: Color(hex: "FFD5D5D5"),
+        surfaceVariant: Color(hex: "FF2C2C2C"),
+        onSurfaceVariant: Color(hex: "FF7F7F7F"),
+        outline: Color(hex: "FF5F5F5F"),
+        outlineVariant: Color(hex: "FF2C2C2C"),
+        surfaceContainerLowest: Color(hex: "FF0C0C0C"),
+        surfaceContainerLow: Color(hex: "FF141414"),
+        surfaceContainer: Color(hex: "FF1A1A1A"),
+        surfaceContainerHigh: Color(hex: "FF222222"),
+        surfaceContainerHighest: Color(hex: "FF2C2C2C"),
+        warmGrayIcon: Color(hex: "FF7F7F7F")
     )
 }
 
@@ -425,7 +425,7 @@ enum CameraTokens {
     static let filterSelectedBorderWidth: CGFloat = 2.5
     static let filterLabelFontSize: CGFloat = 10
     static let panelBackground = Color(hex: "B81C1A1F")
-    static let cameraAccent = Color(hex: "FF2FE385")
+    static let cameraAccent = Color(hex: "FF07C160")
     static let cameraAccentOn = Color.white
     static let toolBarUnselectedBg = Color(hex: "00000000")
     static let inlineFilterPanelHeight: CGFloat = 200
@@ -486,10 +486,10 @@ enum ChatBubbleTokens {
     static let blinkMs: Double = 500
     static let circularButtonSize: CGFloat = 36
     static let circularButtonIconSize: CGFloat = 22
-    static let brandGradientStart = Color(hex: "FF1EA75B")
-    static let brandGradientEnd = Color(hex: "FF7CEFA8")
-    static let userBubbleBg = Color(hex: "FF2FE385")
-    static let userBubbleOn = Color(hex: "FF062B18")
+    static let brandGradientStart = Color(hex: "FF07C160")
+    static let brandGradientEnd = Color(hex: "FF06AD56")
+    static let userBubbleBg = Color(hex: "FF95EC69")
+    static let userBubbleOn = Color(hex: "FF181818")
     static let tryChipHeight: CGFloat = 44
     static let inputBottomPadding: CGFloat = 28
     static let messageGap: CGFloat = 14
