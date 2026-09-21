@@ -32,9 +32,8 @@ ENDPOINT = "http://127.0.0.1:50501/api/v1/mcp"
 FILE_ID = "715061534788814"
 # 期望 LIGHT 铬件的帧名（其余全 DARK）
 LIGHT_FRAMES = {
-    "settings/localmodels-store01-zh",
-    "settings/localmodels-store01-en",
-    "settings/localmodels-store01-tw",
+    # 2026-09-22 用户拍板：PlayStoreScreens 全页统一 Dark（localmodels 三帧
+    # 原钉 Light 的方案废弃）；浅色专用帧未来在此登记。
 }
 STATUS_LAYERS = ("386:39", "386:40")   # bar_dark, bar_light
 NAV_LAYERS = ("386:41", "386:42")
