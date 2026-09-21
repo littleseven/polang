@@ -113,7 +113,7 @@ def collect_instances(cv):
                     continue
                 for c in fr.get("children") or []:
                     if c.get("type") == "INSTANCE" and c.get("name") in (
-                            "status_bar", "system_nav_bar"):
+                            "status_bar", "system_nav_bar", "floating_tab"):
                         out.append({"page": pid, "frame": fr["id"],
                                     "frameName": fr.get("name"),
                                     "inst": c["id"], "kind": c.get("name")})
@@ -134,6 +134,8 @@ def classify(png_path, kind):
         box = (0, 0, w, int(33 * h / 852))
     elif kind == "system_nav_bar":
         box = (0, int(801 * h / 852), w, h)
+    elif kind == "floating_tab":   # 300x56 @ (46,734)
+        box = (int(0.13 * w), int(0.868 * h), int(0.86 * w), int(0.922 * h))
     else:  # content
         box = (0, int(38 * h / 852), w, int(70 * h / 852))
     v = float(np.asarray(im.crop(box), dtype=float).mean())
@@ -186,6 +188,10 @@ def audit(cv, fix=False):
                 mode_id = "2:0" if expect == "DARK" else "79:1"
                 ops.append(f'U("{fid}", {{variableModes: [{{variableSetId: "2:2", modeId: "{mode_id}"}}]}})')
             for it in frame_insts:
+                if it["kind"] == "floating_tab":
+                    # 悬浮导航错色 = 字面量残留，回填母版 token
+                    ops.append(f'U("{it["inst"]}", {{fills: ["$2:156"]}})')
+                    continue
                 layers = STATUS_LAYERS if it["kind"] == "status_bar" else NAV_LAYERS
                 dark_vis = "true" if expect == "DARK" else "false"
                 ops.append(f'U("{it["inst"]};{layers[0]}", {{visible: {dark_vis}}})')
