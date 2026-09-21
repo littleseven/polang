@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=392%3A23"
+    "url": "cocraft://localhost/file/715061534788814?node_id=392%3A22"
   },
   "pages": [
     {
@@ -10023,7 +10023,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-wnaq-20260921_083727935.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-lxi4-20260921_093418747.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -13748,7 +13748,7 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-l8uz-20260921_083730009.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-e7z9-20260921_093419966.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
           }
         },
         "267:518": {
@@ -14519,13 +14519,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-9djs-20260921_083732366.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-b57n-20260921_093421242.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-v92r-20260921_083731531.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-7wj7-20260921_093420784.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -15410,7 +15410,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-p2oy-20260921_083733947.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-atw5-20260921_093422284.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -16742,7 +16742,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-zsdn-20260921_083733179.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-r7sy-20260921_093421813.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -22860,7 +22860,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-r5qh-20260921_083738565.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-lr1a-20260921_093425423.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -23711,7 +23711,7 @@
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-a8d0-20260921_083739399.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-tlyo-20260921_093425890.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -27066,13 +27066,13 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-qgpd-20260921_083741936.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-sw4a-20260921_093427310.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-bd2t-20260921_083740269.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-05a0-20260921_093426332.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
@@ -30253,7 +30253,7 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-82xg-20260921_083743146.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-h6y7-20260921_093428059.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
           }
         }
       },
@@ -33134,26 +33134,6 @@
                   }
                 ],
                 "clipsContent": true,
-                "effects": [
-                  {
-                    "blendMode": "NORMAL",
-                    "color": {
-                      "a": 0.25,
-                      "b": 0,
-                      "g": 0,
-                      "r": 0
-                    },
-                    "offset": {
-                      "x": 0,
-                      "y": 4
-                    },
-                    "radius": 4,
-                    "showShadowBehindNode": true,
-                    "spread": 0,
-                    "type": "DROP_SHADOW",
-                    "visible": true
-                  }
-                ],
                 "fills": [
                   {
                     "blendMode": "NORMAL",
@@ -38894,7 +38874,7 @@
         "300:215": {
           "name": "people/grid-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-e3p1-20260921_083752617.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-dodi-20260921_093432296.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
           }
         },
         "300:29": {
@@ -39897,54 +39877,7 @@
                             "y": "auto"
                           },
                           {
-                            "children": [
-                              {
-                                "children": [],
-                                "clipsContent": true,
-                                "cornerRadius": 2,
-                                "fills": [
-                                  {
-                                    "blendMode": "NORMAL",
-                                    "filters": {
-                                      "contrast": 0,
-                                      "exposure": 0,
-                                      "highlights": 0,
-                                      "saturation": 0,
-                                      "shadows": 0,
-                                      "temperature": 0,
-                                      "tint": 0
-                                    },
-                                    "imageHash": "ec876f77d02846a9a3228e549c3d02076bac08aa",
-                                    "imageTransform": [
-                                      [
-                                        1,
-                                        0,
-                                        0
-                                      ],
-                                      [
-                                        0,
-                                        1,
-                                        0
-                                      ]
-                                    ],
-                                    "opacity": 1,
-                                    "rotation": 0,
-                                    "scaleMode": "FILL",
-                                    "scalingFactor": 1,
-                                    "type": "IMAGE",
-                                    "visible": true
-                                  }
-                                ],
-                                "height": 128.3300018310547,
-                                "id": "300:214",
-                                "layout": "none",
-                                "name": "cell3",
-                                "type": "FRAME",
-                                "width": 128.3333282470703,
-                                "x": 0.333343505859375,
-                                "y": -0.3203125
-                              }
-                            ],
+                            "children": [],
                             "clipsContent": true,
                             "cornerRadius": 2,
                             "fills": [
@@ -41585,20 +41518,7 @@
                         "y": "auto"
                       },
                       {
-                        "children": [
-                          {
-                            "children": [],
-                            "clipsContent": true,
-                            "height": 96,
-                            "id": "300:672",
-                            "layout": "none",
-                            "name": "WaveMark",
-                            "type": "FRAME",
-                            "width": 96,
-                            "x": -12,
-                            "y": -12
-                          }
-                        ],
+                        "children": [],
                         "cornerRadius": 22,
                         "effects": [
                           {
@@ -41848,28 +41768,6 @@
                                     "children": [
                                       {
                                         "fills": [
-                                          {
-                                            "blendMode": "NORMAL",
-                                            "color": {
-                                              "b": 1,
-                                              "g": 0.6509804129600525,
-                                              "r": 0.41960784792900085
-                                            },
-                                            "opacity": 1,
-                                            "type": "SOLID",
-                                            "visible": true
-                                          }
-                                        ],
-                                        "height": 13.333333969116211,
-                                        "id": "300:709",
-                                        "name": "Vector",
-                                        "type": "VECTOR",
-                                        "width": 12.000000953674316,
-                                        "x": 2,
-                                        "y": 1.3333330154418945
-                                      },
-                                      {
-                                        "fills": [
                                           "$2:130"
                                         ],
                                         "height": 13.333333969116211,
@@ -41971,30 +41869,7 @@
                               {
                                 "children": [
                                   {
-                                    "children": [
-                                      {
-                                        "fills": [
-                                          {
-                                            "blendMode": "NORMAL",
-                                            "color": {
-                                              "b": 0.9333333373069763,
-                                              "g": 0.8274509906768799,
-                                              "r": 0.13333334028720856
-                                            },
-                                            "opacity": 1,
-                                            "type": "SOLID",
-                                            "visible": true
-                                          }
-                                        ],
-                                        "height": 13.333333969116211,
-                                        "id": "300:710",
-                                        "name": "Vector",
-                                        "type": "VECTOR",
-                                        "width": 13.333333969116211,
-                                        "x": 1.3333333730697632,
-                                        "y": 1.3333330154418945
-                                      }
-                                    ],
+                                    "children": [],
                                     "clipsContent": true,
                                     "height": 16,
                                     "id": "300:695",
@@ -42073,30 +41948,7 @@
                               {
                                 "children": [
                                   {
-                                    "children": [
-                                      {
-                                        "fills": [
-                                          {
-                                            "blendMode": "NORMAL",
-                                            "color": {
-                                              "b": 0.501960813999176,
-                                              "g": 0.8705882430076599,
-                                              "r": 0.29019609093666077
-                                            },
-                                            "opacity": 1,
-                                            "type": "SOLID",
-                                            "visible": true
-                                          }
-                                        ],
-                                        "height": 12.000000953674316,
-                                        "id": "300:711",
-                                        "name": "Vector",
-                                        "type": "VECTOR",
-                                        "width": 12.000000953674316,
-                                        "x": 2,
-                                        "y": 1.9999990463256836
-                                      }
-                                    ],
+                                    "children": [],
                                     "clipsContent": true,
                                     "height": 16,
                                     "id": "300:697",
@@ -42175,30 +42027,7 @@
                               {
                                 "children": [
                                   {
-                                    "children": [
-                                      {
-                                        "fills": [
-                                          {
-                                            "blendMode": "NORMAL",
-                                            "color": {
-                                              "b": 0.6901960968971252,
-                                              "g": 0.4941176474094391,
-                                              "r": 1
-                                            },
-                                            "opacity": 1,
-                                            "type": "SOLID",
-                                            "visible": true
-                                          }
-                                        ],
-                                        "height": 10.666666984558105,
-                                        "id": "300:712",
-                                        "name": "Vector",
-                                        "type": "VECTOR",
-                                        "width": 10.666666984558105,
-                                        "x": 2.6666667461395264,
-                                        "y": 2.666666030883789
-                                      }
-                                    ],
+                                    "children": [],
                                     "clipsContent": true,
                                     "height": 16,
                                     "id": "300:699",
@@ -42278,28 +42107,6 @@
                                 "children": [
                                   {
                                     "children": [
-                                      {
-                                        "fills": [
-                                          {
-                                            "blendMode": "NORMAL",
-                                            "color": {
-                                              "b": 0.125490203499794,
-                                              "g": 0.6901960968971252,
-                                              "r": 1
-                                            },
-                                            "opacity": 1,
-                                            "type": "SOLID",
-                                            "visible": true
-                                          }
-                                        ],
-                                        "height": 12.000000953674316,
-                                        "id": "300:713",
-                                        "name": "Vector",
-                                        "type": "VECTOR",
-                                        "width": 12.000000953674316,
-                                        "x": 2,
-                                        "y": 1.9999990463256836
-                                      },
                                       {
                                         "fills": [
                                           "$2:130"
@@ -42403,30 +42210,7 @@
                               {
                                 "children": [
                                   {
-                                    "children": [
-                                      {
-                                        "fills": [
-                                          {
-                                            "blendMode": "NORMAL",
-                                            "color": {
-                                              "b": 1,
-                                              "g": 0.5490196347236633,
-                                              "r": 0.6078431606292725
-                                            },
-                                            "opacity": 1,
-                                            "type": "SOLID",
-                                            "visible": true
-                                          }
-                                        ],
-                                        "height": 12.000000953674316,
-                                        "id": "300:714",
-                                        "name": "Vector",
-                                        "type": "VECTOR",
-                                        "width": 12.000000953674316,
-                                        "x": 2,
-                                        "y": 1.9999990463256836
-                                      }
-                                    ],
+                                    "children": [],
                                     "clipsContent": true,
                                     "height": 16,
                                     "id": "300:703",
@@ -42600,19 +42384,2457 @@
         "300:723": {
           "name": "people/detail-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-0r9l-20260921_083753073.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-ugcv-20260921_093432609.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
           }
         },
         "301:13": {
           "name": "chat/store01-conversation",
           "tree": {
-            "_raw": "Read 1 node(s) (19KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-301_13-akwk-20260921_083751480.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 301:13 chat/store01-conversation (FRAME)"
+            "nodes": [
+              {
+                "children": [
+                  {
+                    "componentProperties": {},
+                    "height": 33,
+                    "id": "386:11",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:106"
+                    },
+                    "name": "status_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "children": [
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:19",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:14"
+                        },
+                        "name": "ic/back",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:20",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:18"
+                        },
+                        "name": "ic/menu",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [],
+                        "clipsContent": true,
+                        "height": 1,
+                        "id": "301:21",
+                        "layout": "none",
+                        "name": "spacer",
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:22",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:61"
+                        },
+                        "name": "ic/bug_report",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:23",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:65"
+                        },
+                        "name": "ic/add_comment",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:24",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:69"
+                        },
+                        "name": "ic/delete_sweep",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      }
+                    ],
+                    "clipsContent": true,
+                    "fills": [
+                      "$2:148"
+                    ],
+                    "gap": 8,
+                    "height": "$2:111",
+                    "id": "301:15",
+                    "layout": "horizontal",
+                    "name": "top_bar",
+                    "padding": {
+                      "bottom": 0,
+                      "left": 8,
+                      "right": 8,
+                      "top": 0
+                    },
+                    "type": "FRAME",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$182:136",
+                                "fills": [
+                                  "$2:134"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": 10,
+                                "height": "hug_contents",
+                                "id": "302:28",
+                                "lineHeight": {
+                                  "unit": "AUTO"
+                                },
+                                "name": "chip_text",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 8,
+                            "fills": [
+                              "$2:157"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "302:27",
+                            "layout": "horizontal",
+                            "name": "date_chip",
+                            "padding": {
+                              "bottom": 4,
+                              "left": 10,
+                              "right": 10,
+                              "top": 4
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "302:26",
+                        "layout": "horizontal",
+                        "name": "date_chip_row",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:69",
+                                "fills": [
+                                  "$143:12"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "302:31",
+                                "lineHeight": "$79:160",
+                                "name": "UserText",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "fills": [
+                              "$142:19"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "302:30",
+                            "layout": "horizontal",
+                            "name": "UserBubble",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 18,
+                              "right": 18,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "302:29",
+                        "layout": "horizontal",
+                        "name": "UserRow",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:70",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "302:34",
+                                "lineHeight": "$79:160",
+                                "name": "AgentText1",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "id": "302:35",
+                                "name": "PerfRow1",
+                                "type": "TEXT",
+                                "visible": false
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 6,
+                            "height": "hug_contents",
+                            "id": "302:33",
+                            "layout": "vertical",
+                            "name": "AgentTextCol",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 12,
+                        "height": "hug_contents",
+                        "id": "302:32",
+                        "layout": "horizontal",
+                        "name": "AgentMsg1",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:71",
+                                "fills": [
+                                  "$143:12"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "302:38",
+                                "lineHeight": "$79:160",
+                                "name": "UserText",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "fills": [
+                              "$142:19"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "302:37",
+                            "layout": "horizontal",
+                            "name": "UserBubble",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 18,
+                              "right": 18,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "302:36",
+                        "layout": "horizontal",
+                        "name": "UserRow",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:72",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "301:37",
+                                "lineHeight": "$79:160",
+                                "name": "AgentText1",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "id": "301:38",
+                                "name": "PerfRow1",
+                                "type": "TEXT",
+                                "visible": false
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 6,
+                            "height": "hug_contents",
+                            "id": "301:30",
+                            "layout": "vertical",
+                            "name": "AgentTextCol",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 12,
+                        "height": "hug_contents",
+                        "id": "301:25",
+                        "layout": "horizontal",
+                        "name": "AgentMsg1",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$183:28",
+                                "fills": [
+                                  "$143:12"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "301:39",
+                                "lineHeight": "$79:160",
+                                "name": "UserText",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "fills": [
+                              "$142:19"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "301:31",
+                            "layout": "horizontal",
+                            "name": "UserBubble",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 18,
+                              "right": 18,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "301:26",
+                        "layout": "horizontal",
+                        "name": "UserRow",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "characters": "$343:73",
+                            "fills": [
+                              "$2:130"
+                            ],
+                            "fontName": {
+                              "family": "Sarasa Gothic SC",
+                              "style": "Semi Bold"
+                            },
+                            "fontSize": "$79:155",
+                            "height": "hug_contents",
+                            "id": "301:32",
+                            "lineHeight": {
+                              "unit": "AUTO"
+                            },
+                            "name": "MediaTitle",
+                            "textAlignHorizontal": "LEFT",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:76",
+                                            "layout": "none",
+                                            "name": "ic/thumb_up",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:58",
+                                        "layout": "horizontal",
+                                        "name": "fbUp",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:77",
+                                            "layout": "none",
+                                            "name": "ic/thumb_down",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:59",
+                                        "layout": "horizontal",
+                                        "name": "fbDown",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:78",
+                                            "layout": "none",
+                                            "name": "ic/refresh",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:60",
+                                        "layout": "horizontal",
+                                        "name": "fbMore",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 6,
+                                    "height": "hug_contents",
+                                    "id": "301:48",
+                                    "layout": "vertical",
+                                    "name": "FeedbackCol",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 24,
+                                    "x": 90,
+                                    "y": 6
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "fills": [
+                                  {
+                                    "blendMode": "NORMAL",
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "326cb09d5249d022a8590c02382298544df58302",
+                                    "imageTransform": [
+                                      [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      [
+                                        0,
+                                        1,
+                                        0
+                                      ]
+                                    ],
+                                    "opacity": 1,
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
+                                    "visible": true
+                                  }
+                                ],
+                                "height": "$79:60",
+                                "id": "301:40",
+                                "layout": "none",
+                                "name": "PhotoCard",
+                                "type": "FRAME",
+                                "width": "$79:59",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:79",
+                                            "layout": "none",
+                                            "name": "ic/thumb_up",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:62",
+                                        "layout": "horizontal",
+                                        "name": "fbUp",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:80",
+                                            "layout": "none",
+                                            "name": "ic/thumb_down",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:63",
+                                        "layout": "horizontal",
+                                        "name": "fbDown",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:81",
+                                            "layout": "none",
+                                            "name": "ic/refresh",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:64",
+                                        "layout": "horizontal",
+                                        "name": "fbMore",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 6,
+                                    "height": "hug_contents",
+                                    "id": "301:50",
+                                    "layout": "vertical",
+                                    "name": "FeedbackCol",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 24,
+                                    "x": 90,
+                                    "y": 6
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "fills": [
+                                  {
+                                    "blendMode": "NORMAL",
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "790e415610d6a49971a7dcbe4cc1fd102f08d71d",
+                                    "imageTransform": [
+                                      [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      [
+                                        0,
+                                        1,
+                                        0
+                                      ]
+                                    ],
+                                    "opacity": 1,
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
+                                    "visible": true
+                                  }
+                                ],
+                                "height": "$79:60",
+                                "id": "301:41",
+                                "layout": "none",
+                                "name": "PhotoCard",
+                                "type": "FRAME",
+                                "width": "$79:59",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:82",
+                                            "layout": "none",
+                                            "name": "ic/thumb_up",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:66",
+                                        "layout": "horizontal",
+                                        "name": "fbUp",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:83",
+                                            "layout": "none",
+                                            "name": "ic/thumb_down",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:67",
+                                        "layout": "horizontal",
+                                        "name": "fbDown",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:84",
+                                            "layout": "none",
+                                            "name": "ic/refresh",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:68",
+                                        "layout": "horizontal",
+                                        "name": "fbMore",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 6,
+                                    "height": "hug_contents",
+                                    "id": "301:52",
+                                    "layout": "vertical",
+                                    "name": "FeedbackCol",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 24,
+                                    "x": 90,
+                                    "y": 6
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "fills": [
+                                  {
+                                    "blendMode": "NORMAL",
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "ca8b078a3661560632e5a40cde2b2881ad21461f",
+                                    "imageTransform": [
+                                      [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      [
+                                        0,
+                                        1,
+                                        0
+                                      ]
+                                    ],
+                                    "opacity": 1,
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
+                                    "visible": true
+                                  }
+                                ],
+                                "height": "$79:60",
+                                "id": "301:42",
+                                "layout": "none",
+                                "name": "PhotoCard",
+                                "type": "FRAME",
+                                "width": "$79:59",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "301:33",
+                            "layout": "horizontal",
+                            "name": "Carousel",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 10,
+                        "height": "hug_contents",
+                        "id": "301:27",
+                        "layout": "vertical",
+                        "name": "MediaResults",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:74",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "301:43",
+                                "lineHeight": "$79:160",
+                                "name": "AgentText2",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "id": "301:44",
+                                "name": "PerfRow2",
+                                "type": "TEXT",
+                                "visible": false
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 6,
+                            "height": "hug_contents",
+                            "id": "301:34",
+                            "layout": "vertical",
+                            "name": "AgentTextCol",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 12,
+                        "height": "hug_contents",
+                        "id": "301:28",
+                        "layout": "horizontal",
+                        "name": "AgentMsg2",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      }
+                    ],
+                    "clipsContent": true,
+                    "gap": 14,
+                    "height": "fill_container",
+                    "id": "301:16",
+                    "layout": "vertical",
+                    "name": "MessageList",
+                    "padding": {
+                      "bottom": 16,
+                      "left": 20,
+                      "right": 20,
+                      "top": 16
+                    },
+                    "type": "FRAME",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "gap": 0,
+                    "height": "hug_contents",
+                    "id": "392:2",
+                    "layout": "vertical",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "387:22"
+                    },
+                    "name": "InputBarOuter",
+                    "padding": {
+                      "bottom": 56,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
+                    },
+                    "type": "INSTANCE",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "386:20",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
+                  }
+                ],
+                "clipsContent": true,
+                "fills": [
+                  "$2:146"
+                ],
+                "gap": 0,
+                "height": 852,
+                "id": "301:13",
+                "layout": "vertical",
+                "name": "chat/store01-conversation",
+                "padding": {
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0,
+                  "top": 0
+                },
+                "type": "FRAME",
+                "width": 393,
+                "x": 2052,
+                "y": 7712
+              }
+            ]
           }
         },
         "301:96": {
           "name": "chat/store01-insight",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-301_96-j1xr-20260921_083751957.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 301:96 chat/store01-insight (FRAME)"
+            "nodes": [
+              {
+                "children": [
+                  {
+                    "componentProperties": {},
+                    "height": 33,
+                    "id": "386:12",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:106"
+                    },
+                    "name": "status_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "children": [
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:102",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:14"
+                        },
+                        "name": "ic/back",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:103",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:18"
+                        },
+                        "name": "ic/menu",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [],
+                        "clipsContent": true,
+                        "height": 1,
+                        "id": "301:104",
+                        "layout": "none",
+                        "name": "spacer",
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:105",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:61"
+                        },
+                        "name": "ic/bug_report",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:106",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:65"
+                        },
+                        "name": "ic/add_comment",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "componentProperties": {},
+                        "height": "$2:15",
+                        "id": "301:107",
+                        "layout": "none",
+                        "mainComponent": {
+                          "componentPropertyDefinitions": {},
+                          "id": "132:69"
+                        },
+                        "name": "ic/delete_sweep",
+                        "type": "INSTANCE",
+                        "width": "$2:15",
+                        "x": "auto",
+                        "y": "auto"
+                      }
+                    ],
+                    "clipsContent": true,
+                    "fills": [
+                      "$2:148"
+                    ],
+                    "gap": 8,
+                    "height": "$2:111",
+                    "id": "301:98",
+                    "layout": "horizontal",
+                    "name": "top_bar",
+                    "padding": {
+                      "bottom": 0,
+                      "left": 8,
+                      "right": 8,
+                      "top": 0
+                    },
+                    "type": "FRAME",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$182:136",
+                                "fills": [
+                                  "$2:134"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": 10,
+                                "height": "hug_contents",
+                                "id": "302:18",
+                                "lineHeight": {
+                                  "unit": "AUTO"
+                                },
+                                "name": "chip_text",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": 8,
+                            "fills": [
+                              "$2:157"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "302:17",
+                            "layout": "horizontal",
+                            "name": "date_chip",
+                            "padding": {
+                              "bottom": 4,
+                              "left": 10,
+                              "right": 10,
+                              "top": 4
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "302:16",
+                        "layout": "horizontal",
+                        "name": "date_chip_row",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:75",
+                                "fills": [
+                                  "$143:12"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "302:21",
+                                "lineHeight": "$79:160",
+                                "name": "UserText",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "fills": [
+                              "$142:19"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "302:20",
+                            "layout": "horizontal",
+                            "name": "UserBubble",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 18,
+                              "right": 18,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "302:19",
+                        "layout": "horizontal",
+                        "name": "UserRow",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:76",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "302:24",
+                                "lineHeight": "$79:160",
+                                "name": "AgentText1",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "id": "302:25",
+                                "name": "PerfRow1",
+                                "type": "TEXT",
+                                "visible": false
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 6,
+                            "height": "hug_contents",
+                            "id": "302:23",
+                            "layout": "vertical",
+                            "name": "AgentTextCol",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 12,
+                        "height": "hug_contents",
+                        "id": "302:22",
+                        "layout": "horizontal",
+                        "name": "AgentMsg1",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:77",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "301:120",
+                                "lineHeight": "$79:160",
+                                "name": "AgentText1",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "id": "301:121",
+                                "name": "PerfRow1",
+                                "type": "TEXT",
+                                "visible": false
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 6,
+                            "height": "hug_contents",
+                            "id": "301:113",
+                            "layout": "vertical",
+                            "name": "AgentTextCol",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 12,
+                        "height": "hug_contents",
+                        "id": "301:108",
+                        "layout": "horizontal",
+                        "name": "AgentMsg1",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:78",
+                                "fills": [
+                                  "$143:12"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "301:122",
+                                "lineHeight": "$79:160",
+                                "name": "UserText",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "fills": [
+                              "$142:19"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "301:114",
+                            "layout": "horizontal",
+                            "name": "UserBubble",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 18,
+                              "right": 18,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "301:109",
+                        "layout": "horizontal",
+                        "name": "UserRow",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "characters": "$343:79",
+                            "fills": [
+                              "$2:130"
+                            ],
+                            "fontName": {
+                              "family": "Sarasa Gothic SC",
+                              "style": "Semi Bold"
+                            },
+                            "fontSize": "$79:155",
+                            "height": "hug_contents",
+                            "id": "301:115",
+                            "lineHeight": {
+                              "unit": "AUTO"
+                            },
+                            "name": "MediaTitle",
+                            "textAlignHorizontal": "LEFT",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:159",
+                                            "layout": "none",
+                                            "name": "ic/thumb_up",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:141",
+                                        "layout": "horizontal",
+                                        "name": "fbUp",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:160",
+                                            "layout": "none",
+                                            "name": "ic/thumb_down",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:142",
+                                        "layout": "horizontal",
+                                        "name": "fbDown",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:161",
+                                            "layout": "none",
+                                            "name": "ic/refresh",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:143",
+                                        "layout": "horizontal",
+                                        "name": "fbMore",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 6,
+                                    "height": "hug_contents",
+                                    "id": "301:131",
+                                    "layout": "vertical",
+                                    "name": "FeedbackCol",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 24,
+                                    "x": 90,
+                                    "y": 6
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "fills": [
+                                  {
+                                    "blendMode": "NORMAL",
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "326cb09d5249d022a8590c02382298544df58302",
+                                    "imageTransform": [
+                                      [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      [
+                                        0,
+                                        1,
+                                        0
+                                      ]
+                                    ],
+                                    "opacity": 1,
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
+                                    "visible": true
+                                  }
+                                ],
+                                "height": "$79:60",
+                                "id": "301:123",
+                                "layout": "none",
+                                "name": "PhotoCard",
+                                "type": "FRAME",
+                                "width": "$79:59",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:162",
+                                            "layout": "none",
+                                            "name": "ic/thumb_up",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:145",
+                                        "layout": "horizontal",
+                                        "name": "fbUp",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:163",
+                                            "layout": "none",
+                                            "name": "ic/thumb_down",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:146",
+                                        "layout": "horizontal",
+                                        "name": "fbDown",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:164",
+                                            "layout": "none",
+                                            "name": "ic/refresh",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:147",
+                                        "layout": "horizontal",
+                                        "name": "fbMore",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 6,
+                                    "height": "hug_contents",
+                                    "id": "301:133",
+                                    "layout": "vertical",
+                                    "name": "FeedbackCol",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 24,
+                                    "x": 90,
+                                    "y": 6
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "fills": [
+                                  {
+                                    "blendMode": "NORMAL",
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "790e415610d6a49971a7dcbe4cc1fd102f08d71d",
+                                    "imageTransform": [
+                                      [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      [
+                                        0,
+                                        1,
+                                        0
+                                      ]
+                                    ],
+                                    "opacity": 1,
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
+                                    "visible": true
+                                  }
+                                ],
+                                "height": "$79:60",
+                                "id": "301:124",
+                                "layout": "none",
+                                "name": "PhotoCard",
+                                "type": "FRAME",
+                                "width": "$79:59",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:165",
+                                            "layout": "none",
+                                            "name": "ic/thumb_up",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:149",
+                                        "layout": "horizontal",
+                                        "name": "fbUp",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:166",
+                                            "layout": "none",
+                                            "name": "ic/thumb_down",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:150",
+                                        "layout": "horizontal",
+                                        "name": "fbDown",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [],
+                                            "clipsContent": true,
+                                            "height": 14,
+                                            "id": "301:167",
+                                            "layout": "none",
+                                            "name": "ic/refresh",
+                                            "type": "FRAME",
+                                            "width": 14,
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 12,
+                                        "fills": [
+                                          "$79:65"
+                                        ],
+                                        "gap": 0,
+                                        "height": "$79:63",
+                                        "id": "301:151",
+                                        "layout": "horizontal",
+                                        "name": "fbMore",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "$79:63",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 6,
+                                    "height": "hug_contents",
+                                    "id": "301:135",
+                                    "layout": "vertical",
+                                    "name": "FeedbackCol",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 24,
+                                    "x": 90,
+                                    "y": 6
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "fills": [
+                                  {
+                                    "blendMode": "NORMAL",
+                                    "filters": {
+                                      "contrast": 0,
+                                      "exposure": 0,
+                                      "highlights": 0,
+                                      "saturation": 0,
+                                      "shadows": 0,
+                                      "temperature": 0,
+                                      "tint": 0
+                                    },
+                                    "imageHash": "ca8b078a3661560632e5a40cde2b2881ad21461f",
+                                    "imageTransform": [
+                                      [
+                                        1,
+                                        0,
+                                        0
+                                      ],
+                                      [
+                                        0,
+                                        1,
+                                        0
+                                      ]
+                                    ],
+                                    "opacity": 1,
+                                    "rotation": 0,
+                                    "scaleMode": "FILL",
+                                    "scalingFactor": 1,
+                                    "type": "IMAGE",
+                                    "visible": true
+                                  }
+                                ],
+                                "height": "$79:60",
+                                "id": "301:125",
+                                "layout": "none",
+                                "name": "PhotoCard",
+                                "type": "FRAME",
+                                "width": "$79:59",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "301:116",
+                            "layout": "horizontal",
+                            "name": "Carousel",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 10,
+                        "height": "hug_contents",
+                        "id": "301:110",
+                        "layout": "vertical",
+                        "name": "MediaResults",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "characters": "$343:80",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "301:126",
+                                "lineHeight": "$79:160",
+                                "name": "AgentText2",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "id": "301:127",
+                                "name": "PerfRow2",
+                                "type": "TEXT",
+                                "visible": false
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 6,
+                            "height": "hug_contents",
+                            "id": "301:117",
+                            "layout": "vertical",
+                            "name": "AgentTextCol",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 12,
+                        "height": "hug_contents",
+                        "id": "301:111",
+                        "layout": "horizontal",
+                        "name": "AgentMsg2",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      }
+                    ],
+                    "clipsContent": true,
+                    "gap": 14,
+                    "height": "fill_container",
+                    "id": "301:99",
+                    "layout": "vertical",
+                    "name": "MessageList",
+                    "padding": {
+                      "bottom": 16,
+                      "left": 20,
+                      "right": 20,
+                      "top": 16
+                    },
+                    "type": "FRAME",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "gap": 0,
+                    "height": "hug_contents",
+                    "id": "392:3",
+                    "layout": "vertical",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "387:22"
+                    },
+                    "name": "InputBarOuter",
+                    "padding": {
+                      "bottom": 56,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
+                    },
+                    "type": "INSTANCE",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "386:21",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
+                  }
+                ],
+                "clipsContent": true,
+                "fills": [
+                  "$2:146"
+                ],
+                "gap": 0,
+                "height": 852,
+                "id": "301:96",
+                "layout": "vertical",
+                "name": "chat/store01-insight",
+                "padding": {
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0,
+                  "top": 0
+                },
+                "type": "FRAME",
+                "width": 393,
+                "x": 2565,
+                "y": 7712
+              }
+            ]
           }
         },
         "306:197": {
@@ -43885,19 +46107,19 @@
         "395:1": {
           "name": "settings/localmodels-store01-zh",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-mf10-20260921_083753737.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-v9zl-20260921_093433042.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
           }
         },
         "395:106": {
           "name": "settings/localmodels-store01-en",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-dmrc-20260921_083754417.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-0vnz-20260921_093433489.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
           }
         },
         "395:211": {
           "name": "settings/localmodels-store01-tw",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-7hyc-20260921_083755050.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-5lrl-20260921_093433930.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
           }
         }
       },
@@ -44024,7 +46246,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "bec07e9f7b71910e3d772117db3c4d6b33502aba",
+                        "imageHash": "be12f1eca5aafadc183d5bc14cda862e276c0254",
                         "imageTransform": [
                           [
                             1,
@@ -44308,7 +46530,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "e64e93641c974dd9b0a471ba63ec079a59b343c2",
+                        "imageHash": "108590f2a6bdc34beaa33c8a1c5387f8f1217a65",
                         "imageTransform": [
                           [
                             1,
@@ -44592,7 +46814,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "a61ae0289506999b61e0cc1b27816ee6dff5710b",
+                        "imageHash": "073fa3a2728eede72bb8b897e1e4a48e0303d1ad",
                         "imageTransform": [
                           [
                             1,
@@ -44876,7 +47098,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "1f49df0098df1c5661ea99b16c6a50ae199e7512",
+                        "imageHash": "8ba55df88b57d3f5c1ab4e631134adc672332d15",
                         "imageTransform": [
                           [
                             1,
@@ -45036,8 +47258,8 @@
                 "name": "guide-promo/05",
                 "type": "FRAME",
                 "width": 393,
-                "x": 1760,
-                "y": 6660
+                "x": 0,
+                "y": 7694
               }
             ]
           }
@@ -45160,7 +47382,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "ad2cd4ab940a7113e14ca56001df5497b0e44441",
+                        "imageHash": "4c2ac96260994bb4b20da4517d9f48dcaa3563cd",
                         "imageTransform": [
                           [
                             1,
@@ -45320,8 +47542,8 @@
                 "name": "guide-promo/06",
                 "type": "FRAME",
                 "width": 393,
-                "x": 2200,
-                "y": 6660
+                "x": 440,
+                "y": 7694
               }
             ]
           }
@@ -45444,7 +47666,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "41cc47b49db6b45d4fb493933803364e049b4e39",
+                        "imageHash": "4c50419d1c033d1b4e05599e84803f094d0ffa74",
                         "imageTransform": [
                           [
                             1,
@@ -45604,8 +47826,8 @@
                 "name": "guide-promo/entry",
                 "type": "FRAME",
                 "width": 393,
-                "x": 2640,
-                "y": 6660
+                "x": 880,
+                "y": 7694
               }
             ]
           }
@@ -45728,7 +47950,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "33baa4de50f24970af3ed4409e1ebf68e0070f15",
+                        "imageHash": "4faa82f07abc6749c68466409500915bfd902e2d",
                         "imageTransform": [
                           [
                             1,
@@ -45888,8 +48110,8 @@
                 "name": "guide-promo/preview",
                 "type": "FRAME",
                 "width": 393,
-                "x": 3080,
-                "y": 6660
+                "x": 1320,
+                "y": 7694
               }
             ]
           }
@@ -46012,7 +48234,7 @@
                           "temperature": 0,
                           "tint": 0
                         },
-                        "imageHash": "71833cfd5e0dfc31207cde8db09e6591d8b07c88",
+                        "imageHash": "40dd8a7bfeddfbb74d20a64cefa31f913a9d51eb",
                         "imageTransform": [
                           [
                             1,
