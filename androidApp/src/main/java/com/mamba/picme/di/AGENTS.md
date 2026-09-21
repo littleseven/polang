@@ -22,46 +22,11 @@
 
 ### 2.1 AppContainer 架构
 
-> **代码状态（2026-06）**：`AppContainer` 接口已扩展，新增 `faceDetector`、`llmModelDownloadManager` 依赖。`MediaViewModelDependencies` 新增 `photoProcessor`、`faceDetector` 字段。
-
 **技术规范**:
-- **接口定义**: `AppContainer` 接口暴露全局依赖（Repository、ImageProcessor、FaceDetector、UserSettingsRepository、LlmModelDownloadManager）
+- **接口定义**: `AppContainer` 接口暴露全局依赖；字段清单以 `AppContainer.kt` 为准（已扩展至约百个依赖，本文不再维护快照）
 - **实现类**: `AppContainerImpl` 使用 `by lazy` 延迟初始化，确保单例且线程安全
 - **ViewModel Factory**: 通过 `MediaViewModelFactory` 注入 ViewModel 依赖，避免直接访问 Container
-- **依赖数据结构**: `MediaViewModelDependencies` 封装 ViewModel 所需的全部依赖（含 photoProcessor、faceDetector）
-
-**代码示例**:
-```kotlin
-interface AppContainer {
-    val repository: AndroidMediaRepository
-    val userPreferencesRepository: UserSettingsRepository
-    val imageProcessor: ImageProcessor
-    val faceDetector: FaceDetector
-    val llmModelDownloadManager: LlmModelDownloadManager
-    
-    fun createMediaViewModelFactory(): ViewModelProvider.Factory
-}
-
-class AppContainerImpl(private val context: Context) : AppContainer {
-    private val database by lazy { AppDatabase.getDatabase(context) }
-    
-    override val repository: AndroidMediaRepository by lazy {
-        MediaRepositoryImpl(database.mediaDao(), context)
-    }
-    
-    override val faceDetector: FaceDetector by lazy {
-        FaceDetectorFactory.create(context)
-    }
-
-    override val imageProcessor: ImageProcessor by lazy {
-        ImageProcessorImpl(beautyProcessor, photoProcessor, faceDetector)
-    }
-
-    override val llmModelDownloadManager: LlmModelDownloadManager by lazy {
-        LlmModelDownloadManager(context)
-    }
-}
-```
+- **依赖数据结构**: `MediaViewModelDependencies` 封装 ViewModel 所需的全部依赖（字段清单以 `AppContainer.kt` 为准）
 
 ### 2.2 美颜引擎动态切换
 
@@ -91,72 +56,22 @@ private val photoProcessor: PhotoProcessor by lazy {
 private val cpuBeautyProcessor: BeautyProcessor by lazy {
     GpuBeautyProcessor(context)  // Canvas + ColorMatrix，不涉及 GL
 }
-
-// 实时预览引擎由 Composable 维护（见 GlBeautyPreviewRuntime.kt）
-// rememberGlBeautyPreviewProvider(context, beautyStrategy)
-// └─> BeautyStrategy.BIG_BEAUTY  → GlBeautyPreviewProvider
-// 注意：GlBeautyPreviewProviderFactory 用于创建 PhotoProcessor（拍照 GPU 路径）
-
-object BeautyEngineRuntimeState {
-    @Volatile
-    private var fallbackReason: String? = null
-
-    fun markGlEngineFallback(reason: String) {
-        fallbackReason = reason
-    }
-
-    fun consumeGlEngineFallbackReason(): String? {
-        val reason = fallbackReason
-        fallbackReason = null
-        return reason
-    }
-}
 ```
+
+> 实时预览引擎由 Composable `rememberGlBeautyPreviewProvider` 维护（见 `GlBeautyPreviewRuntime.kt`），DI 层不参与；
+> `BeautyEngineRuntimeState` 实现见 `di/BeautyEngineRuntimeState.kt`（`markGlEngineFallback` / `consumeGlEngineFallbackReason`）。
 
 ### 2.3 UseCase 与 OCR 集成
 
 **技术规范**:
 - **UseCase 实例化**: 在 Container 中创建单例 UseCase（`GetGroupedMediaUseCase`）
 - **OCR 处理器**: `OcrUseCase` 作为单例注入 ViewModel，生命周期由 ViewModel 管理
-- **依赖封装**: 通过 `MediaViewModelDependencies` 数据结构聚合 ViewModel 所需依赖
-- **Factory 模式**: `MediaViewModelFactory` 负责创建 ViewModel 并注入依赖
-
-**代码示例**:
-```kotlin
-data class MediaViewModelDependencies(
-    val repository: MediaRepository,
-    val getGroupedMediaUseCase: GetGroupedMediaUseCase,
-    val ocrUseCase: OcrProcessor,
-    val photoProcessor: PhotoProcessor,
-    val faceDetector: FaceDetector
-)
-
-class MediaViewModelFactory(
-    private val dependencies: MediaViewModelDependencies
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MediaViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return MediaViewModel(
-                repository = dependencies.repository,
-                getGroupedMediaUseCase = dependencies.getGroupedMediaUseCase,
-                ocrUseCase = dependencies.ocrUseCase,
-                photoProcessor = dependencies.photoProcessor,
-                faceDetector = dependencies.faceDetector
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-```
+- **依赖封装**: 通过 `MediaViewModelDependencies` 数据结构聚合 ViewModel 所需依赖（字段清单以 `AppContainer.kt` 为准）
+- **Factory 模式**: `MediaViewModelFactory` 负责创建 ViewModel 并注入依赖；新增依赖时同步更新 Dependencies 数据类与 Factory 构造调用
 
 ### 2.4 Hilt 模块定义（预留扩展）
 
-**技术规范**:
-- **@Singleton 作用域**: Database、ImageLoader、OcrEngine 等全局单例必须使用 `@Singleton` 标注
-- **@ViewModelScoped 作用域**: ViewModel 相关依赖使用 `@HiltViewModel` 和 `@ViewModelScoped`
-- **接口绑定**: 在 Module 中明确接口（Repository）与实现类（RepositoryImpl）的映射关系
-- **当前状态**: 项目采用手动 DI（AppContainer），Hilt 为预留扩展方案
+**当前状态**: 项目采用手动 DI（AppContainer），Hilt 为预留扩展方案、长期未启用；若启用，全局单例用 `@Singleton`、ViewModel 依赖用 `@HiltViewModel`/`@ViewModelScoped`，并在 Module 中显式绑定接口与实现。
 
 ## 3. Agent 执行规约 (Execution Rules)
 

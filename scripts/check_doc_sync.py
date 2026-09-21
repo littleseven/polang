@@ -163,6 +163,7 @@ APPROVED_DOC_DIRS = (
     "docs/reviews/",               # 时间点快照
     ".claude/agents/",             # 工具配置（planner 等 agent 定义，非项目文档）
     ".claude/commands/",
+    ".qoder/agents/",              # Qoder 工具配置（planner 等 agent 定义，非项目文档）
     ".claude/workflows/",
     "skills/",                     # skill 源（SSOT，.claude/ 为其镜像）
 )

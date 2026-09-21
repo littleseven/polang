@@ -40,7 +40,7 @@ PoLang 当前采用双引擎人脸检测架构：`MEDIAPIPE`、`MNN`。
 - `MediaPipeFaceDetector.kt`：MediaPipe 检测入口（预览 VIDEO + 静态图 IMAGE；含 `detect(mediaImage: Image)` 零拷贝重载）
 - `MediaPipeLandmarkDetector.kt`：MediaPipe Landmark 检测（含 `detectLandmarks(mediaImage: Image)` 零拷贝重载）
 - `MediaPipeRoiDetector.kt`：MediaPipe ROI 检测
-- `MnnRoiDetector.kt`：MNN ROI 检测（RetinaFace det_10g），`AtomicBoolean` CAS 非阻塞初始化
+- `MnnRoiDetector.kt`：MNN ROI 检测（RetinaFace det_500m_mnn），`AtomicBoolean` CAS 非阻塞初始化
 - `MnnLandmarkDetector.kt`：MNN Landmark 检测（2D106），`AtomicBoolean` CAS 非阻塞初始化
 - `mnn/MnnFaceDetector.kt`：MNN JNI 桥接
 - `adapter/FaceLandmarkAdapter.kt`：统一适配器接口

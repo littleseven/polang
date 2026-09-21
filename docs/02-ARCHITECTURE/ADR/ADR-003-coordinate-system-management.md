@@ -448,7 +448,7 @@ chmod +x .git/hooks/pre-commit
 
 **优先级**：
 1. 渲染引擎层（BeautyRenderer、Shader）
-2. 人脸检测适配层（MnnLandmarkAdapter、NcnnLandmarkAdapter、MediaPipe468Adapter）
+2. 人脸检测适配层（MnnLandmarkAdapter、MediaPipe468Adapter）
 3. 坐标转换工具类
 
 **任务**：

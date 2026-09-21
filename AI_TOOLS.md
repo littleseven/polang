@@ -9,6 +9,7 @@
 
 | 工具 | 配置位置 | 读取范围 | 用途 / 状态 |
 |------|----------|----------|-------------|
+| **Qoder** | `.qoder/`（agents + settings） | 项目级 | 桌面 Agentic 开发环境·主力之一；用户级 Skills 另见 `~/.qoder-cn/skills/` |
 | **Claude Code** | `.claude/commands/*.md` + `.claude/CLAUDE.md` | 项目级 | AI 开发环境之一·日常备选（命令目录与索引） |
 | **kimi-cli** | `.kimi/AGENTS.md` + `.kimi/skills/` | 项目级 | 终端交互式 AI 开发·主力；`.kimi/skills` → `../skills` |
 | **kimi-code** | `.kimi-code/skills/` | 项目级 | 终端交互式 AI 开发·主力；`.kimi-code/skills` → `../skills`（2026-08-11 补链，否则 Project scope Skills 不可见） |
@@ -121,28 +122,39 @@ docs/superpowers/
 
 | Skill | 描述 |
 |-------|------|
-| `ui-driver` | PoLang UI 自动化（Accessibility 结构化文本驱动） |
 | `adb-bot` | ADB 基础控制与调试 |
 | `android-build-debug` | Android 编译、安装、日志调试 |
-| `dev-loop` | 编译→安装→验证→报告一键闭环 |
+| `android-tag-data-backup-restore` | 换签名重装时保留应用数据（标签/人脸/聚类结果） |
+| `ardot-design-ops` | Ardot 设计稿资产治理（新建帧/token 变更/健康审计） |
 | `av-gl-expert` | 音视频与 OpenGL 渲染专家 |
 | `compose-ui-expert` | Jetpack Compose UI 开发与性能优化 |
 | `coordinate-system-standard` | 人脸关键点坐标系规范化 |
+| `dev-loop` | 编译→安装→验证→报告一键闭环 |
 | `doc-sync-guardian` | 三层文档体系一致性检查 |
 | `egl-state-machine` | EGL 上下文与离屏渲染状态机规范 |
 | `error-healer` | Kotlin/Gradle 错误分类与自愈 |
 | `i18n-validator` | 国际化资源检查与五语同步验证 |
 | `image-quality-checker` | 截屏图片质量分析 |
 | `intent-router` | 自然语言需求解析与上下文加载 |
+| `ios-build-debug` | iOS 编译、模拟器/真机安装、日志调试 |
+| `ios-dev-loop` | iOS 真机无人值守闭环验证 |
 | `ios-follow` | Android 完成后 iOS 一键对等跟随（spec/tokens/平台差异台账契约化 + 双端验收） |
+| `ios-i18n-validator` | iOS 五语文案同步与规范验证 |
+| `kmp-ios-interop` | Kotlin/Native ↔ Swift 互操作与 SharedKit 集成规范 |
 | `layout-inspector-expert` | Android 布局检查与 UI 结构分析专家 |
 | `mediapipe-landmark-mapping` | MediaPipe 关键点映射规范 |
+| `metal-render-expert` | Metal/MSL 渲染管线诊断（iOS 美颜链路） |
 | `mnn-integration` | MNN 推理引擎集成规范 |
+| `mnn-ios-integration` | MNN.framework iOS 构建/embed 与人脸检测诊断 |
 | `mnn-landmark-diagnosis` | MNN 关键点诊断与调试 |
 | `mnn-llm-android` | MNN-LLM 端侧大模型部署指南 |
+| `mnn-modelscope-uploader` | 模型转 MNN 格式并发布到 ModelScope |
 | `onnx-model-integration` | ONNX 模型接入 Checklist |
 | `perf-optimizer` | 性能分析与优化策略 |
 | `rd-reflection` | RD 复盘模板 |
+| `swiftui-expert` | SwiftUI 布局/状态/重组/Preview 诊断 |
+| `ui-driver` | PoLang UI 自动化（Accessibility 结构化文本驱动） |
+| `ui-parity-guard` | 双端 UI 一致性守卫（spec → token → 截图闭环） |
 
 ---
 
@@ -223,3 +235,4 @@ cd ~/AndroidStudioProjects/polang && claude
 | 2026-08-16 | **更正 Arbot 定位：预览层，非 spec SSOT** | 「画布作 SSOT」路线已于 2026-08-15 随 codegen 工作流废止（`design-tokens.json` 为唯一 SSOT，双端镜像由 `gen-design-tokens.py` 生成 + `ai-gate.sh --check` 门禁）；Arbot/Figma 画布降级为**可视化预览层**。上行的「polang-ui-spec.ardot 成为 Camera spec SSOT」表述作废——实际画布文件为根目录 `polang-ui-spec.fig`（untracked）。历史决策以本表 2026-08-15/16 条目为准（原 spec/plan 已随 2026-08-22 文档清理删除，细节查 git 历史） |
 | 2026-08-16 | **Ardot 快照入库 + 删除过时 `.fig`** | Ardot 仅云端（无本地文件功能，用户实测拍板），设计稿 git 形态 = `scripts/export-ardot-snapshot.py` → `docs/08-UI-SPECS/screens/refs/ardot/`（structure.json 可 diff + PNG 快照，commit `70fb3770d`）；云端文档为唯一编辑区。根目录 Figma 时代一次性导出 `polang-ui-spec.fig` 已删除 |
 | 2026-08-22 | **specs/plans 历史清理（103 篇）** | 删除 `docs/superpowers/` 下 ≤08-20 的已交付 spec 77 + plan 25 + nightly 1，仅留在途/活跃 SSOT 白名单；活文档引用统一改「已随交付清理，git 历史可查」；建立「交付即清理、git 历史即归档」约定（`docs/superpowers/README.md` §2） |
+| 2026-09-20 | **Skills 表补全 + Qoder 入库** | Skills 索引由 21 个补全至 33 个（补齐 iOS/Metal/SwiftUI/ardot-design-ops/ui-parity-guard 等）；工具表新增 Qoder 配置行（`.qoder/`） |

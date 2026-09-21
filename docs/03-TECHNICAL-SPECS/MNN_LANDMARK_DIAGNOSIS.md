@@ -1,6 +1,7 @@
 # MNN Landmark 检测路径系统性诊断与修复指南
 
-> **历史文档**：本文档记录 MNN Landmark 检测路径（2d106det）的对齐排查过程。ONNX Runtime 已于 2026-05 完全移除，当前 InsightFace 2D106 仅通过 MNN 后端运行。
+> **历史文档（归档）**：本文档记录 MNN Landmark 检测路径（2d106det）的对齐排查过程，**仅作诊断方法论参考，不再随代码更新**（2026-09-20 标注）。ONNX Runtime 已于 2026-05 完全移除，文中引用的 `InsightFace2D106Detector.kt` 等历史类已删除（git 历史可查）。
+> 现役架构以 [`FACE_DETECTION_ENGINE_ARCHITECTURE.md`](./FACE_DETECTION_ENGINE_ARCHITECTURE.md) 与 [`FACE_LANDMARKS.md`](./FACE_LANDMARKS.md) 为准。
 > 适用场景：MNN 引擎关键点抖动/漂移诊断、新引擎接入时的对齐验证方法论参考。
 
 ---

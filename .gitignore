@@ -125,3 +125,6 @@ docs/08-UI-SPECS/screens/refs/ios/shots/*.png
 
 # Ardot lang driver 运行日志（不入库）
 docs/08-UI-SPECS/screens/lang/*.log
+docs/02-ARCHITECTURE/c4/exported/
+.tmp-guide-fix/
+*.qoder.site

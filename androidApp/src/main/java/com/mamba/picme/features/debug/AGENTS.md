@@ -121,46 +121,11 @@ private suspend fun downloadWithRetry(
 ### 2.3 内容审核与人脸检测
 
 **技术规范**:
-- **ML Kit 集成**: 使用 Google ML Kit Face Detection API 进行离线人脸分析
-- **检测配置**:
-  - 性能模式：`PERFORMANCE_MODE_FAST`
-  - 地标模式：`LANDMARK_MODE_ALL`
-  - 分类模式：`CLASSIFICATION_MODE_ALL`
-- **内容过滤规则**:
+- **ML Kit 已移除（2026-08）**：`SampleDataGenerator.analyzeFace()` 现为常量 stub（返回 `FaceAnalysisResult(count = 1, maxHeightRatio = 0.35f)`），仅用于 debug 样本数据筛选，不影响主链路；ML Kit Face Detection 依赖已从 `:androidApp` 移除
+- **内容过滤规则**（基于上述估算值，规则保留）:
   - 泳装/性感类：必须检测到人脸，且脸部高度占比 < 40%，皮肤区域 > 10%
   - 人物类：至少检测到 1 张人脸
   - 风景类：无人脸检测要求
-- **异步处理**: 人脸检测在 `Dispatchers.Default` 线程执行，避免阻塞 IO
-
-**代码示例**:
-```kotlin
-private suspend fun analyzeFace(bitmap: Bitmap): FaceAnalysisResult {
-    return withContext(Dispatchers.Default) {
-        val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .build()
-        
-        val detector = FaceDetection.getClient(options)
-        val image = InputImage.fromBitmap(bitmap, 0)
-        
-        try {
-            val faces = detector.process(image).await()
-            val maxHeightRatio = faces.maxOfOrNull { 
-                it.boundingBox.height().toFloat() / bitmap.height 
-            } ?: 0f
-            
-            FaceAnalysisResult(
-                count = faces.size,
-                maxHeightRatio = maxHeightRatio
-            )
-        } finally {
-            detector.close()
-        }
-    }
-}
-```
 
 ### 2.4 日志窗口 (LogWindow)
 

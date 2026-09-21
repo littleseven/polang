@@ -766,11 +766,11 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 
 ## 相关文件
 
-- [设计 spec](docs/superpowers/specs/2026-09-19-ardot-design-ops-design.md) - 本 Skill 的设计 SSOT
-- [组件目录](docs/08-UI-SPECS/screens/refs/ardot/components.json) - 组件 SSOT
-- [DESIGN_TOKENS_SPEC](docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md) - token codegen 规范
-- [ARDOT_MCP](.kimi-code/ARDOT_MCP.md) - MCP 工具速查与坑
-- [ui-parity-guard](skills/ui-parity-guard/SKILL.md) - 双端一致性守卫(代码侧)
+- [设计 spec](../specs/2026-09-19-ardot-design-ops-design.md) - 本 Skill 的设计 SSOT
+- [组件目录](../../08-UI-SPECS/screens/refs/ardot/components.json) - 组件 SSOT
+- [DESIGN_TOKENS_SPEC](../../03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md) - token codegen 规范
+- [ARDOT_MCP](../../../.kimi-code/ARDOT_MCP.md) - MCP 工具速查与坑
+- [ui-parity-guard](../../../skills/ui-parity-guard/SKILL.md) - 双端一致性守卫(代码侧)
 
 ## 版本历史
 

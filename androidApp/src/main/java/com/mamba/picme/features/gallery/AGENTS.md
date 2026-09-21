@@ -12,7 +12,7 @@
 > **最后更新**: 2026-09-12  
 > **维护者**: 项目开发者
 
-**模块定位**: 应用默认首页，提供智能聚类相册浏览、媒体查看器、批量操作功能；支持端侧自然语言搜索；语音 Agent 面板提供自然语言交互入口。二级能力入口：悬浮底部 Tab（共享 `MainFloatingBottomBar`，相册/整理/聊天/人物/回忆五项与 Pager 页序 1:1，2026-09-06 导航统一；相册项本页高亮）+ 顶栏（模型中心/设置）+ 相册页左滑（整理）。「相册整理」（去重 2.0）为主页面 Pager 页 1（相册页左滑即达），另有悬浮底部 Tab 整理项 + 设置主菜单一级入口；相机已路由化，无常驻入口。
+**模块定位**: 应用默认首页，提供智能聚类相册浏览、媒体查看器、批量操作功能；支持端侧自然语言搜索；语音 Agent 面板提供自然语言交互入口。二级能力入口：悬浮底部 Tab（共享 `MainFloatingBottomBar`，本页相册项高亮）+ 顶栏（模型中心/设置）+ 相册页左滑（整理）。主页面五项导航与 Pager 页序的归属口径以 `androidApp/AGENTS.md` §1.2 为准。
 
 **主要维护者**: 项目开发者
 
@@ -41,21 +41,7 @@
   - `SEXY`: 匹配 `labels` 中的风格标签（如「性感」「sexy」）
 - **UseCase 层**: 通过 `GetGroupedMediaUseCase` 封装分组逻辑，ViewModel 仅负责状态管理
 - **Flow 组合**: 使用 `combine(repository.allMedia, _groupingMode)` 响应式更新分组结果
-- **性能优化**: 分组计算在 `Dispatchers.Default` 线程执行，避免阻塞 UI
-
-**代码示例**:
-```kotlin
-val groupedMedia: StateFlow<List<GroupedMedia>> = combine(
-    repository.allMedia,
-    _groupingMode
-) { allMedia, mode ->
-    getGroupedMediaUseCase(allMedia, mode)
-}.stateIn(
-    scope = viewModelScope,
-    started = SharingStarted.WhileSubscribed(5000),
-    initialValue = emptyList()
-)
-```
+- **性能优化**: 分组计算在 `Dispatchers.Default` 线程执行，避免阻塞 UI；`combine` 结果经 `stateIn(WhileSubscribed(5000))` 转 `StateFlow`，避免重复订阅
 
 ### 2.2 媒体查看器 (MediaPager)
 
@@ -68,27 +54,13 @@ val groupedMedia: StateFlow<List<GroupedMedia>> = combine(
 - **手势冲突处理**: 
   - 放大时优先图片平移，禁止触发翻页
   - 回到 1x 后恢复翻页功能
-- **上滑删除（回收站，2026-09-08）**: `onSwipeUpDelete: ((MediaAsset) -> Unit)?` 可选参数，为 null 不挂手势（offset/alpha 修饰符同样条件挂载，与现状完全等价）；根 Box 挂 `detectDragGestures`，仅「未放大 + 当前页 PHOTO + 竖直位移主导（abs(dy)>abs(dx)）+ OCR/Vision 浮层不可见」时 consume（不抢横滑翻页），Animatable offsetY 只跟向上（向下钳制 0），拖动中主导性丢失（转横拖）立即归位不再结算；松手超页高 25% 阈值 → 向上飞出 + 淡出（220ms）后回调，未超阈值弹回；判定纯逻辑收口 `components/SwipeUpDeleteGesture.kt`（JVM 可测）；拖动中浮现「松开移入回收站」胶囊提示（`preview_swipe_delete_hint` 五语；API<30 降级永久删除时经 `isTrashSupported` 参数切换中性键 `preview_delete_hint`），超阈值高亮 error 色。与 SwipeReview ↑删除 同一手势语言
-- **删除通路分流（`MediaViewModel.requestTrash(asset, tag)` → 返回实际 Route）**: API 30+ → `TrashSessionController`（`DedupTrashBackend` 包装 `dedupTrashManager`，`MediaStore.createTrashRequest`，30 天可恢复；request 同步置 in-flight 标志防单槽竞态，`cancelPendingRequest(tag)` 供宿主解绑清理防悬挂）；**静默快路径（2026-09-08，MANAGE_MEDIA）**：设置页「删除不再询问」开关开 + 持 MANAGE_MEDIA（API 31+，`DedupTrashManager.canManageMedia`/`silentTrash` 直写 IS_TRASHED 单列——DATE_EXPIRES 属系统管理列，同写实测在 HyperOS 上致 update 整体失败）时 `TrashSessionController.request()` 在 token 构建前经 `TrashBackend.trySilentTrash` 静默回收，零系统弹框、不落 pendingRequest，开关关/无权限返回 null 回落系统授权框；**失败子集回落（2026-09-12）**：直写被 ROM 拒绝时成功集照常 Trashed 入流，失败子集回落 token 通路（持权时 createTrashRequest 免弹框自动通过），写失败记 `PoLang:DedupTrash` 警告日志；API < 30 → `PreviewTrashRouting`（domain/trash 纯函数）降级走既有 `deleteMediaByIds` 永久删除 + 系统授权框。授权 UI 为共享组件 `components/TrashAuthEffects.kt`（自 SwipeReviewScreen 抽出；pendingRequest → StartIntentSenderForResult，partialNotice/errorEvent → snackbar 或 Toast；`tag` 分桶 + onDispose 清理匹配 pending，避免 Activity 级共享 controller 被多宿主重复拉起/悬挂）。三宿主（Gallery/Chat/MemoryDetail）各挂一份（tag 分别为 `preview_swipe_gallery/chat/memory`），**只在 Trashed outcome 后收缩预览列表**（Gallery 本地 `swipeTrashedUris` 过滤 + 删空收起；Chat 收缩 `previewAssets` 并 `removeMediaResultAsset` 清理聊天内联图防死图，legacy 分支补记 `pendingDeletedIds`；MemoryDetail 本地过滤 + 删空随既有 `previewAssets.isEmpty` 效应收起），授权取消/失败用户停在原图；VM 侧 Trashed 后先 `repository.removeTrashedFromLocalCache(trashedUris)` 乐观本地移除（内存缓存剔除 + Room 行删除 + refreshVersion 重发射，网格即时更新，2026-09-12）再 `refreshMediaLibrary()` 全量重扫兜底让网格随流一致——refresh 链路已双端点过滤 trashed（2026-09-12 修复）：查询侧 selection `IS_TRASHED=0`（API 29+）+ stale 探活读 IS_TRASHED 列视 trashed 为不存在；HyperOS/Android 16 的 MediaStore 普查不默认过滤回收站行（AOSP 才默认过滤），无此过滤则已回收照片仍残留网格
+- **上滑删除（回收站）**: `onSwipeUpDelete: ((MediaAsset) -> Unit)?` 可选参数，为 null 不挂手势；仅「未放大 + 当前页 PHOTO + 竖直位移主导（abs(dy)>abs(dx)）+ OCR/Vision 浮层不可见」时 consume，松手超页高 25% 阈值向上飞出淡出（220ms）后回调，未超弹回；判定纯逻辑收口 `components/SwipeUpDeleteGesture.kt`（JVM 可测）；拖动中浮现提示胶囊（`preview_swipe_delete_hint` 五语，API<30 降级时经 `isTrashSupported` 切中性键 `preview_delete_hint`），与 SwipeReview ↑删除 同一手势语言
+- **删除通路（`MediaViewModel.requestTrash(asset, tag)` 返回实际 Route）**: API 30+ → `TrashSessionController`（`MediaStore.createTrashRequest`，30 天可恢复；in-flight 标志防单槽竞态，`cancelPendingRequest(tag)` 供宿主解绑防悬挂）；API < 30 → `PreviewTrashRouting` 降级永久删除 + 系统授权框。域层与跨宿主口径见 `androidApp/AGENTS.md` §2.2 `domain/trash/`
+- **静默快路径（MANAGE_MEDIA）**: 设置页「删除不再询问」开 + 持权（API 31+）时 `TrashSessionController.request()` 在 token 构建前经 `TrashBackend.trySilentTrash` 直写 IS_TRASHED 单列静默回收（DATE_EXPIRES 属系统管理列，同写在 HyperOS 致 update 整体失败）；开关关/无权限返回 null 回落系统授权框；直写被 ROM 拒绝时失败子集回落 token 通路（持权时免弹框自动通过），记 `PoLang:DedupTrash` 警告
+- **授权 UI 与列表收缩约定**: 共享组件 `components/TrashAuthEffects.kt`（pendingRequest → StartIntentSenderForResult，partialNotice/errorEvent → snackbar/Toast，tag 分桶 + onDispose 清理匹配 pending）；三宿主 Gallery/Chat/MemoryDetail 各挂一份（tag 分别为 `preview_swipe_gallery/chat/memory`），只在 Trashed outcome 后收缩预览列表
+- **回收后网格刷新**: VM 侧 Trashed 后先 `repository.removeTrashedFromLocalCache` 乐观移除（缓存剔除 + Room 行删除 + refreshVersion 重发射）再 `refreshMediaLibrary()` 兜底；refresh 链路双端点过滤 trashed（查询侧 `IS_TRASHED=0` + stale 探活读 IS_TRASHED 列），否则 HyperOS/Android 16 已回收照片残留网格
 - **预加载策略**: `beyondBoundsPageCount = 3` 预加载前后 3 页
 - **沉浸式模式**: 隐藏状态栏与导航栏，滑动边缘时 transient 显示
-
-**代码示例**:
-```kotlin
-@OptIn(ExperimentalFoundationApi::class)
-HorizontalPager(
-    state = pagerState,
-    beyondBoundsPageCount = 3,
-    userScrollEnabled = !currentPageZoomed,
-    pageSpacing = 16.dp,
-    contentPadding = PaddingValues(horizontal = 16.dp)
-) { page ->
-    ZoomableImage(
-        imageModel = mediaAssets[page].uri,
-        onZoomChanged = { scale -> currentPageZoomed = scale > 1f }
-    )
-}
-```
 
 ### 2.3 批量选择与操作 (Batch Selection)
 
@@ -107,68 +79,37 @@ HorizontalPager(
   - **Android 10 (API 29)**: 捕获 `RecoverableSecurityException`，保存 `userAction.actionIntent.intentSender`，通过 `StartIntentSenderForResult` 请求单条授权，授权后重试删除
   - **Android 11+ (API 30+)**: 收集失败的 URI 列表，使用 `MediaStore.createDeleteRequest()` 发起批量系统授权对话框，用户允许后系统自动完成物理删除
 - **数据一致性**: 必须遵循"先物理文件、后数据库记录"的顺序。若删除需要用户授权，必须推迟 Room 数据库清理，直到授权成功后再执行，避免用户拒绝后出现"文件还在、记录已消失"的不一致状态
-- **搜索模式一致性**: `GalleryScreen` 订阅 `viewModel.allMedia`，媒体库变更（如删除完成）后自动重新执行当前搜索词并刷新结果网格
-
-**代码示例**:
-```kotlin
-private fun shareMediaAssets(context: Context, assets: List<MediaAsset>) {
-    if (assets.isEmpty()) return
-
-    val uris = assets.map { it.uri.toUri() }
-    val shareIntent = if (uris.size == 1) {
-        Intent(Intent.ACTION_SEND).apply {
-            putExtra(Intent.EXTRA_STREAM, uris.first())
-            type = if (assets.first().type == MediaType.VIDEO) "video/*" else "image/*"
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-    } else {
-        Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-            type = "*/*"
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-    }
-
-    context.startActivity(Intent.createChooser(shareIntent, null))
-}
-```
+- **搜索模式一致性**: 搜索模式下删除/授权完成后自动重新执行当前 query（实现见 §2.5 结果刷新）
 
 ### 2.4 重复照片清理（去重 2.0，Dedup 2.0）
 
-> 旧实现（`DuplicateManager` 页 / `FindDuplicateMediaUseCase` / `DuplicateImageDetector`）已于 2026-08-26 Task 11 整体下线删除；`core/common/PerceptualHash.kt`（MD5/pHash 纯算法，零 Android 依赖、可 JVM 单测）保留，由新扫描器复用。
+> 旧实现（`DuplicateManager` 页 / `FindDuplicateMediaUseCase` / `DuplicateImageDetector`）已删除；`core/common/PerceptualHash.kt`（MD5/pHash 纯算法，零 Android 依赖、可 JVM 单测）保留，由新扫描器复用。
 
 **技术规范**:
-- **入口（2026-09-06 整理+扫描合并页）**: 整理+扫描合并页为主页面 Pager 页 1（页序 相册(0)/整理+扫描(1)/聊天(2)/人物(3)/回忆(4)，见 `features/main/MainPagerHost.kt`；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全）——合并页 `OrganizeHomeRoute`（`features/gallery/organize/OrganizeHomeScreen.kt`）以顶部胶囊分段开关承载「整理」（本页 embedded）/「扫描」（TagGenerationControlScreen embedded）双 Tab；相册页左滑经外层 HorizontalPager 原生手势进入，悬浮底部 Tab 整理项（`Icons.Outlined.CleaningServices`，2026-09-06 导航统一换标）与设置主菜单「相册整理」一级入口均切到页 1 并预选整理 Tab（设置入口经 `organizeTabRequest` 一次性请求驱动）。系统返回键切回相册页不弹栈（根页无顶栏返回箭头，Dedup 扫描态「后台运行」按钮经 `onLeaveToGallery` 离页）
+- **入口（整理+扫描合并页）**: 主页面 Pager 页 1 `OrganizeHomeRoute`（`features/gallery/organize/OrganizeHomeRoute.kt`）以顶部胶囊分段开关承载「整理」（本页 embedded）/「扫描」（TagGenerationControlScreen embedded）双 Tab；`DedupViewModel` 为 Activity 级独立 VM，Pager 托管安全；相册页左滑经外层 HorizontalPager 进入，系统返回键切回相册页不弹栈；页序与外部入口（底 bar 整理项、设置 `organizeTabRequest` 预选）归属口径见 `androidApp/AGENTS.md` §1.2
 - **三级尺度（`DedupLevel`，`domain/dedup/DedupModels.kt`）**:
   - `EXACT` 精确重复：`(sizeBytes, mime)` 分桶 → 流式 MD5 相同成组
   - `VISUAL` 视觉重复：32×32 降采样 64-bit pHash，汉明距离 ≤ `visualThreshold`(=5) 并查集聚类；与 EXACT 组完全重合（全员同 MD5）的簇跳过
   - `SCENE` 相似场景（连拍）：`sceneThreshold`(=8) 聚类 + `sceneTimeWindowMs`(=10s) 拍摄时间窗切桶，仅保留 ≥2 张的桶
   - `DedupScanConfig.levels` 默认 `{EXACT, VISUAL}`，SCENE 由用户在 Config 页勾选
-- **扫描器（`domain/dedup/DedupScanner.kt`）**: cold Flow 流式扫描，逐批/逐组流出 `DedupScanEvent`（Progress/PhaseChanged/GroupFound/Done/Cancelled）；哈希分批 500（SQLite IN 参数上限），MD5/pHash/pixelArea 缓存进 Room `dedup_hash` 表（`modifiedAt + sizeBytes` 一致则复用）；暂停/恢复经 `DedupScanController.pauseRequested` 轮询（200ms；哈希批内每 50 张一个检查点，每张均 `ensureActive` 响应取消），协程取消经 `onCompletion` 补发 `Cancelled`。媒体字节 100% 端侧处理，零上传（[PRIVACY]）
+- **扫描器（`domain/dedup/DedupScanner.kt`）**: cold Flow 流式扫描，逐批流出 `DedupScanEvent`（Progress/PhaseChanged/GroupFound/Done/Cancelled）；哈希分批 500（SQLite IN 参数上限），MD5/pHash/pixelArea 缓存进 Room `dedup_hash` 表（`modifiedAt + sizeBytes` 一致则复用）；暂停/恢复经 `DedupScanController.pauseRequested` 轮询（200ms；批内每 50 张检查点，每张 `ensureActive`），取消经 `onCompletion` 补发 `Cancelled`。媒体字节 100% 端侧处理（[PRIVACY]）
 - **保留规则（`KeepPolicyEngine` 四规则）**: `BEST_QUALITY`（像素面积→文件大小→美学分→拍摄日期 降序）/ `ORIGINAL` / `EDITED` / `LATEST`；`classify` 先行标注 `VersionRole`（像素或大小 < 组内最大值 0.5 → `COMPRESSED`；`modifiedAt - captureDate > 6h` → `EDITED`；否则 `ORIGINAL`），keepUri = 排序后首张，UI 可改选（`userOverride`）
-- **内容类型差异化（spec §10，`DedupContentType`）**: 取数阶段零额外推理识别 SCREENSHOT（MediaStore `RELATIVE_PATH` 含 Screenshots，API 29+；API 24-28 无该列，以 `DATA` 列路径兜底，截图识别退化基本消除）/ DOCUMENT（ocrText 文字密度 = 字符数/像素面积 > 20 字符/MP，WIDTH/HEIGHT 自 API 16 可用、全版本入 projection，列缺失/脏值退回 >200 字符绝对兜底；或 labels 命中 document/receipt/text 类关键词——英文整词匹配（容忍复数后缀）避免 context/texture 误伤，中文子串，`detectContentType` 纯函数）/ PORTRAIT（hasFace 或 faceQualityScore 非空）/ GENERAL 兜底，优先级 SCREENSHOT > DOCUMENT > PORTRAIT > GENERAL；VISUAL 聚类按 contentType 分桶（跨桶不成组），截图桶用收紧阈值 `screenshotVisualThreshold`(=3)；人像组保留排序前置 faceQualityScore（null 排最后）；`DedupGroup.autoPreselected`（EXACT→true、VISUAL 截图/文档→false、SCENE→false）为 false 时 deleteUris/reclaimBytes 为空、不进批量 CTA（口径收口 `DedupGroup.batchEligible`），详情改选（userOverride）后正常派生参与删除；组卡片有中性描边内容类型 badge（GENERAL 不显示）与类型差异化 footer 文案；未预选未改选组 UI 不显示「0 张/0 B」——meta 行改显示按 keepUri 派生的预计可释放量（`potentialReclaimBytes`，「预计」措辞），详情确认按钮改「确认本组选择」中性文案
-- **状态机（`DedupViewModel`，Agent First sealed 枚举）**: `Config` → `Scanning`（渐进 `GroupFound`，含 paused）→ `Results`（按 DedupLevel 分 tab + policy 切换）→（系统授权）→ `Cleaned`（可 undo/done 回 Config）；保留策略 `_policy` 为 VM 级 StateFlow，Config 规则行与 Results 共用；扫描 `Done` 时按当前 policy 对全部组 `resortGroup` 重算默认勾选（扫描器固定按 BEST_QUALITY 建组）。**SCENE 组不参与批量删除**（spec §4 安全约束）：`batchDeleteUris`/`batchReclaimBytes` 派生值统一 `filter batchEligible`（SCENE 组与未预选未改选组均不参与），VM 删除流与结果页底部 CTA 同一口径
-- **回收站（`DedupTrashManager`）**: API 30+ 走 `MediaStore.createTrashRequest` 移入系统回收站（Cleaned 态可 undo 恢复）；`buildTrashIntent` 经 ioDispatcher + runCatching 保护，失败记日志保持 Results 态；部分拒绝（授权后仍有残留 uri）置位 `partialTrashNotice` 一次性事件槽位，UI 弹 snackbar 提示；API < 30 无回收站授权接口，由 UI 层注入 `legacyDeleter` 回调兜底走 `MediaViewModel.deleteMediaByIds` 旧删除授权流。**已知限制：API ≤ 29 删除授权链路当前为降级路径（legacyDeleter），API 29 上授权弹窗可能无人拉起，待修**
-- **残留复查陷阱（2026-09-05 修复）**: `DedupTrashManager.queryExisting` 判残留必须投影并读取 `IS_TRASHED` 列——部分 ROM（实测 HyperOS/Android 16）对已 trash 行的直接 item-URI 查询仍返回该行（AOSP 默认查询会过滤 trash 行），仅判「行可查」会把成功回收误判为部分拒绝，导致组保留不刷新（「点了没反应」表象）。行存在且 `IS_TRASHED=0` 才算真残留
-- **删除两通路（2026-09-04 补齐）**: ① 结果页底部 CTA `deleteSelected()` 按当前 Tab 批量删除，确认后进 `Cleaned` 完成页（可 undo）；② 组详情「保留所选 · 删除其余 N 张」`deleteGroup(groupId)` 逐组立即删除（L3 场景相似唯一删除通路），`PendingTrash.groupId` 标记区分，确认后**留在 Results 原地刷新**不进完成页；两路共用 `computeRemainingGroups`（删净组移出 / 跨级重叠组剔除幽灵成员 / keepUri 被删按 policy 重算 / 存活 <2 不成组）与部分拒绝 `partialTrashNotice` 语义
-- **UI 组件清单（`features/gallery/dedup/`）**: `DedupHomeScreen`（页面 + Route）、`DedupSheets`（`DedupGroupDetailPage` 全屏组详情页——点「保留这张」改选后立即收起回结果列表（2026-09-05 交互修正），删除仍走详情 CTA/批量 CTA——+ 组内全屏对比预览 + `KeepRulesSheet` 保留规则底部弹层——组详情 2026-08-27 起由半屏弹层改全屏页）、`DedupComponents`（组卡片/缩略图等）、`DedupMediaSource`（扫描输入供数，`MediaType.PHOTO` 元数据 + modifiedAt）
-- **整理中心类目详情（F1，`features/gallery/organize/`，2026-09-07 类目体系 v2 重构落地）**: 六类目互斥管线——`domain/organize/` 纯函数四层（`OrganizeCategorizer` 为编排 Facade，对外仅 `classifyAll`（详情页逐媒体裁定）与 `board`（hub 聚合）两入口）：`CategoryArbiter` 按 `OrganizeCategory` 声明序先命中先得（DUPLICATES > SCREEN_CONTENT（截图+录屏）> DOCUMENTS > LOW_QUALITY_PORTRAITS > LOW_QUALITY_PHOTOS > LARGE_FILES；视频仅参与 DUPLICATES/SCREEN_CONTENT/LARGE_FILES，未命中任何类目不属清理范畴）→ `ValueGuard` 价值保护（仅低质两类生效：拍摄 ≥5 年前 / 所属人物聚类 ≤3 张稀缺 / 收藏或查看过（isFavorite、lastViewedAt）→ protected，不预选不计 Hero）→ `ConfidenceGrader`（HIGH=强命中默认勾选 / MEDIUM=近阈值单信号 / LOW=弱信号辅助）；阈值全部集中 `OrganizeThresholds`（单一事实来源）；新信号 blurScore/exposureScore（`BlurAnalyzer` ≤256px 灰度 Laplacian 方差 + 平均亮度，缺分由 `OrganizeRepositoryImpl.backfillQualitySignals` 后台分批补算合批回写）与 lastViewedAt（查看器打开回写，60s 节流守卫）。hub（`DedupHomeHub.kt`）：board 恒 6 卡——零命中且 READY 的类目不渲染、NEEDS_SCAN 渲染 surfaceContainerLow 降档引导卡（不压整卡 alpha，点击切 SCAN tab）；Hero「Estimated reclaimable」= 全类目 HIGH 非保护并集字节，DUPLICATES 额外按精确组扣 1 张 keeper（与去重结果页 reclaimBytes 口径一致；已知残留口径差：highCount 徽标张数含 keeper 而 highBytes 字节不含）；卡按 highBytes 降序，固定 `DedupCategoryCard`（可展开原去重 Config 三件套）钉首位豁免排序、承接 board 的 DUPLICATES 卡 meta。详情页 `OrganizeCategoryScreen`/`OrganizeCategoryViewModel`：三段分组（建议删除=HIGH 非保护 / 请确认=MEDIUM+LOW 非保护 / 可能是珍贵照片=protected，Shield 角标 16dp/黑 40% 圆底）；AI 预选与 selectAll 仅圈 HIGH 非保护项，DUPLICATES 按 `exactDupGroupKey` 每组留 1 张 keeper（captureDate 最新）防全组删光；顶栏保留「AI 预选」开关（`org_ai_preselect_on/off`）；段级全选按钮未实装（VM `selectAll`/`deselectAll` 就绪暂无 UI 调用方）；删除/Undo 走 `TrashSessionController` 系统回收站编排（30 天可恢复）。重复组聚类输入按库内 uri 收敛（`OrganizeRepositoryImpl.queryDuplicateInfo`：dedup_hash 残留幽灵行不参与，失效键=过滤后 uri/md5/phash 集合缓存防 O(n²) 重聚类）；`SwipeQueueBuilder` 消费同一 `classifyAll` 产出（口径同源，废片桶只收 HIGH/MEDIUM 非 protected）。设计 spec：`docs/superpowers/specs/2026-09-06-organize-category-redesign-design.md`；UI SSOT（iOS 翻译唯一输入）：`docs/08-UI-SPECS/screens/organize.yaml`
-- **手势快速整理（F2，`features/gallery/swipe/`，2026-09-05）**: `SwipeReviewScreen`（NavHost 二级页 `swipe_review`：全屏大图卡手势决策——右滑保留 / 左滑跳过 / 上滑删除、点按=跳过，卡片跟手位移 + 超阈值（宽 25%）飞出落决策，预加载后续 3 张；完成态统计卡 + 再来一轮 + 整批恢复）+ `SwipeReviewViewModel`（`SwipeQueueBuilder` 废片优先建队（v2 起与类目页同管线产出，口径见上条）、undo 栈、未提交 DELETE 累计 20 张自动提交一批系统回收站授权，Done 态整批 undoAll 恢复）；hub「滑动整理」(Swipe to tidy) 渐变主按钮经 `onQuickTidy` 点亮该路由；队列入列原因（Screenshot/Blurry/Low-quality portrait/Recent）为卡片角标，视频永不入队。**审查修复语义（2026-09-05 二轮）**：KEEP 30 天抑制——decide(KEEP) 即时写入 `SwipeKeepHistory`（`domain/swipe/SwipeKeepHistory.kt` 纯函数：`uri|epochMs` 编码 + 30 天 TTL 裁剪；`data/preferences/DataStoreSwipeKeepHistoryStore.kt` 持久化到 user_preferences DataStore `swipe_keep_history` stringSet），restart 建队时过滤活跃条目并顺带清理过期写回，undo(KEEP) 只回滚本会话新增条目；防死锁——API<30（TrashBackend `!isSupported`）提交短路不挂在途状态、`finish` 直接 settleDone（未提交 DELETE 以 skipped 口径进 Done，三桶守恒），token 构建失败经 errorEvent 回滚提交状态；授权被拒（Cancelled）批次回滚为未提交可重试，末张决策后（current==null）显示「待提交 N 张 + 重试/放弃」出口面板（放弃 = 未提交 DELETE 改记 SKIP 进 Done）；freedBytes 为 Reviewing 存储字段，decide/undo/discard 增量维护（O(1)）；换图为方向感知（前进无过渡防闪回，undo 保留淡入）
-- **回忆 Memories（F3 独立页，`features/gallery/memories/`，2026-09-06 重设计）**: Memory 独立主页面 Pager 页 4 + 底 bar 回忆项（AutoAwesome，2026-09-06 导航统一换标）+ 详情页路由 `memory_detail/{memoryId}`；生成规则、隐藏持久化与 v1 不落表说明见 §2.12
-- **Pager 页单根铁律（2026-09-04 事故修复）**: `DedupHomeRoute` 必须以单个 `Box(fillMaxSize)` 包裹 Scaffold + 详情页 + 预览层——HorizontalPager 会把 page 内容的多个根节点沿主轴顺序平铺（`MeasuredPage` 按 child 宽度累加 offset，非 Box 式堆叠），多根会导致详情页/预览层被排到屏外，点击「没反应」。Gallery/Person/Chat 页均为单根模式；页内新增全屏覆盖层一律挂进该 Box，不得作为独立根节点
-
-**代码示例**:
-```kotlin
-// DedupViewModel：收集扫描事件流，渐进式推进状态机
-scanner.scan(items, config).flowOn(ioDispatcher).collect { event ->
-    when (event) {
-        is DedupScanEvent.GroupFound -> /* 追加到 Scanning.foundGroups */
-        is DedupScanEvent.Done -> _uiState.value = DedupUiState.Results(event.groups, ...)
-        is DedupScanEvent.Cancelled -> _uiState.value = DedupUiState.Config(config)
-        // Progress / PhaseChanged → 更新 Scanning 进度
-    }
-}
-```
+- **内容类型差异化（spec §10，`DedupContentType`）**: 取数阶段零额外推理识别 SCREENSHOT（`RELATIVE_PATH` 含 Screenshots，API 29+，低版本 `DATA` 列兜底）/ DOCUMENT（ocrText 文字密度 > 20 字符/MP 或 document/receipt/text 类标签命中，英文整词匹配，`detectContentType` 纯函数）/ PORTRAIT（hasFace 或 faceQualityScore 非空）/ GENERAL，优先级 SCREENSHOT > DOCUMENT > PORTRAIT > GENERAL
+- **分桶与预选口径**: VISUAL 聚类按 contentType 分桶（跨桶不成组），截图桶收紧阈值 `screenshotVisualThreshold`(=3)，人像组保留排序前置 faceQualityScore；`DedupGroup.autoPreselected`（EXACT→true、VISUAL 截图/文档→false、SCENE→false）为 false 时不进批量 CTA（口径收口 `DedupGroup.batchEligible`），详情改选（userOverride）后正常参与删除；未预选未改选组 meta 行显示预计可释放量（`potentialReclaimBytes`，「预计」措辞），详情确认按钮为「确认本组选择」中性文案；组卡片有中性描边内容类型 badge（GENERAL 不显示）
+- **状态机（`DedupViewModel`，Agent First sealed 枚举）**: `Config` → `Scanning`（渐进 `GroupFound`，含 paused）→ `Results`（按 DedupLevel 分 tab + policy 切换）→（系统授权）→ `Cleaned`（可 undo/done 回 Config）；`_policy` 为 VM 级 StateFlow，Config 与 Results 共用，扫描 `Done` 按当前 policy `resortGroup` 重算默认勾选；**SCENE 组不参与批量删除**（spec §4 安全约束），`batchDeleteUris`/`batchReclaimBytes` 与底部 CTA 统一 `filter batchEligible`
+- **回收站（`DedupTrashManager`）**: API 30+ 走 `MediaStore.createTrashRequest`（Cleaned 态可 undo 恢复）；`buildTrashIntent` 经 ioDispatcher + runCatching 保护，失败记日志保持 Results 态；部分拒绝置位 `partialTrashNotice` 一次性事件弹 snackbar；API < 30 由 UI 注入 `legacyDeleter` 回调走 `MediaViewModel.deleteMediaByIds` 旧授权流。**已知限制：API ≤ 29 删除授权链路为降级路径，API 29 上授权弹窗可能无人拉起，待修**
+- **残留复查陷阱**: `DedupTrashManager.queryExisting` 判残留必须投影并读取 `IS_TRASHED` 列——部分 ROM（实测 HyperOS/Android 16）对已 trash 行的 item-URI 直查仍返回该行（AOSP 默认查询才过滤），仅判「行可查」会把成功回收误判为部分拒绝（「点了没反应」表象）；行存在且 `IS_TRASHED=0` 才算真残留
+- **删除两通路**: ① 结果页底部 CTA `deleteSelected()` 按当前 Tab 批量删除，确认后进 `Cleaned` 完成页（可 undo）；② 组详情「保留所选 · 删除其余 N 张」`deleteGroup(groupId)` 逐组立即删除（L3 场景相似唯一通路），确认后留在 Results 原地刷新；两路共用 `computeRemainingGroups`（删净组移出 / 跨级重叠组剔除幽灵成员 / keepUri 被删按 policy 重算 / 存活 <2 不成组）与 `partialTrashNotice` 语义
+- **UI 组件清单（`features/gallery/dedup/`）**: `DedupHomeScreen`（页面 + Route）、`DedupSheets`（`DedupGroupDetailPage` 全屏组详情页——点「保留这张」改选后立即收起回结果列表 + 组内全屏对比预览 + `KeepRulesSheet` 保留规则弹层）、`DedupComponents`（组卡片/缩略图等）、`DedupMediaSource`（扫描输入供数，`MediaType.PHOTO` 元数据 + modifiedAt）
+- **整理中心类目详情（F1，`features/gallery/organize/`，类目体系 v2）**: 六类目互斥管线，`domain/organize/` 纯函数四层（`OrganizeCategorizer` 为编排 Facade，对外仅 `classifyAll`（详情页逐媒体裁定）与 `board`（hub 聚合）两入口）：`CategoryArbiter` 按 `OrganizeCategory` 声明序先命中先得（DUPLICATES > SCREEN_CONTENT > DOCUMENTS > LOW_QUALITY_PORTRAITS > LOW_QUALITY_PHOTOS > LARGE_FILES；视频仅参与 DUPLICATES/SCREEN_CONTENT/LARGE_FILES）→ `ValueGuard` 价值保护（仅低质两类：拍摄 ≥5 年前 / 人物聚类 ≤3 张稀缺 / 收藏或查看过 → protected，不预选不计 Hero）→ `ConfidenceGrader`（HIGH 默认勾选 / MEDIUM 近阈值单信号 / LOW 弱信号）；阈值集中 `OrganizeThresholds`（SSOT）
+- **F1 信号与 hub**: 新信号 blurScore/exposureScore（`BlurAnalyzer` ≤256px 灰度 Laplacian 方差 + 平均亮度，缺分由 `OrganizeRepositoryImpl.backfillQualitySignals` 后台分批补算回写）与 lastViewedAt（查看器打开回写，60s 节流）；hub（`DedupHomeHub.kt`）board 恒 6 卡，零命中且 READY 不渲染、NEEDS_SCAN 渲染降档引导卡；Hero = 全类目 HIGH 非保护并集字节（DUPLICATES 按精确组扣 1 张 keeper；已知口径差：highCount 徽标含 keeper 而 highBytes 不含）；`DedupCategoryCard`（可展开原去重 Config 三件套）钉首位豁免排序
+- **F1 详情页**: `OrganizeCategoryScreen`/`OrganizeCategoryViewModel` 三段分组（建议删除=HIGH 非保护 / 请确认=MEDIUM+LOW / 可能是珍贵照片=protected，Shield 角标）；AI 预选与 selectAll 仅圈 HIGH 非保护项，DUPLICATES 按 `exactDupGroupKey` 每组留 1 张 keeper（captureDate 最新）；顶栏「AI 预选」开关（`org_ai_preselect_on/off`）；段级全选按钮未实装（VM `selectAll`/`deselectAll` 就绪暂无 UI 调用方）；删除/Undo 走 `TrashSessionController` 系统回收站（30 天可恢复）
+- **F1 口径与索引**: 重复组聚类输入按库内 uri 收敛（`OrganizeRepositoryImpl.queryDuplicateInfo`，dedup_hash 幽灵行不参与）；`SwipeQueueBuilder` 消费同一 `classifyAll` 产出（口径同源，废片桶只收 HIGH/MEDIUM 非 protected）。设计 spec：`docs/superpowers/specs/2026-09-06-organize-category-redesign-design.md`；UI SSOT：`docs/08-UI-SPECS/screens/organize.yaml`
+- **手势快速整理（F2，`features/gallery/swipe/`）**: `SwipeReviewScreen`（NavHost 二级页 `swipe_review`：全屏大图卡——右滑保留 / 左滑跳过 / 上滑删除、点按=跳过，卡片跟手位移 + 超阈值（宽 25%）飞出落决策，预加载后续 3 张；完成态统计卡 + 再来一轮 + 整批恢复）+ `SwipeReviewViewModel`（`SwipeQueueBuilder` 废片优先建队、undo 栈、未提交 DELETE 累计 20 张自动提交一批系统回收站授权，Done 态整批 undoAll）；hub「滑动整理」渐变主按钮经 `onQuickTidy` 点亮路由；入列原因（Screenshot/Blurry/Low-quality portrait/Recent）为卡片角标，视频永不入队
+- **F2 KEEP 30 天抑制**: decide(KEEP) 即时写入 `SwipeKeepHistory`（`domain/swipe/SwipeKeepHistory.kt` 纯函数：`uri|epochMs` 编码 + 30 天 TTL 裁剪；`data/preferences/DataStoreSwipeKeepHistoryStore.kt` 持久化到 user_preferences DataStore `swipe_keep_history` stringSet），restart 建队过滤活跃条目并清理过期，undo(KEEP) 只回滚本会话新增条目
+- **F2 防死锁与计数**: API<30（`!isSupported`）提交短路不挂在途、`finish` 直接 settleDone（未提交 DELETE 以 skipped 口径进 Done，三桶守恒）；token 构建失败经 errorEvent 回滚；授权被拒（Cancelled）批次回滚可重试，末张决策后显示「待提交 N 张 + 重试/放弃」出口面板；freedBytes 为 Reviewing 存储字段，decide/undo/discard 增量维护（O(1)）
+- **回忆 Memories（F3 独立页，`features/gallery/memories/`）**: Memory 独立主页面 Pager 页 4 + 详情页路由 `memory_detail/{memoryId}`；生成规则、隐藏持久化与 v1 不落表说明见 §2.12
+- **Pager 页单根铁律**: `DedupHomeRoute` 必须以单个 `Box(fillMaxSize)` 包裹 Scaffold + 详情页 + 预览层——HorizontalPager 会把 page 内容的多个根节点沿主轴顺序平铺（非 Box 式堆叠），多根导致详情页/预览层排到屏外「点击没反应」；页内新增全屏覆盖层一律挂进该 Box，不得作为独立根节点
 
 ### 2.5 自然语言搜索 (Natural Language Search)
 
@@ -189,35 +130,6 @@ scanner.scan(items, config).flowOn(ioDispatcher).collect { event ->
 - **结果刷新**: `GalleryScreen` 通过 `snapshotFlow { allMedia }.debounce(300)` 监听媒体库变化，搜索激活时自动重新执行当前 query
 - **缩略图安全**: 搜索结果缩略图禁用 Coil crossfade，避免 `Canvas: trying to use a recycled bitmap` 崩溃
 
-**代码示例**:
-```kotlin
-// GalleryScreen.kt
-var searchQuery by remember { mutableStateOf("") }
-var isSearchActive by remember { mutableStateOf(false) }
-var searchResultMedia by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
-val searchEngine = remember { GalleryCapability.getInstance().searchEngine }
-
-SearchTopBar(
-    searchQuery = searchQuery,
-    onQueryChange = { query ->
-        searchQuery = query
-        if (query.isNotBlank() && searchEngine != null) {
-            searchScope.launch {
-                searchResultMedia = searchEngine.search(query).media
-            }
-        } else {
-            searchResultMedia = emptyList()
-        }
-    },
-    onClose = {
-        searchQuery = ""
-        searchResultMedia = emptyList()
-        isSearchActive = false
-    },
-    resultCount = if (searchQuery.isNotBlank()) searchResultMedia.size else null
-)
-```
-
 ### 2.6 首页导航与底部悬浮 Tab
 
 **首页定位**:
@@ -225,19 +137,12 @@ SearchTopBar(
 - 系统返回键在相册无内部状态（无选择/Pager）时退出应用；主页面其他页按返回键切回相册页（`MainPagerHost` BackHandler）
 
 **底部悬浮 Tab**:
-- 使用共享组件 `MainFloatingBottomBar`（`features/main/MainFloatingBottomBar.kt`，2026-09-06 导航统一；底层仍为 `FloatingBottomTab`）——五项与 Pager 页序 1:1：相册（PhotoLibrary，本页高亮）、整理（CleaningServices）、聊天（ChatBubble）、人物（AccountCircle）、回忆（AutoAwesome）；打标项已移除（扫描深链走 `organizeTabRequest`）
-- 位置：底部居中，底部 padding 16.dp，悬浮于媒体网格之上；相册详情态（`selectedMediaIndex != null`）隐藏
-- 每项仅显示图标，无文字标签
-- 点击经 `switchMainPage` 瞬时切主页面 Pager 页（无滑动动画）
-- `FloatingBottomTabItem.selected` 高亮态（图标着色 primary）：Memory 页底 bar 的回忆项置 true 标识当前页（点击空操作），其余页保持默认 false
+- 使用共享组件 `MainFloatingBottomBar`（`features/main/MainFloatingBottomBar.kt`，底层 `FloatingBottomTab`），五项与 Pager 页序 1:1，本页相册项（PhotoLibrary）高亮；五项组成、图标与切页行为的归属口径以 `androidApp/AGENTS.md` §1.2 为准
+- 位置：底部居中，底部 padding 16.dp，悬浮于媒体网格之上；相册详情态（`selectedMediaIndex != null`）隐藏；每项仅图标无文字；点击经 `switchMainPage` 瞬时切页（无滑动动画）
 
-**设置入口**:
-- 统一放在 `GalleryTopBar` 动作区最右侧
-- 点击跳转 `SettingsScreen`
-
-**模型中心入口**:
-- `GalleryTopBar` 动作区 CloudDownload 图标直接进入
-- 设置主菜单「AI 与系统」组「模型中心」列表行也可进入
+**设置与模型中心入口**:
+- 设置：统一放在 `GalleryTopBar` 动作区最右侧，点击跳转 `SettingsScreen`
+- 模型中心：`GalleryTopBar` 动作区 CloudDownload 图标直达；设置主菜单「AI 与系统」组「模型中心」列表行也可进入
 
 **语音 Agent 面板**:
 - 位置：右下角，底部 padding 84.dp，位于底部 Tab 上方
@@ -272,19 +177,7 @@ SearchTopBar(
   - `sourceBitmap` 在 ViewModel `onCleared()` 时回收
 - **I18N**: 编辑器内所有标签、内容描述、错误提示均已提取到 `strings.xml`，同步覆盖英文 / 简体中文 / 繁体中文 / 西班牙语 / 法语
 
-**代码示例**:
-```kotlin
-// 从 MediaPager 进入编辑器
-onNavigateToEditor = { asset ->
-    navController.navigate(Screen.PhotoEditor(asset.uri, recipeUri = null))
-}
-
-// 保存成功后返回 outputUri，Gallery 自动刷新媒体库
-val onEditSaved: (String) -> Unit = { outputUri ->
-    navController.popBackStack()
-    viewModel.refreshMediaLibrary()
-}
-```
+保存成功后经 `navController.popBackStack()` 返回并 `viewModel.refreshMediaLibrary()` 刷新媒体库。
 
 ### 2.8 OCR 文字识别集成
 
@@ -297,39 +190,15 @@ val onEditSaved: (String) -> Unit = { outputUri ->
 - **结果展示**: 原位浮层卡片展示识别结果，支持复制与分享
 - **异常处理**: 识别失败时显示友好错误提示，记录日志
 
-**代码示例**:
-```kotlin
-fun recognizeTextFromCurrentImage(context: Context, uri: Uri) {
-    viewModelScope.launch {
-        _ocrState.value = OcrResult.Loading
-        try {
-            val result = ocrUseCase.recognizeFromUri(context, uri)
-            _ocrState.value = if (result != null) {
-                OcrResult.Success(result)
-            } else {
-                OcrResult.Error("未找到文字")
-            }
-        } catch (e: Exception) {
-            _ocrState.value = OcrResult.Error("识别失败：${e.message}")
-        }
-    }
-}
-
-override fun onCleared() {
-    super.onCleared()
-    ocrUseCase.close() // 释放 ML Kit 资源
-}
-```
-
 ### 2.9 TAG 生成精细控制（2026-06 新增）
 
-**入口**: `TagGenerationControlScreen`（2026-09-06 起并入整理+扫描合并页 SCAN Tab：主页面 Pager 页 1 `OrganizeHomeRoute`，原 `tag_control` NavHost 路由已删除；入口 = 设置主菜单「AI 与系统」组「TAG 生成控制」列表行（经 `organizeTabRequest` 预选 SCAN Tab）+ 整理页胶囊开关直接切换——悬浮底栏 TAG 图标已随 2026-09-06 导航统一移除；embedded 模式下顶栏关闭内置状态栏避让且无返回箭头（根页规则），由合并页胶囊条统一避让）
+**入口**: `TagGenerationControlScreen`（已并入整理+扫描合并页 SCAN Tab：主页面 Pager 页 1 `OrganizeHomeRoute`，原 `tag_control` NavHost 路由已删除；入口 = 设置主菜单「AI 与系统」组「TAG 生成控制」列表行（经 `organizeTabRequest` 预选 SCAN Tab）+ 整理页胶囊开关直接切换；embedded 模式下顶栏不内置状态栏避让且无返回箭头（根页规则），由合并页胶囊条统一避让）
 
 **技术规范**:
 - **3-Pass 混合管道**（另有 legacy `MOBILE_CLIP_ENCODING` Pass，仅保留用于历史任务兼容及单独重编码场景，不在常规扫描链中）:
   - **Pass 1**: `FACE_DETECTION` — 人脸检测 + 人脸 Embedding + MobileCLIP 语义编码（语义编码已内联合并到本阶段）
   - **Pass 2**: `DBSCAN` — 全局人脸聚类
-  - **Pass 3**: `IMAGE_TAGGING` — Qwen3-VL-2B 端侧多模态标签生成（场景/活动/物体/标签/摘要）
+  - **Pass 3**: `IMAGE_TAGGING` — 端侧多模态标签生成（场景/活动/物体/标签/摘要）；默认打标器 Florence-2（`TaggerModelSelector.defaultKey = "florence2_base"`），Qwen3-VL-2B 为可选打标器
 - **类别到 Pass 映射**（`TagCategory.toPasses`）:
   - `FACE` → `FACE_DETECTION` + `DBSCAN`
   - `SCENE / ACTIVITY / OBJECTS / TAGS / SUMMARY` → `IMAGE_TAGGING`
@@ -340,27 +209,15 @@ override fun onCleared() {
 - **模型加载**: `TagGenerationScheduler.ensureModelLoaded()` 优先 OpenCL（用户开启且未降级），失败/warmup 超时后降级 CPU
 - **状态观察**: 通过 `TagGenerationService.sessionProgress` StateFlow 显示进度、预计剩余时间、暂停/恢复按钮
 
-**UI 结构（2026-08 v2 重设计，英文体验优先）**:
+**UI 结构（v2 重设计，英文体验优先）**:
 - 页面自上而下四个区块：`Library`（Stats 置顶：图库统计 + 语义索引覆盖）→ `Scan`（空闲时 `ScanActionCard`：状态 chip「Up to date / N pending」+ 「Scan new / Rescan all」；扫描中原进度卡 + 会话控制）→ `Stages` → `Regenerate`
-- **Stages 区块**：4 个 `StageRow`（Faces/People/Content tags/Quality scores，右侧百分比或人数 + chevron），点按弹 `StageActionSheet`（ModalBottomSheet）提供「Process new only（Recommended 徽章）/ Reprocess everything」两档——替代旧行内「增量/全量」双按钮，避免误触
+- **Stages 区块**：4 个 `StageRow`（Faces/People/Content tags/Quality scores，右侧百分比或人数 + chevron），点按弹 `StageActionSheet`（ModalBottomSheet）提供「Process new only（Recommended 徽章）/ Reprocess everything」两档
 - **全量二次确认**：选 Reprocess everything 先弹 AlertDialog 确认再下发 intent（`intentScanPass1/2/3Full`、`intentScoreAestheticFull`）
-- **Regenerate 区块**：类别/时间范围 chips + 「Overwrite existing」开关（关 = 仅补齐缺失），替代旧「模式: X」单选
-- 已删除：Pipeline overview 卡、StatsCard 底部阶段进度条、行内增量/全量按钮
-- **视觉规格对齐 Ardot 稿 `gallery/tag_control` / `gallery/tag_stage_sheet`**（两帧 2026-09-06 随 Ardot 页面整合迁至 `Organize` 页，帧名与 node id 171:273/172:113 未变）：卡片=surfaceContainer r16、瓦片/轨道/Cancel=surfaceVariant、弹层/确认框=surfaceContainerHighest、描边=outlineVariant、强调=primary（#8FD6C6）、渐变按钮/大数字=ChatBubbleTokens 品牌渐变；Stats 瓦片无图标（数值 17sp + 标签 11sp）、覆盖环为实色 primary 弧；弹层选项卡带单选圈（推荐项选中态，点卡片直接执行）+ 通栏 Cancel；自定义 44×26 TagSwitch 与 h28 chip（选中=primary 14% 底+描边）
+- **Regenerate 区块**：类别/时间范围 chips + 「Overwrite existing」开关（关 = 仅补齐缺失）
+- **视觉规格对齐 Ardot 稿 `gallery/tag_control` / `gallery/tag_stage_sheet`**（两帧已迁至 `Organize` 页，帧名与 node id 171:273/172:113 未变）：卡片=surfaceContainer r16、瓦片/轨道/Cancel=surfaceVariant、弹层/确认框=surfaceContainerHighest、描边=outlineVariant、强调=primary（#8FD6C6）、渐变按钮/大数字=ChatBubbleTokens 品牌渐变；Stats 瓦片无图标（数值 17sp + 标签 11sp）、覆盖环为实色 primary 弧；弹层选项卡带单选圈（点卡片直接执行）+ 通栏 Cancel；自定义 44×26 TagSwitch 与 h28 chip（选中=primary 14% 底+描边）
 - 文案规范：按钮/标题一律短文案（Faces、Scan new、Rescan all、Regenerate），五语（EN/zh-CN/zh-TW/ES/FR）键同步，新增键以 `tag_section_*` / `tag_stage_*` / `tag_scan_*` / `tag_overwrite_*` 前缀
 
-**代码示例**:
-```kotlin
-// 启动按类别重新生成
-context.startForegroundService(
-    TagGenerationService.intentRegenerateCategories(
-        context = context,
-        categories = listOf(TagCategory.SCENE.name, TagCategory.TAGS.name),
-        startTimeMs = System.currentTimeMillis() - 7 * 24 * 60 * 60 * 1000L,
-        fullMode = false
-    )
-)
-```
+按类别重新生成经 `TagGenerationService.intentRegenerateCategories(categories, startTimeMs, fullMode)` 以前台 Service 下发。
 
 ### 2.10 缩略图缓存策略 (LruCache)
 
@@ -370,7 +227,7 @@ context.startForegroundService(
 - **加载优先级**: 当前可见项优先加载，预加载相邻项
 - **OOM 保护**: 系统内存紧张时自动降低非可见图片质量
 - **位置记录**: 使用 `mutableStateMapOf<Long, Rect>` 记录缩略图位置，支持展开动画
-- **回收位图保护**: 搜索结果缩略图禁用 Coil crossfade，避免列表滚动时复用已回收 Bitmap 导致崩溃
+- **回收位图保护**: 搜索结果缩略图禁用 Coil crossfade（口径见 §2.5 缩略图安全）
 
 ### 2.11 无障碍语义 (Accessibility Semantics)
 
@@ -402,15 +259,15 @@ python3 scripts/ui_driver.py dump
 [android.view.View] 视频，share_xxx.mp4 clickable, bounds=(...)
 ```
 
-### 2.12 回忆 Memories（F3 独立页，2026-09-06 重设计）
+### 2.12 回忆 Memories（F3 独立页）
 
-**模块定位**: Memory 独立主页面 Pager 页（index 4，`MAIN_PAGE_MEMORY`）+ 回忆详情页（NavHost 路由 `memory_detail/{memoryId}`）；纯端侧规则生成，零推理零上传（[PRIVACY]）。原「相册首页顶部 carousel（MediaGrid header 槽）」形态已拆除（2026-09-06，`MediaGrid` 无调用方 header 参数随之删除），对标小米系统相册分区 feed。设计 spec：`docs/superpowers/specs/2026-09-06-memory-page-design.md`。
+**模块定位**: Memory 独立主页面 Pager 页（index 4，`MAIN_PAGE_MEMORY`）+ 回忆详情页（NavHost 路由 `memory_detail/{memoryId}`）；纯端侧规则生成，零推理零上传（[PRIVACY]），对标小米系统相册分区 feed；Pager 页序与路由归属口径见 `androidApp/AGENTS.md` §1.2。设计 spec：`docs/superpowers/specs/2026-09-06-memory-page-design.md`。
 
 **页面结构（`features/gallery/memories/MemoryScreen.kt`）**:
 - 顶栏：`statusBarsPadding()` 状态栏避让（edge-to-edge 防标题被状态栏压住）+ 大标题「回忆」（`memory_title`）+ 副标「端侧生成 · 私密」（`memory_privacy_note`）
 - 三分区 feed（`buildSections`）：时光（ON_THIS_DAY + RECENT_HIGHLIGHTS，`memory_section_time`）→ 旅程（CITY，`memory_section_journey`）→ 人物（PERSON，`memory_section_people`）；空分区剔除不占位，三分区全空显示整页空态 `memory_empty_page`；LazyColumn 底部 contentPadding 96.dp 预留底 bar 悬浮遮挡
 - 竖版大卡（`MemoryBigCard`）：168×224 dp 圆角 16（`MemoryPageTokens`：cardWidth/cardHeight/cardCornerRadius/cardSpacing/sectionHorizontalPadding/sectionTitleSpacing，经 `design-tokens.json` SSOT codegen 双端同步）；封面 Coil size(512) crossfade(false)（recycled bitmap 红线）；底部渐变蒙层 + 左下 17sp Bold 白字标题 + 12sp 80% 副行；`contentDescription = "title · subtitle"`；点击进详情页、长按弹隐藏确认
-- 底 bar：共享 `MainFloatingBottomBar`（2026-09-06 导航统一，五项与 Pager 页序 1:1）；本页回忆项（AutoAwesome 图标）selected 高亮（图标着色 primary，点击空操作）；其他页经 `onSwitchMainPage` → `onBarSwitchPage` → `switchMainPage(index)` 瞬时切页（目标为整理页时预选 ORGANIZE tab）
+- 底 bar：共享 `MainFloatingBottomBar`（五项与 Pager 页序 1:1，口径见 `androidApp/AGENTS.md` §1.2）；本页回忆项（AutoAwesome 图标）selected 高亮（图标着色 primary，点击空操作）；其他页经 `onSwitchMainPage` → `switchMainPage(index)` 瞬时切页（目标为整理页时预选 ORGANIZE tab）
 
 **生成规则（`domain/memories/MemoriesGenerator.kt` 纯函数，now/zoneId 注入确定性，JVM 可测）**:
 - 四类回忆：ON_THIS_DAY（与 now 同月同日的往年 ≥4 张，year < now 未来年份排除）、RECENT_HIGHLIGHTS（近 30 天已评分 ≥6 张）、PERSON（已命名非本人人物 ≥6 张，前 3）、CITY（同城 ≥6 张，前 2，仅 CITY 填 `earliestCaptureDate`/`latestCaptureDate` 供旅程日期范围）；总量截 `MAX_CAROUSEL`(10)
@@ -424,16 +281,16 @@ python3 scripts/ui_driver.py dump
 - **隐藏过滤只在展示层**：`allGenerated`（未过滤全集）为 `observeMemory(id)` 数据源，详情页直达/刷新后 id 稳定可复原（含已隐藏条目）；`memories` 为剔除隐藏后的展示集
 - 人物映射只取已命名人物（`PersonEntity.name` 非空），`NamedPerson(personId.toString(), name, isSelf)`
 
-**隐藏持久化（自 carousel 平移，逻辑不变）**:
-- 长按大卡 → 根 Box 内 `AlertDialog` 确认（`memory_hide` / `memory_hide_confirm` / `memory_hide_cancel`，文案键不变）→ `hideMemory(id)`（runCatching 包 DataStore 写入，失败置位 `hideError` 一次性标志不崩溃，`consumeHideError` 消费）
+**隐藏持久化**:
+- 长按大卡 → 根 Box 内 `AlertDialog` 确认（`memory_hide` / `memory_hide_confirm` / `memory_hide_cancel`）→ `hideMemory(id)`（runCatching 包 DataStore 写入，失败置位 `hideError` 一次性标志不崩溃，`consumeHideError` 消费）
 - `MemoryHiddenStore`（domain 接口）/ `DataStoreMemoryHiddenStore`（data/preferences 实现）：user_preferences DataStore `memory_hidden_ids` stringSet，存 Memory.id；展示集经 combine 重发自动消失
-- v1 无「重新启用」入口，隐藏确认文案不承诺恢复（`memory_hide_confirm` 2026-09-06 校准）
+- v1 无「重新启用」入口，隐藏确认文案不承诺恢复（`memory_hide_confirm`）
 
-**详情页（`MemoryDetailScreen`，2026-09-18 蒙德里安重设计）**:
+**详情页（`MemoryDetailScreen`，蒙德里安重设计）**:
 - 整页一条竖向滚动长列表（LazyColumn，头图/开关均随列表滚动不钉顶不悬浮）：AppTopBar（返回 + Memories + 右上分享图标）→ 16:9 头图（宽撑满、高 = 屏宽×9/16，Coil size(1080) crossfade(false)，底部渐变蒙层 + 左下 20sp Bold 白字标题 + 13sp 副行：`memory_items_count`(hitCount) · 分类型后缀——ON_THIS_DAY/RECENT_HIGHLIGHTS 接 `memorySubtitle`、CITY 接 `cityDateRange`、PERSON 不接）→ 元信息行（左 = 精选/全部胶囊分段开关，右 = `memory_items_count`(displayUris.size) 计数）→ 蒙德里安拼贴网格（五种卡块：2×2 大卡左/右、2×1 横幅左/右、三方卡行；单元 = (屏宽-32-8)/3，间距 4，r8；大卡/横幅 Coil size(720)、方卡 size(360)，`memory_photo_cd` 无障碍序号跨卡块连续）
 - **拼贴洗牌（`domain/memories/MemoryMosaic.kt` 纯函数，JVM 可测）**：seed = FNV-1a 32bit(memory.id) → xorshift32 逐块等概率抽取五种卡块，与上一块同向（左/右）重抽至多 3 次仍冲突取方卡行；大卡块耗 3 项、横幅 2 项；尾行剩余 ≤3 一律方卡行补齐；同 id 同 URI 集输出恒定，媒体增删序列自然顺延不承诺稳定
-- **图片预览（2026-09-06 补齐）**：封面与网格照片点击打开全屏 `MediaPager` overlay（同 Gallery/Chat 宿主范式，非路由；页面根为单 Box 承载 Column + 预览层）；`Memory` 只存 uri，经 `MemoriesViewModel.assetsByUri`（uri → MediaAsset 全库索引，`MediaEntity.toMediaAsset()` 完整映射）反查，按 uri 定位初始页，未解析项剔除；预览内删除/OCR/跳编辑器/证件照经 Activity 级 `MediaViewModel` 与导航回调（`memoryDetailRoute` 注入），删除授权（API 29 / API 30+ createDeleteRequest launcher）写法同 ChatScreen；删除后预览集合随媒体库流自动收缩、删空自动收起；`BackHandler` 优先关预览再弹栈；精选/全部开关切换收起预览（索引口径已变）
-- **精选/全部分段开关**：内联于网格区顶部元信息行（`memory_detail_best` / `memory_detail_all`，2026-09-18 起废弃底部悬浮），`showAll` 按 `remember(memory?.id)` 切回忆时重置回精选；`displayUris = showAll ? allItemUris : itemUris`；分段项带 `role = Button` + `selected` 语义
+- **图片预览**：封面与网格照片点击打开全屏 `MediaPager` overlay（同 Gallery/Chat 宿主范式，非路由；页面根为单 Box 承载 Column + 预览层）；`Memory` 只存 uri，经 `MemoriesViewModel.assetsByUri`（uri → MediaAsset 全库索引）反查定位初始页，未解析项剔除；预览内删除/OCR/跳编辑器/证件照经 Activity 级 `MediaViewModel` 与导航回调（删除授权写法同 ChatScreen）；删除后预览集合随媒体库流自动收缩、删空自动收起；`BackHandler` 优先关预览再弹栈；精选/全部开关切换收起预览（索引口径已变）
+- **精选/全部分段开关**：内联于网格区顶部元信息行（`memory_detail_best` / `memory_detail_all`），`showAll` 按 `remember(memory?.id)` 切回忆时重置回精选；`displayUris = showAll ? allItemUris : itemUris`；分段项带 `role = Button` + `selected` 语义
 - **分享集合跟随开关**：分享图标按当前 `displayUris` 发 `ACTION_SEND_MULTIPLE` + `FLAG_GRANT_READ_URI_PERMISSION`（写法同 `GalleryUtils.shareMediaAssets`）
 - MainActivity 路由内 collect `observeMemory(id)`（未过滤全集 Flow，列表刷新不 stale、冷恢复随流复原不闪空态）；id 失效（媒体清空等）→ `memory_detail_empty` 空态
 

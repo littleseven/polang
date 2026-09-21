@@ -13,7 +13,7 @@
 
 > **2026-08-16 产品决策：相机线冻结 + 聚焦对话式相册管理与后处理智能编辑**：拍照线在**双端相机页 UI 一致性问题收敛**（差异清零或登记为平台差异）后**冻结**，对齐视频线待遇——代码保留不删、不新增功能、冻结后不再投入双端 parity 打磨。相机对系统保留两项职责：**自研实时渲染引擎（帧同步/EGL/实时管线）的试验场**、**编辑流的内容采集入口**（拍照后自动进编辑）。产品方向聚焦 **Chat 式相册管理与搜索 + 图片后处理智能编辑**；效果型能力（智能消除/AI 优化等）不与大厂计算摄影正面军备赛，差异化锚定**对话式 Agent + 事实记忆/人物图谱 + 端侧隐私**。G5 相机功能深化（录像/十字星接脸/MAKEUP·风格滤镜接线/语音入口）不再投入。
 
-> **2026-08-19 产品决策：语音能力进一步降级为「默认关闭的实验能力」**：① 相机页右下两个悬浮入口（语音控制钮 + AI 对话钮）**均默认隐藏**，设置页保留开关（语音控制入口 / 相机页 AI 助手入口，默认关）；② Chat 页与 Agent 共享面板输入框的**语音按钮/语音输入态默认不显示**，由「设置 → 沙盒与权限 → 语音控制」的语音模式开关门控（默认 DISABLED，非 DISABLED 时才出现语音入口）；③ 模型中心语音模型（ASR/KWS）**全部归入「推荐」**，「必须」仅保留相册打标/人脸/翻译等核心模型。语音链路代码保留不删，定位与相机线一致的「可解冻实验能力」。
+> **2026-08-19 产品决策：语音能力进一步降级为「默认关闭的实验能力」**：① 相机页右下两个悬浮入口（语音控制钮 + AI 对话钮）**均默认隐藏**，设置页保留开关（语音控制入口 / 相机页 AI 助手入口，默认关）；② Chat 页与 Agent 共享面板输入框的**语音按钮/语音输入态默认关闭**（设置页语音模式开关默认 DISABLED；2026-09-20 产品定性「无语音输入需求」，VoiceButton 已从设计稿移除，Android 代码中按钮仍由开关门控保留，iOS 不实现）；③ 模型中心语音模型（ASR/KWS）**全部归入「推荐」**，「必须」仅保留相册打标/人脸/翻译等核心模型。语音链路代码保留不删，定位与相机线一致的「可解冻实验能力」。
 
 PoLang 不是面向市场的商业化产品，而是一个技术探索实验场。我们的核心命题是：**当端侧 AI Agent 成为应用的中枢神经系统时，传统的 App 架构和交互范式将如何演进？**
 
@@ -111,7 +111,7 @@ PoLang 的实验目标是探索**右侧范式的工程可行性**。
 - **人物命名 / "我"标记**：为人脸聚类命名，全局唯一"我"标记（`PersonRepository`）
 - **人物页（主页面 Pager 页 3）**：`PersonScreen` 封面网格（coverMediaId 整图 + `faceFocusY` 人脸感知纵向对齐，含人脸不砍头），点封面直接改名/标关系/标"我"；相册悬浮 Tab「人物」或横滑直达；AI 记忆页专注事实记忆，人物关系编辑迁入人物页重命名对话框
 - **人物封面美学选择**：NIMA 美学评分 + eDifFIQA 人脸质量分加权（NNAPI 加速），自动选最佳封面写入 `PersonEntity.coverMediaId`
-- **人物关系图谱**：声明「subject 是我的 predicate」（配偶/子女/父母/兄弟姐妹/祖辈/孙辈/其他亲属），幂等覆盖、级联删除（`person_relations` 表，AppDatabase v13）
+- **人物关系图谱**：声明「subject 是我的 predicate」（配偶/子女/父母/兄弟姐妹/祖辈/孙辈/其他亲属），幂等覆盖、级联删除（`person_relations` 表，AppDatabase v23）
 - **亲属称谓词表**：中文称谓 ↔ 关系谓词映射（`KinshipLexicon`），查询侧与声明侧共用
 - **自然语言人物检索**：支撑「我女儿的照片」「老婆的合照」式查询，由称谓词表 → 关系图谱 → 人脸簇解析
 - 数据层不依赖领域枚举，DAO 存枚举名、Repository 完成映射；关系快照支持备份导出/恢复
@@ -254,7 +254,7 @@ AgentOrchestrator (:shared commonMain)
 | **JS 沙盒脚本** | ✅ | QuickJS + JSBridge，对话内运行相册分析脚本（`run_gallery_script`） |
 | **相册摘要** | ✅ | `GetGallerySummaryUseCase` / `ChatGallerySummaryCapability` |
 | **备份 / 恢复** | ✅ | `features/backuprestore` + `domain/backup`（备份格式 v5，SAF 导出/导入入口，含标签/人物关系快照） |
-| **事实记忆 + 人物关系图谱** | ✅ 能力已注册 | `MemoryRepository` + `PersonRepository`（`memory_facts` / `person_relations`，AppDatabase v13）已注册进 main（MemoryCapability/PersonRelationCapability），体验完善中 |
+| **事实记忆 + 人物关系图谱** | ✅ 能力已注册 | `MemoryRepository` + `PersonRepository`（`memory_facts` / `person_relations`，AppDatabase v23）已注册进 main（MemoryCapability/PersonRelationCapability），体验完善中 |
 | 复杂意图理解 | ⚠️ | 多参数同时调节依赖远程 LLM 或规则模板；端侧仅胜任单参数明确指令 |
 | 上下文推理 | ⚠️ | 基于对话历史的隐式引用（"再亮一点"）准确率有限，需规则兜底 |
 | 语音控制 | ✅ 默认关闭 | 2026-08-19 降级为实验能力：语音模式默认 DISABLED，入口全部默认隐藏，设置中显式开启后可用 Push-to-Talk / WakeWord |
@@ -317,7 +317,7 @@ PoLang 以技术探索与能力验证为核心目标，**聚焦 Gallery/Editor +
 | **相册摘要** | ✅ 已落地 | P1 | `GetGallerySummaryUseCase` / `ChatGallerySummaryCapability` |
 | **标签扫描（对话触发）** | ✅ 已落地 | P1 | Florence-2 / Qwen3-VL-2B 3-Pass，`ChatStartTagScanCapability` |
 | **JS 沙盒脚本** | ✅ 已落地 | P2 | QuickJS + JSBridge，`run_gallery_script` 运行相册分析脚本 |
-| **语音输入** | ✅ 默认关闭 | P2 | 2026-08-19 降级：语音按钮默认不显示，语音模式开关（默认 DISABLED）开启后可用 Push-to-Talk / WakeWord |
+| **语音输入** | ✅ 默认关闭 | P2 | 2026-09-20 产品定性「无语音输入需求」：VoiceButton 已从设计稿移除；Android 代码中输入框语音按钮仍由语音模式开关门控（默认 DISABLED，即入口默认关闭），语音链路（ASR/KWS）与设置页开关保留为实验能力；iOS 不实现 |
 | **快捷入口栏** | ❌ 已取消 | 聊天页不再提供底部快捷入口栏，统一从相册首页进入 |
 
 **演进路线**：
@@ -489,7 +489,6 @@ GPU 管线性能优化（P2）→ 1080p@30fps 不丢帧
 | `docs/01-PRODUCT/NFR_SPEC.md` | 非功能性需求规格（性能/稳定性量化指标） |
 | `docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md` | Agent 架构详细设计 |
 | `docs/02-ARCHITECTURE/ADR/ADR-007-natural-language-photo-search.md` | 自然语言相册搜索架构决策 |
-| `docs/03-TECHNICAL-SPECS/CHAT_UI_UNIFICATION.md` | Chat UI 统一化技术规格 |
 | `docs/03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md` | 大美丽引擎技术规范（含帧同步美妆、容灾降级） |
 | `docs/03-TECHNICAL-SPECS/AI_OPTIMIZATION.md` | AI 一键图片优化方案与参数标准 |
 | `docs/03-TECHNICAL-SPECS/TAG_GENERATION.md` | 相册自动 TAG 生成（Florence-2 / Qwen3-VL-2B 3-Pass） |

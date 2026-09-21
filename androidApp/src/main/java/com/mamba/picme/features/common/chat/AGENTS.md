@@ -34,8 +34,8 @@
 │      - 命令执行卡片          │
 │                             │
 ├─────────────────────────────┤
-│  ModelSelector + InputBar   │
-│  [远程模型 ▼] [输入框] [发送]│
+│  ChatInputArea               │
+│  [功能胶囊] [输入框] [发送]  │
 └─────────────────────────────┘
 ```
 
@@ -45,35 +45,36 @@
 |------|------|------|
 | **ChatScreen** | `features/chat/ChatScreen.kt` | 二级页容器，组合各子组件 |
 | **ChatViewModel** | `features/chat/ChatViewModel.kt` | 对话状态管理、消息发送 |
-| **MessageList** | `features/chat/components/MessageList.kt` | 消息列表渲染，支持多种消息类型 |
-| **ModelSelector** | `features/chat/components/ModelSelector.kt` | 输入框左侧下拉，仅远程模型（本地文本 LLM 已移除） |
-| **ChatInputBar** | `features/chat/components/ChatInputBar.kt` | 输入框 + 发送按钮 + 语音切换 |
+| **MessageList** | `features/chat/ChatScreen.kt`（内联 LazyColumn） | 消息列表渲染，支持多种消息类型 |
+| **ModelSelector** | `features/chat/components/ModelSelector.kt` | 模型切换组件；2026-08-22 起输入区不再展示模型胶囊（仅远程模型） |
+| **ChatInputArea** | `features/chat/ChatScreen.kt`（私有 Composable） | 输入框 + 功能胶囊 + 发送；语音入口为默认关闭的实验能力（见 §8） |
 | **MessageRepository** | `data/repository/MessageRepository.kt` | Room 数据库读写，对话持久化 |
 
 > 注：Chat 页暂不提供底部快捷入口或右下角展开菜单，相机/模型中心等能力统一从相册首页进入。
 
 ## 3. 模型切换实现 (Model Switching)
 
-> **2026-08 更新**：端侧文本 LLM（Qwen3.5-2B）已移除，chat 页仅保留远程模型（DeepSeek），
-> `ChatModelOption` 只剩 `Remote` 单选项，下拉不再提供本地切换。下文本地切换逻辑为历史记录。
+> **2026-08 更新**：端侧文本 LLM 已移除，chat 页仅保留远程模型（DeepSeek），
+> `ChatModelOption`（定义于 `features/chat/ChatScreen.kt`）只剩 `Remote` 单选项；
+> 2026-08-22 起输入区模型切换胶囊已移除，模型固定 Remote。下文切换逻辑为历史记录。
 
 ### 3.1 ModelSelector 组件
 
-**位置**: 输入框左侧，固定宽度 80dp
+**位置**: 原输入框左侧（2026-08-22 起输入区不再展示）
 
 **状态标识**:
 - 远程模型（DeepSeek）：蓝色圆点 `#2196F3` + 文字 "远程"
 
 **下拉选项**:
 ```kotlin
-sealed class ModelOption(val label: String, val indicatorColor: Color) {
-    data object Remote : ModelOption("远程模型", Color(0xFF2196F3))
+sealed class ChatModelOption(val labelRes: Int, val indicatorColor: Color) {
+    data object Remote : ChatModelOption(R.string.chat_model_remote, Color(0xFF2196F3))
 }
 ```
 
 **切换逻辑**（chat 仅远程，简化为单选项）:
 ```kotlin
-fun switchModel(target: ModelOption) {
+fun switchModel(target: ChatModelOption) {
     // 仅 Remote：同步远程配置到 AgentOrchestrator
     currentModel = remoteModel
     showToast("已切换至远程模型（DeepSeek）")
@@ -85,9 +86,9 @@ fun switchModel(target: ModelOption) {
 ### 3.2 默认策略
 
 ```kotlin
-fun getDefaultModel(): ModelOption {
+fun getDefaultModel(): ChatModelOption {
     // chat 页仅远程：固定 Remote
-    return ModelOption.Remote
+    return ChatModelOption.Remote
 }
 ```
 
@@ -206,8 +207,12 @@ ChatScreen(
 
 ## 8. 语音输入集成
 
+> **2026-08-19 更新**：语音能力已降级为**默认关闭的实验能力**（未移除）。仅当设置中语音模式
+> `VoiceCommandMode ≠ DISABLED` 且本地 ASR 模型已下载就绪时，输入区才显示语音入口；
+> 入口隐藏时不初始化 ASR 引擎，已处于语音输入态则强制回落文字模式。
+
 - **Camera/Gallery 浮动面板 (`AiChatScreen`)**：通过 `VoiceCommandCoordinator` 处理，识别结果以 `AgentMessage.UserText` 形式进入消息列表。
-- **独立 Chat 页 (`ChatScreen`)**：`ChatInputArea` 提供文字/语音模式切换。语音模式使用 `PushToTalkEngine` 直接驱动 ASR：
+- **独立 Chat 页 (`ChatScreen`)**：`ChatInputArea` 在语音入口可见时提供文字/语音模式切换。语音模式使用 `PushToTalkEngine` 直接驱动 ASR：
   - 已配置本地 Sherpa-ONNX ASR 模型且文件就绪时，使用本地识别
   - 未配置或本地模型不可用时回退到 `SystemAsrEngine`
   - 按住按钮时请求 `RECORD_AUDIO` 运行时权限，权限拒绝时提示用户
@@ -222,6 +227,8 @@ ChatScreen(
 - **日志规范**: 关键操作（消息发送、数据库读写）需记录 `PoLang:Chat` 日志
 - **内存管理**: 图片消息使用 Coil/Glide 加载，避免内存泄漏
 - **状态恢复**: 进程被杀后重启，自动恢复最近对话
+- **主题适配**: 所有颜色使用 `MaterialTheme.colorScheme`
+- **消息类型扩展**: 新增消息类型时，需同时更新 `AgentMessage` sealed class 和 `ChatBubble` 的 when 表达式
 
 ## 10. 常见陷阱检查清单 (Checklist)
 
@@ -232,7 +239,7 @@ ChatScreen(
 - [ ] 单会话消息数是否超过 1000 条限制？
 - [ ] 应用重启后对话历史是否正确恢复？
 - [ ] 快捷入口跳转后是否正确返回并插入图片消息？
-- [ ] 语音输入是否在所有页面一致可用？
+- [ ] 语音入口是否按「语音模式开关 + ASR 模型就绪」正确显隐？（语音为默认关闭的实验能力，见 §8）
 
 ## 11. 与产品文档对照 (Product Alignment)
 
@@ -248,93 +255,3 @@ ChatScreen(
 - 单会话 1000 条限制：平衡存储空间与历史完整性，后续可扩展为可配置
 - 默认远程模型：确保首次安装最佳体验
 - 图片存储在私有目录：避免暴露到公共相册，用户主动分享时才导出
-
-### 2. AgentMessage
-
-消息类型定义，支持以下类型：
-
-```kotlin
-sealed class AgentMessage {
-    data class UserText(val content: String) : AgentMessage()
-    data class AgentText(val content: String) : AgentMessage()
-    data class PlanPreview(val content: String, val plan: ExecutionPlan? = null) : AgentMessage()
-    data class PlanProgress(val content: String) : AgentMessage()
-    data class PlanResult(val content: String) : AgentMessage()
-}
-```
-
-**消息样式：**
-- **UserText**: 右侧显示，主题色背景，白色文字
-- **AgentText**: 左侧显示，深灰色半透明背景，白色文字
-- **PlanPreview**: 左侧显示，主题色文字，带确认/取消按钮
-- **PlanProgress**: 左侧显示，次要颜色文字，浅背景
-- **PlanResult**: 左侧显示，第三颜色文字，中等背景
-
-## 设计原则
-
-### 1. 显式优于隐式
-所有回调和状态都通过参数显式传递，避免隐式依赖。
-
-### 2. 枚举优于条件
-使用 sealed class 定义消息类型，确保类型安全。
-
-### 3. 自描述优于注释
-组件名称和参数名清晰表达意图，减少注释需求。
-
-### 4. 结构化可观测性
-消息类型包含完整上下文信息，便于日志记录和调试。
-
-## 与旧版对比
-
-### 旧版 (Gallery AiChatPanel)
-```kotlin
-// ❌ 简单的 Dialog 设计
-Dialog(onDismissRequest = onDismiss) {
-    Surface(...) {
-        Column(...) {
-            // Basic layout
-        }
-    }
-}
-```
-
-### 新版 (AiChatScreen)
-```kotlin
-// ✅ ModalBottomSheet + 折叠 + 动画
-ModalBottomSheet(...) {
-    AiChatScreenContent(...) {
-        // Rich features
-    }
-}
-```
-
-**改进点：**
-1. 使用 ModalBottomSheet 替代 Dialog，更好的系统集成
-2. 添加折叠/展开功能，节省屏幕空间
-3. 优雅的滑入滑出动画
-4. 拖拽把手设计，提升交互体验
-5. 支持更多消息类型（PlanPreview、PlanProgress、PlanResult）
-6. 统一的视觉风格，符合 Material Design 3
-
-## 跨模块复用
-
-所有模块都应使用此统一组件：
-
-- ✅ **Camera**: 已使用 AiChatScreen（通过 CameraAgentIntegration 绑定 CameraCapability）
-- ✅ **Gallery**: 已迁移到 AiChatScreen（通过 GalleryAgentIntegration 绑定 GalleryCapability）
-- ✅ **Settings**: 已迁移到 AiChatScreen（通过 SettingsAgentIntegration 绑定 SettingsCapability）
-
-## 语音输入集成
-
-`AiChatScreen` 支持语音输入模式切换：
-
-- **文字模式**：底部输入栏，支持键盘输入
-- **语音模式**：按住麦克风按钮说话（Push-to-Talk），或开启 WakeWord 自动监听
-
-语音输入通过 `VoiceCommandCoordinator` 处理，识别结果以 `AgentMessage.UserText` 形式进入消息列表。
-
-## 维护说明
-
-- 所有颜色使用 `MaterialTheme.colorScheme`，确保主题适配
-- 所有文案提取到 `strings.xml`，支持多语言
-- 新增消息类型时，需同时更新 `AgentMessage` sealed class 和 `ChatBubble` 的 when 表达式

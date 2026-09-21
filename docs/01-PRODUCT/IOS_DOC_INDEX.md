@@ -10,8 +10,8 @@
 
 | 文档 | 职责 |
 |---|---|
-| [`IOS_TASK_STATUS.md`](IOS_TASK_STATUS.md) | **任务看板**：done/next/won't-do + 进展指标 SSOT |
-| [`IOS_PRODUCT_REFERENCE.md`](IOS_PRODUCT_REFERENCE.md) | **产品行为契约**：逐功能 8 子节，以 Android main 代码为准 |
+| [`IOS_TASK_STATUS.md`](IOS_TASK_STATUS.md) | **缺口看板**：当前真实缺口 + 下一步任务（每项带代码/commit 证据） |
+| [`IOS_PRODUCT_REFERENCE.md`](IOS_PRODUCT_REFERENCE.md) | **产品实现参考**：逐模块现状 + 双端能力对照，以 iOS 代码为准 |
 | [`../superpowers/plans/2026-08-07-polang-kmp-ios-transformation.md`](../superpowers/plans/2026-08-07-polang-kmp-ios-transformation.md) | **Phase 路线图**：Phase 1-7 + 决策 + 风险登记 + 变更记录 |
 | [`../superpowers/plans/2026-08-10-ios-implementation-tasks.md`](../superpowers/plans/2026-08-10-ios-implementation-tasks.md) | **缺口主排序**：G1-G7 → T0-T11 Wave |
 | [`../reviews/2026-08-10-ios-android-consistency-gap.md`](../reviews/2026-08-10-ios-android-consistency-gap.md) | **5 屏 code 级差异审计**（最新；相机项已完成） |
@@ -36,9 +36,11 @@
 
 ---
 
-## §3 真实状态快照（详见看板 §1-§2）
+## §3 真实状态快照（2026-09-20 校准，详见看板与产品参考）
 
-- **Phase 1-5 ✅**；**Phase 6 = 主战场**（功能对齐与发布准备）。
-- **TAG**：3-Pass 全通并合入 main ✅（`b78d7081`）；🔴 **聚类质量阻塞**（MNN3.5 Apple bug 致聚类塌陷，分支 `feat/ios-106-to-5-embedding` 修复中）；MetalGuardian/后台 ❌。
-- **相机对齐 ✅**（已合并 main）；**Chat 6.2 ✅**；**设置 6.3 🔄**（剩合规/隐私政策/账号）；**server 6.4 ✅**。
-- **代码** ~12800 行 Swift；**i18n** main 全量键 × 五语（en / zh-Hans / zh-Hant / es / fr）。
+- **代码规模**：iosApp 185 文件 / 41808 行 Swift + 5 Metal shader；shared iosMain 28 文件 / 2507 行；测试 58 文件 / 8494 行。
+- **主界面**：5 页 Pager（相册/整理+扫描/Chat/人物/回忆），2026-09-16 已对齐 Android 主导航。
+- **模块**：相册/整理/Chat/人物/回忆/证件照/扫描/搜索已落地 ✅；设置（备份恢复占位）、编辑器（去背景未接线）🔄；端侧 VLM 打标 = stub ❌。
+- **相机**：✅ 已对齐，2026-08-16 起冻结（代码保留不加新功能）。
+- **聚类**：MNN3.5 Apple bug 已经 ONNX Runtime embedder（`ORTFaceEmbedder.swift`）规避并合入 main，真机终验观察中。
+- **i18n**：`Localizable.xcstrings` 767 键 × 五语（en / zh-Hans / zh-Hant / es / fr）。

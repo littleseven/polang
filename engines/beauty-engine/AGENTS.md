@@ -125,16 +125,9 @@ engines/beauty-engine/src/main/java/com/mamba/picme/beauty/
 - 初始化异常应通过抛出异常或状态查询供 App 层触发兜底。详见 `docs/03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md`
 
 #### PhotoProcessor（拍照 GPU 化接口，2026-05 新增）
-- **定位**：拍照后处理的统一入口，将 Bitmap 通过 GPU 离屏渲染处理，复用预览同一套 Shader 管线
-- **核心方法**：`process(bitmap: Bitmap, params: BeautyParams, faceData: FaceData?): Bitmap`
-- **实现路径**：
-  1. 创建独立 EGL 上下文（可与预览上下文共享纹理）
-  2. Bitmap → `GL_TEXTURE_2D`（通过 `texImage2D`）
-  3. 复用 `BeautyRenderer` 多 Pass 管线（CopyPass → BeautyUnitPass → FaceMakeupPass → MainShader）
-  4. 渲染到 FBO，通过 `glReadPixels` 或 PBO 读取为 Bitmap
-  5. 释放临时资源，返回处理后的 Bitmap
-- **降级策略**：GPU 路径失败时（EGL 创建失败、OOM、Shader 编译失败），抛出异常由调用方回退到 CPU 路径
-- **性能目标**：1080p < 300ms, 4K < 800ms
+- **定位**：拍照后处理统一入口，`process(bitmap: Bitmap, params: BeautyParams, faceData: FaceData?): Bitmap` 经 GPU 离屏渲染复用预览同一套 Shader 管线
+- **降级策略**：GPU 路径失败（EGL 创建失败、OOM、Shader 编译失败）抛出异常，由调用方回退 CPU 路径；**性能目标**：1080p < 300ms，4K < 800ms
+- 实现路径与多 Pass 数据流规范见 §2.4，检查项见 §4.6
 
 #### 未来接口扩展（ML Kit 增强）
 - **FaceWarpParams 增强**：Phase 2 引入 `faceMeshPoints: List<Offset>` 字段，支持 468 点密集网格驱动精细美型和妆容贴合。
@@ -215,22 +208,9 @@ engines/beauty-engine/src/main/java/com/mamba/picme/beauty/
 - **纹理类型**：相机输入使用 `GL_TEXTURE_EXTERNAL_OES`，调试 Shader 使用普通 `GL_TEXTURE_2D`
 - **调试 Shader**：`FRAGMENT_SHADER_DEBUG_RED`（全红）、`FRAGMENT_SHADER_DEBUG_TEXTURE_R`（R 通道灰度）供渲染链路验证使用
 
-**GPU 加速策略**：
-- **优先使用 GPU**：所有图像处理方法必须使用 GPU 加速 (OpenGL ES / OpenCL)
-- **内存管理**：避免频繁的 CPU-GPU 数据传输，使用 FBO (Framebuffer Object)
-- **延迟控制**：单帧处理时间 < 16ms (60fps) 或 < 33ms (30fps)
+**GPU 加速策略**：所有图像处理必须 GPU 加速（OpenGL ES / OpenCL），避免频繁 CPU-GPU 数据传输（使用 FBO）；单帧耗时指标见 §1 [PERF] 约定
 
-**拍照 GPU 化实现规范（2026-05 新增）**：
-- **输入处理**：Bitmap 通过 `GLUtils.texImage2D()` 上传到 `GL_TEXTURE_2D`，相机预览使用 `GL_TEXTURE_EXTERNAL_OES`
-- **Shader 复用**：`BeautyRenderer` 必须支持 2D 纹理输入模式（已有 `shaderProgram2D`），拍照时切换输入纹理类型
-- **多 Pass 管线复用**：
-  - Pass 0: CopyPass — Bitmap 2D纹理 → FBO
-  - Pass 1: BeautyUnitPass — 磨皮/美白/LUT（如果启用）
-  - Pass 2: FaceMakeupPass — 唇色/腮红三角网格（如果启用且有人脸数据）
-  - Pass 3: MainShader — 美型（瘦脸/大眼）+ 调色 + 风格特效
-- **输出读取**：使用 PBO（Pixel Buffer Object）双缓冲异步读取，减少 `glReadPixels` 阻塞
-- **资源隔离**：拍照 EGL 上下文独立创建，不与预览上下文共享，避免互相干扰；但可通过共享上下文机制共享已编译的 Shader Program
-- **尺寸限制**：最大纹理尺寸检查（`GL_MAX_TEXTURE_SIZE`），超大图（> 4096）考虑分块处理或限制分辨率
+**拍照 GPU 化**：渲染层要点为 Bitmap 经 `GLUtils.texImage2D()` 上传 `GL_TEXTURE_2D`、`BeautyRenderer` 支持 2D 纹理输入模式（`shaderProgram2D`）；完整实现规范与多 Pass 数据流见 §2.4
 
 #### EGLCore / WindowSurface
 - `EGLCore` 负责：Display 连接、配置选择、上下文创建、Surface 创建与切换
@@ -238,7 +218,7 @@ engines/beauty-engine/src/main/java/com/mamba/picme/beauty/
 - `WindowSurface` 封装 EGL Surface 与 `swapBuffers()` 调用
 - 释放顺序：先释放 Surface，再释放 Context，最后终止 Display
 
-#### 2.4 拍照 GPU 化数据流（2026-05 新增）
+### 2.4 拍照 GPU 化数据流（2026-05 新增）
 
 ```
 CameraX ImageCapture
@@ -265,7 +245,7 @@ PhotoProcessor.process()
 - PBO 双缓冲优化读取性能
 - GPU 路径失败时自动回退 CPU 路径（调用方处理）
 
-#### 2.5 零拷贝数据流
+### 2.5 零拷贝数据流
 
 #### 大美丽 (BIG_BEAUTY) 路径
 
@@ -286,7 +266,7 @@ SurfaceView Surface
 - ❌ 禁止多次纹理上传/下载
 - ✅ 全流程在 GPU 内完成
 
-### 2.5 性能监控与告警
+### 2.6 性能监控与告警
 
 ```kotlin
 // 渲染线程内每秒聚合
@@ -382,24 +362,16 @@ if (fps < 25 || processingMs > 20) {
 - [ ] 零拷贝路径失败时是否有 Bitmap 降级路径保底？
 
 ### 4.6 拍照 GPU 化检查清单（2026-05 新增）
-- [ ] `PhotoProcessor` 接口是否已添加到 `api/` 包？
-- [ ] `PhotoProcessorImpl` 是否创建独立 EGL 上下文，不与预览上下文冲突？
-- [ ] Bitmap 上传是否使用 `GL_TEXTURE_2D` 而非 `GL_TEXTURE_EXTERNAL_OES`？
-- [ ] `BeautyRenderer` 是否支持 2D 纹理输入模式？
-- [ ] 多 Pass 管线是否正确复用（CopyPass → BeautyUnitPass → FaceMakeupPass → MainShader）？
-- [ ] FBO 输出是否通过 PBO 双缓冲异步读取？
-- [ ] GPU 路径失败时是否抛出明确异常供调用方回退 CPU 路径？
-- [ ] 资源释放是否完整（FBO、Texture、EGL Context、PBO）？
-- [ ] 大尺寸图片是否做纹理尺寸检查（`GL_MAX_TEXTURE_SIZE`）？
-- [ ] 处理耗时是否满足 1080p < 300ms, 4K < 800ms 目标？
+- [ ] `PhotoProcessorImpl` 是否创建独立 EGL 上下文且 Bitmap 走 `GL_TEXTURE_2D`（非 OES），`BeautyRenderer` 使用 2D 输入模式？
+- [ ] 多 Pass 管线复用顺序（CopyPass → BeautyUnitPass → FaceMakeupPass → MainShader）与 PBO 双缓冲异步读取是否符合 §2.4？
+- [ ] GPU 路径失败是否抛出明确异常供调用方回退 CPU？资源释放是否完整（FBO、Texture、EGL Context、PBO）？
+- [ ] 大尺寸图片是否做 `GL_MAX_TEXTURE_SIZE` 检查？耗时是否满足 1080p < 300ms、4K < 800ms 目标？
 
 ### 4.7 代码风格
-- [ ] 日志是否使用了 `PoLang:BeautyEngine` 标签？
-- [ ] 是否避免了通配符导入？
-- [ ] Lambda 参数是否显式命名？
+- [ ] 是否符合 §3.1 编码规范（日志标签 `PoLang:BeautyEngine`、无通配符导入、Lambda 显式命名）？
 - [ ] Shader 源码是否集中管理并带有性能注释？
 
-### 4.7 风格特效 Shader 规范
+### 4.8 风格特效 Shader 规范
 
 #### 自研风格特效（2026-05 实现）
 
@@ -448,86 +420,21 @@ if (fps < 25 || processingMs > 20) {
 - 磨皮使用双边滤波快速近似（5×5 采样核）而非盒式模糊：保边效果更自然，移动端单帧耗时可接受（早期文档"盒式模糊"描述已纠正）。后续评估引导滤波（O(N) 无序复杂度）作为 Phase 2 升级方向
 - 基础美颜通过模块化 Shader 管线处理；妆容纹理通过 `FaceMakeupPass` 独立 Pass 处理，在效果与实时性间平衡
 - `api/` 纯 Kotlin 接口层 + `:engines:beauty-api` 独立模块：为后续独立发布 AAR/Maven 做准备
-- 帧同步系统（2026-05）：解决人脸检测 ~10fps 与渲染 30~60fps 不同步导致的妆容滞后问题
+- 帧同步系统（2026-05）：解决人脸检测 ~10fps 与渲染 30~60fps 不同步导致的妆容滞后问题（详见 §6）
 
 ---
 
-## 6. 帧同步系统规范（Frame-Sync Makeup System，2026-05）— 解决妆容甩飞
+## 6. 帧同步系统（Frame-Sync Makeup，2026-05）— 解决妆容甩飞
 
-### 5.1 架构定位
-帧同步是 beauty-engine 的**横切能力**，核心目标是**解决妆容甩飞问题**（妆容粘屏幕不跟脸、悬空残留、录制跳变）。沉淀在 `internal/framesync/` 包下：
-- `:engines:beauty-api` 提供 `FrameId`、`FrameSyncConfig`、`FrameSyncResult` 数据契约（跨模块共享）
-- `internal/framesync/` 实现时序对齐核心（`FrameSyncBridge`、`FrameSyncManager`、`MotionTracker`），不侵入 `render/` 具体 Pass
-- `FaceMakeupPass` 只消费同步后的顶点数据，不关心同步逻辑
-- **录制场景强制启用**：视频录制必须复用预览同一套帧同步逻辑，确保录制帧与预览帧行为一致
-- **当前实现状态**：核心 `FrameSyncManager` + `MotionTracker` + `FrameSyncBridge` 已落地。`DetectionQueue` / `FaceDetectionWorker` 为设计期概念，当前人脸检测走同步路径（`FaceDetectionProvider`），未来可能引入异步队列优化吞吐。
-
-### 5.2 核心组件
-
-| 组件 | 职责 | 线程 | 状态 |
-|------|------|------|------|
-| `FrameId` | 单调递增全局帧标识符 | 任意（AtomicLong） | ✅ 已落地（`:engines:beauty-api`） |
-| `FrameSyncConfig` | 帧同步配置参数 | — | ✅ 已落地（`:engines:beauty-api`） |
-| `FrameSyncResult` | 帧同步查询结果 | — | ✅ 已落地（`:engines:beauty-api`） |
-| `FrameSyncBridge` | 线程安全共享分析线程的最新 FrameId 给渲染线程 | 分析线程写 / 渲染线程读 | ✅ 已落地 |
-| `FrameSyncManager` | 时序对齐：精确匹配 → 历史回退 → 预测补偿 → 缺失隐藏 | 渲染线程读 / 检测线程写 | ✅ 已落地 |
-| `MotionTracker` | 速度外推预测算法，保留 3 帧历史 | 渲染线程读 / 检测线程写 | ✅ 已落地 |
-| `DetectionQueue` | 带 FrameId 的检测任务队列（设计期概念） | — | 🔄 未实现 |
-| `FaceDetectionWorker` | 异步人脸检测工作线程（设计期概念） | — | 🔄 未实现 |
-
-### 5.3 FrameId 传递机制（当前实现）
-```
-CameraFrameAnalyzer（分析线程）
-    ↓ FrameId.next()
-    ├── FrameSyncBridge.setLatestFrameId(frameId) ──→ 渲染线程读取
-    └── faceDetector.detect() 同步检测 ─────────────→ FrameSyncManager.storeResult()
-
-CameraPreviewRenderer（渲染线程）
-    ↓ FrameSyncBridge.getLatestFrameId()
-    └── FrameSyncManager.query(frameId) → applySyncResultToRenderer()
-
-录制链路（MediaRecorder / Codec）
-    ↓ 复用同一 CameraPreviewRenderer 渲染循环
-    └── 同一 FrameSyncManager.query(frameId) 结果 → 录制 Surface
-```
-
-**关键约束**：
-- 分析线程和渲染线程**共用同一套 FrameId 序列**，通过 `FrameSyncBridge` 共享
-- 当前版本使用同步检测路径，检测结果直接存入 `FrameSyncManager`
-- **`FrameSyncBridge` 在 `CameraPreviewRenderer.release()` 时调用 `reset()` 清理**
-- **录制链路必须复用同一 `FrameSyncManager` 实例**，禁止录制时单独创建新的帧同步上下文（防止预览和录制行为不一致）
-
-### 5.4 同步模式
-
-| 模式 | 行为 | 适用场景 |
-|------|------|----------|
-| `STRICT` | 精确匹配；超过缺失阈值隐藏妆容 | 默认，追求精确对齐 |
-| `SMOOTH` | 精确匹配；无匹配时历史回退+预测补偿 | 快移场景，追求平滑 |
-| `OFF` | 关闭帧同步，恢复原有双缓冲插值 | 对比测试 / 降级 |
-
-### 5.5 性能约束
-- `MotionTracker.predict()` 内部复用预分配缓冲区，避免每帧 GC（CR-P1-1）
-- `CameraPreviewRenderer.applySyncResultToRenderer()` 复用 `syncMappedBuffer`，避免每帧 new FloatArray
-
-### 5.6 资源生命周期
-- `CameraPreviewRenderer.release()` 必须调用：
-  1. `frameSyncManager.clear()` — 清空历史检测结果
-  2. `FrameSyncBridge.reset()` — 重置共享 FrameId
-
-### 5.7 检查清单
-- [ ] `FrameSyncBridge.setLatestFrameId()` 在每次分析帧检测前调用
-- [ ] 检测结果调用 `FrameSyncManager.storeResult()`
-- [ ] `CameraPreviewRenderer` 使用 `FrameSyncBridge.getLatestFrameId()` 而非 `FrameId.next()`
-- [ ] `release()` 时清理 `FrameSyncManager` + `FrameSyncBridge`
-- [ ] `FaceMakeupPass.updateFaceLandmarksSynced()` 输入为 UV [0,1]，内部转 NDC [-1,1]
-- [ ] `FrameSyncManager.updateConfig()` 能真正生效（config 为 var）
-- [ ] **录制场景复用同一 `FrameSyncManager` 实例，预览与录制帧同步行为一致**
-- [ ] **人脸出画后 `uHasFace` 在 N 帧内置 0，妆容 Pass 跳过，无悬空残留**
-- [ ] **快转头场景（>90°/s）录制视频逐帧分析，妆容偏差 < 16px @1080p（P0），< 8px（P1）**
+- **目标**：消除人脸检测 ~10fps 与渲染 30~60fps 不同步导致的妆容甩飞（粘屏、悬空残留、录制跳变）；**录制链路必须复用同一 `FrameSyncManager` 实例**，禁止录制时单独创建帧同步上下文
+- **分层**：契约（`FrameId`/`FrameSyncConfig`/`FrameSyncResult`）在 `:engines:beauty-api`；实现（`FrameSyncBridge`/`FrameSyncManager`/`MotionTracker`）在 `internal/framesync/`，不侵入 `render/` 具体 Pass；`FaceMakeupPass` 只消费同步后的顶点数据
+- **当前实现**：走同步检测路径（`FaceDetectionProvider`），检测结果直接存入 `FrameSyncManager`；`DetectionQueue`/`FaceDetectionWorker` 为设计期概念，未实现
+- **生命周期**：`CameraPreviewRenderer.release()` 必须调用 `frameSyncManager.clear()` + `FrameSyncBridge.reset()`
+- 完整架构、FrameId 传递机制、同步模式（STRICT/SMOOTH/OFF）、性能约束与检查清单见 `docs/03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md`「10. 帧同步美妆系统」
 
 ---
 
-## 6. 相关文档与实现入口
+## 7. 相关文档与实现入口
 
 - `PRODUCT.md` - 产品需求规格说明书（大美丽 产品策略）
 - `docs/01-PRODUCT/FEATURES.md` - 功能交互规范

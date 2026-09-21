@@ -13,6 +13,7 @@
 | **性能红线** | [`01-PRODUCT/NFR_SPEC.md`](./01-PRODUCT/NFR_SPEC.md) | 性能/稳定性/隐私量化指标 |
 | **Agent 架构** | [`02-ARCHITECTURE/AGENT_ARCHITECTURE.md`](./02-ARCHITECTURE/AGENT_ARCHITECTURE.md) | Agent 运行时架构、本地/远程推理 |
 | **模块架构** | [`02-ARCHITECTURE/MODULE_ARCHITECTURE.md`](./02-ARCHITECTURE/MODULE_ARCHITECTURE.md) | Gradle 模块划分与依赖关系 |
+| **C4 系统模型** | [`02-ARCHITECTURE/c4/polang-system.summary.md`](./02-ARCHITECTURE/c4/polang-system.summary.md) | 代码反向建模的当前架构（Structurizr DSL + 证据索引，2026-09-19 生成） |
 | **架构决策** | [`02-ARCHITECTURE/ADR/README.md`](./02-ARCHITECTURE/ADR/README.md) | ADR 索引（现役 9 篇：001/002/003/005/007/008/011/012/013；历史篇 004/006/009/010 已于 2026-08-23 清理） |
 | **能力注册** | [`04-AGENT-CAPABILITIES/CAPABILITY_REGISTRY.md`](./04-AGENT-CAPABILITIES/CAPABILITY_REGISTRY.md) | Capability 列表、命令映射、实现指南 |
 | **命令参考** | [`04-AGENT-CAPABILITIES/COMMAND_REFERENCE.md`](./04-AGENT-CAPABILITIES/COMMAND_REFERENCE.md) | 命令语法与示例 |
@@ -40,7 +41,6 @@
 | [`FACE_DETECTION_ENGINE_ARCHITECTURE.md`](./03-TECHNICAL-SPECS/FACE_DETECTION_ENGINE_ARCHITECTURE.md) | 人脸检测引擎架构 |
 | [`FACE_LANDMARKS.md`](./03-TECHNICAL-SPECS/FACE_LANDMARKS.md) | MediaPipe 468 / 火山 106 点参考与映射 |
 | [`IM_REMOTE_CONTROL_TECH_SPEC.md`](./03-TECHNICAL-SPECS/IM_REMOTE_CONTROL_TECH_SPEC.md) | IM（飞书）远程控制（实验性） |
-| [`CHAT_UI_UNIFICATION.md`](./03-TECHNICAL-SPECS/CHAT_UI_UNIFICATION.md) | Chat UI 统一化改造 |
 | [`JS_ENGINE_TECH_SPEC.md`](./03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md) | JS 沙盒引擎（QuickJS + JSBridge，对话内运行相册分析脚本） |
 | [`DESIGN_TOKENS_SPEC.md`](./03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md) | Design Token SSOT（codegen 双端镜像 + CI 门禁 + Ardot 预览层） |
 | [`IOS_ANDROID_UI_PARITY.md`](./03-TECHNICAL-SPECS/IOS_ANDROID_UI_PARITY.md) | 双端 UI 对齐方法论（度量体系 / 系统栏 / 无障碍 / 深色 / 动效 / 验证闭环） |

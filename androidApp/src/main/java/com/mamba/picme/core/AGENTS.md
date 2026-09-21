@@ -28,9 +28,11 @@
   - 浅色模式：对应调整明度，保持对比度符合 WCAG 标准
 - **毛玻璃效果**：通过 `Modifier.blur(20.dp)`配合半透明白色背景，圆角统一为 28dp
 
-**通用组件库**：
-- **BlurCard 组件**：统一卡片样式，圆角 24dp，支持阴影高度可调，背景色使用 surface.copy(alpha = 0.8f)
-- **FluidButton 组件**：带按压缩放反馈的按钮，按下时缩放至 0.95，使用 spring 动画（stiffness: Medium）
+**通用组件约定**：
+- 卡片样式统一圆角 24dp、背景 `surface.copy(alpha = 0.8f)`、阴影高度可调
+- 可点击交互带按压缩放反馈（spring 动画）
+
+> 注：早期文档提到的 `BlurCard`/`FluidButton` 具名组件未落地为独立 Composable，以上为样式约定而非组件 API。
 
 ### 2.2 图像处理核心
 

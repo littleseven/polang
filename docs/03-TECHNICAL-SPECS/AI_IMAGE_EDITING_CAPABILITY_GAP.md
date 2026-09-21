@@ -13,7 +13,7 @@
 经全链路排查，PoLang 当前的「AI 修图」本质上**不是 AI 在改图，而是 LLM 在遥控一个参数化的 GPU shader 引擎**：
 
 - **像素来源只有两处**：① GLSL 数学运算（双边模糊 / 色调曲线 / LUT / 网格变形）；② 一个 2021 水平的抠图模型（MODNet，无精修）。
-- **整个"生成式 / 修复式像素能力"缺失**：无超分、无 AI 降噪、无人脸修复、无 inpainting（连桩都没有），"智能消除"目前返回"开发中"文案。
+- **整个"生成式 / 修复式像素能力"缺失**：无超分、无 AI 降噪、无人脸修复、无 inpainting（连桩都没有），"智能消除"经 `[unsupported:erase]` 协议显式拒绝（LLM 在 explanation 返回该标记，端侧映射为不支持文案）。
 - 视觉模型仅 Qwen3-VL-2B + Florence-2（理解 / 打标）+ MobileCLIP（语义）——**全是"看懂图"，没有"画图"**。
 
 这是**能力品类的缺失**，不是工程质量问题：架构干净、隐私守得死（媒体处理 100% 端侧）、抽卡闭环 + 退化守卫设计有想法。
@@ -36,7 +36,7 @@
 | 能力 | 状态 | 机制 |
 |---|---|---|
 | 磨皮 / 美白 / 瘦脸 / 调色 / 滤镜 / 风格 | ✅ 全参数化 | GPU beauty/filter shader；多轮 delta 累积 |
-| **智能消除** | ❌ 死路 | 返回 `"智能消除正在开发中"` 文案；无 inpainting / LaMa / SD 后端 |
+| **智能消除** | ❌ 死路 | LLM 经 `[unsupported:erase]` 协议显式拒绝（`ChatToolService.edit_image` explanation 标记 → `chat_edit_unsupported_erase` 文案）；无 inpainting / LaMa / SD 后端 |
 | **会话换背景** | ❌ 不可达 | `MattingEngine` 只接手动编辑器，且仅抠图 + 纯色填充，非生成 |
 | **局部编辑** | ❌ 不支持 | 全是全局或全脸（landmark 网格变形），"只磨左脸"做不到 |
 
