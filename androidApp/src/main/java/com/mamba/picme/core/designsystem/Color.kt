@@ -38,6 +38,7 @@ val SurfaceContainerLight = Color(0xFFF2F2F2)
 val SurfaceContainerHighLight = Color(0xFFEDEDED)
 val SurfaceContainerHighestLight = Color(0xFFE5E5E5)
 val WarmGrayIconLight = Color(0xFF888888)
+val CellLight = Color.White
 
 val PrimaryDark = Color(0xFF07C160)
 val OnPrimaryDark = Color.White
@@ -69,6 +70,7 @@ val SurfaceContainerDark = Color(0xFF1A1A1A)
 val SurfaceContainerHighDark = Color(0xFF222222)
 val SurfaceContainerHighestDark = Color(0xFF2C2C2C)
 val WarmGrayIconDark = Color(0xFF7F7F7F)
+val CellDark = Color(0xFF1A1A1A)
 
 // ── 功能色（color 组，不随主题切换）。引用方式：MaterialTheme.appColors.focusRing ──────────
 val FocusRingColor = Color(0xFF00E5FF)

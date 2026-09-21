@@ -149,6 +149,7 @@ struct SchemeColors {
     let surfaceContainerHigh: Color
     let surfaceContainerHighest: Color
     let warmGrayIcon: Color
+    let cell: Color
 }
 
 enum AppColorScheme {
@@ -182,7 +183,8 @@ enum AppColorScheme {
         surfaceContainer: Color(hex: "FFF2F2F2"),
         surfaceContainerHigh: Color(hex: "FFEDEDED"),
         surfaceContainerHighest: Color(hex: "FFE5E5E5"),
-        warmGrayIcon: Color(hex: "FF888888")
+        warmGrayIcon: Color(hex: "FF888888"),
+        cell: Color.white
     )
 
     static let dark = SchemeColors(
@@ -215,7 +217,8 @@ enum AppColorScheme {
         surfaceContainer: Color(hex: "FF1A1A1A"),
         surfaceContainerHigh: Color(hex: "FF222222"),
         surfaceContainerHighest: Color(hex: "FF2C2C2C"),
-        warmGrayIcon: Color(hex: "FF7F7F7F")
+        warmGrayIcon: Color(hex: "FF7F7F7F"),
+        cell: Color(hex: "FF1A1A1A")
     )
 }
 
