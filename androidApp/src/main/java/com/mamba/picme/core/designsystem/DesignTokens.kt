@@ -83,7 +83,7 @@ object TopBarTokens {
     val buttonSize = 36.dp
     val iconSize = 22.dp
     val titleFontSize = 17.dp
-    val titleFontWeight = FontWeight.Medium
+    val titleFontWeight = FontWeight.SemiBold
     val spacing = 8.dp
     val horizontalPadding = 8.dp
 }
@@ -236,23 +236,23 @@ object CameraTokens {
     val toolChipBg = Color(0xFF4A454F)
 }
 
-/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。 */
+/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。 2026-09-22 v3.0.1 形态对齐：气泡 12+尾4、输入 8、弹层 12（spec §1）。 */
 object ChatBubbleTokens {
     val bubbleMaxWidth = 360.dp
     val imageMaxWidth = 240.dp
     val paddingH = 18.dp
     val paddingV = 14.dp
-    val cornerRadius = 20.dp
+    val cornerRadius = 12.dp
     val tailCornerRadius = 4.dp
     val textSize = 16.dp
     val textLineHeight = 24.dp
-    val inputCornerRadius = 28.dp
+    val inputCornerRadius = 8.dp
     val inputShadowElevation = 4.dp
     val capsuleCornerRadius = 16.dp
     val capsuleActiveAlpha = 0.12f
     val capsuleInactiveAlpha = 0.5f
     val overlayBubbleColor = Color(0xFF2D2D2D)
-    val overlayPanelCornerRadius = 20.dp
+    val overlayPanelCornerRadius = 12.dp
     val typingMs = 400
     val blinkMs = 500
     val circularButtonSize = 36.dp
@@ -297,7 +297,7 @@ object ChatContextTokens {
 
 /** 侧栏抽屉（2026-08-19 绑定清扫候选入库）：threadRadius=会话条圆角; threadTitleSize=会话条标题字号; titleSize=抽屉主标题字号。 */
 object ChatSidebarTokens {
-    val threadRadius = 14.dp
+    val threadRadius = 8.dp
     val threadTitleSize = 15.dp
     val titleSize = 18.dp
 }
@@ -385,7 +385,7 @@ object GalleryTokens {
 
 /** SearchTopBar 内嵌胶囊搜索框（Gallery/Chat 共用 SearchField）。ios-follow gallery-search 2026-08-11 自 Android SearchField.kt 反向提取。颜色全走 colorScheme 角色：bg=surfaceVariant@0.7，icon/placeholder/clear=onSurface@0.5/0.4/0.5，cursor=primary。height=整胶囊高度（2026-08-19 绑定清扫候选入库）。 */
 object SearchFieldTokens {
-    val cornerRadius = 24.dp
+    val cornerRadius = 8.dp
     val paddingH = 12.dp
     val paddingV = 8.dp
     val backgroundAlpha = 0.7f

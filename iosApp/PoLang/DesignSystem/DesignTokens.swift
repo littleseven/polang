@@ -21,9 +21,9 @@ enum Spacing {
 // MARK: - Radius
 
 enum AppRadius {
-    static let panel: CGFloat = 24
+    static let panel: CGFloat = 12
     static let lg: CGFloat = 16
-    static let card: CGFloat = 12
+    static let card: CGFloat = 8
     static let button: CGFloat = 10
     static let small: CGFloat = 8
     static let thumbnail: CGFloat = 2
@@ -298,7 +298,7 @@ enum TopBarTokens {
     static let buttonSize: CGFloat = 36
     static let iconSize: CGFloat = 22
     static let titleFontSize: CGFloat = 17
-    static let titleFontWeight: Font.Weight = .medium
+    static let titleFontWeight: Font.Weight = .semibold
     static let spacing: CGFloat = 8
     static let horizontalPadding: CGFloat = 8
 }
@@ -471,17 +471,17 @@ enum ChatBubbleTokens {
     static let imageMaxWidth: CGFloat = 240
     static let paddingH: CGFloat = 18
     static let paddingV: CGFloat = 14
-    static let cornerRadius: CGFloat = 20
+    static let cornerRadius: CGFloat = 12
     static let tailCornerRadius: CGFloat = 4
     static let textSize: CGFloat = 16
     static let textLineHeight: CGFloat = 24
-    static let inputCornerRadius: CGFloat = 28
+    static let inputCornerRadius: CGFloat = 8
     static let inputShadowElevation: CGFloat = 4
     static let capsuleCornerRadius: CGFloat = 16
     static let capsuleActiveAlpha: Double = 0.12
     static let capsuleInactiveAlpha: Double = 0.5
     static let overlayBubbleColor = Color(hex: "FF2D2D2D")
-    static let overlayPanelCornerRadius: CGFloat = 20
+    static let overlayPanelCornerRadius: CGFloat = 12
     static let typingMs: Double = 400
     static let blinkMs: Double = 500
     static let circularButtonSize: CGFloat = 36
@@ -530,7 +530,7 @@ enum ChatContextTokens {
 // MARK: - Chat Sidebar（侧栏抽屉）
 
 enum ChatSidebarTokens {
-    static let threadRadius: CGFloat = 14
+    static let threadRadius: CGFloat = 8
     static let threadTitleSize: CGFloat = 15
     static let titleSize: CGFloat = 18
 }
@@ -623,7 +623,7 @@ enum GalleryTokens {
 // MARK: - SearchField（SearchTopBar 内嵌胶囊搜索框）
 
 enum SearchFieldTokens {
-    static let cornerRadius: CGFloat = 24
+    static let cornerRadius: CGFloat = 8
     static let paddingH: CGFloat = 12
     static let paddingV: CGFloat = 8
     static let backgroundAlpha: CGFloat = 0.7

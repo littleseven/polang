@@ -13,9 +13,9 @@
   },
   "radius": {
     "_comment": "圆角阶梯。panel=底部面板顶角; card=卡片/模型卡; button=按钮/标签; small=辅助元素; thumbnail=网格缩略图。lg=16 补 card(12)→panel(24) 阶梯空档（2026-08-19 绑定清扫候选入库）。",
-    "panel": 24,
+    "panel": 12,
     "lg": 16,
-    "card": 12,
+    "card": 8,
     "button": 10,
     "small": 8,
     "thumbnail": 2
@@ -34,7 +34,7 @@
     "buttonSize": 36,
     "iconSize": 22,
     "titleFontSize": 17,
-    "titleFontWeight": "Medium",
+    "titleFontWeight": "SemiBold",
     "spacing": 8,
     "horizontalPadding": 8
   },
@@ -74,7 +74,7 @@
   },
   "searchField": {
     "_comment": "SearchTopBar 内嵌胶囊搜索框（Gallery/Chat 共用 SearchField）。ios-follow gallery-search 2026-08-11 自 Android SearchField.kt 反向提取。颜色全走 colorScheme 角色：bg=surfaceVariant@0.7，icon/placeholder/clear=onSurface@0.5/0.4/0.5，cursor=primary。height=整胶囊高度（2026-08-19 绑定清扫候选入库）。",
-    "cornerRadius": 24,
+    "cornerRadius": 8,
     "paddingH": 12,
     "paddingV": 8,
     "backgroundAlpha": 0.7,
@@ -483,23 +483,23 @@
     "toolChipBg": "#FF4A454F"
   },
   "chatBubble": {
-    "_comment": "聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。",
+    "_comment": "聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。 2026-09-22 v3.0.1 形态对齐：气泡 12+尾4、输入 8、弹层 12（spec §1）。",
     "bubbleMaxWidth": 360,
     "imageMaxWidth": 240,
     "paddingH": 18,
     "paddingV": 14,
-    "cornerRadius": 20,
+    "cornerRadius": 12,
     "tailCornerRadius": 4,
     "textSize": 16,
     "textLineHeight": 24,
-    "inputCornerRadius": 28,
+    "inputCornerRadius": 8,
     "inputShadowElevation": 4,
     "capsuleCornerRadius": 16,
     "capsuleActiveAlpha": 0.12,
     "capsuleInactiveAlpha": 0.5,
     "overlayBubbleColor": "#FF2D2D2D",
     "overlayPanelColor": "black",
-    "overlayPanelCornerRadius": 20,
+    "overlayPanelCornerRadius": 12,
     "typingMs": 400,
     "blinkMs": 500,
     "circularButtonSize": 36,
@@ -514,7 +514,7 @@
   },
   "chatSidebar": {
     "_comment": "侧栏抽屉（2026-08-19 绑定清扫候选入库）：threadRadius=会话条圆角; threadTitleSize=会话条标题字号; titleSize=抽屉主标题字号。",
-    "threadRadius": 14,
+    "threadRadius": 8,
     "threadTitleSize": 15,
     "titleSize": 18
   },
