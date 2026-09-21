@@ -121,13 +121,21 @@ def collect_instances(cv):
 
 
 def classify(png_path, kind):
-    """采样渲染 PNG 的状态栏/导航条带 → DARK/LIGHT/MID"""
+    """采样渲染 PNG 的铬件带/内容主题带 → DARK/LIGHT/MID
+
+    kind: status_bar (y0-33) / system_nav_bar (y801-852) / content (y38-70 顶栏背景带，
+    主题判别用——照片内容区无法判主题，顶栏背景是 token 表面色)
+    """
     from PIL import Image
     import numpy as np
     im = Image.open(png_path).convert("L")
     w, h = im.size
-    box = (0, 0, w, int(33 * h / 852)) if kind == "status_bar" else \
-          (0, int(801 * h / 852), w, h)
+    if kind == "status_bar":
+        box = (0, 0, w, int(33 * h / 852))
+    elif kind == "system_nav_bar":
+        box = (0, int(801 * h / 852), w, h)
+    else:  # content
+        box = (0, int(38 * h / 852), w, int(70 * h / 852))
     v = float(np.asarray(im.crop(box), dtype=float).mean())
     return ("DARK" if v < 75 else "LIGHT" if v > 165 else f"MID({v:.0f})"), v
 
@@ -150,11 +158,11 @@ def audit(cv, fix=False):
         files = glob.glob(od + "/**/*.png", recursive=True)
         if not files:
             print(f"  EXPORT-FAIL {fname}")
-            bad.append((page, fid, fname, [], "export-fail"))
+            bad.append((page, fid, fname, [], [], "export-fail"))
             continue
         expect = "LIGHT" if fname in LIGHT_FRAMES else "DARK"
         wrong = []
-        for kind in kinds:
+        for kind in kinds + ["content"]:   # 铬件 + 内容主题（盲区补检）
             got, _ = classify(files[0], kind)
             if got != expect:
                 wrong.append((kind, got))
@@ -162,16 +170,21 @@ def audit(cv, fix=False):
         if wrong:
             print(f"  {mark} {fname}: 期望{expect} 实际 {wrong}")
             bad.append((page, fid, fname,
-                        [i for i in insts if i["frame"] == fid], expect))
+                        [i for i in insts if i["frame"] == fid],
+                        [k for k, _ in wrong], expect))
     if not bad:
         print(f"✅ 全部 {len(by_frame)} 帧铬件一致")
         return 0
     if fix:
         fixed = 0
-        for page, fid, fname, frame_insts, expect in bad:
+        for page, fid, fname, frame_insts, wrong_kinds, expect in bad:
             if not frame_insts:
                 continue
             ops = []
+            # 内容主题错 → 帧级主题钉定（2:2 集；Dark=2:0 / Light=79:1）
+            if any(k == "content" for k in wrong_kinds):
+                mode_id = "2:0" if expect == "DARK" else "79:1"
+                ops.append(f'U("{fid}", {{variableModes: [{{variableSetId: "2:2", modeId: "{mode_id}"}}]}})')
             for it in frame_insts:
                 layers = STATUS_LAYERS if it["kind"] == "status_bar" else NAV_LAYERS
                 dark_vis = "true" if expect == "DARK" else "false"
