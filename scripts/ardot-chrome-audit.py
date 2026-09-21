@@ -112,8 +112,10 @@ def collect_instances(cv):
                 if fr.get("type") != "FRAME":
                     continue
                 for c in fr.get("children") or []:
-                    if c.get("type") == "INSTANCE" and c.get("name") in (
-                            "status_bar", "system_nav_bar", "floating_tab"):
+                    if c.get("type") == "INSTANCE" and (
+                            c.get("name") in ("status_bar", "system_nav_bar",
+                                              "floating_tab", "InputBarOuter")
+                            or "input_bar" in str(c.get("name", "")).lower()):
                         out.append({"page": pid, "frame": fr["id"],
                                     "frameName": fr.get("name"),
                                     "inst": c["id"], "kind": c.get("name")})
@@ -136,6 +138,8 @@ def classify(png_path, kind):
         box = (0, int(801 * h / 852), w, h)
     elif kind == "floating_tab":   # 300x56 @ (46,734)
         box = (int(0.13 * w), int(0.868 * h), int(0.86 * w), int(0.922 * h))
+    elif kind == "InputBarOuter":  # 输入卡 y690-770 全宽
+        box = (0, int(0.81 * h), w, int(0.905 * h))
     else:  # content
         box = (0, int(38 * h / 852), w, int(70 * h / 852))
     v = float(np.asarray(im.crop(box), dtype=float).mean())
@@ -191,6 +195,13 @@ def audit(cv, fix=False):
                 if it["kind"] == "floating_tab":
                     # 悬浮导航错色 = 字面量残留，回填母版 token
                     ops.append(f'U("{it["inst"]}", {{fills: ["$2:156"]}})')
+                    continue
+                if it["kind"] == "InputBarOuter":
+                    # 输入框错色 = 实例内部覆盖，分号子路径回填母版五件套 token
+                    for lyr, tok in (("387:2", "$2:154"), ("387:3", "$2:152"),
+                                     ("387:8", "$2:155"), ("387:9", "$2:155"),
+                                     ("387:7", "$2:130")):
+                        ops.append(f'U("{it["inst"]};{lyr}", {{fills: ["{tok}"]}})')
                     continue
                 layers = STATUS_LAYERS if it["kind"] == "status_bar" else NAV_LAYERS
                 dark_vis = "true" if expect == "DARK" else "false"
