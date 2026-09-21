@@ -361,8 +361,8 @@
     "animEasing": "FastOutSlowInEasing"
   },
   "bottomTab": {
-    "_comment": "悬浮底部胶囊导航（FloatingBottomTab），主入口聚合。v1 SSOT 漏配 cornerRadius=28，已补。color=surface。",
-    "cornerRadius": 28,
+    "_comment": "微信式平底标签栏（2026-09-22 v3.0.2 重造）：全宽贴底+顶 hairline(outlineVariant)+图标+labelSmall 10sp 标签；选中 primary 未选中 onSurfaceVariant；悬浮胶囊形制退役。",
+    "cornerRadius": 0,
     "tonalElevation": 3,
     "shadowElevation": 6,
     "containerPaddingH": 12,

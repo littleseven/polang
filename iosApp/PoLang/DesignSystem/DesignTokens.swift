@@ -344,7 +344,7 @@ enum AppSliderTokens {
 // MARK: - Bottom Tab（悬浮胶囊导航）
 
 enum BottomTabTokens {
-    static let cornerRadius: CGFloat = 28
+    static let cornerRadius: CGFloat = 0
     static let tonalElevation: CGFloat = 3
     static let shadowElevation: CGFloat = 6
     static let containerPaddingH: CGFloat = 12

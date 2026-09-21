@@ -123,9 +123,9 @@ object AppSliderTokens {
     val animDurationMs = 150
 }
 
-/** 悬浮底部胶囊导航（FloatingBottomTab），主入口聚合。v1 SSOT 漏配 cornerRadius=28，已补。color=surface。 */
+/** 微信式平底标签栏（2026-09-22 v3.0.2 重造）：全宽贴底+顶 hairline(outlineVariant)+图标+labelSmall 10sp 标签；选中 primary 未选中 onSurfaceVariant；悬浮胶囊形制退役。 */
 object BottomTabTokens {
-    val cornerRadius = 28.dp
+    val cornerRadius = 0.dp
     val tonalElevation = 3.dp
     val shadowElevation = 6.dp
     val containerPaddingH = 12.dp
