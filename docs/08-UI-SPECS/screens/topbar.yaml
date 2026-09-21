@@ -77,7 +77,7 @@ topbar:
     trailing_max: 3                # chat: ic/bug_report, ic/add_comment, ic/delete_sweep
     # 画布几何（chat 393 宽）：trailing 三钮 x = 303/333/363（末钮迄 385 = 393−8）
     spacer: fill_container         # 中部弹性
-    applies: [chat/empty, chat/conversation]   # light 三帧 2026-08-19 删除——全站统一 dark 正稿 + mode override 预览
+    applies: [chat/conversation, chat/empty-v2-guest]   # chat/empty 2026-09-21 删除（被 empty-v2-guest 取代）；light 三帧 2026-08-19 已删——全站统一 dark 正稿 + mode override 预览
 
   # ── 附录 E：相机 overlay 顶区（引用，不重复定义）──────────────
   appendix_camera:

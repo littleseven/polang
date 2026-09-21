@@ -18,7 +18,7 @@
 #   scripts/ardot-preview-mode.sh 267:21 auto --lang auto  # 整页还原 Dark+English
 #
 # 常用帧 id（docs/08-UI-SPECS/screens/refs/ardot/manifest.json 可查全量）：
-#   settings/main_list=108:94  gallery/grid=105:45  chat/empty=111:321
+#   settings/main_list=108:94  gallery/grid=105:45  chat/conversation=111:383
 #   editor/concept_a_hypic=118:243  camera/idle=118:1146
 set -euo pipefail
 

@@ -20,7 +20,7 @@ PAGES = {
   'settings': ['settings/main_list','settings/local_models','settings/remote_models','settings/sandbox',
                'settings/developer','settings/dialog_language','settings/dialog_stage','settings/dialog_theme',
                'settings/add_remote_provider','settings/provider_config'],
-  'chat':     ['chat/empty','chat/conversation','chat/sidebar','chat/guest-nudge-sheet'],
+  'chat':     ['chat/conversation','chat/sidebar','chat/guest-nudge-sheet'],  # chat/empty 2026-09-21 删除（被 empty-v2-guest 取代）
   'editor':   ['editor/current_crop','editor/current_adjust','editor/concept_a_hypic',
                'editor/concept_a_adjust','editor/concept_a_crop','editor/concept_a_beauty'],
   'people':   ['people/grid','people/detail'],
