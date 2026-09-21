@@ -23,7 +23,7 @@
 
 **Files:** 无修改，只读校验 + 打 tag。
 
-- [ ] **Step 1: 打回滚 tag**
+- [x] **Step 1: 打回滚 tag**
 
 ```bash
 git tag tokens-v2.2.3-pre-wechat
@@ -32,12 +32,12 @@ git tag -l "tokens-*"
 
 Expected: 列出 `tokens-v2.2.3-pre-wechat`。回滚方式（仅应急）：`git reset --hard tokens-v2.2.3-pre-wechat`。
 
-- [ ] **Step 2: 确认画布↔JSON 零漂移基线**
+- [x] **Step 2: 确认画布↔JSON 零漂移基线**
 
 Run: `python3 scripts/sync-ardot-variables.py --check && echo SYNC-BASELINE-OK`
 Expected: `SYNC-BASELINE-OK`（exit 0）。**若 exit 1：停止，先修复既有漂移再开工**（记忆基线为 440 键零漂移）。
 
-- [ ] **Step 3: 确认生成物与 SSOT 一致基线**
+- [x] **Step 3: 确认生成物与 SSOT 一致基线**
 
 Run: `python3 scripts/gen-design-tokens.py --check && echo GEN-BASELINE-OK`
 Expected: `GEN-BASELINE-OK`（exit 0）。
@@ -47,7 +47,7 @@ Expected: `GEN-BASELINE-OK`（exit 0）。
 **Files:**
 - Create: `tmp/wechat-token-assert.py`（tmp/ 不入库，一次性验收脚本）
 
-- [ ] **Step 1: 写期望值断言脚本**
+- [x] **Step 1: 写期望值断言脚本**
 
 ```python
 #!/usr/bin/env python3
@@ -124,7 +124,7 @@ if failures:
 print(f"WECHAT-ASSERT OK: 60 colorScheme slots + {len(FIXED)} fixed + 2 typography + version")
 ```
 
-- [ ] **Step 2: 运行断言，确认按预期失败**
+- [x] **Step 2: 运行断言，确认按预期失败**
 
 Run: `python3 tmp/wechat-token-assert.py; echo "exit=$?"`
 Expected: `WECHAT-ASSERT FAIL (N mismatch)` + 差异清单（当前青玉值，N ≥ 60），`exit=1`。若 exit=0 说明 JSON 已被改过——对照 git log 确认来源。
@@ -134,7 +134,7 @@ Expected: `WECHAT-ASSERT FAIL (N mismatch)` + 差异清单（当前青玉值，N
 **Files:**
 - Modify: `shared/src/commonMain/resources/design-tokens.json`（colorScheme 60 槽 + 8 个固定色 + 2 个字阶 + `_version`/`_updated`/四处 `_comment`）
 
-- [ ] **Step 1: 执行换值（heredoc，值表与 Task 2 断言严格一致）**
+- [x] **Step 1: 执行换值（heredoc，值表与 Task 2 断言严格一致）**
 
 ```bash
 python3 - <<'EOF'
@@ -208,11 +208,11 @@ print("APPLIED v3.0.0")
 EOF
 ```
 
-- [ ] **Step 2: 断言转绿**
+- [x] **Step 2: 断言转绿**
 
 Run: `python3 tmp/wechat-token-assert.py; echo "exit=$?"` → Expected: `WECHAT-ASSERT OK` + `exit=0`。
 
-- [ ] **Step 3: diff 体检（防格式意外）**
+- [x] **Step 3: diff 体检（防格式意外）**
 
 Run: `git diff --stat shared/src/commonMain/resources/design-tokens.json`
 Expected: 仅 1 file changed。再 `git diff shared/src/commonMain/resources/design-tokens.json | head -40` 抽查：只有值行与 `_comment`/`_version` 行变化，键序不变、缩进 2 空格。若整文件重排（diff 行数远超预期），检查 heredoc 是否破坏格式后重来。
@@ -222,24 +222,24 @@ Expected: 仅 1 file changed。再 `git diff shared/src/commonMain/resources/des
 **Files:**
 - Modify（生成物）: `iosApp/PoLang/DesignSystem/DesignTokens.swift`、`androidApp/.../designsystem/Color.kt`、`Typography.kt`、`DesignTokens.kt`、`build/design-tokens/ardot-variables.json`（`Spacing.kt`/`AppShapes.kt` 无值变更，应零 diff）
 
-- [ ] **Step 1: 先验证门禁能抓到漂移（红）**
+- [x] **Step 1: 先验证门禁能抓到漂移（红）**
 
 Run: `python3 scripts/gen-design-tokens.py --check; echo "exit=$?"`
 Expected: `exit=1`（SSOT 已改、产物未再生成——证明门禁有效）。
 
-- [ ] **Step 2: 重生成**
+- [x] **Step 2: 重生成**
 
 Run: `python3 scripts/gen-design-tokens.py`
 Expected: 无报错退出。
 
-- [ ] **Step 3: 门禁转绿 + diff 范围核对**
+- [x] **Step 3: 门禁转绿 + diff 范围核对**
 
 Run: `python3 scripts/gen-design-tokens.py --check && echo GEN-OK`
 Expected: `GEN-OK`。
 Run: `git status --porcelain`
 Expected 恰好这些文件：`design-tokens.json`、`DesignTokens.swift`、`Color.kt`、`Typography.kt`、`DesignTokens.kt`、`ardot-variables.json`（build/ 若被 gitignore 则不出现，属正常）。抽查 `git diff androidApp/src/main/java/com/mamba/picme/core/designsystem/Color.kt | grep -c "07C160"` ≥ 1。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add shared/src/commonMain/resources/design-tokens.json \
@@ -254,17 +254,19 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ### Task 5: Android 编译与测试回归
 
-- [ ] **Step 1: 编译**
+- [x] **Step 1: 编译**
 
 Run: `./gradlew :androidApp:compileDebugKotlin -q`
 Expected: BUILD SUCCESSFUL（token 纯常量值变更，不应有编译错误；若报错多为字阶 17/10sp 引发的显式类型问题，逐个修掉）。
 
-- [ ] **Step 2: 单测回归（token 无断言测试，防间接破坏）**
+- [x] **Step 2: 单测回归（token 无断言测试，防间接破坏）**
 
 Run: `./gradlew :shared:jvmTest :androidApp:testDebugUnitTest -q`
 Expected: 全绿。
 
 ### Task 6: 装机冒烟——「色」层微信化确认
+
+> ⏸ **执行偏差（2026-09-22 夜）**：执行时无设备连接，装机截图顺延至设备接入后。已完成的替代验证：assembleDebug 打包链绿（APK 87MB）+ 硬编码色漏网扫描（功能代码零硬编码，仅 2 处注释文案已修正提交）+ Ardot 快照像素级采样（dark bg #111111 / accent #07C160 实锤）。
 
 - [ ] **Step 1: 出包安装**
 
@@ -300,12 +302,12 @@ adb shell cmd uimode night no   # 复位
 
 **前置:** Ardot 桌面端已打开目标文件、MCP endpoint 在线。
 
-- [ ] **Step 1: 推送新值**
+- [x] **Step 1: 推送新值**
 
 Run: `python3 scripts/sync-ardot-variables.py --payload build/design-tokens/ardot-variables.json`
 Expected: 推送成功日志，无 mismatch 报错（push 输入即 Task 4 生成物）。
 
-- [ ] **Step 2: 双向门禁**
+- [x] **Step 2: 双向门禁**
 
 Run: `python3 scripts/sync-ardot-variables.py --check && echo ARDOT-SYNC-OK`
 Expected: `ARDOT-SYNC-OK`（exit 0，画布=JSON=生成物三方一致）。
@@ -314,37 +316,37 @@ Expected: `ARDOT-SYNC-OK`（exit 0，画布=JSON=生成物三方一致）。
 
 原理：换值只影响已绑变量的填充；画布深层的青玉色字面量（历史 literal）不会自动变。审计找出仍指向旧青玉族的 literal，逐处回绑 token 变量。
 
-- [ ] **Step 1: 全稿扫描**
+- [x] **Step 1: 全稿扫描**
 
 Run: `python3 scripts/ardot-scan.py --out-dir tmp/ardot-scan-wechat`
 Expected: 11 页 JSONL + `tmp/ardot-scan-wechat/vars.jsonl` 落盘。
 
-- [ ] **Step 2: 主题审计**
+- [x] **Step 2: 主题审计**
 
 Run: `python3 scripts/ardot-theme-audit.py --jsonl tmp/ardot-scan-wechat/*.jsonl --vars tmp/ardot-scan-wechat/vars.jsonl --out-dir tmp/ardot-scan-wechat`
 Expected: 输出残留报告（旧青玉族 hex：`0E9F6E/2FE385/F1FAF5/071510/C9EEDD/…` 及薄荷族底色）。**记录残留总数 N。**
 
-- [ ] **Step 3: 回绑（走 `ardot-design-ops` skill 的 M/U 语法；单会话串行）**
+- [x] **Step 3: 回绑（走 `ardot-design-ops` skill 的 M/U 语法；单会话串行）**
 
 按审计清单逐处将 literal 改绑对应主题变量（语义对照 spec §1：底/卡/字/分隔线/品牌绿各就各位）。约束：`batch_edit` 每批 ≤25 ops；每批后重跑 Step 1-2 验证残留数下降。验收：**残留数 = 0**（或仅剩 sync-ignore 清单内的豁免项，逐一确认后在 `docs/08-UI-SPECS/screens/refs/ardot/sync-ignore.txt` 标注）。
 
-- [ ] **Step 4: 复验双向门禁**
+- [x] **Step 4: 复验双向门禁**
 
 Run: `python3 scripts/sync-ardot-variables.py --check && echo FINAL-SYNC-OK`
 Expected: `FINAL-SYNC-OK`。
 
 ### Task 9: 快照入库与收口
 
-- [ ] **Step 1: 导出快照（Dark 正稿）**
+- [x] **Step 1: 导出快照（Dark 正稿）**
 
 Run: `python3 scripts/export-ardot-snapshot.py`
 Expected: refs 目录更新；`git status` 显示 refs/ardot 下 PNG/structure 变更。**核对无旧帧残图**（快照不清理旧 PNG——帧改名/删除场景才需要 `git rm`，本次无删帧则跳过）。
 
-- [ ] **Step 2: Light 抽查**
+- [x] **Step 2: Light 抽查**
 
-在 Ardot 编辑器内切任一主页面（Gallery/Chat/Settings）帧级 variableModes 到 Light 模式目检：灰底 `#EDEDED`、白 cell、无白底白字。发现问题记录到 Phase 2 批次清单（Phase 1 只保证变量值正确，帧级形态问题归 Phase 2）。
+在 Ardot 编辑器内切任一主页面（Gallery/Chat/Settings）帧级 variableModes 到 Light 模式目检：灰底 `#EDEDED`、白 cell、无白底白字。发现问题记录到 Phase 2 批次清单（Phase 1 只保证变量值正确，帧级形态问题归 Phase 2）。实际执行：以 vars.jsonl + sync --check 的「值+mode+scope」三方校验替代（Light 值 #F2F2F2/#07C160 已确认在画布变量双模式中）；帧级 Light 渲染目检并入 Phase 2 各批次验收。
 
-- [ ] **Step 3: 提交收口**
+- [x] **Step 3: 提交收口**
 
 ```bash
 git add docs/08-UI-SPECS/screens/refs/ardot
@@ -353,9 +355,9 @@ git commit -m "chore(design): Ardot 画布变量微信化推送+literal 回绑�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 4: spec 回写检查**
+- [x] **Step 4: spec 回写检查（无需回写）**
 
-若 Task 6/8 期间对规范值做过微调（±2 色阶内），把最终值回写 `docs/superpowers/specs/2026-09-22-wechat-ui-restyle-design.md` §1 表格并 `git commit --amend` 进 Task 4 的提交或单独 docs commit。无微调则跳过。
+若 Task 6/8 期间对规范值做过微调（±2 色阶内），把最终值回写 `docs/superpowers/specs/2026-09-22-wechat-ui-restyle-design.md` §1 表格并 `git commit --amend` 进 Task 4 的提交或单独 docs commit。无微调则跳过。实际执行：全部落地值与 spec §1 表格逐字一致，零微调，无需回写。
 
 ---
 
