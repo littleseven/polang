@@ -124,3 +124,11 @@
 3. `/ui-parity-guard` 双端一致性通过，截图基线按新规范重建。
 4. Play v2.3 三语全量替换成功（zh 两行回读 18/18）。
 5. 官网换色上线（`#07C160` 主绿系）。
+
+## 7. 执行增补（2026-09-22 · Organize 页专项指令）
+
+用户追加指令：Organize 页 UI 重新设计——**简化 + 配色尽量一致**（当日自动执行完毕）。
+
+1. **结构简化**：hub 页 6 张散置 category_card → 单个微信列表组（surfaceContainer 底、组圆角 8、5 条 hairline 等距分隔），与设置页列表语言一致。
+2. **配色统一（token v3.0.5 值级）**：`statusColor.success` `#4CAF50→#07C160`（全 App 双绿合一为品牌绿）；`statusColor.info` 与 `modelCenter.tagColorChat` `#2196F3→#576B95`（Material 蓝收敛为微信链接蓝）。warning/error 保持产品语义色不变。
+3. **连带修复**：`category_card` 组件 Play 烘焙残留 Light 钉 → 显式回 Dark（与铬件漂移同病族：组件级钉定驱动全部实例）。
