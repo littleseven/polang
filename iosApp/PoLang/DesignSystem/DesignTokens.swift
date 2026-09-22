@@ -180,7 +180,7 @@ enum AppColorScheme {
         outlineVariant: Color(hex: "FFE5E5E5"),
         surfaceContainerLowest: Color.white,
         surfaceContainerLow: Color(hex: "FFF7F7F7"),
-        surfaceContainer: Color(hex: "FFF2F2F2"),
+        surfaceContainer: Color(hex: "FFF7F7F7"),
         surfaceContainerHigh: Color(hex: "FFEDEDED"),
         surfaceContainerHighest: Color(hex: "FFE5E5E5"),
         warmGrayIcon: Color(hex: "FF888888"),

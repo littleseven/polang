@@ -1,6 +1,6 @@
 {
   "_comment": "PoLang 双端 Design Token SSOT。Android/iOS 各自从此文件同步到代码常量。修改 token 时先改此文件，再两端同步。完整提取方法学/漂移记录见 docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md。",
-  "_version": "3.0.3",
+  "_version": "3.0.4",
   "_updated": "2026-09-22",
   "spacing": {
     "_comment": "语义间距阶梯。屏幕级 padding 多为 md(12)/lg(16)，组件内 gap 多为 sm(8)。",
@@ -218,7 +218,7 @@
     }
   },
   "colorScheme": {
-    "_comment": "2026-09-13 定稿「A 氧气薄荷(Light) / B 能量绿(Dark)」（小红书配色调研→画布轮播→用户拍板→token 双模式落地；青玉绿×Cloud Dancer v2.2.2 退役为历史）：Light=薄荷白 #F1FAF5 底+primary #0E9F6E；Dark=近黑绿 #071510 底+发光绿 #2FE385。chatBubble/chatCarousel/cameraAccent 为主题无关单值（取 Dark 侧）：品牌渐变 #1EA75B→#7CEFA8、用户气泡 #2FE385 深字 #062B18、反馈钮 #0F2B1B。 2026-09-22 v3.0 微信风全量换值，spec 见 docs/superpowers/specs/2026-09-22-wechat-ui-restyle-design.md。 v3.0.3 新增 cell 槽位=微信列表组 cell 底(light 白/dark #1A1A1A)，供列表组/设置行消费。",
+    "_comment": "2026-09-13 定稿「A 氧气薄荷(Light) / B 能量绿(Dark)」（小红书配色调研→画布轮播→用户拍板→token 双模式落地；青玉绿×Cloud Dancer v2.2.2 退役为历史）：Light=薄荷白 #F1FAF5 底+primary #0E9F6E；Dark=近黑绿 #071510 底+发光绿 #2FE385。chatBubble/chatCarousel/cameraAccent 为主题无关单值（取 Dark 侧）：品牌渐变 #1EA75B→#7CEFA8、用户气泡 #2FE385 深字 #062B18、反馈钮 #0F2B1B。 2026-09-22 v3.0 微信风全量换值，spec 见 docs/superpowers/specs/2026-09-22-wechat-ui-restyle-design.md。 v3.0.3 新增 cell 槽位=微信列表组 cell 底(light 白/dark #1A1A1A)，供列表组/设置行消费。 v3.0.4 surfaceContainer light F2→F7(微信标签栏/次级面标准值); canvas 侧 cell 传播受引擎限,列表组暂用 surfaceContainer,app 侧仍用 cell。",
     "light": {
       "primary": "#FF07C160",
       "onPrimary": "#FFFFFFFF",
@@ -246,7 +246,7 @@
       "outlineVariant": "#FFE5E5E5",
       "surfaceContainerLowest": "#FFFFFFFF",
       "surfaceContainerLow": "#FFF7F7F7",
-      "surfaceContainer": "#FFF2F2F2",
+      "surfaceContainer": "#FFF7F7F7",
       "surfaceContainerHigh": "#FFEDEDED",
       "surfaceContainerHighest": "#FFE5E5E5",
       "warmGrayIcon": "#FF888888",
