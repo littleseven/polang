@@ -1,6 +1,6 @@
 {
   "_comment": "PoLang 双端 Design Token SSOT。Android/iOS 各自从此文件同步到代码常量。修改 token 时先改此文件，再两端同步。完整提取方法学/漂移记录见 docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md。",
-  "_version": "3.0.4",
+  "_version": "3.0.5",
   "_updated": "2026-09-22",
   "spacing": {
     "_comment": "语义间距阶梯。屏幕级 padding 多为 md(12)/lg(16)，组件内 gap 多为 sm(8)。",
@@ -306,12 +306,12 @@
     "ghost": 0.2
   },
   "statusColor": {
-    "_comment": "语义状态色（不随主题）。success/warning/error/info 跨 camera/chat/settings/idphoto/tag 复用。注意 statusError(#E53935)=产品 Material Red，与 colorScheme.error(#B3261E M3) 不同。",
-    "success": "#FF4CAF50",
+    "_comment": "语义状态色（不随主题）。success/warning/error/info 跨 camera/chat/settings/idphoto/tag 复用。注意 statusError(#E53935)=产品 Material Red，与 colorScheme.error(#B3261E M3) 不同。 2026-09-22 v3.0.5 微信化统一：success 双绿合一→#07C160(品牌绿)；info→#576B95(微信链接蓝,弃Material蓝)。",
+    "success": "#FF07C160",
     "warning": "#FFFF9800",
     "warningAmber": "#FFFFA000",
     "error": "#FFE53935",
-    "info": "#FF2196F3"
+    "info": "#FF576B95"
   },
   "motion": {
     "_comment": "动效时长(ms)+缓动。规范：禁用线性(Linear)，统一 FastOutSlowIn/Standard。drift: MainActivity nav 过渡 tween(400) 未指定 easing，应补 FastOutSlowIn。",
@@ -615,10 +615,10 @@
     "unselectedLabelColor": "#FF808080"
   },
   "modelCenter": {
-    "_comment": "模型下载中心专属 token。getTagColor 代码用主题角色(recommended/chat/beauty-camera→tertiary/primary)与下方固定 hex 存在分歧，iOS 以本表固定 hex 为准。",
+    "_comment": "模型下载中心专属 token。getTagColor 代码用主题角色(recommended/chat/beauty-camera→tertiary/primary)与下方固定 hex 存在分歧，iOS 以本表固定 hex 为准。 2026-09-22 v3.0.5 tagColorChat→#576B95。",
     "tagColorMustHave": "#FFE53935",
     "tagColorRecommended": "#FFFF9800",
-    "tagColorChat": "#FF2196F3",
+    "tagColorChat": "#FF576B95",
     "tagColorPhotoTagging": "#FF9C27B0",
     "tagColorBeautyCamera": "#FFFF9800",
     "tagColorDefault": "#FF9E9E9E",

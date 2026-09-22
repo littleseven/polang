@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=392%3A24"
+    "url": "cocraft://localhost/file/715061534788814?node_id=267%3A21"
   },
   "pages": [
     {
@@ -10198,7 +10198,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-l5nz-20260922_085825282.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-6d9u-20260922_090932302.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -13968,7 +13968,7 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-2fq9-20260922_085826358.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-sz1m-20260922_090933583.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
           }
         },
         "267:518": {
@@ -14739,13 +14739,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-zhfz-20260922_085827504.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-tpyh-20260922_090934870.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-9u8c-20260922_085827102.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-lq2u-20260922_090934424.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -15659,7 +15659,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-up15-20260922_085828440.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-6pjo-20260922_090935891.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -16991,7 +16991,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-jtqt-20260922_085828006.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-7v9j-20260922_090935449.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -23151,7 +23151,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-x14k-20260922_085831460.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-a96t-20260922_090939067.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -24031,7 +24031,7 @@
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-js5x-20260922_085831947.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-ygbn-20260922_090939589.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -27459,13 +27459,13 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-2z5x-20260922_085833355.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-x6v0-20260922_090941193.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-z1te-20260922_085832331.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-0ntr-20260922_090940091.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
@@ -27865,151 +27865,250 @@
                         "y": "auto"
                       },
                       {
-                        "componentProperties": {},
+                        "children": [
+                          {
+                            "componentProperties": {},
+                            "fills": [
+                              "$2:156"
+                            ],
+                            "gap": 10,
+                            "height": 64,
+                            "id": "387:182",
+                            "layout": "horizontal",
+                            "mainComponent": {
+                              "componentPropertyDefinitions": {},
+                              "id": "387:181"
+                            },
+                            "name": "cat_duplicates",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 12,
+                              "right": 12,
+                              "top": 0
+                            },
+                            "type": "INSTANCE",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [],
+                            "clipsContent": true,
+                            "fills": [
+                              "$2:153"
+                            ],
+                            "height": 1,
+                            "id": "415:17",
+                            "layout": "none",
+                            "name": "divider",
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "componentProperties": {},
+                            "fills": [
+                              "$2:156"
+                            ],
+                            "gap": 10,
+                            "height": 64,
+                            "id": "387:183",
+                            "layout": "horizontal",
+                            "mainComponent": {
+                              "componentPropertyDefinitions": {},
+                              "id": "387:181"
+                            },
+                            "name": "cat_screenshots",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 12,
+                              "right": 12,
+                              "top": 0
+                            },
+                            "type": "INSTANCE",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [],
+                            "clipsContent": true,
+                            "fills": [
+                              "$2:153"
+                            ],
+                            "height": 1,
+                            "id": "415:18",
+                            "layout": "none",
+                            "name": "divider",
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "componentProperties": {},
+                            "fills": [
+                              "$2:156"
+                            ],
+                            "gap": 10,
+                            "height": 64,
+                            "id": "387:184",
+                            "layout": "horizontal",
+                            "mainComponent": {
+                              "componentPropertyDefinitions": {},
+                              "id": "387:181"
+                            },
+                            "name": "cat_blurry",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 12,
+                              "right": 12,
+                              "top": 0
+                            },
+                            "type": "INSTANCE",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [],
+                            "clipsContent": true,
+                            "fills": [
+                              "$2:153"
+                            ],
+                            "height": 1,
+                            "id": "415:19",
+                            "layout": "none",
+                            "name": "divider",
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "componentProperties": {},
+                            "fills": [
+                              "$2:156"
+                            ],
+                            "gap": 10,
+                            "height": 64,
+                            "id": "387:185",
+                            "layout": "horizontal",
+                            "mainComponent": {
+                              "componentPropertyDefinitions": {},
+                              "id": "387:181"
+                            },
+                            "name": "cat_eyesclosed",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 12,
+                              "right": 12,
+                              "top": 0
+                            },
+                            "type": "INSTANCE",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [],
+                            "clipsContent": true,
+                            "fills": [
+                              "$2:153"
+                            ],
+                            "height": 1,
+                            "id": "415:20",
+                            "layout": "none",
+                            "name": "divider",
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "componentProperties": {},
+                            "fills": [
+                              "$2:156"
+                            ],
+                            "gap": 10,
+                            "height": 64,
+                            "id": "387:186",
+                            "layout": "horizontal",
+                            "mainComponent": {
+                              "componentPropertyDefinitions": {},
+                              "id": "387:181"
+                            },
+                            "name": "cat_videos",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 12,
+                              "right": 12,
+                              "top": 0
+                            },
+                            "type": "INSTANCE",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [],
+                            "clipsContent": true,
+                            "fills": [
+                              "$2:153"
+                            ],
+                            "height": 1,
+                            "id": "415:21",
+                            "layout": "none",
+                            "name": "divider",
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "componentProperties": {},
+                            "fills": [
+                              "$2:156"
+                            ],
+                            "gap": 10,
+                            "height": 64,
+                            "id": "387:187",
+                            "layout": "horizontal",
+                            "mainComponent": {
+                              "componentPropertyDefinitions": {},
+                              "id": "387:181"
+                            },
+                            "name": "cat_documents",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 12,
+                              "right": 12,
+                              "top": 0
+                            },
+                            "type": "INSTANCE",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "cornerRadius": 8,
                         "fills": [
                           "$2:156"
                         ],
-                        "gap": 10,
-                        "height": 64,
-                        "id": "387:182",
-                        "layout": "horizontal",
-                        "mainComponent": {
-                          "componentPropertyDefinitions": {},
-                          "id": "387:181"
-                        },
-                        "name": "cat_duplicates",
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "415:16",
+                        "layout": "vertical",
+                        "name": "cat_group",
                         "padding": {
                           "bottom": 0,
-                          "left": 12,
-                          "right": 12,
+                          "left": 0,
+                          "right": 0,
                           "top": 0
                         },
-                        "type": "INSTANCE",
-                        "width": "fill_container",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "componentProperties": {},
-                        "fills": [
-                          "$2:156"
-                        ],
-                        "gap": 10,
-                        "height": 64,
-                        "id": "387:183",
-                        "layout": "horizontal",
-                        "mainComponent": {
-                          "componentPropertyDefinitions": {},
-                          "id": "387:181"
-                        },
-                        "name": "cat_screenshots",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 12,
-                          "right": 12,
-                          "top": 0
-                        },
-                        "type": "INSTANCE",
-                        "width": "fill_container",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "componentProperties": {},
-                        "fills": [
-                          "$2:156"
-                        ],
-                        "gap": 10,
-                        "height": 64,
-                        "id": "387:184",
-                        "layout": "horizontal",
-                        "mainComponent": {
-                          "componentPropertyDefinitions": {},
-                          "id": "387:181"
-                        },
-                        "name": "cat_blurry",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 12,
-                          "right": 12,
-                          "top": 0
-                        },
-                        "type": "INSTANCE",
-                        "width": "fill_container",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "componentProperties": {},
-                        "fills": [
-                          "$2:156"
-                        ],
-                        "gap": 10,
-                        "height": 64,
-                        "id": "387:185",
-                        "layout": "horizontal",
-                        "mainComponent": {
-                          "componentPropertyDefinitions": {},
-                          "id": "387:181"
-                        },
-                        "name": "cat_eyesclosed",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 12,
-                          "right": 12,
-                          "top": 0
-                        },
-                        "type": "INSTANCE",
-                        "width": "fill_container",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "componentProperties": {},
-                        "fills": [
-                          "$2:156"
-                        ],
-                        "gap": 10,
-                        "height": 64,
-                        "id": "387:186",
-                        "layout": "horizontal",
-                        "mainComponent": {
-                          "componentPropertyDefinitions": {},
-                          "id": "387:181"
-                        },
-                        "name": "cat_videos",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 12,
-                          "right": 12,
-                          "top": 0
-                        },
-                        "type": "INSTANCE",
-                        "width": "fill_container",
-                        "x": "auto",
-                        "y": "auto"
-                      },
-                      {
-                        "componentProperties": {},
-                        "fills": [
-                          "$2:156"
-                        ],
-                        "gap": 10,
-                        "height": 64,
-                        "id": "387:187",
-                        "layout": "horizontal",
-                        "mainComponent": {
-                          "componentPropertyDefinitions": {},
-                          "id": "387:181"
-                        },
-                        "name": "cat_documents",
-                        "padding": {
-                          "bottom": 0,
-                          "left": 12,
-                          "right": 12,
-                          "top": 0
-                        },
-                        "type": "INSTANCE",
+                        "type": "FRAME",
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
@@ -30749,7 +30848,7 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-iv4n-20260922_085834102.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-72hq-20260922_090942107.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
           }
         }
       },
@@ -39370,7 +39469,7 @@
         "300:215": {
           "name": "people/grid-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-jc7j-20260922_085838331.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-1ym2-20260922_090946991.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
           }
         },
         "300:29": {
@@ -42850,7 +42949,7 @@
         "300:723": {
           "name": "people/detail-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-eu31-20260922_085838609.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-1tna-20260922_090947272.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
           }
         },
         "301:13": {
@@ -46563,19 +46662,19 @@
         "395:1": {
           "name": "settings/localmodels-store01-zh",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-p69j-20260922_085839104.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-zumb-20260922_090947716.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
           }
         },
         "395:106": {
           "name": "settings/localmodels-store01-en",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-b06d-20260922_085839537.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-6h0n-20260922_090948180.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
           }
         },
         "395:211": {
           "name": "settings/localmodels-store01-tw",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-icdk-20260922_085839955.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-gx5e-20260922_090948637.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
           }
         }
       },

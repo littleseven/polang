@@ -41,13 +41,13 @@ object AppAlpha {
     val ghost = 0.2.dp
 }
 
-/** 语义状态色（不随主题）。success/warning/error/info 跨 camera/chat/settings/idphoto/tag 复用。注意 statusError(#E53935)=产品 Material Red，与 colorScheme.error(#B3261E M3) 不同。 */
+/** 语义状态色（不随主题）。success/warning/error/info 跨 camera/chat/settings/idphoto/tag 复用。注意 statusError(#E53935)=产品 Material Red，与 colorScheme.error(#B3261E M3) 不同。 2026-09-22 v3.0.5 微信化统一：success 双绿合一→#07C160(品牌绿)；info→#576B95(微信链接蓝,弃Material蓝)。 */
 object StatusColor {
-    val success = Color(0xFF4CAF50)
+    val success = Color(0xFF07C160)
     val warning = Color(0xFFFF9800)
     val warningAmber = Color(0xFFFFA000)
     val error = Color(0xFFE53935)
-    val info = Color(0xFF2196F3)
+    val info = Color(0xFF576B95)
 }
 
 /** 动效时长(ms)+缓动。规范：禁用线性(Linear)，统一 FastOutSlowIn/Standard。drift: MainActivity nav 过渡 tween(400) 未指定 easing，应补 FastOutSlowIn。 */
@@ -409,11 +409,11 @@ object PagerTokens {
     val overlayMaxHeight = 500.dp
 }
 
-/** 模型下载中心专属 token。getTagColor 代码用主题角色(recommended/chat/beauty-camera→tertiary/primary)与下方固定 hex 存在分歧，iOS 以本表固定 hex 为准。 */
+/** 模型下载中心专属 token。getTagColor 代码用主题角色(recommended/chat/beauty-camera→tertiary/primary)与下方固定 hex 存在分歧，iOS 以本表固定 hex 为准。 2026-09-22 v3.0.5 tagColorChat→#576B95。 */
 object ModelCenterTokens {
     val tagColorMustHave = Color(0xFFE53935)
     val tagColorRecommended = Color(0xFFFF9800)
-    val tagColorChat = Color(0xFF2196F3)
+    val tagColorChat = Color(0xFF576B95)
     val tagColorPhotoTagging = Color(0xFF9C27B0)
     val tagColorBeautyCamera = Color(0xFFFF9800)
     val tagColorDefault = Color(0xFF9E9E9E)

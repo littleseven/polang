@@ -254,11 +254,11 @@ enum AppAlpha {
 // MARK: - Status Color（语义状态色，不随主题）
 
 enum StatusColor {
-    static let success = Color(hex: "FF4CAF50")
+    static let success = Color(hex: "FF07C160")
     static let warning = Color(hex: "FFFF9800")
     static let warningAmber = Color(hex: "FFFFA000")
     static let error = Color(hex: "FFE53935")
-    static let info = Color(hex: "FF2196F3")
+    static let info = Color(hex: "FF576B95")
 }
 
 // MARK: - Motion（动效时长 + 缓动）
@@ -656,7 +656,7 @@ enum PagerTokens {
 enum ModelCenterTokens {
     static let tagColorMustHave = Color(hex: "FFE53935")
     static let tagColorRecommended = Color(hex: "FFFF9800")
-    static let tagColorChat = Color(hex: "FF2196F3")
+    static let tagColorChat = Color(hex: "FF576B95")
     static let tagColorPhotoTagging = Color(hex: "FF9C27B0")
     static let tagColorBeautyCamera = Color(hex: "FFFF9800")
     static let tagColorDefault = Color(hex: "FF9E9E9E")
