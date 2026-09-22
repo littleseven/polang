@@ -37,7 +37,7 @@
 - [x] 头像 40dp —— **N/A**：助手对话范式无头像（spec 偏差已回写）
 - [x] 导航栏形态统一（T2 配方）
 - [ ] chatBubble **暗色变体定值** —— 待用户提供微信 Dark 模式聊天截图采样后加 `userBubbleBgDark` 键（唯一遗留项）
-- [x] searchField.backgroundAlpha 0.7 精调（渲染验收后定 1.0 与否）
+- [x] searchField.backgroundAlpha 0.7 精调 —— **维持 0.7**：双模像素合成后与实底差近零（Dark 合成≈#1F1F1F 对底 #111），无视觉回归
 
 ## T4: People/Organize/Memories/Editor（30 帧跟随）
 
