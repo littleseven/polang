@@ -39,13 +39,14 @@
 | onSurfaceVariant 次级字 | `#888888` | `#7F7F7F` | |
 | outlineVariant 分隔线 | `#E5E5E5` | `#2C2C2C` | 组内 hairline |
 | error / badge 红 | `#FA5151` | `#FA5151` | 角标、警示（替换现 `#B3261E`） |
-| chatBubble 自方 | `#95EC69` | `#3EB575`（采样校准） | |
+| chatBubble 自方 | `#95EC69` | `#3EB575`（**待用户微信真机 Dark 截图采样定值**，当前单值双模） | |
 | chatBubble 对方 | `#FFFFFF` | `#2C2C2C` | |
 | 链接蓝（tertiary 承载） | `#576B95` | `#7D90B0`（采样校准） | 聊天内链接/引用文字 |
 
 派生槽位（推导规则，Token 阶段落值并回写）：
 
-- `surfaceContainer*` 梯度：Light `#FFFFFF→#F7F7F7→#F2F2F2→#EDEDED→#E5E5E5`；Dark `#0C0C0C→#141414→#1A1A1A→#222222→#2C2C2C`
+- `surfaceContainer*` 梯度：Light `#FFFFFF→#F7F7F7→#F7F7F7→#EDEDED→#E5E5E5`（2026-09-22 校准：surfaceContainer 由 F2 调至 F7=微信标签栏/次级面标准值，与 Low 同值）；Dark `#0C0C0C→#141414→#1A1A1A→#222222→#2C2C2C`
+  - **canvas 侧注记**：新增 `cell` 槽位(light 白/dark #1A1A1A)供 App 消费；画布列表组绑定 surfaceContainer（帧钉 Light 预览对 in-flow 组填充存在引擎 quirk，与变量新旧无关，Dark 正稿不受影响）
 - `secondary` 系 → 中性灰（Light `#888888` / container `#F2F2F2`；Dark `#7F7F7F` / container `#2C2C2C`）
 - `tertiary` 系 → 链接蓝（如上表），onTertiary `#FFFFFF`
 - errorContainer：Light `#FDEBEB` / Dark `#3A1F1F`
@@ -57,7 +58,7 @@
 - **导航栏**：与页面底同色（Light `#EDEDED` / Dark `#111111`）、居中 17sp semibold 标题、左返回箭头、右功能入口；无大标题、无投影，底一条 hairline。
 - **标签栏**：surface 底、图标+10sp 文字、选中 `#07C160` / 未选中 `#888`、无指示器胶囊。
 - **列表 cell**（设置页大改）：surface 底组内行高 ~54dp、水平 padding 16dp、左 icon+标题、右值+chevron；组圆角 8dp、组间距 8dp 悬于灰底、组内行间 hairline（末行无线）——**替换现有卡片式**。
-- **聊天气泡**：圆角 12dp、靠头像侧尾角 4dp；头像圆 40dp；自方绿/对方白。
+- **聊天气泡**：圆角 12dp、尾角 4dp；自方绿 `#95EC69`/对方白。~~头像圆 40dp~~ **N/A（执行期决策 2026-09-22）**：PoLang 聊天为助手对话范式（2026-08-18 豆包范式去头像：AI 消息通栏、用户气泡无头像），微信化不覆盖此交互结构。
 - **主按钮**：`#07C160` 胶囊白字；次按钮：白底胶囊 + 绿字 + 细绿描边。
 - **搜索框**：`#F7F7F7` 圆角 8dp 灰字（Dark `#2C2C2C`）。
 - **底部弹层**：顶圆角 12dp、surface 底、列表式内容。
@@ -123,3 +124,11 @@
 3. `/ui-parity-guard` 双端一致性通过，截图基线按新规范重建。
 4. Play v2.3 三语全量替换成功（zh 两行回读 18/18）。
 5. 官网换色上线（`#07C160` 主绿系）。
+
+## 7. 执行增补（2026-09-22 · Organize 页专项指令）
+
+用户追加指令：Organize 页 UI 重新设计——**简化 + 配色尽量一致**（当日自动执行完毕）。
+
+1. **结构简化**：hub 页 6 张散置 category_card → 单个微信列表组（surfaceContainer 底、组圆角 8、5 条 hairline 等距分隔），与设置页列表语言一致。
+2. **配色统一（token v3.0.5 值级）**：`statusColor.success` `#4CAF50→#07C160`（全 App 双绿合一为品牌绿）；`statusColor.info` 与 `modelCenter.tagColorChat` `#2196F3→#576B95`（Material 蓝收敛为微信链接蓝）。warning/error 保持产品语义色不变。
+3. **连带修复**：`category_card` 组件 Play 烘焙残留 Light 钉 → 显式回 Dark（与铬件漂移同病族：组件级钉定驱动全部实例）。

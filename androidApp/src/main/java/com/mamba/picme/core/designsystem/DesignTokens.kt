@@ -41,13 +41,13 @@ object AppAlpha {
     val ghost = 0.2.dp
 }
 
-/** 语义状态色（不随主题）。success/warning/error/info 跨 camera/chat/settings/idphoto/tag 复用。注意 statusError(#E53935)=产品 Material Red，与 colorScheme.error(#B3261E M3) 不同。 */
+/** 语义状态色（不随主题）。success/warning/error/info 跨 camera/chat/settings/idphoto/tag 复用。注意 statusError(#E53935)=产品 Material Red，与 colorScheme.error(#B3261E M3) 不同。 2026-09-22 v3.0.5 微信化统一：success 双绿合一→#07C160(品牌绿)；info→#576B95(微信链接蓝,弃Material蓝)。 */
 object StatusColor {
-    val success = Color(0xFF4CAF50)
+    val success = Color(0xFF07C160)
     val warning = Color(0xFFFF9800)
     val warningAmber = Color(0xFFFFA000)
     val error = Color(0xFFE53935)
-    val info = Color(0xFF2196F3)
+    val info = Color(0xFF576B95)
 }
 
 /** 动效时长(ms)+缓动。规范：禁用线性(Linear)，统一 FastOutSlowIn/Standard。drift: MainActivity nav 过渡 tween(400) 未指定 easing，应补 FastOutSlowIn。 */
@@ -83,7 +83,7 @@ object TopBarTokens {
     val buttonSize = 36.dp
     val iconSize = 22.dp
     val titleFontSize = 17.dp
-    val titleFontWeight = FontWeight.Medium
+    val titleFontWeight = FontWeight.SemiBold
     val spacing = 8.dp
     val horizontalPadding = 8.dp
 }
@@ -123,9 +123,9 @@ object AppSliderTokens {
     val animDurationMs = 150
 }
 
-/** 悬浮底部胶囊导航（FloatingBottomTab），主入口聚合。v1 SSOT 漏配 cornerRadius=28，已补。color=surface。 */
+/** 微信式平底标签栏（2026-09-22 v3.0.2 重造）：全宽贴底+顶 hairline(outlineVariant)+图标+labelSmall 10sp 标签；选中 primary 未选中 onSurfaceVariant；悬浮胶囊形制退役。 */
 object BottomTabTokens {
-    val cornerRadius = 28.dp
+    val cornerRadius = 0.dp
     val tonalElevation = 3.dp
     val shadowElevation = 6.dp
     val containerPaddingH = 12.dp
@@ -178,7 +178,7 @@ object BadgeTokens {
     val listHeight = 26.dp
 }
 
-/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。 */
+/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。 2026-09-22 v3.0 cameraAccent 换微信绿 #07C160。 */
 object CameraTokens {
     val focusRingDiameter = 100.dp
     val focusRingStrokeWidth = 3.dp
@@ -198,7 +198,7 @@ object CameraTokens {
     val filterSelectedBorderWidth = 2.5.dp
     val filterLabelFontSize = 10.dp
     val panelBackground = Color(0xB81C1A1F)
-    val cameraAccent = Color(0xFF2FE385)
+    val cameraAccent = Color(0xFF07C160)
     val cameraAccentOn = Color.White
     val toolBarUnselectedBg = Color(0x00000000)
     val inlineFilterPanelHeight = 200.dp
@@ -236,31 +236,31 @@ object CameraTokens {
     val toolChipBg = Color(0xFF4A454F)
 }
 
-/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 */
+/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。 2026-09-22 v3.0.1 形态对齐：气泡 12+尾4、输入 8、弹层 12（spec §1）。 */
 object ChatBubbleTokens {
     val bubbleMaxWidth = 360.dp
     val imageMaxWidth = 240.dp
     val paddingH = 18.dp
     val paddingV = 14.dp
-    val cornerRadius = 20.dp
+    val cornerRadius = 12.dp
     val tailCornerRadius = 4.dp
     val textSize = 16.dp
     val textLineHeight = 24.dp
-    val inputCornerRadius = 28.dp
+    val inputCornerRadius = 8.dp
     val inputShadowElevation = 4.dp
     val capsuleCornerRadius = 16.dp
     val capsuleActiveAlpha = 0.12f
     val capsuleInactiveAlpha = 0.5f
     val overlayBubbleColor = Color(0xFF2D2D2D)
-    val overlayPanelCornerRadius = 20.dp
+    val overlayPanelCornerRadius = 12.dp
     val typingMs = 400
     val blinkMs = 500
     val circularButtonSize = 36.dp
     val circularButtonIconSize = 22.dp
-    val brandGradientStart = Color(0xFF1EA75B)
-    val brandGradientEnd = Color(0xFF7CEFA8)
-    val userBubbleBg = Color(0xFF2FE385)
-    val userBubbleOn = Color(0xFF062B18)
+    val brandGradientStart = Color(0xFF07C160)
+    val brandGradientEnd = Color(0xFF06AD56)
+    val userBubbleBg = Color(0xFF95EC69)
+    val userBubbleOn = Color(0xFF181818)
     val tryChipHeight = 44.dp
     val inputBottomPadding = 28.dp
     val messageGap = 14.dp
@@ -297,7 +297,7 @@ object ChatContextTokens {
 
 /** 侧栏抽屉（2026-08-19 绑定清扫候选入库）：threadRadius=会话条圆角; threadTitleSize=会话条标题字号; titleSize=抽屉主标题字号。 */
 object ChatSidebarTokens {
-    val threadRadius = 14.dp
+    val threadRadius = 8.dp
     val threadTitleSize = 15.dp
     val titleSize = 18.dp
 }
@@ -385,7 +385,7 @@ object GalleryTokens {
 
 /** SearchTopBar 内嵌胶囊搜索框（Gallery/Chat 共用 SearchField）。ios-follow gallery-search 2026-08-11 自 Android SearchField.kt 反向提取。颜色全走 colorScheme 角色：bg=surfaceVariant@0.7，icon/placeholder/clear=onSurface@0.5/0.4/0.5，cursor=primary。height=整胶囊高度（2026-08-19 绑定清扫候选入库）。 */
 object SearchFieldTokens {
-    val cornerRadius = 24.dp
+    val cornerRadius = 8.dp
     val paddingH = 12.dp
     val paddingV = 8.dp
     val backgroundAlpha = 0.7f
@@ -409,11 +409,11 @@ object PagerTokens {
     val overlayMaxHeight = 500.dp
 }
 
-/** 模型下载中心专属 token。getTagColor 代码用主题角色(recommended/chat/beauty-camera→tertiary/primary)与下方固定 hex 存在分歧，iOS 以本表固定 hex 为准。 */
+/** 模型下载中心专属 token。getTagColor 代码用主题角色(recommended/chat/beauty-camera→tertiary/primary)与下方固定 hex 存在分歧，iOS 以本表固定 hex 为准。 2026-09-22 v3.0.5 tagColorChat→#576B95。 */
 object ModelCenterTokens {
     val tagColorMustHave = Color(0xFFE53935)
     val tagColorRecommended = Color(0xFFFF9800)
-    val tagColorChat = Color(0xFF2196F3)
+    val tagColorChat = Color(0xFF576B95)
     val tagColorPhotoTagging = Color(0xFF9C27B0)
     val tagColorBeautyCamera = Color(0xFFFF9800)
     val tagColorDefault = Color(0xFF9E9E9E)
