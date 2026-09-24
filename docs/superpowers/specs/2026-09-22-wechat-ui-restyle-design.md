@@ -87,7 +87,7 @@
 
 ### §4 双端代码落地
 
-- **Android**：token 重生成后 `colorScheme` 直喂 M3，大部分页面自动换色；手工改形态组件——设置页列表化（新建 WeChat 风列表 cell 组件）、导航栏/标签栏/气泡/搜索框改造；相机页只换主题资源。
+- **Android**（2026-09-24 Phase 3 完成，分支 feat/wechat-restyle-phase3）：平底标签栏（FloatingBottomTab 重造+4 调用点）、设置列表组（SettingsListSection→cell+8dp+组距8）、顶栏（AppTopBar 默认居中+SemiBold+hairline+常量收敛 TopBarTokens）、Theme 全槽位映射修正（存量缺口：container/variant/outline 系此前为 M3 默认紫基线）+ `ColorScheme.cell` 扩展。设备 Light 实测：标题 x=600 精确居中/白 cell 组/平底条四要素全中。相机页仅主题资源（已随 token 生效）。
 - **iOS**：走 `/ios-follow` 管线对等跟随。
 - **验收**：`ui_driver` 截图 + `/ui-parity-guard` 双端一致性；**screenshot-diff 基线全红是预期**，重建基线。
 - i18n 不动文案；列表化后布局挤压需五语（en/zh-rCN/zh-rTW/es/fr）回读。
