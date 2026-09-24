@@ -266,9 +266,9 @@ Expected: 全绿。
 
 ### Task 6: 装机冒烟——「色」层微信化确认
 
-> ⏸ **执行偏差（2026-09-22 夜）**：执行时无设备连接，装机截图顺延至设备接入后。已完成的替代验证：assembleDebug 打包链绿（APK 87MB）+ 硬编码色漏网扫描（功能代码零硬编码，仅 2 处注释文案已修正提交）+ Ardot 快照像素级采样（dark bg #111111 / accent #07C160 实锤）。
+> ✅ **2026-09-24 补验完成（设备 51912a5c）**：装机双模像素级验证全绿——Dark：#111 底/白字叠层/选中绿 1618px；Light：页面底 #EDEDED 像素精确命中/白回忆卡/选中页签 #07C160/未选中灰标签，零青玉残留。注：应用内主题曾钉 Dark 致首轮 Light 未切（多轮 force-stop 后系统 uimode 生效）；胶囊标签栏形态为 Phase 3 待改项（预期中间态）。
 
-- [ ] **Step 1: 出包安装**
+- [x] **Step 1: 出包安装**
 
 ```bash
 ./gradlew :androidApp:assembleDebug -q
@@ -276,7 +276,7 @@ adb install -r androidApp/build/outputs/apk/debug/polang-debug.apk
 adb shell monkey -p com.mamba.picme 1   # 冷启动（包名以 applicationId 为准）
 ```
 
-- [ ] **Step 2: 浅色态截图核对**
+- [x] **Step 2: 浅色态截图核对**
 
 ```bash
 adb shell cmd uimode night no
@@ -287,7 +287,7 @@ adb exec-out screencap -p > tmp/wechat-smoke-light.png
 打开设置页与聊天页各截一张（可用 `/ui-driver` skill 结构化导航）。核对：页面底 `#EDEDED` 灰、卡片白、主操作/选中态微信绿 `#07C160`、正文深字。相机页：accent 变 `#07C160`。
 不合格（残留大面积青玉色）→ 多半为硬编码色漏网：`grep -rn "0E9F6E\|2FE385\|F1FAF5" androidApp/src/main --include="*.kt"` 清点并改绑 token（不属于本计划的新增项，记录后按同 spec 处理）。
 
-- [ ] **Step 3: 深色态截图核对**
+- [x] **Step 3: 深色态截图核对**
 
 ```bash
 adb shell cmd uimode night yes
