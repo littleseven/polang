@@ -58,6 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.AppColors
 import com.mamba.picme.core.designsystem.SettingsTokens
+import com.mamba.picme.core.designsystem.appShapes
+import com.mamba.picme.core.designsystem.cell
 
 @Composable
 internal fun SettingsSection(
@@ -382,13 +384,14 @@ internal fun SettingsTextInputRow(
 
 // ── 设置主菜单列表式组件（2026-08-17 重设计，iOS 式分组列表；spec=specs/screens/refs/ardot settings/main_list）──
 
-/** 列表分组容器：surfaceContainerHighest 圆角卡，行间由 [SettingsListDivider] 分隔。 */
+/** 列表分组容器：微信式灰底白组（cell 底 + 8dp 圆角），行间由 [SettingsListDivider] 分隔。 */
 @Composable
 internal fun SettingsListSection(content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.appShapes.card,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            containerColor = MaterialTheme.colorScheme.cell
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {

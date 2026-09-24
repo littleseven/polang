@@ -2,6 +2,7 @@ package com.mamba.picme.core.designsystem
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -9,6 +10,9 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.mamba.picme.domain.model.ThemeMode
 
@@ -48,6 +52,15 @@ private val LightColorScheme = lightColorScheme(
     onBackground = OnBackgroundLight,
     surface = SurfaceLight,
     onSurface = OnSurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
+    surfaceContainerLowest = SurfaceContainerLowestLight,
+    surfaceContainerLow = SurfaceContainerLowLight,
+    surfaceContainer = SurfaceContainerLight,
+    surfaceContainerHigh = SurfaceContainerHighLight,
+    surfaceContainerHighest = SurfaceContainerHighestLight,
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -71,7 +84,27 @@ private val DarkColorScheme = darkColorScheme(
     onBackground = OnBackgroundDark,
     surface = SurfaceDark,
     onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
+    surfaceContainerLowest = SurfaceContainerLowestDark,
+    surfaceContainerLow = SurfaceContainerLowDark,
+    surfaceContainer = SurfaceContainerDark,
+    surfaceContainerHigh = SurfaceContainerHighDark,
+    surfaceContainerHighest = SurfaceContainerHighestDark,
 )
+
+/**
+ * 微信列表组 cell 底色（token v3.0 新增槽位，非 M3 标准槽）：
+ * Light 纯白 / Dark #1A1A1A，供设置列表组等「灰底白组」容器消费。
+ * 动态取色（dynamicColor=true）时回退 surfaceContainerLowest 保持近似。
+ */
+val LocalCellColor = staticCompositionLocalOf { CellLight }
+
+/** 便捷访问：`MaterialTheme.colorScheme.cell`（实为 [LocalCellColor]，非 M3 槽）。 */
+val ColorScheme.cell: Color
+    @Composable @ReadOnlyComposable get() = LocalCellColor.current
 
 /**
  * 全局主题入口。
@@ -103,9 +136,17 @@ fun PoLangTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+        typography = Typography
+    ) {
+        CompositionLocalProvider(
+            LocalCellColor provides when {
+                dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                    colorScheme.surfaceContainerLowest
+                else -> if (darkTheme) CellDark else CellLight
+            },
+            content = content
+        )
+    }
 }
 
 /**
@@ -129,7 +170,11 @@ fun PoLangForcedDarkTheme(
     }
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+        typography = Typography
+    ) {
+        CompositionLocalProvider(
+            LocalCellColor provides CellDark,
+            content = content
+        )
+    }
 }

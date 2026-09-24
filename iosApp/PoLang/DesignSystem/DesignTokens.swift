@@ -559,7 +559,7 @@ enum SettingsTokens {
     static let listIconBlockSize: CGFloat = 28
     static let listIconBlockRadius: CGFloat = 7
     static let listIconInnerSize: CGFloat = 18
-    static let listSectionSpacing: CGFloat = 24
+    static let listSectionSpacing: CGFloat = 8
     static let listSectionPaddingH: CGFloat = 16
     static let listDividerInsetStart: CGFloat = 56
     static let listTitleFontSize: CGFloat = 15
