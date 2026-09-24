@@ -868,7 +868,6 @@ fun GalleryScreen(
                     onSwitchPage = onSwitchMainPage,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp)
                         .navigationBarsPadding()
                 )
             }

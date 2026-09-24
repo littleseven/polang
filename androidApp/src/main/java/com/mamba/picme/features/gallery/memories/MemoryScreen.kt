@@ -143,7 +143,6 @@ fun MemoryScreen(
             onSwitchPage = onSwitchMainPage,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp)
                 .navigationBarsPadding(),
         )
         // 隐藏确认弹窗（从旧 MemoriesCarousel 平移，文案键不变）
