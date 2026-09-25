@@ -147,6 +147,8 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 全量快照商店帧渲染漂移(2026-09-25) | export-ardot-snapshot 后 70 张商店/海报 PNG 内容区由 #111 漂成 #D5D5D5(亮度 41→115),但源帧逐帧单导正常暗色 | 疑陈旧客户端(6h+)×导出管线钉定残留;处置=坏导出全部 git checkout 回滚勿混入任务提交,源帧单导自证正常,重启客户端后再择时全量快照 |
 | preview-mode.sh --shot 搬移路径失配 | 脚本按 `<dir>/screenshot-*.png` 搬文件,实际产物落 `<dir>/<fileId>/` 子目录,报 FileNotFoundError | 钉定本身已生效(像素自证);截图自己 capture_screenshot 代劳,勿重试脚本(重试会二次钉定) |
 | health-check 多页扫描漏页与合并 | 只扫单页时 catalog 全组件报 missing(假 drift);两页 jsonl 直接 cat 合并则 _meta 双行 KeyError | catalog 校验必须含 Components 页;合并时滤掉各文件 _meta 行,重写单行 _meta |
+| 营销帧批量面色重绑后文字全隐形(2026-09-25) | 24 海报标题/副标题+brand_row 组件字被重绑到与背景同 token(scheme/background)→黑底黑字,且 health-check literal=0 照样绿——**对比度错误不在健康检查射程内** | 批量 rebind 后必须逐帧导出+文字带白像素判据复验(全帧行级亮度剖面);营销帧配色对:scheme/primary 底+scheme/onPrimary(#FFF 双模恒值)字;04-people/05-person-groups 帧内文案互换系历史既定(v2.2.2 起线上如此),勿当 bug"修" |
+| Play REST v3 图片端点形态(2026-09-25) | images 增删查 URL 误带 /images 段或 type query → 400 Cannot bind / Invalid value | 真身=.../listings/{lang}/{imageType}(camelCase: phoneScreenshots/featureGraphic,无 /images 段);edit 收尾=.../edits/{id}**:commit**(冒号非斜杠);入库脚本 scripts/play-images-upload.py(SA JWT openssl 签+SOCKS+prune 重传+sha 回读) |
 
 ## 相关文件
 
@@ -179,3 +181,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 1.3.0 | 2026-09-21 | guide 铬件比例实战回填:烘焙图自带错位铬件勿叠浮层,PIL 按源图原生倍率合成+逐图采样底色 |
 | 1.4.0 | 2026-09-22 | 铬件/主题大修实战回填:六类病灶+audit 双指标工具+九行配方(主题钉/D()删变量/陈旧客户端/管道僵死/C 补铬件/图片过期回填/按钮遮挡/PSA 重发流程) |
 | 1.5.0 | 2026-09-25 | 任务卡组件/任务中心页实战回填:快照商店帧渲染漂移处置+preview-mode.sh --shot 路径失配+health-check 多页漏扫/合并两坑(陷阱表 +3 行) |
+| 1.6.0 | 2026-09-25 | 海报隐形文字事故修复实战回填:批量面色重绑对比度盲区(health-check 不设防,须行级亮度判据)+Play REST v3 图片端点形态/入库直传脚本(陷阱表 +2 行) |
