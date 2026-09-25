@@ -3,6 +3,7 @@ package com.mamba.picme.features.chat
 import com.mamba.picme.domain.chat.ClaudeAgentState
 import com.mamba.picme.domain.chat.ClaudeDeliverUi
 import com.mamba.picme.domain.chat.EngineerTaskState
+import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
@@ -301,6 +302,9 @@ class ChatViewModel(
      */
     private val rendererMutex = Mutex()
 
+    /** 任务卡落库串行化：SSE 事件串行到达 + 本 Mutex 保证 upsert 顺序与事件顺序一致（防乱序回写）。 */
+    private val engineerTaskPersistMutex = Mutex()
+
     private val _claudeMode = MutableStateFlow(false)
     val claudeMode: StateFlow<Boolean> = _claudeMode.asStateFlow()
 
@@ -390,7 +394,7 @@ class ChatViewModel(
                 val initialTask = EngineerTaskReducer.initial(taskId, text, System.currentTimeMillis())
                 activeEngineerTaskId = taskId
                 _engineerTasks.update { tasks -> tasks + (taskId to initialTask) }
-                persistEngineerTask(sessionId, initialTask)
+                engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, initialTask) }
                 val renderer = ClaudeAgentRenderer()
                 val streamingId = "claude_streaming_${System.currentTimeMillis()}"
                 _streamingMessage.value = ChatMessageUi(
@@ -563,16 +567,19 @@ class ChatViewModel(
 
     /** 任务卡 upsert（REPLACE 同 id 重插，对齐 gacha metadata 覆写先例）；timestamp 恒为 startedAtMs，卡片锚定提交位置。 */
     private suspend fun persistEngineerTask(sessionId: String, state: EngineerTaskState) {
-        chatMessageDao.insertMessage(
-            ChatMessageEntity(
-                id = state.taskId,
-                sessionId = sessionId,
-                type = EngineerTaskState.ROOM_TYPE,
-                content = state.sourceText.take(50),
-                timestamp = state.startedAtMs,
-                metadata = JSONObject().put("engineer_task", state.toJson()).toString(),
+        // 展示层 overlay 的持久化失败不应中止推理（launch 内异常直接崩溃，故就地吞掉只记日志）
+        runCatching {
+            chatMessageDao.insertMessage(
+                ChatMessageEntity(
+                    id = state.taskId,
+                    sessionId = sessionId,
+                    type = EngineerTaskState.ROOM_TYPE,
+                    content = state.sourceText.take(50),
+                    timestamp = state.startedAtMs,
+                    metadata = JSONObject().put("engineer_task", state.toJson()).toString(),
+                )
             )
-        )
+        }.onFailure { e -> Logger.e(TAG, "persistEngineerTask failed taskId=${state.taskId}", e) }
     }
 
     /** SSE 事件 → 任务卡状态机；结构性事件才落库（文本 delta 不触发 Room churn）。 */
@@ -586,7 +593,7 @@ class ChatViewModel(
         if (next == current) return
         _engineerTasks.update { tasks -> tasks + (taskId to next) }
         if (EngineerTaskReducer.isStructural(event)) {
-            viewModelScope.launch { persistEngineerTask(sessionId, next) }
+            viewModelScope.launch { engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) } }
         }
     }
 
@@ -594,6 +601,9 @@ class ChatViewModel(
     private fun markActiveEngineerTaskFailed(sessionId: String, message: String?) {
         val taskId = activeEngineerTaskId ?: return
         val current = _engineerTasks.value[taskId] ?: return
+        // 断连语义只裁决「还在跑」的卡：COMPLETED/AWAITING_CONTINUE/FAILED 不被二次裁决
+        // （否则 catch 路径会把 AWAITING_CONTINUE 打成 FAILED，吞掉「继续」affordance）
+        if (current.status != EngineerTaskStatus.RUNNING) return
         val next = EngineerTaskReducer.reduce(
             current,
             ClaudeEvent.Error(message ?: "connection lost"),
@@ -601,7 +611,7 @@ class ChatViewModel(
             nowMs = System.currentTimeMillis(),
         )
         _engineerTasks.update { tasks -> tasks + (taskId to next) }
-        viewModelScope.launch { persistEngineerTask(sessionId, next) }
+        viewModelScope.launch { engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) } }
     }
 
     /**
@@ -1085,7 +1095,7 @@ class ChatViewModel(
                             val merged = loadedTasks.toMutableMap()
                             current.forEach { (taskId, live) ->
                                 val fromRoom = merged[taskId]
-                                if (fromRoom == null || live.updatedAtMs > fromRoom.updatedAtMs) {
+                                if (fromRoom == null || live.updatedAtMs >= fromRoom.updatedAtMs) {
                                     merged[taskId] = live
                                 }
                             }
