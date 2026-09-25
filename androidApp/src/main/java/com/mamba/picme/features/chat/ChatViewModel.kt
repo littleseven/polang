@@ -74,6 +74,7 @@ import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.capability.SearchOutcome
 import com.mamba.picme.features.chat.engineer.EngineerTaskReducer
+import com.mamba.picme.features.chat.engineer.EngineerTaskSmokeSamples
 import com.mamba.picme.features.chat.js.CapabilityDispatchHandler
 import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
@@ -1379,6 +1380,19 @@ class ChatViewModel(
             viewModelScope.launch {
                 ensureSessionExists(_currentSessionId.value)
                 HtmlCardSmokeSamples.all.forEach { sample -> emitHtmlCardMessage(sample) }
+            }
+            return
+        }
+
+        // [DEV_ONLY] 调试指令：/task 注入任务卡五态冒烟集，不走 LLM
+        if (BuildConfig.DEBUG && text.trim() == "/task") {
+            viewModelScope.launch {
+                val sessionId = _currentSessionId.value
+                ensureSessionExists(sessionId)
+                EngineerTaskSmokeSamples.all(System.currentTimeMillis()).forEach { sample ->
+                    _engineerTasks.update { tasks -> tasks + (sample.taskId to sample) }
+                    persistEngineerTask(sessionId, sample)
+                }
             }
             return
         }
