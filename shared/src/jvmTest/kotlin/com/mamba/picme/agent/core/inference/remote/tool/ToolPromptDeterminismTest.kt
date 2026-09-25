@@ -3,6 +3,7 @@ package com.mamba.picme.agent.core.inference.remote.tool
 import ai.koog.agents.core.tools.reflect.asToolsByClass
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.File
 
 /**
  * 工具清单 prompt 确定性护栏（KMP 抽取 Task 7，防 suspend 化/去反射改写漂移）。
@@ -16,6 +17,10 @@ import org.junit.Test
  *
  * 位置说明：计划原写 commonTest，但 @Tool 元数据的反射展开是 JVM-only（Koog reflect 包
  * 无 common 版本），只能在 jvmTest 跑；纯格式化的 KMP 部分由 commonTest `ToolInventoryTest` 覆盖。
+ *
+ * deliberate 的工具描述变更后重生 golden：
+ * `POLANG_WRITE_GOLDEN=1 ./gradlew :shared:jvmTest --tests "*ToolPromptDeterminismTest*"`
+ * （与 ChatSystemPromptGoldenTest 同一约定；生成结果必须人工 review 再提交）。
  */
 class ToolPromptDeterminismTest {
 
@@ -24,7 +29,8 @@ class ToolPromptDeterminismTest {
         val actual = ToolInventory.build(
             ChatToolService.getInstance().asToolsByClass().map { it.descriptor }
         )
-        assertEquals(golden("chat_tool_inventory_golden.txt"), actual)
+        writeGoldenIfRequested(CHAT_GOLDEN, actual)
+        assertEquals(golden(CHAT_GOLDEN), actual)
     }
 
     @Test
@@ -32,10 +38,23 @@ class ToolPromptDeterminismTest {
         val actual = ToolInventory.build(
             CameraToolService.getInstance().asToolsByClass().map { it.descriptor }
         )
-        assertEquals(golden("camera_tool_inventory_golden.txt"), actual)
+        writeGoldenIfRequested(CAMERA_GOLDEN, actual)
+        assertEquals(golden(CAMERA_GOLDEN), actual)
+    }
+
+    private fun writeGoldenIfRequested(name: String, actual: String) {
+        if (System.getProperty("polang.writeGolden") == "true" || System.getenv("POLANG_WRITE_GOLDEN") == "1") {
+            File("src/jvmTest/resources/golden/$name").apply { parentFile.mkdirs() }
+                .writeText(actual, Charsets.UTF_8)
+        }
     }
 
     private fun golden(name: String): String =
         requireNotNull(javaClass.getResource("/golden/$name")) { "golden 资源缺失：$name" }
             .readText(Charsets.UTF_8)
+
+    private companion object {
+        const val CHAT_GOLDEN = "chat_tool_inventory_golden.txt"
+        const val CAMERA_GOLDEN = "camera_tool_inventory_golden.txt"
+    }
 }
