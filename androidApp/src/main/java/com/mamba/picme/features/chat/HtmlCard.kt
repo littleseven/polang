@@ -3,51 +3,73 @@ package com.mamba.picme.features.chat
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color as AndroidColor
+import android.util.LruCache
 import android.view.MotionEvent
 import android.view.View
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.mamba.picme.R
 
 /**
- * 聊天里的 HTML 组件卡片：离线 WebView 渲染自包含 HTML（LLM `render_html` 产物，
+ * 聊天里的 HTML 组件卡片：WebView 渲染自包含 HTML（LLM `render_html` 产物，
  * 落库前已过 [HtmlCardSanitizer]）。
  *
- * 锁死策略（渲染对象为不可信内容，[PRIVACY] 不触网）：
- * - `shouldInterceptRequest` 全量拦截 http(s) 子资源（断网，仅放行 data: 等内联协议）；
- * - `shouldOverrideUrlLoading` 一律拦截（禁导航/外链跳转）；
+ * 沙箱策略（渲染对象为不可信的 LLM 产物）：
+ * - **零 JS 桥接**（不 addJavascriptInterface）——JS 拿不到任何原生对象，最高防线不动；
  * - 禁文件/内容访问、禁 DOM Storage、无缓存；
- * - **零 JS 桥接**（不 addJavascriptInterface）；JS 仅在沙盒内启用（动画/交互表现力）。
+ * - 远程资源（img/CSS 等）放行加载（2026-09-25 起暂时放开安全限制，表现力优先）；
+ * - `<a>` 外链点击**不在卡片内导航**：回调 `onOpenLink` 由宿主打开全屏落地页
+ *   （[HtmlLinkPreviewOverlay]）查看；卡片内其余元素（按钮/Tab/手风琴等 JS 交互）
+ *   直接在卡片内生效。
  *
  * 卡片态高度动态适配内容：[HtmlWebView] 加载完成后经 `evaluateJavascript` 读内容高度
  * （出站求值，非 JS 桥接），clamp 到 [[CARD_MIN_HEIGHT], 屏高×[CARD_MAX_HEIGHT_FRACTION]]；
  * 加载后注入 ResizeObserver 监听 body——内容高度随交互变化（手风琴/Tab/动态排版）时经
  * console 约定通道（`onConsoleMessage`，JS→原生单向被动上报，非桥接）持续跟随，容器动画伸缩。
- * 卡片内直接交互（JS 点击/输入即时生效，无全屏落地页）；内容超高时卡片内滚动，
- * 滚动条一律隐藏，嵌套滚动经 `rememberNestedScrollInteropConnection` 滚到边界后让渡外层列表。
+ * **滑动防抖**：测高结果按 html hash 进程级缓存（重回视口零高度动画）+ 列表滑动途中冻结
+ * 高度更新（滚停后一次性应用）+ 小于 [HEIGHT_UPDATE_THRESHOLD_PX]px 的抖动忽略——三者共同
+ * 消除「滑动中列表项边滚边变高」的上下抖动。
+ * 内容超高时卡片内滚动，滚动条一律隐藏，嵌套滚动经 `rememberNestedScrollInteropConnection`
+ * 滚到边界后让渡外层列表。
  */
 
 /** 卡片态最小高度。 */
@@ -65,11 +87,31 @@ const val CARD_MAX_HEIGHT_FRACTION = 0.66f
  */
 const val CARD_HORIZONTAL_CHROME_DP = 48
 
+/**
+ * 测高结果进程级缓存（key = html hashCode）：LazyColumn 划出视口的列表项会被回收，
+ * 滑回来时重组复位成占位高 → 重测高 → 高度动画，多张卡片在滑动途中边滚边变高即「上下抖动」。
+ * 缓存越出单个列表项的 remember 生命周期，卡片重回视口直接以最终高度出现，零高度动画。
+ */
+private val measuredHeightCache = LruCache<Int, Int>(64)
+
+/** 高度更新最小幅度（CSS px ≈ dp）：低于此值的测高抖动（小数取整等）直接忽略，不触发动画。 */
+private const val HEIGHT_UPDATE_THRESHOLD_PX = 2
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun HtmlCard(html: String, modifier: Modifier = Modifier) {
-    // 内容测高（CSS px ≈ dp，模板已注入 viewport meta width=device-width）；html 变化时复位
-    var measuredHeightDp by remember(html) { mutableIntStateOf(-1) }
+fun HtmlCard(
+    html: String,
+    modifier: Modifier = Modifier,
+    isListScrolling: Boolean = false,
+    onOpenLink: ((String) -> Unit)? = null
+) {
+    // 内容测高（CSS px ≈ dp，模板已注入 viewport meta width=device-width）；html 变化时复位，
+    // 初值取进程级缓存——重回视口的卡片直接以最终高度出现，不走占位高度动画
+    val htmlKey = html.hashCode()
+    var measuredHeightDp by remember(html) { mutableIntStateOf(measuredHeightCache.get(htmlKey) ?: -1) }
+    // 滑动途中冻结高度更新（列表项边滚边变高是滑动抖动主因），最新值挂起，滚动停止后一次性应用
+    var pendingHeightDp by remember(html) { mutableIntStateOf(-1) }
+    val currentIsScrolling by rememberUpdatedState(isListScrolling)
     val maxHeightDp = (LocalConfiguration.current.screenHeightDp * CARD_MAX_HEIGHT_FRACTION).toInt()
     val maxHeight = maxOf(CARD_MIN_HEIGHT, maxHeightDp.dp)
     val targetHeight = if (measuredHeightDp > 0) {
@@ -78,6 +120,14 @@ fun HtmlCard(html: String, modifier: Modifier = Modifier) {
         CARD_PLACEHOLDER_HEIGHT
     }
     val animatedHeight by animateDpAsState(targetValue = targetHeight, label = "htmlCardHeight")
+
+    LaunchedEffect(isListScrolling) {
+        if (!isListScrolling && pendingHeightDp > 0) {
+            measuredHeightDp = pendingHeightDp
+            measuredHeightCache.put(htmlKey, pendingHeightDp)
+            pendingHeightDp = -1
+        }
+    }
 
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -92,29 +142,42 @@ fun HtmlCard(html: String, modifier: Modifier = Modifier) {
                 .height(animatedHeight)
                 .nestedScroll(rememberNestedScrollInteropConnection())
                 .padding(8.dp),
-            onContentHeightCssPx = { measuredHeightDp = it }
+            onContentHeightCssPx = { px ->
+                val last = measuredHeightCache.get(htmlKey) ?: -1
+                if (kotlin.math.abs(px - last) >= HEIGHT_UPDATE_THRESHOLD_PX) {
+                    if (currentIsScrolling) {
+                        pendingHeightDp = px
+                    } else {
+                        measuredHeightDp = px
+                        measuredHeightCache.put(htmlKey, px)
+                    }
+                }
+            },
+            onOpenLink = onOpenLink
         )
     }
 }
 
 /**
- * 离线锁死 WebView。内容变化（[html] hash 变化）才重载，避免重组时闪烁重渲染。
+ * 卡片沙箱 WebView。内容变化（[html] hash 变化）才重载，避免重组时闪烁重渲染。
  *
  * [onContentHeightCssPx]：页面加载完成后回测内容高度（CSS px，≈ dp）。
  * 经 `evaluateJavascript` 出站求值实现——不构成 JS 桥接（JS 无法反向调用原生）。
+ * [onOpenLink]：`<a>` http(s) 外链点击回调（卡片自身永不导航），由宿主打开落地页。
  */
-@SuppressLint("SetJavaScriptEnabled") // 表现力来源；已断网 + 零桥接，JS 跑不出沙盒
+@SuppressLint("SetJavaScriptEnabled") // 表现力来源；零桥接，JS 拿不到原生对象
 @Composable
 private fun HtmlWebView(
     html: String,
     modifier: Modifier = Modifier,
-    onContentHeightCssPx: ((Int) -> Unit)? = null
+    onContentHeightCssPx: ((Int) -> Unit)? = null,
+    onOpenLink: ((String) -> Unit)? = null
 ) {
     AndroidView(
         modifier = modifier,
         factory = { context ->
             ChatHtmlWebView(context).apply {
-                applyOfflineLockdown(onContentHeightCssPx)
+                applyCardSandbox(onContentHeightCssPx, onOpenLink)
                 loadHtmlOnce(html)
             }
         },
@@ -221,7 +284,10 @@ private fun WebView.reportContentHeight(onContentHeightCssPx: (Int) -> Unit) {
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun WebView.applyOfflineLockdown(onContentHeightCssPx: ((Int) -> Unit)?) {
+private fun WebView.applyCardSandbox(
+    onContentHeightCssPx: ((Int) -> Unit)?,
+    onOpenLink: ((String) -> Unit)?
+) {
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = false
     settings.allowFileAccess = false
@@ -246,21 +312,19 @@ private fun WebView.applyOfflineLockdown(onContentHeightCssPx: ((Int) -> Unit)?)
         }
     }
     webViewClient = object : WebViewClient() {
-        /** 禁一切导航（外链跳转、location 跳转）。 */
-        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = true
-
-        /** 断网双保险：http(s) 子资源一律返回空响应；data:/about: 等内联协议放行。 */
-        override fun shouldInterceptRequest(
-            view: WebView,
-            request: WebResourceRequest
-        ): WebResourceResponse? {
+        /**
+         * 卡片自身永不导航（一律拦截）：http(s) 外链回调 [onOpenLink] 由宿主打开落地页；
+         * 其他协议（tel:/mailto:/intent: 等）静默吞掉。
+         */
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            val url = request.url?.toString() ?: return true
             val scheme = request.url.scheme?.lowercase()
-            return if (scheme == "http" || scheme == "https") {
-                WebResourceResponse("text/plain", "utf-8", null)
-            } else {
-                null
-            }
+            if (scheme == "http" || scheme == "https") onOpenLink?.invoke(url)
+            return true
         }
+
+        // 远程子资源（img/CSS 等）放行加载：2026-09-25 起暂时放开安全限制，表现力优先；
+        // 零 JS 桥接 + 禁文件访问防线不变。
 
         override fun onPageFinished(view: WebView, url: String?) {
             // 高度 watcher 与布局无关（ResizeObserver 注册即生效），先行注入
@@ -300,3 +364,62 @@ private fun WebView.measureContentHeightWhenLaidOut(onContentHeightCssPx: (Int) 
 }
 
 private const val MEASURE_RETRY_DELAY_MS = 400L
+
+/**
+ * 外链落地页全屏浮层：卡片内 `<a>` 链接点击后以完整浏览器形态加载远程页面。
+ *
+ * 与卡片沙箱的差异：这里是通用 web 内容，启用 DOM Storage 保证兼容性；
+ * **零 JS 桥接不变**（不 addJavascriptInterface）；允许浮层内页面跳转（用户已显式点链接进入）。
+ * 返回键/关闭键由宿主（ChatScreen 的预览 BackHandler）收口，浮层自身不拦截。
+ */
+@SuppressLint("SetJavaScriptEnabled") // 通用 web 内容需要 JS；零桥接防线不变
+@Composable
+fun HtmlLinkPreviewOverlay(url: String?, onDismiss: () -> Unit) {
+    if (url == null) return
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(R.string.close),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                text = url,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    // 显式挂 client：页面内跳转留在浮层内，不甩给外部浏览器
+                    webViewClient = WebViewClient()
+                    loadUrl(url)
+                }
+            },
+            update = { /* 单次加载，url 变化时浮层整体重组（remember key 在调用侧） */ },
+            onRelease = { webView ->
+                webView.stopLoading()
+                webView.destroy()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        )
+    }
+}
