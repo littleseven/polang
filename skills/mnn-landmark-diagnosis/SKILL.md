@@ -2,9 +2,9 @@
 name: mnn-landmark-diagnosis
 description: |
   诊断和修复 MNN 推理引擎在人脸关键点检测中的对齐问题。
-version: 1.2.0
+version: 1.2.1
 created: 2026-05-03
-updated: 2026-08-03
+updated: 2026-09-25
 maintainer: "[RD] 全栈工程师"
 tags:
   - mnn
@@ -48,9 +48,9 @@ tags:
 ```
 Layer 1: 输入预处理层  → C++ detect() 方法
 Layer 2: 输出读取层    → copyToHostTensor 维度类型
-Layer 3: 坐标变换层    → Kotlin prepareInputBitmap / buildLooseFaceCrop
+Layer 3: 坐标变换层    → Kotlin prepareInputBitmap
 Layer 4: 坐标解析层    → parseLandmarks ([-1,1] → 像素 → 归一化)
-Layer 5: 点序映射层    → FULL_REMAP 映射表
+Layer 5: 点序映射层    → MNN 原生 106 点序（无重映射表）
 ```
 
 **诊断顺序**：自上而下建立对比测试 → 自下而上逐层定位
@@ -110,12 +110,14 @@ output->copyToHostTensor(&tmpOutput);
 
 ### Layer 3: 坐标变换排查
 
-**对比维度**：
-| 项目 | ONNX | MNN |
-|------|------|-----|
-| crop 方式 | `buildLooseFaceCrop` | `prepareInputBitmap` |
-| transformMatrix | `inputScale, 0, INPUT_SIZE/2 - centerX*inputScale` | 应完全一致 |
-| inverseMatrix | `transformMatrix.invert()` | 应完全一致 |
+> ONNX 检测器（`buildLooseFaceCrop`）已移除，现役仅 MNN 路径。
+
+**关键点**：
+| 项目 | MNN |
+|------|-----|
+| crop 方式 | `prepareInputBitmap` |
+| transformMatrix | `inputScale, 0, INPUT_SIZE/2 - centerX*inputScale` |
+| inverseMatrix | `transformMatrix.invert()` |
 
 ### Layer 4: 坐标解析排查
 
@@ -132,7 +134,7 @@ val normalizedX = mappedPoint[0] / bitmapWidth
 
 ### Layer 5: 点序映射排查
 
-**验证方法**：确认 `FULL_REMAP` 映射表与 ONNX 版本一致。
+**验证方法**：MNN 106 关键点为原生点序输出，无重映射表（历史 ONNX `FULL_REMAP` 已随 ONNX 检测器移除）。若涉及 MediaPipe 468→106 跨源映射，见 [mediapipe-landmark-mapping](/mediapipe-landmark-mapping)（`MediaPipe468Adapter`）。
 
 ---
 
@@ -272,7 +274,7 @@ adb logcat -d | grep "MNN vs ONNX"   # 仅当已临时加回对比埋点时才�
 | 输出完全错误但稳定 | 维度类型不匹配 | 动态获取维度类型 |
 | 输出接近正确但有偏差 | 归一化参数错误 | 检测内置归一化节点 |
 | 帧间抖动大 | 重复预处理 / 输入尺寸不一致 | 统一 INPUT_SIZE，避免重复 letterbox |
-| 部分点正确部分错误 | 点序映射表错误 | 核对 FULL_REMAP |
+| 部分点正确部分错误 | 点序映射错误 | MNN 原生 106 点序无重映射；跨源核对 `MediaPipe468Adapter` |
 
 ---
 
@@ -287,3 +289,5 @@ adb logcat -d | grep "MNN vs ONNX"   # 仅当已临时加回对比埋点时才�
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.1.0 | 2026-05-03 | 初始版本 |
+| 1.2.0 | 2026-07 | ONNX 对比排查节自注 ONNX 检测器移除 |
+| 1.2.1 | 2026-09-25 | 分层框架同步 ONNX 移除现状：删 `buildLooseFaceCrop`/`FULL_REMAP` 死符号，Layer 5 改为原生 106 点序 + 跨源指向 MediaPipe468Adapter |

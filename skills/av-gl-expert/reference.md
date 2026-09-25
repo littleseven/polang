@@ -12,8 +12,10 @@ title: AV-GL Expert 参考文档
 
 ### 1.1 红色测试 Shader
 
+经 `BeautyRenderer.MODE_DEBUG_RED`（`setDebugMode(MODE_DEBUG_RED)`）启用：
+
 ```glsl
-// FRAGMENT_SHADER_DEBUG_RED
+// debug mode: MODE_DEBUG_RED（纯红输出，验证管线连通）
 precision mediump float;
 varying vec2 vTextureCoord;
 

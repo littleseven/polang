@@ -2,9 +2,9 @@
 name: kmp-ios-interop
 description: |
   Kotlin/Native ↔ Swift 互操作铁律与 shared XCFramework 集成：signal 6 崩溃、Flow→AsyncStream、SharedBridge 约定、组合根 D7。Use when integrating the shared KMP framework into iosApp, crossing Kotlin↔Swift boundaries, or debugging signal 6/retain-cycle/interop issues.
-version: 1.1.0
+version: 1.1.1
 created: 2026-08-08
-updated: 2026-08-10
+updated: 2026-09-25
 maintainer: "[RD] 全栈工程师"
 tags:
   - ios
@@ -48,7 +48,7 @@ fun doSomethingSafe(): Result<Data> = runCatching { doSomethingRisky() }
 ```
 
 ```swift
-// iosApp/SharedBridge —— Swift 只消费 Result，绝不指望 catch Kotlin 异常
+// iosApp/PoLang/SharedBridge —— Swift 只消费 Result，绝不指望 catch Kotlin 异常
 switch SharedBridge.shared.doSomethingSafe() {
 case let .success(data): // ...
 case let .failure(message): // 字符串，非异常
@@ -58,8 +58,8 @@ case let .failure(message): // 字符串，非异常
 ### 2. 组合根 D7 模式
 
 - shared **不知任何 iOS 类型**；无 `PlatformContext` expect。
-- `iosApp/DI/AppContainer.swift` 构造注入 Swift actual 进 shared。
-- shared 接口在 commonMain，actual 实现在 `iosApp/Platform/`。
+- `iosApp/PoLang/DI/AppContainer.swift` 构造注入 Swift actual 进 shared。
+- shared 接口在 commonMain，actual 实现在 `iosApp/PoLang/Platform/`。
 
 ### 3. Flow → Swift AsyncStream
 
@@ -76,7 +76,7 @@ for try await chunk in SharedBridge.shared.chatStream() {
 ## XCFramework embed
 
 ```bash
-./gradlew :shared:assembleSharedDebugXCFramework
+./gradlew :shared:assembleSharedKitDebugXCFramework
 # debug 日常 ~6s；Release ~4min（一次性）
 ```
 
@@ -105,3 +105,4 @@ for try await chunk in SharedBridge.shared.chatStream() {
 |------|------|------|
 | 1.0.0 | 2026-08-08 | 初始版本（Phase 4/5 跨切面 R2） |
 | 1.1.0 | 2026-08-10 | SKIE 0.10.14 接入（spike GO 合入 main）：新增 SKIE 节为新链路首选形态；signal 6 铁律收窄至 SKIE 未覆盖边角；FlowWatcher/SharedBridge 式桥不再新增 |
+| 1.1.1 | 2026-09-25 | 对齐 iOS 目录重组（iosApp 顶层并入 `PoLang/`）与 XCFramework 任务更名（Shared → SharedKit） |

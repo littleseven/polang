@@ -2,10 +2,10 @@
 name: intent-router
 description: |
   PoLang 项目意图路由与需求解析 Skill。将用户的自然语言需求转化为 AI 可执行的技术任务。
-version: 1.1.0
+version: 1.2.0
 created: 2026-05-03
-updated: 2026-08-03
-maintainer: "[PM] 产品经理 + [CO] 协调者"
+updated: 2026-09-25
+maintainer: 项目开发者
 tags:
   - requirement
   - routing
@@ -44,7 +44,7 @@ tags:
 | "调整 UI" / "按钮位置" / "颜色不对" | `[UIAdjust]` | 高 | Compose 布局 + 设计规范 + 主题配置 |
 | "发版" / "打包" / "release" | `[Release]` | 高 | 版本管理流程 + CHANGELOG + 签名配置 |
 | "测试..." / "验证..." / "覆盖率" | `[Test]` | 高 | 测试规范 + 现有测试 + 覆盖率报告 |
-| "文档..." / "补充说明" / "规范" | `[Doc]` | 高 | AGENTS_SPEC.md + 文档治理规则 |
+| "文档..." / "补充说明" / "规范" | `[Doc]` | 高 | 根 AGENTS.md + `docs/superpowers/README.md`（AI 协作产物 SSOT）+ 文档治理规则 |
 | "回滚" / "撤销" / "回退" | `[Rollback]` | 高 | git log + 变更清单 + 影响分析 |
 
 ## 术语对齐表
@@ -123,17 +123,17 @@ tags:
 
 | 用户口语 | 项目术语 | 对应代码 | 所属模块 |
 |----------|----------|----------|----------|
-| 语音控制 | 语音命令 / Voice Command | `VoiceCommandCoordinator` | camera (app) |
-| 智能助手 | AI Agent / Agent Panel | `GlobalAgentPanel / AiAgentPanel` | app |
-| 拍张照 | 拍照指令 / Capture | `AiAgentCommand.CapturePhoto` | domain/agent |
-| 换滤镜 | 切换滤镜 / SwitchFilter | `AiAgentCommand.SwitchFilter` | domain/agent |
-| 美颜参数 | 美颜调整 / AdjustBeauty | `AiAgentCommand.AdjustBeauty` | domain/agent |
-| 场景模式 | 场景切换 / SwitchScene | `AiAgentCommand.SwitchScene` | domain/agent |
-| 语音唤醒 | 唤醒词 / Wake Word | `WakeWordEngine` | camera (app) |
-| 推理模式 | 推理模式 / Inference Mode | `AgentOrchestrator` (OFF/REMOTE/FEISHU) | shared |
+| 语音控制 | 语音命令 / Voice Command | `VoiceCommandCoordinator`（`features/camera/voice/`） | camera (app) |
+| 智能助手 | AI Agent / Agent Panel | `GlobalAgentPanel` | app |
+| 拍张照 | 拍照指令 / Capture | `AiAgentCommand.CapturePhoto` | androidApp `domain/model` |
+| 换滤镜 | 切换滤镜 / SwitchFilter | `AiAgentCommand.SwitchFilter` | androidApp `domain/model` |
+| 美颜参数 | 美颜调整 / AdjustBeauty | `AiAgentCommand.AdjustBeauty` | androidApp `domain/model` |
+| 场景模式 | 场景切换 / SwitchScene | `AiAgentCommand.SwitchScene` | androidApp `domain/model` |
+| 语音唤醒 | 唤醒词 / Wake Word | `KeywordSpotterEngine`（shared）/ `KwakeWordKwsEngine`（app） | shared + camera |
+| 推理模式 | 推理模式 / Inference Mode | shared `AiAgentConfig.AiAgentMode`（OFF/REMOTE/FEISHU）；androidApp `UserPreferences.AiAgentMode`（OFF/LOCAL/REMOTE，LOCAL 为遗留兜底）——**两套枚举勿混** | shared + androidApp |
 | 本地模型 | 端侧 VLM / On-device VLM | `LocalLlmEngine / MnnLlmClient` | shared(androidMain) |
 | 远程模型 | 远程 LLM / Remote LLM | `RemoteChatEngine / KoogReActAgent` | shared |
-| Capability | 能力接口 | `Capability` | domain/agent |
+| Capability | 能力接口 | `Capability` | shared `agent/core/runtime` |
 
 ### 全局红线术语
 
@@ -150,13 +150,12 @@ tags:
 
 [Feature] + camera:
   - androidApp/src/main/java/com/mamba/picme/features/camera/AGENTS.md
-  - docs/03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md（相机预览内容已并入）
-  - docs/01-PRODUCT/FEATURES.md (Section 2.1)
+  - docs/01-PRODUCT/FEATURES.md (§4 智能相机——❄️ 冻结待生效，新需求先确认冻结状态)
   - androidApp/src/main/java/com/mamba/picme/features/camera/*.kt (最新修改的 3 个文件)
 
 [Feature] + gallery:
   - androidApp/src/main/java/com/mamba/picme/features/gallery/AGENTS.md
-  - docs/01-PRODUCT/FEATURES.md (Section 2.2)
+  - docs/01-PRODUCT/FEATURES.md (§1 智能相册与图片编辑)
   - androidApp/src/main/java/com/mamba/picme/features/gallery/*.kt
 
 [Feature] + beauty:
@@ -166,9 +165,10 @@ tags:
 
 [Feature] + agent:
   - docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md
-  - androidApp/src/main/java/com/mamba/picme/domain/agent/capability/AGENTS.md
   - docs/04-AGENT-CAPABILITIES/CAPABILITY_REGISTRY.md
+  - shared/AGENTS.md（编排层模块规范）
   - androidApp/src/main/java/com/mamba/picme/domain/agent/**/*.kt
+  # 注：androidApp domain/agent/capability/AGENTS.md 已冻结，仅历史设计参考
 
 [BugFix] + 任何模块:
   - 相关模块 AGENTS.md
@@ -293,10 +293,19 @@ Intent Router 处理:
 
 在 SKILL.md 的意图分类矩阵中添加新行，并定义对应的上下文加载规则。
 
+## Chat 意图路由：两层架构（2026-09-25 更新）
+
+**本 skill 是「需求解析层」**（AI 协作入口的意图分类与术语对齐），与**「运行时 chat 意图路由」是两层**，勿混淆：
+
+- **运行时现状**：chat 工具分发由 Koog agent loop + `ChatToolService` 驱动；`shared` 侧仅有 `intent/IntentGuard`（意图守卫纯函数：LLM 误拒搜索回退判定、模糊跳转拦截）。尚无独立 IntentRouter。
+- **演进方向（Spec，方向已认可、待评审后实施）**：`docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`——「LLM 管意图、代码管策略」：`ChatIntentContract` 契约表 + 意图路由器（置于 `AgentOrchestrator` chat 入口、`PrivacyGuard` 之后、agent loop 之前），里程碑 **M1 止血 → M2 路由器 → M3 Koog graph 分支化**（OPEN_QA/搜索/脚本等分支）。
+- **联动纪律**：M2 落地时，chat 意图相关需求应先读该 spec 并同步更新本表的路由描述。
+
 ## 相关文件
 
 - `docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md` - Agent 架构设计
-- `AGENTS.md` - 角色与协作规则
+- `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md` - 意图路由契约与路由器 spec（M1/M2/M3）
+- `AGENTS.md` - 顶层治理（角色协作管线已于 2026-08-03 退役）
 - `PRODUCT.md` - 产品需求规格
 - `docs/01-PRODUCT/FEATURES.md` - 交互规范
 - 各模块 `AGENTS.md` - 技术实现规范
@@ -306,3 +315,4 @@ Intent Router 处理:
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.1.0 | 2026-05-03 | 初始版本 |
+| 1.2.0 | 2026-09-25 | 对齐现状：推理模式区分 shared/androidApp 两套 AiAgentMode 枚举；AiAgentCommand 归属改 `domain/model`；FEATURES.md 章节号换新（相机 §4 冻结/相册 §1）；capability AGENTS.md 标注冻结；删虚构 `AGENTS_SPEC.md`；新增「Chat 意图路由两层架构」节衔接 2026-09-25 契约 spec |

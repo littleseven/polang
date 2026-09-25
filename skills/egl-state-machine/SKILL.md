@@ -2,7 +2,7 @@
 name: egl-state-machine
 description: |
   EGL 上下文状态机管理专家。预防 AI 在操作 EGL 上下文、离屏渲染、拍照 GPU 化时陷入线程与状态泥潭。
-version: 1.1.0
+version: 1.2.0
 created: 2026-05-03
 updated: 2026-08-03
 maintainer: "[RD] 全栈工程师"
@@ -19,7 +19,7 @@ tags:
 
 > **定位**：预防 AI 在操作 EGL 上下文、离屏渲染、拍照 GPU 化时陷入"线程与状态"泥潭。
 > **来源**：项目 EGL 离屏渲染实践经验
-> **触发时机**：修改 `PhotoProcessorImpl`、`EGLCore`、`CameraPreviewRenderer`、`BeautyRenderer` 时
+> **触发时机**：修改 `PhotoProcessorImpl`、`EGLCore`、`CameraPreviewRenderer`、`BeautyRenderer` 时（均在 `engines/beauty-engine/src/main/java/com/mamba/picme/beauty/render/`）
 
 ## 核心原则：三元绑定关系
 
@@ -128,11 +128,11 @@ try {
 
 ## 状态机日志标签
 
-所有 EGL 操作必须使用 `PoLang:EGL` 标签，格式：
+EGL 相关类日志 TAG 用类名（如 `EGLCore`），统一经 `core/common/Logger` 输出（自动加 `PoLang:` 前缀），格式：
 ```kotlin
-Log.d("PoLang:EGL", "[makeCurrent] thread=${Thread.currentThread().name}, context=$context, surface=$surface")
-Log.d("PoLang:EGL", "[release] thread=${Thread.currentThread().name}, context=$context")
-Log.d("PoLang:EGL", "[createContext] shareContext=$shareContext, newContext=$newContext")
+Logger.d(TAG, "[makeCurrent] thread=${Thread.currentThread().name}, context=$context, surface=$surface")
+Logger.d(TAG, "[release] thread=${Thread.currentThread().name}, context=$context")
+Logger.d(TAG, "[createContext] shareContext=$shareContext, newContext=$newContext")
 ```
 
 ## 拍照 GPU 化检查清单
@@ -161,7 +161,7 @@ Log.d("PoLang:EGL", "[createContext] shareContext=$shareContext, newContext=$new
 ```
 问题：渲染失败/黑屏/崩溃
     |
-    +-- 检查日志中是否有 "PoLang:EGL makeCurrent failed"?
+    +-- 检查日志中是否有 "EGLCore ... makeCurrent failed"?
     |       +-- YES -> 上下文已被其他线程绑定，检查线程隔离
     |       +-- NO  -> 继续
     |
@@ -174,7 +174,7 @@ Log.d("PoLang:EGL", "[createContext] shareContext=$shareContext, newContext=$new
     |       +-- COMPLETE   -> 继续
     |
     +-- 检查 Uniform 是否正确传递
-    |       +-- 使用 `FRAGMENT_SHADER_DEBUG_RED` 验证管线
+    |       +-- 使用 `BeautyRenderer.MODE_DEBUG_RED`（`setDebugMode`）验证管线
     |
     +-- 仍无法解决 -> 上报并请求人工介入
 ```
@@ -186,3 +186,4 @@ Log.d("PoLang:EGL", "[createContext] shareContext=$shareContext, newContext=$new
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.1.0 | 2026-05-03 | 初始版本 |
+| 1.2.0 | 2026-09-25 | 日志规范对齐现状（TAG=类名经 Logger，删虚构 `PoLang:EGL`）；`FRAGMENT_SHADER_DEBUG_RED` → `BeautyRenderer.MODE_DEBUG_RED`；触发类补模块路径 |

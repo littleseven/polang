@@ -87,7 +87,7 @@ tags:
 
 ## Stage 3 — iOS 实现
 
-- **shared 变更**：iOS 零重写——`JITPACK=true ./gradlew :shared:assembleSharedDebugXCFramework` 重建 + XcodeGen 刷新（`iosApp/scripts/build-shared-kit.sh` 增量路径）。Swift 侧消费 SKIE 形态（铁律 3）。
+- **shared 变更**：iOS 零重写——`JITPACK=true ./gradlew :shared:assembleSharedKitDebugXCFramework` 重建 + XcodeGen 刷新（`iosApp/scripts/build-shared-kit.sh` 增量路径）。Swift 侧消费 SKIE 形态（铁律 3）。
 - **UI**（GLM coder 子 agent）：读 spec + tokens + 定稿截图翻译 SwiftUI；🔴 禁止读 Android 源码翻译布局；尺寸/颜色引用 `DesignTokens.swift`。
 - **平台 actual**（K3，`model="primary"`）：读台账 + shared 接口实现；台账登记的平台独有流程（如 iOS Limited 权限管理入口、系统删除确认弹窗）照台账实现。
 - 每步过既有 hook（i18n 硬编码 / dp/color 硬编码警告）与 `ios-i18n-validator`。

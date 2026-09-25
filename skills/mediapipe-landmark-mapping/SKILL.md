@@ -1,10 +1,10 @@
 ---
 name: mediapipe-landmark-mapping
 description: |
-  MediaPipe 468 点与 106 点人脸关键点映射规范。
-version: 1.1.0
+  MediaPipe 468 点与 106 点人脸关键点映射规范（双端双源架构）。
+version: 2.0.0
 created: 2026-05-03
-updated: 2026-08-03
+updated: 2026-09-25
 maintainer: "[RD] 全栈工程师"
 tags:
   - mediapipe
@@ -19,7 +19,21 @@ tags:
 
 > **定位**：MediaPipe 468 点与 106 点人脸关键点映射规范。
 > **触发时机**：用户涉及 MediaPipe 关键点映射、468 点转 106 点或人脸关键点对齐时自动启用。
+> **映射表 SSOT**：`docs/03-TECHNICAL-SPECS/FACE_LANDMARKS.md`（已合并 MediaPipe 468 参考 / 468→106 映射策略 / 火山 106 点三份历史文档）——索引细节以该文档与代码映射表为准，本 skill 不再复制易腐的具体索引表。
 
+## 双端双源架构（现役）
+
+关键点有 **MediaPipe 468 源** 与 **MNN 106 原生源** 两条链路，双端各自落地：
+
+| 端 | 468→106 适配器 | MNN 原生源 | 注册/选择 |
+|----|---------------|-----------|----------|
+| Android | `engines/beauty-engine/src/main/java/com/mamba/picme/beauty/internal/facedetect/adapter/MediaPipe468Adapter.kt` | 同目录 `MnnLandmarkAdapter.kt` | `FaceLandmarkAdapterRegistry.kt` |
+| iOS | `iosApp/PoLang/Features/Camera/Beauty/MediaPipe468Adapter.swift` | 同目录 `MnnFaceLandmarkService.swift` | 相机管线按需切换 |
+
+**MediaPipe468Adapter 映射结构**（Android/iOS 同源约定）：
+- **轮廓 33 点（索引 0-32）**：基于 MediaPipe FACE_OVAL 路径**插值生成**（468 无 1:1 对应）
+- **非轮廓 73 点（索引 33-105）**：通过固定映射表 `NON_CONTOUR_MAPPING`（intArrayOf，含瞳孔点如 74=右瞳孔 473）**直映射**
+- 合计 `POINT_COUNT = 106`（`CONTOUR_POINT_COUNT=33` + `NON_CONTOUR_POINT_COUNT=73`）
 
 ## 坐标系转换
 
@@ -39,34 +53,12 @@ ndcX = -(x * 2.0f - 1.0f)  // X轴翻转
 ndcY = -(y * 2.0f - 1.0f)  // Y轴翻转
 ```
 
-### MediaPipe 468 → 106 点映射
-使用项目中的 `MediaPipeTo106Mapping.kt`：
-- 左脸轮廓：0-7
-- 右脸轮廓：25-32
-- 左眼：52-57, 72-78
-- 右眼：58-63, 75-79
-- 鼻子：43-51, 78-83
-- 嘴唇：84-103
-- 左眉毛：33-37, 64-67
-- 右眉毛：38-42, 68-71
-
-## 关键索引对照表
-
-| 区域 | MediaPipe 468 | 106点索引 |
-|------|--------------|-----------|
-| 左眼外角 | 33 | 52 |
-| 左眼内角 | 133 | 57 |
-| 右眼外角 | 362 | 58 |
-| 右眼内角 | 463 | 63 |
-| 鼻尖 | 1 | 46 |
-| 鼻底左 | 48 | 31 |
-| 鼻底右 | 278 | 35 |
-| 上唇中 | 0 | 96 |
-| 下唇中 | 17 | 95 |
-| 左嘴角 | 61 | 84 |
-| 右嘴角 | 291 | 90 |
+iOS Metal 侧坐标约定见 [coordinate-system-standard](/coordinate-system-standard)（双端同源）。
 
 ## 常见陷阱
+
+### 映射表二处实现漂移
+Android（`.kt`）与 iOS（`.swift`）各有一份映射实现——**改映射必须双端同改**，并以 FACE_LANDMARKS.md 为对齐基准。
 
 ### 坐标交换问题
 MediaPipe 某些版本输出可能是 [y, x] 顺序：
@@ -80,7 +72,7 @@ y = temp
 ### 索引越界
 - 106 点有效索引：0-105
 - 禁止使用 106+（历史原因：早期引擎有 111 点，统一 106 标准后索引上限为 105）
-- 替代方案：用语义相近的点替代
+- 替代方案：用语义相近的点替代（对照 FACE_LANDMARKS.md 索引表选点）
 
 ### 左右镜像
 前置摄像头预览需要左右镜像：
@@ -104,6 +96,8 @@ for (i in 0 until 106) {
 }
 ```
 
+对齐异常的分层排查（输入预处理/输出读取/坐标变换/坐标解析/点序映射五层框架）见 [mnn-landmark-diagnosis](/mnn-landmark-diagnosis)。
+
 ## 三角网格构建
 
 ### 避免索引越界
@@ -115,19 +109,17 @@ val indices = intArrayOf(95, 96, 106) // 越界！
 val indices = intArrayOf(95, 96, 95) // 95 是下唇底部
 ```
 
-### 语义替代规则
-| 原始索引 | 替代索引 | 说明 |
-|---------|---------|------|
-| 106 | 95 | 下唇底部 |
-| 107 | 43 | 鼻梁中心 |
-| 108 | 0 | 左脸轮廓起点 |
-| 109 | 32 | 右脸轮廓终点 |
-| 110 | 50 | 鼻尖附近 |
-
 ## 相关文件
+
+- `docs/03-TECHNICAL-SPECS/FACE_LANDMARKS.md` — 映射表与索引对照 SSOT
+- `engines/beauty-engine/.../facedetect/adapter/MediaPipe468Adapter.kt` — Android 映射实现
+- `iosApp/PoLang/Features/Camera/Beauty/MediaPipe468Adapter.swift` — iOS 映射实现
+- [coordinate-system-standard](/coordinate-system-standard) — 坐标系规范
+- [mnn-landmark-diagnosis](/mnn-landmark-diagnosis) — 关键点对齐诊断
 
 ## 版本历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.1.0 | 2026-05-03 | 初始版本 |
+| 2.0.0 | 2026-09-25 | 对齐双源架构：真实映射文件 `MediaPipe468Adapter.kt/.swift`（原 `MediaPipeTo106Mapping.kt` 不存在）；映射结构改为 33 轮廓插值 + 73 直映射；易腐索引表移交 FACE_LANDMARKS.md SSOT；补双端同改纪律 |

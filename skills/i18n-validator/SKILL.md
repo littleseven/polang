@@ -2,9 +2,9 @@
 name: i18n-validator
 description: |
   PoLang 多语言同步验证专家。确保用户可见文案同步覆盖英文、简体中文、繁体中文、西班牙语、法语，禁止硬编码字符串。
-version: 1.0.0
+version: 1.0.1
 created: 2026-05-25
-updated: 2026-08-03
+updated: 2026-09-25
 maintainer: "[CR] 规范守护者"
 tags:
   - i18n
@@ -36,11 +36,8 @@ tags:
 ### Step 1: 硬编码检测
 
 ```bash
-# 检查 Kotlin 源码中的硬编码中文/英文
-./scripts/check-i18n-hardcode.sh
-
-# 手动检查（关键文件）
-grep -rn "\"[a-zA-Z\u4e00-\u9fa5]\{3,\}\"" androidApp/src/main/java/com/mamba/picme/ --include="*.kt" | \
+# 手动检查（无专用脚本；检查 Kotlin 源码中的硬编码文案）
+grep -rnE '"[a-zA-Z\x{4e00}-\x{9fa5}]{3,}"' androidApp/src/main/java/com/mamba/picme/ --include="*.kt" | \
     grep -v "Log\." | grep -v "TAG" | grep -v "http"
 ```
 
@@ -50,7 +47,7 @@ grep -rn "\"[a-zA-Z\u4e00-\u9fa5]\{3,\}\"" androidApp/src/main/java/com/mamba/pi
 
 ```bash
 # 对比五语言资源文件
-python3 scripts/check_i18n_sync.py
+python3 skills/doc-sync-guardian/scripts/check-i18n-sync.py
 ```
 
 **检查项**：
@@ -61,15 +58,14 @@ python3 scripts/check_i18n_sync.py
 
 ### Step 3: 术语一致性
 
-**关键术语对照表**（摘自 FEATURES.md）：
+**关键术语对照表**（资源 ID 以 `values/strings.xml` 现役为准，示例）：
 
 | 英文 | 简体中文 | 繁体中文 | 资源 ID |
 |------|----------|----------|---------|
-| Gallery | 相册 | 相簿 | `nav_gallery` |
-| Settings | 设置 | 設定 | `nav_settings` |
-| Smoothing | 磨皮 | 磨皮 | `beauty_smoothing` |
-| Slim Face | 瘦脸 | 瘦臉 | `beauty_slim_face` |
-| Extract Text | 提取文字 | 提取文字 | `ocr_extract_text` |
+| Gallery | 相册 | 相簿 | `gallery` |
+| Settings | 设置 | 設定 | `settings` |
+| Smoothing | 磨皮 | 磨皮 | `smoothing` |
+| Slim Face | 瘦脸 | 瘦臉 | `slim_face` |
 
 **禁止**：同一功能在不同位置使用不同翻译。
 
@@ -91,19 +87,18 @@ python3 scripts/check_i18n_sync.py
 
 ### CI 集成
 
+> 当前 `ai-gate.yml` **尚未集成** i18n 检查；如需集成，在 `.github/workflows/ai-gate.yml` 添加：
+
 ```yaml
-# .github/workflows/ai-gate.yml 中添加
 - name: I18N Validation
-  run: |
-    python3 scripts/check_i18n_sync.py
-    ./scripts/check-i18n-hardcode.sh
+  run: python3 skills/doc-sync-guardian/scripts/check-i18n-sync.py
 ```
 
 ### 快速修复流程
 
 ```bash
 # 1. 发现缺失
-python3 scripts/check_i18n_sync.py
+python3 skills/doc-sync-guardian/scripts/check-i18n-sync.py
 # 输出: ❌ Missing in zh-rCN: beauty_new_feature
 
 # 2. 补充翻译
@@ -112,12 +107,12 @@ python3 scripts/check_i18n_sync.py
 # values-es/strings.xml、values-fr/strings.xml 同步补齐
 
 # 3. 重新验证
-python3 scripts/check_i18n_sync.py
+python3 skills/doc-sync-guardian/scripts/check-i18n-sync.py
 ```
 
 ## 相关文件
 
-- [docs/01-PRODUCT/FEATURES.md](docs/01-PRODUCT/FEATURES.md) — 多语言词汇表（Section 4.1.1）
+- [docs/01-PRODUCT/FEATURES.md](docs/01-PRODUCT/FEATURES.md) — 交互规范（文案口径）
 - [PRODUCT.md](PRODUCT.md) — I18N 规范定义
 - [compose-ui-expert](/compose-ui-expert) — UI 文案硬编码检查
 - [doc-sync-guardian](/doc-sync-guardian) — 文档一致性同步
@@ -128,3 +123,4 @@ python3 scripts/check_i18n_sync.py
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.0.0 | 2026-05-25 | 初始版本 |
+| 1.0.1 | 2026-09-25 | 修正脚本路径（真实位置 `skills/doc-sync-guardian/scripts/check-i18n-sync.py`，删不存在的 `check-i18n-hardcode.sh`）；术语表换现役资源 ID；CI 集成改标注未集成现状 |
