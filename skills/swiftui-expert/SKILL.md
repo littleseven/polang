@@ -31,7 +31,7 @@ tags:
 
 ```swift
 @MainActor
-final class GalleryStore: ObservableObject {
+final class GalleryViewModel: ObservableObject {
     enum State { case loading, full([MediaItem]), limited, denied }
     @Published private(set) var state: State = .loading
     // 唯一持有者；视图只读 @Published，动作走方法

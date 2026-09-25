@@ -2,9 +2,9 @@
 name: image-quality-checker
 description: |
   通过 adb 截屏并分析图片质量，检测黑屏、人脸位置、调试信息是否正常。
-version: 1.1.0
+version: 1.1.1
 created: 2026-05-03
-updated: 2026-08-03
+updated: 2026-09-25
 maintainer: "[RD] 全栈工程师"
 tags:
   - adb
@@ -19,14 +19,14 @@ tags:
 # 图片质量验证 Skill
 
 > **定位**：通过 adb 截屏并分析图片质量，检测黑屏、人脸位置、调试信息是否正常。
-> **⚠️ 注意**：原引用脚本（auto_check_photo.sh, analyze_image.py 等）尚未实现，以下提供手动 adb 命令等效方案。
+> **自动化脚本**：`skills/image-quality-checker/scripts/`（`auto_check_photo.sh` / `check_quality.sh` / `analyze_image.py`）已实现；无脚本时按「快速开始」手动等效方案。
 
 
 通过 adb 截屏并结合 Python 脚本自动分析画面质量，诊断渲染问题。
 
 ## 快速开始（手动命令）
 
-> 自动化脚本尚未实现，使用原始 adb 命令：
+> 自动化脚本位于 `skills/image-quality-checker/scripts/`；以下为原始 adb 等效方案：
 
 ### 1. 截屏并拉取
 ```bash
@@ -61,13 +61,13 @@ if arr.mean() < 5: print('BLACK SCREEN!')
 
 ### 场景1: 手动验证拍照后是否有黑屏
 ```bash
-# 1. 触发拍照
-adb shell am broadcast -a com.mamba.picme.TEST_COMMAND --es action "capture"
+# 1. 触发拍照（TEST_COMMAND 广播框架已随 ADR-011 退役；用 ui-driver 或手动在设备上拍照）
+python3 scripts/ui_driver.py click --text "<快门按钮文案>"   # 或手动拍照
 sleep 2
 
-# 2. 拉取最新照片分析
-adb shell ls /sdcard/DCIM/PoLang/ | tail -1
-adb pull /sdcard/DCIM/PoLang/latest_photo.jpg ./output.jpg
+# 2. 拉取最新照片分析（相机照片落 /sdcard/Pictures/PoLang/）
+adb shell ls -lt /sdcard/Pictures/PoLang/*.jpg | head -1
+adb pull "/sdcard/Pictures/PoLang/<最新文件>" ./output.jpg
 
 # 3. 分析亮度
 python3 -c "from PIL import Image; import numpy as np; arr=np.array(Image.open('output.jpg')); print(f'Brightness: {arr.mean():.1f}/255')"
@@ -102,13 +102,12 @@ D PoLang:ImageProcessor: GPU photo processing succeeded
 
 ### 场景2: 验证 GPU 拍照是否黑屏
 ```bash
-# 1. 触发拍照
-adb shell am broadcast -a com.mamba.picme.TEST_COMMAND --es action "capture"
+# 1. 触发拍照（同场景1：ui-driver 或手动拍照）
 sleep 2
 
 # 2. 拉取相册最新照片
-adb shell ls /sdcard/DCIM/PoLang/ | tail -1
-adb pull /sdcard/DCIM/PoLang/latest_photo.jpg ./output.jpg
+adb shell ls -lt /sdcard/Pictures/PoLang/*.jpg | head -1
+adb pull "/sdcard/Pictures/PoLang/<最新文件>" ./output.jpg
 
 # 3. 分析
 python3 -c "from PIL import Image; import numpy as np; arr=np.array(Image.open('output.jpg')); print(f'Brightness: {arr.mean():.1f}/255')"
@@ -174,12 +173,14 @@ done
 
 ## 相关文件
 
-> 自动化脚本计划但尚未实现（路径预留）：
-> - `scripts/auto_check_photo.sh` — 自动化拍照质量检查
-> - `scripts/check_quality.sh` — 截屏验证流程
+- `skills/image-quality-checker/scripts/auto_check_photo.sh` — 自动化拍照质量检查（拉取 `/sdcard/Pictures/PoLang/` 最新照片）
+- `skills/image-quality-checker/scripts/check_quality.sh` — 截屏验证流程
+- `skills/image-quality-checker/scripts/analyze_image.py` — 图片质量分析
+- [ui-driver](/ui-driver) — 拍照触发（TEST_COMMAND 广播已随 ADR-011 退役）
 
 ## 版本历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.1.0 | 2026-05-03 | 初始版本 |
+| 1.1.1 | 2026-09-25 | 修正"脚本尚未实现"声明（scripts/ 已实装）；照片目录 DCIM→Pictures/PoLang；拍照触发改 ui-driver（TEST_COMMAND 广播已随 ADR-011 退役） |

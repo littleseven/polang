@@ -94,7 +94,7 @@ ContentView()
 - App 源：`iosApp/PoLang/`
 - MNN：`iosApp/Frameworks/MNN.framework`
 - 隐私清单：`iosApp/PrivacyInfo.xcprivacy`
-- 闭环脚本：`scripts/ios-dev-loop.sh`
+- 闭环脚本：`scripts/ios-dev-loop.sh`（转发壳，实际闭环在 `scripts/ios-auto-dev-loop.sh`）
 
 ## 相关文件
 

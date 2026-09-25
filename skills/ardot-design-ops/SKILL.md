@@ -1,9 +1,9 @@
 ---
 name: ardot-design-ops
 description: Ardot 设计稿资产治理——新建页面/帧、token 样式变更、健康审计三场景编排,保障 Light/Dark 全域可切与组件化不腐败。Use when creating/modifying Ardot frames or components, syncing design tokens to canvas, exporting snapshots, or auditing design health (ardot, 设计稿, Light/Dark, 组件化).
-version: 1.4.0
+version: 1.5.0
 created: 2026-09-19
-updated: 2026-09-22
+updated: 2026-09-25
 maintainer: [RD] 全栈工程师
 tags: [ardot, design-system, light-dark, ui-consistency]
 ---

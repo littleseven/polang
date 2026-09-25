@@ -34,7 +34,7 @@ Text("search.photos.label")  // Localizable.xcstrings 键
 ```
 
 ### 2. 五语同步
-`Localizable.xcstrings`（String Catalog，Xcode 15+）每个键必须含五语：
+`Resources/Localizable.xcstrings`（String Catalog，Xcode 15+）每个键必须含五语；权限用途文案（Info.plist purpose strings）在 `Resources/InfoPlist.xcstrings` 同步五语：
 
 | key | en | zh-Hans | zh-Hant | es | fr |
 |-----|----|---------|---------|----|----|
@@ -56,7 +56,7 @@ iOS 键与 Android `androidApp/src/main/res/values*/strings.xml` **语义对齐*
 ## 相关文件
 
 - [i18n-validator](/i18n-validator) — Android 五语验证
-- iOS strings：`iosApp/PoLang/Localizable.xcstrings`
+- iOS strings：`iosApp/PoLang/Resources/Localizable.xcstrings`（权限用途文案在 `iosApp/PoLang/Resources/InfoPlist.xcstrings`）
 - Android strings：`androidApp/src/main/res/values*/strings.xml`
 
 ## 版本历史

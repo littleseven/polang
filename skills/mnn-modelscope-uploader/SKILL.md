@@ -109,11 +109,11 @@ Confirm the `.mnn` file is listed with `"IsLFS": true`.
 
 ### 7. Wire into Android app
 
-1. Add entry to `app/src/main/res/raw/llm_models.json`
+1. Add entry to `androidApp/src/main/res/raw/llm_models.json`
 2. Register file list in `LlmModelDownloadManager.getModelFiles()`
 3. Update model loading code to use new `modelId` and filename
 4. Pass correct `inputName` / `outputName` to `MnnEmbeddingExtractor.initialize()`
-5. Run `./gradlew :app:compileDebugKotlin`
+5. Run `./gradlew :androidApp:compileDebugKotlin`
 
 ## Quick Reference
 

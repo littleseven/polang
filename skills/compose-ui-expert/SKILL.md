@@ -2,7 +2,7 @@
 name: compose-ui-expert
 description: |
   PoLang Jetpack Compose UI 专家。诊断布局异常、状态管理问题、重组性能瓶颈，确保 HyperOS 视觉风格一致。
-version: 1.0.0
+version: 1.1.1
 created: 2026-05-25
 updated: 2026-08-03
 maintainer: "[RD] 全栈工程师"
@@ -29,7 +29,7 @@ tags:
 1. **状态优先使用 Sealed Class**：UI 状态必须用 `sealed class` 建模，禁止用多个独立 Boolean。
 2. **显式命名 Lambda 参数**：禁止隐式 `it`，必须显式命名。
 3. **禁止通配符导入**：所有 import 必须显式列出。
-4. **日志标签统一**：`PoLang:UX` 用于 UI 状态变更结构化日志。
+4. **日志标签统一**：UI 状态变更日志遵循全局 `PoLang:[FeatureName]` 格式（如 `PoLang:Gallery`），无独立 UX 标签。
 
 ---
 
@@ -71,7 +71,7 @@ tags:
 
 | 规范项 | 标准 | 检查方式 |
 |--------|------|----------|
-| 大圆角 | 卡片/按钮 28dp+ | `RoundedCornerShape(28.dp)` |
+| 圆角 token | 走 `AppShapes`（panel=12 顶角/lg=16/card=8/button=10/thumbnail=2），禁止裸 `RoundedCornerShape(n.dp)` | 引用 `core/designsystem/AppShapes`（token SSOT：`shared/src/commonMain/resources/design-tokens.json`，生成物勿手改） |
 | 毛玻璃效果 | blur 20dp + alpha 0.5-0.8 | `Modifier.blur(20.dp)` + 半透明背景 |
 | 流体动效 | Bezier (0.4, 0.0, 0.2, 1) | `CubicBezierEasing(0.4f, 0f, 0.2f, 1f)` |
 | 微交互 | 长按触感 + 点击缩放 0.95x | `HapticFeedback` + `scale = 0.95f` |
@@ -107,6 +107,7 @@ tags:
 |------|------|------|
 | 1.0.0 | 2026-05-25 | 初始版本 |
 | 1.1.0 | 2026-08-09 | 追加 [PARITY] 双端一致性规则段 |
+| 1.1.1 | 2026-09-25 | 圆角规范对齐 AppShapes token 实况（28dp+ 大圆角声明不实）；删虚构 `PoLang:UX` 标签；版本号对齐 frontmatter |
 
 ---
 

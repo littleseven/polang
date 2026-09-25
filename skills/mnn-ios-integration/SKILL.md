@@ -23,8 +23,8 @@ tags:
 ## 构建
 
 ```bash
-# engines/mnn-core 收编的封装（5.1 从 tmp/ 搬正归档）
-./engines/mnn-core/build_lib.sh --ios
+# engines/mnn-core iOS 封装入口（内部调 MNN 源码树 build_lib.sh 并兜底 tmp/mnn-ios-spike）
+./engines/mnn-core/ios/build-ios-framework.sh
 # 产出 arm64 MNN.framework，搬正到 iosApp/Frameworks/
 ```
 
@@ -80,4 +80,5 @@ interp->setSession(sched, Precision_High);  // 不要用默认
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 1.0.1 | 2026-09-25 | 修正构建入口为 `engines/mnn-core/ios/build-ios-framework.sh` |
 | 1.0.0 | 2026-08-08 | 初始版本（Phase 5.1/5.4 人脸检测） |

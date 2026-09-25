@@ -9,7 +9,7 @@ description: Use when the user needs to preserve Android app data across uninsta
 
 同一部测试机反复安装 release / debug 包时，签名不同导致必须卸载重装，应用数据会全部丢失。本 Skill 描述一套**无需 root** 的跨签名数据保护方案，把最耗时的 TAG 扫描结果（标签、人脸 Embedding、人物聚类、OCR、地理位置等）以及 DataStore 设置保存为快照，重装后一键恢复。
 
-PicMe 项目已提供三种入口，覆盖 debug / release 包：
+PoLang 项目已提供三种入口，覆盖 debug / release 包：
 
 1. **PC 脚本（推荐开发/CI）**：`scripts/app-data-backup.sh`，通过 adb 广播触发应用内备份/还原。
 2. **应用内 SAF 入口（推荐 release 手动操作）**：`设置 → 备份与恢复`，使用 Android Storage Access Framework 导出/导入 JSON。
@@ -18,7 +18,7 @@ PicMe 项目已提供三种入口，覆盖 debug / release 包：
 核心依赖：
 
 - 应用内：`TagDataBackupRepository`、`BackupTagDataUseCase`、`RestoreTagDataUseCase`
-- adb 触发入口：`AgentTestBroadcastReceiver` 的 `backup_tag_data` / `restore_tag_data` 命令
+- adb 触发入口：`BackupRestoreBroadcastReceiver`（`.testing.backup.BackupRestoreBroadcastReceiver`，仅 debug 构建）的 `backup_tag_data` / `restore_tag_data` 命令
 - PC 端脚本：`scripts/app-data-backup.sh`
 
 ## When to Use
@@ -110,8 +110,8 @@ release / debug 签名不同，必须卸载重装：
 
 ```bash
 adb uninstall com.mamba.picme
-adb install app/build/outputs/apk/debug/picme-debug.apk
-# 或 adb install app/build/outputs/apk/release/picme-release.apk
+adb install androidApp/build/outputs/apk/debug/polang-debug.apk
+# 或 adb install androidApp/build/outputs/apk/release/polang-release.apk
 ```
 
 > 版本号差异不影响卸载重装后的安装。
@@ -144,21 +144,26 @@ adb shell am force-stop com.mamba.picme
 | 数据 | 说明 |
 |---|---|
 | `tags` | 标签表 |
-| `mediaTagMetadata` | 媒体 TAG 元数据（labels、OCR、语义嵌入、faceRoi、lastTagScanAt 等） |
+| `mediaTagMetadata` | 媒体 TAG 元数据（labels、OCR、语义嵌入、faceRoi、lastTagScanAt 等；v5 增补 `blurScore`/`exposureScore`/`lastViewedAt` 三列整理中心信号） |
 | `crossRefs` | 媒体-标签关联 |
 | `scanTasks` | TAG 扫描任务（恢复后重置为 PENDING） |
 | `persons` | 人物聚类结果 |
 | `faceEmbeddings` | 人脸 Embedding（Pass 1 产物，Base64） |
+| `personRelations` | 人物关系（含 customLabel 自定义称呼） |
+| `memoryFacts` | AI 记忆事实 |
+| `chatSessions` / `chatMessages` | 聊天会话与消息 |
+| `photoEditRecipes` | 照片编辑配方 |
+| `mediaFeedback` | AI 优化反馈 |
 | `ocrWords` / `ocrWordOccurrences` | OCR 倒排索引 |
 | `locationHierarchy` / `mediaLocations` | 地理位置关系 |
 | `preferences` | DataStore 用户偏好：账号、Token（Cloudflare/飞书/服务端）、主题、语言、相机记忆、AI Agent 配置等 |
 
-**不备份：** 聊天记录、下载的模型文件。
+**不备份：** 下载的模型文件。
 
 ## Backup File Location
 
 - **PC 脚本默认快照目录**：`scripts/app-data-snapshots/<name>/tag_data_backup.json`
-- **设备端中转目录**：`/sdcard/Android/media/com.mamba.picme/PicMeBackup/tag_data_backup.json`
+- **设备端中转目录**：`/sdcard/Android/media/com.mamba.picme/PoLangBackup/tag_data_backup.json`
   - 属于应用自身外部媒体目录，无需额外权限即可读写。
   - adb 可直接 `pull/push`，同时支持 debug 与 release 包。
   - 脚本在备份/恢复完成后会清理该中转文件。
@@ -168,9 +173,9 @@ adb shell am force-stop com.mamba.picme
 
 | 问题 | 原因 | 修复 |
 |---|---|---|
-| 还原时报超时 | 设备端操作未完成，或应用进程未启动 | 脚本已先 `am start` 启动 MainActivity；检查日志 `tag=AgentTestReceiver` |
+| 还原时报超时 | 设备端操作未完成，或应用进程未启动 | 脚本已先 `am start` 启动 MainActivity；检查日志 `tag=BackupRestoreReceiver` |
 | `matchedMediaCount` 很低 | 新包媒体库还没同步完 | 等相册完全加载后再 dry-run / restore |
-| adb 广播无响应 | Android 16 上 `am broadcast` 必须显式指定组件名 | 脚本已使用 `-n com.mamba.picme/.testing.agent.bridge.AgentTestBroadcastReceiver` |
+| adb 广播无响应 | Android 16 上 `am broadcast` 必须显式指定组件名 | 脚本已使用 `-n com.mamba.picme/.testing.backup.BackupRestoreBroadcastReceiver`（仅 debug 构建；release 走应用内 SAF） |
 | 扫描任务变多 | 还原追加了备份里的任务，原有任务也在 | 调度器会按 `lastTagScanAt` 自动跳过已扫描媒体 |
 | release 包无法使用脚本 | 旧脚本依赖 `run-as` | 当前脚本已改为外部媒体目录 `adb pull/push`，release 包可用 |
 | SAF 导入提示匹配 0 | 备份时与恢复时的媒体 URI 不一致 | 确认照片未被删除，且新包已完成媒体库同步 |
@@ -183,15 +188,16 @@ adb shell am force-stop com.mamba.picme
 - 还原在单个 SQLite 事务中执行，保证原子性。
 - DataStore 用户偏好通过 `dataStore.data.first()` 导出为 key-value 列表，恢复时通过 `dataStore.edit` 写入，避免直接操作 `preferences_pb` 文件锁。
 - 备份 JSON 使用 **Moshi + Okio 流式读写**（`JsonAdapter.toJson(BufferedSink)` / `fromJson(BufferedSource)`），避免大备份一次性序列化为字符串导致 OOM。
-- 备份 JSON 内置 `version` 字段（当前为 3），未来可用于 Schema 兼容性检查。
+- 备份 JSON 内置 `version` 字段（当前为 5），未来可用于 Schema 兼容性检查。
 
 ## Project-Specific Paths
 
 ```
-app/src/main/java/com/mamba/picme/domain/backup/
-app/src/main/java/com/mamba/picme/features/backuprestore/BackupRestoreActivity.kt
-app/src/main/res/xml/data_extraction_rules.xml
-app/src/main/res/xml/backup_rules.xml
+androidApp/src/main/java/com/mamba/picme/domain/backup/
+androidApp/src/main/java/com/mamba/picme/features/backuprestore/BackupRestoreActivity.kt
+androidApp/src/debug/java/com/mamba/picme/testing/backup/BackupRestoreBroadcastReceiver.kt
+androidApp/src/main/res/xml/data_extraction_rules.xml
+androidApp/src/main/res/xml/backup_rules.xml
 scripts/app-data-backup.sh
 scripts/app-data-snapshots/
 docs/05-DEVELOPMENT/RELEASE_PACKAGE_BACKUP_RESTORE.md

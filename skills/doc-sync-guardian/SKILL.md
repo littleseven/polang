@@ -2,9 +2,9 @@
 name: doc-sync-guardian
 description: |
   自动维护 PRODUCT.md → docs/01-PRODUCT/FEATURES.md → 模块 AGENTS.md 三层文档体系的一致性。
-version: 1.1.0
+version: 1.1.1
 created: 2026-05-03
-updated: 2026-08-03
+updated: 2026-09-25
 maintainer: "[CR] 规范守护者 + [CO] 协调者"
 tags:
   - documentation
@@ -184,7 +184,7 @@ find androidApp engines -name "AGENTS.md" -exec grep -l "Product Alignment" {} \
 | Phase 1 | 识别变更范围 | `git diff --name-only HEAD~1 HEAD` |
 | Phase 2 | 确定需更新文档 | 按变更类型映射到文档层级（见下表） |
 | Phase 3 | 生成更新草案 | 使用 [reference.md](reference.md) §更新草案模板 |
-| Phase 4 | 执行更新并验证 | `./scripts/check-doc-consistency.sh` |
+| Phase 4 | 执行更新并验证 | `./skills/doc-sync-guardian/scripts/check-doc-consistency.sh`（另有根目录 `./scripts/doc-sync-guardian.sh` 按 git diff 生成同步提醒） |
 
 **变更类型 → 文档映射**：
 
@@ -248,7 +248,7 @@ find androidApp engines -name "AGENTS.md" -exec grep -l "Product Alignment" {} \
 - PRODUCT.md: [章节链接]
 - FEATURES.md: [章节链接]
 - 模块 AGENTS.md: [章节链接]
-- 技术专项文档: [docs/XXX_TECH_SPEC.md]
+- 技术专项文档: [docs/03-TECHNICAL-SPECS/XXX_TECH_SPEC.md]
 ```
 
 #### Step 2: 确认技术专项文档位置
@@ -428,7 +428,7 @@ grep -r "已废弃" docs/*.md
    > 最后更新时间：2025-12-01
    ```
 2. **迁移内容**：将仍有价值的部分迁移到新文档
-3. **归档删除**：确认无人引用后，移至 `docs/archived/` 目录
+3. **删除**：确认无人引用后直接删除（仓库无 `docs/archived/` 归档目录，git 历史即存档）
 4. **更新引用**：清理其他文档中对废弃文档的引用
 
 ### Q4: 多层文档内容冲突如何解决？
@@ -506,3 +506,4 @@ grep -r "已废弃" docs/*.md
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.1.0 | 2026-05-03 | 初始版本 |
+| 1.1.1 | 2026-09-25 | 修正脚本真实位置（skill 目录内 + 根 scripts/doc-sync-guardian.sh）；tech spec 路径统一 `docs/03-TECHNICAL-SPECS/` 前缀；删虚构 `docs/archived/` 归档约定 |

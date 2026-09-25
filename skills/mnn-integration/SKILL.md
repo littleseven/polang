@@ -2,9 +2,9 @@
 name: mnn-integration
 description: |
   MNN 推理引擎接入专家。预防 AI 在接入 MNN 模型（含 LLM）时重复犯已验证过的错误，涵盖模型加载、维度类型、JNI 桥接、LLM 推理与线程安全。
-version: 1.0.0
+version: 1.0.1
 created: 2026-05-26
-updated: 2026-08-03
+updated: 2026-09-25
 maintainer: "[RD] 全栈工程师"
 tags:
   - mnn
@@ -13,7 +13,7 @@ tags:
   - android
   - jni
   - llm
-  - vulkan
+  - opencl
   - dimension-type
 ---
 
@@ -21,7 +21,7 @@ tags:
 # MNN 集成专家 (MNN Integration Expert)
 
 > **定位**：预防 AI 在接入 MNN 模型（CV 检测 + LLM）时重复犯已验证过的错误。
-> **触发时机**：接入任何新 MNN 模型、配置 Vulkan GPU、处理维度类型、JNI 桥接、LLM 推理时。
+> **触发时机**：接入任何新 MNN 模型、配置 OpenCL GPU、处理维度类型、JNI 桥接、LLM 推理时。
 
 ---
 
@@ -32,7 +32,7 @@ tags:
 | 1 | **模型来源** | 直接使用未经转换的 ONNX/PyTorch 模型 | 必须通过 `MNNConvert` 转换，确认 `.mnn` 文件有效 |
 | 2 | **维度类型** | 硬编码 `CAFFE` (NCHW) 而模型实际为 `TENSORFLOW` (NHWC) | 调用 `inputTensor_->getDimensionType()` 动态获取 |
 | 3 | **内置归一化** | 重复归一化或漏做归一化 | 检测模型二进制中是否包含 `_minusscalar0` / `_mulscalar0` 节点 |
-| 4 | **Vulkan 后端** | 未显式指定 `MNN_FORWARD_VULKAN` 或忽略 fallback | 配置 `ScheduleConfig.type`，并准备 CPU 降级路径 |
+| 4 | **OpenCL 后端** | 未显式指定 `MNN_FORWARD_OPENCL` 或忽略 fallback | 配置 `ScheduleConfig.type`，并准备 CPU 降级路径 |
 | 5 | **动态输入尺寸** | ONNX 转换后输入维度为 `-1`，未 reshape | 检查 `inputTensor_->height() <= 0` 并调用 `resizeTensor` |
 | 6 | **LLM 两阶段调用** | 直接调用 `generate()` 跳过 prefill | 必须先 `response(..., 0)` 再循环 `generate(1)` |
 
@@ -49,7 +49,7 @@ interpreter_.reset(MNN::Interpreter::createFromFile(modelPath.c_str()));
 // 2. 配置调度器
 MNN::ScheduleConfig config;
 config.numThread = 4;
-config.type = useGpu ? MNN_FORWARD_VULKAN : MNN_FORWARD_CPU;
+config.type = useGpu ? MNN_FORWARD_OPENCL : MNN_FORWARD_CPU;
 
 // 3. 创建会话
 session_ = interpreter_->createSession(config);
@@ -157,21 +157,18 @@ include_directories(${MNN_ROOT_DIR}/include)
 add_library(mnn SHARED IMPORTED)
 set_target_properties(mnn PROPERTIES IMPORTED_LOCATION ${MNN_LIB_DIR}/libMNN.so)
 
-# MNN Vulkan 后端（可选）
-add_library(mnn_vulkan SHARED IMPORTED)
-set_target_properties(mnn_vulkan PROPERTIES IMPORTED_LOCATION ${MNN_LIB_DIR}/libMNN_Vulkan.so)
+# MNN OpenCL GPU 后端（可选）：libMNN_CL.so 提供 OpenCL 后端
+# 检测到则加入链接列表，未检测到自动回落 CPU-only
+# set(MNN_CL_SO_PATH "${MNN_LIB_DIR}/libMNN_CL.so")
 
-# MNN-LLM 库（可选）
-add_library(mnn_llm SHARED IMPORTED)
-set_target_properties(mnn_llm PROPERTIES IMPORTED_LOCATION ${MNN_LIB_DIR}/libllm.so)
+# libllm.so / libMNN_Express.so：统一构建下符号已并入 libMNN.so，不再单独链接
+# （仅当检测到独立 .so 时按需处理，见 engines/agent-native/src/main/cpp/CMakeLists.txt）
 
-# MNN Express（LLM 依赖）
-add_library(mnn_express SHARED IMPORTED)
-set_target_properties(mnn_express PROPERTIES IMPORTED_LOCATION ${MNN_LIB_DIR}/libMNN_Express.so)
-
-# 链接
-target_link_libraries(picme_native mnn mnn_vulkan mnn_llm mnn_express vulkan ...)
+# 链接（实际 target 名为 agent_native，非 picme_native）
+target_link_libraries(agent_native mnn ${OPENCL_LIBS} ...)
 ```
+
+> 真实参考实现：`engines/agent-native/src/main/cpp/CMakeLists.txt`（target `agent_native`）；运行时 .so 在 `engines/mnn-core/src/main/jniLibs/arm64-v8a/`（`libMNN.so` + `libOpenCL.so`）。
 
 **ABI 要求**：MNN 库必须与 `ANDROID_ABI` 匹配（arm64-v8a / armeabi-v7a）。
 
@@ -243,11 +240,11 @@ while (!llm->stoped()) {
 
 **症状**：LLM 输出乱码或重复无意义字符。
 
-### ❌ 错误模式 E：Vulkan 初始化失败未处理
+### ❌ 错误模式 E：OpenCL 初始化失败未处理
 
 ```cpp
-// ❌ 错误：假设 Vulkan 一定可用
-config.type = MNN_FORWARD_VULKAN;
+// ❌ 错误：假设 OpenCL 一定可用
+config.type = MNN_FORWARD_OPENCL;
 session_ = interpreter_->createSession(config);  // 可能返回 null
 
 // ✅ 正确：检查 session 创建结果，准备降级
@@ -283,7 +280,7 @@ auto tInferStart = std::chrono::high_resolution_clock::now();
 interpreter_->runSession(session_);
 auto tInferEnd = std::chrono::high_resolution_clock::now();
 auto inferMs = std::chrono::duration_cast<std::chrono::milliseconds>(tInferEnd - tInferStart).count();
-LOGI("[Perf] MNN infer: %ldms, backend=%s", inferMs, useGpu_ ? "Vulkan" : "CPU");
+LOGI("[Perf] MNN infer: %ldms, backend=%s", inferMs, useGpu_ ? "OpenCL" : "CPU");
 ```
 
 ### 模型结构检查
@@ -304,7 +301,7 @@ strings model.mnn | grep -E "minusscalar|mulscalar"
 |------|-----------|
 | 模型从 ONNX 转换而来 | [onnx-model-integration](/onnx-model-integration) |
 | 人脸关键点对齐问题 | [mnn-landmark-diagnosis](/mnn-landmark-diagnosis) |
-| Vulkan/GPU 相关问题 | [av-gl-expert](/av-gl-expert) |
+| OpenCL/GPU 相关问题 | [av-gl-expert](/av-gl-expert) |
 | 编译错误 | [error-healer](/error-healer) |
 
 ---
@@ -316,7 +313,7 @@ strings model.mnn | grep -E "minusscalar|mulscalar"
 - [ ] 输出张量维度类型是否动态获取？
 - [ ] 是否检测并处理了模型内置归一化节点？
 - [ ] 动态输入尺寸是否已 reshape 为固定尺寸？
-- [ ] Vulkan 初始化失败时是否有 CPU 降级路径？
+- [ ] OpenCL 初始化失败时是否有 CPU 降级路径？
 - [ ] LLM 推理是否遵循 `response() → generate()` 两阶段模式？
 - [ ] LLM 调用是否加了线程锁保护？
 - [ ] JNI 字符串/数组是否正确释放（`ReleaseStringUTFChars`、`ReleaseByteArrayElements`）？
@@ -330,7 +327,7 @@ strings model.mnn | grep -E "minusscalar|mulscalar"
 - [MNN 文档](https://mnn-docs.readthedocs.io/)
 - `docs/03-TECHNICAL-SPECS/MNN_LANDMARK_DIAGNOSIS.md` — MNN 人脸关键点对齐诊断
 - `engines/beauty-engine/src/main/cpp/mnn_face_detector.cpp` — CV 推理参考实现
-- `engines/beauty-engine/src/main/cpp/llm_jni_bridge.cpp` — LLM JNI 桥接参考实现
+- `engines/agent-native/src/main/cpp/llm_jni_bridge.cpp` — LLM JNI 桥接参考实现（含 `libagent_native.so` 构建）
 
 ---
 
@@ -342,6 +339,7 @@ strings model.mnn | grep -E "minusscalar|mulscalar"
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 1.0.1 | 2026-09-25 | GPU 后端正名 Vulkan→OpenCL（MNN_FORWARD_OPENCL/libMNN_CL.so）；CMake 对齐 agent-native 实况（target agent_native，llm/Express 符号并入 libMNN.so）；JNI 桥路径改 `engines/agent-native/` |
 | 1.0.0 | 2026-05-26 | 初始版本，整合 CV 检测 + LLM 推理经验 |
 
 ---

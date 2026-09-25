@@ -110,7 +110,7 @@ UI 定稿后的改动（两端都已实现后），走三同步：
 - `docs/08-UI-SPECS/screens/*.yaml` — 逐屏规格契约
 - `docs/03-TECHNICAL-SPECS/IOS_ANDROID_UI_PARITY.md` — 完整方法论
 - `docs/reviews/2026-08-10-ios-android-consistency-gap.md` — 现行差距审计（08-08 相机/相册两份为历史快照）
-- Android: `core/designsystem/`（生成物 + 手写 `Theme.kt`）
+- Android: `androidApp/src/main/java/com/mamba/picme/core/designsystem/`（生成物 + 手写 `Theme.kt`）
 - iOS: `DesignSystem/DesignTokens.swift`（生成物）
 
 ---

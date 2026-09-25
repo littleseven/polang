@@ -120,7 +120,7 @@ ls -lt docs/comprehensive_audit_*.md | head -1 | xargs code
 **问题**: 完成了拍照 GPU 化迁移，需要记录技术决策。
 
 **解决方案**:
-1. 创建技术专项文档 `docs/PHOTO_GPU_TECH_SPEC.md`
+1. 创建技术专项文档 `docs/03-TECHNICAL-SPECS/PHOTO_GPU_TECH_SPEC.md`
 2. 更新三层文档引用：
    - PRODUCT.md Section 3.1
    - FEATURES.md Section 1.3.5

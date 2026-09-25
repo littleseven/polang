@@ -2,7 +2,7 @@
 name: av-gl-expert
 description: |
   PoLang OpenGL/CameraX 专家。诊断黑屏、Shader 错误、EGL 上下文及性能瓶颈。
-version: 1.1.0
+version: 1.2.0
 created: 2026-05-03
 updated: 2026-08-03
 maintainer: "[RD] 全栈工程师 + [CR] 规范守护者"
@@ -191,7 +191,7 @@ R=U, G=V，验证纹理坐标映射。预期：左上黑(0,0)，右下黄(1,1)�
 
 **根因**：Renderer 未在正确线程初始化，或 Surface 尚未就绪就尝试绑定。
 
-**修复**：确保 `beautyPreviewView.initialize()` 在渲染线程执行，等待 Surface valid 后再绑定。
+**修复**：确保 `CameraPreviewRenderer` 在渲染线程初始化（`BeautyPreviewView.ensureRendererInitialized()` / `bindDisplaySurface()`），等待 Surface valid 后再绑定。
 
 #### 问题 2: ImageAnalysis YUV 数据流中断
 
@@ -431,3 +431,4 @@ MediaPipe 468 点 → 468→106 语义映射 → 旋转校正 → 归一化 → 
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 1.1.0 | 2026-05-03 | 初始版本 |
+| 1.2.0 | 2026-09-25 | Preview Surface 绑定修复项对齐现状：`beautyPreviewView.initialize()` → `CameraPreviewRenderer` + `ensureRendererInitialized()`/`bindDisplaySurface()` |

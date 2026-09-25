@@ -8,34 +8,17 @@
 
 ### check-doc-consistency.sh
 
-```bash
-#!/bin/bash
-# 文档一致性快速检查脚本
+实际脚本：`skills/doc-sync-guardian/scripts/check-doc-consistency.sh`（自包含，以仓库内文件为准）。检查项概览：
 
-echo "🔍 开始文档一致性检查..."
+1. PRODUCT.md → FEATURES.md 引用链（性能/隐私/I18N 指标承接）
+2. 模块 AGENTS.md「## 5. 与产品文档对照」章节完整性（扫描 `androidApp`、`engines`）
+3. I18N 五语资源目录齐全性（values, values-zh-rCN, values-zh-rTW, values-es, values-fr；逐 key 对比用 `check-i18n-sync.py`）
+4. Markdown 悬空文档引用（抽样前 20 个文件）
+5. 顶层 AGENTS.md 内容边界（长度 ≤500 行、无代码示例）
 
-# 1. 检查 PRODUCT.md 指标是否在 FEATURES.md 有承接
-echo "✅ 检查 PRODUCT.md -> FEATURES.md 引用链..."
-python3 scripts/check_product_features_alignment.py
+报告落盘 `docs/05-DEVELOPMENT/audit_report_<时间戳>.md`。
 
-# 2. 检查模块 AGENTS.md 第 5 章完整性
-echo "✅ 检查模块 AGENTS.md Product Alignment 章节..."
-for agents_file in $(find androidApp engines -name "AGENTS.md"); do
-    if ! grep -q "## 5. 与产品文档对照" "$agents_file"; then
-        echo "⚠️  缺少第 5 章: $agents_file"
-    fi
-done
-
-# 3. 检查 I18N 五语资源同步
-echo "✅ 检查国际化资源同步..."
-python3 scripts/check_i18n_sync.py
-
-# 4. 生成报告
-echo "📊 生成审计报告..."
-python3 scripts/generate_audit_report.py
-
-echo "✅ 检查完成！详见 docs/05-DEVELOPMENT/audit_report_$(date +%Y%m%d).md"
-```
+> 历史版本曾调用根目录 `check_product_features_alignment.py` / `check_i18n_sync.py` / `generate_audit_report.py`——这些根目录脚本已不存在，勿再引用。
 
 ### sync-doc-template.py
 
@@ -195,7 +178,7 @@ if __name__ == "__main__":
      - 方案: GPU 离屏渲染复用 Shader
      - 指标: 1080p < 300ms, 一致性 ≥ 99%
 [RD] 创建技术专项文档...
-     ✅ docs/PHOTO_GPU_TECH_SPEC.md
+     ✅ docs/03-TECHNICAL-SPECS/PHOTO_GPU_TECH_SPEC.md
 [RD] 更新三层文档引用...
      ✅ PRODUCT.md Section 3.1
      ✅ FEATURES.md Section 1.3.5
