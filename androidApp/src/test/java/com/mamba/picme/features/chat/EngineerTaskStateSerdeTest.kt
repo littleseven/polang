@@ -60,8 +60,19 @@ class EngineerTaskStateSerdeTest {
             .put("status", "NOT_A_STATUS")
             .put("resolution", "NOT_A_RESOLUTION")
         val parsed = parseEngineerTaskState(JSONObject().put("engineer_task", json).toString())
-        assertEquals(EngineerTaskStatus.RUNNING, parsed?.status)
+        assertEquals(EngineerTaskStatus.FAILED, parsed?.status)
         assertNull(parsed?.resolution)
+    }
+
+    @Test
+    fun `roundtrip preserves truncatedReason and errorSummary`() {
+        val truncated = fullState().copy(
+            status = EngineerTaskStatus.FAILED,
+            truncatedReason = "max_turns",
+            errorSummary = "boom",
+        )
+        val metadata = JSONObject().put("engineer_task", truncated.toJson()).toString()
+        assertEquals(truncated, parseEngineerTaskState(metadata))
     }
 
     @Test

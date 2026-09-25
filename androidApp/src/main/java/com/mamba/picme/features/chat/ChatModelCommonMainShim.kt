@@ -141,7 +141,11 @@ fun EngineerTaskState.toJson(): JSONObject = JSONObject().apply {
     put("deliverBranch", deliverBranch)
 }
 
-/** 从 metadata.engineer_task 还原任务卡状态；任何损坏/缺字段都返回 null 不崩（对齐 OptimizeCandidateGroup.fromJson 先例）。 */
+/**
+ * 从 metadata.engineer_task 还原任务卡状态。taskId 缺失或整体结构损坏返回 null（UI 回落无卡形态）；
+ * 其余字段缺失静默回退默认值，不丢卡（对齐 OptimizeCandidateGroup.fromJson 先例）。
+ * 未知 status 回退 FAILED（安全终态，不参与在场门控），避免旧版本读到未来新枚举值时卡片被静默复活成活跃态。
+ */
 fun parseEngineerTaskState(metadata: String?): EngineerTaskState? {
     if (metadata.isNullOrBlank()) return null
     return runCatching {
@@ -151,7 +155,7 @@ fun parseEngineerTaskState(metadata: String?): EngineerTaskState? {
             sourceText = root.optString("sourceText"),
             sid = root.optString("sid").ifBlank { null },
             status = runCatching { EngineerTaskStatus.valueOf(root.optString("status")) }
-                .getOrDefault(EngineerTaskStatus.RUNNING),
+                .getOrDefault(EngineerTaskStatus.FAILED),
             stage = root.optString("stage").ifBlank { null },
             recentStages = root.optJSONArray("recentStages")?.let { arr ->
                 (0 until arr.length()).map { idx -> arr.getString(idx) }
