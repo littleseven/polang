@@ -129,11 +129,11 @@ struct MainTabView: View {
             // 前台优先：进后台协作暂停扫描（SP-B）；回前台不自动续，由用户在扫描页点恢复
             if phase == .background { TagScanOrchestrator.shared.pauseForBackground() }
         }
-        // 悬浮 Tab：根页（相册/整理/人物/回忆）显示；聊天页（沉浸式，避免遮挡输入栏）隐藏
+        // 微信式平底标签栏：根页（相册/整理/人物/回忆）显示；聊天页（沉浸式，避免遮挡输入栏）隐藏。
+        // overlay 贴 safe-area 底缘（无悬浮边距），条体 surfaceContainer+顶 hairline（2026-09-25 重造）。
         .overlay(alignment: .bottom) {
             if router.currentPage != 2 && !gallerySelecting {
                 FloatingBottomTab(currentPage: $router.currentPage)
-                    .padding(.bottom, 16)
             }
         }
         #if DEBUG
