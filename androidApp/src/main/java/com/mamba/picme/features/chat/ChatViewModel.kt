@@ -365,12 +365,14 @@ class ChatViewModel(
     /**
      * claude 模式下的用户消息：走 [ClaudeChatClient.chat] SSE 流式（spec §6 事件）。
      * 事件经 [ClaudeAgentRenderer] 折叠成 agent 气泡（文本流式 + 步骤 + 文件改动）；
-     * done 后落 Room（metadata 带 claude_agent_state，跨重载保留）；出现 file_change → 交付按钮。
+     * done 后落 Room（metadata 带 claude_agent_state，跨重载保留）；交付审批由 TASK_CARD 任务卡承载。
      */
     fun sendClaudeMessage(text: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
             val sessionId = _currentSessionId.value
+            // 提升到 try 外：finally 做 compare-and-clear，防旧回合误清新回合的活动卡
+            var taskId: String? = null
             try {
                 ensureSessionExists(sessionId)
                 chatMessageDao.insertMessage(
@@ -393,10 +395,11 @@ class ChatViewModel(
 
                 _isProcessing.value = true
                 // 提交即登记任务卡（spec：每次 claude-chat 提交 = 一张任务卡）
-                val taskId = "task_" + UUID.randomUUID().toString()
-                val initialTask = EngineerTaskReducer.initial(taskId, text, System.currentTimeMillis())
-                activeEngineerTaskId = taskId
-                _engineerTasks.update { tasks -> tasks + (taskId to initialTask) }
+                val roundTaskId = "task_" + UUID.randomUUID().toString()
+                taskId = roundTaskId
+                val initialTask = EngineerTaskReducer.initial(roundTaskId, text, System.currentTimeMillis())
+                activeEngineerTaskId = roundTaskId
+                _engineerTasks.update { tasks -> tasks + (roundTaskId to initialTask) }
                 engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, initialTask) }
                 val renderer = ClaudeAgentRenderer()
                 val streamingId = "claude_streaming_${System.currentTimeMillis()}"
@@ -479,7 +482,7 @@ class ChatViewModel(
                 _streamingMessage.value = null
             } finally {
                 _isProcessing.value = false
-                activeEngineerTaskId = null
+                if (activeEngineerTaskId == taskId) activeEngineerTaskId = null
             }
         }
     }
@@ -617,8 +620,9 @@ class ChatViewModel(
         sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue))
     }
 
-    /** 审批动作回填 + 落库（US-9：同一决策点只审批一次，reducer 内幂等）。 */
+    /** 审批动作回填 + 落库（US-9：同一决策点只审批一次，reducer 内幂等）。sessionId 由调用方在动作入口捕获，防异步回包时用户已切会话。 */
     private fun resolveEngineerTask(
+        sessionId: String,
         taskId: String,
         resolution: EngineerTaskResolution,
         deliverBranch: String? = null,
@@ -628,31 +632,46 @@ class ChatViewModel(
         if (next == current) return
         _engineerTasks.update { tasks -> tasks + (taskId to next) }
         viewModelScope.launch {
-            engineerTaskPersistMutex.withLock { persistEngineerTask(_currentSessionId.value, next) }
+            engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) }
         }
     }
 
     /** 任务卡「继续」：旧卡回填已继续 + 同 sid 续跑（新回合新卡，语义同气泡按钮）。 */
     fun continueEngineerTask(taskId: String) {
-        resolveEngineerTask(taskId, EngineerTaskResolution.CONTINUED)
+        if (_isProcessing.value) return
+        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.CONTINUED)
         sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue))
     }
 
     /** 任务卡「到此为止」。 */
-    fun abandonEngineerTask(taskId: String) = resolveEngineerTask(taskId, EngineerTaskResolution.ABANDONED)
+    fun abandonEngineerTask(taskId: String) {
+        if (_isProcessing.value) return
+        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.ABANDONED)
+    }
 
     /** 任务卡「暂不」交付。 */
-    fun skipEngineerDeliver(taskId: String) = resolveEngineerTask(taskId, EngineerTaskResolution.DELIVER_SKIPPED)
+    fun skipEngineerDeliver(taskId: String) {
+        if (_isProcessing.value) return
+        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.DELIVER_SKIPPED)
+    }
 
     /** 任务卡「重试」：重发原消息（新任务卡，不覆盖旧卡，US-11）。 */
     fun retryEngineerTask(taskId: String) {
+        if (_isProcessing.value) return
         val source = _engineerTasks.value[taskId]?.sourceText ?: return
         sendClaudeMessage(source)
     }
 
     /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。 */
     fun deliverEngineerTask(taskId: String) {
-        val sid = _engineerTasks.value[taskId]?.sid ?: return
+        if (_isProcessing.value) return
+        // 消费端校验+回落（reducer 冻结面不动）：claude init 的 UUID session 事件每回合都会
+        // 经 reducer last-wins 覆盖 task.sid，而网关 /deliver 只认 12-hex sid；pattern 不匹配
+        // 则回落 VM 级 claudeSid（该字段本身只采纳 12-hex，见 sendClaudeMessage 事件处理）。
+        val sid = _engineerTasks.value[taskId]?.sid?.takeIf { candidate -> candidate.matches(GATEWAY_SID_PATTERN) }
+            ?: claudeSid
+            ?: return
+        val sessionId = _currentSessionId.value
         viewModelScope.launch {
             val token = _serverAuthToken.value
             if (token.isBlank()) return@launch
@@ -660,26 +679,28 @@ class ChatViewModel(
                 onSuccess = { json ->
                     val branch = json.optString("branch")
                     if (json.optBoolean("ok", false) && branch.isNotBlank()) {
-                        resolveEngineerTask(taskId, EngineerTaskResolution.DELIVERED, branch)
+                        resolveEngineerTask(sessionId, taskId, EngineerTaskResolution.DELIVERED, branch)
                     } else {
-                        markEngineerTaskDeliverError(taskId, json.optString("error"))
+                        markEngineerTaskDeliverError(sessionId, taskId, json.optString("error"))
                     }
                 },
-                onFailure = { error -> markEngineerTaskDeliverError(taskId, error.message) },
+                onFailure = { error -> markEngineerTaskDeliverError(sessionId, taskId, error.message) },
             )
         }
     }
 
     /** 交付失败：保持待审批态，错误摘要上卡（可重试，对齐 confirmClaudeDeliver pending 恢复语义）。 */
-    private fun markEngineerTaskDeliverError(taskId: String, message: String?) {
+    private fun markEngineerTaskDeliverError(sessionId: String, taskId: String, message: String?) {
         val current = _engineerTasks.value[taskId] ?: return
+        // 晚到的失败回包不写已裁决卡（与 resolved 幂等对称）
+        if (current.resolution != null) return
         val next = current.copy(
             errorSummary = stringContext().getString(R.string.claude_deliver_failed, message ?: ""),
             updatedAtMs = System.currentTimeMillis(),
         )
         _engineerTasks.update { tasks -> tasks + (taskId to next) }
         viewModelScope.launch {
-            engineerTaskPersistMutex.withLock { persistEngineerTask(_currentSessionId.value, next) }
+            engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) }
         }
     }
 
