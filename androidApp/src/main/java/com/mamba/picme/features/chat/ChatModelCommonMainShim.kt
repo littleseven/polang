@@ -5,6 +5,9 @@ import com.mamba.picme.domain.chat.ChatMessage
 import com.mamba.picme.domain.chat.ClaudeAgentState
 import com.mamba.picme.domain.chat.ClaudeStepStatus
 import com.mamba.picme.domain.chat.ClaudeStepUi
+import com.mamba.picme.domain.chat.EngineerTaskResolution
+import com.mamba.picme.domain.chat.EngineerTaskState
+import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import org.json.JSONArray
 import org.json.JSONObject
@@ -113,6 +116,57 @@ fun OptimizeCandidateGroup.Companion.fromJson(json: String?): OptimizeCandidateG
             candidates = candidates,
             usedFingerprints = if (fps == null) emptyList() else (0 until fps.length()).map { fps.optString(it) },
             drawIndex = obj.optInt("drawIndex", 1)
+        )
+    }.getOrNull()
+}
+
+// ---- 工程师任务卡（TASK_CARD）Room metadata serde ----
+
+fun EngineerTaskState.toJson(): JSONObject = JSONObject().apply {
+    put("taskId", taskId)
+    put("sourceText", sourceText)
+    put("sid", sid)
+    put("status", status.name)
+    put("stage", stage)
+    put("recentStages", JSONArray(recentStages))
+    put("turns", turns)
+    if (costCents != null) put("costCents", costCents)
+    put("startedAtMs", startedAtMs)
+    put("updatedAtMs", updatedAtMs)
+    put("fileChangeCount", fileChangeCount)
+    put("truncatedReason", truncatedReason)
+    put("errorSummary", errorSummary)
+    put("resultSummary", resultSummary)
+    put("resolution", resolution?.name)
+    put("deliverBranch", deliverBranch)
+}
+
+/** 从 metadata.engineer_task 还原任务卡状态；任何损坏/缺字段都返回 null 不崩（对齐 OptimizeCandidateGroup.fromJson 先例）。 */
+fun parseEngineerTaskState(metadata: String?): EngineerTaskState? {
+    if (metadata.isNullOrBlank()) return null
+    return runCatching {
+        val root = JSONObject(metadata).optJSONObject("engineer_task") ?: return null
+        EngineerTaskState(
+            taskId = root.getString("taskId"),
+            sourceText = root.optString("sourceText"),
+            sid = root.optString("sid").ifBlank { null },
+            status = runCatching { EngineerTaskStatus.valueOf(root.optString("status")) }
+                .getOrDefault(EngineerTaskStatus.RUNNING),
+            stage = root.optString("stage").ifBlank { null },
+            recentStages = root.optJSONArray("recentStages")?.let { arr ->
+                (0 until arr.length()).map { idx -> arr.getString(idx) }
+            } ?: emptyList(),
+            turns = root.optInt("turns"),
+            costCents = if (root.has("costCents")) root.getInt("costCents") else null,
+            startedAtMs = root.optLong("startedAtMs"),
+            updatedAtMs = root.optLong("updatedAtMs"),
+            fileChangeCount = root.optInt("fileChangeCount"),
+            truncatedReason = root.optString("truncatedReason").ifBlank { null },
+            errorSummary = root.optString("errorSummary").ifBlank { null },
+            resultSummary = root.optString("resultSummary").ifBlank { null },
+            resolution = root.optString("resolution").ifBlank { null }
+                ?.let { name -> runCatching { EngineerTaskResolution.valueOf(name) }.getOrNull() },
+            deliverBranch = root.optString("deliverBranch").ifBlank { null },
         )
     }.getOrNull()
 }
