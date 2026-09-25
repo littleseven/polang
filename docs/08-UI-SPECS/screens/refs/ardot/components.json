@@ -155,10 +155,10 @@
       "name": "component/logo",
       "nodeId": "434:8",
       "page": "Components",
-      "purpose": "App Logo(primary绿盒+白WaveMark矢量;旧蓝紫波形/青玉渐变已退役)",
+      "purpose": "App Logo(启动器人物插画图填充;48基准/72实例覆写)",
       "darkPng": "",
       "lightPng": "",
-      "tokenBound": true,
+      "tokenBound": false,
       "variants": [
         "48",
         "72"
@@ -175,6 +175,17 @@
       "tokenBound": true,
       "variants": [],
       "rules": "海报品牌行一律实例(24处已换装)"
+    },
+    {
+      "name": "preview_banner",
+      "nodeId": "434:41",
+      "page": "Components",
+      "purpose": "组件总览预览板(900x1250,双列15组件+标签);散装演示实例已清理",
+      "darkPng": "",
+      "lightPng": "",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "组件预览统一看此banner, 不再另建散装演示实例"
     }
   ]
 }
