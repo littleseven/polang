@@ -91,6 +91,13 @@
 > - `PersonRelationCapability` 命令数 2 → 3：补登 `query_person_relation`（`ChatToolService.list_person_relations` @Tool 分发 `AgentCommand.QueryPersonRelation`）
 > - `AutoTagCapability` 状态由「✅ 已落地」更正为「⚠️ 代码存在但未注册」：全工程无 `registerCapability` 调用点，其命令在 GALLERY 场景实际不可达；实际生效路径为 CHAT 场景的 `ChatStartTagScanCapability`（`start_tag_scan`）
 > - `RemoteControlCapability` 状态由「✅ 已落地」更正为「⚠️ 代码存在但未注册」：IM 远程控制实际走 RemoteChannel 多通道路径（2026-07-27 重新激活），未按 Capability 化设计落地
+>
+> **变更说明（2026-09-26，意图路由 M1/M2 工具面对齐，spec《意图路由契约与意图路由器》）**：
+> - chat **工具面**移除 `view_media`（ChatToolService/ChatToolManifest 同步删除）：chat 场景 view_media 无 delegate 必败，属工具陷阱；**`GalleryCapability.view_media` 命令保留不动**（GALLERY 场景 capability 层与 iOS 侧不变）
+> - `search_media` 工具面新增结构化参数 `person: String`、`fromMs: String`、`toMs: String`（必传、空串=无），组装 `SearchIntent`（query/timeRange/personName）直发——人物∩时间精确搜索不再依赖 `run_gallery_script` 绕行；`ChatToolManifest`（iOS 手工清单）逐字节对齐，工具数 9→8
+> - `run_gallery_script` / `refine_media_search` 描述补 UI 效果契约（脚本 return 对象含 ids 数组时端侧自动补横滑卡片；refine 无基数返回明确错误而非静默全局重搜）
+> - `ChatSearchCapability.SearchOutcome` 新增 `errorMessage` 字段：无基数 refine 映射为 `AgentAction.Error(INVALID_PARAMS)` 如实告知 LLM
+> - 新增意图路由层（`agent/core/intent/`：ChatIntentContract / IntentRouter / ChatRoutingPolicy），VIEW_PHOTOS/REFINE_RESULTS 意图可绕过全量 agent loop 直执 search/refine 命令，详见 `AGENT_ARCHITECTURE.md` §2.4.4 与 ADR-015
 
 ### 1.1 场景 - 能力映射
 

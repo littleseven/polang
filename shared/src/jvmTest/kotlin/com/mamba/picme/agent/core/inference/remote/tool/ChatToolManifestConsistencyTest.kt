@@ -25,9 +25,9 @@ class ChatToolManifestConsistencyTest {
             .associateBy { it.name }
 
     @Test
-    fun `manifest covers exactly the 9 ios chat tools`() {
+    fun `manifest covers exactly the 8 ios chat tools`() {
         val expected = setOf(
-            "get_gallery_summary", "search_media", "refine_media_search", "view_media",
+            "get_gallery_summary", "search_media", "refine_media_search",
             "select_media", "favorite_media", "delete_media", "share_media", "ai_optimize",
         )
         assertEquals(expected, ChatToolManifest.buildDescriptors().map { it.name }.toSet())

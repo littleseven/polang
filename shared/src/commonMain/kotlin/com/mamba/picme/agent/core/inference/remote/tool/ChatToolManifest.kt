@@ -10,8 +10,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * iOS chat 工具手工清单（Phase 6.2 T2）：K/N 无反射，`asToolsByClass()` 不可用，
- * 用 [SimpleTool] 子类逐字面对齐 [ChatToolService] 的 8 个相册工具 + ai_optimize
- * （2026-08-16 抽卡追齐新增）。
+ * 用 [SimpleTool] 子类逐字面对齐 [ChatToolService] 的 7 个相册工具 + ai_optimize
+ * （2026-08-16 抽卡追齐新增；2026-09-26 意图路由 M1：`view_media` 移出 chat 工具面
+ *（chat 内看图 = 点横滑卡片，消除 chat 必败工具陷阱），`search_media` 增补
+ * person/fromMs/toMs 结构化参数透传）。
  *
  * 一致性纪律：name/description/参数名/参数描述**逐字节**照抄 @Tool(customName) 与
  * @LLMDescription 原文（改任何一侧都会触发 jvmTest `ChatToolManifestConsistencyTest`
@@ -34,6 +36,9 @@ object ChatToolManifest {
     @Serializable
     class SearchMediaArgs(
         @property:LLMDescription("自然语言搜索词") val query: String,
+        @property:LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") val person: String,
+        @property:LLMDescription("时间起点（毫秒，据当前日期算）；空串=不限") val fromMs: String,
+        @property:LLMDescription("时间终点（毫秒）；空串=不限") val toMs: String,
     )
 
     @Serializable
@@ -41,11 +46,6 @@ object ChatToolManifest {
         @property:LLMDescription("细化条件") val constraint: String,
         @property:LLMDescription("时间起点（毫秒），如某月起始；空串=不限") val fromMs: String,
         @property:LLMDescription("时间终点（毫秒），如某月末；空串=不限") val toMs: String,
-    )
-
-    @Serializable
-    class ViewMediaArgs(
-        @property:LLMDescription("媒体 id/URI，无则空串") val mediaId: String,
     )
 
     @Serializable
@@ -84,28 +84,19 @@ object ChatToolManifest {
     private class SearchMediaTool : SimpleTool<SearchMediaArgs>(
         argsType = typeToken<SearchMediaArgs>(),
         name = "search_media",
-        description = "搜索本地相册。query 为自然语言搜索词，如'去年夏天海边的小孩'。返回匹配照片。",
+        description = "搜索本地相册，**结果以横滑卡片直接展示给用户**（调用后无需再调其它工具展示，如实总结数量即可）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。",
     ) {
         override suspend fun execute(args: SearchMediaArgs): String =
-            ChatToolService.getInstance().searchMedia(args.query)
+            ChatToolService.getInstance().searchMedia(args.query, args.person, args.fromMs, args.toMs)
     }
 
     private class RefineMediaSearchTool : SimpleTool<RefineMediaSearchArgs>(
         argsType = typeToken<RefineMediaSearchArgs>(),
         name = "refine_media_search",
-        description = "在上一轮搜索结果内细化过滤，如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。",
+        description = "在上一轮搜索结果内细化过滤，**结果以横滑卡片更新展示**。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。",
     ) {
         override suspend fun execute(args: RefineMediaSearchArgs): String =
             ChatToolService.getInstance().refineMediaSearch(args.constraint, args.fromMs, args.toMs)
-    }
-
-    private class ViewMediaTool : SimpleTool<ViewMediaArgs>(
-        argsType = typeToken<ViewMediaArgs>(),
-        name = "view_media",
-        description = "查看指定媒体。mediaId 为媒体 URI 或 id，无则留空串。",
-    ) {
-        override suspend fun execute(args: ViewMediaArgs): String =
-            ChatToolService.getInstance().viewMedia(args.mediaId)
     }
 
     private class SelectMediaTool : SimpleTool<SelectMediaArgs>(
@@ -154,13 +145,12 @@ object ChatToolManifest {
             ChatToolService.getInstance().aiOptimize(args.imageUri)
     }
 
-    /** 9 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
+    /** 8 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
     val tools: List<ToolBase<*, *>> by lazy {
         listOf(
             GetGallerySummaryTool(),
             SearchMediaTool(),
             RefineMediaSearchTool(),
-            ViewMediaTool(),
             SelectMediaTool(),
             FavoriteMediaTool(),
             DeleteMediaTool(),

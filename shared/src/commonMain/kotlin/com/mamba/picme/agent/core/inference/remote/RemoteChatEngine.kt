@@ -9,6 +9,10 @@ import com.mamba.picme.agent.core.inference.remote.react.AgentExecutionMetrics
 import com.mamba.picme.agent.core.inference.remote.react.RemoteReActAgentConfig
 import com.mamba.picme.agent.core.inference.remote.tool.ChatToolService
 import com.mamba.picme.agent.core.inference.remote.tool.ToolInventory
+import com.mamba.picme.agent.core.intent.ChatRoutingPolicy
+import com.mamba.picme.agent.core.intent.CompactChatState
+import com.mamba.picme.agent.core.intent.IntentRouter
+import com.mamba.picme.agent.core.intent.UiArtifact
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.config.AssistantPersona
 import com.mamba.picme.agent.core.model.config.personaPromptSegment
@@ -111,9 +115,80 @@ class RemoteChatEngine internal constructor(
         onEvent: (ChatStreamEvent) -> Unit
     ): Result<StreamChatResult> {
         Logger.d(tag, "streamChat: input='$input'")
-        // chat 页统一走远程 ReAct（tool_calls）（ADR-005 协议分离）。
+        // 意图路由（spec《意图路由契约与意图路由器》M2）：LLM 管意图、代码管策略。
+        // 命中最热意图（看照片/细化结果）时直执确定性命令、跳过全量 agent loop；
+        // 其余（含门控直通与一切降级）原路走 chat 远程 ReAct（ADR-005 协议分离），行为不变。
+        routeAndMaybeExecute(input, agentContext, onEvent)?.let { return it }
         Logger.i(tag, "streamChat routing to Chat ReAct")
         return streamChatReAct(input, agentContext, onEvent)
+    }
+
+    /**
+     * 意图路由入口：门控/pattern/LLM 闭集分类 → [ChatRoutingPolicy] 查表 → 直执或回落。
+     *
+     * 返回 null = 回落完整 agent loop；非 null = 已直执（DirectSearch/DirectRefine），
+     * 直执复用 [ChatToolService.dispatchCommandWithTrace]（uiActions 发射 + observation +
+     * 5s 超时与 LLM tool_calls 路径同源），结果包成 TextReply 命令回 chat。
+     *
+     * 路由器 executor 与 chat agent 同源（[getChatAgent] 缓存复用，含网关 header/协议分流）；
+     * agent 构建失败（远程未配置等）时路由器内部降级为直通，不影响主链路。
+     */
+    private suspend fun routeAndMaybeExecute(
+        input: String,
+        agentContext: AgentContext,
+        onEvent: (ChatStreamEvent) -> Unit
+    ): Result<StreamChatResult>? {
+        val persona = agentContext.persona
+        val replyLanguage = agentContext.replyLanguage
+        // 路由器实例无状态（审计口在 companion），按回合构造、provider 闭包捕获本轮配置
+        val router = IntentRouter {
+            getChatAgent(persona, replyLanguage)?.executorBundle
+        }
+        // 紧凑对话状态（spec §3.2 初值）：搜索基数存在性 + 上轮 artifact
+        val hasSearchBase = agentContext.recentSearchResults.isNotEmpty()
+        val state = CompactChatState(
+            lastArtifact = if (hasSearchBase) UiArtifact.MEDIA_RESULTS_CARD else null,
+            hasSearchBase = hasSearchBase,
+        )
+        val routing = router.route(
+            query = input,
+            state = state,
+            today = today(),
+            traceId = agentContext.traceId,
+        )
+        return when (val decision = ChatRoutingPolicy.decide(routing, state, input)) {
+            is ChatRoutingPolicy.RouteDecision.FullAgentLoop -> {
+                Logger.d(tag, "router fallback to agent loop: ${decision.reason}")
+                null
+            }
+            is ChatRoutingPolicy.RouteDecision.DirectSearch -> {
+                // 占位文案切换到「搜集中」语义（与 tool_calls 路径的 ToolCallStarted 一致）
+                onEvent(ChatStreamEvent.ToolCallStarted)
+                val observation = ChatToolService.getInstance().dispatchCommandWithTrace(
+                    AgentCommand.SearchMedia(query = decision.query, intent = decision.intent),
+                    agentContext.traceId,
+                )
+                Result.success(
+                    StreamChatResult(
+                        fullResponse = observation,
+                        commands = listOf(AgentCommand.TextReply(message = observation)),
+                    )
+                )
+            }
+            is ChatRoutingPolicy.RouteDecision.DirectRefine -> {
+                onEvent(ChatStreamEvent.ToolCallStarted)
+                val observation = ChatToolService.getInstance().dispatchCommandWithTrace(
+                    AgentCommand.RefineMediaSearch(constraint = decision.constraint, intent = decision.intent),
+                    agentContext.traceId,
+                )
+                Result.success(
+                    StreamChatResult(
+                        fullResponse = observation,
+                        commands = listOf(AgentCommand.TextReply(message = observation)),
+                    )
+                )
+            }
+        }
     }
 
     /** chat 远程 ReAct：调 [processChatReAct] 拿 summary，包成 TextReply 命令回 chat。 */

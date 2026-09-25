@@ -38,7 +38,7 @@ object ChatPromptRules {
             【run_gallery_script 能力总览】
             run_gallery_script 在端侧 QuickJS 沙箱执行 JS（取数类 handler 只读、数据不出端；写操作走 capability.dispatch，经用户确认）。所有 handler 均为异步：**必须用 await bridge.callAsync(name, args) 调用**（bridge.call 已禁用，调用会报错）：
             - gallery.summary → 相册聚合统计
-            - gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,person?,limit?}) → 结构化过滤 {ids,total}。**person=人物分组名（如'大宝'）**，按人脸归属做 AND 交集——「某人物 ∩ 时间/标签」必须用 person 精确查；不要把人物名和时间拼进 search_media 的自然语言 query（那样会丢人物维度，误回他人照片）。
+            - gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,person?,limit?}) → 结构化过滤 {ids,total}。person=人物分组名（如'大宝'），按人脸归属做 AND 交集，供脚本内多维组合/交并差使用。「某人物 ∩ 时间/标签」的精确查询优先用 search_media 的 person/fromMs/toMs 参数（直接出横滑卡片），不必为此写脚本；脚本 return 的对象若含 ids 数组，端侧会自动把这些照片补成横滑卡片——纯统计/盘点脚本不要 return ids。
             - gallery.tags → 全局标签分布 {标签:照片数}
             - gallery.timeline({fromMs?,toMs?,bucketMs?}) → 按时间分桶统计 {桶起始时间戳:照片数}（默认按月）
             - gallery.intersect({idsA:[...],idsB:[...],op:"intersect|union|diff"}) → 集合交并差 {ids,total}
@@ -59,7 +59,7 @@ object ChatPromptRules {
             - 用户说"X 是我 Y"（如"小宝是我女儿"）→ remember_person_relation(name, relation)；名字未识别时会返回引导提示，如实告知用户先去相册人物分组命名，不要假装已记住。
             - 用户说"忘掉…"→ 事实用 forget_fact（先 recall_memory 拿 factId 再精确删），人物关系用 forget_person_relation(name)。
             - **人物关系查询**（"看一下我的人物关系""我女儿是谁""小宝和我什么关系""我记住了哪些关系""谁是我的家人"）→ **必须调 list_person_relations 工具**（name 留空查全部、指定人物名查单个），不要凭印象回答，也不要只看下文【关于用户】段（该段可能未及时同步刚声明的关系）。拿到结果后如实列出；返回空才说"还没有记住人物关系"。
-            - 事实回忆类问题（"我对什么过敏""我喜欢什么"）**优先直接引用 system prompt 末尾【关于用户】段**（不要重复调 recall_memory 核对）；仅当【关于用户】段没列全（被预算截断）或需要拿 factId 去删除时，才调 recall_memory。搜"我和 X 的合照""我女儿的照片"仍直接用 search_media。
+            - 事实回忆类问题（"我对什么过敏""我喜欢什么"）**优先直接引用 system prompt 末尾【关于用户】段**（不要重复调 recall_memory 核对）；仅当【关于用户】段没列全（被预算截断）或需要拿 factId 去删除时，才调 recall_memory。搜"我和 X 的合照""我女儿的照片"直接用 search_media（人物经 person 参数传入，如 person="女儿"，可再配 fromMs/toMs 限定时间范围）。
             """.trimIndent()
         ),
         RuleSection(
@@ -130,7 +130,7 @@ object ChatPromptRules {
             示例：① 上一轮"找大宝的照片"→ 用户"找找4月的"→ refine_media_search(constraint="4月", fromMs=<4月起>, toMs=<4月末>)，**不要** search_media("4月")。
             ② 上一轮"大宝的照片"→ 用户"只要今年6月的"→ refine_media_search(constraint="今年6月", fromMs=<6月起>, toMs=<6月末>)。
             ③ 上一轮"大宝的照片"→ 用户"找猫的照片"→ search_media("猫的照片")（全新主题）。
-            若要从零精确做"人物∩时间"，用 gallery.query({person:'大宝', fromMs, toMs})。
+            若要从零精确做"人物∩时间"（全新一轮而非窄化），用 search_media(query, person='大宝', fromMs, toMs) 的结构化参数，直接出卡片。
             """.trimIndent()
         ),
         RuleSection(
