@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// 微信式平底标签栏（2026-09-25 v3.0.2 重造，对齐画布 component/floating_tab 正稿与 Android 重造）
-/// 全宽贴底平底条：surfaceContainer 底 + 顶部 outlineVariant hairline，
-/// 图标 24dp + labelSmall(10sp) 标签；选中 primary(#07C160) / 未选中 onSurfaceVariant(#888)。
-/// 旧悬浮胶囊（ultraThinMaterial+阴影，main-nav.yaml allowed_differences 平台差异）退役。
-/// 五项表驱动，页索引 0-4 与主 Pager 页序 1:1：相册(0) / 整理(1) / 聊天(2) / 人物(3) / 回忆(4)。
+/// 悬浮底部 Tab（2026-09-26 形态回退：平底条现代感不足，悬浮胶囊恢复；
+/// 配色保留微信系——选中 primary(#07C160) / 未选中 onSurfaceVariant(#888)）。
+/// 底部居中悬浮胶囊（iOS ultraThinMaterial，main-nav.yaml allowed_differences 平台差异）+阴影；
+/// 纯图标（labelKey 仅作 a11y）；五项表驱动，页索引 0-4 与主 Pager 页序 1:1。
 /// 选中项点击空操作；未选中点击瞬时切页（无滑动动画）。
 struct FloatingBottomTab: View {
     @Binding var currentPage: Int
@@ -29,19 +28,19 @@ struct FloatingBottomTab: View {
 
     var body: some View {
         let s = appScheme(cs)
-        VStack(spacing: 0) {
-            Divider()
-                .overlay(s.outlineVariant)  // 顶 hairline（微信式）
-            HStack(spacing: 0) {
-                ForEach(TabItem.all, id: \.a11yId) { item in
-                    tabItem(item, scheme: s)
-                }
+        HStack(spacing: 0) {
+            ForEach(TabItem.all, id: \.a11yId) { item in
+                tabItem(item, scheme: s)
             }
-            .frame(maxWidth: .infinity)  // SpaceEvenly：五项均分条宽
-            .frame(height: 56)
-            .padding(.horizontal, BottomTabTokens.containerPaddingH)
         }
-        .background(s.surfaceContainer)
+        .frame(maxWidth: .infinity)  // SpaceEvenly：五项均分胶囊宽度
+        .padding(.horizontal, BottomTabTokens.containerPaddingH)
+        .padding(.vertical, BottomTabTokens.containerPaddingV)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
+        )
     }
 
     private func tabItem(_ item: TabItem, scheme s: SchemeColors) -> some View {
@@ -50,17 +49,12 @@ struct FloatingBottomTab: View {
             // 选中项点击空操作（赋同值无副作用）；未选中瞬时切页（无动画，main-nav §1）
             currentPage = item.page
         } label: {
-            VStack(spacing: BottomTabTokens.labelTopPadding) {
-                MatIcon(name: item.icon, size: BottomTabTokens.iconSize)
-                    // 图标+标签同色区分选中态，无背景块（微信式）
-                    .foregroundColor(selected ? s.primary : s.onSurfaceVariant)
-                Text(L(item.labelKey))
-                    .font(AppTypography.labelSmall.font)
-                    .foregroundColor(selected ? s.primary : s.onSurfaceVariant)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, BottomTabTokens.itemPaddingH)
-            .frame(maxWidth: .infinity)
+            MatIcon(name: item.icon, size: BottomTabTokens.iconSize)
+                // 仅 tint 区分选中态，无背景块（main-nav §1 selected_style）
+                .foregroundColor(selected ? s.primary : s.onSurfaceVariant)
+                .padding(.horizontal, BottomTabTokens.itemPaddingH)
+                .padding(.vertical, BottomTabTokens.itemPaddingVIconOnly)
+                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
         // UI 自动化锚点：tab_gallery / tab_organize / tab_chat / tab_person / tab_memories

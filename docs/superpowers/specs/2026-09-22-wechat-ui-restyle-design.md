@@ -126,6 +126,15 @@
 4. Play v2.3 三语全量替换成功（zh 两行回读 18/18）。
 5. 官网换色上线（`#07C160` 主绿系）。
 
+## 6.5 执行增补二（2026-09-26 · 底 bar 形态回退 + Logo 组件化）
+
+用户反馈追加：
+1. **底 bar 形态回退**：平底条现代感不足，**悬浮胶囊恢复**（token v3.0.7 cornerRadius 28 回位、画布组件+14 实例回悬浮位+圆角 28、Android/iOS 代码回退、调用点恢复 16dp 悬浮边距）；**配色保留微信系**（选中 primary/未选中 onSurfaceVariant 不变）。~~§1 标签栏平底条~~ 形态条款作废，配色条款有效。
+2. **人物页三 action 光学对齐**：FilterList 三线字形密度重心比圆形字形高 ~1.8dp（设备 3x 实测），App 侧 +2dp 光学校正。
+3. **三帧状态栏漂移修复**：dedup/scanning、people/detail、gallery/grid-store01-zhTW 亮状态栏残留 → 回 Dark（烘焙周期覆写丢失病第三批）。
+4. **Logo 组件化**：component/logo（primary 绿盒+白 WaveMark；旧青玉渐变+蓝紫波形退役）+ component/brand_row（Brand Dot+PoLang Gallery 锁组）落 Components 页；26 处换装（24 海报 Brand Row + Chat/Screens LogoBox 实例化）。渐变+变量 stop 绑定引擎不渲染（SendButton 同款雷），Logo 用 scheme/primary 纯色。
+5. Play v2.3.1 三语图像再上线（胶囊圆角+Logo 修正后 27 图重传，回读 28/28）+ 官网 shots ?v=20260926-1 双站部署。
+
 ## 7. 执行增补（2026-09-22 · Organize 页专项指令）
 
 用户追加指令：Organize 页 UI 重新设计——**简化 + 配色尽量一致**（当日自动执行完毕）。
