@@ -11,6 +11,9 @@ import kotlinx.serialization.json.Json
  * Android runtime 下 ServiceLoader 永远空 → "No KoogHttpClient.Factory provider found"
  *（真机实测 2026-08-07 复现）。显式构造也更利于 R8：无需为 ServiceLoader provider 加 keep）。
  *
+ * 时效（2026-09-25 核实）：1.3.0 的 http-client-ktor-android aar 内 classes.jar **仍无**
+ * `META-INF/services` 条目——缺陷未修，显式构造在 1.3.0 下继续必要，勿因升级误删。
+ *
  * @param extraHeaders 注入到每个请求的附加头（如网关鉴权头 `X-App-Token` / `X-Device-Id`）。
  * 空 map 时直接返回默认 Ktor 工厂，零额外开销（语义对齐 runtime-core `RemoteModelFactory` 现状）。
  */

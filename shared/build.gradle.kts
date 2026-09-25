@@ -29,9 +29,14 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // 排除 serialization-jackson：它传递引入 jackson-module-kotlin（MethodHandle.invokeExact，
-            // 需 API 26），minSdk 24 下 D8 拒绝 dex（原 :runtime-core 同一排除理由）。
-            // Koog 主链路用 kotlinx-serialization，不依赖此可选模块。
+            // 排除 serialization-jackson：Android variant 传递引入 jackson-module-kotlin
+            //（MethodHandle.invokeExact，需 API 26），minSdk 24 下 D8 拒绝 dex。
+            // ⚠️ 2026-09-25 双重核实（Koog 1.3.0）：koog-agents-1.3.0.pom（JVM 视角）虽已不直列
+            // 此依赖、:shared jvmRuntimeClasspath 也无 jackson，但 Android variant 的
+            // debugRuntimeClasspath 仍经 ai.koog:serialization-jackson:1.3.0 拉入
+            // jackson-module-kotlin:2.21.3——删本 exclude 实测 mergeExtDexDebug 即失败。
+            // 验证须以 Android 侧 D8 为准，勿信 JVM 侧依赖树。Koog 主链路用 kotlinx-serialization，
+            // 不依赖此可选模块。
             // 注：KMP KotlinDependencyHandler 不支持 Provider+配置块的重载，故用字符串记法，
             // 版本号仍取自版本目录（libs.versions.koog），不产生第二处版本源。
             implementation("ai.koog:koog-agents:${libs.versions.koog.get()}") {

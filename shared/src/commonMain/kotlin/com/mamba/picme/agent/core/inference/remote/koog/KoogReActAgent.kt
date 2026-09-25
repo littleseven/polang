@@ -270,6 +270,7 @@ class KoogReActAgent(
         // 自定义策略（graphStrategy 的 lambda 忽略入参 builder，直接返回预建策略）：
         // 修复 Koog 1.1.1 内建 singleRunStrategy 在 nodeSendToolResult 出边先匹配 onTextMessage
         // 导致「文本+tool_calls 同帧」响应丢工具调用的缺陷，详见 poLangSingleRunStrategy KDoc。
+        //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
         AIAgent.builder()
             // 直接传策略实例（命名 lambda 重载 graphStrategy(name){...} 是 Koog 1.1.1 JVM-only
             // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。
@@ -285,6 +286,8 @@ class KoogReActAgent(
             // 真机实测（2026-08-07）：直接传 10 时约 5 轮工具调用就抛
             // AIAgentMaxNumberOfIterationsReachedException（飞书 navigate_to 循环撞顶）。
             // ×3 换算对齐旧「10 轮 LLM」语义上限（仅是上限，正常 1-3 轮即返回，无副作用）。
+            //（2026-09-25 核实：1.3.0 仍按 plan step 计数——AIAgentPlanner 每 step ++iterations，
+            // 语义未变，换算仍必要。）
             .maxIterations((config.maxIterations * KOOG_STEPS_PER_LLM_ROUND).coerceAtLeast(KOOG_STEPS_PER_LLM_ROUND))
             .install(ChatMemory.Feature) { cm ->
                 cm.chatHistoryProvider(historyProvider)

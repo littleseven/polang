@@ -22,6 +22,10 @@ import ai.koog.agents.core.dsl.extension.onToolCalls
  *
  * 注：叙述文本不会丢——onToolCalls 边只消费 Tool.Call part，Text part 仍由
  * EventHandler 的流式事件旁路到 onPartialText（用户可见）。
+ *
+ * 时效（2026-09-25 核实）：Koog 1.3.0 内建策略**仍未修**——nodeSendToolResult 出边
+ * onTextMessage→nodeFinish 仍声明在 onToolCalls 之前（AIAgentSimpleStrategies.kt），
+ * 谓词仍是「含 Text part 即命中」。本策略在 1.3.0 下继续必要，勿因升级误删。
  */
 internal fun poLangSingleRunStrategy(): AIAgentGraphStrategy<String, String> =
     strategy("polang_single_run") {

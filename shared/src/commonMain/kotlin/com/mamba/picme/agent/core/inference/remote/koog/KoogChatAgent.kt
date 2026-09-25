@@ -149,6 +149,7 @@ class KoogChatAgent(
     private fun buildAgent(systemPrompt: String): AIAgent<String, String> =
         // 自定义策略：修复 Koog 1.1.1 内建 singleRunStrategy 丢「文本+tool_calls 同帧」
         // 工具调用的缺陷（chat 多轮工具任务同样受影响），详见 poLangSingleRunStrategy KDoc。
+        //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
         AIAgent.builder()
             // 直接传策略实例（命名 lambda 重载 graphStrategy(name){...} 是 Koog 1.1.1 JVM-only
             // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。
@@ -161,6 +162,8 @@ class KoogChatAgent(
             .prompt(polangSystemPrompt(id = "polang-chat", systemPrompt = systemPrompt, params = executorBundle.baseParams))
             // Koog maxIterations 数的是子图节点执行次数（一轮工具调用 ≈ 2-3 步），旧 AiServices
             // 数的是 LLM 轮次；×3 对齐旧语义上限（详见 KoogReActAgent 同款注释，飞书真机撞顶实测）。
+            //（2026-09-25 核实：1.3.0 仍按 plan step 计数——AIAgentPlanner 每 step ++iterations，
+            // 语义未变，换算仍必要。）
             .maxIterations((config.maxIterations * KOOG_STEPS_PER_LLM_ROUND).coerceAtLeast(KOOG_STEPS_PER_LLM_ROUND))
             .install(ChatMemory.Feature) { cm ->
                 cm.chatHistoryProvider(historyProvider)
