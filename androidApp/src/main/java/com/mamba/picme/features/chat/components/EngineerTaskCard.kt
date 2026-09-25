@@ -26,6 +26,7 @@ import com.mamba.picme.R
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
+import java.util.Locale
 
 /**
  * 工程师任务卡（spec US-1~3/7~11）：状态 chip + 标题 + 阶段 + meta 行 + 状态动作区 + 展开明细。
@@ -183,5 +184,5 @@ private fun taskMetaText(task: EngineerTaskState): String {
 
 private fun formatElapsed(ms: Long): String {
     val totalSec = (ms / 1000).coerceAtLeast(0)
-    return "%d:%02d".format(totalSec / 60, totalSec % 60)
+    return "%d:%02d".format(Locale.ROOT, totalSec / 60, totalSec % 60)
 }

@@ -325,6 +325,10 @@ class ChatViewModel(
     private val _engineerTasks = MutableStateFlow<Map<String, EngineerTaskState>>(emptyMap())
     val engineerTasks: StateFlow<Map<String, EngineerTaskState>> = _engineerTasks.asStateFlow()
 
+    /** 交付请求在途的 taskId 集合（双击防护，防并发重复 POST /v1/claude-deliver；UI 据此禁用交付按钮）。 */
+    private val _engineerDeliverInFlight = MutableStateFlow<Set<String>>(emptySet())
+    val engineerDeliverInFlight: StateFlow<Set<String>> = _engineerDeliverInFlight.asStateFlow()
+
     /** 当前回合活动任务（sendClaudeMessage 提交时置位，回合结束清空）。 */
     @Volatile
     private var activeEngineerTaskId: String? = null
@@ -672,24 +676,31 @@ class ChatViewModel(
         // 消费端校验+回落（reducer 冻结面不动）：claude init 的 UUID session 事件每回合都会
         // 经 reducer last-wins 覆盖 task.sid，而网关 /deliver 只认 12-hex sid；pattern 不匹配
         // 则回落 VM 级 claudeSid（该字段本身只采纳 12-hex，见 sendClaudeMessage 事件处理）。
-        val sid = task.sid?.takeIf { candidate -> candidate.matches(GATEWAY_SID_PATTERN) }
+        val sid = task.sid?.takeIf { sidValue -> sidValue.matches(GATEWAY_SID_PATTERN) }
             ?: claudeSid
             ?: return
+        // 双击防护：taskId 级 in-flight，回包/早退必移除（finally 覆盖 token 缺失路径）
+        if (taskId in _engineerDeliverInFlight.value) return
+        _engineerDeliverInFlight.update { inFlight -> inFlight + taskId }
         val sessionId = _currentSessionId.value
         viewModelScope.launch {
-            val token = _serverAuthToken.value
-            if (token.isBlank()) return@launch
-            claudeChatClient.deliver(token, sid, "push").fold(
-                onSuccess = { json ->
-                    val branch = json.optString("branch")
-                    if (json.optBoolean("ok", false) && branch.isNotBlank()) {
-                        resolveEngineerTask(sessionId, taskId, EngineerTaskResolution.DELIVERED, branch)
-                    } else {
-                        markEngineerTaskDeliverError(sessionId, taskId, json.optString("error"))
-                    }
-                },
-                onFailure = { error -> markEngineerTaskDeliverError(sessionId, taskId, error.message) },
-            )
+            try {
+                val token = _serverAuthToken.value
+                if (token.isBlank()) return@launch
+                claudeChatClient.deliver(token, sid, "push").fold(
+                    onSuccess = { json ->
+                        val branch = json.optString("branch")
+                        if (json.optBoolean("ok", false) && branch.isNotBlank()) {
+                            resolveEngineerTask(sessionId, taskId, EngineerTaskResolution.DELIVERED, branch)
+                        } else {
+                            markEngineerTaskDeliverError(sessionId, taskId, json.optString("error"))
+                        }
+                    },
+                    onFailure = { error -> markEngineerTaskDeliverError(sessionId, taskId, error.message) },
+                )
+            } finally {
+                _engineerDeliverInFlight.update { inFlight -> inFlight - taskId }
+            }
         }
     }
 

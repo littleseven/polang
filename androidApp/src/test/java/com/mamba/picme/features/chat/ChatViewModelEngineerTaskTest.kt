@@ -287,4 +287,26 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
         assertEquals(EngineerTaskResolution.ABANDONED, vm.engineerTasks.value[taskId]?.resolution)
         assertEquals(EngineerTaskStatus.COMPLETED, vm.engineerTasks.value[taskId]?.status)
     }
+
+    @Test
+    fun `deliver on COMPLETED task is no-op`() = runTest {
+        coEvery { claudeChatClient.chat(any(), any(), any(), any()) } coAnswers {
+            val onEvent = arg<(ClaudeEvent) -> Unit>(3)
+            onEvent(ClaudeEvent.Session("aaaa1111bbbb"))
+            onEvent(ClaudeEvent.Done(turns = 1, truncated = false))
+            Result.success("ok")
+        }
+
+        val vm = newViewModel()
+        vm.sendClaudeMessage("改一下脚本")
+        advanceUntilIdle()
+        val taskId = vm.engineerTasks.value.keys.single()
+        assertEquals(EngineerTaskStatus.COMPLETED, vm.engineerTasks.value[taskId]?.status)
+
+        // 状态门控：COMPLETED 卡不可交付，不发起任何 deliver 请求
+        vm.deliverEngineerTask(taskId)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { claudeChatClient.deliver(any(), any(), any()) }
+    }
 }
