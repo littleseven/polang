@@ -50,7 +50,7 @@
 | **MemoryCapability** | `memory_facts` | CHAT | 3 | ✅ 已落地 | 应用级（AppContainer 注入 MemoryRepository） |
 | **ChatGallerySummaryCapability** | `chat_gallery_summary` | CHAT | 1 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate |
 | **ChatStartTagScanCapability** | `chat_start_tag_scan` | CHAT | 1 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate |
-| **ChatRunScriptCapability** | `chat_run_script` | CHAT | 2 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（端侧 QuickJS 沙箱，命令 `run_gallery_script` / `draw_chart`） |
+| **ChatRunScriptCapability** | `chat_run_script` | CHAT | 3 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（端侧 QuickJS 沙箱，命令 `run_gallery_script` / `draw_chart` / `render_html`） |
 | **ChatMediaWriteCapability** | `chat_media_write` | CHAT | 3 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（CHAT 场景媒体写执行汇聚点：`delete_media` / `favorite_media` / `select_media`） |
 | **ImageEditCapability** | `image_edit` | CHAT | 1 | ✅ 已落地 | 应用级（AppContainer 注入 ChatEditProcessor / ChatEditStateHolder，对话式图片编辑 `edit_image`） |
 | **RemoteControlCapability** | `remote_control` | ALL | 0 | ⚠️ 代码存在但未注册 | 应用级单例，不走 AgentCommand 路由；IM 远程控制实际走 RemoteChannel 多通道路径（未 Capability 化） |

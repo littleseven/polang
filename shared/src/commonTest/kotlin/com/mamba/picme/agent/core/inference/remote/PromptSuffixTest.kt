@@ -1,6 +1,7 @@
 package com.mamba.picme.agent.core.inference.remote
 
 import com.mamba.picme.agent.core.model.config.AssistantPersona
+import com.mamba.picme.agent.core.model.context.RenderEnvironment
 import com.mamba.picme.agent.core.model.context.ReplyLanguage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,6 +44,33 @@ class PromptSuffixTest {
         )
         assertTrue(en.contains("crisp and efficient"))
         assertFalse(en.contains("简洁干练"))
+    }
+
+    @Test
+    fun `render environment segment appended after date line when provided`() {
+        val env = RenderEnvironment(
+            deviceType = "Android 手机",
+            screenWidthDp = 400,
+            screenHeightDp = 890,
+            screenWidthPx = 1200,
+            screenHeightPx = 2670,
+            cardContentWidthCssPx = 352,
+            cardSuggestedHeightCssPx = 587
+        )
+        val withEnv = RemoteChatEngine.buildPromptSuffix(
+            AssistantPersona.DEFAULT, ReplyLanguage.SIMPLIFIED_CHINESE, today, renderEnvironment = env
+        )
+        assertTrue(withEnv.contains("【HTML 卡片渲染环境】设备：Android 手机；屏幕 1200x2670 px（400x890 dp）"))
+        assertTrue(withEnv.contains("卡片内容区最大宽度约 352 CSS px"))
+        assertTrue(withEnv.contains("建议单卡内容高度控制在约 587 CSS px"))
+        // 环境段紧跟日期行、性格/语言段之前
+        assertTrue(withEnv.indexOf("【HTML 卡片渲染环境】") > withEnv.indexOf("当前日期"))
+        assertTrue(withEnv.indexOf("【HTML 卡片渲染环境】") < withEnv.indexOf("App 界面语言为简体中文"))
+
+        val withoutEnv = RemoteChatEngine.buildPromptSuffix(
+            AssistantPersona.DEFAULT, ReplyLanguage.SIMPLIFIED_CHINESE, today
+        )
+        assertFalse(withoutEnv.contains("【HTML 卡片渲染环境】"))
     }
 
     @Test

@@ -169,12 +169,17 @@ LLM 感知 handler 的唯一渠道是 `@Tool` 描述文本（`ChatToolService` /
 | 写确认等待 | **120s** | 单次 capability.dispatch 确认 | `CapabilityDispatchHandler.DEFAULT_CONFIRMATION_TIMEOUT_MS`；超时按拒绝处理 |
 | 写脚本 eval 超时 | **180s** | 含 `capability.dispatch` 的脚本 | `ChatViewModel.WRITE_EVAL_TIMEOUT_MS`；脚本会挂起等用户确认（最长 120s）+ 可能的系统授权提示，故放宽 |
 
-### 5.3 图表拦截
+### 5.3 渲染产物拦截（图卡 / HTML 卡片）
 
 脚本 `return Chart.bar/line/pie/timeline(...)` → 结果 `{chart:<svg>, summary:<text>}`：
 
 - `chart`（SVG 字符串）**不喂回 LLM**，由 `ChatViewModel.emitChartMessage` 落库为 `ChatMessageType.CHART` 消息（聊天列表由 DB Flow 驱动，落库保证图卡跨重载/重启持久）；
 - `summary`（精简文字）回传 LLM 做文字总结，省 token。
+
+脚本 `return {html:<自包含HTML>, summary:<text>}` 走同一拦截通路（2026-09 新增）：
+
+- `html` 经 `HtmlCardSanitizer`（`features/chat/HtmlCardSanitizer.kt`）清洗（128KB 上限、剔除高危标签/远程 script）后，由 `ChatViewModel.emitHtmlCardMessage` 落库为 `ChatMessageType.HTML_CARD` 消息，`HtmlCard` WebView 渲染；清洗拒绝时不落库，原因作为 observation 回传 LLM；
+- `summary` 回传 LLM 做文字总结。
 
 ---
 
@@ -229,6 +234,17 @@ JS: await bridge.callAsync('capability.dispatch', {method, params})
 - **Chart 生成器**：`assets/js/chart_bootstrap.js`（独立 JS 文件便于维护），`ChatViewModel.getOrCreateJsRuntime` 创建 JsRuntime 后 eval 一次，定义全局 `Chart`：`Chart.bar/line/pie({title, labels, values, unit?})` 与 `Chart.timeline(timelineObj, {title, unit?, type?})`，均返回 `{chart:<svg>, summary:<text>}`。加载由 `ChartJs.kt` 的 `loadChartBootstrapJs(context)` 完成，失败仅告警不阻断脚本能力。
 - **两种触发方式**：① 脚本内 `return Chart.x(...)`（§5.3 图表拦截）；② LLM 直接 tool_call `draw_chart(type,title,labels,values,unit)` → `AgentCommand.DrawChart` → `ChatRunScriptCapability` → `ChatViewModel.onDrawChart` → `rt.eval("Chart.<fn>(<args>)")` → 图卡 + summary 回传。
 - `@Tool` 描述明确：draw_chart 是展示图表的唯一方式，禁止 LLM 用文字/Markdown 表格/ASCII 画图。
+
+## 7.1 HTML 组件卡片 / render_html（2026-09 新增）
+
+- **定位**：`render_html` 是 draw_chart 之外的第二种渲染通路——draw_chart 负责柱/折/饼统计图，render_html 负责**用户明确要求**的更丰富展示/交互组件（可交互图表、动画演示、自定义布局卡片）；默认不用（prompt `html_card_rules` 节约束）。
+- **链路**：LLM tool_call `render_html(html, summary)` → `AgentCommand.RenderHtml` → `ChatRunScriptCapability` → `ChatViewModel.onRenderHtml` → `HtmlCardSanitizer` 清洗 → 落库 `HTML_CARD` 消息 → `HtmlCard`（`features/chat/HtmlCard.kt`）WebView 渲染；summary 回传 LLM。脚本内 `return {html,...}` 走 §5.3 拦截。
+- **安全模型**（渲染对象为 LLM 生成的不可信内容；2026-09-25 修订，表现力优先）：清洗器剔除远程 script/iframe/object/embed/form/meta refresh（第一道）；WebView 禁文件/DOM Storage、**零 JS 桥接**（第二道，JS 仅沙盒内启用）；**远程资源（img/CSS/a 外链）放行**（2026-09-25 暂时放开，表现力优先）——http(s) 资源直拉，`<a>` 点击经 `shouldOverrideUrlLoading` 拦截回传 `onOpenLink`，由 `HtmlLinkPreviewOverlay` 打开全屏落地页，卡片自身永不导航；**底线**：远程 JS 执行仍禁（远程 script 剔除 + 不注入 JS 桥）。
+- **排版上下文**：组合根（`PoLangApplication`）按 DisplayMetrics 构建 `RenderEnvironment`（设备类型/屏幕 px+dp/卡片内容区最大宽度/建议单卡内容高度）注入 `AgentConfigurator`，拼进 chat system prompt 动态尾段（`RemoteChatEngine.buildPromptSuffix` 的 `renderEnvironment` 参数，非 golden 锁定区），引导 LLM 响应式排版；未注入（iOS 跟随期）时无该段。
+- **渲染模板**：`HtmlCard.wrapHtmlDocument` 把 HTML 片段包进完整文档——注入 viewport meta（`width=device-width`，1 CSS px ≈ 1 dp，测高/排版基准统一）+ 响应式 reset（`img/video/svg/table{max-width:100%}` 等，防 LLM 产物固定宽度撑爆卡片）；已是完整文档（含 `<html`）时原样加载。
+- **UI 形态**：列表卡片**动态测高 + 完全撑开 + 高度跟随**——`onPageFinished` 后经 `evaluateJavascript` 读 body 内容盒高度（`getBoundingClientRect`，不受 viewport 高度污染；出站求值，非 JS 桥接；首测 + 400ms 延迟复测覆盖 JS 布局 settle），卡片高度 = 内容全高（≥120dp，**无上限**）并动画过渡，测高完成前占位 280dp；**卡片自身永不竖滚**、滚动全交外层 LazyColumn，从根上消除「长列表 vs WebView」手势冲突（`ChatHtmlWebView` 嵌套滚动双策略作兜底：可滚时关闭 `isNestedScrollingEnabled` 防 LazyColumn pre-scroll 抢占，边界时手动 dispatch 让渡）；加载后注入 **ResizeObserver** 观察 body，交互引起的内容高度变化（手风琴展开/Tab 切换）实时回传、容器高度跟随双向缩放（老内核无 ResizeObserver 时静默跳过，由首测+复测兜底）；**滑动防抖三重策略**（修「滑动中列表项边滚边变高」的上下抖动）：测高结果按 html hash 进程级 LruCache 缓存（卡片重回视口直接以最终高度出现，零占位动画）+ 列表滑动途中（`listState.isScrollInProgress`）冻结高度更新、滚停后一次性应用 + 小于 2px 的测高抖动直接忽略；卡片内直接交互（JS 点击/输入即时生效；**仅 `<a>` 外链点击进全屏落地页** `HtmlLinkPreviewOverlay`），滚动条一律隐藏。
+- **调试入口**：DEBUG 构建 chat 输入 `/html` 注入九张冒烟测试卡（纯 HTML / 图文混排内联 SVG / Grid 仪表盘排版 / CSS 动画 / 动画图表 / 内联 JS / Tab+手风琴复合交互 / 远程用例 / NVIDIA 真实内容 all-in-one 综合卡（真图+业绩+股价 SVG 走势图+视频+音乐+CARTO 瓦片地图），`HtmlCardSmokeSamples`，远程用例故意绕过清洗器直插——远程 img 应可加载、外链应开落地页，远程 script 因零桥接+网络失败无原生副作用），不走 LLM。
+- **iOS 状态**：本期仅 Android 落地，iOS 待 ios-follow（WKWebView 照搬 `ChartSvgCard.swift` 模式 + 同款沙盒/动态测高/链接落地页）。
 
 ---
 

@@ -51,6 +51,17 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
             unit: String?,
             traceId: String?
         ): String
+
+        /**
+         * 端侧渲染一张 HTML 组件卡片：[html] 为自包含 HTML（内联 CSS/JS，禁外链/网络资源），
+         * 清洗后作为 HTML_CARD 消息落库（离线 WebView 渲染，断网 + 零 JS 桥接）；
+         * 返回 summary（回传 LLM 做文字总结）。
+         */
+        suspend fun onRenderHtml(
+            html: String,
+            summary: String?,
+            traceId: String?
+        ): String
     }
 
     private var delegateRef: WeakReference<Delegate>? = null
@@ -69,7 +80,7 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
 
     override fun activeScenes(): List<SceneManager.Scene> = listOf(SceneManager.Scene.CHAT)
 
-    override fun supportedCommands(): List<String> = listOf("run_gallery_script", "draw_chart")
+    override fun supportedCommands(): List<String> = listOf("run_gallery_script", "draw_chart", "render_html")
 
     override fun getCommandDescription(command: String): String = when (command) {
         "run_gallery_script" -> "执行 JS 脚本（端侧沙箱，取数只读；写操作经确认）。参数: code (string, JS 源码)。" +
@@ -89,6 +100,9 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
         "draw_chart" -> "画图表（柱状/折线/饼图）并渲染成真实图片。" +
             "参数: type(bar/line/pie)、title、labels(英文逗号分隔)、values(逗号分隔数值,与 labels 等长)、unit。" +
             "这是展示图表的唯一方式，禁止用文字/表格画图。"
+        "render_html" -> "渲染自包含 HTML 组件卡片（离线 WebView，内联 CSS/JS）。" +
+            "参数: html(自包含 HTML，禁外链/网络请求/跳转)、summary(一句话总结)。" +
+            "仅当用户明确要求更丰富展示或交互组件时使用；统计图仍走 draw_chart。"
         else -> "未知命令"
     }
 
@@ -123,6 +137,19 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
                         labels = command.labels,
                         values = command.values,
                         unit = command.unit,
+                        traceId = context.traceId
+                    )
+                    Result.success(
+                        AgentAction.TextReply(
+                            commandId = command.commandId,
+                            message = result
+                        )
+                    )
+                }
+                is AgentCommand.RenderHtml -> {
+                    val result = delegate.onRenderHtml(
+                        html = command.html,
+                        summary = command.summary,
                         traceId = context.traceId
                     )
                     Result.success(

@@ -22,6 +22,7 @@ class ChatPromptRulesTest {
                 "memory_tools",
                 "capability_dispatch",
                 "chart_tool_note",
+                "html_card_rules",
                 "script_vs_tool",
                 "image_edit",
                 "refinement_rules",

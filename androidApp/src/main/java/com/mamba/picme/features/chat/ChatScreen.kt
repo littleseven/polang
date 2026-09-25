@@ -255,6 +255,8 @@ fun ChatScreen(
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
     var previewChartSvg by remember { mutableStateOf<String?>(null) }
+    // HTML 卡片外链落地页预览状态（点击卡片内 <a> 链接打开）
+    var previewLinkUrl by remember { mutableStateOf<String?>(null) }
     // 表格全屏预览状态（点击气泡内表格打开）
     var expandedTable by remember { mutableStateOf<MarkdownTable?>(null) }
     // 相册搜索结果预览状态
@@ -263,11 +265,13 @@ fun ChatScreen(
     // 已点删除但等待媒体库刷新确认的图片 ID
     var pendingDeletedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
+    // 任一全屏预览打开（照片轮播/图片/图表/表格/HTML 外链落地页）：禁外层横滑 + 隐藏顶栏 + 拦截返回键
+    val anyPreviewOpen = previewAssets.isNotEmpty() || imagePreview != null ||
+        previewChartSvg != null || expandedTable != null || previewLinkUrl != null
+
     // 上报外层 Pager 横滑使能：任一全屏预览打开时禁用，避免与内层预览滑动冲突
-    LaunchedEffect(previewAssets, imagePreview, previewChartSvg, expandedTable) {
-        onHorizontalSwipeEnabledChange(
-            previewAssets.isEmpty() && imagePreview == null && previewChartSvg == null && expandedTable == null
-        )
+    LaunchedEffect(anyPreviewOpen) {
+        onHorizontalSwipeEnabledChange(!anyPreviewOpen)
     }
 
     // 媒体库全量数据：用于感知删除完成并同步清理 preview/chat 消息
@@ -436,12 +440,13 @@ fun ChatScreen(
     // 预览打开时拦截系统返回键：关闭预览并回到 chat 页（保留横滑卡片），
     // 而非直接 pop 到相册（Gallery 为 startDestination，栈底为 [Gallery, Chat]）。
     // 与 GalleryScreen 的预览 BackHandler 行为对齐。
-    BackHandler(enabled = isActivePage && (previewAssets.isNotEmpty() || imagePreview != null || previewChartSvg != null || expandedTable != null)) {
+    BackHandler(enabled = isActivePage && anyPreviewOpen) {
         when {
             previewAssets.isNotEmpty() -> previewAssets = emptyList()
             imagePreview != null -> imagePreview = null
             previewChartSvg != null -> previewChartSvg = null
             expandedTable != null -> expandedTable = null
+            previewLinkUrl != null -> previewLinkUrl = null
         }
     }
 
@@ -505,8 +510,8 @@ fun ChatScreen(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 预览（照片轮播 / 图片 / 图表 / 表格全屏）打开时隐藏 chat 顶栏，让覆盖层占满整屏
-            if (previewAssets.isEmpty() && imagePreview == null && previewChartSvg == null && expandedTable == null) {
+            // 预览（照片轮播 / 图片 / 图表 / HTML 卡片 / 表格全屏）打开时隐藏 chat 顶栏，让覆盖层占满整屏
+            if (!anyPreviewOpen) {
                 ChatTopBar(
                     onNavigateBack = onNavigateBack,
                     onOpenSidebar = { isSidebarOpen = true },
@@ -567,6 +572,15 @@ fun ChatScreen(
                             } else if (message.type == ChatMessageType.CHART && message.chartSvg != null) {
                                 val chartSvg = message.chartSvg!!
                                 ChartSvgCard(svg = chartSvg, onClick = { previewChartSvg = chartSvg })
+                            } else if (message.type == ChatMessageType.HTML_CARD && message.htmlContent != null) {
+                                val html = message.htmlContent!!
+                                // 卡片内元素直接交互；仅 <a> 外链点击打开全屏落地页；
+                                // isListScrolling 用于滑动途中冻结卡片高度更新（防列表抖动）
+                                HtmlCard(
+                                    html = html,
+                                    isListScrolling = listState.isScrollInProgress,
+                                    onOpenLink = { url -> previewLinkUrl = url }
+                                )
                             } else if (message.type == ChatMessageType.OPTIMIZE_CANDIDATES && message.optimizeCandidates != null) {
                                 val group = message.optimizeCandidates!!
                                 val selected = gachaSelections[message.id] ?: group.recommendedIndex
@@ -703,6 +717,12 @@ fun ChatScreen(
             ChartPreviewOverlay(
                 svg = previewChartSvg,
                 onDismiss = { previewChartSvg = null }
+            )
+
+            // HTML 卡片外链落地页（全屏内置浏览器）
+            HtmlLinkPreviewOverlay(
+                url = previewLinkUrl,
+                onDismiss = { previewLinkUrl = null }
             )
 
             // 表格全屏预览（横屏旋转查看）

@@ -6,6 +6,7 @@ import com.mamba.picme.agent.core.model.config.AiAgentMode
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.PageContext
+import com.mamba.picme.agent.core.model.context.RenderEnvironment
 import com.mamba.picme.agent.core.inference.remote.tool.CameraToolService
 import com.mamba.picme.agent.core.inference.remote.tool.MemoryContextProvider
 import com.mamba.picme.agent.core.inference.remote.tool.ToolInventory
@@ -181,6 +182,14 @@ class AgentOrchestrator private constructor(
      */
     fun setMemoryContextProvider(provider: MemoryContextProvider) {
         configurator.setMemoryContextProvider(provider)
+    }
+
+    /**
+     * 注入 HTML 卡片渲染环境供给者（转发给内部 [AgentConfigurator]）。须在 chat agent 首次
+     * 构建前调用——app 在 PoLangApplication.onCreate 注入；iOS 跟随期不注入，prompt 无该段。
+     */
+    fun setRenderEnvironmentProvider(provider: () -> RenderEnvironment) {
+        configurator.setRenderEnvironmentProvider(provider)
     }
 
     /**

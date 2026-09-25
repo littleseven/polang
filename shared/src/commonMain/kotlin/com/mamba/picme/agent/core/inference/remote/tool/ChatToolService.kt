@@ -274,6 +274,30 @@ class ChatToolService private constructor() : TraceIdAware {
         )
     }
 
+    @Tool(customName = "render_html")
+    @LLMDescription(
+        "渲染一个 HTML 组件卡片插入聊天（端侧 WebView 渲染，支持内联 CSS/JS 动画与交互）。" +
+            "仅当用户明确要求更丰富的展示或交互组件（如可交互图表、动画演示、自定义布局卡片）时才调用；" +
+            "柱/折/饼统计图一律仍用 draw_chart，不要用本工具替代。" +
+            "html 的 CSS/JS 一律内联；远程 script、iframe/object/embed/form、meta refresh 会被清洗剔除，" +
+            "fetch/XHR 也不可用（离线沙箱）。" +
+            "鼓励引用远程富媒体提升表现力：<img> 网络图片、<video>/<audio> 远程媒体、远程 CSS 样式、" +
+            "<a> 外链均可使用（a 外链用户点击后在全屏落地页打开）；" +
+            "URL 务必用确定可访问的真实地址（优先官方/权威站点素材），不要编造域名。" +
+            "宽度自适应容器（width:100%，不写死超过卡片宽度的固定 px）；" +
+            "卡片会完整撑开展示全部内容（自身不滚动、随聊天列表滚动），" +
+            "单卡内容高度建议不超过【HTML 卡片渲染环境】段的建议值；总大小不超过 100KB。" +
+            "风格要求：简洁专业（白/浅灰底 + 中性深灰文字 + 单一强调色，系统字体栈，留白充足，" +
+            "圆角 8~12px 配细边框/浅阴影，图表细线少网格，不用 emoji 当图标、不用花哨渐变）。" +
+            "summary 填你对卡片内容的一句话文字总结（会回传给你组织回复）。"
+    )
+    suspend fun renderHtml(
+        @LLMDescription("HTML 源码：CSS/JS 内联；可用远程 <img>/<video>/<audio>/CSS 与 <a> 外链；禁远程 script/iframe/fetch/XHR") html: String,
+        @LLMDescription("对卡片内容的一句话文字总结") summary: String
+    ): String = dispatchCommand(
+        AgentCommand.RenderHtml(html = html, summary = summary.ifBlank { null })
+    )
+
     // ── 记忆（人物关系 + 事实） ─────────────────────────────────────
 
     @Tool(customName = "remember_person_relation")

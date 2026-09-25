@@ -38,6 +38,7 @@ class ChatRunScriptCapabilityTest {
                 unit: String?,
                 traceId: String?
             ): String = ""
+            override suspend fun onRenderHtml(html: String, summary: String?, traceId: String?): String = ""
         })
         val result = capability.execute(
             AgentCommand.ExecuteScript(code = "abc"),
@@ -64,6 +65,30 @@ class ChatRunScriptCapabilityTest {
     }
 
     @Test
+    fun `render_html command delegates to onRenderHtml`() = runBlocking {
+        capability.bindDelegate(object : ChatRunScriptCapability.Delegate {
+            override suspend fun onRunScript(code: String, traceId: String?): String = ""
+            override suspend fun onDrawChart(
+                type: String,
+                title: String,
+                labels: List<String>,
+                values: List<Double>,
+                unit: String?,
+                traceId: String?
+            ): String = ""
+            override suspend fun onRenderHtml(html: String, summary: String?, traceId: String?): String =
+                "HTML_OK:${html.length}:${summary ?: ""}"
+        })
+        val result = capability.execute(
+            AgentCommand.RenderHtml(html = "<div>hi</div>", summary = "卡片已渲染"),
+            context,
+            null,
+        ).getOrNull()
+        assertTrue("expected TextReply, got $result", result is AgentAction.TextReply)
+        assertEquals("HTML_OK:13:卡片已渲染", (result as AgentAction.TextReply).message)
+    }
+
+    @Test
     fun `unsupported command reports method not found`() = runBlocking {
         capability.bindDelegate(object : ChatRunScriptCapability.Delegate {
             override suspend fun onRunScript(code: String, traceId: String?): String = ""
@@ -75,6 +100,7 @@ class ChatRunScriptCapabilityTest {
                 unit: String?,
                 traceId: String?
             ): String = ""
+            override suspend fun onRenderHtml(html: String, summary: String?, traceId: String?): String = ""
         })
         val result = capability.execute(
             AgentCommand.TextReply(message = "hi"),
