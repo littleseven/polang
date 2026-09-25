@@ -1,6 +1,6 @@
 {
   "_comment": "PoLang 双端 Design Token SSOT。Android/iOS 各自从此文件同步到代码常量。修改 token 时先改此文件，再两端同步。完整提取方法学/漂移记录见 docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md。",
-  "_version": "3.0.6",
+  "_version": "3.0.7",
   "_updated": "2026-09-22",
   "spacing": {
     "_comment": "语义间距阶梯。屏幕级 padding 多为 md(12)/lg(16)，组件内 gap 多为 sm(8)。",
@@ -363,8 +363,8 @@
     "animEasing": "FastOutSlowInEasing"
   },
   "bottomTab": {
-    "_comment": "微信式平底标签栏（2026-09-22 v3.0.2 重造）：全宽贴底+顶 hairline(outlineVariant)+图标+labelSmall 10sp 标签；选中 primary 未选中 onSurfaceVariant；悬浮胶囊形制退役。",
-    "cornerRadius": 0,
+    "_comment": "悬浮胶囊底栏（2026-09-26 用户反馈回退：平底条现代感不足，悬浮胶囊形制恢复；配色保留微信系 primary/onSurfaceVariant）。v3.0.2 曾短暂平底化。",
+    "cornerRadius": 28,
     "tonalElevation": 3,
     "shadowElevation": 6,
     "containerPaddingH": 12,

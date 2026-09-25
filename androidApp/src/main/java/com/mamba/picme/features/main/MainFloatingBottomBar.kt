@@ -81,11 +81,9 @@ private fun bottomBarItem(
     onSwitchPage: (Int) -> Unit,
 ): FloatingBottomTabItem {
     val isSelected = selectedMainPage == page
-    val label = stringResource(labelRes)
     return FloatingBottomTabItem(
         icon = icon,
-        label = label,
-        contentDescription = label,
+        contentDescription = stringResource(labelRes),
         selected = isSelected,
         onClick = { if (!isSelected) onSwitchPage(page) },
     )
