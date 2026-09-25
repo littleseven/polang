@@ -6,7 +6,7 @@
       "name": "component/floating_tab",
       "nodeId": "385:95",
       "page": "Components",
-      "purpose": "微信式平底标签栏(相册/整理/聊天/人物/回忆五 Tab):全宽贴底+顶hairline+图标+10sp语言标签;选中primary未选中onSurfaceVariant",
+      "purpose": "悬浮胶囊底栏(相册/整理/聊天/人物/回忆五键纯图标);2026-09-26 形态回退自平底条,配色保留微信系(选中primary未选中onSurfaceVariant)",
       "darkPng": "components/floating_tab-dark.png",
       "lightPng": "components/floating_tab-light.png",
       "tokenBound": true,
@@ -150,6 +150,31 @@
       "tokenBound": true,
       "variants": [],
       "rules": "Organize hub 分类卡一律用实例; 覆写路径(主组件子id): 图标换主组件 U(inst+\"387:174\",{ref:\"132:xx\"})(实例 swap 通路, 4c-5 实证 U 可改 ref, 官方文档误称不可), 标题 U(inst+\"387:175\",{characters:\"$343:xx\"}), 副标题 U(inst+\"387:176\",{characters:\"$343:xx\"}), 缩略图 U(inst+\"387:177\"..\"387:180\",{fills:[IMAGE]}); 文本全绑字符串变量(org.cat.*/org.meta.*), 实例按卡重绑变量, 勿写文本字面量; 已收 6 实例 cat_duplicates/screenshots/blurry/eyesclosed/videos/documents(387:182-187), 仅数据级差异(图标/文案/缩略图); 图标主组件映射: duplicates=ic/grid(132:137) screenshots=ic/crop(132:89) blurry=ic/erase(132:109) eyesclosed=ic/face(132:97) videos=ic/camera(132:73) documents=ic/sort(132:49)"
+    },
+    {
+      "name": "component/logo",
+      "nodeId": "434:8",
+      "page": "Components",
+      "purpose": "App Logo(primary绿盒+白WaveMark矢量;旧蓝紫波形/青玉渐变已退役)",
+      "darkPng": "",
+      "lightPng": "",
+      "tokenBound": true,
+      "variants": [
+        "48",
+        "72"
+      ],
+      "rules": "所有 Logo 出现处一律实例, 禁止手绘/栅格副本"
+    },
+    {
+      "name": "component/brand_row",
+      "nodeId": "434:9",
+      "page": "Components",
+      "purpose": "海报品牌锁组(Brand Dot 26 + PoLang Gallery 30sp)",
+      "darkPng": "",
+      "lightPng": "",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "海报品牌行一律实例(24处已换装)"
     }
   ]
 }

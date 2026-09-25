@@ -123,9 +123,9 @@ object AppSliderTokens {
     val animDurationMs = 150
 }
 
-/** 微信式平底标签栏（2026-09-22 v3.0.2 重造）：全宽贴底+顶 hairline(outlineVariant)+图标+labelSmall 10sp 标签；选中 primary 未选中 onSurfaceVariant；悬浮胶囊形制退役。 */
+/** 悬浮胶囊底栏（2026-09-26 用户反馈回退：平底条现代感不足，悬浮胶囊形制恢复；配色保留微信系 primary/onSurfaceVariant）。v3.0.2 曾短暂平底化。 */
 object BottomTabTokens {
-    val cornerRadius = 0.dp
+    val cornerRadius = 28.dp
     val tonalElevation = 3.dp
     val shadowElevation = 6.dp
     val containerPaddingH = 12.dp

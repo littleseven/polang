@@ -5,11 +5,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,12 +39,11 @@ data class FloatingBottomTabItem(
 )
 
 /**
- * 微信式平底标签栏（2026-09-24 v3.0.2 重造，对齐画布 component/floating_tab 正稿）
+ * 悬浮底部 Tab 栏（2026-09-26 形态回退：平底条现代感不足，悬浮胶囊恢复；
+ * 配色保留微信系——选中 primary(#07C160) / 未选中 onSurfaceVariant(#888)）。
  *
- * 全宽贴底平底条：surfaceContainer 底 + 顶部 outlineVariant hairline，
- * 图标 24dp + labelSmall 标签；选中 primary(#07C160) / 未选中 onSurfaceVariant(#888)。
- * 悬浮胶囊形制退役（bottomTab.cornerRadius 已归零）。
- * 定位由调用方控制：`Modifier.align(BottomCenter).fillMaxWidth()` + navigationBarsPadding。
+ * 圆角胶囊（bottomTab.cornerRadius=28）、tonal/shadow 悬浮、surface 底；
+ * label 参数保留渲染能力（当前调用方未传，纯图标）。
  */
 @Composable
 fun FloatingBottomTab(
@@ -59,59 +55,56 @@ fun FloatingBottomTab(
         tonalElevation = BottomTabTokens.tonalElevation,
         shadowElevation = BottomTabTokens.shadowElevation,
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
     ) {
-        Column {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = BottomTabTokens.containerPaddingH)
-            ) {
-                items.forEach { item ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Button,
-                                onClick = item.onClick
-                            )
-                            .padding(
-                                horizontal = BottomTabTokens.itemPaddingH,
-                                vertical = if (item.label.isNullOrBlank()) {
-                                    BottomTabTokens.itemPaddingVIconOnly
-                                } else {
-                                    BottomTabTokens.itemPaddingVWithLabel
-                                }
-                            )
-                    ) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.contentDescription ?: item.label,
-                            tint = if (item.selected) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(
+                horizontal = BottomTabTokens.containerPaddingH,
+                vertical = BottomTabTokens.containerPaddingV
+            )
+        ) {
+            items.forEach { item ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Button,
+                            onClick = item.onClick
+                        )
+                        .padding(
+                            horizontal = BottomTabTokens.itemPaddingH,
+                            vertical = if (item.label.isNullOrBlank()) {
+                                BottomTabTokens.itemPaddingVIconOnly
+                            } else {
+                                BottomTabTokens.itemPaddingVWithLabel
+                            }
+                        )
+                ) {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.contentDescription ?: item.label,
+                        tint = if (item.selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.size(BottomTabTokens.iconSize)
+                    )
+                    if (!item.label.isNullOrBlank()) {
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (item.selected) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                            modifier = Modifier.size(BottomTabTokens.iconSize)
+                            modifier = Modifier.padding(top = BottomTabTokens.labelTopPadding)
                         )
-                        if (!item.label.isNullOrBlank()) {
-                            Text(
-                                text = item.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (item.selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                modifier = Modifier.padding(top = BottomTabTokens.labelTopPadding)
-                            )
-                        }
                     }
                 }
             }

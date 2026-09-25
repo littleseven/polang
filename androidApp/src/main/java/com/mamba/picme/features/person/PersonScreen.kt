@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mamba.picme.PoLangApplication
@@ -150,12 +151,15 @@ fun PersonScreen(
                 },
                 actions = {
                     // 显示全部 / 隐藏单张未命名单人分组
+                    // 光学校正：FilterList/Off 三线字形密度重心比圆形字形高 ~1.8dp（设备 3x 实测 6px），
+                    // 下移 2dp 使三 action 视觉中轴对齐（2026-09-26 用户反馈）
                     AppTopBarAction(
                         icon = if (showAll) Icons.Outlined.FilterListOff else Icons.Outlined.FilterList,
                         contentDescription = stringResource(
                             if (showAll) R.string.people_filter_hide_singletons else R.string.people_filter_show_all
                         ),
-                        onClick = { viewModel.toggleShowAll() }
+                        onClick = { viewModel.toggleShowAll() },
+                        modifier = Modifier.offset(y = 2.dp)
                     )
 
                     // 手动触发：跑一轮（300 张）eDifFIQA 打分 + 刷新封面，完成后 reload 看效果
@@ -242,6 +246,7 @@ fun PersonScreen(
         onSwitchPage = onSwitchMainPage,
         modifier = Modifier
             .align(Alignment.BottomCenter)
+            .padding(bottom = 16.dp)
             .navigationBarsPadding(),
     )
 
