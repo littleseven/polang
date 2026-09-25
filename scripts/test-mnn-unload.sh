@@ -12,7 +12,7 @@
 
 set -e
 
-PACKAGE="com.picme"
+PACKAGE="com.mamba.picme"
 LOG_DIR="/tmp"
 LOG_FILE="$LOG_DIR/mnn_unload_test_$(date +%Y%m%d_%H%M%S).log"
 TAGS="MnnResourceManager:LocalLlmEngine:SherpaOnnxAsr:VoiceCommand"

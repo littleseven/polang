@@ -333,29 +333,9 @@ run_phase4() {
         log_warn "未检测到 BeautyEngine 初始化日志"
     fi
 
-    # 4.4 JSON 命令测试（通过 AgentTestBroadcastReceiver，复用 AgentCommand 解析路径）
-    echo ""
-    echo "→ JSON 命令功能测试..."
-
-    # 测试拍照命令
-    adb shell "am broadcast -n com.mamba.picme/.testing.agent.bridge.AgentTestBroadcastReceiver -a com.mamba.picme.AGENT_TEST --es json '{\"method\":\"capture\",\"params\":{}}'" > /dev/null 2>&1
-    sleep 1
-    if adb logcat -d | grep -qE "AgentTestReceiver.*JSON command executed.*success"; then
-        log_ok "拍照 JSON 命令测试通过"
-    else
-        log_warn "拍照 JSON 命令测试未检测到成功日志"
-    fi
-
-    # 测试画幅切换命令（验证命令分发链路）
-    adb shell "am broadcast -n com.mamba.picme/.testing.agent.bridge.AgentTestBroadcastReceiver -a com.mamba.picme.AGENT_TEST --es json '{\"method\":\"switch_ratio\",\"params\":{\"ratio\":\"4_3\"}}'" > /dev/null 2>&1
-    sleep 0.5
-    if adb logcat -d | grep -qE "AgentTestReceiver.*JSON command executed.*success"; then
-        log_ok "画幅切换 JSON 命令测试通过"
-    else
-        log_warn "画幅切换 JSON 命令测试未检测到成功日志"
-    fi
-
-    # 4.5 Instrumented Tests（仅 --instrumented 时运行）
+    # 4.4 Instrumented Tests（仅 --instrumented 时运行）
+    # （历史 4.4「JSON 命令测试」已随 ADR-011 退役——AgentTestBroadcastReceiver 已删除，
+    #   UI 自动化验证由上方 4.1 的 ui-driver dump 承担）
     if [ "$INSTRUMENTED" = true ]; then
         echo ""
         echo "→ 运行 Instrumented Tests..."

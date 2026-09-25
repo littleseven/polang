@@ -8,7 +8,7 @@
 
 set -u -o pipefail
 
-PACKAGE_NAME="com.picme"
+PACKAGE_NAME="com.mamba.picme"
 INTERVAL_SEC="1"
 DURATION_SEC="0"   # 0 表示持续运行，直到 Ctrl+C
 OUTPUT_FILE=""
@@ -19,7 +19,7 @@ Usage:
   adb-resource-monitor.sh [options]
 
 Options:
-  -p, --package <name>     目标包名，默认: com.picme
+  -p, --package <name>     目标包名，默认: com.mamba.picme
   -i, --interval <sec>     采样间隔秒，支持小数，默认: 1
   -d, --duration <sec>     持续时长秒，默认: 0(无限)
   -o, --output <file>      输出 CSV 文件路径，默认自动生成
