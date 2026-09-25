@@ -1518,6 +1518,7 @@
     <string name="chat_result_feedback_recorded">✅ Feedback recorded</string>
     <string name="chat_result_executed">✅ Executed %1$s</string>
     <string name="chat_chart_generated">Chart generated</string>
+    <string name="chat_html_card_generated">Card rendered</string>
     <string name="chat_write_no_valid_ids">No valid media IDs</string>
     <string name="chat_delete_started_pending">Deletion of %1$d item(s) initiated, awaiting system authorization</string>
     <string name="chat_deleted_n">Deleted %1$d item(s)</string>
@@ -1597,6 +1598,7 @@
     <string name="chat_cmd_exclude_constraint">Exclude constraint</string>
     <string name="chat_cmd_execute_script">Run script</string>
     <string name="chat_cmd_draw_chart">Draw chart</string>
+    <string name="chat_cmd_render_html">Render HTML card</string>
     <string name="chat_cmd_remember_person_relation">Remember relation</string>
     <string name="chat_cmd_forget_person_relation">Forget relation</string>
     <string name="chat_cmd_query_person_relation">Query relation</string>

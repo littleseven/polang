@@ -274,6 +274,23 @@ class ChatToolService private constructor() : TraceIdAware {
         )
     }
 
+    @Tool(customName = "render_html")
+    @LLMDescription(
+        "渲染一个自包含 HTML 组件卡片插入聊天（端侧离线渲染，支持内联 CSS/JS 动画与交互）。" +
+            "仅当用户明确要求更丰富的展示或交互组件（如可交互图表、动画演示、自定义布局卡片）时才调用；" +
+            "柱/折/饼统计图一律仍用 draw_chart，不要用本工具替代。" +
+            "html 必须完全自包含：CSS/JS 一律内联，严禁任何外链或网络资源" +
+            "（script src/link/img 的远程 URL、fetch/XHR 请求、<a> 跳转一律禁止），" +
+            "宽度自适应容器（width:100%），整体高度建议不超过 600px，总大小不超过 100KB。" +
+            "summary 填你对卡片内容的一句话文字总结（会回传给你组织回复）。"
+    )
+    suspend fun renderHtml(
+        @LLMDescription("自包含 HTML 源码：CSS/JS 全部内联，禁外链/网络请求/页面跳转") html: String,
+        @LLMDescription("对卡片内容的一句话文字总结") summary: String
+    ): String = dispatchCommand(
+        AgentCommand.RenderHtml(html = html, summary = summary.ifBlank { null })
+    )
+
     // ── 记忆（人物关系 + 事实） ─────────────────────────────────────
 
     @Tool(customName = "remember_person_relation")

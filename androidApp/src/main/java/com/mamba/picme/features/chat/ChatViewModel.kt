@@ -1179,6 +1179,16 @@ class ChatViewModel(
     fun sendMessage(text: String, imageUri: String? = null) {
         if (text.isBlank()) return
 
+        // [DEV_ONLY] 调试指令：/html 注入 HTML 卡片冒烟测试集（样本清单见 HtmlCardSmokeSamples
+        // KDoc，恶意用例故意绕过清洗器直插以专测 WebView 锁死层），不走 LLM
+        if (BuildConfig.DEBUG && text.trim() == "/html") {
+            viewModelScope.launch {
+                ensureSessionExists(_currentSessionId.value)
+                HtmlCardSmokeSamples.all.forEach { sample -> emitHtmlCardMessage(sample) }
+            }
+            return
+        }
+
         viewModelScope.launch {
             val sessionId = _currentSessionId.value
             replyUsedSandbox = false
@@ -1943,16 +1953,29 @@ class ChatViewModel(
                     // 「脚本已死，确认不再生效」，防孤儿确认在 SCRIPT_TIMEOUT 后仍执行写操作
                     writeConfirmationController.onScriptEnded()
                 }
-                // 图表拦截：脚本 return Chart.x({...}) → 结果 {chart:<svg>, summary:<text>}。
-                // SVG 直接渲染成图卡（不喂回 LLM），summary 回传 LLM 做文字总结（省 token）。
+                // 产物拦截：脚本 return Chart.x({...}) → {chart:<svg>, summary:<text>}；
+                // return {html:<自包含HTML>, summary:<text>} → HTML 组件卡片。
+                // 渲染产物直接渲染成卡片（不喂回 LLM），summary 回传 LLM 做文字总结（省 token）。
                 val obj = result as? JsValue.Obj
                 val chart = obj?.entries?.get("chart") as? JsValue.Str
-                if (chart != null) {
-                    emitChartMessage(chart.value)
-                    (obj.entries["summary"] as? JsValue.Str)?.value
-                        ?: stringContext().getString(R.string.chat_chart_generated)
-                } else {
-                    result.toJson()
+                val htmlCard = obj?.entries?.get("html") as? JsValue.Str
+                when {
+                    chart != null -> {
+                        emitChartMessage(chart.value)
+                        (obj.entries["summary"] as? JsValue.Str)?.value
+                            ?: stringContext().getString(R.string.chat_chart_generated)
+                    }
+                    htmlCard != null -> {
+                        when (val sanitized = HtmlCardSanitizer.sanitize(htmlCard.value)) {
+                            is HtmlCardSanitizer.Result.Ok -> {
+                                emitHtmlCardMessage(sanitized.html)
+                                (obj.entries["summary"] as? JsValue.Str)?.value
+                                    ?: stringContext().getString(R.string.chat_html_card_generated)
+                            }
+                            is HtmlCardSanitizer.Result.Rejected -> sanitized.reason
+                        }
+                    }
+                    else -> result.toJson()
                 }
             }
         }
@@ -1973,6 +1996,23 @@ class ChatViewModel(
                 content = svg,
                 timestamp = System.currentTimeMillis(),
                 modelUsed = "chart"
+            )
+        )
+    }
+
+    /**
+     * 把清洗后的自包含 HTML 作为一条 [ChatMessageType.HTML_CARD] 消息**落库**。
+     * 与 [emitChartMessage] 同理：消息列表由 DB Flow 驱动，卡片必须落库才能跨重载持久。
+     */
+    private suspend fun emitHtmlCardMessage(html: String) {
+        chatMessageDao.insertMessage(
+            ChatMessageEntity(
+                id = "html_" + System.currentTimeMillis(),
+                sessionId = _currentSessionId.value,
+                type = "html_card",
+                content = html,
+                timestamp = System.currentTimeMillis(),
+                modelUsed = "html_card"
             )
         )
     }
@@ -2008,6 +2048,29 @@ class ChatViewModel(
             if (chart != null) emitChartMessage(chart.value)
             (obj?.entries?.get("summary") as? JsValue.Str)?.value
                 ?: stringContext().getString(R.string.chat_chart_generated)
+        }
+    }
+
+    /**
+     * render_html 工具落点：[html] 清洗（[HtmlCardSanitizer]）后作为 HTML_CARD 消息落库，
+     * 由 HtmlCard 离线 WebView 渲染；返回 summary（回传 LLM 做文字总结）。
+     * 清洗拒绝（超限等）时不落库，原因直接回传 LLM 引导重新生成。
+     */
+    override suspend fun onRenderHtml(
+        html: String,
+        summary: String?,
+        traceId: String?
+    ): String = withContext(Dispatchers.Default) {
+        when (val result = HtmlCardSanitizer.sanitize(html)) {
+            is HtmlCardSanitizer.Result.Ok -> {
+                emitHtmlCardMessage(result.html)
+                summary?.takeIf { it.isNotBlank() }
+                    ?: stringContext().getString(R.string.chat_html_card_generated)
+            }
+            is HtmlCardSanitizer.Result.Rejected -> {
+                Logger.w(TAG, "render_html rejected: ${result.reason}")
+                result.reason
+            }
         }
     }
 
@@ -2848,12 +2911,14 @@ class ChatViewModel(
                 "plan_preview" -> ChatMessageType.PLAN_PREVIEW
                 "media_results" -> ChatMessageType.MEDIA_RESULTS
                 "chart" -> ChatMessageType.CHART
+                "html_card" -> ChatMessageType.HTML_CARD
                 "agent_edit_result" -> ChatMessageType.AGENT_EDIT_RESULT
                 OptimizeCandidateGroup.MESSAGE_TYPE -> ChatMessageType.OPTIMIZE_CANDIDATES
                 else -> ChatMessageType.AGENT_TEXT
             },
             content = content,
             chartSvg = if (type == "chart") content else null,
+            htmlContent = if (type == "html_card") content else null,
             imageUri = if (type == "user_image_text" || type == "agent_image" || type == "agent_edit_result") metadata?.let { m -> parseImageUri(m) } else null,
             imageSaved = (type == "agent_image" || type == "agent_edit_result") &&
                 (metadata?.let { runCatching { org.json.JSONObject(it).optBoolean("saved", false) }.getOrDefault(false) } ?: false),

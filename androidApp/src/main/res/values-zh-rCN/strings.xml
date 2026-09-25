@@ -1509,6 +1509,7 @@
     <string name="chat_result_feedback_recorded">✅ 已记录反馈</string>
     <string name="chat_result_executed">✅ 已执行 %1$s</string>
     <string name="chat_chart_generated">已生成图表</string>
+    <string name="chat_html_card_generated">已生成卡片</string>
     <string name="chat_write_no_valid_ids">没有有效的媒体 id</string>
     <string name="chat_delete_started_pending">已发起删除 %1$d 项，等待系统授权</string>
     <string name="chat_deleted_n">已删除 %1$d 项</string>
@@ -1588,6 +1589,7 @@
     <string name="chat_cmd_exclude_constraint">排除约束</string>
     <string name="chat_cmd_execute_script">执行脚本</string>
     <string name="chat_cmd_draw_chart">画图表</string>
+    <string name="chat_cmd_render_html">渲染 HTML 卡片</string>
     <string name="chat_cmd_remember_person_relation">记住人物关系</string>
     <string name="chat_cmd_forget_person_relation">遗忘人物关系</string>
     <string name="chat_cmd_query_person_relation">查询人物关系</string>

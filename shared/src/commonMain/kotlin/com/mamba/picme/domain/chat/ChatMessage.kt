@@ -24,6 +24,8 @@ data class ChatMessage(
     val imageUri: String? = null,
     /** CHART 类型：端侧生成的 SVG 字符串。 */
     val chartSvg: String? = null,
+    /** HTML_CARD 类型：自包含 HTML 字符串（已清洗，离线 WebView 渲染）。 */
+    val htmlContent: String? = null,
     /** agent_image / agent_edit_result 是否已保存到相册。 */
     val imageSaved: Boolean = false,
     /** 流式输出中的瞬态消息（不落库）。 */

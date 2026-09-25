@@ -76,6 +76,14 @@ object ChatPromptRules {
             """.trimIndent()
         ),
         RuleSection(
+            id = "html_card_rules",
+            body = """
+            【HTML 卡片规则·默认不用】仅在用户明确要求更丰富的展示或交互组件（如"做个可交互的图表""用动画演示一下""做个好看的卡片"）时，才调用 render_html 渲染 HTML 组件卡片；普通回答用文字、统计图用 draw_chart，都不要用 render_html 替代。
+            render_html 的 html 参数必须完全自包含：CSS/JS 一律内联，严禁任何外链或网络资源（script src、link、img 的远程 URL、fetch/XHR 请求、a 标签跳转一律禁止——端侧渲染环境完全离线，外链必然加载失败）；排版必须响应式（宽度用百分比或 max-width:100%，不写死超出卡片宽度的固定 px），具体设备/屏幕/卡片宽高上限见下方【HTML 卡片渲染环境】段；总大小不超过 100KB。
+            需要数据时先用 run_gallery_script 取数，再把数据内联进 html；调用后你会收到 summary 回传，据此一句话总结即可。
+            """.trimIndent()
+        ),
+        RuleSection(
             id = "script_vs_tool",
             body = """
             【何时用 run_gallery_script vs 单独 tool】

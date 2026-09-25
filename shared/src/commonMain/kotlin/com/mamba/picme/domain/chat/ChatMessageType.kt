@@ -17,5 +17,6 @@ enum class ChatMessageType {
     PLAN_PREVIEW,
     MEDIA_RESULTS,
     CHART,
+    HTML_CARD,
     OPTIMIZE_CANDIDATES,
 }

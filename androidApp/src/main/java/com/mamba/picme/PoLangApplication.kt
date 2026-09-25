@@ -12,6 +12,7 @@ import coil.ImageLoaderFactory
 import com.mamba.picme.BuildConfig
 import com.mamba.picme.agent.core.inference.remote.tool.RemoteControlToolService
 import com.mamba.picme.agent.core.model.context.MediaType
+import com.mamba.picme.agent.core.model.context.RenderEnvironment
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.diag.CrashTraceStore
 import com.mamba.picme.data.indexing.geo.LocationIndexer
@@ -46,6 +47,8 @@ import com.mamba.picme.features.chat.capability.ChatMediaWriteCapability
 import com.mamba.picme.features.chat.capability.ChatRunScriptCapability
 import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
+import com.mamba.picme.features.chat.CARD_HORIZONTAL_CHROME_DP
+import com.mamba.picme.features.chat.CARD_MAX_HEIGHT_FRACTION
 import com.mamba.picme.features.settings.capability.SettingsCapability
 import com.mamba.picme.features.gallery.capability.GalleryCapability
 // 其他页面级 Capability 由各 Screen 自行创建
@@ -70,6 +73,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.io.File
 import java.util.UUID
 
@@ -760,6 +764,25 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         )
         orchestrator.setMemoryContextProvider(memoryContextProvider)
         Logger.i(TAG, "- MemoryContextProvider: injected (chat + feishu passive memory)")
+        // render_html 排版上下文：设备/屏幕/卡片宽高 → chat system prompt 动态尾段
+        orchestrator.setRenderEnvironmentProvider { buildRenderEnvironment() }
+        Logger.i(TAG, "- RenderEnvironmentProvider: injected (html card layout context)")
+    }
+
+    /** 构建 HTML 卡片渲染环境（CSS px ≈ dp：渲染层已注入 viewport meta width=device-width）。 */
+    private fun buildRenderEnvironment(): RenderEnvironment {
+        val dm = resources.displayMetrics
+        val widthDp = (dm.widthPixels / dm.density).roundToInt()
+        val heightDp = (dm.heightPixels / dm.density).roundToInt()
+        return RenderEnvironment(
+            deviceType = "Android 手机",
+            screenWidthDp = widthDp,
+            screenHeightDp = heightDp,
+            screenWidthPx = dm.widthPixels,
+            screenHeightPx = dm.heightPixels,
+            cardContentWidthCssPx = widthDp - CARD_HORIZONTAL_CHROME_DP,
+            cardMaxHeightCssPx = (heightDp * CARD_MAX_HEIGHT_FRACTION).roundToInt()
+        )
     }
 
     override fun newImageLoader(): ImageLoader {

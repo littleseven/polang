@@ -1,4 +1,4 @@
-可用工具（35）：
+可用工具（36）：
 - adjust_image: 按显式参数调整图片亮度/对比度/饱和度/色温，返回调整后的图片。
 - ai_optimize: AI 一键优化图片。
 - change_language: 切换语言。
@@ -25,6 +25,7 @@
 - refine_media_search: 在上一轮搜索结果内细化过滤，如'只要夜景''找找4月的'。
 - remember_fact: 记住一条事实，如用户说「帮我记住小宝对花粉过敏」「记住我喜欢低饱和度滤镜」。
 - remember_person_relation: 记住人物与「我」的关系，如用户说「小宝是我女儿」「大宝是我发小」。
+- render_html: 渲染一个自包含 HTML 组件卡片插入聊天（端侧离线渲染，支持内联 CSS/JS 动画与交互）。
 - run_gallery_script: 在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数类 handler 只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。
 - search_media: 搜索本地相册。
 - select_media: 选择/取消选择媒体。

@@ -9,6 +9,7 @@ import com.mamba.picme.agent.core.inference.remote.koog.KoogReActAgent
 import com.mamba.picme.agent.core.inference.remote.react.RemoteReActAgentCallback
 import com.mamba.picme.agent.core.inference.remote.react.RemoteReActAgentConfig
 import com.mamba.picme.agent.core.inference.remote.tool.MemoryContextProvider
+import com.mamba.picme.agent.core.model.context.RenderEnvironment
 import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.platform.storage.ChatMemoryStore
 import com.mamba.picme.agent.core.platform.thread.DispatcherProvider
@@ -50,6 +51,18 @@ class AgentConfigurator(
     fun setMemoryContextProvider(provider: MemoryContextProvider) {
         memoryContextProvider = provider
     }
+
+    /** HTML 卡片渲染环境供给者（render_html 排版上下文）；由 app 在 onCreate 注入，iOS 跟随期不注入。 */
+    @Volatile
+    private var renderEnvironmentProvider: (() -> RenderEnvironment)? = null
+
+    /** app 层注入渲染环境供给者；须在 chat agent 首次构建前调用。 */
+    fun setRenderEnvironmentProvider(provider: () -> RenderEnvironment) {
+        renderEnvironmentProvider = provider
+    }
+
+    /** 渲染环境供给者；供 RemoteChatEngine 只读访问（null = 未注入，prompt 不含渲染环境段）。 */
+    fun getRenderEnvironmentProvider(): (() -> RenderEnvironment)? = renderEnvironmentProvider
 
     // 核心组件
     /** 端侧 VLM 引擎（TAG 打标 / 图像理解专用；文本指令链路已移除）。组合根注入，全进程单实例。 */

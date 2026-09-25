@@ -448,6 +448,20 @@ sealed class AgentCommand {
         val unit: String? = null
     ) : AgentCommand()
 
+    /**
+     * 渲染一张 HTML 组件卡片（端侧离线 WebView 渲染，插入聊天）。
+     *
+     * 远程 LLM 把自包含 HTML（内联 CSS/JS，禁外链/网络资源）经此命令交给端侧，
+     * 渲染结果作为 HTML_CARD 消息显示；summary 回传 LLM 做文字总结。
+     * 与 [DrawChart] 分工：统计图走 DrawChart，仅当用户明确要求更丰富展示/
+     * 交互组件时才用本命令。端侧渲染层全量断网 + 零 JS 桥接（不可信内容）。
+     */
+    data class RenderHtml(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val html: String,
+        val summary: String? = null
+    ) : AgentCommand()
+
     // ==================== 记忆命令（人物关系 + 事实记忆） ====================
 
     /**
@@ -581,6 +595,7 @@ sealed class AgentCommand {
             is StartTagScan -> "start_tag_scan"
             is ExecuteScript -> "run_gallery_script"
             is DrawChart -> "draw_chart"
+            is RenderHtml -> "render_html"
             is RememberPersonRelation -> "remember_person_relation"
             is ForgetPersonRelation -> "forget_person_relation"
             is QueryPersonRelation -> "query_person_relation"

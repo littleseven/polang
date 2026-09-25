@@ -1469,6 +1469,7 @@
     <string name="chat_result_feedback_recorded">✅ Comentario registrado</string>
     <string name="chat_result_executed">✅ Se ejecutó %1$s</string>
     <string name="chat_chart_generated">Gráfico generado</string>
+    <string name="chat_html_card_generated">Tarjeta generada</string>
     <string name="chat_write_no_valid_ids">No hay IDs de medios válidos</string>
     <string name="chat_delete_started_pending">Eliminación de %1$d elemento(s) iniciada, esperando autorización del sistema</string>
     <string name="chat_deleted_n">Se eliminaron %1$d elemento(s)</string>
@@ -1548,6 +1549,7 @@
     <string name="chat_cmd_exclude_constraint">Excluir restricción</string>
     <string name="chat_cmd_execute_script">Ejecutar script</string>
     <string name="chat_cmd_draw_chart">Dibujar gráfico</string>
+    <string name="chat_cmd_render_html">Renderizar tarjeta HTML</string>
     <string name="chat_cmd_remember_person_relation">Recordar relación</string>
     <string name="chat_cmd_forget_person_relation">Olvidar relación</string>
     <string name="chat_cmd_query_person_relation">Consultar relación</string>

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.ToggleOn
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.Web
 import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -292,6 +293,7 @@ private fun getAgentCommandDisplayName(context: Context, command: AgentCommand):
         is AgentCommand.ExcludeConstraint -> context.getString(R.string.chat_cmd_exclude_constraint)
         is AgentCommand.ExecuteScript -> context.getString(R.string.chat_cmd_execute_script)
         is AgentCommand.DrawChart -> context.getString(R.string.chat_cmd_draw_chart)
+        is AgentCommand.RenderHtml -> context.getString(R.string.chat_cmd_render_html)
         is AgentCommand.RememberPersonRelation -> context.getString(R.string.chat_cmd_remember_person_relation)
         is AgentCommand.ForgetPersonRelation -> context.getString(R.string.chat_cmd_forget_person_relation)
         is AgentCommand.QueryPersonRelation -> context.getString(R.string.chat_cmd_query_person_relation)
@@ -347,6 +349,7 @@ private fun resolveCommandIcon(command: AgentCommand): ImageVector = when (comma
     is AgentCommand.ExcludeConstraint -> Icons.Rounded.Delete
     is AgentCommand.ExecuteScript -> Icons.Rounded.Code
     is AgentCommand.DrawChart -> Icons.Rounded.Code
+    is AgentCommand.RenderHtml -> Icons.Rounded.Web
     is AgentCommand.RememberPersonRelation -> Icons.Rounded.Face
     is AgentCommand.ForgetPersonRelation -> Icons.Rounded.Face
     is AgentCommand.QueryPersonRelation -> Icons.Rounded.Face

@@ -640,6 +640,14 @@ js_toolcalls:
       message_kind: CHART                    # 独立全宽消息项（非嵌入文本气泡）
       ui: ChartSvgCard                       # SVG 卡片，tap 进横屏 pinch-zoom 预览
       bridge_kind: "ChatUiActionDto 须加 chart kind（携 svg+summary）"  # 见 contracts.md C-B2-2
+    html_card_result:                        # render_html 产出（2026-09 新增，Android 先行）
+      message_kind: HTML_CARD                # 独立全宽消息项；content=自包含 HTML（落库持久）
+      ui: HtmlCard                           # 离线 WebView 卡片（动态测高 clamp [120dp, 屏高×0.66]，卡片内直接交互，无全屏落地页；滚动条隐藏，超高卡片内滚动、滚到边界让渡外层列表）
+      render_template: "wrapHtmlDocument 注入 viewport meta(width=device-width) + 响应式 reset；完整文档原样加载"
+      layout_context: "组合根注入 RenderEnvironment（设备/屏幕/卡片宽高上限）→ prompt 动态尾段，引导 LLM 响应式排版"
+      sanitize: "落库前 HtmlCardSanitizer 清洗（128KB 上限、剔除 script src/link/iframe/meta refresh/@import/远程属性）"
+      lockdown: "shouldInterceptRequest 全量拦截 http(s)、shouldOverrideUrlLoading 禁导航、禁文件/DOM Storage、零 JS 桥接；JS 仅沙盒内启用"
+      ios_status: "TODO(ios-follow) HtmlCard.swift 照搬 ChartSvgCard WKWebView 模式 + 同款锁死/动态测高/卡片内直接交互（无落地页）"
     sandbox_badge:
       show_when: "replyUsedSandbox == true"
       icon: terminal
@@ -722,6 +730,7 @@ platform_differences:
       - { feature: "端侧 VLM 理解",   android: supported, ios: "TODO(B1) MNN.framework 已有" }
       - { feature: "JS 沙箱脚本",     android: supported, ios: "TODO(B2) 引擎选型+handler 移植" }
       - { feature: "draw_chart 图表", android: supported, ios: "TODO(B2) ChartSvgCard + chart kind" }
+      - { feature: "render_html HTML 卡片", android: "supported(2026-09)", ios: "TODO(ios-follow) HtmlCard WKWebView + 同款锁死" }
       - { feature: "AI 工程师(claude)", android: supported, ios: "TODO(B3) SSE 客户端+渲染" }
       - { feature: "AI 优化抽卡",     android: supported, ios: "supported(2026-08-16 §17 追齐；多轮编辑态 ChatEditStateHolder 缺失见 §17 confirm 注)" }
       - { feature: "记忆/人物关系",    android: supported, ios: "未纳入本轮（留技术债）" }

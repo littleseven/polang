@@ -14,6 +14,7 @@ import com.mamba.picme.agent.core.model.config.AssistantPersona
 import com.mamba.picme.agent.core.model.config.personaPromptSegment
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.ReplyLanguage
+import com.mamba.picme.agent.core.model.context.RenderEnvironment
 import com.mamba.picme.agent.core.model.context.replyLanguageRuleSegment
 import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
@@ -65,8 +66,8 @@ class RemoteChatEngine internal constructor(
                 ChatPromptRules.render()
 
         /**
-         * chat system prompt 的动态尾段：当前日期行 + 性格段（按 persona + 回复语言选段）+
-         * 语言规则段（按回复语言选段）。
+         * chat system prompt 的动态尾段：当前日期行 + 渲染环境段（[renderEnvironment] 非空时，
+         * render_html 排版上下文）+ 性格段（按 persona + 回复语言选段）+ 语言规则段（按回复语言选段）。
          * 在 agent 构建期拼接（非 buildChatSystemPrompt 内），DEFAULT 不注入性格段——
          * 保证 `buildChatSystemPrompt` 输出与 golden 逐字节不变。
          * 语言规则段与性格无关、恒注入（含 DEFAULT）：显式对抗全中文 base prompt 与
@@ -75,9 +76,11 @@ class RemoteChatEngine internal constructor(
         fun buildPromptSuffix(
             persona: AssistantPersona,
             replyLanguage: ReplyLanguage,
-            today: String
+            today: String,
+            renderEnvironment: RenderEnvironment? = null
         ): String =
             "\n\n当前日期：$today。用户说「去年」「上个月」等相对时间时，据此计算具体日期范围。" +
+                (renderEnvironment?.let { "\n\n${it.toPromptSegment()}" } ?: "") +
                 (personaPromptSegment(persona, replyLanguage)?.let { "\n\n$it" } ?: "") +
                 "\n\n${replyLanguageRuleSegment(replyLanguage)}"
     }
@@ -246,7 +249,16 @@ class RemoteChatEngine internal constructor(
                 .deviceId(configurator.getDeviceId())
                 .protocol(currentConfig.protocol)
                 .providerId(currentConfig.providerId)
-                .systemPrompt(chatSystemPrompt + buildPromptSuffix(persona, replyLanguage, today()))
+                .systemPrompt(
+                    chatSystemPrompt + buildPromptSuffix(
+                        persona,
+                        replyLanguage,
+                        today(),
+                        // render_html 排版上下文；未注入（iOS 跟随期）时无该段。
+                        // 环境变化（如旋转）不触发重建——agent 缓存键不含此项，下次重建自然刷新。
+                        renderEnvironment = configurator.getRenderEnvironmentProvider()?.invoke()
+                    )
+                )
                 .apply { if (memProvider != null) memoryContextProvider(memProvider) }
                 .build()
         } catch (e: Exception) {
