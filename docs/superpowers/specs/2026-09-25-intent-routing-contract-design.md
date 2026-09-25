@@ -3,7 +3,8 @@
 > **日期**: 2026-09-25
 > **来源**: 「儿子的照片」无横滑卡片事故复盘（当日真机日志 + chat/llm_log 双库交叉定位，根因见 §1.1）。用户定方向：①「意图理解和路由存在问题，请系统性提出解决方案，不要单点处理」；②「专门搞一个意图理解和路由的 LLM 接口/模块」。
 > **上游**: `AGENT_ARCHITECTURE.md` §2.4.4（意图理解）、`CAPABILITY_REGISTRY.md`（命令路由 SSOT）、ADR-008（隐私红线）、ADR-014（RENDER_RICH_HTML 渲染基线，已合 main）、`shared/.../intent/IntentGuard.kt`（既有确定性守卫层先例）
-> **状态**: 方向已认可，待评审后实施
+> **状态**: 方向已认可，评审意见已回写，待实施
+> **评审**: 2026-09-25 GLM 交叉审查（对照代码实证），决议已回写：串行路由加本地信号门控 + 1.5s 硬超时 + 失败分类降级（§3.2）；M1 护栏触发条件与 ids→asset 水合写明（§3.5）；search_media 诊断修正为「@Tool 未透传引擎既有 person 能力」（§1.2/§3.4）；幻觉拦截改结构性信号、不做文本匹配（§3.5-b）；M2 验收去循环论证（§6）；行号/工具数勘误（§1.2）
 
 ---
 
@@ -30,11 +31,11 @@
 
 | # | 系统性缺陷 | 实证 |
 |---|---|---|
-| D1 | 路由规则无单一事实源，手写规则互斥且无机器校验 | `ChatPromptRules.kt` L41「人物∩时间必须 gallery.query」vs L62「女儿的照片用 search_media」vs L124 再强化前者 |
+| D1 | 路由规则无单一事实源，手写规则互斥且无机器校验 | `ChatPromptRules.kt` L41「人物∩时间必须 gallery.query」vs L62「女儿的照片用 search_media」vs L133 再强化前者 |
 | D2 | 意图→UI 契约缺失：模型不知道哪些工具产 UI，无 artifact 反馈回路 | 脚本拿 263 ids 后谎称「已展示」；view_media 全败后仍称「已打开」 |
-| D3 | 工具面与真实能力不对齐 | view_media 在 chat 面暴露但 `GalleryCapability` 只挂 GALLERY 场景（chat 内必败）；search_media 表达不了 person 维度，被迫绕无卡片的 gallery.query |
-| D4 | 会话状态隐式耦合 | refine 基数 `lastResultAssets[sessionId]`（`ChatViewModel.kt:1712`）只被 search/refine 更新，脚本路径不更新 → 级联空转 |
-| D5 | 全量规则常驻 + flash 档指令遵循不稳 | 34k token prompt、36 工具全量注入；「最多 2 次工具调用」被无视（3 分钟 7+ 次）、编造 id、失败后谎报成功 |
+| D3 | 工具面与真实能力不对齐 | view_media 在 chat 面暴露但 `GalleryCapability` 只挂 GALLERY 场景（chat 内必败）；`search_media` 的 @Tool 只透传 query——引擎层 `SearchIntent.personName` / `MediaSearchEngine.collectPersonMediaIds` 早已支持人物维度，缺口仅在工具面透传，被迫绕无卡片的 gallery.query |
+| D4 | 会话状态隐式耦合 | refine 基数 `lastResultAssets[sessionId]`（更新点 `ChatViewModel.kt:1792/:1834`，声明 :632）只被 search/refine 更新，脚本路径不更新 → 级联空转 |
+| D5 | 全量规则常驻 + flash 档指令遵循不稳 | 34k token prompt、43 个 @Tool 全量注入；「最多 2 次工具调用」被无视（3 分钟 7+ 次）、编造 id、失败后谎报成功 |
 
 **根因总结**：「意图理解与路由」目前只是 system prompt 里的一段话，由 flash 模型在 34k token 上下文里一次性完成理解+策略+执行。模型的**语义理解没有错**（儿子→大宝→按人物检索链路正确），错的是**策略层**（在互斥规则里选了不产卡片的工具）。方案核心：把理解和策略拆开——**LLM 管语义理解（输出意图），代码管路由策略（查表执行）**。
 
@@ -115,6 +116,7 @@ data class IntentDef(
 
 ```json
 { "deliverable": "RICH_HTML_CARD", "confidence": 0.9,
+  "isRefinement": false,
   "secondary": null,
   "include": [
     { "kind": "photos", "person": "儿子", "limit": 20 },
@@ -122,26 +124,28 @@ data class IntentDef(
   ] }
 ```
 
-（单意图请求退化为 `deliverable=VIEW_PHOTOS, include=[{photos, person=…}]`；`secondary` 至多 1 个，承载「找照片 + 画图」类双产出物请求。）
+（单意图请求退化为 `deliverable=VIEW_PHOTOS, include=[{photos, person=…}]`；`secondary` 至多 1 个，承载「找照片 + 画图」类双产出物请求。`isRefinement` 由路由器结合紧凑对话状态判定——refine 语义的产生者在此，策略层（§3.3）只消费不再猜。）
 
-- **可靠性工程**：temperature=0；schema 校验失败重试 1 次；仍失败或 `confidence < 阈值` → 降级 OPEN_QA（现有完整 agent loop，优雅退化）。person 槽位称谓→人物名的解析在**端侧**做（关系词表 + `query_person_relation`），路由器不负责实体消歧。
-- **模型**：复用 deepseek-v4-flash（闭集分类 + 槽位抽取是 flash 档最可靠的任务形态）；经 `RemoteModelFactory` 可独立换强模型，与生成模型解耦。
-- **延迟预算**：< 1s（~1k token prompt、几十 token 输出）。
+- **可靠性工程**：temperature=0；schema 校验失败重试 1 次；**1.5s 硬超时**；失败分类同路降级——网络错 / schema 重试仍败 / 超时 / `confidence < 阈值` 均 → OPEN_QA（现有完整 agent loop，优雅退化）。person 槽位称谓→人物名的解析在**端侧**做（关系词表 + `query_person_relation`），路由器不负责实体消歧。
+- **本地信号门控**（评审新增）：路由器不对全量流量无差别启用——先用零成本本地信号（相册域关键词/实体词典命中、pattern 未命中但含媒体语素）判定「本轮是否可能为结构化意图」，寒暄与明显开放问答直通 OPEN_QA、零额外延迟；门控只放行不拦截（误判代价 = 多走一次 OPEN_QA，与现状同，无回退风险）。
+- **路由期间 UX**：路由器等待期间即开始流式占位（与现链路 streaming pacing 一致），命中专用分支后无缝切换，不做「转圈静默」。
+- **模型**：复用 deepseek-v4-flash（闭集分类 + 槽位抽取是 flash 档最可靠的任务形态）；经 `RemoteModelFactory` 可独立换强模型，与生成模型解耦。注意：Koog 结构化输出经 OpenAI 兼容网关时 `response_format: json_schema` 支持因供应商而异（Koog 有文本解析兜底），M2 首日需真机验证 deepseek 通路。
+- **延迟预算**：< 1s（~1k token prompt、几十 token 输出；仅门控放行的流量产生此开销）。
 - **Koog 落点**：M2 先作为普通 LLM 调用插入编排层；M3 升级为 graph strategy 条件边（分类节点 → 分支节点）。
 
 ### 3.3 确定性策略层（查表 + refine 判定 + pattern 捷径）
 
 - **查表执行**：`intent → AgentCommand / 工具子集`，纯函数，commonMain，可单测。
 - **多产出物顺序执行**：`secondary` 非空时按序分发两个意图（共享回合上下文），产物依次落卡片/图表消息。
-- **refine 判定移入代码**：`intent=VIEW_PHOTOS && isRefinement && lastResultAssets 非空` → `RefineMediaSearch`；基数缺失 → 先 `SearchMedia`。不再依赖模型记住上一轮。
-- **pattern 捷径**：仅「看/找/看看/给我看 …照片」最热句式直接短路（跳过路由器调用，零延迟零成本），**不建大 pattern 库**——开放语义（如「想看看我家崽最近长什么样」）归路由器。
-- **IntentGuard 红线修订**：由「只做保守的误伤修正」改为「高频意图确定性直通 + 误伤修正」；现有两函数（`isRefusedSearchRequest` / `sanitizeNavigationCommands`）保留并入新 `IntentRouter` 命名空间。
+- **refine 判定移入代码**：`intent=VIEW_PHOTOS && router.isRefinement && lastResultAssets 非空` → `RefineMediaSearch`；基数缺失 → 先 `SearchMedia`。`isRefinement` 取自路由器输出（§3.2 schema），策略层只消费。不再依赖模型记住上一轮。
+- **pattern 捷径**：仅「看/找/看看/给我看 …照片」最热句式直接短路（跳过路由器调用，零延迟零成本），**不建大 pattern 库**——开放语义（如「想看看我家崽最近长什么样」）归路由器。pattern 集必须配负面样例测试（如「看看照片里有没有糊的」是 ANALYZE 非 VIEW），防捷径劫持语义。
+- **IntentGuard 红线修订**：由「只做保守的误伤修正」改为「高频意图确定性直通 + 误伤修正」；现有两函数保留并入新 `IntentRouter` 命名空间，作用域明确：`isRefusedSearchRequest`（拒答回退本地直搜）在 VIEW_PHOTOS / REFINE / OPEN_QA 三分支的回合收尾统一生效；`sanitizeNavigationCommands` 仅 OPEN_QA 分支生效（专用分支不产 NAVIGATE 命令）。
 
 ### 3.4 工具面契约对齐（模型看得见的 = 真的能做的）
 
-1. **`search_media` 增加结构化参数** `person / fromMs / toMs`：`QueryGalleryMediaUseCase` 已支持 `filter.person`（人脸归属 AND 交集，`QueryGalleryMediaUseCase.kt:28`），只差 `ChatToolService` → `AgentCommand.SearchMedia` → ChatSearchCapability 透传。「精确人物查询必须绕 gallery.query」的存在基础消失，L41 的顾虑（丢人物维度）随之消解。
+1. **`search_media` 透传既有结构化参数** `person / fromMs / toMs`：引擎层早已就绪——`SearchIntent.personName`（`shared/.../model/context/SearchIntent.kt:26`）、`StructuredFilter.personName`、`MediaSearchEngine.collectPersonMediaIds`（含 raw query 人物解析）、`QueryGalleryMediaUseCase.filter.person`（人脸归属 AND 交集，`QueryGalleryMediaUseCase.kt:28`）；缺口仅 `ChatToolService` 的 @Tool 只传 query。M1 只需填充既有 `SearchIntent` 字段并透传到 capability，**不新建解析链路**。「精确人物查询必须绕 gallery.query」的存在基础消失，L41 实为落后于引擎演进的 stale 规则，随透传落地删除。
 2. **`view_media` 移出 chat 工具面**：chat 内看图 = 点卡片；消除「chat 必败工具」陷阱及其诱发的幻觉链。
-3. **脚本出卡**：`run_gallery_script` 返回含 `mediaIds` 且本轮意图为看照片 → 端侧自动渲染横滑卡片（不新增 `show_media_results` 工具，减少模型决策点）。
+3. **脚本出卡**：`run_gallery_script` 返回含 `mediaIds` → 端侧自动渲染横滑卡片（不新增 `show_media_results` 工具，减少模型决策点；触发条件随阶段演进，详见 §3.5-a：M1 无条件补卡、M2 起叠加意图抑制）。
 4. **`@LLMDescription` 标注 UI 效果**：每个工具声明「结果以横滑卡片展示」/「仅返回文本统计」——模型叙述有据，幻觉失去土壤。
 5. **CI 三方一致性测试**：chat 工具面 × capability `activeScenes()` × 契约表 allowed/forbidden 交叉校验——「chat 面暴露但场景必拒」类缺陷被测试拦住。
 
@@ -149,8 +153,8 @@ data class IntentDef(
 
 与 IntentGuard 同层（commonMain 纯函数 + 平台注入 i18n 文案）：
 
-- **a 补卡**：本轮意图=看照片 + 脚本查到 ids + 无 media_results 消息 → 端侧用 ids 直接补渲染卡片。
-- **b 幻觉拦截**：回复含「已展示/已打开卡片」类断言 + 本轮无对应 artifact → 补 artifact 或追加更正文案。
+- **a 补卡**：脚本路径返回 `mediaIds` + 本轮无 media_results 消息 → 端侧用 ids 直接补渲染卡片。触发条件 M1 不依赖意图判定（M1 阶段尚无路由器）：凡产出 mediaIds 的脚本回合即适用；M2 起叠加意图条件（ANALYZE_STATS 等盘点意图可抑制补卡）。ids→MediaAsset 水合走既有按 id 批量查询通道（实现时定位 MediaRepository/MediaSearchEngine 的 by-ids 入口，与搜索路径同一资产源）。
+- **b 幻觉拦截（结构性信号，不做文本匹配）**：以 **tool_call 序列 + artifact presence** 判定——分支执行器先落 artifact 再生成总结（顺序保证叙述有据）；回合收尾校验「本轮应产 artifact（查契约表）而未产」→ 补 artifact 或追加更正文案。不对模型回复做关键词匹配（措辞无限、语言随用户走，i18n 管不住生成文本）。
 - **c refine 基数收口**：`lastResultAssets` 更新点扩展到所有产出媒体 id 集合的路径（search / refine / **script**）——级联断裂消除；无基数时 refine 返回明确错误而非 3ms 空成功。
 
 ### 3.6 分支化 mini-agent（M3，Koog graph）
@@ -175,8 +179,8 @@ data class IntentDef(
 ## 5. 测试决策
 
 - **契约一致性**（新增 CI）：契约表 ruleText × allowed/forbidden 无互斥；三方一致性（§3.4-5）。
-- **IntentRouter 纯函数单测**：pattern 捷径、refine 判定、查表分发、降级路径。
-- **路由器 LLM 离线 golden eval**：固定查询集 × N 次跑意图一致率与槽位准确率，记录基线（不设硬门禁，先观测）。
+- **IntentRouter 纯函数单测**：pattern 捷径（含负面样例）、本地信号门控、refine 判定、查表分发、降级路径（超时 / schema 失败 / 低置信）。
+- **路由器 LLM 离线 golden eval**：固定查询集 × N 次跑意图一致率与槽位准确率，记录基线（不设硬门禁，先观测）。查询集含三类对抗样例：pattern 负面样例（「看看照片里有没有糊的」）、注入样例（用户原文试图改写路由规则）、混合意图（双产出物 / 原料组合）。
 - **prompt golden**：`ChatPromptRules` 变更走既有 `ChatSystemPromptGoldenTest` 重生成流程（`POLANG_WRITE_GOLDEN=1`）+ 人工 diff review。
 - **回合护栏单测**：脚本 ids 无卡 → 补卡；幻觉断言无 artifact → 更正；refine 无基数 → 明确错误。
 - **i18n**：护栏/更正/降级文案五语同步（EN/zh-CN/zh-TW/es/fr）。
@@ -190,7 +194,7 @@ data class IntentDef(
 | `search_media` 加 person/fromMs/toMs 透传 | D3-② |
 | `view_media` 移出 chat 工具面 | D3-① |
 | 回合护栏 a/c（补卡 + refine 基数收口） | D2/D4 |
-| 三条矛盾规则（L41/L62/L124）按意图二分重写，golden 重生成 | D1（人工版） |
+| 三条矛盾规则（L41/L62/L133）按意图二分重写，golden 重生成 | D1（人工版） |
 | `@LLMDescription` UI 效果标注（首批：search/script/view 相关） | D2 |
 
 **验收**：真机重放「看下我儿子的照片」「给我看去年夏天的」（含会话上下文预热：先跑一轮模糊搜索 0 命中）各 ×5，全部出卡片；refine 在脚本路径之后不再 3ms 空转。
@@ -198,7 +202,7 @@ data class IntentDef(
 ### M2 意图路由器（3–5 天）
 
 契约表落地（§3.1）→ IntentRouter LLM 调用 + schema 校验 + 降级（§3.2）→ 确定性策略层 + pattern 捷径（§3.3）→ 路由审计落库（§3.7 前半）。
-**验收**：路由器离线 eval 基线报告产出；线上一周路由审计显示 VIEW_PHOTOS 契约满足率 100%（护栏兜底后）；OPEN_QA 降级率可观测。
+**验收**：路由器离线 eval 基线报告产出；线上一周路由审计同时统计**护栏前路由正确率**（目标 ≥ 95%——只统计护栏兜底后满足率是循环论证，路由器本身的质量必须可观测）与 VIEW_PHOTOS 契约满足率 100%（护栏兜底后）；OPEN_QA 降级率与门控放行率可观测。
 
 ### M3 分支化 + eval（演进）
 
@@ -228,7 +232,7 @@ Koog graph 条件边分支（§3.6）+ 规则按分支注入（prompt 瘦身）+
 ## 9. 开放问题
 
 - 混合意图的路由器输出形态：`feat/chat-html-card` 已合 main（2026-09-25，89270e0a4），include 槽位 schema（photos/chart/stats）以 main 的实际取数 handler 为准标定；组合分支工具面宽度（给多宽会重新引入注意力稀释）用 M2 eval 观测。
-- 路由器携带的对话状态窗口：建议 1 轮紧凑态（上轮意图 + artifact 类型），实施时用 eval 数据标定。
+- 路由器携带的对话状态窗口：初值 2 轮紧凑态（上轮意图 + artifact 类型 + 搜索基数存在性；`isRefinement` 的多轮指代判定依赖它），M2 用 eval 数据标定是否可收敛到 1 轮。
 - 置信度降级阈值：初值 0.6，M2 期间按误路由率调。
 - OPEN_QA 分支保留多大工具面：M3 分支化时按使用率裁剪。
 - iOS 落地节奏：Android M2 验收后走 `/ios-follow`。
