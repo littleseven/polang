@@ -9,6 +9,8 @@
 > 2026-08-03 更新：移除已退役的 CO/PM/RD/CR/QA 角色协作管线（`agents/*_agent.md` 已删；该管线从未被 kimi 实际调度，kimi 改用全局子代理）。本文档聚焦**架构原则、全局红线、文档治理与工具脚本**，不再定义强制角色编排流程。
 >
 > 2026-08-07 更新：仓库重组 Phase 3——项目改名 polang（原 langchain4android），`app/` → `androidApp/`（`:app` → `:androidApp`），引擎模块迁入 `engines/`（`:beauty-api`/`:beauty-engine`/`:mnn-core`/`:sentencepiece` → `:engines:*`），Gradle `rootProject.name` = "polang"。
+>
+> 2026-09-25 更新：§7 索引登记当日三篇 chat 体系方案——ADR-014（富内容渲染，已定稿且 Android 落地）、意图路由契约 spec、工程师任务卡 spec（两篇均在途，实施时按各自 §8/§测试决策原子同步文档）。
 
 > 本文档为**顶层治理文档**，定义 Agent First 的研发规范。
 >
@@ -272,6 +274,9 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **★ 双端 UI 研发流程** | `docs/08-UI-SPECS/README.md`（Vibe Coding → 固化 Spec → iOS 翻译） |
 | **iOS 对等跟随编排** | `docs/superpowers/specs/2026-08-10-ios-follow-command-design.md`（/ios-follow 六阶段管线设计 SSOT + platform_differences 台账层；可执行形态 `skills/ios-follow/SKILL.md`） |
 | **AI 工具配置索引** | `AI_TOOLS.md`（四工具配置位置、Skills/Plans/Specs SSOT 约定） |
+| **Chat 富内容渲染（ADR-014）** | `docs/02-ARCHITECTURE/ADR/ADR-014-chat-rich-rendering-hybrid.md`（正文原生富渲染 + RICH_HTML 沙箱卡；ADR 索引 `docs/02-ARCHITECTURE/ADR/README.md`） |
+| **意图路由契约与路由器（Spec，在途）** | `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（chat 路由体系重构：LLM 管意图、代码管策略；M1 止血 → M2 路由器 → M3 分支化） |
+| **工程师任务卡（Spec，在途）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（工程师模式任务卡 + 任务中心页，Muse 任务卡范式；原生 Compose，不经 ADR-014 管线） |
 | **产品定义** | `PRODUCT.md` |
 | **交互规范** | `docs/01-PRODUCT/FEATURES.md` |
 | **★ AI 协作产物 SSOT** | `docs/superpowers/README.md`（Plans / Specs 唯一事实来源，四工具共同遵守） |

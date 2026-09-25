@@ -16,7 +16,7 @@
 | [ADR-011](./ADR-011-retire-non-ui-driver-tests.md) | 退役非 ui-driver 测试 | UI 自动化只保留 `ui-driver`（Accessibility 结构化文本驱动）+ JVM 单测 |
 | [ADR-012](./ADR-012-unify-conversation-memory.md) | 统一会话记忆 | 每条链路有且仅有一套对话记忆；事实记忆/人物关系与对话记忆职责分离 |
 | [ADR-013](./ADR-013-kmp-architecture-contract.md) | KMP 架构契约 | 只共享业务逻辑绝不共享 UI（不做 CMP）；跨 Swift seam 必须扁平；commonMain 纯度构建期守卫 |
-| [ADR-014](./ADR-014-chat-rich-rendering-hybrid.md) | Chat 富内容渲染（方案 B） | 正文原生富渲染（替换 compose-markdown）；Agent 生成 UI 走 RICH_HTML 卡 + 全屏沙箱 Artifact 查看器（L1/L2 风格分级）；不做全量 HTML 会话 |
+| [ADR-014](./ADR-014-chat-rich-rendering-hybrid.md) | Chat 富内容渲染（方案 B） | 正文原生富渲染（替换 compose-markdown）；Agent 生成 UI 走 RICH_HTML 沙箱卡（卡片内直接交互，`<a>` 外链进全屏落地页；L1/L2 风格分级）；不做全量 HTML 会话 |
 
 ## 已删除的历史篇（2026-08-23）
 

@@ -2,7 +2,7 @@
 
 > **日期**: 2026-09-25
 > **来源**: 「儿子的照片」无横滑卡片事故复盘（当日真机日志 + chat/llm_log 双库交叉定位，根因见 §1.1）。用户定方向：①「意图理解和路由存在问题，请系统性提出解决方案，不要单点处理」；②「专门搞一个意图理解和路由的 LLM 接口/模块」。
-> **上游**: `AGENT_ARCHITECTURE.md` §2.4.4（意图理解）、`CAPABILITY_REGISTRY.md`（命令路由 SSOT）、ADR-008（隐私红线）、`shared/.../intent/IntentGuard.kt`（既有确定性守卫层先例）
+> **上游**: `AGENT_ARCHITECTURE.md` §2.4.4（意图理解）、`CAPABILITY_REGISTRY.md`（命令路由 SSOT）、ADR-008（隐私红线）、ADR-014（RENDER_RICH_HTML 渲染基线，已合 main）、`shared/.../intent/IntentGuard.kt`（既有确定性守卫层先例）
 > **状态**: 方向已认可，待评审后实施
 
 ---
@@ -93,7 +93,7 @@ data class IntentDef(
 - **规则由表生成/校验**：`ChatPromptRules` 的路由相关节从本表派生；CI 一致性测试保证「同一意图的 ruleText 与 allowed/forbidden 不互斥」——L41 vs L62 类矛盾在设计上不可能再发生。
 - 与 `CAPABILITY_REGISTRY.md`（命令路由 SSOT）同构，形成代码+文档双层 SSOT。
 - 意图初版 10 个（见上枚举）；`slots` 统一定义：`person? / fromMs? / toMs? / label? / constraint? / mediaId?`。
-- **`RENDER_RICH_HTML` 在途标注**：render_html 通路在 `feat/chat-html-card` 分支（349c5eb75，离线沙箱 WebView + 卡片内交互 + ResizeObserver 高度跟随），未合 main；契约表登记时以该分支为实现基线。隐私语义（ADR-008 × ADR-014）：模型只产出 HTML 结构与本地资产引用，图片/渲染全部端侧解析，媒体文件永不出端。
+- **`RENDER_RICH_HTML` 基线**：render_html 通路已合 main（2026-09-25，89270e0a4：离线沙箱 WebView + 卡片内直接交互 + ResizeObserver 高度跟随 + `<a>` 外链全屏落地页，详见 ADR-014 修订注记与 `JS_ENGINE_TECH_SPEC.md` §7.1）；契约表登记以 main 为实现基线。隐私语义（ADR-008 × ADR-014）：模型只产出 HTML 结构与本地资产引用，图片/渲染全部端侧解析，媒体文件永不出端。
 
 **混合意图原则——按「最终产出物」分类，不按「动作清单」分类**。路由器判定的是 deliverable（用户最终要什么形态的东西），动作是原料：
 
@@ -227,7 +227,7 @@ Koog graph 条件边分支（§3.6）+ 规则按分支注入（prompt 瘦身）+
 
 ## 9. 开放问题
 
-- 混合意图的路由器输出形态需随 `feat/chat-html-card` 合并节奏对齐：include 槽位 schema（photos/chart/stats）以该分支的实际取数 handler 为准标定；组合分支工具面宽度（给多宽会重新引入注意力稀释）用 M2 eval 观测。
+- 混合意图的路由器输出形态：`feat/chat-html-card` 已合 main（2026-09-25，89270e0a4），include 槽位 schema（photos/chart/stats）以 main 的实际取数 handler 为准标定；组合分支工具面宽度（给多宽会重新引入注意力稀释）用 M2 eval 观测。
 - 路由器携带的对话状态窗口：建议 1 轮紧凑态（上轮意图 + artifact 类型），实施时用 eval 数据标定。
 - 置信度降级阈值：初值 0.6，M2 期间按误路由率调。
 - OPEN_QA 分支保留多大工具面：M3 分支化时按使用率裁剪。

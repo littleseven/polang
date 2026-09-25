@@ -98,3 +98,4 @@ Muse 最受认可的范式转变是「任务后台跑 + 需要决策才回联」
 - 服务端改造点是本期唯一硬依赖：`/v1/claude-task/status` 需要网关/claude-tunnel 暴露会话存活与终态查询；若网关暂不支持，降级方案 = 仅靠 SSE 重连对账（US-4 保留，US-5 通知推迟），spec 评审时先确认网关可行性。
 - 成本字段已有（`ClaudeEvent.Cost`），任务卡展示可直接复用，顺带兑现「工程师模式成本可见」的既有诉求。
 - 设计稿：任务卡组件帧（进度态/审批态/完成态/失败态）随本 spec 同批出 Ardot 稿，token 绑定走既有 sync 通道。
+- 关联 spec：`2026-09-25-intent-routing-contract-design.md`（意图路由契约）——工程师模式走独立 `/v1/claude-chat` 链路，TASK_CARD 不经意图路由器；未来相册域 TaskRegistry（Muse 调研 #1）若接入 chat 路由，再在契约表登记对应 UiArtifact。

@@ -94,6 +94,8 @@ Muse 最受认可的范式转变是「关掉 App 还在干活 + 需要决策才�
 - 完成回联：前台通知（批量任务完成/失败/需决策）
 差异化叙事：**「隐私版 Agent 任务」——同样的后台任务范式，任务数据 100% 不出端**。
 
+> **落地跟进（2026-09-25）**：工程师模式场景已立项 spec——`docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（任务卡 + 任务中心页）。spec 决策 D1/D2 相对本节有两点收敛：任务卡改为**原生 Compose**（不复用 ADR-014 预览卡容器，进度实时刷新与静态 HTML 语义相斥）；相册域 TaskRegistry 暂不捆绑、仅保持组件通用形状。
+
 **#2 审批三要素卡（P0，成本最低）**
 Muse 购物确认三要素（订单/收货/支付）的本质是**把「将要发生什么」的要素聚合到一张卡上再要授权**。PoLang 的 DESTRUCTIVE 操作（`delete_media` 批量删除）可直接套用：卡片聚合「数量 / 收藏占比 / 可恢复性（回收站编排 `TrashSessionController` 已支持）」。已有 `CommandRisk` 分级与 Tier A 确认体系，只是把确认信息从散点文本升级为结构化卡片。
 顺带正名：Muse 的 Sentinel 把审批弹窗放 **App UI 而非对话流**（防提示注入），与 PoLang 现有 Tier A 设计同构——PoLang 已走在正确方向，Muse 提供了外部佐证。
