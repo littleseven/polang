@@ -18,5 +18,6 @@ enum class ChatMessageType {
     MEDIA_RESULTS,
     CHART,
     HTML_CARD,
+    TASK_CARD,
     OPTIMIZE_CANDIDATES,
 }

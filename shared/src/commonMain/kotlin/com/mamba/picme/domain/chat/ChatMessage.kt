@@ -40,6 +40,8 @@ data class ChatMessage(
     val claudeDeliver: ClaudeDeliverUi? = null,
     /** 抽卡候选卡组负载（OPTIMIZE_CANDIDATES 消息）。 */
     val optimizeCandidates: OptimizeCandidateGroup? = null,
+    /** TASK_CARD 载荷（工程师任务卡；状态存 Room metadata）。 */
+    val engineerTask: EngineerTaskState? = null,
     /** 卡条是否可交互（controller 内存态仍有 pending；进程重建后降级只读）。 */
     val gachaInteractive: Boolean = false,
 )

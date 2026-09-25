@@ -2,6 +2,7 @@ package com.mamba.picme.features.chat
 
 import com.mamba.picme.domain.chat.ClaudeAgentState
 import com.mamba.picme.domain.chat.ClaudeDeliverUi
+import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
@@ -312,6 +313,13 @@ class ChatViewModel(
 
     /** msgId → 交付按钮状态（内存态；Room 消息经 loadMessages 重放时按 id 回填）。 */
     private val claudeDeliverOverrides = mutableMapOf<String, ClaudeDeliverUi>()
+
+    /** 工程师任务卡内存态：taskId → 最新状态（Room 为持久层，此处为流式期间的 live 覆盖）。 */
+    private val _engineerTasks = MutableStateFlow<Map<String, EngineerTaskState>>(emptyMap())
+
+    /** 当前回合活动任务（sendClaudeMessage 提交时置位，回合结束清空）。 */
+    @Volatile
+    private var activeEngineerTaskId: String? = null
 
     /**
      * 进入 AI 工程师模式：有持久化上下文且所属 chat 会话仍在 → 切回该会话并恢复 sid
@@ -696,11 +704,20 @@ class ChatViewModel(
     }
 
     /**
-     * UI 实际展示的消息列表：已持久化消息 + 流式临时消息。
+     * UI 实际展示的消息列表：已持久化消息 + 流式临时消息；TASK_CARD 叠加工程师任务 live 态。
      */
-    val displayMessages: StateFlow<List<ChatMessageUi>> = combine(_messages, _streamingMessage) { messages, streaming ->
-        if (streaming != null) messages + streaming else messages
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val displayMessages: StateFlow<List<ChatMessageUi>> =
+        combine(_messages, _streamingMessage, _engineerTasks) { messages, streaming, tasks ->
+            val base = if (streaming != null) messages + streaming else messages
+            if (tasks.isEmpty()) {
+                base
+            } else {
+                base.map { msg ->
+                    val live = msg.engineerTask?.let { task -> tasks[task.taskId] }
+                    if (live != null && live != msg.engineerTask) msg.copy(engineerTask = live) else msg
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
@@ -998,12 +1015,16 @@ class ChatViewModel(
                         chatMessageDao.getMessagesBySession(sessionId)
                     }
                     .collect { entities ->
-                        _messages.value = entities.map { e ->
+                        val uiMessages = entities.map { e ->
                             val ui = e.toUiModel()
                             val deliver = claudeDeliverOverrides[ui.id]
                             ui
                                 .let { if (deliver != null) it.copy(claudeDeliver = deliver) else it }
                         }
+                        _messages.value = uiMessages
+                        _engineerTasks.value = uiMessages
+                            .mapNotNull { msg -> msg.engineerTask?.let { task -> task.taskId to task } }
+                            .toMap()
                         // 回填仍处 pending 的卡条选中态（controller 内存态存活于 ViewModel 重建，选中态不存活）
                         val restored = entities
                             .filter { it.type == OptimizeCandidateGroup.MESSAGE_TYPE }
@@ -2914,6 +2935,7 @@ class ChatViewModel(
                 "html_card" -> ChatMessageType.HTML_CARD
                 "agent_edit_result" -> ChatMessageType.AGENT_EDIT_RESULT
                 OptimizeCandidateGroup.MESSAGE_TYPE -> ChatMessageType.OPTIMIZE_CANDIDATES
+                EngineerTaskState.ROOM_TYPE -> ChatMessageType.TASK_CARD
                 else -> ChatMessageType.AGENT_TEXT
             },
             content = content,
@@ -2934,6 +2956,7 @@ class ChatViewModel(
             },
             gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
                 optimizeGachaController?.hasPending(id) == true,
+            engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
         )
     }
 
