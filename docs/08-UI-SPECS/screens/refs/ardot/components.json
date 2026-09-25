@@ -178,7 +178,7 @@
     },
     {
       "name": "preview_banner",
-      "nodeId": "434:41",
+      "nodeId": "434:72",
       "page": "Components",
       "purpose": "组件总览预览板(900x1250,双列15组件+标签);散装演示实例已清理",
       "darkPng": "",
