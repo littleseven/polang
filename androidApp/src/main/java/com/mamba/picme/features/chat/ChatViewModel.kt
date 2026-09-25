@@ -71,6 +71,7 @@ import com.mamba.picme.features.chat.capability.ChatRunScriptCapability
 import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.capability.SearchOutcome
+import com.mamba.picme.features.chat.engineer.EngineerTaskReducer
 import com.mamba.picme.features.chat.js.CapabilityDispatchHandler
 import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
@@ -384,6 +385,12 @@ class ChatViewModel(
                 }
 
                 _isProcessing.value = true
+                // 提交即登记任务卡（spec：每次 claude-chat 提交 = 一张任务卡）
+                val taskId = "task_" + UUID.randomUUID().toString()
+                val initialTask = EngineerTaskReducer.initial(taskId, text, System.currentTimeMillis())
+                activeEngineerTaskId = taskId
+                _engineerTasks.update { tasks -> tasks + (taskId to initialTask) }
+                persistEngineerTask(sessionId, initialTask)
                 val renderer = ClaudeAgentRenderer()
                 val streamingId = "claude_streaming_${System.currentTimeMillis()}"
                 _streamingMessage.value = ChatMessageUi(
@@ -413,6 +420,7 @@ class ChatViewModel(
                     }
                 }
                 val result = claudeChatClient.chat(token, text, claudeSid) { event ->
+                    onClaudeEventForTask(sessionId, event, renderer.state.text)
                     when (event) {
                         is ClaudeEvent.Session -> Logger.i(TAG, "claude evt: Session sid=${event.sid}")
                         is ClaudeEvent.ToolUse -> Logger.i(
@@ -450,6 +458,7 @@ class ChatViewModel(
                 result.fold(
                     onSuccess = { persistClaudeBubble(sessionId, renderer.state) },
                     onFailure = { e ->
+                        markActiveEngineerTaskFailed(sessionId, e.message)
                         insertAgentMessage(
                             sessionId,
                             stringContext().getString(R.string.chat_inference_error, e.message ?: stringContext().getString(R.string.chat_unknown_error)),
@@ -459,9 +468,11 @@ class ChatViewModel(
                 )
             } catch (e: Exception) {
                 Logger.e(TAG, "sendClaudeMessage failed", e)
+                markActiveEngineerTaskFailed(sessionId, e.message)
                 _streamingMessage.value = null
             } finally {
                 _isProcessing.value = false
+                activeEngineerTaskId = null
             }
         }
     }
@@ -548,6 +559,49 @@ class ChatViewModel(
             ),
         )
         chatSessionDao.touchSession(sessionId)
+    }
+
+    /** 任务卡 upsert（REPLACE 同 id 重插，对齐 gacha metadata 覆写先例）；timestamp 恒为 startedAtMs，卡片锚定提交位置。 */
+    private suspend fun persistEngineerTask(sessionId: String, state: EngineerTaskState) {
+        chatMessageDao.insertMessage(
+            ChatMessageEntity(
+                id = state.taskId,
+                sessionId = sessionId,
+                type = EngineerTaskState.ROOM_TYPE,
+                content = state.sourceText.take(50),
+                timestamp = state.startedAtMs,
+                metadata = JSONObject().put("engineer_task", state.toJson()).toString(),
+            )
+        )
+    }
+
+    /** SSE 事件 → 任务卡状态机；结构性事件才落库（文本 delta 不触发 Room churn）。 */
+    private fun onClaudeEventForTask(sessionId: String, event: ClaudeEvent, finalText: String) {
+        val taskId = activeEngineerTaskId ?: return
+        val current = _engineerTasks.value[taskId] ?: return
+        var next = EngineerTaskReducer.reduce(current, event, canDeliverClaude.value, System.currentTimeMillis())
+        if (event is ClaudeEvent.Done && !event.truncated) {
+            next = next.copy(resultSummary = EngineerTaskReducer.summarize(finalText))
+        }
+        if (next == current) return
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        if (EngineerTaskReducer.isStructural(event)) {
+            viewModelScope.launch { persistEngineerTask(sessionId, next) }
+        }
+    }
+
+    /** SSE 断连/失败：任务卡 terminal 化（P1 在场态 = FAILED；P3 回联时改「后台运行中」）。 */
+    private fun markActiveEngineerTaskFailed(sessionId: String, message: String?) {
+        val taskId = activeEngineerTaskId ?: return
+        val current = _engineerTasks.value[taskId] ?: return
+        val next = EngineerTaskReducer.reduce(
+            current,
+            ClaudeEvent.Error(message ?: "connection lost"),
+            canDeliver = false,
+            nowMs = System.currentTimeMillis(),
+        )
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        viewModelScope.launch { persistEngineerTask(sessionId, next) }
     }
 
     /**
@@ -1022,9 +1076,21 @@ class ChatViewModel(
                                 .let { if (deliver != null) it.copy(claudeDeliver = deliver) else it }
                         }
                         _messages.value = uiMessages
-                        _engineerTasks.value = uiMessages
+                        // 合并语义（非整体重置）：Room 表级 invalidation 重发不能冲掉活动任务的
+                        // live entry——同 taskId 取 updatedAtMs 较大者，内存独有 entry 保留。
+                        val loadedTasks = uiMessages
                             .mapNotNull { msg -> msg.engineerTask?.let { task -> task.taskId to task } }
                             .toMap()
+                        _engineerTasks.update { current ->
+                            val merged = loadedTasks.toMutableMap()
+                            current.forEach { (taskId, live) ->
+                                val fromRoom = merged[taskId]
+                                if (fromRoom == null || live.updatedAtMs > fromRoom.updatedAtMs) {
+                                    merged[taskId] = live
+                                }
+                            }
+                            merged
+                        }
                         // 回填仍处 pending 的卡条选中态（controller 内存态存活于 ViewModel 重建，选中态不存活）
                         val restored = entities
                             .filter { it.type == OptimizeCandidateGroup.MESSAGE_TYPE }
