@@ -12,7 +12,6 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
@@ -30,8 +29,7 @@ import org.junit.Test
  * - 流式进行中 Room 表级 invalidation 重发旧快照 → 合并语义保住 live entry（不被冲回 RUNNING）
  *
  * 基建复用 [ChatViewModelTestBase]；claudeChatClient fake SSE 对齐 [ChatViewModelClaudeSidTest] 先例。
- * 内部态观测：`_engineerTasks` 无私有访问器，按任务计划经反射读私有流（displayMessages 为
- * WhileSubscribed，无订阅者不发射，不适合断言）。
+ * 内部态经公开只读流 [ChatViewModel.engineerTasks] 观测。
  */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
@@ -77,12 +75,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
     private fun taskCards(): List<ChatMessageEntity> =
         insertedMessages.filter { entity -> entity.type == EngineerTaskState.ROOM_TYPE }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun engineerTasks(vm: ChatViewModel): Map<String, EngineerTaskState> {
-        val field = ChatViewModel::class.java.getDeclaredField("_engineerTasks")
-        field.isAccessible = true
-        return (field.get(vm) as StateFlow<Map<String, EngineerTaskState>>).value
-    }
+    private fun engineerTasks(vm: ChatViewModel): Map<String, EngineerTaskState> = vm.engineerTasks.value
 
     @Test
     fun `sse failure marks active task FAILED and persists terminal state`() = runTest {

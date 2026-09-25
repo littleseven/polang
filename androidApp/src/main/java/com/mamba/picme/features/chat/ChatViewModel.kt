@@ -2,6 +2,7 @@ package com.mamba.picme.features.chat
 
 import com.mamba.picme.domain.chat.ClaudeAgentState
 import com.mamba.picme.domain.chat.ClaudeDeliverUi
+import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.LlmPerformance
@@ -92,6 +93,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -321,6 +323,7 @@ class ChatViewModel(
 
     /** 工程师任务卡内存态：taskId → 最新状态（Room 为持久层，此处为流式期间的 live 覆盖）。 */
     private val _engineerTasks = MutableStateFlow<Map<String, EngineerTaskState>>(emptyMap())
+    val engineerTasks: StateFlow<Map<String, EngineerTaskState>> = _engineerTasks.asStateFlow()
 
     /** 当前回合活动任务（sendClaudeMessage 提交时置位，回合结束清空）。 */
     @Volatile
@@ -529,8 +532,7 @@ class ChatViewModel(
 
     /**
      * 把折叠后的 agent 气泡落 Room（type=agent_text + metadata.claude_agent_state）。
-     * loadMessages 重放时由 [parseClaudeAgentState] 还原 [ChatMessageUi.claudeAgent]；
-     * 有 file_change 则挂交付按钮（内存态，loadMessages 回填）。
+     * loadMessages 重放时由 [parseClaudeAgentState] 还原 [ChatMessageUi.claudeAgent]。
      */
     private suspend fun persistClaudeBubble(sessionId: String, state: ClaudeAgentState) {
         val sid = claudeSid
@@ -539,18 +541,8 @@ class ChatViewModel(
             "persistClaudeBubble: hasFileChange=${state.hasFileChange} claudeSid=$sid steps=${state.steps.size} stepTools=${state.steps.map { it.tool }}",
         )
         val msgId = UUID.randomUUID().toString()
-        // ⚠️ 时序：必须先 set override，再 insertMessage。insertMessage 会触发 loadMessages reload，
-        // reload 读 claudeDeliverOverrides[msgId] 渲染交付按钮；若 set 晚于 reload，按钮永不出现
-        // （之后无新 Room 写入再触发 reload）。预生成 msgId 保证 set 先于 insert。
-        if (!sid.isNullOrBlank() && state.hasFileChange) {
-            // 交付按钮：只在 AI 实际改动过文件时显示。
-            // 注意：gateway 必须确保 Bash/Edit 等改文件操作都发出 file_change 事件；
-            // 若漏发，则交付按钮不会出现，需在 gateway 侧修复事件翻译。
-            claudeDeliverOverrides[msgId] = ClaudeDeliverUi(sid, pending = true)
-            Logger.i(TAG, "persistClaudeBubble: deliver override pre-attached msgId=$msgId (hasFileChange=true)")
-        } else {
-            Logger.i(TAG, "persistClaudeBubble: NO deliver button (sid=${sid?.take(4)}, hasFileChange=${state.hasFileChange})")
-        }
+        // 任务卡时代（2026-09-25 起）：交付审批收口到 TASK_CARD（US-2 审批唯一入口），
+        // 新气泡不再登记 claudeDeliverOverrides；confirmClaudeDeliver 仅供 legacy 内存 override 使用。
         val metadata = JSONObject().put("claude_agent_state", state.toJson()).toString()
         chatMessageDao.insertMessage(
             ChatMessageEntity(
@@ -579,7 +571,10 @@ class ChatViewModel(
                     metadata = JSONObject().put("engineer_task", state.toJson()).toString(),
                 )
             )
-        }.onFailure { e -> Logger.e(TAG, "persistEngineerTask failed taskId=${state.taskId}", e) }
+        }.onFailure { e ->
+            if (e is CancellationException) throw e
+            Logger.e(TAG, "persistEngineerTask failed taskId=${state.taskId}", e)
+        }
     }
 
     /** SSE 事件 → 任务卡状态机；结构性事件才落库（文本 delta 不触发 Room churn）。 */
@@ -620,6 +615,72 @@ class ChatViewModel(
      */
     fun continueClaude() {
         sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue))
+    }
+
+    /** 审批动作回填 + 落库（US-9：同一决策点只审批一次，reducer 内幂等）。 */
+    private fun resolveEngineerTask(
+        taskId: String,
+        resolution: EngineerTaskResolution,
+        deliverBranch: String? = null,
+    ) {
+        val current = _engineerTasks.value[taskId] ?: return
+        val next = EngineerTaskReducer.resolved(current, resolution, System.currentTimeMillis(), deliverBranch)
+        if (next == current) return
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        viewModelScope.launch {
+            engineerTaskPersistMutex.withLock { persistEngineerTask(_currentSessionId.value, next) }
+        }
+    }
+
+    /** 任务卡「继续」：旧卡回填已继续 + 同 sid 续跑（新回合新卡，语义同气泡按钮）。 */
+    fun continueEngineerTask(taskId: String) {
+        resolveEngineerTask(taskId, EngineerTaskResolution.CONTINUED)
+        sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue))
+    }
+
+    /** 任务卡「到此为止」。 */
+    fun abandonEngineerTask(taskId: String) = resolveEngineerTask(taskId, EngineerTaskResolution.ABANDONED)
+
+    /** 任务卡「暂不」交付。 */
+    fun skipEngineerDeliver(taskId: String) = resolveEngineerTask(taskId, EngineerTaskResolution.DELIVER_SKIPPED)
+
+    /** 任务卡「重试」：重发原消息（新任务卡，不覆盖旧卡，US-11）。 */
+    fun retryEngineerTask(taskId: String) {
+        val source = _engineerTasks.value[taskId]?.sourceText ?: return
+        sendClaudeMessage(source)
+    }
+
+    /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。 */
+    fun deliverEngineerTask(taskId: String) {
+        val sid = _engineerTasks.value[taskId]?.sid ?: return
+        viewModelScope.launch {
+            val token = _serverAuthToken.value
+            if (token.isBlank()) return@launch
+            claudeChatClient.deliver(token, sid, "push").fold(
+                onSuccess = { json ->
+                    val branch = json.optString("branch")
+                    if (json.optBoolean("ok", false) && branch.isNotBlank()) {
+                        resolveEngineerTask(taskId, EngineerTaskResolution.DELIVERED, branch)
+                    } else {
+                        markEngineerTaskDeliverError(taskId, json.optString("error"))
+                    }
+                },
+                onFailure = { error -> markEngineerTaskDeliverError(taskId, error.message) },
+            )
+        }
+    }
+
+    /** 交付失败：保持待审批态，错误摘要上卡（可重试，对齐 confirmClaudeDeliver pending 恢复语义）。 */
+    private fun markEngineerTaskDeliverError(taskId: String, message: String?) {
+        val current = _engineerTasks.value[taskId] ?: return
+        val next = current.copy(
+            errorSummary = stringContext().getString(R.string.claude_deliver_failed, message ?: ""),
+            updatedAtMs = System.currentTimeMillis(),
+        )
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        viewModelScope.launch {
+            engineerTaskPersistMutex.withLock { persistEngineerTask(_currentSessionId.value, next) }
+        }
     }
 
     /**
