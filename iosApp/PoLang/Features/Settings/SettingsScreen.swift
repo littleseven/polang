@@ -155,8 +155,8 @@ struct SettingsScreen: View {
                     .foregroundColor(.secondary)
             }
             .padding(16)
-            .background(s.surfaceContainerHighest)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .background(s.cell)
+            .clipShape(AppShapes.card)
         }
         .buttonStyle(.plain)
     }
@@ -176,7 +176,7 @@ struct SettingsScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(s.surfaceContainerHighest)
+        .background(s.cell)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -197,7 +197,7 @@ struct SettingsScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(s.surfaceContainerHighest)
+        .background(s.cell)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -258,7 +258,7 @@ struct SettingsScreen: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(16)
-        .background(s.surfaceContainerHighest)
+        .background(s.cell)
         .clipShape(RoundedRectangle(cornerRadius: 12))
 
         Group {
@@ -454,7 +454,7 @@ struct AccountSettingsView: View {
             }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-        .background(s.surfaceContainerHighest).clipShape(AppShapes.card)
+        .background(s.cell).clipShape(AppShapes.card)
     }
 
     // MARK: 已登录详情
@@ -480,7 +480,7 @@ struct AccountSettingsView: View {
             Button { showDeleteConfirm = true } label: { Text(L("Delete Account")).frame(maxWidth: .infinity) }.buttonStyle(.bordered).foregroundColor(s.error)
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-        .background(s.surfaceContainerHighest).clipShape(AppShapes.card)
+        .background(s.cell).clipShape(AppShapes.card)
     }
 
     // MARK: Actions
@@ -651,7 +651,7 @@ struct AboutView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .background(s.surfaceContainerHighest)
+                .background(s.cell)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal, 16)
 
@@ -730,7 +730,7 @@ struct LocalModelsSettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(s.surfaceContainerHighest)
+        .background(s.cell)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -856,7 +856,7 @@ struct SandboxSettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(s.surfaceContainerHighest)
+        .background(s.cell)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
