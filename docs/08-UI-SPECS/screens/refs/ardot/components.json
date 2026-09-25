@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-20",
+  "updated": "2026-09-25",
   "components": [
     {
       "name": "component/floating_tab",
@@ -186,6 +186,22 @@
       "tokenBound": true,
       "variants": [],
       "rules": "组件预览统一看此banner, 不再另建散装演示实例"
+    },
+    {
+      "name": "component/task_card",
+      "nodeId": "435:11",
+      "page": "Components",
+      "purpose": "工程师模式任务卡(361宽,chat 内任务锚点):header(图标+标题+状态chip)+body 四态组(running 进度条/approval 截断要素+继续/stop、done 摘要+交付审批、failed 错误+重试),状态组可见性切换;标签绑 UI Language taskcard.* 三语变量",
+      "darkPng": "components/task_card-dark.png",
+      "lightPng": "components/task_card-light.png",
+      "tokenBound": true,
+      "variants": [
+        "running",
+        "approval",
+        "done",
+        "failed"
+      ],
+      "rules": "chat 内工程师任务一律实例化+visible 覆写切态,禁止手画;演示帧 task_card_states(435:58) 四态各一实例;spec=docs/superpowers/specs/2026-09-25-engineer-task-card-design.md"
     }
   ]
 }

@@ -144,6 +144,9 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 图片资源过期渲染空白 | 结构 hash 完好但渲染纯色空白(只有渲染能暴露) | 回填源=Components 页 cast/* 五头像(download_source_media 一 node 一调用);**实例内部图走分号子路径 "inst;387:147"**;跨节点 hash 不复用,同图多节点逐节点独立 upload;upload filePath 须绝对路径(MCP 按自身 cwd 解析) |
 | 底按钮被虚拟键遮挡 | btn/bottom_bar 下缘切进 y801-852 | 底容器(body/sheet/bottom_bar)padding.bottom 补足 51+~24 间隙(28→91/24→75 类);绿像素遮挡扫描只测绿钮且营销帧绿背景全误报——393×852 应用帧限定 |
 | PSA 三语重发全流程 | 设计稿修复后商店/官网图需全量跟发 | 语言钉源帧→export 2x→upload 灌海报 Screen 节点→export 海报→Play 逐语言 prune 重传(回读 sha)→官网 shots+setup 刷→?v bump→双站选择性 rsync;guide 卡=EN/ZH 双轮烘焙后画布终态回 zh;zh-TW 02-07 海报 Screen 保留 09-18 繁体覆写成果(重烘会丢 hant),仅 01(zhTW 物理帧)/08(localmodels-tw)可安全重烘 |
+| 全量快照商店帧渲染漂移(2026-09-25) | export-ardot-snapshot 后 70 张商店/海报 PNG 内容区由 #111 漂成 #D5D5D5(亮度 41→115),但源帧逐帧单导正常暗色 | 疑陈旧客户端(6h+)×导出管线钉定残留;处置=坏导出全部 git checkout 回滚勿混入任务提交,源帧单导自证正常,重启客户端后再择时全量快照 |
+| preview-mode.sh --shot 搬移路径失配 | 脚本按 `<dir>/screenshot-*.png` 搬文件,实际产物落 `<dir>/<fileId>/` 子目录,报 FileNotFoundError | 钉定本身已生效(像素自证);截图自己 capture_screenshot 代劳,勿重试脚本(重试会二次钉定) |
+| health-check 多页扫描漏页与合并 | 只扫单页时 catalog 全组件报 missing(假 drift);两页 jsonl 直接 cat 合并则 _meta 双行 KeyError | catalog 校验必须含 Components 页;合并时滤掉各文件 _meta 行,重写单行 _meta |
 
 ## 相关文件
 
@@ -175,3 +178,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 1.2.9 | 2026-09-21 | 快照收口实战回填:批量 export_nodes 映射错乱逐帧单导+烘焙窗口语言钉残留(还原须显式带语言集) |
 | 1.3.0 | 2026-09-21 | guide 铬件比例实战回填:烘焙图自带错位铬件勿叠浮层,PIL 按源图原生倍率合成+逐图采样底色 |
 | 1.4.0 | 2026-09-22 | 铬件/主题大修实战回填:六类病灶+audit 双指标工具+九行配方(主题钉/D()删变量/陈旧客户端/管道僵死/C 补铬件/图片过期回填/按钮遮挡/PSA 重发流程) |
+| 1.5.0 | 2026-09-25 | 任务卡组件/任务中心页实战回填:快照商店帧渲染漂移处置+preview-mode.sh --shot 路径失配+health-check 多页漏扫/合并两坑(陷阱表 +3 行) |

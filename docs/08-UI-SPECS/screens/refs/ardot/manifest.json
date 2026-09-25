@@ -137,6 +137,11 @@
           "id": "267:518",
           "name": "chat/cleanup_done",
           "png": "chat-cleanup_done.png"
+        },
+        {
+          "id": "435:80",
+          "name": "chat/task_center",
+          "png": "chat-task_center.png"
         }
       ],
       "id": "111:319",
@@ -359,6 +364,11 @@
           "id": "434:72",
           "name": "preview_banner",
           "png": "preview_banner.png"
+        },
+        {
+          "id": "435:58",
+          "name": "task_card_states",
+          "png": "task_card_states.png"
         }
       ],
       "id": "386:45",
