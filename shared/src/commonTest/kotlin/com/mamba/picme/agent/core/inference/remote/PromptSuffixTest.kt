@@ -55,14 +55,14 @@ class PromptSuffixTest {
             screenWidthPx = 1200,
             screenHeightPx = 2670,
             cardContentWidthCssPx = 352,
-            cardMaxHeightCssPx = 587
+            cardSuggestedHeightCssPx = 587
         )
         val withEnv = RemoteChatEngine.buildPromptSuffix(
             AssistantPersona.DEFAULT, ReplyLanguage.SIMPLIFIED_CHINESE, today, renderEnvironment = env
         )
         assertTrue(withEnv.contains("【HTML 卡片渲染环境】设备：Android 手机；屏幕 1200x2670 px（400x890 dp）"))
         assertTrue(withEnv.contains("卡片内容区最大宽度约 352 CSS px"))
-        assertTrue(withEnv.contains("最大展示高度约 587 CSS px"))
+        assertTrue(withEnv.contains("建议单卡内容高度控制在约 587 CSS px"))
         // 环境段紧跟日期行、性格/语言段之前
         assertTrue(withEnv.indexOf("【HTML 卡片渲染环境】") > withEnv.indexOf("当前日期"))
         assertTrue(withEnv.indexOf("【HTML 卡片渲染环境】") < withEnv.indexOf("App 界面语言为简体中文"))

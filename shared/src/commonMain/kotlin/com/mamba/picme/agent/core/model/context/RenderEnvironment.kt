@@ -20,14 +20,14 @@ data class RenderEnvironment(
     val screenHeightPx: Int,
     /** 卡片内容区最大宽度（CSS px，已扣除列表/卡片边距的近似值）。 */
     val cardContentWidthCssPx: Int,
-    /** 卡片在列表内的最大展示高度（CSS px），超出部分卡片内滚动查看。 */
-    val cardMaxHeightCssPx: Int,
+    /** 建议单卡内容高度（CSS px，约 2/3 屏高；卡片已完全撑开不内滚，此为可读性建议值而非硬上限）。 */
+    val cardSuggestedHeightCssPx: Int,
 ) {
     /** prompt 段文本（与规则段一致，全中文、面向远程模型）。 */
     fun toPromptSegment(): String =
         "【HTML 卡片渲染环境】设备：$deviceType；屏幕 ${screenWidthPx}x${screenHeightPx} px" +
-            "（${screenWidthDp}x${screenHeightDp} dp）；卡片内容区最大宽度约 $cardContentWidthCssPx CSS px，" +
-            "列表内最大展示高度约 $cardMaxHeightCssPx CSS px（超出部分用户在卡片内滚动查看）。" +
-            "render_html 的 html 请按此响应式排版：宽度用百分比或 max-width:100%，不写死超过卡片宽度的固定 px；" +
-            "整体高度尽量控制在最大展示高度以内。"
+            "（${screenWidthDp}x${screenHeightDp} dp）；卡片内容区最大宽度约 $cardContentWidthCssPx CSS px；" +
+            "卡片会完整撑开展示全部内容（无高度上限、卡片自身不滚动，随外层聊天列表滚动），" +
+            "为聊天可读性，建议单卡内容高度控制在约 $cardSuggestedHeightCssPx CSS px（约 2/3 屏高）以内。" +
+            "render_html 的 html 请按此响应式排版：宽度用百分比或 max-width:100%，不写死超过卡片宽度的固定 px。"
 }

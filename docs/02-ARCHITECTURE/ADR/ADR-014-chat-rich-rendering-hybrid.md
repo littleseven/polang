@@ -8,8 +8,9 @@
 > **修订注记（2026-09-25）**：落地实现与本 ADR 两处方向性差异，经用户确认、留痕如下——
 > 1. **呈现形态**：D2 原定为「气泡内定比预览卡 → 点击进全屏沙箱 Artifact 查看器」两段式；
 >    实际落地（`HtmlCard`，见 JS_ENGINE_TECH_SPEC.md §7.1）为「**卡片内直接交互**（动态测高 +
->    ResizeObserver 高度跟随，规避 LazyColumn 高度协商的方式从定比预览改为出站 JS 测高）+
->    **仅 `<a>` 外链点击进全屏落地页**（`HtmlLinkPreviewOverlay`）」——全屏查看器不再是主交互入口。
+>    ResizeObserver 高度跟随 + **完全撑开**（卡片高度=内容全高、不内滚，规避 LazyColumn 高度协商的
+>    方式从定比预览改为出站 JS 测高+全高展开））+ **仅 `<a>` 外链点击进全屏落地页**
+>    （`HtmlLinkPreviewOverlay`）」——全屏查看器不再是主交互入口。
 > 2. **外链安全限制暂时放开**（表现力优先，用户 2026-09-25 指示）：远程 img/CSS/`<a>` href
 >    放行直拉，卡片内点击外链打开全屏落地页；**底线不变**——远程 script/iframe/object/embed/
 >    form/meta refresh 仍由清洗器剔除，零 JS 桥接不变。后续若收紧，收紧点在

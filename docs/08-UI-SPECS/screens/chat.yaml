@@ -642,7 +642,7 @@ js_toolcalls:
       bridge_kind: "ChatUiActionDto 须加 chart kind（携 svg+summary）"  # 见 contracts.md C-B2-2
     html_card_result:                        # render_html 产出（2026-09 新增，Android 先行）
       message_kind: HTML_CARD                # 独立全宽消息项；content=自包含 HTML（落库持久）
-      ui: HtmlCard                           # WebView 卡片（动态测高 clamp [120dp, 屏高×0.66] + ResizeObserver 高度跟随 + 滑动防抖（高度进程级缓存/滑动冻结/2px 阈值）；卡片内直接交互，仅 a 外链点击进全屏落地页 HtmlLinkPreviewOverlay；滚动条隐藏，超高卡片内滚动、滚到边界让渡外层列表）
+      ui: HtmlCard                           # WebView 卡片（动态测高 + 完全撑开（≥120dp 无上限，卡片不内滚、滚动全交外层列表）+ ResizeObserver 高度跟随 + 滑动防抖（高度进程级缓存/滑动冻结/2px 阈值）；卡片内直接交互，仅 a 外链点击进全屏落地页 HtmlLinkPreviewOverlay；滚动条隐藏）
       render_template: "wrapHtmlDocument 注入 viewport meta(width=device-width) + 响应式 reset；完整文档原样加载"
       layout_context: "组合根注入 RenderEnvironment（设备/屏幕/卡片宽高上限）→ prompt 动态尾段，引导 LLM 响应式排版"
       sanitize: "落库前 HtmlCardSanitizer 清洗（128KB 上限、剔除远程 script/iframe/object/embed/form/meta refresh；2026-09-25 起远程 img/CSS/a 外链放行，表现力优先）"

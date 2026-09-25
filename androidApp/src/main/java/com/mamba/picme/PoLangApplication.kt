@@ -781,7 +781,7 @@ class PoLangApplication : Application(), ImageLoaderFactory {
             screenWidthPx = dm.widthPixels,
             screenHeightPx = dm.heightPixels,
             cardContentWidthCssPx = widthDp - CARD_HORIZONTAL_CHROME_DP,
-            cardMaxHeightCssPx = (heightDp * CARD_MAX_HEIGHT_FRACTION).roundToInt()
+            cardSuggestedHeightCssPx = (heightDp * CARD_MAX_HEIGHT_FRACTION).roundToInt()
         )
     }
 

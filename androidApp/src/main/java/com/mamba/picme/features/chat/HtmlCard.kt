@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,15 +60,14 @@ import com.mamba.picme.R
  *   （[HtmlLinkPreviewOverlay]）查看；卡片内其余元素（按钮/Tab/手风琴等 JS 交互）
  *   直接在卡片内生效。
  *
- * 卡片态高度动态适配内容：[HtmlWebView] 加载完成后经 `evaluateJavascript` 读内容高度
- * （出站求值，非 JS 桥接），clamp 到 [[CARD_MIN_HEIGHT], 屏高×[CARD_MAX_HEIGHT_FRACTION]]；
+ * 卡片态高度动态适配内容并**完全撑开**：[HtmlWebView] 加载完成后经 `evaluateJavascript` 读内容
+ * 高度（出站求值，非 JS 桥接），卡片高度 = 内容全高（≥ [CARD_MIN_HEIGHT]，无上限）——
+ * 卡片自身永不竖滚，滚动全交外层 LazyColumn，从根上消除「长列表 vs WebView 手势冲突」；
  * 加载后注入 ResizeObserver 监听 body——内容高度随交互变化（手风琴/Tab/动态排版）时经
  * console 约定通道（`onConsoleMessage`，JS→原生单向被动上报，非桥接）持续跟随，容器动画伸缩。
  * **滑动防抖**：测高结果按 html hash 进程级缓存（重回视口零高度动画）+ 列表滑动途中冻结
  * 高度更新（滚停后一次性应用）+ 小于 [HEIGHT_UPDATE_THRESHOLD_PX]px 的抖动忽略——三者共同
- * 消除「滑动中列表项边滚边变高」的上下抖动。
- * 内容超高时卡片内滚动，滚动条一律隐藏，嵌套滚动经 `rememberNestedScrollInteropConnection`
- * 滚到边界后让渡外层列表。
+ * 消除「滑动中列表项边滚边变高」的上下抖动。滚动条一律隐藏。
  */
 
 /** 卡片态最小高度。 */
@@ -78,7 +76,7 @@ internal val CARD_MIN_HEIGHT = 120.dp
 /** 测高完成前的占位高度（接近常见卡片高度，减少跳动）。 */
 private val CARD_PLACEHOLDER_HEIGHT = 280.dp
 
-/** 卡片态最大高度占屏高比例（超出部分卡片内滚动查看）；组合根注入渲染环境时复用。 */
+/** 建议单卡内容高度占屏高比例（卡片已完全撑开，此为组合根注入 prompt 的可读性建议值，非硬上限）。 */
 const val CARD_MAX_HEIGHT_FRACTION = 0.66f
 
 /**
@@ -112,10 +110,10 @@ fun HtmlCard(
     // 滑动途中冻结高度更新（列表项边滚边变高是滑动抖动主因），最新值挂起，滚动停止后一次性应用
     var pendingHeightDp by remember(html) { mutableIntStateOf(-1) }
     val currentIsScrolling by rememberUpdatedState(isListScrolling)
-    val maxHeightDp = (LocalConfiguration.current.screenHeightDp * CARD_MAX_HEIGHT_FRACTION).toInt()
-    val maxHeight = maxOf(CARD_MIN_HEIGHT, maxHeightDp.dp)
+    // 卡片完全撑开：高度 = 内容全高（≥ [CARD_MIN_HEIGHT]），无上限、不内滚，
+    // 竖直滚动全交外层列表——WebView 永不竖滚，与 LazyColumn 的手势冲突从根上消失
     val targetHeight = if (measuredHeightDp > 0) {
-        measuredHeightDp.dp.coerceIn(CARD_MIN_HEIGHT, maxHeight)
+        measuredHeightDp.dp.coerceAtLeast(CARD_MIN_HEIGHT)
     } else {
         CARD_PLACEHOLDER_HEIGHT
     }
@@ -199,36 +197,25 @@ private fun WebView.loadHtmlOnce(html: String) {
 }
 
 /**
- * 聊天卡片专用 WebView：补足「内容不可竖直滚动时 drag delta 不进嵌套滚动」的缺口——
- * WebView 内建嵌套滚动只在自身可滚时 dispatch；卡片高度适配内容后通常不可滚，
- * 此时竖直拖动应让渡外层列表，这里手动把 delta 经 NestedScrollingChild 通道上报 Compose 父链
- * （配合 modifier 上的 `rememberNestedScrollInteropConnection` 到达 LazyColumn）。
- * 内容超高可滚时走 WebView 内建链（先自滚、边界让渡），本分支不触发。
+ * 聊天卡片专用 WebView 的嵌套滚动策略。卡片已完全撑开（无高度上限、自身不滚动），
+ * 竖直拖动手势应**全部让渡给外层聊天列表**，WebView 只保留点击/横滑等卡内交互：
+ * - 内容不可竖滚（常态）：MOVE 直接返回 false，且不调用 requestDisallowInterceptTouchEvent，
+ *   Compose 父链（LazyColumn）越过 touch slop 后经 onInterceptTouchEvent 接管手势流，
+ *   WebView 收 ACTION_CANCEL、列表顺畅滚动——这是 WebView 嵌进 LazyColumn 的标准做法，
+ *   替代手动 dispatchNestedPreScroll（实测在 Compose interop 链路上不可靠，几乎滑不动）；
+ * - 内容可竖滚（异常兜底，如测高滞后瞬间）：保持 isNestedScrollingEnabled=false，
+ *   WebView 自滚、父链无感知（防 LazyColumn pre-scroll 抢占 delta 导致卡死）。
  */
 private class ChatHtmlWebView(context: Context) : WebView(context) {
-    private var lastY = 0f
-    private val nestedConsumed = IntArray(2)
+    init {
+        isNestedScrollingEnabled = false
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                lastY = event.y
-                startNestedScroll(View.SCROLL_AXIS_VERTICAL)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val dy = (lastY - event.y).toInt()
-                lastY = event.y
-                if (dy != 0 && !canScrollVertically(-1) && !canScrollVertically(1)) {
-                    nestedConsumed[0] = 0
-                    nestedConsumed[1] = 0
-                    dispatchNestedPreScroll(0, dy, nestedConsumed, null)
-                    val unconsumedDy = dy - nestedConsumed[1]
-                    if (unconsumedDy != 0) {
-                        dispatchNestedScroll(0, 0, 0, unconsumedDy, null)
-                    }
-                }
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stopNestedScroll()
+        if (event.actionMasked == MotionEvent.ACTION_MOVE &&
+            !canScrollVertically(-1) && !canScrollVertically(1)
+        ) {
+            return false
         }
         return super.onTouchEvent(event)
     }
