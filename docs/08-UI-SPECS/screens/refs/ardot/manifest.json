@@ -1,6 +1,6 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-25T10:52:51+08:00",
+  "exportedAt": "2026-09-25T10:59:36+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
@@ -356,7 +356,7 @@
           "png": "cast-chris.png"
         },
         {
-          "id": "434:41",
+          "id": "434:72",
           "name": "preview_banner",
           "png": "preview_banner.png"
         }
@@ -614,5 +614,5 @@
     }
   ],
   "scale": 1,
-  "structureSha256": "5434a8de1390aedd7129996f04b3317f9cf81289bcd7074e699e4a0e9eebf5eb"
+  "structureSha256": "32d9c0d816bbbaa537b983ae44493a176f99da733cfca1ee5fe11466c86e05a8"
 }

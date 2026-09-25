@@ -10221,7 +10221,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-6hzi-20260925_105150214.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-b3ia-20260925_105834265.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -14003,7 +14003,7 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-d01k-20260925_105151385.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_437-v1mh-20260925_105835477.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:437 chat/cleanup_confirm (FRAME)"
           }
         },
         "267:518": {
@@ -14780,13 +14780,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-qtr7-20260925_105152752.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-pjir-20260925_105836921.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-p187-20260925_105152290.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-vbs5-20260925_105836331.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -15700,7 +15700,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-f77y-20260925_105153758.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-fn7v-20260925_105837971.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -17032,7 +17032,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-hm2c-20260925_105153313.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-tlmi-20260925_105837499.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -23312,7 +23312,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-a8rk-20260925_105156848.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-hj06-20260925_105841184.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -24198,7 +24198,7 @@
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-89e4-20260925_105157342.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-spc9-20260925_105841678.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -27626,13 +27626,13 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-7uh8-20260925_105158844.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-w6o3-20260925_105843266.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-4gad-20260925_105157796.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-88ag-20260925_105842178.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
@@ -31022,7 +31022,7 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-6yxv-20260925_105159630.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-297_7-zkib-20260925_105844067.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 297:7 memory/feed (FRAME)"
           }
         }
       },
@@ -31077,8 +31077,8 @@
                 "name": "cast/mom",
                 "type": "FRAME",
                 "width": 240,
-                "x": 1026,
-                "y": 1012
+                "x": 0,
+                "y": 0
               }
             ]
           }
@@ -31129,8 +31129,8 @@
                 "name": "cast/dad",
                 "type": "FRAME",
                 "width": 240,
-                "x": 1283,
-                "y": 1012
+                "x": 260,
+                "y": 0
               }
             ]
           }
@@ -31181,8 +31181,8 @@
                 "name": "cast/alex",
                 "type": "FRAME",
                 "width": 240,
-                "x": 1540,
-                "y": 1012
+                "x": 520,
+                "y": 0
               }
             ]
           }
@@ -31233,8 +31233,8 @@
                 "name": "cast/lin",
                 "type": "FRAME",
                 "width": 240,
-                "x": 1797,
-                "y": 1012
+                "x": 780,
+                "y": 0
               }
             ]
           }
@@ -31285,18 +31285,41 @@
                 "name": "cast/chris",
                 "type": "FRAME",
                 "width": 240,
-                "x": 2054,
-                "y": 1012
+                "x": 1040,
+                "y": 0
               }
             ]
           }
         },
-        "434:41": {
+        "434:72": {
           "name": "preview_banner",
           "tree": {
             "nodes": [
               {
                 "children": [
+                  {
+                    "characters": "floating_tab",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:73",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 56,
+                    "x": 48,
+                    "y": 48
+                  },
                   {
                     "componentProperties": {},
                     "cornerRadius": 28,
@@ -31305,7 +31328,7 @@
                     ],
                     "gap": 0,
                     "height": 56,
-                    "id": "434:42",
+                    "id": "434:74",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31320,13 +31343,36 @@
                     },
                     "type": "INSTANCE",
                     "width": 300,
-                    "x": 60,
-                    "y": 60
+                    "x": 48,
+                    "y": 74
+                  },
+                  {
+                    "characters": "status_bar",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:75",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 50,
+                    "x": 48,
+                    "y": 174
                   },
                   {
                     "componentProperties": {},
                     "height": 33,
-                    "id": "434:43",
+                    "id": "434:76",
                     "layout": "none",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31335,13 +31381,36 @@
                     "name": "status_bar",
                     "type": "INSTANCE",
                     "width": 393,
-                    "x": 60,
-                    "y": 172
+                    "x": 48,
+                    "y": 200
+                  },
+                  {
+                    "characters": "system_nav_bar",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:77",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 76,
+                    "x": 48,
+                    "y": 277
                   },
                   {
                     "componentProperties": {},
                     "height": 51,
-                    "id": "434:44",
+                    "id": "434:78",
                     "layout": "none",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31350,8 +31419,31 @@
                     "name": "system_nav_bar",
                     "type": "INSTANCE",
                     "width": 393,
-                    "x": 60,
-                    "y": 261
+                    "x": 48,
+                    "y": 303
+                  },
+                  {
+                    "characters": "top_bar",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:79",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 36,
+                    "x": 48,
+                    "y": 398
                   },
                   {
                     "componentProperties": {},
@@ -31360,7 +31452,7 @@
                     ],
                     "gap": 8,
                     "height": "$2:111",
-                    "id": "434:45",
+                    "id": "434:80",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31375,14 +31467,37 @@
                     },
                     "type": "INSTANCE",
                     "width": 393,
-                    "x": 60,
-                    "y": 368
+                    "x": 48,
+                    "y": 424
+                  },
+                  {
+                    "characters": "top_bar_gallery",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:81",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 73,
+                    "x": 48,
+                    "y": 516
                   },
                   {
                     "componentProperties": {},
                     "gap": 22,
                     "height": "$2:111",
-                    "id": "434:46",
+                    "id": "434:82",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31397,8 +31512,31 @@
                     },
                     "type": "INSTANCE",
                     "width": 393,
-                    "x": 60,
-                    "y": 472
+                    "x": 48,
+                    "y": 542
+                  },
+                  {
+                    "characters": "logo",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:83",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 21,
+                    "x": 48,
+                    "y": 634
                   },
                   {
                     "componentProperties": {},
@@ -31436,7 +31574,7 @@
                       }
                     ],
                     "height": 48,
-                    "id": "434:47",
+                    "id": "434:84",
                     "layout": "none",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31445,14 +31583,37 @@
                     "name": "logo",
                     "type": "INSTANCE",
                     "width": 48,
-                    "x": 500,
-                    "y": 60
+                    "x": 48,
+                    "y": 660
+                  },
+                  {
+                    "characters": "brand_row",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:85",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 51,
+                    "x": 48,
+                    "y": 752
                   },
                   {
                     "componentProperties": {},
                     "gap": 18,
-                    "height": "hug_contents",
-                    "id": "434:48",
+                    "height": 40,
+                    "id": "434:86",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31467,62 +31628,37 @@
                     },
                     "type": "INSTANCE",
                     "width": 320,
-                    "x": 500,
-                    "y": 164
+                    "x": 48,
+                    "y": 778
                   },
                   {
-                    "componentProperties": {},
-                    "cornerRadius": 8,
+                    "characters": "provider_row",
                     "fills": [
-                      "$2:150"
+                      "$2:151"
                     ],
-                    "gap": 8,
-                    "height": "$143:9",
-                    "id": "434:49",
-                    "layout": "horizontal",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "387:86"
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
                     },
-                    "name": "search_field",
-                    "padding": {
-                      "bottom": 0,
-                      "left": 12,
-                      "right": 12,
-                      "top": 0
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:87",
+                    "lineHeight": {
+                      "unit": "AUTO"
                     },
-                    "type": "INSTANCE",
-                    "width": 284,
-                    "x": 500,
-                    "y": 284
-                  },
-                  {
-                    "componentProperties": {},
-                    "gap": 0,
-                    "height": "hug_contents",
-                    "id": "434:50",
-                    "layout": "vertical",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "387:22"
-                    },
-                    "name": "input_bar",
-                    "padding": {
-                      "bottom": 28,
-                      "left": 12,
-                      "right": 12,
-                      "top": 12
-                    },
-                    "type": "INSTANCE",
-                    "width": 393,
-                    "x": 500,
-                    "y": 404
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 62,
+                    "x": 48,
+                    "y": 862
                   },
                   {
                     "componentProperties": {},
                     "gap": 12,
                     "height": "$79:71",
-                    "id": "434:51",
+                    "id": "434:88",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31537,14 +31673,37 @@
                     },
                     "type": "INSTANCE",
                     "width": 361,
-                    "x": 500,
-                    "y": 524
+                    "x": 48,
+                    "y": 888
+                  },
+                  {
+                    "characters": "model_row",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:89",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 52,
+                    "x": 48,
+                    "y": 1004
                   },
                   {
                     "componentProperties": {},
                     "gap": 12,
                     "height": "$108:339",
-                    "id": "434:52",
+                    "id": "434:90",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31559,8 +31718,125 @@
                     },
                     "type": "INSTANCE",
                     "width": 361,
-                    "x": 500,
-                    "y": 644
+                    "x": 48,
+                    "y": 1030
+                  },
+                  {
+                    "characters": "search_field",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:91",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 58,
+                    "x": 480,
+                    "y": 48
+                  },
+                  {
+                    "componentProperties": {},
+                    "cornerRadius": 8,
+                    "fills": [
+                      "$2:150"
+                    ],
+                    "gap": 8,
+                    "height": "$143:9",
+                    "id": "434:92",
+                    "layout": "horizontal",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "387:86"
+                    },
+                    "name": "search_field",
+                    "padding": {
+                      "bottom": 0,
+                      "left": 12,
+                      "right": 12,
+                      "top": 0
+                    },
+                    "type": "INSTANCE",
+                    "width": 284,
+                    "x": 480,
+                    "y": 74
+                  },
+                  {
+                    "characters": "input_bar",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:93",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 45,
+                    "x": 480,
+                    "y": 174
+                  },
+                  {
+                    "componentProperties": {},
+                    "gap": 0,
+                    "height": 96,
+                    "id": "434:94",
+                    "layout": "vertical",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "387:22"
+                    },
+                    "name": "input_bar",
+                    "padding": {
+                      "bottom": 28,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
+                    },
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 480,
+                    "y": 200
+                  },
+                  {
+                    "characters": "category_card",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:95",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 68,
+                    "x": 480,
+                    "y": 340
                   },
                   {
                     "componentProperties": {},
@@ -31570,7 +31846,7 @@
                     ],
                     "gap": 10,
                     "height": 64,
-                    "id": "434:53",
+                    "id": "434:96",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31585,8 +31861,31 @@
                     },
                     "type": "INSTANCE",
                     "width": 361,
-                    "x": 500,
-                    "y": 764
+                    "x": 480,
+                    "y": 366
+                  },
+                  {
+                    "characters": "person_card",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:97",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 59,
+                    "x": 480,
+                    "y": 474
                   },
                   {
                     "componentProperties": {},
@@ -31615,8 +31914,8 @@
                       "$2:156"
                     ],
                     "gap": 0,
-                    "height": "hug_contents",
-                    "id": "434:54",
+                    "height": 200,
+                    "id": "434:98",
                     "layout": "vertical",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31631,8 +31930,31 @@
                     },
                     "type": "INSTANCE",
                     "width": 174,
-                    "x": 500,
-                    "y": 884
+                    "x": 480,
+                    "y": 500
+                  },
+                  {
+                    "characters": "chat_photo_card",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:99",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 79,
+                    "x": 480,
+                    "y": 744
                   },
                   {
                     "componentProperties": {},
@@ -31671,7 +31993,7 @@
                       }
                     ],
                     "height": "$79:60",
-                    "id": "434:55",
+                    "id": "434:100",
                     "layout": "none",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31680,14 +32002,37 @@
                     "name": "chat_photo_card",
                     "type": "INSTANCE",
                     "width": "$79:59",
-                    "x": 500,
-                    "y": 1004
+                    "x": 480,
+                    "y": 770
+                  },
+                  {
+                    "characters": "grid_row",
+                    "fills": [
+                      "$2:151"
+                    ],
+                    "fontName": {
+                      "family": "Sarasa Gothic SC",
+                      "style": "Regular"
+                    },
+                    "fontSize": 10,
+                    "height": 12,
+                    "id": "434:101",
+                    "lineHeight": {
+                      "unit": "AUTO"
+                    },
+                    "name": "lbl",
+                    "textAlignHorizontal": "LEFT",
+                    "textAlignVertical": "TOP",
+                    "type": "TEXT",
+                    "width": 42,
+                    "x": 480,
+                    "y": 1014
                   },
                   {
                     "componentProperties": {},
                     "gap": 2,
-                    "height": "hug_contents",
-                    "id": "434:56",
+                    "height": 120,
+                    "id": "434:102",
                     "layout": "horizontal",
                     "mainComponent": {
                       "componentPropertyDefinitions": {},
@@ -31702,367 +32047,22 @@
                     },
                     "type": "INSTANCE",
                     "width": 389,
-                    "x": 500,
-                    "y": 1124
-                  },
-                  {
-                    "characters": "floating_tab",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:57",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_floating_tab",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 56,
-                    "x": 60,
-                    "y": 42
-                  },
-                  {
-                    "characters": "status_bar",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:58",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_status_bar",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 50,
-                    "x": 60,
-                    "y": 154
-                  },
-                  {
-                    "characters": "system_nav_bar",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:59",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_system_nav_bar",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 76,
-                    "x": 60,
-                    "y": 243
-                  },
-                  {
-                    "characters": "top_bar",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:60",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_top_bar",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 36,
-                    "x": 60,
-                    "y": 350
-                  },
-                  {
-                    "characters": "top_bar_gallery",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:61",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_top_bar_gallery",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 73,
-                    "x": 60,
-                    "y": 454
-                  },
-                  {
-                    "characters": "logo",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:62",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_logo",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 21,
-                    "x": 500,
-                    "y": 42
-                  },
-                  {
-                    "characters": "brand_row",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:63",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_brand_row",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 51,
-                    "x": 500,
-                    "y": 146
-                  },
-                  {
-                    "characters": "search_field",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:64",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_search_field",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 58,
-                    "x": 500,
-                    "y": 266
-                  },
-                  {
-                    "characters": "input_bar",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:65",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_input_bar",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 45,
-                    "x": 500,
-                    "y": 386
-                  },
-                  {
-                    "characters": "provider_row",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:66",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_provider_row",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 62,
-                    "x": 500,
-                    "y": 506
-                  },
-                  {
-                    "characters": "model_row",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:67",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_model_row",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 52,
-                    "x": 500,
-                    "y": 626
-                  },
-                  {
-                    "characters": "category_card",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:68",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_category_card",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 68,
-                    "x": 500,
-                    "y": 746
-                  },
-                  {
-                    "characters": "person_card",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:69",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_person_card",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 59,
-                    "x": 500,
-                    "y": 866
-                  },
-                  {
-                    "characters": "chat_photo_card",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:70",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_chat_photo_card",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 79,
-                    "x": 500,
-                    "y": 986
-                  },
-                  {
-                    "characters": "grid_row",
-                    "fills": [
-                      "$2:151"
-                    ],
-                    "fontName": {
-                      "family": "Sarasa Gothic SC",
-                      "style": "Regular"
-                    },
-                    "fontSize": 10,
-                    "height": 12,
-                    "id": "434:71",
-                    "lineHeight": {
-                      "unit": "AUTO"
-                    },
-                    "name": "lbl_grid_row",
-                    "textAlignHorizontal": "LEFT",
-                    "textAlignVertical": "TOP",
-                    "type": "TEXT",
-                    "width": 42,
-                    "x": 500,
-                    "y": 1106
+                    "x": 480,
+                    "y": 1040
                   }
                 ],
                 "clipsContent": true,
                 "fills": [
                   "$2:146"
                 ],
-                "height": 1250,
-                "id": "434:41",
+                "height": 1340,
+                "id": "434:72",
                 "layout": "none",
                 "name": "preview_banner",
                 "type": "FRAME",
                 "width": 900,
                 "x": 0,
-                "y": 1200
+                "y": 2200
               }
             ]
           }
@@ -37104,7 +37104,7 @@
         "300:215": {
           "name": "people/grid-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-pcf5-20260925_105203360.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (27KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-8mc5-20260925_105848026.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
           }
         },
         "300:29": {
@@ -40714,19 +40714,19 @@
         "300:723": {
           "name": "people/detail-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-7jy9-20260925_105203614.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-xly8-20260925_105848313.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
           }
         },
         "301:13": {
           "name": "chat/store01-conversation",
           "tree": {
-            "_raw": "Read 1 node(s) (19KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-301_13-lu3k-20260925_105202612.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 301:13 chat/store01-conversation (FRAME)"
+            "_raw": "Read 1 node(s) (19KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-301_13-kh3k-20260925_105847283.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 301:13 chat/store01-conversation (FRAME)"
           }
         },
         "301:96": {
           "name": "chat/store01-insight",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-301_96-6m3m-20260925_105202926.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 301:96 chat/store01-insight (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-301_96-crln-20260925_105847618.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 301:96 chat/store01-insight (FRAME)"
           }
         },
         "306:197": {
@@ -41990,19 +41990,19 @@
         "395:1": {
           "name": "settings/localmodels-store01-zh",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-wgwa-20260925_105204025.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-o5mp-20260925_105848777.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
           }
         },
         "395:106": {
           "name": "settings/localmodels-store01-en",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-rfmq-20260925_105204509.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-zcse-20260925_105849249.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
           }
         },
         "395:211": {
           "name": "settings/localmodels-store01-tw",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-37kj-20260925_105204952.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-yg8g-20260925_105849704.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
           }
         }
       },
