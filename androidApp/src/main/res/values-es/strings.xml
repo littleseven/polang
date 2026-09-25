@@ -1329,6 +1329,27 @@
     <string name="claude_truncated_reason_max_turns">(se alcanzó el máximo de turnos)</string>
     <string name="claude_truncated_reason_timeout">(tiempo agotado)</string>
     <string name="claude_continue">Continuar</string>
+
+    <!-- Engineer task card -->
+    <string name="chat_task_status_running">En curso</string>
+    <string name="chat_task_status_awaiting">Pendiente</string>
+    <string name="chat_task_status_completed">Completado</string>
+    <string name="chat_task_status_failed">Fallido</string>
+    <string name="chat_task_meta_turns">%1$d turnos</string>
+    <string name="chat_task_meta_cost">Coste $%1$.2f</string>
+    <string name="chat_task_meta_files">%1$d archivos</string>
+    <string name="chat_task_stage">Fase: %1$s</string>
+    <string name="chat_task_abandon">Terminar</string>
+    <string name="chat_task_skip_deliver">Ahora no</string>
+    <string name="chat_task_retry">Reintentar</string>
+    <string name="chat_task_resolved_continued">Continuado</string>
+    <string name="chat_task_resolved_delivered">Entregado</string>
+    <string name="chat_task_resolved_abandoned">Abandonado</string>
+    <string name="chat_task_resolved_skipped">Entrega omitida</string>
+    <string name="chat_task_expand">Ver detalles</string>
+    <string name="chat_task_collapse">Ocultar</string>
+    <string name="chat_task_deliver_summary">%1$d archivos, listo para entregar</string>
+    <string name="cd_engineer_task_card">Tarjeta de tarea</string>
     <!-- Issue report -->
     <string name="report_issue_title">Informar de un problema</string>
     <string name="report_issue_cd">Informar de un problema</string>

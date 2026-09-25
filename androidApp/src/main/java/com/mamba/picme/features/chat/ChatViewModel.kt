@@ -665,10 +665,14 @@ class ChatViewModel(
     /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。 */
     fun deliverEngineerTask(taskId: String) {
         if (_isProcessing.value) return
+        // 状态门控：仅 AWAITING_DELIVER 可交付，防 COMPLETED 卡被代码层重复交付
+        val task = _engineerTasks.value[taskId]
+            ?.takeIf { candidate -> candidate.status == EngineerTaskStatus.AWAITING_DELIVER }
+            ?: return
         // 消费端校验+回落（reducer 冻结面不动）：claude init 的 UUID session 事件每回合都会
         // 经 reducer last-wins 覆盖 task.sid，而网关 /deliver 只认 12-hex sid；pattern 不匹配
         // 则回落 VM 级 claudeSid（该字段本身只采纳 12-hex，见 sendClaudeMessage 事件处理）。
-        val sid = _engineerTasks.value[taskId]?.sid?.takeIf { candidate -> candidate.matches(GATEWAY_SID_PATTERN) }
+        val sid = task.sid?.takeIf { candidate -> candidate.matches(GATEWAY_SID_PATTERN) }
             ?: claudeSid
             ?: return
         val sessionId = _currentSessionId.value

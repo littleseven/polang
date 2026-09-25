@@ -233,11 +233,13 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
 
     @Test
     fun `deliver uses gateway 12-hex sid even when claude init UUID session event overwrote task sid`() = runTest {
+        coEvery { claudeChatClient.engineerAvailability(any()) } returns Result.success(true)
         coEvery { claudeChatClient.chat(any(), any(), any(), any()) } coAnswers {
             val onEvent = arg<(ClaudeEvent) -> Unit>(3)
             onEvent(ClaudeEvent.Session("aaaa1111bbbb"))
             // claude stream-json 的 system/init（带连字符 UUID）每回合转发，reducer last-wins 覆盖 task.sid
             onEvent(ClaudeEvent.Session("550e8400-e29b-41d4-a716-446655440000"))
+            onEvent(ClaudeEvent.FileChange("fix.kt", "edit"))
             onEvent(ClaudeEvent.Done(turns = 1, truncated = false))
             Result.success("ok")
         }
@@ -245,8 +247,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
             Result.success(JSONObject().put("ok", true).put("branch", "fix/x"))
 
         val vm = newViewModel()
-        vm.sendClaudeMessage("改一下脚本")
-        advanceUntilIdle()
+        runRoundToAwaitingDeliver(vm)
         val taskId = vm.engineerTasks.value.keys.single()
         // 证据固定：reducer 确实把 UUID 存进了卡（消费端校验的成因）
         assertEquals("550e8400-e29b-41d4-a716-446655440000", vm.engineerTasks.value[taskId]?.sid)

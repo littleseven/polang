@@ -120,6 +120,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -181,6 +182,7 @@ import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.components.ChatEmptyState
 import com.mamba.picme.features.chat.components.ChatPhotoPickerSheet
 import com.mamba.picme.features.chat.components.ChatRegistrationSheet
+import com.mamba.picme.features.chat.components.EngineerTaskCard
 import com.mamba.picme.features.chat.components.GuestNudgeBanner
 import com.mamba.picme.features.chat.components.GachaCandidateStrip
 import com.mamba.picme.features.chat.components.MediaResultsCarousel
@@ -583,6 +585,22 @@ fun ChatScreen(
                                     isListScrolling = listState.isScrollInProgress,
                                     onOpenLink = { url -> previewLinkUrl = url }
                                 )
+                            } else if (message.type == ChatMessageType.TASK_CARD && message.engineerTask != null) {
+                                val task = message.engineerTask
+                                if (task != null) {
+                                    var taskExpanded by rememberSaveable(message.id) { mutableStateOf(false) }
+                                    EngineerTaskCard(
+                                        task = task,
+                                        expanded = taskExpanded,
+                                        actionsEnabled = !isProcessing,
+                                        onToggleExpand = { taskExpanded = !taskExpanded },
+                                        onContinue = { viewModel.continueEngineerTask(task.taskId) },
+                                        onAbandon = { viewModel.abandonEngineerTask(task.taskId) },
+                                        onDeliver = { viewModel.deliverEngineerTask(task.taskId) },
+                                        onSkipDeliver = { viewModel.skipEngineerDeliver(task.taskId) },
+                                        onRetry = { viewModel.retryEngineerTask(task.taskId) },
+                                    )
+                                }
                             } else if (message.type == ChatMessageType.OPTIMIZE_CANDIDATES && message.optimizeCandidates != null) {
                                 val group = message.optimizeCandidates!!
                                 val selected = gachaSelections[message.id] ?: group.recommendedIndex
