@@ -40,7 +40,7 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：
 
 讨论过三方案：A 原生增强 / B 混合富卡片 / C 全量 HTML 会话。市场调研（2026-09-25）结论：
 
-- **(a) 无头部 App 用 WebView 渲染正文**：ChatGPT 为 RN + react-markdown 式原生组件管线（流式不完整 markdown 的增量解析是专门课题，参考 react-native-streamdown）；Android 原生阵营走 Markwon 式管线
+- **(a) 无头部 App 用 WebView 渲染正文**：ChatGPT 移动端为双端原生（Android Kotlin+Compose / iOS Swift+SwiftUI，官方 JD 实证；**2026-09-26 勘误**——原「RN 管线」说法系与 web 端 react-markdown 栈混淆，详见 `docs/reviews/2026-09-26-chat-rendering-framework-research.md`），web 端走 react-markdown 式组件管线（流式不完整 markdown 的增量解析是专门课题，参考 react-native-streamdown）；Android 原生阵营走 Markwon 式管线
 - **(b) 头部 App 全员收敛到「原生聊天流 + 沙箱 WebView 卡片/独立面板」**：Claude Artifacts、ChatGPT Apps widgets、微信小程序卡片、电商客服 H5 卡
 - **C（全量 HTML 会话）无市场先例**
 
@@ -152,4 +152,4 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：
 ## 6. 相关
 
 - 依赖：ADR-008、ADR-011、ADR-013
-- 市场调研（2026-09-25，本轮对话存档）：ChatGPT（RN 原生管线 + Apps widgets 沙箱）、Claude Artifacts、微信小程序卡片、字节小程序卡片形态、电商客服 H5 卡
+- 市场调研（2026-09-25，本轮对话存档；**2026-09-26 扩充勘误**：四家系统调研见 `docs/reviews/2026-09-26-chat-rendering-framework-research.md`，ChatGPT「RN」系误记，实为双端原生）：ChatGPT（双端原生管线 + Apps widgets 沙箱）、Claude Artifacts、微信小程序卡片、字节小程序卡片形态、电商客服 H5 卡
