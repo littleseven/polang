@@ -180,7 +180,6 @@ private fun ImageEditContent(
         topBar = {
             AppTopBar(
                 title = { Text(stringResource(R.string.edit)) },
-                centered = true,
                 navigationIcon = {
                     AppTopBarAction(
                         icon = Icons.Outlined.Close,

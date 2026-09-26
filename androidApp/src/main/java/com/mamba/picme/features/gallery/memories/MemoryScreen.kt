@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -48,6 +47,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.MemoryPageTokens
+import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.domain.memories.Memory
 import com.mamba.picme.domain.memories.MemoryType
 import com.mamba.picme.features.main.MAIN_PAGE_MEMORY
@@ -78,9 +78,9 @@ private fun buildSections(memories: List<Memory>): List<MemorySection> = listOf(
 ).filter { section -> section.memories.isNotEmpty() }
 
 /**
- * Memory 独立 Pager 页（2026-09-06，对标小米相册）：顶栏（标题「回忆」+ 副标「端侧生成 · 私密」）→
- * 三分区大卡 feed（时光/旅程/人物，空分区不占位）→ 整页空态；长按大卡弹隐藏确认；
- * 底部悬浮底 bar（共享 [MainFloatingBottomBar]，回忆项高亮；2026-09-06 导航统一五项与 Pager 页序 1:1）。
+ * Memory 独立 Pager 页（2026-09-06，对标小米相册）：标准 [AppTopBar]（标题「回忆」左对齐，2026-09-26
+ * 与各页统一，大标题+副标形态废弃）→ 三分区大卡 feed（时光/旅程/人物，空分区不占位）→ 整页空态；
+ * 长按大卡弹隐藏确认；底部悬浮底 bar（共享 [MainFloatingBottomBar]，回忆项高亮；2026-09-06 导航统一五项与 Pager 页序 1:1）。
  */
 @Suppress("LongMethod") // 待重构：顶栏/分区 feed/底 bar/隐藏弹窗可抽子组合函数
 @Composable
@@ -95,23 +95,11 @@ fun MemoryScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // 顶栏：大标题 + 副标（对齐相册页「相册」标题风格）
-            Column(
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.memory_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(R.string.memory_privacy_note),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // 顶栏：标准 AppTopBar 左对齐标题（2026-09-26 与各页统一；大标题+副标形态废弃，
+            // 副标「端侧生成 · 私密」无存在意义移除）
+            AppTopBar(
+                title = { Text(stringResource(R.string.memory_title)) }
+            )
             val sections = remember(memories) { buildSections(memories) }
             if (sections.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

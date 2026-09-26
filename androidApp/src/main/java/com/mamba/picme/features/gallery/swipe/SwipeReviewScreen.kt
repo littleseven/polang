@@ -173,7 +173,6 @@ private fun SwipeTopBar(
 ) {
     val reviewing = state as? SwipeUiState.Reviewing
     AppTopBar(
-        centered = true,
         title = {
             if (reviewing != null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

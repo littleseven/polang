@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,7 +43,7 @@ private val TopBarHorizontalPadding = TopBarTokens.horizontalPadding
 private val TopBarHeight = TopBarTokens.height
 
 /**
- * 槽位式主力 topbar（自建紧凑版，微信式：48dp 高、17sp SemiBold 居中标题、底 hairline、内置状态栏 + 刘海避让）。
+ * 槽位式主力 topbar（自建紧凑版：48dp 高、17sp SemiBold 左对齐标题、底 hairline、内置状态栏 + 刘海避让）。
  *
  * 不再使用 Material3 [androidx.compose.material3.TopAppBar]（其高度写死 64dp），
  * 改为自建 [Row]，保证所有核心页顶栏的高度 / 字号 / 状态栏与刘海避让一致。
@@ -53,9 +52,9 @@ private val TopBarHeight = TopBarTokens.height
  *   状态栏避让作用于内部 [Row]，使状态栏区域仍由外层 surface 背景填充，视觉无缝；
  *   仅当顶栏外层已处理状态栏 insets 时，通过 [includeStatusBarPadding] = false 关闭状态栏避让；
  * - 标题统一 17sp / SemiBold，通过 [LocalTextStyle] 注入，调用方传普通 [Text] 即可继承；
- * - [centered] 默认 true（微信式居中，叠加层实现屏幕真中心，不受左右图标数量影响）；
- *   显式传 false 保持左对齐（标题在流内、避让返回键）；
- * - 底部一条 outlineVariant hairline（微信式导航分隔），[showHairline] = false 可关。
+ * - 标题左对齐（流内 weight(1f)，避让返回键、被 actions 挤占时截断）——2026-09-26 弃微信式居中
+ *   （刘海屏居中标题遮挡），页面名统一居左，与设计画布正典一致；
+ * - 底部一条 outlineVariant hairline（导航分隔），[showHairline] = false 可关。
  */
 @Composable
 fun AppTopBar(
@@ -63,10 +62,9 @@ fun AppTopBar(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
-    centered: Boolean = true,
     /** 是否内置状态栏避让（默认开启）；仅当顶栏外层已处理状态栏 insets 时关闭 */
     includeStatusBarPadding: Boolean = true,
-    /** 底部 hairline（默认开启，微信式）；照片沉浸页可关 */
+    /** 底部 hairline（默认开启）；照片沉浸页可关 */
     showHairline: Boolean = true
 ) {
     val titleStyle = MaterialTheme.typography.titleLarge.copy(
@@ -78,45 +76,29 @@ fun AppTopBar(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (includeStatusBarPadding) Modifier.statusBarsPadding() else Modifier)
+                .displayCutoutPadding()
+                .height(TopBarHeight)
+                .padding(horizontal = TopBarHorizontalPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            navigationIcon()
+            CompositionLocalProvider(LocalTextStyle provides titleStyle) {
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    title()
+                }
+            }
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(if (includeStatusBarPadding) Modifier.statusBarsPadding() else Modifier)
-                    .displayCutoutPadding()
-                    .height(TopBarHeight)
-                    .padding(horizontal = TopBarHorizontalPadding),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                navigationIcon()
-                if (!centered) {
-                    CompositionLocalProvider(LocalTextStyle provides titleStyle) {
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            title()
-                        }
-                    }
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(TopBarSpacing),
-                    verticalAlignment = Alignment.CenterVertically,
-                    content = actions
-                )
-            }
-            if (centered) {
-                CompositionLocalProvider(LocalTextStyle provides titleStyle) {
-                    Box(
-                        modifier = Modifier.matchParentSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        title()
-                    }
-                }
-            }
+                horizontalArrangement = Arrangement.spacedBy(TopBarSpacing),
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions
+            )
         }
         if (showHairline) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -131,10 +113,9 @@ fun AppTopBar(
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
-    centered: Boolean = true,
     /** 是否内置状态栏避让（默认开启）；仅当顶栏外层已处理状态栏 insets 时关闭 */
     includeStatusBarPadding: Boolean = true,
-    /** 底部 hairline（默认开启，微信式）；照片沉浸页可关 */
+    /** 底部 hairline（默认开启）；照片沉浸页可关 */
     showHairline: Boolean = true
 ) {
     AppTopBar(
@@ -152,7 +133,6 @@ fun AppTopBar(
             }
         },
         actions = actions,
-        centered = centered,
         includeStatusBarPadding = includeStatusBarPadding,
         showHairline = showHairline
     )

@@ -1,7 +1,6 @@
 package com.mamba.picme.features.gallery.components
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.rounded.Check
@@ -24,9 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
 import com.mamba.picme.domain.model.GroupingMode
 import com.mamba.picme.domain.model.GroupingMode.DATE
@@ -62,16 +59,14 @@ fun GalleryTopBar(
     val isScanning by TagGenerationService.isScanning.collectAsState(false)
     AppTopBar(
         title = {
-            // 无返回键时标题距屏幕左缘仅 4dp（Row 水平 padding），补齐到 16dp；
-            // 选择模式/有返回键时标题紧贴返回键，保持原样
-            val hasNavBack = isSelectionMode || onNavigateBack != null
+            // 标题左对齐（2026-09-26 弃居中）；无返回键时距左缘即 Row 水平 padding 8dp，
+            // 与设计画布正典（title x=8）一致，无需额外补偿
             Text(
                 text = if (isSelectionMode) {
                     stringResource(R.string.selected_items, selectedCount)
                 } else {
                     stringResource(R.string.gallery)
-                },
-                modifier = if (hasNavBack) Modifier else Modifier.padding(start = 12.dp)
+                }
             )
         },
         navigationIcon = {

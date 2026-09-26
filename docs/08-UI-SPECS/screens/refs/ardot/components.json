@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-25",
+  "updated": "2026-09-26",
   "components": [
     {
       "name": "component/floating_tab",
@@ -66,7 +66,7 @@
     {
       "name": "component/input_bar",
       "nodeId": "387:22",
-      "page": "Components",
+      "page": "ChatComponents",
       "purpose": "Chat 输入栏(InputCard+占位文本+相册/工程师胶囊+发送钮)",
       "darkPng": "components/input_bar-dark.png",
       "lightPng": "components/input_bar-light.png",
@@ -99,7 +99,7 @@
     {
       "name": "component/top_bar",
       "nodeId": "387:113",
-      "page": "Components",
+      "page": "ChatComponents",
       "purpose": "Chat 顶栏(返回+菜单+spacer+问题上报/追加/清理三动作位, empty/conversation/empty-v2-guest/cleanup_confirm/cleanup_done 5 帧全同构)",
       "darkPng": "components/top_bar-dark.png",
       "lightPng": "components/top_bar-light.png",
@@ -121,7 +121,7 @@
     {
       "name": "component/chat_photo_card",
       "nodeId": "387:143",
-      "page": "Components",
+      "page": "ChatComponents",
       "purpose": "Chat 媒体结果轮播照片卡(120x150, IMAGE 照片底 + FeedbackCol 三反馈钮 + DateChip 日期角标)",
       "darkPng": "components/chat_photo_card-dark.png",
       "lightPng": "components/chat_photo_card-light.png",
@@ -190,7 +190,7 @@
     {
       "name": "component/task_card",
       "nodeId": "435:11",
-      "page": "Components",
+      "page": "ChatComponents",
       "purpose": "工程师模式任务卡(361宽,chat 内任务锚点):header(图标+标题+状态chip)+body 四态组(running 进度条/approval 截断要素+继续/stop、done 摘要+交付审批、failed 错误+重试),状态组可见性切换;标签绑 UI Language taskcard.* 三语变量",
       "darkPng": "components/task_card-dark.png",
       "lightPng": "components/task_card-light.png",
@@ -202,6 +202,75 @@
         "failed"
       ],
       "rules": "chat 内工程师任务一律实例化+visible 覆写切态,禁止手画;演示帧 task_card_states(435:58) 四态各一实例;spec=docs/superpowers/specs/2026-09-25-engineer-task-card-design.md"
+    },
+    {
+      "name": "component/chat_user_bubble",
+      "nodeId": "438:332",
+      "page": "ChatComponents",
+      "purpose": "用户消息气泡(绿底白字);fills绑chatBubble/userBubbleBg($142:19,#95EC69双模恒值);hug尺寸,pad 18h/14v;小尾巴角=实例cornerRadius覆写(右下4)",
+      "darkPng": "components/chat_user_bubble-dark.png",
+      "lightPng": "components/chat_user_bubble-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "chat 会话用户消息一律实例;日期胶囊见component/chat_date_chip;light导出与dark字节级相同系token双模同值,非缺陷"
+    },
+    {
+      "name": "component/chat_date_chip",
+      "nodeId": "438:335",
+      "page": "ChatComponents",
+      "purpose": "会话日期分隔胶囊(surfaceContainerHigh底r8,hug)",
+      "darkPng": "components/chat_date_chip-dark.png",
+      "lightPng": "components/chat_date_chip-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "会话内日期分隔一律实例,文案绑语言变量"
+    },
+    {
+      "name": "component/chat_thread_item",
+      "nodeId": "438:342",
+      "page": "ChatComponents",
+      "purpose": "sidebar会话列表行(标题+预览双行+⋮更多);根透明fills:[],w264;title/preview绑语言变量",
+      "darkPng": "components/chat_thread_item-dark.png",
+      "lightPng": "components/chat_thread_item-light.png",
+      "tokenBound": true,
+      "variants": [
+        "default",
+        "selected"
+      ],
+      "rules": "sidebar ThreadList 一律实例;选中态=实例覆写(fills绑$2:157+title绑$2:130+SemiBold);title实例须width fill_container防溢出;独立导出黑底系透明根,以帧内渲染为准"
+    },
+    {
+      "name": "component/chat_nudge_card",
+      "nodeId": "438:357",
+      "page": "ChatComponents",
+      "purpose": "游客引导注册sheet卡(r28+surfaceContainerLowest);标题/描述/注册主钮/稍后次钮/脚注",
+      "darkPng": "components/chat_nudge_card-dark.png",
+      "lightPng": "components/chat_nudge_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "chat 游客nudge帧(171:171)用实例;btnRegister 2026-09-26 由渐变literal改绑scheme/primary纯色(SendButton先例:渐变+变量stop引擎不绘制,U侧fills绑定须paint内嵌boundVariables:{color:{type:VARIABLE_ALIAS,id}}直写)"
+    },
+    {
+      "name": "component/chat_cleanup_card",
+      "nodeId": "438:397",
+      "page": "ChatComponents",
+      "purpose": "清理确认卡(9宫格照片缩略+宽主钮+双次钮+caption);surfaceContainer底+outlineVariant描边,w353",
+      "darkPng": "components/chat_cleanup_card-dark.png",
+      "lightPng": "components/chat_cleanup_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "cleanup_confirm 帧(267:437)用实例width fill;九宫格照片为IMAGE fill不参与双模;light判据按卡底带采样(照片霸占中部带)"
+    },
+    {
+      "name": "component/chat_cleanup_done_card",
+      "nodeId": "438:409",
+      "page": "ChatComponents",
+      "purpose": "清理完成卡(✓图标+标题+caption);同cleanup_card皮(surfaceContainer+outlineVariant),w353",
+      "darkPng": "components/chat_cleanup_done_card-dark.png",
+      "lightPng": "components/chat_cleanup_done_card-light.png",
+      "tokenBound": true,
+      "variants": [],
+      "rules": "cleanup_done 帧(267:518)用实例width fill"
     }
   ]
 }
