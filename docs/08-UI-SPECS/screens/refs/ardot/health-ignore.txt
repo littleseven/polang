@@ -84,3 +84,16 @@ cleaned/body/recycle_card/header
 # Organize dedup 进度行 + 组元信息行
 dedup/scanning/body/progress_card/phase_row
 dedup/group_detail/body/group_meta
+# HtmlCard 页(原 HtmlCardSpec,2026-09-26 用户在客户端改名 HtmlCard)HTML 卡双形态+任务卡 HTML 化 spec 帧内同构重复(统计格行/条形行/手风琴条目+head/便签卡/UserRow 五帧/任务卡 header+badge 行,组件化候选待双端实现期收编)
+HtmlCard/htmlcard/inline/MessageList/HtmlCardInline/StatRow
+HtmlCard/htmlcard/inline/MessageList/HtmlCardInline/BarRow
+HtmlCard/htmlcard/fullpage/ViewerScroll/Report/AccDay
+HtmlCard/htmlcard/notes/NotesList/Note
+HtmlCard/taskcard/notes/NotesList/Note
+TaskCardHtml/HeaderRow
+TaskCardHtml/BadgeRow
+HtmlCard/htmlcard/inline/MessageList/UserRow
+HtmlCard/htmlcard/preview/MessageList/UserRow
+HtmlCard/taskcard/collapsed/MessageList/UserRow
+HtmlCard/taskcard/expanded/MessageList/UserRow
+HtmlCard/taskcard/approval/MessageList/UserRow

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML 卡双形态设计稿 · PoLang Chat</title>
+<style>
+  :root {
+    --bg: #eef0f4;
+    --phone-w: 375px;
+    --phone-h: 780px;
+    --chat-bg: #f5f6f8;
+    --card-bg: #ffffff;
+    --accent: #3b6ef0;
+    --text-1: #1c1c1e;
+    --text-2: #6b6f76;
+    --text-3: #9aa0a8;
+    --user-bubble: #d7e4ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
+  body { background: var(--bg); padding: 40px 24px; }
+
+  .page-title { text-align: center; margin-bottom: 8px; font-size: 24px; font-weight: 700; color: var(--text-1); }
+  .page-sub { text-align: center; margin-bottom: 36px; font-size: 14px; color: var(--text-2); }
+
+  .stage { display: flex; gap: 48px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+  .scene { display: flex; flex-direction: column; align-items: center; }
+  .scene-label { font-size: 15px; font-weight: 700; color: var(--text-1); margin-bottom: 4px; }
+  .scene-desc { font-size: 12px; color: var(--text-2); margin-bottom: 14px; text-align: center; max-width: 340px; line-height: 1.6; }
+
+  .phone {
+    width: var(--phone-w); height: var(--phone-h);
+    background: var(--chat-bg);
+    border-radius: 28px; border: 8px solid #22252a;
+    overflow: hidden; position: relative;
+    box-shadow: 0 18px 48px rgba(0,0,0,.18);
+    display: flex; flex-direction: column;
+  }
+  .statusbar { height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 11px; color: var(--text-2); background: var(--chat-bg); flex: none; }
+  .chat-topbar { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--text-1); background: var(--chat-bg); border-bottom: .5px solid #e2e4e8; flex: none; }
+
+  .chat-scroll { flex: 1; padding: 14px 12px 10px; overflow: hidden; position: relative; }
+
+  .msg { margin-bottom: 12px; display: flex; }
+  .msg.user { justify-content: flex-end; }
+  .bubble { max-width: 78%; padding: 9px 13px; border-radius: 16px; font-size: 13.5px; line-height: 1.55; }
+  .msg.agent .bubble { background: var(--card-bg); color: var(--text-1); border-top-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .msg.user .bubble { background: var(--user-bubble); color: var(--text-1); border-top-right-radius: 4px; }
+
+  /* ---- HTML 卡片通用 ---- */
+  .html-card {
+    width: 100%; background: var(--card-bg); border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow: hidden; position: relative;
+  }
+  .card-badge {
+    position: absolute; top: 8px; right: 8px; z-index: 5;
+    font-size: 10px; padding: 2px 8px; border-radius: 8px;
+    background: rgba(28,28,30,.72); color: #fff; letter-spacing: .5px;
+  }
+
+  /* ---- 短卡：内嵌仪表盘（完全撑开） ---- */
+  .dash { padding: 12px; }
+  .dash-title { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 10px; }
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: #f4f6fa; border-radius: 10px; padding: 10px 12px; }
+  .stat .num { font-size: 20px; font-weight: 700; color: var(--accent); }
+  .stat .lbl { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .bar-row .bl { font-size: 11px; color: var(--text-2); width: 42px; flex: none; }
+  .bar-track { flex: 1; height: 8px; background: #eef1f6; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #6a9bff, var(--accent)); }
+  .dash-tabs { display: flex; gap: 6px; margin: 12px 0 4px; }
+  .dash-tab { font-size: 11px; padding: 4px 12px; border-radius: 12px; background: #eef1f6; color: var(--text-2); }
+  .dash-tab.on { background: var(--accent); color: #fff; }
+
+  /* ---- 长卡：预览裁剪 ---- */
+  .preview-clip { height: 340px; overflow: hidden; position: relative; }
+  .report { padding: 14px; }
+  .report h2 { font-size: 15px; color: var(--text-1); margin-bottom: 6px; }
+  .report .meta { font-size: 11px; color: var(--text-3); margin-bottom: 10px; }
+  .report .hero { height: 110px; border-radius: 10px; background: linear-gradient(120deg, #f6c98a, #e98a8a 55%, #7a9cf5); margin-bottom: 10px; display: flex; align-items: flex-end; padding: 8px 10px; color: #fff; font-size: 11px; }
+  .report p { font-size: 12.5px; line-height: 1.7; color: #3c3f45; margin-bottom: 8px; }
+  .report .ph2 { font-size: 13px; font-weight: 700; color: var(--text-1); margin: 10px 0 4px; }
+  .fade-mask {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 120px; z-index: 3;
+    background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.96) 62%);
+    pointer-events: none;
+  }
+  .expand-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 0 9px; font-size: 12.5px; font-weight: 600; color: var(--accent);
+    background: transparent;
+  }
+  .expand-bar .chev { display: inline-block; border: 1.5px solid var(--accent); border-radius: 50%; width: 18px; height: 18px; line-height: 16px; text-align: center; font-size: 11px; }
+
+  /* ---- 全屏查看器 ---- */
+  .viewer { position: absolute; inset: 0; background: #fff; z-index: 10; display: flex; flex-direction: column; }
+  .viewer-topbar { height: 46px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-bottom: .5px solid #e6e8ec; }
+  .viewer-close { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--text-1); background: #f2f3f5; flex: none; }
+  .viewer-title { font-size: 13.5px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .viewer-scroll { flex: 1; overflow: hidden; position: relative; padding: 0; }
+  .viewer-scroll .report { padding: 16px 16px 30px; }
+  .scrollbar { position: absolute; right: 3px; top: 60px; width: 3px; height: 210px; border-radius: 2px; background: #c9cdd4; }
+  .acc-item { border: 1px solid #e8eaef; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .acc-head { padding: 10px 12px; font-size: 12.5px; font-weight: 600; color: var(--text-1); background: #f7f8fa; display: flex; justify-content: space-between; }
+  .acc-body { padding: 10px 12px; font-size: 12px; color: #3c3f45; line-height: 1.65; }
+
+  /* ---- 批注 ---- */
+  .notes { max-width: 300px; font-size: 12.5px; color: var(--text-1); line-height: 1.7; }
+  .notes h3 { font-size: 14px; margin-bottom: 10px; color: var(--text-1); }
+  .note { background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+  .note b { color: var(--accent); }
+  .note .tag { display: inline-block; font-size: 10px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 6px; padding: 1px 7px; margin-right: 6px; }
+  .note .tag.warn { background: #e08a2e; }
+
+  .input-bar { flex: none; height: 52px; background: #fff; border-top: .5px solid #e2e4e8; display: flex; align-items: center; padding: 0 12px; gap: 10px; }
+  .input-fake { flex: 1; height: 34px; border-radius: 17px; background: #f2f3f5; color: var(--text-3); font-size: 13px; display: flex; align-items: center; padding: 0 14px; }
+  .send-fake { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+
+  @media (max-width: 900px) { .stage { gap: 32px; } }
+</style>
+</head>
+<body>
+
+<div class="page-title">HTML 卡双形态 · 设计稿</div>
+<div class="page-sub">短卡 inline 直接交互 ｜ 长卡固定高预览 + 点击全屏 ｜ 2026-09-26</div>
+
+<div class="stage">
+
+  <!-- ========== 场景 1：短卡 ========== -->
+  <div class="scene">
+    <div class="scene-label">① 短卡 · Inline（现状保留）</div>
+    <div class="scene-desc">单屏内可看完：完全撑开、卡内直接交互<br>Tab / 按钮点击即时生效，卡片自身永不竖滚</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="chat-topbar">PoLang AI</div>
+      <div class="chat-scroll">
+        <div class="msg user"><div class="bubble">看看我这个月的相册统计</div></div>
+        <div class="msg agent"><div class="bubble">9 月你共新增 312 张照片，人像占比最高，这是统计卡片：</div></div>
+
+        <div class="html-card">
+          <div class="card-badge">INLINE</div>
+          <div class="dash">
+            <div class="dash-title">📊 9 月相册统计</div>
+            <div class="dash-grid">
+              <div class="stat"><div class="num">312</div><div class="lbl">新增照片</div></div>
+              <div class="stat"><div class="num">47</div><div class="lbl">人像照片</div></div>
+              <div class="stat"><div class="num">18</div><div class="lbl">拍摄地点</div></div>
+              <div class="stat"><div class="num">6.2G</div><div class="lbl">占用空间</div></div>
+            </div>
+            <div class="dash-tabs">
+              <span class="dash-tab on">按类别</span><span class="dash-tab">按时间</span><span class="dash-tab">按地点</span>
+            </div>
+            <div class="bar-row"><span class="bl">人像</span><div class="bar-track"><div class="bar-fill" style="width:72%"></div></div></div>
+            <div class="bar-row"><span class="bl">风景</span><div class="bar-track"><div class="bar-fill" style="width:45%"></div></div></div>
+            <div class="bar-row"><span class="bl">美食</span><div class="bar-track"><div class="bar-fill" style="width:30%"></div></div></div>
+          </div>
+        </div>
+
+        <div class="msg agent" style="margin-top:12px"><div class="bubble">可以点卡片上的 Tab 切换维度，还想看什么维度？</div></div>
+      </div>
+      <div class="input-bar"><div class="input-fake">问点什么…</div><div class="send-fake">↑</div></div>
+    </div>
+  </div>
+
+  <!-- ========== 场景 2：长卡预览 ========== -->
+  <div class="scene">
+    <div class="scene-label">② 长卡 · 固定高预览（新）</div>
+    <div class="scene-desc">超一屏内容：固定 ≈0.5 屏实时裁剪预览<br>底部渐隐 + 提示条；预览禁交互，点击进全屏</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="chat-topbar">PoLang AI</div>
+      <div class="chat-scroll">
+        <div class="msg user"><div class="bubble">把上周云南旅行的照片整理成一份图文回顾</div></div>
+        <div class="msg agent"><div class="bubble">已从 86 张照片中整理出这份旅行回顾，篇幅较长，生成了完整图文页：</div></div>
+
+        <div class="html-card">
+          <div class="card-badge">FULLPAGE · 预览</div>
+          <div class="preview-clip">
+            <div class="report">
+              <h2>云南七日 · 旅行图文回顾</h2>
+              <div class="meta">9/14 – 9/20 ｜ 86 张照片 ｜ 大理 · 丽江 · 香格里拉</div>
+              <div class="hero">🏔 洱海日出 · 9/15 06:47</div>
+              <p>第一天抵达大理，恰逢雨后初晴。清晨在洱海边拍下了整趟旅程最喜欢的一张照片——云层间隙洒下的光柱正好落在渔船上方……</p>
+              <div class="ph2">Day 2 · 古城漫行</div>
+              <p>大理古城的石板路在午后阳光里泛着暖色，你在这里拍了 23 张照片，其中 8 张人像、5 张美食……</p>
+              <div class="ph2">Day 3 · 环海骑行</div>
+              <p>（以下内容被裁剪）</p>
+            </div>
+            <div class="fade-mask"></div>
+            <div class="expand-bar"><span class="chev">⤢</span>点击查看完整内容</div>
+          </div>
+        </div>
+
+        <div class="msg agent" style="margin-top:12px"><div class="bubble">要点开看看吗？也可以让我调整内容或换个风格。</div></div>
+      </div>
+      <div class="input-bar"><div class="input-fake">问点什么…</div><div class="send-fake">↑</div></div>
+    </div>
+  </div>
+
+  <!-- ========== 场景 3：全屏查看器 ========== -->
+  <div class="scene">
+    <div class="scene-label">③ 全屏查看器（新）</div>
+    <div class="scene-desc">点击预览卡进入：同沙箱、允许竖滚<br>全量 JS 交互（手风琴/Tab/地图）都在这里生效</div>
+    <div class="phone">
+      <div class="viewer" style="position:absolute">
+        <div class="statusbar" style="background:#fff"><span>9:41</span><span>📶 🔋</span></div>
+        <div class="viewer-topbar">
+          <div class="viewer-close">✕</div>
+          <div class="viewer-title">云南七日 · 旅行图文回顾</div>
+        </div>
+        <div class="viewer-scroll">
+          <div class="report">
+            <h2>云南七日 · 旅行图文回顾</h2>
+            <div class="meta">9/14 – 9/20 ｜ 86 张照片 ｜ 大理 · 丽江 · 香格里拉</div>
+            <div class="hero">🏔 洱海日出 · 9/15 06:47</div>
+            <p>第一天抵达大理，恰逢雨后初晴。清晨在洱海边拍下了整趟旅程最喜欢的一张照片……</p>
+            <div class="acc-item">
+              <div class="acc-head"><span>Day 2 · 古城漫行（23 张）</span><span>▾</span></div>
+              <div class="acc-body">大理古城的石板路在午后阳光里泛着暖色，你在这里拍了 23 张照片，其中 8 张人像、5 张美食。最佳一张拍摄于 17:23 的洋人街转角……</div>
+            </div>
+            <div class="acc-item">
+              <div class="acc-head"><span>Day 3 · 环海骑行（31 张）</span><span>▸</span></div>
+            </div>
+            <div class="acc-item">
+              <div class="acc-head"><span>Day 4-5 · 丽江（19 张）</span><span>▸</span></div>
+            </div>
+            <div class="acc-item">
+              <div class="acc-head"><span>Day 6-7 · 香格里拉（13 张）</span><span>▸</span></div>
+            </div>
+            <p style="color:#9aa0a8;font-size:11px;margin-top:14px">— 内容可继续下滑，手风琴可展开收起 —</p>
+          </div>
+          <div class="scrollbar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 批注列 ========== -->
+  <div class="notes">
+    <h3>交互与工程批注</h3>
+    <div class="note"><span class="tag">分流</span><b>混合判定</b>：render_html 新增 <code>display: inline|fullpage</code>；端侧测高 &gt; 1.0 屏强制降级预览卡，LLM 误判有兜底。</div>
+    <div class="note"><span class="tag">预览</span>固定高 ≈ 0.5 屏；WebView 真实渲染（所见即所得），透明触控层吃掉全部触摸 → <b>点击任意处进全屏</b>，竖拖落回聊天列表，零手势冲突。</div>
+    <div class="note"><span class="tag">渐隐</span>底部 120px 渐隐遮罩 + 「点击查看完整内容」提示条（accent 色 + ⤢ 图标），明确传达「还有更多」。</div>
+    <div class="note"><span class="tag">全屏</span>顶栏 = ✕ + 标题（取 summary）；同沙箱（零 JS 桥 / 禁 DOM Storage / 远程 script 已剔除）；允许竖滚、显示滚动条；&lt;a&gt; 外链仍走现有落地页浮层。</div>
+    <div class="note"><span class="tag warn">兜底</span>预览卡渲染失败 → 原生封面兜底（summary + 提示条），不白屏；判定结果随消息持久化，会话重开形态稳定。</div>
+    <div class="note"><span class="tag warn">Prompt</span>契约更新：inline 卡建议 ≤ 0.66 屏；长报告/多屏内容必须声明 fullpage；LLM 据此决定内容排版策略。</div>
+    <div class="note"><span class="tag warn">iOS</span>WKWebView 同构，走 ios-follow 排期，记入 parity 台账。</div>
+  </div>
+
+</div>
+
+</body>
+</html>
