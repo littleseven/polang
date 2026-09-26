@@ -55,11 +55,14 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
         /**
          * 端侧渲染一张 HTML 组件卡片：[html] 为自包含 HTML（内联 CSS/JS，禁外链/网络资源），
          * 清洗后作为 HTML_CARD 消息落库（离线 WebView 渲染，断网 + 零 JS 桥接）；
+         * [display] 为 LLM 声明的展示形态（"inline"/"fullpage"，null = inline，
+         * 端侧终判见 HtmlCardDisplay 混合分流）；
          * 返回 summary（回传 LLM 做文字总结）。
          */
         suspend fun onRenderHtml(
             html: String,
             summary: String?,
+            display: String?,
             traceId: String?
         ): String
     }
@@ -101,7 +104,9 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
             "参数: type(bar/line/pie)、title、labels(英文逗号分隔)、values(逗号分隔数值,与 labels 等长)、unit。" +
             "这是展示图表的唯一方式，禁止用文字/表格画图。"
         "render_html" -> "渲染自包含 HTML 组件卡片（离线 WebView，内联 CSS/JS）。" +
-            "参数: html(自包含 HTML，禁外链/网络请求/跳转)、summary(一句话总结)。" +
+            "参数: html(自包含 HTML，禁外链/网络请求/跳转)、summary(一句话总结)、" +
+            "display(展示形态：inline 默认，聊天内完全撑开直接交互；fullpage 长报告/多屏内容，" +
+            "聊天内显示固定高预览、点击进全屏查看器)。" +
             "仅当用户明确要求更丰富展示或交互组件时使用；统计图仍走 draw_chart。"
         else -> "未知命令"
     }
@@ -150,6 +155,7 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
                     val result = delegate.onRenderHtml(
                         html = command.html,
                         summary = command.summary,
+                        display = command.display,
                         traceId = context.traceId
                     )
                     Result.success(

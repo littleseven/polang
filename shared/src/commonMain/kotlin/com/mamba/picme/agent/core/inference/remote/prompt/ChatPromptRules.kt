@@ -79,7 +79,8 @@ object ChatPromptRules {
             id = "html_card_rules",
             body = """
             【HTML 卡片规则·默认不用】仅在用户明确要求更丰富的展示或交互组件（如"做个可交互的图表""用动画演示一下""做个好看的卡片"）时，才调用 render_html 渲染 HTML 组件卡片；普通回答用文字、统计图用 draw_chart，都不要用 render_html 替代。
-            render_html 的 html 参数要求：CSS/JS 一律内联（远程 script、iframe/object/embed/form、meta refresh 会被清洗剔除，fetch/XHR 不可用）；鼓励引用远程富媒体提升表现力——img 网络图片、video/audio 远程媒体、远程 CSS、a 标签外链均可（远程资源端侧可加载，a 外链用户点击后会在全屏落地页打开），URL 务必用确定可访问的真实地址（优先官方/权威站点素材），不要编造域名；排版必须响应式（宽度用百分比或 max-width:100%，不写死超出卡片宽度的固定 px），具体设备/屏幕/卡片尺寸与建议内容高度见下方【HTML 卡片渲染环境】段；总大小不超过 100KB。
+            展示形态（display 参数）：inline（默认）在聊天流内完全撑开、卡内直接交互，建议内容高度 ≤ 2/3 屏；fullpage 在聊天流内只显示固定高上半部预览（约 0.5 屏、底部渐隐），用户点击后进全屏查看器交互——长报告/多屏图文/为全屏设计的交互页必须传 display="fullpage"，并把标题/导航/关键交互设计在内容顶部（用户先看到的是上半部预览）；未声明 fullpage 但内容超过一屏的卡会被端侧强制转为预览形态。具体尺寸基准见下方【HTML 卡片渲染环境】段。
+            render_html 的 html 参数要求：CSS/JS 一律内联（远程 script、iframe/object/embed/form、meta refresh 会被清洗剔除，fetch/XHR 不可用）；鼓励引用远程富媒体提升表现力——img 网络图片、video/audio 远程媒体、远程 CSS、a 标签外链均可（远程资源端侧可加载，a 外链用户点击后会在全屏落地页打开），URL 务必用确定可访问的真实地址（优先官方/权威站点素材），不要编造域名；排版必须响应式（宽度用百分比或 max-width:100%，不写死超出卡片宽度的固定 px）；总大小不超过 100KB。
             审美要求（对齐 Claude/Codex 级输出的简洁专业风）：白/浅灰底 + 中性深灰文字（#111827~#374151）+ 全程只用一种强调色（如 #2563EB 蓝或 #16A34A 绿），禁花哨渐变与多色堆砌；字体用系统栈（-apple-system,"PingFang SC",Roboto,sans-serif），标题 600 字重、正文 14~16px、行高 1.6 以上；信息层级靠字号/字重/留白区分而非分割线，容器圆角 8~12px 配 1px 细边框（#E5E7EB）或极浅阴影；图表细线、少网格、淡填充；不用 emoji 当图标（需要图标用内联 SVG），不用超大标题。
             需要数据时先用 run_gallery_script 取数，再把数据内联进 html；调用后你会收到 summary 回传，据此一句话总结即可。
             """.trimIndent()

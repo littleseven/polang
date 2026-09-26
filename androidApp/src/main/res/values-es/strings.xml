@@ -1503,6 +1503,10 @@
     <string name="chat_result_executed">✅ Se ejecutó %1$s</string>
     <string name="chat_chart_generated">Gráfico generado</string>
     <string name="chat_html_card_generated">Tarjeta generada</string>
+    <string name="html_card_view_full">Toca para ver el contenido completo</string>
+    <string name="html_card_preview_failed">No se pudo renderizar la vista previa</string>
+    <string name="html_fullpage_title_default">Detalle de la tarjeta</string>
+    <string name="html_fullpage_load_failed">No se pudo cargar el contenido</string>
     <string name="chat_write_no_valid_ids">No hay IDs de medios válidos</string>
     <string name="chat_delete_started_pending">Eliminación de %1$d elemento(s) iniciada, esperando autorización del sistema</string>
     <string name="chat_deleted_n">Se eliminaron %1$d elemento(s)</string>

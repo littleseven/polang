@@ -33,6 +33,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -61,6 +62,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -169,6 +171,7 @@ import androidx.compose.ui.text.input.ImeAction
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.shadow
@@ -272,6 +275,19 @@ fun ChatScreen(
     // delta 拉走——条数增长（新回合/新消息）或用户主动拖拽才解除）
     var pendingTaskAnchor by remember { mutableStateOf<ChatTaskAnchor?>(null) }
     var anchorHold by remember { mutableStateOf<Pair<Long, Int>?>(null) }
+    // HTML 卡双形态的分流阈值/预览高度基准：消息列表视口实测高（0 = 尚未布局，卡片侧退回整屏高估算）
+    var listViewportHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    // 列表在 imePadding 容器内：键盘弹出 → 视口收缩。分流阈值必须用「对 IME 不变」的视口高
+    // （加回 IME inset），否则键盘弹出期间测高会把 inline 卡误判 FULLPAGE 并永久持久化；
+    // 预览卡显示高度用即时视口即可（随键盘收缩合理）
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val listViewportHeightDp = with(density) {
+        if (listViewportHeightPx > 0) listViewportHeightPx.toDp().value.roundToInt() else 0
+    }
+    val listViewportStableHeightDp = with(density) {
+        if (listViewportHeightPx > 0) (listViewportHeightPx + imeBottomPx).toDp().value.roundToInt() else 0
+    }
 
     var isSidebarOpen by remember { mutableStateOf(false) }
     // 图片预览状态（横滑翻页集合）
@@ -279,6 +295,8 @@ fun ChatScreen(
     var previewChartSvg by remember { mutableStateOf<String?>(null) }
     // HTML 卡片外链落地页预览状态（点击卡片内 <a> 链接打开）
     var previewLinkUrl by remember { mutableStateOf<String?>(null) }
+    // HTML 卡全屏查看器状态（点击 fullpage 预览卡/兜底封面打开；与 HtmlLinkPreviewOverlay 同级）
+    var fullpageHtmlCard by remember { mutableStateOf<HtmlFullpageContent?>(null) }
     // 表格全屏预览状态（点击气泡内表格打开）
     var expandedTable by remember { mutableStateOf<MarkdownTable?>(null) }
     // 相册搜索结果预览状态
@@ -287,9 +305,9 @@ fun ChatScreen(
     // 已点删除但等待媒体库刷新确认的图片 ID
     var pendingDeletedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
-    // 任一全屏预览打开（照片轮播/图片/图表/表格/HTML 外链落地页）：禁外层横滑 + 隐藏顶栏 + 拦截返回键
+    // 任一全屏预览打开（照片轮播/图片/图表/表格/HTML 外链落地页/HTML 卡全屏查看器）：禁外层横滑 + 隐藏顶栏 + 拦截返回键
     val anyPreviewOpen = previewAssets.isNotEmpty() || imagePreview != null ||
-        previewChartSvg != null || expandedTable != null || previewLinkUrl != null
+        previewChartSvg != null || expandedTable != null || previewLinkUrl != null || fullpageHtmlCard != null
 
     // 上报外层 Pager 横滑使能：任一全屏预览打开时禁用，避免与内层预览滑动冲突
     LaunchedEffect(anyPreviewOpen) {
@@ -468,7 +486,9 @@ fun ChatScreen(
             imagePreview != null -> imagePreview = null
             previewChartSvg != null -> previewChartSvg = null
             expandedTable != null -> expandedTable = null
+            // 落地页叠在全屏查看器之上，返回键先关落地页再关查看器
             previewLinkUrl != null -> previewLinkUrl = null
+            fullpageHtmlCard != null -> fullpageHtmlCard = null
         }
     }
 
@@ -583,6 +603,7 @@ fun ChatScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
+                            .onGloballyPositioned { coords -> listViewportHeightPx = coords.size.height }
                             .padding(horizontal = 20.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -607,12 +628,26 @@ fun ChatScreen(
                                 ChartSvgCard(svg = chartSvg, onClick = { previewChartSvg = chartSvg })
                             } else if (message.type == ChatMessageType.HTML_CARD && message.htmlContent != null) {
                                 val html = message.htmlContent!!
-                                // 卡片内元素直接交互；仅 <a> 外链点击打开全屏落地页；
+                                // 双形态（spec §3/§4）：inline 卡完全撑开直接交互；fullpage 预览卡固定高，
+                                // 点击进全屏查看器；端侧测高超 1.0 屏强制转预览；终判持久化到消息 metadata；
                                 // isListScrolling 用于滑动途中冻结卡片高度更新（防列表抖动）
                                 HtmlCard(
                                     html = html,
+                                    meta = message.htmlCardMeta,
+                                    cacheKey = message.id,
+                                    viewportHeightDp = listViewportStableHeightDp,
+                                    previewViewportHeightDp = listViewportHeightDp,
                                     isListScrolling = listState.isScrollInProgress,
-                                    onOpenLink = { url -> previewLinkUrl = url }
+                                    onOpenLink = { url -> previewLinkUrl = url },
+                                    onOpenFullpage = {
+                                        fullpageHtmlCard = HtmlFullpageContent(
+                                            html = html,
+                                            title = message.htmlCardMeta?.summary
+                                        )
+                                    },
+                                    onDisplayModeResolved = { mode, measuredPx ->
+                                        viewModel.persistHtmlCardDisplayMode(message.id, mode, measuredPx)
+                                    }
                                 )
                             } else if (message.type == ChatMessageType.TASK_CARD && message.engineerTask != null) {
                                 val task = message.engineerTask
@@ -768,6 +803,13 @@ fun ChatScreen(
             ChartPreviewOverlay(
                 svg = previewChartSvg,
                 onDismiss = { previewChartSvg = null }
+            )
+
+            // HTML 卡全屏查看器（fullpage 预览卡点击进入；z 序在落地页之下——查看器内 <a> 点击叠落地页）
+            HtmlFullpageViewer(
+                content = fullpageHtmlCard,
+                onOpenLink = { url -> previewLinkUrl = url },
+                onDismiss = { fullpageHtmlCard = null }
             )
 
             // HTML 卡片外链落地页（全屏内置浏览器）

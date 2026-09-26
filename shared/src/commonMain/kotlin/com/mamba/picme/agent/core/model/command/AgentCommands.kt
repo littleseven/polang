@@ -455,11 +455,16 @@ sealed class AgentCommand {
      * 渲染结果作为 HTML_CARD 消息显示；summary 回传 LLM 做文字总结。
      * 与 [DrawChart] 分工：统计图走 DrawChart，仅当用户明确要求更丰富展示/
      * 交互组件时才用本命令。端侧渲染层全量断网 + 零 JS 桥接（不可信内容）。
+     *
+     * [display] 为 LLM 声明的展示形态（"inline"/"fullpage"，null = inline）：
+     * fullpage 卡在聊天流内外显为固定高预览，点击进全屏查看器；
+     * 端侧另有测高兜底（超 1.0 屏强制预览形态），终判见 `HtmlCardDisplay`（androidApp）。
      */
     data class RenderHtml(
         override val commandId: Int = AgentIdGenerator.nextId(),
         val html: String,
-        val summary: String? = null
+        val summary: String? = null,
+        val display: String? = null
     ) : AgentCommand()
 
     // ==================== 记忆命令（人物关系 + 事实记忆） ====================

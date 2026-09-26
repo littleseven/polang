@@ -15,6 +15,13 @@
 >    放行直拉，卡片内点击外链打开全屏落地页；**底线不变**——远程 script/iframe/object/embed/
 >    form/meta refresh 仍由清洗器剔除，零 JS 桥接不变。后续若收紧，收紧点在
 >    `HtmlCardSanitizer` 与 `shouldInterceptRequest`，架构上可随时回退到 D5 严格模式。
+> 3. **呈现形态二次演进（2026-09-26，双形态 H1）**：注记 1 的「卡片内直接交互 + 完全撑开」
+>    收窄为 **Inline 形态**（短卡保留现状）；新增 **Fullpage 双态**——长卡（LLM 声明
+>    `display="fullpage"` 或端侧测高 > 1.0 × 可用屏高）在聊天流内外显为固定高（≈0.5 屏）
+>    实时裁剪预览（底部渐隐 + 提示条、预览态禁交互），点击进**全屏查看器**
+>    （`HtmlFullpageViewer`，同沙箱、允许竖滚、全量 JS 交互）；分流终判随消息 metadata
+>    持久化，形态不跳变。spec《2026-09-26-html-card-two-tier-design.md》，
+>    实现细节见 JS_ENGINE_TECH_SPEC.md §7.1「UI 形态（双形态）」。
 
 ---
 

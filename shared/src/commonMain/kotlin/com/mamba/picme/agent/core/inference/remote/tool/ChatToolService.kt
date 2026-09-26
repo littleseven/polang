@@ -284,18 +284,27 @@ class ChatToolService private constructor() : TraceIdAware {
             "鼓励引用远程富媒体提升表现力：<img> 网络图片、<video>/<audio> 远程媒体、远程 CSS 样式、" +
             "<a> 外链均可使用（a 外链用户点击后在全屏落地页打开）；" +
             "URL 务必用确定可访问的真实地址（优先官方/权威站点素材），不要编造域名。" +
-            "宽度自适应容器（width:100%，不写死超过卡片宽度的固定 px）；" +
-            "卡片会完整撑开展示全部内容（自身不滚动、随聊天列表滚动），" +
-            "单卡内容高度建议不超过【HTML 卡片渲染环境】段的建议值；总大小不超过 100KB。" +
+            "宽度自适应容器（width:100%，不写死超过卡片宽度的固定 px）；总大小不超过 100KB。" +
+            "卡片有两种展示形态（display 参数）：inline（默认）在聊天流内完全撑开、卡内直接交互，" +
+            "内容高度建议不超过【HTML 卡片渲染环境】段的建议值；" +
+            "fullpage 在聊天流内只显示固定高上半部预览（底部渐隐），用户点击后进全屏查看器交互——" +
+            "长报告/多屏图文/为全屏设计的交互页必须传 display=\"fullpage\"，" +
+            "并把标题/导航/关键交互设计在内容顶部（用户先看到的是上半部预览）；" +
+            "未声明 fullpage 但内容超过一屏的卡会被端侧强制转为预览形态。" +
             "风格要求：简洁专业（白/浅灰底 + 中性深灰文字 + 单一强调色，系统字体栈，留白充足，" +
             "圆角 8~12px 配细边框/浅阴影，图表细线少网格，不用 emoji 当图标、不用花哨渐变）。" +
-            "summary 填你对卡片内容的一句话文字总结（会回传给你组织回复）。"
+            "summary 填你对卡片内容的一句话文字总结（会回传给你组织回复，并用作全屏查看器标题）。"
     )
     suspend fun renderHtml(
         @LLMDescription("HTML 源码：CSS/JS 内联；可用远程 <img>/<video>/<audio>/CSS 与 <a> 外链；禁远程 script/iframe/fetch/XHR") html: String,
-        @LLMDescription("对卡片内容的一句话文字总结") summary: String
+        @LLMDescription("对卡片内容的一句话文字总结") summary: String,
+        @LLMDescription("展示形态：inline（默认，聊天内完全撑开直接交互，内容高度建议 ≤2/3 屏）或 fullpage（长报告/多屏图文/为全屏设计的交互页，聊天内显示固定高预览、点击进全屏）；空串 = inline") display: String
     ): String = dispatchCommand(
-        AgentCommand.RenderHtml(html = html, summary = summary.ifBlank { null })
+        AgentCommand.RenderHtml(
+            html = html,
+            summary = summary.ifBlank { null },
+            display = display.trim().lowercase().ifBlank { null }
+        )
     )
 
     // ── 记忆（人物关系 + 事实） ─────────────────────────────────────

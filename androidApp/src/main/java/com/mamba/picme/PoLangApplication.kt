@@ -51,6 +51,7 @@ import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.CARD_HORIZONTAL_CHROME_DP
 import com.mamba.picme.features.chat.CARD_MAX_HEIGHT_FRACTION
+import com.mamba.picme.features.chat.HtmlCardDisplay
 import com.mamba.picme.features.settings.capability.SettingsCapability
 import com.mamba.picme.features.gallery.capability.GalleryCapability
 // 其他页面级 Capability 由各 Screen 自行创建
@@ -789,7 +790,9 @@ class PoLangApplication : Application(), ImageLoaderFactory {
             screenWidthPx = dm.widthPixels,
             screenHeightPx = dm.heightPixels,
             cardContentWidthCssPx = widthDp - CARD_HORIZONTAL_CHROME_DP,
-            cardSuggestedHeightCssPx = (heightDp * CARD_MAX_HEIGHT_FRACTION).roundToInt()
+            cardSuggestedHeightCssPx = (heightDp * CARD_MAX_HEIGHT_FRACTION).roundToInt(),
+            previewCardHeightCssPx = (heightDp * HtmlCardDisplay.PREVIEW_HEIGHT_FRACTION).roundToInt(),
+            fullpageThresholdCssPx = (heightDp * HtmlCardDisplay.FULLPAGE_THRESHOLD_FRACTION).roundToInt()
         )
     }
 

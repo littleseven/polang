@@ -9,6 +9,8 @@ import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
+import com.mamba.picme.domain.chat.HtmlCardDisplayMode
+import com.mamba.picme.domain.chat.HtmlCardMeta
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -171,6 +173,38 @@ fun parseEngineerTaskState(metadata: String?): EngineerTaskState? {
             resolution = root.optString("resolution").ifBlank { null }
                 ?.let { name -> runCatching { EngineerTaskResolution.valueOf(name) }.getOrNull() },
             deliverBranch = root.optString("deliverBranch").ifBlank { null },
+        )
+    }.getOrNull()
+}
+
+// ---- HTML 卡双形态（HTML_CARD）Room metadata serde ----
+
+/** 序列化为 metadata `html_card` 子对象（缺省字段不写，保持 JSON 紧凑）。 */
+fun HtmlCardMeta.toJson(): JSONObject = JSONObject().apply {
+    val declaredDisplay = display
+    val decidedMode = displayMode
+    val measured = measuredHeightPx
+    val caption = summary
+    if (declaredDisplay != null) put("display", declaredDisplay)
+    if (decidedMode != null) put("displayMode", decidedMode.name)
+    if (measured != null) put("measuredHeightPx", measured)
+    if (caption != null) put("summary", caption)
+}
+
+/**
+ * 从 metadata.html_card 还原双形态元数据。整体结构损坏返回 null（按无元数据处理 = 未声明 inline 待测高）；
+ * 未知 displayMode 枚举值静默回退 null（待重新判定），避免旧版本读到未来值时形态错乱。
+ */
+fun parseHtmlCardMeta(metadata: String?): HtmlCardMeta? {
+    if (metadata.isNullOrBlank()) return null
+    return runCatching {
+        val root = JSONObject(metadata).optJSONObject("html_card") ?: return null
+        HtmlCardMeta(
+            display = root.optString("display").ifBlank { null },
+            displayMode = root.optString("displayMode").ifBlank { null }
+                ?.let { name -> runCatching { HtmlCardDisplayMode.valueOf(name) }.getOrNull() },
+            measuredHeightPx = if (root.has("measuredHeightPx")) root.getInt("measuredHeightPx") else null,
+            summary = root.optString("summary").ifBlank { null },
         )
     }.getOrNull()
 }

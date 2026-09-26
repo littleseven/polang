@@ -1552,6 +1552,10 @@
     <string name="chat_result_executed">✅ Executed %1$s</string>
     <string name="chat_chart_generated">Chart generated</string>
     <string name="chat_html_card_generated">Card rendered</string>
+    <string name="html_card_view_full">Tap to view full content</string>
+    <string name="html_card_preview_failed">Preview failed to render</string>
+    <string name="html_fullpage_title_default">Card detail</string>
+    <string name="html_fullpage_load_failed">Content failed to load</string>
     <string name="chat_write_no_valid_ids">No valid media IDs</string>
     <string name="chat_delete_started_pending">Deletion of %1$d item(s) initiated, awaiting system authorization</string>
     <string name="chat_deleted_n">Deleted %1$d item(s)</string>
