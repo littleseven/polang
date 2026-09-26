@@ -3,6 +3,7 @@ package com.mamba.picme.domain.usertask
 import com.mamba.picme.data.download.DownloadStatus
 import com.mamba.picme.domain.tag.scan.ScanSessionState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -42,9 +43,12 @@ class UserTaskMappingTest {
 
     @Test
     fun `活动态判据与 destination 推导`() {
+        assertTrue(UserTaskMapping.isActive(UserTaskStatus.PENDING))
         assertTrue(UserTaskMapping.isActive(UserTaskStatus.RUNNING))
         assertTrue(UserTaskMapping.isActive(UserTaskStatus.PAUSED))
-        assertTrue(!UserTaskMapping.isActive(UserTaskStatus.COMPLETED))
+        assertFalse(UserTaskMapping.isActive(UserTaskStatus.COMPLETED))
+        assertFalse(UserTaskMapping.isActive(UserTaskStatus.FAILED))
+        assertFalse(UserTaskMapping.isActive(UserTaskStatus.CANCELLED))
         assertEquals(UserTaskDestination.TAG_SCAN_CONTROL, UserTaskMapping.destinationFor(UserTaskKind.TAG_SCAN))
         assertEquals(UserTaskDestination.MODEL_CENTER, UserTaskMapping.destinationFor(UserTaskKind.MODEL_DOWNLOAD))
     }
