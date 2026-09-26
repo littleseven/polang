@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-09-25T23:20:42+08:00",
+  "exportedAt": "2026-09-26T08:51:13+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=392%3A22"
+    "url": "cocraft://localhost/file/715061534788814?node_id=392%3A24"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -624,5 +624,5 @@
     }
   ],
   "scale": 1,
-  "structureSha256": "c84eed369affa29ff925f3c8d056b1f376bd7e18961321709f6f363236d7101e"
+  "structureSha256": "93b85dd4ad03f088282daf2baaab919e9b518eaa0551fc828cfaa86e8ba337f5"
 }

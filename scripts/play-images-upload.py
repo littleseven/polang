@@ -27,7 +27,7 @@ TYPES = [("PHONE_SCREENSHOTS", "phone-screenshots", "phoneScreenshots"),
          ("FEATURE_GRAPHIC", "feature-graphic", "featureGraphic")]
 BASE = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications"
 UPLOAD_BASE = "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications"
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LISTINGS = os.path.join(ROOT, "androidApp/src/main/play/listings")
 
 
@@ -132,6 +132,9 @@ def main():
             # 2) 上传本地图
             folder = os.path.join(LISTINGS, lang, "graphics", dir_name)
             files = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+            files = [f for f in files if f.endswith(".png")]
+            if not files:
+                raise RuntimeError(f"目录无 PNG: {folder} (ROOT={ROOT})——路径算错,拒绝空传")
             for name in files:
                 if not name.endswith(".png"):
                     continue
