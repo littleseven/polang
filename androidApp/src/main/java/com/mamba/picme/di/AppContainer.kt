@@ -47,6 +47,7 @@ import com.mamba.picme.domain.tag.i18n.BilingualVocab
 import com.mamba.picme.domain.tag.i18n.ChineseQueryTranslator
 import com.mamba.picme.domain.tag.i18n.OpusMtTranslator
 import com.mamba.picme.domain.tag.i18n.TagTranslator
+import com.mamba.picme.data.download.DownloadState
 import com.mamba.picme.data.download.LlmModelDownloadManager
 import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.domain.backup.BackupTagDataUseCase
@@ -106,6 +107,11 @@ import com.mamba.picme.domain.memories.MemoryHiddenStore
 import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.trash.DedupTrashBackend
 import com.mamba.picme.domain.trash.TrashBackend
+import com.mamba.picme.domain.usertask.ModelDownloadControl
+import com.mamba.picme.domain.usertask.ModelDownloadTaskAdapter
+import com.mamba.picme.domain.usertask.TagScanControl
+import com.mamba.picme.domain.usertask.TagScanTaskAdapter
+import com.mamba.picme.domain.usertask.UserTaskRegistry
 import androidx.lifecycle.ViewModel
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.tag.FaceClusterEngine
@@ -115,9 +121,13 @@ import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.data.indexing.MediaChangeEvent
 import com.mamba.picme.service.tag.TagGenerationService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 data class MediaViewModelDependencies(
     val repository: AndroidMediaRepository,
@@ -275,6 +285,8 @@ interface AppContainer {
     val imageProcessor: ImageProcessor
     val faceDetector: FaceDetector
     val llmModelDownloadManager: LlmModelDownloadManager
+    /** 用户任务注册表（spec §5）：任务中心后台任务 Tab 与顶栏角标的数据源 */
+    val userTaskRegistry: UserTaskRegistry
     val kwsEngine: KeywordSpotterEngine?
     val mediaSearchEngine: MediaSearchEngine
     val mediaIndexingWorker: MediaIndexingWorker
@@ -365,6 +377,12 @@ interface AppContainer {
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
+
+    /**
+     * 启动用户任务适配器（spec §6 组合根接线）。
+     * 非幂等：由 Application.onCreate 单点调用保证一次（重复调用会起双订阅）。
+     */
+    fun startUserTaskAdapters()
 }
 
 class AppContainerImpl(
@@ -663,6 +681,53 @@ class AppContainerImpl(
 
     override val llmModelDownloadManager: LlmModelDownloadManager by lazy {
         LlmModelDownloadManager(context)
+    }
+
+    /** 应用级协程作用域：注册表合并流与适配器订阅的生命周期宿主（进程级单例，不随页面销毁） */
+    private val applicationScope: CoroutineScope by lazy {
+        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    }
+
+    override val userTaskRegistry: UserTaskRegistry by lazy {
+        UserTaskRegistry(dao = database.userTaskDao(), scope = applicationScope)
+    }
+
+    /**
+     * 启动用户任务适配器（spec §6 组合根接线）。
+     * 非幂等：由 Application.onCreate 单点调用保证一次（重复调用会起双订阅）。
+     */
+    override fun startUserTaskAdapters() {
+        userTaskRegistry.registerAdapter(
+            TagScanTaskAdapter(
+                registry = userTaskRegistry,
+                control = TagScanControl { action -> startTagScanUseCase(action) },
+                scope = applicationScope,
+            )
+        )
+        userTaskRegistry.registerAdapter(
+            ModelDownloadTaskAdapter(
+                registry = userTaskRegistry,
+                control = object : ModelDownloadControl {
+                    override val downloadStates: StateFlow<Map<String, DownloadState>>
+                        get() = llmModelDownloadManager.downloadStates
+
+                    override fun pause(modelId: String) = llmModelDownloadManager.pauseDownload(modelId)
+
+                    override fun resume(modelId: String) {
+                        applicationScope.launch { llmModelDownloadManager.resumeDownload(modelId).collect {} }
+                    }
+
+                    override fun cancel(modelId: String) = llmModelDownloadManager.cancelDownload(modelId)
+
+                    // retry 接 downloadModel 而非 resumeDownload（审查钉死项）：downloadModel 内部对
+                    // 已完成且校验通过的文件会跳过，不会整模型重复下载（spec §4.2「重新下载」语义）
+                    override fun retry(modelId: String) {
+                        applicationScope.launch { llmModelDownloadManager.downloadModel(modelId).collect {} }
+                    }
+                },
+                scope = applicationScope,
+            )
+        )
     }
 
     /**
