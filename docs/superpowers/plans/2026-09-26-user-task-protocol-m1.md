@@ -1751,3 +1751,12 @@ git commit -m "docs(usertask): M1 落地同步——AGENTS 双级 + spec 状态"
 - manager enqueue collect 无 catch 窄缝（🔵-6）：manager 内部冷流 collect 异常理论上可穿透，预检已挡主路径，窄缝随 manager 改造一并收口。
 - 预检 ModelScope 大小写宽于 manager 查找（🔵-6）：预检 `ignoreCase=true`、manager 精确匹配，方向安全（预检更宽只少拦不多放）。
 - `defaultTab` 活页翻转 quirk（🔵-5）：后台任务 Tab 停留期间新任务到达不强制跳 Tab，属预期产品设计而非缺陷。
+
+## 真机冒烟记录（2026-09-26，Xiaomi 24129PN74C，debug 包）
+
+- 场景①：扫描中暂停/恢复/取消 ✓ 全通过（暂停冻结进度、恢复续跑、取消入历史「已取消」）。
+- 场景①变体：扫描中杀进程重启 → 历史区「失败 + 已中断——点重试重新开始 + 重试」✓；点重试经 StartTagScanUseCase 重启扫描 ✓。
+- 场景②：下载中杀进程重启 → FAILED + 重试 ✓；重试 HTTP 206 断点续传 ✓；卡片暂停/继续 ✓（日志 `Download paused at N bytes`，续传从暂停字节恢复）；完成入历史「已完成」✓。
+- 场景③：角标合并计数 ✓（工程师 3 + 扫描 1 = 4）；默认 Tab 落位（工程师活跃→工程师 Tab）✓；目的地跳转双路径 ✓（下载卡→模型中心、扫描卡→整理页扫描 Tab）。「均无活跃→工程师 Tab」分支与后台 Tab 空态未覆盖（工程师任务恒有活跃，未人为清用户数据）。
+- 冒烟发现并修复：暂停恢复中的下载被误判 FAILED——OkHttp 取消消息为 "stream was reset: CANCEL"，manager catch 按 `contains("cancelled")` 匹配落空；改为优先按 `pausedDownloads` 暂停意图判定（LlmModelDownloadManager 两处 catch，commit 见下行）。
+- 冒烟观察（未修，登记跟踪）：① 暂停点击到状态落定有瞬态闪烁（pause 后残留的进度发射会短暂把 UI 翻回 RUNNING，流拆除后落定 PAUSED）；② 杀进程后续传的文件曾出现 SHA256 校验失败，manager 自动全量重下自愈——并行分块写入与单流续传的兼容性值得 manager 侧专项核查。
