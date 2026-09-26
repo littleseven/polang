@@ -20,6 +20,7 @@
 #   ./scripts/play-upload-resumable.py --aab <path> --track alpha --status draft
 #   ./scripts/play-upload-resumable.py --images androidApp/src/main/play/listings   # 仅图像
 #   ./scripts/play-upload-resumable.py --listing androidApp/src/main/play/listings  # 文本+详情+图像
+#   ./scripts/play-upload-resumable.py --notes production   # 给已上传版本回填 release notes
 #
 # AAB 模式仅做上传 + 挂轨道 + commit；listing 模式默认只做新增/更新，不删除远端图像
 # （防误删线上素材）。显式传 --prune-types phoneScreenshots,featureGraphic 可在本次
@@ -199,6 +200,56 @@ def assign_track(package: str, edit_id: str, token: str, track: str,
         release["userFraction"] = float(user_fraction)
     payload = {"track": track, "releases": [release]}
     api_request("PUT", url, token, payload=payload)
+
+
+# ---- release notes 回填（--notes 模式） ----
+
+DEFAULT_NOTES_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "androidApp", "src", "main", "play", "release-notes",
+)
+
+
+def upload_release_notes(package: str, notes_dir: str, token: str, track: str,
+                         version_code: int = 0) -> None:
+    """给 track 上现存 release 补挂 release notes（--notes 模式）。
+
+    GPP 4.1.1 的 publishListing 只传 title/short/full/video（ListingDetail 枚举实证），
+    notes 只随 PublishBundle/Promote 走 JVM 通道——直连网络下 GPP 连 OAuth token 都可能
+    超时的场景，用本模式在独立 edit 内给已上传的版本回填 notes。
+    读取 notes_dir/<language>/<track>.txt，语言目录有几个就挂几种（≤500 字符/语言）。
+    """
+    notes = []
+    for lang in sorted(os.listdir(notes_dir)):
+        path = os.path.join(notes_dir, lang, f"{track}.txt")
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            text = f.read().strip()
+        if not text:
+            continue
+        if len(text) > 500:
+            raise RuntimeError(f"{lang} notes 超 500 字符（{len(text)}）")
+        notes.append({"language": lang, "text": text})
+    if not notes:
+        raise RuntimeError(f"{notes_dir} 下未找到任何 <language>/{track}.txt")
+
+    edit_id = create_edit(package, token)
+    url = f"{API_BASE}/applications/{package}/edits/{edit_id}/tracks/{track}"
+    body, _ = api_request("GET", url, token)
+    releases = body.get("releases", [])
+    if not releases:
+        raise RuntimeError(f"track {track} 上没有任何 release")
+    if not version_code:
+        version_code = max(int(vc) for r in releases for vc in r.get("versionCodes", []))
+    target = next((r for r in releases
+                   if str(version_code) in [str(vc) for vc in r.get("versionCodes", [])]), None)
+    if target is None:
+        raise RuntimeError(f"track {track} 上没有 versionCode={version_code} 的 release")
+    target["releaseNotes"] = notes
+    api_request("PUT", url, token, payload={"track": track, "releases": releases})
+    commit_edit(package, edit_id, token)
+    log(f"✅ notes 已回填: v{version_code} @ {track}（{', '.join(n['language'] for n in notes)}）")
 
 
 def commit_edit(package: str, edit_id: str, token: str) -> None:
@@ -406,6 +457,13 @@ def main():
     parser.add_argument("--langs", default="",
                         help="逗号分隔的 language（如 en-US,zh-CN）：只同步指定语言，"
                              "配合 --listing 分语言逐 edit 提交，失败只回滚当前语言")
+    parser.add_argument("--notes", metavar="TRACK", default="",
+                        help="给该轨道现存 release 回填 release notes"
+                             "（读 play/release-notes/<lang>/<track>.txt，GPP listing 通道不含 notes）")
+    parser.add_argument("--notes-dir", default=DEFAULT_NOTES_DIR,
+                        help=f"release notes 根目录（默认仓库内 play/release-notes）")
+    parser.add_argument("--version-code", type=int, default=0,
+                        help="--notes 挂到哪个 versionCode（默认取该轨道最大值）")
     args = parser.parse_args()
     prune_types = frozenset(t.strip() for t in args.prune_types.split(",") if t.strip())
     langs = frozenset(t.strip() for t in args.langs.split(",") if t.strip())
@@ -419,6 +477,16 @@ def main():
     if not sa_path or not os.path.isfile(sa_path):
         log("错误: POLANG_PLAY_SERVICE_ACCOUNT_JSON（文件路径）或 ANDROID_PUBLISHER_CREDENTIALS（JSON 全文）未设置")
         sys.exit(1)
+
+    if args.notes:
+        if not os.path.isdir(args.notes_dir):
+            log(f"错误: release notes 目录不存在: {args.notes_dir}")
+            sys.exit(1)
+        log("获取 access token...")
+        token = get_access_token(sa_path)
+        upload_release_notes(args.package, args.notes_dir, token, args.notes,
+                             version_code=args.version_code)
+        return
 
     listings_dir = args.listing or args.images
     if listings_dir:
