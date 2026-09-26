@@ -68,7 +68,7 @@ data class UserTask(
 enum class UserTaskKind { TAG_SCAN, MODEL_DOWNLOAD }
 enum class UserTaskStatus { PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED }
 enum class UserTaskAction { PAUSE, RESUME, CANCEL, RETRY }
-enum class UserTaskErrorCode { PROCESS_TERMINATED, PARTIAL_FAILURES }
+enum class UserTaskErrorCode { PROCESS_TERMINATED, PARTIAL_FAILURES, MODEL_UNAVAILABLE }
 enum class UserTaskDestination { TAG_SCAN_CONTROL, MODEL_CENTER }
 
 /** 高频进度快照（仅内存，不落库）。supportedActions 不入快照——可从 status 纯推导（§4.2）。 */
@@ -113,7 +113,7 @@ TAG 扫描会话 7 态 → 6 态：
 
 **启动对账（reconciliation）**：进程重启后适配器 `start()` 时执行一次——
 
-- TAG 扫描：orchestrator 自身 Room 队列恢复后重发会话态，注册表被动同步（既有机制，零新增）。
+- TAG 扫描：orchestrator 自身 Room 队列恢复后重发会话态，注册表被动同步（既有机制，零新增）；另首帧 null 且注册表残留活动态行 = 进程死于扫描中 → 置 FAILED(PROCESS_TERMINATED)，按钮 {RETRY}（2026-09-26 终审修订：原 CANCELLED 动作集为空，与「点重试重新开始」文案不自洽）。
 - 模型下载：Room 中 PENDING/RUNNING/PAUSED 但无活体 Job 的行 → 置 FAILED，errorCode=PROCESS_TERMINATED（UI 按码取五语文案「已中断——点重试重新开始」），按钮 {RETRY}。这是下载体系首次获得「重启后任务可见」能力——协议接入的附带收益。
 
 ## 6. 适配器（体系与协议之间的唯一接缝）

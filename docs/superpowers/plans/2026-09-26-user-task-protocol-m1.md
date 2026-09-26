@@ -1735,3 +1735,19 @@ git commit -m "docs(usertask): M1 落地同步——AGENTS 双级 + spec 状态"
 - material3 `Card(onClick=)` 重载是否存在 → Task 8 Step 2 给了退化方案
 - `task_center_section_history` 资源名 → 实现时按工程师任务中心既有名核实
 - PoLangApplication 中 container 静态类型 → Task 6 Step 2 给了两种处理
+
+---
+
+## 不阻塞遗留清单（终审 2026-09-26 固化）
+
+以下为终审（agent-26）确认不阻塞 M1 交付的遗留项，逐项一句话登记，后续迭代按需拾起：
+
+- `TaskCenterListItem` LongParameterList detekt 命中：工程师卡既有平移代码的历史命中，非本次新增，随工程师卡重构一并处理。
+- `UserTaskCard` 动作按钮无 in-flight 禁用：双击间隙依赖体系幂等兜底（enqueue 去重 / StartTagScanUseCase 协议幂等），不加按钮态机。
+- 卡片 cd 仅含标题：进度/状态未进 contentDescription，卡片级 cd 已可定位，无障碍细化留待专门 pass。
+- 任务中心 Tab 索引裸 0/1：两 Tab 场景可读性可接受，抽枚举收益不抵成本。
+- `perform` CancellationException rethrow 分支无测试：CE 传播路径由协程框架保证，单测构造收益低。
+- adapter `start()` 双 launch 零覆盖：启动序列简单，核心路径已由 sync/reconcile 单测覆盖。
+- manager enqueue collect 无 catch 窄缝（🔵-6）：manager 内部冷流 collect 异常理论上可穿透，预检已挡主路径，窄缝随 manager 改造一并收口。
+- 预检 ModelScope 大小写宽于 manager 查找（🔵-6）：预检 `ignoreCase=true`、manager 精确匹配，方向安全（预检更宽只少拦不多放）。
+- `defaultTab` 活页翻转 quirk（🔵-5）：后台任务 Tab 停留期间新任务到达不强制跳 Tab，属预期产品设计而非缺陷。
