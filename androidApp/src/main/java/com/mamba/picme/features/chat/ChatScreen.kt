@@ -123,7 +123,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -132,6 +131,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -268,8 +268,10 @@ fun ChatScreen(
     val gachaConfirmFailedText = stringResource(R.string.chat_gacha_confirm_failed)
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    // 任务中心回锚（US-15）pending 态：pending 期间抑制自动滚底，锚定成功（或超时放弃）后恢复
+    // 任务中心回锚（US-15）两阶段自动滚底抑制：pending（等待锚定）+ hold（锚定后防流式
+    // delta 拉走——条数增长（新回合/新消息）或用户主动拖拽才解除）
     var pendingTaskAnchor by remember { mutableStateOf<ChatTaskAnchor?>(null) }
+    var anchorHold by remember { mutableStateOf<Pair<Long, Int>?>(null) }
 
     var isSidebarOpen by remember { mutableStateOf(false) }
     var showReportIssueDialog by remember { mutableStateOf(false) }
@@ -481,10 +483,10 @@ fun ChatScreen(
     }
 
     // 自动滚动到底部：列表条数变化或最后一条内容变化时触发（支持流式打字效果）；
-    // 任务中心回锚 pending 期间跳过，防与锚定滚动互抢（rememberUpdatedState 读最新值，不把 pending 态纳入 key）
-    val currentPendingAnchor by rememberUpdatedState(pendingTaskAnchor)
+    // 回锚 pending/hold 期间跳过（plain read 在 effect 重跑时取最新值，抑制态不入 key 防自身触发滚动）
     LaunchedEffect(messages.size, messages.lastOrNull()?.content) {
-        if (currentPendingAnchor == null && messages.isNotEmpty()) {
+        anchorHold?.let { hold -> if (messages.size > hold.second) anchorHold = null }
+        if (pendingTaskAnchor == null && anchorHold == null && messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
@@ -498,12 +500,14 @@ fun ChatScreen(
             }
         }
     }
-    // 锚定滚动：消息列表出现该任务卡（id == taskId）后瞬时滚动到位并消费请求
+    // 锚定滚动：消息列表出现该任务卡（id == taskId）后瞬时滚动到位并消费请求；
+    // 随后进入 hold 态——流式 delta 不再拉到底部，直到新消息到来或用户拖拽
     LaunchedEffect(pendingTaskAnchor?.nonce, messages) {
         val anchor = pendingTaskAnchor ?: return@LaunchedEffect
         val index = messages.indexOfFirst { msg -> msg.id == anchor.taskId }
         if (index >= 0) {
             listState.scrollToItem(index)
+            anchorHold = anchor.nonce to messages.size
             pendingTaskAnchor = null
             onTaskAnchorConsumed()
         }
@@ -511,10 +515,17 @@ fun ChatScreen(
     // 锚定兜底：8s 未等到任务卡（极端情况：消息被清理）自动放弃，恢复自动滚底
     LaunchedEffect(pendingTaskAnchor?.nonce) {
         val anchor = pendingTaskAnchor ?: return@LaunchedEffect
-        kotlinx.coroutines.delay(ANCHOR_TIMEOUT_MS)
+        delay(ANCHOR_TIMEOUT_MS)
         if (pendingTaskAnchor?.nonce == anchor.nonce) {
             pendingTaskAnchor = null
             onTaskAnchorConsumed()
+        }
+    }
+    // 用户主动拖拽即解除锚定保持（恢复自动滚底）
+    LaunchedEffect(anchorHold?.first) {
+        if (anchorHold == null) return@LaunchedEffect
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) anchorHold = null
         }
     }
 
@@ -992,14 +1003,24 @@ private fun ChatTopBar(
                 badge = {
                     if (activeTaskCount > 0) {
                         Badge {
-                            Text(text = if (activeTaskCount > 99) "99+" else activeTaskCount.toString())
+                            Text(
+                                text = if (activeTaskCount > 99) {
+                                    stringResource(R.string.task_center_badge_overflow)
+                                } else {
+                                    activeTaskCount.toString()
+                                }
+                            )
                         }
                     }
                 }
             ) {
                 AppTopBarAction(
                     icon = Icons.Outlined.Assignment,
-                    contentDescription = stringResource(R.string.cd_task_center),
+                    contentDescription = if (activeTaskCount > 0) {
+                        stringResource(R.string.cd_task_center_active, activeTaskCount)
+                    } else {
+                        stringResource(R.string.cd_task_center)
+                    },
                     onClick = onNavigateToTaskCenter
                 )
             }

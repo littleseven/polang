@@ -1360,6 +1360,9 @@
     <string name="task_center_empty">Aucune tâche d’ingénieur pour le moment — envoyez un message en mode AI Engineer pour en créer une.</string>
     <string name="task_center_view_all">Tout afficher</string>
     <string name="cd_task_center">Centre des tâches</string>
+    <string name="cd_task_center_active">Centre des tâches, %1$d tâches actives</string>
+    <string name="task_center_badge_overflow">99+</string>
+    <string name="chat_task_deliver_sid_unavailable">Session indisponible — ouvrez le chat de la tâche pour livrer</string>
     <!-- Issue report -->
     <string name="report_issue_title">Signaler un problème</string>
     <string name="report_issue_cd">Signaler un problème</string>

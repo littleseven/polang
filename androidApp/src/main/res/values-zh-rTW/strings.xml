@@ -1395,6 +1395,9 @@
     <string name="task_center_empty">尚無工程師任務——在 AI 工程師模式傳送訊息即可建立。</string>
     <string name="task_center_view_all">查看全部</string>
     <string name="cd_task_center">任務中心</string>
+    <string name="cd_task_center_active">任務中心，%1$d 個進行中任務</string>
+    <string name="task_center_badge_overflow">99+</string>
+    <string name="chat_task_deliver_sid_unavailable">無法定位原會話上下文，請回到該任務所在會話交付</string>
 
     <!-- Issue report -->
     <string name="report_issue_title">上報問題</string>

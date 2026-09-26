@@ -34,8 +34,9 @@ interface ChatMessageDao {
     /**
      * 跨会话获取所有任务卡消息（type = 'task_card'），按提交时间倒序。
      * 任务中心页数据源：type 为 TEXT 列，纯查询新增无 schema 变更。
+     * LIMIT 200：任务卡只增不删，全表失效重发时限制回扫量；进行中/历史 50 条判据只关心最近窗口。
      */
-    @Query("SELECT * FROM chat_messages WHERE type = 'task_card' ORDER BY timestamp DESC")
+    @Query("SELECT * FROM chat_messages WHERE type = 'task_card' ORDER BY timestamp DESC LIMIT 200")
     fun getTaskCardMessages(): Flow<List<ChatMessageEntity>>
 
     /**

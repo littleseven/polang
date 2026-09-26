@@ -68,67 +68,66 @@ fun TaskCenterScreen(
             )
         },
     ) { innerPadding ->
-        if (taskList.active.isEmpty() && taskList.history.isEmpty()) {
-            TaskCenterEmpty(
+        val list = taskList
+        when {
+            // 首查未回：仅顶栏（防空态文案闪现一帧）
+            list == null -> Unit
+            list.active.isEmpty() && list.history.isEmpty() -> TaskCenterEmpty(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
             )
-            return@Scaffold
-        }
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-            if (taskList.active.isNotEmpty()) {
-                item(key = "header_active") {
-                    TaskCenterSectionHeader(stringResource(R.string.task_center_section_active))
+            else -> LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(vertical = 8.dp),
+            ) {
+                if (list.active.isNotEmpty()) {
+                    item(key = "header_active") {
+                        TaskCenterSectionHeader(stringResource(R.string.task_center_section_active))
+                    }
+                    items(list.active, key = { item -> "active_${item.task.taskId}" }) { item ->
+                        TaskCenterListItem(
+                            item = item,
+                            actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
+                            onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
+                            onContinue = {
+                                chatViewModel.continueEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                                onOpenTaskInChat(item.sessionId, item.task.taskId)
+                            },
+                            onAbandon = {
+                                chatViewModel.abandonEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                            },
+                            onDeliver = {
+                                chatViewModel.deliverEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                            },
+                            onSkipDeliver = {
+                                chatViewModel.skipEngineerDeliverFromCenter(item.sessionId, item.task.taskId)
+                            },
+                            onRetry = {
+                                chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                                onOpenTaskInChat(item.sessionId, item.task.taskId)
+                            },
+                        )
+                    }
                 }
-                items(taskList.active, key = { item -> "active_${item.task.taskId}" }) { item ->
-                    TaskCenterListItem(
-                        item = item,
-                        actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
-                        onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
-                        onContinue = {
-                            chatViewModel.continueEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                            onOpenTaskInChat(item.sessionId, item.task.taskId)
-                        },
-                        onAbandon = {
-                            chatViewModel.abandonEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                        },
-                        onDeliver = {
-                            chatViewModel.deliverEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                        },
-                        onSkipDeliver = {
-                            chatViewModel.skipEngineerDeliverFromCenter(item.sessionId, item.task.taskId)
-                        },
-                        onRetry = {
-                            chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                            onOpenTaskInChat(item.sessionId, item.task.taskId)
-                        },
-                    )
-                }
-            }
-            if (taskList.history.isNotEmpty()) {
-                item(key = "header_history") {
-                    TaskCenterSectionHeader(stringResource(R.string.task_center_section_history))
-                }
-                items(taskList.history, key = { item -> "history_${item.task.taskId}" }) { item ->
-                    TaskCenterListItem(
-                        item = item,
-                        actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
-                        onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
-                        onContinue = {},
-                        onAbandon = {},
-                        onDeliver = {},
-                        onSkipDeliver = {},
-                        onRetry = {
-                            chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                            onOpenTaskInChat(item.sessionId, item.task.taskId)
-                        },
-                    )
+                if (list.history.isNotEmpty()) {
+                    item(key = "header_history") {
+                        TaskCenterSectionHeader(stringResource(R.string.task_center_section_history))
+                    }
+                    items(list.history, key = { item -> "history_${item.task.taskId}" }) { item ->
+                        // 历史区只读（D7）：仅 FAILED 保留「重试」动作，审批回调缺省为 null（不渲染）
+                        TaskCenterListItem(
+                            item = item,
+                            actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
+                            onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
+                            onRetry = {
+                                chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                                onOpenTaskInChat(item.sessionId, item.task.taskId)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -164,17 +163,18 @@ private fun TaskCenterEmpty(modifier: Modifier = Modifier) {
 /**
  * 任务中心列表项（US-14）：任务卡同构紧凑形态——标题 + 状态 chip + meta 行 + 进度/结果摘要。
  * 审批中项高亮（描边）并带动作按钮；整卡点击回 chat 锚定（US-15）。
+ * 动作回调可空：null = 该动作不可用（历史区只读），对应按钮不渲染。
  */
 @Composable
 private fun TaskCenterListItem(
     item: TaskCenterItem,
     actionsEnabled: Boolean,
     onClick: () -> Unit,
-    onContinue: () -> Unit,
-    onAbandon: () -> Unit,
-    onDeliver: () -> Unit,
-    onSkipDeliver: () -> Unit,
-    onRetry: () -> Unit,
+    onContinue: (() -> Unit)? = null,
+    onAbandon: (() -> Unit)? = null,
+    onDeliver: (() -> Unit)? = null,
+    onSkipDeliver: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
 ) {
     val task = item.task
     val awaiting = TaskCenterPartition.isAwaitingApproval(task)
@@ -294,19 +294,20 @@ private fun TaskProgressSummary(task: EngineerTaskState) {
     }
 }
 
-/** 状态动作区（D7：仅审批动作）：待审批给决策按钮，失败给重试，其余只读。 */
+/** 状态动作区（D7：仅审批动作）：待审批给决策按钮，失败给重试，其余只读；回调为 null 的动作不渲染。 */
 @Composable
 private fun TaskActionsRow(
     task: EngineerTaskState,
     actionsEnabled: Boolean,
-    onContinue: () -> Unit,
-    onAbandon: () -> Unit,
-    onDeliver: () -> Unit,
-    onSkipDeliver: () -> Unit,
-    onRetry: () -> Unit,
+    onContinue: (() -> Unit)?,
+    onAbandon: (() -> Unit)?,
+    onDeliver: (() -> Unit)?,
+    onSkipDeliver: (() -> Unit)?,
+    onRetry: (() -> Unit)?,
 ) {
     when {
-        task.status == EngineerTaskStatus.AWAITING_CONTINUE && task.resolution == null -> {
+        task.status == EngineerTaskStatus.AWAITING_CONTINUE && task.resolution == null &&
+            onContinue != null && onAbandon != null -> {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onContinue, enabled = actionsEnabled) {
                     Text(stringResource(R.string.claude_continue), fontSize = 13.sp)
@@ -316,7 +317,8 @@ private fun TaskActionsRow(
                 }
             }
         }
-        task.status == EngineerTaskStatus.AWAITING_DELIVER && task.resolution == null -> {
+        task.status == EngineerTaskStatus.AWAITING_DELIVER && task.resolution == null &&
+            onDeliver != null && onSkipDeliver != null -> {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onDeliver, enabled = actionsEnabled) {
                     Text(stringResource(R.string.claude_deliver_mode_push), fontSize = 13.sp)
@@ -326,7 +328,7 @@ private fun TaskActionsRow(
                 }
             }
         }
-        task.status == EngineerTaskStatus.FAILED -> {
+        task.status == EngineerTaskStatus.FAILED && onRetry != null -> {
             TextButton(onClick = onRetry, enabled = actionsEnabled) {
                 Text(stringResource(R.string.chat_task_retry), fontSize = 13.sp)
             }

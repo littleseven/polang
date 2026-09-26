@@ -24,7 +24,8 @@ class TaskCenterViewModel(
     chatSessionDao: ChatSessionDao,
 ) : ViewModel() {
 
-    val taskList: StateFlow<TaskCenterList> =
+    /** null = 首查未回（UI 只显示顶栏，防空态文案闪现一帧）。 */
+    val taskList: StateFlow<TaskCenterList?> =
         combine(
             chatMessageDao.getTaskCardMessages(),
             chatSessionDao.getAllSessions(),
@@ -43,6 +44,6 @@ class TaskCenterViewModel(
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = TaskCenterList(active = emptyList(), history = emptyList()),
+            initialValue = null,
         )
 }

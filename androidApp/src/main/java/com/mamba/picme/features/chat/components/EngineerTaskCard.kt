@@ -66,9 +66,10 @@ fun EngineerTaskCard(
                         text = stringResource(R.string.task_center_view_all),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary,
+                        // clickable 在 padding 之前：热区含 padding（小文本不撑高卡片行）
                         modifier = Modifier
                             .clickable(onClick = onViewAll)
-                            .padding(end = 8.dp),
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                     )
                 }
                 Text(
