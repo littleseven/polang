@@ -1,0 +1,48 @@
+{
+ "kind": "flow",
+ "title": "JS 沙箱执行架构",
+ "banner": "tool_call → 串行求值 → 白名单桥",
+ "pill": "QuickJS",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "LLM（远程 ReAct）",
+   "chips": [
+    "tool_call：run_gallery_script / draw_chart"
+   ]
+  },
+  {
+   "t": "ChatToolService / RemoteControlToolService",
+   "s": "@Tool",
+   "chips": [
+    "dispatchCommand → AgentCommand.ExecuteScript / DrawChart"
+   ]
+  },
+  {
+   "t": "CapabilityRegistry（CHAT 场景）",
+   "chips": [
+    "ChatRunScriptCapability / ChatMediaWriteCapability"
+   ]
+  },
+  {
+   "t": "ChatViewModel.onRunScript / onDrawChart",
+   "chips": [
+    "jsEvalMutex 串行"
+   ]
+  },
+  {
+   "t": "JsRuntime → QuickJsEngine",
+   "chips": [
+    ":shared 门面 register NativeHandler（白名单）",
+    "QuickJS C 引擎（沙箱）"
+   ]
+  },
+  {
+   "t": "bridge.callAsync → JsBridge.dispatchAsync",
+   "chips": [
+    "UseCase / DAO / CapabilityRegistry"
+   ]
+  }
+ ],
+ "name": "js-sandbox-architecture"
+}

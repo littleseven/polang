@@ -1,0 +1,91 @@
+{
+ "kind": "layers",
+ "title": "Agent 运行时全景分层",
+ "banner": "UI → 编排 → 能力 → 数据 四层纵贯",
+ "pill": "端侧编排 · 远程推理",
+ "pill_c": "blue",
+ "foot": "<b>编排层在端、推理在云、能力归注册表</b>——所有语义命令收敛于 CapabilityRegistry.dispatch 一个点。",
+ "bands": [
+  {
+   "t": "UI Layer",
+   "s": "Compose",
+   "split": {
+    "ad": [
+     "ChatScreen|💬 二级页·AI对话",
+     "GalleryScreen|🏠 默认首页·AI搜索",
+     "CameraScreen|📷 辅助入口·美颜滤镜语音"
+    ],
+    "ad_t": "三入口",
+    "ios": [
+     "Chat UI|多线程",
+     "Voice Btn|KWS唤醒",
+     "QuickActs|快捷入口",
+     "Model Sel|远程模型",
+     "StatusBar|推理状态"
+    ],
+    "ios_t": "Agent 面板组件"
+   }
+  },
+  {
+   "t": "Agent Orchestration Layer",
+   "s": ":androidApp · Kotlin",
+   "chips": [
+    {
+     "c": "hero",
+     "t": "AgentOrchestrator"
+    },
+    "SceneManager|场景感知",
+    "PrivacyGuard|隐私分级",
+    "MemoryManager|对话持久化",
+    {
+     "c": "green",
+     "t": "相机指令：processCameraInput → KoogReActAgent + CameraToolService @Tool"
+    },
+    {
+     "c": "green",
+     "t": "chat/相册/飞书：RemoteChatEngine → AgentConfigurator → Koog OpenAILLMClient"
+    },
+    "OpenAI Chat Completions · DeepSeek 适配 · L2/L3/L4",
+    "Voice Pipeline：KWS always-on ~14MB/50mW → SherpaOnnx ASR 按需 ~282MB",
+    {
+     "c": "orange",
+     "t": "RemoteChannelManager|飞书 WS 直连·消息→AgentCommand·拍照回传"
+    },
+    {
+     "c": "orange",
+     "t": "PoLang Server|AI网关·账号·管理台·LLM代理"
+    }
+   ]
+  },
+  {
+   "t": "CapabilityRegistry",
+   "s": "能力注册表 · 唯一收敛点",
+   "chips": [
+    "Camera|拍照录像·美颜滤镜·变焦曝光",
+    "Gallery|查看删除·分享搜索·批量",
+    "Settings|主题语言·模型管理·语音",
+    "Navigate|页面切换·返回退出",
+    "Editor|图片编辑·AI优化",
+    "IMRemote|飞书远控·设备绑定·命令确认"
+   ]
+  },
+  {
+   "t": "Domain / Data / Infra",
+   "s": "",
+   "chips": [
+    "MediaRepo|Room",
+    "SettingsRepo|DataStore",
+    "BeautyEngine|OpenGL ES",
+    {
+     "c": "orange",
+     "t": "MNN-VLM|Qwen3-VL-2B TAG Pass3 专用"
+    },
+    ":shared|KMP SDK·Koog·@Tool·SSE",
+    "LlmModelDownloadManager|前台服务·断点续传",
+    "FaceDetect|MediaPipe·MNN",
+    "NetworkMonitor|飞书重连·心跳"
+   ]
+  }
+ ],
+ "name": "agent-runtime-stack"
+}

@@ -1,0 +1,24 @@
+{
+ "kind": "hflow",
+ "title": "ML Kit 标签中英双存",
+ "banner": "英文原始标签 → 翻译 → 双列存储",
+ "pill": "搜索友好",
+ "pill_c": "blue",
+ "nodes": [
+  {
+   "t": "MlKitTagExtractor",
+   "s": "英文标签 [Cat, Outdoor, Food]",
+   "c": "tint"
+  },
+  {
+   "t": "MlKitLabelTranslator",
+   "s": "translateToZh()"
+  },
+  {
+   "t": "双列存储",
+   "s": "mlKitLabels(EN) + mlKitLabelsZh(ZH)",
+   "c": "hero"
+  }
+ ],
+ "name": "mlkit-zh-translate"
+}

@@ -1,0 +1,38 @@
+{
+ "kind": "layers",
+ "title": "大美丽引擎预览栈",
+ "banner": "UI → 渲染 → 相机 三层纵贯",
+ "pill": "OpenGL ES",
+ "pill_c": "blue",
+ "foot": "CameraX 的 Surface 来自大美丽（SurfaceRequest → Surface），<b>预览全程 GPU 零拷贝</b>。",
+ "bands": [
+  {
+   "t": "UI Layer",
+   "s": "Compose",
+   "chips": [
+    "BeautyPreviewView|自定义 View",
+    "SurfaceView|显示最终渲染结果"
+   ]
+  },
+  {
+   "t": "Rendering Layer",
+   "s": "OpenGL ES",
+   "chips": [
+    "CameraPreviewRenderer|渲染管线核心",
+    "EGLCore|EGL 管理",
+    "BeautyRenderer|美颜渲染器",
+    "SurfaceTexture|相机输入纹理",
+    "WindowSurface|SurfaceView 输出目标"
+   ]
+  },
+  {
+   "t": "Camera Layer",
+   "s": "CameraX",
+   "chips": [
+    "Preview UseCase",
+    "SurfaceRequest → Surface|来自大美丽"
+   ]
+  }
+ ],
+ "name": "beauty-preview-stack"
+}

@@ -1,0 +1,31 @@
+{
+ "kind": "layers",
+ "title": "AI 优化双引擎",
+ "banner": "Fast 本地 500ms · Smart 远程 1-3s",
+ "pill": "AiOptimizeCapability",
+ "pill_c": "blue",
+ "foot": "输入 imageUri + mode(fast|smart) + source；输出 OptimizeRecommendation（场景 + 配方 + 说明）。",
+ "bands": [
+  {
+   "t": "FastOptimizeEngine（本地）",
+   "s": "默认路径 · < 500ms · 无需网络",
+   "chips": [
+    "SceneAnalyzer|ML Kit 图像标签已移除，fast 恒 GENERAL（§3.2 注）",
+    "人脸检测",
+    "光线/色彩启发式",
+    "PresetRepo|本地 JSON 预设库"
+   ]
+  },
+  {
+   "t": "SmartOptimizeEngine（远程）",
+   "s": "增强路径 · 1-3s · 需用户授权",
+   "chips": [
+    "VisionLlmClient|OpenAI 兼容 API",
+    "GPT-4o / Qwen-VL",
+    "压缩图 base64",
+    "ResponseParser|解析推荐参数"
+   ]
+  }
+ ],
+ "name": "ai-optimize-dual-engine"
+}

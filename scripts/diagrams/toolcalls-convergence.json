@@ -1,0 +1,54 @@
+{
+ "kind": "flow",
+ "title": "tool_calls 收敛结构",
+ "banner": "三条表面 · 一个注册表",
+ "pill": "SSOT",
+ "pill_c": "blue",
+ "foot": "Chat / 相机 / 飞书三条表面共用 ADR-005 协议，全部收敛到 <b>CapabilityRegistry.dispatch</b>；JS 沙箱与 RPA 是受控旁路。",
+ "steps": [
+  {
+   "t": "CHAT 场景（相册助理）",
+   "chips": [
+    "streamChat → streamChatReAct（固定远程）→ ChatToolService @Tool"
+   ]
+  },
+  {
+   "t": "相机场景",
+   "chips": [
+    "processCameraInput → KoogReActAgent + CameraToolService @Tool（capture / adjust_beauty / switch_filter…）",
+    "@Tool 直接构造 AgentCommand"
+   ]
+  },
+  {
+   "t": "ChatToolService",
+   "s": "每个工具 = dispatchCommand(AgentCommand.X) 一行",
+   "chips": [
+    "tool_calls 薄封装"
+   ]
+  },
+  {
+   "t": "CapabilityRegistry.dispatch",
+   "chips": [
+    "按 method 找 Capability → execute()|所有语义命令的唯一收敛点"
+   ]
+  },
+  {
+   "t": "旁路 · 飞书 RPA",
+   "s": "绕开注册表的另一条链路",
+   "chips": [
+    "RemoteControlToolService：UI 自动化 click/scroll/input → Accessibility",
+    "相机工具 → CameraToolHelper 直连",
+    "相册工具 → dispatchCommand 回注册表"
+   ]
+  },
+  {
+   "t": "旁路 · JS 沙箱",
+   "s": "run_gallery_script 内部世界",
+   "chips": [
+    "gallery.*/media.*/face.*/tag.* → 直连 UseCase/Dao（只读）",
+    "capability.dispatch {method,params} → 回环注册表（写操作经 Tier A 确认）"
+   ]
+  }
+ ],
+ "name": "toolcalls-convergence"
+}

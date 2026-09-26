@@ -1,0 +1,34 @@
+{
+ "kind": "flow",
+ "title": "MNN 资源状态机",
+ "banner": "MNN_RESOURCE_STATE 五态",
+ "pill": "状态机",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "IDLE（无模型）",
+   "chips": [
+    "load() → SHARED"
+   ]
+  },
+  {
+   "t": "SHARED（VLM+Face）",
+   "chips": [
+    "双方同意 unload() → UNLOADED",
+    "trim() → VLM_ONLY",
+    "face_unload() → FACE_ONLY"
+   ]
+  },
+  {
+   "t": "VLM_ONLY / FACE_ONLY",
+   "chips": [
+    "单侧常驻|可回 IDLE"
+   ]
+  },
+  {
+   "t": "UNLOADED（已释放）",
+   "chips": []
+  }
+ ],
+ "name": "mnn-resource-states"
+}

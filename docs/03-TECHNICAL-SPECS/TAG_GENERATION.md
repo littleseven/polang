@@ -44,39 +44,7 @@
 
 ### 2.1 Pipeline 总览
 
-```
-照片入库 / 用户触发
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ Pass 1: FACE_DETECTION                       │
-│ • 人脸 ROI 检测 + 106 关键点                 │
-│ • Glint360K R100 512 维人脸 Embedding         │
-│ • MobileCLIP 语义 Embedding（Base64，已内联） │
-│ 写入: faceRoiResult / face_embeddings        │
-│       semanticEmbedding / lastTagScanPasses  │
-└─────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ Pass 2: DBSCAN                               │
-│ • 全局人脸聚类 → persons / faceId            │
-└─────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│ Pass 3: IMAGE_TAGGING                         │
-│ • 图像打标                       │
-│ • 中文标签 + ControlledVocab 规范化          │
-│ 写入: labels JSON                            │
-└─────────────────────────────────────────────┘
-
-Pass 4: MOBILE_CLIP_ENCODING（保留枚举值，用于兼容历史任务/单独重编码场景；
-        常规扫描已将 MobileCLIP 编码内联合并到 Pass 1）
-
-注：原 Pass 5（ML_KIT_TAGGING，ML Kit Image Labeler 英文标签提取）已随
-    ML Kit 打标链路整体移除，`TagScanPass` 枚举与 `MlKitTagExtractor` 类均已删除。
-```
+![TAG 生成 3-Pass 流水线](assets/diagrams/tag-3pass-pipeline.png)
 
 ### 2.2 TAG 分类体系
 
@@ -320,27 +288,7 @@ RUNNING --(执行异常，非取消)--> PAUSED
 
 ### 3.8 线程模型
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Main Thread（Service / UI）                                 │
-│  - onStartCommand 接收 Intent                                 │
-│  - serviceScope 分发 pause/resume/cancel 到 control thread    │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│  tag-control thread（控制线程）                              │
-│  - TagScanOrchestrator 状态机                                │
-│  - 任务队列 poll / pause / resume / cancel                   │
-│  - 进度更新 _progress                                        │
-└───────────────────────┬─────────────────────────────────────┘
-                        │  dispatch executeTask()
-┌───────────────────────▼─────────────────────────────────────┐
-│  tag-worker thread（任务线程）                               │
-│  - TagGenerationScheduler 原子任务                           │
-│  - 人脸检测 / DBSCAN / Qwen JNI 推理                         │
-│  可能被 native 推理阻塞，但不影响控制线程                    │
-└─────────────────────────────────────────────────────────────┘
-```
+![TAG 扫描线程模型](assets/diagrams/tag-thread-model.png)
 
 **关键原则**：
 - 控制线程与任务线程必须分离。
@@ -560,46 +508,7 @@ ML Kit Image Labeler 输出的英文标签，按置信度过滤后存储为 JSON
 
 ### 5.3 3-Pass 数据流转
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Pass 1: 人脸检测 + MobileCLIP 语义编码（同一张 Bitmap）          │
-│  ├─ faceDetector.detectFacesOnly(bitmap) → ROI 列表            │
-│  ├─ faceClusterEngine.extractFeature(bitmap, roi) → embedding   │
-│  ├─ mobileClipEngine.encode(bitmap) → 512维语义向量              │
-│  │                                                              │
-│  └─ 写入 DB:                                                    │
-│     • media_assets.hasFace = true/false                        │
-│     • media_assets.faceRoiResult = JSON（人脸上下文）             │
-│     • media_assets.semanticEmbedding = Base64(512维向量)          │
-│     • face_embeddings.embedding = ByteArray(512维)             │
-│     • media_assets.lastTagScanPasses += {"1": ts}               │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  Pass 2: DBSCAN 全局聚类（批量，mediaId = -1 标记）              │
-│  ├─ 读取所有未聚类的 face_embeddings                            │
-│  ├─ 余弦距离矩阵 + DBSCAN 聚类                                  │
-│  │                                                              │
-│  └─ 写入 DB:                                                    │
-│     • persons 表新增/更新人物簇                                  │
-│     • face_embeddings.personId = 聚类分配的人物 ID              │
-│     • media_assets.faceId = personId（可选，用于快速查询）       │
-│     • media_assets.lastTagScanPasses += {"2": ts}               │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  Pass 3: 图像打标                                   │
-│  ├─ 从 faceRoiResult 恢复人脸上下文（无需重新检测）               │
-│  ├─ llmEngine.imageInference(bitmap, prompt) → JSON 标签         │
-│  │                                                              │
-│  └─ 写入 DB:                                                    │
-│     • media_assets.labels = 最终 TAG JSON                        │
-│     • tags 表新增规范化标签（去重）                               │
-│     • media_tag_cross_ref 新增关联记录                           │
-│     • media_assets.lastTagScanPasses += {"3": ts}               │
-│     • media_assets.lastTagScanAt = 当前时间戳                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+![三阶段数据落库明细](assets/diagrams/tag-pass-db-writes.png)
 
 ### 5.4 数据库版本迁移历史
 
@@ -833,26 +742,7 @@ Pass 1 以 640px 加载，Pass 3 又加载 512px。两次 `ContentResolver.openI
 
 #### 两层节流架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  TagGenerationService.checkGuard()     ← 电池/热状态守卫     │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Battery ≤ 5%           → ABORT（终止扫描）          │   │
-│  │  Battery ≤ 15% (非充电)  → PAUSE（→ 3000ms 节流）    │   │
-│  │  Thermal ≥ SEVERE       → ABORT                     │   │
-│  │  Thermal ≥ MODERATE     → PAUSE（→ 3000ms 节流）    │   │
-│  │  其他                   → ALLOW（→ 500ms 节流）     │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│  TagGenerationScheduler.guardCheck()                        │
-│  → 调用 guard() 获取结果                                    │
-│    ALLOW  → 正常执行（Pass 3 每张结束 delay(getPass3CooldownMs())=800ms） │
-│    PAUSE  → delay(getThrottleMs())，默认 1000ms           │
-│    ABORT  → return false → 退出循环                         │
-└─────────────────────────────────────────────────────────────┘
-```
+![电池/热守卫与节流](assets/diagrams/tag-guard-throttle.png)
 
 #### 恒速冷却 `DEFAULT_PASS3_COOLDOWN_MS = 800L` 的作用
 
@@ -979,22 +869,7 @@ for (i in 0 until n)          // n = 所有 face embedding 数量
 
 ### 8.3 总体架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  UI / Search                                                │
-│  • 展示：中文 TAG ──TagTranslator──> 英文 displayName         │
-│  • 搜索：英文 query ──TagTranslator──> 中文 canonical 集合    │
-│         ──> Room LIKE / TagDao 查询                          │
-├─────────────────────────────────────────────────────────────┤
-│  Runtime Localization Layer（新增）                          │
-│  • TagTranslator：zh↔en 映射 + 同义词扩展                     │
-│  • BilingualVocab：从 assets/tag_translations.json 加载       │
-├─────────────────────────────────────────────────────────────┤
-│  Existing Storage（不变）                                    │
-│  • media_assets.labels（中文 JSON）                           │
-│  • tags / media_tag_cross_ref（可后续迁移）                   │
-└─────────────────────────────────────────────────────────────┘
-```
+![TAG 双语检索架构](assets/diagrams/tag-bilingual-search.png)
 
 ### 8.4 双语词表与翻译器
 
@@ -1115,18 +990,7 @@ ML Kit Image Labeling API 使用固定的 ~400 个英文标签。创建静态中
 
 **数据流**：
 
-```
-MlKitTagExtractor → 英文标签 ["Cat","Outdoor","Food"]
-                          ↓
-              MlKitLabelTranslator.translateToZh()
-                          ↓
-              中文标签 ["猫","户外","食物"]
-                          ↓
-         ┌────────────────┼────────────────┐
-         ↓                                 ↓
-  mlKitLabels (EN)                mlKitLabelsZh (ZH)
-  ["Cat","Outdoor","Food"]       ["猫","户外","食物"]
-```
+![ML Kit 标签中英双存](assets/diagrams/mlkit-zh-translate.png)
 
 **DB Migration 6→7：** 新增 `media_assets.mlKitLabelsZh TEXT` 列。
 
@@ -1134,39 +998,13 @@ MlKitTagExtractor → 英文标签 ["Cat","Outdoor","Food"]
 
 #### TagTranslator 翻译分层策略
 
-```
-expandForSearch(中文查询词)
-  │
-  ├─ 1. BilingualVocab.zhToEn 词表精确匹配（0ms）
-  │    命中 → 返回 {中文词, 英文词}
-  │
-  ├─ 2. ControlledVocab 中文同义词双向扩展（0ms）
-  │    synonyms: "美女"→"女性"
-  │    reverseSynonyms: "女性"→["美女","大美女"]
-  │
-  ├─ 3. OPUS-MT 模型翻译回退（~50ms，词表未命中时）
-  │    中文词 → NMT → 英文词
-  │    质量校验：过滤空白/异常输出
-  │
-  └─ 4. 保留原词兜底
-```
+![中文查询扩展四级回退](assets/diagrams/zh-query-expansion.png)
 
 > **Tokenizer 说明**：OPUS-MT 的编解码依赖 `:engines:sentencepiece` 模块加载的 `source.spm` / `target.spm`，`tokenizer.json` 仅用于 Hugging Face token ID 与 SentencePiece piece 之间的映射。详见 `ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md`。
 
 #### ChineseQueryTranslator CLIP 扩展增强
 
-```
-expandForClip(中文查询)
-  │
-  ├─ 1. CLIP_QUERY_EXPANSIONS 硬编码表（人工维护，CLIP 优化短语）
-  │    如 "小孩"→["child","kid","children","young child"]
-  │
-  ├─ 2. ControlledVocab 同义词动态翻译（新增）
-  │    "美女"→synonym "女性"→translateForClip("女性")→"female"
-  │    弥补硬编码表仅 20 条的不足
-  │
-  └─ 3. translateForClip 基础翻译（vocab→OPUS-MT 回退）
-```
+![CLIP 查询扩展](assets/diagrams/clip-query-expansion.png)
 
 ### 8.9 实施路线图
 

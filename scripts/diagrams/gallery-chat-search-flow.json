@@ -1,0 +1,42 @@
+{
+ "kind": "flow",
+ "title": "Chat 场景搜索流",
+ "banner": "streamChat → SearchIntent → 结构化过滤",
+ "pill": "Chat 路径",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "用户输入「近半年小孩的照片」",
+   "chips": [
+    "AgentOrchestrator.streamChat()"
+   ]
+  },
+  {
+   "t": "远程 LLM（KoogChatAgent）",
+   "chips": [
+    "AgentCommand.SearchMedia",
+    "query = 原文",
+    "intent = SearchIntent|timeRange(近半年) · keywords=[小孩] · hasFaces=true"
+   ]
+  },
+  {
+   "t": "ChatSearchCapability.execute()",
+   "chips": []
+  },
+  {
+   "t": "ChatViewModel.onSearchMedia(query, intent)",
+   "chips": []
+  },
+  {
+   "t": "searchIntentToStructuredFilter(intent)",
+   "chips": [
+    "→ StructuredFilter"
+   ]
+  },
+  {
+   "t": "MediaSearchEngine.search(filter)",
+   "chips": []
+  }
+ ],
+ "name": "gallery-chat-search-flow"
+}

@@ -1,0 +1,30 @@
+{
+ "kind": "hflow",
+ "title": "语音内存阶段图",
+ "banner": "休眠 → 唤醒 → 推理 → 休眠",
+ "pill": "峰值 ~2GB",
+ "pill_c": "orange",
+ "nodes": [
+  {
+   "t": "休眠态",
+   "s": "常驻 ~45MB · KWS █████",
+   "c": "tint"
+  },
+  {
+   "t": "唤醒态",
+   "s": "KWS 暂停 · ASR 加载 ~400MB",
+   "c": "tint"
+  },
+  {
+   "t": "推理态",
+   "s": "峰值 ~2GB · VLM+ASR 并存，转录完 ASR 立即释放",
+   "c": "hero"
+  },
+  {
+   "t": "休眠态",
+   "s": "常驻 ~45MB · KWS █████",
+   "c": "tint"
+  }
+ ],
+ "name": "voice-memory-phases"
+}

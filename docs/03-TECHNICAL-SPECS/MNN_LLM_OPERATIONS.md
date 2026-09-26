@@ -36,38 +36,7 @@
 
 ### 1.3 单例架构链路
 
-```
-调用方（TagGenerationScheduler / OpenClGuardian / TagScanOrchestrator）
-    │
-    ▼
-AgentOrchestrator.getInstance()  ←── 进程级单例（组合根 Application.onCreate 经 initialize(deps) 完成初始化，无参 getInstance() 取实例）
-    │
-    └── localModelService（AgentOrchestrator.kt:134 持有 LocalModelService）
-            │
-            ├── getLlmEngine()（LocalModelService.kt:71）──→ ImageInferenceEngine（Android actual = LocalLlmEngine，由 AgentConfigurator 持有）
-            │                                                       │
-            │                                                       ▼
-            │                                               MnnLlmClient（成员变量，唯一实例）
-            │                                                       │
-            │                                                       ▼
-            │                                               nativeHandle: Long（指向 C++ Llm 对象）
-            │
-            └── ensureModelLoaded / withModelLoaded ──→ imageEngine.loadModel(modelId, useOpencl)（LocalModelService.kt:127，唯一直调）
-                                                            │
-                                                            ▼
-                                                    engineMutex.withLock（协程 Mutex + modelDispatcher）
-                                                            │
-                                                            ▼
-                                                    MnnLlmClient.load(modelId)
-                                                            │
-                                                            ▼
-                                                    if (isLoaded) return true（幂等守卫）
-                                                            │
-                                                            ▼
-                                                    MnnGlobalReleaseLock.withOperation {
-                                                        nativeHandle = nativeCreate(configPath)
-                                                    }
-```
+![VLM 引擎调用链](assets/diagrams/mnn-llm-callchain.png)
 
 ### 1.4 MNN 多实例安全性判断：安全（在当前架构下）
 
@@ -210,42 +179,13 @@ localLlmEngine.trimMemory()
 
 引入 `MnnResourceManager` 作为**唯一协调者**，VLM 打标和 MNN 人脸检测分别持有独立引用计数：
 
-```
-VLM 请求加载      →  acquireLlm()            → llmRefCount++
-人脸检测请求加载   →  acquireFaceDetection()  → faceDetectionRefCount++
-
-VLM 请求释放  →  releaseLlm()
-    ├─ faceDetectionRefCount == 0 → onSafeUnload()  → 真正 unload()（MnnGlobalReleaseLock 串行化）
-    └─ faceDetectionRefCount  > 0 → onSoftRelease() → trimMemory()
-
-人脸检测请求释放  →  releaseFaceDetection()
-    ├─ llmRefCount == 0 → onSafeUnload()  → 真正 release()
-    └─ llmRefCount  > 0 → onSoftRelease()
-```
+![引用计数释放决策](assets/diagrams/mnn-refcount-release.png)
 
 > **注意**：引用计数 API 名仍为 `acquireLlm`/`releaseLlm`，但当前 `llmRefCount` 实际管理的是 **VLM 打标引擎**的生命周期（文本 LLM 已移除）。历史上的 `acquireAsr`/`releaseAsr` 已随 ASR 迁移 Sherpa-ONNX 而移除——ASR 不再共享 `libMNN.so`，也不接入 `MnnResourceManager`。
 
 ### 2.5 联合状态机
 
-```
-                    ┌─────────────────────────────────────┐
-                    │         MNN_RESOURCE_STATE          │
-                    └─────────────────────────────────────┘
-
-    ┌──────────┐    load()    ┌──────────┐   both agree   ┌──────────┐
-    │  IDLE    │ ───────────→ │  SHARED  │ ─────────────→ │ UNLOADED │
-    │(无模型)   │              │(VLM+Face)│   unload()     │(已释放)   │
-    └──────────┘              └────┬─────┘                └──────────┘
-         ↑                         │
-         │              ┌──────────┴──────────┐
-         │              │                     │
-         │         trim()               face_unload()
-         │              ↓                     ↓
-         │       ┌──────────┐          ┌──────────┐
-         └───────│ VLM_ONLY │          │ FACE_ONLY │
-                 │(仅VLM常驻)│          │(仅Face常驻)│
-                 └──────────┘          └──────────┘
-```
+![MNN 资源状态机](assets/diagrams/mnn-resource-states.png)
 
 > 每模型另有独立细粒度状态机（`ModelState`：`UNLOADED → MODEL_LOADED → SESSION_READY → ACTIVE`），见 `MnnResourceManager`。
 
@@ -338,18 +278,7 @@ val stats = MnnResourceManager.getInstance(context).getMemoryStats()
 
 ### 3.2 引用计数协调机制（核心规则）
 
-```
-acquireLlm()           → llmRefCount++
-acquireFaceDetection() → faceDetectionRefCount++
-
-releaseLlm()
-    ├─ faceDetectionRefCount == 0 → onSafeUnload()  → 真正 nativeDestroy()（MnnGlobalReleaseLock 串行化）
-    └─ faceDetectionRefCount  > 0 → onSoftRelease() → trimMemory()（保留模型）
-
-releaseFaceDetection()
-    ├─ llmRefCount == 0 → onSafeUnload()  → 真正 detector release()
-    └─ llmRefCount  > 0 → onSoftRelease() → 保留模型
-```
+![引用计数释放决策（同前图）](assets/diagrams/mnn-refcount-release.png)
 
 ### 3.3 App 前后台切换
 
@@ -373,41 +302,7 @@ override fun onActivityStopped(activity: Activity) {
 
 **时序**：
 
-```
-用户按 Home 键
-    │
-    ▼
-最后一个 Activity onStopped()
-    │
-    ▼
-onAppBackground()
-    │
-    ▼
-调度协程：delay 30s
-    │
-    ▼
-30s 后检查：仍后台 + 无引用？
-    │
-    ├── 是 → notifySoftTrim()
-    │           ├── LocalLlmEngine.onSoftTrim() → trimMemory()
-    │           └── 人脸检测.onSoftTrim() → softRelease（保留模型）
-    │
-    ▼
-delay 再 30s（累计 60s）
-    │
-    ▼
-60s 后检查：仍后台 + 无引用？
-    │
-    ├── 是 → notifySafeUnload()
-    │           ├── LocalLlmEngine.onSafeUnload() → performUnload()
-    │           └── 人脸检测.onSafeUnload() → performUnload()
-    │
-    ▼
-┌─────────────────────────────────────┐
-│            IDLE 状态                │
-│            VLM + 人脸检测完全释放          │
-└─────────────────────────────────────┘
-```
+![后台两段式释放](assets/diagrams/mnn-background-unload.png)
 
 **关键参数**：
 - `BACKGROUND_UNLOAD_DELAY_MS = 30000L`

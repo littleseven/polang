@@ -53,34 +53,7 @@ PoLang 已从相机转向智能相册（ADR-005 产品重心迁移），需要�
 
 ### 2.1 总体方案：CV 标签 + LLM 语义解析双层架构
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    离线索引（后台异步）                          │
-│  ML Kit Image Labeling ──┐                                   │
-│  ML Kit Text Recognition ─┼──→ Room DB (media_assets 扩展)    │
-│  EXIF GPS + Geocoder ────┘                                    │
-└──────────────────────────────────────────────────────────────┘
-                              │
-                              │ 标签/分类数据
-                              ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    在线搜索                                    │
-│                                                              │
-│  Layer 0: LLM 意图标准化（Chat 场景优先）                       │
-│  - 近半年/去年/上个月/近3个月 → TimeRange {startMs, endMs}     │
-│  - 小孩/海边/上海/自拍 → keywords / locationKeywords / hasFaces │
-│  - search_media 命令携带 SearchIntent，解析后直接转 StructuredFilter │
-│                                                              │
-│  Layer 1: QueryParser 规则匹配（离线，< 100ms，兜底）           │
-│  - 时间词："去年"→年份-1，"夏天"→6-8月，"近半年"→6 个月前至今   │
-│  - 关键词 → labels/ocrText/locationName LIKE 匹配              │
-│                                                              │
-│  Layer 2: Agent LLM 语义解析（需要时）                         │
-│  - 复杂混合查询："去年夏天在上海拍的猫"                          │
-│  - LLM → StructuredFilter {timeRange, keywords}                │
-│  - 通过 AgentOrchestrator → search_media 命令执行              │
-└──────────────────────────────────────────────────────────────┘
-```
+![自然语言搜索分层](assets/diagrams/adr007-search-layers.png)
 
 ### 2.2 决策 1：使用 ML Kit Image Labeling 而非 CLIP
 
@@ -118,24 +91,7 @@ ALTER TABLE media_assets ADD COLUMN indexedAt INTEGER;  -- 索引时间
 
 不另建搜索接口，而是将搜索作为 Gallery Capability 的一个命令，通过现有 Agent Runtime 路由：
 
-```
-用户输入 "找出去年夏天的猫"
-    │
-    ▼
-AgentOrchestrator.dispatch()
-    │
-    ├── LOCAL mode → LocalLlmEngine → 输出 [{"method":"search_media","params":{"query":"..."}}]   # ⚠️ 已废止（2026-08-02 端侧文本 LLM 移除）
-    └── REMOTE mode → KoogChatAgent（原 RemoteReActAgent）→ tool_calls → search_media
-    │
-    ▼
-~~LocalCommandParser / ToolCallCommandParser~~（均已删除；现为 @Tool 方法直接构造）→ AgentCommand.SearchMedia
-    │
-    ▼
-CapabilityRegistry.dispatch() → GalleryCapability.execute()
-    │
-    ▼
-MediaSearchEngine.search(query) → 结构化过滤 → MediaDao 查询
-```
+![搜索指令分发流](assets/diagrams/adr007-dispatch-flow.png)
 
 **理由**：
 - 复用已有 Agent Runtime 基础设施
@@ -164,28 +120,7 @@ class MediaIndexingWorker(context: Context) {
 
 **决策**：让 LLM 在输出 `search_media` / `refine_media_search` 命令时，附带一个标准化的 `SearchIntent` 对象，由 LLM 根据当前时间把相对时间词换算为毫秒时间戳。
 
-```
-用户输入 "近半年小孩的照片"
-    │
-    ▼
-Local/Remote LLM
-    │
-    ▼
-AgentCommand.SearchMedia(
-    query = "近半年小孩的照片",
-    intent = SearchIntent(
-        timeRange = TimeRange(startMs=1735689600000, endMs=1751327999999),
-        keywords = ["小孩"],
-        hasFaces = true
-    )
-)
-    │
-    ▼
-ChatViewModel.searchIntentToStructuredFilter(intent) → StructuredFilter
-    │
-    ▼
-MediaSearchEngine.search(filter) // 直接按时间范围查 DB
-```
+![SearchIntent 结构化流](assets/diagrams/adr007-intent-flow.png)
 
 **规则保留策略**：
 
@@ -226,54 +161,7 @@ app/
 
 ### 3.2 数据流
 
-```
-[拍照/导入照片]
-    │
-    ▼
-MediaRepositoryImpl.refreshMediaLibrary()
-    │
-    ▼
-MediaIndexingWorker.start()
-    │
-    ├── 读取未索引照片 (indexedAt IS NULL)
-    ├── 每批 20 张
-    │   ├── ML Kit Image Labeling → labels JSON
-    │   ├── ML Kit Text Recognition → ocrText
-    │   ├── EXIF GPS → lat/lon
-    │   └── Geocoder → locationName
-    ├── 写入 Room DB
-    └── 标记 indexedAt
-
-[Gallery 搜索框输入]
-    │
-    ▼
-QueryParser.parse("猫")
-    ├── 无时间词，有关键词["猫"]
-    └── → StructuredFilter(keywords=["猫"])
-    │
-    ▼
-MediaSearchEngine.search(filter)
-    ├── searchByLabel("猫") → 匹配标签
-    ├── searchByOcrText("猫") → 匹配OCR文字
-    └── 合并去重，按时间降序
-
-[Chat 对话输入]
-    │
-    ▼
-Local/Remote LLM → AgentCommand.SearchMedia(query, intent?)
-    │
-    ▼
-ChatSearchCapability.execute()
-    │
-    ▼
-ChatViewModel.onSearchMedia(query, intent)
-    │
-    ▼
-searchIntentToStructuredFilter(intent) → StructuredFilter
-    │
-    ▼
-MediaSearchEngine.search(filter)
-```
+![索引与检索闭环](assets/diagrams/adr007-index-search-loop.png)
 
 ### 3.3 LLM Prompt 集成
 

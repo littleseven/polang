@@ -136,50 +136,11 @@
 
 ### 2.1 整体架构
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                     UI Layer (Compose)                  │
-│  ┌──────────────────────────────────────────────────┐    │
-│  │           BeautyPreviewView (自定义 View)        │    │
-│  │  ┌──────────────────────────────────────────┐    │    │
-│  │  │   SurfaceView (显示最终渲染结果)         │    │    │
-│  │  └──────────────────────────────────────────┘    │    │
-│  └──────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────┐
-│               Rendering Layer (OpenGL ES)               │
-│  ┌──────────────────────────────────────────────────┐    │
-│  │    CameraPreviewRenderer (渲染管线核心)          │    │
-│  │    ├─ EGLCore (EGL 管理)                         │    │
-│  │    ├─ BeautyRenderer (美颜渲染器)                │    │
-│  │    ├─ SurfaceTexture(相机输入纹理)               │    │
-│  │    └─ WindowSurface (SurfaceView 输出目标)       │    │
-│  └──────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────┘
-                           ↓
-┌──────────────────────────────────────────────────────────┐
-│                 Camera Layer (CameraX)                  │
-│  ┌──────────────────────────────────────────────────┐    │
-│  │   Preview UseCase                                │    │
-│  │   └─ SurfaceRequest → Surface (来自 大美丽)      │    │
-│  └──────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────┘
-```
+![大美丽引擎预览栈](assets/diagrams/beauty-preview-stack.png)
 
 ### 2.2 数据流（零拷贝）
 
-```
-CameraX 预览帧
-    ↓ (无拷贝)
-SurfaceTexture.updateTexImage()
-    ↓ (GPU 纹理)
-OpenGL ES 外部纹理 (GL_TEXTURE_EXTERNAL_OES)
-    ↓ (Shader 处理：磨皮/美白/大眼/瘦脸/唇色/腮红)
-美颜后纹理
-    ↓ (直接显示)
-SurfaceView Surface
-```
+![预览帧 GPU 管线](assets/diagrams/beauty-frame-pipeline.png)
 
 **关键优化点**：
 
@@ -189,14 +150,7 @@ SurfaceView Surface
 
 ### 2.3 引擎策略路由（2026-04 当前实现）
 
-```
-BeautyStrategy（domain.model.UserPreferences）
-    ↓
-CameraPreviewStrategies.rememberPreviewStrategyBundle()
-    └── BeautyStrategy.BIG_BEAUTY → GlBeautyPreviewStrategy
-            → GlBeautyPreviewProvider（engines/beauty-engine/render）
-                → BeautyPreviewView → CameraPreviewRenderer → BeautyRenderer
-```
+![美颜策略装配链](assets/diagrams/beauty-strategy-chain.png)
 
 ### 2.4 拍照处理架构（2026-04 新增）
 
@@ -343,14 +297,7 @@ while (isRendering && !Thread.interrupted()) {
 
 **解决方案**：`CameraPreviewRenderer.mapViewNormalizedToUv()` 四步映射
 
-```
-归一化 View 坐标 (0~1, 以预览容器为参考)
-    ↓ Step 1: 映射到 viewport 内的像素坐标
-    ↓ Step 2: 反转 Y 轴（OpenGL 纹理坐标原点在左下）
-    ↓ Step 3: 归一化为 pre-transform UV（未应用纹理变换矩阵）
-    ↓ Step 4: 乘以 SurfaceTexture 变换矩阵（uTextureTransform）
-输出：Shader 可用的 UV 坐标
-```
+![人脸坐标 → Shader UV 变换](assets/diagrams/beauty-uv-transform.png)
 
 **约束**：
 - `transformFaceCoordinateSimple()`（ML Kit → 屏幕像素）与 `mapViewNormalizedToUv()`（屏幕 → UV）是串联关系，不能跳过任何一步。
@@ -775,17 +722,7 @@ val croppedBitmap = if (cropRect.width() != originalBitmap.width ||
 #### 2.1 相机传感器物理特性
 
 ##### 传感器方向
-```
-┌─────────────────────────────┐
-│   手机竖屏握持              │
-│                             │
-│    ┌───────────┐            │
-│    │ 传感器    │ ← 横向放置 │
-│    │ (864x480) │            │
-│    └───────────┘            │
-│                             │
-└─────────────────────────────┘
-```
+手机竖屏握持时，传感器为**横向放置**（864×480 原始输出）。
 
 **关键事实**：
 - 相机传感器**永远横向放置**（width > height）
@@ -804,13 +741,7 @@ val croppedBitmap = if (cropRect.width() != originalBitmap.width ||
 
 ##### 自动旋转流程
 
-```
-传感器输出 (864x480, 横向)
-         ↓
-   CameraX 自动旋转 270°
-         ↓
-  PreviewView 显示 (480x864, 竖向)
-```
+![传感器方向旋转链](assets/diagrams/beauty-sensor-rotation.png)
 
 **旋转规则**：
 - 后置摄像头：顺时针旋转 **90°**
@@ -820,18 +751,7 @@ val croppedBitmap = if (cropRect.width() != originalBitmap.width ||
 #### 2.3 PreviewView ScaleType 工作原理
 
 ##### FIT_CENTER（保持比例）
-```
-┌──────────────────┐
-│   黑边 (上)      │
-├──────────────────┤
-│                  │
-│   预览画面       │
-│  (480 x 864)     │
-│                  │
-├──────────────────┤
-│   黑边 (下)      │
-└──────────────────┘
-```
+**contain 模式**：预览画面按 480×864 完整显示，上下留黑边。
 
 **适用场景**：4:3、16:9 模式
 **特点**：
@@ -840,17 +760,7 @@ val croppedBitmap = if (cropRect.width() != originalBitmap.width ||
 - 所见即所得
 
 ##### FILL_CENTER（裁剪填充）
-```
-┌──────────────────┐
-│                  │← 裁剪掉顶部
-│ ╔══════════════╗ │
-│ ║  预览画面    ║ │
-│ ║ (铺满全屏)   ║ │
-│ ║              ║ │
-│ ╚══════════════╝ │
-│                  │← 裁剪掉底部
-└──────────────────┘
-```
+**crop 模式**：裁剪掉顶部与底部，预览画面铺满全屏。
 
 **适用场景**：FULL 模式
 **特点**：
@@ -1011,42 +921,7 @@ DisposableEffect(previewView) {
 
 #### 2.1 整体数据流
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CameraX 预览层                                  │
-│  ┌─────────────────┐                                                       │
-│  │ SurfaceTexture  │  updateTexImage() 时生成 FrameId                       │
-│  │   (帧源)        │                                                       │
-│  └────────┬────────┘                                                       │
-│           │                                                                  │
-│           ▼ FrameId + ImageProxy                                            │
-│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐       │
-│  │  📋 DetectionQueue │────▶│ FaceDetector    │────▶│ DetectionResult │       │
-│  │  (设计概念，未落地) │     │ (MediaPipe/MNN) │     │ (106点+FrameId) │       │
-│  │   深度=2,超时丢帧 │     │                 │     │                 │       │
-│  │  > 注：未实现，当前 │     │                 │     │                 │       │
-│  │    使用同步检测路径 │     │                 │     │                 │       │
-│  └─────────────────┘     └─────────────────┘     └────────┬────────┘       │
-│                                                           │                  │
-│                                                           ▼                  │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │                      FrameSyncManager (单例)                            ││
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                   ││
-│  │  │ ResultStore  │  │ MatchEngine  │  │ Predictor    │                   ││
-│  │  │ (时序存储)   │  │ (帧ID匹配)   │  │ (运动预测)   │                   ││
-│  │  └──────────────┘  └──────────────┘  └──────────────┘                   ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
-│                              │                                               │
-│                              ▼ FrameSyncResult                                │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │                         渲染线程 (GL Thread)                            ││
-│  │  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐   ││
-│  │  │ CameraPreview   │────▶│  BeautyRenderer │────▶│ FaceMakeupPass  │   ││
-│  │  │   Renderer      │     │                 │     │ (消费同步顶点)  │   ││
-│  │  └─────────────────┘     └─────────────────┘     └─────────────────┘   ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![帧同步美妆体系](assets/diagrams/beauty-framesync.png)
 
 #### 2.2 关键设计决策
 
@@ -1518,13 +1393,7 @@ data class BeautyPerfStats(
 
 #### 6.2 调试浮层展示
 
-```
-┌─────────────────────────────┐
-│ FPS: 58.3  |  GPU: 4.2ms   │
-│ Latency: 45ms | Sync: PRED  │  ← 新增
-│ Offset: 3.2px | Face: ✓     │  ← 新增
-└─────────────────────────────┘
-```
+调试 HUD 实际显示：`FPS: 58.3 | GPU: 4.2ms | Latency: 45ms | Sync: PRED`（新增）`| Offset: 3.2px | Face: ✓`（新增）
 
 #### 6.3 日志字段
 
@@ -1567,21 +1436,7 @@ data class BeautyPerfStats(
 
 #### 8.2 降级路径
 
-```
-FrameSyncManager 初始化失败
-    └── 降级为 SyncMode.OFF
-        └── 恢复当前双缓冲插值行为
-
-检测线程崩溃
-    └── FrameSyncManager 接收不到新结果
-        └── query() 持续返回 MISSING
-            └── BeautyRenderer 设置 hasFace=false
-                └── 妆容隐藏，其他美颜正常
-
-预测结果超出约束
-    └── clamp 到最大允许位移
-        └── 视觉上表现为"妆容慢半拍"，但不跳变
-```
+![帧同步降级路径](assets/diagrams/beauty-degradation-paths.png)
 
 ---
 
@@ -1735,13 +1590,7 @@ private fun onGlWarmUpFallback(reason: String) {
 
 **定义**：从源图像的像素/顶点出发，计算它在目标图像中的新位置。
 
-```
-源图像                    目标图像
-┌─────┐                  ┌─────┐
-│  A  │ ──映射计算──→    │  A' │
-│  B  │ ──映射计算──→    │  B' │
-└─────┘                  └─────┘
-```
+![关键点映射](assets/diagrams/beauty-landmark-mapping.png)
 
 **特点**：
 - 直接移动源像素/顶点到新位置
@@ -1768,13 +1617,7 @@ for (i in 0 until count) {
 
 **定义**：从目标图像的像素出发，反向查找它在源图像中的对应位置。
 
-```
-源图像                    目标图像
-┌─────┐                  ┌─────┐
-│  A  │ ←──反向查找──    │  A' │
-│  B  │ ←──反向查找──    │  B' │
-└─────┘                  └─────┘
-```
+反向查找：由**目标图像**的关键点 A′/B′ 反查**源图像**的 A/B（用于 warp 逆映射）。
 
 **特点**：
 - 遍历目标图像的每个像素

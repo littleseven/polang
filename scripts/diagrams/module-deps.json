@@ -1,0 +1,48 @@
+{
+ "kind": "layers",
+ "title": "Gradle 模块依赖全景",
+ "banner": "应用层 → 五模块 → Koog 外部依赖",
+ "pill": "7 模块",
+ "pill_c": "blue",
+ "foot": "<b>server/ 为独立 Ktor 工程</b>不纳入 Android settings.gradle，Monorepo 管理；:shared 的 Agent 框架是外部依赖 ai.koog:koog-agents，非本仓库模块。",
+ "bands": [
+  {
+   "t": "应用层",
+   "chips": [
+    {
+     "c": "hero",
+     "t": ":androidApp|PoLang 主应用"
+    }
+   ]
+  },
+  {
+   "t": "五大模块",
+   "chips": [
+    ":engines:beauty-api|美颜 API 契约·纯 Kotlin",
+    ":engines:beauty-engine|美颜引擎实现",
+    ":shared|Agent 编排层 KMP",
+    ":engines:mnn-core|MNN 共享模块",
+    ":engines:sentencepiece|Tokenizer"
+   ]
+  },
+  {
+   "t": "外部依赖",
+   "chips": [
+    {
+     "c": "green",
+     "t": "ai.koog:koog-agents|JetBrains Koog · OpenAI 兼容 client · ToolSet/Agent 策略"
+    },
+    ":shared androidMain → :engines:mnn-core + :engines:agent-native|VLM JNI 桥"
+   ]
+  },
+  {
+   "t": "关键说明",
+   "chips": [
+    "beauty-engine 不直接依赖 :shared|经 mnn-core 共享 MNN 资源",
+    ":androidApp 直接依赖 mnn-core|PoLangApplication 使用 MnnResourceManager",
+    "beauty-api 经 api 依赖 :shared|契约类型透出"
+   ]
+  }
+ ],
+ "name": "module-deps"
+}

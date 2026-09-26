@@ -1,0 +1,48 @@
+{
+ "kind": "layers",
+ "title": "Capability 生命周期分层",
+ "banner": "Application → Activity → Screen → ViewModel",
+ "pill": "作用域递减",
+ "pill_c": "blue",
+ "foot": "ViewModel 不持有 Capability 引用（回调通信）；配置变更时 ViewModel 存活、Screen 级 Capability 重建。",
+ "bands": [
+  {
+   "t": "Layer 1 · Application",
+   "s": "全局配置，无状态",
+   "chips": [
+    "LogModuleConfig 默认值",
+    "BeautyEngine 全局初始化（仅一次）",
+    "不持有任何 Capability 实例"
+   ]
+  },
+  {
+   "t": "Layer 2 · Activity",
+   "s": "导航级",
+   "chips": [
+    "NavigationCapability|绑定 NavController",
+    "生命周期 onCreate ~ onDestroy",
+    "所有页面共享同一实例"
+   ]
+  },
+  {
+   "t": "Layer 3 · Screen",
+   "s": "页面级",
+   "chips": [
+    "CameraCapability|绑定 Camera 状态",
+    "生命周期 Screen Enter ~ Exit",
+    "仅当前 CameraScreen",
+    "aspectRatio / lensFacing / beautySettings"
+   ]
+  },
+  {
+   "t": "Layer 4 · ViewModel",
+   "s": "业务逻辑",
+   "chips": [
+    "MediaViewModel|媒体数据管理",
+    "配置变更存活",
+    "不持有 Capability 引用（回调通信）"
+   ]
+  }
+ ],
+ "name": "cap-lifecycle-layers"
+}

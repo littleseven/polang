@@ -1,0 +1,49 @@
+{
+ "kind": "flow",
+ "title": "VLM 引擎调用链",
+ "banner": "调度器 → 单例引擎 → nativeHandle",
+ "pill": "串行化",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "调用方",
+   "chips": [
+    "TagGenerationScheduler / OpenClGuardian / TagScanOrchestrator"
+   ]
+  },
+  {
+   "t": "AgentOrchestrator.getInstance()",
+   "chips": [
+    "进程级单例|组合根 Application.onCreate initialize(deps)",
+    "localModelService（AgentOrchestrator.kt:134）"
+   ]
+  },
+  {
+   "t": "getLlmEngine()",
+   "chips": [
+    "ImageInferenceEngine|Android actual = LocalLlmEngine",
+    "MnnLlmClient（唯一实例）→ nativeHandle: Long（C++ Llm 对象）"
+   ]
+  },
+  {
+   "t": "ensureModelLoaded / withModelLoaded",
+   "chips": [
+    "imageEngine.loadModel(modelId, useOpencl)|LocalModelService.kt:127 唯一直调"
+   ]
+  },
+  {
+   "t": "engineMutex.withLock",
+   "chips": [
+    "协程 Mutex + modelDispatcher → MnnLlmClient.load(modelId)"
+   ]
+  },
+  {
+   "t": "幂等守卫 + 全局锁",
+   "chips": [
+    "if (isLoaded) return true",
+    "MnnGlobalReleaseLock.withOperation { nativeCreate(configPath) }"
+   ]
+  }
+ ],
+ "name": "mnn-llm-callchain"
+}

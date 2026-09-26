@@ -1,0 +1,41 @@
+{
+ "kind": "flow",
+ "title": "索引与检索闭环（ADR-007）",
+ "banner": "入库建索引 · 查询走两层",
+ "pill": "闭环",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "拍照 / 导入照片",
+   "chips": [
+    "MediaRepositoryImpl.refreshMediaLibrary() → MediaIndexingWorker.start()"
+   ]
+  },
+  {
+   "t": "批量索引",
+   "s": "每批 20 张 · indexedAt IS NULL",
+   "chips": [
+    "ML Kit Image Labeling → labels JSON",
+    "ML Kit Text Recognition → ocrText",
+    "EXIF GPS → lat/lon",
+    "Geocoder → locationName",
+    "写入 Room DB 并标记 indexedAt"
+   ]
+  },
+  {
+   "t": "Gallery 搜索框输入",
+   "chips": [
+    "QueryParser.parse(「猫」) → StructuredFilter(keywords=[猫])"
+   ]
+  },
+  {
+   "t": "MediaSearchEngine.search(filter)",
+   "chips": [
+    "searchByLabel 匹配标签",
+    "searchByOcrText 匹配 OCR 文字",
+    "合并去重 · 按时间降序"
+   ]
+  }
+ ],
+ "name": "adr007-index-search-loop"
+}

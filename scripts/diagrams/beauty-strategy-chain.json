@@ -1,0 +1,36 @@
+{
+ "kind": "flow",
+ "title": "美颜策略装配链",
+ "banner": "BeautyStrategy → 渲染器",
+ "pill": "策略模式",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "BeautyStrategy",
+   "chips": [
+    "domain.model.UserPreferences"
+   ]
+  },
+  {
+   "t": "rememberPreviewStrategyBundle()",
+   "chips": [
+    "CameraPreviewStrategies"
+   ]
+  },
+  {
+   "t": "BIG_BEAUTY → GlBeautyPreviewStrategy",
+   "chips": []
+  },
+  {
+   "t": "GlBeautyPreviewProvider",
+   "chips": [
+    "engines/beauty-engine/render"
+   ]
+  },
+  {
+   "t": "BeautyPreviewView → CameraPreviewRenderer → BeautyRenderer",
+   "chips": []
+  }
+ ],
+ "name": "beauty-strategy-chain"
+}

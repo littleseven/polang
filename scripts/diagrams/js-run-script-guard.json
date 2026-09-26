@@ -1,0 +1,41 @@
+{
+ "kind": "flow",
+ "title": "run_gallery_script 写确认护栏",
+ "banner": "脚本执行全程挂确认控制器",
+ "pill": "Tier A",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "LLM tool_call: run_gallery_script(code)",
+   "chips": [
+    "ChatToolService / RemoteControlToolService → AgentCommand.ExecuteScript"
+   ]
+  },
+  {
+   "t": "ChatRunScriptCapability → onRunScript",
+   "chips": [
+    "jsEvalMutex 串行",
+    "writeConfirmationController.onScriptStarted()"
+   ]
+  },
+  {
+   "t": "rt.eval(...)",
+   "chips": [
+    "(async function(){ <code> })() + evalTimeoutMs"
+   ]
+  },
+  {
+   "t": "finally 收尾",
+   "chips": [
+    "onScriptEnded()|在途写确认一律拒绝"
+   ]
+  },
+  {
+   "t": "结果 JSON 回传",
+   "chips": [
+    "作为 observation 给 LLM 做自然语言总结"
+   ]
+  }
+ ],
+ "name": "js-run-script-guard"
+}

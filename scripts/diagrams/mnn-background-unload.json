@@ -1,0 +1,38 @@
+{
+ "kind": "flow",
+ "title": "后台两段式释放",
+ "banner": "30s 软回收 → 60s 硬卸载",
+ "pill": "生命周期",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "用户按 Home 键",
+   "chips": [
+    "最后一个 Activity onStopped() → onAppBackground()"
+   ]
+  },
+  {
+   "t": "30s 后检查",
+   "chips": [
+    "仍后台 + 无引用 → notifySoftTrim()",
+    "LocalLlmEngine.onSoftTrim() → trimMemory()",
+    "人脸检测 softRelease（保留模型）"
+   ]
+  },
+  {
+   "t": "累计 60s 再检查",
+   "chips": [
+    "仍后台 + 无引用 → notifySafeUnload()",
+    "LocalLlmEngine.onSafeUnload() → performUnload()",
+    "人脸检测 performUnload()"
+   ]
+  },
+  {
+   "t": "前台返回即取消",
+   "chips": [
+    "调度协程取消，恢复现场"
+   ]
+  }
+ ],
+ "name": "mnn-background-unload"
+}

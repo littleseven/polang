@@ -1,0 +1,24 @@
+{
+ "kind": "hflow",
+ "title": "传感器方向旋转链",
+ "banner": "横向传感器 → 竖向显示",
+ "pill": "864×480 → 480×864",
+ "pill_c": "blue",
+ "nodes": [
+  {
+   "t": "传感器输出",
+   "s": "864×480 · 横向",
+   "c": "tint"
+  },
+  {
+   "t": "CameraX 自动旋转",
+   "s": "270°"
+  },
+  {
+   "t": "PreviewView 显示",
+   "s": "480×864 · 竖向",
+   "c": "hero"
+  }
+ ],
+ "name": "beauty-sensor-rotation"
+}

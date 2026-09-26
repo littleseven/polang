@@ -1,0 +1,44 @@
+{
+ "kind": "flow",
+ "title": "电池/热守卫与节流",
+ "banner": "checkGuard 决策 + 冷却节奏",
+ "pill": "功耗红线",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "TagGenerationService.checkGuard",
+   "s": "电池 / 热状态",
+   "chips": [
+    {
+     "c": "rose",
+     "t": "Battery ≤ 5% → ABORT 终止扫描"
+    },
+    {
+     "c": "orange",
+     "t": "Battery ≤ 15%（非充电）→ PAUSE"
+    },
+    {
+     "c": "rose",
+     "t": "Thermal ≥ SEVERE → ABORT"
+    },
+    {
+     "c": "orange",
+     "t": "Thermal ≥ MODERATE → PAUSE"
+    },
+    {
+     "c": "green",
+     "t": "其他 → ALLOW"
+    }
+   ]
+  },
+  {
+   "t": "Scheduler.guardCheck 响应",
+   "chips": [
+    "ALLOW → 正常执行（Pass 3 每张结束 delay 800ms）",
+    "PAUSE → delay(getThrottleMs()) 默认 1000ms",
+    "ABORT → return false 退出循环"
+   ]
+  }
+ ],
+ "name": "tag-guard-throttle"
+}

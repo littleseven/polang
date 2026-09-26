@@ -36,28 +36,7 @@
 
 ### 1.1 核心拓扑
 
-```
-┌──────────────┐     ┌──────────────────┐     ┌─────────────────────────┐
-│  用户(飞书)   │────→│  飞书开放平台     │←───→│  PoLang 设备端           │
-│  发送消息     │     │  (Bot网关)       │     │  (Android)              │
-└──────────────┘     └──────────────────┘     │                         │
-      ↑                                       │  ┌───────────────────┐  │
-      │                                       │  │ FeishuChannel     │  │
-      └───────────────────────────────────────┤  │ Handler           │  │
-             飞书 Bot API 回复结果              │  │ (WS+OAPI Client)  │  │
-                                               │  └────────┬──────────┘  │
-                                               │           │              │
-                                               │  ┌────────▼──────────┐  │
-                                               │  │ RemoteCommand     │  │
-                                               │  │ Dispatcher        │  │
-                                               │  │ (LLM+Capability)  │  │
-                                               │  └────────┬──────────┘  │
-                                               │           │              │
-                                               │  ┌────────▼──────────┐  │
-                                               │  │ CapabilityRegistry │  │
-                                               │  └───────────────────┘  │
-                                               └─────────────────────────┘
-```
+![飞书远程控制架构](assets/diagrams/im-feishu-architecture.png)
 
 ### 1.2 关键变化：去除 SCF Relay Server
 
@@ -70,12 +49,7 @@
 
 ### 1.3 消息流转路径
 
-```
-用户 → 飞书消息 → 飞书开放平台 → WebSocket 推送 → PoLang 设备端
-    → FeishuChannelHandler → RemoteCommandDispatcher
-        → LLM 解析意图 → CapabilityRegistry.dispatch()
-        → 结果 → 飞书 OAPI HTTP 回复 → 用户
-```
+全链路：用户 → 飞书消息 → 飞书开放平台 → WebSocket 推送 → PoLang 设备端 → `FeishuChannelHandler` → `RemoteCommandDispatcher` → LLM 解析意图 → `CapabilityRegistry.dispatch()` → 结果经飞书 OAPI HTTP 回复 → 用户。
 
 ### 1.4 组件职责
 
@@ -181,31 +155,7 @@ class FeishuChannelHandler(
 
 ### 3.1 组件架构
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                   Android 端                              │
-│                                                          │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │  FeishuChannelHandler                                │  │
-│  │  ├── ws.Client (飞书 WS, 接收消息事件)               │  │
-│  │  └── apiClient (飞书 OAPI HTTP, 回复/上传)           │  │
-│  └──────────────────────┬──────────────────────────────┘  │
-│                         │                                  │
-│  ┌──────────────────────▼──────────────────────────────┐  │
-│  │  RemoteCommandDispatcher                             │  │
-│  │  (命令解析/LLM意图理解/分派到Capability)              │  │
-│  └──────────────────────┬──────────────────────────────┘  │
-│                         │                                  │
-│  ┌──────────────────────▼──────────────────────────────┐  │
-│  │  CapabilityRegistry                                  │  │
-│  │  (GalleryCapability/ImageEditCapability)              │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                          │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  RemoteControlCapability (设备绑定/状态管理)          │  │
-│  └──────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────┘
-```
+![飞书远程控制架构（Android 端组件）](assets/diagrams/im-feishu-architecture.png)
 
 ### 3.2 RemoteCommandDispatcher
 
@@ -254,12 +204,10 @@ class RemoteCommandDispatcher(
 
 ## 4. 设备绑定流程
 
-```
 1. App 内生成绑定码 → 在飞书 Bot 中输入绑定码（或扫码）
-2. FeishuChannelHandler 收到绑定消息 → RemoteControlCapability.updateBinding()
-3. RemoteControlCapability 记录绑定状态
-4. 通过飞书回复 "设备 Xiaomi 15 Ultra 已绑定成功 ✅"
-```
+2. `FeishuChannelHandler` 收到绑定消息 → `RemoteControlCapability.updateBinding()`
+3. `RemoteControlCapability` 记录绑定状态
+4. 通过飞书回复「设备 Xiaomi 15 Ultra 已绑定成功 ✅」
 
 **首次绑定的安全性**：
 - 绑定码在 App 内生成，有效期内可配对
@@ -286,14 +234,7 @@ class RemoteCommandDispatcher(
 
 ### 5.3 命令确认流程
 
-```
-用户发送: "删除模糊的照片"
-    ↓ LLM 解析意图 → 需要确认
-    ↓ RemoteCommandDispatcher → 发送确认卡片
-用户点击确认 → 卡片回调经 WS 返回 → 执行删除 → 结果回复
-    ↓
-用户未操作 30s → 自动超时取消
-```
+![危险命令确认流](assets/diagrams/im-confirm-timeout.png)
 
 **确认策略矩阵**：
 
@@ -313,16 +254,7 @@ class RemoteCommandDispatcher(
 
 ### 6.1 设备离线场景
 
-```
-用户发送命令 → 飞书平台 → WebSocket 推送
-    ↓ 设备在线？
-    ├── 是 → 立即执行
-    └── 否 → 飞书 WebSocket 连接断开
-        ↓
-    用户收到 "设备离线，请稍后再试"
-    ↓
-    设备上线后：飞书 SDK 自动重连 → 恢复可用
-```
+![设备离线处理](assets/diagrams/im-offline-reconnect.png)
 
 - 飞书 SDK 内置重连机制（指数退避）
 - 无离线命令队列（相比 SCF 方案，这是唯一的能力损失：设备离线期间的命令不会缓冲）
@@ -394,12 +326,7 @@ class RemoteCommandDispatcher(
 
 ### 8.2 与现有远程推理链路的协同
 
-```
-飞书消息 → FeishuChannelHandler → RemoteCommandDispatcher
-    → LLM 解析意图（复用 Koog OpenAILLMClient）
-    → CapabilityRegistry.dispatch()
-    → 结果 → FeishuChannelHandler.sendMessage/sendImage
-```
+链路：飞书消息 → `FeishuChannelHandler` → `RemoteCommandDispatcher` → LLM 解析意图（复用 Koog OpenAILLMClient）→ `CapabilityRegistry.dispatch()` → 结果经 `sendMessage`/`sendImage` 回复。
 
 - IM 远程的 LLM 调用与 App 内共享同一 Koog `OpenAILLMClient`
 - 使用独立 System Prompt（IM 场景上下文不同）

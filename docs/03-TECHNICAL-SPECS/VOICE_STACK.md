@@ -33,23 +33,16 @@ PoLang 语音栈已完成 **Phase 2（Sherpa-ONNX KWS）** 迁移并投入使用
 
 #### 旧版本局限性
 
-```
-原方案（6 个唤醒词）：
-├─ "小觅" × 1（标准）
-├─ "小蜜"（同音）
-├─ "小秘"（同音）
-├─ "小米"（近音）
-├─ "小咪"（近音）
-└─ "小哔"（近音）
+**原方案（6 个唤醒词）**：「小觅」×1（标准）、「小蜜」「小秘」（同音）、「小米」「小咪」「小哔」（近音）
 
-问题：
-❌ 不支持口语启动词（"嘿小觅"、"哎小觅"）
-❌ 不支持自然用法（"小觅你好"、"小觅啊"）
-❌ 轮询策略单一：固定 150ms，无法根据语音活动动态调整
-❌ ASR 模型生命周期不优化：始终保持加载
-❌ VAD 结果无稳定性检查，容易误触
-❌ 唤醒词匹配无权重/优先级，不支持渐进式验证
-```
+**问题**：
+
+- ❌ 不支持口语启动词（「嘿小觅」「哎小觅」）
+- ❌ 不支持自然用法（「小觅你好」「小觅啊」）
+- ❌ 轮询策略单一：固定 150ms，无法根据语音活动动态调整
+- ❌ ASR 模型生命周期不优化：始终保持加载
+- ❌ VAD 结果无稳定性检查，容易误触
+- ❌ 唤醒词匹配无权重/优先级，不支持渐进式验证
 
 #### 用户体验痛点
 
@@ -137,25 +130,7 @@ delay(lastPollDelayMs)  // 使用动态延迟
 
 #### 按需 ASR 加载
 
-```
-原方案：start() → 加载 ASR → 持续运行 → stop()
-问题：ASR 282MB 模型始终占用内存和 CPU
-
-优化方案：
-┌─────────────────────────────────────┐
-│ WakeWordEngine.start()              │
-│   ├─ 启动 AudioRecorder + VAD       │
-│   └─ ASR 保持未初始化（低功耗）      │
-│        ↓
-│   检测到语音活动 + VAD 稳定        │
-│   └─ 【关键】调用 asrEngine.transcribe()
-│        → 触发 ASR 按需加载          │
-│        ↓ (仅在识别期间运行)
-│   识别完成或超时                   │
-│   └─ ASR 自动释放（不在此管理）     │
-│        ↓
-└─────────────────────────────────────┘
-```
+![ASR 按需加载（VAD 触发）](assets/diagrams/voice-asr-ondemand.png)
 
 ### 2.4 精准度优化
 
@@ -219,23 +194,7 @@ lastWakeTime = System.currentTimeMillis()
 
 #### 代码流程
 
-```
-VoiceCommandCoordinator.startWakeWordListening()
-    ↓
-wakeWordEngine.start(onTranscript)
-    ├─ audioRecorder.start()
-    ├─ vadDetector.reset()
-    └─ Dispatchers.IO 启动主循环
-         ├─ 轮询 audioRecorder.read()
-         ├─ VAD 处理 + 动态轮询
-         ├─ 稳定性检查（3 帧）
-         ├─ 冷却期检查（1.2s）
-         ├─ ASR 按需转录
-         ├─ 唤醒词权重匹配 + 日志
-         └─ onTranscript 回调（主线程）
-    ↓
-AgentOrchestrator 接收指令并执行
-```
+![唤醒词引擎主循环](assets/diagrams/voice-kws-loop.png)
 
 ### 2.6 性能指标
 
@@ -374,58 +333,19 @@ D/PoLang:WakeWord: Speech detected but in cooldown (200ms / 1200ms), skipped
 
 #### 隐式耦合链（历史）
 
-```
-libsherpa-mnn-jni.so → libMNN.so ← libmnn_llm.so
-         ↓                               ↓
-    [ASR 推理]                      [LLM 推理]
-         ↓
-libMNN.so 还被 FaceDetectManager（MNN 路径）引用
-```
+依赖关系：`libsherpa-mnn-jni.so → libMNN.so ← libmnn_llm.so`——ASR 与 LLM 推理各自依赖 libMNN.so，而 libMNN.so 还被 FaceDetectManager（MNN 路径）引用。
 
 **核心矛盾**：`libMNN.so` 被三个子系统共享，`MnnResourceManager` 的引用计数 + 全局释放锁 + 三级释放策略本质上是一个被迫的补丁。
 
 #### 当前唤醒词方案缺陷
 
-```
-VAD(RMS 25dB) → 录音(最长4s) → ASR 全量转录(282MB) → 文本匹配"小觅"
-                                                    ↑
-                                          每次检测都跑 282MB 模型
-                                          延迟数秒，无法 always-on
-```
+> 旧方案（已弃）：VAD(RMS 25dB) → 录音(最长 4s) → ASR 全量转录(282MB) → 文本匹配「小觅」——每次检测都跑 282MB 模型，延迟数秒，无法 always-on。
 
 ### 4.2 目标架构
 
 #### 分层运行时
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    应用层 (App Layer)                      │
-│                                                         │
-│  CameraScreen  →  VoiceCommandCoordinator                │
-│                      ├─ WakeWordEngine (新 KWS)           │
-│                      ├─ PushToTalkEngine                  │
-│                      └─ AiAgentUseCase                   │
-└──────────┬──────────────┬──────────────┬────────────────┘
-           │              │              │
-┌──────────▼──────┐ ┌─────▼──────────┐ ┌────▼──────────────┐
-│  语音栈 (ONNX)   │ │ VLM 打标(MNN) │ │  FaceDetect       │
-│                 │ │ (仅 TAG 用)    │ │  (MNN)            │
-│ libsherpa-      │ │ libMNN.so      │ │  独立 .so         │
-│ onnx-jni.so     │ │ +              │ │                   │
-│ +               │ │ libmnn_llm     │ │                   │
-│ libonnxruntime  │ │ .so            │ │                   │
-│ .so             │ │                │ │                   │
-│                 │ │                │ │                   │
-│ ├─ Keyword      │ │ Qwen3-VL-2B    │ │ Det10G + 2D106   │
-│ │  Spotter(KWS) │ │ (TAG Pass 3)   │ │                   │
-│ ├─ OnlineRecog  │ │                │ │                   │
-│ │  nizer(ASR)   │ │                │ │                   │
-│ └─ Vad(DNN VAD) │ │                │ │                   │
-│                 │ │                │ │                   │
-│ 完全独立        │ │ MNN 使用者     │ │ 完全独立          │
-│ 加载/释放       │ │ (VLM+Face)     │ │ 加载/释放         │
-└─────────────────┘ └────────────────┘ └───────────────────┘
-```
+![语音栈 Native 隔离地图](assets/diagrams/voice-stack-sos.png)
 
 **关键性质**：三个栈各自拥有独立的 Native 运行时，互相不共享全局状态。
 
@@ -444,59 +364,23 @@ VAD(RMS 25dB) → 录音(最长4s) → ASR 全量转录(282MB) → 文本匹配"
 
 #### 双引擎工作流程
 
-```
-【待机阶段】
-KWS 常驻监听 (50mW)
-    ↓ (100ms chunk 推理)
-检测到唤醒词 (如"小觅")
-    ↓
-【唤醒阶段】
-加载 ASR 模型 (~282MB, ~500mW)
-    ↓
-完整转录音频 (获取指令: "打开前置")
-    ↓
-识别完毕立即释放 ASR
-    ↓
-VLM 处理指令（或远程推理，执行操作）
-    ↓
-【回到待机】
-KWS 继续监听
-```
+![语音唤醒生命周期](assets/diagrams/voice-wakeup-lifecycle.png)
 
 ### 4.3 生命周期状态机
 
 #### 模型加载状态
 
-```
-每个子系统独立管理加载/释放，互不耦合：
+| 子系统 | UNLOADED（释放） | LOADED（加载） | ACTIVE（推理中） | 加载/释放管理 |
+|---|---|---|---|---|
+| KWS（ONNX） | ✅ | ✅ | ✅ | 独立 |
+| ASR（ONNX） | ✅ | ✅ | ✅ | 独立 |
+| VLM（MNN） | ✅ | ✅ | ✅ | 独立 |
 
-         ┌──────────┐    ┌──────────┐    ┌──────────┐
-         │  KWS     │    │  ASR     │    │  VLM     │
-         │ (ONNX)   │    │ (ONNX)   │    │ (MNN)    │
-         ├──────────┤    ├──────────┤    ├──────────┤
-UNLOADED │          │    │          │    │          │
-    ↓    │  释放    │    │  释放    │    │  释放    │
-LOADED   │  加载    │    │  加载    │    │  加载    │
-    ↓    │          │    │          │    │          │
-ACTIVE   │  推理中  │    │  推理中  │    │  推理中  │
-         └──────────┘    └──────────┘    └──────────┘
-              ↑ 独立            ↑ 独立            ↑ 独立
-             不共享任何 Native 状态
-```
+三个子系统互不耦合，不共享任何 Native 状态。
 
 #### 核心原则：分时复用，绝不叠加
 
-```
-[休眠态]                    [唤醒态]                     [推理态]                  [休眠态]
-KWS ████████████           KWS ░░░░░░░░░░░              KWS ░░░░░░░░░░░            KWS ████████████
-ASR ────────────    →      ASR ────────────     →       ASR ████████████    →      ASR ────────────
-VLM ────────────           VLM ────────────             VLM ████████████           VLM ────────────
-
- 常驻 ~45MB                 KWS 暂停                     峰值 ~2GB                  常驻 ~45MB
-                            ASR 加载 (~400MB)            VLM + ASR 同时存在
-                            VLM 按需加载 (~1.5GB)        转录完成 → ASR 立即释放
-                                                        VLM 推理完成 → 立即释放
-```
+![语音内存阶段图](assets/diagrams/voice-memory-phases.png)
 
 **设计约束**：
 1. KWS 与 ASR 绝不同时 ACTIVE（KWS 暂停后 ASR 加载）
@@ -666,17 +550,9 @@ fun canLoadVlm(): Boolean {
 
 #### 实施顺序（已按此完成）
 
-```
-Phase 1: 基础迁移（2天）          Phase 2: KWS 集成（1天）        Phase 3: 解耦优化（1天）
-┌──────────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐
-│ 1. 添加 AAR 依赖      │    │ 5. 实现 KWS 引擎       │    │ 8. 简化资源管理器     │
-│ 2. 更新模型配置        │    │ 6. 重写 WakeWordEngine │    │ 9. 删除 MnnReleaseLock│
-│ 3. 重写 ASR 引擎       │    │ 7. KWS 单元测试        │    │ 10. 集成测试          │
-│ 4. 下载 ONNX ASR 模型  │    │                      │    │ 11. 全链路验证        │
-└──────────────────────┘    └──────────────────────┘    └──────────────────────┘
-         ↓                          ↓                          ↓
-    ASR 功能持平              唤醒词体验质变               代码质量提升
-```
+- **Phase 1 · 基础迁移（2 天）**：① 添加 AAR 依赖 ② 更新模型配置 ③ 重写 ASR 引擎 ④ 下载 ONNX ASR 模型 → ASR 功能持平
+- **Phase 2 · KWS 集成（1 天）**：⑤ 实现 KWS 引擎 ⑥ 重写 WakeWordEngine ⑦ KWS 单元测试 → 唤醒词体验质变
+- **Phase 3 · 解耦优化（1 天）**：⑧ 简化资源管理器 ⑨ 删除 MnnReleaseLock ⑩ 集成测试 ⑪ 全链路验证 → 代码质量提升
 
 ### 4.7 模型配置（已上线，以下为 `androidApp/src/main/res/raw/llm_models.json` 实际内容）
 
@@ -816,24 +692,7 @@ implementation(files("../shared/libs/sherpa-onnx-1.13.3.aar"))  // Phase 4 Task 
 
 #### 6.1.1 ASR 流水线
 
-```
-音频输入
-    │
-    ▼
-┌─────────────────┐
-│  声学模型 (AM)   │  ← encoder.mnn + decoder.mnn + joiner.mnn
-│  Acoustic Model │     将音频波形转为音素概率分布
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  语言模型 (LM)   │  ← with-state-epoch-*.mnn（可选）
-│  Language Model │     根据语法/语义规律选择最可能的文本
-└────────┬────────┘
-         │
-         ▼
-      文本输出
-```
+![ASR 两级模型链](assets/diagrams/voice-asr-am-lm.png)
 
 #### 6.1.2 LM 的作用举例
 

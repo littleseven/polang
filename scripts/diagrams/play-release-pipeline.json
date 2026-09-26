@@ -1,0 +1,26 @@
+{
+ "name": "play-release-pipeline",
+ "kind": "hflow",
+ "title": "Play 发布流水线",
+ "banner": "版本号 → GPP 封装 → 审核",
+ "pill": "CI",
+ "pill_c": "green",
+ "nodes": [
+  {
+   "t": "release-automation.sh",
+   "s": "版本号 / CHANGELOG / git tag",
+   "c": "tint"
+  },
+  {
+   "t": "play-publish.sh",
+   "s": "GPP 封装：上传 / 文案 / 晋升",
+   "c": "tint"
+  },
+  {
+   "t": "Play Console",
+   "s": "审核 → 上架",
+   "c": "hero"
+  }
+ ],
+ "foot": "CI：.github/workflows/release.yml（tag v* 触发，只发 internal）"
+}

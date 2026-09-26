@@ -1,0 +1,45 @@
+{
+ "kind": "layers",
+ "title": "自然语言搜索分层（ADR-007）",
+ "banner": "离线索引打底 · 在线三层解析",
+ "pill": "Hybrid",
+ "pill_c": "blue",
+ "bands": [
+  {
+   "t": "离线索引",
+   "s": "后台异步",
+   "chips": [
+    "ML Kit Image Labeling",
+    "ML Kit Text Recognition",
+    "EXIF GPS + Geocoder",
+    "→ Room DB（media_assets 扩展）"
+   ]
+  },
+  {
+   "t": "Layer 0 · LLM 意图标准化",
+   "s": "Chat 场景优先",
+   "chips": [
+    "近半年/去年/上个月 → TimeRange {startMs, endMs}",
+    "小孩/海边/上海/自拍 → keywords / locationKeywords / hasFaces",
+    "search_media 携带 SearchIntent → 直接转 StructuredFilter"
+   ]
+  },
+  {
+   "t": "Layer 1 · QueryParser 规则匹配",
+   "s": "离线 < 100ms 兜底",
+   "chips": [
+    "「去年」→年份-1 ·「夏天」→6-8月 ·「近半年」→6 个月前至今",
+    "关键词 → labels / ocrText / locationName LIKE"
+   ]
+  },
+  {
+   "t": "Layer 2 · Agent LLM 语义解析",
+   "s": "需要时",
+   "chips": [
+    "复杂混合查询「去年夏天在上海拍的猫」",
+    "LLM → StructuredFilter → AgentOrchestrator → search_media"
+   ]
+  }
+ ],
+ "name": "adr007-search-layers"
+}

@@ -1,0 +1,33 @@
+{
+ "kind": "flow",
+ "title": "ASR 两级模型链",
+ "banner": "声学模型 → 语言模型 → 文本",
+ "pill": "Sherpa",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "音频输入",
+   "chips": []
+  },
+  {
+   "t": "声学模型 AM",
+   "chips": [
+    "encoder.mnn + decoder.mnn + joiner.mnn",
+    "音频波形 → 音素概率分布"
+   ]
+  },
+  {
+   "t": "语言模型 LM",
+   "s": "可选",
+   "chips": [
+    "with-state-epoch-*.mnn",
+    "按语法/语义选择最可能文本"
+   ]
+  },
+  {
+   "t": "文本输出",
+   "chips": []
+  }
+ ],
+ "name": "voice-asr-am-lm"
+}

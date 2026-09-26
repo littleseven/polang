@@ -1,0 +1,50 @@
+{
+ "kind": "flow",
+ "title": "AI 工程师链路",
+ "banner": "claude-chat 隧道 · 云端 Claude Code",
+ "pill": "实验性",
+ "pill_c": "orange",
+ "foot": "工具闭环：<b>app_tools MCP</b> 经 SSE 下行到 App 采集脱敏后回传，Claude 持续迭代；交付走 <b>push / pr / auto</b> 三选。",
+ "steps": [
+  {
+   "t": "用户输入",
+   "chips": [
+    "ChatScreen（AI Engineer toggle ON）→ sendClaudeMessage()"
+   ]
+  },
+  {
+   "t": "PoLang Server",
+   "chips": [
+    "POST /v1/claude-chat（X-App-Token 鉴权）"
+   ]
+  },
+  {
+   "t": "chisel wss 反向隧道",
+   "chips": [
+    "→ KimiClaw gateway → Claude Code --resume <sid>（GLM backend）"
+   ]
+  },
+  {
+   "t": "代码迭代事件",
+   "chips": [
+    "读/改代码（Bash/Edit）→ file_change / tool_use SSE → App 渲染步骤列表 + 文本流"
+   ]
+  },
+  {
+   "t": "App 工具闭环",
+   "chips": [
+    "MCP app_tools → app_tool_request SSE 下行",
+    "AppToolExecutor：日志/崩溃/聊天历史/运行时状态/相册摘要",
+    "DiagSanitizer 脱敏 → POST /v1/claude-tool-result → 回传继续推理"
+   ]
+  },
+  {
+   "t": "交付",
+   "chips": [
+    "用户选择 push / pr / auto → POST /v1/claude-deliver",
+    "git commit + push claude-chat/<sid> 或 gh pr create"
+   ]
+  }
+ ],
+ "name": "engineer-claude-chain"
+}

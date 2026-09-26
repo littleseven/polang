@@ -1,0 +1,41 @@
+{
+ "kind": "flow",
+ "title": "唤醒词引擎主循环",
+ "banner": "startWakeWordListening 内部",
+ "pill": "Dispatchers.IO",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "VoiceCommandCoordinator.startWakeWordListening()",
+   "chips": [
+    "→ wakeWordEngine.start(onTranscript)"
+   ]
+  },
+  {
+   "t": "启动",
+   "chips": [
+    "audioRecorder.start()",
+    "vadDetector.reset()",
+    "Dispatchers.IO 启动主循环"
+   ]
+  },
+  {
+   "t": "主循环",
+   "chips": [
+    "轮询 audioRecorder.read()",
+    "VAD 处理 + 动态轮询",
+    "稳定性检查（3 帧）",
+    "冷却期检查（1.2s）",
+    "ASR 按需转录",
+    "唤醒词权重匹配 + 日志"
+   ]
+  },
+  {
+   "t": "onTranscript 回调",
+   "chips": [
+    "主线程 → AgentOrchestrator 接收指令并执行"
+   ]
+  }
+ ],
+ "name": "voice-kws-loop"
+}

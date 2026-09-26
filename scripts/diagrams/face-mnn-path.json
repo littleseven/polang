@@ -1,0 +1,34 @@
+{
+ "kind": "flow",
+ "title": "人脸检测 · MNN NV21 路径",
+ "banner": "备选引擎 · DirectByteBuffer 零拷贝",
+ "pill": "2D106",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "CameraX ImageProxy",
+   "chips": [
+    "detectRoiFromNv21(yuvData, width, height, …)|DirectByteBuffer 零拷贝 → MNN C++ 层"
+   ]
+  },
+  {
+   "t": "MnnRoiDetector",
+   "chips": [
+    "detectRoiFromYuv：letterbox → 原图坐标逆映射"
+   ]
+  },
+  {
+   "t": "Landmark 检测",
+   "chips": [
+    "detectLandmarksFromNv21WithRoi|基于 ROI 裁剪区域"
+   ]
+  },
+  {
+   "t": "MnnLandmarkAdapter",
+   "chips": [
+    "106 点重排 → Face106ToWarpParams → BeautyRenderer"
+   ]
+  }
+ ],
+ "name": "face-mnn-path"
+}

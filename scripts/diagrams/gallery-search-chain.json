@@ -1,0 +1,29 @@
+{
+  "name": "gallery-search-chain",
+  "kind": "flow",
+  "title": "相册自然语言搜索链路",
+  "banner": "八层漏斗 · 显式约束先行 · 语义兜底",
+  "pill": "100% 端侧",
+  "foot": "<b>媒体文件绝不上传</b>——整条链路只消费本机索引与 embedding，仅 Layer 0 的文本查询可经远程 LLM。",
+  "steps": [
+    {"t": "用户输入", "s": "自然语言", "chips": ["「找去年夏天在海边拍的照片」"]},
+    {"t": "Layer 0 · LLM 意图标准化", "s": "Chat 场景优先；文本查询可远程",
+     "chips": ["search_media / refine_media_search 携带 SearchIntent",
+               {"c": "green", "t": "近半年/去年/上个月 → TimeRange {startMs, endMs}"},
+               {"c": "green", "t": "小孩/海边/上海/自拍 → keywords / locationKeywords / hasFaces"}]},
+    {"t": "Layer 0.5 · QuerySegmenter 语义分段", "s": "Gallery 搜索框入口",
+     "chips": ["时间", "地点", "人物", "物体", "场景", "活动", "OCR", {"c": "ghost", "t": "未知"}]},
+    {"t": "Layer 1 · QueryParser 规则解析",
+     "chips": ["去年/今年/夏天/本周/五月/近半年 → TimeRange", "北京/室内/海边 → locationKeywords"]},
+    {"t": "Layer 2 · ExplicitFirstSearchPipeline 结构化召回",
+     "chips": ["显式约束（时间/地点/人脸）先取交集 → candidateIds",
+               "内容关键词在候选集内匹配 labels / mlKitLabels / OCR / 文件名"]},
+    {"t": "Layer 2.5 · SemanticSearchEngine 语义召回", "s": "MobileCLIP",
+     "chips": ["中文查询 → ChineseQueryTranslator → 英文 embedding",
+               "与 candidateIds 内 image embedding 计算余弦相似度"]},
+    {"t": "Layer 3 · MediaSearchEngine 融合排序",
+     "chips": ["SQL 召回分 + 语义相似度分 + 时间衰减 → 最终列表"]},
+    {"t": "UI 呈现", "s": "GalleryScreen / Chat 消息卡片",
+     "chips": ["长按选择", "批量删除/分享", {"c": "ghost", "t": "删除后自动刷新搜索结果"}]}
+  ]
+}

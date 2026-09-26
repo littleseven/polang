@@ -1,0 +1,32 @@
+{
+ "kind": "flow",
+ "title": "Agent 任务编排蓝图",
+ "banner": "[agent-task] → JSON → 四 Agent",
+ "pill": "设计中",
+ "pill_c": "orange",
+ "foot": "parse_agent_tasks.py 尚未落地（⏳ 设计中）；当前为规划形态。",
+ "steps": [
+  {
+   "t": "Spec 文档",
+   "chips": [
+    "含 [agent-task] 标记"
+   ]
+  },
+  {
+   "t": "Task JSON",
+   "chips": [
+    "parse_agent_tasks.py（⏳ 设计中，未落地）|标准化任务描述"
+   ]
+  },
+  {
+   "t": "编排脚本分发",
+   "chips": [
+    "RD Agent：执行代码变更",
+    "QA Agent：执行验收测试",
+    "CR Agent：执行代码审查",
+    "PM Agent：更新进度跟踪"
+   ]
+  }
+ ],
+ "name": "dev-agent-orchestration"
+}

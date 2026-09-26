@@ -1,0 +1,38 @@
+{
+ "kind": "flow",
+ "title": "中文查询扩展四级回退",
+ "banner": "expandForSearch",
+ "pill": "0ms 优先",
+ "pill_c": "green",
+ "steps": [
+  {
+   "t": "① BilingualVocab 精确匹配",
+   "chips": [
+    "zhToEn 词表（0ms）",
+    "命中 → {中文词, 英文词}"
+   ]
+  },
+  {
+   "t": "② ControlledVocab 同义词扩展",
+   "chips": [
+    "synonyms：「美女」→「女性」",
+    "reverseSynonyms：「女性」→[美女, 大美女]"
+   ]
+  },
+  {
+   "t": "③ OPUS-MT 翻译回退",
+   "chips": [
+    "~50ms，词表未命中时",
+    "中文词 → NMT → 英文词",
+    "质量校验：过滤空白/异常输出"
+   ]
+  },
+  {
+   "t": "④ 保留原词兜底",
+   "chips": [
+    "以上全未命中"
+   ]
+  }
+ ],
+ "name": "zh-query-expansion"
+}

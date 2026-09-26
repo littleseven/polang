@@ -31,58 +31,7 @@ PoLang 相册支持用户用自然语言搜索本地照片，例如：
 
 ## 2. 整体架构
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      用户输入（自然语言）                         │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 0: LLM 意图标准化（Chat 场景优先）                         │
-│  search_media / refine_media_search 携带 SearchIntent             │
-│  近半年/去年/上个月 → TimeRange {startMs, endMs}                  │
-│  小孩/海边/上海/自拍 → keywords / locationKeywords / hasFaces     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ (Gallery 搜索框入口)
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 0.5: QuerySegmenter 语义分段                              │
-│  时间 / 地点 / 人物 / 物体 / 场景 / 活动 / OCR / 未知             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 1: QueryParser 规则解析                                   │
-│  去年/今年/夏天/本周/五月/近半年 → TimeRange                      │
-│  北京/室内/海边 → locationKeywords                                │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: ExplicitFirstSearchPipeline 结构化召回                 │
-│  显式约束（时间/地点/人脸）先取交集 → candidateIds                │
-│  内容关键词在候选集内匹配 labels / mlKitLabels / OCR / 文件名      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2.5: SemanticSearchEngine MobileCLIP 语义召回             │
-│  中文查询 → ChineseQueryTranslator → 英文 embedding               │
-│  与 candidateIds 内的 image embedding 计算余弦相似度               │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 3: MediaSearchEngine 融合排序                             │
-│  SQL 召回分 + 语义相似度分 + 时间衰减 → 最终列表                   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  UI: GalleryScreen / Chat 消息卡片                               │
-│  长按选择、批量删除/分享、删除后自动刷新搜索结果                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+![相册自然语言搜索链路](assets/diagrams/gallery-search-chain.png)
 
 **双入口说明**：
 
@@ -166,34 +115,7 @@ data class TimeRange(
 
 **Chat 链路**：
 
-```
-用户输入 "近半年小孩的照片"
-    │
-    ▼
-AgentOrchestrator.streamChat()
-    │
-    ▼
-远程 LLM（KoogChatAgent）→ AgentCommand.SearchMedia(
-    query = "近半年小孩的照片",
-    intent = SearchIntent(
-        timeRange = TimeRange(...),   // 近半年
-        keywords = ["小孩"],
-        hasFaces = true
-    )
-)
-    │
-    ▼
-ChatSearchCapability.execute()
-    │
-    ▼
-ChatViewModel.onSearchMedia(query, intent)
-    │
-    ▼
-searchIntentToStructuredFilter(intent) → StructuredFilter
-    │
-    ▼
-MediaSearchEngine.search(filter)
-```
+![Chat 场景搜索流](assets/diagrams/gallery-chat-search-flow.png)
 
 ### 4.1 QuerySegmenter 语义分段
 

@@ -1,0 +1,34 @@
+{
+ "kind": "flow",
+ "title": "Spec ↔ Code 双螺旋",
+ "banner": "文档驱动实现 · 实现反哺文档",
+ "pill": "共识循环",
+ "pill_c": "green",
+ "steps": [
+  {
+   "t": "Spec 文档",
+   "chips": [
+    "What & How"
+   ]
+  },
+  {
+   "t": "代码实现",
+   "chips": [
+    "驱动"
+   ]
+  },
+  {
+   "t": "新问题 / 优化点",
+   "chips": [
+    "发现"
+   ]
+  },
+  {
+   "t": "Spec 文档更新",
+   "chips": [
+    "反馈共识 → 驱动下一轮"
+   ]
+  }
+ ],
+ "name": "dev-spec-code-loop"
+}

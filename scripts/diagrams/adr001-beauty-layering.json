@@ -1,0 +1,47 @@
+{
+ "kind": "layers",
+ "title": "美颜引擎四层架构（ADR-001）",
+ "banner": "App → Domain → Data → 引擎",
+ "pill": "分层解耦",
+ "pill_c": "blue",
+ "bands": [
+  {
+   "t": "App Layer",
+   "chips": [
+    "仅依赖 beauty-engine:api"
+   ]
+  },
+  {
+   "t": "Domain Layer",
+   "s": "beauty-engine:api",
+   "chips": [
+    "BeautyPreviewProvider / BeautyPreviewEngine",
+    "PhotoProcessor",
+    "BeautyParams / FaceData / FilterType",
+    "BeautyPerfStats / FrameSyncResult"
+   ]
+  },
+  {
+   "t": "Data Layer",
+   "s": "beauty-engine:render",
+   "chips": [
+    "GlBeautyPreviewProvider",
+    "CameraPreviewRenderer|自研 OpenGL ES 管线",
+    "BeautyRenderer|美颜 Shader",
+    "PhotoProcessorImpl|拍照 GPU 离屏",
+    "FaceMakeupPass|唇色/腮红三角网格",
+    "EGLCore / WindowSurface"
+   ]
+  },
+  {
+   "t": "BIG_BEAUTY",
+   "chips": [
+    {
+     "c": "hero",
+     "t": "自研引擎|零三方美颜 SDK"
+    }
+   ]
+  }
+ ],
+ "name": "adr001-beauty-layering"
+}

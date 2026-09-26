@@ -1,0 +1,34 @@
+{
+ "kind": "flow",
+ "title": "问题上报链路",
+ "banner": "设置页 → 服务端脱敏 → GitHub issue",
+ "pill": "2026-09",
+ "pill_c": "green",
+ "steps": [
+  {
+   "t": "用户点击「上报问题」",
+   "chips": [
+    "设置页 → 其他分组"
+   ]
+  },
+  {
+   "t": "IssueReportClient",
+   "chips": [
+    "POST /v1/report-issue（X-App-Token 鉴权）"
+   ]
+  },
+  {
+   "t": "PoLang Server 脱敏",
+   "chips": [
+    "IssueReportRoute"
+   ]
+  },
+  {
+   "t": "自动创建 GitHub issue",
+   "chips": [
+    "littleseven/polang"
+   ]
+  }
+ ],
+ "name": "report-issue-flow"
+}

@@ -1,0 +1,46 @@
+{
+ "kind": "flow",
+ "title": "飞书远程控制架构",
+ "banner": "消息经 WS 下行 · 结果经 OAPI 回传",
+ "pill": "用户自配置通道",
+ "pill_c": "orange",
+ "foot": "通道属用户自有配置（ADR-008 豁免）；设备离线时飞书 SDK 自动重连恢复。",
+ "steps": [
+  {
+   "t": "用户（飞书）发送消息",
+   "chips": [
+    "飞书开放平台 Bot 网关"
+   ]
+  },
+  {
+   "t": "FeishuChannelHandler",
+   "s": "设备端 Android",
+   "chips": [
+    "ws.Client|飞书 WS 接收消息事件",
+    "apiClient|飞书 OAPI HTTP 回复/上传"
+   ]
+  },
+  {
+   "t": "RemoteCommandDispatcher",
+   "chips": [
+    "命令解析",
+    "LLM 意图理解（复用 Koog OpenAILLMClient）",
+    "分派到 Capability"
+   ]
+  },
+  {
+   "t": "CapabilityRegistry.dispatch",
+   "chips": [
+    "GalleryCapability / ImageEditCapability",
+    "RemoteControlCapability|设备绑定 / 状态管理"
+   ]
+  },
+  {
+   "t": "结果回复用户",
+   "chips": [
+    "sendMessage / sendImage → 飞书 Bot API"
+   ]
+  }
+ ],
+ "name": "im-feishu-architecture"
+}

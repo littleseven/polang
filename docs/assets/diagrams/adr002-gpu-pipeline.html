@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU 统一管线（ADR-002）</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{color-scheme:light;--grid:#E8ECF1;--card:#fff;--tint:#EEF3FB;--tint2:#F0F3F8;
+    --navy:#0D2240;--blue:#2563EB;--blue-deep:#3B6FD4;--chip-bg:#DCE9FB;--green:#2FA05A;
+    --green-bg:#E4F5EA;--orange:#D97E2E;--orange-bg:#FDEBD9;--rose:#D9482B;--rose-bg:#FCEAE5;
+    --txt:#12263F;--sub:#5A6B80;--line:#D8E0EC}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{background:#E9EEF5}
+  body{font-family:"Noto Sans SC","PingFang SC",sans-serif;color:var(--txt);
+    padding:22px 14px 26px;background:#E9EEF5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;background-color:#F7F9FC;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:26px 26px;border:1.5px solid #C9D4E4;border-radius:20px;
+    padding:22px 22px 20px;box-shadow:0 10px 26px rgba(18,38,63,.10)}
+  .mono{font-family:"JetBrains Mono",monospace}
+  .hero{text-align:center;margin-bottom:14px}
+  .hero h1{font-size:26px;font-weight:900;letter-spacing:.02em}
+  .hero h1 .dot{color:var(--blue)}
+  .banner{display:inline-flex;align-items:center;gap:10px;background:var(--navy);color:#fff;
+    border-radius:999px;padding:6px 16px 6px 12px;margin-top:10px;box-shadow:0 5px 14px rgba(13,34,64,.22)}
+  .banner .bn-t{font-size:13.5px;font-weight:700;letter-spacing:.05em}
+  .pill{font-size:11px;font-weight:700;color:#fff;background:#34C759;border-radius:999px;padding:2px 10px}
+  .pill.blue{background:var(--blue)} .pill.orange{background:var(--orange)}
+  .step{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:12px 15px 12px 48px;box-shadow:0 3px 10px rgba(18,38,63,.05);text-align:left}
+  .step.tint{background:var(--tint)} .step.tint2{background:var(--tint2)}
+  .step .num{position:absolute;left:13px;top:12px;width:26px;height:26px;border-radius:50%;
+    background:var(--blue);color:#fff;font-weight:900;font-size:13px;display:grid;place-items:center;
+    box-shadow:0 2px 6px rgba(37,99,235,.35)}
+  .step .sh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+  .step .st{font-size:16.5px;font-weight:900}
+  .step .ss{font-size:11.5px;color:var(--blue-deep);font-weight:500}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;
+    color:var(--blue-deep);background:var(--chip-bg);border:1.5px solid rgba(37,99,235,.35);
+    border-radius:999px;padding:4px 11px;white-space:nowrap}
+  .chip.green{background:var(--green-bg);border-color:#7BC894;color:var(--green)}
+  .chip.orange{background:var(--orange-bg);border-color:#E8B27C;color:var(--orange)}
+  .chip.rose{background:var(--rose-bg);border-color:rgba(217,72,43,.45);color:var(--rose);border-style:dashed}
+  .chip.ghost{background:transparent;border-style:dashed;border-color:var(--line);color:var(--sub)}
+  .chip.hero{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700;
+    box-shadow:0 2px 8px rgba(13,34,64,.28)}
+  .chip small{font-size:10.5px;opacity:.75;font-weight:400}
+  .varrow{display:grid;place-items:center;padding:3px 0}
+  .note{margin-top:8px;font-size:11.5px;color:var(--sub);display:flex;flex-wrap:wrap;gap:5px 12px}
+  .foot{margin-top:14px;background:var(--navy);color:#fff;border-radius:12px;padding:11px 16px;
+    text-align:center;box-shadow:0 6px 16px rgba(13,34,64,.25)}
+  .foot b{color:#7EE2A8} .foot .ft{font-size:13px;line-height:1.65;font-weight:500}
+  /* hflow */
+  .hrow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;justify-content:center}
+  .hnode{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 14px;
+    box-shadow:0 3px 10px rgba(18,38,63,.05);min-width:150px;max-width:230px;text-align:center;
+    display:flex;flex-direction:column;justify-content:center;gap:4px}
+  .hnode .ht{font-size:14px;font-weight:900}
+  .hnode .hs{font-size:11px;color:var(--sub);line-height:1.5}
+  .hnode.hero{background:var(--navy);border-color:var(--navy)} .hnode.hero .ht{color:#fff}
+  .hnode.hero .hs{color:#9FC3F8}
+  .hnode.tint{background:var(--tint)}
+  .harrow{display:grid;place-items:center;padding:0 7px;color:var(--blue)}
+  /* layers split */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+  .half{border:1px dashed var(--line);border-radius:11px;padding:8px 10px;background:rgba(255,255,255,.6)}
+  .ph{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap}
+  .pn{font-size:13px;font-weight:900}
+  .pt{font-size:10px;color:#fff;border-radius:999px;padding:2px 8px;font-weight:700}
+  .pt.ad{background:var(--green)} .pt.ios{background:var(--navy)} .pt.srv{background:var(--orange)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>GPU 统一管线（ADR-002）<span class="dot">.</span></h1>
+    <div class="banner"><span class="bn-t">预览与拍照共用同一 Shader 管线</span><span class="pill blue">FBO 离屏</span></div>
+  </div>
+  <div class="step tint"><span class="num">1</span><div class="sh"><span class="st">App Layer</span></div><div class="chips"><span class="chip ">依赖 beauty-engine:api </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint2"><span class="num">2</span><div class="sh"><span class="st">Domain Layer</span><span class="ss">beauty-engine:api</span></div><div class="chips"><span class="chip ">BeautyPreviewProvider / PhotoProcessor / BeautyParams / BeautyPerfStats </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint"><span class="num">3</span><div class="sh"><span class="st">Data Layer</span><span class="ss">beauty-engine:render</span></div><div class="chips"><span class="chip green">预览：SurfaceTexture → SurfaceView（实时） </span><span class="chip orange">拍照：Bitmap → Texture → FBO → glReadPixels（离屏） </span><span class="chip ">CopyPass <small>OES → 2D 纹理</small></span><span class="chip ">BeautyUnitPass <small>磨皮/美白/LUT</small></span><span class="chip ">FaceMakeupPass <small>唇色/腮红三角网格</small></span><span class="chip ">MainShader <small>美型+调色+风格特效</small></span><span class="chip ">EGLCore <small>EGL 上下文管理</small></span></div></div>
+  <div class="foot"><div class="ft">拍照走 <b>Bitmap → Texture → FBO → glReadPixels → Bitmap</b> 离屏路径，保证预览/成片一致性（2026-05 落地）。</div></div>
+</div>
+<script>window.addEventListener("load",function(){setTimeout(function(){document.title="H"+document.documentElement.scrollHeight},500)})</script>
+</body>
+</html>

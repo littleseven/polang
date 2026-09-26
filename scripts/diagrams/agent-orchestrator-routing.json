@@ -1,0 +1,45 @@
+{
+ "kind": "flow",
+ "title": "AgentOrchestrator 路由",
+ "banner": "隐私分级 → 全场景远程 tool_calls",
+ "pill": "ADR-005",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "用户输入",
+   "chips": [
+    "「找出去年夏天的照片」",
+    "相机语音「磨皮50」"
+   ]
+  },
+  {
+   "t": "AgentOrchestrator",
+   "s": "chat: streamChat · 相机: processCameraInput",
+   "chips": [
+    {
+     "c": "green",
+     "t": "PrivacyGuard.assess → 隐私分级|媒体文件不出端 [PRIVACY]"
+    },
+    {
+     "c": "ghost",
+     "t": "端侧文本 LLM 已移除 · 全场景 REMOTE"
+    }
+   ]
+  },
+  {
+   "t": "Koog Agent + ToolService",
+   "chips": [
+    "chat/相册 → KoogChatAgent + ChatToolService（@Tool）",
+    "相机指令 → KoogReActAgent + CameraToolService（@Tool 相机场域工具集）",
+    ":shared（KMP Library，Koog 驱动）→ OpenAILLMClient"
+   ]
+  },
+  {
+   "t": "Capability 执行",
+   "chips": [
+    "CapabilityRegistry.dispatch → Capability.execute"
+   ]
+  }
+ ],
+ "name": "agent-orchestrator-routing"
+}

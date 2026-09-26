@@ -1,0 +1,35 @@
+{
+ "kind": "flow",
+ "title": "SearchIntent 结构化流（ADR-007）",
+ "banner": "意图即结构 · 免二次解析",
+ "pill": "SearchIntent",
+ "pill_c": "green",
+ "steps": [
+  {
+   "t": "用户输入「近半年小孩的照片」",
+   "chips": [
+    "Local/Remote LLM"
+   ]
+  },
+  {
+   "t": "AgentCommand.SearchMedia",
+   "chips": [
+    "query = 原文",
+    "intent = SearchIntent|timeRange{startMs,endMs} · keywords=[小孩] · hasFaces=true"
+   ]
+  },
+  {
+   "t": "searchIntentToStructuredFilter(intent)",
+   "chips": [
+    "ChatViewModel → StructuredFilter"
+   ]
+  },
+  {
+   "t": "MediaSearchEngine.search(filter)",
+   "chips": [
+    "直接按时间范围查 DB"
+   ]
+  }
+ ],
+ "name": "adr007-intent-flow"
+}

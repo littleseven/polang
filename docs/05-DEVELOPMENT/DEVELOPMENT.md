@@ -27,16 +27,7 @@
 
 Spec 驱动开发（Spec-Driven Development, SDD）要求**文档与代码始终保持同步**，但在实践中允许"探索-固化"的双向演进：
 
-```
-Spec 文档（What & How）
-    ↓ 驱动
-代码实现（Implementation）
-    ↓ 发现
-实现中的新问题 / 优化点
-    ↓ 反馈
-Spec 文档更新（Consensus）
-    ↓ 驱动下一轮...
-```
+![Spec ↔ Code 双螺旋](assets/diagrams/dev-spec-code-loop.png)
 
 ### 1.2 探索-固化规则
 
@@ -535,16 +526,7 @@ doc-sync-check:
 
 #### 驱动执行流程
 
-```
-Spec 文档（含 [agent-task]）
-    ↓ parse_agent_tasks.py（⏳ 设计中，未落地）
-Task JSON（标准化任务描述）
-    ↓ 编排脚本
-├─→ RD Agent: 执行代码变更
-├─→ QA Agent: 执行验收测试
-├─→ CR Agent: 执行代码审查
-└─→ PM Agent: 更新进度跟踪
-```
+![Agent 任务编排蓝图](assets/diagrams/dev-agent-orchestration.png)
 
 ### 5.5 任务状态流转
 

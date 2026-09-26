@@ -1,0 +1,40 @@
+{
+ "kind": "flow",
+ "title": "TAG 生成 3-Pass 流水线",
+ "banner": "人脸 → 聚类 → 打标 · 全端侧",
+ "pill": "100% 端侧",
+ "pill_c": "green",
+ "foot": "Pass 4（MOBILE_CLIP_ENCODING）保留枚举值仅用于兼容历史任务/单独重编码；原 Pass 5（ML Kit 打标）已随链路整体移除。",
+ "steps": [
+  {
+   "t": "触发",
+   "chips": [
+    "照片入库 / 用户手动触发"
+   ]
+  },
+  {
+   "t": "Pass 1 · FACE_DETECTION",
+   "chips": [
+    "人脸 ROI 检测 + 106 关键点",
+    "Glint360K R100 512 维人脸 Embedding",
+    "MobileCLIP 语义 Embedding（Base64，已内联）",
+    "写入：faceRoiResult / face_embeddings / semanticEmbedding / lastTagScanPasses"
+   ]
+  },
+  {
+   "t": "Pass 2 · DBSCAN",
+   "chips": [
+    "全局人脸聚类 → persons / faceId"
+   ]
+  },
+  {
+   "t": "Pass 3 · IMAGE_TAGGING",
+   "chips": [
+    "图像打标（VLM）",
+    "中文标签 + ControlledVocab 规范化",
+    "写入：labels JSON"
+   ]
+  }
+ ],
+ "name": "tag-3pass-pipeline"
+}

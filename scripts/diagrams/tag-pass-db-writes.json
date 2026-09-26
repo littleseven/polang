@@ -1,0 +1,37 @@
+{
+ "kind": "flow",
+ "title": "三阶段数据落库明细",
+ "banner": "每 Pass 的 DB 写入面",
+ "pill": "Room",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "Pass 1 · 人脸 + 语义编码",
+   "s": "同一张 Bitmap",
+   "chips": [
+    "detectFacesOnly(bitmap) → ROI 列表",
+    "extractFeature(bitmap, roi) → embedding",
+    "mobileClipEngine.encode(bitmap) → 512维语义向量",
+    "写：hasFace / faceRoiResult / semanticEmbedding / face_embeddings / lastTagScanPasses"
+   ]
+  },
+  {
+   "t": "Pass 2 · DBSCAN 全局聚类",
+   "s": "批量 · mediaId=-1 标记",
+   "chips": [
+    "读取未聚类 face_embeddings",
+    "余弦距离矩阵 + DBSCAN",
+    "写：persons 新增/更新 / face_embeddings.personId / media_assets.faceId / lastTagScanPasses"
+   ]
+  },
+  {
+   "t": "Pass 3 · 图像打标",
+   "chips": [
+    "从 faceRoiResult 恢复人脸上下文（无需重新检测）",
+    "llmEngine.imageInference(bitmap, prompt) → JSON 标签",
+    "写：labels / tags 规范化去重 / media_tag_cross_ref / lastTagScanPasses"
+   ]
+  }
+ ],
+ "name": "tag-pass-db-writes"
+}

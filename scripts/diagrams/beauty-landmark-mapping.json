@@ -1,0 +1,24 @@
+{
+ "kind": "hflow",
+ "title": "关键点映射",
+ "banner": "源图像 → 映射计算 → 目标图像",
+ "pill": "warp",
+ "pill_c": "blue",
+ "nodes": [
+  {
+   "t": "源图像",
+   "s": "关键点 A · B",
+   "c": "tint"
+  },
+  {
+   "t": "映射计算",
+   "s": "仿射/三角剖分"
+  },
+  {
+   "t": "目标图像",
+   "s": "A′ · B′",
+   "c": "hero"
+  }
+ ],
+ "name": "beauty-landmark-mapping"
+}

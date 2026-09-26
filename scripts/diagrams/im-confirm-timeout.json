@@ -1,0 +1,35 @@
+{
+ "kind": "flow",
+ "title": "危险命令确认流",
+ "banner": "LLM 判定需确认 → 卡片回调执行",
+ "pill": "30s 超时",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "用户发送：删除模糊的照片",
+   "chips": [
+    "LLM 解析意图 → 需要确认"
+   ]
+  },
+  {
+   "t": "RemoteCommandDispatcher 发送确认卡片",
+   "chips": []
+  },
+  {
+   "t": "用户点击确认",
+   "chips": [
+    "卡片回调经 WS 返回 → 执行删除 → 结果回复"
+   ]
+  },
+  {
+   "t": "未操作 30s",
+   "chips": [
+    {
+     "c": "rose",
+     "t": "自动超时取消"
+    }
+   ]
+  }
+ ],
+ "name": "im-confirm-timeout"
+}

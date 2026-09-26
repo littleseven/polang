@@ -1,0 +1,38 @@
+{
+ "kind": "flow",
+ "title": "人脸坐标 → Shader UV 变换",
+ "banner": "四步归一化",
+ "pill": "坐标系",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "归一化 View 坐标",
+   "chips": [
+    "0~1 · 以预览容器为参考"
+   ]
+  },
+  {
+   "t": "Step 1 · 映射 viewport 像素坐标",
+   "chips": []
+  },
+  {
+   "t": "Step 2 · 反转 Y 轴",
+   "chips": [
+    "OpenGL 纹理坐标原点在左下"
+   ]
+  },
+  {
+   "t": "Step 3 · 归一化 pre-transform UV",
+   "chips": [
+    "未应用纹理变换矩阵"
+   ]
+  },
+  {
+   "t": "Step 4 · 乘 SurfaceTexture 变换矩阵",
+   "chips": [
+    "uTextureTransform → Shader 可用 UV"
+   ]
+  }
+ ],
+ "name": "beauty-uv-transform"
+}

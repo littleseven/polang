@@ -1,0 +1,45 @@
+{
+ "kind": "flow",
+ "title": "预览帧 GPU 管线",
+ "banner": "无拷贝直通 · 全程纹理",
+ "pill": "零拷贝",
+ "pill_c": "green",
+ "steps": [
+  {
+   "t": "CameraX 预览帧",
+   "chips": [
+    "无拷贝"
+   ]
+  },
+  {
+   "t": "SurfaceTexture.updateTexImage()",
+   "chips": [
+    "GPU 纹理"
+   ]
+  },
+  {
+   "t": "OpenGL ES 外部纹理",
+   "chips": [
+    "GL_TEXTURE_EXTERNAL_OES"
+   ]
+  },
+  {
+   "t": "Shader 处理",
+   "chips": [
+    "磨皮",
+    "美白",
+    "大眼",
+    "瘦脸",
+    "唇色",
+    "腮红"
+   ]
+  },
+  {
+   "t": "SurfaceView Surface",
+   "chips": [
+    "直接显示"
+   ]
+  }
+ ],
+ "name": "beauty-frame-pipeline"
+}

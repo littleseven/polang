@@ -1,0 +1,35 @@
+{
+ "kind": "flow",
+ "title": "人脸检测 · Bitmap 兼容路径",
+ "banner": "YUV→ARGB CPU 转换的旧接口",
+ "pill": "兼容",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "CameraX ImageProxy",
+   "chips": [
+    "转 Bitmap|YUV→ARGB CPU 转换"
+   ]
+  },
+  {
+   "t": "FaceDetectorManager.detect(bitmap, …)",
+   "chips": [
+    "按 EngineType 分流"
+   ]
+  },
+  {
+   "t": "MEDIAPIPE / MNN",
+   "chips": [
+    "MediaPipeFaceDetector.detect(bitmap)",
+    "RoiDetector.detectRoi + LandmarkDetector.detectLandmarks"
+   ]
+  },
+  {
+   "t": "统一 106 点",
+   "chips": [
+    "Adapter 统一 → Face106ToWarpParams → BeautyRenderer"
+   ]
+  }
+ ],
+ "name": "face-bitmap-legacy"
+}

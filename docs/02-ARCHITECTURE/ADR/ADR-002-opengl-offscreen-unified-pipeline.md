@@ -29,47 +29,7 @@
 
 ### 2.1 目标架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    App Layer (PoLang)                        │
-│                   ↓ 依赖 beauty-engine:api                    │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│  Domain Layer: beauty-engine:api                             │
-│  ├─ BeautyPreviewProvider (Interface)                   │
-│  ├─ PhotoProcessor (Interface)                          │
-│  ├─ BeautyParams / FaceData                             │
-│  └─ BeautyPerfStats                                     │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│  Data Layer: beauty-engine:render                         │
-│  ├─ GlBeautyPreviewProvider                               │
-│  ├─ PhotoProcessorImpl (OpenGL FBO 离屏渲染，2026-05 落地) │
-│  │   ├─ 预览: SurfaceTexture → SurfaceView (实时)          │
-│  │   └─ 拍照: Bitmap → Texture → FBO → glReadPixels → Bitmap (离屏)               │
-│  ├─ CameraPreviewRenderer (渲染管线核心)                 │
-│  ├─ BeautyRenderer (自研 Shader 管线，含多 Pass 渲染)    │
-│  │   ├─ CopyPass: OES → 2D 纹理（预览路径）              │
-│  │   ├─ BeautyUnitPass: 磨皮/美白/LUT                    │
-│  │   ├─ FaceMakeupPass: 唇色/腮红三角网格                │
-│  │   └─ MainShader: 美型+调色+风格特效                   │
-│  ├─ FaceMakeupPass (妆容三角网格 Pass)                   │
-│  ├─ StyleEffectShader (风格特效 Shader)                  │
-│  └─ EGLCore (EGL 上下文管理)                             │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-        ┌──────────────────────────────┐
-        ▼                              
-┌───────────────┐                      
-│  BIG_BEAUTY   │                      
-│ (自研 Shader) │                      
-│ 磨皮/美白/瘦脸 │                      
-│ 大眼/唇色/腮红 │                      
-│ 风格特效/调色  │                      
-└───────────────┘                      
-```
+![GPU 统一管线](assets/diagrams/adr002-gpu-pipeline.png)
 
 ### 2.2 核心设计
 

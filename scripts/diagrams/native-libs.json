@@ -1,0 +1,42 @@
+{
+ "kind": "layers",
+ "title": "Native 库资产地图",
+ "banner": "自研 SO × 外部 AAR · 全部聚合进 APK",
+ "pill": "JNI 桥",
+ "pill_c": "orange",
+ "foot": "libonnxruntime 双来源（自研链路与 Sherpa AAR）冲突由 :androidApp <b>pickFirsts</b> 解决。",
+ "bands": [
+  {
+   "t": "项目内部 Native 库",
+   "chips": [
+    "libMNN.so|7.2MB · :engines:mnn-core",
+    "libOpenCL.so|96KB · 启动预加载",
+    "libagent_native.so|VLM 打标 JNI 桥 · :engines:agent-native",
+    "libbeauty_native.so|人脸检测 JNI 桥 · :engines:beauty-engine",
+    "libsentencepiece_android.so|:engines:sentencepiece",
+    {
+     "c": "hero",
+     "t": ":androidApp|聚合所有 SO 到 APK"
+    }
+   ]
+  },
+  {
+   "t": "外部 AAR 携带",
+   "chips": [
+    {
+     "c": "orange",
+     "t": "Sherpa-ONNX|libsherpa-onnx-*.so + libonnxruntime.so"
+    },
+    {
+     "c": "orange",
+     "t": "MediaPipe|libmediapipe_tasks_vision_jni.so"
+    },
+    {
+     "c": "orange",
+     "t": "ML Kit|libmlkit*.so"
+    }
+   ]
+  }
+ ],
+ "name": "native-libs"
+}

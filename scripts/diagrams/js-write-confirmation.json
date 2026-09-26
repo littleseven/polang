@@ -1,0 +1,43 @@
+{
+ "kind": "flow",
+ "title": "capability.dispatch 写通路",
+ "banner": "风险分级 → 互斥确认 → 回环注册表",
+ "pill": "写操作",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "JS 调用",
+   "chips": [
+    "await bridge.callAsync('capability.dispatch', {method, params})"
+   ]
+  },
+  {
+   "t": "CapabilityDispatchHandler",
+   "chips": [
+    ":androidApp features/chat/js/",
+    "解析 {method, params} → buildCommand → AgentCommand",
+    "CommandRisk.ofMethod 风险分级"
+   ]
+  },
+  {
+   "t": "非 READ_ONLY",
+   "chips": [
+    "confirmationMutex 互斥",
+    "WriteConfirmationController.request(...) 挂起等用户确认"
+   ]
+  },
+  {
+   "t": "dispatch → CapabilityRegistry",
+   "chips": [
+    "CHAT 场景 → ChatMediaWriteCapability → ChatViewModel"
+   ]
+  },
+  {
+   "t": "结果回传 JS",
+   "chips": [
+    "AgentAction → JsValue"
+   ]
+  }
+ ],
+ "name": "js-write-confirmation"
+}

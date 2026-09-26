@@ -27,35 +27,7 @@ App Layer → 大美丽模块 (混合业务逻辑+GPU实现)
 
 ## 2. 决策目标架构
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    App Layer                            │
-│              ↓ 依赖 beauty-engine:api                   │
-└────────────────────┬──────────────────────────────────┘
-                     │
-┌────────────────────▼──────────────────────────────────┐
-│  Domain Layer: beauty-engine:api                        │
-│  ├─ BeautyPreviewProvider (Interface)                 │
-│  ├─ BeautyPreviewEngine (Interface)                   │
-│  ├─ PhotoProcessor (Interface)                        │
-│  ├─ BeautyParams / FaceData / FilterType              │
-│  └─ BeautyPerfStats / FrameSyncResult                 │
-└────────────────────┬──────────────────────────────────┘
-                     │
-┌────────────────────▼──────────────────────────────────┐
-│  Data Layer: beauty-engine:render                       │
-│  ├─ GlBeautyPreviewProvider (Provider 实现)           │
-│  ├─ CameraPreviewRenderer (自研 OpenGL ES 管线)      │
-│  ├─ BeautyRenderer (美颜 Shader 渲染器)              │
-│  ├─ PhotoProcessorImpl (拍照 GPU 离屏渲染)           │
-│  ├─ FaceMakeupPass (唇色/腮红三角网格 Pass)          │
-│  └─ EGLCore / WindowSurface                           │
-└────────────────────┬──────────────────────────────────┘
-                     │
-┌────────────────────▼──────────────────────────────────┐
-│              BIG_BEAUTY (自研引擎)                      │
-└─────────────────────────────────────────────────────────┘
-```
+![美颜引擎四层架构](assets/diagrams/adr001-beauty-layering.png)
 
 ---
 

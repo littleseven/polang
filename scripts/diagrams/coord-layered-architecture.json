@@ -1,0 +1,36 @@
+{
+ "kind": "layers",
+ "title": "坐标系分层架构",
+ "banner": "上层用人话 · 下层用像素",
+ "pill": "双坐标系",
+ "pill_c": "orange",
+ "foot": "两层之间只经 <b>convertUserToImageCoordinates / convertImageToUserCoordinates</b> 两个明确函数转换，禁止散落换算。",
+ "bands": [
+  {
+   "t": "UI / 业务层",
+   "chips": [
+    "可使用 [人脸坐标系]",
+    "便于用户理解",
+    "需处理前后置差异"
+   ]
+  },
+  {
+   "t": "转换边界（明确函数）",
+   "chips": [
+    "convertUserToImageCoordinates()",
+    "convertImageToUserCoordinates()"
+   ],
+   "noarrow": true
+  },
+  {
+   "t": "渲染 / 算法层",
+   "chips": [
+    "必须使用 [图像坐标系]",
+    "GPU Shader 处理",
+    "OpenGL 纹理映射",
+    "图像处理算法"
+   ]
+  }
+ ],
+ "name": "coord-layered-architecture"
+}

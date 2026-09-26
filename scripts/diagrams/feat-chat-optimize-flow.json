@@ -1,0 +1,32 @@
+{
+ "kind": "flow",
+ "title": "Chat 图片优化流",
+ "banner": "对话即修图",
+ "pill": "ai_optimize",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "用户发送图片 +「帮我优化这张照片」",
+   "chips": []
+  },
+  {
+   "t": "Agent 调用 ai_optimize 工具",
+   "chips": [
+    "远程 tool_calls · 默认 fast 模式"
+   ]
+  },
+  {
+   "t": "生成 EditRecipe → GPU 渲染",
+   "chips": [
+    "保存结果图"
+   ]
+  },
+  {
+   "t": "结果回渲染至对话",
+   "chips": [
+    "结果图片 + 一句话说明"
+   ]
+  }
+ ],
+ "name": "feat-chat-optimize-flow"
+}

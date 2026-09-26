@@ -1,0 +1,35 @@
+{
+ "kind": "flow",
+ "title": "人脸检测 · MediaPipe 零拷贝路径",
+ "banner": "默认引擎 · YUV 原生消费",
+ "pill": "468→106",
+ "pill_c": "green",
+ "steps": [
+  {
+   "t": "CameraX ImageProxy",
+   "chips": [
+    "detectFromImage(image, rotation, lensFacing)|跳过 YUV→ARGB CPU 转换"
+   ]
+  },
+  {
+   "t": "MediaPipeFaceDetector.detect",
+   "chips": [
+    "MediaImageBuilder 包装 MPImage",
+    "C++ 层原生消费 YUV"
+   ]
+  },
+  {
+   "t": "MediaPipe468Adapter",
+   "chips": [
+    "468 → 106 语义映射"
+   ]
+  },
+  {
+   "t": "Face106ToWarpParams.convert()",
+   "chips": [
+    "BeautyRenderer 使用 FaceWarpParams"
+   ]
+  }
+ ],
+ "name": "face-medipipe-path"
+}

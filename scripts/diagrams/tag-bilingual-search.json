@@ -1,0 +1,33 @@
+{
+ "kind": "layers",
+ "title": "TAG 双语检索架构",
+ "banner": "存储中文 · 运行时翻译 · 查询扩展",
+ "pill": "zh↔en",
+ "pill_c": "blue",
+ "bands": [
+  {
+   "t": "UI / Search",
+   "chips": [
+    "展示：中文 TAG → TagTranslator → 英文 displayName",
+    "搜索：英文 query → TagTranslator → 中文 canonical 集合 → Room LIKE / TagDao"
+   ]
+  },
+  {
+   "t": "Runtime Localization Layer",
+   "s": "新增",
+   "chips": [
+    "TagTranslator：zh↔en 映射 + 同义词扩展",
+    "BilingualVocab：assets/tag_translations.json 加载"
+   ]
+  },
+  {
+   "t": "Existing Storage",
+   "s": "不变",
+   "chips": [
+    "media_assets.labels（中文 JSON）",
+    "tags / media_tag_cross_ref（可后续迁移）"
+   ]
+  }
+ ],
+ "name": "tag-bilingual-search"
+}

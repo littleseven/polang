@@ -1,0 +1,43 @@
+{
+ "kind": "flow",
+ "title": "帧同步美妆体系",
+ "banner": "检测 ~10fps × 渲染 30-60fps 的时间对齐",
+ "pill": "防妆容漂移",
+ "pill_c": "orange",
+ "foot": "渲染线程按 FrameId 查询：<b>精确匹配 → 历史回退 → 预测补偿 → 隐藏</b>；DetectionQueue 为设计概念，当前走同步检测路径。",
+ "steps": [
+  {
+   "t": "SurfaceTexture",
+   "s": "帧源",
+   "chips": [
+    "updateTexImage() 时生成 FrameId"
+   ]
+  },
+  {
+   "t": "FaceDetector",
+   "s": "MediaPipe / MNN",
+   "chips": [
+    "FrameId + ImageProxy 输入",
+    "DetectionResult|106 点 + FrameId",
+    "DetectionQueue（设计概念未落地·深度2超时丢帧）"
+   ]
+  },
+  {
+   "t": "FrameSyncManager",
+   "s": "单例",
+   "chips": [
+    "ResultStore|时序存储",
+    "MatchEngine|帧ID匹配",
+    "Predictor|运动预测"
+   ]
+  },
+  {
+   "t": "渲染线程",
+   "s": "GL Thread",
+   "chips": [
+    "CameraPreviewRenderer → BeautyRenderer → FaceMakeupPass|消费同步顶点"
+   ]
+  }
+ ],
+ "name": "beauty-framesync"
+}

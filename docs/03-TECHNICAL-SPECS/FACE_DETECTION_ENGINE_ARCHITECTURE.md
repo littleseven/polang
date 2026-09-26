@@ -73,43 +73,15 @@ PoLang 当前采用双引擎人脸检测架构：`MEDIAPIPE`、`MNN`。
 
 #### 路径 A：MediaPipe Image 零拷贝（首选，~5ms 节省）
 
-```text
-CameraX ImageProxy
-  -> FaceDetectorManager.detectFromImage(image, rotation, lensFacing)
-     （跳过 YUV→ARGB CPU 转换）
-  -> MediaPipeFaceDetector.detect(mediaImage: Image, ...)
-     （MediaImageBuilder 包装为 MPImage，C++ 层原生消费 YUV）
-  -> MediaPipe468Adapter：468 -> 106
-  -> Face106ToWarpParams.convert()
-  -> BeautyRenderer 使用 FaceWarpParams
-```
+![MediaPipe 零拷贝路径](assets/diagrams/face-medipipe-path.png)
 
 #### 路径 B：MNN NV21 零拷贝（ROI + Landmark 双阶段）
 
-```text
-CameraX ImageProxy
-  -> FaceDetectorManager.detectRoiFromNv21(yuvData, width, height, ...)
-     （DirectByteBuffer 零拷贝 → MNN C++ 层）
-  -> MnnRoiDetector.detectRoiFromYuv(): letterbox → 原图坐标逆映射
-  -> FaceDetectorManager.detectLandmarksFromNv21WithRoi()（基于 ROI 裁剪区域）
-  -> MnnLandmarkAdapter：106 点重排
-  -> Face106ToWarpParams.convert()
-  -> BeautyRenderer 使用 FaceWarpParams
-```
+![MNN NV21 路径](assets/diagrams/face-mnn-path.png)
 
 #### 路径 C：Bitmap 降级路径（Legacy）
 
-```text
-CameraX ImageProxy
-  -> 转 Bitmap（YUV→ARGB CPU 转换）
-  -> FaceDetectorManager.detect(bitmap, rotation, lensFacing)
-      -> 按 EngineType 分流
-         - MEDIAPIPE: MediaPipeFaceDetector.detect(bitmap)
-         - MNN: RoiDetector.detectRoi() + LandmarkDetector.detectLandmarks()
-      -> 通过 Adapter 统一到 106 点
-  -> Face106ToWarpParams.convert()
-  -> BeautyRenderer 使用 FaceWarpParams
-```
+![Bitmap 兼容路径](assets/diagrams/face-bitmap-legacy.png)
 
 ### 3.2 静态图检测（拍照后）
 

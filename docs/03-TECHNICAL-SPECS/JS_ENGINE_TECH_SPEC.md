@@ -78,23 +78,7 @@
 
 ### 3.1 分层与依赖方向
 
-```
-LLM (远程 ReAct)  tool_call: run_gallery_script / draw_chart
-    ↓
-ChatToolService（@Tool，:shared）/ RemoteControlToolService（@Tool，:androidApp）
-    ↓ dispatchCommand
-AgentCommand.ExecuteScript / DrawChart
-    ↓ CapabilityRegistry (CHAT 场景)
-ChatRunScriptCapability / ChatMediaWriteCapability (:androidApp)
-    ↓ Delegate
-ChatViewModel.onRunScript / onDrawChart
-    ↓ jsEvalMutex 串行
-JsRuntime (:shared 门面) ──register── NativeHandler (白名单)
-    ↓ engine 注入
-QuickJsEngine (:androidApp) ──bridge.callAsync──→ JsBridge.dispatchAsync
-    ↓                                        ↓
-QuickJS C 引擎 (沙箱)                   UseCase / DAO / CapabilityRegistry
-```
+![JS 沙箱执行架构](assets/diagrams/js-sandbox-architecture.png)
 
 - `:shared` 的 `js/` 包**引擎无关**：`JsEngine` 接口（`eval` / `eval(script, timeoutMs)` / `callFunction` / `installBridge` / `close`）、`JsValue`（sealed：Null/Bool/Num/Str/Obj/Arr）、`JsBridge`（handler 注册与 sync/async 分发）、`JsRuntime`（门面，引擎由调用方注入）、`NativeHandler`（Sync/Async 两种 SPI，`syncHandler`/`asyncHandler` 工厂函数）、`JsBridgeException`（错误码）。
 - `:androidApp` 的 `QuickJsEngine` 是唯一生产引擎实现：dokar3 的 `evaluate` 是 suspend，用 `runBlocking` + `withTimeout` 适配同步 `JsEngine.eval`；协程取消可真正中断 C 层死循环。
@@ -147,17 +131,7 @@ QuickJS C 引擎 (沙箱)                   UseCase / DAO / CapabilityRegistry
 
 ### 5.1 run_gallery_script 主链路
 
-```
-LLM tool_call: run_gallery_script(code)
- → ChatToolService / RemoteControlToolService.runGalleryScript
- → dispatchCommand(AgentCommand.ExecuteScript(code))
- → ChatRunScriptCapability (CHAT 场景)
- → ChatViewModel.onRunScript(code)
-    jsEvalMutex 串行 → writeConfirmationController.onScriptStarted()
-    → rt.eval("(async function(){\n<code>\n})()", evalTimeoutMs)
-    → finally: writeConfirmationController.onScriptEnded()（在途写确认一律拒绝）
- → 结果 JSON 作为 observation 回传 LLM 做自然语言总结
-```
+![run_gallery_script 写确认护栏](assets/diagrams/js-run-script-guard.png)
 
 LLM 感知 handler 的唯一渠道是 `@Tool` 描述文本（`ChatToolService` / `RemoteControlToolService` 的 `run_gallery_script` 描述已列出全部 handler 签名与示例），新增 handler 必须同步该描述。
 
@@ -187,16 +161,7 @@ LLM 感知 handler 的唯一渠道是 `@Tool` 描述文本（`ChatToolService` /
 
 ### 6.1 链路
 
-```
-JS: await bridge.callAsync('capability.dispatch', {method, params})
- → CapabilityDispatchHandler (:androidApp, features/chat/js/)
-    解析 {method, params} → buildCommand → AgentCommand
-    → CommandRisk.ofMethod(method) 风险分级
-    → 非 READ_ONLY：confirmationMutex 互斥 → WriteConfirmationController.request(...) 挂起等用户确认
-    → dispatch(command) → CapabilityRegistry (CHAT 场景)
- → ChatMediaWriteCapability → ChatViewModel (Delegate)
- → 结果 AgentAction → JsValue 回传 JS
-```
+![capability.dispatch 写通路](assets/diagrams/js-write-confirmation.png)
 
 ### 6.2 CommandRisk 风险分级
 

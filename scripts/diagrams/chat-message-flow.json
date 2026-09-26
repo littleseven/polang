@@ -1,0 +1,56 @@
+{
+ "kind": "flow",
+ "title": "Chat 消息链路",
+ "banner": "一次对话式请求的完整通路",
+ "pill": "流式 SSE",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "用户输入",
+   "chips": [
+    "ChatScreen → ChatViewModel.sendMessage()"
+   ]
+  },
+  {
+   "t": "AiAgentUseCase → AgentOrchestrator",
+   "chips": [
+    "固定远程 REMOTE",
+    {
+     "c": "ghost",
+     "t": "端侧文本 LLM 已移除"
+    }
+   ]
+  },
+  {
+   "t": "RemoteChatEngine → KoogChatAgent",
+   "chips": [
+    "Koog OpenAILLMClient → OpenAI Chat Completions (tool_calls)"
+   ]
+  },
+  {
+   "t": "LLM / 服务端",
+   "chips": [
+    "PoLang Server / DeepSeek / 通义千问"
+   ]
+  },
+  {
+   "t": "ChatToolService @Tool",
+   "chips": [
+    "→ AgentCommand"
+   ]
+  },
+  {
+   "t": "CapabilityRegistry.dispatch",
+   "chips": [
+    "Chat*Capability：搜索 / 摘要 / 编辑 / 脚本 / 媒体写 / 打标"
+   ]
+  },
+  {
+   "t": "结果回 UI",
+   "chips": [
+    "SSE 流式渲染"
+   ]
+  }
+ ],
+ "name": "chat-message-flow"
+}

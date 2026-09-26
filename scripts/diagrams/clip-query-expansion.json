@@ -1,0 +1,30 @@
+{
+ "kind": "flow",
+ "title": "CLIP 查询扩展",
+ "banner": "expandForClip",
+ "pill": "语义召回",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "① CLIP_QUERY_EXPANSIONS 硬编码表",
+   "chips": [
+    "人工维护 CLIP 优化短语",
+    "「小孩」→[child, kid, children, young child]"
+   ]
+  },
+  {
+   "t": "② ControlledVocab 同义词动态翻译",
+   "chips": [
+    "「美女」→ synonym「女性」→ translateForClip → female",
+    "弥补硬编码表仅 20 条的不足"
+   ]
+  },
+  {
+   "t": "③ translateForClip 基础翻译",
+   "chips": [
+    "vocab → OPUS-MT 回退"
+   ]
+  }
+ ],
+ "name": "clip-query-expansion"
+}

@@ -51,11 +51,9 @@
 **文本推理全远程**：chat 与相机指令统一走标准 OpenAI Chat Completions API（原生 tool_calls + 流式 + 多轮对话，ADR-005 远程协议）。  
 **端侧仅保留 VLM 打标**：`LocalLlmEngine` 仅存 `imageInference` 用途（Qwen3-VL-2B，TAG Pass3 打标），不再承担任何文本推理。
 
-```
-用户输入 → AgentOrchestrator
-    ├── chat/相册 → streamChat → KoogChatAgent + ChatToolService → tool_calls → Capability 执行
-    └── 相机指令  → processCameraInput → KoogReActAgent + CameraToolService → tool_calls → Capability 执行
-```
+- 用户输入 → AgentOrchestrator
+  - chat/相册 → `streamChat` → KoogChatAgent + ChatToolService → tool_calls → Capability 执行
+  - 相机指令 → `processCameraInput` → KoogReActAgent + CameraToolService → tool_calls → Capability 执行（全景见下方路由图）
 
 > 历史：ADR-005 的「本地/远程双链路」（Qwen3.5-2B 端侧推理 + 自定义 JSON 数组协议）已于 2026-08-02 随端侧文本 LLM 一并移除，见本节「已移除组件」与 ADR-005 的「状态更新（2026-08-02）」块（历史 ADR-009/010 已于 2026-08-23 删除，见 [ADR 索引](./ADR/README.md)）。
 
@@ -103,142 +101,15 @@
 
 ### 2.1 系统全景架构
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                               UI Layer (Compose)                               │
-│                                                                               │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐               │
-│  │   ChatScreen    │  │  GalleryScreen  │  │   CameraScreen  │               │
-│  │  💬 二级页        │  │  🏠 默认首页     │  │  📷 辅助入口     │               │
-│  │  AI对话·模型切换  │  │  媒体浏览·AI搜索 │  │  美颜·滤镜·语音  │               │
-│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘               │
-│           │                    │                    │                         │
-│           └────────────────────┼────────────────────┘                         │
-│                                ▼                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐    │
-│  │                   GlobalAgentPanel / AiAgentUseCase (Facade)           │    │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │    │
-│  │  │ Chat UI  │ │Voice Btn │ │QuickActs │ │Model Sel │ │StatusBar │   │    │
-│  │  │(多线程)   │ │(KWS唤醒) │ │(快捷入口) │ │(远程模型) │ │(推理状态) │   │    │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘   │    │
-│  └──────────────────────────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                       Agent Orchestration Layer (:androidApp · Kotlin)           │
-│                                                                               │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │                      AgentOrchestrator (编排器)                          │  │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐                         │  │
-│  │  │SceneManager│ │PrivacyGuard│ │MemoryManager│                         │  │
-│  │  │(场景感知)   │ │(隐私分级)   │ │(对话持久化)  │                         │  │
-│  │  └────────────┘ └────────────┘ └────────────┘                         │  │
-│  └────────────────────────────────────────────────────────────────────────┘  │
-│                    │                              │                           │
-│             相机指令│                              │chat/相册/飞书 (REMOTE)      │
-│                    ▼                              ▼                           │
-│  ┌────────────────────────────┐  ┌──────────────────────────────────────┐   │
-│  │ CameraScreen→AiAgentUseCase│  │  RemoteChatEngine                     │   │
-│  │ →processCameraInput (远程) │  │  ┌────────────────────────────────┐  │   │
-│  │  ┌──────────────────────┐  │  │  │ AgentConfigurator              │  │   │
-│  │  │KoogReActAgent +     │  │  │  │ Koog OpenAILLMClient         │  │   │
-│  │  │CameraToolService@Tool│  │  │  │ OpenAI Chat Completions API   │  │   │
-│  │  └──────────────────────┘  │  │  │ DeepSeek V4 适配               │  │   │
-│  └────────────────────────────┘  │  │ L2 Batch / L3 Plan / L4 Chat   │  │   │
-│                                  │  └────────────────────────────────┘  │   │
-│  ┌──────────────────────────┐    │                                      │   │
-│  │   Voice Pipeline (ONNX)  │    │  ┌────────────────────────────────┐  │   │
-│  │  ┌────────────────────┐  │    │  │ RemoteChannelManager           │  │   │
-│  │  │KeywordSpotterEngine│  │    │  │ 飞书 WebSocket 直连             │  │   │
-│  │  │ KWS always-on      │  │    │  │ IM消息→AgentCommand            │  │   │
-│  │  │ ~14MB · 50mW       │  │    │  │ 拍照回传·设备绑定·确认机制      │  │   │
-│  │  └─────────┬──────────┘  │    │  └────────────────────────────────┘  │   │
-│  │            │ 唤醒        │    │                                      │   │
-│  │  ┌─────────▼──────────┐  │    │  ┌────────────────────────────────┐  │   │
-│  │  │SherpaOnnxAsrEngine │  │    │  │ PoLang Server (Ktor)            │  │   │
-│  │  │ ASR on-demand      │  │    │  │ AI 网关 · 账号 · 管理后台        │  │   │
-│  │  │ ~282MB · 按需加载   │  │    │  │ Channel 路由 · LLM 代理         │  │   │
-│  │  └────────────────────┘  │    │  └────────────────────────────────┘  │   │
-│  └──────────────────────────┘    └──────────────────────────────────────┘   │
-│                                      │                                       │
-│                                      ▼                                       │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                    CapabilityRegistry (能力注册表)                      │   │
-│  │                                                                       │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │   │
-│  │  │ Camera   │ │ Gallery  │ │ Settings │ │ Navigate │ │ Editor   │  │   │
-│  │  │拍照/录像  │ │查看/删除  │ │主题/语言  │ │页面切换   │ │图片编辑  │  │   │
-│  │  │美颜/滤镜  │ │分享/搜索  │ │模型管理  │ │返回/退出  │ │AI 优化   │  │   │
-│  │  │变焦/曝光  │ │批量操作   │ │语音配置  │ │          │ │          │  │   │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │   │
-│  │  ┌──────────┐                                                        │   │
-│  │  │ IMRemote │ 飞书远程控制 · 设备绑定 · 命令确认                        │   │
-│  │  └──────────┘                                                        │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                          Domain / Data / Infra                                │
-│                                                                              │
-│  ┌────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────────────┐ │
-│  │MediaRepo   │ │SettingsRepo  │ │ BeautyEngine │ │ MNN-VLM (Qwen3-VL-2B)│ │
-│  │(Room DB)   │ │(DataStore)   │ │ (OpenGL ES)  │ │ TAG Pass3 打标专用    │ │
-│  └────────────┘ └──────────────┘ └──────────────┘ └──────────────────────┘ │
-│                                                                              │
-│  ┌──────────────────────┐ ┌──────────────────────┐ ┌──────────────────────┐ │
-│  │ :shared (KMP SDK)   │ │LlmModelDownloadManager│ │ FaceDetect Pipeline  │ │
-│  │ Kotlin Multiplatform│ │前台服务·断点续传       │ │ MediaPipe·MNN        │ │
-│  │ Koog·@Tool          │ └──────────────────────┘ └──────────────────────┘ │
-│  │ AIAgent·SSE         │ ┌──────────────────────┐                           │
-│  └──────────────────────┘ │ Network Monitor      │                           │
-│                           │ 飞书重连·心跳保持     │                           │
-│                           └──────────────────────┘                           │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+![Agent 运行时全景分层](assets/diagrams/agent-runtime-stack.png)
 
 ### 2.2 推理链路数据流（2026-08-02：文本推理全远程）
 
-```
-用户输入 "找出去年夏天的照片" / 相机语音 "磨皮50"
-        │
-        ▼
-AgentOrchestrator（chat: streamChat · 相机: processCameraInput）
-        │
-        ├── PrivacyGuard.assess(input) → 隐私分级（媒体文件不出端，[PRIVACY] 红线）
-        │
-        └── REMOTE（端侧文本 LLM 已移除，全场景远程）
-            │
-            ├── chat/相册 → KoogChatAgent + ChatToolService（@Tool）
-            ├── 相机指令 → KoogReActAgent + CameraToolService（@Tool 相机场域工具集）
-            │
-            └── :shared (KMP Library, Koog 驱动)
-                ├── OpenAILLMClient (ChatLanguageModel)
-                ├── ToolDescriptor (tool_calls 构建)
-                └── SSE Streaming (流式响应)
-                        └── PoLang Server / DeepSeek / Claude API
-                            → tool_calls 解析 → CapabilityRegistry.dispatch 执行
-```
+![AgentOrchestrator 路由](assets/diagrams/agent-orchestrator-routing.png)
 
 ### 2.3 语音交互管线（Sherpa-ONNX 双引擎）
 
-```
-[休眠态] Always-on KWS (~14MB · 50mW)
-    │
-    │ 用户说"小觅拍张照"
-    ▼
-KWS 检测到唤醒词 → 暂停 KWS
-    │
-    ▼
-加载 ASR (~282MB · ~500mW) → 转录 "拍张照"
-    │
-    ▼
-AgentOrchestrator.dispatch("拍张照") → Capability 执行
-    │
-    ▼
-释放 ASR → 恢复 KWS always-on
-```
+![语音唤醒生命周期](assets/diagrams/voice-wakeup-lifecycle.png)
 
 ### 2.4 能力访问链路：tool_call 为主，JS 是 run_gallery_script 的内部实现
 
@@ -246,48 +117,7 @@ AgentOrchestrator.dispatch("拍张照") → Capability 执行
 > 对外，LLM 只有一种调用方式 —— **tool_call（`@Tool`）**；`run_gallery_script` 只是其中一个"参数为 JS 源码"的特殊工具，**JS 沙箱不是与 tool_call 平级的第二条链路**，而是该工具的执行体。
 > 对内，所有 tool 最终收敛到 `CapabilityRegistry.dispatch(AgentCommand)`；唯一旁路是飞书 RPA 的 UI 自动化（操作无障碍树，非语义命令）。
 
-```
-                    ┌─ CHAT 场景（相册助理）──────────────────────┐
-                    │  streamChat → streamChatReAct（固定远程）    │
-                    │  → ChatToolService @Tool                    │
-                    └────────────────────┬────────────────────────┘
-                                         │ tool_calls
-用户/IM ── AgentOrchestrator ────────────┼─→ @Tool 薄封装
-                    ┌────────────────────┴────────────────────────┐
-                    │ ChatToolService：每个工具 =                  │
-                    │ dispatchCommand(AgentCommand.X) 一行         │
-                    └────────────────────┬────────────────────────┘
-                                         ▼
-                    ┌─────────────────────────────────────────────┐
-                    │  CapabilityRegistry.dispatch(command)        │ ← 所有语义命令
-                    │  → 按 method 找 Capability → execute()       │   的唯一收敛点
-                    └─────────────────────────────────────────────┘
-                                         ▲
-                                         │ dispatchCommand(AgentCommand)
-                    ┌────────────────────┴────────────────────────┐
-                    │ RemoteControlToolService（飞书 RPA）：             │
-                    │  • UI 自动化 click/scroll/input → Accessibility │ ← 绕开注册表，
-                    │  • 相机工具 → CameraToolHelper 直连          │   真正的"另一条链路"
-                    │  • 相册工具 → dispatchCommand 回注册表       │
-                    └─────────────────────────────────────────────┘
-
-                    ┌─ 相机场景（远程 tool_calls）─────────────────┐
-                    │ processCameraInput → KoogReActAgent         │
-                    │ + CameraToolService @Tool（capture/         │ ← 与 chat 同一
-                    │   adjust_beauty/switch_filter/…）           │   ADR-005 协议；
-                    │ @Tool 直接构造 AgentCommand                  │   也收敛到注册表
-                    │ → CapabilityRegistry.dispatch               │
-                    └─────────────────────────────────────────────┘
-
-   ┌─ run_gallery_script 的内部世界（JS 沙箱，非平级链路）─────────────┐
-   │ ChatRunScriptCapability → ChatViewModel.onRunScript(code)        │
-   │ → QuickJS 执行 JS，bridge.callAsync(...) 取数：                   │
-   │   • gallery.*/media.*/face.*/tag.* → 直连 UseCase/Dao（只读，     │
-   │     绕开 CapabilityRegistry，属另一"能力表面"）                   │
-   │   • capability.dispatch {method,params} → 回环进 CapabilityRegistry │
-   │     （写操作，经 Tier A 确认）                                    │
-   └──────────────────────────────────────────────────────────────────┘
-```
+![tool_calls 收敛结构](assets/diagrams/toolcalls-convergence.png)
 
 #### 2.4.1 三条 LLM 入口与收敛
 
@@ -354,36 +184,7 @@ Chat 页通过输入栏的 **AI 工程师** toggle 在两条完全独立的 LLM 
 
 #### 2.5.1 普通 Chat 链路（相册助手）
 
-```
-用户输入 (ChatScreen)
-        │
-        ▼
-ChatViewModel.sendMessage()
-        │
-        ▼
-AgentOrchestrator / AiAgentUseCase（固定远程 REMOTE，端侧文本 LLM 已移除）
-        │
-        ▼
-RemoteChatEngine ──► KoogChatAgent ──► Koog OpenAILLMClient
-        │
-        ▼
-OpenAI Chat Completions (tool_calls)
-        │
-        ▼
-PoLang Server / DeepSeek / 通义千问
-        │
-        ▼
-ChatToolService @Tool ──► AgentCommand
-        │
-        ▼
-CapabilityRegistry.dispatch(AgentCommand)
-        │
-        ▼
-Chat*Capability（搜索/摘要/编辑/脚本/媒体写/打标）
-        │
-        ▼
-执行结果 → ChatMessageUi（文本/图片/媒体轮播/图表）
-```
+![Chat 消息链路](assets/diagrams/chat-message-flow.png)
 
 **普通 Chat 的 LLM 感知：**
 - 输入：当前用户消息 + 多轮对话历史 + 被动注入的记忆快照 + 可选图片。
@@ -393,48 +194,7 @@ Chat*Capability（搜索/摘要/编辑/脚本/媒体写/打标）
 
 #### 2.5.2 AI 工程师链路（远程 coding agent）
 
-```
-用户输入 (ChatScreen，AI Engineer toggle ON)
-        │
-        ▼
-ChatViewModel.sendClaudeMessage()
-        │
-        ▼
-POST /v1/claude-chat ──► PoLang Server (Ktor，X-App-Token 鉴权)
-        │
-        ▼
-chisel wss 反向隧道 ──► KimiClaw gateway (server.py)
-        │
-        ▼
-Claude Code --resume <sid> (GLM backend)
-        │
-        ├── 读/改代码（Bash/Edit）──────────► file_change / tool_use SSE 事件
-        │                                          │
-        │                                          ▼
-        │                                App 渲染步骤列表 + 文本流
-        │
-        └── MCP app_tools ──► app_tool_request SSE 下行
-                    │
-                    ▼
-            AppToolExecutor（日志/崩溃/聊天历史/运行时状态/相册摘要）
-                    │
-                    ▼
-            DiagSanitizer 脱敏 ──► POST /v1/claude-tool-result
-                    │
-                    ▼
-            回传到 Claude 继续推理
-        │
-        ▼
-用户选择交付方式：push / pr / auto
-        │
-        ▼
-POST /v1/claude-deliver
-        │
-        ▼
-git commit + push claude-chat/<sid>
-或 gh pr create
-或 ./gradlew -p server test + ff-merge main + push
-```
+![AI 工程师链路](assets/diagrams/engineer-claude-chain.png)
 
 **AI 工程师的 LLM 感知：**
 - 输入：当前用户消息 + 完整代码库（KimiClaw workdir）+ App 运行时数据（经 MCP 工具按需拉取）。
@@ -461,18 +221,7 @@ git commit + push claude-chat/<sid>
 
 设置页「其他」分组的「上报问题」入口（2026-09-26 自 Chat 顶部栏迁入），与 AI 工程师链路独立：
 
-```
-用户点击「上报问题」（设置页 → 其他分组）
-        │
-        ▼
-POST /v1/report-issue (IssueReportClient，X-App-Token 鉴权)
-        │
-        ▼
-PoLang Server 脱敏处理（IssueReportRoute）
-        │
-        ▼
-自动在 littleseven/polang 创建 GitHub issue
-```
+![问题上报链路](assets/diagrams/report-issue-flow.png)
 
 - 上报内容为文本描述与脱敏后的运行信息，不触碰用户图片/视频（[PRIVACY] 红线）。
 - 创建的问题在管理后台「问题诊断」页（`/admin/diagnosis`）可见，供 AI 工程师链路后续诊断与修复。
@@ -1108,12 +857,7 @@ class AiAgentUseCase(
 
 飞书/Telegram 远程控制复用同一远程推理链路（`RemoteChatEngine`/`KoogReActAgent`，经 `RemoteChannelManager` 分发）：
 
-```
-飞书消息 → FeishuChannelHandler → RemoteCommandDispatcher
-    → LLM 解析意图（复用 RemoteChatEngine，独立 System Prompt）
-    → CapabilityRegistry.dispatch()
-    → 结果 → FeishuChannelHandler.sendMessage/sendImage
-```
+飞书消息 → `FeishuChannelHandler` → `RemoteCommandDispatcher` → LLM 解析意图（复用 RemoteChatEngine，独立 System Prompt）→ `CapabilityRegistry.dispatch()` → 结果经 `sendMessage`/`sendImage` 回复。
 
 ---
 
@@ -1201,37 +945,35 @@ class AiAgentUseCase(
 
 ## 11. 架构演进路线图
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        端侧推理演进路线                           │
-├─────────────────────────────────────────────────────────────────┤
-│  P0（已完成）:                                                    │
-│  1. JSON 解析改用 kotlinx.serialization                         │
-│  2. System Prompt 提取为 LocalPromptBuilder / RemotePromptBuilder │
-│  3. MemoryManager 引入内存缓存 + 批量刷盘                         │
-│  4. 本地/远程协议彻底分离（ADR-005）                              │
-│  5. 远程推理引入 langchain4j 标准化                               │
-│  6. DeepSeek 适配（thinking 禁用、strict 兼容）                   │
-│  7. Sherpa-MNN 语音栈清理，迁至 Sherpa-ONNX                      │
-│  8. 唤醒词引擎 Phase 1 完成（21 词 + 动态轮询 + VAD 稳定性）       │
-│                                                                 │
-│  P1（进行中）:                                                   │
-│  9. KWS always-on 迁移（Sherpa-ONNX KWS，Phase 2）               │
-│  10. 支持 Batch Function Calling（tool_calls 数组）               │
-│  11. ChatFormat 抽象，支持多模型切换                              │
-│  12. Capability 命令映射改为注解驱动或属性声明                      │
-│  13. IM 远程控制（飞书 WebSocket）全链路打通                       │
-│                                                                 │
-│  P2（中期）:                                                    │
-│  14. Plan-and-Execute 规则模板引擎（端侧不用 LLM 做规划）           │
-│  15. Token 预算管理与上下文压缩                                    │
-│  16. 隐私分级路由完善：敏感强制本地，非敏感允许远程                    │
-│                                                                 │
-│  P3（远期）:                                                    │
-│  17. 记忆摘要（长期对话不丢失上下文）                               │
-│  18. 多会话管理                                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+**P0（已完成）**
+
+1. JSON 解析改用 kotlinx.serialization
+2. System Prompt 提取为 LocalPromptBuilder / RemotePromptBuilder
+3. MemoryManager 引入内存缓存 + 批量刷盘
+4. 本地/远程协议彻底分离（ADR-005）
+5. 远程推理引入 langchain4j 标准化（2026-08 已迁移 Koog）
+6. DeepSeek 适配（thinking 禁用、strict 兼容）
+7. Sherpa-MNN 语音栈清理，迁至 Sherpa-ONNX
+8. 唤醒词引擎 Phase 1 完成（21 词 + 动态轮询 + VAD 稳定性）
+
+**P1（进行中）**
+
+9. KWS always-on 迁移（Sherpa-ONNX KWS，Phase 2）
+10. 支持 Batch Function Calling（tool_calls 数组）
+11. ChatFormat 抽象，支持多模型切换
+12. Capability 命令映射改为注解驱动或属性声明
+13. IM 远程控制（飞书 WebSocket）全链路打通
+
+**P2（中期）**
+
+14. Plan-and-Execute 规则模板引擎（端侧不用 LLM 做规划）
+15. Token 预算管理与上下文压缩
+16. 隐私分级路由完善：敏感强制本地，非敏感允许远程
+
+**P3（远期）**
+
+17. 记忆摘要（长期对话不丢失上下文）
+18. 多会话管理
 
 ---
 

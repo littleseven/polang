@@ -1,0 +1,43 @@
+{
+ "kind": "layers",
+ "title": "GPU 统一管线（ADR-002）",
+ "banner": "预览与拍照共用同一 Shader 管线",
+ "pill": "FBO 离屏",
+ "pill_c": "blue",
+ "foot": "拍照走 <b>Bitmap → Texture → FBO → glReadPixels → Bitmap</b> 离屏路径，保证预览/成片一致性（2026-05 落地）。",
+ "bands": [
+  {
+   "t": "App Layer",
+   "chips": [
+    "依赖 beauty-engine:api"
+   ]
+  },
+  {
+   "t": "Domain Layer",
+   "s": "beauty-engine:api",
+   "chips": [
+    "BeautyPreviewProvider / PhotoProcessor / BeautyParams / BeautyPerfStats"
+   ]
+  },
+  {
+   "t": "Data Layer",
+   "s": "beauty-engine:render",
+   "chips": [
+    {
+     "c": "green",
+     "t": "预览：SurfaceTexture → SurfaceView（实时）"
+    },
+    {
+     "c": "orange",
+     "t": "拍照：Bitmap → Texture → FBO → glReadPixels（离屏）"
+    },
+    "CopyPass|OES → 2D 纹理",
+    "BeautyUnitPass|磨皮/美白/LUT",
+    "FaceMakeupPass|唇色/腮红三角网格",
+    "MainShader|美型+调色+风格特效",
+    "EGLCore|EGL 上下文管理"
+   ]
+  }
+ ],
+ "name": "adr002-gpu-pipeline"
+}

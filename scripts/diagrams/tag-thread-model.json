@@ -1,0 +1,36 @@
+{
+ "kind": "flow",
+ "title": "TAG 扫描线程模型",
+ "banner": "控制与执行隔离 · 阻塞不传染",
+ "pill": "三线程",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "Main Thread",
+   "s": "Service / UI",
+   "chips": [
+    "onStartCommand 接收 Intent",
+    "serviceScope 分发 pause/resume/cancel 到控制线程"
+   ]
+  },
+  {
+   "t": "tag-control thread",
+   "s": "控制线程",
+   "chips": [
+    "TagScanOrchestrator 状态机",
+    "任务队列 poll / pause / resume / cancel",
+    "进度更新 _progress"
+   ]
+  },
+  {
+   "t": "tag-worker thread",
+   "s": "任务线程",
+   "chips": [
+    "TagGenerationScheduler 原子任务",
+    "人脸检测 / DBSCAN / Qwen JNI 推理",
+    "可能被 native 推理阻塞，但不影响控制线程"
+   ]
+  }
+ ],
+ "name": "tag-thread-model"
+}

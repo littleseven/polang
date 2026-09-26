@@ -1,0 +1,41 @@
+{
+ "kind": "flow",
+ "title": "帧同步降级路径",
+ "banner": "三种故障 · 各自兜底",
+ "pill": "容灾",
+ "pill_c": "orange",
+ "steps": [
+  {
+   "t": "FrameSyncManager 初始化失败",
+   "chips": [
+    {
+     "c": "orange",
+     "t": "降级 SyncMode.OFF → 恢复双缓冲插值行为"
+    }
+   ]
+  },
+  {
+   "t": "检测线程崩溃",
+   "chips": [
+    {
+     "c": "orange",
+     "t": "收不到新结果 → query() 持续 MISSING"
+    },
+    {
+     "c": "orange",
+     "t": "BeautyRenderer hasFace=false → 妆容隐藏，其他美颜正常"
+    }
+   ]
+  },
+  {
+   "t": "预测结果超出约束",
+   "chips": [
+    {
+     "c": "green",
+     "t": "clamp 到最大允许位移|「妆容慢半拍」但不跳变"
+    }
+   ]
+  }
+ ],
+ "name": "beauty-degradation-paths"
+}

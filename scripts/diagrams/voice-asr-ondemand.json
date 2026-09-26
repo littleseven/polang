@@ -1,0 +1,30 @@
+{
+ "kind": "flow",
+ "title": "ASR 按需加载（VAD 触发）",
+ "banner": "告别常驻 282MB",
+ "pill": "低功耗",
+ "pill_c": "green",
+ "foot": "原方案 start() 即加载 ASR 持续运行、282MB 常占内存与 CPU；优化后仅在识别窗口加载，用毕自动释放。",
+ "steps": [
+  {
+   "t": "WakeWordEngine.start()",
+   "chips": [
+    "启动 AudioRecorder + VAD",
+    "ASR 保持未初始化（低功耗）"
+   ]
+  },
+  {
+   "t": "检测到语音活动 + VAD 稳定",
+   "chips": [
+    "调用 asrEngine.transcribe() → 触发 ASR 按需加载"
+   ]
+  },
+  {
+   "t": "识别完成或超时",
+   "chips": [
+    "ASR 自动释放（不在此管理）|仅在识别期间运行"
+   ]
+  }
+ ],
+ "name": "voice-asr-ondemand"
+}

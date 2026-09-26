@@ -1,0 +1,48 @@
+{
+ "kind": "flow",
+ "title": "搜索指令分发流（ADR-007）",
+ "banner": "@Tool 直构命令 · 收敛注册表",
+ "pill": "现行口径",
+ "pill_c": "blue",
+ "steps": [
+  {
+   "t": "用户输入「找出去年夏天的猫」",
+   "chips": [
+    "AgentOrchestrator.dispatch()"
+   ]
+  },
+  {
+   "t": "REMOTE mode",
+   "chips": [
+    "KoogChatAgent（原 RemoteReActAgent）→ tool_calls → search_media",
+    {
+     "c": "ghost",
+     "t": "LOCAL mode 已废止|2026-08-02 端侧文本 LLM 移除"
+    }
+   ]
+  },
+  {
+   "t": "命令构造",
+   "chips": [
+    {
+     "c": "ghost",
+     "t": "LocalCommandParser / ToolCallCommandParser 均已删除"
+    },
+    "@Tool 方法直接构造 → AgentCommand.SearchMedia"
+   ]
+  },
+  {
+   "t": "CapabilityRegistry.dispatch()",
+   "chips": [
+    "GalleryCapability.execute()"
+   ]
+  },
+  {
+   "t": "MediaSearchEngine.search(query)",
+   "chips": [
+    "结构化过滤 → MediaDao 查询"
+   ]
+  }
+ ],
+ "name": "adr007-dispatch-flow"
+}

@@ -1,0 +1,43 @@
+{
+ "kind": "flow",
+ "title": "语音唤醒生命周期",
+ "banner": "KWS 常驻休眠 → ASR 按需加载",
+ "pill": "功耗优先",
+ "pill_c": "orange",
+ "foot": "<b>~14MB / 50mW 常驻</b>换 always-on 唤醒；重型 ASR 只在唤醒窗口加载，用毕即释。",
+ "steps": [
+  {
+   "t": "休眠态",
+   "s": "Always-on KWS",
+   "chips": [
+    "~14MB · ~50mW"
+   ],
+   "note": "用户说「小觅拍张照」"
+  },
+  {
+   "t": "KWS 检测到唤醒词",
+   "chips": [
+    "暂停 KWS"
+   ]
+  },
+  {
+   "t": "加载 ASR",
+   "chips": [
+    "~282MB · ~500mW → 转录「拍张照」"
+   ]
+  },
+  {
+   "t": "AgentOrchestrator.dispatch",
+   "chips": [
+    "「拍张照」→ Capability 执行"
+   ]
+  },
+  {
+   "t": "回收",
+   "chips": [
+    "释放 ASR → 恢复 KWS always-on"
+   ]
+  }
+ ],
+ "name": "voice-wakeup-lifecycle"
+}

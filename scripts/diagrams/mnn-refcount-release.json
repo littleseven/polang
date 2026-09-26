@@ -1,0 +1,44 @@
+{
+ "kind": "flow",
+ "title": "引用计数释放决策",
+ "banner": "VLM × FaceDetect 共存下的卸载裁决",
+ "pill": "refcount",
+ "pill_c": "orange",
+ "foot": "两处重复出现的口径（§获取/释放 与 §后台策略）已合并为本图。",
+ "steps": [
+  {
+   "t": "获取",
+   "chips": [
+    "VLM 请求 → acquireLlm() → llmRefCount++",
+    "人脸检测请求 → acquireFaceDetection() → faceDetectionRefCount++"
+   ]
+  },
+  {
+   "t": "releaseLlm()",
+   "chips": [
+    {
+     "c": "green",
+     "t": "faceDetectionRefCount == 0 → onSafeUnload() → 真正 unload()/nativeDestroy()|MnnGlobalReleaseLock 串行化"
+    },
+    {
+     "c": "orange",
+     "t": "faceDetectionRefCount > 0 → onSoftRelease() → trimMemory()"
+    }
+   ]
+  },
+  {
+   "t": "releaseFaceDetection()",
+   "chips": [
+    {
+     "c": "green",
+     "t": "llmRefCount == 0 → onSafeUnload() → 真正 release()"
+    },
+    {
+     "c": "orange",
+     "t": "llmRefCount > 0 → onSoftRelease() → 保留模型"
+    }
+   ]
+  }
+ ],
+ "name": "mnn-refcount-release"
+}

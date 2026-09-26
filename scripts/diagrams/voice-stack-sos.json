@@ -1,0 +1,46 @@
+{
+ "kind": "layers",
+ "title": "语音栈 Native 隔离地图",
+ "banner": "三套推理运行时 · 互不共享状态",
+ "pill": "ONNX / MNN",
+ "pill_c": "orange",
+ "foot": "语音栈与 FaceDetect <b>完全独立加载/释放</b>；libMNN.so 由 VLM 打标与人脸检测两个使用者共享。",
+ "bands": [
+  {
+   "t": "应用层",
+   "chips": [
+    "CameraScreen → VoiceCommandCoordinator",
+    "WakeWordEngine（新 KWS）",
+    "PushToTalkEngine",
+    "AiAgentUseCase"
+   ]
+  },
+  {
+   "t": "语音栈（ONNX）",
+   "s": "完全独立加载/释放",
+   "chips": [
+    "libsherpa-onnx-jni.so + libonnxruntime.so",
+    "KeywordSpotter（KWS）",
+    "OnlineRecognizer（ASR）",
+    "Vad（DNN VAD）"
+   ]
+  },
+  {
+   "t": "VLM 打标（MNN）",
+   "s": "MNN 使用者",
+   "chips": [
+    "libMNN.so + libmnn_llm.so",
+    "Qwen3-VL-2B|TAG Pass 3"
+   ]
+  },
+  {
+   "t": "FaceDetect（MNN）",
+   "s": "完全独立加载/释放",
+   "chips": [
+    "独立 .so",
+    "Det10G + 2D106"
+   ]
+  }
+ ],
+ "name": "voice-stack-sos"
+}
