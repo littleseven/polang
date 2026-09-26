@@ -124,7 +124,7 @@ class ModelDownloadTaskAdapter(
         }
     }
 
-    private fun taskId(modelId: String): String = "download:$modelId"
+    private fun taskId(modelId: String): String = taskIdFor(modelId)
     private fun modelId(taskId: String): String = taskId.removePrefix("download:")
 
     private fun formatBytes(bytes: Long): String = when {
@@ -138,5 +138,8 @@ class ModelDownloadTaskAdapter(
         private const val BYTES_PER_KB = 1L shl 10
         private const val BYTES_PER_MB = 1L shl 20
         private const val BYTES_PER_GB = 1L shl 30
+
+        /** 任务 ID 方案唯一入口（组合根前置校验 FAILED 落库等外部写入方复用，禁止各处硬编码前缀）。 */
+        fun taskIdFor(modelId: String): String = "download:$modelId"
     }
 }
