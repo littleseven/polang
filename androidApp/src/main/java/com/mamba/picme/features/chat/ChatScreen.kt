@@ -234,7 +234,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val messages by viewModel.displayMessages.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
-    val engineerDeliverInFlight by viewModel.engineerDeliverInFlight.collectAsState()
+    val engineerActionInFlight by viewModel.engineerActionInFlight.collectAsState()
     val currentModel by viewModel.currentModel.collectAsState()
     val threads by viewModel.filteredThreads.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -593,7 +593,7 @@ fun ChatScreen(
                                     EngineerTaskCard(
                                         task = task,
                                         expanded = taskExpanded,
-                                        actionsEnabled = !isProcessing && task.taskId !in engineerDeliverInFlight,
+                                        actionsEnabled = !isProcessing && task.taskId !in engineerActionInFlight,
                                         onToggleExpand = { taskExpanded = !taskExpanded },
                                         onContinue = { viewModel.continueEngineerTask(task.taskId) },
                                         onAbandon = { viewModel.abandonEngineerTask(task.taskId) },

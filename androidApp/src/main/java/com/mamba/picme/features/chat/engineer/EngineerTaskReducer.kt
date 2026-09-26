@@ -75,9 +75,10 @@ object EngineerTaskReducer {
         )
     }
 
-    /** 完成态结果摘要：首个非空行，截断 80 字（US-10 末段文本首行）。 */
+    /** 完成态结果摘要：末段首个非空行，截断 80 字（US-10 末段回复首行；delta 为全回合累积，末段才是结论）。 */
     fun summarize(text: String): String =
-        text.lines().firstOrNull { line -> line.isNotBlank() }?.trim()?.take(SUMMARY_MAX) ?: ""
+        text.split(Regex("\\n\\s*\\n")).lastOrNull { paragraph -> paragraph.isNotBlank() }
+            ?.lines()?.firstOrNull { line -> line.isNotBlank() }?.trim()?.take(SUMMARY_MAX) ?: ""
 
     private fun EngineerTaskState.pushStage(label: String, nowMs: Long): EngineerTaskState =
         copy(stage = label, recentStages = (recentStages + label).takeLast(MAX_STAGES), updatedAtMs = nowMs)

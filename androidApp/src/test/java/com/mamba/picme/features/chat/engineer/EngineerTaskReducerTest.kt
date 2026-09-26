@@ -111,8 +111,10 @@ class EngineerTaskReducerTest {
     }
 
     @Test
-    fun `summarize takes first non blank line capped`() {
+    fun `summarize takes first non blank line of last paragraph capped`() {
         assertEquals("结果", EngineerTaskReducer.summarize("\n\n结果\n第二行"))
+        // 末段语义：全回合累积文本先分段，取最后非空段的首行（开场叙述不盖结论）
+        assertEquals("结果：已修复", EngineerTaskReducer.summarize("我先看看代码\n\n结果：已修复"))
         assertEquals(80, EngineerTaskReducer.summarize("x".repeat(200)).length)
         assertEquals("", EngineerTaskReducer.summarize(""))
     }

@@ -8,15 +8,19 @@ object EngineerTaskSmokeSamples {
 
     fun all(nowMs: Long): List<EngineerTaskState> = listOf(
         EngineerTaskReducer.initial("task_smoke_running", "帮我整理相册模块的包结构", nowMs - 30_000)
-            .copy(sid = "a1b2c3d4e5f6", stage = "Edit", recentStages = listOf("Read", "Grep", "Edit"), turns = 3),
+            .copy(sid = "a1b2c3d4e5f6", stage = "Edit", recentStages = listOf("Read", "Grep", "Edit"), turns = 3,
+                updatedAtMs = nowMs - 5_000),
         EngineerTaskReducer.initial("task_smoke_truncated", "重构 ChatViewModel", nowMs - 90_000)
-            .copy(sid = "a1b2c3d4e5f6", status = EngineerTaskStatus.AWAITING_CONTINUE, truncatedReason = "max_turns", turns = 10),
+            .copy(sid = "a1b2c3d4e5f6", status = EngineerTaskStatus.AWAITING_CONTINUE, truncatedReason = "max_turns", turns = 10,
+                updatedAtMs = nowMs - 60_000),
         EngineerTaskReducer.initial("task_smoke_deliver", "修复登录页崩溃", nowMs - 150_000)
             .copy(sid = "a1b2c3d4e5f6", status = EngineerTaskStatus.AWAITING_DELIVER, turns = 6, fileChangeCount = 3,
-                recentStages = listOf("Read", "Edit", "Bash", "file_change:Login.kt")),
+                recentStages = listOf("Read", "Edit", "Bash", "file_change:Login.kt"), updatedAtMs = nowMs - 30_000),
         EngineerTaskReducer.initial("task_smoke_done", "写一个日期工具函数", nowMs - 300_000)
-            .copy(sid = "a1b2c3d4e5f6", status = EngineerTaskStatus.COMPLETED, turns = 2, resultSummary = "已创建 DateUtils.formatRelative()"),
+            .copy(sid = "a1b2c3d4e5f6", status = EngineerTaskStatus.COMPLETED, turns = 2, resultSummary = "已创建 DateUtils.formatRelative()",
+                updatedAtMs = nowMs - 120_000),
         EngineerTaskReducer.initial("task_smoke_failed", "升级 Koog 到 9.9", nowMs - 400_000)
-            .copy(sid = "a1b2c3d4e5f6", status = EngineerTaskStatus.FAILED, errorSummary = "connection lost"),
+            .copy(sid = "a1b2c3d4e5f6", status = EngineerTaskStatus.FAILED, errorSummary = "connection lost",
+                updatedAtMs = nowMs - 200_000),
     )
 }

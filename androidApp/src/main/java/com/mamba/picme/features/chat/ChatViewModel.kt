@@ -326,9 +326,9 @@ class ChatViewModel(
     private val _engineerTasks = MutableStateFlow<Map<String, EngineerTaskState>>(emptyMap())
     val engineerTasks: StateFlow<Map<String, EngineerTaskState>> = _engineerTasks.asStateFlow()
 
-    /** 交付请求在途的 taskId 集合（双击防护，防并发重复 POST /v1/claude-deliver；UI 据此禁用交付按钮）。 */
-    private val _engineerDeliverInFlight = MutableStateFlow<Set<String>>(emptySet())
-    val engineerDeliverInFlight: StateFlow<Set<String>> = _engineerDeliverInFlight.asStateFlow()
+    /** 任务卡动作（交付/继续/重试）在途的 taskId 集合（双击防护；UI 据此禁用审批按钮）。 */
+    private val _engineerActionInFlight = MutableStateFlow<Set<String>>(emptySet())
+    val engineerActionInFlight: StateFlow<Set<String>> = _engineerActionInFlight.asStateFlow()
 
     /** 当前回合活动任务（sendClaudeMessage 提交时置位，回合结束清空）。 */
     @Volatile
@@ -371,9 +371,16 @@ class ChatViewModel(
      * claude 模式下的用户消息：走 [ClaudeChatClient.chat] SSE 流式（spec §6 事件）。
      * 事件经 [ClaudeAgentRenderer] 折叠成 agent 气泡（文本流式 + 步骤 + 文件改动）；
      * done 后落 Room（metadata 带 claude_agent_state，跨重载保留）；交付审批由 TASK_CARD 任务卡承载。
+     * @param actionInFlightTaskId 任务卡动作（继续/重试）来源卡 id：回合结束（finally）释放其在途标记。
      */
-    fun sendClaudeMessage(text: String) {
-        if (text.isBlank()) return
+    fun sendClaudeMessage(text: String, actionInFlightTaskId: String? = null) {
+        if (text.isBlank()) {
+            // 携带在途标记的空调用：立即释放（正常路径由回合 finally 释放）
+            actionInFlightTaskId?.let { id ->
+                _engineerActionInFlight.update { inFlight -> inFlight - id }
+            }
+            return
+        }
         viewModelScope.launch {
             val sessionId = _currentSessionId.value
             // 提升到 try 外：finally 做 compare-and-clear，防旧回合误清新回合的活动卡
@@ -488,6 +495,9 @@ class ChatViewModel(
             } finally {
                 _isProcessing.value = false
                 if (activeEngineerTaskId == taskId) activeEngineerTaskId = null
+                actionInFlightTaskId?.let { id ->
+                    _engineerActionInFlight.update { inFlight -> inFlight - id }
+                }
             }
         }
     }
@@ -644,8 +654,12 @@ class ChatViewModel(
     /** 任务卡「继续」：旧卡回填已继续 + 同 sid 续跑（新回合新卡，语义同气泡按钮）。 */
     fun continueEngineerTask(taskId: String) {
         if (_isProcessing.value) return
+        // 双击防护：在途标记跨帧存活（sendClaudeMessage 的 launch 异步置位 _isProcessing，
+        // 同帧 try/finally 移除会留空窗），由新回合 finally 释放
+        if (taskId in _engineerActionInFlight.value) return
         resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.CONTINUED)
-        sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue))
+        _engineerActionInFlight.update { inFlight -> inFlight + taskId }
+        sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue), actionInFlightTaskId = taskId)
     }
 
     /** 任务卡「到此为止」。 */
@@ -663,8 +677,11 @@ class ChatViewModel(
     /** 任务卡「重试」：重发原消息（新任务卡，不覆盖旧卡，US-11）。 */
     fun retryEngineerTask(taskId: String) {
         if (_isProcessing.value) return
-        val source = _engineerTasks.value[taskId]?.sourceText ?: return
-        sendClaudeMessage(source)
+        val source = _engineerTasks.value[taskId]?.sourceText?.takeIf { text -> text.isNotBlank() } ?: return
+        // 双击防护同 continueEngineerTask：在途标记由新回合 finally 释放
+        if (taskId in _engineerActionInFlight.value) return
+        _engineerActionInFlight.update { inFlight -> inFlight + taskId }
+        sendClaudeMessage(source, actionInFlightTaskId = taskId)
     }
 
     /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。 */
@@ -681,8 +698,8 @@ class ChatViewModel(
             ?: claudeSid
             ?: return
         // 双击防护：taskId 级 in-flight，回包/早退必移除（finally 覆盖 token 缺失路径）
-        if (taskId in _engineerDeliverInFlight.value) return
-        _engineerDeliverInFlight.update { inFlight -> inFlight + taskId }
+        if (taskId in _engineerActionInFlight.value) return
+        _engineerActionInFlight.update { inFlight -> inFlight + taskId }
         val sessionId = _currentSessionId.value
         viewModelScope.launch {
             try {
@@ -700,7 +717,7 @@ class ChatViewModel(
                     onFailure = { error -> markEngineerTaskDeliverError(sessionId, taskId, error.message) },
                 )
             } finally {
-                _engineerDeliverInFlight.update { inFlight -> inFlight - taskId }
+                _engineerActionInFlight.update { inFlight -> inFlight - taskId }
             }
         }
     }
@@ -1391,7 +1408,7 @@ class ChatViewModel(
                 ensureSessionExists(sessionId)
                 EngineerTaskSmokeSamples.all(System.currentTimeMillis()).forEach { sample ->
                     _engineerTasks.update { tasks -> tasks + (sample.taskId to sample) }
-                    persistEngineerTask(sessionId, sample)
+                    engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, sample) }
                 }
             }
             return
