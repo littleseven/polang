@@ -48,7 +48,7 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：
 
 ### D1（目标 a）：正文走原生富渲染，不走 HTML
 
-- 替换的是**渲染库**（`compose-markdown`，长期未维护），不是 markdown 格式——LLM 输出仍以 markdown 为准（通用语，prompt 约束与工具链依赖它），新管线继续渲染 markdown。选型硬指标：**不完整 markdown 的增量解析**、表格、代码高亮（具体选型在实现 spec 定）
+- 替换的是**渲染库**（`compose-markdown`，长期未维护），不是 markdown 格式——LLM 输出仍以 markdown 为准（通用语，prompt 约束与工具链依赖它），新管线继续渲染 markdown。选型硬指标：**不完整 markdown 的增量解析**、表格、代码高亮、**白名单内联 HTML 原生渲染**（轻量花式排版——下划线/高亮/上标级，GitHub README 模式，见 §4-18）（具体选型在实现 spec 定）
 - WebView 不用于渲染聊天正文（流式性能/文本选择/a11y/PERF 红线均不支持）
 
 ### D2（目标 b）：`RICH_HTML` 消息类型 + 沙箱 Artifact 容器
@@ -137,6 +137,7 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：
 15. L1 模板的 Ardot 设计稿覆盖（Light/Dark 双模式），设计管线成本入账
 16. `FloatingChatBubbleService` 中 RICH_HTML 降级为仅预览卡
 17. SVG 静态图表卡与 Chart.js 卡并存的迁移窗口与终态时间表
+18. **正文轻量花式排版与 HTML 防御**（2026-09-26 增，随富内容三通道路由决策——`2026-09-26-html-card-two-tier-design.md` §8）：① D1 选库须评估**白名单内联 HTML 的原生渲染**（`<u> <mark> <sup> <sub> <kbd> <br>` 级，原生组件渲染、不进 WebView）；② 实现验收含**正文流块级 HTML 防御**——检测到渲染级 HTML → 剥离或降级为代码块，不允许半渲染（防 LLM 自发嵌 HTML 绕过 `render_html` 通道）
 
 ## 5. 状态
 
@@ -146,7 +147,7 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：
 | 正文渲染管线选型（D1） | ⏳ 实现 spec |
 | RICH_HTML + Artifact 容器（D2/D3） | ✅ Android 已落地（2026-09-25 合 main；呈现形态按顶部修订注记，实现 SSOT = `JS_ENGINE_TECH_SPEC.md` §7.1） |
 | 排版风格约束分级（D5） | ✅ 用户已认可（2026-09-25）；模板库/词表落地在实现 spec |
-| 开放问题收敛（§4，17 条） | 🔄 部分随 Android 落地裁决（预览卡形态、外链策略见顶部修订注记）；余量随后续迭代收敛 |
+| 开放问题收敛（§4，18 条） | 🔄 部分随 Android 落地裁决（预览卡形态、外链策略见顶部修订注记）；余量随后续迭代收敛 |
 | iOS 同构落地（D4） | ⏳ /ios-follow 排期 |
 
 ## 6. 相关

@@ -3,7 +3,7 @@
 > **日期**: 2026-09-26
 > **来源**: 用户新想法——「短卡 chat 内直接交互无手势冲突；长文 HTML（超一屏）手势冲突突出，外显为固定高预览卡，点击全屏」；随后扩展「任务卡也适合 HTML 形态呈现，点击展开细节」
 > **上游**: ADR-014（chat 富内容渲染，含 2026-09-25 修订注记）、`JS_ENGINE_TECH_SPEC.md` §7.1（HtmlCard 实现 SSOT）、`2026-09-25-engineer-task-card-design.md`（任务卡，本 spec 修订其 D2/§6）
-> **关键决策**（用户 2026-09-26 逐项确认）：混合分流判定 / 实时裁剪预览 / 全屏同沙箱允许竖滚；任务卡原地展开+超长进全屏 / 审批动作条原生外置 / 折叠展开全 HTML
+> **关键决策**（用户 2026-09-26 逐项确认）：混合分流判定 / 实时裁剪预览 / 全屏同沙箱允许竖滚；任务卡原地展开+超长进全屏 / 审批动作条原生外置 / 折叠展开全 HTML；富内容三通道路由（draw_chart / render_html / 纯 markdown）+ 正文禁嵌渲染级 HTML
 > **设计稿**: Ardot 文件 polang-ui-spec（fileId 715061534788814）页面 `HtmlCard`（pageId `438:2`）8 帧，见 §13；过程稿 `docs/superpowers/specs/2026-09-26-html-card-two-tier-mockup.html`
 
 ---
@@ -78,6 +78,17 @@
 - `render_html` tool description 增加 `display` 参数说明与适用判据。
 - `html_card_rules` 增加：inline 卡建议内容高度 ≤ 0.66 屏；长报告/多屏内容声明 `fullpage`；fullpage 卡把导航/关键交互设计在顶部（用户可能先看预览）。
 - `RenderEnvironment` 注入追加：预览卡固定高度（0.5 屏 px 值）与分流阈值（1.0 屏 px 值），LLM 排版有确定基准。
+- **富内容三通道路由决策表**（用户 2026-09-26 决策；调研佐证 `docs/reviews/2026-09-26-chat-rendering-framework-research.md` §6——四家正文流均无 WebView、富内容全部走独立卡片/part）——写入 `html_card_rules` 与 `draw_chart` tool description，作为 LLM 产出富内容时的唯一选择依据：
+
+| 诉求 | LLM 选择 | 判据 |
+|---|---|---|
+| 数据对比 / 趋势 / 占比 / 时间线 | `draw_chart` | 端侧零成本、高频形态枚举；禁止 markdown 表格/ASCII 画图（既有约束不变） |
+| 「好看 / 交互 / 组合媒体 / 生成式 UI」（短） | `render_html` + `display=inline` | 卡内直接交互，建议 ≤ 0.66 屏 |
+| 长报告 / 多屏图文 / 为全屏设计的交互页 | `render_html` + `display=fullpage` | §4 分流判定 |
+| 端侧媒体（相册图 / 编辑结果） | **不经 LLM 排版**，走原生消息（`MEDIA_RESULTS` / `AGENT_IMAGE`） | ADR-008 媒体红线 |
+| 其余一切文字表达 | 纯 markdown | 通用语 |
+
+- **正文禁嵌渲染级 HTML**：prompt 契约明令禁止在 markdown 正文流输出块级 HTML（图表/富媒体/花式排版一律走上表三通道）；端侧配套防御（D1 选库实现 spec 验收项）——正文流检测到块级 HTML → 剥离或降级为代码块展示，不允许半渲染。轻量文字强调（下划线/高亮/上标）仅允许**白名单内联标签**，由原生 markdown 管线渲染（选型评估项，ADR-014 §4-18）。
 
 ## 9. 降级链与错误处理
 
@@ -132,6 +143,7 @@
 - 增量 DOM 补丁刷新通道（任务卡闪烁若可接受则永不做，预留评估）；
 - 任务中心页列表项 HTML 化；
 - 预览卡内横向交互保留（预览态一律禁交互，YAGNI）；
+- **markdown 正文内嵌渲染级 HTML**（WebView 进正文流）——四家头部 App 零先例 + 渲染管线分裂 / 流式标签截断 / 安全面从消息级碎到段落级三个硬伤（2026-09-26 调研结论）；轻表达走白名单内联标签（D1 选型评估项），重表达走本 spec 卡片体系；
 - iOS 完整实现（/ios-follow 排期）。
 
 ## 16. 实施分期建议
@@ -149,3 +161,4 @@
 - `2026-09-25-engineer-task-card-design.md`：D2「原生卡片」与 §6「RICH_HTML 化任务卡」不做项被本 spec §7 推翻（用户 2026-09-26）；该 spec 头部已加修订注记指回本 spec。
 - `JS_ENGINE_TECH_SPEC.md` §7.1：实现落地时按双形态更新「UI 形态」段（完全撑开不再是无上限唯一形态），随代码原子同步（DOC-SYNC）。
 - `ADR-014`：顶部修订注记第 1 条（呈现形态）在本 spec 后二次演进——「卡片内直接交互 + 完全撑开」收窄为 Inline 形态，新增 Fullpage 双态；实施时回写 ADR 注记。
+- `ADR-014` §4：新增第 18 条选型评估项（白名单内联 HTML 原生渲染 + 正文块级 HTML 防御），随本 spec §8 富内容路由决策同步（2026-09-26）。
