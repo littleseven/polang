@@ -1,9 +1,9 @@
 ---
 name: ardot-design-ops
 description: Ardot 设计稿资产治理——新建页面/帧、token 样式变更、健康审计三场景编排,保障 Light/Dark 全域可切与组件化不腐败。Use when creating/modifying Ardot frames or components, syncing design tokens to canvas, exporting snapshots, or auditing design health (ardot, 设计稿, Light/Dark, 组件化).
-version: 1.5.0
+version: 1.8.0
 created: 2026-09-19
-updated: 2026-09-25
+updated: 2026-09-26
 maintainer: [RD] 全栈工程师
 tags: [ardot, design-system, light-dark, ui-consistency]
 ---
@@ -152,6 +152,9 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 营销帧边框范式定案(2026-09-26) | 深色截图的边框选型;Light 钉帧内 onSurface 渲成深灰 | 统一纯白:边框一律绑 color/white($143:3,双模恒 #FFFFFF);guide 卡结构=边框帧(padding12/外角28)+Screen 子(内角18);海报/FG 内条同款;勿用 $2:149(Light 钉下变 #181818) |
 | 直传脚本挪位 ROOT 越级(2026-09-26) | play-images-upload.py 从 tmp 挪 scripts/ 后 ../.. 指到仓库上级,listing 目录找不到→上传静默空转→空 edit commit 403 | 脚本内相对 ROOT 按部署位重算+空目录硬失败防呆;线上无伤(edit 不 commit 自动作废) |
 | Play REST v3 图片端点形态(2026-09-25) | images 增删查 URL 误带 /images 段或 type query → 400 Cannot bind / Invalid value | 真身=.../listings/{lang}/{imageType}(camelCase: phoneScreenshots/featureGraphic,无 /images 段);edit 收尾=.../edits/{id}**:commit**(冒号非斜杠);入库脚本 scripts/play-images-upload.py(SA JWT openssl 签+SOCKS+prune 重传+sha 回读) |
+| 微信化标题 ABSOLUTE 残留(2026-09-26) | 09-24 居中标题是叠加层:TITLE 节点 layoutPositioning=ABSOLUTE(整条 393 宽);改 LEFT/fill_container 不生效、图标压字、返回键被盖 | 唯一解 `U(node,{layoutPositioning:"AUTO"})` 回流(x:null 与 x:"auto" 均被引擎拒);2026-09-26 用户拍板弃居中(刘海遮挡)→页面名统一居左,topbar 正典=horizontal gap8 pad8/8 h$2:111 标题$2:114 LEFT fill+图标$2:15+hairline y47;app 侧 AppTopBar centered=true 待跟 |
+| 帧级 padding 推走流内铬件(2026-09-26) | gallery/empty 帧 pad{top236,l40,r40} 为定位内容却把流内 status_bar 推到 y=236(游离信号图标/乱码根因);绝对定位铬件(top_bar/floating_tab)免疫 | 内容定位勿用帧级 padding 承载含铬件的帧;修复=帧 pad 归零+铬件回 flow+内容节点(quote 等)改显式 x/y 绝对定位 |
+| refs 导出稀疏帧误判空白(2026-09-26) | empty/sort_menu/provider_config 等帧本相近纯色或变高(428/681/921),tones/size 阈值误报「冷缓存空白」 | 判据=与旧 refs 同名文件比对(尺寸+KB+tones 三特征一致即本相);真空白=KB 骤降且 tones=1 全采样区 |
 
 ## 相关文件
 
@@ -186,3 +189,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 1.5.0 | 2026-09-25 | 任务卡组件/任务中心页实战回填:快照商店帧渲染漂移处置+preview-mode.sh --shot 路径失配+health-check 多页漏扫/合并两坑(陷阱表 +3 行) |
 | 1.6.0 | 2026-09-25 | 海报隐形文字事故修复实战回填:批量面色重绑对比度盲区(health-check 不设防,须行级亮度判据)+Play REST v3 图片端点形态/入库直传脚本(陷阱表 +2 行) |
 | 1.7.0 | 2026-09-26 | Guide 重烘+边框统一实战回填:Guide 图文映射 SSOT/纯白边框范式($143:3)/直传脚本 ROOT 越级坑(陷阱表 +3 行) |
+| 1.8.0 | 2026-09-26 | 顶栏左对齐全域修复实战回填:微信化标题 ABSOLUTE 残留(AUTO 回流)/帧级 padding 推走铬件/稀疏帧导出误判(陷阱表 +3 行);gallery grid/empty 结构复位+memories 三段式(hero轮播+宽卡双up+小卡4up)定案 |
