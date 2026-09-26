@@ -103,7 +103,7 @@ PoLang 的实验目标是探索**右侧范式的工程可行性**。
 - **标签扫描** ✅：Florence-2 / Qwen3-VL-2B 端侧打标 3-Pass 链路，可由对话触发（`ChatStartTagScanCapability`，详见 `TAG_GENERATION.md`）
 - **JS 沙盒脚本** ✅：QuickJS 沙箱 + JSBridge，对话内运行相册分析/健康报告脚本（`run_gallery_script`，详见 `JS_ENGINE_TECH_SPEC.md`）
 - 对话式反馈：操作确认、错误澄清、建议推荐、结果展示
-- **用户问题上报** ✅：Chat 顶部「上报问题」入口 → `POST /v1/report-issue`，服务端脱敏后自动创建 GitHub issue
+- **用户问题上报** ✅：设置页「其他」分组「上报问题」入口 → `POST /v1/report-issue`，服务端脱敏后自动创建 GitHub issue
 - 为主页面 Pager 页 2，从相册悬浮「聊天」Tab 或全屏横滑进入，顶部栏提供返回相册按钮
 
 **人物记忆与关系层（✅ 已合并 main）**

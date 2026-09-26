@@ -85,7 +85,6 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.ShortText
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteSweep
@@ -260,7 +259,6 @@ fun ChatScreen(
     val showRegistration by viewModel.showRegistrationSheet.collectAsState()
     val showGuestBanner by viewModel.showGuestBanner.collectAsState()
     val guestMessageCount by viewModel.guestMessageCount.collectAsState()
-    val issueReportState by viewModel.issueReportState.collectAsState()
     val canDeliverClaude by viewModel.canDeliverClaude.collectAsState()
     val activeEngineerTaskCount by viewModel.activeEngineerTaskCount.collectAsState()
     val gachaSelections by viewModel.gachaSelections.collectAsState()
@@ -276,7 +274,6 @@ fun ChatScreen(
     var anchorHold by remember { mutableStateOf<Pair<Long, Int>?>(null) }
 
     var isSidebarOpen by remember { mutableStateOf(false) }
-    var showReportIssueDialog by remember { mutableStateOf(false) }
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
     var previewChartSvg by remember { mutableStateOf<String?>(null) }
@@ -539,41 +536,6 @@ fun ChatScreen(
         settingsViewModel.checkChatModelsOnCellular()
     }
 
-    // 问题上报结果反馈
-    LaunchedEffect(issueReportState) {
-        when (val state = issueReportState) {
-            is IssueReportState.Success -> {
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.report_issue_success, state.issueId),
-                    Toast.LENGTH_SHORT,
-                ).show()
-                showReportIssueDialog = false
-                viewModel.resetIssueReportState()
-            }
-            is IssueReportState.Error -> {
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.report_issue_error, state.message),
-                    Toast.LENGTH_LONG,
-                ).show()
-                viewModel.resetIssueReportState()
-            }
-            else -> {}
-        }
-    }
-
-    if (showReportIssueDialog) {
-        ReportIssueDialog(
-            state = issueReportState,
-            isGuest = isGuestMode,
-            onDismiss = { showReportIssueDialog = false },
-            onSubmit = { category, title, description ->
-                viewModel.submitIssueReport(category, title, description)
-            },
-        )
-    }
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -585,7 +547,6 @@ fun ChatScreen(
                     onOpenSidebar = { isSidebarOpen = true },
                     onNewChat = { viewModel.newSession() },
                     onClearChat = { viewModel.clearChat() },
-                    onReportIssue = { showReportIssueDialog = true },
                     activeTaskCount = activeEngineerTaskCount + activeUserTaskCount,
                     onNavigateToTaskCenter = onNavigateToTaskCenter,
                     isActivePage = isActivePage
@@ -985,7 +946,6 @@ private fun ChatTopBar(
     onOpenSidebar: () -> Unit,
     onNewChat: () -> Unit,
     onClearChat: () -> Unit,
-    onReportIssue: () -> Unit = {},
     /** 活动工程师任务数（任务中心入口角标，US-12；0 不显示角标） */
     activeTaskCount: Int = 0,
     onNavigateToTaskCenter: () -> Unit = {},
@@ -1029,102 +989,10 @@ private fun ChatTopBar(
                     onClick = onNavigateToTaskCenter
                 )
             }
-            AppTopBarAction(Icons.Outlined.BugReport, stringResource(R.string.report_issue_cd), onReportIssue)
             AppTopBarAction(Icons.Outlined.AddComment, stringResource(R.string.new_chat), onNewChat)
             AppTopBarAction(Icons.Outlined.DeleteSweep, stringResource(R.string.clear_chat), onClearChat)
         }
     )
-}
-
-@Composable
-private fun ReportIssueDialog(
-    state: IssueReportState,
-    isGuest: Boolean,
-    onDismiss: () -> Unit,
-    onSubmit: (category: String, title: String, description: String) -> Unit,
-) {
-    var category by remember { mutableStateOf("other") }
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    val submitting = state is IssueReportState.Submitting
-    val categories = listOf("crash", "bug", "ai", "other")
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.report_issue_title)) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (isGuest) {
-                    Text(
-                        text = stringResource(R.string.report_issue_guest_not_allowed),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.report_issue_category_label),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    categories.forEach { c ->
-                        FilterChip(
-                            selected = category == c,
-                            onClick = { category = c },
-                            label = { Text(stringResource(categoryLabelRes(c))) },
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.report_issue_title_label)) },
-                    placeholder = { Text(stringResource(R.string.report_issue_title_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isGuest,
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.report_issue_description_label)) },
-                    placeholder = { Text(stringResource(R.string.report_issue_description_hint)) },
-                    minLines = 3,
-                    maxLines = 6,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isGuest,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSubmit(category, title, description) },
-                enabled = !submitting && !isGuest && title.isNotBlank(),
-            ) {
-                if (submitting) {
-                    // 保持按钮宽度稳定，仅显示 "提交中..."
-                    Text(stringResource(R.string.report_issue_submit) + "…")
-                } else {
-                    Text(stringResource(R.string.report_issue_submit))
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !submitting) {
-                Text(stringResource(R.string.report_issue_cancel))
-            }
-        },
-    )
-}
-
-@StringRes
-private fun categoryLabelRes(category: String): Int = when (category) {
-    "crash" -> R.string.report_issue_category_crash
-    "bug" -> R.string.report_issue_category_bug
-    "ai" -> R.string.report_issue_category_ai
-    else -> R.string.report_issue_category_other
 }
 
 /** LRU 已清理的编辑结果图占位：灰框 + 图标 + 「图片已过期·不可见」。 */

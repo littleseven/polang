@@ -1323,7 +1323,7 @@ private fun SettingsMainMenu(
             )
         }
 
-        // ── 其他：数据与隐私 / 开发者选项（解锁后显示）──
+        // ── 其他：数据与隐私 / 上报问题 / 开发者选项（解锁后显示）──
         SettingsListSection {
             SettingsListRow(
                 title = stringResource(R.string.data_privacy_entry),
@@ -1331,6 +1331,8 @@ private fun SettingsMainMenu(
                 iconBlockColor = AppColors.vibrantBlue,
                 onClick = onNavigateToDataPrivacy
             )
+            SettingsListDivider()
+            ReportIssueEntry()
             if (developerOptionsUnlocked) {
                 SettingsListDivider()
                 SettingsListRow(
