@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reddit 冷启动发帖工具（官方 API / PRAW，单账号本人内容）。
 
-帖子 SSOT 同步自 docs/superpowers/specs/2026-08-24-en-launch-posts.md（改动须两侧同步）。
+帖子内容 SSOT = 本文件（原 spec docs/superpowers/specs/2026-08-24-en-launch-posts.md 已随交付清理，git 历史可查）。
 
 用法:
   export REDDIT_CLIENT_ID=...        # reddit.com/prefs/apps → script app
@@ -29,7 +29,7 @@ except ImportError:
     print("缺依赖: pip3 install praw")
     sys.exit(2)
 
-# ---- 帖子内容（与 docs/superpowers/specs/2026-08-24-en-launch-posts.md 同步） ----
+# ---- 帖子内容（SSOT，已发布冻结） ----
 
 PLAY = "https://play.google.com/store/apps/details?id=com.mamba.picme"
 GITHUB = "https://github.com/littleseven/polang"

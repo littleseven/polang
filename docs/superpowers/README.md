@@ -83,11 +83,20 @@ docs/superpowers/
 
 ---
 
-## 6. 索引
+## 6. 索引（2026-09-26 清理后）
 
-- 现有 specs（9 篇，均为在途/活跃 SSOT）：见 `specs/` 目录
-- 现有 plans（6 篇，均为在途/路线图）：见 `plans/` 目录
-- 阶段汇总：`claude-tunnel-summary.md`
+- **specs（10 篇，均为在途/活跃 SSOT）**：
+  - `2026-08-08-face-restoration-ondevice-design.md` — 人脸修复方向（未实施，待排期）
+  - `2026-08-10-ios-follow-command-design.md` — /ios-follow 六阶段管线设计 SSOT（AGENTS §7 引用）
+  - `2026-08-13-ios-chat-rich-features-design.md` — iOS Chat 富交互（批次③沙盒写操作在途）
+  - `2026-08-25-album-dedup-design.md` — 去重 2.0 + 主页面 Pager 结构（FEATURES/模块 AGENTS 引用其 §11）
+  - `2026-09-04-model-download-scan-power-optimization-design.md` — 下载/扫描功耗优化评估稿（供排期决策）
+  - `2026-09-19-ardot-design-ops-design.md` — Ardot Design Ops skill 设计 SSOT
+  - `2026-09-25-engineer-task-card-design.md` — 工程师任务卡（US-4~6 回联待 P2 网关改造）
+  - `2026-09-25-intent-routing-contract-design.md` — 意图路由契约（M3 分支化在途）
+  - `2026-09-26-html-card-two-tier-design.md`（+ 同名 mockup.html）— HTML 卡双形态 + 任务卡 HTML 化（已定稿待实施）
+  - `2026-09-26-user-task-protocol-design.md` — 用户任务协议 + 任务中心双 Tab（M2/M3 在途）
+- **plans（1 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）
 
 ---
 
@@ -97,3 +106,4 @@ docs/superpowers/
 |------|------|
 | 2026-08-01 | 建立 SSOT 约定，统一四工具 plan/spec 写入位置；新增 `.omo/plans` 软链 |
 | 2026-08-22 | 历史清理：删除 103 篇已交付 spec/plan（≤08-20 非白名单，specs 77 + plans 25 + nightly 1），仅留在途/活跃 SSOT；建立「交付即清理、git 历史即归档」生命周期约定（见 §2） |
+| 2026-09-26 | 第二轮清理：删除 40 篇已交付产物（specs 18 + plans 21 + claude-tunnel-summary），保留在途/活跃 SSOT（10 specs + 1 plan，清单见 §6）；AGENTS/yaml/脚本等活跃引用同步改写为「已随交付清理，git 历史可查」 |

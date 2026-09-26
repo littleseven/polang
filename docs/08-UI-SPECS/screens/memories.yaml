@@ -5,7 +5,7 @@
 #        + domain/memories/{MemoriesGenerator,MemoriesModels,MemoryHiddenStore}.kt
 #        + features/gallery/memories/MemoriesViewModel.kt
 # 用途：iOS 实现的唯一输入，不读 Android 源码（[PARITY] 红线）
-# 版本：v1（2026-09-16 反向提取固化）；设计 spec：docs/superpowers/specs/2026-09-06-memory-page-design.md
+# 版本：v1（2026-09-16 反向提取固化）；设计 spec 已随交付清理（git 历史可查）
 # 覆盖两屏：回忆根页（§2，Pager 页 4）/ 回忆详情页（§3，路由 memory_detail/{memoryId}）
 # 导航框架（页序/底 bar/页面身份）见 main-nav.yaml
 

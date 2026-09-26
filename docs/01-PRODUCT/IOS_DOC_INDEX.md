@@ -12,8 +12,6 @@
 |---|---|
 | [`IOS_TASK_STATUS.md`](IOS_TASK_STATUS.md) | **缺口看板**：当前真实缺口 + 下一步任务（每项带代码/commit 证据） |
 | [`IOS_PRODUCT_REFERENCE.md`](IOS_PRODUCT_REFERENCE.md) | **产品实现参考**：逐模块现状 + 双端能力对照，以 iOS 代码为准 |
-| [`../superpowers/plans/2026-08-07-polang-kmp-ios-transformation.md`](../superpowers/plans/2026-08-07-polang-kmp-ios-transformation.md) | **Phase 路线图**：Phase 1-7 + 决策 + 风险登记 + 变更记录 |
-| [`../superpowers/plans/2026-08-10-ios-implementation-tasks.md`](../superpowers/plans/2026-08-10-ios-implementation-tasks.md) | **缺口主排序**：G1-G7 → T0-T11 Wave |
 | [`../reviews/2026-08-10-ios-android-consistency-gap.md`](../reviews/2026-08-10-ios-android-consistency-gap.md) | **5 屏 code 级差异审计**（最新；相机项已完成） |
 | [`../../docs/08-UI-SPECS/PARITY_MASTER_PLAN.md`](../../docs/08-UI-SPECS/PARITY_MASTER_PLAN.md) | **Parity 顶层架构**（五层防线） |
 | [`../03-TECHNICAL-SPECS/IOS_ANDROID_UI_PARITY.md`](../03-TECHNICAL-SPECS/IOS_ANDROID_UI_PARITY.md) | **Parity 方法论** |
@@ -33,6 +31,7 @@
 - **已过期审计**：08-08 camera / gallery UI gap-analysis → 被 `2026-08-10-ios-android-consistency-gap.md` 取代
 - **已吸收**：camera-gallery-gap plan（相册 G1-G4 → 看板 §6.6）、spec-test-gaps（gap 项 → 看板 §6.5）
 - **过程产物**：2 份 Phase 5 kickoff 派发（camera-glm / gallery-k3）
+- **KMP 转换路线图**（2026-09-26 清理：`polang-kmp-ios-transformation` plan + `ios-implementation-tasks` plan）→ Phase 1-7 全部交付，代码为现行事实
 
 ---
 

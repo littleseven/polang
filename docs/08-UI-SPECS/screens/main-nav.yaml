@@ -4,7 +4,7 @@
 # 基准端：Android features/main/{MainPagerHost,MainFloatingBottomBar}.kt + MainActivity.kt
 #        + navigation/Screen.kt + features/common/avatar/AvatarCaptureController.kt
 # 用途：iOS 实现的唯一输入，不读 Android 源码（[PARITY] 红线）
-# 版本：v1（2026-09-16 反向提取固化）；设计 spec：docs/superpowers/specs/2026-09-06-main-nav-unification-design.md
+# 版本：v1（2026-09-16 反向提取固化）；设计 spec 已随交付清理（git 历史可查）
 # 各屏内部结构见各自 yaml（gallery-grid / organize / chat / person / memories / camera）
 
 # ============================================================================

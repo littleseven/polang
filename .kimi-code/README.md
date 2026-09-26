@@ -1,7 +1,7 @@
 # polang · kimi-code 原生 Hooks
 
 > 三个观察型/异步 Hook，把「改文件后检查、turn 结束 GLM 交叉审查、完成桌面通知」自动化。
-> 设计 spec：`docs/superpowers/specs/2026-08-09-kimi-code-hooks-design.md`(v2, Option A)。
+> 设计 spec 已随交付清理（v2 Option A，git 历史可查）。
 > 实现计划已随交付清理（2026-08-22 文档整理，git 历史可查）。
 
 ## 这是什么

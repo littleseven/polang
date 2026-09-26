@@ -104,7 +104,7 @@
 - **整理中心类目详情（F1，`features/gallery/organize/`，类目体系 v2）**: 六类目互斥管线，`domain/organize/` 纯函数四层（`OrganizeCategorizer` 为编排 Facade，对外仅 `classifyAll`（详情页逐媒体裁定）与 `board`（hub 聚合）两入口）：`CategoryArbiter` 按 `OrganizeCategory` 声明序先命中先得（DUPLICATES > SCREEN_CONTENT > DOCUMENTS > LOW_QUALITY_PORTRAITS > LOW_QUALITY_PHOTOS > LARGE_FILES；视频仅参与 DUPLICATES/SCREEN_CONTENT/LARGE_FILES）→ `ValueGuard` 价值保护（仅低质两类：拍摄 ≥5 年前 / 人物聚类 ≤3 张稀缺 / 收藏或查看过 → protected，不预选不计 Hero）→ `ConfidenceGrader`（HIGH 默认勾选 / MEDIUM 近阈值单信号 / LOW 弱信号）；阈值集中 `OrganizeThresholds`（SSOT）
 - **F1 信号与 hub**: 新信号 blurScore/exposureScore（`BlurAnalyzer` ≤256px 灰度 Laplacian 方差 + 平均亮度，缺分由 `OrganizeRepositoryImpl.backfillQualitySignals` 后台分批补算回写）与 lastViewedAt（查看器打开回写，60s 节流）；hub（`DedupHomeHub.kt`）board 恒 6 卡，零命中且 READY 不渲染、NEEDS_SCAN 渲染降档引导卡；Hero = 全类目 HIGH 非保护并集字节（DUPLICATES 按精确组扣 1 张 keeper；已知口径差：highCount 徽标含 keeper 而 highBytes 不含）；`DedupCategoryCard`（可展开原去重 Config 三件套）钉首位豁免排序
 - **F1 详情页**: `OrganizeCategoryScreen`/`OrganizeCategoryViewModel` 三段分组（建议删除=HIGH 非保护 / 请确认=MEDIUM+LOW / 可能是珍贵照片=protected，Shield 角标）；AI 预选与 selectAll 仅圈 HIGH 非保护项，DUPLICATES 按 `exactDupGroupKey` 每组留 1 张 keeper（captureDate 最新）；顶栏「AI 预选」开关（`org_ai_preselect_on/off`）；段级全选按钮未实装（VM `selectAll`/`deselectAll` 就绪暂无 UI 调用方）；删除/Undo 走 `TrashSessionController` 系统回收站（30 天可恢复）
-- **F1 口径与索引**: 重复组聚类输入按库内 uri 收敛（`OrganizeRepositoryImpl.queryDuplicateInfo`，dedup_hash 幽灵行不参与）；`SwipeQueueBuilder` 消费同一 `classifyAll` 产出（口径同源，废片桶只收 HIGH/MEDIUM 非 protected）。设计 spec：`docs/superpowers/specs/2026-09-06-organize-category-redesign-design.md`；UI SSOT：`docs/08-UI-SPECS/screens/organize.yaml`
+- **F1 口径与索引**: 重复组聚类输入按库内 uri 收敛（`OrganizeRepositoryImpl.queryDuplicateInfo`，dedup_hash 幽灵行不参与）；`SwipeQueueBuilder` 消费同一 `classifyAll` 产出（口径同源，废片桶只收 HIGH/MEDIUM 非 protected）。设计 spec：已随交付清理（git 历史可查）；UI SSOT：`docs/08-UI-SPECS/screens/organize.yaml`
 - **手势快速整理（F2，`features/gallery/swipe/`）**: `SwipeReviewScreen`（NavHost 二级页 `swipe_review`：全屏大图卡——右滑保留 / 左滑跳过 / 上滑删除、点按=跳过，卡片跟手位移 + 超阈值（宽 25%）飞出落决策，预加载后续 3 张；完成态统计卡 + 再来一轮 + 整批恢复）+ `SwipeReviewViewModel`（`SwipeQueueBuilder` 废片优先建队、undo 栈、未提交 DELETE 累计 20 张自动提交一批系统回收站授权，Done 态整批 undoAll）；hub「滑动整理」渐变主按钮经 `onQuickTidy` 点亮路由；入列原因（Screenshot/Blurry/Low-quality portrait/Recent）为卡片角标，视频永不入队
 - **F2 KEEP 30 天抑制**: decide(KEEP) 即时写入 `SwipeKeepHistory`（`domain/swipe/SwipeKeepHistory.kt` 纯函数：`uri|epochMs` 编码 + 30 天 TTL 裁剪；`data/preferences/DataStoreSwipeKeepHistoryStore.kt` 持久化到 user_preferences DataStore `swipe_keep_history` stringSet），restart 建队过滤活跃条目并清理过期，undo(KEEP) 只回滚本会话新增条目
 - **F2 防死锁与计数**: API<30（`!isSupported`）提交短路不挂在途、`finish` 直接 settleDone（未提交 DELETE 以 skipped 口径进 Done，三桶守恒）；token 构建失败经 errorEvent 回滚；授权被拒（Cancelled）批次回滚可重试，末张决策后显示「待提交 N 张 + 重试/放弃」出口面板；freedBytes 为 Reviewing 存储字段，decide/undo/discard 增量维护（O(1)）
@@ -261,7 +261,7 @@ python3 scripts/ui_driver.py dump
 
 ### 2.12 回忆 Memories（F3 独立页）
 
-**模块定位**: Memory 独立主页面 Pager 页（index 4，`MAIN_PAGE_MEMORY`）+ 回忆详情页（NavHost 路由 `memory_detail/{memoryId}`）；纯端侧规则生成，零推理零上传（[PRIVACY]），对标小米系统相册分区 feed；Pager 页序与路由归属口径见 `androidApp/AGENTS.md` §1.2。设计 spec：`docs/superpowers/specs/2026-09-06-memory-page-design.md`。
+**模块定位**: Memory 独立主页面 Pager 页（index 4，`MAIN_PAGE_MEMORY`）+ 回忆详情页（NavHost 路由 `memory_detail/{memoryId}`）；纯端侧规则生成，零推理零上传（[PRIVACY]），对标小米系统相册分区 feed；Pager 页序与路由归属口径见 `androidApp/AGENTS.md` §1.2。设计 spec：已随交付清理（2026-09-06 memory-page，git 历史可查）。
 
 **页面结构（`features/gallery/memories/MemoryScreen.kt`）**:
 - 顶栏：`statusBarsPadding()` 状态栏避让（edge-to-edge 防标题被状态栏压住）+ 大标题「回忆」（`memory_title`）+ 副标「端侧生成 · 私密」（`memory_privacy_note`）

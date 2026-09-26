@@ -2,7 +2,7 @@
 
 > Claude Code 命令索引。所有命令定义在 `.claude/commands/*.md`，对话中通过 `/command-name` 调用。历史命令曾从 `.qoder/skills/` 迁移而来，当前以 `.claude/commands/` 为唯一事实来源。
 
-## 可用 Commands（共 30 个）
+## 可用 Commands（共 33 个）
 
 ### 🔧 开发与构建
 | Command | 说明 |
@@ -11,11 +11,12 @@
 | `/error-healer` | Kotlin/Gradle 编译错误自动分类与修复策略 |
 | `/dev-loop` | 一键编译→安装→设备验证→质量检查闭环 |
 | `/i18n-validator` | 多语言同步验证（中/英/繁），禁止硬编码字符串 |
+| `/android-tag-data-backup-restore` | 卸载重装（换签名键）前后备份恢复应用数据（TAG/人脸嵌入/聚类等高价值数据） |
 
 ### 📱 设备控制与调试
 | Command | 说明 |
 |---------|------|
-| `/adb-bot` | adb 自动化控制相机应用与设备调试 |
+| `/adb-bot` | adb 设备调试与应用生命周期管理（TEST_COMMAND 广播已移除，应用内自动化走 `/ui-driver`） |
 | `/image-quality-checker` | 截屏质量分析（黑屏/亮度），注意：自动化脚本尚未实现 |
 
 ### 🧪 测试与质量
@@ -39,6 +40,7 @@
 | `/mnn-llm-android` | MNN-LLM 端侧大模型推理（Qwen/下载/调试） |
 | `/mnn-landmark-diagnosis` | MNN 人脸关键点检测对齐诊断 |
 | `/onnx-model-integration` | ONNX 模型接入专家 |
+| `/mnn-modelscope-uploader` | 预训练模型转 MNN 格式并发布到 ModelScope 仓库供 Android 下载 |
 
 ### 🎯 UI/交互
 | Command | 说明 |
@@ -47,6 +49,7 @@
 | `/ui-parity-guard` | 双端 UI 一致性守卫（spec → token → 截图闭环硬规则） |
 | `/layout-inspector-expert` | Layout Inspector 调试 Compose UI 问题 |
 | `/mediapipe-landmark-mapping` | MediaPipe 468/106 点人脸关键点映射 |
+| `/ardot-design-ops` | Ardot 设计运维（快照导出/token 同步/语言台账等 MCP 操作规程） |
 
 ### 📋 流程与治理
 | Command | 说明 |
@@ -85,5 +88,5 @@
 
 > 命令源文件：`.claude/commands/*.md`
 > 历史源文件：`.qoder/skills/*/SKILL.md`（已迁出，`.qoder/` 已删除）
-> Canonical skills 源（SSOT）：`skills/`（经 `.kimi/skills` 软链供 kimi/OpenCode 共享）；`.claude/commands/` 为 Claude Code 专用镜像（无 frontmatter），由 `scripts/check-skill-sync.sh` 校验、从 `skills/` 同步
-> 最近整理：2026-08-16（补录 `/ios-follow`、新增 `/ui-parity-guard` 镜像；命令数 28→30，与 `skills/` SSOT 对齐，`./scripts/check-skill-sync.sh` 无漂移）。2026-08-08（补充 iOS 部分 7 个 skill：ios-build-debug / ios-dev-loop / swiftui-expert / metal-render-expert / mnn-ios-integration / kmp-ios-interop / ios-i18n-validator；命令数 21→28）。2026-08-03 整理记录：移除已下线 `ncnn-integration` 条目；清理 InsightFace→MNN、`/agent-test`→`/ui-driver`、`/qa-acceptance` 等过时引用；去掉易过期的「行数」列。
+> Canonical skills 源（SSOT）：`skills/`（经 `.kimi/skills` 软链供 kimi/OpenCode 共享）；`.claude/commands/` 为 Claude Code 专用镜像（与 SKILL.md 同文拷贝），由 `scripts/check-skill-sync.sh` 校验、从 `skills/` 同步
+> 最近整理：2026-09-26（补录 `/android-tag-data-backup-restore`、`/mnn-modelscope-uploader`、`/ardot-design-ops`；重同步 `/adb-bot` 至 3.0.0；命令数 30→33，`./scripts/check-skill-sync.sh` 无漂移）。2026-08-16（补录 `/ios-follow`、新增 `/ui-parity-guard` 镜像；命令数 28→30，与 `skills/` SSOT 对齐，`./scripts/check-skill-sync.sh` 无漂移）。2026-08-08（补充 iOS 部分 7 个 skill：ios-build-debug / ios-dev-loop / swiftui-expert / metal-render-expert / mnn-ios-integration / kmp-ios-interop / ios-i18n-validator；命令数 21→28）。2026-08-03 整理记录：移除已下线 `ncnn-integration` 条目；清理 InsightFace→MNN、`/agent-test`→`/ui-driver`、`/qa-acceptance` 等过时引用；去掉易过期的「行数」列。

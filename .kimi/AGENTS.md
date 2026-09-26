@@ -6,7 +6,7 @@
 ## 项目速览
 
 - **名称**: PoLang
-- **类型**: Android + iOS 跨平台应用（Kotlin/Jetpack Compose + Swift/SwiftUI，KMP 共享 core；详见 `docs/superpowers/specs/2026-08-08-ios-app-skeleton-design.md`）
+- **类型**: Android + iOS 跨平台应用（Kotlin/Jetpack Compose + Swift/SwiftUI，KMP 共享 core；iOS 应用骨架设计 spec 已随交付清理，git 历史可查）
 - **包名**: com.mamba.picme
 - **架构**: Clean Architecture + MVVM
 - **关键约束**: 100% 本地 AI 处理、交互反馈 < 100ms、五语言 I18N（EN/CN/TW/ES/FR）

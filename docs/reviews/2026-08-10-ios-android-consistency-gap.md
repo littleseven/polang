@@ -220,7 +220,7 @@
 
 - **契约 SSOT**：`docs/08-UI-SPECS/screens/*.yaml`（camera/gallery-grid/chat/settings/model-download-center）。对齐 = iOS 实现 → yaml 契约（yaml 镜像 Android）。
 - **真机验证**：`./scripts/ios-auto-dev-loop.sh --quick --screenshot <name>`（baseline 已采，iPhone 15）。相机视觉类改动用 before/after 截图 + syslog 崩溃检查。
-- **下一步**：~~相机页对齐（T7b）~~ ✅ **已完成并合并 main（2026-08-10）**——快门 token 启用+黑闪+反馈（`f050d6ea`）+ 右列 4 面板（比例/网格/场景/ProMode + 面板互斥状态机，`262bf406`/`0267b62f`/`19ae5942`/`04b912fa`/`e965445e`）。§3 剩余 #8 十字星接人脸 / #9 makeup·风格滤镜 / #6 录像属 **G5 功能深化**（见 [`IOS_TASK_STATUS.md`](../01-PRODUCT/IOS_TASK_STATUS.md) §6.6 / [`plans/2026-08-10-ios-implementation-tasks.md`](../superpowers/plans/2026-08-10-ios-implementation-tasks.md) T9）。
+- **下一步**：~~相机页对齐（T7b）~~ ✅ **已完成并合并 main（2026-08-10）**——快门 token 启用+黑闪+反馈（`f050d6ea`）+ 右列 4 面板（比例/网格/场景/ProMode + 面板互斥状态机，`262bf406`/`0267b62f`/`19ae5942`/`04b912fa`/`e965445e`）。§3 剩余 #8 十字星接人脸 / #9 makeup·风格滤镜 / #6 录像属 **G5 功能深化**（见 [`IOS_TASK_STATUS.md`](../01-PRODUCT/IOS_TASK_STATUS.md) §6.6 / `plans/2026-08-10-ios-implementation-tasks.md`（已随交付清理，git 历史可查） T9）。
 - **2026-08-16 下一步（优先级调整后）**：~~批次A 速赢~~ ✅ **已落地**（相-5/10/13/14 + 聊-2 + demo 文案 i18n；spec 修正 + Ardot Gallery/empty 预览 + 快照入库 + 导出脚本多页化）。~~批次B 相册功能~~ ✅ **已落地**（LANDSCAPE/LOCATION 分组真实现 · PhotoInfo 全字段 · 拖拽多选；Ardot Gallery 页 3 帧入库；device 构建+真机 dev-loop 全过）。→ **批次C 聊天③+设置涉及项**（JS 写操作+确认弹窗 · 消息类型产生源 · 清除访客/AI 记忆等随批）→ **大工程**（视频播放 · 证件照 · 语音输入 · 抽卡）。相机 G5 暂缓；Android 场景面板移除待办保留。UI 类改动一律先 Ardot 页面预览。
 - **不混入本批**：相册/设置的「整块功能缺失」（搜索/编辑/账号/录像等 Phase 6 大功能）单列计划，不在纯对齐批次内。
 

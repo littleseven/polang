@@ -2,7 +2,7 @@
 
 - 日期：2026-08-23
 - 结论：**GO**——TEXT_CONTENT 绑定语法可行，mode 切换/双 override/快照导出全部验证通过
-- spec：`docs/superpowers/specs/2026-08-23-ardot-language-modes-design.md`
+- spec：已随交付清理（2026-08-23 ardot-language-modes，git 历史可查）
 - 探针帧：gallery/grid（105:45，Gallery 页）
 - 探针后画布终态：三节点保持绑定（Step 1 种子），帧 override 显式写回双默认（Dark + English）
 

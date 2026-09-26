@@ -87,7 +87,7 @@ Sources: [sczhou/CodeFormer](https://github.com/sczhou/codeformer) · [NeurIPS 2
 
 ## 7. 双端归属（正式开工的前置）
 
-KMP 改造（[`2026-08-07-polang-kmp-ios-transformation.md`](../plans/2026-08-07-polang-kmp-ios-transformation.md)）：
+KMP 改造（转换 plan 已随交付清理，git 历史可查）：
 
 - **Phase 4 新建 `shared/`**，**`:runtime-core` 在 Phase 4 消亡**（逻辑迁 `shared/`，Android 特有沉 `shared/androidMain`）。
 - 推理两端异构：Android ONNX Runtime / iOS MNN-Metal 或 CoreML。
@@ -142,7 +142,7 @@ KMP 改造（[`2026-08-07-polang-kmp-ios-transformation.md`](../plans/2026-08-07
 ## 12. 相关文档 / 代码
 
 - 缺口上游：[`AI_IMAGE_EDITING_CAPABILITY_GAP.md`](../../03-TECHNICAL-SPECS/AI_IMAGE_EDITING_CAPABILITY_GAP.md)
-- 双端架构前置：[`plans/2026-08-07-polang-kmp-ios-transformation.md`](../plans/2026-08-07-polang-kmp-ios-transformation.md)（Phase 4 `shared/`）
+- 双端架构前置：KMP 转换 plan（Phase 4 `shared/`，已随交付清理，git 历史可查）
 - 抽卡度量：[`AI_OPTIMIZATION.md`](../../03-TECHNICAL-SPECS/AI_OPTIMIZATION.md) §11.5；`optimize/gacha/OptimizeScorer.kt`、`Guardrails.kt`
 - 复用代码：`domain/aesthetic/EdiffiqaScorer.kt`（ONNX 范式）、`FaceAligner.kt`（Umeyama，需改 512）、`domain/matting/MaskPostProcessor.kt:feather`、`engines/beauty-engine/.../facedetect/`（检测）
 

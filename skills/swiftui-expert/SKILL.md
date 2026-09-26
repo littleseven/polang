@@ -89,7 +89,7 @@ ForEach(items) { item in
 
 - [compose-ui-expert](/compose-ui-expert) — Android Compose 对照
 - [ios-i18n-validator](/ios-i18n-validator) — 文案五语
-- S4 可调试性纪律（单一状态源 / Preview 全覆盖 / accessibilityIdentifier 全量标注）：`docs/superpowers/plans/2026-08-07-polang-kmp-ios-transformation.md` Phase 5（原骨架设计稿已清理）
+- S4 可调试性纪律（单一状态源 / Preview 全覆盖 / accessibilityIdentifier 全量标注）：KMP 转换计划 Phase 5 已随交付清理（git 历史可查）
 
 ## 版本历史
 

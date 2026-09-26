@@ -2,7 +2,7 @@
 
 > **用途**：检索词 SSOT 台账——词表分层、覆盖计数、双周搜索词报告记录。
 > **更新节奏**：每双周随 Play Console 搜索词报告导出更新（流程见 §4）。
-> **关联**：策略与两轮方案 `docs/superpowers/specs/2026-08-08-google-play-aso-design.md`（第二轮见其 §7）；文案 SSOT `androidApp/src/main/play/listings/`（en-US / zh-CN / zh-TW / zh-HK，zh-HK 与 zh-TW 同文镜像）。
+> **关联**：策略与两轮方案已随交付清理（git 历史：`docs/superpowers/specs/2026-08-08-google-play-aso-design.md`）；文案 SSOT `androidApp/src/main/play/listings/`（en-US / zh-CN / zh-TW / zh-HK，zh-HK 与 zh-TW 同文镜像）。
 
 ## 1. 三语词表（2026-08-24 第二轮定稿）
 

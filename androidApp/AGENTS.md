@@ -46,7 +46,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 >
 > **2026-09-06 Memory 独立页**：Pager 追加第 5 页「回忆」（index 4，`MAIN_PAGE_MEMORY`，`beyondViewportPageCount` 随之 = 4），对标小米系统相册分区 feed；实现细节见 `features/gallery/AGENTS.md` §2.12。
 >
-> **2026-09-06 导航统一（五页一面、聊天沉浸）**：底 bar 五项与 Pager 页序 1:1（相册 PhotoLibrary / 整理 CleaningServices / 聊天 / 人物 / 回忆 AutoAwesome），收敛为共享组件 `MainFloatingBottomBar`（`features/main/`）。**页面身份规则**：根页（相册/整理/人物/回忆）= 无顶栏返回箭头 + 渲染底 bar 高亮自身项 + 系统返回经 MainPagerHost BackHandler 回相册页；沉浸二级页（聊天）= 有返回出路、不渲染 bar。页面自身有底部 UI/全屏态时隐藏 bar（先例：相册详情态、Dedup CTA 三态）。打标 bar 项移除（深链仍走 `organizeTabRequest`）；`Screen.People` 死声明删除。spec：`docs/superpowers/specs/2026-09-06-main-nav-unification-design.md`。
+> **2026-09-06 导航统一（五页一面、聊天沉浸）**：底 bar 五项与 Pager 页序 1:1（相册 PhotoLibrary / 整理 CleaningServices / 聊天 / 人物 / 回忆 AutoAwesome），收敛为共享组件 `MainFloatingBottomBar`（`features/main/`）。**页面身份规则**：根页（相册/整理/人物/回忆）= 无顶栏返回箭头 + 渲染底 bar 高亮自身项 + 系统返回经 MainPagerHost BackHandler 回相册页；沉浸二级页（聊天）= 有返回出路、不渲染 bar。页面自身有底部 UI/全屏态时隐藏 bar（先例：相册详情态、Dedup CTA 三态）。打标 bar 项移除（深链仍走 `organizeTabRequest`）；`Screen.People` 死声明删除。spec：已随交付清理（2026-09-06 main-nav-unification，git 历史可查）。
 >
 > **2026-09-06 整理+扫描合并页**：原 Pager 页 1（去重 2.0 `DedupHomeRoute`）与 NavHost 路由 `tag_control`（TAG 生成控制）合并为页 1 双 Tab 容器 `OrganizeHomeRoute`（顶部胶囊分段开关「整理/扫描」，两子页以 `embedded` 模式嵌入保留各自顶栏 actions）；`tag_control` 路由删除，悬浮底栏两图标与设置入口均切页并预选对应 Tab（页内 Tab 态由 MainPagerHost `rememberSaveable` 持有，外部经 `organizeTabRequest` 驱动）。
 >

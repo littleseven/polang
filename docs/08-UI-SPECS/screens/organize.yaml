@@ -6,7 +6,7 @@
 #        SwipeReviewScreen.kt / domain/organize/* / domain/swipe/SwipeQueueBuilder.kt
 # 用途：iOS 实现的唯一输入，不读 Android 源码（[PARITY] 红线）
 # 值引用：颜色引用 Material colorScheme 语义色 / design-tokens.json token 名
-# 版本：v2（2026-09-07 落地固化）；设计 spec：docs/superpowers/specs/2026-09-06-organize-category-redesign-design.md
+# 版本：v2（2026-09-07 落地固化）；设计 spec 已随交付清理（git 历史可查）
 # 覆盖四屏：hub（§2）/ category_grid（§3）/ cleaned（§4）/ swipe_review 口径（§5）
 
 # ============================================================================

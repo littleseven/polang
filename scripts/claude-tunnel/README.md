@@ -1,6 +1,6 @@
 # claude-tunnel
 
-chisel wss 反向隧道 + Claude 流式网关。让外部经 api.polang.net 实时、流式、多轮驱动 KimiClaw 上的 Claude Code（GLM 后端）。spec：`docs/superpowers/specs/2026-07-31-claude-tunnel-chat-design.md`；实现细节见 `docs/superpowers/claude-tunnel-summary.md`。
+chisel wss 反向隧道 + Claude 流式网关。让外部经 api.polang.net 实时、流式、多轮驱动 KimiClaw 上的 Claude Code（GLM 后端）。设计 spec 与实现总结已随交付清理，git 历史可查。
 
 ## 拓扑
 ```
