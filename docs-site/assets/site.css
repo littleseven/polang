@@ -213,3 +213,6 @@ footer .x-logo svg { width: 56px; height: 56px; }
 .cmp td { color: var(--text-soft); }
 .cmp td:first-child, .cmp th:first-child { color: var(--text); font-weight: 500; }
 .cmp .yes { color: var(--primary-deep); font-weight: 600; }
+
+/* 架构图(2026-09-26) */
+.arch-img { width: 100%; height: auto; border-radius: 18px; border: 1px solid var(--hairline); box-shadow: var(--shadow-md); background: #fff; }

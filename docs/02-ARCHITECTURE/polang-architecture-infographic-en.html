@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoLang System Architecture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #F4F6F9;
+    --grid: #E8ECF1;
+    --card: #FFFFFF;
+    --tint: #EEF3FB;
+    --tint2: #F0F3F8;
+    --navy: #0D2240;
+    --blue: #2563EB;
+    --blue-deep: #3B6FD4;
+    --chip-bg: #DCE9FB;
+    --green: #2FA05A;
+    --green-bg: #E4F5EA;
+    --orange: #D97E2E;
+    --orange-bg: #FDEBD9;
+    --rose: #D9482B;
+    --rose-bg: #FCEAE5;
+    --txt: #12263F;
+    --sub: #5A6B80;
+    --line: #D8E0EC;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: #E9EEF5; } /* 与 body 桌面同色，防裁剪窗口露幽灵底 */
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+    color: var(--txt);
+    padding: 30px 16px 36px;
+    background: #E9EEF5;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 画板外框：网格收进框内，body 作桌面 */
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    background-color: #F7F9FC;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 30px 30px;
+    border: 1.5px solid #C9D4E4;
+    border-radius: 24px;
+    padding: 30px 28px 26px;
+    box-shadow: 0 12px 32px rgba(18,38,63,.10);
+  }
+  .mono { font-family: "JetBrains Mono", monospace; }
+
+  /* ── 标题区 ── */
+  .hero { text-align: center; margin-bottom: 18px; }
+  .hero h1 { font-size: clamp(30px, 4.6vw, 46px); font-weight: 900; letter-spacing: .02em; }
+  .hero h1 .dot { color: var(--blue); }
+  .banner {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: var(--navy); color: #fff;
+    border-radius: 999px; padding: 9px 20px 9px 15px;
+    margin-top: 14px; box-shadow: 0 6px 18px rgba(13,34,64,.22);
+  }
+  .banner .bn-t { font-size: 16.5px; font-weight: 700; letter-spacing: .06em; }
+  .pill-green {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: #34C759; border-radius: 999px; padding: 3px 12px;
+  }
+  .core {
+    margin: 16px auto 0; max-width: 860px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(18,38,63,.06);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+    padding: 12px 20px; justify-content: center;
+  }
+  .core .ic { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--sub); }
+  .core .ic b { color: var(--txt); font-weight: 700; }
+
+  /* ── 主区：左层带 + 右要点 ── */
+  .main { display: grid; grid-template-columns: 1fr 292px; gap: 16px; align-items: start; margin-top: 16px; }
+  @media (max-width: 940px) { .main { grid-template-columns: 1fr; } }
+
+  .band {
+    position: relative;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 18px 15px 56px;
+    box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .band.tint { background: var(--tint); }
+  .band.tint2 { background: var(--tint2); }
+  .band .num {
+    position: absolute; left: 14px; top: 14px;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--blue); color: #fff; font-weight: 900; font-size: 15px;
+    display: grid; place-items: center; box-shadow: 0 3px 8px rgba(37,99,235,.35);
+  }
+  .band .bh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .band .bt { font-size: 19px; font-weight: 900; }
+  .band .bs { font-size: 12px; color: var(--blue-deep); font-weight: 500; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* 双端分栏 */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+  @media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+  .split .half { border: 1px dashed var(--line); border-radius: 12px; padding: 9px 11px 10px; background: rgba(255,255,255,.6); }
+  .split .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .split .ph .pn { font-size: 14px; font-weight: 900; }
+  .split .ph .pt { font-size: 10.5px; color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 700; letter-spacing: .03em; }
+  .split .ph .pt.ad { background: var(--green); }
+  .split .ph .pt.ios { background: var(--navy); }
+  .share-strip { border-top: 1px dashed var(--line); padding-top: 9px; }
+  .share-strip .ss-t { font-size: 12px; color: var(--green); font-weight: 900; margin-bottom: 7px; display: inline-flex; align-items: center; gap: 5px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 500; color: var(--blue-deep);
+    background: var(--chip-bg); border: 1.5px solid rgba(37,99,235,.35);
+    border-radius: 999px; padding: 5px 13px; white-space: nowrap;
+  }
+  .chip.green { background: var(--green-bg); border-color: #7BC894; color: var(--green); }
+  .chip.orange { background: var(--orange-bg); border-color: #E8B27C; color: var(--orange); }
+  .chip.rose { background: var(--rose-bg); border-color: rgba(217,72,43,.45); color: var(--rose); border-style: dashed; }
+  .chip.ghost { background: transparent; border-style: dashed; border-color: var(--line); color: var(--sub); }
+  .chip.hero {
+    background: var(--navy); color: #fff; border-color: var(--navy);
+    font-weight: 700; box-shadow: 0 3px 10px rgba(13,34,64,.28);
+  }
+  .chip small { font-size: 11px; opacity: .75; font-weight: 400; }
+  .chip svg { flex: none; }
+
+  /* 层间箭头 */
+  .varrow { display: grid; place-items: center; padding: 4px 0; }
+
+  /* band 内虚线流向小注 */
+  .flow-note { margin-top: 9px; font-size: 12px; color: var(--sub); display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .flow-note .fn { display: inline-flex; align-items: center; gap: 5px; }
+
+  /* ── 右侧要点栏 ── */
+  .side {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 14px 8px; box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .side h3 { font-size: 16px; font-weight: 900; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .mini {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 9px 6px 10px; border-top: 1px dashed var(--line);
+  }
+  .mini:first-of-type { border-top: 0; }
+  .mini .mic {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--tint); display: grid; place-items: center;
+  }
+  .mini .mt { font-size: 13.5px; font-weight: 700; }
+  .mini .md { font-size: 11.5px; color: var(--sub); line-height: 1.6; margin-top: 2px; }
+
+  /* 右列纵向栈 */
+  .col { display: grid; gap: 16px; align-content: start; }
+
+  /* 数据流卡 */
+  .fstep { display: flex; gap: 9px; padding: 8px 2px; align-items: flex-start; }
+  .fstep + .fstep { border-top: 1px dashed var(--line); }
+  .fstep .fn {
+    width: 21px; height: 21px; border-radius: 50%; flex: none; margin-top: 1px;
+    background: var(--tint); color: var(--blue); font-size: 11px; font-weight: 900;
+    display: grid; place-items: center; border: 1.5px solid rgba(37,99,235,.4);
+  }
+  .fstep .fd { font-size: 12.5px; line-height: 1.55; }
+  .fstep .fd .fs { font-size: 11px; color: var(--sub); display: block; margin-top: 1px; }
+  .tag-ok { color: var(--green); font-weight: 700; font-size: 11px; }
+  .tag-no { color: var(--rose); font-weight: 700; font-size: 11px; }
+
+  /* 模块清单卡 */
+  .mods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mods .m {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+    color: var(--blue-deep); background: var(--tint);
+    border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; text-align: center;
+  }
+  .refs { margin-top: 10px; font-size: 10.5px; color: var(--sub); line-height: 1.8; }
+  .refs code { font-family: "JetBrains Mono", monospace; background: rgba(18,38,63,.05); padding: 0 4px; border-radius: 4px; }
+
+  /* ── 底部两卡 ── */
+  .bottom { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 940px) { .bottom { grid-template-columns: 1fr; } }
+  .bcard {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 18px 16px; box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .bcard h3 { font-size: 16px; font-weight: 900; margin-bottom: 12px; }
+  .shift { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 8px 0 4px; }
+  .shift .sbox {
+    border: 1.5px solid var(--line); border-radius: 12px; background: var(--tint2);
+    padding: 8px 14px; font-size: 13px; color: var(--sub); text-align: center;
+  }
+  .shift .sbox.to { border-color: rgba(37,99,235,.45); background: var(--chip-bg); color: var(--txt); font-weight: 700; }
+  .tech { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }
+  .tech .t {
+    font-size: 12px; font-weight: 500; color: var(--blue-deep);
+    background: var(--tint); border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 4px; text-align: center;
+  }
+  .tech .t.g { background: var(--green-bg); color: var(--green); }
+  .tech .t.o { background: var(--orange-bg); color: var(--orange); }
+
+  /* ── 页脚总结 ── */
+  .foot-banner {
+    margin-top: 18px; background: var(--navy); color: #fff;
+    border-radius: 16px; padding: 16px 22px; text-align: center;
+    box-shadow: 0 8px 22px rgba(13,34,64,.25);
+  }
+  .foot-banner .fb-t { font-size: 15px; font-weight: 900; letter-spacing: .12em; margin-bottom: 6px; color: #9FC3F8; }
+  .foot-banner .fb-d { font-size: 15.5px; line-height: 1.75; font-weight: 500; }
+  .foot-banner .fb-d b { color: #7EE2A8; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 标题 -->
+  <div class="hero">
+    <h1>PoLang System Architecture<span class="dot">.</span></h1>
+    <div class="banner">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7EB3F8" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.6"/><circle cx="5" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/><path d="M6.8 6.5L10 10.3M17.2 6.5L14 10.3M6.8 17.5L10 13.7M17.2 17.5L14 13.7"/></svg>
+      <span class="bn-t">On-device AI Gallery on KMP</span>
+      <span class="pill-green">KMP Cross-Platform</span>
+    </div>
+    <div class="core">
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg><b>7</b> Gradle modules</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><b>Dual rendering</b> GL ES / Metal</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg><b>100%</b> media on-device</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 1 0-.9-8.9 6 6 0 0 0-11.5 1.6A3.8 3.8 0 0 0 6 19h11.5z"/></svg><b>Cloud</b> inference gateway</span>
+    </div>
+  </div>
+
+  <!-- 主区 -->
+  <div class="main">
+    <div><!-- 左：层带栈 -->
+
+      <!-- ① UI 层（双端） -->
+      <section class="band">
+        <span class="num">1</span>
+        <div class="bh"><span class="bt">UI Layer</span><span class="bs">One product surface · native UI on both platforms</span></div>
+        <div class="split">
+          <div class="half">
+            <div class="ph"><span class="pn">Android</span><span class="pt ad">Compose · :androidApp</span></div>
+            <div class="chips">
+              <span class="chip green">Gallery ★</span>
+              <span class="chip green">Chat ★</span>
+              <span class="chip">Edit</span>
+              <span class="chip">Settings</span>
+              <span class="chip ghost">Camera <small>frozen</small></span>
+              <span class="chip ghost mono" style="font-size:11px">features / domain / data</span>
+            </div>
+          </div>
+          <div class="half">
+            <div class="ph"><span class="pn">iOS</span><span class="pt ios">SwiftUI · iosApp</span></div>
+            <div class="chips">
+              <span class="chip green">Gallery</span>
+              <span class="chip green">Chat</span>
+              <span class="chip">Edit</span>
+              <span class="chip">Settings</span>
+              <span class="chip ghost">Camera <small>frozen</small></span>
+              <span class="chip ghost mono" style="font-size:11px">/ios-follow parity pipeline</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="varrow"><svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg></div>
+
+      <!-- ② Agent 编排层 -->
+      <section class="band tint">
+        <span class="num">2</span>
+        <div class="bh"><span class="bt">Agent Orchestration</span><span class="bs mono">KMP :shared · com.mamba.picme.agent.core</span><span class="chip green" style="font-size:11.5px;padding:2px 10px">Shared by both · one commonMain</span></div>
+        <div class="chips" style="margin-bottom:9px">
+          <span class="chip hero">AgentOrchestrator</span>
+          <span class="chip">KoogChatAgent / KoogReActAgent</span>
+          <span class="chip">CapabilityRegistry <small>dispatch</small></span>
+          <span class="chip">14 Capabilities <small>ImageEdit · Gallery · Chat×6 · Memory …</small></span>
+        </div>
+        <div class="chips">
+          <span class="chip">PrivacyGuard <small>3-tier</small></span>
+          <span class="chip">MemoryManager <small>multi-turn</small></span>
+          <span class="chip">JS sandbox</span>
+          <span class="chip">Voice ASR <small>SherpaOnnx</small></span>
+          <span class="chip ghost">On-device text LLM removed · 2026-08</span>
+        </div>
+      </section>
+
+      <div class="varrow"><svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg></div>
+
+      <!-- ③ 端侧引擎与数据层（双端分列 + 共用条） -->
+      <section class="band tint2">
+        <span class="num">3</span>
+        <div class="bh"><span class="bt">On-device Engines &amp; Data</span><span class="bs">Self-built rendering on both platforms · zero 3rd-party beauty SDK</span></div>
+        <div class="split">
+          <div class="half">
+            <div class="ph"><span class="pn">Android</span><span class="pt ad">OpenGL ES + EGL</span></div>
+            <div class="chips">
+              <span class="chip orange">VLM tagging <small>Qwen3-VL-2B</small></span>
+              <span class="chip">MNN inference <small>mnn-core</small></span>
+              <span class="chip">CameraX → GL → SurfaceView <small>zero-copy</small></span>
+              <span class="chip">Room · DataStore</span>
+            </div>
+          </div>
+          <div class="half">
+            <div class="ph"><span class="pn">iOS</span><span class="pt ios">Metal · SharedKit</span></div>
+            <div class="chips">
+              <span class="chip">Metal render <small>warp.metal</small></span>
+              <span class="chip">ONNX embedding <small>ORTFaceEmbedder</small></span>
+              <span class="chip">MNN.framework</span>
+              <span class="chip">GRDB · TagDB</span>
+            </div>
+          </div>
+        </div>
+        <div class="share-strip">
+          <span class="ss-t"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M3 8l9-5 9 5M5 10v7M19 10v7M3 8v7"/></svg>Shared by both</span>
+          <div class="chips">
+            <span class="chip">Beauty Engine <small>self-built · layered boundary</small></span>
+            <span class="chip orange">Florence-2 <small>auto-tagging</small></span>
+            <span class="chip">Face 106pt <small>MediaPipe</small></span>
+            <span class="chip">Glint360K embedding <small>clustering / people graph</small></span>
+            <span class="chip">FrameSync <small>anti-makeup-drift</small></span>
+            <span class="chip">Gallery metadata <small>faces / scenes / tags</small></span>
+          </div>
+        </div>
+        <div class="flow-note">
+          <span class="fn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5A6B80" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Photos &amp; videos, and all media processing, <b style="color:var(--rose)">stay inside this layer</b> on both platforms</span>
+        </div>
+      </section>
+
+      <div class="varrow">
+        <svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3" stroke-dasharray="6 5"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg>
+        <div style="font-size:11.5px;color:var(--blue-deep);margin-top:3px">Only text · metadata · album summaries cross the line (ADR-005 / ADR-008)</div>
+      </div>
+
+      <!-- ④ PoLang Server -->
+      <section class="band">
+        <span class="num">4</span>
+        <div class="bh"><span class="bt">PoLang Server</span><span class="bs">Cloud · chat runs remote by default</span></div>
+        <div style="background:var(--tint);border-radius:12px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:9px">
+          <span class="chip hero"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>LLM Gateway <small>OpenAI-compatible · tool_calls · streaming</small></span>
+          <span class="chip">Koog orchestration <small>JetBrains KMP Agent</small></span>
+          <span class="chip">DeepSeek adapter</span>
+        </div>
+        <div class="chips">
+          <span class="chip">Self-hosted Ktor backend <small>api.polang.net</small></span>
+          <span class="chip">Accounts</span>
+          <span class="chip">Admin console</span>
+          <span class="chip rose">⛔ Media files never uploaded</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右：架构要点 + 数据流 + 模块清单 -->
+    <div class="col">
+    <aside class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.7.5 1 1.3 1 2.1h5c0-.8.3-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Architecture Highlights</h3>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/><path d="M9 11.5l2 2 4-4.5"/></svg></span>
+        <div><div class="mt">Privacy first, on-device</div><div class="md">Face / OCR / tagging 100% on-device; media never goes to the cloud (ADR-008)</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h4"/></svg></span>
+        <div><div class="mt">Single KMP codebase</div><div class="md">Engine-agnostic orchestration in commonMain, shared by Android &amp; iOS (ADR-013)</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2" stroke-linecap="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg></span>
+        <div><div class="mt">One core, two platforms</div><div class="md">iOS consumes the same :shared via SharedKit XCFramework; /ios-follow keeps parity</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#D97E2E" stroke-width="2" stroke-linecap="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></span>
+        <div><div class="mt">Self-built render engine</div><div class="md">OpenGL ES + EGL all-GPU pipeline; GPUPixel fully removed, zero 3rd-party SDK</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 1 0-.9-8.9 6 6 0 0 0-11.5 1.6A3.8 3.8 0 0 0 6 19h11.5z"/></svg></span>
+        <div><div class="mt">Local / remote split</div><div class="md">Only VLM tagging stays on-device; text inference goes remote via OpenAI-compatible APIs (ADR-005)</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+        <div><div class="mt">Zero-copy GPU preview</div><div class="md">CameraX → GL → SurfaceView stays on GPU; no glReadPixels in preview</div></div>
+      </div>
+    </aside>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.4" fill="#2563EB"/><circle cx="4" cy="12" r="1.4" fill="#2563EB"/><circle cx="4" cy="18" r="1.4" fill="#2563EB"/></svg>Data Flow · One Query</h3>
+      <div class="fstep"><span class="fn">1</span><div class="fd"><b>User: “Find last summer’s photos”</b><span class="fs">Natural language enters Chat — same path on both platforms</span></div></div>
+      <div class="fstep"><span class="fn">2</span><div class="fd"><b>AiAgentUseCase → AgentOrchestrator</b><span class="fs">PrivacyGuard tier: PUBLIC → remote allowed</span></div></div>
+      <div class="fstep"><span class="fn">3</span><div class="fd"><b>Koog → remote LLM · tool_calls</b><span class="fs">Crossing the line: text/metadata only <span class="tag-ok">✓ cloud OK</span> <span class="tag-no">media ⛔</span></span></div></div>
+      <div class="fstep"><span class="fn">4</span><div class="fd"><b>ChatSearchCapability runs</b><span class="fs">CapabilityRegistry.dispatch routes to an on-device capability</span></div></div>
+      <div class="fstep"><span class="fn">5</span><div class="fd"><b>On-device metadata search → reply</b><span class="fs">Face / scene / tag indexes stay local; results stream back</span></div></div>
+    </section>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M4 4h7l9 16h-7L4 4zM13 4h7"/></svg>Modules &amp; Specs</h3>
+      <div class="mods">
+        <span class="m">:androidApp</span><span class="m">:shared</span>
+        <span class="m">beauty-api</span><span class="m">beauty-engine</span>
+        <span class="m">mnn-core</span><span class="m">agent-native</span>
+        <span class="m" style="grid-column:1/-1">sentencepiece</span>
+      </div>
+      <div class="refs">
+        <code>AGENT_ARCHITECTURE.md</code> · <code>ADR-005/008/013</code><br>
+        <code>CAPABILITY_REGISTRY.md</code> · <code>BEAUTY_ENGINE_TECH_SPEC.md</code>
+      </div>
+    </section>
+    </div>
+  </div>
+
+  <!-- 底部两卡 -->
+  <div class="bottom">
+    <section class="bcard">
+      <h3>Traditional App → AI-first Client</h3>
+      <div class="shift">
+        <span class="sbox">Traditional gallery app<br><small style="font-size:11px">manual browsing · fixed features</small></span>
+        <svg width="46" height="20" viewBox="0 0 46 20"><line x1="2" y1="10" x2="36" y2="10" stroke="#2563EB" stroke-width="2"/><path d="M34 4 L44 10 L34 16 Z" fill="#2563EB"/></svg>
+        <span class="sbox to">PoLang<br><small style="font-size:11px">natural language · agent-driven · on-device + cloud</small></span>
+      </div>
+    </section>
+    <section class="bcard">
+      <h3>Tech Stack</h3>
+      <div class="tech">
+        <span class="t">KMP</span><span class="t">Compose</span><span class="t">SwiftUI</span>
+        <span class="t o">VLM</span><span class="t o">MNN</span><span class="t o">Florence-2</span><span class="t o">ONNX</span>
+        <span class="t">OpenGL ES</span><span class="t">EGL</span><span class="t">Metal</span><span class="t">MediaPipe</span>
+        <span class="t">Room</span><span class="t">DataStore</span><span class="t">CameraX</span><span class="t">GRDB</span><span class="t">SharedKit</span>
+        <span class="t g">Koog</span><span class="t g">Ktor</span><span class="t g">OpenAI-compat</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- 页脚总结 -->
+  <div class="foot-banner">
+    <div class="fb-t">IN ONE SENTENCE</div>
+    <div class="fb-d">One <b>KMP Agent core</b>, shipping on Android and iOS; on-device engines guard privacy and performance, the cloud gateway completes inference.<br>Media never leaves the device · text may go to the cloud — the AI-first principles of PoLang.</div>
+  </div>
+</div>
+</body>
+</html>
