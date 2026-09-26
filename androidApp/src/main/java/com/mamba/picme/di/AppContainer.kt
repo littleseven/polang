@@ -266,10 +266,11 @@ class MemoriesViewModelFactory(
     }
 }
 
-/** 任务中心页 VM 工厂：跨会话任务卡聚合（chat_messages + chat_sessions join）。 */
+/** 任务中心页 VM 工厂：跨会话任务卡聚合（chat_messages + chat_sessions join）+ 用户任务注册表。 */
 class TaskCenterViewModelFactory(
     private val chatMessageDao: ChatMessageDao,
     private val chatSessionDao: ChatSessionDao,
+    private val userTaskRegistry: UserTaskRegistry,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -278,6 +279,7 @@ class TaskCenterViewModelFactory(
             return TaskCenterViewModel(
                 chatMessageDao = chatMessageDao,
                 chatSessionDao = chatSessionDao,
+                userTaskRegistry = userTaskRegistry,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -1058,6 +1060,7 @@ class AppContainerImpl(
         return TaskCenterViewModelFactory(
             chatMessageDao = database.chatMessageDao(),
             chatSessionDao = database.chatSessionDao(),
+            userTaskRegistry = userTaskRegistry,
         )
     }
 
