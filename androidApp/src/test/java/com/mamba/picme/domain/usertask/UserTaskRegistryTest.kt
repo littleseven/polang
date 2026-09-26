@@ -21,8 +21,10 @@ class UserTaskRegistryTest {
         val rows = MutableStateFlow<List<UserTaskEntity>>(emptyList())
         var trimCalls = 0
             private set
+        var failOnUpsert = false
 
         override suspend fun upsert(task: UserTaskEntity) {
+            if (failOnUpsert) throw IllegalStateException("disk full")
             rows.value = rows.value.filterNot { row -> row.id == task.id } + task
         }
 
@@ -136,5 +138,59 @@ class UserTaskRegistryTest {
         registry.updateProgress("tagscan:main", TaskProgressSnapshot(0.3f, "3/10", null))
         registry.updateProgress("tagscan:main", null)
         assertNull(registry.tasks.value.single().progress)
+    }
+
+    @Test
+    fun `写库失败记日志降级不抛出且 tasks 不受影响`() = runTest {
+        val dao = FakeDao()
+        val registry = registry(dao, testScheduler)
+        registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.RUNNING)
+        assertEquals(1, registry.tasks.value.size)
+
+        dao.failOnUpsert = true
+        registry.upsertStatus("download:b", UserTaskKind.MODEL_DOWNLOAD, "b", UserTaskStatus.RUNNING) // 不抛出即通过
+
+        assertEquals(listOf("download:a"), registry.tasks.value.map { task -> task.id })
+    }
+
+    @Test
+    fun `perform 行存在但 kind 未注册适配器静默返回`() = runTest {
+        val dao = FakeDao()
+        val registry = registry(dao, testScheduler)
+        val downloadAdapter = FakeAdapter(UserTaskKind.MODEL_DOWNLOAD)
+        registry.registerAdapter(downloadAdapter)
+
+        registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
+        registry.perform("tagscan:main", UserTaskAction.PAUSE) // 不抛异常即通过
+
+        assertTrue(downloadAdapter.performed.isEmpty())
+    }
+
+    @Test
+    fun `perform 非法 kind 行静默返回且该行被 tasks 丢弃`() = runTest {
+        val dao = FakeDao()
+        val registry = registry(dao, testScheduler)
+        val tagAdapter = FakeAdapter(UserTaskKind.TAG_SCAN)
+        registry.registerAdapter(tagAdapter)
+        dao.rows.value = listOf(
+            UserTaskEntity(
+                id = "ghost-row",
+                kind = "GHOST",
+                displayName = null,
+                status = "RUNNING",
+                errorCode = null,
+                errorDetail = null,
+                destination = "TAG_SCAN_CONTROL",
+                updatedAt = 1000L,
+                completedAt = null,
+            )
+        )
+        registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
+
+        registry.perform("ghost-row", UserTaskAction.PAUSE) // 不抛异常即通过
+
+        assertTrue(tagAdapter.performed.isEmpty())
+        assertEquals(listOf("tagscan:main"), registry.tasks.value.map { task -> task.id })
+        assertEquals(1, registry.activeCount.value)
     }
 }

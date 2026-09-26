@@ -1,5 +1,6 @@
 package com.mamba.picme.domain.usertask
 
+import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.dao.UserTaskDao
 import com.mamba.picme.data.local.entity.UserTaskEntity
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +27,8 @@ class UserTaskRegistry(
 
     val tasks: StateFlow<List<UserTask>> =
         combine(dao.observeAll(), _progress) { rows, snapshots ->
-            rows.map { row -> row.toUserTask(snapshots[row.id]) }
+            // 非法行整行丢弃（mapNotNull）——transform 抛出会杀死 Eagerly 共享协程且 stateIn 不重启
+            rows.mapNotNull { row -> row.toUserTask(snapshots[row.id]) }
         }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     val activeCount: StateFlow<Int> =
@@ -45,7 +47,7 @@ class UserTaskRegistry(
         adapters[kind]?.perform(taskId, action)
     }
 
-    /** 状态迁移（落 Room；终态顺带修剪历史）。errorCode/errorDetail 仅在异常语义时传。 */
+    /** 状态迁移（落 Room；终态顺带修剪历史并清除残留进度快照）。errorCode/errorDetail 仅在异常语义时传。 */
     suspend fun upsertStatus(
         id: String,
         kind: UserTaskKind,
@@ -55,20 +57,29 @@ class UserTaskRegistry(
         errorDetail: String? = null,
     ) {
         val now = clock()
-        dao.upsert(
-            UserTaskEntity(
-                id = id,
-                kind = kind.name,
-                displayName = displayName,
-                status = status.name,
-                errorCode = errorCode?.name,
-                errorDetail = errorDetail,
-                destination = UserTaskMapping.destinationFor(kind).name,
-                updatedAt = now,
-                completedAt = if (UserTaskMapping.isActive(status)) null else now,
+        try {
+            dao.upsert(
+                UserTaskEntity(
+                    id = id,
+                    kind = kind.name,
+                    displayName = displayName,
+                    status = status.name,
+                    errorCode = errorCode?.name,
+                    errorDetail = errorDetail,
+                    destination = UserTaskMapping.destinationFor(kind).name,
+                    updatedAt = now,
+                    completedAt = if (UserTaskMapping.isActive(status)) null else now,
+                )
             )
-        )
-        if (!UserTaskMapping.isActive(status)) dao.trimHistory(HISTORY_KEEP)
+            if (!UserTaskMapping.isActive(status)) dao.trimHistory(HISTORY_KEEP)
+        } catch (exception: Exception) {
+            // spec §9-5：写库失败记 warning 降级不致命——不传播，避免打断适配器的体系订阅协程
+            Logger.w(TAG, "upsertStatus failed, id=$id status=$status", exception)
+            return
+        }
+        if (!UserTaskMapping.isActive(status)) {
+            _progress.update { current -> current - id }
+        }
     }
 
     /** 高频进度（仅内存）；传 null 清除快照。 */
@@ -87,9 +98,15 @@ class UserTaskRegistry(
             runCatching { UserTaskStatus.valueOf(row.status) }.getOrNull()
         }
 
-    private fun UserTaskEntity.toUserTask(snapshot: TaskProgressSnapshot?): UserTask {
-        val kind = UserTaskKind.valueOf(kind)
-        val status = UserTaskStatus.valueOf(status)
+    private fun UserTaskEntity.toUserTask(snapshot: TaskProgressSnapshot?): UserTask? {
+        val kind = runCatching { UserTaskKind.valueOf(kind) }.getOrElse { exception ->
+            Logger.w(TAG, "drop row with illegal kind, id=$id kind=$kind", exception)
+            return null
+        }
+        val status = runCatching { UserTaskStatus.valueOf(status) }.getOrElse { exception ->
+            Logger.w(TAG, "drop row with illegal status, id=$id status=$status", exception)
+            return null
+        }
         return UserTask(
             id = id,
             kind = kind,
@@ -108,5 +125,6 @@ class UserTaskRegistry(
 
     companion object {
         const val HISTORY_KEEP = 50
+        private const val TAG = "UserTask"
     }
 }
