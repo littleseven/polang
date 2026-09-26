@@ -52,24 +52,27 @@
 data class UserTask(
     val id: String,                            // 体系前缀寻址："tagscan:main" / "download:<modelId>"
     val kind: UserTaskKind,                    // TAG_SCAN / MODEL_DOWNLOAD（枚举即扩展点，收编即加值）
-    val titleKey: String,                      // 静态文案 key（UI 按 kind 取 string resource，不入库；见 §7 i18n）
-    val displayName: String?,                  // 体系自带名字（如下载的模型名），原样展示，不参与 i18n
+    val displayName: String?,                  // 体系自带名字（如下载的模型展示名），原样展示，不参与 i18n
+                                               // 静态标题不入库：UI 按 kind 取 string resource（见 §7 i18n）
     val status: UserTaskStatus,                // 见下
     val progress: Float?,                      // 0..1；无法量化时 null（渲染不定进度条）
     val progressText: String?,                 // "512/2048" / "12.3 MB / 45 MB"（格式由适配器产出，UI 不拼）
     val etaMs: Long?,                          // 可空，各体系有就给（TAG 有，下载无）
-    val errorSummary: String?,
-    val supportedActions: Set<UserTaskAction>, // 声明式能力集（按状态推导，见 §4.3）
+    val errorCode: UserTaskErrorCode?,         // 机器可读错误码（UI 按码取五语资源）；null = 无错误
+    val errorDetail: String?,                  // 体系原文细节（如失败计数、异常消息），追加展示
+    val supportedActions: Set<UserTaskAction>, // 声明式能力集（按状态推导，见 §4.3；体系可收窄、不得超出推导集）
     val destination: UserTaskDestination,      // 点击卡片跳转：扫描控制页 / 模型中心
     val updatedAt: Long,
 )
 
+enum class UserTaskKind { TAG_SCAN, MODEL_DOWNLOAD }
 enum class UserTaskStatus { PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED }
 enum class UserTaskAction { PAUSE, RESUME, CANCEL, RETRY }
-sealed interface UserTaskDestination {
-    data object TagScanControl : UserTaskDestination   // 整理页 SCAN tab
-    data object ModelCenter : UserTaskDestination      // 设置-模型下载中心
-}
+enum class UserTaskErrorCode { PROCESS_TERMINATED, PARTIAL_FAILURES }
+enum class UserTaskDestination { TAG_SCAN_CONTROL, MODEL_CENTER }
+
+/** 高频进度快照（仅内存，不落库）。supportedActions 不入快照——可从 status 纯推导（§4.2）。 */
+data class TaskProgressSnapshot(val progress: Float?, val progressText: String?, val etaMs: Long?)
 ```
 
 ### 4.1 状态映射（适配器纯函数，可单测钉死）
@@ -81,7 +84,7 @@ TAG 扫描会话 7 态 → 6 态：
 | IDLE | （无任务，不发射） | 空闲时任务中心不显示 |
 | RUNNING / PAUSING / CANCELLING | RUNNING | 过渡态按进行态呈现（CANCELLING 落定后进 CANCELLED） |
 | PAUSED | PAUSED | |
-| COMPLETED | COMPLETED | 任务级失败（failed>0）不进 FAILED，以 errorSummary「N 张失败」附在 COMPLETED 上 |
+| COMPLETED | COMPLETED | 任务级失败（failed>0）不进 FAILED，以 errorCode=PARTIAL_FAILURES + errorDetail=失败数附在 COMPLETED 上 |
 | CANCELLED | CANCELLED | |
 
 模型下载 6 态 → 6 态：PENDING→PENDING、DOWNLOADING→RUNNING、PAUSED→PAUSED、COMPLETED→COMPLETED、FAILED→FAILED、CANCELLED→CANCELLED（1:1）。
@@ -102,8 +105,8 @@ TAG 扫描会话 7 态 → 6 态：
 
 组合根单例（`AppContainer` 创建，平台实现唯一直构点），三件套：
 
-1. **Room `user_task` 表（身份，SSOT）**：`id` PK / `kind` / `displayName` / `status` / `errorSummary` / `destination` / `updatedAt` / `completedAt?`。**只在状态迁移时写入**（进度刷新不落库）。静态文案（titleKey）不入库——遵守 [I18N] 红线，用户可见静态文案一律走 string resource。
-2. **内存进度流**：`StateFlow<Map<String, TaskProgressSnapshot>>`（progress / progressText / etaMs / supportedActions），高频刷新只走内存。
+1. **Room `user_task` 表（身份，SSOT）**：`id` PK / `kind` / `displayName` / `status` / `errorCode` / `errorDetail` / `destination` / `updatedAt` / `completedAt?`。**只在状态迁移时写入**（进度刷新不落库）。静态标题不入库——遵守 [I18N] 红线，用户可见静态文案一律由 UI 按 kind 取 string resource；errorCode 同理按码取资源，errorDetail 仅承接体系原文。
+2. **内存进度流**：`StateFlow<Map<String, TaskProgressSnapshot>>`（progress / progressText / etaMs），高频刷新只走内存。
 3. **对 UI 暴露单一合并流** `tasks: Flow<List<UserTask>>`（Room 元数据 ⋈ 内存进度）。UI 依赖这一个显式接口，不感知背后体系（Agent First：显式优于隐式）。
 
 **历史语义**（与工程师 Tab 对齐）：COMPLETED / FAILED / CANCELLED 进历史区，封顶 50 条，超出清最旧。
@@ -111,7 +114,7 @@ TAG 扫描会话 7 态 → 6 态：
 **启动对账（reconciliation）**：进程重启后适配器 `start()` 时执行一次——
 
 - TAG 扫描：orchestrator 自身 Room 队列恢复后重发会话态，注册表被动同步（既有机制，零新增）。
-- 模型下载：Room 中 PENDING/RUNNING/PAUSED 但无活体 Job 的行 → 置 FAILED，errorSummary = 「进程终止，可重试」（五语资源 key），按钮 {RETRY}。这是下载体系首次获得「重启后任务可见」能力——协议接入的附带收益。
+- 模型下载：Room 中 PENDING/RUNNING/PAUSED 但无活体 Job 的行 → 置 FAILED，errorCode=PROCESS_TERMINATED（UI 按码取五语文案「已中断——点重试重新开始」），按钮 {RETRY}。这是下载体系首次获得「重启后任务可见」能力——协议接入的附带收益。
 
 ## 6. 适配器（体系与协议之间的唯一接缝）
 
@@ -131,7 +134,7 @@ interface UserTaskAdapter {
 
 - `TaskCenterScreen` 顶部加一级 Tab：**工程师任务 \| 后台任务**（五语）。
 - **工程师 Tab**：现有内容原样（进行中/历史、审批动作、回锚）。
-- **后台任务 Tab**：`UserTask` 卡片列表，进行中/历史双分区（历史封顶 50）。卡片 = 类型图标 + 标题（titleKey 资源或 displayName）+ 状态 chip + 进度条（`progress=null` 时不定进度）+ progressText + ETA + 按 `supportedActions` 渲染的动作按钮 + 错误摘要。点击卡片跳 `destination`。
+- **后台任务 Tab**：`UserTask` 卡片列表，进行中/历史双分区（历史封顶 50）。卡片 = 类型图标 + 标题（displayName 或按 kind 取 string resource）+ 状态 chip + 进度条（`progress=null` 时不定进度）+ progressText + ETA + 按 `supportedActions` 渲染的动作按钮 + 错误摘要（按 errorCode 取资源 + errorDetail）。点击卡片跳 `destination`。
 - **卡片渲染 = 原生 Compose**：照引 HTML 卡 spec §7/§15 决策（任务中心列表项多卡并存，WebView 实例成本不划算），两 spec 边界见 §8。
 - **角标合并**：Chat 顶栏任务图标角标 = 工程师进行中数 + 用户任务进行中数；点击进任务中心，默认 Tab = 工程师有活跃 → 工程师，否则后台任务，均无 → 工程师（现状兼容）。
 - **i18n**：新增文案（Tab 名 / 空态 / 错误摘要 / 动作按钮若缺）五语同步（EN/zh-CN/zh-TW/ES/FR）。
@@ -159,7 +162,7 @@ interface UserTaskAdapter {
 
 - **[PRIVACY]**：无新增网络面，用户任务全端侧，天然满足。
 - **[PERF]**：进度高频刷新只走内存；Room 写仅限状态迁移 + 对账；合并流对 UI 输出节流沿用各体系既有的进度节流（下载 500ms/1MB）。
-- **[I18N]**：静态文案不入库（titleKey 机制）；新增文案五语同步。
+- **[I18N]**：静态文案不入库（标题按 kind、错误按 errorCode 取 string resource）；新增文案五语同步。
 - **[DOC-SYNC]**：实施时同步 `androidApp/AGENTS.md`（§2 路由表 TaskCenter 行 + §3 架构说明）、根 AGENTS.md §7 索引。
 - **[PARITY]**：M1 Android 定稿后走 /ios-follow；记入 parity 台账。
 
