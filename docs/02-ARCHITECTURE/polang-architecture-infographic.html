@@ -90,6 +90,18 @@
   .band .bs { font-size: 12px; color: var(--blue-deep); font-weight: 500; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* 双端分栏 */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+  @media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+  .split .half { border: 1px dashed var(--line); border-radius: 12px; padding: 9px 11px 10px; background: rgba(255,255,255,.6); }
+  .split .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .split .ph .pn { font-size: 14px; font-weight: 900; }
+  .split .ph .pt { font-size: 10.5px; color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 700; letter-spacing: .03em; }
+  .split .ph .pt.ad { background: var(--green); }
+  .split .ph .pt.ios { background: var(--navy); }
+  .share-strip { border-top: 1px dashed var(--line); padding-top: 9px; }
+  .share-strip .ss-t { font-size: 12px; color: var(--green); font-weight: 900; margin-bottom: 7px; display: inline-flex; align-items: center; gap: 5px; }
   .chip {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 13.5px; font-weight: 500; color: var(--blue-deep);
@@ -179,7 +191,7 @@
     </div>
     <div class="core">
       <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg><b>7 模块</b> Gradle</span>
-      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><b>自研</b> GL 引擎</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><b>双端渲染</b> GL ES / Metal</span>
       <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg><b>100%</b> 媒体端内处理</span>
       <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 1 0-.9-8.9 6 6 0 0 0-11.5 1.6A3.8 3.8 0 0 0 6 19h11.5z"/></svg><b>云端</b> 推理网关</span>
     </div>
@@ -189,17 +201,33 @@
   <div class="main">
     <div><!-- 左：层带栈 -->
 
-      <!-- ① UI 层 -->
+      <!-- ① UI 层（双端） -->
       <section class="band">
         <span class="num">1</span>
-        <div class="bh"><span class="bt">UI 层</span><span class="bs">KMP 跨端界面 · Compose / SwiftUI</span></div>
-        <div class="chips">
-          <span class="chip green">相册 Gallery ★ <small>主入口</small></span>
-          <span class="chip green">聊天 Chat ★ <small>核心助理</small></span>
-          <span class="chip">图片编辑 Editor</span>
-          <span class="chip">设置 Settings</span>
-          <span class="chip ghost">相机 <small>2026-08 冻结 · 引擎试验台</small></span>
-          <span class="chip ghost mono" style="font-size:11.5px">:androidApp · features/domain/data</span>
+        <div class="bh"><span class="bt">UI 层</span><span class="bs">同一产品面 · 双端原生界面</span></div>
+        <div class="split">
+          <div class="half">
+            <div class="ph"><span class="pn">Android</span><span class="pt ad">Compose · :androidApp</span></div>
+            <div class="chips">
+              <span class="chip green">相册 ★</span>
+              <span class="chip green">聊天 ★</span>
+              <span class="chip">编辑</span>
+              <span class="chip">设置</span>
+              <span class="chip ghost">相机 <small>冻结</small></span>
+              <span class="chip ghost mono" style="font-size:11px">features/domain/data</span>
+            </div>
+          </div>
+          <div class="half">
+            <div class="ph"><span class="pn">iOS</span><span class="pt ios">SwiftUI · iosApp</span></div>
+            <div class="chips">
+              <span class="chip green">相册</span>
+              <span class="chip green">聊天</span>
+              <span class="chip">编辑</span>
+              <span class="chip">设置</span>
+              <span class="chip ghost">相机 <small>冻结</small></span>
+              <span class="chip ghost mono" style="font-size:11px">/ios-follow 对齐流水线</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -208,7 +236,7 @@
       <!-- ② Agent 编排层 -->
       <section class="band tint">
         <span class="num">2</span>
-        <div class="bh"><span class="bt">Agent 编排层</span><span class="bs mono">KMP :shared · com.mamba.picme.agent.core</span></div>
+        <div class="bh"><span class="bt">Agent 编排层</span><span class="bs mono">KMP :shared · com.mamba.picme.agent.core</span><span class="chip green" style="font-size:11.5px;padding:2px 10px">双端共用 · commonMain 单源</span></div>
         <div class="chips" style="margin-bottom:9px">
           <span class="chip hero">AgentOrchestrator</span>
           <span class="chip">KoogChatAgent / KoogReActAgent</span>
@@ -226,25 +254,43 @@
 
       <div class="varrow"><svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg></div>
 
-      <!-- ③ 端侧引擎与数据层 -->
+      <!-- ③ 端侧引擎与数据层（双端分列 + 共用条） -->
       <section class="band tint2">
         <span class="num">3</span>
-        <div class="bh"><span class="bt">端侧引擎与数据层</span><span class="bs">自研 OpenGL ES + EGL · 零三方美颜 SDK</span></div>
-        <div class="chips" style="margin-bottom:9px">
-          <span class="chip orange"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D97E2E" stroke-width="2.2" stroke-linecap="round"><path d="M20 12l-1.8 5.5L12 16l-6.2 1.5L4 12l1.8-5.5L12 8l6.2-1.5L20 12z"/><circle cx="12" cy="12" r="2.6"/></svg>VLM 打标 <small>Qwen3-VL-2B</small></span>
-          <span class="chip orange">Florence-2 <small>自动标注</small></span>
-          <span class="chip">MNN 推理 <small>mnn-core</small></span>
-          <span class="chip">Beauty Engine <small>render · 着色器</small></span>
-          <span class="chip">人脸 106pt <small>MediaPipe / MNN</small></span>
-          <span class="chip">FrameSync <small>防妆容漂移</small></span>
+        <div class="bh"><span class="bt">端侧引擎与数据层</span><span class="bs">渲染引擎双端自研 · 零三方美颜 SDK</span></div>
+        <div class="split">
+          <div class="half">
+            <div class="ph"><span class="pn">Android</span><span class="pt ad">OpenGL ES + EGL</span></div>
+            <div class="chips">
+              <span class="chip orange">VLM 打标 <small>Qwen3-VL-2B</small></span>
+              <span class="chip">MNN 推理 <small>mnn-core</small></span>
+              <span class="chip">CameraX → GL → SurfaceView <small>零拷贝</small></span>
+              <span class="chip">Room · DataStore</span>
+            </div>
+          </div>
+          <div class="half">
+            <div class="ph"><span class="pn">iOS</span><span class="pt ios">Metal · SharedKit</span></div>
+            <div class="chips">
+              <span class="chip">Metal 渲染 <small>warp.metal</small></span>
+              <span class="chip">ONNX 嵌入 <small>ORTFaceEmbedder</small></span>
+              <span class="chip">MNN.framework</span>
+              <span class="chip">GRDB · TagDB</span>
+            </div>
+          </div>
         </div>
-        <div class="chips">
-          <span class="chip">CameraX → SurfaceTexture → GL → SurfaceView <small>零拷贝</small></span>
-          <span class="chip">Data Store <small>Room · DataStore</small></span>
-          <span class="chip">相册元数据 <small>人脸/场景/标签</small></span>
+        <div class="share-strip">
+          <span class="ss-t"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M3 8l9-5 9 5M5 10v7M19 10v7M3 8v7"/></svg>双端共用</span>
+          <div class="chips">
+            <span class="chip">Beauty Engine <small>自研渲染 · 分层边界</small></span>
+            <span class="chip orange">Florence-2 <small>自动标注</small></span>
+            <span class="chip">人脸 106pt <small>MediaPipe</small></span>
+            <span class="chip">Glint360K 嵌入 <small>聚类/人物图谱</small></span>
+            <span class="chip">FrameSync <small>防妆容漂移</small></span>
+            <span class="chip">相册元数据 <small>人脸/场景/标签</small></span>
+          </div>
         </div>
         <div class="flow-note">
-          <span class="fn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5A6B80" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>图片/视频文件与媒体处理 <b style="color:var(--rose)">全部留在本层</b>，不出端</span>
+          <span class="fn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5A6B80" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>图片/视频文件与媒体处理 <b style="color:var(--rose)">全部留在本层</b>，双端同规不出端</span>
         </div>
       </section>
 
@@ -283,6 +329,10 @@
         <div><div class="mt">KMP 单一代码库</div><div class="md">commonMain 引擎无关编排逻辑，Android / iOS 双端共享（ADR-013）</div></div>
       </div>
       <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2" stroke-linecap="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg></span>
+        <div><div class="mt">一套内核 · 双端落地</div><div class="md">iOS 经 SharedKit XCFramework 接入同一 :shared；/ios-follow 对齐流水线保证 parity</div></div>
+      </div>
+      <div class="mini">
         <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#D97E2E" stroke-width="2" stroke-linecap="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></span>
         <div><div class="mt">自研渲染引擎</div><div class="md">OpenGL ES + EGL 全 GPU 管线，GPUPixel 已完全移除，零三方 SDK</div></div>
       </div>
@@ -311,9 +361,9 @@
       <h3>技术栈总览</h3>
       <div class="tech">
         <span class="t">KMP</span><span class="t">Compose</span><span class="t">SwiftUI</span>
-        <span class="t o">VLM</span><span class="t o">MNN</span><span class="t o">Florence-2</span>
-        <span class="t">OpenGL ES</span><span class="t">EGL</span><span class="t">MediaPipe</span>
-        <span class="t">Room</span><span class="t">DataStore</span><span class="t">CameraX</span>
+        <span class="t o">VLM</span><span class="t o">MNN</span><span class="t o">Florence-2</span><span class="t o">ONNX</span>
+        <span class="t">OpenGL ES</span><span class="t">EGL</span><span class="t">Metal</span><span class="t">MediaPipe</span>
+        <span class="t">Room</span><span class="t">DataStore</span><span class="t">CameraX</span><span class="t">GRDB</span><span class="t">SharedKit</span>
         <span class="t g">Koog</span><span class="t g">Ktor</span><span class="t g">OpenAI 兼容</span>
       </div>
     </section>
@@ -322,7 +372,7 @@
   <!-- 页脚总结 -->
   <div class="foot-banner">
     <div class="fb-t">一 句 话 总 结</div>
-    <div class="fb-d">KMP 是跨端基座，<b>Agent 是调度中枢</b>，端侧引擎守住隐私与性能，云端网关补足推理。<br>媒体不出端 · 文本可上云 —— 破浪相册的 AI-first 架构原则。</div>
+    <div class="fb-d">一套 <b>KMP Agent 内核</b>，Android / iOS 双端落地；端侧引擎守住隐私与性能，云端网关补足推理。<br>媒体不出端 · 文本可上云 —— 破浪相册的 AI-first 架构原则。</div>
   </div>
 </div>
 </body>
