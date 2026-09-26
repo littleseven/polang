@@ -275,7 +275,7 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **iOS 对等跟随编排** | `docs/superpowers/specs/2026-08-10-ios-follow-command-design.md`（/ios-follow 六阶段管线设计 SSOT + platform_differences 台账层；可执行形态 `skills/ios-follow/SKILL.md`） |
 | **AI 工具配置索引** | `AI_TOOLS.md`（四工具配置位置、Skills/Plans/Specs SSOT 约定） |
 | **Chat 富内容渲染（ADR-014）** | `docs/02-ARCHITECTURE/ADR/ADR-014-chat-rich-rendering-hybrid.md`（正文原生富渲染 + RICH_HTML 沙箱卡；ADR 索引 `docs/02-ARCHITECTURE/ADR/README.md`） |
-| **意图路由契约与路由器（Spec，在途）** | `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（chat 路由体系重构：LLM 管意图、代码管策略；M1 止血 → M2 路由器 → M3 分支化） |
+| **意图路由契约与路由器（ADR-015，M1/M2 已实施）** | `docs/02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md`（LLM 管意图、代码管策略）+ spec `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（M1 止血 + M2 路由器主干已落地 `feat/intent-router`；M3 分支化在途） |
 | **工程师任务卡（Spec，在途）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（工程师模式任务卡 + 任务中心页，Muse 任务卡范式；原生 Compose，不经 ADR-014 管线） |
 | **产品定义** | `PRODUCT.md` |
 | **交互规范** | `docs/01-PRODUCT/FEATURES.md` |

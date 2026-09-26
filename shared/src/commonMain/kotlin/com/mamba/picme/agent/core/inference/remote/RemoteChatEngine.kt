@@ -2,6 +2,9 @@ package com.mamba.picme.agent.core.inference.remote
 
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.RequestMetaInfo
+import ai.koog.prompt.message.ResponseMetaInfo
 import com.mamba.picme.agent.core.facade.AgentConfigurator
 import com.mamba.picme.agent.core.inference.remote.koog.KoogChatAgent
 import com.mamba.picme.agent.core.inference.remote.prompt.ChatPromptRules
@@ -9,7 +12,12 @@ import com.mamba.picme.agent.core.inference.remote.react.AgentExecutionMetrics
 import com.mamba.picme.agent.core.inference.remote.react.RemoteReActAgentConfig
 import com.mamba.picme.agent.core.inference.remote.tool.ChatToolService
 import com.mamba.picme.agent.core.inference.remote.tool.ToolInventory
+import com.mamba.picme.agent.core.intent.ChatRoutingPolicy
+import com.mamba.picme.agent.core.intent.CompactChatState
+import com.mamba.picme.agent.core.intent.IntentRouter
+import com.mamba.picme.agent.core.intent.UiArtifact
 import com.mamba.picme.agent.core.model.command.AgentCommand
+import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.config.AssistantPersona
 import com.mamba.picme.agent.core.model.config.personaPromptSegment
 import com.mamba.picme.agent.core.model.context.AgentContext
@@ -111,9 +119,118 @@ class RemoteChatEngine internal constructor(
         onEvent: (ChatStreamEvent) -> Unit
     ): Result<StreamChatResult> {
         Logger.d(tag, "streamChat: input='$input'")
-        // chat 页统一走远程 ReAct（tool_calls）（ADR-005 协议分离）。
+        // 意图路由（spec《意图路由契约与意图路由器》M2）：LLM 管意图、代码管策略。
+        // 命中最热意图（看照片/细化结果）时直执确定性命令、跳过全量 agent loop；
+        // 其余（含门控直通与一切降级）原路走 chat 远程 ReAct（ADR-005 协议分离），行为不变。
+        routeAndMaybeExecute(input, agentContext, onEvent)?.let { return it }
         Logger.i(tag, "streamChat routing to Chat ReAct")
         return streamChatReAct(input, agentContext, onEvent)
+    }
+
+    /**
+     * 意图路由入口：门控/pattern/LLM 闭集分类 → [ChatRoutingPolicy] 查表 → 直执或回落。
+     *
+     * 返回 null = 回落完整 agent loop；非 null = 已直执（DirectSearch/DirectRefine）。
+     * 直执语义（review 决议）：
+     * - 复用 [ChatToolService.dispatchCommandDetailed]（uiActions 发射 + observation + 5s 超时
+     *   与 LLM tool_calls 路径同源）；dispatch 失败/业务错误（非 MediaResults）→ 返回 null
+     *   回落完整 agent loop（降级语义的自然延伸，错误不经直执路径直达用户）。
+     * - 成功时不产 LLM 总结：结果以 [StreamChatResult.directReply] 结构化回执返回，
+     *   用户气泡由平台层本地化渲染（observation 硬编码中文模板只进记忆/审计，I18N 红线）；
+     *   该轮 user+observation 补写 Koog 会话记忆（直执跳过 agent loop，否则多轮指代断裂）。
+     * - 整体在 orchestratorDispatcher 执行（与 processChatReAct 同一线程上下文，
+     *   避免 lastResultAssets 等非线程安全状态的写入线程扩散）。
+     *
+     * 路由器 executor 与 chat agent 同源（[getChatAgent] 缓存复用，含网关 header/协议分流）；
+     * agent 构建失败（远程未配置等）时路由器内部降级为直通，不影响主链路。
+     */
+    private suspend fun routeAndMaybeExecute(
+        input: String,
+        agentContext: AgentContext,
+        onEvent: (ChatStreamEvent) -> Unit
+    ): Result<StreamChatResult>? = withContext(configurator.dispatcherProvider.orchestratorDispatcher) {
+        val persona = agentContext.persona
+        val replyLanguage = agentContext.replyLanguage
+        // 路由器实例无状态（审计口在 companion），按回合构造、provider 闭包捕获本轮配置
+        val router = IntentRouter {
+            getChatAgent(persona, replyLanguage)?.executorBundle
+        }
+        // 紧凑对话状态（spec §3.2 初值）：搜索基数存在性 + 上轮 artifact
+        val hasSearchBase = agentContext.recentSearchResults.isNotEmpty()
+        val state = CompactChatState(
+            lastArtifact = if (hasSearchBase) UiArtifact.MEDIA_RESULTS_CARD else null,
+            hasSearchBase = hasSearchBase,
+        )
+        val routing = router.route(
+            query = input,
+            state = state,
+            today = today(),
+            traceId = agentContext.traceId,
+        )
+        when (val decision = ChatRoutingPolicy.decide(routing, state, input)) {
+            is ChatRoutingPolicy.RouteDecision.FullAgentLoop -> {
+                Logger.d(tag, "router fallback to agent loop: ${decision.reason}")
+                null
+            }
+            is ChatRoutingPolicy.RouteDecision.DirectSearch -> executeDirect(
+                command = AgentCommand.SearchMedia(query = decision.query, intent = decision.intent),
+                kind = DirectRouteReply.Kind.SEARCH,
+                input = input,
+                agentContext = agentContext,
+                onEvent = onEvent,
+            )
+            is ChatRoutingPolicy.RouteDecision.DirectRefine -> executeDirect(
+                command = AgentCommand.RefineMediaSearch(constraint = decision.constraint, intent = decision.intent),
+                kind = DirectRouteReply.Kind.REFINE,
+                input = input,
+                agentContext = agentContext,
+                onEvent = onEvent,
+            )
+        }
+    }
+
+    /**
+     * 直执一条搜索/细化命令：成功 → [DirectRouteReply] 结构化回执 + 补写会话记忆；
+     * 失败（dispatch 超时/业务错误/非 MediaResults action）→ null（调用方回落 agent loop）。
+     */
+    private suspend fun executeDirect(
+        command: AgentCommand,
+        kind: DirectRouteReply.Kind,
+        input: String,
+        agentContext: AgentContext,
+        onEvent: (ChatStreamEvent) -> Unit,
+    ): Result<StreamChatResult>? {
+        // 占位文案切换到「搜集中」语义（与 tool_calls 路径的 ToolCallStarted 一致）
+        onEvent(ChatStreamEvent.ToolCallStarted)
+        val detailed = ChatToolService.getInstance().dispatchCommandDetailed(command, agentContext.traceId)
+        val results = detailed.action as? AgentAction.MediaResults
+        if (results == null) {
+            Logger.w(tag, "direct dispatch failed (${detailed.observation.take(80)}), fallback to agent loop")
+            return null
+        }
+        // 补写 Koog 会话记忆（直执跳过 agent loop，ChatMemory 不会记录本轮）：
+        // user 原文 + 模型侧 observation，使下一轮追问（"他多大了"类 OPEN_QA）能看到上下文。
+        runCatching {
+            val store = configurator.chatMemoryStore
+            val sessionId = agentContext.memorySessionId
+            store.save(
+                sessionId,
+                store.load(sessionId) + listOf(
+                    Message.User(input, RequestMetaInfo.Empty),
+                    Message.Assistant(detailed.observation, ResponseMetaInfo.Empty),
+                )
+            )
+        }.onFailure { Logger.w(tag, "direct turn memory write failed: ${it.message}") }
+        return Result.success(
+            StreamChatResult(
+                fullResponse = "",
+                directReply = DirectRouteReply(
+                    kind = kind,
+                    query = results.query,
+                    totalCount = results.totalCount,
+                ),
+            )
+        )
     }
 
     /** chat 远程 ReAct：调 [processChatReAct] 拿 summary，包成 TextReply 命令回 chat。 */

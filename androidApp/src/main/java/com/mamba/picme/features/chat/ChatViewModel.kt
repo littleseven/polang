@@ -818,6 +818,13 @@ class ChatViewModel(
     /** session -> 上一轮搜索全量命中（供 in-set 细化）。 */
     private val lastResultAssets = mutableMapOf<String, List<MediaAsset>>()
 
+    /**
+     * session -> 脚本路径（run_gallery_script return 含 ids）产出的媒体 id 集合与总数，
+     * 待回合收尾护栏消费（spec §3.5-a/c）：水合成 MediaAsset 后收口 refine 基数
+     *（写 [lastResultAssets]），且本回合未出横滑卡片时端侧补卡。
+     */
+    private val pendingScriptMediaIds = mutableMapOf<String, Pair<List<Long>, Int>>()
+
     /** session -> 最近搜索快照（多轮对话指代用）。 */
     private val sessionSearchSnapshots = mutableMapOf<String, MutableList<SearchResultSnapshot>>()
 
@@ -1332,6 +1339,7 @@ class ChatViewModel(
                 chatSessionDao.deleteSession(sessionId)
                 // 会话级内存缓存同步清理，避免已删会话的搜索结果/快照/排除集残留
                 lastResultAssets.remove(sessionId)
+                pendingScriptMediaIds.remove(sessionId)
                 sessionSearchSnapshots.remove(sessionId)
                 sessionExcludes.remove(sessionId)
                 // 选中态是纯 UI 内存态，会话删除后整体清理，回退到推荐卡高亮即可
@@ -1417,6 +1425,8 @@ class ChatViewModel(
         viewModelScope.launch {
             val sessionId = _currentSessionId.value
             replyUsedSandbox = false
+            // 新回合开始：清掉上一回合可能残留的脚本待补卡 ids（防跨回合泄漏）
+            pendingScriptMediaIds.remove(sessionId)
             // 用户发新消息即放弃未确认的抽卡（落库 dismiss）
             discardPendingOptimizeGacha()
             try {
@@ -1551,6 +1561,12 @@ class ChatViewModel(
                         // 清除流式占位
                         _streamingMessage.value = null
 
+                        // 回合终态护栏 a/c（spec §3.5，意图路由 M1）：脚本路径 return 含 ids
+                        // 而本回合未出横滑卡片 → 端侧水合 ids 直接补卡 + 收口 refine 搜索基数。
+                        // 须在误拒回退检测之前执行：补上的卡片让后续 getLatestMediaResultsSinceLastUserMessage
+                        // 判定一致（避免重复卡）。
+                        settleScriptMediaIds(sessionId, text)
+
                         // 性能数据统一在此计算并透传给所有回复路径（文本/命令），
                         // 让 remote(DeepSeek) 响应气泡也展示 prompt/decode tokens、延迟、速度。
                         // 此前仅纯文本路径填 performance，命令路径（remote ReAct 常走）传 null。
@@ -1570,8 +1586,21 @@ class ChatViewModel(
                         // 检测 LLM 安全对齐误触发：用户想搜相册但 LLM 拒绝了
                         val replyText = (streamResult.commands.firstOrNull() as? AgentCommand.TextReply)?.message
                             ?: streamResult.fullResponse
-                        // ReAct 已出过卡片时（总结文本带拒绝措辞属常见误报），跳过回退直搜，避免重复卡片
-                        if (IntentGuard.isRefusedSearchRequest(text, replyText) &&
+                        val directReply = streamResult.directReply
+                        if (directReply != null) {
+                            // 意图路由直执回合：用户气泡由平台层本地化渲染（模型侧 observation
+                            // 是硬编码中文模板，不可直达用户——I18N 红线）；卡片已经 uiActions 渲染
+                            insertAgentMessage(
+                                sessionId,
+                                if (directReply.totalCount > 0) {
+                                    stringContext().getString(R.string.chat_direct_results_shown)
+                                } else {
+                                    stringContext().getString(R.string.gallery_search_no_results)
+                                },
+                                currentModelLabel(),
+                                performance
+                            )
+                        } else if (IntentGuard.isRefusedSearchRequest(text, replyText) &&
                             chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId) == null
                         ) {
                             Logger.w(TAG, "LLM refused search request, falling back to direct gallery search")
@@ -2022,8 +2051,17 @@ class ChatViewModel(
     override suspend fun onRefineMediaSearch(constraint: String, intent: SearchIntent?): SearchOutcome {
         val sessionId = _currentSessionId.value
         val prior = lastResultAssets[sessionId].orEmpty()
-        // 无上一轮 → 当 fresh 全局搜
-        if (prior.isEmpty()) return onSearchMedia(constraint, intent)
+        // 回合护栏 c（spec §3.5-c）：无搜索基数时返回明确错误引导模型改用 search_media，
+        // 不再静默退化为全局重搜（那会用与既有约束无关的新结果覆盖会话搜索状态，
+        // 且观测文本与真实行为脱节，诱发幻觉链）。
+        if (prior.isEmpty()) {
+            Logger.w(TAG, "onRefineMediaSearch without base results, asking model to search fresh")
+            return SearchOutcome(
+                constraint, emptyList(), 0, isRefinement = true,
+                errorMessage = "没有上一轮搜索结果可细化：请改用 search_media 重新全局搜索" +
+                    "（人物/时间用 person/fromMs/toMs 结构化参数）"
+            )
+        }
 
         val start = System.currentTimeMillis()
         val priorIds = prior.map { asset -> asset.id }.toSet()
@@ -2200,7 +2238,13 @@ class ChatViewModel(
                             is HtmlCardSanitizer.Result.Rejected -> sanitized.reason
                         }
                     }
-                    else -> result.toJson()
+                    else -> {
+                        // 回合护栏数据源（spec §3.5-a/c）：脚本 return 对象含 ids 数组
+                        //（gallery.query/intersect 命中集合）→ 登记待回合收尾补卡/收口 refine 基数
+                        //（M1 阶段无条件触发，不依赖意图判定；纯统计脚本不 return ids 即可规避）。
+                        captureScriptMediaIds(result)
+                        result.toJson()
+                    }
                 }
             }
         }
@@ -2451,6 +2495,59 @@ class ChatViewModel(
             } finally {
                 _isProcessing.value = false
             }
+        }
+    }
+
+    /**
+     * 回合护栏数据采集（spec §3.5-a/c）：脚本 return 对象含 `ids` 数组时登记到
+     * [pendingScriptMediaIds]，等回合收尾统一水合/补卡（onRunScript 内不做 IO，
+     * 避免拉长 JS eval 临界区）。
+     */
+    private fun captureScriptMediaIds(result: JsValue) {
+        val obj = result as? JsValue.Obj ?: return
+        val arr = obj.entries["ids"] as? JsValue.Arr ?: return
+        val ids = arr.items.mapNotNull { item -> (item as? JsValue.Num)?.value?.toLong() }
+        if (ids.isEmpty()) return
+        val total = (obj.entries["total"] as? JsValue.Num)?.value?.toInt() ?: ids.size
+        pendingScriptMediaIds[_currentSessionId.value] = ids to total
+    }
+
+    /**
+     * 回合终态护栏 a/c（spec §3.5，意图路由 M1）：
+     * - c（refine 基数收口）：脚本路径产出的媒体 id 集合水合后写入 [lastResultAssets]，
+     *   后续 refine_media_search 不再因基数缺失而空转；
+     * - a（补卡）：本回合未产出 media_results 卡片时，端侧用水合结果直接补渲染横滑卡片，
+     *   消除「脚本拿到 ids 却谎称已展示」的幻觉土壤。
+     *
+     * 水合走 [MediaRepository.allMedia] 快照过滤（与 resolvePreviewUris 同一既有范式），
+     * 与搜索路径同一资产源。
+     */
+    private suspend fun settleScriptMediaIds(sessionId: String, userText: String) {
+        val pending = pendingScriptMediaIds.remove(sessionId) ?: return
+        val (ids, total) = pending
+        val idSet = ids.toSet()
+        val assets = runCatching {
+            mediaRepository.allMedia.first().filter { asset -> asset.id in idSet }
+        }.getOrElse {
+            Logger.w(TAG, "settleScriptMediaIds hydrate failed (${ids.size} ids)", it)
+            return
+        }
+        if (assets.isEmpty()) return
+        lastResultAssets[sessionId] = assets
+        // 搜索基数快照（spec §3.2 紧凑状态源）：脚本路径同样让 hasSearchBase 为真，
+        // 使意图路由器/细化链路能识别「上一轮有结果可细化」。
+        recordSearchSnapshot(sessionId, userText, total, isRefinement = false)
+        if (chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId) == null) {
+            Logger.i(TAG, "settleScriptMediaIds: 补卡 ${assets.size} 张（脚本路径未出卡）")
+            insertMediaResultsMessage(
+                sessionId,
+                MediaResultsUi(
+                    query = userText,
+                    assets = assets.take(MAX_CARDS),
+                    totalCount = total,
+                    isRefinement = false
+                )
+            )
         }
     }
 
@@ -3090,6 +3187,11 @@ class ChatViewModel(
                 _messages.value = emptyList()
                 // 选中态是纯 UI 内存态，消息删光后整体清理，回退到推荐卡高亮即可
                 _gachaSelections.value = emptyMap()
+                // 搜索/路由状态同步清理：消息已删，旧搜索基数不应再驱动 refine 直执（路由层
+                // hasSearchBase 派生自 recentSearchResults）与卡片水合
+                lastResultAssets.remove(sessionId)
+                sessionSearchSnapshots.remove(sessionId)
+                pendingScriptMediaIds.remove(sessionId)
                 Logger.i(TAG, "Chat cleared for session: $sessionId")
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to clear chat", e)

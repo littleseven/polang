@@ -18,10 +18,10 @@ class ChatToolManifestDescriptorTest {
     private val descriptors = ChatToolManifest.buildDescriptors()
 
     @Test
-    fun `exactly 9 tools with deterministic names`() {
+    fun `exactly 8 tools with deterministic names`() {
         assertEquals(
             listOf(
-                "get_gallery_summary", "search_media", "refine_media_search", "view_media",
+                "get_gallery_summary", "search_media", "refine_media_search",
                 "select_media", "favorite_media", "delete_media", "share_media", "ai_optimize",
             ),
             descriptors.map { it.name },
@@ -31,8 +31,11 @@ class ChatToolManifestDescriptorTest {
     @Test
     fun `param descriptions survive schema generation on this platform`() {
         val search = descriptors.single { it.name == "search_media" }
-        val query = search.requiredParameters.single { it.name == "query" }
-        assertEquals("自然语言搜索词", query.description)
+        assertEquals(
+            listOf("query", "person", "fromMs", "toMs"),
+            search.requiredParameters.map { it.name },
+        )
+        assertEquals("自然语言搜索词", search.requiredParameters[0].description)
 
         val refine = descriptors.single { it.name == "refine_media_search" }
         assertEquals(

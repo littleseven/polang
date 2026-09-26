@@ -153,20 +153,35 @@ class ChatSearchCapability private constructor() : BaseCapability() {
 
 /**
  * Delegate 执行搜索后的结果。mediaIds 为全量命中 id（供 ChatViewModel 持有做细化）。
+ *
+ * [errorMessage] 非空表示前置条件失败（如 refine 无搜索基数，spec §3.5-c），
+ * 映射为 [AgentAction.Error] 让 LLM 拿到明确观测文本自行改道，而非空结果假成功。
  */
 data class SearchOutcome(
     val query: String,
     val mediaIds: List<Long>,
     val totalCount: Int,
-    val isRefinement: Boolean
+    val isRefinement: Boolean,
+    val errorMessage: String? = null
 ) {
-    fun toMediaResults(commandId: Int): Result<AgentAction> = Result.success(
-        AgentAction.MediaResults(
-            commandId = commandId,
-            query = query,
-            mediaIds = mediaIds,
-            totalCount = totalCount,
-            isRefinement = isRefinement
+    fun toMediaResults(commandId: Int): Result<AgentAction> {
+        if (errorMessage != null) {
+            return Result.success(
+                AgentAction.Error(
+                    commandId = commandId,
+                    errorCode = AgentErrorCode.INVALID_PARAMS,
+                    message = errorMessage
+                )
+            )
+        }
+        return Result.success(
+            AgentAction.MediaResults(
+                commandId = commandId,
+                query = query,
+                mediaIds = mediaIds,
+                totalCount = totalCount,
+                isRefinement = isRefinement
+            )
         )
-    )
+    }
 }

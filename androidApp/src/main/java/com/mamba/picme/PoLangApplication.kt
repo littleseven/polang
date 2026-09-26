@@ -21,6 +21,7 @@ import com.mamba.picme.core.image.ThumbnailCache
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.llmlog.RoomJsRunRecorder
 import com.mamba.picme.data.local.llmlog.RoomLlmCallRecorder
+import com.mamba.picme.data.local.llmlog.RoomRoutingAuditRecorder
 import com.mamba.picme.data.local.llmlog.RoomToolCallRecorder
 import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.download.RecommendedModelAutoDownloader
@@ -37,6 +38,7 @@ import com.mamba.picme.agent.core.model.config.AiAgentMode
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.AndroidAgentComposition
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
+import com.mamba.picme.agent.core.intent.IntentRouter
 import com.mamba.picme.agent.core.js.JsRuntime
 import com.mamba.picme.agent.core.runtime.capability.CommandExecutor
 import com.mamba.picme.agent.core.platform.logging.Logger as AgentCoreLogger
@@ -242,6 +244,9 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         // 与上面同一约定：release 仅落指标，DEBUG 额外记录脚本文本与结果预览。
         JsRuntime.captureContent = BuildConfig.DEBUG
         JsRuntime.recorder = RoomJsRunRecorder(this)
+        // 路由层审计（spec《意图路由契约与意图路由器》§3.7 前半）：每回合路由判定
+        //（含门控直通/降级）落 routing_audit_log，仅路由维度指标、不含用户 query 原文。
+        IntentRouter.recorder = RoomRoutingAuditRecorder(this)
         Logger.i(TAG, "LLM/tool/js-run metrics recorder installed (captureContent=${BuildConfig.DEBUG})")
 
         // 注册 Activity 生命周期回调，跟踪当前活跃 Activity

@@ -26490,6 +26490,41 @@
           }
         }
       }
+    },
+    "Search results are shown in the card above": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search results are shown in the card above"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultados mostrados en la tarjeta de arriba"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résultats affichés dans la carte ci-dessus"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在上方卡片展示搜索结果"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在上方卡片顯示搜尋結果"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

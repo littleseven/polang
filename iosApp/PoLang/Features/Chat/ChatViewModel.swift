@@ -318,10 +318,10 @@ final class ChatViewModel: ObservableObject {
                     self?.toolCallingUpdate(id: placeholderId)
                 }
             },
-            onComplete: { [weak self] summary, errorMessage in
+            onComplete: { [weak self] summary, errorMessage, directReply in
                 Task { @MainActor in
                     self?.pacing?.finish()
-                    self?.completeMessage(id: placeholderId, summary: summary, errorMessage: errorMessage)
+                    self?.completeMessage(id: placeholderId, summary: summary, errorMessage: errorMessage, directReply: directReply)
                     self?.isProcessing = false
                 }
             }
@@ -414,7 +414,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     /// 推理完成
-    private func completeMessage(id: UUID, summary: String, errorMessage: String?) {
+    private func completeMessage(id: UUID, summary: String, errorMessage: String?, directReply: DirectRouteReply? = nil) {
         guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[idx].isStreaming = false
         messages[idx].isThinking = false
@@ -427,6 +427,12 @@ final class ChatViewModel: ObservableObject {
             if isGuestMode, errorMessage.localizedCaseInsensitiveContains("quota_exceeded") {
                 showGuestQuotaExhaustedNudge()
             }
+        } else if let directReply {
+            // 意图路由直执回合：本地化气泡（模型侧 observation 是硬编码中文模板，不可直达用户）；
+            // 卡片已经 watchUiActions 渲染（对齐 Android directReply 分支口径）
+            messages[idx].text = directReply.totalCount > 0
+                ? String(localized: "Search results are shown in the card above")
+                : String(localized: "No results")
         } else {
             messages[idx].text = summary.isEmpty ? String(localized: "(No response)") : summary
         }

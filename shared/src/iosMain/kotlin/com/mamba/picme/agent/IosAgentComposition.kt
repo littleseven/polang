@@ -139,7 +139,8 @@ object IosAgentComposition {
         )
 
         // 注册 iOS chat 相册能力（T4），使 ChatToolService.dispatchCommand → CapabilityRegistry(CHAT) 路由可达
-        orchestrator.registerCapability(IosChatGalleryCapability(mediaRepository, bridge, searchBridge))
+        val chatGalleryCapability = IosChatGalleryCapability(mediaRepository, bridge, searchBridge)
+        orchestrator.registerCapability(chatGalleryCapability)
 
         // 注册 iOS chat 图表能力（draw_chart 执行端 → ChartJsEngine 端侧渲染）
         orchestrator.registerCapability(IosChartCapability(chartBridge))
@@ -153,8 +154,8 @@ object IosAgentComposition {
         // 注册 iOS 导航能力（2026-09-16 主导航统一：navigate_to 执行端 → Swift 真实切页/弹出）
         orchestrator.registerCapability(IosNavigationCapability(navigationBridge))
 
-        // 创建 chat 桥
-        chatBridge = ChatAgentBridge(orchestrator)
+        // 创建 chat 桥（searchBaseProvider：意图路由器紧凑状态 hasSearchBase 的 iOS 数据源）
+        chatBridge = ChatAgentBridge(orchestrator, searchBaseProvider = { chatGalleryCapability.hasSearchBase })
 
         Logger.i(TAG, "iOS agent composition initialized (deviceId=${deviceId.take(8)}…)")
     }
