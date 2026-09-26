@@ -277,7 +277,7 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **Chat 富内容渲染（ADR-014）** | `docs/02-ARCHITECTURE/ADR/ADR-014-chat-rich-rendering-hybrid.md`（正文原生富渲染 + RICH_HTML 沙箱卡；ADR 索引 `docs/02-ARCHITECTURE/ADR/README.md`） |
 | **意图路由契约与路由器（ADR-015，M1/M2 已实施）** | `docs/02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md`（LLM 管意图、代码管策略）+ spec `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（M1 止血 + M2 路由器主干已落地 `feat/intent-router`；M3 分支化在途） |
 | **工程师任务卡（Spec，P1+任务中心已落地；渲染层已被下一项修订）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（工程师模式任务卡 + 任务中心页，Muse 任务卡范式；P1 在场态与 US-12~16 任务中心已落地（2026-09-26），US-4~6 回联待 P2 网关改造；2026-09-26 修订：渲染层改 HTML，状态机/分期不变） |
-| **HTML 卡双形态 + 任务卡 HTML 化（Spec，已定稿）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器；任务卡 L1 模板 HTML 化；设计稿 Ardot `HtmlCard` 页 8 帧） |
+| **HTML 卡双形态 + 任务卡 HTML 化（Spec，H1 已落地 2026-09-26）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器——H1 已合 main（`dcccaabb3`）；H2 任务卡 L1 模板 HTML 化待做；设计稿 Ardot `HtmlCard` 页 8 帧） |
 | **用户任务协议 + 任务中心双 Tab（M1 已落地，2026-09-26）** | `docs/superpowers/specs/2026-09-26-user-task-protocol-design.md`（扫描/下载等 app 级长耗时操作统一管控：`UserTask` 协议 + 混合注册表（元数据落 Room + 进度走内存）+ 适配器接缝 + 任务中心「工程师任务 \| 后台任务」双 Tab；M1 = TAG 扫描 + 模型下载接入（M1 实施计划已随交付清理，git 历史可查；实现见 `androidApp` `domain/usertask/`）；M2/M3 = 去重/美学/重聚类，与 HTML 卡 spec 边界见该 spec §8） |
 | **任务范式定位升格（Spec，2026-09-26）** | `docs/superpowers/specs/2026-09-26-task-paradigm-positioning-design.md`（任务进核心定位句 + PRODUCT.md v3.1 新增横切任务范式线 §6.6 + Muse Top5 全量落位；借鉴来源 `docs/reviews/2026-09-25-meta-muse-feature-research.md`） |
 | **产品定义** | `PRODUCT.md` |
