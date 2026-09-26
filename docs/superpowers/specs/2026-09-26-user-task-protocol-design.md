@@ -66,7 +66,10 @@ data class UserTask(
 
 enum class UserTaskStatus { PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED }
 enum class UserTaskAction { PAUSE, RESUME, CANCEL, RETRY }
-sealed interface UserTaskDestination { data object TagScanControl : …; data object ModelCenter : … }
+sealed interface UserTaskDestination {
+    data object TagScanControl : UserTaskDestination   // 整理页 SCAN tab
+    data object ModelCenter : UserTaskDestination      // 设置-模型下载中心
+}
 ```
 
 ### 4.1 状态映射（适配器纯函数，可单测钉死）
