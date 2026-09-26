@@ -12,6 +12,8 @@ import com.mamba.picme.core.image.ImageProcessorImpl
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
 import com.mamba.picme.data.local.AppDatabase
+import com.mamba.picme.data.local.ChatMessageDao
+import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
@@ -45,7 +47,9 @@ import com.mamba.picme.domain.tag.i18n.BilingualVocab
 import com.mamba.picme.domain.tag.i18n.ChineseQueryTranslator
 import com.mamba.picme.domain.tag.i18n.OpusMtTranslator
 import com.mamba.picme.domain.tag.i18n.TagTranslator
+import com.mamba.picme.data.download.DownloadState
 import com.mamba.picme.data.download.LlmModelDownloadManager
+import com.mamba.picme.data.download.ModelConfig
 import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.domain.backup.BackupTagDataUseCase
 import com.mamba.picme.domain.backup.RestoreTagDataUseCase
@@ -82,6 +86,7 @@ import com.mamba.picme.features.chat.PrefsClaudeSidStore
 import com.mamba.picme.features.chat.buildAppToolExecutor
 import com.mamba.picme.features.chat.capability.MemoryCapability
 import com.mamba.picme.features.chat.capability.PersonRelationCapability
+import com.mamba.picme.features.chat.taskcenter.TaskCenterViewModel
 import com.mamba.picme.domain.matting.MattingEngine
 import com.mamba.picme.domain.matting.MattingEngineImpl
 import com.mamba.picme.domain.memory.MemoryRepository
@@ -103,6 +108,14 @@ import com.mamba.picme.domain.memories.MemoryHiddenStore
 import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.trash.DedupTrashBackend
 import com.mamba.picme.domain.trash.TrashBackend
+import com.mamba.picme.domain.usertask.ModelDownloadControl
+import com.mamba.picme.domain.usertask.ModelDownloadTaskAdapter
+import com.mamba.picme.domain.usertask.TagScanControl
+import com.mamba.picme.domain.usertask.TagScanTaskAdapter
+import com.mamba.picme.domain.usertask.UserTaskErrorCode
+import com.mamba.picme.domain.usertask.UserTaskKind
+import com.mamba.picme.domain.usertask.UserTaskRegistry
+import com.mamba.picme.domain.usertask.UserTaskStatus
 import androidx.lifecycle.ViewModel
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.tag.FaceClusterEngine
@@ -112,9 +125,14 @@ import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.data.indexing.MediaChangeEvent
 import com.mamba.picme.service.tag.TagGenerationService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 data class MediaViewModelDependencies(
     val repository: AndroidMediaRepository,
@@ -248,12 +266,34 @@ class MemoriesViewModelFactory(
     }
 }
 
+/** 任务中心页 VM 工厂：跨会话任务卡聚合（chat_messages + chat_sessions join）+ 用户任务注册表。 */
+class TaskCenterViewModelFactory(
+    private val chatMessageDao: ChatMessageDao,
+    private val chatSessionDao: ChatSessionDao,
+    private val userTaskRegistry: UserTaskRegistry,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TaskCenterViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TaskCenterViewModel(
+                chatMessageDao = chatMessageDao,
+                chatSessionDao = chatSessionDao,
+                userTaskRegistry = userTaskRegistry,
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
 interface AppContainer {
     val repository: AndroidMediaRepository
     val userPreferencesRepository: UserSettingsRepository
     val imageProcessor: ImageProcessor
     val faceDetector: FaceDetector
     val llmModelDownloadManager: LlmModelDownloadManager
+    /** 用户任务注册表（spec §5）：任务中心后台任务 Tab 与顶栏角标的数据源 */
+    val userTaskRegistry: UserTaskRegistry
     val kwsEngine: KeywordSpotterEngine?
     val mediaSearchEngine: MediaSearchEngine
     val mediaIndexingWorker: MediaIndexingWorker
@@ -339,8 +379,17 @@ interface AppContainer {
     /** 回忆 carousel（F3）ViewModel 工厂（无参数：数据源与隐藏集由容器注入） */
     fun createMemoriesViewModelFactory(): ViewModelProvider.Factory
 
+    /** 任务中心页 ViewModel 工厂（无参数：跨会话任务卡聚合，DAO 由容器注入） */
+    fun createTaskCenterViewModelFactory(): ViewModelProvider.Factory
+
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
+
+    /**
+     * 启动用户任务适配器（spec §6 组合根接线）。
+     * 幂等：由 Application.onCreate 单点调用；实现侧守卫兜底，重复调用直接返回（防双订阅）。
+     */
+    fun startUserTaskAdapters()
 }
 
 class AppContainerImpl(
@@ -642,6 +691,115 @@ class AppContainerImpl(
     }
 
     /**
+     * 用户任务体系协程作用域：注册表合并流与适配器订阅的生命周期宿主（进程级单例，不随页面销毁）。
+     * 与 PoLangApplication.applicationScope 平行独立——本 scope 只承载 usertask 体系，故障互不影响；
+     * CoroutineExceptionHandler 作全局保险：体系内未捕获异常仅记日志，不穿透崩溃。
+     */
+    private val userTaskScope: CoroutineScope by lazy {
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.Default +
+                CoroutineExceptionHandler { _, throwable ->
+                    Logger.e("AppContainer", "uncaught exception in userTaskScope", throwable)
+                }
+        )
+    }
+
+    override val userTaskRegistry: UserTaskRegistry by lazy {
+        UserTaskRegistry(dao = database.userTaskDao(), scope = userTaskScope)
+    }
+
+    /** 幂等守卫：KDoc 约定不如代码可靠，重复调用直接返回（防双订阅） */
+    @Volatile
+    private var userTaskAdaptersStarted = false
+
+    /**
+     * 启动用户任务适配器（spec §6 组合根接线）。
+     * 幂等：正常由 Application.onCreate 单点调用；守卫兜底重复调用直接返回。
+     */
+    override fun startUserTaskAdapters() {
+        if (userTaskAdaptersStarted) return
+        userTaskAdaptersStarted = true
+        userTaskRegistry.registerAdapter(
+            TagScanTaskAdapter(
+                registry = userTaskRegistry,
+                control = TagScanControl { action -> startTagScanUseCase(action) },
+                scope = userTaskScope,
+            )
+        )
+        userTaskRegistry.registerAdapter(
+            ModelDownloadTaskAdapter(
+                registry = userTaskRegistry,
+                control = object : ModelDownloadControl {
+                    override val downloadStates: StateFlow<Map<String, DownloadState>>
+                        get() = llmModelDownloadManager.downloadStates
+
+                    override fun pause(modelId: String) = llmModelDownloadManager.pauseDownload(modelId)
+
+                    override fun resume(modelId: String) =
+                        enqueueVerifiedModelDownload(modelId, llmModelDownloadManager::enqueueResume)
+
+                    override fun cancel(modelId: String) = llmModelDownloadManager.cancelDownload(modelId)
+
+                    // retry 走 enqueueDownload（downloadModel 路径，审查钉死项）：其内部对已完成且
+                    // 校验通过的文件会跳过，不会整模型重复下载（spec §4.2「重新下载」语义）
+                    override fun retry(modelId: String) =
+                        enqueueVerifiedModelDownload(modelId, llmModelDownloadManager::enqueueDownload)
+
+                    // 查不到/清单加载失败回退 null，适配器侧回退 modelId（与预检同一数据源）
+                    override suspend fun displayNameOf(modelId: String): String? = runCatching {
+                        llmModelDownloadManager.loadAvailableModels()
+                            .find { model -> model.id == modelId }?.name
+                    }.onFailure { err ->
+                        Logger.w("AppContainer", "displayNameOf failed for $modelId", err)
+                    }.getOrNull()
+                },
+                scope = userTaskScope,
+            )
+        )
+    }
+
+    /**
+     * 模型下载动词统一入口：前置校验 + manager enqueue 发起（审查修复）。
+     *
+     * - **必须经 enqueue\***：enqueue 提供 activeJobs 去重（防双击并发双下载）+ Job 注册
+     *   （pauseDownload/cancelDownload 靠 `activeJobs.remove(modelId)?.cancel()` 生效）+ finally 清理；
+     *   裸 `launch { collect {} }` 三者皆无，全仓禁止。
+     * - **前置校验**：冷流（downloadModel/resumeDownload）的 Unknown model / ModelScope 源缺失
+     *   校验 throw 位于 flow 内层 try 之外，而 enqueue* 的 managerScope launch 无 catch，
+     *   throw 会穿透崩溃。可达路径：注册表持久化的 modelId 已从模型清单下架 → 对账 FAILED →
+     *   用户点 RETRY。此处先同步查配置并显式传入（跳过冷流内的重复查找），不可用则直接
+     *   FAILED 落注册表不发起（spec §9 降级语义，状态自愈可再 RETRY）。
+     */
+    private fun enqueueVerifiedModelDownload(
+        modelId: String,
+        enqueue: (String, ModelConfig) -> Unit,
+    ) {
+        userTaskScope.launch {
+            val config = runCatching {
+                llmModelDownloadManager.loadAvailableModels().find { model -> model.id == modelId }
+            }.onFailure { err ->
+                Logger.e("AppContainer", "loadAvailableModels failed for $modelId", err)
+            }.getOrNull()
+            val hasModelScopeSource = config?.sources?.keys
+                ?.any { key -> key.equals("modelscope", ignoreCase = true) } == true
+            if (config == null || !hasModelScopeSource) {
+                Logger.w("AppContainer", "model $modelId unavailable (delisted or no ModelScope source), mark FAILED without enqueue")
+                userTaskRegistry.upsertStatus(
+                    id = ModelDownloadTaskAdapter.taskIdFor(modelId),
+                    kind = UserTaskKind.MODEL_DOWNLOAD,
+                    displayName = modelId,
+                    status = UserTaskStatus.FAILED,
+                    // errorDetail 放机器可读标识（UI 按 errorCode 取五语资源渲染，不原文展示）
+                    errorCode = UserTaskErrorCode.MODEL_UNAVAILABLE,
+                    errorDetail = modelId,
+                )
+            } else {
+                enqueue(modelId, config)
+            }
+        }
+    }
+
+    /**
      * KWS 唤醒词引擎（sherpa-onnx 版）
      *
      * 用于低功耗的 always-on 唤醒词检测。
@@ -903,6 +1061,14 @@ class AppContainerImpl(
             mediaDao = database.mediaDao(),
             personDao = database.personDao(),
             hiddenStore = DataStoreMemoryHiddenStore(context),
+        )
+    }
+
+    override fun createTaskCenterViewModelFactory(): ViewModelProvider.Factory {
+        return TaskCenterViewModelFactory(
+            chatMessageDao = database.chatMessageDao(),
+            chatSessionDao = database.chatSessionDao(),
+            userTaskRegistry = userTaskRegistry,
         )
     }
 

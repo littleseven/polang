@@ -47,10 +47,14 @@ import com.mamba.picme.data.preferences.UserPreferencesRepository
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.ThemeMode
 import com.mamba.picme.domain.organize.OrganizeCategory
+import com.mamba.picme.domain.usertask.UserTaskDestination
 import com.mamba.picme.features.common.avatar.AvatarCaptureController
 import com.mamba.picme.features.common.avatar.AvatarCaptureOrigin
 import com.mamba.picme.features.common.avatar.AvatarCaptureTarget
 import com.mamba.picme.features.chat.ChatViewModel
+import com.mamba.picme.features.chat.ChatTaskAnchor
+import com.mamba.picme.features.chat.taskcenter.TaskCenterScreen
+import com.mamba.picme.features.chat.taskcenter.TaskCenterViewModel
 import com.mamba.picme.features.debug.DebugScreen
 import com.mamba.picme.features.debug.JsBridgeScreen
 import com.mamba.picme.features.debug.LlmCallLogScreen
@@ -75,6 +79,7 @@ import com.mamba.picme.features.settings.DataPrivacyScreen
 import com.mamba.picme.features.settings.AddRemoteProviderScreen
 import com.mamba.picme.features.settings.ProviderConfigScreen
 import com.mamba.picme.features.settings.MemoryFactsScreen
+import com.mamba.picme.features.main.MAIN_PAGE_CHAT
 import com.mamba.picme.features.main.MAIN_PAGE_COUNT
 import com.mamba.picme.features.main.MAIN_PAGE_DEDUP
 import com.mamba.picme.features.main.MAIN_PAGE_GALLERY
@@ -209,6 +214,8 @@ class MainActivity : ComponentActivity() {
                     var gallerySearchRequest by remember { mutableStateOf<Pair<String, Long>?>(null) }
                     // 整理+扫描合并页（Pager 页 1）Tab 一次性请求：设置页等 NavHost 路由入口经此预选 Tab
                     var organizeTabRequest by remember { mutableStateOf<OrganizeTab?>(null) }
+                    // 任务中心回锚一次性请求（US-15）：任务中心点击/继续/重试 → 切 chat 页 + 锚定任务卡
+                    var chatTaskAnchor by remember { mutableStateOf<ChatTaskAnchor?>(null) }
 
                     // 主页面切换（底部 Tab / 编程入口）：瞬时跳转，无横滑动画；手指拖动由 Pager 跟手处理
                     val switchMainPage: (Int) -> Unit = { index ->
@@ -294,6 +301,8 @@ class MainActivity : ComponentActivity() {
                             ) {
                             // 主页面：相机/相册/聊天/人物 由 HorizontalPager 承载，横滑跟手切换
                             composable(Screen.Main.route) {
+                                val activeUserTaskCount by app.container.userTaskRegistry.activeCount
+                                    .collectAsStateWithLifecycle()
                                 MainPagerHost(
                                     pagerState = pagerState,
                                     chatViewModel = chatViewModel,
@@ -335,7 +344,10 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     organizeTabRequest = organizeTabRequest,
-                                    onOrganizeTabRequestConsumed = { organizeTabRequest = null }
+                                    onOrganizeTabRequestConsumed = { organizeTabRequest = null },
+                                    taskAnchor = chatTaskAnchor,
+                                    onTaskAnchorConsumed = { chatTaskAnchor = null },
+                                    activeUserTaskCount = activeUserTaskCount
                                 )
                             }
                             // 相机：2026-08-26 起为 NavHost 全屏路由（原 Pager 页 0 席位由相册整理接替），
@@ -743,6 +755,37 @@ class MainActivity : ComponentActivity() {
                             composable(Screen.LlmLog.route) {
                                 LlmCallLogScreen(
                                     onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
+                            // 任务中心（spec US-12~16）：工程师任务跨会话集中管理，入口在 Chat 顶栏任务图标
+                            composable(Screen.TaskCenter.route) {
+                                val taskCenterViewModel: TaskCenterViewModel = viewModel(
+                                    factory = app.container.createTaskCenterViewModelFactory()
+                                )
+                                TaskCenterScreen(
+                                    taskCenterViewModel = taskCenterViewModel,
+                                    chatViewModel = chatViewModel,
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onOpenTaskInChat = { sessionId, taskId ->
+                                        chatTaskAnchor = ChatTaskAnchor(
+                                            sessionId = sessionId,
+                                            taskId = taskId,
+                                            nonce = System.currentTimeMillis()
+                                        )
+                                        switchMainPage(MAIN_PAGE_CHAT)
+                                    },
+                                    onOpenUserTaskDestination = { destination ->
+                                        when (destination) {
+                                            UserTaskDestination.TAG_SCAN_CONTROL -> {
+                                                organizeTabRequest = OrganizeTab.SCAN
+                                                switchMainPage(MAIN_PAGE_DEDUP)
+                                            }
+                                            UserTaskDestination.MODEL_CENTER -> navController.navigate(
+                                                Screen.ModelCenter.createRoute(""),
+                                                navOptions { launchSingleTop = true }
+                                            )
+                                        }
+                                    }
                                 )
                             }
                             }

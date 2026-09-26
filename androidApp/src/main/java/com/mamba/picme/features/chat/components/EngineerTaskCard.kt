@@ -1,5 +1,6 @@
 package com.mamba.picme.features.chat.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,7 +8,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,12 +38,14 @@ import java.util.Locale
  * 工程师任务卡（spec US-1~3/7~11）：状态 chip + 标题 + 阶段 + meta 行 + 状态动作区 + 展开明细。
  * 纯渲染无状态；审批动作回调由 ChatScreen 接到 ChatViewModel。
  * 审批按钮经 [actionsEnabled] 门控（回合进行中禁用，对齐 VM 侧 _isProcessing 守卫）。
+ * [onViewAll] 非空时头部显示「查看全部」次入口（US-12 → 任务中心）。
  */
 @Composable
 fun EngineerTaskCard(
     task: EngineerTaskState,
     expanded: Boolean,
     actionsEnabled: Boolean = true,
+    onViewAll: (() -> Unit)? = null,
     onToggleExpand: () -> Unit,
     onContinue: () -> Unit,
     onAbandon: () -> Unit,
@@ -58,6 +66,17 @@ fun EngineerTaskCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 EngineerTaskStatusChip(task)
                 Spacer(Modifier.weight(1f))
+                if (onViewAll != null) {
+                    Text(
+                        text = stringResource(R.string.task_center_view_all),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        // clickable 在 padding 之前：热区含 padding（小文本不撑高卡片行）
+                        modifier = Modifier
+                            .clickable(onClick = onViewAll)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                }
                 Text(
                     text = formatElapsed(task.updatedAtMs - task.startedAtMs),
                     fontSize = 11.sp,
@@ -88,6 +107,14 @@ fun EngineerTaskCard(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // 截断原因（max_tokens 等，服务端原文）：采集后此前未展示
+                    task.truncatedReason?.takeIf { reason -> reason.isNotBlank() }?.let { reason ->
+                        Text(
+                            text = reason,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = onContinue, enabled = actionsEnabled) { Text(stringResource(R.string.claude_continue), fontSize = 13.sp) }
                         TextButton(onClick = onAbandon, enabled = actionsEnabled) { Text(stringResource(R.string.chat_task_abandon), fontSize = 13.sp) }
@@ -101,7 +128,8 @@ fun EngineerTaskCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     task.errorSummary?.let { deliverError ->
-                        Text(text = deliverError, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(6.dp))
+                        EngineerTaskErrorBlock(deliverError)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = onDeliver, enabled = actionsEnabled) { Text(stringResource(R.string.claude_deliver_mode_push), fontSize = 13.sp) }
@@ -113,11 +141,16 @@ fun EngineerTaskCard(
                         Spacer(Modifier.height(4.dp))
                         Text(text = summary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    // 失败后被裁决（放弃/重试后终态化）的卡：出错原因仍是卡片的一部分，不随终态消失
+                    task.errorSummary?.takeIf { task.resolution != null }?.let { errorText ->
+                        Spacer(Modifier.height(6.dp))
+                        EngineerTaskErrorBlock(errorText)
+                    }
                 }
                 EngineerTaskStatus.FAILED -> {
-                    Spacer(Modifier.height(6.dp))
                     task.errorSummary?.let { errorText ->
-                        Text(text = errorText, fontSize = 12.sp, color = MaterialTheme.colorScheme.error, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(6.dp))
+                        EngineerTaskErrorBlock(errorText)
                     }
                     TextButton(onClick = onRetry, enabled = actionsEnabled) { Text(stringResource(R.string.chat_task_retry), fontSize = 13.sp) }
                 }
@@ -145,7 +178,7 @@ fun EngineerTaskCard(
 }
 
 @Composable
-private fun EngineerTaskStatusChip(task: EngineerTaskState) {
+internal fun EngineerTaskStatusChip(task: EngineerTaskState) {
     val labelRes = when (task.resolution) {
         EngineerTaskResolution.CONTINUED -> R.string.chat_task_resolved_continued
         EngineerTaskResolution.ABANDONED -> R.string.chat_task_resolved_abandoned
@@ -174,15 +207,53 @@ private fun EngineerTaskStatusChip(task: EngineerTaskState) {
 }
 
 @Composable
-private fun taskMetaText(task: EngineerTaskState): String {
+internal fun taskMetaText(task: EngineerTaskState): String {
     val parts = mutableListOf<String>()
     if (task.turns > 0) parts += stringResource(R.string.chat_task_meta_turns, task.turns)
     task.costCents?.let { cents -> parts += stringResource(R.string.chat_task_meta_cost, cents / 100.0) }
     if (task.fileChangeCount > 0) parts += stringResource(R.string.chat_task_meta_files, task.fileChangeCount)
+    // 交付目标分支（DELIVERED 裁决时回填，此前采集未展示）
+    task.deliverBranch?.takeIf { branch -> branch.isNotBlank() }?.let { branch -> parts += "⎇ $branch" }
     return parts.joinToString(" · ")
 }
 
-private fun formatElapsed(ms: Long): String {
+/**
+ * 错误区块：出错信息是任务卡的一等组成部分——错误色容器 + 图标 + 完整摘要
+ * （最多 6 行，取代原单行/两行红字）。Chat 卡与任务中心列表项共用。
+ */
+@Composable
+internal fun EngineerTaskErrorBlock(
+    errorText: String,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 6,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Icon(
+                imageVector = Icons.Rounded.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .size(14.dp)
+                    .padding(top = 1.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = errorText,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+internal fun formatElapsed(ms: Long): String {
     val totalSec = (ms / 1000).coerceAtLeast(0)
     return "%d:%02d".format(Locale.ROOT, totalSec / 60, totalSec % 60)
 }

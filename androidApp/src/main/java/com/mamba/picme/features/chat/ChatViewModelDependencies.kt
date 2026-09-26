@@ -6,7 +6,6 @@ import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.data.remote.picme.ClaudeChatClient
-import com.mamba.picme.data.remote.picme.IssueReportClient
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.data.repository.MediaFeedbackRepository
 import com.mamba.picme.domain.repository.ChatImageStore
@@ -32,7 +31,6 @@ class ChatViewModelDependencies(
     val mediaRepository: AndroidMediaRepository,
     val picMeAuthClient: PoLangAuthClient,
     val claudeChatClient: ClaudeChatClient = ClaudeChatClient(),
-    val issueReportClient: IssueReportClient = IssueReportClient(),
     val getGallerySummaryUseCase: GetGallerySummaryUseCase,
     val queryGalleryMediaUseCase: QueryGalleryMediaUseCase,
     val startTagScanUseCase: StartTagScanUseCase,

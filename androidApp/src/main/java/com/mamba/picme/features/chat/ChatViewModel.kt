@@ -74,7 +74,9 @@ import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.capability.SearchOutcome
 import com.mamba.picme.features.chat.engineer.EngineerTaskReducer
+import com.mamba.picme.features.chat.engineer.EngineerTaskSid
 import com.mamba.picme.features.chat.engineer.EngineerTaskSmokeSamples
+import com.mamba.picme.features.chat.engineer.TaskCenterPartition
 import com.mamba.picme.features.chat.js.CapabilityDispatchHandler
 import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
@@ -92,6 +94,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -112,7 +115,7 @@ private const val MAX_CARDS = 20
 private const val CHAT_IMAGE_MAX_PX = 1024
 
 /** 网关 sid 格式：uuid4().hex[:12]（12 位小写 hex）；claude init 的 session_id 是带连字符 UUID，不匹配。 */
-private val GATEWAY_SID_PATTERN = Regex("[0-9a-f]{12}")
+private val GATEWAY_SID_PATTERN = EngineerTaskSid.GATEWAY_PATTERN
 
 /** 只读 JS 脚本 eval 超时。 */
 private const val DEFAULT_EVAL_TIMEOUT_MS = 5_000L
@@ -319,6 +322,10 @@ class ChatViewModel(
     @Volatile
     private var claudeSid: String? = null
 
+    /** [claudeSid] 所属 chat 会话（跨会话守卫：他会话残留 sid 不得串用于本会话 resume/deliver）。 */
+    @Volatile
+    private var claudeSidOwner: String? = null
+
     /** msgId → 交付按钮状态（内存态；Room 消息经 loadMessages 重放时按 id 回填）。 */
     private val claudeDeliverOverrides = mutableMapOf<String, ClaudeDeliverUi>()
 
@@ -329,6 +336,17 @@ class ChatViewModel(
     /** 任务卡动作（交付/继续/重试）在途的 taskId 集合（双击防护；UI 据此禁用审批按钮）。 */
     private val _engineerActionInFlight = MutableStateFlow<Set<String>>(emptySet())
     val engineerActionInFlight: StateFlow<Set<String>> = _engineerActionInFlight.asStateFlow()
+
+    /** 跨会话活动任务计数（任务中心顶栏角标数据源；Room 驱动，进行中判据同 [TaskCenterPartition.isActive]）。 */
+    val activeEngineerTaskCount: StateFlow<Int> =
+        chatMessageDao.getTaskCardMessages()
+            .map { messages ->
+                messages.count { entity ->
+                    parseEngineerTaskState(entity.metadata)
+                        ?.let { task -> TaskCenterPartition.isActive(task) } == true
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     /** 当前回合活动任务（sendClaudeMessage 提交时置位，回合结束清空）。 */
     @Volatile
@@ -346,6 +364,7 @@ class ChatViewModel(
         val saved = claudeSidStore?.load()
         if (saved == null) {
             claudeSid = null
+            claudeSidOwner = null
             newSession()
             return
         }
@@ -353,11 +372,13 @@ class ChatViewModel(
         viewModelScope.launch {
             if (chatSessionDao.getSession(chatSessionId) != null) {
                 claudeSid = sid
+                claudeSidOwner = chatSessionId
                 switchSession(chatSessionId)
             } else {
                 // 所属会话已被删除：清残留记录，按全新会话处理
                 claudeSidStore?.clear()
                 claudeSid = null
+                claudeSidOwner = null
                 newSession()
             }
         }
@@ -372,8 +393,10 @@ class ChatViewModel(
      * 事件经 [ClaudeAgentRenderer] 折叠成 agent 气泡（文本流式 + 步骤 + 文件改动）；
      * done 后落 Room（metadata 带 claude_agent_state，跨重载保留）；交付审批由 TASK_CARD 任务卡承载。
      * @param actionInFlightTaskId 任务卡动作（继续/重试）来源卡 id：回合结束（finally）释放其在途标记。
+     * @param resumeSid 任务中心跨会话动作传入的卡片 sid（经网关 pattern 校验后才采纳）：
+     *   VM 级 claudeSid 属于其他会话时的显式 resume 通道，防串会话续跑。
      */
-    fun sendClaudeMessage(text: String, actionInFlightTaskId: String? = null) {
+    fun sendClaudeMessage(text: String, actionInFlightTaskId: String? = null, resumeSid: String? = null) {
         if (text.isBlank()) {
             // 携带在途标记的空调用：立即释放（正常路径由回合 finally 释放）
             actionInFlightTaskId?.let { id ->
@@ -424,9 +447,22 @@ class ChatViewModel(
                     isThinking = true,
                     claudeAgent = ClaudeAgentState(),
                 )
-                // 进程重建后内存 sid 丢失：单槽兜底恢复（仅当记录属于当前会话），--resume 续上下文
+                // sid 归属守卫：内存 sid 仅当属于本次发送会话才可用（切会话/任务中心跨会话动作后
+                // 防串会话 --resume）；否则按 store 单槽恢复（仅当记录属于当前会话），
+                // 再回落显式 resumeSid（任务中心跨会话动作传卡片 sid）。
+                if (claudeSidOwner != sessionId) {
+                    claudeSid = null
+                    claudeSidOwner = null
+                }
                 if (claudeSid == null) {
                     claudeSid = claudeSidStore?.load()?.takeIf { it.first == sessionId }?.second
+                    if (claudeSid != null) claudeSidOwner = sessionId
+                }
+                if (claudeSid == null && resumeSid != null && EngineerTaskSid.isGatewaySid(resumeSid)) {
+                    // 网关有效 resume 不下发 session 事件（见下方 Session 分支注释），本地先登记归属
+                    claudeSid = resumeSid
+                    claudeSidOwner = sessionId
+                    claudeSidStore?.save(sessionId, resumeSid)
                 }
                 // SSE 回调是非 suspend 主流：tryLock 与 IO 协程的合成 ToolResult 串行，
                 // 拿不到锁则直接 apply（事件不能丢，竞态概率极低）
@@ -464,6 +500,7 @@ class ChatViewModel(
                         // 网关侧轮换（workdir 被清后重新签发）时新 sid 直接覆盖并持久化，自愈失忆。
                         is ClaudeEvent.Session -> if (event.sid.matches(GATEWAY_SID_PATTERN)) {
                             claudeSid = event.sid
+                            claudeSidOwner = sessionId
                             claudeSidStore?.save(sessionId, event.sid)
                         }
                         is ClaudeEvent.Done, is ClaudeEvent.Cost -> Unit
@@ -651,56 +688,72 @@ class ChatViewModel(
         }
     }
 
-    /** 任务卡「继续」：旧卡回填已继续 + 同 sid 续跑（新回合新卡，语义同气泡按钮）。 */
-    fun continueEngineerTask(taskId: String) {
+    /** 任务卡「继续」：旧卡回填已继续 + 同 sid 续跑（新回合新卡，语义同气泡按钮）。resumeSid 见 [sendClaudeMessage]。 */
+    fun continueEngineerTask(taskId: String, resumeSid: String? = null) {
         if (_isProcessing.value) return
         // 双击防护：在途标记跨帧存活（sendClaudeMessage 的 launch 异步置位 _isProcessing，
         // 同帧 try/finally 移除会留空窗），由新回合 finally 释放
         if (taskId in _engineerActionInFlight.value) return
         resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.CONTINUED)
         _engineerActionInFlight.update { inFlight -> inFlight + taskId }
-        sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue), actionInFlightTaskId = taskId)
+        sendClaudeMessage(
+            stringContext().getString(R.string.chat_claude_continue),
+            actionInFlightTaskId = taskId,
+            resumeSid = resumeSid,
+        )
     }
 
-    /** 任务卡「到此为止」。 */
-    fun abandonEngineerTask(taskId: String) {
+    /** 任务卡「到此为止」。sessionId 显式传入时按该会话落库（任务中心跨会话动作），缺省取当前会话。 */
+    fun abandonEngineerTask(taskId: String, sessionId: String? = null) {
         if (_isProcessing.value) return
-        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.ABANDONED)
+        resolveEngineerTask(sessionId ?: _currentSessionId.value, taskId, EngineerTaskResolution.ABANDONED)
     }
 
-    /** 任务卡「暂不」交付。 */
-    fun skipEngineerDeliver(taskId: String) {
+    /** 任务卡「暂不」交付。sessionId 语义同 [abandonEngineerTask]。 */
+    fun skipEngineerDeliver(taskId: String, sessionId: String? = null) {
         if (_isProcessing.value) return
-        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.DELIVER_SKIPPED)
+        resolveEngineerTask(sessionId ?: _currentSessionId.value, taskId, EngineerTaskResolution.DELIVER_SKIPPED)
     }
 
-    /** 任务卡「重试」：重发原消息（新任务卡，不覆盖旧卡，US-11）。 */
-    fun retryEngineerTask(taskId: String) {
+    /** 任务卡「重试」：重发原消息（新任务卡，不覆盖旧卡，US-11）。resumeSid 见 [sendClaudeMessage]。 */
+    fun retryEngineerTask(taskId: String, resumeSid: String? = null) {
         if (_isProcessing.value) return
         val source = _engineerTasks.value[taskId]?.sourceText?.takeIf { text -> text.isNotBlank() } ?: return
         // 双击防护同 continueEngineerTask：在途标记由新回合 finally 释放
         if (taskId in _engineerActionInFlight.value) return
         _engineerActionInFlight.update { inFlight -> inFlight + taskId }
-        sendClaudeMessage(source, actionInFlightTaskId = taskId)
+        sendClaudeMessage(source, actionInFlightTaskId = taskId, resumeSid = resumeSid)
     }
 
-    /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。 */
-    fun deliverEngineerTask(taskId: String) {
+    /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。sessionId 语义同 [abandonEngineerTask]。 */
+    fun deliverEngineerTask(taskId: String, sessionId: String? = null) {
         if (_isProcessing.value) return
+        val targetSessionId = sessionId ?: _currentSessionId.value
         // 状态门控：仅 AWAITING_DELIVER 可交付，防 COMPLETED 卡被代码层重复交付
         val task = _engineerTasks.value[taskId]
             ?.takeIf { candidate -> candidate.status == EngineerTaskStatus.AWAITING_DELIVER }
             ?: return
-        // 消费端校验+回落（reducer 冻结面不动）：claude init 的 UUID session 事件每回合都会
-        // 经 reducer last-wins 覆盖 task.sid，而网关 /deliver 只认 12-hex sid；pattern 不匹配
-        // 则回落 VM 级 claudeSid（该字段本身只采纳 12-hex，见 sendClaudeMessage 事件处理）。
-        val sid = task.sid?.takeIf { sidValue -> sidValue.matches(GATEWAY_SID_PATTERN) }
-            ?: claudeSid
-            ?: return
+        // 消费端校验+归属守卫（reducer 冻结面不动）：claude init 的 UUID session 事件每回合都会
+        // 经 reducer last-wins 覆盖 task.sid，而网关 /deliver 只认 12-hex sid；
+        // 回落 VM 级 claudeSid 仅当其归属目标会话（跨会话残留 sid 不得串用）。
+        val sid = EngineerTaskSid.chooseActionSid(
+            taskSid = task.sid,
+            vmSid = claudeSid,
+            vmSidOwner = claudeSidOwner,
+            targetSessionId = targetSessionId,
+        ) ?: run {
+            // 无法定位 sid（跨会话且卡片 sid 被 UUID 覆盖）：错误摘要上卡、保持待审批，
+            // 引导回原会话交付（防静默失败，按钮失灵零反馈）
+            markEngineerTaskDeliverError(
+                targetSessionId,
+                taskId,
+                stringContext().getString(R.string.chat_task_deliver_sid_unavailable),
+            )
+            return
+        }
         // 双击防护：taskId 级 in-flight，回包/早退必移除（finally 覆盖 token 缺失路径）
         if (taskId in _engineerActionInFlight.value) return
         _engineerActionInFlight.update { inFlight -> inFlight + taskId }
-        val sessionId = _currentSessionId.value
         viewModelScope.launch {
             try {
                 val token = _serverAuthToken.value
@@ -709,12 +762,12 @@ class ChatViewModel(
                     onSuccess = { json ->
                         val branch = json.optString("branch")
                         if (json.optBoolean("ok", false) && branch.isNotBlank()) {
-                            resolveEngineerTask(sessionId, taskId, EngineerTaskResolution.DELIVERED, branch)
+                            resolveEngineerTask(targetSessionId, taskId, EngineerTaskResolution.DELIVERED, branch)
                         } else {
-                            markEngineerTaskDeliverError(sessionId, taskId, json.optString("error"))
+                            markEngineerTaskDeliverError(targetSessionId, taskId, json.optString("error"))
                         }
                     },
-                    onFailure = { error -> markEngineerTaskDeliverError(sessionId, taskId, error.message) },
+                    onFailure = { error -> markEngineerTaskDeliverError(targetSessionId, taskId, error.message) },
                 )
             } finally {
                 _engineerActionInFlight.update { inFlight -> inFlight - taskId }
@@ -734,6 +787,67 @@ class ChatViewModel(
         _engineerTasks.update { tasks -> tasks + (taskId to next) }
         viewModelScope.launch {
             engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) }
+        }
+    }
+
+    /**
+     * 任务中心跨会话动作前置：内存态无该卡时从 Room 补种（suspend，调用方须 await 后再动作），
+     * 防跨会话操作时 resolve/retry 因 map 未加载而空转。已存在（含 live 覆盖）时不触碰。
+     */
+    private suspend fun primeEngineerTask(taskId: String) {
+        if (_engineerTasks.value.containsKey(taskId)) return
+        val entity = chatMessageDao.getMessageById(taskId) ?: return
+        val task = parseEngineerTaskState(entity.metadata) ?: return
+        _engineerTasks.update { tasks ->
+            if (tasks.containsKey(taskId)) tasks else tasks + (taskId to task)
+        }
+    }
+
+    /** 任务中心「交付 push」：跨会话安全（prime 补种 + 显式 sessionId 落库），页内完成不跳转。 */
+    fun deliverEngineerTaskFromCenter(sessionId: String, taskId: String) {
+        viewModelScope.launch {
+            primeEngineerTask(taskId)
+            deliverEngineerTask(taskId, sessionId)
+        }
+    }
+
+    /** 任务中心「暂不」交付：跨会话安全，页内完成不跳转。 */
+    fun skipEngineerDeliverFromCenter(sessionId: String, taskId: String) {
+        viewModelScope.launch {
+            primeEngineerTask(taskId)
+            skipEngineerDeliver(taskId, sessionId)
+        }
+    }
+
+    /** 任务中心「到此为止」：跨会话安全，页内完成不跳转。 */
+    fun abandonEngineerTaskFromCenter(sessionId: String, taskId: String) {
+        viewModelScope.launch {
+            primeEngineerTask(taskId)
+            abandonEngineerTask(taskId, sessionId)
+        }
+    }
+
+    /**
+     * 任务中心「继续」：切到任务所属会话后同 sid 续跑（新回合新卡）。
+     * 发送依赖当前会话上下文，故跨会话时先 switchSession；卡片自带合规 sid 经 resumeSid 显式续跑
+     * （VM 级 claudeSid 属于其他会话时不得串用）；UI 层随后应返回 chat 观察新回合。
+     */
+    fun continueEngineerTaskFromCenter(sessionId: String, taskId: String) {
+        viewModelScope.launch {
+            primeEngineerTask(taskId)
+            val cardSid = _engineerTasks.value[taskId]?.sid
+            if (_currentSessionId.value != sessionId) switchSession(sessionId)
+            continueEngineerTask(taskId, resumeSid = cardSid)
+        }
+    }
+
+    /** 任务中心「重试」：切到任务所属会话后重发原消息（新卡，不覆盖旧卡，US-11）；resumeSid 语义同 [continueEngineerTaskFromCenter]；UI 层随后应返回 chat。 */
+    fun retryEngineerTaskFromCenter(sessionId: String, taskId: String) {
+        viewModelScope.launch {
+            primeEngineerTask(taskId)
+            val cardSid = _engineerTasks.value[taskId]?.sid
+            if (_currentSessionId.value != sessionId) switchSession(sessionId)
+            retryEngineerTask(taskId, resumeSid = cardSid)
         }
     }
 
@@ -981,36 +1095,6 @@ class ChatViewModel(
                 .onSuccess { _canDeliverClaude.value = it }
                 .onFailure { _canDeliverClaude.value = false }
         }
-    }
-
-    // ── 问题上报 ──────────────────────────────────
-    private val issueReportClient = dependencies.issueReportClient
-
-    private val _issueReportState = MutableStateFlow<IssueReportState>(IssueReportState.Idle)
-    val issueReportState: StateFlow<IssueReportState> = _issueReportState.asStateFlow()
-
-    fun submitIssueReport(category: String, title: String, description: String) {
-        val token = _serverAuthToken.value
-        if (token.isBlank()) {
-            _issueReportState.value = IssueReportState.Error(stringContext().getString(R.string.report_issue_guest_not_allowed))
-            return
-        }
-        if (title.isBlank()) {
-            _issueReportState.value = IssueReportState.Error(stringContext().getString(R.string.chat_report_title_required))
-            return
-        }
-        _issueReportState.value = IssueReportState.Submitting
-        viewModelScope.launch {
-            val result = issueReportClient.submit(token, category, title, description)
-            _issueReportState.value = result.fold(
-                onSuccess = { IssueReportState.Success(it) },
-                onFailure = { IssueReportState.Error(it.message ?: stringContext().getString(R.string.chat_report_failed)) }
-            )
-        }
-    }
-
-    fun resetIssueReportState() {
-        _issueReportState.value = IssueReportState.Idle
     }
 
     /** 远程模式且未注册（无 server token）→ 访客试用，由服务端设备级额度放行。 */
@@ -1346,6 +1430,10 @@ class ChatViewModel(
                 _gachaSelections.value = emptyMap()
                 // 删除的是工程师上下文所属会话 → 清掉持久化记录，避免 prefs 残留
                 if (claudeSidStore?.load()?.first == sessionId) claudeSidStore?.clear()
+                if (claudeSidOwner == sessionId) {
+                    claudeSid = null
+                    claudeSidOwner = null
+                }
                 if (_currentSessionId.value == sessionId) {
                     _currentSessionId.value = "default"
                     userSettingsRepository.updateChatCurrentSessionId("default")
@@ -3337,14 +3425,6 @@ class ChatViewModel(
         }
     }
 
-}
-
-/** Chat 问题上报 UI 状态。 */
-sealed interface IssueReportState {
-    data object Idle : IssueReportState
-    data object Submitting : IssueReportState
-    data class Success(val issueId: Int) : IssueReportState
-    data class Error(val message: String) : IssueReportState
 }
 
 /**

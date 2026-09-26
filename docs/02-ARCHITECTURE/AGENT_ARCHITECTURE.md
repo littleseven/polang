@@ -459,10 +459,10 @@ git commit + push claude-chat/<sid>
 
 #### 2.5.4 用户问题上报
 
-Chat 顶部新增「上报问题」入口，与 AI 工程师链路独立：
+设置页「其他」分组的「上报问题」入口（2026-09-26 自 Chat 顶部栏迁入），与 AI 工程师链路独立：
 
 ```
-用户点击「上报问题」(ChatScreen 顶部)
+用户点击「上报问题」（设置页 → 其他分组）
         │
         ▼
 POST /v1/report-issue (IssueReportClient，X-App-Token 鉴权)

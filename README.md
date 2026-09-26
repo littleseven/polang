@@ -83,7 +83,7 @@ PoLang 以「对话即操作」为核心：用户用自然语言与相册交互�
 🌐 独立 `server/` 工程（部署 `api.polang.net`）：AI 网关（按模型路由 Cloudflare AI Gateway / 腾讯 TokenHub）+ 邮箱注册账号 + 免费额度 + 管理后台 + 遥测。**不做 Agent 编排**（ReAct 循环在客户端）。
 
 ### 用户问题上报
-📝 Chat 顶部「上报问题」入口 → `POST /v1/report-issue`，服务端脱敏后自动在 GitHub 仓库创建 issue，用户无需离开 App 即可反馈问题。
+📝 设置页「其他」分组「上报问题」入口 → `POST /v1/report-issue`，服务端脱敏后自动在 GitHub 仓库创建 issue，用户无需离开 App 即可反馈问题。
 
 > **核心特点**：媒体处理端侧 · 隐私安全 ｜ Agent First 架构（Capability 可插拔）｜ 文本推理全远程 ｜ monorepo（androidApp / iosApp / shared(KMP) / engines(beauty-engine · beauty-api · mnn-core · agent-native · sentencepiece) + server）
 

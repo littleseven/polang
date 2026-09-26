@@ -1351,6 +1351,17 @@
     <string name="chat_task_collapse">Ocultar</string>
     <string name="chat_task_deliver_summary">%1$d archivos, listo para entregar</string>
     <string name="cd_engineer_task_card">Tarjeta de tarea</string>
+
+    <!-- Task center -->
+    <string name="task_center_title">Centro de tareas</string>
+    <string name="task_center_section_active">En curso</string>
+    <string name="task_center_section_history">Historial</string>
+    <string name="task_center_empty">Aún no hay tareas de ingeniero: envía un mensaje en el modo AI Engineer para crear una.</string>
+    <string name="task_center_view_all">Ver todo</string>
+    <string name="cd_task_center">Centro de tareas</string>
+    <string name="cd_task_center_active">Centro de tareas, %1$d tareas activas</string>
+    <string name="task_center_badge_overflow">99+</string>
+    <string name="chat_task_deliver_sid_unavailable">Sesión no disponible: abre el chat de la tarea para entregar</string>
     <!-- Issue report -->
     <string name="report_issue_title">Informar de un problema</string>
     <string name="report_issue_cd">Informar de un problema</string>
@@ -1603,4 +1614,24 @@
     <string name="chat_claude_continue">Continuar</string>
     <string name="chat_more_like_this">Más como esto</string>
     <string name="chat_more_like_this_with_tags">Más como esto: %1$s</string>
+    <string name="task_center_tab_engineer">Ingeniero</string>
+    <string name="task_center_tab_background">En segundo plano</string>
+    <string name="task_center_empty_user_tasks">Sin tareas en segundo plano</string>
+    <string name="user_task_title_tag_scan">Escaneo de etiquetas</string>
+    <string name="user_task_title_model_download">Descarga de modelo</string>
+    <string name="cd_user_task_card">Tarjeta de tarea: %1$s</string>
+    <string name="user_task_status_pending">Pendiente</string>
+    <string name="user_task_status_running">En curso</string>
+    <string name="user_task_status_paused">En pausa</string>
+    <string name="user_task_status_completed">Completada</string>
+    <string name="user_task_status_failed">Fallida</string>
+    <string name="user_task_status_cancelled">Cancelada</string>
+    <string name="user_task_action_pause">Pausar</string>
+    <string name="user_task_action_resume">Reanudar</string>
+    <string name="user_task_action_cancel">Cancelar</string>
+    <string name="user_task_action_retry">Reintentar</string>
+    <string name="user_task_error_process_terminated">Interrumpida — toca Reintentar</string>
+    <string name="user_task_error_partial_failures">%1$s elementos fallaron</string>
+    <string name="user_task_error_model_unavailable">Modelo no disponible — puede haber sido retirado</string>
+    <string name="user_task_eta_remaining">~%1$s restantes</string>
 </resources>

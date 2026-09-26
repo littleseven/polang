@@ -1396,6 +1396,17 @@
     <string name="chat_task_deliver_summary">%1$d files changed, ready to deliver</string>
     <string name="cd_engineer_task_card">Engineer task card</string>
 
+    <!-- Task center -->
+    <string name="task_center_title">Task Center</string>
+    <string name="task_center_section_active">Active</string>
+    <string name="task_center_section_history">History</string>
+    <string name="task_center_empty">No engineer tasks yet — send a message in AI Engineer mode to start one.</string>
+    <string name="task_center_view_all">View all</string>
+    <string name="cd_task_center">Task center</string>
+    <string name="cd_task_center_active">Task center, %1$d active tasks</string>
+    <string name="task_center_badge_overflow">99+</string>
+    <string name="chat_task_deliver_sid_unavailable">Session unavailable — open the task\'s chat to deliver</string>
+
     <!-- Issue report -->
     <string name="report_issue_title">Report a problem</string>
     <string name="report_issue_cd">Report a problem</string>
@@ -1652,4 +1663,24 @@
     <string name="chat_claude_continue">Continue</string>
     <string name="chat_more_like_this">More like this</string>
     <string name="chat_more_like_this_with_tags">More like this: %1$s</string>
+    <string name="task_center_tab_engineer">Engineer</string>
+    <string name="task_center_tab_background">Background</string>
+    <string name="task_center_empty_user_tasks">No background tasks</string>
+    <string name="user_task_title_tag_scan">Gallery tag scan</string>
+    <string name="user_task_title_model_download">Model download</string>
+    <string name="cd_user_task_card">%1$s task card</string>
+    <string name="user_task_status_pending">Pending</string>
+    <string name="user_task_status_running">Running</string>
+    <string name="user_task_status_paused">Paused</string>
+    <string name="user_task_status_completed">Completed</string>
+    <string name="user_task_status_failed">Failed</string>
+    <string name="user_task_status_cancelled">Cancelled</string>
+    <string name="user_task_action_pause">Pause</string>
+    <string name="user_task_action_resume">Resume</string>
+    <string name="user_task_action_cancel">Cancel</string>
+    <string name="user_task_action_retry">Retry</string>
+    <string name="user_task_error_process_terminated">Interrupted — tap Retry to restart</string>
+    <string name="user_task_error_partial_failures">%1$s items failed</string>
+    <string name="user_task_error_model_unavailable">Model unavailable — may have been delisted</string>
+    <string name="user_task_eta_remaining">~%1$s left</string>
 </resources>

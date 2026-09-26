@@ -83,8 +83,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.ShortText
+import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteSweep
@@ -100,6 +100,8 @@ import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
@@ -128,6 +130,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -205,12 +208,18 @@ import java.io.File
 
 private const val TAG = "ChatScreen"
 
+/** 任务中心回锚等待超时（US-15 兜底）：超时未锚定自动放弃并恢复自动滚底 */
+private const val ANCHOR_TIMEOUT_MS = 8000L
+
+/** 任务中心回锚请求（US-15）：目标会话 + 目标任务卡 + nonce（重复锚同卡也能触发新一次滚动）。 */
+data class ChatTaskAnchor(val sessionId: String, val taskId: String, val nonce: Long)
+
 /**
  * Chat 二级页 — AI 对话入口
  *
  * 从相册首页通过 plus 菜单进入。页面提供返回按钮回到相册。
  * 布局：
- * - 顶部栏：返回 + 菜单 + 清空 + 新建（设置入口仅在相册首页，不在每个页面重复）
+ * - 顶部栏：返回 + 菜单 + 任务中心（角标） + 清空 + 新建（设置入口仅在相册首页，不在每个页面重复）
  * - 消息列表：LazyColumn 展示对话历史
  * - 输入区：ModelSelector + 输入框 + 发送按钮
  * - 快捷入口：相机 / 模型中心
@@ -226,10 +235,17 @@ fun ChatScreen(
     mediaViewModel: MediaViewModel,
     onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -> Unit = { _, _ -> },
     onNavigateToIDPhoto: (uri: String) -> Unit = {},
+    /** 任务中心入口（US-12 顶栏任务图标） */
+    onNavigateToTaskCenter: () -> Unit = {},
+    /** 任务中心回锚请求（US-15）；非 null 时切会话并滚动锚定对应任务卡 */
+    taskAnchor: ChatTaskAnchor? = null,
+    onTaskAnchorConsumed: () -> Unit = {},
     /** 上报是否允许外层主页面 Pager 横滑（预览打开时禁用） */
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
-    isActivePage: Boolean = true
+    isActivePage: Boolean = true,
+    /** 后台用户任务活跃数（用户任务协议 §7）：与工程师活跃数合并进顶栏任务中心角标 */
+    activeUserTaskCount: Int = 0
 ) {
     val context = LocalContext.current
     val messages by viewModel.displayMessages.collectAsState()
@@ -243,8 +259,8 @@ fun ChatScreen(
     val showRegistration by viewModel.showRegistrationSheet.collectAsState()
     val showGuestBanner by viewModel.showGuestBanner.collectAsState()
     val guestMessageCount by viewModel.guestMessageCount.collectAsState()
-    val issueReportState by viewModel.issueReportState.collectAsState()
     val canDeliverClaude by viewModel.canDeliverClaude.collectAsState()
+    val activeEngineerTaskCount by viewModel.activeEngineerTaskCount.collectAsState()
     val gachaSelections by viewModel.gachaSelections.collectAsState()
     val gachaRerolling by viewModel.gachaRerolling.collectAsState()
     // 抽卡条确认/换一组失败 toast 文案（闭包回调内无法取 stringResource，提前取）
@@ -252,9 +268,12 @@ fun ChatScreen(
     val gachaConfirmFailedText = stringResource(R.string.chat_gacha_confirm_failed)
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    // 任务中心回锚（US-15）两阶段自动滚底抑制：pending（等待锚定）+ hold（锚定后防流式
+    // delta 拉走——条数增长（新回合/新消息）或用户主动拖拽才解除）
+    var pendingTaskAnchor by remember { mutableStateOf<ChatTaskAnchor?>(null) }
+    var anchorHold by remember { mutableStateOf<Pair<Long, Int>?>(null) }
 
     var isSidebarOpen by remember { mutableStateOf(false) }
-    var showReportIssueDialog by remember { mutableStateOf(false) }
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
     var previewChartSvg by remember { mutableStateOf<String?>(null) }
@@ -462,51 +481,59 @@ fun ChatScreen(
         }
     }
 
-    // 自动滚动到底部：列表条数变化或最后一条内容变化时触发（支持流式打字效果）
+    // 自动滚动到底部：列表条数变化或最后一条内容变化时触发（支持流式打字效果）；
+    // 回锚 pending/hold 期间跳过（plain read 在 effect 重跑时取最新值，抑制态不入 key 防自身触发滚动）
     LaunchedEffect(messages.size, messages.lastOrNull()?.content) {
-        if (messages.isNotEmpty()) {
+        anchorHold?.let { hold -> if (messages.size > hold.second) anchorHold = null }
+        if (pendingTaskAnchor == null && anchorHold == null && messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // 任务中心回锚（US-15）：先切到任务所属会话（会话加载是异步的，滚动由下一 effect 等消息就位）
+    // 会话切换时清残留 hold：否则切到消息更少的会话后条数恒超不过 hold.second，
+    // 自动滚底被持续抑制，只能靠用户拖拽自愈
+    LaunchedEffect(currentSessionId) { anchorHold = null }
+    LaunchedEffect(taskAnchor) {
+        taskAnchor?.let { anchor ->
+            pendingTaskAnchor = anchor
+            if (viewModel.currentSessionId.value != anchor.sessionId) {
+                viewModel.switchSession(anchor.sessionId)
+            }
+        }
+    }
+    // 锚定滚动：消息列表出现该任务卡（id == taskId）后瞬时滚动到位并消费请求；
+    // 随后进入 hold 态——流式 delta 不再拉到底部，直到新消息到来或用户拖拽
+    LaunchedEffect(pendingTaskAnchor?.nonce, messages) {
+        val anchor = pendingTaskAnchor ?: return@LaunchedEffect
+        val index = messages.indexOfFirst { msg -> msg.id == anchor.taskId }
+        if (index >= 0) {
+            listState.scrollToItem(index)
+            anchorHold = anchor.nonce to messages.size
+            pendingTaskAnchor = null
+            onTaskAnchorConsumed()
+        }
+    }
+    // 锚定兜底：8s 未等到任务卡（极端情况：消息被清理）自动放弃，恢复自动滚底
+    LaunchedEffect(pendingTaskAnchor?.nonce) {
+        val anchor = pendingTaskAnchor ?: return@LaunchedEffect
+        delay(ANCHOR_TIMEOUT_MS)
+        if (pendingTaskAnchor?.nonce == anchor.nonce) {
+            pendingTaskAnchor = null
+            onTaskAnchorConsumed()
+        }
+    }
+    // 用户主动拖拽即解除锚定保持（恢复自动滚底）
+    LaunchedEffect(anchorHold?.first) {
+        if (anchorHold == null) return@LaunchedEffect
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) anchorHold = null
         }
     }
 
     // 进入聊天页后，若已开启本地推理或语音功能，在蜂窝网络下检查 Tier 2 模型
     LaunchedEffect(Unit) {
         settingsViewModel.checkChatModelsOnCellular()
-    }
-
-    // 问题上报结果反馈
-    LaunchedEffect(issueReportState) {
-        when (val state = issueReportState) {
-            is IssueReportState.Success -> {
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.report_issue_success, state.issueId),
-                    Toast.LENGTH_SHORT,
-                ).show()
-                showReportIssueDialog = false
-                viewModel.resetIssueReportState()
-            }
-            is IssueReportState.Error -> {
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.report_issue_error, state.message),
-                    Toast.LENGTH_LONG,
-                ).show()
-                viewModel.resetIssueReportState()
-            }
-            else -> {}
-        }
-    }
-
-    if (showReportIssueDialog) {
-        ReportIssueDialog(
-            state = issueReportState,
-            isGuest = isGuestMode,
-            onDismiss = { showReportIssueDialog = false },
-            onSubmit = { category, title, description ->
-                viewModel.submitIssueReport(category, title, description)
-            },
-        )
     }
 
     Scaffold(
@@ -520,7 +547,8 @@ fun ChatScreen(
                     onOpenSidebar = { isSidebarOpen = true },
                     onNewChat = { viewModel.newSession() },
                     onClearChat = { viewModel.clearChat() },
-                    onReportIssue = { showReportIssueDialog = true },
+                    activeTaskCount = activeEngineerTaskCount + activeUserTaskCount,
+                    onNavigateToTaskCenter = onNavigateToTaskCenter,
                     isActivePage = isActivePage
                 )
             }
@@ -594,6 +622,7 @@ fun ChatScreen(
                                         task = task,
                                         expanded = taskExpanded,
                                         actionsEnabled = !isProcessing && task.taskId !in engineerActionInFlight,
+                                        onViewAll = onNavigateToTaskCenter,
                                         onToggleExpand = { taskExpanded = !taskExpanded },
                                         onContinue = { viewModel.continueEngineerTask(task.taskId) },
                                         onAbandon = { viewModel.abandonEngineerTask(task.taskId) },
@@ -917,7 +946,9 @@ private fun ChatTopBar(
     onOpenSidebar: () -> Unit,
     onNewChat: () -> Unit,
     onClearChat: () -> Unit,
-    onReportIssue: () -> Unit = {},
+    /** 活动工程师任务数（任务中心入口角标，US-12；0 不显示角标） */
+    activeTaskCount: Int = 0,
+    onNavigateToTaskCenter: () -> Unit = {},
     isActivePage: Boolean = true
 ) {
     AppTopBar(
@@ -933,102 +964,35 @@ private fun ChatTopBar(
             }
         },
         actions = {
-            AppTopBarAction(Icons.Outlined.BugReport, stringResource(R.string.report_issue_cd), onReportIssue)
+            BadgedBox(
+                badge = {
+                    if (activeTaskCount > 0) {
+                        Badge {
+                            Text(
+                                text = if (activeTaskCount > 99) {
+                                    stringResource(R.string.task_center_badge_overflow)
+                                } else {
+                                    activeTaskCount.toString()
+                                }
+                            )
+                        }
+                    }
+                }
+            ) {
+                AppTopBarAction(
+                    icon = Icons.Outlined.Assignment,
+                    contentDescription = if (activeTaskCount > 0) {
+                        stringResource(R.string.cd_task_center_active, activeTaskCount)
+                    } else {
+                        stringResource(R.string.cd_task_center)
+                    },
+                    onClick = onNavigateToTaskCenter
+                )
+            }
             AppTopBarAction(Icons.Outlined.AddComment, stringResource(R.string.new_chat), onNewChat)
             AppTopBarAction(Icons.Outlined.DeleteSweep, stringResource(R.string.clear_chat), onClearChat)
         }
     )
-}
-
-@Composable
-private fun ReportIssueDialog(
-    state: IssueReportState,
-    isGuest: Boolean,
-    onDismiss: () -> Unit,
-    onSubmit: (category: String, title: String, description: String) -> Unit,
-) {
-    var category by remember { mutableStateOf("other") }
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    val submitting = state is IssueReportState.Submitting
-    val categories = listOf("crash", "bug", "ai", "other")
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.report_issue_title)) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (isGuest) {
-                    Text(
-                        text = stringResource(R.string.report_issue_guest_not_allowed),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.report_issue_category_label),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    categories.forEach { c ->
-                        FilterChip(
-                            selected = category == c,
-                            onClick = { category = c },
-                            label = { Text(stringResource(categoryLabelRes(c))) },
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.report_issue_title_label)) },
-                    placeholder = { Text(stringResource(R.string.report_issue_title_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isGuest,
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.report_issue_description_label)) },
-                    placeholder = { Text(stringResource(R.string.report_issue_description_hint)) },
-                    minLines = 3,
-                    maxLines = 6,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isGuest,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSubmit(category, title, description) },
-                enabled = !submitting && !isGuest && title.isNotBlank(),
-            ) {
-                if (submitting) {
-                    // 保持按钮宽度稳定，仅显示 "提交中..."
-                    Text(stringResource(R.string.report_issue_submit) + "…")
-                } else {
-                    Text(stringResource(R.string.report_issue_submit))
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !submitting) {
-                Text(stringResource(R.string.report_issue_cancel))
-            }
-        },
-    )
-}
-
-@StringRes
-private fun categoryLabelRes(category: String): Int = when (category) {
-    "crash" -> R.string.report_issue_category_crash
-    "bug" -> R.string.report_issue_category_bug
-    "ai" -> R.string.report_issue_category_ai
-    else -> R.string.report_issue_category_other
 }
 
 /** LRU 已清理的编辑结果图占位：灰框 + 图标 + 「图片已过期·不可见」。 */

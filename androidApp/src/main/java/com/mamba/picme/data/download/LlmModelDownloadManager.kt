@@ -904,19 +904,21 @@ fun isModelDownloaded(modelId: String): Boolean {
             Logger.i(TAG, "Model download completed: $modelId")
 
         } catch (e: Exception) {
-            if (e.message?.contains("cancelled", ignoreCase = true) == true) {
-                val pausedBytes = pausedDownloads[modelId]
-                if (pausedBytes != null) {
-                    _downloadStates.update {
-                        it + (modelId to DownloadState(modelId, DownloadStatus.PAUSED, pausedBytes, actualTotalBytes))
-                    }
-                    updateServiceState()
-                    emit(DownloadProgress(modelId, pausedBytes, actualTotalBytes, DownloadStatus.PAUSED))
-                } else {
-                    _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
-                    updateServiceState()
-                    emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
+            // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
+            // pausedDownloads 由 pauseDownload 在取消前写入，是可靠意图来源
+            val pausedBytes = pausedDownloads[modelId]
+            if (pausedBytes != null) {
+                _downloadStates.update {
+                    it + (modelId to DownloadState(modelId, DownloadStatus.PAUSED, pausedBytes, actualTotalBytes))
                 }
+                updateServiceState()
+                emit(DownloadProgress(modelId, pausedBytes, actualTotalBytes, DownloadStatus.PAUSED))
+                return@flow
+            }
+            if (e.message?.contains("cancel", ignoreCase = true) == true) {
+                _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
+                updateServiceState()
+                emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
                 return@flow
             }
             val errorMsg = e.message ?: e.javaClass.simpleName
@@ -1148,19 +1150,21 @@ fun isModelDownloaded(modelId: String): Boolean {
             Logger.i(TAG, "Model download completed: $modelId")
 
         } catch (e: Exception) {
-            if (e.message?.contains("cancelled", ignoreCase = true) == true) {
-                val pausedBytes = pausedDownloads[modelId]
-                if (pausedBytes != null) {
-                    _downloadStates.update {
-                        it + (modelId to DownloadState(modelId, DownloadStatus.PAUSED, pausedBytes, actualTotalBytes))
-                    }
-                    updateServiceState()
-                    emit(DownloadProgress(modelId, pausedBytes, actualTotalBytes, DownloadStatus.PAUSED))
-                } else {
-                    _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
-                    updateServiceState()
-                    emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
+            // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
+            // pausedDownloads 由 pauseDownload 在取消前写入，是可靠意图来源
+            val pausedBytes = pausedDownloads[modelId]
+            if (pausedBytes != null) {
+                _downloadStates.update {
+                    it + (modelId to DownloadState(modelId, DownloadStatus.PAUSED, pausedBytes, actualTotalBytes))
                 }
+                updateServiceState()
+                emit(DownloadProgress(modelId, pausedBytes, actualTotalBytes, DownloadStatus.PAUSED))
+                return@flow
+            }
+            if (e.message?.contains("cancel", ignoreCase = true) == true) {
+                _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
+                updateServiceState()
+                emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
                 return@flow
             }
             val errorMsg = e.message ?: e.javaClass.simpleName

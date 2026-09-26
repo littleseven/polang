@@ -17,6 +17,7 @@ import com.mamba.picme.data.local.dao.PersonRelationDao
 import com.mamba.picme.data.local.dao.PhotoEditRecipeDao
 import com.mamba.picme.data.local.dao.TagDao
 import com.mamba.picme.data.local.dao.TagScanTaskDao
+import com.mamba.picme.data.local.dao.UserTaskDao
 import com.mamba.picme.data.local.entity.ChatImageCacheEntity
 import com.mamba.picme.data.local.entity.FaceEmbeddingEntity
 import com.mamba.picme.data.local.entity.LocationHierarchyEntity
@@ -32,6 +33,7 @@ import com.mamba.picme.data.local.entity.PersonRelationEntity
 import com.mamba.picme.data.local.entity.PhotoEditRecipeEntity
 import com.mamba.picme.data.local.entity.TagEntity
 import com.mamba.picme.data.local.entity.TagScanTaskEntity
+import com.mamba.picme.data.local.entity.UserTaskEntity
 import com.mamba.picme.data.model.MediaEntity
 
 @Database(
@@ -54,9 +56,10 @@ import com.mamba.picme.data.model.MediaEntity
         MemoryFactEntity::class,
         ChatImageCacheEntity::class,
         OptimizeFeedbackEntity::class,
-        DedupHashEntity::class
+        DedupHashEntity::class,
+        UserTaskEntity::class
     ],
-    version = 23,
+    version = 24,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -76,6 +79,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chatImageCacheDao(): ChatImageCacheDao
     abstract fun optimizeFeedbackDao(): OptimizeFeedbackDao
     abstract fun dedupHashDao(): DedupHashDao
+    abstract fun userTaskDao(): UserTaskDao
 
     companion object {
         @Volatile
@@ -95,7 +99,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
                         MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
-                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23
+                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
+                        MIGRATION_23_24
                     )
                     .build()
                 INSTANCE = instance
@@ -490,6 +495,29 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_media_assets_uri` ON `media_assets`(`uri`)"
+                )
+            }
+        }
+
+        /**
+         * Migration 23 → 24：新增 user_task 表（用户任务注册表身份行，spec §5）。
+         */
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `user_task` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `kind` TEXT NOT NULL,
+                        `displayName` TEXT,
+                        `status` TEXT NOT NULL,
+                        `errorCode` TEXT,
+                        `errorDetail` TEXT,
+                        `destination` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `completedAt` INTEGER
+                    )
+                    """.trimIndent()
                 )
             }
         }

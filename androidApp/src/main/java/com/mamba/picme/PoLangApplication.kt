@@ -177,6 +177,9 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         thumbnailCache = ThumbnailCache(this)
         container = AppContainerImpl(this, thumbnailCache)
 
+        // 用户任务适配器（spec §6）：注册表 + TAG 扫描/模型下载接入任务中心
+        container.startUserTaskAdapters()
+
         // 注入媒体搜索引擎到 GalleryCapability（自然语言图片搜索）
         GalleryCapability.getInstance().searchEngine = container.mediaSearchEngine
         // 注入跨维度查询构建器（LLM 意图 → 多维度 Room 查询）
