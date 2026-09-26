@@ -41,6 +41,7 @@ PAGES = [
     ("Organize", "267:21"),
     ("Memories", "297:1"),
     ("Components", "386:45"),
+    ("ChatComponents", "438:328"),
 ]
 
 # 缓存路径正则回退: 允许文件名含空格(fetch_variables 缓存名带集合名, 如 "PoLang Tokens"), 不跨行
