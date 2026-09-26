@@ -49,6 +49,7 @@ class UserTaskRegistry(
     }
 
     /** 状态迁移（落 Room；终态顺带修剪历史并清除残留进度快照）。errorCode/errorDetail 仅在异常语义时传。 */
+    @Suppress("TooGenericExceptionCaught") // spec §9-5 有意兜住一切写库异常降级（CancellationException 已先行 rethrow）
     suspend fun upsertStatus(
         id: String,
         kind: UserTaskKind,
