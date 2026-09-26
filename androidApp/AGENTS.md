@@ -105,7 +105,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 |------|------|---------|------|
 | **Agent** | `features/agent/` | `GlobalAgentPanel.kt` | 全局悬浮 Agent 面板 |
 | **BackupRestore** | `features/backuprestore/` | `BackupRestoreActivity` | 数据备份与恢复入口（本地数据导出/导入，备份模型 v5） |
-| **Chat** | `features/chat/` | `ChatScreen`, `ChatViewModel`, `ChatThreadSidebar`, `ChatTitleGenerator` | AI 对话二级页，从相册首页进入，支持多线程；首条消息自动生成会话标题；支持对话式图片编辑（`edit_image`），结果以 `AGENT_EDIT_RESULT` 消息 inline 返回 |
+| **Chat** | `features/chat/` | `ChatScreen`, `ChatViewModel`, `ChatThreadSidebar`, `ChatTitleGenerator` | AI 对话二级页，从相册首页进入，支持多线程；首条消息自动生成会话标题；支持对话式图片编辑（`edit_image`），结果以 `AGENT_EDIT_RESULT` 消息 inline 返回；工程师任务卡：`components/EngineerTaskCard.kt`（五态渲染）+ `engineer/EngineerTaskReducer.kt`（SSE→状态机）+ `engineer/EngineerTaskSmokeSamples.kt`（/task 冒烟） |
 | **Chat JS** | `features/chat/js/` | `QuickJsEngine`, `QuickJsConverter`, `GalleryScriptHandlers`, `GalleryJs`, `ChartJs`, `CapabilityDispatchHandler` | QuickJS 沙箱引擎与 JSBridge 应用层（见下方 JS Engine 说明） |
 | **Camera** | `features/camera/` | `CameraScreen`, `CameraPreviewContent`, `CameraAgentCommandHandler` | 相机预览、美颜实时渲染、Agent 命令处理 |
 | **Common** | `features/common/chat/` | `AgentChatComponents`, `AgentMessage`, `AiChatScreen` | Chat UI 共享组件库（Camera/Gallery 复用） |
@@ -219,6 +219,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | 事实记忆 | 聊天 `remember_fact`/`recall_memory`/`forget_fact` / JS `capability.dispatch` → `MemoryCapability` → `MemoryRepository` → `memory_facts`；设置页「AI 记忆」（`MemoryFactsScreen`：人物关系区查看/编辑/删除 + 事实区查看/编辑/删除/清空） | LIKE 召回（v1 无 FTS）；遗忘按 factId 或唯一匹配（多候选不删）；JS 写操作走确认门控，chat 直调不弹窗 |
 | 工具执行指标（tool_call_log） | `CommandExecutor`（:shared）→ `CommandExecutionRecorder` → `RoomToolCallRecorder` → `polang_llm_log.db` | Capability 业务失败以 `Result.success(AgentAction.Error)` 返回（如引导性错误），记账按 action 语义：`AgentAction.Error` 记 `success=0` + errorCode/errorMessage，其余 action 记 `success=1`；只记纯指标（capability/method/耗时/结果），不含命令参数（隐私红线） |
 | 用户问题上报（report-issue） | Chat 顶部「上报问题」入口 → `IssueReportClient`（`data/remote/picme/`）→ `POST /v1/report-issue` | 用户问题描述经服务端脱敏后自动在 `littleseven/polang` 创建 GitHub issue；管理后台「问题诊断」页（`/admin/diagnosis`）承载上报列表 |
+| 工程师任务卡（TASK_CARD） | `sendClaudeMessage` 提交即插卡 → `EngineerTaskReducer`（SSE 事件→五态迁移 + 审批回填幂等，`features/chat/engineer/`）→ `EngineerTaskCard`（`features/chat/components/`，审批唯一入口；会话含卡时气泡 legacy 继续/交付按钮经 `suppressClaudeActions` 抑制） | 状态存 Room metadata `engineer_task`（REPLACE upsert + `engineerTaskPersistMutex` 串行化 + loadMessages 合并回填 live 优先）；交付 sid 消费端校验 12-hex pattern 回落 VM 级 claudeSid；`/task` DEBUG 冒烟入口注入五态样本（`EngineerTaskSmokeSamples`）；spec `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md` |
 
 ---
 
