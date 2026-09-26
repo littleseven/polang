@@ -3,6 +3,7 @@ package com.mamba.picme.domain.usertask
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.dao.UserTaskDao
 import com.mamba.picme.data.local.entity.UserTaskEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -72,6 +73,8 @@ class UserTaskRegistry(
                 )
             )
             if (!UserTaskMapping.isActive(status)) dao.trimHistory(HISTORY_KEEP)
+        } catch (exception: CancellationException) {
+            throw exception
         } catch (exception: Exception) {
             // spec §9-5：写库失败记 warning 降级不致命——不传播，避免打断适配器的体系订阅协程
             Logger.w(TAG, "upsertStatus failed, id=$id status=$status", exception)
