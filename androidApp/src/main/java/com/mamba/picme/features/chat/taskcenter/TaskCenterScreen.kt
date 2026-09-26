@@ -47,6 +47,7 @@ import com.mamba.picme.domain.usertask.UserTaskAction
 import com.mamba.picme.domain.usertask.UserTaskDestination
 import com.mamba.picme.domain.usertask.UserTaskMapping
 import com.mamba.picme.features.chat.ChatViewModel
+import com.mamba.picme.features.chat.components.EngineerTaskErrorBlock
 import com.mamba.picme.features.chat.components.EngineerTaskStatusChip
 import com.mamba.picme.features.chat.components.formatElapsed
 import com.mamba.picme.features.chat.components.taskMetaText
@@ -414,6 +415,13 @@ private fun TaskProgressSummary(task: EngineerTaskState) {
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            task.truncatedReason?.takeIf { reason -> reason.isNotBlank() }?.let { reason ->
+                Text(
+                    text = reason,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         EngineerTaskStatus.AWAITING_DELIVER -> {
             Spacer(Modifier.height(6.dp))
@@ -423,7 +431,8 @@ private fun TaskProgressSummary(task: EngineerTaskState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             task.errorSummary?.let { deliverError ->
-                Text(text = deliverError, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(6.dp))
+                EngineerTaskErrorBlock(deliverError, maxLines = 3)
             }
         }
         EngineerTaskStatus.COMPLETED -> {
@@ -437,17 +446,15 @@ private fun TaskProgressSummary(task: EngineerTaskState) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            task.errorSummary?.takeIf { task.resolution != null }?.let { errorText ->
+                Spacer(Modifier.height(6.dp))
+                EngineerTaskErrorBlock(errorText, maxLines = 3)
+            }
         }
         EngineerTaskStatus.FAILED -> {
             task.errorSummary?.let { errorText ->
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    text = errorText,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.error,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                EngineerTaskErrorBlock(errorText, maxLines = 3)
             }
         }
     }
