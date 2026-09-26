@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Badge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -99,15 +101,27 @@ fun TaskCenterScreen(
                 .padding(innerPadding),
         ) {
             TabRow(selectedTabIndex = selectedTab) {
+                // Tab 级活跃计数徽标：分解 Chat 顶栏角标总数（= 工程师活跃 + 后台活跃），
+                // 让用户一眼定位角标指的是哪些任务（2026-09-26 真机反馈）
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { userPickedTab = 0 },
-                    text = { Text(stringResource(R.string.task_center_tab_engineer)) },
+                    text = {
+                        TaskCenterTabLabel(
+                            title = stringResource(R.string.task_center_tab_engineer),
+                            activeCount = taskList?.active?.size ?: 0,
+                        )
+                    },
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { userPickedTab = 1 },
-                    text = { Text(stringResource(R.string.task_center_tab_background)) },
+                    text = {
+                        TaskCenterTabLabel(
+                            title = stringResource(R.string.task_center_tab_background),
+                            activeCount = activeUserTaskCount,
+                        )
+                    },
                 )
             }
             if (selectedTab == 0) {
@@ -253,6 +267,26 @@ private fun UserTaskTab(
                     onAction = { action -> onAction(task.id, action) },
                     onOpenDestination = { onOpenDestination(task.destination) },
                     modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Tab 标题 + 活跃计数徽标（计数 = 该 Tab「进行中」分区条数，与 Chat 顶栏角标同口径）。 */
+@Composable
+private fun TaskCenterTabLabel(title: String, activeCount: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title)
+        if (activeCount > 0) {
+            Spacer(Modifier.width(6.dp))
+            Badge {
+                Text(
+                    text = if (activeCount > 99) {
+                        stringResource(R.string.task_center_badge_overflow)
+                    } else {
+                        activeCount.toString()
+                    },
                 )
             }
         }

@@ -56,6 +56,14 @@ fun UserTaskCard(
         }
     )
     val cardCd = stringResource(R.string.cd_user_task_card, title)
+    // 活跃标记（2026-09-26 真机反馈）：活跃态（PENDING/RUNNING/PAUSED，与顶栏角标同口径）
+    // 图标与状态字用主色，FAILED 用错误色，终态灰——列表内一眼区分角标所指任务
+    val active = UserTaskMapping.isActive(task.status)
+    val statusColor = when {
+        task.status == UserTaskStatus.FAILED -> MaterialTheme.colorScheme.error
+        active -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Card(
         onClick = onOpenDestination,
         modifier = modifier
@@ -69,7 +77,7 @@ fun UserTaskCard(
                 Icon(
                     imageVector = kindIcon(task.kind),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = statusColor,
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -84,7 +92,7 @@ fun UserTaskCard(
                 Text(
                     text = stringResource(statusTextRes(task.status)),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = statusColor,
                 )
             }
             if (UserTaskMapping.isActive(task.status)) {
