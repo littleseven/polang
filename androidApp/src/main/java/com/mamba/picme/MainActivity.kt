@@ -47,6 +47,7 @@ import com.mamba.picme.data.preferences.UserPreferencesRepository
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.ThemeMode
 import com.mamba.picme.domain.organize.OrganizeCategory
+import com.mamba.picme.domain.usertask.UserTaskDestination
 import com.mamba.picme.features.common.avatar.AvatarCaptureController
 import com.mamba.picme.features.common.avatar.AvatarCaptureOrigin
 import com.mamba.picme.features.common.avatar.AvatarCaptureTarget
@@ -300,6 +301,8 @@ class MainActivity : ComponentActivity() {
                             ) {
                             // 主页面：相机/相册/聊天/人物 由 HorizontalPager 承载，横滑跟手切换
                             composable(Screen.Main.route) {
+                                val activeUserTaskCount by app.container.userTaskRegistry.activeCount
+                                    .collectAsStateWithLifecycle()
                                 MainPagerHost(
                                     pagerState = pagerState,
                                     chatViewModel = chatViewModel,
@@ -343,7 +346,8 @@ class MainActivity : ComponentActivity() {
                                     organizeTabRequest = organizeTabRequest,
                                     onOrganizeTabRequestConsumed = { organizeTabRequest = null },
                                     taskAnchor = chatTaskAnchor,
-                                    onTaskAnchorConsumed = { chatTaskAnchor = null }
+                                    onTaskAnchorConsumed = { chatTaskAnchor = null },
+                                    activeUserTaskCount = activeUserTaskCount
                                 )
                             }
                             // 相机：2026-08-26 起为 NavHost 全屏路由（原 Pager 页 0 席位由相册整理接替），
@@ -769,6 +773,18 @@ class MainActivity : ComponentActivity() {
                                             nonce = System.currentTimeMillis()
                                         )
                                         switchMainPage(MAIN_PAGE_CHAT)
+                                    },
+                                    onOpenUserTaskDestination = { destination ->
+                                        when (destination) {
+                                            UserTaskDestination.TAG_SCAN_CONTROL -> {
+                                                organizeTabRequest = OrganizeTab.SCAN
+                                                switchMainPage(MAIN_PAGE_DEDUP)
+                                            }
+                                            UserTaskDestination.MODEL_CENTER -> navController.navigate(
+                                                Screen.ModelCenter.createRoute(""),
+                                                navOptions { launchSingleTop = true }
+                                            )
+                                        }
                                     }
                                 )
                             }

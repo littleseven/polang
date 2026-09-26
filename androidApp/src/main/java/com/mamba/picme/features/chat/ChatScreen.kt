@@ -244,7 +244,9 @@ fun ChatScreen(
     /** 上报是否允许外层主页面 Pager 横滑（预览打开时禁用） */
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
-    isActivePage: Boolean = true
+    isActivePage: Boolean = true,
+    /** 后台用户任务活跃数（用户任务协议 §7）：与工程师活跃数合并进顶栏任务中心角标 */
+    activeUserTaskCount: Int = 0
 ) {
     val context = LocalContext.current
     val messages by viewModel.displayMessages.collectAsState()
@@ -584,7 +586,7 @@ fun ChatScreen(
                     onNewChat = { viewModel.newSession() },
                     onClearChat = { viewModel.clearChat() },
                     onReportIssue = { showReportIssueDialog = true },
-                    activeTaskCount = activeEngineerTaskCount,
+                    activeTaskCount = activeEngineerTaskCount + activeUserTaskCount,
                     onNavigateToTaskCenter = onNavigateToTaskCenter,
                     isActivePage = isActivePage
                 )

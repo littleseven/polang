@@ -84,6 +84,8 @@ fun MainPagerHost(
     /** 任务中心回锚请求（US-15）：切 chat 页 + 切会话 + 滚动锚定任务卡；null = 无请求。 */
     taskAnchor: ChatTaskAnchor? = null,
     onTaskAnchorConsumed: () -> Unit = {},
+    /** 后台用户任务活跃数（用户任务协议 §7）：透传 ChatScreen 合并顶栏角标 */
+    activeUserTaskCount: Int = 0,
 ) {
     var gallerySwipeEnabled by remember { mutableStateOf(true) }
     var chatSwipeEnabled by remember { mutableStateOf(true) }
@@ -203,7 +205,8 @@ fun MainPagerHost(
                 taskAnchor = taskAnchor,
                 onTaskAnchorConsumed = onTaskAnchorConsumed,
                 onHorizontalSwipeEnabledChange = { enabled -> chatSwipeEnabled = enabled },
-                isActivePage = pagerState.currentPage == MAIN_PAGE_CHAT
+                isActivePage = pagerState.currentPage == MAIN_PAGE_CHAT,
+                activeUserTaskCount = activeUserTaskCount
             )
 
             MAIN_PAGE_PEOPLE -> PersonScreen(
