@@ -49,12 +49,14 @@ class UserTaskRegistryTest {
         val performed = mutableListOf<Pair<String, UserTaskAction>>()
         var started = false
             private set
+        var failOnPerform = false
 
         override fun start() {
             started = true
         }
 
         override suspend fun perform(taskId: String, action: UserTaskAction) {
+            if (failOnPerform) error("FGS start rejected")
             performed += taskId to action
         }
     }
@@ -128,6 +130,21 @@ class UserTaskRegistryTest {
         val registry = registry(dao, testScheduler)
         registry.registerAdapter(FakeAdapter(UserTaskKind.TAG_SCAN))
         registry.perform("ghost", UserTaskAction.PAUSE) // 不抛异常即通过
+    }
+
+    @Test
+    fun `perform 适配器抛异常降级为日志不穿透且任务状态不受影响`() = runTest {
+        val dao = FakeDao()
+        val registry = registry(dao, testScheduler)
+        val tagAdapter = FakeAdapter(UserTaskKind.TAG_SCAN).apply { failOnPerform = true }
+        registry.registerAdapter(tagAdapter)
+        registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
+
+        registry.perform("tagscan:main", UserTaskAction.PAUSE) // 不抛异常即通过
+
+        val task = registry.tasks.value.single()
+        assertEquals(UserTaskStatus.RUNNING, task.status)
+        assertEquals(1, registry.activeCount.value)
     }
 
     @Test

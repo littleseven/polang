@@ -41,11 +41,23 @@ class UserTaskRegistry(
         adapter.start()
     }
 
-    /** 统一动词分发：按任务 kind 路由到对应适配器；未知任务/未知 kind 静默返回（spec §9-1）。 */
+    /**
+     * 统一动词分发：按任务 kind 路由到对应适配器；未知任务/未知 kind/无适配器静默返回（spec §9-1）。
+     * 全链路（Room 读 + 适配器分发，如 FGS 启动）异常兜底为日志降级，不穿透调用方——
+     * 组合根 CEH 语义延伸：viewModelScope 直 launch 调用安全（CancellationException 照常传播）。
+     */
+    @Suppress("TooGenericExceptionCaught") // spec §9-1 动作失败静默语义：动词链路全包（CancellationException 已先行 rethrow）
     suspend fun perform(taskId: String, action: UserTaskAction) {
-        val row = dao.getById(taskId) ?: return
-        val kind = runCatching { UserTaskKind.valueOf(row.kind) }.getOrNull() ?: return
-        adapters[kind]?.perform(taskId, action)
+        try {
+            val row = dao.getById(taskId) ?: return
+            val kind = runCatching { UserTaskKind.valueOf(row.kind) }.getOrNull() ?: return
+            adapters[kind]?.perform(taskId, action)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            // spec §9-1：动作失败不穿透调用方——记日志降级，状态以体系流为准
+            Logger.w(TAG, "perform failed, id=$taskId action=$action", exception)
+        }
     }
 
     /** 状态迁移（落 Room；终态顺带修剪历史并清除残留进度快照）。errorCode/errorDetail 仅在异常语义时传。 */
