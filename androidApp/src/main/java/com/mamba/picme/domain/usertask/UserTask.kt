@@ -24,7 +24,12 @@ data class UserTask(
 enum class UserTaskKind { TAG_SCAN, MODEL_DOWNLOAD }
 enum class UserTaskStatus { PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED }
 enum class UserTaskAction { PAUSE, RESUME, CANCEL, RETRY }
-enum class UserTaskErrorCode { PROCESS_TERMINATED, PARTIAL_FAILURES }
+enum class UserTaskErrorCode {
+    PROCESS_TERMINATED,
+    PARTIAL_FAILURES,
+    /** 模型已下架或下载源不可用 */
+    MODEL_UNAVAILABLE,
+}
 enum class UserTaskDestination { TAG_SCAN_CONTROL, MODEL_CENTER }
 
 /** 高频进度快照（仅内存，不落库——spec §5 混合注册表）。 */

@@ -112,6 +112,7 @@ import com.mamba.picme.domain.usertask.ModelDownloadControl
 import com.mamba.picme.domain.usertask.ModelDownloadTaskAdapter
 import com.mamba.picme.domain.usertask.TagScanControl
 import com.mamba.picme.domain.usertask.TagScanTaskAdapter
+import com.mamba.picme.domain.usertask.UserTaskErrorCode
 import com.mamba.picme.domain.usertask.UserTaskKind
 import com.mamba.picme.domain.usertask.UserTaskRegistry
 import com.mamba.picme.domain.usertask.UserTaskStatus
@@ -778,7 +779,9 @@ class AppContainerImpl(
                     kind = UserTaskKind.MODEL_DOWNLOAD,
                     displayName = modelId,
                     status = UserTaskStatus.FAILED,
-                    errorDetail = "模型已下架或下载源不可用",
+                    // errorDetail 放机器可读标识（UI 按 errorCode 取五语资源渲染，不原文展示）
+                    errorCode = UserTaskErrorCode.MODEL_UNAVAILABLE,
+                    errorDetail = modelId,
                 )
             } else {
                 enqueue(modelId, config)
