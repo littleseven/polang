@@ -1618,6 +1618,8 @@
     <string name="task_center_tab_background">En segundo plano</string>
     <string name="task_center_empty_user_tasks">Sin tareas en segundo plano</string>
     <string name="user_task_title_tag_scan">Escaneo de etiquetas</string>
+    <string name="user_task_title_model_download">Descarga de modelo</string>
+    <string name="cd_user_task_card">Tarjeta de tarea: %1$s</string>
     <string name="user_task_status_pending">Pendiente</string>
     <string name="user_task_status_running">En curso</string>
     <string name="user_task_status_paused">En pausa</string>

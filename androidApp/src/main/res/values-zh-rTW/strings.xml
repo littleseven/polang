@@ -1658,6 +1658,8 @@
     <string name="task_center_tab_background">後台任務</string>
     <string name="task_center_empty_user_tasks">暫無後台任務</string>
     <string name="user_task_title_tag_scan">相簿標籤掃描</string>
+    <string name="user_task_title_model_download">模型下載</string>
+    <string name="cd_user_task_card">%1$s任務卡</string>
     <string name="user_task_status_pending">等待中</string>
     <string name="user_task_status_running">進行中</string>
     <string name="user_task_status_paused">已暫停</string>

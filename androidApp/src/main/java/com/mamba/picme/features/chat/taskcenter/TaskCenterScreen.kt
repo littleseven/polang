@@ -76,11 +76,14 @@ fun TaskCenterScreen(
     val actionInFlight by chatViewModel.engineerActionInFlight.collectAsStateWithLifecycle()
     val userTasks by taskCenterViewModel.userTasks.collectAsStateWithLifecycle()
     val activeUserTaskCount by taskCenterViewModel.activeUserTaskCount.collectAsStateWithLifecycle()
-    // 默认 Tab：工程师有活跃 → 工程师；否则后台有活跃 → 后台；均无 → 工程师（现状兼容，spec §7）
+    // 默认 Tab：工程师有活跃 → 工程师；否则后台有活跃 → 后台；均无 → 工程师（现状兼容，spec §7）。
+    // 手选态与默认落位解耦：userPickedTab=null 时跟随 defaultTab（taskList 首查回流后仍可纠正落位），
+    // 用户点选后固定手选（rememberSaveable 跨重组/配置变更保留）
     val defaultTab = remember(taskList, activeUserTaskCount) {
         if ((taskList?.active?.size ?: 0) > 0) 0 else if (activeUserTaskCount > 0) 1 else 0
     }
-    var selectedTab by rememberSaveable { mutableStateOf(defaultTab) }
+    var userPickedTab by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedTab = userPickedTab ?: defaultTab
 
     Scaffold(
         topBar = {
@@ -98,12 +101,12 @@ fun TaskCenterScreen(
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    onClick = { userPickedTab = 0 },
                     text = { Text(stringResource(R.string.task_center_tab_engineer)) },
                 )
                 Tab(
                     selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                    onClick = { userPickedTab = 1 },
                     text = { Text(stringResource(R.string.task_center_tab_background)) },
                 )
             }

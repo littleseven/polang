@@ -1667,6 +1667,8 @@
     <string name="task_center_tab_background">Background</string>
     <string name="task_center_empty_user_tasks">No background tasks</string>
     <string name="user_task_title_tag_scan">Gallery tag scan</string>
+    <string name="user_task_title_model_download">Model download</string>
+    <string name="cd_user_task_card">%1$s task card</string>
     <string name="user_task_status_pending">Pending</string>
     <string name="user_task_status_running">Running</string>
     <string name="user_task_status_paused">Paused</string>

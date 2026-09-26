@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
@@ -40,21 +42,25 @@ fun UserTaskCard(
     onOpenDestination: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val title = task.displayName ?: stringResource(
+        when (task.kind) {
+            UserTaskKind.TAG_SCAN -> R.string.user_task_title_tag_scan
+            // 不会走到：下载必有 displayName（modelId）；兜底语义独立成串，不复用扫描标题
+            UserTaskKind.MODEL_DOWNLOAD -> R.string.user_task_title_model_download
+        }
+    )
+    val cardCd = stringResource(R.string.cd_user_task_card, title)
     Card(
         onClick = onOpenDestination,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = cardCd },
         shape = RoundedCornerShape(12.dp),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = task.displayName ?: stringResource(
-                        when (task.kind) {
-                            UserTaskKind.TAG_SCAN -> R.string.user_task_title_tag_scan
-                            // 不会走到：下载必有 displayName（modelId）
-                            UserTaskKind.MODEL_DOWNLOAD -> R.string.user_task_title_tag_scan
-                        }
-                    ),
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
