@@ -32,14 +32,23 @@
   body {
     font-family: "Noto Sans SC", "PingFang SC", sans-serif;
     color: var(--txt);
-    padding: 34px 20px 40px;
+    padding: 30px 16px 36px;
+    background: #E9EEF5;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 画板外框：网格收进框内，body 作桌面 */
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    background-color: #F7F9FC;
     background-image:
       linear-gradient(var(--grid) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid) 1px, transparent 1px);
     background-size: 30px 30px;
-    -webkit-font-smoothing: antialiased;
+    border: 1.5px solid #C9D4E4;
+    border-radius: 24px;
+    padding: 30px 28px 26px;
+    box-shadow: 0 12px 32px rgba(18,38,63,.10);
   }
-  .wrap { max-width: 1240px; margin: 0 auto; }
   .mono { font-family: "JetBrains Mono", monospace; }
 
   /* ── 标题区 ── */
