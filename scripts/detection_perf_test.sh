@@ -77,8 +77,11 @@ test_detection_performance() {
         # 记录开始时间
         local start_time=$(date +%s%N)
         
-        # 触发拍照（通过 AgentTestBroadcastReceiver JSON 命令）
-        adb shell "am broadcast -n com.picme/.testing.agent.bridge.AgentTestBroadcastReceiver -a com.picme.AGENT_TEST --es json '{\"method\":\"capture\",\"params\":{}}'" > /dev/null 2>&1
+        # 触发拍照（ui-driver 点击快门；替代已退役的 AgentTestBroadcastReceiver 广播，ADR-011）
+        # 前提：debug 包 + 无障碍服务已启用 + 相机页在前台（快门 contentDescription 本地化，尝试 EN/zh）
+        python3 "$(dirname "$0")/ui_driver.py" click --content-description "Shutter" > /dev/null 2>&1 || \
+        python3 "$(dirname "$0")/ui_driver.py" click --content-description "快门" > /dev/null 2>&1 || \
+            echo -e "  ${YELLOW}⚠️ ui-driver 快门点击失败（确认相机页前台 / 无障碍服务已启用 / debug 构建）${NC}"
         
         # 等待检测完成
         sleep 2

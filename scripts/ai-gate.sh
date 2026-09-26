@@ -124,7 +124,7 @@ if [ "$DEVICE_CHECK" = true ]; then
             PASS_COUNT=$((PASS_COUNT + 1))
         else
             # 签名冲突时尝试卸载重装
-            adb uninstall com.picme > /dev/null 2>&1 || true
+            adb uninstall com.mamba.picme > /dev/null 2>&1 || true
             if adb install "$apk" > "$OUTPUT_DIR/install.log" 2>&1; then
                 echo -e "${GREEN}✅ PASS${NC}: APK 卸载重装成功"
                 PASS_COUNT=$((PASS_COUNT + 1))
@@ -136,7 +136,7 @@ if [ "$DEVICE_CHECK" = true ]; then
 
         # 启动应用并截屏
         echo "→ 启动应用并截屏..."
-        adb shell am start -n com.picme/.MainActivity > /dev/null 2>&1
+        adb shell am start -n com.mamba.picme/.MainActivity > /dev/null 2>&1
         sleep 3
         # exec-out 直传电脑，设备零残留，不污染相册/MediaStore
         adb exec-out screencap -p > "$OUTPUT_DIR/screen.png"
