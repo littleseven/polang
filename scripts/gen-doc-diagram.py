@@ -216,17 +216,22 @@ def main():
     if "--png" not in sys.argv:
         return
     # 高度探测 → 精确窗口截图 @2x
-    dom = subprocess.run([CHROME, "--headless=new", "--disable-gpu",
-                          "--virtual-time-budget=9000", "--dump-dom", "file://" + html_path],
-                         capture_output=True, text=True).stdout
+    def chrome(args):
+        # timeout 兜底：Chrome 拉取 Google Fonts 偶发卡死虚拟时钟，25s 上限后降级
+        try:
+            return subprocess.run([CHROME] + args, capture_output=True, text=True, timeout=25).stdout
+        except subprocess.TimeoutExpired:
+            return ""
+    dom = chrome(["--headless=new", "--disable-gpu",
+                  "--virtual-time-budget=9000", "--dump-dom", "file://" + html_path])
     import re
     m = re.search(r"<title>H(\d+)", dom)
     height = int(m.group(1)) + 20 if m else 2400
     png_path = os.path.join(OUT_DIR, name + ".png")
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                    "--force-device-scale-factor=2", "--virtual-time-budget=9000",
-                    f"--window-size=1100,{height}", "--screenshot=" + png_path,
-                    "file://" + html_path], capture_output=True)
+    chrome(["--headless=new", "--disable-gpu", "--hide-scrollbars",
+            "--force-device-scale-factor=2", "--virtual-time-budget=9000",
+            f"--window-size=1100,{height}", "--screenshot=" + png_path,
+            "file://" + html_path])
     print(f"PNG : docs/assets/diagrams/{name}.png (window 1100x{height} @2x)")
 
 
