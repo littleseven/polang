@@ -492,6 +492,9 @@ fun ChatScreen(
     }
 
     // 任务中心回锚（US-15）：先切到任务所属会话（会话加载是异步的，滚动由下一 effect 等消息就位）
+    // 会话切换时清残留 hold：否则切到消息更少的会话后条数恒超不过 hold.second，
+    // 自动滚底被持续抑制，只能靠用户拖拽自愈
+    LaunchedEffect(currentSessionId) { anchorHold = null }
     LaunchedEffect(taskAnchor) {
         taskAnchor?.let { anchor ->
             pendingTaskAnchor = anchor
