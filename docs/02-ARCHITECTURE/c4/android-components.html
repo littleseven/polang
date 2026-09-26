@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoLang Android 组件视图 · C4 L3</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #F4F6F9;
+    --grid: #E8ECF1;
+    --card: #FFFFFF;
+    --tint: #EEF3FB;
+    --tint2: #F0F3F8;
+    --navy: #0D2240;
+    --blue: #2563EB;
+    --blue-deep: #3B6FD4;
+    --chip-bg: #DCE9FB;
+    --green: #2FA05A;
+    --green-bg: #E4F5EA;
+    --orange: #D97E2E;
+    --orange-bg: #FDEBD9;
+    --rose: #D9482B;
+    --rose-bg: #FCEAE5;
+    --txt: #12263F;
+    --sub: #5A6B80;
+    --line: #D8E0EC;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: #E9EEF5; }
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+    color: var(--txt);
+    padding: 30px 16px 36px;
+    background: #E9EEF5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    background-color: #F7F9FC;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 30px 30px;
+    border: 1.5px solid #C9D4E4;
+    border-radius: 24px;
+    padding: 30px 28px 26px;
+    box-shadow: 0 12px 32px rgba(18,38,63,.10);
+  }
+  .mono { font-family: "JetBrains Mono", monospace; }
+
+  .hero { text-align: center; margin-bottom: 18px; }
+  .hero h1 { font-size: clamp(30px, 4.6vw, 46px); font-weight: 900; letter-spacing: .02em; }
+  .hero h1 .dot { color: var(--blue); }
+  .banner {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: var(--navy); color: #fff;
+    border-radius: 999px; padding: 9px 20px 9px 15px;
+    margin-top: 14px; box-shadow: 0 6px 18px rgba(13,34,64,.22);
+  }
+  .banner .bn-t { font-size: 16.5px; font-weight: 700; letter-spacing: .06em; }
+  .pill-green {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: #34C759; border-radius: 999px; padding: 3px 12px;
+  }
+  .core {
+    margin: 16px auto 0; max-width: 860px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(18,38,63,.06);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+    padding: 12px 20px; justify-content: center;
+  }
+  .core .ic { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--sub); }
+  .core .ic b { color: var(--txt); font-weight: 700; }
+
+  .main { display: grid; grid-template-columns: 1fr 292px; gap: 16px; align-items: start; margin-top: 16px; }
+  @media (max-width: 940px) { .main { grid-template-columns: 1fr; } }
+
+  .band {
+    position: relative;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 18px 15px 56px;
+    box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .band.tint { background: var(--tint); }
+  .band.tint2 { background: var(--tint2); }
+  .band .num {
+    position: absolute; left: 14px; top: 14px;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--blue); color: #fff; font-weight: 900; font-size: 15px;
+    display: grid; place-items: center; box-shadow: 0 3px 8px rgba(37,99,235,.35);
+  }
+  .band .bh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .band .bt { font-size: 19px; font-weight: 900; }
+  .band .bs { font-size: 12px; color: var(--blue-deep); font-weight: 500; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+  @media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+  .split .half { border: 1px dashed var(--line); border-radius: 12px; padding: 9px 11px 10px; background: rgba(255,255,255,.6); }
+  .split .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .split .ph .pn { font-size: 14px; font-weight: 900; }
+  .split .ph .pt { font-size: 10.5px; color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 700; letter-spacing: .03em; }
+  .split .ph .pt.ad { background: var(--green); }
+  .split .ph .pt.ios { background: var(--navy); }
+  .share-strip { border-top: 1px dashed var(--line); padding-top: 9px; }
+  .share-strip .ss-t { font-size: 12px; color: var(--green); font-weight: 900; margin-bottom: 7px; display: inline-flex; align-items: center; gap: 5px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 500; color: var(--blue-deep);
+    background: var(--chip-bg); border: 1.5px solid rgba(37,99,235,.35);
+    border-radius: 999px; padding: 5px 13px; white-space: nowrap;
+  }
+  .chip.green { background: var(--green-bg); border-color: #7BC894; color: var(--green); }
+  .chip.orange { background: var(--orange-bg); border-color: #E8B27C; color: var(--orange); }
+  .chip.rose { background: var(--rose-bg); border-color: rgba(217,72,43,.45); color: var(--rose); border-style: dashed; }
+  .chip.ghost { background: transparent; border-style: dashed; border-color: var(--line); color: var(--sub); }
+  .chip.hero {
+    background: var(--navy); color: #fff; border-color: var(--navy);
+    font-weight: 700; box-shadow: 0 3px 10px rgba(13,34,64,.28);
+  }
+  .chip small { font-size: 11px; opacity: .75; font-weight: 400; }
+  .chip svg { flex: none; }
+
+  .varrow { display: grid; place-items: center; padding: 4px 0; }
+
+  .flow-note { margin-top: 9px; font-size: 12px; color: var(--sub); display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .flow-note .fn { display: inline-flex; align-items: center; gap: 5px; }
+
+  .side {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 14px 8px; box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .side h3 { font-size: 16px; font-weight: 900; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .mini {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 9px 6px 10px; border-top: 1px dashed var(--line);
+  }
+  .mini:first-of-type { border-top: 0; }
+  .mini .mic {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--tint); display: grid; place-items: center;
+  }
+  .mini .mt { font-size: 13.5px; font-weight: 700; }
+  .mini .md { font-size: 11.5px; color: var(--sub); line-height: 1.6; margin-top: 2px; }
+
+  .col { display: grid; gap: 16px; align-content: start; }
+
+  .fstep { display: flex; gap: 9px; padding: 8px 2px; align-items: flex-start; }
+  .fstep + .fstep { border-top: 1px dashed var(--line); }
+  .fstep .fn {
+    width: 21px; height: 21px; border-radius: 50%; flex: none; margin-top: 1px;
+    background: var(--tint); color: var(--blue); font-size: 11px; font-weight: 900;
+    display: grid; place-items: center; border: 1.5px solid rgba(37,99,235,.4);
+  }
+  .fstep .fd { font-size: 12.5px; line-height: 1.55; }
+  .fstep .fd .fs { font-size: 11px; color: var(--sub); display: block; margin-top: 1px; }
+  .tag-ok { color: var(--green); font-weight: 700; font-size: 11px; }
+  .tag-no { color: var(--rose); font-weight: 700; font-size: 11px; }
+
+  .mods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mods .m {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+    color: var(--blue-deep); background: var(--tint);
+    border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; text-align: center;
+  }
+  .refs { margin-top: 10px; font-size: 10.5px; color: var(--sub); line-height: 1.8; }
+  .refs code { font-family: "JetBrains Mono", monospace; background: rgba(18,38,63,.05); padding: 0 4px; border-radius: 4px; }
+
+  .bottom { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 940px) { .bottom { grid-template-columns: 1fr; } }
+  .bcard {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 18px 16px; box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .bcard h3 { font-size: 16px; font-weight: 900; margin-bottom: 12px; }
+  .shift { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 8px 0 4px; }
+  .shift .sbox {
+    border: 1.5px solid var(--line); border-radius: 12px; background: var(--tint2);
+    padding: 8px 14px; font-size: 13px; color: var(--sub); text-align: center;
+  }
+  .shift .sbox.to { border-color: rgba(37,99,235,.45); background: var(--chip-bg); color: var(--txt); font-weight: 700; }
+  .tech { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }
+  .tech .t {
+    font-size: 12px; font-weight: 500; color: var(--blue-deep);
+    background: var(--tint); border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 4px; text-align: center;
+  }
+  .tech .t.g { background: var(--green-bg); color: var(--green); }
+  .tech .t.o { background: var(--orange-bg); color: var(--orange); }
+
+  .foot-banner {
+    margin-top: 18px; background: var(--navy); color: #fff;
+    border-radius: 16px; padding: 16px 22px; text-align: center;
+    box-shadow: 0 8px 22px rgba(13,34,64,.25);
+  }
+  .foot-banner .fb-t { font-size: 15px; font-weight: 900; letter-spacing: .12em; margin-bottom: 6px; color: #9FC3F8; }
+  .foot-banner .fb-d { font-size: 15.5px; line-height: 1.75; font-weight: 500; }
+  .foot-banner .fb-d b { color: #7EE2A8; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>PoLang Android 组件视图<span class="dot">.</span></h1>
+    <div class="banner">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7EB3F8" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M9 9h6v6H9z"/></svg>
+      <span class="bn-t">C4 Level 3 · :androidApp 内部分层</span>
+      <span class="pill-green">Components</span>
+    </div>
+    <div class="core">
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg><b>14</b> features</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><b>Clean</b> Architecture 三层</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg><b>媒体 100%</b> 端内</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div>
+
+      <!-- ① 功能界面层 -->
+      <section class="band">
+        <span class="num">1</span>
+        <div class="bh"><span class="bt">功能界面层</span><span class="bs mono">features/ · Compose UI + ViewModel</span></div>
+        <div class="chips">
+          <span class="chip green">gallery ★ <small>主入口</small></span>
+          <span class="chip green">chat ★ <small>核心助手</small></span>
+          <span class="chip">imageedit <small>对话式编辑</small></span>
+          <span class="chip">search · person · memory · organize</span>
+          <span class="chip">settings · idphoto · tag</span>
+          <span class="chip ghost">camera <small>❄️ 冻结 · 引擎实时试验台</small></span>
+        </div>
+        <div class="flow-note">
+          <span class="fn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5A6B80" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>相机页带 Agent 交互面板（自然语言控参）；主页面五页 Pager + 聊天沉浸页</span>
+        </div>
+      </section>
+
+      <div class="varrow"><svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg></div>
+
+      <!-- ② 领域与数据层 -->
+      <section class="band tint">
+        <span class="num">2</span>
+        <div class="bh"><span class="bt">领域与数据层</span><span class="bs">纯 Kotlin · 无 Android 依赖（domain）</span></div>
+        <div class="split">
+          <div class="half">
+            <div class="ph"><span class="pn">domain/</span><span class="pt ad">usecase + repository</span></div>
+            <div class="chips">
+              <span class="chip">AiAgentUseCase <small>Facade → :shared</small></span>
+              <span class="chip">编辑/搜索/打标用例</span>
+            </div>
+          </div>
+          <div class="half">
+            <div class="ph"><span class="pn">data/</span><span class="pt" style="background:var(--blue-deep)">实现 + 存储</span></div>
+            <div class="chips">
+              <span class="chip">Repository 实现</span>
+              <span class="chip">Room DB · DataStore</span>
+              <span class="chip">LlmModelDownloadManager <small>模型下载</small></span>
+            </div>
+          </div>
+        </div>
+        <div class="share-strip">
+          <span class="ss-t"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>组合根</span>
+          <div class="chips">
+            <span class="chip hero">AndroidAgentComposition <small>平台实现唯一直构点</small></span>
+            <span class="chip">注入 shared 依赖 → Agent 编排核心</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="varrow"><svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg></div>
+
+      <!-- ③ Agent 编排核心 -->
+      <section class="band tint2">
+        <span class="num">3</span>
+        <div class="bh"><span class="bt">Agent 编排核心</span><span class="bs mono">:shared commonMain · com.mamba.picme.agent.core</span><span class="chip green" style="font-size:11.5px;padding:2px 10px">引擎无关 · 双端单源</span></div>
+        <div class="chips" style="margin-bottom:9px">
+          <span class="chip hero">AgentOrchestrator</span>
+          <span class="chip">processCameraInput <small>→ KoogReActAgent + CameraToolService</small></span>
+          <span class="chip">streamChat <small>→ KoogChatAgent + ChatToolService</small></span>
+          <span class="chip">CapabilityRegistry <small>dispatch · 14 Capabilities</small></span>
+        </div>
+        <div class="chips">
+          <span class="chip">PrivacyGuard <small>PUBLIC/SENSITIVE/RESTRICTED</small></span>
+          <span class="chip">MemoryManager <small>多轮记忆</small></span>
+          <span class="chip">SceneManager</span>
+          <span class="chip ghost">端侧文本 LLM 已移除 · 2026-08</span>
+        </div>
+      </section>
+
+      <div class="varrow">
+        <svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3" stroke-dasharray="6 5"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg>
+        <div style="font-size:11.5px;color:var(--blue-deep);margin-top:3px">OpenAI 兼容 tool_calls（ADR-005）· 仅文本过线（ADR-008）</div>
+      </div>
+
+      <!-- ④ 端侧管线与原生引擎 -->
+      <section class="band">
+        <span class="num">4</span>
+        <div class="bh"><span class="bt">端侧管线与原生引擎</span><span class="bs">媒体处理 100% 端侧的执行者</span></div>
+        <div class="chips" style="margin-bottom:9px">
+          <span class="chip orange">TAG 3-Pass <small>人脸嵌入 → k-NN 聚类 → VLM 打标</small></span>
+          <span class="chip orange">Qwen3-VL-2B <small>OpenCL 超时自动降级 CPU</small></span>
+          <span class="chip orange">Florence-2 <small>默认打标器 · CPU</small></span>
+        </div>
+        <div class="chips">
+          <span class="chip">beauty-engine <small>OpenGL ES + EGL 自研 · 零拷贝预览</small></span>
+          <span class="chip">mnn-core <small>推理 JNI</small></span>
+          <span class="chip">agent-native <small>VLM JNI 桥 libagent_native.so</small></span>
+          <span class="chip">sentencepiece <small>tokenizer</small></span>
+        </div>
+        <div class="flow-note">
+          <span class="fn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5A6B80" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>CameraX → SurfaceTexture → GL Shader → SurfaceView；预览禁 glReadPixels，拍照走同一 shader 的 FBO 离屏</span>
+        </div>
+      </section>
+
+      <!-- ⑤ 本地数据 -->
+      <section class="band tint2" style="margin-top:14px">
+        <span class="num">5</span>
+        <div class="bh"><span class="bt">本地数据</span><span class="bs">相册智能的全部记忆都在本机</span></div>
+        <div class="chips">
+          <span class="chip">Room <small>标签/人脸/人物关系/记忆</small></span>
+          <span class="chip">DataStore <small>偏好 · 语言</small></span>
+          <span class="chip">MediaStore <small>媒体索引</small></span>
+          <span class="chip rose">⛔ 永不上传</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+    <aside class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M5 8l7-5 7 5M7 10v8M17 10v8"/></svg>依赖方向铁律</h3>
+      <div class="mini">
+        <span class="mic"><b style="color:var(--blue);font-size:13px">→</b></span>
+        <div><div class="mt">features → domain → data</div><div class="md">UI 不直接碰数据实现；domain 纯 Kotlin 零 Android 依赖</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><b style="color:var(--blue);font-size:13px">→</b></span>
+        <div><div class="mt">App 只依赖 beauty-api</div><div class="md">render/ internal/ 禁止直接引用；GPU/EGL 全封装在 beauty-engine:render</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><b style="color:var(--blue);font-size:13px">→</b></span>
+        <div><div class="mt">:androidApp → :shared → Koog</div><div class="md">Agent 编排唯一通路；commonMain 纯度编译期门禁</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#D9482B" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/><path d="M9 12l6 6M15 12l-6 6"/></svg></span>
+        <div><div class="mt">两条红线</div><div class="md">媒体不出端（ADR-008）；交互反馈 &lt;100ms · 快门 &lt;50ms</div></div>
+      </div>
+    </aside>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.4" fill="#2563EB"/><circle cx="4" cy="12" r="1.4" fill="#2563EB"/><circle cx="4" cy="18" r="1.4" fill="#2563EB"/></svg>指令流 · 「磨皮 50」</h3>
+      <div class="fstep"><span class="fn">1</span><div class="fd"><b>相机页 Agent 面板输入</b><span class="fs">或 chat 内自然语言</span></div></div>
+      <div class="fstep"><span class="fn">2</span><div class="fd"><b>processCameraInput → KoogReActAgent</b><span class="fs">远程 LLM 解析意图（tool_calls）</span></div></div>
+      <div class="fstep"><span class="fn">3</span><div class="fd"><b>构造 AgentCommand</b><span class="fs">命令 → CapabilityRegistry 路由</span></div></div>
+      <div class="fstep"><span class="fn">4</span><div class="fd"><b>BeautyCapability 参数落地</b><span class="fs">FrameSync 帧同步美妆 · 零拷贝管线实时生效</span></div></div>
+    </section>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M4 4h7l9 16h-7L4 4zM13 4h7"/></svg>Gradle 模块清单</h3>
+      <div class="mods">
+        <span class="m">:androidApp</span><span class="m">:shared</span>
+        <span class="m">beauty-api</span><span class="m">beauty-engine</span>
+        <span class="m">mnn-core</span><span class="m">agent-native</span>
+        <span class="m" style="grid-column:1/-1">sentencepiece</span>
+      </div>
+      <div class="refs">
+        <code>MODULE_ARCHITECTURE.md</code><br>
+        <code>androidApp/AGENTS.md</code> · <code>shared/AGENTS.md</code>
+      </div>
+    </section>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <section class="bcard">
+      <h3>分层唯一入口</h3>
+      <div class="shift">
+        <span class="sbox">UI 直接调用能力<br><small style="font-size:11px">散射 · 难测</small></span>
+        <svg width="46" height="20" viewBox="0 0 46 20"><line x1="2" y1="10" x2="36" y2="10" stroke="#2563EB" stroke-width="2"/><path d="M34 4 L44 10 L34 16 Z" fill="#2563EB"/></svg>
+        <span class="sbox to">AiAgentUseCase Facade<br><small style="font-size:11px">单向依赖 · 组合根唯一直构</small></span>
+      </div>
+    </section>
+    <section class="bcard">
+      <h3>组件级技术栈</h3>
+      <div class="tech">
+        <span class="t">Compose</span><span class="t">ViewModel</span><span class="t">Room</span><span class="t">DataStore</span>
+        <span class="t o">OpenGL ES</span><span class="t o">EGL</span><span class="t o">MNN</span><span class="t o">QuickJS</span>
+        <span class="t o">Qwen3-VL</span><span class="t o">Florence-2</span><span class="t o">MediaPipe</span>
+        <span class="t g">Koog</span><span class="t g">tool_calls</span><span class="t g">KMP</span>
+      </div>
+    </section>
+  </div>
+
+  <div class="foot-banner">
+    <div class="fb-t">一 句 话 总 结</div>
+    <div class="fb-d">UI 只管展示与意图，<b>domain 定规则</b>、<b>shared 管编排</b>、<b>引擎干活不出端</b>——四层单向依赖，红线焊在数据层。</div>
+  </div>
+</div>
+</body>
+</html>

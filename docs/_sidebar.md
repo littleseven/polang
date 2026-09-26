@@ -5,10 +5,12 @@
   - [功能交互](01-PRODUCT/FEATURES.md)
   - [使用前提与设置](01-PRODUCT/SETUP_GUIDE.md)
   - [非功能性需求](01-PRODUCT/NFR_SPEC.md)
+  - [iOS 文档前门](01-PRODUCT/IOS_DOC_INDEX.md)
 
 - **架构**
   - [Agent 架构](02-ARCHITECTURE/AGENT_ARCHITECTURE.md)
   - [模块架构](02-ARCHITECTURE/MODULE_ARCHITECTURE.md)
+  - [C4 系统模型三视图](02-ARCHITECTURE/c4/polang-system.summary.md)
   - **架构决策 (ADR)**（[索引](02-ARCHITECTURE/ADR/README.md)）
     - [ADR-001 美颜引擎架构](02-ARCHITECTURE/ADR/ADR-001-beauty-engine-architecture.md)
     - [ADR-002 OpenGL 离屏统一管线](02-ARCHITECTURE/ADR/ADR-002-opengl-offscreen-unified-pipeline.md)
@@ -19,6 +21,8 @@
     - [ADR-011 退役非 ui-driver 测试](02-ARCHITECTURE/ADR/ADR-011-retire-non-ui-driver-tests.md)
     - [ADR-012 统一会话记忆](02-ARCHITECTURE/ADR/ADR-012-unify-conversation-memory.md)
     - [ADR-013 KMP 架构契约](02-ARCHITECTURE/ADR/ADR-013-kmp-architecture-contract.md)
+    - [ADR-014 Chat 富内容混合渲染](02-ARCHITECTURE/ADR/ADR-014-chat-rich-rendering-hybrid.md)
+    - [ADR-015 意图路由契约](02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md)
 
 - **技术规格**
   - [大美丽引擎](03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md)
@@ -36,6 +40,9 @@
   - [Design Token SSOT](03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md)
   - [双端 UI 对齐方法论](03-TECHNICAL-SPECS/IOS_ANDROID_UI_PARITY.md)
   - [IM 远程控制](03-TECHNICAL-SPECS/IM_REMOTE_CONTROL_TECH_SPEC.md)
+  - [AI 修图能力缺口](03-TECHNICAL-SPECS/AI_IMAGE_EDITING_CAPABILITY_GAP.md)
+  - [智能优化 VLM 设计](03-TECHNICAL-SPECS/SMART_OPTIMIZE_VLM_DESIGN.md)
+  - [后端实现计划](03-TECHNICAL-SPECS/SERVER_IMPLEMENTATION_PLAN.md)
 
 - **Agent 能力**
   - [能力注册表](04-AGENT-CAPABILITIES/CAPABILITY_REGISTRY.md)
@@ -44,6 +51,7 @@
 - **开发**
   - [开发流程](05-DEVELOPMENT/DEVELOPMENT.md)
   - [本地环境](05-DEVELOPMENT/LOCAL_ENVIRONMENT.md)
+  - [Play 发布自动化](05-DEVELOPMENT/GOOGLE_PLAY_RELEASE_AUTOMATION.md)
 
 - **QA**
   - [性能基线报告](06-QA/PERFORMANCE_BASELINE_REPORT.md)

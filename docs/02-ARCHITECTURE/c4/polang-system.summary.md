@@ -2,7 +2,23 @@
 
 > 受众：开发 / 架构评审。范围：polang Monorepo 当前状态（2026-09-19）。
 > 生成路径：`explore` → `system-modeler`（场景）+ `c4model`（Structurizr DSL 载体）。
-> 阅读顺序：本说明 → `polang-system.structurizr.dsl` 三个视图 → `polang-system.evidence.md` 查证。
+> 阅读顺序：本说明 → 下方三视图信息图 → `polang-system.structurizr.dsl` → `polang-system.evidence.md` 查证。
+
+## 三视图（信息图风格，2026-09-27 重绘）
+
+> 渲染源为本目录 `system-context.html` / `containers.html` / `android-components.html`（正典模板 `../polang-architecture-infographic.html` 换内容不换骨架），Chrome headless 2x 导出至 `exported/*.png`。
+
+### L1 系统上下文
+
+![系统上下文](02-ARCHITECTURE/c4/exported/system-context.png)
+
+### L2 容器视图
+
+![容器视图](02-ARCHITECTURE/c4/exported/containers.png)
+
+### L3 Android 组件视图
+
+![Android 组件视图](02-ARCHITECTURE/c4/exported/android-components.png)
 
 ## 系统是什么
 
@@ -41,5 +57,7 @@ PoLang（破浪相册）是一个 Monorepo，包含三个可部署单元：
 
 ## 如何查看 / 维护
 
-- 用 Qoder 的 Structurizr DSL 预览打开 `polang-system.structurizr.dsl`（或粘贴到 Structurizr Playground / Lite）
-- DSL 是唯一事实来源；渲染图均为派生物。架构变化先改 DSL，并同步更新 evidence.md 的 sourceRefs
+- 模型事实：用 Structurizr DSL 预览打开 `polang-system.structurizr.dsl`（或粘贴到 Structurizr Playground / Lite）
+- 渲染图维护：改对应 `*.html`（换内容不换骨架）→ Chrome headless `--force-device-scale-factor=2` 截图导出 `exported/*.png`（exported/ 为派生物目录，不入 VCS）
+- DSL 与 evidence 是唯一事实来源；渲染图均为派生物。架构变化先改 DSL，并同步更新 evidence.md 的 sourceRefs 与本说明
+- 旧 Structurizr/Mermaid 线框导出（svg/mmd，2026-09-19）已于 2026-09-27 汰换，git/本地历史可查

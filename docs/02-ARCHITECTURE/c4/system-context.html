@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoLang 系统上下文 · C4 L1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #F4F6F9;
+    --grid: #E8ECF1;
+    --card: #FFFFFF;
+    --tint: #EEF3FB;
+    --tint2: #F0F3F8;
+    --navy: #0D2240;
+    --blue: #2563EB;
+    --blue-deep: #3B6FD4;
+    --chip-bg: #DCE9FB;
+    --green: #2FA05A;
+    --green-bg: #E4F5EA;
+    --orange: #D97E2E;
+    --orange-bg: #FDEBD9;
+    --rose: #D9482B;
+    --rose-bg: #FCEAE5;
+    --txt: #12263F;
+    --sub: #5A6B80;
+    --line: #D8E0EC;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: #E9EEF5; }
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+    color: var(--txt);
+    padding: 30px 16px 36px;
+    background: #E9EEF5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1240px; margin: 0 auto;
+    background-color: #F7F9FC;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 30px 30px;
+    border: 1.5px solid #C9D4E4;
+    border-radius: 24px;
+    padding: 30px 28px 26px;
+    box-shadow: 0 12px 32px rgba(18,38,63,.10);
+  }
+  .mono { font-family: "JetBrains Mono", monospace; }
+
+  .hero { text-align: center; margin-bottom: 18px; }
+  .hero h1 { font-size: clamp(30px, 4.6vw, 46px); font-weight: 900; letter-spacing: .02em; }
+  .hero h1 .dot { color: var(--blue); }
+  .banner {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: var(--navy); color: #fff;
+    border-radius: 999px; padding: 9px 20px 9px 15px;
+    margin-top: 14px; box-shadow: 0 6px 18px rgba(13,34,64,.22);
+  }
+  .banner .bn-t { font-size: 16.5px; font-weight: 700; letter-spacing: .06em; }
+  .pill-green {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: #34C759; border-radius: 999px; padding: 3px 12px;
+  }
+  .core {
+    margin: 16px auto 0; max-width: 860px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(18,38,63,.06);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+    padding: 12px 20px; justify-content: center;
+  }
+  .core .ic { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--sub); }
+  .core .ic b { color: var(--txt); font-weight: 700; }
+
+  .main { display: grid; grid-template-columns: 1fr 292px; gap: 16px; align-items: start; margin-top: 16px; }
+  @media (max-width: 940px) { .main { grid-template-columns: 1fr; } }
+
+  .band {
+    position: relative;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 18px 15px 56px;
+    box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .band.tint { background: var(--tint); }
+  .band.tint2 { background: var(--tint2); }
+  .band .num {
+    position: absolute; left: 14px; top: 14px;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--blue); color: #fff; font-weight: 900; font-size: 15px;
+    display: grid; place-items: center; box-shadow: 0 3px 8px rgba(37,99,235,.35);
+  }
+  .band .bh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .band .bt { font-size: 19px; font-weight: 900; }
+  .band .bs { font-size: 12px; color: var(--blue-deep); font-weight: 500; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+  @media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+  .split .half { border: 1px dashed var(--line); border-radius: 12px; padding: 9px 11px 10px; background: rgba(255,255,255,.6); }
+  .split .ph { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .split .ph .pn { font-size: 14px; font-weight: 900; }
+  .split .ph .pt { font-size: 10.5px; color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 700; letter-spacing: .03em; }
+  .split .ph .pt.ad { background: var(--green); }
+  .split .ph .pt.ios { background: var(--navy); }
+  .share-strip { border-top: 1px dashed var(--line); padding-top: 9px; }
+  .share-strip .ss-t { font-size: 12px; color: var(--green); font-weight: 900; margin-bottom: 7px; display: inline-flex; align-items: center; gap: 5px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 500; color: var(--blue-deep);
+    background: var(--chip-bg); border: 1.5px solid rgba(37,99,235,.35);
+    border-radius: 999px; padding: 5px 13px; white-space: nowrap;
+  }
+  .chip.green { background: var(--green-bg); border-color: #7BC894; color: var(--green); }
+  .chip.orange { background: var(--orange-bg); border-color: #E8B27C; color: var(--orange); }
+  .chip.rose { background: var(--rose-bg); border-color: rgba(217,72,43,.45); color: var(--rose); border-style: dashed; }
+  .chip.ghost { background: transparent; border-style: dashed; border-color: var(--line); color: var(--sub); }
+  .chip.hero {
+    background: var(--navy); color: #fff; border-color: var(--navy);
+    font-weight: 700; box-shadow: 0 3px 10px rgba(13,34,64,.28);
+  }
+  .chip small { font-size: 11px; opacity: .75; font-weight: 400; }
+  .chip svg { flex: none; }
+
+  .varrow { display: grid; place-items: center; padding: 4px 0; }
+
+  .flow-note { margin-top: 9px; font-size: 12px; color: var(--sub); display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .flow-note .fn { display: inline-flex; align-items: center; gap: 5px; }
+
+  .side {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 14px 8px; box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .side h3 { font-size: 16px; font-weight: 900; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .mini {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 9px 6px 10px; border-top: 1px dashed var(--line);
+  }
+  .mini:first-of-type { border-top: 0; }
+  .mini .mic {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--tint); display: grid; place-items: center;
+  }
+  .mini .mt { font-size: 13.5px; font-weight: 700; }
+  .mini .md { font-size: 11.5px; color: var(--sub); line-height: 1.6; margin-top: 2px; }
+
+  .col { display: grid; gap: 16px; align-content: start; }
+
+  .fstep { display: flex; gap: 9px; padding: 8px 2px; align-items: flex-start; }
+  .fstep + .fstep { border-top: 1px dashed var(--line); }
+  .fstep .fn {
+    width: 21px; height: 21px; border-radius: 50%; flex: none; margin-top: 1px;
+    background: var(--tint); color: var(--blue); font-size: 11px; font-weight: 900;
+    display: grid; place-items: center; border: 1.5px solid rgba(37,99,235,.4);
+  }
+  .fstep .fd { font-size: 12.5px; line-height: 1.55; }
+  .fstep .fd .fs { font-size: 11px; color: var(--sub); display: block; margin-top: 1px; }
+  .tag-ok { color: var(--green); font-weight: 700; font-size: 11px; }
+  .tag-no { color: var(--rose); font-weight: 700; font-size: 11px; }
+
+  .mods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mods .m {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+    color: var(--blue-deep); background: var(--tint);
+    border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; text-align: center;
+  }
+  .refs { margin-top: 10px; font-size: 10.5px; color: var(--sub); line-height: 1.8; }
+  .refs code { font-family: "JetBrains Mono", monospace; background: rgba(18,38,63,.05); padding: 0 4px; border-radius: 4px; }
+
+  .bottom { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 940px) { .bottom { grid-template-columns: 1fr; } }
+  .bcard {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 18px 16px; box-shadow: 0 4px 14px rgba(18,38,63,.05);
+  }
+  .bcard h3 { font-size: 16px; font-weight: 900; margin-bottom: 12px; }
+  .shift { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 8px 0 4px; }
+  .shift .sbox {
+    border: 1.5px solid var(--line); border-radius: 12px; background: var(--tint2);
+    padding: 8px 14px; font-size: 13px; color: var(--sub); text-align: center;
+  }
+  .shift .sbox.to { border-color: rgba(37,99,235,.45); background: var(--chip-bg); color: var(--txt); font-weight: 700; }
+  .tech { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }
+  .tech .t {
+    font-size: 12px; font-weight: 500; color: var(--blue-deep);
+    background: var(--tint); border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 4px; text-align: center;
+  }
+  .tech .t.g { background: var(--green-bg); color: var(--green); }
+  .tech .t.o { background: var(--orange-bg); color: var(--orange); }
+
+  .foot-banner {
+    margin-top: 18px; background: var(--navy); color: #fff;
+    border-radius: 16px; padding: 16px 22px; text-align: center;
+    box-shadow: 0 8px 22px rgba(13,34,64,.25);
+  }
+  .foot-banner .fb-t { font-size: 15px; font-weight: 900; letter-spacing: .12em; margin-bottom: 6px; color: #9FC3F8; }
+  .foot-banner .fb-d { font-size: 15.5px; line-height: 1.75; font-weight: 500; }
+  .foot-banner .fb-d b { color: #7EE2A8; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>PoLang 系统上下文<span class="dot">.</span></h1>
+    <div class="banner">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7EB3F8" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/></svg>
+      <span class="bn-t">C4 Level 1 · 一个系统 · 三个可部署单元</span>
+      <span class="pill-green">System Context</span>
+    </div>
+    <div class="core">
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg><b>3</b> 可部署单元</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M4 4h7l9 16h-7L4 4zM13 4h7"/></svg><b>4</b> 类外部依赖</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg><b>100%</b> 媒体端内处理</span>
+      <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 1 0-.9-8.9 6 6 0 0 0-11.5 1.6A3.8 3.8 0 0 0 6 19h11.5z"/></svg><b>文本/元数据</b> 可过线</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div>
+
+      <!-- ① 用户与入口 -->
+      <section class="band">
+        <span class="num">1</span>
+        <div class="bh"><span class="bt">用户与交互入口</span><span class="bs">自然语言驱动 · 双端原生 App</span></div>
+        <div class="chips">
+          <span class="chip green">用户 · 自然语言指令</span>
+          <span class="chip">「找去年夏天的照片」</span>
+          <span class="chip">「磨皮 50」</span>
+          <span class="chip ghost">对话式编辑 / 搜索 / 打标</span>
+        </div>
+        <div class="flow-note">
+          <span class="fn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5A6B80" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>IM 远程控制为<b>用户自配置通道</b>（飞书 / Telegram，非模型推理上传）</span>
+        </div>
+      </section>
+
+      <div class="varrow"><svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg></div>
+
+      <!-- ② PoLang 系统 -->
+      <section class="band tint">
+        <span class="num">2</span>
+        <div class="bh"><span class="bt">PoLang 系统</span><span class="bs mono">Monorepo · 破浪相册</span><span class="chip green" style="font-size:11.5px;padding:2px 10px">KMP 单源 · 双端落地</span></div>
+        <div class="split">
+          <div class="half">
+            <div class="ph"><span class="pn">移动端</span><span class="pt ad">Android · :androidApp</span></div>
+            <div class="chips">
+              <span class="chip">Kotlin + Compose <small>主体应用</small></span>
+              <span class="chip">内嵌 shared 层 + 原生引擎</span>
+            </div>
+            <div class="ph" style="margin-top:9px"><span class="pn"></span><span class="pt ios">iOS · iosApp</span></div>
+            <div class="chips">
+              <span class="chip">SwiftUI</span>
+              <span class="chip">SharedKit XCFramework <small>复用 :shared</small></span>
+            </div>
+          </div>
+          <div class="half">
+            <div class="ph"><span class="pn">云端</span><span class="pt" style="background:var(--orange)">Ktor · server/</span></div>
+            <div class="chips">
+              <span class="chip">AI 网关 <small>Channel 路由 / LlmProxy</small></span>
+              <span class="chip">账号 · 管理后台</span>
+              <span class="chip">推荐 · 限流</span>
+              <span class="chip">AI 工程师链路 <small>claude-chat</small></span>
+              <span class="chip">问题上报 <small>→ GitHub issue</small></span>
+            </div>
+          </div>
+        </div>
+        <div class="share-strip">
+          <span class="ss-t"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2FA05A" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M3 8l9-5 9 5M5 10v7M19 10v7M3 8v7"/></svg>容器内部</span>
+          <div class="chips">
+            <span class="chip ghost">拆解见 容器视图（C4 L2）</span>
+            <span class="chip ghost">Android 内部见 组件视图（C4 L3）</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="varrow">
+        <svg width="26" height="30" viewBox="0 0 26 30"><line x1="13" y1="0" x2="13" y2="20" stroke="#2563EB" stroke-width="3" stroke-dasharray="6 5"/><path d="M4 19 L13 29 L22 19 Z" fill="#2563EB"/></svg>
+        <div style="font-size:11.5px;color:var(--blue-deep);margin-top:3px">仅 文本 · 元数据 · 相册摘要 出系统边界（ADR-008）</div>
+      </div>
+
+      <!-- ③ 外部依赖 -->
+      <section class="band tint2">
+        <span class="num">3</span>
+        <div class="bh"><span class="bt">外部服务依赖</span><span class="bs">推理 / 存储 / IM / 工单</span></div>
+        <div class="chips" style="margin-bottom:9px">
+          <span class="chip hero"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>LLM 提供商 <small>远程文本推理</small></span>
+          <span class="chip">DeepSeek</span>
+          <span class="chip">通义千问</span>
+          <span class="chip">OpenAI 官方</span>
+          <span class="chip">Anthropic <small>Messages 协议</small></span>
+        </div>
+        <div class="chips">
+          <span class="chip orange">腾讯云 COS <small>服务端对象存储</small></span>
+          <span class="chip orange">GitHub <small>问题上报落点</small></span>
+          <span class="chip ghost">飞书 / Telegram <small>IM 远程控制 · 用户自有通道</small></span>
+        </div>
+        <div class="flow-note">
+          <span class="fn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5A6B80" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>LLM 通路：<b>端侧直连</b> 与 <b>服务端网关代理</b> 两条并存</span>
+        </div>
+      </section>
+
+      <!-- ④ 关键边界 -->
+      <section class="band" style="margin-top:14px">
+        <span class="num">4</span>
+        <div class="bh"><span class="bt">关键边界</span><span class="bs">本层最核心的三条事实</span></div>
+        <div class="chips">
+          <span class="chip green">隐私边界 <small>图片/视频不出端 · 媒体处理 100% 端侧</small></span>
+          <span class="chip">推理分流 <small>相机指令与 chat 全远程 · 端侧仅存 VLM 打标/人脸检测</small></span>
+          <span class="chip">双端共享 <small>Agent 编排层在 :shared commonMain</small></span>
+          <span class="chip rose">⛔ 媒体文件永不上传</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+    <aside class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M3 12h6M15 12h6M12 3v6M12 15v6"/><circle cx="12" cy="12" r="3.2"/></svg>C4 视图导航</h3>
+      <div class="mini">
+        <span class="mic"><b style="color:var(--blue);font-size:12px">L1</b></span>
+        <div><div class="mt">系统上下文（本图）</div><div class="md">系统边界 · 外部依赖 · 隐私边界</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><b style="color:var(--blue);font-size:12px">L2</b></span>
+        <div><div class="mt">容器视图</div><div class="md">三部署单元内部构成与相互连接</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><b style="color:var(--blue);font-size:12px">L3</b></span>
+        <div><div class="mt">Android 组件视图</div><div class="md">:androidApp 内部分层与模块</div></div>
+      </div>
+      <div class="mini">
+        <span class="mic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+        <div><div class="mt">事实来源</div><div class="md mono" style="font-size:10.5px">polang-system.structurizr.dsl<br>+ polang-system.evidence.md</div></div>
+      </div>
+    </aside>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.7.5 1 1.3 1 2.1h5c0-.8.3-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>置信度注记</h3>
+      <div class="fstep"><span class="fn">✓</span><div class="fd"><b>绝大多数节点/边 high</b><span class="fs">代码 + AGENTS.md + 技术规格 三源互证</span></div></div>
+      <div class="fstep"><span class="fn">?</span><div class="fd"><b>两处 inferred（虚线）</b><span class="fs">iOS → LLM 直连、iOS → Server：复用 shared Koog 链路可推断，通道配置未逐条核实</span></div></div>
+      <div class="fstep"><span class="fn">!</span><div class="fd"><b>详细未知项</b><span class="fs">验证任务见 evidence.md 末节</span></div></div>
+    </section>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="6" rx="1.6"/><rect x="3" y="14" width="18" height="6" rx="1.6"/></svg>生成路径</h3>
+      <div class="mods" style="grid-template-columns:1fr">
+        <span class="m">explore → 场景梳理</span>
+        <span class="m">system-modeler → 建模</span>
+        <span class="m">c4model → Structurizr DSL</span>
+      </div>
+      <div class="refs">
+        DSL 是唯一事实来源，渲染图均为派生物<br>
+        <code>2026-09-19 生成 · 2026-09-27 信息图化</code>
+      </div>
+    </section>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <section class="bcard">
+      <h3>用户视角的一句话</h3>
+      <div class="shift">
+        <span class="sbox">手机上的智能相册<br><small style="font-size:11px">说话就能找图 / 修图</small></span>
+        <svg width="46" height="20" viewBox="0 0 46 20"><line x1="2" y1="10" x2="36" y2="10" stroke="#2563EB" stroke-width="2"/><path d="M34 4 L44 10 L34 16 Z" fill="#2563EB"/></svg>
+        <span class="sbox to">三个单元协同<br><small style="font-size:11px">双端 App 端侧干活 · 云端网关补推理</small></span>
+      </div>
+    </section>
+    <section class="bcard">
+      <h3>对外协议与通道</h3>
+      <div class="tech">
+        <span class="t g">OpenAI 兼容</span><span class="t g">tool_calls</span><span class="t g">流式 SSE</span>
+        <span class="t o">Anthropic Messages</span><span class="t o">HTTPS</span><span class="t o">IM Webhook</span>
+        <span class="t">api.polang.net</span><span class="t">COS SDK</span><span class="t">GitHub API</span>
+      </div>
+    </section>
+  </div>
+
+  <div class="foot-banner">
+    <div class="fb-t">一 句 话 总 结</div>
+    <div class="fb-d">用户只看到<b>一个智能相册</b>；系统由<b>三个可部署单元</b>协同——媒体留在端内，<b>文本与元数据</b>才出边界。</div>
+  </div>
+</div>
+</body>
+</html>

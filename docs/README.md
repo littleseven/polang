@@ -19,7 +19,7 @@
 | [05 开发](05-DEVELOPMENT/DEVELOPMENT.md) | 开发流程、本地环境 |
 | [06 QA](06-QA/PERFORMANCE_BASELINE_REPORT.md) | 性能基线报告 |
 | [07 标准](07-STANDARDS/GLOSSARY.md) | 坐标系、术语表 |
-| [08 UI 契约](08-UI-SPECS/PARITY_MASTER_PLAN.md) | 双端 UI 一致性总纲与逐屏规格（内部） |
+| 08 UI 契约 | 双端 UI 一致性总纲与逐屏规格（内部目录，不上线） |
 
 ## 关于
 
