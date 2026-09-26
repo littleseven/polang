@@ -144,6 +144,32 @@
   .mini .mt { font-size: 13.5px; font-weight: 700; }
   .mini .md { font-size: 11.5px; color: var(--sub); line-height: 1.6; margin-top: 2px; }
 
+  /* 右列纵向栈 */
+  .col { display: grid; gap: 16px; align-content: start; }
+
+  /* 数据流卡 */
+  .fstep { display: flex; gap: 9px; padding: 8px 2px; align-items: flex-start; }
+  .fstep + .fstep { border-top: 1px dashed var(--line); }
+  .fstep .fn {
+    width: 21px; height: 21px; border-radius: 50%; flex: none; margin-top: 1px;
+    background: var(--tint); color: var(--blue); font-size: 11px; font-weight: 900;
+    display: grid; place-items: center; border: 1.5px solid rgba(37,99,235,.4);
+  }
+  .fstep .fd { font-size: 12.5px; line-height: 1.55; }
+  .fstep .fd .fs { font-size: 11px; color: var(--sub); display: block; margin-top: 1px; }
+  .tag-ok { color: var(--green); font-weight: 700; font-size: 11px; }
+  .tag-no { color: var(--rose); font-weight: 700; font-size: 11px; }
+
+  /* 模块清单卡 */
+  .mods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mods .m {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+    color: var(--blue-deep); background: var(--tint);
+    border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; text-align: center;
+  }
+  .refs { margin-top: 10px; font-size: 10.5px; color: var(--sub); line-height: 1.8; }
+  .refs code { font-family: "JetBrains Mono", monospace; background: rgba(18,38,63,.05); padding: 0 4px; border-radius: 4px; }
+
   /* ── 底部两卡 ── */
   .bottom { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; margin-top: 16px; }
   @media (max-width: 940px) { .bottom { grid-template-columns: 1fr; } }
@@ -317,7 +343,8 @@
       </section>
     </div>
 
-    <!-- 右：架构要点 -->
+    <!-- 右：架构要点 + 数据流 + 模块清单 -->
+    <div class="col">
     <aside class="side">
       <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.7.5 1 1.3 1 2.1h5c0-.8.3-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>架构要点</h3>
       <div class="mini">
@@ -345,6 +372,30 @@
         <div><div class="mt">零拷贝 GPU 预览</div><div class="md">CameraX → GL → SurfaceView 全程 GPU，预览禁 glReadPixels</div></div>
       </div>
     </aside>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.4" fill="#2563EB"/><circle cx="4" cy="12" r="1.4" fill="#2563EB"/><circle cx="4" cy="18" r="1.4" fill="#2563EB"/></svg>数据流 · 一次查询</h3>
+      <div class="fstep"><span class="fn">1</span><div class="fd"><b>用户：「找去年夏天的照片」</b><span class="fs">自然语言进入聊天界面（双端同源路径）</span></div></div>
+      <div class="fstep"><span class="fn">2</span><div class="fd"><b>AiAgentUseCase → AgentOrchestrator</b><span class="fs">PrivacyGuard 分级：PUBLIC → 可远程</span></div></div>
+      <div class="fstep"><span class="fn">3</span><div class="fd"><b>Koog → 远程 LLM · tool_calls</b><span class="fs">过线仅文本/元数据 <span class="tag-ok">✓ 可上云</span> <span class="tag-no">媒体 ⛔</span></span></div></div>
+      <div class="fstep"><span class="fn">4</span><div class="fd"><b>ChatSearchCapability 执行</b><span class="fs">CapabilityRegistry.dispatch 路由到端侧能力</span></div></div>
+      <div class="fstep"><span class="fn">5</span><div class="fd"><b>端侧检索相册元数据 → 回复</b><span class="fs">人脸/场景/标签索引全在本机，结果流式回传</span></div></div>
+    </section>
+
+    <section class="side">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round"><path d="M4 4h7l9 16h-7L4 4zM13 4h7"/></svg>模块与规范</h3>
+      <div class="mods">
+        <span class="m">:androidApp</span><span class="m">:shared</span>
+        <span class="m">beauty-api</span><span class="m">beauty-engine</span>
+        <span class="m">mnn-core</span><span class="m">agent-native</span>
+        <span class="m" style="grid-column:1/-1">sentencepiece</span>
+      </div>
+      <div class="refs">
+        <code>AGENT_ARCHITECTURE.md</code> · <code>ADR-005/008/013</code><br>
+        <code>CAPABILITY_REGISTRY.md</code> · <code>BEAUTY_ENGINE_TECH_SPEC.md</code>
+      </div>
+    </section>
+    </div>
   </div>
 
   <!-- 底部两卡 -->
