@@ -93,8 +93,18 @@ class UserTaskRegistry(
         }
     }
 
-    /** 适配器对账用：注册表中某 kind 的活动态任务 id。 */
-    suspend fun activeIdsOfKind(kind: UserTaskKind): List<String> = dao.activeIdsOfKind(kind.name)
+    /** 适配器对账用：注册表中某 kind 的活动态任务 id；读库失败返回 emptyList（降级语义 = 本次启动跳过对账）。 */
+    @Suppress("TooGenericExceptionCaught") // 与 currentStatus 读路径降级对齐：读失败视同无活动行，不杀死适配器对账协程
+    suspend fun activeIdsOfKind(kind: UserTaskKind): List<String> {
+        return try {
+            dao.activeIdsOfKind(kind.name)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            Logger.w(TAG, "activeIdsOfKind failed, kind=$kind", exception)
+            emptyList()
+        }
+    }
 
     /** 适配器对账用：注册表中某任务的当前状态（无行或读库失败返回 null）。 */
     @Suppress("TooGenericExceptionCaught") // 与 upsertStatus 写路径降级对齐：读失败视同无行，不杀死适配器 collect 协程

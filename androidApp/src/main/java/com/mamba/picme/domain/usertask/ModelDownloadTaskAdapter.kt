@@ -31,6 +31,9 @@ class ModelDownloadTaskAdapter(
 
     override val kind: UserTaskKind = UserTaskKind.MODEL_DOWNLOAD
 
+    // 上一轮 sync 见过的活动任务 id——仅在 sync 内读写（单 collect 协程串行，无线程问题）
+    private var lastActiveIds: Set<String> = emptySet()
+
     /** 非幂等：重复调用会起双订阅；当前唯一调用方 UserTaskRegistry.registerAdapter 保证单次。 */
     override fun start() {
         scope.launch { reconcile() }
@@ -39,7 +42,12 @@ class ModelDownloadTaskAdapter(
         }
     }
 
-    /** 启动对账（spec §5）：Room 活动态行但无活体下载 → FAILED(PROCESS_TERMINATED)，可 RETRY。 */
+    /**
+     * 启动对账（spec §5）：Room 活动态行但无活体下载 → FAILED(PROCESS_TERMINATED)，可 RETRY。
+     * 两个不变量：
+     * 1) 正确性依赖 manager 不丢 id（除 deleteModel 用户删除）——活体 id 若被 manager 丢失会被误判进程死亡；
+     * 2) 尾部 sync 重读活体状态自愈——即使对账误判，活体下载的下一帧 collect 也会覆盖回正确状态。
+     */
     @VisibleForTesting
     internal suspend fun reconcile() {
         val liveIds = control.downloadStates.value.keys.map { modelId -> taskId(modelId) }.toSet()
@@ -60,6 +68,7 @@ class ModelDownloadTaskAdapter(
 
     @VisibleForTesting
     internal suspend fun sync(states: Map<String, DownloadState>) {
+        val currentActiveIds = mutableSetOf<String>()
         for ((id, state) in states) {
             val status = UserTaskMapping.fromDownloadStatus(state.status)
             registry.upsertStatus(
@@ -70,15 +79,22 @@ class ModelDownloadTaskAdapter(
             )
             // 终态不写进度快照（upsertStatus 内部已清）：与 TagScan 适配器审查结论一致，避免幽灵进度
             if (UserTaskMapping.isActive(status)) {
+                currentActiveIds += taskId(id)
                 registry.updateProgress(
                     taskId(id),
                     TaskProgressSnapshot(
                         progress = if (state.totalBytes > 0) {
-                            state.downloadedBytes / state.totalBytes.toFloat()
+                            // coerceIn 兜底：manager resumeDownload 有预存双计 bug 可致 downloadedBytes > totalBytes
+                            (state.downloadedBytes / state.totalBytes.toFloat()).coerceIn(0f, 1f)
                         } else {
                             null
                         },
-                        progressText = "${formatBytes(state.downloadedBytes)} / ${formatBytes(state.totalBytes)}",
+                        // totalBytes==0 时文案同样置 null，避免误导性的 "0 B / 0 B"（对齐 TagScan "0/0" 规避先例）
+                        progressText = if (state.totalBytes > 0) {
+                            "${formatBytes(state.downloadedBytes)} / ${formatBytes(state.totalBytes)}"
+                        } else {
+                            null
+                        },
                         etaMs = null,
                     )
                 )
@@ -86,6 +102,17 @@ class ModelDownloadTaskAdapter(
                 registry.updateProgress(taskId(id), null)
             }
         }
+        // 本轮 map 中消失的活动任务 → CANCELLED 终态（无 errorCode：map 收缩唯一来源是 deleteModel
+        // 用户删除，非进程死亡；CANCELLED 即终态不留 RETRY）。仍在本轮 map 中的终态行由上方循环处理。
+        for (missingId in lastActiveIds - states.keys.map { id -> taskId(id) }.toSet()) {
+            registry.upsertStatus(
+                id = missingId,
+                kind = kind,
+                displayName = modelId(missingId),
+                status = UserTaskStatus.CANCELLED,
+            )
+        }
+        lastActiveIds = currentActiveIds
     }
 
     override suspend fun perform(taskId: String, action: UserTaskAction) {
