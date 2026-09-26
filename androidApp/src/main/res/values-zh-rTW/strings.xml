@@ -1654,4 +1654,21 @@
     <string name="chat_claude_continue">繼續</string>
     <string name="chat_more_like_this">更多類似這張照片的</string>
     <string name="chat_more_like_this_with_tags">和這張照片類似的：%1$s</string>
+    <string name="task_center_tab_engineer">工程師任務</string>
+    <string name="task_center_tab_background">後台任務</string>
+    <string name="task_center_empty_user_tasks">暫無後台任務</string>
+    <string name="user_task_title_tag_scan">相簿標籤掃描</string>
+    <string name="user_task_status_pending">等待中</string>
+    <string name="user_task_status_running">進行中</string>
+    <string name="user_task_status_paused">已暫停</string>
+    <string name="user_task_status_completed">已完成</string>
+    <string name="user_task_status_failed">失敗</string>
+    <string name="user_task_status_cancelled">已取消</string>
+    <string name="user_task_action_pause">暫停</string>
+    <string name="user_task_action_resume">繼續</string>
+    <string name="user_task_action_cancel">取消</string>
+    <string name="user_task_action_retry">重試</string>
+    <string name="user_task_error_process_terminated">已中斷——點重試重新開始</string>
+    <string name="user_task_error_partial_failures">%1$s 項失敗</string>
+    <string name="user_task_error_model_unavailable">模型不可用——可能已下架</string>
 </resources>

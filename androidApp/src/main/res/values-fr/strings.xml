@@ -1614,4 +1614,21 @@
     <string name="chat_claude_continue">Continuer</string>
     <string name="chat_more_like_this">Plus comme ceci</string>
     <string name="chat_more_like_this_with_tags">Plus comme ceci : %1$s</string>
+    <string name="task_center_tab_engineer">Ingénieur</string>
+    <string name="task_center_tab_background">Arrière-plan</string>
+    <string name="task_center_empty_user_tasks">Aucune tâche en arrière-plan</string>
+    <string name="user_task_title_tag_scan">Analyse des tags</string>
+    <string name="user_task_status_pending">En attente</string>
+    <string name="user_task_status_running">En cours</string>
+    <string name="user_task_status_paused">En pause</string>
+    <string name="user_task_status_completed">Terminée</string>
+    <string name="user_task_status_failed">Échouée</string>
+    <string name="user_task_status_cancelled">Annulée</string>
+    <string name="user_task_action_pause">Pause</string>
+    <string name="user_task_action_resume">Reprendre</string>
+    <string name="user_task_action_cancel">Annuler</string>
+    <string name="user_task_action_retry">Réessayer</string>
+    <string name="user_task_error_process_terminated">Interrompue — touchez Réessayer</string>
+    <string name="user_task_error_partial_failures">%1$s éléments en échec</string>
+    <string name="user_task_error_model_unavailable">Modèle indisponible — peut avoir été retiré</string>
 </resources>

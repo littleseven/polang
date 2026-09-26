@@ -1614,4 +1614,21 @@
     <string name="chat_claude_continue">Continuar</string>
     <string name="chat_more_like_this">Más como esto</string>
     <string name="chat_more_like_this_with_tags">Más como esto: %1$s</string>
+    <string name="task_center_tab_engineer">Ingeniero</string>
+    <string name="task_center_tab_background">En segundo plano</string>
+    <string name="task_center_empty_user_tasks">Sin tareas en segundo plano</string>
+    <string name="user_task_title_tag_scan">Escaneo de etiquetas</string>
+    <string name="user_task_status_pending">Pendiente</string>
+    <string name="user_task_status_running">En curso</string>
+    <string name="user_task_status_paused">En pausa</string>
+    <string name="user_task_status_completed">Completada</string>
+    <string name="user_task_status_failed">Fallida</string>
+    <string name="user_task_status_cancelled">Cancelada</string>
+    <string name="user_task_action_pause">Pausar</string>
+    <string name="user_task_action_resume">Reanudar</string>
+    <string name="user_task_action_cancel">Cancelar</string>
+    <string name="user_task_action_retry">Reintentar</string>
+    <string name="user_task_error_process_terminated">Interrumpida — toca Reintentar</string>
+    <string name="user_task_error_partial_failures">%1$s elementos fallaron</string>
+    <string name="user_task_error_model_unavailable">Modelo no disponible — puede haber sido retirado</string>
 </resources>

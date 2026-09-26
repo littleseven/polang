@@ -1663,4 +1663,21 @@
     <string name="chat_claude_continue">Continue</string>
     <string name="chat_more_like_this">More like this</string>
     <string name="chat_more_like_this_with_tags">More like this: %1$s</string>
+    <string name="task_center_tab_engineer">Engineer</string>
+    <string name="task_center_tab_background">Background</string>
+    <string name="task_center_empty_user_tasks">No background tasks</string>
+    <string name="user_task_title_tag_scan">Gallery tag scan</string>
+    <string name="user_task_status_pending">Pending</string>
+    <string name="user_task_status_running">Running</string>
+    <string name="user_task_status_paused">Paused</string>
+    <string name="user_task_status_completed">Completed</string>
+    <string name="user_task_status_failed">Failed</string>
+    <string name="user_task_status_cancelled">Cancelled</string>
+    <string name="user_task_action_pause">Pause</string>
+    <string name="user_task_action_resume">Resume</string>
+    <string name="user_task_action_cancel">Cancel</string>
+    <string name="user_task_action_retry">Retry</string>
+    <string name="user_task_error_process_terminated">Interrupted — tap Retry to restart</string>
+    <string name="user_task_error_partial_failures">%1$s items failed</string>
+    <string name="user_task_error_model_unavailable">Model unavailable — may have been delisted</string>
 </resources>

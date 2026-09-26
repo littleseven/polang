@@ -17,10 +17,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -34,20 +40,28 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mamba.picme.R
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
+import com.mamba.picme.domain.usertask.UserTask
+import com.mamba.picme.domain.usertask.UserTaskAction
+import com.mamba.picme.domain.usertask.UserTaskDestination
+import com.mamba.picme.domain.usertask.UserTaskMapping
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.chat.components.EngineerTaskStatusChip
 import com.mamba.picme.features.chat.components.formatElapsed
 import com.mamba.picme.features.chat.components.taskMetaText
 import com.mamba.picme.features.chat.engineer.TaskCenterItem
+import com.mamba.picme.features.chat.engineer.TaskCenterList
 import com.mamba.picme.features.chat.engineer.TaskCenterPartition
 import com.mamba.picme.features.common.topbar.AppTopBar
 
 /**
- * 任务中心页（spec US-12~16 + D7）：跨会话聚合工程师任务，分区「进行中/历史」。
- * 只读管理 + 审批动作（继续/交付/重试/暂不/到此为止），不做任务编辑/删除。
- * 审批动作经 Activity 级共享 [ChatViewModel] 的 FromCenter 入口（prime 补种 + sessionId 显式落库）。
+ * 任务中心页（spec US-12~16 + D7 + 用户任务协议 §7）：双 Tab「工程师任务 | 后台任务」。
+ * 工程师 Tab：跨会话聚合工程师任务，分区「进行中/历史」，只读管理 + 审批动作
+ * （继续/交付/重试/暂不/到此为止），不做任务编辑/删除；审批动作经 Activity 级共享
+ * [ChatViewModel] 的 FromCenter 入口（prime 补种 + sessionId 显式落库）。
+ * 后台任务 Tab：`UserTask` 卡片列表（UserTaskCard），动作经 `performUserTaskAction`。
  *
  * @param onOpenTaskInChat 回 chat 锚定对应任务卡（US-15）：(sessionId, taskId) → 由 Activity 层驱动切页+滚动
+ * @param onOpenUserTaskDestination 用户任务卡片点击 → destination 导航（Task 9 接线；默认空实现保底）
  */
 @Composable
 fun TaskCenterScreen(
@@ -55,10 +69,18 @@ fun TaskCenterScreen(
     chatViewModel: ChatViewModel,
     onNavigateBack: () -> Unit,
     onOpenTaskInChat: (sessionId: String, taskId: String) -> Unit,
+    onOpenUserTaskDestination: (UserTaskDestination) -> Unit = {},
 ) {
     val taskList by taskCenterViewModel.taskList.collectAsStateWithLifecycle()
     val isProcessing by chatViewModel.isProcessing.collectAsStateWithLifecycle()
     val actionInFlight by chatViewModel.engineerActionInFlight.collectAsStateWithLifecycle()
+    val userTasks by taskCenterViewModel.userTasks.collectAsStateWithLifecycle()
+    val activeUserTaskCount by taskCenterViewModel.activeUserTaskCount.collectAsStateWithLifecycle()
+    // 默认 Tab：工程师有活跃 → 工程师；否则后台有活跃 → 后台；均无 → 工程师（现状兼容，spec §7）
+    val defaultTab = remember(taskList, activeUserTaskCount) {
+        if ((taskList?.active?.size ?: 0) > 0) 0 else if (activeUserTaskCount > 0) 1 else 0
+    }
+    var selectedTab by rememberSaveable { mutableStateOf(defaultTab) }
 
     Scaffold(
         topBar = {
@@ -68,67 +90,167 @@ fun TaskCenterScreen(
             )
         },
     ) { innerPadding ->
-        val list = taskList
-        when {
-            // 首查未回：仅顶栏（防空态文案闪现一帧）
-            list == null -> Unit
-            list.active.isEmpty() && list.history.isEmpty() -> TaskCenterEmpty(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text(stringResource(R.string.task_center_tab_engineer)) },
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text(stringResource(R.string.task_center_tab_background)) },
+                )
+            }
+            if (selectedTab == 0) {
+                EngineerTaskTab(
+                    taskList = taskList,
+                    isProcessing = isProcessing,
+                    actionInFlight = actionInFlight,
+                    chatViewModel = chatViewModel,
+                    onOpenTaskInChat = onOpenTaskInChat,
+                )
+            } else {
+                UserTaskTab(
+                    userTasks = userTasks,
+                    onAction = { taskId, action ->
+                        taskCenterViewModel.performUserTaskAction(taskId, action)
+                    },
+                    onOpenDestination = onOpenUserTaskDestination,
+                )
+            }
+        }
+    }
+}
+
+/** 工程师任务 Tab：原单页内容原样（进行中/历史分区 + 审批动作 + 回锚），零行为变化。 */
+@Composable
+private fun EngineerTaskTab(
+    taskList: TaskCenterList?,
+    isProcessing: Boolean,
+    actionInFlight: Set<String>,
+    chatViewModel: ChatViewModel,
+    onOpenTaskInChat: (sessionId: String, taskId: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val list = taskList
+    when {
+        // 首查未回：空白（防空态文案闪现一帧）
+        list == null -> Unit
+        list.active.isEmpty() && list.history.isEmpty() -> TaskCenterEmpty(
+            modifier = modifier.fillMaxSize(),
+        )
+        else -> LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            contentPadding = PaddingValues(vertical = 8.dp),
+        ) {
+            if (list.active.isNotEmpty()) {
+                item(key = "header_active") {
+                    TaskCenterSectionHeader(stringResource(R.string.task_center_section_active))
+                }
+                items(list.active, key = { item -> "active_${item.task.taskId}" }) { item ->
+                    TaskCenterListItem(
+                        item = item,
+                        actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
+                        onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
+                        onContinue = {
+                            chatViewModel.continueEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                            onOpenTaskInChat(item.sessionId, item.task.taskId)
+                        },
+                        onAbandon = {
+                            chatViewModel.abandonEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                        },
+                        onDeliver = {
+                            chatViewModel.deliverEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                        },
+                        onSkipDeliver = {
+                            chatViewModel.skipEngineerDeliverFromCenter(item.sessionId, item.task.taskId)
+                        },
+                        onRetry = {
+                            chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                            onOpenTaskInChat(item.sessionId, item.task.taskId)
+                        },
+                    )
+                }
+            }
+            if (list.history.isNotEmpty()) {
+                item(key = "header_history") {
+                    TaskCenterSectionHeader(stringResource(R.string.task_center_section_history))
+                }
+                items(list.history, key = { item -> "history_${item.task.taskId}" }) { item ->
+                    // 历史区只读（D7）：仅 FAILED 保留「重试」动作，审批回调缺省为 null（不渲染）
+                    TaskCenterListItem(
+                        item = item,
+                        actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
+                        onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
+                        onRetry = {
+                            chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
+                            onOpenTaskInChat(item.sessionId, item.task.taskId)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 后台任务 Tab（用户任务协议 §7）：进行中/历史双分区 UserTaskCard 列表。 */
+@Composable
+private fun UserTaskTab(
+    userTasks: List<UserTask>,
+    onAction: (String, UserTaskAction) -> Unit,
+    onOpenDestination: (UserTaskDestination) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val (active, history) = userTasks.partition { task -> UserTaskMapping.isActive(task.status) }
+    if (active.isEmpty() && history.isEmpty()) {
+        Column(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(R.string.task_center_empty_user_tasks),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(vertical = 8.dp),
-            ) {
-                if (list.active.isNotEmpty()) {
-                    item(key = "header_active") {
-                        TaskCenterSectionHeader(stringResource(R.string.task_center_section_active))
-                    }
-                    items(list.active, key = { item -> "active_${item.task.taskId}" }) { item ->
-                        TaskCenterListItem(
-                            item = item,
-                            actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
-                            onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
-                            onContinue = {
-                                chatViewModel.continueEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                                onOpenTaskInChat(item.sessionId, item.task.taskId)
-                            },
-                            onAbandon = {
-                                chatViewModel.abandonEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                            },
-                            onDeliver = {
-                                chatViewModel.deliverEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                            },
-                            onSkipDeliver = {
-                                chatViewModel.skipEngineerDeliverFromCenter(item.sessionId, item.task.taskId)
-                            },
-                            onRetry = {
-                                chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                                onOpenTaskInChat(item.sessionId, item.task.taskId)
-                            },
-                        )
-                    }
-                }
-                if (list.history.isNotEmpty()) {
-                    item(key = "header_history") {
-                        TaskCenterSectionHeader(stringResource(R.string.task_center_section_history))
-                    }
-                    items(list.history, key = { item -> "history_${item.task.taskId}" }) { item ->
-                        // 历史区只读（D7）：仅 FAILED 保留「重试」动作，审批回调缺省为 null（不渲染）
-                        TaskCenterListItem(
-                            item = item,
-                            actionsEnabled = !isProcessing && item.task.taskId !in actionInFlight,
-                            onClick = { onOpenTaskInChat(item.sessionId, item.task.taskId) },
-                            onRetry = {
-                                chatViewModel.retryEngineerTaskFromCenter(item.sessionId, item.task.taskId)
-                                onOpenTaskInChat(item.sessionId, item.task.taskId)
-                            },
-                        )
-                    }
-                }
+        }
+        return
+    }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (active.isNotEmpty()) {
+            item(key = "user_header_active") {
+                TaskCenterSectionHeader(stringResource(R.string.task_center_section_active))
+            }
+            items(active, key = { task -> "user_active_${task.id}" }) { task ->
+                UserTaskCard(
+                    task = task,
+                    onAction = { action -> onAction(task.id, action) },
+                    onOpenDestination = { onOpenDestination(task.destination) },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
+        if (history.isNotEmpty()) {
+            item(key = "user_header_history") {
+                TaskCenterSectionHeader(stringResource(R.string.task_center_section_history))
+            }
+            items(history, key = { task -> "user_history_${task.id}" }) { task ->
+                UserTaskCard(
+                    task = task,
+                    onAction = { action -> onAction(task.id, action) },
+                    onOpenDestination = { onOpenDestination(task.destination) },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
             }
         }
     }
