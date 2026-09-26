@@ -96,11 +96,21 @@ class UserTaskRegistry(
     /** 适配器对账用：注册表中某 kind 的活动态任务 id。 */
     suspend fun activeIdsOfKind(kind: UserTaskKind): List<String> = dao.activeIdsOfKind(kind.name)
 
-    /** 适配器对账用：注册表中某任务的当前状态（无行返回 null）。 */
-    suspend fun currentStatus(taskId: String): UserTaskStatus? =
-        dao.getById(taskId)?.let { row ->
-            runCatching { UserTaskStatus.valueOf(row.status) }.getOrNull()
+    /** 适配器对账用：注册表中某任务的当前状态（无行或读库失败返回 null）。 */
+    @Suppress("TooGenericExceptionCaught") // 与 upsertStatus 写路径降级对齐：读失败视同无行，不杀死适配器 collect 协程
+    suspend fun currentStatus(taskId: String): UserTaskStatus? {
+        val row = try {
+            dao.getById(taskId)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            Logger.w(TAG, "currentStatus failed, id=$taskId", exception)
+            return null
         }
+        return row?.let { entity ->
+            runCatching { UserTaskStatus.valueOf(entity.status) }.getOrNull()
+        }
+    }
 
     private fun UserTaskEntity.toUserTask(snapshot: TaskProgressSnapshot?): UserTask? {
         val kind = runCatching { UserTaskKind.valueOf(kind) }.getOrElse { exception ->

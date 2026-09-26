@@ -69,25 +69,32 @@ class TagScanTaskAdapterTest {
     @Test
     fun `COMPLETED 含失败任务时挂 PARTIAL_FAILURES`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
-        adapter.sync(progress(ScanSessionState.COMPLETED, processed = 18, total = 20, failed = 2))
+        adapter.sync(progress(ScanSessionState.COMPLETED, processed = 18, total = 20, failed = 2, eta = 5000L))
         val task = registry.tasks.value.single()
         assertEquals(UserTaskStatus.COMPLETED, task.status)
         assertEquals(UserTaskErrorCode.PARTIAL_FAILURES, task.errorCode)
         assertEquals("2", task.errorDetail)
+        // 终态不回写进度快照：无幽灵 ETA、重启前后表现一致
+        assertNull(task.progress)
+        assertNull(task.progressText)
+        assertNull(task.etaMs)
     }
 
     @Test
     fun `COMPLETED 零失败时无错误码`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
         adapter.sync(progress(ScanSessionState.COMPLETED, processed = 20, total = 20, failed = 0))
-        assertNull(registry.tasks.value.single().errorCode)
+        val task = registry.tasks.value.single()
+        assertNull(task.errorCode)
+        assertNull(task.progress)
+        assertNull(task.etaMs)
     }
 
     @Test
-    fun `null 进度且注册表残留活动态行时置 CANCELLED 对账`() = runTest {
+    fun `首帧 null 且注册表残留活动态行时置 CANCELLED 对账`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
         registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
-        adapter.sync(null)
+        adapter.sync(null, isFirstEmission = true)
         val task = registry.tasks.value.single()
         assertEquals(UserTaskStatus.CANCELLED, task.status)
         assertEquals(UserTaskErrorCode.PROCESS_TERMINATED, task.errorCode)
@@ -95,10 +102,44 @@ class TagScanTaskAdapterTest {
     }
 
     @Test
+    fun `非首帧 null 不动状态仅清快照`() = runTest {
+        val (registry, adapter, _) = fixture(testScheduler)
+        registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
+        registry.updateProgress("tagscan:main", TaskProgressSnapshot(0.5f, "10/20", 3000L))
+        adapter.sync(null)
+        val task = registry.tasks.value.single()
+        assertEquals(UserTaskStatus.RUNNING, task.status)
+        assertNull(task.errorCode)
+        assertNull(task.progress)
+    }
+
+    @Test
+    fun `IDLE 对象不误判进程死亡仅清快照`() = runTest {
+        val (registry, adapter, _) = fixture(testScheduler)
+        registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
+        registry.updateProgress("tagscan:main", TaskProgressSnapshot(0.5f, "10/20", 3000L))
+        adapter.sync(progress(ScanSessionState.IDLE, processed = 10, total = 20))
+        val task = registry.tasks.value.single()
+        assertEquals(UserTaskStatus.RUNNING, task.status)
+        assertNull(task.errorCode)
+        assertNull(task.progress)
+    }
+
+    @Test
     fun `null 进度且注册表无行时不产生任务`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
-        adapter.sync(null)
+        adapter.sync(null, isFirstEmission = true)
         assertTrue(registry.tasks.value.isEmpty())
+    }
+
+    @Test
+    fun `total 为 0 时进度与文案均为 null 不显示 0 比 0`() = runTest {
+        val (registry, adapter, _) = fixture(testScheduler)
+        adapter.sync(progress(ScanSessionState.RUNNING, processed = 0, total = 0))
+        val task = registry.tasks.value.single()
+        assertEquals(UserTaskStatus.RUNNING, task.status)
+        assertNull(task.progress)
+        assertNull(task.progressText)
     }
 
     @Test

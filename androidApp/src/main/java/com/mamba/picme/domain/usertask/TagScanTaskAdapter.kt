@@ -24,24 +24,33 @@ class TagScanTaskAdapter(
 
     override val kind: UserTaskKind = UserTaskKind.TAG_SCAN
 
+    /** 非幂等：重复调用会起双订阅；当前唯一调用方 UserTaskRegistry.registerAdapter 保证单次。 */
     override fun start() {
         scope.launch {
-            TagGenerationService.sessionProgress.collect { progress -> sync(progress) }
+            var isFirstEmission = true
+            TagGenerationService.sessionProgress.collect { progress ->
+                sync(progress, isFirstEmission)
+                isFirstEmission = false
+            }
         }
     }
 
     @VisibleForTesting
-    internal suspend fun sync(progress: TagScanSessionProgress?) {
+    internal suspend fun sync(progress: TagScanSessionProgress?, isFirstEmission: Boolean = false) {
         val status = progress?.let { value -> UserTaskMapping.fromTagScanState(value.state) }
         if (status == null) {
-            // IDLE / 无会话：注册表残留活动态行 = 进程被杀于扫描中 → 对账置 CANCELLED
-            val current = registry.currentStatus(TASK_ID)
-            if (current != null && UserTaskMapping.isActive(current)) {
-                registry.upsertStatus(
-                    id = TASK_ID, kind = kind, displayName = null,
-                    status = UserTaskStatus.CANCELLED,
-                    errorCode = UserTaskErrorCode.PROCESS_TERMINATED,
-                )
+            // 进程被杀对账仅限「start() 后首帧为 null」（进程重启后 Service 静态流必为 null 初值）：
+            // 注册表残留活动态行 = 进程死于扫描中 → 置 CANCELLED(PROCESS_TERMINATED)。
+            // 运行中出现的 IDLE 对象（orchestrator resume 竞态窗口会发）或后续 null 只清快照、不动状态。
+            if (progress == null && isFirstEmission) {
+                val current = registry.currentStatus(TASK_ID)
+                if (current != null && UserTaskMapping.isActive(current)) {
+                    registry.upsertStatus(
+                        id = TASK_ID, kind = kind, displayName = null,
+                        status = UserTaskStatus.CANCELLED,
+                        errorCode = UserTaskErrorCode.PROCESS_TERMINATED,
+                    )
+                }
             }
             registry.updateProgress(TASK_ID, null)
             return
@@ -56,14 +65,18 @@ class TagScanTaskAdapter(
             errorCode = if (partialFailures) UserTaskErrorCode.PARTIAL_FAILURES else null,
             errorDetail = if (partialFailures) progress.failed.toString() else null,
         )
-        registry.updateProgress(
-            TASK_ID,
-            TaskProgressSnapshot(
-                progress = if (progress.total > 0) progress.processed / progress.total.toFloat() else null,
-                progressText = "${progress.processed}/${progress.total}",
-                etaMs = progress.estimatedRemainingMs,
+        // 终态不写进度快照（upsertStatus 内部已清）：避免 PARTIAL_FAILURES 卡带幽灵 ETA、重启前后进度文案不一致
+        if (UserTaskMapping.isActive(status)) {
+            registry.updateProgress(
+                TASK_ID,
+                TaskProgressSnapshot(
+                    progress = if (progress.total > 0) progress.processed / progress.total.toFloat() else null,
+                    // total==0 时文案同样置 null，避免误导性的 "0/0"
+                    progressText = if (progress.total > 0) "${progress.processed}/${progress.total}" else null,
+                    etaMs = progress.estimatedRemainingMs,
+                )
             )
-        )
+        }
     }
 
     override suspend fun perform(taskId: String, action: UserTaskAction) {
@@ -71,7 +84,7 @@ class TagScanTaskAdapter(
             UserTaskAction.PAUSE -> control("pause")
             UserTaskAction.RESUME -> control("resume")
             UserTaskAction.CANCEL -> control("cancel")
-            // 会话级无 FAILED 态，RETRY 只出现在进程被杀对账后 → 重起增量扫描
+            // 防御性映射：当前状态机不可达（CANCELLED 无动作集、会话级无 FAILED 态），保留以对齐协议动词全集
             UserTaskAction.RETRY -> control("start")
         }
     }
