@@ -91,13 +91,15 @@ class TagScanTaskAdapterTest {
     }
 
     @Test
-    fun `首帧 null 且注册表残留活动态行时置 CANCELLED 对账`() = runTest {
+    fun `首帧 null 且注册表残留活动态行时置 FAILED 对账可重试`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
         registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
         adapter.sync(null, isFirstEmission = true)
         val task = registry.tasks.value.single()
-        assertEquals(UserTaskStatus.CANCELLED, task.status)
+        // FAILED 而非 CANCELLED：actionsFor(FAILED)=RETRY，「已中断——点重试重新开始」文案有按钮可点
+        assertEquals(UserTaskStatus.FAILED, task.status)
         assertEquals(UserTaskErrorCode.PROCESS_TERMINATED, task.errorCode)
+        assertEquals(setOf(UserTaskAction.RETRY), task.supportedActions)
         assertNull(task.progress)
     }
 

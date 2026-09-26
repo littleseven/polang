@@ -21,9 +21,12 @@ class UserTaskRegistryTest {
         val rows = MutableStateFlow<List<UserTaskEntity>>(emptyList())
         var trimCalls = 0
             private set
+        var upsertCalls = 0
+            private set
         var failOnUpsert = false
 
         override suspend fun upsert(task: UserTaskEntity) {
+            upsertCalls++
             if (failOnUpsert) error("disk full")
             rows.value = rows.value.filterNot { row -> row.id == task.id } + task
         }
@@ -168,6 +171,30 @@ class UserTaskRegistryTest {
         registry.upsertStatus("download:b", UserTaskKind.MODEL_DOWNLOAD, "b", UserTaskStatus.RUNNING) // 不抛出即通过
 
         assertEquals(listOf("download:a"), registry.tasks.value.map { task -> task.id })
+    }
+
+    @Test
+    fun `连续同态 upsertStatus 节流为单次落库`() = runTest {
+        val dao = FakeDao()
+        val registry = registry(dao, testScheduler)
+        // 同态 5 连写（模拟下载 500ms 帧 / 扫描每张一帧的同态刷新）只落库 1 次
+        repeat(5) {
+            registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.RUNNING)
+        }
+        assertEquals(1, dao.upsertCalls)
+
+        // 状态迁移不节流
+        registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.PAUSED)
+        assertEquals(2, dao.upsertCalls)
+
+        // 写失败不入缓存：恢复后同态调用仍会重试落库
+        dao.failOnUpsert = true
+        registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.COMPLETED)
+        assertEquals(3, dao.upsertCalls)
+        dao.failOnUpsert = false
+        registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.COMPLETED)
+        assertEquals(4, dao.upsertCalls)
+        assertEquals(UserTaskStatus.COMPLETED, registry.tasks.value.single().status)
     }
 
     @Test

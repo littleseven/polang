@@ -744,6 +744,14 @@ class AppContainerImpl(
                     // 校验通过的文件会跳过，不会整模型重复下载（spec §4.2「重新下载」语义）
                     override fun retry(modelId: String) =
                         enqueueVerifiedModelDownload(modelId, llmModelDownloadManager::enqueueDownload)
+
+                    // 查不到/清单加载失败回退 null，适配器侧回退 modelId（与预检同一数据源）
+                    override suspend fun displayNameOf(modelId: String): String? = runCatching {
+                        llmModelDownloadManager.loadAvailableModels()
+                            .find { model -> model.id == modelId }?.name
+                    }.onFailure { err ->
+                        Logger.w("AppContainer", "displayNameOf failed for $modelId", err)
+                    }.getOrNull()
                 },
                 scope = userTaskScope,
             )

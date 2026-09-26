@@ -1633,4 +1633,5 @@
     <string name="user_task_error_process_terminated">Interrumpida — toca Reintentar</string>
     <string name="user_task_error_partial_failures">%1$s elementos fallaron</string>
     <string name="user_task_error_model_unavailable">Modelo no disponible — puede haber sido retirado</string>
+    <string name="user_task_eta_remaining">~%1$s restantes</string>
 </resources>

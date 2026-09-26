@@ -1682,4 +1682,5 @@
     <string name="user_task_error_process_terminated">Interrupted — tap Retry to restart</string>
     <string name="user_task_error_partial_failures">%1$s items failed</string>
     <string name="user_task_error_model_unavailable">Model unavailable — may have been delisted</string>
+    <string name="user_task_eta_remaining">~%1$s left</string>
 </resources>

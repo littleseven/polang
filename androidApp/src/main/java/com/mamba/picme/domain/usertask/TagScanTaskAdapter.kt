@@ -40,14 +40,15 @@ class TagScanTaskAdapter(
         val status = progress?.let { value -> UserTaskMapping.fromTagScanState(value.state) }
         if (status == null) {
             // 进程被杀对账仅限「start() 后首帧为 null」（进程重启后 Service 静态流必为 null 初值）：
-            // 注册表残留活动态行 = 进程死于扫描中 → 置 CANCELLED(PROCESS_TERMINATED)。
+            // 注册表残留活动态行 = 进程死于扫描中 → 置 FAILED(PROCESS_TERMINATED)——
+            // actionsFor(FAILED)=RETRY 使「已中断——点重试重新开始」文案有按钮可点（CANCELLED 动作集为空）。
             // 运行中出现的 IDLE 对象（orchestrator resume 竞态窗口会发）或后续 null 只清快照、不动状态。
             if (progress == null && isFirstEmission) {
                 val current = registry.currentStatus(TASK_ID)
                 if (current != null && UserTaskMapping.isActive(current)) {
                     registry.upsertStatus(
                         id = TASK_ID, kind = kind, displayName = null,
-                        status = UserTaskStatus.CANCELLED,
+                        status = UserTaskStatus.FAILED,
                         errorCode = UserTaskErrorCode.PROCESS_TERMINATED,
                     )
                 }
@@ -84,7 +85,7 @@ class TagScanTaskAdapter(
             UserTaskAction.PAUSE -> control("pause")
             UserTaskAction.RESUME -> control("resume")
             UserTaskAction.CANCEL -> control("cancel")
-            // 防御性映射：当前状态机不可达（CANCELLED 无动作集、会话级无 FAILED 态），保留以对齐协议动词全集
+            // RETRY → start：进程死亡对账（FAILED）唯一出口，「点重试重新开始」链（spec §9-2）
             UserTaskAction.RETRY -> control("start")
         }
     }

@@ -1633,4 +1633,5 @@
     <string name="user_task_error_process_terminated">Interrompue — touchez Réessayer</string>
     <string name="user_task_error_partial_failures">%1$s éléments en échec</string>
     <string name="user_task_error_model_unavailable">Modèle indisponible — peut avoir été retiré</string>
+    <string name="user_task_eta_remaining">~%1$s restantes</string>
 </resources>

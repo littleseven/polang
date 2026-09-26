@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 用户任务混合注册表（spec §5）：Room 存身份（仅状态迁移落库）+ 内存走进度 + 合并流对 UI。
@@ -25,6 +26,13 @@ class UserTaskRegistry(
 
     private val _progress = MutableStateFlow<Map<String, TaskProgressSnapshot>>(emptyMap())
     private val adapters = mutableMapOf<UserTaskKind, UserTaskAdapter>()
+
+    /**
+     * 写库节流缓存（最近成功落库行）。ConcurrentHashMap：upsertStatus 可被多适配器协程并发调用，
+     * 非原子 check-then-act 最坏只多写一次可接受。trimHistory 删行不清缓存是安全的——
+     * 任何任务复跑必经活动态（与缓存的终态行不等）先行落库覆盖缓存。
+     */
+    private val lastWritten = ConcurrentHashMap<String, WrittenRow>()
 
     val tasks: StateFlow<List<UserTask>> =
         combine(dao.observeAll(), _progress) { rows, snapshots ->
@@ -70,6 +78,15 @@ class UserTaskRegistry(
         errorCode: UserTaskErrorCode? = null,
         errorDetail: String? = null,
     ) {
+        // 写库节流（spec §5 决策 #4「Room 只在状态迁移时写入」）：与最近成功落库行一致则跳过
+        // dao.upsert——TAG 扫描每张一帧、下载 500ms 一帧的同态刷新不再击穿 Room。
+        // updatedAt/completedAt 是每次刷新的派生字段，不入相等键（入键则节流失效）。
+        val written = WrittenRow(kind, displayName, status, errorCode, errorDetail)
+        if (lastWritten[id] == written) {
+            // 终态进度快照在首次落库时已清，此处幂等再清一次兜底
+            if (!UserTaskMapping.isActive(status)) _progress.update { current -> current - id }
+            return
+        }
         val now = clock()
         try {
             dao.upsert(
@@ -93,6 +110,8 @@ class UserTaskRegistry(
             Logger.w(TAG, "upsertStatus failed, id=$id status=$status", exception)
             return
         }
+        // 写成功才入缓存；写失败降级保持不缓存，下次同态调用仍会重试落库
+        lastWritten[id] = written
         if (!UserTaskMapping.isActive(status)) {
             _progress.update { current -> current - id }
         }
@@ -158,6 +177,15 @@ class UserTaskRegistry(
             updatedAt = updatedAt,
         )
     }
+
+    /** 落库相等键：仅含内容字段；updatedAt/completedAt 为派生刷新字段不入键。 */
+    private data class WrittenRow(
+        val kind: UserTaskKind,
+        val displayName: String?,
+        val status: UserTaskStatus,
+        val errorCode: UserTaskErrorCode?,
+        val errorDetail: String?,
+    )
 
     companion object {
         const val HISTORY_KEEP = 50

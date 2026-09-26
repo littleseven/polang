@@ -34,10 +34,12 @@ class ModelDownloadTaskAdapterTest {
     private class FakeControl : ModelDownloadControl {
         override val downloadStates = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
         val calls = mutableListOf<Pair<String, String>>() // verb to modelId
+        val displayNames = mutableMapOf<String, String>()
         override fun pause(modelId: String) { calls += "pause" to modelId }
         override fun resume(modelId: String) { calls += "resume" to modelId }
         override fun cancel(modelId: String) { calls += "cancel" to modelId }
         override fun retry(modelId: String) { calls += "retry" to modelId }
+        override suspend fun displayNameOf(modelId: String): String? = displayNames[modelId]
     }
 
     // stateIn(Eagerly) 的收集协程需即时跑完才能让 .value 断言同步可见：
@@ -146,5 +148,21 @@ class ModelDownloadTaskAdapterTest {
         val task = registry.tasks.value.single()
         assertEquals(UserTaskStatus.COMPLETED, task.status)
         assertNull(task.progress)
+    }
+
+    @Test
+    fun `卡片标题用模型展示名——查不到回退 id 且命中后缓存`() = runTest {
+        val (registry, adapter, control) = fixture(testScheduler)
+        // 清单无此模型 → 回退 modelId
+        adapter.sync(mapOf("m1" to DownloadState("m1", DownloadStatus.DOWNLOADING, 5L, 10L)))
+        assertEquals("m1", registry.tasks.value.single().displayName)
+
+        // 清单后至（null 不缓存）→ 升级为展示名；改名后再 sync 仍用缓存值
+        control.displayNames["m1"] = "Qwen3-VL-2B"
+        adapter.sync(mapOf("m1" to DownloadState("m1", DownloadStatus.DOWNLOADING, 6L, 10L)))
+        assertEquals("Qwen3-VL-2B", registry.tasks.value.single().displayName)
+        control.displayNames["m1"] = "Other Name"
+        adapter.sync(mapOf("m1" to DownloadState("m1", DownloadStatus.DOWNLOADING, 7L, 10L)))
+        assertEquals("Qwen3-VL-2B", registry.tasks.value.single().displayName)
     }
 }

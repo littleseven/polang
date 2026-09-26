@@ -17,6 +17,9 @@ interface ModelDownloadControl {
     fun resume(modelId: String)
     fun cancel(modelId: String)
     fun retry(modelId: String)
+
+    /** 模型展示名（ModelConfig.name）；查不到/加载失败返回 null（调用方回退 modelId）。 */
+    suspend fun displayNameOf(modelId: String): String?
 }
 
 /**
@@ -33,6 +36,14 @@ class ModelDownloadTaskAdapter(
 
     // 上一轮 sync 见过的活动任务 id——仅在 sync 内读写（单 collect 协程串行，无线程问题）
     private var lastActiveIds: Set<String> = emptySet()
+
+    // 模型展示名缓存（spec §4 卡片标题用展示名不用机器 ID）；null 结果不缓存——模型清单可能后至，下次再查
+    private val displayNameCache = mutableMapOf<String, String>()
+
+    private suspend fun displayNameOf(modelId: String): String =
+        displayNameCache[modelId]
+            ?: control.displayNameOf(modelId)?.also { name -> displayNameCache[modelId] = name }
+            ?: modelId
 
     /** 非幂等：重复调用会起双订阅；当前唯一调用方 UserTaskRegistry.registerAdapter 保证单次。 */
     override fun start() {
@@ -55,7 +66,7 @@ class ModelDownloadTaskAdapter(
             if (rowId !in liveIds) {
                 registry.upsertStatus(
                     id = rowId, kind = kind,
-                    displayName = modelId(rowId),
+                    displayName = displayNameOf(modelId(rowId)),
                     status = UserTaskStatus.FAILED,
                     errorCode = UserTaskErrorCode.PROCESS_TERMINATED,
                 )
@@ -74,7 +85,7 @@ class ModelDownloadTaskAdapter(
             registry.upsertStatus(
                 id = taskId(id),
                 kind = kind,
-                displayName = id,
+                displayName = displayNameOf(id),
                 status = status,
             )
             // 终态不写进度快照（upsertStatus 内部已清）：与 TagScan 适配器审查结论一致，避免幽灵进度
@@ -108,7 +119,7 @@ class ModelDownloadTaskAdapter(
             registry.upsertStatus(
                 id = missingId,
                 kind = kind,
-                displayName = modelId(missingId),
+                displayName = displayNameOf(modelId(missingId)),
                 status = UserTaskStatus.CANCELLED,
             )
         }
