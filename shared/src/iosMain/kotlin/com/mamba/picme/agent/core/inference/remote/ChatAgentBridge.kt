@@ -8,6 +8,7 @@ import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentScene
 import com.mamba.picme.agent.core.model.context.ReplyLanguage
+import com.mamba.picme.agent.core.model.context.SearchResultSnapshot
 import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.runtime.capability.CapabilityRegistry
 import com.mamba.picme.shared.FlowWatcher
@@ -39,7 +40,12 @@ import kotlinx.coroutines.withTimeout
  */
 class ChatAgentBridge(
     private val orchestrator: AgentOrchestrator,
-    initialSessionId: String = DEFAULT_SESSION_ID
+    initialSessionId: String = DEFAULT_SESSION_ID,
+    /**
+     * 搜索基数存在性供给（组合根注入 IosChatGalleryCapability.hasSearchBase）：
+     * 意图路由器紧凑状态 hasSearchBase 的 iOS 数据源——缺失时 refine 语义会退化为全局重搜。
+     */
+    private val searchBaseProvider: () -> Boolean = { false },
 ) {
     private val tag = "ChatAgentBridge"
 
@@ -69,7 +75,7 @@ class ChatAgentBridge(
         replyLanguage: String,
         onText: (String) -> Unit,
         onToolCall: () -> Unit,
-        onComplete: (summary: String, errorMessage: String?) -> Unit
+        onComplete: (summary: String, errorMessage: String?, directReply: DirectRouteReply?) -> Unit
     ) {
         val personaEnum = runCatching { AssistantPersona.valueOf(persona) }
             .getOrDefault(AssistantPersona.DEFAULT)
@@ -81,7 +87,22 @@ class ChatAgentBridge(
                     scene = AgentScene.CHAT,
                     memorySessionId = sessionId,
                     persona = personaEnum,
-                    replyLanguage = languageEnum
+                    replyLanguage = languageEnum,
+                    // 意图路由器紧凑状态：iOS 搜索基数在 IosChatGalleryCapability.lastSearchAssets，
+                    // 经组合根注入的 provider 透传（合成快照只表达存在性，路由器只消费 isNotEmpty）
+                    recentSearchResults = if (searchBaseProvider()) {
+                        listOf(
+                            SearchResultSnapshot(
+                                query = "",
+                                results = emptyList(),
+                                totalCount = 1,
+                                isRefinement = false,
+                                timestamp = 0L,
+                            )
+                        )
+                    } else {
+                        emptyList()
+                    },
                 )
                 val result = orchestrator.remoteChatEngine.streamChat(
                     input = input,
@@ -95,18 +116,19 @@ class ChatAgentBridge(
                 )
                 result.fold(
                     onSuccess = { streamResult ->
-                        onComplete(streamResult.fullResponse, null)
+                        // directReply 非空 = 意图路由直执回合：summary 为空，Swift 据此渲染本地化气泡
+                        onComplete(streamResult.fullResponse, null, streamResult.directReply)
                     },
                     onFailure = { e ->
                         Logger.e(tag, "sendMessage failed", e)
-                        onComplete("", e.message ?: "未知错误")
+                        onComplete("", e.message ?: "未知错误", null)
                     }
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 Logger.e(tag, "sendMessage exception", e)
-                onComplete("", e.message ?: "未知错误")
+                onComplete("", e.message ?: "未知错误", null)
             }
         }
     }

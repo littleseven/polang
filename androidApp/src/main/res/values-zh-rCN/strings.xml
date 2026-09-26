@@ -810,6 +810,8 @@
     <string name="gallery_index_complete">索引完成</string>
     <string name="gallery_search_hint">按内容、地点、文字搜索…</string>
     <string name="gallery_search_no_results">未找到相关照片</string>
+    <!-- 意图路由直执回合的气泡（找到结果时；卡片已经 uiActions 渲染） -->
+    <string name="chat_direct_results_shown">已在上方卡片展示搜索结果</string>
     <string name="gallery_tag_category_scene">场景</string>
     <string name="gallery_tag_category_animal">动物</string>
     <string name="gallery_tag_category_food">食物</string>

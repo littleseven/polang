@@ -28,6 +28,15 @@ class IntentRouterCoreTest {
         assertFalse(IntentRouterCore.shouldRoute("给我讲个笑话"))
     }
 
+    @Test
+    fun `gating requires media noun co-occurrence for bare view verbs`() {
+        // 单字动词（看/找/搜/画）不与媒体名词共现时不放行——防「含常用动词即路由」
+        assertFalse(IntentRouterCore.shouldRoute("你看这事怎么办"))
+        assertFalse(IntentRouterCore.shouldRoute("帮我找个理由"))
+        assertTrue(IntentRouterCore.shouldRoute("看下我儿子的照片")) // 照片=强信号
+        assertTrue(IntentRouterCore.shouldRoute("找一下视频")) // 找+视频 共现
+    }
+
     // ── pattern 捷径 ────────────────────────────────────────────────
 
     @Test
@@ -86,6 +95,13 @@ class IntentRouterCoreTest {
     @Test
     fun `parse rejects invalid enum`() {
         val raw = """{"deliverable":"FLY_TO_MOON","confidence":0.9}"""
+        assertNull(IntentRouterCore.parseRouterOutput(raw))
+    }
+
+    @Test
+    fun `parse rejects invalid secondary enum`() {
+        // secondary 拼错按 schema 失败处理（重试/降级），不吞为单产出物
+        val raw = """{"deliverable":"VIEW_PHOTOS","confidence":0.9,"secondary":"DRAW_CHRT"}"""
         assertNull(IntentRouterCore.parseRouterOutput(raw))
     }
 

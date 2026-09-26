@@ -1361,8 +1361,21 @@ class ChatViewModel(
                         // 检测 LLM 安全对齐误触发：用户想搜相册但 LLM 拒绝了
                         val replyText = (streamResult.commands.firstOrNull() as? AgentCommand.TextReply)?.message
                             ?: streamResult.fullResponse
-                        // ReAct 已出过卡片时（总结文本带拒绝措辞属常见误报），跳过回退直搜，避免重复卡片
-                        if (IntentGuard.isRefusedSearchRequest(text, replyText) &&
+                        val directReply = streamResult.directReply
+                        if (directReply != null) {
+                            // 意图路由直执回合：用户气泡由平台层本地化渲染（模型侧 observation
+                            // 是硬编码中文模板，不可直达用户——I18N 红线）；卡片已经 uiActions 渲染
+                            insertAgentMessage(
+                                sessionId,
+                                if (directReply.totalCount > 0) {
+                                    stringContext().getString(R.string.chat_direct_results_shown)
+                                } else {
+                                    stringContext().getString(R.string.gallery_search_no_results)
+                                },
+                                currentModelLabel(),
+                                performance
+                            )
+                        } else if (IntentGuard.isRefusedSearchRequest(text, replyText) &&
                             chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId) == null
                         ) {
                             Logger.w(TAG, "LLM refused search request, falling back to direct gallery search")
@@ -2949,6 +2962,11 @@ class ChatViewModel(
                 _messages.value = emptyList()
                 // 选中态是纯 UI 内存态，消息删光后整体清理，回退到推荐卡高亮即可
                 _gachaSelections.value = emptyMap()
+                // 搜索/路由状态同步清理：消息已删，旧搜索基数不应再驱动 refine 直执（路由层
+                // hasSearchBase 派生自 recentSearchResults）与卡片水合
+                lastResultAssets.remove(sessionId)
+                sessionSearchSnapshots.remove(sessionId)
+                pendingScriptMediaIds.remove(sessionId)
                 Logger.i(TAG, "Chat cleared for session: $sessionId")
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to clear chat", e)

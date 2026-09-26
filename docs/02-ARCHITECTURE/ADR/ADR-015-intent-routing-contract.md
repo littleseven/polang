@@ -35,6 +35,6 @@
 
 ## 4. 影响面
 
-- chat 链路所有入口（Android chat 页、iOS ChatAgentBridge、飞书 `processRemoteImInput`）经 `RemoteChatEngine.streamChat` 统一过路由器；
-- 直执路径跳过全量 agent loop：最热意图（看照片/细化）时延 ≈ 路由 LLM 一跳（≤1.5s 超时兜底）+ 端侧搜索，不再走多轮 tool_calls；
-- iOS 侧自动生效（shared commonMain），工具清单 `ChatToolManifest` 已同步（view_media 移除、search_media 参数对齐）。
+- 路由器挂在 `RemoteChatEngine.streamChat`，覆盖 **Android chat 页与 iOS ChatAgentBridge 两个入口**；飞书 `processRemoteImInput` 走 `KoogReActAgent` 独立链路、**不经 streamChat，行为不变**（M2 验收观测口径以此为准）；
+- 直执路径跳过全量 agent loop：最热意图（看照片/细化）时延 ≈ 路由 LLM 一跳（≤1.5s 超时兜底）+ 端侧搜索，不再走多轮 tool_calls；直执不产 LLM 总结，用户气泡由平台层按 `DirectRouteReply` 本地化渲染（I18N 红线），该轮 user+observation 补写 Koog 会话记忆防多轮指代断裂；
+- iOS 侧自动生效（shared commonMain），工具清单 `ChatToolManifest` 已同步（view_media 移除、search_media 参数对齐）；搜索基数存在性经 `IosChatGalleryCapability.hasSearchBase` 透传进路由状态。

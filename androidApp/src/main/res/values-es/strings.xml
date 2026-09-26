@@ -828,6 +828,8 @@
     <string name="gallery_index_complete">Indexación completa</string>
     <string name="gallery_search_hint">Buscar por contenido, ubicación, texto…</string>
     <string name="gallery_search_no_results">No se encontraron fotos</string>
+    <!-- 意图路由直执回合的气泡（找到结果时；卡片已经 uiActions 渲染） -->
+    <string name="chat_direct_results_shown">Resultados mostrados en la tarjeta de arriba</string>
     <string name="gallery_tag_category_scene">Escena</string>
     <string name="gallery_tag_category_animal">Animal</string>
     <string name="gallery_tag_category_food">Comida</string>

@@ -436,11 +436,21 @@ class ChatToolService private constructor() : TraceIdAware {
         dispatchCommandWithTrace(command, traceIdHolder?.value)
 
     /**
-     * 带显式 traceId 的命令分发入口（internal）：供意图路由器策略层（ChatRoutingPolicy 直执路径）
+     * 带显式 traceId 的命令分发入口（internal）：供意图路由器直执路径（RemoteChatEngine）
      * 复用同一条「dispatch → uiActions 发射 → observation 文本 → 5s 超时」链路，
      * 保证路由直执与 LLM tool_calls 的执行语义完全一致（含审计 traceId 串联）。
      */
-    internal suspend fun dispatchCommandWithTrace(command: AgentCommand, traceId: String?): String {
+    internal suspend fun dispatchCommandWithTrace(command: AgentCommand, traceId: String?): String =
+        dispatchCommandDetailed(command, traceId).observation
+
+    /** 直执路径的结构化分发结果：[action] 为 null 表示 dispatch 失败/超时（observation 为 Error 文本）。 */
+    internal data class DetailedDispatch(val observation: String, val action: AgentAction?)
+
+    /**
+     * [dispatchCommandWithTrace] 的结构化变体：除 observation 外返回真实 [AgentAction]，
+     * 供路由直执路径判定成功/失败（失败回落完整 agent loop）并提取结果基数（totalCount）。
+     */
+    internal suspend fun dispatchCommandDetailed(command: AgentCommand, traceId: String?): DetailedDispatch {
         return try {
             // 结构化等待（替代 future{}.get(5s) 阻塞桥）：超时经协程取消级联终止底层 dispatch。
             val result = withTimeout(DISPATCH_TIMEOUT_MS) {
@@ -451,21 +461,25 @@ class ChatToolService private constructor() : TraceIdAware {
                 onSuccess = { action ->
                     // UI 通道：把原始 AgentAction 发给 ChatViewModel 渲染（卡片/跳转等）
                     uiActions.tryEmit(action)
-                    // LLM observation：基于真实执行结果生成（而非 "OK"）
-                    when (action) {
-                        is AgentAction.MediaResults ->
-                            "找到 ${action.totalCount} 张「${action.query}」的照片，已展示在卡片中"
-                        is AgentAction.TextReply -> action.message
-                        is AgentAction.Success -> when (action.command) {
-                            is AgentCommand.AiOptimize -> "图片已优化，结果已展示在聊天中"
-                            is AgentCommand.EditImage -> "图片已编辑完成，结果图已发到聊天中"
-                            else -> "OK"
-                        }
-                        is AgentAction.Error -> "Error: ${action.message}"
-                        else -> "OK: ${action::class.simpleName}"
-                    }
+                    // LLM observation：基于真实执行结果生成（而非 "OK"）。
+                    // ⚠️ 该文本是模型侧观测（硬编码中文模板），直执路径下绝不可直达用户气泡（I18N）。
+                    DetailedDispatch(
+                        observation = when (action) {
+                            is AgentAction.MediaResults ->
+                                "找到 ${action.totalCount} 张「${action.query}」的照片，已展示在卡片中"
+                            is AgentAction.TextReply -> action.message
+                            is AgentAction.Success -> when (action.command) {
+                                is AgentCommand.AiOptimize -> "图片已优化，结果已展示在聊天中"
+                                is AgentCommand.EditImage -> "图片已编辑完成，结果图已发到聊天中"
+                                else -> "OK"
+                            }
+                            is AgentAction.Error -> "Error: ${action.message}"
+                            else -> "OK: ${action::class.simpleName}"
+                        },
+                        action = action,
+                    )
                 },
-                onFailure = { "Error: ${it.message}" },
+                onFailure = { DetailedDispatch("Error: ${it.message}", null) },
             )
         } catch (e: TimeoutCancellationException) {
             // 等待 dispatch 5s 超时（语义对齐旧 java.util.concurrent.TimeoutException 分支）：
@@ -480,13 +494,13 @@ class ChatToolService private constructor() : TraceIdAware {
                 errorMessage = "dispatch wait timed out after 5s",
                 traceId = traceId
             )
-            "Error: ${e.message}"
+            DetailedDispatch("Error: ${e.message}", null)
         } catch (e: CancellationException) {
             // 外部取消（agent cancel）：结构化并发要求透传，不吞为错误字符串。
             throw e
         } catch (e: Exception) {
             Logger.w(tag, "dispatchCommand failed: ${command::class.simpleName}: ${e.message}")
-            "Error: ${e.message}"
+            DetailedDispatch("Error: ${e.message}", null)
         }
     }
 

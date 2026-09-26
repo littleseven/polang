@@ -54,6 +54,12 @@ class IosChatGalleryCapability(
     /** 上一轮搜索命中的资产快照（全量 PHOTO），供 refine/more/exclude 做 in-set 过滤。 */
     private var lastSearchAssets: List<MediaAsset>? = null
 
+    /**
+     * 搜索基数存在性（只读）：组合根注入 ChatAgentBridge 作意图路由器紧凑状态
+     * hasSearchBase 的 iOS 数据源（缺失时 refine 直执退化为全局重搜）。
+     */
+    val hasSearchBase: Boolean get() = !lastSearchAssets.isNullOrEmpty()
+
     /** 最近一轮搜索 query（feedback 落库 query_text 口径，契约 §8/R10 精确等值）。 */
     private var lastRoundQuery: String? = null
 

@@ -858,6 +858,8 @@
     <string name="gallery_index_complete">Index complete</string>
     <string name="gallery_search_hint">Search by content, location, text…</string>
     <string name="gallery_search_no_results">No photos found</string>
+    <!-- 意图路由直执回合的气泡（找到结果时；卡片已经 uiActions 渲染） -->
+    <string name="chat_direct_results_shown">Search results are shown in the card above</string>
     <string name="gallery_tag_category_scene">Scene</string>
     <string name="gallery_tag_category_animal">Animal</string>
     <string name="gallery_tag_category_food">Food</string>

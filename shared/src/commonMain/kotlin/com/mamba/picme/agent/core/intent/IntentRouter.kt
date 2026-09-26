@@ -97,11 +97,20 @@ object IntentRouterCore {
     const val ROUTER_TIMEOUT_MS = 1500L
 
     /**
-     * 本地信号门控：相册域关键词/媒体语素命中才放行给路由器（含 pattern）。
+     * 本地信号门控：相册域信号命中才放行给路由器（含 pattern）。
      * 只放行不拦截——未命中 = 直通 OPEN_QA（零成本，行为与现状一致）。
+     *
+     * 信号分两层（review 决议，防「含常用动词即放行」导致门控形同虚设）：
+     * - 强信号（媒体名词/相册域词/应用域动作词）：命中即放行；
+     * - 弱信号（单字动词 看/找/搜/画）：必须与媒体名词共现才放行
+     *   （"你看这事怎么办"不进路由器，"看下我儿子的照片"经「照片」强信号已放行）。
      */
     fun shouldRoute(query: String): Boolean =
-        GALLERY_DOMAIN_SIGNALS.any { signal -> query.contains(signal) }
+        GALLERY_STRONG_SIGNALS.any { signal -> query.contains(signal) } ||
+            (
+                VIEW_VERBS.any { verb -> query.contains(verb) } &&
+                    MEDIA_NOUNS.any { noun -> query.contains(noun) }
+                )
 
     /**
      * pattern 捷径：仅「看/找/搜 + … + 照片/图片/合照」最热句式短路（零延迟零成本）。
@@ -138,8 +147,10 @@ object IntentRouterCore {
             ROUTER_JSON.decodeFromString<RouterOutputDto>(raw.substring(start, end + 1))
         }.getOrNull() ?: return null
         val deliverable = runCatching { IntentId.valueOf(dto.deliverable) }.getOrNull() ?: return null
+        // secondary 枚举非法同样判 schema 失败（触发重试/降级）——吞掉会把双产出物请求
+        // 静默降级为单产出物直执（"找照片并画图"只出卡片不出图），比回落 OPEN_QA 更糟。
         val secondary = dto.secondary?.let { value ->
-            runCatching { IntentId.valueOf(value) }.getOrNull()
+            runCatching { IntentId.valueOf(value) }.getOrNull() ?: return null
         }
         val confidence = dto.confidence
         if (confidence == null || confidence < 0.0 || confidence > 1.0) return null
@@ -189,17 +200,17 @@ object IntentRouterCore {
 
     private val ROUTER_JSON = Json { ignoreUnknownKeys = true }
 
-    // 门控信号：相册域名词 + 常见动作语素（只放行不拦截，误判代价为零）
-    private val GALLERY_DOMAIN_SIGNALS = listOf(
-        "照片", "图片", "相册", "视频", "合照", "搜", "找", "看", "画", "图表",
-        "统计", "盘点", "多少", "几张", "趋势", "分布", "记住", "忘掉", "忘记",
+    // 门控强信号：媒体名词 + 相册域词 + 应用域动作词（命中即放行）
+    private val GALLERY_STRONG_SIGNALS = listOf(
+        "照片", "图片", "相册", "视频", "合照", "截图", "图表",
+        "统计", "盘点", "几张", "趋势", "分布", "记住", "忘掉", "忘记",
         "打开", "返回", "设置", "主题", "语言", "删除", "分享", "收藏",
         "优化", "美颜", "磨皮", "瘦脸", "美白", "滤镜", "调亮", "调暗",
     )
 
-    // pattern 捷径的媒体名词与观看动词（最热句式）
-    private val MEDIA_NOUNS = listOf("照片", "图片", "合照")
-    private val VIEW_VERBS = listOf("看", "找", "搜")
+    // pattern 捷径的媒体名词与观看动词（最热句式）；弱信号层共用（需与媒体名词共现）
+    private val MEDIA_NOUNS = listOf("照片", "图片", "合照", "视频", "相册", "截图")
+    private val VIEW_VERBS = listOf("看", "找", "搜", "画")
 
     // 捷径负面语素：命中则语义非「看照片」（分析/计数/画图/疑问），归路由器
     private val NEGATIVE_MORPHEMES = listOf(
@@ -271,11 +282,11 @@ class IntentRouter(
             return RoutingResult(openQaOutput(), RoutePath.DEGRADED_NO_EXECUTOR, 0, "executor unavailable")
                 .also { result -> audit(result, traceId) }
         }
-        var lastRaw: String? = null
         repeat(2) { attempt ->
+            // 单次尝试 1.5s 硬超时；schema 重试不共享预算（最坏 2×1.5s 才降级，spec §3.2 注记）
             val raw = runCatching {
                 withTimeout(IntentRouterCore.ROUTER_TIMEOUT_MS) {
-                    callRouterLlm(bundle, query, state, today)
+                    callRouterLlm(bundle, query, state, today, traceId)
                 }
             }.getOrElse { error ->
                 val path = if (error is kotlinx.coroutines.TimeoutCancellationException) {
@@ -290,7 +301,6 @@ class IntentRouter(
                     error.message,
                 ).also { result -> audit(result, traceId) }
             }
-            lastRaw = raw
             val parsed = IntentRouterCore.parseRouterOutput(raw)
             if (parsed != null) {
                 val latency = Clock.System.now().toEpochMilliseconds() - started
@@ -306,11 +316,12 @@ class IntentRouter(
             }
             Logger.w(tag, "router schema invalid (attempt $attempt): ${raw.take(120)}")
         }
-        // schema 重试仍败 → 降级
+        // schema 重试仍败 → 降级（degradeReason 只记分类标签：模型原始输出可能夹带用户原话
+        // 片段（constraint/person 槽位），routing_audit_log 不落用户输入内容——隐私红线）
         return RoutingResult(
             openQaOutput(), RoutePath.DEGRADED_SCHEMA,
             Clock.System.now().toEpochMilliseconds() - started,
-            "schema invalid after retry: ${lastRaw?.take(80)}",
+            "schema invalid after retry",
         ).also { result -> audit(result, traceId) }
     }
 
@@ -320,6 +331,7 @@ class IntentRouter(
         query: String,
         state: CompactChatState,
         today: String,
+        traceId: String?,
     ): String {
         val params = bundle.baseParams.copy(temperature = 0.0, maxTokens = 256)
         val routerPrompt = prompt(id = "polang-intent-router", params = params) {
@@ -328,28 +340,47 @@ class IntentRouter(
         }
         val started = Clock.System.now().toEpochMilliseconds()
         // Koog 1.3.0：execute 返回单个 Message.Assistant，文本在 parts（ResponsePart）里
-        val response = bundle.executor.execute(routerPrompt, bundle.model, emptyList())
+        val response = try {
+            bundle.executor.execute(routerPrompt, bundle.model, emptyList())
+        } catch (e: Exception) {
+            // 失败同样落 llm_call_log（降级率需与推理侧错误详情交叉，spec §3.7）
+            recordRouterCall(bundle, started, traceId, success = false, text = null, error = e.message)
+            throw e
+        }
         val text = response.parts
             .filterIsInstance<MessagePart.Text>()
             .joinToString("") { part -> part.text }
-        // 推理层审计（llm_call_log）：路由器调用与 chat 主链路同表不同 source
-        RemoteModelFactory.recorder?.record(
-            LlmCallRecord(
-                createdAt = Clock.System.now().toEpochMilliseconds(),
-                source = RECORD_SOURCE,
-                model = bundle.model.id,
-                success = true,
-                latencyMs = Clock.System.now().toEpochMilliseconds() - started,
-                promptTokens = null,
-                completionTokens = null,
-                totalTokens = null,
-                requestJson = "",
-                responseJson = if (RemoteModelFactory.captureContent) text.take(512) else null,
-                errorMessage = null,
-                traceId = null,
-            )
-        )
+        // 推理层审计（llm_call_log）：路由器调用与 chat 主链路同表不同 source，traceId 串联
+        recordRouterCall(bundle, started, traceId, success = true, text = text, error = null)
         return text
+    }
+
+    private fun recordRouterCall(
+        bundle: RemoteModelFactory.KoogExecutorBundle,
+        started: Long,
+        traceId: String?,
+        success: Boolean,
+        text: String?,
+        error: String?,
+    ) {
+        runCatching {
+            RemoteModelFactory.recorder?.record(
+                LlmCallRecord(
+                    createdAt = Clock.System.now().toEpochMilliseconds(),
+                    source = RECORD_SOURCE,
+                    model = bundle.model.id,
+                    success = success,
+                    latencyMs = Clock.System.now().toEpochMilliseconds() - started,
+                    promptTokens = null,
+                    completionTokens = null,
+                    totalTokens = null,
+                    requestJson = "",
+                    responseJson = if (RemoteModelFactory.captureContent) text?.take(512) else null,
+                    errorMessage = error?.take(200),
+                    traceId = traceId,
+                )
+            )
+        }
     }
 
     private fun openQaOutput(): RouterOutput = RouterOutput(
@@ -364,7 +395,8 @@ class IntentRouter(
         constraint = null,
     )
 
-    private fun audit(result: RoutingResult, traceId: String?) {        Logger.i(
+    private fun audit(result: RoutingResult, traceId: String?) {
+        Logger.i(
             tag,
             "route: path=${result.path} deliverable=${result.output.deliverable} " +
                 "confidence=${result.output.confidence} latency=${result.latencyMs}ms " +

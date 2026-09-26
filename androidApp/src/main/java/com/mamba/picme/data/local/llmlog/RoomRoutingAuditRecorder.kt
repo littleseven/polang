@@ -74,7 +74,9 @@ class RoomRoutingAuditRecorder(
 
         /** 与 RoomLlmCallRecorder / RoomToolCallRecorder 区分，避免共享同一按天 prune 标记互相跳过。 */
         private const val KEY_LAST_PRUNE_DAY = "last_prune_day_routing"
-        private const val KEEP = 200
+
+        /** 路由审计留存量（M2 验收需跨天聚合路由正确率/降级率，重度用户日增量可达数百）。 */
+        private const val KEEP = 1000
         private const val DEGRADE_REASON_MAX_CHARS = 200
     }
 }
