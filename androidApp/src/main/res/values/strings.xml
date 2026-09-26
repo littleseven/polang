@@ -1374,6 +1374,27 @@
     <string name="claude_truncated_reason_timeout">(timeout)</string>
     <string name="claude_continue">Continue</string>
 
+    <!-- Engineer task card -->
+    <string name="chat_task_status_running">Running</string>
+    <string name="chat_task_status_awaiting">Needs approval</string>
+    <string name="chat_task_status_completed">Completed</string>
+    <string name="chat_task_status_failed">Failed</string>
+    <string name="chat_task_meta_turns">%1$d turns</string>
+    <string name="chat_task_meta_cost">Cost $%1$.2f</string>
+    <string name="chat_task_meta_files">%1$d files changed</string>
+    <string name="chat_task_stage">Stage: %1$s</string>
+    <string name="chat_task_abandon">Stop here</string>
+    <string name="chat_task_skip_deliver">Not now</string>
+    <string name="chat_task_retry">Retry</string>
+    <string name="chat_task_resolved_continued">Continued</string>
+    <string name="chat_task_resolved_delivered">Delivered</string>
+    <string name="chat_task_resolved_abandoned">Abandoned</string>
+    <string name="chat_task_resolved_skipped">Delivery skipped</string>
+    <string name="chat_task_expand">Show details</string>
+    <string name="chat_task_collapse">Hide details</string>
+    <string name="chat_task_deliver_summary">%1$d files changed, ready to deliver</string>
+    <string name="cd_engineer_task_card">Engineer task card</string>
+
     <!-- Issue report -->
     <string name="report_issue_title">Report a problem</string>
     <string name="report_issue_cd">Report a problem</string>

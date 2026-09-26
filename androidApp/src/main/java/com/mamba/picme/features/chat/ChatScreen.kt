@@ -120,6 +120,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -181,6 +182,7 @@ import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.components.ChatEmptyState
 import com.mamba.picme.features.chat.components.ChatPhotoPickerSheet
 import com.mamba.picme.features.chat.components.ChatRegistrationSheet
+import com.mamba.picme.features.chat.components.EngineerTaskCard
 import com.mamba.picme.features.chat.components.GuestNudgeBanner
 import com.mamba.picme.features.chat.components.GachaCandidateStrip
 import com.mamba.picme.features.chat.components.MediaResultsCarousel
@@ -232,6 +234,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val messages by viewModel.displayMessages.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
+    val engineerActionInFlight by viewModel.engineerActionInFlight.collectAsState()
     val currentModel by viewModel.currentModel.collectAsState()
     val threads by viewModel.filteredThreads.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -545,6 +548,8 @@ fun ChatScreen(
                             .fillMaxWidth(),
                     )
                 } else {
+                    // 会话内存在任务卡 ⇒ 气泡上的 claude 审批按钮整体抑制（US-2 审批唯一入口）
+                    val hasTaskCards = messages.any { msg -> msg.type == ChatMessageType.TASK_CARD }
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
@@ -581,6 +586,22 @@ fun ChatScreen(
                                     isListScrolling = listState.isScrollInProgress,
                                     onOpenLink = { url -> previewLinkUrl = url }
                                 )
+                            } else if (message.type == ChatMessageType.TASK_CARD && message.engineerTask != null) {
+                                val task = message.engineerTask
+                                if (task != null) {
+                                    var taskExpanded by rememberSaveable(message.id) { mutableStateOf(false) }
+                                    EngineerTaskCard(
+                                        task = task,
+                                        expanded = taskExpanded,
+                                        actionsEnabled = !isProcessing && task.taskId !in engineerActionInFlight,
+                                        onToggleExpand = { taskExpanded = !taskExpanded },
+                                        onContinue = { viewModel.continueEngineerTask(task.taskId) },
+                                        onAbandon = { viewModel.abandonEngineerTask(task.taskId) },
+                                        onDeliver = { viewModel.deliverEngineerTask(task.taskId) },
+                                        onSkipDeliver = { viewModel.skipEngineerDeliver(task.taskId) },
+                                        onRetry = { viewModel.retryEngineerTask(task.taskId) },
+                                    )
+                                }
                             } else if (message.type == ChatMessageType.OPTIMIZE_CANDIDATES && message.optimizeCandidates != null) {
                                 val group = message.optimizeCandidates!!
                                 val selected = gachaSelections[message.id] ?: group.recommendedIndex
@@ -637,6 +658,7 @@ fun ChatScreen(
                                     onClaudeDeliver = { id, mode -> viewModel.confirmClaudeDeliver(id, mode) },
                                     onClaudeContinue = { viewModel.continueClaude() },
                                     canDeliverClaude = canDeliverClaude,
+                                    suppressClaudeActions = hasTaskCards,
                                     onTableClick = { table -> expandedTable = table }
                                 )
                             }
@@ -1392,6 +1414,7 @@ private fun ChatMessageItem(
     onClaudeDeliver: (String, String) -> Unit = { _, _ -> },
     onClaudeContinue: () -> Unit = {},
     canDeliverClaude: Boolean = false,
+    suppressClaudeActions: Boolean = false,
     onTableClick: (MarkdownTable) -> Unit = {},
 ) {
     val isUser = message.type == ChatMessageType.USER_TEXT ||
@@ -1446,7 +1469,8 @@ private fun ChatMessageItem(
                     message = message,
                     onClaudeDeliver = onClaudeDeliver,
                     onClaudeContinue = onClaudeContinue,
-                    canDeliverClaude = canDeliverClaude
+                    canDeliverClaude = canDeliverClaude,
+                    suppressClaudeActions = suppressClaudeActions
                 )
                 message.performance?.let { perf ->
                     MessagePerformanceRow(perf, isUser = false)
@@ -1577,6 +1601,7 @@ private fun AgentMessageExtras(
     onClaudeDeliver: (String, String) -> Unit,
     onClaudeContinue: () -> Unit,
     canDeliverClaude: Boolean,
+    suppressClaudeActions: Boolean,
 ) {
     // claude agent 步骤列表（tool_use↔tool_result 配对 + file_change 徽标）
     message.claudeAgent?.let { cs ->
@@ -1585,46 +1610,49 @@ private fun AgentMessageExtras(
             ClaudeAgentSteps(cs.steps)
         }
     }
-    // 截断标识 + 继续（spec §3.4）：truncatedReason 粘滞，置位后只设不清。
-    message.claudeAgent?.truncatedReason?.let { reason ->
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "ⓘ " + stringResource(R.string.claude_truncated) +
-                    " " + truncationReasonLabel(reason),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(8.dp))
-            TextButton(onClick = onClaudeContinue) {
-                Text(stringResource(R.string.claude_continue), fontSize = 12.sp)
+    // 任务卡时代（US-2 审批唯一入口）：会话内存在 TASK_CARD 时，气泡上的截断继续/交付按钮整体抑制
+    if (!suppressClaudeActions) {
+        // 截断标识 + 继续（spec §3.4）：truncatedReason 粘滞，置位后只设不清。
+        message.claudeAgent?.truncatedReason?.let { reason ->
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "ⓘ " + stringResource(R.string.claude_truncated) +
+                        " " + truncationReasonLabel(reason),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onClaudeContinue) {
+                    Text(stringResource(R.string.claude_continue), fontSize = 12.sp)
+                }
             }
         }
-    }
-    // claude 交付按钮：file_change 后出现，pending 时可选 push/pr/auto（spec §8）
-    // 仅白名单账号展示写链路入口；非白名单只读诊断，不能改代码。
-    message.claudeDeliver?.let { cd ->
-        if (cd.pending && canDeliverClaude) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.claude_deliver_choose),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DeliverModeButton(
-                    label = stringResource(R.string.claude_deliver_mode_push),
-                    onClick = { onClaudeDeliver(message.id, "push") }
+        // claude 交付按钮：file_change 后出现，pending 时可选 push/pr/auto（spec §8）
+        // 仅白名单账号展示写链路入口；非白名单只读诊断，不能改代码。
+        message.claudeDeliver?.let { cd ->
+            if (cd.pending && canDeliverClaude) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.claude_deliver_choose),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                DeliverModeButton(
-                    label = stringResource(R.string.claude_deliver_mode_pr),
-                    onClick = { onClaudeDeliver(message.id, "pr") }
-                )
-                DeliverModeButton(
-                    label = stringResource(R.string.claude_deliver_mode_auto),
-                    onClick = { onClaudeDeliver(message.id, "auto") }
-                )
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DeliverModeButton(
+                        label = stringResource(R.string.claude_deliver_mode_push),
+                        onClick = { onClaudeDeliver(message.id, "push") }
+                    )
+                    DeliverModeButton(
+                        label = stringResource(R.string.claude_deliver_mode_pr),
+                        onClick = { onClaudeDeliver(message.id, "pr") }
+                    )
+                    DeliverModeButton(
+                        label = stringResource(R.string.claude_deliver_mode_auto),
+                        onClick = { onClaudeDeliver(message.id, "auto") }
+                    )
+                }
             }
         }
     }

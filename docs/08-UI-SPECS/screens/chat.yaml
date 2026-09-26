@@ -648,6 +648,14 @@ js_toolcalls:
       sanitize: "落库前 HtmlCardSanitizer 清洗（128KB 上限、剔除远程 script/iframe/object/embed/form/meta refresh；2026-09-25 起远程 img/CSS/a 外链放行，表现力优先）"
       lockdown: "禁文件/DOM Storage、零 JS 桥接；远程资源直拉，a 点击经 shouldOverrideUrlLoading 回传 onOpenLink 开落地页，卡片自身永不导航"
       ios_status: "TODO(ios-follow) HtmlCard.swift 照搬 ChartSvgCard WKWebView 模式 + 同款沙盒/动态测高/高度跟随/链接落地页"
+    task_card:                               # AI Engineer 模式每次 claude-chat 提交即产一张（2026-09-25 新增，Android 先行）
+      message_kind: TASK_CARD                # 独立全宽消息项；content=源指令截 50 字，载荷在 metadata.engineer_task
+      ui: EngineerTaskCard                   # 原生 Compose（features/chat/components/）：五态 chip + 阶段/轮次/成本/文件数 meta + 审批动作区 + 展开明细
+      payload: "Room metadata engineer_task key（EngineerTaskState serde：toJson/parseEngineerTaskState，features/chat/ChatModelCommonMainShim.kt）"
+      lifecycle: "EngineerTaskReducer SSE 事件驱动五态迁移（RUNNING/AWAITING_CONTINUE/AWAITING_DELIVER/COMPLETED/FAILED）+ 审批回填幂等；REPLACE upsert + Mutex 串行化落库"
+      approval: "审批唯一入口：截断→继续/到此为止，可交付→push/暂不，失败→重试；会话含任务卡时气泡 legacy 继续/交付按钮抑制（suppressClaudeActions）"
+      smoke: "/task DEBUG 调试指令注入五态样本（EngineerTaskSmokeSamples）"
+      ios_status: "TODO(ios-follow)"
     sandbox_badge:
       show_when: "replyUsedSandbox == true"
       icon: terminal

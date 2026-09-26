@@ -2,6 +2,9 @@ package com.mamba.picme.features.chat
 
 import com.mamba.picme.domain.chat.ClaudeAgentState
 import com.mamba.picme.domain.chat.ClaudeDeliverUi
+import com.mamba.picme.domain.chat.EngineerTaskResolution
+import com.mamba.picme.domain.chat.EngineerTaskState
+import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
@@ -70,6 +73,8 @@ import com.mamba.picme.features.chat.capability.ChatRunScriptCapability
 import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.capability.SearchOutcome
+import com.mamba.picme.features.chat.engineer.EngineerTaskReducer
+import com.mamba.picme.features.chat.engineer.EngineerTaskSmokeSamples
 import com.mamba.picme.features.chat.js.CapabilityDispatchHandler
 import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
@@ -89,6 +94,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -299,6 +305,9 @@ class ChatViewModel(
      */
     private val rendererMutex = Mutex()
 
+    /** 任务卡落库串行化：SSE 事件串行到达 + 本 Mutex 保证 upsert 顺序与事件顺序一致（防乱序回写）。 */
+    private val engineerTaskPersistMutex = Mutex()
+
     private val _claudeMode = MutableStateFlow(false)
     val claudeMode: StateFlow<Boolean> = _claudeMode.asStateFlow()
 
@@ -312,6 +321,18 @@ class ChatViewModel(
 
     /** msgId → 交付按钮状态（内存态；Room 消息经 loadMessages 重放时按 id 回填）。 */
     private val claudeDeliverOverrides = mutableMapOf<String, ClaudeDeliverUi>()
+
+    /** 工程师任务卡内存态：taskId → 最新状态（Room 为持久层，此处为流式期间的 live 覆盖）。 */
+    private val _engineerTasks = MutableStateFlow<Map<String, EngineerTaskState>>(emptyMap())
+    val engineerTasks: StateFlow<Map<String, EngineerTaskState>> = _engineerTasks.asStateFlow()
+
+    /** 任务卡动作（交付/继续/重试）在途的 taskId 集合（双击防护；UI 据此禁用审批按钮）。 */
+    private val _engineerActionInFlight = MutableStateFlow<Set<String>>(emptySet())
+    val engineerActionInFlight: StateFlow<Set<String>> = _engineerActionInFlight.asStateFlow()
+
+    /** 当前回合活动任务（sendClaudeMessage 提交时置位，回合结束清空）。 */
+    @Volatile
+    private var activeEngineerTaskId: String? = null
 
     /**
      * 进入 AI 工程师模式：有持久化上下文且所属 chat 会话仍在 → 切回该会话并恢复 sid
@@ -349,12 +370,21 @@ class ChatViewModel(
     /**
      * claude 模式下的用户消息：走 [ClaudeChatClient.chat] SSE 流式（spec §6 事件）。
      * 事件经 [ClaudeAgentRenderer] 折叠成 agent 气泡（文本流式 + 步骤 + 文件改动）；
-     * done 后落 Room（metadata 带 claude_agent_state，跨重载保留）；出现 file_change → 交付按钮。
+     * done 后落 Room（metadata 带 claude_agent_state，跨重载保留）；交付审批由 TASK_CARD 任务卡承载。
+     * @param actionInFlightTaskId 任务卡动作（继续/重试）来源卡 id：回合结束（finally）释放其在途标记。
      */
-    fun sendClaudeMessage(text: String) {
-        if (text.isBlank()) return
+    fun sendClaudeMessage(text: String, actionInFlightTaskId: String? = null) {
+        if (text.isBlank()) {
+            // 携带在途标记的空调用：立即释放（正常路径由回合 finally 释放）
+            actionInFlightTaskId?.let { id ->
+                _engineerActionInFlight.update { inFlight -> inFlight - id }
+            }
+            return
+        }
         viewModelScope.launch {
             val sessionId = _currentSessionId.value
+            // 提升到 try 外：finally 做 compare-and-clear，防旧回合误清新回合的活动卡
+            var taskId: String? = null
             try {
                 ensureSessionExists(sessionId)
                 chatMessageDao.insertMessage(
@@ -376,6 +406,13 @@ class ChatViewModel(
                 }
 
                 _isProcessing.value = true
+                // 提交即登记任务卡（spec：每次 claude-chat 提交 = 一张任务卡）
+                val roundTaskId = "task_" + UUID.randomUUID().toString()
+                taskId = roundTaskId
+                val initialTask = EngineerTaskReducer.initial(roundTaskId, text, System.currentTimeMillis())
+                activeEngineerTaskId = roundTaskId
+                _engineerTasks.update { tasks -> tasks + (roundTaskId to initialTask) }
+                engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, initialTask) }
                 val renderer = ClaudeAgentRenderer()
                 val streamingId = "claude_streaming_${System.currentTimeMillis()}"
                 _streamingMessage.value = ChatMessageUi(
@@ -405,6 +442,7 @@ class ChatViewModel(
                     }
                 }
                 val result = claudeChatClient.chat(token, text, claudeSid) { event ->
+                    onClaudeEventForTask(sessionId, event, renderer.state.text)
                     when (event) {
                         is ClaudeEvent.Session -> Logger.i(TAG, "claude evt: Session sid=${event.sid}")
                         is ClaudeEvent.ToolUse -> Logger.i(
@@ -442,6 +480,7 @@ class ChatViewModel(
                 result.fold(
                     onSuccess = { persistClaudeBubble(sessionId, renderer.state) },
                     onFailure = { e ->
+                        markActiveEngineerTaskFailed(sessionId, e.message)
                         insertAgentMessage(
                             sessionId,
                             stringContext().getString(R.string.chat_inference_error, e.message ?: stringContext().getString(R.string.chat_unknown_error)),
@@ -451,9 +490,14 @@ class ChatViewModel(
                 )
             } catch (e: Exception) {
                 Logger.e(TAG, "sendClaudeMessage failed", e)
+                markActiveEngineerTaskFailed(sessionId, e.message)
                 _streamingMessage.value = null
             } finally {
                 _isProcessing.value = false
+                if (activeEngineerTaskId == taskId) activeEngineerTaskId = null
+                actionInFlightTaskId?.let { id ->
+                    _engineerActionInFlight.update { inFlight -> inFlight - id }
+                }
             }
         }
     }
@@ -506,8 +550,7 @@ class ChatViewModel(
 
     /**
      * 把折叠后的 agent 气泡落 Room（type=agent_text + metadata.claude_agent_state）。
-     * loadMessages 重放时由 [parseClaudeAgentState] 还原 [ChatMessageUi.claudeAgent]；
-     * 有 file_change 则挂交付按钮（内存态，loadMessages 回填）。
+     * loadMessages 重放时由 [parseClaudeAgentState] 还原 [ChatMessageUi.claudeAgent]。
      */
     private suspend fun persistClaudeBubble(sessionId: String, state: ClaudeAgentState) {
         val sid = claudeSid
@@ -516,18 +559,8 @@ class ChatViewModel(
             "persistClaudeBubble: hasFileChange=${state.hasFileChange} claudeSid=$sid steps=${state.steps.size} stepTools=${state.steps.map { it.tool }}",
         )
         val msgId = UUID.randomUUID().toString()
-        // ⚠️ 时序：必须先 set override，再 insertMessage。insertMessage 会触发 loadMessages reload，
-        // reload 读 claudeDeliverOverrides[msgId] 渲染交付按钮；若 set 晚于 reload，按钮永不出现
-        // （之后无新 Room 写入再触发 reload）。预生成 msgId 保证 set 先于 insert。
-        if (!sid.isNullOrBlank() && state.hasFileChange) {
-            // 交付按钮：只在 AI 实际改动过文件时显示。
-            // 注意：gateway 必须确保 Bash/Edit 等改文件操作都发出 file_change 事件；
-            // 若漏发，则交付按钮不会出现，需在 gateway 侧修复事件翻译。
-            claudeDeliverOverrides[msgId] = ClaudeDeliverUi(sid, pending = true)
-            Logger.i(TAG, "persistClaudeBubble: deliver override pre-attached msgId=$msgId (hasFileChange=true)")
-        } else {
-            Logger.i(TAG, "persistClaudeBubble: NO deliver button (sid=${sid?.take(4)}, hasFileChange=${state.hasFileChange})")
-        }
+        // 任务卡时代（2026-09-25 起）：交付审批收口到 TASK_CARD（US-2 审批唯一入口），
+        // 新气泡不再登记 claudeDeliverOverrides；confirmClaudeDeliver 仅供 legacy 内存 override 使用。
         val metadata = JSONObject().put("claude_agent_state", state.toJson()).toString()
         chatMessageDao.insertMessage(
             ChatMessageEntity(
@@ -542,12 +575,166 @@ class ChatViewModel(
         chatSessionDao.touchSession(sessionId)
     }
 
+    /** 任务卡 upsert（REPLACE 同 id 重插，对齐 gacha metadata 覆写先例）；timestamp 恒为 startedAtMs，卡片锚定提交位置。 */
+    private suspend fun persistEngineerTask(sessionId: String, state: EngineerTaskState) {
+        // 展示层 overlay 的持久化失败不应中止推理（launch 内异常直接崩溃，故就地吞掉只记日志）
+        runCatching {
+            chatMessageDao.insertMessage(
+                ChatMessageEntity(
+                    id = state.taskId,
+                    sessionId = sessionId,
+                    type = EngineerTaskState.ROOM_TYPE,
+                    content = state.sourceText.take(50),
+                    timestamp = state.startedAtMs,
+                    metadata = JSONObject().put("engineer_task", state.toJson()).toString(),
+                )
+            )
+        }.onFailure { e ->
+            if (e is CancellationException) throw e
+            Logger.e(TAG, "persistEngineerTask failed taskId=${state.taskId}", e)
+        }
+    }
+
+    /** SSE 事件 → 任务卡状态机；结构性事件才落库（文本 delta 不触发 Room churn）。 */
+    private fun onClaudeEventForTask(sessionId: String, event: ClaudeEvent, finalText: String) {
+        val taskId = activeEngineerTaskId ?: return
+        val current = _engineerTasks.value[taskId] ?: return
+        var next = EngineerTaskReducer.reduce(current, event, canDeliverClaude.value, System.currentTimeMillis())
+        if (event is ClaudeEvent.Done && !event.truncated) {
+            next = next.copy(resultSummary = EngineerTaskReducer.summarize(finalText))
+        }
+        if (next == current) return
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        if (EngineerTaskReducer.isStructural(event)) {
+            viewModelScope.launch { engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) } }
+        }
+    }
+
+    /** SSE 断连/失败：任务卡 terminal 化（P1 在场态 = FAILED；P3 回联时改「后台运行中」）。 */
+    private fun markActiveEngineerTaskFailed(sessionId: String, message: String?) {
+        val taskId = activeEngineerTaskId ?: return
+        val current = _engineerTasks.value[taskId] ?: return
+        // 断连语义只裁决「还在跑」的卡：COMPLETED/AWAITING_CONTINUE/FAILED 不被二次裁决
+        // （否则 catch 路径会把 AWAITING_CONTINUE 打成 FAILED，吞掉「继续」affordance）
+        if (current.status != EngineerTaskStatus.RUNNING) return
+        val next = EngineerTaskReducer.reduce(
+            current,
+            ClaudeEvent.Error(message ?: "connection lost"),
+            canDeliver = false,
+            nowMs = System.currentTimeMillis(),
+        )
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        viewModelScope.launch { engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) } }
+    }
+
     /**
      * 截断后「继续」：用当前 session 的 sid 发"继续"（[sendClaudeMessage] 复用 --resume）。
      * 注：继续的是本会话最新 sid，与具体气泡无关（一会话一 sid）。
      */
     fun continueClaude() {
         sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue))
+    }
+
+    /** 审批动作回填 + 落库（US-9：同一决策点只审批一次，reducer 内幂等）。sessionId 由调用方在动作入口捕获，防异步回包时用户已切会话。 */
+    private fun resolveEngineerTask(
+        sessionId: String,
+        taskId: String,
+        resolution: EngineerTaskResolution,
+        deliverBranch: String? = null,
+    ) {
+        val current = _engineerTasks.value[taskId] ?: return
+        val next = EngineerTaskReducer.resolved(current, resolution, System.currentTimeMillis(), deliverBranch)
+        if (next == current) return
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        viewModelScope.launch {
+            engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) }
+        }
+    }
+
+    /** 任务卡「继续」：旧卡回填已继续 + 同 sid 续跑（新回合新卡，语义同气泡按钮）。 */
+    fun continueEngineerTask(taskId: String) {
+        if (_isProcessing.value) return
+        // 双击防护：在途标记跨帧存活（sendClaudeMessage 的 launch 异步置位 _isProcessing，
+        // 同帧 try/finally 移除会留空窗），由新回合 finally 释放
+        if (taskId in _engineerActionInFlight.value) return
+        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.CONTINUED)
+        _engineerActionInFlight.update { inFlight -> inFlight + taskId }
+        sendClaudeMessage(stringContext().getString(R.string.chat_claude_continue), actionInFlightTaskId = taskId)
+    }
+
+    /** 任务卡「到此为止」。 */
+    fun abandonEngineerTask(taskId: String) {
+        if (_isProcessing.value) return
+        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.ABANDONED)
+    }
+
+    /** 任务卡「暂不」交付。 */
+    fun skipEngineerDeliver(taskId: String) {
+        if (_isProcessing.value) return
+        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.DELIVER_SKIPPED)
+    }
+
+    /** 任务卡「重试」：重发原消息（新任务卡，不覆盖旧卡，US-11）。 */
+    fun retryEngineerTask(taskId: String) {
+        if (_isProcessing.value) return
+        val source = _engineerTasks.value[taskId]?.sourceText?.takeIf { text -> text.isNotBlank() } ?: return
+        // 双击防护同 continueEngineerTask：在途标记由新回合 finally 释放
+        if (taskId in _engineerActionInFlight.value) return
+        _engineerActionInFlight.update { inFlight -> inFlight + taskId }
+        sendClaudeMessage(source, actionInFlightTaskId = taskId)
+    }
+
+    /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。 */
+    fun deliverEngineerTask(taskId: String) {
+        if (_isProcessing.value) return
+        // 状态门控：仅 AWAITING_DELIVER 可交付，防 COMPLETED 卡被代码层重复交付
+        val task = _engineerTasks.value[taskId]
+            ?.takeIf { candidate -> candidate.status == EngineerTaskStatus.AWAITING_DELIVER }
+            ?: return
+        // 消费端校验+回落（reducer 冻结面不动）：claude init 的 UUID session 事件每回合都会
+        // 经 reducer last-wins 覆盖 task.sid，而网关 /deliver 只认 12-hex sid；pattern 不匹配
+        // 则回落 VM 级 claudeSid（该字段本身只采纳 12-hex，见 sendClaudeMessage 事件处理）。
+        val sid = task.sid?.takeIf { sidValue -> sidValue.matches(GATEWAY_SID_PATTERN) }
+            ?: claudeSid
+            ?: return
+        // 双击防护：taskId 级 in-flight，回包/早退必移除（finally 覆盖 token 缺失路径）
+        if (taskId in _engineerActionInFlight.value) return
+        _engineerActionInFlight.update { inFlight -> inFlight + taskId }
+        val sessionId = _currentSessionId.value
+        viewModelScope.launch {
+            try {
+                val token = _serverAuthToken.value
+                if (token.isBlank()) return@launch
+                claudeChatClient.deliver(token, sid, "push").fold(
+                    onSuccess = { json ->
+                        val branch = json.optString("branch")
+                        if (json.optBoolean("ok", false) && branch.isNotBlank()) {
+                            resolveEngineerTask(sessionId, taskId, EngineerTaskResolution.DELIVERED, branch)
+                        } else {
+                            markEngineerTaskDeliverError(sessionId, taskId, json.optString("error"))
+                        }
+                    },
+                    onFailure = { error -> markEngineerTaskDeliverError(sessionId, taskId, error.message) },
+                )
+            } finally {
+                _engineerActionInFlight.update { inFlight -> inFlight - taskId }
+            }
+        }
+    }
+
+    /** 交付失败：保持待审批态，错误摘要上卡（可重试，对齐 confirmClaudeDeliver pending 恢复语义）。 */
+    private fun markEngineerTaskDeliverError(sessionId: String, taskId: String, message: String?) {
+        val current = _engineerTasks.value[taskId] ?: return
+        // 晚到的失败回包不写已裁决卡（与 resolved 幂等对称）
+        if (current.resolution != null) return
+        val next = current.copy(
+            errorSummary = stringContext().getString(R.string.claude_deliver_failed, message ?: ""),
+            updatedAtMs = System.currentTimeMillis(),
+        )
+        _engineerTasks.update { tasks -> tasks + (taskId to next) }
+        viewModelScope.launch {
+            engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, next) }
+        }
     }
 
     /**
@@ -696,11 +883,20 @@ class ChatViewModel(
     }
 
     /**
-     * UI 实际展示的消息列表：已持久化消息 + 流式临时消息。
+     * UI 实际展示的消息列表：已持久化消息 + 流式临时消息；TASK_CARD 叠加工程师任务 live 态。
      */
-    val displayMessages: StateFlow<List<ChatMessageUi>> = combine(_messages, _streamingMessage) { messages, streaming ->
-        if (streaming != null) messages + streaming else messages
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val displayMessages: StateFlow<List<ChatMessageUi>> =
+        combine(_messages, _streamingMessage, _engineerTasks) { messages, streaming, tasks ->
+            val base = if (streaming != null) messages + streaming else messages
+            if (tasks.isEmpty()) {
+                base
+            } else {
+                base.map { msg ->
+                    val live = msg.engineerTask?.let { task -> tasks[task.taskId] }
+                    if (live != null && live != msg.engineerTask) msg.copy(engineerTask = live) else msg
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
@@ -998,11 +1194,27 @@ class ChatViewModel(
                         chatMessageDao.getMessagesBySession(sessionId)
                     }
                     .collect { entities ->
-                        _messages.value = entities.map { e ->
+                        val uiMessages = entities.map { e ->
                             val ui = e.toUiModel()
                             val deliver = claudeDeliverOverrides[ui.id]
                             ui
                                 .let { if (deliver != null) it.copy(claudeDeliver = deliver) else it }
+                        }
+                        _messages.value = uiMessages
+                        // 合并语义（非整体重置）：Room 表级 invalidation 重发不能冲掉活动任务的
+                        // live entry——同 taskId 取 updatedAtMs 较大者，内存独有 entry 保留。
+                        val loadedTasks = uiMessages
+                            .mapNotNull { msg -> msg.engineerTask?.let { task -> task.taskId to task } }
+                            .toMap()
+                        _engineerTasks.update { current ->
+                            val merged = loadedTasks.toMutableMap()
+                            current.forEach { (taskId, live) ->
+                                val fromRoom = merged[taskId]
+                                if (fromRoom == null || live.updatedAtMs >= fromRoom.updatedAtMs) {
+                                    merged[taskId] = live
+                                }
+                            }
+                            merged
                         }
                         // 回填仍处 pending 的卡条选中态（controller 内存态存活于 ViewModel 重建，选中态不存活）
                         val restored = entities
@@ -1185,6 +1397,19 @@ class ChatViewModel(
             viewModelScope.launch {
                 ensureSessionExists(_currentSessionId.value)
                 HtmlCardSmokeSamples.all.forEach { sample -> emitHtmlCardMessage(sample) }
+            }
+            return
+        }
+
+        // [DEV_ONLY] 调试指令：/task 注入任务卡五态冒烟集，不走 LLM
+        if (BuildConfig.DEBUG && text.trim() == "/task") {
+            viewModelScope.launch {
+                val sessionId = _currentSessionId.value
+                ensureSessionExists(sessionId)
+                EngineerTaskSmokeSamples.all(System.currentTimeMillis()).forEach { sample ->
+                    _engineerTasks.update { tasks -> tasks + (sample.taskId to sample) }
+                    engineerTaskPersistMutex.withLock { persistEngineerTask(sessionId, sample) }
+                }
             }
             return
         }
@@ -2914,6 +3139,7 @@ class ChatViewModel(
                 "html_card" -> ChatMessageType.HTML_CARD
                 "agent_edit_result" -> ChatMessageType.AGENT_EDIT_RESULT
                 OptimizeCandidateGroup.MESSAGE_TYPE -> ChatMessageType.OPTIMIZE_CANDIDATES
+                EngineerTaskState.ROOM_TYPE -> ChatMessageType.TASK_CARD
                 else -> ChatMessageType.AGENT_TEXT
             },
             content = content,
@@ -2934,6 +3160,7 @@ class ChatViewModel(
             },
             gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
                 optimizeGachaController?.hasPending(id) == true,
+            engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
         )
     }
 

@@ -1329,6 +1329,27 @@
     <string name="claude_truncated_reason_max_turns">(nombre max de tours atteint)</string>
     <string name="claude_truncated_reason_timeout">(délai dépassé)</string>
     <string name="claude_continue">Continuer</string>
+
+    <!-- Engineer task card -->
+    <string name="chat_task_status_running">En cours</string>
+    <string name="chat_task_status_awaiting">En attente</string>
+    <string name="chat_task_status_completed">Terminé</string>
+    <string name="chat_task_status_failed">Échec</string>
+    <string name="chat_task_meta_turns">%1$d tours</string>
+    <string name="chat_task_meta_cost">Coût $%1$.2f</string>
+    <string name="chat_task_meta_files">%1$d fichiers</string>
+    <string name="chat_task_stage">Étape : %1$s</string>
+    <string name="chat_task_abandon">Arrêter</string>
+    <string name="chat_task_skip_deliver">Plus tard</string>
+    <string name="chat_task_retry">Réessayer</string>
+    <string name="chat_task_resolved_continued">Repris</string>
+    <string name="chat_task_resolved_delivered">Livré</string>
+    <string name="chat_task_resolved_abandoned">Abandonné</string>
+    <string name="chat_task_resolved_skipped">Livraison ignorée</string>
+    <string name="chat_task_expand">Voir le détail</string>
+    <string name="chat_task_collapse">Réduire</string>
+    <string name="chat_task_deliver_summary">%1$d fichiers, prêt à livrer</string>
+    <string name="cd_engineer_task_card">Carte de tâche</string>
     <!-- Issue report -->
     <string name="report_issue_title">Signaler un problème</string>
     <string name="report_issue_cd">Signaler un problème</string>

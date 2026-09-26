@@ -69,7 +69,7 @@ Muse 最受认可的范式转变是「任务后台跑 + 需要决策才回联」
 ## 4. 已定决策
 
 - **D1 场景先行**：工程师模式先做，相册域 TaskRegistry（调研 #1）不捆绑；任务卡 UI 组件与任务状态模型按通用形状设计（状态机与渲染分离），但本次只接工程师模式一个数据源。任务状态流宿主为**进程级单例**（AppContainer 域），chat 页/任务中心页/前台 Service 三方消费，不挂 ChatViewModel 内存。
-- **D2 原生卡片**：任务卡 = 原生 Compose 组件，新增 `ChatMessageType.TASK_CARD`（或挂 `metadata` 扩展，实现时二选一，倾向独立类型对齐 `HTML_CARD` 先例——ADR-014 计划名 RICH_HTML 未随落地更新，实际枚举名为 `HTML_CARD`）；不依赖 ADR-014 实现排期。注意 `ChatMessageType` 是双端 SSOT，新增枚举会进入 iOS 面——iOS 侧须同步 default 兜底渲染（纯文本摘要占位），完整实现另走 /ios-follow（见 §6）。
+- **D2 原生卡片**：任务卡 = 原生 Compose 组件，新增 `ChatMessageType.TASK_CARD`（或挂 `metadata` 扩展，实现时二选一，倾向独立类型对齐 `HTML_CARD` 先例——ADR-014 计划名 RICH_HTML 未随落地更新，实际枚举名为 `HTML_CARD`）；不依赖 ADR-014 实现排期。注意 `ChatMessageType` 是双端 SSOT，新增枚举会进入 iOS 面——iOS 侧须同步 default 兜底渲染（纯文本摘要占位），完整实现另走 /ios-follow（见 §6）。实证更正（2026-09-25 实现期）：iOS chat 用独立 Swift `MessageType` 枚举、不消费 shared `ChatMessageType`（`iosApp/PoLang/Features/Chat/ChatMessage.swift:50-55`），新增 TASK_CARD 无枚举面泄漏；iOS 接入时点以 chat.yaml 登记为准。
 - **D3 回联通道 = 本地通知 + 前台对账，不做服务端推送**：FCM/厂商推送不在本期；后台期间由前台 Service 短间隔轮询兜底（对齐网关 `CT_PHASE_TIMEOUT=300s` 量级——任务分钟级终态，WorkManager 15 分钟最小周期对回联基本无效，仅作进程死亡后的兜底）；前台恢复时即时对账。
 - **D4 状态权威在服务端**：App 侧任务是投影；服务端（网关反代 claude-tunnel）新增 `GET /v1/claude-task/status?sid=` 返回 `{state, turns, costCents, summary, updatedAt}`（sid 不存在 → unknown），SSE 仍是实时通道，状态接口是对账通道。**硬依赖（评审升格）——网关三项改造先行**：①回合执行与 SSE 断连解耦（事件写缓冲、断连后回合继续跑；现状 pump 直写 SSE，断连即子进程孤儿化）；②per-sid 状态登记落盘（对齐 `.claude_session` 文件先例，防网关重启丢状态；现状 `SSE_HUB` 回合结束即删）；③sid↔owner 归属校验（Ktor 反代注入 owner 标识、网关登记映射，跨账号查询 → 403；现状 Ktor 纯透传无映射，不解则为越权读取面）。
 - **D5 审批外置语义沿用**：审批动作在卡片原生 UI（App UI 层），不在对话流文本内——与 Muse Sentinel 设计同构，延续 Tier A 思路。

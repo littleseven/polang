@@ -1365,6 +1365,27 @@
     <string name="claude_truncated_reason_timeout">（逾時）</string>
     <string name="claude_continue">繼續</string>
 
+    <!-- Engineer task card -->
+    <string name="chat_task_status_running">進行中</string>
+    <string name="chat_task_status_awaiting">待審批</string>
+    <string name="chat_task_status_completed">已完成</string>
+    <string name="chat_task_status_failed">失敗</string>
+    <string name="chat_task_meta_turns">%1$d 輪</string>
+    <string name="chat_task_meta_cost">成本 $%1$.2f</string>
+    <string name="chat_task_meta_files">改 %1$d 個檔案</string>
+    <string name="chat_task_stage">目前階段：%1$s</string>
+    <string name="chat_task_abandon">到此為止</string>
+    <string name="chat_task_skip_deliver">暫不</string>
+    <string name="chat_task_retry">重試</string>
+    <string name="chat_task_resolved_continued">已繼續</string>
+    <string name="chat_task_resolved_delivered">已交付</string>
+    <string name="chat_task_resolved_abandoned">已放棄</string>
+    <string name="chat_task_resolved_skipped">已跳過交付</string>
+    <string name="chat_task_expand">展開明細</string>
+    <string name="chat_task_collapse">收起明細</string>
+    <string name="chat_task_deliver_summary">改動 %1$d 個檔案，可交付</string>
+    <string name="cd_engineer_task_card">工程師任務卡</string>
+
     <!-- Issue report -->
     <string name="report_issue_title">上報問題</string>
     <string name="report_issue_cd">上報問題</string>
