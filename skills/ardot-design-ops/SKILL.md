@@ -148,7 +148,7 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | preview-mode.sh --shot 搬移路径失配 | 脚本按 `<dir>/screenshot-*.png` 搬文件,实际产物落 `<dir>/<fileId>/` 子目录,报 FileNotFoundError | 钉定本身已生效(像素自证);截图自己 capture_screenshot 代劳,勿重试脚本(重试会二次钉定) |
 | health-check 多页扫描漏页与合并 | 只扫单页时 catalog 全组件报 missing(假 drift);两页 jsonl 直接 cat 合并则 _meta 双行 KeyError | catalog 校验必须含 Components 页;合并时滤掉各文件 _meta 行,重写单行 _meta |
 | 营销帧批量面色重绑后文字全隐形(2026-09-25) | 24 海报标题/副标题+brand_row 组件字被重绑到与背景同 token(scheme/background)→黑底黑字,且 health-check literal=0 照样绿——**对比度错误不在健康检查射程内** | 批量 rebind 后必须逐帧导出+文字带白像素判据复验(全帧行级亮度剖面);营销帧配色对:scheme/primary 底+scheme/onPrimary(#FFF 双模恒值)字;04-people/05-person-groups 帧内文案互换系历史既定(v2.2.2 起线上如此),勿当 bug"修" |
-| Guide 图文重映射 SSOT(2026-09-26) | setup-* 与文案错位(编辑人物页顶模型中心)且未随微信化重烘 | 源帧钉语言→3x 导出→灌 guide 卡 Screen 子节点→导卡,终态回 zh;映射=entry 设置总览/1 本地模型/2 tag_control 顶裁/3 底裁 y443/4 账号/preview 聊天;**05/06 虽网站未引用也须同步补结构**——画布一致性优先 |
+| Guide 图文重映射 SSOT(2026-09-26) | setup-* 与文案错位(编辑人物页顶模型中心)且未随微信化重烘 | 源帧钉语言→3x 导出→灌 guide 卡 Screen 子节点→导卡,终态回 zh;映射=entry 设置总览/1 本地模型/2 tag_control 顶裁 **0–852(1x)=0–2556(@3x) 首屏完整段,含图库统计+扫描状态段(「扫描中」pill 必须入镜)**/3 底裁 y443–1295(=1329–3885@3x,分阶段+重新生成+GPU)/4 账号/preview 聊天;**05/06 虽网站未引用也须同步补结构**——画布一致性优先;顶裁勿按半屏猜,先读整页分段定界(2026-09-26 二修:0–443 裁法漏扫描段被 QA 打回) |
 | 营销帧边框范式定案(2026-09-26) | 深色截图的边框选型;Light 钉帧内 onSurface 渲成深灰 | 统一纯白:边框一律绑 color/white($143:3,双模恒 #FFFFFF);guide 卡结构=边框帧(padding12/外角28)+Screen 子(内角18);海报/FG 内条同款;勿用 $2:149(Light 钉下变 #181818) |
 | 直传脚本挪位 ROOT 越级(2026-09-26) | play-images-upload.py 从 tmp 挪 scripts/ 后 ../.. 指到仓库上级,listing 目录找不到→上传静默空转→空 edit commit 403 | 脚本内相对 ROOT 按部署位重算+空目录硬失败防呆;线上无伤(edit 不 commit 自动作废) |
 | Play REST v3 图片端点形态(2026-09-25) | images 增删查 URL 误带 /images 段或 type query → 400 Cannot bind / Invalid value | 真身=.../listings/{lang}/{imageType}(camelCase: phoneScreenshots/featureGraphic,无 /images 段);edit 收尾=.../edits/{id}**:commit**(冒号非斜杠);入库脚本 scripts/play-images-upload.py(SA JWT openssl 签+SOCKS+prune 重传+sha 回读) |
@@ -195,3 +195,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 1.7.0 | 2026-09-26 | Guide 重烘+边框统一实战回填:Guide 图文映射 SSOT/纯白边框范式($143:3)/直传脚本 ROOT 越级坑(陷阱表 +3 行) |
 | 1.8.0 | 2026-09-26 | 顶栏左对齐全域修复实战回填:微信化标题 ABSOLUTE 残留(AUTO 回流)/帧级 padding 推走铬件/稀疏帧导出误判(陷阱表 +3 行);gallery grid/empty 结构复位+memories 三段式(hero轮播+宽卡双up+小卡4up)定案 |
 | 1.9.0 | 2026-09-26 | Chat 卡片全量组件化实战回填:U 侧 fills 绑定内嵌 VARIABLE_ALIAS 姿势/渐变 literal 盲区/主组件本体钉 Light 导出/模式不变 token 组件豁免(陷阱表 +4 行);新建 ChatComponents 页 10 组件+16 处实例化+catalog 23 |
+| 1.9.1 | 2026-09-26 | 官网 guide 图二修实战回填:tag_control 顶裁边界定死 0–852 首屏(陷阱表 Guide SSOT 行修订)+en/tw 首页裸 setup 引用补 ?v 缓存戳 |
