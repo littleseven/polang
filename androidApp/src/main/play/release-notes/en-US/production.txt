@@ -1,4 +1,6 @@
-- Album cleanup 2.0: duplicates grouped by content type, batch keep/clean, full-screen group review
-- New languages: Spanish & French (5 total)
-- Status bar now follows in-app theme; fixed bottom-bar overlap on gesture navigation
-- Camera routing & avatar capture improvements
+- Task Center: dual-tab hub for background & user tasks, live activity badges, task cards with progress & ETA
+- Conversational album management: delegate in chat, tasks run in background, results delivered back
+- HTML cards: inline preview card + full-screen viewer
+- Album cleanup: redesigned category hub, three-group review (suggested / confirm / protected), swipe to tidy
+- Gallery: swipe-up-to-trash, delete-without-asking, HyperOS visibility fixes
+- Memories page redesigned
