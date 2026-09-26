@@ -142,6 +142,10 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 营销帧边框范式定案(2026-09-26) | 深色截图的边框选型;Light 钉帧内 onSurface 渲成深灰 | 统一纯白:边框一律绑 color/white($143:3,双模恒 #FFFFFF);guide 卡结构=边框帧(padding12/外角28)+Screen 子(内角18);海报/FG 内条同款;勿用 $2:149(Light 钉下变 #181818) |
 | 直传脚本挪位 ROOT 越级(2026-09-26) | play-images-upload.py 从 tmp 挪 scripts/ 后 ../.. 指到仓库上级,listing 目录找不到→上传静默空转→空 edit commit 403 | 脚本内相对 ROOT 按部署位重算+空目录硬失败防呆;线上无伤(edit 不 commit 自动作废) |
 | Play REST v3 图片端点形态(2026-09-25) | images 增删查 URL 误带 /images 段或 type query → 400 Cannot bind / Invalid value | 真身=.../listings/{lang}/{imageType}(camelCase: phoneScreenshots/featureGraphic,无 /images 段);edit 收尾=.../edits/{id}**:commit**(冒号非斜杠);入库脚本 scripts/play-images-upload.py(SA JWT openssl 签+SOCKS+prune 重传+sha 回读) |
+| U 侧 fills 变量绑定姿势(2026-09-26) | `U(node,{fills:"$var"})` 被 setBoundVariable 白名单拒(fills 不在可绑字段表);创建时 I() 可绑,U 侧不行 | U 侧唯一可行=fills 数组内嵌 `boundVariables:{color:{type:"VARIABLE_ALIAS",id:"<varId>"}}`(id 无 $ 前缀;SOLID paint 不得带 a 键);回显 `["$varId"]` 即成功 |
+| health-check 渐变 literal 盲区(2026-09-26) | literal 检测只查 SOLID fills,GRADIENT_LINEAR stops 的字面色不设防,报告 literal=0 照样绿 | 渐变钮收编按 SendButton 先例改绑 scheme/* 纯色;审渐变节点须手动查 gradientStops[].color.boundVariables 是否为空 |
+| 主组件自身钉 Light 导出(2026-09-26) | 组件根 variableModes 钉 Light 后 export 主组件本体,5/6 双模 MD5 翻转生效 | 钉定驱动实例也驱动本体渲染;还原=显式写回 Dark;variableModes 回读不序列化,以导出像素为准 |
+| 模式不变 token 组件双模同图(2026-09-26) | user_bubble 类组件 light/dark 导出字节级相同,light-verify Δ>40 判据必误报 | token 双模同值(#95EC69 类)系设计使然,登记 components.json rules 备注+人工豁免;透明根组件独立导出黑底同理以帧内渲染为准 |
 | 微信化标题 ABSOLUTE 残留(2026-09-26) | 09-24 居中标题是叠加层:TITLE 节点 layoutPositioning=ABSOLUTE(整条 393 宽);改 LEFT/fill_container 不生效、图标压字、返回键被盖 | 唯一解 `U(node,{layoutPositioning:"AUTO"})` 回流(x:null 与 x:"auto" 均被引擎拒);2026-09-26 用户拍板弃居中(刘海遮挡)→页面名统一居左,topbar 正典=horizontal gap8 pad8/8 h$2:111 标题$2:114 LEFT fill+图标$2:15+hairline y47;app 侧 AppTopBar centered=true 待跟 |
 | 帧级 padding 推走流内铬件(2026-09-26) | gallery/empty 帧 pad{top236,l40,r40} 为定位内容却把流内 status_bar 推到 y=236(游离信号图标/乱码根因);绝对定位铬件(top_bar/floating_tab)免疫 | 内容定位勿用帧级 padding 承载含铬件的帧;修复=帧 pad 归零+铬件回 flow+内容节点(quote 等)改显式 x/y 绝对定位 |
 | refs 导出稀疏帧误判空白(2026-09-26) | empty/sort_menu/provider_config 等帧本相近纯色或变高(428/681/921),tones/size 阈值误报「冷缓存空白」 | 判据=与旧 refs 同名文件比对(尺寸+KB+tones 三特征一致即本相);真空白=KB 骤降且 tones=1 全采样区 |
@@ -180,3 +184,4 @@ ls docs/08-UI-SPECS/screens/refs/ardot/   # 核对陈旧 PNG → git rm
 | 1.6.0 | 2026-09-25 | 海报隐形文字事故修复实战回填:批量面色重绑对比度盲区(health-check 不设防,须行级亮度判据)+Play REST v3 图片端点形态/入库直传脚本(陷阱表 +2 行) |
 | 1.7.0 | 2026-09-26 | Guide 重烘+边框统一实战回填:Guide 图文映射 SSOT/纯白边框范式($143:3)/直传脚本 ROOT 越级坑(陷阱表 +3 行) |
 | 1.8.0 | 2026-09-26 | 顶栏左对齐全域修复实战回填:微信化标题 ABSOLUTE 残留(AUTO 回流)/帧级 padding 推走铬件/稀疏帧导出误判(陷阱表 +3 行);gallery grid/empty 结构复位+memories 三段式(hero轮播+宽卡双up+小卡4up)定案 |
+| 1.9.0 | 2026-09-26 | Chat 卡片全量组件化实战回填:U 侧 fills 绑定内嵌 VARIABLE_ALIAS 姿势/渐变 literal 盲区/主组件本体钉 Light 导出/模式不变 token 组件豁免(陷阱表 +4 行);新建 ChatComponents 页 10 组件+16 处实例化+catalog 23 |
