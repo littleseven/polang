@@ -77,6 +77,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `SearchTest` | `search_test` | 搜索诊断测试页 |
 | `SentencePieceTest` | `sentencepiece_test` | SentencePiece 翻译测试页 |
 | `LlmLog` | `llm_log` | LLM 调用日志查看页 |
+| `TaskCenter` | `task_center` | 任务中心（2026-09-26，spec US-12~16 提前落地）— 工程师任务跨会话集中管理：进行中/历史分区（历史封顶 50 条）、审批动作（继续/交付/重试/暂不/到此为止）、点击项回 chat 锚定任务卡（Activity 级 `chatTaskAnchor` 一次性请求态，仿 `gallerySearchRequest` 先例）；入口在 Chat 顶栏任务图标（`activeEngineerTaskCount` 角标）与任务卡「查看全部」；VM 经 `AppContainer.createTaskCenterViewModelFactory()` 构建，审批动作复用 Activity 级共享 ChatViewModel 的 `*FromCenter` 入口（prime 补种 + sessionId 显式落库） |
 
 > Chat/Gallery/Organize(整理+扫描)/People/Memory 为 `Main` 内部 Pager 页，不单独注册 destination；相机为 NavHost 全屏路由（`camera`）；完整路由定义以 `navigation/Screen.kt` 为准。
 
@@ -105,7 +106,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 |------|------|---------|------|
 | **Agent** | `features/agent/` | `GlobalAgentPanel.kt` | 全局悬浮 Agent 面板 |
 | **BackupRestore** | `features/backuprestore/` | `BackupRestoreActivity` | 数据备份与恢复入口（本地数据导出/导入，备份模型 v5） |
-| **Chat** | `features/chat/` | `ChatScreen`, `ChatViewModel`, `ChatThreadSidebar`, `ChatTitleGenerator` | AI 对话二级页，从相册首页进入，支持多线程；首条消息自动生成会话标题；支持对话式图片编辑（`edit_image`），结果以 `AGENT_EDIT_RESULT` 消息 inline 返回；工程师任务卡：`components/EngineerTaskCard.kt`（五态渲染）+ `engineer/EngineerTaskReducer.kt`（SSE→状态机）+ `engineer/EngineerTaskSmokeSamples.kt`（/task 冒烟） |
+| **Chat** | `features/chat/` | `ChatScreen`, `ChatViewModel`, `ChatThreadSidebar`, `ChatTitleGenerator` | AI 对话二级页，从相册首页进入，支持多线程；首条消息自动生成会话标题；支持对话式图片编辑（`edit_image`），结果以 `AGENT_EDIT_RESULT` 消息 inline 返回；工程师任务卡：`components/EngineerTaskCard.kt`（五态渲染）+ `engineer/EngineerTaskReducer.kt`（SSE→状态机）+ `engineer/EngineerTaskSmokeSamples.kt`（/task 冒烟）；任务中心：`taskcenter/TaskCenterScreen.kt` + `taskcenter/TaskCenterViewModel.kt` + `engineer/TaskCenterPartition.kt`（分区纯逻辑），入口为顶栏任务图标（角标） |
 | **Chat JS** | `features/chat/js/` | `QuickJsEngine`, `QuickJsConverter`, `GalleryScriptHandlers`, `GalleryJs`, `ChartJs`, `CapabilityDispatchHandler` | QuickJS 沙箱引擎与 JSBridge 应用层（见下方 JS Engine 说明） |
 | **Camera** | `features/camera/` | `CameraScreen`, `CameraPreviewContent`, `CameraAgentCommandHandler` | 相机预览、美颜实时渲染、Agent 命令处理 |
 | **Common** | `features/common/chat/` | `AgentChatComponents`, `AgentMessage`, `AiChatScreen` | Chat UI 共享组件库（Camera/Gallery 复用） |
@@ -221,6 +222,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | 意图路由审计（routing_audit_log） | `IntentRouter`（:shared `agent/core/intent/`）→ `RoutingAuditRecorder` → `RoomRoutingAuditRecorder` → `polang_llm_log.db` | 每回合路由判定（门控/pattern/LLM/降级）落一条：path/deliverable/confidence/latency/degradeReason，**不含用户 query 原文**（隐私红线）；路由器 LLM 调用落 `llm_call_log`（source=`chat-intent-router`）。spec《意图路由契约与意图路由器》§3.7 + ADR-015 |
 | 用户问题上报（report-issue） | Chat 顶部「上报问题」入口 → `IssueReportClient`（`data/remote/picme/`）→ `POST /v1/report-issue` | 用户问题描述经服务端脱敏后自动在 `littleseven/polang` 创建 GitHub issue；管理后台「问题诊断」页（`/admin/diagnosis`）承载上报列表 |
 | 工程师任务卡（TASK_CARD） | `sendClaudeMessage` 提交即插卡 → `EngineerTaskReducer`（SSE 事件→五态迁移 + 审批回填幂等，`features/chat/engineer/`）→ `EngineerTaskCard`（`features/chat/components/`，审批唯一入口；会话含卡时气泡 legacy 继续/交付按钮经 `suppressClaudeActions` 抑制） | 状态存 Room metadata `engineer_task`（REPLACE upsert + `engineerTaskPersistMutex` 串行化 + loadMessages 合并回填 live 优先）；交付 sid 消费端校验 12-hex pattern 回落 VM 级 claudeSid；`/task` DEBUG 冒烟入口注入五态样本（`EngineerTaskSmokeSamples`）；spec `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md` |
+| 任务中心（US-12~16，2026-09-26 提前落地） | Chat 顶栏任务图标（`activeEngineerTaskCount` 角标）/ 任务卡「查看全部」→ `task_center` 路由 → `TaskCenterScreen`（进行中/历史分区 + 审批动作）→ 点击项经 Activity 级 `chatTaskAnchor` 回 chat 锚定 | 数据源 = `ChatMessageDao.getTaskCardMessages()`（跨会话 `type='task_card'` 查询，TEXT 列零迁移）+ `ChatSessionDao.getAllSessions()` join 会话标题；分区纯逻辑 `TaskCenterPartition`（JVM 单测）；实时刷新靠 Room Flow（结构性事件逐条落库，无新通道）；审批动作复用共享 ChatViewModel 的 `deliverEngineerTaskFromCenter` 等入口（`primeEngineerTask` Room 补种防跨会话空转；deliver/skip/abandon 页内完成，continue/retry 切会话后回 chat）；回联（US-4~6）仍属 P3，依赖 P2 网关改造 |
 
 ---
 

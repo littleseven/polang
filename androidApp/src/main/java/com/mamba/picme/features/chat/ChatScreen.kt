@@ -83,6 +83,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.ShortText
+import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.rounded.ChatBubble
@@ -100,6 +101,8 @@ import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
@@ -120,6 +123,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -205,12 +209,18 @@ import java.io.File
 
 private const val TAG = "ChatScreen"
 
+/** 任务中心回锚等待超时（US-15 兜底）：超时未锚定自动放弃并恢复自动滚底 */
+private const val ANCHOR_TIMEOUT_MS = 8000L
+
+/** 任务中心回锚请求（US-15）：目标会话 + 目标任务卡 + nonce（重复锚同卡也能触发新一次滚动）。 */
+data class ChatTaskAnchor(val sessionId: String, val taskId: String, val nonce: Long)
+
 /**
  * Chat 二级页 — AI 对话入口
  *
  * 从相册首页通过 plus 菜单进入。页面提供返回按钮回到相册。
  * 布局：
- * - 顶部栏：返回 + 菜单 + 清空 + 新建（设置入口仅在相册首页，不在每个页面重复）
+ * - 顶部栏：返回 + 菜单 + 任务中心（角标） + 清空 + 新建（设置入口仅在相册首页，不在每个页面重复）
  * - 消息列表：LazyColumn 展示对话历史
  * - 输入区：ModelSelector + 输入框 + 发送按钮
  * - 快捷入口：相机 / 模型中心
@@ -226,6 +236,11 @@ fun ChatScreen(
     mediaViewModel: MediaViewModel,
     onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -> Unit = { _, _ -> },
     onNavigateToIDPhoto: (uri: String) -> Unit = {},
+    /** 任务中心入口（US-12 顶栏任务图标） */
+    onNavigateToTaskCenter: () -> Unit = {},
+    /** 任务中心回锚请求（US-15）；非 null 时切会话并滚动锚定对应任务卡 */
+    taskAnchor: ChatTaskAnchor? = null,
+    onTaskAnchorConsumed: () -> Unit = {},
     /** 上报是否允许外层主页面 Pager 横滑（预览打开时禁用） */
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
@@ -245,6 +260,7 @@ fun ChatScreen(
     val guestMessageCount by viewModel.guestMessageCount.collectAsState()
     val issueReportState by viewModel.issueReportState.collectAsState()
     val canDeliverClaude by viewModel.canDeliverClaude.collectAsState()
+    val activeEngineerTaskCount by viewModel.activeEngineerTaskCount.collectAsState()
     val gachaSelections by viewModel.gachaSelections.collectAsState()
     val gachaRerolling by viewModel.gachaRerolling.collectAsState()
     // 抽卡条确认/换一组失败 toast 文案（闭包回调内无法取 stringResource，提前取）
@@ -252,6 +268,8 @@ fun ChatScreen(
     val gachaConfirmFailedText = stringResource(R.string.chat_gacha_confirm_failed)
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    // 任务中心回锚（US-15）pending 态：pending 期间抑制自动滚底，锚定成功（或超时放弃）后恢复
+    var pendingTaskAnchor by remember { mutableStateOf<ChatTaskAnchor?>(null) }
 
     var isSidebarOpen by remember { mutableStateOf(false) }
     var showReportIssueDialog by remember { mutableStateOf(false) }
@@ -462,10 +480,41 @@ fun ChatScreen(
         }
     }
 
-    // 自动滚动到底部：列表条数变化或最后一条内容变化时触发（支持流式打字效果）
+    // 自动滚动到底部：列表条数变化或最后一条内容变化时触发（支持流式打字效果）；
+    // 任务中心回锚 pending 期间跳过，防与锚定滚动互抢（rememberUpdatedState 读最新值，不把 pending 态纳入 key）
+    val currentPendingAnchor by rememberUpdatedState(pendingTaskAnchor)
     LaunchedEffect(messages.size, messages.lastOrNull()?.content) {
-        if (messages.isNotEmpty()) {
+        if (currentPendingAnchor == null && messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // 任务中心回锚（US-15）：先切到任务所属会话（会话加载是异步的，滚动由下一 effect 等消息就位）
+    LaunchedEffect(taskAnchor) {
+        taskAnchor?.let { anchor ->
+            pendingTaskAnchor = anchor
+            if (viewModel.currentSessionId.value != anchor.sessionId) {
+                viewModel.switchSession(anchor.sessionId)
+            }
+        }
+    }
+    // 锚定滚动：消息列表出现该任务卡（id == taskId）后瞬时滚动到位并消费请求
+    LaunchedEffect(pendingTaskAnchor?.nonce, messages) {
+        val anchor = pendingTaskAnchor ?: return@LaunchedEffect
+        val index = messages.indexOfFirst { msg -> msg.id == anchor.taskId }
+        if (index >= 0) {
+            listState.scrollToItem(index)
+            pendingTaskAnchor = null
+            onTaskAnchorConsumed()
+        }
+    }
+    // 锚定兜底：8s 未等到任务卡（极端情况：消息被清理）自动放弃，恢复自动滚底
+    LaunchedEffect(pendingTaskAnchor?.nonce) {
+        val anchor = pendingTaskAnchor ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(ANCHOR_TIMEOUT_MS)
+        if (pendingTaskAnchor?.nonce == anchor.nonce) {
+            pendingTaskAnchor = null
+            onTaskAnchorConsumed()
         }
     }
 
@@ -521,6 +570,8 @@ fun ChatScreen(
                     onNewChat = { viewModel.newSession() },
                     onClearChat = { viewModel.clearChat() },
                     onReportIssue = { showReportIssueDialog = true },
+                    activeTaskCount = activeEngineerTaskCount,
+                    onNavigateToTaskCenter = onNavigateToTaskCenter,
                     isActivePage = isActivePage
                 )
             }
@@ -594,6 +645,7 @@ fun ChatScreen(
                                         task = task,
                                         expanded = taskExpanded,
                                         actionsEnabled = !isProcessing && task.taskId !in engineerActionInFlight,
+                                        onViewAll = onNavigateToTaskCenter,
                                         onToggleExpand = { taskExpanded = !taskExpanded },
                                         onContinue = { viewModel.continueEngineerTask(task.taskId) },
                                         onAbandon = { viewModel.abandonEngineerTask(task.taskId) },
@@ -918,6 +970,9 @@ private fun ChatTopBar(
     onNewChat: () -> Unit,
     onClearChat: () -> Unit,
     onReportIssue: () -> Unit = {},
+    /** 活动工程师任务数（任务中心入口角标，US-12；0 不显示角标） */
+    activeTaskCount: Int = 0,
+    onNavigateToTaskCenter: () -> Unit = {},
     isActivePage: Boolean = true
 ) {
     AppTopBar(
@@ -933,6 +988,21 @@ private fun ChatTopBar(
             }
         },
         actions = {
+            BadgedBox(
+                badge = {
+                    if (activeTaskCount > 0) {
+                        Badge {
+                            Text(text = if (activeTaskCount > 99) "99+" else activeTaskCount.toString())
+                        }
+                    }
+                }
+            ) {
+                AppTopBarAction(
+                    icon = Icons.Outlined.Assignment,
+                    contentDescription = stringResource(R.string.cd_task_center),
+                    onClick = onNavigateToTaskCenter
+                )
+            }
             AppTopBarAction(Icons.Outlined.BugReport, stringResource(R.string.report_issue_cd), onReportIssue)
             AppTopBarAction(Icons.Outlined.AddComment, stringResource(R.string.new_chat), onNewChat)
             AppTopBarAction(Icons.Outlined.DeleteSweep, stringResource(R.string.clear_chat), onClearChat)

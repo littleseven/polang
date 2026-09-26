@@ -1397,6 +1397,14 @@
     <string name="chat_task_deliver_summary">%1$d files changed, ready to deliver</string>
     <string name="cd_engineer_task_card">Engineer task card</string>
 
+    <!-- Task center -->
+    <string name="task_center_title">Task Center</string>
+    <string name="task_center_section_active">Active</string>
+    <string name="task_center_section_history">History</string>
+    <string name="task_center_empty">No engineer tasks yet — send a message in AI Engineer mode to start one.</string>
+    <string name="task_center_view_all">View all</string>
+    <string name="cd_task_center">Task center</string>
+
     <!-- Issue report -->
     <string name="report_issue_title">Report a problem</string>
     <string name="report_issue_cd">Report a problem</string>

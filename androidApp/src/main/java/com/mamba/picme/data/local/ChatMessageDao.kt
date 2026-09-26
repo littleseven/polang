@@ -32,6 +32,13 @@ interface ChatMessageDao {
     suspend fun getMessageById(id: String): ChatMessageEntity?
 
     /**
+     * 跨会话获取所有任务卡消息（type = 'task_card'），按提交时间倒序。
+     * 任务中心页数据源：type 为 TEXT 列，纯查询新增无 schema 变更。
+     */
+    @Query("SELECT * FROM chat_messages WHERE type = 'task_card' ORDER BY timestamp DESC")
+    fun getTaskCardMessages(): Flow<List<ChatMessageEntity>>
+
+    /**
      * 获取指定会话的最后一条消息
      */
     @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp DESC LIMIT 1")

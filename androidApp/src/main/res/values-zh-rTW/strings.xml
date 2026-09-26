@@ -1388,6 +1388,14 @@
     <string name="chat_task_deliver_summary">改動 %1$d 個檔案，可交付</string>
     <string name="cd_engineer_task_card">工程師任務卡</string>
 
+    <!-- Task center -->
+    <string name="task_center_title">任務中心</string>
+    <string name="task_center_section_active">進行中</string>
+    <string name="task_center_section_history">歷史</string>
+    <string name="task_center_empty">尚無工程師任務——在 AI 工程師模式傳送訊息即可建立。</string>
+    <string name="task_center_view_all">查看全部</string>
+    <string name="cd_task_center">任務中心</string>
+
     <!-- Issue report -->
     <string name="report_issue_title">上報問題</string>
     <string name="report_issue_cd">上報問題</string>

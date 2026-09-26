@@ -6,6 +6,8 @@ sealed class Screen(val route: String) {
     /** 主页面容器：内部以 HorizontalPager 承载 相册/相册整理/聊天/人物 4 页 */
     data object Main : Screen("main")
     data object Chat : Screen("chat")
+    /** 任务中心（工程师任务跨会话集中管理，spec US-12~16）：进行中/历史分区 + 审批动作；入口在 Chat 顶栏任务图标 */
+    data object TaskCenter : Screen("task_center")
     data object Camera : Screen("camera")
     data object Gallery : Screen("gallery") {
         const val ROUTE_WITH_ARGS = "gallery?query={query}&personId={personId}"

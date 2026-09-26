@@ -19,6 +19,7 @@ import androidx.navigation.navOptions
 import com.mamba.picme.agent.core.runtime.state.SceneManager
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.chat.ChatScreen
+import com.mamba.picme.features.chat.ChatTaskAnchor
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.gallery.GalleryScreen
 import com.mamba.picme.features.gallery.MediaViewModel
@@ -80,6 +81,9 @@ fun MainPagerHost(
     /** 外部入口（设置页）一次性请求合并页 Tab；null = 无请求。 */
     organizeTabRequest: OrganizeTab? = null,
     onOrganizeTabRequestConsumed: () -> Unit = {},
+    /** 任务中心回锚请求（US-15）：切 chat 页 + 切会话 + 滚动锚定任务卡；null = 无请求。 */
+    taskAnchor: ChatTaskAnchor? = null,
+    onTaskAnchorConsumed: () -> Unit = {},
 ) {
     var gallerySwipeEnabled by remember { mutableStateOf(true) }
     var chatSwipeEnabled by remember { mutableStateOf(true) }
@@ -193,6 +197,11 @@ fun MainPagerHost(
                         navOptions { launchSingleTop = true }
                     )
                 },
+                onNavigateToTaskCenter = {
+                    navController.navigate(Screen.TaskCenter.route, navOptions { launchSingleTop = true })
+                },
+                taskAnchor = taskAnchor,
+                onTaskAnchorConsumed = onTaskAnchorConsumed,
                 onHorizontalSwipeEnabledChange = { enabled -> chatSwipeEnabled = enabled },
                 isActivePage = pagerState.currentPage == MAIN_PAGE_CHAT
             )

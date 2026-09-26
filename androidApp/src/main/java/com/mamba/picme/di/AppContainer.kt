@@ -12,6 +12,8 @@ import com.mamba.picme.core.image.ImageProcessorImpl
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
 import com.mamba.picme.data.local.AppDatabase
+import com.mamba.picme.data.local.ChatMessageDao
+import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
@@ -82,6 +84,7 @@ import com.mamba.picme.features.chat.PrefsClaudeSidStore
 import com.mamba.picme.features.chat.buildAppToolExecutor
 import com.mamba.picme.features.chat.capability.MemoryCapability
 import com.mamba.picme.features.chat.capability.PersonRelationCapability
+import com.mamba.picme.features.chat.taskcenter.TaskCenterViewModel
 import com.mamba.picme.domain.matting.MattingEngine
 import com.mamba.picme.domain.matting.MattingEngineImpl
 import com.mamba.picme.domain.memory.MemoryRepository
@@ -248,6 +251,24 @@ class MemoriesViewModelFactory(
     }
 }
 
+/** 任务中心页 VM 工厂：跨会话任务卡聚合（chat_messages + chat_sessions join）。 */
+class TaskCenterViewModelFactory(
+    private val chatMessageDao: ChatMessageDao,
+    private val chatSessionDao: ChatSessionDao,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TaskCenterViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TaskCenterViewModel(
+                chatMessageDao = chatMessageDao,
+                chatSessionDao = chatSessionDao,
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
 interface AppContainer {
     val repository: AndroidMediaRepository
     val userPreferencesRepository: UserSettingsRepository
@@ -338,6 +359,9 @@ interface AppContainer {
 
     /** 回忆 carousel（F3）ViewModel 工厂（无参数：数据源与隐藏集由容器注入） */
     fun createMemoriesViewModelFactory(): ViewModelProvider.Factory
+
+    /** 任务中心页 ViewModel 工厂（无参数：跨会话任务卡聚合，DAO 由容器注入） */
+    fun createTaskCenterViewModelFactory(): ViewModelProvider.Factory
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
@@ -903,6 +927,13 @@ class AppContainerImpl(
             mediaDao = database.mediaDao(),
             personDao = database.personDao(),
             hiddenStore = DataStoreMemoryHiddenStore(context),
+        )
+    }
+
+    override fun createTaskCenterViewModelFactory(): ViewModelProvider.Factory {
+        return TaskCenterViewModelFactory(
+            chatMessageDao = database.chatMessageDao(),
+            chatSessionDao = database.chatSessionDao(),
         )
     }
 

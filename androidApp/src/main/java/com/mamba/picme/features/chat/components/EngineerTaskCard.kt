@@ -1,5 +1,6 @@
 package com.mamba.picme.features.chat.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,12 +33,14 @@ import java.util.Locale
  * 工程师任务卡（spec US-1~3/7~11）：状态 chip + 标题 + 阶段 + meta 行 + 状态动作区 + 展开明细。
  * 纯渲染无状态；审批动作回调由 ChatScreen 接到 ChatViewModel。
  * 审批按钮经 [actionsEnabled] 门控（回合进行中禁用，对齐 VM 侧 _isProcessing 守卫）。
+ * [onViewAll] 非空时头部显示「查看全部」次入口（US-12 → 任务中心）。
  */
 @Composable
 fun EngineerTaskCard(
     task: EngineerTaskState,
     expanded: Boolean,
     actionsEnabled: Boolean = true,
+    onViewAll: (() -> Unit)? = null,
     onToggleExpand: () -> Unit,
     onContinue: () -> Unit,
     onAbandon: () -> Unit,
@@ -58,6 +61,16 @@ fun EngineerTaskCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 EngineerTaskStatusChip(task)
                 Spacer(Modifier.weight(1f))
+                if (onViewAll != null) {
+                    Text(
+                        text = stringResource(R.string.task_center_view_all),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable(onClick = onViewAll)
+                            .padding(end = 8.dp),
+                    )
+                }
                 Text(
                     text = formatElapsed(task.updatedAtMs - task.startedAtMs),
                     fontSize = 11.sp,
@@ -145,7 +158,7 @@ fun EngineerTaskCard(
 }
 
 @Composable
-private fun EngineerTaskStatusChip(task: EngineerTaskState) {
+internal fun EngineerTaskStatusChip(task: EngineerTaskState) {
     val labelRes = when (task.resolution) {
         EngineerTaskResolution.CONTINUED -> R.string.chat_task_resolved_continued
         EngineerTaskResolution.ABANDONED -> R.string.chat_task_resolved_abandoned
@@ -174,7 +187,7 @@ private fun EngineerTaskStatusChip(task: EngineerTaskState) {
 }
 
 @Composable
-private fun taskMetaText(task: EngineerTaskState): String {
+internal fun taskMetaText(task: EngineerTaskState): String {
     val parts = mutableListOf<String>()
     if (task.turns > 0) parts += stringResource(R.string.chat_task_meta_turns, task.turns)
     task.costCents?.let { cents -> parts += stringResource(R.string.chat_task_meta_cost, cents / 100.0) }
@@ -182,7 +195,7 @@ private fun taskMetaText(task: EngineerTaskState): String {
     return parts.joinToString(" · ")
 }
 
-private fun formatElapsed(ms: Long): String {
+internal fun formatElapsed(ms: Long): String {
     val totalSec = (ms / 1000).coerceAtLeast(0)
     return "%d:%02d".format(Locale.ROOT, totalSec / 60, totalSec % 60)
 }

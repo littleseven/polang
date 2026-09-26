@@ -1388,6 +1388,14 @@
     <string name="chat_task_deliver_summary">改动 %1$d 个文件，可交付</string>
     <string name="cd_engineer_task_card">工程师任务卡</string>
 
+    <!-- Task center -->
+    <string name="task_center_title">任务中心</string>
+    <string name="task_center_section_active">进行中</string>
+    <string name="task_center_section_history">历史</string>
+    <string name="task_center_empty">暂无工程师任务——在 AI 工程师模式发送消息即可创建。</string>
+    <string name="task_center_view_all">查看全部</string>
+    <string name="cd_task_center">任务中心</string>
+
     <!-- Issue report -->
     <string name="report_issue_title">上报问题</string>
     <string name="report_issue_cd">上报问题</string>

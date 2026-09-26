@@ -1352,6 +1352,14 @@
     <string name="chat_task_collapse">Réduire</string>
     <string name="chat_task_deliver_summary">%1$d fichiers, prêt à livrer</string>
     <string name="cd_engineer_task_card">Carte de tâche</string>
+
+    <!-- Task center -->
+    <string name="task_center_title">Centre des tâches</string>
+    <string name="task_center_section_active">En cours</string>
+    <string name="task_center_section_history">Historique</string>
+    <string name="task_center_empty">Aucune tâche d’ingénieur pour le moment — envoyez un message en mode AI Engineer pour en créer une.</string>
+    <string name="task_center_view_all">Tout afficher</string>
+    <string name="cd_task_center">Centre des tâches</string>
     <!-- Issue report -->
     <string name="report_issue_title">Signaler un problème</string>
     <string name="report_issue_cd">Signaler un problème</string>
