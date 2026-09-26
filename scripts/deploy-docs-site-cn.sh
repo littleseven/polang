@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 部署 polang 官网国内镜像(xuxingzhiyuan.cn)到腾讯云国内服务器(ssh 别名 xuxing)。
-# 备案通过前官网经 8100 端口 basic-auth 预览；备案通过后按
-# 设计 spec 已随交付清理（2026-09-16 cn-mirror，git 历史可查），原 §6 切 80/443。
+# 备案通过前官网经 8100 端口 basic-auth 预览；备案通过后切 80/443。
+# （来源设计 spec 已随交付清理，git 历史可查：2026-09-16 cn-mirror。）
 # 用法: ./scripts/deploy-docs-site-cn.sh
 # 流程: sync-docs → 远端备份 → rsync 镜像 → 远端 localhost:8100 校验(首页标记+关键子页)。
 set -euo pipefail
