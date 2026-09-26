@@ -161,6 +161,7 @@ Android 截图（adb screencap）+ iOS 截图（XCUITest / App 内捕获）
 | A9 | chat 屏 spec 产出 | — | ✅ 完成（另 editor/person 亦已建） |
 | A10 | 自动截图 diff CI（双端截图 → 比对） | 🟢 P2 | ❌ 开放（依赖 iOS 侧截图自动化稳定） |
 | A11 | `docs/08-UI-SPECS/screens/refs/android/`（27MB 真值截图）入库策略 | 🟢 P2 | 🔶 半决策：`polang-ui-spec.fig` 已删除（2026-08-16，Ardot 仅云端，git 形态改走 `docs/08-UI-SPECS/screens/refs/ardot/` 快照）；android 真值目录仍 untracked 待决策 |
+| A12 | Android 09-20 后交付的 parity 缺口登记与跟随（任务体系三件套 / 意图路由 iOS 接线 / 设置页上报问题入口 / 顶栏左对齐） | 🟡 P1 | ❌ 开放（2026-09-26 docs-only 对账已登记 `../01-PRODUCT/IOS_TASK_STATUS.md` §1 #13-16；同日拍板**全部上 iOS**，实施批走 /ios-follow，排序见看板 §3-7） |
 
 ---
 
