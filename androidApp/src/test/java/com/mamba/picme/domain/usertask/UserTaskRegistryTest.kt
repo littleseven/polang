@@ -24,7 +24,7 @@ class UserTaskRegistryTest {
         var failOnUpsert = false
 
         override suspend fun upsert(task: UserTaskEntity) {
-            if (failOnUpsert) throw IllegalStateException("disk full")
+            if (failOnUpsert) error("disk full")
             rows.value = rows.value.filterNot { row -> row.id == task.id } + task
         }
 
