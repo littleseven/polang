@@ -5,6 +5,8 @@ import com.mamba.picme.domain.chat.ClaudeDeliverUi
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
+import com.mamba.picme.domain.chat.HtmlCardDisplayMode
+import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
@@ -106,6 +108,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "ChatViewModel"
 private const val MAX_MESSAGES = 500
@@ -1488,11 +1491,14 @@ class ChatViewModel(
         if (text.isBlank()) return
 
         // [DEV_ONLY] 调试指令：/html 注入 HTML 卡片冒烟测试集（样本清单见 HtmlCardSmokeSamples
-        // KDoc，恶意用例故意绕过清洗器直插以专测 WebView 锁死层），不走 LLM
+        // KDoc，恶意用例故意绕过清洗器直插以专测 WebView 锁死层；含双形态用例——超一屏长文卡
+        // 应自动转预览形态、display=fullpage 声明卡应直接预览形态），不走 LLM
         if (BuildConfig.DEBUG && text.trim() == "/html") {
             viewModelScope.launch {
                 ensureSessionExists(_currentSessionId.value)
-                HtmlCardSmokeSamples.all.forEach { sample -> emitHtmlCardMessage(sample) }
+                HtmlCardSmokeSamples.all.forEach { sample ->
+                    emitHtmlCardMessage(sample.html, summary = sample.summary, display = sample.display)
+                }
             }
             return
         }
@@ -2319,9 +2325,10 @@ class ChatViewModel(
                     htmlCard != null -> {
                         when (val sanitized = HtmlCardSanitizer.sanitize(htmlCard.value)) {
                             is HtmlCardSanitizer.Result.Ok -> {
-                                emitHtmlCardMessage(sanitized.html)
-                                (obj.entries["summary"] as? JsValue.Str)?.value
-                                    ?: stringContext().getString(R.string.chat_html_card_generated)
+                                // summary 一并落库（metadata html_card.summary：查看器标题/兜底封面文案）
+                                val summary = (obj.entries["summary"] as? JsValue.Str)?.value
+                                emitHtmlCardMessage(sanitized.html, summary = summary)
+                                summary ?: stringContext().getString(R.string.chat_html_card_generated)
                             }
                             is HtmlCardSanitizer.Result.Rejected -> sanitized.reason
                         }
@@ -2357,21 +2364,55 @@ class ChatViewModel(
         )
     }
 
+    /** HTML 卡消息 id 序号兜底（同毫秒连发防主键碰撞被 REPLACE 覆盖）。 */
+    private val htmlMessageSeq = AtomicInteger(0)
+
     /**
      * 把清洗后的自包含 HTML 作为一条 [ChatMessageType.HTML_CARD] 消息**落库**。
      * 与 [emitChartMessage] 同理：消息列表由 DB Flow 驱动，卡片必须落库才能跨重载持久。
+     *
+     * 双形态元数据（spec §10）：metadata `html_card` key 记 LLM display 声明与 summary
+     * （端侧终判 displayMode/测高由 [persistHtmlCardDisplayMode] 在测高后回填）。
      */
-    private suspend fun emitHtmlCardMessage(html: String) {
+    private suspend fun emitHtmlCardMessage(html: String, summary: String? = null, display: String? = null) {
+        val meta = HtmlCardMeta(
+            display = display?.trim()?.lowercase()?.ifBlank { null },
+            summary = summary?.ifBlank { null }
+        )
+        val metadata = JSONObject().put("html_card", meta.toJson()).toString()
         chatMessageDao.insertMessage(
             ChatMessageEntity(
-                id = "html_" + System.currentTimeMillis(),
+                // 同毫秒多张卡（/html 冒烟集连发）需序号兜底，否则主键相同被 REPLACE 覆盖丢卡
+                id = "html_" + System.currentTimeMillis() + "_" + htmlMessageSeq.incrementAndGet(),
                 sessionId = _currentSessionId.value,
                 type = "html_card",
                 content = html,
                 timestamp = System.currentTimeMillis(),
-                modelUsed = "html_card"
+                modelUsed = "html_card",
+                metadata = metadata
             )
         )
+    }
+
+    /**
+     * 端侧终判回写（HtmlCard 首次分流判定回调）：displayMode + 测高合并进 metadata `html_card`
+     * 子对象（其余 key 不动），幂等——已持久化同值时跳过写库（重组重复回调不产 DB churn）。
+     * 持久化后会话重开/列表回收后卡片形态不跳变（spec §4 稳定性）。
+     */
+    fun persistHtmlCardDisplayMode(messageId: String, mode: HtmlCardDisplayMode, measuredHeightPx: Int?) {
+        viewModelScope.launch(Dispatchers.Default) {
+            val entity = chatMessageDao.getMessageById(messageId) ?: return@launch
+            if (entity.type != "html_card") return@launch
+            val root = entity.metadata
+                ?.let { raw -> runCatching { JSONObject(raw) }.getOrNull() }
+                ?: JSONObject()
+            val card = root.optJSONObject("html_card") ?: JSONObject()
+            if (card.optString("displayMode").ifBlank { null } == mode.name) return@launch
+            card.put("displayMode", mode.name)
+            if (measuredHeightPx != null && measuredHeightPx > 0) card.put("measuredHeightPx", measuredHeightPx)
+            root.put("html_card", card)
+            chatMessageDao.insertMessage(entity.copy(metadata = root.toString()))
+        }
     }
 
     /**
@@ -2410,17 +2451,19 @@ class ChatViewModel(
 
     /**
      * render_html 工具落点：[html] 清洗（[HtmlCardSanitizer]）后作为 HTML_CARD 消息落库，
-     * 由 HtmlCard 离线 WebView 渲染；返回 summary（回传 LLM 做文字总结）。
+     * 由 HtmlCard 离线 WebView 渲染；[display] 为 LLM 声明的展示形态（inline/fullpage，
+     * 落库 metadata，端侧测高兜底终判）；返回 summary（回传 LLM 做文字总结）。
      * 清洗拒绝（超限等）时不落库，原因直接回传 LLM 引导重新生成。
      */
     override suspend fun onRenderHtml(
         html: String,
         summary: String?,
+        display: String?,
         traceId: String?
     ): String = withContext(Dispatchers.Default) {
         when (val result = HtmlCardSanitizer.sanitize(html)) {
             is HtmlCardSanitizer.Result.Ok -> {
-                emitHtmlCardMessage(result.html)
+                emitHtmlCardMessage(result.html, summary = summary, display = display)
                 summary?.takeIf { it.isNotBlank() }
                     ?: stringContext().getString(R.string.chat_html_card_generated)
             }
@@ -3335,6 +3378,7 @@ class ChatViewModel(
             content = content,
             chartSvg = if (type == "chart") content else null,
             htmlContent = if (type == "html_card") content else null,
+            htmlCardMeta = if (type == "html_card") parseHtmlCardMeta(metadata) else null,
             imageUri = if (type == "user_image_text" || type == "agent_image" || type == "agent_edit_result") metadata?.let { m -> parseImageUri(m) } else null,
             imageSaved = (type == "agent_image" || type == "agent_edit_result") &&
                 (metadata?.let { runCatching { org.json.JSONObject(it).optBoolean("saved", false) }.getOrDefault(false) } ?: false),

@@ -1543,6 +1543,10 @@
     <string name="chat_result_executed">✅ 已執行 %1$s</string>
     <string name="chat_chart_generated">已生成圖表</string>
     <string name="chat_html_card_generated">已生成卡片</string>
+    <string name="html_card_view_full">點擊查看完整內容</string>
+    <string name="html_card_preview_failed">預覽渲染失敗</string>
+    <string name="html_fullpage_title_default">卡片詳情</string>
+    <string name="html_fullpage_load_failed">內容載入失敗</string>
     <string name="chat_write_no_valid_ids">沒有有效的媒體 ID</string>
     <string name="chat_delete_started_pending">已發起刪除 %1$d 項，等待系統授權</string>
     <string name="chat_deleted_n">已刪除 %1$d 項</string>

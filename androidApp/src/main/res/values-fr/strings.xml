@@ -1503,6 +1503,10 @@
     <string name="chat_result_executed">✅ Exécuté : %1$s</string>
     <string name="chat_chart_generated">Graphique généré</string>
     <string name="chat_html_card_generated">Carte générée</string>
+    <string name="html_card_view_full">Appuyez pour voir tout le contenu</string>
+    <string name="html_card_preview_failed">Échec du rendu de l\'aperçu</string>
+    <string name="html_fullpage_title_default">Détail de la carte</string>
+    <string name="html_fullpage_load_failed">Échec du chargement du contenu</string>
     <string name="chat_write_no_valid_ids">Aucun identifiant de média valide</string>
     <string name="chat_delete_started_pending">Suppression de %1$d élément(s) initiée, en attente de l\'autorisation du système</string>
     <string name="chat_deleted_n">%1$d élément(s) supprimé(s)</string>

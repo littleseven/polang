@@ -640,14 +640,18 @@ js_toolcalls:
       message_kind: CHART                    # 独立全宽消息项（非嵌入文本气泡）
       ui: ChartSvgCard                       # SVG 卡片，tap 进横屏 pinch-zoom 预览
       bridge_kind: "ChatUiActionDto 须加 chart kind（携 svg+summary）"  # 见 contracts.md C-B2-2
-    html_card_result:                        # render_html 产出（2026-09 新增，Android 先行）
-      message_kind: HTML_CARD                # 独立全宽消息项；content=自包含 HTML（落库持久）
-      ui: HtmlCard                           # WebView 卡片（动态测高 + 完全撑开（≥120dp 无上限，卡片不内滚、滚动全交外层列表）+ ResizeObserver 高度跟随 + 滑动防抖（高度进程级缓存/滑动冻结/2px 阈值）；卡片内直接交互，仅 a 外链点击进全屏落地页 HtmlLinkPreviewOverlay；滚动条隐藏）
+    html_card_result:                        # render_html 产出（2026-09 新增，Android 先行；2026-09-26 双形态 H1）
+      message_kind: HTML_CARD                # 独立全宽消息项；content=自包含 HTML（落库持久）；metadata `html_card` key 记 display 声明/displayMode 终判/measuredHeightPx/summary
+      ui: HtmlCard                           # WebView 卡片，双形态（spec 2026-09-26-html-card-two-tier-design §3/§4）：
+      inline_form: "短卡（默认）：动态测高+完全撑开（≥120dp，≤1.0 屏阈值）+ ResizeObserver 高度跟随 + 滑动防抖（测高按消息 id 缓存/滑动冻结/2px 阈值/布局前虚高拦截）；卡内直接交互，仅 a 外链进落地页；滚动条隐藏"
+      fullpage_preview_form: "长卡（display=fullpage 或测高>1.0 屏）：固定高 ≈0.5 屏 + WebView 渲染上半部 + 底部 120dp 渐隐遮罩（向运行时卡底色）+ 居中提示条「点击查看完整内容」（primary 色）；透明触控层消费点击不消费竖拖；WebView 禁聚焦禁点击；渲染失败 → 原生封面兜底（summary+提示条）"
+      fullpage_viewer: "HtmlFullpageViewer overlay（与 HtmlLinkPreviewOverlay 同级，ChatScreen BackHandler 收口）：顶栏 ✕+标题（summary 截断）+hairline；同沙箱（零桥/禁文件/禁 DOM Storage）；允许竖滚+显示滚动条；不注入测高 JS；a 仍走落地页叠上；加载失败 → 错误占位+关闭"
+      routing: "分流判定 HtmlCardDisplay 纯函数：display==fullpage 直判 FULLPAGE；测高>1.0×可用屏高强制 FULLPAGE；测高异常(≤0)降级 INLINE；终判持久化 metadata，会话重开/回收后不跳变；判定 INLINE 后交互撑高不再转换"
       render_template: "wrapHtmlDocument 注入 viewport meta(width=device-width) + 响应式 reset；完整文档原样加载"
-      layout_context: "组合根注入 RenderEnvironment（设备/屏幕/卡片宽高上限）→ prompt 动态尾段，引导 LLM 响应式排版"
+      layout_context: "组合根注入 RenderEnvironment（设备/屏幕/卡片宽 + 建议 inline 高 + 预览高 0.5 屏 px + 分流阈值 1.0 屏 px）→ prompt 动态尾段，引导 LLM 响应式排版并正确声明 display"
       sanitize: "落库前 HtmlCardSanitizer 清洗（128KB 上限、剔除远程 script/iframe/object/embed/form/meta refresh；2026-09-25 起远程 img/CSS/a 外链放行，表现力优先）"
       lockdown: "禁文件/DOM Storage、零 JS 桥接；远程资源直拉，a 点击经 shouldOverrideUrlLoading 回传 onOpenLink 开落地页，卡片自身永不导航"
-      ios_status: "TODO(ios-follow) HtmlCard.swift 照搬 ChartSvgCard WKWebView 模式 + 同款沙盒/动态测高/高度跟随/链接落地页"
+      ios_status: "TODO(ios-follow) HtmlCard.swift 照搬 ChartSvgCard WKWebView 模式 + 同款沙盒/动态测高/双形态（预览卡+全屏查看器+分流判定）/链接落地页"
     task_card:                               # AI Engineer 模式每次 claude-chat 提交即产一张（2026-09-25 新增，Android 先行）
       message_kind: TASK_CARD                # 独立全宽消息项；content=源指令截 50 字，载荷在 metadata.engineer_task
       ui: EngineerTaskCard                   # 原生 Compose（features/chat/components/）：五态 chip + 阶段/轮次/成本/文件数 meta + 审批动作区 + 展开明细
@@ -738,7 +742,7 @@ platform_differences:
       - { feature: "端侧 VLM 理解",   android: supported, ios: "TODO(B1) MNN.framework 已有" }
       - { feature: "JS 沙箱脚本",     android: supported, ios: "TODO(B2) 引擎选型+handler 移植" }
       - { feature: "draw_chart 图表", android: supported, ios: "TODO(B2) ChartSvgCard + chart kind" }
-      - { feature: "render_html HTML 卡片", android: "supported(2026-09)", ios: "TODO(ios-follow) HtmlCard WKWebView + 同款沙盒/链接落地页" }
+      - { feature: "render_html HTML 卡片", android: "supported(2026-09；2026-09-26 双形态 H1：inline/fullpage 分流+预览卡+全屏查看器)", ios: "TODO(ios-follow) HtmlCard WKWebView + 同款沙盒/双形态/链接落地页" }
       - { feature: "AI 工程师(claude)", android: supported, ios: "TODO(B3) SSE 客户端+渲染" }
       - { feature: "AI 优化抽卡",     android: supported, ios: "supported(2026-08-16 §17 追齐；多轮编辑态 ChatEditStateHolder 缺失见 §17 confirm 注)" }
       - { feature: "记忆/人物关系",    android: supported, ios: "未纳入本轮（留技术债）" }

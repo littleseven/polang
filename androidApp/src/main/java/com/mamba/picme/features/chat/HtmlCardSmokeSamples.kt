@@ -3,7 +3,7 @@ package com.mamba.picme.features.chat
 /**
  * [DEV_ONLY] HTML 卡片冒烟测试样本（`ChatViewModel` 调试指令 `/html` 注入，仅 DEBUG 构建）。
  *
- * 覆盖八类验证点：
+ * 覆盖十类验证点：
  * 1. [STATIC]：纯 HTML/CSS 排版卡片；
  * 2. [RICH_MEDIA]：图文混排（内联 SVG 插图 + 首字下沉 + 双栏正文）；
  *    内联图（SVG/data URI）仍是首选，远程 img 见 [REMOTE_CASES]；
@@ -23,12 +23,22 @@ package com.mamba.picme.features.chat
  *    预告片）、远程音乐（SoundHelix，含旋转唱片封面动画）、真实地图（Esri World Street Map
  *    瓦片 3×2 马赛克 + SVG 图钉脉冲，免 key；CARTO 瓦片有 API KEY REQUIRED 水印不可用，
  *    Google Maps 国内不可达、Mapbox Static 需 token 可一行 URL 替换）。
+ * 10. 双形态用例（2026-09-26，spec《HTML 卡双形态》）：
+ *    [LONG_ARTICLE]——超一屏长文卡（未声明 display），测高后应自动转固定高预览形态
+ *    （渐隐遮罩 + 提示条，点击进全屏查看器）；
+ *    [FULLPAGE_DECLARED]——短内容但声明 display="fullpage"，应免测高直接预览形态。
  *
- * 注意：列表卡片高度动态适配内容并**完全撑开**（≥120dp，无高度上限），卡片自身不滚动，
- * 竖直滚动全交外层列表（WebView 永不竖滚，无手势冲突）；滚动条一律隐藏；
- * JS 交互（按钮/Tab/手风琴）在卡片内直接生效。
+ * 形态速查：inline 卡完全撑开（≥120dp）、自身不滚动、卡内直接交互、滚动条隐藏；
+ * fullpage 预览卡固定高 ≈0.5 屏、禁交互、点击进全屏查看器（竖滚 + 滚动条）。
  */
 object HtmlCardSmokeSamples {
+
+    /** 冒烟样本：display 非空时随消息 metadata 落库（对齐 render_html 工具链路）。 */
+    data class SmokeSample(
+        val html: String,
+        val summary: String,
+        val display: String? = null
+    )
 
     private const val STATIC = """
         <div style="font-family:sans-serif;padding:16px">
@@ -504,15 +514,55 @@ object HtmlCardSmokeSamples {
           </script>
         </div>
     """
-    val all: List<String> = listOf(
-        STATIC,
-        RICH_MEDIA,
-        COMPLEX_LAYOUT,
-        CSS_ANIMATION,
-        ANIMATED_CHART,
-        INLINE_JS,
-        INTERACTIVE,
-        REMOTE_CASES,
-        ALL_IN_ONE,
+    /**
+     * 超一屏长文卡（未声明 display）：验证端侧测高兜底——测高 > 1.0 × 可用屏高应自动转
+     * Fullpage 预览形态（固定高 + 渐隐遮罩 + 提示条），点击进全屏查看器（竖滚 + 滚动条）。
+     * 12 节 × 固定高块（每节 240px）≈ 2900 CSS px，主流机型均超一屏。
+     */
+    private val LONG_ARTICLE: String = buildString {
+        append(
+            """<div style="font-family:sans-serif;background:#f7f8fa;color:#1a1a1a">""" +
+                """<div style="padding:18px 16px;background:#fff;border-bottom:1px solid #eee">""" +
+                """<div style="font-size:19px;font-weight:bold">长文卡 · 双形态冒烟</div>""" +
+                """<div style="font-size:11.5px;color:#999;margin-top:4px">未声明 display · 内容约 2900px（超一屏）· 应自动转预览形态</div>""" +
+                """</div>"""
+        )
+        for (i in 1..12) {
+            append(
+                """<div style="background:#fff;border-radius:10px;margin:10px 12px 0;padding:14px;height:240px;overflow:hidden">""" +
+                    """<div style="font-size:14px;font-weight:bold;color:#2563eb">第 ${i} 节 · 验证小节</div>""" +
+                    """<p style="font-size:12.5px;line-height:1.8;color:#555;margin:8px 0 0">""" +
+                    """本节为长文占位内容，用于把卡片总高撑过 1.0 × 聊天可用屏高，触发端侧测高兜底分流。""" +
+                    """预览形态下卡片高度恒定为 0.5 屏，底部渐隐并出现「点击查看完整内容」提示条；""" +
+                    """点击进全屏查看器后可竖滚浏览全部 12 节，滚动条应可见。""" +
+                    """</p></div>"""
+            )
+        }
+        append("""<div style="text-align:center;font-size:11px;color:#999;padding:16px">— 全文完 —</div></div>""")
+    }
+
+    /** 短内容但声明 display="fullpage"：应尊重 LLM 声明、免测高直接外显预览形态。 */
+    private const val FULLPAGE_DECLARED = """
+        <div style="font-family:sans-serif;padding:18px;text-align:center">
+          <div style="font-size:16px;font-weight:bold">display="fullpage" 声明卡</div>
+          <p style="font-size:12.5px;color:#666;margin:8px 0 0">
+            内容很短（不足一屏），但声明了 fullpage——应直接外显固定高预览形态，
+            点击进全屏查看器（尊重 LLM 意图，不测高）。
+          </p>
+        </div>
+    """
+
+    val all: List<SmokeSample> = listOf(
+        SmokeSample(STATIC, "纯 HTML/CSS 排版卡"),
+        SmokeSample(RICH_MEDIA, "图文混排（内联 SVG）"),
+        SmokeSample(COMPLEX_LAYOUT, "Grid 仪表盘排版"),
+        SmokeSample(CSS_ANIMATION, "CSS 动画"),
+        SmokeSample(ANIMATED_CHART, "动画图表 + 数字滚动"),
+        SmokeSample(INLINE_JS, "内联 JS 计数交互"),
+        SmokeSample(INTERACTIVE, "Tab + 手风琴复合交互"),
+        SmokeSample(REMOTE_CASES, "远程资源与外链用例"),
+        SmokeSample(ALL_IN_ONE, "NVIDIA 专题综合长文卡（all-in-one）"),
+        SmokeSample(LONG_ARTICLE, "长文卡：超一屏，应自动转预览形态"),
+        SmokeSample(FULLPAGE_DECLARED, "display=fullpage 声明卡：应直接预览形态", display = "fullpage"),
     )
 }

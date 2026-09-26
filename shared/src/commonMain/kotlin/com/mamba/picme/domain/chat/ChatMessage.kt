@@ -44,6 +44,8 @@ data class ChatMessage(
     val engineerTask: EngineerTaskState? = null,
     /** 卡条是否可交互（controller 内存态仍有 pending；进程重建后降级只读）。 */
     val gachaInteractive: Boolean = false,
+    /** HTML_CARD 双形态元数据（display 声明 / 端侧终判 displayMode / 测高 / summary；Room metadata `html_card` key）。 */
+    val htmlCardMeta: HtmlCardMeta? = null,
 )
 
 /**
@@ -56,6 +58,25 @@ data class MediaResultsUi(
     val totalCount: Int,
     val isRefinement: Boolean,
     val feedbackState: Map<String, FeedbackAction> = emptyMap()
+)
+
+/** HTML 卡展示形态终判（端侧；spec §4 分流判定结果，随消息 metadata 持久化）。 */
+enum class HtmlCardDisplayMode { INLINE, FULLPAGE }
+
+/**
+ * HTML_CARD 消息的双形态元数据（Room metadata `html_card` key；org.json serde 在 androidApp 扩展）。
+ *
+ * 纯数据，不含平台依赖；判定逻辑见 androidApp `HtmlCardDisplay`。
+ */
+data class HtmlCardMeta(
+    /** LLM 经 render_html `display` 参数的声明原值（"inline"/"fullpage"）；null = 未声明（按 inline 处理）。 */
+    val display: String? = null,
+    /** 端侧终判形态；null = 尚未判定（待测高）。 */
+    val displayMode: HtmlCardDisplayMode? = null,
+    /** 终判时的内容测高（CSS px ≈ dp）；声明 fullpage 直判时可为 null（未测高）。 */
+    val measuredHeightPx: Int? = null,
+    /** LLM 给的一句话摘要：全屏查看器标题 / 渲染失败兜底封面文案。 */
+    val summary: String? = null,
 )
 
 /** 本地/远程 LLM 性能指标（展示用）。 */

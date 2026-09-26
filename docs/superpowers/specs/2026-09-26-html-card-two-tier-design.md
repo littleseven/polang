@@ -51,6 +51,7 @@
 - 预览态在 WebView 上叠透明触控层（Compose）：消费**点击**（→ 全屏查看器），不消费竖拖——LazyColumn 越过 touch slop 后正常接管滚动，手势冲突从根上消失（卡高恒定，无测高滞后窗口）。
 - WebView 设不可聚焦/不可点击；JS 仍运行（渲染与动画需要），仅触摸不到达。
 - 预览卡高度恒定 → 不参与 ResizeObserver 高度跟随，滑动防抖三件套（测高缓存/滑动冻结/抖动阈值）对其天然无负载。
+- 实现偏差（2026-09-26 H1 审查接受，不修）：inline 测高兜底转 FULLPAGE 的卡其 ResizeObserver 仍在运行——转预览后 observer 反注册不做，无效回调被 displayMode 分支忽略（FULLPAGE 不参与高度跟随），无功能影响。
 
 ## 6. 全屏查看器
 

@@ -38,7 +38,7 @@ class ChatRunScriptCapabilityTest {
                 unit: String?,
                 traceId: String?
             ): String = ""
-            override suspend fun onRenderHtml(html: String, summary: String?, traceId: String?): String = ""
+            override suspend fun onRenderHtml(html: String, summary: String?, display: String?, traceId: String?): String = ""
         })
         val result = capability.execute(
             AgentCommand.ExecuteScript(code = "abc"),
@@ -76,16 +76,20 @@ class ChatRunScriptCapabilityTest {
                 unit: String?,
                 traceId: String?
             ): String = ""
-            override suspend fun onRenderHtml(html: String, summary: String?, traceId: String?): String =
-                "HTML_OK:${html.length}:${summary ?: ""}"
+            override suspend fun onRenderHtml(
+                html: String,
+                summary: String?,
+                display: String?,
+                traceId: String?
+            ): String = "HTML_OK:${html.length}:${summary ?: ""}:${display ?: ""}"
         })
         val result = capability.execute(
-            AgentCommand.RenderHtml(html = "<div>hi</div>", summary = "卡片已渲染"),
+            AgentCommand.RenderHtml(html = "<div>hi</div>", summary = "卡片已渲染", display = "fullpage"),
             context,
             null,
         ).getOrNull()
         assertTrue("expected TextReply, got $result", result is AgentAction.TextReply)
-        assertEquals("HTML_OK:13:卡片已渲染", (result as AgentAction.TextReply).message)
+        assertEquals("HTML_OK:13:卡片已渲染:fullpage", (result as AgentAction.TextReply).message)
     }
 
     @Test
@@ -100,7 +104,7 @@ class ChatRunScriptCapabilityTest {
                 unit: String?,
                 traceId: String?
             ): String = ""
-            override suspend fun onRenderHtml(html: String, summary: String?, traceId: String?): String = ""
+            override suspend fun onRenderHtml(html: String, summary: String?, display: String?, traceId: String?): String = ""
         })
         val result = capability.execute(
             AgentCommand.TextReply(message = "hi"),
