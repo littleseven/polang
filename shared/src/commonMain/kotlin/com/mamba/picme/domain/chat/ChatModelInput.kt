@@ -8,9 +8,12 @@ package com.mamba.picme.domain.chat
  * - [MessagePart.Text] → [ModelInputItem.TextMessage]（角色随消息）；
  * - [MessagePart.Chart] / [MessagePart.HtmlCard] / [MessagePart.TaskCard] →
  *   tool-call + tool-result 语义对（卡片生命周期 = tool call 生命周期）；
- * - [MessagePart.MediaResults] / [MessagePart.Image] / [MessagePart.EditResult] /
- *   [MessagePart.OptimizeCandidates] 等 data part / 媒体块 **不进上下文**
- *   （对齐 Vercel convertToModelMessages 丢弃规则；[PRIVACY] 媒体红线：图片不发给远程 LLM）。
+ * - [MessagePart.Image] → 英文中性占位文本（图片本体不进上下文，[PRIVACY] 媒体红线；
+ *   占位保住多轮会话的回合结构）；
+ * - [MessagePart.EditResult] → 回灌其文字说明（沿旧路径 `(agent_edit_result, content)` 语义，
+ *   防多轮编辑上下文断裂）；
+ * - [MessagePart.MediaResults] / [MessagePart.OptimizeCandidates] 等 data part
+ *   **不进上下文**（对齐 Vercel convertToModelMessages 丢弃规则）。
  *
  * 引擎无关：不引用 Koog 类型；Koog Message 组装是上层（inference/remote）关注点。
  */
@@ -37,16 +40,20 @@ sealed interface ModelInputItem {
     ) : ModelInputItem
 }
 
-/** 消息角色（spec §2：role = USER | AGENT）。M1 自 legacy [ChatMessage.type] 派生。 */
-val ChatMessage.modelRole: ModelInputRole
-    get() = when (type) {
-        ChatMessageType.USER_TEXT,
-        ChatMessageType.USER_IMAGE,
-        ChatMessageType.USER_IMAGE_TEXT,
-        -> ModelInputRole.USER
+/**
+ * 回灌角色派生单点（spec §2：role = USER | AGENT）：legacy Room type 列值 `user_*` → USER，
+ * 其余 → ASSISTANT。实体侧（androidApp `toModelInputItems`）与模型侧（[ChatMessage.modelRole]）
+ * 共用本函数，禁止各自实现前缀判断。
+ */
+fun roleOf(roomType: String): ModelInputRole =
+    if (roomType.startsWith("user_")) ModelInputRole.USER else ModelInputRole.ASSISTANT
 
-        else -> ModelInputRole.ASSISTANT
-    }
+/**
+ * 消息角色（spec §2：role = USER | AGENT）。M1 自 legacy [ChatMessage.type] 派生。
+ * Room 列值 = 枚举名小写（`USER_TEXT` ↔ "user_text"），委托 [roleOf] 单点口径。
+ */
+val ChatMessage.modelRole: ModelInputRole
+    get() = roleOf(type.name.lowercase())
 
 /** 整条消息 → 回灌项序列（空列表 = 整条消息不进上下文）。 */
 fun ChatMessage.toModelInput(): List<ModelInputItem> = parts.toModelInput(modelRole)
@@ -59,11 +66,14 @@ private fun MessagePart.toModelInput(role: ModelInputRole): List<ModelInputItem>
     is MessagePart.Text ->
         if (markdown.isBlank()) emptyList() else listOf(ModelInputItem.TextMessage(role, markdown))
 
+    // TODO(M2): toolCallId 暂以 partId 占位；转真 tool_call 协议时须换 "${messageId}:partId"
+    // 或真实 callId（与流式 chunk 的 tool_call id 对齐），否则跨消息 id 可能碰撞。
     is MessagePart.Chart -> listOf(
         ModelInputItem.ToolCall(partId, TOOL_DRAW_CHART, argsSummary = ""),
-        ModelInputItem.ToolResult(partId, TOOL_DRAW_CHART, resultSummary = "图表卡片（SVG，${svg.length} 字符）"),
+        ModelInputItem.ToolResult(partId, TOOL_DRAW_CHART, resultSummary = "Chart card (SVG, ${svg.length} chars)"),
     )
 
+    // TODO(M2): 同上，toolCallId 暂以 partId 占位。
     is MessagePart.HtmlCard -> listOf(
         ModelInputItem.ToolCall(
             partId,
@@ -73,7 +83,7 @@ private fun MessagePart.toModelInput(role: ModelInputRole): List<ModelInputItem>
         ModelInputItem.ToolResult(
             partId,
             TOOL_RENDER_HTML,
-            resultSummary = meta.summary ?: "HTML 卡片（${html.length} 字符）",
+            resultSummary = meta.summary ?: "HTML card (${html.length} chars)",
         ),
     )
 
@@ -84,15 +94,26 @@ private fun MessagePart.toModelInput(role: ModelInputRole): List<ModelInputItem>
             TOOL_ENGINEER_TASK,
             resultSummary = task.errorSummary
                 ?: task.resultSummary
-                ?: "任务状态 ${task.status.name}",
+                ?: "Task status: ${task.status.name}",
             isError = state == ToolPartState.OUTPUT_ERROR,
         ),
     )
 
-    // data part / 媒体块：默认不进上下文（spec §6）
+    // 图片本体不进上下文（[PRIVACY] 媒体红线）；英文中性占位文本保住回合结构（spec §6）。
+    is MessagePart.Image -> listOf(
+        ModelInputItem.TextMessage(
+            role,
+            if (role == ModelInputRole.USER) USER_IMAGE_PLACEHOLDER else AGENT_IMAGE_PLACEHOLDER,
+        ),
+    )
+
+    // 编辑结果图不进上下文；文字说明回灌（沿旧路径 (agent_edit_result, content) 语义），
+    // 防多轮编辑上下文断裂（spec §6）。
+    is MessagePart.EditResult ->
+        if (description.isBlank()) emptyList() else listOf(ModelInputItem.TextMessage(role, description))
+
+    // data part：默认不进上下文（spec §6）
     is MessagePart.MediaResults,
-    is MessagePart.Image,
-    is MessagePart.EditResult,
     is MessagePart.OptimizeCandidates,
     -> emptyList()
 }
@@ -100,3 +121,6 @@ private fun MessagePart.toModelInput(role: ModelInputRole): List<ModelInputItem>
 private const val TOOL_DRAW_CHART = "draw_chart"
 private const val TOOL_RENDER_HTML = "render_html"
 private const val TOOL_ENGINEER_TASK = "engineer_task"
+
+private const val USER_IMAGE_PLACEHOLDER = "[user sent an image]"
+private const val AGENT_IMAGE_PLACEHOLDER = "[assistant generated an image]"

@@ -107,13 +107,13 @@ class ChatModelInputTest {
     }
 
     @Test
-    fun `data parts and media blocks never enter the model context`() {
+    fun `data parts never enter the model context`() {
         val dropped = listOf(
-            Triple("media_results", """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""", null),
-            Triple("user_image", "/data/img.jpg", null),
-            Triple("user_image_text", "文字", """{"imageUri":"/i.jpg"}"""),
-            Triple("agent_image", "说明", """{"imageUri":"/i.jpg"}"""),
-            Triple("agent_edit_result", "已提亮", """{"imageUri":"/i.jpg"}"""),
+            Triple(
+                "media_results",
+                """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""",
+                null,
+            ),
             Triple(
                 "optimize_candidates",
                 "挑一张",
@@ -122,16 +122,38 @@ class ChatModelInputTest {
         )
         dropped.forEach { (type, content, metadata) ->
             val items = legacyMessage(type, content, metadata).toModelInput()
-            if (type == "user_image_text") {
-                // 图文混排：图片块丢弃，文字段保留（用户意图文本对上下文有价值）
-                assertEquals(
-                    listOf(ModelInputItem.TextMessage(ModelInputRole.USER, "文字")),
-                    items,
-                )
-            } else {
-                assertEquals(emptyList(), items, "type=$type should not enter model context")
-            }
+            assertEquals(emptyList(), items, "type=$type should not enter model context")
         }
+    }
+
+    @Test
+    fun `images replay as neutral placeholders keeping turn structure`() {
+        // 图片本体不进上下文（[PRIVACY]）；英文中性占位保住多轮会话的回合结构（spec §6）
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.USER, "[user sent an image]")),
+            legacyMessage("user_image", "/data/img.jpg").toModelInput(),
+        )
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "[assistant generated an image]")),
+            legacyMessage("agent_image", "说明", """{"imageUri":"/i.jpg"}""").toModelInput(),
+        )
+        // 图文混排：占位 + 文字段都保留，块内顺序即展示顺序（图先文后）
+        assertEquals(
+            listOf(
+                ModelInputItem.TextMessage(ModelInputRole.USER, "[user sent an image]"),
+                ModelInputItem.TextMessage(ModelInputRole.USER, "文字"),
+            ),
+            legacyMessage("user_image_text", "文字", """{"imageUri":"/i.jpg"}""").toModelInput(),
+        )
+    }
+
+    @Test
+    fun `edit result replays its description so multi-turn edits keep context`() {
+        // 沿旧路径 (agent_edit_result, content) 语义：编辑说明回灌，防多轮编辑上下文断裂（spec §6）
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "已提亮")),
+            legacyMessage("agent_edit_result", "已提亮", """{"imageUri":"/i.jpg"}""").toModelInput(),
+        )
     }
 
     @Test

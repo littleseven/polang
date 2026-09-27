@@ -54,7 +54,9 @@ data class ChatMessage(
     val htmlCardMeta: HtmlCardMeta? = null,
     /**
      * 有序内容块数组（ADR-016 parts 模型，M1）。数组顺序即锚点。
-     * 由 Room 读侧（partsJson 解码，缺失时 legacy 列现算）填充；直接构造的瞬态消息默认空表。
+     * M1 期 UI 模型有意不填充（无消费方，避免每条消息一次无效 JSON decode）；
+     * 消费方在持久化（Room partsJson 双写）与 LLM 回灌（实体侧 `toModelInputItems`）。
+     * 直接构造的瞬态消息默认空表；M2 切渲染源时恢复 Room 读侧填充。
      */
     val parts: List<MessagePart> = emptyList(),
 )

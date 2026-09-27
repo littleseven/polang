@@ -9,7 +9,8 @@ import org.junit.Test
 
 /**
  * GET_CHAT_HISTORY 回灌链路的 (type, content) 对形状测试（spec §6 + M1 验收：
- * 与现状回灌输出等价——文本消息逐条等价；卡片/数据块的语义差为 spec 显式决策）。
+ * 文本消息逐条等价；command/plan_preview relabel 为 agent_text；卡片/数据块按 §6
+ * 显式转换——语义差为 spec 显式决策，逐条钉在本测试里）。
  */
 class ChatHistoryModelInputTest {
 
@@ -63,18 +64,36 @@ class ChatHistoryModelInputTest {
         assertEquals(
             listOf(
                 "tool_call" to "draw_chart",
-                "tool_result" to "draw_chart → 图表卡片（SVG，6 字符）",
+                "tool_result" to "draw_chart → Chart card (SVG, 6 chars)",
                 "tool_call" to "render_html",
                 "tool_result" to "render_html → 周报",
                 "tool_call" to "engineer_task(修复编译)",
-                "tool_result" to "engineer_task → 编译失败（失败）",
+                "tool_result" to "engineer_task → 编译失败 (failed)",
             ),
             pairs,
         )
     }
 
     @Test
-    fun `data parts and media blocks are absent from history payload`() {
+    fun `command and plan preview are relabeled to agent text in history payload`() {
+        // 旧路径原样输出 type；M1 起 command/plan_preview 归 Text part（spec §2），
+        // 回灌时 relabel 为 agent_text——原 type 仍由 legacy 列保留，UI 渲染不受影响
+        val entities = listOf(
+            entity("command", "search:猫", id = "r1"),
+            entity("plan_preview", "计划预览", id = "r2"),
+        )
+        assertEquals(
+            listOf("command" to "search:猫", "plan_preview" to "计划预览"),
+            legacyPairs(entities),
+        )
+        assertEquals(
+            listOf("agent_text" to "search:猫", "agent_text" to "计划预览"),
+            newPairs(entities),
+        )
+    }
+
+    @Test
+    fun `data parts are absent while images and edit results replay as text`() {
         val pairs = newPairs(
             listOf(
                 entity("user_text", "看图", id = "d1"),
@@ -87,8 +106,15 @@ class ChatHistoryModelInputTest {
                 entity("agent_edit_result", "已提亮", """{"imageUri":"/i.jpg"}""", id = "d4"),
             ),
         )
-        // 媒体块/数据块不进上下文；用户文本保留
-        assertEquals(listOf("user_text" to "看图"), pairs)
+        // media_results 等 data part 不进上下文；用户图片回灌占位文本、编辑结果回灌文字说明
+        assertEquals(
+            listOf(
+                "user_text" to "看图",
+                "user_text" to "[user sent an image]",
+                "agent_text" to "已提亮",
+            ),
+            pairs,
+        )
     }
 
     @Test

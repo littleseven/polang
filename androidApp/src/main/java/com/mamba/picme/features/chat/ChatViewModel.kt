@@ -50,7 +50,6 @@ import com.mamba.picme.core.image.BitmapSampling
 import com.mamba.picme.BuildConfig
 import android.os.Build
 import com.mamba.picme.data.local.ChatMessageDao
-import com.mamba.picme.data.local.decodePartsOrLegacy
 import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.data.local.toModelInputItems
 import com.mamba.picme.data.remote.picme.ClaudeEvent
@@ -3436,9 +3435,10 @@ class ChatViewModel(
             gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
                 optimizeGachaController?.hasPending(id) == true,
             engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
-            // ADR-016 M1：parts 双读——优先 partsJson，缺失/损坏回 legacy 列现算。
-            // UI 渲染仍读上方 legacy 字段（M1 不动 UI）；parts 供持久化/回灌与 M2+ 消费。
-            parts = decodePartsOrLegacy(),
+            // ADR-016 M1：parts 有意不填充——UI 渲染仍读上方 legacy 字段，parts 在 M1 无任何
+            // 消费方（回灌走实体侧 toModelInputItems），每条消息一次 JSON decode 属无效主链路
+            // 开销。M2 切渲染源时恢复双读填充（decodePartsOrLegacy：优先 partsJson，
+            // 缺失/损坏回 legacy 列现算）。
         )
     }
 

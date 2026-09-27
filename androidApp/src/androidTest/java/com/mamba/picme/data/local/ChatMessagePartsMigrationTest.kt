@@ -1,6 +1,9 @@
 package com.mamba.picme.data.local
 
 import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
@@ -8,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.MessagePartsCodec
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -15,21 +19,47 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
+ * 仅声明 [ChatMessageEntity] 的测试专用 Database：让 Room 真打开迁移后的库，
+ * 触发其对 chat_messages 表的 schema 校验（列名/类型/可空性/默认值逐字段比对实体声明）。
+ * 不用 AppDatabase 本体的原因：手写 v24 fixture 库只有 chat_messages 一张表，Room 对
+ * AppDatabase 其余 20 个实体的校验必然失败——那不是本次迁移要验证的东西。
+ */
+@Database(entities = [ChatMessageEntity::class], version = 25, exportSchema = false)
+abstract class ChatMessagesOnlyDatabase : RoomDatabase()
+
+/**
  * MIGRATION_24_25 端到端迁移测试（真机/instrumented）：v24 schema → ALTER ADD partsJson → 全量回填。
  *
- * 不依赖 room-testing 的 MigrationTestHelper：直接用 SupportSQLiteOpenHelper 以版本 24
- * 建 v24 形状的 chat_messages 表，执行真实 [AppDatabase.MIGRATION_24_25]，再逐行断言。
+ * 两段式：
+ * 1. 用 SupportSQLiteOpenHelper 以版本 24 建 v24 形状的 chat_messages 表（文件库）并灌 fixture；
+ * 2. 经 [Room.databaseBuilder]（[ChatMessagesOnlyDatabase]）真打开该库——Room 找到 24→25 迁移
+ *    路径后执行真实 [AppDatabase.MIGRATION_24_25]，随后对迁移结果做 **schema 校验**
+ *    （onValidateSchema：列名/类型/可空性/默认值与 @Entity 声明逐字段比对，不一致直接抛
+ *    IllegalStateException 使本测试失败）。
+ *
  * 覆盖：13 类抽样 + 未知类型 + 损坏 metadata → 全部不丢消息（parts 非空，坏行 Text 兜底）。
  */
 @RunWith(AndroidJUnit4::class)
 class ChatMessagePartsMigrationTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
+    private var roomDb: ChatMessagesOnlyDatabase? = null
 
-    /** v24 形状（无 partsJson 列）。 */
-    private fun createV24Database(): SupportSQLiteDatabase {
+    @After
+    fun tearDown() {
+        roomDb?.close()
+        context.deleteDatabase(DB_NAME)
+    }
+
+    /**
+     * v24 形状（无 partsJson 列）。
+     * 注意：列定义必须与 Room 由实体生成的真实 v24 产物一致——Kotlin 属性默认值不产生
+     * SQL DEFAULT（无 @ColumnInfo defaultValue），写 `DEFAULT 'default'` 会过不了 §2 的校验。
+     */
+    private fun createV24DatabaseFile() {
+        context.deleteDatabase(DB_NAME)
         val config = SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // in-memory
+            .name(DB_NAME)
             .callback(object : SupportSQLiteOpenHelper.Callback(24) {
                 override fun onConfigure(db: SupportSQLiteDatabase) {}
                 override fun onCreate(db: SupportSQLiteDatabase) {
@@ -37,7 +67,7 @@ class ChatMessagePartsMigrationTest {
                         """
                         CREATE TABLE `chat_messages` (
                             `id` TEXT NOT NULL PRIMARY KEY,
-                            `sessionId` TEXT NOT NULL DEFAULT 'default',
+                            `sessionId` TEXT NOT NULL,
                             `type` TEXT NOT NULL,
                             `content` TEXT NOT NULL,
                             `timestamp` INTEGER NOT NULL,
@@ -51,17 +81,48 @@ class ChatMessagePartsMigrationTest {
                 override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
             })
             .build()
-        return FrameworkSQLiteOpenHelperFactory().create(config).writableDatabase
+        FrameworkSQLiteOpenHelperFactory().create(config).apply {
+            writableDatabase.insertFixtures()
+            close()
+        }
     }
 
-    private fun insertLegacyRow(
-        db: SupportSQLiteDatabase,
+    private fun SupportSQLiteDatabase.insertFixtures() {
+        insertLegacyRow("m-user", "user_text", "帮我找海边的照片")
+        insertLegacyRow("m-agent", "agent_text", "找到了 3 张", """{"prompt_len":10}""")
+        insertLegacyRow("m-img", "user_image", "/data/img.jpg")
+        insertLegacyRow("m-imgtext", "user_image_text", "调亮一点", """{"imageUri":"file:///x.jpg"}""")
+        insertLegacyRow("m-aimg", "agent_image", "已生成", """{"imageUri":"file:///y.jpg","saved":true}""")
+        insertLegacyRow("m-edit", "agent_edit_result", "已提亮", """{"imageUri":"file:///z.jpg","suggestions":["微调"]}""")
+        insertLegacyRow("m-cmd", "command", "search:猫")
+        insertLegacyRow("m-plan", "plan_preview", "计划预览")
+        insertLegacyRow(
+            "m-media", "media_results",
+            """[{"id":7,"uri":"content://m/7","type":"PHOTO","captureDate":123,"fileName":"a.jpg"}]""",
+            """{"query":"海边","totalCount":99,"isRefinement":false}""",
+        )
+        insertLegacyRow("m-chart", "chart", "<svg/>")
+        insertLegacyRow("m-html", "html_card", "<html/>", """{"html_card":{"display":"inline","summary":"周报"}}""")
+        insertLegacyRow(
+            "m-task", "task_card", "修复编译",
+            """{"engineer_task":{"taskId":"t1","sourceText":"修复编译","status":"RUNNING","startedAtMs":1,"updatedAtMs":2}}""",
+        )
+        insertLegacyRow(
+            "m-gacha", "optimize_candidates", "挑一张",
+            """{"sourceImageUri":"u","scene":"人像","recommendedIndex":0,"drawIndex":1,"candidates":[],"usedFingerprints":[]}""",
+        )
+        // 边界行：未知类型 + 损坏 metadata（必须兜底不丢消息）
+        insertLegacyRow("m-unknown", "future_type", "未来类型原文")
+        insertLegacyRow("m-broken", "task_card", "损坏的任务卡", """{"engineer_task":{oops""")
+    }
+
+    private fun SupportSQLiteDatabase.insertLegacyRow(
         id: String,
         type: String,
         content: String,
         metadata: String? = null,
     ) {
-        db.execSQL(
+        execSQL(
             "INSERT INTO `chat_messages` (`id`, `sessionId`, `type`, `content`, `timestamp`, `metadata`) VALUES (?, 's', ?, ?, 1000, ?)",
             arrayOf(id, type, content, metadata),
         )
@@ -81,85 +142,70 @@ class ChatMessagePartsMigrationTest {
 
     @Test
     fun migrationBackfillsAllLegacyTypesWithoutLosingMessages() {
-        val db = createV24Database()
-        insertLegacyRow(db, "m-user", "user_text", "帮我找海边的照片")
-        insertLegacyRow(db, "m-agent", "agent_text", "找到了 3 张", """{"prompt_len":10}""")
-        insertLegacyRow(db, "m-img", "user_image", "/data/img.jpg")
-        insertLegacyRow(db, "m-imgtext", "user_image_text", "调亮一点", """{"imageUri":"file:///x.jpg"}""")
-        insertLegacyRow(db, "m-aimg", "agent_image", "已生成", """{"imageUri":"file:///y.jpg","saved":true}""")
-        insertLegacyRow(db, "m-edit", "agent_edit_result", "已提亮", """{"imageUri":"file:///z.jpg","suggestions":["微调"]}""")
-        insertLegacyRow(db, "m-cmd", "command", "search:猫")
-        insertLegacyRow(db, "m-plan", "plan_preview", "计划预览")
-        insertLegacyRow(
-            db, "m-media", "media_results",
-            """[{"id":7,"uri":"content://m/7","type":"PHOTO","captureDate":123,"fileName":"a.jpg"}]""",
-            """{"query":"海边","totalCount":99,"isRefinement":false}""",
-        )
-        insertLegacyRow(db, "m-chart", "chart", "<svg/>")
-        insertLegacyRow(db, "m-html", "html_card", "<html/>", """{"html_card":{"display":"inline","summary":"周报"}}""")
-        insertLegacyRow(
-            db, "m-task", "task_card", "修复编译",
-            """{"engineer_task":{"taskId":"t1","sourceText":"修复编译","status":"RUNNING","startedAtMs":1,"updatedAtMs":2}}""",
-        )
-        insertLegacyRow(
-            db, "m-gacha", "optimize_candidates", "挑一张",
-            """{"sourceImageUri":"u","scene":"人像","recommendedIndex":0,"drawIndex":1,"candidates":[],"usedFingerprints":[]}""",
-        )
-        // 边界行：未知类型 + 损坏 metadata（必须兜底不丢消息）
-        insertLegacyRow(db, "m-unknown", "future_type", "未来类型原文")
-        insertLegacyRow(db, "m-broken", "task_card", "损坏的任务卡", """{"engineer_task":{oops""")
+        createV24DatabaseFile()
 
-        AppDatabase.MIGRATION_24_25.migrate(db)
-
-        // 行数不变：不丢消息
-        val countCursor = db.query("SELECT COUNT(*) FROM `chat_messages`")
-        countCursor.use {
-            it.moveToFirst()
-            assertEquals(15, it.getInt(0))
+        // Room 真打开：执行真实 MIGRATION_24_25 并做 schema 校验（校验不过此处直接抛异常）
+        val db = Room
+            .databaseBuilder(context, ChatMessagesOnlyDatabase::class.java, DB_NAME)
+            .addMigrations(AppDatabase.MIGRATION_24_25)
+            .build()
+            .also { roomDb = it }
+        db.openHelper.writableDatabase.let { writable ->
+            // 行数不变：不丢消息
+            val countCursor = writable.query("SELECT COUNT(*) FROM `chat_messages`")
+            countCursor.use {
+                it.moveToFirst()
+                assertEquals(15, it.getInt(0))
+            }
         }
 
-        assertEquals("帮我找海边的照片", (readParts(db, "m-user").single() as MessagePart.Text).markdown)
-        assertEquals("找到了 3 张", (readParts(db, "m-agent").single() as MessagePart.Text).markdown)
+        val readable = db.openHelper.readableDatabase
+        assertEquals("帮我找海边的照片", (readParts(readable, "m-user").single() as MessagePart.Text).markdown)
+        assertEquals("找到了 3 张", (readParts(readable, "m-agent").single() as MessagePart.Text).markdown)
 
-        assertEquals("/data/img.jpg", (readParts(db, "m-img").single() as MessagePart.Image).ref)
+        assertEquals("/data/img.jpg", (readParts(readable, "m-img").single() as MessagePart.Image).ref)
 
-        val imgText = readParts(db, "m-imgtext")
+        val imgText = readParts(readable, "m-imgtext")
         assertEquals(2, imgText.size)
         assertEquals("file:///x.jpg", (imgText[0] as MessagePart.Image).ref)
         assertEquals("调亮一点", (imgText[1] as MessagePart.Text).markdown)
 
-        val aimg = readParts(db, "m-aimg").single() as MessagePart.Image
+        val aimg = readParts(readable, "m-aimg").single() as MessagePart.Image
         assertEquals("file:///y.jpg", aimg.ref)
         assertEquals(true, aimg.saved)
 
-        val edit = readParts(db, "m-edit").single() as MessagePart.EditResult
+        val edit = readParts(readable, "m-edit").single() as MessagePart.EditResult
         assertEquals("file:///z.jpg", edit.ref)
         assertEquals(listOf("微调"), edit.suggestions)
 
-        assertEquals("search:猫", (readParts(db, "m-cmd").single() as MessagePart.Text).markdown)
-        assertEquals("计划预览", (readParts(db, "m-plan").single() as MessagePart.Text).markdown)
+        assertEquals("search:猫", (readParts(readable, "m-cmd").single() as MessagePart.Text).markdown)
+        assertEquals("计划预览", (readParts(readable, "m-plan").single() as MessagePart.Text).markdown)
 
-        val media = readParts(db, "m-media").single() as MessagePart.MediaResults
+        val media = readParts(readable, "m-media").single() as MessagePart.MediaResults
         assertEquals("海边", media.results.query)
         assertEquals(99, media.results.totalCount)
         assertEquals(1, media.results.assets.size)
 
-        assertEquals("<svg/>", (readParts(db, "m-chart").single() as MessagePart.Chart).svg)
+        assertEquals("<svg/>", (readParts(readable, "m-chart").single() as MessagePart.Chart).svg)
 
-        val html = readParts(db, "m-html").single() as MessagePart.HtmlCard
+        val html = readParts(readable, "m-html").single() as MessagePart.HtmlCard
         assertEquals("<html/>", html.html)
         assertEquals("inline", html.meta.display)
         assertEquals("周报", html.meta.summary)
 
-        val task = readParts(db, "m-task").single() as MessagePart.TaskCard
+        val task = readParts(readable, "m-task").single() as MessagePart.TaskCard
         assertEquals("t1", task.toolCallId)
         assertEquals("修复编译", task.task.sourceText)
 
-        val gacha = readParts(db, "m-gacha").single() as MessagePart.OptimizeCandidates
+        val gacha = readParts(readable, "m-gacha").single() as MessagePart.OptimizeCandidates
         assertEquals("人像", gacha.group.scene)
 
         // 兜底行：原文保留为 Text part
-        assertEquals("未来类型原文", (readParts(db, "m-unknown").single() as MessagePart.Text).markdown)
-        assertEquals("损坏的任务卡", (readParts(db, "m-broken").single() as MessagePart.Text).markdown)
+        assertEquals("未来类型原文", (readParts(readable, "m-unknown").single() as MessagePart.Text).markdown)
+        assertEquals("损坏的任务卡", (readParts(readable, "m-broken").single() as MessagePart.Text).markdown)
+    }
+
+    private companion object {
+        const val DB_NAME = "chat-parts-migration-test.db"
     }
 }

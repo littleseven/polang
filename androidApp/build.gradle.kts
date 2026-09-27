@@ -328,6 +328,8 @@ dependencies {
 
     "ksp"(libs.androidx.room.compiler)
     "ksp"(libs.moshi.kotlin.codegen)
+    // androidTest 的测试专用 Room Database（ChatMessagesOnlyDatabase，迁移 schema 校验）需要生成 Impl
+    "kspAndroidTest"(libs.androidx.room.compiler)
 }
 
 // 修复 KSP 增量缓存损坏（file-to-id.tab is already registered）的根因：

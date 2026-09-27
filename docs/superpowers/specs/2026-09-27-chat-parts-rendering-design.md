@@ -113,8 +113,8 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 
 ## 6. 持久化与 LLM 回灌（双层分离）
 
-- **渲染/持久层**：Room `chat_message` 表加 `parts_json` 列（整包 JSON 序列化，对齐 Vercel「UIMessage JSON 落库」实践）；升级迁移：旧 `type + payload` → 单 part 文档，迁移失败行降级为 Text part 原文兜底，**不允许丢消息**
-- **回灌 LLM**：新增 `ChatMessage.toModelInput()` 显式转换——Text → 文本消息；TaskCard/Chart/HtmlCard → tool-call + tool-result 对；`MediaResults`/`OptimizeCandidates` 等 data part **默认不进上下文**（对齐 Vercel `convertToModelMessages` 丢弃规则）；替换 `getRecentMessages` 的现行拼接逻辑（`ChatViewModel.kt:3489` 一带）
+- **渲染/持久层**：Room `chat_messages` 表加 `partsJson` 列（列名随 Room 属性名，本表列均 camelCase；整包 JSON 序列化，对齐 Vercel「UIMessage JSON 落库」实践）；升级迁移：旧 `type + payload` → parts 文档，迁移失败行降级为 Text part 原文兜底，**不允许丢消息**
+- **回灌 LLM**：新增 `ChatMessage.toModelInput()` 显式转换——Text → 文本消息（command/plan_preview 经 Text part 归一后 relabel 为 `agent_text`，原 type 由 legacy 列保留）；TaskCard/Chart/HtmlCard → tool-call + tool-result 对；Image → 英文中性占位文本（`[user sent an image]` / `[assistant generated an image]`，图片本体不进上下文，占位保住回合结构）；EditResult → 回灌其文字说明 description（沿旧路径 `(agent_edit_result, content)` 语义，防多轮编辑上下文断裂）；`MediaResults`/`OptimizeCandidates` 等 data part **默认不进上下文**（对齐 Vercel `convertToModelMessages` 丢弃规则）；替换 `getRecentMessages` 的现行拼接逻辑（`ChatViewModel.kt:3489` 一带）
 - displayMode/测高等渲染 metadata 随 part 持久化（two-tier spec「形态不跳变」要求不变）
 
 ## 7. 渲染层设计
@@ -168,7 +168,7 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 
 | 期 | 内容 | 验收 |
 |---|---|---|
-| **M1 数据模型** | §3 parts 模型 + Room 迁移 + 回灌转换（§6）；UI 不动，旧渲染经 parts 适配层读取 | 全量历史消息迁移无损（抽查 + 单测）；回灌 token 序列与现状等价（fixture 对比）；编译+ui-driver 冒烟过 |
+| **M1 数据模型** | §3 parts 模型 + Room 迁移 + 回灌转换（§6）；UI 不动，旧渲染经 legacy 字段读取 | 全量历史消息迁移无损（抽查 + 单测）；回灌：文本消息逐条等价，卡片/数据块按 §6 显式转换（command/plan_preview relabel 为 agent_text）（fixture 对比）；编译+ui-driver 冒烟过 |
 | **M2 流式管线** | §4 chunk 事件 + reducer + §5 状态机；任务卡状态迁入 parts | 流式交错顺序正确（文本-卡-文本）；任务卡五态渲染等价；OUTPUT_ERROR 落库可回灌 |
 | **M3 正文渲染** | §7.1 spike → 替换 compose-markdown | spike 四项硬指标过线；流式长文无闪烁（screenshot-diff + 人工体感）；白名单内联 HTML 渲染 |
 | **M4 渲染拍平 + Turn 聚合** | §7.2/§7.3 + §8 性能清单 | 流式期间重组范围实测收窄（Layout Inspector/重组计数）；chat.yaml 修订 + 截图对比基线更新 |
