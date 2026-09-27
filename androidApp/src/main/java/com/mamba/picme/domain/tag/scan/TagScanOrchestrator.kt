@@ -662,6 +662,9 @@ class TagScanOrchestrator(
     private suspend fun runSession(sessionId: String) {
         updateProgressState(sessionId, ScanSessionState.RUNNING)
         logInfo(sessionId, "会话开始运行")
+        // 清零跨会话残留的特征提取失败计数（取消/暂停分支不消费，
+        // reembedFacesAndRecluster 等非会话路径也会累加），避免过期警告带入本会话
+        scheduler.consumeFaceEmbeddingFailureCount()
         acquireWakeLock()
 
 

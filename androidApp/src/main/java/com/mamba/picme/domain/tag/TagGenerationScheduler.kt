@@ -45,6 +45,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.sqrt
@@ -176,7 +177,7 @@ class TagGenerationScheduler(
      * （人脸模型缺失/损坏的特征信号）。由 [TagScanOrchestrator] 在会话收尾时
      * 经 [consumeFaceEmbeddingFailureCount] 读取并清零，转为用户可见警告。
      */
-    private val faceEmbeddingFailureCount = java.util.concurrent.atomic.AtomicInteger(0)
+    private val faceEmbeddingFailureCount = AtomicInteger(0)
 
     /** 读取并清零「检测到人脸但 embedding 为空」的累计次数（供会话收尾告警） */
     fun consumeFaceEmbeddingFailureCount(): Int = faceEmbeddingFailureCount.getAndSet(0)
@@ -1220,9 +1221,7 @@ class TagGenerationScheduler(
         // 产出率哨兵：检测到人脸但 embedding 为空 → 人脸模型缺失/损坏的典型信号
         // （extractFeature 返回零向量被过滤）。静默降级曾导致 embedding/persons 全 0
         // 而任务全部显示 COMPLETED，这里累计计数供会话收尾时转为可见警告。
-        if (result.faceRoiJson != null && !hasValidFace &&
-            runCatching { JSONObject(result.faceRoiJson).optBoolean("hasFace", false) }.getOrDefault(false)
-        ) {
+        if (result.faceRoiJson != null && !hasValidFace && result.faceDetected) {
             val failures = faceEmbeddingFailureCount.incrementAndGet()
             Log.w(TAG, "[Pass 1] Face detected but no embedding extracted " +
                 "(face embedding model missing/broken?) mediaId=${entity.id}, totalFailures=$failures")

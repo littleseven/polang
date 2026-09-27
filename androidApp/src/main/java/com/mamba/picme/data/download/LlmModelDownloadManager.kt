@@ -20,11 +20,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -64,7 +66,7 @@ class LlmModelDownloadManager(context: Context) {
          * 每行进页都会 remember 新实例），实例级 init 清扫会误删其他实例正在进行中的
          * 下载 .part（删除后写入方继续写已 unlink 的 inode，校验必失败 → 下载 FAILED）。
          */
-        private val stalePartCleaned = java.util.concurrent.atomic.AtomicBoolean(false)
+        private val stalePartCleaned = AtomicBoolean(false)
 
         /** .part 陈旧阈值：只清扫 mtime 早于此阈值的残骸，进行中下载的 .part 绝不触碰（双保险） */
         private const val STALE_PART_AGE_MS = 30L * 60 * 1000
@@ -161,6 +163,25 @@ class LlmModelDownloadManager(context: Context) {
             "README.md",
             "embeddings_bf16.bin"
         )
+
+        /**
+         * 续传盘点：单文件动作决策（纯函数，供 [resumeDownload] 与单测）。
+         *
+         * - 正式文件存在 → [FileResumeAction.SKIP_COMPLETED]：提升前已过完整性校验，永远可信；
+         * - .part 仅在「0 < partLength < expectedSize」时可信为单流顺序写的真实前缀 →
+         *   [FileResumeAction.RESUME_PARTIAL]；partLength ≥ expectedSize 可能是并行分块
+         *   setLength 预分配的空洞文件（长度正确内容空洞），不可信 → [FileResumeAction.RESTART_DOWNLOAD]；
+         * - expectedSize ≤ 0（API 未返回大小）无法判断 .part 可信度 → RESTART。
+         */
+        fun decideFileResumeAction(destExists: Boolean, partLength: Long?, expectedSize: Long): FileResumeAction {
+            if (destExists) return FileResumeAction.SKIP_COMPLETED
+            if (partLength == null || expectedSize <= 0) return FileResumeAction.RESTART_DOWNLOAD
+            return if (partLength in 1 until expectedSize) {
+                FileResumeAction.RESUME_PARTIAL
+            } else {
+                FileResumeAction.RESTART_DOWNLOAD
+            }
+        }
 
         /**
          * 根据模型 ID 解析其文件清单（纯函数，供 [getModelFiles] 复用，便于单测）。
@@ -260,17 +281,25 @@ class LlmModelDownloadManager(context: Context) {
     init {
         // 进程上次被杀可能留下 .part 残骸（原子下载方案：正式文件名永远完整，中断只留 .part）。
         // 启动时全局清扫一次，避免残骸长期占用存储。
-        managerScope.launch {
-            var cleaned = 0
-            downloadDir.listFiles()?.forEach { modelDir ->
-                modelDir.listFiles()?.forEach { file ->
-                    if (file.name.endsWith(PARTIAL_FILE_SUFFIX) && file.delete()) cleaned++
+        // 双保险：进程级 one-shot（本类非单例，SettingsScreen 语音区会重复实例化）+
+        // 只删陈旧文件（mtime 早于阈值），绝不触碰其他实例正在进行中的下载 .part。
+        if (stalePartCleaned.compareAndSet(false, true)) {
+            managerScope.launch {
+                val staleBefore = System.currentTimeMillis() - STALE_PART_AGE_MS
+                var cleaned = 0
+                downloadDir.listFiles()?.forEach { modelDir ->
+                    modelDir.listFiles()?.forEach { file ->
+                        if (file.name.endsWith(PARTIAL_FILE_SUFFIX) &&
+                            file.lastModified() < staleBefore && file.delete()
+                        ) {
+                            cleaned++
+                        }
+                    }
                 }
+                if (cleaned > 0) Logger.i(TAG, "Cleaned $cleaned stale partial download file(s)")
             }
-            if (cleaned > 0) Logger.i(TAG, "Cleaned $cleaned stale partial download file(s)")
         }
     }
-
 
     /**
      * 加载可用模型配置
@@ -842,16 +871,20 @@ fun isModelDownloaded(modelId: String): Boolean {
             for (fileInfo in allFileInfos) {
                 val destFile = File(modelDir, fileInfo.name)
                 val partFile = File(modelDir, fileInfo.name + PARTIAL_FILE_SUFFIX)
-                if (destFile.exists()) {
-                    totalDownloaded += destFile.length()
-                    continue
-                }
-                if (partFile.exists()) {
-                    if (fileInfo.size > 0 && partFile.length() < fileInfo.size) {
+                when (decideFileResumeAction(
+                    destExists = destFile.exists(),
+                    partLength = partFile.takeIf { part -> part.exists() }?.length(),
+                    expectedSize = fileInfo.size
+                )) {
+                    FileResumeAction.SKIP_COMPLETED -> totalDownloaded += destFile.length()
+                    FileResumeAction.RESUME_PARTIAL -> {
                         resumeOffsets[fileInfo.name] = partFile.length()
                         totalDownloaded += partFile.length()
-                    } else if (!partFile.delete()) {
-                        Logger.w(TAG, "Failed to delete untrusted partial file: ${partFile.name}")
+                    }
+                    FileResumeAction.RESTART_DOWNLOAD -> {
+                        if (partFile.exists() && !partFile.delete()) {
+                            Logger.w(TAG, "Failed to delete untrusted partial file: ${partFile.name}")
+                        }
                     }
                 }
             }
@@ -906,7 +939,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                             Logger.w(TAG, "Server ignored Range for $fileName (HTTP 200), restarting file from 0")
                             totalDownloaded -= resumeOffset
                         }
-                        java.io.FileOutputStream(partFile, append).use { out ->
+                        FileOutputStream(partFile, append).use { out ->
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                             var bytesRead: Int
                             var lastEmitTime = System.currentTimeMillis()
@@ -946,6 +979,16 @@ fun isModelDownloaded(modelId: String): Boolean {
             Logger.i(TAG, "Model download completed: $modelId")
 
         } catch (e: Exception) {
+            // 数据完整性错误（大小/SHA256 不符）不是暂停：必须优先于暂停意图判定，
+            // 清掉暂停态并明确 FAILED——否则用户曾暂停过时会在 UI 上反复 resume 反复静默失败
+            if (e is DownloadIntegrityException) {
+                pausedDownloads.remove(modelId)
+                Logger.e(TAG, "Download integrity check failed for $modelId: ${e.message}")
+                _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
+                updateServiceState()
+                emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
+                return@flow
+            }
             // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
             // pausedDownloads 由 pauseDownload 在取消前写入，是可靠意图来源
             val pausedBytes = pausedDownloads[modelId]
@@ -1201,6 +1244,16 @@ fun isModelDownloaded(modelId: String): Boolean {
             Logger.i(TAG, "Model download completed: $modelId")
 
         } catch (e: Exception) {
+            // 数据完整性错误（大小/SHA256 不符）不是暂停：必须优先于暂停意图判定，
+            // 清掉暂停态并明确 FAILED——否则用户曾暂停过时会在 UI 上反复 resume 反复静默失败
+            if (e is DownloadIntegrityException) {
+                pausedDownloads.remove(modelId)
+                Logger.e(TAG, "Download integrity check failed for $modelId: ${e.message}")
+                _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
+                updateServiceState()
+                emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
+                return@flow
+            }
             // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
             // pausedDownloads 由 pauseDownload 在取消前写入，是可靠意图来源
             val pausedBytes = pausedDownloads[modelId]
@@ -1236,6 +1289,15 @@ fun isModelDownloaded(modelId: String): Boolean {
      * 校验失败即删除损坏文件并抛 [IOException]，让本次下载标记为 FAILED，
      * 避免「大小正确、内容损坏」的模型文件被静默当作完成（如 CDN 断流导致某段截断）。
      */
+    /**
+     * 下载完整性校验失败（大小/SHA256 不符）。
+     *
+     * 必须与普通 [IOException] 区分：catch 分支会按 pausedDownloads 残留把任何异常
+     * 误报为 PAUSED（用户曾暂停过该模型时），数据错误应当清掉暂停态并明确 FAILED，
+     * 否则用户在 UI 上反复 resume 反复静默失败。
+     */
+    private class DownloadIntegrityException(message: String) : IOException(message)
+
     private fun verifyDownloadedFile(
         destFile: File,
         fileName: String,
@@ -1245,11 +1307,11 @@ fun isModelDownloaded(modelId: String): Boolean {
         val actualSize = destFile.length()
         if (expectedSize > 0 && actualSize != expectedSize) {
             destFile.delete()
-            throw IOException("Size mismatch after download for $fileName: expected=$expectedSize, actual=$actualSize")
+            throw DownloadIntegrityException("Size mismatch after download for $fileName: expected=$expectedSize, actual=$actualSize")
         }
         if (!expectedSha256.isNullOrEmpty() && !verifyFileSha256(destFile, expectedSha256)) {
             destFile.delete()
-            throw IOException("SHA256 mismatch after download for $fileName (corrupted file deleted)")
+            throw DownloadIntegrityException("SHA256 mismatch after download for $fileName (corrupted file deleted)")
         }
         Logger.d(TAG, "Post-download verification passed: $fileName ($actualSize bytes)")
     }
@@ -1492,6 +1554,16 @@ data class ModelFileInfo(
     val size: Long,
     val sha256: String?
 )
+
+/** 续传盘点的单文件动作，见 [LlmModelDownloadManager.decideFileResumeAction] */
+enum class FileResumeAction {
+    /** 正式文件已存在（提升前已过校验），跳过 */
+    SKIP_COMPLETED,
+    /** .part 为可信的单流真实前缀，Range 断点续传 */
+    RESUME_PARTIAL,
+    /** 无可信部分（无 part / part 疑似预分配空洞 / 大小未知），删除 part 从头下载 */
+    RESTART_DOWNLOAD
+}
 
 /**
  * 模型配置

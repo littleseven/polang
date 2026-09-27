@@ -228,7 +228,9 @@ data class Stage1WithEmbeddingsResult(
     /** MobileCLIP 语义 embedding Base64（null = 编码失败） */
     val semanticEmbedding: String? = null,
     /** 人脸纵向聚焦点（归一化 0~1；null=无人脸/解码失败）。供列表对齐持久化。 */
-    val faceFocusY: Float? = null
+    val faceFocusY: Float? = null,
+    /** 检测器是否检出人脸（与 faceRoiJson 内的 hasFace 同源，免去调用方反解 JSON） */
+    val faceDetected: Boolean = false
 )
 
 /**
