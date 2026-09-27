@@ -1,5 +1,6 @@
 package com.mamba.picme.data.remote.picme
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.job
@@ -100,7 +101,9 @@ class ClaudeChatClient(private val baseUrl: String = DEFAULT_BASE_URL) {
         sid: String? = null,
         onEvent: (ClaudeEvent) -> Unit,
     ): Result<String?> = withContext(Dispatchers.IO) {
-        runCatching {
+        // 不用 runCatching：协程取消必须穿透（否则被折叠成 Result.failure，调用方会当成
+        // 网络失败产「推理失败」气泡）；任务卡「停止」依赖取消沿调用链传播（2026-09-27 H2）
+        try {
             val body = JSONObject().put("message", message).also {
                 sid?.takeIf { s -> s.isNotBlank() }?.let { s -> it.put("sid", s) }
             }.toString()
@@ -137,7 +140,11 @@ class ClaudeChatClient(private val baseUrl: String = DEFAULT_BASE_URL) {
                     }
                 }
             }
-            sessionSid
+            Result.success(sessionSid)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) { // 显式复刻 runCatching 语义（唯一差异：取消穿透），宽捕获即其本意
+            Result.failure(e)
         }
     }
 

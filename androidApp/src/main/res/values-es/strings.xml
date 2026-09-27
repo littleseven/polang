@@ -1343,6 +1343,15 @@
     <string name="chat_task_abandon">Terminar</string>
     <string name="chat_task_skip_deliver">Ahora no</string>
     <string name="chat_task_retry">Reintentar</string>
+    <string name="chat_task_stop">Detener tarea</string>
+    <string name="chat_task_title_prefix">Tarea de ingeniería: </string>
+    <string name="chat_task_meta_elapsed">Tiempo %1$s</string>
+    <string name="chat_task_reason_prefix">Motivo: </string>
+    <string name="chat_task_used_prefix">Usado: </string>
+    <string name="chat_task_summary_prefix">Resumen: </string>
+    <string name="chat_task_recent_events">Eventos recientes</string>
+    <string name="chat_card_expand_hint">Toca para ver detalles ▾</string>
+    <string name="chat_card_collapse_hint">Toca para contraer ▴</string>
     <string name="chat_task_resolved_continued">Continuado</string>
     <string name="chat_task_resolved_delivered">Entregado</string>
     <string name="chat_task_resolved_abandoned">Abandonado</string>

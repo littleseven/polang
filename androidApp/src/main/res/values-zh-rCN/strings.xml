@@ -1378,6 +1378,15 @@
     <string name="chat_task_abandon">到此为止</string>
     <string name="chat_task_skip_deliver">暂不</string>
     <string name="chat_task_retry">重试</string>
+    <string name="chat_task_stop">停止任务</string>
+    <string name="chat_task_title_prefix">工程师任务：</string>
+    <string name="chat_task_meta_elapsed">耗时 %1$s</string>
+    <string name="chat_task_reason_prefix">截断原因：</string>
+    <string name="chat_task_used_prefix">已用：</string>
+    <string name="chat_task_summary_prefix">小结：</string>
+    <string name="chat_task_recent_events">最近事件</string>
+    <string name="chat_card_expand_hint">点击展开细节 ▾</string>
+    <string name="chat_card_collapse_hint">点击收起 ▴</string>
     <string name="chat_task_resolved_continued">已继续</string>
     <string name="chat_task_resolved_delivered">已交付</string>
     <string name="chat_task_resolved_abandoned">已放弃</string>

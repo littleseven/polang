@@ -55,11 +55,13 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.mamba.picme.R
@@ -97,6 +99,11 @@ import kotlin.math.roundToInt
  * 列表滑动途中冻结高度更新（滚停后一次性应用）+ 小于 [HEIGHT_UPDATE_THRESHOLD_PX]px 的抖动忽略；
  * console 上报的高度在视图未完成首次布局（width=0，CSS 视口宽度为 0 文本极限换行测出虚高）时丢弃——
  * 三者共同消除「滑动中卡片先显示大片空白再收起」的抖动。滚动条一律隐藏。
+ *
+ * **任务卡复用**（2026-09-27 H2，spec《HTML 卡双形态》§7）：[cardColor]/[cardShape]/[cardTonalElevation]/
+ * [contentPadding] 外观参数化（渐隐遮罩目标色随 [cardColor]，Light/Dark 运行时安全）；
+ * [onInlineCardTap] 非空时 INLINE 态叠透明触控层（同预览卡手法）——WebView 禁触摸/聚焦，
+ * 整卡点击回调宿主（任务卡展开/收起），竖拖仍落回 LazyColumn；适用前提是卡内 HTML 无交互元素。
  */
 
 /** 卡片态最小高度。 */
@@ -145,7 +152,22 @@ fun HtmlCard(
     /** 预览卡点击 / 兜底封面点击 → 宿主打开全屏查看器（[HtmlFullpageViewer]）。 */
     onOpenFullpage: (() -> Unit)? = null,
     /** 端侧终判完成回调（宿主持久化 displayMode + 测高到消息 metadata）；仅在首次判定时触发。 */
-    onDisplayModeResolved: (HtmlCardDisplayMode, Int?) -> Unit = { _, _ -> }
+    onDisplayModeResolved: (HtmlCardDisplayMode, Int?) -> Unit = { _, _ -> },
+    /** 卡底色（渐隐遮罩目标色随此）；默认 surface——HTML_CARD 分支历史行为。 */
+    cardColor: Color = MaterialTheme.colorScheme.surface,
+    /** 卡外形；默认 12dp 圆角。带原生动作条的任务卡传「顶圆底直」形状续接。 */
+    cardShape: Shape = RoundedCornerShape(12.dp),
+    /** 卡色调海拔；任务卡传 0（底色即 surfaceContainer，无需 tonal 叠加）。 */
+    cardTonalElevation: Dp = 1.dp,
+    /** WebView 与卡缘的内边距；任务卡模板自带 body padding 时传 0。 */
+    contentPadding: Dp = 8.dp,
+    /**
+     * INLINE 态整卡点击回调（任务卡展开/收起）。非空时 WebView 禁触摸/聚焦并叠透明触控层
+     * （同预览卡手法，spec §5）——仅适用于卡内 HTML 无交互元素的场景（任务卡纯展示）。
+     */
+    onInlineCardTap: (() -> Unit)? = null,
+    /** INLINE 触控层的 onClickLabel（无障碍）。 */
+    inlineTapLabel: String? = null,
 ) {
     val configuration = LocalConfiguration.current
     val effectiveViewportHeightDp =
@@ -220,12 +242,11 @@ fun HtmlCard(
     }
 
     val isFullpage = displayMode == HtmlCardDisplayMode.FULLPAGE
-    val cardColor = MaterialTheme.colorScheme.surface
     val viewFullLabel = stringResource(R.string.html_card_view_full)
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = cardShape,
         color = cardColor,
-        tonalElevation = 1.dp,
+        tonalElevation = cardTonalElevation,
         modifier = modifier.fillMaxWidth()
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -243,9 +264,9 @@ fun HtmlCard(
                                 Modifier.nestedScroll(rememberNestedScrollInteropConnection())
                             }
                         )
-                        .padding(8.dp),
+                        .padding(contentPadding),
                     measureEnabled = !isFullpage,
-                    previewMode = isFullpage,
+                    previewMode = isFullpage || onInlineCardTap != null,
                     onContentHeightCssPx = { px ->
                         when (displayMode) {
                             // 首次测高 → 混合分流判定（display 声明 × 测高 × 阈值），终判回写持久化
@@ -307,6 +328,20 @@ fun HtmlCard(
                             ) { onOpenFullpage?.invoke() }
                     )
                 }
+            }
+            if (!isFullpage && onInlineCardTap != null) {
+                // INLINE 态整卡触控层（任务卡展开/收起）：同预览卡手法——只消费点击，
+                // 竖拖落回 LazyColumn；高度跟随 inline 卡动画高度（WebView 已禁触摸/聚焦）
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(animatedHeight)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClickLabel = inlineTapLabel
+                        ) { onInlineCardTap.invoke() }
+                )
             }
         }
     }

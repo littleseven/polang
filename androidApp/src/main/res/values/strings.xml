@@ -1387,6 +1387,15 @@
     <string name="chat_task_abandon">Stop here</string>
     <string name="chat_task_skip_deliver">Not now</string>
     <string name="chat_task_retry">Retry</string>
+    <string name="chat_task_stop">Stop task</string>
+    <string name="chat_task_title_prefix">Engineer task: </string>
+    <string name="chat_task_meta_elapsed">Elapsed %1$s</string>
+    <string name="chat_task_reason_prefix">Reason: </string>
+    <string name="chat_task_used_prefix">Used: </string>
+    <string name="chat_task_summary_prefix">Summary: </string>
+    <string name="chat_task_recent_events">Recent events</string>
+    <string name="chat_card_expand_hint">Tap to expand details ▾</string>
+    <string name="chat_card_collapse_hint">Tap to collapse ▴</string>
     <string name="chat_task_resolved_continued">Continued</string>
     <string name="chat_task_resolved_delivered">Delivered</string>
     <string name="chat_task_resolved_abandoned">Abandoned</string>

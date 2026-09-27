@@ -100,6 +100,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -355,6 +356,10 @@ class ChatViewModel(
     @Volatile
     private var activeEngineerTaskId: String? = null
 
+    /** 当前 claude 回合协程（任务卡「停止」取消对象；finally compare-and-clear 同 [activeEngineerTaskId]）。 */
+    @Volatile
+    private var activeClaudeJob: Job? = null
+
     /**
      * 进入 AI 工程师模式：有持久化上下文且所属 chat 会话仍在 → 切回该会话并恢复 sid
      * （transcript + agent 上下文双连续）；否则新建独立会话（claude-tunnel 上下文独立）。
@@ -407,7 +412,8 @@ class ChatViewModel(
             }
             return
         }
-        viewModelScope.launch {
+        activeClaudeJob = viewModelScope.launch {
+            val selfJob = coroutineContext[Job]
             val sessionId = _currentSessionId.value
             // 提升到 try 外：finally 做 compare-and-clear，防旧回合误清新回合的活动卡
             var taskId: String? = null
@@ -528,6 +534,11 @@ class ChatViewModel(
                         )
                     },
                 )
+            } catch (e: CancellationException) {
+                // 主动停止（stopEngineerTask 取消本回合）：静默收场不产「推理失败」气泡；
+                // 任务卡已由 stop 侧裁决 ABANDONED，markActiveEngineerTaskFailed 的 RUNNING 守卫亦不覆盖
+                _streamingMessage.value = null
+                throw e
             } catch (e: Exception) {
                 Logger.e(TAG, "sendClaudeMessage failed", e)
                 markActiveEngineerTaskFailed(sessionId, e.message)
@@ -535,6 +546,7 @@ class ChatViewModel(
             } finally {
                 _isProcessing.value = false
                 if (activeEngineerTaskId == taskId) activeEngineerTaskId = null
+                if (activeClaudeJob === selfJob) activeClaudeJob = null
                 actionInFlightTaskId?.let { id ->
                     _engineerActionInFlight.update { inFlight -> inFlight - id }
                 }
@@ -726,6 +738,21 @@ class ChatViewModel(
         if (taskId in _engineerActionInFlight.value) return
         _engineerActionInFlight.update { inFlight -> inFlight + taskId }
         sendClaudeMessage(source, actionInFlightTaskId = taskId, resumeSid = resumeSid)
+    }
+
+    /**
+     * 任务卡「停止任务」（2026-09-27 H2，spec《HTML 卡双形态》§7 running=[停止]）：仅 RUNNING 态可停。
+     * 裁决 ABANDONED 后取消本回合 SSE 协程——[ClaudeChatClient.chat] 已挂 invokeOnCompletion{call.cancel}，
+     * 取消即断流；取消经重抛的 CancellationException 穿透到 sendClaudeMessage 的静默分支，
+     * 不产「推理失败」气泡。既知 P1 语义：本地取消，网关侧运行成孤儿；停止时半截流式气泡丢弃不落库。
+     */
+    fun stopEngineerTask(taskId: String) {
+        val task = _engineerTasks.value[taskId] ?: return
+        if (task.status != EngineerTaskStatus.RUNNING) return
+        resolveEngineerTask(_currentSessionId.value, taskId, EngineerTaskResolution.ABANDONED)
+        if (activeEngineerTaskId == taskId) {
+            activeClaudeJob?.cancel()
+        }
     }
 
     /** 任务卡「交付 push」：复用 ClaudeChatClient.deliver；失败保持 AWAITING_DELIVER 可重试。sessionId 语义同 [abandonEngineerTask]。 */

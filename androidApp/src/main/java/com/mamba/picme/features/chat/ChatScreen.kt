@@ -653,12 +653,20 @@ fun ChatScreen(
                                 val task = message.engineerTask
                                 if (task != null) {
                                     var taskExpanded by rememberSaveable(message.id) { mutableStateOf(false) }
+                                    // H2 HTML 化（2026-09-27）：L1 模板经 HtmlCard 双形态渲染 + 原生动作条；
+                                    // viewportHeightDp 用 IME 稳定值（对齐 HTML_CARD 分支，防键盘态误升格 FULLPAGE）
                                     EngineerTaskCard(
                                         task = task,
                                         expanded = taskExpanded,
+                                        viewportHeightDp = listViewportStableHeightDp,
+                                        previewViewportHeightDp = listViewportHeightDp,
+                                        isListScrolling = listState.isScrollInProgress,
                                         actionsEnabled = !isProcessing && task.taskId !in engineerActionInFlight,
-                                        onViewAll = onNavigateToTaskCenter,
                                         onToggleExpand = { taskExpanded = !taskExpanded },
+                                        onOpenFullpage = { html, title ->
+                                            fullpageHtmlCard = HtmlFullpageContent(html = html, title = title)
+                                        },
+                                        onStop = { viewModel.stopEngineerTask(task.taskId) },
                                         onContinue = { viewModel.continueEngineerTask(task.taskId) },
                                         onAbandon = { viewModel.abandonEngineerTask(task.taskId) },
                                         onDeliver = { viewModel.deliverEngineerTask(task.taskId) },
