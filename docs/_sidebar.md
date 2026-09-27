@@ -20,8 +20,8 @@
     - [ADR-011 退役非 ui-driver 测试](02-ARCHITECTURE/ADR/ADR-011-retire-non-ui-driver-tests.md)
     - [ADR-012 统一会话记忆](02-ARCHITECTURE/ADR/ADR-012-unify-conversation-memory.md)
     - [ADR-013 KMP 架构契约](02-ARCHITECTURE/ADR/ADR-013-kmp-architecture-contract.md)
-    - [ADR-014 Chat 富内容混合渲染](02-ARCHITECTURE/ADR/ADR-014-chat-rich-rendering-hybrid.md)
     - [ADR-015 意图路由契约](02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md)
+    - [ADR-016 Chat 消息内容模型与渲染架构](02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md)
 
 - **技术规格**
   - [大美丽引擎](03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md)

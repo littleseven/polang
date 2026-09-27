@@ -85,7 +85,7 @@ docs/superpowers/
 
 ## 6. 索引（2026-09-26 清理后）
 
-- **specs（10 篇，均为在途/活跃 SSOT）**：
+- **specs（11 篇，均为在途/活跃 SSOT）**：
   - `2026-08-08-face-restoration-ondevice-design.md` — 人脸修复方向（未实施，待排期）
   - `2026-08-10-ios-follow-command-design.md` — /ios-follow 六阶段管线设计 SSOT（AGENTS §7 引用）
   - `2026-08-13-ios-chat-rich-features-design.md` — iOS Chat 富交互（批次③沙盒写操作在途）
@@ -96,6 +96,7 @@ docs/superpowers/
   - `2026-09-25-intent-routing-contract-design.md` — 意图路由契约（M3 分支化在途）
   - `2026-09-26-html-card-two-tier-design.md`（+ 同名 mockup.html）— HTML 卡双形态 + 任务卡 HTML 化（已定稿待实施）
   - `2026-09-26-user-task-protocol-design.md` — 用户任务协议 + 任务中心双 Tab（M2/M3 在途）
+  - `2026-09-27-chat-parts-rendering-design.md` — Chat parts 消息模型与渲染架构（ADR-016 实施 spec，已定稿待实施）
 - **plans（1 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）
 
 ---

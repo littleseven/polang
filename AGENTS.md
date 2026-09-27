@@ -269,7 +269,7 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **★ 双端 UI 研发流程** | `docs/08-UI-SPECS/README.md`（Vibe Coding → 固化 Spec → iOS 翻译） |
 | **iOS 对等跟随编排** | `docs/superpowers/specs/2026-08-10-ios-follow-command-design.md`（/ios-follow 六阶段管线设计 SSOT + platform_differences 台账层；可执行形态 `skills/ios-follow/SKILL.md`） |
 | **AI 工具配置索引** | `AI_TOOLS.md`（四工具配置位置、Skills/Plans/Specs SSOT 约定） |
-| **Chat 富内容渲染（ADR-014）** | `docs/02-ARCHITECTURE/ADR/ADR-014-chat-rich-rendering-hybrid.md`（正文原生富渲染 + RICH_HTML 沙箱卡；ADR 索引 `docs/02-ARCHITECTURE/ADR/README.md`） |
+| **★ Chat 消息模型与渲染宪法（ADR-016，已定稿待实施；整合原 ADR-014）** | `docs/02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md`（Vercel parts 协议 + ChatGPT AST 渲染 + 沙箱卡双形态 + tokens SSOT；**Chat 域消息模型/流式/渲染一切改动的上位约束**；原 ADR-014 富内容渲染已并入——D3 沙箱/D4 iOS/D5 样式分级编号语义不变，编号 014 永久留空）+ spec `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md`（parts 模型/chunk 流式/工具状态机/Turn 聚合/性能顺车修复，M1~M5 分期） |
 | **意图路由契约与路由器（ADR-015，M1/M2 已实施）** | `docs/02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md`（LLM 管意图、代码管策略）+ spec `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（M1 止血 + M2 路由器主干已落地，M3 分支化在途） |
 | **工程师任务卡（P1+任务中心已落地，渲染层改 HTML）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（任务卡 + 任务中心页，Muse 范式；US-4~6 回联待 P2 网关改造） |
 | **HTML 卡双形态 + 任务卡 HTML 化（H1 已合 main）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器；H2 任务卡 L1 模板 HTML 化待做；设计稿 Ardot `HtmlCard` 页 8 帧） |

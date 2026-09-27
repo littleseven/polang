@@ -5,7 +5,7 @@ import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
 
 /**
- * 工程师任务卡 L1 模板组装器（spec《HTML 卡双形态》2026-09-26 §7；ADR-014 D5 L1 轨首个兑现场景）。
+ * 工程师任务卡 L1 模板组装器（spec《HTML 卡双形态》2026-09-26 §7；ADR-016 D5 L1 轨首个兑现场景）。
  *
  * - HTML 来源 = 端侧模板 + [EngineerTaskState]（App 渲染，非 LLM 产物）——样式权威在 App，
  *   模板本身可信，**变量插值是唯一注入面**：所有状态文本字段（阶段/事件行/原因/摘要）入模板前
