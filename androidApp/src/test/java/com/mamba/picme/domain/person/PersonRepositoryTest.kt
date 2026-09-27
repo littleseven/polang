@@ -435,4 +435,77 @@ class PersonRepositoryTest {
         assertNotNull(person)
         assertEquals(100L, person!!.coverMediaId)
     }
+
+    @Test
+    fun `applyPersonEdit without self returns SelfNotDeclared and writes no relation`() = runTest {
+        val childId = insertPerson("小宝")
+
+        val result = repository.applyPersonEdit(
+            personId = childId,
+            name = "小宝",
+            relation = RelationPredicate.CHILD,
+            customLabel = "",
+            isSelf = false
+        )
+
+        assertTrue("结果必须透传给调用方，不允许静默吞掉", result is PersonRepository.DeclareRelationResult.SelfNotDeclared)
+        assertTrue("被拒的声明不落库", db.personRelationDao().getAll().isEmpty())
+    }
+
+    @Test
+    fun `applyPersonEdit with self returns Declared and persists relation`() = runTest {
+        val selfId = insertPerson("我")
+        val childId = insertPerson("小宝")
+        repository.setSelf(selfId)
+
+        val result = repository.applyPersonEdit(
+            personId = childId,
+            name = "小宝",
+            relation = RelationPredicate.CHILD,
+            customLabel = "二儿子",
+            isSelf = false
+        )
+
+        assertTrue(result is PersonRepository.DeclareRelationResult.Declared)
+        val relation = db.personRelationDao().getAll().single()
+        assertEquals(RelationPredicate.CHILD.name, relation.predicate)
+        assertEquals("二儿子", relation.customLabel)
+    }
+
+    @Test
+    fun `applyPersonEdit with null relation returns null and clears relations`() = runTest {
+        val selfId = insertPerson("我")
+        val childId = insertPerson("小宝")
+        repository.setSelf(selfId)
+        repository.declareRelation(childId, RelationPredicate.CHILD, RelationSource.RENAME_DIALOG)
+
+        val result = repository.applyPersonEdit(
+            personId = childId,
+            name = "小宝",
+            relation = null,
+            customLabel = "",
+            isSelf = false
+        )
+
+        assertNull("清除路径无声明动作，返回 null", result)
+        assertTrue(db.personRelationDao().getAll().isEmpty())
+    }
+
+    @Test
+    fun `applyPersonEdit renames in the same write as relation declaration`() = runTest {
+        val selfId = insertPerson("我")
+        val childId = insertPerson("旧名")
+        repository.setSelf(selfId)
+
+        val result = repository.applyPersonEdit(
+            personId = childId,
+            name = "新名",
+            relation = RelationPredicate.FRIEND,
+            customLabel = "",
+            isSelf = false
+        )
+
+        assertTrue(result is PersonRepository.DeclareRelationResult.Declared)
+        assertEquals("新名单次写入即生效", "新名", db.personDao().getPerson(childId)?.name)
+    }
 }

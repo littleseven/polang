@@ -1218,6 +1218,8 @@
     <string name="person_relation_group_family">Familia</string>
     <string name="person_relation_group_social">Social</string>
     <string name="person_is_self">Soy yo</string>
+    <string name="person_relation_need_self">Aún no has marcado «Soy yo»: actívalo primero en tu propio grupo y luego establece la relación</string>
+    <string name="person_save_subject_gone">Esta persona ya no existe (puede haberse fusionado al reagrupar)</string>
     <string name="person_relation_add">Añadir relación</string>
     <!-- AI 记忆（事实记忆管理页） -->
     <string name="settings_ai_memory">Memoria de IA</string>

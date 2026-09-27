@@ -101,6 +101,22 @@ fun PersonScreen(
         }
     }
 
+    // 保存被拒的类型化错误 → 本地化 snackbar 引导（如未标记「这是我」时声明关系）
+    val saveError by viewModel.saveError.collectAsState()
+    LaunchedEffect(saveError) {
+        when (saveError) {
+            PersonSaveError.SELF_NOT_DECLARED -> {
+                snackbarHostState.showSnackbar(context.getString(R.string.person_relation_need_self))
+                viewModel.clearSaveError()
+            }
+            PersonSaveError.SUBJECT_NOT_FOUND -> {
+                snackbarHostState.showSnackbar(context.getString(R.string.person_save_subject_gone))
+                viewModel.clearSaveError()
+            }
+            null -> Unit
+        }
+    }
+
     LaunchedEffect(showAll, persons.size, totalPersonCount) {
         val hidden = totalPersonCount - persons.size
         if (hidden > 0 && !showAll) {
@@ -256,8 +272,8 @@ fun PersonScreen(
             relation = relations[person.personId],
             cover = covers[person.personId],
             photos = infoPhotos,
-            onSave = { relation, customLabel, isSelf ->
-                viewModel.updatePersonInfo(person.personId, relation, customLabel, isSelf)
+            onSave = { name, relation, customLabel, isSelf ->
+                viewModel.updatePersonInfo(person.personId, name, relation, customLabel, isSelf)
             },
             onNavigateBack = { infoTarget = null },
             onCaptureAvatar = {
@@ -269,9 +285,6 @@ fun PersonScreen(
             },
             onUpdateCover = { photo ->
                 viewModel.updateCover(person.personId, photo.id)
-            },
-            onUpdateName = { name ->
-                viewModel.updateName(person.personId, name)
             },
             onRescore = {
                 val app = context.applicationContext as? PoLangApplication

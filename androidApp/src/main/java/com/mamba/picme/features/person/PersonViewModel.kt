@@ -18,13 +18,21 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** 人物编辑保存被拒的类型化原因（UI 映射为本地化文案，不透传裸异常）。 */
+enum class PersonSaveError {
+    /** 未标记"我"本人就声明关系——声明被拒，需引导先打开「这是我」。 */
+    SELF_NOT_DECLARED,
+
+    /** 目标人物已不存在（如重聚类后被合并）。 */
+    SUBJECT_NOT_FOUND
+}
+
 /**
  * 「人物」页 ViewModel：全部人脸聚类列表 + 每个聚类的封面 + 指向"我"的关系。
  *
  * 封面用 [PersonCoverResolver] 纯映射（可单测）；编辑走 [PersonRepository] 收口。
  */
-class PersonViewModel(
-    private val personRepository: PersonRepository,
+class PersonViewModel(    private val personRepository: PersonRepository,
     private val db: AppDatabase,
     private val faceClusterEngine: FaceClusterEngine
 ) : ViewModel() {
@@ -52,6 +60,9 @@ class PersonViewModel(
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _saveError = MutableStateFlow<PersonSaveError?>(null)
+    val saveError: StateFlow<PersonSaveError?> = _saveError.asStateFlow()
 
     /** 加载全部人物簇并解析封面与关系。 */
     fun load() {
@@ -166,23 +177,39 @@ class PersonViewModel(
         }
     }
 
-    /** 更新人物信息（关系/自定义称呼/"我"标记）。 */
+    /**
+     * 更新人物信息（姓名/关系/自定义称呼/"我"标记）。
+     *
+     * name 由编辑页随保存一并提交（单次写入 [PersonRepository.applyPersonEdit]），
+     * 不再从 [_persons] 取旧名快照——那是"改名被回退"竞态的来源。
+     * 声明被拒（未标记"我"）时透传 [PersonSaveError]，由 UI 引导用户。
+     */
     fun updatePersonInfo(
         personId: Long,
+        name: String,
         relation: RelationPredicate?,
         customLabel: String,
         isSelf: Boolean
     ) {
         viewModelScope.launch {
             try {
-                val person = _persons.value.find { it.personId == personId } ?: return@launch
-                val name = person.name ?: ""
-                personRepository.applyPersonEdit(personId, name, relation, customLabel, isSelf)
+                val result = personRepository.applyPersonEdit(personId, name, relation, customLabel, isSelf)
+                _saveError.value = when (result) {
+                    is PersonRepository.DeclareRelationResult.SelfNotDeclared ->
+                        PersonSaveError.SELF_NOT_DECLARED
+                    is PersonRepository.DeclareRelationResult.SubjectNotFound ->
+                        PersonSaveError.SUBJECT_NOT_FOUND
+                    else -> null
+                }
                 load()
             } catch (e: Exception) {
                 _errorMessage.value = e.message
             }
         }
+    }
+
+    fun clearSaveError() {
+        _saveError.value = null
     }
 
     /** 读取某人物关联的全部媒体（供封面选择 Sheet）。单人照优先，避免合影作封面。 */

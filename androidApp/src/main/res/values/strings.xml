@@ -1261,6 +1261,8 @@
     <string name="person_relation_group_family">Family</string>
     <string name="person_relation_group_social">Social</string>
     <string name="person_is_self">This is me</string>
+    <string name="person_relation_need_self">"This is me" is not marked yet: turn on "This is me" on your own group first, then set relationships</string>
+    <string name="person_save_subject_gone">This person no longer exists (may have been merged by re-clustering)</string>
     <string name="person_relation_add">Add relation</string>
 
     <!-- AI 记忆（事实记忆管理页） -->

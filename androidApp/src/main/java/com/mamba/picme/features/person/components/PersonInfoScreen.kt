@@ -77,10 +77,9 @@ fun PersonInfoScreen(
     relation: RelationDisplayItem?,
     cover: PersonCover?,
     photos: List<MediaEntity>,
-    onSave: (RelationPredicate?, String, Boolean) -> Unit,
+    onSave: (name: String, relation: RelationPredicate?, customLabel: String, isSelf: Boolean) -> Unit,
     onNavigateBack: () -> Unit,
     onUpdateCover: (MediaEntity) -> Unit,
-    onUpdateName: (String) -> Unit,
     /** 仅给该人物聚类（重新）打美学/人脸画质分 + 刷新封面；null=不显示该入口。 */
     onRescore: (suspend () -> Unit)? = null,
     /** 相机角标：进相机拍摄该人物封面（2026-08-26 起角标不再打开封面选择 Sheet） */
@@ -104,9 +103,9 @@ fun PersonInfoScreen(
         } else {
             editState.relation
         }
-        val trimmedName = editState.name.trim()
-        if (trimmedName.isNotBlank()) onUpdateName(trimmedName)
-        onSave(effectiveRelation, editState.customLabel, editState.isSelf)
+        // 改名并入保存回调单次提交：applyPersonEdit 收口写入，
+        // 避免「先独立改名、再拿旧名快照写回」的竞态回退
+        onSave(editState.name.trim(), effectiveRelation, editState.customLabel, editState.isSelf)
         onNavigateBack()
     }
 
