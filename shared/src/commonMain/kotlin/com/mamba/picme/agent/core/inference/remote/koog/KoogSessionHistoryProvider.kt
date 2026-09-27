@@ -13,7 +13,8 @@ import com.mamba.picme.agent.core.platform.storage.ChatMemoryStore
  * 调本接口的 load/store）→ 因此这里把 `id` 原样作为 DataStore 的 session key。
  *
  * - [load]：store 已做 decode + withoutSystem（不变式①）+ sanitizeToolPairing（不变式③）。
- * - [store]：store 内部做 withoutSystem + trimToMaxMessages（不变式②，maxMessages=10）+ 落盘。
+ * - [store]：store 内部做 [KoogMessageMemory.assembleForPersistence]（M1：withoutSystem① + 老化旧 tool result
+ *   + token 预算裁剪 + trimToMaxMessages 条数上限兜底②）+ 落盘。
  *
  * **窗口裁剪完全由 store 承担**：这里**不**给 ChatMemory feature 设 windowSize——避免 feature 做朴素
  * 计数裁剪拆散 tool_call 块（Call/Result 分属 Assistant/User 两条消息，朴素按条数裁会产生悬空 Call →

@@ -40,7 +40,7 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 | 子包 | 内容 |
 |------|------|
 | `facade/` | `AgentOrchestrator`（initialize(AgentDependencies) + 无参 getInstance）、`AgentConfigurator`、`AgentDependencies`（9 字段注入契约）、`LocalModelService` |
-| `inference/remote/` | `KoogChatAgent`/`KoogReActAgent`/`KoogReActStrategy`（koog/）、`ChatToolService`/`CameraToolService`/`ToolInventory`/`MemoryContextProvider`（tool/）、`RemotePromptBuilder`（prompt/，L2/L3/L4 遗留模板）、`ChatPromptRules`（prompt/，chat system prompt 行为规则段分节拼装）、`RemoteChatEngine`、`LlmCallRecorder` |
+| `inference/remote/` | `KoogChatAgent`/`KoogReActAgent`/`KoogReActStrategy`（koog/）、`KoogMessageMemory`（koog/，三不变式 + M1 预算制组装：`estimateTokens`/`ageToolResults`/`trimToTokenBudget`/`assembleForPersistence`，双端 store save 统一入口，spec《chat-agent-layered-memory》）、`ChatToolService`/`CameraToolService`/`ToolInventory`/`MemoryContextProvider`（tool/）、`RemotePromptBuilder`（prompt/，L2/L3/L4 遗留模板）、`ChatPromptRules`（prompt/，chat system prompt 行为规则段分节拼装）、`RemoteChatEngine`、`LlmCallRecorder` |
 | `intent/` | `IntentGuard`（意图守卫层：LLM 误拒搜索回退判定、chat 页模糊跳转拦截；纯函数确定性规则，自 ChatViewModel 私有 guard 收口，双端可复用）；意图路由体系（2026-09-26，spec《意图路由契约与意图路由器》+ ADR-015）：`ChatIntentContract`（10 意图闭集契约表，allowed∩forbidden=∅ 机器校验）、`IntentRouter`（门控→pattern 捷径→LLM 闭集分类 1.5s 超时降级，路由审计 recorder 口）、`ChatRoutingPolicy`（意图→命令确定性查表，VIEW_PHOTOS/REFINE_RESULTS 直执） |
 | `inference/local/` | `ImageInferenceEngine` 接口（端侧 VLM 抽象）、`LocalModelService` |
 | `js/` | JS 引擎无关层（JsEngine/JsValue/JsBridge/JsRuntime/NativeHandler/BuiltInHandlers/GallerySummaryJs） |
@@ -55,6 +55,7 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 - `RemoteProtocol.CLAUDE` 经 `AnthropicLLMClient`（Messages 协议）：自建 LLModel 须映射进 `AnthropicClientSettings.modelVersionsMap` 为模型 id 字符串（Koog 默认版本表只认其预定义实例）。
 - 自定义 `poLangSingleRunStrategy` 修复 Koog 1.1.1 内建策略丢「文本+tool_calls 同帧」工具调用的缺陷。
 - 协议分流收口在 `RemoteModelFactory.createKoogExecutor`。
+- **Koog 实际版本 = 1.3.0**（`gradle/libs.versions.toml`；本文其余 1.1.1 表述为历史实证记录）。1.3.0 起消息模型变化：`MessagePart.Tool.Result` 内容为 `parts: List<ContentPart>`（读全文用 `output`，改写用 `copy(parts = …)`，String content 仅是便捷构造）；`MessagePart.Tool.Call` 参数字段为 `args`（非 arguments）。
 
 另有 `beauty/api/`（BeautySettings/FilterType/StyleFilter，供 beauty-api 经 `api(project(":shared"))` 透出）、`domain/`（UserPreferences/MediaRepository/StructuredFilter/tag 聚类纯算法；旧 `DuplicateGroup` 已随去重 2.0（androidApp `domain/dedup/`）于 2026-08-26 删除）。
 

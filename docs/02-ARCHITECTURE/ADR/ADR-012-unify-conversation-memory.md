@@ -12,7 +12,7 @@
 >
 > 经代码核实，本 ADR 波次1 的两个数据正确性 bug 均已修复：`MemoryManager.appendConversation` 已改为 DataStore `edit{}` 内原子 read-modify-write（`MemoryManager.kt:144`）；`DataStoreChatMemory.clear()` 已同步清内存 `cache`（`RemoteReActAgent.kt:467`，注释明确记录旧 bug）。
 > 原 `streamChat` 对 `MemoryManager` 的死写回已随链路重构消除（`AgentOrchestrator` 已无 `streamChat`）；现存两处写回为有意保留：相机会话回写 `saveCameraConversation`（`processCameraInput` 后，`AgentOrchestrator.kt:415`）与 chat 图片分析结果回写（`ChatViewModel.kt:2302`）。
-> §3 中「`MemoryManager` 限定相机」的前提已不成立：2026-08-02 本地链路整体删除，相机链路同样改走远程 tool_calls，`MemoryManager` 现状服务相机会话与 chat 图片上下文两类写回。⚠️ 遗留观察（2026-08-23 复核仍未变）：`buildContextMessages` 无调用方，`MemoryManager` 写回的消费者链路待后续梳理。
+> §3 中「`MemoryManager` 限定相机」的前提已不成立：2026-08-02 本地链路整体删除，相机链路同样改走远程 tool_calls，`MemoryManager` 现状服务相机会话与 chat 图片上下文两类写回。⚠️ 遗留观察（2026-08-23 复核仍未变）：`buildContextMessages` 无调用方，`MemoryManager` 写回的消费者链路待后续梳理。✅ 2026-09-27 复核：`buildContextMessages` 已不存在于 `MemoryManager`（随演进删除，全仓仅文档提及），该遗留观察关闭。
 
 ## 1. 背景
 

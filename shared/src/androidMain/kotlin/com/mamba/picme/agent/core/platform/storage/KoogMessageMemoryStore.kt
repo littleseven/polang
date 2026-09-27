@@ -67,13 +67,11 @@ public class KoogMessageMemoryStore(
         }
     }
 
-    /** 保存指定 session 的历史：剔除 System（不变式①）→ 原子块裁剪（不变式②）→ 编码落盘。 */
+    /** 保存指定 session 的历史：M1 组装（剔 System① → 老化旧 tool result → token 预算裁剪 → 条数上限兜底②）→ 编码落盘。 */
     override suspend fun save(sessionId: String, messages: List<Message>) = withContext(dataStoreDispatcher) {
         try {
             val key = stringPreferencesKey("koog_memory_$sessionId")
-            val persisted = KoogMessageMemory.trimToMaxMessages(
-                KoogMessageMemory.withoutSystemMessages(messages)
-            )
+            val persisted = KoogMessageMemory.assembleForPersistence(messages)
             val raw = encodeKoogMessages(persisted)
             withTimeout(TIMEOUT_MS) {
                 dataStore.edit { prefs -> prefs[key] = raw }

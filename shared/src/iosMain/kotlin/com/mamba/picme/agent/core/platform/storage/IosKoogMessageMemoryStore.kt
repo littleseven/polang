@@ -32,12 +32,10 @@ class IosKoogMessageMemoryStore(
         emptyList()
     }
 
-    /** 保存：剔除 System（不变式①）→ 原子块裁剪（不变式②）→ 编码落盘。 */
+    /** 保存：M1 组装（剔 System① → 老化旧 tool result → token 预算裁剪 → 条数上限兜底②）→ 编码落盘。 */
     override suspend fun save(sessionId: String, messages: List<Message>) {
         try {
-            val persisted = KoogMessageMemory.trimToMaxMessages(
-                KoogMessageMemory.withoutSystemMessages(messages)
-            )
+            val persisted = KoogMessageMemory.assembleForPersistence(messages)
             defaults.setObject(encodeKoogMessages(persisted), forKey = key(sessionId))
             Logger.d(tag, "Saved ${persisted.size} messages to session $sessionId")
         } catch (exception: Exception) {
