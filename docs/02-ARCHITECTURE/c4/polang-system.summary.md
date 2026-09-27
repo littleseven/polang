@@ -10,15 +10,15 @@
 
 ### L1 系统上下文
 
-![系统上下文](exported/system-context.png?v=20260927-3)
+![系统上下文](exported/system-context.png?v=20260927-4)
 
 ### L2 容器视图
 
-![容器视图](exported/containers.png?v=20260927-3)
+![容器视图](exported/containers.png?v=20260927-4)
 
 ### L3 Android 组件视图
 
-![Android 组件视图](exported/android-components.png?v=20260927-3)
+![Android 组件视图](exported/android-components.png?v=20260927-4)
 
 ## 系统是什么
 
@@ -59,8 +59,9 @@ PoLang（破浪相册）是一个 Monorepo，包含三个可部署单元：
 
 - 模型事实：用 Structurizr DSL 预览打开 `polang-system.structurizr.dsl`（或粘贴到 Structurizr Playground / Lite）
 - 渲染图维护：改对应 `*.html`（换内容不换骨架）→ Chrome headless 两遍法导出 `exported/*.png`（exported/ 为派生物目录，不入 VCS）：
-  1. 量高：往 `<head>` 注入 `document.title=Math.ceil(document.documentElement.scrollHeight)` 的 load 监听，`--headless=new --dump-dom --virtual-time-budget=3000` 读 `<title>` 取内容高 H；
-  2. 截图：`--headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=1300,H --screenshot=exported/<name>.png <name>.html`；
-  3. **目检**：尺寸正确 ≠ 内容正确（2026-09-27 事故：批量导出产出尺寸正常但大面积空白/串图的废图），每张导出后必须人眼看一遍再入库部署。
+  1. 量高：往 `<head>` 注入 `document.title=Math.ceil(document.documentElement.scrollHeight)` 的 load 监听，`--headless=new --window-size=1300,600 --dump-dom --virtual-time-budget=3000` 读 `<title>` 取内容高 H。**量高与截图必须同窗口宽度**（2026-09-27 事故：量高漏带 window-size 走 800px 默认窄视口，芯片流式布局重排后高度≈1.8 倍，截图按 1300 宽内容只填 55%，画布拖近半空白）；
+  2. 截图：`--headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=1300,H --screenshot=<name>.png <name>.html`；
+  3. **sips 重编码**：`sips -s format png`（或 `--resampleWidth 1500` 顺带瘦身）过一遍——Chrome 截图原始字节存在「Chrome 自身渲染为全白」问题（苹果系解码器正常，极具迷惑性）；
+  4. **机器验收**：像素行扫填充率 ≥95%（逐行最暗像素 <190 的最后行位置），外加 Chrome 实渲染截图体积 >15KB。尺寸/字节/预览工具零证明力（同日三起事故：空白废图、串图、半空画布均逃过文件级检查）。
 - DSL 与 evidence 是唯一事实来源；渲染图均为派生物。架构变化先改 DSL，并同步更新 evidence.md 的 sourceRefs 与本说明
 - 旧 Structurizr/Mermaid 线框导出（svg/mmd，2026-09-19）已于 2026-09-27 汰换，git/本地历史可查
