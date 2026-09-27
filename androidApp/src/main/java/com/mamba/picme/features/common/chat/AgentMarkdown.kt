@@ -65,6 +65,18 @@ import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.getTextInNode
 
 /**
+ * immediate（同步解析）内容长度门控上限（字符数）。
+ *
+ * 定案实测（2026-09-27，Redmi 24129PN74C 真机 instrument 打点，org.jetbrains.markdown GFM 全量 parse，
+ * 临时用例取数后已删）：进程稳态（ART 预热后）700 字 2.1ms / 1500 字 4.1ms / 3000 字 7.8ms /
+ * 5000 字 12.3ms（线性 ~2.4μs/字）；冷进程首次 parse ~20ms（一次性，可接受）。
+ * 结论：≤1500 字同步解析稳态 ≤~4ms 远低于 16.6ms 帧预算，换首帧无空窗；
+ * >1500 字走异步（retainState 保旧帧 + 库内 conflate 防抖），规避流式期每 pacing tick
+ * 一次主线程 parse 的累积卡顿（3000+ 字时单次即逼近帧预算一半）。
+ */
+internal const val IMMEDIATE_PARSE_MAX_CHARS = 1500
+
+/**
  * Agent 正文 Markdown 渲染（ADR-016 M3，mikepenz multiplatform-markdown-renderer 0.41.0）。
  * 取代 jeziellago compose-markdown（Markwon 位图渲染，流式抖动根源），AST → 原生 Compose 组件。
  *
@@ -73,9 +85,10 @@ import org.intellij.markdown.ast.getTextInNode
  * MARKDOWN 正文段；AiChatScreen/MediaPager/悬浮气泡等不分段的调用点，围栏代码块则由
  * 本组件的 [CollapsibleHighlightedCodeFence] 承接（库高亮 + 自研折叠/复制）。
  *
- * 流式参数（spike 真机验证）：retainState=true 防重解析期 loading 态闪烁；immediate=true
- * 同步解析——JVM 实测全量 parse 均值 ~2.4ms/739 字（MarkdownParserRobustnessSpikeTest），
- * 主线程无阻塞风险，且规避异步首帧空窗。
+ * 流式参数：retainState=true 防重解析期 loading 态闪烁。immediate（同步解析）按内容长度门控——
+ * 官方明示 immediate=true 阻塞 composition 不宜全量上生产；短内容走同步保首帧无空窗，
+ * 长内容走异步（库内置 conflate，流式 tick 间自然防抖）。
+ * 阈值定案依据（真机实测数据见 [IMMEDIATE_PARSE_MAX_CHARS] KDoc）。
  */
 @Composable
 fun AgentMarkdown(
@@ -88,7 +101,7 @@ fun AgentMarkdown(
     val markdownState = rememberMarkdownState(
         content = content,
         retainState = true,
-        immediate = true,
+        immediate = content.length <= IMMEDIATE_PARSE_MAX_CHARS,
     )
     Markdown(
         markdownState = markdownState,
@@ -154,32 +167,38 @@ private fun agentMarkdownTypography(fontSize: TextUnit, lineHeight: TextUnit): M
  * SpanStyle、闭标签弹栈；非白名单标签同样消费丢弃（正文禁嵌渲染级 HTML，与 two-tier spec §8 一致）。
  * mark 底色走 token（appColors.amber 降透明度，深浅主题下正文均可读）；sup/sub 字号用 em 相对值。
  *
+ * 行为契约（已由 InlineHtmlAnnotatorTest 钉住）：仅匹配标签原文 trim 后的精确形式
+ * （`<u>` 匹配、`<u >`/`<u class=...>` 不匹配——按非白名单消费丢弃）；
+ * 未闭合开标签样式泄漏到段尾不崩，深度计数按 AnnotatedString.Builder 实例复位不污染下一次渲染。
+ *
  * 🔴 流式竞态红线（2026-09-27 spike 真机闪退实证）：lambda 首个参数 content 才是 AST 所属文档，
  * 绝不能用闭包捕获的外部 content——retainState 下旧树配新 annotator，节点区间超出捕获文本直接
- * StringIndexOutOfBounds。深度计数按 AnnotatedString.Builder 实例复位（未闭合标签样式泄漏到段尾
- * 属可接受中间态）。
+ * StringIndexOutOfBounds。
  */
 @Composable
 private fun rememberInlineHtmlAnnotator(): MarkdownAnnotator {
     val markColor = MaterialTheme.appColors.amber.copy(alpha = 0.35f)
-    return remember(markColor) {
-        var openStyles = 0
-        var lastBuilder: AnnotatedString.Builder? = null
-        markdownAnnotator { content, child ->
-            if (lastBuilder !== this) {
-                openStyles = 0
-                lastBuilder = this
-            }
-            if (child.type != MarkdownTokenTypes.HTML_TAG) return@markdownAnnotator false
-            when (child.getTextInNode(content).toString().lowercase().trim()) {
-                "<u>" -> { pushStyle(SpanStyle(textDecoration = TextDecoration.Underline)); openStyles++ }
-                "<mark>" -> { pushStyle(SpanStyle(background = markColor)); openStyles++ }
-                "<sup>" -> { pushStyle(SpanStyle(baselineShift = BaselineShift.Superscript, fontSize = 0.75.em)); openStyles++ }
-                "<sub>" -> { pushStyle(SpanStyle(baselineShift = BaselineShift.Subscript, fontSize = 0.75.em)); openStyles++ }
-                "</u>", "</mark>", "</sup>", "</sub>" -> if (openStyles > 0) { pop(); openStyles-- }
-            }
-            true
+    return remember(markColor) { createInlineHtmlAnnotator(markColor) }
+}
+
+/** 非 Composable 工厂（JVM 单测可直接构造）：每次调用返回独立状态（开标签深度按 Builder 实例复位）。 */
+internal fun createInlineHtmlAnnotator(markColor: Color): MarkdownAnnotator {
+    var openStyles = 0
+    var lastBuilder: AnnotatedString.Builder? = null
+    return markdownAnnotator { content, child ->
+        if (lastBuilder !== this) {
+            openStyles = 0
+            lastBuilder = this
         }
+        if (child.type != MarkdownTokenTypes.HTML_TAG) return@markdownAnnotator false
+        when (child.getTextInNode(content).toString().lowercase().trim()) {
+            "<u>" -> { pushStyle(SpanStyle(textDecoration = TextDecoration.Underline)); openStyles++ }
+            "<mark>" -> { pushStyle(SpanStyle(background = markColor)); openStyles++ }
+            "<sup>" -> { pushStyle(SpanStyle(baselineShift = BaselineShift.Superscript, fontSize = 0.75.em)); openStyles++ }
+            "<sub>" -> { pushStyle(SpanStyle(baselineShift = BaselineShift.Subscript, fontSize = 0.75.em)); openStyles++ }
+            "</u>", "</mark>", "</sup>", "</sub>" -> if (openStyles > 0) { pop(); openStyles-- }
+        }
+        true
     }
 }
 
