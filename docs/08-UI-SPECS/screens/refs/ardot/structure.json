@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=111%3A319"
+    "url": "cocraft://localhost/file/715061534788814?node_id=438%3A2"
   },
   "pages": [
     {
@@ -10309,7 +10309,7 @@
         "171:273": {
           "name": "gallery/tag_control",
           "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-kcni-20260926_121121038.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
+            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-5rsp-20260927_091135136.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
           }
         },
         "172:113": {
@@ -11149,10 +11149,27 @@
                                 "y": "auto"
                               },
                               {
+                                "characters": "8818 tok · 53 · 1830ms · 29.0 t/s",
+                                "fills": [
+                                  "$2:151"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:179",
+                                "height": "hug_contents",
                                 "id": "111:568",
+                                "lineHeight": {
+                                  "unit": "AUTO"
+                                },
                                 "name": "PerfRow1",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
                                 "type": "TEXT",
-                                "visible": false
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
                               }
                             ],
                             "clipsContent": true,
@@ -11477,10 +11494,27 @@
                                 "y": "auto"
                               },
                               {
+                                "characters": "17649 tok · 149 · 2400ms · 62.1 t/s",
+                                "fills": [
+                                  "$2:151"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:179",
+                                "height": "hug_contents",
                                 "id": "111:575",
+                                "lineHeight": {
+                                  "unit": "AUTO"
+                                },
                                 "name": "PerfRow2",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
                                 "type": "TEXT",
-                                "visible": false
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
                               }
                             ],
                             "clipsContent": true,
@@ -11603,21 +11637,6 @@
             "nodes": [
               {
                 "children": [
-                  {
-                    "componentProperties": {},
-                    "height": 33,
-                    "id": "410:23",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "385:106"
-                    },
-                    "name": "status_bar",
-                    "type": "INSTANCE",
-                    "width": 393,
-                    "x": 0,
-                    "y": 0
-                  },
                   {
                     "fills": [
                       "$143:23"
@@ -12013,21 +12032,6 @@
                     "width": 280,
                     "x": 0,
                     "y": 0
-                  },
-                  {
-                    "componentProperties": {},
-                    "height": 51,
-                    "id": "410:24",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "385:107"
-                    },
-                    "name": "system_nav_bar",
-                    "type": "INSTANCE",
-                    "width": 393,
-                    "x": 0,
-                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -12052,21 +12056,6 @@
             "nodes": [
               {
                 "children": [
-                  {
-                    "componentProperties": {},
-                    "height": 33,
-                    "id": "410:25",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "385:106"
-                    },
-                    "name": "status_bar",
-                    "type": "INSTANCE",
-                    "width": 393,
-                    "x": 0,
-                    "y": 0
-                  },
                   {
                     "children": [],
                     "clipsContent": true,
@@ -12107,21 +12096,6 @@
                     "width": 393,
                     "x": 0,
                     "y": 470
-                  },
-                  {
-                    "componentProperties": {},
-                    "height": 51,
-                    "id": "410:26",
-                    "layout": "none",
-                    "mainComponent": {
-                      "componentPropertyDefinitions": {},
-                      "id": "385:107"
-                    },
-                    "name": "system_nav_bar",
-                    "type": "INSTANCE",
-                    "width": 393,
-                    "x": 0,
-                    "y": 801
                   }
                 ],
                 "clipsContent": true,
@@ -14132,13 +14106,13 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-pk51-20260926_121123618.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-14d6-20260927_091137492.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-vnd2-20260926_121123105.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-a099-20260927_091136951.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
           }
         },
         "111:1": {
@@ -15052,7 +15026,7 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-bc4r-20260926_121124714.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-w68q-20260927_091138513.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
           }
         },
         "111:276": {
@@ -16384,7 +16358,7 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-ic4f-20260926_121124234.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-z5qs-20260927_091138092.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
           }
         },
         "166:3": {
@@ -22544,7 +22518,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-vtay-20260926_121128016.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-14mc-20260927_091141396.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
           }
         }
       },
@@ -23430,7 +23404,7 @@
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-82fd-20260926_121128563.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-imy0-20260927_091141844.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
           }
         }
       },
@@ -26858,13 +26832,13 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-osoq-20260926_121130228.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-mzwf-20260927_091143273.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-6pya-20260926_121129087.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-ea2r-20260927_091142257.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
           }
         },
         "267:24": {
@@ -32713,7 +32687,7 @@
                   {
                     "children": [],
                     "clipsContent": true,
-                    "cornerRadius": 30,
+                    "cornerRadius": 28,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -32743,10 +32717,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 7,
-                      "left": 7,
-                      "right": 7,
-                      "top": 7
+                      "bottom": 4,
+                      "left": 4,
+                      "right": 4,
+                      "top": 4
                     },
                     "type": "FRAME",
                     "width": 210,
@@ -32875,7 +32849,7 @@
                   {
                     "children": [],
                     "clipsContent": true,
-                    "cornerRadius": 30,
+                    "cornerRadius": 28,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -32905,10 +32879,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 7,
-                      "left": 7,
-                      "right": 7,
-                      "top": 7
+                      "bottom": 4,
+                      "left": 4,
+                      "right": 4,
+                      "top": 4
                     },
                     "type": "FRAME",
                     "width": 210,
@@ -33037,7 +33011,7 @@
                   {
                     "children": [],
                     "clipsContent": true,
-                    "cornerRadius": 30,
+                    "cornerRadius": 28,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -33067,10 +33041,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 7,
-                      "left": 7,
-                      "right": 7,
-                      "top": 7
+                      "bottom": 4,
+                      "left": 4,
+                      "right": 4,
+                      "top": 4
                     },
                     "type": "FRAME",
                     "width": 210,
@@ -33226,7 +33200,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -33256,10 +33230,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -33415,7 +33389,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -33445,10 +33419,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -33604,7 +33578,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -33634,10 +33608,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -33793,7 +33767,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -33823,10 +33797,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -33982,7 +33956,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -34012,10 +33986,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -34171,7 +34145,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -34201,10 +34175,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -34360,7 +34334,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -34390,10 +34364,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -34549,7 +34523,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -34579,10 +34553,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -34738,7 +34712,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -34768,10 +34742,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -34927,7 +34901,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -34957,10 +34931,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -35116,7 +35090,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -35146,10 +35120,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -35305,7 +35279,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -35335,10 +35309,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -35494,7 +35468,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -35524,10 +35498,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -35683,7 +35657,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -35713,10 +35687,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -35872,7 +35846,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -35902,10 +35876,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -36061,7 +36035,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -36091,10 +36065,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -36250,7 +36224,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -36280,10 +36254,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -36439,7 +36413,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -36469,10 +36443,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -36628,7 +36602,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -36658,10 +36632,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -36817,7 +36791,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -36847,10 +36821,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -37006,7 +36980,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -37036,10 +37010,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -37195,7 +37169,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -37225,10 +37199,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -37384,7 +37358,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -37414,10 +37388,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -37573,7 +37547,7 @@
                       }
                     ],
                     "clipsContent": true,
-                    "cornerRadius": 60,
+                    "cornerRadius": 52,
                     "effects": [
                       {
                         "blendMode": "NORMAL",
@@ -37603,10 +37577,10 @@
                     "layout": "vertical",
                     "name": "Screenshot",
                     "padding": {
-                      "bottom": 24,
-                      "left": 24,
-                      "right": 24,
-                      "top": 24
+                      "bottom": 12,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
                     },
                     "type": "FRAME",
                     "width": 700,
@@ -37646,7 +37620,7 @@
         "300:215": {
           "name": "people/grid-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-7zvh-20260926_121135305.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-6ae5-20260927_091147740.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
           }
         },
         "300:29": {
@@ -41073,7 +41047,7 @@
         "300:723": {
           "name": "people/detail-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-r60d-20260926_121135626.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-ktvu-20260927_091148089.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
           }
         },
         "301:13": {
@@ -44823,19 +44797,19 @@
         "395:1": {
           "name": "settings/localmodels-store01-zh",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-ab3x-20260926_121136093.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-43m1-20260927_091148502.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
           }
         },
         "395:106": {
           "name": "settings/localmodels-store01-en",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-kv2a-20260926_121136596.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-csnc-20260927_091148948.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
           }
         },
         "395:211": {
           "name": "settings/localmodels-store01-tw",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-350n-20260926_121137103.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-uvmx-20260927_091149356.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
           }
         }
       },
@@ -46961,7 +46935,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
@@ -48141,7 +48115,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
@@ -48818,7 +48792,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
@@ -50693,7 +50667,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
@@ -51564,7 +51538,7 @@
                     },
                     "name": "InputBarOuter",
                     "padding": {
-                      "bottom": 28,
+                      "bottom": 56,
                       "left": 12,
                       "right": 12,
                       "top": 12
