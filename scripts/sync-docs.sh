@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 SRC="docs"
 DST="docs-site/docs"
 
-# 公开面瘦身（2026-09-27）：内部工作文档/过时快照只在仓库，不上线
+# 公开面瘦身（2026-09-27）：内部工作文档/过时快照只在仓库或随清理删除，不上线
 rsync -a --delete --delete-excluded \
   --exclude 'superpowers/' \
   --exclude '08-UI-SPECS/' \
@@ -19,15 +19,12 @@ rsync -a --delete --delete-excluded \
   --exclude '03-TECHNICAL-SPECS/OVERSEAS_SERVER_DEPLOYMENT.md' \
   --exclude '03-TECHNICAL-SPECS/AI_IMAGE_EDITING_CAPABILITY_GAP.md' \
   --exclude '03-TECHNICAL-SPECS/MNN_LANDMARK_DIAGNOSIS.md' \
-  --exclude '03-TECHNICAL-SPECS/ONDEVICE_IMAGE_UNDERSTANDING_MODELS.md' \
   --exclude '03-TECHNICAL-SPECS/SERVER_IMPLEMENTATION_PLAN.md' \
-  --exclude '03-TECHNICAL-SPECS/SMART_OPTIMIZE_VLM_DESIGN.md' \
   --exclude '05-DEVELOPMENT/LOCAL_ENVIRONMENT.md' \
   --exclude '05-DEVELOPMENT/RELEASE_PACKAGE_BACKUP_RESTORE.md' \
-  --exclude '06-QA/' \
   --exclude 'privacy-policy/' \
   "$SRC/" "$DST/"
 
 echo "sync-docs: ${SRC} -> ${DST} (docsify site)"
 echo "  online docs: $(find "${DST}" -name '*.md' | wc -l | tr -d ' ')"
-echo "  excluded: superpowers/(在途) + 08-UI-SPECS/(双端契约) + reviews/(内部审计) + iOS 工作文档×3 + 本机环境 + 06-QA/(历史报告) + 4 篇过时技术快照 + server deploy/backup + privacy-policy/ (landing page has it)"
+echo "  excluded: superpowers/(在途) + 08-UI-SPECS/(双端契约) + reviews/(时间点快照) + iOS 工作文档×3 + 本机环境/发布备份 + server 内部三篇 + privacy-policy/ (landing page has it)"

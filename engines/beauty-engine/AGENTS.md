@@ -439,7 +439,7 @@ if (fps < 25 || processingMs > 20) {
 - `PRODUCT.md` - 产品需求规格说明书（大美丽 产品策略）
 - `docs/01-PRODUCT/FEATURES.md` - 功能交互规范
 - `docs/03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md` - 大美丽 渲染链路、容灾回退、冷却恢复与观测指标
-- `docs/06-QA/PERFORMANCE_BASELINE_REPORT.md` - 性能基线报告
+- `docs/01-PRODUCT/NFR_SPEC.md` - 性能红线指标 SSOT（历史 trace 报告已清理，git 历史可查）
 - `androidApp/src/main/java/com/mamba/picme/features/camera/AGENTS.md` - Camera 模块实现规范
 - `engines/beauty-engine/src/main/java/com/mamba/picme/beauty/api/` - 对外稳定 API
 - `engines/beauty-engine/src/main/java/com/mamba/picme/beauty/render/` - OpenGL ES 渲染管线实现

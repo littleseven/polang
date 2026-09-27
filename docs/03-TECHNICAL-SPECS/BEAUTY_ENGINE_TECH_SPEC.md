@@ -578,7 +578,7 @@ suspend fun triggerManualGlEngineRecovery() {
 
 ### 7.4 QA 与回归检查
 
-性能基线与历史 trace 见 `docs/06-QA/PERFORMANCE_BASELINE_REPORT.md`（独立的 QA 验收清单已于 ADR-011 退役）。
+性能红线指标见 `docs/01-PRODUCT/NFR_SPEC.md`（独立 QA 验收清单已于 ADR-011 退役；本地 LLM/NCNN 时代的历史 trace 合集已于 2026-09-27 清理，git 历史可查）。
 
 ---
 

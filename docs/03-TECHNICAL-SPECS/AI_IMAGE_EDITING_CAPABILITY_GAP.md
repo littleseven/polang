@@ -127,8 +127,8 @@
 
 ## 7. 相关文档
 
-- 端侧模型清单 SSOT：[`ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md`](ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md)、[`ONDEVICE_IMAGE_UNDERSTANDING_MODELS.md`](ONDEVICE_IMAGE_UNDERSTANDING_MODELS.md)
-- AI 一键优化 / 抽卡闭环：[`AI_OPTIMIZATION.md`](AI_OPTIMIZATION.md) §11.5（NIMA 评分守卫）、`SMART_OPTIMIZE_VLM_DESIGN.md`
+- 端侧模型清单 SSOT：[`ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md`](ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md)（早期调研快照 ONDEVICE_IMAGE_UNDERSTANDING_MODELS 与 SMART_OPTIMIZE_VLM_DESIGN 已清理，git 历史可查）
+- AI 一键优化 / 抽卡闭环：[`AI_OPTIMIZATION.md`](AI_OPTIMIZATION.md) §11.5（NIMA 评分守卫）
 - 🆕 人脸修复（桶 1）调研方案：[`docs/superpowers/specs/2026-08-08-face-restoration-ondevice-design.md`](../superpowers/specs/2026-08-08-face-restoration-ondevice-design.md)
 - 抠图设计稿（已随交付清理，git 历史可查）：2026-07-18 背景移除、2026-08-06 证照可调抠图
 - 会话式修图：`ImageEditCapability.kt` / `ChatEditProcessor.kt` / `RecipeApplier.kt`

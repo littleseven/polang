@@ -190,7 +190,7 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 - **JVM 单测**（commonMain 可测）：parts reducer（chunk→文档拼装、同帧顺序）、迁移器（旧类型→parts 全枚举覆盖）、`toModelInput`（丢弃规则、tool 对拆分）、工具状态机迁移表
 - **ui-driver**：chat 冒烟（流式回复 + 图卡 + HTML 卡 + 任务卡审批流）
 - **screenshot-diff**：M3/M4 视觉回归基线
-- **性能基线**：流式重组计数、多 HTML 卡同屏 RSS（ADR-016 §4 内存预算实测项一并执行）、滚帧耗时——数据落 `docs/06-QA/PERFORMANCE_BASELINE_REPORT.md`
+- **性能基线**：流式重组计数、多 HTML 卡同屏 RSS（ADR-016 §4 内存预算实测项一并执行）、滚帧耗时——数据以时间点快照落 `docs/reviews/`，指标 SSOT 为 `docs/01-PRODUCT/NFR_SPEC.md`
 
 ## 13. 风险与回退
 
