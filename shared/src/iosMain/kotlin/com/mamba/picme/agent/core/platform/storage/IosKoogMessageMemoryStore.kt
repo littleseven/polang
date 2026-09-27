@@ -2,6 +2,7 @@ package com.mamba.picme.agent.core.platform.storage
 
 import ai.koog.prompt.message.Message
 import com.mamba.picme.agent.core.inference.remote.koog.KoogMessageMemory
+import com.mamba.picme.agent.core.inference.remote.koog.SessionCompaction
 import com.mamba.picme.agent.core.platform.logging.Logger
 import platform.Foundation.NSUserDefaults
 
@@ -43,15 +44,46 @@ class IosKoogMessageMemoryStore(
         }
     }
 
-    /** 清空指定 session 的历史。 */
+    /** 清空指定 session 的历史 + 摘要（会话销毁 = 全清，契约见 [ChatMemoryStore.clear]）。 */
     override suspend fun clear(sessionId: String) {
         try {
             defaults.removeObjectForKey(key(sessionId))
+            defaults.removeObjectForKey(summaryKey(sessionId))
             Logger.i(tag, "Cleared history for session $sessionId")
         } catch (exception: Exception) {
             Logger.e(tag, "Failed to clear history for session $sessionId", exception)
         }
     }
 
+    /** 加载会话摘要；无摘要/解析失败返回 null（不阻断对话，US-2.3）。 */
+    override suspend fun loadSummary(sessionId: String): SessionCompaction? = try {
+        val raw = defaults.stringForKey(summaryKey(sessionId)) ?: return null
+        SessionCompaction.decode(raw)
+    } catch (exception: Exception) {
+        Logger.w(tag, "Failed to load summary for session $sessionId", exception)
+        null
+    }
+
+    /** 保存会话摘要（覆盖旧版本；编码失败静默，不阻断对话）。 */
+    override suspend fun saveSummary(sessionId: String, summary: SessionCompaction) {
+        try {
+            defaults.setObject(SessionCompaction.encode(summary), forKey = summaryKey(sessionId))
+            Logger.d(tag, "Saved summary v${summary.version} to session $sessionId")
+        } catch (exception: Exception) {
+            Logger.e(tag, "Failed to save summary for session $sessionId", exception)
+        }
+    }
+
+    /** 只清摘要（保留历史）；无摘要时幂等。 */
+    override suspend fun clearSummary(sessionId: String) {
+        try {
+            defaults.removeObjectForKey(summaryKey(sessionId))
+            Logger.i(tag, "Cleared summary for session $sessionId")
+        } catch (exception: Exception) {
+            Logger.e(tag, "Failed to clear summary for session $sessionId", exception)
+        }
+    }
+
     private fun key(sessionId: String) = "koog_memory_$sessionId"
+    private fun summaryKey(sessionId: String) = "koog_summary_$sessionId"
 }

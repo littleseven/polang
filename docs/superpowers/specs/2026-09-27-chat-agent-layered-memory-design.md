@@ -1,11 +1,19 @@
 # Chat Agent 分层记忆系统设计（Layered Agent Memory）
 
 > **日期**：2026-09-27
-> **状态**：M1 已实施（feat/chat-memory-m1 分支）；M2/M3 待排期
+> **状态**：M1 + M2 已实施（feat/chat-memory-m2 分支）；M3 待排期
 > **来源**：记忆管理专项调研会话（参考系：ChatGPT Memory、Claude Code auto-compact、Vercel AI SDK parts）
 > **关联**：ADR-012（对话记忆三分边界）、ADR-016（chat 消息模型宪法，互不侵入）、ADR-008（[PRIVACY]）、`docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md`
 >
 > **M1 实施记录（2026-09-27）**：`KoogMessageMemory` 新增 `estimateTokens`/`estimateMessageTokens`/`ageToolResults`/`trimToTokenBudget`/`assembleForPersistence`（19 个 JVM 单测）；双端 store save 统一改走 `assembleForPersistence`。预算默认 8000 token 常量——接真实模型窗口的配置化留到 M2 一并做。实证发现：项目 Koog 已升 1.3.0，`MessagePart.Tool.Result` 内容形态变为 `parts: List<ContentPart>`（读全文 `output`、老化改写 `copy(parts=…)`）、`Call` 参数字段为 `args`。
+>
+> **M2 实施记录（2026-09-27）**：滚动摘要（compaction）落地——
+> - **数据层**：`SessionCompaction`（version/slots/compactedUpToTurnId/createdAt，kotlinx-serializable）+ `CompactionSlots` 四槽位（intent/decisions/todos/entities），`parseSlots` 解析失败整体回退自由文本进 intent（决策 9）；`merge` 增量合并（标量新覆盖旧、列表追加去重保序）。
+> - **候选选择**：`KoogMessageMemory.selectCompactionCandidates`——组装超预算才触发，从最旧块取、跳过近 `PROTECTED_RECENT_TURNS` 实轮保护区、最新块永不压、tool 块原子（复用 `groupIntoBlocks`）。
+> - **执行器**：`SessionCompactor`（`maybeCompact`）+ `SummaryGenerator` 函数接口；生产实现 `SummaryGeneratorViaExecutor` 经 Koog executor 单发（temperature=0/maxTokens=512，与 `IntentRouter.callRouterLlm` 同源），llm_call_log source=`chat-session-compaction`。**不改写历史消息**——compaction 是叠加式摘要，历史仍按 M1 预算组装。
+> - **存储**：`ChatMemoryStore` 加 `loadSummary/saveSummary/clearSummary`（摘要键 `koog_summary_` 独立于历史键 `koog_memory_`；`clear` 会话销毁才一并清）；双端 actual（Android DataStore / iOS NSUserDefaults）同步落地，失败降级 null/静默。
+> - **注入**：`composeChatSystemPrompt`（top-level 纯函数）把摘要段拼在记忆快照后（`【会话摘要】` 标记）；`KoogChatAgent` 的 agent 重建键 = 记忆快照 + 摘要 version（压缩后 version 变 → 重建 → 新摘要烘焙进 system prompt）；每轮 `runChat` 开头 `maybeCompact` + `loadSummary` 新鲜渲染。
+> - **测试**：`SessionCompactionTest`（21 例：槽位解析/合并/渲染/序列化/候选选择/prompt 构造）+ `ChatMemoryStoreSummaryTest`（6 例契约）+ `SessionCompactorTest`（9 例触发/合并/失败跳过）+ `ComposeChatSystemPromptTest`（5 例注入语义）。
 
 ---
 
@@ -51,14 +59,14 @@
 - **US-1.3 不变式保持**：老化与裁剪后仍满足三不变式（①System 不落盘 ②tool 块原子 ③双向配对），现有 `KoogMessageMemoryTest` 全绿。
 - **US-1.4 裁剪顺序**：从最旧块向新丢，但近 K 轮（默认 3）对话轮最后才丢；同预算下优先保对话、牺牲旧工具输出。
 
-### M2：滚动摘要（compaction）
+### M2：滚动摘要（compaction，已实施 2026-09-27）
 
-- **US-2.1 触发**：组装超预算且存在可压缩轮 → 最旧 M 轮送摘要请求（经 S4 网关，模型默认取 chat 模型廉价档）。
-- **US-2.2 槽位化摘要**：输出四槽位 JSON——`intent`（用户意图）/ `decisions`（已决定）/ `todos`（待办）/ `entities`（关键实体）；schema 校验，解析失败降级自由文本。
-- **US-2.3 摘要持久化**：`ChatMemoryStore` 新增 `sessionSummary`（带版本号），会话恢复时自动重放，无需重读全史。
-- **US-2.4 注入**：摘要作为 system 段拼在 `chatSystemPrompt` 之后，每轮新鲜组装、**不落盘**（与不变式①语义一致）。
-- **US-2.5 增量合并**：新一次 compaction 输入 = 旧摘要 + 新被压轮 → 输出 v(n+1)。
-- **US-2.6 语义保护**：media id、日期、数字、否定语义（"不要时间线"）在摘要 prompt 中明确要求保留。
+- **US-2.1 触发**：组装超预算且存在可压缩轮 → 最旧 M 轮送摘要请求（经 S4 网关，模型默认取 chat 模型廉价档）。✅ `SessionCompactor.maybeCompact` + `KoogMessageMemory.selectCompactionCandidates`
+- **US-2.2 槽位化摘要**：输出四槽位 JSON——`intent`（用户意图）/ `decisions`（已决定）/ `todos`（待办）/ `entities`（关键实体）；schema 校验，解析失败降级自由文本。✅ `CompactionSlots.parseSlots`
+- **US-2.3 摘要持久化**：`ChatMemoryStore` 新增 `sessionSummary`（带版本号），会话恢复时自动重放，无需重读全史。✅ `loadSummary/saveSummary/clearSummary` 双端 actual
+- **US-2.4 注入**：摘要作为 system 段拼在 `chatSystemPrompt` 之后，每轮新鲜组装、**不落盘**（与不变式①语义一致）。✅ `composeChatSystemPrompt` + agent 重建键含摘要 version
+- **US-2.5 增量合并**：新一次 compaction 输入 = 旧摘要 + 新被压轮 → 输出 v(n+1)。✅ `CompactionSlots.merge`
+- **US-2.6 语义保护**：media id、日期、数字、否定语义（"不要时间线"）在摘要 prompt 中明确要求保留。✅ `CompactionPrompt.build`
 
 ### M3：跨会话事实库
 
