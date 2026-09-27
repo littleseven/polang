@@ -14,7 +14,14 @@ import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
  * - 工具的产出/失败不由本适配器产出——payload 在能力执行点（如图表 SVG 落库处），
  *   由调用方直接喂 [TurnPartsReducer] 的 ToolOutputAvailable/ToolOutputError。
  *
- * 单线程使用（主线程事件回调）；turn 边界由调用方 [reset]（一次 sendMessage = 一个 turn）。
+ * 🔴 差分启发式前提（Koog 线行为锚定，2026-09-27 实证）：onPartialText 快照在同一轮内
+ * **单调追加**（新快照恒以旧快照为前缀），新一轮从空重新累计。「非扩展快照 = 轮边界」
+ * 的猜测建立在该前提上；若上游语义变更（快照乱序 / 修正前文 / 跨轮不清空），表现为
+ * 旧块提前 DONE + 前文重复落新块（文本双显）、跨轮文本归属错块。M4 切渲染源前须以显式
+ * round-start 信号替代本猜测（spec §10 M4 收口项）。
+ *
+ * 单线程使用（调用方收口在 Main.immediate，同 [TurnPartsReducer] 契约）；turn 边界由
+ * 调用方 [reset]（一次 sendMessage = 一个 turn）。
  */
 class ChatStreamTurnAdapter {
 

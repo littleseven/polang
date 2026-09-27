@@ -20,8 +20,10 @@ import com.mamba.picme.domain.chat.ToolPartState
  * - **DONE 不可变**（spec §3）：[PartState.DONE] 的 Text 块不再接受 Delta（忽略并视为
  *   适配层 bug 信号）；占位 part 的原位覆写是 spec 显式豁免。
  *
- * 纯 Kotlin 状态机，单线程使用（与调用方 ViewModel 主线程/事件回调串行语义一致；
- * 线程约束同 [StreamingPacingController]）。
+ * 纯 Kotlin 状态机，**单线程契约**：全部 [apply]/[reset]/[oldestPendingToolCallId] 访问
+ * 由调用方漏斗到同一线程（androidApp ChatViewModel 收口在 Main.immediate——onEvent 实际
+ * 运行在 orchestrator 调度器、能力执行点在 Dispatchers.Default，均先切 Main 再触本类；
+ * 线程约束注释与 [StreamingPacingController] 一致，但实现方式是「调用方收口」而非本类自检）。
  */
 class TurnPartsReducer {
 
@@ -128,7 +130,8 @@ class TurnPartsReducer {
             // 原位填充：位置锚定（占位契约），partId 以产物自身为准（调用方契约：与 toolCallId 一致）
             replaceAt(position, output)
         } else {
-            // 无占位（非卡片工具的产物 part，如脚本直出图卡）：按到达顺序 append
+            // 无位置锚：非卡片工具不产占位（产物经调用方 oldestPendingToolCallId 降级关联到
+            // 该 toolCallId，如 run_gallery_script 直出图卡）——按到达顺序 append 到尾部
             toolPartPositions[toolCallId] = parts.size
             parts = parts + output
         }
@@ -169,5 +172,8 @@ class TurnPartsReducer {
     companion object {
         const val TOOL_DRAW_CHART = "draw_chart"
         const val TOOL_RENDER_HTML = "render_html"
+
+        /** 脚本沙箱工具（无类型化占位，只占位登记；直出图卡/HTML 卡经降级关联 append）。 */
+        const val TOOL_RUN_GALLERY_SCRIPT = "run_gallery_script"
     }
 }

@@ -97,6 +97,7 @@ import com.mamba.picme.domain.chat.streaming.TurnStreamEvent
 import com.mamba.picme.features.gallery.MediaViewModel
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -106,6 +107,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
@@ -1045,21 +1047,48 @@ class ChatViewModel(
      * M2 turn 装配入口：引擎事件经 [turnAdapter] 翻译为块级三段式事件，由 [turnReducer]
      * 拼装 parts 快照并挂到流式占位消息。瞬态内存轨——M2 期 UI 渲染仍读 legacy content
      * （占位 parts 不可见），本管线为 M4 渲染切换打底；流式消息不落 Room。
+     *
+     * 线程收口（M2 审查修复）：onEvent 实际运行在 orchestrator 调度器，adapter/reducer
+     * 是单线程契约——全部访问漏斗到 Main.immediate（launch 保 FIFO 事件序）。
      */
     private fun feedTurn(event: ChatStreamEvent) {
-        turnAdapter.onEvent(event).forEach { turnEvent -> turnReducer.apply(turnEvent) }
-        _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            turnAdapter.onEvent(event).forEach { turnEvent -> turnReducer.apply(turnEvent) }
+            _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+        }
     }
 
     /**
      * M2 工具产物回填：能力执行点（图卡/HTML 卡落库处）把最终 part 喂给装配器——
-     * 有 in-flight 占位则原位填充（位置锚定）；无待关联调用（非流式回合直出，如 /chart 冒烟）则跳过。
-     * 产物 partId 与 toolCallId 一致（占位原位替换契约，见 [TurnPartsReducer]）。
+     * 同名 in-flight 占位则原位填充（位置锚定）；无同名 pending 时降级关联任意在途调用
+     * （脚本直出图卡：run_gallery_script 的产物本无占位，reducer 走 append 分支落尾部）；
+     * 无任何在途调用（非流式回合，如 /chart 冒烟直出）则跳过。
+     * 产物 partId 与关联的 toolCallId 一致（占位原位替换契约，见 [TurnPartsReducer]）。
+     * 线程收口同 [feedTurn]（调用方在 Dispatchers.Default，先切 Main 再触 reducer）。
      */
-    private fun feedToolOutput(toolName: String, output: (toolCallId: String) -> MessagePart) {
-        val toolCallId = turnReducer.oldestPendingToolCallId(toolName) ?: return
-        turnReducer.apply(TurnStreamEvent.ToolOutputAvailable(toolCallId, output(toolCallId)))
-        _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+    private suspend fun feedToolOutput(toolName: String, output: (toolCallId: String) -> MessagePart) {
+        withContext(Dispatchers.Main.immediate) {
+            val toolCallId = turnReducer.oldestPendingToolCallId(toolName)
+                ?: turnReducer.oldestPendingToolCallId()
+                ?: return@withContext
+            turnReducer.apply(TurnStreamEvent.ToolOutputAvailable(toolCallId, output(toolCallId)))
+            _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+        }
+    }
+
+    /**
+     * M2 工具失败回填（spec §5.3 错误进文档）：占位 part 标 OUTPUT_ERROR + errorText 入
+     * [TurnPartsReducer.toolErrors]——**瞬态轨不落库**（持久化错误以 TaskCard 路径为准）。
+     * 关联语义与 [feedToolOutput] 相同（同名优先，降级任意在途）；无在途调用则跳过。
+     */
+    private suspend fun feedToolError(toolName: String, errorText: String) {
+        withContext(Dispatchers.Main.immediate) {
+            val toolCallId = turnReducer.oldestPendingToolCallId(toolName)
+                ?: turnReducer.oldestPendingToolCallId()
+                ?: return@withContext
+            turnReducer.apply(TurnStreamEvent.ToolOutputError(toolCallId, errorText))
+            _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+        }
     }
 
     /**
@@ -1073,10 +1102,20 @@ class ChatViewModel(
     }
 
     /**
+     * 任务卡 live 态的节流视图（ADR-016 M2）：SSE 高频事件不直接驱动全列表重组。
+     * onStart 首值直通——裸 sample 的首帧要等首个周期 tick（~500ms），会拖白首次进
+     * chat 页的列表（M2 审查回归修复）；首值之后的高频更新仍按周期节流。
+     * 终态/审批态不豁免节流：结构性事件本就落库，_messages（未节流）同步驱动重算。
+     */
+    @VisibleForTesting
+    internal val throttledEngineerTasks: Flow<Map<String, EngineerTaskState>> =
+        _engineerTasks.sample(ENGINEER_TASK_OVERLAY_THROTTLE_MS).onStart { emit(_engineerTasks.value) }
+
+    /**
      * UI 实际展示的消息列表：已持久化消息 + 流式临时消息；TASK_CARD 叠加工程师任务 live 态。
      */
     val displayMessages: StateFlow<List<ChatMessageUi>> =
-        combine(_messages, _streamingMessage, _engineerTasks.sample(ENGINEER_TASK_OVERLAY_THROTTLE_MS)) { messages, streaming, tasks ->
+        combine(_messages, _streamingMessage, throttledEngineerTasks) { messages, streaming, tasks ->
             val base = if (streaming != null) messages + streaming else messages
             if (tasks.isEmpty()) {
                 base
@@ -2386,6 +2425,12 @@ class ChatViewModel(
                 writeConfirmationController.onScriptStarted()
                 val result = try {
                     rt.evalAsync(code, evalTimeoutMs, traceId)
+                } catch (e: Exception) {
+                    // ADR-016 M2：脚本失败闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）；
+                    // 异常继续上抛走既有「错误回传 LLM」路径。取消是回合拆除，不算工具失败。
+                    if (e is CancellationException) throw e
+                    feedToolError(TurnPartsReducer.TOOL_RUN_GALLERY_SCRIPT, e.message ?: "script eval failed")
+                    throw e
                 } finally {
                     // 脚本结束（正常/超时/取消）：在途写确认一律拒绝——
                     // 「脚本已死，确认不再生效」，防孤儿确认在 SCRIPT_TIMEOUT 后仍执行写操作
@@ -2411,7 +2456,11 @@ class ChatViewModel(
                                 emitHtmlCardMessage(sanitized.html, summary = summary)
                                 summary ?: stringContext().getString(R.string.chat_html_card_generated)
                             }
-                            is HtmlCardSanitizer.Result.Rejected -> sanitized.reason
+                            is HtmlCardSanitizer.Result.Rejected -> {
+                                // ADR-016 M2：清洗拒绝闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）
+                                feedToolError(TurnPartsReducer.TOOL_RENDER_HTML, sanitized.reason)
+                                sanitized.reason
+                            }
                         }
                     }
                     else -> {
@@ -2529,7 +2578,15 @@ class ChatViewModel(
                 .put("values", JSONArray(values))
                 .apply { if (!unit.isNullOrBlank()) put("unit", unit) }
                 .toString()
-            val result = rt.eval("Chart." + fn + "(" + args + ")", traceId)
+            val result = try {
+                rt.eval("Chart." + fn + "(" + args + ")", traceId)
+            } catch (e: Exception) {
+                // ADR-016 M2：eval 失败闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）；
+                // 异常继续上抛走既有「错误回传 LLM」路径。取消不算工具失败。
+                if (e is CancellationException) throw e
+                feedToolError(TurnPartsReducer.TOOL_DRAW_CHART, e.message ?: "chart eval failed")
+                throw e
+            }
             val obj = result as? JsValue.Obj
             val chart = obj?.entries?.get("chart") as? JsValue.Str
             if (chart != null) emitChartMessage(chart.value)
@@ -2558,6 +2615,8 @@ class ChatViewModel(
             }
             is HtmlCardSanitizer.Result.Rejected -> {
                 Logger.w(TAG, "render_html rejected: ${result.reason}")
+                // ADR-016 M2：清洗拒绝闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）
+                feedToolError(TurnPartsReducer.TOOL_RENDER_HTML, result.reason)
                 result.reason
             }
         }

@@ -7,9 +7,13 @@ import com.mamba.picme.data.local.ChatSessionEntity
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.slot
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -45,5 +49,16 @@ class ChatViewModelStreamingWiringTest : ChatViewModelTestBase() {
         advanceUntilIdle()
 
         assertNull(vm.streamingMessage.value)
+    }
+
+    @Test
+    fun `throttled engineer tasks emits current value without waiting for sample tick`() = runTest {
+        // M2 审查回归钉桩：displayMessages 的第三路源是 sample(500) 节流流，裸 sample 首帧要等
+        // 首个周期 tick，combine 三源不齐导致首进 chat 页列表空白 ~500ms；onStart 首值直通后
+        // 不推进虚拟时间即可取到首值（若被 sample 拖住，100ms 虚拟超时返回 null）。
+        val vm = newViewModel()
+        val first = withTimeoutOrNull(100) { vm.throttledEngineerTasks.first() }
+        assertNotNull(first)
+        assertTrue(first!!.isEmpty())
     }
 }

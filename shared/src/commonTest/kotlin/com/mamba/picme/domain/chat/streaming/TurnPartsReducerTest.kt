@@ -129,6 +129,36 @@ class TurnPartsReducerTest {
     }
 
     @Test
+    fun `script produced chart associated to script call appends after text`() {
+        // M2 审查修复钉桩：run_gallery_script 直出图卡——调用方经 oldestPendingToolCallId
+        // 降级关联到脚本的 callId（非卡片工具无占位）→ reducer 走 append 分支落尾部并完成调用
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.TextDelta("txt-0", "统计如下"))
+        reducer.apply(TurnStreamEvent.ToolInputStart("call-0", TurnPartsReducer.TOOL_RUN_GALLERY_SCRIPT))
+        val output = MessagePart.Chart(partId = "call-0", svg = "<svg/>")
+        val parts = reducer.apply(TurnStreamEvent.ToolOutputAvailable("call-0", output))
+        assertEquals(
+            listOf(
+                MessagePart.Text("txt-0", "统计如下", PartState.STREAMING),
+                output,
+            ),
+            parts,
+        )
+        assertNull(reducer.oldestPendingToolCallId())
+    }
+
+    @Test
+    fun `tool output error on non card tool records error without producing a part`() {
+        // M2：脚本 eval 失败——无占位可标错，错误进 toolErrors 瞬态轨并完成调用（不产 part）
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.ToolInputStart("call-0", TurnPartsReducer.TOOL_RUN_GALLERY_SCRIPT))
+        val parts = reducer.apply(TurnStreamEvent.ToolOutputError("call-0", "SCRIPT_TIMEOUT"))
+        assertEquals(emptyList(), parts)
+        assertEquals(mapOf("call-0" to "SCRIPT_TIMEOUT"), reducer.toolErrors)
+        assertNull(reducer.oldestPendingToolCallId())
+    }
+
+    @Test
     fun `tool output error marks placeholder and records error text`() {
         // 错误进文档（spec §5.3）：占位标 OUTPUT_ERROR，errorText 入 toolErrors
         val reducer = TurnPartsReducer()

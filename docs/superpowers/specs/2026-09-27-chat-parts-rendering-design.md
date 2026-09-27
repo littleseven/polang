@@ -113,7 +113,7 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 
 ### 5.3 错误进文档
 
-工具失败以 `OUTPUT_ERROR` part 落库（而非旁路日志），回灌时转为 tool 结果消息让模型可自我修正（对齐 Vercel v5 移除 ToolExecutionError 的理由）。
+工具失败以 `OUTPUT_ERROR` part 进文档（而非旁路日志），回灌时转为 tool 结果消息让模型可自我修正（对齐 Vercel v5 移除 ToolExecutionError 的理由）。M2 双轨落地口径：持久化错误轨 = 任务卡（errorSummary 经 M1 双写落库，回灌 isError）；Chart/HtmlCard/脚本错误为瞬态轨（流式 turn 内占位标错 + reducer `toolErrors`，不落 Room——流式消息本就不落库），其回灌语义（isError）有测试钉桩，持久化错误卡随 M4 渲染切换一并收口。
 
 ## 6. 持久化与 LLM 回灌（双层分离）
 
@@ -173,9 +173,9 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 | 期 | 内容 | 验收 |
 |---|---|---|
 | **M1 数据模型** | §3 parts 模型 + Room 迁移 + 回灌转换（§6）；UI 不动，旧渲染经 legacy 字段读取 | 全量历史消息迁移无损（抽查 + 单测）；回灌：文本消息逐条等价，卡片/数据块按 §6 显式转换（command/plan_preview relabel 为 agent_text）（fixture 对比）；编译+ui-driver 冒烟过 |
-| **M2 流式管线** | §4 chunk 事件 + reducer + §5 状态机；任务卡状态迁入 parts | 流式交错顺序正确（文本-卡-文本）；任务卡五态渲染等价；OUTPUT_ERROR 落库可回灌 |
+| **M2 流式管线** | §4 chunk 事件 + reducer + §5 状态机；任务卡状态迁入 parts | 流式交错顺序正确（文本-卡-文本）；任务卡五态渲染等价；OUTPUT_ERROR 双轨口径：持久化错误轨 = TaskCard 路径（errorSummary 双写落库可回灌），Chart/HtmlCard 错误为瞬态轨（占位标错 + toolErrors，不落库） |
 | **M3 正文渲染** | §7.1 spike → 替换 compose-markdown | spike 四项硬指标过线；流式长文无闪烁（screenshot-diff + 人工体感）；白名单内联 HTML 渲染 |
-| **M4 渲染拍平 + Turn 聚合** | §7.2/§7.3 + §8 性能清单 | 流式期间重组范围实测收窄（Layout Inspector/重组计数）；chat.yaml 修订 + 截图对比基线更新 |
+| **M4 渲染拍平 + Turn 聚合** | §7.2/§7.3 + §8 性能清单 | 流式期间重组范围实测收窄（Layout Inspector/重组计数）；chat.yaml 修订 + 截图对比基线更新。**切渲染源前须收口**：① 显式 round-start 信号替代文本侧「非扩展快照=轮边界」猜测（前提与失效表现见 ChatStreamTurnAdapter 类注释）；② partId 双轨（M2 流式 `txt-N`/`call-N` vs M1 迁移 `p0`/`p1`…）导致的 LazyColumn key 跳变须一并处理 |
 | **M5 iOS 跟随** | ios-follow 管线 | parity gap 报告清零（渲染矩阵口径） |
 
 依赖序：M1 → M2 → M3 ∥ M4（M4 依赖 M1）；M5 在 M4 定稿后启动。每期独立分支、独立可回退（§3.4 工作区隔离）。
