@@ -1155,7 +1155,7 @@ class CameraCapability {
 
 #### 3.2 架构分层
 
-![Capability 生命周期分层](assets/diagrams/cap-lifecycle-layers.png)
+![Capability 生命周期分层](../assets/diagrams/cap-lifecycle-layers.png)
 
 #### 3.3 Capability 生命周期分类
 

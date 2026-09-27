@@ -31,7 +31,7 @@ PoLang 相册支持用户用自然语言搜索本地照片，例如：
 
 ## 2. 整体架构
 
-![相册自然语言搜索链路](assets/diagrams/gallery-search-chain.png)
+![相册自然语言搜索链路](../assets/diagrams/gallery-search-chain.png)
 
 **双入口说明**：
 
@@ -115,7 +115,7 @@ data class TimeRange(
 
 **Chat 链路**：
 
-![Chat 场景搜索流](assets/diagrams/gallery-chat-search-flow.png)
+![Chat 场景搜索流](../assets/diagrams/gallery-chat-search-flow.png)
 
 ### 4.1 QuerySegmenter 语义分段
 

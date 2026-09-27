@@ -53,7 +53,7 @@ PoLang 已从相机转向智能相册（ADR-005 产品重心迁移），需要�
 
 ### 2.1 总体方案：CV 标签 + LLM 语义解析双层架构
 
-![自然语言搜索分层](assets/diagrams/adr007-search-layers.png)
+![自然语言搜索分层](../../assets/diagrams/adr007-search-layers.png)
 
 ### 2.2 决策 1：使用 ML Kit Image Labeling 而非 CLIP
 
@@ -91,7 +91,7 @@ ALTER TABLE media_assets ADD COLUMN indexedAt INTEGER;  -- 索引时间
 
 不另建搜索接口，而是将搜索作为 Gallery Capability 的一个命令，通过现有 Agent Runtime 路由：
 
-![搜索指令分发流](assets/diagrams/adr007-dispatch-flow.png)
+![搜索指令分发流](../../assets/diagrams/adr007-dispatch-flow.png)
 
 **理由**：
 - 复用已有 Agent Runtime 基础设施
@@ -120,7 +120,7 @@ class MediaIndexingWorker(context: Context) {
 
 **决策**：让 LLM 在输出 `search_media` / `refine_media_search` 命令时，附带一个标准化的 `SearchIntent` 对象，由 LLM 根据当前时间把相对时间词换算为毫秒时间戳。
 
-![SearchIntent 结构化流](assets/diagrams/adr007-intent-flow.png)
+![SearchIntent 结构化流](../../assets/diagrams/adr007-intent-flow.png)
 
 **规则保留策略**：
 
@@ -161,7 +161,7 @@ app/
 
 ### 3.2 数据流
 
-![索引与检索闭环](assets/diagrams/adr007-index-search-loop.png)
+![索引与检索闭环](../../assets/diagrams/adr007-index-search-loop.png)
 
 ### 3.3 LLM Prompt 集成
 

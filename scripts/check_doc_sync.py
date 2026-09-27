@@ -177,6 +177,34 @@ def check_broken_links() -> list:
                     f"解析会 404，应改写为 '{fixed}'"
                 )
 
+        # markdown 图片：docsify renderer.image 无条件按「文件所在目录」解析
+        # （q(contentBase, getParentPath(currentRoute), href)）——与链接语义相反；
+        # 根相对图片在嵌套页必 404。原始 HTML <img> 走浏览器 /docs/ 基址，不在此列。
+        img_pattern = re.compile(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
+        for match in img_pattern.finditer(content):
+            img_target = match.group(1)
+            if img_target.startswith(("http", "data:", "#", "mailto:")):
+                continue
+            img_path = img_target.split("#")[0].split("?")[0]
+            if not img_path:
+                continue
+            img_file_rel_ok = (base_dir / img_path).exists()
+            img_root_rel = img_path.strip("./").lstrip("/")
+            img_docs_rel_ok = (PROJECT_ROOT / "docs" / img_root_rel).exists()
+            if not img_file_rel_ok and not img_docs_rel_ok:
+                issues.append(
+                    f"  [断裂图片] {rel_path}: '{img_target}' 不存在"
+                )
+            elif published and not img_file_rel_ok and img_docs_rel_ok:
+                # rel_path 含 docs/ 前缀，深度按 docs 内层数计
+                depth = len(rel_path.parent.parts) - (1 if in_docs else 0)
+                fixed = "../" * depth + img_root_rel if depth else img_root_rel
+                issues.append(
+                    f"  [docsify 图片断链] {rel_path}: '{img_target}' 官网按文件所在"
+                    f"目录解析会 404（docsify 图片=文件相对，与链接相反），应改写为"
+                    f" '{fixed}'"
+                )
+
     return issues
 
 

@@ -7,7 +7,7 @@
 
 ## 1. 总览
 
-![Play 发布流水线](assets/diagrams/play-release-pipeline.png)
+![Play 发布流水线](../assets/diagrams/play-release-pipeline.png)
 
 - **构建**：`./scripts/build.sh aab`（release 签名，`POLANG_RELEASE_*` 环境变量）
 - **发布**：`./scripts/play-publish.sh`（GPP 封装，默认 internal 轨道）

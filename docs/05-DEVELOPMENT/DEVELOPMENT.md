@@ -27,7 +27,7 @@
 
 Spec 驱动开发（Spec-Driven Development, SDD）要求**文档与代码始终保持同步**，但在实践中允许"探索-固化"的双向演进：
 
-![Spec ↔ Code 双螺旋](assets/diagrams/dev-spec-code-loop.png)
+![Spec ↔ Code 双螺旋](../assets/diagrams/dev-spec-code-loop.png)
 
 ### 1.2 探索-固化规则
 
@@ -526,7 +526,7 @@ doc-sync-check:
 
 #### 驱动执行流程
 
-![Agent 任务编排蓝图](assets/diagrams/dev-agent-orchestration.png)
+![Agent 任务编排蓝图](../assets/diagrams/dev-agent-orchestration.png)
 
 ### 5.5 任务状态流转
 

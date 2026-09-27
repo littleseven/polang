@@ -57,7 +57,7 @@ AI 一键优化是新路线下最值得投入的 P0 能力之一：
 
 ### 2.4 单图优化流程
 
-![AI 优化用户流](assets/diagrams/ai-optimize-ux-flow.png)
+![AI 优化用户流](../assets/diagrams/ai-optimize-ux-flow.png)
 
 ---
 
@@ -65,7 +65,7 @@ AI 一键优化是新路线下最值得投入的 P0 能力之一：
 
 ### 3.1 总体架构：本地优先 + 云端增强
 
-![AI 优化双引擎](assets/diagrams/ai-optimize-dual-engine.png)
+![AI 优化双引擎](../assets/diagrams/ai-optimize-dual-engine.png)
 
 > **2026-08-06 更新**：Fast 路径现已接入抽卡闭环（best-of-N + NIMA 评分守卫），见 §11.5。
 

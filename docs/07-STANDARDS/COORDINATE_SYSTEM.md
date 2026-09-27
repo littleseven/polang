@@ -103,7 +103,7 @@ fun convertUserToImageCoordinates(
 
 **项目推荐策略**：
 
-![坐标系分层架构](assets/diagrams/coord-layered-architecture.png)
+![坐标系分层架构](../assets/diagrams/coord-layered-architecture.png)
 
 **选择建议**：
 
@@ -314,11 +314,11 @@ class FaceProcessor {
 
 ### 前置摄像头（镜像模式）
 
-![前置摄像头 · 镜像显示](assets/diagrams/coord-eyes-front.png)
+![前置摄像头 · 镜像显示](../assets/diagrams/coord-eyes-front.png)
 
 ### 后置摄像头（非镜像模式）
 
-![后置摄像头 · 无镜像](assets/diagrams/coord-eyes-back.png)
+![后置摄像头 · 无镜像](../assets/diagrams/coord-eyes-back.png)
 
 ---
 

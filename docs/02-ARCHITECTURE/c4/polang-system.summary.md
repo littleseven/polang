@@ -10,15 +10,15 @@
 
 ### L1 系统上下文
 
-![系统上下文](02-ARCHITECTURE/c4/exported/system-context.png)
+![系统上下文](exported/system-context.png)
 
 ### L2 容器视图
 
-![容器视图](02-ARCHITECTURE/c4/exported/containers.png)
+![容器视图](exported/containers.png)
 
 ### L3 Android 组件视图
 
-![Android 组件视图](02-ARCHITECTURE/c4/exported/android-components.png)
+![Android 组件视图](exported/android-components.png)
 
 ## 系统是什么
 

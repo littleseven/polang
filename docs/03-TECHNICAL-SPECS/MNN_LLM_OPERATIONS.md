@@ -36,7 +36,7 @@
 
 ### 1.3 单例架构链路
 
-![VLM 引擎调用链](assets/diagrams/mnn-llm-callchain.png)
+![VLM 引擎调用链](../assets/diagrams/mnn-llm-callchain.png)
 
 ### 1.4 MNN 多实例安全性判断：安全（在当前架构下）
 
@@ -179,13 +179,13 @@ localLlmEngine.trimMemory()
 
 引入 `MnnResourceManager` 作为**唯一协调者**，VLM 打标和 MNN 人脸检测分别持有独立引用计数：
 
-![引用计数释放决策](assets/diagrams/mnn-refcount-release.png)
+![引用计数释放决策](../assets/diagrams/mnn-refcount-release.png)
 
 > **注意**：引用计数 API 名仍为 `acquireLlm`/`releaseLlm`，但当前 `llmRefCount` 实际管理的是 **VLM 打标引擎**的生命周期（文本 LLM 已移除）。历史上的 `acquireAsr`/`releaseAsr` 已随 ASR 迁移 Sherpa-ONNX 而移除——ASR 不再共享 `libMNN.so`，也不接入 `MnnResourceManager`。
 
 ### 2.5 联合状态机
 
-![MNN 资源状态机](assets/diagrams/mnn-resource-states.png)
+![MNN 资源状态机](../assets/diagrams/mnn-resource-states.png)
 
 > 每模型另有独立细粒度状态机（`ModelState`：`UNLOADED → MODEL_LOADED → SESSION_READY → ACTIVE`），见 `MnnResourceManager`。
 
@@ -278,7 +278,7 @@ val stats = MnnResourceManager.getInstance(context).getMemoryStats()
 
 ### 3.2 引用计数协调机制（核心规则）
 
-![引用计数释放决策（同前图）](assets/diagrams/mnn-refcount-release.png)
+![引用计数释放决策（同前图）](../assets/diagrams/mnn-refcount-release.png)
 
 ### 3.3 App 前后台切换
 
@@ -302,7 +302,7 @@ override fun onActivityStopped(activity: Activity) {
 
 **时序**：
 
-![后台两段式释放](assets/diagrams/mnn-background-unload.png)
+![后台两段式释放](../assets/diagrams/mnn-background-unload.png)
 
 **关键参数**：
 - `BACKGROUND_UNLOAD_DELAY_MS = 30000L`
