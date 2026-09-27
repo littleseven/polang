@@ -242,6 +242,7 @@ class ChatViewModel(
     private val saveChatEditResultUseCase = dependencies.saveChatEditResultUseCase
     private val optimizeGachaController = dependencies.optimizeGachaController
     private val tagGenerationScheduler = dependencies.tagGenerationScheduler
+    private val messageDecodeDispatcher = dependencies.messageDecodeDispatcher
 
     private val mediaFeedbackUseCase = MediaFeedbackUseCase(mediaFeedbackRepository)
     private val authClient = dependencies.picMeAuthClient
@@ -1403,11 +1404,18 @@ class ChatViewModel(
                         chatMessageDao.getMessagesBySession(sessionId)
                     }
                     .collect { entities ->
-                        val uiMessages = entities.map { e ->
-                            val ui = e.toUiModel()
+                        // M4 review 🟡2：M4 起 toUiModel 每条必经 decodePartsOrLegacy（kotlinx
+                        // decode），Room invalidation（任务卡 SSE 高频/测高回写/图卡落库）会触发
+                        // 全列表（上限 500）重 decode——挪出主线程防掉帧。仅纯 decode 段下移；
+                        // 共享态（claudeDeliverOverrides 普通 mutableMap / engineerTasks /
+                        // gacha controller）仍在主线程读写，防数据竞争。
+                        // 调度器经 dependencies 显式注入（单测传测试调度器保 runTest 确定性）
+                        val decoded = withContext(messageDecodeDispatcher) {
+                            entities.map { e -> e.toUiModel() }
+                        }
+                        val uiMessages = decoded.map { ui ->
                             val deliver = claudeDeliverOverrides[ui.id]
-                            ui
-                                .let { if (deliver != null) it.copy(claudeDeliver = deliver) else it }
+                            if (deliver != null) ui.copy(claudeDeliver = deliver) else ui
                         }
                         _messages.value = uiMessages
                         // 合并语义（非整体重置）：Room 表级 invalidation 重发不能冲掉活动任务的

@@ -14,6 +14,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -74,6 +75,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
             chatEditProcessor = mockk(relaxed = true),
             chatImageStore = mockk(relaxed = true),
             saveChatEditResultUseCase = mockk(relaxed = true),
+            messageDecodeDispatcher = Dispatchers.Main,
         )
     )
 

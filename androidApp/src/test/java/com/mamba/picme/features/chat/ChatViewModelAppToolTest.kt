@@ -11,6 +11,7 @@ import com.mamba.picme.domain.usecase.StartTagScanUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
@@ -61,6 +62,7 @@ class ChatViewModelAppToolTest : ChatViewModelTestBase() {
             chatEditProcessor = mockk(relaxed = true),
             chatImageStore = mockk(relaxed = true),
             saveChatEditResultUseCase = mockk(relaxed = true),
+            messageDecodeDispatcher = Dispatchers.Main,
         ).also { it.appToolExecutor = appToolExecutor }
     )
 

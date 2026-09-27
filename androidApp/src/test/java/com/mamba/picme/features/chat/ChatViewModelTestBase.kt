@@ -144,6 +144,9 @@ abstract class ChatViewModelTestBase {
             chatImageStore = mockk(relaxed = true),
             saveChatEditResultUseCase = mockk(relaxed = true),
             optimizeGachaController = controller,
+            // decode 段与主线程同调度器（setMain 的 UnconfinedTestDispatcher）：
+            // runTest 下同步执行，advanceUntilIdle 即可等 decode 完成（M4 review 🟡2 注入点）
+            messageDecodeDispatcher = Dispatchers.Main,
         )
     )
 

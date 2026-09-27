@@ -9,6 +9,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -64,6 +65,7 @@ class ChatViewModelClaudeSidTest : ChatViewModelTestBase() {
             chatEditProcessor = mockk(relaxed = true),
             chatImageStore = mockk(relaxed = true),
             saveChatEditResultUseCase = mockk(relaxed = true),
+            messageDecodeDispatcher = Dispatchers.Main,
         ).also { it.claudeSidStore = sidStore }
     )
 
