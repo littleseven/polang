@@ -50,7 +50,7 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：**(a
 
 - **媒体不可经 WebView 外泄**：远程 script/iframe/object/embed/form/meta refresh 一律剔除；远程 img/CSS/`<a>` href 放行（2026-09-25 表现力优先决策；收紧点在 `HtmlCardSanitizer` 与 `shouldInterceptRequest`，可随时回退严格模式）
 - 出站测高 JS 允许（ResizeObserver），**入站指令桥为零**（零 JS 桥红线，承双形态 spec §15）
-- WebView 禁通用 file 访问/DOM Storage；`content://` 媒体经 WebViewAssetLoader 白名单注入
+- WebView 禁通用 file 访问/DOM Storage；本地相册媒体经 WebViewAssetLoader 白名单注入（已落地 2026-09-27：LLM 以 `media://{id}` 契约引用（uri 永不下发），渲染期重写为白名单域 `polang-media.invalid` URL，命中后经组合根注入的 resolver（`MediaRepositoryImpl.getMediaById`，双 id 命名空间）解析为 content:// Uri 开流直通；媒体域与页面不透明 origin 跨源——可显示但 JS 读不到字节，**字节级**无外泄通道（存在性/尺寸元数据可被卡内 JS 探测，属允许面）。实现：`androidApp features/chat/LocalMediaWebViewAssets.kt`）
 - 端侧 HTML 清洗与风格白名单是**同一条管线**（见 D5 防线 2）：安全与风格一鱼两吃
 
 ### D4 iOS 同构（不推翻 ADR-013；原 ADR-014 D4，编号不变）

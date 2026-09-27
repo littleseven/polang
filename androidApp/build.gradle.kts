@@ -246,6 +246,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+    implementation(libs.androidx.webkit)
     implementation(libs.compose.markdown)
     implementation(libs.androidsvg)
     implementation(libs.retrofit)

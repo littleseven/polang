@@ -3,7 +3,7 @@ package com.mamba.picme.features.chat
 /**
  * [DEV_ONLY] HTML 卡片冒烟测试样本（`ChatViewModel` 调试指令 `/html` 注入，仅 DEBUG 构建）。
  *
- * 覆盖十类验证点：
+ * 覆盖十一类验证点：
  * 1. [STATIC]：纯 HTML/CSS 排版卡片；
  * 2. [RICH_MEDIA]：图文混排（内联 SVG 插图 + 首字下沉 + 双栏正文）；
  *    内联图（SVG/data URI）仍是首选，远程 img 见 [REMOTE_CASES]；
@@ -27,6 +27,8 @@ package com.mamba.picme.features.chat
  *    [LONG_ARTICLE]——超一屏长文卡（未声明 display），测高后应自动转固定高预览形态
  *    （渐隐遮罩 + 提示条，点击进全屏查看器）；
  *    [FULLPAGE_DECLARED]——短内容但声明 display="fullpage"，应免测高直接预览形态。
+ * 11. [LOCAL_MEDIA]：本地相册媒体引用（`media://{id}` 契约 → 白名单域注入，
+ *    2026-09-27）——应显示相册中 id=1 的图；显示兜底文案 = 通道未生效或该 id 已删除。
  *
  * 形态速查：inline 卡完全撑开（≥120dp）、自身不滚动、卡内直接交互、滚动条隐藏；
  * fullpage 预览卡固定高 ≈0.5 屏、禁交互、点击进全屏查看器（竖滚 + 滚动条）。
@@ -552,6 +554,22 @@ object HtmlCardSmokeSamples {
         </div>
     """
 
+    /**
+     * 本地媒体引用用例（2026-09-27，`media://{id}` 契约 → LocalMediaWebViewAssets 白名单域注入）。
+     * media://1 取相册里 MediaStore id=1 的图——多数设备存在（最早的媒体）；
+     * 不存在/已删除时 onerror 兜底文案外显，据此即可肉眼分辨白名单通道是否生效。
+     */
+    private const val LOCAL_MEDIA = """
+        <div style="font-family:sans-serif;padding:16px">
+          <div style="font-size:15px;font-weight:bold;margin-bottom:8px">本地相册图引用（media:// 契约）</div>
+          <img src="media://1" style="width:100%;border-radius:10px;display:block"
+               onerror="this.outerHTML='<div style=\'padding:24px;text-align:center;color:#999;border:1px dashed #ccc;border-radius:10px\'>media://1 不存在或不可读（白名单通道未生效/该 id 已删除）</div>'">
+          <p style="font-size:12px;color:#666;margin:8px 0 0">
+            上图应为相册中 id=1 的媒体；显示兜底文案 = 注入通道未生效或该 id 已删除。
+          </p>
+        </div>
+    """
+
     val all: List<SmokeSample> = listOf(
         SmokeSample(STATIC, "纯 HTML/CSS 排版卡"),
         SmokeSample(RICH_MEDIA, "图文混排（内联 SVG）"),
@@ -564,5 +582,6 @@ object HtmlCardSmokeSamples {
         SmokeSample(ALL_IN_ONE, "NVIDIA 专题综合长文卡（all-in-one）"),
         SmokeSample(LONG_ARTICLE, "长文卡：超一屏，应自动转预览形态"),
         SmokeSample(FULLPAGE_DECLARED, "display=fullpage 声明卡：应直接预览形态", display = "fullpage"),
+        SmokeSample(LOCAL_MEDIA, "本地相册图引用（media://1）"),
     )
 }

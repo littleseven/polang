@@ -86,7 +86,7 @@
 | 数据对比 / 趋势 / 占比 / 时间线 | `draw_chart` | 端侧零成本、高频形态枚举；禁止 markdown 表格/ASCII 画图（既有约束不变） |
 | 「好看 / 交互 / 组合媒体 / 生成式 UI」（短） | `render_html` + `display=inline` | 卡内直接交互，建议 ≤ 0.66 屏 |
 | 长报告 / 多屏图文 / 为全屏设计的交互页 | `render_html` + `display=fullpage` | §4 分流判定 |
-| 端侧媒体（相册图 / 编辑结果） | **不经 LLM 排版**，走原生消息（`MEDIA_RESULTS` / `AGENT_IMAGE`） | ADR-008 媒体红线 |
+| 端侧媒体（相册图 / 编辑结果） | 默认**不经 LLM 排版**，走原生消息（`MEDIA_RESULTS` / `AGENT_IMAGE`）；需在 HTML 卡内排版相册图/视频时，用 `media://{id}` 白名单引用（2026-09-27 落地：id 来自取数结果、uri 不下发，字节不出设备且媒体域跨源 JS 读不到，见 `LocalMediaWebViewAssets`） | ADR-008 媒体红线 |
 | 其余一切文字表达 | 纯 markdown | 通用语 |
 
 - **正文禁嵌渲染级 HTML**：prompt 契约明令禁止在 markdown 正文流输出块级 HTML（图表/富媒体/花式排版一律走上表三通道）；端侧配套防御（D1 选库实现 spec 验收项）——正文流检测到块级 HTML → 剥离或降级为代码块展示，不允许半渲染。轻量文字强调（下划线/高亮/上标）仅允许**白名单内联标签**，由原生 markdown 管线渲染（选型评估项，ADR-014 §4-18）。

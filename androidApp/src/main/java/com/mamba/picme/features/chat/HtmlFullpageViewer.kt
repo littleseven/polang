@@ -47,7 +47,8 @@ import com.mamba.picme.R
  * HTML payload。与 [HtmlLinkPreviewOverlay] 同级 overlay，宿主（ChatScreen）统一 BackHandler 收口。
  *
  * 与卡片沙箱完全一致（渲染对象是同一清洗产物，非通用 web 内容）：零 JS 桥接 / 禁文件 /
- * 禁 DOM Storage / 远程 script 已剔除 / img·CSS 放行；差异仅在交互面——**允许竖滚 +
+ * 禁 DOM Storage / 远程 script 已剔除 / img·CSS 放行 / 本地媒体经 [LocalMediaWebViewAssets]
+ * 白名单域注入；差异仅在交互面——**允许竖滚 +
  * 显示滚动条**（长内容需位置指示），不注入测高 JS 与 ResizeObserver。
  * `<a>` 点击仍回调 [onOpenLink] → [HtmlLinkPreviewOverlay] 叠在查看器之上；查看器自身永不导航。
  *
@@ -124,7 +125,7 @@ fun HtmlFullpageViewer(
                             tag = content.html.hashCode()
                             loadDataWithBaseURL(
                                 null,
-                                wrapHtmlDocument(content.html),
+                                wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(content.html)),
                                 "text/html",
                                 "utf-8",
                                 null
@@ -138,7 +139,7 @@ fun HtmlFullpageViewer(
                             webView.tag = content.html.hashCode()
                             webView.loadDataWithBaseURL(
                                 null,
-                                wrapHtmlDocument(content.html),
+                                wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(content.html)),
                                 "text/html",
                                 "utf-8",
                                 null
@@ -184,6 +185,11 @@ private fun WebView.applyFullpageSandbox(
             if (scheme == "http" || scheme == "https") onOpenLink(url)
             return true
         }
+
+        /** 本地媒体白名单注入（同卡片沙箱，见 [LocalMediaWebViewAssets]）；其余子资源放行。 */
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+            LocalMediaWebViewAssets.intercept(view.context, request)
+                ?: super.shouldInterceptRequest(view, request)
 
         @RequiresApi(Build.VERSION_CODES.O)
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
