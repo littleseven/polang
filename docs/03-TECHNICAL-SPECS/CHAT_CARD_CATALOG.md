@@ -380,7 +380,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 ```
 
 **UI**：通栏无气泡皮；流式态 `TypingIndicator`（thinking）/`BlinkCursor`；表格点击进 `TablePreviewOverlay`；代码块 >12 行折叠 + 复制。
-**渲染组件**：`SegmentedAgentText` → `MarkdownText`（`dev.jeziellago.compose:markdowntext`）+ `AgentTable`（纯 Compose 网格）+ `CodeBlock`；分段器 shared `MarkdownSegmenter`（MARKDOWN/TABLE/CODE）。附加区：`ClaudeAgentSteps`（步骤 ⏳/✓/✗ + 截断继续条 + 交付按钮）、`MessagePerformanceRow`。ADR-016 D2 规划升格 markdown AST 管线。
+**渲染组件**：`SegmentedAgentText` → `AgentMarkdown`（mikepenz multiplatform-markdown-renderer 0.41.0，ADR-016 M3 已替换 jeziellago compose-markdown；`features/common/chat/AgentMarkdown.kt`：retainState+immediate 流式参数、白名单内联 HTML annotator、高亮+折叠 codeFence）+ `AgentTable`（纯 Compose 网格）+ `CodeBlock`；分段器 shared `MarkdownSegmenter`（MARKDOWN/TABLE/CODE）。附加区：`ClaudeAgentSteps`（步骤 ⏳/✓/✗ + 截断继续条 + 交付按钮）、`MessagePerformanceRow`。ADR-016 D2 markdown AST 管线 M3 已落地。
 **parts 协议（✅ M1/M2 已落地）**：§0.2 `text`——一条回复多段交错（M2 流式按 `txt-N` 块级三段式装配）；`command`/`plan_preview` 经 Text part 归一，回灌 relabel 为 `agent_text`（原 type 由 legacy 列保留）；claude_agent_state 步骤流 M1 不进 parts（随后续里程碑定表达）。
 
 ### 3.3 日期分隔

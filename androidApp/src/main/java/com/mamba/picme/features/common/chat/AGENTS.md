@@ -49,6 +49,7 @@
 | **ModelSelector** | `features/chat/components/ModelSelector.kt` | 模型切换组件；2026-08-22 起输入区不再展示模型胶囊（仅远程模型） |
 | **ChatInputArea** | `features/chat/ChatScreen.kt`（私有 Composable） | 输入框 + 功能胶囊 + 发送；语音入口为默认关闭的实验能力（见 §8） |
 | **MessageRepository** | `data/repository/MessageRepository.kt` | Room 数据库读写，对话持久化 |
+| **AgentMarkdown** | `features/common/chat/AgentMarkdown.kt` | Agent 正文 Markdown 唯一渲染入口（ADR-016 M3，mikepenz 0.41.0）：Chat 正文 MARKDOWN 段、AiChatScreen 浮动面板、悬浮气泡、MediaPager 视觉结果共用；retainState+immediate 流式参数、白名单内联 HTML（u/mark/sup/sub）annotator、高亮+折叠 codeFence |
 
 > 注：Chat 页暂不提供底部快捷入口或右下角展开菜单，相机/模型中心等能力统一从相册首页进入。
 
