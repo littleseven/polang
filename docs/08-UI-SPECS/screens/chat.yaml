@@ -5,6 +5,7 @@
 #        / MediaResultsCarousel.kt / ModelSelector.kt / Color.kt / Typography.kt
 # 用途：iOS 重做的唯一输入，不读 Android 源码
 # 值引用：尺寸引用 design-tokens.json 的 token 名
+# M4 修订（2026-09-27，spec §13 先行修订）：§3.1 Turn 聚合 + §3.2 parts 拍平渲染矩阵（M4 在途 🔄）
 
 # ============================================================================
 # 1. 总体结构
@@ -99,10 +100,77 @@ message_list:
   layout: lazy_column
   weight: 1                         # 填充可用空间
   horizontal_padding: 20            # 2026-08-18 三修：12→20（去头像后通栏文本需要更大呼吸感，用户定稿）
-  item_spacing: 8                   # 消息间距 8dp
+  item_spacing: 8                   # 消息间距 8dp（M4 起：turn 内相邻 Text part 间收窄为段落间距、turn 间加回合分隔，见 §3.1）
   auto_scroll:                      # 自动滚到底部
     triggers: [message_count_changed, last_message_content_changed]
     animation: ease
+
+# ============================================================================
+# 3.1 Turn 聚合渲染（M4 在途 🔄；spec 2026-09-27-chat-parts-rendering-design §7.3，
+#     本节即 spec §13 要求的 chat.yaml 先行修订）
+# ============================================================================
+turn_aggregation:
+  status: "M4 在途（Android 先行定稿 → M5 iOS 经 /ios-follow 跟随，TODO 见 §3.2 ios_todo）"
+  scope: "纯视觉层聚合：数据层仍一条消息一行（Room partsJson），列表 item 粒度不变（§3.2），聚合不引入嵌套容器"
+  turn_boundary:
+    definition: "一条 USER 消息开启新 turn；turn = 该 user 消息至下一条 user 消息之间的全部 AGENT 消息 parts 序列"
+    leading_agent_message: "会话首条若为 AGENT 消息（访客引导/错误提示等），独立成 turn（无开启者）"
+  within_turn:                       # turn 内聚合形态
+    adjacent_text_parts:
+      bubble: none                   # 取消气泡边界：相邻 Text part 为连续文档流（agent 文本本就无气泡 §5；此条约束 part 化后不回退加皮）
+      gap: "TODO(token)"             # 段落间距（收窄）：消息间距 8dp 收窄为段落间距档；M4 定稿时入 design-tokens.json（建议 4dp 档，勿硬编）
+    card_blocks:
+      width: full                    # 卡片 block 保持全宽独立（CHART/HTML_CARD/TASK_CARD/MEDIA_RESULTS/GACHA），不被文本流吞并
+      gap_around: 8                  # 卡片与相邻 part 间沿用消息间距（保持呼吸感，不随文本收窄）
+    user_bubble: unchanged           # turn 开启的 USER 气泡（文/图/图文）形态不变（§5）
+  between_turns:                     # turn 间回合分隔
+    separator: spacing_only          # 本屏无头像/无时间戳（2026-08-18 去头像定稿；§5 timestamp_visible:false）——spec §7.3「头像/时间」分隔项在本屏以间距承担
+    gap: "TODO(token)"               # 回合分隔距：大于消息间距 8dp 的独立档；M4 定稿时入 design-tokens.json（建议 16dp 档 = 8+8，勿硬编）
+  streaming_note: "流式进行中的 turn 同样聚合（占位 part → 原位填充，spec §4 占位契约）；占位/瞬态 part 不落库，不改本节视觉规则"
+
+# ============================================================================
+# 3.2 parts 拍平渲染矩阵（M4 在途 🔄；spec §7.2 段拍平与列表粒度 + §7.4 卡片 block 复用清单）
+# ============================================================================
+parts_rendering:
+  status: "M4 在途（渲染源自 legacy 消息字段切换为 MessagePart；M1 数据层/M2 流式/M3 AST 正文已落地）"
+  granularity:
+    rule: "每个 MessagePart = LazyColumn 独立 item（一条回复的多 part 拍平为连续 items）"
+    key: '"${messageId}:${partId}"'  # 块级稳定 key（流式三段式与回收锚点）
+    content_type: "按 part 鉴别 type（text/chart/html_card/task_card/media_results/image/edit_result/optimize_candidates）——LazyColumn 复用桶，禁无 contentType（性能红线 ADR-016 §4）"
+    anti_pattern: "禁止「一条回复一个巨型 item 内部 Column 排段」（回收粒度/重组隔离/测高防抖全面劣化）"
+    user_note: "USER 图文消息（user_image_text = Image+Text 两 part）视觉单元遵循 §5 上图下文同气泡；part 的 item 边界细节以 M4 实现验收为准回填"
+  render_matrix:                     # part → 渲染组件复用清单（spec §7.4）
+    text:
+      component: "AgentMarkdown（M3 AST 管线）/ 用户气泡 Text（§5）"
+      change: none
+      layout: "AGENT → 通栏无气泡；USER → 右侧绿气泡（turn 开启者）"
+    chart:
+      component: "ChartSvgCard / ChartSvgImage（SVG 后台栅格化 ×2.5）"
+      change: none
+    html_card:
+      component: "HtmlCard 全套（双形态/沙箱/防抖三件套/全屏查看器，§13）"
+      change: "仅数据源从消息 payload 改 part；测高 LruCache key 由消息 id 改 partId"
+    task_card:
+      component: "EngineerTaskCard（H2 HTML 化路线不变，§13）"
+      change: "状态源改 ToolPartState（parts 投影）"
+    media_results:
+      component: "MediaResultsCarousel（§9）"
+      change: none
+    image:
+      component: "ChatMessageItem isImage/isUser 分支（Coil 原生）"
+      change: none                  # 媒体红线：原生 block，不经 LLM 排版
+    edit_result:
+      component: "isEditResult 分支（§5 image_content.edit_result）"
+      change: none
+    optimize_candidates:
+      component: "GachaCandidateStrip（§17）"
+      change: none
+  perf_notes: "性能防护清单见 spec §8（@Immutable/contentType/remember 派生态/滚底 key 收窄等，代码侧收口）；WebView 池化与消息分页明确不做"
+  ios_todo:                          # spec §9：M5 走 /ios-follow 一次跟随（渲染矩阵口径登记）
+    - "parts 模型：shared commonMain 直接可得（XCFramework），Swift 侧 parts 解码 + 拍平列表"
+    - "turn 聚合：§3.1 视觉规则 SwiftUI 等价（turn 内段落间距档 + 回合分隔档，token 同源）"
+    - "AST 正文渲染：解析层 commonMain，SwiftUI 渲染自绘（M3 管线 iOS 对等）"
+    - "HTML 卡双形态：现为零实现，gap 最大（HtmlCard WKWebView + 沙盒/测高/分流/全屏查看器/链接落地页）"
 
 # ============================================================================
 # 4. 空状态（ChatEmptyState）
@@ -450,6 +518,7 @@ media_results:
 # ============================================================================
 interaction_model:
   # 消息列表是 flat（无日期分隔/无对话分组），按时间顺序排列
+  # M4：Turn 聚合为纯视觉层分组（§3.1），列表结构仍 flat、item 粒度不变（§3.2）
   message_list_structure: flat_chronological
 
   # 多会话模型（侧栏 §2.5）
@@ -481,10 +550,10 @@ interaction_model:
     6_complete:
       action: "streaming placeholder discarded, final text saved as new AGENT_TEXT message"
 
-  # 消息类型渲染分发
+  # 消息类型渲染分发（M1-M3 消息 type 级分发；M4 起切换 part 级渲染矩阵 §3.2，本表保留为 legacy 对照）
   message_type_rendering:
     USER_TEXT: "right bubble, userBubbleBg bg, userBubbleOn text"
-    AGENT_TEXT: "left bubble, surfaceVariant bg, segmented Markdown (text+table+code)"
+    AGENT_TEXT: "通栏无气泡（§5 background.agent_text=none，2026-08-18 定稿）+ segmented Markdown (text+table+code)"
     MEDIA_RESULTS: "⚠️ separate full-width message (MediaResultsCarousel), NOT inline in text bubble"
     CHART: "separate full-width message (SVG card)"
     OPTIMIZE_CANDIDATES: "separate full-width message (GachaCandidateStrip §17)，伴随 agent 文本气泡（content=场景解释句）"
@@ -643,7 +712,7 @@ js_toolcalls:
     html_card_result:                        # render_html 产出（2026-09 新增，Android 先行；2026-09-26 双形态 H1）
       message_kind: HTML_CARD                # 独立全宽消息项；content=自包含 HTML（落库持久）；metadata `html_card` key 记 display 声明/displayMode 终判/measuredHeightPx/summary
       ui: HtmlCard                           # WebView 卡片，双形态（spec 2026-09-26-html-card-two-tier-design §3/§4）：
-      inline_form: "短卡（默认）：动态测高+完全撑开（≥120dp，≤1.0 屏阈值）+ ResizeObserver 高度跟随 + 滑动防抖（测高按消息 id 缓存/滑动冻结/2px 阈值/布局前虚高拦截）；卡内直接交互，仅 a 外链进落地页；滚动条隐藏"
+      inline_form: "短卡（默认）：动态测高+完全撑开（≥120dp，≤1.0 屏阈值）+ ResizeObserver 高度跟随 + 滑动防抖（测高缓存 M4 起 key 改 partId/滑动冻结/2px 阈值/布局前虚高拦截）；卡内直接交互，仅 a 外链进落地页；滚动条隐藏"
       fullpage_preview_form: "长卡（display=fullpage 或测高>1.0 屏）：固定高 ≈0.5 屏 + WebView 渲染上半部 + 底部 120dp 渐隐遮罩（向运行时卡底色）+ 居中提示条「点击查看完整内容」（primary 色）；透明触控层消费点击不消费竖拖；WebView 禁聚焦禁点击；渲染失败 → 原生封面兜底（summary+提示条）"
       fullpage_viewer: "HtmlFullpageViewer overlay（与 HtmlLinkPreviewOverlay 同级，ChatScreen BackHandler 收口）：顶栏 ✕+标题（summary 截断）+hairline；同沙箱（零桥/禁文件/禁 DOM Storage）；允许竖滚+显示滚动条；不注入测高 JS；a 仍走落地页叠上；加载失败 → 错误占位+关闭"
       routing: "分流判定 HtmlCardDisplay 纯函数：display==fullpage 直判 FULLPAGE；测高>1.0×可用屏高强制 FULLPAGE；测高异常(≤0)降级 INLINE；终判持久化 metadata，会话重开/回收后不跳变；判定 INLINE 后交互撑高不再转换"
@@ -743,6 +812,7 @@ platform_differences:
       - { feature: "JS 沙箱脚本",     android: supported, ios: "TODO(B2) 引擎选型+handler 移植" }
       - { feature: "draw_chart 图表", android: supported, ios: "TODO(B2) ChartSvgCard + chart kind" }
       - { feature: "render_html HTML 卡片", android: "supported(2026-09；2026-09-26 双形态 H1：inline/fullpage 分流+预览卡+全屏查看器)", ios: "TODO(ios-follow) HtmlCard WKWebView + 同款沙盒/双形态/链接落地页" }
+      - { feature: "parts 拍平 + Turn 聚合渲染", android: "M4 在途（spec 2026-09-27 §7.2/7.3；chat.yaml §3.1/§3.2 先行修订）", ios: "TODO(M5 ios-follow) parts 模型/turn 聚合/AST 正文/HTML 卡双形态一次跟随" }
       - { feature: "AI 工程师(claude)", android: supported, ios: "TODO(B3) SSE 客户端+渲染" }
       - { feature: "AI 优化抽卡",     android: supported, ios: "supported(2026-08-16 §17 追齐；多轮编辑态 ChatEditStateHolder 缺失见 §17 confirm 注)" }
       - { feature: "记忆/人物关系",    android: supported, ios: "未纳入本轮（留技术债）" }
