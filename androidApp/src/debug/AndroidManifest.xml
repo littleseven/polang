@@ -40,7 +40,6 @@
                 <action android:name="com.mamba.picme.AGENT_TEST" />
             </intent-filter>
         </receiver>
-
     </application>
 
 </manifest>
