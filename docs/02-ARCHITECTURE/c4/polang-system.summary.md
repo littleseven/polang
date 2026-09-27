@@ -58,6 +58,9 @@ PoLang（破浪相册）是一个 Monorepo，包含三个可部署单元：
 ## 如何查看 / 维护
 
 - 模型事实：用 Structurizr DSL 预览打开 `polang-system.structurizr.dsl`（或粘贴到 Structurizr Playground / Lite）
-- 渲染图维护：改对应 `*.html`（换内容不换骨架）→ Chrome headless `--force-device-scale-factor=2` 截图导出 `exported/*.png`（exported/ 为派生物目录，不入 VCS）
+- 渲染图维护：改对应 `*.html`（换内容不换骨架）→ Chrome headless 两遍法导出 `exported/*.png`（exported/ 为派生物目录，不入 VCS）：
+  1. 量高：往 `<head>` 注入 `document.title=Math.ceil(document.documentElement.scrollHeight)` 的 load 监听，`--headless=new --dump-dom --virtual-time-budget=3000` 读 `<title>` 取内容高 H；
+  2. 截图：`--headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=1300,H --screenshot=exported/<name>.png <name>.html`；
+  3. **目检**：尺寸正确 ≠ 内容正确（2026-09-27 事故：批量导出产出尺寸正常但大面积空白/串图的废图），每张导出后必须人眼看一遍再入库部署。
 - DSL 与 evidence 是唯一事实来源；渲染图均为派生物。架构变化先改 DSL，并同步更新 evidence.md 的 sourceRefs 与本说明
 - 旧 Structurizr/Mermaid 线框导出（svg/mmd，2026-09-19）已于 2026-09-27 汰换，git/本地历史可查
