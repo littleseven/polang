@@ -70,44 +70,87 @@ class FaceClusterEngine(private val context: Context) {
      */
     private val centroidCache = mutableMapOf<Long, Pair<FloatArray, Int>>()
 
-    /** Glint360K R100 嵌入提取器（懒加载，模型缺失/损坏时为 null） */
-    private val embeddingExtractorLazy = lazy {
-        val modelDir = ModelPathConfig.getModelDir(context, "face-embedding-glint360k-r100-mnn")
-        val modelFile = File(modelDir, "glintr100.mnn")
-        val extractor = MnnEmbeddingExtractor(modelFile)
-        // Glint360K R100 MNN 输入/输出名：input.1 / 1333；优先尝试 OpenCL GPU，失败回退 CPU
-        when {
-            !extractor.isModelReady -> {
-                Log.w(TAG, "Glint360K R100 model NOT found at ${modelFile.absolutePath}, face clustering will NOT work. Download glintr100.mnn to enable.")
-                null
+    /** 人脸 embedding 提取器初始化失败后，距上次失败超过该间隔才允许重试（避免每张照片都重试加载 260MB 模型） */
+    private val extractorRetryCooldownMs = 60_000L
+
+    /**
+     * Glint360K R100 嵌入提取器（首用时初始化，线程安全）。
+     *
+     * 失败**不永久缓存**：模型文件 mtime 变化（用户在模型中心重新下载）或冷却期过后
+     * 自动重试，避免「重下模型后必须杀进程才生效」（lazy 缓存失败的教训）。
+     */
+    @Volatile
+    private var embeddingExtractorInstance: MnnEmbeddingExtractor? = null
+
+    @Volatile
+    private var initFailedAtMs: Long = 0L
+
+    @Volatile
+    private var initFailedModelMtime: Long = -1L
+
+    private val extractorInitLock = Any()
+
+    private val embeddingExtractor: MnnEmbeddingExtractor?
+        get() = getOrInitExtractor()
+
+    private fun getOrInitExtractor(): MnnEmbeddingExtractor? {
+        embeddingExtractorInstance?.let { return it }
+        synchronized(extractorInitLock) {
+            embeddingExtractorInstance?.let { return it }
+
+            val modelDir = ModelPathConfig.getModelDir(context, "face-embedding-glint360k-r100-mnn")
+            val modelFile = File(modelDir, "glintr100.mnn")
+
+            if (initFailedAtMs > 0L) {
+                val fileChanged = modelFile.lastModified() != initFailedModelMtime
+                val cooldownElapsed = System.currentTimeMillis() - initFailedAtMs >= extractorRetryCooldownMs
+                if (!fileChanged && !cooldownElapsed) return null
             }
-            extractor.initialize(
-                inputName = "input.1",
-                outputName = "1333",
-                useGpu = true,
-                swapRb = false
-            ) -> {
-                Log.i(TAG, "Glint360K R100 model loaded: ${modelFile.absolutePath}")
-                extractor
+
+            // Glint360K R100 MNN 输入/输出名：input.1 / 1333；优先尝试 OpenCL GPU，失败回退 CPU
+            val extractor = MnnEmbeddingExtractor(modelFile)
+            val initialized = when {
+                !extractor.isModelReady -> {
+                    Log.w(TAG, "Glint360K R100 model NOT found at ${modelFile.absolutePath}, face clustering will NOT work. Download glintr100.mnn to enable.")
+                    false
+                }
+                extractor.initialize(
+                    inputName = "input.1",
+                    outputName = "1333",
+                    useGpu = true,
+                    swapRb = false
+                ) -> {
+                    Log.i(TAG, "Glint360K R100 model loaded: ${modelFile.absolutePath}")
+                    true
+                }
+                else -> {
+                    // 文件存在但 MNN 解释器创建失败：典型原因是文件损坏（如下载截断，
+                    // 大小可能与官方一致但 SHA256 不符），日志须明确指向重下而非「未下载」
+                    Log.w(TAG, "Glint360K R100 model file exists but FAILED to load (likely corrupted): ${modelFile.absolutePath}. Re-download the model in Model Center to recover.")
+                    false
+                }
             }
-            else -> {
-                // 文件存在但 MNN 解释器创建失败：典型原因是文件损坏（如下载截断，
-                // 大小可能与官方一致但 SHA256 不符），日志须明确指向重下而非「未下载」
-                Log.w(TAG, "Glint360K R100 model file exists but FAILED to load (likely corrupted): ${modelFile.absolutePath}. Re-download the model in Model Center to recover.")
+
+            return if (initialized) {
+                initFailedAtMs = 0L
+                extractor.also { embeddingExtractorInstance = it }
+            } else {
+                initFailedAtMs = System.currentTimeMillis()
+                initFailedModelMtime = modelFile.lastModified()
                 null
             }
         }
     }
-    private val embeddingExtractor: MnnEmbeddingExtractor? by embeddingExtractorLazy
 
     /**
      * 释放 Glint360K R100 嵌入模型 native 资源。
      *
-     * 仅供 Service onDestroy 级联调用；模型未初始化（本轮未做聚类）则跳过。
+     * 仅供 Service onDestroy 级联调用；模型未初始化（本轮未做聚类）则跳过，不为释放而触发模型加载。
      */
     fun release() {
-        if (embeddingExtractorLazy.isInitialized()) {
-            embeddingExtractor?.close()
+        synchronized(extractorInitLock) {
+            embeddingExtractorInstance?.close()
+            embeddingExtractorInstance = null
         }
     }
 

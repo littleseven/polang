@@ -110,7 +110,8 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
             "参数: html(自包含 HTML：CSS/JS 一律内联，远程 script/iframe/form/meta refresh 会被剔除；" +
             "远程 img/CSS/a 外链可引用；引用相册本地图片/视频：图片用 <img src=\"media://媒体id\">、" +
             "视频用 <video src=\"media://媒体id\">，" +
-            "id 须来自取数结果、禁止虚构，禁 file://、content:// 路径)、summary(一句话总结)、" +
+            "id 须来自取数结果、禁止虚构，禁 file://、content:// 路径；" +
+            "取数脚本 return 勿带 ids 数组（会触发端侧自动补横滑卡片，与本卡重复）)、summary(一句话总结)、" +
             "display(展示形态：inline 默认，聊天内完全撑开直接交互；fullpage 长报告/多屏内容，" +
             "聊天内显示固定高预览、点击进全屏查看器)。" +
             "仅当用户明确要求更丰富展示或交互组件时使用；统计图仍走 draw_chart。"

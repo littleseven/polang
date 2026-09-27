@@ -223,7 +223,7 @@ class TagGenerationPipeline(
             Log.d(TAG, "[Pass 1] Extracted ${embeddings.size} valid embeddings for mediaId=$mediaId, " +
                 "semanticEmbedding=${if (semanticEmbedding != null) "ok" else "null"}")
             val faceFocusY = computeFaceFocusY(stage1Result.faces, faceBitmap.height)
-            return Stage1WithEmbeddingsResult(faceRoiJson, embeddings, semanticEmbedding, faceFocusY)
+            return Stage1WithEmbeddingsResult(faceRoiJson, embeddings, semanticEmbedding, faceFocusY, stage1Result.hasFace)
         } finally {
             faceBitmap.recycle()
         }

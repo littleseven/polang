@@ -662,6 +662,9 @@ class TagScanOrchestrator(
     private suspend fun runSession(sessionId: String) {
         updateProgressState(sessionId, ScanSessionState.RUNNING)
         logInfo(sessionId, "会话开始运行")
+        // 清零跨会话残留的特征提取失败计数（取消/暂停分支不消费，
+        // reembedFacesAndRecluster 等非会话路径也会累加），避免过期警告带入本会话
+        scheduler.consumeFaceEmbeddingFailureCount()
         acquireWakeLock()
 
 
@@ -765,8 +768,12 @@ class TagScanOrchestrator(
     }
 
     private suspend fun maybeUpdateMediaScanRecord(task: TagScanTaskEntity) {
-        // DBSCAN 是全局任务，不更新单媒体记录
-        if (task.mediaId < 0 || task.pass == TagScanPass.DBSCAN) return
+        // DBSCAN 是全局任务（mediaId=-1 哨兵），不更新单媒体记录。
+        // 注意不能用 mediaId < 0 判断：media_assets 主键全部是负数合成 ID
+        // （MediaRepositoryImpl.syntheticMediaId），用符号判断会导致所有媒体的
+        // lastTagScanAt/lastTagScanPasses 永不写入 → 增量扫描选片窗口失效 →
+        // 每个 session 重复处理同一批最新照片（死循环）。
+        if (task.pass == TagScanPass.DBSCAN) return
 
         // 仅当该媒体所有同会话任务都完成时更新 lastTagScanAt
         val sessionTasks = db.tagScanTaskDao().getTasksBySession(task.sessionId)
@@ -803,6 +810,13 @@ class TagScanOrchestrator(
             }
             pending == 0 && running == 0 -> {
                 logInfo(sessionId, "会话完成")
+                // 产出率哨兵：本会话有照片检测到人脸但 embedding 提取为空 → 人脸模型疑似损坏，
+                // 转为用户可见警告（否则 persons/embeddings 统计静默归零，无任何报错）。
+                val faceFailures = scheduler.consumeFaceEmbeddingFailureCount()
+                if (faceFailures > 0) {
+                    logWarning(sessionId, "有 $faceFailures 张照片检测到人脸但特征提取失败" +
+                        "（人脸模型缺失或损坏），请到模型中心重新下载 Glint360K R100 后重新扫描")
+                }
                 updateProgressState(sessionId, ScanSessionState.COMPLETED)
                 cleanup()
             }

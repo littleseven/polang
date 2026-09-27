@@ -12,9 +12,11 @@ import com.mamba.picme.core.common.Logger
  *
  * 引用契约：LLM 在 render_html 的 html 里以 `media://{id}` 引用相册图片/视频
  * （id 只能来自 gallery.query / media.meta / search_media 等取数结果——uri 白名单红线不动，
- * LLM 永远拿不到 content:// 路径）。渲染前 [rewriteMediaRefs] 把 `media://{id}` 重写为
- * 白名单域 URL，WebView 子资源请求经 [intercept]（WebViewAssetLoader）命中后由
- * [LocalMediaPathHandler] 解析并用 ContentResolver 开流直通。
+ * LLM 永远拿不到 content:// 路径）。两条生效路径：
+ * 1. 静态字面量：渲染前 [rewriteMediaRefs] 把 html 字符串里的 `media://{id}` 重写为
+ *    白名单域 URL，WebView 子资源请求经 [intercept]（WebViewAssetLoader）命中开流；
+ * 2. 运行时拼接：JS 动态赋值（`el.src='media://'+id`）不产生静态重写，[intercept]
+ *    对 `media://` scheme 请求直接拦截开流（与路径 handler 共用 [openMediaStream]）。
  * 落库 HTML 保持 `media://` 契约形态，URL 机制演进不影响已存消息。
  *
  * id 命名空间（与 chat 取数结果同源，`MediaRepositoryImpl.getMediaById` 双空间解析）：
@@ -44,6 +46,9 @@ object LocalMediaWebViewAssets {
 
     private const val MEDIA_PATH_PREFIX = "/media/"
 
+    /** 运行时直通 scheme（`media://{id}` 的 scheme 部分）。 */
+    private const val MEDIA_SCHEME = "media"
+
     /** `media://123` / `media://-10000211391`（负数 = 未落库系统媒体合成 id）；`\b` 防半截误配。 */
     private val MEDIA_REF_REGEX = Regex("""media://(-?\d+)\b""")
 
@@ -69,34 +74,36 @@ object LocalMediaWebViewAssets {
      */
     internal fun parseMediaId(path: String): Long? = path.trimEnd('/').toLongOrNull()
 
+    /**
+     * 完整 `media://{id}` URL → chat 媒体 id（纯函数，JS 运行时拼接场景：
+     * 入参形如 `media://123` / `media://-10000211391`）。契约外输入一律 null。
+     */
+    internal fun parseMediaRefId(url: String): Long? =
+        MEDIA_REF_REGEX.find(url)?.groupValues?.get(1)?.toLongOrNull()
+
     @Volatile
     private var assetLoader: WebViewAssetLoader? = null
 
     /**
-     * WebViewClient.shouldInterceptRequest 钩子：命中白名单域 → 解析 id 开流；
-     * 其余请求返回 null 放行（远程资源加载行为不变）。
+     * WebViewClient.shouldInterceptRequest 钩子：
+     * - `media://` scheme（JS 运行时拼接，未经静态重写）→ 解析 id 直接开流；
+     * - 白名单域（静态重写产物）→ WebViewAssetLoader 路径 handler 开流；
+     * - 其余请求返回 null 放行（远程资源加载行为不变）。
      */
-    fun intercept(context: Context, request: WebResourceRequest): WebResourceResponse? =
-        assetLoader(context).shouldInterceptRequest(request.url)
-
-    private fun assetLoader(context: Context): WebViewAssetLoader =
-        assetLoader ?: synchronized(this) {
-            assetLoader ?: WebViewAssetLoader.Builder()
-                .setDomain(MEDIA_HOST)
-                .addPathHandler(MEDIA_PATH_PREFIX, LocalMediaPathHandler(context.applicationContext))
-                .build()
-                .also { assetLoader = it }
+    fun intercept(context: Context, request: WebResourceRequest): WebResourceResponse? {
+        if (request.url.scheme == MEDIA_SCHEME) {
+            val id = parseMediaRefId(request.url.toString()) ?: return null
+            return openMediaStream(context.applicationContext, id)
         }
-}
+        return assetLoader(context).shouldInterceptRequest(request.url)
+    }
 
-/** `/media/{id}` → 解析 chat 媒体 id（[LocalMediaWebViewAssets.mediaUriResolver]）→ 原图/原视频流。 */
-private class LocalMediaPathHandler(
-    private val appContext: Context
-) : WebViewAssetLoader.PathHandler {
-
-    override fun handle(path: String): WebResourceResponse? {
-        val id = LocalMediaWebViewAssets.parseMediaId(path) ?: return null
-        val resolver = LocalMediaWebViewAssets.mediaUriResolver
+    /**
+     * id → content:// 解析 → 原图/原视频流（路径 handler 与 `media://` 直通共用）。
+     * 已删除/无权限/resolver 未注入 → null（WebView 显示破图，HTML 侧可 onerror 兜底）。
+     */
+    internal fun openMediaStream(appContext: Context, id: Long): WebResourceResponse? {
+        val resolver = mediaUriResolver
         if (resolver == null) {
             Logger.w(TAG, "mediaUriResolver not wired; local media unavailable: id=$id")
             return null
@@ -107,20 +114,38 @@ private class LocalMediaPathHandler(
             return null
         }
         // 日志只记 id（uri 不外显口径，与 GalleryJs 白名单一致）
-        return openStream(uri).also { response ->
+        return openStream(appContext, uri).also { response ->
             if (response == null) Logger.w(TAG, "local media stream open failed: id=$id")
         }
     }
 
-    /** 开流 + 探测 MIME；已删除/无权限 → null（WebView 显示破图，HTML 侧可 onerror 兜底）。 */
-    private fun openStream(uri: Uri): WebResourceResponse? {
+    /** 开流 + 探测 MIME。 */
+    private fun openStream(appContext: Context, uri: Uri): WebResourceResponse? {
         val contentResolver = appContext.contentResolver
         val stream = runCatching { contentResolver.openInputStream(uri) }.getOrNull() ?: return null
         val mime = runCatching { contentResolver.getType(uri) }.getOrNull() ?: "image/jpeg"
         return WebResourceResponse(mime, null, stream)
     }
 
-    private companion object {
-        const val TAG = "PoLang:HtmlCard"
+    private fun assetLoader(context: Context): WebViewAssetLoader =
+        assetLoader ?: synchronized(this) {
+            assetLoader ?: WebViewAssetLoader.Builder()
+                .setDomain(MEDIA_HOST)
+                .addPathHandler(MEDIA_PATH_PREFIX, LocalMediaPathHandler(context.applicationContext))
+                .build()
+                .also { assetLoader = it }
+        }
+
+    private const val TAG = "PoLang:HtmlCard"
+}
+
+/** `/media/{id}` → 解析 chat 媒体 id → 开流（实现收口在 [LocalMediaWebViewAssets]）。 */
+private class LocalMediaPathHandler(
+    private val appContext: Context
+) : WebViewAssetLoader.PathHandler {
+
+    override fun handle(path: String): WebResourceResponse? {
+        val id = LocalMediaWebViewAssets.parseMediaId(path) ?: return null
+        return LocalMediaWebViewAssets.openMediaStream(appContext, id)
     }
 }
