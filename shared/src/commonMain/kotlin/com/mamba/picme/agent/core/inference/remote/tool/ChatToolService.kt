@@ -287,6 +287,8 @@ class ChatToolService private constructor() : TraceIdAware {
             "引用用户相册本地图片/视频：图片用 <img src=\"media://媒体id\">、视频用 <video src=\"media://媒体id\">（id 只能来自 run_gallery_script 取数" +
             "（gallery.query/media.meta 等）或 search_media 的结果，禁止虚构 id；" +
             "禁止 file://、content:// 路径——端侧会把 media:// 重写为白名单通道注入）。" +
+            "取数脚本若仅为本卡取数，return 不要带 ids 数组（端侧会把 return 的 ids 自动补成横滑照片卡片，" +
+            "与本卡重复展示）——ids 只用于拼接 media:// 引用内联进 html，return 只回统计摘要。" +
             "宽度自适应容器（width:100%，不写死超过卡片宽度的固定 px）；总大小不超过 100KB。" +
             "卡片有两种展示形态（display 参数）：inline（默认）在聊天流内完全撑开、卡内直接交互，" +
             "内容高度建议不超过【HTML 卡片渲染环境】段的建议值；" +

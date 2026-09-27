@@ -87,6 +87,23 @@ class LocalMediaWebViewAssetsTest {
         assertEquals(7L, LocalMediaWebViewAssets.parseMediaId("007"))
     }
 
+    // ── parseMediaRefId（JS 运行时拼接 media:// URL 直通拦截的解析口）──
+
+    @Test
+    fun `parseMediaRefId parses runtime media urls`() {
+        assertEquals(123L, LocalMediaWebViewAssets.parseMediaRefId("media://123"))
+        assertEquals(-10000211391L, LocalMediaWebViewAssets.parseMediaRefId("media://-10000211391"))
+        assertEquals(123L, LocalMediaWebViewAssets.parseMediaRefId("media://123/"))
+    }
+
+    @Test
+    fun `parseMediaRefId rejects malformed urls`() {
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaRefId("media://abc"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaRefId("media://"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaRefId("media://99999999999999999999"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaRefId("https://polang-media.invalid/media/123"))
+    }
+
     @Test
     fun `media host uses reserved invalid tld and prefix is derived`() {
         // 锁死纵深防线：白名单域必须是 RFC 2606 保留 TLD（拦截失效时 DNS 必失败），
