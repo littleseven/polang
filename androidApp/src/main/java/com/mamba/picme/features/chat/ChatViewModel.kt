@@ -43,12 +43,16 @@ import com.mamba.picme.agent.core.runtime.execution.InferenceResult
 import com.mamba.picme.core.agenttools.AppTool
 import com.mamba.picme.core.agenttools.AppToolExecutor
 import com.mamba.picme.core.agenttools.RuntimeStateProvider
+import com.mamba.picme.core.agenttools.toHistoryPair
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.diag.CrashTraceStore
 import com.mamba.picme.core.image.BitmapSampling
 import com.mamba.picme.BuildConfig
 import android.os.Build
 import com.mamba.picme.data.local.ChatMessageDao
+import com.mamba.picme.data.local.decodePartsOrLegacy
+import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.local.toModelInputItems
 import com.mamba.picme.data.remote.picme.ClaudeEvent
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
@@ -419,7 +423,7 @@ class ChatViewModel(
             var taskId: String? = null
             try {
                 ensureSessionExists(sessionId)
-                chatMessageDao.insertMessage(
+                chatMessageDao.insertMessageWithParts(
                     ChatMessageEntity(
                         id = UUID.randomUUID().toString(),
                         sessionId = sessionId,
@@ -614,7 +618,7 @@ class ChatViewModel(
         // 任务卡时代（2026-09-25 起）：交付审批收口到 TASK_CARD（US-2 审批唯一入口），
         // 新气泡不再登记 claudeDeliverOverrides；confirmClaudeDeliver 仅供 legacy 内存 override 使用。
         val metadata = JSONObject().put("claude_agent_state", state.toJson()).toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = msgId,
                 sessionId = sessionId,
@@ -631,7 +635,7 @@ class ChatViewModel(
     private suspend fun persistEngineerTask(sessionId: String, state: EngineerTaskState) {
         // 展示层 overlay 的持久化失败不应中止推理（launch 内异常直接崩溃，故就地吞掉只记日志）
         runCatching {
-            chatMessageDao.insertMessage(
+            chatMessageDao.insertMessageWithParts(
                 ChatMessageEntity(
                     id = state.taskId,
                     sessionId = sessionId,
@@ -1578,7 +1582,7 @@ class ChatViewModel(
                     modelUsed = null,
                     metadata = imageUri?.let { """{"imageUri":"$it"}""" }
                 )
-                chatMessageDao.insertMessage(userMessage)
+                chatMessageDao.insertMessageWithParts(userMessage)
                 chatSessionDao.touchSession(sessionId)
 
                 // 1.2 访客渐进引导：仅未注册时计数；恰好跨阈值当次插入提示消息并弹出双选项引导（>阈值不再弹）
@@ -1828,7 +1832,7 @@ class ChatViewModel(
                     ),
                     modelUsed = "error"
                 )
-                chatMessageDao.insertMessage(errorMessage)
+                chatMessageDao.insertMessageWithParts(errorMessage)
                 chatSessionDao.touchSession(sessionId)
             } finally {
                 _isProcessing.value = false
@@ -2389,7 +2393,7 @@ class ChatViewModel(
      * 的重载冲掉（表现为“图先出现又消失”）。落库后图卡随会话持久，跨重载/重启均保留。
      */
     private suspend fun emitChartMessage(svg: String) {
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = "chart_" + System.currentTimeMillis(),
                 sessionId = _currentSessionId.value,
@@ -2417,7 +2421,7 @@ class ChatViewModel(
             summary = summary?.ifBlank { null }
         )
         val metadata = JSONObject().put("html_card", meta.toJson()).toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 // 同毫秒多张卡（/html 冒烟集连发）需序号兜底，否则主键相同被 REPLACE 覆盖丢卡
                 id = "html_" + System.currentTimeMillis() + "_" + htmlMessageSeq.incrementAndGet(),
@@ -2448,7 +2452,7 @@ class ChatViewModel(
             card.put("displayMode", mode.name)
             if (measuredHeightPx != null && measuredHeightPx > 0) card.put("measuredHeightPx", measuredHeightPx)
             root.put("html_card", card)
-            chatMessageDao.insertMessage(entity.copy(metadata = root.toString()))
+            chatMessageDao.insertMessageWithParts(entity.copy(metadata = root.toString()))
         }
     }
 
@@ -2633,7 +2637,7 @@ class ChatViewModel(
             try {
                 ensureSessionExists(sessionId)
                 _isProcessing.value = true
-                chatMessageDao.insertMessage(
+                chatMessageDao.insertMessageWithParts(
                     ChatMessageEntity(
                         id = UUID.randomUUID().toString(),
                         sessionId = sessionId,
@@ -2737,7 +2741,7 @@ class ChatViewModel(
             } else {
                 null
             }
-            chatMessageDao.insertMessage(
+            chatMessageDao.insertMessageWithParts(
                 ChatMessageEntity(
                     id = previousCard?.id ?: UUID.randomUUID().toString(),
                     sessionId = sessionId,
@@ -2824,7 +2828,7 @@ class ChatViewModel(
                 put("used_sandbox", it.usedSandbox)
             }.toString()
         }
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
@@ -2860,7 +2864,7 @@ class ChatViewModel(
                 put("used_sandbox", p.usedSandbox)
             }
         }.toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
@@ -2905,7 +2909,7 @@ class ChatViewModel(
                 put("decode_speed", it.decodeSpeed.toDouble())
             }
         }.toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
@@ -2927,7 +2931,7 @@ class ChatViewModel(
         content: String,
         modelUsed: String
     ) {
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = messageId,
                 sessionId = sessionId,
@@ -2960,7 +2964,7 @@ class ChatViewModel(
                 when (val outcome = controller.reroll(messageId)) {
                     is ChatOptimizeGachaController.RerollOutcome.Rerolled -> {
                         chatMessageDao.getMessageById(messageId)?.let { entity ->
-                            chatMessageDao.insertMessage(
+                            chatMessageDao.insertMessageWithParts(
                                 entity.copy(content = outcome.explanation, metadata = outcome.group.toJson())
                             )
                         }
@@ -2994,7 +2998,7 @@ class ChatViewModel(
                     put("imageUri", result.imageUri)
                     put("saved", false)
                 }.toString()
-                chatMessageDao.insertMessage(
+                chatMessageDao.insertMessageWithParts(
                     entity.copy(type = "agent_image", metadata = metadata)
                 )
             }
@@ -3099,7 +3103,7 @@ class ChatViewModel(
                     content = persistedUri,
                     modelUsed = null
                 )
-                chatMessageDao.insertMessage(userMessage)
+                chatMessageDao.insertMessageWithParts(userMessage)
                 _lastUserImageUri.value = persistedUri
                 chatSessionDao.touchSession(sessionId)
 
@@ -3297,7 +3301,7 @@ class ChatViewModel(
                         if (newAssets.isEmpty()) {
                             val deletedText = stringContext().getString(R.string.chat_results_photo_deleted)
                             chatMessageDao.getMessageById(message.id)?.let { entity ->
-                                chatMessageDao.insertMessage(
+                                chatMessageDao.insertMessageWithParts(
                                     entity.copy(
                                         type = "agent_text",
                                         content = deletedText,
@@ -3313,7 +3317,7 @@ class ChatViewModel(
                         }
                         val newTotal = (mr.totalCount - 1).coerceAtLeast(newAssets.size)
                         chatMessageDao.getMessageById(message.id)?.let { entity ->
-                            chatMessageDao.insertMessage(
+                            chatMessageDao.insertMessageWithParts(
                                 entity.copy(
                                     content = ChatGallerySearch.serializeContent(newAssets),
                                     metadata = ChatGallerySearch.serializeMetadata(
@@ -3432,6 +3436,9 @@ class ChatViewModel(
             gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
                 optimizeGachaController?.hasPending(id) == true,
             engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
+            // ADR-016 M1：parts 双读——优先 partsJson，缺失/损坏回 legacy 列现算。
+            // UI 渲染仍读上方 legacy 字段（M1 不动 UI）；parts 供持久化/回灌与 M2+ 消费。
+            parts = decodePartsOrLegacy(),
         )
     }
 
@@ -3528,8 +3535,12 @@ internal fun buildAppToolExecutor(deps: ChatViewModelDependencies): AppToolExecu
         // 改从设置库读当前会话 id（switchSession/newSession 均经 updateChatCurrentSessionId 写入）
         val effectiveSessionId = sessionId
             ?: deps.userSettingsRepository.chatCurrentSessionIdFlow.first()
+        // ADR-016 M1：回灌经 toModelInput 显式转换（UIMessage→ModelMessage 双层分离）——
+        // 文本消息保持 (user_text|agent_text, 原文) 与旧直拼输出等价；卡片类消息呈现为
+        // tool_call/tool_result 语义对；media_results/图片/抽卡等 data part 不进上下文（spec §6）。
         deps.chatMessageDao.getRecentMessages(effectiveSessionId, limit)
-            .map { it.type to it.content }
+            .flatMap { entity -> entity.toModelInputItems() }
+            .map { item -> item.toHistoryPair() }
     },
     runtimeStateProvider = RuntimeStateProvider {
         runBlocking {

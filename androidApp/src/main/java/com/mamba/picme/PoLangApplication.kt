@@ -28,6 +28,7 @@ import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.download.RecommendedModelAutoDownloader
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
+import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.di.AppContainer
 import com.mamba.picme.di.AppContainerImpl
 import com.mamba.picme.domain.memory.MemoryContextProviderImpl
@@ -636,7 +637,7 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                                     )
                                 )
                             }
-                            chatMessageDao.insertMessage(
+                            chatMessageDao.insertMessageWithParts(
                                 ChatMessageEntity(
                                     id = UUID.randomUUID().toString(),
                                     sessionId = sessionId,

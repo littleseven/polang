@@ -41,5 +41,14 @@ data class ChatMessageEntity(
     /**
      * 扩展 JSON 字段，用于存储额外元数据
      */
-    val metadata: String? = null
+    val metadata: String? = null,
+
+    /**
+     * 消息内容块数组 JSON（ADR-016 M1 parts 模型；[com.mamba.picme.domain.chat.MessagePartsCodec] 线格式）。
+     *
+     * M1 双写过渡：写入侧由 `ChatMessageDao.insertMessageWithParts` 从 (type, content, metadata)
+     * 现算填充；读侧优先本列、缺失时回 legacy 列现算（`decodePartsOrLegacy`），旧列保留不删，
+     * 回退安全。v24→v25 迁移对存量行全量回填（失败行降级 Text part 原文兜底，不丢消息）。
+     */
+    val partsJson: String? = null
 )
