@@ -36,7 +36,7 @@
 
 ### 1.1 核心拓扑
 
-![飞书远程控制架构](../assets/diagrams/im-feishu-architecture.png)
+![飞书远程控制架构](../assets/diagrams/im-feishu-architecture.png?v=20260927-3)
 
 ### 1.2 关键变化：去除 SCF Relay Server
 
@@ -155,7 +155,7 @@ class FeishuChannelHandler(
 
 ### 3.1 组件架构
 
-![飞书远程控制架构（Android 端组件）](../assets/diagrams/im-feishu-architecture.png)
+![飞书远程控制架构（Android 端组件）](../assets/diagrams/im-feishu-architecture.png?v=20260927-3)
 
 ### 3.2 RemoteCommandDispatcher
 
@@ -234,7 +234,7 @@ class RemoteCommandDispatcher(
 
 ### 5.3 命令确认流程
 
-![危险命令确认流](../assets/diagrams/im-confirm-timeout.png)
+![危险命令确认流](../assets/diagrams/im-confirm-timeout.png?v=20260927-3)
 
 **确认策略矩阵**：
 
@@ -254,7 +254,7 @@ class RemoteCommandDispatcher(
 
 ### 6.1 设备离线场景
 
-![设备离线处理](../assets/diagrams/im-offline-reconnect.png)
+![设备离线处理](../assets/diagrams/im-offline-reconnect.png?v=20260927-3)
 
 - 飞书 SDK 内置重连机制（指数退避）
 - 无离线命令队列（相比 SCF 方案，这是唯一的能力损失：设备离线期间的命令不会缓冲）

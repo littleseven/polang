@@ -44,7 +44,7 @@
 
 ### 2.1 Pipeline 总览
 
-![TAG 生成 3-Pass 流水线](../assets/diagrams/tag-3pass-pipeline.png)
+![TAG 生成 3-Pass 流水线](../assets/diagrams/tag-3pass-pipeline.png?v=20260927-3)
 
 ### 2.2 TAG 分类体系
 
@@ -288,7 +288,7 @@ RUNNING --(执行异常，非取消)--> PAUSED
 
 ### 3.8 线程模型
 
-![TAG 扫描线程模型](../assets/diagrams/tag-thread-model.png)
+![TAG 扫描线程模型](../assets/diagrams/tag-thread-model.png?v=20260927-3)
 
 **关键原则**：
 - 控制线程与任务线程必须分离。
@@ -508,7 +508,7 @@ ML Kit Image Labeler 输出的英文标签，按置信度过滤后存储为 JSON
 
 ### 5.3 3-Pass 数据流转
 
-![三阶段数据落库明细](../assets/diagrams/tag-pass-db-writes.png)
+![三阶段数据落库明细](../assets/diagrams/tag-pass-db-writes.png?v=20260927-3)
 
 ### 5.4 数据库版本迁移历史
 
@@ -742,7 +742,7 @@ Pass 1 以 640px 加载，Pass 3 又加载 512px。两次 `ContentResolver.openI
 
 #### 两层节流架构
 
-![电池/热守卫与节流](../assets/diagrams/tag-guard-throttle.png)
+![电池/热守卫与节流](../assets/diagrams/tag-guard-throttle.png?v=20260927-3)
 
 #### 恒速冷却 `DEFAULT_PASS3_COOLDOWN_MS = 800L` 的作用
 
@@ -869,7 +869,7 @@ for (i in 0 until n)          // n = 所有 face embedding 数量
 
 ### 8.3 总体架构
 
-![TAG 双语检索架构](../assets/diagrams/tag-bilingual-search.png)
+![TAG 双语检索架构](../assets/diagrams/tag-bilingual-search.png?v=20260927-3)
 
 ### 8.4 双语词表与翻译器
 
@@ -990,7 +990,7 @@ ML Kit Image Labeling API 使用固定的 ~400 个英文标签。创建静态中
 
 **数据流**：
 
-![ML Kit 标签中英双存](../assets/diagrams/mlkit-zh-translate.png)
+![ML Kit 标签中英双存](../assets/diagrams/mlkit-zh-translate.png?v=20260927-3)
 
 **DB Migration 6→7：** 新增 `media_assets.mlKitLabelsZh TEXT` 列。
 
@@ -998,13 +998,13 @@ ML Kit Image Labeling API 使用固定的 ~400 个英文标签。创建静态中
 
 #### TagTranslator 翻译分层策略
 
-![中文查询扩展四级回退](../assets/diagrams/zh-query-expansion.png)
+![中文查询扩展四级回退](../assets/diagrams/zh-query-expansion.png?v=20260927-3)
 
 > **Tokenizer 说明**：OPUS-MT 的编解码依赖 `:engines:sentencepiece` 模块加载的 `source.spm` / `target.spm`，`tokenizer.json` 仅用于 Hugging Face token ID 与 SentencePiece piece 之间的映射。详见 `ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md`。
 
 #### ChineseQueryTranslator CLIP 扩展增强
 
-![CLIP 查询扩展](../assets/diagrams/clip-query-expansion.png)
+![CLIP 查询扩展](../assets/diagrams/clip-query-expansion.png?v=20260927-3)
 
 ### 8.9 实施路线图
 

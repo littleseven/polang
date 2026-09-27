@@ -29,7 +29,7 @@
 
 ### 2.1 目标架构
 
-![GPU 统一管线](../../assets/diagrams/adr002-gpu-pipeline.png)
+![GPU 统一管线](../../assets/diagrams/adr002-gpu-pipeline.png?v=20260927-3)
 
 ### 2.2 核心设计
 

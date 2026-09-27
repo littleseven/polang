@@ -35,7 +35,7 @@
 
 ### 决策 2: 产品重心迁移 — 从相机到相册与图片编辑（现役）
 
-![产品重心迁移](../../assets/diagrams/adr005-focus-shift.png)
+![产品重心迁移](../../assets/diagrams/adr005-focus-shift.png?v=20260927-3)
 
 核心原因：
 1. **AI 在相册场景的不可替代性**：自动识别、智能分类、美颜建议、OCR 提取是 AI 天然优势场景。

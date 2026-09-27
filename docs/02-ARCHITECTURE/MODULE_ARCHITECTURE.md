@@ -31,7 +31,7 @@
 
 ## 2. 模块依赖图
 
-![Gradle 模块依赖全景](../assets/diagrams/module-deps.png)
+![Gradle 模块依赖全景](../assets/diagrams/module-deps.png?v=20260927-3)
 
 ### 依赖方向说明
 
@@ -44,7 +44,7 @@
 
 ## 3. Native SO 归属图
 
-![Native 库资产地图](../assets/diagrams/native-libs.png)
+![Native 库资产地图](../assets/diagrams/native-libs.png?v=20260927-3)
 
 ### SO 归属说明
 

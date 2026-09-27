@@ -124,7 +124,7 @@ fun calculateEyeDistance() {
 
 ### 2.2 分层架构设计
 
-![坐标系分层架构](../../assets/diagrams/coord-layered-architecture.png)
+![坐标系分层架构](../../assets/diagrams/coord-layered-architecture.png?v=20260927-3)
 
 ### 2.3 坐标系选择策略
 

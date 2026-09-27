@@ -27,7 +27,7 @@ App Layer → 大美丽模块 (混合业务逻辑+GPU实现)
 
 ## 2. 决策目标架构
 
-![美颜引擎四层架构](../../assets/diagrams/adr001-beauty-layering.png)
+![美颜引擎四层架构](../../assets/diagrams/adr001-beauty-layering.png?v=20260927-3)
 
 ---
 
