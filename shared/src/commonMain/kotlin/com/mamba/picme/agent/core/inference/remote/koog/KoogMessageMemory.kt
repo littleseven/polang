@@ -155,7 +155,185 @@ public object KoogMessageMemory {
         return blocks
     }
 
+    // ── M1：token 估算（US-1.1，确定性启发式，无 tokenizer 依赖）──
+
+    /** M1 默认 token 预算（约对应主流模型窗口 70% 的一半以下；M2 接真实窗口配置）。 */
+    public const val DEFAULT_BUDGET_TOKENS: Int = 8_000
+
+    /** 最近 N 个实轮的 tool result 保留原文，更早的替换为占位（US-1.2）。 */
+    public const val KEEP_RECENT_TOOL_TURNS: Int = 2
+
+    /** 近 K 个实轮的对话块最后才丢（US-1.4）。 */
+    public const val PROTECTED_RECENT_TURNS: Int = 3
+
+    private const val MESSAGE_OVERHEAD_TOKENS: Int = 4
+    private const val UNKNOWN_PART_TOKENS: Int = 32
+    private const val RESULT_PLACEHOLDER_HEAD_CHARS: Int = 80
+    private const val RESULT_AGING_MIN_LENGTH: Int = 120
+    private val WHITESPACE_RUN = Regex("\\s+")
+
+    /**
+     * 粗估 token：CJK 字符 1 token/字，其余 4 字符 1 token（向上取整）。仅用于预算裁剪的
+     * 确定性相对比较，不追求与任意分词器精确一致。
+     */
+    public fun estimateTokens(text: String): Int {
+        if (text.isEmpty()) return 0
+        var cjk = 0
+        var other = 0
+        for (ch in text) {
+            if (ch.isCjk()) cjk++ else other++
+        }
+        return cjk + (other + 3) / 4
+    }
+
+    /** 估算单条消息 token：固定开销 + 各 part 之和（Text/Call/Result 精估，未知 part 计常量）。 */
+    public fun estimateMessageTokens(message: Message): Int =
+        MESSAGE_OVERHEAD_TOKENS + when (message) {
+            is Message.User -> message.parts.sumOf { part -> estimatePartTokens(part) }
+            is Message.Assistant -> message.parts.sumOf { part -> estimatePartTokens(part) }
+            else -> estimateTokens(message.textContent())
+        }
+
+    private fun estimatePartTokens(part: MessagePart): Int = when (part) {
+        is MessagePart.Text -> estimateTokens(part.text)
+        is MessagePart.Tool.Call -> estimateTokens(part.tool) + estimateTokens(part.args)
+        is MessagePart.Tool.Result -> estimateTokens(part.tool) + estimateTokens(part.output)
+        else -> UNKNOWN_PART_TOKENS
+    }
+
+    private fun Char.isCjk(): Boolean =
+        this in '\u4E00'..'\u9FFF' || this in '\u3000'..'\u303F' || this in '\uFF00'..'\uFFEF'
+
+    // ── M1：tool result 老化（US-1.2）─────────────────────────
+
+    /**
+     * 把「非最近 [keepRecentTurns] 个实轮」的 [MessagePart.Tool.Result] 内容替换为单行占位
+     * （`[tool:名 → result omitted: 前80字符]`），保住 Call/Result 配对与消息结构。
+     *
+     * - 实轮边界 = parts 不含 Result 的 User 消息（真实用户输入；纯 Result 的 User 是工具回灌）。
+     * - 短 result（≤120 字符）不替换，避免占位反而更长。
+     * - 实轮总数 ≤ [keepRecentTurns] 时无老化。
+     */
+    public fun ageToolResults(
+        messages: List<Message>,
+        keepRecentTurns: Int = KEEP_RECENT_TOOL_TURNS,
+    ): List<Message> {
+        if (messages.isEmpty() || keepRecentTurns <= 0) return messages.toList()
+        val boundaries = messages.indices.filter { index -> isRealUserTurn(messages[index]) }
+        if (boundaries.size <= keepRecentTurns) return messages.toList()
+        val protectFrom = boundaries[boundaries.size - keepRecentTurns]
+        return messages.mapIndexed { index, message ->
+            if (index >= protectFrom) message else ageMessageToolResults(message)
+        }
+    }
+
+    private fun isRealUserTurn(message: Message): Boolean =
+        message is Message.User && message.parts.none { part -> part is MessagePart.Tool.Result }
+
+    private fun ageMessageToolResults(message: Message): Message =
+        if (message !is Message.User || !message.hasToolResults()) {
+            message
+        } else {
+            message.copy(
+                parts = message.parts.map { part ->
+                    if (part is MessagePart.Tool.Result && part.output.length > RESULT_AGING_MIN_LENGTH) {
+                        val head = part.output
+                            .replace(WHITESPACE_RUN, " ")
+                            .take(RESULT_PLACEHOLDER_HEAD_CHARS)
+                        part.copy(parts = listOf(MessagePart.Text("[tool:${part.tool} → result omitted: $head]")))
+                    } else {
+                        part
+                    }
+                }
+            )
+        }
+
+    // ── M1：token 预算裁剪（US-1.1/1.4）──────────────────────
+
+    /**
+     * 按 token 预算从旧到新丢块（复用不变式②的原子块分组，tool 块永不拆散）。丢弃优先级：
+     *
+     * 1. 非保护区的 tool 块（旧工具输出最先牺牲）
+     * 2. 保护区的 tool 块（工具输出让位于对话）
+     * 3. 非保护区的对话块
+     * 4. 保护区的对话块（近 [protectedRecentTurns] 个实轮，最后才丢）
+     *
+     * - System 计入预算、始终保留最前（与 [trimToMaxMessages] 一致）。
+     * - **最新块永不丢**（用户最新输入必须到达模型），即使单块超预算。
+     * - 实轮边界定义同 [ageToolResults]。
+     */
+    public fun trimToTokenBudget(
+        messages: List<Message>,
+        budgetTokens: Int = DEFAULT_BUDGET_TOKENS,
+        protectedRecentTurns: Int = PROTECTED_RECENT_TURNS,
+    ): List<Message> {
+        if (messages.isEmpty()) return messages
+        val systems = messages.filterIsInstance<Message.System>()
+        val nonSystem = messages.filterNot { message -> message is Message.System }
+        if (nonSystem.isEmpty()) return systems
+
+        val blocks = groupIntoBlocks(nonSystem)
+        val blockStarts = ArrayList<Int>(blocks.size)
+        var acc = 0
+        for (block in blocks) {
+            blockStarts.add(acc)
+            acc += block.size
+        }
+        val boundaries = nonSystem.indices.filter { index -> isRealUserTurn(nonSystem[index]) }
+        val protectFrom =
+            if (boundaries.size > protectedRecentTurns) boundaries[boundaries.size - protectedRecentTurns] else 0
+
+        val systemTokens = systems.sumOf { system -> estimateMessageTokens(system) }
+        val kept = blocks.mapIndexed { index, block -> blockStarts[index] to block }.toMutableList()
+
+        fun isProtectedBlock(start: Int): Boolean = start >= protectFrom
+        fun hasToolPart(block: List<Message>): Boolean = block.any { message ->
+            (message is Message.Assistant && message.hasToolCalls()) ||
+                (message is Message.User && message.hasToolResults())
+        }
+        fun totalTokens(): Int =
+            systemTokens + kept.sumOf { (_, block) -> block.sumOf { estimateMessageTokens(it) } }
+
+        // 逐级牺牲：非保护 tool → 保护 tool → 非保护对话 → 保护对话（最新块除外）
+        val passes = listOf(
+            { start: Int, block: List<Message> -> !isProtectedBlock(start) && hasToolPart(block) },
+            { start: Int, block: List<Message> -> isProtectedBlock(start) && hasToolPart(block) },
+            { start: Int, _: List<Message> -> !isProtectedBlock(start) },
+            { _: Int, _: List<Message> -> true },
+        )
+        for (droppable in passes) {
+            while (totalTokens() > budgetTokens) {
+                val idx = kept.indexOfFirst { (start, block) -> droppable(start, block) }
+                if (idx == -1) break
+                if (kept.size == 1) break // 最新块永不丢
+                kept.removeAt(idx)
+            }
+        }
+        return systems + kept.map { (_, block) -> block }.flatten()
+    }
+
+    // ── M1：持久化组装全管线（US-1.3）────────────────────────
+
+    /**
+     * 双端 store save 的唯一组装入口：剔 System（①）→ 老化旧 tool result（US-1.2）
+     * → token 预算裁剪（US-1.1/1.4）→ 条数硬上限兜底（不变式②原语义，防估算失准）。
+     * 产物满足三不变式（tool 块原子、配对完整）。
+     */
+    public fun assembleForPersistence(
+        messages: List<Message>,
+        budgetTokens: Int = DEFAULT_BUDGET_TOKENS,
+        keepRecentToolTurns: Int = KEEP_RECENT_TOOL_TURNS,
+        protectedRecentTurns: Int = PROTECTED_RECENT_TURNS,
+    ): List<Message> = trimToMaxMessages(
+        trimToTokenBudget(
+            ageToolResults(withoutSystemMessages(messages), keepRecentToolTurns),
+            budgetTokens,
+            protectedRecentTurns,
+        )
+    )
+
     // ── part 探测辅助 ──────────────────────────────────────────
+
 
     private fun Message.Assistant.hasToolCalls(): Boolean =
         parts.any { part -> part is MessagePart.Tool.Call }

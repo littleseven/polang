@@ -1,9 +1,11 @@
 # Chat Agent 分层记忆系统设计（Layered Agent Memory）
 
 > **日期**：2026-09-27
-> **状态**：设计稿（未排期，待 to-tickets 切分）
+> **状态**：M1 已实施（feat/chat-memory-m1 分支）；M2/M3 待排期
 > **来源**：记忆管理专项调研会话（参考系：ChatGPT Memory、Claude Code auto-compact、Vercel AI SDK parts）
 > **关联**：ADR-012（对话记忆三分边界）、ADR-016（chat 消息模型宪法，互不侵入）、ADR-008（[PRIVACY]）、`docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md`
+>
+> **M1 实施记录（2026-09-27）**：`KoogMessageMemory` 新增 `estimateTokens`/`estimateMessageTokens`/`ageToolResults`/`trimToTokenBudget`/`assembleForPersistence`（19 个 JVM 单测）；双端 store save 统一改走 `assembleForPersistence`。预算默认 8000 token 常量——接真实模型窗口的配置化留到 M2 一并做。实证发现：项目 Koog 已升 1.3.0，`MessagePart.Tool.Result` 内容形态变为 `parts: List<ContentPart>`（读全文 `output`、老化改写 `copy(parts=…)`）、`Call` 参数字段为 `args`。
 
 ---
 

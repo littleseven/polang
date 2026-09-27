@@ -97,7 +97,7 @@ docs/superpowers/
   - `2026-09-26-html-card-two-tier-design.md`（+ 同名 mockup.html）— HTML 卡双形态 + 任务卡 HTML 化（已定稿待实施）
   - `2026-09-26-user-task-protocol-design.md` — 用户任务协议 + 任务中心双 Tab（M2/M3 在途）
   - `2026-09-27-chat-parts-rendering-design.md` — Chat parts 消息模型与渲染架构（ADR-016 实施 spec，已定稿待实施）
-  - `2026-09-27-chat-agent-layered-memory-design.md` — Chat Agent 分层记忆系统（L1 预算制/L2 滚动摘要/L3 事实库，M1~M3 分期，设计稿待排期）
+  - `2026-09-27-chat-agent-layered-memory-design.md` — Chat Agent 分层记忆系统（L1 预算制/L2 滚动摘要/L3 事实库，M1~M3 分期；M1 已合 main，M2/M3 待排期）
 - **plans（1 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）
 
 ---
