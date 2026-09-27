@@ -33,7 +33,7 @@
 
 **反序列化路由**：`ChatViewModel.toUiModel()`（ChatViewModel.kt:3383）按 type 取 content/metadata 各字段 → `ChatMessage`（shared `domain/chat/ChatMessage.kt`，双端 SSOT）→ `ChatScreen.kt` LazyColumn if/else 链选渲染组件。
 
-### 0.1 协议一致性现状与在途重构（2026-09-27）
+### 0.1 协议一致性现状与 parts 重构（2026-09-27）
 
 **legacy 13-type 协议本身不统一**——这正是 ADR-016 parts 重构的动机，盘点如下（下文各卡「落库协议」示例均为 legacy 形态，即迁移源）：
 
@@ -45,17 +45,17 @@
 | serde 位置 | org.json 扩展在 androidApp shim（`ChatModelCommonMainShim.kt`），非 commonMain 纯 Kotlin |
 | 僵尸类型 | `command` / `plan_preview` 主聊天流无专属渲染分支（真正消费者在平行浮动面板体系，§6） |
 
-**在途重构（另一 kimi-code 会话实施中，worktree `.worktrees/chat-parts-m1`，未合入主树）**：按 ADR-016 对齐 OpenAI Responses / Vercel parts 协议——Room 增 `partsJson` 列，一条消息 = 有序 parts 数组，kotlinx JSON 鉴别字段 `type`（值与 legacy type 列对齐），`ignoreUnknownKeys` 前向兼容 + `encodeDefaults=false` 紧凑落库；legacy 三列经 `LegacyMessagePartsConverter` 全枚举迁移，**行级 Text 兜底不允许丢消息**。目标线格式：
+**parts 重构（✅ M1/M2 已落地：分支 `feat/chat-parts-m1`，待合 main）**：按 ADR-016 对齐 OpenAI Responses / Vercel parts 协议——Room 增 `partsJson` 列（v24→v25 迁移全量回填），一条消息 = 有序 parts 数组，kotlinx JSON 鉴别字段 `type`（值与 legacy type 列对齐），`ignoreUnknownKeys` 前向兼容 + `encodeDefaults=false` 紧凑落库；legacy 三列经 `LegacyMessagePartsConverter` 全枚举迁移，**行级 Text 兜底不允许丢消息**。M2 流式三件套（`domain/chat/streaming/`：TurnStreamEvent / ChatStreamTurnAdapter / TurnPartsReducer + `TaskCardOverlay`）已落地：占位契约（`ToolInputStart` 即插占位 part，`draw_chart`/`render_html` 类型化占位）→ 产物原位填充；错误双轨（持久化错误轨 = TaskCard，Chart/HtmlCard/脚本错误瞬态不落库，详见 §4.3）。落库线格式实例：
 
 ```jsonc
-// partsJson 列（M1 在途；encodeDefaults=false → state="DONE"/saved=false 等缺省字段不写出）
+// partsJson 列（M1/M2 已落地；encodeDefaults=false → state="DONE"/saved=false 等缺省字段不写出）
 [
   { "type": "text", "partId": "p0", "markdown": "已定位崩溃根因：…" },
   {
     "type": "task_card",
     "partId": "p1",
     "toolCallId": "task-01JD2Z…",
-    "state": "APPROVAL_REQUESTED",        // ToolPartState 七态（Vercel 对齐）；M1 仅持久化枚举，流式语义属 M2
+    "state": "APPROVAL_REQUESTED",        // ToolPartState 七态（Vercel 对齐）；M2 流式已驱动（占位→原位填充/OUTPUT_ERROR）
     "task": { "…": "EngineerTaskState 全量，同 §4.3" }
   },
   {
@@ -63,15 +63,16 @@
     "partId": "p2",
     "html": "<div style='width:100%…'>…</div>",
     "meta": { "display": "fullpage", "displayMode": "FULLPAGE", "summary": "NVIDIA 2026 Q3 业绩概览" }
+    // M2：Chart/HtmlCard 另有 state: ToolPartState（缺省 OUTPUT_AVAILABLE 不写出），见 §0.2
   }
 ]
 ```
 
-迁移合入后，本目录各卡「落库协议」示例将统一切换为 partsJson 形态（届时 legacy 三列仅作迁移源保留）。
+M1 期 partsJson 为 legacy 三列的纯函数双写（写接缝 `data/local/ChatMessageParts.kt`）；M2 起流式以 parts 为权威装配（占位/瞬态不落 Room），legacy 三列仍为持久化写面，**渲染源切换（UI 读 parts）属 M4**——各卡「落库协议」示例当前仍为 legacy 形态（迁移源），parts 形态见 §0.2 与各卡「parts 协议」小节。
 
 ### 0.2 目标协议（parts 形态）逐类型示例
 
-字段名与缺省省略行为以 worktree `MessagePartsCodec`（kotlinx JSON，`encodeDefaults=false`）为准，round-trip 有单测锁定（`MessagePartsCodecTest`）。**缺省值不写出**：`state="DONE"`、`saved=false`、空集合、`null` 默认字段一律省略，解码回填。
+字段名与缺省省略行为以 `MessagePartsCodec`（kotlinx JSON，`encodeDefaults=false`）为准，round-trip 有单测锁定（`MessagePartsCodecTest`）。**缺省值不写出**：`state="DONE"`、`saved=false`、空集合、`null` 默认字段一律省略，解码回填。**M2 增量**：`Chart`/`HtmlCard` 新增 `state: ToolPartState`（缺省 `OUTPUT_AVAILABLE`，持久化 JSON 不写出；流式占位 `INPUT_STREAMING` 瞬态不落库）——M1 存量 partsJson 行解码落默认值，线格式兼容。
 
 ```jsonc
 // text ← user_text / agent_text / command / plan_preview（一条回复可多段交错）
@@ -81,7 +82,7 @@
   "markdown": "已定位崩溃根因：…"          // state 仅 STREAMING 时写出（DONE 为缺省）
 }
 
-// chart ← chart
+// chart ← chart（M2 起 model 另有 state: ToolPartState，缺省 OUTPUT_AVAILABLE 不写出）
 {
   "type": "chart",
   "partId": "p1",
@@ -105,7 +106,7 @@
 {
   "type": "task_card",
   "partId": "p3",
-  "toolCallId": "task-01JD2Z…",           // M1 = taskId；M2 流式起为真实 chunk id
+  "toolCallId": "task-01JD2Z…",           // 持久化行恒 = taskId；M2 流式瞬态用 call-N 合成 id（不落库，见 §4.3）
   "state": "APPROVAL_REQUESTED",
   "task": {
     "taskId": "task-01JD2Z…",
@@ -277,9 +278,9 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 - **样式权威**：design-tokens.json → codegen 双端镜像（ADR-016 D5）；HTML/L1 模板 CSS 变量走 MaterialTheme tokens，Light/Dark 随主题。
 - **媒体红线**（ADR-008）：相册图/编辑结果走原生消息（MEDIA_RESULTS/AGENT_IMAGE），不经 LLM 排版、不上传远程。
 
-### 1.3 ADR-016 parts 模型（在途架构）
+### 1.3 ADR-016 parts 模型（✅ M1/M2 已落地：feat/chat-parts-m1，待合 main）
 
-未来一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2。M1 实现在 worktree `.worktrees/chat-parts-m1`（未合入主树）。
+一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（turn 装配器 `txt-N`/`call-N` 合成 id、类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；渲染源切换（UI 读 parts）与 Turn 聚合属 M3/M4。
 
 ---
 
@@ -335,7 +336,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 **UI**：绿底深字（`chatBubble/userBubbleBg` #95EC69 双模恒值 / `userBubbleOn` #181818），hug 尺寸 pad 18h/14v，右对齐。
 ![chat_user_bubble](assets/chat-cards/chat_user_bubble-dark.png)
 **渲染组件**：`ChatMessageItem`（ChatScreen.kt）isUser 分支，原生 Compose；图片走 Coil。`ChatBubbleTokens`（`core/designsystem/DesignTokens.kt`）。
-**目标 parts 形态**：§0.2 `text` / `image`（user_image 的 ref=content 列；图文消息 = Image+Text 图上文下）。
+**parts 协议（✅ M1 已落地）**：§0.2 `text` / `image`——`user_image` → `Image(ref=content 列)`；`user_image_text` → `[Image(p0, ref=metadata.imageUri), Text(p1, content)]` 图上文下（顺序即展示顺序；metadata 缺 imageUri 行级 Text 兜底，文不丢）。回灌：Image → 占位 `[user sent an image]`、Text → 原文，两腿相邻保回合结构（逐字示例见 §4.6）。
 
 ### 3.2 Agent 文本流（markdown）
 
@@ -380,7 +381,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 
 **UI**：通栏无气泡皮；流式态 `TypingIndicator`（thinking）/`BlinkCursor`；表格点击进 `TablePreviewOverlay`；代码块 >12 行折叠 + 复制。
 **渲染组件**：`SegmentedAgentText` → `MarkdownText`（`dev.jeziellago.compose:markdowntext`）+ `AgentTable`（纯 Compose 网格）+ `CodeBlock`；分段器 shared `MarkdownSegmenter`（MARKDOWN/TABLE/CODE）。附加区：`ClaudeAgentSteps`（步骤 ⏳/✓/✗ + 截断继续条 + 交付按钮）、`MessagePerformanceRow`。ADR-016 D2 规划升格 markdown AST 管线。
-**目标 parts 形态**：§0.2 `text`（一条回复多段交错；claude_agent_state 步骤流 M1 不进 parts）。
+**parts 协议（✅ M1/M2 已落地）**：§0.2 `text`——一条回复多段交错（M2 流式按 `txt-N` 块级三段式装配）；`command`/`plan_preview` 经 Text part 归一，回灌 relabel 为 `agent_text`（原 type 由 legacy 列保留）；claude_agent_state 步骤流 M1 不进 parts（随后续里程碑定表达）。
 
 ### 3.3 日期分隔
 
@@ -420,7 +421,22 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 **UI**：无固定设计帧（端侧生成物）；点击进 `ChartPreviewOverlay` 全屏。
 **渲染组件**：`ChartSvgCard` / `ChartSvgImage`（`ChartSvgImage.kt`）——androidsvg 解析 → ×2.5 栅格化位图；渲染中占位文案。生成链路：`assets/js/chart_bootstrap.js`（`Chart.bar/line/pie/timeline`，QuickJS `ChartJs.kt` 加载，返回 `{chart, summary}`，summary 作 observation 回传 LLM）。prompt 契约：图表唯一通路，禁 markdown 表格/ASCII。
 **测试**：`GalleryJsTest` / `ChatRunScriptCapabilityTest`。
-**目标 parts 形态**：§0.2 `chart`（svg=legacy content 列）。
+**parts 协议（✅ M1/M2 已落地）**：`MessagePart.Chart`——
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `partId` | String | 块级 id（M1 迁移 `p0`…；M2 流式产物 = `call-N` 合成 id） |
+| `svg` | String | 端侧 JS 生成的自包含 SVG（= legacy content 列） |
+| `state` | ToolPartState | M2 增；持久化恒缺省 `OUTPUT_AVAILABLE`（JSON 不写出），流式占位 `INPUT_STREAMING` 瞬态不落库 |
+
+partsJson 实例见 §0.2 `chart`。**回灌**（`toModelInput`，M2 起 toolCallId = `"<messageId>:<partId>"` 命名空间锚防跨消息碰撞）→ `ToolCall(…, "draw_chart", argsSummary="")` + `ToolResult(…, "Chart card (SVG, ${svg.length} chars)", isError = state==OUTPUT_ERROR)`；经 `toHistoryPair` 进 GET_CHAT_HISTORY 的现行线格式逐字：
+
+```
+("tool_call", "draw_chart")
+("tool_result", "draw_chart → Chart card (SVG, 2831 chars)")
+```
+
+（SVG 本体不回灌，省 token；OpenAI 线格式目标形态见 §0.3③。）**端到端**：①②（上）→ `emitChartMessage` 落库行经 `withPartsJson` 双写 `[{"type":"chart","partId":"p0","svg":"…"}]` → `summary` 作 observation 回传 LLM → `ChartSvgCard` 栅格化。M2 流式轨：`ToolInputStart(draw_chart)` 即插 `Chart(svg="", INPUT_STREAMING)` 占位（骨架/进度），产物落库后 `ToolOutputAvailable` 原位填充。**红线**：无交互位图（交互图表走 render_html）；SVG 只由端侧模板生成（prompt 禁 LLM 手写 SVG/markdown 表格画图）。
 
 ### 4.2 HTML 卡 `HtmlCard`（双形态）+ 全屏查看器
 
@@ -466,7 +482,23 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 **渲染组件**：`HtmlCard` / `HtmlWebView` / `HtmlPreviewHintBar` / `HtmlPreviewFallbackCover`（`HtmlCard.kt`）+ `HtmlFullpageViewer`（同目录）+ `HtmlLinkPreviewOverlay`（`<a>` 落地页浮层）。机制：`HtmlCardSanitizer` 清洗（128KB/剔远程 script/iframe/form）→ `wrapHtmlDocument`（viewport + 响应式 reset）→ `HtmlCardDisplay` 纯函数分流（display==fullpage 直判；否则测高 >1.0 屏强制 FULLPAGE；终判落 metadata 防跳变）；Inline = console 出站测高 + ResizeObserver 跟随 + 防抖三件套；渲染失败 → 原生封面兜底。
 **调试**：DEBUG `/html` → `HtmlCardSmokeSamples`（十一卡）。
 **测试**：`HtmlCardDisplayTest` / `HtmlCardSanitizerTest` / `HtmlSandboxGuardTest`。
-**目标 parts 形态**：§0.2 `html_card`（meta 四字段随迁，键名与 legacy 一致）。
+**parts 协议（✅ M1/M2 已落地）**：`MessagePart.HtmlCard`——
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `partId` | String | 块级 id（M2 流式 = `call-N` 合成 id） |
+| `html` | String | 清洗后 HTML（= legacy content 列） |
+| `meta` | HtmlCardMeta | `display`/`displayMode`/`measuredHeightPx`/`summary` 四字段（键名与 legacy metadata.html_card 一致，随迁；全空时整体缺省不写出） |
+| `state` | ToolPartState | M2 增；语义同 Chart.state——清洗 Rejected 时补喂 `feedToolError` → 瞬态 OUTPUT_ERROR（不落库，reason 回传 LLM 引导重生成） |
+
+partsJson 实例见 §0.2 `html_card`。**回灌**（toolCallId 同为 `"<messageId>:<partId>"` 命名空间锚）→ `ToolCall(…, "render_html", argsSummary = "display=<display>"（未声明则空）)` + `ToolResult(…, meta.summary ?: "HTML card (${html.length} chars)", isError)`；`toHistoryPair` 逐字：
+
+```
+("tool_call", "render_html(display=fullpage)")
+("tool_result", "render_html → NVIDIA 2026 Q3 业绩概览")
+```
+
+（HTML 本体不回灌，只有 summary/长度。）**端到端**：① tool_call → `HtmlCardSanitizer`（空白/超 128KB Rejected：不落库 + reason 回传 + M2 瞬态标错）→ ② 落库 + metadata.html_card → 测高后 `persistHtmlCardDisplayMode` 幂等回写终判 → `withPartsJson` 重算 parts → 双形态渲染；M2 流式轨同 Chart（`INPUT_STREAMING` 占位 → 原位填充）。**红线**：零 JS 桥；128KB 硬限（@Tool 软引导 100KB，两级口径）；正文禁嵌渲染级 HTML。
 
 ### 4.3 工程师任务卡（task_card）
 
@@ -514,9 +546,28 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 ![collapsed](assets/chat-cards/taskcard-collapsed.png) ![expanded](assets/chat-cards/taskcard-expanded.png) ![approval](assets/chat-cards/taskcard-approval.png) ![done](assets/chat-cards/taskcard-done.png)
 
 **渲染组件**：`EngineerTaskCard` + `EngineerTaskNativeActionBar`（现实现动作条外置卡底）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。机制：`EngineerTaskHtml`（L1 端侧模板 + 状态 JSON 组装完整 HTML，CSS 变量走 tokens）经 `HtmlCard` 双形态渲染；displayMode 粘滞不落库；500ms 合帧节流（`EngineerTaskThrottle`）；状态文本 HTML escape（唯一注入面）；停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
-**parts**：`TaskCard(toolCallId, state)`——五态映射 Vercel 工具状态机 + 审批态。
+**parts 协议（✅ M1/M2 已落地）**：`MessagePart.TaskCard`——
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `partId` | String | 块级 id |
+| `toolCallId` | String | 持久化行恒 = taskId；M2 流式瞬态用 `call-N` 合成 id（不落库） |
+| `state` | ToolPartState | 五态投影（`toToolPartState()`）：RUNNING→`INPUT_AVAILABLE`；AWAITING_CONTINUE/AWAITING_DELIVER→`APPROVAL_REQUESTED`；COMPLETED→`OUTPUT_AVAILABLE`；FAILED→`OUTPUT_ERROR` |
+| `task` | EngineerTaskState | 完整状态快照（16 字段，键名与 legacy metadata.engineer_task 一致） |
+
+**M2 overlay**：`TaskCardOverlay.overlayLiveTaskState`——SSE live 态对消息内首个 TaskCard part **同 id 原位覆写**，legacy `engineerTask` 渲染字段自 part 投影（同源防漂移；500ms 节流在 displayMessages 管线，首帧直通）；`toUiModel` 对 TASK_CARD 已恢复 parts 双读填充。**错误双轨的持久化轨**：FAILED 的 `errorSummary` 经 M1 双写落库、回灌 `isError=true`（Chart/HtmlCard/脚本错误为瞬态轨不落库，spec §5.3）。
+
 **测试**：`EngineerTaskHtmlTest` / `EngineerTaskReducerTest` / `EngineerTaskStateSerdeTest` / `ChatViewModelEngineerTaskTest`；冒烟 `/task`（`EngineerTaskSmokeSamples`）。
-**目标 parts 形态**：§0.2 `task_card`（五态映射 ToolPartState 七态，taskId 兼任 toolCallId）。
+
+**回灌** → `ToolCall(taskId, "engineer_task", argsSummary = sourceText)` + `ToolResult(taskId, "engineer_task", errorSummary ?: resultSummary ?: "Task status: <status>", isError = state==OUTPUT_ERROR)`；`toHistoryPair` 逐字：
+
+```
+("tool_call", "engineer_task(修复相册扫描时的崩溃)")
+("tool_result", "engineer_task → 已完成根因定位与修复，编译验证中断")
+// FAILED：("tool_result", "engineer_task → SSE connection lost (failed)")——错误进上下文，模型可自我修正
+```
+
+**端到端**：工程师模式提交 → `task_<uuid>` 行 upsert（RUNNING）→ SSE 结构性事件经 `EngineerTaskReducer` 五态迁移逐次 upsert（parts 随 `withPartsJson` 重算）→ 审批 `resolved()` terminal 化（resolution 粘滞）→ `EngineerTaskCard` 渲染。partsJson 实例见 §0.2 `task_card`。
 
 ### 4.4 相册搜索结果卡 `MediaResultsCarousel`
 
@@ -549,7 +600,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 ![chat_photo_card](assets/chat-cards/chat_photo_card-dark.png)
 **渲染组件**：`MediaResultsCarousel`（`components/MediaResultsCarousel.kt`）——原生 Compose（LazyRow + Coil）；媒体被删后同步收缩。
 **测试**：`ChatGallerySearchTest` / `SearchSnapshotBuilderTest`。
-**目标 parts 形态**：§0.2 `media_results`（content 数组与 metadata 三字段合一进 results）。
+**parts 协议（✅ M1 已落地）**：`MessagePart.MediaResults(partId, results: MediaResultsUi)`——`results` 合一 legacy 两列：`query`/`totalCount`/`isRefinement`（← metadata 三字段）+ `assets`（← content 数组，含 `faceFocusY`）；`feedbackState` 会话内 👍/👎 反馈态（空 Map 缺省不写出）。partsJson 实例见 §0.2 `media_results`。**回灌：丢弃**（data part 不进上下文，对齐 Vercel 丢弃规则；LLM 对结果的感知来自 `search_media` 即时 observation，非历史回灌）。**端到端**：`search_media` tool_call → `SearchIntent`→`StructuredFilter`→`MediaSearchEngine` → **同一用户回合至多一张卡**（`getLatestMediaResultsSinceLastUserMessage` 定位行 id 做 REPLACE upsert；以图搜图等自成新回合追加新卡）→ 落库行双写 parts → `MediaResultsCarousel`。**红线**：资产字段白名单（重建最小 MediaAsset，不含 GPS/OCR/标签明细）。
 
 ### 4.5 AI 优化抽卡候选条 `GachaCandidateStrip`
 
@@ -581,7 +632,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 **UI**：设计稿已随交付清理（git 历史可查）；选中高亮 / 换一组 loading / 护栏 rejected / 进程重建只读态；确认后消息改写为 `agent_image`。
 **渲染组件**：`GachaCandidateStrip`（`components/GachaCandidateStrip.kt`）+ `ChatOptimizeGachaController`（内存态 `hasPending(id)` 驱动 `gachaInteractive`）。
 **测试**：`ChatViewModelGachaTest` / `OptimizeCandidateGroupTest` / `ChatOptimizeGachaControllerTest`。
-**目标 parts 形态**：§0.2 `optimize_candidates`（group 全量，键名与 legacy metadata 一致）。
+**parts 协议（✅ M1 已落地）**：`MessagePart.OptimizeCandidates(partId, group: OptimizeCandidateGroup)`——group 六字段全量入 part（键名与 legacy metadata 一致；kotlinx 与 org.json 双 serde 线格式互不干扰）；单条消息 parts 只有此一块（content 列的 explanation **不成** Text part，仅行级兜底时出现）。partsJson 实例见 §0.2 `optimize_candidates`。**回灌：丢弃**（data part）。**端到端**：AI 一键优化 → `ChatOptimizeGachaController.draw` 端侧并行出 N 候选 → `optimize_candidates` 行（metadata = group JSON）→「换一组」同 id 覆写（drawIndex+1、usedFingerprints 排重）/「就用这张」行改写为 `agent_image`（parts 随之重算为 image part）→ `GachaCandidateStrip`。**红线**：交互态（controller `hasPending`）是进程内存，进程重建后卡条降级只读。
 
 ### 4.6 Agent 图片结果卡 / 编辑结果卡
 
@@ -614,7 +665,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 **UI**：通栏结果图；LRU 清理后 → `ExpiredImagePlaceholder` 灰框过期占位；点击进 `ChatImagePreviewOverlay`（保存/删除/OCR）。
 **渲染组件**：`ChatMessageItem` isImage / isEditResult 分支（原生 Compose，Coil；`ChatImageLive` 判定存活）。媒体红线：不经 LLM 排版。
 **测试**：`ChatImageLiveTest` / `ChatImageRenderer*Test` / `ChatViewModelEditResultTest`。
-**目标 parts 形态**：§0.2 `image` / `edit_result`（ref+saved / description+suggestions）。
+**parts 协议（✅ M1 已落地）**：`MessagePart.Image(partId, ref, saved=false)` 与 `MessagePart.EditResult(partId, ref?, description, suggestions?, saved?)`——Image 的 `ref`：user 图 = 内部存储路径（saved 恒缺省）、agent 图 = 结果图 URI（保存后 `"saved": true` 写出）；EditResult 的 `description` = legacy content 列（**回灌唯一通道**），`ref` 为 null 时整键不写出（UI 落 legacy 兜底）。partsJson 实例见 §0.2 `image` / `edit_result`。**回灌**（[PRIVACY] 媒体红线：图片本体不进上下文）——Image → 英文中性占位：user `[user sent an image]` / agent `[assistant generated an image]`（`toHistoryPair` 落 `("user_text"|"agent_text", 占位)`，保多轮回合结构）；EditResult → `TextMessage(ASSISTANT, description)`（只回灌文字说明，防多轮编辑上下文断裂；结果图/ref/suggestions 均不进）。**端到端**（EditResult）：`edit_image` tool_call（`*_delta` 相对调整带步进截断：美颜 ±10/亮度 ±15 等，绝对值不限幅）→ `ChatEditProcessor` Recipe 渲染 → `agent_edit_result` 行（图 + 说明 + suggestions）→ 气泡内结果图 + 建议条；agent Image 三来源：`adjust_image` / AI 优化 fallback / 抽卡「就用这张」行改写（见 §4.5）。
 
 ### 4.7 流程卡：清理确认/完成 · 游客引导 · 写操作确认
 
@@ -645,15 +696,15 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 
 DESTRUCTIVE 批量删除的聚合确认卡：数量 + 珍贵信号（收藏/老照片）+ 可恢复性三要素；双链路（JS 写通路 + Tier B 批量阈值 3）；形态 = 升级确认对话框（不做 chat 内审批卡）。spec：`docs/superpowers/specs/2026-09-26-approval-three-element-card-design.md`。
 
-### 5.2 ADR-016 parts 模型迁移（🚧 M1 worktree 在途 · kimi-code 会话实施中）
+### 5.2 ADR-016 parts 模型迁移（✅ M1/M2 已落地：feat/chat-parts-m1，待合 main；M3/M4 渲染侧在途）
 
-一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线换代。卡片 UI/渲染形态**不变**（ADR-016 D2）。M1 已落 worktree `.worktrees/chat-parts-m1`（`MessagePart.kt` sealed 八类 + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt` 全枚举迁移/行级兜底），目标线格式示例见 §0.1。数据形态（spec §3）：
+一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线换代。卡片 UI/渲染形态**不变**（ADR-016 D2）。已落地：M1（`MessagePart.kt` sealed 八类 + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt` 全枚举迁移/行级兜底 + Room v24→v25 回填 + 回灌转换）与 M2（`domain/chat/streaming/` 三件套 + `TaskCardOverlay` 任务卡迁入 parts + Chart/HtmlCard `state` 字段 + 回灌 `"<messageId>:<partId>"` 命名空间 id）；线格式实例见 §0.1/§0.2，各卡 parts 协议见 §3/§4 各节。数据形态（spec §3，已按实现校准）：
 
 ```kotlin
-// shared commonMain（M1 worktree 已有 MessagePart/MessagePartsCodec，未合入）
+// shared commonMain（feat/chat-parts-m1 已有，待合 main）
 sealed interface MessagePart { val partId: String }
-// Text(markdown, state) | Chart(svg) | HtmlCard(html, display)
-// TaskCard(toolCallId, state) | MediaResults(assets) | Image(ref) | EditResult(…) | OptimizeCandidates(…)
+// Text(markdown, state: PartState) | Chart(svg, state: ToolPartState) | HtmlCard(html, meta: HtmlCardMeta, state: ToolPartState)
+// TaskCard(toolCallId, state, task: EngineerTaskState) | MediaResults(results: MediaResultsUi) | Image(ref, saved) | EditResult(…) | OptimizeCandidates(…)
 ```
 
 现状 type → part 映射表：`2026-09-27-chat-parts-rendering-design.md` §2。
