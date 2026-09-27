@@ -136,11 +136,11 @@
 
 ### 2.1 整体架构
 
-![大美丽引擎预览栈](../assets/diagrams/beauty-preview-stack.png?v=20260927-3)
+![大美丽引擎预览栈](../assets/diagrams/beauty-preview-stack.png?v=20260927-4)
 
 ### 2.2 数据流（零拷贝）
 
-![预览帧 GPU 管线](../assets/diagrams/beauty-frame-pipeline.png?v=20260927-3)
+![预览帧 GPU 管线](../assets/diagrams/beauty-frame-pipeline.png?v=20260927-4)
 
 **关键优化点**：
 
@@ -150,7 +150,7 @@
 
 ### 2.3 引擎策略路由（2026-04 当前实现）
 
-![美颜策略装配链](../assets/diagrams/beauty-strategy-chain.png?v=20260927-3)
+![美颜策略装配链](../assets/diagrams/beauty-strategy-chain.png?v=20260927-4)
 
 ### 2.4 拍照处理架构（2026-04 新增）
 
@@ -297,7 +297,7 @@ while (isRendering && !Thread.interrupted()) {
 
 **解决方案**：`CameraPreviewRenderer.mapViewNormalizedToUv()` 四步映射
 
-![人脸坐标 → Shader UV 变换](../assets/diagrams/beauty-uv-transform.png?v=20260927-3)
+![人脸坐标 → Shader UV 变换](../assets/diagrams/beauty-uv-transform.png?v=20260927-4)
 
 **约束**：
 - `transformFaceCoordinateSimple()`（ML Kit → 屏幕像素）与 `mapViewNormalizedToUv()`（屏幕 → UV）是串联关系，不能跳过任何一步。
@@ -741,7 +741,7 @@ val croppedBitmap = if (cropRect.width() != originalBitmap.width ||
 
 ##### 自动旋转流程
 
-![传感器方向旋转链](../assets/diagrams/beauty-sensor-rotation.png?v=20260927-3)
+![传感器方向旋转链](../assets/diagrams/beauty-sensor-rotation.png?v=20260927-4)
 
 **旋转规则**：
 - 后置摄像头：顺时针旋转 **90°**
@@ -921,7 +921,7 @@ DisposableEffect(previewView) {
 
 #### 2.1 整体数据流
 
-![帧同步美妆体系](../assets/diagrams/beauty-framesync.png?v=20260927-3)
+![帧同步美妆体系](../assets/diagrams/beauty-framesync.png?v=20260927-4)
 
 #### 2.2 关键设计决策
 
@@ -1436,7 +1436,7 @@ data class BeautyPerfStats(
 
 #### 8.2 降级路径
 
-![帧同步降级路径](../assets/diagrams/beauty-degradation-paths.png?v=20260927-3)
+![帧同步降级路径](../assets/diagrams/beauty-degradation-paths.png?v=20260927-4)
 
 ---
 
@@ -1590,7 +1590,7 @@ private fun onGlWarmUpFallback(reason: String) {
 
 **定义**：从源图像的像素/顶点出发，计算它在目标图像中的新位置。
 
-![关键点映射](../assets/diagrams/beauty-landmark-mapping.png?v=20260927-3)
+![关键点映射](../assets/diagrams/beauty-landmark-mapping.png?v=20260927-4)
 
 **特点**：
 - 直接移动源像素/顶点到新位置

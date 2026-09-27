@@ -130,7 +130,7 @@ delay(lastPollDelayMs)  // 使用动态延迟
 
 #### 按需 ASR 加载
 
-![ASR 按需加载（VAD 触发）](../assets/diagrams/voice-asr-ondemand.png?v=20260927-3)
+![ASR 按需加载（VAD 触发）](../assets/diagrams/voice-asr-ondemand.png?v=20260927-4)
 
 ### 2.4 精准度优化
 
@@ -194,7 +194,7 @@ lastWakeTime = System.currentTimeMillis()
 
 #### 代码流程
 
-![唤醒词引擎主循环](../assets/diagrams/voice-kws-loop.png?v=20260927-3)
+![唤醒词引擎主循环](../assets/diagrams/voice-kws-loop.png?v=20260927-4)
 
 ### 2.6 性能指标
 
@@ -345,7 +345,7 @@ D/PoLang:WakeWord: Speech detected but in cooldown (200ms / 1200ms), skipped
 
 #### 分层运行时
 
-![语音栈 Native 隔离地图](../assets/diagrams/voice-stack-sos.png?v=20260927-3)
+![语音栈 Native 隔离地图](../assets/diagrams/voice-stack-sos.png?v=20260927-4)
 
 **关键性质**：三个栈各自拥有独立的 Native 运行时，互相不共享全局状态。
 
@@ -364,7 +364,7 @@ D/PoLang:WakeWord: Speech detected but in cooldown (200ms / 1200ms), skipped
 
 #### 双引擎工作流程
 
-![语音唤醒生命周期](../assets/diagrams/voice-wakeup-lifecycle.png?v=20260927-3)
+![语音唤醒生命周期](../assets/diagrams/voice-wakeup-lifecycle.png?v=20260927-4)
 
 ### 4.3 生命周期状态机
 
@@ -380,7 +380,7 @@ D/PoLang:WakeWord: Speech detected but in cooldown (200ms / 1200ms), skipped
 
 #### 核心原则：分时复用，绝不叠加
 
-![语音内存阶段图](../assets/diagrams/voice-memory-phases.png?v=20260927-3)
+![语音内存阶段图](../assets/diagrams/voice-memory-phases.png?v=20260927-4)
 
 **设计约束**：
 1. KWS 与 ASR 绝不同时 ACTIVE（KWS 暂停后 ASR 加载）
@@ -692,7 +692,7 @@ implementation(files("../shared/libs/sherpa-onnx-1.13.3.aar"))  // Phase 4 Task 
 
 #### 6.1.1 ASR 流水线
 
-![ASR 两级模型链](../assets/diagrams/voice-asr-am-lm.png?v=20260927-3)
+![ASR 两级模型链](../assets/diagrams/voice-asr-am-lm.png?v=20260927-4)
 
 #### 6.1.2 LM 的作用举例
 

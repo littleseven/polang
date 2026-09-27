@@ -30,14 +30,14 @@ CSS = """
     --txt:#12263F;--sub:#5A6B80;--line:#D8E0EC}
   *{margin:0;padding:0;box-sizing:border-box}
   html{background:#E9EEF5}
-  body{font-family:"Noto Sans SC","PingFang SC",sans-serif;color:var(--txt);
+  body{font-family:"PingFang SC","Noto Sans SC",sans-serif;color:var(--txt);
     padding:22px 14px 26px;background:#E9EEF5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1040px;margin:0 auto;background-color:#F7F9FC;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),
       linear-gradient(90deg,var(--grid) 1px,transparent 1px);
     background-size:26px 26px;border:1.5px solid #C9D4E4;border-radius:20px;
     padding:22px 22px 20px;box-shadow:0 10px 26px rgba(18,38,63,.10)}
-  .mono{font-family:"JetBrains Mono",monospace}
+  .mono{font-family:"SF Mono","JetBrains Mono",Menlo,monospace}
   .hero{text-align:center;margin-bottom:14px}
   .hero h1{font-size:26px;font-weight:900;letter-spacing:.02em}
   .hero h1 .dot{color:var(--blue)}
@@ -95,8 +95,15 @@ ARROW = '<div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><li
 HARROW = ('<div class="harrow"><svg width="30" height="16" viewBox="0 0 34 16">'
           '<line x1="2" y1="8" x2="26" y2="8" stroke="#2563EB" stroke-width="2.4"/>'
           '<path d="M24 3 L32 8 L24 13 Z" fill="#2563EB"/></svg></div>')
-PROBE = ('<script>window.addEventListener("load",function(){setTimeout(function(){'
-         'document.title="H"+document.documentElement.scrollHeight},500)})</script>')
+# 量高探针：等 document.fonts.ready（字体换装重排后再量，否则量到换装前的更高布局，
+# 截图却是换装后的短布局 → 画布拖空白），量 .wrap 盒底 + body 下内边距。
+# 弃用 documentElement.scrollHeight——headless 下它对短内容虚报 ~2×（2026-09-27 实测）。
+PROBE = ('<script>window.addEventListener("load",function(){'
+         'var m=function(){setTimeout(function(){'
+         'var w=document.querySelector(".wrap").getBoundingClientRect().bottom;'
+         'var p=parseFloat(getComputedStyle(document.body).paddingBottom)||0;'
+         'document.title="H"+Math.ceil(w+p+2)},300)};'
+         '(document.fonts&&document.fonts.ready?document.fonts.ready.then(m):m())})</script>')
 
 
 def chip(c):
@@ -183,7 +190,7 @@ def build(spec):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{H.escape(spec['title'])}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<!-- 本地字体栈（禁网络字体：headless 量高/截图字体竞态致高度抽奖，2026-09-27） -->
 <style>{CSS}</style>
 </head>
 <body>
@@ -222,7 +229,9 @@ def main():
             return subprocess.run([CHROME] + args, capture_output=True, text=True, timeout=25).stdout
         except subprocess.TimeoutExpired:
             return ""
-    dom = chrome(["--headless=new", "--disable-gpu",
+    # 量高必须与截图同窗口宽度（2026-09-27 事故：漏带时默认 800px 窄视口重排
+    # 高度虚高 ~1.8×，1100 宽截图内容只填 ~55%，画布拖近半空白）
+    dom = chrome(["--headless=new", "--disable-gpu", "--window-size=1100,600",
                   "--virtual-time-budget=9000", "--dump-dom", "file://" + html_path])
     import re
     m = re.search(r"<title>H(\d+)", dom)
@@ -232,6 +241,14 @@ def main():
             "--force-device-scale-factor=2", "--virtual-time-budget=9000",
             f"--window-size=1100,{height}", "--screenshot=" + png_path,
             "file://" + html_path])
+    # sips 重编码：Chrome 截图原始字节存在「Chrome 自身渲染为全白」问题
+    # （结构合法、苹果系解码器正常，sips 过一遍即愈）
+    if os.path.exists(png_path):
+        tmp = png_path + ".sips.png"
+        subprocess.run(["sips", "-s", "format", "png", png_path, "--out", tmp],
+                       capture_output=True)
+        if os.path.exists(tmp) and os.path.getsize(tmp) > 0:
+            os.replace(tmp, png_path)
     print(f"PNG : docs/assets/diagrams/{name}.png (window 1100x{height} @2x)")
 
 

@@ -36,7 +36,7 @@
 相册首页是用户打开 PoLang 后的首屏，核心能力（整理、聊天、人物、回忆）从这里进入（打标已并入整理页 SCAN tab）；相机为全屏路由（仅头像拍摄进入），模型中心入口在相册顶栏最左与设置主菜单（两处）。
 
 **页面布局**
-![相册首页布局分区](../assets/diagrams/feat-gallery-layout.png?v=20260927-3)
+![相册首页布局分区](../assets/diagrams/feat-gallery-layout.png?v=20260927-4)
 
 **底部导航**（悬浮胶囊，纯图标无文字标签，与主页面 Pager 页序 1:1，2026-09-06 导航统一）
 - 相册：本页高亮（显式回家路径）
@@ -128,13 +128,13 @@
 
 **编辑器内一键优化（当前实现，2026-08-06 抽卡闭环 + 先预览后应用）**
 
-![编辑页 AI 一键优化流](../assets/diagrams/feat-edit-optimize-flow.png?v=20260927-3)
+![编辑页 AI 一键优化流](../assets/diagrams/feat-edit-optimize-flow.png?v=20260927-4)
 
 > **关键体验**：先预览后应用——AI 推荐直接在大图上预览，用户确认后才应用；缩略图仅作导航，真正的效果对比发生在主预览区。
 
 **对话命令一键优化（当前实现）**
 
-![Chat 图片优化流](../assets/diagrams/feat-chat-optimize-flow.png?v=20260927-3)
+![Chat 图片优化流](../assets/diagrams/feat-chat-optimize-flow.png?v=20260927-4)
 
 #### 状态与反馈
 
@@ -333,7 +333,7 @@ AI 对话页是主页面 Pager 页 2（相册悬浮「聊天」Tab 瞬时切换�
 
 采用全屏对话式设计：
 
-![聊天页布局分区](../assets/diagrams/feat-chat-layout.png?v=20260927-3)
+![聊天页布局分区](../assets/diagrams/feat-chat-layout.png?v=20260927-4)
 
 ### 2.3 模型切换（输入框下拉）
 
@@ -655,11 +655,11 @@ AudioRecorder → VAD 检测 → ASR 识别 → LLM 解析 → 命令执行
 
 ## 附录 B：模型切换状态流转
 
-![远程模型切换流](../assets/diagrams/feat-model-switch.png?v=20260927-3)
+![远程模型切换流](../assets/diagrams/feat-model-switch.png?v=20260927-4)
 
 ## 附录 C：快捷入口跳转流程
 
-![相册 ↔ 聊天/整理 跳转流](../assets/diagrams/feat-nav-flow.png?v=20260927-3)
+![相册 ↔ 聊天/整理 跳转流](../assets/diagrams/feat-nav-flow.png?v=20260927-4)
 
 | Agent 指令 | GUI 操作等效 |
 |------------|--------------|

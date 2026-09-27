@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>帧同步美妆体系</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<!-- 本地字体栈（禁网络字体：headless 量高/截图字体竞态致高度抽奖，2026-09-27） -->
 <style>
   :root{color-scheme:light;--grid:#E8ECF1;--card:#fff;--tint:#EEF3FB;--tint2:#F0F3F8;
     --navy:#0D2240;--blue:#2563EB;--blue-deep:#3B6FD4;--chip-bg:#DCE9FB;--green:#2FA05A;
@@ -12,14 +12,14 @@
     --txt:#12263F;--sub:#5A6B80;--line:#D8E0EC}
   *{margin:0;padding:0;box-sizing:border-box}
   html{background:#E9EEF5}
-  body{font-family:"Noto Sans SC","PingFang SC",sans-serif;color:var(--txt);
+  body{font-family:"PingFang SC","Noto Sans SC",sans-serif;color:var(--txt);
     padding:22px 14px 26px;background:#E9EEF5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1040px;margin:0 auto;background-color:#F7F9FC;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),
       linear-gradient(90deg,var(--grid) 1px,transparent 1px);
     background-size:26px 26px;border:1.5px solid #C9D4E4;border-radius:20px;
     padding:22px 22px 20px;box-shadow:0 10px 26px rgba(18,38,63,.10)}
-  .mono{font-family:"JetBrains Mono",monospace}
+  .mono{font-family:"SF Mono","JetBrains Mono",Menlo,monospace}
   .hero{text-align:center;margin-bottom:14px}
   .hero h1{font-size:26px;font-weight:900;letter-spacing:.02em}
   .hero h1 .dot{color:var(--blue)}
@@ -82,6 +82,6 @@
   <div class="step"><span class="num">1</span><div class="sh"><span class="st">SurfaceTexture</span><span class="ss">帧源</span></div><div class="chips"><span class="chip ">updateTexImage() 时生成 FrameId </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint"><span class="num">2</span><div class="sh"><span class="st">FaceDetector</span><span class="ss">MediaPipe / MNN</span></div><div class="chips"><span class="chip ">FrameId + ImageProxy 输入 </span><span class="chip ">DetectionResult <small>106 点 + FrameId</small></span><span class="chip ">DetectionQueue（设计概念未落地·深度2超时丢帧） </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint2"><span class="num">3</span><div class="sh"><span class="st">FrameSyncManager</span><span class="ss">单例</span></div><div class="chips"><span class="chip ">ResultStore <small>时序存储</small></span><span class="chip ">MatchEngine <small>帧ID匹配</small></span><span class="chip ">Predictor <small>运动预测</small></span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step"><span class="num">4</span><div class="sh"><span class="st">渲染线程</span><span class="ss">GL Thread</span></div><div class="chips"><span class="chip ">CameraPreviewRenderer → BeautyRenderer → FaceMakeupPass <small>消费同步顶点</small></span></div></div>
   <div class="foot"><div class="ft">渲染线程按 FrameId 查询：<b>精确匹配 → 历史回退 → 预测补偿 → 隐藏</b>；DetectionQueue 为设计概念，当前走同步检测路径。</div></div>
 </div>
-<script>window.addEventListener("load",function(){setTimeout(function(){document.title="H"+document.documentElement.scrollHeight},500)})</script>
+<script>window.addEventListener("load",function(){var m=function(){setTimeout(function(){var w=document.querySelector(".wrap").getBoundingClientRect().bottom;var p=parseFloat(getComputedStyle(document.body).paddingBottom)||0;document.title="H"+Math.ceil(w+p+2)},300)};(document.fonts&&document.fonts.ready?document.fonts.ready.then(m):m())})</script>
 </body>
 </html>
