@@ -134,4 +134,68 @@ class ChatStreamTurnAdapterTest {
         assertEquals("call-0", parts[1].partId)
         assertEquals("txt-1", parts[2].partId)
     }
+
+    // ── M4：显式 RoundStarted 轮边界（spec §10 收口）─────────────────
+
+    @Test
+    fun `round started closes open text block and emits round event`() {
+        val adapter = ChatStreamTurnAdapter()
+        adapter.onEvent(ChatStreamEvent.TextSnapshot("第一轮"))
+        val events = adapter.onEvent(ChatStreamEvent.RoundStarted)
+        assertEquals(
+            listOf(
+                TurnStreamEvent.TextEnd("txt-0"),
+                TurnStreamEvent.RoundStarted(0),
+            ),
+            events,
+        )
+        // 下一轮快照开新块（差分基准已清空）
+        assertEquals(
+            listOf(
+                TurnStreamEvent.TextStart("txt-1"),
+                TurnStreamEvent.TextDelta("txt-1", "第二轮"),
+            ),
+            adapter.onEvent(ChatStreamEvent.TextSnapshot("第二轮")),
+        )
+    }
+
+    @Test
+    fun `round started without open block emits only round event and increments`() {
+        val adapter = ChatStreamTurnAdapter()
+        assertEquals(
+            listOf(TurnStreamEvent.RoundStarted(0)),
+            adapter.onEvent(ChatStreamEvent.RoundStarted),
+        )
+        assertEquals(
+            listOf(TurnStreamEvent.RoundStarted(1)),
+            adapter.onEvent(ChatStreamEvent.RoundStarted),
+        )
+    }
+
+    @Test
+    fun `explicit round signal beats extension heuristic`() {
+        // 关键钉桩：新轮首个快照恰是旧快照的前缀扩展（如模型复述前文）时，
+        // 显式 RoundStarted 优先——必须开新块全量落，而非差分续写旧块
+        val adapter = ChatStreamTurnAdapter()
+        adapter.onEvent(ChatStreamEvent.TextSnapshot("abc"))
+        adapter.onEvent(ChatStreamEvent.RoundStarted)
+        val events = adapter.onEvent(ChatStreamEvent.TextSnapshot("abcd"))
+        assertEquals(
+            listOf(
+                TurnStreamEvent.TextStart("txt-1"),
+                TurnStreamEvent.TextDelta("txt-1", "abcd"),
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun `reducer ignores round started without touching parts`() {
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.TextStart("txt-0"))
+        reducer.apply(TurnStreamEvent.TextDelta("txt-0", "内容"))
+        val before = reducer.parts
+        reducer.apply(TurnStreamEvent.RoundStarted(0))
+        assertEquals(before, reducer.parts)
+    }
 }

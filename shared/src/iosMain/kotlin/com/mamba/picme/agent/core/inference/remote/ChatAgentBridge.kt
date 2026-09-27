@@ -111,6 +111,8 @@ class ChatAgentBridge(
                         when (event) {
                             is ChatStreamEvent.TextSnapshot -> onText(event.text)
                             is ChatStreamEvent.ToolCallStarted -> onToolCall()
+                            // M4 显式轮边界信号：iOS 渲染未走 turn 装配器（M5 跟随），无需响应
+                            is ChatStreamEvent.RoundStarted -> Unit
                         }
                     }
                 )

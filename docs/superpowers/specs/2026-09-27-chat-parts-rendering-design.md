@@ -75,12 +75,21 @@ enum class PartState { STREAMING, DONE }
 - part 增删只发生在**流式进行中**；DONE 后的 part 不可变（原位更新仅允许 `TaskCard.state` 与 data part 的同 id 覆写——对齐 Vercel `data-*` 原位更新语义）
 - commonMain 纯 Kotlin，无平台依赖（ADR-013 纯度守卫覆盖）
 
+> **partId 分轨命名空间（2026-09-27，M4 定稿收口项②）**：双轨统一方案 = 分轨 + 生命周期内稳定，
+> 不做全量重编号。瞬态轨（流式 turn，reducer 合成）`txt-N`/`call-N` 与持久轨（Room partsJson，
+> converter 合成）`p0`/`p1`… 两轨不交叉（流式消息不落 Room、落库消息不经 reducer），任一消息在
+> 任一时刻只属于一轨 ⇒ LazyColumn key（`messageId:partId`）在各生命周期内恒定。流式→落库边界
+> messageId 必然变更（一 turn 拆多行的持久模型使然，§11 不做消息树），该边界 item 重建与 M2 前
+> 基线行为一致，不属 key 跳变回归。代码锚点：`MessagePart.partId` KDoc。
+
+
 ## 4. 流式管线（chunk 三段式语义）
 
 对齐的是**事件语义**，传输仍走 Koog agent 循环，不引入 SSE 线协议。
 
 ```
 TurnStreamEvent
+├── RoundStarted(round)                 ← M4 显式轮边界（Koog onLLMStreamingStarting 为地面真值）
 ├── TextStart(partId) / TextDelta(partId, delta) / TextEnd(partId)
 ├── ToolInputStart(toolCallId, toolName) / ToolInputDelta(toolCallId, argsDelta) / ToolInputAvailable(toolCallId, args)
 └── ToolOutputAvailable(toolCallId, output) / ToolOutputError(toolCallId, errorText)
@@ -176,7 +185,7 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 | **M1 数据模型** | §3 parts 模型 + Room 迁移 + 回灌转换（§6）；UI 不动，旧渲染经 legacy 字段读取 | 全量历史消息迁移无损（抽查 + 单测）；回灌：文本消息逐条等价，卡片/数据块按 §6 显式转换（command/plan_preview relabel 为 agent_text）（fixture 对比）；编译+ui-driver 冒烟过 |
 | **M2 流式管线** | §4 chunk 事件 + reducer + §5 状态机；任务卡状态迁入 parts | 流式交错顺序正确（文本-卡-文本）；任务卡五态渲染等价；OUTPUT_ERROR 双轨口径：持久化错误轨 = TaskCard 路径（errorSummary 双写落库可回灌），Chart/HtmlCard 错误为瞬态轨（占位标错 + toolErrors，不落库） |
 | **M3 正文渲染** ✅（2026-09-27） | §7.1 spike 过线 → mikepenz 0.41.0 替换 compose-markdown（`AgentMarkdown`：retainState+immediate 长度门控（≤1500 字同步，真机实测数据见验收记录 §2）、白名单内联 HTML annotator、高亮+折叠 codeFence；Segmenter 保留 TABLE/CODE 段自研组件） | spike 四项硬指标过线；流式长文无闪烁（screenshot-diff + 人工体感）；白名单内联 HTML 渲染。**证据链：`docs/06-QA/M3_CHAT_MARKDOWN_ACCEPTANCE.md`**（spike 数字 + immediate 真机实测 + 冒烟截图基线 + 在树单测 7 例） |
-| **M4 渲染拍平 + Turn 聚合** | §7.2/§7.3 + §8 性能清单 | 流式期间重组范围实测收窄（Layout Inspector/重组计数）；chat.yaml 修订 + 截图对比基线更新。**切渲染源前须收口**：① 显式 round-start 信号替代文本侧「非扩展快照=轮边界」猜测（前提与失效表现见 ChatStreamTurnAdapter 类注释）；② partId 双轨（M2 流式 `txt-N`/`call-N` vs M1 迁移 `p0`/`p1`…）导致的 LazyColumn key 跳变须一并处理 |
+| **M4 渲染拍平 + Turn 聚合**（在途 🔄：前置收口 ① RoundStarted 显式信号链（Koog onLLMStreamingStarting → ChatStreamEvent → TurnStreamEvent → adapter/reducer，差分启发式降为兜底）+ ② partId 分轨命名空间方案（§3 注记）已落地，2026-09-27） | §7.2/§7.3 + §8 性能清单 | 流式期间重组范围实测收窄（Layout Inspector/重组计数）；chat.yaml 修订 + 截图对比基线更新。**切渲染源前须收口**：① 显式 round-start 信号替代文本侧「非扩展快照=轮边界」猜测（前提与失效表现见 ChatStreamTurnAdapter 类注释）；② partId 双轨（M2 流式 `txt-N`/`call-N` vs M1 迁移 `p0`/`p1`…）导致的 LazyColumn key 跳变须一并处理 |
 | **M5 iOS 跟随** | ios-follow 管线 | parity gap 报告清零（渲染矩阵口径） |
 
 依赖序：M1 → M2 → M3 ∥ M4（M4 依赖 M1）；M5 在 M4 定稿后启动。每期独立分支、独立可回退（§3.4 工作区隔离）。

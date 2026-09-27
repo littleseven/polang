@@ -323,6 +323,10 @@ class RemoteChatEngine internal constructor(
                         Logger.d(tag, "Chat ReAct toolCall: $toolName(${args.take(100)})")
                         onEvent?.invoke(ChatStreamEvent.ToolCallStarted(toolName = toolName, args = args))
                     },
+                    onRoundStarted = {
+                        // M4：显式轮边界（spec §10 收口），turn 装配器替代快照差分猜测
+                        onEvent?.invoke(ChatStreamEvent.RoundStarted)
+                    },
                 )
             }
             Result.success(summary to metrics)

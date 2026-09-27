@@ -32,7 +32,8 @@ import kotlin.time.Clock
  * - **网关 header**：经 [RemoteModelFactory.createKoogExecutor] 的 extraHeaders 注入（X-App-Token / X-Device-Id），
  *   auth 仍走 apiKey 标准路径。
  * - **流式**：onLLMStreamingFrameReceived 把 TextDelta 累积成本轮快照（[com.mamba.picme.agent.core.inference.remote.ChatStreamEvent.TextSnapshot]
- *   语义=累计全文非 delta），onLLMStreamingStarting 重置（新一轮从空累计）；onToolCallStarted 发 ToolCallStarted。
+ *   语义=累计全文非 delta），onLLMStreamingStarting 重置（新一轮从空累计）并发射显式轮边界
+ *   [com.mamba.picme.agent.core.inference.remote.ChatStreamEvent.RoundStarted]（M4，spec §10）；onToolCallStarted 发 ToolCallStarted。
  * - **指标**：onLLMCallCompleted 累加 token + 录制 [LlmCallRecord]（DEBUG 全文 / release 纯指标，双模式隐私）。
  *
  * **不可变契约**：[runChat] 返回 `(summary, AgentExecutionMetrics)`，由 RemoteChatEngine 包成冻结的
@@ -98,6 +99,9 @@ class KoogChatAgent(
     @Volatile private var currentPartialText: ((snapshot: String) -> Unit)? = null
     @Volatile private var currentToolCall: ((toolName: String, args: String) -> Unit)? = null
 
+    /** M4：显式轮边界回调（[ChatStreamEvent.RoundStarted] 的发射源）。 */
+    @Volatile private var currentRoundStarted: (() -> Unit)? = null
+
     @Volatile private var running = false
     private var currentSessionId: String = "default"
 
@@ -122,6 +126,7 @@ class KoogChatAgent(
         traceId: String?,
         onPartialText: (snapshot: String) -> Unit,
         onToolCall: (toolName: String, args: String) -> Unit,
+        onRoundStarted: () -> Unit = {},
     ): Pair<String, AgentExecutionMetrics> {
         running = true
         traceIdHolder.value = traceId
@@ -130,6 +135,7 @@ class KoogChatAgent(
         completionTokens.store(0)
         currentPartialText = onPartialText
         currentToolCall = onToolCall
+        currentRoundStarted = onRoundStarted
         val started = Clock.System.now().toEpochMilliseconds()
         return try {
             // M2：跑 agent 前判定并执行滚动压缩（超预算才触发；失败静默跳过，决策 9）。
@@ -152,6 +158,7 @@ class KoogChatAgent(
             traceIdHolder.value = null
             currentPartialText = null
             currentToolCall = null
+            currentRoundStarted = null
         }
     }
 
@@ -204,6 +211,8 @@ class KoogChatAgent(
                     // 新一轮 LLM 流式开始（如工具调用后的下一轮）：本轮快照从空重新累计
                     Logger.d(tag, "streaming round start: model=${ctx.model?.id}")
                     snapshotBuffer.setLength(0)
+                    // M4：显式轮边界信号（spec §10 收口），turn 装配器据此闭合上一轮文本块
+                    currentRoundStarted?.invoke()
                 }
                 events.onLLMStreamingFrameReceived { ctx ->
                     val frame = ctx.streamFrame

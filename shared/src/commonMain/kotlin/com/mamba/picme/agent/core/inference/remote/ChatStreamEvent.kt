@@ -26,4 +26,15 @@ sealed interface ChatStreamEvent {
      * [args] 为工具参数 JSON（Koog 在调用开始即给全量，无增量），瞬态不入库。
      */
     data class ToolCallStarted(val toolName: String = "", val args: String = "") : ChatStreamEvent
+
+    /**
+     * 新一轮 LLM 流式开始（ADR-016 M4 收口，spec §10）：显式轮边界信号，
+     * 替代 turn 装配器「非扩展快照 = 轮边界」的差分启发式猜测（失效表现见
+     * `ChatStreamTurnAdapter` 类注释）。发射点 = Koog `onLLMStreamingStarting`
+     * （每轮一次，含首轮；工具调用后的下一轮同样触发）。
+     *
+     * UI 无需响应本事件（气泡态由 TextSnapshot/ToolCallStarted 驱动）；
+     * 消费方是 turn 装配器（闭合上一轮文本块）。
+     */
+    data object RoundStarted : ChatStreamEvent
 }

@@ -14,6 +14,16 @@ import com.mamba.picme.domain.chat.MessagePart
  */
 sealed interface TurnStreamEvent {
 
+    /**
+     * 新一轮 LLM 流式开始（ADR-016 M4 收口，spec §10）：显式轮边界信号。
+     *
+     * 由 [ChatStreamTurnAdapter] 自引擎层 `ChatStreamEvent.RoundStarted` 翻译（Koog
+     * `onLLMStreamingStarting` 为地面真值），替代「非扩展快照 = 轮边界」的差分猜测；
+     * 未闭合文本块的闭合（TextEnd）由 adapter 一并翻译。[round] 为 turn 内 0 起轮次序号
+     * （事件流自描述/审计用）；reducer 不消费轮次——块状态闭合以 TextEnd 为准。
+     */
+    data class RoundStarted(val round: Int) : TurnStreamEvent
+
     /** 文本块开始（一轮 LLM 输出的正文段）。同 partId 重复 Start 幂等。 */
     data class TextStart(val partId: String) : TurnStreamEvent
 

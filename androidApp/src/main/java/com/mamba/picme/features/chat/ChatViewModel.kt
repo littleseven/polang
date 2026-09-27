@@ -1760,6 +1760,9 @@ class ChatViewModel(
                                     isThinking = false
                                 )
                             }
+                            // M4 显式轮边界：气泡态无需响应（文本快照/工具事件已驱动），
+                            // 仅经 feedTurn 喂装配器闭合上一轮文本块
+                            is ChatStreamEvent.RoundStarted -> Unit
                         }
                         // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）
                         feedTurn(event)

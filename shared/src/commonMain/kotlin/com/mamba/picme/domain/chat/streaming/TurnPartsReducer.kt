@@ -62,6 +62,9 @@ class TurnPartsReducer {
     /** 消费一个事件并返回最新 parts 快照。 */
     fun apply(event: TurnStreamEvent): List<MessagePart> {
         when (event) {
+            // 轮边界不消费块状态：未闭合文本块的闭合已由 adapter 翻译为 TextEnd（M4 显式
+            // 信号，spec §10）；round 序号仅作事件流自描述/审计，reducer 无轮级语义
+            is TurnStreamEvent.RoundStarted -> Unit
             is TurnStreamEvent.TextStart -> textStart(event.partId)
             is TurnStreamEvent.TextDelta -> textDelta(event.partId, event.delta)
             is TurnStreamEvent.TextEnd -> textEnd(event.partId)

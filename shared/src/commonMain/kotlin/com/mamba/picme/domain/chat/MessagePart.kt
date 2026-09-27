@@ -20,7 +20,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface MessagePart {
 
-    /** 块级 id：消息内唯一（M1 legacy 迁移用 `p0`/`p1`… 序号；M2 流式起为真实 chunk id）。 */
+    /**
+     * 块级 id：消息内唯一。M4 定稿的**分轨命名空间**方案（spec §3/§10）：
+     * - 瞬态轨（流式 turn，TurnPartsReducer 合成）：`txt-N`（文本块）/ `call-N`（工具块，
+     *   占位原位填充 partId 不变）；
+     * - 持久轨（Room partsJson，LegacyMessagePartsConverter 合成）：`p0`/`p1`… 消息内序号。
+     * 两轨不交叉：流式消息不落 Room，落库消息不经 reducer——同一条消息任一时刻只属于一轨，
+     * 故各生命周期内 LazyColumn key（`messageId:partId`）恒定。流式→落库边界 messageId
+     * 必然变更（一 turn 拆多行的持久模型使然，spec §11 不做消息树），该边界 item 重建与
+     * M2 前基线行为一致（整条流式气泡本就被新行替换），不属 key 跳变回归。
+     */
     val partId: String
 
     /** 正文段（markdown）。一条回复可有多个 Text part（卡片间交错）。 */
