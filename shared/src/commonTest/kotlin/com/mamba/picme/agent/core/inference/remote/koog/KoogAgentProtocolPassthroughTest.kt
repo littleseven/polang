@@ -25,6 +25,9 @@ class KoogAgentProtocolPassthroughTest {
         override suspend fun load(sessionId: String): List<Message> = emptyList()
         override suspend fun save(sessionId: String, messages: List<Message>) {}
         override suspend fun clear(sessionId: String) {}
+        override suspend fun loadSummary(sessionId: String): SessionCompaction? = null
+        override suspend fun saveSummary(sessionId: String, summary: SessionCompaction) {}
+        override suspend fun clearSummary(sessionId: String) {}
     }
 
     private fun buildAgent(protocol: RemoteProtocol, providerId: String): KoogChatAgent =

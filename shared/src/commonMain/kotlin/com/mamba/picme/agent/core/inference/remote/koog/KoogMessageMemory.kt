@@ -332,6 +332,54 @@ public object KoogMessageMemory {
         )
     )
 
+    // ── M2：压缩候选选择（US-2.1）────────────────────────────
+
+    /**
+     * 选出待压缩的对话轮（最旧 M 轮，US-2.1）。触发条件 = 组装超 [budgetTokens] 且存在
+     * 保护区之外的对话轮。返回的候选满足：
+     * - 从消息列表头部（最旧）开始连续取；
+     * - 不含近 [protectedRecentTurns] 个实轮（保护区，最后才压）；
+     * - 不含最新块（用户最新输入必须到达模型，同 [trimToTokenBudget]）；
+     * - tool 块原子（复用 [groupIntoBlocks]，绝不拆散 Call/Result）。
+     *
+     * 不超预算或无候选时返回空列表（调用方跳过本轮 compaction，spec §5 决策 9）。
+     */
+    public fun selectCompactionCandidates(
+        messages: List<Message>,
+        budgetTokens: Int = DEFAULT_BUDGET_TOKENS,
+        protectedRecentTurns: Int = PROTECTED_RECENT_TURNS,
+    ): List<Message> {
+        val systems = messages.filterIsInstance<Message.System>()
+        val nonSystem = messages.filterNot { message -> message is Message.System }
+        if (nonSystem.isEmpty()) return emptyList()
+
+        // 未超预算 → 无可压
+        val totalTokens = systems.sumOf { estimateMessageTokens(it) } +
+            nonSystem.sumOf { estimateMessageTokens(it) }
+        if (totalTokens <= budgetTokens) return emptyList()
+
+        val blocks = groupIntoBlocks(nonSystem)
+        val blockStarts = ArrayList<Int>(blocks.size)
+        var acc = 0
+        for (block in blocks) {
+            blockStarts.add(acc)
+            acc += block.size
+        }
+        val boundaries = nonSystem.indices.filter { index -> isRealUserTurn(nonSystem[index]) }
+        val protectFrom =
+            if (boundaries.size > protectedRecentTurns) boundaries[boundaries.size - protectedRecentTurns] else 0
+
+        // 从最旧块向新取，跳过保护区内块；最新块永不压
+        val candidates = mutableListOf<Message>()
+        for (index in blocks.indices) {
+            if (index == blocks.size - 1) break // 最新块
+            val start = blockStarts[index]
+            if (start >= protectFrom) break     // 保护区
+            candidates.addAll(blocks[index])
+        }
+        return candidates
+    }
+
     // ── part 探测辅助 ──────────────────────────────────────────
 
 

@@ -49,6 +49,7 @@ class KoogChatAgent(
     private val config: RemoteReActAgentConfig,
     private val toolRegistry: ToolRegistry,
     memoryStore: ChatMemoryStore,
+    summaryGenerator: SummaryGenerator? = null,
 ) {
     private val tag = "KoogChatAgent"
 
@@ -67,6 +68,17 @@ class KoogChatAgent(
     )
 
     private val historyProvider = KoogSessionHistoryProvider(memoryStore)
+    private val memoryStoreRef = memoryStore
+
+    /**
+     * M2 滚动压缩执行器（US-2.1~2.5）。runChat 前 maybeCompact 判定并压缩；
+     * 摘要注入 system prompt（[composeSystemPrompt]）。generator 默认经 executorBundle 单发
+     * （[SummaryGeneratorViaExecutor]），可注入假实现测试。压缩失败静默跳过（决策 9）。
+     */
+    private val compactor = SessionCompactor(
+        store = memoryStore,
+        generator = summaryGenerator ?: SummaryGeneratorViaExecutor(executorBundle),
+    )
 
     /**
      * 当轮 traceId 持有器（runChat 开头写入，onLLMCallCompleted 录制时读取）。
@@ -89,8 +101,10 @@ class KoogChatAgent(
     @Volatile private var running = false
     private var currentSessionId: String = "default"
 
-    // 记忆快照驱动的懒重建（快照变更才重建 AIAgent；executor/store/provider 复用）
+    // 记忆快照 + 摘要版本驱动的懒重建（两者任一变更才重建 AIAgent；executor/store/provider 复用）。
+    // 摘要每轮新鲜渲染（US-2.4），但其变化经 version 反映——压缩后 version 变 → 重建 → 新摘要烘焙。
     private var builtSnapshot: String? = null
+    private var builtSummaryVersion: Int = -1
     private var builtAgent: AIAgent<String, String>? = null
 
     fun setSessionId(sessionId: String) {
@@ -118,9 +132,16 @@ class KoogChatAgent(
         currentToolCall = onToolCall
         val started = Clock.System.now().toEpochMilliseconds()
         return try {
-            val summary = agent().run(input, currentSessionId)
+            // M2：跑 agent 前判定并执行滚动压缩（超预算才触发；失败静默跳过，决策 9）。
+            // 与 agent run 串行（runs 互斥），压缩完成后续正常推理。
+            runCatching { compactor.maybeCompact(currentSessionId) }
+                .onFailure { Logger.w(tag, "compaction pre-pass failed: ${it.message}") }
+            // M2：加载会话摘要（US-2.4），作为 system 段注入 + 版本纳入 agent 重建键。
+            val summary = runCatching { memoryStoreRef.loadSummary(currentSessionId) }.getOrNull()
+            val summaryText = summary?.slots?.render()?.ifBlank { null }
+            val summaryResult = agent(summaryText, summary?.version ?: 0).run(input, currentSessionId)
             val latencyMs = Clock.System.now().toEpochMilliseconds() - started
-            summary to AgentExecutionMetrics(
+            summaryResult to AgentExecutionMetrics(
                 latencyMs = latencyMs,
                 promptTokens = promptTokens.load().takeIf { it > 0 },
                 completionTokens = completionTokens.load().takeIf { it > 0 },
@@ -134,15 +155,25 @@ class KoogChatAgent(
         }
     }
 
-    /** 取或按记忆快照新鲜度重建 AIAgent。 */
-    private fun agent(): AIAgent<String, String> {
+    /**
+     * 取或按「记忆快照 + 摘要版本」新鲜度重建 AIAgent（M2：摘要变更同样触发重建，
+     * 使新压缩的摘要即时烘焙进 system prompt）。
+     */
+    private fun agent(summaryText: String?, summaryVersion: Int): AIAgent<String, String> {
         val snapshot = config.memoryContextProvider?.snapshot()?.trim()?.ifEmpty { null }
         val cached = builtAgent
-        if (cached != null && snapshot == builtSnapshot) return cached
-        val agent = buildAgent(composeSystemPrompt(snapshot))
+        if (cached != null && snapshot == builtSnapshot && summaryVersion == builtSummaryVersion) {
+            return cached
+        }
+        val agent = buildAgent(composeSystemPrompt(snapshot, summaryText))
         builtAgent = agent
         builtSnapshot = snapshot
-        Logger.i(tag, "Built Koog AIAgent: model=${config.modelName}, snapshotLen=${snapshot?.length ?: 0}")
+        builtSummaryVersion = summaryVersion
+        Logger.i(
+            tag,
+            "Built Koog AIAgent: model=${config.modelName}, snapshotLen=${snapshot?.length ?: 0}, " +
+                "summaryV=$summaryVersion",
+        )
         return agent
     }
 
@@ -217,11 +248,13 @@ class KoogChatAgent(
             }
             .build()
 
-    /** base system prompt + 【关于用户】记忆快照（快照空则原样返回，零开销）。 */
-    private fun composeSystemPrompt(snapshot: String?): String {
-        val base = config.systemPrompt
-        return if (snapshot.isNullOrBlank()) base else "$base\n\n$snapshot"
-    }
+    /**
+     * base system prompt + 【关于用户】记忆快照 + 【会话摘要】段（M2，US-2.4）。
+     * 摘要段拼在快照后；空则跳过（零开销）。每轮新鲜渲染（[CompactionSlots.render]），
+     * 与 system prompt 同样不落盘——摘要记录落盘，渲染文本现算（不变式①语义）。
+     */
+    private fun composeSystemPrompt(snapshot: String?, summaryText: String?): String =
+        composeChatSystemPrompt(config.systemPrompt, snapshot, summaryText)
 
     /**
      * 网关鉴权 header（与 RemoteReActAgent 经 MambaAgentFactory.customHeader 注入的等价）：
@@ -241,4 +274,13 @@ class KoogChatAgent(
         /** Koog 一轮工具调用消耗的步数估计（nodeLLMRequest + nodeExecuteTool 等）。 */
         const val KOOG_STEPS_PER_LLM_ROUND = 3
     }
+}
+
+/**
+ * chat system prompt 三段组装（base + 记忆快照 + 会话摘要），纯函数便于 commonTest 直测（US-2.4）。
+ * 任一段空则跳过；摘要恒在快照后（快照是用户级长期事实，摘要是会话级近期情节）。
+ */
+internal fun composeChatSystemPrompt(base: String, snapshot: String?, summaryText: String?): String {
+    val withSnapshot = if (snapshot.isNullOrBlank()) base else "$base\n\n$snapshot"
+    return if (summaryText.isNullOrBlank()) withSnapshot else "$withSnapshot\n\n【会话摘要】\n$summaryText"
 }
