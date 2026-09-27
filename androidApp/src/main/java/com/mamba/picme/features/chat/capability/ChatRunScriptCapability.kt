@@ -105,7 +105,8 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
             "这是展示图表的唯一方式，禁止用文字/表格画图。"
         "render_html" -> "渲染自包含 HTML 组件卡片（端侧 WebView，内联 CSS/JS）。" +
             "参数: html(自包含 HTML：CSS/JS 一律内联，远程 script/iframe/form/meta refresh 会被剔除；" +
-            "远程 img/CSS/a 外链可引用；引用相册本地图片/视频用 <img src=\"media://媒体id\">，" +
+            "远程 img/CSS/a 外链可引用；引用相册本地图片/视频：图片用 <img src=\"media://媒体id\">、" +
+            "视频用 <video src=\"media://媒体id\">，" +
             "id 须来自取数结果、禁止虚构，禁 file://、content:// 路径)、summary(一句话总结)、" +
             "display(展示形态：inline 默认，聊天内完全撑开直接交互；fullpage 长报告/多屏内容，" +
             "聊天内显示固定高预览、点击进全屏查看器)。" +

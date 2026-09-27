@@ -599,7 +599,7 @@ private fun WebView.applyCardSandbox(
         // 零 JS 桥接 + 禁文件访问防线不变。
 
         /**
-         * 本地媒体白名单注入（ADR-014 D3 落地）：`media://{id}` 引用已重写为白名单域 URL，
+         * 本地媒体白名单注入（ADR-016 D3 落地）：`media://{id}` 引用已重写为白名单域 URL，
          * 命中 → MediaStore 开流（见 [LocalMediaWebViewAssets]）；其余子资源返回 null 放行。
          */
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =

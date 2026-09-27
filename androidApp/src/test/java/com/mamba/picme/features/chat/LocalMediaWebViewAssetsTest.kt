@@ -52,4 +52,46 @@ class LocalMediaWebViewAssetsTest {
         val once = LocalMediaWebViewAssets.rewriteMediaRefs("""<img src="media://42">""")
         assertEquals(once, LocalMediaWebViewAssets.rewriteMediaRefs(once))
     }
+
+    // ── parseMediaId 边界（WebViewAssetLoader path handler 入参为 /media/ 前缀后的尾段）──
+
+    @Test
+    fun `parseMediaId parses plain and negative ids`() {
+        assertEquals(123L, LocalMediaWebViewAssets.parseMediaId("123"))
+        assertEquals(-10000211391L, LocalMediaWebViewAssets.parseMediaId("-10000211391"))
+    }
+
+    @Test
+    fun `parseMediaId tolerates trailing slashes`() {
+        assertEquals(123L, LocalMediaWebViewAssets.parseMediaId("123/"))
+        assertEquals(123L, LocalMediaWebViewAssets.parseMediaId("123//"))
+    }
+
+    @Test
+    fun `parseMediaId rejects extra leading path segments`() {
+        // 多余前导路径段（契约外输入）安全降级 null
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaId("/123"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaId("a/123"))
+    }
+
+    @Test
+    fun `parseMediaId rejects long overflow and non numeric input`() {
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaId("99999999999999999999"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaId("abc"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaId(""))
+    }
+
+    @Test
+    fun `parseMediaId normalizes leading zeros`() {
+        // 前导零按数值归一（锁定语义：007 与 7 指同一媒体）
+        assertEquals(7L, LocalMediaWebViewAssets.parseMediaId("007"))
+    }
+
+    @Test
+    fun `media host uses reserved invalid tld and prefix is derived`() {
+        // 锁死纵深防线：白名单域必须是 RFC 2606 保留 TLD（拦截失效时 DNS 必失败），
+        // URL 前缀必须由该域派生，二者漂移此处立即报警。
+        assertTrue(LocalMediaWebViewAssets.MEDIA_HOST.endsWith(".invalid"))
+        assertEquals("https://" + LocalMediaWebViewAssets.MEDIA_HOST, LocalMediaWebViewAssets.MEDIA_URL_PREFIX)
+    }
 }

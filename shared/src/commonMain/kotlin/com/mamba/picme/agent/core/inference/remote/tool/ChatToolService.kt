@@ -284,7 +284,7 @@ class ChatToolService private constructor() : TraceIdAware {
             "鼓励引用远程富媒体提升表现力：<img> 网络图片、<video>/<audio> 远程媒体、远程 CSS 样式、" +
             "<a> 外链均可使用（a 外链用户点击后在全屏落地页打开）；" +
             "URL 务必用确定可访问的真实地址（优先官方/权威站点素材），不要编造域名。" +
-            "引用用户相册本地图片/视频用 <img src=\"media://媒体id\">（id 只能来自 run_gallery_script 取数" +
+            "引用用户相册本地图片/视频：图片用 <img src=\"media://媒体id\">、视频用 <video src=\"media://媒体id\">（id 只能来自 run_gallery_script 取数" +
             "（gallery.query/media.meta 等）或 search_media 的结果，禁止虚构 id；" +
             "禁止 file://、content:// 路径——端侧会把 media:// 重写为白名单通道注入）。" +
             "宽度自适应容器（width:100%，不写死超过卡片宽度的固定 px）；总大小不超过 100KB。" +

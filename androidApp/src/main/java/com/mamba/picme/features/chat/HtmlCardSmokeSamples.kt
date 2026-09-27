@@ -587,6 +587,6 @@ object HtmlCardSmokeSamples {
         SmokeSample(ALL_IN_ONE, "NVIDIA 专题综合长文卡（all-in-one）"),
         SmokeSample(LONG_ARTICLE, "长文卡：超一屏，应自动转预览形态"),
         SmokeSample(FULLPAGE_DECLARED, "display=fullpage 声明卡：应直接预览形态", display = "fullpage"),
-        SmokeSample(LOCAL_MEDIA, "本地相册图引用（media://1）"),
+        SmokeSample(LOCAL_MEDIA, "本地相册图引用（media:// 契约）"),
     )
 }

@@ -8,7 +8,7 @@ import androidx.webkit.WebViewAssetLoader
 import com.mamba.picme.core.common.Logger
 
 /**
- * HTML 卡本地媒体注入层（ADR-014 D3 预留方案落地，2026-09-27）。
+ * HTML 卡本地媒体注入层（ADR-016 D3 预留方案落地，2026-09-27）。
  *
  * 引用契约：LLM 在 render_html 的 html 里以 `media://{id}` 引用相册图片/视频
  * （id 只能来自 gallery.query / media.meta / search_media 等取数结果——uri 白名单红线不动，
@@ -25,9 +25,11 @@ import com.mamba.picme.core.common.Logger
  * - 白名单域 `polang-media.invalid`（`.invalid` 为 RFC 2606 保留 TLD，永不真实解析）；
  *   页面 origin 为不透明 origin（loadDataWithBaseURL baseUrl=null），与媒体域天然跨源——
  *   `<img>`/`<video>` 可正常显示，但卡内 JS 拿不到媒体字节：fetch/XHR 跨源且无 CORS 头被拒，
- *   canvas 绘制即污染（toDataURL 抛异常），LLM 产物无法把本地图片字节外传到远程；
+ *   canvas 绘制即污染（toDataURL 抛异常），**字节级**无远程外泄通道
+ *   （允许面：JS 可经 img onload/onerror + naturalWidth/Height 对任意 id 做存在性/尺寸探测——
+ *   属元数据级信息且仅本机显示，不触碰 [PRIVACY] 红线）；
  * - allowFileAccess/allowContentAccess 保持 false，本地媒体只走这一条白名单通道；
- * - 字节全程不出设备（本进程 ContentResolver 流），不触碰 [PRIVACY] 媒体红线。
+ * - 字节全程不出设备（本进程 ContentResolver 流）。
  */
 object LocalMediaWebViewAssets {
 
@@ -60,6 +62,13 @@ object LocalMediaWebViewAssets {
         return MEDIA_REF_REGEX.replace(html) { match -> "$MEDIA_URL_PREFIX/media/${match.groupValues[1]}" }
     }
 
+    /**
+     * `/media/` 前缀后的路径尾段 → chat 媒体 id（纯函数，便于 JVM 单测）。
+     * 容忍尾部多斜杠；非数字 / Long 溢出 / 多余前导路径段（如 `/123`）一律 null
+     * （调用侧破图降级，契约外输入安全）。前导零按数值归一（`007` → 7）。
+     */
+    internal fun parseMediaId(path: String): Long? = path.trimEnd('/').toLongOrNull()
+
     @Volatile
     private var assetLoader: WebViewAssetLoader? = null
 
@@ -86,7 +95,7 @@ private class LocalMediaPathHandler(
 ) : WebViewAssetLoader.PathHandler {
 
     override fun handle(path: String): WebResourceResponse? {
-        val id = path.trimEnd('/').toLongOrNull() ?: return null
+        val id = LocalMediaWebViewAssets.parseMediaId(path) ?: return null
         val resolver = LocalMediaWebViewAssets.mediaUriResolver
         if (resolver == null) {
             Logger.w(TAG, "mediaUriResolver not wired; local media unavailable: id=$id")
@@ -97,17 +106,16 @@ private class LocalMediaPathHandler(
             Logger.w(TAG, "local media id not resolvable: id=$id")
             return null
         }
-        return openStream(uri)
+        // 日志只记 id（uri 不外显口径，与 GalleryJs 白名单一致）
+        return openStream(uri).also { response ->
+            if (response == null) Logger.w(TAG, "local media stream open failed: id=$id")
+        }
     }
 
     /** 开流 + 探测 MIME；已删除/无权限 → null（WebView 显示破图，HTML 侧可 onerror 兜底）。 */
     private fun openStream(uri: Uri): WebResourceResponse? {
         val contentResolver = appContext.contentResolver
-        val stream = runCatching { contentResolver.openInputStream(uri) }.getOrNull()
-        if (stream == null) {
-            Logger.w(TAG, "local media stream open failed: uri=$uri")
-            return null
-        }
+        val stream = runCatching { contentResolver.openInputStream(uri) }.getOrNull() ?: return null
         val mime = runCatching { contentResolver.getType(uri) }.getOrNull() ?: "image/jpeg"
         return WebResourceResponse(mime, null, stream)
     }
