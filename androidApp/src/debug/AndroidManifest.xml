@@ -41,11 +41,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- M3 spike 临时入口（markdown 渲染器验证，验证后删除） -->
-        <activity
-            android:name=".spike.MarkdownSpikeActivity"
-            android:exported="true"
-            android:label="MarkdownSpike" />
     </application>
 
 </manifest>
