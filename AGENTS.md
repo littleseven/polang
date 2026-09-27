@@ -1,16 +1,11 @@
 # polang AI Agent 系统：唯一事实来源 (SSOT)
 
-> **版本**：2.4（仓库重组版）  
+> **版本**：2.5（瘦身版）  
 > **状态**：生效中  
-> **最后更新**：2026-08-09  
+> **最后更新**：2026-09-27  
 > **维护者**：项目开发者  
-> **历史合并说明**：本文档由根目录 `AGENTS.md` 与 `agents/README.md` 合并而成。
 >
-> 2026-08-03 更新：移除已退役的 CO/PM/RD/CR/QA 角色协作管线（`agents/*_agent.md` 已删；该管线从未被 kimi 实际调度，kimi 改用全局子代理）。本文档聚焦**架构原则、全局红线、文档治理与工具脚本**，不再定义强制角色编排流程。
->
-> 2026-08-07 更新：仓库重组 Phase 3——项目改名 polang（原 langchain4android），`app/` → `androidApp/`（`:app` → `:androidApp`），引擎模块迁入 `engines/`（`:beauty-api`/`:beauty-engine`/`:mnn-core`/`:sentencepiece` → `:engines:*`），Gradle `rootProject.name` = "polang"。
->
-> 2026-09-25 更新：§7 索引登记当日三篇 chat 体系方案——ADR-014（富内容渲染，已定稿且 Android 落地）、意图路由契约 spec、工程师任务卡 spec（两篇均在途，实施时按各自 §8/§测试决策原子同步文档）。
+> 2026-09-27 更新：文档瘦身——删除头部历史更新日志与 §7 架构说明中的模块级细节（模块结构/依赖链由根 `CLAUDE.md` 承载，实现细节由各模块 `AGENTS.md` 与技术专项文档承载）；Koog 远程协议接入坑位移至 `shared/AGENTS.md` §2；删除与 §4.1/§6.2 重复的附录 B。git 历史可查全部被删内容。
 
 > 本文档为**顶层治理文档**，定义 Agent First 的研发规范。
 >
@@ -24,7 +19,7 @@ polang 是一个元实验（meta-experiment），同时探索三个层次：
 
 | 层次 | 实验对象 | 核心问题 |
 |------|----------|----------|
-| **基础库** | LangChain4j 风格 Android Agent 基础库（原 `:agent-core` fork，已删除） | LangChain4j 风格 API 能否在 Android 高效运行？（结论：自维护 vendored fork 不可持续——冻结上游、死重多、0 测试；2026-08 全面迁移至 JetBrains Koog，fork 模块已删除） |
+| **基础库** | LangChain4j 风格 Android Agent 基础库（原 `:agent-core` fork，已删除） | LangChain4j 风格 API 能否在 Android 高效运行？（结论：vendored fork 不可持续——冻结上游、死重多、0 测试；2026-08 迁移至 Koog，模块已删除） |
 | **运行时** | PoLang Agent 编排层（`:shared` KMP 模块 + `:androidApp` 组合根） | LLM 能否成为应用的中枢神经系统？ |
 | **服务端** | PoLang Server（`server/` Ktor 后端） | AI 网关、账号体系、管理后台能否支撑端侧 Agent？ |
 | **架构层** | Agent First 客户端框架 | 什么样的架构让 Agent 最高效？ |
@@ -186,9 +181,9 @@ Logger.log(AgentCommandParsedEvent(...))
 | 代码评审 | STRONG(`reviewer.md`,`fable`) | **WEAK**(glm-5.2,`review.md`) | kimi 故意用 GLM 审 K3 → **跨模型交叉验证** |
 | 搜索/探索 | WEAK(内置 Explore,glm-5.1) | WEAK(内置 explore) | 一致 |
 
-> 这正体现了抽象的价值:同一「评审」角色,CC 给最强档,kimi 却故意用弱档做交叉验证——**角色→档是策略,随工具而定**,而档→模型的绑定各管各。
+> 同一「评审」角色，CC 给最强档、kimi 故意用弱档——**角色→档是策略，随工具而定**，档→模型的绑定各管各。
 >
-> **CC 自定义 agent 用 `model: fable` 表达 STRONG 档**。fable 别名经实测映射正确(`ANTHROPIC_DEFAULT_FABLE_MODEL_NAME=glm-5.2`;主循环 `model:fable` 实跑 glm-5.2,**无静默回落**)。**但注意:本环境 frontmatter `model:` 字段(及 Agent 工具 `model` 参数)对子代理实际是空操作**——实测显式传 `model:haiku` 仍跑 glm-5.2、历史 85 个子代理 LLM 调用全为 glm-5.2 无一 glm-5.1,子代理恒继承主会话模型(当前 fable→glm-5.2;含上表 WEAK 档的内置 Explore 实际亦然)。故 frontmatter 写 `fable` 仅作语义/未来兼容占位,实际档位由主会话 `model:fable` 决定(已配,自动跟 Fable 重映射)。kimi 原生用 `model=primary/secondary` 逻辑档,无需显式 id。
+> **CC 子代理模型注意**：本环境 frontmatter `model:`（及 Agent 工具 `model` 参数）对子代理实际是**空操作**——子代理恒继承主会话模型（当前 fable→glm-5.2，含上表 WEAK 档的内置 Explore 亦然），frontmatter 写 `fable` 仅作语义占位，实际档位由主会话 `model:fable` 决定。kimi 原生用 `model=primary/secondary` 逻辑档。
 
 ---
 
@@ -275,11 +270,11 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **iOS 对等跟随编排** | `docs/superpowers/specs/2026-08-10-ios-follow-command-design.md`（/ios-follow 六阶段管线设计 SSOT + platform_differences 台账层；可执行形态 `skills/ios-follow/SKILL.md`） |
 | **AI 工具配置索引** | `AI_TOOLS.md`（四工具配置位置、Skills/Plans/Specs SSOT 约定） |
 | **Chat 富内容渲染（ADR-014）** | `docs/02-ARCHITECTURE/ADR/ADR-014-chat-rich-rendering-hybrid.md`（正文原生富渲染 + RICH_HTML 沙箱卡；ADR 索引 `docs/02-ARCHITECTURE/ADR/README.md`） |
-| **意图路由契约与路由器（ADR-015，M1/M2 已实施）** | `docs/02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md`（LLM 管意图、代码管策略）+ spec `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（M1 止血 + M2 路由器主干已落地 `feat/intent-router`；M3 分支化在途） |
-| **工程师任务卡（Spec，P1+任务中心已落地；渲染层已被下一项修订）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（工程师模式任务卡 + 任务中心页，Muse 任务卡范式；P1 在场态与 US-12~16 任务中心已落地（2026-09-26），US-4~6 回联待 P2 网关改造；2026-09-26 修订：渲染层改 HTML，状态机/分期不变） |
-| **HTML 卡双形态 + 任务卡 HTML 化（Spec，H1 已落地 2026-09-26）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器——H1 已合 main（`dcccaabb3`）；H2 任务卡 L1 模板 HTML 化待做；设计稿 Ardot `HtmlCard` 页 8 帧） |
-| **用户任务协议 + 任务中心双 Tab（M1 已落地，2026-09-26）** | `docs/superpowers/specs/2026-09-26-user-task-protocol-design.md`（扫描/下载等 app 级长耗时操作统一管控：`UserTask` 协议 + 混合注册表（元数据落 Room + 进度走内存）+ 适配器接缝 + 任务中心「工程师任务 \| 后台任务」双 Tab；M1 = TAG 扫描 + 模型下载接入（M1 实施计划已随交付清理，git 历史可查；实现见 `androidApp` `domain/usertask/`）；M2/M3 = 去重/美学/重聚类，与 HTML 卡 spec 边界见该 spec §8） |
-| **任务范式定位升格（Spec，2026-09-26）** | `docs/superpowers/specs/2026-09-26-task-paradigm-positioning-design.md`（任务进核心定位句 + PRODUCT.md v3.1 新增横切任务范式线 §6.6 + Muse Top5 全量落位；借鉴来源 `docs/reviews/2026-09-25-meta-muse-feature-research.md`） |
+| **意图路由契约与路由器（ADR-015，M1/M2 已实施）** | `docs/02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md`（LLM 管意图、代码管策略）+ spec `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（M1 止血 + M2 路由器主干已落地，M3 分支化在途） |
+| **工程师任务卡（P1+任务中心已落地，渲染层改 HTML）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（任务卡 + 任务中心页，Muse 范式；US-4~6 回联待 P2 网关改造） |
+| **HTML 卡双形态 + 任务卡 HTML 化（H1 已合 main）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器；H2 任务卡 L1 模板 HTML 化待做；设计稿 Ardot `HtmlCard` 页 8 帧） |
+| **用户任务协议 + 任务中心双 Tab（M1 已落地）** | `docs/superpowers/specs/2026-09-26-user-task-protocol-design.md`（`UserTask` 协议 + 混合注册表（Room 元数据 + 内存进度）+ 任务中心双 Tab；M1 = TAG 扫描 + 模型下载，实现见 `androidApp` `domain/usertask/`；M2/M3 = 去重/美学/重聚类） |
+| **任务范式定位升格** | `docs/superpowers/specs/2026-09-26-task-paradigm-positioning-design.md`（PRODUCT.md v3.1 §6.6 任务范式线 + Muse Top5 落位；调研来源 `docs/reviews/2026-09-25-meta-muse-feature-research.md`） |
 | **产品定义** | `PRODUCT.md` |
 | **交互规范** | `docs/01-PRODUCT/FEATURES.md` |
 | **★ AI 协作产物 SSOT** | `docs/superpowers/README.md`（Plans / Specs 唯一事实来源，四工具共同遵守） |
@@ -306,19 +301,12 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **Google Play 发布自动化** | `docs/05-DEVELOPMENT/GOOGLE_PLAY_RELEASE_AUTOMATION.md`（GPP 4.1.1：internal 自动 + production 人工晋升；文案 SSOT `androidApp/src/main/play/listings/`） |
 | **KMP 最佳实践评估** | `docs/reviews/2026-08-10-kmp-best-practices-architecture-review.md`（KMP 路线评估：方向不修正；行动项 SKIE spike / CrashKiOS / AndroidX KMP 存储收编盘点） |
 
-> **架构说明（2026-08-07 更新）**：
-> - **Agent 框架为 JetBrains Koog（`ai.koog:koog-agents` 外部依赖）**：原 `:agent-core`（langchain4j 1.13.0 vendored fork）已于 2026-08-07 Phase 6 整体删除；chat/相机/飞书链路分别由 `KoogChatAgent` / `KoogReActAgent`（`shared/src/commonMain/.../inference/remote/koog/`）驱动；`ChatToolService`/`CameraToolService` 为 commonMain 纯 @Tool 类（不再实现 JVM-only 的 `reflect.ToolSet`），由 Android 组合根 `asToolsByClass()` 反射展开为 ToolDescriptor 清单 + ToolRegistry 同源注入；`RemoteControlToolService` 在 `:androidApp`，仍实现 `reflect.ToolSet`
-> - **Agent 编排层在 `:shared` KMP 模块**（Kotlin Multiplatform，android/jvm/iosX64/iosArm64/iosSimulatorArm64 五 target）：`AgentOrchestrator`、`CapabilityRegistry`、`PrivacyGuard`、`SceneManager` 等引擎无关层位于 `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/`；平台实现（VLM `LocalLlmEngine`/`MnnLlmClient`、语音 `SherpaOnnxAsrEngine`/`KeywordSpotterEngine`、DataStore `KoogMessageMemoryStore`/`MemoryManager`、`DispatcherProvider` actual）在 `shared/src/androidMain/`（iOS 侧 `shared/src/iosMain/` 已实装 Phase 6.2 chat 全链路：`IosAgentComposition` 组合根、`ChatAgentBridge`、`IosChatGalleryCapability`、`IosKoogMessageMemoryStore` 等；端侧 VLM 仍为显式 stub；VLM JNI 桥 `libagent_native.so` 由 `:engines:agent-native` 构建经 AAR 传递）；Android 组合根为 `androidApp/src/main/java/com/mamba/picme/agent/AndroidAgentComposition.kt`（Application.onCreate 接线，平台实现唯一直构点，经 `AgentOrchestrator.initialize(AgentDependencies)` 注入）
-> - **TAG 生成在 `:androidApp` 模块**：`TagScanOrchestrator`、`TagGenerationScheduler`、`OpenClGuardian` 位于 `androidApp/src/main/java/com/mamba/picme/domain/tag/`；`TagGenerationService` 为前台 Service；`TagGenerationControlScreen` 提供 3-Pass 控制与按类别/时间范围重新生成 UI
-> - **OpenCL 超时与降级**：`OpenClGuardian` 在 Pass 3 前执行 warmup，单次推理带超时；连续失败/超时后标记设备降级为 CPU，黑名单持久化到 DataStore；`TagGenerationScheduler.ensureModelLoaded()` 自动按 Guardian 策略选择后端
-> - **OpenAI 协议兼容**：经 Koog `OpenAILLMClient` 接入所有兼容 OpenAI API 的服务（DeepSeek、通义千问、OpenAI 官方、PoLang Server 网关），含 tool_calls、多轮对话；自定义模型名须在 `LLModel.capabilities` 显式声明（`Completion, Tools, OpenAIEndpoint.Completions`，🔴不加 Responses/Thinking）
-> - **Anthropic 原生协议**：`RemoteProtocol.CLAUDE` 配置经 Koog `AnthropicLLMClient`（Messages 协议）接入 Anthropic 官方及兼容端点；`AnthropicClientSettings.modelVersionsMap` 须把自建 LLModel 映射为模型 id 字符串（Koog 默认版本表只认其预定义实例）；`thinking.type=disabled` 注入仅对 tokenhub/kimi/deepseek 保留，OpenAI 官方/Anthropic 不注入（未知参数 400）；分流逻辑收口在 `RemoteModelFactory.createKoogExecutor`
-> - **DeepSeek 适配**：`RemoteModelFactory` 经 Koog `additionalProperties` 注入 `thinking.type=disabled`；自定义 `poLangSingleRunStrategy` 修复 Koog 1.1.1 内建策略丢「文本+tool_calls 同帧」工具调用的缺陷
-> - **端侧文本 LLM 已移除（2026-08-02）**：shared 的 `AiAgentMode`（`agent/core/model/config/AiAgentConfig.kt`）仅剩 OFF/REMOTE/FEISHU（FEISHU 属远程控制模式）；androidApp 层 `UserPreferences.AiAgentMode` 为 OFF/LOCAL/REMOTE（LOCAL 为遗留离线兜底枚举值）。相机 AI 指令走远程 tool_calls（`AgentOrchestrator.processCameraInput` + `CameraToolService` 相机场域工具集，@Tool 方法已 suspend 化，Koog agent 循环内直接 `CapabilityRegistry.dispatch`，ToolCallCommandParser 已随 Phase 5 删除），chat 全远程（`ChatToolService`）；`AiAgentUseCase` 作为 Facade 兼容层（`:androidApp` 模块）内部委托 `AgentOrchestrator`；`LocalLlmEngine`（shared androidMain）仅存 `imageInference`（Qwen3-VL-2B 端侧 VLM 打标，TAG Pass3）
-> - **JS Engine（QuickJS 沙箱）**：引擎无关层在 `:shared` commonMain `agent/core/js/`（JsEngine/JsValue/JsBridge/JsRuntime/NativeHandler），QuickJS 实现与应用 handler 在 `:androidApp` `features/chat/js/`（QuickJsEngine/GalleryScriptHandlers/ChartJs/CapabilityDispatchHandler）；除只读取数 handler 外，已存在 `capability.dispatch` **写通路**（CommandRisk 分级 + 用户确认 + ChatMediaWriteCapability）。详见 `docs/03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md`
-> - **AI 工程师模式（原诊断模式已并入）**：Chat「AI Engineer」toggle → `POST /v1/claude-chat` → chisel 隧道 → KimiClaw 云主机 Claude Code（GLM）；云主机 MCP server（`scripts/claude-tunnel/gateway/app_tools_mcp.py`）暴露 5 个 `app_*` 工具（日志/崩溃/聊天历史/运行时状态/相册摘要），tool call 经 SSE 下行 `app_tool_request` 到 App，`AppToolExecutor`（`androidApp/src/main/java/com/mamba/picme/core/agenttools/`）采集脱敏后经 `POST /v1/claude-tool-result` 回传；`claudeSid` 经 `ClaudeSidStore`（SharedPreferences）持久化，进程重建后可 `--resume` 续上下文。诊断工单链路（DiagRoute/diag-worker）已于 2026-08-01 移除。**账号白名单区分读写**：`/v1/claude-chat` 与 `/v1/claude-tool-result` 对所有已认证账号开放（只读诊断），仅 `/v1/claude-deliver` 代码交付受 `ai_engineer_whitelist` 限制；`/v1/claude-engineer/available` 返回 `{available, canDeliver}`。**用户问题上报**：设置页「其他」分组「上报问题」入口（2026-09-26 自 Chat 顶部栏迁入）→ `POST /v1/report-issue`，服务端脱敏后自动在 `littleseven/polang` 创建 GitHub issue；管理后台「设置」页（`/admin/settings#whitelist`）承载「AI 工程师白名单」配置，「问题诊断」页（`/admin/diagnosis`）承载「用户上报问题」，原 `/admin/ai-engineer-whitelist` 已 301 重定向到设置页白名单区块。详见 spec（已随交付清理，git 历史可查：`git log --all -- docs/superpowers/specs/2026-08-01-ai-engineer-diag-merge-design.md`）
-> - **服务端（`server/`）**：独立 Ktor 工程，提供 AI 网关（Channel 路由 / LLM 代理）、账号体系（邮箱注册 / Token 认证）、管理后台（Admin 视图）、推荐引擎（RuleEngine）、限流（RateLimiter）、COS 对象存储。与 Android 客户端通过 Monorepo 管理，但不纳入 Android `settings.gradle`。
-> - **iOS 应用（`iosApp/`）**：SwiftUI，相机（AVFoundation + Metal 4-pass 美颜 + MediaPipe/MNN 双关键点源）、相册、Chat（Phase 6.2 已实装：经 SharedKit `ChatAgentBridge` 流式远程推理 + tool_calls UI 动作；多会话历史侧栏已落地——会话索引+每会话消息文件持久化、自动标题/重命名/删除/搜索，spec `docs/08-UI-SPECS/screens/chat.yaml` §2.5）、设置（含模型下载中心）均已落地；人物页为占位；分模块边界（相册 Swift 主导 presentation 消费 shared 领域层 / 相机纯 Swift + Metal 美颜管线；Phase 5 骨架设计稿已并入 iOS 文档体系，前门 `docs/01-PRODUCT/IOS_DOC_INDEX.md`）；双端图标统一 Material Icons Round（`Assets.xcassets/mat_*.imageset`）；SharedKit XCFramework embed 集成（Gradle 构建 → XcodeGen `project.yml` 声明 → build-shared-kit.sh 增量）
+> **架构速览（2026-09-27 瘦身：模块级细节下沉到各归属文档，此处只留指针）**：
+> - Agent 框架 = JetBrains Koog（外部依赖）；编排层 = `:shared` KMP 模块（iOS Phase 6.2 chat 全链路已实装）。模块结构与依赖链见根 `CLAUDE.md`，组件明细见 `shared/AGENTS.md`。
+> - 远程协议接入坑位（`LLModel.capabilities` 声明 / Anthropic `modelVersionsMap` / `poLangSingleRunStrategy`）→ `shared/AGENTS.md` §2。
+> - 端侧文本 LLM 已移除，仅存 Qwen3-VL-2B VLM 打标；TAG 3-Pass 与 OpenCL 降级 → `docs/03-TECHNICAL-SPECS/TAG_GENERATION.md`；JS Engine → `docs/03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md`。
+> - AI 工程师模式（claude-chat 隧道 / 白名单读写分离 / 问题上报）→ `docs/01-PRODUCT/FEATURES.md` §2.7 + `server/AGENTS.md`。
+> - 服务端 Ktor 工程 → `server/AGENTS.md`；iOS 应用 → `docs/01-PRODUCT/IOS_DOC_INDEX.md`。
 
 ---
 
@@ -345,21 +333,3 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | 设备操作 | `Bash` | `adb install/logcat` |
 | 任务追踪 | `TodoWrite` | 任务进度维护 |
 | 知识存储 | `Skill` | 关键决策记录 |
-
-## 附录 B：快速参考
-
-### 文档体系
-```
-PRODUCT.md (What)
-    ↓
-FEATURES.md (How)
-    ↓
-模块 AGENTS.md (Implementation)
-    ↓
-代码
-```
-
-### 关键指标
-- 自动修复成功率：目标 > 70%
-- 文档同步率：目标 > 95%
-- 人工介入率：目标 < 20%

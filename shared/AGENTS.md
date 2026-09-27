@@ -50,7 +50,15 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 | `remote/config/` | `RemoteModelFactory`/`RemoteModelConfig`/`KoogHttpClientFactoryProvider`（按 `RemoteProtocol` 分流 OpenAI/Anthropic 客户端；DeepSeek 系 `thinking.type=disabled` 注入点，仅 tokenhub/kimi/deepseek 保留） |
 | `tool/` | `CameraToolHelper`、`perception/UiObservationFormatter` |
 
+**远程协议接入坑位（`RemoteModelFactory`，真机实证，2026-09-27 自根 `AGENTS.md` 移入）**：
+- 自定义模型名须在 `LLModel.capabilities` 显式声明 `Completion, Tools, OpenAIEndpoint.Completions`——🔴 不加 Responses/Thinking，否则 Koog 选错端点。
+- `RemoteProtocol.CLAUDE` 经 `AnthropicLLMClient`（Messages 协议）：自建 LLModel 须映射进 `AnthropicClientSettings.modelVersionsMap` 为模型 id 字符串（Koog 默认版本表只认其预定义实例）。
+- 自定义 `poLangSingleRunStrategy` 修复 Koog 1.1.1 内建策略丢「文本+tool_calls 同帧」工具调用的缺陷。
+- 协议分流收口在 `RemoteModelFactory.createKoogExecutor`。
+
 另有 `beauty/api/`（BeautySettings/FilterType/StyleFilter，供 beauty-api 经 `api(project(":shared"))` 透出）、`domain/`（UserPreferences/MediaRepository/StructuredFilter/tag 聚类纯算法；旧 `DuplicateGroup` 已随去重 2.0（androidApp `domain/dedup/`）于 2026-08-26 删除）。
+
+> 🔴 **`domain/chat/` 消息模型的上位约束（2026-09-27 起，宪法级）**：ChatMessage/MessagePart/流式 chunk/工具状态机的一切演进以 ADR-016 + spec `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md` 为准（Vercel parts 模型：有序 parts 数组、块级 id、UIMessage/ModelMessage 双层分离、data part 默认不回灌 LLM）。
 
 ## 3. 依赖方向
 
