@@ -144,6 +144,7 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 - 渲染时 parts **拍平为 LazyColumn 独立 item**：key = `"${messageId}:${partId}"`，**补 `contentType`**（按 part 类型）——顺车修复现状「有 key 无 contentType」的复用错配
 - 禁止「一条回复一个巨型 item 内部 Column 排段」（回收粒度/重组隔离/测高防抖全面劣化）
 - 卡片渲染组件（`HtmlCard`/`ChartSvgCard`/`EngineerTaskCard`）原样复用；HTML 卡测高 LruCache 的 key 从消息 id 改为 partId
+- 流式卡 part 跳过口径（M4 review 🟡3）：OUTPUT_AVAILABLE 的 Chart/HtmlCard part 仅在其**产物行已在列表中**才跳过（防双显）；Room invalidation 异步窗口期内占位 part 按已填充负载原位渲染，防卡片闪失与位置跳变。匹配按负载等值锚定本 turn 产物行（emit 时 Room content 与 part 负载同源同值），非 messageId 前缀粗判（旧 turn 历史卡行会误判）
 
 ### 7.3 Turn 聚合渲染
 
@@ -163,7 +164,7 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 
 ## 8. 性能防护清单（顺车修复，2026-09-27 梳理 🔴 项；M4 已全部落地 ✅）
 
-1. ✅ 消息/part 模型稳定性收口（§3）：shared 不依赖 compose-runtime 无法加 `@Immutable` 注解，改走 Compose compiler stability configuration file——`androidApp/compose-stability.conf` 白名单（`domain.chat` 整包 val-only + `MediaAsset`/`MediaType`/`FeedbackAction`），`androidApp/build.gradle.kts` 挂 `composeCompiler.stabilityConfigurationFiles`
+1. ✅ 消息/part 模型稳定性收口（§3）：shared 不依赖 compose-runtime 无法加 `@Immutable` 注解，改走 Compose compiler stability configuration file——`androidApp/compose-stability.conf` 白名单（M4 review 🟡1 收窄为**显式清单**：逐个核对不可变的类 + 类级 `**` 限定 sealed 嵌套，streaming 包可变装配类排除），`androidApp/build.gradle.kts` 挂 `composeCompiler.stabilityConfigurationFiles`
 2. ✅ LazyColumn 补 contentType（§7.2，拍平落地时一并接入）
 3. ✅ `messages.any { TASK_CARD }` 改 `remember(messages)` 派生；`isScrollInProgress` 读取上移到列表层一次传入 item
 4. ✅ `chatImageIsLive` 移出组合期：`rememberChatImageIsLive`（produceState + Dispatchers.IO，乐观初值 true——LRU 清理低频，短暂按存活渲染优于阻塞主线程）
