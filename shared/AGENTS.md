@@ -59,6 +59,10 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 另有 `beauty/api/`（BeautySettings/FilterType/StyleFilter，供 beauty-api 经 `api(project(":shared"))` 透出）、`domain/`（UserPreferences/MediaRepository/StructuredFilter/tag 聚类纯算法；旧 `DuplicateGroup` 已随去重 2.0（androidApp `domain/dedup/`）于 2026-08-26 删除）。
 
 > 🔴 **`domain/chat/` 消息模型的上位约束（2026-09-27 起，宪法级）**：ChatMessage/MessagePart/流式 chunk/工具状态机的一切演进以 ADR-016 + spec `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md` 为准（Vercel parts 模型：有序 parts 数组、块级 id、UIMessage/ModelMessage 双层分离、data part 默认不回灌 LLM）。
+>
+> **M1 落地状态（2026-09-27）**：`MessagePart` sealed（8 子类型：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates，partId 块级 id + `PartState`/`ToolPartState` 枚举）、`MessagePartsCodec`（kotlinx JSON 线格式，`type` 鉴别字段对齐 legacy 列值）、`LegacyMessagePartsConverter`（13 种 Room type 全枚举 → parts，行级 Text 兜底）、`toModelInput`/`ModelInputItem`（UIMessage→ModelMessage 显式转换）均已落地本包；`ChatMessage.parts` 双写共存（UI 仍读 legacy 字段，M4 切换渲染源）。`@Immutable` 不进 commonMain（纯度守卫禁 androidx.compose），Compose 稳定性注解属 M4 androidApp 侧收口。
+>
+> **M2 落地状态（2026-09-27）**：流式管线三件套落地 `domain/chat/streaming/`——`TurnStreamEvent`（spec §4 块级三段式：Text 三事件 + 工具五事件）、`ChatStreamTurnAdapter`（Koog 累计快照语义 → 块级事件：差分 delta / 轮边界闭合 / `txt-N`·`call-N` 合成 id）、`TurnPartsReducer`（占位契约：draw_chart/render_html 类型化占位 → 产物原位填充 / OUTPUT_ERROR 进文档，DONE 不可变）；`ChatStreamEvent.ToolCallStarted` 带 toolName/args（RemoteChatEngine 两发射点透传）；Chart/HtmlCard part 加 `state: ToolPartState`（持久化卡恒 OUTPUT_AVAILABLE 默认值，M1 存量行兼容）；Chart/HtmlCard 回灌 toolCallId 换 `"$messageId:$partId"` 命名空间锚；任务卡 live 态挂载收口 `TaskCardOverlay.overlayLiveTaskState`（part 同 id 原位覆写 + legacy 字段自 part 投影）。M2 期占位 parts 瞬态不落 Room、UI 渲染仍读 legacy 列（渲染源切换属 M4）。
 
 ## 3. 依赖方向
 

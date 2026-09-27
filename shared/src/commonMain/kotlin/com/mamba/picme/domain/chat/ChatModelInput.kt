@@ -56,34 +56,39 @@ val ChatMessage.modelRole: ModelInputRole
     get() = roleOf(type.name.lowercase())
 
 /** 整条消息 → 回灌项序列（空列表 = 整条消息不进上下文）。 */
-fun ChatMessage.toModelInput(): List<ModelInputItem> = parts.toModelInput(modelRole)
+fun ChatMessage.toModelInput(): List<ModelInputItem> = parts.toModelInput(modelRole, id)
 
-/** parts 序列 → 回灌项序列（块内顺序即上下文顺序）。 */
-fun List<MessagePart>.toModelInput(role: ModelInputRole): List<ModelInputItem> =
-    flatMap { part -> part.toModelInput(role) }
+/** parts 序列 → 回灌项序列（块内顺序即上下文顺序；[messageId] 用于 toolCallId 命名空间锚定）。 */
+fun List<MessagePart>.toModelInput(role: ModelInputRole, messageId: String): List<ModelInputItem> =
+    flatMap { part -> part.toModelInput(role, messageId) }
 
-private fun MessagePart.toModelInput(role: ModelInputRole): List<ModelInputItem> = when (this) {
+private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): List<ModelInputItem> = when (this) {
     is MessagePart.Text ->
         if (markdown.isBlank()) emptyList() else listOf(ModelInputItem.TextMessage(role, markdown))
 
-    // TODO(M2): toolCallId 暂以 partId 占位；转真 tool_call 协议时须换 "${messageId}:partId"
-    // 或真实 callId（与流式 chunk 的 tool_call id 对齐），否则跨消息 id 可能碰撞。
+    // toolCallId = "${messageId}:${partId}" 命名空间锚（M2 起）：跨消息防碰撞；
+    // 转真 tool_call 协议时换 Koog/网关侧真实 callId。
     is MessagePart.Chart -> listOf(
-        ModelInputItem.ToolCall(partId, TOOL_DRAW_CHART, argsSummary = ""),
-        ModelInputItem.ToolResult(partId, TOOL_DRAW_CHART, resultSummary = "Chart card (SVG, ${svg.length} chars)"),
+        ModelInputItem.ToolCall(namespacedToolCallId(messageId), TOOL_DRAW_CHART, argsSummary = ""),
+        ModelInputItem.ToolResult(
+            namespacedToolCallId(messageId),
+            TOOL_DRAW_CHART,
+            resultSummary = "Chart card (SVG, ${svg.length} chars)",
+            isError = state == ToolPartState.OUTPUT_ERROR,
+        ),
     )
 
-    // TODO(M2): 同上，toolCallId 暂以 partId 占位。
     is MessagePart.HtmlCard -> listOf(
         ModelInputItem.ToolCall(
-            partId,
+            namespacedToolCallId(messageId),
             TOOL_RENDER_HTML,
             argsSummary = meta.display?.let { "display=$it" } ?: "",
         ),
         ModelInputItem.ToolResult(
-            partId,
+            namespacedToolCallId(messageId),
             TOOL_RENDER_HTML,
             resultSummary = meta.summary ?: "HTML card (${html.length} chars)",
+            isError = state == ToolPartState.OUTPUT_ERROR,
         ),
     )
 
@@ -117,6 +122,8 @@ private fun MessagePart.toModelInput(role: ModelInputRole): List<ModelInputItem>
     is MessagePart.OptimizeCandidates,
     -> emptyList()
 }
+
+private fun MessagePart.namespacedToolCallId(messageId: String): String = "$messageId:$partId"
 
 private const val TOOL_DRAW_CHART = "draw_chart"
 private const val TOOL_RENDER_HTML = "render_html"

@@ -9,7 +9,9 @@ import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
+import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
+import com.mamba.picme.domain.chat.overlayLiveTaskState
 
 import android.content.Context
 import android.content.res.Configuration
@@ -50,6 +52,7 @@ import com.mamba.picme.core.image.BitmapSampling
 import com.mamba.picme.BuildConfig
 import android.os.Build
 import com.mamba.picme.data.local.ChatMessageDao
+import com.mamba.picme.data.local.decodePartsOrLegacy
 import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.data.local.toModelInputItems
 import com.mamba.picme.data.remote.picme.ClaudeEvent
@@ -87,7 +90,10 @@ import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
 import com.mamba.picme.features.chat.js.registerGalleryHandlers
 import com.mamba.picme.domain.chat.ChatMessageType
+import com.mamba.picme.domain.chat.streaming.ChatStreamTurnAdapter
 import com.mamba.picme.domain.chat.streaming.StreamingPacingController
+import com.mamba.picme.domain.chat.streaming.TurnPartsReducer
+import com.mamba.picme.domain.chat.streaming.TurnStreamEvent
 import com.mamba.picme.features.gallery.MediaViewModel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -100,6 +106,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -116,6 +123,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "ChatViewModel"
 private const val MAX_MESSAGES = 500
+/** ADR-016 M2：任务卡 live 态 overlay 节流（SSE 高频事件不直接驱动全列表重组）。 */
+private const val ENGINEER_TASK_OVERLAY_THROTTLE_MS = 500L
 private const val GUEST_REGISTER_NUDGE_THRESHOLD = 20
 private const val MAX_PREVIEW_LENGTH = 60
 private const val MAX_CARDS = 20
@@ -1026,6 +1035,33 @@ class ChatViewModel(
         }
     )
 
+    /** ADR-016 M2：引擎事件 → spec §4 块级三段式事件的翻译器（一次 sendMessage = 一个 turn，流式起点 reset）。 */
+    private val turnAdapter = ChatStreamTurnAdapter()
+
+    /** ADR-016 M2：turn parts 快照装配器（占位契约 / 原位填充 / DONE 不可变，语义见类注释）。 */
+    private val turnReducer = TurnPartsReducer()
+
+    /**
+     * M2 turn 装配入口：引擎事件经 [turnAdapter] 翻译为块级三段式事件，由 [turnReducer]
+     * 拼装 parts 快照并挂到流式占位消息。瞬态内存轨——M2 期 UI 渲染仍读 legacy content
+     * （占位 parts 不可见），本管线为 M4 渲染切换打底；流式消息不落 Room。
+     */
+    private fun feedTurn(event: ChatStreamEvent) {
+        turnAdapter.onEvent(event).forEach { turnEvent -> turnReducer.apply(turnEvent) }
+        _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+    }
+
+    /**
+     * M2 工具产物回填：能力执行点（图卡/HTML 卡落库处）把最终 part 喂给装配器——
+     * 有 in-flight 占位则原位填充（位置锚定）；无待关联调用（非流式回合直出，如 /chart 冒烟）则跳过。
+     * 产物 partId 与 toolCallId 一致（占位原位替换契约，见 [TurnPartsReducer]）。
+     */
+    private fun feedToolOutput(toolName: String, output: (toolCallId: String) -> MessagePart) {
+        val toolCallId = turnReducer.oldestPendingToolCallId(toolName) ?: return
+        turnReducer.apply(TurnStreamEvent.ToolOutputAvailable(toolCallId, output(toolCallId)))
+        _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+    }
+
     /**
      * AI 优化命令触发后需要导航到编辑器的目标 URI。
      */
@@ -1040,15 +1076,15 @@ class ChatViewModel(
      * UI 实际展示的消息列表：已持久化消息 + 流式临时消息；TASK_CARD 叠加工程师任务 live 态。
      */
     val displayMessages: StateFlow<List<ChatMessageUi>> =
-        combine(_messages, _streamingMessage, _engineerTasks) { messages, streaming, tasks ->
+        combine(_messages, _streamingMessage, _engineerTasks.sample(ENGINEER_TASK_OVERLAY_THROTTLE_MS)) { messages, streaming, tasks ->
             val base = if (streaming != null) messages + streaming else messages
             if (tasks.isEmpty()) {
                 base
             } else {
-                base.map { msg ->
-                    val live = msg.engineerTask?.let { task -> tasks[task.taskId] }
-                    if (live != null && live != msg.engineerTask) msg.copy(engineerTask = live) else msg
-                }
+                // ADR-016 M2：live 态挂载迁入 parts overlay——TaskCard part 同 id 原位覆写 +
+                // legacy engineerTask 字段自 part 投影（M4 渲染切换前 UI 仍读 legacy，二者同源
+                // 防漂移）；非任务卡/无变化消息引用相等原样返回（零分配）。
+                base.map { msg -> msg.overlayLiveTaskState(tasks) }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -1612,6 +1648,9 @@ class ChatViewModel(
 
                 // 3. 创建流式占位消息（立即展示「思考中」提示，避免空气泡）
                 val streamingId = "streaming_${System.currentTimeMillis()}"
+                // ADR-016 M2：一次 sendMessage = 一个 turn，起点重置装配器（防上一回合残留）
+                turnAdapter.reset()
+                turnReducer.reset()
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
                     type = ChatMessageType.AGENT_TEXT,
@@ -1674,7 +1713,7 @@ class ChatViewModel(
                                     _streamingMessage.value = _streamingMessage.value?.copy(isThinking = false)
                                 }
                             }
-                            ChatStreamEvent.ToolCallStarted -> {
+                            is ChatStreamEvent.ToolCallStarted -> {
                                 pacingController.reset()
                                 _streamingMessage.value = _streamingMessage.value?.copy(
                                     content = stringContext().getString(R.string.chat_calling_tool),
@@ -1683,6 +1722,8 @@ class ChatViewModel(
                                 )
                             }
                         }
+                        // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）
+                        feedTurn(event)
                     }
                 )
 
@@ -2402,6 +2443,10 @@ class ChatViewModel(
                 modelUsed = "chart"
             )
         )
+        // ADR-016 M2：产物回填 turn 装配器（占位原位填充；无待关联调用时 no-op）
+        feedToolOutput(TurnPartsReducer.TOOL_DRAW_CHART) { toolCallId ->
+            MessagePart.Chart(partId = toolCallId, svg = svg)
+        }
     }
 
     /** HTML 卡消息 id 序号兜底（同毫秒连发防主键碰撞被 REPLACE 覆盖）。 */
@@ -2432,6 +2477,10 @@ class ChatViewModel(
                 metadata = metadata
             )
         )
+        // ADR-016 M2：产物回填 turn 装配器（同 emitChartMessage）
+        feedToolOutput(TurnPartsReducer.TOOL_RENDER_HTML) { toolCallId ->
+            MessagePart.HtmlCard(partId = toolCallId, html = html, meta = meta)
+        }
     }
 
     /**
@@ -3435,10 +3484,11 @@ class ChatViewModel(
             gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
                 optimizeGachaController?.hasPending(id) == true,
             engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
-            // ADR-016 M1：parts 有意不填充——UI 渲染仍读上方 legacy 字段，parts 在 M1 无任何
-            // 消费方（回灌走实体侧 toModelInputItems），每条消息一次 JSON decode 属无效主链路
-            // 开销。M2 切渲染源时恢复双读填充（decodePartsOrLegacy：优先 partsJson，
-            // 缺失/损坏回 legacy 列现算）。
+            // ADR-016 M2：任务卡消息恢复双读填充（decodePartsOrLegacy：优先 partsJson，缺失/损坏
+            // 回 legacy 列现算）——live 态 overlay（displayMessages）挂载在 parts 的 TaskCard part
+            // 上，需要它在场；其余类型仍不填充（无消费方，避免每条消息一次无效 JSON decode）。
+            // M4 切渲染源时全量恢复。
+            parts = if (type == EngineerTaskState.ROOM_TYPE) decodePartsOrLegacy() else emptyList(),
         )
     }
 

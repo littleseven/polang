@@ -70,6 +70,50 @@ class ChatModelInputTest {
     }
 
     @Test
+    fun `chart and html tool call ids are namespaced by message id`() {
+        // M2 命名空间锚：toolCallId = "${messageId}:${partId}"，跨消息同 partId（p0）不碰撞
+        val chart = legacyMessage("chart", "<svg/>").toModelInput()
+        assertEquals("m-chart:p0", (chart[0] as ModelInputItem.ToolCall).toolCallId)
+        assertEquals("m-chart:p0", (chart[1] as ModelInputItem.ToolResult).toolCallId)
+        val html = legacyMessage("html_card", "<html/>").toModelInput()
+        assertEquals("m-html_card:p0", (html[0] as ModelInputItem.ToolCall).toolCallId)
+        assertEquals("m-html_card:p0", (html[1] as ModelInputItem.ToolResult).toolCallId)
+        // 任务卡保持真 taskId（不经命名空间——其 toolCallId 本来就是全局唯一锚）
+        val metadata = """{"engineer_task":{"taskId":"t-7","sourceText":"做","status":"COMPLETED","startedAtMs":1,"updatedAtMs":2}}"""
+        val task = legacyMessage("task_card", "做", metadata).toModelInput()
+        assertEquals("t-7", (task[0] as ModelInputItem.ToolCall).toolCallId)
+    }
+
+    @Test
+    fun `chart in output error state replays tool result as error`() {
+        // M2 占位契约的持久化投影：OUTPUT_ERROR 的卡片以 isError 落上下文，模型可自我修正（spec §5.3）
+        val message = ChatMessage(
+            id = "m-err",
+            type = ChatMessageType.CHART,
+            content = "",
+            parts = listOf(MessagePart.Chart("p0", "", state = ToolPartState.OUTPUT_ERROR)),
+        )
+        val items = message.toModelInput()
+        val result = items[1]
+        assertIs<ModelInputItem.ToolResult>(result)
+        assertEquals(true, result.isError)
+        assertEquals("m-err:p0", result.toolCallId)
+    }
+
+    @Test
+    fun `html card in output error state replays tool result as error`() {
+        val message = ChatMessage(
+            id = "m-herr",
+            type = ChatMessageType.HTML_CARD,
+            content = "",
+            parts = listOf(MessagePart.HtmlCard("p0", "", state = ToolPartState.OUTPUT_ERROR)),
+        )
+        val result = message.toModelInput()[1]
+        assertIs<ModelInputItem.ToolResult>(result)
+        assertEquals(true, result.isError)
+    }
+
+    @Test
     fun `html card converts to tool pair carrying summary when present`() {
         val metadata = """{"html_card":{"display":"inline","summary":"相册周报"}}"""
         val items = legacyMessage("html_card", "<html></html>", metadata).toModelInput()

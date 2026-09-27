@@ -19,7 +19,8 @@ import com.mamba.picme.domain.chat.toModelInput
  * - 读侧：[decodePartsOrLegacy] 优先 partsJson，缺失/损坏回 legacy 列现算（不丢消息）；
  * - 迁移：[backfillChatMessageParts] 对存量行全量回填。
  *
- * M2 起流式写入将以 parts 为权威源，本接缝随之反转（legacy 列由 parts 投影）。
+ * M2 起流式管线在内存轨装配 parts（TurnPartsReducer，瞬态不落 Room，UI 仍读 legacy 列）；
+ * 持久化接缝反转（parts 为权威源、legacy 列投影）属 M4 渲染切换一并收口。
  */
 
 /** 由 legacy 列现算 parts（纯函数，转 single 行失败在转换器内部已降级 Text 兜底）。 */
@@ -40,7 +41,7 @@ fun ChatMessageEntity.decodePartsOrLegacy(): List<MessagePart> =
  * 与 `ChatMessage.modelRole` 同口径）；data part 不进上下文（转换规则见 commonMain `toModelInput`）。
  */
 fun ChatMessageEntity.toModelInputItems(): List<ModelInputItem> =
-    decodePartsOrLegacy().toModelInput(roleOf(type))
+    decodePartsOrLegacy().toModelInput(roleOf(type), id)
 
 /** 插入单条消息（M1 起统一入口：legacy 列 + partsJson 双写）。 */
 suspend fun ChatMessageDao.insertMessageWithParts(message: ChatMessageEntity) =

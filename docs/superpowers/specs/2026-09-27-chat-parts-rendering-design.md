@@ -56,8 +56,10 @@ sealed interface MessagePart {
     val partId: String              // 块级 id：流式三段式与UI key的锚
 
     @Immutable data class Text(override val partId: String, val markdown: String, val state: PartState) : MessagePart
-    @Immutable data class Chart(override val partId: String, val svg: String) : MessagePart
-    @Immutable data class HtmlCard(override val partId: String, val html: String, val display: HtmlCardDisplay) : MessagePart
+    // M2 起 Chart/HtmlCard 携带工具状态机（占位契约：INPUT_STREAMING/INPUT_AVAILABLE → OUTPUT_AVAILABLE/OUTPUT_ERROR；
+    // 持久化卡恒 OUTPUT_AVAILABLE 默认值，M1 存量 partsJson 行解码落默认值，线格式兼容）
+    @Immutable data class Chart(override val partId: String, val svg: String, val state: ToolPartState = ToolPartState.OUTPUT_AVAILABLE) : MessagePart
+    @Immutable data class HtmlCard(override val partId: String, val html: String, val meta: HtmlCardMeta = HtmlCardMeta(), val state: ToolPartState = ToolPartState.OUTPUT_AVAILABLE) : MessagePart
     @Immutable data class TaskCard(override val partId: String, val toolCallId: String, val state: ToolPartState) : MessagePart
     // Image / EditResult / MediaResults / OptimizeCandidates 同构
 }

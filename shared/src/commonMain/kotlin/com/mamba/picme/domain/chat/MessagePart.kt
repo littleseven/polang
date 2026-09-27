@@ -32,21 +32,31 @@ sealed interface MessagePart {
         val state: PartState = PartState.DONE,
     ) : MessagePart
 
-    /** draw_chart 的渲染投影（端侧生成的 SVG 字符串）。 */
+    /**
+     * draw_chart 的渲染投影（端侧生成的 SVG 字符串）。
+     * [state] = 工具状态机（spec §5.1）：M2 流式占位 INPUT_STREAMING/INPUT_AVAILABLE →
+     * 产出原位填充 OUTPUT_AVAILABLE / 失败 OUTPUT_ERROR；持久化卡恒 OUTPUT_AVAILABLE
+     * （默认值——M1 存量 partsJson 行无此字段，解码落默认值，线格式兼容）。
+     */
     @Serializable
     @SerialName("chart")
     data class Chart(
         override val partId: String,
         val svg: String,
+        val state: ToolPartState = ToolPartState.OUTPUT_AVAILABLE,
     ) : MessagePart
 
-    /** render_html 的渲染投影；display 声明/终判/测高随 [meta] 随迁（形态不跳变）。 */
+    /**
+     * render_html 的渲染投影；display 声明/终判/测高随 [meta] 随迁（形态不跳变）。
+     * [state] 语义同 [Chart.state]。
+     */
     @Serializable
     @SerialName("html_card")
     data class HtmlCard(
         override val partId: String,
         val html: String,
         val meta: HtmlCardMeta = HtmlCardMeta(),
+        val state: ToolPartState = ToolPartState.OUTPUT_AVAILABLE,
     ) : MessagePart
 
     /**

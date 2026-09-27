@@ -200,8 +200,13 @@ class RemoteChatEngine internal constructor(
         agentContext: AgentContext,
         onEvent: (ChatStreamEvent) -> Unit,
     ): Result<StreamChatResult>? {
-        // 占位文案切换到「搜集中」语义（与 tool_calls 路径的 ToolCallStarted 一致）
-        onEvent(ChatStreamEvent.ToolCallStarted)
+        // 占位文案切换到「搜集中」语义（与 tool_calls 路径的 ToolCallStarted 一致）；
+        // M2 起携带工具名（直执命令 → 对应 @Tool customName）供 turn 装配器登记。
+        val toolName = when (command) {
+            is AgentCommand.RefineMediaSearch -> "refine_media_search"
+            else -> "search_media"
+        }
+        onEvent(ChatStreamEvent.ToolCallStarted(toolName = toolName))
         val detailed = ChatToolService.getInstance().dispatchCommandDetailed(command, agentContext.traceId)
         val results = detailed.action as? AgentAction.MediaResults
         if (results == null) {
@@ -316,7 +321,7 @@ class RemoteChatEngine internal constructor(
                     },
                     onToolCall = { toolName, args ->
                         Logger.d(tag, "Chat ReAct toolCall: $toolName(${args.take(100)})")
-                        onEvent?.invoke(ChatStreamEvent.ToolCallStarted)
+                        onEvent?.invoke(ChatStreamEvent.ToolCallStarted(toolName = toolName, args = args))
                     },
                 )
             }
