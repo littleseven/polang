@@ -247,8 +247,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
     implementation(libs.androidx.webkit)
-    implementation(libs.compose.markdown)
-    // M3 spike（ADR-016 §7.1）：mikepenz AST 渲染器候选，验证后决定去留
+    // ADR-016 M3：mikepenz AST 渲染器（Chat 正文/浮动面板/悬浮气泡共用 AgentMarkdown）
     implementation(libs.mikepenz.markdown.renderer)
     implementation(libs.mikepenz.markdown.renderer.m3)
     implementation(libs.mikepenz.markdown.renderer.code)

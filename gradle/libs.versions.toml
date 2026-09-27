@@ -50,7 +50,6 @@ mockk = "1.13.8"
 oapi = "2.5.3"
 telegramBot = "5.5.0"
 detekt = "1.23.6"
-composeMarkdown = "0.5.4"
 mikepenzMarkdown = "0.41.0"
 androidsvg = "1.4"
 dokar3Quickjs = "1.0.5"
@@ -116,8 +115,7 @@ google-mlkit-text-recognition-chinese = { group = "com.google.mlkit", name = "te
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesPlayServices" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
-compose-markdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "composeMarkdown" }
-# M3 spike（ADR-016 §7.1）：mikepenz AST 渲染器候选，验证后决定去留
+# ADR-016 M3：Agent 正文 Markdown 渲染器（AST→原生组件）；0.42+ 需 Kotlin 2.4，0.41.0 为项目 Kotlin 2.3.x 兼容上限
 mikepenz-markdown-renderer = { group = "com.mikepenz", name = "multiplatform-markdown-renderer", version.ref = "mikepenzMarkdown" }
 mikepenz-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "mikepenzMarkdown" }
 mikepenz-markdown-renderer-code = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-code", version.ref = "mikepenzMarkdown" }

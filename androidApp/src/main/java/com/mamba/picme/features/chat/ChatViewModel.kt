@@ -1722,7 +1722,7 @@ class ChatViewModel(
                 //
                 // 流式期间占位消息内容实时更新（只走 _streamingMessage 内存轨，不落 Room）：
                 // - TextSnapshot：模型本轮累计全文快照，直接整体替换气泡内容
-                //   （AGENT_TEXT 经 MarkdownText 渲染，天然支持增量 Markdown）。
+                //   （AGENT_TEXT 经 AgentMarkdown 渲染，天然支持增量 Markdown）。
                 // - ToolCallStarted：进入工具调用轮，气泡切换为"正在调用工具"状态文案；
                 //   新一轮首个 delta 到达时快照从空重新累计，自动覆盖状态文案。
                 // chat 推理前同步配置 remoteConfig：确保用当前 _remoteSource 对应的远程源，
