@@ -67,6 +67,8 @@ sealed interface MessagePart {
 enum class PartState { STREAMING, DONE }
 ```
 
+> **实施注记（2026-09-27，M1/M2 落地后校准）**：草图与实现现实的偏差——① `ChatMessage` 未取上述全新形态，实为 legacy 字段 + `parts: List<MessagePart>` **双写共存**（M1 起 Room `partsJson` 双写双读，UI 仍读 legacy 字段，接缝 `data/local/ChatMessageParts.kt`）；`parentId` 未落代码字段（仅 ADR-016 D4 文档层预留）；② `TaskCard` 实际携带完整 `EngineerTaskState` 快照（`task` 字段），非仅 `(toolCallId, state)`。Chart/HtmlCard 的 `meta`/`state` 字段已随 M2 对齐。逐字段事实源：`domain/chat/MessagePart.kt` + `docs/03-TECHNICAL-SPECS/CHAT_CARD_CATALOG.md`。
+
 约束：
 
 - **全部 `@Immutable`**（含 `List` 用不可变拷贝收口），顺车修复当前消息模型 unstable 导致的流式重组放大（2026-09-27 性能梳理 🔴1）

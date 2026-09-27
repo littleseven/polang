@@ -53,8 +53,11 @@ class ChatRunScriptCapability private constructor() : BaseCapability() {
         ): String
 
         /**
-         * 端侧渲染一张 HTML 组件卡片：[html] 为自包含 HTML（内联 CSS/JS，禁外链/网络资源），
-         * 清洗后作为 HTML_CARD 消息落库（离线 WebView 渲染，断网 + 零 JS 桥接）；
+         * 端侧渲染一张 HTML 组件卡片：[html] 为自包含 HTML（CSS/JS 一律内联；远程 script/iframe/
+         * form/meta refresh 由 [com.mamba.picme.features.chat.HtmlCardSanitizer] 清洗剔除；
+         * 远程 img/CSS/a 外链可引用（外链点击由宿主开全屏落地页）；引用相册本地图片/视频用
+         * media://媒体id（id 须来自取数结果、禁止虚构），禁 file://、content:// 路径），
+         * 清洗后作为 HTML_CARD 消息落库（沙箱 WebView 渲染，零 JS 桥接）；
          * [display] 为 LLM 声明的展示形态（"inline"/"fullpage"，null = inline，
          * 端侧终判见 HtmlCardDisplay 混合分流）；
          * 返回 summary（回传 LLM 做文字总结）。

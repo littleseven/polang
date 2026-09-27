@@ -19,7 +19,9 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
 
     /**
-     * 消息类型：user_text, agent_text, user_image, agent_image, command, plan_preview
+     * 消息类型（13 种现役列值，全枚举映射见 ChatMessageType / LegacyMessagePartsConverter）：
+     * user_text, agent_text, user_image, user_image_text, agent_image, agent_edit_result,
+     * command, plan_preview, media_results, chart, html_card, task_card, optimize_candidates
      */
     val type: String,
 
