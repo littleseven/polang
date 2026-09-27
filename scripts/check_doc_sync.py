@@ -108,8 +108,30 @@ def check_status_inconsistency() -> list:
     return issues
 
 
+def _site_excludes():
+    """解析 scripts/sync-docs.sh 的 rsync --exclude 清单（发布集合判定单一事实源）"""
+    sh = PROJECT_ROOT / "scripts" / "sync-docs.sh"
+    return [m.group(1) for m in re.finditer(
+        r"--exclude '([^']+)'", sh.read_text(encoding="utf-8"))]
+
+
+def _is_published(rel_docs_posix: str) -> bool:
+    """docs/ 内文件是否随官网文档站发布（未被 sync-docs.sh exclude）"""
+    for ex in _site_excludes():
+        ex = ex.rstrip("/")
+        if rel_docs_posix == ex or rel_docs_posix.startswith(ex + "/"):
+            return False
+    return True
+
+
 def check_broken_links() -> list:
-    """检查内部 Markdown 链接是否指向存在的文件"""
+    """检查内部 Markdown 链接是否指向存在的文件
+
+    双语义解析（2026-09-27）：① 文件相对（GitHub/skills 习惯）；② 项目根相对；
+    ③ docs 站点根相对（docsify relativePath:false 语义——官网发布文档的标准写法）。
+    任一命中即有效。另对「发布集合内嵌套文档」做 docsify 断链回归拦截：
+    同目录裸文件名链接只在文件相对语义下命中 = 官网点开必 404。
+    """
     issues = []
     md_files = [
         f for f in PROJECT_ROOT.rglob("*.md")
@@ -122,6 +144,8 @@ def check_broken_links() -> list:
         rel_path = md_file.relative_to(PROJECT_ROOT)
         content = md_file.read_text(encoding="utf-8")
         base_dir = md_file.parent
+        in_docs = str(rel_path).startswith("docs/")
+        published = in_docs and _is_published(str(rel_path)[len("docs/"):])
 
         for match in link_pattern.finditer(content):
             link_target = match.group(2)
@@ -135,13 +159,22 @@ def check_broken_links() -> list:
             if rel_path == Path("skills/TEMPLATE.md"):
                 continue
 
-            target_path = base_dir / link_target
-            # 回退：skills/ 与 .claude/commands/ 内链接 / leading-slash 根相对链接按项目根解析
-            if not target_path.exists():
-                target_path = PROJECT_ROOT / link_target.lstrip("/")
-            if not target_path.exists():
+            file_rel_ok = (base_dir / link_target).exists()
+            root_rel_ok = (PROJECT_ROOT / link_target.lstrip("/")).exists()
+            docs_rel_ok = (PROJECT_ROOT / "docs" /
+                           link_target.lstrip("./").lstrip("/")).exists()
+            if not (file_rel_ok or root_rel_ok or docs_rel_ok):
                 issues.append(
                     f"  [断裂链接] {rel_path}: '{link_target}' 不存在"
+                )
+            elif (published and not str(rel_path) == "docs/_sidebar.md"
+                  and file_rel_ok and not docs_rel_ok):
+                # 发布集合内：docsify 按 /docs/ 根解析，文件相对命中的裸链在线必断
+                fixed = (base_dir / link_target).resolve().relative_to(
+                    (PROJECT_ROOT / "docs").resolve()).as_posix()
+                issues.append(
+                    f"  [docsify 断链] {rel_path}: '{link_target}' 在官网按 /docs/ 根"
+                    f"解析会 404，应改写为 '{fixed}'"
                 )
 
     return issues

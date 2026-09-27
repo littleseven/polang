@@ -334,8 +334,8 @@ while (isRendering && !Thread.interrupted()) {
 #### 3.5.2 映射实现参考
 
 **非轮廓 73 点（33-105）**的具体映射关系请参考：
-- [MediaPipe468Adapter.kt](../../engines/beauty-engine/src/main/java/com/mamba/picme/beauty/internal/facedetect/adapter/MediaPipe468Adapter.kt) - 生产环境映射
-- [FaceLandmarkOverlay.kt](../../androidApp/src/main/java/com/mamba/picme/features/gallery/components/FaceLandmarkOverlay.kt) - 静态图调试映射与可视化
+- `MediaPipe468Adapter.kt` - 生产环境映射
+- `FaceLandmarkOverlay.kt` - 静态图调试映射与可视化
 
 **映射原则**：
 1. **语义优先**：每个 106 点找到 MediaPipe 中语义对应的固定点

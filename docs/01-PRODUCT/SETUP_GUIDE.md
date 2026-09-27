@@ -1,7 +1,7 @@
 # PoLang 破浪相册 · 使用前提与首次设置指南
 
 > **定位**：新用户「如何把 PoLang 真正用起来」的唯一事实来源（SSOT），供官网帮助页 / Google Play 商店说明复用。
-> **维护**：与 [`FEATURES.md`](./FEATURES.md)、[`03-TECHNICAL-SPECS/TAG_GENERATION.md`](../03-TECHNICAL-SPECS/TAG_GENERATION.md) 保持一致；模型清单以 `androidApp/src/main/res/raw/llm_models.json` 为准。
+> **维护**：与 [`FEATURES.md`](01-PRODUCT/FEATURES.md)、[`03-TECHNICAL-SPECS/TAG_GENERATION.md`](03-TECHNICAL-SPECS/TAG_GENERATION.md) 保持一致；模型清单以 `androidApp/src/main/res/raw/llm_models.json` 为准。
 > **最后更新**：2026-09-18（Pass 扫描入口改为「整理」页 SCAN tab）
 
 ---
@@ -175,8 +175,8 @@ PoLang 的 AI 对话**默认走远程大模型**（体验最佳）。远程推�
 
 ## 相关文档
 
-- [`FEATURES.md`](./FEATURES.md) — 功能交互规范（产品 How）
-- [`03-TECHNICAL-SPECS/TAG_GENERATION.md`](../03-TECHNICAL-SPECS/TAG_GENERATION.md) — TAG 生成 3-Pass 管道（技术细节）
-- [`03-TECHNICAL-SPECS/GALLERY_SEARCH.md`](../03-TECHNICAL-SPECS/GALLERY_SEARCH.md) — 相册搜索 SSOT
-- [`03-TECHNICAL-SPECS/ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md`](../03-TECHNICAL-SPECS/ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md) — 端侧模型清单
-- [`02-ARCHITECTURE/ADR/ADR-008-privacy-redline-media-only.md`](../02-ARCHITECTURE/ADR/ADR-008-privacy-redline-media-only.md) — 隐私红线（端侧媒体处理）
+- [`FEATURES.md`](01-PRODUCT/FEATURES.md) — 功能交互规范（产品 How）
+- [`03-TECHNICAL-SPECS/TAG_GENERATION.md`](03-TECHNICAL-SPECS/TAG_GENERATION.md) — TAG 生成 3-Pass 管道（技术细节）
+- [`03-TECHNICAL-SPECS/GALLERY_SEARCH.md`](03-TECHNICAL-SPECS/GALLERY_SEARCH.md) — 相册搜索 SSOT
+- [`03-TECHNICAL-SPECS/ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md`](03-TECHNICAL-SPECS/ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md) — 端侧模型清单
+- [`02-ARCHITECTURE/ADR/ADR-008-privacy-redline-media-only.md`](02-ARCHITECTURE/ADR/ADR-008-privacy-redline-media-only.md) — 隐私红线（端侧媒体处理）

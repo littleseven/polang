@@ -608,18 +608,18 @@ scripts/check-doc-coordinate-annotation.sh # ✅ 通过
 
 ### 7.1 规范文档
 
-- [COORDINATE_SYSTEM.md](../../07-STANDARDS/COORDINATE_SYSTEM.md) - 坐标系规范详细说明
-- [BEAUTY_ENGINE_TECH_SPEC.md](../../03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md) - 大美丽引擎技术规范（含相机预览比例与坐标转换）
+- [COORDINATE_SYSTEM.md](07-STANDARDS/COORDINATE_SYSTEM.md) - 坐标系规范详细说明
+- [BEAUTY_ENGINE_TECH_SPEC.md](03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md) - 大美丽引擎技术规范（含相机预览比例与坐标转换）
 - InsightFace 106 映射文档（已移除，InsightFace ONNX 路径已于 2026-05 删除）
 
 ### 7.2 技术文档
 
-- [BEAUTY_ENGINE_TECH_SPEC.md](../../03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md) - 大美丽引擎技术规范（含渲染链路、帧同步美妆与容灾降级恢复）
+- [BEAUTY_ENGINE_TECH_SPEC.md](03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md) - 大美丽引擎技术规范（含渲染链路、帧同步美妆与容灾降级恢复）
 
 ### 7.3 其他 ADR
 
-- [ADR-001: Beauty Engine Architecture](./ADR-001-beauty-engine-architecture.md)
-- [ADR-002: OpenGL Offscreen Unified Pipeline](./ADR-002-opengl-offscreen-unified-pipeline.md)
+- [ADR-001: Beauty Engine Architecture](02-ARCHITECTURE/ADR/ADR-001-beauty-engine-architecture.md)
+- [ADR-002: OpenGL Offscreen Unified Pipeline](02-ARCHITECTURE/ADR/ADR-002-opengl-offscreen-unified-pipeline.md)
 
 ---
 

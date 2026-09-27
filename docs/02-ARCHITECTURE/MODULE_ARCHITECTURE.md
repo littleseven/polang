@@ -2,8 +2,8 @@
 
 > **边界声明（Boundary Statement）**
 > - 本文档描述 PoLang Demo 工程当前的 Gradle 模块划分、依赖方向与 Native SO 归属。
-> - 产品目标与验收口径以 [`../01-PRODUCT/FEATURES.md`](../01-PRODUCT/FEATURES.md) 为准。
-> - 顶层治理规则（角色协作、全局红线、文档流程）以根目录 [`AGENTS.md`](../../AGENTS.md) 为准。
+> - 产品目标与验收口径以 [`../01-PRODUCT/FEATURES.md`](01-PRODUCT/FEATURES.md) 为准。
+> - 顶层治理规则（角色协作、全局红线、文档流程）以根目录 `AGENTS.md` 为准。
 
 **模块定位**：模块分层与依赖关系可视化
 **主要维护者**：项目开发者、AI Agent

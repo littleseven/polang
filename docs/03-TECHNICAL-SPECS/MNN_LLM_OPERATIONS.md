@@ -148,7 +148,7 @@ PoLang 使用 MNN 3.5.0 统一构建的 `libMNN.so`，当前承载两个独立�
 | **VLM 打标** | `MNN::Transformer::Llm` | Qwen3-VL-2B（INT4）约 1.5-2.5GB | 加载后常驻，仅响应内存压力卸载 |
 | **MNN 人脸检测** | `MNN Interpreter`（beauty-engine `MnnRoiDetector` / `MnnLandmarkDetector`） | 约 50-70MB | 相机页场景绑定，离开相机页延迟卸载 |
 
-> **注意**：语音栈已迁移至 Sherpa-ONNX（见 [VOICE_STACK.md](VOICE_STACK.md)），ASR 不再依赖 `libMNN.so`，`SherpaOnnxAsrEngine` 也明确**不再接入 `MnnResourceManager` / `MnnGlobalReleaseLock`**（引用计数协调机制中已无 ASR 一方）。`libMNN.so` 的共享方为 VLM 打标与 MNN 人脸检测。历史上的「VLM + ASR 共享协调」设计见下文标注的历史小节，保留用于理解 `MnnResourceManager` 的演进。
+> **注意**：语音栈已迁移至 Sherpa-ONNX（见 [VOICE_STACK.md](03-TECHNICAL-SPECS/VOICE_STACK.md)），ASR 不再依赖 `libMNN.so`，`SherpaOnnxAsrEngine` 也明确**不再接入 `MnnResourceManager` / `MnnGlobalReleaseLock`**（引用计数协调机制中已无 ASR 一方）。`libMNN.so` 的共享方为 VLM 打标与 MNN 人脸检测。历史上的「VLM + ASR 共享协调」设计见下文标注的历史小节，保留用于理解 `MnnResourceManager` 的演进。
 
 ### 2.2 核心冲突（历史）
 

@@ -12,7 +12,7 @@
 > 本 ADR 原确立「本地/远程双链路」，现已演进为**文本推理全远程**：端侧文本 LLM（Qwen3.5-2B）及整条本地链路（`LocalInferencePipeline`/`LocalCameraAgent`/`LocalCommandParser`/`LocalPromptBuilder`/`IntentCache`、`AiAgentMode.LOCAL`、qwen3_5_2b 模型下载条目与设置 UI）已完全移除（commit 2fb1f299e）。相机指令同样改走远程 tool_calls：`AgentOrchestrator.processCameraInput` → `RemoteReActAgent` + `CameraToolService`（相机场域 @Tool 工具集：capture/adjust_beauty/switch_filter/adjust_zoom/flip_camera 等）→ `CapabilityRegistry.dispatch`。
 > `LocalLlmEngine` 仅保留 `imageInference`（Qwen3-VL-2B 端侧 VLM 打标，TAG Pass3），位于 `:shared` androidMain。
 > 后续 2026-08 远程编排由自维护 langchain4j fork 迁移至 **Koog**（JetBrains KMP Agent 框架），`:agent-core` 模块删除（commit 1cbe9353）；`:runtime-core` 整体并入 `:shared` 后删除。
-> **现役架构唯一事实来源**：[`docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md`](../AGENT_ARCHITECTURE.md)（v4.1+）。本 ADR 仅保留仍 govern 现状的两大决策：**决策 1（远程协议标准化）**与**决策 2（产品重心迁移）**。
+> **现役架构唯一事实来源**：[`docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md`](02-ARCHITECTURE/AGENT_ARCHITECTURE.md)（v4.1+）。本 ADR 仅保留仍 govern 现状的两大决策：**决策 1（远程协议标准化）**与**决策 2（产品重心迁移）**。
 
 ## 1. 背景与问题陈述
 

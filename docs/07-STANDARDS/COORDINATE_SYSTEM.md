@@ -639,7 +639,7 @@ exit 0
 ## 📚 参考资源
 
 ### 内部文档
-- [BEAUTY_ENGINE_TECH_SPEC.md](../03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md) - 相机预览比例、坐标转换与人脸关键点使用
+- [BEAUTY_ENGINE_TECH_SPEC.md](03-TECHNICAL-SPECS/BEAUTY_ENGINE_TECH_SPEC.md) - 相机预览比例、坐标转换与人脸关键点使用
 
 ### 外部资源
 - [OpenCV Coordinate System](https://docs.opencv.org/master/d2/d44/tutorial_py_image_basic_ops.html)
@@ -669,7 +669,7 @@ find androidApp/src/ -name "*.kt" -exec grep -n "//.*左眼\|//.*右眼" {} +
 ## PoLang 开发规范
 
 ### 坐标系与命名
-- 阅读 [人脸坐标系与左右命名规范](../02-ARCHITECTURE/ADR/ADR-003-coordinate-system-management.md)
+- 阅读 [人脸坐标系与左右命名规范](02-ARCHITECTURE/ADR/ADR-003-coordinate-system-management.md)
 - 理解图像坐标系 vs 人脸坐标系的区别
 - 掌握前置/后置摄像头的镜像差异
 ```

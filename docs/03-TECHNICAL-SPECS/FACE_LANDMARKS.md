@@ -18,7 +18,7 @@
 
 本文档同时提供 **MediaPipe 468 → 火山 106 的映射策略**，供 `MediaPipe468Adapter.kt` 与 `FaceLandmarkOverlay.kt` 参考实现。
 
-> **坐标系说明**：MediaPipe 与火山引擎均返回归一化坐标（0-1），原点(0,0)在左上角，x轴向右，y轴向下。前置摄像头需要水平镜像（`x = 1 - x`）。详见 [`docs/07-STANDARDS/COORDINATE_SYSTEM.md`](../07-STANDARDS/COORDINATE_SYSTEM.md)。
+> **坐标系说明**：MediaPipe 与火山引擎均返回归一化坐标（0-1），原点(0,0)在左上角，x轴向右，y轴向下。前置摄像头需要水平镜像（`x = 1 - x`）。详见 [`docs/07-STANDARDS/COORDINATE_SYSTEM.md`](07-STANDARDS/COORDINATE_SYSTEM.md)。
 
 ---
 

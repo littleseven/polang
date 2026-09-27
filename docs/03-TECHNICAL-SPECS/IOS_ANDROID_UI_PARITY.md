@@ -113,7 +113,7 @@
 
 ## 3. 设计令牌（Design Tokens）作为 SSOT
 
-**Token SSOT = `shared/src/commonMain/resources/design-tokens.json`**（v2.0.0）；双端镜像（Android `Spacing`/`AppShapes`/`Color`/`Typography`、iOS `DesignTokens.swift`）由 `scripts/gen-design-tokens.py` 生成，**禁止手改**，`ai-gate.sh --check` 门禁拦截。完整工作流与消费规则见 [`DESIGN_TOKENS_SPEC.md`](DESIGN_TOKENS_SPEC.md)。spec 中尺寸一律引用 token 名，不写裸数值——**对齐收敛为 token 对齐**：
+**Token SSOT = `shared/src/commonMain/resources/design-tokens.json`**（v2.0.0）；双端镜像（Android `Spacing`/`AppShapes`/`Color`/`Typography`、iOS `DesignTokens.swift`）由 `scripts/gen-design-tokens.py` 生成，**禁止手改**，`ai-gate.sh --check` 门禁拦截。完整工作流与消费规则见 [`DESIGN_TOKENS_SPEC.md`](03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md)。spec 中尺寸一律引用 token 名，不写裸数值——**对齐收敛为 token 对齐**：
 
 | Token 类 | 示例 |
 |---|---|
@@ -217,7 +217,7 @@ Ardot/Figma 画布为 token **可视化预览层**（非 SSOT），由 `sync-ard
 | px 直接当 dp 用 | 高密度机上整体放大 2~3 倍 |
 | 硬编码绝对坐标 | 换机型/换刘海形态即错位 |
 | 忽略 safe area | 顶栏被刘海吃、底栏被手势条挡 |
-| 用平台默认控件拼装（NavigationStack/TabView/List 默认样式） | 信息层级全面缺失（相册差距分析 🔴26 项的根因；注：该分析为 2026-08-08 快照，多数 gap 已于后续重构关闭，见 [`2026-08-10-ios-kmp-doc-drift-audit.md`](../reviews/2026-08-10-ios-kmp-doc-drift-audit.md)） |
+| 用平台默认控件拼装（NavigationStack/TabView/List 默认样式） | 信息层级全面缺失（相册差距分析 🔴26 项的根因；注：该分析为 2026-08-08 快照，多数 gap 已于后续重构关闭，见 `2026-08-10-ios-kmp-doc-drift-audit.md`） |
 | 位图只供单倍率 | 高倍屏模糊 |
 | 硬编码 Color.White / Color.Black | 深色模式下文字不可见 |
 | 交互元素无 accessibilityLabel | TalkBack/VoiceOver 读不出功能，视障用户完全无法使用 |
@@ -242,4 +242,4 @@ Ardot/Figma 画布为 token **可视化预览层**（非 SSOT），由 `sync-ard
 - [Swift by Sundell：Defining Dynamic Colors in Swift](https://www.swiftbysundell.com/articles/defining-dynamic-colors-in-swift)
 - [Appy Pie：200ms Rule for Mobile Animation](https://www.appypie.com/blog/mobile-app-animation-guide)
 - [Bitrise：Introduction to App Localization in iOS and Android](https://bitrise.com/blog/post/introduction-to-app-localization-in-ios-and-android)
-- 本项目实证（2026-08-08 快照；相机/相册视图层已大幅重构，多数 gap 已关闭，勿用于当前规划，见 [`2026-08-10-ios-kmp-doc-drift-audit.md`](../reviews/2026-08-10-ios-kmp-doc-drift-audit.md)）
+- 本项目实证（2026-08-08 快照；相机/相册视图层已大幅重构，多数 gap 已关闭，勿用于当前规划，见 `2026-08-10-ios-kmp-doc-drift-audit.md`）

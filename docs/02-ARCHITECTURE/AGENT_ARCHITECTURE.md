@@ -8,9 +8,9 @@
 
 > **边界声明（Boundary Statement）**
 > - 本文档定义 Agent 的运行时架构、Capability 模型与推理模式选型。
-> - 产品目标与验收口径以 [`../01-PRODUCT/FEATURES.md`](../01-PRODUCT/FEATURES.md) 为准。
-> - 顶层治理规则（角色协作、全局红线、文档流程）以根目录 [`AGENTS.md`](../../AGENTS.md) 为准。
-> - **重要：原 `:agent-core` Java 基础库已删除**（2026-08 迁移至 JetBrains Koog 外部依赖），Agent 编排层（AgentOrchestrator、CapabilityRegistry、PrivacyGuard、MemoryManager、SceneManager 等）在 `:shared` KMP 模块的 `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/` 目录下（平台实现 androidMain；Android 组合根 `androidApp/src/main/java/com/mamba/picme/agent/AndroidAgentComposition.kt`）。详见 [`MODULE_ARCHITECTURE.md`](MODULE_ARCHITECTURE.md)。
+> - 产品目标与验收口径以 [`../01-PRODUCT/FEATURES.md`](01-PRODUCT/FEATURES.md) 为准。
+> - 顶层治理规则（角色协作、全局红线、文档流程）以根目录 `AGENTS.md` 为准。
+> - **重要：原 `:agent-core` Java 基础库已删除**（2026-08 迁移至 JetBrains Koog 外部依赖），Agent 编排层（AgentOrchestrator、CapabilityRegistry、PrivacyGuard、MemoryManager、SceneManager 等）在 `:shared` KMP 模块的 `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/` 目录下（平台实现 androidMain；Android 组合根 `androidApp/src/main/java/com/mamba/picme/agent/AndroidAgentComposition.kt`）。详见 [`MODULE_ARCHITECTURE.md`](02-ARCHITECTURE/MODULE_ARCHITECTURE.md)。
 
 **模块定位**: AI Agent 运行时架构与推理模式选型（基础库 polang + Demo 工程 PoLang）  
 **阅读对象**: RD、AI Agent
@@ -55,7 +55,7 @@
   - chat/相册 → `streamChat` → KoogChatAgent + ChatToolService → tool_calls → Capability 执行
   - 相机指令 → `processCameraInput` → KoogReActAgent + CameraToolService → tool_calls → Capability 执行（全景见下方路由图）
 
-> 历史：ADR-005 的「本地/远程双链路」（Qwen3.5-2B 端侧推理 + 自定义 JSON 数组协议）已于 2026-08-02 随端侧文本 LLM 一并移除，见本节「已移除组件」与 ADR-005 的「状态更新（2026-08-02）」块（历史 ADR-009/010 已于 2026-08-23 删除，见 [ADR 索引](./ADR/README.md)）。
+> 历史：ADR-005 的「本地/远程双链路」（Qwen3.5-2B 端侧推理 + 自定义 JSON 数组协议）已于 2026-08-02 随端侧文本 LLM 一并移除，见本节「已移除组件」与 ADR-005 的「状态更新（2026-08-02）」块（历史 ADR-009/010 已于 2026-08-23 删除，见 [ADR 索引](02-ARCHITECTURE/ADR/README.md)）。
 
 **核心组件状态**: 
 
@@ -979,14 +979,14 @@ class AiAgentUseCase(
 
 ## 12. 附录：参考文档
 
-- [AGENTS.md](../../AGENTS.md) — 顶层治理规则
-- [FEATURES.md](../01-PRODUCT/FEATURES.md) — 功能交互细节
-- [COMMAND_REFERENCE.md](../04-AGENT-CAPABILITIES/COMMAND_REFERENCE.md) — 命令参考手册
-- [AI_OPTIMIZATION.md](../03-TECHNICAL-SPECS/AI_OPTIMIZATION.md) — AI 一键优化
-- [TAG_GENERATION.md](../03-TECHNICAL-SPECS/TAG_GENERATION.md) — TAG 生成
-- [MNN_LLM_OPERATIONS.md](../03-TECHNICAL-SPECS/MNN_LLM_OPERATIONS.md) — 端侧 VLM 打标引擎运维
-- [VOICE_STACK.md](../03-TECHNICAL-SPECS/VOICE_STACK.md) — 语音栈
-- [IM_REMOTE_CONTROL_TECH_SPEC.md](../03-TECHNICAL-SPECS/IM_REMOTE_CONTROL_TECH_SPEC.md) — IM 远程控制技术规范
+- `AGENTS.md` — 顶层治理规则
+- [FEATURES.md](01-PRODUCT/FEATURES.md) — 功能交互细节
+- [COMMAND_REFERENCE.md](04-AGENT-CAPABILITIES/COMMAND_REFERENCE.md) — 命令参考手册
+- [AI_OPTIMIZATION.md](03-TECHNICAL-SPECS/AI_OPTIMIZATION.md) — AI 一键优化
+- [TAG_GENERATION.md](03-TECHNICAL-SPECS/TAG_GENERATION.md) — TAG 生成
+- [MNN_LLM_OPERATIONS.md](03-TECHNICAL-SPECS/MNN_LLM_OPERATIONS.md) — 端侧 VLM 打标引擎运维
+- [VOICE_STACK.md](03-TECHNICAL-SPECS/VOICE_STACK.md) — 语音栈
+- [IM_REMOTE_CONTROL_TECH_SPEC.md](03-TECHNICAL-SPECS/IM_REMOTE_CONTROL_TECH_SPEC.md) — IM 远程控制技术规范
 - `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/` — 源码目录（Agent 编排层：AgentOrchestrator、CapabilityRegistry、PrivacyGuard、MemoryManager、SceneManager 等；平台实现见 `shared/src/androidMain/`）
 - ~~`agent-core/src/main/java/com/mamba/`~~ — `:agent-core` 已删除（2026-08 迁移至 JetBrains Koog 外部依赖）
 - `androidApp/src/main/java/com/mamba/picme/domain/usecase/AiAgentUseCase.kt` — Facade 桥接层

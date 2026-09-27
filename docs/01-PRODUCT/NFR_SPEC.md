@@ -1,8 +1,8 @@
 # PoLang 非功能性需求规格说明书（NFR Spec）
 
-**版本**：1.1  
+**版本**：1.3  
 **状态**：生效中  
-**最后更新**：2026-08-03  
+**最后更新**：2026-09-27  
 **维护者**：项目开发者  
 
 ---
@@ -11,26 +11,37 @@
 
 本文档统一收口 PoLang 所有**可量化的非功能性需求**，作为自动化测试和 CI 门禁的通过/失败标准。所有指标均为**硬红线**（Hard Limit），未达标视为阻塞发布项。
 
+> **口径声明（2026-09-27）**：本文件是 PoLang 工程指标数字的**唯一全量出处**（红线+目标+测量方法+验收工具）。`PRODUCT.md` §2.2 仅保留产品体验红线值并与本表对齐维护；其他文档（FEATURES 等）不再复写数字，一律引用本表。
+
 ---
 
 ## 2. 性能指标（Performance）
 
 | 维度 | 指标 | 红线 | 目标 | 测量方法 | 验收工具 | 关联文档 |
 |------|------|------|------|----------|----------|----------|
-| **启动性能** | 冷启动 → 首帧预览 | ≤ 500ms | ≤ 400ms | `adb shell am start -W` | CI perf test | PRODUCT.md#2.1 |
-| **启动性能** | 启动阶段禁止项 | — | 零启动页 / 零数据库迁移阻塞 | 人工检查 + Logcat | CI lint | PRODUCT.md#2.1 |
+| **启动性能** | 冷启动 → 首帧预览 | ≤ 500ms | ≤ 400ms | `adb shell am start -W` | CI perf test | PRODUCT.md §5.1 |
+| **启动性能** | 启动阶段禁止项 | — | 零启动页 / 零数据库迁移阻塞 | 人工检查 + Logcat | CI lint | PRODUCT.md §5.1 |
 | **预览性能** | 预览帧率（高端机）| ≥ 30fps | ≥ 55fps | `BeautyPerfStats.fps` | 调试浮层 + Systrace | AGENTS.md#5 |
 | **预览性能** | 预览帧率（低端机）| ≥ 30fps | ≥ 30fps | `BeautyPerfStats.fps` | 调试浮层 | AGENTS.md#5 |
 | **预览性能** | 单帧处理耗时 | ≤ 16ms | ≤ 12ms | `processingMs` | Systrace / 自定义计时 | AGENTS.md#5 |
-| **参数响应** | 参数调节 → 画面变化 | ≤ 100ms | ≤ 50ms | 人工体感 + 高速摄像 | QA checklist | PRODUCT.md#2.1 |
-| **拍照后处理** | 1080p GPU 处理 | ≤ 300ms | ≤ 200ms | `PhotoProcessorImpl` 耗时 | CI perf test | PRODUCT.md#3.1 |
-| **拍照后处理** | 4K GPU 处理 | ≤ 800ms | ≤ 600ms | `PhotoProcessorImpl` 耗时 | CI perf test | PRODUCT.md#3.1 |
-| **相册滚动** | 1000+ 照片滑动帧率 | ≥ 120fps | ≥ 120fps | GPU Profile | Systrace | PRODUCT.md#2.1 |
-| **相册滚动** | 快速滑动停止后首图清晰 | ≤ 100ms | ≤ 50ms | 人工体感 | QA checklist | PRODUCT.md#2.1 |
-| **快门延迟** | 按下快门 → 反馈 | ≤ 50ms | ≤ 30ms | 触感 + 音效 + 黑场同步 | QA checklist | PRODUCT.md#2.1 |
+| **参数响应** | 参数调节 → 画面变化 | ≤ 100ms | ≤ 50ms | 人工体感 + 高速摄像 | QA checklist | PRODUCT.md §5.1 |
+| **拍照后处理** | 1080p GPU 处理 | ≤ 300ms | ≤ 200ms | `PhotoProcessorImpl` 耗时 | CI perf test | PRODUCT.md §2 |
+| **拍照后处理** | 4K GPU 处理 | ≤ 800ms | ≤ 600ms | `PhotoProcessorImpl` 耗时 | CI perf test | PRODUCT.md §2 |
+| **相册滚动** | 1000+ 照片滑动帧率 | ≥ 120fps | ≥ 120fps | GPU Profile | Systrace | PRODUCT.md §5.1 |
+| **相册滚动** | 快速滑动停止后首图清晰 | ≤ 100ms | ≤ 50ms | 人工体感 | QA checklist | PRODUCT.md §5.1 |
+| **快门延迟** | 按下快门 → 反馈 | ≤ 50ms | ≤ 30ms | 触感 + 音效 + 黑场同步 | QA checklist | PRODUCT.md §5.1 |
 | **美颜引擎** | 内存占用 | ≤ 30MB | ≤ 25MB | Android Profiler | CI perf test | AGENTS.md#2.1 |
 | **美颜引擎** | CPU 占用（美颜模块）| ≤ 15% | ≤ 10% | `cpuUsage` | Android Profiler | AGENTS.md#5 |
 | **美颜引擎** | 空帧计数异常波动 | 无告警 | 零告警 | `nullFrames` | 调试浮层 | AGENTS.md#5 |
+| **Agent 交互** | Agent 响应（远程 L3/L4 推理） | < 1.5s | < 1s | 日志埋点 | QA checklist | PRODUCT.md §2.2 |
+| **Agent 交互** | 交互反馈（UI 响应） | < 100ms | < 50ms | 人工感知测试 | QA checklist | PRODUCT.md §2.2 |
+| **Agent 交互** | LLM 首 token 延迟（远程） | < 2s | < 1s | 日志埋点 | CI perf test | PRODUCT.md §2.2 |
+| **Agent 交互** | 端到端命令执行（远程） | < 3s | < 2s | 日志埋点 | QA checklist | PRODUCT.md §2.2 |
+| **Agent 交互** | ASR 识别到命令执行（远程推理） | < 3s | < 2s | 端到端计时 | QA checklist | FEATURES.md §3.5 |
+| **Agent 交互** | 对话数据库查询（1000 条消息） | < 50ms | < 30ms | Room 查询计时 | CI perf test | — |
+| **Agent 交互** | 对话历史恢复（重启后） | < 500ms | < 300ms | 端到端计时 | QA checklist | FEATURES.md §3.5 |
+| **Agent 交互** | 远程模型切换延迟 | < 200ms | < 100ms | 端到端计时 | QA checklist | FEATURES.md §3.5 |
+| **包体** | 应用包体积（含模型） | < 150MB | < 120MB | APK/AAB 产物 | CI | — |
 
 ---
 
@@ -124,3 +135,4 @@
 | 1.0 | 2026-05-14 | 初版，收口所有 NFR 指标 | PM |
 | 1.1 | 2026-08-03 | 离线可用指标修正（端侧文本 LLM 已移除，AI 对话/指令需网络）；维护者去角色化 | 项目开发者 |
 | 1.2 | 2026-09-20 | 相机冻结口径落地：§3 帧同步专项与 §7.2 相机发布门禁标注「仅作回归基线」 | 项目开发者 |
+| 1.3 | 2026-09-27 | 升格为工程指标数字 SSOT：吸收 PRODUCT §7.2/§2.2 与 FEATURES §3.5 独有指标共 9 行（Agent 交互组 + 包体）；口径声明；关联文档列死链清理 | 项目开发者 |

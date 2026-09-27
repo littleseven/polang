@@ -189,7 +189,7 @@ class RemoteCommandDispatcher(
 
 ### 3.3 RemoteControlCapability
 
-与现有实现一致（见 [RemoteControlCapability.kt](../../androidApp/src/main/java/com/mamba/picme/domain/agent/capability/RemoteControlCapability.kt)），管理设备绑定状态、自动确认模式，不通过 AgentCommand 密封类分发。
+与现有实现一致（见 `RemoteControlCapability.kt`），管理设备绑定状态、自动确认模式，不通过 AgentCommand 密封类分发。
 
 ### 3.4 图片回传流程
 
@@ -273,6 +273,7 @@ class RemoteCommandDispatcher(
 |------|------|------|
 | 飞书接收 | 20MB | 飞书平台限制 |
 | 设备回复 | 20MB | 设备端自动压缩（> 10MB 压缩到 80% 质量） |
+| 并发处理 | 同时处理队列上限 5 张 | 防止设备过载（超限排队） |
 
 ---
 
@@ -381,6 +382,8 @@ class RemoteCommandDispatcher(
 | AC-IM-9 | 飞书命令响应 < 3s（含 LLM 推理 + 设备执行） | P0 |
 | AC-IM-10 | 图片处理 < 5s @1080p | P1 |
 | AC-IM-11 | **零云端基础设施**：无需部署任何云函数/Relay Server | P0 |
+| AC-IM-12 | 图片回传 < 2s（处理完成到 IM 可见） | P1 |
+| AC-IM-13 | 非法请求（鉴权失败）拒绝 < 500ms | P0 |
 
 ---
 
@@ -479,7 +482,7 @@ class RemoteCommandDispatcher(
 
 | 文档 | 说明 |
 |------|------|
-| `../../docs/01-PRODUCT/FEATURES.md#5-im-远程控制实验性融合入口---p2` | 产品交互规范 |
+| `../../docs/01-PRODUCT/FEATURES.md#5-im-远程控制-冻结--低优先实验线` | 产品交互规范 |
 | `../../PRODUCT.md` | 产品路线图与里程碑 |
 | `../../docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md` | Agent 架构详细设计 |
 | `../../docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md` | 远程推理架构（LLM 复用层） |

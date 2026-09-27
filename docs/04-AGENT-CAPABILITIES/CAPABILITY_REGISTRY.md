@@ -2,8 +2,8 @@
 
 > **边界声明（Boundary Statement）**
 > - 本文档定义所有 Agent Capability 的注册表、命令映射、执行逻辑、新增 Capability 实现指南以及生命周期规范。
-> - 架构设计以 [`../02-ARCHITECTURE/AGENT_ARCHITECTURE.md`](../02-ARCHITECTURE/AGENT_ARCHITECTURE.md) 为准。
-> - 交互规范以 [`../01-PRODUCT/FEATURES.md`](../01-PRODUCT/FEATURES.md) 为准。
+> - 架构设计以 [`../02-ARCHITECTURE/AGENT_ARCHITECTURE.md`](02-ARCHITECTURE/AGENT_ARCHITECTURE.md) 为准。
+> - 交互规范以 [`../01-PRODUCT/FEATURES.md`](01-PRODUCT/FEATURES.md) 为准。
 
 **模块定位**: Agent 能力注册表、命令映射、实现指南与生命周期规范  
 **主要维护者**: 项目开发者  
@@ -1385,6 +1385,6 @@ class CapabilityRegistry {
 ---
 
 > **参考文档**:
-> - [AGENTS.md](../../AGENTS.md) — Agent First 架构原则
-> - [AGENT_ARCHITECTURE.md](../02-ARCHITECTURE/AGENT_ARCHITECTURE.md) — Agent 架构设计
-> - [COMMAND_REFERENCE.md](./COMMAND_REFERENCE.md) — 命令语法参考
+> - `AGENTS.md` — Agent First 架构原则
+> - [AGENT_ARCHITECTURE.md](02-ARCHITECTURE/AGENT_ARCHITECTURE.md) — Agent 架构设计
+> - [COMMAND_REFERENCE.md](04-AGENT-CAPABILITIES/COMMAND_REFERENCE.md) — 命令语法参考

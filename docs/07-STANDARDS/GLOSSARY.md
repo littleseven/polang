@@ -3,7 +3,7 @@
 > **边界声明（Boundary Statement）**
 > - 本文档定义 PoLang 项目统一术语，确保 Spec 语义一致性。
 > - 技术规范以各模块 `*_TECH_SPEC.md` 为准。
-> - 坐标系标准以 [`COORDINATE_SYSTEM.md`](./COORDINATE_SYSTEM.md) 为准。
+> - 坐标系标准以 [`COORDINATE_SYSTEM.md`](07-STANDARDS/COORDINATE_SYSTEM.md) 为准。
 
 **模块定位**: 统一术语定义与禁用别名  
 **主要维护者**: 项目开发者  
@@ -352,6 +352,6 @@ val leftEye = landmarks[52]  // 左眼？图像左侧？被拍摄者左眼？
 ---
 
 > **参考文档**:
-> - [COORDINATE_SYSTEM.md](./COORDINATE_SYSTEM.md) — 坐标系标准
-> - [NFR_SPEC.md](../01-PRODUCT/NFR_SPEC.md) — 非功能性需求规格
-> - [AGENT_ARCHITECTURE.md](../02-ARCHITECTURE/AGENT_ARCHITECTURE.md) — Agent 架构设计
+> - [COORDINATE_SYSTEM.md](07-STANDARDS/COORDINATE_SYSTEM.md) — 坐标系标准
+> - [NFR_SPEC.md](01-PRODUCT/NFR_SPEC.md) — 非功能性需求规格
+> - [AGENT_ARCHITECTURE.md](02-ARCHITECTURE/AGENT_ARCHITECTURE.md) — Agent 架构设计

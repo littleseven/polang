@@ -333,7 +333,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 ```
 
 **UI**：绿底深字（`chatBubble/userBubbleBg` #95EC69 双模恒值 / `userBubbleOn` #181818），hug 尺寸 pad 18h/14v，右对齐。
-![chat_user_bubble](../08-UI-SPECS/screens/refs/ardot/components/chat_user_bubble-dark.png)
+![chat_user_bubble](assets/chat-cards/chat_user_bubble-dark.png)
 **渲染组件**：`ChatMessageItem`（ChatScreen.kt）isUser 分支，原生 Compose；图片走 Coil。`ChatBubbleTokens`（`core/designsystem/DesignTokens.kt`）。
 **目标 parts 形态**：§0.2 `text` / `image`（user_image 的 ref=content 列；图文消息 = Image+Text 图上文下）。
 
@@ -385,7 +385,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 ### 3.3 日期分隔
 
 列表装饰非消息。`ChatDateChip`（surfaceContainerHigh 底 r8 胶囊）。
-![chat_date_chip](../08-UI-SPECS/screens/refs/ardot/components/chat_date_chip-dark.png)
+![chat_date_chip](assets/chat-cards/chat_date_chip-dark.png)
 
 ---
 
@@ -461,7 +461,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | Fullpage 预览 | `htmlcard/preview` 438:60 | 0.5 屏固定高 + 底部渐隐遮罩 + 「点击查看完整内容」提示条 |
 | 全屏查看器 | `htmlcard/fullpage` 438:98 | ✕ 顶栏（标题=summary）+ 竖滚 + 滚动条 |
 
-![inline](../08-UI-SPECS/screens/refs/ardot/htmlcard-inline.png) ![preview](../08-UI-SPECS/screens/refs/ardot/htmlcard-preview.png) ![fullpage](../08-UI-SPECS/screens/refs/ardot/htmlcard-fullpage.png)
+![inline](assets/chat-cards/htmlcard-inline.png) ![preview](assets/chat-cards/htmlcard-preview.png) ![fullpage](assets/chat-cards/htmlcard-fullpage.png)
 
 **渲染组件**：`HtmlCard` / `HtmlWebView` / `HtmlPreviewHintBar` / `HtmlPreviewFallbackCover`（`HtmlCard.kt`）+ `HtmlFullpageViewer`（同目录）+ `HtmlLinkPreviewOverlay`（`<a>` 落地页浮层）。机制：`HtmlCardSanitizer` 清洗（128KB/剔远程 script/iframe/form）→ `wrapHtmlDocument`（viewport + 响应式 reset）→ `HtmlCardDisplay` 纯函数分流（display==fullpage 直判；否则测高 >1.0 屏强制 FULLPAGE；终判落 metadata 防跳变）；Inline = console 出站测高 + ResizeObserver 跟随 + 防抖三件套；渲染失败 → 原生封面兜底。
 **调试**：DEBUG `/html` → `HtmlCardSmokeSamples`（十一卡）。
@@ -511,7 +511,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 待审批 | `taskcard/approval` 438:264 | radio 选项列表（继续执行/到此为止） |
 | 完成 | `taskcard/done` 444:31 | [暂不｜推送交付] 双按钮 |
 
-![collapsed](../08-UI-SPECS/screens/refs/ardot/taskcard-collapsed.png) ![expanded](../08-UI-SPECS/screens/refs/ardot/taskcard-expanded.png) ![approval](../08-UI-SPECS/screens/refs/ardot/taskcard-approval.png) ![done](../08-UI-SPECS/screens/refs/ardot/taskcard-done.png)
+![collapsed](assets/chat-cards/taskcard-collapsed.png) ![expanded](assets/chat-cards/taskcard-expanded.png) ![approval](assets/chat-cards/taskcard-approval.png) ![done](assets/chat-cards/taskcard-done.png)
 
 **渲染组件**：`EngineerTaskCard` + `EngineerTaskNativeActionBar`（现实现动作条外置卡底）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。机制：`EngineerTaskHtml`（L1 端侧模板 + 状态 JSON 组装完整 HTML，CSS 变量走 tokens）经 `HtmlCard` 双形态渲染；displayMode 粘滞不落库；500ms 合帧节流（`EngineerTaskThrottle`）；状态文本 HTML escape（唯一注入面）；停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
 **parts**：`TaskCard(toolCallId, state)`——五态映射 Vercel 工具状态机 + 审批态。
@@ -546,7 +546,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 ```
 
 **UI**：`chat_photo_card` 组件（120×150 照片卡 + 👍/👎/🔁 反馈钮列 + DateChip 角标）横滑轮播。
-![chat_photo_card](../08-UI-SPECS/screens/refs/ardot/components/chat_photo_card-dark.png)
+![chat_photo_card](assets/chat-cards/chat_photo_card-dark.png)
 **渲染组件**：`MediaResultsCarousel`（`components/MediaResultsCarousel.kt`）——原生 Compose（LazyRow + Coil）；媒体被删后同步收缩。
 **测试**：`ChatGallerySearchTest` / `SearchSnapshotBuilderTest`。
 **目标 parts 形态**：§0.2 `media_results`（content 数组与 metadata 三字段合一进 results）。
@@ -635,7 +635,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 }
 ```
 
-![cleanup](../08-UI-SPECS/screens/refs/ardot/components/chat_cleanup_card-dark.png) ![cleanup_done](../08-UI-SPECS/screens/refs/ardot/components/chat_cleanup_done_card-dark.png) ![nudge](../08-UI-SPECS/screens/refs/ardot/components/chat_nudge_card-dark.png)
+![cleanup](assets/chat-cards/chat_cleanup_card-dark.png) ![cleanup_done](assets/chat-cards/chat_cleanup_done_card-dark.png) ![nudge](assets/chat-cards/chat_nudge_card-dark.png)
 
 ---
 
