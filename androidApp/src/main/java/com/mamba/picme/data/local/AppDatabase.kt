@@ -59,7 +59,7 @@ import com.mamba.picme.data.model.MediaEntity
         DedupHashEntity::class,
         UserTaskEntity::class
     ],
-    version = 24,
+    version = 25,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -100,7 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
                         MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
-                        MIGRATION_23_24
+                        MIGRATION_23_24, MIGRATION_24_25
                     )
                     .build()
                 INSTANCE = instance
@@ -519,6 +519,21 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        /**
+         * Migration 24 → 25：chat_messages 新增 partsJson 列（ADR-016 M1 parts 模型双写过渡）。
+         *
+         * 列名随 Room 属性名（本表列均为 camelCase：sessionId/modelUsed/metadata）。
+         * 存量行逐行回填 parts JSON（legacy type+content+metadata → parts 文档，
+         * 转换逻辑收口 [backfillChatMessageParts]，单行失败降级 Text 原文兜底，不丢消息）；
+         * 旧列保留不删（双读双写过渡，回退安全）。
+         */
+        internal val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `chat_messages` ADD COLUMN `partsJson` TEXT")
+                backfillChatMessageParts(database)
             }
         }
     }

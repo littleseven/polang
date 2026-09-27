@@ -9,6 +9,7 @@ import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.ChatSessionEntity
+import com.mamba.picme.data.local.insertMessageWithParts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
@@ -198,7 +199,7 @@ class RemoteCommandDispatcher(
 
     private suspend fun saveUserMessage(content: String) {
         try {
-            chatMessageDao.insertMessage(
+            chatMessageDao.insertMessageWithParts(
                 ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId(),
@@ -215,7 +216,7 @@ class RemoteCommandDispatcher(
 
     private suspend fun saveAgentMessage(content: String) {
         try {
-            chatMessageDao.insertMessage(
+            chatMessageDao.insertMessageWithParts(
                 ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId(),

@@ -1,5 +1,7 @@
 package com.mamba.picme.domain.chat
 
+import kotlinx.serialization.Serializable
+
 /**
  * 工程师模式任务卡状态（spec 2026-09-25-engineer-task-card-design D1/D2）。
  * 纯数据形状，双端 SSOT；状态迁移在 androidApp `EngineerTaskReducer`（消费 ClaudeEvent）。
@@ -10,6 +12,7 @@ enum class EngineerTaskStatus { RUNNING, AWAITING_CONTINUE, AWAITING_DELIVER, CO
 /** 审批动作回填（US-9）：已继续 / 已放弃 / 已交付 / 暂不交付。 */
 enum class EngineerTaskResolution { CONTINUED, ABANDONED, DELIVERED, DELIVER_SKIPPED }
 
+@Serializable
 data class EngineerTaskState(
     val taskId: String,
     val sourceText: String,

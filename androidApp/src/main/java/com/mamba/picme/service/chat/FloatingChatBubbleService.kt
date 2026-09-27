@@ -80,6 +80,7 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import com.mamba.picme.MainActivity
 import com.mamba.picme.PoLangApplication
@@ -91,7 +92,7 @@ import com.mamba.picme.domain.chat.ChatMessageType
 import com.mamba.picme.features.chat.ChatMessageUi
 import com.mamba.picme.features.chat.ChatModelOption
 import com.mamba.picme.features.chat.ChatViewModel
-import dev.jeziellago.compose.markdowntext.MarkdownText
+import com.mamba.picme.features.common.chat.AgentMarkdown
 import kotlinx.coroutines.launch
 
 /**
@@ -727,9 +728,11 @@ private fun FloatingChatMessageItem(message: ChatMessageUi) {
                     style = MaterialTheme.typography.bodyMedium
                 )
             } else {
-                MarkdownText(
-                    markdown = message.content,
+                AgentMarkdown(
+                    content = message.content,
                     color = textColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     modifier = Modifier.padding(10.dp)
                 )
             }

@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatMessageEntity
+import com.mamba.picme.data.local.insertMessagesWithParts
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.MediaDao
@@ -730,7 +731,8 @@ class TagDataBackupRepository(
             }
             if (backup.chatMessages.isNotEmpty()) {
                 backup.chatMessages.chunked(500).forEach { chunk ->
-                    chatMessageDao.insertMessages(
+                    // 旧备份（v5 及以前）不含 partsJson：恢复时从 legacy 列现算回填（M1 双写接缝）
+                    chatMessageDao.insertMessagesWithParts(
                         chunk.map { msg ->
                             ChatMessageEntity(
                                 id = msg.id,

@@ -5,6 +5,9 @@ package com.mamba.picme.agent.core.inference.remote
  *
  * 由 [RemoteChatEngine.streamChat] 的 onEvent 回调产出，承载流式期间的瞬态内容；
  * 全部走内存轨（ViewModel 的 _streamingMessage），**不落 Room**。
+ *
+ * ADR-016 M2：本事件流经 `ChatStreamTurnAdapter`（domain/chat/streaming）翻译为
+ * spec §4 的 TurnStreamEvent 三段式（块级 id 锚定），驱动 turn parts 快照装配。
  */
 sealed interface ChatStreamEvent {
 
@@ -17,6 +20,10 @@ sealed interface ChatStreamEvent {
     /**
      * 模型本轮产出 tool_calls，进入端侧工具执行。
      * UI 可将气泡内容切换为"正在调用工具"类状态文案（文案由 app 层按语言本地化）。
+     *
+     * M2 起携带 [toolName]（Koog onToolCallStarting 透传）供 turn 装配器生成类型化
+     * 占位 part；缺省空串 = 未知工具（直执路径等），占位降级为通用登记。
+     * [args] 为工具参数 JSON（Koog 在调用开始即给全量，无增量），瞬态不入库。
      */
-    data object ToolCallStarted : ChatStreamEvent
+    data class ToolCallStarted(val toolName: String = "", val args: String = "") : ChatStreamEvent
 }

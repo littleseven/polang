@@ -127,7 +127,7 @@ import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.tag.i18n.BilingualVocab
 import com.mamba.picme.domain.tag.i18n.TagTranslator
 import com.mamba.picme.features.gallery.MediaViewModel
-import dev.jeziellago.compose.markdowntext.MarkdownText
+import com.mamba.picme.features.common.chat.AgentMarkdown
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -892,8 +892,8 @@ private fun VisionResultOverlay(
                         )
 
                         val scrollState = rememberScrollState()
-                        MarkdownText(
-                            markdown = result,
+                        AgentMarkdown(
+                            content = result,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
@@ -901,8 +901,7 @@ private fun VisionResultOverlay(
                                 .padding(horizontal = 4.dp),
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
-                            color = Color.Black,
-                            style = MaterialTheme.typography.bodyMedium
+                            color = Color.Black
                         )
 
                         Row(

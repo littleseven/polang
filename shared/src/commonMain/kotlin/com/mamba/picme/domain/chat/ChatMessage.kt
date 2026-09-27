@@ -2,6 +2,7 @@ package com.mamba.picme.domain.chat
 
 import com.mamba.picme.agent.core.model.command.FeedbackAction
 import com.mamba.picme.agent.core.model.context.MediaAsset
+import kotlinx.serialization.Serializable
 
 /**
  * 聊天消息 UI 数据类（SSOT，1:1 对齐 Android `ChatMessageUi`）。
@@ -11,6 +12,11 @@ import com.mamba.picme.agent.core.model.context.MediaAsset
  * 它们是平台关注点，由 androidApp 扩展函数提供（Room metadata 边界）。
  *
  * iOS 当前用 Swift 原生 `ChatMessage`（未消费本类型）；本下沉为后续 KMP 整理铺路。
+ *
+ * ADR-016（M1）：新增 [parts] 有序内容块数组（Vercel parts 模型），与 legacy 平铺字段
+ * 双写共存；UI 渲染仍读 legacy 字段（M1 不动 UI），parts 供持久化（Room partsJson）与
+ * LLM 回灌（[toModelInput]）消费。流式瞬态字段（isStreaming/showCursor/isThinking）不进入
+ * parts（streaming 消息不落库，parts 恒空）。
  */
 data class ChatMessage(
     val id: String,
@@ -46,12 +52,21 @@ data class ChatMessage(
     val gachaInteractive: Boolean = false,
     /** HTML_CARD 双形态元数据（display 声明 / 端侧终判 displayMode / 测高 / summary；Room metadata `html_card` key）。 */
     val htmlCardMeta: HtmlCardMeta? = null,
+    /**
+     * 有序内容块数组（ADR-016 parts 模型，M1）。数组顺序即锚点。
+     * 填充口径：持久化（Room partsJson 双写）与 LLM 回灌（实体侧 `toModelInputItems`）恒消费；
+     * UI 模型侧——M2 起流式占位消息由 turn 装配器实时填充（瞬态内存轨），Room 读侧仅
+     * 任务卡消息恢复填充（live 态 overlay 挂载点），其余类型仍留空（无消费方，省 decode 开销）；
+     * M4 切渲染源时全量恢复。直接构造的瞬态消息默认空表。
+     */
+    val parts: List<MessagePart> = emptyList(),
 )
 
 /**
  * 相册搜索结果 carousel 的 UI 数据。
  * assets 已截到展示上限；totalCount 为全量命中数。
  */
+@Serializable
 data class MediaResultsUi(
     val query: String,
     val assets: List<MediaAsset>,
@@ -68,6 +83,7 @@ enum class HtmlCardDisplayMode { INLINE, FULLPAGE }
  *
  * 纯数据，不含平台依赖；判定逻辑见 androidApp `HtmlCardDisplay`。
  */
+@Serializable
 data class HtmlCardMeta(
     /** LLM 经 render_html `display` 参数的声明原值（"inline"/"fullpage"）；null = 未声明（按 inline 处理）。 */
     val display: String? = null,
@@ -118,7 +134,9 @@ data class ClaudeDeliverUi(val sid: String, val pending: Boolean)
 /**
  * chat 抽卡候选卡组消息负载（OPTIMIZE_CANDIDATES 消息的 metadata）。
  * 纯数据；toJson/fromJson（org.json）在 androidApp 扩展。
+ * `@Serializable` 供 parts_json（kotlinx）落库；与 org.json 线格式互不干扰。
  */
+@Serializable
 data class OptimizeCandidateGroup(
     val sourceImageUri: String,
     val scene: String,
@@ -135,11 +153,13 @@ data class OptimizeCandidateGroup(
      * - [thumbPath] 候选图路径；空串 = 落盘失败（UI 占位）。
      * - [nimaScore] NIMA 美学分；null = 未评分。
      */
+    @Serializable
     data class Candidate(
         val direction: String,
         val thumbPath: String,
-        val nimaScore: Float?,
-        val rejected: Boolean
+        // 默认值供 kotlinx 解码兜底：org.json 线格式在 nimaScore 为 null 时缺省该键
+        val nimaScore: Float? = null,
+        val rejected: Boolean = false,
     )
 
     companion object {

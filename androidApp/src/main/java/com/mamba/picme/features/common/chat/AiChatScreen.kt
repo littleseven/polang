@@ -100,7 +100,6 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.compose.ui.text.TextStyle
-import dev.jeziellago.compose.markdowntext.MarkdownText
 
 private const val TAG = "Voice"
 
@@ -407,10 +406,11 @@ private fun AgentTextBubble(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.CenterStart
     ) {
-        MarkdownText(
-            markdown = message.content,
+        AgentMarkdown(
+            content = message.content,
             color = Color.White,
             fontSize = 13.sp,
+            lineHeight = 18.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp))
                 .background(Color.DarkGray.copy(alpha = 0.85f))
