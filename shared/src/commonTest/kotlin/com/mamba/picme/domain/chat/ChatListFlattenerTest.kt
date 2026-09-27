@@ -142,7 +142,7 @@ class ChatListFlattenerTest {
     }
 
     @Test
-    fun `filled streaming card parts are skipped but placeholders and errors stay`() {
+    fun `filled streaming card parts are skipped only after persisted row arrives`() {
         val streaming = ChatMessage(
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
@@ -154,13 +154,69 @@ class ChatListFlattenerTest {
                 MessagePart.Chart(partId = "call-2", svg = "", state = ToolPartState.OUTPUT_ERROR),
             ),
         )
-        val items = flattenChatItems(listOf(streaming))
-        // OUTPUT_AVAILABLE 跳过（产物已落库为独立消息行渲染）；占位与失败保留
-        assertEquals(listOf("s1:call-1", "s1:call-2"), items.map { it.key })
+        // 产物行（chart_ 前缀独立消息行，content 与 part 负载同值）已在列表中：
+        // OUTPUT_AVAILABLE 跳过（双显禁止）；占位与失败保留
+        val persistedChartRow = ChatMessage(
+            id = "chart_1",
+            type = ChatMessageType.CHART,
+            content = "<svg/>",
+            parts = listOf(MessagePart.Chart(partId = "p0", svg = "<svg/>")),
+        )
+        val items = flattenChatItems(listOf(streaming, persistedChartRow))
         assertEquals(
-            listOf(ChatListItem.TYPE_TOOL_PLACEHOLDER, ChatListItem.TYPE_TOOL_ERROR),
+            listOf("s1:call-1", "s1:call-2", "chart_1:p0"),
+            items.map { it.key },
+        )
+        assertEquals(
+            listOf(ChatListItem.TYPE_TOOL_PLACEHOLDER, ChatListItem.TYPE_TOOL_ERROR, ChatListItem.TYPE_CHART),
             items.map { it.contentType },
         )
+    }
+
+    @Test
+    fun `filled streaming card part renders inline until persisted row arrives`() {
+        // 🟡3 窗口期钉桩：feedToolOutput 已同步填满占位 part，但 Room invalidation 尚未把
+        // 产物行送进列表——卡 part 必须继续按 OUTPUT_AVAILABLE 负载原位渲染（交错位），
+        // 不得提前跳过造成窗口期卡片闪失
+        val streaming = ChatMessage(
+            id = "s1",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            isStreaming = true,
+            parts = listOf(
+                textPart("txt-0", "统计如下"),
+                MessagePart.Chart(partId = "call-0", svg = "<svg/>", state = ToolPartState.OUTPUT_AVAILABLE),
+                MessagePart.HtmlCard(partId = "call-1", html = "<html/>", state = ToolPartState.OUTPUT_AVAILABLE),
+            ),
+        )
+        val items = flattenChatItems(listOf(streaming))
+        assertEquals(listOf("s1:txt-0", "s1:call-0", "s1:call-1"), items.map { it.key })
+        assertEquals(
+            listOf(ChatListItem.TYPE_AGENT_TEXT, ChatListItem.TYPE_CHART, ChatListItem.TYPE_HTML_CARD),
+            items.map { it.contentType },
+        )
+    }
+
+    @Test
+    fun `historical card row of other turn does not trigger early skip`() {
+        // 🟡3 负载锚定：旧 turn 的历史卡行（负载不同）不得让本 turn 新填充的卡 part 提前跳过
+        val historicalChartRow = ChatMessage(
+            id = "chart_old",
+            type = ChatMessageType.CHART,
+            content = "<svg>old</svg>",
+            parts = listOf(MessagePart.Chart(partId = "p0", svg = "<svg>old</svg>")),
+        )
+        val streaming = ChatMessage(
+            id = "s1",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            isStreaming = true,
+            parts = listOf(
+                MessagePart.Chart(partId = "call-0", svg = "<svg>new</svg>", state = ToolPartState.OUTPUT_AVAILABLE),
+            ),
+        )
+        val items = flattenChatItems(listOf(historicalChartRow, streaming))
+        assertEquals(listOf("chart_old:p0", "s1:call-0"), items.map { it.key })
     }
 
     @Test

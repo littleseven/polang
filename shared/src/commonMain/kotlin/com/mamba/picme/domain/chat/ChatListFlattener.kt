@@ -13,8 +13,10 @@ package com.mamba.picme.domain.chat
  *   AGENT_IMAGE / AGENT_EDIT_RESULT（message 形渲染器）与 parts 为空的瞬态消息
  *   （流式占位「思考中」）；
  * - **流式消息卡 part 三分流**（spec §4 占位契约 + M2 双轨口径）：已填充
- *   （OUTPUT_AVAILABLE）的 Chart/HtmlCard **跳过**——产物已落库为独立消息行在列表中渲染，
- *   双显禁止；未完成（INPUT_STREAMING/INPUT_AVAILABLE）渲染占位 item；
+ *   （OUTPUT_AVAILABLE）的 Chart/HtmlCard 在其**产物行已在列表中**时跳过——
+ *   产物落库为独立消息行渲染，双显禁止；产物行未达的窗口期（Room invalidation
+ *   异步，M4 review 🟡3）占位 part 继续按 OUTPUT_AVAILABLE 负载原位渲染，防卡片
+ *   闪失与位置跳变；未完成（INPUT_STREAMING/INPUT_AVAILABLE）渲染占位 item；
  *   失败（OUTPUT_ERROR，瞬态轨不落库）渲染失败 item；
  * - **流式开放文本块**（Text + STREAMING）：内容以消息 content（节奏器 paced 输出）为准
  *   （[textOverride]），光标随 [ChatMessage.showCursor]——50ms 打字机节拍不因拍平丢失；
@@ -29,6 +31,18 @@ fun flattenChatItems(
     pendingToolName: String? = null,
 ): List<ChatListItem> {
     val items = ArrayList<ChatListItem>(messages.size * 2)
+    // 已落库产物行的负载集（🟡3）：chart/html 独立消息行的 content 与 part 负载同源同值
+    // （emitChartMessage/emitHtmlCardMessage 同一变量写两边），跳过已填充卡 part
+    // 以「产物行已在列表中」为前提
+    val persistedChartPayloads = HashSet<String>()
+    val persistedHtmlPayloads = HashSet<String>()
+    messages.forEach { message ->
+        when (message.type) {
+            ChatMessageType.CHART -> persistedChartPayloads += message.content
+            ChatMessageType.HTML_CARD -> persistedHtmlPayloads += message.content
+            else -> Unit
+        }
+    }
     var nextTurn = 0
     var currentTurn = -1
     messages.forEach { message ->
@@ -38,7 +52,7 @@ fun flattenChatItems(
         }
         val turn = currentTurn
         val turnStart = items.isEmpty() || items.last().turnIndex != turn
-        flattenMessage(message, turn, turnStart, items)
+        flattenMessage(message, turn, turnStart, persistedChartPayloads, persistedHtmlPayloads, items)
     }
     // 同 turn 相邻 agent 文本合并标记（段落间距收窄）：后一 item 与前一 item 同为 agent
     // 文本且同 turn 即并入连续文本流（覆盖消息内跨轮文本与消息间相邻文本两种形态）
@@ -75,6 +89,8 @@ private fun flattenMessage(
     message: ChatMessage,
     turn: Int,
     turnStart: Boolean,
+    persistedChartPayloads: Set<String>,
+    persistedHtmlPayloads: Set<String>,
     out: MutableList<ChatListItem>,
 ) {
     // USER 消息与 legacy 整消息渲染类型：单 item（part = null，渲染器读 legacy 字段）
@@ -94,8 +110,10 @@ private fun flattenMessage(
         )
         return
     }
-    // agent 消息按 part 拍平（跳过已填充卡 part：产物行已渲染）
-    val visible = message.parts.filterNot { part -> part.isPersistedStreamingOutput(message) }
+    // agent 消息按 part 拍平（跳过产物行已渲染的已填充卡 part）
+    val visible = message.parts.filterNot { part ->
+        part.isPersistedStreamingOutput(message, persistedChartPayloads, persistedHtmlPayloads)
+    }
     visible.forEachIndexed { index, part ->
         out += ChatListItem(
             key = "${message.id}:${part.partId}",
@@ -125,11 +143,29 @@ private fun ChatMessage.rendersAsWholeMessage(): Boolean =
 private fun wholeMessageKey(message: ChatMessage): String =
     "${message.id}:${message.parts.firstOrNull()?.partId ?: "whole"}"
 
-/** 流式消息中已填充落库的卡 part（双显禁止：独立 CHART/HTML_CARD 消息行在列表中渲染）。 */
-private fun MessagePart.isPersistedStreamingOutput(message: ChatMessage): Boolean =
-    message.isStreaming &&
-        (this is MessagePart.Chart || this is MessagePart.HtmlCard) &&
-        toolStateOrNull() == ToolPartState.OUTPUT_AVAILABLE
+/**
+ * 流式消息中已填充落库、且**产物行已在列表中**的卡 part（双显禁止：独立
+ * CHART/HTML_CARD 消息行在列表中渲染）。
+ *
+ * M4 review 🟡3：跳过必须以产物行在场为前提——`insertMessageWithParts` 的 Room
+ * invalidation 是异步的，`feedToolOutput` 同步填满占位 part 后到产物行到达
+ * `_messages` 之间有数十~数百 ms 窗口；仅按 OUTPUT_AVAILABLE 跳过会让卡片窗口期
+ * 消失、随后又在列表尾部出现（闪失 + 位置跳变）。匹配按负载等值（emit 时 Room
+ * content 与 part 负载同源同值），精确锚定本 turn 的产物行——旧 turn 的历史卡行
+ * 负载不同，不会误判提前跳过。
+ */
+private fun MessagePart.isPersistedStreamingOutput(
+    message: ChatMessage,
+    persistedChartPayloads: Set<String>,
+    persistedHtmlPayloads: Set<String>,
+): Boolean {
+    if (!message.isStreaming || toolStateOrNull() != ToolPartState.OUTPUT_AVAILABLE) return false
+    return when (this) {
+        is MessagePart.Chart -> svg in persistedChartPayloads
+        is MessagePart.HtmlCard -> html in persistedHtmlPayloads
+        else -> false
+    }
+}
 
 private fun MessagePart.toolStateOrNull(): ToolPartState? = when (this) {
     is MessagePart.Chart -> state
