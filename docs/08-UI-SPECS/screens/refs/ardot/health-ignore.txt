@@ -92,6 +92,12 @@ HtmlCard/htmlcard/notes/NotesList/Note
 HtmlCard/taskcard/notes/NotesList/Note
 TaskCardHtml/HeaderRow
 TaskCardHtml/BadgeRow
+# 任务卡上下两分区改版(2026-09-27,Muse 风格)新增同构重复:四态帧有意复用 InfoZone/ActionZone/选项行结构(HTML L1 模板 mockup,组件化在代码模板层)
+TaskCardHtml/InfoZone/HeaderRow
+TaskCardHtml/InfoZone/BadgeRow
+TaskCardHtml/ActionZone
+TaskCardHtml/ActionZone/ActionInner
+TaskCardHtml/ActionZone/ActionInner/OptionRow
 HtmlCard/htmlcard/inline/MessageList/UserRow
 HtmlCard/htmlcard/preview/MessageList/UserRow
 HtmlCard/taskcard/collapsed/MessageList/UserRow
