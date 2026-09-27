@@ -5,6 +5,9 @@ package com.mamba.picme.features.chat
 
 import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import com.mamba.picme.domain.chat.ChatMessageType
+import com.mamba.picme.domain.chat.ChatListItem
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.flattenChatItems
 import com.mamba.picme.domain.model.VoiceCommandMode
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.ClaudeStepStatus
@@ -266,6 +269,7 @@ fun ChatScreen(
     val activeEngineerTaskCount by viewModel.activeEngineerTaskCount.collectAsState()
     val gachaSelections by viewModel.gachaSelections.collectAsState()
     val gachaRerolling by viewModel.gachaRerolling.collectAsState()
+    val pendingNonCardTool by viewModel.pendingNonCardTool.collectAsState()
     // 抽卡条确认/换一组失败 toast 文案（闭包回调内无法取 stringResource，提前取）
     val gachaRerollUnavailableText = stringResource(R.string.chat_gacha_reroll_unavailable)
     val gachaConfirmFailedText = stringResource(R.string.chat_gacha_confirm_failed)
@@ -598,6 +602,12 @@ fun ChatScreen(
                 } else {
                     // 会话内存在任务卡 ⇒ 气泡上的 claude 审批按钮整体抑制（US-2 审批唯一入口）
                     val hasTaskCards = messages.any { msg -> msg.type == ChatMessageType.TASK_CARD }
+                    // ADR-016 M4（spec §7.2）：渲染源切到 parts——拍平为 LazyColumn 独立 item，
+                    // key="${messageId}:${partId}" + contentType 复用桶（修「有 key 无 contentType」
+                    // 的复用错配）；USER 消息整颗单 item（§5 图文同气泡不拆）
+                    val flatItems = remember(messages, pendingNonCardTool) {
+                        flattenChatItems(messages, pendingNonCardTool)
+                    }
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
@@ -607,52 +617,62 @@ fun ChatScreen(
                             .padding(horizontal = 20.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(messages, key = { it.id }) { message ->
-                            val mr = message.mediaResults
-                            if (message.type == ChatMessageType.MEDIA_RESULTS && mr != null) {
-                                MediaResultsCarousel(
-                                    mediaResults = mr,
-                                    onCardClick = { index ->
-                                        previewAssets = mr.assets
-                                        previewIndex = index
-                                    },
-                                    onViewAll = {
-                                        onNavigateToGallery(mr.query)
-                                    },
-                                    onFeedback = { mediaId, action ->
-                                        viewModel.onMediaFeedback(mediaId, mr.query, action)
-                                    }
-                                )
-                            } else if (message.type == ChatMessageType.CHART && message.chartSvg != null) {
-                                val chartSvg = message.chartSvg!!
-                                ChartSvgCard(svg = chartSvg, onClick = { previewChartSvg = chartSvg })
-                            } else if (message.type == ChatMessageType.HTML_CARD && message.htmlContent != null) {
-                                val html = message.htmlContent!!
-                                // 双形态（spec §3/§4）：inline 卡完全撑开直接交互；fullpage 预览卡固定高，
-                                // 点击进全屏查看器；端侧测高超 1.0 屏强制转预览；终判持久化到消息 metadata；
-                                // isListScrolling 用于滑动途中冻结卡片高度更新（防列表抖动）
-                                HtmlCard(
-                                    html = html,
-                                    meta = message.htmlCardMeta,
-                                    cacheKey = message.id,
-                                    viewportHeightDp = listViewportStableHeightDp,
-                                    previewViewportHeightDp = listViewportHeightDp,
-                                    isListScrolling = listState.isScrollInProgress,
-                                    onOpenLink = { url -> previewLinkUrl = url },
-                                    onOpenFullpage = {
-                                        fullpageHtmlCard = HtmlFullpageContent(
-                                            html = html,
-                                            title = message.htmlCardMeta?.summary
-                                        )
-                                    },
-                                    onDisplayModeResolved = { mode, measuredPx ->
-                                        viewModel.persistHtmlCardDisplayMode(message.id, mode, measuredPx)
-                                    }
-                                )
-                            } else if (message.type == ChatMessageType.TASK_CARD && message.engineerTask != null) {
-                                val task = message.engineerTask
-                                if (task != null) {
-                                    var taskExpanded by rememberSaveable(message.id) { mutableStateOf(false) }
+                        items(
+                            items = flatItems,
+                            key = { item -> item.key },
+                            contentType = { item -> item.contentType },
+                        ) { item ->
+                            when (item.contentType) {
+                                ChatListItem.TYPE_MEDIA_RESULTS -> {
+                                    val results = (item.part as MessagePart.MediaResults).results
+                                    MediaResultsCarousel(
+                                        mediaResults = results,
+                                        onCardClick = { index ->
+                                            previewAssets = results.assets
+                                            previewIndex = index
+                                        },
+                                        onViewAll = {
+                                            onNavigateToGallery(results.query)
+                                        },
+                                        onFeedback = { mediaId, action ->
+                                            viewModel.onMediaFeedback(mediaId, results.query, action)
+                                        }
+                                    )
+                                }
+                                ChatListItem.TYPE_CHART -> {
+                                    val chartSvg = (item.part as MessagePart.Chart).svg
+                                    ChartSvgCard(svg = chartSvg, onClick = { previewChartSvg = chartSvg })
+                                }
+                                ChatListItem.TYPE_HTML_CARD -> {
+                                    val part = item.part as MessagePart.HtmlCard
+                                    // 双形态（spec §3/§4）：inline 卡完全撑开直接交互；fullpage 预览卡固定高，
+                                    // 点击进全屏查看器；端侧测高超 1.0 屏强制转预览；终判持久化到消息 metadata；
+                                    // M4：测高 LruCache key 由消息 id 改 partId（item.key = messageId:partId）；
+                                    // isListScrolling 用于滑动途中冻结卡片高度更新（防列表抖动）
+                                    HtmlCard(
+                                        html = part.html,
+                                        meta = part.meta,
+                                        cacheKey = item.key,
+                                        viewportHeightDp = listViewportStableHeightDp,
+                                        previewViewportHeightDp = listViewportHeightDp,
+                                        isListScrolling = listState.isScrollInProgress,
+                                        onOpenLink = { url -> previewLinkUrl = url },
+                                        onOpenFullpage = {
+                                            fullpageHtmlCard = HtmlFullpageContent(
+                                                html = part.html,
+                                                title = part.meta.summary
+                                            )
+                                        },
+                                        onDisplayModeResolved = { mode, measuredPx ->
+                                            viewModel.persistHtmlCardDisplayMode(item.message.id, mode, measuredPx)
+                                        }
+                                    )
+                                }
+                                ChatListItem.TYPE_TASK_CARD -> {
+                                    // M4（spec §7.4）：状态源 = TaskCard part（live 态经 parts 同 id
+                                    // 原位覆写，500ms 节流在 displayMessages 管线）
+                                    val task = (item.part as MessagePart.TaskCard).task
+                                    var taskExpanded by rememberSaveable(item.key) { mutableStateOf(false) }
                                     // H2 HTML 化（2026-09-27）：L1 模板经 HtmlCard 双形态渲染 + 原生动作条；
                                     // viewportHeightDp 用 IME 稳定值（对齐 HTML_CARD 分支，防键盘态误升格 FULLPAGE）
                                     EngineerTaskCard(
@@ -674,65 +694,81 @@ fun ChatScreen(
                                         onRetry = { viewModel.retryEngineerTask(task.taskId) },
                                     )
                                 }
-                            } else if (message.type == ChatMessageType.OPTIMIZE_CANDIDATES && message.optimizeCandidates != null) {
-                                val group = message.optimizeCandidates!!
-                                val selected = gachaSelections[message.id] ?: group.recommendedIndex
-                                GachaCandidateStrip(
-                                    group = group,
-                                    interactive = message.gachaInteractive,
-                                    selectedIndex = selected,
-                                    rerolling = message.id in gachaRerolling,
-                                    onSelect = { index ->
-                                        viewModel.onOptimizeGachaSelection(message.id, index)
-                                        // 点卡 = 选中 + 全屏预览该组候选（isEditableResult=false → 无保存按钮）
-                                        val pages = group.candidates.mapIndexedNotNull { i, c ->
-                                            c.thumbPath.takeIf { it.isNotBlank() }?.let { path ->
-                                                ImagePreviewPage(
-                                                    messageId = "${message.id}#$i",
-                                                    rawUri = path,
-                                                    isEditableResult = false,
-                                                    isSaved = false
-                                                )
+                                ChatListItem.TYPE_OPTIMIZE_CANDIDATES -> {
+                                    val group = (item.part as MessagePart.OptimizeCandidates).group
+                                    val selected = gachaSelections[item.message.id] ?: group.recommendedIndex
+                                    GachaCandidateStrip(
+                                        group = group,
+                                        interactive = item.message.gachaInteractive,
+                                        selectedIndex = selected,
+                                        rerolling = item.message.id in gachaRerolling,
+                                        onSelect = { index ->
+                                            viewModel.onOptimizeGachaSelection(item.message.id, index)
+                                            // 点卡 = 选中 + 全屏预览该组候选（isEditableResult=false → 无保存按钮）
+                                            val pages = group.candidates.mapIndexedNotNull { i, c ->
+                                                c.thumbPath.takeIf { it.isNotBlank() }?.let { path ->
+                                                    ImagePreviewPage(
+                                                        messageId = "${item.message.id}#$i",
+                                                        rawUri = path,
+                                                        isEditableResult = false,
+                                                        isSaved = false
+                                                    )
+                                                }
+                                            }
+                                            if (pages.isNotEmpty()) {
+                                                val startAt = pages.indexOfFirst { it.messageId == "${item.message.id}#$index" }
+                                                    .coerceAtLeast(0)
+                                                imagePreview = ChatImagePreviewState(pages = pages, initialIndex = startAt)
+                                            }
+                                        },
+                                        onReroll = {
+                                            viewModel.onOptimizeGachaReroll(item.message.id) { ok ->
+                                                if (!ok) Toast.makeText(context, gachaRerollUnavailableText, Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        onConfirm = {
+                                            viewModel.onOptimizeGachaConfirm(item.message.id, selected) { ok ->
+                                                if (!ok) Toast.makeText(context, gachaConfirmFailedText, Toast.LENGTH_SHORT).show()
                                             }
                                         }
-                                        if (pages.isNotEmpty()) {
-                                            val startAt = pages.indexOfFirst { it.messageId == "${message.id}#$index" }
-                                                .coerceAtLeast(0)
-                                            imagePreview = ChatImagePreviewState(pages = pages, initialIndex = startAt)
-                                        }
-                                    },
-                                    onReroll = {
-                                        viewModel.onOptimizeGachaReroll(message.id) { ok ->
-                                            if (!ok) Toast.makeText(context, gachaRerollUnavailableText, Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    onConfirm = {
-                                        viewModel.onOptimizeGachaConfirm(message.id, selected) { ok ->
-                                            if (!ok) Toast.makeText(context, gachaConfirmFailedText, Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                )
-                            } else {
-                                ChatMessageItem(
-                                    message = message,
-                                    onImageClick = { msg ->
-                                        val pages = buildImagePreviewPages(messages)
-                                        if (pages.isNotEmpty()) {
-                                            val isEdit = msg.type == ChatMessageType.AGENT_IMAGE ||
-                                                msg.type == ChatMessageType.AGENT_EDIT_RESULT
-                                            if (isEdit) viewModel.touchEditImage(msg.imageUri)
-                                            imagePreview = ChatImagePreviewState(
-                                                pages = pages,
-                                                initialIndex = indexOfPage(pages, msg.id)
-                                            )
-                                        }
-                                    },
-                                    onClaudeDeliver = { id, mode -> viewModel.confirmClaudeDeliver(id, mode) },
-                                    onClaudeContinue = { viewModel.continueClaude() },
-                                    canDeliverClaude = canDeliverClaude,
-                                    suppressClaudeActions = hasTaskCards,
-                                    onTableClick = { table -> expandedTable = table }
-                                )
+                                    )
+                                }
+                                ChatListItem.TYPE_AGENT_TEXT -> {
+                                    ChatAgentTextPart(item = item, onTableClick = { table -> expandedTable = table })
+                                }
+                                ChatListItem.TYPE_TOOL_PLACEHOLDER -> {
+                                    ToolStatusChip(text = stringResource(R.string.generating), isError = false)
+                                }
+                                ChatListItem.TYPE_TOOL_STATUS -> {
+                                    ToolStatusChip(text = stringResource(R.string.chat_calling_tool), isError = false)
+                                }
+                                ChatListItem.TYPE_TOOL_ERROR -> {
+                                    ToolStatusChip(text = stringResource(R.string.chat_card_generate_failed), isError = true)
+                                }
+                                else -> {
+                                    // TYPE_USER_MESSAGE / TYPE_LEGACY_MESSAGE：整消息渲染（§5 用户气泡
+                                    // 图文同单元；claude 气泡 / COMMAND / PLAN_PREVIEW / 图片类 message 形渲染器）
+                                    ChatMessageItem(
+                                        message = item.message,
+                                        onImageClick = { msg ->
+                                            val pages = buildImagePreviewPages(messages)
+                                            if (pages.isNotEmpty()) {
+                                                val isEdit = msg.type == ChatMessageType.AGENT_IMAGE ||
+                                                    msg.type == ChatMessageType.AGENT_EDIT_RESULT
+                                                if (isEdit) viewModel.touchEditImage(msg.imageUri)
+                                                imagePreview = ChatImagePreviewState(
+                                                    pages = pages,
+                                                    initialIndex = indexOfPage(pages, msg.id)
+                                                )
+                                            }
+                                        },
+                                        onClaudeDeliver = { id, mode -> viewModel.confirmClaudeDeliver(id, mode) },
+                                        onClaudeContinue = { viewModel.continueClaude() },
+                                        canDeliverClaude = canDeliverClaude,
+                                        suppressClaudeActions = hasTaskCards,
+                                        onTableClick = { table -> expandedTable = table }
+                                    )
+                                }
                             }
                         }
                     }
@@ -1605,6 +1641,76 @@ private fun ChatMessageItem(
                 }
             }
         }
+    }
+}
+
+/**
+ * M4（spec §7.2）：agent Text part 的通栏 markdown 渲染（去气泡纯文本流范式沿用 §5）。
+ * 流式开放块以 paced 内容 + 打字光标渲染（节奏器节拍保留，M3 管线不变）；
+ * 消息级尾件（性能行）挂在消息最后一个可见 part。
+ */
+@Composable
+private fun ChatAgentTextPart(
+    item: ChatListItem,
+    onTableClick: (MarkdownTable) -> Unit,
+) {
+    val part = item.part as? MessagePart.Text ?: return
+    val text = item.textOverride ?: part.markdown
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val copySuccess = stringResource(R.string.copy_success)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        clipboardManager.setText(AnnotatedString(text))
+                        Toast.makeText(context, copySuccess, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            },
+    ) {
+        if (item.textOverride != null) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Column(modifier = Modifier.weight(1f)) {
+                    SegmentedAgentText(text, onTableClick)
+                }
+                if (item.showCursor) {
+                    BlinkCursor()
+                }
+            }
+        } else {
+            SegmentedAgentText(text, onTableClick)
+        }
+        if (item.isLastPartOfMessage) {
+            item.message.performance?.let { perf -> MessagePerformanceRow(perf, isUser = false) }
+        }
+    }
+}
+
+/** M4（spec §4 占位契约 / §5.3）：工具进行中 / 失败的轻量状态行（骨架占位，全宽独立 item）。 */
+@Composable
+private fun ToolStatusChip(text: String, isError: Boolean) {
+    val tint = if (isError) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(tint)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text = text, fontSize = 13.sp, color = tint)
     }
 }
 

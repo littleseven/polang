@@ -1059,6 +1059,7 @@
     <string name="chat_guest_quota_used_up">Cuota de prueba agotada. Regístrate para obtener 1000 llamadas gratuitas.</string>
     <string name="chat_inference_error">Error de inferencia: %1$s</string>
     <string name="chat_calling_tool">Llamando a la herramienta…</string>
+    <string name="chat_card_generate_failed">Error al generar</string>
     <string name="chat_example_group_search">Buscar fotos</string>
     <string name="chat_example_group_ask">Pregunta sobre tu galería</string>
     <string-array name="chat_example_prompts_search">

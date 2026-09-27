@@ -1059,6 +1059,7 @@
     <string name="chat_guest_quota_used_up">Quota d\'essai épuisé. Inscrivez-vous pour obtenir 1000 appels gratuits.</string>
     <string name="chat_inference_error">Erreur d\'inférence : %1$s</string>
     <string name="chat_calling_tool">Appel de l\'outil…</string>
+    <string name="chat_card_generate_failed">Échec de la génération</string>
     <string name="chat_example_group_search">Trouver des photos</string>
     <string name="chat_example_group_ask">Questions sur votre galerie</string>
     <string-array name="chat_example_prompts_search">

@@ -1089,6 +1089,7 @@
     <string name="chat_guest_quota_used_up">試用額度已用完，註冊即可獲得 1000 次免費額度。</string>
     <string name="chat_inference_error">推論錯誤：%1$s</string>
     <string name="chat_calling_tool">正在呼叫工具…</string>
+    <string name="chat_card_generate_failed">生成失敗</string>
     <string name="chat_example_group_search">找照片</string>
     <string name="chat_example_group_ask">問相簿</string>
     <string-array name="chat_example_prompts_search">

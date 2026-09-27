@@ -11,6 +11,7 @@ import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
+import com.mamba.picme.domain.chat.PartState
 import com.mamba.picme.domain.chat.overlayLiveTaskState
 
 import android.content.Context
@@ -1044,6 +1045,15 @@ class ChatViewModel(
     private val turnReducer = TurnPartsReducer()
 
     /**
+     * M4：流式 turn 内进行中的**非卡片**工具名（draw_chart/render_html 有类型化占位 part
+     * 承载进度，非卡片工具无 part 承载，由本状态合成工具状态 item 渲染，spec §7.2 拍平）。
+     * 生命周期：ToolCallStarted 置位（卡片工具归 null 让位占位 part）→ 下一个 TextSnapshot
+     * 或流式结束（sendMessage finally）清除。瞬态，不落库。
+     */
+    private val _pendingNonCardTool = MutableStateFlow<String?>(null)
+    val pendingNonCardTool: StateFlow<String?> = _pendingNonCardTool.asStateFlow()
+
+    /**
      * M2 turn 装配入口：引擎事件经 [turnAdapter] 翻译为块级三段式事件，由 [turnReducer]
      * 拼装 parts 快照并挂到流式占位消息。瞬态内存轨——M2 期 UI 渲染仍读 legacy content
      * （占位 parts 不可见），本管线为 M4 渲染切换打底；流式消息不落 Room。
@@ -1690,6 +1700,7 @@ class ChatViewModel(
                 // ADR-016 M2：一次 sendMessage = 一个 turn，起点重置装配器（防上一回合残留）
                 turnAdapter.reset()
                 turnReducer.reset()
+                _pendingNonCardTool.value = null
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
                     type = ChatMessageType.AGENT_TEXT,
@@ -1748,6 +1759,8 @@ class ChatViewModel(
                         when (event) {
                             is ChatStreamEvent.TextSnapshot -> {
                                 pacingController.onTextSnapshot(event.text)
+                                // 新一轮文本到达：非卡片工具状态让位（对齐 legacy 状态文案被快照覆盖）
+                                _pendingNonCardTool.value = null
                                 if (_streamingMessage.value?.isThinking == true) {
                                     _streamingMessage.value = _streamingMessage.value?.copy(isThinking = false)
                                 }
@@ -1759,6 +1772,12 @@ class ChatViewModel(
                                     showCursor = false,
                                     isThinking = false
                                 )
+                                // M4：非卡片工具无占位 part 承载进度，登记合成状态 item；
+                                // 卡片工具（draw_chart/render_html）归 null 让位类型化占位 part
+                                _pendingNonCardTool.value = event.toolName.takeIf { name ->
+                                    name != TurnPartsReducer.TOOL_DRAW_CHART &&
+                                        name != TurnPartsReducer.TOOL_RENDER_HTML
+                                }
                             }
                             // M4 显式轮边界：气泡态无需响应（文本快照/工具事件已驱动），
                             // 仅经 feedTurn 喂装配器闭合上一轮文本块
@@ -1918,6 +1937,7 @@ class ChatViewModel(
                 chatSessionDao.touchSession(sessionId)
             } finally {
                 _isProcessing.value = false
+                _pendingNonCardTool.value = null
             }
         }
     }
@@ -2150,11 +2170,21 @@ class ChatViewModel(
                     }
                 }
                 val reorderedAssets = reorderAssetsByFeedback(mr.assets, updatedState, query)
+                val updatedResults = mr.copy(
+                    assets = reorderedAssets,
+                    feedbackState = updatedState
+                )
                 message.copy(
-                    mediaResults = mr.copy(
-                        assets = reorderedAssets,
-                        feedbackState = updatedState
-                    )
+                    mediaResults = updatedResults,
+                    // ADR-016 M4：渲染源已切 parts——part 负载与 legacy 字段同源双写防漂移
+                    // （同 overlayLiveTaskState 先例；本更新为内存态，Room 重载后两者一致回落空表）
+                    parts = message.parts.map { part ->
+                        if (part is MessagePart.MediaResults && part.results.query == query) {
+                            part.copy(results = updatedResults)
+                        } else {
+                            part
+                        }
+                    },
                 )
             } else {
                 message
@@ -3422,7 +3452,16 @@ class ChatViewModel(
                             return@mapNotNull message.copy(
                                 type = ChatMessageType.AGENT_TEXT,
                                 content = deletedText,
-                                mediaResults = null
+                                mediaResults = null,
+                                // M4：渲染源切 parts——内存快路径与落库重导出的 parts 同构
+                                //（agent_text → Text p0 DONE，Room 重载后口径一致）
+                                parts = listOf(
+                                    MessagePart.Text(
+                                        partId = "p0",
+                                        markdown = deletedText,
+                                        state = PartState.DONE,
+                                    ),
+                                ),
                             )
                         }
                         val newTotal = (mr.totalCount - 1).coerceAtLeast(newAssets.size)
@@ -3438,11 +3477,20 @@ class ChatViewModel(
                                 )
                             )
                         }
+                        val updatedResults = mr.copy(
+                            assets = newAssets,
+                            totalCount = newTotal
+                        )
                         message.copy(
-                            mediaResults = mr.copy(
-                                assets = newAssets,
-                                totalCount = newTotal
-                            )
+                            mediaResults = updatedResults,
+                            // M4：part 负载与 legacy 字段同源双写（防渲染漂移）
+                            parts = message.parts.map { part ->
+                                if (part is MessagePart.MediaResults) {
+                                    part.copy(results = updatedResults)
+                                } else {
+                                    part
+                                }
+                            },
                         )
                     } else {
                         message
@@ -3546,11 +3594,10 @@ class ChatViewModel(
             gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
                 optimizeGachaController?.hasPending(id) == true,
             engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
-            // ADR-016 M2：任务卡消息恢复双读填充（decodePartsOrLegacy：优先 partsJson，缺失/损坏
-            // 回 legacy 列现算）——live 态 overlay（displayMessages）挂载在 parts 的 TaskCard part
-            // 上，需要它在场；其余类型仍不填充（无消费方，避免每条消息一次无效 JSON decode）。
-            // M4 切渲染源时全量恢复。
-            parts = if (type == EngineerTaskState.ROOM_TYPE) decodePartsOrLegacy() else emptyList(),
+            // ADR-016 M4：全量恢复双读填充（decodePartsOrLegacy：优先 partsJson，缺失/损坏
+            // 回 legacy 列现算）——UI 渲染源切到 parts（flattenChatItems 拍平），每条消息
+            // 都需要 parts 在场；M2 期仅 TASK_CARD 填充是「无消费方省 decode」的过渡口径。
+            parts = decodePartsOrLegacy(),
         )
     }
 
