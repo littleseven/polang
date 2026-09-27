@@ -171,6 +171,16 @@ class TagGenerationScheduler(
     /** 防止「重新聚类」被并发/重复触发：同一人被多次重提并重复分组。 */
     private val reembedMutex = Mutex()
 
+    /**
+     * 产出率哨兵：Pass 1 检测到人脸但 embedding 提取为空的累计次数
+     * （人脸模型缺失/损坏的特征信号）。由 [TagScanOrchestrator] 在会话收尾时
+     * 经 [consumeFaceEmbeddingFailureCount] 读取并清零，转为用户可见警告。
+     */
+    private val faceEmbeddingFailureCount = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** 读取并清零「检测到人脸但 embedding 为空」的累计次数（供会话收尾告警） */
+    fun consumeFaceEmbeddingFailureCount(): Int = faceEmbeddingFailureCount.getAndSet(0)
+
     private val _progress = MutableStateFlow<TagScanProgress?>(null)
     val progress: StateFlow<TagScanProgress?> = _progress.asStateFlow()
 
@@ -1206,6 +1216,17 @@ class TagGenerationScheduler(
 
         // 【关键修复】只有当检测到有效 embedding 时才标记 hasFace=true
         val hasValidFace = result.faceRoiJson != null && result.embeddings.isNotEmpty()
+
+        // 产出率哨兵：检测到人脸但 embedding 为空 → 人脸模型缺失/损坏的典型信号
+        // （extractFeature 返回零向量被过滤）。静默降级曾导致 embedding/persons 全 0
+        // 而任务全部显示 COMPLETED，这里累计计数供会话收尾时转为可见警告。
+        if (result.faceRoiJson != null && !hasValidFace &&
+            runCatching { JSONObject(result.faceRoiJson).optBoolean("hasFace", false) }.getOrDefault(false)
+        ) {
+            val failures = faceEmbeddingFailureCount.incrementAndGet()
+            Log.w(TAG, "[Pass 1] Face detected but no embedding extracted " +
+                "(face embedding model missing/broken?) mediaId=${entity.id}, totalFailures=$failures")
+        }
         if (result.faceRoiJson != null) {
             dao.updateFaceRoiResult(entity.id, result.faceRoiJson, hasValidFace)
         } else if (entity.type == MediaType.PHOTO) {

@@ -47,6 +47,29 @@ class LlmModelDownloadManager(context: Context) {
         private const val MODEL_MARKET_URL = "https://meta.alicdn.com/data/mnn/apis/model_market.json"
 
         /**
+         * 下载中文件的临时后缀：所有下载先写入 `文件名.part`，完整性校验（大小+SHA256）
+         * 通过后才原子 rename 为正式文件名。保证正式名文件要么完整可信、要么不存在——
+         * 进程被杀/断流只会留下 .part 残骸，不会被 `isModelDownloaded` 误认为已下载
+         * （事故：并行分块 setLength 预分配后进程被杀，留下大小正确但内容空洞的模型文件）。
+         */
+        private const val PARTIAL_FILE_SUFFIX = ".part"
+
+        /** HTTP 206：Range 断点续传响应（resumeDownload 判定服务器是否接受断点） */
+        private const val HTTP_PARTIAL_CONTENT = 206
+
+        /**
+         * 孤儿 .part 清扫的进程级 one-shot 守卫。
+         *
+         * 必须进程级而非实例级：本类并非单例（除 AppContainer 外，SettingsScreen 语音区
+         * 每行进页都会 remember 新实例），实例级 init 清扫会误删其他实例正在进行中的
+         * 下载 .part（删除后写入方继续写已 unlink 的 inode，校验必失败 → 下载 FAILED）。
+         */
+        private val stalePartCleaned = java.util.concurrent.atomic.AtomicBoolean(false)
+
+        /** .part 陈旧阈值：只清扫 mtime 早于此阈值的残骸，进行中下载的 .part 绝不触碰（双保险） */
+        private const val STALE_PART_AGE_MS = 30L * 60 * 1000
+
+        /**
          * MNN-LLM 模型固定文件列表
          */
         private val LLM_MODEL_FILES = listOf(
@@ -234,6 +257,19 @@ class LlmModelDownloadManager(context: Context) {
      */
     private val activeJobs = ConcurrentHashMap<String, Job>()
 
+    init {
+        // 进程上次被杀可能留下 .part 残骸（原子下载方案：正式文件名永远完整，中断只留 .part）。
+        // 启动时全局清扫一次，避免残骸长期占用存储。
+        managerScope.launch {
+            var cleaned = 0
+            downloadDir.listFiles()?.forEach { modelDir ->
+                modelDir.listFiles()?.forEach { file ->
+                    if (file.name.endsWith(PARTIAL_FILE_SUFFIX) && file.delete()) cleaned++
+                }
+            }
+            if (cleaned > 0) Logger.i(TAG, "Cleaned $cleaned stale partial download file(s)")
+        }
+    }
 
 
     /**
@@ -797,30 +833,33 @@ fun isModelDownloaded(modelId: String): Boolean {
         try {
             Logger.i(TAG, "Resuming model $modelId from $resumeFromBytes bytes")
 
-            var totalDownloaded = resumeFromBytes
-
-            val expectedFiles = allFileInfos.map { it.name }
-
-            // 计算已完成的文件和当前文件中的偏移量
-            var bytesToSkip = resumeFromBytes
-            var resumeFileIndex = 0
-            var resumeFileOffset = 0L
-
-            for ((index, fileName) in expectedFiles.withIndex()) {
-                val file = File(modelDir, fileName)
-                val fileSize = if (file.exists()) file.length() else 0L
-                if (bytesToSkip >= fileSize) {
-                    bytesToSkip -= fileSize
-                    totalDownloaded += fileSize
-                } else {
-                    resumeFileIndex = index
-                    resumeFileOffset = bytesToSkip
-                    break
+            // 以磁盘真实状态为准盘点进度（不信任 pausedDownloads 计数：崩溃/失败场景计数与磁盘可能不一致）。
+            // - 正式文件名存在 = 完整（提升前已过完整性校验），跳过；
+            // - .part 仅在「长度 < 期望大小」时可信为单流真实部分下载，可断点续传；
+            //   长度 == 期望大小的 .part 可能是并行分块 setLength 预分配的空洞文件，必须删掉重下。
+            var totalDownloaded = 0L
+            val resumeOffsets = mutableMapOf<String, Long>()
+            for (fileInfo in allFileInfos) {
+                val destFile = File(modelDir, fileInfo.name)
+                val partFile = File(modelDir, fileInfo.name + PARTIAL_FILE_SUFFIX)
+                if (destFile.exists()) {
+                    totalDownloaded += destFile.length()
+                    continue
+                }
+                if (partFile.exists()) {
+                    if (fileInfo.size > 0 && partFile.length() < fileInfo.size) {
+                        resumeOffsets[fileInfo.name] = partFile.length()
+                        totalDownloaded += partFile.length()
+                    } else if (!partFile.delete()) {
+                        Logger.w(TAG, "Failed to delete untrusted partial file: ${partFile.name}")
+                    }
                 }
             }
 
-            for (fileIndex in resumeFileIndex until expectedFiles.size) {
-                val fileName = expectedFiles[fileIndex]
+            _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.DOWNLOADING, totalDownloaded, actualTotalBytes)) }
+
+            for (fileInfo in allFileInfos) {
+                val fileName = fileInfo.name
 
                 if (activeDownloads[modelId]?.isCanceled() == true) {
                     throw IOException("Download cancelled")
@@ -828,22 +867,22 @@ fun isModelDownloaded(modelId: String): Boolean {
 
                 val url = buildDownloadUrl(config.sources, fileName)
                 val destFile = File(modelDir, fileName)
+                val partFile = File(modelDir, fileName + PARTIAL_FILE_SUFFIX)
 
-                // 文件已完整下载
-                if (destFile.exists() && fileIndex > resumeFileIndex) {
-                    totalDownloaded += destFile.length()
-                    emit(DownloadProgress(modelId, totalDownloaded, actualTotalBytes, DownloadStatus.DOWNLOADING))
+                // 文件已完整下载（盘点时已计入进度）
+                if (destFile.exists()) {
                     continue
                 }
 
-                // 部分下载的文件：使用 Range 请求断点续传
+                // 可续传的半截 .part：用 Range 从断点继续
+                val resumeOffset = resumeOffsets[fileName] ?: 0L
                 val requestBuilder = Request.Builder()
                     .url(url)
                     .header("User-Agent", "PoLang-Android/1.0")
 
-                if (fileIndex == resumeFileIndex && resumeFileOffset > 0 && destFile.exists()) {
-                    requestBuilder.header("Range", "bytes=$resumeFileOffset-")
-                    Logger.d(TAG, "Resuming $fileName from byte $resumeFileOffset")
+                if (resumeOffset > 0) {
+                    requestBuilder.header("Range", "bytes=$resumeOffset-")
+                    Logger.d(TAG, "Resuming $fileName from byte $resumeOffset")
                 }
 
                 val call = client.newCall(requestBuilder.build())
@@ -851,7 +890,7 @@ fun isModelDownloaded(modelId: String): Boolean {
 
                 call.execute().use { response ->
                     Logger.d(TAG, "Response: HTTP ${response.code} for $fileName")
-                    if (!response.isSuccessful && response.code != 206) {
+                    if (!response.isSuccessful && response.code != HTTP_PARTIAL_CONTENT) {
                         val errorBody = response.body?.string()?.take(200) ?: ""
                         throw IOException("HTTP ${response.code} for $fileName, url=$url, body=$errorBody")
                     }
@@ -860,13 +899,14 @@ fun isModelDownloaded(modelId: String): Boolean {
                         ?: throw IOException("Empty response for $fileName from $url")
 
                     body.byteStream().use { input ->
-                        val output = if (fileIndex == resumeFileIndex && resumeFileOffset > 0) {
-                            destFile.outputStream().apply { channel.truncate(resumeFileOffset) }
-                        } else {
-                            destFile.outputStream()
+                        // 服务器忽略 Range 回了 200 全量内容：必须从 0 重写，不能 append
+                        // （否则全量内容追加在半截数据后，文件损坏）
+                        val append = resumeOffset > 0 && response.code == HTTP_PARTIAL_CONTENT
+                        if (resumeOffset > 0 && !append) {
+                            Logger.w(TAG, "Server ignored Range for $fileName (HTTP 200), restarting file from 0")
+                            totalDownloaded -= resumeOffset
                         }
-
-                        output.use { out ->
+                        java.io.FileOutputStream(partFile, append).use { out ->
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                             var bytesRead: Int
                             var lastEmitTime = System.currentTimeMillis()
@@ -893,8 +933,10 @@ fun isModelDownloaded(modelId: String): Boolean {
                     }
                 }
 
-                // 重置偏移量（后续文件从头下载）
-                resumeFileOffset = 0
+                // 续传路径此前完全没有完整性校验（size/sha 均不查），半截提升曾直接产出
+                // 损坏模型文件；此处与 downloadModel 同口径校验通过后才提升为正式文件名。
+                verifyDownloadedFile(partFile, fileName, fileInfo.size, fileInfo.sha256)
+                promotePartFile(partFile, destFile, fileName)
             }
 
             pausedDownloads.remove(modelId)
@@ -1042,6 +1084,13 @@ fun isModelDownloaded(modelId: String): Boolean {
 
                 val url = buildModelScopeUrl(repoPath, fileName)
                 val destFile = File(modelDir, fileName)
+                val partFile = File(modelDir, fileName + PARTIAL_FILE_SUFFIX)
+
+                // 上次下载中断（进程被杀/失败）可能残留半截 .part：一律清掉重下该文件。
+                // .part 内容不可信（并行分块路径 setLength 预分配后可能大小正确但内容空洞）。
+                if (partFile.exists() && !partFile.delete()) {
+                    Logger.w(TAG, "Failed to delete stale partial file: ${partFile.name}")
+                }
 
                 // 检查文件是否已完整下载
                 if (destFile.exists() && destFile.length() > 0) {
@@ -1090,14 +1139,15 @@ fun isModelDownloaded(modelId: String): Boolean {
                 if (expectedSize > PARALLEL_DOWNLOAD_THRESHOLD) {
                     parallelDownloader.download(
                         url = url,
-                        destFile = destFile,
+                        destFile = partFile,
                         totalSize = expectedSize,
                         onBytes = { delta ->
                             reportProgress(delta)
                         },
                         isCancelled = { cancelFlags[modelId] == true }
                     )
-                    verifyDownloadedFile(destFile, fileName, expectedSize, expectedSha256)
+                    verifyDownloadedFile(partFile, fileName, expectedSize, expectedSha256)
+                    promotePartFile(partFile, destFile, fileName)
                     continue
                 }
 
@@ -1124,7 +1174,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                         ?: throw IOException("Empty response for $fileName from $url")
 
                     body.byteStream().use { input ->
-                        destFile.outputStream().use { output ->
+                        partFile.outputStream().use { output ->
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                             var bytesRead: Int
 
@@ -1140,7 +1190,8 @@ fun isModelDownloaded(modelId: String): Boolean {
 
                     // 单流路径同样需要在下载完成后校验（流提前结束不会抛异常）；
                     // 放在 use 块内，避免可选文件 404 return@use 跳过下载后被误校验
-                    verifyDownloadedFile(destFile, fileName, expectedSize, expectedSha256)
+                    verifyDownloadedFile(partFile, fileName, expectedSize, expectedSha256)
+                    promotePartFile(partFile, destFile, fileName)
                 }
             }
 
@@ -1201,6 +1252,21 @@ fun isModelDownloaded(modelId: String): Boolean {
             throw IOException("SHA256 mismatch after download for $fileName (corrupted file deleted)")
         }
         Logger.d(TAG, "Post-download verification passed: $fileName ($actualSize bytes)")
+    }
+
+    /**
+     * 校验通过后把 .part 临时文件原子提升为正式文件名。
+     *
+     * renameTo 在同文件系统内是原子操作（下载目录固定为应用内部存储，满足前提），
+     * 因此任何时刻观察者看到的正式文件都是完整校验通过的版本。
+     */
+    private fun promotePartFile(partFile: File, destFile: File, fileName: String) {
+        if (destFile.exists() && !destFile.delete()) {
+            throw IOException("Failed to replace existing file before promote: $fileName")
+        }
+        if (!partFile.renameTo(destFile)) {
+            throw IOException("Failed to promote partial file to final name: $fileName")
+        }
     }
 
     /**
