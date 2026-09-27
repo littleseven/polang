@@ -163,7 +163,7 @@ import com.mamba.picme.features.common.topbar.AppTopBarNavBack
 import com.mamba.picme.features.chat.ChatThreadSidebar
 import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.preferences.UserPreferencesRepository
-import dev.jeziellago.compose.markdowntext.MarkdownText
+import com.mamba.picme.features.common.chat.AgentMarkdown
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -1149,14 +1149,14 @@ private fun CodeBlock(raw: String) {
     }
 }
 
-/** agent 文本分段渲染（流式与最终态共用）：MARKDOWN→MarkdownText、TABLE→Compose 网格表格、CODE→CodeBlock。 */
+/** agent 文本分段渲染（流式与最终态共用）：MARKDOWN→AgentMarkdown（mikepenz AST）、TABLE→Compose 网格表格、CODE→CodeBlock。 */
 @Composable
 private fun SegmentedAgentText(displayText: String, onTableClick: (MarkdownTable) -> Unit) {
     segmentMarkdown(displayText).forEach { segment ->
         when (segment.type) {
             SegmentType.TABLE -> AgentTable(raw = segment.text, onTableClick = onTableClick)
-            SegmentType.MARKDOWN -> MarkdownText(
-                markdown = segment.text,
+            SegmentType.MARKDOWN -> AgentMarkdown(
+                content = segment.text,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 lineHeight = 24.sp,

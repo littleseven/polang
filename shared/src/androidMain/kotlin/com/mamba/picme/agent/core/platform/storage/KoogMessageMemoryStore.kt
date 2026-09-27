@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import ai.koog.prompt.message.Message
 import com.mamba.picme.agent.core.inference.remote.koog.KoogMessageMemory
+import com.mamba.picme.agent.core.inference.remote.koog.SessionCompaction
 import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.platform.thread.DispatcherProvider
 import com.mamba.picme.agent.core.platform.thread.SharedDispatcherProvider
@@ -84,12 +85,16 @@ public class KoogMessageMemoryStore(
         }
     }
 
-    /** 清空指定 session 的历史。 */
+    /** 清空指定 session 的历史 + 摘要（会话销毁 = 全清，契约见 [ChatMemoryStore.clear]）。 */
     override suspend fun clear(sessionId: String) = withContext(dataStoreDispatcher) {
         try {
             val key = stringPreferencesKey("koog_memory_$sessionId")
+            val summaryKey = stringPreferencesKey(summaryKey(sessionId))
             withTimeout(TIMEOUT_MS) {
-                dataStore.edit { prefs -> prefs.remove(key) }
+                dataStore.edit { prefs ->
+                    prefs.remove(key)
+                    prefs.remove(summaryKey)
+                }
             }
             Logger.i(tag, "Cleared history for session $sessionId")
         } catch (exception: TimeoutCancellationException) {
@@ -98,6 +103,56 @@ public class KoogMessageMemoryStore(
             Logger.e(tag, "Failed to clear history for session $sessionId", exception)
         }
     }
+
+    /** 加载会话摘要；无摘要/解析失败返回 null（不阻断对话，US-2.3）。 */
+    override suspend fun loadSummary(sessionId: String): SessionCompaction? = withContext(dataStoreDispatcher) {
+        return@withContext try {
+            val key = stringPreferencesKey(summaryKey(sessionId))
+            val raw = withTimeout(TIMEOUT_MS) {
+                dataStore.data.map { prefs -> prefs[key] }.first()
+            } ?: return@withContext null
+            SessionCompaction.decode(raw)
+        } catch (exception: TimeoutCancellationException) {
+            Logger.w(tag, "Timeout loading summary for session $sessionId")
+            null
+        } catch (exception: Exception) {
+            Logger.w(tag, "Failed to load summary for session $sessionId", exception)
+            null
+        }
+    }
+
+    /** 保存会话摘要（覆盖旧版本；编码失败静默，不阻断对话）。 */
+    override suspend fun saveSummary(sessionId: String, summary: SessionCompaction) = withContext(dataStoreDispatcher) {
+        try {
+            val key = stringPreferencesKey(summaryKey(sessionId))
+            val raw = SessionCompaction.encode(summary)
+            withTimeout(TIMEOUT_MS) {
+                dataStore.edit { prefs -> prefs[key] = raw }
+            }
+            Logger.d(tag, "Saved summary v${summary.version} to session $sessionId")
+        } catch (exception: TimeoutCancellationException) {
+            Logger.w(tag, "Timeout saving summary for session $sessionId")
+        } catch (exception: Exception) {
+            Logger.e(tag, "Failed to save summary for session $sessionId", exception)
+        }
+    }
+
+    /** 只清摘要（保留历史）；无摘要时幂等。 */
+    override suspend fun clearSummary(sessionId: String) = withContext(dataStoreDispatcher) {
+        try {
+            val key = stringPreferencesKey(summaryKey(sessionId))
+            withTimeout(TIMEOUT_MS) {
+                dataStore.edit { prefs -> prefs.remove(key) }
+            }
+            Logger.i(tag, "Cleared summary for session $sessionId")
+        } catch (exception: TimeoutCancellationException) {
+            Logger.w(tag, "Timeout clearing summary for session $sessionId")
+        } catch (exception: Exception) {
+            Logger.e(tag, "Failed to clear summary for session $sessionId", exception)
+        }
+    }
+
+    private fun summaryKey(sessionId: String) = "koog_summary_$sessionId"
 
     private companion object {
         private const val TIMEOUT_MS: Long = 5000L

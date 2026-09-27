@@ -1,6 +1,7 @@
 package com.mamba.picme.domain.usecase
 
 import com.mamba.picme.data.local.ChatMessageDao
+import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.domain.repository.ChatImageStore
 import org.json.JSONObject
 import java.io.File
@@ -41,7 +42,7 @@ class SaveChatEditResultUseCase(
         meta.put("imageUri", contentUri)
         meta.put("saved", true)
         meta.put("savedAt", System.currentTimeMillis())
-        chatMessageDao.insertMessage(msg.copy(metadata = meta.toString()))
+        chatMessageDao.insertMessageWithParts(msg.copy(metadata = meta.toString()))
         store.markSaved(filePath)
         return Result.success(contentUri)
     }

@@ -101,15 +101,15 @@
 
 ### 2.1 系统全景架构
 
-![Agent 运行时全景分层](../assets/diagrams/agent-runtime-stack.png?v=20260927-3)
+![Agent 运行时全景分层](../assets/diagrams/agent-runtime-stack.png?v=20260927-4)
 
 ### 2.2 推理链路数据流（2026-08-02：文本推理全远程）
 
-![AgentOrchestrator 路由](../assets/diagrams/agent-orchestrator-routing.png?v=20260927-3)
+![AgentOrchestrator 路由](../assets/diagrams/agent-orchestrator-routing.png?v=20260927-4)
 
 ### 2.3 语音交互管线（Sherpa-ONNX 双引擎）
 
-![语音唤醒生命周期](../assets/diagrams/voice-wakeup-lifecycle.png?v=20260927-3)
+![语音唤醒生命周期](../assets/diagrams/voice-wakeup-lifecycle.png?v=20260927-4)
 
 ### 2.4 能力访问链路：tool_call 为主，JS 是 run_gallery_script 的内部实现
 
@@ -117,7 +117,7 @@
 > 对外，LLM 只有一种调用方式 —— **tool_call（`@Tool`）**；`run_gallery_script` 只是其中一个"参数为 JS 源码"的特殊工具，**JS 沙箱不是与 tool_call 平级的第二条链路**，而是该工具的执行体。
 > 对内，所有 tool 最终收敛到 `CapabilityRegistry.dispatch(AgentCommand)`；唯一旁路是飞书 RPA 的 UI 自动化（操作无障碍树，非语义命令）。
 
-![tool_calls 收敛结构](../assets/diagrams/toolcalls-convergence.png?v=20260927-3)
+![tool_calls 收敛结构](../assets/diagrams/toolcalls-convergence.png?v=20260927-4)
 
 #### 2.4.1 三条 LLM 入口与收敛
 
@@ -184,7 +184,7 @@ Chat 页通过输入栏的 **AI 工程师** toggle 在两条完全独立的 LLM 
 
 #### 2.5.1 普通 Chat 链路（相册助手）
 
-![Chat 消息链路](../assets/diagrams/chat-message-flow.png?v=20260927-3)
+![Chat 消息链路](../assets/diagrams/chat-message-flow.png?v=20260927-4)
 
 **普通 Chat 的 LLM 感知：**
 - 输入：当前用户消息 + 多轮对话历史 + 被动注入的记忆快照 + 可选图片。
@@ -194,7 +194,7 @@ Chat 页通过输入栏的 **AI 工程师** toggle 在两条完全独立的 LLM 
 
 #### 2.5.2 AI 工程师链路（远程 coding agent）
 
-![AI 工程师链路](../assets/diagrams/engineer-claude-chain.png?v=20260927-3)
+![AI 工程师链路](../assets/diagrams/engineer-claude-chain.png?v=20260927-4)
 
 **AI 工程师的 LLM 感知：**
 - 输入：当前用户消息 + 完整代码库（KimiClaw workdir）+ App 运行时数据（经 MCP 工具按需拉取）。
@@ -221,7 +221,7 @@ Chat 页通过输入栏的 **AI 工程师** toggle 在两条完全独立的 LLM 
 
 设置页「其他」分组的「上报问题」入口（2026-09-26 自 Chat 顶部栏迁入），与 AI 工程师链路独立：
 
-![问题上报链路](../assets/diagrams/report-issue-flow.png?v=20260927-3)
+![问题上报链路](../assets/diagrams/report-issue-flow.png?v=20260927-4)
 
 - 上报内容为文本描述与脱敏后的运行信息，不触碰用户图片/视频（[PRIVACY] 红线）。
 - 创建的问题在管理后台「问题诊断」页（`/admin/diagnosis`）可见，供 AI 工程师链路后续诊断与修复。

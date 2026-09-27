@@ -40,7 +40,7 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 | 子包 | 内容 |
 |------|------|
 | `facade/` | `AgentOrchestrator`（initialize(AgentDependencies) + 无参 getInstance）、`AgentConfigurator`、`AgentDependencies`（9 字段注入契约）、`LocalModelService` |
-| `inference/remote/` | `KoogChatAgent`/`KoogReActAgent`/`KoogReActStrategy`（koog/）、`KoogMessageMemory`（koog/，三不变式 + M1 预算制组装：`estimateTokens`/`ageToolResults`/`trimToTokenBudget`/`assembleForPersistence`，双端 store save 统一入口，spec《chat-agent-layered-memory》）、`ChatToolService`/`CameraToolService`/`ToolInventory`/`MemoryContextProvider`（tool/）、`RemotePromptBuilder`（prompt/，L2/L3/L4 遗留模板）、`ChatPromptRules`（prompt/，chat system prompt 行为规则段分节拼装）、`RemoteChatEngine`、`LlmCallRecorder` |
+| `inference/remote/` | `KoogChatAgent`/`KoogReActAgent`/`KoogReActStrategy`（koog/）、`KoogMessageMemory`（koog/，三不变式 + M1 预算制组装：`estimateTokens`/`ageToolResults`/`trimToTokenBudget`/`assembleForPersistence` + M2 压缩候选选择 `selectCompactionCandidates`，双端 store save 统一入口，spec《chat-agent-layered-memory》）、M2 滚动摘要套件（koog/：`SessionCompaction`/`CompactionSlots` 四槽位 + 增量合并、`CompactionPrompt` 语义保护 prompt 构造、`SessionCompactor` 触发执行器、`SummaryGenerator` 函数接口 + `SummaryGeneratorViaExecutor` 经 Koog executor 单发、`composeChatSystemPrompt` 三段组装注入）、`ChatToolService`/`CameraToolService`/`ToolInventory`/`MemoryContextProvider`（tool/）、`RemotePromptBuilder`（prompt/，L2/L3/L4 遗留模板）、`ChatPromptRules`（prompt/，chat system prompt 行为规则段分节拼装）、`RemoteChatEngine`、`LlmCallRecorder` |
 | `intent/` | `IntentGuard`（意图守卫层：LLM 误拒搜索回退判定、chat 页模糊跳转拦截；纯函数确定性规则，自 ChatViewModel 私有 guard 收口，双端可复用）；意图路由体系（2026-09-26，spec《意图路由契约与意图路由器》+ ADR-015）：`ChatIntentContract`（10 意图闭集契约表，allowed∩forbidden=∅ 机器校验）、`IntentRouter`（门控→pattern 捷径→LLM 闭集分类 1.5s 超时降级，路由审计 recorder 口）、`ChatRoutingPolicy`（意图→命令确定性查表，VIEW_PHOTOS/REFINE_RESULTS 直执） |
 | `inference/local/` | `ImageInferenceEngine` 接口（端侧 VLM 抽象）、`LocalModelService` |
 | `js/` | JS 引擎无关层（JsEngine/JsValue/JsBridge/JsRuntime/NativeHandler/BuiltInHandlers/GallerySummaryJs） |
@@ -60,6 +60,10 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 另有 `beauty/api/`（BeautySettings/FilterType/StyleFilter，供 beauty-api 经 `api(project(":shared"))` 透出）、`domain/`（UserPreferences/MediaRepository/StructuredFilter/tag 聚类纯算法；旧 `DuplicateGroup` 已随去重 2.0（androidApp `domain/dedup/`）于 2026-08-26 删除）。
 
 > 🔴 **`domain/chat/` 消息模型的上位约束（2026-09-27 起，宪法级）**：ChatMessage/MessagePart/流式 chunk/工具状态机的一切演进以 ADR-016 + spec `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md` 为准（Vercel parts 模型：有序 parts 数组、块级 id、UIMessage/ModelMessage 双层分离、data part 默认不回灌 LLM）。
+>
+> **M1 落地状态（2026-09-27）**：`MessagePart` sealed（8 子类型：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates，partId 块级 id + `PartState`/`ToolPartState` 枚举）、`MessagePartsCodec`（kotlinx JSON 线格式，`type` 鉴别字段对齐 legacy 列值）、`LegacyMessagePartsConverter`（13 种 Room type 全枚举 → parts，行级 Text 兜底）、`toModelInput`/`ModelInputItem`（UIMessage→ModelMessage 显式转换）均已落地本包；`ChatMessage.parts` 双写共存（UI 仍读 legacy 字段，M4 切换渲染源）。`@Immutable` 不进 commonMain（纯度守卫禁 androidx.compose），Compose 稳定性注解属 M4 androidApp 侧收口。
+>
+> **M2 落地状态（2026-09-27）**：流式管线三件套落地 `domain/chat/streaming/`——`TurnStreamEvent`（spec §4 块级三段式：Text 三事件 + 工具五事件）、`ChatStreamTurnAdapter`（Koog 累计快照语义 → 块级事件：差分 delta / 轮边界闭合 / `txt-N`·`call-N` 合成 id；「非扩展快照=轮边界」的单调追加前提与失效表现见其类注释）、`TurnPartsReducer`（占位契约：draw_chart/render_html 类型化占位 → 产物原位填充 / 无占位 append / OUTPUT_ERROR 进文档，DONE 不可变；单线程契约=调用方漏斗 Main.immediate）；`ChatStreamEvent.ToolCallStarted` 带 toolName/args（RemoteChatEngine 两发射点透传）；Chart/HtmlCard part 加 `state: ToolPartState`（持久化卡恒 OUTPUT_AVAILABLE 默认值，M1 存量行兼容）；Chart/HtmlCard 回灌 toolCallId 换 `"$messageId:$partId"` 命名空间锚；任务卡 live 态挂载收口 `TaskCardOverlay.overlayLiveTaskState`（part 同 id 原位覆写 + legacy 字段自 part 投影）。M2 期占位 parts 瞬态不落 Room、UI 渲染仍读 legacy 列（渲染源切换属 M4）；OUTPUT_ERROR 双轨口径见 spec §5.3（持久化轨=TaskCard，Chart/HtmlCard/脚本错误瞬态不落库）。
 
 ## 3. 依赖方向
 

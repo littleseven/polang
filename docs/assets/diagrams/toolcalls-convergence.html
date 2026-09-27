@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tool_calls 收敛结构</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<!-- 本地字体栈（禁网络字体：headless 量高/截图字体竞态致高度抽奖，2026-09-27） -->
 <style>
   :root{color-scheme:light;--grid:#E8ECF1;--card:#fff;--tint:#EEF3FB;--tint2:#F0F3F8;
     --navy:#0D2240;--blue:#2563EB;--blue-deep:#3B6FD4;--chip-bg:#DCE9FB;--green:#2FA05A;
@@ -12,14 +12,14 @@
     --txt:#12263F;--sub:#5A6B80;--line:#D8E0EC}
   *{margin:0;padding:0;box-sizing:border-box}
   html{background:#E9EEF5}
-  body{font-family:"Noto Sans SC","PingFang SC",sans-serif;color:var(--txt);
+  body{font-family:"PingFang SC","Noto Sans SC",sans-serif;color:var(--txt);
     padding:22px 14px 26px;background:#E9EEF5;-webkit-font-smoothing:antialiased}
   .wrap{max-width:1040px;margin:0 auto;background-color:#F7F9FC;
     background-image:linear-gradient(var(--grid) 1px,transparent 1px),
       linear-gradient(90deg,var(--grid) 1px,transparent 1px);
     background-size:26px 26px;border:1.5px solid #C9D4E4;border-radius:20px;
     padding:22px 22px 20px;box-shadow:0 10px 26px rgba(18,38,63,.10)}
-  .mono{font-family:"JetBrains Mono",monospace}
+  .mono{font-family:"SF Mono","JetBrains Mono",Menlo,monospace}
   .hero{text-align:center;margin-bottom:14px}
   .hero h1{font-size:26px;font-weight:900;letter-spacing:.02em}
   .hero h1 .dot{color:var(--blue)}
@@ -82,6 +82,6 @@
   <div class="step"><span class="num">1</span><div class="sh"><span class="st">CHAT 场景（相册助理）</span></div><div class="chips"><span class="chip ">streamChat → streamChatReAct（固定远程）→ ChatToolService @Tool </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint"><span class="num">2</span><div class="sh"><span class="st">相机场景</span></div><div class="chips"><span class="chip ">processCameraInput → KoogReActAgent + CameraToolService @Tool（capture / adjust_beauty / switch_filter…） </span><span class="chip ">@Tool 直接构造 AgentCommand </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint2"><span class="num">3</span><div class="sh"><span class="st">ChatToolService</span><span class="ss">每个工具 = dispatchCommand(AgentCommand.X) 一行</span></div><div class="chips"><span class="chip ">tool_calls 薄封装 </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step"><span class="num">4</span><div class="sh"><span class="st">CapabilityRegistry.dispatch</span></div><div class="chips"><span class="chip ">按 method 找 Capability → execute() <small>所有语义命令的唯一收敛点</small></span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint"><span class="num">5</span><div class="sh"><span class="st">旁路 · 飞书 RPA</span><span class="ss">绕开注册表的另一条链路</span></div><div class="chips"><span class="chip ">RemoteControlToolService：UI 自动化 click/scroll/input → Accessibility </span><span class="chip ">相机工具 → CameraToolHelper 直连 </span><span class="chip ">相册工具 → dispatchCommand 回注册表 </span></div></div><div class="varrow"><svg width="22" height="24" viewBox="0 0 26 26"><line x1="13" y1="0" x2="13" y2="17" stroke="#2563EB" stroke-width="3"/><path d="M5 16 L13 24 L21 16 Z" fill="#2563EB"/></svg></div><div class="step tint2"><span class="num">6</span><div class="sh"><span class="st">旁路 · JS 沙箱</span><span class="ss">run_gallery_script 内部世界</span></div><div class="chips"><span class="chip ">gallery.*/media.*/face.*/tag.* → 直连 UseCase/Dao（只读） </span><span class="chip ">capability.dispatch {method,params} → 回环注册表（写操作经 Tier A 确认） </span></div></div>
   <div class="foot"><div class="ft">Chat / 相机 / 飞书三条表面共用 ADR-005 协议，全部收敛到 <b>CapabilityRegistry.dispatch</b>；JS 沙箱与 RPA 是受控旁路。</div></div>
 </div>
-<script>window.addEventListener("load",function(){setTimeout(function(){document.title="H"+document.documentElement.scrollHeight},500)})</script>
+<script>window.addEventListener("load",function(){var m=function(){setTimeout(function(){var w=document.querySelector(".wrap").getBoundingClientRect().bottom;var p=parseFloat(getComputedStyle(document.body).paddingBottom)||0;document.title="H"+Math.ceil(w+p+2)},300)};(document.fonts&&document.fonts.ready?document.fonts.ready.then(m):m())})</script>
 </body>
 </html>

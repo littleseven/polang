@@ -9,7 +9,9 @@ import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
+import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
+import com.mamba.picme.domain.chat.overlayLiveTaskState
 
 import android.content.Context
 import android.content.res.Configuration
@@ -43,12 +45,16 @@ import com.mamba.picme.agent.core.runtime.execution.InferenceResult
 import com.mamba.picme.core.agenttools.AppTool
 import com.mamba.picme.core.agenttools.AppToolExecutor
 import com.mamba.picme.core.agenttools.RuntimeStateProvider
+import com.mamba.picme.core.agenttools.toHistoryPair
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.diag.CrashTraceStore
 import com.mamba.picme.core.image.BitmapSampling
 import com.mamba.picme.BuildConfig
 import android.os.Build
 import com.mamba.picme.data.local.ChatMessageDao
+import com.mamba.picme.data.local.decodePartsOrLegacy
+import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.local.toModelInputItems
 import com.mamba.picme.data.remote.picme.ClaudeEvent
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
@@ -84,10 +90,14 @@ import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
 import com.mamba.picme.features.chat.js.registerGalleryHandlers
 import com.mamba.picme.domain.chat.ChatMessageType
+import com.mamba.picme.domain.chat.streaming.ChatStreamTurnAdapter
 import com.mamba.picme.domain.chat.streaming.StreamingPacingController
+import com.mamba.picme.domain.chat.streaming.TurnPartsReducer
+import com.mamba.picme.domain.chat.streaming.TurnStreamEvent
 import com.mamba.picme.features.gallery.MediaViewModel
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -97,6 +107,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -113,6 +125,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "ChatViewModel"
 private const val MAX_MESSAGES = 500
+/** ADR-016 M2：任务卡 live 态 overlay 节流（SSE 高频事件不直接驱动全列表重组）。 */
+private const val ENGINEER_TASK_OVERLAY_THROTTLE_MS = 500L
 private const val GUEST_REGISTER_NUDGE_THRESHOLD = 20
 private const val MAX_PREVIEW_LENGTH = 60
 private const val MAX_CARDS = 20
@@ -419,7 +433,7 @@ class ChatViewModel(
             var taskId: String? = null
             try {
                 ensureSessionExists(sessionId)
-                chatMessageDao.insertMessage(
+                chatMessageDao.insertMessageWithParts(
                     ChatMessageEntity(
                         id = UUID.randomUUID().toString(),
                         sessionId = sessionId,
@@ -614,7 +628,7 @@ class ChatViewModel(
         // 任务卡时代（2026-09-25 起）：交付审批收口到 TASK_CARD（US-2 审批唯一入口），
         // 新气泡不再登记 claudeDeliverOverrides；confirmClaudeDeliver 仅供 legacy 内存 override 使用。
         val metadata = JSONObject().put("claude_agent_state", state.toJson()).toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = msgId,
                 sessionId = sessionId,
@@ -631,7 +645,7 @@ class ChatViewModel(
     private suspend fun persistEngineerTask(sessionId: String, state: EngineerTaskState) {
         // 展示层 overlay 的持久化失败不应中止推理（launch 内异常直接崩溃，故就地吞掉只记日志）
         runCatching {
-            chatMessageDao.insertMessage(
+            chatMessageDao.insertMessageWithParts(
                 ChatMessageEntity(
                     id = state.taskId,
                     sessionId = sessionId,
@@ -1023,6 +1037,60 @@ class ChatViewModel(
         }
     )
 
+    /** ADR-016 M2：引擎事件 → spec §4 块级三段式事件的翻译器（一次 sendMessage = 一个 turn，流式起点 reset）。 */
+    private val turnAdapter = ChatStreamTurnAdapter()
+
+    /** ADR-016 M2：turn parts 快照装配器（占位契约 / 原位填充 / DONE 不可变，语义见类注释）。 */
+    private val turnReducer = TurnPartsReducer()
+
+    /**
+     * M2 turn 装配入口：引擎事件经 [turnAdapter] 翻译为块级三段式事件，由 [turnReducer]
+     * 拼装 parts 快照并挂到流式占位消息。瞬态内存轨——M2 期 UI 渲染仍读 legacy content
+     * （占位 parts 不可见），本管线为 M4 渲染切换打底；流式消息不落 Room。
+     *
+     * 线程收口（M2 审查修复）：onEvent 实际运行在 orchestrator 调度器，adapter/reducer
+     * 是单线程契约——全部访问漏斗到 Main.immediate（launch 保 FIFO 事件序）。
+     */
+    private fun feedTurn(event: ChatStreamEvent) {
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            turnAdapter.onEvent(event).forEach { turnEvent -> turnReducer.apply(turnEvent) }
+            _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+        }
+    }
+
+    /**
+     * M2 工具产物回填：能力执行点（图卡/HTML 卡落库处）把最终 part 喂给装配器——
+     * 同名 in-flight 占位则原位填充（位置锚定）；无同名 pending 时降级关联任意在途调用
+     * （脚本直出图卡：run_gallery_script 的产物本无占位，reducer 走 append 分支落尾部）；
+     * 无任何在途调用（非流式回合，如 /chart 冒烟直出）则跳过。
+     * 产物 partId 与关联的 toolCallId 一致（占位原位替换契约，见 [TurnPartsReducer]）。
+     * 线程收口同 [feedTurn]（调用方在 Dispatchers.Default，先切 Main 再触 reducer）。
+     */
+    private suspend fun feedToolOutput(toolName: String, output: (toolCallId: String) -> MessagePart) {
+        withContext(Dispatchers.Main.immediate) {
+            val toolCallId = turnReducer.oldestPendingToolCallId(toolName)
+                ?: turnReducer.oldestPendingToolCallId()
+                ?: return@withContext
+            turnReducer.apply(TurnStreamEvent.ToolOutputAvailable(toolCallId, output(toolCallId)))
+            _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+        }
+    }
+
+    /**
+     * M2 工具失败回填（spec §5.3 错误进文档）：占位 part 标 OUTPUT_ERROR + errorText 入
+     * [TurnPartsReducer.toolErrors]——**瞬态轨不落库**（持久化错误以 TaskCard 路径为准）。
+     * 关联语义与 [feedToolOutput] 相同（同名优先，降级任意在途）；无在途调用则跳过。
+     */
+    private suspend fun feedToolError(toolName: String, errorText: String) {
+        withContext(Dispatchers.Main.immediate) {
+            val toolCallId = turnReducer.oldestPendingToolCallId(toolName)
+                ?: turnReducer.oldestPendingToolCallId()
+                ?: return@withContext
+            turnReducer.apply(TurnStreamEvent.ToolOutputError(toolCallId, errorText))
+            _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+        }
+    }
+
     /**
      * AI 优化命令触发后需要导航到编辑器的目标 URI。
      */
@@ -1034,18 +1102,28 @@ class ChatViewModel(
     }
 
     /**
+     * 任务卡 live 态的节流视图（ADR-016 M2）：SSE 高频事件不直接驱动全列表重组。
+     * onStart 首值直通——裸 sample 的首帧要等首个周期 tick（~500ms），会拖白首次进
+     * chat 页的列表（M2 审查回归修复）；首值之后的高频更新仍按周期节流。
+     * 终态/审批态不豁免节流：结构性事件本就落库，_messages（未节流）同步驱动重算。
+     */
+    @VisibleForTesting
+    internal val throttledEngineerTasks: Flow<Map<String, EngineerTaskState>> =
+        _engineerTasks.sample(ENGINEER_TASK_OVERLAY_THROTTLE_MS).onStart { emit(_engineerTasks.value) }
+
+    /**
      * UI 实际展示的消息列表：已持久化消息 + 流式临时消息；TASK_CARD 叠加工程师任务 live 态。
      */
     val displayMessages: StateFlow<List<ChatMessageUi>> =
-        combine(_messages, _streamingMessage, _engineerTasks) { messages, streaming, tasks ->
+        combine(_messages, _streamingMessage, throttledEngineerTasks) { messages, streaming, tasks ->
             val base = if (streaming != null) messages + streaming else messages
             if (tasks.isEmpty()) {
                 base
             } else {
-                base.map { msg ->
-                    val live = msg.engineerTask?.let { task -> tasks[task.taskId] }
-                    if (live != null && live != msg.engineerTask) msg.copy(engineerTask = live) else msg
-                }
+                // ADR-016 M2：live 态挂载迁入 parts overlay——TaskCard part 同 id 原位覆写 +
+                // legacy engineerTask 字段自 part 投影（M4 渲染切换前 UI 仍读 legacy，二者同源
+                // 防漂移）；非任务卡/无变化消息引用相等原样返回（零分配）。
+                base.map { msg -> msg.overlayLiveTaskState(tasks) }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -1578,7 +1656,7 @@ class ChatViewModel(
                     modelUsed = null,
                     metadata = imageUri?.let { """{"imageUri":"$it"}""" }
                 )
-                chatMessageDao.insertMessage(userMessage)
+                chatMessageDao.insertMessageWithParts(userMessage)
                 chatSessionDao.touchSession(sessionId)
 
                 // 1.2 访客渐进引导：仅未注册时计数；恰好跨阈值当次插入提示消息并弹出双选项引导（>阈值不再弹）
@@ -1609,6 +1687,9 @@ class ChatViewModel(
 
                 // 3. 创建流式占位消息（立即展示「思考中」提示，避免空气泡）
                 val streamingId = "streaming_${System.currentTimeMillis()}"
+                // ADR-016 M2：一次 sendMessage = 一个 turn，起点重置装配器（防上一回合残留）
+                turnAdapter.reset()
+                turnReducer.reset()
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
                     type = ChatMessageType.AGENT_TEXT,
@@ -1641,7 +1722,7 @@ class ChatViewModel(
                 //
                 // 流式期间占位消息内容实时更新（只走 _streamingMessage 内存轨，不落 Room）：
                 // - TextSnapshot：模型本轮累计全文快照，直接整体替换气泡内容
-                //   （AGENT_TEXT 经 MarkdownText 渲染，天然支持增量 Markdown）。
+                //   （AGENT_TEXT 经 AgentMarkdown 渲染，天然支持增量 Markdown）。
                 // - ToolCallStarted：进入工具调用轮，气泡切换为"正在调用工具"状态文案；
                 //   新一轮首个 delta 到达时快照从空重新累计，自动覆盖状态文案。
                 // chat 推理前同步配置 remoteConfig：确保用当前 _remoteSource 对应的远程源，
@@ -1671,7 +1752,7 @@ class ChatViewModel(
                                     _streamingMessage.value = _streamingMessage.value?.copy(isThinking = false)
                                 }
                             }
-                            ChatStreamEvent.ToolCallStarted -> {
+                            is ChatStreamEvent.ToolCallStarted -> {
                                 pacingController.reset()
                                 _streamingMessage.value = _streamingMessage.value?.copy(
                                     content = stringContext().getString(R.string.chat_calling_tool),
@@ -1680,6 +1761,8 @@ class ChatViewModel(
                                 )
                             }
                         }
+                        // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）
+                        feedTurn(event)
                     }
                 )
 
@@ -1828,7 +1911,7 @@ class ChatViewModel(
                     ),
                     modelUsed = "error"
                 )
-                chatMessageDao.insertMessage(errorMessage)
+                chatMessageDao.insertMessageWithParts(errorMessage)
                 chatSessionDao.touchSession(sessionId)
             } finally {
                 _isProcessing.value = false
@@ -2342,6 +2425,12 @@ class ChatViewModel(
                 writeConfirmationController.onScriptStarted()
                 val result = try {
                     rt.evalAsync(code, evalTimeoutMs, traceId)
+                } catch (e: Exception) {
+                    // ADR-016 M2：脚本失败闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）；
+                    // 异常继续上抛走既有「错误回传 LLM」路径。取消是回合拆除，不算工具失败。
+                    if (e is CancellationException) throw e
+                    feedToolError(TurnPartsReducer.TOOL_RUN_GALLERY_SCRIPT, e.message ?: "script eval failed")
+                    throw e
                 } finally {
                     // 脚本结束（正常/超时/取消）：在途写确认一律拒绝——
                     // 「脚本已死，确认不再生效」，防孤儿确认在 SCRIPT_TIMEOUT 后仍执行写操作
@@ -2367,7 +2456,11 @@ class ChatViewModel(
                                 emitHtmlCardMessage(sanitized.html, summary = summary)
                                 summary ?: stringContext().getString(R.string.chat_html_card_generated)
                             }
-                            is HtmlCardSanitizer.Result.Rejected -> sanitized.reason
+                            is HtmlCardSanitizer.Result.Rejected -> {
+                                // ADR-016 M2：清洗拒绝闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）
+                                feedToolError(TurnPartsReducer.TOOL_RENDER_HTML, sanitized.reason)
+                                sanitized.reason
+                            }
                         }
                     }
                     else -> {
@@ -2389,7 +2482,7 @@ class ChatViewModel(
      * 的重载冲掉（表现为“图先出现又消失”）。落库后图卡随会话持久，跨重载/重启均保留。
      */
     private suspend fun emitChartMessage(svg: String) {
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = "chart_" + System.currentTimeMillis(),
                 sessionId = _currentSessionId.value,
@@ -2399,6 +2492,10 @@ class ChatViewModel(
                 modelUsed = "chart"
             )
         )
+        // ADR-016 M2：产物回填 turn 装配器（占位原位填充；无待关联调用时 no-op）
+        feedToolOutput(TurnPartsReducer.TOOL_DRAW_CHART) { toolCallId ->
+            MessagePart.Chart(partId = toolCallId, svg = svg)
+        }
     }
 
     /** HTML 卡消息 id 序号兜底（同毫秒连发防主键碰撞被 REPLACE 覆盖）。 */
@@ -2417,7 +2514,7 @@ class ChatViewModel(
             summary = summary?.ifBlank { null }
         )
         val metadata = JSONObject().put("html_card", meta.toJson()).toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 // 同毫秒多张卡（/html 冒烟集连发）需序号兜底，否则主键相同被 REPLACE 覆盖丢卡
                 id = "html_" + System.currentTimeMillis() + "_" + htmlMessageSeq.incrementAndGet(),
@@ -2429,6 +2526,10 @@ class ChatViewModel(
                 metadata = metadata
             )
         )
+        // ADR-016 M2：产物回填 turn 装配器（同 emitChartMessage）
+        feedToolOutput(TurnPartsReducer.TOOL_RENDER_HTML) { toolCallId ->
+            MessagePart.HtmlCard(partId = toolCallId, html = html, meta = meta)
+        }
     }
 
     /**
@@ -2448,7 +2549,7 @@ class ChatViewModel(
             card.put("displayMode", mode.name)
             if (measuredHeightPx != null && measuredHeightPx > 0) card.put("measuredHeightPx", measuredHeightPx)
             root.put("html_card", card)
-            chatMessageDao.insertMessage(entity.copy(metadata = root.toString()))
+            chatMessageDao.insertMessageWithParts(entity.copy(metadata = root.toString()))
         }
     }
 
@@ -2477,7 +2578,15 @@ class ChatViewModel(
                 .put("values", JSONArray(values))
                 .apply { if (!unit.isNullOrBlank()) put("unit", unit) }
                 .toString()
-            val result = rt.eval("Chart." + fn + "(" + args + ")", traceId)
+            val result = try {
+                rt.eval("Chart." + fn + "(" + args + ")", traceId)
+            } catch (e: Exception) {
+                // ADR-016 M2：eval 失败闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）；
+                // 异常继续上抛走既有「错误回传 LLM」路径。取消不算工具失败。
+                if (e is CancellationException) throw e
+                feedToolError(TurnPartsReducer.TOOL_DRAW_CHART, e.message ?: "chart eval failed")
+                throw e
+            }
             val obj = result as? JsValue.Obj
             val chart = obj?.entries?.get("chart") as? JsValue.Str
             if (chart != null) emitChartMessage(chart.value)
@@ -2506,6 +2615,8 @@ class ChatViewModel(
             }
             is HtmlCardSanitizer.Result.Rejected -> {
                 Logger.w(TAG, "render_html rejected: ${result.reason}")
+                // ADR-016 M2：清洗拒绝闭环 turn 占位（瞬态 OUTPUT_ERROR，不落库）
+                feedToolError(TurnPartsReducer.TOOL_RENDER_HTML, result.reason)
                 result.reason
             }
         }
@@ -2633,7 +2744,7 @@ class ChatViewModel(
             try {
                 ensureSessionExists(sessionId)
                 _isProcessing.value = true
-                chatMessageDao.insertMessage(
+                chatMessageDao.insertMessageWithParts(
                     ChatMessageEntity(
                         id = UUID.randomUUID().toString(),
                         sessionId = sessionId,
@@ -2737,7 +2848,7 @@ class ChatViewModel(
             } else {
                 null
             }
-            chatMessageDao.insertMessage(
+            chatMessageDao.insertMessageWithParts(
                 ChatMessageEntity(
                     id = previousCard?.id ?: UUID.randomUUID().toString(),
                     sessionId = sessionId,
@@ -2824,7 +2935,7 @@ class ChatViewModel(
                 put("used_sandbox", it.usedSandbox)
             }.toString()
         }
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
@@ -2860,7 +2971,7 @@ class ChatViewModel(
                 put("used_sandbox", p.usedSandbox)
             }
         }.toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
@@ -2905,7 +3016,7 @@ class ChatViewModel(
                 put("decode_speed", it.decodeSpeed.toDouble())
             }
         }.toString()
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
@@ -2927,7 +3038,7 @@ class ChatViewModel(
         content: String,
         modelUsed: String
     ) {
-        chatMessageDao.insertMessage(
+        chatMessageDao.insertMessageWithParts(
             ChatMessageEntity(
                 id = messageId,
                 sessionId = sessionId,
@@ -2960,7 +3071,7 @@ class ChatViewModel(
                 when (val outcome = controller.reroll(messageId)) {
                     is ChatOptimizeGachaController.RerollOutcome.Rerolled -> {
                         chatMessageDao.getMessageById(messageId)?.let { entity ->
-                            chatMessageDao.insertMessage(
+                            chatMessageDao.insertMessageWithParts(
                                 entity.copy(content = outcome.explanation, metadata = outcome.group.toJson())
                             )
                         }
@@ -2994,7 +3105,7 @@ class ChatViewModel(
                     put("imageUri", result.imageUri)
                     put("saved", false)
                 }.toString()
-                chatMessageDao.insertMessage(
+                chatMessageDao.insertMessageWithParts(
                     entity.copy(type = "agent_image", metadata = metadata)
                 )
             }
@@ -3099,7 +3210,7 @@ class ChatViewModel(
                     content = persistedUri,
                     modelUsed = null
                 )
-                chatMessageDao.insertMessage(userMessage)
+                chatMessageDao.insertMessageWithParts(userMessage)
                 _lastUserImageUri.value = persistedUri
                 chatSessionDao.touchSession(sessionId)
 
@@ -3297,7 +3408,7 @@ class ChatViewModel(
                         if (newAssets.isEmpty()) {
                             val deletedText = stringContext().getString(R.string.chat_results_photo_deleted)
                             chatMessageDao.getMessageById(message.id)?.let { entity ->
-                                chatMessageDao.insertMessage(
+                                chatMessageDao.insertMessageWithParts(
                                     entity.copy(
                                         type = "agent_text",
                                         content = deletedText,
@@ -3313,7 +3424,7 @@ class ChatViewModel(
                         }
                         val newTotal = (mr.totalCount - 1).coerceAtLeast(newAssets.size)
                         chatMessageDao.getMessageById(message.id)?.let { entity ->
-                            chatMessageDao.insertMessage(
+                            chatMessageDao.insertMessageWithParts(
                                 entity.copy(
                                     content = ChatGallerySearch.serializeContent(newAssets),
                                     metadata = ChatGallerySearch.serializeMetadata(
@@ -3432,6 +3543,11 @@ class ChatViewModel(
             gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
                 optimizeGachaController?.hasPending(id) == true,
             engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
+            // ADR-016 M2：任务卡消息恢复双读填充（decodePartsOrLegacy：优先 partsJson，缺失/损坏
+            // 回 legacy 列现算）——live 态 overlay（displayMessages）挂载在 parts 的 TaskCard part
+            // 上，需要它在场；其余类型仍不填充（无消费方，避免每条消息一次无效 JSON decode）。
+            // M4 切渲染源时全量恢复。
+            parts = if (type == EngineerTaskState.ROOM_TYPE) decodePartsOrLegacy() else emptyList(),
         )
     }
 
@@ -3528,8 +3644,12 @@ internal fun buildAppToolExecutor(deps: ChatViewModelDependencies): AppToolExecu
         // 改从设置库读当前会话 id（switchSession/newSession 均经 updateChatCurrentSessionId 写入）
         val effectiveSessionId = sessionId
             ?: deps.userSettingsRepository.chatCurrentSessionIdFlow.first()
+        // ADR-016 M1：回灌经 toModelInput 显式转换（UIMessage→ModelMessage 双层分离）——
+        // 文本消息保持 (user_text|agent_text, 原文) 与旧直拼输出等价；卡片类消息呈现为
+        // tool_call/tool_result 语义对；media_results/图片/抽卡等 data part 不进上下文（spec §6）。
         deps.chatMessageDao.getRecentMessages(effectiveSessionId, limit)
-            .map { it.type to it.content }
+            .flatMap { entity -> entity.toModelInputItems() }
+            .map { item -> item.toHistoryPair() }
     },
     runtimeStateProvider = RuntimeStateProvider {
         runBlocking {
