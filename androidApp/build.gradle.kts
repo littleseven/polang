@@ -248,6 +248,10 @@ dependencies {
     implementation(libs.coil.video)
     implementation(libs.androidx.webkit)
     implementation(libs.compose.markdown)
+    // M3 spike（ADR-016 §7.1）：mikepenz AST 渲染器候选，验证后决定去留
+    implementation(libs.mikepenz.markdown.renderer)
+    implementation(libs.mikepenz.markdown.renderer.m3)
+    implementation(libs.mikepenz.markdown.renderer.code)
     implementation(libs.androidsvg)
     implementation(libs.retrofit)
     implementation(libs.converter.moshi)
