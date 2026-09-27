@@ -23,7 +23,17 @@ rsync -avz --delete "$LOCAL_DIR/" "$HOST:$REMOTE_DIR/"
 
 echo "==> [3/3] 校验线上首页标记: $MARKER"
 # 注意: / 会 302 到 /en/（英文页无中文标记），须直接校验 /index.html
-if curl -s --max-time 20 https://polang.net/index.html | grep -q "$MARKER"; then
+# HK 链路偶发截断导致误报（2026-09-27 两例：rsync io_read_int / curl 半包），重试 2 次再判失败
+verify_ok=0
+for attempt in 1 2 3; do
+  if curl -s --max-time 20 https://polang.net/index.html | grep -q "$MARKER"; then
+    verify_ok=1
+    break
+  fi
+  [ "$attempt" -lt 3 ] && echo "  (校验未过，第 ${attempt} 次重试…)"
+  sleep 2
+done
+if [ "$verify_ok" -eq 1 ]; then
   echo "✅ 部署成功: https://polang.net/"
 else
   echo "❌ 校验失败:首页未检测到标记。回滚命令:"
