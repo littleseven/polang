@@ -4,6 +4,7 @@
 package com.mamba.picme.features.chat
 
 import com.mamba.picme.core.designsystem.ChatBubbleTokens
+import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.domain.chat.ChatMessageType
 import com.mamba.picme.domain.chat.ChatListItem
 import com.mamba.picme.domain.chat.MessagePart
@@ -77,6 +78,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -615,13 +617,22 @@ fun ChatScreen(
                             .fillMaxWidth()
                             .onGloballyPositioned { coords -> listViewportHeightPx = coords.size.height }
                             .padding(horizontal = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(
+                        itemsIndexed(
                             items = flatItems,
-                            key = { item -> item.key },
-                            contentType = { item -> item.contentType },
-                        ) { item ->
+                            key = { _, item -> item.key },
+                            contentType = { _, item -> item.contentType },
+                        ) { index, item ->
+                            // turn 聚合间距（chat.yaml §3.1，纯视觉层，token 阶梯）：turn 间回合
+                            // 分隔 lg(16)（去头像/无时间戳，间距承担分隔）；同 turn 相邻文本段落
+                            // 距 xs(4)；卡片与相邻 part 间沿用消息距 sm(8)
+                            val topGap = when {
+                                index == 0 -> 0.dp
+                                item.isTurnStart -> Spacing.lg
+                                item.mergeWithPrevious -> Spacing.xs
+                                else -> Spacing.sm
+                            }
+                            Box(modifier = Modifier.padding(top = topGap)) {
                             when (item.contentType) {
                                 ChatListItem.TYPE_MEDIA_RESULTS -> {
                                     val results = (item.part as MessagePart.MediaResults).results
@@ -769,6 +780,7 @@ fun ChatScreen(
                                         onTableClick = { table -> expandedTable = table }
                                     )
                                 }
+                            }
                             }
                         }
                     }
