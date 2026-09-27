@@ -8,7 +8,9 @@ import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.domain.chat.ChatMessageType
 import com.mamba.picme.domain.chat.ChatListItem
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.flattenChatItems
+import com.mamba.picme.domain.chat.modelRole
 import com.mamba.picme.domain.model.VoiceCommandMode
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.ClaudeStepStatus
@@ -1485,9 +1487,9 @@ private fun ChatMessageItem(
     suppressClaudeActions: Boolean = false,
     onTableClick: (MarkdownTable) -> Unit = {},
 ) {
-    val isUser = message.type == ChatMessageType.USER_TEXT ||
-        message.type == ChatMessageType.USER_IMAGE ||
-        message.type == ChatMessageType.USER_IMAGE_TEXT
+    // 🔵7（M4 review）：user 角色判定收口 commonMain 单点 `roleOf`（经 modelRole），
+    // 不再枚举 user 类型——与 turn 边界/回灌角色同口径，新增 user_* 类型零漂移
+    val isUser = message.modelRole == ModelInputRole.USER
     val isImage = message.type == ChatMessageType.AGENT_IMAGE || message.type == ChatMessageType.USER_IMAGE
     val isImageText = message.type == ChatMessageType.USER_IMAGE_TEXT
     val isEditResult = message.type == ChatMessageType.AGENT_EDIT_RESULT

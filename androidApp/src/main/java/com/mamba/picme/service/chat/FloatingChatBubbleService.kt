@@ -88,7 +88,8 @@ import com.mamba.picme.R
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import com.mamba.picme.domain.agent.capability.SystemCapability
-import com.mamba.picme.domain.chat.ChatMessageType
+import com.mamba.picme.domain.chat.ModelInputRole
+import com.mamba.picme.domain.chat.modelRole
 import com.mamba.picme.features.chat.ChatMessageUi
 import com.mamba.picme.features.chat.ChatModelOption
 import com.mamba.picme.features.chat.ChatViewModel
@@ -682,8 +683,9 @@ private fun ModelIndicatorChip(currentModel: ChatModelOption) {
 
 @Composable
 private fun FloatingChatMessageItem(message: ChatMessageUi) {
-    val isUser = message.type == ChatMessageType.USER_TEXT ||
-        message.type == ChatMessageType.USER_IMAGE
+    // 🔵7（M4 review）：user 角色判定收口 commonMain 单点 `roleOf`（经 modelRole）——
+    // 顺带修正 USER_IMAGE_TEXT 此前被枚举遗漏而渲染为 agent 配色的漂移（对齐 ChatScreen 口径）
+    val isUser = message.modelRole == ModelInputRole.USER
     val bubbleColor = if (isUser) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
