@@ -224,6 +224,14 @@ android {
     }
 }
 
+// ADR-016 M4（spec §8）：Compose 稳定性白名单——shared 模块的领域模型跨模块编译时
+// 默认判定为 unstable（无法加 @Immutable 注解，shared 不依赖 compose-runtime），
+// 在此声明为 stable 使 item 级 skip 生效（ChatListItem/MessagePart 全 val 不可变，约定成立）。
+// 配置文件格式：https://kotlinlang.org/docs/compose-compiler-options.html#stability-configuration-file
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
+}
+
 base {
     archivesName.set("polang")
 }

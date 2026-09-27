@@ -52,6 +52,7 @@ import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.mamba.picme.core.designsystem.PoLangForcedDarkTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -221,6 +222,11 @@ private fun AiChatScreenContent(
 ) {
     var isExpanded by remember { mutableStateOf(true) }
 
+    // ADR-016 M4（spec §8 收口）：面板为相机/相册上的恒黑浮层，浅色 scheme 下派生色
+    // 在黑底上不可见——强制深色 scheme 对齐视觉场景（对齐相机页先例）；气泡原硬编码
+    // Color.White/DarkGray 同步收口为 colorScheme 语义色。面板底色保持纯黑不动
+    //（spec 只点名气泡；改 background 会引起相机页浮层视觉回归）
+    PoLangForcedDarkTheme {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -269,6 +275,7 @@ private fun AiChatScreenContent(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -289,7 +296,7 @@ private fun AiChatHeader(
     ) {
         Text(
             text = stringResource(R.string.ai_agent),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold
         )
@@ -303,7 +310,7 @@ private fun AiChatHeader(
                 Icon(
                     imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowDown else Icons.Rounded.KeyboardArrowUp,
                     contentDescription = if (isExpanded) stringResource(R.string.cd_collapse) else stringResource(R.string.cd_expand),
-                    tint = Color.White.copy(alpha = 0.7f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -316,7 +323,7 @@ private fun AiChatHeader(
                 Icon(
                     imageVector = Icons.Rounded.Close,
                     contentDescription = stringResource(R.string.close),
-                    tint = Color.White.copy(alpha = 0.7f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -338,7 +345,7 @@ private fun AiChatHeader(
             modifier = Modifier
                 .size(width = 36.dp, height = 4.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.25f))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f))
         )
     }
 }
@@ -375,7 +382,7 @@ private fun UserTextBubble(
     ) {
         Text(
             text = message.content,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onPrimary,
             fontSize = 13.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp))
@@ -408,12 +415,12 @@ private fun AgentTextBubble(
     ) {
         AgentMarkdown(
             content = message.content,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 13.sp,
             lineHeight = 18.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp))
-                .background(Color.DarkGray.copy(alpha = 0.85f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
                 .padding(horizontal = 14.dp, vertical = 10.dp)
                 .pointerInput(Unit) {
                     detectTapGestures(
@@ -445,7 +452,7 @@ private fun PlanPreviewBubble(
             modifier = modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color.DarkGray.copy(alpha = 0.85f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
                 .padding(14.dp)
         ) {
             Column(
@@ -454,7 +461,7 @@ private fun PlanPreviewBubble(
             ) {
                 Text(
                     text = message.content,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -483,7 +490,7 @@ private fun PlanPreviewBubble(
                         Icon(
                             Icons.Rounded.Close,
                             contentDescription = stringResource(R.string.cancel),
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -501,7 +508,7 @@ private fun PlanPreviewBubble(
                 fontSize = 12.sp,
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.15f))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             )
         }
@@ -523,7 +530,7 @@ private fun PlanProgressBubble(
             fontSize = 12.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.1f))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 .padding(horizontal = 14.dp, vertical = 8.dp)
         )
     }
@@ -544,7 +551,7 @@ private fun PlanResultBubble(
             fontSize = 13.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         )
     }
@@ -556,7 +563,7 @@ private fun CommandExecutionBubble(
     modifier: Modifier = Modifier
 ) {
     val statusColor = when (message.status) {
-        AgentMessage.CommandExecution.Status.PENDING -> Color.Gray
+        AgentMessage.CommandExecution.Status.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
         AgentMessage.CommandExecution.Status.RUNNING -> MaterialTheme.colorScheme.primary
         AgentMessage.CommandExecution.Status.SUCCESS -> Color(0xFF4CAF50)
         AgentMessage.CommandExecution.Status.FAILED -> Color(0xFFE53935)
@@ -580,7 +587,7 @@ private fun CommandExecutionBubble(
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color.DarkGray.copy(alpha = 0.65f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -603,7 +610,7 @@ private fun CommandExecutionBubble(
                 Icon(
                     imageVector = commandIcon,
                     contentDescription = message.commandName,
-                    tint = Color.White.copy(alpha = 0.85f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                     modifier = Modifier.size(20.dp)
                 )
                 // 批量执行时显示小序号徽章
@@ -618,7 +625,7 @@ private fun CommandExecutionBubble(
                     ) {
                         Text(
                             text = "${message.index}",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -630,7 +637,7 @@ private fun CommandExecutionBubble(
             if (message.detail.isNotBlank()) {
                 Text(
                     text = message.detail,
-                    color = Color.White.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                     fontSize = 12.sp,
                     lineHeight = 16.sp
                 )
@@ -788,7 +795,7 @@ private fun TextInputMode(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Color.White.copy(alpha = 0.1f))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -807,7 +814,7 @@ private fun TextInputMode(
                     Icon(
                         imageVector = Icons.Rounded.KeyboardVoice,
                         contentDescription = stringResource(R.string.cd_switch_to_voice),
-                        tint = Color.White.copy(alpha = 0.7f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -828,7 +835,7 @@ private fun TextInputMode(
             placeholder = {
                 Text(
                     stringResource(R.string.ai_agent_input_hint),
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
             },
@@ -842,16 +849,16 @@ private fun TextInputMode(
                 onSend = { onSend() }
             ),
             textStyle = TextStyle(
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             ),
             shape = RoundedCornerShape(20.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                focusedContainerColor = Color.White.copy(alpha = 0.06f),
-                unfocusedContainerColor = Color.White.copy(alpha = 0.03f)
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f)
             )
         )
 
@@ -864,7 +871,7 @@ private fun TextInputMode(
                     if (hasContent && !isProcessing) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        Color.Gray.copy(alpha = 0.3f)
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     }
                 )
                 .clickable(enabled = hasContent && !isProcessing) { onSend() },
@@ -873,7 +880,7 @@ private fun TextInputMode(
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.Send,
                 contentDescription = stringResource(R.string.chat_send),
-                tint = if (hasContent && !isProcessing) Color.White else Color.White.copy(alpha = 0.4f),
+                tint = if (hasContent && !isProcessing) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -910,7 +917,7 @@ private fun VoiceInputMode(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Color.White.copy(alpha = 0.1f))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -923,7 +930,7 @@ private fun VoiceInputMode(
             Icon(
                 imageVector = Icons.Rounded.Keyboard,
                 contentDescription = stringResource(R.string.switch_to_keyboard),
-                tint = Color.White.copy(alpha = 0.7f),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -932,7 +939,7 @@ private fun VoiceInputMode(
         val buttonBackground = when {
             isListening && !isCancelRecord -> MaterialTheme.colorScheme.primary
             isListening && isCancelRecord -> Color(0xFFE53935)
-            else -> Color.White.copy(alpha = 0.12f)
+            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
         }
 
         Box(
@@ -1013,7 +1020,7 @@ private fun VoiceInputMode(
                     isListening -> stringResource(R.string.release_to_stop)
                     else -> stringResource(R.string.hold_to_speak)
                 },
-                color = if (isListening) Color.White else Color.White.copy(alpha = 0.8f),
+                color = if (isListening) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 fontSize = 14.sp
             )
         }
@@ -1044,7 +1051,7 @@ private fun HeadsetBadge(
             .padding(top = 2.dp, end = 2.dp)
             .size(14.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f))
             .padding(2.dp),
         contentAlignment = Alignment.Center
     ) {

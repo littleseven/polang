@@ -71,7 +71,7 @@ enum class PartState { STREAMING, DONE }
 
 约束：
 
-- **全部 `@Immutable`**（含 `List` 用不可变拷贝收口），顺车修复当前消息模型 unstable 导致的流式重组放大（2026-09-27 性能梳理 🔴1）
+- **全部不可变 + Compose 稳定性收口**（val-only 数据类，`List` 用不可变拷贝）：顺车修复消息模型 unstable 导致的流式重组放大（2026-09-27 性能梳理 🔴1）。M4 落地机制 = stability configuration file（`androidApp/compose-stability.conf` 白名单，见 §8-1）——shared 不依赖 compose-runtime，无法直接加 `@Immutable` 注解，白名单语义等价
 - part 增删只发生在**流式进行中**；DONE 后的 part 不可变（原位更新仅允许 `TaskCard.state` 与 data part 的同 id 覆写——对齐 Vercel `data-*` 原位更新语义）
 - commonMain 纯 Kotlin，无平台依赖（ADR-013 纯度守卫覆盖）
 
@@ -161,15 +161,15 @@ INPUT_STREAMING → INPUT_AVAILABLE → OUTPUT_AVAILABLE
 | TaskCard | `EngineerTaskCard`（H2 HTML 化路线不变，见 two-tier spec §7） | 状态源改 ToolPartState |
 | MediaResults/抽卡 | 现有轮播/候选条 | 无 |
 
-## 8. 性能防护清单（顺车修复，2026-09-27 梳理 🔴 项）
+## 8. 性能防护清单（顺车修复，2026-09-27 梳理 🔴 项；M4 已全部落地 ✅）
 
-1. 消息/part 模型全 `@Immutable`（§3）
-2. LazyColumn 补 contentType（§7.2）
-3. `messages.any { TASK_CARD }` 等每帧计算改 `remember(messages)` 派生态；`isScrollInProgress` 读取上移到列表层一次性传入
-4. `chatImageIsLive` 的主线程 `File.exists()` 移出组合期（入 ViewModel 或 produceState）
-5. 自动滚底 `LaunchedEffect` key 收窄（不含整个 messages 列表）
-6. `collectAsState` → `collectAsStateWithLifecycle`
-7. AiChatScreen 深色气泡硬编码 `Color.White`/`Color.DarkGray`（M3 换渲染器时沿用的历史欠账，非本期引入）——M4 一并过，按 token/主题色收口
+1. ✅ 消息/part 模型稳定性收口（§3）：shared 不依赖 compose-runtime 无法加 `@Immutable` 注解，改走 Compose compiler stability configuration file——`androidApp/compose-stability.conf` 白名单（`domain.chat` 整包 val-only + `MediaAsset`/`MediaType`/`FeedbackAction`），`androidApp/build.gradle.kts` 挂 `composeCompiler.stabilityConfigurationFiles`
+2. ✅ LazyColumn 补 contentType（§7.2，拍平落地时一并接入）
+3. ✅ `messages.any { TASK_CARD }` 改 `remember(messages)` 派生；`isScrollInProgress` 读取上移到列表层一次传入 item
+4. ✅ `chatImageIsLive` 移出组合期：`rememberChatImageIsLive`（produceState + Dispatchers.IO，乐观初值 true——LRU 清理低频，短暂按存活渲染优于阻塞主线程）
+5. ✅ 自动滚底/回锚 `LaunchedEffect` key 收窄（不含整个 messages 列表）：key 改 `flatItems.size + lastContent` / `nonce + flatItems.size + sessionId`；**同车修复拍平引入的 index 失配回归**——滚动 target/hold 计数/锚定查找全部改 flatItems item 粒度（原消息粒度 index 会滚错位）
+6. ✅ `collectAsState` → `collectAsStateWithLifecycle`（ChatScreen 全量 26 处，含两处 Flow 初值重载）
+7. ✅ AiChatScreen 深色气泡收口：内容包 `PoLangForcedDarkTheme`（钉品牌 DarkColorScheme，primary 同浅色品牌绿，用户气泡不变色），`Color.White`/`Color.DarkGray`/`Color.Gray` 全量改 colorScheme 语义色（onSurface/onSurfaceVariant/surfaceVariant/onPrimary）；面板底色保持纯黑不动（spec 只点名气泡，防相机页浮层视觉回归）
 
 明确不做：WebView 池化（状态污染风险，two-tier spec 已否）、消息分页（独立议题，不在本期）。
 

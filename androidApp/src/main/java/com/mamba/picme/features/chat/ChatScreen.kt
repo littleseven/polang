@@ -124,7 +124,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -256,22 +256,32 @@ fun ChatScreen(
     activeUserTaskCount: Int = 0
 ) {
     val context = LocalContext.current
-    val messages by viewModel.displayMessages.collectAsState()
-    val isProcessing by viewModel.isProcessing.collectAsState()
-    val engineerActionInFlight by viewModel.engineerActionInFlight.collectAsState()
-    val currentModel by viewModel.currentModel.collectAsState()
-    val threads by viewModel.filteredThreads.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val currentSessionId by viewModel.currentSessionId.collectAsState()
-    val isGuestMode by viewModel.isGuestMode.collectAsState()
-    val showRegistration by viewModel.showRegistrationSheet.collectAsState()
-    val showGuestBanner by viewModel.showGuestBanner.collectAsState()
-    val guestMessageCount by viewModel.guestMessageCount.collectAsState()
-    val canDeliverClaude by viewModel.canDeliverClaude.collectAsState()
-    val activeEngineerTaskCount by viewModel.activeEngineerTaskCount.collectAsState()
-    val gachaSelections by viewModel.gachaSelections.collectAsState()
-    val gachaRerolling by viewModel.gachaRerolling.collectAsState()
-    val pendingNonCardTool by viewModel.pendingNonCardTool.collectAsState()
+    val messages by viewModel.displayMessages.collectAsStateWithLifecycle()
+    val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
+    val engineerActionInFlight by viewModel.engineerActionInFlight.collectAsStateWithLifecycle()
+    val currentModel by viewModel.currentModel.collectAsStateWithLifecycle()
+    val threads by viewModel.filteredThreads.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val currentSessionId by viewModel.currentSessionId.collectAsStateWithLifecycle()
+    val isGuestMode by viewModel.isGuestMode.collectAsStateWithLifecycle()
+    val showRegistration by viewModel.showRegistrationSheet.collectAsStateWithLifecycle()
+    val showGuestBanner by viewModel.showGuestBanner.collectAsStateWithLifecycle()
+    val guestMessageCount by viewModel.guestMessageCount.collectAsStateWithLifecycle()
+    val canDeliverClaude by viewModel.canDeliverClaude.collectAsStateWithLifecycle()
+    val activeEngineerTaskCount by viewModel.activeEngineerTaskCount.collectAsStateWithLifecycle()
+    val gachaSelections by viewModel.gachaSelections.collectAsStateWithLifecycle()
+    val gachaRerolling by viewModel.gachaRerolling.collectAsStateWithLifecycle()
+    val pendingNonCardTool by viewModel.pendingNonCardTool.collectAsStateWithLifecycle()
+    // ADR-016 M4（spec §7.2）：渲染源切到 parts——拍平为 LazyColumn 独立 item，
+    // key="${messageId}:${partId}" + contentType 复用桶（修「有 key 无 contentType」
+    // 的复用错配）；USER 消息整颗单 item（§5 图文同气泡不拆）。
+    // 上移到滚动 effect 之前：自动滚底/回锚以 flatItems 粒度计 index（spec §8 收口）
+    val flatItems = remember(messages, pendingNonCardTool) {
+        flattenChatItems(messages, pendingNonCardTool)
+    }
+    // 会话内存在任务卡 ⇒ 气泡上的 claude 审批按钮整体抑制（US-2 审批唯一入口）；
+    // remember 派生，避免流式重组期每次全量扫描（spec §8）
+    val hasTaskCards = remember(messages) { messages.any { msg -> msg.type == ChatMessageType.TASK_CARD } }
     // 抽卡条确认/换一组失败 toast 文案（闭包回调内无法取 stringResource，提前取）
     val gachaRerollUnavailableText = stringResource(R.string.chat_gacha_reroll_unavailable)
     val gachaConfirmFailedText = stringResource(R.string.chat_gacha_confirm_failed)
@@ -321,8 +331,8 @@ fun ChatScreen(
     }
 
     // 媒体库全量数据：用于感知删除完成并同步清理 preview/chat 消息
-    val allMedia by mediaViewModel.allMedia.collectAsState()
-    val deleteAuthRequest by mediaViewModel.deleteAuthRequest.collectAsState()
+    val allMedia by mediaViewModel.allMedia.collectAsStateWithLifecycle()
+    val deleteAuthRequest by mediaViewModel.deleteAuthRequest.collectAsStateWithLifecycle()
 
     // Android 10 (API 29) 恢复性删除权限请求 launcher
     val api29DeleteLauncher = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
@@ -382,7 +392,7 @@ fun ChatScreen(
     }
 
     // ChatViewModel 侧（JS capability.dispatch 删除）触发的系统授权请求，复用上面的 launcher
-    val chatWriteDeleteAuthRequest by viewModel.deleteAuthRequest.collectAsState()
+    val chatWriteDeleteAuthRequest by viewModel.deleteAuthRequest.collectAsStateWithLifecycle()
     LaunchedEffect(chatWriteDeleteAuthRequest) {
         chatWriteDeleteAuthRequest?.let { request ->
             when (request) {
@@ -499,7 +509,7 @@ fun ChatScreen(
     }
 
     // AI 优化命令触发后导航到编辑器
-    val pendingOptimizeUri by viewModel.pendingAiOptimizeNavigation.collectAsState()
+    val pendingOptimizeUri by viewModel.pendingAiOptimizeNavigation.collectAsStateWithLifecycle()
     LaunchedEffect(pendingOptimizeUri) {
         pendingOptimizeUri?.let { uri ->
             onNavigateToPhotoEditor(uri, true)
@@ -508,11 +518,12 @@ fun ChatScreen(
     }
 
     // 自动滚动到底部：列表条数变化或最后一条内容变化时触发（支持流式打字效果）；
-    // 回锚 pending/hold 期间跳过（plain read 在 effect 重跑时取最新值，抑制态不入 key 防自身触发滚动）
-    LaunchedEffect(messages.size, messages.lastOrNull()?.content) {
-        anchorHold?.let { hold -> if (messages.size > hold.second) anchorHold = null }
-        if (pendingTaskAnchor == null && anchorHold == null && messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    // 回锚 pending/hold 期间跳过（plain read 在 effect 重跑时取最新值，抑制态不入 key 防自身触发滚动）。
+    // M4：列表粒度已从消息切到 flatItems（spec §7.2），滚动 target/hold 计数同步改用 item 数
+    LaunchedEffect(flatItems.size, messages.lastOrNull()?.content) {
+        anchorHold?.let { hold -> if (flatItems.size > hold.second) anchorHold = null }
+        if (pendingTaskAnchor == null && anchorHold == null && flatItems.isNotEmpty()) {
+            listState.animateScrollToItem(flatItems.size - 1)
         }
     }
 
@@ -529,13 +540,14 @@ fun ChatScreen(
         }
     }
     // 锚定滚动：消息列表出现该任务卡（id == taskId）后瞬时滚动到位并消费请求；
-    // 随后进入 hold 态——流式 delta 不再拉到底部，直到新消息到来或用户拖拽
-    LaunchedEffect(pendingTaskAnchor?.nonce, messages) {
+    // 随后进入 hold 态——流式 delta 不再拉到底部，直到新消息到来或用户拖拽。
+    // M4：index 查 flatItems（item 粒度）；key 收窄为 size + sessionId（会话切换后同 item 数也要重查）
+    LaunchedEffect(pendingTaskAnchor?.nonce, flatItems.size, currentSessionId) {
         val anchor = pendingTaskAnchor ?: return@LaunchedEffect
-        val index = messages.indexOfFirst { msg -> msg.id == anchor.taskId }
+        val index = flatItems.indexOfFirst { it.message.id == anchor.taskId }
         if (index >= 0) {
             listState.scrollToItem(index)
-            anchorHold = anchor.nonce to messages.size
+            anchorHold = anchor.nonce to flatItems.size
             pendingTaskAnchor = null
             onTaskAnchorConsumed()
         }
@@ -602,14 +614,8 @@ fun ChatScreen(
                             .fillMaxWidth(),
                     )
                 } else {
-                    // 会话内存在任务卡 ⇒ 气泡上的 claude 审批按钮整体抑制（US-2 审批唯一入口）
-                    val hasTaskCards = messages.any { msg -> msg.type == ChatMessageType.TASK_CARD }
-                    // ADR-016 M4（spec §7.2）：渲染源切到 parts——拍平为 LazyColumn 独立 item，
-                    // key="${messageId}:${partId}" + contentType 复用桶（修「有 key 无 contentType」
-                    // 的复用错配）；USER 消息整颗单 item（§5 图文同气泡不拆）
-                    val flatItems = remember(messages, pendingNonCardTool) {
-                        flattenChatItems(messages, pendingNonCardTool)
-                    }
+                    // 滑动态读取上移到列表层一次（spec §8），传入 item 防逐 item 快照订阅
+                    val isListScrolling = listState.isScrollInProgress
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
@@ -666,7 +672,7 @@ fun ChatScreen(
                                         cacheKey = item.key,
                                         viewportHeightDp = listViewportStableHeightDp,
                                         previewViewportHeightDp = listViewportHeightDp,
-                                        isListScrolling = listState.isScrollInProgress,
+                                        isListScrolling = isListScrolling,
                                         onOpenLink = { url -> previewLinkUrl = url },
                                         onOpenFullpage = {
                                             fullpageHtmlCard = HtmlFullpageContent(
@@ -691,7 +697,7 @@ fun ChatScreen(
                                         expanded = taskExpanded,
                                         viewportHeightDp = listViewportStableHeightDp,
                                         previewViewportHeightDp = listViewportHeightDp,
-                                        isListScrolling = listState.isScrollInProgress,
+                                        isListScrolling = isListScrolling,
                                         actionsEnabled = !isProcessing && task.taskId !in engineerActionInFlight,
                                         onToggleExpand = { taskExpanded = !taskExpanded },
                                         onOpenFullpage = { html, title ->
@@ -933,7 +939,7 @@ fun ChatScreen(
     }
 
     // ── JS 写操作确认（capability.dispatch 触发，删除/收藏/选中）──────────────
-    val pendingWriteConfirmation by viewModel.pendingWriteConfirmation.collectAsState()
+    val pendingWriteConfirmation by viewModel.pendingWriteConfirmation.collectAsStateWithLifecycle()
     pendingWriteConfirmation?.let { req ->
         val operationText = when (req.method) {
             "delete_media" -> stringResource(R.string.chat_write_confirm_delete, req.targetCount)
@@ -1001,8 +1007,8 @@ fun ChatScreen(
     }
 
     // ── 聊天/语音/本地 LLM 模型下载提示 ────────────────────────────
-    val showChatModelsPrompt by settingsViewModel.showChatModelsPrompt.collectAsState()
-    val isChatBatchDownloading by settingsViewModel.isBatchDownloading.collectAsState()
+    val showChatModelsPrompt by settingsViewModel.showChatModelsPrompt.collectAsStateWithLifecycle()
+    val isChatBatchDownloading by settingsViewModel.isBatchDownloading.collectAsStateWithLifecycle()
     if (showChatModelsPrompt) {
         AlertDialog(
             onDismissRequest = { if (!isChatBatchDownloading) settingsViewModel.dismissChatModelsPrompt() },
@@ -1595,7 +1601,7 @@ private fun ChatMessageItem(
                     isImage -> {
                         // 显示图片（可点击进入全屏预览）；agent 生成的结果图过期则显示占位
                         val imgSrc = message.imageUri ?: message.content
-                        if (message.type == ChatMessageType.AGENT_IMAGE && !chatImageIsLive(imgSrc)) {
+                        if (message.type == ChatMessageType.AGENT_IMAGE && !rememberChatImageIsLive(imgSrc)) {
                             ExpiredImagePlaceholder()
                         } else {
                             AsyncImage(
@@ -1613,7 +1619,7 @@ private fun ChatMessageItem(
                         // 对话式编辑结果：图片 + 说明文字；结果图过期则显示占位
                         val imageUri = message.imageUri.orEmpty()
                         if (imageUri.isNotBlank()) {
-                            if (!chatImageIsLive(imageUri)) {
+                            if (!rememberChatImageIsLive(imageUri)) {
                                 ExpiredImagePlaceholder(height = 200.dp)
                             } else {
                                 AsyncImage(
@@ -1923,11 +1929,11 @@ private fun ChatInputArea(
     // 独立 chat 页默认文本输入模式（不继承/回写公共 AI chat 的语音偏好）
     var inputMode by remember { mutableStateOf(ChatInputMode.TEXT) }
     // AI 工程师模式（claude-tunnel）：状态在 ViewModel（进入时新建独立会话）
-    val claudeMode by viewModel.claudeMode.collectAsState()
+    val claudeMode by viewModel.claudeMode.collectAsStateWithLifecycle()
 
     // 语音为默认关闭的实验能力（2026-08-19）：语音模式 ≠ DISABLED 时才显示语音入口
-    val voiceCommandMode by settingsRepository.voiceCommandModeFlow.collectAsState(
-        initial = VoiceCommandMode.DISABLED
+    val voiceCommandMode by settingsRepository.voiceCommandModeFlow.collectAsStateWithLifecycle(
+        initialValue = VoiceCommandMode.DISABLED
     )
     val voiceEnabled = voiceCommandMode != VoiceCommandMode.DISABLED
     // 开关关闭时，已处于语音输入态则强制回落文字模式
@@ -1938,7 +1944,7 @@ private fun ChatInputArea(
     }
 
     // 语音输入：按需加载本地 Sherpa-ONNX ASR 模型，未配置时回退到系统 ASR
-    val localAsrModel by settingsRepository.localAsrModelFlow.collectAsState(initial = "")
+    val localAsrModel by settingsRepository.localAsrModelFlow.collectAsStateWithLifecycle(initialValue = "")
     // 语音模型就绪状态：未就绪时输入区不显示语音入口（无内容时回退为禁用态发送按钮）
     var voiceModelReady by remember { mutableStateOf(false) }
     LaunchedEffect(context, localAsrModel, voiceEnabled) {

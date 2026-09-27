@@ -206,6 +206,8 @@ ChatScreen(
 - ✅ **Gallery**: 保留 AiChatScreen 浮动面板（作为页面内辅助）
 - **Editor**: 已独立为 `PhotoEditorScreen` 二级页（`photo_editor/{sourceUri}` 路由），不使用 AiChatScreen 浮动面板
 
+> 2026-09-27（ADR-016 M4 §8 收口）：AiChatScreen 浮动面板为相机/相册上的恒黑浮层，内容包 `PoLangForcedDarkTheme`（钉品牌 DarkColorScheme，对齐相机页先例）——浅色 scheme 派生色在黑底不可见的问题由此消除；气泡/输入区/头部颜色全部走 `colorScheme` 语义色（onSurface/onSurfaceVariant/surfaceVariant/onPrimary），原硬编码 `Color.White`/`Color.DarkGray`/`Color.Gray` 已清除；面板底色保持纯黑不动（防相机页浮层视觉回归）。
+
 ## 8. 语音输入集成
 
 > **2026-08-19 更新**：语音能力已降级为**默认关闭的实验能力**（未移除）。仅当设置中语音模式
