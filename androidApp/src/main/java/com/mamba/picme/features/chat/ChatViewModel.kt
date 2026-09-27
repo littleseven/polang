@@ -1523,8 +1523,18 @@ class ChatViewModel(
         if (BuildConfig.DEBUG && text.trim() == "/html") {
             viewModelScope.launch {
                 ensureSessionExists(_currentSessionId.value)
+                // LOCAL_MEDIA 样本的 id 占位符替换为本机首张照片的真实 chat 媒体 id
+                //（相册为空 → -1，走兜底文案；只取 PHOTO——视频 id 喂给 <img> 渲染不出）
+                val localMediaId: Long = runCatching {
+                    mediaRepository.allMedia.first()
+                        .firstOrNull { asset -> asset.type == MediaType.PHOTO }?.id
+                }.getOrNull() ?: -1L
                 HtmlCardSmokeSamples.all.forEach { sample ->
-                    emitHtmlCardMessage(sample.html, summary = sample.summary, display = sample.display)
+                    val html = sample.html.replace(
+                        HtmlCardSmokeSamples.LOCAL_MEDIA_ID_PLACEHOLDER,
+                        localMediaId.toString()
+                    )
+                    emitHtmlCardMessage(html, summary = sample.summary, display = sample.display)
                 }
             }
             return

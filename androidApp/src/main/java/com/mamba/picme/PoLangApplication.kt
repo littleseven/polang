@@ -6,6 +6,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.Uri
 import android.os.Bundle
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -52,6 +53,7 @@ import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
 import com.mamba.picme.features.chat.CARD_HORIZONTAL_CHROME_DP
 import com.mamba.picme.features.chat.CARD_MAX_HEIGHT_FRACTION
 import com.mamba.picme.features.chat.HtmlCardDisplay
+import com.mamba.picme.features.chat.LocalMediaWebViewAssets
 import com.mamba.picme.features.settings.capability.SettingsCapability
 import com.mamba.picme.features.gallery.capability.GalleryCapability
 // 其他页面级 Capability 由各 Screen 自行创建
@@ -76,6 +78,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlin.math.roundToInt
 import java.io.File
 import java.util.UUID
@@ -180,6 +183,14 @@ class PoLangApplication : Application(), ImageLoaderFactory {
 
         // 用户任务适配器（spec §6）：注册表 + TAG 扫描/模型下载接入任务中心
         container.startUserTaskAdapters()
+
+        // HTML 卡本地媒体注入层（LocalMediaWebViewAssets）：chat 媒体 id → content:// Uri 解析器。
+        // id 双命名空间（正数 = Room media_assets 行 id；负数 = 未落库系统媒体合成 id），
+        // 解析真源 = MediaRepositoryImpl.getMediaById；在 WebView 子资源加载线程同步调用，
+        // 短时阻塞可接受（主键查询 / 内存快照过滤）
+        LocalMediaWebViewAssets.mediaUriResolver = { id ->
+            runBlocking { container.repository.getMediaById(id) }?.uri?.let(Uri::parse)
+        }
 
         // 注入媒体搜索引擎到 GalleryCapability（自然语言图片搜索）
         GalleryCapability.getInstance().searchEngine = container.mediaSearchEngine

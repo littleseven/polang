@@ -28,7 +28,8 @@ package com.mamba.picme.features.chat
  *    （渐隐遮罩 + 提示条，点击进全屏查看器）；
  *    [FULLPAGE_DECLARED]——短内容但声明 display="fullpage"，应免测高直接预览形态。
  * 11. [LOCAL_MEDIA]：本地相册媒体引用（`media://{id}` 契约 → 白名单域注入，
- *    2026-09-27）——应显示相册中 id=1 的图；显示兜底文案 = 通道未生效或该 id 已删除。
+ *    2026-09-27）——id 为占位符 [LOCAL_MEDIA_ID_PLACEHOLDER]，注入时替换为本机
+ *    首张照片的真实 chat 媒体 id；显示兜底文案 = 通道未生效或相册为空。
  *
  * 形态速查：inline 卡完全撑开（≥120dp）、自身不滚动、卡内直接交互、滚动条隐藏；
  * fullpage 预览卡固定高 ≈0.5 屏、禁交互、点击进全屏查看器（竖滚 + 滚动条）。
@@ -556,19 +557,23 @@ object HtmlCardSmokeSamples {
 
     /**
      * 本地媒体引用用例（2026-09-27，`media://{id}` 契约 → LocalMediaWebViewAssets 白名单域注入）。
-     * media://1 取相册里 MediaStore id=1 的图——多数设备存在（最早的媒体）；
-     * 不存在/已删除时 onerror 兜底文案外显，据此即可肉眼分辨白名单通道是否生效。
+     * id 为占位符 [LOCAL_MEDIA_ID_PLACEHOLDER]，由 /html 注入侧（ChatViewModel）替换为本机相册
+     * 首条媒体的真实 id（相册为空时替换为 -1，onerror 兜底文案外显——据此即可肉眼分辨
+     * 白名单通道是否生效）。
      */
     private const val LOCAL_MEDIA = """
         <div style="font-family:sans-serif;padding:16px">
           <div style="font-size:15px;font-weight:bold;margin-bottom:8px">本地相册图引用（media:// 契约）</div>
-          <img src="media://1" style="width:100%;border-radius:10px;display:block"
-               onerror="this.outerHTML='<div style=\'padding:24px;text-align:center;color:#999;border:1px dashed #ccc;border-radius:10px\'>media://1 不存在或不可读（白名单通道未生效/该 id 已删除）</div>'">
+          <img src="media://__LOCAL_MEDIA_ID__" style="width:100%;border-radius:10px;display:block"
+               onerror="this.outerHTML='<div style=\'padding:24px;text-align:center;color:#999;border:1px dashed #ccc;border-radius:10px\'>本地图加载失败（白名单通道未生效或相册为空）</div>'">
           <p style="font-size:12px;color:#666;margin:8px 0 0">
-            上图应为相册中 id=1 的媒体；显示兜底文案 = 注入通道未生效或该 id 已删除。
+            上图应为本机相册首张照片；显示兜底文案 = 注入通道未生效或相册为空。
           </p>
         </div>
     """
+
+    /** [LOCAL_MEDIA] 样本中的媒体 id 占位符，/html 注入时替换为本机真实首条媒体 id。 */
+    const val LOCAL_MEDIA_ID_PLACEHOLDER = "__LOCAL_MEDIA_ID__"
 
     val all: List<SmokeSample> = listOf(
         SmokeSample(STATIC, "纯 HTML/CSS 排版卡"),

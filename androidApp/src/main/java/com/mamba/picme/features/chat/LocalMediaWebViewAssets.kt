@@ -1,9 +1,7 @@
 package com.mamba.picme.features.chat
 
-import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
-import android.provider.MediaStore
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import androidx.webkit.WebViewAssetLoader
@@ -16,8 +14,12 @@ import com.mamba.picme.core.common.Logger
  * （id 只能来自 gallery.query / media.meta / search_media 等取数结果——uri 白名单红线不动，
  * LLM 永远拿不到 content:// 路径）。渲染前 [rewriteMediaRefs] 把 `media://{id}` 重写为
  * 白名单域 URL，WebView 子资源请求经 [intercept]（WebViewAssetLoader）命中后由
- * [LocalMediaPathHandler] 用 ContentResolver 打开 MediaStore 原图/原视频流直通。
+ * [LocalMediaPathHandler] 解析并用 ContentResolver 开流直通。
  * 落库 HTML 保持 `media://` 契约形态，URL 机制演进不影响已存消息。
+ *
+ * id 命名空间（与 chat 取数结果同源，`MediaRepositoryImpl.getMediaById` 双空间解析）：
+ * - 正数：Room `media_assets` 行 id（已索引媒体）；
+ * - 负数：未落库系统媒体的合成 id（`-(mediaStoreId*10+typeSalt)`，salt 1=图片 2=视频）。
  *
  * 安全/隐私设计：
  * - 白名单域 `polang-media.invalid`（`.invalid` 为 RFC 2606 保留 TLD，永不真实解析）；
@@ -29,7 +31,7 @@ import com.mamba.picme.core.common.Logger
  */
 object LocalMediaWebViewAssets {
 
-    /** LLM 侧引用契约前缀：`media://{id}`（id = MediaStore 媒体 id）。 */
+    /** LLM 侧引用契约前缀：`media://{id}`（id 为 chat 媒体 id，可为负数合成 id）。 */
     const val MEDIA_REF_SCHEME = "media://"
 
     /** 白名单拦截域（拦截失效时 DNS 必失败，不会误触真实站点）。 */
@@ -40,8 +42,17 @@ object LocalMediaWebViewAssets {
 
     private const val MEDIA_PATH_PREFIX = "/media/"
 
-    /** `media://123` 纯数字 id 引用（`\b` 防止 `media://123abc` 这类半截误配）。 */
-    private val MEDIA_REF_REGEX = Regex("""media://(\d+)\b""")
+    /** `media://123` / `media://-10000211391`（负数 = 未落库系统媒体合成 id）；`\b` 防半截误配。 */
+    private val MEDIA_REF_REGEX = Regex("""media://(-?\d+)\b""")
+
+    /**
+     * chat 媒体 id → content:// Uri 解析器，由组合根（PoLangApplication）注入
+     * （实现 = `MediaRepositoryImpl.getMediaById(id)?.uri`，双 id 命名空间解析的唯一真源）。
+     * 未注入时本地媒体引用不生效（拦截返回 null → 破图，其余行为不变）。
+     * 在 WebView 子资源加载线程上同步调用（实现内部允许短时阻塞：DB 主键查询/内存快照过滤）。
+     */
+    @Volatile
+    var mediaUriResolver: ((Long) -> Uri?)? = null
 
     /** 渲染前重写：html 中的 `media://{id}` 引用 → 白名单域 URL（幂等，无引用时原样返回）。 */
     fun rewriteMediaRefs(html: String): String {
@@ -53,7 +64,7 @@ object LocalMediaWebViewAssets {
     private var assetLoader: WebViewAssetLoader? = null
 
     /**
-     * WebViewClient.shouldInterceptRequest 钩子：命中白名单域 → MediaStore 开流；
+     * WebViewClient.shouldInterceptRequest 钩子：命中白名单域 → 解析 id 开流；
      * 其余请求返回 null 放行（远程资源加载行为不变）。
      */
     fun intercept(context: Context, request: WebResourceRequest): WebResourceResponse? =
@@ -69,38 +80,39 @@ object LocalMediaWebViewAssets {
         }
 }
 
-/** `/media/{id}` → MediaStore 原图/原视频流（先图片库后视频库，两库 id 空间独立）。 */
+/** `/media/{id}` → 解析 chat 媒体 id（[LocalMediaWebViewAssets.mediaUriResolver]）→ 原图/原视频流。 */
 private class LocalMediaPathHandler(
     private val appContext: Context
 ) : WebViewAssetLoader.PathHandler {
 
     override fun handle(path: String): WebResourceResponse? {
         val id = path.trimEnd('/').toLongOrNull() ?: return null
-        val candidates = listOf(
-            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id),
-            ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
-        )
-        for (uri in candidates) {
-            openStream(uri)?.let { return it }
+        val resolver = LocalMediaWebViewAssets.mediaUriResolver
+        if (resolver == null) {
+            Logger.w(TAG, "mediaUriResolver not wired; local media unavailable: id=$id")
+            return null
         }
-        Logger.w(TAG, "local media not found or unreadable: id=$id")
-        return null
+        val uri = runCatching { resolver.invoke(id) }.getOrNull()
+        if (uri == null) {
+            Logger.w(TAG, "local media id not resolvable: id=$id")
+            return null
+        }
+        return openStream(uri)
     }
 
-    /** 存在且可读 → (mime, 流) 组装响应；已删除/无权限 → null，继续尝试下一个集合。 */
+    /** 开流 + 探测 MIME；已删除/无权限 → null（WebView 显示破图，HTML 侧可 onerror 兜底）。 */
     private fun openStream(uri: Uri): WebResourceResponse? {
-        val resolver = appContext.contentResolver
-        val mime = runCatching {
-            resolver.query(uri, MIME_PROJECTION, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0) else null
-            }
-        }.getOrNull() ?: return null
-        val stream = runCatching { resolver.openInputStream(uri) }.getOrNull() ?: return null
+        val contentResolver = appContext.contentResolver
+        val stream = runCatching { contentResolver.openInputStream(uri) }.getOrNull()
+        if (stream == null) {
+            Logger.w(TAG, "local media stream open failed: uri=$uri")
+            return null
+        }
+        val mime = runCatching { contentResolver.getType(uri) }.getOrNull() ?: "image/jpeg"
         return WebResourceResponse(mime, null, stream)
     }
 
     private companion object {
         const val TAG = "PoLang:HtmlCard"
-        val MIME_PROJECTION = arrayOf(MediaStore.MediaColumns.MIME_TYPE)
     }
 }

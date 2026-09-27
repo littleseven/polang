@@ -40,6 +40,14 @@ class LocalMediaWebViewAssetsTest {
     }
 
     @Test
+    fun `negative synthetic media ids are rewritten intact`() {
+        // 未落库系统媒体的合成 id 为负数（-(mediaStoreId*10+salt)），重写必须原样保留
+        val html = """<img src="media://-10000211391">"""
+        val out = LocalMediaWebViewAssets.rewriteMediaRefs(html)
+        assertTrue(out.contains("""src="https://polang-media.invalid/media/-10000211391""""))
+    }
+
+    @Test
     fun `already rewritten urls are stable under re-rewrite`() {
         val once = LocalMediaWebViewAssets.rewriteMediaRefs("""<img src="media://42">""")
         assertEquals(once, LocalMediaWebViewAssets.rewriteMediaRefs(once))
