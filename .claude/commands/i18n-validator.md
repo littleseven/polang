@@ -99,7 +99,7 @@ python3 scripts/check_i18n_sync.py
 
 ## 相关文件
 
-- [docs/01-PRODUCT/FEATURES.md](docs/01-PRODUCT/FEATURES.md) — 多语言词汇表（Section 4.1.1）
+- [docs/01-PRODUCT/FEATURES.md](docs/01-PRODUCT/FEATURES.md) — 交互规范（文案口径）
 - [PRODUCT.md](PRODUCT.md) — I18N 规范定义
 - [compose-ui-expert](/compose-ui-expert) — UI 文案硬编码检查
 - [doc-sync-guardian](/doc-sync-guardian) — 文档一致性同步

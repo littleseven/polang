@@ -35,7 +35,7 @@ docs/superpowers/
 ### 生命周期（2026-08-22 起：交付即清理，git 历史即归档）
 
 - **本目录只保留两类文档**：① 在途工作的 spec/plan；② 仍被活跃引用的设计 SSOT。已交付 feature 的 spec/plan **随交付定期清理删除**（不建 archived/ 目录，git 历史永久可查：`git log --all -- <path>` / `git show <rev>:<path>`）。
-- **清理纪律**：删除前把仍有长期价值的事实沉淀进三层活文档（`PRODUCT.md` / `FEATURES.md` / 模块 `AGENTS.md` / `*_TECH_SPEC.md`）；活文档中的引用同步改为「已随交付清理，git 历史可查」，不留悬空链接（与 `docs/01-PRODUCT/IOS_DOC_INDEX.md` §2 同款约定）。
+- **清理纪律**：删除前把仍有长期价值的事实沉淀进三层活文档（`PRODUCT.md` / `FEATURES.md` / 模块 `AGENTS.md` / `*_TECH_SPEC.md`）；活文档中的引用同步改为「已随交付清理，git 历史可查」，不留悬空链接（已随交付清理的文档查 git 历史：`git log --all -- <path>`）。
 - 设计稿内容与代码冲突时以代码为准；本目录文档不是长期事实源，长期事实源是三层文档体系。
 
 ---

@@ -4,7 +4,7 @@
 >
 > **定位**：iOS 端产品实现的单一参考。以 `iosApp/PoLang` 当前 Swift 代码 + `shared/src/iosMain` + `docs/08-UI-SPECS/screens/*.yaml` 契约为事实来源描述**现状**；不再保留历史演进叙述（2026-08-10 前的 Phase 史见 git 历史与 `../reviews/`）。
 >
-> **数字口径**：行数均为 2026-09-20 实测（`find iosApp/PoLang -name "*.swift"`，不含 Pods/build/测试）。测试代码单独统计：58 文件 / 8494 行（PoLangTests + PoLangUITests）。
+> **数字口径**：总量规模数字（主 target / iosMain / 测试）唯一出处 = `IOS_TASK_STATUS.md` 规模锚点（2026-09-20 实测）；本文件 §1.1/§1.2 保留**模块级拆分**（仅本文件有）。
 >
 > **图例**：✅ 已落地 · 🔄 已落地但有登记缺口 · ❌ 缺口/stub · ❄️ 冻结（代码保留不加新功能）· 🚫 平台不对齐（不做）
 
@@ -14,7 +14,7 @@
 
 ### 1.1 代码规模实测（2026-09-20）
 
-iOS 主 target（`iosApp/PoLang`）：**185 个 Swift 文件 / 41808 行**；另有 5 个 Metal shader（beauty/lut/smoothing/warp/yuv，相机美颜管线）。
+iOS 主 target（`iosApp/PoLang`）总量见规模锚点（185 文件 / 41808 行 + 5 Metal shader，2026-09-20）；模块拆分如下：
 
 | 模块 | 文件 | 行数 | 状态 |
 |---|---:|---:|---|
@@ -46,15 +46,7 @@ iOS 主 target（`iosApp/PoLang`）：**185 个 Swift 文件 / 41808 行**；另
 
 ### 1.3 shared iosMain（Kotlin 侧 iOS 桥接）
 
-`shared/src/iosMain`：**28 个 Kotlin 文件 / 2507 行**，编译进 SharedKit XCFramework 供 Swift 消费。清单与职责见 §4。
-
-### 1.4 版本号漂移注记
-
-Android `androidApp/build.gradle.kts` 为 versionName 1.0.39 / versionCode 10039；**iOS `iosApp/project.yml` 仍为 MARKETING_VERSION 0.1.0 / CURRENT_PROJECT_VERSION 1**，双端版本号未同步（登记为任务，见 IOS_TASK_STATUS.md）。
-
-### 1.5 文档前门一致性注记
-
-`IOS_DOC_INDEX.md` §3「真实状态快照」已随本轮校准同步更新（2026-09-20）：聚类 MNN3.5 Apple bug 已于 2026-08-13 经 ONNX Runtime embedder（`ORTFaceEmbedder.swift`）规避并合入 main，i18n 已五语（en/zh-Hans/zh-Hant/es/fr，`Localizable.xcstrings` 767 键）。
+`shared/src/iosMain`：28 个 Kotlin 文件 / 2507 行（2026-09-20，总量归规模锚点），编译进 SharedKit XCFramework 供 Swift 消费。清单与职责见 §4。
 
 ---
 
@@ -107,7 +99,7 @@ Android `androidApp/build.gradle.kts` 为 versionName 1.0.39 / versionCode 10039
 2026-09-15 批次全域移植（`b914f62e3`，契约 organize.yaml）：
 
 - **领域管线**（`Domain/`，纯 Swift 直译 Android，口径逐条一致并有 XCTest 锁定）：`OrganizeCategorizer`/`CategoryArbiter`（互斥裁定）/`BlurAnalyzer`/`ConfidenceGrader`/`ValueGuard`/`SwipeQueueBuilder`/`SwipeKeepHistory`/`OrganizeThresholds`。
-- **Hub**：`OrganizeHubView` + `OrganizeHubViewModel`（类目卡 + Hero 字节数）；**DUPLICATES 卡降档**（needsScan 占位，organize.yaml §8 `ios_duplicates_card_downgrade`）——前提 T8 dedup_hash 扫描器未实现。
+- **Hub**：`OrganizeHubView` + `OrganizeHubViewModel`（类目卡 + Hero 字节数）；**DUPLICATES 卡降档**（needsScan 占位，organize.yaml §8 `ios_duplicates_card_downgrade`）——缺口 #2（T8 dedup_hash 扫描器未实现，见 `IOS_TASK_STATUS.md` §1）。
 - **详情/清理**：`OrganizeCategoryScreen`、`OrganizeRepository`（TagDatabase+Organize 扩列存储）、cleaned 页。
 - **滑动审片**：`SwipeReviewScreen`（飞出动画 + undo，竞态已修）。
 - 信号存储落 `TagDatabase+Organize.swift`（GRDB 扩列）。
@@ -121,7 +113,7 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 - **富交互**：流式节奏器（commonMain `StreamingPacingController`）、Markdown（表格网格/代码块折叠复制）、CHART 图表卡（`ChartSvgCard`+`ChartJsEngine`）、媒体结果卡横滑「查看全部」、👍👎🔄 反馈+模型胶囊、图片消息（上图下文/编辑回链/捏合 1-5x 全屏预览）、工具轮渲染。
 - **AI 优化抽卡**：`ChatOptimizeGachaController` + `GachaCandidateStrip`（chat 侧抽卡条，与编辑器共用引擎，见 §3.7）。
 - **JS 沙盒**：`run_gallery_script` 12/12 **只读** handler（`Platform/GalleryScriptHandlers.swift`）；写操作（capability.dispatch + 确认弹窗）未实现。
-- **登记缺口**：暂存图 UNDERSTAND/FIND_SIMILAR 意图依赖端侧 VLM（stub，见 §3.9），当前提示「端侧能力不可用」（`ChatViewModel.swift:251/450`）；refine_template 未接线；语音输入不做（§6）。
+- **登记缺口**：#1（端侧 VLM stub，连带暂存图 UNDERSTAND/FIND_SIMILAR）/ #8（refine_template 未接线），见 `IOS_TASK_STATUS.md` §1；语音输入不做（平台差异，§6）。
 - 助手性格/回复语言注入 bridge（`52c6335aa`/`565270f43`，含粤语解析）。
 
 ### 3.4 人物 Person（4 文件 / 1172 行）✅
@@ -151,7 +143,7 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 
 - **全功能编辑**：`PhotoEditorScreen` + `PhotoEditorViewModel`：CROP / ADJUST / FILTER（9 色+5 风格）/ MARKUP（`MarkupDrawingCanvas`，绘层仅普通编辑态接管）；`EditHistory` 撤销栈；`RecipeApplier`/`RecipeModels` 配方系统。
 - **AI 优化抽卡**（`Gacha/` 10 文件）：`OptimizeGachaEngine` + `CandidateSampler`（候选采样）+ `NimaScorer`/`OptimizeScorer`（美学打分）+ `Guardrails` + `OptimizeFeedbackLogger`（稳定 image_key 落库三源反馈）+ `AiOptimizeService`（SharedKit `IosAiOptimizeBridge` 远程）；对比模式 `GachaCandidateBar` 替换底栏。
-- **登记缺口**：去背景顶栏按钮置灰（「敬请期待」toast，MattingEngine 已在 IdPhoto 存在但未接进编辑器）；BEAUTY 滑杆可调+参数存档，渲染 DEFER。
+- **登记缺口**：#6（去背景未接线 / BEAUTY 渲染 DEFER），见 `IOS_TASK_STATUS.md` §1。
 
 ### 3.8 证件照 IdPhoto（9 文件 / 1836 行）✅
 
@@ -167,8 +159,8 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 - **Pass1**：`Pass1Pipeline` + `FaceAlignment`（106→5 点）+ `ORTFaceEmbedder`（ONNX Glint360K R100——规避 MNN3.5 Apple embedding bug）+ `MobileClipEncoder`（语义 embedding）+ GRDB `TagDatabase`。
 - **Pass2**：`Pass2Pipeline` + `FaceClusterer`（自适应 k-NN 连通分量 + 精修）+ `FaceClusterMaintenance`。
 - **Pass3**：`Florence2Tagger`（Florence-2-base INT8，ORT 4-session，OD+DETAILED_CAPTION 双任务）。
-- **端侧 VLM**：❌ **stub**——`shared/iosMain` `IosUnavailableImageInferenceEngine`（isLoaded=false / loadModel 恒失败 / 推理返回空串），修图理解/打标 VLM 工具在 iOS v1 不注册；连带 chat UNDERSTAND/FIND_SIMILAR 不可用。
-- **缺口**：MetalGuardian（warmup 超时/Metal→CPU 降级/黑名单）未实现；后台扫描未实现（进后台仅 `pauseForBackground()` 协作暂停，无 BGTaskScheduler）；T8 dedup_hash 扫描器未实现（DUPLICATES 前提）。
+- **端侧 VLM**：❌ **stub**（#1，`IosUnavailableImageInferenceEngine`——修图理解/打标 VLM 工具不注册，连带 chat UNDERSTAND/FIND_SIMILAR 不可用，见 `IOS_TASK_STATUS.md` §1）。
+- **缺口**：#2（T8 dedup_hash）/ #3（MetalGuardian）/ #4（后台扫描），见 `IOS_TASK_STATUS.md` §1。
 
 ### 3.10 自然语言搜索（Platform/Search，20 文件 / 4106 行）✅
 
@@ -185,7 +177,7 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 
 - 账号（邮箱注册/登录/quota 外显/Hero 卡+头像拍摄角标/清除访客数据 `PoLangAuthClient.clearGuestData`）、AI Memory（`MemoryFactsView` 查看/编辑/删除事实）、人物管理、通道（飞书/Telegram 凭证配置——仅凭证，RPA 不做）、相册设置（统计卡+扫描控制台入口）、远程模型（BYOK 双页面：OpenAI/Anthropic/自定义供应商协议分流，`AddRemoteProviderView`/`ProviderConfigView`/`ModelConfigStore`）、本地模型、模型中心（`ModelCenterView`/`ModelDownloadCenterView`，16 模型下载/进度/删除/完整性校验）、沙盒与权限、数据与隐私、开发者选项（诊断日志查看器 llm/tool/js 三份 JSONL + Log Modules）、主题/语言即时生效。
 - 助手性格选择（三 chips，五语）。
-- **缺口**：备份与恢复「Coming Soon」占位（`SettingsScreen.swift:537`）；语音模型选择为持久化占位（iOS 无引擎，`SettingsScreen.swift:707`）；App Store 2.5.2 合规结论未出（JS 写操作上线前置）。
+- **缺口**：#7（备份恢复占位）/ #5 前置（App Store 2.5.2 合规结论），见 `IOS_TASK_STATUS.md` §1；语音模型选择为持久化占位（平台差异，非任务）。
 
 ### 3.12 Debug（5 文件 / 1064 行）
 

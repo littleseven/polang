@@ -22,7 +22,7 @@
 | **Play 发布自动化** | [`05-DEVELOPMENT/GOOGLE_PLAY_RELEASE_AUTOMATION.md`](05-DEVELOPMENT/GOOGLE_PLAY_RELEASE_AUTOMATION.md) | Google Play 构建发布流水线与商店素材 |
 | **发布包备份恢复** | `05-DEVELOPMENT/RELEASE_PACKAGE_BACKUP_RESTORE.md`（内部，不上线） | 发布产物备份与恢复流程 |
 | **双端 UI 契约** | `08-UI-SPECS/PARITY_MASTER_PLAN.md`（内部，不上线） | 双端一致性总纲（五层防线）+ `screens/*.yaml` 逐屏规格 |
-| **iOS 文档前门** | `01-PRODUCT/IOS_DOC_INDEX.md`（内部，不上线） | iOS 侧文档索引（缺口看板 / 产品参考 / 状态快照） |
+| **iOS 文档前门** | `01-PRODUCT/IOS_DOC_INDEX.md`（内部，不上线） | iOS 侧文档索引（缺口看板 / 产品参考） |
 | **坐标系标准** | [`07-STANDARDS/COORDINATE_SYSTEM.md`](07-STANDARDS/COORDINATE_SYSTEM.md) | 图像/人脸坐标系与命名规范 |
 | **术语词典** | [`07-STANDARDS/GLOSSARY.md`](07-STANDARDS/GLOSSARY.md) | 统一术语定义 |
 

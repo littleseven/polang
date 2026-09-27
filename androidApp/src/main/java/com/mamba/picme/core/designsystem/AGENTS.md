@@ -122,5 +122,5 @@ Box(
 
 **参考文档**:
 - PRODUCT.md Section 3.3: 设计系统与规范
-- docs/01-PRODUCT/FEATURES.md Section 3: HyperOS 视觉风格
-- docs/01-PRODUCT/FEATURES.md Section 3.1: 色彩系统
+- docs/01-PRODUCT/FEATURES.md §6.1: HyperOS 风格
+- docs/01-PRODUCT/FEATURES.md §6.2: 色彩系统

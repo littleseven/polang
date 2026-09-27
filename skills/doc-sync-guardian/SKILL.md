@@ -93,7 +93,7 @@ tags:
 |---------|-----------|------|
 | 产品愿景与使命 | `PRODUCT.md` | "成为 Android 平台最快相机" |
 | 性能指标与红线 | `PRODUCT.md` | "冷启动 < 500ms" |
-| 交互流程描述 | `docs/01-PRODUCT/FEATURES.md` | "点击快门触发三位一体反馈" |
+| 交互流程描述 | `docs/01-PRODUCT/FEATURES.md` | "聊天指令调节编辑参数（对话式编辑）" |
 | UI 视觉规范 | `docs/01-PRODUCT/FEATURES.md` | "大圆角 28dp+，毛玻璃效果" |
 | 技术架构设计 | 模块 `AGENTS.md` | "Clean Architecture 分层" |
 | 代码实现细节 | 模块 `AGENTS.md` | "Repository 层职责定义" |
