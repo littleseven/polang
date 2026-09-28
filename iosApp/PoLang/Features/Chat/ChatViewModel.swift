@@ -190,6 +190,11 @@ final class ChatViewModel: ObservableObject {
         ChatEditResultBridge.onEditResult = { [weak self] path in
             Task { @MainActor in self?.appendEditResultMessage(imagePath: path) }
         }
+        // HTML 卡回链（M5 B4）：LLM render_html → IosRenderHtmlCapability → HtmlCardSanitizer
+        // 清洗（iosMain）→ RenderHtmlBridge.onRenderHtml 回此落 HTML_CARD 消息（chat.yaml §13）
+        RenderHtmlBridge.onRenderHtml = { [weak self] outcome in
+            Task { @MainActor in self?.handleRenderHtmlOutcome(outcome) }
+        }
     }
 
     // MARK: - Send (对齐 Android sendMessage 流程)
@@ -251,6 +256,17 @@ final class ChatViewModel: ObservableObject {
         // AGENT_EDIT_RESULT 渲染 demo：生成图落盘 → 追加编辑结果消息（确定性验证，/chart 同款）
         if trimmed.lowercased() == "/editdemo" {
             emitEditResultDemo()
+            return
+        }
+
+        // HTML 卡 INLINE demo：短卡 → 动态测高定案 INLINE（spec §14 冒烟，不经 bridge）
+        if trimmed.lowercased() == "/html" {
+            emitHtmlCardDemo()
+            return
+        }
+        // HTML 卡 FULLPAGE demo：超一屏长文 → 首测 > 1.0 屏自动转 FULLPAGE 预览
+        if trimmed.lowercased() == "/htmlpage" {
+            emitHtmlFullpageDemo()
             return
         }
 
@@ -837,6 +853,131 @@ final class ChatViewModel: ObservableObject {
             }
         }
     }
+
+    // MARK: - HTML 卡双形态（M5 B4，chat.yaml §13：render_html → sanitize → 沙箱 WebView）
+
+    /// render_html 产物落点（LLM 链路 / 手动 demo 共用入口，对齐 Android handleRenderHtml）：
+    /// 清洗通过 → HTML_CARD 消息；清洗拒绝 → 流式占位 part 置 OUTPUT_ERROR（瞬态，不落产物行）。
+    private func handleRenderHtmlOutcome(_ outcome: RenderHtmlBridge.Outcome) {
+        switch outcome {
+        case .ok(let html, let summary, let display):
+            appendHtmlCardMessage(html: html, summary: summary, display: display)
+        case .rejected(let reason):
+            feedToolError(toolName: TurnPartsReducer.companion.TOOL_RENDER_HTML, reason: reason)
+        }
+    }
+
+    /// 追加一条 HTML_CARD 消息（双路径对齐 appendChartMessage）：
+    /// ① feedToolOutput 回填流式占位 part（render_html 走 LLM 链路时 reducer 有 pending
+    ///    toolCall，ToolInputStart 占位 → OUTPUT_AVAILABLE 原位填充；手动 demo 无 reducer
+    ///    活动则跳过）；② 追加独立产物行（双显禁止契约：content 承载 html 本体 + parts 双写）。
+    private func appendHtmlCardMessage(html: String, summary: String?, display: String?) {
+        let meta = HtmlCardMeta(
+            display: display, displayMode: nil, measuredHeightPx: nil, summary: summary)
+        feedToolOutput(toolName: TurnPartsReducer.companion.TOOL_RENDER_HTML) { toolCallId in
+            MessagePartHtmlCard(
+                partId: toolCallId, html: html, meta: meta, state: .outputAvailable)
+        }
+        messages.append(ChatMessage.make(
+            type: .htmlCard, content: html, role: .assistant,
+            htmlContent: html, htmlCardMeta: meta,
+            parts: [MessagePartHtmlCard(
+                partId: "p0", html: html, meta: meta, state: .outputAvailable)]))
+        touchThread(preview: summary ?? String(localized: "chat.html_card_generated"))
+        persist()
+    }
+
+    /// 工具失败回填（render_html sanitize 拒绝等）：镜像 feedToolOutput——流式占位 part
+    /// 原位置 OUTPUT_ERROR；瞬态错误态不落独立产物行（flattener 路由 TYPE_TOOL_ERROR）。
+    private func feedToolError(toolName: String, reason: String) {
+        let toolCallId = turnReducer.oldestPendingToolCallId(toolName: toolName)
+            ?? turnReducer.oldestPendingToolCallId(toolName: nil)
+        guard let toolCallId,
+              let idx = messages.lastIndex(where: { $0.isStreaming }) else { return }
+        _ = turnReducer.apply(event: TurnStreamEventToolOutputError(
+            toolCallId: toolCallId, errorText: reason))
+        messages[idx] = messages[idx].with(parts: turnReducer.parts)
+        pendingToolName = nil
+    }
+
+    /// HTML 卡形态终判持久化（HtmlCardView.onDisplayFinalized 回调，chat.yaml §13 routing）：
+    /// displayMode 一经终判不再跳变。with() 无 htmlCardMeta 参 → make 重建（保留 id/timestamp）；
+    /// parts 内 MessagePartHtmlCard 同步重建带终判 meta。
+    func updateHtmlCardDisplay(
+        messageId: String, displayMode: HtmlCardDisplayMode, measuredHeightPx: Int32?
+    ) {
+        guard let idx = messages.firstIndex(where: { $0.id == messageId }),
+              let oldMeta = messages[idx].htmlCardMeta else { return }
+        // SKIE：HtmlCardMeta 构造器 Int? 参以 KotlinInt? 形态暴露（属性读取已重映射 Int32?）
+        let newMeta = HtmlCardMeta(
+            display: oldMeta.display, displayMode: displayMode,
+            measuredHeightPx: measuredHeightPx.map { KotlinInt(int: $0) },
+            summary: oldMeta.summary)
+        let newParts = messages[idx].parts.map { part -> MessagePart in
+            guard let card = part as? MessagePartHtmlCard else { return part }
+            return MessagePartHtmlCard(
+                partId: card.partId, html: card.html, meta: newMeta, state: card.state)
+        }
+        let old = messages[idx]
+        messages[idx] = ChatMessage.make(
+            id: old.id, type: old.type, content: old.content, role: old.role,
+            timestamp: old.timestamp, htmlContent: old.htmlContent,
+            htmlCardMeta: newMeta, parts: newParts)
+        persist()
+    }
+
+    /// /html：短 HTML 卡 demo（表格 + 链接，INLINE 动态测高定案；spec §14 冒烟，不经 bridge）
+    private func emitHtmlCardDemo() {
+        appendHtmlCardMessage(html: Self.demoInlineHtml, summary: "HTML Card Demo", display: nil)
+    }
+
+    /// /htmlpage：超一屏长文 demo（首测 > 1.0 屏 → 自动转 FULLPAGE 预览 + 全屏查看器）
+    private func emitHtmlFullpageDemo() {
+        appendHtmlCardMessage(html: Self.demoFullpageHtml, summary: "HTML Fullpage Demo", display: nil)
+    }
+
+    /// demo 短卡：一段表格（INLINE 目标形态，测高 < 1.0 屏）
+    private static let demoInlineHtml = """
+    <div style="font-family:-apple-system,sans-serif;padding:12px">
+      <h3 style="margin:0 0 8px">Photo Stats</h3>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><th style="text-align:left;padding:4px 6px;border-bottom:1px solid #ddd">Month</th><th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd">Photos</th></tr>
+        <tr><td style="padding:4px 6px">Jan</td><td style="text-align:right;padding:4px 6px">128</td></tr>
+        <tr><td style="padding:4px 6px">Feb</td><td style="text-align:right;padding:4px 6px">96</td></tr>
+        <tr><td style="padding:4px 6px">Mar</td><td style="text-align:right;padding:4px 6px">204</td></tr>
+      </table>
+      <p style="margin:8px 0 0;font-size:13px;color:#888">Tap links open in preview.</p>
+    </div>
+    """
+
+    /// demo 长文：多段落 + 表格超一屏（触发 FULLPAGE 自动转换阈值）
+    private static let demoFullpageHtml = """
+    <div style="font-family:-apple-system,sans-serif;padding:16px;line-height:1.6">
+      <h2>Gallery Weekly Report</h2>
+      <p>This is a long-form HTML card designed to exceed one screen height, so the first measured height crosses the 1.0&times;screen threshold and the card converts to FULLPAGE preview.</p>
+      <h3>Highlights</h3>
+      <ul>
+        <li>Total photos scanned: 3,482</li>
+        <li>New tags generated: 412</li>
+        <li>Duplicates found: 57</li>
+        <li>People clusters updated: 18</li>
+      </ul>
+      <h3>Breakdown by Month</h3>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><th style="text-align:left;padding:4px 6px;border-bottom:1px solid #ddd">Month</th><th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd">Photos</th><th style="text-align:right;padding:4px 6px;border-bottom:1px solid #ddd">Tags</th></tr>
+        <tr><td style="padding:4px 6px">January</td><td style="text-align:right;padding:4px 6px">412</td><td style="text-align:right;padding:4px 6px">58</td></tr>
+        <tr><td style="padding:4px 6px">February</td><td style="text-align:right;padding:4px 6px">388</td><td style="text-align:right;padding:4px 6px">52</td></tr>
+        <tr><td style="padding:4px 6px">March</td><td style="text-align:right;padding:4px 6px">521</td><td style="text-align:right;padding:4px 6px">77</td></tr>
+        <tr><td style="padding:4px 6px">April</td><td style="text-align:right;padding:4px 6px">466</td><td style="text-align:right;padding:4px 6px">63</td></tr>
+        <tr><td style="padding:4px 6px">May</td><td style="text-align:right;padding:4px 6px">609</td><td style="text-align:right;padding:4px 6px">88</td></tr>
+        <tr><td style="padding:4px 6px">June</td><td style="text-align:right;padding:4px 6px">574</td><td style="text-align:right;padding:4px 6px">74</td></tr>
+      </table>
+      <h3>Notes</h3>
+      <p>The scanner ran on-device with the Qwen3-VL model; no media left the device. Tag quality improved after the Florence-2 pass was re-tuned for landscape shots. Duplicate detection now compares perceptual hashes before pixel diffs, cutting false positives by roughly a third.</p>
+      <p>Next week the model will be swapped to the quantized build to reduce warm-up time on first scan. Cache invalidation follows the album change token so incremental scans stay consistent.</p>
+      <p style="margin-top:16px;font-size:13px;color:#888">Generated on-device &middot; demo content</p>
+    </div>
+    """
 
     // MARK: - run_gallery_script（LLM run_gallery_script → JsRuntime 端侧沙箱 + 确定性 demo）
 

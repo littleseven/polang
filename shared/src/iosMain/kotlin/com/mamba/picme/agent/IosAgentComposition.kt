@@ -5,6 +5,7 @@ import com.mamba.picme.agent.core.capability.IosAiOptimizeCapability
 import com.mamba.picme.agent.core.capability.IosChartCapability
 import com.mamba.picme.agent.core.capability.IosChatGalleryCapability
 import com.mamba.picme.agent.core.capability.IosNavigationCapability
+import com.mamba.picme.agent.core.capability.IosRenderHtmlCapability
 import com.mamba.picme.agent.core.capability.IosRunScriptCapability
 import com.mamba.picme.agent.core.facade.AgentDependencies
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
@@ -22,6 +23,7 @@ import com.mamba.picme.data.IosChatSearchBridge
 import com.mamba.picme.data.IosMediaRepository
 import com.mamba.picme.data.IosMediaRepositoryBridge
 import com.mamba.picme.data.IosNavigationBridge
+import com.mamba.picme.data.IosRenderHtmlBridge
 import com.mamba.picme.data.IosRunScriptBridge
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -79,6 +81,9 @@ object IosAgentComposition {
      *                     chat 搜索保持文件名匹配降级（防御路径，契约 §9）
      * @param chartBridge Swift 侧图表渲染桥（ChartRendererBridge → ChartJsEngine）；null 时
      *                   draw_chart 命令不可用（IosChartCapability.isAvailable=false）
+     * @param renderHtmlBridge Swift 侧 HTML 卡渲染桥（RenderHtmlBridge → ChatViewModel 落卡消息，
+     *                         M5 B4 chat.yaml §13）；null 时 render_html 命令不可用
+     *                         （IosRenderHtmlCapability.isAvailable=false）
      * @param runScriptBridge Swift 侧脚本执行桥（RunScriptBridge → JsRuntime+JsCoreEngine）；null 时
      *                        run_gallery_script 命令不可用（IosRunScriptCapability.isAvailable=false）
      * @param aiOptimizeBridge Swift 侧 AI 优化桥（AiOptimizeBridge → AiOptimizeService 固定预设路径）；
@@ -93,6 +98,7 @@ object IosAgentComposition {
         deviceId: String,
         searchBridge: IosChatSearchBridge? = null,
         chartBridge: IosChartBridge? = null,
+        renderHtmlBridge: IosRenderHtmlBridge? = null,
         runScriptBridge: IosRunScriptBridge? = null,
         aiOptimizeBridge: IosAiOptimizeBridge? = null,
         navigationBridge: IosNavigationBridge? = null,
@@ -144,6 +150,9 @@ object IosAgentComposition {
 
         // 注册 iOS chat 图表能力（draw_chart 执行端 → ChartJsEngine 端侧渲染）
         orchestrator.registerCapability(IosChartCapability(chartBridge))
+
+        // 注册 iOS chat HTML 卡能力（render_html 执行端 → ChatViewModel 落卡消息，M5 B4 chat.yaml §13）
+        orchestrator.registerCapability(IosRenderHtmlCapability(renderHtmlBridge))
 
         // 注册 iOS chat 脚本能力（run_gallery_script 执行端 → JsRuntime+JsCoreEngine 端侧沙箱）
         orchestrator.registerCapability(IosRunScriptCapability(runScriptBridge))

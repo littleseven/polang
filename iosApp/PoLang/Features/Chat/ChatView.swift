@@ -26,6 +26,10 @@ struct ChatView: View {
     @State private var comingSoonFeature: String? = nil
     /// 「自己的 Token」入口：全屏打开设置·远程模型页（chat.yaml §4.1 secondary_cta）
     @State private var showTokenConfig = false
+    /// HTML 卡 FULLPAGE 全屏查看器（chat.yaml §13：卡内「查看完整内容」进入）
+    @State private var htmlFullpage: HtmlFullpagePayload? = nil
+    /// HTML 卡外链浮层（非 http(s) 之外的导航/新窗口链接，页内 WebView 预览）
+    @State private var htmlLinkURL: URL? = nil
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -88,6 +92,21 @@ struct ChatView: View {
             .offset(x: isSidebarOpen ? 0 : -300)
             .allowsHitTesting(isSidebarOpen)
             .accessibilityHidden(!isSidebarOpen)
+
+            // HTML 卡浮层层级（M5 B4，chat.yaml §13）：FULLPAGE 查看器压消息列表，
+            // 外链浮层再压查看器（Android 逐层 overlay 的 iOS zIndex 叠层对等实现）
+            if let payload = htmlFullpage {
+                HtmlFullpageViewer(
+                    payload: payload,
+                    onClose: { htmlFullpage = nil },
+                    onOpenLink: { url in htmlLinkURL = url }
+                )
+                .zIndex(10)
+            }
+            if let url = htmlLinkURL {
+                HtmlLinkPreviewOverlay(url: url, onClose: { htmlLinkURL = nil })
+                    .zIndex(11)
+            }
         }
         .background(Color(.systemBackground).ignoresSafeArea())
         .onAppear {
@@ -272,6 +291,17 @@ struct ChatView: View {
                             },
                             onGachaCardTap: { thumbPath in
                                 openGachaPreview(thumbPath: thumbPath)
+                            },
+                            onOpenHtmlFullpage: { html, summary in
+                                htmlFullpage = HtmlFullpagePayload(
+                                    id: item.message.id, html: html, summary: summary)
+                            },
+                            onOpenHtmlLink: { url in htmlLinkURL = url },
+                            onHtmlDisplayFinalized: { messageId, mode, measured in
+                                viewModel.updateHtmlCardDisplay(
+                                    messageId: messageId,
+                                    displayMode: mode,
+                                    measuredHeightPx: measured)
                             }
                         )
                         .id(item.key)
@@ -722,7 +752,8 @@ private struct MessageBubble: View {
 // ChatListFlattener（commonMain）拍平产物逐 item 渲染：part==nil 的整颗消息
 // （USER / legacy 桶）走 MessageBubble；带 part 的 item 按 contentType 分桶。
 // B1 工具态极简（placeholder/status = spinner、error = 三角，复用既有文案 key）；
-// HTML_CARD/TASK_CARD 为占位卡（双显禁止——不渲染消息行 content 的 html 本体）。
+// B4 落地：HTML_CARD 双形态已实现（htmlCardItem——INLINE 沙箱 WebView / FULLPAGE
+// 封面卡 + 查看器浮层）；TASK_CARD 仍为占位卡（双显禁止——不渲染消息行 content 本体）。
 
 private struct ChatListItemView: View {
     let item: ChatListItem
@@ -736,6 +767,12 @@ private struct ChatListItemView: View {
     var onGachaReroll: () -> Void = {}
     var onGachaConfirm: () -> Void = {}
     var onGachaCardTap: (String?) -> Void = { _ in }
+    /// HTML 卡（M5 B4，chat.yaml §13）：打开 FULLPAGE 查看器（html 本体 + summary 标题）
+    var onOpenHtmlFullpage: (String, String?) -> Void = { _, _ in }
+    /// HTML 卡内非页内导航链接 → 外链浮层
+    var onOpenHtmlLink: (URL) -> Void = { _ in }
+    /// INLINE/FULLPAGE 终判回写（测高完成或首测超一屏；persist 到消息 metadata）
+    var onHtmlDisplayFinalized: (String, HtmlCardDisplayMode, Int32?) -> Void = { _, _, _ in }
 
     var body: some View {
         if item.part == nil {
@@ -752,7 +789,8 @@ private struct ChatListItemView: View {
         case t.TYPE_CHART: chartItem
         case t.TYPE_MEDIA_RESULTS: mediaResultsItem
         case t.TYPE_OPTIMIZE_CANDIDATES: gachaItem
-        case t.TYPE_HTML_CARD, t.TYPE_TASK_CARD: pendingCardItem
+        case t.TYPE_HTML_CARD: htmlCardItem
+        case t.TYPE_TASK_CARD: pendingCardItem
         case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
         default: EmptyView()
         }
@@ -849,7 +887,28 @@ private struct ChatListItemView: View {
         }
     }
 
-    /// HTML_CARD / TASK_CARD：B4 双形态实现前的占位卡（html 本体不渲染）。
+    /// HTML_CARD part（M5 B4）：INLINE 沙箱 WebView 动态测高 / FULLPAGE 封面卡双形态
+    /// （chat.yaml §13；终判回调回写消息 metadata）。meta 以消息级 htmlCardMeta 优先
+    /// （终判持久化在消息上，part.meta 为写入时快照）。双显禁止——不渲染消息行 content。
+    private var htmlCardItem: some View {
+        Group {
+            if let part = item.part as? MessagePartHtmlCard {
+                let meta = item.message.htmlCardMeta ?? part.meta
+                HtmlCardView(
+                    messageId: item.message.id,
+                    part: part,
+                    meta: meta,
+                    onOpenFullpage: onOpenHtmlFullpage,
+                    onOpenLink: onOpenHtmlLink,
+                    onDisplayFinalized: { mode, measured in
+                        onHtmlDisplayFinalized(item.message.id, mode, measured)
+                    }
+                )
+            }
+        }
+    }
+
+    /// TASK_CARD：B4 双形态实现前的占位卡（HTML 化在 H2 线）。
     private var pendingCardItem: some View {
         HStack(spacing: Spacing.sm) {
             Image(systemName: "doc.richtext")
