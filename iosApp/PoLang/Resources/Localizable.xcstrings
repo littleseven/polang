@@ -1,6 +1,41 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "\"This is me\" is not marked yet: turn on \"This is me\" on your own group first, then set relationships": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"This is me\" is not marked yet: turn on \"This is me\" on your own group first, then set relationships"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no has marcado «Soy yo»: actívalo primero en tu propio grupo y luego establece la relación"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "« C'est moi » n'est pas encore activé : activez-le d'abord sur votre propre groupe, puis définissez la relation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有标记「这是我」：请先在自己的分组上打开「这是我」，再设置关系"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還沒有標記「這是我」：請先在自己的分組上打開「這是我」，再設定關係"
+          }
+        }
+      }
+    },
     "%1$@ · %2$@ · %3$d preset models": {
       "localizations": {
         "en": {
@@ -15688,6 +15723,41 @@
           "stringUnit": {
             "state": "translated",
             "value": "TA 是我的…"
+          }
+        }
+      }
+    },
+    "This person no longer exists (may have been merged by re-clustering)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This person no longer exists (may have been merged by re-clustering)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta persona ya no existe (puede haberse fusionado al reagrupar)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette personne n'existe plus (elle a peut-être été fusionnée lors du regroupement)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该人物已不存在（可能已被重新聚类合并）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該人物已不存在（可能已被重新分群合併）"
           }
         }
       }
