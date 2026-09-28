@@ -1,6 +1,7 @@
 package com.mamba.picme.features.chat
 
 import com.mamba.picme.domain.chat.ChatMessageType
+import com.mamba.picme.domain.chat.ModelInputRole
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -13,7 +14,18 @@ class ImagePreviewPagesBuilderTest {
         imageUri: String? = null,
         type: ChatMessageType = ChatMessageType.AGENT_IMAGE,
         saved: Boolean = false
-    ) = ChatMessageUi(id = id, type = type, content = "", imageUri = imageUri, imageSaved = saved)
+    ) = ChatMessageUi(
+        id = id,
+        type = type,
+        role = if (type == ChatMessageType.USER_IMAGE || type == ChatMessageType.USER_IMAGE_TEXT) {
+            ModelInputRole.USER
+        } else {
+            ModelInputRole.ASSISTANT
+        },
+        content = "",
+        imageUri = imageUri,
+        imageSaved = saved
+    )
 
     @Test
     fun `filters to image-bearing messages and preserves order`() {

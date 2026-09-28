@@ -172,6 +172,7 @@ parts_rendering:
     - "turn 聚合：§3.1 视觉规则 SwiftUI 等价（turn 内段落间距档 + 回合分隔档，token 同源）"
     - "AST 正文渲染：解析层 commonMain，SwiftUI 渲染自绘（M3 管线 iOS 对等）"
     - "HTML 卡双形态：现为零实现，gap 最大（HtmlCard WKWebView + 沙盒/测高/分流/全屏查看器/链接落地页）"
+    - "type 分类法（2026-09-28 重构，spec 2026-09-28-chat-type-taxonomy-design.md）：iOS M5 直接按新 3 分类 8 值实现（text/image + tool_chart/tool_html/tool_task/tool_image_edit + data_media_results/data_optimize_candidates），role 为消息级独立字段——零 legacy 迁移包袱"
 
 # ============================================================================
 # 4. 空状态（ChatEmptyState）
@@ -861,7 +862,7 @@ optimize_gacha:
   interaction_model:
     selection: "点卡 → selectedIndex=index + 全屏预览该卡（无保存按钮的 ImagePreviewPage；rejected 卡不可点）"
     reroll: "换一组 → 以 usedFingerprints 为 exclude 重抽 → DAO 覆写原消息 metadata（新组 JSON）→ drawIndex+1；失败 toast chat_gacha_reroll_unavailable"
-    confirm: "就用这张 → 全尺寸渲染确认卡 → 落盘 Documents/chat_edits/ → 消息改写为 agent_image（imageUri, saved:false）→ 反馈落库 source=user；失败 toast chat_gacha_confirm_failed（保持 pending 可重试）"
+    confirm: "就用这张 → 全尺寸渲染确认卡 → 落盘 Documents/chat_edits/ → 消息改写为 image（type=image, role=agent；imageUri, saved:false）→ 反馈落库 source=user；失败 toast chat_gacha_confirm_failed（保持 pending 可重试）"
     confirm_ios_gap: "⚠️ Android 确认后更新 ChatEditStateHolder（多轮『继续优化』以结果为基准）——iOS 无该机制，确认仅落图文件，多轮基准编辑不可达（技术债，独立 follow）"
     expired_semantics: "pending 组为进程级内存态——切会话/发新消息/清空/删会话/进程回收 → 落库 source=dismiss + 卡条转只读（expired 文案，无按钮行）；iOS 后台回收更激进，expired 出现频率更高（台账）"
   state:
@@ -869,7 +870,7 @@ optimize_gacha:
     rerolling: "Set<messageId>（防抖）"
     restore: "加载历史时对仍有 pending 的卡组恢复 selections"
   fallback_chain:
-    - "NIMA 未下载/初始化失败 → 引擎 Unavailable → 固定预设单发优化（agent_image 消息，非卡组）"
+    - "NIMA 未下载/初始化失败 → 引擎 Unavailable → 固定预设单发优化（type=image, role=agent 消息，非卡组）"
     - "缩略图全部落盘失败 → Fallback 单发（含图或纯文本解释）"
   feedback: "与编辑器共用 optimize_feedback 表（auto=每组抽完 / user=就用这张 / dismiss=废弃）"
   ios_impl:

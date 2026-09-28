@@ -12,7 +12,7 @@ class AppToolExecutorTest {
     private fun executor(
         logs: String = "2026-08-01 I PoLang:Tag: hello",
         crash: String? = null,
-        history: List<Pair<String, String>> = listOf("user_text" to "之前的问题"),
+        history: List<Pair<String, String>> = listOf("user" to "之前的问题"),
         state: JSONObject = JSONObject().put("appVersion", "1.0"),
         gallery: JSONObject = JSONObject().put("total", 42),
     ) = AppToolExecutor(
@@ -52,7 +52,7 @@ class AppToolExecutorTest {
 
     @Test
     fun `chat history limited to 50`() = runTest {
-        val history = (1..60).map { "user_text" to "msg$it" }
+        val history = (1..60).map { "user" to "msg$it" }
         val out = executor(history = history).execute(
             AppTool.GET_CHAT_HISTORY, JSONObject().put("limit", 100),
         )
@@ -78,7 +78,7 @@ class AppToolExecutorTest {
     @Test
     fun `chat history truncation keeps messages as JSONArray`() = runTest {
         // 50 条超长消息（~100KB）超 32KB 预算：截断必须裁剪条目数，而非把 JSONArray 腐蚀成字符串
-        val history = (1..50).map { "agent_text" to "x".repeat(2_000) }
+        val history = (1..50).map { "agent" to "x".repeat(2_000) }
         val out = executor(history = history).execute(
             AppTool.GET_CHAT_HISTORY, JSONObject().put("limit", 50),
         )

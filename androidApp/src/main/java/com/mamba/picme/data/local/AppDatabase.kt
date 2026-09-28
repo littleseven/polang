@@ -59,7 +59,7 @@ import com.mamba.picme.data.model.MediaEntity
         DedupHashEntity::class,
         UserTaskEntity::class
     ],
-    version = 25,
+    version = 26,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -100,7 +100,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
                         MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
-                        MIGRATION_23_24, MIGRATION_24_25
+                        MIGRATION_23_24, MIGRATION_24_25,
+                        MIGRATION_25_26
                     )
                     .build()
                 INSTANCE = instance
@@ -534,6 +535,18 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `chat_messages` ADD COLUMN `partsJson` TEXT")
                 backfillChatMessageParts(database)
+            }
+        }
+
+        /**
+         * Migration 25 → 26：chat_messages 新增 role 列 + 存量行 type/role/partsJson 一次改写
+         * （spec §2 role 升格；legacy 13 值 → 新 8 值）。两段在同一 migrate() 内 = Room 单事务。
+         * DEFAULT 'agent' 仅为 ALTER TABLE 安全网，写路径均显式赋值（Task 6 接线）。
+         */
+        internal val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `chat_messages` ADD COLUMN `role` TEXT NOT NULL DEFAULT 'agent'")
+                migrateChatMessageTypes(database)
             }
         }
     }

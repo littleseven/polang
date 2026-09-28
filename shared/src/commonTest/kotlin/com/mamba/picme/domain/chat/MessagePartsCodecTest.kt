@@ -5,6 +5,7 @@ import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -169,10 +170,79 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `encode uses type discriminator aligned with legacy room types`() {
+    fun `encode uses category taxonomy type discriminator`() {
         val encoded = encode(listOf(MessagePart.Chart("p0", "<svg/>")))
-        assertTrue(""""type":"chart"""" in encoded, encoded)
+        assertTrue(""""type":"tool_chart"""" in encoded, encoded)
         assertTrue(""""partId":"p0"""" in encoded, encoded)
+    }
+
+    @Test
+    fun `sealed descriptor locks the 8-value taxonomy`() {
+        // kotlinx.serialization 1.10.0 起 sealed 描述符为 {type, value} 两元素包装，
+        // 子类描述符收纳在 "value"（CONTEXTUAL kotlinx.serialization.Sealed<...>）内层——
+        // 外层 elementsCount 恒为 2，须下沉一层枚举子类 @SerialName。
+        val sealed = MessagePart.serializer().descriptor.getElementDescriptor(1)
+        assertEquals(8, sealed.elementsCount)
+        val serialNames = (0 until sealed.elementsCount)
+            .map { sealed.getElementDescriptor(it).serialName }
+            .toSet()
+        assertEquals(
+            setOf(
+                "text", "image",
+                "tool_chart", "tool_html", "tool_task", "tool_image_edit",
+                "data_media_results", "data_optimize_candidates",
+            ),
+            serialNames,
+        )
+    }
+
+    @Test
+    fun `serial name prefix matches declared category`() {
+        // wireName 钉桩：category → 线格式命名空间（content/tool/data），与 type 前缀约定对应
+        assertEquals(listOf("content", "tool", "data"), PartCategory.entries.map { it.wireName })
+        val parts: List<MessagePart> = listOf(
+            MessagePart.Text("p0", "hi"),
+            MessagePart.Image("p0", ref = "u"),
+            MessagePart.Chart("p0", svg = "<svg/>"),
+            MessagePart.HtmlCard("p0", html = "<html/>"),
+            MessagePart.TaskCard(
+                "p0",
+                toolCallId = "t",
+                state = ToolPartState.OUTPUT_AVAILABLE,
+                task = EngineerTaskState(taskId = "t", sourceText = "做", startedAtMs = 0L, updatedAtMs = 0L),
+            ),
+            MessagePart.EditResult("p0", description = "已提亮"),
+            MessagePart.MediaResults(
+                "p0",
+                MediaResultsUi(query = "q", assets = emptyList(), totalCount = 0, isRefinement = false),
+            ),
+            MessagePart.OptimizeCandidates(
+                "p0",
+                OptimizeCandidateGroup(
+                    sourceImageUri = "u",
+                    scene = "s",
+                    recommendedIndex = 0,
+                    drawIndex = 1,
+                    candidates = emptyList(),
+                    usedFingerprints = emptyList(),
+                ),
+            ),
+        )
+        parts.forEach { part ->
+            val json = MessagePartsCodec.encode(listOf(part))
+            val expectedPrefix = when (part.category) {
+                PartCategory.CONTENT -> null
+                PartCategory.TOOL -> "\"type\":\"tool_"
+                PartCategory.DATA -> "\"type\":\"data_"
+            }
+            if (expectedPrefix != null) assertTrue(json.contains(expectedPrefix), "$json should carry prefix for $part")
+            // content 类反锁：不得带保留前缀
+            if (part.category == PartCategory.CONTENT) {
+                assertTrue(!json.contains("\"type\":\"tool_") && !json.contains("\"type\":\"data_"))
+            }
+            // category 是纯代码面属性：getter-only 无后备字段，不得泄漏进线格式
+            assertFalse(json.contains("category"), "$json must not carry category field")
+        }
     }
 
     @Test

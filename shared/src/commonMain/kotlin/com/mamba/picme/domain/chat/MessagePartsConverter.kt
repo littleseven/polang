@@ -15,16 +15,12 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 
 /**
- * legacy `type + content + metadata` → parts 文档的迁移转换器（spec §2 映射表，M1）。
+ * (type, content, metadata, role) → parts 的运行时转换器（M1 双写接缝的写侧纯函数）。
  *
- * 纯函数、全枚举覆盖 13 种 [ChatMessageType] 的 Room 列值；**任何单行转换失败都降级为
- * [MessagePart.Text] 原文兜底（row 级 runCatching），不允许丢消息**（spec §6/§13）。
- *
- * 解析口径与 androidApp 既有 org.json 读取端（`ChatViewModel.toUiModel` /
- * `ChatModelCommonMainShim`）逐字段对齐；未知枚举值/缺字段的回退语义保持一致
- * （如 engineer_task 未知 status → FAILED 安全终态）。
+ * 纯净化口径（spec §4.2）：只认新 8 值分类法；legacy 13→8 映射知识在
+ * [LegacyChatTypeMigration]，本转换器不双吃。行级兜底不变：任何异常/空结果 → 原文 Text part。
  */
-object LegacyMessagePartsConverter {
+object MessagePartsConverter {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -32,8 +28,8 @@ object LegacyMessagePartsConverter {
      * 转换单条 Room 消息行为 parts 列表（有序）。
      * partId 用消息内序号 `p0`/`p1`…（M1 迁移期约定；M2 流式起为真实 chunk id）。
      */
-    fun toParts(type: String, content: String, metadata: String?): List<MessagePart> =
-        runCatching { convert(type, content, metadata) }
+    fun toParts(type: String, content: String, metadata: String?, role: ModelInputRole): List<MessagePart> =
+        runCatching { convert(type, content, metadata, role) }
             .getOrElse { fallbackText(content) }
             .ifEmpty { fallbackText(content) }
 
@@ -41,45 +37,43 @@ object LegacyMessagePartsConverter {
     private fun fallbackText(content: String): List<MessagePart> =
         listOf(MessagePart.Text(partId = "p0", markdown = content, state = PartState.DONE))
 
-    @Suppress("CyclomaticComplexMethod", "LongMethod") // 13 类型全枚举映射表，单点收口
-    private fun convert(type: String, content: String, metadata: String?): List<MessagePart> {
+    @Suppress("CyclomaticComplexMethod", "LongMethod") // 8 类型全枚举映射表，单点收口
+    private fun convert(type: String, content: String, metadata: String?, role: ModelInputRole): List<MessagePart> {
         val meta = parseMetadata(metadata)
         return when (type) {
-            // COMMAND / PLAN_PREVIEW 归 Text part（spec §2：优先不污染 parts 序列；
-            // 原类型信息仍由 legacy `type` 列保留，M4 渲染切换时再评估专用 part）
-            "user_text", "agent_text", "command", "plan_preview" ->
-                listOf(MessagePart.Text("p0", content, PartState.DONE))
+            "text" -> listOf(MessagePart.Text("p0", content, PartState.DONE))
 
-            // user_image：content 即图片本地路径（见 ChatMessageEntity 字段注释）
-            "user_image" ->
-                listOf(MessagePart.Image("p0", ref = content))
-
-            // 图文混排：图在 metadata.imageUri，文在 content；parts 顺序 = 展示顺序（图上文下）
-            "user_image_text" -> {
-                val uri = meta?.str("imageUri")
-                if (uri != null) {
+            // image 按角色分流（spec §4.2）：user 图文在场拆双 part（图上文下），
+            // 缺 uri 时 content 即路径；agent 图 ref 取 metadata.imageUri ?: content
+            "image" -> when {
+                role == ModelInputRole.USER && meta?.str("imageUri") != null ->
                     listOf(
-                        MessagePart.Image("p0", ref = uri),
+                        MessagePart.Image("p0", ref = meta.str("imageUri")!!),
                         MessagePart.Text("p1", content, PartState.DONE),
                     )
-                } else {
-                    fallbackText(content)
-                }
-            }
 
-            "agent_image" ->
-                listOf(
+                role == ModelInputRole.USER -> listOf(MessagePart.Image("p0", ref = content))
+
+                else -> listOf(
                     MessagePart.Image(
-                        partId = "p0",
+                        "p0",
                         ref = meta?.str("imageUri") ?: content,
                         saved = meta?.bool("saved") ?: false,
                     ),
                 )
+            }
 
-            "agent_edit_result" ->
+            "tool_chart" -> listOf(MessagePart.Chart("p0", svg = content))
+
+            "tool_html" -> listOf(MessagePart.HtmlCard("p0", html = content, meta = parseHtmlCardMeta(meta)))
+
+            EngineerTaskState.ROOM_TYPE ->
+                listOf(parseTaskCard(meta))
+
+            "tool_image_edit" ->
                 listOf(
                     MessagePart.EditResult(
-                        partId = "p0",
+                        "p0",
                         ref = meta?.str("imageUri"),
                         description = content,
                         suggestions = meta?.strList("suggestions") ?: emptyList(),
@@ -87,23 +81,8 @@ object LegacyMessagePartsConverter {
                     ),
                 )
 
-            "media_results" ->
+            "data_media_results" ->
                 listOf(MessagePart.MediaResults("p0", parseMediaResults(content, meta)))
-
-            "chart" ->
-                listOf(MessagePart.Chart("p0", svg = content))
-
-            "html_card" ->
-                listOf(
-                    MessagePart.HtmlCard(
-                        partId = "p0",
-                        html = content,
-                        meta = parseHtmlCardMeta(meta),
-                    ),
-                )
-
-            EngineerTaskState.ROOM_TYPE ->
-                listOf(parseTaskCard(meta))
 
             OptimizeCandidateGroup.MESSAGE_TYPE ->
                 listOf(MessagePart.OptimizeCandidates("p0", parseOptimizeGroup(metadata)))

@@ -40,23 +40,12 @@ sealed interface ModelInputItem {
     ) : ModelInputItem
 }
 
-/**
- * 回灌角色派生单点（spec §2：role = USER | AGENT）：legacy Room type 列值 `user_*` → USER，
- * 其余 → ASSISTANT。实体侧（androidApp `toModelInputItems`）与模型侧（[ChatMessage.modelRole]）
- * 共用本函数，禁止各自实现前缀判断。
- */
-fun roleOf(roomType: String): ModelInputRole =
-    if (roomType.startsWith("user_")) ModelInputRole.USER else ModelInputRole.ASSISTANT
-
-/**
- * 消息角色（spec §2：role = USER | AGENT）。M1 自 legacy [ChatMessage.type] 派生。
- * Room 列值 = 枚举名小写（`USER_TEXT` ↔ "user_text"），委托 [roleOf] 单点口径。
- */
-val ChatMessage.modelRole: ModelInputRole
-    get() = roleOf(type.name.lowercase())
+/** Room role 列（"user"/"agent"）→ 模型角色（spec §2：role 升格为独立列后的唯一派生点）。 */
+fun roleOf(roomRole: String): ModelInputRole =
+    if (roomRole == "user") ModelInputRole.USER else ModelInputRole.ASSISTANT
 
 /** 整条消息 → 回灌项序列（空列表 = 整条消息不进上下文）。 */
-fun ChatMessage.toModelInput(): List<ModelInputItem> = parts.toModelInput(modelRole, id)
+fun ChatMessage.toModelInput(): List<ModelInputItem> = parts.toModelInput(role, id)
 
 /** parts 序列 → 回灌项序列（块内顺序即上下文顺序；[messageId] 用于 toolCallId 命名空间锚定）。 */
 fun List<MessagePart>.toModelInput(role: ModelInputRole, messageId: String): List<ModelInputItem> =

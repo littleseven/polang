@@ -20,7 +20,7 @@ class ChatTitleGeneratorTest {
         assertEquals(
             "帮我找下去年冬天的照片",
             ChatTitleGenerator.generateTitle(
-                "user_text",
+                "text",
                 "帮我找下去年冬天的照片",
                 IMAGE_TITLE,
                 FALLBACK
@@ -33,8 +33,25 @@ class ChatTitleGeneratorTest {
         assertEquals(
             IMAGE_TITLE,
             ChatTitleGenerator.generateTitle(
-                "user_image",
+                "image",
                 "file:///path/to/image.jpg",
+                IMAGE_TITLE,
+                FALLBACK
+            )
+        )
+    }
+
+    /**
+     * 钉住 T6 行为变更：legacy user_image_text（现统一为 image）带正文时，
+     * 首条消息标题取 imageTitle（图片优先），而非旧的正文兜底标题。
+     */
+    @Test
+    fun `image with text first message still gets image title`() {
+        assertEquals(
+            IMAGE_TITLE,
+            ChatTitleGenerator.generateTitle(
+                "image",
+                "帮我把这张照片调亮一点",
                 IMAGE_TITLE,
                 FALLBACK
             )

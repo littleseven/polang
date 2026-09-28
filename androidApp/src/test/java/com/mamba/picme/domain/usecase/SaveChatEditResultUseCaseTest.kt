@@ -19,7 +19,7 @@ class SaveChatEditResultUseCaseTest {
     fun tearDown() = unmockkAll()
 
     private fun msg(metadata: String) = ChatMessageEntity(
-        id = "m1", sessionId = "default", type = "agent_edit_result",
+        id = "m1", sessionId = "default", type = "tool_image_edit", role = "agent",
         content = "已提亮", timestamp = 1, modelUsed = "m", metadata = metadata
     )
 

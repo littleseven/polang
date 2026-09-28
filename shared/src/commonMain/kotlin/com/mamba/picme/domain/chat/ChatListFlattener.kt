@@ -9,8 +9,8 @@ package com.mamba.picme.domain.chat
  * 拍平规则：
  * - **key** = `"${messageId}:${partId}"`（块级稳定锚，分轨命名空间见 [MessagePart.partId]）；
  * - **USER 消息整颗单 item**（§5 图文同气泡不拆）；agent 消息按 part 拍平；
- * - **整消息 legacy 渲染**（part = null）：claude 气泡 / COMMAND / PLAN_PREVIEW /
- *   AGENT_IMAGE / AGENT_EDIT_RESULT（message 形渲染器）与 parts 为空的瞬态消息
+ * - **整消息 legacy 渲染**（part = null）：claude 气泡 / AGENT_IMAGE /
+ *   AGENT_EDIT_RESULT（message 形渲染器）与 parts 为空的瞬态消息
  *   （流式占位「思考中」）；
  * - **流式消息卡 part 三分流**（spec §4 占位契约 + M2 双轨口径）：已填充
  *   （OUTPUT_AVAILABLE）的 Chart/HtmlCard 在其**产物行已在列表中**时跳过——
@@ -47,7 +47,7 @@ fun flattenChatItems(
     var currentTurn = -1
     messages.forEach { message ->
         // turn 边界：USER 消息开启新 turn；会话首条若为 AGENT 消息独立成 turn（无开启者）
-        if (message.modelRole == ModelInputRole.USER || currentTurn < 0) {
+        if (message.role == ModelInputRole.USER || currentTurn < 0) {
             currentTurn = nextTurn++
         }
         val turn = currentTurn
@@ -94,10 +94,10 @@ private fun flattenMessage(
     out: MutableList<ChatListItem>,
 ) {
     // USER 消息与 legacy 整消息渲染类型：单 item（part = null，渲染器读 legacy 字段）
-    if (message.modelRole == ModelInputRole.USER || message.rendersAsWholeMessage()) {
+    if (message.role == ModelInputRole.USER || message.rendersAsWholeMessage()) {
         out += ChatListItem(
             key = wholeMessageKey(message),
-            contentType = if (message.modelRole == ModelInputRole.USER) {
+            contentType = if (message.role == ModelInputRole.USER) {
                 ChatListItem.TYPE_USER_MESSAGE
             } else {
                 ChatListItem.TYPE_LEGACY_MESSAGE
@@ -131,12 +131,10 @@ private fun flattenMessage(
     // 全部 part 被跳过（如 turn 仅产出一张已落库卡）：不留空消息位
 }
 
-/** 整消息 legacy 渲染的判定（message 形渲染器 / 瞬态占位无 parts）。 */
+/** 整消息 legacy 渲染的判定（message 形渲染器 / 瞬态占位无 parts）。command/plan_preview 已并入 text，走 Text part 常规渲染。 */
 private fun ChatMessage.rendersAsWholeMessage(): Boolean =
     parts.isEmpty() ||
         claudeAgent != null ||
-        type == ChatMessageType.COMMAND ||
-        type == ChatMessageType.PLAN_PREVIEW ||
         type == ChatMessageType.AGENT_IMAGE ||
         type == ChatMessageType.AGENT_EDIT_RESULT
 

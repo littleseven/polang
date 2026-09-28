@@ -22,6 +22,12 @@ data class ChatMessage(
     val id: String,
     val type: ChatMessageType,
     val content: String,
+    /**
+     * 消息角色（spec §2：role 升格为独立消息级字段，不再自 type 前缀派生）。
+     * 无默认值——调用点必须显式声明；持久化行经 [roleOf] 自 Room role 列（"user"/"agent"）
+     * 解析，内存构造按消息来源直接给值。
+     */
+    val role: ModelInputRole,
     val modelUsed: String? = null,
     val timestamp: Long = nowEpochMillis(),
     val performance: LlmPerformance? = null,
@@ -163,6 +169,6 @@ data class OptimizeCandidateGroup(
     )
 
     companion object {
-        const val MESSAGE_TYPE = "optimize_candidates"
+        const val MESSAGE_TYPE = "data_optimize_candidates"
     }
 }

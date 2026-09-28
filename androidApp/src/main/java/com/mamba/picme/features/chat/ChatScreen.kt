@@ -10,7 +10,6 @@ import com.mamba.picme.domain.chat.ChatListItem
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.flattenChatItems
-import com.mamba.picme.domain.chat.modelRole
 import com.mamba.picme.domain.model.VoiceCommandMode
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.ClaudeStepStatus
@@ -766,7 +765,8 @@ fun ChatScreen(
                                 }
                                 else -> {
                                     // TYPE_USER_MESSAGE / TYPE_LEGACY_MESSAGE：整消息渲染（§5 用户气泡
-                                    // 图文同单元；claude 气泡 / COMMAND / PLAN_PREVIEW / 图片类 message 形渲染器）
+                                    // 图文同单元；claude 气泡 / 图片类 message 形渲染器；command/plan_preview
+                                    // 已并入 text，走 Text part 常规渲染）
                                     ChatMessageItem(
                                         message = item.message,
                                         onImageClick = { msg ->
@@ -1487,9 +1487,9 @@ private fun ChatMessageItem(
     suppressClaudeActions: Boolean = false,
     onTableClick: (MarkdownTable) -> Unit = {},
 ) {
-    // 🔵7（M4 review）：user 角色判定收口 commonMain 单点 `roleOf`（经 modelRole），
-    // 不再枚举 user 类型——与 turn 边界/回灌角色同口径，新增 user_* 类型零漂移
-    val isUser = message.modelRole == ModelInputRole.USER
+    // 🔵7（M4 review）+ spec §2：user 角色判定直接读消息级 `role` 字段
+    // （Room 行经 roleOf 解析，内存构造显式给值），不再枚举 user 类型——与 turn 边界/回灌角色同口径
+    val isUser = message.role == ModelInputRole.USER
     val isImage = message.type == ChatMessageType.AGENT_IMAGE || message.type == ChatMessageType.USER_IMAGE
     val isImageText = message.type == ChatMessageType.USER_IMAGE_TEXT
     val isEditResult = message.type == ChatMessageType.AGENT_EDIT_RESULT

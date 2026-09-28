@@ -203,7 +203,8 @@ class RemoteCommandDispatcher(
                 ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId(),
-                    type = "user_text",
+                    type = "text",
+                    role = "user",
                     content = content,
                     modelUsed = null
                 )
@@ -220,7 +221,8 @@ class RemoteCommandDispatcher(
                 ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId(),
-                    type = "agent_text",
+                    type = "text",
+                    role = "agent",
                     content = content,
                     modelUsed = "feishu_remote"
                 )

@@ -33,6 +33,6 @@ data class EngineerTaskState(
 ) {
     companion object {
         /** Room chat_messages.type 列值（TEXT 列，新增类型无需迁移）。 */
-        const val ROOM_TYPE = "task_card"
+        const val ROOM_TYPE = "tool_task"
     }
 }

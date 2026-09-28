@@ -627,7 +627,7 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                     lastRemotePhotoSentCaptureDate = photosToSend.maxOf { it.captureDate }
 
                     photosToSend.forEach { photo ->
-                        // 1. 写入聊天记录（agent_image 类型）
+                        // 1. 写入聊天记录（image 类型 + role=agent）
                         try {
                             if (chatSessionDao.getSession(sessionId) == null) {
                                 chatSessionDao.insertSession(
@@ -641,7 +641,8 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                                 ChatMessageEntity(
                                     id = UUID.randomUUID().toString(),
                                     sessionId = sessionId,
-                                    type = "agent_image",
+                                    type = "image",
+                                    role = "agent",
                                     content = photo.uri,
                                     modelUsed = sourceTag
                                 )

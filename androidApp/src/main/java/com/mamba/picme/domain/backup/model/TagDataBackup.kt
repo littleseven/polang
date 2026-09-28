@@ -203,6 +203,10 @@ data class BackupChatSession(
 /**
  * 聊天消息。
  *
+ * [role] 为 Room v26 起的消息级角色列（"user"/"agent"）；nullable——旧分类法时期导出的
+ * 备份无此字段（容器版本不校验，恢复按 type 内容分流），恢复时经
+ * [com.mamba.picme.domain.chat.LegacyChatTypeMigration] 转正补齐。
+ *
  * 已知限制：图片消息的 [content] 为旧安装的本地文件路径，
  * 跨安装恢复后图片文件可能不存在，仅保留消息记录本身。
  */
@@ -214,7 +218,8 @@ data class BackupChatMessage(
     val content: String,
     val timestamp: Long,
     val modelUsed: String? = null,
-    val metadata: String? = null
+    val metadata: String? = null,
+    val role: String? = null
 )
 
 /**

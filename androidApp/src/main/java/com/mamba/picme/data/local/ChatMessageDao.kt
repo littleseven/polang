@@ -32,11 +32,11 @@ interface ChatMessageDao {
     suspend fun getMessageById(id: String): ChatMessageEntity?
 
     /**
-     * 跨会话获取所有任务卡消息（type = 'task_card'），按提交时间倒序。
+     * 跨会话获取所有任务卡消息（type = 'tool_task'），按提交时间倒序。
      * 任务中心页数据源：type 为 TEXT 列，纯查询新增无 schema 变更。
      * LIMIT 200：任务卡只增不删，全表失效重发时限制回扫量；进行中/历史 50 条判据只关心最近窗口。
      */
-    @Query("SELECT * FROM chat_messages WHERE type = 'task_card' ORDER BY timestamp DESC LIMIT 200")
+    @Query("SELECT * FROM chat_messages WHERE type = 'tool_task' ORDER BY timestamp DESC LIMIT 200")
     fun getTaskCardMessages(): Flow<List<ChatMessageEntity>>
 
     /**
@@ -46,15 +46,15 @@ interface ChatMessageDao {
     suspend fun getLastMessageForSession(sessionId: String): ChatMessageEntity?
 
     /**
-     * 获取当前用户回合（最近一条 user_* 消息之后）最新的一张搜索结果卡片。
-     * 用于 ReAct 多轮搜索 / 回退直搜时的卡片替换去重。
+     * 获取当前用户回合（最近一条 role = 'user' 消息之后）最新的一张搜索结果卡片。
+     * 用于 ReAct 多轮搜索 / 回退直搜时的卡片替换去重；role 列取代 user_ 前缀解析。
      */
     @Query("""
         SELECT * FROM chat_messages
-        WHERE sessionId = :sessionId AND type = 'media_results'
+        WHERE sessionId = :sessionId AND type = 'data_media_results'
           AND timestamp > (
               SELECT MAX(timestamp) FROM chat_messages
-              WHERE sessionId = :sessionId AND type LIKE 'user\_%' ESCAPE '\'
+              WHERE sessionId = :sessionId AND role = 'user'
           )
         ORDER BY timestamp DESC LIMIT 1
     """)

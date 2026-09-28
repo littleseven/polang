@@ -102,11 +102,13 @@ fun getDefaultModel(): ChatModelOption {
 data class ChatMessageEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val sessionId: String = "default", // 后续支持多会话
-    val type: String, // "user_text", "agent_text", "image", "command"
+    val type: String, // 新分类法 8 值：text, image, tool_chart, tool_html, tool_task, tool_image_edit, data_media_results, data_optimize_candidates（2026-09-28 重构）
+    val role: String = "agent", // 消息角色 "user"/"agent"（Room v26 新列，取代 user_/agent_ type 前缀）
     val content: String, // 文本内容或图片路径
     val timestamp: Long = System.currentTimeMillis(),
     val modelUsed: String? = null, // 生成该消息的模型标识
-    val metadata: String? = null // JSON 扩展字段
+    val metadata: String? = null, // JSON 扩展字段
+    val partsJson: String? = null // parts 数组 JSON（读面权威源）
 )
 ```
 
@@ -119,14 +121,21 @@ data class ChatMessageEntity(
 
 ### 4.3 消息类型映射
 
-| UI 消息类型 | 数据库 type | 内容格式 |
+| UI 消息类型（ChatMessageType） | 数据库 type（+ role） | 内容格式 |
 |-------------|-------------|----------|
-| UserText | `user_text` | 纯文本 |
-| AgentText | `agent_text` | 纯文本 |
-| UserImage | `user_image` | 图片文件路径 |
-| AgentImage | `agent_image` | 图片文件路径 |
-| CommandExecution | `command` | JSON: `{command, status, detail}` |
-| PlanPreview | `plan_preview` | JSON: `{content, plan}` |
+| USER_TEXT | `text`（role=user） | 纯文本 |
+| AGENT_TEXT | `text`（role=agent） | 纯文本 |
+| USER_IMAGE | `image`（role=user） | 图片文件路径 |
+| USER_IMAGE_TEXT | `image`（role=user） | 图片路径 + 图文双 part（Image+Text） |
+| AGENT_IMAGE | `image`（role=agent） | 图片文件路径 |
+| CHART | `tool_chart` | SVG 产物 |
+| HTML_CARD | `tool_html` | HTML 产物 |
+| TASK_CARD | `tool_task` | 工程任务卡（metadata.engineer_task） |
+| AGENT_EDIT_RESULT | `tool_image_edit` | 编辑结果图 |
+| MEDIA_RESULTS | `data_media_results` | 媒体检索结果 |
+| OPTIMIZE_CANDIDATES | `data_optimize_candidates` | 优化候选卡组 |
+
+> 2026-09-28 分类法重构：`command`/`plan_preview` 已删除（并入 `text`，存量行经 Room MIGRATION_25_26 转正）；浮动面板 sealed AgentMessage 平行体系不受影响。详见 spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`。
 
 ## 5. 快捷入口实现 (QuickActionBar)
 

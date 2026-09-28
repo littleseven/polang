@@ -34,8 +34,8 @@ internal object ChatTitleGenerator {
         fallbackTitle: String
     ): String {
         return when (firstUserMessageType) {
-            "user_image" -> imageTitle
-            "user_text" -> sanitizeTitle(textContent, fallbackTitle)
+            "image" -> imageTitle
+            "text" -> sanitizeTitle(textContent, fallbackTitle)
             else -> fallbackTitle
         }
     }
