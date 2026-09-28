@@ -32,7 +32,8 @@ enum class PersonSaveError {
  *
  * 封面用 [PersonCoverResolver] 纯映射（可单测）；编辑走 [PersonRepository] 收口。
  */
-class PersonViewModel(    private val personRepository: PersonRepository,
+class PersonViewModel(
+    private val personRepository: PersonRepository,
     private val db: AppDatabase,
     private val faceClusterEngine: FaceClusterEngine
 ) : ViewModel() {

@@ -157,12 +157,12 @@ final class PersonRepository: @unchecked Sendable {
     ) -> DeclareRelationResult? {
         guard db.personRow(personId) != nil else { return .subjectNotFound }
         if let n = name, !n.isEmpty {
-            db.renamePerson(personId: personId, name: n)
+            rename(personId: personId, name: n)
         }
         if isSelf {
-            db.setSelf(personId: personId, isSelf: true)
+            setSelf(personId: personId, isSelf: true)
         } else if db.selfPersonId() == personId {
-            db.setSelf(personId: personId, isSelf: false)
+            setSelf(personId: personId, isSelf: false)
         }
         if let predicate = relation, !predicate.isEmpty {
             return declareRelation(personId: personId, predicate: predicate, customLabel: customLabel)

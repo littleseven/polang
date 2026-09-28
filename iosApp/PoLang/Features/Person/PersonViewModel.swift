@@ -85,10 +85,12 @@ final class PersonViewModel: ObservableObject {
     @Published private(set) var showAll: Bool = false
     @Published private(set) var isLoading = false
     @Published private(set) var editingPersonId: Int64?
-    /// 瞬时提示（重聚类已启动 / 已隐藏 N 个单人组）。view 侧消费后置 nil。
+    /// 瞬时提示（重聚类已启动 / 已隐藏 N 个单人组 / 保存被拒引导）。view 侧消费后置 nil。
     @Published var toast: String?
 
     private let repo: PersonRepository
+    /// reload 代际（见 reload 内守卫注释）。
+    private var reloadGeneration = 0
 
     init(repo: PersonRepository = .shared) {
         self.repo = repo
@@ -101,6 +103,10 @@ final class PersonViewModel: ObservableObject {
 
     private func reload(reconcile: Bool) {
         isLoading = true
+        // 代际守卫：详情保存回联会连发两次 refresh（onBack 立即 + 写入完成后），
+        // DB 队列入队顺序不保证——旧快照后发时丢弃，防「改名被回退」假象（🟡 review 修复）
+        reloadGeneration += 1
+        let generation = reloadGeneration
         let repo = self.repo
         let showAll = self.showAll
         Task.detached(priority: .userInitiated) { [weak self] in
@@ -108,7 +114,7 @@ final class PersonViewModel: ObservableObject {
                 ? repo.reconcileAndLoad(showAll: showAll)
                 : repo.load(showAll: showAll)
             await MainActor.run {
-                guard let self else { return }
+                guard let self, generation == self.reloadGeneration else { return }
                 self.items = snapshot.items
                 self.totalCount = snapshot.totalCount
                 self.isLoading = false
@@ -159,7 +165,10 @@ final class PersonViewModel: ObservableObject {
     }
 
     /// 默认筛选下隐藏了单人组时，提示用户。
+    /// 已有 toast 在展示（如保存被拒引导）时不覆盖——引导被 hidden-hint 顶掉
+    /// 等于「被拒无反馈」复活（🔴 review 修复；Android snackbar 为队列，iOS toast 单槽）。
     private func emitHiddenHintIfNeeded() {
+        guard toast == nil else { return }
         guard !showAll else { return }
         let hidden = totalCount - items.count
         guard hidden > 0 else { return }
