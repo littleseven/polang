@@ -36,6 +36,7 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：**(a
 - 流式对齐 **chunk 三段式语义**（start/delta/end，块级 id）——对齐的是事件语义，不是 SSE 线协议（传输仍走 Koog 内部循环）
 - 工具调用状态机对齐 Vercel 四态 + 审批态；工程师任务卡五态（RUNNING/AWAITING_CONTINUE/AWAITING_DELIVER/COMPLETED/FAILED）映射为该状态机的渲染投影
 - **双层分离**：渲染/持久层保存富 parts 文档（防信息丢失）；回灌 LLM 时显式转换（工具结果拆为 tool 角色消息、UI 专有 part 不进上下文）——对应 Vercel UIMessage↔ModelMessage
+- **type 分类法（2026-09-28 重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`）**：Room `type` 列值域 = 3 分类 8 值——content（`text`/`image`，免前缀）· tool（`tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`）· data（`data_media_results`/`data_optimize_candidates`，回灌剥离）；命名规则 `^{category}_{kind}$`，`tool_`/`data_` 为保留前缀，禁 UI 容器词（card/bubble/strip/viewer）进协议值；`MessagePart` 挂 `PartCategory` 分类载体（getter-only，不进线格式）；`role` 上提为消息级独立列（Room v26，"user"/"agent"）取代 user_/agent_ type 前缀；legacy 13 值经 `LegacyChatTypeMigration` 一次性转正（MIGRATION_25_26 + 备份恢复），运行时转换器 `MessagePartsConverter` 只认新值
 
 ### D2 渲染层：对齐 ChatGPT——markdown AST → 原生受控组件 + 卡片独立 block
 

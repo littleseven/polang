@@ -19,6 +19,7 @@ class ChatListFlattenerTest {
         id = id,
         type = ChatMessageType.AGENT_TEXT,
         content = text,
+        role = ModelInputRole.ASSISTANT,
         parts = parts ?: listOf(textPart("p0", text)),
     )
 
@@ -26,7 +27,7 @@ class ChatListFlattenerTest {
     fun `user message flattens to a single whole item and opens a turn`() {
         val items = flattenChatItems(
             listOf(
-                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "你好"),
+                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "你好", role = ModelInputRole.USER),
                 agentText("a1", "你好呀"),
             ),
         )
@@ -47,9 +48,9 @@ class ChatListFlattenerTest {
     fun `second user message starts a new turn`() {
         val items = flattenChatItems(
             listOf(
-                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "一"),
+                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "一", role = ModelInputRole.USER),
                 agentText("a1", "答一"),
-                ChatMessage(id = "u2", type = ChatMessageType.USER_TEXT, content = "二"),
+                ChatMessage(id = "u2", type = ChatMessageType.USER_TEXT, content = "二", role = ModelInputRole.USER),
                 agentText("a2", "答二"),
             ),
         )
@@ -62,7 +63,7 @@ class ChatListFlattenerTest {
         val items = flattenChatItems(
             listOf(
                 agentText("a0", "欢迎"),
-                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "问"),
+                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "问", role = ModelInputRole.USER),
             ),
         )
         assertEquals(listOf(0, 1), items.map { it.turnIndex })
@@ -76,6 +77,7 @@ class ChatListFlattenerTest {
             id = "a1",
             type = ChatMessageType.AGENT_TEXT,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(
                 textPart("p0", "统计如下"),
                 MessagePart.Chart(partId = "p1", svg = "<svg/>"),
@@ -99,6 +101,7 @@ class ChatListFlattenerTest {
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "paced",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             parts = listOf(
                 textPart("txt-0", "第一轮"),
@@ -117,6 +120,7 @@ class ChatListFlattenerTest {
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "打字中",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             showCursor = true,
             parts = listOf(textPart("txt-0", "全量快照", PartState.STREAMING)),
@@ -132,6 +136,7 @@ class ChatListFlattenerTest {
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "正在调用工具",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             showCursor = false,
             parts = listOf(textPart("txt-0", "已完成")),
@@ -147,6 +152,7 @@ class ChatListFlattenerTest {
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             parts = listOf(
                 MessagePart.Chart(partId = "call-0", svg = "<svg/>", state = ToolPartState.OUTPUT_AVAILABLE),
@@ -160,6 +166,7 @@ class ChatListFlattenerTest {
             id = "chart_1",
             type = ChatMessageType.CHART,
             content = "<svg/>",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.Chart(partId = "p0", svg = "<svg/>")),
         )
         val items = flattenChatItems(listOf(streaming, persistedChartRow))
@@ -182,6 +189,7 @@ class ChatListFlattenerTest {
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             parts = listOf(
                 textPart("txt-0", "统计如下"),
@@ -204,12 +212,14 @@ class ChatListFlattenerTest {
             id = "chart_old",
             type = ChatMessageType.CHART,
             content = "<svg>old</svg>",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.Chart(partId = "p0", svg = "<svg>old</svg>")),
         )
         val streaming = ChatMessage(
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             parts = listOf(
                 MessagePart.Chart(partId = "call-0", svg = "<svg>new</svg>", state = ToolPartState.OUTPUT_AVAILABLE),
@@ -225,6 +235,7 @@ class ChatListFlattenerTest {
             id = "c1",
             type = ChatMessageType.CHART,
             content = "<svg/>",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.Chart(partId = "p0", svg = "<svg/>")),
         )
         val items = flattenChatItems(listOf(persisted))
@@ -233,24 +244,36 @@ class ChatListFlattenerTest {
     }
 
     @Test
-    fun `claude agent and command messages render as whole legacy items`() {
+    fun `claude agent messages render as whole legacy items`() {
         val claude = ChatMessage(
             id = "cl1",
             type = ChatMessageType.AGENT_TEXT,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             claudeAgent = ClaudeAgentState(text = "工作中"),
             parts = listOf(textPart("p0", "")),
         )
+        val items = flattenChatItems(listOf(claude))
+        assertEquals(listOf(ChatListItem.TYPE_LEGACY_MESSAGE), items.map { it.contentType })
+        assertEquals(listOf("cl1:p0"), items.map { it.key })
+        assertTrue(items.all { it.part == null })
+    }
+
+    @Test
+    fun `command merged into text renders per part not whole message`() {
+        // 行为变化钉桩（spec §4）：COMMAND 枚举已删，命令并入 text——
+        // 常规 Text part 按部分渲染，不再走 whole-message legacy 分支
         val command = ChatMessage(
             id = "cmd1",
-            type = ChatMessageType.COMMAND,
+            type = ChatMessageType.AGENT_TEXT,
             content = "/task x",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(textPart("p0", "/task x")),
         )
-        val items = flattenChatItems(listOf(claude, command))
-        assertEquals(listOf(ChatListItem.TYPE_LEGACY_MESSAGE, ChatListItem.TYPE_LEGACY_MESSAGE), items.map { it.contentType })
-        assertEquals(listOf("cl1:p0", "cmd1:p0"), items.map { it.key })
-        assertTrue(items.all { it.part == null })
+        val items = flattenChatItems(listOf(command))
+        assertEquals(listOf(ChatListItem.TYPE_AGENT_TEXT), items.map { it.contentType })
+        assertEquals(listOf("cmd1:p0"), items.map { it.key })
+        assertTrue(items.all { it.part != null })
     }
 
     @Test
@@ -259,6 +282,7 @@ class ChatListFlattenerTest {
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "思考中",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             isThinking = true,
         )
@@ -273,6 +297,7 @@ class ChatListFlattenerTest {
             id = "s1",
             type = ChatMessageType.AGENT_TEXT,
             content = "正在调用工具",
+            role = ModelInputRole.ASSISTANT,
             isStreaming = true,
             parts = listOf(textPart("txt-0", "前文")),
         )

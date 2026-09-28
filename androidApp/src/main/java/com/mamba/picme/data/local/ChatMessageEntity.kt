@@ -19,11 +19,17 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
 
     /**
-     * 消息类型（13 种现役列值，全枚举映射见 ChatMessageType / LegacyMessagePartsConverter）：
-     * user_text, agent_text, user_image, user_image_text, agent_image, agent_edit_result,
-     * command, plan_preview, media_results, chart, html_card, task_card, optimize_candidates
+     * 新分类法 8 值（spec §1）：text, image, tool_chart, tool_html, tool_task,
+     * tool_image_edit, data_media_results, data_optimize_candidates。
+     * 降级定位：索引冗余 + 迁移源；读面权威是 partsJson。
      */
     val type: String,
+
+    /**
+     * 消息角色："user" / "agent"（spec §2 升格列；默认值 'agent' 仅为迁移安全网，
+     * 所有写路径必须显式赋值）。
+     */
+    val role: String = "agent",
 
     /**
      * 文本内容或图片路径（图片消息存储本地文件路径）

@@ -16,17 +16,20 @@ import org.junit.Test
 /**
  * M1 双写/双读接缝（[withPartsJson] / [decodePartsOrLegacy] / [toModelInputItems]）JVM 单测
  * + 全仓双写守卫（所有 chat_messages 写入必须走 WithParts 入口）。
+ *
+ * Room v26 起 type 为新 8 值分类法、role 独立列（"user"/"agent"），接缝现算均以两列为准。
  */
 class ChatMessagePartsTest {
 
     // ── 双写 ───────────────────────────────────────────────────
 
     @Test
-    fun `withPartsJson fills partsJson derived from legacy columns`() {
+    fun `withPartsJson fills partsJson derived from type and role columns`() {
         val entity = ChatMessageEntity(
             id = "m1",
             sessionId = "s",
-            type = "agent_text",
+            type = "text",
+            role = "agent",
             content = "你好",
             timestamp = 1L,
         )
@@ -42,7 +45,8 @@ class ChatMessagePartsTest {
         val original = ChatMessageEntity(
             id = "m2",
             sessionId = "s",
-            type = "html_card",
+            type = "tool_html",
+            role = "agent",
             content = "<html/>",
             timestamp = 1L,
             metadata = """{"html_card":{"display":"inline"}}""",
@@ -58,6 +62,34 @@ class ChatMessagePartsTest {
         assertEquals(320, part.meta.measuredHeightPx)
     }
 
+    @Test
+    fun `deriveParts splits user image with uri into image and text parts by role`() {
+        // user 图文在场：图上文下双 part（ref 取 metadata.imageUri）
+        val user = ChatMessageEntity(
+            id = "iu",
+            sessionId = "s",
+            type = "image",
+            role = "user",
+            content = "看这张",
+            timestamp = 1L,
+            metadata = """{"imageUri":"file://img"}""",
+        )
+        assertEquals(
+            listOf(
+                MessagePart.Image("p0", ref = "file://img"),
+                MessagePart.Text("p1", "看这张", PartState.DONE),
+            ),
+            user.deriveParts(),
+        )
+
+        // agent 图：单 Image part，ref 取 metadata.imageUri ?: content
+        val agent = user.copy(id = "ia", role = "agent")
+        assertEquals(
+            listOf(MessagePart.Image("p0", ref = "file://img", saved = false)),
+            agent.deriveParts(),
+        )
+    }
+
     // ── 双读 ───────────────────────────────────────────────────
 
     @Test
@@ -65,7 +97,8 @@ class ChatMessagePartsTest {
         val entity = ChatMessageEntity(
             id = "m3",
             sessionId = "s",
-            type = "agent_text",
+            type = "text",
+            role = "agent",
             content = "legacy 原文",
             timestamp = 1L,
             partsJson = MessagePartsCodec.encode(
@@ -83,7 +116,8 @@ class ChatMessagePartsTest {
         val missing = ChatMessageEntity(
             id = "m4",
             sessionId = "s",
-            type = "chart",
+            type = "tool_chart",
+            role = "agent",
             content = "<svg/>",
             timestamp = 1L,
         )
@@ -96,9 +130,13 @@ class ChatMessagePartsTest {
     // ── 回灌桥（实体 → ModelInputItem） ─────────────────────────
 
     @Test
-    fun `toModelInputItems derives role from legacy type prefix`() {
-        val user = ChatMessageEntity(id = "u", sessionId = "s", type = "user_text", content = "问", timestamp = 1L)
-        val agent = ChatMessageEntity(id = "a", sessionId = "s", type = "agent_text", content = "答", timestamp = 2L)
+    fun `toModelInputItems derives role from role column`() {
+        val user = ChatMessageEntity(
+            id = "u", sessionId = "s", type = "text", role = "user", content = "问", timestamp = 1L,
+        )
+        val agent = ChatMessageEntity(
+            id = "a", sessionId = "s", type = "text", role = "agent", content = "答", timestamp = 2L,
+        )
         assertEquals(listOf(ModelInputItem.TextMessage(ModelInputRole.USER, "问")), user.toModelInputItems())
         assertEquals(listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "答")), agent.toModelInputItems())
     }
@@ -108,7 +146,8 @@ class ChatMessagePartsTest {
         val entity = ChatMessageEntity(
             id = "m5",
             sessionId = "s",
-            type = "media_results",
+            type = "data_media_results",
+            role = "agent",
             content = """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""",
             timestamp = 1L,
             metadata = """{"query":"q","totalCount":1,"isRefinement":false}""",

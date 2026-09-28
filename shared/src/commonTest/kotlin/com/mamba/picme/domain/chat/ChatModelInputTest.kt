@@ -3,7 +3,6 @@ package com.mamba.picme.domain.chat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /**
  * [toModelInput] 回灌转换（spec §6 双层分离）与现状回灌输出的等价性 fixture。
@@ -19,6 +18,8 @@ class ChatModelInputTest {
         rows.map { (type, content, _) -> type to content }
 
     private fun legacyMessage(type: String, content: String, metadata: String? = null): ChatMessage {
+        // 经迁移单点构造：role + parts 一次到位（与 Room v26 迁移同源，防测试私搭派生逻辑）
+        val migrated = LegacyChatTypeMigration.map(type, content, metadata)
         val uiType = when (type) {
             "user_text" -> ChatMessageType.USER_TEXT
             "user_image" -> ChatMessageType.USER_IMAGE
@@ -29,7 +30,8 @@ class ChatModelInputTest {
             id = "m-$type",
             type = uiType,
             content = content,
-            parts = LegacyMessagePartsConverter.toParts(type, content, metadata),
+            role = roleOf(migrated.role),
+            parts = migrated.parts,
         )
     }
 
@@ -91,6 +93,7 @@ class ChatModelInputTest {
             id = "m-err",
             type = ChatMessageType.CHART,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.Chart("p0", "", state = ToolPartState.OUTPUT_ERROR)),
         )
         val items = message.toModelInput()
@@ -106,6 +109,7 @@ class ChatModelInputTest {
             id = "m-herr",
             type = ChatMessageType.HTML_CARD,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.HtmlCard("p0", "", state = ToolPartState.OUTPUT_ERROR)),
         )
         val result = message.toModelInput()[1]
@@ -206,6 +210,7 @@ class ChatModelInputTest {
             id = "m",
             type = ChatMessageType.AGENT_TEXT,
             content = "",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.Text("p0", "  ", PartState.DONE)),
         )
         assertEquals(emptyList(), message.toModelInput())
@@ -218,6 +223,7 @@ class ChatModelInputTest {
             id = "m",
             type = ChatMessageType.AGENT_TEXT,
             content = "前",
+            role = ModelInputRole.ASSISTANT,
             parts = listOf(
                 MessagePart.Text("p0", "前段", PartState.DONE),
                 MessagePart.Chart("p1", "<svg/>"),
@@ -238,11 +244,9 @@ class ChatModelInputTest {
     }
 
     @Test
-    fun `role derives from legacy type`() {
-        assertEquals(ModelInputRole.USER, legacyMessage("user_text", "x").modelRole)
-        assertEquals(ModelInputRole.USER, legacyMessage("user_image", "x").modelRole)
-        assertEquals(ModelInputRole.ASSISTANT, legacyMessage("agent_text", "x").modelRole)
-        assertEquals(ModelInputRole.ASSISTANT, legacyMessage("chart", "x").modelRole)
-        assertTrue(legacyMessage("task_card", "x").modelRole == ModelInputRole.ASSISTANT)
+    fun `roleOf maps room role column to model role`() {
+        // spec §2：role 升格为独立列后的唯一派生点——"user"→USER，其余（含 "agent"）→ASSISTANT
+        assertEquals(ModelInputRole.USER, roleOf("user"))
+        assertEquals(ModelInputRole.ASSISTANT, roleOf("agent"))
     }
 }

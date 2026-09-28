@@ -61,6 +61,7 @@ import com.mamba.picme.domain.backup.model.BackupPreferences
 import com.mamba.picme.domain.backup.model.BackupTag
 import com.mamba.picme.domain.backup.model.BackupTagScanTask
 import com.mamba.picme.domain.backup.model.TagDataBackup
+import com.mamba.picme.domain.chat.LegacyChatTypeMigration
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
@@ -302,7 +303,8 @@ class TagDataBackupRepository(
                 content = it.content,
                 timestamp = it.timestamp,
                 modelUsed = it.modelUsed,
-                metadata = it.metadata
+                metadata = it.metadata,
+                role = it.role
             )
         }
 
@@ -731,13 +733,23 @@ class TagDataBackupRepository(
             }
             if (backup.chatMessages.isNotEmpty()) {
                 backup.chatMessages.chunked(500).forEach { chunk ->
-                    // 旧备份（v5 及以前）不含 partsJson：恢复时从 legacy 列现算回填（M1 双写接缝）
+                    // 备份恢复双分支（spec §6 消费者表）：新备份（type 已是新 8 值）直通，
+                    // role 缺省补 agent 安全网；旧备份（旧分类法导出，type 为 legacy 13 值）
+                    // 经唯一映射知识库 [LegacyChatTypeMigration] 转正。随后统一走 insertMessagesWithParts：
+                    // withPartsJson 用纯净化转换器在新 (type, role) 上现算 partsJson，
+                    // 与迁移产物零逻辑重复（旧备份不含 partsJson：从 legacy 列现算回填）。
                     chatMessageDao.insertMessagesWithParts(
                         chunk.map { msg ->
+                            val row = if (msg.type in LegacyChatTypeMigration.NEW_TYPES) {
+                                LegacyChatTypeMigration.MigratedRow(msg.type, msg.role ?: "agent", emptyList())
+                            } else {
+                                LegacyChatTypeMigration.map(msg.type, msg.content, msg.metadata)
+                            }
                             ChatMessageEntity(
                                 id = msg.id,
                                 sessionId = msg.sessionId,
-                                type = msg.type,
+                                type = row.type,
+                                role = row.role,
                                 content = msg.content,
                                 timestamp = msg.timestamp,
                                 modelUsed = msg.modelUsed,

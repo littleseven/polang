@@ -10,9 +10,11 @@ import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
 import com.mamba.picme.domain.chat.overlayLiveTaskState
+import com.mamba.picme.domain.chat.roleOf
 
 import android.content.Context
 import android.content.res.Configuration
@@ -439,7 +441,8 @@ class ChatViewModel(
                     ChatMessageEntity(
                         id = UUID.randomUUID().toString(),
                         sessionId = sessionId,
-                        type = "user_text",
+                        type = "text",
+                        role = "user",
                         content = text,
                         modelUsed = null,
                     ),
@@ -466,6 +469,7 @@ class ChatViewModel(
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
                     type = ChatMessageType.AGENT_TEXT,
+                    role = ModelInputRole.ASSISTANT,
                     content = "",
                     modelUsed = currentModelLabel(),
                     isStreaming = true,
@@ -617,7 +621,7 @@ class ChatViewModel(
     }
 
     /**
-     * 把折叠后的 agent 气泡落 Room（type=agent_text + metadata.claude_agent_state）。
+     * 把折叠后的 agent 气泡落 Room（type=text + role=agent + metadata.claude_agent_state）。
      * loadMessages 重放时由 [parseClaudeAgentState] 还原 [ChatMessageUi.claudeAgent]。
      */
     private suspend fun persistClaudeBubble(sessionId: String, state: ClaudeAgentState) {
@@ -634,7 +638,8 @@ class ChatViewModel(
             ChatMessageEntity(
                 id = msgId,
                 sessionId = sessionId,
-                type = "agent_text",
+                type = "text",
+                role = "agent",
                 content = state.text,
                 modelUsed = currentModelLabel(),
                 metadata = metadata,
@@ -652,6 +657,7 @@ class ChatViewModel(
                     id = state.taskId,
                     sessionId = sessionId,
                     type = EngineerTaskState.ROOM_TYPE,
+                    role = "agent",
                     content = state.sourceText.take(50),
                     timestamp = state.startedAtMs,
                     metadata = JSONObject().put("engineer_task", state.toJson()).toString(),
@@ -1669,7 +1675,8 @@ class ChatViewModel(
                 val userMessage = ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
-                    type = if (imageUri != null) "user_image_text" else "user_text",
+                    type = if (imageUri != null) "image" else "text",
+                    role = "user",
                     content = text,
                     modelUsed = null,
                     metadata = imageUri?.let { """{"imageUri":"$it"}""" }
@@ -1712,6 +1719,7 @@ class ChatViewModel(
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
                     type = ChatMessageType.AGENT_TEXT,
+                    role = ModelInputRole.ASSISTANT,
                     content = stringContext().getString(STREAMING_THINKING_HINT_RES),
                     modelUsed = currentModelLabel(),
                     isStreaming = true,
@@ -1934,7 +1942,8 @@ class ChatViewModel(
                 val errorMessage = ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
-                    type = "agent_text",
+                    type = "text",
+                    role = "agent",
                     content = stringContext().getString(
                         R.string.chat_inference_error,
                         e.message ?: stringContext().getString(R.string.chat_unknown_error),
@@ -2527,7 +2536,8 @@ class ChatViewModel(
             ChatMessageEntity(
                 id = "chart_" + System.currentTimeMillis(),
                 sessionId = _currentSessionId.value,
-                type = "chart",
+                type = "tool_chart",
+                role = "agent",
                 content = svg,
                 timestamp = System.currentTimeMillis(),
                 modelUsed = "chart"
@@ -2560,7 +2570,8 @@ class ChatViewModel(
                 // 同毫秒多张卡（/html 冒烟集连发）需序号兜底，否则主键相同被 REPLACE 覆盖丢卡
                 id = "html_" + System.currentTimeMillis() + "_" + htmlMessageSeq.incrementAndGet(),
                 sessionId = _currentSessionId.value,
-                type = "html_card",
+                type = "tool_html",
+                role = "agent",
                 content = html,
                 timestamp = System.currentTimeMillis(),
                 modelUsed = "html_card",
@@ -2581,7 +2592,7 @@ class ChatViewModel(
     fun persistHtmlCardDisplayMode(messageId: String, mode: HtmlCardDisplayMode, measuredHeightPx: Int?) {
         viewModelScope.launch(Dispatchers.Default) {
             val entity = chatMessageDao.getMessageById(messageId) ?: return@launch
-            if (entity.type != "html_card") return@launch
+            if (entity.type != "tool_html") return@launch
             val root = entity.metadata
                 ?.let { raw -> runCatching { JSONObject(raw) }.getOrNull() }
                 ?: JSONObject()
@@ -2789,7 +2800,8 @@ class ChatViewModel(
                     ChatMessageEntity(
                         id = UUID.randomUUID().toString(),
                         sessionId = sessionId,
-                        type = "user_text",
+                        type = "text",
+                        role = "user",
                         content = text,
                         modelUsed = null
                     )
@@ -2893,7 +2905,8 @@ class ChatViewModel(
                 ChatMessageEntity(
                     id = previousCard?.id ?: UUID.randomUUID().toString(),
                     sessionId = sessionId,
-                    type = "media_results",
+                    type = "data_media_results",
+                    role = "agent",
                     content = ChatGallerySearch.serializeContent(ui.assets),
                     timestamp = previousCard?.timestamp ?: System.currentTimeMillis(),
                     modelUsed = "gallery_search",
@@ -2980,7 +2993,8 @@ class ChatViewModel(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
-                type = "agent_text",
+                type = "text",
+                role = "agent",
                 content = content,
                 modelUsed = modelUsed,
                 metadata = metadata
@@ -2990,7 +3004,7 @@ class ChatViewModel(
     }
 
     /**
-     * 插入一条带结果图的 AI 消息（type=agent_image）。用于 chat 内执行图像编辑后直接返回结果。
+     * 插入一条带结果图的 AI 消息（type=image + role=agent）。用于 chat 内执行图像编辑后直接返回结果。
      */
     private suspend fun insertAgentImageMessage(
         sessionId: String,
@@ -3016,7 +3030,8 @@ class ChatViewModel(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
-                type = "agent_image",
+                type = "image",
+                role = "agent",
                 content = content,
                 modelUsed = modelUsed,
                 metadata = metadata
@@ -3061,7 +3076,8 @@ class ChatViewModel(
             ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
-                type = "agent_edit_result",
+                type = "tool_image_edit",
+                role = "agent",
                 content = explanation,
                 modelUsed = modelUsed,
                 metadata = metadata
@@ -3070,7 +3086,7 @@ class ChatViewModel(
         chatSessionDao.touchSession(sessionId)
     }
 
-    /** 插入候选卡组消息（type=optimize_candidates），并按推荐卡初始化选中态。 */
+    /** 插入候选卡组消息（type=data_optimize_candidates（OptimizeCandidateGroup.MESSAGE_TYPE）），并按推荐卡初始化选中态。 */
     @VisibleForTesting
     internal suspend fun insertOptimizeCandidatesMessage(
         sessionId: String,
@@ -3084,6 +3100,7 @@ class ChatViewModel(
                 id = messageId,
                 sessionId = sessionId,
                 type = OptimizeCandidateGroup.MESSAGE_TYPE,
+                role = "agent",
                 content = content,
                 modelUsed = modelUsed,
                 metadata = group.toJson()
@@ -3129,7 +3146,7 @@ class ChatViewModel(
     }
 
     /**
-     * 就用这张：全尺寸渲染 → 该条消息改写为 agent_image 结果消息（复用 insert-replace 模式）。
+     * 就用这张：全尺寸渲染 → 该条消息改写为 image（role=agent）结果消息（复用 insert-replace 模式）。
      *
      * @param onResult true=成功；false=失败（UI toast，卡条保持可重试）
      */
@@ -3147,7 +3164,7 @@ class ChatViewModel(
                     put("saved", false)
                 }.toString()
                 chatMessageDao.insertMessageWithParts(
-                    entity.copy(type = "agent_image", metadata = metadata)
+                    entity.copy(type = "image", role = "agent", metadata = metadata)
                 )
             }
             _gachaSelections.value = _gachaSelections.value - messageId
@@ -3247,7 +3264,8 @@ class ChatViewModel(
                 val userMessage = ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
-                    type = "user_image",
+                    type = "image",
+                    role = "user",
                     content = persistedUri,
                     modelUsed = null
                 )
@@ -3272,6 +3290,7 @@ class ChatViewModel(
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
                     type = ChatMessageType.AGENT_TEXT,
+                    role = ModelInputRole.ASSISTANT,
                     content = stringContext().getString(R.string.chat_analyzing_image),
                     modelUsed = modelKey,
                     isStreaming = true,
@@ -3318,6 +3337,7 @@ class ChatViewModel(
                     _streamingMessage.value = ChatMessageUi(
                         id = streamingId,
                         type = ChatMessageType.AGENT_TEXT,
+                        role = ModelInputRole.ASSISTANT,
                         content = stringContext().getString(R.string.chat_loading_model),
                         modelUsed = modelKey
                     )
@@ -3451,7 +3471,8 @@ class ChatViewModel(
                             chatMessageDao.getMessageById(message.id)?.let { entity ->
                                 chatMessageDao.insertMessageWithParts(
                                     entity.copy(
-                                        type = "agent_text",
+                                        type = "text",
+                                        role = "agent",
                                         content = deletedText,
                                         metadata = null
                                     )
@@ -3462,7 +3483,7 @@ class ChatViewModel(
                                 content = deletedText,
                                 mediaResults = null,
                                 // M4：渲染源切 parts——内存快路径与落库重导出的 parts 同构
-                                //（agent_text → Text p0 DONE，Room 重载后口径一致）
+                                //（text → Text p0 DONE，Room 重载后口径一致）
                                 parts = listOf(
                                     MessagePart.Text(
                                         partId = "p0",
@@ -3553,59 +3574,57 @@ class ChatViewModel(
         }
     }
 
-    private fun parseImageUri(metadata: String): String? = try {
-        org.json.JSONObject(metadata).optString("imageUri").takeIf { it.isNotBlank() }
-    } catch (e: Exception) {
-        null
-    }
-
     @Suppress("CyclomaticComplexMethod") // 待重构：toUiModel 按消息类型映射抽表
     private fun ChatMessageEntity.toUiModel(): ChatMessageUi {
-        val isMediaResults = type == "media_results"
-        val performance = if (isMediaResults) null else metadata?.let { parsePerformanceMetadata(it) }
-        val mediaResults = if (isMediaResults) ChatGallerySearch.deserialize(content, metadata) else null
+        // ADR-016 M4 + spec §4：parts 优先投影——primary part 定 [ChatMessageType]，
+        // role 列区分 USER_TEXT/AGENT_TEXT 与用户图文（type 前缀不再承载角色信息）；
+        // 平铺字段（chartSvg/htmlContent/…/engineerTask）一律自 parts 提取，
+        // 不再按 type 字符串守卫；performance/claudeAgent 仍从 metadata 解析（现状不变）。
+        val parts = decodePartsOrLegacy()
+        val primary = parts.firstOrNull()
+        val role = roleOf(this.role)
         return ChatMessageUi(
             id = id,
-            type = when (type) {
-                "user_text" -> ChatMessageType.USER_TEXT
-                "agent_text" -> ChatMessageType.AGENT_TEXT
-                "user_image" -> ChatMessageType.USER_IMAGE
-                "user_image_text" -> ChatMessageType.USER_IMAGE_TEXT
-                "agent_image" -> ChatMessageType.AGENT_IMAGE
-                "command" -> ChatMessageType.COMMAND
-                "plan_preview" -> ChatMessageType.PLAN_PREVIEW
-                "media_results" -> ChatMessageType.MEDIA_RESULTS
-                "chart" -> ChatMessageType.CHART
-                "html_card" -> ChatMessageType.HTML_CARD
-                "agent_edit_result" -> ChatMessageType.AGENT_EDIT_RESULT
-                OptimizeCandidateGroup.MESSAGE_TYPE -> ChatMessageType.OPTIMIZE_CANDIDATES
-                EngineerTaskState.ROOM_TYPE -> ChatMessageType.TASK_CARD
-                else -> ChatMessageType.AGENT_TEXT
+            type = when (primary) {
+                is MessagePart.Text -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
+                is MessagePart.Image -> when {
+                    role == ModelInputRole.USER && parts.any { it is MessagePart.Text } -> ChatMessageType.USER_IMAGE_TEXT
+                    role == ModelInputRole.USER -> ChatMessageType.USER_IMAGE
+                    else -> ChatMessageType.AGENT_IMAGE
+                }
+                is MessagePart.Chart -> ChatMessageType.CHART
+                is MessagePart.HtmlCard -> ChatMessageType.HTML_CARD
+                is MessagePart.TaskCard -> ChatMessageType.TASK_CARD
+                is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
+                is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
+                is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
+                null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
             },
+            role = role,
             content = content,
-            chartSvg = if (type == "chart") content else null,
-            htmlContent = if (type == "html_card") content else null,
-            htmlCardMeta = if (type == "html_card") parseHtmlCardMeta(metadata) else null,
-            imageUri = if (type == "user_image_text" || type == "agent_image" || type == "agent_edit_result") metadata?.let { m -> parseImageUri(m) } else null,
-            imageSaved = (type == "agent_image" || type == "agent_edit_result") &&
-                (metadata?.let { runCatching { org.json.JSONObject(it).optBoolean("saved", false) }.getOrDefault(false) } ?: false),
+            chartSvg = (primary as? MessagePart.Chart)?.svg,
+            htmlContent = (primary as? MessagePart.HtmlCard)?.html,
+            htmlCardMeta = (primary as? MessagePart.HtmlCard)?.meta,
+            imageUri = (primary as? MessagePart.Image)?.ref
+                ?: (primary as? MessagePart.EditResult)?.ref,
+            imageSaved = when (primary) {
+                is MessagePart.Image -> primary.saved
+                is MessagePart.EditResult -> primary.saved
+                else -> false
+            },
             modelUsed = modelUsed,
             timestamp = timestamp,
-            performance = performance,
-            mediaResults = mediaResults,
+            performance = if (primary is MessagePart.MediaResults) null else metadata?.let { parsePerformanceMetadata(it) },
+            mediaResults = (primary as? MessagePart.MediaResults)?.results,
             claudeAgent = parseClaudeAgentState(metadata),
-            optimizeCandidates = if (type == OptimizeCandidateGroup.MESSAGE_TYPE) {
-                OptimizeCandidateGroup.fromJson(metadata)
-            } else {
-                null
-            },
-            gachaInteractive = type == OptimizeCandidateGroup.MESSAGE_TYPE &&
+            optimizeCandidates = (primary as? MessagePart.OptimizeCandidates)?.group,
+            gachaInteractive = primary is MessagePart.OptimizeCandidates &&
                 optimizeGachaController?.hasPending(id) == true,
-            engineerTask = if (type == EngineerTaskState.ROOM_TYPE) parseEngineerTaskState(metadata) else null,
+            engineerTask = (primary as? MessagePart.TaskCard)?.task,
             // ADR-016 M4：全量恢复双读填充（decodePartsOrLegacy：优先 partsJson，缺失/损坏
             // 回 legacy 列现算）——UI 渲染源切到 parts（flattenChatItems 拍平），每条消息
             // 都需要 parts 在场；M2 期仅 TASK_CARD 填充是「无消费方省 decode」的过渡口径。
-            parts = decodePartsOrLegacy(),
+            parts = parts,
         )
     }
 
@@ -3703,8 +3722,8 @@ internal fun buildAppToolExecutor(deps: ChatViewModelDependencies): AppToolExecu
         val effectiveSessionId = sessionId
             ?: deps.userSettingsRepository.chatCurrentSessionIdFlow.first()
         // ADR-016 M1：回灌经 toModelInput 显式转换（UIMessage→ModelMessage 双层分离）——
-        // 文本消息保持 (user_text|agent_text, 原文) 与旧直拼输出等价；卡片类消息呈现为
-        // tool_call/tool_result 语义对；media_results/图片/抽卡等 data part 不进上下文（spec §6）。
+        // 文本消息呈现 (user|agent, 原文)；卡片类消息呈现为
+        // tool_call/tool_result 语义对；data part 不进上下文（spec §6）。
         deps.chatMessageDao.getRecentMessages(effectiveSessionId, limit)
             .flatMap { entity -> entity.toModelInputItems() }
             .map { item -> item.toHistoryPair() }

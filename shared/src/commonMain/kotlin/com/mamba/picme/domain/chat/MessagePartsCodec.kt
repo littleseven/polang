@@ -6,8 +6,9 @@ import kotlinx.serialization.json.Json
 /**
  * [MessagePart] 列表的 kotlinx JSON 编解码（Room `partsJson` 列的线格式，ADR-016 D1）。
  *
- * 对齐 Vercel「UIMessage JSON 整包落库」实践：鉴别字段 `type`，值与 legacy `type` 列对齐
- * （text/chart/html_card/task_card/media_results/image/edit_result/optimize_candidates）。
+ * 对齐 Vercel「UIMessage JSON 整包落库」实践：鉴别字段 `type`，值遵循 8 值分类法
+ * （type taxonomy spec §1）：text/image 为内容物，tool_chart/tool_html/tool_task/
+ * tool_image_edit 为工具产物，data_media_results/data_optimize_candidates 为数据载荷。
  */
 object MessagePartsCodec {
 
@@ -24,7 +25,7 @@ object MessagePartsCodec {
 
     /**
      * 解码 parts JSON；空串/结构损坏/未知 part 类型返回 null，
-     * 调用方按 legacy 列兜底（[LegacyMessagePartsConverter]），**不允许丢消息**。
+     * 调用方按 legacy 列兜底（[MessagePartsConverter]），**不允许丢消息**。
      */
     fun decode(partsJson: String?): List<MessagePart>? {
         if (partsJson.isNullOrBlank()) return null

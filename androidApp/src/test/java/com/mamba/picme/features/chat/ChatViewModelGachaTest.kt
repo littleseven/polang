@@ -71,7 +71,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
     }
 
     @Test
-    fun `onOptimizeGachaConfirm rewrites message to agent_image`() = runTest {
+    fun `onOptimizeGachaConfirm rewrites message to agent image`() = runTest {
         val vm = newViewModel()
         advanceUntilIdle()
         coEvery { gachaController.confirm("msg1", 1) } returns
@@ -87,7 +87,8 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
 
         val slot = slot<ChatMessageEntity>()
         coVerify { chatMessageDao.insertMessage(capture(slot)) }
-        assertEquals("agent_image", slot.captured.type)
+        assertEquals("image", slot.captured.type)
+        assertEquals("agent", slot.captured.role)
         assertEquals("msg1", slot.captured.id)
         assertTrue(slot.captured.metadata!!.contains("file:///full.jpg"))
         assertEquals("expl", slot.captured.content)

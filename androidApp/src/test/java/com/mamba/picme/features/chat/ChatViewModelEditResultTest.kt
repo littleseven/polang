@@ -13,7 +13,7 @@ import org.junit.Test
 class ChatViewModelEditResultTest : ChatViewModelTestBase() {
 
     @Test
-    fun `insertEditResultMessage persists agent_edit_result with metadata`() = runTest {
+    fun `insertEditResultMessage persists tool_image_edit with metadata`() = runTest {
         val vm = newViewModel()
         advanceUntilIdle()
 
@@ -28,7 +28,8 @@ class ChatViewModelEditResultTest : ChatViewModelTestBase() {
         coVerify { chatMessageDao.insertMessage(capture(slot)) }
 
         val entity = slot.captured
-        assertEquals("agent_edit_result", entity.type)
+        assertEquals("tool_image_edit", entity.type)
+        assertEquals("agent", entity.role)
         assertEquals(explanation, entity.content)
         assertEquals(sessionId, entity.sessionId)
         assertEquals("remote_deepseek", entity.modelUsed)
