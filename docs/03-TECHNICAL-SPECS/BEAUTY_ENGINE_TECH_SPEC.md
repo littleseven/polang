@@ -105,7 +105,7 @@
 渲染线程：独立上下文（共享纹理） + 美颜渲染
 ```
 
-### 1.4 磨皮算法演进路线（2026-04）
+### 1.4 磨皮算法路线
 
 **当前实现**：双边滤波快速近似（5×5 采样核 + 值域高斯权重），已落地在 `engines/beauty-engine/src/main/assets/shaders/pass_smoothing.glsl`。
 
@@ -113,12 +113,11 @@
 
 | 阶段 | 方案 | 复杂度 | 边缘保持 | 状态 |
 |------|------|------|------|------|
-| 已放弃 | 盒式模糊（Box Blur） | O(1) | 无，失真明显 | ❌ 放弃 |
 | **当前** | 双边滤波快速近似（5×5 采样核 + 锐化后处理） | O(N·r²) 近似 | 良好，保留皮肤轮廓 | ✅ 已落地 |
 | Phase 2 | **引导滤波（Guided Filter）** | **O(N)，与半径无关** | 更优，结构转移特性，无梯度反转光晕 | ⏳ 规划中 |
 | Phase 3 | 多尺度细节分层（Multi-scale） | O(N·K)，K层 | 工业级，分频层独立处理后融合 | 🔭 长期目标 |
 
-### 1.5 滤镜技术演进路线（2026-04）
+### 1.5 滤镜技术路线
 
 **当前实现**：自定义 GLSL Shader 硬编码颜色变换（LEICA_CLASSIC / FILM_GOLD / COOL / WARM）。
 
@@ -578,7 +577,7 @@ suspend fun triggerManualGlEngineRecovery() {
 
 ### 7.4 QA 与回归检查
 
-性能红线指标见 `docs/01-PRODUCT/NFR_SPEC.md`（独立 QA 验收清单已于 ADR-011 退役；本地 LLM/NCNN 时代的历史 trace 合集已于 2026-09-27 清理，git 历史可查）。
+性能红线指标见 `docs/01-PRODUCT/NFR_SPEC.md`。
 
 ---
 
@@ -1578,13 +1577,10 @@ private fun onGlWarmUpFallback(reason: String) {
 
 在图像变形（如瘦脸、大眼）实现中，**映射方向**是决定效果正确性的核心概念。
 
-> **2026-05 更新**：GPU 离屏渲染拍照已落地，拍照路径复用同一套 Shader 管线，统一采用**反向映射（Backward Mapping）**。原 CPU Canvas 正向映射路径已废弃，仅保留作为历史参考。
-
-大美丽引擎当前映射方式：
+大美丽引擎映射方式：
 
 - **预览（Shader）**：反向映射（Backward Mapping）
-- **拍照（GPU）**：反向映射（Backward Mapping）✅ 当前标准路径
-- **拍照（CPU）**：正向映射（Forward Mapping）⚠️ 已废弃，仅作历史参考
+- **拍照（GPU）**：反向映射（Backward Mapping）✅ 标准路径
 
 ### A.2 正向映射（Forward Mapping）
 

@@ -13,6 +13,7 @@ rsync -a --delete --delete-excluded \
   --exclude 'superpowers/' \
   --exclude '08-UI-SPECS/' \
   --exclude 'reviews/' \
+  --exclude '06-QA/' \
   --exclude '01-PRODUCT/IOS_DOC_INDEX.md' \
   --exclude '01-PRODUCT/IOS_TASK_STATUS.md' \
   --exclude '01-PRODUCT/IOS_PRODUCT_REFERENCE.md' \
@@ -27,4 +28,4 @@ rsync -a --delete --delete-excluded \
 
 echo "sync-docs: ${SRC} -> ${DST} (docsify site)"
 echo "  online docs: $(find "${DST}" -name '*.md' | wc -l | tr -d ' ')"
-echo "  excluded: superpowers/(在途) + 08-UI-SPECS/(双端契约) + reviews/(时间点快照) + iOS 工作文档×3 + 本机环境/发布备份 + server 内部三篇 + privacy-policy/ (landing page has it)"
+echo "  excluded: superpowers/(在途) + 08-UI-SPECS/(双端契约) + reviews/(结论性快照) + 06-QA/(过程验收) + iOS 工作文档×3 + 本机环境/发布备份 + server 内部三篇 + privacy-policy/ (landing page has it)"

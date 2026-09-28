@@ -453,7 +453,6 @@ PoLang 以技术探索与能力验证为核心目标，**聚焦 Gallery/Editor +
 | 文档 | 说明 |
 |------|------|
 | `docs/01-PRODUCT/FEATURES.md` | 功能交互细节（传统 PRD 内容） |
-| `docs/reviews/2026-09-25-meta-muse-feature-research.md` | Meta Muse 客户端调研（任务范式借鉴来源；端侧隐私叙事外部验证） |
 | `docs/superpowers/specs/2026-09-26-user-task-protocol-design.md` | 用户任务协议 + 任务中心双 Tab 设计 Spec（M1 已落地） |
 | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md` | 工程师任务卡 + 任务中心页设计 Spec（P1 + 任务中心已落地） |
 | `docs/01-PRODUCT/NFR_SPEC.md` | 非功能性需求规格（性能/稳定性量化指标） |

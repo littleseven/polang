@@ -2,7 +2,7 @@
 
 > **日期**: 2026-09-26
 > **来源**: 用户新想法——「短卡 chat 内直接交互无手势冲突；长文 HTML（超一屏）手势冲突突出，外显为固定高预览卡，点击全屏」；随后扩展「任务卡也适合 HTML 形态呈现，点击展开细节」
-> **上游**: ADR-014（chat 富内容渲染，含 2026-09-25 修订注记）、`JS_ENGINE_TECH_SPEC.md` §7.1（HtmlCard 实现 SSOT）、`2026-09-25-engineer-task-card-design.md`（任务卡，本 spec 修订其 D2/§6）
+> **上游**: ADR-016（chat 富内容渲染，含 2026-09-25 修订注记）、`JS_ENGINE_TECH_SPEC.md` §7.1（HtmlCard 实现 SSOT）、`2026-09-25-engineer-task-card-design.md`（任务卡，本 spec 修订其 D2/§6）
 > **关键决策**（用户 2026-09-26 逐项确认）：混合分流判定 / 实时裁剪预览 / 全屏同沙箱允许竖滚；任务卡原地展开+超长进全屏 / 审批动作条原生外置（**2026-09-27 修订：动作区收进卡内，上下两分区，Muse 风格**，见 §7）/ 折叠展开全 HTML；富内容三通道路由（draw_chart / render_html / 纯 markdown）+ 正文禁嵌渲染级 HTML
 > **设计稿**: Ardot 文件 polang-ui-spec（fileId 715061534788814）页面 `HtmlCard`（pageId `438:2`）8 帧，见 §13；过程稿 `docs/superpowers/specs/2026-09-26-html-card-two-tier-mockup.html`
 
@@ -10,7 +10,7 @@
 
 ## 1. 问题陈述
 
-现状（ADR-014 修订注记落地态）：所有 HTML 卡一律「动态测高 + 完全撑开 + 卡内直接交互」，短内容体验良好，但两类场景失配：
+现状（ADR-016 修订注记落地态）：所有 HTML 卡一律「动态测高 + 完全撑开 + 卡内直接交互」，短内容体验良好，但两类场景失配：
 
 1. **长文 HTML（超一屏）**：完全撑开后一张卡占据聊天流数屏，聊天浏览节奏被打断；且测高滞后窗口内 WebView 内容可竖滚，与 LazyColumn 的手势让渡兜底（`ChatHtmlWebView` 双策略）会被触发，上下滑冲突在此时段仍然存在。
 2. **工程师任务卡**：现为原生 Compose（9-25 spec D2），当初弃 HTML 的理由是「实时刷新与静态 HTML 语义相斥」。但任务卡恰好是「折叠摘要 + 点击看细节」的天然双态形态，与 HTML 卡双形态体系同构；且端侧模板渲染（非 LLM 产物）使「样式权威在 App」，比自由 HTML 更可控。
@@ -64,7 +64,7 @@
 
 **对 9-25 spec 的修订（用户 2026-09-26 决策，留痕）**：推翻 D2「任务卡 = 原生 Compose」与 §6「RICH_HTML 化任务卡」不做项。`TASK_CARD` 消息类型、`EngineerTaskReducer` 状态机、审批语义（US-1~16）、实施分期（P1/P2/P3）全部不变——**只换渲染层**。
 
-- **HTML 来源**：端侧 **L1 模板 + 任务状态 JSON**（App 渲染，非 LLM 产物）——ADR-014 D5 的 L1 轨首个兑现场景；样式权威在 App，安全面远小于自由 HTML；模板 CSS 走 token 导出的 CSS variables，Light/Dark 随主题切换。
+- **HTML 来源**：端侧 **L1 模板 + 任务状态 JSON**（App 渲染，非 LLM 产物）——ADR-016 D5 的 L1 轨首个兑现场景；样式权威在 App，安全面远小于自由 HTML；模板 CSS 走 token 导出的 CSS variables，Light/Dark 随主题切换。
 - **形态**：
   - 折叠态 = inline HTML 卡：header（⚙ + 标题 + 状态 chip）、当前阶段（最近 tool_use 摘要）、meta（轮次/耗时/成本）、进度条、底部「点击展开细节 ▾」。
   - 点击 → **卡内原地展开**：+ 阶段时间线、最近事件列表、diff 摘要；高度跟随（ResizeObserver 现有管线）；提示变「点击收起 ▴」。
@@ -79,7 +79,7 @@
 - `render_html` tool description 增加 `display` 参数说明与适用判据。
 - `html_card_rules` 增加：inline 卡建议内容高度 ≤ 0.66 屏；长报告/多屏内容声明 `fullpage`；fullpage 卡把导航/关键交互设计在顶部（用户可能先看预览）。
 - `RenderEnvironment` 注入追加：预览卡固定高度（0.5 屏 px 值）与分流阈值（1.0 屏 px 值），LLM 排版有确定基准。
-- **富内容三通道路由决策表**（用户 2026-09-26 决策；调研佐证 `docs/reviews/2026-09-26-chat-rendering-framework-research.md` §6——四家正文流均无 WebView、富内容全部走独立卡片/part）——写入 `html_card_rules` 与 `draw_chart` tool description，作为 LLM 产出富内容时的唯一选择依据：
+- **富内容三通道路由决策表**（用户 2026-09-26 决策；四家对标结论：正文流均无 WebView、富内容全部走独立卡片/part）——写入 `html_card_rules` 与 `draw_chart` tool description，作为 LLM 产出富内容时的唯一选择依据：
 
 | 诉求 | LLM 选择 | 判据 |
 |---|---|---|
@@ -89,7 +89,7 @@
 | 端侧媒体（相册图 / 编辑结果） | 默认**不经 LLM 排版**，走原生消息（`MEDIA_RESULTS` / `AGENT_IMAGE`）；需在 HTML 卡内排版相册图/视频时，用 `media://{id}` 白名单引用（2026-09-27 落地：id 来自取数结果、uri 不下发，字节不出设备且媒体域跨源 JS 读不到，见 `LocalMediaWebViewAssets`） | ADR-008 媒体红线 |
 | 其余一切文字表达 | 纯 markdown | 通用语 |
 
-- **正文禁嵌渲染级 HTML**：prompt 契约明令禁止在 markdown 正文流输出块级 HTML（图表/富媒体/花式排版一律走上表三通道）；端侧配套防御（D1 选库实现 spec 验收项）——正文流检测到块级 HTML → 剥离或降级为代码块展示，不允许半渲染。轻量文字强调（下划线/高亮/上标）仅允许**白名单内联标签**，由原生 markdown 管线渲染（选型评估项，ADR-014 §4-18）。
+- **正文禁嵌渲染级 HTML**：prompt 契约明令禁止在 markdown 正文流输出块级 HTML（图表/富媒体/花式排版一律走上表三通道）；端侧配套防御（D1 选库实现 spec 验收项）——正文流检测到块级 HTML → 剥离或降级为代码块展示，不允许半渲染。轻量文字强调（下划线/高亮/上标）仅允许**白名单内联标签**，由原生 markdown 管线渲染（选型评估项，ADR-016 §4-18）。
 
 ## 9. 降级链与错误处理
 
@@ -102,7 +102,7 @@
 
 - `HTML_CARD` 消息 metadata 扩展：`display`（LLM 声明原值）、`displayMode`（端侧终判 inline/fullpage）、`measuredHeightPx`。
 - 任务卡：`TASK_CARD` payload 不变（状态 JSON），HTML 为渲染期产物，不落库——进程重建后按状态重渲染（对齐 US-6 恢复路径）。
-- Room 迁移：metadata 为 JSON 扩展字段，无 schema 变更（实现时核实序列化管线，对齐 ADR-014 §3 已知项）。
+- Room 迁移：metadata 为 JSON 扩展字段，无 schema 变更（实现时核实序列化管线，对齐 ADR-016 §3 已知项）。
 
 ## 11. 安全模型
 
@@ -162,5 +162,5 @@
 
 - `2026-09-25-engineer-task-card-design.md`：D2「原生卡片」与 §6「RICH_HTML 化任务卡」不做项被本 spec §7 推翻（用户 2026-09-26）；该 spec 头部已加修订注记指回本 spec。
 - `JS_ENGINE_TECH_SPEC.md` §7.1：实现落地时按双形态更新「UI 形态」段（完全撑开不再是无上限唯一形态），随代码原子同步（DOC-SYNC）。
-- `ADR-014`：顶部修订注记第 1 条（呈现形态）在本 spec 后二次演进——「卡片内直接交互 + 完全撑开」收窄为 Inline 形态，新增 Fullpage 双态；实施时回写 ADR 注记。
-- `ADR-014` §4：新增第 18 条选型评估项（白名单内联 HTML 原生渲染 + 正文块级 HTML 防御），随本 spec §8 富内容路由决策同步（2026-09-26）。
+- `ADR-016`：顶部修订注记第 1 条（呈现形态）在本 spec 后二次演进——「卡片内直接交互 + 完全撑开」收窄为 Inline 形态，新增 Fullpage 双态；实施时回写 ADR 注记。
+- `ADR-016` §4：新增第 18 条选型评估项（白名单内联 HTML 原生渲染 + 正文块级 HTML 防御），随本 spec §8 富内容路由决策同步（2026-09-26）。

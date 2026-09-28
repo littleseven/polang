@@ -1,8 +1,8 @@
 # 工程师模式任务卡——Muse 任务卡范式落地（Spec）
 
 > **日期**: 2026-09-25
-> **来源**: Muse 调研 P0 借鉴项（`docs/reviews/2026-09-25-meta-muse-feature-research.md` §3.2 #1/#2），用户定方向：「任务卡非常好，工程师模式需要学习一下」
-> **上游**: FEATURES.md §2.7（AI 工程师模式）、`2026-07-31-claude-tunnel-chat-design.md`（SSE 协议 §5/§6）、ADR-014（卡片容器与审批语义）、ADR-008（隐私红线）
+> **来源**: Muse 任务卡范式调研 P0 借鉴项，用户定方向：「任务卡非常好，工程师模式需要学习一下」
+> **上游**: FEATURES.md §2.7（AI 工程师模式）、claude-tunnel chat SSE 协议、ADR-016（卡片容器与审批语义）、ADR-008（隐私红线）
 > **评审**: 2026-09-25 GLM 交叉审查（对照 App/网关/服务端代码实证），决议已回写：网关「回合与 SSE 解耦 + per-sid 状态落盘 + sid 归属校验」升格为 D4 硬依赖（原立论前提「断连任务照跑」与网关现状相悖）；cost 事件链路上不存在，改为网关补发待办（§7/US-1）；断连恢复闭环（US-4/6）、单任务 enforcement（D6）、审批唯一入口（US-2/7~9）；新增 §8 实施分期
 >
 > **修订注记（2026-09-26）**：D2「任务卡 = 原生 Compose」与 §6「RICH_HTML 化任务卡」不做项已被 `2026-09-26-html-card-two-tier-design.md` §7 推翻（用户 2026-09-26 决策）——任务卡折叠/展开态改为端侧 L1 模板渲染 HTML，审批动作条原生外置；`TASK_CARD` 消息类型、`EngineerTaskReducer` 状态机、US-1~16 与 P1/P2/P3 分期不变，只换渲染层。
@@ -33,7 +33,7 @@ Muse 最受认可的范式转变是「任务后台跑 + 需要决策才回联」
 
 另有**任务中心页**：App 内集中管理入口，聚合进行中和历史任务（见 US-12~16），任务卡是它在 chat 内的投影。
 
-任务卡用**原生 Compose** 实现，不走 ADR-014 的 RICH_HTML 管线（进度实时刷新与一消息一卡的静态 HTML 语义相斥；任务卡是原生组件，ADR-014 的预览卡容器不适用于本场景）。
+任务卡用**原生 Compose** 实现，不走 ADR-016 的 RICH_HTML 管线（进度实时刷新与一消息一卡的静态 HTML 语义相斥；任务卡是原生组件，ADR-016 的预览卡容器不适用于本场景）。
 
 ## 3. 用户故事
 
@@ -71,7 +71,7 @@ Muse 最受认可的范式转变是「任务后台跑 + 需要决策才回联」
 ## 4. 已定决策
 
 - **D1 场景先行**：工程师模式先做，相册域 TaskRegistry（调研 #1）不捆绑；任务卡 UI 组件与任务状态模型按通用形状设计（状态机与渲染分离），但本次只接工程师模式一个数据源。任务状态流宿主为**进程级单例**（AppContainer 域），chat 页/任务中心页/前台 Service 三方消费，不挂 ChatViewModel 内存。
-- **D2 原生卡片**：任务卡 = 原生 Compose 组件，新增 `ChatMessageType.TASK_CARD`（或挂 `metadata` 扩展，实现时二选一，倾向独立类型对齐 `HTML_CARD` 先例——ADR-014 计划名 RICH_HTML 未随落地更新，实际枚举名为 `HTML_CARD`）；不依赖 ADR-014 实现排期。注意 `ChatMessageType` 是双端 SSOT，新增枚举会进入 iOS 面——iOS 侧须同步 default 兜底渲染（纯文本摘要占位），完整实现另走 /ios-follow（见 §6）。实证更正（2026-09-25 实现期）：iOS chat 用独立 Swift `MessageType` 枚举、不消费 shared `ChatMessageType`（`iosApp/PoLang/Features/Chat/ChatMessage.swift:50-55`），新增 TASK_CARD 无枚举面泄漏；iOS 接入时点以 chat.yaml 登记为准。
+- **D2 原生卡片**：任务卡 = 原生 Compose 组件，新增 `ChatMessageType.TASK_CARD`（或挂 `metadata` 扩展，实现时二选一，倾向独立类型对齐 `HTML_CARD` 先例——ADR-016 计划名 RICH_HTML 未随落地更新，实际枚举名为 `HTML_CARD`）；不依赖 ADR-016 实现排期。注意 `ChatMessageType` 是双端 SSOT，新增枚举会进入 iOS 面——iOS 侧须同步 default 兜底渲染（纯文本摘要占位），完整实现另走 /ios-follow（见 §6）。实证更正（2026-09-25 实现期）：iOS chat 用独立 Swift `MessageType` 枚举、不消费 shared `ChatMessageType`（`iosApp/PoLang/Features/Chat/ChatMessage.swift:50-55`），新增 TASK_CARD 无枚举面泄漏；iOS 接入时点以 chat.yaml 登记为准。
 - **D3 回联通道 = 本地通知 + 前台对账，不做服务端推送**：FCM/厂商推送不在本期；后台期间由前台 Service 短间隔轮询兜底（对齐网关 `CT_PHASE_TIMEOUT=300s` 量级——任务分钟级终态，WorkManager 15 分钟最小周期对回联基本无效，仅作进程死亡后的兜底）；前台恢复时即时对账。
 - **D4 状态权威在服务端**：App 侧任务是投影；服务端（网关反代 claude-tunnel）新增 `GET /v1/claude-task/status?sid=` 返回 `{state, turns, costCents, summary, updatedAt}`（sid 不存在 → unknown），SSE 仍是实时通道，状态接口是对账通道。**硬依赖（评审升格）——网关三项改造先行**：①回合执行与 SSE 断连解耦（事件写缓冲、断连后回合继续跑；现状 pump 直写 SSE，断连即子进程孤儿化）；②per-sid 状态登记落盘（对齐 `.claude_session` 文件先例，防网关重启丢状态；现状 `SSE_HUB` 回合结束即删）；③sid↔owner 归属校验（Ktor 反代注入 owner 标识、网关登记映射，跨账号查询 → 403；现状 Ktor 纯透传无映射，不解则为越权读取面）。
 - **D5 审批外置语义沿用**：审批动作在卡片原生 UI（App UI 层），不在对话流文本内——与 Muse Sentinel 设计同构，延续 Tier A 思路。
@@ -97,7 +97,7 @@ Muse 最受认可的范式转变是「任务后台跑 + 需要决策才回联」
 - iOS 端完整实现（工程师模式当前 Android 独占，后续走 `/ios-follow` 另行评估）；但 `ChatMessageType` 是双端 SSOT，新增 `TASK_CARD` 会进入 iOS 枚举面——iOS 侧需同步 default 兜底渲染（纯文本摘要占位），防未知类型渲染异常；
 - 并行多任务、任务排队/取消（取消语义需网关侧支持，本期不碰；「显式放弃」仅为本地标记，见 D6）；
 - 任务中心的历史清理、搜索、筛选（MVP 只读 + 审批动作，见 D7）；
-- RICH_HTML 化任务卡（见 §2 与 ADR-014 D2 的边界说明）。
+- RICH_HTML 化任务卡（见 §2 与 ADR-016 D2 的边界说明）。
 
 ## 7. 补充说明
 

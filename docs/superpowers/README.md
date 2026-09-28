@@ -32,10 +32,11 @@ docs/superpowers/
 
 > `decisions/`（ADR 风格跨工具决策记录）为可选扩展，目前未启用，需要时新建即可。
 
-### 生命周期（2026-08-22 起：交付即清理，git 历史即归档）
+### 生命周期（2026-09-28 升级：单向引用 + 沉淀管线；总纲见 AGENTS.md §4.3）
 
-- **本目录只保留两类文档**：① 在途工作的 spec/plan；② 仍被活跃引用的设计 SSOT。已交付 feature 的 spec/plan **随交付定期清理删除**（不建 archived/ 目录，git 历史永久可查：`git log --all -- <path>` / `git show <rev>:<path>`）。
-- **清理纪律**：删除前把仍有长期价值的事实沉淀进三层活文档（`PRODUCT.md` / `FEATURES.md` / 模块 `AGENTS.md` / `*_TECH_SPEC.md`）；活文档中的引用同步改为「已随交付清理，git 历史可查」，不留悬空链接（已随交付清理的文档查 git 历史：`git log --all -- <path>`）。
+- **本目录只保留两类文档**：① 在途工作的 spec/plan；② 仍被活跃引用的设计 SSOT——以本文件 §6 白名单为准，活文档（AGENTS.md §7 / PRODUCT.md 等）可索引的本目录文档仅限白名单内，交付即摘除索引并删除文档（git 历史即归档：`git log --all -- <path>`）。
+- **交付沉淀管线（Definition of Done）**：交付合 main 前按类型落位——决策→ADR、交互→`FEATURES.md`、实现约束→模块 `AGENTS.md` / `AGENT_ARCHITECTURE.md`、技术链路→TECH_SPEC、UI→`08-UI-SPECS`、术语→GLOSSARY；落完 `git rm` 本文档，不留「已随交付清理」过渡标注。
+- **引用单向铁律**：本目录文档可引用活文档与互相引用；活文档禁止指向本目录与 `docs/06-QA`（在册快照 `docs/reviews/` 除外，见 AGENTS.md §4.3 三分类）。`scripts/check_doc_sync.py` 第 5/6 项检查强制执行。
 - 设计稿内容与代码冲突时以代码为准；本目录文档不是长期事实源，长期事实源是三层文档体系。
 
 ---
@@ -83,9 +84,9 @@ docs/superpowers/
 
 ---
 
-## 6. 索引（2026-09-26 清理后）
+## 6. 索引（在途/活跃 SSOT 白名单 = 活文档可引用本目录文档的唯一许可集）
 
-- **specs（12 篇，均为在途/活跃 SSOT）**：
+- **specs（15 篇，均为在途/活跃 SSOT）**：
   - `2026-08-08-face-restoration-ondevice-design.md` — 人脸修复方向（未实施，待排期）
   - `2026-08-10-ios-follow-command-design.md` — /ios-follow 六阶段管线设计 SSOT（AGENTS §7 引用）
   - `2026-08-13-ios-chat-rich-features-design.md` — iOS Chat 富交互（批次③沙盒写操作在途）
@@ -94,10 +95,13 @@ docs/superpowers/
   - `2026-09-19-ardot-design-ops-design.md` — Ardot Design Ops skill 设计 SSOT
   - `2026-09-25-engineer-task-card-design.md` — 工程师任务卡（US-4~6 回联待 P2 网关改造）
   - `2026-09-25-intent-routing-contract-design.md` — 意图路由契约（M3 分支化在途）
+  - `2026-09-26-approval-three-element-card-design.md` — 审批三要素卡（PRODUCT.md §6.6 任务范式线 P0，无前置依赖）
   - `2026-09-26-html-card-two-tier-design.md`（+ 同名 mockup.html）— HTML 卡双形态 + 任务卡 HTML 化（已定稿待实施）
   - `2026-09-26-user-task-protocol-design.md` — 用户任务协议 + 任务中心双 Tab（M2/M3 在途）
+  - `2026-09-26-task-paradigm-positioning-design.md` — 任务范式定位升格（已实施：PRODUCT.md v3.1 定位句 + §6.6 任务线）
   - `2026-09-27-chat-parts-rendering-design.md` — Chat parts 消息模型与渲染架构（ADR-016 实施 spec，已定稿待实施）
   - `2026-09-27-chat-agent-layered-memory-design.md` — Chat Agent 分层记忆系统（L1 预算制/L2 滚动摘要/L3 事实库，M1~M3 分期；M1 已合 main，M2/M3 待排期）
+  - `2026-09-28-chat-type-taxonomy-design.md` — chat type 分类法（content/tool/data 三分类 + 命名规则 + role 上提；chat-parts 线配套 spec）
 - **plans（1 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）
 
 ---
@@ -109,3 +113,5 @@ docs/superpowers/
 | 2026-08-01 | 建立 SSOT 约定，统一四工具 plan/spec 写入位置；新增 `.omo/plans` 软链 |
 | 2026-08-22 | 历史清理：删除 103 篇已交付 spec/plan（≤08-20 非白名单，specs 77 + plans 25 + nightly 1），仅留在途/活跃 SSOT；建立「交付即清理、git 历史即归档」生命周期约定（见 §2） |
 | 2026-09-26 | 第二轮清理：删除 40 篇已交付产物（specs 18 + plans 21 + claude-tunnel-summary），保留在途/活跃 SSOT（10 specs + 1 plan，清单见 §6）；AGENTS/yaml/脚本等活跃引用同步改写为「已随交付清理，git 历史可查」 |
+| 2026-09-28 | 索引补录 3 篇 09-26 清理后新增 spec（approval-three-element-card / task-paradigm-positioning / chat-type-taxonomy）；同日 docs 治理：reviews 目录两批清理 27 篇过程性报告（无引用 16 + 证据/调研存档 11，结论已收编 ADR/PRODUCT/IOS_* 活文档），目录仅存 consistency-gap / kmp-best-practices 两篇活文档 |
+| 2026-09-28 | 机制升级：§2 生命周期升级为「单向引用 + 沉淀管线」（AGENTS.md §4.3）；check_doc_sync.py 新增第 5 项（活文档→过程目录单向引用）与第 6 项（reviews 白名单）检查 |

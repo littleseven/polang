@@ -1,16 +1,14 @@
 # polang Agent 架构设计
 
-> **版本**：4.1（端侧文本 LLM 移除对齐版）  
-> **状态**：已实施 / 迭代中  
-> **最后更新**：2026-08-03  
+> **版本**：4.1  
+> **状态**：已实施  
 > **主要维护者**：项目开发者、AI Agent  
-> **历史合并说明**：本文档由 `AGENT_ARCHITECTURE.md` 与 `REMOTE_INFERENCE_ARCHITECTURE.md` 合并而成。远程推理相关的 OpenAI 协议、langchain4j 标准化、DeepSeek 适配、四层模型、性能成本与验收标准已并入“推理模式选型”与“远程推理”章节，原 `REMOTE_INFERENCE_ARCHITECTURE.md` 已删除。
 
 > **边界声明（Boundary Statement）**
 > - 本文档定义 Agent 的运行时架构、Capability 模型与推理模式选型。
 > - 产品目标与验收口径以 [`../01-PRODUCT/FEATURES.md`](01-PRODUCT/FEATURES.md) 为准。
 > - 顶层治理规则（角色协作、全局红线、文档流程）以根目录 `AGENTS.md` 为准。
-> - **重要：原 `:agent-core` Java 基础库已删除**（2026-08 迁移至 JetBrains Koog 外部依赖），Agent 编排层（AgentOrchestrator、CapabilityRegistry、PrivacyGuard、MemoryManager、SceneManager 等）在 `:shared` KMP 模块的 `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/` 目录下（平台实现 androidMain；Android 组合根 `androidApp/src/main/java/com/mamba/picme/agent/AndroidAgentComposition.kt`）。详见 [`MODULE_ARCHITECTURE.md`](02-ARCHITECTURE/MODULE_ARCHITECTURE.md)。
+> - Agent 编排层（AgentOrchestrator、CapabilityRegistry、PrivacyGuard、MemoryManager、SceneManager 等）位于 `:shared` KMP 模块（Agent 框架 = JetBrains Koog 外部依赖）的 `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/` 目录下（平台实现 androidMain；Android 组合根 `androidApp/src/main/java/com/mamba/picme/agent/AndroidAgentComposition.kt`）。详见 [`MODULE_ARCHITECTURE.md`](02-ARCHITECTURE/MODULE_ARCHITECTURE.md)。
 
 **模块定位**: AI Agent 运行时架构与推理模式选型（基础库 polang + Demo 工程 PoLang）  
 **阅读对象**: RD、AI Agent
@@ -308,7 +306,7 @@ class RemotePromptBuilder {
 
 #### 3.2.1 被动记忆注入（chat + 飞书，2026-07）
 
-Koog agent（`KoogChatAgent` / `KoogReActAgent`）的 system prompt 在 agent 构建期拼接，在固定 system prompt 后追加 `MemoryContextProvider.snapshot()` 返回的【关于用户】快照（已记住的事实 + 与"我"的人物关系）。快照由 app 层 `MemoryContextProviderImpl` 用 Room Flow（`observeAllFacts` + `observeRelationsToSelf`）预热 `@Volatile` 缓存，按 ~1500 字符预算截断、超出用 `recall_memory` 兜底。chat 与飞书 agent 共用同一份设备本机记忆（设计稿已随交付清理，git 历史可查）。
+Koog agent（`KoogChatAgent` / `KoogReActAgent`）的 system prompt 在 agent 构建期拼接，在固定 system prompt 后追加 `MemoryContextProvider.snapshot()` 返回的【关于用户】快照（已记住的事实 + 与"我"的人物关系）。快照由 app 层 `MemoryContextProviderImpl` 用 Room Flow（`observeAllFacts` + `observeRelationsToSelf`）预热 `@Volatile` 缓存，按 ~1500 字符预算截断、超出用 `recall_memory` 兜底。chat 与飞书 agent 共用同一份设备本机记忆。
 
 ### 3.3 Capability 接口扩展
 
@@ -489,25 +487,9 @@ class NavigationCapability(
 
 **端侧保留**：仅 Qwen3-VL-2B VLM 打标（`LocalLlmEngine` 仅存 `imageInference`，TAG Pass3）、Florence-2 打标、人脸检测（`:engines:mnn-core`）、OPUS-MT 翻译（`:engines:sentencepiece`）——均为媒体/视觉处理，不承担文本对话与指令解析。
 
-**演进脉络**：ADR-005（本地/远程协议分离，2026-06）→ 本地收缩与链路隔离（2026-07~08，相关 ADR-009/010 已删除，历史见 git）→ 2026-08-02 端侧文本 LLM 移除、本地链路整体删除（commit 2fb1f299e）→ 2026-08 langchain4j fork 迁移 Koog、`:agent-core` 删除（commit 1cbe9353）。
+### 4.2 端侧推理现状：仅视觉/媒体处理
 
-**历史对比（ADR-005 时期，本地列已删除）**：
-
-| 维度 | 本地推理（已删除） | 远程推理（现状唯一链路） |
-|------|---------|---------|
-| **协议** | 自定义 JSON 数组 | 标准 OpenAI Chat Completions API |
-| **Library** | 无第三方依赖 | Koog (OpenAILLMClient) |
-| **Prompt** | 精简、结构化 | 自然语言 + Tool Schema |
-| **输出解析** | 简单 JSON 数组解析 | 标准 JSON 反序列化（tool_calls） |
-| **约束方式** | JSON 数组格式 Prompt 约束 | OpenAI 原生协议约束 |
-| **聊天/闲聊** | 通过 text_reply 命令兜底 | 原生支持（流式 + 多轮） |
-| **Strategy** | L1 Cache / L2 Batch | L2 Batch / L3 Plan / L4 Chat |
-| **延迟** | < 600ms | 500ms-2s |
-| **隐私** | 敏感数据本地处理 | 媒体文件不出端；文本/元数据可远程（[PRIVACY]） |
-
-### 4.2 端侧推理现状：仅 VLM 打标（原 Qwen3.5-2B 选型已废止）
-
-端侧不再运行任何文本 LLM。保留的端侧推理均为视觉/媒体处理：
+端侧不运行任何文本 LLM。保留的端侧推理均为视觉/媒体处理：
 
 | 引擎 | 用途 | 模块 |
 |------|------|------|
@@ -517,11 +499,6 @@ class NavigationCapability(
 | NIMA / eDifFIQA（ONNX，NNAPI 加速） | 人物封面美学/人脸质量打分（`NimaScorer`/`EdiffiqaScorer`/`CoverSelector`） | `:androidApp` `domain/aesthetic/` |
 | OPUS-MT（SentencePiece） | 翻译（与 LLM 无关） | `:engines:sentencepiece` |
 
-**原 Qwen3.5-2B 端侧文本推理选型（历史记录，2026-06-12 验证，已随模型删除而废止）**：
-
-- 不推荐完整 ReAct：2B 模型 COT（链式思考）能力弱，Thought 质量不稳定；AI 对话页 < 500ms 首字延迟的 `[PERF]` 红线多轮推理无法满足；端侧电池/发热敏感。
-- 端侧能力边界：单条 Function Calling 已验证（准确率 > 90%）；简单 Batch FC（2-3 条）部分支持；复杂组合指令、上下文推理、开放式闲聊不支持——这些短板正是最终移除端侧文本 LLM、全面转向远程 tool_calls 的原因。
-
 ### 4.3 远程推理模式选型
 
 远程模式下**减少 LLM 调用次数**比端侧更重要（RTT 成本主导）。
@@ -530,7 +507,6 @@ class NavigationCapability(
 
 | 层级 | 模式 | 适用场景 | 协议 | 输出格式 | 执行位置 |
 |------|------|---------|------|---------|---------|
-| Layer 1 | 本地规则缓存（已随 `IntentCache` 移除，2026-08-02） | — | — | — | — |
 | Layer 2 | Batch Function Calling | 简单连续动作指令（2-3 步） | OpenAI Chat Completions + tool_calls | `ToolExecutionRequest[]` → `AgentCommand[]` | 远程 |
 | Layer 3 | Plan-and-Execute | 条件/依赖/多步骤 | OpenAI Chat Completions + tool_calls | `ExecutionPlan` (含 command 字段) | 远程规划 + 本地执行 |
 | Layer 4 | 流式 Chat | 开放式对话、闲聊 | OpenAI Chat Completions (stream=true) | 文本流 + 可选 tool_calls | 远程 |
@@ -988,5 +964,4 @@ class AiAgentUseCase(
 - [VOICE_STACK.md](03-TECHNICAL-SPECS/VOICE_STACK.md) — 语音栈
 - [IM_REMOTE_CONTROL_TECH_SPEC.md](03-TECHNICAL-SPECS/IM_REMOTE_CONTROL_TECH_SPEC.md) — IM 远程控制技术规范
 - `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/` — 源码目录（Agent 编排层：AgentOrchestrator、CapabilityRegistry、PrivacyGuard、MemoryManager、SceneManager 等；平台实现见 `shared/src/androidMain/`）
-- ~~`agent-core/src/main/java/com/mamba/`~~ — `:agent-core` 已删除（2026-08 迁移至 JetBrains Koog 外部依赖）
 - `androidApp/src/main/java/com/mamba/picme/domain/usecase/AiAgentUseCase.kt` — Facade 桥接层

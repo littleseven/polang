@@ -24,7 +24,7 @@
 | `AndroidManifest` | 移除 `AgentTestActivity` + `AgentTestBroadcastReceiver` 注册 | — |
 | commands | `.claude/commands/agent-test.md`、`qa-acceptance.md` | `ui-driver.md` |
 | scripts | `scripts/agent-tester`、`regression-test.sh`、`scripts/tests/`（JSON 用例） | — |
-| docs | `docs/06-QA/QA_EXECUTION_CHECKLIST.md` | `PERFORMANCE_BASELINE_REPORT.md` |
+| docs | 06-QA 下 QA 执行清单（已随本决策删除） | `PERFORMANCE_BASELINE_REPORT.md` |
 | 索引 | `.claude/CLAUDE.md`（25→22）、`CLAUDE.md`（Useful Scripts）、`AI_TOOLS.md` | — |
 
 **明确保留（不属「测试方法」）**：`scripts/test_*.py` / `test_*.sh`（deepseek/mnn/florence 等模型评测脚本）——属模型实验，用户确认暂不清理。归档源 `.qoder/skills/`（项目已声明不再维护）不动；`CHANGELOG.md` 历史记录不动。

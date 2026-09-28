@@ -1,10 +1,11 @@
 # polang AI Agent 系统：唯一事实来源 (SSOT)
 
-> **版本**：2.5（瘦身版）  
+> **版本**：2.6（治理机制版）  
 > **状态**：生效中  
-> **最后更新**：2026-09-27  
+> **最后更新**：2026-09-28  
 > **维护者**：项目开发者  
 >
+> 2026-09-28 更新：新增 §4.3 活文档×过程文档「单向引用 + 沉淀管线」机制（治理总纲：系统性/结构性/简洁性/准确性 > 兼容性/过程性）；check_doc_sync.py 新增第 5/6 项检查强制执行。
 > 2026-09-27 更新：文档瘦身——删除头部历史更新日志与 §7 架构说明中的模块级细节（模块结构/依赖链由根 `CLAUDE.md` 承载，实现细节由各模块 `AGENTS.md` 与技术专项文档承载）；Koog 远程协议接入坑位移至 `shared/AGENTS.md` §2；删除与 §4.1/§6.2 重复的附录 B。git 历史可查全部被删内容。
 
 > 本文档为**顶层治理文档**，定义 Agent First 的研发规范。
@@ -220,6 +221,20 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 
 **收益**：需求→任务→代码的转换自动化，减少信息损耗。
 
+### 4.3 活文档 × 快照 × 过程文档：单向引用 + 沉淀管线（2026-09-28 定）
+
+治理总纲：**系统性、结构性、简洁性、准确性 优先于 兼容性、过程性**。三类体系——
+
+- **活文档**（长期事实 SSOT，随代码持续维护）：`PRODUCT.md` / `FEATURES.md` / ADR / `03-TECHNICAL-SPECS` / 模块 `AGENTS.md` / `08-UI-SPECS` / `07-STANDARDS`。
+- **快照**（结论性系统快照：某时点的审计/评估/调研结论，日期命名，不随代码维护）：`docs/reviews/`。被新快照取代或结论收编活文档后删除；入 main 须登记白名单。
+- **过程文档**（AI 协作工作流产物，随时可删、git 即归档）：`docs/superpowers/{plans,specs}` / `docs/06-QA`（含 ios-follow 批次验收）。交付即按沉淀管线落位删除。
+
+三条铁律：
+
+1. **引用单向**：活文档只引用活文档与**在册快照**，禁止指向过程目录。例外：AGENTS.md §7 / PRODUCT.md 可索引「在途活跃 spec」（以 `docs/superpowers/README.md` §6 白名单为准，交付即摘除）。提及在途工作写 spec 名/分支名，不写路径。
+2. **交付沉淀管线（DoD）**：spec/plan 交付合 main 前，结论按类型落位——决策→ADR、交互→`FEATURES.md`、实现约束→模块 `AGENTS.md` / `AGENT_ARCHITECTURE.md`、技术链路→TECH_SPEC、UI→`08-UI-SPECS`、术语→GLOSSARY；落完 `git rm` 过程文档本体，不留「已随交付清理」过渡标注。值得长期参考的结论性观测/评估可落 `docs/reviews/` 快照（登记制）。
+3. **门禁自动化**：`scripts/check_doc_sync.py` 第 5/6 项检查强制执行（ai-gate 每次提交跑）：活文档引用过程文档即 FAIL；`docs/reviews` 新快照入 main 即 FAIL，须显式登记白名单。
+
 ---
 
 ## 5. 全局红线（不可突破）
@@ -274,7 +289,7 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **工程师任务卡（P1+任务中心已落地，渲染层改 HTML）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（任务卡 + 任务中心页，Muse 范式；US-4~6 回联待 P2 网关改造） |
 | **HTML 卡双形态 + 任务卡 HTML 化（H1 已合 main）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器；H2 任务卡 L1 模板 HTML 化待做；设计稿 Ardot `HtmlCard` 页 8 帧） |
 | **用户任务协议 + 任务中心双 Tab（M1 已落地）** | `docs/superpowers/specs/2026-09-26-user-task-protocol-design.md`（`UserTask` 协议 + 混合注册表（Room 元数据 + 内存进度）+ 任务中心双 Tab；M1 = TAG 扫描 + 模型下载，实现见 `androidApp` `domain/usertask/`；M2/M3 = 去重/美学/重聚类） |
-| **任务范式定位升格** | `docs/superpowers/specs/2026-09-26-task-paradigm-positioning-design.md`（PRODUCT.md v3.1 §6.6 任务范式线 + Muse Top5 落位；调研来源 `docs/reviews/2026-09-25-meta-muse-feature-research.md`） |
+| **任务范式定位升格** | `docs/superpowers/specs/2026-09-26-task-paradigm-positioning-design.md`（PRODUCT.md v3.1 §6.6 任务范式线 + Muse Top5 落位） |
 | **产品定义** | `PRODUCT.md` |
 | **交互规范** | `docs/01-PRODUCT/FEATURES.md` |
 | **★ AI 协作产物 SSOT** | `docs/superpowers/README.md`（Plans / Specs 唯一事实来源，四工具共同遵守） |

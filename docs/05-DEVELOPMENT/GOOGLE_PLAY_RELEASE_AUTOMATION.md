@@ -171,6 +171,6 @@ git tag v1.0.37 && git push origin v1.0.37                # tag 触发 release.y
 
 ## 7. 相关文档
 
-- 商店文案与 ASO：`google-play-listing/README.md`（含迁移说明）、`google-play-listing/keyword-ledger.md`（关键词台账 SSOT；原 ASO 设计 spec 已随交付清理，git 历史可查）
+- 商店文案与 ASO：`google-play-listing/README.md`（含迁移说明）、`google-play-listing/keyword-ledger.md`（关键词台账 SSOT）
 - 构建与签名：`scripts/build.sh` 头注释、`androidApp/build.gradle.kts` signing 段
 - 版本发布：`scripts/release-automation.sh` 头注释

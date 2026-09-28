@@ -6,7 +6,6 @@
 > **最后更新**: 2026-08-03  
 > **维护者**: [RD] 全栈工程师  
 >
-> **历史合并说明**：本文档由以下 3 份文档合并而成：`WAKE_WORD_OPTIMIZATION.md`、`WAKE_WORD_DEPLOYMENT.md`、`KWS_MIGRATION_TECH_SPEC.md`。内容已按「当前唤醒词实现 → 部署验收 → KWS 迁移规划」重组，并消除重复内容。  
 > 2026-07-08 再次合并 `ASR_LANGUAGE_MODEL_EXPLANATION.md` 作为附录「ASR Language Model 说明」，并去除重复元信息头。  
 > 2026-08-03 更新：Phase 2（Sherpa-ONNX KWS）已全面落地——ASR 引擎切换为 `SherpaOnnxAsrEngine`（`com.k2fsa.sherpa.onnx.OnlineRecognizer`），KWS 唤醒经 `KeywordSpotterEngine` + `KwakeWordKwsEngine` 集成进 `VoiceCommandCoordinator`，`llm_models.json` 已含 `type:"KWS"` 模型。§4 由「迁移规划」更新为「已实施」记录。
 

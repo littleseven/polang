@@ -2,7 +2,7 @@
 
 > **日期**: 2026-09-25
 > **来源**: 「儿子的照片」无横滑卡片事故复盘（当日真机日志 + chat/llm_log 双库交叉定位，根因见 §1.1）。用户定方向：①「意图理解和路由存在问题，请系统性提出解决方案，不要单点处理」；②「专门搞一个意图理解和路由的 LLM 接口/模块」。
-> **上游**: `AGENT_ARCHITECTURE.md` §2.4.4（意图理解）、`CAPABILITY_REGISTRY.md`（命令路由 SSOT）、ADR-008（隐私红线）、ADR-014（RENDER_RICH_HTML 渲染基线，已合 main）、`shared/.../intent/IntentGuard.kt`（既有确定性守卫层先例）
+> **上游**: `AGENT_ARCHITECTURE.md` §2.4.4（意图理解）、`CAPABILITY_REGISTRY.md`（命令路由 SSOT）、ADR-008（隐私红线）、ADR-016（RENDER_RICH_HTML 渲染基线，已合 main）、`shared/.../intent/IntentGuard.kt`（既有确定性守卫层先例）
 > **状态**: M1（止血：工具面对齐 + 矛盾规则重写 + 回合护栏 a/c）与 M2（路由器主干：契约表/IntentRouter/ChatRoutingPolicy/RemoteChatEngine 接线/路由审计落库）已实施并编译测试通过（2026-09-26，`feat/intent-router` 分支）；决策记录见 ADR-015。M2 验收中的真机 eval 与线上观测项为遗留（需真机与线上数据，见 §6）。
 > **评审**: 2026-09-25 GLM 交叉审查（对照代码实证），决议已回写：串行路由加本地信号门控 + 1.5s 硬超时 + 失败分类降级（§3.2）；M1 护栏触发条件与 ids→asset 水合写明（§3.5）；search_media 诊断修正为「@Tool 未透传引擎既有 person 能力」（§1.2/§3.4）；幻觉拦截改结构性信号、不做文本匹配（§3.5-b）；M2 验收去循环论证（§6）；行号/工具数勘误（§1.2）
 
@@ -94,7 +94,7 @@ data class IntentDef(
 - **规则由表生成/校验**：`ChatPromptRules` 的路由相关节从本表派生；CI 一致性测试保证「同一意图的 ruleText 与 allowed/forbidden 不互斥」——L41 vs L62 类矛盾在设计上不可能再发生。
 - 与 `CAPABILITY_REGISTRY.md`（命令路由 SSOT）同构，形成代码+文档双层 SSOT。
 - 意图初版 10 个（见上枚举）；`slots` 统一定义：`person? / fromMs? / toMs? / label? / constraint? / mediaId?`。
-- **`RENDER_RICH_HTML` 基线**：render_html 通路已合 main（2026-09-25，89270e0a4：离线沙箱 WebView + 卡片内直接交互 + ResizeObserver 高度跟随 + `<a>` 外链全屏落地页，详见 ADR-014 修订注记与 `JS_ENGINE_TECH_SPEC.md` §7.1）；契约表登记以 main 为实现基线。隐私语义（ADR-008 × ADR-014）：模型只产出 HTML 结构与本地资产引用，图片/渲染全部端侧解析，媒体文件永不出端。
+- **`RENDER_RICH_HTML` 基线**：render_html 通路已合 main（2026-09-25，89270e0a4：离线沙箱 WebView + 卡片内直接交互 + ResizeObserver 高度跟随 + `<a>` 外链全屏落地页，详见 ADR-016 修订注记与 `JS_ENGINE_TECH_SPEC.md` §7.1）；契约表登记以 main 为实现基线。隐私语义（ADR-008 × ADR-016）：模型只产出 HTML 结构与本地资产引用，图片/渲染全部端侧解析，媒体文件永不出端。
 
 **混合意图原则——按「最终产出物」分类，不按「动作清单」分类**。路由器判定的是 deliverable（用户最终要什么形态的东西），动作是原料：
 

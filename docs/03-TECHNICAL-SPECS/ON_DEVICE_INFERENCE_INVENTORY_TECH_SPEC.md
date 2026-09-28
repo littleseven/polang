@@ -207,7 +207,6 @@ OPUS-MT 原始训练基于 SentencePiece，但导出的 ONNX 模型输入/输出
 | **Swap PSS 暴涨** | 2.33GB Swap | 内存压力触发系统换页 | 渲染卡顿、发热 |
 | **CameraX ImageReader 缓冲** | Native Heap 1.72GB 基线 | 1280×720 多帧缓冲 + GPU 纹理 | 即使无模型也占用偏高 |
 
-> 历史参考：`06-QA/perf_trace_2026-06-06_ncnn_llm_comparison.md`（历史文件名，含 NCNN 基线）记录了文本 LLM 时期的数据：开启本地 LLM 后 Native Heap 从 1.72GB → 3.61GB，Swap 从 54MB → 2.33GB，Janky frames 从 0.89% → 18.42%。文本 LLM 移除后此瓶颈已解除。
 
 ### 5.2 计算瓶颈（P1）
 
@@ -352,9 +351,7 @@ OPUS-MT 原始训练基于 SentencePiece，但导出的 ONNX 模型输入/输出
 - `docs/03-TECHNICAL-SPECS/TAG_GENERATION.md` — TAG 性能瓶颈分析
 - `docs/03-TECHNICAL-SPECS/GALLERY_SEARCH.md` — 相册自然语言搜索（含 MobileCLIP 语义召回）
 - `docs/03-TECHNICAL-SPECS/TAG_GENERATION.md` — TAG 国际化与 OPUS-MT 翻译回退
-- `docs/reviews/2026-07-05-opus-mt-translation-validation.md` — OPUS-MT 端侧推理验证记录
 - `docs/03-TECHNICAL-SPECS/VOICE_STACK.md` — KWS 唤醒词迁移
-- ~~`docs/06-QA/perf_trace_2026-06-06_ncnn_llm_comparison.md`~~ — LLM 开启前后性能对比（已删，commit 412dd27c1，git 历史可查；历史文件名，含 NCNN 基线）
 - `androidApp/src/main/res/raw/llm_models.json` — 模型清单与下载配置
 - `androidApp/src/main/java/com/mamba/picme/features/settings/AGENTS.md` — 模型中心与设置
 

@@ -6,6 +6,8 @@ Document Sync Guardian - 文档一致性自动检查器
 2. "进行中" vs "已落地" 状态标记不一致
 3. 无效的内部链接
 4. spec/plan/design/adr 文档散逸门禁（集中管理，见 docs/00-INDEX.md 文档地图）
+5. 活文档 → 过程文档 单向引用门禁（AGENTS.md §4.3 三分类：活文档/快照/过程文档）
+6. docs/reviews 快照登记（结论性快照准入制，AGENTS.md §4.3）
 """
 
 import os
@@ -221,7 +223,7 @@ APPROVED_DOC_DIRS = (
     "docs/01-PRODUCT/",            # 产品规格（NFR_SPEC 等）
     "docs/08-UI-SPECS/",           # 双端 UI 契约（原根 specs/，2026-08-23 迁入）
     "docs/superpowers/",           # AI 协作在途 spec/plan（交付即清理）
-    "docs/reviews/",               # 时间点快照
+    "docs/reviews/",               # 结论性快照（登记准入，AGENTS.md §4.3）
     ".claude/agents/",             # 工具配置（planner 等 agent 定义，非项目文档）
     ".claude/commands/",
     ".qoder/agents/",              # Qoder 工具配置（planner 等 agent 定义，非项目文档）
@@ -273,6 +275,103 @@ def check_doc_drift() -> list:
     return issues
 
 
+# ---------------------------------------------------------------------------
+# 检查 5：活文档 → 过程文档 单向引用门禁（2026-09-28 机制，AGENTS.md §4.3）
+# 三分类：活文档（过程命名空间之外的一切 .md）/ 快照（docs/reviews 结论性
+# 系统快照，登记准入）/ 过程文档（docs/superpowers + docs/06-QA）。
+# 活文档可引用活文档与在册快照；引用过程产物路径即 FAIL。
+# ---------------------------------------------------------------------------
+PROCESS_DIRS = ("docs/superpowers/", "docs/06-QA/")
+
+REVIEWS_WHITELIST = {
+    "2026-08-10-ios-android-consistency-gap.md":
+        "PARITY 现行差异审计快照（PARITY_MASTER_PLAN/skills 引用）",
+    "2026-08-10-kmp-best-practices-architecture-review.md":
+        "KMP 路线评估快照（含行动项，AGENTS.md §7 引用）",
+}
+
+PROCESS_REF_PATTERN = re.compile(
+    r"(?:docs/)?(?:\.\./)*(?:docs/)?"
+    r"(superpowers|reviews|06-QA)/([\w\-./]+\.(?:md|html|yaml))"
+)
+
+
+def _superpowers_whitelist() -> set:
+    """docs/superpowers/README.md §6 的在途/活跃 spec 白名单（活文档可引用集）"""
+    names = {"README.md"}  # 白名单登记处与机制说明本身
+    readme = PROJECT_ROOT / "docs" / "superpowers" / "README.md"
+    if readme.exists():
+        text = readme.read_text(encoding="utf-8")
+        m = re.search(r"## 6\.[^\n]*\n(.*?)(?=\n## )", text, re.S)
+        if m:
+            names |= set(re.findall(r"`([\w\-./]+\.md)`", m.group(1)))
+    return names
+
+
+def _tracked_files():
+    """git 追踪文件集合（非 git 环境返回 None，调用方回退全量扫描）"""
+    try:
+        out = subprocess.run(
+            ["git", "ls-files"], cwd=PROJECT_ROOT, capture_output=True,
+            text=True, check=True,
+        ).stdout
+        return set(out.splitlines())
+    except Exception:
+        return None
+
+
+def check_one_way_references() -> list:
+    """活文档禁止指向过程目录（白名单例外；AGENTS.md §4.3 引用单向铁律）"""
+    issues = []
+    sp_whitelist = _superpowers_whitelist()
+    tracked = _tracked_files()
+    md_files = [
+        f for f in PROJECT_ROOT.rglob("*.md")
+        if not is_excluded(f.relative_to(PROJECT_ROOT))
+    ]
+    for md_file in md_files:
+        rel = md_file.relative_to(PROJECT_ROOT).as_posix()
+        if any(rel.startswith(d) for d in PROCESS_DIRS):
+            continue  # 过程命名空间内部互引不受限（docs/reviews 快照照常扫描）
+        if tracked is not None and rel not in tracked:
+            continue  # 未追踪草稿不拦（并行会话在途稿；提交边界由 CI 把关）
+        content = md_file.read_text(encoding="utf-8")
+        for m in PROCESS_REF_PATTERN.finditer(content):
+            ns, name = m.group(1), Path(m.group(2)).name
+            if ns == "superpowers" and name in sp_whitelist:
+                continue
+            if ns == "reviews" and name in REVIEWS_WHITELIST:
+                continue
+            issues.append(
+                f"  [过程引用] {rel}: 指向过程文档 '{m.group(0)}'"
+                f"（AGENTS.md §4.3 单向引用：结论收编活文档，不留过程路径）"
+            )
+    return issues
+
+
+def check_reviews_whitelist() -> list:
+    """git 追踪的 docs/reviews 快照必须显式登记白名单（未追踪的在途稿不拦）"""
+    issues = []
+    try:
+        tracked = subprocess.run(
+            ["git", "ls-files", "docs/reviews"], cwd=PROJECT_ROOT,
+            capture_output=True, text=True, check=True,
+        ).stdout.splitlines()
+    except Exception:
+        return issues  # 非 git 环境跳过本检查
+    for path in tracked:
+        name = Path(path).name
+        if not (PROJECT_ROOT / path).exists():
+            continue  # 已从工作区删除、待暂存的历史项不重复报
+        if name not in REVIEWS_WHITELIST:
+            issues.append(
+                f"  [快照未登记] {path}: docs/reviews 为结论性快照目录"
+                f"（登记准入制）——结论收编活文档或被新快照取代后应删除；"
+                f"确需保留请在 check_doc_sync.py REVIEWS_WHITELIST 登记理由"
+            )
+    return issues
+
+
 def main():
     print("🤖 Document Sync Guardian")
     print("=" * 50)
@@ -318,6 +417,26 @@ def main():
             print(issue)
     else:
         print("   ✅ 无散逸文档")
+
+    print("\n🔍 检查 5: 活文档→过程文档 单向引用门禁...")
+    issues = check_one_way_references()
+    if issues:
+        all_issues.extend(issues)
+        print(f"   ⚠️  发现 {len(issues)} 个问题")
+        for issue in issues:
+            print(issue)
+    else:
+        print("   ✅ 活文档无过程目录引用")
+
+    print("\n🔍 检查 6: docs/reviews 快照登记...")
+    issues = check_reviews_whitelist()
+    if issues:
+        all_issues.extend(issues)
+        print(f"   ⚠️  发现 {len(issues)} 个问题")
+        for issue in issues:
+            print(issue)
+    else:
+        print("   ✅ reviews 目录在册")
 
     print("\n" + "=" * 50)
     if all_issues:

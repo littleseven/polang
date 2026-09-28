@@ -1,7 +1,7 @@
 # iOS 文档索引（前门）
 
 > **定位**：iOS 端文档的单一入口。2026-08-10 整合后冗余/历史文档已删除（git 历史可恢复），只保留活文档 SSOT。进度以 **origin/main** 为准，未合并分支标「in-flight」。
-> **2026-09-27 纯索引化**：规模数字唯一出处 = [`IOS_TASK_STATUS.md`](IOS_TASK_STATUS.md) 规模锚点；模块状态唯一出处 = [`IOS_PRODUCT_REFERENCE.md`](IOS_PRODUCT_REFERENCE.md)；本文件不再维护状态快照与删除档案（原 §2/§3 见 git 历史，整合留痕：[`../reviews/2026-08-10-ios-doc-consolidation-audit.md`](../reviews/2026-08-10-ios-doc-consolidation-audit.md)）。
+> **2026-09-27 纯索引化**：规模数字唯一出处 = [`IOS_TASK_STATUS.md`](IOS_TASK_STATUS.md) 规模锚点；模块状态唯一出处 = [`IOS_PRODUCT_REFERENCE.md`](IOS_PRODUCT_REFERENCE.md)；本文件不再维护状态快照与删除档案（原 §2/§3 见 git 历史）。
 
 ## §1 活文档（现行事实来源，须保持最新）
 

@@ -2,12 +2,9 @@
 
 > **文档编号**: TECH-SPEC-MNN-VLM-OPS-001  
 > **关联模块**: `:shared`（LocalLlmEngine/MnnLlmClient 在 androidMain，AgentOrchestrator/AgentConfigurator 在 commonMain facade）, `:engines:mnn-core` (MnnResourceManager), `:engines:agent-native`（libagent_native.so JNI 桥构建）, `:androidApp` (MediaPager, TagGenerationScheduler)  
-> **最后更新**: 2026-08-03  
 > **维护者**: 项目开发者  
 >
-> **变更说明（2026-08）**：端侧**文本** LLM（Qwen3.5-2B 聊天/指令模型）已移除（`AiAgentMode.LOCAL`、`LocalCameraAgent`/`LocalInferencePipeline`/`LocalCommandParser`/`LocalPromptBuilder` 全部删除）。`LocalLlmEngine` 现仅服务 **VLM 打标**（Qwen3-VL-2B `imageInference`）；相机 AI 指令改走远程 tool_calls（`AgentOrchestrator.processCameraInput` + `CameraToolService`）。MNN-LLM 运行时（`libMNN.so` + `libmnn_llm.so` + `MnnLlmClient` + `libagent_native.so` JNI 桥）仍保留，用于 VLM 图像推理。
->
-> **历史合并说明**：本文档由以下 5 份文档合并而成：`MNN_LLM_MULTI_INSTANCE_RESEARCH.md`、`MNN_LLM_PERFORMANCE_OPTIMIZATION.md`、`MNN_RESOURCE_MANAGER_DESIGN.md`、`MNN_UNLOAD_TRIGGER_MECHANISM.md`、`MNN_UNLOAD_TEST_CASES.md`。内容已按「架构与单例安全 → 资源管理器 → 加载/卸载触发机制 → 性能优化 → 测试用例」重组，并消除重复内容。原文档面向通用 MNN-LLM 运维；2026-08 更新后聚焦于 VLM 打标引擎运维。
+> **范围**：`LocalLlmEngine` 服务 **VLM 打标**（Qwen3-VL-2B `imageInference`）；相机 AI 指令走远程 tool_calls（`AgentOrchestrator.processCameraInput` + `CameraToolService`）。MNN-LLM 运行时（`libMNN.so` + `libmnn_llm.so` + `MnnLlmClient` + `libagent_native.so` JNI 桥）用于 VLM 图像推理。
 
 ---
 
@@ -29,8 +26,6 @@
 | 2 | `TagGenerationScheduler.kt:1116`（私有 `ensureModelLoaded`） | `orchestrator.localModelService.ensureModelLoaded(...)`（:1146 OpenCL / :1169 CPU 回退） | Pass 3 打标 | :316 / :345 / :398 / :1508 / :1580（`prepareTaggerModel`）全走此私有封装 |
 | 3 | `OpenClGuardian.kt:211` | `orchestrator.localModelService.ensureModelLoaded(...)` | OpenCL warmup | Guardian 内部检查 |
 | 4 | `TagScanOrchestrator.kt:672-673` | 委托 `scheduler.executeImageTagging`（内部 ensureModelLoaded） | 后台标签扫描 Pass 3 | 不直接触模型 |
-
-已失效调用点（历史参考）：~~`ChatViewModel.kt:583`~~ / ~~`AiAgentUseCase.kt:157`~~（文本 LLM 删除，聊天/Agent 改远程 tool_calls）；~~`AgentOrchestrator.loadModel()`~~（facade 已移除，见 §1.3）；~~`ImageTagIndexingWorker.kt:209`~~（文件已不存在，TAG 域现为 `domain/tag/scan/TagScanOrchestrator.kt`）；~~`MediaPager.kt:400`~~（MediaPager 已无任何 loadModel 调用）。
 
 **关键事实**：所有调用最终汇聚到 `AgentConfigurator` 持有的**同一个** `LocalLlmEngine` 实例（接口视图 `ImageInferenceEngine`，经 `LocalModelService.getLlmEngine()` 暴露，`LocalModelService.kt:71`）；androidApp TAG 域经组合根 `AndroidAgentComposition.localLlmEngine` 取同一实例的具体类型。
 
@@ -148,13 +143,11 @@ PoLang 使用 MNN 3.5.0 统一构建的 `libMNN.so`，当前承载两个独立�
 | **VLM 打标** | `MNN::Transformer::Llm` | Qwen3-VL-2B（INT4）约 1.5-2.5GB | 加载后常驻，仅响应内存压力卸载 |
 | **MNN 人脸检测** | `MNN Interpreter`（beauty-engine `MnnRoiDetector` / `MnnLandmarkDetector`） | 约 50-70MB | 相机页场景绑定，离开相机页延迟卸载 |
 
-> **注意**：语音栈已迁移至 Sherpa-ONNX（见 [VOICE_STACK.md](03-TECHNICAL-SPECS/VOICE_STACK.md)），ASR 不再依赖 `libMNN.so`，`SherpaOnnxAsrEngine` 也明确**不再接入 `MnnResourceManager` / `MnnGlobalReleaseLock`**（引用计数协调机制中已无 ASR 一方）。`libMNN.so` 的共享方为 VLM 打标与 MNN 人脸检测。历史上的「VLM + ASR 共享协调」设计见下文标注的历史小节，保留用于理解 `MnnResourceManager` 的演进。
+> **注意**：语音栈为 Sherpa-ONNX（见 [VOICE_STACK.md](03-TECHNICAL-SPECS/VOICE_STACK.md)），ASR 不依赖 `libMNN.so`，`SherpaOnnxAsrEngine` 不接入 `MnnResourceManager` / `MnnGlobalReleaseLock`。`libMNN.so` 的共享方为 VLM 打标与 MNN 人脸检测。
 
-### 2.2 核心冲突（历史）
+### 2.2 核心冲突
 
-`MNN::Transformer::Llm::destroy()` 在释放 LLM 独占内存时，会触及 MNN 全局内存分配器状态，导致**同一进程内仍在运行的 Sherpa-MNN ASR 崩溃**（历史问题，ASR 已迁移至 Sherpa-ONNX，不再依赖 MNN）。
-
-> **当前对应关系**：同类冲突如今存在于 **VLM 打标 ↔ MNN 人脸检测** 之间——两者共享 `libMNN.so` 全局分配器，一方释放时若另一方仍在推理，同样可能触发 use-after-free。`MnnGlobalReleaseLock` 与引用计数协调即为解决此问题。
+**VLM 打标 ↔ MNN 人脸检测**共享 `libMNN.so` 全局内存分配器：一方释放独占内存（`MNN::Transformer::Llm::destroy()` 触及全局分配器状态）时若另一方仍在推理，可能触发 use-after-free。`MnnGlobalReleaseLock` 与引用计数协调即为解决此问题。
 
 现有规避方案（`AgentOrchestrator.applySceneDrivenModelPolicy`）：
 
@@ -430,39 +423,6 @@ adb logcat -s "MnnResourceManager:*" "LocalLlmEngine:*" "SherpaOnnxAsr:*" -v tim
 | 模型 | 文件大小 | 运行时内存 | 配置路径 |
 |------|---------|-----------|---------|
 | **Qwen3-VL-2B**（INT4） | weight 1.4GB | ~1.5-2.5GB | `files/llm_models/qwen3_vl_2b/config.json` |
-
-> **历史参考**：端侧文本 LLM（Qwen3.5-2B，weight 1.8GB，~4.2GB 运行时内存）已于 2026-08 移除。以下 config 示例和优化分析保留作历史参考。
-
-#### 历史 config.json（Qwen3.5-2B 文本 LLM，已移除）
-
-```json
-{
-    "llm_model": "llm.mnn",
-    "llm_weight": "llm.mnn.weight",
-    "backend_type": "cpu",
-    "thread_num": 4,
-    "precision": "low",
-    "memory": "low",
-    "sampler_type": "mixed",
-    "mixed_samplers": ["penalty", "topK", "topP", "min_p", "temperature"],
-    "penalty": 1.1,
-    "temperature": 0.6,
-    "topP": 0.95,
-    "topK": 20,
-    "min_p": 0
-}
-```
-
-#### 当前问题
-
-| 问题 | 现象 | 根因 |
-|------|------|------|
-| ~~内存占用过高~~ | ~~Native Heap ~4.2GB~~ | ~~文本 LLM weight 1.8GB + KV Cache + 激活值~~（文本 LLM 已移除） |
-| ~~应用被 OOM Kill~~ | ~~相机预览 + LLM 同时运行时可能被杀~~ | ~~总 PSS 可能超过 LMK 阈值~~（文本 LLM 已移除） |
-| ~~渲染卡顿~~ | ~~Janky frames 增加~~ | ~~内存压力导致 Swap 换页，GPU 竞争~~（文本 LLM 已移除） |
-| ~~高温~~ | ~~CPU/GPU 可能发热~~ | ~~CPU 后端推理，未使用 GPU/NPU~~（文本 LLM 已移除） |
-
-> 以上问题均针对历史文本 LLM（Qwen3.5-2B）。VLM 打标（Qwen3-VL-2B INT4）内存占用约 1.5-2.5GB，远低于文本 LLM。
 
 ### 4.2 MNN-LLM 配置参数详解
 

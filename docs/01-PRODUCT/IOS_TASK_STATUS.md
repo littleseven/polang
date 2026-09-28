@@ -1,9 +1,9 @@
 # PoLang iOS 缺口与任务状态
 
 > **校准基线：v1.0.39 (10039) / 2026-09-20 / 事实来源=代码**
-> **2026-09-26 增量对账**（docs-only 批次，见 `../reviews/2026-09-26-ios-follow-docs-reconciliation.md`）：登记 Android 09-20 后交付产生的 parity 缺口 #13-16（任务体系 / 意图路由接线 / 上报问题入口 / 顶栏左对齐），iOS 代码未动
+> **2026-09-26 增量对账**（docs-only 批次）：登记 Android 09-20 后交付产生的 parity 缺口 #13-16（任务体系 / 意图路由接线 / 上报问题入口 / 顶栏左对齐），iOS 代码未动
 >
-> **定位**：只列**当前仍存在的真实缺口**与下一步任务，每项标注代码/commit 证据。已完成事项不罗列——验收事实见 `../reviews/`（2026-08-10 ~ 2026-09-16 共 10 篇 ios-follow 批次报告，最新 `2026-09-16-ios-follow-main-nav-memories.md` PASS）；产品现状全貌见 [`IOS_PRODUCT_REFERENCE.md`](IOS_PRODUCT_REFERENCE.md)。
+> **定位**：只列**当前仍存在的真实缺口**与下一步任务，每项标注代码/commit 证据。已完成事项不罗列——验收事实见 git 历史（ios-follow 批次报告已随交付清理）；产品现状全貌见 [`IOS_PRODUCT_REFERENCE.md`](IOS_PRODUCT_REFERENCE.md)。
 >
 > **规模锚点**（2026-09-20 实测）：iosApp 185 文件 / 41808 行 Swift + 5 metal shader；shared iosMain 28 文件 / 2507 行；测试 58 文件 / 8494 行；i18n 767 键 × 五语。
 
@@ -21,7 +21,7 @@
 | 6 | **编辑器两个降级项** | `Features/Editor/PhotoEditorScreen.swift` 头注：去背景顶栏按钮置灰（「敬请期待」toast）；BEAUTY 滑杆存档但渲染 DEFER | 去背景可直接复用 `Features/IdPhoto/MattingEngine.swift`（FUSION 已验收） |
 | 7 | **设置页备份恢复占位** | `Features/Settings/SettingsScreen.swift:537-542`「Coming Soon」（Android 已并入该页） | 备份/恢复通路未建 |
 | 8 | **chat refine_template 未接线** | 契约 `docs/08-UI-SPECS/screens/chat.yaml §15`；2026-09-16 批次审查登记 | 随下轮 chat 批次 |
-| 9 | **settings_menu_entry 未接线**（设置页「相册整理」一级入口） | 2026-09-16 批次审查登记（`../reviews/2026-09-16-ios-follow-batch-main-sync.md` 技术债） | 小项 |
+| 9 | **settings_menu_entry 未接线**（设置页「相册整理」一级入口） | 2026-09-16 批次审查登记（技术债） | 小项 |
 | 10 | **iOS 版本号未同步** | `iosApp/project.yml:34-35` MARKETING_VERSION 0.1.0 / CURRENT_PROJECT_VERSION 1（Android 已 1.0.39/10039） | 发布前必改 |
 | 11 | **聚类质量真机终验**（观察项，非阻塞） | ONNX embedder 已规避 MNN3.5 bug（`Platform/ORTFaceEmbedder.swift`）；全量重扫后聚类质量待真机观察（`scripts/ios_face_sim_diag.py`） | 真机任务 |
 | 12 | **iOS 测试跑批受宿主限制** | MNN.framework arm64-only 无 simulator slice → Intel 宿主模拟器链接失败；XCTest/UITest 全量+深浅双跑 SSIM 依赖真机（两篇 2026-09-16 报告「待真机终验」清单） | 流程项：真机在线后补跑 |
@@ -52,4 +52,4 @@
 ## §4 文档一致性注记
 
 - `IOS_DOC_INDEX.md` 已纯索引化（2026-09-27）：原 §2 删除档案与 §3 状态快照撤销——删除清单查 git 历史，状态事实 = 本文件规模锚点 + `IOS_PRODUCT_REFERENCE.md` 对照表。
-- 维护：缺口关闭即从 §1 删除（验收留痕归 `../reviews/`）；发现新漂移在对应行补证据。不收录纯 Android 侧变更。
+- 维护：缺口关闭即从 §1 删除（验收留痕入 `docs/06-QA/`，随线清理）；发现新漂移在对应行补证据。不收录纯 Android 侧变更。

@@ -333,31 +333,6 @@
 
 ---
 
-## 8. AutoTagCapability
-
-**职责**: 将标签系统作为 Agent 可编排的 Capability 暴露，支持触发全量标签扫描、查询照片标签、获取进度、取消扫描  
-**活跃场景**: `GALLERY`  
-**文件**: `androidApp/src/main/java/com/mamba/picme/domain/agent/capability/AutoTagCapability.kt`  
-**状态**: ⚠️ 代码存在但未注册
-
-> **注意（2026-08-03 核实）**：全工程无任何 `registerCapability(AutoTagCapability...)` 调用点，本 Capability 未注册到 `CapabilityRegistry`，其命令（`scan_all_tags` 等）在 GALLERY 场景运行时会 `METHOD_NOT_FOUND`。且其实现仍使用过时的执行模型（依赖 `AgentCommand.Unknown.raw` 文本匹配，非标准 sealed class 分发）。实际生效的标签扫描路径为 CHAT 场景的 `ChatStartTagScanCapability`（`start_tag_scan`）。本章节保留仅作历史参考。
-
-### 7.1 支持命令
-
-| 命令 | 参数 | 描述 | 示例 |
-|------|------|------|------|
-| `scan_all_tags` | - | 触发全量标签扫描 | "扫描所有照片标签" |
-| `get_photo_tags` | `photo_id: Long` | 查询指定照片的标签 | "查看这张照片的标签" |
-| `get_tag_progress` | - | 获取当前扫描进度 | "标签扫描进度" |
-| `cancel_tag_scan` | - | 取消当前扫描 | "取消标签扫描" |
-
-### 7.2 生命周期
-
-- **应用级**：委托给 `TagScanOrchestrator` 执行
-- 所有扫描统一走 orchestrator，确保与 UI 控制页进度同源
-
----
-
 ## 9. AiOptimizeCapability
 
 **职责**: AI 一键优化图片，分析照片场景并自动推荐美颜、滤镜、调节参数  
@@ -379,37 +354,6 @@
 
 - **应用级**：在 `Application.onCreate()` 中注册
 - 实际优化逻辑委托给 `AiOptimizeUseCase`
-
----
-
-## 10. RemoteControlCapability
-
-**职责**: IM 远程控制：管理设备绑定与远程命令执行状态  
-**活跃场景**: `ALL`  
-**文件**: `androidApp/src/main/java/com/mamba/picme/domain/agent/capability/RemoteControlCapability.kt`  
-**状态**: ⚠️ 代码存在但未注册；IM 远程控制实际走 RemoteChannel 多通道路径（未 Capability 化）
-
-> **注意（2026-08-03 核实）**：代码中无任何 `registerCapability` 调用点，本 Capability 实际未注册到 `CapabilityRegistry`（其 KDoc 声称的注册关系不存在）。IM 远程控制线本身已于 2026-07-27 重新激活（RemoteChannel 多通道：飞书 + Telegram，详见 `IM_REMOTE_CONTROL_TECH_SPEC.md`），但未按本文的 Capability 化设计落地。本章节保留仅作历史参考。
-
-### 9.1 支持命令
-
-**无 AgentCommand 路由命令**。`RemoteControlCapability` 不通过 `AgentCommand` 密封类分发命令；所有管理操作通过公开 API 由 `RemoteCommandDispatcher` 直接调用。
-
-`execute()` 始终返回 `METHOD_NOT_FOUND`。
-
-### 9.2 公开管理 API
-
-| API | 说明 |
-|-----|------|
-| `updateBinding(token, relayUrl, userId, deviceName)` | 更新设备绑定状态 |
-| `clearBinding()` | 清除设备绑定 |
-| `setAutoConfirm(enabled)` | 设置自动确认模式 |
-| `buildStatusString()` | 构建设备状态描述 |
-
-### 9.3 生命周期
-
-- **应用级单例（设计意图，实际未生效）**：原设计为在 `Application.onCreate()` 中创建注册，但代码中无对应注册调用，IM 远程控制线冻结后不再生效
-- 进程结束时 `onDestroy()` 清理状态
 
 ---
 
@@ -1168,60 +1112,6 @@ class CameraCapability {
 
 ### 4. 详细设计
 
-> ⚠️ **2026-07-29 单轨收敛**：`CapabilityHost` / `LocalCapabilityHost` / `ComposeCapabilityHost`
-> 已退役删除，`CapabilityRegistry` 是唯一注册表（应用级启动期注册、页面级随 Screen
-> register/unregister）。下文 §4.1 与 §5 迁移路径中的 CapabilityHost 内容保留为历史设计参考，
-> 现行注册方式见 §1 生命周期表、`PoLangApplication.initializeCapabilities()` 与 §4.2/§4.3 示例。
-
-#### 4.1 CapabilityHost（Capability 容器）——已退役（历史参考）
-
-```kotlin
-/**
- * Capability 宿主
- *
- * 管理当前作用域内所有 Capability 的注册和查询。
- * 支持层级查找：如果当前宿主找不到，会委托给父宿主。
- */
-class CapabilityHost(
-    private val parent: CapabilityHost? = null
-) {
-    private val capabilities = mutableMapOf<String, Capability>()
-
-    fun register(capability: Capability) {
-        capabilities[capability.name] = capability
-    }
-
-    fun unregister(capability: Capability) {
-        capabilities.remove(capability.name)
-    }
-
-    fun find(name: String): Capability? {
-        return capabilities[name] ?: parent?.find(name)
-    }
-
-    fun findForScene(scene: SceneManager.Scene): List<Capability> {
-        return capabilities.values.filter {
-            it.activeScenes().contains(scene) || it.activeScenes().isEmpty()
-        }
-    }
-}
-
-// Compose 集成
-val LocalCapabilityHost = compositionLocalOf<CapabilityHost> {
-    error("CapabilityHost not provided")
-}
-
-@Composable
-fun rememberCapabilityHost(vararg capabilities: Capability): CapabilityHost {
-    val parent = LocalCapabilityHost.current
-    return remember(capabilities) {
-        CapabilityHost(parent).apply {
-            capabilities.forEach { register(it) }
-        }
-    }
-}
-```
-
 #### 4.2 页面级 CameraCapability
 
 ```kotlin
@@ -1274,7 +1164,7 @@ fun CameraScreen(
     // 创建页面级 Capability
     val cameraCapability = remember { CameraCapability() }
 
-    // 注册到全局 CapabilityRegistry（唯一注册表，Compose CapabilityHost 已退役）
+    // 注册到全局 CapabilityRegistry（唯一注册表）
     val orchestrator = remember { AgentOrchestrator.getInstance(context.applicationContext) }
     DisposableEffect(cameraCapability) {
         orchestrator.registerCapability(cameraCapability)
@@ -1325,62 +1215,6 @@ class NavigationCapability(
     }
 }
 ```
-
-### 5. 迁移路径
-
-#### 5.1 阶段 1: 引入 CapabilityHost（向后兼容）
-
-```kotlin
-// 1. 添加 CapabilityHost 和 CompositionLocal
-// 2. 修改 CapabilityRegistry 支持从 CapabilityHost 查询
-// 3. CameraScreen 同时注册到单例和 CapabilityHost
-class CapabilityRegistry {
-    fun dispatch(command: AgentCommand, context: AgentContext): Result<AgentAction> {
-        // 优先从 CapabilityHost 查找
-        val host = LocalCapabilityHost.currentOrNull
-        val capability = host?.findForCommand(command)
-            ?: findCapabilityForCommand(command)
-        // ...
-    }
-}
-```
-
-#### 5.2 阶段 2: 移除单例（破坏性变更）
-
-```kotlin
-// 1. 移除 CameraCapability.getInstance()
-// 2. 移除 Application 中的 initializeCapabilities()
-// 3. MainActivity 创建 NavigationCapability 并注入
-// 4. 各 Screen 创建自己的 Capability
-```
-
-#### 5.3 阶段 3: 清理废弃代码
-
-```kotlin
-// 1. 移除 SceneManager 的引用计数机制
-// 2. 移除 CapabilityRegistry 的命令队列
-// 3. 移除所有 WeakReference delegate 模式
-```
-
-### 6. 内存影响评估
-
-| 指标 | 旧架构 | 新架构 | 变化 |
-|------|--------|--------|------|
-| 常驻 Capability 数 | 4（永不释放） | 1（Navigation） | -75% |
-| CameraCapability 内存占用 | 常驻 | 仅在相机页 | 按需分配 |
-| 匿名 Delegate 实例 | 1/页面（泄漏风险） | 0 | 完全消除 |
-| 命令队列轮询 | 500ms 间隔 | 无 | 节省 CPU |
-| SceneManager 引用计数 | 复杂 | 简单 | 降低复杂度 |
-
-### 7. 红线合规检查
-
-| 红线 | 合规状态 | 说明 |
-|------|----------|------|
-| [PRIVACY] | ✅ | 无变更 |
-| [PERF] | ✅ | 减少常驻内存和后台轮询 |
-| [I18N] | ✅ | 无变更 |
-| [DOC-SYNC] | ✅ | 本文档同步架构变更 |
-| [AGENT-FIRST] | ✅ | 显式生命周期、枚举状态、自描述类型 |
 
 ---
 

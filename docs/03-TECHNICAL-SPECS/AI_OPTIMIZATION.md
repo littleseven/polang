@@ -2,10 +2,7 @@
 
 > **文档类型**：产品 + 技术方案 + 参数标准  
 > **针对能力**：AI 一键优化（AI One-Click Image Optimization）  
-> **最后更新**：2026-08-03  
 > **维护者**：项目开发者  
->
-> **历史合并说明**：本文档由 `AI_ONE_CLICK_OPTIMIZATION_PROPOSAL.md` 与 `AI_OPTIMIZE_PARAMETER_STANDARD.md` 合并而成。参数预设以 `AI_OPTIMIZE_PARAMETER_STANDARD.md` 为准，已合并重复内容。
 
 ---
 
@@ -140,27 +137,6 @@ when {
    - 首次调用前弹窗告知「将上传压缩图片至云端模型，是否允许？」
    - 设置中提供「允许云端 AI 优化」开关
    - 不在云端存储用户图片
-
-### 3.4 ~~本地 Qwen3.5-2B 多模态作为离线 fallback~~（历史方案，已失效）
-
-> **2026-08 变更**：端侧文本 LLM（Qwen3.5-2B）已移除，本节的离线 fallback 方案不再可用。
-> 且原文描述有误——`TagGenerationPipeline` Pass 3 实际使用的是 Qwen3-**VL**-2B（MNN VLM 打标，现为备选 tagger，默认 Florence-2），并非 Qwen3.5-2B 文本模型。
-> 当前无网络时的实际降级行为：Fast 路径直接应用 `Scene.GENERAL` 本地预设（见 §3.2 实现现状注）。以下内容保留作历史参考。
-
-项目已有的 `TagGenerationPipeline` Pass 3 使用 Qwen3.5-2B 做图像理解。可探索复用该路径：
-
-- 输入：压缩图
-- 输出：场景标签 + 简短描述
-- 映射到本地预设
-
-**当前限制**：
-- 2B 模型输出 JSON 稳定性有限
-- 推理速度约 1-3s（取决于设备）
-- 功耗/发热较高
-
-**建议**：不作为默认路径，仅作为无网络且用户未禁用云端时的降级提示："当前无法使用智能推荐，已应用本地优化"。
-
----
 
 ## 4. 参数标准与预设规范
 
@@ -637,14 +613,13 @@ AI 优化已从「一次给值」升级为「抽卡闭环」（best-of-N + NIMA 
 
 - **链路**：`CandidateSampler` 以场景预设为锚点抽 4 候选 → `CandidateRenderer` 512px 渲染 → `OptimizeScorer` NIMA 评分 + 技术护栏（高光裁剪增量 5pp、亮度漂移 15%）→ 选优
 - **退化守卫**：最优候选 NIMA 分 ≤ 原图 + 0.05 时不推荐（previewedIndex=-1，保持原图预览），从机制上杜绝"越优化越差"
-- **先预览后应用（2026-08-06 修订）**：抽卡后进入对比模式——最优卡在编辑器主预览区全尺寸预览（复用 2048px 预览管线，不入撤销历史），底部候选条独占（面板/底栏隐藏、undo/redo 禁用）；点卡仅切预览，「应用」才入历史 + 落库 `user`，「关闭」回退原图 + 落库 `dismiss`
+- **先预览后应用**：抽卡后进入对比模式——最优卡在编辑器主预览区全尺寸预览（复用 2048px 预览管线，不入撤销历史），底部候选条独占（面板/底栏隐藏、undo/redo 禁用）；点卡仅切预览，「应用」才入历史 + 落库 `user`，「关闭」回退原图 + 落库 `dismiss`
 - **落库语义**：每组生成时自动落一条 `auto` 记录（NIMA 建议），「应用」/「关闭」再落 `user`/`dismiss` 记录——两组叠加是有意设计，Phase 2 可比对「NIMA 建议 vs 人选」差异
 - **降级链**：NIMA 模型未下载 → 退回固定预设直接应用（原行为）；批量优化不走抽卡
-- 设计/计划稿已随交付清理（2026-08-06 抽卡，git 历史可查），本节为现行事实源
 
 ---
 
-## Chat 页抽卡（2026-08-06）
+## Chat 页抽卡
 
 chat 内 AI 优化指令同样走抽卡闭环（复用 `optimizeWithGacha`，domain 引擎零改动）：
 结果以对话内候选卡条呈现（type=optimize_candidates 消息，metadata 存展示数据，
@@ -653,7 +628,6 @@ chat 内 AI 优化指令同样走抽卡闭环（复用 `optimizeWithGacha`，dom
 选中 recipe 写入 `ChatEditStateHolder` 支撑多轮 delta 续调。
 NIMA 不可用 / 缩略图落盘全失败时退回原固定预设单发路径。
 反馈经 `OptimizeFeedbackLogger` 落库（auto/user/dismiss），与编辑器抽卡共用 optimize_feedback 表。
-（设计稿已随交付清理，git 历史可查）。
 
 ---
 

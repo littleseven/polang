@@ -128,5 +128,4 @@ ADR-014 文件已删除，编号永久留空不复用（循 004/006/009/010 先�
 ## 6. 相关
 
 - 依赖：ADR-008（隐私红线）、ADR-011（ui-driver）、ADR-013（KMP 契约）
-- 调研存档：`docs/reviews/2026-09-26-chat-rendering-framework-research.md`（四家系统调研 + ChatGPT「RN」勘误）、`docs/reviews/2026-09-25-meta-muse-feature-research.md`（任务卡范式来源）
 - 任务卡产品线：`2026-09-25-engineer-task-card-design.md`（五态状态机）· UserTask 协议 2026-09-26

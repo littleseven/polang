@@ -1,7 +1,7 @@
 # 审批三要素卡——DESTRUCTIVE 批量删除聚合确认（Spec）
 
 > **日期**: 2026-09-26
-> **来源**: Muse 调研 P0 借鉴项 #2（`docs/reviews/2026-09-25-meta-muse-feature-research.md` §3.2）、PRODUCT.md §6.6 任务范式线 P0（「审批三要素卡：无前置，性价比最高」）
+> **来源**: Muse 调研 P0 借鉴项 #2、PRODUCT.md §6.6 任务范式线 P0（「审批三要素卡：无前置，性价比最高」）
 > **上游**: `CommandRisk.kt`（写操作确认两层策略 SSOT）、`WriteConfirmationController`（Tier A 确认状态机）、`TrashSessionController`（回收站编排）、`ValueGuard`（珍贵信号语义先例）
 > **关键决策**（用户 2026-09-26 逐项确认）: 双链路覆盖（Tier B 批量阈值 3）/ 形态 = 升级确认对话框（不做 chat 内审批卡）
 > **状态**: 已定稿，待实施

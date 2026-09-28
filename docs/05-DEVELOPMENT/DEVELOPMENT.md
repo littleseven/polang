@@ -681,13 +681,3 @@ doc-sync-check:
 | TAG 生成 | Tag Generation | 本地 3-Pass 照片标签生成管道 | 打标、标签扫描 |
 | 语义召回 | Semantic Recall | MobileCLIP 文本-图像相似度召回 | CLIP 搜索 |
 | 显式召回 | Explicit Recall | 基于结构化字段（时间/地点/人脸/TAG）的 SQL 召回 | 规则召回 |
-
----
-
-## 7. 更新历史
-
-| 版本 | 日期 | 变更 | 作者 |
-|------|------|------|------|
-| 1.0 | 2026-05-14 | 初版，定义双螺旋演进工作流、反向链接规范、CI 检查规则 | PM |
-| 1.1 | 2026-06-30 | 更新文档引用（GALLERY_SEARCH / AUTO_TAG / BEAUTY_ENGINE_TECH_SPEC），补充搜索/TAG 红线、I18N/隐私否决项、当前 CI 命令 | CO |
-| 1.2 | 2026-07-08 | 合并 `CODE_REVIEW_CHECKLIST.md` 与 `TASK_MARKUP_SPEC.md`，统一为研发流程唯一事实来源；更新目录与元信息 | CO |

@@ -4,7 +4,7 @@
 **日期**: 2026-07-28
 **更新日期**: 2026-08-03（核实 `PrivacyGuard` 现状，更新状态表）
 **决策**: 用户（基于 chat/LLM 链路架构 review）
-**依赖**: ADR-005（本地/远程推理协议分离）；`docs/reviews/2026-07-27-chat-llm-architecture-review.md` §0
+**依赖**: ADR-005（本地/远程推理协议分离）
 
 ---
 
@@ -48,4 +48,3 @@
 
 - ADR-005（远程推理协议标准化）
 - 原 ADR-009/010（本地模型收缩/链路隔离）已于 2026-08-23 随 ADR 整理删除，历史见 git
-- `docs/reviews/2026-07-27-chat-llm-architecture-review.md` §0.3-D1

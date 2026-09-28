@@ -56,11 +56,6 @@
 - 美颜面板高度唯一 SSOT = `beautyPanel.heightRatio`（0.35 → **0.40**，容下磨皮/美白/瘦脸/大眼 4 行 + Tab 栏）；iOS 由 `CameraTokens.beautyPanelHeightRatio`（手写）切换到 `BeautyPanelTokens.heightRatio`（生成）。
 - 生成器新增 `RAW_SWIFT_VALUES` 直出表：JSON 中 `"@xxx"` 占位字符串（语义引用，classify=skip）可经该表为 Swift 生成原始属性行（如 `cameraAccent = Color.accentColor`——系统动态色不可冻结为 hex）；Android 侧不生成（对应语义走 colorScheme 角色，如相机 accent=primary）。`SWIFT_CG_FLOAT_KEYS` 增补 `beautyPanel.heightRatio`（iOS `ControlPanel(heightRatio:)` 形参为 CGFloat）。
 
-**v2.2.2（2026-08-18，「青玉绿×Cloud Dancer」，已退役为历史）：**
-- scheme 25 角色切换青玉系：中性轴=潘通 2026 年度色 Cloud Dancer 暖乳白 `#F0EEE9`（暗色暖黑 `#171412`）；primary=青玉绿家族（Light `#1F5C54` / Dark `#8FD6C6`）；tertiary=翡翠绿（commit 276caa49c）。
-- 主题无关单值：cameraAccent `#0F766E`；chatBubble 品牌渐变 `#0F766E→#5EA88F`（暗帧）/`#43937E`（浅帧深端）；用户气泡 userBubbleBg `#0F766E` + 白字。
-- 已被 v2.2.3 整体取代，仅存 git 历史。
-
 **v2.2.3（2026-09-13，「A 氧气薄荷(Light) / B 能量绿(Dark)」，现行）：**
 - scheme 25 角色重写：Light=薄荷白底 surface `#F1FAF5` + primary `#0E9F6E`；Dark=近黑绿底 surface `#071510` + 发光绿 primary `#2FE385`；容器梯度/outline 全套跟进（commit 457a854da）。
 - 主题无关单值（取 Dark 侧）：cameraAccent 单值 `#2FE385`；chatBubble 品牌渐变 brandGradient `#1EA75B→#7CEFA8`；用户气泡 userBubbleBg `#2FE385`、深字 userBubbleOn `#062B18`。

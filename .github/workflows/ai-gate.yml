@@ -91,6 +91,5 @@ jobs:
 
       - name: Run check_doc_sync.py
         # 结构层一致性门：断裂内部链接 / 对已删除文件的引用 / 状态标记不一致。
-        # 语义层漂移（iOS 状态 vs 代码）脚本不可捕获，靠周期 audit（见
-        # docs/reviews/2026-08-10-ios-kmp-doc-drift-audit.md §4）。
+        # 语义层漂移（iOS 状态 vs 代码）脚本不可捕获，靠周期 audit。
         run: python3 scripts/check_doc_sync.py

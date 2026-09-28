@@ -147,7 +147,7 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 
 ### 3.8 证件照 IdPhoto（9 文件 / 1836 行）✅
 
-2026-08-16 ios-follow 验收 PASS（`../reviews/2026-08-16-ios-follow-idphoto.md`，契约 idphoto.yaml）：
+2026-08-16 ios-follow 验收 PASS（契约 idphoto.yaml）：
 
 - `MattingEngine`：FUSION 固定路由——MediaPipe selfie 分割（256²）+ ORT ModNet（1024²）逐像素 max 融合，100% 端侧；EXIF 方向归一化。
 - `IDPhotoScreen`/`IDPhotoViewModel`/`IdPhotoDomain` + Components（尺寸 chip/底色色板/边缘/修复面板）；模型经模型下载中心预解析。
@@ -229,7 +229,7 @@ shared KMP 模块编译为 **SharedKit XCFramework**（`:shared:assembleSharedDe
 | Chat 流式对话+工具 | ✅ | ✅ | iOS 8 相册工具+ai_optimize（手工清单） |
 | Chat 多会话历史 | ✅ | ✅ | iOS `54799952` |
 | Chat JS 沙盒 | ✅（读+写） | 🔄 只读 12/12 | 写操作（capability.dispatch+确认弹窗）未实现；前置 App Store 2.5.2 结论 |
-| AI 优化抽卡 | ✅ | ✅ | chat+editor 双入口（`2026-08-16-ios-follow-optimize-gacha.md` PASS） |
+| AI 优化抽卡 | ✅ | ✅ | chat+editor 双入口（验收 PASS） |
 | 人物页 | ✅ | ✅ | 含关系/封面/头像拍摄 |
 | 回忆页 | ✅ | ✅ | iOS `cd2e5f102`+`1e5bd5275` |
 | 编辑器（crop/adjust/filter/markup） | ✅ | 🔄 | iOS 去背景未接线、BEAUTY 渲染 DEFER |
@@ -250,7 +250,7 @@ shared KMP 模块编译为 **SharedKit XCFramework**（`:shared:assembleSharedDe
 
 - **逐屏契约**：`docs/08-UI-SPECS/screens/*.yaml` 15 份（camera/chat/editor/gallery-grid/idphoto/main-nav/memories/model-download-center/organize/person/settings/tag-control/topbar + lang/refs）；iOS 实现读 spec 不读 Android 源码（ui-parity-guard 红线）。
 - **Design tokens**：`design-tokens.json` 唯一 SSOT → `scripts/gen-design-tokens.py` 双端镜像 codegen（iOS 落 `DesignSystem/DesignTokens.swift`），`--check` 门禁禁手改；2026-09-20 漂移收敛归零（`7a5cc8db7`）。
-- **验收留痕**：`docs/reviews/` 下 ios-follow 批次报告为各模块验收事实来源（2026-08-10 ~ 2026-09-16 共 10 篇 ios-follow 报告 + 差评/一致性审计）。
+- **验收留痕**：ios-follow 批次报告已随交付清理（git 历史可查，新批次入 `docs/06-QA/` 随线清理）；现行差距审计快照 = `docs/reviews/2026-08-10-ios-android-consistency-gap.md`。
 - **自动化**：PoLangUITests 经 `-startPage <0-4>` / `-openCamera` launch arg 驱动；iOS 单测模拟器受限（MNN.framework arm64-only 无 simulator slice），XCTest/UITest 全量跑批依赖真机。
 
 ---

@@ -5,7 +5,6 @@
 > **最后更新**: 2026-07-08  
 > **维护者**: RD Agent  
 >
-> **历史合并说明**：本文档由以下 3 份文档合并而成：`MEDIAPIPE_468_REFERENCE.md`、`MEDIAPIPE_468_TO_106_MAPPING_STRATEGY.md`、`VOLCANO_106_POINTS.md`。内容已合并为单一人脸关键点参考手册，交叉引用 `docs/07-STANDARDS/COORDINATE_SYSTEM.md`。
 
 ---
 

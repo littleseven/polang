@@ -1,7 +1,6 @@
 # ADR 索引（架构决策记录）
 
-> **整理口径（2026-08-23）**：只保留仍 govern 现状的决策记录；纯历史篇已删除，编号永久留空不复用，历史细节靠 git 追溯。
-> 本地/远程推理演化史（协议分离 → 本地收缩 → 链路隔离 → 端侧文本 LLM 移除 → Koog 迁移）的**现役结论**收敛于 [ADR-005](02-ARCHITECTURE/ADR/ADR-005-local-remote-inference-split.md) + [AGENT_ARCHITECTURE.md](02-ARCHITECTURE/AGENT_ARCHITECTURE.md)（SSOT）。
+> 只保留仍 govern 现状的决策记录；被推翻且无追溯刚需的决策直接删除，编号永久留空不复用。
 
 ## 现役 ADR（11 篇）
 
@@ -19,18 +18,8 @@
 | [ADR-015](02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md) | 意图路由契约与路由器 | LLM 管语义理解（意图闭集分类），代码管路由策略（查表执行）；门控+pattern+1.5s 超时降级，路由器永不拦截能力 |
 | [ADR-016](02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md) | Chat 消息内容模型与渲染架构（整合原 ADR-014） | 数据层对齐 Vercel parts（有序 parts 数组 + chunk 三段式 + 工具状态机 + UIMessage/ModelMessage 双层）；渲染层对齐 ChatGPT（markdown AST→原生受控组件 + 卡片独立 block + Turn 聚合 + WebView 永不渲染正文）；沙箱卡双形态 + D5 L1/L2/L3 样式分级（LLM 永不产代码只产数据）；不做全量 HTML 会话/文内锚点/JS 桥/消息树 |
 
-## 已删除的历史篇
-
-| 编号 | 原标题 | 删除理由 |
-|------|--------|---------|
-| ~~ADR-004~~ | Adreno GPU 争抢问题 | 三当事方（ncnn Vulkan、ggml/llama.cpp、端侧文本 LLM）已全部删除，争抢场景不复存在 |
-| ~~ADR-006~~ | 本地/远程指令体系包级隔离 | 本地指令体系已随端侧文本 LLM 整体删除，单体系无隔离对象；远程编排 SSOT 在 AGENT_ARCHITECTURE.md |
-| ~~ADR-009~~ | 本地 LLM 收缩至相机场景 | 被「本地 LLM 完全移除（2026-08-02）」超越，无残余决策效力 |
-| ~~ADR-010~~ | 远程/本地链路严格隔离 | 隔离以「本地链路整体删除」方式终结，隔离对象消失 |
-| ~~ADR-014~~ | Chat 富内容渲染（方案 B） | 2026-09-27 整合进 ADR-016：D2 数据模型被 parts 协议取代，D1/D3~D6 仍有效决策随迁且编号语义保持（ADR-016 D3/D4/D5 = 原 D3/D4/D5）；顶部修订注记与 §4 开放问题清单收编（ADR-016 §3），编号永久留空 |
-
 ## 维护规则
 
 - 新 ADR 编号自 **017** 起递增，已删除编号不复用。
 - ADR 记录**决策**（why），实现细节归 TECH_SPECS / AGENT_ARCHITECTURE.md / 模块 AGENTS.md，ADR 内只留链接。
-- 决策被推翻时：若新决策有独立价值 → 新开 ADR 并在旧 ADR 头部标注 Superseded；若旧 ADR 全文失去决策效力且无追溯刚需 → 直接删除并更新本索引（2026-08-23 先例）。
+- 决策被推翻时：若新决策有独立价值 → 新开 ADR 并在旧 ADR 头部标注 Superseded；若旧 ADR 全文失去决策效力且无追溯刚需 → 直接删除并更新本索引。

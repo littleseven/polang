@@ -5,7 +5,6 @@
 > **最后更新**: 2026-08-03  
 > **维护者**: 项目开发者  
 >
-> **历史合并说明**：本文档由以下 6 份文档合并而成：`AUTO_TAG_GENERATION_SPEC.md`、`TAG_DATABASE_SCHEMA.md`、`TAG_SCAN_STATE_MACHINE.md`、`TAG_GENERATION_IMPLEMENTATION_REVIEW.md`、`TAG_GENERATION_PERFORMANCE_ANALYSIS.md`、`TAG_I18N_DESIGN.md`。内容已按「总览 → 3-Pass Pipeline → 状态机 → 数据库模型 → 实现回顾 → 性能分析 → I18N」重组，并消除重复内容。
 >
 > **相关文档**: `GALLERY_SEARCH.md`（相册搜索 SSOT）、`ON_DEVICE_INFERENCE_INVENTORY_TECH_SPEC.md`
 

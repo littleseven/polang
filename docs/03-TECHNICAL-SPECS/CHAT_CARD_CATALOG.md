@@ -282,7 +282,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 
 一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；M3 = 正文 `AgentMarkdown`（§3.2）。
 
-**M4 渲染源切 parts + Turn 聚合**（spec §7.2/§7.3/§8；验收 `docs/06-QA/M4_CHAT_FLATTEN_ACCEPTANCE.md`）：
+**M4 渲染源切 parts + Turn 聚合**（spec §7.2/§7.3/§8）：
 
 - **拍平粒度**：shared `domain/chat/ChatListFlattener` 纯函数——每个 MessagePart = LazyColumn 独立 item，**key = `"${messageId}:${partId}"`** + **contentType 复用桶**（`ChatListItem.TYPE_*`：user_message / legacy_message / agent_text / chart / html_card / task_card / media_results / optimize_candidates / tool_placeholder / tool_error / tool_status）。禁止「一条回复一个巨型 item 内部 Column 排段」（性能红线 ADR-016 §4）。
 - **拍平三分流/直通清单**：USER 消息整颗单 item（§5 图文同气泡不拆）；claude 气泡 / COMMAND / PLAN_PREVIEW / AGENT_IMAGE / AGENT_EDIT_RESULT 整消息 legacy 渲染（part=null，渲染器读 legacy 字段）；流式卡 part 三分流——已填充（OUTPUT_AVAILABLE）的 Chart/HtmlCard **跳过**（产物已落库为独立行，双显禁止）、未完成（INPUT_*）渲染占位 item、失败（OUTPUT_ERROR 瞬态轨）渲染失败 item；非卡片工具进行中合成 `ToolStatusChip` 状态 item（key `messageId:tool_status`）。
@@ -302,7 +302,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | HTML 卡（双形态） | `html_card` | `HtmlCard` / `HtmlFullpageViewer` | WebView | `htmlcard/inline` 438:3 · `preview` 438:60 · `fullpage` 438:98 | ✅ |
 | 工程师任务卡 | `task_card` | `EngineerTaskCard` + 原生动作条 | WebView L1 模板 | `taskcard/*` 438:181/208/264/444:31 | ✅（两分区改版待实现迁移） |
 | 搜索结果卡 | `media_results` | `MediaResultsCarousel` | 原生 | `chat_photo_card` 387:143 | ✅ |
-| 抽卡候选条 | `optimize_candidates` | `GachaCandidateStrip` | 原生 | —（设计稿已随交付清理） | ✅ |
+| 抽卡候选条 | `optimize_candidates` | `GachaCandidateStrip` | 原生 | — | ✅ |
 | Agent 图片结果卡 | `agent_image` | `ChatMessageItem` isImage 分支 | 原生 | —（跟随会话帧） | ✅ |
 | 编辑结果卡 | `agent_edit_result` | isEditResult 分支 | 原生 | — | ✅ |
 | Claude 步骤附加区 | `agent_text` + metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
@@ -638,7 +638,7 @@ partsJson 实例见 §0.2 `html_card`。**回灌**（toolCallId 同为 `"<messag
 }
 ```
 
-**UI**：设计稿已随交付清理（git 历史可查）；选中高亮 / 换一组 loading / 护栏 rejected / 进程重建只读态；确认后消息改写为 `agent_image`。
+**UI**：选中高亮 / 换一组 loading / 护栏 rejected / 进程重建只读态；确认后消息改写为 `agent_image`。
 **渲染组件**：`GachaCandidateStrip`（`components/GachaCandidateStrip.kt`）+ `ChatOptimizeGachaController`（内存态 `hasPending(id)` 驱动 `gachaInteractive`）。
 **测试**：`ChatViewModelGachaTest` / `OptimizeCandidateGroupTest` / `ChatOptimizeGachaControllerTest`。
 **parts 协议（✅ M1 已落地）**：`MessagePart.OptimizeCandidates(partId, group: OptimizeCandidateGroup)`——group 六字段全量入 part（键名与 legacy metadata 一致；kotlinx 与 org.json 双 serde 线格式互不干扰）；单条消息 parts 只有此一块（content 列的 explanation **不成** Text part，仅行级兜底时出现）。partsJson 实例见 §0.2 `optimize_candidates`。**回灌：丢弃**（data part）。**端到端**：AI 一键优化 → `ChatOptimizeGachaController.draw` 端侧并行出 N 候选 → `optimize_candidates` 行（metadata = group JSON）→「换一组」同 id 覆写（drawIndex+1、usedFingerprints 排重）/「就用这张」行改写为 `agent_image`（parts 随之重算为 image part）→ `GachaCandidateStrip`。**M4**：item contentType `optimize_candidates`，组件无改动（spec §7.4 复用清单）。**红线**：交互态（controller `hasPending`）是进程内存，进程重建后卡条降级只读。
@@ -705,9 +705,9 @@ partsJson 实例见 §0.2 `html_card`。**回灌**（toolCallId 同为 `"<messag
 
 DESTRUCTIVE 批量删除的聚合确认卡：数量 + 珍贵信号（收藏/老照片）+ 可恢复性三要素；双链路（JS 写通路 + Tier B 批量阈值 3）；形态 = 升级确认对话框（不做 chat 内审批卡）。spec：`docs/superpowers/specs/2026-09-26-approval-three-element-card-design.md`。
 
-### 5.2 ADR-016 parts 模型迁移（✅ M1-M4 已落地：M1-M3 合 main `46a6e91fb`；M4 在 `feat/chat-parts-m4` 待合——真机验收待补）
+### 5.2 ADR-016 parts 模型现状（M1-M4 已合 main；真机验收待补）
 
-一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线换代。卡片 UI/渲染形态**不变**（ADR-016 D2）。已落地：M1（`MessagePart.kt` sealed 八类 + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt` 全枚举迁移/行级兜底 + Room v24→v25 回填 + 回灌转换）、M2（`domain/chat/streaming/` 三件套 + `TaskCardOverlay` 任务卡迁入 parts + Chart/HtmlCard `state` 字段 + 回灌 `"<messageId>:<partId>"` 命名空间 id + `RoundStarted` 显式轮边界）、M3（`AgentMarkdown` AST 正文，jeziellago 移除）、M4（渲染源切 parts：`ChatListFlattener` 拍平 + Turn 聚合视觉层 + §8 性能收口；验收 `docs/06-QA/M4_CHAT_FLATTEN_ACCEPTANCE.md`，**真机冒烟/重组实测/截图基线待补**）。M5 = iOS ios-follow 跟随。线格式实例见 §0.1/§0.2，各卡 parts 协议见 §3/§4 各节，渲染矩阵见 §1.3 + chat.yaml §3.2。数据形态（spec §3，已按实现校准）：
+一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线；卡片 UI/渲染形态不变（ADR-016 D2）。数据模型：`MessagePart.kt` sealed 八类 + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt` 全枚举迁移/行级兜底 + Room 回填与回灌转换（回灌 id 命名空间 `"<messageId>:<partId>"`）；流式：`domain/chat/streaming/`（adapter/reducer/pacing）+ `RoundStarted` 显式轮边界 + 任务卡/Chart/HtmlCard 以 parts 表达（含 `state` 字段）；渲染：`AgentMarkdown` AST 正文 + `ChatListFlattener` 拍平 + Turn 聚合视觉层 + §8 性能收口——**真机冒烟/重组实测/截图基线待补**。iOS 跟随走 ios-follow。线格式实例见 §0.1/§0.2，各卡 parts 协议见 §3/§4 各节，渲染矩阵见 §1.3 + chat.yaml §3.2。数据形态（已按实现校准）：
 
 ```kotlin
 // shared commonMain（M1-M3 已合 main；M4 ChatListFlattener 在 feat/chat-parts-m4）
@@ -733,8 +733,8 @@ sealed interface MessagePart { val partId: String }
 
 ## 7. 测试与冒烟入口汇总
 
-- **单测**：见各卡片小节；DAO 层 `ChatMessageDaoTest`；shared `MarkdownSegmenterTest` / `StreamingPacingControllerTest` / `MessagePartsCodecTest`；M4 `ChatListFlattenerTest`（拍平规则全枚举 13 例）+ streaming 包（adapter/reducer）；M3 `InlineHtmlAnnotatorTest`（白名单 4 例）+ `MarkdownStreamRobustnessTest`（流式解析鲁棒 3 例）。
-- **ui-driver 冒烟**（DEV_ONLY，DEBUG 构建）：`/html` → `HtmlCardSmokeSamples`（十一卡含双形态/远程/ALL_IN_ONE）；`/task` → `EngineerTaskSmokeSamples`（五态 + 超屏展开）。⏳ M4 真机冒烟待补（设备离线，清单见 `docs/06-QA/M4_CHAT_FLATTEN_ACCEPTANCE.md` §3：流式/`/html`/`/chart`/`/task`/长列表滚动 + 重组实测 + Turn 聚合截图基线）。
+- **单测**：见各卡片小节；DAO 层 `ChatMessageDaoTest`；shared `MarkdownSegmenterTest` / `StreamingPacingControllerTest` / `MessagePartsCodecTest`；`ChatListFlattenerTest`（拍平规则全枚举 13 例）+ streaming 包（adapter/reducer）；`InlineHtmlAnnotatorTest`（白名单 4 例）+ `MarkdownStreamRobustnessTest`（流式解析鲁棒 3 例）。
+- **ui-driver 冒烟**（DEV_ONLY，DEBUG 构建）：`/html` → `HtmlCardSmokeSamples`（十一卡含双形态/远程/ALL_IN_ONE）；`/task` → `EngineerTaskSmokeSamples`（五态 + 超屏展开）。⏳ M4 真机冒烟待补（设备离线；清单：流式/`/html`/`/chart`/`/task`/长列表滚动 + 重组实测 + Turn 聚合截图基线）。
 - **设计稿验收**：health-check（`scripts/ardot-health-check.py`）+ Light 双模（`scripts/ardot-light-verify.py`）+ refs 快照（`scripts/export-ardot-snapshot.py`）。
 
 ## 8. 文档索引
@@ -745,7 +745,7 @@ sealed interface MessagePart { val partId: String }
 | 富内容渲染决策（原 ADR-014 D1~D6） | 已并入 ADR-016（D2 渲染 / D3 沙箱 / D4 iOS / D5 样式 / D6 不做；编号 014 永久留空） |
 | HTML/图表/脚本实现 SSOT | `docs/03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md` §5/§7/§7.1 |
 | Turn 聚合 + 拍平渲染矩阵（视觉 SSOT） | `docs/08-UI-SPECS/screens/chat.yaml` §3.1 turn_aggregation / §3.2 parts_rendering（M4 已落地 ✅，iOS TODO 口径） |
-| M3/M4 验收记录 | `docs/06-QA/M3_CHAT_MARKDOWN_ACCEPTANCE.md`（AST 正文 + immediate 定案）/ `docs/06-QA/M4_CHAT_FLATTEN_ACCEPTANCE.md`（四块证据链，真机待补） |
+| M3/M4 验收 | AST 正文 + immediate 长度门控 + 拍平规则全枚举 13 例已落地；真机冒烟待补 |
 | 双形态 + 任务卡 HTML 化 | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md` |
 | 任务卡产品线 | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md` · UserTask 协议 2026-09-26 |
 | 设计稿 | Ardot polang-ui-spec（fileId 715061534788814）HtmlCard 页 438:2 · ChatComponents 页 438:328；refs `docs/08-UI-SPECS/screens/refs/ardot/` |

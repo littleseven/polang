@@ -4,7 +4,7 @@
 **日期**: 2026-08-12
 **决策**: 用户
 **依赖**: ADR-005（远程推理协议标准化）、ADR-008（隐私红线）
-**评估依据**: `docs/reviews/2026-08-12-kmp-architecture-contract-evaluation.md`
+**评估依据**: 2026-08-12 KMP 契约评估（结论已收编本 ADR）
 
 ---
 
@@ -119,5 +119,4 @@
 ## 6. 相关
 
 - ADR-005（远程推理协议标准化）、ADR-008（隐私红线）
-- 评估文档：`docs/reviews/2026-08-12-kmp-architecture-contract-evaluation.md`
 - 先例 / 工具：`coordinate-system-standard` skill、`/ios-follow` skill、`screenshot-diff.py`、`swiftui-expert`、`ios-i18n-validator`

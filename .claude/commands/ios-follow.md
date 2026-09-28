@@ -84,7 +84,7 @@
 
 ## Stage 5 — 报告
 
-1. **gap analysis**（审查模型与实现模型交叉，铁律 4）：审 iOS 侧 diff → `docs/reviews/<date>-ios-follow-<feature>.md`，🔴/🟡/✅ 分级，🔴 未清零则整体判 FAIL。
+1. **gap analysis**（审查模型与实现模型交叉，铁律 4）：审 iOS 侧 diff → `docs/06-QA/<date>-ios-follow-<feature>.md`（过程验收，随线清理），🔴/🟡/✅ 分级，🔴 未清零则整体判 FAIL。
 2. **验收报告**（`tmp/ios-follow/<branch|feature>/report.md` + 终端摘要）显式分三栏：
    - ✅ **自动通过**：编译 / shared 单测 / 截图比对 / 无崩溃
    - ⚠️ **待真机终验**：手感、观感、性能、真机任务流（命令绿 ≠ 做完，按「功能 > UI > 性能」优先级由用户终验）

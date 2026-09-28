@@ -18,9 +18,9 @@
 
 ---
 
-## 0. 多通道扩展（2026-07-27 重新激活）
+## 0. 多通道架构
 
-> 详细设计稿与实现计划均已随落地清理（git 历史可查），本节即现行事实源。
+> 本节为现行事实源。
 
 - **`RemoteChannel` 接口**（`domain/agent/remote/RemoteChannel.kt`）：统一 `channelId / isConnected / onMessageReceived / sendMessage(text, replyToken) / sendImage`。`replyToken` 通道不透明（飞书=messageId，Telegram=chatId）。
 - **`RemoteChannelManager`**：单通道管理器，按 `selected_remote_channel`（FEISHU/TELEGRAM/NONE）激活；先断旧再连新；重连 = 重新 activate；发送/回调委托激活通道。
@@ -398,83 +398,6 @@ class RemoteCommandDispatcher(
 | **目标** | 通用 Android 自动化 | **专注相册+图片编辑**（核心能力更深） |
 
 **核心差异**：PoLang 不需要 AccessibilityService 来做通用 UI 自动化。我们的 Capability 系统直接操作相册/编辑内核，稳定性和响应速度优于无障碍节点遍历。
-
----
-
-## 12. 远程推理与本地推理协议隔离
-
-> **核心设计原则（2026-06-18）**：远程推理原生支持 OpenAI tool_calls 格式，与本地 LLM 的 method/params 格式完全隔离，不产生任何耦合。
-
-> ⚠️ **历史记录（2026-08-02 更新）**：端侧**文本** LLM 链路已移除，下文「本地推理链路（端侧 LLM）」/ `LocalCommandParser` / method/params 协议仅为隔离设计的历史参考。命令解析曾走远程 ~~`ToolCallCommandParser`~~（标准 OpenAI tool_calls，已随 Phase 5 删除），tool_calls 现由 Koog agent 循环内直接 `CapabilityRegistry.dispatch` 执行。
-
-### 12.1 协议分层
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     用户输入层                               │
-│         飞书消息 / 语音 / 本地语音唤醒                        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┴─────────────────────┐
-        ▼                                           ▼
-┌───────────────┐                         ┌───────────────────┐
-│  远程推理链路  │                         │   本地推理链路     │
-│  (云端 LLM)   │                         │  (端侧 LLM)       │
-├───────────────┤                         ├───────────────────┤
-│ OpenAI        │                         │ 自定义 JSON 数组   │
-│ tool_calls    │                         │ method/params     │
-│ protocol      │                         │ protocol          │
-│               │                         │                   │
-│ ToolExecution │                         │ LocalCommand      │
-│ Request       │                         │ Parser            │
-│ (name +       │                         │ (method + params) │
-│ arguments)    │                         │                   │
-└───────┬───────┘                         └─────────┬─────────┘
-        │                                           │
-        ▼                                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│              ToolCallCommandParser                          │
-│         直接解析为 AgentCommand（共用命令模型）              │
-│              ↓ 与 LocalCommandParser 完全隔离                │
-├─────────────────────────────────────────────────────────────┤
-│              CapabilityRegistry.dispatch()                   │
-│                    统一执行层                                │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 12.2 关键隔离点
-
-| 维度 | 远程推理 | 本地推理 | 隔离方式 |
-|------|----------|----------|----------|
-| **输入格式** | `{"tool_calls":[{"function":{"name":"...","arguments":"..."}}]}` | `[{"method":"...","params":{}}]` | 不同 Parser |
-| **解析器** | `ToolCallCommandParser` | `LocalCommandParser` | 独立文件，无互相调用 |
-| **命令模型** | `AgentCommand` (sealed class) | `AgentCommand` (sealed class) | 共用 |
-| **执行层** | `CapabilityRegistry.dispatch()` | `CapabilityRegistry.dispatch()` | 共用 |
-| **Prompt 格式** | `name` + `arguments` | `method` + `params` | 不同 Builder |
-| **LLM 输出** | 原生 function calling | 文本 JSON 数组 | 不同协议 |
-
-### 12.3 禁止的耦合模式
-
-以下模式已被彻底移除，远程推理链路不再使用：
-
-| 反模式 | 说明 | 状态 |
-|--------|------|------|
-| `parseAgentCommand()` | 将 method/params 转换为 AgentCommand | 已删除 |
-| `mergeParamsIntoRoot()` | 合并 params 到根对象 | 已删除 |
-| 在 Prompt 中混合 `method`/`params` | L3 Plan 使用 `command` 字段 | 已更新 |
-| `CameraToolHelper` 调用 `LocalCommandParser` | 直接构建 AgentCommand | 已重构 |
-| `parseToolCalls` 回退到 method/params | ~~直接使用 `ToolCallCommandParser`~~（已随 Phase 5 删除；tool_calls 由 Koog agent 循环内直接 `CapabilityRegistry.dispatch`） | 已重构 |
-
-### 12.4 实现文件
-
-| 文件 | 职责 | 协议 |
-|------|------|------|
-| ~~`ToolCallCommandParser.kt`~~ | ~~远程 tool_calls 解析~~（已随 Phase 5 删除；tool_calls 由 Koog agent 循环内直接 `CapabilityRegistry.dispatch`） | — |
-| ~~`LocalCommandParser.kt`~~ | ~~本地 method/params 解析~~（已随端侧文本 LLM 移除） | — |
-| ~~`RemoteOrchestrator.kt`~~ | ~~远程编排器~~（类不存在；现由 `RemoteChatEngine`/`AgentConfigurator` 承担） | — |
-| `RemotePromptBuilder.kt` | 远程 Prompt 构建 | `name` + `arguments` 格式 |
-| `CameraToolHelper.kt` | 相机命令辅助 | 直接构建 `AgentCommand` |
-| ~~`InAppAgentConfig.kt`~~ | ~~本地 System Prompt~~（已移除，见 §13 失效提示） | — |
 
 ---
 
