@@ -51,6 +51,17 @@
 # 验证：release 包 logcat 不再出现 PoLang:FeishuHandler NoSuchFieldException autoReconnect。
 -keep class com.lark.oapi.ws.Client { *; }
 
+# === Moshi 反射序列化模型（KotlinJsonAdapterFactory + 内置 EnumJsonAdapter）===
+# EnumJsonAdapter 构造时以 enumClass.getField(constant.name()) 反射取常量字段，
+# R8 重命名字段后抛 NoSuchFieldException → AssertionError（release 包进 PhotoEditor 即崩，
+# 2026-09-28：PhotoEditRecipeRepository 构建 BeautySettings 适配器触发）。
+# KotlinJsonAdapterFactory 同样依赖数据类字段原名 + kotlin.Metadata 绑定。
+# 凡经 moshi.adapter(SomeClass::class.java) 反射适配的模型与其枚举字段类型，一律保留：
+-keep class com.mamba.picme.beauty.api.** { *; }
+-keep class com.mamba.picme.domain.agent.capability.optimize.OptimizeResultDto { *; }
+# OptimizePreset 内嵌 BeautyPreset/FilterPreset/AdjustmentPreset，Moshi 会逐层反射适配，整包保留
+-keep class com.mamba.picme.domain.agent.capability.optimize.preset.** { *; }
+
 # === JS 引擎 + JSBridge（QuickJS）===
 # JS bridge：NativeHandler 工厂 object、JsBridge、JsEngine 实现经反射装配
 -keep class com.mamba.picme.agent.core.js.** { *; }
