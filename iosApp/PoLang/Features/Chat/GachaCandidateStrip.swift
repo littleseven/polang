@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import SharedKit
 
 // MARK: - AI 优化抽卡候选卡条（chat.yaml §17 strip_ui）
 //
@@ -35,7 +36,10 @@ enum GachaDirectionLabel {
 }
 
 struct GachaCandidateStrip: View {
-    let payload: ChatMessage.GachaPayload
+    /// 候选组（commonMain OptimizeCandidateGroup，M5 B1 切 shared SSOT）。
+    /// index==数组位置不变量：candidate 无 index 字段，推荐位/选中位/确认位一律用
+    /// 数组位置（enumerated offset）。
+    let payload: OptimizeCandidateGroup
     /// 当前选中卡序号（nil=非 interactive 不显示选中态）；初值=recommendedIndex
     let selectedIndex: Int?
     /// pending 组存在（interactive）才出按钮行与选中态；过期转只读（expired 文案）
@@ -53,19 +57,21 @@ struct GachaCandidateStrip: View {
             hintText
             // 4 卡均分（row_weight1；等宽由各卡 maxWidth .infinity 实现）
             HStack(spacing: Spacing.sm) {
-                ForEach(payload.candidates, id: \.index) { card in
+                // index==数组位置：enumerated offset 即卡序号
+                ForEach(Array(payload.candidates.enumerated()), id: \.offset) { position, card in
                     GachaCandidateCard(
                         candidate: card,
-                        recommended: card.index == payload.recommendedIndex,
+                        position: position,
+                        recommended: position == Int(payload.recommendedIndex),
                         // 选中态仅 interactive 时呈现（过期卡条只读）
-                        selected: interactive && card.index == selectedIndex,
+                        selected: interactive && position == selectedIndex,
                         onTap: {
                             // 淘汰卡不可点；过期卡仍可预览但不改选中
                             guard !card.rejected else { return }
                             if interactive {
-                                onSelection(card.index)
+                                onSelection(position)
                             }
-                            onCardTap(card.thumbPath)
+                            onCardTap(card.thumbPath.isEmpty ? nil : card.thumbPath)
                         })
                 }
             }
@@ -129,21 +135,23 @@ struct GachaCandidateStrip: View {
         }
     }
 
-    /// enabled_when: selectedIndex >= 0 && !selectedRejected（§17 buttons_row）
+    /// enabled_when: selectedIndex >= 0 && !selectedRejected（§17 buttons_row；
+    /// index==数组位置不变量 → indices.contains 直接下标）
     private var canConfirm: Bool {
-        guard let selectedIndex, selectedIndex >= 0,
-              let selected = payload.candidates.first(where: { $0.index == selectedIndex }) else {
+        guard let selectedIndex, payload.candidates.indices.contains(selectedIndex) else {
             return false
         }
-        return !selected.rejected
+        return !payload.candidates[selectedIndex].rejected
     }
 }
 
 // MARK: - 单卡（thumb + 推荐角标 + 方向名 + 选中描边）
 
 private struct GachaCandidateCard: View {
-    let candidate: ChatMessage.GachaCandidate
-    /// index == recommendedIndex（top-start 角标）
+    let candidate: OptimizeCandidateGroup.Candidate
+    /// 卡序号（== 数组位置，无 index 字段）
+    let position: Int
+    /// position == recommendedIndex（top-start 角标）
     let recommended: Bool
     /// 选中卡（2dp primary 描边）
     let selected: Bool
@@ -191,11 +199,11 @@ private struct GachaCandidateCard: View {
             guard !candidate.rejected else { return }
             onTap()
         }
-        .accessibilityIdentifier("chat_gacha_card_\(candidate.index)")
+        .accessibilityIdentifier("chat_gacha_card_\(position)")
         .task(id: candidate.thumbPath) {
-            // thumbPath 空 → 占位图（落盘失败卡）；512px JPEG 解码放 .task 避免卡首帧
-            guard let path = candidate.thumbPath else { return }
-            thumb = UIImage(contentsOfFile: path)
+            // thumbPath 空串 → 占位图（落盘失败卡）；reroll 换卡时清残影；
+            // 512px JPEG 解码放 .task 避免卡首帧
+            thumb = candidate.thumbPath.isEmpty ? nil : UIImage(contentsOfFile: candidate.thumbPath)
         }
     }
 

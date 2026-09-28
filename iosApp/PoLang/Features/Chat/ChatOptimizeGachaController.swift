@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import ImageIO
 import CoreImage
+import SharedKit
 
 // MARK: - Chat AI 优化抽卡控制器（chat.yaml §17 interaction_model 执行端）
 //
@@ -21,9 +22,9 @@ import CoreImage
 // 引擎与数值契约：specs/screens/editor.yaml §17（chat 复用同一引擎，零改动）。
 // [PRIVACY] 全链路端侧（场景分析/渲染/NIMA 评分），无媒体上传。
 
-/// pending 卡组（进程级内存态）。
+/// pending 卡组（进程级内存态）。messageId = commonMain ChatMessage.id（String）。
 struct GachaPendingGroup {
-    let messageId: UUID
+    let messageId: String
     let sessionId: String
     /// LLM 传入的目标图标识（payload 持久化用，reroll 覆写时保持不变）。
     let sourceImageUri: String
@@ -99,20 +100,21 @@ final class ChatOptimizeGachaController {
     /// 反馈落库（auto=每组抽完已由 AiOptimizeService 落；此处只落 user/dismiss）。
     private let feedbackLogger = OptimizeFeedbackLogger()
 
-    /// messageId → pending 组（进程级内存态，spec §17 expired_semantics）。
-    private(set) var pendingGroups: [UUID: GachaPendingGroup] = [:]
+    /// messageId → pending 组（进程级内存态，spec §17 expired_semantics；key=ChatMessage.id String）。
+    private(set) var pendingGroups: [String: GachaPendingGroup] = [:]
 
     // MARK: - draw（首次抽卡）
 
     enum DrawOutcome {
-        /// selected / keepOriginal → 建组出卡条（payload 供消息持久化；explanation=场景解释句）。
-        case candidates(payload: ChatMessage.GachaPayload, explanation: String)
+        /// selected / keepOriginal → 建组出卡条（payload=SharedKit OptimizeCandidateGroup
+        /// 供消息持久化与 parts；explanation=场景解释句）。
+        case candidates(payload: OptimizeCandidateGroup, explanation: String)
         /// unavailable / 缩略图全灭 / 无可用源图 → 单发降级（imagePath=nil 纯文本解释）。
         case fallback(imagePath: String?, explanation: String)
     }
 
     enum RerollOutcome {
-        case replaced(payload: ChatMessage.GachaPayload, explanation: String)
+        case replaced(payload: OptimizeCandidateGroup, explanation: String)
         case unavailable
     }
 
@@ -123,7 +125,7 @@ final class ChatOptimizeGachaController {
     ///   - imageUri: LLM 传的目标图标识；解析失败回退 fallbackImageUri（会话最近用户图）
     ///   - sessionId: 归属会话（discardPending 按会话过期）
     ///   - fallbackImageUri: 会话最近一张用户图标识（兜底链）
-    func draw(messageId: UUID, imageUri: String, sessionId: String, fallbackImageUri: String?) async -> DrawOutcome {
+    func draw(messageId: String, imageUri: String, sessionId: String, fallbackImageUri: String?) async -> DrawOutcome {
         // 1. 目标图解析（file:// / 裸路径 / PHAsset id → 失败回退会话最近用户图）
         var resolvedUri = imageUri
         var sourceFile = await ChatImageUriResolver.resolve(imageUri)
@@ -148,7 +150,9 @@ final class ChatOptimizeGachaController {
         let cards: [ScoredCandidate]
         switch outcome.result {
         case .selected(let best, let all, _):
-            recommendedIndex = best.candidate.index
+            // ★ index==position 不变量（payload 候选无 index 字段，位置即序号）：
+            // 推荐位 = best 在卡组中的数组位置
+            recommendedIndex = all.firstIndex { $0.candidate.index == best.candidate.index } ?? 0
             cards = all
         case .keepOriginal(let all, _):
             recommendedIndex = -1
@@ -181,7 +185,7 @@ final class ChatOptimizeGachaController {
 
         let payload = Self.makePayload(group: group, recommendedIndex: recommendedIndex)
         NSLog("%@ draw: group ready (message=%@, scene=%@, cards=%d)",
-              Self.tag, messageId.uuidString, outcome.scene.rawValue, scored.count)
+              Self.tag, messageId, outcome.scene.rawValue, scored.count)
         return .candidates(payload: payload, explanation: explanation)
     }
 
@@ -189,9 +193,9 @@ final class ChatOptimizeGachaController {
 
     /// 以 pending.usedFingerprints 为 exclude 重抽 → 覆写 pending（drawIndex+1）。
     /// 引擎 unavailable / 新组缩略图全灭 → .unavailable（调用方 toast，pending 保持不动）。
-    func reroll(messageId: UUID) async -> RerollOutcome {
+    func reroll(messageId: String) async -> RerollOutcome {
         guard var group = pendingGroups[messageId] else {
-            NSLog("%@ reroll: no pending group (message=%@)", Self.tag, messageId.uuidString)
+            NSLog("%@ reroll: no pending group (message=%@)", Self.tag, messageId)
             return .unavailable
         }
 
@@ -205,13 +209,14 @@ final class ChatOptimizeGachaController {
         let cards: [ScoredCandidate]
         switch outcome.result {
         case .selected(let best, let all, _):
-            recommendedIndex = best.candidate.index
+            // ★ index==position 不变量：推荐位 = best 在新卡组中的数组位置
+            recommendedIndex = all.firstIndex { $0.candidate.index == best.candidate.index } ?? 0
             cards = all
         case .keepOriginal(let all, _):
             recommendedIndex = -1
             cards = all
         case .unavailable:
-            NSLog("%@ reroll: engine unavailable (message=%@)", Self.tag, messageId.uuidString)
+            NSLog("%@ reroll: engine unavailable (message=%@)", Self.tag, messageId)
             return .unavailable
         }
         if cards.allSatisfy({ card in card.thumbPath == nil }) {
@@ -234,17 +239,20 @@ final class ChatOptimizeGachaController {
 
     /// 确认应用候选卡：**先摘除 pending 再渲染**（渲染期间收到 discard 也不会双落库）；
     /// 成功返回 Documents/chat_edits/<uuid>.jpg 路径；失败回填 pending 保持可重试并返回 nil。
-    func confirm(messageId: UUID, candidateIndex: Int) async -> String? {
+    func confirm(messageId: String, candidateIndex: Int) async -> String? {
         guard let group = pendingGroups[messageId] else {
-            NSLog("%@ confirm: no pending group (message=%@)", Self.tag, messageId.uuidString)
+            NSLog("%@ confirm: no pending group (message=%@)", Self.tag, messageId)
             return nil
         }
-        guard let card = group.scored.first(where: { scored in scored.candidate.index == candidateIndex }),
-              !card.rejected else {
+        // ★ index==position 不变量：candidateIndex 是卡组数组位置（payload 候选无 index 字段，
+        // UI 选中/推荐位均按位置传递）
+        guard group.scored.indices.contains(candidateIndex),
+              !group.scored[candidateIndex].rejected else {
             NSLog("%@ confirm: invalid card index=%d (message=%@)",
-                  Self.tag, candidateIndex, messageId.uuidString)
+                  Self.tag, candidateIndex, messageId)
             return nil
         }
+        let card = group.scored[candidateIndex]
 
         pendingGroups.removeValue(forKey: messageId)
 
@@ -262,7 +270,7 @@ final class ChatOptimizeGachaController {
                            selectedIndex: candidateIndex,
                            source: OptimizeFeedbackLogger.sourceUser)
         NSLog("%@ confirm: applied card=%d -> %@ (message=%@)",
-              Self.tag, candidateIndex, path, messageId.uuidString)
+              Self.tag, candidateIndex, path, messageId)
         return path
     }
 
@@ -270,7 +278,7 @@ final class ChatOptimizeGachaController {
 
     /// 废弃会话内 pending 组（切会话/发新消息/清空/删会话）：落库 source=dismiss 后移除。
     /// exceptMessageId：confirm 成功路径此时已摘除自身，一般传 nil。
-    func discardPending(sessionId: String, exceptMessageId: UUID? = nil) {
+    func discardPending(sessionId: String, exceptMessageId: String? = nil) {
         let targets = pendingGroups.filter { entry in
             entry.value.sessionId == sessionId && entry.key != exceptMessageId
         }
@@ -288,7 +296,7 @@ final class ChatOptimizeGachaController {
     }
 
     /// 卡条 interactive 判定（pending 存在；过期即只读，spec §17 expired 文案/无按钮行）。
-    func hasPending(_ messageId: UUID) -> Bool {
+    func hasPending(_ messageId: String) -> Bool {
         pendingGroups[messageId] != nil
     }
 
@@ -303,23 +311,23 @@ final class ChatOptimizeGachaController {
         }
     }
 
-    /// pending 组 → 消息 payload（结构照 chat.yaml §17 message_model.payload）。
-    private static func makePayload(group: GachaPendingGroup, recommendedIndex: Int) -> ChatMessage.GachaPayload {
-        ChatMessage.GachaPayload(
+    /// pending 组 → 消息 payload（SharedKit OptimizeCandidateGroup，结构照 chat.yaml §17
+    /// message_model.payload；★ index==position 不变量——candidates 顺序即卡组顺序，
+    /// recommendedIndex 为数组位置，候选本体无 index 字段）。
+    private static func makePayload(group: GachaPendingGroup, recommendedIndex: Int) -> OptimizeCandidateGroup {
+        OptimizeCandidateGroup(
             sourceImageUri: group.sourceImageUri,
             scene: group.scene.rawValue,
-            recommendedIndex: recommendedIndex,
+            recommendedIndex: Int32(recommendedIndex),
             candidates: group.scored.map { card in
-                ChatMessage.GachaCandidate(
-                    index: card.candidate.index,
+                OptimizeCandidateGroup.Candidate(
                     direction: card.candidate.direction,
-                    thumbPath: card.thumbPath,
-                    nimaScore: card.nimaScore,
-                    rejected: card.rejected,
-                    rejectReason: card.rejectReason)
+                    thumbPath: card.thumbPath ?? "",
+                    nimaScore: card.nimaScore.map { KotlinFloat(float: $0) },
+                    rejected: card.rejected)
             },
             usedFingerprints: group.usedFingerprints.sorted(),
-            drawIndex: group.drawIndex)
+            drawIndex: Int32(group.drawIndex))
     }
 
     /// EditRecipe 全尺寸渲染并写 Documents/chat_edits/<uuid>.jpg（长边 2048 上限，jpeg 0.92）；

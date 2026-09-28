@@ -1,4 +1,5 @@
 import Foundation
+import SharedKit
 
 /// 会话线程（侧栏列表项）。
 ///
@@ -102,18 +103,31 @@ final class ChatHistoryStore {
 
     // MARK: - 消息（每会话文件）
 
-    /// 消息编解码经 ChatMessage 自定义 init(from:)：optimize_candidates 消息的 gacha payload
-    /// 随消息整体 Codable 落盘；老 JSON 无该字段（decodeIfPresent）或结构漂移时
-    /// 该字段被静默丢弃（nil）——消息退化为普通文本气泡，不崩（chat.yaml §17 persistence）。
+    /// 读取消息：新线格式（ChatHistoryStoreCodec，parts 双 payload）优先；
+    /// 结构损坏/空文件 → 老 JSON（LegacyChatMessage）兜底迁移，迁移成功即回写新线格式
+    /// （下次读取走 codec 快路径），**不允许丢消息**。
     func loadMessages(sessionId: String) -> [ChatMessage] {
-        guard let data = try? Data(contentsOf: messagesFileURL(sessionId: sessionId)) else { return [] }
-        return (try? JSONDecoder().decode([ChatMessage].self, from: data)) ?? []
+        guard let data = try? Data(contentsOf: messagesFileURL(sessionId: sessionId)),
+              let text = String(data: data, encoding: .utf8) else { return [] }
+        if let decoded = ChatHistoryStoreCodec.shared.decode(text: text) {
+            return decoded
+        }
+        if let legacy = try? JSONDecoder().decode([LegacyChatMessage].self, from: data) {
+            let migrated = legacy.map { $0.toShared() }
+            if !migrated.isEmpty {
+                saveMessages(sessionId: sessionId, messages: migrated)
+            }
+            return migrated
+        }
+        return []
     }
 
+    /// 落盘消息：ChatHistoryStoreCodec 整包编码（wire 8 值分类法 + parts 嵌套数组，
+    /// 与 Android MessagePartsCodec 同一线格式；瞬态字段不落库）。
     func saveMessages(sessionId: String, messages: [ChatMessage]) {
         do {
-            let data = try JSONEncoder().encode(messages)
-            try data.write(to: messagesFileURL(sessionId: sessionId), options: .atomic)
+            let text = ChatHistoryStoreCodec.shared.encode(messages: messages)
+            try text.data(using: .utf8)?.write(to: messagesFileURL(sessionId: sessionId), options: .atomic)
         } catch {
             // 持久化失败不阻断聊天，下次启动从上次成功的文件恢复
             print("ChatHistoryStore: saveMessages failed — \(error)")

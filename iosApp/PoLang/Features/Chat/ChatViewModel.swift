@@ -50,10 +50,11 @@ final class ChatViewModel: ObservableObject {
     // MARK: AI 优化抽卡状态（chat.yaml §17）
     /// 抽卡控制器（pending 卡组进程级内存态 + 引擎调用 + 反馈落库）
     private let gachaController = ChatOptimizeGachaController.shared
-    /// messageId → 选中卡序号（初值=recommendedIndex；pending 过期后仅驱动只读渲染）
-    @Published private(set) var gachaSelections: [UUID: Int] = [:]
+    /// messageId → 选中卡序号（初值=recommendedIndex；pending 过期后仅驱动只读渲染；
+    /// key = commonMain ChatMessage.id（String））
+    @Published private(set) var gachaSelections: [String: Int] = [:]
     /// 重抽中消息集合（防抖 + 卡条按钮行 spinner）
-    @Published private(set) var gachaRerolling: Set<UUID> = []
+    @Published private(set) var gachaRerolling: Set<String> = []
     /// ai_optimize 抽卡在途（ReAct 同轮重复动作去重）
     private var gachaDrawInFlight = false
 
@@ -113,7 +114,9 @@ final class ChatViewModel: ObservableObject {
             format: L("You've chatted %lld rounds with me 🎉 Register to claim free quota, or configure your own LLM Token — either works to keep chatting!"),
             guestMessageCount
         )
-        messages.append(ChatMessage(role: .assistant, text: notice))
+        messages.append(ChatMessage.make(
+            type: .agentText, content: notice, role: .assistant,
+            parts: [MessagePartText(partId: "p0", markdown: notice, state: .done)]))
         touchThread(preview: notice)
         persist()
         showRegistrationSheet = true
@@ -122,7 +125,9 @@ final class ChatViewModel: ObservableObject {
     /// 配额耗尽提示气泡（server 403 兜底）+ 弹 sheet
     private func showGuestQuotaExhaustedNudge() {
         let notice = L("Trial quota used up. Register to get 1000 free calls.")
-        messages.append(ChatMessage(role: .assistant, text: notice))
+        messages.append(ChatMessage.make(
+            type: .agentText, content: notice, role: .assistant,
+            parts: [MessagePartText(partId: "p0", markdown: notice, state: .done)]))
         touchThread(preview: notice)
         persist()
         showRegistrationSheet = true
@@ -267,11 +272,15 @@ final class ChatViewModel: ObservableObject {
 
         // 1. user 消息即追加（带暂存图 → userImageText 上图下文；图引用 localIdentifier，
         //    远程只发文本——图片像素不上传，隐私红线）
-        messages.append(ChatMessage(
-            role: .user,
-            text: trimmed,
+        // parts 双写（持久轨 p0/p1）：userImageText = image 先 + text 后（对齐 codec
+        // rebuildParts "image" user 分支）；MessagePartImage.ref 非空 → ?? "" 兜底
+        messages.append(ChatMessage.make(
             type: stagedImage != nil ? .userImageText : .userText,
-            imageUri: stagedImage?.localIdentifier
+            content: trimmed, role: .user, imageUri: stagedLocalId,
+            parts: stagedImage != nil
+                ? [MessagePartImage(partId: "p0", ref: stagedLocalId ?? "", saved: false),
+                   MessagePartText(partId: "p1", markdown: trimmed, state: .done)]
+                : [MessagePartText(partId: "p0", markdown: trimmed, state: .done)]
         ))
         autoTitleIfNeeded(firstUserText: trimmed)
         touchThread(preview: trimmed)
@@ -281,11 +290,12 @@ final class ChatViewModel: ObservableObject {
         // 带图发文本：远程只收文本（图片像素不上传，隐私红线）；暂存图消费掉
         stagedImage = nil
 
-        // 2. assistant 占位：thinking 态（首 token 前显示 3 点动画）
-        let placeholderId = UUID()
-        messages.append(ChatMessage(
-            id: placeholderId, role: .assistant,
-            text: "", isStreaming: true, isThinking: true
+        // 2. assistant 占位：thinking 态（首 token 前显示 3 点动画）。parts 留空 →
+        //    flattener whole-item 渲染；完成时 completeMessage 建 parts=[Text p0] → key 一次重建
+        let placeholderId = UUID().uuidString
+        messages.append(ChatMessage.make(
+            id: placeholderId, type: .agentText, content: "",
+            role: .assistant, isStreaming: true, isThinking: true
         ))
         isProcessing = true
 
@@ -293,10 +303,9 @@ final class ChatViewModel: ObservableObject {
         pacing = createStreamingPacingController(onPaced: { [weak self] text, cursor in
             guard let self else { return }
             guard let idx = self.messages.firstIndex(where: { $0.id == placeholderId }) else { return }
-            self.messages[idx].isThinking = false
-            self.messages[idx].isToolCalling = false
-            self.messages[idx].text = text
-            self.messages[idx].showCursor = cursor.boolValue
+            // SKIE class 引用语义：with 复制 + 数组元素重赋值触发 @Published
+            self.messages[idx] = self.messages[idx].with(
+                content: text, showCursor: cursor.boolValue, isThinking: false)
         })
         pacing?.start()
 
@@ -405,23 +414,23 @@ final class ChatViewModel: ObservableObject {
 
     // streamingUpdate 已由节奏器 onPaced 内联替代（见 send() 中 pacing 创建）
 
-    /// 工具调用开始：显示状态文案
-    private func toolCallingUpdate(id: UUID) {
+    /// 工具调用开始：显示状态文案（B1 过渡——commonMain 无 isToolCalling 字段，仅切文案；
+    /// 完整工具态占位卡由 B2 TurnPartsReducer 的 pendingToolName 驱动）
+    private func toolCallingUpdate(id: String) {
         guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[idx].isThinking = false
-        messages[idx].isToolCalling = true
-        messages[idx].text = String(localized: "Calling tools…")  // 正在调用工具…
+        messages[idx] = messages[idx].with(
+            content: String(localized: "Calling tools…"),  // 正在调用工具…
+            isThinking: false)
     }
 
-    /// 推理完成
-    private func completeMessage(id: UUID, summary: String, errorMessage: String?, directReply: DirectRouteReply? = nil) {
+    /// 推理完成：一次 with 定稿正文 + 建持久轨 parts（p0 Text done）——
+    /// item key 由 whole 重建为 part 级，流式光标随之消失
+    private func completeMessage(id: String, summary: String, errorMessage: String?, directReply: DirectRouteReply? = nil) {
         guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[idx].isStreaming = false
-        messages[idx].isThinking = false
-        messages[idx].isToolCalling = false
+        let finalText: String
         if let errorMessage, !errorMessage.isEmpty {
-            messages[idx].text = errorMessage
-            messages[idx].error = errorMessage
+            // 错误正文直接承载 content（commonMain 无独立 error 字段）
+            finalText = errorMessage
             // 访客配额耗尽硬兜底（chat.yaml §4.1 triggers.quota_exceeded）：server 403 body
             // 全程透传到 errorMessage（contracts.md §2 已验证），含 "quota_exceeded" 即插提示 + 弹 sheet
             if isGuestMode, errorMessage.localizedCaseInsensitiveContains("quota_exceeded") {
@@ -430,13 +439,16 @@ final class ChatViewModel: ObservableObject {
         } else if let directReply {
             // 意图路由直执回合：本地化气泡（模型侧 observation 是硬编码中文模板，不可直达用户）；
             // 卡片已经 watchUiActions 渲染（对齐 Android directReply 分支口径）
-            messages[idx].text = directReply.totalCount > 0
+            finalText = directReply.totalCount > 0
                 ? String(localized: "Search results are shown in the card above")
                 : String(localized: "No results")
         } else {
-            messages[idx].text = summary.isEmpty ? String(localized: "(No response)") : summary
+            finalText = summary.isEmpty ? String(localized: "(No response)") : summary
         }
-        touchThread(preview: messages[idx].text)
+        messages[idx] = messages[idx].with(
+            content: finalText, isStreaming: false, showCursor: false, isThinking: false,
+            parts: [MessagePartText(partId: "p0", markdown: finalText, state: .done)])
+        touchThread(preview: finalText)
         persist()
     }
 
@@ -448,7 +460,22 @@ final class ChatViewModel: ObservableObject {
             // 空结果不出卡片：Android uiActions 收集器以 assets.isNotEmpty() 为门，
             // 空结果由 LLM 在最终回复里说明（避免多轮空搜索刷出多条「未找到」气泡）
             guard dto.totalCount > 0, !dto.mediaIds.isEmpty else { return }
-            let ids = dto.mediaIds.map { $0.int64Value }
+            // MediaResultsUi 负载（uri 空 stub，渲染侧按 assets[].id 反查媒体库——同 legacy 迁移口径）
+            let ui = MediaResultsUi(
+                query: dto.query,
+                assets: dto.mediaIds.map {
+                    MediaAsset(
+                        id: $0.int64Value, uri: "", type: .photo, captureDate: 0, fileName: "",
+                        duration: nil, hasFace: false, faceId: nil, source: nil,
+                        labels: nil, ocrText: nil, latitude: nil, longitude: nil,
+                        locationName: nil, city: nil, indexedAt: nil,
+                        faceFocusY: nil, aestheticScore: nil, faceQualityScore: nil
+                    )
+                },
+                totalCount: Int32(truncatingIfNeeded: dto.totalCount),
+                isRefinement: false,
+                feedbackState: [:]
+            )
             let header = String(localized: "Found \(dto.totalCount) results for「\(dto.query)」")
             // 回合内 upsert 去重（chat.yaml §9 per_turn_upsert，c4cea4995 定稿口径）：
             // 同一用户回合（最后一条 user 消息之后）至多一张横滑卡——查本回合上一张卡，
@@ -461,25 +488,16 @@ final class ChatViewModel: ObservableObject {
             if let lastUser = messages.lastIndex(where: { $0.role == .user }),
                let prevCard = messages[lastUser...].lastIndex(where: { $0.type == .mediaResults }) {
                 let previous = messages[prevCard]
-                messages[prevCard] = ChatMessage(
-                    id: previous.id,
-                    role: .assistant,
-                    text: header,
-                    timestamp: previous.timestamp,
-                    type: .mediaResults,
-                    mediaIds: ids,
-                    mediaQuery: dto.query,
-                    mediaTotalCount: Int(truncatingIfNeeded: dto.totalCount)
-                )
+                messages[prevCard] = ChatMessage.make(
+                    id: previous.id, type: .mediaResults, content: header,
+                    role: .assistant, timestamp: previous.timestamp,
+                    mediaResults: ui,
+                    parts: [MessagePartMediaResults(partId: "p0", results: ui)])
             } else {
-                messages.append(ChatMessage(
-                    role: .assistant,
-                    text: header,
-                    type: .mediaResults,
-                    mediaIds: ids,
-                    mediaQuery: dto.query,
-                    mediaTotalCount: Int(truncatingIfNeeded: dto.totalCount)
-                ))
+                messages.append(ChatMessage.make(
+                    type: .mediaResults, content: header, role: .assistant,
+                    mediaResults: ui,
+                    parts: [MessagePartMediaResults(partId: "p0", results: ui)]))
             }
             touchThread(preview: header)
             persist()
@@ -491,13 +509,17 @@ final class ChatViewModel: ObservableObject {
         case "error":
             // 对齐 Android：错误以 ❌ 气泡可见（ChatViewModel.kt:1419），不由 LLM 总结掩盖
             let text = "❌ \(dto.message)"
-            messages.append(ChatMessage(role: .assistant, text: text))
+            messages.append(ChatMessage.make(
+                type: .agentText, content: text, role: .assistant,
+                parts: [MessagePartText(partId: "p0", markdown: text, state: .done)]))
             touchThread(preview: text)
             persist()
         case "success":
             // 对齐 Android describeCommandResult（ChatViewModel.kt:1409）：✅ 已执行 {command}
             let text = String(format: String(localized: "chat.command_executed"), dto.message)
-            messages.append(ChatMessage(role: .assistant, text: text))
+            messages.append(ChatMessage.make(
+                type: .agentText, content: text, role: .assistant,
+                parts: [MessagePartText(partId: "p0", markdown: text, state: .done)]))
             touchThread(preview: text)
             persist()
         case "ai_optimize":
@@ -518,7 +540,7 @@ final class ChatViewModel: ObservableObject {
         guard !gachaDrawInFlight else { return }
         gachaDrawInFlight = true
         let sessionId = currentSessionId
-        let messageId = UUID()
+        let messageId = UUID().uuidString
         let imageUri = dto.imageUri
         let fallbackUri = lastUserImageUri()
         Task { @MainActor in
@@ -535,22 +557,26 @@ final class ChatViewModel: ObservableObject {
             }
             switch outcome {
             case .candidates(let payload, let explanation):
-                messages.append(ChatMessage(
-                    id: messageId, role: .assistant,
-                    text: explanation, type: .optimizeCandidates, gacha: payload))
+                messages.append(ChatMessage.make(
+                    id: messageId, type: .optimizeCandidates, content: explanation,
+                    role: .assistant, optimizeCandidates: payload,
+                    parts: [MessagePartOptimizeCandidates(partId: "p0", group: payload)]))
                 // 选中态初值 = 推荐卡（KeepOriginal=-1 不预选）
-                gachaSelections[messageId] = payload.recommendedIndex
+                gachaSelections[messageId] = Int(payload.recommendedIndex)
                 touchThread(preview: explanation)
                 persist()
             case .fallback(let imagePath, let explanation):
                 // 降级单发：含图（固定预设全尺寸渲染落盘）或纯文本解释
                 // 图消息走 AGENT_IMAGE 契约（FillWidth 240 完整显示，chat.yaml §5 image_content.agent_image）
                 if let imagePath {
-                    messages.append(ChatMessage(
-                        role: .assistant, text: explanation,
-                        type: .agentImage, imageUri: imagePath))
+                    messages.append(ChatMessage.make(
+                        type: .agentImage, content: explanation, role: .assistant,
+                        imageUri: imagePath,
+                        parts: [MessagePartImage(partId: "p0", ref: imagePath, saved: false)]))
                 } else {
-                    messages.append(ChatMessage(role: .assistant, text: explanation))
+                    messages.append(ChatMessage.make(
+                        type: .agentText, content: explanation, role: .assistant,
+                        parts: [MessagePartText(partId: "p0", markdown: explanation, state: .done)]))
                 }
                 touchThread(preview: explanation)
                 persist()
@@ -559,17 +585,17 @@ final class ChatViewModel: ObservableObject {
     }
 
     /// 卡条 interactive 判定（pending 组存在；过期即只读——无按钮行、不改选中）
-    func isGachaInteractive(_ messageId: UUID) -> Bool {
+    func isGachaInteractive(_ messageId: String) -> Bool {
         gachaController.hasPending(messageId)
     }
 
     /// 点卡：改选中（全屏预览由 ChatView onCardTap 打开）
-    func selectGachaCard(messageId: UUID, index: Int) {
+    func selectGachaCard(messageId: String, index: Int) {
         gachaSelections[messageId] = index
     }
 
     /// 换一组：以 usedFingerprints 为 exclude 重抽 → 覆写原消息候选（drawIndex+1）
-    func rerollGacha(messageId: UUID) {
+    func rerollGacha(messageId: String) {
         guard !gachaRerolling.contains(messageId),
               messages.contains(where: { $0.id == messageId && $0.type == .optimizeCandidates }) else { return }
         gachaRerolling.insert(messageId)
@@ -579,9 +605,10 @@ final class ChatViewModel: ObservableObject {
             case .replaced(let payload, let explanation):
                 // 覆写原消息候选与伴随解释（await 后按 id 重找——列表可能已变动）
                 guard let idx = messages.firstIndex(where: { $0.id == messageId }) else { return }
-                messages[idx].gacha = payload
-                messages[idx].text = explanation
-                gachaSelections[messageId] = payload.recommendedIndex
+                messages[idx] = messages[idx].with(
+                    content: explanation, optimizeCandidates: payload,
+                    parts: [MessagePartOptimizeCandidates(partId: "p0", group: payload)])
+                gachaSelections[messageId] = Int(payload.recommendedIndex)
                 persist()
             case .unavailable:
                 // 引擎不可用/重抽全灭：pending 保持不动，卡条仍可确认既有卡
@@ -593,11 +620,11 @@ final class ChatViewModel: ObservableObject {
     /// 就用这张：全尺寸渲染 → 落 Documents/chat_edits → 原消息改写为 agentEditResult
     /// （saved=false 语义——文件仅落 App 沙盒，气泡文案不标注「已存相册」；
     /// 失败 pending 已回填，卡条保持可重试 + toast）
-    func confirmGacha(messageId: UUID) {
+    func confirmGacha(messageId: String) {
         guard let selection = gachaSelections[messageId], selection >= 0,
               let msg = messages.first(where: { $0.id == messageId && $0.type == .optimizeCandidates }) else { return }
         let sessionId = currentSessionId
-        let explanation = msg.text
+        let explanation = msg.content
         Task { @MainActor in
             guard let path = await gachaController.confirm(messageId: messageId, candidateIndex: selection) else {
                 unavailableNotice = String(localized: "chat_gacha_confirm_failed")
@@ -606,18 +633,21 @@ final class ChatViewModel: ObservableObject {
             // 渲染期间切了会话：反馈已落库、图已写盘，仅放弃 UI 改写（不污染新会话）
             guard currentSessionId == sessionId else { return }
             if let idx = messages.firstIndex(where: { $0.id == messageId }) {
-                // 原地改写：气泡正文保留场景解释句，图换为全尺寸渲染结果
+                // 原地改写：make 重建（type 转 agentImage + 清 optimizeCandidates——with 不支持置 nil），
+                // 气泡正文保留场景解释句，图换为全尺寸渲染结果（保留 id/timestamp 稳定列表）
                 // （AGENT_IMAGE 契约：对齐 Android confirm 改写 type="agent_image"）
-                messages[idx].type = .agentImage
-                messages[idx].imageUri = path
-                messages[idx].gacha = nil
+                messages[idx] = ChatMessage.make(
+                    id: messageId, type: .agentImage, content: explanation,
+                    role: .assistant, timestamp: msg.timestamp, imageUri: path,
+                    parts: [MessagePartImage(partId: "p0", ref: path, saved: false)])
                 gachaSelections.removeValue(forKey: messageId)
                 touchThread(preview: explanation)
                 persist()
             } else {
-                messages.append(ChatMessage(
-                    role: .assistant, text: explanation,
-                    type: .agentImage, imageUri: path))
+                messages.append(ChatMessage.make(
+                    type: .agentImage, content: explanation, role: .assistant,
+                    imageUri: path,
+                    parts: [MessagePartImage(partId: "p0", ref: path, saved: false)]))
                 persist()
             }
         }
@@ -631,10 +661,10 @@ final class ChatViewModel: ObservableObject {
     /// 历史载入后恢复卡条选中态（初值=recommendedIndex）。pending 组为进程级内存态，
     /// 冷启后一律只读过期（ChatView interactive=false）；selections 仅驱动渲染。
     private func restoreGachaSelections() {
-        var restored: [UUID: Int] = [:]
+        var restored: [String: Int] = [:]
         for msg in messages where msg.type == .optimizeCandidates {
-            if let payload = msg.gacha {
-                restored[msg.id] = payload.recommendedIndex
+            if let payload = msg.optimizeCandidates {
+                restored[msg.id] = Int(payload.recommendedIndex)
             }
         }
         gachaSelections = restored
@@ -703,9 +733,11 @@ final class ChatViewModel: ObservableObject {
     /// 追加一条 CHART 消息（图卡）。LLM draw_chart（经 IosChartCapability → ChartRendererBridge.onChart）
     /// 与 /chart 手动 demo 共用此落点。
     private func appendChartMessage(svg: String, summary: String) {
-        var msg = ChatMessage(role: .assistant, text: summary, type: .chart)
-        msg.chartSvg = svg
-        messages.append(msg)
+        // 双显禁止契约：content 承载 svg 本体（persisted payloads 集合来自消息行 content），
+        // summary 仅作 touchThread 预览
+        messages.append(ChatMessage.make(
+            type: .chart, content: svg, role: .assistant, chartSvg: svg,
+            parts: [MessagePartChart(partId: "p0", svg: svg, state: .outputAvailable)]))
         touchThread(preview: summary)
         persist()
     }
@@ -729,11 +761,10 @@ final class ChatViewModel: ObservableObject {
         ) { [weak self] _, errorMessage in
             Task { @MainActor in
                 guard let self, let errorMessage, !errorMessage.isEmpty else { return }
-                self.messages.append(
-                    ChatMessage(role: .assistant,
-                                text: String(format: String(localized: "chat.chart_failed"), errorMessage),
-                                error: errorMessage)
-                )
+                let text = String(format: String(localized: "chat.chart_failed"), errorMessage)
+                self.messages.append(ChatMessage.make(
+                    type: .agentText, content: text, role: .assistant,
+                    parts: [MessagePartText(partId: "p0", markdown: text, state: .done)]))
                 self.persist()
             }
         }
@@ -755,13 +786,14 @@ final class ChatViewModel: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 if let errorMessage, !errorMessage.isEmpty {
-                    self.messages.append(
-                        ChatMessage(role: .assistant,
-                                    text: String(format: String(localized: "chat.script_failed"), errorMessage),
-                                    error: errorMessage)
-                    )
+                    let text = String(format: String(localized: "chat.script_failed"), errorMessage)
+                    self.messages.append(ChatMessage.make(
+                        type: .agentText, content: text, role: .assistant,
+                        parts: [MessagePartText(partId: "p0", markdown: text, state: .done)]))
                 } else {
-                    self.messages.append(ChatMessage(role: .assistant, text: result))
+                    self.messages.append(ChatMessage.make(
+                        type: .agentText, content: result, role: .assistant,
+                        parts: [MessagePartText(partId: "p0", markdown: result, state: .done)]))
                 }
                 self.persist()
             }
@@ -774,7 +806,12 @@ final class ChatViewModel: ObservableObject {
     /// 保存时已入库，与 Android「chat 内保存按钮」为有意分歧，见 plan 范围裁决）。
     private func appendEditResultMessage(imagePath: String) {
         let caption = String(localized: "Edit complete. Result saved to Photos.")
-        messages.append(ChatMessage(role: .assistant, text: caption, type: .agentEditResult, imageUri: imagePath))
+        messages.append(ChatMessage.make(
+            type: .agentEditResult, content: caption, role: .assistant,
+            imageUri: imagePath, imageSaved: true,
+            parts: [MessagePartEditResult(
+                partId: "p0", ref: imagePath, description: caption,
+                suggestions: [], saved: true)]))
         touchThread(preview: caption)
         persist()
     }
@@ -801,7 +838,10 @@ final class ChatViewModel: ObservableObject {
             try data.write(to: url)
             appendEditResultMessage(imagePath: url.path)
         } catch {
-            messages.append(ChatMessage(role: .assistant, text: "demo 图片写入失败：\(error.localizedDescription)", error: error.localizedDescription))
+            let text = "demo 图片写入失败：\(error.localizedDescription)"
+            messages.append(ChatMessage.make(
+                type: .agentText, content: text, role: .assistant,
+                parts: [MessagePartText(partId: "p0", markdown: text, state: .done)]))
             persist()
         }
     }
