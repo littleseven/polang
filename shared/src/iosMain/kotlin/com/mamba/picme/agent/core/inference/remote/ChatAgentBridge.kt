@@ -31,7 +31,7 @@ import kotlinx.coroutines.withTimeout
  * - **try/catch(Throwable) 全兜**：CancellationException 语义保留（重新抛出不吞），
  *   其余异常在 Kotlin 侧吞掉，经 `onComplete(errorMessage)` 回传 Swift——
  *   未声明 @Throws 的异常逃逸到 Swift 会 signal 6 (SIGABRT)。
- * - **回调线程**：onText/onToolCall/onAction 可在任意调度器线程触发；
+ * - **回调线程**：onStreamEvent/onAction 可在任意调度器线程触发；
  *   Swift 侧必须在 `Task { @MainActor in }` 内更新 UI（漏一处即 UI 线程违规）。
  *
  * @param orchestrator 已初始化的 [AgentOrchestrator] 实例
@@ -65,6 +65,11 @@ class ChatAgentBridge(
      * 发送消息（启动流式远程推理）。返回 void（K/N 多参数方法丢返回类型，
      * watcher 生命周期内部管理，Swift 经 [cancelCurrent] 取消）。
      *
+     * M5 B2：事件透传形态——`onStreamEvent` 原样转发引擎层 [ChatStreamEvent]
+     * （TextSnapshot/ToolCallStarted/RoundStarted 全量），Swift 侧喂
+     * ChatStreamTurnAdapter 翻译成块级 TurnStreamEvent 驱动 turn parts 装配
+     * （对齐 Android ChatViewModel 消费形态；替代 B1 的 onText/onToolCall 双回调）。
+     *
      * @param persona 助手性格枚举 name（`AssistantPersona.name`），非法值回落 DEFAULT
      * @param replyLanguage 回复语言枚举 name（`ReplyLanguage.name`），非法值回落 SIMPLIFIED_CHINESE
      *   （String 参数而非枚举：规避 K/N 枚举导出的互操作摩擦，解析失败兜底不炸）
@@ -73,8 +78,7 @@ class ChatAgentBridge(
         input: String,
         persona: String,
         replyLanguage: String,
-        onText: (String) -> Unit,
-        onToolCall: () -> Unit,
+        onStreamEvent: (ChatStreamEvent) -> Unit,
         onComplete: (summary: String, errorMessage: String?, directReply: DirectRouteReply?) -> Unit
     ) {
         val personaEnum = runCatching { AssistantPersona.valueOf(persona) }
@@ -107,14 +111,7 @@ class ChatAgentBridge(
                 val result = orchestrator.remoteChatEngine.streamChat(
                     input = input,
                     agentContext = context,
-                    onEvent = { event ->
-                        when (event) {
-                            is ChatStreamEvent.TextSnapshot -> onText(event.text)
-                            is ChatStreamEvent.ToolCallStarted -> onToolCall()
-                            // M4 显式轮边界信号：iOS 渲染未走 turn 装配器（M5 跟随），无需响应
-                            is ChatStreamEvent.RoundStarted -> Unit
-                        }
-                    }
+                    onEvent = { event -> onStreamEvent(event) }
                 )
                 result.fold(
                     onSuccess = { streamResult ->

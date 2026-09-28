@@ -11,7 +11,8 @@ import kotlinx.serialization.Serializable
  * （[ClaudeAgentState] / [OptimizeCandidateGroup] 的 toJson/fromJson）不在此——
  * 它们是平台关注点，由 androidApp 扩展函数提供（Room metadata 边界）。
  *
- * iOS 当前用 Swift 原生 `ChatMessage`（未消费本类型）；本下沉为后续 KMP 整理铺路。
+ * iOS 经 SharedKit 消费本类型（Swift `typealias ChatMessage = SharedKit.ChatMessage`，
+ * M5 起渲染源 = parts 拍平列表；Swift 侧仅保留流式瞬态包装）。
  *
  * ADR-016（M1）：新增 [parts] 有序内容块数组（Vercel parts 模型），与 legacy 平铺字段
  * 双写共存；UI 渲染仍读 legacy 字段（M1 不动 UI），parts 供持久化（Room partsJson）与

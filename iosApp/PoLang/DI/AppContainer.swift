@@ -31,6 +31,10 @@ final class AppContainer: ObservableObject {
     /// 2026-09-16 主导航统一，main-nav.yaml §4）
     let navigationBridge: NavigationBridge
 
+    /// chat HTML 卡桥（IosRenderHtmlCapability render_html 执行端 → sanitize +
+    /// ChatViewModel 落 HTML_CARD 消息，M5 B4 chat.yaml §13）
+    let renderHtmlBridge: RenderHtmlBridge
+
     /// 美颜渲染参数（全局共享，BeautyPanelView ↔ BeautyRenderer 双向绑定）
     @Published var beautyParams = BeautyRenderer.Params()
 
@@ -54,6 +58,7 @@ final class AppContainer: ObservableObject {
         self.runScriptBridge = RunScriptBridge.shared
         self.aiOptimizeBridge = AiOptimizeBridge.shared
         self.navigationBridge = NavigationBridge.shared
+        self.renderHtmlBridge = RenderHtmlBridge.shared
         setupAgentComposition()
     }
 
@@ -65,6 +70,7 @@ final class AppContainer: ObservableObject {
             deviceId: deviceId,
             searchBridge: searchBridge,
             chartBridge: chartBridge,
+            renderHtmlBridge: renderHtmlBridge,
             runScriptBridge: runScriptBridge,
             aiOptimizeBridge: aiOptimizeBridge,
             navigationBridge: navigationBridge,

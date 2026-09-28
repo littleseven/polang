@@ -26,6 +26,10 @@ struct ChatView: View {
     @State private var comingSoonFeature: String? = nil
     /// 「自己的 Token」入口：全屏打开设置·远程模型页（chat.yaml §4.1 secondary_cta）
     @State private var showTokenConfig = false
+    /// HTML 卡 FULLPAGE 全屏查看器（chat.yaml §13：卡内「查看完整内容」进入）
+    @State private var htmlFullpage: HtmlFullpagePayload? = nil
+    /// HTML 卡外链浮层（非 http(s) 之外的导航/新窗口链接，页内 WebView 预览）
+    @State private var htmlLinkURL: URL? = nil
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -88,6 +92,21 @@ struct ChatView: View {
             .offset(x: isSidebarOpen ? 0 : -300)
             .allowsHitTesting(isSidebarOpen)
             .accessibilityHidden(!isSidebarOpen)
+
+            // HTML 卡浮层层级（M5 B4，chat.yaml §13）：FULLPAGE 查看器压消息列表，
+            // 外链浮层再压查看器（Android 逐层 overlay 的 iOS zIndex 叠层对等实现）
+            if let payload = htmlFullpage {
+                HtmlFullpageViewer(
+                    payload: payload,
+                    onClose: { htmlFullpage = nil },
+                    onOpenLink: { url in htmlLinkURL = url }
+                )
+                .zIndex(10)
+            }
+            if let url = htmlLinkURL {
+                HtmlLinkPreviewOverlay(url: url, onClose: { htmlLinkURL = nil })
+                    .zIndex(11)
+            }
         }
         .background(Color(.systemBackground).ignoresSafeArea())
         .onAppear {
@@ -222,35 +241,71 @@ struct ChatView: View {
 
     // MARK: - Message List
 
+    /// M5：消息列表拍平（commonMain ChatListFlattener）。每渲染重算——消息量级
+    /// <100 可接受，后续优化点为随 turn 缓存。pendingToolName 接 B2 turn 装配轨
+    /// （ToolInputStart 置值 / ToolOutput·收尾清除），非卡片工具进行中合成
+    /// TYPE_TOOL_STATUS item。
+    private var flattenedItems: [ChatListItem] {
+        ChatListFlattenerKt.flattenChatItems(
+            messages: viewModel.messages,
+            pendingToolName: viewModel.pendingToolName
+        )
+    }
+
+    /// M5 turn 间距阶梯（对齐 Android ChatList 间距语义）：
+    /// 首项 0（容器 `.padding(.top, 12)` 统一留白）/ turn 起点 `Spacing.lg`（16）/
+    /// 连续 agent 文本合并 `Spacing.xs`（4）/ 其余 `Spacing.sm`（8）。
+    /// LazyVStack spacing 置 0，间距全由本阶梯承载（firstKey 由调用方传入，
+    /// 避免 helper 内重算拍平）。
+    private func topSpacing(for item: ChatListItem, firstKey: String?) -> CGFloat {
+        if item.key == firstKey { return 0 }
+        if item.isTurnStart { return Spacing.lg }
+        if item.mergeWithPrevious { return Spacing.xs }
+        return Spacing.sm
+    }
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(viewModel.messages) { msg in
-                        MessageBubble(
-                            message: msg,
+                LazyVStack(spacing: 0) {
+                    let items = flattenedItems
+                    ForEach(items, id: \.key) { item in
+                        ChatListItemView(
+                            item: item,
                             onNavigateToGallery: onNavigateToGallery,
                             onImageTap: { img in
                                 if let img { previewImage = img }
                             },
                             onMediaTap: { lid in openPreview(localIdentifier: lid) },
-                            gachaInteractive: viewModel.isGachaInteractive(msg.id),
-                            gachaSelectedIndex: viewModel.gachaSelections[msg.id],
-                            gachaRerolling: viewModel.gachaRerolling.contains(msg.id),
+                            gachaInteractive: viewModel.isGachaInteractive(item.message.id),
+                            gachaSelectedIndex: viewModel.gachaSelections[item.message.id],
+                            gachaRerolling: viewModel.gachaRerolling.contains(item.message.id),
                             onGachaSelection: { index in
-                                viewModel.selectGachaCard(messageId: msg.id, index: index)
+                                viewModel.selectGachaCard(messageId: item.message.id, index: index)
                             },
                             onGachaReroll: {
-                                viewModel.rerollGacha(messageId: msg.id)
+                                viewModel.rerollGacha(messageId: item.message.id)
                             },
                             onGachaConfirm: {
-                                viewModel.confirmGacha(messageId: msg.id)
+                                viewModel.confirmGacha(messageId: item.message.id)
                             },
                             onGachaCardTap: { thumbPath in
                                 openGachaPreview(thumbPath: thumbPath)
+                            },
+                            onOpenHtmlFullpage: { html, summary in
+                                htmlFullpage = HtmlFullpagePayload(
+                                    id: item.message.id, html: html, summary: summary)
+                            },
+                            onOpenHtmlLink: { url in htmlLinkURL = url },
+                            onHtmlDisplayFinalized: { messageId, mode, measured in
+                                viewModel.updateHtmlCardDisplay(
+                                    messageId: messageId,
+                                    displayMode: mode,
+                                    measuredHeightPx: measured)
                             }
                         )
-                        .id(msg.id)
+                        .id(item.key)
+                        .padding(.top, topSpacing(for: item, firstKey: items.first?.key))
                     }
                 }
                 .padding(.horizontal, 12)
@@ -268,7 +323,7 @@ struct ChatView: View {
                 }
             }
             .onChange(of: viewModel.messages.count) { _ in scrollToBottom(proxy) }
-            .onChange(of: viewModel.messages.last?.text) { _ in scrollToBottom(proxy) }
+            .onChange(of: viewModel.messages.last?.content) { _ in scrollToBottom(proxy) }
         }
     }
 
@@ -288,9 +343,9 @@ struct ChatView: View {
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        if let lastId = viewModel.messages.last?.id {
+        if let lastKey = flattenedItems.last?.key {
             withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(lastId, anchor: .bottom)
+                proxy.scrollTo(lastKey, anchor: .bottom)
             }
         }
     }
@@ -485,164 +540,168 @@ struct ChatView: View {
     }
 }
 
-// MARK: - Markdown 文本（spec §5 agent.text: markdown=true；§11 allowed: iOS AttributedString）
-// 用 Apple AttributedString(markdown:) 解析 CommonMark（粗体/斜体/链接/行内代码/标题/列表/引用）。
-// 代码块折叠·复制、表格渲染属 §11 允许差异，本版不做。用户气泡保持纯文本（对齐 Android）。
+// MARK: - Markdown 文本（M5 B3，spec chat.yaml §5 agent_markdown）
+// AttributedString(markdown:) 全量解析 + run 级排版阶梯（§5 typography）：
+// headings h1 1.30…h6 1.00 全 Bold、inline_code 同字号等宽（Text 自动尊重
+// inlinePresentationIntent.code）、link primary+下划线、quote italic。
+// parse gating：≤1500 字同步解析；超阈异步 + 80ms 防抖（task(id:) 随文本变化
+// 取消重排——流式增量不捕获旧内容，§5 streaming 红线）。
+// 平台限制登记（gap 报告披露）：run 级背景（inline_code_bg=text α0.12）与
+// run 级段落行高 SwiftUI Text 不支持——inline_code 以等宽区分，行高沿用视图级。
 
 struct MarkdownText: View {
     let text: String
 
+    /// §5 parse gating 阈值（字符）
+    private static let syncLimit = 1500
+    /// 超阈异步解析防抖
+    private static let debounceNs: UInt64 = 80_000_000
+
+    @State private var asyncParsed: AttributedString?
+
     var body: some View {
-        Text(parsed)
+        if text.count <= Self.syncLimit {
+            Text(Self.styled(Self.parse(text)))
+        } else {
+            Text(asyncParsed ?? AttributedString(text))
+                .task(id: text) {
+                    try? await Task.sleep(nanoseconds: Self.debounceNs)
+                    guard !Task.isCancelled else { return }
+                    asyncParsed = Self.styled(Self.parse(text))
+                }
+        }
     }
 
-    private var parsed: AttributedString {
-        // 流式期间文本可能不完整（未闭合 ** / ``），用 returnPartiallyParsedIfPossible 容错；
-        // 整体解析失败回退纯文本。
-        if let attr = try? AttributedString(markdown: text, options: Self.opts) {
-            return attr
-        }
-        return AttributedString(text)
+    private static func parse(_ markdown: String) -> AttributedString {
+        // 流式期间文本可能不完整（未闭合 ** / ``），用 returnPartiallyParsedIfPossible
+        // 容错；整体解析失败回退纯文本。
+        (try? AttributedString(markdown: markdown, options: opts)) ?? AttributedString(markdown)
     }
 
     private static let opts = AttributedString.MarkdownParsingOptions(
         interpretedSyntax: .full,
         failurePolicy: .returnPartiallyParsedIfPossible
     )
+
+    /// §5 typography：headings 缩放（正文 16pt 基准），全档 Bold
+    private static let headingScale: [Int: CGFloat] = [
+        1: 1.30, 2: 1.22, 3: 1.15, 4: 1.10, 5: 1.05, 6: 1.00,
+    ]
+
+    /// run 级排版阶梯：headings 缩放+Bold / quote italic / link primary+下划线。
+    private static func styled(_ attr: AttributedString) -> AttributedString {
+        var m = attr
+        let base = ChatBubbleTokens.textSize
+        for run in m.runs {
+            // 新 Foundation API：presentationIntent.components（.header(level:) / .blockQuote）
+            if let intent = run.presentationIntent {
+                for component in intent.components {
+                    switch component.kind {
+                    case .header(let level):
+                        let scale = headingScale[level] ?? 1.0
+                        m[run.range].font = .system(size: base * scale, weight: .bold)
+                    case .blockQuote:
+                        m[run.range].font = .system(size: base).italic()
+                    default:
+                        break
+                    }
+                }
+            }
+            if run.link != nil {
+                m[run.range].foregroundColor = .accentColor
+                m[run.range].underlineStyle = .single
+            }
+        }
+        return m
+    }
 }
 
 // MARK: - Message Bubble
 
+/// 整颗消息气泡（M5 B1 收窄为整颗桶）：只承接 flattener 判定「整颗渲染」的消息——
+/// USER（无视 parts）与 legacy 桶（parts 空 / claudeAgent / agent_image /
+/// agent_edit_result / 流式占位）。part 拍平项（文本/图卡/媒体/抽卡/工具态/HTML）
+/// 由 `ChatListItemView` 分桶渲染。媒体卡与 chart/gacha 载荷不再挂在气泡上。
 private struct MessageBubble: View {
     let message: ChatMessage
-    var onNavigateToGallery: ((String) -> Void)? = nil
     var onImageTap: ((UIImage?) -> Void)? = nil
-    var onMediaTap: ((String) -> Void)? = nil
-    // AI 优化抽卡（chat.yaml §17）：卡条状态与回调（仅 optimizeCandidates 消息消费）
-    var gachaInteractive: Bool = false
-    var gachaSelectedIndex: Int? = nil
-    var gachaRerolling: Bool = false
-    var onGachaSelection: ((Int) -> Void)? = nil
-    var onGachaReroll: (() -> Void)? = nil
-    var onGachaConfirm: (() -> Void)? = nil
-    var onGachaCardTap: ((String?) -> Void)? = nil
     @Environment(\.colorScheme) private var cs
     private var s: SchemeColors { appScheme(cs) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                if message.role == .user { Spacer(minLength: 40) }
+        HStack {
+            if message.role == .user { Spacer(minLength: 40) }
 
-                VStack(alignment: .leading, spacing: 0) {
-                    if message.isThinking {
-                        // 思考态：3 点动画（首 token 前）
-                        ThinkingIndicator()
-                    } else if message.isToolCalling {
-                        // 工具调用态：状态文案
-                        Text(message.text)
-                            .font(.system(size: ChatBubbleTokens.textSize))
-                            .foregroundColor(Color(.secondaryLabel))
-                    } else if !message.text.isEmpty || !message.mediaIds.isEmpty || message.imageUri != nil {
-                        // USER_IMAGE_TEXT：上图下文（图在文本上方，对齐 Android）
-                        if message.type == .userImageText, let uri = message.imageUri {
-                            UserImageAttachment(localIdentifier: uri, onTap: { onImageTap?($0) })
-                                .padding(.bottom, 6)
-                        }
+            VStack(alignment: .leading, spacing: 0) {
+                if message.isThinking {
+                    // 思考态：3 点动画（首 token 前）
+                    ThinkingIndicator()
+                } else if !message.content.isEmpty || message.imageUri != nil {
+                    // USER_IMAGE_TEXT：上图下文（图在文本上方，对齐 Android）
+                    if message.type == .userImageText, let uri = message.imageUri {
+                        UserImageAttachment(localIdentifier: uri, onTap: { onImageTap?($0) })
+                            .padding(.bottom, 6)
+                    }
 
-                        // AGENT_IMAGE：agent 单发结果图（gacha 确认/降级；FillWidth 240 完整显示，
-                        // chat.yaml §5 image_content.agent_image）
-                        if message.type == .agentImage, let path = message.imageUri {
-                            AgentImageAttachment(imagePath: path, onTap: { onImageTap?($0) })
-                                .padding(.bottom, 6)
-                        }
+                    // AGENT_IMAGE：agent 单发结果图（gacha 确认/降级；FillWidth 240 完整显示，
+                    // chat.yaml §5 image_content.agent_image）
+                    if message.type == .agentImage, let path = message.imageUri {
+                        AgentImageAttachment(imagePath: path, onTap: { onImageTap?($0) })
+                            .padding(.bottom, 6)
+                    }
 
-                        // AGENT_EDIT_RESULT：编辑结果图卡（文件路径 + 失效占位），说明文字走下方文本渲染
-                        if message.type == .agentEditResult, let path = message.imageUri {
-                            ChatEditImageCard(imagePath: path, onTap: { onImageTap?($0) })
-                                .padding(.bottom, 6)
-                        }
+                    // AGENT_EDIT_RESULT：编辑结果图卡（文件路径 + 失效占位），说明文字走下方文本渲染
+                    if message.type == .agentEditResult, let path = message.imageUri {
+                        ChatEditImageCard(imagePath: path, onTap: { onImageTap?($0) })
+                            .padding(.bottom, 6)
+                    }
 
-                        // 正常文本（agent → Markdown 渲染；user → 纯文本；流式光标内联右侧，对齐 Android）
-                        if !message.text.isEmpty {
-                            HStack(alignment: .bottom, spacing: 2) {
-                                Group {
-                                    if message.role == .user {
-                                        Text(message.text)
-                                    } else {
-                                        AgentTextView(content: message.text)
-                                    }
-                                }
-                                .font(.system(size: ChatBubbleTokens.textSize))
-                                .lineSpacing(ChatBubbleTokens.textLineHeight - ChatBubbleTokens.textSize)
-                                .foregroundColor(textColor)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier(message.role == .user ? "chat_user_bubble" : "chat_ai_bubble")
-
-                                // 流式光标（内联右侧，由节奏器 showCursor 驱动：吐字中可见 / 完成隐藏）
-                                if message.showCursor {
-                                    BlinkCursor()
-                                        .padding(.bottom, 3)
+                    // 正常文本（agent → Markdown 渲染；user → 纯文本；流式光标内联右侧，对齐 Android）
+                    if !message.content.isEmpty {
+                        HStack(alignment: .bottom, spacing: 2) {
+                            Group {
+                                if message.role == .user {
+                                    Text(message.content)
+                                } else {
+                                    AgentTextView(content: message.content)
                                 }
                             }
-                        }
+                            .font(.system(size: ChatBubbleTokens.textSize))
+                            .lineSpacing(ChatBubbleTokens.textLineHeight - ChatBubbleTokens.textSize)
+                            .foregroundColor(textColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier(message.role == .user ? "chat_user_bubble" : "chat_ai_bubble")
 
-                        // 媒体卡片（独立消息项）
-                        if !message.mediaIds.isEmpty {
-                            MediaCardRow(
-                                mediaIds: message.mediaIds,
-                                totalCount: message.mediaTotalCount ?? message.mediaIds.count,
-                                onViewAll: { onNavigateToGallery?(message.mediaQuery ?? "") },
-                                onMediaTap: onMediaTap
-                            )
-                            .padding(.top, 6)
+                            // 流式光标（内联右侧，由节奏器 showCursor 驱动：吐字中可见 / 完成隐藏）
+                            if message.showCursor {
+                                BlinkCursor()
+                                    .padding(.bottom, 3)
+                            }
                         }
                     }
                 }
-                // 宽度上限（对齐 Android Column.widthIn）：内容收缩包裹，超 cap 才换行。
-                // 图+文气泡 240，其余 360（对齐 Android isImage/isImageText 分支）。
-                // 图类气泡（用户图+文 / agent 单发图）：240 上限 + padding 6/6
-                // （Android isImage||isImageText 分支）；文本/编辑结果 360 上限 + 16/12。
-                // 常量未入 DesignTokens（生成物，门禁修复前禁手改——技术债：待 tokens JSON 统一）
-                .widthCap((message.type == .userImageText || message.type == .agentImage)
-                    ? ChatBubbleTokens.imageMaxWidth
-                    : ChatBubbleTokens.bubbleMaxWidth)
-                .padding(.horizontal,
-                         (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingH)
-                .padding(.vertical,
-                         (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingV)
-                .background(bubbleBackground)
-                .clipShape(bubbleShape)
-                .contentShape(Rectangle())
-                .onLongPressGesture {
-                    // 长按复制（对齐 Android）
-                    UIPasteboard.general.string = message.text
-                }
-
-                // CHART 图卡（draw_chart 端侧 JS 生成的 SVG，ChartJsEngine 渲染）
-                if let svg = message.chartSvg {
-                    ChartSvgCard(svg: svg)
-                        .padding(.top, 6)
-                        .frame(maxWidth: ChatBubbleTokens.bubbleMaxWidth)
-                }
-
-                if message.role == .assistant { Spacer(minLength: 40) }
+            }
+            // 宽度上限（对齐 Android Column.widthIn）：内容收缩包裹，超 cap 才换行。
+            // 图+文气泡 240，其余 360（对齐 Android isImage/isImageText 分支）。
+            // 图类气泡（用户图+文 / agent 单发图）：240 上限 + padding 6/6
+            // （Android isImage||isImageText 分支）；文本/编辑结果 360 上限 + 16/12。
+            // 常量未入 DesignTokens（生成物，门禁修复前禁手改——技术债：待 tokens JSON 统一）
+            .widthCap((message.type == .userImageText || message.type == .agentImage)
+                ? ChatBubbleTokens.imageMaxWidth
+                : ChatBubbleTokens.bubbleMaxWidth)
+            .padding(.horizontal,
+                     (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingH)
+            .padding(.vertical,
+                     (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingV)
+            .background(bubbleBackground)
+            .clipShape(bubbleShape)
+            .contentShape(Rectangle())
+            .onLongPressGesture {
+                // 长按复制（对齐 Android）
+                UIPasteboard.general.string = message.content
             }
 
-            // OPTIMIZE_CANDIDATES 候选卡条（chat.yaml §17 strip_ui）：独立全宽块，
-            // 伴随上方 agent 文本气泡（场景解释句）；pending 过期 → interactive=false
-            // 只读（expired 文案、无按钮行、无选中态）
-            if message.type == .optimizeCandidates, let payload = message.gacha {
-                GachaCandidateStrip(
-                    payload: payload,
-                    selectedIndex: gachaSelectedIndex,
-                    interactive: gachaInteractive,
-                    rerolling: gachaRerolling,
-                    onSelection: { index in onGachaSelection?(index) },
-                    onReroll: { onGachaReroll?() },
-                    onConfirm: { onGachaConfirm?() },
-                    onCardTap: { thumbPath in onGachaCardTap?(thumbPath) })
-            }
+            if message.role == .assistant { Spacer(minLength: 40) }
         }
     }
 
@@ -688,6 +747,211 @@ private struct MessageBubble: View {
     }
 }
 
+// MARK: - M5 B1: flattener item 分发视图
+//
+// ChatListFlattener（commonMain）拍平产物逐 item 渲染：part==nil 的整颗消息
+// （USER / legacy 桶）走 MessageBubble；带 part 的 item 按 contentType 分桶。
+// B1 工具态极简（placeholder/status = spinner、error = 三角，复用既有文案 key）；
+// B4 落地：HTML_CARD 双形态已实现（htmlCardItem——INLINE 沙箱 WebView / FULLPAGE
+// 封面卡 + 查看器浮层）；TASK_CARD 仍为占位卡（双显禁止——不渲染消息行 content 本体）。
+
+private struct ChatListItemView: View {
+    let item: ChatListItem
+    var onNavigateToGallery: ((String) -> Void)? = nil
+    var onImageTap: ((UIImage?) -> Void)? = nil
+    var onMediaTap: ((String) -> Void)? = nil
+    var gachaInteractive: Bool = false
+    var gachaSelectedIndex: Int? = nil
+    var gachaRerolling: Bool = false
+    var onGachaSelection: (Int) -> Void = { _ in }
+    var onGachaReroll: () -> Void = {}
+    var onGachaConfirm: () -> Void = {}
+    var onGachaCardTap: (String?) -> Void = { _ in }
+    /// HTML 卡（M5 B4，chat.yaml §13）：打开 FULLPAGE 查看器（html 本体 + summary 标题）
+    var onOpenHtmlFullpage: (String, String?) -> Void = { _, _ in }
+    /// HTML 卡内非页内导航链接 → 外链浮层
+    var onOpenHtmlLink: (URL) -> Void = { _ in }
+    /// INLINE/FULLPAGE 终判回写（测高完成或首测超一屏；persist 到消息 metadata）
+    var onHtmlDisplayFinalized: (String, HtmlCardDisplayMode, Int32?) -> Void = { _, _, _ in }
+
+    var body: some View {
+        if item.part == nil {
+            MessageBubble(message: item.message, onImageTap: { img in onImageTap?(img) })
+        } else {
+            partBody
+        }
+    }
+
+    @ViewBuilder private var partBody: some View {
+        let t = ChatListItem.companion
+        switch item.contentType {
+        case t.TYPE_AGENT_TEXT: agentTextItem
+        case t.TYPE_CHART: chartItem
+        case t.TYPE_MEDIA_RESULTS: mediaResultsItem
+        case t.TYPE_OPTIMIZE_CANDIDATES: gachaItem
+        case t.TYPE_HTML_CARD: htmlCardItem
+        case t.TYPE_TASK_CARD: pendingCardItem
+        case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
+        default: EmptyView()
+        }
+    }
+
+    /// AGENT_TEXT part：textOverride 优先（flattener：STREAMING Text part 以消息
+    /// content 为准），Markdown 渲染 + 内联光标，agent 气泡 chrome。
+    private var agentTextItem: some View {
+        let part = item.part as? MessagePartText
+        let markdown = item.textOverride ?? part?.markdown ?? ""
+        return HStack {
+            HStack(alignment: .bottom, spacing: 2) {
+                AgentTextView(content: markdown)
+                    .font(.system(size: ChatBubbleTokens.textSize))
+                    .lineSpacing(ChatBubbleTokens.textLineHeight - ChatBubbleTokens.textSize)
+                    .foregroundColor(Color(.label))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("chat_ai_bubble")
+                if item.showCursor {
+                    BlinkCursor()
+                        .padding(.bottom, 3)
+                }
+            }
+            .agentBubbleChrome()
+            .onLongPressGesture {
+                UIPasteboard.general.string = markdown
+            }
+            Spacer(minLength: 40)
+        }
+    }
+
+    /// CHART part：svg 本体渲染（消息行 content 亦承载 svg 副本——双显禁止，绝不当文本渲染）。
+    private var chartItem: some View {
+        Group {
+            if let part = item.part as? MessagePartChart, !part.svg.isEmpty {
+                ChartSvgCard(svg: part.svg)
+            }
+        }
+        .frame(maxWidth: ChatBubbleTokens.bubbleMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// MEDIA_RESULTS part：场景解释句（消息 content）+ 媒体卡行同 item 渲染
+    /// （flattener 单 item 消息，对齐 chat.yaml §6 防视觉回归）。
+    private var mediaResultsItem: some View {
+        let results = (item.part as? MessagePartMediaResults)?.results
+        return HStack {
+            VStack(alignment: .leading, spacing: 6) {
+                if !item.message.content.isEmpty {
+                    AgentTextView(content: item.message.content)
+                }
+                if let results {
+                    MediaCardRow(
+                        mediaIds: results.assets.map { $0.id },
+                        totalCount: Int(results.totalCount),
+                        onViewAll: { onNavigateToGallery?(results.query) },
+                        onMediaTap: { lid in onMediaTap?(lid) }
+                    )
+                }
+            }
+            .agentBubbleChrome()
+            .onLongPressGesture {
+                UIPasteboard.general.string = item.message.content
+            }
+            Spacer(minLength: 40)
+        }
+    }
+
+    /// OPTIMIZE_CANDIDATES part：场景解释句气泡 + 候选卡条（chat.yaml §17；单 item 消息）。
+    private var gachaItem: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !item.message.content.isEmpty {
+                HStack {
+                    AgentTextView(content: item.message.content)
+                        .agentBubbleChrome()
+                        .onLongPressGesture {
+                            UIPasteboard.general.string = item.message.content
+                        }
+                    Spacer(minLength: 40)
+                }
+            }
+            if let group = (item.part as? MessagePartOptimizeCandidates)?.group {
+                GachaCandidateStrip(
+                    payload: group,
+                    selectedIndex: gachaSelectedIndex,
+                    interactive: gachaInteractive,
+                    rerolling: gachaRerolling,
+                    onSelection: onGachaSelection,
+                    onReroll: onGachaReroll,
+                    onConfirm: onGachaConfirm,
+                    onCardTap: onGachaCardTap
+                )
+            }
+        }
+    }
+
+    /// HTML_CARD part（M5 B4）：INLINE 沙箱 WebView 动态测高 / FULLPAGE 封面卡双形态
+    /// （chat.yaml §13；终判回调回写消息 metadata）。meta 以消息级 htmlCardMeta 优先
+    /// （终判持久化在消息上，part.meta 为写入时快照）。双显禁止——不渲染消息行 content。
+    private var htmlCardItem: some View {
+        Group {
+            if let part = item.part as? MessagePartHtmlCard {
+                let meta = item.message.htmlCardMeta ?? part.meta
+                HtmlCardView(
+                    messageId: item.message.id,
+                    part: part,
+                    meta: meta,
+                    onOpenFullpage: onOpenHtmlFullpage,
+                    onOpenLink: onOpenHtmlLink,
+                    onDisplayFinalized: { mode, measured in
+                        onHtmlDisplayFinalized(item.message.id, mode, measured)
+                    }
+                )
+            }
+        }
+    }
+
+    /// TASK_CARD：B4 双形态实现前的占位卡（HTML 化在 H2 线）。
+    private var pendingCardItem: some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: "doc.richtext")
+                .font(.system(size: 18))
+                .foregroundColor(Color(.secondaryLabel))
+            Text(String(localized: "Coming Soon"))
+                .font(.system(size: 14))
+                .foregroundColor(Color(.secondaryLabel))
+        }
+        .padding(Spacing.md)
+        .frame(maxWidth: ChatBubbleTokens.bubbleMaxWidth, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 工具态（B1 极简）：placeholder/status = spinner；error = 三角警示。文案复用
+    /// 既有 key（B2 接 ChatStreamTurnAdapter 后 pendingToolName 透出工具名）。
+    private var toolStatusItem: some View {
+        HStack(spacing: 6) {
+            if item.contentType == ChatListItem.companion.TYPE_TOOL_ERROR {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+            } else {
+                ProgressView()
+                    .frame(width: 14, height: 14)
+            }
+            if item.contentType == ChatListItem.companion.TYPE_TOOL_ERROR {
+                // 工具失败态：固定失败文案（对齐 Android ChatScreen.kt:763 R.string.chat_card_generate_failed）
+                Text(String(localized: "chat.card_generate_failed"))
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+            } else {
+                Text(item.pendingToolName ?? String(localized: "Calling tools…"))
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
 // MARK: - WidthCap Layout（对齐 Android Modifier.widthIn(max=)）
 
 /// `widthIn(max:)` 等价布局：内容宽度自适应（短文本收缩包裹），超过 maxWidth 才收缩换行。
@@ -716,6 +980,21 @@ private extension View {
     /// `WidthCapLayout` 的 modifier 形式（Layout 协议只有 callAsFunction 用法，无 .layout()）。
     func widthCap(_ maxWidth: CGFloat) -> some View {
         WidthCapLayout(maxWidth: maxWidth) { self }
+    }
+
+    /// agent part item 气泡 chrome（M5 B1）：360 cap + 16/12 padding + 灰底 0.85 +
+    /// assistant 尾形（右下 sharp）。与 MessageBubble agent 文本气泡同形态。
+    func agentBubbleChrome() -> some View {
+        let r = ChatBubbleTokens.cornerRadius, sharp = ChatBubbleTokens.tailCornerRadius
+        return widthCap(ChatBubbleTokens.bubbleMaxWidth)
+            .padding(.horizontal, ChatBubbleTokens.paddingH)
+            .padding(.vertical, ChatBubbleTokens.paddingV)
+            .background(Color(.secondarySystemBackground).opacity(0.85))
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: r, bottomLeadingRadius: sharp,
+                bottomTrailingRadius: r, topTrailingRadius: r
+            ))
+            .contentShape(Rectangle())
     }
 }
 

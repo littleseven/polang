@@ -336,7 +336,45 @@ message_bubble:
       color: "onSurface"
       font_size: 16
       line_height: 24
-      markdown: true                # MarkdownText 渲染
+      markdown: true                # AST→原生组件渲染（能力契约见下 agent_markdown 节）
+
+  # Agent 正文 Markdown 能力契约（2026-09-28 自 Android M3 定稿反向提取）
+  # 口径 = 表现对等：双端各自选渲染库/自绘，元素覆盖与视觉参数须对齐；宿主两种（常规表面 onSurface / 深色气泡白字）。
+  agent_markdown:
+    dialect: "GFM 全量（CommonMark + 表格/删除线/任务列表/自动链接）"
+    rendering_model: "AST → 原生组件（禁 HTML 整体转换/位图渲染）；流式重解析保旧帧防 loading 闪烁"
+    parse_gating:                   # 性能门控（真机实测线性 ~2.4μs/字，2026-09-27 定案）
+      immediate_max_chars: 1500     # ≤1500 字同步解析（稳态 ~4ms < 16.6ms 帧预算，首帧无空窗）
+      over_threshold: "异步解析 + 防抖合并（流式 tick 不逐次主线程全量 parse）"
+    typography:                     # 相对正文 16/24 的缩放阶梯；标题行高 = 正文行高 ×1.2，标题全部 Bold
+      headings: { h1: 1.30, h2: 1.22, h3: 1.15, h4: 1.10, h5: 1.05, h6: 1.00, weight: bold, line_height_ratio: 1.2 }
+      code_block: { scale: 0.80, line_height_ratio: 1.35, family: monospace }
+      inline_code: { family: monospace, size: same_as_body }   # 行内代码同字号仅换等宽
+      quote: { style: italic }
+      link: { color: primary, decoration: underline }
+    color_derivation:               # 全部派生自正文色 → 深/浅两宿主对比度一致
+      code_block_bg: "text α0.08"
+      inline_code_bg: "text α0.12"
+      divider: "text α0.20"
+      table_bg: "text α0.02"
+      highlight_mark: "amber α0.35" # <mark> 底色（token appColors.amber 降透明度）
+    inline_html_whitelist:          # 仅四标签原文 trim 后精确形式生效（`<u>` 匹配；`<u >`/带属性形式按非白名单处理）
+      tags:
+        - { tag: u,    effect: underline }
+        - { tag: mark, effect: highlight_bg }
+        - { tag: sup,  effect: superscript, font_scale: 0.75em }
+        - { tag: sub,  effect: subscript,   font_scale: 0.75em }
+      non_whitelist: "消费丢弃不渲染（正文禁渲染级 HTML）；未闭合开标签样式允许泄漏到段尾，不得崩溃；样式深度按渲染实例复位"
+    code_block:                     # 围栏 ``` 与 4 空格缩进块同待遇；语法高亮开启
+      collapse_lines: 12            # 超过 12 行默认折叠，截断高 = 行高×12 + 竖向内边距
+      actions: [expand_collapse, copy]   # 复制成功提示 ~1.5s 自动消失
+      corner_radius: 8
+      overflow: "折叠态裁切，展开态完整"
+    segmentation:                   # 消息级分段边界（仅 chat 二级页走分段；不分段的调用点整段进本渲染器）
+      markdown: "正文段 → 本渲染器（本节契约）"
+      table: "TABLE 段 → 自研表格组件（CJK 计宽列）"
+      code: "围栏 CODE 段 → 自研代码块组件（折叠/复制/全屏预览）"
+    streaming_redline: "流式注解/定位必须基于当前文档自身内容，禁止闭包捕获外部旧内容（旧树配新文本 → 越界崩溃）"
 
   # 无时间戳显示
   timestamp_visible: false
@@ -813,14 +851,27 @@ platform_differences:
       - { feature: "端侧 VLM 理解",   android: supported, ios: "TODO(B1) MNN.framework 已有" }
       - { feature: "JS 沙箱脚本",     android: supported, ios: "TODO(B2) 引擎选型+handler 移植" }
       - { feature: "draw_chart 图表", android: supported, ios: "TODO(B2) ChartSvgCard + chart kind" }
-      - { feature: "render_html HTML 卡片", android: "supported(2026-09；2026-09-26 双形态 H1：inline/fullpage 分流+预览卡+全屏查看器)", ios: "TODO(ios-follow) HtmlCard WKWebView + 同款沙盒/双形态/链接落地页" }
-      - { feature: "parts 拍平 + Turn 聚合渲染", android: "M4 在途（spec 2026-09-27 §7.2/7.3；chat.yaml §3.1/§3.2 先行修订）", ios: "TODO(M5 ios-follow) parts 模型/turn 聚合/AST 正文/HTML 卡双形态一次跟随" }
+      - { feature: "render_html HTML 卡片", android: "supported(2026-09；2026-09-26 双形态 H1：inline/fullpage 分流+预览卡+全屏查看器)", ios: "M5 在途（chat-parts-m5 分支）：WKWebView + 同款沙盒/双形态/链接落地页" }
+      - { feature: "parts 拍平 + Turn 聚合渲染", android: "supported(2026-09-27 M4 定稿：ChatListFlattener 拍平 + §3.1/§3.2 契约)", ios: "M5 在途（chat-parts-m5 分支）：parts 模型/turn 聚合/AST 正文/HTML 卡双形态一次跟随" }
       - { feature: "AI 工程师(claude)", android: supported, ios: "TODO(B3) SSE 客户端+渲染" }
       - { feature: "AI 优化抽卡",     android: supported, ios: "supported(2026-08-16 §17 追齐；多轮编辑态 ChatEditStateHolder 缺失见 §17 confirm 注)" }
       - { feature: "记忆/人物关系",    android: supported, ios: "未纳入本轮（留技术债）" }
   privacy_disclosure:
     android: "Manifest 权限 + Play Data Safety；chat 推理 STRICT（图不上传）"
     ios: "purpose string + PrivacyInfo.xcprivacy；附件用 PHPicker(AddOnly)；VLM 端侧"
+  implementation_paths:             # 2026-09-28 M5 iOS 跟随登记：同一 shared 契约，双端实现载体差异
+    markdown_rendering:
+      android: "mikepenz multiplatform-markdown-renderer 0.41.0（AST→Compose）+ 白名单内联 HTML annotator；TABLE/CODE 段自研组件承接"
+      ios: "SwiftUI AST 自绘或等价 swift 库（库自选，能力面按 §5 agent_markdown 契约表现对等）"
+    html_card:
+      android: "WebView 沙盒（loadHTMLString + about:blank，禁外链脚本）+ 测高分流 + 全屏查看器"
+      ios: "WKWebView 同构（html-card-two-tier spec §12：照搬同款沙箱/测高/渐隐预览/链接落地页）"
+    persistence:
+      android: "Room：type 列（分类法 8 值）+ parts 列（codec JSON）+ 双写迁移"
+      ios: "ChatHistoryStore Codable 直按同一线格式（无 Room，零迁移；旧 type 行按 §3.2 legacy 兜底）"
+    svg_chart:
+      android: "WebView 栅格化 SVG"
+      ios: "WKWebView 栅格化或 CoreGraphics/SwiftUI 路径（同源 SVG 输入，表现对等）"
 
 # ============================================================================
 # 17. AI 优化抽卡候选卡组（Optimize Candidates）— 2026-08-16 反向提取自 Android
