@@ -222,21 +222,35 @@ struct ChatView: View {
 
     // MARK: - Message List
 
-    /// M5 B1：消息列表拍平（commonMain ChatListFlattener）。每渲染重算——消息量级
-    /// <100 可接受，B2 TurnPartsReducer 落地后随 turn 缓存。pendingToolName B1 传
-    /// nil（tool_status 桶不可达；B2 接 ChatStreamTurnAdapter 透出工具名）。
+    /// M5：消息列表拍平（commonMain ChatListFlattener）。每渲染重算——消息量级
+    /// <100 可接受，后续优化点为随 turn 缓存。pendingToolName 接 B2 turn 装配轨
+    /// （ToolInputStart 置值 / ToolOutput·收尾清除），非卡片工具进行中合成
+    /// TYPE_TOOL_STATUS item。
     private var flattenedItems: [ChatListItem] {
         ChatListFlattenerKt.flattenChatItems(
             messages: viewModel.messages,
-            pendingToolName: nil
+            pendingToolName: viewModel.pendingToolName
         )
+    }
+
+    /// M5 turn 间距阶梯（对齐 Android ChatList 间距语义）：
+    /// 首项 0（容器 `.padding(.top, 12)` 统一留白）/ turn 起点 `Spacing.lg`（16）/
+    /// 连续 agent 文本合并 `Spacing.xs`（4）/ 其余 `Spacing.sm`（8）。
+    /// LazyVStack spacing 置 0，间距全由本阶梯承载（firstKey 由调用方传入，
+    /// 避免 helper 内重算拍平）。
+    private func topSpacing(for item: ChatListItem, firstKey: String?) -> CGFloat {
+        if item.key == firstKey { return 0 }
+        if item.isTurnStart { return Spacing.lg }
+        if item.mergeWithPrevious { return Spacing.xs }
+        return Spacing.sm
     }
 
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(flattenedItems, id: \.key) { item in
+                LazyVStack(spacing: 0) {
+                    let items = flattenedItems
+                    ForEach(items, id: \.key) { item in
                         ChatListItemView(
                             item: item,
                             onNavigateToGallery: onNavigateToGallery,
@@ -261,6 +275,7 @@ struct ChatView: View {
                             }
                         )
                         .id(item.key)
+                        .padding(.top, topSpacing(for: item, firstKey: items.first?.key))
                     }
                 }
                 .padding(.horizontal, 12)

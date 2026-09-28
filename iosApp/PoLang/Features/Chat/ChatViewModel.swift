@@ -149,6 +149,13 @@ final class ChatViewModel: ObservableObject {
     /// 流式吐字节奏器（commonMain StreamingPacingController，经 SharedKit 工厂创建）
     private var pacing: StreamingPacingController?
     private var actionWatcher: FlowWatcher?
+    /// M5 B2 turn 装配（对齐 Android ChatViewModel）：adapter 翻译引擎事件为块级
+    /// TurnStreamEvent，reducer 拼装 turn parts 快照写回流式消息（content 轨仍走 pacing）。
+    private let turnAdapter = ChatStreamTurnAdapter()
+    private let turnReducer = TurnPartsReducer()
+    /// 流式 turn 内进行中的非卡片工具名（flattener 合成 TYPE_TOOL_STATUS item 的输入；
+    /// ToolInputStart 置值，ToolOutput/收尾清除）
+    @Published private(set) var pendingToolName: String? = nil
 
     /// 侧栏列表：标题或预览模糊过滤（对齐 Android filteredThreads）
     var filteredThreads: [ChatThread] {
@@ -291,13 +298,18 @@ final class ChatViewModel: ObservableObject {
         stagedImage = nil
 
         // 2. assistant 占位：thinking 态（首 token 前显示 3 点动画）。parts 留空 →
-        //    flattener whole-item 渲染；完成时 completeMessage 建 parts=[Text p0] → key 一次重建
+        //    flattener whole-item 渲染；流式期 parts 由 turnReducer 快照逐事件写回
         let placeholderId = UUID().uuidString
         messages.append(ChatMessage.make(
             id: placeholderId, type: .agentText, content: "",
             role: .assistant, isStreaming: true, isThinking: true
         ))
         isProcessing = true
+
+        // turn 边界（一次 sendMessage = 一个 turn）：装配器与 reducer 双复位（对齐 Android）
+        turnAdapter.reset()
+        turnReducer.reset()
+        pendingToolName = nil
 
         // 节奏器（豆包风逐字吐）：onPaced 在 main 回调，按 50ms/字推进文本 + 光标可见性
         pacing = createStreamingPacingController(onPaced: { [weak self] text, cursor in
@@ -314,17 +326,10 @@ final class ChatViewModel: ObservableObject {
             input: Self.llmInput(text: trimmed, stagedImageUri: stagedLocalId),
             persona: UserDefaults.standard.string(forKey: "assistant_persona") ?? "DEFAULT",
             replyLanguage: Self.currentReplyLanguage(),
-            onText: { [weak self] snapshot in
+            onStreamEvent: { [weak self] event in
                 Task { @MainActor in
-                    // 首 token 到达：喂给节奏器（不直接写 UI，节奏器按字符时间轴推进）
-                    self?.pacing?.onTextSnapshot(fullText: snapshot)
-                }
-            },
-            onToolCall: { [weak self] in
-                Task { @MainActor in
-                    // 工具调用：清节奏器缓冲（避免用旧全文覆盖状态文案）
-                    self?.pacing?.reset()
-                    self?.toolCallingUpdate(id: placeholderId)
+                    // 引擎事件全量经 adapter → reducer 双轨装配（parts 轨）+ pacing（content 轨）
+                    self?.handleStreamEvent(event, placeholderId: placeholderId)
                 }
             },
             onComplete: { [weak self] summary, errorMessage, directReply in
@@ -335,6 +340,48 @@ final class ChatViewModel: ObservableObject {
                 }
             }
         )
+    }
+
+    // MARK: - Turn 流式装配（M5 B2，对齐 Android feedToolOutput 消费形态）
+
+    /// 引擎事件分发：① TextSnapshot 喂节奏器（content/textOverride 轨，不直接写 UI）；
+    /// ② adapter 翻译为块级 TurnStreamEvent 逐个进 reducer，快照 parts 写回流式消息；
+    /// ③ ToolInputStart → pendingToolName 透出（flattener 合成工具状态 item）+ 节奏器
+    /// 清缓冲（工具调用后旧全文不得覆盖后续轮次文本）。
+    private func handleStreamEvent(_ event: ChatStreamEvent, placeholderId: String) {
+        if let snapshot = event as? ChatStreamEventTextSnapshot {
+            pacing?.onTextSnapshot(fullText: snapshot.text)
+        }
+        let turnEvents = turnAdapter.onEvent(event: event)
+        guard !turnEvents.isEmpty else { return }
+        for turnEvent in turnEvents {
+            _ = turnReducer.apply(event: turnEvent)
+            if let started = turnEvent as? TurnStreamEventToolInputStart {
+                pendingToolName = started.toolName.isEmpty ? nil : started.toolName
+                pacing?.reset()
+            }
+        }
+        writeStreamingParts(placeholderId: placeholderId)
+    }
+
+    /// reducer 当前 parts 快照写回流式消息（SKIE class 引用语义：with 复制 + 重赋值触发 @Published）。
+    private func writeStreamingParts(placeholderId: String) {
+        guard let idx = messages.firstIndex(where: { $0.id == placeholderId }) else { return }
+        messages[idx] = messages[idx].with(parts: turnReducer.parts)
+    }
+
+    /// 工具产物回填（对齐 Android feedToolOutput ChatViewModel.kt:1086）：流式消息内
+    /// 占位 part 原位填充（有占位替换同位置，无占位按到达序 append）。payload 由调用方
+    /// 组装成最终 part（reducer 不解析产物）；锚定 toolName 优先，无同名占位降级任意。
+    private func feedToolOutput(toolName: String, output: (String) -> MessagePart) {
+        let toolCallId = turnReducer.oldestPendingToolCallId(toolName: toolName)
+            ?? turnReducer.oldestPendingToolCallId(toolName: nil)
+        guard let toolCallId,
+              let idx = messages.lastIndex(where: { $0.isStreaming }) else { return }
+        _ = turnReducer.apply(event: TurnStreamEventToolOutputAvailable(
+            toolCallId: toolCallId, output: output(toolCallId)))
+        messages[idx] = messages[idx].with(parts: turnReducer.parts)
+        pendingToolName = nil
     }
 
     // MARK: - 会话管理（对齐 Android switchSession/newSession/renameSession/deleteSession）
@@ -412,18 +459,10 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Streaming State Updates
 
-    // streamingUpdate 已由节奏器 onPaced 内联替代（见 send() 中 pacing 创建）
+    // streamingUpdate 已由节奏器 onPaced 内联替代（见 send() 中 pacing 创建）；
+    // 工具调用文案已由 B2 pendingToolName + flattener TYPE_TOOL_STATUS item 承载
 
-    /// 工具调用开始：显示状态文案（B1 过渡——commonMain 无 isToolCalling 字段，仅切文案；
-    /// 完整工具态占位卡由 B2 TurnPartsReducer 的 pendingToolName 驱动）
-    private func toolCallingUpdate(id: String) {
-        guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[idx] = messages[idx].with(
-            content: String(localized: "Calling tools…"),  // 正在调用工具…
-            isThinking: false)
-    }
-
-    /// 推理完成：一次 with 定稿正文 + 建持久轨 parts（p0 Text done）——
+    /// 推理完成：一次 with 定稿正文 + 瞬态 parts 转持久轨——
     /// item key 由 whole 重建为 part 级，流式光标随之消失
     private func completeMessage(id: String, summary: String, errorMessage: String?, directReply: DirectRouteReply? = nil) {
         guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
@@ -447,9 +486,29 @@ final class ChatViewModel: ObservableObject {
         }
         messages[idx] = messages[idx].with(
             content: finalText, isStreaming: false, showCursor: false, isThinking: false,
-            parts: [MessagePartText(partId: "p0", markdown: finalText, state: .done)])
+            parts: persistedParts(fallbackText: finalText))
+        // turn 收尾：非卡片工具进行中的合成状态 item 随之消失
+        pendingToolName = nil
         touchThread(preview: finalText)
         persist()
+    }
+
+    /// 瞬态 parts → 持久轨（对齐 Android persistedParts 语义）：
+    /// - Text part 保留自身累积 markdown（content 轨 pacing 全文与 reducer 差分累计等价），
+    ///   partId 就地沿用（txt-N 稳定锚，不重排），state 收敛 done；
+    /// - 卡 part（OUTPUT_AVAILABLE）剔除——产物已/将由独立消息行承载，落库后 flattener
+    ///   等值跳过仅对流式期生效，持久轨保留必双显；
+    /// - INPUT_*/OUTPUT_ERROR 等瞬态态剔除（产物行或失败 item 不落库）；
+    /// - 空产物兜底单 Text p0（直执/错误路径无 reducer 活动）。
+    private func persistedParts(fallbackText: String) -> [MessagePart] {
+        let texts = turnReducer.parts.compactMap { part -> MessagePart? in
+            guard let text = part as? MessagePartText, !text.markdown.isEmpty else { return nil }
+            return MessagePartText(partId: text.partId, markdown: text.markdown, state: .done)
+        }
+        if texts.isEmpty {
+            return [MessagePartText(partId: "p0", markdown: fallbackText, state: .done)]
+        }
+        return texts
     }
 
     // MARK: - UI Actions（媒体结果 = 独立消息）
@@ -733,6 +792,15 @@ final class ChatViewModel: ObservableObject {
     /// 追加一条 CHART 消息（图卡）。LLM draw_chart（经 IosChartCapability → ChartRendererBridge.onChart）
     /// 与 /chart 手动 demo 共用此落点。
     private func appendChartMessage(svg: String, summary: String) {
+        // M5 B2 双路径（对齐 Android emitChartMessage）：
+        // ① feedToolOutput 回填流式占位 part（draw_chart 走 LLM 链路时 reducer 有 pending
+        //    toolCall，ToolInputStart 占位 → OUTPUT_AVAILABLE 原位填充；手动 demo 无 reducer
+        //    活动则跳过）；
+        // ② 追加独立 CHART 产物行——flattener 流式期按「产物行已在列表」等值跳过已填充
+        //    占位 part（双显禁止），turn 收尾转持久轨时占位 part 剔除、产物行独存。
+        feedToolOutput(toolName: TurnPartsReducer.companion.TOOL_DRAW_CHART) { toolCallId in
+            MessagePartChart(partId: toolCallId, svg: svg, state: .outputAvailable)
+        }
         // 双显禁止契约：content 承载 svg 本体（persisted payloads 集合来自消息行 content），
         // summary 仅作 touchThread 预览
         messages.append(ChatMessage.make(
