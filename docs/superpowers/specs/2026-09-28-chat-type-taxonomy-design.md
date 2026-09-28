@@ -4,6 +4,8 @@
 > **状态**：已定稿待实施
 > **上位约束**：ADR-016（chat 消息内容模型宪法）；本文是 ADR-016 框架内的**鉴别字段分类学**专项，不改变 parts 模型本身
 > **关联文档**：`docs/03-TECHNICAL-SPECS/CHAT_CARD_CATALOG.md` §0/§0.1/§0.2/§0.3（协议总纲与 OpenAI 兼容硬约束）、`docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md`（M1~M5 主线 spec）
+>
+> 2026-09-28 修订（用户指示「无需考虑兼容问题，按理想态实现」）：运行时转换器纯净化——不再双吃 legacy 13，legacy 映射知识收敛到迁移专用 `LegacyChatTypeMigration`（§4.2/§5/§6/§8/§11 联动）。
 
 ---
 
@@ -79,7 +81,8 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 
 ### 4.2 转换与编解码
 
-- `LegacyMessagePartsConverter`：13 值映射表更新为输出新分类法（`command`/`plan_preview`→Text；`user_image_text`→Image+Text）；行级 Text 兜底原则不变；
+- **运行时转换器纯净化**：`LegacyMessagePartsConverter` 更名 `MessagePartsConverter`（文件 `LegacyMessageParts.kt` → `MessagePartsConverter.kt`），**仅映射新 8 值**——不再双吃 legacy 13；未知值 → 行级 Text 兜底原则不变。签名补 role 入参（`toParts(type, content, metadata, role)`）：`image` 映射按角色分流——user 且 metadata.imageUri 在场 → [Image, Text] 图文双 part，否则 [Image(ref=content)]；agent → [Image(ref=metadata.imageUri ?: content, saved)]；
+- **legacy 映射收敛迁移专用**：新增 `LegacyChatTypeMigration`（shared `domain/chat/`）：`map(legacyType, content, metadata) → MigratedRow(type, role, parts)`——type 重写表 + role 推导（`user_` 前缀 → `"user"`，其余 → `"agent"`）单点收口，parts 委托 `MessagePartsConverter`（零解析逻辑重复）。**仅供 `MIGRATION_25_26` 与备份恢复两个存量数据入口使用**，运行时路径不引用；
 - `MessagePartsCodec`：线格式随 `@SerialName` 自动更新；`ignoreUnknownKeys` 前向兼容语义不变；round-trip 测试全量改写（§8）。
 
 ### 4.3 实体与迁移
@@ -101,27 +104,28 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 
 ## 5. Room v25→v26 迁移（`MIGRATION_25_26`）
 
-四步，单事务：
+两步，单事务：
 
-1. `ALTER TABLE chat_messages ADD COLUMN role TEXT NOT NULL DEFAULT 'agent'`；
-2. `UPDATE chat_messages SET role='user' WHERE type IN ('user_text','user_image','user_image_text')`；
-3. `UPDATE chat_messages SET type=…` 按 §1 映射表重写（`user_image_text`→`image`；`command`/`plan_preview`/`user_text`/`agent_text`→`text`；其余一对一）；
-4. partsJson 逐行重编码：读出 → `LegacyMessagePartsConverter` rerun（输入旧 type/content/metadata，输出新分类法 parts）→ `MessagePartsCodec` 编码回写；失败行行级 Text 兜底（content 原文），不丢消息。
+1. `ALTER TABLE chat_messages ADD COLUMN role TEXT NOT NULL DEFAULT 'agent'`（default 仅迁移安全网，写路径恒显式赋值）；
+2. **逐行转换**（compileStatement 单语句复用，实现形态同 v24→v25 `backfillChatMessageParts`）：读出 `(id, type, content, metadata)` → `LegacyChatTypeMigration.map` → **一次 UPDATE 同写** `type`（§1 新值）+ `role` + `partsJson`（新鉴别值重编码）。行级 runCatching 双保险：失败行 `type='text'` + `role='agent'` + Text 原文 part，**不丢消息**。
 
-> 实现形态参考 v24→v25 的 partsJson 回填迁移（`ChatMessagePartsMigrationTest` 已有 androidTest fixture 框架，本迁移复用其测试壳）。
+> 先重写 type 再重编码会丢信息（`user_image`/`user_image_text`/`agent_image` 同归 `image` 后无法区分 parts 形态），故单行内原子完成三字段转换。
+> 测试壳复用 `ChatMessagePartsMigrationTest` 的 fixture 框架（§8）。
 
 ## 6. 消费点改造清单（grep 锚点）
 
 | 位置 | 改动 |
 |---|---|
 | `shared/.../domain/chat/MessagePart.kt` | §4.1（鉴别值 + PartCategory） |
-| `shared/.../domain/chat/LegacyMessageParts.kt` | §4.2 映射表 |
+| `shared/.../domain/chat/MessagePartsConverter.kt`（原 LegacyMessageParts.kt） | §4.2 运行时转换器纯净化 |
+| `shared/.../domain/chat/LegacyChatTypeMigration.kt`（新建） | §4.2 迁移专用 mapper（迁移 + 备份恢复共用） |
 | `shared/.../domain/chat/MessagePartsCodec.kt` | 注释/测试 |
 | `shared/.../domain/chat/ChatMessage.kt` | +role；`toModelInput` 映射表单点化（§4.4） |
 | `androidApp/.../data/local/ChatMessageEntity.kt` | +role 列、KDoc（§4.3） |
 | `androidApp/.../data/local/AppDatabase.kt` | version 26 + `MIGRATION_25_26`（§5） |
-| `androidApp/.../data/local/ChatMessageDao.kt` | SQL 字面量 + 写入路径（§4.3） |
-| `androidApp/.../features/chat/ChatViewModel.kt` | `toUiModel` role 判据 + 各 emit 写路径 type 值（§2/§4.3） |
+| `androidApp/.../data/local/ChatMessageDao.kt` | SQL 字面量（`'task_card'`→`'tool_task'`、`'media_results'`→`'data_media_results'`、`type LIKE 'user\_%'`→`role = 'user'`）+ 写入路径（§4.3） |
+| `androidApp/.../features/chat/ChatViewModel.kt` | `toUiModel` parts+role 判据 + 各 emit 写路径 type 值 + role 显式赋值（§2/§4.3） |
+| `androidApp/.../domain/backup/TagDataBackupRepository.kt` | 备份 DTO +role；恢复路径旧备份经 `LegacyChatTypeMigration` 一次性转正，新备份直通 |
 | 任务中心（`TaskCenterScreen` 数据源链路） | 随 DAO 查询自动生效，冒烟确认 |
 | iOS（M5 未动工） | `docs/08-UI-SPECS/screens/chat.yaml` §3.2 ios_todo 登记新值，零迁移 |
 
@@ -139,8 +143,9 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 ## 8. 测试计划
 
 - `MessagePartsCodecTest`（commonTest）：8 值 round-trip 全量 + 缺省省略（`encodeDefaults=false`）+ `category` 属性正确性 + **前缀规则锁定测试**（所有 `@SerialName` 值经反射/KClass 枚举，断言 `data_` 前缀 ⟺ category==DATA、`tool_` ⟺ TOOL、无前缀 ⟺ CONTENT——命名规则违反即测试红）；
-- `LegacyMessagePartsConverterTest`：13 legacy 值 → 新分类法映射全枚举（含 `command`/`plan_preview`→Text、`user_image_text`→双 part）；
-- `ChatMessagePartsMigrationTest`（androidTest）：v25 fixture 行（13 值各一 + 边界行：空 metadata、缺 imageUri、超长 content）→ v26 断言 role 推导、type 重写、partsJson 重编码、兜底行不丢；
+- `MessagePartsConverterTest`（原 LegacyMessagePartsConverterTest 改写）：新 8 值映射全枚举 + `image` 的 role 双分支 + 未知值 Text 兜底；
+- `LegacyChatTypeMigrationTest`（新建）：13 legacy 值 → `MigratedRow(type, role, parts)` 三元组全枚举（含 `command`/`plan_preview`→text+agent、`user_image_text`→image+user+双 part、未知值兜底）；
+- `ChatMessagePartsMigrationTest`（androidTest）：v25 fixture 行（13 值各一 + 边界行：未知类型、损坏 metadata、空 metadata）→ v26 断言 role 推导、type 重写、partsJson 重编码、兜底行不丢；
 - 回灌测试：`toModelInput` 的 tool 配对完整 + data 剥离 + image 占位，六条硬约束回归；
 - `toUiModel`：role 判据单测（user/agent 气泡分派）。
 
@@ -165,4 +170,6 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 - 不动 `ToolPartState` 七态与 `PartState`（状态机分类学已系统，无改名诉求）；
 - 不动浮动面板体系的 sealed `AgentMessage`（平行模型，不在 chat_messages 协议面）；
 - 不做 M2 已知缺口（工具原始入参保真，`input` 字段）——属另一专项；
+- **不做运行时 legacy 双吃**（用户 2026-09-28 指示：无兼容包袱、按理想态实现）——旧存量数据（v25 库 / 旧备份）经 `LegacyChatTypeMigration` 一次性转正，运行时转换器不保留 legacy 分支；
+- 不做闲聊/命令的 type 级区分——type 是内容产物分类，对话意图属 ADR-015 路由层，需要时挂 metadata/modelUsed，不进 type 值域；
 - iOS 侧零代码（M5 开工时直接按新分类法实现）。
