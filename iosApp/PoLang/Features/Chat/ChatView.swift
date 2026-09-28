@@ -937,9 +937,16 @@ private struct ChatListItemView: View {
                 ProgressView()
                     .frame(width: 14, height: 14)
             }
-            Text(item.pendingToolName ?? String(localized: "Calling tools…"))
-                .font(.system(size: 13))
-                .foregroundColor(Color(.secondaryLabel))
+            if item.contentType == ChatListItem.companion.TYPE_TOOL_ERROR {
+                // 工具失败态：固定失败文案（对齐 Android ChatScreen.kt:763 R.string.chat_card_generate_failed）
+                Text(String(localized: "chat.card_generate_failed"))
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+            } else {
+                Text(item.pendingToolName ?? String(localized: "Calling tools…"))
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+            }
         }
         .padding(.horizontal, 4)
     }

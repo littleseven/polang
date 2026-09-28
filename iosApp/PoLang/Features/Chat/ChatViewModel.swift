@@ -367,13 +367,20 @@ final class ChatViewModel: ObservableObject {
     private func handleStreamEvent(_ event: ChatStreamEvent, placeholderId: String) {
         if let snapshot = event as? ChatStreamEventTextSnapshot {
             pacing?.onTextSnapshot(fullText: snapshot.text)
+            // 文本恢复 → 工具状态行收口（对齐 Android ChatViewModel.kt:1793-1796）
+            pendingToolName = nil
         }
         let turnEvents = turnAdapter.onEvent(event: event)
         guard !turnEvents.isEmpty else { return }
         for turnEvent in turnEvents {
             _ = turnReducer.apply(event: turnEvent)
             if let started = turnEvent as? TurnStreamEventToolInputStart {
-                pendingToolName = started.toolName.isEmpty ? nil : started.toolName
+                // 双状态行契约：仅非卡片工具名透出状态行；卡片工具有类型化占位 part
+                // 不走状态行（对齐 Android ChatViewModel.kt:1779 takeIf 排除两张卡工具）
+                let isCardTool = started.toolName == TurnPartsReducer.companion.TOOL_DRAW_CHART
+                    || started.toolName == TurnPartsReducer.companion.TOOL_RENDER_HTML
+                pendingToolName =
+                    (started.toolName.isEmpty || isCardTool) ? nil : started.toolName
                 pacing?.reset()
             }
         }

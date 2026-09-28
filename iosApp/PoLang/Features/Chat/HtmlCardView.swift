@@ -8,7 +8,7 @@ import SharedKit
 ///
 /// 形态路由（chat.yaml §13 routing）：
 /// - `display == "fullpage"` 声明 → 直判 FULLPAGE 预览（不测高）；
-/// - INLINE 动态测高，首测 > 1.0×可用屏高 → 转 FULLPAGE 预览；
+/// - INLINE 动态测高，首测 > 1.0×屏高 → 转 FULLPAGE 预览；
 /// - 测高异常（≤0）→ 降级 INLINE；
 /// - 终判（displayMode）持久化后形态不再跳变；判定 INLINE 后交互撑高不回转。
 ///
@@ -32,12 +32,17 @@ struct HtmlCardView: View {
     private static let minInlineHeight: CGFloat = 120
     /// FULLPAGE 预览固定高（spec：≈0.5 屏）
     private var previewHeight: CGFloat { UIScreen.main.bounds.height * 0.5 }
-    /// 转 FULLPAGE 阈值（spec：测高 > 1.0×可用屏高强制 FULLPAGE）
+    /// 转 FULLPAGE 阈值（spec：测高 > 1.0×屏高强制 FULLPAGE；此处取全屏 bounds 高，
+    /// 无安全区扣减——较 Android「可用屏高」阈值略偏宽松，差值 ≤ 底部安全区）
     private var fullpageThreshold: CGFloat { UIScreen.main.bounds.height }
 
-    /// partId → 测高缓存（LazyVStack 复建时防跳变；iOS 无 Android 滑动冻结直通，
-    /// 以缓存 + 防抖兜底——平台差异，见 M5 gap 报告）
+    /// "messageId:partId" → 测高缓存（LazyVStack 复建时防跳变；iOS 无 Android 滑动冻结
+    /// 直通，以缓存 + 防抖兜底——平台差异，见 M5 gap 报告）。键必须复合 messageId：
+    /// 持久轨产物行 partId 恒 "p0"，单以 partId 为键 = 全 App 单槽跨消息互相污染。
     private static var heightCache: [String: CGFloat] = [:]
+
+    /// 测高缓存键：复合 messageId（见 [heightCache] 注释）
+    private var heightCacheKey: String { "\(messageId):\(part.partId)" }
 
     /// 运行时判定形态（init 时按声明初判；测高后升级）
     @State private var judgedMode: CardMode
@@ -117,7 +122,7 @@ struct HtmlCardView: View {
             return CGFloat(max(stored.int32Value, Int32(Self.minInlineHeight)))
         }
         if let measured = measuredHeight { return measured }
-        if let cached = Self.heightCache[part.partId] { return cached }
+        if let cached = Self.heightCache[heightCacheKey] { return cached }
         return Self.minInlineHeight
     }
 
@@ -193,7 +198,8 @@ struct HtmlCardView: View {
         guard raw > 0 else { return }
         let clamped = min(max(CGFloat(raw), Self.minInlineHeight), UIScreen.main.bounds.height * 3)
         measuredHeight = clamped
-        Self.heightCache[part.partId] = clamped
+        if Self.heightCache.count > 128 { Self.heightCache.removeAll() }
+        Self.heightCache[heightCacheKey] = clamped
         finalizeInlineIfNeeded(measured: clamped)
     }
 
