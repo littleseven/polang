@@ -28,12 +28,13 @@ object HtmlCardSanitizer {
     // ── 剔除规则（按序应用）─────────────────────────────────────────────
 
     /** 带 src 的 <script> 整段剔除（远程 JS 执行是底线）；内联 <script> 保留（表现力来源）。 */
+    // commonMain 无 RegexOption.DOT_MATCHES_ALL（JVM-only），用 [\s\S] 等价跨行匹配
     private val EXTERNAL_SCRIPT =
-        Regex("<script[^>]*\\bsrc\\s*=[^>]*>.*?</script>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        Regex("<script[^>]*\\bsrc\\s*=[^>]*>[\\s\\S]*?</script>", RegexOption.IGNORE_CASE)
 
     /** 高危嵌入/导航标签整段剔除（iframe 可嵌任意远程页面，form 可提交数据，不放行）。 */
     private val DANGEROUS_BLOCK =
-        Regex("<(iframe|object|embed|form|frame|frameset)[^>]*>.*?</\\1>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        Regex("<(iframe|object|embed|form|frame|frameset)[^>]*>[\\s\\S]*?</\\1>", RegexOption.IGNORE_CASE)
     private val DANGEROUS_SELF_CLOSING = Regex("<(iframe|object|embed|frame)[^>]*>", RegexOption.IGNORE_CASE)
 
     /** <meta http-equiv=refresh> 跳转剔除（卡片不允许自动跳走）。 */
