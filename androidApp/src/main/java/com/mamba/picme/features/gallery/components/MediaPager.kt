@@ -172,6 +172,8 @@ fun MediaPager(
         var showInfo by remember { mutableStateOf(false) }
         var showLandmarkOverlay by remember { mutableStateOf(false) }
         var currentPageZoomed by remember { mutableStateOf(false) }
+        // 当前页是否长图（ZoomableImage 尺寸探测后回传）；长图页竖直拖动归阅读滚动，禁用上滑删除
+        var currentPageIsLongImage by remember { mutableStateOf(false) }
         var showBarsVisible by remember { mutableStateOf(true) }
         var visionResult by remember { mutableStateOf<String?>(null) }
         var isVisionLoading by remember { mutableStateOf(false) }
@@ -246,6 +248,7 @@ fun MediaPager(
 
         LaunchedEffect(pagerState.currentPage) {
             currentPageZoomed = false
+            currentPageIsLongImage = false
             if (currentAsset?.type != MediaType.PHOTO) {
                 showLandmarkOverlay = false
             }
@@ -278,6 +281,7 @@ fun MediaPager(
                                         swipeUpDragY
                                     )
                                     val gestureEnabled = !currentPageZoomed &&
+                                        !currentPageIsLongImage &&
                                         !overlaysActiveState.value &&
                                         asset?.type == MediaType.PHOTO &&
                                         verticalDominant
@@ -311,7 +315,9 @@ fun MediaPager(
                                         offsetY = swipeUpOffsetY,
                                         alpha = swipeUpAlpha,
                                         asset = currentAssetState.value,
-                                        enabled = !currentPageZoomed && !overlaysActiveState.value,
+                                        enabled = !currentPageZoomed &&
+                                            !currentPageIsLongImage &&
+                                            !overlaysActiveState.value,
                                         onCommit = onSwipeUpDeleteState.value,
                                     )
                                 },
@@ -357,6 +363,11 @@ fun MediaPager(
                         onZoomStateChanged = { scale ->
                             if (pageIndex == pagerState.currentPage) {
                                 currentPageZoomed = scale > 1.02f
+                            }
+                        },
+                        onLongImageDetected = { isLong ->
+                            if (pageIndex == pagerState.currentPage) {
+                                currentPageIsLongImage = isLong
                             }
                         }
                     )

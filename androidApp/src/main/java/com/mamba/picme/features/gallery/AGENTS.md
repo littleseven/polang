@@ -47,14 +47,17 @@
 
 **技术规范**:
 - **HorizontalPager**: 使用 Compose Foundation 的 `HorizontalPager` 实现左右翻页
-- **缩放控制**: 
-  - 缩放范围: 1.0x ~ 4.0x
-  - 放大态禁用翻页 (`userScrollEnabled = !currentPageZoomed`)
-  - 单指平移查看细节，双指捏合缩放
+- **缩放控制（底座 Telephoto `zoomable-image-coil` 0.19.0）**: 
+  - 缩放上限相对原图像素（ZoomSpec 语义）：普通图 4.0x，长图 3.0x；双击在最小/最大缩放间循环
+  - 放大态禁用翻页 (`userScrollEnabled = !currentPageZoomed`；回传值 = 1f + zoomFraction，> 1f 即放大态)
+  - 单指平移查看细节，双指捏合缩放；拖拽钳制以内容边界为准；SubsamplingImage 区域解码，放大后文字依然清晰
+  - **必须 `Modifier.fillMaxSize()`**：SubSamplingImage 内部按 `imageOrPreviewSize` 自 wrap 尺寸，不撑满会把画布量成预览图大小（1:1 左上角绘制），初始 size 未知时还会导致 Telephoto `canvasSize.first()` 永不发射、请求挂死黑屏；`ZoomableImage` 已内置，调用方勿覆盖
+- **长图模式（`isLongImage`，高/宽 ≥ 2.5，判定纯函数 JVM 可测）**: FillWidth 填充宽度 + 顶部对齐，单指竖直拖动即滚动阅读（长截屏/文字长图形态）；基线（未放大）时翻页不受影响；尺寸经 Coil listener 探测（等比降采样不失真）
 - **手势冲突处理**: 
   - 放大时优先图片平移，禁止触发翻页
   - 回到 1x 后恢复翻页功能
-- **上滑删除（回收站）**: `onSwipeUpDelete: ((MediaAsset) -> Unit)?` 可选参数，为 null 不挂手势；仅「未放大 + 当前页 PHOTO + 竖直位移主导（abs(dy)>abs(dx)）+ OCR/Vision 浮层不可见」时 consume，松手超页高 25% 阈值向上飞出淡出（220ms）后回调，未超弹回；判定纯逻辑收口 `components/SwipeUpDeleteGesture.kt`（JVM 可测）；拖动中浮现提示胶囊（`preview_swipe_delete_hint` 五语，API<30 降级时经 `isTrashSupported` 切中性键 `preview_delete_hint`），与 SwipeReview ↑删除 同一手势语言
+  - 长图页竖直拖动归阅读滚动，禁用上滑删除（`currentPageIsLongImage` 门控，删除走底栏按钮）
+- **上滑删除（回收站）**: `onSwipeUpDelete: ((MediaAsset) -> Unit)?` 可选参数，为 null 不挂手势；仅「未放大 + 非长图页 + 当前页 PHOTO + 竖直位移主导（abs(dy)>abs(dx)）+ OCR/Vision 浮层不可见」时 consume，松手超页高 25% 阈值向上飞出淡出（220ms）后回调，未超弹回；判定纯逻辑收口 `components/SwipeUpDeleteGesture.kt`（JVM 可测）；拖动中浮现提示胶囊（`preview_swipe_delete_hint` 五语，API<30 降级时经 `isTrashSupported` 切中性键 `preview_delete_hint`），与 SwipeReview ↑删除 同一手势语言
 - **删除通路（`MediaViewModel.requestTrash(asset, tag)` 返回实际 Route）**: API 30+ → `TrashSessionController`（`MediaStore.createTrashRequest`，30 天可恢复；in-flight 标志防单槽竞态，`cancelPendingRequest(tag)` 供宿主解绑防悬挂）；API < 30 → `PreviewTrashRouting` 降级永久删除 + 系统授权框。域层与跨宿主口径见 `androidApp/AGENTS.md` §2.2 `domain/trash/`
 - **静默快路径（MANAGE_MEDIA）**: 设置页「删除不再询问」开 + 持权（API 31+）时 `TrashSessionController.request()` 在 token 构建前经 `TrashBackend.trySilentTrash` 直写 IS_TRASHED 单列静默回收（DATE_EXPIRES 属系统管理列，同写在 HyperOS 致 update 整体失败）；开关关/无权限返回 null 回落系统授权框；直写被 ROM 拒绝时失败子集回落 token 通路（持权时免弹框自动通过），记 `PoLang:DedupTrash` 警告
 - **授权 UI 与列表收缩约定**: 共享组件 `components/TrashAuthEffects.kt`（pendingRequest → StartIntentSenderForResult，partialNotice/errorEvent → snackbar/Toast，tag 分桶 + onDispose 清理匹配 pending）；三宿主 Gallery/Chat/MemoryDetail 各挂一份（tag 分别为 `preview_swipe_gallery/chat/memory`），只在 Trashed outcome 后收缩预览列表
