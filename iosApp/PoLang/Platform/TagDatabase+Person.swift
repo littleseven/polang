@@ -427,4 +427,17 @@ extension TagDatabase {
             sqlite3_step(stmt); sqlite3_finalize(stmt)
         }
     }
+
+    /// 清除该人物**全部**关系（subject=personId，不限 object；对标 Android removeAllRelationsOf）。
+    /// 详情保存 relation=nil 路径用：当前库内关系均为对己行，语义上与 clearRelationToSelf 等价，
+    /// 但契约要求「清除所有」——若未来引入多 object 关系亦正确。
+    func deleteAllRelationsOfPerson(personId: Int64) {
+        queue.sync {
+            guard let db = db else { return }
+            var stmt: OpaquePointer?
+            sqlite3_prepare_v2(db, "DELETE FROM person_relations WHERE subjectPersonId=?;", -1, &stmt, nil)
+            sqlite3_bind_int64(stmt, 1, personId)
+            sqlite3_step(stmt); sqlite3_finalize(stmt)
+        }
+    }
 }

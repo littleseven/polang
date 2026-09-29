@@ -73,6 +73,10 @@ class PersonRepository(
      * 2) isSelf → 设为"我"，否则若当前是"我"则清除；
      * 3) relation != null → 声明（覆盖）；relation == null → 清除该人物所有关系。
      * 自定义称呼非空时 predicate 应为 [RelationPredicate.OTHER]（由调用方决定）。
+     *
+     * 返回声明结果（relation == null 走清除路径时返回 null）；
+     * 调用方必须处理 [DeclareRelationResult.SelfNotDeclared]——未标记"我"时声明会被拒绝，
+     * 吞掉结果就是"修改关系不生效"静默 bug。
      */
     suspend fun applyPersonEdit(
         personId: Long,
@@ -80,7 +84,7 @@ class PersonRepository(
         relation: RelationPredicate?,
         customLabel: String,
         isSelf: Boolean
-    ) {
+    ): DeclareRelationResult? {
         if (name.isNotBlank()) {
             renamePerson(personId, name)
         }
@@ -89,7 +93,7 @@ class PersonRepository(
         } else if (getSelfPerson()?.personId == personId) {
             clearSelf()
         }
-        if (relation != null) {
+        return if (relation != null) {
             declareRelation(
                 subjectPersonId = personId,
                 predicate = relation,
@@ -98,6 +102,7 @@ class PersonRepository(
             )
         } else {
             removeAllRelationsOf(personId)
+            null
         }
     }
 

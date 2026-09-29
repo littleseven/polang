@@ -1,4 +1,5 @@
 import Foundation
+import SharedKit
 
 // MARK: - 人物域显示模型
 
@@ -28,8 +29,25 @@ struct PersonListSnapshot: Equatable {
 final class PersonRepository: @unchecked Sendable {
     static let shared = PersonRepository()
 
-    private let db = TagDatabase.shared
-    private init() {}
+    private let db: TagDatabase
+
+    /// db 注入口仅供单测（临时库）；生产一律走 `.shared`。
+    init(db: TagDatabase = .shared) {
+        self.db = db
+    }
+
+    // MARK: - 声明结果（对标 Android PersonRepository.DeclareRelationResult）
+
+    /// 对己关系声明结果。**调用方必须处理** `.selfNotDeclared`——未标记「这是我」时
+    /// 声明被拒；吞掉结果即「修改关系不生效」静默 bug（2026-09 修复根因）。
+    enum DeclareRelationResult {
+        /// 声明成功落库。
+        case declared
+        /// 无「这是我」人物 → 声明被拒，未写入。
+        case selfNotDeclared
+        /// 目标人物已不存在（如重聚类后被合并）。
+        case subjectNotFound
+    }
 
     // MARK: - 加载
 
@@ -117,21 +135,57 @@ final class PersonRepository: @unchecked Sendable {
     func relation(personId: Int64) -> PersonRelationDb? { db.relationToSelf(personId: personId) }
     func coverCandidates(personId: Int64) -> [MediaCoverInfo] { db.coverCandidates(personId: personId) }
 
-    /// 保存对己关系：清旧→写新。customLabel 非空→effective predicate=OTHER（对齐 Android doSave）。
-    /// predicate=nil 且 customLabel 空 → 仅清空（不设置关系）。
-    func saveRelation(personId: Int64, predicate: String?, customLabel: String?, source: String) {
-        db.clearRelationToSelf(personId: personId)
-        let customFilled = (customLabel?.isEmpty == false)
-        if let pred = predicate, !pred.isEmpty {
-            let effective = customFilled ? "OTHER" : pred
-            _ = db.upsertRelationToSelf(
-                subjectPersonId: personId, predicate: effective,
-                source: source, customLabel: customLabel)
-        } else if customFilled {
-            // 仅自定义、无谓词 → OTHER
-            _ = db.upsertRelationToSelf(
-                subjectPersonId: personId, predicate: "OTHER",
-                source: source, customLabel: customLabel)
+    // MARK: - 详情保存（applyPersonEdit 单次写入；spec person.yaml §7 定稿）
+
+    /// 详情页保存的原子收口：改名 + 我标记 + 关系声明**同一通路单次写入**。
+    ///
+    /// 语义（对标 Android applyPersonEdit）：
+    /// 1. 目标人物行不存在 → 直接返回 `.subjectNotFound`（全部写操作跳过）；
+    /// 2. name 非空 → rename（空 = 保持原名；编辑页不支持取消命名）；
+    /// 3. isSelf=true → setSelf；false 且当前 self==该人 → clearSelf；
+    /// 4. relation 非空 → `declareRelation`（覆盖）并**透传结果**；
+    ///    relation 空 → 清除该人物全部关系，返回 nil。
+    ///
+    /// - Attention: 调用方必须处理返回的 `.selfNotDeclared`（引导用户先标记「这是我」），
+    ///   吞掉结果即静默丢弃 bug。
+    func applyPersonEdit(
+        personId: Int64,
+        name: String?,
+        relation: String?,
+        customLabel: String?,
+        isSelf: Bool
+    ) -> DeclareRelationResult? {
+        guard db.personRow(personId) != nil else { return .subjectNotFound }
+        if let n = name, !n.isEmpty {
+            rename(personId: personId, name: n)
         }
+        if isSelf {
+            setSelf(personId: personId, isSelf: true)
+        } else if db.selfPersonId() == personId {
+            setSelf(personId: personId, isSelf: false)
+        }
+        if let predicate = relation, !predicate.isEmpty {
+            return declareRelation(personId: personId, predicate: predicate, customLabel: customLabel)
+        }
+        db.deleteAllRelationsOfPerson(personId: personId)
+        return nil
+    }
+
+    /// 声明对己关系（覆盖：清旧→写新）。无 self 人物 → `.selfNotDeclared` 拒绝写入。
+    /// source 固定 renameDialog（iOS 暂无聊天声明通道）。
+    @discardableResult
+    func declareRelation(
+        personId: Int64,
+        predicate: String,
+        customLabel: String?
+    ) -> DeclareRelationResult {
+        guard db.selfPersonId() != nil else { return .selfNotDeclared }
+        db.clearRelationToSelf(personId: personId)
+        _ = db.upsertRelationToSelf(
+            subjectPersonId: personId,
+            predicate: predicate,
+            source: RelationSource.renameDialog.name,
+            customLabel: customLabel)
+        return .declared
     }
 }

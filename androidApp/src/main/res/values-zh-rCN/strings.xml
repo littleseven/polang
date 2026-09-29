@@ -1252,6 +1252,8 @@
     <string name="person_relation_group_family">家庭</string>
     <string name="person_relation_group_social">社会</string>
     <string name="person_is_self">这是我</string>
+    <string name="person_relation_need_self">还没有标记「这是我」：请先在自己的分组上打开「这是我」，再设置关系</string>
+    <string name="person_save_subject_gone">该人物已不存在（可能已被重新聚类合并）</string>
     <string name="person_relation_add">添加关系</string>
 
     <!-- AI 记忆（事实记忆管理页） -->

@@ -2,6 +2,7 @@ package com.mamba.picme.features.gallery
 
 import android.os.Build
 import android.provider.MediaStore
+import android.widget.Toast
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -968,17 +969,33 @@ fun GalleryScreen(
             relation = infoSnap.relation,
             cover = infoSnap.coverMedia?.let { media -> PersonCover(media.uri, media.faceFocusY) },
             photos = infoSnap.photos,
-            onSave = { relation, customLabel, isSelf ->
+            onSave = { name, relation, customLabel, isSelf ->
                 kotlinx.coroutines.MainScope().launch {
                     runCatching {
                         app.container.personRepository.applyPersonEdit(
                             infoSnap.person.personId,
-                            infoSnap.person.name.orEmpty(),
+                            name,
                             relation,
                             customLabel,
                             isSelf
                         )
-                    }.onSuccess { refreshPersonNameMap() }
+                    }.onSuccess { result ->
+                        // 声明被拒（未标记「这是我」）时给用户即时引导，不再静默吞掉
+                        if (result is PersonRepository.DeclareRelationResult.SelfNotDeclared) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.person_relation_need_self),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else if (result is PersonRepository.DeclareRelationResult.SubjectNotFound) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.person_save_subject_gone),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        refreshPersonNameMap()
+                    }
                         .onFailure { Logger.e(TAG, "Failed to apply person edit", it) }
                 }
             },
@@ -997,16 +1014,6 @@ fun GalleryScreen(
                         app.container.personRepository.updateCover(infoSnap.person.personId, photo.id)
                     }.onSuccess { refreshPersonNameMap() }
                         .onFailure { Logger.e(TAG, "Failed to update cover", it) }
-                }
-            },
-            onUpdateName = { name ->
-                val trimmed = name.trim()
-                if (trimmed.isNotBlank()) {
-                    kotlinx.coroutines.MainScope().launch {
-                        runCatching {
-                            app.container.personRepository.renamePerson(infoSnap.person.personId, trimmed)
-                        }.onFailure { Logger.e(TAG, "Failed to rename person", it) }
-                    }
                 }
             },
             onRescore = {

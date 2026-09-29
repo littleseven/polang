@@ -43,10 +43,18 @@ struct PersonView: View {
             vm.toast = nil
         }
         .fullScreenCover(item: $detailRoute) { route in
-            PersonInfoView(personId: route.id) {
-                detailRoute = nil
-                vm.refresh()
-            }
+            PersonInfoView(
+                personId: route.id,
+                onBack: {
+                    detailRoute = nil
+                    vm.refresh()
+                },
+                onSaveResult: { error in
+                    // 保存写入完成（详情页通常已关）：被拒 → 列表页引导 toast；
+                    // 无论成败再刷一次列表——写入晚于关闭，防旧数据残留（spec §7 error_guidance）
+                    if let error = error { vm.showSaveGuidance(error) }
+                    vm.refresh()
+                })
         }
     }
 

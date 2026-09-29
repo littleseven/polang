@@ -1218,6 +1218,8 @@
     <string name="person_relation_group_family">Famille</string>
     <string name="person_relation_group_social">Social</string>
     <string name="person_is_self">C\'est moi</string>
+    <string name="person_relation_need_self">« C\'est moi » n\'est pas encore activé : activez-le d\'abord sur votre propre groupe, puis définissez la relation</string>
+    <string name="person_save_subject_gone">Cette personne n\'existe plus (elle a peut-être été fusionnée lors du regroupement)</string>
     <string name="person_relation_add">Ajouter une relation</string>
     <!-- AI 记忆（事实记忆管理页） -->
     <string name="settings_ai_memory">Mémoire IA</string>

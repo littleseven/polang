@@ -323,14 +323,28 @@ cover_picker:
   on_select: "updateCover(personId, media.id) → 关闭"
 
 # ============================================================================
-# 7. 详情保存逻辑（doSave）
+# 7. 详情保存逻辑（doSave + applyPersonEdit 单次写入；2026-09-29 静默丢弃修复定稿）
 # ============================================================================
 save_logic:
   steps:
-    - "effectiveRelation = customLabel.isNotBlank() ? OTHER : currentRelation"
-    - "if nameText.trim() 非空 → onUpdateName(trimmed)"
-    - "onSave(effectiveRelation, customLabel, currentIsSelf)"
-    - "onNavigateBack()"
+    - "effectiveRelation = customLabel 非空(trim) ? OTHER : currentRelation"
+    - "onSave(nameText.trim(), effectiveRelation, customLabel, currentIsSelf) —— 改名随保存单次提交"
+    - "onNavigateBack()（被拒引导提示在父列表页展示，不在编辑页内弹）"
+  apply_person_edit:
+    signature: "applyPersonEdit(personId, name, relation, customLabel, isSelf) -> DeclareRelationResult?"
+    steps:
+      - "目标人物行不存在 → 返回 SubjectNotFound（前置检查，全部写操作跳过）"
+      - "name 非空 → renamePerson（空 = 保持原名不变；编辑页不支持取消命名，仅列表行内改名支持）"
+      - "isSelf=true → setSelf；isSelf=false 且当前 self==该人 → clearSelf"
+      - "relation 非空 → declareRelation（覆盖：清旧→写新；无 self 人物时返回 SelfNotDeclared 拒绝写入）→ 透传 Declared / SelfNotDeclared / SubjectNotFound"
+      - "relation 空 → 清除该人物全部关系，返回 null/nil"
+    invariant: "声明结果必须透传给 UI——吞掉 SelfNotDeclared 即「修改关系不生效」静默 bug（本次修复根因）"
+  declare_relation_result: [ Declared, SelfNotDeclared(无「这是我」标记), SubjectNotFound(目标人物已不存在) ]
+  error_guidance:
+    SELF_NOT_DECLARED: "提示文案 person_relation_need_self（还没有标记「这是我」：请先在自己的分组上打开「这是我」，再设置关系）"
+    SUBJECT_NOT_FOUND: "提示文案 person_save_subject_gone（该人物已不存在（可能已被重新聚类合并））"
+    ios_surface: "详情页立即关闭；引导经列表页 toast 胶囊展示（PersonViewModel.toast，3s 自动消失），对齐 Android snackbar 于 PersonScreen"
+  removed: "独立 onUpdateName 通路（改名并入 onSave 单次写入，消除「旧名快照回写新名」竞态）"
 
 # ============================================================================
 # 8. 数据模型（TagDatabase，与 Android 同构）
@@ -360,6 +374,7 @@ states:
   relation_predicate: [ FATHER, MOTHER, SON, DAUGHTER, ELDER_BROTHER, ELDER_SISTER, YOUNGER_BROTHER, YOUNGER_SISTER, GRANDFATHER, GRANDMOTHER, SPOUSE, PARTNER, FRIEND, CLASSMATE, COLLEAGUE, IDOL, OTHER ]   # SSOT=shared RelationPredicate(23)，分组按 isFamily
   list_mode: [ default_show_all_false, show_all_true ]
   name_state: [ named, unnamed, editing ]
+  save_error: [ none, self_not_declared, subject_not_found ]   # 详情保存被拒类型化原因（UI 映射本地化引导文案）
 
 # ============================================================================
 # 10. 允许的平台差异 / 平台差异台账
@@ -368,6 +383,7 @@ allowed_differences:
   - { dimension: icon_set, android: "Material Icons", ios: "SF Symbols", note: "语义一致" }
   - { dimension: bottom_sheet_material, android: "ModalBottomSheet", ios: ".sheet", note: "容器材质各原生，圆角值对齐" }
   - { dimension: card_elevation, android: "1dp shadow", ios: "轻微 shadow/opacity 近似", note: "iOS 卡片可用 surfaceContainerLow + 弱投影" }
+  - { dimension: save_guidance_surface, android: "snackbar（人物页）/ Toast（相册 overlay）", ios: "列表页 toast 胶囊（3s 自动消失）", note: "语义一致：类型化错误 → 本地化引导，均不阻断返回" }
 
 platform_differences:
   permission: "无新权限（本地 DB + 已有相册访问）"
@@ -375,6 +391,7 @@ platform_differences:
     recluster: "Android=前台服务 intentReembedFaces；iOS=TagScanOrchestrator.runPass2Clustering()（同步触发 Pass2）"
     rescore: "Android=aestheticScoreWorker；iOS=无打分器（Stage2 暂缓）"
     gallery_person_filter: "Android=onRequestGallerySearch(personId)；iOS=相册按 faceId 分组（Stage2 桥接 personId↔faceId）"
+    person_edit_surface: "Android=人物页 + 相册人物信息 overlay 双编辑入口（2026-09 修复两处均透出结果）；iOS=仅人物详情页单入口（无相册 overlay）→ 本次跟随只落单入口，台账登记"
   privacy_disclosure: "无变更（人物/照片关联 100% 端侧，不触远程）"
 
 # ============================================================================

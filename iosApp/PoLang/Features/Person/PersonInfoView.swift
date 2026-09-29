@@ -11,6 +11,9 @@ struct PersonInfoView: View {
 
     let personId: Int64
     var onBack: () -> Void = {}
+    /// 保存写入完成后回调（详情页此时通常已 dismiss）：被拒类型交列表页出引导 toast；
+    /// 闭包不持本视图生命周期，由 `PersonDetailViewModel.applyEdit` 完成侧触发。
+    var onSaveResult: ((PersonSaveError?) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @StateObject private var vm: PersonDetailViewModel
 
@@ -22,9 +25,14 @@ struct PersonInfoView: View {
     @State private var showCoverPicker = false
     @State private var didSync = false
 
-    init(personId: Int64, onBack: @escaping () -> Void = {}) {
+    init(
+        personId: Int64,
+        onBack: @escaping () -> Void = {},
+        onSaveResult: ((PersonSaveError?) -> Void)? = nil
+    ) {
         self.personId = personId
         self.onBack = onBack
+        self.onSaveResult = onSaveResult
         _vm = StateObject(wrappedValue: PersonDetailViewModel(personId: personId))
     }
 
@@ -95,13 +103,19 @@ struct PersonInfoView: View {
         onBack()
     }
 
-    // MARK: 保存（对标 Android doSave）
+    // MARK: 保存（对标 Android doSave；spec person.yaml §7 单次提交）
 
     private func doSave() {
         let trimmed = nameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        vm.saveName(trimmed.isEmpty ? nil : trimmed)
-        vm.saveRelation(predicate: currentRelation, customLabel: customLabel)
-        vm.saveSelf(currentIsSelf)
+        // customLabel 非空 → OTHER 折叠；改名随保存单次提交（空名=保持原名，编辑页不支持取消命名）
+        vm.applyEdit(
+            name: trimmed,
+            relation: customActive ? "OTHER" : currentRelation,
+            customLabel: customLabel,
+            isSelf: currentIsSelf
+        ) { error in
+            onSaveResult?(error)
+        }
         close()
     }
 
