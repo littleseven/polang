@@ -1,10 +1,10 @@
 # PoLang iOS 产品实现参考
 
-> **校准基线：v1.0.39 (10039) / 2026-09-20 / 事实来源=代码**
+> **校准基线：v1.0.41 (10041) / 2026-09-29 / 事实来源=代码**
 >
 > **定位**：iOS 端产品实现的单一参考。以 `iosApp/PoLang` 当前 Swift 代码 + `shared/src/iosMain` + `docs/08-UI-SPECS/screens/*.yaml` 契约为事实来源描述**现状**；不再保留历史演进叙述（2026-08-10 前的 Phase 史见 git 历史与 `../reviews/`）。
 >
-> **数字口径**：总量规模数字（主 target / iosMain / 测试）唯一出处 = `IOS_TASK_STATUS.md` 规模锚点（2026-09-20 实测）；本文件 §1.1/§1.2 保留**模块级拆分**（仅本文件有）。
+> **数字口径**：总量规模数字（主 target / iosMain / 测试）唯一出处 = `IOS_TASK_STATUS.md` 规模锚点（2026-09-29 实测）；本文件 §1.1/§1.2 保留**模块级拆分**（仅本文件有）。
 >
 > **图例**：✅ 已落地 · 🔄 已落地但有登记缺口 · ❌ 缺口/stub · ❄️ 冻结（代码保留不加新功能）· 🚫 平台不对齐（不做）
 
@@ -12,41 +12,41 @@
 
 ## §1 总览
 
-### 1.1 代码规模实测（2026-09-20）
+### 1.1 代码规模实测（2026-09-29）
 
-iOS 主 target（`iosApp/PoLang`）总量见规模锚点（185 文件 / 41808 行 + 5 Metal shader，2026-09-20）；模块拆分如下：
+iOS 主 target（`iosApp/PoLang`）总量见规模锚点（188 文件 / 43373 行 + 5 Metal shader，2026-09-29）；模块拆分如下：
 
 | 模块 | 文件 | 行数 | 状态 |
 |---|---:|---:|---|
 | Features/Camera（相机+美颜） | 18 | 3995 | ❄️ 冻结（2026-08-16 决策） |
 | Features/Settings（设置） | 9 | 3953 | 🔄（备份恢复占位） |
 | Features/Editor（编辑器+AI 抽卡） | 18 | 3817 | 🔄（去背景未接线、BEAUTY 渲染 DEFER） |
-| Features/Chat（聊天） | 13 | 3687 | 🔄（端侧意图缺口，见 §3.3） |
-| Features/Gallery（相册） | 14 | 3048 | ✅ |
+| Features/Chat（聊天） | 15 | 5038 | 🔄（端侧意图缺口，见 §3.3） |
+| Features/Gallery（相册） | 14 | 3058 | ✅ |
 | Features/Organize（整理 v2） | 17 | 2973 | 🔄（DUPLICATES 卡降档） |
 | Features/IdPhoto（证件照） | 9 | 1836 | ✅ |
-| Features/Person（人物） | 4 | 1172 | ✅ |
+| Features/Person（人物） | 4 | 1283 | ✅ |
 | Features/Memories（回忆） | 4 | 1050 | ✅ |
 | Features/TagScan（扫描控制页） | 3 | 923 | ✅ |
-| Features/Main（主 Pager 宿主） | 1 | 241 | ✅ |
-| Features/Common | 2 | 189 | — |
+| Features/Main（主 Pager 宿主） | 1 | 242 | ✅ |
+| Features/Common | 2 | 191 | — |
 | Features/Debug（调试页） | 5 | 1064 | DEBUG 工具 |
-| Platform（引擎/桥/库） | 61 | 12678 | 见 §1.2 |
-| DesignSystem（token 镜像+组件） | 3 | 912 | codegen 产物，禁手改 |
-| App / DI / SharedBridge | 4 | 270 | 入口+组合根+K/N 桥 |
+| Platform（引擎/桥/库） | 62 | 12759 | 见 §1.2 |
+| DesignSystem（token 镜像+组件） | 3 | 915 | codegen 产物，禁手改 |
+| App / DI / SharedBridge | 4 | 276 | 入口+组合根+K/N 桥 |
 
-### 1.2 Platform 层拆分（12678 行）
+### 1.2 Platform 层拆分（12759 行）
 
 | 子域 | 文件 | 行数 | 内容 |
 |---|---:|---:|---|
 | Platform/Search | 20 | 4106 | 自然语言搜索全链路（§3.10） |
 | Platform/Tag | 10 | 2085 | TAG 3-Pass 扫描（§3.9） |
 | Platform/Js | 3 | 349 | JS 沙盒宿主（QuickJS） |
-| 根级 | 28 | 6138 | TagDatabase（GRDB，+6 扩展文件）、PhMediaBridge/PhSearchBridge、模型下载（ModelDownloadManager/ParallelFileDownloader/DownloadTaskHub/ModelCatalog）、ORT/MobileCLIP/OCR/FaceAlignment、缩略图、回收站、各 Bridge |
+| 根级 | 29 | 6219 | TagDatabase（GRDB，+6 扩展文件）、PhMediaBridge/PhSearchBridge、模型下载（ModelDownloadManager/ParallelFileDownloader/DownloadTaskHub/ModelCatalog）、ORT/MobileCLIP/OCR/FaceAlignment、缩略图、回收站、各 Bridge（含 RenderHtmlBridge，M5） |
 
 ### 1.3 shared iosMain（Kotlin 侧 iOS 桥接）
 
-`shared/src/iosMain`：28 个 Kotlin 文件 / 2507 行（2026-09-20，总量归规模锚点），编译进 SharedKit XCFramework 供 Swift 消费。清单与职责见 §4。
+`shared/src/iosMain`：31 个 Kotlin 文件 / 2974 行（2026-09-29，总量归规模锚点），编译进 SharedKit XCFramework 供 Swift 消费。清单与职责见 §4。
 
 ---
 
@@ -104,25 +104,27 @@ iOS 主 target（`iosApp/PoLang`）总量见规模锚点（185 文件 / 41808 �
 - **滑动审片**：`SwipeReviewScreen`（飞出动画 + undo，竞态已修）。
 - 信号存储落 `TagDatabase+Organize.swift`（GRDB 扩列）。
 
-### 3.3 聊天 Chat（13 文件 / 3687 行）🔄
+### 3.3 聊天 Chat（15 文件 / 5038 行）🔄
 
-Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_calls。
+Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_calls；M5 parts 渲染已落地（2026-09-28，merge `b99c1e2fd`，契约 chat.yaml §3.2 ios_todo 清零）。
 
 - **链路**：`ChatViewModel` → SharedKit `ChatAgentBridge.sendMessage`（非 suspend，void 返回）→ Koog 远程引擎 → `watchUiActions/watchText` FlowWatcher 回流；`cancelCurrent` 取消。iOS 专属 prompt（`IosChatPrompt`，只保留与已注册工具匹配的规则段：8 相册工具 + ai_optimize）。
-- **多会话**：`ChatThreadSidebarView` + `ChatHistoryStore`（会话/消息 JSON 文件持久化，按 sessionId 分键）；bridge 侧 `setSessionId` 切 Koog memory ID。
-- **富交互**：流式节奏器（commonMain `StreamingPacingController`）、Markdown（表格网格/代码块折叠复制）、CHART 图表卡（`ChartSvgCard`+`ChartJsEngine`）、媒体结果卡横滑「查看全部」、👍👎🔄 反馈+模型胶囊、图片消息（上图下文/编辑回链/捏合 1-5x 全屏预览）、工具轮渲染。
+- **多会话**：`ChatThreadSidebarView` + `ChatHistoryStore`（会话/消息 JSON 文件持久化，按 sessionId 分键；M5 起消息经 SharedKit `ChatHistoryStoreCodec` parts 编解码落库）；bridge 侧 `setSessionId` 切 Koog memory ID。
+- **parts 渲染（M5）**：`ChatMessage` Swift 消费 parts 模型（type 3 分类 8 值 + role 独立列，iOS 零 legacy 包袱）+ 拍平列表 item 化；turn 装配双轨（adapter+reducer）+ 工具状态行 + 间距阶梯（段落 4/卡片 8/回合 16，token 同源）；agent.text AST 正文渲染（`AgentTextView`：GFM 分段 + 排版阶梯 + parse gating）；HTML 卡双形态（`HtmlCardView`/`HtmlCardOverlays`：INLINE 动态测高 / FULLPAGE 预览+全屏查看器+链接落地页，render_html 工具经 iosMain `IosRenderHtmlCapability` → commonMain `HtmlCardSanitizer` 清洗 → Swift `RenderHtmlBridge`）。
+- **富交互**：流式节奏器（commonMain `StreamingPacingController`）、CHART 图表卡（`ChartSvgCard`+`ChartJsEngine`）、媒体结果卡横滑「查看全部」、👍👎🔄 反馈+模型胶囊、图片消息（上图下文/编辑回链/捏合 1-5x 全屏预览）、工具轮渲染。
 - **AI 优化抽卡**：`ChatOptimizeGachaController` + `GachaCandidateStrip`（chat 侧抽卡条，与编辑器共用引擎，见 §3.7）。
 - **JS 沙盒**：`run_gallery_script` 12/12 **只读** handler（`Platform/GalleryScriptHandlers.swift`）；写操作（capability.dispatch + 确认弹窗）未实现。
 - **登记缺口**：#1（端侧 VLM stub，连带暂存图 UNDERSTAND/FIND_SIMILAR）/ #8（refine_template 未接线），见 `IOS_TASK_STATUS.md` §1；语音输入不做（平台差异，§6）。
 - 助手性格/回复语言注入 bridge（`52c6335aa`/`565270f43`，含粤语解析）。
 
-### 3.4 人物 Person（4 文件 / 1172 行）✅
+### 3.4 人物 Person（4 文件 / 1283 行）✅
 
-非占位、完整实现（2026-08-22 Ardot 设计定稿重排 + 2026-09-16 批次补全）：
+非占位、完整实现（2026-08-22 Ardot 设计定稿重排 + 2026-09-16 批次补全 + 2026-09-29 关系保存修复 `67a495409`）：
 
 - **列表**：`PersonView` 2 列网格卡（人脸感知封面+张数角标/行内改名/关系胶囊+Add relation 引导/「这是我」标记），数据源 TAG 人脸聚类（`TagDatabase.persons`）。
 - **详情**：`PersonInfoView`（封面选择、关系编辑、头像拍摄入口——`person_cell_<id>` 锚点 + AvatarCapture 链路，cover 上叠 cover）。
-- 存储：`PersonRepository` + `TagDatabase+Person.swift`（含 person_relations 表）。
+- **保存流契约**（person.yaml §7）：`PersonRepository.applyPersonEdit` 单次原子写入五步收口（前置存在性/空名跳过/self 置清/声明透传/nil 全清）+ `DeclareRelationResult` 三值（declared/selfNotDeclared/subjectNotFound）结果透传 → 列表页 toast 错误引导（五语，toast 单槽 guard 防被隐藏提示覆盖）；取代旧 saveName/saveSelf/saveRelation 三连独立写（消除旧名快照回写与 relation 先于 self 被拒双竞态）；reload 带单调 generation 守卫。测试：`PersonApplyEditTests` 6 条。
+- 存储：`PersonRepository` + `TagDatabase+Person.swift`（含 person_relations 表 + `deleteAllRelationsOfPerson`）。
 - 待真机项：无人脸聚类数据时 e2e 用例 XCTSkip（`person_avatar_capture`）。
 
 ### 3.5 回忆 Memories（4 文件 / 1050 行）✅
@@ -191,7 +193,7 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 
 shared KMP 模块编译为 **SharedKit XCFramework**（`:shared:assembleSharedDebugXCFramework`），Swift `import SharedKit` 消费。互操作纪律（kmp-ios-interop 铁律）：跨边界方法全部非 suspend（void 返回）、Kotlin 侧 try/catch(Throwable) 兜底（未声明 @Throws 的异常逃逸 = signal 6）、Flow 经 `FlowWatcher`（`shared/iosMain/shared/FlowWatchers.kt`）转回调、回调线程任意（Swift 须 `Task { @MainActor in }` 更新 UI）。Swift 侧统一入口 `SharedBridge/KotlinBridge.swift`，组合根 `DI/AppContainer.swift`。
 
-### 4.2 iosMain 清单（28 文件 / 2507 行）
+### 4.2 iosMain 清单（31 文件 / 2974 行）
 
 | 文件 | 职责 |
 |---|---|
@@ -201,12 +203,12 @@ shared KMP 模块编译为 **SharedKit XCFramework**（`:shared:assembleSharedDe
 | `agent/core/inference/local/IosUnavailableImageInferenceEngine.kt` | 端侧 VLM stub（§3.9） |
 | `agent/core/capability/IosChatGalleryCapability.kt` + `IosChatGallerySearch.kt` | chat 相册能力：search/refine/feedback/more/exclude 五命令 + 写操作四命令（favorite/select/share/delete，delete 走系统确认窗） |
 | `agent/core/capability/IosNavigationCapability.kt` | navigate_to 能力（→ `IosNavigationBridge` → Swift `NavigationBridge`） |
-| `agent/core/capability/IosAiOptimizeCapability.kt` / `IosChartCapability.kt` / `IosRunScriptCapability.kt` | AI 抽卡 / 图表 / JS 沙盒能力 |
+| `agent/core/capability/IosAiOptimizeCapability.kt` / `IosChartCapability.kt` / `IosRunScriptCapability.kt` / `IosRenderHtmlCapability.kt` | AI 抽卡 / 图表 / JS 沙盒 / render_html（M5：→ `HtmlCardSanitizer` 清洗 → Swift `RenderHtmlBridge` → HtmlCardView）能力 |
 | `agent/core/js/IosJsRuntimeSupport.kt` | JS 运行时 actual（QuickJS） |
 | `agent/core/platform/*` | Platform.ios / DispatcherProvider.ios / IosDiagnosticLogStore / IosKoogMessageMemoryStore（NSUserDefaults）/ KoogHttpClientFactoryProvider.ios / AgentIdGenerator.ios |
-| `data/Ios*Bridge.kt`（7 个） | Swift 实现接口的 Kotlin 侧声明：MediaRepository/ChatSearch/Navigation/AiOptimize/Chart/RunScript |
+| `data/Ios*Bridge.kt`（7 个） | Swift 实现接口的 Kotlin 侧声明：MediaRepository/ChatSearch/Navigation/AiOptimize/Chart/RunScript/RenderHtml |
 | `data/IosMediaRepository.kt` | 相册仓储（经 PhMediaBridge 回调 Swift） |
-| `domain/chat/*` | TimeProvider / StreamingPacingControllerFactory actual |
+| `domain/chat/*` | TimeProvider / StreamingPacingControllerFactory actual / ChatHistoryStoreCodec（M5：会话 parts 落库 JSON 编解码，commonTest 覆盖 round-trip） |
 | `shared/FlowWatchers.kt` | Flow→回调 watcher（K/N 返回类型保留） |
 
 ### 4.3 数据与隐私口径
@@ -215,7 +217,7 @@ shared KMP 模块编译为 **SharedKit XCFramework**（`:shared:assembleSharedDe
 
 ---
 
-## §5 双端能力对照表（Android main v1.0.39 vs iOS 2026-09-20）
+## §5 双端能力对照表（Android main v1.0.41 vs iOS 2026-09-29）
 
 | 能力域 | Android | iOS | 备注 |
 |---|---|---|---|
@@ -227,10 +229,11 @@ shared KMP 模块编译为 **SharedKit XCFramework**（`:shared:assembleSharedDe
 | TAG 3-Pass 扫描 | ✅ | 🔄 | iOS 缺 MetalGuardian/后台扫描/dedup_hash |
 | 端侧 VLM（图像理解/打标） | ✅ | ❌ stub | `IosUnavailableImageInferenceEngine`；连带 chat UNDERSTAND/FIND_SIMILAR 不可用 |
 | Chat 流式对话+工具 | ✅ | ✅ | iOS 8 相册工具+ai_optimize（手工清单） |
-| Chat 多会话历史 | ✅ | ✅ | iOS `54799952` |
+| Chat parts 渲染（AST 正文/HTML 卡双形态/turn 聚合） | ✅ | ✅ | M5 iOS 跟随 2026-09-28（merge `b99c1e2fd`，chat.yaml §3.2 ios_todo 清零） |
+| Chat 多会话历史 | ✅ | ✅ | iOS `54799952`；M5 起 parts codec 落库 |
 | Chat JS 沙盒 | ✅（读+写） | 🔄 只读 12/12 | 写操作（capability.dispatch+确认弹窗）未实现；前置 App Store 2.5.2 结论 |
 | AI 优化抽卡 | ✅ | ✅ | chat+editor 双入口（验收 PASS） |
-| 人物页 | ✅ | ✅ | 含关系/封面/头像拍摄 |
+| 人物页 | ✅ | ✅ | 含关系/封面/头像拍摄；关系保存单次写入+结果透传+错误引导（person.yaml §7，2026-09-29 `67a495409`） |
 | 回忆页 | ✅ | ✅ | iOS `cd2e5f102`+`1e5bd5275` |
 | 编辑器（crop/adjust/filter/markup） | ✅ | 🔄 | iOS 去背景未接线、BEAUTY 渲染 DEFER |
 | 证件照 | ✅ | ✅ | iOS MattingEngine FUSION |
@@ -241,7 +244,7 @@ shared KMP 模块编译为 **SharedKit XCFramework**（`:shared:assembleSharedDe
 | 悬浮聊天气泡 | ✅ | 🚫 | iOS 无系统悬浮窗等价 |
 | launch_app / open_system_settings | ✅ | 🚫 | iOS 沙盒限制 |
 | HyperOS 后台冻结检测 | ✅ | 🚫 | iOS 无厂商冻结问题 |
-| i18n | ✅ 五语 | ✅ 五语 | 767 键 × en/zh-Hans/zh-Hant/es/fr |
+| i18n | ✅ 五语 | ✅ 五语 | 775 键 × en/zh-Hans/zh-Hant/es/fr |
 | server 适配 | ✅ | ✅ | `X-Platform: ios` + 设备平台字段 |
 
 ---

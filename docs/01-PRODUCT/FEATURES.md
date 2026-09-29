@@ -213,10 +213,10 @@
 - 支持从搜索结果中直接编辑/分享/删除
 - 搜索历史保留（本地存储，最多 20 条）
 
-**人物记忆与关系（🔄 开发中，未合并 main）**
-- 事实记忆：用户「帮我记住…」声明的事实统一收口于 `MemoryRepository`（`memory_facts` 表），来源含聊天工具与 JS 沙盒写通路
-- 人物命名 / "我"标记：为人脸簇命名，全局唯一"我"
-- 关系图谱：声明「subject 是我的 predicate」（配偶/子女/父母/兄弟姐妹/祖辈/孙辈/其他亲属），幂等覆盖、级联删除，支持备份导出/恢复
+**人物记忆与关系（✅ 已落地 main；iOS chat 声明通路未注册）**
+- 事实记忆：用户「帮我记住…」声明的事实统一收口于 `MemoryRepository`（`memory_facts` 表），来源含聊天工具（Android `MemoryCapability` 已注册）与 JS 沙盒写通路；双端设置页均可查看/编辑/删除（Android `MemoryFactsScreen` / iOS `MemoryFactsView`）
+- 人物命名 / "我"标记：为人脸簇命名，全局唯一"我"（双端人物页 ✅）
+- 关系图谱：声明「subject 是我的 predicate」（配偶/子女/父母/兄弟姐妹/祖辈/孙辈/其他亲属），幂等覆盖、级联删除，支持备份导出/恢复；双端人物页编辑 ✅（保存流契约 `docs/08-UI-SPECS/screens/person.yaml` §7：单次写入 + 结果透传 + 错误引导，2026-09-29）；Android chat 声明通路 `PersonRelationCapability` 已注册，iOS chat 未注册（iOS chat 工具 = 8 相册 + ai_optimize）
 
 **OCR 文字提取**
 - 触发方式：工具栏「提取文字」按钮 / AI 对话触发（"这张图上的文字是什么？"）
