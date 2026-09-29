@@ -56,12 +56,15 @@ core/image/
 ├── ImageProcessor.kt                # 拍照/录像接口 + ImageProcessorImpl 实现
 ├── ThumbnailCache.kt                # 双级缩略图缓存（L1 LRU 360px 位图 + L2 JPEG 磁盘）
 ├── ThumbnailCacheFetcher.kt         # Coil Fetcher：content:// 且宽度 ≤ THUMBNAIL_SIZE_PX 才拦截走缓存
+├── ThumbnailCachePolicy.kt          # 缓存可用性判定：fill 放大倍率 > 1.5 弃缓存回落 Coil（纯函数 JVM 可测）
 ├── BitmapSampling.kt                # 按目标尺寸降采样解码工具
 ├── FaceAwareAlignment.kt            # 人脸感知纵向对齐（faceFocusY → ContentScale.Crop alignment）
 └── CoilConfig.kt                    # Coil 全局图片加载配置
 ```
 
 > **⚠️ 阈值联动约束**：`ThumbnailCacheFetcher` 的拦截阈值必须与 `ThumbnailCache.THUMBNAIL_SIZE_PX`（360px）保持一致（直接引用同一常量，禁止另写魔法数）——拦截更大请求会返回 360px 小图放大显示导致模糊（2026-08 人物页封面糊图的根因）。
+
+> **⚠️ 放大倍率闸门（2026-09 长图缩略图糊图根因）**：`loadThumbnail` aspect-fit 会把 5:1 长图（1080×5400）缓存成 72×360，网格 Crop 放大 ~4.2x 显示必然糊。`ThumbnailCacheFetcher.fetch()` 命中缓存后须过 `ThumbnailCachePolicy.isCacheAdequate`（fill 放大倍率 > 1.5 返回 null 回落 Coil 正常解码）；正常 4:3 照片 1.33x 不受影响仍走缓存。修改缓存分辨率或拦截阈值时同步评估该闸门。
 
 > **⚠️ 2026-05 架构下沉**：以下文件已从 `core/image/` 迁移至 `beauty-engine/api/`，实现美颜领域模型与引擎内聚：
 > - `BeautySettings.kt`、`BeautyParams.kt`、`BeautyParamsConverter.kt`

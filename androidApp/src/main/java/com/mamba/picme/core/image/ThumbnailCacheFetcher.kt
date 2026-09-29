@@ -26,15 +26,29 @@ import coil.size.isOriginal
  *
  * 阈值必须与缓存实际分辨率一致：缓存位图只有 360px，若拦截更大请求
  * （如人物页封面 ~486px），会返回小图放大显示导致模糊。
+ *
+ * 放大倍率闸门（[ThumbnailCachePolicy]）：系统 loadThumbnail 按 aspect-fit
+ * 生成缓存，长截屏（5:1）仅缓存 72×360；命中后若 fill 放大倍率超阈值，
+ * fetch() 同样返回 null 回落 Coil 正常解码（长图解码 360×1800 再 Crop，清晰）。
  */
 class ThumbnailCacheFetcher(
     private val uri: Uri,
+    private val requestedWidthPx: Int,
+    private val requestedHeightPx: Int,
     private val cache: ThumbnailCache
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? {
         val cached = cache.get(uri.toString())
         if (cached != null && !cached.isRecycled) {
+            // 放大倍率闸门：缓存图相对请求尺寸放大超阈值（长图 aspect-fit 缓存过小），
+            // 直接返回会模糊，回落 Coil 正常解码管线
+            if (!ThumbnailCachePolicy.isCacheAdequate(
+                    cached.width, cached.height, requestedWidthPx, requestedHeightPx
+                )
+            ) {
+                return null
+            }
             // 创建 Bitmap 副本，避免 ThumbnailCache LRU 驱逐或 evict() 回收后
             // Compose 绘制时出现 "Canvas: trying to use a recycled bitmap" 崩溃
             val copiedBitmap = cached.copy(cached.config ?: android.graphics.Bitmap.Config.ARGB_8888, false)
@@ -69,7 +83,9 @@ class ThumbnailCacheFetcher(
             // 若返回 360px 缓存图会被放大模糊，必须走 Coil 正常解码
             val width = options.size.width
             if (width is Dimension.Pixels && width.px <= ThumbnailCache.THUMBNAIL_SIZE_PX) {
-                return ThumbnailCacheFetcher(data, cache)
+                // 高度未指定时（如 .size(360) 只给宽）按宽度计，Crop 语义下保守
+                val heightPx = (options.size.height as? Dimension.Pixels)?.px ?: width.px
+                return ThumbnailCacheFetcher(data, width.px, heightPx, cache)
             }
 
             return null
