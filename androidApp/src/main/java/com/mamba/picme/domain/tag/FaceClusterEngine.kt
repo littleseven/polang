@@ -9,6 +9,8 @@ import android.util.Log
 import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.indexing.MnnEmbeddingExtractor
 import com.mamba.picme.data.local.AppDatabase
+import com.mamba.picme.data.local.MediaDao
+import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.data.local.entity.FaceEmbeddingEntity
 import com.mamba.picme.data.local.entity.PersonEntity
 import java.io.BufferedWriter
@@ -31,10 +33,16 @@ import kotlin.math.sqrt
  *   模型缺失时降级为零向量（聚类不生效）。
  * - **聚类算法**：增量式余弦距离匹配已实现。
  *
- * @param context Android Context（用于 Room 数据库访问和模型目录）
+ * @param context Android Context（用于模型目录与调试输出路径）
+ * @param personDao 人物/embedding DAO（可注入，默认取应用单例库；测试注入内存库实例）
+ * @param mediaDao 媒体 DAO（同上）
  */
 @Suppress("TooManyFunctions") // 待重构：聚类引擎，按职责拆分
-class FaceClusterEngine(private val context: Context) {
+class FaceClusterEngine(
+    private val context: Context,
+    private val personDao: PersonDao = AppDatabase.getDatabase(context).personDao(),
+    private val mediaDao: MediaDao = AppDatabase.getDatabase(context).mediaDao()
+) {
 
     companion object {
         private const val TAG = "FaceClusterEngine"
@@ -60,8 +68,6 @@ class FaceClusterEngine(private val context: Context) {
         @Volatile
         private var debugFaceSaveCount = 0
     }
-
-    private val personDao = AppDatabase.getDatabase(context).personDao()
 
     /**
      * 人物质心缓存：personId -> (centroid, embeddingCount)。
@@ -489,7 +495,6 @@ class FaceClusterEngine(private val context: Context) {
             }
         }
         if (mediaFaceIds.isNotEmpty()) {
-            val mediaDao = AppDatabase.getDatabase(context).mediaDao()
             mediaFaceIds.entries
                 .groupBy({ entry -> entry.value }, { entry -> entry.key })
                 .forEach { (personId, mediaIds) ->
@@ -501,9 +506,38 @@ class FaceClusterEngine(private val context: Context) {
     }
 
     /**
-     * 合并两个簇（将 personB 的所有 embedding 转移到 personA，删除 personB）
+     * 合并两个簇（将 personB 的所有 embedding 转移到 personA，删除 personB）。
+     *
+     * **提交前复查**：调用方（[mergeSmallClusters]）的合并决策基于维护开始时的一次性快照，
+     * 凝聚式循环可能跑数秒，期间用户可能已给某组命名（2026-09-29「大幂幂」组命名后当场消失
+     * 即此竞态）。因此在执行删除前以 DB 现值重读双方 person 行，套用 [decideSmallClusterMerge]
+     * 的同一套规则（双方命名跳过 / 命名者与 self 优先存活）；判定与过期快照不一致时放弃本次
+     * 合并，由下一轮维护基于新快照重新判定。
+     *
+     * @return true 表示合并已执行；false 表示复查否决（命名/self 状态已变或行已不存在）
      */
-    suspend fun mergeClusters(personA: Long, personB: Long) {
+    suspend fun mergeClusters(personA: Long, personB: Long): Boolean {
+        val freshA = personDao.getPerson(personA)
+        val freshB = personDao.getPerson(personB)
+        if (freshA == null || freshB == null) {
+            Log.i(TAG, "mergeClusters aborted: person row gone (a=${freshA != null}, b=${freshB != null})")
+            return false
+        }
+        val commitDecision = decideSmallClusterMerge(
+            MergeCandidate(personA, freshA.name, freshA.isSelf, personDao.getEmbeddingCount(personA)),
+            MergeCandidate(personB, freshB.name, freshB.isSelf, personDao.getEmbeddingCount(personB)),
+            similarity = 1f, // 相似度门槛在上游决策已过滤，此处只复查命名/self 归属
+            threshold = 0f
+        )
+        if (commitDecision == null || commitDecision.absorbed.personId != personB) {
+            Log.i(
+                TAG,
+                "mergeClusters aborted: named/self state changed since snapshot " +
+                    "(a.name=${freshA.name}, b.name=${freshB.name}, a.self=${freshA.isSelf}, b.self=${freshB.isSelf})"
+            )
+            return false
+        }
+
         val embeddingsB = personDao.getEmbeddingsByPerson(personB)
         for (embedding in embeddingsB) {
             personDao.assignEmbedding(embedding.embeddingId, personA)
@@ -540,6 +574,7 @@ class FaceClusterEngine(private val context: Context) {
         personDao.deletePerson(personB)
 
         Log.d(TAG, "Merged clusters: $personB -> $personA, ${countB} embeddings moved")
+        return true
     }
 
     /**
@@ -625,7 +660,20 @@ class FaceClusterEngine(private val context: Context) {
             val survivor = decision.survivor.personId
             val absorbed = decision.absorbed.personId
 
-            mergeClusters(survivor, absorbed)
+            if (!mergeClusters(survivor, absorbed)) {
+                // 合并被提交前复查否决（维护运行期间用户命名/设了 self）：用 DB 现值刷新
+                // 本地过期快照。双方均已命名则本轮起自然跳过该对；仅吸收方新获命名时下一轮
+                // 会以新快照重新判定幸存者（命名方存活），不会死循环（兜底 MAX_MERGE_ITERATIONS）。
+                personDao.getPerson(survivor)?.let { fresh ->
+                    names[survivor] = fresh.name
+                    selves[survivor] = fresh.isSelf
+                }
+                personDao.getPerson(absorbed)?.let { fresh ->
+                    names[absorbed] = fresh.name
+                    selves[absorbed] = fresh.isSelf
+                }
+                continue
+            }
             alive.remove(absorbed)
             counts[survivor] = (counts[survivor] ?: 0) + (counts.remove(absorbed) ?: 0)
             names.remove(absorbed)
@@ -739,6 +787,14 @@ class FaceClusterEngine(private val context: Context) {
             val sample = entities.take(ClusteringConfig.SINK_SAMPLE_CAP)
                 .map { entity -> byteArrayToFloatArray(entity.embedding) }
             if (medianPairwiseSim(sample) >= cohesionThreshold) continue
+
+            // 提交前复查：上方快照在维护开始时读取，凝聚循环期间用户可能已给该组命名
+            // （与 mergeClusters 同一竞态），以 DB 现值为准，已命名则放弃解散。
+            val fresh = personDao.getPerson(person.personId) ?: continue
+            if (!fresh.name.isNullOrBlank()) {
+                Log.i(TAG, "dissolveSinks: skip person ${person.personId}, named '${fresh.name}' since snapshot")
+                continue
+            }
 
             personDao.unlinkEmbeddings(person.personId) // personId=NULL，释放
             personDao.deletePerson(person.personId)
