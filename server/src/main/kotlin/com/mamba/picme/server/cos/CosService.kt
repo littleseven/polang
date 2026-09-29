@@ -71,7 +71,9 @@ class CosService(config: AppConfig) {
                 contentType = "application/vnd.android.package-archive"
                 addUserMetadata("version", version)
                 addUserMetadata("versioncode", versionCode.toString())
-                addUserMetadata("changelog", changelog)
+                // COS user metadata 参与签名且仅支持 ASCII：中文 changelog 必须百分号编码，
+                // 否则 putObject 报 SignatureDoesNotMatch（2026-09-29 实测）
+                addUserMetadata("changelog", encodeMetaValue(changelog))
             }
             val request = PutObjectRequest(bucket, key, inputStream, metadata)
             c.putObject(request)
@@ -97,7 +99,7 @@ class CosService(config: AppConfig) {
                 lastModified = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(metadata.lastModified.time)),
                 version = metadata.userMetadata["version"] ?: "",
                 versionCode = metadata.userMetadata["versioncode"]?.toLongOrNull() ?: 0,
-                changelog = metadata.userMetadata["changelog"] ?: "",
+                changelog = metadata.userMetadata["changelog"]?.let { decodeMetaValue(it) } ?: "",
                 publicUrl = url,
             )
         } catch (e: Exception) {
@@ -162,5 +164,13 @@ class CosService(config: AppConfig) {
         fun apkKey(channel: String): String = "apk/polang-$channel.apk"
 
         fun apkPublicUrl(channel: String): String = "https://cos.polang.net/${apkKey(channel)}"
+
+        /** COS user metadata 仅允许 ASCII（参与请求签名）：中文等值需百分号编码。 */
+        fun encodeMetaValue(value: String): String =
+            java.net.URLEncoder.encode(value, Charsets.UTF_8)
+
+        /** 解码兼容：老数据（未编码纯 ASCII）解码失败时原样返回。 */
+        fun decodeMetaValue(value: String): String =
+            runCatching { java.net.URLDecoder.decode(value, Charsets.UTF_8) }.getOrDefault(value)
     }
 }
