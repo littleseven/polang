@@ -47,7 +47,11 @@ class QueryGalleryMediaUseCase(
                     db.mediaDao().searchByTimeRange(
                         filter.fromMs ?: 0L,
                         filter.toMs ?: Long.MAX_VALUE,
-                    ).map { it.id }
+                    ).let { timed ->
+                        // 时间 ∩ hasFace 组合：时间分支命中后仍需按人脸维度过滤，
+                        // 否则 {hasFace:true, fromMs, toMs} 会静默退回纯时间查询
+                        if (filter.hasFace == true) timed.filter { m -> m.hasFace } else timed
+                    }.map { it.id }
                 filter.hasFace == true -> db.mediaDao().getHasFaceIds()
                 else -> null
             }

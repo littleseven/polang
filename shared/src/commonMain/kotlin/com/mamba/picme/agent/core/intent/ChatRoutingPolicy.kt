@@ -78,11 +78,11 @@ object ChatRoutingPolicy {
 
     /**
      * 路由器槽位 → [SearchIntent]（person 原词透传，称谓消歧在引擎层
-     * PersonQueryResolver / collectPersonMediaIds 完成）。
+     * PersonQueryResolver / collectPersonMediaIds 完成；hasFace 透传为人脸过滤）。
      */
     private fun RouterOutput.toSearchIntent(query: String): SearchIntent? {
         val hasTime = fromMs != null || toMs != null
-        if (person == null && !hasTime && label == null) return null
+        if (person == null && !hasTime && label == null && hasFace == null) return null
         return SearchIntent(
             query = query,
             timeRange = if (hasTime) {
@@ -92,6 +92,7 @@ object ChatRoutingPolicy {
             },
             keywords = label?.let { listOf(it) } ?: emptyList(),
             personName = person,
+            hasFaces = hasFace,
         )
     }
 }

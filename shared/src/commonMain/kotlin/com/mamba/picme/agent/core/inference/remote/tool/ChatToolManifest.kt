@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * 用 [SimpleTool] 子类逐字面对齐 [ChatToolService] 的 7 个相册工具 + ai_optimize
  * （2026-08-16 抽卡追齐新增；2026-09-26 意图路由 M1：`view_media` 移出 chat 工具面
  *（chat 内看图 = 点横滑卡片，消除 chat 必败工具陷阱），`search_media` 增补
- * person/fromMs/toMs 结构化参数透传）。
+ * person/fromMs/toMs 结构化参数透传；2026-09-29 `search_media` 再增补 hasFace 参数）。
  *
  * 一致性纪律：name/description/参数名/参数描述**逐字节**照抄 @Tool(customName) 与
  * @LLMDescription 原文（改任何一侧都会触发 jvmTest `ChatToolManifestConsistencyTest`
@@ -39,6 +39,7 @@ object ChatToolManifest {
         @property:LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") val person: String,
         @property:LLMDescription("时间起点（毫秒，据当前日期算）；空串=不限") val fromMs: String,
         @property:LLMDescription("时间终点（毫秒）；空串=不限") val toMs: String,
+        @property:LLMDescription("true=只要含人脸的照片；空串=不限") val hasFace: String,
     )
 
     @Serializable
@@ -84,10 +85,10 @@ object ChatToolManifest {
     private class SearchMediaTool : SimpleTool<SearchMediaArgs>(
         argsType = typeToken<SearchMediaArgs>(),
         name = "search_media",
-        description = "搜索本地相册，**结果以横滑卡片直接展示给用户**（调用后无需再调其它工具展示，如实总结数量即可）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。",
+        description = "搜索本地相册，**结果以横滑卡片直接展示给用户**（调用后无需再调其它工具展示，如实总结数量即可）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。",
     ) {
         override suspend fun execute(args: SearchMediaArgs): String =
-            ChatToolService.getInstance().searchMedia(args.query, args.person, args.fromMs, args.toMs)
+            ChatToolService.getInstance().searchMedia(args.query, args.person, args.fromMs, args.toMs, args.hasFace)
     }
 
     private class RefineMediaSearchTool : SimpleTool<RefineMediaSearchArgs>(

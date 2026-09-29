@@ -121,4 +121,20 @@ class IntentRouterCoreTest {
         assertNull(IntentRouterCore.parseRouterOutput("VIEW_PHOTOS"))
         assertNull(IntentRouterCore.parseRouterOutput(""))
     }
+
+    @Test
+    fun `parse keeps hasFace slot`() {
+        // hasFace=true 必须透传（2026-09-29：人脸约束槽位，丢失会导致返回无人脸照片）
+        val raw = """{"deliverable":"VIEW_PHOTOS","confidence":0.95,"isRefinement":false,""" +
+            """"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":true}"""
+        val parsed = IntentRouterCore.parseRouterOutput(raw)
+        assertNotNull(parsed)
+        assertEquals(true, parsed.hasFace)
+        // 缺省/显式 null 均解析为 null
+        val withoutSlot = IntentRouterCore.parseRouterOutput(
+            """{"deliverable":"VIEW_PHOTOS","confidence":0.9}"""
+        )
+        assertNotNull(withoutSlot)
+        assertNull(withoutSlot.hasFace)
+    }
 }

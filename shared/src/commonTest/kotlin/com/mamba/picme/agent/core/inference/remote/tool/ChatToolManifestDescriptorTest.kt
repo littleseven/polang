@@ -32,7 +32,7 @@ class ChatToolManifestDescriptorTest {
     fun `param descriptions survive schema generation on this platform`() {
         val search = descriptors.single { it.name == "search_media" }
         assertEquals(
-            listOf("query", "person", "fromMs", "toMs"),
+            listOf("query", "person", "fromMs", "toMs", "hasFace"),
             search.requiredParameters.map { it.name },
         )
         assertEquals("自然语言搜索词", search.requiredParameters[0].description)

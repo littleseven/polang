@@ -212,6 +212,7 @@ Agent: ✅ 已为你拍照
 | "搜索7月的美女" | `SearchMedia("7月的美女")` | 复合语义搜索 |
 | "近半年小孩的照片" | `SearchMedia("近半年小孩的照片", SearchIntent(timeRange=近半年, keywords=["小孩"], hasFaces=true))` | Chat 场景 LLM 直接输出结构化意图 |
 | "去年夏天的合照" | `SearchMedia("去年夏天的合照", SearchIntent(timeRange=去年夏天, keywords=["合照"], hasFaces=true))` | Chat 场景 LLM 标准化时间 |
+| "去年夏天有人脸的照片" | `SearchMedia("去年夏天有人脸的照片", SearchIntent(timeRange=去年夏天, hasFaces=true))` | 人脸约束走 hasFaces 字段：路由器 hasFace 槽位 / search_media hasFace 参数 / ChatViewModel 规则兜底（QueryParser.isPeopleSearch）三路补齐 |
 
 ### 3.6 Chat 相册搜索细化（CHAT 场景）
 

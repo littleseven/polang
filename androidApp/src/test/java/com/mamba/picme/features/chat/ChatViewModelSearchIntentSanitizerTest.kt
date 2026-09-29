@@ -1,5 +1,7 @@
 package com.mamba.picme.features.chat
 
+import com.mamba.picme.agent.core.model.context.MediaAsset
+import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.agent.core.model.context.SearchIntent
 import com.mamba.picme.agent.core.model.context.TimeRange
 import com.mamba.picme.domain.model.StructuredFilter
@@ -10,6 +12,7 @@ import io.mockk.slot
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -129,5 +132,66 @@ class ChatViewModelSearchIntentSanitizerTest : ChatViewModelTestBase() {
         coVerify(atLeast = 1) { mediaSearchEngine.search(filter = capture(filters), limitToIds = any(), enableSemanticSearch = any()) }
         val refineFilter = filters.last()
         assertTrue("细化时也应剔除时间词 '夏天'", refineFilter.keywords.isEmpty())
+    }
+
+    // ── 人脸意图兜底（2026-09-29：结构化入口丢 hasFaces 的回归防护）────────────
+
+    @Test
+    fun `onSearchMedia backfills hasFaces when query asks for faces but intent lacks it`() = runTest {
+        val viewModel = newViewModel()
+        val intent = SearchIntent(
+            query = "去年夏天有人脸的照片",
+            timeRange = TimeRange(startMs = 1_718_198_400_000, endMs = 1_725_145_599_999),
+        )
+
+        viewModel.onSearchMedia("去年夏天有人脸的照片", intent)
+        advanceUntilIdle()
+
+        val filterSlot = slot<StructuredFilter>()
+        coVerify { mediaSearchEngine.search(filter = capture(filterSlot), limitToIds = any(), enableSemanticSearch = any()) }
+        assertEquals("query 含'人脸'时应补回 hasFaces=true", true, filterSlot.captured.hasFaces)
+    }
+
+    @Test
+    fun `onSearchMedia keeps hasFaces null when query has no people words`() = runTest {
+        val viewModel = newViewModel()
+        val intent = SearchIntent(
+            query = "去年夏天海边的照片",
+            timeRange = TimeRange(startMs = 1_718_198_400_000, endMs = 1_725_145_599_999),
+        )
+
+        viewModel.onSearchMedia("去年夏天海边的照片", intent)
+        advanceUntilIdle()
+
+        val filterSlot = slot<StructuredFilter>()
+        coVerify { mediaSearchEngine.search(filter = capture(filterSlot), limitToIds = any(), enableSemanticSearch = any()) }
+        assertNull(filterSlot.captured.hasFaces)
+    }
+
+    @Test
+    fun `onRefineMediaSearch backfills hasFaces from constraint text`() = runTest {
+        val photo = MediaAsset(
+            id = 1L, uri = "content://media/1", type = MediaType.PHOTO,
+            captureDate = 0L, fileName = "a.jpg", hasFace = true,
+        )
+        coEvery {
+            mediaSearchEngine.search(filter = any(), limitToIds = any(), enableSemanticSearch = any())
+        } returns SearchResult(listOf(photo), "")
+        val viewModel = newViewModel()
+        viewModel.onSearchMedia(
+            "去年的照片",
+            SearchIntent(
+                query = "去年的照片",
+                timeRange = TimeRange(startMs = 1_704_067_200_000, endMs = 1_735_603_199_999),
+            )
+        )
+        advanceUntilIdle()
+
+        viewModel.onRefineMediaSearch("只要有人脸的", SearchIntent(query = ""))
+        advanceUntilIdle()
+
+        val filters = mutableListOf<StructuredFilter>()
+        coVerify(atLeast = 1) { mediaSearchEngine.search(filter = capture(filters), limitToIds = any(), enableSemanticSearch = any()) }
+        assertEquals("constraint 含'人脸'时应补回 hasFaces=true", true, filters.last().hasFaces)
     }
 }

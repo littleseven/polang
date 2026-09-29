@@ -86,7 +86,7 @@ object ChatIntentContract {
             uiContract = UiArtifact.MEDIA_RESULTS_CARD,
             allowedTools = listOf("search_media", "refine_media_search", "list_person_relations"),
             forbiddenTools = listOf("run_gallery_script"),
-            ruleText = "看/找照片一律 search_media 出横滑卡片（人物/时间走 person/fromMs/toMs " +
+            ruleText = "看/找照片一律 search_media 出横滑卡片（人物/时间/人脸走 person/fromMs/toMs/hasFace " +
                 "结构化参数）；禁止绕脚本路径拿 ids 假装已展示",
         ),
         IntentDef(

@@ -37,7 +37,7 @@ data class CompactChatState(
     val hasSearchBase: Boolean,
 )
 
-/** 路由器结构化输出（策略层消费；person 槽位为原词，消歧在端侧）。 */
+/** 路由器结构化输出（策略层消费；person 槽位为原词，消歧在端侧；hasFace=只要含人脸照片）。 */
 data class RouterOutput(
     val deliverable: IntentId,
     val confidence: Double,
@@ -48,6 +48,7 @@ data class RouterOutput(
     val toMs: Long?,
     val label: String?,
     val constraint: String?,
+    val hasFace: Boolean?,
 )
 
 /** 路由路径（审计维度）：pattern 捷径 / LLM 路由器 / 门控直通 / 降级。 */
@@ -132,6 +133,7 @@ object IntentRouterCore {
             toMs = null,
             label = null,
             constraint = null,
+            hasFace = null,
         )
     }
 
@@ -164,6 +166,7 @@ object IntentRouterCore {
             toMs = dto.toMs,
             label = dto.label?.trim()?.ifBlank { null },
             constraint = dto.constraint?.trim()?.ifBlank { null },
+            hasFace = dto.hasFace,
         )
     }
 
@@ -183,14 +186,15 @@ object IntentRouterCore {
 规则：
 - 按最终交付物分类，不按动作分类；"找照片并画图"主交付物取用户强调的那个，另一个填 secondary。
 - isRefinement=true 仅当本轮明显在上一轮搜索结果上窄化（有指代/加条件）。
-- 槽位：person=人物名或称谓原词（如"儿子""大宝"，不做消歧）；fromMs/toMs=毫秒时间戳（按当前日期换算"上个月""去年"等）；label=场景/标签词；constraint=窄化条件原文。没有则为 null。
+- 槽位：person=人物名或称谓原词（如"儿子""大宝"，不做消歧）；fromMs/toMs=毫秒时间戳（按当前日期换算"上个月""去年"等）；label=场景/标签词；constraint=窄化条件原文；hasFace=只要含人脸/人像的照片时为 true（"有人脸""有人的""人像""自拍/合照"类诉求，仅看照片内容不提及时为 null）。没有则为 null。
 - confidence：0~1，不确定就低分（低分会自动回落完整助手，不要硬猜）。
-只输出一行 JSON：{"deliverable":"...","confidence":0.0,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null}
+只输出一行 JSON：{"deliverable":"...","confidence":0.0,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}
 示例：
-用户"看下我儿子的照片" → {"deliverable":"VIEW_PHOTOS","confidence":0.95,"isRefinement":false,"secondary":null,"person":"儿子","fromMs":null,"toMs":null,"label":null,"constraint":null}
-用户"只要4月的"（上一轮有搜索卡片） → {"deliverable":"REFINE_RESULTS","confidence":0.9,"isRefinement":true,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":"4月的"}
-用户"看看照片里有没有糊的" → {"deliverable":"ANALYZE_STATS","confidence":0.8,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":"糊","constraint":null}
-用户"今天天气怎么样" → {"deliverable":"OPEN_QA","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null}"""
+用户"看下我儿子的照片" → {"deliverable":"VIEW_PHOTOS","confidence":0.95,"isRefinement":false,"secondary":null,"person":"儿子","fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}
+用户"去年夏天有人脸的照片" → {"deliverable":"VIEW_PHOTOS","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":true}
+用户"只要4月的"（上一轮有搜索卡片） → {"deliverable":"REFINE_RESULTS","confidence":0.9,"isRefinement":true,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":"4月的","hasFace":null}
+用户"看看照片里有没有糊的" → {"deliverable":"ANALYZE_STATS","confidence":0.8,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":"糊","constraint":null,"hasFace":null}
+用户"今天天气怎么样" → {"deliverable":"OPEN_QA","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}"""
 
     /** 路由器 user payload：当前日期 + 紧凑对话状态 + 用户原文。 */
     fun buildUserPayload(query: String, today: String, state: CompactChatState): String =
@@ -229,6 +233,7 @@ object IntentRouterCore {
         val toMs: Long? = null,
         val label: String? = null,
         val constraint: String? = null,
+        val hasFace: Boolean? = null,
     )
 }
 
@@ -393,6 +398,7 @@ class IntentRouter(
         toMs = null,
         label = null,
         constraint = null,
+        hasFace = null,
     )
 
     private fun audit(result: RoutingResult, traceId: String?) {

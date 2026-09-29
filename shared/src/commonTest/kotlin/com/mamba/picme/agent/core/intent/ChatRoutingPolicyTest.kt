@@ -17,6 +17,7 @@ class ChatRoutingPolicyTest {
         secondary: IntentId? = null,
         person: String? = null,
         constraint: String? = null,
+        hasFace: Boolean? = null,
     ) = RouterOutput(
         deliverable = deliverable,
         confidence = confidence,
@@ -27,6 +28,7 @@ class ChatRoutingPolicyTest {
         toMs = null,
         label = null,
         constraint = constraint,
+        hasFace = hasFace,
     )
 
     private fun result(
@@ -64,6 +66,33 @@ class ChatRoutingPolicyTest {
         assertEquals("给我看去年夏天的照片", direct.query)
         // pattern 捷径无槽位 → intent 为 null
         assertNull(direct.intent)
+    }
+
+    // ── hasFace 槽位（2026-09-29：人脸约束不再被结构化路径丢弃）────────────────
+
+    @Test
+    fun `face slot flows into search intent`() {
+        val decision = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.VIEW_PHOTOS, hasFace = true)),
+            noBase,
+            originalQuery = "去年夏天有人脸的照片",
+        )
+        val direct = assertIs<ChatRoutingPolicy.RouteDecision.DirectSearch>(decision)
+        assertEquals(true, direct.intent?.hasFaces)
+    }
+
+    @Test
+    fun `face-only output still produces structured intent`() {
+        // 其余槽位全空、仅 hasFace=true 时也必须产出 intent（否则会退化到字符串路径之外的无约束搜索）
+        val decision = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.VIEW_PHOTOS, hasFace = true)),
+            withBase,
+            originalQuery = "找有人脸的照片",
+        )
+        val direct = assertIs<ChatRoutingPolicy.RouteDecision.DirectSearch>(decision)
+        assertEquals(true, direct.intent?.hasFaces)
+        assertNull(direct.intent?.timeRange)
+        assertNull(direct.intent?.personName)
     }
 
     // ── refine 基数规则 ─────────────────────────────────────────────

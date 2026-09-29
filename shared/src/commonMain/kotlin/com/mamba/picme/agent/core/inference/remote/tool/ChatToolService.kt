@@ -105,14 +105,15 @@ class ChatToolService private constructor() : TraceIdAware {
         dispatchCommand(AgentCommand.GetGallerySummary(includeDetails = false))
 
     @Tool(customName = "search_media")
-    @LLMDescription("搜索本地相册，**结果以横滑卡片直接展示给用户**（调用后无需再调其它工具展示，如实总结数量即可）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。")
+    @LLMDescription("搜索本地相册，**结果以横滑卡片直接展示给用户**（调用后无需再调其它工具展示，如实总结数量即可）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") person: String,
         @LLMDescription("时间起点（毫秒，据当前日期算）；空串=不限") fromMs: String,
-        @LLMDescription("时间终点（毫秒）；空串=不限") toMs: String
+        @LLMDescription("时间终点（毫秒）；空串=不限") toMs: String,
+        @LLMDescription("true=只要含人脸的照片；空串=不限") hasFace: String
     ): String {
-        val intent = structuredSearchIntent(query, person, fromMs, toMs)
+        val intent = structuredSearchIntent(query, person, fromMs, toMs, hasFace)
         return dispatchCommand(AgentCommand.SearchMedia(query = query, intent = intent))
     }
 
@@ -533,20 +534,23 @@ class ChatToolService private constructor() : TraceIdAware {
             .getOrDefault(FeedbackAction.LIKE)
 
     /**
-     * 把 search_media 的 person/fromMs/toMs 组装成 [SearchIntent]（M1 透传，spec §3.4-1）。
-     * 三者全空 → null（走 onSearchMedia 的字符串路径）；任一非空 → 结构化过滤精确执行。
+     * 把 search_media 的 person/fromMs/toMs/hasFace 组装成 [SearchIntent]（M1 透传，spec §3.4-1；
+     * 2026-09-29 增补 hasFace——此前人脸约束只写进 query 时被结构化路径整句丢弃）。
+     * 四者全空 → null（走 onSearchMedia 的字符串路径）；任一非空 → 结构化过滤精确执行。
      * person 槽位原样透传（称谓→人物名的消歧由引擎层 PersonQueryResolver / 调用方先做）。
      */
     private fun structuredSearchIntent(
         query: String,
         person: String,
         fromMs: String,
-        toMs: String
+        toMs: String,
+        hasFace: String
     ): SearchIntent? {
         val start = fromMs.trim().toLongOrNull()
         val end = toMs.trim().toLongOrNull()
         val personName = person.trim().ifBlank { null }
-        if (personName == null && start == null && end == null) return null
+        val wantsFace = hasFace.trim().equals("true", ignoreCase = true)
+        if (personName == null && start == null && end == null && !wantsFace) return null
         return SearchIntent(
             query = query,
             timeRange = if (start != null || end != null) {
@@ -555,6 +559,7 @@ class ChatToolService private constructor() : TraceIdAware {
                 null
             },
             personName = personName,
+            hasFaces = if (wantsFace) true else null,
         )
     }
 
