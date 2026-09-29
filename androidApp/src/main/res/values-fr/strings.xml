@@ -1650,4 +1650,16 @@
     <string name="user_task_error_partial_failures">%1$s éléments en échec</string>
     <string name="user_task_error_model_unavailable">Modèle indisponible — peut avoir été retiré</string>
     <string name="user_task_eta_remaining">~%1$s restantes</string>
+    <!-- OTA 自更新 -->
+    <string name="ota_update_title">Mise à jour disponible</string>
+    <string name="ota_update_message">Version %1$s (%2$s)</string>
+    <string name="ota_changelog_label">Nouveautés</string>
+    <string name="ota_update_now">Mettre à jour</string>
+    <string name="ota_update_later">Plus tard</string>
+    <string name="ota_downloading">Téléchargement de %1$s… %2$d%%</string>
+    <string name="ota_ready_to_install">%1$s téléchargé. Installer maintenant ?</string>
+    <string name="ota_install">Installer</string>
+    <string name="ota_download_failed">Échec du téléchargement : %1$s</string>
+    <string name="ota_retry">Réessayer</string>
+    <string name="ota_cancel">Annuler</string>
 </resources>

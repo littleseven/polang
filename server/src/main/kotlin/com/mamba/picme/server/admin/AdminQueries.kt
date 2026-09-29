@@ -516,6 +516,7 @@ object AdminQueries {
 
     data class ApkUploadRow(
         val id: Int,
+        val channel: String,
         val version: String,
         val fileName: String,
         val fileSize: Long,
@@ -532,6 +533,7 @@ object AdminQueries {
                 .map { r ->
                     ApkUploadRow(
                         id = r[ApkUploads.id],
+                        channel = r[ApkUploads.channel],
                         version = r[ApkUploads.version],
                         fileName = r[ApkUploads.fileName],
                         fileSize = r[ApkUploads.fileSize],

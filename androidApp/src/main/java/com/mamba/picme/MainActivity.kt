@@ -98,6 +98,8 @@ import com.mamba.picme.features.settings.SettingsViewModelFactory
 import com.mamba.picme.features.debug.LogOverlay
 import com.mamba.picme.navigation.Screen
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.features.update.AppUpdateController
+import com.mamba.picme.features.update.AppUpdateDialog
 import com.mamba.picme.agent.core.runtime.state.SceneManager
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.domain.agent.capability.NavigationCapability
@@ -216,6 +218,19 @@ class MainActivity : ComponentActivity() {
                     var organizeTabRequest by remember { mutableStateOf<OrganizeTab?>(null) }
                     // 任务中心回锚一次性请求（US-15）：任务中心点击/继续/重试 → 切 chat 页 + 锚定任务卡
                     var chatTaskAnchor by remember { mutableStateOf<ChatTaskAnchor?>(null) }
+
+                    // OTA 自更新：冷启动静默检查（仅非 Play 渠道，controller 内部判定安装来源）；
+                    // 状态机经 AppUpdateDialog 穷举渲染（发现新版 → 下载 → 安装）
+                    val appUpdateController = remember {
+                        AppUpdateController(
+                            applicationContext,
+                            app.container.appUpdateClient,
+                            app.container.otaUpdatePrefs,
+                            scope,
+                        )
+                    }
+                    LaunchedEffect(Unit) { appUpdateController.checkForUpdate() }
+                    AppUpdateDialog(appUpdateController)
 
                     // 主页面切换（底部 Tab / 编程入口）：瞬时跳转，无横滑动画；手指拖动由 Pager 跟手处理
                     val switchMainPage: (Int) -> Unit = { index ->

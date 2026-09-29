@@ -118,6 +118,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | **Settings** | `features/settings/` | `SettingsScreen`, `SettingsViewModel`, `LlmModelManagerScreen`（含 `ModelCenterScreen` composable）, `MemoryFactsScreen` | 设置与模型管理；`MemoryFactsScreen` 为「AI 记忆」管理二级页（人物关系区查看/编辑/删除 + 事实记忆区查看/编辑/删除/清空） |
 | **TagViewer** | `features/tagviewer/` | `TagViewerTestScreen`, `TagAggregator`, `TagJsonParser` | 标签查看页 |
 | **Translation** | `features/translation/` | `SentencePieceTestScreen` | SentencePiece 翻译测试页 |
+| **Update** | `features/update/` | `AppUpdateController`, `AppUpdateDialog` | OTA 自更新（2026-09-29）：启动静默检查 `GET /api/app/latest?channel=BuildConfig.BUILD_TYPE`（debug/release 双轨）→ 更新对话框 → OkHttp 下载 `cacheDir/ota/` → FileProvider 安装；Play 渠道（installer=com.android.vending）整体禁用；同 versionCode 重发判定经 `domain/update/AppUpdateChecker`（RemoteBuild key=versionCode@updatedAt）+ `data/preferences/OtaUpdatePrefs` |
 | **Debug** | `features/debug/` | `DebugScreen`, `LogOverlay`, `ScreenshotUtil` | 开发调试工具 |
 
 > **2026-07-25 JS Engine（QuickJS 沙箱，`features/chat/js/`）**：

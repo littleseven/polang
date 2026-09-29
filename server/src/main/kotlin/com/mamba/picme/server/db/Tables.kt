@@ -146,6 +146,7 @@ object LlmChannels : Table("llm_channel") {
 // ── APK 上传历史 ──────────────────────────────────────
 object ApkUploads : Table("apk_upload") {
     val id = integer("id").autoIncrement()
+    val channel = varchar("channel", 16).default("release") // debug | release
     val version = varchar("version", 64)
     val fileName = varchar("file_name", 256)
     val fileSize = long("file_size")

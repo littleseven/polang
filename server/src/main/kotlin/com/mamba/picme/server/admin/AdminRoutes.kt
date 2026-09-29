@@ -489,16 +489,28 @@ fun Route.adminRoute(
                     ),
                 )
             } else {
-                val apkInfo = cosService.getApkInfo()
+                val debugInfo = cosService.getApkInfo(CosService.CHANNEL_DEBUG)
+                val releaseInfo = cosService.getApkInfo(CosService.CHANNEL_RELEASE)
                 AdminViews.releasePage(
                     tab = tab,
                     message = msg,
                     android = AdminViews.AndroidReleaseData(
-                        fileExists = apkInfo.exists,
-                        fileSize = apkInfo.size,
-                        lastModified = apkInfo.lastModified,
-                        version = apkInfo.version,
-                        cosUrl = apkInfo.publicUrl,
+                        debug = AdminViews.AndroidTrackInfo(
+                            fileExists = debugInfo.exists,
+                            fileSize = debugInfo.size,
+                            lastModified = debugInfo.lastModified,
+                            version = debugInfo.version,
+                            versionCode = debugInfo.versionCode,
+                            cosUrl = debugInfo.publicUrl,
+                        ),
+                        release = AdminViews.AndroidTrackInfo(
+                            fileExists = releaseInfo.exists,
+                            fileSize = releaseInfo.size,
+                            lastModified = releaseInfo.lastModified,
+                            version = releaseInfo.version,
+                            versionCode = releaseInfo.versionCode,
+                            cosUrl = releaseInfo.publicUrl,
+                        ),
                         cosConfigured = cosService.configured,
                         history = AdminQueries.apkUploadHistory(30),
                     ),
@@ -515,19 +527,36 @@ fun Route.adminRoute(
 
         post("/apk/upload") {
             if (!call.adminGuard(adminToken)) return@post
+            // X-Admin-Token header 鉴权 = CLI 模式：响应 JSON 而非浏览器跳转（ota-publish.sh 消费）
+            val cliMode = AdminAuth.isValidHeader(call.request.headers[AdminAuth.TOKEN_HEADER], adminToken)
             // APK 通常 50-150MB，放宽 multipart 限制到 200MB
             val multipart = call.receiveMultipart(200L * 1024 * 1024)
             var uploaded = false
             var errorMsg: String? = null
+            var channel = CosService.CHANNEL_RELEASE
+            var channelInvalid = false
             var version = ""
+            var versionCode = 0L
+            var changelog = ""
             var fileName = ""
             var fileSize = 0L
+            var fileReceived = false
             val tmpFile = java.io.File.createTempFile("apk-upload-", ".apk")
             try {
                 multipart.forEachPart { part ->
                     when {
+                        part is PartData.FormItem && part.name == "channel" -> {
+                            val raw = part.value.trim()
+                            if (CosService.isValidChannel(raw)) channel = raw else channelInvalid = true
+                        }
                         part is PartData.FormItem && part.name == "version" -> {
                             version = part.value.trim()
+                        }
+                        part is PartData.FormItem && part.name == "versionCode" -> {
+                            versionCode = part.value.trim().toLongOrNull() ?: 0
+                        }
+                        part is PartData.FormItem && part.name == "changelog" -> {
+                            changelog = part.value.trim()
                         }
                         part is PartData.FileItem && part.name == "apkfile" -> {
                             fileName = part.originalFileName ?: ""
@@ -535,20 +564,17 @@ fun Route.adminRoute(
                                 errorMsg = "文件格式错误：请上传 .apk 文件"
                             } else {
                                 try {
-                                    val channel = part.provider()
+                                    val channel1 = part.provider()
                                     tmpFile.outputStream().use { output ->
                                         val buffer = ByteArray(8192)
                                         while (true) {
-                                            val read = channel.readAvailable(buffer)
+                                            val read = channel1.readAvailable(buffer)
                                             if (read <= 0) break
                                             output.write(buffer, 0, read)
                                         }
                                     }
                                     fileSize = tmpFile.length()
-                                    uploaded = cosService.uploadApk(tmpFile.inputStream(), fileSize, version)
-                                    if (!uploaded && errorMsg == null) {
-                                        errorMsg = "COS 上传失败：检查 COS 配置或凭证"
-                                    }
+                                    fileReceived = true
                                 } catch (e: Exception) {
                                     errorMsg = "上传失败：${e.message}"
                                 }
@@ -557,26 +583,48 @@ fun Route.adminRoute(
                     }
                     part.dispose()
                 }
+                // channel 字段可能出现在文件之后，统一直到最后判定：非法渠道不上传、不记历史
+                if (!channelInvalid && fileReceived && errorMsg == null) {
+                    uploaded = cosService.uploadApk(tmpFile.inputStream(), fileSize, version, versionCode, changelog, channel)
+                    if (!uploaded) {
+                        errorMsg = "COS 上传失败：检查 COS 配置或凭证"
+                    }
+                }
             } finally {
                 tmpFile.delete()
             }
             val msg = when {
-                uploaded -> "成功上传 v$version 到 COS"
+                channelInvalid -> "channel 非法：仅支持 debug | release"
+                uploaded -> "成功上传 v$version 到 COS（$channel 渠道）"
                 errorMsg != null -> errorMsg
                 else -> "未收到文件"
             }
-            // 写入上传历史记录
-            transaction(Db.instance) {
-                ApkUploads.insert {
-                    it[ApkUploads.version] = version
-                    it[ApkUploads.fileName] = fileName
-                    it[ApkUploads.fileSize] = fileSize
-                    it[ApkUploads.status] = if (uploaded) "success" else "failed"
-                    it[ApkUploads.message] = if (uploaded) null else errorMsg
-                    it[ApkUploads.createdAt] = System.currentTimeMillis()
+            // 写入上传历史记录（非法渠道属请求错误，不留痕）
+            if (!channelInvalid) {
+                transaction(Db.instance) {
+                    ApkUploads.insert {
+                        it[ApkUploads.channel] = channel
+                        it[ApkUploads.version] = version
+                        it[ApkUploads.fileName] = fileName
+                        it[ApkUploads.fileSize] = fileSize
+                        it[ApkUploads.status] = if (uploaded) "success" else "failed"
+                        it[ApkUploads.message] = if (uploaded) null else errorMsg
+                        it[ApkUploads.createdAt] = System.currentTimeMillis()
+                    }
                 }
             }
-            call.respondRedirect("/admin/release?tab=android&msg=${java.net.URLEncoder.encode(msg, "UTF-8")}")
+            if (cliMode) {
+                call.respondText(
+                    buildJsonObject {
+                        put("ok", uploaded)
+                        put("channel", channel)
+                        put("message", msg ?: "")
+                    }.toString(),
+                    ContentType.Application.Json,
+                )
+            } else {
+                call.respondRedirect("/admin/release?tab=android&msg=${java.net.URLEncoder.encode(msg, "UTF-8")}")
+            }
         }
 
         // ── iOS Ad-Hoc 自测分发管理 ──
@@ -656,12 +704,13 @@ fun Route.adminRoute(
     }
 }
 
-/** 受保护页面统一鉴权：空 token → 503；cookie 无效 → 跳登录。返回 false 表示已响应、调用方应 return。 */
+/** 受保护页面统一鉴权：空 token → 503；X-Admin-Token header 直连（CLI）→ 放行；cookie 无效 → 跳登录。返回 false 表示已响应、调用方应 return。 */
 private suspend fun ApplicationCall.adminGuard(adminToken: String): Boolean {
     if (adminToken.isBlank()) {
         respondText("admin disabled", contentType = ContentType.Text.Plain, status = HttpStatusCode.ServiceUnavailable)
         return false
     }
+    if (AdminAuth.isValidHeader(request.headers[AdminAuth.TOKEN_HEADER], adminToken)) return true
     val cookie = request.cookies[AdminAuth.COOKIE_NAME]
     if (!AdminAuth.isValid(cookie, adminToken)) {
         respondRedirect("/admin/login")

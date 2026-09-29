@@ -23,6 +23,7 @@ import com.mamba.picme.server.routes.EmailKey
 import com.mamba.picme.server.routes.PlatformKey
 import com.mamba.picme.server.routes.TokenHashKey
 import com.mamba.picme.server.routes.accountDeletionRoute
+import com.mamba.picme.server.routes.appLatestRoute
 import com.mamba.picme.server.routes.guestDeletionRoute
 import com.mamba.picme.server.routes.authRoute
 import com.mamba.picme.server.routes.claudeChatRoute
@@ -81,6 +82,7 @@ private val publicRoutes = setOf(
     "/healthz",
     "/auth/email/send",
     "/auth/email/verify",
+    "/api/app/latest",
     "/download",
     "/download/ios",
     "/download/ios/manifest.plist",
@@ -167,6 +169,7 @@ fun Application.module(config: AppConfig) {
         // Public
         downloadRoute(cosService)
         iosDownloadRoute(cosService)
+        appLatestRoute(cosService)
         healthzRoute()
         authRoute(emailService)
 

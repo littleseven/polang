@@ -24,6 +24,7 @@ import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.data.indexing.IndexingTaskQueue
 import com.mamba.picme.data.indexing.MediaIndexingWorker
 import com.mamba.picme.data.indexing.MediaStoreObserver
+import com.mamba.picme.data.preferences.OtaUpdatePrefs
 import com.mamba.picme.data.preferences.UserPreferencesRepository
 import com.mamba.picme.data.preferences.dataStore
 import com.mamba.picme.data.repository.ChatImageStoreImpl
@@ -78,6 +79,7 @@ import com.mamba.picme.domain.usecase.GenerateSummaryOnDemandUseCase
 import com.mamba.picme.domain.usecase.OcrProcessor
 import com.mamba.picme.features.chat.ChatEditStateHolder
 import com.mamba.picme.features.chat.ChatViewModel
+import com.mamba.picme.data.remote.picme.AppUpdateClient
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.features.chat.ChatImageRenderer
 import com.mamba.picme.features.chat.ChatOptimizeGachaController
@@ -289,6 +291,9 @@ class TaskCenterViewModelFactory(
 interface AppContainer {
     val repository: AndroidMediaRepository
     val userPreferencesRepository: UserSettingsRepository
+    /** OTA 自更新：版本检查客户端 + 已装远程构建标识存储（仅非 Play 渠道启用） */
+    val appUpdateClient: AppUpdateClient
+    val otaUpdatePrefs: OtaUpdatePrefs
     val imageProcessor: ImageProcessor
     val faceDetector: FaceDetector
     val llmModelDownloadManager: LlmModelDownloadManager
@@ -689,6 +694,10 @@ class AppContainerImpl(
     override val llmModelDownloadManager: LlmModelDownloadManager by lazy {
         LlmModelDownloadManager(context)
     }
+
+    override val appUpdateClient: AppUpdateClient by lazy { AppUpdateClient() }
+
+    override val otaUpdatePrefs: OtaUpdatePrefs by lazy { OtaUpdatePrefs(context) }
 
     /**
      * 用户任务体系协程作用域：注册表合并流与适配器订阅的生命周期宿主（进程级单例，不随页面销毁）。

@@ -144,6 +144,7 @@ Logger.log(AgentCommandParsedEvent(...))
 | `./scripts/test-generator.py` | 基于 public 方法生成测试骨架 |
 | `./scripts/screenshot-diff.py` | UI 回归检测 |
 | `./scripts/play-publish.sh` | Google Play 自动发布（GPP 封装：上传 AAB / 同步文案 / 轨道晋升），手册见 `docs/05-DEVELOPMENT/GOOGLE_PLAY_RELEASE_AUTOMATION.md` |
+| `./scripts/ota-publish.sh` | 自建 OTA 一键发包（debug 轨默认 / `--type release`）：构建 APK → 提取 versionCode → 上传 picme-server `/admin/apk/upload`（X-Admin-Token），测试机冷启动弹自更新（仅非 Play 渠道） |
 
 > **闭环验证习惯**：代码改动后走「编译 → 安装 → 测试 → 日志」闭环（`auto-dev-loop.sh`）；失败时基于日志定位根因再修，单任务自动重试最多 2 次，不盲目堆尝试。
 

@@ -150,6 +150,8 @@ server/
 | DELETE | `/auth/account` | P1 | ✅ | X-App-Token | 注销账号（软删除） |
 | DELETE | `/guest/device` | P1 | ✅ | X-App-Token | 清除访客设备记录（X-Device-Id 定位） |
 | GET | `/download/ios` | P1 | ✅ | 无 | iOS 安装下载页 |
+| GET | `/api/app/latest` | P1 | ✅ | 无 | Android OTA 版本信息（`?channel=debug\|release` 双轨，COS metadata 透传 versionCode/changelog） |
+| POST | `/admin/apk/upload` | P1 | ✅ | ADMIN_TOKEN | APK 上传双轨（channel/versionCode/changelog 字段；`X-Admin-Token` header 直连返回 JSON，供 ota-publish.sh 消费） |
 | GET | `/download/ios/manifest.plist` | P1 | ✅ | 无 | iOS OTA 安装 manifest（itms-services） |
 | POST | `/download/ios/udid` | P1 | ✅ | 无 | iOS UDID 注册（mobileconfig 回传表单） |
 | GET | `/admin/users/{id}/token` | P1 | ✅ | ADMIN_TOKEN | 查看账号 token |
@@ -182,7 +184,7 @@ App → 后续请求带 X-App-Token: <picme_at_*>
 
 ### 4.2 管理后台认证
 
-- `/admin/**` 不走 X-App-Token，用固定 `ADMIN_TOKEN` + cookie（`picme_admin = sha256(ADMIN_TOKEN)`）
+- `/admin/**` 不走 X-App-Token，用固定 `ADMIN_TOKEN` + cookie（`picme_admin = sha256(ADMIN_TOKEN)`）；CLI/脚本可改用 `X-Admin-Token: <ADMIN_TOKEN>` header 直连（如 `scripts/ota-publish.sh` 发包），header 鉴权的请求响应 JSON 而非浏览器跳转
 - `ADMIN_TOKEN` 为空 → 后台禁用（全部 503）
 - **强烈建议** nginx 对 `/admin` 加 IP 白名单
 

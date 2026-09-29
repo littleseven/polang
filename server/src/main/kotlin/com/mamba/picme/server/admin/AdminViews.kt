@@ -636,12 +636,18 @@ object AdminViews {
         }
     }
 
-    data class AndroidReleaseData(
+    data class AndroidTrackInfo(
         val fileExists: Boolean,
         val fileSize: String,
         val lastModified: String,
         val version: String,
+        val versionCode: Long,
         val cosUrl: String,
+    )
+
+    data class AndroidReleaseData(
+        val debug: AndroidTrackInfo,
+        val release: AndroidTrackInfo,
         val cosConfigured: Boolean,
         val history: List<AdminQueries.ApkUploadRow> = emptyList(),
     )
@@ -695,48 +701,81 @@ object AdminViews {
         }
     }
 
-    private fun FlowContent.androidReleasePanel(data: AndroidReleaseData) {
-        val fileExists = data.fileExists
-        val fileSize = data.fileSize
-        val lastModified = data.lastModified
-        val version = data.version
-        val cosUrl = data.cosUrl
-        val history = data.history
-        // 当前 APK 信息卡片
-        if (fileExists) {
+    private fun FlowContent.androidTrackCard(channelLabel: String, info: AndroidTrackInfo) {
+        if (info.fileExists) {
             div("card apk-info-card") {
                 div("apk-info-header") {
                     div("apk-info-title") {
-                        span("apk-badge") { +"当前版本" }
-                        +version.ifBlank { "未命名版本" }
+                        span("apk-badge") { +"当前 $channelLabel" }
+                        +"${info.version.ifBlank { "未命名版本" }}（versionCode ${info.versionCode}）"
                     }
                     div("apk-info-meta") {
-                        span { +fileSize }
+                        span { +info.fileSize }
                         span("apk-meta-sep") { +"·" }
-                        span { +lastModified }
+                        span { +info.lastModified }
                     }
                 }
                 div("apk-info-actions") {
-                    a(href = "https://api.polang.net/download", target = "_blank", classes = "btn btn-sm btn-primary") { +"下载页" }
-                    a(href = cosUrl, target = "_blank", classes = "btn btn-sm btn-primary") { +"COS 直链" }
+                    a(href = info.cosUrl, target = "_blank", classes = "btn btn-sm btn-primary") { +"COS 直链" }
                 }
             }
         } else {
             div("card apk-info-card apk-empty") {
                 div("apk-empty-icon") { +"📦" }
-                div("apk-empty-text") { +"COS 上暂无 APK 文件" }
+                div("apk-empty-text") { +"COS 上暂无 $channelLabel 包" }
             }
         }
+    }
+
+    private fun FlowContent.androidReleasePanel(data: AndroidReleaseData) {
+        val history = data.history
+        // 双轨当前版本信息卡片
+        androidTrackCard("debug", data.debug)
+        androidTrackCard("release", data.release)
 
         // 上传区域
         h2 { +"上传新版本" }
         div("card upload-card") {
+            // 渠道选择（默认 debug：唯一开发者日常遛狗主轨）
+            div("form-row") {
+                label { +"渠道" }
+                select {
+                    attributes["id"] = "apk-channel"
+                    attributes["class"] = "form-input"
+                    option {
+                        value = "debug"
+                        selected = true
+                        +"debug（debug.keystore，日常自测）"
+                    }
+                    option {
+                        value = "release"
+                        +"release（picme-release.jks，Play 对齐）"
+                    }
+                }
+            }
             // 版本号输入
             div("form-row") {
                 label { +"版本号" }
                 input(type = InputType.text, name = "version", classes = "form-input") {
                     attributes["id"] = "apk-version"
                     placeholder = "如 1.0.11"
+                }
+            }
+            // versionCode 输入（OTA 更新比较依据）
+            div("form-row") {
+                label { +"versionCode" }
+                input(type = InputType.number, name = "versionCode", classes = "form-input") {
+                    attributes["id"] = "apk-version-code"
+                    placeholder = "如 10042（OTA 更新判定依据）"
+                }
+            }
+            // 更新说明
+            div("form-row") {
+                label { +"更新说明" }
+                textArea(classes = "form-input") {
+                    attributes["id"] = "apk-changelog"
+                    attributes["rows"] = "3"
+                    attributes["placeholder"] = "可选，App 更新弹窗中展示"
                 }
             }
 
@@ -819,6 +858,7 @@ object AdminViews {
             table {
                 tr {
                     th { +"时间" }
+                    th { +"渠道" }
                     th { +"版本号" }
                     th { +"文件名" }
                     th { +"大小" }
@@ -827,6 +867,7 @@ object AdminViews {
                 history.forEach { h ->
                     tr {
                         td { +fmtTs(h.createdAt) }
+                        td { +(h.channel.ifBlank { "release" }) }
                         td { +(h.version.ifBlank { "—" }) }
                         td { +(h.fileName.ifBlank { "—" }) }
                         td { +formatBytes(h.fileSize) }
@@ -852,6 +893,9 @@ object AdminViews {
                     var previewName=document.getElementById('file-name');
                     var previewSize=document.getElementById('file-size');
                     var versionInput=document.getElementById('apk-version');
+                    var channelInput=document.getElementById('apk-channel');
+                    var versionCodeInput=document.getElementById('apk-version-code');
+                    var changelogInput=document.getElementById('apk-changelog');
                     var uploadBtn=document.getElementById('upload-btn');
                     var progressWrap=document.getElementById('progress-wrap');
                     var progressFill=document.getElementById('progress-fill');
@@ -898,7 +942,10 @@ object AdminViews {
                     function uploadApk(){
                       if(!selectedFile){alert('请选择 APK 文件');return;}
                       var form=new FormData();
+                      form.append('channel',channelInput.value);
                       form.append('version',versionInput.value.trim()||'');
+                      form.append('versionCode',versionCodeInput.value.trim()||'');
+                      form.append('changelog',changelogInput.value.trim()||'');
                       form.append('apkfile',selectedFile);
                       var xhr=new XMLHttpRequest();
                       xhr.open('POST','/admin/apk/upload',true);
