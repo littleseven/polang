@@ -254,6 +254,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+    // 长图预览优化：Telephoto 区域解码缩放（SubsamplingImage），修复长截屏放大模糊+拖拽钳制 bug
+    implementation(libs.telephoto.zoomable.image.coil)
     implementation(libs.androidx.webkit)
     // ADR-016 M3：mikepenz AST 渲染器（Chat 正文/浮动面板/悬浮气泡共用 AgentMarkdown）
     implementation(libs.mikepenz.markdown.renderer)
