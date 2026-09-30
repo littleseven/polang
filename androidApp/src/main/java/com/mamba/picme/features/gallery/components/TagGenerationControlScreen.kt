@@ -1396,7 +1396,7 @@ private fun StatsCard(
     embeddingCount: Int,
     onNavigateToTagViewer: () -> Unit
 ) {
-    // 设计稿 gallery/tag_control_v2「Library stats」：渐变大数字 + 语义覆盖率圆环 + 2×2 指标瓦片
+    // 设计稿 gallery/tag_control_v2「Library stats」：渐变大数字 + AI 打标完成率圆环 + 2×2 指标瓦片
     // （阶段进度条已移至 Stages 列表行内，不再重复展示）
     // 口径=内容标签 pass 完成率，与 stages 区块「内容标签」行同源（stats.remainingForPass3）
     // 同舍入（percentRounded）——2026-09-30 澄清：不再用语义向量占比
@@ -1446,7 +1446,7 @@ private fun StatsCard(
                 }
             }
 
-            // ── Hero：渐变大数字 + 语义覆盖率圆环 ──
+            // ── Hero：渐变大数字 + AI 打标完成率圆环 ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
