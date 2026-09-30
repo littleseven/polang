@@ -7,10 +7,14 @@ import com.mamba.picme.data.local.entity.PersonEntity
 import com.mamba.picme.data.model.MediaEntity
 import com.mamba.picme.domain.model.StructuredFilter
 import com.mamba.picme.domain.model.TimeRange
+import com.mamba.picme.domain.person.PersonQueryResolver
+import com.mamba.picme.domain.person.PersonRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -152,6 +156,118 @@ class MediaSearchEngineFilterTest {
         val result = engineWithPerson.search(filter)
 
         assertEquals(listOf(100L), result.media.map { it.id })
+    }
+
+    /**
+     * 回归测试：人物搜索精度——"找下我儿子的照片"曾返回 470 张（27 张正确的 ∪ ~443 张标签并集污染）。
+     *
+     * 根因：executeFilter 把 PersonQueryResolver 的命中结果当作内容并集成员，
+     * 关键词"儿子"又驱动全库标签搜索，两者取并集。正确语义：人物命中是显式收窄维度，
+     * 且已被人物解析消费的关键词不得再驱动标签搜索。
+     */
+    @Test
+    fun `resolver hit excludes keyword tag pollution`() = runTest {
+        val engine = sonResolverEngine()
+
+        // 标签污染：全库有大量被打了"儿子/child"类标签的照片（模拟 99）
+        coEvery { mediaDao.searchByLabel(any()) } returns listOf(mediaEntity(99L))
+        coEvery { mediaDao.searchByFileName(any()) } returns emptyList()
+        coEvery { mediaDao.getMediaByIds(any()) } answers { firstArg<List<Long>>().map { id -> mediaEntity(id) } }
+
+        val result = engine.search(
+            StructuredFilter(keywords = listOf("儿子")),
+            enableSemanticSearch = false
+        )
+
+        assertEquals(
+            "人物命中为显式维度：只返回儿子的人物簇照片，排除标签并集污染",
+            setOf(100L, 101L),
+            result.media.map { it.id }.toSet()
+        )
+    }
+
+    @Test
+    fun `resolver hit intersects with time range without pollution`() = runTest {
+        val engine = sonResolverEngine()
+
+        val timeRange = TimeRange(startMs = 0, endMs = 1000)
+        coEvery { mediaDao.getMediaIdsByTimeRange(timeRange.startMs, timeRange.endMs) } returns listOf(99L, 100L, 200L)
+        // 有时间约束 → 关键词走候选集内搜索（searchLabelsInIds），污染源必须打在正确方法上
+        coEvery { mediaDao.searchLabelsInIds(any(), any()) } returns listOf(mediaEntity(99L))
+        coEvery { mediaDao.getMediaByIds(any()) } answers { firstArg<List<Long>>().map { id -> mediaEntity(id) } }
+
+        val result = engine.search(
+            StructuredFilter(timeRange = timeRange, keywords = listOf("儿子")),
+            enableSemanticSearch = false
+        )
+
+        assertEquals(
+            "时间 ∩ 人物簇，标签命中 99 不得因并集混入",
+            setOf(100L),
+            result.media.map { it.id }.toSet()
+        )
+    }
+
+    @Test
+    fun `resolver hit with unmatched extra keyword falls back to person set`() = runTest {
+        val engine = sonResolverEngine()
+
+        // "海边"命中全库标签 50（不在儿子人物簇中）：剩余关键词交集为空时，
+        // 应回退人物簇全集——宁返回 27 张正确结果，不返回 0、也不返回带 50 的污染并集
+        coEvery { mediaDao.searchByLabel(any()) } returns listOf(mediaEntity(50L))
+        coEvery { mediaDao.getMediaByIds(any()) } answers { firstArg<List<Long>>().map { id -> mediaEntity(id) } }
+
+        val result = engine.search(
+            StructuredFilter(keywords = listOf("儿子", "海边")),
+            enableSemanticSearch = false
+        )
+
+        assertEquals(
+            "剩余关键词交集为空时回退人物簇，宁返回 27 张正确结果不返回 0",
+            setOf(100L, 101L),
+            result.media.map { it.id }.toSet()
+        )
+    }
+
+    @Test
+    fun `resolver hit disables semantic recall`() = runTest {
+        val semanticEngine: SemanticSearchEngine = mockk(relaxed = true)
+        val engine = sonResolverEngine(semantic = semanticEngine)
+
+        coEvery { mediaDao.getMediaByIds(any()) } answers { firstArg<List<Long>>().map { id -> mediaEntity(id) } }
+
+        val result = engine.search(
+            StructuredFilter(keywords = listOf("儿子")),
+            enableSemanticSearch = true
+        )
+
+        assertTrue(result.media.isNotEmpty())
+        coVerify(exactly = 0) {
+            "人物命中是精确约束，不得启用 MobileCLIP 语义召回引入'长得像'污染"
+            semanticEngine.searchByText(any(), any(), any())
+        }
+    }
+
+    /**
+     * 构造带真实 PersonQueryResolver 的引擎：resolveByKinship("儿子") 命中 person 42，
+     * 其人物簇含媒体 {100, 101}（对应用户真机上 27 张的抽象）。
+     */
+    private fun sonResolverEngine(semantic: SemanticSearchEngine? = null): MediaSearchEngine {
+        val repository = mockk<PersonRepository>(relaxed = true)
+        coEvery { repository.resolveByCustomLabels(any()) } returns emptyList()
+        coEvery { repository.getNamedPersons() } returns emptyList()
+        coEvery { repository.resolveByKinship("儿子") } returns listOf(PersonEntity(personId = 42L, name = null))
+        coEvery { repository.getSelfPerson() } returns null
+
+        val personDao: PersonDao = mockk(relaxed = true)
+        coEvery { personDao.getMediaByPerson(42L) } returns listOf(mediaEntity(100L), mediaEntity(101L))
+
+        return MediaSearchEngine(
+            mediaDao = mediaDao,
+            personDao = personDao,
+            semanticSearchEngine = semantic,
+            personQueryResolver = PersonQueryResolver(repository)
+        )
     }
 
     private fun mediaEntity(id: Long): MediaEntity {

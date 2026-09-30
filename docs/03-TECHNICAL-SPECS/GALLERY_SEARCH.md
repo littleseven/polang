@@ -152,8 +152,8 @@ data class TimeRange(
 
 `androidApp/src/main/java/com/mamba/picme/domain/search/ExplicitFirstSearchPipeline.kt`
 
-1. **显式过滤取交集**：时间范围、地点关键词、`hasFace=1` 分别查 `MediaDao`，得到 `candidateIds`。
-2. **候选集内内容检索**：在 `candidateIds` 内匹配 `labels`、`mlKitLabels`（仅历史数据，新扫描不产生）、`ocrText`、`fileName`。
+1. **显式过滤取交集**：时间范围、地点关键词、`hasFace=1`、**人物簇**（`personKeywords` 经 `PersonQueryResolver` 命中的亲属称谓/人名簇）分别查 `MediaDao` / `PersonDao`，维度间取交集得到 `candidateIds`。
+2. **候选集内内容检索**：在 `candidateIds` 内匹配 `labels`、`mlKitLabels`（仅历史数据，新扫描不产生）、`ocrText`、`fileName`；**已被人物解析消费的称谓词**（如"儿子"）不再驱动标签搜索，防止全库标签并集污染。
 3. **无显式约束时**：退化为全局内容检索。
 
 ### 4.4 SemanticSearchEngine 语义召回
@@ -174,7 +174,7 @@ data class TimeRange(
 #### `search(query)` — 字符串入口（Gallery 搜索框、无 LLM 标准化时）
 
 1. 尝试 `QuerySegmenter` + `ExplicitFirstSearchPipeline`。
-2. 同时调用 `SemanticSearchEngine.searchByText()` 做语义召回。
+2. 同时调用 `SemanticSearchEngine.searchByText()` 做语义召回（**人物命中闸门**：`PersonQueryResolver` 命中人物时关闭语义召回，见下）。
 3. 将 SQL 结果与语义结果通过 `mergeAndRank()` 合并：
    - SQL 召回分 × `SQL_SCORE_WEIGHT`
    - 语义相似度分 × `SEMANTIC_SCORE_WEIGHT`
@@ -189,6 +189,11 @@ data class TimeRange(
 2. 若 `limitToIds` 非空（如多轮细化），在上一步结果集中按 ID 过滤。
 3. 调用 `SemanticSearchEngine.searchByText(query, filter, topK=50)` 做语义召回。
 4. `mergeAndRank()` 融合排序后返回。
+
+**人物显式维度与语义闸门（2026-09-30 修复）**：`PersonQueryResolver` 命中人物（含亲属称谓，如"我儿子"）时——
+- 人物簇是**显式收窄维度**：与时间/地点/人脸取交集，不并入内容关键词并集（此前 27 张正确结果 ∪ ~443 张"儿子"标签污染 = 470 张的根因）；
+- 已被消费的称谓词不再驱动标签/文件名搜索；剩余关键词交集为空时回退人物簇（∩ 其余显式约束）；
+- 语义召回（MobileCLIP）关闭——人物查询是精确约束，语义"长得像"只会引入污染。
 
 **多轮细化**：`RefineMediaSearch` 通过 `limitToIds = priorResultIds` 在上一轮结果集内执行 in-set 过滤，避免“只要近半年的”这类追加条件触发全库重搜。
 

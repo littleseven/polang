@@ -461,12 +461,13 @@ class AppContainerImpl(
         )
     }
 
-    /** 显式约束优先搜索管道（注入翻译器支持跨语言扩展） */
+    /** 显式约束优先搜索管道（注入翻译器支持跨语言扩展；人物解析器用于称谓词收窄） */
     private val explicitFirstSearchPipeline: ExplicitFirstSearchPipeline by lazy {
         ExplicitFirstSearchPipeline(
             mediaDao = database.mediaDao(),
             personDao = database.personDao(),
-            tagTranslator = TagTranslator(bilingualVocab, opusMtTranslator, controlledVocab)
+            tagTranslator = TagTranslator(bilingualVocab, opusMtTranslator, controlledVocab),
+            personQueryResolver = personQueryResolver
         )
     }
 

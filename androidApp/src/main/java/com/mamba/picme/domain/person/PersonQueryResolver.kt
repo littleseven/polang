@@ -6,11 +6,14 @@ package com.mamba.picme.domain.person
  * @param personIds 解析出的去重人物 ID 集合（≥2 时调用方应走共现查询）
  * @param descriptions 人可读的来源说明（命中名字 / 称谓 → 人物），供日志与聊天回复引用
  * @param isAmbiguous 存在歧义：某称谓命中多条关系（已取并集）或同名命中多个人物
+ * @param matchedTerms 命中人物的原词（自定义称呼 / 人名 / 亲属称谓），供调用方从
+ *   内容关键词中消费，避免同一词再驱动标签搜索引入并集污染
  */
 data class ResolvedPersons(
     val personIds: Set<Long>,
     val descriptions: List<String>,
-    val isAmbiguous: Boolean
+    val isAmbiguous: Boolean,
+    val matchedTerms: Set<String> = emptySet()
 )
 
 /**
@@ -36,12 +39,14 @@ class PersonQueryResolver(
 
         val personIds = linkedSetOf<Long>()
         val descriptions = mutableListOf<String>()
+        val matchedTerms = linkedSetOf<String>()
         var isAmbiguous = false
 
         // 1. 自定义称呼精确命中（最高优先级，多个不同称呼可同时命中）
         val customLabelHits = personRepository.resolveByCustomLabels(query)
         for (hit in customLabelHits) {
             personIds.add(hit.person.personId)
+            matchedTerms.add(hit.label)
             descriptions.add("${hit.label} → ${hit.person.name ?: "#${hit.person.personId}"}")
         }
 
@@ -53,6 +58,9 @@ class PersonQueryResolver(
         }
         nameHits.groupBy { person -> person.name }.forEach { (name, persons) ->
             personIds.addAll(persons.map { person -> person.personId })
+            if (!name.isNullOrBlank()) {
+                matchedTerms.add(name)
+            }
             if (persons.size > 1) {
                 isAmbiguous = true
                 descriptions.add("$name（同名 ${persons.size} 人，已取并集）")
@@ -66,15 +74,24 @@ class PersonQueryResolver(
         val matchedLabels = customLabelHits.map { hit -> hit.label }
         for ((term, _) in KinshipLexicon.scan(query)) {
             if (matchedLabels.any { label -> label.contains(term) }) continue
-            val persons = personRepository.resolveByKinship(term)
+            var persons = personRepository.resolveByKinship(term)
+            var viaClusterName = false
+            if (persons.isEmpty()) {
+                // 未声明该关系时兜底：称谓命中已命名人物分组名（如分组命名"大儿子"，查询"儿子"）
+                persons = namedPersons.filter { person -> person.name?.contains(term) == true }
+                viaClusterName = persons.isNotEmpty()
+            }
             if (persons.isEmpty()) continue
             personIds.addAll(persons.map { person -> person.personId })
+            matchedTerms.add(term)
             val names = persons.map { person -> person.name ?: "#${person.personId}" }
-            if (persons.size > 1) {
-                isAmbiguous = true
-                descriptions.add("$term → ${names.joinToString("、")}（多人，已取并集）")
-            } else {
-                descriptions.add("$term → ${names.first()}")
+            when {
+                persons.size > 1 -> {
+                    isAmbiguous = true
+                    descriptions.add("$term → ${names.joinToString("、")}（多人，已取并集）")
+                }
+                viaClusterName -> descriptions.add("$term → 命中分组名 ${names.first()}")
+                else -> descriptions.add("$term → ${names.first()}")
             }
         }
 
@@ -87,7 +104,7 @@ class PersonQueryResolver(
             }
         }
 
-        return ResolvedPersons(personIds, descriptions, isAmbiguous)
+        return ResolvedPersons(personIds, descriptions, isAmbiguous, matchedTerms)
     }
 
     companion object {

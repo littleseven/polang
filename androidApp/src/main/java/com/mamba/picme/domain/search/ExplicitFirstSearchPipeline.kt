@@ -6,6 +6,7 @@ import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.data.model.MediaEntity
 import com.mamba.picme.domain.model.AppLanguage
+import com.mamba.picme.domain.person.PersonQueryResolver
 import com.mamba.picme.domain.tag.i18n.BilingualVocab
 import com.mamba.picme.domain.tag.i18n.TagTranslator
 
@@ -23,7 +24,8 @@ import com.mamba.picme.domain.tag.i18n.TagTranslator
 class ExplicitFirstSearchPipeline(
     private val mediaDao: MediaDao,
     private val personDao: PersonDao? = null,
-    private val tagTranslator: TagTranslator = TagTranslator(BilingualVocab.empty())
+    private val tagTranslator: TagTranslator = TagTranslator(BilingualVocab.empty()),
+    private val personQueryResolver: PersonQueryResolver? = null
 ) {
 
     /**
@@ -39,17 +41,31 @@ class ExplicitFirstSearchPipeline(
 
     /**
      * 使用显式约束和内容过滤条件执行搜索
+     *
+     * 人物维度（缺陷③修复）：explicit.personKeywords 经 [PersonQueryResolver] 命中的人物簇
+     * 作为显式收窄维度参与候选交集（此前 personKeywords 被静默丢弃，"去年夏天儿子的照片"
+     * 退化为 时间∩标签搜索）；已被消费的称谓词不再驱动标签搜索。
      */
     suspend fun search(
         explicit: ExplicitFilter,
         content: ContentFilter,
         uiLang: AppLanguage = AppLanguage.CHINESE
     ): com.mamba.picme.domain.search.SearchResult {
-        val candidateIds = resolveCandidateIds(explicit)
-        val mediaList = if (candidateIds == null) {
-            searchGlobal(content, uiLang)
+        val personOutcome = resolvePersonOutcome(explicit.personKeywords)
+        val effectiveContent = if (personOutcome == null) {
+            content
         } else {
-            searchInCandidates(candidateIds, content, uiLang)
+            content.copy(
+                keywords = content.keywords.filterNot { keyword ->
+                    personOutcome.consumedTerms.any { it.isNotBlank() && keyword.contains(it) }
+                }
+            )
+        }
+        val candidateIds = resolveCandidateIds(explicit, personOutcome?.mediaIds)
+        val mediaList = if (candidateIds == null) {
+            searchGlobal(effectiveContent, uiLang)
+        } else {
+            searchInCandidates(candidateIds, effectiveContent, uiLang)
         }
         return com.mamba.picme.domain.search.SearchResult(
             media = mediaList.map { it.toDomain(uiLang) },
@@ -58,9 +74,51 @@ class ExplicitFirstSearchPipeline(
     }
 
     /**
-     * 根据显式约束解析候选媒体 ID 集合；若没有任何显式约束则返回 null，表示全局搜索
+     * 人物维度预解析结果（簇内媒体 + 已消费称谓词）
      */
-    private suspend fun resolveCandidateIds(explicit: ExplicitFilter): Set<Long>? {
+    private data class PersonOutcome(
+        val mediaIds: Set<Long>,
+        val consumedTerms: Set<String>
+    )
+
+    /**
+     * 解析显式人物关键词：personKeywords 经 [PersonQueryResolver] 命中人物时返回其簇内媒体。
+     * 解析器/人物 DAO 未注入、关键词为空、0 命中时返回 null（回落原有关键词链路）。
+     */
+    private suspend fun resolvePersonOutcome(personKeywords: List<String>): PersonOutcome? {
+        val resolver = personQueryResolver ?: return null
+        val dao = personDao ?: return null
+        if (personKeywords.isEmpty()) return null
+
+        val query = personKeywords.joinToString(" ")
+        val resolved = resolver.resolve(query)
+        if (resolved.personIds.isEmpty()) return null
+
+        val mediaIds = if (resolved.personIds.size >= 2) {
+            val ids = resolved.personIds.toList()
+            dao.getMediaByPersonsCooccurrence(ids, ids.size)
+                .mapTo(mutableSetOf()) { it.id }
+        } else {
+            dao.getMediaByPerson(resolved.personIds.first())
+                .mapTo(mutableSetOf()) { it.id }
+        }
+        Logger.d(
+            TAG,
+            "personOutcome keywords=$personKeywords persons=${resolved.descriptions} " +
+                "consumed=${resolved.matchedTerms} media=${mediaIds.size}"
+        )
+        return PersonOutcome(mediaIds, resolved.matchedTerms)
+    }
+
+    /**
+     * 根据显式约束解析候选媒体 ID 集合；若没有任何显式约束则返回 null，表示全局搜索
+     *
+     * @param personMediaIds 人物维度候选集（PersonQueryResolver 命中的人物簇），参与维度间交集
+     */
+    private suspend fun resolveCandidateIds(
+        explicit: ExplicitFilter,
+        personMediaIds: Set<Long>? = null
+    ): Set<Long>? {
         val candidateSets = mutableListOf<Set<Long>>()
 
         explicit.timeRange?.let { range ->
@@ -79,6 +137,8 @@ class ExplicitFirstSearchPipeline(
         if (explicit.hasFaces == true) {
             candidateSets.add(mediaDao.getMediaIdsByHasFace().toSet())
         }
+
+        personMediaIds?.let { candidateSets.add(it) }
 
         if (candidateSets.isEmpty()) return null
         return candidateSets.reduce { acc, set -> acc.intersect(set) }

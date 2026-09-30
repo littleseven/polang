@@ -117,12 +117,15 @@ class MediaSearchEngine(
 
         // Layer 1: 规则匹配
         val filter = QueryParser.parse(query, uiLang)
+        // 人物命中预解析：命中的人物簇作为显式收窄维度传入 executeFilter，
+        // 并关闭语义召回（人物查询是精确约束，闸门语义与 search(filter) 一致）
+        val personOutcome = resolvePersonOutcome(query)
         if (filter != null && !filter.needsLlm) {
             // SQL 搜索与语义召回并行执行
             val (results, semanticResults) = coroutineScope {
-                val sqlDeferred = async { executeFilter(filter, rawQuery = query) }
+                val sqlDeferred = async { executeFilter(filter, rawQuery = query, personOutcome = personOutcome) }
                 val semanticDeferred = async {
-                    if (enableSemanticSearch && semanticSearchEngine != null) {
+                    if (enableSemanticSearch && semanticSearchEngine != null && personOutcome == null) {
                         searchSemantic(query, filter)
                     } else emptyList()
                 }
@@ -138,11 +141,11 @@ class MediaSearchEngine(
         if (llmSearch != null) {
             val llmFilter = llmSearch(query)
             if (llmFilter != null) {
-                // SQL 搜索与语义召回并行执行
+                // SQL 搜索与语义召回并行执行（人物命中时同样关闭语义召回）
                 val (results, semanticResults) = coroutineScope {
-                    val sqlDeferred = async { executeFilter(llmFilter, rawQuery = query) }
+                    val sqlDeferred = async { executeFilter(llmFilter, rawQuery = query, personOutcome = personOutcome) }
                     val semanticDeferred = async {
-                        if (enableSemanticSearch && semanticSearchEngine != null) {
+                        if (enableSemanticSearch && semanticSearchEngine != null && personOutcome == null) {
                             searchSemantic(query, llmFilter)
                         } else emptyList()
                     }
@@ -200,10 +203,13 @@ class MediaSearchEngine(
 
         // 人物名查询是精确约束：人脸聚类已能准确召回该人物的所有照片，
         // 不应再启用 MobileCLIP 语义召回，否则全库“长得像”的图片会混入结果。
-        val enableSemanticForFilter = enableSemanticSearch && filter.personName.isNullOrBlank()
+        // 亲属称谓解析命中同理（缺陷③：闸门原先只看 personName，结构化路径漏拦）。
+        val personOutcome = resolvePersonOutcome(query)
+        val enableSemanticForFilter =
+            enableSemanticSearch && filter.personName.isNullOrBlank() && personOutcome == null
 
         val (results, semanticResults) = coroutineScope {
-            val sqlDeferred = async { executeFilter(filter, rawQuery = query) }
+            val sqlDeferred = async { executeFilter(filter, rawQuery = query, personOutcome = personOutcome) }
             val semanticDeferred = async {
                 if (enableSemanticForFilter && semanticSearchEngine != null && query.isNotBlank()) {
                     searchSemantic(query, filter)
@@ -337,15 +343,27 @@ class MediaSearchEngine(
      * 语义：维度之间取**交集**（AND），同一维度内不同关键词取**并集**（OR）。
      * 例如 "近半年小孩的照片" → 时间范围 ∩ (标签/文件名/OCR 命中 "小孩" 之一) ∩ 有人脸。
      *
+     * 人物维度（缺陷②修复）：[PersonQueryResolver] 命中的人物簇是**显式收窄维度**，
+     * 与时间/地点/人脸取交集而非并入内容并集；已被人物解析消费的关键词（如"儿子"）
+     * 不再驱动标签/文件名搜索，防止全库标签并集污染（回归表现：27 张正确 ∪ ~443 张标签污染 = 470）。
+     * 剩余关键词交集为空时回退人物簇（∩ 其余显式约束），宁返回正确子集不返回 0。
+     *
      * 修复历史：此前实现把各维度结果累积到同一个 map 中，导致时间约束与关键词约束变成
      * 并集，旧照片只要命中关键词就会被召回，从而出现 2003 年/2023 年等非半年内结果。
      */
     @Suppress("CyclomaticComplexMethod")
-    private suspend fun executeFilter(filter: StructuredFilter, rawQuery: String = ""): List<MediaAsset> {
+    private suspend fun executeFilter(
+        filter: StructuredFilter,
+        rawQuery: String = "",
+        personOutcome: PersonSearchOutcome? = null
+    ): List<MediaAsset> {
         val uiLang = userSettingsRepository?.getAppLanguageBlocking() ?: AppLanguage.CHINESE
         val totalStart = System.currentTimeMillis()
 
-        // 1. 显式约束候选集（时间 / 地点 / 人脸）—— 维度间交集
+        // 人物维度预解析（调用方已解析则复用，避免重复 DB 往返）
+        val resolvedPersons = personOutcome ?: resolvePersonOutcome(rawQuery)
+
+        // 1. 显式约束候选集（时间 / 地点 / 人脸）—— 维度间交集（人物维度单独持有，用于兜底）
         val explicitStart = System.currentTimeMillis()
         val explicitCandidateSets = mutableListOf<Set<Long>>()
 
@@ -366,24 +384,39 @@ class MediaSearchEngine(
             explicitCandidateSets.add(mediaDao.getHasFaceIds().toSet())
         }
 
-        val explicitCandidateIds: Set<Long>? = if (explicitCandidateSets.isEmpty()) {
+        val otherExplicitIds: Set<Long>? = if (explicitCandidateSets.isEmpty()) {
             null
         } else {
             explicitCandidateSets.reduce { acc, set -> acc.intersect(set) }
         }
+
+        // 人物簇与其余显式约束取交集（无其余约束时即人物簇全集）
+        val personIds: Set<Long>? = resolvedPersons?.mediaIds?.takeIf { it.isNotEmpty() }
+        val explicitCandidateIds: Set<Long>? = when {
+            otherExplicitIds != null && personIds != null -> otherExplicitIds.intersect(personIds)
+            otherExplicitIds != null -> otherExplicitIds
+            else -> personIds
+        }
         val explicitTime = System.currentTimeMillis() - explicitStart
 
-        // 2. 内容关键词候选集（标签 / ML Kit / OCR / 文件名 / 人物名）—— 维度内并集
+        // 2. 内容关键词候选集（标签 / ML Kit / OCR / 文件名 / 人物名）—— 维度内并集。
+        // 已被人物解析消费的关键词不得再驱动标签搜索（防标签并集污染）。
         val contentStart = System.currentTimeMillis()
         val contentIds = mutableSetOf<Long>()
-        val hasContentKeywords = filter.keywords.isNotEmpty() || filter.ocrKeywords.isNotEmpty() ||
-            !filter.personName.isNullOrBlank()
+        val consumedTerms = resolvedPersons?.consumedTerms ?: emptySet()
+        val remainingKeywords = filter.keywords.filterNot { keyword ->
+            consumedTerms.any { it.isNotBlank() && keyword.contains(it) }
+        }
+        val hasContentKeywords = remainingKeywords.isNotEmpty() || filter.ocrKeywords.isNotEmpty() ||
+            (resolvedPersons == null && !filter.personName.isNullOrBlank())
 
-        // 人物名匹配：显式 personName + 每个关键词都可能命中自定义分组名称
-        contentIds.addAll(collectPersonMediaIds(filter, rawQuery))
+        // 人物名 LIKE 兜底仅保留给人物解析未命中的路径（命中时人物簇已作为显式维度）
+        if (resolvedPersons == null) {
+            contentIds.addAll(collectPersonMediaIds(filter, rawQuery))
+        }
 
-        if (filter.keywords.isNotEmpty() || filter.ocrKeywords.isNotEmpty()) {
-            for (keyword in filter.keywords) {
+        if (remainingKeywords.isNotEmpty() || filter.ocrKeywords.isNotEmpty()) {
+            for (keyword in remainingKeywords) {
                 val candidates = cachedExpandForSearch(keyword, uiLang)
                 for (candidate in candidates) {
                     contentIds.addAll(searchCandidateIds(candidate, explicitCandidateIds))
@@ -399,11 +432,19 @@ class MediaSearchEngine(
         val contentTime = System.currentTimeMillis() - contentStart
 
         // 3. 最终 ID = 显式约束 ∩ 内容关键词
-        val finalIds = when {
+        val intersectedIds = when {
             explicitCandidateIds == null && !hasContentKeywords -> emptySet()
             explicitCandidateIds == null -> contentIds
             !hasContentKeywords -> explicitCandidateIds
             else -> explicitCandidateIds.intersect(contentIds)
+        }
+
+        // 人物命中兜底：剩余关键词交集为空时回退人物簇（∩ 其余显式约束）——
+        // 宁返回 27 张正确结果，不返回 0、也不返回标签污染并集
+        val finalIds = if (intersectedIds.isEmpty() && personIds != null) {
+            otherExplicitIds?.intersect(personIds) ?: personIds
+        } else {
+            intersectedIds
         }
 
         if (finalIds.isEmpty()) {
@@ -477,6 +518,49 @@ class MediaSearchEngine(
         }
 
         return if (candidateIds != null) matched.intersect(candidateIds) else matched
+    }
+
+    /**
+     * 人物维度预解析结果。
+     *
+     * @param mediaIds 人物簇媒体 ID 集（≥2 人命中时为共现照片）
+     * @param consumedTerms 已被人物解析消费的查询词（如"儿子"），不得再驱动标签搜索。
+     * isNotBlank 守卫关键：消费判定是 `keyword.contains(term)`，空白 term 会消费一切关键词。
+     */
+    private data class PersonSearchOutcome(
+        val mediaIds: Set<Long>,
+        val consumedTerms: Set<String>
+    )
+
+    /**
+     * 预解析人物维度：rawQuery 经 [PersonQueryResolver] 命中人物时返回其簇内媒体。
+     * 解析器/人物 DAO 未注入、查询为空、0 命中时返回 null（回落原有关键词 + 人名 LIKE 链路）。
+     */
+    private suspend fun resolvePersonOutcome(rawQuery: String): PersonSearchOutcome? {
+        val resolver = personQueryResolver ?: return null
+        val dao = personDao ?: return null
+        if (rawQuery.isBlank()) return null
+
+        val resolved = resolver.resolve(rawQuery)
+        if (resolved.personIds.isEmpty()) return null
+
+        val mediaIds = when {
+            resolved.personIds.size >= 2 -> {
+                val ids = resolved.personIds.toList()
+                dao.getMediaByPersonsCooccurrence(ids, ids.size)
+                    .mapTo(mutableSetOf()) { it.id }
+            }
+            else -> {
+                val personId = resolved.personIds.first()
+                dao.getMediaByPerson(personId).mapTo(mutableSetOf()) { it.id }
+            }
+        }
+        Logger.d(
+            TAG,
+            "personOutcome query='$rawQuery' persons=${resolved.descriptions} " +
+                "consumed=${resolved.matchedTerms} media=${mediaIds.size}"
+        )
+        return PersonSearchOutcome(mediaIds, resolved.matchedTerms)
     }
 
     /**

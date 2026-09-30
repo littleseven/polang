@@ -260,4 +260,20 @@ class QuerySegmenterTest {
         assertEquals(5, cal.get(java.util.Calendar.MONTH)) // June
         assertEquals(emptyList<String>(), content.keywords)
     }
+
+    @Test
+    fun `segment classifies kinship term as person`() {
+        // 亲属称谓（儿子/女儿/爸爸…）应与 "小孩" 一样归入 PERSON 段，
+        // 供 toFilters 产出 explicit.personKeywords 供人物解析器消费
+        val result = QuerySegmenter.segment("去年夏天儿子的照片")
+
+        assertEquals(
+            listOf(
+                Segment(SegmentType.TIME, "去年夏天"),
+                Segment(SegmentType.PERSON, "儿子"),
+                Segment(SegmentType.UNKNOWN, "照片")
+            ),
+            result.segments
+        )
+    }
 }

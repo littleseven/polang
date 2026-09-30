@@ -1,7 +1,9 @@
 package com.mamba.picme.domain.search
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
 
@@ -270,5 +272,14 @@ class QueryParserTimeTest {
         assertEquals(2026, cal.get(Calendar.YEAR)) // Winter spans into next year
         assertEquals(1, cal.get(Calendar.MONTH)) // 0-based: February
         assertEquals(28, cal.get(Calendar.DAY_OF_MONTH))
+    }
+
+    @Test
+    fun `kinship terms are recognized as people search`() {
+        // 亲属称谓词（儿子/女儿/妈妈…）应视为人物搜索，
+        // 否则 QueryParser 会把 "我儿子" 当作普通关键词驱动标签搜索（回归表现：470 张并集污染）
+        assertTrue(QueryParser.isPeopleSearch("我儿子的照片"))
+        assertTrue(QueryParser.isPeopleSearch("女儿和妈妈的合照"))
+        assertFalse(QueryParser.isPeopleSearch("海边的日落"))
     }
 }

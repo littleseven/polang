@@ -3,6 +3,7 @@ package com.mamba.picme.domain.search
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.StructuredFilter
 import com.mamba.picme.domain.model.TimeRange
+import com.mamba.picme.domain.person.KinshipLexicon
 import java.util.Calendar
 
 /**
@@ -438,7 +439,7 @@ object QueryParser {
     }
 
     /**
-     * 判断是否是"人物"相关搜索（含儿童/婴儿等同义概念）
+     * 判断是否是"人物"相关搜索（含儿童/婴儿/亲属称谓等同义概念）
      */
     fun isPeopleSearch(query: String): Boolean {
         val peopleKeywords = listOf(
@@ -446,7 +447,7 @@ object QueryParser {
             "face", "portrait", "selfie", "自拍", "头像",
             "小孩", "儿童", "婴儿", "宝宝", "孩子",
             "child", "children", "kid", "kids", "baby", "infant", "toddler"
-        )
+        ) + KinshipLexicon.terms
         return peopleKeywords.any { query.contains(it, ignoreCase = true) }
     }
 

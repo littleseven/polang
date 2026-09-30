@@ -6,6 +6,8 @@ import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.data.local.entity.PersonEntity
 import com.mamba.picme.data.model.MediaEntity
 import com.mamba.picme.domain.model.TimeRange
+import com.mamba.picme.domain.person.PersonQueryResolver
+import com.mamba.picme.domain.person.PersonRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -96,6 +98,46 @@ class ExplicitFirstSearchPipelineTest {
         )
 
         assertEquals(setOf(100L, 101L), result.media.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `resolver hit narrows candidates and consumes person keyword`() = runTest {
+        // 缺陷③回归：resolveCandidateIds 曾静默丢弃 personKeywords —— "去年夏天儿子的照片"
+        // 只走 时间∩标签搜索，"儿子"标签命中大量无关照片。人物解析器命中后：
+        // 1. 人物簇成为显式维度（时间 ∩ 人物簇）
+        // 2. 已消费的关键词不再驱动标签搜索
+        val personDao: PersonDao = mockk(relaxed = true)
+        val repository = mockk<PersonRepository>(relaxed = true)
+        coEvery { repository.resolveByCustomLabels(any()) } returns emptyList()
+        coEvery { repository.getNamedPersons() } returns emptyList()
+        coEvery { repository.resolveByKinship("儿子") } returns listOf(PersonEntity(personId = 42L, name = null))
+        coEvery { repository.getSelfPerson() } returns null
+        val pipeline = ExplicitFirstSearchPipeline(
+            mediaDao = mediaDao,
+            personDao = personDao,
+            personQueryResolver = PersonQueryResolver(repository)
+        )
+
+        val timeRange = TimeRange(startMs = 0, endMs = 1000)
+        // 显式约束：时间返回 {99, 100, 200}
+        coEvery { mediaDao.getMediaIdsByTimeRange(timeRange.startMs, timeRange.endMs) } returns listOf(99L, 100L, 200L)
+        // 人物簇：person 42 拥有 {100, 101}
+        coEvery { personDao.getMediaByPerson(42L) } returns listOf(mediaEntity(100L), mediaEntity(101L))
+        // 标签污染源：候选内 "儿子" 标签命中 99（不在人物簇中）
+        coEvery { mediaDao.searchLabelsAllFieldsInIds(any(), any()) } returns listOf(mediaEntity(99L))
+        coEvery { mediaDao.searchFileNameInIds(any(), any()) } returns emptyList()
+        coEvery { mediaDao.getMediaByIds(any()) } answers { firstArg<List<Long>>().map { id -> mediaEntity(id) } }
+
+        val result = pipeline.search(
+            explicit = explicitFilter(timeRange = timeRange).copy(personKeywords = listOf("儿子")),
+            content = contentFilter("儿子")
+        )
+
+        assertEquals(
+            "时间 {99,100,200} ∩ 人物簇 {100,101} = {100}；'儿子'被消费不得经标签混入 99",
+            setOf(100L),
+            result.media.map { it.id }.toSet()
+        )
     }
 
     private fun mediaEntity(id: Long): MediaEntity {

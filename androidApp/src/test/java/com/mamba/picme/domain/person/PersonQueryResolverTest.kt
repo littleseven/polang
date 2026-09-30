@@ -197,4 +197,40 @@ class PersonQueryResolverTest {
         assertEquals("只解析一次，无「爸」重复描述", 1, result.descriptions.size)
         assertTrue(result.descriptions.single().startsWith("爸爸"))
     }
+
+    @Test
+    fun `kinship hit records matchedTerm for caller consumption`() = runTest {
+        stubDefaults(kinship = mapOf("儿子" to listOf(person(42, null))))
+
+        val result = resolver.resolve("我儿子的照片")
+
+        assertEquals(setOf(42L), result.personIds)
+        assertTrue("命中的称谓词应回传给调用方，供其从内容关键词中消费", "儿子" in result.matchedTerms)
+    }
+
+    @Test
+    fun `custom label and name hits record matchedTerms`() = runTest {
+        stubDefaults(customLabels = listOf(CustomLabelHit(label = "宝贝", person = person(5, "大宝"))))
+
+        val labelHit = resolver.resolve("宝贝的照片")
+        assertEquals(setOf(5L), labelHit.personIds)
+        assertEquals(setOf("宝贝"), labelHit.matchedTerms)
+
+        stubDefaults(named = listOf(person(5, "大宝")))
+        val nameHit = resolver.resolve("大宝的照片")
+        assertEquals(setOf(5L), nameHit.personIds)
+        assertEquals("人名命中同样要回传 matchedTerms", setOf("大宝"), nameHit.matchedTerms)
+    }
+
+    @Test
+    fun `kinship term without declared relation falls back to named person whose name contains term`() = runTest {
+        // 用户未声明 SON 关系，但把人物簇命名为"大儿子"：称谓解析空手而归时
+        // 应回退到"簇名包含称谓"的命名簇，而不是返回空
+        stubDefaults(named = listOf(person(7, "大儿子")))
+
+        val result = resolver.resolve("我儿子的照片")
+
+        assertEquals(setOf(7L), result.personIds)
+        assertTrue("儿子" in result.matchedTerms)
+    }
 }

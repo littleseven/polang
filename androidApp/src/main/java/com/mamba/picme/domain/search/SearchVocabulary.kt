@@ -1,5 +1,7 @@
 package com.mamba.picme.domain.search
 
+import com.mamba.picme.domain.person.KinshipLexicon
+
 /**
  * 搜索词典：供 QueryParser 和 QuerySegmenter 共享的地点/人物/场景等词表。
  */
@@ -30,12 +32,17 @@ object SearchVocabulary {
         "自拍", "合影", "合照", "头像"
     )
 
+    /**
+     * 人物词汇（分段为 PERSON 段 → explicit.personKeywords，供人物解析器消费）。
+     * 亲属称谓（儿子/女儿/爸爸…）来自 [KinshipLexicon]——注意**不并入**
+     * [PERSON_GENERIC_TRIGGERS]：用户未声明关系时"儿子"仍需回落标签搜索兜底。
+     */
     val PERSON = setOf(
         "人", "人物", "人脸", "我", "我们", "你", "你们",
         "小孩", "儿童", "婴儿", "宝宝", "孩子", "男孩", "女孩",
         "男人", "女人", "男生", "女生", "老人", "朋友", "家人",
         "合影", "合照", "自拍", "自己"
-    )
+    ) + KinshipLexicon.terms
 
     val SCENE = setOf(
         "海边", "山上", "海滩", "日落", "夜景", "天空", "草地",
