@@ -109,8 +109,8 @@ class ChatToolService private constructor() : TraceIdAware {
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") person: String,
-        @LLMDescription("时间起点（毫秒，据当前日期算）；空串=不限") fromMs: String,
-        @LLMDescription("时间终点（毫秒）；空串=不限") toMs: String,
+        @LLMDescription("时间起点（毫秒，据当前日期算）；query 含时间词（如'去年夏天''3月'）时**必须**换算填入；空串=不限") fromMs: String,
+        @LLMDescription("时间终点（毫秒）；query 含时间词时**必须**换算填入；空串=不限") toMs: String,
         @LLMDescription("true=只要含人脸的照片；空串=不限") hasFace: String
     ): String {
         val intent = structuredSearchIntent(query, person, fromMs, toMs, hasFace)

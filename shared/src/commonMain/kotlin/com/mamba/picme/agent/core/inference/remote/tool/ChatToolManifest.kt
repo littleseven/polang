@@ -37,8 +37,8 @@ object ChatToolManifest {
     class SearchMediaArgs(
         @property:LLMDescription("自然语言搜索词") val query: String,
         @property:LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") val person: String,
-        @property:LLMDescription("时间起点（毫秒，据当前日期算）；空串=不限") val fromMs: String,
-        @property:LLMDescription("时间终点（毫秒）；空串=不限") val toMs: String,
+        @property:LLMDescription("时间起点（毫秒，据当前日期算）；query 含时间词（如'去年夏天''3月'）时**必须**换算填入；空串=不限") val fromMs: String,
+        @property:LLMDescription("时间终点（毫秒）；query 含时间词时**必须**换算填入；空串=不限") val toMs: String,
         @property:LLMDescription("true=只要含人脸的照片；空串=不限") val hasFace: String,
     )
 

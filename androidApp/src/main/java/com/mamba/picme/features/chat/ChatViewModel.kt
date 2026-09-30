@@ -2297,7 +2297,7 @@ class ChatViewModel(
         val start = System.currentTimeMillis()
         val result = runCatching {
             if (intent != null) {
-                val filter = searchIntentToStructuredFilter(withFaceIntentBackstop(intent, query))
+                val filter = searchIntentToStructuredFilter(withStringParseBackstop(intent, query))
                 mediaSearchEngine.search(filter = filter)
             } else {
                 mediaSearchEngine.search(query)
@@ -2333,7 +2333,7 @@ class ChatViewModel(
         val result = runCatching {
             if (intent != null) {
                 // LLM 已给出标准化意图：直接在 prior 内执行结构化过滤
-                val filter = searchIntentToStructuredFilter(withFaceIntentBackstop(intent, constraint))
+                val filter = searchIntentToStructuredFilter(withStringParseBackstop(intent, constraint))
                 mediaSearchEngine.search(filter = filter, limitToIds = priorIds).media
             } else {
                 // 兜底：字符串解析 + in-set 过滤
@@ -2365,14 +2365,26 @@ class ChatViewModel(
     }
 
     /**
-     * 人脸意图兜底（2026-09-29）：结构化入口（路由器直执 / search_media 工具）一旦填了
-     * 时间/人物参数，就跳过字符串解析路径，若上游漏填 hasFaces，"有人脸"这类约束会被
-     * 整句丢弃。这里对原始文本再跑一次规则判定（与字符串搜索路径 [QueryParser] 同口径），
-     * 把丢失的人脸约束补回；上游已显式给出 hasFaces（true/false）时尊重上游，不覆盖。
+     * 字符串解析兜底（2026-09-29 hasFaces / 2026-09-30 timeRange）：结构化入口（路由器
+     * 直执 / search_media 工具）一旦填了任一结构化参数，就跳过字符串解析路径；上游漏填的
+     * 维度会被整句丢弃（实证：LLM 只传 hasFace 不传 fromMs/toMs 时，"去年夏天"约束丢失，
+     * 返回其他年份的人脸照片）。这里对原始文本再跑一次规则判定（与字符串搜索路径
+     * [QueryParser] 同口径），把丢失的人脸/时间约束补回；上游已显式给出的维度尊重上游，
+     * 不覆盖。
      */
-    private fun withFaceIntentBackstop(intent: SearchIntent, rawText: String): SearchIntent {
-        if (intent.hasFaces != null) return intent
-        return if (QueryParser.isPeopleSearch(rawText)) intent.copy(hasFaces = true) else intent
+    private fun withStringParseBackstop(intent: SearchIntent, rawText: String): SearchIntent {
+        var result = intent
+        if (result.hasFaces == null && QueryParser.isPeopleSearch(rawText)) {
+            result = result.copy(hasFaces = true)
+        }
+        if (result.timeRange == null) {
+            QueryParser.parseTimeRange(rawText)?.let { parsed ->
+                result = result.copy(
+                    timeRange = TimeRange(startMs = parsed.startMs, endMs = parsed.endMs)
+                )
+            }
+        }
+        return result
     }
 
     /**

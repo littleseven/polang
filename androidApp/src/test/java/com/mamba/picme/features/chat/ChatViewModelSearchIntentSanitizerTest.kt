@@ -5,6 +5,7 @@ import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.agent.core.model.context.SearchIntent
 import com.mamba.picme.agent.core.model.context.TimeRange
 import com.mamba.picme.domain.model.StructuredFilter
+import com.mamba.picme.domain.search.QueryParser
 import com.mamba.picme.domain.search.SearchResult
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -12,6 +13,7 @@ import io.mockk.slot
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -90,7 +92,7 @@ class ChatViewModelSearchIntentSanitizerTest : ChatViewModelTestBase() {
     }
 
     @Test
-    fun `onSearchMedia leaves keywords unchanged when no timeRange`() = runTest {
+    fun `onSearchMedia backfills timeRange from bare season word and strips it from keywords`() = runTest {
         val viewModel = newViewModel()
         val intent = SearchIntent(
             query = "夏天的回忆",
@@ -103,7 +105,10 @@ class ChatViewModelSearchIntentSanitizerTest : ChatViewModelTestBase() {
 
         val filterSlot = slot<StructuredFilter>()
         coVerify { mediaSearchEngine.search(filter = capture(filterSlot), limitToIds = any(), enableSemanticSearch = any()) }
-        assertEquals(listOf("夏天"), filterSlot.captured.keywords)
+        // 与字符串搜索路径同口径：裸季节词也会被 QueryParser 解析出 timeRange，
+        // 随后时间专属词从 keywords 剔除，避免时间约束与空内容候选集取交集
+        assertEquals(QueryParser.parseTimeRange("夏天的回忆")?.startMs, filterSlot.captured.timeRange?.startMs)
+        assertTrue(filterSlot.captured.keywords.isEmpty())
     }
 
     @Test
@@ -193,5 +198,53 @@ class ChatViewModelSearchIntentSanitizerTest : ChatViewModelTestBase() {
         val filters = mutableListOf<StructuredFilter>()
         coVerify(atLeast = 1) { mediaSearchEngine.search(filter = capture(filters), limitToIds = any(), enableSemanticSearch = any()) }
         assertEquals("constraint 含'人脸'时应补回 hasFaces=true", true, filters.last().hasFaces)
+    }
+
+    // ── 时间兜底（2026-09-30 真机实证：LLM 只传 hasFace 不传 fromMs/toMs，时间约束丢失）──
+
+    @Test
+    fun `onSearchMedia backfills timeRange when intent lacks it but query has time words`() = runTest {
+        val viewModel = newViewModel()
+        // 真机回归场景：search_media 只给了 hasFace=true，fromMs/toMs 空串
+        val intent = SearchIntent(query = "去年夏天有人脸的照片", hasFaces = true)
+
+        viewModel.onSearchMedia("去年夏天有人脸的照片", intent)
+        advanceUntilIdle()
+
+        val filterSlot = slot<StructuredFilter>()
+        coVerify { mediaSearchEngine.search(filter = capture(filterSlot), limitToIds = any(), enableSemanticSearch = any()) }
+        val expected = QueryParser.parseTimeRange("去年夏天有人脸的照片")
+        assertNotNull("query 含'去年夏天'时应补回 timeRange", filterSlot.captured.timeRange)
+        assertEquals(expected?.startMs, filterSlot.captured.timeRange?.startMs)
+        assertEquals(expected?.endMs, filterSlot.captured.timeRange?.endMs)
+        assertEquals(true, filterSlot.captured.hasFaces)
+    }
+
+    @Test
+    fun `onSearchMedia keeps explicit timeRange over query-parsed one`() = runTest {
+        val viewModel = newViewModel()
+        val explicit = TimeRange(startMs = 1_718_198_400_000, endMs = 1_725_145_599_999)
+        val intent = SearchIntent(query = "去年夏天有人脸的照片", timeRange = explicit, hasFaces = true)
+
+        viewModel.onSearchMedia("去年夏天有人脸的照片", intent)
+        advanceUntilIdle()
+
+        val filterSlot = slot<StructuredFilter>()
+        coVerify { mediaSearchEngine.search(filter = capture(filterSlot), limitToIds = any(), enableSemanticSearch = any()) }
+        assertEquals("上游已显式给出 timeRange 时不得覆盖", explicit.startMs, filterSlot.captured.timeRange?.startMs)
+        assertEquals(explicit.endMs, filterSlot.captured.timeRange?.endMs)
+    }
+
+    @Test
+    fun `onSearchMedia keeps timeRange null when query has no time words`() = runTest {
+        val viewModel = newViewModel()
+        val intent = SearchIntent(query = "有人脸的照片", hasFaces = true)
+
+        viewModel.onSearchMedia("有人脸的照片", intent)
+        advanceUntilIdle()
+
+        val filterSlot = slot<StructuredFilter>()
+        coVerify { mediaSearchEngine.search(filter = capture(filterSlot), limitToIds = any(), enableSemanticSearch = any()) }
+        assertNull(filterSlot.captured.timeRange)
     }
 }
