@@ -26,11 +26,11 @@ tag_control:
     card: { background: surfaceContainer, corner_radius: 16 }
     stats_card:
       hero_number:
-        text: "<语义索引覆盖率 %>"                  # 大数字，品牌渐变前景
+        text: "<总照片数 %,d>"                      # 大数字=图库总数，品牌渐变前景
         foreground: "brandGradient #1EA75B→#7CEFA8"
-        caption: "stats_hero_caption = %1$d%% semantically indexed"
+        caption: "stats_hero_caption = %1$d%% AI-tagged（口径=内容标签 pass 完成率 tagPassProgress(totalMedia, remainingPass3)，与 stages 区块「内容标签」行同源同舍入；2026-09-30 弃语义向量占比口径）"
       progress_ring:
-        style: "实色 primary 弧（非渐变）；尺寸对齐 ardot 帧 tag_control_v2"
+        style: "实色 primary 弧（非渐变）；中心两行：百分比 13sp SemiBold + 微标签 tag_stats_ring_label（8sp onSurfaceVariant，AI 打标/AI-tagged）；尺寸对齐 ardot 帧 tag_control_v2"
         track: surfaceVariant
       metric_tiles:                                # 2×2 无图标瓦片（v2 删图标）
         grid: "2×2"
