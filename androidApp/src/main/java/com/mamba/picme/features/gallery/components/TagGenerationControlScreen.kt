@@ -61,7 +61,6 @@ import com.mamba.picme.util.permission.BackgroundScanGuard
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
-import kotlin.math.roundToInt
 
 /**
  * TAG 生成精细控制子页面
@@ -106,7 +105,6 @@ fun TagGenerationControlScreen(
     var totalMedia by remember { mutableIntStateOf(0) }
     var withFace by remember { mutableIntStateOf(0) }
     var withLabels by remember { mutableIntStateOf(0) }
-    var withSemantic by remember { mutableIntStateOf(0) }
     var personCount by remember { mutableIntStateOf(0) }
     var namedPersonCount by remember { mutableIntStateOf(0) }
     var embeddingCount by remember { mutableIntStateOf(0) }
@@ -135,7 +133,6 @@ fun TagGenerationControlScreen(
                 totalMedia = stats.totalMedia
                 withFace = stats.withFace
                 withLabels = stats.withLabels
-                withSemantic = stats.withSemantic
                 personCount = stats.personCount
                 namedPersonCount = stats.namedPersonCount
                 embeddingCount = stats.faceEmbeddingCount
@@ -294,7 +291,7 @@ fun TagGenerationControlScreen(
                 totalMedia = totalMedia,
                 withFace = withFace,
                 withLabels = withLabels,
-                withSemantic = withSemantic,
+                remainingPass3 = remainingPass3,
                 personCount = personCount,
                 namedPersonCount = namedPersonCount,
                 embeddingCount = embeddingCount,
@@ -1326,7 +1323,7 @@ private fun StageActionOption(
 private enum class TagStage { FACE, PEOPLE, CONTENT, QUALITY }
 
 private fun stagePercentText(progress: TagPassProgress): String =
-    if (progress.isEmpty) "—" else "${(progress.fraction * 100).roundToInt()}%"
+    if (progress.isEmpty) "—" else "${progress.percentRounded()}%"
 
 internal fun formatDuration(ms: Long): String {
     val seconds = ms / 1000
@@ -1393,7 +1390,7 @@ private fun StatsCard(
     totalMedia: Int,
     withFace: Int,
     withLabels: Int,
-    withSemantic: Int,
+    remainingPass3: Int,
     personCount: Int,
     namedPersonCount: Int,
     embeddingCount: Int,
@@ -1401,7 +1398,9 @@ private fun StatsCard(
 ) {
     // 设计稿 gallery/tag_control_v2「Library stats」：渐变大数字 + 语义覆盖率圆环 + 2×2 指标瓦片
     // （阶段进度条已移至 Stages 列表行内，不再重复展示）
-    val semanticPct = if (totalMedia > 0) withSemantic * 100 / totalMedia else 0
+    // 口径=内容标签 pass 完成率，与 stages 区块「内容标签」行同源（stats.remainingForPass3）
+    // 同舍入（percentRounded）——2026-09-30 澄清：不再用语义向量占比
+    val taggedPct = tagPassProgress(totalMedia, remainingPass3).percentRounded()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1464,12 +1463,12 @@ private fun StatsCard(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = stringResource(R.string.stats_hero_caption, semanticPct),
+                        text = stringResource(R.string.stats_hero_caption, taggedPct),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                StatsProgressRing(progress = semanticPct)
+                StatsProgressRing(progress = taggedPct)
             }
 
             // ── 2×2 指标瓦片（设计稿 tile 阵列：数值 + 标签，无图标） ──
@@ -1503,7 +1502,7 @@ private fun StatsCard(
     }
 }
 
-/** 72dp 进度圆环（设计稿 ringSvg）：surfaceVariant 底环 + 品牌实色前景弧 + 中心百分比。 */
+/** 72dp 进度圆环（设计稿 ringSvg）：surfaceVariant 底环 + 品牌实色前景弧 + 中心两行（百分比 + AI 打标微标签）。 */
 @Composable
 private fun StatsProgressRing(progress: Int) {
     val sweep = 360f * (progress.coerceIn(0, 100) / 100f)
@@ -1532,12 +1531,20 @@ private fun StatsProgressRing(progress: Int) {
                 )
             }
         }
-        Text(
-            text = "$progress%",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "$progress%",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.tag_stats_ring_label),
+                fontSize = 8.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
     }
 }
 
