@@ -545,6 +545,9 @@ class TagGenerationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        // 服务销毁兜底：progressJob 已取消，isScanning 唯一写者不再运行——
+        // 显式归零，防服务中途死亡后标志残留 true 误导底 bar 落点（2026-09-30）
+        isScanning.value = false
         progressJob?.cancel()
         batteryReceiver.let {
             try { unregisterReceiver(it) } catch (_: Exception) {}
