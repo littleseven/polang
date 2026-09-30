@@ -1391,7 +1391,8 @@
     <string name="report_issue_success">Enviado (#%1$d)</string>
     <string name="report_issue_error">Error al enviar: %1$s</string>
     <string name="report_issue_guest_not_allowed">Inicia sesión para informar de problemas</string>
-    <string name="stats_hero_caption">fotos · %1$d%% indexadas semánticamente</string>
+    <string name="stats_hero_caption">fotos · %1$d%% etiquetadas por IA</string>
+    <string name="tag_stats_ring_label">Etiquetado IA</string>
     <!-- Gallery i18n P0 -->
     <string name="ocr_char_count">%1$d caracteres</string>
     <string name="ocr_text_recognition">Reconocimiento de texto OCR</string>

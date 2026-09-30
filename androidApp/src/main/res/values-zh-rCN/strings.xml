@@ -1427,7 +1427,8 @@
     <string name="report_issue_success">已上报（#%1$d）</string>
     <string name="report_issue_error">上报失败：%1$s</string>
     <string name="report_issue_guest_not_allowed">请先登录账号再上报问题</string>
-    <string name="stats_hero_caption">张照片 · 语义索引已覆盖 %1$d%%</string>
+    <string name="stats_hero_caption">张照片 · AI 打标已覆盖 %1$d%%</string>
+    <string name="tag_stats_ring_label">AI 打标</string>
 
     <!-- Gallery i18n P0 -->
     <string name="ocr_char_count">%1$d 字</string>

@@ -1391,7 +1391,8 @@
     <string name="report_issue_success">Signalé (#%1$d)</string>
     <string name="report_issue_error">Échec du signalement : %1$s</string>
     <string name="report_issue_guest_not_allowed">Connectez-vous pour signaler des problèmes</string>
-    <string name="stats_hero_caption">photos · %1$d%% indexées sémantiquement</string>
+    <string name="stats_hero_caption">photos · %1$d%% annotées par IA</string>
+    <string name="tag_stats_ring_label">Annotées IA</string>
     <!-- Gallery i18n P0 -->
     <string name="ocr_char_count">%1$d caractères</string>
     <string name="ocr_text_recognition">Reconnaissance de texte OCR</string>

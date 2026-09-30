@@ -1436,7 +1436,8 @@
     <string name="report_issue_success">Reported (#%1$d)</string>
     <string name="report_issue_error">Report failed: %1$s</string>
     <string name="report_issue_guest_not_allowed">Please sign in to report issues</string>
-    <string name="stats_hero_caption">photos · %1$d%% semantically indexed</string>
+    <string name="stats_hero_caption">photos · %1$d%% AI-tagged</string>
+    <string name="tag_stats_ring_label">AI-tagged</string>
 
     <!-- Gallery i18n P0 -->
     <string name="ocr_char_count">%1$d chars</string>
