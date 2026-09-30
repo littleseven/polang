@@ -422,6 +422,10 @@ object QueryParser {
     fun extractKeywords(query: String, lang: AppLanguage = AppLanguage.CHINESE): List<String> {
         var text = removeTimeWords(query)
 
+        // 口语缓和词「找下/找一下/看下…」：动词+（一）+下 不是实体词，
+        // 残留会以 LIKE '%下%' 命中「下午」等标签，把人物查询错误收窄（真机回归 2026-09-30）
+        text = text.replace(Regex("""(找|看|搜|查|翻|拍|弄|整|来)(一)?下"""), " ")
+
         // 根据当前语言移除停用词（西语/法语回退英文停用词表）
         val stopWords = when (lang) {
             AppLanguage.ENGLISH, AppLanguage.SPANISH, AppLanguage.FRENCH -> ENGLISH_STOP_WORDS

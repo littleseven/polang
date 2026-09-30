@@ -282,4 +282,20 @@ class QueryParserTimeTest {
         assertTrue(QueryParser.isPeopleSearch("女儿和妈妈的合照"))
         assertFalse(QueryParser.isPeopleSearch("海边的日落"))
     }
+
+    @Test
+    fun `colloquial softener verb-xia is not extracted as content keyword`() {
+        // 口语缓和词「找下/找一下/看下」中的「下」不是实体词，
+        // 残留会以 LIKE '%下%' 命中「下午」等标签，把人物 27 张错误收窄到 3 张（真机回归 2026-09-30）
+        assertTrue(QueryParser.extractKeywords("找下我儿子的照片").none { it == "下" })
+        assertTrue(QueryParser.extractKeywords("找一下我儿子的照片").none { it == "下" })
+        assertTrue(QueryParser.extractKeywords("看下女儿的照片").none { it == "下" })
+    }
+
+    @Test
+    fun `softener removal keeps afternoon time word intact`() {
+        // 「下午」是时间语义，不能被缓和建议词清理误伤成「午」
+        val keywords = QueryParser.extractKeywords("下午的照片")
+        assertTrue(keywords.none { it == "午" })
+    }
 }
