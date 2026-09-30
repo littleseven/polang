@@ -26,17 +26,17 @@ tag_control:
     card: { background: surfaceContainer, corner_radius: 16 }
     stats_card:
       hero_number:
-        text: "<总照片数 %,d>"                      # 大数字=图库总数，品牌渐变前景
+        text: "<总照片数 %,d>"                      # 大数字=图库总数（千分位分组），34sp SemiBold，品牌渐变前景
         foreground: "brandGradient #1EA75B→#7CEFA8"
-        caption: "stats_hero_caption = %1$d%% AI-tagged（口径=内容标签 pass 完成率 tagPassProgress(totalMedia, remainingPass3)，与 stages 区块「内容标签」行同源同舍入；2026-09-30 弃语义向量占比口径）"
+        caption: "stats_hero_caption = photos · %1$d%% AI-tagged（口径=内容标签 pass 完成率，公式=round((total−remaining)/total×100)；total=0 时圆环示 0%、stages 行示 —；Android 侧 tagPassProgress(totalMedia, remainingPass3) 与 stages「内容标签」行同源同舍入；2026-09-30 弃语义向量占比口径）"
       progress_ring:
-        style: "实色 primary 弧（非渐变）；中心两行：百分比 13sp SemiBold + 微标签 tag_stats_ring_label（8sp onSurfaceVariant，AI 打标/AI-tagged）；尺寸对齐 ardot 帧 tag_control_v2"
+        style: "实色 primary 弧（非渐变）·72dp、stroke 6dp、12 点钟起点、圆头端点；中心两行：百分比 13sp SemiBold + 微标签 tag_stats_ring_label（8sp onSurfaceVariant，AI 打标/AI-tagged）；视觉基准 ardot 帧 tag_control_v2"
         track: surfaceVariant
       metric_tiles:                                # 2×2 无图标瓦片（v2 删图标）
         grid: "2×2"
         value: { size: 17, weight: semibold }
         label: { size: 11 }
-        values: "[Faces 数, People 数, Content tags 数, Quality scores 覆盖]"
+        values: "[tag_stats_with_face, tag_stats_embeddings, tag_stats_people, tag_stats_named]"
     removed: "底部阶段进度条（v1 有，v2 删）"
 
   # ── 区块 2：Scan ──
