@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.Executors
@@ -330,6 +331,7 @@ class TagGenerationService : Service() {
         progressJob = serviceScope.launch {
             var scoredSession: String? = null
             orch.progress.collectLatest { sp ->
+                if (!coroutineContext.isActive) return@collectLatest // onDestroy 已取消；禁止残留写复活 isScanning
                 sessionProgress.value = sp
                 isScanning.value = sp?.state in setOf(
                     ScanSessionState.RUNNING,
@@ -545,7 +547,7 @@ class TagGenerationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        // 服务销毁兜底：progressJob 已取消，isScanning 唯一写者不再运行——
+        // onDestroy 即将取消 progressJob（isScanning 唯一写者），取消后残留值无人刷新——
         // 显式归零，防服务中途死亡后标志残留 true 误导底 bar 落点（2026-09-30）
         isScanning.value = false
         progressJob?.cancel()
