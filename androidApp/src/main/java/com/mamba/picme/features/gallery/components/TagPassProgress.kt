@@ -1,5 +1,7 @@
 package com.mamba.picme.features.gallery.components
 
+import kotlin.math.roundToInt
+
 /**
  * 单个 Pass 阶段的进度快照。
  *
@@ -34,3 +36,9 @@ internal fun tagPassProgress(total: Int, remaining: Int): TagPassProgress {
         isEmpty = safeTotal == 0
     )
 }
+
+/**
+ * 阶段完成率整数百分比（0..100，四舍五入）。阶段行 trailing 与图库统计圆环
+ * 共用本函数（2026-09-30），杜绝同页两个口径/两种舍入的漂移。
+ */
+internal fun TagPassProgress.percentRounded(): Int = (fraction * 100).roundToInt()
