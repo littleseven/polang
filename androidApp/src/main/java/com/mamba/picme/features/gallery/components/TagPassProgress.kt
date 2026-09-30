@@ -41,4 +41,5 @@ internal fun tagPassProgress(total: Int, remaining: Int): TagPassProgress {
  * 阶段完成率整数百分比（0..100，四舍五入）。阶段行 trailing 与图库统计圆环
  * 共用本函数（2026-09-30），杜绝同页两个口径/两种舍入的漂移。
  */
-internal fun TagPassProgress.percentRounded(): Int = (fraction * 100).roundToInt()
+internal fun TagPassProgress.percentRounded(): Int =
+    if (total > 0) (processed.toDouble() / total * 100).roundToInt() else 0

@@ -59,6 +59,8 @@ class TagPassProgressTest {
         // 1000 张待处理 904 → 9.6% → 四舍五入 10（整数截断会给 9，同页圆环与阶段行将漂移）
         assertEquals(10, tagPassProgress(total = 1000, remaining = 904).percentRounded())
         assertEquals(80, tagPassProgress(total = 100, remaining = 20).percentRounded())
+        // 真中点 half-up：125/1000 = 12.5% → 13（0.125 二进制精确，Double 路径无漂移）
+        assertEquals(13, tagPassProgress(total = 1000, remaining = 875).percentRounded())
     }
 
     @Test
