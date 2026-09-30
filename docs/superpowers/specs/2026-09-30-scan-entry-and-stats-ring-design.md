@@ -62,7 +62,7 @@ val onBarSwitchPage: (Int) -> Unit = { index ->
 | zh-rCN | `张照片 · AI 打标已覆盖 %1$d%%` |
 | zh-rTW | `張照片 · AI 打標已覆蓋 %1$d%%` |
 | es | `fotos · %1$d%% etiquetadas por IA` |
-| fr | `photos · %1$d%% annotées par IA` |
+| fr | `photos · %1$d%% étiquetées par IA` |
 
 `tag_stats_ring_label`（新增，圆环微标签；终稿措辞实现评审时可微调）：
 
@@ -72,7 +72,7 @@ val onBarSwitchPage: (Int) -> Unit = { index ->
 | zh-rCN | `AI 打标` |
 | zh-rTW | `AI 打標` |
 | es | `Etiquetado IA` |
-| fr | `Annotées IA` |
+| fr | `Étiquetage IA` |
 
 ## 5. 文档同步（与代码同原子提交）
 

@@ -116,7 +116,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 `values-fr/strings.xml`:
 
 ```xml
-    <string name="stats_hero_caption">photos · %1$d%% annotées par IA</string>
+    <string name="stats_hero_caption">photos · %1$d%% étiquetées par IA</string>
 ```
 
 （替换各自文件中同名旧行：EN `semantically indexed` / zh-CN `语义索引已覆盖` / zh-TW `語義索引已覆蓋` / es `indexadas semánticamente` / fr `indexées sémantiquement`。）
@@ -150,7 +150,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 `values-fr/strings.xml`:
 
 ```xml
-    <string name="tag_stats_ring_label">Annotées IA</string>
+    <string name="tag_stats_ring_label">Étiquetage IA</string>
 ```
 
 - [ ] **Step 3: 校验五语键齐**
