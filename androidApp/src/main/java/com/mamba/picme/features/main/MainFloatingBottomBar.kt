@@ -21,7 +21,8 @@ import com.mamba.picme.features.common.components.FloatingBottomTabItem
  * 外部深链仍走 organizeTabRequest）。
  *
  * - 表驱动：icon + contentDescription + 页索引；选中项高亮且点击空操作
- * - 目标为整理页（[MAIN_PAGE_DEDUP]）时由调用方包装回调预选 ORGANIZE tab（见 MainPagerHost）
+ * - 目标为整理页（[MAIN_PAGE_DEDUP]）时由调用方包装回调处理 tab 落点——扫描进行中落
+ *   SCAN，否则保持上次选择（见 MainPagerHost）
  */
 @Composable
 fun MainFloatingBottomBar(

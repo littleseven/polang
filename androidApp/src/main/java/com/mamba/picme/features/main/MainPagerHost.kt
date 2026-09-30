@@ -32,6 +32,7 @@ import com.mamba.picme.features.person.PersonScreen
 import com.mamba.picme.features.person.PersonViewModel
 import com.mamba.picme.features.settings.SettingsViewModel
 import com.mamba.picme.navigation.Screen
+import com.mamba.picme.service.tag.TagGenerationService
 
 /** 主页面 Pager 页索引（线性，无循环回绕） */
 const val MAIN_PAGE_GALLERY = 0
@@ -100,10 +101,14 @@ fun MainPagerHost(
         }
     }
 
-    // 底 bar 页切换（2026-09-06 导航统一）：目标为整理页时预选 ORGANIZE tab
-    // （扫描不再是独立 bar 项，深链仍走 organizeTabRequest）
+    // 底 bar 页切换（2026-09-06 导航统一；2026-09-30 入口优化）：目标为整理页时不再
+    // 强制重置 tab——organizeTab 为 rememberSaveable，自然记住上次选择；扫描进行中
+    // （isScanning，暂停不算）智能落 SCAN tab——此刻点整理的高频意图是查进度。
+    // 深链仍走 organizeTabRequest
     val onBarSwitchPage: (Int) -> Unit = { index ->
-        if (index == MAIN_PAGE_DEDUP) organizeTab = OrganizeTab.ORGANIZE
+        if (index == MAIN_PAGE_DEDUP && TagGenerationService.isScanning.value) {
+            organizeTab = OrganizeTab.SCAN
+        }
         onSwitchPage(index)
     }
 
