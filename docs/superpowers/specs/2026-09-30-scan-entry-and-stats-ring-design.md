@@ -46,7 +46,7 @@ val onBarSwitchPage: (Int) -> Unit = { index ->
 
 ## 4. 变更 B：图库统计圆环（`TagGenerationControlScreen.kt` + 五语 strings）
 
-1. `StatsCard` 的 hero 圆环口径由 `withSemantic * 100 / totalMedia` 改为与阶段行**同一计算**：`tagPassProgress(totalMedia, remainingPass3).fraction` → 百分比（复用 `stagePercentText` 的舍入，杜绝同页 9% vs 10% 的舍入漂移；数据同源 `stats.remainingForPass3`，零新增查询）。
+1. `StatsCard` 的 hero 圆环口径由 `withSemantic * 100 / totalMedia` 改为与阶段行**同一计算**：`tagPassProgress(totalMedia, remainingPass3).percentRounded()`（实现期落地为新提取的共享扩展 `TagPassProgress.percentRounded()`——Double 精确路径 `(processed.toDouble() / total * 100).roundToInt()`，真中点四舍五入成立；阶段行 `stagePercentText` 与圆环共用它，杜绝同页 9% vs 10% 的舍入漂移；数据同源 `stats.remainingForPass3`，零新增查询）。
 2. `StatsCard` 签名：`withSemantic: Int` 参数替换为 `remainingPass3: Int`（hero 不再消费 embedding 数）。
 3. 圆环中心两行："9%"（13sp SemiBold）+ 下方「AI 打标」微标签（约 8sp，`onSurfaceVariant`）。
 4. 「人脸 Embedding」瓦片（`embeddingCount`）**保留不动**——术语问题另行处理，不混入本次。
