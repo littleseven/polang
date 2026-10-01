@@ -69,6 +69,7 @@ import com.mamba.picme.util.permission.BackgroundScanGuard
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * TAG 生成精细控制子页面
@@ -481,11 +482,21 @@ private fun HeroCard(
         model.isPaused -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> MaterialTheme.colorScheme.onPrimaryContainer
     }
-    // 口径立法：圆环百分比空闲=Pass3 库级、运行=LibraryCompletion，同公式同舍入
+    // 口径（2026-10-01 真机反馈修订）：空闲=全库 AI 打标完成率（LibraryCompletion/Pass3 同源）；
+    // 运行=圆环与轨道切「本轮会话进度」（第 x/y 张，肉眼可见走动——全库口径一轮只挪 <1% 等于冻住），
+    // 全库完成率降级为轨道下 caption 行，唯一百分比锚点保留。
     val taggedPct = library?.percentRounded()
         ?: tagPassProgress(totalMedia, remainingPass3).percentRounded()
     val trackFraction = library?.fraction
         ?: tagPassProgress(totalMedia, remainingPass3).fraction
+    val sessionFraction = model?.narrative?.takeIf { it.total > 0 }?.let { it.processed.toFloat() / it.total }
+    val sessionPct = sessionFraction?.let { fraction -> (fraction * 100).roundToInt() }
+    val ringProgress = sessionPct ?: taggedPct
+    val ringLabelRes = if (model != null && sessionPct != null) {
+        R.string.tag_ring_session_label
+    } else {
+        R.string.tag_stats_ring_label
+    }
     // 零失败终态回落空闲态时，剩余行换上次会话统计叙述
     val terminal = lastSession?.takeIf {
         it.state == ScanSessionState.COMPLETED || it.state == ScanSessionState.CANCELLED
@@ -577,7 +588,7 @@ private fun HeroCard(
                         )
                     }
                 }
-                StatsProgressRing(progress = taggedPct)
+                StatsProgressRing(progress = ringProgress, labelRes = ringLabelRes)
                 Icon(
                     Icons.Rounded.ChevronRight,
                     null,
@@ -596,7 +607,7 @@ private fun HeroCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(trackFraction)
+                        .fillMaxWidth(sessionFraction ?: trackFraction)
                         .height(6.dp)
                         .background(
                             if (model == null) {
@@ -605,6 +616,15 @@ private fun HeroCard(
                                 contentColor
                             }
                         )
+                )
+            }
+
+            // 运行态全库锚点行：唯一百分比口径仍在场（本轮进度接管圆环后由此行承载）
+            if (model != null && library != null && !model.isTerminalWithFailures) {
+                Text(
+                    text = stringResource(R.string.tag_scan_library_line, library.percentRounded()),
+                    fontSize = 11.sp,
+                    color = contentColor.copy(alpha = 0.75f)
                 )
             }
 
@@ -1443,7 +1463,7 @@ private fun CategoryChip(
 
 /** 72dp 进度圆环（设计稿 ringSvg）：surfaceVariant 底环 + primary 实色前景弧 + 中心两行（百分比 + AI 打标微标签）。 */
 @Composable
-private fun StatsProgressRing(progress: Int) {
+private fun StatsProgressRing(progress: Int, labelRes: Int = R.string.tag_stats_ring_label) {
     val sweep = 360f * (progress.coerceIn(0, 100) / 100f)
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val accentColor = MaterialTheme.colorScheme.primary
@@ -1478,7 +1498,7 @@ private fun StatsProgressRing(progress: Int) {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = stringResource(R.string.tag_stats_ring_label),
+                text = stringResource(labelRes),
                 fontSize = 8.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1

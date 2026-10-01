@@ -2974,8 +2974,8 @@
    "ardotId": "478:7"
   },
   "tag.stats.indexed.pct.running": {
-   "zh": "13%",
-   "en": "13%",
+   "zh": "76%",
+   "en": "76%",
    "status": "created",
    "ardotId": "478:9"
   },
@@ -2984,6 +2984,18 @@
    "en": "Tap a stage to view",
    "status": "created",
    "ardotId": "478:164"
+  },
+  "tag.ring.session.label": {
+   "zh": "本轮",
+   "en": "This run",
+   "status": "created",
+   "ardotId": "478:183"
+  },
+  "tag.scan.library.line": {
+   "zh": "全库已打标 12%",
+   "en": "Library 12% tagged",
+   "status": "created",
+   "ardotId": "478:184"
   }
  }
 }

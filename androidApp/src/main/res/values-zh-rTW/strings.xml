@@ -1429,6 +1429,7 @@
     <string name="report_issue_success">已上報（#%1$d）</string>
     <string name="report_issue_error">上報失敗：%1$s</string>
     <string name="report_issue_guest_not_allowed">請先登入帳號再上報問題</string>    <string name="tag_stats_ring_label">AI 打標</string>
+    <string name="tag_ring_session_label">本輪</string>
     <string name="tag_stats_coverage_label">AI 打標覆蓋</string>
     <string name="tag_stats_remaining_line">張照片 · 剩餘 %1$d 張待處理</string>
     <string name="tag_stages_hint_view">點按階段查看內容</string>

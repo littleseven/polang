@@ -36,8 +36,8 @@ gallery/tag_control_running,478:177,tabOrganize,整理,Organize,matched,org.titl
 gallery/tag_control_running,478:178,tabScan,扫描,Scan,matched,org.scan.label,bind,孪生;激活页签,Scan,478:178
 gallery/tag_control_running,478:98,scanStageTitle,正在识别人脸,Detecting faces,manual,tag.scan.now.face,bind,v3 新键(key tag_scan_now_face 具象);15sp,Detecting faces,478:98
 gallery/tag_control_running,478:99,narrative,"第 1,024/8,205 张 · 约 3 小时","Photo 1,024 of 8,205 · ~3h left",manual,tag.scan.narrative,bind,v3 新键(key tag_scan_narrative 具象),"Photo 1,024 of 8,205 · ~3h left",478:99
-gallery/tag_control_running,478:102,ringPct,13%,13%,manual,tag.stats.indexed.pct.running,bind,slot 虚构;运行态 mock,13%,478:102
-gallery/tag_control_running,478:103,ringLabel,AI 打标,AI-tagged,manual,tag.stats.ring.label,bind,孪生,AI-tagged,478:103
+gallery/tag_control_running,478:102,ringPct,76%,76%,manual,tag.stats.indexed.pct.running,v3.1 本轮口径 mock 76%(38/50);bind,slot 虚构;运行态 mock,76%,478:102
+gallery/tag_control_running,478:103,ringLabel,本轮,This run,manual,tag.ring.session.label,bind,v3.1 运行态圆环切本轮口径(2026-10-01),This run,478:103
 gallery/tag_control_running,478:112,btnPause,暂停,Pause,matched,pause,bind,r12 h48 surfaceContainerHigh(dedup 同款),Pause,478:112
 gallery/tag_control_running,478:114,btnCancel,取消,Cancel,matched,cancel,bind,幽灵钮(无底)onSurfaceVariant,Cancel,478:114
 gallery/tag_control_running,478:118,secStages,分阶段,Stages,matched,tag.pass.control.title,bind,孪生,Stages,478:118
@@ -54,3 +54,4 @@ gallery/tag_control_running,478:136,pct,35%,35%,manual,tag.pass.content.pct,bind
 gallery/tag_control_running,478:155,t,质量评分,Quality scores,matched,tag.pass.title.aesthetic,bind,孪生,Quality scores,478:155
 gallery/tag_control_running,478:156,st,美学与人脸画质,Aesthetic & face quality,matched,tag.pass.desc.aesthetic,bind,孪生,Aesthetic & face quality,478:156
 gallery/tag_control_running,478:140,pct,35%,35%,manual,tag.pass.aesthetic.pct,bind,孪生,35%,478:140
+gallery/tag_control_running,478:185,libraryLine,全库已打标 12%,Library 12% tagged,manual,tag.scan.library.line,bind,v3.1 全库锚点降 caption 行(唯一百分比口径保留),Library 12% tagged,478:185
