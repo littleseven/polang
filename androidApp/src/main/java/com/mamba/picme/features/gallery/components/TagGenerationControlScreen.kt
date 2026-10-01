@@ -183,9 +183,10 @@ fun TagGenerationControlScreen(
     var pendingStart by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     fun startScanWithGuard(startAction: () -> Unit) {
-        val issues = runCatching { BackgroundScanGuard.diagnose(context.applicationContext) }
+        // 先检查再提醒（2026-10-01）：只报未确认过的缺失项，全部确认过则静默直启
+        val issues = runCatching { BackgroundScanGuard.unacknowledgedIssues(context.applicationContext) }
             .getOrDefault(emptyList())
-        if (issues.isNotEmpty() && BackgroundScanGuard.shouldShowDialog(context.applicationContext)) {
+        if (issues.isNotEmpty()) {
             guardIssues = issues
             pendingStart = startAction
         } else {
@@ -231,7 +232,11 @@ fun TagGenerationControlScreen(
                 pending?.invoke()
             },
             onDontRemind = {
-                BackgroundScanGuard.doNotShowAgain(context.applicationContext)
+                // 按项确认：仅静默当前缺失项，未来新项/回归项仍会提醒
+                BackgroundScanGuard.acknowledgeIssues(
+                    context.applicationContext,
+                    guardIssues.map { issue -> issue.type }
+                )
                 guardIssues = emptyList()
                 pendingStart = null
             }

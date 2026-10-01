@@ -55,10 +55,10 @@ import com.mamba.picme.util.permission.BackgroundScanGuard
 fun BackgroundScanGuardBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val issues by produceState<List<BackgroundScanGuard.Issue>>(initialValue = emptyList(), context) {
-        value = runCatching { BackgroundScanGuard.diagnose(context.applicationContext) }
+        value = runCatching { BackgroundScanGuard.unacknowledgedIssues(context.applicationContext) }
             .getOrDefault(emptyList())
-            // MIUI/HyperOS 自启动无读取 API（恒报），不在常驻 Banner 显示——
-            // 配齐「电池白名单 + 通知」后 Banner 即消失；自启动仅在启动扫描弹窗引导一次
+            // 先检查再提醒（2026-10-01）：MIUI 自启动无读取 API（恒报）不入常驻 Banner；
+            // 电池/通知按系统事实 + 用户按项确认（确认过即隐，回归缺失自动复现）
             .filter { it.type != BackgroundScanGuard.IssueType.MIUI_AUTOSTART }
     }
     if (issues.isEmpty()) return
@@ -124,9 +124,17 @@ fun BackgroundScanGuardDialog(
     val allResolved = issues.all { issue ->
         BackgroundScanGuard.isRowResolved(issue.type, stillMissing.contains(issue.type), autostartVisited)
     }
-    // 全项处理完自动继续扫描（兑现用户点「开始扫描」的原始意图）
+    // 全项处理完自动继续扫描（兑现用户点「开始扫描」的原始意图）；
+    // 同时按项落确认——MIUI 自启动（按「访问过确认页」）从此不再每次弹；
+    // 电池/通知此时已恢复 OK，其确认会被惰性清理自动撤销，未来回归缺失仍会提醒
     LaunchedEffect(allResolved) {
-        if (allResolved) onContinue()
+        if (allResolved) {
+            BackgroundScanGuard.acknowledgeIssues(
+                context.applicationContext,
+                issues.map { issue -> issue.type }
+            )
+            onContinue()
+        }
     }
 
     AlertDialog(

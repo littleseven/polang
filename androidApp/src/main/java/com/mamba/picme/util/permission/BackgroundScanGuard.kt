@@ -25,7 +25,12 @@ object BackgroundScanGuard {
 
     private const val TAG = "BackgroundScanGuard"
     private const val PREFS_NAME = "picme_bg_scan_guard"
+
+    /** 旧核弹开关（已设置者继续全局静默；新交互改用按项 ack，不再写此键） */
     private const val KEY_DONT_SHOW = "dont_show_dialog"
+
+    /** 按项确认前缀：ack_BATTERY_OPTIMIZATION / ack_NOTIFICATIONS / ack_MIUI_AUTOSTART */
+    private const val KEY_ACK_PREFIX = "ack_"
 
     enum class IssueType { BATTERY_OPTIMIZATION, NOTIFICATIONS, MIUI_AUTOSTART }
 
@@ -72,15 +77,49 @@ object BackgroundScanGuard {
         if (type == IssueType.MIUI_AUTOSTART) visited else !stillMissing
 
     /**
-     * 是否应展示引导弹窗（用户未选「不再提醒」时为 true）。
+     * 仍需提醒的缺失项（「先检查再提醒」口径，2026-10-01 用户反馈驱动）：
+     * - 裸事实 [diagnose] 扣除用户已确认过的项 → 全部确认过则静默（不再每次弹）；
+     * - 惰性清理：已恢复 OK 的项顺手清掉确认标记——未来回归缺失（如通知被再关）会重新提醒；
+     * - MIUI_AUTOSTART 无读取 API 恒缺失：确认一次即静默。
      */
-    fun shouldShowDialog(context: Context): Boolean {
+    fun unacknowledgedIssues(context: Context): List<Issue> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return !prefs.getBoolean(KEY_DONT_SHOW, false)
+        if (prefs.getBoolean(KEY_DONT_SHOW, false)) return emptyList()
+        val missing = diagnose(context).map { it.type }
+        val acked = IssueType.entries.filterTo(HashSet()) { prefs.getBoolean(KEY_ACK_PREFIX + it.name, false) }
+        val okTypes = IssueType.entries.filterTo(HashSet()) { it !in missing }
+        val staleAcks = acked intersect okTypes
+        if (staleAcks.isNotEmpty()) {
+            prefs.edit().apply { staleAcks.forEach { remove(KEY_ACK_PREFIX + it.name) } }.apply()
+            acked.removeAll(staleAcks)
+        }
+        return filterUnacknowledged(missing, acked).map { it.toIssue() }
     }
 
     /**
-     * 标记用户选择「不再提醒」。
+     * 纯逻辑：缺失项扣除已确认项（保持原序）。抽出便于 JVM 单测。
+     */
+    fun filterUnacknowledged(missing: List<IssueType>, acknowledged: Set<IssueType>): List<IssueType> =
+        missing.filterNot { it in acknowledged }
+
+    /**
+     * 用户确认「这些项不用再提醒」——弹窗「不再提醒」与全项处理完自动继续时按当前项集调用。
+     */
+    fun acknowledgeIssues(context: Context, types: Collection<IssueType>) {
+        if (types.isEmpty()) return
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .apply { types.forEach { putBoolean(KEY_ACK_PREFIX + it.name, true) } }
+            .apply()
+    }
+
+    /**
+     * 是否应展示引导弹窗：存在未确认缺失项才弹（核弹开关优先全局静默）。
+     */
+    fun shouldShowDialog(context: Context): Boolean = unacknowledgedIssues(context).isNotEmpty()
+
+    /**
+     * 旧「不再提醒」核弹开关（全局静默，含未来新项）。保留兼容已设置用户；新交互走 [acknowledgeIssues]。
      */
     fun doNotShowAgain(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

@@ -3,6 +3,7 @@ package com.mamba.picme.util.permission
 import com.mamba.picme.util.permission.BackgroundScanGuard.IssueType
 import com.mamba.picme.util.permission.BackgroundScanGuard.evaluate
 import com.mamba.picme.util.permission.BackgroundScanGuard.isRowResolved
+import com.mamba.picme.util.permission.BackgroundScanGuard.filterUnacknowledged
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -77,5 +78,46 @@ class BackgroundScanGuardTest {
         // MIUI 无读取 API：点进过确认页即视为已处理，与系统事实（stillMissing 恒 true）无关
         assertFalse(isRowResolved(IssueType.MIUI_AUTOSTART, stillMissing = true, visited = false))
         assertTrue(isRowResolved(IssueType.MIUI_AUTOSTART, stillMissing = true, visited = true))
+    }
+
+    // ── 先检查再提醒（2026-10-01）：缺失项扣除已确认项 ──
+
+    @Test
+    fun `no ack yields all missing issues`() {
+        val missing = listOf(IssueType.BATTERY_OPTIMIZATION, IssueType.MIUI_AUTOSTART)
+        assertEquals(missing, filterUnacknowledged(missing, acknowledged = emptySet()))
+    }
+
+    @Test
+    fun `acked issues are removed keeping order`() {
+        val missing = listOf(
+            IssueType.BATTERY_OPTIMIZATION,
+            IssueType.NOTIFICATIONS,
+            IssueType.MIUI_AUTOSTART
+        )
+        assertEquals(
+            listOf(IssueType.MIUI_AUTOSTART),
+            filterUnacknowledged(missing, acknowledged = setOf(IssueType.BATTERY_OPTIMIZATION, IssueType.NOTIFICATIONS))
+        )
+    }
+
+    @Test
+    fun `all acked yields empty list - no reminder`() {
+        // 用户已全部确认过 → 静默（不再每次提醒）
+        val missing = listOf(IssueType.BATTERY_OPTIMIZATION, IssueType.MIUI_AUTOSTART)
+        assertEquals(
+            emptyList<IssueType>(),
+            filterUnacknowledged(missing, acknowledged = missing.toSet())
+        )
+    }
+
+    @Test
+    fun `ack of resolved type is ignored for still-missing regression`() {
+        // 已确认项若回归缺失（ack 已被惰性清理），重新出现在提醒列表
+        val missing = listOf(IssueType.NOTIFICATIONS)
+        assertEquals(
+            listOf(IssueType.NOTIFICATIONS),
+            filterUnacknowledged(missing, acknowledged = emptySet())
+        )
     }
 }
