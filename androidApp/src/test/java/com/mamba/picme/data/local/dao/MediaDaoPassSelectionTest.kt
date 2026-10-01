@@ -74,7 +74,7 @@ class MediaDaoPassSelectionTest {
     fun `incremental scan projection excludes videos`() = runTest {
         val (photoId, _) = seed()
 
-        val candidates = dao.getMediaForIncrementalScanNewestProjection(before = Long.MAX_VALUE, limit = 10)
+        val candidates = dao.getMediaForIncrementalScanNewestProjection(before = Long.MAX_VALUE, limit = 10, passPattern = null)
 
         assertEquals(listOf(photoId), candidates.map { it.id })
     }
@@ -98,5 +98,64 @@ class MediaDaoPassSelectionTest {
 
         // 照片已处理，视频本就排除 → 计数 0（回归保证：不会因视频把计数卡住）。
         assertEquals(0, dao.getMediaWithoutFaceRoiCount())
+    }
+    // ── 2026-10-01 增量管线饿死回归（真库实锤：newest-100 窗口被已完扫 {"1","3"} 占满）──
+
+    private suspend fun seedStarvedLibrary(): Pair<List<Long>, List<Long>> {
+        // 5 张「最新但已完扫 {"1","3"}」+ 2 张「更老但从未扫描」
+        val covered = (1..5).map { i ->
+            dao.insertMedia(
+                MediaEntity(
+                    uri = "content://covered/$i", type = MediaType.PHOTO,
+                    captureDate = 10_000L + i, fileName = "c$i.jpg",
+                    lastTagScanPasses = "{\"1\":1,\"3\":1}", lastTagScanAt = 1L
+                )
+            )
+        }
+        val old = (1..2).map { i ->
+            dao.insertMedia(
+                MediaEntity(
+                    uri = "content://old/$i", type = MediaType.PHOTO,
+                    captureDate = 100L + i, fileName = "o$i.jpg"
+                )
+            )
+        }
+        return covered to old
+    }
+
+    @Test
+    fun `null passPattern keeps legacy window behavior`() = runTest {
+        val (coveredIds, _) = seedStarvedLibrary()
+        // 无 pattern：newest 窗口按旧行为返回已完扫媒体（内存过滤前的原始候选）
+        val candidates = dao.getMediaForIncrementalScanNewestProjection(
+            before = Long.MAX_VALUE, limit = 3, passPattern = null
+        )
+        assertEquals(coveredIds.takeLast(3).reversed(), candidates.map { it.id })
+    }
+
+    @Test
+    fun `passPattern pushes covered media out and rescues old unscanned`() = runTest {
+        val (_, oldIds) = seedStarvedLibrary()
+        // Pass3 相位（pattern %"3"%）：已完扫 5 张被剔除出窗口，2 张老未扫描得救
+        val candidates = dao.getMediaForIncrementalScanNewestProjection(
+            before = Long.MAX_VALUE, limit = 3, passPattern = "%\"3\"%"
+        )
+        assertEquals(oldIds.reversed(), candidates.map { it.id })
+    }
+
+    @Test
+    fun `passPattern keeps recently scanned excluded`() = runTest {
+        val (_, oldIds) = seedStarvedLibrary()
+        // 最近扫描（lastTagScanAt=now）即使缺 pass 也被 4h 窗口挡住——防重扫节流不回退
+        dao.insertMedia(
+            MediaEntity(
+                uri = "content://fresh/1", type = MediaType.PHOTO,
+                captureDate = 99_999L, fileName = "f1.jpg", lastTagScanAt = Long.MAX_VALUE
+            )
+        )
+        val candidates = dao.getMediaForIncrementalScanNewestProjection(
+            before = Long.MAX_VALUE - 14400000, limit = 10, passPattern = "%\"1\"%"
+        )
+        assertEquals(oldIds.reversed(), candidates.map { it.id })
     }
 }

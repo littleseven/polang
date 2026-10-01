@@ -542,34 +542,51 @@ interface MediaDao {
         val lastTagScanPasses: String?
     )
 
-    /** 按拍摄时间降序获取候选媒体 ID 与已扫描 Passes（newest-first） */
+    /**
+     * 按拍摄时间降序获取候选媒体 ID 与已扫描 Passes（newest-first）。
+     *
+     * [passPattern] 非空时仅返回 lastTagScanPasses 不含该 pass 键的候选（如 `%"3"%`）：
+     * 覆盖过滤必须下推 SQL——否则 newest 窗口（LIMIT maxBatchSize×2）被已完扫媒体占满时
+     * （2026-10-01 真库实锤：窗口 100/100 全 {"1","3"}），更老的未打标媒体永远进不了窗口，
+     * 增量管线饿死（「没有需要增量扫描的媒体」× N，库覆盖率冻结）。
+     */
     @Query(
         """
         SELECT id, lastTagScanPasses FROM media_assets
         WHERE (lastTagScanAt IS NULL OR lastTagScanAt < :before)
           AND type = 'PHOTO'
+          AND ( :passPattern IS NULL
+                OR lastTagScanPasses IS NULL
+                OR lastTagScanPasses = ''
+                OR lastTagScanPasses NOT LIKE :passPattern )
         ORDER BY captureDate DESC, lastTagScanAt ASC
         LIMIT :limit
         """
     )
     suspend fun getMediaForIncrementalScanNewestProjection(
         before: Long,
-        limit: Int
+        limit: Int,
+        passPattern: String?
     ): List<TagScanCandidateProjection>
 
-    /** 按拍摄时间升序获取候选媒体 ID 与已扫描 Passes（oldest-first） */
+    /** 按拍摄时间升序获取候选媒体 ID 与已扫描 Passes（oldest-first）；[passPattern] 语义同 Newest 版 */
     @Query(
         """
         SELECT id, lastTagScanPasses FROM media_assets
         WHERE (lastTagScanAt IS NULL OR lastTagScanAt < :before)
           AND type = 'PHOTO'
+          AND ( :passPattern IS NULL
+                OR lastTagScanPasses IS NULL
+                OR lastTagScanPasses = ''
+                OR lastTagScanPasses NOT LIKE :passPattern )
         ORDER BY captureDate ASC, lastTagScanAt ASC
         LIMIT :limit
         """
     )
     suspend fun getMediaForIncrementalScanOldestProjection(
         before: Long,
-        limit: Int
+        limit: Int,
+        passPattern: String?
     ): List<TagScanCandidateProjection>
 
     /** 获取指定 ID 中最近扫描时间早于阈值的照片 */

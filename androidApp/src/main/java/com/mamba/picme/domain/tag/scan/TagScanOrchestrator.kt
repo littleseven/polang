@@ -247,9 +247,13 @@ class TagScanOrchestrator(
 
         // 按排序策略从数据库拉取轻量候选（仅 id + lastTagScanPasses），
         // 避免一次性加载 faceRoiResult/semanticEmbedding 等大字段到 Java Heap。
+        // 覆盖过滤下推 SQL（单 pass 相位）：窗口先剔除已完扫再取 newest——否则窗口被
+        // 已完扫媒体占满时老媒体永远进不来（饿死，见 MediaDao passPattern 注释）；
+        // 多 pass 组合（手动）无单一 pattern，走下方内存 isPassesCovered 兜底。
+        val sqlPassPattern = requestedPassNumbers.singleOrNull()?.let { pass -> "%\"$pass\"%" }
         val projections = when (policy.order) {
-            QueueOrder.OLDEST_FIRST -> db.mediaDao().getMediaForIncrementalScanOldestProjection(before, policy.maxBatchSize * 2)
-            QueueOrder.NEWEST_FIRST -> db.mediaDao().getMediaForIncrementalScanNewestProjection(before, policy.maxBatchSize * 2)
+            QueueOrder.OLDEST_FIRST -> db.mediaDao().getMediaForIncrementalScanOldestProjection(before, policy.maxBatchSize * 2, sqlPassPattern)
+            QueueOrder.NEWEST_FIRST -> db.mediaDao().getMediaForIncrementalScanNewestProjection(before, policy.maxBatchSize * 2, sqlPassPattern)
         }
         val filteredIds = projections
             .filter { !isPassesCovered(it.lastTagScanPasses, requestedPassNumbers) }
