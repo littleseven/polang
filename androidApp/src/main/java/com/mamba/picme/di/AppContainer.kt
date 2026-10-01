@@ -324,6 +324,9 @@ interface AppContainer {
     val tagGenerationLastMessage: kotlinx.coroutines.flow.StateFlow<String?>
     /** TAG 生成会话级增强进度 */
     val tagGenerationSessionProgress: kotlinx.coroutines.flow.StateFlow<TagScanSessionProgress?>
+
+    /** 库级 AI 打标完成率（口径立法唯一百分比数据源；无活跃会话时为 null） */
+    val tagGenerationLibraryCompletion: kotlinx.coroutines.flow.StateFlow<com.mamba.picme.domain.tag.scan.LibraryCompletion?>
     /** 跨维度查询构建器（LLM 意图 → Room 查询） */
     val queryBuilder: QueryBuilder
     /** 双级缩略图缓存（LRU 内存 + 磁盘） */
@@ -561,6 +564,10 @@ class AppContainerImpl(
     /** TAG 生成会话级增强进度 */
     override val tagGenerationSessionProgress: kotlinx.coroutines.flow.StateFlow<TagScanSessionProgress?>
         get() = TagGenerationService.sessionProgress
+
+    /** 库级 AI 打标完成率（2026-10-01 口径立法：全 app 唯一对外百分比数据源） */
+    override val tagGenerationLibraryCompletion: kotlinx.coroutines.flow.StateFlow<com.mamba.picme.domain.tag.scan.LibraryCompletion?>
+        get() = TagGenerationService.libraryCompletion
 
     /**
      * 创建 MediaStoreObserver。
