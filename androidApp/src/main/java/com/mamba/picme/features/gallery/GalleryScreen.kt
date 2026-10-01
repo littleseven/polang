@@ -290,12 +290,6 @@ fun GalleryScreen(
     if (guardIssues.isNotEmpty()) {
         BackgroundScanGuardDialog(
             issues = guardIssues,
-            onGoSettings = {
-                val first = guardIssues.first()
-                guardIssues = emptyList()
-                pendingStart = null
-                first.openFix(context)
-            },
             onContinue = {
                 val pending = pendingStart
                 guardIssues = emptyList()

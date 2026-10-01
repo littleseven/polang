@@ -789,14 +789,16 @@
 
     <!-- 后台扫描保活引导 -->
     <string name="bg_scan_guard_dialog_title">开启后台扫描</string>
-    <string name="bg_scan_guard_dialog_message">为了让破浪相册在后台持续扫描,请开启以下项,否则系统可能在一段时间后冻结扫描任务。</string>
-    <string name="bg_scan_guard_action_settings">去设置</string>
+    <string name="bg_scan_guard_dialog_message">逐项点击前往对应设置页，全部完成后将自动开始扫描。未开启时，应用退到后台或息屏后扫描可能被系统冻结。</string>
     <string name="bg_scan_guard_action_continue">仍然扫描</string>
     <string name="bg_scan_guard_action_dont_remind">不再提醒</string>
     <string name="bg_scan_guard_banner_text">后台保活未开启 —— app 退到后台后扫描可能被系统暂停。</string>
     <string name="bg_scan_guard_issue_battery">忽略电池优化</string>
+    <string name="bg_scan_guard_hint_battery">在系统弹窗中点「允许」；部分机型需在 应用信息 → 省电策略 中选「无限制」。</string>
     <string name="bg_scan_guard_issue_notifications">允许通知</string>
+    <string name="bg_scan_guard_hint_notifications">打开破浪相册的通知开关。</string>
     <string name="bg_scan_guard_issue_miui_autostart">MIUI 自启动</string>
+    <string name="bg_scan_guard_hint_miui_autostart">在列表中找到破浪相册，打开它的自启动开关。</string>
 
     <!-- 智能相册索引 -->
     <string name="gallery_group_tag">按标签</string>

@@ -837,14 +837,16 @@
 
     <!-- Background scan keep-alive guard -->
     <string name="bg_scan_guard_dialog_title">Enable Background Scan</string>
-    <string name="bg_scan_guard_dialog_message">To keep scanning when PoLang is in the background, please enable the following. Otherwise the system may freeze scanning after a while.</string>
-    <string name="bg_scan_guard_action_settings">Go to Settings</string>
+    <string name="bg_scan_guard_dialog_message">Tap each item to open its setting. Scanning starts automatically once all items are done. Otherwise the system may freeze the scan when the app is backgrounded or the screen is off.</string>
     <string name="bg_scan_guard_action_continue">Scan Anyway</string>
     <string name="bg_scan_guard_action_dont_remind">Don\'t Remind</string>
     <string name="bg_scan_guard_banner_text">Background keep-alive is off — scanning may pause when the app is backgrounded.</string>
     <string name="bg_scan_guard_issue_battery">Ignore battery optimizations</string>
+    <string name="bg_scan_guard_hint_battery">Tap Allow in the system dialog. On some devices: App info → Battery saver → No restrictions.</string>
     <string name="bg_scan_guard_issue_notifications">Allow notifications</string>
+    <string name="bg_scan_guard_hint_notifications">Turn on the notifications toggle for PoLang.</string>
     <string name="bg_scan_guard_issue_miui_autostart">MIUI auto-start</string>
+    <string name="bg_scan_guard_hint_miui_autostart">Find PoLang in the list and turn on its auto-start switch.</string>
 
     <!-- Smart Gallery Index -->
     <string name="gallery_group_tag">By Tag</string>

@@ -789,14 +789,16 @@
 
     <!-- 背景掃描保活引導 -->
     <string name="bg_scan_guard_dialog_title">開啟背景掃描</string>
-    <string name="bg_scan_guard_dialog_message">為了讓破浪相冊在背景持續掃描,請開啟以下項,否則系統可能在一段時間後凍結掃描任務。</string>
-    <string name="bg_scan_guard_action_settings">前往設定</string>
+    <string name="bg_scan_guard_dialog_message">逐項點擊前往對應設定頁，全部完成後將自動開始掃描。未開啟時，應用退到背景或息屏後掃描可能被系統凍結。</string>
     <string name="bg_scan_guard_action_continue">仍要掃描</string>
     <string name="bg_scan_guard_action_dont_remind">不再提醒</string>
     <string name="bg_scan_guard_banner_text">背景保活未開啟 —— app 退到背景後掃描可能被系統暫停。</string>
     <string name="bg_scan_guard_issue_battery">忽略電池優化</string>
+    <string name="bg_scan_guard_hint_battery">在系統彈窗中點「允許」；部分機型需在 應用資訊 → 省電策略 中選「無限制」。</string>
     <string name="bg_scan_guard_issue_notifications">允許通知</string>
+    <string name="bg_scan_guard_hint_notifications">打開破浪相簿的通知開關。</string>
     <string name="bg_scan_guard_issue_miui_autostart">MIUI 自啟動</string>
+    <string name="bg_scan_guard_hint_miui_autostart">在列表中找到破浪相簿，打開它的自啟動開關。</string>
 
     <!-- 智慧型相簿索引 -->
     <string name="gallery_group_tag">按標籤</string>

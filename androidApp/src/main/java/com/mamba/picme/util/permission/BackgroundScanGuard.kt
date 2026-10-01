@@ -33,6 +33,8 @@ object BackgroundScanGuard {
         val type: IssueType,
         /** 用于在弹窗 / 提示条中展示该项名称 */
         val titleRes: Int,
+        /** 目标设置页上的具体操作指引（弹窗行副标题） */
+        val hintRes: Int,
         /** 点击该项后跳转的修复动作 */
         val openFix: (Context) -> Unit
     )
@@ -62,6 +64,14 @@ object BackgroundScanGuard {
     }
 
     /**
+     * 纯逻辑：弹窗 checklist 单行是否已处理（ON_RESUME 复查打勾依据）。
+     * 电池/通知按系统事实（[stillMissing] = 最新 diagnose 仍缺失）；MIUI 自启动无读取 API，
+     * 按用户是否已点击进入过确认页（会话级 [visited]）。
+     */
+    fun isRowResolved(type: IssueType, stillMissing: Boolean, visited: Boolean): Boolean =
+        if (type == IssueType.MIUI_AUTOSTART) visited else !stillMissing
+
+    /**
      * 是否应展示引导弹窗（用户未选「不再提醒」时为 true）。
      */
     fun shouldShowDialog(context: Context): Boolean {
@@ -83,16 +93,19 @@ object BackgroundScanGuard {
         IssueType.BATTERY_OPTIMIZATION -> Issue(
             type = this,
             titleRes = R.string.bg_scan_guard_issue_battery,
+            hintRes = R.string.bg_scan_guard_hint_battery,
             openFix = { ctx -> BatteryOptimizationUtils.requestIgnoreBatteryOptimizations(ctx) }
         )
         IssueType.NOTIFICATIONS -> Issue(
             type = this,
             titleRes = R.string.bg_scan_guard_issue_notifications,
+            hintRes = R.string.bg_scan_guard_hint_notifications,
             openFix = { ctx -> openNotificationSettings(ctx) }
         )
         IssueType.MIUI_AUTOSTART -> Issue(
             type = this,
             titleRes = R.string.bg_scan_guard_issue_miui_autostart,
+            hintRes = R.string.bg_scan_guard_hint_miui_autostart,
             openFix = { ctx -> MiuiPermissionUtils.openMiuiAutoStart(ctx) }
         )
     }

@@ -808,14 +808,16 @@
     <string name="settings_miui_action_open">Abrir</string>
     <!-- Background scan keep-alive guard -->
     <string name="bg_scan_guard_dialog_title">Activar el escaneo en segundo plano</string>
-    <string name="bg_scan_guard_dialog_message">Para seguir escaneando cuando PoLang esté en segundo plano, activa lo siguiente. Si no, el sistema puede detener el escaneo pasado un tiempo.</string>
-    <string name="bg_scan_guard_action_settings">Ir a ajustes</string>
+    <string name="bg_scan_guard_dialog_message">Toca cada elemento para abrir su ajuste. El escaneo comenzará automáticamente al completarlos todos. Si no, el sistema puede congelar el escaneo cuando la app esté en segundo plano o con la pantalla apagada.</string>
     <string name="bg_scan_guard_action_continue">Escanear igualmente</string>
     <string name="bg_scan_guard_action_dont_remind">No recordar más</string>
     <string name="bg_scan_guard_banner_text">La permanencia en segundo plano está desactivada; el escaneo puede pausarse cuando la app está en segundo plano.</string>
     <string name="bg_scan_guard_issue_battery">Ignorar optimizaciones de batería</string>
+    <string name="bg_scan_guard_hint_battery">Toca Permitir en el diálogo del sistema. En algunos modelos: Información de la app → Ahorro de batería → Sin restricciones.</string>
     <string name="bg_scan_guard_issue_notifications">Permitir notificaciones</string>
+    <string name="bg_scan_guard_hint_notifications">Activa el interruptor de notificaciones de PoLang.</string>
     <string name="bg_scan_guard_issue_miui_autostart">Inicio automático de MIUI</string>
+    <string name="bg_scan_guard_hint_miui_autostart">Busca PoLang en la lista y activa su interruptor de inicio automático.</string>
     <!-- Smart Gallery Index -->
     <string name="gallery_group_tag">Por etiqueta</string>
     <string name="gallery_group_location">Ubicación</string>

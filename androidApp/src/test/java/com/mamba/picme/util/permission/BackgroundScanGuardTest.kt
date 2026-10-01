@@ -2,7 +2,10 @@ package com.mamba.picme.util.permission
 
 import com.mamba.picme.util.permission.BackgroundScanGuard.IssueType
 import com.mamba.picme.util.permission.BackgroundScanGuard.evaluate
+import com.mamba.picme.util.permission.BackgroundScanGuard.isRowResolved
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackgroundScanGuardTest {
@@ -52,5 +55,27 @@ class BackgroundScanGuardTest {
         assertEquals(IssueType.BATTERY_OPTIMIZATION, result[0])
         assertEquals(IssueType.NOTIFICATIONS, result[1])
         assertEquals(IssueType.MIUI_AUTOSTART, result[2])
+    }
+
+    // ── 弹窗 checklist 行状态（ON_RESUME 复查打勾口径）──
+
+    @Test
+    fun `battery and notification rows resolve by system fact`() {
+        assertFalse(isRowResolved(IssueType.BATTERY_OPTIMIZATION, stillMissing = true, visited = false))
+        assertTrue(isRowResolved(IssueType.BATTERY_OPTIMIZATION, stillMissing = false, visited = false))
+        assertTrue(isRowResolved(IssueType.NOTIFICATIONS, stillMissing = false, visited = false))
+    }
+
+    @Test
+    fun `notification still missing stays unresolved regardless of visited`() {
+        // visited 只对 MIUI 行有意义；通知行仍按系统事实判定
+        assertFalse(isRowResolved(IssueType.NOTIFICATIONS, stillMissing = true, visited = true))
+    }
+
+    @Test
+    fun `miui autostart row resolves only by visiting confirmation page`() {
+        // MIUI 无读取 API：点进过确认页即视为已处理，与系统事实（stillMissing 恒 true）无关
+        assertFalse(isRowResolved(IssueType.MIUI_AUTOSTART, stillMissing = true, visited = false))
+        assertTrue(isRowResolved(IssueType.MIUI_AUTOSTART, stillMissing = true, visited = true))
     }
 }
