@@ -4,8 +4,9 @@ gallery/tag_control_en,172:37,secLabelStats,图库,Library,matched,tag.section.l
 gallery/tag_control_en,172:47,t,图库统计,Library stats,matched,tag.stats.title,bind,ledger 复用 tag.stats.title,Library stats,172:47
 gallery/tag_control_en,172:49,entry,查看标签,View tags,manual,tag.stats.view.tags,bind,slot 虚构 app 无此键,View tags,172:49
 gallery/tag_control_en,172:63,bigNum,"12,593","12,593",manual,tag.stats.total.value,bind,slot 虚构数字;no-anchor noop,"12,593",172:63
-gallery/tag_control_en,172:64,heroCap,张照片 · 语义索引已覆盖 98%,photos · 98% semantically indexed,manual,tag.stats.total.caption,bind,key stats_hero_caption 具象（photos · %1$d%% semantically indexed/张照片 · 语义索引已覆盖 %1$d%%）,photos · 98% semantically indexed,172:64
+gallery/tag_control_en,172:64,heroCap,张照片 · AI 打标已覆盖 98%,photos · 98% AI-tagged,manual,tag.stats.total.caption,bind,key stats_hero_caption 具象（photos · %1$d%% AI-tagged/张照片 · AI 打标已覆盖 %1$d%%; 2026-10-01 口径改 AI 打标）,photos · 98% AI-tagged,172:64
 gallery/tag_control_en,172:65,ringPct,98%,98%,manual,tag.stats.indexed.pct,bind,slot 虚构;no-anchor noop,98%,172:65
+gallery/tag_control_en,478:2,ringLabel,AI 打标,AI-tagged,manual,tag.stats.ring.label,bind,key tag_stats_ring_label 具象（AI-tagged/AI 打标/AI 打標; 2026-10-01 新增圆环中心微标签）,AI-tagged,478:2
 gallery/tag_control_en,172:74,v,"3,208","3,208",manual,tag.stats.with.face.value,bind,slot 虚构数字;no-anchor noop,"3,208",172:74
 gallery/tag_control_en,172:75,l,含人脸照片,With faces,matched,tag.stats.with.face,bind,ledger 复用 tag.stats.with.face,With faces,172:75
 gallery/tag_control_en,172:76,v,"3,207","3,207",manual,tag.stats.embeddings.value,bind,slot 虚构数字;no-anchor noop,"3,207",172:76

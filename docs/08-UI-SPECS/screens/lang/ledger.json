@@ -154,8 +154,8 @@
    "ardotId": "182:159"
   },
   "stats.hero.caption": {
-   "zh": "张照片 · 语义索引已覆盖 98%",
-   "en": "photos · 98% semantically indexed",
+   "zh": "张照片 · AI 打标已覆盖 98%",
+   "en": "photos · 98% AI-tagged",
    "status": "created",
    "ardotId": "182:160"
   },
@@ -1718,8 +1718,8 @@
    "ardotId": "184:66"
   },
   "tag.stats.total.caption": {
-   "zh": "张照片 · 语义索引已覆盖 98%",
-   "en": "photos · 98% semantically indexed",
+   "zh": "张照片 · AI 打标已覆盖 98%",
+   "en": "photos · 98% AI-tagged",
    "status": "created",
    "ardotId": "184:67",
    "key": "stats_hero_caption"
@@ -1729,6 +1729,13 @@
    "en": "98%",
    "status": "created",
    "ardotId": "184:68"
+  },
+  "tag.stats.ring.label": {
+   "zh": "AI 打标",
+   "en": "AI-tagged",
+   "status": "created",
+   "ardotId": "478:1",
+   "key": "tag_stats_ring_label"
   },
   "tag.stats.with.face.value": {
    "zh": "3,208",
