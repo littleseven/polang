@@ -1439,6 +1439,7 @@
     <string name="report_issue_error">Report failed: %1$s</string>
     <string name="report_issue_guest_not_allowed">Please sign in to report issues</string>    <string name="tag_stats_ring_label">AI-tagged</string>
     <string name="tag_ring_session_label">This run</string>
+    <string name="tag_scan_progress_count">%1$d/%2$d</string>
     <string name="tag_stats_coverage_label">AI-tagged coverage</string>
     <string name="tag_stats_remaining_line">photos · %1$d remaining</string>
     <string name="tag_stages_hint_view">Tap a stage to view</string>

@@ -33,9 +33,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -70,6 +75,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * TAG 生成精细控制子页面
@@ -305,6 +317,14 @@ fun TagGenerationControlScreen(
         )
     }
 
+    // 会话状态（屏幕级：钉住状态条与滚动列内 HeroCard 共用）
+    val scanActive = isScanning
+    val cardModel = sessionProgress?.let { value -> scanCardUiModel(value) }
+    // 钉住状态条：会话活跃(含暂停/过渡)即显示；终态失败为静态结果不占条
+    val showRunningStrip = cardModel != null && scanActive
+    val sessionFraction = cardModel?.narrative?.takeIf { it.total > 0 }
+        ?.let { it.processed.toFloat() / it.total } ?: 0f
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         // embedded（OrganizeHome 内 tab）：胶囊条即页头，不再叠静态标题栏——
@@ -321,15 +341,29 @@ fun TagGenerationControlScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── 钉住的全宽扫描状态条（2026-10-01 二轮反馈：运行态不显著）──────
+            // 同族语言=相册页 scan_progress_track：胶囊下全宽带 + 底缘 4dp 本轮进度条；
+            // 不入滚动列——页面再长滚动中状态始终可见。
+            if (showRunningStrip) {
+                ScanStatusStrip(
+                    title = scanCardTitle(cardModel),
+                    processed = cardModel?.narrative?.processed ?: 0,
+                    total = cardModel?.narrative?.total ?: 0,
+                    fraction = sessionFraction ?: 0f,
+                    animating = cardModel?.primaryAction == ScanCardAction.PAUSE
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // ── HeroCard（v3 单锚点主卡，spec tag-control.yaml §hero）──────
             // 空闲/运行同槽位互斥切换；统计区（标题+大数字+剩余行+圆环）可点跳「已打标照片」。
             // 零失败终态回落空闲态（叙述行显示上次会话统计）；美学打分/中断卡为同槽位互斥附属卡。
-            val scanActive = isScanning
-            val cardModel = sessionProgress?.let { value -> scanCardUiModel(value) }
             val showRunningHero = cardModel != null && (scanActive || cardModel.isTerminalWithFailures)
             HeroCard(
                 model = if (showRunningHero) cardModel else null,
@@ -442,6 +476,7 @@ fun TagGenerationControlScreen(
 
             // ── 后台保活缺失项提示(非阻断,点击跳设置) ────────
             BackgroundScanGuardBanner()
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -533,7 +568,7 @@ private fun HeroCard(
                             }
                             Text(
                                 text = scanCardTitle(model),
-                                fontSize = 15.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = contentColor
                             )
@@ -588,7 +623,11 @@ private fun HeroCard(
                         )
                     }
                 }
-                StatsProgressRing(progress = ringProgress, labelRes = ringLabelRes)
+                StatsProgressRing(
+                    progress = ringProgress,
+                    labelRes = ringLabelRes,
+                    active = model?.primaryAction == ScanCardAction.PAUSE
+                )
                 Icon(
                     Icons.Rounded.ChevronRight,
                     null,
@@ -690,6 +729,130 @@ private fun HeroCard(
                             modifier = Modifier.weight(1f)
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 钉住的全宽扫描状态条（v3.2，2026-10-01 二轮反馈「运行态不显著」）：
+ * 胶囊下 surface 底横带——[呼吸绿点 + 阶段名 15sp SemiBold + 第 x/y 张]，底缘 4dp 全宽
+ * 本轮进度条（同族语言=相册页 scan_progress_track）。不入滚动列，滚动中始终可见。
+ */
+@Composable
+private fun ScanStatusStrip(
+    title: String,
+    processed: Int,
+    total: Int,
+    fraction: Float,
+    /** RUNNING 才动（波纹/流光）；暂停/过渡态静止呈现 */
+    animating: Boolean = true
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    // 显著动画（2026-10-01 三轮反馈）：双层错峰波纹点 + 底缘进度条流光——
+    // 运行中的强活体信号，纯 Compose 无限动画
+    val infiniteTransition = rememberInfiniteTransition(label = "scanStripAnim")
+    val ripple1 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(1400), repeatMode = RepeatMode.Restart),
+        label = "ripple1"
+    )
+    val ripple2 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, delayMillis = 700),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple2"
+    )
+    // 流光带：0→1 横向循环扫过进度填充段
+    val shimmer by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(1100), repeatMode = RepeatMode.Restart),
+        label = "shimmer"
+    )
+    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // 波纹点：实心核 + 两层扩散淡出圆环（错峰 700ms）
+            Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                for (r in if (animating) listOf(ripple1, ripple2) else emptyList()) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .graphicsLayer {
+                                scaleX = 0.34f + r * 0.66f
+                                scaleY = 0.34f + r * 0.66f
+                                alpha = (1f - r) * 0.55f
+                            }
+                            .background(accent, CircleShape)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(9.dp)
+                        .background(accent, CircleShape)
+                )
+            }
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            if (total > 0) {
+                Text(
+                    text = stringResource(R.string.tag_scan_progress_count, processed, total),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+        // 底缘 4dp 全宽本轮进度条 + 流光带（高亮段循环扫过填充区）
+        val fillFraction = fraction.coerceIn(0f, 1f)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fillFraction)
+                    .height(4.dp)
+                    .background(accent)
+            )
+            if (animating && fillFraction > 0.02f) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth(fillFraction)
+                        .height(4.dp)
+                        .clipToBounds()
+                ) {
+                    val travel = maxWidth + 56.dp
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(56.dp)
+                            .offset(x = -56.dp + travel * shimmer)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color.Transparent, Color.White.copy(alpha = 0.75f), Color.Transparent)
+                                )
+                            )
+                    )
                 }
             }
         }
@@ -1463,10 +1626,22 @@ private fun CategoryChip(
 
 /** 72dp 进度圆环（设计稿 ringSvg）：surfaceVariant 底环 + primary 实色前景弧 + 中心两行（百分比 + AI 打标微标签）。 */
 @Composable
-private fun StatsProgressRing(progress: Int, labelRes: Int = R.string.tag_stats_ring_label) {
+private fun StatsProgressRing(
+    progress: Int,
+    labelRes: Int = R.string.tag_stats_ring_label,
+    /** RUNNING 时叠加旋转彗星弧（显著动画，2026-10-01 三轮反馈）；暂停/过渡/空闲为静态 */
+    active: Boolean = false
+) {
     val sweep = 360f * (progress.coerceIn(0, 100) / 100f)
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val accentColor = MaterialTheme.colorScheme.primary
+    val spinTransition = rememberInfiniteTransition(label = "ringSpin")
+    val spin by spinTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(animation = tween(1500, easing = LinearEasing)),
+        label = "spin"
+    )
     Box(
         modifier = Modifier.size(72.dp),
         contentAlignment = Alignment.Center
@@ -1488,6 +1663,18 @@ private fun StatsProgressRing(progress: Int, labelRes: Int = R.string.tag_stats_
                     useCenter = false,
                     style = Stroke(width = stroke, cap = StrokeCap.Round)
                 )
+            }
+            if (active) {
+                // 旋转彗星弧：40° 亮弧持续绕环（Material 不确定态语言，弧内高亮段）
+                rotate(degrees = spin) {
+                    drawArc(
+                        color = accentColor.copy(alpha = 0.95f),
+                        startAngle = -50f,
+                        sweepAngle = 40f,
+                        useCenter = false,
+                        style = Stroke(width = stroke * 1.25f, cap = StrokeCap.Round)
+                    )
+                }
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

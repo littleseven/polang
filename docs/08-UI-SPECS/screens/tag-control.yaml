@@ -111,6 +111,17 @@ tag_control:
       overwrite_switch: { size: "44×26 r13", title: "tag_overwrite_existing", desc: "tag_overwrite_existing_desc" }
       submit: { text: "tag_fine_control_title = Regenerate", background: primary, corner_radius: 12, height: 48 }   # v3 换肤：弃渐变胶囊
 
+  # ── 运行态动画规格（v3.3，2026-10-01 三轮反馈「要显著动画」；画布为静态 SSOT，动效在此立规）──
+  scan_animations:
+    principle: "RUNNING 才动；暂停/过渡/终态一律静止（静态呈现确定性数值）"
+    status_strip:
+      dot: "实心核 9dp + 双层错峰波纹（24dp 扩散环 1.4s 循环，间隔 700ms，峰值透明度 0.55）"
+      bar: "底缘本轮进度条填充段上 56dp 白色 0.75 透明度高亮带 1.1s 循环扫过（流光）"
+    progress_ring:
+      comet_arc: "RUNNING 时叠加 40° 亮弧（1.25×stroke, 0.95α）1.5s 匀速绕环旋转（Material 不确定态语言）"
+      determinate: "本轮 x/y 确定弧保持（彗星弧为叠加层非替代）"
+    engine: "全部 Compose infiniteTransition 实现，无资产；iOS 侧以等价 SwiftUI TimelineView/withAnimation 对齐节拍(1.4s/1.1s/1.5s)"
+
   # ── v3 删除清单（相对 v2）──
   removed_components:
     - "2×2 指标瓦片（tag_stats_with_face/embeddings/people/named 出页；数据仍在——人物数进 People 页，标签进 TagViewer）"

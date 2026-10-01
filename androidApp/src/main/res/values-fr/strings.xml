@@ -1394,6 +1394,7 @@
     <string name="report_issue_error">Échec du signalement : %1$s</string>
     <string name="report_issue_guest_not_allowed">Connectez-vous pour signaler des problèmes</string>    <string name="tag_stats_ring_label">Étiquetage IA</string>
     <string name="tag_ring_session_label">Cette passe</string>
+    <string name="tag_scan_progress_count">%1$d/%2$d</string>
     <string name="tag_stats_coverage_label">Couverture des tags IA</string>
     <string name="tag_stats_remaining_line">photos · %1$d restantes</string>
     <string name="tag_stages_hint_view">Touchez une étape pour voir</string>
