@@ -808,14 +808,16 @@
     <string name="settings_miui_action_open">Ouvrir</string>
     <!-- Background scan keep-alive guard -->
     <string name="bg_scan_guard_dialog_title">Activer l\'analyse en arrière-plan</string>
-    <string name="bg_scan_guard_dialog_message">Pour continuer l\'analyse lorsque PoLang est en arrière-plan, veuillez activer les éléments suivants. Sinon, le système pourrait suspendre l\'analyse après un certain temps.</string>
-    <string name="bg_scan_guard_action_settings">Aller aux réglages</string>
+    <string name="bg_scan_guard_dialog_message">Touchez chaque élément pour ouvrir son réglage. L\'analyse démarrera automatiquement une fois tout terminé. Sinon, le système peut geler l\'analyse quand l\'app est en arrière-plan ou l\'écran éteint.</string>
     <string name="bg_scan_guard_action_continue">Analyser quand même</string>
     <string name="bg_scan_guard_action_dont_remind">Ne plus rappeler</string>
     <string name="bg_scan_guard_banner_text">Le maintien en arrière-plan est désactivé — l\'analyse peut s\'interrompre quand l\'application passe en arrière-plan.</string>
     <string name="bg_scan_guard_issue_battery">Ignorer les optimisations de batterie</string>
+    <string name="bg_scan_guard_hint_battery">Touchez Autoriser dans la boîte de dialogue système. Sur certains modèles : Infos de l\'app → Économiseur de batterie → Sans restrictions.</string>
     <string name="bg_scan_guard_issue_notifications">Autoriser les notifications</string>
+    <string name="bg_scan_guard_hint_notifications">Activez l\'interrupteur de notifications de PoLang.</string>
     <string name="bg_scan_guard_issue_miui_autostart">Démarrage automatique MIUI</string>
+    <string name="bg_scan_guard_hint_miui_autostart">Trouvez PoLang dans la liste et activez son interrupteur de démarrage automatique.</string>
     <!-- Smart Gallery Index -->
     <string name="gallery_group_tag">Par étiquette</string>
     <string name="gallery_group_location">Lieu</string>
