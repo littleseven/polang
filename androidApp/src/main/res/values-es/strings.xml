@@ -1160,9 +1160,7 @@
     <string name="tag_viewer_section_scenes">Escenas</string>
     <string name="tag_viewer_section_objects">Objetos</string>
     <string name="tag_viewer_section_tags_field">Etiquetas</string>
-    <string name="tag_viewer_raw_json">JSON sin procesar</string>
-    <string name="tag_viewer_open_entry">Ver etiquetas generadas</string>
-    <string name="jsbridge_debug_section">JS Bridge (MVP)</string>
+    <string name="tag_viewer_raw_json">JSON sin procesar</string>    <string name="jsbridge_debug_section">JS Bridge (MVP)</string>
     <string name="jsbridge_entry_title">JS Bridge</string>
     <string name="jsbridge_entry_subtitle">Edita y ejecuta scripts en el sandbox de QuickJS</string>
     <string name="jsbridge_debug_run_demo">Ejecutar demo de JS Bridge</string>
@@ -1305,21 +1303,9 @@
     <string name="tag_time_range_days_30">30 días</string>
     <string name="tag_time_range_days_90">90 días</string>
     <string name="tag_regenerate_selected">Regenerar</string>
-    <string name="tag_stats_title">Estadísticas de la biblioteca</string>
-    <string name="tag_stats_with_face">Con caras</string>
-    <string name="tag_stats_embeddings">Embeddings de caras</string>
-    <string name="tag_stats_people">Personas encontradas</string>
-    <string name="tag_stats_named">Con nombre</string>
-    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
+    <string name="tag_stats_title">Estadísticas de la biblioteca</string>    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
     <string name="tag_section_library">Biblioteca</string>
-    <string name="tag_section_scan">Escaneo</string>
-    <string name="tag_scan_status">Estado del escaneo</string>
-    <string name="tag_scan_up_to_date">Actualizado</string>
-    <string name="tag_scan_chip_pending">%1$d pendientes</string>
-    <string name="tag_scan_idle_caption">%1$d elementos en la biblioteca · %2$d pendientes</string>
-    <string name="tag_scan_caption_done">%1$s elementos escaneados · %2$d fallidos</string>
-    <string name="tag_stages_hint">Toca una etapa para gestionarla</string>
-    <string name="tag_stage_sheet_desc">Elige qué reprocesar en esta etapa.</string>
+    <string name="tag_section_scan">Escaneo</string>    <string name="tag_scan_caption_done">%1$s elementos escaneados · %2$d fallidos</string>    <string name="tag_stage_sheet_desc">Elige qué reprocesar en esta etapa.</string>
     <string name="tag_stage_action_new">Procesar solo las nuevas</string>
     <string name="tag_stage_action_new_desc">Omite las fotos ya procesadas · lo más rápido</string>
     <string name="tag_stage_action_full">Reprocesar todo</string>
@@ -1406,9 +1392,7 @@
     <string name="report_issue_cancel">Cancelar</string>
     <string name="report_issue_success">Enviado (#%1$d)</string>
     <string name="report_issue_error">Error al enviar: %1$s</string>
-    <string name="report_issue_guest_not_allowed">Inicia sesión para informar de problemas</string>
-    <string name="stats_hero_caption">fotos · %1$d%% etiquetadas por IA</string>
-    <string name="tag_stats_ring_label">Etiquetado IA</string>
+    <string name="report_issue_guest_not_allowed">Inicia sesión para informar de problemas</string>    <string name="tag_stats_ring_label">Etiquetado IA</string>
     <string name="tag_stats_coverage_label">Cobertura de etiquetas IA</string>
     <string name="tag_stats_remaining_line">fotos · quedan %1$d</string>
     <string name="tag_stages_hint_view">Toca una etapa para ver</string>

@@ -1202,9 +1202,7 @@
     <string name="tag_viewer_section_scenes">Scenes</string>
     <string name="tag_viewer_section_objects">Objects</string>
     <string name="tag_viewer_section_tags_field">Tags</string>
-    <string name="tag_viewer_raw_json">Raw JSON</string>
-    <string name="tag_viewer_open_entry">View generated tags</string>
-    <string name="jsbridge_debug_section">JS Bridge (MVP)</string>
+    <string name="tag_viewer_raw_json">Raw JSON</string>    <string name="jsbridge_debug_section">JS Bridge (MVP)</string>
         <string name="jsbridge_entry_title">JS Bridge</string>
         <string name="jsbridge_entry_subtitle">Edit and run scripts in QuickJS sandbox</string>
     <string name="jsbridge_debug_run_demo">Run JS Bridge demo</string>
@@ -1349,21 +1347,9 @@
     <string name="tag_time_range_days_30">30 days</string>
     <string name="tag_time_range_days_90">90 days</string>
     <string name="tag_regenerate_selected">Regenerate</string>
-    <string name="tag_stats_title">Library stats</string>
-    <string name="tag_stats_with_face">With faces</string>
-    <string name="tag_stats_embeddings">Face embeddings</string>
-    <string name="tag_stats_people">People found</string>
-    <string name="tag_stats_named">Named</string>
-    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
+    <string name="tag_stats_title">Library stats</string>    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
     <string name="tag_section_library">Library</string>
-    <string name="tag_section_scan">Scan</string>
-    <string name="tag_scan_status">Scan status</string>
-    <string name="tag_scan_up_to_date">Up to date</string>
-    <string name="tag_scan_chip_pending">%1$d pending</string>
-    <string name="tag_scan_idle_caption">%1$d items in library · %2$d pending</string>
-    <string name="tag_scan_caption_done">%1$s items scanned · %2$d failed</string>
-    <string name="tag_stages_hint">Tap a stage to manage</string>
-    <string name="tag_stage_sheet_desc">Choose what to reprocess in this stage.</string>
+    <string name="tag_section_scan">Scan</string>    <string name="tag_scan_caption_done">%1$s items scanned · %2$d failed</string>    <string name="tag_stage_sheet_desc">Choose what to reprocess in this stage.</string>
     <string name="tag_stage_action_new">Process new only</string>
     <string name="tag_stage_action_new_desc">Skips already-processed photos · fastest</string>
     <string name="tag_stage_action_full">Reprocess everything</string>
@@ -1451,9 +1437,7 @@
     <string name="report_issue_cancel">Cancel</string>
     <string name="report_issue_success">Reported (#%1$d)</string>
     <string name="report_issue_error">Report failed: %1$s</string>
-    <string name="report_issue_guest_not_allowed">Please sign in to report issues</string>
-    <string name="stats_hero_caption">photos · %1$d%% AI-tagged</string>
-    <string name="tag_stats_ring_label">AI-tagged</string>
+    <string name="report_issue_guest_not_allowed">Please sign in to report issues</string>    <string name="tag_stats_ring_label">AI-tagged</string>
     <string name="tag_stats_coverage_label">AI-tagged coverage</string>
     <string name="tag_stats_remaining_line">photos · %1$d remaining</string>
     <string name="tag_stages_hint_view">Tap a stage to view</string>

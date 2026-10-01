@@ -63,6 +63,7 @@ import com.mamba.picme.features.editor.PhotoEditorScreen
 import com.mamba.picme.features.editor.PhotoEditorViewModel
 import com.mamba.picme.features.idphoto.IDPhotoScreen
 import com.mamba.picme.features.idphoto.IDPhotoViewModel
+import com.mamba.picme.features.gallery.GalleryViewFilter
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
 import com.mamba.picme.features.gallery.organize.OrganizeTab
@@ -217,6 +218,8 @@ class MainActivity : ComponentActivity() {
                     )
                     val scope = rememberCoroutineScope()
                     var gallerySearchRequest by remember { mutableStateOf<Pair<String, Long>?>(null) }
+                    // 扫描页 v3 确定性视图过滤一次性请求（已打标/含人脸/最佳照片 → 相册页）
+                    var galleryViewRequest by remember { mutableStateOf<GalleryViewFilter?>(null) }
                     // 整理+扫描合并页（Pager 页 1）Tab 一次性请求：设置页等 NavHost 路由入口经此预选 Tab
                     var organizeTabRequest by remember { mutableStateOf<OrganizeTab?>(null) }
                     // 任务中心回锚一次性请求（US-15）：任务中心点击/继续/重试 → 切 chat 页 + 锚定任务卡
@@ -335,6 +338,12 @@ class MainActivity : ComponentActivity() {
                                     onGallerySearchRequestConsumed = { gallerySearchRequest = null },
                                     onRequestGallerySearch = { query, personId ->
                                         gallerySearchRequest = query to personId
+                                        switchMainPage(MAIN_PAGE_GALLERY)
+                                    },
+                                    galleryViewRequest = galleryViewRequest,
+                                    onGalleryViewRequestConsumed = { galleryViewRequest = null },
+                                    onRequestGalleryView = { filter ->
+                                        galleryViewRequest = filter
                                         switchMainPage(MAIN_PAGE_GALLERY)
                                     },
                                     // 整理中心 hub 出口：F2 Quick tidy → 手势整理页；类目卡 → F1 类目详情路由

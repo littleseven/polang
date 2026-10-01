@@ -1160,9 +1160,7 @@
     <string name="tag_viewer_section_scenes">Scènes</string>
     <string name="tag_viewer_section_objects">Objets</string>
     <string name="tag_viewer_section_tags_field">Étiquettes</string>
-    <string name="tag_viewer_raw_json">JSON brut</string>
-    <string name="tag_viewer_open_entry">Voir les étiquettes générées</string>
-    <string name="jsbridge_debug_section">JS Bridge (MVP)</string>
+    <string name="tag_viewer_raw_json">JSON brut</string>    <string name="jsbridge_debug_section">JS Bridge (MVP)</string>
     <string name="jsbridge_entry_title">JS Bridge</string>
     <string name="jsbridge_entry_subtitle">Modifiez et exécutez des scripts dans la sandbox QuickJS</string>
     <string name="jsbridge_debug_run_demo">Exécuter la démo JS Bridge</string>
@@ -1305,21 +1303,9 @@
     <string name="tag_time_range_days_30">30 jours</string>
     <string name="tag_time_range_days_90">90 jours</string>
     <string name="tag_regenerate_selected">Régénérer</string>
-    <string name="tag_stats_title">Statistiques de la bibliothèque</string>
-    <string name="tag_stats_with_face">Avec des visages</string>
-    <string name="tag_stats_embeddings">Empreintes faciales</string>
-    <string name="tag_stats_people">Personnes trouvées</string>
-    <string name="tag_stats_named">Nommées</string>
-    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
+    <string name="tag_stats_title">Statistiques de la bibliothèque</string>    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
     <string name="tag_section_library">Bibliothèque</string>
-    <string name="tag_section_scan">Analyse</string>
-    <string name="tag_scan_status">État de l\'analyse</string>
-    <string name="tag_scan_up_to_date">À jour</string>
-    <string name="tag_scan_chip_pending">%1$d en attente</string>
-    <string name="tag_scan_idle_caption">%1$d éléments dans la bibliothèque · %2$d en attente</string>
-    <string name="tag_scan_caption_done">%1$s éléments analysés · %2$d échecs</string>
-    <string name="tag_stages_hint">Touchez une phase pour la gérer</string>
-    <string name="tag_stage_sheet_desc">Choisissez ce qu\'il faut retraiter dans cette phase.</string>
+    <string name="tag_section_scan">Analyse</string>    <string name="tag_scan_caption_done">%1$s éléments analysés · %2$d échecs</string>    <string name="tag_stage_sheet_desc">Choisissez ce qu\'il faut retraiter dans cette phase.</string>
     <string name="tag_stage_action_new">Traiter uniquement les nouveaux</string>
     <string name="tag_stage_action_new_desc">Ignore les photos déjà traitées · le plus rapide</string>
     <string name="tag_stage_action_full">Retraiter tout</string>
@@ -1406,9 +1392,7 @@
     <string name="report_issue_cancel">Annuler</string>
     <string name="report_issue_success">Signalé (#%1$d)</string>
     <string name="report_issue_error">Échec du signalement : %1$s</string>
-    <string name="report_issue_guest_not_allowed">Connectez-vous pour signaler des problèmes</string>
-    <string name="stats_hero_caption">photos · %1$d%% étiquetées par IA</string>
-    <string name="tag_stats_ring_label">Étiquetage IA</string>
+    <string name="report_issue_guest_not_allowed">Connectez-vous pour signaler des problèmes</string>    <string name="tag_stats_ring_label">Étiquetage IA</string>
     <string name="tag_stats_coverage_label">Couverture des tags IA</string>
     <string name="tag_stats_remaining_line">photos · %1$d restantes</string>
     <string name="tag_stages_hint_view">Touchez une étape pour voir</string>

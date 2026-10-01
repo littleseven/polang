@@ -262,6 +262,14 @@ interface MediaDao {
     @Query("SELECT COUNT(*) FROM media_assets WHERE labels IS NULL OR labels = ''")
     suspend fun getUnlabeledMediaCount(): Int
 
+    /** 已生成 AI 标签的媒体 ID，按拍摄时间降序（扫描页 v3「已打标照片」视图；与 getUnlabeledMediaCount 谓词互补） */
+    @Query("SELECT id FROM media_assets WHERE labels IS NOT NULL AND labels != '' ORDER BY captureDate DESC")
+    suspend fun getLabeledMediaIds(): List<Long>
+
+    /** 美学分降序的照片 ID（扫描页 v3「最佳照片」视图；仅照片，与打分口径一致） */
+    @Query("SELECT id FROM media_assets WHERE aestheticScore IS NOT NULL AND type = 'PHOTO' ORDER BY aestheticScore DESC")
+    suspend fun getBestQualityMediaIds(): List<Long>
+
     /** 更新媒体的 AI 标签 */
     @Query("UPDATE media_assets SET labels = :labels WHERE id = :mediaId")
     suspend fun updateLabels(mediaId: Long, labels: String)

@@ -200,6 +200,8 @@ fun SettingsScreen(
     val appLanguage by viewModel.appLanguage.collectAsState()
     val developerOptionsUnlocked by viewModel.developerOptionsUnlocked.collectAsState()
     val debugUiEnabled by viewModel.debugUiEnabled.collectAsState()
+    // TAG 生成 GPU 加速（2026-10-01 自扫描页迁入开发者选项）
+    val tagGenerationUseOpencl by viewModel.tagGenerationUseOpencl.collectAsState()
     val showCameraInfoInPreview by viewModel.showCameraInfoInPreview.collectAsState()
     val showFaceDebugOverlay by viewModel.showFaceDebugOverlay.collectAsState()
     val showLogOverlay by viewModel.showLogOverlay.collectAsState()
@@ -334,6 +336,8 @@ fun SettingsScreen(
             onAgentCameraAccessChange = { viewModel.setAgentCameraAccessEnabled(it) },
             agentGalleryAccessEnabled = agentGalleryAccessEnabled,
             onAgentGalleryAccessChange = { viewModel.setAgentGalleryAccessEnabled(it) },
+            tagGenerationUseOpencl = tagGenerationUseOpencl,
+            onTagGenerationUseOpenclChange = { viewModel.setTagGenerationUseOpencl(it) },
             taggerModelKey = taggerModelKey,
             onTaggerModelKeyChange = { viewModel.setTaggerModelKey(it) },
             voiceCommandMode = voiceCommandMode,
@@ -409,6 +413,8 @@ private fun SettingsContent(
     onAgentCameraAccessChange: (Boolean) -> Unit,
     agentGalleryAccessEnabled: Boolean,
     onAgentGalleryAccessChange: (Boolean) -> Unit,
+    tagGenerationUseOpencl: Boolean = false,
+    onTagGenerationUseOpenclChange: (Boolean) -> Unit = {},
     taggerModelKey: String,
     onTaggerModelKeyChange: (String) -> Unit,
     voiceCommandMode: VoiceCommandMode,
@@ -1080,6 +1086,19 @@ private fun SettingsContent(
                 }
 
                 // 引擎与模型（人脸检测阶段配置 + 打标模型）已移至「本地模型」一级入口
+
+                // ── 组1.5 TAG 生成引擎（2026-10-01 自扫描页 CardTagAccel 迁入）──
+                SettingsListSection {
+                    DebugOptionRow(
+                        title = stringResource(R.string.tag_gen_use_opencl_title),
+                        subtitle = stringResource(R.string.tag_gen_use_opencl_subtitle),
+                        checked = tagGenerationUseOpencl,
+                        onCheckedChange = onTagGenerationUseOpenclChange,
+                        horizontalPadding = SettingsTokens.listRowPaddingH,
+                        icon = Icons.Rounded.Speed,
+                        iconBlockColor = StatusColor.warningAmber
+                    )
+                }
 
                 // ── 组2 诊断日志 ──
                 SettingsListSection {

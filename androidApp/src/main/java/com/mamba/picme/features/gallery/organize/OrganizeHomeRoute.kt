@@ -29,11 +29,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
 import com.mamba.picme.domain.organize.OrganizeCategory
+import com.mamba.picme.features.gallery.GalleryViewFilter
 import com.mamba.picme.features.gallery.components.TagGenerationControlScreen
 import com.mamba.picme.features.gallery.dedup.DedupHomeRoute
 import com.mamba.picme.features.gallery.dedup.DedupUiState
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.main.MAIN_PAGE_DEDUP
+import com.mamba.picme.features.main.MAIN_PAGE_PEOPLE
 import com.mamba.picme.features.main.MainFloatingBottomBar
 
 /**
@@ -59,13 +61,13 @@ fun OrganizeHomeRoute(
     dedupViewModel: DedupViewModel,
     selectedTab: OrganizeTab,
     onSelectTab: (OrganizeTab) -> Unit,
-    useOpencl: Boolean,
-    onUseOpenclChange: (Boolean) -> Unit,
     /** Dedup 扫描态「后台运行」按钮离页回相册（根页无返回箭头，此回调仅服务该按钮语义） */
     onLeaveToGallery: () -> Unit,
     onQuickTidy: () -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
     onNavigateToTagViewer: () -> Unit,
+    /** 扫描 Tab v3 确定性相册视图出口（已打标/含人脸/最佳照片） */
+    onRequestGalleryView: (GalleryViewFilter) -> Unit = {},
     /** 底 bar 页切换出口（整理项=本页，高亮且点击空操作） */
     onSwitchMainPage: (Int) -> Unit,
 ) {
@@ -105,8 +107,10 @@ fun OrganizeHomeRoute(
                     )
                     OrganizeTab.SCAN -> TagGenerationControlScreen(
                         onNavigateToTagViewer = onNavigateToTagViewer,
-                        useOpencl = useOpencl,
-                        onUseOpenclChange = onUseOpenclChange,
+                        onOpenTagged = { onRequestGalleryView(GalleryViewFilter.TAGGED) },
+                        onOpenFaces = { onRequestGalleryView(GalleryViewFilter.FACES) },
+                        onOpenBest = { onRequestGalleryView(GalleryViewFilter.BEST) },
+                        onOpenPeople = { onSwitchMainPage(MAIN_PAGE_PEOPLE) },
                         embedded = true,
                     )
                 }

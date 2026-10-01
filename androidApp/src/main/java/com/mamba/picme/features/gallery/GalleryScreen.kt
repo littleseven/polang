@@ -114,6 +114,14 @@ private const val TAG = "Gallery"
 private const val TAG_AGENT = "GalleryAgent"
 private const val SEARCH_DEBOUNCE_MS = 300L
 
+/**
+ * 扫描页 v3 的确定性相册视图（与数字匹配的跳转目的地）：
+ * TAGGED=已生成 AI 标签 / FACES=含人脸 / BEST=美学分降序照片。
+ * 经 MainPagerHost 的 viewFilterRequest 通道进入，落 GalleryScreen 本地过滤态（isPersonFilter 同语义复用）。
+ */
+enum class GalleryViewFilter { TAGGED, FACES, BEST }
+
+
 @OptIn(FlowPreview::class)
 @Composable
 fun GalleryScreen(
@@ -129,6 +137,9 @@ fun GalleryScreen(
     /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */
     searchRequest: Pair<String, Long>? = null,
     onSearchRequestConsumed: () -> Unit = {},
+    /** 外部确定性视图过滤请求（扫描页 v3 统计区/阶段行跳转）：TAGGED/FACES/BEST */
+    viewFilterRequest: GalleryViewFilter? = null,
+    onViewFilterRequestConsumed: () -> Unit = {},
     /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
     /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */
@@ -246,6 +257,63 @@ fun GalleryScreen(
             }
         }
         onSearchRequestConsumed()
+    }
+
+    // 扫描页 v3 确定性视图过滤（已打标/含人脸/最佳照片）：与人物过滤同范式——
+    // DAO 取 id（或模型内建字段）过滤，不经搜索引擎；isPersonFilter=true 复用
+    // 「防抖不接管」语义（label 为展示文案，交给引擎会泛化召回致张数对不上）。
+    suspend fun applyViewFilter(filter: GalleryViewFilter) {
+        val label = when (filter) {
+            GalleryViewFilter.TAGGED -> context.getString(R.string.gallery_view_tagged)
+            GalleryViewFilter.FACES -> context.getString(R.string.gallery_view_faces)
+            GalleryViewFilter.BEST -> context.getString(R.string.gallery_view_best)
+        }
+        val finalMedia = withContext(Dispatchers.IO) {
+            val db = AppDatabase.getDatabase(context)
+            when (filter) {
+                GalleryViewFilter.TAGGED -> {
+                    val ids = db.mediaDao().getLabeledMediaIds()
+                    if (ids.isEmpty()) {
+                        emptyList()
+                    } else {
+                        // 保 SQL 序（拍摄时间降序）：getMediaByIds 返回序不定，按 ids 序重排
+                        val byId = db.mediaDao().getMediaByIds(ids).associateBy { it.id }
+                        ids.mapNotNull { byId[it]?.toMediaAsset() }
+                    }
+                }
+                GalleryViewFilter.BEST -> {
+                    val ids = db.mediaDao().getBestQualityMediaIds()
+                    if (ids.isEmpty()) {
+                        emptyList()
+                    } else {
+                        // 保 SQL 序（美学分降序）
+                        val byId = db.mediaDao().getMediaByIds(ids).associateBy { it.id }
+                        ids.mapNotNull { byId[it]?.toMediaAsset() }
+                    }
+                }
+                // hasFace 为 MediaAsset 内建字段，直接过滤全量列表
+                // （allFlatMedia 声明于本函数之后；allMedia 为同一数据的前置 StateFlow 值）
+                GalleryViewFilter.FACES -> allMedia.filter { it.hasFace }
+            }
+        }
+
+        searchQuery = label
+        isSearchActive = true
+        isPersonFilter = true
+        searchResultMedia = finalMedia
+        isSearchLoading = false
+    }
+
+    LaunchedEffect(viewFilterRequest) {
+        val filter = viewFilterRequest ?: return@LaunchedEffect
+        // 立即占位防闪烁（同 personId 分支）：DB 查询完成前不渲染全量相册
+        searchQuery = context.getString(R.string.gallery_view_tagged)
+        isSearchActive = true
+        isPersonFilter = true
+        searchResultMedia = emptyList()
+        isSearchLoading = true
+        applyViewFilter(filter)
+        onViewFilterRequestConsumed()
     }
 
     // 上报外层 Pager 横滑使能：照片详情/多选时禁用，避免与内层 MediaPager 滑动冲突
