@@ -55,3 +55,5 @@ gallery/tag_control_running,478:155,t,质量评分,Quality scores,matched,tag.pa
 gallery/tag_control_running,478:156,st,美学与人脸画质,Aesthetic & face quality,matched,tag.pass.desc.aesthetic,bind,孪生,Aesthetic & face quality,478:156
 gallery/tag_control_running,478:140,pct,35%,35%,manual,tag.pass.aesthetic.pct,bind,孪生,35%,478:140
 gallery/tag_control_running,478:185,libraryLine,全库已打标 12%,Library 12% tagged,manual,tag.scan.library.line,bind,v3.1 全库锚点降 caption 行(唯一百分比口径保留),Library 12% tagged,478:185
+gallery/tag_control_running,478:208,stripTitle,正在识别人脸,Detecting faces,manual,tag.scan.now.face,bind,v3.3 钉住状态条(2026-10-01);复用阶段名键,Detecting faces,478:208
+gallery/tag_control_running,478:210,stripCount,"第 1,024/8,205 张 · 约 3 小时","Photo 1,024 of 8,205 · ~3h left",manual,tag.scan.narrative,bind,v3.3 钉住状态条右侧计数,"Photo 1,024 of 8,205 · ~3h left",478:210
