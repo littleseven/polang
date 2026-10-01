@@ -1286,9 +1286,9 @@
     <string name="tag_scan_interrupted_title">Escaneo interrumpido</string>
     <string name="tag_scan_interrupted_desc">El sistema reclamó la app. El progreso está guardado.</string>
     <string name="tag_scan_resume_breakpoint">Reanudar escaneo</string>
-    <string name="tag_pass_scope_face">%1$,d de %2$,d fotos con rostros detectados</string>
-    <string name="tag_pass_scope_content">%1$,d de %2$,d fotos etiquetadas</string>
-    <string name="tag_pass_scope_aesthetic">%1$,d de %2$,d fotos puntuadas</string>
+    <string name="tag_pass_scope_face">%1$d de %2$,d fotos con rostros detectados</string>
+    <string name="tag_pass_scope_content">%1$d de %2$,d fotos etiquetadas</string>
+    <string name="tag_pass_scope_aesthetic">%1$d de %2$,d fotos puntuadas</string>
     <string name="tag_pass_control_title">Etapas</string>
     <string name="tag_pass_step_semantic">Codificación semántica (independiente)</string>
     <string name="tag_fine_control_title">Regenerar</string>
@@ -1409,6 +1409,13 @@
     <string name="report_issue_guest_not_allowed">Inicia sesión para informar de problemas</string>
     <string name="stats_hero_caption">fotos · %1$d%% etiquetadas por IA</string>
     <string name="tag_stats_ring_label">Etiquetado IA</string>
+    <string name="tag_stats_coverage_label">Cobertura de etiquetas IA</string>
+    <string name="tag_stats_remaining_line">fotos · quedan %1$d</string>
+    <string name="tag_stages_hint_view">Toca una etapa para ver</string>
+    <string name="tag_regen_entry">Regenerar por etapa o filtro</string>
+    <string name="gallery_view_tagged">Etiquetadas por IA</string>
+    <string name="gallery_view_faces">Con caras</string>
+    <string name="gallery_view_best">Mejores fotos</string>
     <!-- Gallery i18n P0 -->
     <string name="ocr_char_count">%1$d caracteres</string>
     <string name="ocr_text_recognition">Reconocimiento de texto OCR</string>

@@ -1321,9 +1321,9 @@
     <string name="tag_scan_interrupted_title">掃描已中斷</string>
     <string name="tag_scan_interrupted_desc">App 被系統回收，進度已保存</string>
     <string name="tag_scan_resume_breakpoint">從中斷處繼續</string>
-    <string name="tag_pass_scope_face">全庫 %2$,d 張中已辨識 %1$,d 張</string>
-    <string name="tag_pass_scope_content">全庫 %2$,d 張中已標記 %1$,d 張</string>
-    <string name="tag_pass_scope_aesthetic">全庫 %2$,d 張中已評分 %1$,d 張</string>
+    <string name="tag_pass_scope_face">全庫 %2$,d 張中已辨識 %1$d 張</string>
+    <string name="tag_pass_scope_content">全庫 %2$,d 張中已標記 %1$d 張</string>
+    <string name="tag_pass_scope_aesthetic">全庫 %2$,d 張中已評分 %1$d 張</string>
     <string name="tag_pass_control_title">分階段</string>
     <string name="tag_pass_step_semantic">語義編碼（單獨）</string>
     <string name="tag_fine_control_title">重新產生</string>
@@ -1445,6 +1445,13 @@
     <string name="report_issue_guest_not_allowed">請先登入帳號再上報問題</string>
     <string name="stats_hero_caption">張照片 · AI 打標已覆蓋 %1$d%%</string>
     <string name="tag_stats_ring_label">AI 打標</string>
+    <string name="tag_stats_coverage_label">AI 打標覆蓋</string>
+    <string name="tag_stats_remaining_line">張照片 · 剩餘 %1$d 張待處理</string>
+    <string name="tag_stages_hint_view">點按階段查看內容</string>
+    <string name="tag_regen_entry">按階段或條件重新生成</string>
+    <string name="gallery_view_tagged">AI 已打標</string>
+    <string name="gallery_view_faces">含人臉</string>
+    <string name="gallery_view_best">最佳照片</string>
 
     <!-- Gallery i18n P0 -->
     <string name="ocr_char_count">%1$d 字</string>
