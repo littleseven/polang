@@ -27,7 +27,8 @@ tag_control:
     capsule_switch:                                # 胶囊分段条 r24，track=surfaceVariant
       active_tab: "扫描（org.scan.label）= primary 底 + onPrimary 字"
       inactive_tab: "整理（org.title）= 无底 + onSurfaceVariant 字"
-    top_bar: "标题=gallery_settings（相册/Gallery）17sp onSurface + hairline"
+    note: "v3.1（2026-10-01 真机反馈）：embedded 态不再叠静态标题栏（AppTopBar 占位+Scaffold 二次
+      inset 曾致顶部 ~100dp 空白）；胶囊条即唯一页头，contentWindowInsets 清零（对齐 DedupHomeScreen）"
   layout: vscroll                                  # Body pad 16，区块间 16dp；卡片=surfaceContainer r16
   sections_order: [hero, stages, regen_entry]
 
