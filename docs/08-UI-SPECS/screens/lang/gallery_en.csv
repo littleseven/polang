@@ -57,3 +57,9 @@ gallery/tag_control_running,478:140,pct,35%,35%,manual,tag.pass.aesthetic.pct,bi
 gallery/tag_control_running,478:185,libraryLine,全库已打标 12%,Library 12% tagged,manual,tag.scan.library.line,bind,v3.1 全库锚点降 caption 行(唯一百分比口径保留),Library 12% tagged,478:185
 gallery/tag_control_running,478:208,stripTitle,正在识别人脸,Detecting faces,manual,tag.scan.now.face,bind,v3.3 钉住状态条(2026-10-01);复用阶段名键,Detecting faces,478:208
 gallery/tag_control_running,478:210,stripCount,"第 1,024/8,205 张 · 约 3 小时","Photo 1,024 of 8,205 · ~3h left",manual,tag.scan.narrative,bind,v3.3 钉住状态条右侧计数,"Photo 1,024 of 8,205 · ~3h left",478:210
+gallery/tag_control_paused,479:22,stripTitle,已暂停 · 人脸 打到一半,Paused · faces mid-run,manual,tag.scan.paused.title.mock,bind,v3.4 暂停帧(2026-10-01);琥珀状态条,Paused · faces mid-run,479:22
+gallery/tag_control_paused,479:24,stripCount,第 31/50 张,Photo 31 of 50,manual,tag.scan.narrative.no.eta.mock,bind,暂停态无ETA叙述(key tag_scan_narrative_no_eta 具象),Photo 31 of 50,479:24
+gallery/tag_control_paused,479:59,scanStageTitle,已暂停 · 人脸 打到一半,Paused · faces mid-run,manual,tag.scan.paused.title.mock,bind,同状态条标题,Paused · faces mid-run,479:59
+gallery/tag_control_paused,479:60,narrative,第 31/50 张,Photo 31 of 50,manual,tag.scan.narrative.no.eta.mock,bind,,Photo 31 of 50,479:60
+gallery/tag_control_paused,479:62,ringPct,62%,62%,manual,tag.stats.indexed.pct.paused,bind,断点 mock;环静态(动画仅 RUNNING),62%,479:62
+gallery/tag_control_paused,479:65,btnResume,继续,Resume,manual,tag.btn.resume,bind,primary 实底(key resume),Resume,479:65

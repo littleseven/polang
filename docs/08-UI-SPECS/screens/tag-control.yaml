@@ -110,6 +110,12 @@ tag_control:
       overwrite_switch: { size: "44×26 r13", title: "tag_overwrite_existing", desc: "tag_overwrite_existing_desc" }
       submit: { text: "tag_fine_control_title = Regenerate", background: primary, corner_radius: 12, height: 48 }   # v3 换肤：弃渐变胶囊
 
+  # ── 暂停态（v3.4，帧 gallery/tag_control_paused 479:5）──
+  paused_state:
+    strip: "状态条保留但转琥珀(warningAmber #FFA000)点缀：琥珀点+琥珀底缘条，全部静止"
+    hero: "标题=tag_scan_paused_title(已暂停 · 阶段 打到一半)+无ETA叙述(第 x/y 张)；圆环停断点静态；继续=primary/取消=ghost"
+    principle: "容器仍 surfaceContainer(不洗色)；状态色只活在点缀元素上——绿=跑,琥珀=停"
+
   # ── 运行态动画规格（v3.3，2026-10-01 三轮反馈「要显著动画」；画布为静态 SSOT，动效在此立规）──
   scan_animations:
     principle: "RUNNING 才动；暂停/过渡/终态一律静止（静态呈现确定性数值）"

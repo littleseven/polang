@@ -116,3 +116,10 @@ tag_control/capsule_switch
 # 语义不同非复用(r12 双钮范式若三处再现再抽组件)
 tag_control/Body/HeroCard/btnRow
 tag_control_running/Body/HeroCard/btnRow
+# Gallery tag_control_paused 暂停帧(v3.4 2026-10-01,running 帧全拷贝改态):
+# 状态帧家族三连(idle/running/paused)共享子树,单侧豁免;组件化收编后逐行移除
+tag_control_paused/Body/CardStages
+tag_control_paused/Body/HeroCard/heroRow
+tag_control_paused/Body/HeroCard/btnRow
+tag_control_paused/capsule_switch
+tag_control_paused/Body/secRowStages

@@ -2996,6 +2996,33 @@
    "en": "Library 12% tagged",
    "status": "created",
    "ardotId": "478:184"
+  },
+  "tag.scan.paused.title.mock": {
+   "zh": "已暂停 · 人脸 打到一半",
+   "en": "Paused · faces mid-run",
+   "status": "created",
+   "ardotId": "479:1",
+   "key": "tag_scan_paused_title"
+  },
+  "tag.scan.narrative.no.eta.mock": {
+   "zh": "第 31/50 张",
+   "en": "Photo 31 of 50",
+   "status": "created",
+   "ardotId": "479:2",
+   "key": "tag_scan_narrative_no_eta"
+  },
+  "tag.btn.resume": {
+   "zh": "继续",
+   "en": "Resume",
+   "status": "created",
+   "ardotId": "479:3",
+   "key": "resume"
+  },
+  "tag.stats.indexed.pct.paused": {
+   "zh": "62%",
+   "en": "62%",
+   "status": "created",
+   "ardotId": "479:4"
   }
  }
 }

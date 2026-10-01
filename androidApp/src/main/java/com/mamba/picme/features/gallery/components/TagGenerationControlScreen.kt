@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.PoLangApplication
 import com.mamba.picme.R
+import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.domain.aesthetic.AestheticScoreWorker
 import com.mamba.picme.domain.tag.TagCategory
@@ -321,7 +322,8 @@ fun TagGenerationControlScreen(
     val scanActive = isScanning
     val cardModel = sessionProgress?.let { value -> scanCardUiModel(value) }
     // 钉住状态条：会话活跃(含暂停/过渡)即显示；终态失败为静态结果不占条
-    val showRunningStrip = cardModel != null && scanActive
+    // 暂停=琥珀状态条(v3.4 设计稿 tag_control_paused);运行/过渡=绿
+    val showRunningStrip = cardModel != null && (scanActive || cardModel.isPaused)
     val sessionFraction = cardModel?.narrative?.takeIf { it.total > 0 }
         ?.let { it.processed.toFloat() / it.total } ?: 0f
 
@@ -742,7 +744,12 @@ private fun ScanStatusStrip(
     /** RUNNING 才动（波纹/流光）；暂停/过渡态静止呈现 */
     animating: Boolean = true
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    // 暂停=琥珀点缀(tag_control_paused 状态语言)；运行=绿
+    val accent = if (animating) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        StatusColor.warningAmber
+    }
     // 显著动画（2026-10-01 三轮反馈）：双层错峰波纹点 + 底缘进度条流光——
     // 运行中的强活体信号，纯 Compose 无限动画
     val infiniteTransition = rememberInfiniteTransition(label = "scanStripAnim")
