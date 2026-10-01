@@ -68,10 +68,9 @@ tag_control:
     progress_ring:                                 # 72dp 圆环，两态共用
       style: "primary 实色弧 · stroke 6dp · 12 点钟起点 · 圆头端点；中心两行：百分比 13sp SemiBold onSurface + 微标签 tag_stats_ring_label（8sp onSurfaceVariant，AI 打标/AI-tagged）"
       track: surfaceVariant
-    state_colors:                                  # 容器色随态（内容色自动配对）
-      running_transition: primaryContainer         # RUNNING/PAUSING/CANCELLING
-      paused: secondaryContainer
-      terminal_with_failures: errorContainer
+    state_colors:                                  # v3.4：容器不随态换色(暗黑洗白翻车返工)
+      all_states: surfaceContainer                 # 运行/暂停由状态条绿点/绿条+标题承载
+      terminal_with_failures: errorContainer       # 仅终态失败保留语义红
     mutex_slots:                                   # 同槽位互斥卡（沿用 v2 语义）
       aesthetic_card: { visible_when: "aestheticProgress!=null 且 !isScanning" }
       interrupted_card:

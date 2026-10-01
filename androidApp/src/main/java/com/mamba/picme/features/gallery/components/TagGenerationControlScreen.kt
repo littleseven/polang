@@ -505,17 +505,16 @@ private fun HeroCard(
     onScanNew: () -> Unit,
     onRescanAll: () -> Unit,
 ) {
+    // v3.4(2026-10-01 暗黑不过关返工)：弃 v2 的 primaryContainer/secondaryContainer 状态洗色
+    // ——暗黑下调成灰绿洗白底与纯黑卡系打架(真机实测)；对齐画布正稿=纯 surfaceContainer 卡，
+    // 运行/暂停态由钉住状态条的绿点/绿条与标题承载，容器不换色；仅终态失败保留语义红。
     val containerColor = when {
-        model == null -> MaterialTheme.colorScheme.surfaceContainer
-        model.isTerminalWithFailures -> MaterialTheme.colorScheme.errorContainer
-        model.isPaused -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.primaryContainer
+        model != null && model.isTerminalWithFailures -> MaterialTheme.colorScheme.errorContainer
+        else -> MaterialTheme.colorScheme.surfaceContainer
     }
     val contentColor = when {
-        model == null -> MaterialTheme.colorScheme.onSurface
-        model.isTerminalWithFailures -> MaterialTheme.colorScheme.onErrorContainer
-        model.isPaused -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.onPrimaryContainer
+        model != null && model.isTerminalWithFailures -> MaterialTheme.colorScheme.onErrorContainer
+        else -> MaterialTheme.colorScheme.onSurface
     }
     // 口径（2026-10-01 真机反馈修订）：空闲=全库 AI 打标完成率（LibraryCompletion/Pass3 同源）；
     // 运行=圆环与轨道切「本轮会话进度」（第 x/y 张，肉眼可见走动——全库口径一轮只挪 <1% 等于冻住），
@@ -648,13 +647,7 @@ private fun HeroCard(
                     modifier = Modifier
                         .fillMaxWidth(sessionFraction ?: trackFraction)
                         .height(6.dp)
-                        .background(
-                            if (model == null) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                contentColor
-                            }
-                        )
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
 
