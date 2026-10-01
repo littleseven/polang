@@ -840,11 +840,11 @@
     <string name="gallery_face_clustering">Regroupement des visages…</string>
     <string name="gallery_face_clustering_done">%1$d personnes trouvées</string>
     <!-- Tag Generation Service -->
-    <string name="tag_gen_notification_title">Génération d\'étiquettes</string>
-    <string name="tag_gen_notification_progress">%1$d / %2$d photos</string>
-    <string name="tag_gen_notification_starting">Préparation…</string>
+    <string name="tag_gen_notification_title">Étiquetage IA</string>
     <string name="tag_gen_notification_idle">En attente</string>
-    <string name="tag_gen_notification_channel_desc">Affiche la progression de la génération d\'étiquettes</string>
+    <string name="tag_gen_notification_paused">En pause</string>
+    <string name="tag_gen_notification_completed">Terminé</string>
+    <string name="tag_gen_notification_channel_desc">Affiche la progression de l\'étiquetage IA</string>
     <!-- Accessibility (contentDescription) -->
     <string name="cd_quick_actions">Actions rapides</string>
     <string name="cd_open_sidebar">Ouvrir la barre latérale</string>
@@ -1268,17 +1268,27 @@
     <string name="tag_scan_full">Tout réanalyser</string>
     <string name="tag_scan_incremental">Analyser les nouveaux</string>
     <string name="tag_scan_pausing">Mise en pause…</string>
-    <string name="tag_scan_state_running">Analyse en cours</string>
     <string name="tag_scan_state_pausing">Mise en pause</string>
-    <string name="tag_scan_state_paused">En pause</string>
     <string name="tag_scan_state_cancelling">Annulation</string>
-    <string name="tag_scan_state_cancelled">Annulé</string>
-    <string name="tag_scan_state_completed">Terminé</string>
-    <string name="tag_scan_state_idle">Inactif</string>
-    <string name="tag_scan_waiting_task">En attente de la fin de la tâche en cours</string>
     <string name="tag_scan_preparing">Préparation</string>
-    <string name="tag_scan_progress_line">Tâches %1$d/%2$d terminées · %3$d en attente · %4$d échouées</string>
-    <string name="tag_scan_eta">Temps restant estimé : %1$s</string>
+    <!-- Carte d'état principale du scan (refonte 2026-10-01) : titre par étape + narration + piste bibliothèque -->
+    <string name="tag_scan_now_preparing">Préparation du scan…</string>
+    <string name="tag_scan_now_face">Détection des visages</string>
+    <string name="tag_scan_now_cluster">Regroupement des personnes</string>
+    <string name="tag_scan_now_content">Étiquetage du contenu des photos</string>
+    <string name="tag_scan_now_semantic">Encodage sémantique</string>
+    <string name="tag_scan_narrative">Photo %1$d sur %2$d · ~%3$s restantes</string>
+    <string name="tag_scan_narrative_no_eta">Photo %1$d sur %2$d</string>
+    <string name="tag_scan_library_line">%1$d%% de la bibliothèque étiquetée</string>
+    <string name="tag_scan_paused_title">En pause · %1$s</string>
+    <string name="tag_scan_completed_with_failures">Terminé · %1$d en échec</string>
+    <string name="tag_scan_retry_failed_items">Réessayer les échecs</string>
+    <string name="tag_scan_interrupted_title">Scan interrompu</string>
+    <string name="tag_scan_interrupted_desc">Le système a réclamé l\'app. La progression est sauvegardée.</string>
+    <string name="tag_scan_resume_breakpoint">Reprendre le scan</string>
+    <string name="tag_pass_scope_face">%1$,d sur %2$,d photos avec visages détectés</string>
+    <string name="tag_pass_scope_content">%1$,d sur %2$,d photos étiquetées</string>
+    <string name="tag_pass_scope_aesthetic">%1$,d sur %2$,d photos notées</string>
     <string name="tag_pass_control_title">Phases</string>
     <string name="tag_pass_step_semantic">Encodage sémantique (autonome)</string>
     <string name="tag_fine_control_title">Régénérer</string>

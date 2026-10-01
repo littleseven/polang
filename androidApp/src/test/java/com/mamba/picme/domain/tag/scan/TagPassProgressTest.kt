@@ -1,4 +1,4 @@
-package com.mamba.picme.features.gallery.components
+package com.mamba.picme.domain.tag.scan
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

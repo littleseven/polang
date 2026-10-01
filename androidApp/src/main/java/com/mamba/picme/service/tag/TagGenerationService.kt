@@ -19,7 +19,11 @@ import com.mamba.picme.R
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.domain.tag.TagGenerationScheduler
 import com.mamba.picme.domain.tag.TagScanProgress
+import com.mamba.picme.domain.tag.scan.LibraryCompletion
 import com.mamba.picme.domain.tag.scan.ScanQueuePolicy
+import com.mamba.picme.domain.tag.scan.ScanStage
+import com.mamba.picme.domain.tag.scan.formatDuration
+import com.mamba.picme.domain.tag.scan.scanStageOf
 import com.mamba.picme.PoLangApplication
 import com.mamba.picme.domain.tag.scan.ScanSessionState
 import com.mamba.picme.domain.tag.scan.TagScanOrchestrator
@@ -215,6 +219,12 @@ class TagGenerationService : Service() {
         val sessionProgress: MutableStateFlow<TagScanSessionProgress?> = MutableStateFlow(null)
 
         /**
+         * 库级 AI 打标完成率（2026-10-01 口径立法：全 app 唯一对外百分比数据源）。
+         * 扫描会话活跃期间由 progressJob 节流刷新；会话终态/Service 销毁时置 null。
+         */
+        val libraryCompletion: MutableStateFlow<LibraryCompletion?> = MutableStateFlow(null)
+
+        /**
          * 刷新统一数据库统计快照。
          *
          * 直接查询数据库，不依赖 Orchestrator 实例是否已创建，
@@ -330,6 +340,7 @@ class TagGenerationService : Service() {
 
         progressJob = serviceScope.launch {
             var scoredSession: String? = null
+            var lastLibraryRefreshMs = 0L
             orch.progress.collectLatest { sp ->
                 if (!coroutineContext.isActive) return@collectLatest // onDestroy 已取消；禁止残留写复活 isScanning
                 sessionProgress.value = sp
@@ -341,6 +352,19 @@ class TagGenerationService : Service() {
                 progress.value = sp.toLegacyProgress()
                 lastScanMessage.value = sp?.messages?.lastOrNull()?.text
                 updateNotification(sp)
+                // 口径立法：活跃会话期间节流（≥1s）刷新库级完成率，终态/空闲置 null
+                val sessionActive = sp != null && sp.state != ScanSessionState.IDLE &&
+                        sp.state != ScanSessionState.COMPLETED && sp.state != ScanSessionState.CANCELLED
+                val nowMs = System.currentTimeMillis()
+                if (sessionActive && nowMs - lastLibraryRefreshMs >= 1000L) {
+                    lastLibraryRefreshMs = nowMs
+                    runCatching { orch.getDbStats() }.onSuccess { stats ->
+                        libraryCompletion.value = LibraryCompletion(stats.totalMedia, stats.remainingForPass3)
+                    }
+                } else if (!sessionActive) {
+                    libraryCompletion.value = null
+                    lastLibraryRefreshMs = 0L
+                }
                 // 扫描会话活跃 → 取消在途美学打分（互斥：eDifFIQA 复用 RetinaFace，非线程安全），
                 // 同时避免打标控制页在扫描期间显示「美学评分」进度而非扫描进度。
                 if (isScanning.value && aestheticJob?.isActive == true) {
@@ -550,6 +574,8 @@ class TagGenerationService : Service() {
         // onDestroy 即将取消 progressJob（isScanning 唯一写者），取消后残留值无人刷新——
         // 显式归零，防服务中途死亡后标志残留 true 误导底 bar 落点（2026-09-30）
         isScanning.value = false
+        // 库级完成率同理归零：残留值会让任务中心/通知拿陈旧口径渲染
+        libraryCompletion.value = null
         progressJob?.cancel()
         batteryReceiver.let {
             try { unregisterReceiver(it) } catch (_: Exception) {}
@@ -651,31 +677,49 @@ class TagGenerationService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val title = getString(R.string.tag_gen_notification_title)
-        val isScanning = progress?.state in setOf(
-            ScanSessionState.RUNNING,
-            ScanSessionState.PAUSING,
-            ScanSessionState.CANCELLING
-        )
-        val content = when {
-            progress == null -> getString(R.string.tag_gen_notification_idle)
-            isScanning -> "${progress.processed}/${progress.total} 张 · ${progress.currentPass?.name ?: ""}"
-            progress.state == ScanSessionState.PAUSED -> "已暂停"
-            progress.state == ScanSessionState.COMPLETED -> "完成"
-            else -> getString(R.string.tag_gen_notification_idle)
+        // 口径立法（spec §4）：对外唯一百分比 = 库级完成率（percentRounded()）；
+        // 库级暂缺（首帧/非活跃清空）回退任务级整数口径，仅通知条内使用
+        val percent = libraryCompletion.value?.percentRounded()
+            ?: if (progress != null && progress.total > 0) {
+                (progress.processed * 100 / progress.total).coerceIn(0, 100)
+            } else null
+        val titleRes = when (progress?.state) {
+            ScanSessionState.PAUSED -> R.string.tag_gen_notification_paused
+            ScanSessionState.COMPLETED -> R.string.tag_gen_notification_completed
+            ScanSessionState.RUNNING, ScanSessionState.PAUSING, ScanSessionState.CANCELLING ->
+                when (scanStageOf(progress.currentPass)) {
+                    ScanStage.FACE -> R.string.tag_scan_now_face
+                    ScanStage.CLUSTER -> R.string.tag_scan_now_cluster
+                    ScanStage.CONTENT -> R.string.tag_scan_now_content
+                    ScanStage.SEMANTIC -> R.string.tag_scan_now_semantic
+                    ScanStage.PREPARING -> R.string.tag_scan_now_preparing
+                }
+            else -> R.string.tag_gen_notification_title
         }
-        val progressPercent = if (progress != null && progress.total > 0) {
-            (progress.processed * 100 / progress.total).coerceIn(0, 100)
-        } else 0
+        // 任务级进度只允许「第 x/y 张」叙述形态（spec §4），ETA 仅运行中有意义
+        val content = if (progress != null && progress.total > 0) {
+            if (progress.state == ScanSessionState.RUNNING && progress.estimatedRemainingMs != null) {
+                getString(
+                    R.string.tag_scan_narrative,
+                    progress.processed,
+                    progress.total,
+                    formatDuration(progress.estimatedRemainingMs),
+                )
+            } else {
+                getString(R.string.tag_scan_narrative_no_eta, progress.processed, progress.total)
+            }
+        } else {
+            getString(R.string.tag_gen_notification_idle)
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
+            .setContentTitle(getString(titleRes))
             .setContentText(content)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setProgress(100, progressPercent, !isScanning)
+            .setProgress(100, percent ?: 0, percent == null)
             .setContentIntent(pendingIntent)
             .build()
     }

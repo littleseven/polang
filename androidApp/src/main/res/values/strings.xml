@@ -871,11 +871,11 @@
     <string name="gallery_face_clustering_done">%1$d people found</string>
 
     <!-- Tag Generation Service -->
-    <string name="tag_gen_notification_title">TAG 生成</string>
-    <string name="tag_gen_notification_progress">%1$d / %2$d 张</string>
-    <string name="tag_gen_notification_starting">准备中…</string>
-    <string name="tag_gen_notification_idle">等待中</string>
-    <string name="tag_gen_notification_channel_desc">显示 TAG 生成进度</string>
+    <string name="tag_gen_notification_title">AI Tagging</string>
+    <string name="tag_gen_notification_idle">Idle</string>
+    <string name="tag_gen_notification_paused">Paused</string>
+    <string name="tag_gen_notification_completed">Completed</string>
+    <string name="tag_gen_notification_channel_desc">Shows AI tagging progress</string>
 
     <!-- Accessibility (contentDescription) -->
     <string name="cd_quick_actions">Quick Actions</string>
@@ -1312,17 +1312,27 @@
     <string name="tag_scan_full">Rescan all</string>
     <string name="tag_scan_incremental">Scan new</string>
     <string name="tag_scan_pausing">Pausing…</string>
-    <string name="tag_scan_state_running">Scanning</string>
     <string name="tag_scan_state_pausing">Pausing</string>
-    <string name="tag_scan_state_paused">Paused</string>
     <string name="tag_scan_state_cancelling">Cancelling</string>
-    <string name="tag_scan_state_cancelled">Cancelled</string>
-    <string name="tag_scan_state_completed">Completed</string>
-    <string name="tag_scan_state_idle">Idle</string>
-    <string name="tag_scan_waiting_task">Waiting for current task to finish</string>
     <string name="tag_scan_preparing">Preparing</string>
-    <string name="tag_scan_progress_line">Tasks %1$d/%2$d done · %3$d pending · %4$d failed</string>
-    <string name="tag_scan_eta">Est. remaining: %1$s</string>
+    <!-- 扫描态主状态卡（2026-10-01 口径立法 redesign）：阶段整句标题 + 叙述行 + 库级轨道 -->
+    <string name="tag_scan_now_preparing">Preparing scan…</string>
+    <string name="tag_scan_now_face">Detecting faces</string>
+    <string name="tag_scan_now_cluster">Clustering people</string>
+    <string name="tag_scan_now_content">Tagging photo content</string>
+    <string name="tag_scan_now_semantic">Encoding semantics</string>
+    <string name="tag_scan_narrative">Photo %1$d of %2$d · ~%3$s left</string>
+    <string name="tag_scan_narrative_no_eta">Photo %1$d of %2$d</string>
+    <string name="tag_scan_library_line">%1$d%% of library tagged</string>
+    <string name="tag_scan_paused_title">Paused · %1$s</string>
+    <string name="tag_scan_completed_with_failures">Completed · %1$d failed</string>
+    <string name="tag_scan_retry_failed_items">Retry failed</string>
+    <string name="tag_scan_interrupted_title">Scan interrupted</string>
+    <string name="tag_scan_interrupted_desc">The app was reclaimed by the system. Progress is saved.</string>
+    <string name="tag_scan_resume_breakpoint">Resume scan</string>
+    <string name="tag_pass_scope_face">%1$,d of %2$,d photos face-detected</string>
+    <string name="tag_pass_scope_content">%1$,d of %2$,d photos tagged</string>
+    <string name="tag_pass_scope_aesthetic">%1$,d of %2$,d photos scored</string>
     <string name="tag_pass_control_title">Stages</string>
     <string name="tag_pass_step_semantic">Semantic encoding (standalone)</string>
     <string name="tag_fine_control_title">Regenerate</string>

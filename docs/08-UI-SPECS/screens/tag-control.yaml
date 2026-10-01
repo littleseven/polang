@@ -40,6 +40,11 @@ tag_control:
     removed: "底部阶段进度条（v1 有，v2 删）"
 
   # ── 区块 2：Scan ──
+  # ── 区块 2：Scan（2026-10-01 单口径锚点重设计，spec 2026-10-01-scan-progress-ux-redesign）──
+  # 口径立法（全 app 唯一对外百分比）：库级 AI 打标完成率 =
+  # round((totalMedia − remainingPass3) / totalMedia × 100)，计算点 domain LibraryCompletion.percentRounded()，
+  # 圆环/主卡库级行/通知 setProgress/任务中心进度条四面同源同舍入。
+  # 任务级进度只允许「第 x/y 张」自然语言叙述形态（tag_scan_narrative*），禁止渲染为百分比。
   scan:
     idle_scan_action_card:
       status_chip:
@@ -52,7 +57,11 @@ tag_control:
           pending: { text: "tag_scan_chip_pending = %1$d pending", fg_bg: "#FFB020 系" }
       title: { size: 14 }                          # tag_scan_status / 标题短文案
       caption: "空闲=『图库共 %1$d 项 · 待处理 %2$d 项』；终态=『已扫描 %1$d 项 · 失败 %2$d 项』（参数化）"
-      progress_track: { height: 6, corner_radius: 3, track: surfaceVariant, fill: "brandGradient 按 (total−pending)/total 比例填充" }
+      progress_track:
+        height: 6
+        corner_radius: 3
+        track: surfaceVariant
+        fill: "brandGradient 按 Pass3 库级口径 (totalMedia−remainingPass3)/totalMedia 填充（与圆环同源，tagPassProgress(totalMedia, remainingPass3).fraction）"
       buttons:
         primary:                                   # GradientPillButton
           text: "tag_scan_incremental = Scan new"
@@ -65,18 +74,61 @@ tag_control:
           height: 40
           corner_radius: 20
           stroke: { width: 1, color: outlineVariant }
-    scanning: "沿用既有 ScanProgressCard / AestheticProgressCard + 会话控制（暂停/恢复/取消：secondaryContainer / error 容器着色）"
-    terminal: "上次会话结果摘要（终态展示）"
+
+    # 会话活跃/暂停/过渡/终态失败时的主状态卡：一张卡承载阶段名标题 + 任务级叙述行 +
+    # 库级完成率轨道 + 全部会话操作（原独立会话控制卡已并入，2026-10-01 删）。
+    # UI 状态全部由 domain 纯函数 scanCardUiModel(sessionProgress) 产出（§7 边界态矩阵），
+    # UI 层零逻辑。可见性：cardModel!=null 且（扫描活跃 ∨ 终态带失败 ∨ 无美学进度）。
+    active_scan_progress_card:
+      leading_icon:
+        running: "CircularProgressIndicator 20dp strokeWidth 2dp（RUNNING/PAUSING/CANCELLING）"
+        paused_or_terminal: "Icons.Rounded.Info 20dp"
+      title:                                       # 标题优先级：终态失败 > 暂停 > 过渡态 > 阶段名
+        running: "tag_scan_now_face / cluster / content / semantic / preparing（阶段名整句键）"
+        paused: "tag_scan_paused_title = 已暂停 · %1$s 打到一半（%1$s=阶段短名，复用 Stages 行标题键）"
+        pausing: "tag_scan_state_pausing"
+        cancelling: "tag_scan_state_cancelling"
+        terminal_with_failures: "tag_scan_completed_with_failures = %1$d 项失败"
+      narrative_line:                              # 任务级唯一允许的形态：自然语言「第 x/y 张」
+        with_eta: "tag_scan_narrative = 第 %1$d/%2$d 张 · 约 %3$s 剩余（%3$s=formatDuration ETA）"
+        no_eta: "tag_scan_narrative_no_eta = 第 %1$d/%2$d 张（PAUSED 态与 ETA 缺失时）"
+        hidden: "total=0 或终态失败卡（无叙述行）"
+      library_track:                               # 唯一百分比轨道；终态失败卡不显示
+        bar: "LinearProgressIndicator 高 4dp 全宽，fill=LibraryCompletion.fraction"
+        caption: "tag_scan_library_line = 全库已打标 %1$d%%（percentRounded()）"
+      buttons:                                     # 按钮集由 scanCardUiModel 决定；等宽 weight(1f)
+        running: "[暂停 outlined] [取消 outlined]"
+        pausing: "[暂停中 disabled] [取消 outlined]"
+        paused: "[继续 filled] [取消 outlined]"
+        cancelling: "[取消中 disabled]（取消按钮隐藏）"
+        terminal_with_failures: "[tag_scan_retry_failed_items filled]"
+      container_color:                             # 内容色随容器自动配对
+        running_transition: primaryContainer       # RUNNING/PAUSING/CANCELLING
+        paused: secondaryContainer
+        terminal_with_failures: errorContainer
+    aesthetic_card_mutex:                          # 美学打分（非会话制）同槽位独立卡，
+      visible_when: "aestheticProgress!=null 且 !isScanning"   # 与主状态卡互斥不叠卡
+    interrupted_card:                              # 进程死亡对账（registry FAILED）后显示
+      visible_when: "cardModel==null 且 无美学进度 且 tagscan:main 任务 FAILED"
+      title: "tag_scan_interrupted_title"
+      desc: "tag_scan_interrupted_desc"
+      primary: "tag_scan_resume_breakpoint（增量续扫=断点续跑，天然不重扫已完成项）"
+
+    terminal: "零失败 COMPLETED → 主卡消失，回落 idle_scan_action_card 终态 caption（已扫描/失败统计）"
 
   # ── 区块 3：Stages ──
+  # 会话活跃（含暂停/过渡态）时锁定：整卡 alpha 0.38 + 点击守卫，防误触互斥操作。
+  # 行口径：trailing 百分比 = tagPassProgress().percentRounded()（与圆环同源舍入）；
+  # description 参数化为库级覆盖叙述（tag_pass_scope_*），空库回落静态描述键。
   stages:
     section_header: { title_size: 11, hint: "tag_stages_hint" }
+    locked_when_scanning: { alpha: 0.38, click: guarded }
     rows:                                          # StageRow ×4
-      - { title: "tag_pass_title_face = Faces", trailing: "<百分比> + chevron" }
-      - { title: "tag_pass_title_cluster = People", trailing: "<人数> + chevron" }
-      - { title: "tag_pass_title_content = Content tags", trailing: "<百分比> + chevron" }
-      - { title: "tag_pass_title_aesthetic = Quality scores", trailing: "<百分比> + chevron" }
-    row_click: "→ StageActionSheet"
+      - { title: "tag_pass_title_face = Faces", desc: "tag_pass_scope_face = 全库 %2$d 张中已检测 %1$d 张", trailing: "<percentRounded()%> + chevron" }
+      - { title: "tag_pass_title_cluster = People", desc: "tag_pass_desc_cluster（静态）", trailing: "<人数> + chevron" }
+      - { title: "tag_pass_title_content = Content tags", desc: "tag_pass_scope_content = 全库 %2$d 张中已打标 %1$d 张", trailing: "<percentRounded()%> + chevron" }
+      - { title: "tag_pass_title_aesthetic = Quality scores", desc: "tag_pass_scope_aesthetic = 全库 %2$d 张中已评分 %1$d 张", trailing: "<percentRounded()%> + chevron" }
+    row_click: "→ StageActionSheet（锁定时不可达）"
     stage_action_sheet:                            # ModalBottomSheet，视觉定稿 ardot tag_stage_sheet
       background: surfaceContainerHighest
       desc: "tag_stage_sheet_desc"
@@ -92,8 +144,10 @@ tag_control:
     removed: "行内「增量/全量」双按钮（v2 删，防误触）"
 
   # ── 区块 4：Regenerate ──
+  # 会话活跃（含暂停/过渡态）时锁定：alpha 0.38 + 提交按钮 return 守卫。
   regenerate:
-    section_header: { title: "tag_fine_control_title = Regenerate" }
+    section_header: { title: "tag_fine_control_title = Regenerate", title_size: 11 }
+    locked_when_scanning: { alpha: 0.38, submit: guarded }
     category_chips:                                # CategoryChip 组（多选）
       height: 28
       corner_radius: 100
@@ -147,6 +201,7 @@ tag_control:
     - "行内增量/全量按钮（tag_action_incremental / tag_action_full）"
     - "2026-09-05：GallerySettingsHeader 页头注入（GPU 加速收口至 tag_accel 卡）"
     - "2026-09-05：Settings 休眠 GALLERY 分类整块 + SettingsCategory.GALLERY 枚举（12 个字符串键随删）"
+    - "2026-10-01：独立会话控制卡（暂停/恢复/取消并入主状态卡；tag_scan_state_running/paused/cancelled/completed/idle、tag_scan_waiting_task、tag_scan_progress_line、tag_scan_eta、tag_gen_notification_progress/starting 死键随删）"
 
   # ── 视觉令牌映射（AGENTS.md 块 + ardot 帧）──
   token_mapping:
@@ -165,7 +220,12 @@ tag_control:
   state_machine:
     idle_up_to_date: "无 pending 媒体 → chip=Up to date，Scan new 主按钮"
     idle_pending: "chip=N pending"
-    scanning: "进度卡 + 会话控制（可暂停/恢复/取消）"
+    scanning: "主状态卡（active_scan_progress_card，scanCardUiModel 驱动）：阶段名标题 + 第x/y张叙述 + 库级轨道 + 暂停/取消；Stages 与 Regenerate 锁定"
+    pausing_cancelling: "过渡态：主按钮 disabled（tag_scan_state_pausing/cancelling），取消按钮按 cancelEnabled"
+    paused: "主状态卡换 secondaryContainer：『已暂停 · 阶段 打到一半』+ 无 ETA 叙述 + 继续/取消；Stages/Regenerate 保持锁定"
+    terminal_zero_failures: "主卡消失 → idle_scan_action_card 终态 caption（已扫描/失败统计）"
+    terminal_with_failures: "errorContainer 主卡 + RETRY_FAILED 按钮（intentRetryFailed）"
+    interrupted: "进程死亡对账 FAILED → interrupted_card，增量续扫断点恢复"
     stage_sheet_open: "点 StageRow → sheet；new 直接执行；full 先确认再执行"
     regenerate_submitted: "按 categories × timeRange × overwrite 下发 intentRegenerateCategories"
 

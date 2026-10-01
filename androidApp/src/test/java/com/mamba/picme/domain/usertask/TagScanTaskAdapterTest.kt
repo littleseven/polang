@@ -2,6 +2,7 @@ package com.mamba.picme.domain.usertask
 
 import com.mamba.picme.data.local.dao.UserTaskDao
 import com.mamba.picme.data.local.entity.UserTaskEntity
+import com.mamba.picme.domain.tag.scan.LibraryCompletion
 import com.mamba.picme.domain.tag.scan.ScanSessionState
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,13 +58,27 @@ class TagScanTaskAdapterTest {
     @Test
     fun `RUNNING 会话同步为活动任务含进度`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
-        adapter.sync(progress(ScanSessionState.RUNNING, processed = 10, total = 20, eta = 5000L))
+        adapter.sync(
+            progress(ScanSessionState.RUNNING, processed = 10, total = 20, eta = 5000L),
+            library = LibraryCompletion(totalMedia = 1000, remainingPass3 = 904),
+        )
         val task = registry.tasks.value.single()
         assertEquals("tagscan:main", task.id)
         assertEquals(UserTaskStatus.RUNNING, task.status)
-        assertEquals(0.5f, task.progress)
+        // 口径立法：进度条喂库级完成率（96/1000），不再喂任务级 10/20
+        assertEquals(0.096f, task.progress!!, 1e-5f)
+        // progressText 保持「本次 x/y」数字中性辅助行
         assertEquals("10/20", task.progressText)
         assertEquals(5000L, task.etaMs)
+    }
+
+    @Test
+    fun `库级完成率缺失时回退任务级进度`() = runTest {
+        val (registry, adapter, _) = fixture(testScheduler)
+        adapter.sync(progress(ScanSessionState.RUNNING, processed = 10, total = 20), library = null)
+        val task = registry.tasks.value.single()
+        assertEquals(0.5f, task.progress!!, 1e-5f)
+        assertEquals("10/20", task.progressText)
     }
 
     @Test

@@ -862,11 +862,11 @@
     <string name="chat_input_hint">向 AI 助手提問…</string>
 
     <!-- Tag Generation Notifications -->
-    <string name="tag_gen_notification_title">TAG 生成</string>
-    <string name="tag_gen_notification_progress">%1$d / %2$d 張</string>
-    <string name="tag_gen_notification_starting">準備中…</string>
-    <string name="tag_gen_notification_idle">等待中</string>
-    <string name="tag_gen_notification_channel_desc">顯示 TAG 生成進度</string>
+    <string name="tag_gen_notification_title">AI 標記</string>
+    <string name="tag_gen_notification_idle">閒置</string>
+    <string name="tag_gen_notification_paused">已暫停</string>
+    <string name="tag_gen_notification_completed">已完成</string>
+    <string name="tag_gen_notification_channel_desc">顯示 AI 標記進度</string>
 
     <!-- Accessibility (contentDescription) -->
     <string name="cd_quick_actions">快捷操作</string>
@@ -1303,17 +1303,27 @@
     <string name="tag_scan_full">全量重掃</string>
     <string name="tag_scan_incremental">掃描新增</string>
     <string name="tag_scan_pausing">暫停中…</string>
-    <string name="tag_scan_state_running">掃描中</string>
     <string name="tag_scan_state_pausing">暫停中</string>
-    <string name="tag_scan_state_paused">已暫停</string>
     <string name="tag_scan_state_cancelling">取消中</string>
-    <string name="tag_scan_state_cancelled">已取消</string>
-    <string name="tag_scan_state_completed">完成</string>
-    <string name="tag_scan_state_idle">閒置</string>
-    <string name="tag_scan_waiting_task">等待目前任務結束</string>
     <string name="tag_scan_preparing">準備中</string>
-    <string name="tag_scan_progress_line">任務 %1$d/%2$d 完成 · 待處理 %3$d · 失敗 %4$d</string>
-    <string name="tag_scan_eta">預計剩餘: %1$s</string>
+    <!-- 掃描態主狀態卡（2026-10-01 口径立法 redesign）：階段整句標題 + 敘述行 + 庫級軌道 -->
+    <string name="tag_scan_now_preparing">正在準備掃描…</string>
+    <string name="tag_scan_now_face">正在辨識人臉</string>
+    <string name="tag_scan_now_cluster">正在聚類人物</string>
+    <string name="tag_scan_now_content">正在標記內容標籤</string>
+    <string name="tag_scan_now_semantic">正在編碼語意</string>
+    <string name="tag_scan_narrative">第 %1$d/%2$d 張 · 約 %3$s</string>
+    <string name="tag_scan_narrative_no_eta">第 %1$d/%2$d 張</string>
+    <string name="tag_scan_library_line">全庫已標記 %1$d%%</string>
+    <string name="tag_scan_paused_title">已暫停 · %1$s 進行到一半</string>
+    <string name="tag_scan_completed_with_failures">已完成 · %1$d 張失敗</string>
+    <string name="tag_scan_retry_failed_items">重試失敗項目</string>
+    <string name="tag_scan_interrupted_title">掃描已中斷</string>
+    <string name="tag_scan_interrupted_desc">App 被系統回收，進度已保存</string>
+    <string name="tag_scan_resume_breakpoint">從中斷處繼續</string>
+    <string name="tag_pass_scope_face">全庫 %2$,d 張中已辨識 %1$,d 張</string>
+    <string name="tag_pass_scope_content">全庫 %2$,d 張中已標記 %1$,d 張</string>
+    <string name="tag_pass_scope_aesthetic">全庫 %2$,d 張中已評分 %1$,d 張</string>
     <string name="tag_pass_control_title">分階段</string>
     <string name="tag_pass_step_semantic">語義編碼（單獨）</string>
     <string name="tag_fine_control_title">重新產生</string>

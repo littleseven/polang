@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -52,9 +53,20 @@ import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.entity.TagScanPass
 import com.mamba.picme.domain.aesthetic.AestheticScoreWorker
 import com.mamba.picme.domain.tag.TagCategory
+import com.mamba.picme.domain.tag.scan.LibraryCompletion
+import com.mamba.picme.domain.tag.scan.ScanCardAction
+import com.mamba.picme.domain.tag.scan.ScanCardUiModel
 import com.mamba.picme.domain.tag.scan.ScanSessionState
+import com.mamba.picme.domain.tag.scan.ScanStage
+import com.mamba.picme.domain.tag.scan.TagPassProgress
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.domain.tag.scan.TagScanOrchestrator
+import com.mamba.picme.domain.tag.scan.formatDuration
+import com.mamba.picme.domain.tag.scan.percentRounded
+import com.mamba.picme.domain.tag.scan.scanCardUiModel
+import com.mamba.picme.domain.tag.scan.tagPassProgress
+import com.mamba.picme.domain.usertask.TagScanTaskAdapter
+import com.mamba.picme.domain.usertask.UserTaskStatus
 import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.service.tag.TagGenerationService
 import com.mamba.picme.util.permission.BackgroundScanGuard
@@ -86,6 +98,13 @@ fun TagGenerationControlScreen(
     // ── 通过 AppContainer 观察 TAG 生成状态（Service 内部分发） ───
     val sessionProgress by app.container.tagGenerationSessionProgress.collectAsState()
     val isScanning by app.container.tagGenerationIsScanning.collectAsState()
+    // 库级 AI 打标完成率（口径立法唯一百分比）；无活跃会话时为 null
+    val libraryCompletion by app.container.tagGenerationLibraryCompletion.collectAsState()
+    // 进程死亡对账（FAILED + PROCESS_TERMINATED）驱动「扫描已中断」卡
+    val userTasks by app.container.userTaskRegistry.tasks.collectAsState()
+    val scanInterrupted = userTasks.any { task ->
+        task.id == TagScanTaskAdapter.TASK_ID && task.status == UserTaskStatus.FAILED
+    }
     // 附属打分器（美学/人脸画质）进度：非会话制，null = 空闲；顶部进度卡优先显示活跃任务
     val aestheticProgress by app.container.aestheticScoreWorker.progress.collectAsState()
     val currentState = sessionProgress?.state
@@ -295,105 +314,45 @@ fun TagGenerationControlScreen(
             // ── Scan ──
             SectionHeader(title = stringResource(R.string.tag_section_scan))
 
-            // ── 当前任务进度卡片（统一槽位）─────────────────────
-            // 扫描会话活跃时优先显示扫描进度（美学打分此时已被 Service 互斥取消，
-            // 此处再兜底防竞态）；空闲时美学评分运行则显示打分进度，否则显示会话终态。
-            // 美学评分非会话制（不进 TagScanOrchestrator），会话卡片只反映扫描本身。
+            // ── 当前任务进度卡片（统一槽位，单口径锚点 + 分层披露）──────
+            // 一张主状态卡承载阶段名标题 + 任务级叙述行 + 库级轨道 + 全部会话操作；
+            // 美学打分（非会话制）沿用独立卡但同槽位互斥；进程死亡对账后显示中断卡。
             val scanActive = isScanning
+            val cardModel = sessionProgress?.let { value -> scanCardUiModel(value) }
             AnimatedVisibility(visible = aestheticProgress != null && !scanActive) {
                 aestheticProgress?.let { AestheticProgressCard(it) }
             }
-            AnimatedVisibility(visible = sessionProgress != null && (scanActive || aestheticProgress == null)) {
-                sessionProgress?.let { ScanProgressCard(it) }
-            }
-
-            // ── 会话控制（扫描活跃时显示） ────────────────
-            AnimatedVisibility(visible = isRunning || isPausing || isPaused) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+            AnimatedVisibility(
+                visible = cardModel != null &&
+                        (scanActive || cardModel?.isTerminalWithFailures == true || aestheticProgress == null)
+            ) {
+                cardModel?.let { model ->
+                    ScanProgressCard(
+                        model = model,
+                        library = libraryCompletion,
+                        onPause = { context.startForegroundService(TagGenerationService.intentPause(context)) },
+                        onResume = { context.startForegroundService(TagGenerationService.intentResume(context)) },
+                        onCancel = { context.startForegroundService(TagGenerationService.intentCancel(context)) },
+                        onRetryFailed = { context.startForegroundService(TagGenerationService.intentRetryFailed(context)) }
                     )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        when {
-                            isRunning -> {
-                                OutlinedButton(
-                                    onClick = {
-                                        context.startForegroundService(TagGenerationService.intentPause(context))
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Rounded.Pause, null, Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(stringResource(R.string.pause))
-                                }
-                            }
-                            isPausing -> {
-                                OutlinedButton(
-                                    onClick = {},
-                                    enabled = false,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Rounded.Pause, null, Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(stringResource(R.string.tag_scan_pausing))
-                                }
-                            }
-                            isPaused -> {
-                                Button(
-                                    onClick = {
-                                        context.startForegroundService(TagGenerationService.intentResume(context))
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Rounded.PlayArrow, null, Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(stringResource(R.string.resume))
-                                }
-                            }
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                context.startForegroundService(TagGenerationService.intentCancel(context))
-                            },
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Rounded.Cancel, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.cancel))
-                        }
-
-                        if ((sessionProgress?.failed ?: 0) > 0) {
-                            OutlinedButton(
-                                onClick = {
-                                    context.startForegroundService(TagGenerationService.intentRetryFailed(context))
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Rounded.Refresh, null, Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(stringResource(R.string.retry))
-                            }
+                }
+            }
+            AnimatedVisibility(visible = cardModel == null && aestheticProgress == null && scanInterrupted) {
+                InterruptedScanCard(
+                    onResume = {
+                        startScanWithGuard {
+                            context.startForegroundService(TagGenerationService.intentScanIncremental(context))
                         }
                     }
-                }
+                )
             }
 
             // ── 空闲时的扫描操作卡（大按钮区分 新增/全量）──
             AnimatedVisibility(visible = !isRunning && !isPausing && !isPaused) {
                 ScanActionCard(
                     totalMedia = totalMedia,
-                    pendingCount = remainingPass1 + remainingPass3,
+                    // 口径立法：pending 与圆环同为 Pass3 库级口径（未打标媒体数）
+                    pendingCount = remainingPass3,
                     lastSession = sessionProgress,
                     onScanNew = {
                         refreshStats()
@@ -411,25 +370,34 @@ fun TagGenerationControlScreen(
             }
 
             // ── 分阶段（点按行弹出操作弹层，避免增量/全量误触）──
+            // 扫描会话活跃（含暂停）时精细控制锁定：降透明度 + 禁用点击，防误触互斥操作
+            val controlsLocked = cardModel != null
             SectionHeader(
                 title = stringResource(R.string.tag_pass_control_title),
                 hint = stringResource(R.string.tag_stages_hint)
             )
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (controlsLocked) 0.38f else 1f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
                 )
             ) {
                 Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                    val faceProgress = tagPassProgress(totalMedia, remainingPass1)
                     StageRow(
                         icon = Icons.Rounded.Face,
                         iconTint = Color(0xFFFF7EB0),
                         title = stringResource(R.string.tag_pass_title_face),
-                        description = stringResource(R.string.tag_pass_desc_face),
-                        trailing = stagePercentText(tagPassProgress(totalMedia, remainingPass1)),
-                        onClick = { stageSheetTarget = TagStage.FACE }
+                        description = if (faceProgress.isEmpty) {
+                            stringResource(R.string.tag_pass_desc_face)
+                        } else {
+                            stringResource(R.string.tag_pass_scope_face, faceProgress.processed, faceProgress.total)
+                        },
+                        trailing = stagePercentText(faceProgress),
+                        onClick = { if (!controlsLocked) stageSheetTarget = TagStage.FACE }
                     )
                     StageRow(
                         icon = Icons.Rounded.Person,
@@ -437,23 +405,33 @@ fun TagGenerationControlScreen(
                         title = stringResource(R.string.tag_pass_title_cluster),
                         description = stringResource(R.string.tag_pass_desc_cluster),
                         trailing = if (personCount > 0) "$personCount" else "—",
-                        onClick = { stageSheetTarget = TagStage.PEOPLE }
+                        onClick = { if (!controlsLocked) stageSheetTarget = TagStage.PEOPLE }
                     )
+                    val contentProgress = tagPassProgress(totalMedia, remainingPass3)
                     StageRow(
                         icon = Icons.Rounded.Label,
                         iconTint = Color(0xFF22D3EE),
                         title = stringResource(R.string.tag_pass_title_content),
-                        description = stringResource(R.string.tag_pass_desc_content),
-                        trailing = stagePercentText(tagPassProgress(totalMedia, remainingPass3)),
-                        onClick = { stageSheetTarget = TagStage.CONTENT }
+                        description = if (contentProgress.isEmpty) {
+                            stringResource(R.string.tag_pass_desc_content)
+                        } else {
+                            stringResource(R.string.tag_pass_scope_content, contentProgress.processed, contentProgress.total)
+                        },
+                        trailing = stagePercentText(contentProgress),
+                        onClick = { if (!controlsLocked) stageSheetTarget = TagStage.CONTENT }
                     )
+                    val qualityProgress = tagPassProgress(photoCount, photoCount - aestheticScored)
                     StageRow(
                         icon = Icons.Rounded.Star,
                         iconTint = Color(0xFF4ADE80),
                         title = stringResource(R.string.tag_pass_title_aesthetic),
-                        description = stringResource(R.string.tag_pass_desc_aesthetic),
-                        trailing = stagePercentText(tagPassProgress(photoCount, photoCount - aestheticScored)),
-                        onClick = { stageSheetTarget = TagStage.QUALITY }
+                        description = if (qualityProgress.isEmpty) {
+                            stringResource(R.string.tag_pass_desc_aesthetic)
+                        } else {
+                            stringResource(R.string.tag_pass_scope_aesthetic, qualityProgress.processed, qualityProgress.total)
+                        },
+                        trailing = stagePercentText(qualityProgress),
+                        onClick = { if (!controlsLocked) stageSheetTarget = TagStage.QUALITY }
                     )
                 }
             }
@@ -461,7 +439,9 @@ fun TagGenerationControlScreen(
             // ── 精细控制：按类别 / 时间范围重新生成 ──────────
             SectionHeader(title = stringResource(R.string.tag_fine_control_title))
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (controlsLocked) 0.38f else 1f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -573,6 +553,7 @@ fun TagGenerationControlScreen(
                         cornerRadius = 22.dp,
                         fontSize = 14.sp,
                         onClick = {
+                            if (controlsLocked) return@GradientPillButton
                             refreshStats()
                             val categories = selectedCategories.ifEmpty { TagCategory.ALL }
                             val startTimeMs = selectedTimeRange.startTimeMs
@@ -604,98 +585,204 @@ fun TagGenerationControlScreen(
     }
 }
 
+/**
+ * 扫描态主状态卡（spec 2026-10-01 §5.2）：阶段名标题 + 任务级叙述行 + 库级完成率轨道 +
+ * 全部会话操作（暂停/继续/取消/重试失败），替代旧进度卡 + 独立会话控制卡的两卡结构。
+ * 状态→标题/按钮集映射全在 domain 层 [scanCardUiModel]，此处纯渲染。
+ */
 @Composable
-private fun ScanProgressCard(progress: TagScanSessionProgress) {
-    val isScanning = progress.state in setOf(
-        ScanSessionState.RUNNING,
-        ScanSessionState.PAUSING,
-        ScanSessionState.CANCELLING
-    )
-    val stateText = when (progress.state) {
-        ScanSessionState.RUNNING -> stringResource(R.string.tag_scan_state_running)
-        ScanSessionState.PAUSING -> stringResource(R.string.tag_scan_state_pausing)
-        ScanSessionState.PAUSED -> stringResource(R.string.tag_scan_state_paused)
-        ScanSessionState.CANCELLING -> stringResource(R.string.tag_scan_state_cancelling)
-        ScanSessionState.CANCELLED -> stringResource(R.string.tag_scan_state_cancelled)
-        ScanSessionState.COMPLETED -> stringResource(R.string.tag_scan_state_completed)
-        ScanSessionState.IDLE -> stringResource(R.string.tag_scan_state_idle)
+private fun ScanProgressCard(
+    model: ScanCardUiModel,
+    library: LibraryCompletion?,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onRetryFailed: () -> Unit,
+) {
+    val containerColor = when {
+        model.isTerminalWithFailures -> MaterialTheme.colorScheme.errorContainer
+        model.isPaused -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.primaryContainer
     }
-
+    val contentColor = when {
+        model.isTerminalWithFailures -> MaterialTheme.colorScheme.onErrorContainer
+        model.isPaused -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onPrimaryContainer
+    }
+    val title = scanCardTitle(model)
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = when (progress.state) {
-                ScanSessionState.PAUSED -> MaterialTheme.colorScheme.secondaryContainer
-                ScanSessionState.CANCELLED -> MaterialTheme.colorScheme.errorContainer
-                else -> MaterialTheme.colorScheme.primaryContainer
-            }
-        ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isScanning) {
+                val active = model.primaryAction == ScanCardAction.PAUSE ||
+                        (model.primaryAction == ScanCardAction.NONE && !model.isTerminalWithFailures)
+                if (active) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = contentColor
                     )
                 } else {
                     Icon(
                         Icons.Rounded.Info,
                         null,
                         modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = contentColor
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                val subtitle = when {
-                    progress.state == ScanSessionState.CANCELLING -> stringResource(R.string.tag_scan_waiting_task)
-                    progress.state == ScanSessionState.CANCELLED -> ""
-                    progress.state == ScanSessionState.COMPLETED -> ""
-                    progress.currentPass == null -> stringResource(R.string.tag_scan_preparing)
-                    else -> passDisplayName(progress.currentPass)
-                }
                 Text(
-                    text = if (subtitle.isNotEmpty()) "$stateText · $subtitle" else stateText,
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = contentColor
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = {
-                    if (progress.total > 0) progress.processed.toFloat() / progress.total else 0f
-                },
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(
-                    R.string.tag_scan_progress_line,
-                    progress.processed,
-                    progress.total,
-                    progress.pending,
-                    progress.failed
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            if (progress.estimatedRemainingMs != null && isScanning) {
+            // 叙述行：任务级进度只允许自然语言形态（第 x/y 张 · 约 N 分钟）
+            model.narrative?.let { narrative ->
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    stringResource(R.string.tag_scan_eta, formatDuration(progress.estimatedRemainingMs)),
+                    text = if (narrative.etaMs != null) {
+                        stringResource(
+                            R.string.tag_scan_narrative,
+                            narrative.processed,
+                            narrative.total,
+                            formatDuration(narrative.etaMs)
+                        )
+                    } else {
+                        stringResource(R.string.tag_scan_narrative_no_eta, narrative.processed, narrative.total)
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    color = contentColor
                 )
             }
-            if (progress.messages.isNotEmpty()) {
+            // 库级完成率轨道：唯一百分比，与圆环/通知/任务中心同源同舍入
+            if (library != null && !model.isTerminalWithFailures) {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { library.fraction },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = contentColor,
+                    trackColor = contentColor.copy(alpha = 0.2f)
+                )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    progress.messages.last().text,
+                    text = stringResource(R.string.tag_scan_library_line, library.percentRounded()),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    color = contentColor.copy(alpha = 0.8f)
                 )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                when (model.primaryAction) {
+                    ScanCardAction.PAUSE -> OutlinedButton(onClick = onPause, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Rounded.Pause, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.pause))
+                    }
+                    ScanCardAction.RESUME -> Button(onClick = onResume, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Rounded.PlayArrow, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.resume))
+                    }
+                    ScanCardAction.RETRY_FAILED -> Button(onClick = onRetryFailed, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Rounded.Refresh, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.tag_scan_retry_failed_items))
+                    }
+                    ScanCardAction.NONE -> OutlinedButton(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Rounded.Pause, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            stringResource(
+                                if (model.cancelEnabled) R.string.tag_scan_state_pausing
+                                else R.string.tag_scan_state_cancelling
+                            )
+                        )
+                    }
+                }
+                if (model.cancelEnabled) {
+                    OutlinedButton(
+                        onClick = onCancel,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Rounded.Cancel, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 卡片标题：终态失败 > 暂停 > 过渡态 > 阶段名（全部整句文案键，无跨语拼接）。 */
+@Composable
+private fun scanCardTitle(model: ScanCardUiModel): String = when {
+    model.isTerminalWithFailures ->
+        stringResource(R.string.tag_scan_completed_with_failures, model.failedCount)
+    model.isPaused ->
+        stringResource(R.string.tag_scan_paused_title, scanStageShortName(model.stage))
+    model.primaryAction == ScanCardAction.NONE && model.cancelEnabled ->
+        stringResource(R.string.tag_scan_state_pausing)
+    model.primaryAction == ScanCardAction.NONE ->
+        stringResource(R.string.tag_scan_state_cancelling)
+    else -> when (model.stage) {
+        ScanStage.FACE -> stringResource(R.string.tag_scan_now_face)
+        ScanStage.CLUSTER -> stringResource(R.string.tag_scan_now_cluster)
+        ScanStage.CONTENT -> stringResource(R.string.tag_scan_now_content)
+        ScanStage.SEMANTIC -> stringResource(R.string.tag_scan_now_semantic)
+        ScanStage.PREPARING -> stringResource(R.string.tag_scan_now_preparing)
+    }
+}
+
+/** 暂停标题插值用的阶段短名（复用 Stages 行标题键）。 */
+@Composable
+private fun scanStageShortName(stage: ScanStage): String = when (stage) {
+    ScanStage.FACE -> stringResource(R.string.tag_pass_title_face)
+    ScanStage.CLUSTER -> stringResource(R.string.tag_pass_title_cluster)
+    ScanStage.CONTENT -> stringResource(R.string.tag_pass_title_content)
+    ScanStage.SEMANTIC -> stringResource(R.string.tag_pass_step_semantic)
+    ScanStage.PREPARING -> stringResource(R.string.tag_scan_preparing)
+}
+
+/** 进程死亡复活卡（spec §5.3）：对账 FAILED 后出现，主按钮增量续扫（天然断点续跑）。 */
+@Composable
+private fun InterruptedScanCard(onResume: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.tag_scan_interrupted_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.tag_scan_interrupted_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = onResume, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.PlayArrow, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.tag_scan_resume_breakpoint))
             }
         }
     }
@@ -740,15 +827,6 @@ private fun AestheticProgressCard(progress: AestheticScoreWorker.AestheticProgre
             )
         }
     }
-}
-
-@Composable
-private fun passDisplayName(pass: TagScanPass?): String = when (pass) {
-    TagScanPass.FACE_DETECTION -> stringResource(R.string.tag_pass_step_face)
-    TagScanPass.DBSCAN -> stringResource(R.string.tag_pass_step_cluster)
-    TagScanPass.IMAGE_TAGGING -> stringResource(R.string.tag_pass_step_content)
-    TagScanPass.MOBILE_CLIP_ENCODING -> stringResource(R.string.tag_pass_step_semantic)
-    null -> stringResource(R.string.tag_scan_preparing)
 }
 
 /** 区块标题行：左侧标题 + 可选右侧提示（设计稿 11sp 分区标签）。 */
@@ -925,11 +1003,8 @@ private fun ScanActionCard(
                     )
                 }
             }
-            val fraction = if (totalMedia > 0) {
-                ((totalMedia - pendingCount).coerceAtLeast(0)).toFloat() / totalMedia
-            } else {
-                0f
-            }
+            // 口径立法：与圆环同源同公式（pendingCount 即 remainingPass3）
+            val fraction = tagPassProgress(totalMedia, pendingCount).fraction
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1318,19 +1393,6 @@ private enum class TagStage { FACE, PEOPLE, CONTENT, QUALITY }
 
 private fun stagePercentText(progress: TagPassProgress): String =
     if (progress.isEmpty) "—" else "${progress.percentRounded()}%"
-
-internal fun formatDuration(ms: Long): String {
-    val seconds = ms / 1000
-    val minutes = seconds / 60
-    val hours = minutes / 60
-    val days = hours / 24
-    return when {
-        days > 0 -> "${days}d ${hours % 24}h"
-        hours > 0 -> "${hours}h ${minutes % 60}m"
-        minutes > 0 -> "${minutes}m ${seconds % 60}s"
-        else -> "${seconds}s"
-    }
-}
 
 private enum class TimeRangePreset(@StringRes val labelRes: Int, private val startOffsetMs: Long) {
     ALL(R.string.tag_time_range_all, 0),

@@ -858,7 +858,11 @@ class TagScanOrchestrator(
         _progress.value = TagScanSessionProgress(
             sessionId = sessionId,
             state = state,
-            currentPass = currentPass,
+            currentPass = retainedCurrentPass(
+                state = state,
+                incoming = currentPass,
+                previous = current?.takeIf { it.sessionId == sessionId }?.currentPass,
+            ),
             currentMediaId = currentMediaId,
             processed = processed,
             total = total,
