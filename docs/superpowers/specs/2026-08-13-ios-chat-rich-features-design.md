@@ -247,21 +247,21 @@ commonMain 已有引擎无关层（`shared/.../agent/core/js/`：`JsEngine` 接�
 ## §9 验收标准
 
 ### 功能（逐项对标 Android）
-- [ ] 流式逐字吐字（50ms/字 + 标点/CJK 块）；光标内联右侧、受 pacing 驱动
-- [ ] 11 type 建模；至少 AGENT_TEXT/MEDIA_RESULTS/USER_TEXT/USER_IMAGE_TEXT 端到端渲染正确
-- [ ] Markdown 表格→网格、代码块→折叠+复制
-- [ ] 媒体反馈 👍👎🔄 持久化
-- [ ] 模型胶囊切换生效
-- [ ] **JS 沙盒**：JS `1+2`→3；`bridge.callAsync('gallery.summary',{})` 返回相册摘要
-- [ ] **CHART 端到端**：`draw_chart` → JS 生成 SVG → `ChartSvgCard` 渲染成图
-- [ ] 键盘避让：系统处理，XCUITest `testKeyboardAvoidance` 绿
+- [x] 流式逐字吐字（50ms/字 + 标点/CJK 块）；光标内联右侧、受 pacing 驱动
+- [x] 11 type 建模；至少 AGENT_TEXT/MEDIA_RESULTS/USER_TEXT/USER_IMAGE_TEXT 端到端渲染正确
+- [x] Markdown 表格→网格、代码块→折叠+复制
+- [x] 媒体反馈 👍👎🔄 持久化
+- [x] 模型胶囊切换生效
+- [x] **JS 沙盒**：JS `1+2`→3；`bridge.callAsync('gallery.summary',{})` 返回相册摘要
+- [x] **CHART 端到端**：`draw_chart` → JS 生成 SVG → `ChartSvgCard` 渲染成图
+- [x] 键盘避让：系统处理，XCUITest `testKeyboardAvoidance` 绿
 
 ### 工程
-- [ ] `shared/commonMain` 纯度检查（`checkCommonMainPurity`）绿——新增文件无平台 import
-- [ ] commonTest（节奏器 + 分段器）全绿
-- [ ] Android 删本地重复定义后 `./gradlew :androidApp:assembleDebug` 绿 + Chat 回归无回归
-- [ ] iOS `xcodegen generate` → `xcodebuild` 绿（新增 commonMain KMP 互操作）
-- [ ] ktlint + detekt 绿
+- [x] `shared/commonMain` 纯度检查（`checkCommonMainPurity`）绿——新增文件无平台 import
+- [x] commonTest（节奏器 + 分段器）全绿
+- [x] Android 删本地重复定义后 `./gradlew :androidApp:assembleDebug` 绿 + Chat 回归无回归
+- [x] iOS `xcodegen generate` → `xcodebuild` 绿（新增 commonMain KMP 互操作）
+- [x] ktlint + detekt 绿
 
 ---
 

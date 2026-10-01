@@ -14,6 +14,8 @@
 
 ## 执行进展（2026-08-14，分支 `feat/ios-chat-rich-features`）
 
+> 2026-09-27 复盘勾选：批次①已交付（见下方 ✅ 记录与 commit），全部 step 勾选闭合。
+
 **已完成（7 commit，全程编译绿）**：
 - Task 1a commonMain 下沉（ChatMessageType + StreamingPacingController + MarkdownSegmenter + commonTest 19 用例 + 纯度门）
 - Task 2a Android 改引用（删本地重复 + import/`AgentSegmentType`→`SegmentType` 同步 + chat 单测绿）
@@ -99,7 +101,7 @@
 - Create: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/streaming/StreamingPacingControllerTest.kt`
 - Create: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/markdown/MarkdownSegmenterTest.kt`
 
-- [ ] **Step 1: ChatMessageType.kt**
+- [x] **Step 1: ChatMessageType.kt**
 
 ```kotlin
 package com.mamba.picme.domain.chat
@@ -109,7 +111,7 @@ enum class ChatMessageType {
 }
 ```
 
-- [ ] **Step 2: ChatMessage.kt（全字段 + 子类型）**
+- [x] **Step 2: ChatMessage.kt（全字段 + 子类型）**
 
 先 grep 确认 Android 子类型纯度：
 ```bash
@@ -141,19 +143,19 @@ data class ChatMessage(
 )
 ```
 
-- [ ] **Step 3: StreamingPacingController.kt（迁移）**
+- [x] **Step 3: StreamingPacingController.kt（迁移）**
 
 整文件复制 `androidApp/src/main/java/com/mamba/picme/features/chat/streaming/StreamingPacingController.kt` → 新路径。仅改：`package com.mamba.picme.domain.chat.streaming`。逻辑/常量/import 零改动（已确认仅依赖 `kotlinx.coroutines` + `kotlin.math`，commonMain 可用）。
 
-- [ ] **Step 4: MarkdownSegmenter.kt（迁移）**
+- [x] **Step 4: MarkdownSegmenter.kt（迁移）**
 
 复制 `androidApp/.../chat/ClaudeMarkdownSegmenter.kt` → 新路径，重命名 `MarkdownSegmenter`（类名 + 文件名去 Claude 前缀）。改 `package com.mamba.picme.domain.chat.markdown`。`enum AgentSegmentType`→`SegmentType`，`AgentSegment`→`Segment`。逻辑零改动（纯 Kotlin + 正则）。
 
-- [ ] **Step 5: 迁移 commonTest**
+- [x] **Step 5: 迁移 commonTest**
 
 复制 `androidApp/.../chat/streaming/StreamingPacingControllerTest.kt` 和 `ClaudeMarkdownSegmenterTest.kt` → commonTest 对应路径。改 package + import 指向 commonMain。`runTest` 在 commonTest 可用。
 
-- [ ] **Step 6: 验证（TDD pass + 纯度）**
+- [x] **Step 6: 验证（TDD pass + 纯度）**
 
 ```bash
 ./gradlew :shared:checkCommonMainPurity         # 纯度门（ADR-013）
@@ -161,7 +163,7 @@ data class ChatMessage(
 ```
 Expected: 纯度检查绿；commonTest 全绿（节奏器 8 用例 + 分段器用例）。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/ shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/
@@ -179,7 +181,7 @@ git commit -m "feat(shared): Chat 消息模型/节奏器/分段器下沉 commonM
 - Delete: `androidApp/.../features/chat/ClaudeMarkdownSegmenter.kt`
 - Delete: 对应 androidApp test
 
-- [ ] **Step 1: ChatScreen.kt 改 typealias**
+- [x] **Step 1: ChatScreen.kt 改 typealias**
 
 `ChatScreen.kt:2350` `data class ChatMessageUi(...)` → 替换为：
 ```kotlin
@@ -189,11 +191,11 @@ typealias ChatMessageUi = ChatMessage
 删 `enum class ChatMessageType`（line 2380，已下沉）。删本地子类型定义（OptimizeCandidateGroup 等，若在 ChatScreen.kt 或邻文件——grep 定位，已迁 commonMain 则删本地）。
 ChatScreen 全文 `ChatMessageUi` / `ChatMessageType` 引用不变（typealias 透明）。若字段名差异（如 Android `content` vs commonMain `content`）已对齐，无需改。
 
-- [ ] **Step 2: ChatViewModel.kt import 改包**
+- [x] **Step 2: ChatViewModel.kt import 改包**
 
 `import com.mamba.picme.features.chat.streaming.StreamingPacingController` → `import com.mamba.picme.domain.chat.streaming.StreamingPacingController`。同理 `ClaudeMarkdownSegmenter`→`MarkdownSegmenter`（domain.chat.markdown）。
 
-- [ ] **Step 3: 删 Android 本地文件**
+- [x] **Step 3: 删 Android 本地文件**
 
 ```bash
 git rm androidApp/src/main/java/com/mamba/picme/features/chat/streaming/StreamingPacingController.kt
@@ -202,7 +204,7 @@ git rm androidApp/src/test/java/com/mamba/picme/features/chat/streaming/Streamin
 git rm androidApp/src/test/java/com/mamba/picme/features/chat/ClaudeMarkdownSegmenterTest.kt
 ```
 
-- [ ] **Step 4: 验证编译 + Chat 回归**
+- [x] **Step 4: 验证编译 + Chat 回归**
 
 ```bash
 ./gradlew :androidApp:assembleDebug
@@ -210,7 +212,7 @@ git rm androidApp/src/test/java/com/mamba/picme/features/chat/ClaudeMarkdownSegm
 ```
 Expected: assembleDebug 绿；chat 相关单测绿（无回归）。若编译报 `ChatMessageUi` 字段缺失，对照 commonMain `ChatMessage` 补 typealias 或调整引用。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A androidApp/
@@ -225,7 +227,7 @@ git commit -m "refactor(android): Chat 模型/节奏器/分段器改引用 commo
 - Modify: `iosApp/PoLang/Features/Chat/ChatMessage.swift`
 - Modify: `iosApp/PoLang/Features/Chat/ChatHistoryStore.swift`（如有解码逻辑）
 
-- [ ] **Step 1: ChatMessage.swift 改 wrapper 消费 commonMain**
+- [x] **Step 1: ChatMessage.swift 改 wrapper 消费 commonMain**
 
 iOS 不直接用 commonMain `ChatMessage` 做 Codable（KMP Codable 跨平台复杂）。保留 `ChatMessage` 为 Swift struct，字段对齐 commonMain，`Codable` 向前兼容老数据（旧字段 role+text+mediaIds）：
 
@@ -259,11 +261,11 @@ struct ChatMessage: Identifiable, Codable {
 
 > 注：iOS `ChatMessage` 是 commonMain 模型的 Swift 投影（非 KMP 直接互操作），通过 ViewModel 在边界转换。本批保持 Swift-owned（避免 KMP Codable 踩坑），后续 KMP 整理阶段再评估直接消费 commonMain。
 
-- [ ] **Step 2: ChatViewModel/ChatView 字段引用更新**
+- [x] **Step 2: ChatViewModel/ChatView 字段引用更新**
 
 `messages[idx].text` → `messages[idx].content`（全局替换，因字段改名 text→content 对齐 commonMain）。`streamingUpdate` 等更新 content + showCursor。
 
-- [ ] **Step 3: 验证 iOS 编译**
+- [x] **Step 3: 验证 iOS 编译**
 
 ```bash
 cd iosApp && xcodegen generate && pod install && xcodebuild -workspace polang.xcworkspace -scheme polang -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build 2>&1 | tail -5
@@ -271,7 +273,7 @@ cd iosApp && xcodegen generate && pod install && xcodebuild -workspace polang.xc
 （或 device 构建：`-sdk iphoneos -destination 'generic/platform=iOS'`，按 Intel 机用 device，见 memory `ios-intel-dev-device-only-build`）
 Expected: BUILD SUCCEEDED。旧 chat_history JSON 能解码（写个临时单测或真机验证老会话可见）。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add iosApp/PoLang/Features/Chat/
@@ -290,7 +292,7 @@ git commit -m "feat(ios): Chat 消息模型扩字段对齐 commonMain + Codable 
 
 > 对照 Android `androidApp/.../chat/js/QuickJsEngine.kt`（实现同一 `JsEngine` 接口）+ `shared/.../agent/core/js/JsEngine.kt`（接口定义 5 方法）。
 
-- [ ] **Step 1: 写失败测试（JS 引擎基础）**
+- [x] **Step 1: 写失败测试（JS 引擎基础）**
 
 ```swift
 // JsCoreEngineTest.swift
@@ -309,18 +311,18 @@ final class JsCoreEngineTest: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 xcodebuild test -scheme polang -destination 'platform=iOS,name=<device>' -only-testing:PoLangTests/JsCoreEngineTest
 ```
 Expected: FAIL（JsCoreEngine 未定义）。
 
-- [ ] **Step 3: JsValueConverter.swift**
+- [x] **Step 3: JsValueConverter.swift**
 
 `JSValue` ↔ commonMain `JsValue`（SharedKit 暴露的 Kotlin protocol）。对照 Android `QuickJsConverter`。核心：JSValue.number/.string/.bool/.array/.dictionary → JsValue.num/str/bool/arr/obj；null/undefined→JsValue.null。
 
-- [ ] **Step 4: JsCoreEngine.swift（实现 JsEngine 5 方法）**
+- [x] **Step 4: JsCoreEngine.swift（实现 JsEngine 5 方法）**
 
 ```swift
 import JavaScriptCore
@@ -363,19 +365,19 @@ final class JsCoreEngine: JsEngine, JsClosable {
 ```
 > ⚠️ SharedKit 暴露的 Kotlin interface 方法签名（`dispatchSync`/`dispatchAsync` 参数标签）以 KMP 生成的 Swift 头为准——`xcodegen` 后查 `SharedKit.xcframework` 头文件确认实际签名，按它调。
 
-- [ ] **Step 5: GalleryHandlers.swift（native handlers）**
+- [x] **Step 5: GalleryHandlers.swift（native handlers）**
 
 注册进 commonMain `JsBridge`（参考 Android ChatRunScriptCapability 注册 gallery.summary/query/tags/timeline + media.meta）。只读 handler 本批实现（读 PHAsset / TagDatabase）；写 handler（delete_media/favorite）占位抛"not implemented"。
 对照 Android handler 实现（grep `gallery.summary\|registerHandler` in androidApp capability）逐个移植数据读取逻辑（Android 用 MediaStore，iOS 用 PHAsset/TagDatabase）。
 
-- [ ] **Step 6: 跑测试确认通过**
+- [x] **Step 6: 跑测试确认通过**
 
 ```bash
 xcodebuild test -scheme polang -destination 'platform=iOS,name=<device>' -only-testing:PoLangTests/JsCoreEngineTest
 ```
 Expected: PASS（1+2=3；gallery.summary 返回数据）。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add iosApp/PoLang/Platform/Js/ iosApp/PoLangTests/JsCoreEngineTest.swift iosApp/project.yml  # 新源文件须 xcodegen 入库
@@ -390,7 +392,7 @@ git commit -m "feat(ios): JS 沙盒接入 JavaScriptCore 实现 commonMain JsEng
 - Modify: `iosApp/PoLang/Features/Chat/ChatViewModel.swift`
 - Modify: `iosApp/PoLang/Features/Chat/ChatView.swift`（光标位置）
 
-- [ ] **Step 1: ChatViewModel 接 StreamingPacingController**
+- [x] **Step 1: ChatViewModel 接 StreamingPacingController**
 
 commonMain `StreamingPacingController`（domain.chat.streaming）经 SharedKit 暴露给 Swift。ViewModel 持有：
 ```swift
@@ -408,18 +410,18 @@ pacing?.start()
 
 > ⚠️ commonMain `StreamingPacingController` 构造需 `CoroutineScope`。iOS 侧用 Kotlin `MainScope()` 或经 SharedKit 提供的 main scope（查 SharedKit 是否暴露 helper；无则在 iosMain 加一个 `actual fun mainScope()`）。onPaced 回调签名以 KMP 头为准。
 
-- [ ] **Step 2: 光标内联右侧**
+- [x] **Step 2: 光标内联右侧**
 
 `ChatView.swift` agent 气泡：`HStack(alignment: .bottom) { AgentTextView(...); if msg.showCursor { BlinkCursor() } }`（从文本下方独立 HStack 移到内联右侧底对齐）。
 
-- [ ] **Step 3: 验证（真机验吐字 + 编译）**
+- [x] **Step 3: 验证（真机验吐字 + 编译）**
 
 ```bash
 xcodebuild ... build   # 编译绿
 # 真机：发一条长回复，观察逐字吐（~50ms/字）+ 标点停顿 + 光标吐字中可见完成消失
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add iosApp/PoLang/Features/Chat/
@@ -434,7 +436,7 @@ git commit -m "feat(ios): Chat 流式节奏器接入（commonMain StreamingPacin
 - Create: `iosApp/PoLang/Features/Chat/AgentTextView.swift`
 - Modify: `iosApp/PoLang/Features/Chat/ChatView.swift`（messageList 按 type 分发）
 
-- [ ] **Step 1: AgentTextView.swift（分段渲染）**
+- [x] **Step 1: AgentTextView.swift（分段渲染）**
 
 ```swift
 import SwiftUI
@@ -455,11 +457,11 @@ struct AgentTextView: View {
 ```
 `MarkdownSegmenter` 是 commonMain（domain.chat.markdown），经 SharedKit 暴露（`segment(text:)` 返回 `[Segment]`，Segment 有 `type`/`text`）。
 
-- [ ] **Step 2: TableView（自建网格）+ CodeBlockView（折叠+复制）**
+- [x] **Step 2: TableView（自建网格）+ CodeBlockView（折叠+复制）**
 
 `TableView`：调 `MarkdownSegmenter.parseTable(seg)` → 表头+数据行 → SwiftUI `Grid`（表头加粗）。`CodeBlockView`：等宽字体 + `@State expanded` + 复制按钮（`UIPasteboard.general.string = code`）。
 
-- [ ] **Step 3: ChatView messageList 按 type 分发**
+- [x] **Step 3: ChatView messageList 按 type 分发**
 
 ```swift
 switch msg.type {
@@ -472,14 +474,14 @@ case .agentEditResult, .optimizeCandidates, .command, .planPreview, .agentImage:
 }
 ```
 
-- [ ] **Step 4: 验证（编译 + 真机看表格/代码块）**
+- [x] **Step 4: 验证（编译 + 真机看表格/代码块）**
 
 ```bash
 xcodebuild ... build
 # 真机：让 agent 回复含 markdown 表格 + ```代码块```，确认网格渲染 + 代码折叠复制
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add iosApp/PoLang/Features/Chat/AgentTextView.swift iosApp/PoLang/Features/Chat/ChatView.swift
@@ -497,7 +499,7 @@ git commit -m "feat(ios): Chat Markdown 分段富渲染（表格网格 + 代码�
 
 > 依赖 Task 4（JsCoreEngine）+ Task 1（chartSvg 字段）。对照 Android `ChatRunScriptCapability.kt` + `ChatViewModel.emitChartMessage`。
 
-- [ ] **Step 1: ChartSvgCard.swift（WKWebView 渲染 SVG）**
+- [x] **Step 1: ChartSvgCard.swift（WKWebView 渲染 SVG）**
 
 ```swift
 import SwiftUI import WebKit
@@ -519,11 +521,11 @@ struct WebView: UIViewRepresentable {
 }
 ```
 
-- [ ] **Step 2: ChatRunScriptCapability iOS 接入**
+- [x] **Step 2: ChatRunScriptCapability iOS 接入**
 
 注册 `draw_chart`/`run_gallery_script` 命令 → 构造 `JsRuntime(engine: JsCoreEngine(), scope:, source: "chat")` → `runtime.evalAsync(code:, timeoutMs:)` → 解析返回 JsValue.Obj 取 `chart`/`summary`（对照 Android `obj.entries["chart"]`）。若 ChatRunScriptCapability 逻辑可下沉 commonMain 则下沉（优先），否则 iOS app 层等价实现并注册进 AgentOrchestrator/CapabilityRegistry。
 
-- [ ] **Step 3: ChatViewModel.emitChartMessage**
+- [x] **Step 3: ChatViewModel.emitChartMessage**
 
 ```swift
 func emitChartMessage(svg: String, summary: String) {
@@ -533,14 +535,14 @@ func emitChartMessage(svg: String, summary: String) {
 ```
 接入 capability 回调（draw_chart 结果 → emitChartMessage）。
 
-- [ ] **Step 4: 验证（CHART 端到端真机）**
+- [x] **Step 4: 验证（CHART 端到端真机）**
 
 ```bash
 xcodebuild ... build
 # 真机：chat 输入"画一个柱状图展示..." → agent 调 draw_chart → JS 生成 SVG → ChartSvgCard 渲染成图
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add iosApp/
@@ -556,7 +558,7 @@ git commit -m "feat(ios): CHART 端到端（draw_chart→JS生成SVG→ChartSvgC
 - Modify: `iosApp/PoLang/Features/Chat/ChatViewModel.swift`（feedbackState）
 - Modify: `iosApp/PoLang/Features/Chat/ChatHistoryStore.swift`（feedback 持久化）
 
-- [ ] **Step 1: feedbackState + 持久化**
+- [x] **Step 1: feedbackState + 持久化**
 
 ```swift
 // ChatViewModel
@@ -569,22 +571,22 @@ func onMediaFeedback(messageId: UUID, type: FeedbackType) {
 ```
 ChatHistoryStore 加 feedback 持久化（扩展 Codable 或单独 plist）。
 
-- [ ] **Step 2: MediaThumbnail 反馈按钮**
+- [x] **Step 2: MediaThumbnail 反馈按钮**
 
 卡片右上角 3 个 `FeedbackIconButton`（thumbUp/thumbDown/refresh），选中态高亮（accentColor），读 feedbackState。对照 Android `MediaResultsCarousel.kt:147-171`。
 
-- [ ] **Step 3: 模型胶囊**
+- [x] **Step 3: 模型胶囊**
 
 输入栏第二行加 `ModelCapsule`：`ModelConfigStore` 的 `hasUserKey` 为真时显示，下拉切 official/自配 Key（对齐 Android `ModelSelector.kt`）。读现有 `ModelConfigStore`（已存在）。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 ```bash
 xcodebuild ... build
 # 真机：媒体卡片点👍高亮+冷启仍选中；模型胶囊切换生效
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add iosApp/PoLang/Features/Chat/
@@ -602,11 +604,11 @@ git commit -m "feat(ios): Chat 媒体反馈 👍👎🔄 + 模型胶囊"
 
 > memory `ios-keyboard-avoidance-system-only`：系统在 TabView(.page) 内会处理避让，手动 lift 与系统叠加→过度上抬。
 
-- [ ] **Step 1: 删手动键盘避让**
+- [x] **Step 1: 删手动键盘避让**
 
 `ChatView.swift` 删：`@State keyboardHeight`、`keyboardWillChangeFrameNotification` onReceive、`GeometryReader` DEBUG dump、`.padding(.bottom, max(0, keyboardHeight - bottomSafeInset))`、`bottomSafeInset`。改回依赖系统 safeArea 避让（确认 body 不阻止系统 inset）。`DebugBypass.dumpViewHierarchy` 若仅此处引用则删。
 
-- [ ] **Step 2: 写 XCUITest 回归**
+- [x] **Step 2: 写 XCUITest 回归**
 
 ```swift
 // ChatKeyboardAvoidanceTest.swift
@@ -621,14 +623,14 @@ func testKeyboardAvoidance() {
 }
 ```
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
 ```bash
 xcodebuild test ... -only-testing:PoLangTests/ChatKeyboardAvoidanceTest
 # 真机：点输入框，输入栏不被键盘遮挡（系统处理）
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add iosApp/
@@ -639,11 +641,11 @@ git commit -m "fix(ios): Chat 键盘避让回退系统处理 + XCUITest 回归"
 
 ## Task 10: 全量验收 + 文档同步
 
-- [ ] **Step 1: spec §9 验收清单逐项**
+- [x] **Step 1: spec §9 验收清单逐项**
 
 逐条核对：节奏器吐字/11type 渲染/Markdown 表格代码块/JS 沙盒(1+2, gallery.summary)/CHART 端到端/媒体反馈持久化/模型胶囊/键盘避让 XCUITest。
 
-- [ ] **Step 2: 工程 gate**
+- [x] **Step 2: 工程 gate**
 
 ```bash
 ./gradlew :shared:checkCommonMainPurity
@@ -654,11 +656,11 @@ cd iosApp && xcodegen generate && xcodebuild ... build
 ```
 全绿。
 
-- [ ] **Step 3: 文档同步**
+- [x] **Step 3: 文档同步**
 
 更新 `docs/01-PRODUCT/IOS_TASK_STATUS.md` §6.2（Chat ~45%→对齐）+ §6 漂移记录加 08-13 Chat 批次行。
 
-- [ ] **Step 4: 最终 commit**
+- [x] **Step 4: 最终 commit**
 
 ```bash
 git add docs/
