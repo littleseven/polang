@@ -44,6 +44,7 @@ import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.PoLangApplication
@@ -1160,7 +1161,12 @@ private fun StageActionSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
     ) {
         Column(
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            // navigationBarsPadding：弹层内容须避让虚拟键（2026-10-01 真机实测取消钮下半截
+            // 压进 y2517+ 导航区被手势条遮挡；同 DedupSheets 正典写法），之上再留 16dp 呼吸
+            modifier = Modifier
+                .padding(start = 20.dp, end = 20.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -1268,20 +1274,25 @@ private fun StageActionOption(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (recommended) {
-                    Box(
+                    // 自适配胶囊：行高 12sp + Center 对齐修正 CJK 行盒不对称——原定高 16dp 胶囊
+                    // 下文字行盒(~17dp)更高且墨迹沉底，真机实测「推荐」比胶囊中心低 4dp 且贴边
+                    // 被裁（2026-10-01 像素测量 y1809-1835 vs 胶囊 y1785-1835）
+                    Text(
+                        text = stringResource(R.string.tag_action_recommended),
+                        fontSize = 10.sp,
+                        color = accent,
+                        style = LocalTextStyle.current.copy(
+                            lineHeight = 12.sp,
+                            lineHeightStyle = LineHeightStyle(
+                                alignment = LineHeightStyle.Alignment.Center,
+                                trim = LineHeightStyle.Trim.None
+                            )
+                        ),
                         modifier = Modifier
-                            .height(16.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(accent.copy(alpha = 0.2f))
-                            .padding(horizontal = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            stringResource(R.string.tag_action_recommended),
-                            fontSize = 10.sp,
-                            color = accent
-                        )
-                    }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
                 }
             }
             Text(
