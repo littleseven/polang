@@ -162,6 +162,13 @@ interface UserSettingsRepository {
     val mediaManageSilentTrashFlow: Flow<Boolean>
     suspend fun updateMediaManageSilentTrash(enabled: Boolean)
 
+    /**
+     * 「删除不再询问」删除现场一次性引导是否已展示过，默认 false。
+     * 展示并裁决（开启/保持确认/关闭弹窗）后置 true，此后不再在删除现场打扰。
+     */
+    val mediaManageSilentTrashGuidedFlow: Flow<Boolean>
+    suspend fun updateMediaManageSilentTrashGuided(guided: Boolean)
+
     val localAsrModelFlow: Flow<String>
     suspend fun updateLocalAsrModel(modelId: String)
 

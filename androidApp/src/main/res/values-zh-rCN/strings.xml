@@ -998,6 +998,10 @@
     <string name="settings_silent_trash_title">删除不再询问</string>
     <string name="settings_silent_trash_summary_granted">删除与移入回收站不再弹系统确认框</string>
     <string name="settings_silent_trash_summary_denied">需要在系统设置中允许媒体管理权限</string>
+    <string name="silent_trash_guide_title">删除时免确认？</string>
+    <string name="silent_trash_guide_message">当前每次删除都需系统确认。开启后照片直接移入回收站（30 天内可恢复），不再弹确认框。需前往系统授权一次「媒体管理」权限。</string>
+    <string name="silent_trash_guide_enable">开启</string>
+    <string name="silent_trash_guide_keep">保持确认</string>
     <string name="gallery_debug_features">相册调试功能</string>
     <string name="gallery_debug_features_desc">相册打标的测试工具与后端模式切换。</string>
     <string name="debug_image_download">图片下载调试</string>

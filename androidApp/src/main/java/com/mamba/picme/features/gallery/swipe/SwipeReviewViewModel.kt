@@ -9,6 +9,7 @@ import com.mamba.picme.domain.swipe.SwipeKeepHistory
 import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.swipe.SwipeQueueBuilder
 import com.mamba.picme.domain.trash.TrashBackend
+import com.mamba.picme.domain.trash.TrashGuidanceGate
 import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.domain.trash.TrashSessionController
 import kotlinx.coroutines.CoroutineDispatcher
@@ -73,6 +74,7 @@ sealed interface SwipeUiState {
 class SwipeReviewViewModel(
     private val organizeRepository: OrganizeRepository,
     trashBackend: TrashBackend,
+    trashGuidanceGate: TrashGuidanceGate? = null,
     private val keepHistoryStore: SwipeKeepHistoryStore,
     /** 测试注入作用域（避开 Dispatchers.Main）；生产为 null → viewModelScope。 */
     coroutineScope: CoroutineScope? = null,
@@ -83,7 +85,7 @@ class SwipeReviewViewModel(
 
     private val scope: CoroutineScope = coroutineScope ?: viewModelScope
 
-    val trashController = TrashSessionController(trashBackend, scope, ioDispatcher)
+    val trashController = TrashSessionController(trashBackend, scope, ioDispatcher, trashGuidanceGate)
 
     private val _uiState = MutableStateFlow<SwipeUiState>(SwipeUiState.Loading)
     val uiState: StateFlow<SwipeUiState> = _uiState.asStateFlow()

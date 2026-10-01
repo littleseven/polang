@@ -115,6 +115,9 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         // 「删除不再询问」：持 MANAGE_MEDIA 后回收站删除静默执行（零系统弹框），默认关闭
         val MEDIA_MANAGE_SILENT_TRASH = booleanPreferencesKey("media_manage_silent_trash")
 
+        // 「删除不再询问」删除现场一次性引导是否已展示过（防重复打扰），默认未展示
+        val MEDIA_MANAGE_SILENT_TRASH_GUIDED = booleanPreferencesKey("media_manage_silent_trash_guided")
+
         // 相机参数记忆
         val CAMERA_MEMORY_USE_FRONT_CAMERA = booleanPreferencesKey("camera_memory_use_front_camera")
         val CAMERA_MEMORY_CAPTURE_MODE = stringPreferencesKey("camera_memory_capture_mode")
@@ -968,6 +971,24 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
     override suspend fun updateMediaManageSilentTrash(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.MEDIA_MANAGE_SILENT_TRASH] = enabled
+        }
+    }
+
+    override val mediaManageSilentTrashGuidedFlow: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.MEDIA_MANAGE_SILENT_TRASH_GUIDED] ?: false
+        }
+
+    override suspend fun updateMediaManageSilentTrashGuided(guided: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.MEDIA_MANAGE_SILENT_TRASH_GUIDED] = guided
         }
     }
 

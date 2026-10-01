@@ -52,11 +52,14 @@ sealed interface TrashOutcome {
  * 直写 IS_TRASHED 零弹框，Trashed 直接入流、不产生 pendingRequest；返回 null 回落系统授权框通路。
  * 失败子集回落（2026-09-12）：直写被 ROM 拒绝时成功集照常入流，失败子集改走 token 通路
  * （持 MANAGE_MEDIA 时 createTrashRequest 免弹框自动通过），无感兜底不丢图。
+ * 一次性引导（2026-10-01）：快路径不可用且未引导过时，先经 [TrashGuidanceGate] 征询用户
+ * 「开启免确认删除」——开启并就绪后重试静默回收（本次删除零弹框），拒绝则回落系统授权框。
  */
 class TrashSessionController(
     private val backend: TrashBackend,
     private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher,
+    private val guidanceGate: TrashGuidanceGate? = null,
 ) {
     private val _pendingRequest = MutableStateFlow<PendingTrashRequest?>(null)
     val pendingRequest: StateFlow<PendingTrashRequest?> = _pendingRequest
@@ -108,8 +111,18 @@ class TrashSessionController(
             // 持 MANAGE_MEDIA 时 createTrashRequest 同样免弹框自动通过，无感兜底；
             // 未持权则退化为功能上线前的系统授权框行为。
             if (!isRestore) {
-                val silentTrashed = withContext(ioDispatcher) {
+                var silentTrashed = withContext(ioDispatcher) {
                     runCatching { backend.trySilentTrash(uris) }.getOrNull()
+                }
+                // 一次性引导：快路径不可用（开关关/无权限）且未引导过时征询用户；
+                // 开启并就绪 → 重试静默回收（本次删除零弹框）；拒绝/不适用 → 回落既有 token 通路。
+                // ask() 挂起期间 requestInFlight 保持置位（单槽语义），宿主解绑取消由既有分支兜底
+                if (silentTrashed == null && guidanceGate != null &&
+                    guidanceGate.ask() == TrashGuidanceDecision.Enabled
+                ) {
+                    silentTrashed = withContext(ioDispatcher) {
+                        runCatching { backend.trySilentTrash(uris) }.getOrNull()
+                    }
                 }
                 if (silentTrashed != null) {
                     if (requestInFlightCancelled) {

@@ -21,6 +21,7 @@ import com.mamba.picme.domain.repository.AndroidMediaRepository
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import com.mamba.picme.domain.trash.PreviewTrashRouting
 import com.mamba.picme.domain.trash.TrashBackend
+import com.mamba.picme.domain.trash.TrashGuidanceGate
 import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.domain.trash.TrashSessionController
 import com.mamba.picme.domain.usecase.GenerateSummaryOnDemandUseCase
@@ -51,7 +52,8 @@ class MediaViewModel(
     private val faceDetector: FaceDetector,
     private val generateSummaryOnDemandUseCase: GenerateSummaryOnDemandUseCase,
     private val userSettingsRepository: UserSettingsRepository,
-    trashBackend: TrashBackend
+    trashBackend: TrashBackend,
+    trashGuidanceGate: TrashGuidanceGate? = null,
 ) : ViewModel() {
 
     companion object {
@@ -62,7 +64,7 @@ class MediaViewModel(
      * 预览页上滑删除的回收站编排（系统回收站 30 天可恢复）。
      * 授权 IntentSender 的拉起与结果回调在 UI 层（共享组件 `TrashAuthEffects`，按 tag 分桶路由）。
      */
-    val trashController = TrashSessionController(trashBackend, viewModelScope, Dispatchers.IO)
+    val trashController = TrashSessionController(trashBackend, viewModelScope, Dispatchers.IO, trashGuidanceGate)
 
     /** 系统回收站可用性（API 30+）；宿主据此选择上滑删除提示文案。 */
     val isTrashSupported: Boolean get() = trashController.isSupported

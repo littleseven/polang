@@ -1007,6 +1007,10 @@
     <string name="settings_silent_trash_title">Delete Without Asking</string>
     <string name="settings_silent_trash_summary_granted">Deleting and moving to Trash no longer shows a system confirmation.</string>
     <string name="settings_silent_trash_summary_denied">Allow media management in system settings to enable silent deletion.</string>
+    <string name="silent_trash_guide_title">Delete without confirmation?</string>
+    <string name="silent_trash_guide_message">Every deletion asks the system to confirm. Turn this on once and photos go straight to Trash (recoverable for 30 days), with no more dialogs. You will be asked to allow media management once.</string>
+    <string name="silent_trash_guide_enable">Turn on</string>
+    <string name="silent_trash_guide_keep">Keep asking</string>
     <string name="gallery_debug_features">Gallery Debug Features</string>
     <string name="gallery_debug_features_desc">Testing tools and backend mode switches for gallery tagging.</string>
     <string name="debug_image_download">Image Download Debug</string>

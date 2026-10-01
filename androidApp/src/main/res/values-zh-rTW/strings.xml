@@ -998,6 +998,10 @@
     <string name="settings_silent_trash_title">刪除不再詢問</string>
     <string name="settings_silent_trash_summary_granted">刪除與移入回收站不再彈出系統確認框</string>
     <string name="settings_silent_trash_summary_denied">需要在系統設定中允許媒體管理權限</string>
+    <string name="silent_trash_guide_title">刪除時免確認？</string>
+    <string name="silent_trash_guide_message">目前每次刪除都需系統確認。開啟後照片直接移入回收桶（30 天內可復原），不再彈出確認框。需前往系統授權一次「媒體管理」權限。</string>
+    <string name="silent_trash_guide_enable">開啟</string>
+    <string name="silent_trash_guide_keep">保持確認</string>
     <string name="gallery_debug_features">相簿除錯功能</string>
     <string name="gallery_debug_features_desc">相簿打標的測試工具與後端模式切換。</string>
     <string name="debug_image_download">圖片下載調試</string>

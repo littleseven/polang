@@ -970,6 +970,10 @@
     <string name="settings_silent_trash_title">Supprimer sans demander</string>
     <string name="settings_silent_trash_summary_granted">La suppression et la mise à la corbeille n\'affichent plus de confirmation système.</string>
     <string name="settings_silent_trash_summary_denied">Autorisez la gestion des médias dans les réglages système.</string>
+    <string name="silent_trash_guide_title">Supprimer sans confirmation ?</string>
+    <string name="silent_trash_guide_message">Chaque suppression demande une confirmation système. Activez-le une fois et les photos iront directement à la corbeille (récupérables pendant 30 jours), sans plus de dialogues. Vous devrez autoriser la gestion des médias une seule fois.</string>
+    <string name="silent_trash_guide_enable">Activer</string>
+    <string name="silent_trash_guide_keep">Continuer à confirmer</string>
     <string name="gallery_debug_features">Fonctionnalités de débogage de la galerie</string>
     <string name="gallery_debug_features_desc">Outils de test et sélecteurs de modes backend pour l\'étiquetage de la galerie.</string>
     <string name="debug_image_download">Débogage du téléchargement d\'images</string>

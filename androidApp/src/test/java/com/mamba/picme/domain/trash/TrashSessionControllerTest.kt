@@ -53,8 +53,22 @@ class TrashSessionControllerTest {
         override suspend fun trySilentTrash(uris: List<String>): List<String>? = null
     }
 
-    private fun newController(scope: TestScope, backend: TrashBackend): TrashSessionController =
-        TrashSessionController(backend, scope, StandardTestDispatcher(scope.testScheduler))
+    private class FakeGate(
+        private val decisionProvider: () -> TrashGuidanceDecision = { TrashGuidanceDecision.KeepSystemConfirm },
+    ) : TrashGuidanceGate {
+        var askCalls = 0
+        override suspend fun ask(): TrashGuidanceDecision {
+            askCalls++
+            return decisionProvider()
+        }
+    }
+
+    private fun newController(
+        scope: TestScope,
+        backend: TrashBackend,
+        guidanceGate: TrashGuidanceGate? = null,
+    ): TrashSessionController =
+        TrashSessionController(backend, scope, StandardTestDispatcher(scope.testScheduler), guidanceGate)
 
     /** 收集 outcomes 流；测试尾必须 cancel（runTest 会等待子协程）。 */
     private fun TestScope.collectOutcomes(
@@ -346,6 +360,81 @@ class TrashSessionControllerTest {
         c.requestRestore(listOf("a"))
         advanceUntilIdle()
         // 恢复仍走系统授权 token（静默快路径仅覆盖 trash）
+        assertEquals("restore-token", c.pendingRequest.value?.token)
+    }
+
+    // ── 一次性引导门（TrashGuidanceGate）──
+
+    @Test
+    fun `guidance enabled retries silent trash and bypasses token path`() = runTest {
+        val backend = FakeBackend() // 初始 null：开关关/无权限
+        val gate = FakeGate {
+            // 用户在引导弹窗中点「开启」→ 开关 + 授权就绪，静默路径变为可用
+            backend.silentTrashResult = listOf("a", "b")
+            TrashGuidanceDecision.Enabled
+        }
+        val c = newController(this, backend, gate)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestTrash(listOf("a", "b"), tag = "cat:x")
+        advanceUntilIdle()
+        assertEquals(1, gate.askCalls)
+        // 本次删除零弹框：不构建 token、不产生 pending，直接 Trashed 入流
+        assertEquals(0, backend.buildTrashCalls)
+        assertNull(c.pendingRequest.value)
+        val outcome = received.single() as TrashOutcome.Trashed
+        assertEquals(listOf("a", "b"), outcome.trashedUris)
+        assertEquals("cat:x", outcome.tag)
+        job.cancel()
+    }
+
+    @Test
+    fun `guidance declined falls back to system token path`() = runTest {
+        val backend = FakeBackend()
+        val gate = FakeGate { TrashGuidanceDecision.KeepSystemConfirm }
+        val c = newController(this, backend, gate)
+        c.requestTrash(listOf("a"))
+        advanceUntilIdle()
+        // 用户保持确认：回落既有系统授权框通路
+        assertEquals(1, backend.buildTrashCalls)
+        assertEquals("trash-token", c.pendingRequest.value?.token)
+    }
+
+    @Test
+    fun `guidance enabled but retry still unavailable falls back to token path`() = runTest {
+        val backend = FakeBackend() // 开启后静默路径仍不可用（如授权未完成）
+        val gate = FakeGate { TrashGuidanceDecision.Enabled }
+        val c = newController(this, backend, gate)
+        c.requestTrash(listOf("a"))
+        advanceUntilIdle()
+        // 重试仍 null → 不死等，回落 token 通路兜底
+        assertEquals(1, gate.askCalls)
+        assertEquals(1, backend.buildTrashCalls)
+        assertEquals("trash-token", c.pendingRequest.value?.token)
+    }
+
+    @Test
+    fun `guidance not asked when silent path already engaged`() = runTest {
+        val backend = FakeBackend().apply { silentTrashResult = listOf("a") }
+        val gate = FakeGate { error("silent path engaged, gate must not be asked") }
+        val c = newController(this, backend, gate)
+        val received = mutableListOf<TrashOutcome>()
+        val job = collectOutcomes(c, received)
+        c.requestTrash(listOf("a"))
+        advanceUntilIdle()
+        assertEquals(0, gate.askCalls)
+        assertEquals(1, (received.single() as TrashOutcome.Trashed).trashedUris.size)
+        job.cancel()
+    }
+
+    @Test
+    fun `guidance not asked for restore requests`() = runTest {
+        val backend = FakeBackend()
+        val gate = FakeGate { error("restore must not trigger guidance") }
+        val c = newController(this, backend, gate)
+        c.requestRestore(listOf("a"))
+        advanceUntilIdle()
+        assertEquals(0, gate.askCalls)
         assertEquals("restore-token", c.pendingRequest.value?.token)
     }
 }

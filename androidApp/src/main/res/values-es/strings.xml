@@ -970,6 +970,10 @@
     <string name="settings_silent_trash_title">Eliminar sin preguntar</string>
     <string name="settings_silent_trash_summary_granted">Eliminar y mover a la papelera ya no mostrará una confirmación del sistema.</string>
     <string name="settings_silent_trash_summary_denied">Permite la gestión de contenido multimedia en los ajustes del sistema.</string>
+    <string name="silent_trash_guide_title">¿Eliminar sin confirmación?</string>
+    <string name="silent_trash_guide_message">Cada eliminación pide confirmación al sistema. Actívalo una vez y las fotos irán directamente a la papelera (recuperables durante 30 días), sin más diálogos. Se te pedirá permitir la gestión de multimedia una sola vez.</string>
+    <string name="silent_trash_guide_enable">Activar</string>
+    <string name="silent_trash_guide_keep">Seguir confirmando</string>
     <string name="gallery_debug_features">Funciones de depuración de la galería</string>
     <string name="gallery_debug_features_desc">Herramientas de prueba y conmutadores de modo de backend para el etiquetado de la galería.</string>
     <string name="debug_image_download">Depuración de descarga de imágenes</string>

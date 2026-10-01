@@ -9,6 +9,7 @@ import com.mamba.picme.domain.organize.OrganizeCategorizer
 import com.mamba.picme.domain.organize.OrganizeConfidence
 import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.trash.TrashBackend
+import com.mamba.picme.domain.trash.TrashGuidanceGate
 import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.domain.trash.TrashSessionController
 import kotlinx.coroutines.CoroutineDispatcher
@@ -88,6 +89,7 @@ class OrganizeCategoryViewModel(
     val category: OrganizeCategory,
     private val organizeRepository: OrganizeRepository,
     trashBackend: TrashBackend,
+    trashGuidanceGate: TrashGuidanceGate? = null,
     /** 测试注入作用域（避开 Dispatchers.Main）；生产为 null → viewModelScope。 */
     coroutineScope: CoroutineScope? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -95,7 +97,7 @@ class OrganizeCategoryViewModel(
 
     private val scope: CoroutineScope = coroutineScope ?: viewModelScope
 
-    val trashController = TrashSessionController(trashBackend, scope, ioDispatcher)
+    val trashController = TrashSessionController(trashBackend, scope, ioDispatcher, trashGuidanceGate)
 
     private val _uiState = MutableStateFlow<OrganizeCategoryUiState>(OrganizeCategoryUiState.Loading)
     val uiState: StateFlow<OrganizeCategoryUiState> = _uiState.asStateFlow()

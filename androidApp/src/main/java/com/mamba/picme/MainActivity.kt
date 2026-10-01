@@ -51,6 +51,7 @@ import com.mamba.picme.domain.usertask.UserTaskDestination
 import com.mamba.picme.features.common.avatar.AvatarCaptureController
 import com.mamba.picme.features.common.avatar.AvatarCaptureOrigin
 import com.mamba.picme.features.common.avatar.AvatarCaptureTarget
+import com.mamba.picme.features.common.trash.SilentTrashGuidanceDialog
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.chat.ChatTaskAnchor
 import com.mamba.picme.features.chat.taskcenter.TaskCenterScreen
@@ -206,6 +207,8 @@ class MainActivity : ComponentActivity() {
             ) {
                 // dynamicColor 显式钉 false：2026-08-19 签核全局钉青玉，防 Theme.kt 默认值未来回摆
                 PoLangTheme(themeMode = themeMode, dynamicColor = false) {
+                    // 「删除不再询问」删除现场一次性引导（全宿主共享单例，根级弹窗覆盖所有页面）
+                    SilentTrashGuidanceDialog(app.container.silentTrashGuidance)
                     val navController = rememberNavController()
                     // 主页面 Pager 状态：提升到此层，保证导航到二级页再返回后页位与滚动状态保留
                     val pagerState = rememberPagerState(

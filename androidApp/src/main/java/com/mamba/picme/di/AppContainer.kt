@@ -110,6 +110,8 @@ import com.mamba.picme.domain.memories.MemoryHiddenStore
 import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
 import com.mamba.picme.domain.trash.DedupTrashBackend
 import com.mamba.picme.domain.trash.TrashBackend
+import com.mamba.picme.domain.trash.TrashGuidanceGate
+import com.mamba.picme.features.common.trash.SilentTrashGuidanceController
 import com.mamba.picme.domain.usertask.ModelDownloadControl
 import com.mamba.picme.domain.usertask.ModelDownloadTaskAdapter
 import com.mamba.picme.domain.usertask.TagScanControl
@@ -144,7 +146,8 @@ data class MediaViewModelDependencies(
     val faceDetector: FaceDetector,
     val generateSummaryOnDemandUseCase: GenerateSummaryOnDemandUseCase,
     val userSettingsRepository: UserSettingsRepository,
-    val trashBackend: TrashBackend
+    val trashBackend: TrashBackend,
+    val trashGuidanceGate: TrashGuidanceGate? = null
 )
 
 class MediaViewModelFactory(
@@ -162,7 +165,8 @@ class MediaViewModelFactory(
                 faceDetector = dependencies.faceDetector,
                 generateSummaryOnDemandUseCase = dependencies.generateSummaryOnDemandUseCase,
                 userSettingsRepository = dependencies.userSettingsRepository,
-                trashBackend = dependencies.trashBackend
+                trashBackend = dependencies.trashBackend,
+                trashGuidanceGate = dependencies.trashGuidanceGate
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -212,6 +216,7 @@ class OrganizeCategoryViewModelFactory(
     private val organizeRepository: OrganizeRepository,
     private val trashManager: DedupTrashManager,
     private val silentTrashEnabled: suspend () -> Boolean = { false },
+    private val trashGuidanceGate: TrashGuidanceGate? = null,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -221,6 +226,7 @@ class OrganizeCategoryViewModelFactory(
                 category = category,
                 organizeRepository = organizeRepository,
                 trashBackend = DedupTrashBackend(trashManager, silentTrashEnabled),
+                trashGuidanceGate = trashGuidanceGate,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -233,6 +239,7 @@ class SwipeReviewViewModelFactory(
     private val trashManager: DedupTrashManager,
     private val keepHistoryStore: SwipeKeepHistoryStore,
     private val silentTrashEnabled: suspend () -> Boolean = { false },
+    private val trashGuidanceGate: TrashGuidanceGate? = null,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -242,6 +249,7 @@ class SwipeReviewViewModelFactory(
                 organizeRepository = organizeRepository,
                 trashBackend = DedupTrashBackend(trashManager, silentTrashEnabled),
                 keepHistoryStore = keepHistoryStore,
+                trashGuidanceGate = trashGuidanceGate,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -360,6 +368,8 @@ interface AppContainer {
     val dedupScanner: DedupScanner
     /** 去重 2.0：回收站删除/恢复授权管理 */
     val dedupTrashManager: DedupTrashManager
+    /** 「删除不再询问」删除现场一次性引导（全宿主共享单例，弹窗挂 MainActivity 根） */
+    val silentTrashGuidance: SilentTrashGuidanceController
 
     /** 整理中心（F1）：Room + MediaStore 按 uri 合并的类目数据源 */
     val organizeRepository: OrganizeRepository
@@ -909,7 +919,8 @@ class AppContainerImpl(
             trashBackend = DedupTrashBackend(
                 trashManager = dedupTrashManager,
                 silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
-            )
+            ),
+            trashGuidanceGate = silentTrashGuidance,
         )
     }
 
@@ -928,6 +939,15 @@ class AppContainerImpl(
 
     override val dedupTrashManager: DedupTrashManager by lazy {
         DedupTrashManager(context)
+    }
+
+    /** 全宿主共享单例：一次性引导状态机 + 根级弹窗数据源；scope 独立于 VM（引导跨页面存续） */
+    override val silentTrashGuidance: SilentTrashGuidanceController by lazy {
+        SilentTrashGuidanceController(
+            appContext = context,
+            settingsRepository = userPreferencesRepository,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+        )
     }
 
     private val dedupMediaSource: DedupMediaSource by lazy {
@@ -1054,6 +1074,7 @@ class AppContainerImpl(
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
             silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
+            trashGuidanceGate = silentTrashGuidance,
         )
     }
 
@@ -1063,6 +1084,7 @@ class AppContainerImpl(
             trashManager = dedupTrashManager,
             keepHistoryStore = DataStoreSwipeKeepHistoryStore(context),
             silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
+            trashGuidanceGate = silentTrashGuidance,
         )
     }
 
