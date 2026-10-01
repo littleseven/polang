@@ -8,8 +8,7 @@ IconSet/
 # Camera 滤镜样本色: 内容色(滤镜样本)非主题色
 Camera/camera/panel_filter/inline_panel/thumb
 # 待收编重复组(2026-09-20 P0-P4 后剩余 30 组,增量收编时逐行移除;子串经全画布路径核验,除注释注明外零族外命中)
-# Gallery tag_control 统计瓦片行+瓦片(dup 组 g0+g16 嵌套,一行覆盖两组)
-tag_control/Body/CardStats/tileRow
+# Gallery tag_control v2 已删(2026-10-01 v3 晋升),瓦片豁免随之移除
 # Gallery 网格内容行(grid/scanning 两帧,grid_row 收编后残余整行变体)
 gallery/grid/grid_content
 gallery/scanning/grid_content
@@ -103,3 +102,17 @@ HtmlCard/htmlcard/preview/MessageList/UserRow
 HtmlCard/taskcard/collapsed/MessageList/UserRow
 HtmlCard/taskcard/expanded/MessageList/UserRow
 HtmlCard/taskcard/approval/MessageList/UserRow
+
+# Gallery tag_control v3 状态变体帧对(idle=gallery/tag_control / running=gallery/tag_control_running,
+# 2026-10-01 晋升;共享子树按单侧豁免,组件化收编后逐行移除)
+tag_control_running/Body/CardStages
+tag_control_running/Body/HeroCard/heroRow/ringBox
+tag_control_running/capsule_switch
+tag_control_running/Body/secRowStages
+# Gallery tag_control v3 晋升新增(2026-10-01):capsule_switch 与 organize/hub 同构
+# (整理|扫描 胶囊分段条,3 帧复用,待组件化收编后移除;running 侧单列于上)
+tag_control/capsule_switch
+# tag_control 主卡双钮行 与 dedup/scanning btn_row 结构同构(r12 主/次双钮行),
+# 语义不同非复用(r12 双钮范式若三处再现再抽组件)
+tag_control/Body/HeroCard/btnRow
+tag_control_running/Body/HeroCard/btnRow

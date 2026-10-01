@@ -2,7 +2,7 @@
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
-    "url": "cocraft://localhost/file/715061534788814?node_id=438%3A2"
+    "url": "cocraft://localhost/file/715061534788814?node_id=267%3A21"
   },
   "pages": [
     {
@@ -10,6 +10,9 @@
         "118:1184": {
           "name": "camera/panel_beauty_face",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -1112,6 +1115,9 @@
         "118:1255": {
           "name": "camera/panel_ratio",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -1949,6 +1955,9 @@
         "118:1299": {
           "name": "camera/panel_grid",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -2786,6 +2795,9 @@
         "118:1343": {
           "name": "camera/panel_filter",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -3666,6 +3678,9 @@
         "118:1397": {
           "name": "camera/panel_pro",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -4928,6 +4943,9 @@
         "118:1465": {
           "name": "camera/focusing",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -5591,6 +5609,9 @@
         "146:1": {
           "name": "camera/idle",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -6253,6 +6274,9 @@
         "103:3": {
           "name": "gallery/empty",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -6407,6 +6431,9 @@
         "105:1": {
           "name": "gallery/info",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -7273,6 +7300,9 @@
         "105:45": {
           "name": "gallery/grid",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -7687,6 +7717,9 @@
         "107:112": {
           "name": "gallery/search",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -8007,6 +8040,9 @@
         "107:156": {
           "name": "gallery/search_no_result",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -8217,6 +8253,9 @@
         "107:189": {
           "name": "gallery/scanning",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -8684,6 +8723,9 @@
         "107:264": {
           "name": "gallery/sort_menu",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -9490,6 +9532,9 @@
         "107:353": {
           "name": "gallery/selection",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -10306,15 +10351,12 @@
             ]
           }
         },
-        "171:273": {
-          "name": "gallery/tag_control",
-          "tree": {
-            "_raw": "Read 1 node(s) (39KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_273-5rsp-20260927_091135136.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:273 gallery/tag_control (FRAME)"
-          }
-        },
         "172:113": {
           "name": "gallery/tag_stage_sheet",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -10916,6 +10958,18 @@
               }
             ]
           }
+        },
+        "478:10": {
+          "name": "gallery/tag_control",
+          "tree": {
+            "_raw": "Read 1 node(s) (19KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-478_10-f2p1-20261001_200610496.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 478:10 gallery/tag_control (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
+          }
+        },
+        "478:89": {
+          "name": "gallery/tag_control_running",
+          "tree": {
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-478_89-z58s-20261001_200611004.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 478:89 gallery/tag_control_running (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
+          }
         }
       },
       "id": "103:1",
@@ -10926,6 +10980,9 @@
         "111:383": {
           "name": "chat/conversation",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -11634,6 +11691,9 @@
         "111:492": {
           "name": "chat/sidebar",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -12117,6 +12177,9 @@
         "171:187": {
           "name": "chat/empty-v2-guest",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -13046,6 +13109,9 @@
         "267:437": {
           "name": "chat/cleanup_confirm",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -13331,6 +13397,9 @@
         "267:518": {
           "name": "chat/cleanup_done",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -13812,6 +13881,9 @@
         "435:80": {
           "name": "chat/task_center",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -14106,18 +14178,21 @@
         "108:363": {
           "name": "settings/local_models",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-14d6-20260927_091137492.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_363-uch3-20261001_200613829.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:363 settings/local_models (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "108:94": {
           "name": "settings/main_list",
           "tree": {
-            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-a099-20260927_091136951.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)"
+            "_raw": "Read 1 node(s) (30KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-108_94-7qrz-20261001_200613208.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 108:94 settings/main_list (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "111:1": {
           "name": "settings/remote_models",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -15026,12 +15101,15 @@
         "111:129": {
           "name": "settings/developer",
           "tree": {
-            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-w68q-20260927_091138513.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)"
+            "_raw": "Read 1 node(s) (21KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_129-mlhf-20261001_200615235.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:129 settings/developer (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "111:276": {
           "name": "settings/dialog_language",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -15521,6 +15599,9 @@
         "111:294": {
           "name": "settings/dialog_stage",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -16021,6 +16102,9 @@
         "111:446": {
           "name": "settings/dialog_theme",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -16358,12 +16442,15 @@
         "111:50": {
           "name": "settings/sandbox",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-z5qs-20260927_091138092.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-111_50-j0ki-20261001_200614573.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 111:50 settings/sandbox (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "166:3": {
           "name": "settings/add_remote_provider",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -17251,6 +17338,9 @@
         "167:2": {
           "name": "settings/provider_config",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -18075,6 +18165,9 @@
         "379:100": {
           "name": "settings/account",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -18891,6 +18984,9 @@
         "118:243": {
           "name": "editor/concept_a_hypic",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -19720,6 +19816,9 @@
         "118:372": {
           "name": "editor/concept_a_adjust",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -20855,6 +20954,9 @@
         "118:480": {
           "name": "editor/concept_a_crop",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -21969,6 +22071,9 @@
         "118:583": {
           "name": "editor/concept_a_beauty",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -22518,7 +22623,7 @@
         "132:4": {
           "name": "icon/spec_sheet",
           "tree": {
-            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-14mc-20260927_091141396.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)"
+            "_raw": "Read 1 node(s) (54KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-132_4-pv3m-20261001_200619271.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 132:4 icon/spec_sheet (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         }
       },
@@ -22530,6 +22635,9 @@
         "171:3": {
           "name": "people/grid",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -23404,7 +23512,7 @@
         "171:87": {
           "name": "people/detail",
           "tree": {
-            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-imy0-20260927_091141844.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)"
+            "_raw": "Read 1 node(s) (17KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-171_87-zq0j-20261001_200619963.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 171:87 people/detail (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         }
       },
@@ -23416,6 +23524,9 @@
         "189:148": {
           "name": "dedup/group_detail",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -24348,6 +24459,9 @@
         "189:186": {
           "name": "dedup/keep_rules",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -25028,6 +25142,9 @@
         "189:216": {
           "name": "dedup/cleaned",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -25752,6 +25869,9 @@
         "189:48": {
           "name": "dedup/scanning",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -26832,18 +26952,21 @@
         "189:90": {
           "name": "dedup/results",
           "tree": {
-            "_raw": "Read 1 node(s) (25KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-mzwf-20260927_091143273.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-189_90-7gto-20261001_200622071.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 189:90 dedup/results (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "267:150": {
           "name": "organize/category_grid",
           "tree": {
-            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-ea2r-20260927_091142257.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)"
+            "_raw": "Read 1 node(s) (16KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-267_150-0307-20261001_200620608.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 267:150 organize/category_grid (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "267:24": {
           "name": "organize/hub",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -27601,6 +27724,9 @@
         "267:280": {
           "name": "organize/cleaned",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -28242,6 +28368,9 @@
         "267:312": {
           "name": "swipe/review",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -28662,6 +28791,9 @@
         "267:329": {
           "name": "swipe/done",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -29296,6 +29428,9 @@
         "297:65": {
           "name": "memory/detail",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -30228,6 +30363,9 @@
         "297:7": {
           "name": "memory/feed",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -31588,6 +31726,9 @@
         "434:72": {
           "name": "preview_banner",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -32364,6 +32505,9 @@
         "435:58": {
           "name": "task_card_states",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -32592,6 +32736,9 @@
         "152:128": {
           "name": "feature-graphic/zh-CN",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -32754,6 +32901,9 @@
         "152:134": {
           "name": "feature-graphic/en-US",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -32916,6 +33066,9 @@
         "152:140": {
           "name": "feature-graphic/zh-TW",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -33078,6 +33231,9 @@
         "300:1000": {
           "name": "02-search/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -33267,6 +33423,9 @@
         "300:1008": {
           "name": "03-chat/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -33456,6 +33615,9 @@
         "300:1016": {
           "name": "05-person-groups/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -33645,6 +33807,9 @@
         "300:1024": {
           "name": "06-chat-welcome/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -33834,6 +33999,9 @@
         "300:1032": {
           "name": "07-insight/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -34023,6 +34191,9 @@
         "300:1040": {
           "name": "08-privacy/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -34212,6 +34383,9 @@
         "300:113": {
           "name": "01-gallery/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -34401,6 +34575,9 @@
         "300:339": {
           "name": "04-people/en-US-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -34590,6 +34767,9 @@
         "302:103": {
           "name": "01-gallery/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -34779,6 +34959,9 @@
         "302:111": {
           "name": "02-search/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -34968,6 +35151,9 @@
         "302:119": {
           "name": "03-chat/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -35157,6 +35343,9 @@
         "302:127": {
           "name": "04-people/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -35346,6 +35535,9 @@
         "302:135": {
           "name": "05-person-groups/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -35535,6 +35727,9 @@
         "302:143": {
           "name": "06-chat-welcome/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -35724,6 +35919,9 @@
         "302:151": {
           "name": "07-insight/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -35913,6 +36111,9 @@
         "302:159": {
           "name": "08-privacy/zh-TW-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -36102,6 +36303,9 @@
         "302:39": {
           "name": "01-gallery/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -36291,6 +36495,9 @@
         "302:47": {
           "name": "02-search/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -36480,6 +36687,9 @@
         "302:55": {
           "name": "03-chat/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -36669,6 +36879,9 @@
         "302:63": {
           "name": "04-people/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -36858,6 +37071,9 @@
         "302:71": {
           "name": "05-person-groups/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -37047,6 +37263,9 @@
         "302:79": {
           "name": "06-chat-welcome/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -37236,6 +37455,9 @@
         "302:87": {
           "name": "07-insight/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -37425,6 +37647,9 @@
         "302:95": {
           "name": "08-privacy/zh-CN-design",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -37620,12 +37845,15 @@
         "300:215": {
           "name": "people/grid-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-6ae5-20260927_091147740.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (26KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_215-8dwi-20261001_200628243.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:215 people/grid-store01 (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "300:29": {
           "name": "gallery/grid-store01",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -38884,6 +39112,9 @@
         "300:539": {
           "name": "search/store01",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -40094,6 +40325,9 @@
         "300:651": {
           "name": "chat/store01-welcome",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -41047,12 +41281,15 @@
         "300:723": {
           "name": "people/detail-store01",
           "tree": {
-            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-ktvu-20260927_091148089.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)"
+            "_raw": "Read 1 node(s) (18KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-300_723-90pk-20261001_200628624.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 300:723 people/detail-store01 (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "301:13": {
           "name": "chat/store01-conversation",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -42331,6 +42568,9 @@
         "301:96": {
           "name": "chat/store01-insight",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -43539,6 +43779,9 @@
         "306:197": {
           "name": "gallery/grid-store01-zhTW",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -44797,19 +45040,19 @@
         "395:1": {
           "name": "settings/localmodels-store01-zh",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-43m1-20260927_091148502.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_1-6p6n-20261001_200629233.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:1 settings/localmodels-store01-zh (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "395:106": {
           "name": "settings/localmodels-store01-en",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-csnc-20260927_091148948.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_106-a66u-20261001_200629887.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:106 settings/localmodels-store01-en (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         },
         "395:211": {
           "name": "settings/localmodels-store01-tw",
           "tree": {
-            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-uvmx-20260927_091149356.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)"
+            "_raw": "Read 1 node(s) (22KB) — full data written to:\n  /var/folders/qy/sn5fq48s5892tz5wq7_v0ddw0000gn/T/.ardot/reads/batch_read-395_211-h8k1-20261001_200630453.jsonl\n\nJSONL, one JSON object per line: line 1 is metadata, then one line per requested node, then `_resolvedComponent` lines, then `_propertyMap` lines. Grep this file by node id for a single node, or read it with an offset/limit window.\n\nTop-level: 395:211 settings/localmodels-store01-tw (FRAME)\nIssues:\n  - Some nodes do not have the specified properties will be omitted in the result"
           }
         }
       },
@@ -45499,6 +45742,9 @@
         "438:139": {
           "name": "htmlcard/notes",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -46425,6 +46671,9 @@
         "438:181": {
           "name": "taskcard/collapsed",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -46557,120 +46806,73 @@
                           {
                             "children": [
                               {
-                                "children": [],
-                                "clipsContent": true,
-                                "height": 1,
-                                "id": "438:193",
-                                "layout": "none",
-                                "name": "spacer",
-                                "type": "FRAME",
-                                "width": "fill_container",
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
                                 "children": [
                                   {
-                                    "characters": "TASK · HTML",
-                                    "fills": [
-                                      "$2:151"
+                                    "children": [],
+                                    "clipsContent": true,
+                                    "height": 1,
+                                    "id": "438:193",
+                                    "layout": "none",
+                                    "name": "spacer",
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "characters": "TASK · HTML",
+                                        "fills": [
+                                          "$2:151"
+                                        ],
+                                        "fontName": {
+                                          "family": "Sarasa Gothic SC",
+                                          "style": "Semi Bold"
+                                        },
+                                        "fontSize": 10,
+                                        "height": "hug_contents",
+                                        "id": "438:195",
+                                        "lineHeight": {
+                                          "unit": "AUTO"
+                                        },
+                                        "name": "txt",
+                                        "textAlignHorizontal": "LEFT",
+                                        "textAlignVertical": "TOP",
+                                        "type": "TEXT",
+                                        "width": "hug_contents",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
                                     ],
-                                    "fontName": {
-                                      "family": "Sarasa Gothic SC",
-                                      "style": "Semi Bold"
-                                    },
-                                    "fontSize": 10,
+                                    "clipsContent": true,
+                                    "cornerRadius": 8,
+                                    "fills": [
+                                      "$2:158"
+                                    ],
+                                    "gap": 0,
                                     "height": "hug_contents",
-                                    "id": "438:195",
-                                    "lineHeight": {
-                                      "unit": "AUTO"
+                                    "id": "438:194",
+                                    "layout": "horizontal",
+                                    "name": "BadgeTaskHtml",
+                                    "padding": {
+                                      "bottom": 2,
+                                      "left": 8,
+                                      "right": 8,
+                                      "top": 2
                                     },
-                                    "name": "txt",
-                                    "textAlignHorizontal": "LEFT",
-                                    "textAlignVertical": "TOP",
-                                    "type": "TEXT",
+                                    "type": "FRAME",
                                     "width": "hug_contents",
                                     "x": "auto",
                                     "y": "auto"
                                   }
                                 ],
                                 "clipsContent": true,
-                                "cornerRadius": 8,
-                                "fills": [
-                                  "$2:158"
-                                ],
                                 "gap": 0,
                                 "height": "hug_contents",
-                                "id": "438:194",
+                                "id": "438:192",
                                 "layout": "horizontal",
-                                "name": "BadgeTaskHtml",
-                                "padding": {
-                                  "bottom": 2,
-                                  "left": 8,
-                                  "right": 8,
-                                  "top": 2
-                                },
-                                "type": "FRAME",
-                                "width": "hug_contents",
-                                "x": "auto",
-                                "y": "auto"
-                              }
-                            ],
-                            "clipsContent": true,
-                            "gap": 0,
-                            "height": "hug_contents",
-                            "id": "438:192",
-                            "layout": "horizontal",
-                            "name": "BadgeRow",
-                            "padding": {
-                              "bottom": 0,
-                              "left": 0,
-                              "right": 0,
-                              "top": 0
-                            },
-                            "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "children": [
-                              {
-                                "children": [
-                                  {
-                                    "characters": "⚙",
-                                    "fills": [
-                                      "$2:130"
-                                    ],
-                                    "fontName": {
-                                      "family": "Sarasa Gothic SC",
-                                      "style": "Regular"
-                                    },
-                                    "fontSize": 15,
-                                    "height": "fill_container",
-                                    "id": "438:198",
-                                    "lineHeight": {
-                                      "unit": "AUTO"
-                                    },
-                                    "name": "ic",
-                                    "textAlignHorizontal": "CENTER",
-                                    "textAlignVertical": "CENTER",
-                                    "type": "TEXT",
-                                    "width": "fill_container",
-                                    "x": "auto",
-                                    "y": "auto"
-                                  }
-                                ],
-                                "clipsContent": true,
-                                "cornerRadius": 7,
-                                "fills": [
-                                  "$2:157"
-                                ],
-                                "gap": 0,
-                                "height": 28,
-                                "id": "438:197",
-                                "layout": "horizontal",
-                                "name": "IconBlock",
+                                "name": "BadgeRow",
                                 "padding": {
                                   "bottom": 0,
                                   "left": 0,
@@ -46678,39 +46880,6 @@
                                   "top": 0
                                 },
                                 "type": "FRAME",
-                                "width": 28,
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
-                                "characters": "工程师任务：修复相册扫描崩溃",
-                                "fills": [
-                                  "$2:149"
-                                ],
-                                "fontName": {
-                                  "family": "Sarasa Gothic SC",
-                                  "style": "Semi Bold"
-                                },
-                                "fontSize": "$79:155",
-                                "height": "fill_container",
-                                "id": "438:199",
-                                "lineHeight": "$79:156",
-                                "name": "title",
-                                "textAlignHorizontal": "LEFT",
-                                "textAlignVertical": "CENTER",
-                                "type": "TEXT",
-                                "width": 196,
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
-                                "children": [],
-                                "clipsContent": true,
-                                "height": 1,
-                                "id": "438:200",
-                                "layout": "none",
-                                "name": "spacer",
-                                "type": "FRAME",
                                 "width": "fill_container",
                                 "x": "auto",
                                 "y": "auto"
@@ -46718,47 +46887,250 @@
                               {
                                 "children": [
                                   {
-                                    "characters": "进行中",
+                                    "children": [
+                                      {
+                                        "characters": "⚙",
+                                        "fills": [
+                                          "$2:130"
+                                        ],
+                                        "fontName": {
+                                          "family": "Sarasa Gothic SC",
+                                          "style": "Regular"
+                                        },
+                                        "fontSize": 15,
+                                        "height": "fill_container",
+                                        "id": "438:198",
+                                        "lineHeight": {
+                                          "unit": "AUTO"
+                                        },
+                                        "name": "ic",
+                                        "textAlignHorizontal": "CENTER",
+                                        "textAlignVertical": "CENTER",
+                                        "type": "TEXT",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "cornerRadius": 7,
                                     "fills": [
-                                      "$2:131"
+                                      "$2:157"
+                                    ],
+                                    "gap": 0,
+                                    "height": 28,
+                                    "id": "438:197",
+                                    "layout": "horizontal",
+                                    "name": "IconBlock",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 28,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "characters": "工程师任务：修复相册扫描崩溃",
+                                    "fills": [
+                                      "$2:149"
                                     ],
                                     "fontName": {
                                       "family": "Sarasa Gothic SC",
                                       "style": "Semi Bold"
                                     },
-                                    "fontSize": 10,
-                                    "height": "hug_contents",
-                                    "id": "438:202",
-                                    "lineHeight": {
-                                      "unit": "AUTO"
-                                    },
-                                    "name": "txt",
+                                    "fontSize": "$79:155",
+                                    "height": "fill_container",
+                                    "id": "438:199",
+                                    "lineHeight": "$79:156",
+                                    "name": "title",
                                     "textAlignHorizontal": "LEFT",
-                                    "textAlignVertical": "TOP",
+                                    "textAlignVertical": "CENTER",
                                     "type": "TEXT",
+                                    "width": 196,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [],
+                                    "clipsContent": true,
+                                    "height": 1,
+                                    "id": "438:200",
+                                    "layout": "none",
+                                    "name": "spacer",
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "characters": "进行中",
+                                        "fills": [
+                                          "$2:131"
+                                        ],
+                                        "fontName": {
+                                          "family": "Sarasa Gothic SC",
+                                          "style": "Semi Bold"
+                                        },
+                                        "fontSize": 10,
+                                        "height": "hug_contents",
+                                        "id": "438:202",
+                                        "lineHeight": {
+                                          "unit": "AUTO"
+                                        },
+                                        "name": "txt",
+                                        "textAlignHorizontal": "LEFT",
+                                        "textAlignVertical": "TOP",
+                                        "type": "TEXT",
+                                        "width": "hug_contents",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "cornerRadius": 6,
+                                    "fills": [
+                                      "$2:130"
+                                    ],
+                                    "gap": 0,
+                                    "height": "hug_contents",
+                                    "id": "438:201",
+                                    "layout": "horizontal",
+                                    "name": "ChipRunning",
+                                    "padding": {
+                                      "bottom": 3,
+                                      "left": 8,
+                                      "right": 8,
+                                      "top": 3
+                                    },
+                                    "type": "FRAME",
                                     "width": "hug_contents",
                                     "x": "auto",
                                     "y": "auto"
                                   }
                                 ],
                                 "clipsContent": true,
-                                "cornerRadius": 6,
-                                "fills": [
-                                  "$2:130"
-                                ],
-                                "gap": 0,
+                                "gap": 8,
                                 "height": "hug_contents",
-                                "id": "438:201",
+                                "id": "438:196",
                                 "layout": "horizontal",
-                                "name": "ChipRunning",
+                                "name": "HeaderRow",
                                 "padding": {
-                                  "bottom": 3,
-                                  "left": 8,
-                                  "right": 8,
-                                  "top": 3
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
                                 },
                                 "type": "FRAME",
-                                "width": "hug_contents",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "characters": "Edit · 正在修改 TagScanOrchestrator.kt",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:167",
+                                "height": "hug_contents",
+                                "id": "438:203",
+                                "lineHeight": "$79:168",
+                                "name": "stage",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "characters": "轮次 12 ｜ 耗时 3:42 ｜ 成本 ¥0.31",
+                                "fills": [
+                                  "$2:151"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:179",
+                                "height": "hug_contents",
+                                "id": "438:204",
+                                "lineHeight": "$79:180",
+                                "name": "meta",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [],
+                                    "clipsContent": true,
+                                    "cornerRadius": 2,
+                                    "fills": [
+                                      "$2:130"
+                                    ],
+                                    "height": 4,
+                                    "id": "438:206",
+                                    "layout": "none",
+                                    "name": "bar",
+                                    "type": "FRAME",
+                                    "width": 197,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "cornerRadius": 2,
+                                "fills": [
+                                  "$2:150"
+                                ],
+                                "gap": 0,
+                                "height": 4,
+                                "id": "438:205",
+                                "layout": "horizontal",
+                                "name": "ProgressTrack",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "characters": "点击展开细节 ▾",
+                                "fills": [
+                                  "$2:151"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:179",
+                                "height": "hug_contents",
+                                "id": "438:207",
+                                "lineHeight": "$79:180",
+                                "name": "expandHint",
+                                "textAlignHorizontal": "CENTER",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
                                 "x": "auto",
                                 "y": "auto"
                               }
@@ -46766,58 +47138,16 @@
                             "clipsContent": true,
                             "gap": 8,
                             "height": "hug_contents",
-                            "id": "438:196",
-                            "layout": "horizontal",
-                            "name": "HeaderRow",
+                            "id": "444:1",
+                            "layout": "vertical",
+                            "name": "InfoZone",
                             "padding": {
-                              "bottom": 0,
-                              "left": 0,
-                              "right": 0,
-                              "top": 0
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 12
                             },
                             "type": "FRAME",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "characters": "Edit · 正在修改 TagScanOrchestrator.kt",
-                            "fills": [
-                              "$2:149"
-                            ],
-                            "fontName": {
-                              "family": "Sarasa Gothic SC",
-                              "style": "Regular"
-                            },
-                            "fontSize": "$79:167",
-                            "height": "hug_contents",
-                            "id": "438:203",
-                            "lineHeight": "$79:168",
-                            "name": "stage",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
-                          },
-                          {
-                            "characters": "轮次 12 ｜ 耗时 3:42 ｜ 成本 ¥0.31",
-                            "fills": [
-                              "$2:151"
-                            ],
-                            "fontName": {
-                              "family": "Sarasa Gothic SC",
-                              "style": "Regular"
-                            },
-                            "fontSize": "$79:179",
-                            "height": "hug_contents",
-                            "id": "438:204",
-                            "lineHeight": "$79:180",
-                            "name": "meta",
-                            "textAlignHorizontal": "LEFT",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
                             "width": "fill_container",
                             "x": "auto",
                             "y": "auto"
@@ -46827,30 +47157,119 @@
                               {
                                 "children": [],
                                 "clipsContent": true,
-                                "cornerRadius": 2,
                                 "fills": [
-                                  "$2:130"
+                                  "$2:153"
                                 ],
-                                "height": 4,
-                                "id": "438:206",
+                                "height": 1,
+                                "id": "444:3",
                                 "layout": "none",
-                                "name": "bar",
+                                "name": "hairline",
                                 "type": "FRAME",
-                                "width": 197,
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "characters": "停止任务",
+                                            "fills": [
+                                              "$2:149"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Semi Bold"
+                                            },
+                                            "fontSize": "$79:167",
+                                            "height": "hug_contents",
+                                            "id": "444:7",
+                                            "lineHeight": "$79:168",
+                                            "name": "label",
+                                            "textAlignHorizontal": "CENTER",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 18,
+                                        "fills": [
+                                          "$2:158"
+                                        ],
+                                        "gap": 0,
+                                        "height": 36,
+                                        "id": "444:6",
+                                        "layout": "horizontal",
+                                        "name": "BtnStop",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 8,
+                                    "height": "hug_contents",
+                                    "id": "444:5",
+                                    "layout": "horizontal",
+                                    "name": "ButtonRow",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 8,
+                                "height": "hug_contents",
+                                "id": "444:4",
+                                "layout": "vertical",
+                                "name": "ActionInner",
+                                "padding": {
+                                  "bottom": 14,
+                                  "left": 16,
+                                  "right": 16,
+                                  "top": 10
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
                                 "x": "auto",
                                 "y": "auto"
                               }
                             ],
                             "clipsContent": true,
-                            "cornerRadius": 2,
+                            "cornerRadius": {
+                              "bottomLeft": 16,
+                              "bottomRight": 16,
+                              "topLeft": 0,
+                              "topRight": 0
+                            },
                             "fills": [
-                              "$2:150"
+                              "$2:157"
                             ],
                             "gap": 0,
-                            "height": 4,
-                            "id": "438:205",
-                            "layout": "horizontal",
-                            "name": "ProgressTrack",
+                            "height": "hug_contents",
+                            "id": "444:2",
+                            "layout": "vertical",
+                            "name": "ActionZone",
                             "padding": {
                               "bottom": 0,
                               "left": 0,
@@ -46861,44 +47280,23 @@
                             "width": "fill_container",
                             "x": "auto",
                             "y": "auto"
-                          },
-                          {
-                            "characters": "点击展开细节 ▾",
-                            "fills": [
-                              "$2:151"
-                            ],
-                            "fontName": {
-                              "family": "Sarasa Gothic SC",
-                              "style": "Regular"
-                            },
-                            "fontSize": "$79:179",
-                            "height": "hug_contents",
-                            "id": "438:207",
-                            "lineHeight": "$79:180",
-                            "name": "expandHint",
-                            "textAlignHorizontal": "CENTER",
-                            "textAlignVertical": "TOP",
-                            "type": "TEXT",
-                            "width": "fill_container",
-                            "x": "auto",
-                            "y": "auto"
                           }
                         ],
                         "clipsContent": true,
-                        "cornerRadius": 12,
+                        "cornerRadius": 16,
                         "fills": [
                           "$2:156"
                         ],
-                        "gap": 8,
+                        "gap": 0,
                         "height": "hug_contents",
                         "id": "438:191",
                         "layout": "vertical",
                         "name": "TaskCardHtml",
                         "padding": {
-                          "bottom": 12,
-                          "left": 12,
-                          "right": 12,
-                          "top": 10
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
                         },
                         "type": "FRAME",
                         "width": "fill_container",
@@ -46978,8 +47376,8 @@
                 },
                 "type": "FRAME",
                 "width": 393,
-                "x": 2052,
-                "y": 0
+                "x": 0,
+                "y": 952
               }
             ]
           }
@@ -46987,6 +47385,9 @@
         "438:208": {
           "name": "taskcard/expanded",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -47957,25 +48358,16 @@
                               }
                             ],
                             "clipsContent": true,
-                            "cornerRadius": {
-                              "bottomLeft": 0,
-                              "bottomRight": 0,
-                              "topLeft": 12,
-                              "topRight": 12
-                            },
-                            "fills": [
-                              "$2:156"
-                            ],
                             "gap": 8,
                             "height": "hug_contents",
-                            "id": "438:219",
+                            "id": "444:8",
                             "layout": "vertical",
-                            "name": "TaskCardHtml",
+                            "name": "InfoZone",
                             "padding": {
-                              "bottom": 12,
-                              "left": 12,
-                              "right": 12,
-                              "top": 10
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 12
                             },
                             "type": "FRAME",
                             "width": "fill_container",
@@ -47985,82 +48377,126 @@
                           {
                             "children": [
                               {
-                                "characters": "停止任务",
-                                "fills": [
-                                  "$2:151"
-                                ],
-                                "fontName": {
-                                  "family": "Sarasa Gothic SC",
-                                  "style": "Semi Bold"
-                                },
-                                "fontSize": "$79:167",
-                                "height": "fill_container",
-                                "id": "438:261",
-                                "lineHeight": "$79:168",
-                                "name": "btnStop",
-                                "textAlignHorizontal": "LEFT",
-                                "textAlignVertical": "CENTER",
-                                "type": "TEXT",
-                                "width": 48,
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
                                 "children": [],
                                 "clipsContent": true,
+                                "fills": [
+                                  "$2:153"
+                                ],
                                 "height": 1,
-                                "id": "438:262",
+                                "id": "444:10",
                                 "layout": "none",
-                                "name": "spacer",
+                                "name": "hairline",
                                 "type": "FRAME",
                                 "width": "fill_container",
                                 "x": "auto",
                                 "y": "auto"
                               },
                               {
-                                "characters": "原生 Compose 动作条",
-                                "fills": [
-                                  "$2:151"
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "characters": "停止任务",
+                                            "fills": [
+                                              "$2:149"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Semi Bold"
+                                            },
+                                            "fontSize": "$79:167",
+                                            "height": "hug_contents",
+                                            "id": "444:14",
+                                            "lineHeight": "$79:168",
+                                            "name": "label",
+                                            "textAlignHorizontal": "CENTER",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 18,
+                                        "fills": [
+                                          "$2:158"
+                                        ],
+                                        "gap": 0,
+                                        "height": 36,
+                                        "id": "444:13",
+                                        "layout": "horizontal",
+                                        "name": "BtnStop",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 8,
+                                    "height": "hug_contents",
+                                    "id": "444:12",
+                                    "layout": "horizontal",
+                                    "name": "ButtonRow",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
                                 ],
-                                "fontName": {
-                                  "family": "Sarasa Gothic SC",
-                                  "style": "Regular"
+                                "clipsContent": true,
+                                "gap": 8,
+                                "height": "hug_contents",
+                                "id": "444:11",
+                                "layout": "vertical",
+                                "name": "ActionInner",
+                                "padding": {
+                                  "bottom": 14,
+                                  "left": 16,
+                                  "right": 16,
+                                  "top": 10
                                 },
-                                "fontSize": 10,
-                                "height": "fill_container",
-                                "id": "438:263",
-                                "lineHeight": {
-                                  "unit": "AUTO"
-                                },
-                                "name": "nativeCap",
-                                "textAlignHorizontal": "RIGHT",
-                                "textAlignVertical": "CENTER",
-                                "type": "TEXT",
-                                "width": 101,
+                                "type": "FRAME",
+                                "width": "fill_container",
                                 "x": "auto",
                                 "y": "auto"
                               }
                             ],
                             "clipsContent": true,
                             "cornerRadius": {
-                              "bottomLeft": 12,
-                              "bottomRight": 12,
+                              "bottomLeft": 16,
+                              "bottomRight": 16,
                               "topLeft": 0,
                               "topRight": 0
                             },
                             "fills": [
                               "$2:157"
                             ],
-                            "gap": 8,
+                            "gap": 0,
                             "height": "hug_contents",
-                            "id": "438:260",
-                            "layout": "horizontal",
-                            "name": "NativeActionBar",
+                            "id": "444:9",
+                            "layout": "vertical",
+                            "name": "ActionZone",
                             "padding": {
-                              "bottom": 8,
-                              "left": 12,
-                              "right": 12,
-                              "top": 8
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
                             },
                             "type": "FRAME",
                             "width": "fill_container",
@@ -48069,11 +48505,15 @@
                           }
                         ],
                         "clipsContent": true,
+                        "cornerRadius": 16,
+                        "fills": [
+                          "$2:156"
+                        ],
                         "gap": 0,
                         "height": "hug_contents",
-                        "id": "438:218",
+                        "id": "438:219",
                         "layout": "vertical",
-                        "name": "TaskCardWithBar",
+                        "name": "TaskCardHtml",
                         "padding": {
                           "bottom": 0,
                           "left": 0,
@@ -48158,8 +48598,8 @@
                 },
                 "type": "FRAME",
                 "width": 393,
-                "x": 2565,
-                "y": 0
+                "x": 513,
+                "y": 952
               }
             ]
           }
@@ -48167,6 +48607,9 @@
         "438:264": {
           "name": "taskcard/approval",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -48589,25 +49032,16 @@
                               }
                             ],
                             "clipsContent": true,
-                            "cornerRadius": {
-                              "bottomLeft": 0,
-                              "bottomRight": 0,
-                              "topLeft": 12,
-                              "topRight": 12
-                            },
-                            "fills": [
-                              "$2:156"
-                            ],
                             "gap": 8,
                             "height": "hug_contents",
-                            "id": "438:275",
+                            "id": "444:15",
                             "layout": "vertical",
-                            "name": "TaskCardHtml",
+                            "name": "InfoZone",
                             "padding": {
-                              "bottom": 12,
-                              "left": 12,
-                              "right": 12,
-                              "top": 10
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 12
                             },
                             "type": "FRAME",
                             "width": "fill_container",
@@ -48617,127 +49051,299 @@
                           {
                             "children": [
                               {
-                                "characters": "到此为止",
-                                "fills": [
-                                  "$2:151"
-                                ],
-                                "fontName": {
-                                  "family": "Sarasa Gothic SC",
-                                  "style": "Semi Bold"
-                                },
-                                "fontSize": "$79:167",
-                                "height": "fill_container",
-                                "id": "438:291",
-                                "lineHeight": "$79:168",
-                                "name": "btnStop",
-                                "textAlignHorizontal": "LEFT",
-                                "textAlignVertical": "CENTER",
-                                "type": "TEXT",
-                                "width": 48,
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
                                 "children": [],
                                 "clipsContent": true,
+                                "fills": [
+                                  "$2:153"
+                                ],
                                 "height": 1,
-                                "id": "438:292",
+                                "id": "444:17",
                                 "layout": "none",
-                                "name": "spacer",
+                                "name": "hairline",
                                 "type": "FRAME",
                                 "width": "fill_container",
                                 "x": "auto",
                                 "y": "auto"
                               },
                               {
-                                "characters": "原生 Compose 动作条",
-                                "fills": [
-                                  "$2:151"
-                                ],
-                                "fontName": {
-                                  "family": "Sarasa Gothic SC",
-                                  "style": "Regular"
-                                },
-                                "fontSize": 10,
-                                "height": "fill_container",
-                                "id": "438:293",
-                                "lineHeight": {
-                                  "unit": "AUTO"
-                                },
-                                "name": "nativeCap",
-                                "textAlignHorizontal": "RIGHT",
-                                "textAlignVertical": "CENTER",
-                                "type": "TEXT",
-                                "width": 101,
-                                "x": "auto",
-                                "y": "auto"
-                              },
-                              {
                                 "children": [
                                   {
-                                    "characters": "继续",
+                                    "characters": "请选择下一步",
                                     "fills": [
-                                      "$2:131"
+                                      "$2:151"
                                     ],
                                     "fontName": {
                                       "family": "Sarasa Gothic SC",
-                                      "style": "Semi Bold"
+                                      "style": "Regular"
                                     },
-                                    "fontSize": "$79:167",
+                                    "fontSize": "$79:179",
                                     "height": "hug_contents",
-                                    "id": "438:295",
-                                    "lineHeight": "$79:168",
-                                    "name": "txt",
+                                    "id": "444:19",
+                                    "lineHeight": "$79:180",
+                                    "name": "caption",
                                     "textAlignHorizontal": "LEFT",
                                     "textAlignVertical": "TOP",
                                     "type": "TEXT",
-                                    "width": "hug_contents",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [],
+                                        "clipsContent": true,
+                                        "cornerRadius": 9,
+                                        "fills": [
+                                          "$2:156"
+                                        ],
+                                        "height": 18,
+                                        "id": "444:21",
+                                        "layout": "none",
+                                        "name": "Radio",
+                                        "strokes": [
+                                          "$2:151"
+                                        ],
+                                        "type": "FRAME",
+                                        "width": 18,
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "characters": "继续执行",
+                                            "fills": [
+                                              "$2:149"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Semi Bold"
+                                            },
+                                            "fontSize": "$79:167",
+                                            "height": "hug_contents",
+                                            "id": "444:23",
+                                            "lineHeight": "$79:168",
+                                            "name": "optLabel",
+                                            "textAlignHorizontal": "LEFT",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          },
+                                          {
+                                            "characters": "按当前方案继续，直到任务完成",
+                                            "fills": [
+                                              "$2:151"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Regular"
+                                            },
+                                            "fontSize": "$79:179",
+                                            "height": "hug_contents",
+                                            "id": "444:24",
+                                            "lineHeight": "$79:180",
+                                            "name": "optDesc",
+                                            "textAlignHorizontal": "LEFT",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "gap": 2,
+                                        "height": "hug_contents",
+                                        "id": "444:22",
+                                        "layout": "vertical",
+                                        "name": "TextCol",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 12,
+                                    "height": "hug_contents",
+                                    "id": "444:20",
+                                    "layout": "horizontal",
+                                    "name": "OptionRow",
+                                    "padding": {
+                                      "bottom": 6,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 6
+                                    },
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [],
+                                    "clipsContent": true,
+                                    "fills": [
+                                      "$2:153"
+                                    ],
+                                    "height": 1,
+                                    "id": "444:25",
+                                    "layout": "none",
+                                    "name": "optDivider",
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [],
+                                        "clipsContent": true,
+                                        "cornerRadius": 9,
+                                        "fills": [
+                                          "$2:156"
+                                        ],
+                                        "height": 18,
+                                        "id": "444:27",
+                                        "layout": "none",
+                                        "name": "Radio",
+                                        "strokes": [
+                                          "$2:151"
+                                        ],
+                                        "type": "FRAME",
+                                        "width": 18,
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "characters": "到此为止",
+                                            "fills": [
+                                              "$2:149"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Semi Bold"
+                                            },
+                                            "fontSize": "$79:167",
+                                            "height": "hug_contents",
+                                            "id": "444:29",
+                                            "lineHeight": "$79:168",
+                                            "name": "optLabel",
+                                            "textAlignHorizontal": "LEFT",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          },
+                                          {
+                                            "characters": "保留已完成的修改，结束任务",
+                                            "fills": [
+                                              "$2:151"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Regular"
+                                            },
+                                            "fontSize": "$79:179",
+                                            "height": "hug_contents",
+                                            "id": "444:30",
+                                            "lineHeight": "$79:180",
+                                            "name": "optDesc",
+                                            "textAlignHorizontal": "LEFT",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "gap": 2,
+                                        "height": "hug_contents",
+                                        "id": "444:28",
+                                        "layout": "vertical",
+                                        "name": "TextCol",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 12,
+                                    "height": "hug_contents",
+                                    "id": "444:26",
+                                    "layout": "horizontal",
+                                    "name": "OptionRow",
+                                    "padding": {
+                                      "bottom": 6,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 6
+                                    },
+                                    "type": "FRAME",
+                                    "width": "fill_container",
                                     "x": "auto",
                                     "y": "auto"
                                   }
                                 ],
                                 "clipsContent": true,
-                                "cornerRadius": 17,
-                                "fills": [
-                                  "$2:130"
-                                ],
-                                "gap": 0,
+                                "gap": 6,
                                 "height": "hug_contents",
-                                "id": "438:294",
-                                "layout": "horizontal",
-                                "name": "btnContinue",
+                                "id": "444:18",
+                                "layout": "vertical",
+                                "name": "ActionInner",
                                 "padding": {
-                                  "bottom": 7,
+                                  "bottom": 12,
                                   "left": 16,
                                   "right": 16,
-                                  "top": 7
+                                  "top": 10
                                 },
                                 "type": "FRAME",
-                                "width": "hug_contents",
+                                "width": "fill_container",
                                 "x": "auto",
                                 "y": "auto"
                               }
                             ],
                             "clipsContent": true,
                             "cornerRadius": {
-                              "bottomLeft": 12,
-                              "bottomRight": 12,
+                              "bottomLeft": 16,
+                              "bottomRight": 16,
                               "topLeft": 0,
                               "topRight": 0
                             },
                             "fills": [
                               "$2:157"
                             ],
-                            "gap": 8,
+                            "gap": 0,
                             "height": "hug_contents",
-                            "id": "438:290",
-                            "layout": "horizontal",
-                            "name": "NativeActionBar",
+                            "id": "444:16",
+                            "layout": "vertical",
+                            "name": "ActionZone",
                             "padding": {
-                              "bottom": 8,
-                              "left": 12,
-                              "right": 12,
-                              "top": 8
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
                             },
                             "type": "FRAME",
                             "width": "fill_container",
@@ -48746,11 +49352,15 @@
                           }
                         ],
                         "clipsContent": true,
+                        "cornerRadius": 16,
+                        "fills": [
+                          "$2:156"
+                        ],
                         "gap": 0,
                         "height": "hug_contents",
-                        "id": "438:274",
+                        "id": "438:275",
                         "layout": "vertical",
-                        "name": "TaskCardWithBar",
+                        "name": "TaskCardHtml",
                         "padding": {
                           "bottom": 0,
                           "left": 0,
@@ -48835,8 +49445,8 @@
                 },
                 "type": "FRAME",
                 "width": 393,
-                "x": 3078,
-                "y": 0
+                "x": 1026,
+                "y": 952
               }
             ]
           }
@@ -48844,6 +49454,9 @@
         "438:296": {
           "name": "taskcard/notes",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -48886,7 +49499,7 @@
                         "y": "auto"
                       },
                       {
-                        "characters": "对 2026-09-25 工程师任务卡 spec 的渲染层修订 · 2026-09-26",
+                        "characters": "对 2026-09-25 工程师任务卡 spec 的渲染层修订 · 2026-09-26 · 09-27 上下分区改版",
                         "fills": [
                           "$2:151"
                         ],
@@ -49220,7 +49833,7 @@
                             "y": "auto"
                           },
                           {
-                            "characters": "原生动作条外置卡底，零 JS 桥接红线不动（D5 审批外置语义延续）。",
+                            "characters": "2026-09-27 修订：选项/按钮收进卡内下半分区，弃原生外置动作条；零 JS 桥接红线不动，D5「审批不在 HTML 内执行」语义延续。",
                             "fills": [
                               "$2:149"
                             ],
@@ -49485,6 +50098,118 @@
                         "width": "fill_container",
                         "x": "auto",
                         "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "characters": "分区",
+                                    "fills": [
+                                      "$2:131"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Semi Bold"
+                                    },
+                                    "fontSize": 10,
+                                    "height": "hug_contents",
+                                    "id": "444:80",
+                                    "lineHeight": {
+                                      "unit": "AUTO"
+                                    },
+                                    "name": "txt",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "TOP",
+                                    "type": "TEXT",
+                                    "width": "hug_contents",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "cornerRadius": 6,
+                                "fills": [
+                                  "$2:130"
+                                ],
+                                "gap": 0,
+                                "height": "hug_contents",
+                                "id": "444:79",
+                                "layout": "horizontal",
+                                "name": "tag",
+                                "padding": {
+                                  "bottom": 1,
+                                  "left": 7,
+                                  "right": 7,
+                                  "top": 1
+                                },
+                                "type": "FRAME",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 6,
+                            "height": "hug_contents",
+                            "id": "444:78",
+                            "layout": "horizontal",
+                            "name": "head",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "characters": "上半部=任务信息；下半部=用户选项列表（radio 行）或整宽胶囊按钮（如有）；风格对齐 Meta Muse 任务卡。running=[停止]、approval=[选项列表]、done=[暂不|推送交付]、failed=[重试]。",
+                            "fills": [
+                              "$2:149"
+                            ],
+                            "fontName": {
+                              "family": "Sarasa Gothic SC",
+                              "style": "Regular"
+                            },
+                            "fontSize": "$79:167",
+                            "height": "hug_contents",
+                            "id": "444:81",
+                            "lineHeight": "$79:168",
+                            "name": "body",
+                            "textAlignHorizontal": "LEFT",
+                            "textAlignVertical": "TOP",
+                            "type": "TEXT",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "cornerRadius": 10,
+                        "fills": [
+                          "$2:156"
+                        ],
+                        "gap": 6,
+                        "height": "hug_contents",
+                        "id": "444:77",
+                        "layout": "vertical",
+                        "name": "Note分区",
+                        "padding": {
+                          "bottom": 10,
+                          "left": 12,
+                          "right": 12,
+                          "top": 10
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
                       }
                     ],
                     "clipsContent": true,
@@ -49537,8 +50262,8 @@
                 },
                 "type": "FRAME",
                 "width": 393,
-                "x": 3591,
-                "y": 0
+                "x": 1539,
+                "y": 952
               }
             ]
           }
@@ -49546,6 +50271,9 @@
         "438:3": {
           "name": "htmlcard/inline",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -50719,6 +51447,9 @@
         "438:60": {
           "name": "htmlcard/preview",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -51590,6 +52321,9 @@
         "438:98": {
           "name": "htmlcard/fullpage",
           "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
             "nodes": [
               {
                 "children": [
@@ -52460,6 +53194,725 @@
                 "width": 393,
                 "x": 1026,
                 "y": 0
+              }
+            ]
+          }
+        },
+        "444:31": {
+          "name": "taskcard/done",
+          "tree": {
+            "issues": [
+              "Some nodes do not have the specified properties will be omitted in the result"
+            ],
+            "nodes": [
+              {
+                "children": [
+                  {
+                    "componentProperties": {},
+                    "height": 33,
+                    "id": "444:32",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:106"
+                    },
+                    "name": "status_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "fills": [
+                      "$2:148"
+                    ],
+                    "gap": 8,
+                    "height": "$2:111",
+                    "id": "444:33",
+                    "layout": "horizontal",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "387:113"
+                    },
+                    "name": "top_bar",
+                    "padding": {
+                      "bottom": 0,
+                      "left": 8,
+                      "right": 8,
+                      "top": 0
+                    },
+                    "type": "INSTANCE",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [],
+                            "clipsContent": true,
+                            "height": 1,
+                            "id": "444:39",
+                            "layout": "none",
+                            "name": "flexSpacer",
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "characters": "修复相册扫描时的崩溃",
+                                "fills": [
+                                  "$143:12"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:159",
+                                "height": "hug_contents",
+                                "id": "444:43",
+                                "lineHeight": "$79:160",
+                                "name": "UserText",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "hug_contents",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": {
+                              "bottomLeft": 4,
+                              "bottomRight": 12,
+                              "topLeft": 12,
+                              "topRight": 12
+                            },
+                            "fills": [
+                              "$142:19"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "444:40",
+                            "layout": "horizontal",
+                            "name": "UserBubble",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 18,
+                              "right": 18,
+                              "top": 14
+                            },
+                            "type": "FRAME",
+                            "width": "hug_contents",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "444:37",
+                        "layout": "horizontal",
+                        "name": "UserRow",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [],
+                                    "clipsContent": true,
+                                    "height": 1,
+                                    "id": "444:51",
+                                    "layout": "none",
+                                    "name": "spacer",
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "characters": "TASK · HTML",
+                                        "fills": [
+                                          "$2:151"
+                                        ],
+                                        "fontName": {
+                                          "family": "Sarasa Gothic SC",
+                                          "style": "Semi Bold"
+                                        },
+                                        "fontSize": 10,
+                                        "height": "hug_contents",
+                                        "id": "444:61",
+                                        "lineHeight": {
+                                          "unit": "AUTO"
+                                        },
+                                        "name": "txt",
+                                        "textAlignHorizontal": "LEFT",
+                                        "textAlignVertical": "TOP",
+                                        "type": "TEXT",
+                                        "width": "hug_contents",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "cornerRadius": 8,
+                                    "fills": [
+                                      "$2:158"
+                                    ],
+                                    "gap": 0,
+                                    "height": "hug_contents",
+                                    "id": "444:52",
+                                    "layout": "horizontal",
+                                    "name": "BadgeTaskHtml",
+                                    "padding": {
+                                      "bottom": 2,
+                                      "left": 8,
+                                      "right": 8,
+                                      "top": 2
+                                    },
+                                    "type": "FRAME",
+                                    "width": "hug_contents",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 0,
+                                "height": "hug_contents",
+                                "id": "444:44",
+                                "layout": "horizontal",
+                                "name": "BadgeRow",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "characters": "⚙",
+                                        "fills": [
+                                          "$2:130"
+                                        ],
+                                        "fontName": {
+                                          "family": "Sarasa Gothic SC",
+                                          "style": "Regular"
+                                        },
+                                        "fontSize": 15,
+                                        "height": "fill_container",
+                                        "id": "444:62",
+                                        "lineHeight": {
+                                          "unit": "AUTO"
+                                        },
+                                        "name": "ic",
+                                        "textAlignHorizontal": "CENTER",
+                                        "textAlignVertical": "CENTER",
+                                        "type": "TEXT",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "cornerRadius": 7,
+                                    "fills": [
+                                      "$2:157"
+                                    ],
+                                    "gap": 0,
+                                    "height": 28,
+                                    "id": "444:53",
+                                    "layout": "horizontal",
+                                    "name": "IconBlock",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": 28,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "characters": "工程师任务：修复相册扫描崩溃",
+                                    "fills": [
+                                      "$2:149"
+                                    ],
+                                    "fontName": {
+                                      "family": "Sarasa Gothic SC",
+                                      "style": "Semi Bold"
+                                    },
+                                    "fontSize": "$79:155",
+                                    "height": "fill_container",
+                                    "id": "444:54",
+                                    "lineHeight": "$79:156",
+                                    "name": "title",
+                                    "textAlignHorizontal": "LEFT",
+                                    "textAlignVertical": "CENTER",
+                                    "type": "TEXT",
+                                    "width": 196,
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [],
+                                    "clipsContent": true,
+                                    "height": 1,
+                                    "id": "444:55",
+                                    "layout": "none",
+                                    "name": "spacer",
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "characters": "已完成",
+                                        "fills": [
+                                          "$2:131"
+                                        ],
+                                        "fontName": {
+                                          "family": "Sarasa Gothic SC",
+                                          "style": "Semi Bold"
+                                        },
+                                        "fontSize": 10,
+                                        "height": "hug_contents",
+                                        "id": "444:63",
+                                        "lineHeight": {
+                                          "unit": "AUTO"
+                                        },
+                                        "name": "txt",
+                                        "textAlignHorizontal": "LEFT",
+                                        "textAlignVertical": "TOP",
+                                        "type": "TEXT",
+                                        "width": "hug_contents",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "cornerRadius": 6,
+                                    "fills": [
+                                      "$2:130"
+                                    ],
+                                    "gap": 0,
+                                    "height": "hug_contents",
+                                    "id": "444:56",
+                                    "layout": "horizontal",
+                                    "name": "ChipDone",
+                                    "padding": {
+                                      "bottom": 3,
+                                      "left": 8,
+                                      "right": 8,
+                                      "top": 3
+                                    },
+                                    "type": "FRAME",
+                                    "width": "hug_contents",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 8,
+                                "height": "hug_contents",
+                                "id": "444:45",
+                                "layout": "horizontal",
+                                "name": "HeaderRow",
+                                "padding": {
+                                  "bottom": 0,
+                                  "left": 0,
+                                  "right": 0,
+                                  "top": 0
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "characters": "结果：修复完成，回归验证通过",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:167",
+                                "height": "hug_contents",
+                                "id": "444:46",
+                                "lineHeight": "$79:168",
+                                "name": "reason",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "characters": "共 18 轮 ｜ 耗时 6:05 ｜ 成本 ¥0.52",
+                                "fills": [
+                                  "$2:151"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:179",
+                                "height": "hug_contents",
+                                "id": "444:47",
+                                "lineHeight": "$79:180",
+                                "name": "used",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "characters": "小结：TagScanOrchestrator 空指针已修复，改动 4 文件 +86/−23",
+                                "fills": [
+                                  "$2:149"
+                                ],
+                                "fontName": {
+                                  "family": "Sarasa Gothic SC",
+                                  "style": "Regular"
+                                },
+                                "fontSize": "$79:167",
+                                "height": "hug_contents",
+                                "id": "444:48",
+                                "lineHeight": "$79:168",
+                                "name": "summary",
+                                "textAlignHorizontal": "LEFT",
+                                "textAlignVertical": "TOP",
+                                "type": "TEXT",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "gap": 8,
+                            "height": "hug_contents",
+                            "id": "444:41",
+                            "layout": "vertical",
+                            "name": "InfoZone",
+                            "padding": {
+                              "bottom": 14,
+                              "left": 16,
+                              "right": 16,
+                              "top": 12
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [],
+                                "clipsContent": true,
+                                "fills": [
+                                  "$2:153"
+                                ],
+                                "height": 1,
+                                "id": "444:49",
+                                "layout": "none",
+                                "name": "hairline",
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "characters": "暂不",
+                                            "fills": [
+                                              "$2:149"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Semi Bold"
+                                            },
+                                            "fontSize": "$79:167",
+                                            "height": "hug_contents",
+                                            "id": "444:74",
+                                            "lineHeight": "$79:168",
+                                            "name": "label",
+                                            "textAlignHorizontal": "CENTER",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 18,
+                                        "fills": [
+                                          "$2:158"
+                                        ],
+                                        "gap": 0,
+                                        "height": 36,
+                                        "id": "444:73",
+                                        "layout": "horizontal",
+                                        "name": "BtnLater",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "characters": "推送交付",
+                                            "fills": [
+                                              "$2:131"
+                                            ],
+                                            "fontName": {
+                                              "family": "Sarasa Gothic SC",
+                                              "style": "Semi Bold"
+                                            },
+                                            "fontSize": "$79:167",
+                                            "height": "hug_contents",
+                                            "id": "444:76",
+                                            "lineHeight": "$79:168",
+                                            "name": "label",
+                                            "textAlignHorizontal": "CENTER",
+                                            "textAlignVertical": "TOP",
+                                            "type": "TEXT",
+                                            "width": "fill_container",
+                                            "x": "auto",
+                                            "y": "auto"
+                                          }
+                                        ],
+                                        "clipsContent": true,
+                                        "cornerRadius": 18,
+                                        "fills": [
+                                          "$2:130"
+                                        ],
+                                        "gap": 0,
+                                        "height": 36,
+                                        "id": "444:75",
+                                        "layout": "horizontal",
+                                        "name": "BtnDeliver",
+                                        "padding": {
+                                          "bottom": 0,
+                                          "left": 0,
+                                          "right": 0,
+                                          "top": 0
+                                        },
+                                        "type": "FRAME",
+                                        "width": "fill_container",
+                                        "x": "auto",
+                                        "y": "auto"
+                                      }
+                                    ],
+                                    "clipsContent": true,
+                                    "gap": 8,
+                                    "height": "hug_contents",
+                                    "id": "444:72",
+                                    "layout": "horizontal",
+                                    "name": "ButtonRow",
+                                    "padding": {
+                                      "bottom": 0,
+                                      "left": 0,
+                                      "right": 0,
+                                      "top": 0
+                                    },
+                                    "type": "FRAME",
+                                    "width": "fill_container",
+                                    "x": "auto",
+                                    "y": "auto"
+                                  }
+                                ],
+                                "clipsContent": true,
+                                "gap": 8,
+                                "height": "hug_contents",
+                                "id": "444:50",
+                                "layout": "vertical",
+                                "name": "ActionInner",
+                                "padding": {
+                                  "bottom": 12,
+                                  "left": 16,
+                                  "right": 16,
+                                  "top": 10
+                                },
+                                "type": "FRAME",
+                                "width": "fill_container",
+                                "x": "auto",
+                                "y": "auto"
+                              }
+                            ],
+                            "clipsContent": true,
+                            "cornerRadius": {
+                              "bottomLeft": 16,
+                              "bottomRight": 16,
+                              "topLeft": 0,
+                              "topRight": 0
+                            },
+                            "fills": [
+                              "$2:157"
+                            ],
+                            "gap": 0,
+                            "height": "hug_contents",
+                            "id": "444:42",
+                            "layout": "vertical",
+                            "name": "ActionZone",
+                            "padding": {
+                              "bottom": 0,
+                              "left": 0,
+                              "right": 0,
+                              "top": 0
+                            },
+                            "type": "FRAME",
+                            "width": "fill_container",
+                            "x": "auto",
+                            "y": "auto"
+                          }
+                        ],
+                        "clipsContent": true,
+                        "cornerRadius": 16,
+                        "fills": [
+                          "$2:156"
+                        ],
+                        "gap": 0,
+                        "height": "hug_contents",
+                        "id": "444:38",
+                        "layout": "vertical",
+                        "name": "TaskCardHtml",
+                        "padding": {
+                          "bottom": 0,
+                          "left": 0,
+                          "right": 0,
+                          "top": 0
+                        },
+                        "type": "FRAME",
+                        "width": "fill_container",
+                        "x": "auto",
+                        "y": "auto"
+                      }
+                    ],
+                    "clipsContent": true,
+                    "gap": 14,
+                    "height": "fill_container",
+                    "id": "444:34",
+                    "layout": "vertical",
+                    "name": "MessageList",
+                    "padding": {
+                      "bottom": 16,
+                      "left": 20,
+                      "right": 20,
+                      "top": 16
+                    },
+                    "type": "FRAME",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "gap": 0,
+                    "height": "hug_contents",
+                    "id": "444:35",
+                    "layout": "vertical",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "387:22"
+                    },
+                    "name": "InputBarOuter",
+                    "padding": {
+                      "bottom": 56,
+                      "left": 12,
+                      "right": 12,
+                      "top": 12
+                    },
+                    "type": "INSTANCE",
+                    "width": "fill_container",
+                    "x": "auto",
+                    "y": "auto"
+                  },
+                  {
+                    "componentProperties": {},
+                    "height": 51,
+                    "id": "444:36",
+                    "layout": "none",
+                    "mainComponent": {
+                      "componentPropertyDefinitions": {},
+                      "id": "385:107"
+                    },
+                    "name": "system_nav_bar",
+                    "type": "INSTANCE",
+                    "width": 393,
+                    "x": 0,
+                    "y": 801
+                  }
+                ],
+                "clipsContent": true,
+                "fills": [
+                  "$2:146"
+                ],
+                "gap": 0,
+                "height": 852,
+                "id": "444:31",
+                "layout": "vertical",
+                "name": "taskcard/done",
+                "padding": {
+                  "bottom": 0,
+                  "left": 0,
+                  "right": 0,
+                  "top": 0
+                },
+                "type": "FRAME",
+                "width": 393,
+                "x": 0,
+                "y": 1904
               }
             ]
           }

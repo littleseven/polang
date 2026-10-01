@@ -2942,6 +2942,48 @@
    "status": "created",
    "ardotId": "343:83",
    "key": "delete"
+  },
+  "tag.stats.coverage.label": {
+   "zh": "AI 打标覆盖",
+   "en": "AI-tagged coverage",
+   "status": "created",
+   "ardotId": "478:3"
+  },
+  "tag.stats.remaining.line": {
+   "zh": "张照片 · 剩余 8,205 张待处理",
+   "en": "photos · 8,205 remaining",
+   "status": "created",
+   "ardotId": "478:4"
+  },
+  "tag.regen.entry": {
+   "zh": "按阶段或条件重新生成",
+   "en": "Regenerate by stage or filter",
+   "status": "created",
+   "ardotId": "478:5"
+  },
+  "tag.scan.now.face": {
+   "zh": "正在识别人脸",
+   "en": "Detecting faces",
+   "status": "created",
+   "ardotId": "478:6"
+  },
+  "tag.scan.narrative": {
+   "zh": "第 1,024/8,205 张 · 约 3 小时",
+   "en": "Photo 1,024 of 8,205 · ~3h left",
+   "status": "created",
+   "ardotId": "478:7"
+  },
+  "tag.stats.indexed.pct.running": {
+   "zh": "13%",
+   "en": "13%",
+   "status": "created",
+   "ardotId": "478:9"
+  },
+  "tag.stages.hint.view": {
+   "zh": "点按阶段查看内容",
+   "en": "Tap a stage to view",
+   "status": "created",
+   "ardotId": "478:164"
   }
  }
 }
