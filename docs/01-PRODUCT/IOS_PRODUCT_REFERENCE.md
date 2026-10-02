@@ -154,13 +154,15 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 - `MattingEngine`：FUSION 固定路由——MediaPipe selfie 分割（256²）+ ORT ModNet（1024²）逐像素 max 融合，100% 端侧；EXIF 方向归一化。
 - `IDPhotoScreen`/`IDPhotoViewModel`/`IdPhotoDomain` + Components（尺寸 chip/底色色板/边缘/修复面板）；模型经模型下载中心预解析。
 
-### 3.9 TAG 打标扫描（TagScan 3 文件 / 923 行 + Platform/Tag 10 文件 / 2085 行）🔄
+### 3.9 TAG 打标扫描（TagScan 3 文件 / ~980 行 + Platform/Tag 12 文件 / ~2200 行）🔄
 
 3-Pass 全通（`TagScanOrchestrator` 编排，`TagScanScreen`/`TagScanViewModel` 控制页）：
 
 - **Pass1**：`Pass1Pipeline` + `FaceAlignment`（106→5 点）+ `ORTFaceEmbedder`（ONNX Glint360K R100——规避 MNN3.5 Apple embedding bug）+ `MobileClipEncoder`（语义 embedding）+ GRDB `TagDatabase`。
 - **Pass2**：`Pass2Pipeline` + `FaceClusterer`（自适应 k-NN 连通分量 + 精修）+ `FaceClusterMaintenance`。
 - **Pass3**：`Florence2Tagger`（Florence-2-base INT8，ORT 4-session，OD+DETAILED_CAPTION 双任务）。
+- **扫描页 v4.1（2026-10-02 ios-follow tag-scan 追齐，spec `tag-control.yaml` 正典）**：四段骨架 progBar（4dp 本轮进度，流光/琥珀）→ top_bar（标题+x/y 计数+ETA）→ content（ringHero 全库仪表环+六格成果面板+阶段行×4 StageActionSheet）→ bottom_bar（52dp 主/次双钮四态状态机）；口径立法 `LibraryCompletion`（库级 AI 打标完成率 Double 精确舍入，`Platform/Tag/LibraryCompletion.swift` + PoLangTests）；`ScanDbStats` 补 cityCount/groupPhotoCount/selfPhotoCount 三格 SQL；`TagScanStatusCenter` 全局扫描信号（isScanning + events 多播，对齐 Android `TagGenerationService.isScanning`，驱动整理页 tab 落点：@AppStorage 记忆 + 扫描中智能落扫描 tab）；运行动画 TimelineView（1.1s 流光/1.5s 彗星弧）。
+- **平台缺口台账（tag-control.yaml platform_differences）**：后台扫描 iOS 无（退后台即暂停，保活引导整体 N/A）；美学评分恒缺（QUALITY 行弹「后续版本」）；GROUP/TAGGED 成果格出口置灰（无 GalleryViewFilter 通道）；city 列零写入方（城市格恒 0，回填链路待立项）；Pass1 单阶段/Pass2 full 变体无。
 - **端侧 VLM**：❌ **stub**（#1，`IosUnavailableImageInferenceEngine`——修图理解/打标 VLM 工具不注册，连带 chat UNDERSTAND/FIND_SIMILAR 不可用，见 `IOS_TASK_STATUS.md` §1）。
 - **缺口**：#2（T8 dedup_hash）/ #3（MetalGuardian）/ #4（后台扫描），见 `IOS_TASK_STATUS.md` §1。
 

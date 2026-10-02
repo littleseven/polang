@@ -216,4 +216,58 @@ final class TagDatabaseScanTests: XCTestCase {
         XCTAssertEqual(stats.totalMedia, 1, "孤儿行应被清理")
         XCTAssertEqual(db.allImageMediaIds().count, 1)
     }
+
+    // MARK: scanStats 成果格三字段（v4.1：cityCount / groupPhotoCount / selfPhotoCount）
+    func testScanStatsAchievementCounts() {
+        let db = makeDb()
+        // 空库：三字段恒 0
+        let empty = db.scanStats()
+        XCTAssertEqual(empty.cityCount, 0)
+        XCTAssertEqual(empty.groupPhotoCount, 0)
+        XCTAssertEqual(empty.selfPhotoCount, 0)
+
+        let m1 = db.getOrCreateMedia(localIdentifier: "L-1", type: "IMAGE", captureDateMs: 1, fileName: "a")
+        let m2 = db.getOrCreateMedia(localIdentifier: "L-2", type: "IMAGE", captureDateMs: 2, fileName: "b")
+        let m3 = db.getOrCreateMedia(localIdentifier: "L-3", type: "IMAGE", captureDateMs: 3, fileName: "c")
+        let emb = Data(repeating: 0, count: 2048)
+        db.insertEmbeddings(mediaId: m1, embeddings: [emb, emb])
+        db.insertEmbeddings(mediaId: m2, embeddings: [emb, emb])
+        db.insertEmbeddings(mediaId: m3, embeddings: [emb])
+        let p1 = db.insertPerson(name: nil, coverMediaId: m1, faceCount: 3, isSelf: false)
+        let p2 = db.insertPerson(name: nil, coverMediaId: m3, faceCount: 2, isSelf: true)
+
+        // m1 = 合照（embedding 分属 p1/p2）；m2 = 同一人两张脸（非合照）；m3 = 「我」照片。
+        // DAO 无单 embedding 赋值 API，测试直接走 exec 精确构造。
+        db.queue.sync {
+            db.exec("""
+                UPDATE face_embeddings SET person_id = \(p1)
+                WHERE media_id = \(m1) AND embedding_id = (
+                    SELECT MIN(embedding_id) FROM face_embeddings WHERE media_id = \(m1));
+                """)
+            db.exec("""
+                UPDATE face_embeddings SET person_id = \(p2)
+                WHERE media_id = \(m1) AND embedding_id = (
+                    SELECT MAX(embedding_id) FROM face_embeddings WHERE media_id = \(m1));
+                """)
+            db.exec("UPDATE face_embeddings SET person_id = \(p1) WHERE media_id = \(m2);")
+            db.exec("UPDATE face_embeddings SET person_id = \(p2) WHERE media_id = \(m3);")
+            // city：m1/m2 同城、一条空串（不计）、m3 空串（不计）
+            db.exec("UPDATE media_assets SET city = 'Shanghai' WHERE id IN (\(m1), \(m2));")
+            db.exec("UPDATE media_assets SET city = '' WHERE id = \(m3);")
+        }
+
+        let stats = db.scanStats()
+        XCTAssertEqual(stats.groupPhotoCount, 1, "仅 m1 同照片聚到 ≥2 人物")
+        XCTAssertEqual(stats.selfPhotoCount, 2, "is_self 人物 p2 出现在 m1 与 m3")
+        XCTAssertEqual(stats.cityCount, 1, "DISTINCT 非空 city 只有 Shanghai")
+    }
+
+    func testScanStatsSelfUnsetIsZero() {
+        let db = makeDb()
+        let m1 = db.getOrCreateMedia(localIdentifier: "L-1", type: "IMAGE", captureDateMs: 1, fileName: "a")
+        db.insertEmbeddings(mediaId: m1, embeddings: [Data(repeating: 0, count: 2048)])
+        let p1 = db.insertPerson(name: nil, coverMediaId: m1, faceCount: 1, isSelf: false)
+        db.assignEmbeddingsByMediaIds([m1], personId: p1)
+        XCTAssertEqual(db.scanStats().selfPhotoCount, 0, "未标记 is_self 时恒 0")
+    }
 }

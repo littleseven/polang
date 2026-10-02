@@ -273,6 +273,12 @@ final class TagScanOrchestrator: @unchecked Sendable {
     /// 是否有未完成 session（扫描页「恢复」提示用）。
     var hasUnfinishedSession: Bool { db.unfinishedSessionId() != nil }
 
+    /// 全局扫描中信号（对齐 Android TagGenerationService.isScanning：running/pausing 为 true，
+    /// paused 不算）。非 UI 消费方直接读；SwiftUI 响应式消费走 TagScanStatusCenter.shared。
+    var isScanning: Bool {
+        read { box in box.sessionState == .running || box.sessionState == .pausing }
+    }
+
     /// 前台优先：进后台时由调用方触发（仅 running 时协作暂停）。
     func pauseForBackground() { pause() }
 
@@ -627,6 +633,15 @@ final class TagScanOrchestrator: @unchecked Sendable {
             message: box.sessionState.localizationKey)
     }
 
-    private func emit(_ ev: ScanEvent) { onEvent?(ev) }
+    private func emit(_ ev: ScanEvent) {
+        // 每次事件都伴随（或紧随）状态迁移 → 同步推送全局扫描信号（值由 box.sessionState 推导，
+        // 而非事件快照——runPass2Clustering 等合成事件不改 box 状态，不应翻转全局信号）。
+        let scanning = isScanning
+        Task { @MainActor in
+            TagScanStatusCenter.shared.update(isScanning: scanning)
+            TagScanStatusCenter.shared.relay(ev)
+        }
+        onEvent?(ev)
+    }
     private static func nowMs() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
 }

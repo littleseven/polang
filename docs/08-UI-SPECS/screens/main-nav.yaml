@@ -53,7 +53,7 @@ bottom_bar:
   item_layout: { icon_size: 24, padding: { horizontal: 16, vertical: 10 }, distribution: space_evenly }
   selected_style: "图标着色 = primary/accent；未选中 = onSurface/primary 默认色；仅 tint 区分无背景块"
   removed_items: [camera, tag_sell]    # 相机项移除（路由化）；打标 Sell 项移除（扫描并入整理页胶囊）
-  special_routing: "点击整理项时预选整理页 ORGANIZE tab（扫描深链走独立一次性请求机制 organizeTabRequest）"
+  special_routing: "点击整理项（2026-09-30 优化）：页内 tab 由宿主 rememberSaveable 记住上次选择、不强制重置；扫描进行中（isScanning，暂停不算）智能落 SCAN tab（高频意图=查进度）；设置页等深链仍走一次性请求机制 organizeTabRequest（消费后清零）"
   visibility: "渲染于四个根页；聊天页不渲染；页面自身底部 UI/全屏态门控隐藏"
 
 # ============================================================================

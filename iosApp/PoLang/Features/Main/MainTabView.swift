@@ -51,6 +51,9 @@ struct MainTabView: View {
     @State private var editingImage: String? = nil
     /// 相册多选态（main-nav.yaml §0 hide_bar_when：页面自身底部 UI 激活时隐藏悬浮底 bar）
     @State private var gallerySelecting = false
+    /// 整理页「扫描中落 SCAN tab」一次性请求（消费后清零；对齐 Android
+    /// MainPagerHost onBarSwitchPage：底 bar 点整理项且 isScanning → 落 SCAN tab）
+    @State private var organizeScanLanding = false
 
     var body: some View {
         ZStack {
@@ -66,7 +69,7 @@ struct MainTabView: View {
                     .tag(0)
                 // 整理+扫描合并页（spec organize.yaml §0 container: organize_home_route），
                 // 相册页左滑即达（对标 Android gallery_left_swipe 入口）
-                OrganizeHomeView()
+                OrganizeHomeView(scanLandingRequested: $organizeScanLanding)
                     .environmentObject(container)
                     .tag(1)
                 ChatView(
@@ -133,7 +136,13 @@ struct MainTabView: View {
         // 2026-09-26 形态回退：悬浮胶囊恢复（配色保留微信系）
         .overlay(alignment: .bottom) {
             if router.currentPage != 2 && !gallerySelecting {
-                FloatingBottomTab(currentPage: $router.currentPage)
+                FloatingBottomTab(currentPage: $router.currentPage) { page in
+                    // 底 bar 点整理项：扫描进行中（isScanning，暂停不算）智能落 SCAN tab
+                    // （高频意图=查进度）；否则保持页内 tab 记忆值（main-nav §1 special_routing）
+                    if page == 1 && TagScanStatusCenter.shared.isScanning {
+                        organizeScanLanding = true
+                    }
+                }
                     .padding(.bottom, 16)
             }
         }

@@ -210,6 +210,7 @@ run_phase1() {
                 -destination "id=$DEVICE_ID" -configuration Debug \
                 -only-testing:PoLangTests \
                 -derivedDataPath "$DERIVED_DATA" \
+                -allowProvisioningUpdates CODE_SIGN_STYLE=Automatic \
                 test > "$OUTPUT_DIR/ios_test.log" 2>&1; then
                 log_ok "PoLangTests 通过"
             else
@@ -234,6 +235,7 @@ run_phase2() {
     if xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
         -destination "id=$DEVICE_ID" -configuration Debug \
         -derivedDataPath "$DERIVED_DATA" \
+        -allowProvisioningUpdates CODE_SIGN_STYLE=Automatic \
         build > "$OUTPUT_DIR/build.log" 2>&1; then
         log_ok "Debug 编译成功"
         if [ -f "$APP_PATH" ]; then

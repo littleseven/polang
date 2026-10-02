@@ -76,11 +76,11 @@ tag_control:
 
     results_panel:                                 # v4.1（2026-10-02）：环下分隔线+3×2 成果格（查看入口）
       principle: "成果格=查看内容；阶段行=扫描控制——浏览与操作彻底分家"
-      cells:                                       # 数字 20sp SemiBold + 6dp 彩点 + 11sp 标签 + 14dp chevron
-        - { count: "<withFace>", label: "tag_result_faces_label = 含人脸照片", dot: "#FF7EB0", tap: "相册 FACES 视图" }
-        - { count: "<personCount>", label: "tag_result_people_label = 识别人物 · N 位已命名", dot: "#9B8CFF", tap: "人物页" }
-        - { count: "<cityCount>", label: "tag_result_cities_label = 足迹城市", dot: "#22D3EE", tap: "城市选择弹层 → 相册 CITY 视图" }
-        - { count: "<groupPhotoCount>", label: "tag_result_group_label = 合照", dot: "#4ADE80", tap: "相册 GROUP 视图（face_embeddings ≥2 人聚合）" }
+      cells:                                       # 数字 20sp SemiBold + 6dp 彩点 + 11sp 标签 + 14dp chevron；dot 色一律引用 design-tokens.json token 名（双端镜像生成物取值）
+        - { count: "<withFace>", label: "tag_result_faces_label = 含人脸照片", dot: "tagPink", tap: "相册 FACES 视图" }
+        - { count: "<personCount>", label: "tag_result_people_label = 识别人物 · N 位已命名", dot: "tagPurple", tap: "人物页" }
+        - { count: "<cityCount>", label: "tag_result_cities_label = 足迹城市", dot: "tagCyan", tap: "城市选择弹层 → 相册 CITY 视图" }
+        - { count: "<groupPhotoCount>", label: "tag_result_group_label = 合照", dot: "tagGreen", tap: "相册 GROUP 视图（face_embeddings ≥2 人聚合）" }
         - { count: "<selfPhotoCount 或 —>", label: "tag_result_self_label = “我”的照片", dot: "warningAmber", tap: "已标记→相册 SELF 视图；未标记→snackbar 引导去人物页标记" }
         - { count: "<withLabels>", label: "tag_result_tags_label = 已打内容标签", dot: "primary", tap: "相册 TAGGED 视图" }
       city_sheet: "ModalBottomSheet 城市列表（getCityGroups，城市名+张数）→ 点选 CITY 请求"
@@ -99,7 +99,7 @@ tag_control:
       - { title: "tag_pass_title_cluster", desc: "tag_pass_desc_cluster", trailing: "<人物数>（计数非百分比）", tap: "StageActionSheet(PEOPLE)" }
       - { title: "tag_pass_title_content", desc: "tag_pass_scope_content", trailing: "<%>", tap: "StageActionSheet(CONTENT)" }
       - { title: "tag_pass_title_aesthetic", desc: "tag_pass_scope_aesthetic", trailing: "<%>", tap: "StageActionSheet(QUALITY)" }
-    row_icon: "28dp r7 色底芯片（12% 透明度）+ 18dp 图标，色板 [#FF7EB0, #9B8CFF, #22D3EE, #4ADE80]"
+    row_icon: "28dp r7 色底芯片（12% 透明度）+ 18dp 图标，色板 = token [tagPink, tagPurple, tagCyan, tagGreen]"
     trailing_note: "行口径=tagPassProgress().percentRounded()，与环心大数字同源同舍入"
 
   guard_banner: "BackgroundScanGuardBanner 殿后（缺失项未确认时显示，先检查再提醒）"
@@ -160,11 +160,17 @@ tag_control:
 
   platform_differences:
     capabilities: "扫描执行链 iOS=TagScanOrchestrator（既有）；UI 状态消费同源 sessionProgress 语义"
+    background_scan: "🔴 2026-10-02 台账：Android=前台 Service（FGS dataSync + 通知 + AlarmManager 续扫），退后台扫描继续；iOS 无 BGTaskScheduler/UIBackgroundModes，退后台即 pauseForBackground——扫描仅前台进行。iOS「后台续扫」属 BGProcessingTask 新立项，不在本期"
+    guard_banner_na: "🔴 2026-10-02 台账：guard_banner（BackgroundScanGuard 保活引导 checklist：电池优化白名单/通知权限/MIUI 自启动三项）整体为 Android 平台概念，iOS 无对应物——iOS 不渲染 guard_banner，该项标记 N/A"
+    session_control_gap: "iOS 会话控制缺口（2026-10-02 台账）：无 Pass1 单阶段入口、Pass2 无 full 变体、美学评分（QUALITY 阶段）恒缺——StageActionSheet 美学行 iOS 弹「后续版本」提示；BEST 视图因无美学分不落地"
+    stats_source: "成果格六格数据源：Android=getDbStats（含 cityCount/groupPhotoCount/selfPhotoCount）；iOS ScanDbStats 2026-10-02 补齐同名字段（SQL 等价物），语义对齐。⚠️ iOS 无写 media_assets.city 的链路（列存在、零写入方，Android 在扫描中做逆地理回填）——城市回填落地前 iOS 足迹城市格恒 0，属平台缺口（技术债）"
+    tab_landing: "整理+扫描容器 tab 落点规则见 main-nav.yaml bottom_bar.special_routing（rememberSaveable 记忆 + isScanning 智能落 SCAN）"
     i18n_keys: "v4 新键：tag_scan_page_title / tag_scan_top_eta / tag_scan_top_running / tag_scan_top_paused /
       tag_scan_ring_hint / tag_scan_status_{ready,running,paused,done} / tag_scan_btn_{start,later,pause_scan,stop,resume_scan,restart}；
       v4.1 新键：tag_result_{faces,people,cities,group,self,tags}_label / tag_result_self_unset /
-      tag_city_sheet_{title,count} / gallery_view_{group,self}"
+      tag_city_sheet_{title,count} / gallery_view_{group,self}；iOS 统一走 Android 同名键族入 xcstrings 五语"
     allowed_differences:
       - "容器色可用两端等价 colorScheme 角色实现"
       - "四个导航目的地 iOS 侧若缺（评分排序视图/hasFace 筛选）：允许首版落地为等价页面（TagViewer/People），缺口登记台账"
       - "长按重处理 iOS 侧可用 contextMenu 或长按手势等价实现"
+      - "成果格出口（FACES/TAGGED/GROUP/SELF/CITY 过滤视图）iOS 无 GalleryViewFilter 通道：允许首版落地为等价页（FACES→人物页、TAGGED→TagViewer、GROUP/SELF/CITY 台账登记缺口），不阻塞本期"

@@ -1,5 +1,13 @@
 import SwiftUI
+import Combine
 
+/// TAG 扫描页 v4.1 ViewModel：会话状态 / 统计快照 / 会话控制中转（spec tag-control.yaml）。
+///
+/// 进度信号双通道分工：本页 UI 订阅 `TagScanStatusCenter.shared.events`（多播中继，
+/// 不占 orchestrator.onEvent 单闭包——scan tab 内嵌实例与相册 fullScreenCover 实例可共存，
+/// 互不覆盖）→ `progress`（本轮会话 x/y）；全局「扫描中」信号一律消费
+/// `TagScanStatusCenter.shared`（orchestrator emit 时推送），本层不再自推导 isScanning
+/// （消双源）。环心大数字走 `LibraryCompletion`（库级口径立法）。
 @MainActor
 final class TagScanViewModel: ObservableObject {
     @Published private(set) var progress: TagScanSessionProgress?
@@ -12,10 +20,11 @@ final class TagScanViewModel: ObservableObject {
     @Published var showModelsNeeded = false
 
     private let orchestrator = TagScanOrchestrator.shared
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
-        orchestrator.onEvent = { [weak self] ev in
-            Task { @MainActor in
+        TagScanStatusCenter.shared.events
+            .sink { [weak self] ev in
                 guard let self else { return }
                 switch ev {
                 case .progress(let p):
@@ -27,26 +36,41 @@ final class TagScanViewModel: ObservableObject {
                     self.refreshStats()
                 }
             }
-        }
+            .store(in: &cancellables)
         refreshStats()
     }
 
-    var isScanning: Bool {
-        let s = progress?.state ?? .idle
-        return s == .running || s == .pausing
+    // MARK: - 库级口径（环心大数字 / 弧 / hint；2026-10-01 口径立法唯一对外百分比）
+
+    var libraryCompletion: LibraryCompletion {
+        LibraryCompletion(totalMedia: stats.totalMedia, remainingPass3: stats.remainingPass3)
     }
 
-    func startFull() { orchestrator.start(mode: .full); refreshStats() }
+    // MARK: - 会话控制（v4 bottom_bar 四态状态机入口）
+
     func startIncremental() { orchestrator.start(mode: .incremental); refreshStats() }
+    func startFull() { orchestrator.start(mode: .full); refreshStats() }
     func pause() { orchestrator.pause() }
     func resume() { orchestrator.resume() }
     func cancel() { orchestrator.cancel() }
     func retryFailed() { orchestrator.retryFailed() }
 
-    // MARK: - 分阶段独立控制（v2 StageActionSheet 入口）
+    /// paused 态次钮「重新开始」：cancel → 800ms → 增量重起（yaml bottom_bar.states.paused.secondary）。
+    func restart() {
+        cancel()
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            startIncremental()
+        }
+    }
+
+    // MARK: - 分阶段独立控制（StageActionSheet intents）
+
     func runPass2() { orchestrator.runPass2Clustering() }
     func startPass3Incremental() { orchestrator.startPass3(mode: .incremental); refreshStats() }
     func startPass3Full() { orchestrator.startPass3(mode: .full); refreshStats() }
+
+    // MARK: - 数据源
 
     func refreshStats() {
         stats = TagDatabase.shared.scanStats()
@@ -54,9 +78,24 @@ final class TagScanViewModel: ObservableObject {
         if progress == nil, let p = orchestrator.currentProgress() { progress = p }
     }
 
-    /// 恢复上次未完成 session（进入扫描页提示后用）。
+    /// 恢复上次未完成 session（进程死亡对账 → interrupted_card「从中断处继续」）。
     func resumeUnfinished() {
         orchestrator.resumeUnfinishedSession()
         refreshStats()
+    }
+
+    /// 城市分组（成果格城市弹层数据源）。
+    /// ⚠️ iOS 无写 media_assets.city 的链路 → 恒空（tag-control.yaml platform_differences.stats_source
+    /// 已登记平台缺口：城市回填落地前足迹城市格恒 0，弹层仍可开）。
+    func cityGroups() -> [(city: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for (_, city) in TagDatabase.shared.cityByLocalIdentifier() {
+            counts[city, default: 0] += 1
+        }
+        let entries = counts.map { (city: $0.key, count: $0.value) }
+        return entries.sorted { lhs, rhs in
+            if lhs.count != rhs.count { return lhs.count > rhs.count }
+            return lhs.city < rhs.city
+        }
     }
 }

@@ -15,6 +15,27 @@ struct ScanDbStats: Sendable, Equatable {
     let faceEmbeddingCount: Int
     let remainingPass1: Int
     let remainingPass3: Int  // SP-D
+    let cityCount: Int       // DISTINCT 非空 city（成果格，对齐 Android getDistinctCityCount）
+    let groupPhotoCount: Int // 同照片聚到 ≥2 人物（成果格，对齐 Android getGroupPhotoMediaIds().size）
+    let selfPhotoCount: Int  // is_self 人物照片数（成果格，未标记=0，对齐 Android getSelfPersonMediaIds().size）
+
+    init(totalMedia: Int, withFace: Int, withLabels: Int, withSemantic: Int,
+         personCount: Int, namedPersonCount: Int, faceEmbeddingCount: Int,
+         remainingPass1: Int, remainingPass3: Int,
+         cityCount: Int = 0, groupPhotoCount: Int = 0, selfPhotoCount: Int = 0) {
+        self.totalMedia = totalMedia
+        self.withFace = withFace
+        self.withLabels = withLabels
+        self.withSemantic = withSemantic
+        self.personCount = personCount
+        self.namedPersonCount = namedPersonCount
+        self.faceEmbeddingCount = faceEmbeddingCount
+        self.remainingPass1 = remainingPass1
+        self.remainingPass3 = remainingPass3
+        self.cityCount = cityCount
+        self.groupPhotoCount = groupPhotoCount
+        self.selfPhotoCount = selfPhotoCount
+    }
 }
 
 extension TagDatabase {
@@ -172,6 +193,19 @@ extension TagDatabase {
                     """),
                 remainingPass3: countInt("""
                     SELECT COUNT(*) FROM media_assets WHERE type='IMAGE' AND labelsEn IS NULL;
+                    """),
+                cityCount: countInt("""
+                    SELECT COUNT(DISTINCT city) FROM media_assets WHERE city IS NOT NULL AND city != '';
+                    """),
+                groupPhotoCount: countInt("""
+                    SELECT COUNT(*) FROM (
+                        SELECT media_id FROM face_embeddings
+                        GROUP BY media_id
+                        HAVING COUNT(DISTINCT person_id) >= 2);
+                    """),
+                selfPhotoCount: countInt("""
+                    SELECT COUNT(DISTINCT media_id) FROM face_embeddings
+                    WHERE person_id = (SELECT person_id FROM persons WHERE is_self = 1 LIMIT 1);
                     """)
             )
         }

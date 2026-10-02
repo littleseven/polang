@@ -7,6 +7,9 @@ import SwiftUI
 /// 选中项点击空操作；未选中点击瞬时切页（无滑动动画）。
 struct FloatingBottomTab: View {
     @Binding var currentPage: Int
+    /// 点击回调（含选中项空操作点击；切页之外的特殊路由钩子，如整理页扫描中落 SCAN tab——
+    /// 对齐 Android MainPagerHost onBarSwitchPage）。
+    var onTapPage: ((Int) -> Void)? = nil
     @Environment(\.colorScheme) private var cs
 
     /// 表驱动项（main-nav.yaml §1 bottom_bar.items；图标资产 mat_o_photo_library /
@@ -48,6 +51,7 @@ struct FloatingBottomTab: View {
         return Button {
             // 选中项点击空操作（赋同值无副作用）；未选中瞬时切页（无动画，main-nav §1）
             currentPage = item.page
+            onTapPage?(item.page)
         } label: {
             MatIcon(name: item.icon, size: BottomTabTokens.iconSize)
                 // 仅 tint 区分选中态，无背景块（main-nav §1 selected_style）
