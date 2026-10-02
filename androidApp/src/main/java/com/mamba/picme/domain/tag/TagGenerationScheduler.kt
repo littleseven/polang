@@ -594,33 +594,63 @@ class TagGenerationScheduler(
         }
 
         // 展平索引
-        val flatIndex = mutableListOf<Pair<Long, Int>>()
+        val fullFlatIndex = mutableListOf<Pair<Long, Int>>()
         for ((mediaId, faceEmbs) in embeddingsMap) {
             for (i in faceEmbs.indices) {
-                flatIndex.add(mediaId to i)
+                fullFlatIndex.add(mediaId to i)
             }
         }
 
-        // 诊断：分析 embedding 两两相似度分布
-        logEmbeddingSimilarityDistribution(embeddingsMap, flatIndex)
-
-        // 选择聚类策略：方案 B（密度自适应 k-NN 图聚类）或方案 A（DBSCAN）
-        val clusters = if (ClusteringConfig.USE_ADAPTIVE_CLUSTERING) {
-            AdaptiveFaceClusterer.cluster(
-                embeddingsMap = embeddingsMap,
-                flatIndex = flatIndex,
-                k = ClusteringConfig.KNN_K,
-                minSimilarity = ClusteringConfig.KNN_MIN_SIMILARITY,
-                minClusterSize = ClusteringConfig.KNN_MIN_CLUSTER_SIZE
-            ).also {
-                Log.i(TAG, "Adaptive k-NN clustering: ${it.size} cluster keys from ${flatIndex.size} face embeddings")
-            }
+        // 分块（2026-10-02 OOM 修复）：未分配积压 > KNN_CHUNK_SIZE 时按序切块，
+        // 块间以全人物质心快照续接（同人簇跨块复用既有 person，不因切块分裂）
+        val chunked = fullFlatIndex.size > ClusteringConfig.KNN_CHUNK_SIZE
+        val chunks = if (chunked) {
+            Log.w(TAG, "Clustering chunked: ${fullFlatIndex.size} unassigned faces > " +
+                "${ClusteringConfig.KNN_CHUNK_SIZE}, splitting into " +
+                "${(fullFlatIndex.size + ClusteringConfig.KNN_CHUNK_SIZE - 1) / ClusteringConfig.KNN_CHUNK_SIZE} chunks")
+            fullFlatIndex.chunked(ClusteringConfig.KNN_CHUNK_SIZE)
         } else {
-            var dbscanClusters = dbscanCluster(embeddingsMap, flatIndex, ClusteringConfig.DBSCAN_EPS, ClusteringConfig.DBSCAN_MIN_PTS)
-            Log.i(TAG, "DBSCAN: ${dbscanClusters.size} clusters from ${flatIndex.size} face embeddings")
-            // 验证簇内部一致性，分裂不健康的簇
-            validateAndSplitClusters(dbscanClusters, embeddingsMap)
+            listOf(fullFlatIndex)
         }
+
+        var totalAssigned = 0
+        var totalReused = 0
+        var totalNoise = 0
+        var totalMergedNoise = 0
+        for ((chunkIndex, flatIndex) in chunks.withIndex()) {
+            // 块间续接：重读全人物质心（含未命名），让后块与前块产出的人物按质心合并
+            val availableSnapshots = if (chunkIndex == 0) {
+                namedPersonSnapshots.toMutableList()
+            } else {
+                buildAllPersonSnapshots().toMutableList()
+            }
+
+            // 诊断：分析 embedding 两两相似度分布
+            logEmbeddingSimilarityDistribution(embeddingsMap, flatIndex)
+
+            // 选择聚类策略：方案 B（密度自适应 k-NN 图聚类）或方案 A（DBSCAN）；
+            // OOM 熔断：升级为会话级失败而非进程崩溃——避免 START_STICKY 自动续跑成崩溃循环
+            val clusters = try {
+                if (ClusteringConfig.USE_ADAPTIVE_CLUSTERING) {
+                    AdaptiveFaceClusterer.cluster(
+                        embeddingsMap = embeddingsMap,
+                        flatIndex = flatIndex,
+                        k = ClusteringConfig.KNN_K,
+                        minSimilarity = ClusteringConfig.KNN_MIN_SIMILARITY,
+                        minClusterSize = ClusteringConfig.KNN_MIN_CLUSTER_SIZE
+                    ).also {
+                        Log.i(TAG, "Adaptive k-NN clustering: ${it.size} cluster keys from ${flatIndex.size} face embeddings")
+                    }
+                } else {
+                    var dbscanClusters = dbscanCluster(embeddingsMap, flatIndex, ClusteringConfig.DBSCAN_EPS, ClusteringConfig.DBSCAN_MIN_PTS)
+                    Log.i(TAG, "DBSCAN: ${dbscanClusters.size} clusters from ${flatIndex.size} face embeddings")
+                    // 验证簇内部一致性，分裂不健康的簇
+                    validateAndSplitClusters(dbscanClusters, embeddingsMap)
+                }
+            } catch (oom: OutOfMemoryError) {
+                Log.e(TAG, "Clustering OOM (chunk faces=${flatIndex.size}, chunked=$chunked) — fail session, no crash loop", oom)
+                throw IllegalStateException("Face clustering OOM at ${flatIndex.size} faces")
+            }
 
         // 分配 personId：按簇批量写入，避免逐条 UPDATE 阻塞协程/线程
         val sorted = clusters.entries
@@ -632,11 +662,10 @@ class TagGenerationScheduler(
             entry.key to computeClusterCentroid(entry.value, embeddingsMap)
         }
 
-        Log.i(TAG, "DBSCAN assignment start: ${sorted.size} clusters to persist")
+        Log.i(TAG, "DBSCAN assignment start: ${sorted.size} clusters to persist (chunk ${chunkIndex + 1}/${chunks.size})")
         var assignedCount = 0
         var reusedCount = 0
         val clusterKeyToPersonId = mutableMapOf<Int, Long>()
-        val availableSnapshots = namedPersonSnapshots.toMutableList()
         db.withTransaction {
             for ((index, entry) in sorted.withIndex()) {
                 val mediaIds = entry.value.map { it.first }.distinct()
@@ -710,8 +739,15 @@ class TagGenerationScheduler(
         }
 
         val noiseCount = noisePoints.size
-        Log.i(TAG, "DBSCAN done: $assignedCount media clustered into ${sorted.size} persons, " +
-            "reused=$reusedCount, noise=$noiseCount (merged=$mergedNoiseCount, remaining=${noiseCount - mergedNoiseCount})")
+        totalAssigned += assignedCount
+        totalReused += reusedCount
+        totalNoise += noiseCount
+        totalMergedNoise += mergedNoiseCount
+        } // chunk loop end
+
+        Log.i(TAG, "DBSCAN done: $totalAssigned faces clustered" +
+            "${if (chunked) " in ${chunks.size} chunks" else ""}, " +
+            "reused=$totalReused, noise=$totalNoise (merged=$totalMergedNoise, remaining=${totalNoise - totalMergedNoise})")
 
         // 【关键修复】校验 hasFace 标记：清理有 hasFace=true 但无有效 embedding 的媒体
         // 这些媒体可能是之前误检（RetinaFace 误报）或零向量过滤后的残留
@@ -1481,6 +1517,31 @@ class TagGenerationScheduler(
             )
         }
         Log.i(TAG, "Built ${snapshots.size} named person snapshots for clustering preservation")
+        return snapshots
+    }
+
+    /**
+     * 全人物质心快照（含未命名）——分块聚类的块间续接用：
+     * 后块簇质心与前块产出人物按 [ClusteringConfig.NAME_PRESERVE_MIN_SIMILARITY] 匹配置复用，
+     * 同人的簇跨块合并到同一 person，不因切块而分裂。
+     */
+    private suspend fun buildAllPersonSnapshots(): List<NamedPersonSnapshot> {
+        val persons = personDao.getAllPersons()
+        if (persons.isEmpty()) return emptyList()
+        val snapshots = mutableListOf<NamedPersonSnapshot>()
+        for (person in persons) {
+            val embeddings = personDao.getEmbeddingsByPerson(person.personId)
+            if (embeddings.isEmpty()) continue
+            val centroid = computeCentroid(embeddings.map { byteArrayToFloatArray(it.embedding) })
+            snapshots.add(
+                NamedPersonSnapshot(
+                    personId = person.personId,
+                    name = person.name,
+                    centroid = centroid,
+                    isSelf = person.isSelf
+                )
+            )
+        }
         return snapshots
     }
 

@@ -95,6 +95,14 @@ object ClusteringConfig {
      *  与 DBSCAN_MIN_PTS 保持一致的语义：≥2 张人脸才成人物簇。 */
     const val KNN_MIN_CLUSTER_SIZE = 2
 
+    /**
+     * 单次聚类分块上限（2026-10-02 OOM 修复）：未分配 embedding 积压超过此值时
+     * 按 flatIndex 顺序分块聚类，块间以全人物质心快照续接（同人簇跨块复用既有 person）。
+     * 4000 ≈ 单块图构建 O(n²) 相似度 ~8GFLOP + 内存 ~30MB，256MB 堆安全；
+     * 配合 buildKnnGraph 去装箱化（原 filter/sortedByDescending 每节点 n 个装箱 Integer）。
+     */
+    const val KNN_CHUNK_SIZE = 4000
+
     /** 全量重聚类时，新簇与旧命名人物质心的最小余弦相似度。
      *  高于此值则认为新旧簇为同一人，复用 personId 与 name。 */
     const val NAME_PRESERVE_MIN_SIMILARITY = 0.65f
