@@ -111,6 +111,8 @@ fun OrganizeHomeRoute(
                         onOpenFaces = { onRequestGalleryView(GalleryViewFilter.FACES) },
                         onOpenBest = { onRequestGalleryView(GalleryViewFilter.BEST) },
                         onOpenPeople = { onSwitchMainPage(MAIN_PAGE_PEOPLE) },
+                        // 「稍后」=切回整理 tab（v4 设计稿 idle 次钮）
+                        onLater = { onSelectTab(OrganizeTab.ORGANIZE) },
                         embedded = true,
                     )
                 }

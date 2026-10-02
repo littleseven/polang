@@ -1277,6 +1277,22 @@
     <string name="tag_scan_now_semantic">Codificando semántica</string>
     <string name="tag_scan_narrative">Foto %1$d de %2$d · quedan ~%3$s</string>
     <string name="tag_scan_narrative_no_eta">Foto %1$d de %2$d</string>
+    <!-- v4 扫描页（2026-10-02 用户重设计：top_bar 计数 + ringHero + bottom_bar） -->
+    <string name="tag_scan_page_title">Escanear y organizar</string>
+    <string name="tag_scan_top_eta">Esta pasada · ~%1$s restantes</string>
+    <string name="tag_scan_top_running">Esta pasada · en curso</string>
+    <string name="tag_scan_top_paused">Esta pasada · en pausa</string>
+    <string name="tag_scan_ring_hint">%1$s / %2$s fotos · %3$s</string>
+    <string name="tag_scan_status_ready">Listo para empezar</string>
+    <string name="tag_scan_status_running">Analizando</string>
+    <string name="tag_scan_status_paused">En pausa</string>
+    <string name="tag_scan_status_done">Completado</string>
+    <string name="tag_scan_btn_start">Empezar escaneo</string>
+    <string name="tag_scan_btn_later">Más tarde</string>
+    <string name="tag_scan_btn_pause_scan">Pausar escaneo</string>
+    <string name="tag_scan_btn_stop">Detener</string>
+    <string name="tag_scan_btn_resume_scan">Reanudar escaneo</string>
+    <string name="tag_scan_btn_restart">Reiniciar</string>
     <string name="tag_scan_library_line">%1$d%% de la biblioteca etiquetada</string>
     <string name="tag_scan_paused_title">En pausa · %1$s</string>
     <string name="tag_scan_completed_with_failures">Completado · %1$d con error</string>

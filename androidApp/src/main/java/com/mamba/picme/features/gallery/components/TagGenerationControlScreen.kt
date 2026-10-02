@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.mamba.picme.features.gallery.components
 
@@ -7,23 +7,19 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Label
-import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,9 +35,10 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -54,7 +51,6 @@ import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.domain.aesthetic.AestheticScoreWorker
-import com.mamba.picme.domain.tag.TagCategory
 import com.mamba.picme.domain.tag.scan.LibraryCompletion
 import com.mamba.picme.domain.tag.scan.ScanCardAction
 import com.mamba.picme.domain.tag.scan.ScanCardUiModel
@@ -69,7 +65,6 @@ import com.mamba.picme.domain.tag.scan.scanCardUiModel
 import com.mamba.picme.domain.tag.scan.tagPassProgress
 import com.mamba.picme.domain.usertask.TagScanTaskAdapter
 import com.mamba.picme.domain.usertask.UserTaskStatus
-import com.mamba.picme.features.common.topbar.AppTopBar
 import com.mamba.picme.service.tag.TagGenerationService
 import com.mamba.picme.util.permission.BackgroundScanGuard
 import kotlinx.coroutines.delay
@@ -101,6 +96,8 @@ fun TagGenerationControlScreen(
     onOpenBest: () -> Unit = {},
     /** 人物行→人物页（宿主切主页面） */
     onOpenPeople: () -> Unit = {},
+    /** 「稍后」次钮出口（v4 设计稿：宿主切回整理 tab） */
+    onLater: () -> Unit = {},
     /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）；根页无返回箭头（2026-09-06 导航统一移除）。 */
     embedded: Boolean = false,
 ) {
@@ -137,15 +134,9 @@ fun TagGenerationControlScreen(
     var photoCount by remember { mutableIntStateOf(0) }
     var aestheticScored by remember { mutableIntStateOf(0) }
 
-    // 精细控制：类别 / 时间范围 / 模式
-    var selectedCategories by remember { mutableStateOf(setOf<TagCategory>()) }
-    var selectedTimeRange by remember { mutableStateOf(TimeRangePreset.ALL) }
-    var fullRegenerateMode by remember { mutableStateOf(false) }
-
-    // 阶段操作底部弹层 / 全量重处理二次确认 / 重新生成二级弹层（v3：管理动作入口）
+    // 阶段操作底部弹层 / 全量重处理二次确认（v4：阶段行长按弹层，RegenSheet 二级入口随设计稿移除）
     var stageSheetTarget by remember { mutableStateOf<TagStage?>(null) }
     var pendingFullStage by remember { mutableStateOf<TagStage?>(null) }
-    var showRegenSheet by remember { mutableStateOf(false) }
 
     // 刷新统计：统一通过 TagScanOrchestrator.getDbStats(db) 获取，
     // 不依赖 Service/Orchestrator 实例，进入页面即可立即显示。
@@ -288,698 +279,513 @@ fun TagGenerationControlScreen(
         )
     }
 
-    // ── 重新生成二级弹层（v3）：分阶段重处理 + 按类别/时间精细控制 ──────
-    if (showRegenSheet) {
-        RegenSheet(
-            onDismiss = { showRegenSheet = false },
-            onStageClick = { stage ->
-                showRegenSheet = false
-                stageSheetTarget = stage
-            },
-            selectedCategories = selectedCategories,
-            onToggleCategory = { category -> selectedCategories = selectedCategories.toggle(category) },
-            selectedTimeRange = selectedTimeRange,
-            onSelectTimeRange = { preset -> selectedTimeRange = preset },
-            fullRegenerateMode = fullRegenerateMode,
-            onFullRegenerateModeChange = { checked -> fullRegenerateMode = checked },
-            onRegenerate = {
-                refreshStats()
-                val categories = selectedCategories.ifEmpty { TagCategory.ALL }
-                val startTimeMs = selectedTimeRange.startTimeMs
-                context.startForegroundService(
-                    TagGenerationService.intentRegenerateCategories(
-                        context = context,
-                        categories = categories.map { it.name },
-                        startTimeMs = startTimeMs,
-                        fullMode = fullRegenerateMode
-                    )
-                )
-            }
-        )
-    }
-
-    // 会话状态（屏幕级：钉住状态条与滚动列内 HeroCard 共用）
+    // 会话状态（v4 2026-10-02 用户重设计：progBar+top_bar 计数承载本轮，环=全库口径）
     val scanActive = isScanning
     val cardModel = sessionProgress?.let { value -> scanCardUiModel(value) }
-    // 钉住状态条：会话活跃(含暂停/过渡)即显示；终态失败为静态结果不占条
-    // 暂停=琥珀状态条(v3.4 设计稿 tag_control_paused);运行/过渡=绿
-    val showRunningStrip = cardModel != null && (scanActive || cardModel.isPaused)
-    val sessionFraction = cardModel?.narrative?.takeIf { it.total > 0 }
-        ?.let { it.processed.toFloat() / it.total } ?: 0f
+    // 零失败终态回落空闲（同 v3 语义）；暂停态占位（isScanning 不含 PAUSED，须显式保留）
+    val liveModel = cardModel?.takeIf { scanActive || it.isPaused || it.isTerminalWithFailures }
+    // 本轮会话分数：活跃(含暂停/过渡)时驱动 progBar 填充与顶栏计数；空闲归零
+    val sessionNarrative = liveModel?.narrative?.takeIf { it.total > 0 }
+    val sessionFraction = sessionNarrative?.let { it.processed.toFloat() / it.total } ?: 0f
+    // 环口径立法不变：全库 AI 打标完成率（唯一百分比）；本轮只以计数出现在顶栏
+    val libraryPct = libraryCompletion?.percentRounded()
+        ?: tagPassProgress(totalMedia, remainingPass3).percentRounded()
+    val libraryFraction = libraryCompletion?.fraction
+        ?: tagPassProgress(totalMedia, remainingPass3).fraction
+    val taggedCount = totalMedia - remainingPass3
+    val running = liveModel?.primaryAction == ScanCardAction.PAUSE
+    val pausedState = liveModel?.isPaused == true
+    val terminal = sessionProgress?.state == ScanSessionState.COMPLETED
+
+    // 底部操作：v4 设计稿三态（idle 开始/稍后；running 暂停/停止；paused 继续/重新开始）
+    fun restartScan() {
+        coroutineScope.launch {
+            context.startForegroundService(TagGenerationService.intentCancel(context))
+            delay(800)
+            refreshStats()
+            startScanWithGuard {
+                context.startForegroundService(TagGenerationService.intentScanIncremental(context))
+            }
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        // embedded（OrganizeHome 内 tab）：胶囊条即页头，不再叠静态标题栏——
-        // 2026-10-01 真机反馈「顶部一大段空白」根因 = AppTopBar 占位 + Scaffold
-        // contentWindowInsets 二次叠加状态栏 inset；清零对齐 DedupHomeScreen embedded 套路
-        contentWindowInsets = if (embedded) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
-        topBar = {
-            if (!embedded) {
-                AppTopBar(title = { Text(stringResource(R.string.gallery_settings)) })
-            }
-        }
+        // embedded（OrganizeHome 内 tab）：宿主胶囊条即页头；清零 insets 对齐 Dedup 套路
+        contentWindowInsets = if (embedded) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            // ── 钉住的全宽扫描状态条（2026-10-01 二轮反馈：运行态不显著）──────
-            // 同族语言=相册页 scan_progress_track：胶囊下全宽带 + 底缘 4dp 本轮进度条；
-            // 不入滚动列——页面再长滚动中状态始终可见。
-            if (showRunningStrip) {
-                ScanStatusStrip(
-                    title = scanCardTitle(cardModel),
-                    processed = cardModel?.narrative?.processed ?: 0,
-                    total = cardModel?.narrative?.total ?: 0,
-                    fraction = sessionFraction ?: 0f,
-                    animating = cardModel?.primaryAction == ScanCardAction.PAUSE
-                )
-            }
+            // ── 顶部 4dp 全宽本轮进度条（v4 设计稿 progBar：胶囊正下方）──
+            ScanProgressBar(
+                fraction = sessionFraction,
+                running = running,
+                paused = pausedState
+            )
+
+            // ── top_bar：标题 + 本轮计数（空闲只有标题）──
+            ScanTopBar(
+                counter = sessionNarrative?.let { "%,d / %,d".format(Locale.ROOT, it.processed, it.total) },
+                subline = when {
+                    sessionNarrative == null -> null
+                    pausedState -> stringResource(R.string.tag_scan_top_paused)
+                    sessionNarrative.etaMs != null ->
+                        stringResource(R.string.tag_scan_top_eta, formatDuration(sessionNarrative.etaMs))
+                    else -> stringResource(R.string.tag_scan_top_running)
+                }
+            )
+
+            // ── content：环卡 + 附属互斥卡 + 分阶段列表 ──
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-            // ── HeroCard（v3 单锚点主卡，spec tag-control.yaml §hero）──────
-            // 空闲/运行同槽位互斥切换；统计区（标题+大数字+剩余行+圆环）可点跳「已打标照片」。
-            // 零失败终态回落空闲态（叙述行显示上次会话统计）；美学打分/中断卡为同槽位互斥附属卡。
-            val showRunningHero = cardModel != null && (scanActive || cardModel.isTerminalWithFailures)
-            HeroCard(
-                model = if (showRunningHero) cardModel else null,
-                library = libraryCompletion,
-                totalMedia = totalMedia,
-                remainingPass3 = remainingPass3,
-                lastSession = sessionProgress,
-                onOpenTagged = onOpenTagged,
-                onPause = { context.startForegroundService(TagGenerationService.intentPause(context)) },
-                onResume = { context.startForegroundService(TagGenerationService.intentResume(context)) },
-                onCancel = { context.startForegroundService(TagGenerationService.intentCancel(context)) },
-                onRetryFailed = { context.startForegroundService(TagGenerationService.intentRetryFailed(context)) },
-                onScanNew = {
+                RingHeroCard(
+                    percent = libraryPct,
+                    fraction = libraryFraction,
+                    labeledCount = taggedCount,
+                    totalCount = totalMedia,
+                    running = running,
+                    paused = pausedState,
+                    terminalDone = terminal,
+                    onOpenTagged = onOpenTagged
+                )
+
+                // 附属互斥卡（非会话制美学打分 / 进程死亡对账）
+                AnimatedVisibility(visible = aestheticProgress != null && liveModel == null) {
+                    aestheticProgress?.let { AestheticProgressCard(it) }
+                }
+                AnimatedVisibility(visible = liveModel == null && aestheticProgress == null && scanInterrupted) {
+                    InterruptedScanCard(
+                        onResume = {
+                            startScanWithGuard {
+                                context.startForegroundService(TagGenerationService.intentScanIncremental(context))
+                            }
+                        }
+                    )
+                }
+
+                // ── 分阶段列表（点行=查看内容页；长按=重处理弹层）──
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                        val faceProgress = tagPassProgress(totalMedia, remainingPass1)
+                        StageRow(
+                            icon = Icons.Rounded.Face,
+                            iconTint = Color(0xFFFF7EB0),
+                            title = stringResource(R.string.tag_pass_title_face),
+                            description = if (faceProgress.isEmpty) {
+                                stringResource(R.string.tag_pass_desc_face)
+                            } else {
+                                stringResource(R.string.tag_pass_scope_face, faceProgress.processed, faceProgress.total)
+                            },
+                            trailing = stagePercentText(faceProgress),
+                            onClick = onOpenFaces,
+                            onLongClick = { stageSheetTarget = TagStage.FACE }
+                        )
+                        StageRow(
+                            icon = Icons.Rounded.Person,
+                            iconTint = Color(0xFF9B8CFF),
+                            title = stringResource(R.string.tag_pass_title_cluster),
+                            description = stringResource(R.string.tag_pass_desc_cluster),
+                            trailing = if (personCount > 0) "$personCount" else "—",
+                            onClick = onOpenPeople,
+                            onLongClick = { stageSheetTarget = TagStage.PEOPLE }
+                        )
+                        val contentProgress = tagPassProgress(totalMedia, remainingPass3)
+                        StageRow(
+                            icon = Icons.Rounded.Label,
+                            iconTint = Color(0xFF22D3EE),
+                            title = stringResource(R.string.tag_pass_title_content),
+                            description = if (contentProgress.isEmpty) {
+                                stringResource(R.string.tag_pass_desc_content)
+                            } else {
+                                stringResource(R.string.tag_pass_scope_content, contentProgress.processed, contentProgress.total)
+                            },
+                            trailing = stagePercentText(contentProgress),
+                            onClick = onNavigateToTagViewer,
+                            onLongClick = { stageSheetTarget = TagStage.CONTENT }
+                        )
+                        val qualityProgress = tagPassProgress(photoCount, photoCount - aestheticScored)
+                        StageRow(
+                            icon = Icons.Rounded.Star,
+                            iconTint = Color(0xFF4ADE80),
+                            title = stringResource(R.string.tag_pass_title_aesthetic),
+                            description = if (qualityProgress.isEmpty) {
+                                stringResource(R.string.tag_pass_desc_aesthetic)
+                            } else {
+                                stringResource(R.string.tag_pass_scope_aesthetic, qualityProgress.processed, qualityProgress.total)
+                            },
+                            trailing = stagePercentText(qualityProgress),
+                            onClick = onOpenBest,
+                            onLongClick = { stageSheetTarget = TagStage.QUALITY }
+                        )
+                    }
+                }
+
+                // ── 后台保活缺失项提示(非阻断,点击跳设置) ────────
+                BackgroundScanGuardBanner()
+            }
+
+            // ── bottom_bar：主/次双钮（v4 设计稿，52dp r12 16sp SemiBold）──
+            BottomActionBar(
+                model = liveModel,
+                running = running,
+                onStart = {
                     refreshStats()
                     startScanWithGuard {
                         context.startForegroundService(TagGenerationService.intentScanIncremental(context))
                     }
                 },
-                onRescanAll = {
-                    refreshStats()
-                    startScanWithGuard {
-                        context.startForegroundService(TagGenerationService.intentScanAll(context))
-                    }
-                }
+                onPause = { context.startForegroundService(TagGenerationService.intentPause(context)) },
+                onResume = { context.startForegroundService(TagGenerationService.intentResume(context)) },
+                onStop = { context.startForegroundService(TagGenerationService.intentCancel(context)) },
+                onRestart = ::restartScan,
+                onRetryFailed = { context.startForegroundService(TagGenerationService.intentRetryFailed(context)) },
+                onLater = onLater
             )
-
-            // 附属互斥卡（非会话制美学打分 / 进程死亡对账）
-            AnimatedVisibility(visible = aestheticProgress != null && !scanActive) {
-                aestheticProgress?.let { AestheticProgressCard(it) }
-            }
-            AnimatedVisibility(visible = cardModel == null && aestheticProgress == null && scanInterrupted) {
-                InterruptedScanCard(
-                    onResume = {
-                        startScanWithGuard {
-                            context.startForegroundService(TagGenerationService.intentScanIncremental(context))
-                        }
-                    }
-                )
-            }
-
-            // ── 分阶段（v3：点行=查看与数字匹配的内容页，浏览不锁定）──
-            // 管理动作（重新处理）不在行上——收进「重新生成」二级（RegenSheet）。
-            SectionHeader(
-                title = stringResource(R.string.tag_pass_control_title),
-                hint = stringResource(R.string.tag_stages_hint_view)
-            )
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
-            ) {
-                Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                    val faceProgress = tagPassProgress(totalMedia, remainingPass1)
-                    StageRow(
-                        icon = Icons.Rounded.Face,
-                        iconTint = Color(0xFFFF7EB0),
-                        title = stringResource(R.string.tag_pass_title_face),
-                        description = if (faceProgress.isEmpty) {
-                            stringResource(R.string.tag_pass_desc_face)
-                        } else {
-                            stringResource(R.string.tag_pass_scope_face, faceProgress.processed, faceProgress.total)
-                        },
-                        trailing = stagePercentText(faceProgress),
-                        onClick = onOpenFaces
-                    )
-                    StageRow(
-                        icon = Icons.Rounded.Person,
-                        iconTint = Color(0xFF9B8CFF),
-                        title = stringResource(R.string.tag_pass_title_cluster),
-                        description = stringResource(R.string.tag_pass_desc_cluster),
-                        trailing = if (personCount > 0) "$personCount" else "—",
-                        onClick = onOpenPeople
-                    )
-                    val contentProgress = tagPassProgress(totalMedia, remainingPass3)
-                    StageRow(
-                        icon = Icons.Rounded.Label,
-                        iconTint = Color(0xFF22D3EE),
-                        title = stringResource(R.string.tag_pass_title_content),
-                        description = if (contentProgress.isEmpty) {
-                            stringResource(R.string.tag_pass_desc_content)
-                        } else {
-                            stringResource(R.string.tag_pass_scope_content, contentProgress.processed, contentProgress.total)
-                        },
-                        trailing = stagePercentText(contentProgress),
-                        onClick = onNavigateToTagViewer
-                    )
-                    val qualityProgress = tagPassProgress(photoCount, photoCount - aestheticScored)
-                    StageRow(
-                        icon = Icons.Rounded.Star,
-                        iconTint = Color(0xFF4ADE80),
-                        title = stringResource(R.string.tag_pass_title_aesthetic),
-                        description = if (qualityProgress.isEmpty) {
-                            stringResource(R.string.tag_pass_desc_aesthetic)
-                        } else {
-                            stringResource(R.string.tag_pass_scope_aesthetic, qualityProgress.processed, qualityProgress.total)
-                        },
-                        trailing = stagePercentText(qualityProgress),
-                        onClick = onOpenBest
-                    )
-                }
-            }
-
-            // ── 重新生成入口（v3 单行卡）：管理动作收进二级（分阶段重处理 + 按条件）──
-            // 扫描会话活跃（含暂停/过渡态）时整行隐藏，与行浏览解耦。
-            AnimatedVisibility(visible = cardModel == null) {
-                RegenEntryRow(onClick = { showRegenSheet = true })
-            }
-
-            // ── 后台保活缺失项提示(非阻断,点击跳设置) ────────
-            BackgroundScanGuardBanner()
-            }
         }
-
-        Spacer(Modifier.height(16.dp))
     }
 }
 
 /**
- * HeroCard（v3 单锚点主卡，spec tag-control.yaml §hero）：
- * model=null 空闲态（覆盖率标签 + 渐变大数字…改为平铺 primary 大数字 + 剩余行 + 圆环 + 双钮）；
- * model!=null 运行态（阶段名标题 + 任务级叙述行 + 圆环 + 会话操作，scanCardUiModel 纯渲染）。
- * 统计区（标题/大数字/剩余行 + 圆环）整体可点跳「已打标照片」；圆环=库级 AI 打标完成率唯一百分比。
+ * RingHeroCard（v4 2026-10-02 用户重设计 ringHero）：r16 sC 卡，200dp 仪表环（12dp 描边）
+ * + 环心 48sp 大百分比 + 居中说明行。环=全库 AI 打标完成率（口径立法唯一百分比）；
+ * 运行=绿弧+彗星动画，暂停=琥珀弧，空闲=灰数字。整卡可点跳「已打标照片」。
  */
-@Suppress("LongParameterList") // v3 单卡聚合空闲/运行双态数据；拆数据类收益低于可读性损失
 @Composable
-private fun HeroCard(
-    model: ScanCardUiModel?,
-    library: LibraryCompletion?,
-    totalMedia: Int,
-    remainingPass3: Int,
-    lastSession: TagScanSessionProgress?,
-    onOpenTagged: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onCancel: () -> Unit,
-    onRetryFailed: () -> Unit,
-    onScanNew: () -> Unit,
-    onRescanAll: () -> Unit,
+private fun RingHeroCard(
+    percent: Int,
+    fraction: Float,
+    labeledCount: Int,
+    totalCount: Int,
+    running: Boolean,
+    paused: Boolean,
+    terminalDone: Boolean,
+    onOpenTagged: () -> Unit
 ) {
-    // v3.4(2026-10-01 暗黑不过关返工)：弃 v2 的 primaryContainer/secondaryContainer 状态洗色
-    // ——暗黑下调成灰绿洗白底与纯黑卡系打架(真机实测)；对齐画布正稿=纯 surfaceContainer 卡，
-    // 运行/暂停态由钉住状态条的绿点/绿条与标题承载，容器不换色；仅终态失败保留语义红。
-    val containerColor = when {
-        model != null && model.isTerminalWithFailures -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceContainer
+    val accent = when {
+        paused -> StatusColor.warningAmber
+        running -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val contentColor = when {
-        model != null && model.isTerminalWithFailures -> MaterialTheme.colorScheme.onErrorContainer
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-    // 口径（2026-10-01 真机反馈修订）：空闲=全库 AI 打标完成率（LibraryCompletion/Pass3 同源）；
-    // 运行=圆环与轨道切「本轮会话进度」（第 x/y 张，肉眼可见走动——全库口径一轮只挪 <1% 等于冻住），
-    // 全库完成率降级为轨道下 caption 行，唯一百分比锚点保留。
-    val taggedPct = library?.percentRounded()
-        ?: tagPassProgress(totalMedia, remainingPass3).percentRounded()
-    val trackFraction = library?.fraction
-        ?: tagPassProgress(totalMedia, remainingPass3).fraction
-    val sessionFraction = model?.narrative?.takeIf { it.total > 0 }?.let { it.processed.toFloat() / it.total }
-    val sessionPct = sessionFraction?.let { fraction -> (fraction * 100).roundToInt() }
-    val ringProgress = sessionPct ?: taggedPct
-    val ringLabelRes = if (model != null && sessionPct != null) {
-        R.string.tag_ring_session_label
-    } else {
-        R.string.tag_stats_ring_label
-    }
-    // 零失败终态回落空闲态时，剩余行换上次会话统计叙述
-    val terminal = lastSession?.takeIf {
-        it.state == ScanSessionState.COMPLETED || it.state == ScanSessionState.CANCELLED
-    }
-
+    val statusWord = stringResource(
+        when {
+            running -> R.string.tag_scan_status_running
+            paused -> R.string.tag_scan_status_paused
+            terminalDone -> R.string.tag_scan_status_done
+            else -> R.string.tag_scan_status_ready
+        }
+    )
     Card(
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenTagged),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── 统计区（可点 → 已打标照片视图）──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenTagged),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Column(Modifier.weight(1f)) {
-                    if (model != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val active = model.primaryAction == ScanCardAction.PAUSE ||
-                                    (model.primaryAction == ScanCardAction.NONE && !model.isTerminalWithFailures)
-                            if (active) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = contentColor
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
-                            Text(
-                                text = scanCardTitle(model),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = contentColor
-                            )
-                        }
-                        // 叙述行：任务级进度只允许自然语言形态（第 x/y 张 · 约 N 分钟）
-                        model.narrative?.let { narrative ->
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = if (narrative.etaMs != null) {
-                                    stringResource(
-                                        R.string.tag_scan_narrative,
-                                        narrative.processed,
-                                        narrative.total,
-                                        formatDuration(narrative.etaMs)
-                                    )
-                                } else {
-                                    stringResource(
-                                        R.string.tag_scan_narrative_no_eta,
-                                        narrative.processed,
-                                        narrative.total
-                                    )
-                                },
-                                fontSize = 12.sp,
-                                color = contentColor.copy(alpha = 0.8f)
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = stringResource(R.string.tag_stats_coverage_label),
-                            fontSize = 12.sp,
-                            color = contentColor.copy(alpha = 0.72f)
-                        )
-                        Text(
-                            text = "%,d".format(Locale.ROOT, totalMedia),
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            // v3 换肤：平铺 primary（对齐 organize hero，弃渐变）
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = if (terminal != null) {
-                                stringResource(
-                                    R.string.tag_scan_caption_done,
-                                    "%,d".format(Locale.ROOT, terminal.processed),
-                                    terminal.failed
-                                )
-                            } else {
-                                stringResource(R.string.tag_stats_remaining_line, remainingPass3)
-                            },
-                            fontSize = 12.sp,
-                            color = contentColor.copy(alpha = 0.72f)
-                        )
-                    }
-                }
-                StatsProgressRing(
-                    progress = ringProgress,
-                    labelRes = ringLabelRes,
-                    active = model?.primaryAction == ScanCardAction.PAUSE
-                )
-                Icon(
-                    Icons.Rounded.ChevronRight,
-                    null,
-                    modifier = Modifier.size(20.dp),
-                    tint = contentColor.copy(alpha = 0.6f)
-                )
-            }
-
-            // ── 库级完成率轨道（唯一百分比，与圆环同源）──
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(contentColor.copy(alpha = 0.15f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(sessionFraction ?: trackFraction)
-                        .height(6.dp)
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-            }
-
-            // 运行态全库锚点行：唯一百分比口径仍在场（本轮进度接管圆环后由此行承载）
-            if (model != null && library != null && !model.isTerminalWithFailures) {
-                Text(
-                    text = stringResource(R.string.tag_scan_library_line, library.percentRounded()),
-                    fontSize = 11.sp,
-                    color = contentColor.copy(alpha = 0.75f)
-                )
-            }
-
-            // ── 操作钮（r12 圆角矩形，v3 弃胶囊；集由 scanCardUiModel 决定）──
-            if (model == null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    PrimaryActionButton(
-                        text = stringResource(R.string.tag_scan_incremental),
-                        icon = Icons.Rounded.PlayArrow,
-                        onClick = onScanNew,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SecondaryActionButton(
-                        text = stringResource(R.string.tag_scan_full),
-                        icon = Icons.Rounded.Refresh,
-                        onClick = onRescanAll,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    when (model.primaryAction) {
-                        ScanCardAction.PAUSE -> SecondaryActionButton(
-                            text = stringResource(R.string.pause),
-                            icon = Icons.Rounded.Pause,
-                            onClick = onPause,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ScanCardAction.RESUME -> PrimaryActionButton(
-                            text = stringResource(R.string.resume),
-                            icon = Icons.Rounded.PlayArrow,
-                            onClick = onResume,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ScanCardAction.RETRY_FAILED -> PrimaryActionButton(
-                            text = stringResource(R.string.tag_scan_retry_failed_items),
-                            icon = Icons.Rounded.Refresh,
-                            onClick = onRetryFailed,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ScanCardAction.NONE -> SecondaryActionButton(
-                            text = stringResource(
-                                if (model.cancelEnabled) R.string.tag_scan_state_pausing
-                                else R.string.tag_scan_state_cancelling
-                            ),
-                            icon = Icons.Rounded.Pause,
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    if (model.cancelEnabled) {
-                        GhostCancelButton(
-                            text = stringResource(R.string.cancel),
-                            icon = Icons.Rounded.Cancel,
-                            onClick = onCancel,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
+            RingDial(
+                fraction = fraction.coerceIn(0f, 1f),
+                accent = accent,
+                animating = running,
+                centerText = "$percent%"
+            )
+            Text(
+                text = stringResource(
+                    R.string.tag_scan_ring_hint,
+                    "%,d".format(Locale.ROOT, labeledCount),
+                    "%,d".format(Locale.ROOT, totalCount),
+                    statusWord
+                ),
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
 
 /**
- * 钉住的全宽扫描状态条（v3.2，2026-10-01 二轮反馈「运行态不显著」）：
- * 胶囊下 surface 底横带——[呼吸绿点 + 阶段名 15sp SemiBold + 第 x/y 张]，底缘 4dp 全宽
- * 本轮进度条（同族语言=相册页 scan_progress_track）。不入滚动列，滚动中始终可见。
+ * 仪表环（v4 ringWrap）：176dp 直径 12dp 描边；轨道=surfaceVariant，
+ * 弧=accent；运行时 40° 彗星弧绕环（scan_animations 节奏立法 1.5s LinearEasing）。
  */
 @Composable
-private fun ScanStatusStrip(
-    title: String,
-    processed: Int,
-    total: Int,
+private fun RingDial(
     fraction: Float,
-    /** RUNNING 才动（波纹/流光）；暂停/过渡态静止呈现 */
-    animating: Boolean = true
+    accent: Color,
+    animating: Boolean,
+    centerText: String
 ) {
-    // 暂停=琥珀点缀(tag_control_paused 状态语言)；运行=绿
-    val accent = if (animating) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        StatusColor.warningAmber
-    }
-    // 显著动画（2026-10-01 三轮反馈）：双层错峰波纹点 + 底缘进度条流光——
-    // 运行中的强活体信号，纯 Compose 无限动画
-    val infiniteTransition = rememberInfiniteTransition(label = "scanStripAnim")
-    val ripple1 by infiniteTransition.animateFloat(
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val transition = rememberInfiniteTransition(label = "ringDial")
+    val sweep by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(1400), repeatMode = RepeatMode.Restart),
-        label = "ripple1"
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(animation = tween(1500, easing = LinearEasing)),
+        label = "comet"
     )
-    val ripple2 by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, delayMillis = 700),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ripple2"
-    )
-    // 流光带：0→1 横向循环扫过进度填充段
-    val shimmer by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(1100), repeatMode = RepeatMode.Restart),
-        label = "shimmer"
-    )
-    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // 波纹点：实心核 + 两层扩散淡出圆环（错峰 700ms）
-            Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                for (r in if (animating) listOf(ripple1, ripple2) else emptyList()) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .graphicsLayer {
-                                scaleX = 0.34f + r * 0.66f
-                                scaleY = 0.34f + r * 0.66f
-                                alpha = (1f - r) * 0.55f
-                            }
-                            .background(accent, CircleShape)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(9.dp)
-                        .background(accent, CircleShape)
-                )
-            }
-            Text(
-                text = title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                modifier = Modifier.weight(1f)
+    Box(
+        modifier = Modifier.size(200.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(176.dp)) {
+            val strokePx = 12.dp.toPx()
+            val stroke = Stroke(width = strokePx, cap = StrokeCap.Round)
+            val arcSize = Size(size.width - strokePx, size.height - strokePx)
+            val topLeft = Offset(strokePx / 2, strokePx / 2)
+            // 轨道整圈
+            drawArc(
+                color = trackColor,
+                startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                topLeft = topLeft, size = arcSize, style = stroke
             )
-            if (total > 0) {
-                Text(
-                    text = stringResource(R.string.tag_scan_progress_count, processed, total),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
+            // 进度弧：顶部起顺时针（v4 设计稿 35%≈右上象限）
+            drawArc(
+                color = accent,
+                startAngle = -90f, sweepAngle = 360f * fraction, useCenter = false,
+                topLeft = topLeft, size = arcSize, style = stroke
+            )
+            // 彗星弧：运行中 40° 亮段绕环（显著动画，scan_animations 立法）
+            if (animating) {
+                drawArc(
+                    color = Color.White.copy(alpha = 0.85f),
+                    startAngle = sweep, sweepAngle = 40f, useCenter = false,
+                    topLeft = topLeft, size = arcSize, style = stroke
                 )
             }
         }
-        // 底缘 4dp 全宽本轮进度条 + 流光带（高亮段循环扫过填充区）
-        val fillFraction = fraction.coerceIn(0f, 1f)
+        Text(
+            text = centerText,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = accent,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/** 顶部 4dp 全宽本轮进度条（v4 progBar）：轨道 surfaceVariant，填充=本轮会话分数；
+ *  暂停=琥珀；运行=绿+56dp 流光带循环扫过填充段。 */
+@Composable
+private fun ScanProgressBar(
+    fraction: Float,
+    running: Boolean,
+    paused: Boolean
+) {
+    val accent = if (paused) StatusColor.warningAmber else MaterialTheme.colorScheme.primary
+    val transition = rememberInfiniteTransition(label = "progShimmer")
+    val shimmer by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(1100)),
+        label = "shimmer"
+    )
+    val fillFraction = fraction.coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(fillFraction)
                 .height(4.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Box(
+                .background(accent)
+        )
+        if (running && fillFraction > 0.02f) {
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth(fillFraction)
                     .height(4.dp)
-                    .background(accent)
-            )
-            if (animating && fillFraction > 0.02f) {
-                BoxWithConstraints(
+                    .clipToBounds()
+            ) {
+                val travel = maxWidth + 56.dp
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth(fillFraction)
-                        .height(4.dp)
-                        .clipToBounds()
-                ) {
-                    val travel = maxWidth + 56.dp
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(56.dp)
-                            .offset(x = -56.dp + travel * shimmer)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color.Transparent, Color.White.copy(alpha = 0.75f), Color.Transparent)
-                                )
+                        .fillMaxHeight()
+                        .width(56.dp)
+                        .offset(x = -56.dp + travel * shimmer)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color.Transparent, Color.White.copy(alpha = 0.75f), Color.Transparent)
                             )
-                    )
-                }
+                        )
+                )
             }
         }
     }
 }
 
-/** 主操作钮（v3 设计稿 r12 h48）：primary 实底 + onPrimary 15sp。 */
+/** 顶栏（v4 top_bar）：48dp surface 底，「扫描整理」15sp SemiBold + 本轮计数列。 */
 @Composable
-private fun PrimaryActionButton(
+private fun ScanTopBar(counter: String?, subline: String?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.tag_scan_page_title),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
+        if (counter != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = counter,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                if (subline != null) {
+                    Text(
+                        text = subline,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+/** 底部操作条（v4 bottom_bar）：主/次双钮 52dp r12 16sp SemiBold；次钮=描边幽灵样式。
+ *  idle=开始扫描/稍后；running=暂停扫描/停止；paused=继续扫描/重新开始；
+ *  过渡态=禁用占位；终态失败=重试失败项/停止。 */
+@Suppress("LongParameterList")
+@Composable
+private fun BottomActionBar(
+    model: ScanCardUiModel?,
+    running: Boolean,
+    onStart: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onStop: () -> Unit,
+    onRestart: () -> Unit,
+    onRetryFailed: () -> Unit,
+    onLater: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        when {
+            model == null -> {
+                BottomPrimaryButton(text = stringResource(R.string.tag_scan_btn_start), onClick = onStart, modifier = Modifier.weight(1f))
+                BottomOutlineButton(text = stringResource(R.string.tag_scan_btn_later), onClick = onLater, modifier = Modifier.weight(1f))
+            }
+            model.isTerminalWithFailures -> {
+                BottomPrimaryButton(text = stringResource(R.string.tag_scan_retry_failed_items), onClick = onRetryFailed, modifier = Modifier.weight(1f))
+                BottomOutlineButton(text = stringResource(R.string.tag_scan_btn_stop), onClick = onStop, modifier = Modifier.weight(1f))
+            }
+            model.isPaused -> {
+                BottomPrimaryButton(text = stringResource(R.string.tag_scan_btn_resume_scan), onClick = onResume, modifier = Modifier.weight(1f))
+                BottomOutlineButton(text = stringResource(R.string.tag_scan_btn_restart), onClick = onRestart, modifier = Modifier.weight(1f))
+            }
+            model.primaryAction == ScanCardAction.PAUSE -> {
+                BottomPrimaryButton(text = stringResource(R.string.tag_scan_btn_pause_scan), onClick = onPause, modifier = Modifier.weight(1f))
+                BottomOutlineButton(text = stringResource(R.string.tag_scan_btn_stop), onClick = onStop, modifier = Modifier.weight(1f))
+            }
+            else -> {
+                // 过渡态（pausing/cancelling）：禁用占位保持布局稳定
+                BottomPrimaryButton(
+                    text = stringResource(
+                        if (model.cancelEnabled) R.string.tag_scan_state_pausing
+                        else R.string.tag_scan_state_cancelling
+                    ),
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.weight(1f)
+                )
+                BottomOutlineButton(text = stringResource(R.string.tag_scan_btn_stop), onClick = onStop, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** 主操作钮（v4 设计稿 btn_primary）：52dp r12，primary 实底 + onPrimary 16sp SemiBold。 */
+@Composable
+private fun BottomPrimaryButton(
     text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
+    enabled: Boolean = true
 ) {
     Box(
         modifier = modifier
-            .height(48.dp)
+            .height(52.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(
-                if (enabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
-                }
+                if (enabled) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
             )
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(icon, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary)
-            Text(text, fontSize = 15.sp, color = MaterialTheme.colorScheme.onPrimary)
-        }
+        Text(
+            text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimary
+        )
     }
 }
 
-/** 次操作钮（v3 设计稿 r12 h48）：surfaceContainerHigh 实底 + onSurface 15sp（dedup 同款）。 */
+/** 次操作钮（v4 设计稿 btn_secondary）：52dp r12，outlineVariant 描边 + 透明底 + 16sp SemiBold。 */
 @Composable
-private fun SecondaryActionButton(
+private fun BottomOutlineButton(
     text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
+    enabled: Boolean = true
 ) {
+    val shape = RoundedCornerShape(12.dp)
     Box(
         modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .height(52.dp)
+            .clip(shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(icon, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
-            Text(
-                text,
-                fontSize = 15.sp,
-                color = if (enabled) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                }
-            )
-        }
+        Text(
+            text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+        )
     }
-}
-
-/** 幽灵取消钮（v3 设计稿运行态）：无底 + error 色文字（dedup 扫描中同款）。 */
-@Composable
-private fun GhostCancelButton(
-    text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(icon, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
-            Text(text, fontSize = 15.sp, color = MaterialTheme.colorScheme.error)
-        }
-    }
-}
-
-/** 卡片标题：终态失败 > 暂停 > 过渡态 > 阶段名（全部整句文案键，无跨语拼接）。 */
-@Composable
-private fun scanCardTitle(model: ScanCardUiModel): String = when {
-    model.isTerminalWithFailures ->
-        stringResource(R.string.tag_scan_completed_with_failures, model.failedCount)
-    model.isPaused ->
-        stringResource(R.string.tag_scan_paused_title, scanStageShortName(model.stage))
-    model.primaryAction == ScanCardAction.NONE && model.cancelEnabled ->
-        stringResource(R.string.tag_scan_state_pausing)
-    model.primaryAction == ScanCardAction.NONE ->
-        stringResource(R.string.tag_scan_state_cancelling)
-    else -> when (model.stage) {
-        ScanStage.FACE -> stringResource(R.string.tag_scan_now_face)
-        ScanStage.CLUSTER -> stringResource(R.string.tag_scan_now_cluster)
-        ScanStage.CONTENT -> stringResource(R.string.tag_scan_now_content)
-        ScanStage.SEMANTIC -> stringResource(R.string.tag_scan_now_semantic)
-        ScanStage.PREPARING -> stringResource(R.string.tag_scan_now_preparing)
-    }
-}
-
-/** 暂停标题插值用的阶段短名（复用 Stages 行标题键）。 */
-@Composable
-private fun scanStageShortName(stage: ScanStage): String = when (stage) {
-    ScanStage.FACE -> stringResource(R.string.tag_pass_title_face)
-    ScanStage.CLUSTER -> stringResource(R.string.tag_pass_title_cluster)
-    ScanStage.CONTENT -> stringResource(R.string.tag_pass_title_content)
-    ScanStage.SEMANTIC -> stringResource(R.string.tag_pass_step_semantic)
-    ScanStage.PREPARING -> stringResource(R.string.tag_scan_preparing)
 }
 
 /** 进程死亡复活卡（spec §5.3）：对账 FAILED 后出现，主按钮增量续扫（天然断点续跑）。 */
@@ -1078,33 +884,7 @@ private fun SectionHeader(title: String, hint: String? = null) {
     }
 }
 
-/** 设计稿开关：44×26 r13，关=surfaceVariant 底 + 次级圆点，开=品牌色底 + 白点。 */
-@Composable
-private fun TagSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(width = 44.dp, height = 26.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(
-                if (checked) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surfaceVariant
-            )
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
-            .padding(3.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .align(if (checked) Alignment.CenterEnd else Alignment.CenterStart)
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(
-                    if (checked) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-        )
-    }
-}
-
-/** 阶段行：图标 + 标题/描述 + 进度% + chevron，整行可点（v3：跳转对应内容页）。 */
+/** 阶段行：图标 + 标题/描述 + 进度% + chevron。点按=跳转内容页；长按=重处理弹层（v4）。 */
 @Composable
 private fun StageRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1112,14 +892,15 @@ private fun StageRow(
     title: String,
     description: String,
     trailing: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 12.dp)
-            .height(64.dp),
+            .height(60.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1332,364 +1113,8 @@ private fun StageActionOption(
     }
 }
 
-/** 重新生成入口单行卡（v3 设计稿 RegenEntry）：14sp 文字 + chevron，r16 surfaceContainer。 */
-@Composable
-private fun RegenEntryRow(onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.tag_regen_entry),
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.weight(1f))
-            Icon(
-                Icons.Rounded.ChevronRight,
-                null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-/**
- * 重新生成二级弹层（v3）：① 分阶段重处理（点行 → StageActionSheet 两档，全量仍二次确认）
- * ② 按类别/时间范围精细控制（原页内整段移入，控件原样）。会话活跃时入口整行隐藏，本弹层不可达。
- * navigationBarsPadding：弹层内容避让虚拟键（同 StageActionSheet 正典写法）。
- */
-@Suppress("LongParameterList") // 精细控制状态由页面持有，弹层纯受控渲染
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RegenSheet(
-    onDismiss: () -> Unit,
-    onStageClick: (TagStage) -> Unit,
-    selectedCategories: Set<TagCategory>,
-    onToggleCategory: (TagCategory) -> Unit,
-    selectedTimeRange: TimeRangePreset,
-    onSelectTimeRange: (TimeRangePreset) -> Unit,
-    fullRegenerateMode: Boolean,
-    onFullRegenerateModeChange: (Boolean) -> Unit,
-    onRegenerate: () -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(start = 20.dp, end = 20.dp)
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                stringResource(R.string.tag_fine_control_title),
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            // ── ① 分阶段重处理 ──
-            Text(
-                stringResource(R.string.tag_pass_control_title),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            RegenStageRow(
-                icon = Icons.Rounded.Face,
-                iconTint = Color(0xFFFF7EB0),
-                title = stringResource(R.string.tag_pass_title_face),
-                onClick = { onStageClick(TagStage.FACE) }
-            )
-            RegenStageRow(
-                icon = Icons.Rounded.Person,
-                iconTint = Color(0xFF9B8CFF),
-                title = stringResource(R.string.tag_pass_title_cluster),
-                onClick = { onStageClick(TagStage.PEOPLE) }
-            )
-            RegenStageRow(
-                icon = Icons.Rounded.Label,
-                iconTint = Color(0xFF22D3EE),
-                title = stringResource(R.string.tag_pass_title_content),
-                onClick = { onStageClick(TagStage.CONTENT) }
-            )
-            RegenStageRow(
-                icon = Icons.Rounded.Star,
-                iconTint = Color(0xFF4ADE80),
-                title = stringResource(R.string.tag_pass_title_aesthetic),
-                onClick = { onStageClick(TagStage.QUALITY) }
-            )
-
-            // ── ② 按类别 / 时间范围 ──
-            Text(
-                stringResource(R.string.tag_select_categories),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CategoryChip(
-                    label = stringResource(R.string.tag_category_face),
-                    selected = TagCategory.FACE in selectedCategories,
-                    onClick = { onToggleCategory(TagCategory.FACE) }
-                )
-                CategoryChip(
-                    label = stringResource(R.string.tag_category_scene),
-                    selected = TagCategory.SCENE in selectedCategories,
-                    onClick = { onToggleCategory(TagCategory.SCENE) }
-                )
-                CategoryChip(
-                    label = stringResource(R.string.tag_category_activity),
-                    selected = TagCategory.ACTIVITY in selectedCategories,
-                    onClick = { onToggleCategory(TagCategory.ACTIVITY) }
-                )
-                CategoryChip(
-                    label = stringResource(R.string.tag_category_objects),
-                    selected = TagCategory.OBJECTS in selectedCategories,
-                    onClick = { onToggleCategory(TagCategory.OBJECTS) }
-                )
-                CategoryChip(
-                    label = stringResource(R.string.tag_category_tags),
-                    selected = TagCategory.TAGS in selectedCategories,
-                    onClick = { onToggleCategory(TagCategory.TAGS) }
-                )
-                CategoryChip(
-                    label = stringResource(R.string.tag_category_summary),
-                    selected = TagCategory.SUMMARY in selectedCategories,
-                    onClick = { onToggleCategory(TagCategory.SUMMARY) }
-                )
-            }
-
-            Text(
-                stringResource(R.string.tag_time_range),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TimeRangePreset.entries.forEach { preset ->
-                    CategoryChip(
-                        label = stringResource(preset.labelRes),
-                        selected = selectedTimeRange == preset,
-                        onClick = { onSelectTimeRange(preset) }
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.tag_overwrite_existing),
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        stringResource(R.string.tag_overwrite_existing_desc),
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                TagSwitch(
-                    checked = fullRegenerateMode,
-                    onCheckedChange = onFullRegenerateModeChange
-                )
-            }
-
-            PrimaryActionButton(
-                text = stringResource(R.string.tag_regenerate_selected),
-                icon = Icons.Rounded.Tune,
-                onClick = {
-                    onDismiss()
-                    onRegenerate()
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
-/** 弹层内的阶段行（紧凑版）：图标芯片 + 标题 + chevron。 */
-@Composable
-private fun RegenStageRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconTint: Color,
-    title: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(iconTint.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, null, modifier = Modifier.size(18.dp), tint = iconTint)
-        }
-        Text(
-            title,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        Icon(
-            Icons.Rounded.ChevronRight,
-            null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
 /** 可独立操作的扫描阶段（RegenSheet 内点行弹 StageActionSheet）。 */
 private enum class TagStage { FACE, PEOPLE, CONTENT, QUALITY }
 
 private fun stagePercentText(progress: TagPassProgress): String =
     if (progress.isEmpty) "—" else "${progress.percentRounded()}%"
-
-private enum class TimeRangePreset(@StringRes val labelRes: Int, private val startOffsetMs: Long) {
-    ALL(R.string.tag_time_range_all, 0),
-    DAYS_7(R.string.tag_time_range_days_7, 7 * 24 * 60 * 60 * 1000L),
-    DAYS_30(R.string.tag_time_range_days_30, 30 * 24 * 60 * 60 * 1000L),
-    DAYS_90(R.string.tag_time_range_days_90, 90 * 24 * 60 * 60 * 1000L);
-
-    val startTimeMs: Long
-        get() = if (startOffsetMs > 0) System.currentTimeMillis() - startOffsetMs else 0L
-}
-
-private fun Set<TagCategory>.toggle(category: TagCategory): Set<TagCategory> {
-    return if (category in this) this - category else this + category
-}
-
-/** 设计稿 chip：h28 r14；选中=品牌色 14% 底 + 品牌色描边/文字，未选=outlineVariant 描边 + 次级文字。 */
-@Composable
-private fun CategoryChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val accent = MaterialTheme.colorScheme.primary
-    val shape = RoundedCornerShape(14.dp)
-    Box(
-        modifier = Modifier
-            .height(28.dp)
-            .clip(shape)
-            .background(if (selected) accent.copy(alpha = 0.14f) else Color.Transparent)
-            .border(
-                1.dp,
-                if (selected) accent else MaterialTheme.colorScheme.outlineVariant,
-                shape
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            label,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-/** 72dp 进度圆环（设计稿 ringSvg）：surfaceVariant 底环 + primary 实色前景弧 + 中心两行（百分比 + AI 打标微标签）。 */
-@Composable
-private fun StatsProgressRing(
-    progress: Int,
-    labelRes: Int = R.string.tag_stats_ring_label,
-    /** RUNNING 时叠加旋转彗星弧（显著动画，2026-10-01 三轮反馈）；暂停/过渡/空闲为静态 */
-    active: Boolean = false
-) {
-    val sweep = 360f * (progress.coerceIn(0, 100) / 100f)
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    val accentColor = MaterialTheme.colorScheme.primary
-    val spinTransition = rememberInfiniteTransition(label = "ringSpin")
-    val spin by spinTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(animation = tween(1500, easing = LinearEasing)),
-        label = "spin"
-    )
-    Box(
-        modifier = Modifier.size(72.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = 6.dp.toPx()
-            drawArc(
-                color = trackColor,
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                style = Stroke(width = stroke, cap = StrokeCap.Round)
-            )
-            if (sweep > 0f) {
-                drawArc(
-                    color = accentColor,
-                    startAngle = -90f,
-                    sweepAngle = sweep,
-                    useCenter = false,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                )
-            }
-            if (active) {
-                // 旋转彗星弧：40° 亮弧持续绕环（Material 不确定态语言，弧内高亮段）
-                rotate(degrees = spin) {
-                    drawArc(
-                        color = accentColor.copy(alpha = 0.95f),
-                        startAngle = -50f,
-                        sweepAngle = 40f,
-                        useCenter = false,
-                        style = Stroke(width = stroke * 1.25f, cap = StrokeCap.Round)
-                    )
-                }
-            }
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "$progress%",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(labelRes),
-                fontSize = 8.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-        }
-    }
-}

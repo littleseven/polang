@@ -1,173 +1,156 @@
 # ============================================================================
-# TAG 生成控制页规格书（Tag Control Screen Spec）—— v3 单锚点主卡式（2026-10-01）
+# TAG 生成控制页规格书（Tag Control Screen Spec）—— v4 顶栏+仪表环+底操作条（2026-10-02）
 # ============================================================================
-# 基准端：Android features/gallery/components/TagGenerationControlScreen.kt（v3 重写）
-# 视觉定稿：Ardot `gallery/tag_control`（空闲态 478:10）/ `gallery/tag_control_running`
-#        （运行态 478:89）/ `gallery/tag_stage_sheet`（阶段操作弹层，172:113）
-#        （2026-10-01 v3 晋升替换 v2 帧；refs/ardot/ 快照同名 PNG）
+# 基准端：Android features/gallery/components/TagGenerationControlScreen.kt（v4 重写）
+# 视觉定稿：Ardot `organize/tag_control`（空闲 478:10）/ `organize/tag_control_running`
+#        （运行 478:89）/ `organize/tag_control_paused`（暂停 479:5）/
+#        `organize/tag_stage_sheet`（阶段操作弹层 172:113）
+#        （2026-10-02 用户在 Ardot 亲自重设计三帧；v3 条卡分工稿作废）
 # 用途：iOS TagScanScreen 重写的唯一输入，不读 Android 源码
-# v3 三大决策（相对 v2）：
-#   1) 单锚点主卡：图库统计与扫描状态收进同一张 HeroCard，空闲/运行同槽位切换；
-#      2×2 指标瓦片、独立扫描操作卡退出页面
-#   2) 全页可浏览化：主卡统计区 + 四阶段行点击跳转与数字匹配的内容页；
-#      「重新处理」类管理动作全部收进「重新生成」入口（二级），浏览归浏览、管理归管理
-#   3) GPU 加速开关移出本页 → 设置·开发者选项（与检测引擎/打标模型同族）
-# 换肤基线（对齐 organize/hub + dedup 家族语言，渐变全数退场）：
-#   强调一律平铺 primary（#07C160 系 $2:130），不再使用 brandGradient
-# 数据/执行链：TagScanOrchestrator / TagGenerationService 既有不动——v3 是纯控制页 UI 重设计
+# v4 四大决策（相对 v3）：
+#   1) 骨架改为 progBar → top_bar → content(ringHero+stages) → bottom_bar 四段固定结构；
+#      钉住状态条（ScanStatusStrip）退役，状态/进度由 progBar + top_bar 计数承载
+#   2) ringHero 仪表环回归「全库口径」：环心 48sp 大百分比=库级 AI 打标完成率（口径立法不变）；
+#      本轮会话只以「x / y 计数」出现在 top_bar，不再染指环（环走全库、条走本轮，分工清晰）
+#   3) RegenSheet 二级弹层（按类别/时间精细重生成）整体下线；阶段重处理改由
+#      「阶段行长按」弹 StageActionSheet 承接（点按仍=导航，浏览归浏览）
+#   4) bottom_bar 常驻主/次双钮（52dp r12 16sp SemiBold；次钮=描边幽灵），
+#      替代 v3 卡内按钮集；idle 次钮「稍后」=宿主切回整理 tab
+# 数据/执行链：TagScanOrchestrator / TagGenerationService 既有不动——v4 是纯控制页 UI 重设计
 # 口径立法（全 app 唯一对外百分比）：库级 AI 打标完成率 =
 #   round((totalMedia − remainingPass3) / totalMedia × 100)，计算点 domain
-#   LibraryCompletion.percentRounded()，圆环/主卡轨道/通知/任务中心四面同源同舍入。
-#   任务级进度只允许「第 x/y 张」自然语言叙述形态，禁止渲染为百分比。
+#   LibraryCompletion.percentRounded()，环心大数字/通知/任务中心同源同舍入。
+#   任务级进度只允许「x / y 计数」与「第 x/y 张」自然语言形态，禁止渲染为百分比。
 
 tag_control:
   type: full_screen
   background: "colorScheme.background"
   chrome:                                          # 嵌入 OrganizeHome（整理|扫描双 tab 宿主）
-    capsule_switch:                                # 胶囊分段条 r24，track=surfaceVariant
-      active_tab: "扫描（org.scan.label）= primary 底 + onPrimary 字"
-      inactive_tab: "整理（org.title）= 无底 + onSurfaceVariant 字"
-    note: "v3.1（2026-10-01 真机反馈）：embedded 态不再叠静态标题栏（AppTopBar 占位+Scaffold 二次
-      inset 曾致顶部 ~100dp 空白）；胶囊条即唯一页头，contentWindowInsets 清零（对齐 DedupHomeScreen）"
-  layout: vscroll                                  # Body pad 16，区块间 16dp；卡片=surfaceContainer r16
-  sections_order: [hero, stages, regen_entry]
+    capsule_switch:                                # 宿主提供（r24 track=surfaceVariant pad6）
+      active_tab: "扫描 = primary 底 + onPrimary 14sp SemiBold"
+      inactive_tab: "整理 = 无底 + onSurfaceVariant 14sp Regular"
+    note: "embedded 态 contentWindowInsets 清零（对齐 DedupHomeScreen）；胶囊条即唯一页头"
 
-  # ── 区块 1：HeroCard（单锚点主卡，空闲/运行同槽位互斥）──
-  hero:
-    card: { background: surfaceContainer, corner_radius: 16 }
-    stats_tap:                                     # 统计区整体可点（标题+数字+剩余行+圆环，不含按钮）
-      affordance: "行尾 chevron 20dp onSurfaceVariant"
-      navigates_to: "已打标照片视图（相册按 AI 已打标筛选；数字对齐=覆盖率%）"
-    idle:                                          # 空闲态内容
-      coverage_label: { key: tag_stats_coverage_label（AI 打标覆盖/AI-tagged coverage）, size: 12, color: onSurfaceVariant }
-      big_number:
-        text: "<总照片数 %,d>"
-        style: "34sp SemiBold 平铺 primary（v3 弃渐变，对齐 organize hero）"
-      remaining_line: { key: "tag_stats_remaining_line（张照片 · 剩余 N 张待处理，参数化）", size: 12, color: onSurfaceVariant }
-      library_track:                               # 唯一百分比轨道，与圆环同源同公式
-        { height: 6, corner_radius: 3, track: surfaceVariant, fill: "primary 按 LibraryCompletion.fraction" }
-      buttons:                                     # r12 圆角矩形双钮（v3 弃 r20 渐变胶囊）
-        primary: { text: "tag_scan_incremental = Scan new", height: 48, corner_radius: 12, background: primary, foreground: onPrimary, font: 15 }
-        secondary: { text: "tag_scan_full = Rescan all", height: 48, corner_radius: 12, background: surfaceContainerHigh, foreground: onSurface, font: 15 }
-    running:                                       # 会话活跃/暂停/过渡/终态失败时的同槽位内容
-      title:                                       # 15sp onSurface；优先级：终态失败 > 暂停 > 过渡态 > 阶段名
-        running: "tag_scan_now_face / cluster / content / semantic / preparing（阶段名整句键）"
-        paused: "tag_scan_paused_title = 已暂停 · %1$s 打到一半（%1$s=阶段短名）"
-        pausing: "tag_scan_state_pausing"
-        cancelling: "tag_scan_state_cancelling"
-        terminal_with_failures: "tag_scan_completed_with_failures = %1$d 项失败"
-      narrative_line:                              # 任务级唯一允许形态：自然语言「第 x/y 张」12sp
-        with_eta: "tag_scan_narrative = 第 %1$d/%2$d 张 · 约 %3$s 剩余"
-        no_eta: "tag_scan_narrative_no_eta（PAUSED 态与 ETA 缺失时）"
-      progress_ring:                               # 空闲态同款圆环（见下），空闲/运行共用
-      buttons:                                     # dedup/scanning 同款 r12 h48 双钮；集由 scanCardUiModel 决定
-        running: "[暂停=surfaceContainerHigh/onSurface] [取消=幽灵钮（无底）onSurfaceVariant]"
-        paused: "[继续=primary/onPrimary] [取消=幽灵钮]"
-        pausing_cancelling: "[过渡态 disabled]（cancelEnabled 时保留取消）"
-        terminal_with_failures: "[tag_scan_retry_failed_items=primary/onPrimary]"
-    progress_ring:                                 # 72dp 圆环，两态共用
-      style: "primary 实色弧 · stroke 6dp · 12 点钟起点 · 圆头端点；中心两行：百分比 13sp SemiBold onSurface + 微标签 tag_stats_ring_label（8sp onSurfaceVariant，AI 打标/AI-tagged）"
-      track: surfaceVariant
-    state_colors:                                  # v3.4：容器不随态换色(暗黑洗白翻车返工)
-      all_states: surfaceContainer                 # 运行/暂停由状态条绿点/绿条+标题承载
-      terminal_with_failures: errorContainer       # 仅终态失败保留语义红
-    mutex_slots:                                   # 同槽位互斥卡（沿用 v2 语义）
-      aesthetic_card: { visible_when: "aestheticProgress!=null 且 !isScanning" }
-      interrupted_card:
-        visible_when: "cardModel==null 且 无美学进度 且 tagscan:main 任务 FAILED（进程死亡对账）"
-        primary: "tag_scan_resume_breakpoint（增量续扫=断点续跑）"
-    terminal: "零失败 COMPLETED → 回落 idle（终态叙述行=已扫描/失败统计 tag_scan_caption_done）"
-
-  # ── 区块 2：Stages（点按=查看，浏览不锁定）──
-  stages:
-    section_header: { title_size: 11, hint: "tag_stages_hint_view = 点按阶段查看内容/Tap a stage to view（v3 改语义）" }
-    lock: "无（v3：行点击为只读导航，扫描中可浏览；管理动作不在行上）"
-    rows:                                          # StageRow ×4，64dp 高
-      - { title: "tag_pass_title_face = Faces", desc: "tag_pass_scope_face（参数化覆盖叙述，空库回落静态键）", trailing: "<percentRounded()%> 12sp SemiBold primary + chevron", navigates_to: "含人脸照片（相册 hasFace 筛选视图）" }
-      - { title: "tag_pass_title_cluster = People", desc: "tag_pass_desc_cluster（静态）", trailing: "<人物数>（计数非百分比）+ chevron", navigates_to: "人物页（People）" }
-      - { title: "tag_pass_title_content = Content tags", desc: "tag_pass_scope_content", trailing: "<percentRounded()%> + chevron", navigates_to: "标签查看页（TagViewer）" }
-      - { title: "tag_pass_title_aesthetic = Quality scores", desc: "tag_pass_scope_aesthetic", trailing: "<percentRounded()%> + chevron", navigates_to: "按评分排序的照片视图（aestheticScore 降序，高分在前）" }
-    row_icon: "28dp r7 色底芯片（12% 透明度）+ 18dp 图标，色板 [#FF7EB0, #9B8CFF, #22D3EE, #4ADE80]（v2 沿用）"
-    trailing_note: "行口径=tagPassProgress().percentRounded()，与主卡圆环同源同舍入"
-
-  # ── 区块 3：Regenerate 入口（单行卡，v3 收拢）──
-  regen_entry:
-    card: { background: surfaceContainer, corner_radius: 16 }
-    row: { text: "tag_regen_entry = 按阶段或条件重新生成/Regenerate by stage or filter（14sp onSurface）", trailing: chevron }
-    hidden_when: "扫描会话活跃（含暂停/过渡态）——运行态帧无此行"
-    opens: "重新生成二级页/弹层（v2 的内联精细控制整体移入）：① 分阶段重处理（StageActionSheet 两档：仅处理新增/全部重新处理，推荐=新增，full 二次确认）② 按类别/时间范围重新生成（CategoryChip 多选 + TimeRange 单选 + 覆盖开关 + 提交）"
-    stage_action_sheet:                            # ModalBottomSheet，视觉定稿 ardot tag_stage_sheet（不变）
-      background: surfaceContainerHighest
-      desc: "tag_stage_sheet_desc"
-      options:
-        - { title: "tag_stage_action_new", desc: "tag_stage_action_new_desc", badge: "tag_action_recommended（默认选中）" }
-        - { title: "tag_stage_action_full", desc: "tag_stage_action_full_desc", confirm_first: true }
-      full_confirm_dialog: { title: "tag_stage_full_confirm_title", message: "tag_stage_full_confirm_msg", positive: "tag_stage_full_confirm_ok" }
-      intents: "intentScanPass1/2/3Full、intentScoreAestheticFull（既有，语义不变）"
-    fine_control:                                  # ② 按类别/时间（v2 §regenerate 原文移入，样式不变）
-      category_chips: { height: 28, corner_radius: 100, selected: "primary@14% + primary 描边" }
-      time_range_chips: "[All time / 7 days / 30 days / 90 days]"
-      overwrite_switch: { size: "44×26 r13", title: "tag_overwrite_existing", desc: "tag_overwrite_existing_desc" }
-      submit: { text: "tag_fine_control_title = Regenerate", background: primary, corner_radius: 12, height: 48 }   # v3 换肤：弃渐变胶囊
-
-  # ── 暂停态（v3.4，帧 gallery/tag_control_paused 479:5）──
-  paused_state:
-    strip: "状态条保留但转琥珀(warningAmber #FFA000)点缀：琥珀点+琥珀底缘条，全部静止"
-    hero: "标题=tag_scan_paused_title(已暂停 · 阶段 打到一半)+无ETA叙述(第 x/y 张)；圆环停断点静态；继续=primary/取消=ghost"
-    principle: "容器仍 surfaceContainer(不洗色)；状态色只活在点缀元素上——绿=跑,琥珀=停"
-
-  # ── 运行态动画规格（v3.3，2026-10-01 三轮反馈「要显著动画」；画布为静态 SSOT，动效在此立规）──
-  scan_animations:
-    principle: "RUNNING 才动；暂停/过渡/终态一律静止（静态呈现确定性数值）"
-    status_strip:
-      dot: "实心核 9dp + 双层错峰波纹（24dp 扩散环 1.4s 循环，间隔 700ms，峰值透明度 0.55）"
-      bar: "底缘本轮进度条填充段上 56dp 白色 0.75 透明度高亮带 1.1s 循环扫过（流光）"
-    progress_ring:
-      comet_arc: "RUNNING 时叠加 40° 亮弧（1.25×stroke, 0.95α）1.5s 匀速绕环旋转（Material 不确定态语言）"
-      determinate: "本轮 x/y 确定弧保持（彗星弧为叠加层非替代）"
-    engine: "全部 Compose infiniteTransition 实现，无资产；iOS 侧以等价 SwiftUI TimelineView/withAnimation 对齐节拍(1.4s/1.1s/1.5s)"
-
-  # ── v3 删除清单（相对 v2）──
-  removed_components:
-    - "2×2 指标瓦片（tag_stats_with_face/embeddings/people/named 出页；数据仍在——人物数进 People 页，标签进 TagViewer）"
-    - "独立 idle 扫描操作卡（ScanActionCard：状态 chip/轨道/双大按钮并入 HeroCard）"
-    - "独立 Library stats 分区（与 Scan 分区合并为 HeroCard）"
-    - "Regenerate 内联整段（类别/时间 chips + 覆盖开关 + 渐变提交钮 → 收进 regen_entry 二级）"
-    - "CardTagAccel GPU 加速行（→ 设置·开发者选项；本页不再是 tagGenerationUseOpencl 入口）"
-    - "阶段行点击弹 StageActionSheet（行点击改为导航；sheet 移入 regen_entry 二级）"
-    - "扫描中 Stages/Regenerate 的 alpha 0.38 锁定态（浏览不锁；regen_entry 整行隐藏）"
-    - "tag.stages.locked 提示文案（扫描进行中 · 暂不可调整，键随删）"
-
-  # ── 视觉令牌映射 ──
-  token_mapping:
-    card: "surfaceContainer r16"
-    secondary_button: "surfaceContainerHigh r12（onSurface 15sp）"
-    ghost_button: "无底 onSurfaceVariant 15sp（运行态取消）"
+  # ── 段 1：progBar（胶囊正下方 4dp 全宽本轮进度条）──
+  prog_bar:
+    height: 4
     track: surfaceVariant
-    emphasis: "primary 平铺（dark=#07C160 系；v3 全页禁 brandGradient）"
-    accent_literals:                               # 字面量（未入 token，双端按本文对齐）
-      stage_icon_colors: "[#FF7EB0, #9B8CFF, #22D3EE, #4ADE80]"
+    fill: "primary 按 sessionFraction（本轮 x/y）；暂停态=warningAmber (#FFA000)"
+    idle: "0 宽（track 仅存）"
+    running_effect: "填充段上 56dp 白色 0.75 高亮带 1.1s 循环扫过（流光）"
+
+  # ── 段 2：top_bar（48dp surface 底标题栏）──
+  top_bar:
+    height: 48
+    background: surface
+    padding_h: 12
+    title: { key: "tag_scan_page_title = 扫描整理/Scan & organize", size: 15, weight: SemiBold, color: onSurface }
+    counter:                                       # 会话活跃/暂停时出现；空闲只有标题
+      count: "<x / y> 15sp SemiBold onSurface（本轮会话计数）"
+      subline:
+        running_eta: "tag_scan_top_eta = 本轮 · 预计 %1$s"
+        running_no_eta: "tag_scan_top_running = 本轮 · 进行中"
+        paused: "tag_scan_top_paused = 本轮 · 已暂停"
+        style: { size: 11, color: onSurfaceVariant }
+
+  # ── 段 3：content（滚动列，pad16/12，区块间 8dp）──
+  layout: vscroll
+  sections_order: [ring_hero, mutex_cards, stages, guard_banner]
+
+  ring_hero:                                       # r16 surfaceContainer 卡，pad20/14/12
+    card: { background: surfaceContainer, corner_radius: 16 }
+    tap: "整卡可点 → 已打标照片视图（相册按 AI 已打标筛选；数字对齐=环%）"
+    dial:                                          # 200dp 容器 / 176dp 环
+      stroke: 12
+      track: surfaceVariant
+      arc: "顶部 12 点钟起点顺时针；运行=primary，暂停=warningAmber；圆头端点"
+      center_number: "<percentRounded()%> 48sp SemiBold；运行=primary/暂停=warningAmber/空闲=onSurfaceVariant"
+      running_effect: "40° 白 0.85 亮弧 1.5s 匀速绕环（彗星弧，叠加非替代）"
+    hint: { key: "tag_scan_ring_hint = %1$s / %2$s 张 · %3$s", size: 13, color: onSurface, align: center }
+    hint_status_word:
+      ready: "tag_scan_status_ready = 准备开始"
+      running: "tag_scan_status_running = AI 分析中"
+      paused: "tag_scan_status_paused = 已暂停"
+      done: "tag_scan_status_done = 已完成"
+    principle: "环=全库口径恒定；状态色只活在弧/大数字（绿=跑，琥珀=停），容器不换色"
+
+  mutex_slots:                                     # 同槽位互斥附属卡（沿用 v3 语义）
+    aesthetic_card: { visible_when: "aestheticProgress!=null 且 liveModel==null" }
+    interrupted_card:
+      visible_when: "liveModel==null 且 无美学进度 且 tagscan:main 任务 FAILED（进程死亡对账）"
+      primary: "tag_scan_resume_breakpoint（增量续扫=断点续跑）"
+
+  stages:                                          # 点按=查看内容页；长按=重处理弹层（v4 新增）
+    lock: "无（扫描中可浏览）"
+    rows:                                           # StageRow ×4，60dp 高，pad_h 12
+      - { title: "tag_pass_title_face", desc: "tag_pass_scope_face（空库回落静态键）", trailing: "<%> 12sp SemiBold primary + chevron", tap: "含人脸照片（hasFace 筛选）", long_press: "StageActionSheet(FACE)" }
+      - { title: "tag_pass_title_cluster", desc: "tag_pass_desc_cluster", trailing: "<人物数>（计数非百分比）", tap: "人物页", long_press: "StageActionSheet(PEOPLE)" }
+      - { title: "tag_pass_title_content", desc: "tag_pass_scope_content", trailing: "<%>", tap: "标签查看页 TagViewer", long_press: "StageActionSheet(CONTENT)" }
+      - { title: "tag_pass_title_aesthetic", desc: "tag_pass_scope_aesthetic", trailing: "<%>", tap: "按评分排序照片视图", long_press: "StageActionSheet(QUALITY)" }
+    row_icon: "28dp r7 色底芯片（12% 透明度）+ 18dp 图标，色板 [#FF7EB0, #9B8CFF, #22D3EE, #4ADE80]"
+    trailing_note: "行口径=tagPassProgress().percentRounded()，与环心大数字同源同舍入"
+
+  guard_banner: "BackgroundScanGuardBanner 殿后（缺失项未确认时显示，先检查再提醒）"
+
+  # ── 段 4：bottom_bar（常驻主/次双钮）──
+  bottom_bar:
+    padding: "16/12 + navigationBarsPadding"
+    gap: 10
+    primary: { height: 52, corner_radius: 12, background: primary, foreground: onPrimary, font: "16sp SemiBold" }
+    secondary: { height: 52, corner_radius: 12, background: transparent, stroke: "outlineVariant 1dp", foreground: onSurfaceVariant, font: "16sp SemiBold" }
+    states:
+      idle: { primary: "tag_scan_btn_start = 开始扫描（startScanWithGuard→增量）", secondary: "tag_scan_btn_later = 稍后（宿主切回整理 tab）" }
+      running: { primary: "tag_scan_btn_pause_scan = 暂停扫描", secondary: "tag_scan_btn_stop = 停止（cancel）" }
+      paused: { primary: "tag_scan_btn_resume_scan = 继续扫描", secondary: "tag_scan_btn_restart = 重新开始（cancel→800ms→增量重起）" }
+      pausing_cancelling: { primary: "disabled（tag_scan_state_pausing/cancelling）", secondary: "停止" }
+      terminal_with_failures: { primary: "tag_scan_retry_failed_items", secondary: "停止" }
+
+  # ── 阶段操作弹层（长按触发；视觉=organize/tag_stage_sheet 172:113）──
+  stage_action_sheet:
+    background: surfaceContainerHigh
+    options:
+      - { title: "tag_stage_action_new", desc: "tag_stage_action_new_desc", badge: "tag_action_recommended" }
+      - { title: "tag_stage_action_full", desc: "tag_stage_action_full_desc", confirm_first: true }
+    full_confirm_dialog: { title: "tag_stage_full_confirm_title", message: "tag_stage_full_confirm_msg", positive: "tag_stage_full_confirm_ok" }
+    intents: "intentScanPass1/2/3(±Full)、intentScoreAesthetic(±Full)（既有，语义不变）"
+
+  # ── 动画规格（RUNNING 才动；暂停/过渡/终态静止）──
+  scan_animations:
+    prog_bar_shimmer: "见 prog_bar.running_effect（1.1s）"
+    dial_comet: "见 ring_hero.dial.running_effect（1.5s LinearEasing）"
+    engine: "全部 Compose infiniteTransition；iOS 以等价 TimelineView 对齐节拍(1.1s/1.5s)"
+
+  # ── v4 删除清单（相对 v3）──
+  removed_components:
+    - "ScanStatusStrip 钉住状态条（波纹点+阶段名条）→ progBar+top_bar 计数替代"
+    - "HeroCard 单锚点卡（统计区+按钮集）→ ringHero 环卡 + bottom_bar 常驻双钮分家"
+    - "RegenEntryRow 入口行 + RegenSheet 二级（类别/时间 chips + 覆盖开关）整体下线"
+    - "卡内 r12 h48 按钮组（Primary/Secondary/Ghost 三件套）→ bottom_bar 52dp 双钮"
+    - "tag_regen_entry / tag_fine_control_title 入口文案随入口消失（键暂留存库）"
+  added_components:
+    - "progBar / top_bar / bottom_bar 三段固定骨架（v4 设计稿）"
+    - "阶段行长按 → StageActionSheet（combinedClickable）"
 
   # ── 状态机 ──
   state_machine:
-    idle: "HeroCard 空闲态：覆盖率+总数+剩余+圆环+轨道+[扫描新增 primary][全量重扫 secondary]"
-    scanning: "HeroCard 运行态（scanCardUiModel 驱动，UI 零逻辑）：阶段名标题+第x/y张叙述+圆环+轨道+暂停/取消；Stages 可浏览，regen_entry 隐藏"
-    pausing_cancelling: "过渡态：主按钮 disabled（tag_scan_state_pausing/cancelling），取消按 cancelEnabled"
-    paused: "secondaryContainer 容器：『已暂停 · 阶段 打到一半』+ 无 ETA 叙述 + 继续/取消"
-    terminal_zero_failures: "回落 idle（终态叙述行=已扫描/失败统计）"
-    terminal_with_failures: "errorContainer + RETRY_FAILED（intentRetryFailed）"
-    interrupted: "对账 FAILED → interrupted_card 断点续扫"
-    regen_open: "regen_entry 点击 → 二级（分阶段重处理 sheet + 按类别/时间表单）"
+    idle: "progBar 0 + top_bar 仅标题 + 环=全库%(灰数字)+准备开始 + [开始扫描][稍后]"
+    scanning: "progBar 本轮分数(绿+流光) + top_bar x/y+ETA + 环=全库%(绿弧+彗星)+AI 分析中 + [暂停扫描][停止]"
+    pausing_cancelling: "过渡态：主钮 disabled 占位，次钮停止"
+    paused: "progBar 冻结(琥珀) + top_bar x/y+已暂停 + 环=全库%(琥珀弧)+已暂停 + [继续扫描][重新开始]"
+    terminal_zero_failures: "liveModel 置空回落 idle 布局；环 hint 尾词=已完成"
+    terminal_with_failures: "[重试失败项][停止]"
+    interrupted: "对账 FAILED → interrupted_card 断点续扫（content 内互斥槽）"
     stage_row_tap: "四行分别 → 含人脸照片 / 人物页 / TagViewer / 评分排序视图"
-    hero_stats_tap: "主卡统计区 → 已打标照片视图"
+    stage_row_long_press: "弹 StageActionSheet（仅处理新增/全部重新处理）"
+    later_tap: "宿主 onSelectTab(ORGANIZE) 切回整理 tab"
 
   back_stack: "系统返回（Android back / iOS NavigationStack pop）"
 
   platform_differences:
     capabilities: "扫描执行链 iOS=TagScanOrchestrator（既有）；UI 状态消费同源 sessionProgress 语义"
-    i18n_keys: "iOS 取词全局 L()；v3 新键 tag_stats_coverage_label / tag_stats_remaining_line / tag_stages_hint_view / tag_regen_entry 需同步建键"
+    i18n_keys: "v4 新键：tag_scan_page_title / tag_scan_top_eta / tag_scan_top_running / tag_scan_top_paused /
+      tag_scan_ring_hint / tag_scan_status_{ready,running,paused,done} / tag_scan_btn_{start,later,pause_scan,stop,resume_scan,restart}"
     allowed_differences:
       - "容器色可用两端等价 colorScheme 角色实现"
-      - "四个导航目的地 iOS 侧入口若缺（评分排序视图/hasFace 筛选）：允许首版落地为已有的等价页面（TagViewer/People），缺口登记台账"
-      - "Y1（存量）：Stages·Faces 动作 iOS 映射全链 startFull/startIncremental，Android 为 intentScanPass1 仅 Pass1——补 startPass1(mode:) 后收敛"
-      - "Y3（存量）：Regenerate 的 categories × timeRange 在 iOS 执行链无对应 intent 参数，暂为 UI 态"
+      - "四个导航目的地 iOS 侧若缺（评分排序视图/hasFace 筛选）：允许首版落地为等价页面（TagViewer/People），缺口登记台账"
+      - "长按重处理 iOS 侧可用 contextMenu 或长按手势等价实现"
