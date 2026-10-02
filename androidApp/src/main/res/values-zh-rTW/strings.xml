@@ -1369,15 +1369,11 @@
     <string name="tag_stats_title">圖庫統計</string>    <!-- TAG 控制頁 v2：區塊標題 / 閒置掃描卡 / 階段操作面板 -->
     <string name="tag_section_library">圖庫</string>
     <string name="tag_section_scan">掃描</string>    <string name="tag_scan_caption_done">已掃描 %1$s 項 · 失敗 %2$d 項</string>    <string name="tag_stage_sheet_desc">選擇該階段要處理的範圍</string>
-    <string name="tag_stage_action_new">僅處理新增</string>
+    <string name="tag_stage_action_new">增量掃描</string>
     <string name="tag_stage_action_new_desc">跳過已處理的照片，速度最快</string>
-    <string name="tag_stage_action_full">全部重新處理</string>
+    <string name="tag_stage_action_full">全量掃描</string>
     <string name="tag_stage_action_full_desc">重做全部照片，耗時更長</string>
     <string name="tag_action_recommended">推薦</string>
-    <string name="tag_stage_full_note">「全部重新處理」執行前會再次確認</string>
-    <string name="tag_stage_full_confirm_title">全部重新處理？</string>
-    <string name="tag_stage_full_confirm_msg">該階段將重做全部照片，可能需要較長時間。</string>
-    <string name="tag_stage_full_confirm_ok">開始</string>
     <string name="tag_overwrite_existing">覆蓋已有結果</string>
     <string name="tag_overwrite_existing_desc">關閉：僅補齊缺失標籤</string>
     <!-- Claude-tunnel chat（AI 工程師 toggle） -->

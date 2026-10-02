@@ -13,7 +13,7 @@
 #   2) ringHero 仪表环回归「全库口径」：环心 48sp 大百分比=库级 AI 打标完成率（口径立法不变）；
 #      本轮会话只以「x / y 计数」出现在 top_bar，不再染指环（环走全库、条走本轮，分工清晰）
 #   3) RegenSheet 二级弹层（按类别/时间精细重生成）整体下线；阶段重处理改由
-#      「阶段行长按」弹 StageActionSheet 承接（点按仍=导航，浏览归浏览）
+#      StageActionSheet 承接（v4 长按触发；v4.1 起点按同触发，查看职责移交成果格）
 #   4) bottom_bar 常驻主/次双钮（52dp r12 16sp SemiBold；次钮=描边幽灵），
 #      替代 v3 卡内按钮集；idle 次钮「稍后」=宿主切回整理 tab
 # 数据/执行链：TagScanOrchestrator / TagGenerationService 既有不动——v4 是纯控制页 UI 重设计
@@ -117,13 +117,13 @@ tag_control:
       pausing_cancelling: { primary: "disabled（tag_scan_state_pausing/cancelling）", secondary: "停止" }
       terminal_with_failures: { primary: "tag_scan_retry_failed_items", secondary: "停止" }
 
-  # ── 阶段操作弹层（长按触发；视觉=organize/tag_stage_sheet 172:113）──
+  # ── 阶段操作弹层（点按/长按触发；视觉=organize/tag_stage_sheet 172:113）──
   stage_action_sheet:
     background: surfaceContainerHigh
     options:
-      - { title: "tag_stage_action_new", desc: "tag_stage_action_new_desc", badge: "tag_action_recommended" }
-      - { title: "tag_stage_action_full", desc: "tag_stage_action_full_desc", confirm_first: true }
-    full_confirm_dialog: { title: "tag_stage_full_confirm_title", message: "tag_stage_full_confirm_msg", positive: "tag_stage_full_confirm_ok" }
+      - { title: "tag_stage_action_new（增量扫描）", desc: "tag_stage_action_new_desc", badge: "tag_action_recommended" }
+      - { title: "tag_stage_action_full（全量扫描）", desc: "tag_stage_action_full_desc" }
+    behavior: "两选项点选即执行（2026-10-02 移除全量二次确认 AlertDialog 与 tag_stage_full_* 键）"
     intents: "intentScanPass1/2/3(±Full)、intentScoreAesthetic(±Full)（既有，语义不变）"
 
   # ── 动画规格（RUNNING 才动；暂停/过渡/终态静止）──
@@ -153,7 +153,7 @@ tag_control:
     terminal_with_failures: "[重试失败项][停止]"
     interrupted: "对账 FAILED → interrupted_card 断点续扫（content 内互斥槽）"
     result_cell_tap: "六格分别 → FACES / 人物页 / 城市弹层→CITY / GROUP / SELF(或引导) / TAGGED"
-    stage_row_tap: "四行 → StageActionSheet 阶段扫描控制（仅处理新增/全部重新处理）"
+    stage_row_tap: "四行 → StageActionSheet 阶段扫描控制（增量扫描/全量扫描，点选即执行）"
     later_tap: "宿主 onSelectTab(ORGANIZE) 切回整理 tab"
 
   back_stack: "系统返回（Android back / iOS NavigationStack pop）"

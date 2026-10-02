@@ -1334,15 +1334,11 @@
     <string name="tag_stats_title">Statistiques de la bibliothèque</string>    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
     <string name="tag_section_library">Bibliothèque</string>
     <string name="tag_section_scan">Analyse</string>    <string name="tag_scan_caption_done">%1$s éléments analysés · %2$d échecs</string>    <string name="tag_stage_sheet_desc">Choisissez ce qu\'il faut retraiter dans cette phase.</string>
-    <string name="tag_stage_action_new">Traiter uniquement les nouveaux</string>
+    <string name="tag_stage_action_new">Analyse incrémentielle</string>
     <string name="tag_stage_action_new_desc">Ignore les photos déjà traitées · le plus rapide</string>
-    <string name="tag_stage_action_full">Retraiter tout</string>
+    <string name="tag_stage_action_full">Analyse complète</string>
     <string name="tag_stage_action_full_desc">Refait toutes les photos · beaucoup plus long</string>
     <string name="tag_action_recommended">Recommandé</string>
-    <string name="tag_stage_full_note">« Retraiter tout » demande une confirmation au préalable.</string>
-    <string name="tag_stage_full_confirm_title">Retraiter tout ?</string>
-    <string name="tag_stage_full_confirm_msg">Cette phase refera toutes les photos et peut prendre du temps.</string>
-    <string name="tag_stage_full_confirm_ok">Démarrer</string>
     <string name="tag_overwrite_existing">Écraser l\'existant</string>
     <string name="tag_overwrite_existing_desc">Désactivé : ne complète que les étiquettes manquantes</string>
     <!-- Claude-tunnel chat (AI engineer toggle) -->

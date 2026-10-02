@@ -1334,15 +1334,11 @@
     <string name="tag_stats_title">Estadísticas de la biblioteca</string>    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
     <string name="tag_section_library">Biblioteca</string>
     <string name="tag_section_scan">Escaneo</string>    <string name="tag_scan_caption_done">%1$s elementos escaneados · %2$d fallidos</string>    <string name="tag_stage_sheet_desc">Elige qué reprocesar en esta etapa.</string>
-    <string name="tag_stage_action_new">Procesar solo las nuevas</string>
+    <string name="tag_stage_action_new">Escaneo incremental</string>
     <string name="tag_stage_action_new_desc">Omite las fotos ya procesadas · lo más rápido</string>
-    <string name="tag_stage_action_full">Reprocesar todo</string>
+    <string name="tag_stage_action_full">Escaneo completo</string>
     <string name="tag_stage_action_full_desc">Rehace todas las fotos · tarda mucho más</string>
     <string name="tag_action_recommended">Recomendado</string>
-    <string name="tag_stage_full_note">"Reprocesar todo" pide confirmación primero.</string>
-    <string name="tag_stage_full_confirm_title">¿Reprocesar todo?</string>
-    <string name="tag_stage_full_confirm_msg">Esta etapa rehará todas las fotos y puede tardar un poco.</string>
-    <string name="tag_stage_full_confirm_ok">Iniciar</string>
     <string name="tag_overwrite_existing">Sobrescribir existentes</string>
     <string name="tag_overwrite_existing_desc">Desactivado: rellena solo las etiquetas que faltan</string>
     <!-- Claude-tunnel chat (AI engineer toggle) -->

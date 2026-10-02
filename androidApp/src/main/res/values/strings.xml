@@ -1378,15 +1378,11 @@
     <string name="tag_stats_title">Library stats</string>    <!-- Tag control v2: section labels / idle scan card / stage action sheet -->
     <string name="tag_section_library">Library</string>
     <string name="tag_section_scan">Scan</string>    <string name="tag_scan_caption_done">%1$s items scanned · %2$d failed</string>    <string name="tag_stage_sheet_desc">Choose what to reprocess in this stage.</string>
-    <string name="tag_stage_action_new">Process new only</string>
+    <string name="tag_stage_action_new">Incremental scan</string>
     <string name="tag_stage_action_new_desc">Skips already-processed photos · fastest</string>
-    <string name="tag_stage_action_full">Reprocess everything</string>
+    <string name="tag_stage_action_full">Full scan</string>
     <string name="tag_stage_action_full_desc">Redoes all photos · takes much longer</string>
     <string name="tag_action_recommended">Recommended</string>
-    <string name="tag_stage_full_note">\"Reprocess everything\" asks for confirmation first.</string>
-    <string name="tag_stage_full_confirm_title">Reprocess everything?</string>
-    <string name="tag_stage_full_confirm_msg">This stage will redo all photos and may take a while.</string>
-    <string name="tag_stage_full_confirm_ok">Start</string>
     <string name="tag_overwrite_existing">Overwrite existing</string>
     <string name="tag_overwrite_existing_desc">Off: fill in missing tags only</string>
     <!-- Claude-tunnel chat (AI engineer toggle) -->

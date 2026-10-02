@@ -1369,15 +1369,11 @@
     <string name="tag_stats_title">图库统计</string>    <!-- TAG 控制页 v2：区块标题 / 空闲扫描卡 / 阶段操作弹层 -->
     <string name="tag_section_library">图库</string>
     <string name="tag_section_scan">扫描</string>    <string name="tag_scan_caption_done">已扫描 %1$s 项 · 失败 %2$d 项</string>    <string name="tag_stage_sheet_desc">选择该阶段要处理的范围</string>
-    <string name="tag_stage_action_new">仅处理新增</string>
+    <string name="tag_stage_action_new">增量扫描</string>
     <string name="tag_stage_action_new_desc">跳过已处理的照片，速度最快</string>
-    <string name="tag_stage_action_full">全部重新处理</string>
+    <string name="tag_stage_action_full">全量扫描</string>
     <string name="tag_stage_action_full_desc">重做全部照片，耗时更长</string>
     <string name="tag_action_recommended">推荐</string>
-    <string name="tag_stage_full_note">「全部重新处理」执行前会再次确认</string>
-    <string name="tag_stage_full_confirm_title">全部重新处理？</string>
-    <string name="tag_stage_full_confirm_msg">该阶段将重做全部照片，可能需要较长时间。</string>
-    <string name="tag_stage_full_confirm_ok">开始</string>
     <string name="tag_overwrite_existing">覆盖已有结果</string>
     <string name="tag_overwrite_existing_desc">关闭：仅补齐缺失标签</string>
     <!-- Claude-tunnel chat（AI 工程师 toggle） -->

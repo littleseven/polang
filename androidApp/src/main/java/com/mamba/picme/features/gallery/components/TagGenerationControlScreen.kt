@@ -15,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Face
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Label
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -145,9 +144,8 @@ fun TagGenerationControlScreen(
     var cityChoices by remember { mutableStateOf<List<com.mamba.picme.data.local.CityGroupCount>>(emptyList()) }
     var showCitySheet by remember { mutableStateOf(false) }
 
-    // 阶段操作底部弹层 / 全量重处理二次确认（v4：阶段行长按弹层，RegenSheet 二级入口随设计稿移除）
+    // 阶段操作底部弹层（v4：点按/长按阶段行弹出；2026-10-02 两选项点选即执行，全量二次确认移除）
     var stageSheetTarget by remember { mutableStateOf<TagStage?>(null) }
-    var pendingFullStage by remember { mutableStateOf<TagStage?>(null) }
 
     // 刷新统计：统一通过 TagScanOrchestrator.getDbStats(db) 获取，
     // 不依赖 Service/Orchestrator 实例，进入页面即可立即显示。
@@ -215,7 +213,7 @@ fun TagGenerationControlScreen(
         }
     }
 
-    // 阶段操作：弹层选择「仅处理新增 / 全部重新处理」，全量需二次确认
+    // 阶段操作：弹层选择「增量扫描 / 全量扫描」，点选即执行
     fun startStage(stage: TagStage, full: Boolean) {
         refreshStats()
         val intent = when (stage) {
@@ -264,34 +262,13 @@ fun TagGenerationControlScreen(
         )
     }
 
-    // ── 阶段操作弹层（点按阶段行弹出）+ 全量重处理二次确认 ────────
+    // ── 阶段操作弹层（点按阶段行弹出；两选项点选即执行）────────
     stageSheetTarget?.let { stage ->
         StageActionSheet(
             title = stageTitle(stage),
             onDismiss = { stageSheetTarget = null },
             onProcessNew = { startStage(stage, full = false) },
-            onReprocessAll = { pendingFullStage = stage }
-        )
-    }
-    pendingFullStage?.let { stage ->
-        AlertDialog(
-            onDismissRequest = { pendingFullStage = null },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            title = { Text(stringResource(R.string.tag_stage_full_confirm_title)) },
-            text = { Text(stringResource(R.string.tag_stage_full_confirm_msg)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    startStage(stage, full = true)
-                    pendingFullStage = null
-                }) {
-                    Text(stringResource(R.string.tag_stage_full_confirm_ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingFullStage = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
+            onReprocessAll = { startStage(stage, full = true) }
         )
     }
 
@@ -422,7 +399,7 @@ fun TagGenerationControlScreen(
                     )
                 }
 
-                // ── 分阶段列表（点行=查看内容页；长按=重处理弹层）──
+                // ── 分阶段列表（点按/长按行=扫描控制弹层；查看职责在成果格）──
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -1116,7 +1093,7 @@ private fun SectionHeader(title: String, hint: String? = null) {
     }
 }
 
-/** 阶段行：图标 + 标题/描述 + 进度% + chevron。点按=跳转内容页；长按=重处理弹层（v4）。 */
+/** 阶段行：图标 + 标题/描述 + 进度% + chevron。点按/长按=扫描控制弹层（v4.1 查看职责移交成果格）。 */
 @Composable
 private fun StageRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1168,7 +1145,7 @@ private fun StageRow(
     }
 }
 
-/** 阶段操作底部弹层：两个大选项上下排开（单选圈示意推荐项），替代易误触的右侧堆叠小按钮。 */
+/** 阶段操作底部弹层：增量/全量两个大选项上下排开（单选圈示意推荐项），点选即执行。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StageActionSheet(
@@ -1219,22 +1196,6 @@ private fun StageActionSheet(
                     onReprocessAll()
                 }
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    Icons.Rounded.Info,
-                    null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    stringResource(R.string.tag_stage_full_note),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
             // Cancel（设计稿 btnCancel：surfaceVariant 底 r22 通栏）
             Box(
                 modifier = Modifier
