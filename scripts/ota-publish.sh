@@ -73,7 +73,7 @@ APK_SIZE="$(stat -f%z "$APK_PATH")"
 echo "==> $TYPE | v$VERSION_NAME ($VERSION_CODE) | $((APK_SIZE / 1024 / 1024)) MB"
 
 # ── 3. 上传 ─────────────────────────────────────────────
-echo "==> 上传到 $BASE_URL（$TYPE 渠道）"
+echo "==> 上传到 ${BASE_URL}（${TYPE} 渠道）"
 RESP="$(curl -fsS -X POST "$BASE_URL/admin/apk/upload" \
     -H "X-Admin-Token: $POLANG_ADMIN_TOKEN" \
     -F "channel=$TYPE" \
