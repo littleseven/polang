@@ -175,13 +175,21 @@ Phase 6.2 已实装：SharedKit `ChatAgentBridge` 流式远程推理 + tool_call
 - 语义召回：`SemanticSearchEngine` + `MobileClipTextEncoder`/`MobileClipTokenizer`（文本塔）+ `SemanticEmbeddingCodec`；
 - OCR：`OcrRecognizer`（Vision）；反馈：`MediaFeedbackUseCase`；chat 桥：`PhSearchBridge` → SharedKit `IosChatGallerySearch`（refine in-set 语义）。
 
-### 3.11 设置 Settings（9 文件 / 3953 行）🔄
+### 3.11 设置 Settings（13 文件 / 4509 行）✅
 
-列表式分组主页（`SettingsScreen`）+ 全部二级页（`SettingsSubPages`）：
+**2026-10-02 追齐批（spec `08-UI-SPECS/screens/settings.yaml` v2026-10-02）**：主菜单由卡片网格重构为 Android 定稿的列表式四组行式分组（个性化/功能/AI 与系统/其他，15 行，彩色圆形图标块+可选右值+chevron），补齐 Gallery Cleanup（切整理页 Pager 1）/ Camera / Report a problem 三入口；死代码清理 AiAgentSettingsView/CameraBeautySettingsView/AboutView/AddModelSheet。
 
-- 账号（邮箱注册/登录/quota 外显/Hero 卡+头像拍摄角标/清除访客数据 `PoLangAuthClient.clearGuestData`）、AI Memory（`MemoryFactsView` 查看/编辑/删除事实）、人物管理、通道（飞书/Telegram 凭证配置——仅凭证，RPA 不做）、相册设置（统计卡+扫描控制台入口）、远程模型（BYOK 双页面：OpenAI/Anthropic/自定义供应商协议分流，`AddRemoteProviderView`/`ProviderConfigView`/`ModelConfigStore`）、本地模型、模型中心（`ModelCenterView`/`ModelDownloadCenterView`，16 模型下载/进度/删除/完整性校验）、沙盒与权限、数据与隐私、开发者选项（诊断日志查看器 llm/tool/js 三份 JSONL + Log Modules）、主题/语言即时生效。
-- 助手性格选择（三 chips，五语）。
-- **缺口**：#7（备份恢复占位）/ #5 前置（App Store 2.5.2 合规结论），见 `IOS_TASK_STATUS.md` §1；语音模型选择为持久化占位（平台差异，非任务）。
+- 主菜单（`SettingsScreen`）：账号 Hero 卡（头像+相机角标）+ 主题/语言行（行+confirmationDialog 单选）+ 四组行 + 版本页脚。
+- 远程模型（`ModelCenterView`）：行式列表（品牌色徽章/「In use」胶囊/⋯动作弹层/点行设当前）+ 组尾添加行 → `AddRemoteProviderView`；**助手性格 4 chips**（DEFAULT/WARM/LIVELY/CONCISE，@AppStorage `assistant_persona`，ChatViewModel 同键消费——本批接通）。
+- 本地模型（`LocalModelsSettingsView`，新独立文件）：检测模型（ROI 引擎 MNN/MediaPipe 真接 `camera_use_mnn`、关键点随引擎灰显、打标 Florence-2 弹层）/ 检测策略（persistence-only 开关+档位）/ 语音组灰显。
+- 沙盒与权限（`SandboxSettingsView`，新独立文件）：智能体执行（auto_execute/js_engine 开关）/ 设备访问（软开关 + 系统权限行实读 AVFoundation/Photos 状态点跳系统设置；silent_trash 按 spec 省略）/ 语音组灰显。
+- 通信通道：通道选择 chips + 状态行（iOS 二态退化：无连接驱动）+ 飞书/Telegram **双常驻**凭证段。
+- 开发者选项：预览调试五行常显（shader 行+弹层单选）/ 诊断日志（LLM Call Log + Log Modules 行+sheet 多选）/ 开发工具（DEBUG）；TAG OpenCL 组按 spec 省略。
+- 账号（`AccountSettingsView`）：头部 + Quota 卡（≥90% error 色/8pt 进度条）+ actions + danger zone（清访客/删号）分层；注册表单逻辑不变。
+- 数据与隐私：7 段正文 + 备份恢复（Coming Soon 占位）+ 清访客（确认弹窗）操作行。
+- 上报问题（`ReportIssueEntryView`）：行 + sheet 表单（category chips/title/description）+ `IssueReportClient`（POST /v1/report-issue，guest 拦截）。
+- 相机设置（`CameraSettingsView`）：相机状态记忆重置（删 UserDefaults 水合键）。
+- **缺口**：#7（备份恢复占位）/ #5 前置，见 `IOS_TASK_STATUS.md` §1；语音模型/检测策略为持久化占位（平台差异台账见 spec §9）；通道连接态二态退化。
 
 ### 3.12 Debug（5 文件 / 1064 行）
 

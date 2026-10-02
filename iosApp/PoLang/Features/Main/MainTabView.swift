@@ -132,6 +132,12 @@ struct MainTabView: View {
             // 前台优先：进后台协作暂停扫描（SP-B）；回前台不自动续，由用户在扫描页点恢复
             if phase == .background { TagScanOrchestrator.shared.pauseForBackground() }
         }
+        // 设置页入口请求切主页面（Gallery Cleanup → 整理页 1，对齐 Android 切 Pager 页 1；
+        // 设置页是 fullScreenCover 无法直触本 router，经 NotificationCenter 解耦）
+        .onReceive(NotificationCenter.default.publisher(for: .settingsRequestMainPage)) { note in
+            router.showSettings = false
+            switchPage((note.object as? NSNumber)?.intValue ?? 1)
+        }
         // 悬浮 Tab：根页（相册/整理/人物/回忆）显示；聊天页（沉浸式，避免遮挡输入栏）隐藏
         // 2026-09-26 形态回退：悬浮胶囊恢复（配色保留微信系）
         .overlay(alignment: .bottom) {

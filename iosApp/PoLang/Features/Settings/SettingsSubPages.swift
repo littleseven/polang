@@ -1,207 +1,13 @@
 import SwiftUI
-import SharedKit
-
-// MARK: - AI Agent Settings
-
-struct AiAgentSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @AppStorage("auto_execute_plans") private var autoExecutePlans = true
-    @AppStorage("assistant_persona") private var assistantPersona: String = "DEFAULT"
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // Section: AI 智能助手
-                settingsSection(L("AI Assistant"), L("Use remote model for natural language camera control.")) {
-                    VStack(spacing: 0) {
-                        // 自动执行计划
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(L("Auto-Execute Multi-Step Plans"))
-                                    .font(.system(size: 14))
-                                Text(L("When disabled, Agent requires confirmation before executing multi-step plans."))
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $autoExecutePlans).labelsHidden()
-                        }
-                        .padding(.vertical, 8)
-
-                        SettingsM3Divider()
-
-                        // 推理模式
-                        HStack {
-                            Text(L("Inference Mode")).font(.system(size: 14))
-                            Spacer()
-                            chip(L("Remote Model"), isSelected: true)
-                        }
-                        .padding(.vertical, 8)
-
-                        SettingsM3Divider()
-
-                        // 助手性格
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(L("Assistant Personality")).font(.system(size: 14))
-                            Text(personaDescription)
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            FlowLayout(spacing: 8) {
-                                personaChip("DEFAULT", L("Default"))
-                                personaChip("WARM", L("Warm & Caring"))
-                                personaChip("LIVELY", L("Lively & Playful"))
-                                personaChip("CONCISE", L("Crisp & Direct"))
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-                }
-
-                // Section: 远程推理
-                settingsSection(L("Remote Inference")) {
-                    AiAgentRemoteModelsSection()
-                        .environmentObject(ModelConfigStore.shared)
-                }
-
-                // Section: 语音控制
-                settingsSection(L("Voice Control"), L("Control camera shooting via voice commands.")) {
-                    VStack(spacing: 8) {
-                        HStack {
-                            Text(L("Voice Mode")).font(.system(size: 14))
-                            Spacer()
-                            Text(L("Not Available"))
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-        }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle(L("AI Assistant"))
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private func chip(_ label: String, isSelected: Bool) -> some View {
-        Text(label)
-            .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-            .foregroundColor(isSelected ? .white : .primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.accentColor : Color(.tertiarySystemBackground))
-            .clipShape(Capsule())
-    }
-
-    private var personaDescription: String {
-        switch assistantPersona {
-        case "WARM": return L("Empathizes first, encouraging and supportive")
-        case "LIVELY": return L("Relaxed and fun, with light emoji use")
-        case "CONCISE": return L("Straight to conclusions, minimal pleasantries")
-        default: return L("Balanced, neutral standard replies")
-        }
-    }
-
-    private func personaChip(_ value: String, _ label: String) -> some View {
-        Button(action: { assistantPersona = value }) {
-            Text(label)
-                .font(.system(size: 13, weight: assistantPersona == value ? .semibold : .regular))
-                .foregroundColor(assistantPersona == value ? .white : .primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(assistantPersona == value ? Color.accentColor : Color(.tertiarySystemBackground))
-                .clipShape(Capsule())
-                .lineLimit(1)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Remote Models Section (inline in AI settings)
-
-private struct AiAgentRemoteModelsSection: View {
-    @EnvironmentObject private var store: ModelConfigStore
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // 当前模型
-            HStack {
-                Image(matIcon: "check").font(.system(size: 18)).foregroundColor(.accentColor)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("Current Model"))
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                    Text(store.activeConfig().modelId)
-                        .font(.system(size: 14, weight: .medium))
-                }
-                Spacer()
-            }
-            .padding(12)
-            .background(Color.accentColor.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            // 模型列表
-            if store.configs.isEmpty {
-                VStack(spacing: 4) {
-                    Text(L("Default remote model has time limits"))
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                    Text(L("Add your own model to remove restrictions"))
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-            } else {
-                ForEach(store.configs, id: \.uniqueKey) { config in
-                    HStack(spacing: 10) {
-                        Image(matIcon: store.selectedModelId == config.modelId ? "radio_button_checked" : "radio_button_unchecked")
-                            .font(.system(size: 20))
-                            .foregroundColor(store.selectedModelId == config.modelId ? .accentColor : .secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(config.modelId).font(.system(size: 14, weight: .medium))
-                            Text(providerName(config)).font(.system(size: 11)).foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Button { store.remove(uniqueKey: config.uniqueKey) } label: {
-                            Image(matIcon: "delete").font(.system(size: 18)).foregroundColor(.red.opacity(0.6))
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture { store.select(modelId: config.modelId) }
-                    .padding(.vertical, 6)
-                    if config.uniqueKey != store.configs.last?.uniqueKey {
-                        SettingsM3Divider()
-                    }
-                }
-            }
-
-            // 添加入口：导航到添加远程模型页（spec §3 add_entry_target；原 AddModelSheet 弹窗流程下线）
-            NavigationLink {
-                AddRemoteProviderView()
-            } label: {
-                HStack {
-                    Image(matIcon: "add").font(.system(size: 16))
-                    Text(L("Add Model")).font(.system(size: 14, weight: .medium))
-                }
-                .foregroundColor(.accentColor)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func providerName(_ config: RemoteModelConfig) -> String {
-        let providers = RemoteModelConfig.companion.PROVIDERS as? [RemoteModelProvider] ?? []
-        return providers.first { $0.providerId == config.providerId }?.displayName ?? config.baseUrl
-    }
-}
 
 // MARK: - Communication Channel Settings
 
+/// 通信通道分类页（spec settings.yaml §3f channels，2026-10-02 S3d 对齐）。
+/// 三组：通道选择（chips 单选 + 状态行）/ 飞书 / Telegram——后两组双常驻（不随选中通道显隐）。
 struct CommunicationChannelView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var cs
+    private var s: SchemeColors { appScheme(cs) }
+
     @AppStorage("channel_type") private var channelType: String = "none"
     @AppStorage("feishu_app_id") private var feishuAppId = ""
     @AppStorage("feishu_app_secret") private var feishuAppSecret = ""
@@ -210,61 +16,92 @@ struct CommunicationChannelView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) {
-                // Channel selection
-                settingsSection(L("Current Channel")) {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 8) {
-                            channelChip("feishu", label: L("Feishu"))
-                            channelChip("telegram", label: "Telegram")
-                            channelChip("none", label: L("None"))
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-
-                // Feishu config
-                if channelType == "feishu" {
-                    settingsSection(L("Feishu"), L("Connect Feishu to receive remote commands via IM messages.")) {
-                        VStack(spacing: 10) {
-                            credentialField(title: "App ID", text: $feishuAppId, placeholder: L("Feishu App ID"))
-                            credentialField(title: "App Secret", text: $feishuAppSecret, placeholder: L("Feishu App Secret"), isPassword: true)
-                        }
-                    }
-                }
-
-                // Telegram config
-                if channelType == "telegram" {
-                    settingsSection("Telegram", L("Connect via Telegram Bot long polling (no public IP needed).")) {
-                        VStack(spacing: 10) {
-                            credentialField(title: "Bot Token", text: $telegramBotToken, placeholder: "123456:ABC-DEF...", isPassword: true)
-                            credentialField(title: L("Allowed Chat ID"), text: $telegramChatId, placeholder: "123456789")
-                            Text(L("Create a bot via @BotFather then paste its token."))
-                                .font(.system(size: 11)).foregroundColor(.secondary)
-                            Text(L("Only this chat can send commands (security whitelist). Without Chat ID, the bot rejects all messages."))
-                                .font(.system(size: 11)).foregroundColor(.orange)
-                        }
-                    }
-                }
+            VStack(alignment: .leading, spacing: SettingsTokens.listSectionSpacing) {
+                selectionGroup
+                feishuGroup
+                telegramGroup
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm)
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle(L("Channels"))
+        .background(s.background.ignoresSafeArea())
+        .navigationTitle(L("Communication Channel"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func channelChip(_ value: String, label: String) -> some View {
-        let selected = channelType == value
-        return Button { channelType = value } label: {
-            Text(label)
-                .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundColor(selected ? .white : .primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(selected ? Color.accentColor : Color(.tertiarySystemBackground))
-                .clipShape(Capsule())
+    // MARK: 组1 通道选择（channel_selection：chips 单选 + 状态行）
+
+    private var selectionGroup: some View {
+        SettingsListGroup(title: L("Active Channel")) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                FlowLayout(spacing: Spacing.sm) {
+                    SettingsM3Chip(label: L("Feishu"), isSelected: channelType == "feishu") { channelType = "feishu" }
+                    SettingsM3Chip(label: L("Telegram"), isSelected: channelType == "telegram") { channelType = "telegram" }
+                    SettingsM3Chip(label: L("None"), isSelected: channelType == "none") { channelType = "none" }
+                }
+                Text(statusText)
+                    .font(AppTypography.bodySmall.font)
+                    .foregroundColor(s.onSurfaceVariant)
+            }
+            .padding(.horizontal, SettingsTokens.listRowPaddingH)
+            .padding(.vertical, Spacing.sm)
+        }
+    }
+
+    /// isConfigured = 当前选中通道凭据齐全（飞书 appId+secret / TG token+chatId；none 视为不齐）。
+    /// iOS 无激活连接驱动（无 IM 长连接生命周期可观察，isConnected 快照无来源）→
+    /// Android 三态在此二态退化：凭据不齐 → not_configured；凭据齐全 → disconnected
+    /// （connected 分支不可达，已登记平台差异台账）。
+    private var isConfigured: Bool {
+        switch channelType {
+        case "feishu": return !feishuAppId.isEmpty && !feishuAppSecret.isEmpty
+        case "telegram": return !telegramBotToken.isEmpty && !telegramChatId.isEmpty
+        default: return false
+        }
+    }
+
+    private var statusText: String {
+        isConfigured ? L("Disconnected") : L("Not configured")
+    }
+
+    // MARK: 组2 飞书（双常驻，不随选中通道显隐）
+
+    private var feishuGroup: some View {
+        SettingsListGroup(
+            title: L("Feishu"),
+            desc: L("Connect to Feishu (Lark) to receive remote commands via IM messages.")
+        ) {
+            VStack(spacing: Spacing.sm) {
+                CredentialField(title: L("App ID"), text: $feishuAppId, placeholder: L("Feishu App ID"))
+                CredentialField(title: L("App Secret"), text: $feishuAppSecret, placeholder: L("Feishu App Secret"), isPassword: true)
+            }
+            .padding(.horizontal, SettingsTokens.listRowPaddingH)
+            .padding(.vertical, Spacing.sm)
+        }
+    }
+
+    // MARK: 组3 Telegram（双常驻，不随选中通道显隐）
+
+    private var telegramGroup: some View {
+        SettingsListGroup(
+            title: L("Telegram"),
+            desc: L("Connect via Telegram Bot long polling (no public IP needed).")
+        ) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                CredentialField(title: L("Bot Token"), text: $telegramBotToken, placeholder: L("123456:ABC-DEF..."), isPassword: true)
+                CredentialField(title: L("Allowed Chat ID"), text: $telegramChatId, placeholder: L("e.g. 123456789"))
+                Text(L("Create a bot via @BotFather and paste its token."))
+                    .font(AppTypography.bodySmall.font)
+                    .foregroundColor(s.onSurfaceVariant.opacity(0.7))
+                Text(L("Only this chat can send commands (security whitelist)."))
+                    .font(AppTypography.bodySmall.font)
+                    .foregroundColor(s.onSurfaceVariant.opacity(0.7))
+                Text(L("Without an Allowed Chat ID, the bot rejects all messages for safety."))
+                    .font(AppTypography.bodySmall.font)
+                    .foregroundColor(s.error)
+            }
+            .padding(.horizontal, SettingsTokens.listRowPaddingH)
+            .padding(.vertical, Spacing.sm)
         }
     }
 }
@@ -316,8 +153,16 @@ struct MemoryFactsView: View {
 
 // MARK: - Developer Settings View
 
+/// 开发者选项分类页（spec settings.yaml §6.5 developer，2026-10-02 S3d 行式重构）。
+/// 组1 相机预览调试五行常显（warningAmber 行式图标块，不随 debug 总开关折叠；
+/// shader_debug_mode = 行+右值 → 单选弹层）；TAG Generation Engine 组（tag_gen_use_opencl）
+/// iOS 无 OpenCL 概念整组省略（spec §6.5 已登记台账，iOS 推理走 MNN CPU/ORT）；
+/// 组2 诊断与日志（LLM 日志导航 + log_modules 行+右值 → 底部多选 sheet）；
+/// 组3 开发测试工具仅 DEBUG 构建。
 struct DeveloperSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var cs
+    private var s: SchemeColors { appScheme(cs) }
+
     @AppStorage("debug_ui_enabled") private var debugEnabled = false
     @AppStorage("show_camera_info_in_preview") private var showCameraInfo = true
     @AppStorage("show_face_debug_overlay") private var showFaceDebug = true
@@ -327,13 +172,13 @@ struct DeveloperSettingsView: View {
     /// Log Modules 多选（spec §6.5 log_modules）：UserDefaults `log_module_config`
     /// JSON `{"enabledModules":[...]}`，与 Android/`IosModuleGatedLogger` 同构消费。
     /// 成员为枚举名大写下划线；key 缺失时默认 AGENT/ORCHESTRATOR/DOWNLOAD/SETTINGS/CHAT/SEMANTIC。
-    private struct LogModule: Identifiable {
+    struct LogModule: Identifiable {
         let rawValue: String   // 枚举名（持久化值）
         let displayName: String
         var id: String { rawValue }
     }
 
-    private static let logModules: [LogModule] = [
+    static let logModules: [LogModule] = [
         .init(rawValue: "FACE_DETECTION", displayName: "Face Detection"),
         .init(rawValue: "RENDERING", displayName: "Rendering"),
         .init(rawValue: "BEAUTY", displayName: "Beauty"),
@@ -346,14 +191,157 @@ struct DeveloperSettingsView: View {
         .init(rawValue: "SEMANTIC", displayName: "Semantic Search"),
     ]
 
-    private static let defaultEnabledModules: Set<String> = [
+    static let defaultEnabledModules: Set<String> = [
         "AGENT", "ORCHESTRATOR", "DOWNLOAD", "SETTINGS", "CHAT", "SEMANTIC",
     ]
 
     @State private var enabledModules: Set<String> = Self.defaultEnabledModules
+    @State private var showShaderDialog = false
+    @State private var showLogModulesSheet = false
+
+    /// Shader Debug Mode 选项（spec §6.5：Normal/Skin Mask/Warp Offset/BigEye Radius/
+    /// ThinFace Radius/All Warp 对应 Int 0-5；双端预览均不消费，persistence-only）。
+    private static let shaderModes: [String] = [
+        "Normal", "Skin Mask", "Warp Offset", "BigEye Radius", "ThinFace Radius", "All Warp"
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SettingsTokens.listSectionSpacing) {
+                cameraPreviewDebugGroup
+                diagnosticsGroup
+                #if DEBUG
+                developerToolsGroup
+                #endif
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm)
+        }
+        .background(s.background.ignoresSafeArea())
+        .navigationTitle(L("Developer Options"))
+        .navigationBarTitleDisplayMode(.inline)
+        // shader_debug_mode 单选弹层（spec §6.5 row_value_dialog）
+        .confirmationDialog(L("Shader Debug Mode"), isPresented: $showShaderDialog, titleVisibility: .visible) {
+            ForEach(0..<Self.shaderModes.count, id: \.self) { mode in
+                Button(L(Self.shaderModes[mode])) { debugShaderMode = mode }
+            }
+            Button(L("Cancel"), role: .cancel) {}
+        }
+        // log_modules 底部多选弹层（spec §6.5 row_value_sheet）
+        .sheet(isPresented: $showLogModulesSheet) {
+            LogModulesSheet(enabledModules: $enabledModules, onToggle: toggleModule)
+        }
+        .onAppear { enabledModules = Self.loadEnabledModules() }
+    }
+
+    // MARK: 组1 相机预览调试（五行常显，行式图标块 warningAmber）
+
+    private var cameraPreviewDebugGroup: some View {
+        SettingsListGroup(
+            title: L("Camera Preview Debug"),
+            desc: L("Recommended for debugging only.")
+        ) {
+            SettingsIconToggleRow(
+                title: L("Debug"),
+                icon: .mat("bug_report"),
+                iconBlock: .warningAmber,
+                isOn: $debugEnabled
+            )
+            SettingsListDivider()
+            SettingsIconToggleRow(
+                title: L("Camera Info"),
+                icon: .mat("camera_alt"),
+                iconBlock: .warningAmber,
+                isOn: $showCameraInfo
+            )
+            SettingsListDivider()
+            SettingsIconToggleRow(
+                title: L("Face Debug Overlay"),
+                icon: .mat("mat_face"),
+                iconBlock: .warningAmber,
+                isOn: $showFaceDebug
+            )
+            SettingsListDivider()
+            SettingsIconToggleRow(
+                title: L("Log Overlay"),
+                icon: .mat("mat_text_snippet"),
+                iconBlock: .warningAmber,
+                isOn: $showLogOverlay
+            )
+            SettingsListDivider()
+            SettingsListRow(
+                title: L("Shader Debug Mode"),
+                valueText: L(Self.shaderModes[min(max(debugShaderMode, 0), Self.shaderModes.count - 1)]),
+                icon: .mat("mat_tune"),
+                iconBlock: .warningAmber,
+                action: { showShaderDialog = true }
+            )
+            SettingsListFootnote(text: L("Stored only; preview rendering does not consume this setting yet."))
+        }
+    }
+
+    // MARK: 组2 诊断与日志
+
+    private var diagnosticsGroup: some View {
+        SettingsListGroup(title: L("Diagnostics & Logs")) {
+            NavigationLink {
+                DiagnosticLogView()
+            } label: {
+                SettingsListRow(
+                    title: L("LLM Call Log"),
+                    subtitle: L("View LLM inference, tool call and JS run logs"),
+                    showChevron: true
+                )
+            }
+            .buttonStyle(.plain)
+            SettingsListDivider()
+            SettingsListRow(
+                title: L("Log Modules"),
+                valueText: logModulesValue,
+                action: { showLogModulesSheet = true }
+            )
+            SettingsListFootnote(text: L("Only gates Agent (Kotlin-side) log output."))
+        }
+    }
+
+    /// 全部开启 → log_modules_all 文案；否则 "N/10"（spec §6.5 log_modules 右值）。
+    private var logModulesValue: String {
+        enabledModules.count == Self.logModules.count
+            ? L("All")
+            : "\(enabledModules.count)/\(Self.logModules.count)"
+    }
+
+    // MARK: 组3 开发测试工具（仅 DEBUG）
+
+    #if DEBUG
+    private var developerToolsGroup: some View {
+        SettingsListGroup(title: L("Developer Tools")) {
+            NavigationLink {
+                DebugScreenView()
+            } label: {
+                SettingsListRow(title: L("Image Download"), showChevron: true)
+            }
+            .buttonStyle(.plain)
+            SettingsListDivider()
+            androidOnlyRow(L("Search Test"))
+            SettingsListDivider()
+            androidOnlyRow(L("JSBridge"))
+            SettingsListDivider()
+            androidOnlyRow(L("Accessibility Service"))
+        }
+    }
+
+    /// Android 专属开发工具行：灰显 + 右值 "Android only"（spec §6.5 ios_state: disabled_android_only）。
+    private func androidOnlyRow(_ title: String) -> some View {
+        SettingsListRow(title: title, valueText: L("Android only"))
+            .modifier(GrayedOut())
+    }
+    #endif
+
+    // MARK: log_module_config 持久化（JSON 结构与 Android 同构，键不变）
 
     /// 读取 UserDefaults `log_module_config`；key 缺失/解析失败 → 默认启用集。
-    private static func loadEnabledModules() -> Set<String> {
+    static func loadEnabledModules() -> Set<String> {
         guard let raw = UserDefaults.standard.string(forKey: "log_module_config"),
               let data = raw.data(using: .utf8),
               let decoded = try? JSONDecoder().decode(ModuleConfig.self, from: data) else {
@@ -363,8 +351,8 @@ struct DeveloperSettingsView: View {
     }
 
     /// 与 Android `toJson()` 同构：`{"enabledModules":[...]}`（保持插入序稳定）。
-    private func persistEnabledModules() {
-        let ordered = Self.logModules.map(\.rawValue).filter { enabledModules.contains($0) }
+    static func persistEnabledModules(_ enabled: Set<String>) {
+        let ordered = logModules.map(\.rawValue).filter { enabled.contains($0) }
         let payload = ["enabledModules": ordered]
         if let data = try? JSONSerialization.data(withJSONObject: payload),
            let json = String(data: data, encoding: .utf8) {
@@ -372,293 +360,87 @@ struct DeveloperSettingsView: View {
         }
     }
 
-    private struct ModuleConfig: Codable {
+    private func toggleModule(_ rawValue: String) {
+        if enabledModules.contains(rawValue) {
+            enabledModules.remove(rawValue)
+        } else {
+            enabledModules.insert(rawValue)
+        }
+        Self.persistEnabledModules(enabledModules)
+    }
+
+    struct ModuleConfig: Codable {
         let enabledModules: [String]
     }
 
-    /// Shader Debug Mode 单选 chips（值 0-5，持久化 debug_shader_mode；预览暂不消费）
-    private let shaderDebugModes: [String] = [
-        "Normal", "Skin Mask", "Warp Offset", "BigEye Radius", "ThinFace Radius", "All Warp"
-    ]
+    /// Log Modules 底部多选弹层（spec §6.5 sheet：标题 log_management + 副题
+    /// log_modules_dialog_subtitle + 10 模块多选行；切换即时生效并持久化）。
+    private struct LogModulesSheet: View {
+        @Binding var enabledModules: Set<String>
+        let onToggle: (String) -> Void
+        @Environment(\.dismiss) private var dismiss
+        @Environment(\.colorScheme) private var cs
+        private var s: SchemeColors { appScheme(cs) }
 
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // ── 1. 相机预览调试 ──
-                settingsSection(L("Camera Preview Debug"), L("Recommended for debugging only.")) {
+        var body: some View {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("Module Logs"))
+                        .font(AppTypography.titleMedium.font)
+                        .foregroundColor(s.onSurface)
+                    Text(L("Toggle per-module logging"))
+                        .font(AppTypography.bodySmall.font)
+                        .foregroundColor(s.onSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.top, Spacing.lg)
+                .padding(.bottom, Spacing.sm)
+
+                ScrollView {
                     VStack(spacing: 0) {
-                        toggleRow(L("Debug"), isOn: $debugEnabled)
-                        if debugEnabled {
-                            SettingsM3Divider()
-                            toggleRow(L("Show Camera Info"), isOn: $showCameraInfo)
-                            SettingsM3Divider()
-                            toggleRow(L("Show Face Debug"), isOn: $showFaceDebug)
-                            SettingsM3Divider()
-                            toggleRow(L("Show Log Overlay"), isOn: $showLogOverlay)
-                            SettingsM3Divider()
-                            // Shader Debug Mode 单选 chips
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(L("Shader Debug Mode"))
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                                FlowLayout(spacing: 8) {
-                                    ForEach(0..<shaderDebugModes.count, id: \.self) { mode in
-                                        shaderModeChip(mode)
-                                    }
-                                }
-                                Text(L("Stored only; preview rendering does not consume this setting yet."))
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
+                        ForEach(Array(DeveloperSettingsView.logModules.enumerated()), id: \.element.id) { index, module in
+                            moduleRow(module)
+                            if index < DeveloperSettingsView.logModules.count - 1 {
+                                SettingsM3Divider()
                             }
-                            .padding(.vertical, 8)
                         }
                     }
-                }
-
-                // ── 2. 诊断与日志 ──
-                settingsSection(L("Diagnostics & Logs")) {
-                    VStack(spacing: 0) {
-                        NavigationLink {
-                            DiagnosticLogView()
-                        } label: {
-                            HStack {
-                                Text(L("LLM Call Log")).foregroundColor(.primary)
-                                Spacer()
-                                Text(L("Enter")).font(.system(size: 13)).foregroundColor(.secondary)
-                                Image(systemName: "chevron.right").font(.system(size: 13)).foregroundColor(.secondary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        SettingsM3Divider()
-                        // Log Modules 多选 chips
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(L("Log Modules"))
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                            FlowLayout(spacing: 8) {
-                                ForEach(Self.logModules) { module in
-                                    logModuleChip(module)
-                                }
-                            }
-                            Text(L("Only gates Agent (Kotlin-side) log output."))
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 8)
-                    }
-                }
-
-                // ── 3. 开发测试工具（仅 DEBUG）──
-                #if DEBUG
-                settingsSection(L("Developer Tools")) {
-                    VStack(spacing: 0) {
-                        NavigationLink {
-                            DebugScreenView()
-                        } label: {
-                            HStack {
-                                Text(L("Image Download")).foregroundColor(.primary)
-                                Spacer()
-                                Text(L("Enter")).font(.system(size: 13)).foregroundColor(.secondary)
-                                Image(systemName: "chevron.right").font(.system(size: 13)).foregroundColor(.secondary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        SettingsM3Divider()
-                        disabledRow(title: L("Search Test"), subtitle: nil)
-                        SettingsM3Divider()
-                        disabledRow(title: L("JSBridge"), subtitle: nil)
-                        SettingsM3Divider()
-                        disabledRow(title: L("Accessibility Service"), subtitle: nil)
-                    }
-                }
-                #endif
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-        }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle(L("Developer Options"))
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear { enabledModules = Self.loadEnabledModules() }
-    }
-
-    private func logModuleChip(_ module: LogModule) -> some View {
-        let selected = enabledModules.contains(module.rawValue)
-        return Button {
-            if selected {
-                enabledModules.remove(module.rawValue)
-            } else {
-                enabledModules.insert(module.rawValue)
-            }
-            persistEnabledModules()
-        } label: {
-            Text(L(module.displayName))
-                .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundColor(selected ? .white : .primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(selected ? Color.accentColor : Color(.tertiarySystemBackground))
-                .clipShape(Capsule())
-        }
-    }
-
-    private func shaderModeChip(_ mode: Int) -> some View {
-        let selected = debugShaderMode == mode
-        return Button { debugShaderMode = mode } label: {
-            Text(L(shaderDebugModes[mode]))
-                .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundColor(selected ? .white : .primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(selected ? Color.accentColor : Color(.tertiarySystemBackground))
-                .clipShape(Capsule())
-        }
-    }
-
-    /// Android 专属功能行：整体灰显、不可点击，右值标注 "Android only"
-    private func disabledRow(title: String, subtitle: String?) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: 14))
-                if let subtitle {
-                    Text(subtitle).font(.system(size: 12))
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.bottom, Spacing.lg)
                 }
             }
-            Spacer()
-            Text(L("Android only"))
-                .font(.system(size: 13))
-        }
-        .foregroundColor(.secondary)
-        .padding(.vertical, 8)
-    }
-}
-
-// MARK: - Camera & Beauty Settings View
-
-/// 相机与美颜调试设置（对标 Android SettingsScreen 的 cameraBeauty 入口）。
-/// 🔴 瘦脸诊断中枢：实时瘦脸/大眼/形变强度 + 人脸引擎切换 + 调试可视化开关 + live 遥测。
-///
-/// 设计动机：相机页美颜面板(wand 图标)已有 Slim/BigEyes 滑杆，但瘦脸真机不可见；
-/// 此页补充 ① 形变强度倍率(warpStrength)排查「强度不足」、② hasFace 遥测排查「关键点未送达」、
-/// ③ 引擎默认值持久化、④ 调试开关集中入口。
-struct CameraBeautySettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var container = AppContainer.shared
-    @ObservedObject private var dbg = DebugOverlayState.shared
-    @AppStorage("camera_use_mnn") private var cameraUseMnn = true
-    @AppStorage("camera_debug_overlay") private var debugOverlay = false
-    @AppStorage("camera_show_landmarks") private var showLandmarks = false
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // Section: 美颜实时调试
-                settingsSection(L("Beauty Debug"), L("Live slim/big-eyes strength. Also adjustable on the camera beauty panel (wand icon).")) {
-                    VStack(spacing: 0) {
-                        sliderRow(L("Slim Face"), value: $container.beautyParams.slimFace, range: -50...50)
-                            .onChange(of: container.beautyParams.slimFace) { v in
-                                UserDefaults.standard.set(v, forKey: "beauty_slim_debug")
-                            }
-                        SettingsM3Divider()
-                        sliderRow(L("Big Eyes"), value: $container.beautyParams.bigEyes, range: 0...100)
-                            .onChange(of: container.beautyParams.bigEyes) { v in
-                                UserDefaults.standard.set(v, forKey: "beauty_bigeyes_debug")
-                            }
-                        SettingsM3Divider()
-                        sliderRow(L("Warp Strength"), value: $container.beautyParams.warpStrength,
-                                  range: 0...8, step: 0.5, format: { String(format: "%.1fx", $0) })
-                            .onChange(of: container.beautyParams.warpStrength) { v in
-                                UserDefaults.standard.set(v, forKey: "beauty_warp_strength")
-                            }
-                        Text(L("Warp strength magnifies the slim delta. 1.0 = default (subtle); raise it to test if slim is too weak to see."))
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .padding(.top, 6)
-                    }
-                }
-
-                // Section: 人脸检测引擎
-                settingsSection(L("Face Detection Engine"),
-                                L("Default engine. MNN ships on-device models (RetinaFace + 2d106); MediaPipe needs a downloaded model.")) {
-                    HStack(spacing: 8) {
-                        engineChip(mnn: true, label: "MNN")
-                        engineChip(mnn: false, label: "MediaPipe")
-                    }
-                    .padding(.vertical, 4)
-                }
-
-                // Section: 调试可视化
-                settingsSection(L("Debug Visualization")) {
-                    VStack(spacing: 0) {
-                        toggleRow(L("Debug Overlay"), isOn: $debugOverlay)
-                            .onChange(of: debugOverlay) { v in DebugOverlayState.shared.isEnabled = v }
-                        SettingsM3Divider()
-                        toggleRow(L("Show Face Landmarks"), isOn: $showLandmarks)
-                        Text(L("Draw detected face landmarks on the preview to verify detection feeds the renderer."))
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .padding(.top, 6)
-                    }
-                    .onAppear { DebugOverlayState.shared.isEnabled = debugOverlay }
-                }
-
-                // Section: live 诊断遥测
-                settingsSection(L("Live Diagnostics"),
-                                L("Read-only. beauty.hasFace=0 means face points never reach the shader — slim cannot work no matter the strength.")) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(dbg.entries, id: \.key) { entry in
-                            HStack {
-                                Text(entry.key)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text(entry.value)
-                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                    .foregroundColor(diagnosticColor(entry.key, entry.value))
-                            }
-                        }
-                    }
+            .background(s.surfaceContainerLow)
+            .presentationDetents([.medium, .large])
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L("Done")) { dismiss() }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle(L("Camera & Beauty"))
-        .navigationBarTitleDisplayMode(.inline)
-    }
 
-    private func engineChip(mnn: Bool, label: String) -> some View {
-        let selected = cameraUseMnn == mnn
-        return Button { cameraUseMnn = mnn } label: {
-            Text(label)
-                .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundColor(selected ? .white : .primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(selected ? Color.accentColor : Color(.tertiarySystemBackground))
-                .clipShape(Capsule())
+        private func moduleRow(_ module: DeveloperSettingsView.LogModule) -> some View {
+            let selected = enabledModules.contains(module.rawValue)
+            return Button {
+                onToggle(module.rawValue)
+            } label: {
+                HStack {
+                    Text(L(module.displayName))
+                        .font(AppTypography.bodyMedium.font)
+                        .foregroundColor(s.onSurface)
+                    Spacer()
+                    if selected {
+                        Image(matIcon: "check")
+                            .font(.system(size: 18))
+                            .foregroundColor(s.primary)
+                    }
+                }
+                .frame(minHeight: SettingsTokens.dialogOptionRowHeight)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
-
-    /// 遥测着色：hasFace=1 绿 / =0 红，方便一眼判断 warp 是否在跑
-    private func diagnosticColor(_ key: String, _ value: String) -> Color {
-        if key == "beauty.hasFace" { return value == "1" ? .green : .red }
-        if key == "face.error" { return .orange }
-        return .primary
-    }
-}
-
-// MARK: - Reusable Components
-
-private func settingsSection<C: View>(_ title: String, _ desc: String? = nil, @ViewBuilder content: () -> C) -> some View {
-    SettingsM3Section(title: title, desc: desc) { content() }
-}
-
-private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
-    SettingsM3ToggleRow(title: title, isOn: isOn)
 }
 
 // MARK: - M3 设置原语（对齐 Android SettingsBaseComponents，消费 DesignTokens）
@@ -691,22 +473,6 @@ struct SettingsM3Section<Content: View>: View {
             .clipShape(AppShapes.card)
             SettingsM3Divider()
         }
-    }
-}
-
-/// Android DebugOptionRow：高 44 + 标签 bodyMedium + Switch。
-struct SettingsM3ToggleRow: View {
-    let title: String
-    @Binding var isOn: Bool
-    @Environment(\.colorScheme) private var cs
-    var body: some View {
-        HStack {
-            Text(title).font(AppTypography.bodyMedium.font).foregroundColor(appScheme(cs).onSurface)
-            Spacer()
-            Toggle("", isOn: $isOn).labelsHidden()
-        }
-        .frame(height: SettingsTokens.toggleRowHeight)
-        .padding(.horizontal, SettingsTokens.rowPaddingH)
     }
 }
 
@@ -784,54 +550,246 @@ struct SettingsM3Chip: View {
     }
 }
 
-/// 调试滑杆行（相机美颜设置专用）：标签 + 当前值 + Slider。
-private struct DebugSliderRow: View {
-    let label: String
-    @Binding var value: Float
-    let range: ClosedRange<Float>
-    var step: Float = 1.0
-    var format: ((Float) -> String)?
+// MARK: - 主菜单列表原语（spec settings.yaml §2 list_sections，对齐 Android SettingsListSection/Row/Divider）
+
+/// 行图标块配色（vibrant* 为固定功能色，容器色/状态色走语义通道；前景一律反色）。
+enum SettingsListIconBlock {
+    case vibrantGreen, vibrantBlue, vibrantOrange, vibrantPink, vibrantPurple
+    case primaryContainer
+    case statusInfo
+    case warningAmber
+
+    func colors(_ s: SchemeColors) -> (bg: Color, fg: Color) {
+        switch self {
+        case .vibrantGreen: return (AppColors.vibrantGreen, AppColors.iconOnVibrant)
+        case .vibrantBlue: return (AppColors.vibrantBlue, AppColors.iconOnVibrant)
+        case .vibrantOrange: return (AppColors.vibrantOrange, AppColors.iconOnVibrant)
+        case .vibrantPink: return (AppColors.vibrantPink, AppColors.iconOnVibrant)
+        case .vibrantPurple: return (AppColors.vibrantPurple, AppColors.iconOnVibrant)
+        case .primaryContainer: return (s.primaryContainer, s.onPrimaryContainer)
+        case .statusInfo: return (StatusColor.info, AppColors.iconOnVibrant)
+        case .warningAmber: return (StatusColor.warningAmber, AppColors.iconOnVibrant)
+        }
+    }
+}
+
+/// 行图标：Material 资产（mat_*）优先；资产缺失时 SF Symbol 兜底（图标字形属平台原生差异层）。
+enum SettingsListIcon {
+    case mat(String)
+    case sf(String)
+
+    @ViewBuilder
+    func image(size: CGFloat) -> some View {
+        switch self {
+        case .mat(let name):
+            MatIcon(name: name, size: size)
+        case .sf(let name):
+            Image(systemName: name)
+                .font(.system(size: size, weight: .medium))
+        }
+    }
+}
+
+/// Android SettingsListRow：高 listRowHeight（带副标题 rowHeightWithSubtitle）+
+/// 圆形彩色图标块 + 标题 + 可选右值（当前选中）+ 可选 chevron。
+/// action 为 nil 时渲染纯内容（供 NavigationLink 包裹）。
+struct SettingsListRow: View {
+    let title: String
+    var subtitle: String? = nil
+    var valueText: String? = nil
+    var icon: SettingsListIcon? = nil
+    var iconBlock: SettingsListIconBlock? = nil
+    var showChevron: Bool = false
+    var action: (() -> Void)? = nil
+    @Environment(\.colorScheme) private var cs
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Text(label).font(.system(size: 14))
-                Spacer()
-                Text(displayText)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(value != 0 ? .accentColor : .secondary)
+        let s = appScheme(cs)
+        let content = HStack(spacing: SettingsTokens.rowElementGap) {
+            leadingIcon(s)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: SettingsTokens.listTitleFontSize))
+                    .foregroundColor(s.onSurface)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(AppTypography.bodySmall.font)
+                        .foregroundColor(s.onSurfaceVariant)
+                }
             }
-            Slider(value: $value, in: range, step: step) { Text(label) }
-                .tint(.accentColor)
+            Spacer()
+            if let valueText {
+                Text(valueText)
+                    .font(.system(size: SettingsTokens.listValueFontSize))
+                    .foregroundColor(s.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: SettingsTokens.listValueMaxWidth, alignment: .trailing)
+            }
+            if showChevron {
+                Image(matIcon: "arrow_forward")
+                    .font(.system(size: SettingsTokens.rowChevronSize))
+                    .foregroundColor(s.onSurfaceVariant.opacity(SettingsTokens.rowChevronAlpha))
+            }
         }
-        .padding(.vertical, 8)
-    }
+        .frame(minHeight: subtitle == nil ? SettingsTokens.listRowHeight : SettingsTokens.rowHeightWithSubtitle)
+        .padding(.horizontal, SettingsTokens.listRowPaddingH)
+        .contentShape(Rectangle())
 
-    private var displayText: String {
-        if let format { return format(value) }
-        return value == 0 ? "--" : "\(Int(value))"
-    }
-}
-
-/// 文件内 sliderRow 视图构造器（包 DebugSliderRow，供 CameraBeautySettingsView 使用）
-private func sliderRow(_ label: String, value: Binding<Float>, range: ClosedRange<Float>,
-                        step: Float = 1.0, format: ((Float) -> String)? = nil) -> DebugSliderRow {
-    DebugSliderRow(label: label, value: value, range: range, step: step, format: format)
-}
-
-private func credentialField(title: String, text: Binding<String>, placeholder: String, isPassword: Bool = false) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-        Text(title).font(.system(size: 12)).foregroundColor(.secondary)
-        if isPassword {
-            SecureField(placeholder, text: text)
-                .font(.system(size: 14))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+        if let action {
+            Button(action: action) { content }.buttonStyle(.plain)
         } else {
-            TextField(placeholder, text: text)
-                .font(.system(size: 14))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            content
         }
+    }
+
+    /// 有图标块 → 块内 inner 尺寸反色图标；无块 → 主色裸图标（SettingsClickableRow 形态）。
+    @ViewBuilder
+    private func leadingIcon(_ s: SchemeColors) -> some View {
+        if let icon, let iconBlock {
+            let c = iconBlock.colors(s)
+            icon.image(size: SettingsTokens.listIconInnerSize)
+                .foregroundColor(c.fg)
+                .frame(width: SettingsTokens.listIconBlockSize, height: SettingsTokens.listIconBlockSize)
+                .background(Circle().fill(c.bg))
+        } else if let icon {
+            icon.image(size: SettingsTokens.rowLeadingIconSize)
+                .foregroundColor(s.primary)
+        }
+    }
+}
+
+/// Android SettingsListSection：surfaceContainerHighest 卡片（组标题按 Android 惯例缺省），
+/// 组内行间分隔线由调用方插入 SettingsListDivider。
+struct SettingsListSection<Content: View>: View {
+    @ViewBuilder let content: Content
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        VStack(spacing: 0) { content }
+            .background(appScheme(cs).surfaceContainerHighest)
+            .clipShape(AppShapes.panel)
+    }
+}
+
+/// Android SettingsListDivider：组内行间分隔线，起始缩进与图标块列对齐。
+struct SettingsListDivider: View {
+    var body: some View {
+        SettingsM3Divider()
+            .padding(.leading, SettingsTokens.listDividerInsetStart)
+    }
+}
+
+/// 凭据输入行（spec §3f channels 字段）：label bodySmall + 内凹浅色底输入框（surfaceContainerHigh、
+/// 圆角 small、无指示线）；密码字段 SecureField 掩码。
+private struct CredentialField: View {
+    let title: String
+    @Binding var text: String
+    let placeholder: String
+    var isPassword: Bool = false
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(AppTypography.bodySmall.font)
+                .foregroundColor(appScheme(cs).onSurfaceVariant)
+            Group {
+                if isPassword {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                }
+            }
+            .font(AppTypography.bodyMedium.font)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .padding(10)
+            .background(appScheme(cs).surfaceContainerHigh)
+            .clipShape(AppShapes.small)
+        }
+    }
+}
+
+// MARK: - 行式分组构件（S3d：开发者/通道页组内共用，对齐 S3c group/footnote 模式）
+
+/// 组 = 组标题（+可选组描述）+ SettingsListSection 卡片（组内行间分隔线由调用方插入）。
+private struct SettingsListGroup<Content: View>: View {
+    let title: String
+    var desc: String? = nil
+    @ViewBuilder let content: Content
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(title)
+                .font(AppTypography.titleSmall.font)
+                .foregroundColor(appScheme(cs).onSurface)
+            if let desc {
+                Text(desc)
+                    .font(AppTypography.bodySmall.font)
+                    .foregroundColor(appScheme(cs).onSurfaceVariant)
+            }
+            SettingsListSection { content }
+        }
+    }
+}
+
+/// 行式开关行：图标块 + 标题(+副题) + Switch，量规对齐 SettingsListRow。
+private struct SettingsIconToggleRow: View {
+    let title: String
+    var subtitle: String? = nil
+    let icon: SettingsListIcon
+    let iconBlock: SettingsListIconBlock
+    @Binding var isOn: Bool
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        let s = appScheme(cs)
+        HStack(spacing: SettingsTokens.rowElementGap) {
+            icon.image(size: SettingsTokens.listIconInnerSize)
+                .foregroundColor(iconBlock.colors(s).fg)
+                .frame(width: SettingsTokens.listIconBlockSize, height: SettingsTokens.listIconBlockSize)
+                .background(Circle().fill(iconBlock.colors(s).bg))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: SettingsTokens.listTitleFontSize))
+                    .foregroundColor(s.onSurface)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(AppTypography.bodySmall.font)
+                        .foregroundColor(s.onSurfaceVariant)
+                }
+            }
+            Spacer()
+            Toggle("", isOn: $isOn).labelsHidden()
+        }
+        .frame(minHeight: subtitle == nil ? SettingsTokens.listRowHeight : SettingsTokens.rowHeightWithSubtitle)
+        .padding(.horizontal, SettingsTokens.listRowPaddingH)
+        .contentShape(Rectangle())
+    }
+}
+
+/// 组内脚注：bodySmall onSurfaceVariant 0.7。
+private struct SettingsListFootnote: View {
+    let text: String
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        Text(text)
+            .font(AppTypography.bodySmall.font)
+            .foregroundColor(appScheme(cs).onSurfaceVariant.opacity(0.7))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SettingsTokens.listRowPaddingH)
+            .padding(.vertical, Spacing.sm)
+    }
+}
+
+/// 能力缺口灰显注记（spec §9 允许平台差异层）：禁用交互并压暗整行/整组。
+private struct GrayedOut: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .environment(\.isEnabled, false)
+            .opacity(0.55)
     }
 }

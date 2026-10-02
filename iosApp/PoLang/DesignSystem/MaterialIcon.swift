@@ -100,6 +100,7 @@ enum MaterialIconMap {
         "lock":           "mat_lock",
         "arrow_forward":  "mat_arrow_forward",
         "person":         "mat_person",
+        "bug_report":     "mat_bug_report",
     ]
 }
 

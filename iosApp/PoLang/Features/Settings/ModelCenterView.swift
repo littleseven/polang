@@ -1,354 +1,270 @@
 import SwiftUI
 import SharedKit
 
-/// 模型中心：管理远程模型配置（添加/选择/删除）。
+/// 远程模型设置页（spec settings.yaml §3 remote_model，2026-10-02 S3b 行式重构）。
 ///
-/// 对标 Android `AiAgentRemoteModelsSection` + `AddProviderModelDialog`：
-/// - 已配置模型列表（RadioButton 选中 + 删除）
-/// - 当前选中高亮卡片
-/// - + 添加模型：导航 AddRemoteProviderView 两页流（2026-08-21 弹窗下线；AddModelSheet 保留无入口）
-/// - 访客模式提示
+/// 两区结构（对齐 Android RemoteModelsListSection + 助手性格区）：
+/// - 已配置模型行式列表（无组标题）：品牌色徽章 + 模型名/「使用中」胶囊/供应商·已配置双行文本 +
+///   ⋯ 动作弹层（设为当前/删除）；点行 = 设为当前模型；组尾「添加模型」行 → AddRemoteProviderView
+/// - 助手性格：单选 chips，@AppStorage "assistant_persona" 持久化 shared 枚举名，ChatViewModel 同键消费
 struct ModelCenterView: View {
     @EnvironmentObject private var store: ModelConfigStore
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var cs
     private var s: SchemeColors { appScheme(cs) }
-    @State private var editTarget: EditModelTarget?
+
+    /// ⋯ 动作弹层目标（标题 = 模型名，副题 = 供应商 displayName）
+    @State private var actionTarget: RemoteModelConfig?
+
+    /// 已配置模型（spec §3 data：filter isConfigured）
+    private var configuredModels: [RemoteModelConfig] {
+        store.configs.filter { $0.isConfigured }
+    }
 
     var body: some View {
-        List {
-            // 当前选中卡片
-            Section {
-                currentModelCard
-            } header: {
-                Text(L("Current Model"))
+        ScrollView {
+            VStack(spacing: SettingsTokens.listSectionSpacing) {
+                remoteModelsSection
+                AssistantPersonaSection()
             }
-
-            // 已配置模型列表
-            if !store.configs.isEmpty {
-                Section {
-                    ForEach(store.configs, id: \.uniqueKey) { config in
-                        modelRow(config)
-                    }
-                } header: {
-                    Text(L("Configured Models"))
-                }
-            }
-
-            // 访客模式提示
-            Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(matIcon: "info")
-                            .font(.system(size: 14))
-                            .foregroundColor(.secondary)
-                        Text(L("Guest Mode"))
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                    Text(L("Without a configured model, PoLang uses a free proxy server with limited guest quota. Add your own API key for unlimited access."))
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary.opacity(0.8))
-                }
-            } footer: {
-                EmptyView()
-            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm)
         }
+        .background(s.background.ignoresSafeArea())
         .navigationTitle(L("Remote Models"))
         .navigationBarTitleDisplayMode(.inline)
-        .scrollContentBackground(.hidden)
-        .background(s.background.ignoresSafeArea())
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                // 添加模型：导航两页流（原 AddModelSheet 弹窗入口下线，spec §3c/§3d）
-                NavigationLink {
-                    AddRemoteProviderView()
-                } label: {
-                    Image(matIcon: "add")
-                        .font(.system(size: 20))
-                }
+        // ⋯ 动作弹层（spec §3 action_sheet；「设为当前」已是当前时禁用）
+        .confirmationDialog(
+            actionTarget?.modelId ?? "",
+            isPresented: .init(get: { actionTarget != nil }, set: { if !$0 { actionTarget = nil } }),
+            titleVisibility: .visible,
+            presenting: actionTarget
+        ) { config in
+            Button(L("Set as current")) {
+                store.select(modelId: config.modelId)
             }
-        }
-        .sheet(item: $editTarget) { target in
-            EditApiKeySheet(modelName: target.config.modelId, initialApiKey: target.config.apiKey) { newKey in
-                store.updateApiKey(uniqueKey: target.config.uniqueKey, apiKey: newKey)
-            }
-        }
-    }
-
-    // MARK: - Current Model Card
-
-    private var currentModelCard: some View {
-        HStack(spacing: 12) {
-            Image(matIcon: "cloud_download")
-                .font(.system(size: 24))
-                .foregroundColor(s.primary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(store.activeConfig().modelId)
-                    .font(.system(size: 15, weight: .semibold))
-                Text(providerName(for: store.activeConfig()))
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            if store.activeConfig().isConfigured {
-                Text(L("API Key"))
-                    .font(.system(size: 10))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.green.opacity(0.2))
-                    .foregroundColor(.green)
-                    .clipShape(Capsule())
-            } else {
-                Text(L("Guest"))
-                    .font(.system(size: 10))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.orange.opacity(0.2))
-                    .foregroundColor(.orange)
-                    .clipShape(Capsule())
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    // MARK: - Model Row
-
-    private func modelRow(_ config: RemoteModelConfig) -> some View {
-        HStack(spacing: 12) {
-            // RadioButton
-            Image(matIcon: store.selectedModelId == config.modelId ? "radio_button_checked" : "radio_button_unchecked")
-                .font(.system(size: 20))
-                .foregroundColor(store.selectedModelId == config.modelId ? .accentColor : .secondary)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(config.modelId)
-                    .font(.system(size: 14, weight: .medium))
-                Text(providerName(for: config))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            // Edit (改 API Key)
-            Button {
-                editTarget = EditModelTarget(config: config)
-            } label: {
-                Image(matIcon: "tune")
-                    .font(.system(size: 18))
-                    .foregroundColor(s.primary)
-            }
-
-            // Delete
-            Button {
+            .disabled(config.modelId == store.selectedModelId)
+            Button(L("Delete"), role: .destructive) {
                 store.remove(uniqueKey: config.uniqueKey)
-            } label: {
-                Image(matIcon: "delete")
-                    .font(.system(size: 18))
-                    .foregroundColor(.red.opacity(0.7))
             }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: { config in
+            Text(providerName(for: config))
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            store.select(modelId: config.modelId)
+    }
+
+    // MARK: - Remote Models List（spec §3 remote_models_list，行式无组标题）
+
+    private var remoteModelsSection: some View {
+        SettingsListSection {
+            if configuredModels.isEmpty {
+                emptyHint
+            } else {
+                ForEach(Array(configuredModels.enumerated()), id: \.element.uniqueKey) { index, config in
+                    RemoteModelRow(
+                        config: config,
+                        providerDisplayName: providerName(for: config),
+                        isSelected: config.modelId == store.selectedModelId,
+                        onTap: { store.select(modelId: config.modelId) },
+                        onMore: { actionTarget = config }
+                    )
+                    if index < configuredModels.count - 1 {
+                        SettingsListDivider()
+                    }
+                }
+                // 添加行上方分隔线（spec §3 add_row：有配置项时）
+                SettingsListDivider()
+            }
+            addRow
         }
+    }
+
+    /// 空态提示（无已配置模型时列表区仅此提示 + 添加行；文案沿用既有五语键）
+    private var emptyHint: some View {
+        VStack(spacing: Spacing.xs) {
+            Text(L("Default remote model has time limits"))
+                .font(AppTypography.bodyMedium.font)
+                .foregroundColor(s.onSurfaceVariant)
+            Text(L("Add your own model to remove restrictions"))
+                .font(AppTypography.bodySmall.font)
+                .foregroundColor(s.onSurfaceVariant)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.md)
+    }
+
+    /// 组尾「添加模型」行：vibrantGreen 圆形块白 + → add_remote_provider（AddRemoteProviderView）
+    private var addRow: some View {
+        NavigationLink {
+            AddRemoteProviderView()
+        } label: {
+            SettingsListRow(
+                title: L("Add Model"),
+                icon: .mat("add"),
+                iconBlock: .vibrantGreen,
+                showChevron: true
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Helpers
 
     private func providerName(for config: RemoteModelConfig) -> String {
-        let providers = RemoteModelConfig.companion.PROVIDERS as? [RemoteModelProvider] ?? []
-        return providers.first { $0.providerId == config.providerId }?.displayName
+        RemoteModelConfig.companion.getProvider(providerId: config.providerId)?.displayName
             ?? (config.baseUrl.isEmpty ? "PoLang Server" : config.baseUrl)
     }
 }
 
-// MARK: - Add Model Sheet
+// MARK: - Remote Model Row（spec §3 remote_model.row）
 
-struct AddModelSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let onConfirm: (RemoteModelProvider, String, String) -> Void
-
-    @State private var selectedProvider: RemoteModelProvider?
-    @State private var selectedModelId: String = ""
-    @State private var isCustomModel: Bool = false
-    @State private var customModelId: String = ""
-    @State private var apiKey: String = ""
-
-    private var providers: [RemoteModelProvider] {
-        (RemoteModelConfig.companion.PROVIDERS as? [RemoteModelProvider])?
-            .filter { $0.isVisible } ?? []
-    }
-
-    private var availableModels: [String] {
-        guard let provider = selectedProvider else { return [] }
-        return provider.models as? [String] ?? []
-    }
-
-    /// 生效模型 ID：预置选项或自定义输入（对齐 Android AddProviderModelDialog 的自定义 chip）
-    private var effectiveModelId: String {
-        isCustomModel ? customModelId.trimmingCharacters(in: .whitespaces) : selectedModelId
-    }
-
-    private var canConfirm: Bool {
-        selectedProvider != nil && !effectiveModelId.isEmpty && !apiKey.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                // 供应商选择
-                Section(L("Provider")) {
-                    ForEach(providers, id: \.providerId) { provider in
-                        providerChip(provider)
-                    }
-                }
-
-                // 模型选择（预置 + 自定义模型 ID）
-                if selectedProvider != nil {
-                    Section(L("Model")) {
-                        ForEach(availableModels, id: \.self) { modelId in
-                            modelChip(modelId)
-                        }
-                        customModelChip
-                        if isCustomModel {
-                            TextField(L("Model ID"), text: $customModelId)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                        }
-                    }
-                }
-
-                // API Key
-                Section(L("API Key")) {
-                    SecureField(L("Enter API Key"), text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    if let provider = selectedProvider,
-                       !provider.apiKeyUrl.isEmpty,
-                       let url = URL(string: provider.apiKeyUrl) {
-                        Link(L("Get API Key"), destination: url)
-                            .font(.caption)
-                    }
-                }
-            }
-            .navigationTitle(L("Add Model"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(L("Cancel")) { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(L("Add")) {
-                        if let provider = selectedProvider {
-                            onConfirm(provider, effectiveModelId, apiKey.trimmingCharacters(in: .whitespaces))
-                            dismiss()
-                        }
-                    }
-                    .disabled(!canConfirm)
-                    .bold(canConfirm)
-                }
-            }
-        }
-    }
-
-    // MARK: - Chips
-
-    private func providerChip(_ provider: RemoteModelProvider) -> some View {
-        HStack {
-            Image(matIcon: selectedProvider?.providerId == provider.providerId
-                ? "radio_button_checked" : "radio_button_unchecked")
-                .font(.system(size: 20))
-                .foregroundColor(selectedProvider?.providerId == provider.providerId ? .accentColor : .secondary)
-            Text(provider.displayName)
-                .font(.system(size: 14))
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectedProvider = provider
-            selectedModelId = ""
-            isCustomModel = false
-            customModelId = ""
-        }
-    }
-
-    private func modelChip(_ modelId: String) -> some View {
-        HStack {
-            Image(matIcon: !isCustomModel && selectedModelId == modelId
-                ? "radio_button_checked" : "radio_button_unchecked")
-                .font(.system(size: 20))
-                .foregroundColor(!isCustomModel && selectedModelId == modelId ? .accentColor : .secondary)
-            Text(modelId)
-                .font(.system(size: 14))
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectedModelId = modelId
-            isCustomModel = false
-        }
-    }
-
-    private var customModelChip: some View {
-        HStack {
-            Image(matIcon: isCustomModel
-                ? "radio_button_checked" : "radio_button_unchecked")
-                .font(.system(size: 20))
-                .foregroundColor(isCustomModel ? .accentColor : .secondary)
-            Text(L("Add Custom Model"))
-                .font(.system(size: 14))
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            isCustomModel = true
-            selectedModelId = ""
-        }
-    }
-}
-
-// MARK: - Edit API Key（对齐 Android RemoteModelConfigCard 编辑：预定义模型改 apiKey）
-
-private struct EditModelTarget: Identifiable {
+/// 品牌色圆角方块字母徽章 + 双行文本（行1 = 模型名 + 可选「使用中」胶囊；行2 = 供应商 · 已配置）+
+/// ⋯ 动作入口；点行 = 设为当前模型。
+private struct RemoteModelRow: View {
     let config: RemoteModelConfig
-    var id: String { config.uniqueKey }
-}
-
-struct EditApiKeySheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let modelName: String
-    let initialApiKey: String
-    let onSave: (String) -> Void
-
-    @State private var apiKey: String = ""
+    let providerDisplayName: String
+    let isSelected: Bool
+    let onTap: () -> Void
+    let onMore: () -> Void
+    @Environment(\.colorScheme) private var cs
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section(L("API Key")) {
-                    SecureField(L("Enter API Key"), text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                }
-            }
-            .navigationTitle(L("Edit Model"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(L("Cancel")) { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(L("Save")) {
-                        let trimmed = apiKey.trimmingCharacters(in: .whitespaces)
-                        if !trimmed.isEmpty { onSave(trimmed); dismiss() }
+        let s = appScheme(cs)
+        HStack(spacing: SettingsTokens.rowElementGap) {
+            RemoteModelBadge(providerId: config.providerId, displayName: providerDisplayName)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: Spacing.sm) {
+                    Text(config.modelId)
+                        .font(.system(size: SettingsTokens.listTitleFontSize, weight: .semibold))
+                        .foregroundColor(s.onSurface)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if isSelected {
+                        Text(L("In use"))
+                            .font(AppTypography.labelSmall.font)
+                            .foregroundColor(s.onPrimary)
+                            .padding(.horizontal, BadgeTokens.tagPaddingH)
+                            .padding(.vertical, BadgeTokens.tagPaddingV)
+                            .background(s.primary)
+                            .clipShape(Capsule())
                     }
-                    .disabled(apiKey.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                Text("\(providerDisplayName) · \(L("Configured"))")
+                    .font(AppTypography.bodySmall.font)
+                    .foregroundColor(s.onSurfaceVariant)
+            }
+            Spacer()
+            Button(action: onMore) {
+                MatIcon(name: "mat_more_horiz", size: SettingsTokens.rowChevronSize)
+                    .foregroundColor(s.onSurfaceVariant.opacity(SettingsTokens.rowChevronAlpha))
+            }
+            .accessibilityIdentifier("remote_models.row.more.\(config.uniqueKey)")
+        }
+        .frame(minHeight: SettingsTokens.listRowHeight)
+        .padding(.horizontal, SettingsTokens.listRowPaddingH)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+        .accessibilityIdentifier("remote_models.row.\(config.uniqueKey)")
+    }
+}
+
+/// spec §3 remote_model.row.badge：listIconBlockSize 圆角方块 + 白色首字母 + 品牌底色
+/// （deepseek→vibrantBlue / moonshot|kimi→vibrantPurple(#4F378B) / openai→vibrantGreen /
+/// anthropic→#D97757 / 其他→#938F99；色值以 §3 remote_model 为准，与 §3c 添加页色板为 spec 级差异）。
+/// 字母规则沿用 §3c ProviderBrandBadge（Kimi=M、TokenHub=T，余取 displayName 首字母），与添加流两页观感一致。
+private struct RemoteModelBadge: View {
+    let providerId: String
+    let displayName: String
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: SettingsTokens.listIconBlockRadius, style: .continuous)
+                .fill(brandColor)
+            Text(letter)
+                .font(.system(size: AppTypography.bodyMedium.size, weight: AppTypography.WeightOverride.semibold))
+                .foregroundColor(AppColors.iconOnVibrant)
+        }
+        .frame(width: SettingsTokens.listIconBlockSize, height: SettingsTokens.listIconBlockSize)
+    }
+
+    private var letter: String {
+        switch providerId {
+        case "kimi-official": return "M"
+        case "tencent-tokenhub": return "T"
+        default: return String(displayName.prefix(1))
+        }
+    }
+
+    private var brandColor: Color {
+        switch providerId {
+        case "deepseek-official": return AppColors.vibrantBlue
+        case "kimi-official": return AppColors.vibrantPurple
+        case "openai-official": return AppColors.vibrantGreen
+        case "anthropic-official": return Color(hex: "FFD97757")
+        default: return Color(hex: "FF938F99")
+        }
+    }
+}
+
+// MARK: - Assistant Personality（spec §3 remote_model.assistant_persona）
+
+private struct PersonaOption {
+    let value: String
+    let label: String
+    let desc: String
+}
+
+/// 助手性格单选 chips（SettingsM3Section 带组标题）+ 选中项描述脚注。
+/// 持久化 @AppStorage("assistant_persona") = shared AssistantPersona 枚举名
+/// （DEFAULT/WARM/LIVELY/CONCISE），ChatViewModel 经 UserDefaults 同键消费。
+private struct AssistantPersonaSection: View {
+    @AppStorage("assistant_persona") private var persona: String = "DEFAULT"
+    @Environment(\.colorScheme) private var cs
+
+    private var options: [PersonaOption] {
+        [
+            PersonaOption(value: "DEFAULT", label: L("Default"), desc: L("Balanced, neutral standard replies")),
+            PersonaOption(value: "WARM", label: L("Warm & Caring"), desc: L("Empathizes first, encouraging and supportive")),
+            PersonaOption(value: "LIVELY", label: L("Lively & Playful"), desc: L("Relaxed and fun, with light emoji use")),
+            PersonaOption(value: "CONCISE", label: L("Crisp & Direct"), desc: L("Straight to conclusions, minimal pleasantries")),
+        ]
+    }
+
+    var body: some View {
+        SettingsM3Section(title: L("Assistant Personality")) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                FlowLayout(spacing: Spacing.sm) {
+                    ForEach(options, id: \.value) { option in
+                        SettingsM3Chip(label: option.label, isSelected: persona == option.value) {
+                            persona = option.value
+                        }
+                        .accessibilityIdentifier("assistant_persona.chip.\(option.value)")
+                    }
+                }
+                Text(selectedDesc)
+                    .font(AppTypography.bodySmall.font)
+                    .foregroundColor(appScheme(cs).onSurfaceVariant)
+                    .lineLimit(2)
             }
         }
-        .onAppear { apiKey = initialApiKey }
+    }
+
+    private var selectedDesc: String {
+        options.first { $0.value == persona }?.desc ?? options[0].desc
+    }
+}
+
+// MARK: - ARGB hex 色构造（与 DesignTokens.swift/AddRemoteProviderView.swift 同款 file-private 扩展）
+
+private extension Color {
+    init(hex: String) {
+        let scanner = Scanner(string: hex)
+        var hexNumber: UInt64 = 0
+        scanner.scanHexInt64(&hexNumber)
+        let a = Double((hexNumber & 0xFF00_0000) >> 24) / 255
+        let r = Double((hexNumber & 0x00FF_0000) >> 16) / 255
+        let g = Double((hexNumber & 0x0000_FF00) >> 8) / 255
+        let b = Double(hexNumber & 0x0000_00FF) / 255
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
     }
 }
 

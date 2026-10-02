@@ -71,11 +71,12 @@ final class ModelConfigStore: ObservableObject {
         applyToOrchestrator()
     }
 
-    /// 删除模型
+    /// 删除模型（删的是当前选中项则自动改选下一个 isConfigured，spec §3 remote_model action_sheet）
     func remove(uniqueKey: String) {
+        // selectedModelId 存 modelId，而 uniqueKey = providerId:modelId（含前缀不可直比），按删除项 modelId 匹配
+        let removedModelId = configs.first { $0.uniqueKey == uniqueKey }?.modelId
         configs.removeAll { $0.uniqueKey == uniqueKey }
-        // 如果删的是选中的，回退到第一个已配置的，否则默认
-        if selectedModelId == uniqueKey {
+        if let removedModelId, removedModelId == selectedModelId {
             selectedModelId = configs.first(where: { $0.isConfigured })?.modelId ?? "deepseek-v4-flash"
         }
         save()

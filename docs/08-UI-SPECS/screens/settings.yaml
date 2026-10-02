@@ -1,10 +1,13 @@
 # ============================================================================
 # 设置屏完整产品规格书（Settings Screen Spec）
 # ============================================================================
-# 基准端：Android SettingsScreen.kt (1319行) + SettingsBaseComponents.kt +
-#        SettingsAiAgent.kt + SettingsServerAuth.kt + DataPrivacyScreen.kt
+# 基准端：Android SettingsScreen.kt (2103行，2026-10-02 口径) + SettingsBaseComponents.kt +
+#        SettingsAiAgent.kt + SettingsServerAuth.kt + DataPrivacyScreen.kt + ReportIssueEntry.kt
 # 用途：iOS 重做的唯一输入，不读 Android 源码
 # 范围：iOS 当前阶段可实现的设置项（Android 专属项如 MIUI/电池优化/无障碍 标为 not_applicable）
+# 2026-10-02 追齐批：主菜单补 report_issue 行；§3 重构为 remote_model/local_model/sandbox
+# 三页现行 spec（旧 ai_agent 聚合页拆分）；developer 页五行常显 + TAG OpenCL 组 +
+# 日志管理行式弹层；data_privacy 补备份恢复/清访客操作行。
 
 # ============================================================================
 # 1. 总体结构
@@ -51,7 +54,7 @@ main_menu:
   list_sections:
     - id: personalization                          # 个性化
       rows:
-        - { id: theme,    icon: dark_mode, icon_block: vibrantOrange, title: "Theme",    value: current_selection, click: theme_choice_dialog }     # 主题模式：弹层单选 system/light/dark
+        - { id: theme,    icon: dark_mode, icon_block: vibrantOrange, title: "Theme Mode", value: current_selection, click: theme_choice_dialog }     # 主题模式 theme_mode：弹层单选 system/light/dark
         - { id: language, icon: language,  icon_block: vibrantBlue,   title: "Language", value: current_selection, click: language_choice_dialog }  # 语言：弹层单选 system/English/中文/繁體中文/Español/Français
     - id: features                                 # 功能
       rows:
@@ -72,7 +75,18 @@ main_menu:
     - id: others                                   # 其他
       rows:
         - { id: data_privacy, icon: privacy_tip, icon_block: vibrantBlue,  title: "Data & privacy",     target: data_privacy }
+        # 上报问题（2026-09-26 自 Chat 顶栏迁入，ReportIssueEntry 自包含：行+对话框+提交；行题=对话框题=report_issue_title）
+        - { id: report_issue, icon: bug_report,  icon_block: vibrantPink,  title: "Report a problem",  click: report_issue_dialog }
         - { id: developer,    icon: terminal,    icon_block: warningAmber, title: "Developer Options",  target: developer, visible_when: developer_options_unlocked }
+
+  report_issue_dialog:                            # 对话框（AlertDialog 等价物）
+    fields:
+      category: { type: chips, options: [crash, bug, ai, other], default: other, keys: "report_issue_category_*" }
+      title:    { type: text_field, single_line: true, required: true, key: report_issue_title_label }
+      description: { type: text_field, lines: "3-6", key: report_issue_description_label }
+    guest_rule: "未登录（serverToken 空）→ 顶部错误文案 report_issue_guest_not_allowed + 输入禁用，提交按钮置灰；title 空白时提交按钮也置灰"
+    submit: "IssueReportClient.submit(token, category, title, description) = POST {baseUrl}/v1/report-issue（baseUrl=https://api.polang.net），header X-App-Token=token + X-Platform=ios，body {category,title,description}；成功 resp.issueId → toast report_issue_success(issueId) 并关窗；失败 resp.error → toast report_issue_error；提交中按钮文案 report_issue_submit + …且禁用取消"
+    ios_note: "iOS 用 URLSession 实现等价 client（超时 connect 15s/read 30s）；无后端凭证时整行仍渲染但提交被 guest_rule 拦截"
 
   # ⑥ 版本页脚（原 About 卡收敛为页脚）
   version_footer:
@@ -80,77 +94,134 @@ main_menu:
     hidden_interaction: "连点 7 次解锁开发者选项"
 
 # ============================================================================
-# 3. AI Assistant 分类页（ai_agent）
+# 3. 远程模型分类页（remote_model，2026-10-02 重构：旧 ai_agent 聚合页拆分）
 # ============================================================================
-ai_agent:
+# Android 现状（SettingsScreen.kt:535-552）：RemoteModelsListSection + 助手性格区。
+# 旧 ai_agent 聚合页已拆：语音组 → sandbox 页组3；静默回收 → sandbox 页组2；
+# auto_execute_plans → sandbox 页组1；persona 留本页。
+remote_model:
   sections:
-    - title: "AI Agent"
-      desc: "AI assistant configuration"
-      items:
-        - auto_execute_plans:
-            type: switch
-            title: "Auto Execute Plans"
-            default: true
-            desc: "Automatically execute plans without confirmation"
-        - agent_mode:
-            type: chips
-            title: "Mode"
-            options: [remote]
-            default: remote
-        - silent_trash:                 # 「删除不再询问」2026-09-12 新增（37a9e4c6d；Android 位于 agent_gallery_access 权限行之后）
-            type: switch
-            title: "Delete Without Asking"        # settings_silent_trash_title
-            default: false
-            show_when: "android_api >= 31"        # canManageMedia 检查口为 API 31+ 新增，低版本不显示该行
-            summary:
-              granted: "Deleting and moving to Trash no longer shows a system confirmation."   # settings_silent_trash_summary_granted
-              denied: "Allow media management in system settings to enable silent deletion."   # settings_silent_trash_summary_denied
-            behavior: "开 + 持 MANAGE_MEDIA → 上滑删除/整理删除直写 IS_TRASHED 静默回收（零系统弹框，失败子集回落 token 通路）；开关照存，未授权开启时引导跳 ACTION_REQUEST_MANAGE_MEDIA 系统授权页；权限状态 ON_RESUME 刷新"
-            ios: not_applicable          # iOS deleteAssets 系统强制确认框，无静默等价（gallery-grid.yaml §16b/§26 台账）
+    - remote_models_list:                    # RemoteModelsListSection（行式，无组标题）
+        row:                                 # RemoteModelRow
+          height: listRowHeight
+          badge:                             # 供应商字母徽章（品牌色）
+            size: listIconBlockSize
+            corner: "圆角方块"
+            letter: "白色首字母"
+            colors: "deepseek→vibrantBlue / moonshot|kimi→#4F378B / openai→vibrantGreen / anthropic→#D97757 / 其他→#938F99"
+          text: "双行：行1 = 模型名 + 可选「使用中」胶囊（selected 时，primary 底 onPrimary 小胶囊）；行2 = 供应商·已配置（onSurfaceVariant 12sp）"
+          trailing: "⋯ 图标 → 动作弹层"
+          tap: "设为当前模型（onSelectedModelChange(uniqueKey)）"
+        data: "shared RemoteModelConfigs.fromJson(configsJson)，filter isConfigured；SSOT RemoteModelConfig.PROVIDERS"
+        action_sheet:                        # ⋯ → SettingsOptionSheetShell（标题=模型名，副题=供应商 displayName）
+          options:
+            - { label: remote_model_set_current, selected_when: "uniqueKey == selectedModelId" }
+            - { label: delete, behavior: "removeConfig；删的是当前选中项则自动改选下一个 isConfigured" }
+        add_row:                             # 组尾「添加模型」行（有配置项时上方有分隔线）
+          icon: "白色 + 于 vibrantGreen 圆形块"
+          title: add_model
+          target: add_remote_provider
+    - assistant_persona:                     # 助手性格（SettingsSection 带组标题）
+        type: option_chips                   # 单选 chips（FlowLayout capsule），maxLines=2
+        title: "Assistant Personality"
+        options: [default, warm_caring, lively_playful, crisp_direct]   # 展示序；持久化值 = shared AssistantPersona 枚举名 DEFAULT/WARM/LIVELY/CONCISE（SSOT shared/.../config/AssistantPersona.kt，ChatViewModel 按此消费）
+        option_labels: "assistant_persona_default/warm/lively/concise + _desc（labels+描述键）"
+        default: default
+        persistence:
+          android: "DataStore assistant_persona (enum name)"
+          ios: "@AppStorage(\"assistant_persona\")（已存在，ChatViewModel:343 消费）"
+        effect: "chat system prompt 尾段注入性格段（五语按界面语言选段），下一条消息生效；default 不注入"
+        desc_per_option: true
+        ios_note: "⚠️ 2026-10-02 前 iOS UI 不可达（孤儿 AiAgentSettingsView）而 ChatViewModel 已消费（恒 default）——本批次落地页面即接通"
 
-    - title: "Remote Models"           # 远程推理
-      items:
-        - remote_models_section:
-            type: custom                # RemoteModelsListSection（iOS 对等 ModelCenterView）；
-                                        # 供应商清单 SSOT 在 shared RemoteModelConfig.PROVIDERS
-                                        # （tokenhub/kimi/deepseek/openai/anthropic）
-                                        # 2026-08-21：组尾「添加模型」行改为导航 add_remote_provider 页
-                                        # （原 AddProviderModelDialog 弹窗流程下线）
-            add_entry_target: add_remote_provider
-        - assistant_persona:            # 2026-08-22 新增
-            type: option_chips          # 单选 chips（Android CompactOptionChips / iOS FlowLayout + capsule Button），maxLines=2
-            title: "Assistant Personality"  # 助手性格
-            options: [default, warm_caring, lively_playful, crisp_direct]
-            default: default
-            persistence:
-              android: "DataStore assistant_persona (enum name)"
-              ios: "@AppStorage(\"assistant_persona\")"
-            effect: "chat system prompt 尾段注入性格段（五语按界面语言选段），下一条消息生效；default 不注入"
-            desc_per_option: true       # 选中项下方显示一句话描述
+# ============================================================================
+# 3b. 本地模型分类页（local_model，2026-10-02 补 spec；Android :554-704）
+# ============================================================================
+local_model:
+  sections:
+    - id: detection_models                   # 组1 检测模型
+      rows:
+        - { id: roi,      icon: face,                icon_block: vibrantBlue,   title: stage_roi_title,      value: "当前模型名", click: roi_stage_dialog }
+        - { id: landmark, icon: center_focus_strong, icon_block: vibrantPink,   title: stage_landmark_title,  value: "当前模型名", click: landmark_stage_dialog }
+        - { id: tagger,   icon: sell,                icon_block: vibrantOrange, title: tagging_model_label,   value: "auto→tag_model_auto / 否则模型名", click: tagger_choice_dialog }
+    - id: detection_strategy                 # 组2 检测策略
+      rows:
+        - { id: landmark_mode, type: switch, icon: speed, icon_block: vibrantBlue, title: face_landmark_mode }
+        - { id: adaptive_interval, type: switch, icon: timer, icon_block: vibrantBlue, title: adaptive_face_detect_interval }
+        - { id: interval_profile, icon: tune, icon_block: vibrantBlue, title: face_detect_profile_title, value: "当前档位", click: profile_choice_dialog, visible_when: "adaptive_interval == on" }
+    - id: voice                              # 组3 语音（VoiceModelRow）
+      rows:
+        - { id: asr, icon: graphic_eq, icon_block: vibrantGreen, title: local_asr_model, value: "当前模型名", behavior: "已下载模型单选；无模型 → 跳模型中心 Audio 分类" }
+        - { id: kws, icon: mic,        icon_block: vibrantGreen, title: local_kws_model, value: "当前模型名", behavior: "同 asr" }
+  dialogs:
+    stage_config_dialog:                     # ROI/关键点共用（StageConfigDialog）
+      content: "模型单选（未下载项点选即触发下载，带下载态）+ 设备偏好双单选（CPU/GPU 等）"
+      ios_note: "iOS 检测管线固定（MNN CPU 单管线，settings.yaml 既有台账）→ 设备偏好组 iOS 省略；模型单选仅保留 iOS 实有模型项，无等价项整行灰显注 Android only"
+    tagger_choice_dialog: { type: single_choice, options: [tag_model_auto, Florence-2, Qwen3-VL] }
+    profile_choice_dialog: { type: single_choice, options: [face_detect_profile_conservative, face_detect_profile_balanced, face_detect_profile_aggressive] }
+  ios_note: "iOS 无双检测模型可选/无语音引擎（设-3 已登记）→ 组1 行 value 显示当前固定管线、弹层仅单选项或行灰显；组3 整组灰显注「后续版本」。结构（三组行式）必须先对齐，能力缺口用灰显/N-A 注记"
 
-    - title: "Voice Control"            # 语音控制（2026-08-19：语音全面默认关闭，本组为唯一开启入口）
-      items:
-        - voice_mode:
-            type: chips
-            title: "Voice Command"
-            options: [disabled, push_to_talk, wake_word]
-            default: disabled           # 门控 Chat 页 / Agent 共享面板输入框语音按钮：≠disabled 才显示
-        - voice_entry:
-            type: switch
-            title: "Voice Control Entry"  # 相机页语音控制悬浮钮（RecordVoiceOver）
-            default: false
-        - ai_chat_entry:                # 2026-08-19 新增
-            type: switch
-            title: "Camera AI Chat Entry" # 相机页 AI 对话悬浮钮（KeyboardVoice 图标）
-            default: false
-        - asr_model:                   # 仅 mode≠disabled 时显示
-            type: chips
-            show_when: "voice_mode != disabled"
-            options: "downloaded ASR models or fallback text"
-        - kws_model:
-            type: chips
-            show_when: "voice_mode == wake_word"
-            options: "downloaded KWS models or fallback text"
+# ============================================================================
+# 3e. 沙盒与权限分类页（sandbox，2026-10-02 补 spec；Android :710-873）
+# ============================================================================
+sandbox:
+  sections:
+    - id: agent_execution                    # 组1 智能体执行
+      rows:
+        - { id: auto_execute_plans, type: switch, icon: psychology, icon_block: vibrantPurple, title: ai_agent_auto_execute_plans, default: true }
+        - { id: js_engine,          type: switch, icon: code,       icon_block: vibrantPurple, title: js_engine_execution, default: true }
+    - id: device_access                      # 组2 设备访问
+      rows:
+        - { id: agent_camera,  type: switch, icon: camera_alt,     icon_block: vibrantBlue, title: agent_camera_access }
+        - { id: camera_system, icon: lock, icon_block: vibrantBlue, title: camera_permission_system, value: permission_system_value, behavior: "跳系统设置 App 页（iOS openSettingsURLString）" }
+        - { id: agent_gallery, type: switch, icon: photo_library,  icon_block: vibrantBlue, title: agent_gallery_access }
+        - { id: gallery_system, icon: lock, icon_block: vibrantBlue, title: gallery_permission_system, value: permission_system_value, behavior: "同上" }
+        - id: silent_trash                   # 「删除不再询问」API 31+（MANAGE_MEDIA）
+          type: switch
+          icon: delete_sweep
+          icon_block: vibrantBlue
+          title: settings_silent_trash_title
+          summary: { granted: settings_silent_trash_summary_granted, denied: settings_silent_trash_summary_denied }
+          behavior: "开+持权 → 静默回收（失败回落 token 通路）；未授权开启引导跳系统授权页；权限态 ON_RESUME 刷新"
+          ios: not_applicable                # iOS 系统强制删除确认，无静默等价（gallery-grid.yaml §16b/§26 台账）→ iOS 整行省略
+    - id: voice                              # 组3 语音
+      rows:
+        - { id: voice_mode, icon: mic, icon_block: vibrantGreen, title: voice_control, value: "当前模式", click: voice_mode_dialog }
+        - { id: voice_entry, type: switch, icon: keyboard_voice, icon_block: vibrantGreen, title: voice_entry_enabled, default: false }
+        - { id: ai_chat_entry, type: switch, icon: smart_toy, icon_block: vibrantGreen, title: ai_chat_entry_enabled, default: false }
+  dialogs:
+    voice_mode_dialog: { type: single_choice, options: [voice_command_mode_disabled, voice_command_mode_push_to_talk, voice_command_mode_wake_word], default: disabled }
+  ios_note: "iOS 无语音引擎（设-3 登记）→ 组3 整组灰显注「后续版本」；voice_mode 行不弹层"
+
+# ============================================================================
+# 3f. 通信通道分类页（channels，2026-10-02 补 spec；Android CommunicationChannelScreen.kt 全文件）
+# ============================================================================
+channels:
+  navigation_title: "Communication Channel"   # communication_channel（非 Channels）
+  sections:
+    - id: channel_selection                  # 组1 通道选择（channel_selection）
+      type: option_chips                   # 单选 chips：feishu / telegram / none（不启用）
+      persistence: "channel_type（feishu/telegram/none）"
+      status_row:                          # chips 下方状态行（bodySmall onSurfaceVariant）
+        rules: "凭据不齐 → channel_status_not_configured；已连接 → channel_status_connected；否则 → channel_status_disconnected"
+        note: "isConnected 为激活驱动快照；isConfigured = 当前选中通道凭据齐全（飞书 appId+secret / TG token+chatId）"
+    - id: feishu                             # 组2 飞书（双常驻段之一：不随选中显隐）
+      title: channel_feishu
+      desc: feishu_channel_desc
+      fields:
+        - { id: feishu_app_id, type: text_input, key: feishu_app_id, placeholder: feishu_app_id_placeholder }
+        - { id: feishu_app_secret, type: text_input, key: feishu_app_secret, placeholder: feishu_app_secret_placeholder, password: true }
+    - id: telegram                           # 组3 Telegram（双常驻段之一）
+      title: channel_telegram
+      desc: telegram_channel_desc
+      fields:
+        - { id: telegram_bot_token, type: text_input, key: telegram_bot_token, placeholder: telegram_bot_token_placeholder, password: true }
+        - { id: telegram_chat_id, type: text_input, key: telegram_chat_id, placeholder: telegram_chat_id_placeholder }
+      footnotes:
+        - { key: telegram_bot_token_desc, style: "bodySmall onSurfaceVariant 0.7" }
+        - { key: telegram_chat_id_desc, style: "bodySmall onSurfaceVariant 0.7" }
+        - { key: telegram_security_note, style: "bodySmall error" }
+  ios_note: "iOS 现状（S3d 前）：段随 channel_type 条件显隐、无状态行、标题 Channels——均按本 spec 对齐；isConnected 快照 iOS 若无激活驱动则以 isConfigured 二态退化（not_configured/disconnected），登记台账"
 
 # ============================================================================
 # 3c. 添加远程模型页（add_remote_provider，2026-08-21 新增：弹窗改页面）
@@ -289,7 +360,7 @@ camera:
             leading_icon: restart_alt
             confirm_dialog: true                          # AlertDialog 二次确认（OK/Cancel）
             action: resetCameraMemoryState                # 经 cameraMemoryStateFlow 即时水合生效
-            note: "iOS 对等实现待定（iOS 暂无相机状态记忆持久化）"
+            ios_state: implemented                        # 2026-10-02 S3a：iOS 已实现——重置=删 CameraPreviewView UserDefaults 水合键（CameraSettingsView），下次进相机按出厂默认水合
 
 # ============================================================================
 # 5. 数据与隐私（data_privacy）
@@ -310,6 +381,9 @@ data_privacy:
       body: "Only text and metadata are sent to remote LLMs for inference. No photos or videos leave your device."
     - title: "Contact"
       body: "budao.gs@gmail.com"
+  rows:                                        # 2026-10-02 补：正文段后的操作行（Android 已并入）
+    - { id: backup_restore, icon: backup, title: "备份与恢复", behavior: "Android → BackupRestoreActivity；iOS Coming Soon 占位（已登记）" }
+    - { id: clear_guest_data, icon: delete, title: "清除访客数据", behavior: "确认弹窗 → clearGuestData；Android 账号页 Danger Zone 亦有同入口" }
   link:
     text: "View Full Privacy Policy"
     url: "https://polang.net/privacy-policy/"
@@ -332,36 +406,43 @@ about:
 developer:
   navigation_title: "Developer Options"
   sections:
-    - title: "Camera Preview Debug"             # 相机预览调试
+    - title: "Camera Preview Debug"             # 相机预览调试（2026-10-02 更新：设计稿 111:129 五行常显，不随 debug 开关折叠）
       desc: "Recommended for debugging only."
+      row_style: "行式图标块（warningAmber），非卡内堆叠"
       items:
         - debug:
             type: switch
-            key: debug_ui_enabled               # 总开关，关闭时下列 4 项隐藏
+            key: debug_ui_enabled               # 总开关
             default: false
         - show_camera_info:
             type: switch
             key: show_camera_info_in_preview
             default: true
-            show_when: "debug == on"
         - show_face_debug:
             type: switch
             key: show_face_debug_overlay
             default: true
-            show_when: "debug == on"
         - show_log_overlay:
             type: switch
             key: show_log_overlay
             default: true
-            show_when: "debug == on"
         - shader_debug_mode:
-            type: chips                          # 单选 chips，最多 2 行
+            type: row_value_dialog               # 行+右值 → 单选弹层（非 chips）
             key: debug_shader_mode               # Int 0-5
             title: "Shader Debug Mode"
             options: [Normal, Skin Mask, Warp Offset, BigEye Radius, ThinFace Radius, All Warp]
             default: 0                           # Normal
-            show_when: "debug == on"
             note: "persistence-only：双端预览均不消费——Android CameraScreen 硬编码 0（避免调试模式蓝屏），iOS Metal shader 无 uDebugMode 分支；行下加注脚说明"
+
+    - title: "TAG Generation Engine"            # TAG 生成引擎（2026-10-01 自扫描页迁入，Android :1090）
+      items:
+        - tag_gen_use_opencl:
+            type: switch
+            key: tag_gen_use_opencl
+            title: tag_gen_use_opencl_title
+            subtitle: tag_gen_use_opencl_subtitle
+            default: true
+            ios: "persistence-only 或整行省略——iOS 推理走 MNN CPU/ORT 无 OpenCL 概念；建议省略并登记台账"
 
     - title: "Diagnostics & Logs"               # 诊断与日志
       items:
@@ -371,9 +452,10 @@ developer:
             desc: "View LLM inference, tool call and JS run logs"
             ios_state: implemented               # → DiagnosticLogView（三层日志查看器，见 §6.6）
         - log_modules:
-            type: chips_multi                    # 多选 chips，最多 3 行（对标 Android LogModuleConfigSection）
+            type: row_value_sheet                # 2026-10-02 更新：行+右值(log_modules_all) → 底部弹层多选（非 chips）
             title: "Log Modules"
             key: log_module_config               # UserDefaults JSON：{"enabledModules":[...]}，与 Android 同构
+            sheet: "SettingsOptionSheetShell（标题 log_management + 副题 log_modules_dialog_subtitle）内列 SettingsOptionRow 多选"
             options: [Face Detection, Rendering, Beauty, Agent, Camera, Download, Settings, Orchestrator, Chat, Semantic Search]
             default_enabled: [Agent, Orchestrator, Download, Settings, Chat, Semantic Search]  # FACE_DETECTION/RENDERING/BEAUTY/CAMERA 默认关
             note: "门控 shared Kotlin 侧 Logger 输出（IosModuleGatedLogger，tag 前缀最长匹配，未分类默认放行）；iOS Swift 侧 print 不经此门控"
@@ -515,3 +597,17 @@ allowed_differences:
   - "Log Modules 门控范围：双端均只门控 shared/平台 Logger 通道；iOS Swift 侧 print 不经门控"
   - "语音控制（iOS 暂无 sherpa-onnx；2026-08-19 起 Android 全部语音入口默认关闭，iOS Chat 语音占位按钮同步移除，voice 三组开关为 Android only 平台差异）"
   - "相册 TAG 控制页（iOS Phase 6.1 未落地）"
+
+  # ── 2026-10-02 设置域追齐批（S3a~S3d）登记 ──
+  - "上报问题：iOS IssueReportClient 超时以 request 级 30s 近似（URLSession 无独立 connect 15s API）；提交反馈为页内临时 overlay 胶囊（项目无共享 toast 构件）；表单弹层取 sheet（Android AlertDialog）"
+  - "单选弹层形态：主题/语言/检测引擎/打标模型/间隔档位/模型动作统一取 confirmationDialog（Android AlertDialog 单选/动作弹层的平台原生等价）"
+  - "版本页脚：version_info 键未入 iOS 文案源，页脚维持 iOS 既有 PoLang v{version} 格式"
+  - "远程模型列表空态：复用 iOS 既有键（Default remote model has time limits / Add your own model…），与 Android remote_model_default_limit_title/desc 语义同措辞异"
+  - "远程模型「In use」判定为 modelId 粒度（selected_model_id 存裸 modelId，既有存储语义）；跨供应商同名模型会同显，uniqueKey 粒度改造待评估"
+  - "远程模型徽章色板：列表页（§3 remote_model）与添加页（§3c）同供应商品牌色定义不同（deepseek/openai），spec 级差异待统一"
+  - "本地模型页组题 Detection Models/Detection Strategy 无 Android 文案键，iOS 五语为编译值，建议 Android 补键后回灌；模型专名（RetinaFace/MNN 2d106/MediaPipe 468pt/Florence-2）为同文展示键"
+  - "检测策略开关（face_landmark_mode/adaptive_face_detection_interval/face_detect_interval_profile）与打标选择（tagger_model_key）iOS persistence-only（检测链路无消费端），行下脚注注明；js_engine_enabled 默认值对齐 spec true"
+  - "沙盒页系统权限态用彩色状态点（绿/琥珀/红/灰）+ 跳系统设置行，无 Android 授权态五语文字键；voice_command_mode 不再由 iOS 设置页持有"
+  - "通信通道：iOS 无 IM 激活连接驱动，状态行二态退化（not_configured/disconnected，connected 不可达），接通通道引擎后补三态"
+  - "开发者页：TAG Generation Engine 组（tag_gen_use_opencl）iOS 整组省略（无 OpenCL 概念）；账号页 quota 剩余文案采用 auth_quota_remaining 键（spec 字面量无键）；部分账号/开发者文案 iOS 取 spec 字面量与 Android 键值仅 en 大小写差"
+  - "死代码清理：AiAgentSettingsView/CameraBeautySettingsView/AboutView/AddModelSheet/EditApiKeySheet/SettingsM3ToggleRow 已删（git 历史可恢复）"
