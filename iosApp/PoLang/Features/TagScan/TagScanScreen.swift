@@ -107,6 +107,14 @@ struct TagScanScreen: View {
         }
         .background(s.background.ignoresSafeArea())
         .onAppear { vm.refreshStats() }
+        // 对齐 Android TagGenerationControlScreen 的 1s 轮询（LaunchedEffect while(true) refreshStats）：
+        // 扫描中成果格/仪表环/阶段行实时更新；页面离开组合（切 tab/关浮层）自动取消。
+        .task {
+            while !Task.isCancelled {
+                vm.refreshStats()
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
         .sheet(item: $activeStageSheet) { stage in
             StageActionSheet(
                 stage: stage,

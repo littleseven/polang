@@ -72,10 +72,21 @@ final class TagScanViewModel: ObservableObject {
 
     // MARK: - 数据源
 
+    /// 刷新统计。对齐 Android `TagGenerationControlScreen.refreshStats`（Room 查询走 IO 线程）：
+    /// SQLite 统计查询离主线程，避免扫描高峰写库时主线程 `queue.sync` 等待串行队列造成卡顿；
+    /// 相等性门控——`@Published` 逐次赋值即触发刷新，1s 轮询场景下值未变不重渲染。
     func refreshStats() {
-        stats = TagDatabase.shared.scanStats()
-        hasUnfinishedSession = orchestrator.hasUnfinishedSession
-        if progress == nil, let p = orchestrator.currentProgress() { progress = p }
+        Task.detached(priority: .utility) { [weak self] in
+            let newStats = TagDatabase.shared.scanStats()
+            let unfinished = TagScanOrchestrator.shared.hasUnfinishedSession
+            let current = TagScanOrchestrator.shared.currentProgress()
+            await MainActor.run {
+                guard let self else { return }
+                if self.stats != newStats { self.stats = newStats }
+                if self.hasUnfinishedSession != unfinished { self.hasUnfinishedSession = unfinished }
+                if self.progress == nil, let p = current { self.progress = p }
+            }
+        }
     }
 
     /// 恢复上次未完成 session（进程死亡对账 → interrupted_card「从中断处继续」）。

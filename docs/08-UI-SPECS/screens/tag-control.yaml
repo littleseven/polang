@@ -132,6 +132,13 @@ tag_control:
     dial_comet: "见 ring_hero.dial.running_effect（1.5s LinearEasing）"
     engine: "全部 Compose infiniteTransition；iOS 以等价 TimelineView 对齐节拍(1.1s/1.5s)"
 
+  # ── 数据刷新节奏（实时性契约，2026-10-02 立法）──
+  data_refresh:
+    session_progress: "会话 x/y 与 ETA 走事件流逐任务推送（Android TagGenerationService.sessionProgress StateFlow / iOS TagScanStatusCenter.events 多播）"
+    stats_poll: "页面在组合期间每 1s 轮询刷新库级统计（成果格六格/仪表环口径/阶段行计数）——Android=LaunchedEffect while(true) refreshStats+delay(1000)，iOS=TagScanScreen .task 轮询 vm.refreshStats()；离组合即取消，空闲也轮（覆盖 Pass2 聚类/附属打分等少事件阶段）"
+    terminal_refresh: "会话终态（COMPLETED/CANCELLED/模型缺失）再全量 refreshStats 一次收口"
+    io_safety: "统计查询必须离主线程（Android Room IO 调度；iOS Task.detached + MainActor 回填），且相等性门控避免每秒空转重渲染"
+
   # ── v4 删除清单（相对 v3）──
   removed_components:
     - "ScanStatusStrip 钉住状态条（波纹点+阶段名条）→ progBar+top_bar 计数替代"
