@@ -156,6 +156,7 @@ git tag v1.0.37 && git push origin v1.0.37                # tag 触发 release.y
 | 约束 | 说明 |
 |------|------|
 | versionCode 严格递增 | 同 code 重传报错；冲突可选 GPP `ResolutionStrategy.AUTO` 自动抬 |
+| REQUEST_INSTALL_PACKAGES 禁入 Play 产物 | OTA 自更新权限仅 APK 直装渠道保留（Play 渠道 OTA 本就禁用）；AAB 构建走 `build.sh aab`（`-Polang.play.channel=true`）自动剥离，edit commit 报 400 "hasn't been declared in Play Console" 即中招（2026-10-02 v1.0.45 实录） |
 | 文案字符上限 | title 30 / short 80 / full 4000 / release notes 500（脚本预检 notes 长度） |
 | `userFraction=1.0` 非法 | 灰度收尾改 `--status completed` |
 | edit 并发冲突 | Console 手动改动会使未 commit 的 API 事务失效；发布窗口内不要在 Console 改文案 |

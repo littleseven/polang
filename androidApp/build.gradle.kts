@@ -356,3 +356,44 @@ tasks.register<Delete>("cleanKspCaches") {
 tasks.named<Delete>("clean").configure {
     dependsOn("cleanKspCaches")
 }
+
+// ---------------------------------------------------------------------------
+// Play 渠道产物剥离 REQUEST_INSTALL_PACKAGES（2026-10-02）
+//
+// OTA 自更新（59ceaffec）为官网 APK 直装渠道引入该权限，但 Google Play 政策要求
+// Console 声明且禁止借其绕过 Play 分发自更新；App 侧 Play 渠道本就整体禁用自更新
+// （AppUpdateChecker.isSelfUpdateAllowed：installer == com.android.vending 短路），
+// 因此 Play 产物剥离该权限零行为影响。
+// 渠道约定：AAB = Play 渠道产物（build.sh aab 传 -Polang.play.channel=true，剥离）；
+//           APK = 直装渠道产物（默认保留，OTA 自更新可用）。
+// 属性同时注册为任务输入：切换时 manifest 处理必然重跑，防 UP-TO-DATE 吞掉剥离。
+// ---------------------------------------------------------------------------
+val playChannelBuild = providers.gradleProperty("polang.play.channel").map(String::toBoolean).orElse(false)
+// 挂 ProcessApplicationManifest doLast（release 变体）：manifest 落盘后立即按磁盘目录剥离，
+// 打包任务随后消费。属性注册为任务输入：开关切换必然重跑 manifest 处理，防 UP-TO-DATE 吞剥离。
+tasks.withType<com.android.build.gradle.tasks.ProcessApplicationManifest>().configureEach {
+    if (!name.contains("Release", ignoreCase = true)) return@configureEach
+    inputs.property("playChannel", playChannelBuild)
+    doLast {
+        if (!playChannelBuild.get()) return@doLast
+        val manifestDirs =
+            listOf(
+                layout.buildDirectory.dir("intermediates/merged_manifests/release").get().asFile,
+                layout.buildDirectory.dir("intermediates/packaged_manifests/release").get().asFile,
+            )
+        for (dir in manifestDirs) {
+            val files = dir.walkTopDown().filter { it.isFile && it.name == "AndroidManifest.xml" }
+            for (mf in files) {
+                val text = mf.readText()
+                val stripped =
+                    text.lineSequence()
+                        .filterNot { it.contains("android.permission.REQUEST_INSTALL_PACKAGES") }
+                        .joinToString("\n")
+                if (stripped != text) {
+                    mf.writeText(stripped)
+                    logger.lifecycle("PoLang:PlayChannel stripped REQUEST_INSTALL_PACKAGES from " + mf.path)
+                }
+            }
+        }
+    }
+}

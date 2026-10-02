@@ -7,7 +7,7 @@
 #   ./scripts/build.sh debug          # 打 debug 包
 #   ./scripts/build.sh release        # 打 release APK（使用 androidApp/keystore/picme-release.jks）
 #   ./scripts/build.sh release-plain  # 打 release APK 但不混淆（用于调试 release 问题）
-#   ./scripts/build.sh aab            # 打 release AAB（Google Play 上架格式）
+#   ./scripts/build.sh aab            # 打 release AAB（Google Play 上架格式；Play 渠道，自动剥离 REQUEST_INSTALL_PACKAGES）
 #   ./scripts/build.sh aab-plain      # 打 release AAB 但不混淆（用于调试 release 问题）
 #
 # Release 签名配置从环境变量读取（优先 POLANG_*，兼容旧 PICME_*）：
@@ -137,7 +137,7 @@ build_release() {
     # 传递构建类型标记给 Gradle
     local plain_flag=""
     if [ "$plain_mode" = "true" ]; then
-        plain_flag="-Polang.release.plain=true"
+        plain_flag="-Ppolang.release.plain=true"
         log_info "开始构建 Release 包（不混淆）..."
     else
         log_info "开始构建 Release 包..."
@@ -203,17 +203,20 @@ build_aab() {
     # 传递构建类型标记给 Gradle
     local plain_flag=""
     if [ "$plain_mode" = "true" ]; then
-        plain_flag="-Polang.release.plain=true"
+        plain_flag="-Ppolang.release.plain=true"
         log_info "开始构建 Release AAB（不混淆）..."
     else
         log_info "开始构建 Release AAB（Google Play 上架格式）..."
     fi
 
+    # AAB = Play 渠道产物：剥离 REQUEST_INSTALL_PACKAGES（Play 政策禁止未声明权限，
+    # 且 Play 渠道 OTA 自更新本就禁用）；APK 直装渠道保留该权限。
     ./gradlew :androidApp:bundleRelease \
         -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
         -Pandroid.injected.signing.store.password="$POLANG_RELEASE_STORE_PASSWORD" \
         -Pandroid.injected.signing.key.alias="$POLANG_RELEASE_KEY_ALIAS" \
         -Pandroid.injected.signing.key.password="$POLANG_RELEASE_KEY_PASSWORD" \
+        -Ppolang.play.channel=true \
         $plain_flag \
         --no-configuration-cache
 
