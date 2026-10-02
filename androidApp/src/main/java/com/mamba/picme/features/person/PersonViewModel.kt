@@ -128,17 +128,30 @@ class PersonViewModel(
         load()
     }
 
-    /** 进入人物页：先对齐 persons 表（清孤儿/修悬空封面/重算 faceCount），再加载。幂等。 */
+    /**
+     * 进入人物页：**先出列表再愈合**（2026-10-02 空白页修复）。
+     * 原序「对齐→聚类维护→load」在大碎簇集（694 人物）上维护耗时分钟级，
+     * 列表被堵死=整页空白。现改为 load() 先渲染，对齐/拆分/合并转后台，
+     * 愈合完成后自动刷新；单飞闸防重复进页叠加跑（维护幂等，中断无害）。
+     */
+    private val maintenanceInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+
     fun reconcileAndLoad() {
+        load()
+        if (!maintenanceInFlight.compareAndSet(false, true)) return
         viewModelScope.launch {
-            personRepository.reconcilePersons()
-            // 聚类维护：拆分（两个不同的人被并成一组）+ 合并（同一人被拆成多组），进人物页即时愈合。
-            // 失败不阻断人物页加载。
-            withContext(Dispatchers.IO) {
-                runCatching { faceClusterEngine.runClusterMaintenance() }
-                    .onFailure { Log.w("PersonViewModel", "runClusterMaintenance failed", it) }
+            try {
+                personRepository.reconcilePersons()
+                // 聚类维护：拆分（两个不同的人被并成一组）+ 合并（同一人被拆成多组）。
+                // 失败不阻断人物页加载。
+                withContext(Dispatchers.IO) {
+                    runCatching { faceClusterEngine.runClusterMaintenance() }
+                        .onFailure { Log.w("PersonViewModel", "runClusterMaintenance failed", it) }
+                }
+                load()
+            } finally {
+                maintenanceInFlight.set(false)
             }
-            load()
         }
     }
 
