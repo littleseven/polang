@@ -4,7 +4,8 @@ import SharedKit
 /// 相册网格页（对齐 Android `GalleryScreen.kt` + `MediaGrid.kt`，量化基准 = dump 1200px/360dp）：
 /// - 自建 48pt `AppTopBar`（去系统 NavigationStack 大标题），操作组对齐 GalleryTopBar：
 ///   模型中心→ModelDownloadCenterView（端侧模型下载中心，对齐 Settings 入口）；搜索→激活 SearchTopBar（防抖 300ms，
-///   MediaSearchEngine 端侧检索）；扫描→TagScanScreen；分组菜单扁平 6 项（对齐 dump 下拉：全部/日期/人脸/人物/风景/地点），
+///   MediaSearchEngine 端侧检索）；扫描→原地 toggle（TagScanOrchestrator 增量扫描，spec scan_toggle）；
+///   分组菜单扁平 6 项（对齐 dump 下拉：全部/日期/人脸/人物/风景/地点），
 ///   NONE/DATE 实做，其余依赖 Phase 6 索引数据灰置。
 /// - 网格：**固定 3 列**（dump 实测 3 列、间距/边距 7px≈2dp；列数固定、格宽 = 屏宽/列数导出）。
 /// - 长按进选择模式（对齐 gallery_longpress dump）：顶栏 morph 为 返回/已选 N 项/全选/分享/删除，
@@ -14,6 +15,7 @@ import SharedKit
 struct GalleryGridView: View {
     @StateObject private var vm: GalleryViewModel
     @StateObject private var permission = GalleryPermissionStore()
+    @Environment(\.colorScheme) private var cs
     /// 全屏大图页：nil = 关闭，否则为初始素材 localIdentifier
     @State private var pagerInitial: String? = nil
     /// 选择模式（gallery_longpress 对齐）
@@ -28,8 +30,8 @@ struct GalleryGridView: View {
     /// 方向守卫：本次手势判为竖向滚动则忽略（防选择模式下滚屏误选竖列）
     @State private var dragIsScrollLike = false
     @State private var showModelCenter = false
-    /// TAG 扫描页（SP-B）：相册顶栏扫描图标进入
-    @State private var showScanScreen = false
+    /// TAG 扫描中信号（spec scan_toggle/scan_progress）：原地 toggle + 顶栏下进度条
+    @ObservedObject private var scanStatus = TagScanStatusCenter.shared
     /// 删除直调 Swift 桥（PHAssetChangeRequest 自带系统确认；成功后观察者驱动网格刷新）
     private let bridge = PhMediaBridge()
 
@@ -64,17 +66,21 @@ struct GalleryGridView: View {
         // 兄弟 Color 忽略 safe area 会把 ZStack 布局区扩展到全屏，连带把 VStack 顶栏拉到 y=0，
         // 顶栏被刘海/灵动岛遮挡。改为 .background 后 VStack 保留顶部 safe-area inset，填色仍渗到状态栏。
         VStack(spacing: 0) {
-            if vm.isSearchActive {
+            // 三态优先级（spec top_bar.state_priority）：选择态 > 搜索态 > 普通态
+            if isSelectionMode {
+                selectionTopBar
+            } else if vm.isSearchActive {
                 SearchTopBar(
                     query: $vm.searchQuery,
                     resultCount: vm.hasSearched ? vm.searchResults.count : nil,
                     onBack: { vm.exitSearch() },
                     onQueryChange: { vm.handleQueryChange($0) }
                 )
-            } else if isSelectionMode {
-                selectionTopBar
             } else {
                 normalTopBar
+            }
+            if scanStatus.isScanning {
+                ScanProgressBar()
             }
             content
         }
@@ -102,9 +108,6 @@ struct GalleryGridView: View {
                 ModelDownloadCenterView()  // 端侧模型下载中心（对齐 Settings「Model Center」入口）
             }
         }
-        .fullScreenCover(isPresented: $showScanScreen) {
-            TagScanScreen(onDismiss: { showScanScreen = false })
-        }
         // 删除确认收敛为仅系统 PHAsset 窗（对齐 Android：无 app 层二次确认，相-10）
         .onAppear {
             if permissionOverride == nil { permission.refresh() }
@@ -124,15 +127,18 @@ struct GalleryGridView: View {
     // MARK: - 顶栏（常态 / 选择态 morph，对齐 gallery_grid / gallery_longpress dump）
 
     /// 常态顶栏：标题 + 5 操作组（对齐 Android GalleryTopBar）：
-    /// 模型中心→ModelDownloadCenterView（端侧模型下载中心）；搜索→激活 SearchTopBar（端侧搜索）；
-    /// 分组菜单/设置可用。
+    /// 模型中心→ModelDownloadCenterView（端侧模型下载中心）；扫描→原地 toggle（空闲启动增量/扫描中暂停）；
+    /// 搜索→激活 SearchTopBar（端侧搜索）；分组菜单/设置可用。
     private var normalTopBar: some View {
-        AppTopBar(title: String(localized: "Gallery")) {
+        let s = appScheme(cs)
+        return AppTopBar(title: String(localized: "Gallery")) {
             AppTopBarAction(systemName: "mat_o_cloud_download",
                             accessibilityID: "topbar_model_center") { showModelCenter = true }
-            AppTopBarAction(systemName: "mat_o_play_arrow",
-                            accessibilityID: "topbar_scan") {
-                showScanScreen = true
+            AppTopBarAction(systemName: scanStatus.isScanning ? "mat_o_pause" : "mat_o_play_arrow",
+                            accessibilityID: "topbar_scan",
+                            tint: scanStatus.isScanning ? s.primary : s.onSurface,
+                            label: scanStatus.isScanning ? L("Pause") : L("Start Scan")) {
+                toggleScan()
             }
             AppTopBarAction(systemName: "mat_o_search",
                             accessibilityID: "topbar_search") {
@@ -144,19 +150,22 @@ struct GalleryGridView: View {
         }
     }
 
-    /// 选择态顶栏（dump：返回 ← + "已选择 N 项" + 全选/分享/删除，原位 morph）
+    /// 选择态顶栏（spec selection_top_bar：返回 ← + "N Selected" + 全选/分享/删除，原位 morph；
+    /// actions_enabled: always——三键恒可用，空选不灰置）
     private var selectionTopBar: some View {
-        AppTopBar(title: String(format: String(localized: "Selected %lld"), selected.count),
+        AppTopBar(title: String(format: L("%lld Selected"), selected.count),
                   showsBackButton: true,
-                  onBack: { exitSelectionMode() }) {
+                  onBack: { exitSelectionMode() },
+                  backLabel: L("Close")) {
             AppTopBarAction(systemName: "mat_o_select_all",
-                            accessibilityID: "topbar_select_all") { toggleSelectAll() }
+                            accessibilityID: "topbar_select_all",
+                            label: L("Select All")) { toggleSelectAll() }
             AppTopBarAction(systemName: "mat_o_share",
                             accessibilityID: "topbar_share",
-                            isEnabled: !selected.isEmpty) { shareSelected() }
+                            label: L("Share")) { shareSelected() }
             AppTopBarAction(systemName: "mat_o_delete",
                             accessibilityID: "topbar_delete",
-                            isEnabled: !selected.isEmpty) { deleteSelected() }
+                            label: L("Delete")) { deleteSelected() }
         }
     }
 
@@ -418,6 +427,17 @@ struct GalleryGridView: View {
         selected = []
     }
 
+    /// 扫描原地 toggle：扫描中→暂停；暂停会话→resume（start 会拒绝非 idle 会话）；空闲→增量扫描
+    private func toggleScan() {
+        if scanStatus.isScanning {
+            TagScanOrchestrator.shared.pause()
+        } else if TagScanOrchestrator.shared.isSessionActive {
+            TagScanOrchestrator.shared.resume()
+        } else {
+            TagScanOrchestrator.shared.start(mode: .incremental)
+        }
+    }
+
     private func toggleSelectAll() {
         if selected.count == allItems.count {
             selected = []
@@ -465,6 +485,30 @@ struct GalleryGridView: View {
     private func openSystemSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
+        }
+    }
+}
+
+/// TAG 扫描 indeterminate 线性进度条（spec scan_progress：2pt 高全宽，primary 色 / surfaceVariant 轨道）
+private struct ScanProgressBar: View {
+    @State private var sweep: CGFloat = 0
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        let s = appScheme(cs)
+        GeometryReader { geo in
+            let barWidth = geo.size.width * 0.4
+            Capsule()
+                .fill(s.primary)
+                .frame(width: barWidth, height: 2)
+                .offset(x: (geo.size.width - barWidth) * (sweep * 2 - 1))
+        }
+        .background(s.surfaceVariant)
+        .frame(height: 2)
+        .onAppear {
+            withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
+                sweep = 1
+            }
         }
     }
 }

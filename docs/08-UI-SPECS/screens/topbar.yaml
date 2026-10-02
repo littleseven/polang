@@ -25,8 +25,8 @@ topbar:
 
   title:
     font_size: 17                  # sp
-    weight: Medium   # token topBar.titleFontWeight
-                    # 设计稿注：Sarasa Gothic SC 无 Medium 字重，画布以 Semi Bold 近似；双端系统字体用真 Medium
+    weight: SemiBold   # token topBar.titleFontWeight（2026-10-02 校准：双端代码真值均为 SemiBold——
+                       # Android DesignTokens.kt:85 / iOS DesignTokens.swift:303，原 Medium 为文档漂移）
     color: "onSurface"
     max_lines: 1
     single_line: true
@@ -50,11 +50,11 @@ topbar:
 
   # ── 变体 B：首页顶栏（title + actions）───────────────────────
   variant_home:
-    title: { align: start, padding_start: 16 }   # 画布 393 帧实测盒宽 w211 FIXED（防 30×42 窄盒复发）
+    title: { align: start, padding_start: 8 }   # 2026-10-02 校准：对齐双端代码真值 TopBarTokens.horizontalPadding=8（原 16 为画布标注漂移）
     actions:
       pack: end                    # 右对齐成组，30px 节奏 = 22 icon + 8 gap
       count_max: 5
-      # 设计稿几何（相册首页 5 钮，393 宽）：x = 235/265/295/325/355，最右图标右边 377（余 16）
+      # 代码真值（Android TopBarTokens / iOS TopBarTokens.swift）：栏水平 padding 8、钮 36/22、间距 8
     applies: [gallery/grid, gallery/empty]
 
   # ── 变体 C：搜索顶栏（back + field + count）──────────────────
