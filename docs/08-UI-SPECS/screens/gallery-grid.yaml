@@ -76,6 +76,9 @@ grid_page:
     background: colorScheme.surface
     anchor: safe_area_top                   # 自动避让状态栏
     layout: row_space_between               # 左标题 / 右操作组 HStack
+    # 三态渲染优先级（Android GalleryScreen.kt:685 真值）：选择态 > 搜索态 > 普通态。
+    # 选择态顶栏 morph 见 selection_top_bar；搜索栏仅当 search_active && !selection_mode 渲染。
+    state_priority: selection_mode > search_active > normal
 
     # ── 标题 ──
     title:
@@ -87,18 +90,19 @@ grid_page:
       items:
         # (a) 模型中心
         - id: model_center
-          material_icon: smart_toy
-          sf_symbol: "cpu"                  # 或 "sparkles"
+          material_icon: cloud_download     # Android Icons.Outlined.CloudDownload / iOS mat_o_cloud_download（2026-10-02 校准，原 smart_toy/cpu 陈旧）
+          sf_symbol: "icloud.and.arrow.down"
           tint: colorScheme.onSurface
           behavior: navigate_to_model_center
 
-        # (b) TAG 扫描开关
+        # (b) TAG 扫描开关（原地 toggle，不开页面——扫描控制页入口在整理 Tab SCAN 段）
         - id: scan_toggle
-          material_icon: radar
-          sf_symbol: "antenna.radiowaves.left.and.right"
-          tint: colorScheme.onSurface
-          behavior: toggle_tag_scanning     # 开始扫描→显示进度条；暂停→隐藏
-          note: "图标可随状态切换：扫描中显示 stop/pause 图标"
+          material_icon: play_arrow         # 空闲态；扫描中切换为 pause（Android GalleryTopBar.kt:96-105）
+          sf_symbol: "play.fill"            # 扫描中 "pause.fill"
+          tint: "idle: colorScheme.onSurface / scanning: colorScheme.primary"
+          behavior: toggle_tag_scanning_in_place  # 空闲→启动增量扫描；扫描中→暂停。扫描中顶栏下显示 scan_progress
+          string_key_cd: "start_scan（空闲）/ pause（扫描中）"
+          platform_note: "Android 侧为前台 Service + BackgroundScanGuard 保活引导弹窗（HyperOS 冻结）；iOS 保活 N-A，直接 toggle TagScanOrchestrator，见 allowed_differences scan_guard"
 
         # (c) 搜索入口
         - id: search
@@ -115,13 +119,14 @@ grid_page:
           behavior: show_dropdown_menu
           menu:
             type: dropdown_overlay          # 下拉浮层，不弹 Dialog
+            # 顺序 = Android GroupingMode.entries 过滤 SWIMWEAR/SEXY 后的渲染序（GalleryTopBar.kt:127-153）
             options:
-              - DATE:      "按日期分组"
-              - FACE:      "按人脸分组"
-              - PERSON:    "按人物分组"
-              - LANDSCAPE: "按风景分组"
-              - LOCATION:  "按位置分组"
-              - NONE:      "不分组"
+              - NONE:      { string_key: group_none, zh-CN: "不分组", en: "All" }
+              - DATE:      { string_key: group_date, zh-CN: "按日期分组", en: "Date" }
+              - FACE:      { string_key: group_face, zh-CN: "按人脸分组", en: "Face" }
+              - PERSON:    { string_key: group_person, zh-CN: "按人物分组", en: "Person" }
+              - LANDSCAPE: { string_key: landscape, zh-CN: "按风景分组", en: "Landscape" }
+              - LOCATION:  { string_key: gallery_group_location, zh-CN: "按位置分组", en: "Location" }
             current_selection_checkmark: true
             on_select: set_grouping_mode($option)
 
@@ -131,6 +136,27 @@ grid_page:
           sf_symbol: "gearshape"
           tint: colorScheme.onSurface
           behavior: navigate_to_settings
+
+  # ── 4b. 选择态顶栏（selection_top_bar：顶栏 morph，无独立底部选择栏）─────
+  # 2026-10-02 校准：Android 真值 = 选择操作在顶栏（GalleryTopBar.kt:65-87），
+  # 不存在 selection_bottom_bar（旧 spec 反写，已删除）；FloatingBottomTab 在选择态不替换。
+
+  selection_top_bar:
+    visible_when: selection_mode            # 优先级高于 search_top_bar（见 top_bar.state_priority）
+    type: AppTopBar                         # 同容器，leading/title/actions morph
+    leading:
+      icon: arrow_back                      # iOS mat_o_arrow_back
+      string_key_cd: close
+      behavior: exit_selection_mode
+    title:
+      string_key: selected_items            # EN "%1$d Selected" / zh-CN "已选 %1$d 项"
+      position: leading
+    actions:
+      items:
+        - { id: select_all, material_icon: select_all, string_key_cd: select_all, behavior: select_all_items }
+        - { id: share, material_icon: share, string_key_cd: ocr_share, behavior: share_selected }
+        - { id: delete, material_icon: delete, string_key_cd: delete, behavior: delete_selected }
+      actions_enabled: always               # Android 真值：三键恒可用，空选不灰置（iOS 原 isEnabled=false 灰置已对齐移除）
 
   # ── 5. 搜索激活态顶栏 SearchTopBar ───────────────────────────
   # 🔴 gap #13：iOS 完全缺失搜索功能（/ios-follow gallery-search 2026-08-11 实现后关闭）。
@@ -194,7 +220,7 @@ grid_page:
     width: full_width
     color: colorScheme.primary
     track_color: colorScheme.surfaceVariant
-    behavior: indeterminate_or_determinate  # 有进度值则 determinate，否则 indeterminate
+    behavior: indeterminate                 # Android 真值：恒 indeterminate（GalleryScreen.kt:781-785 无进度值入参）
 
   # ── 7. 网格区 ────────────────────────────────────────────────
 
@@ -306,10 +332,7 @@ grid_page:
           behavior: |
             进入选择模式后，手指不抬起继续滑动，经过的缩略图自动切换选中态。
             用于快速选择连续多张照片。
-        # 选择模式下的底部操作栏（替换 FloatingBottomTab）
-        selection_bottom_bar:
-          visible_when: selection_mode
-          actions: [share, delete, select_all, cancel]
+        # 选择操作在顶栏 morph（见 selection_top_bar）；Android 无独立底部选择栏，FloatingBottomTab 不替换
 
   # ── 8. 冷启动占位页 GallerySplashPlaceholder ──
   # 🔴 gap #39/#40 / P0-4：iOS 完全缺失，数据加载时直接空网格闪烁。
@@ -927,13 +950,14 @@ states:
     trigger: long_press_thumbnail
     overlay: black_alpha_30_on_selected     # 选中项遮罩
     checkbox: visible_on_all_items          # 所有项显示 checkbox
-    bottom: selection_bottom_bar            # 底栏替换为选择操作栏
+    top_bar: selection_top_bar              # 顶栏 morph：返回 + "N Selected" + 全选/分享/删除（接管搜索态）
     drag: drag_multi_select                 # 拖拽连续选择
     back: exit_selection_mode               # Back → 退出选择
 
   scanning:
     description: "TAG 扫描进行中"
     scan_progress: visible                  # 顶栏下显示进度条
+    scan_toggle_icon: "play_arrow→pause，tint→primary"
     behavior: 进度条显示扫描进度，扫描完成后自动隐藏
 
   permission_denied:
@@ -1002,6 +1026,11 @@ allowed_differences:
     android: "搜索引擎在 androidApp 模块（Kotlin + Room）"
     ios: "Swift 对等实现 + TagDatabase SQLite"
     rule: "行为契约对齐（contracts.md），实现语言/ORM 各自原生；远期可评估纯逻辑上 shared commonMain（技术债）"
+
+  - dimension: scan_guard
+    android: "扫描启动经前台 Service + BackgroundScanGuard 保活引导弹窗（HyperOS 后台冻结，按项确认后静默直启）"
+    ios: "N-A（无后台冻结问题）；顶栏 scan_toggle 直接 toggle TagScanOrchestrator.shared（start(.incremental)/pause()），状态经 TagScanStatusCenter.shared.isScanning 响应式消费"
+    rule: "toggle 语义与顶栏状态（图标 Play↔Pause + tint primary + 进度条）双端一致；保活引导为 Android 独有流程"
 
 # ============================================================================
 # 第六部分：禁止事项（iOS 实现红线）

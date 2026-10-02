@@ -25,8 +25,8 @@ topbar:
 
   title:
     font_size: 17                  # sp
-    weight: Medium   # token topBar.titleFontWeight
-                    # 设计稿注：Sarasa Gothic SC 无 Medium 字重，画布以 Semi Bold 近似；双端系统字体用真 Medium
+    weight: SemiBold   # token topBar.titleFontWeight（2026-10-02 校准：双端代码真值均为 SemiBold——
+                       # Android DesignTokens.kt:85 / iOS DesignTokens.swift:303，原 Medium 为文档漂移）
     color: "onSurface"
     max_lines: 1
     single_line: true
