@@ -109,6 +109,25 @@ interface PersonDao {
     @Query("UPDATE persons SET is_self = 0 WHERE is_self = 1")
     suspend fun clearSelfFlags()
 
+    /** 合照 media id（同一张照片聚到 ≥2 个不同人物；扫描页成果面板「合照」格与相册过滤视图同源） */
+    @Query(
+        """
+        SELECT mediaId FROM face_embeddings
+        GROUP BY mediaId
+        HAVING COUNT(DISTINCT personId) >= 2
+        """
+    )
+    suspend fun getGroupPhotoMediaIds(): List<Long>
+
+    /** 「我」本人照片 media id（is_self 人物的全部出现；未标记时返回空） */
+    @Query(
+        """
+        SELECT DISTINCT mediaId FROM face_embeddings
+        WHERE personId = (SELECT personId FROM persons WHERE is_self = 1 LIMIT 1)
+        """
+    )
+    suspend fun getSelfPersonMediaIds(): List<Long>
+
     @Query("SELECT * FROM persons WHERE is_self = 1 LIMIT 1")
     suspend fun getSelfPerson(): PersonEntity?
 

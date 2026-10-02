@@ -1293,6 +1293,18 @@
     <string name="tag_scan_btn_stop">Detener</string>
     <string name="tag_scan_btn_resume_scan">Reanudar escaneo</string>
     <string name="tag_scan_btn_restart">Reiniciar</string>
+    <!-- v4.1 扫描成果面板（2026-10-02：成果格=查看入口，阶段行=扫描控制） -->
+    <string name="tag_result_faces_label">Fotos con rostros</string>
+    <string name="tag_result_people_label">Personas · %1$d con nombre</string>
+    <string name="tag_result_cities_label">Ciudades</string>
+    <string name="tag_result_group_label">Fotos de grupo</string>
+    <string name="tag_result_self_label">Fotos de mí</string>
+    <string name="tag_result_tags_label">Fotos etiquetadas</string>
+    <string name="tag_result_self_unset">Márcate primero en Personas</string>
+    <string name="tag_city_sheet_title">Elegir ciudad</string>
+    <string name="tag_city_sheet_count">%1$d fotos</string>
+    <string name="gallery_view_group">Fotos de grupo</string>
+    <string name="gallery_view_self">Fotos de mí</string>
     <string name="tag_scan_library_line">%1$d%% de la biblioteca etiquetada</string>
     <string name="tag_scan_paused_title">En pausa · %1$s</string>
     <string name="tag_scan_completed_with_failures">Completado · %1$d con error</string>

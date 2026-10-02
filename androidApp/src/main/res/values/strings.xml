@@ -1338,6 +1338,18 @@
     <string name="tag_scan_btn_stop">Stop</string>
     <string name="tag_scan_btn_resume_scan">Resume scan</string>
     <string name="tag_scan_btn_restart">Restart</string>
+    <!-- v4.1 扫描成果面板（2026-10-02：成果格=查看入口，阶段行=扫描控制） -->
+    <string name="tag_result_faces_label">Photos with faces</string>
+    <string name="tag_result_people_label">People · %1$d named</string>
+    <string name="tag_result_cities_label">Cities visited</string>
+    <string name="tag_result_group_label">Group photos</string>
+    <string name="tag_result_self_label">Photos of me</string>
+    <string name="tag_result_tags_label">AI-tagged photos</string>
+    <string name="tag_result_self_unset">Mark yourself in People first</string>
+    <string name="tag_city_sheet_title">Choose a city</string>
+    <string name="tag_city_sheet_count">%1$d photos</string>
+    <string name="gallery_view_group">Group photos</string>
+    <string name="gallery_view_self">Photos of me</string>
     <string name="tag_scan_paused_title">Paused · %1$s</string>
     <string name="tag_scan_completed_with_failures">Completed · %1$d failed</string>
     <string name="tag_scan_retry_failed_items">Retry failed</string>

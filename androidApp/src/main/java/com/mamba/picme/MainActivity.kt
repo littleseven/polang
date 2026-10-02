@@ -63,7 +63,7 @@ import com.mamba.picme.features.editor.PhotoEditorScreen
 import com.mamba.picme.features.editor.PhotoEditorViewModel
 import com.mamba.picme.features.idphoto.IDPhotoScreen
 import com.mamba.picme.features.idphoto.IDPhotoViewModel
-import com.mamba.picme.features.gallery.GalleryViewFilter
+import com.mamba.picme.features.gallery.GalleryViewRequest
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
 import com.mamba.picme.features.gallery.organize.OrganizeTab
@@ -219,7 +219,7 @@ class MainActivity : ComponentActivity() {
                     val scope = rememberCoroutineScope()
                     var gallerySearchRequest by remember { mutableStateOf<Pair<String, Long>?>(null) }
                     // 扫描页 v3 确定性视图过滤一次性请求（已打标/含人脸/最佳照片 → 相册页）
-                    var galleryViewRequest by remember { mutableStateOf<GalleryViewFilter?>(null) }
+                    var galleryViewRequest by remember { mutableStateOf<GalleryViewRequest?>(null) }
                     // 整理+扫描合并页（Pager 页 1）Tab 一次性请求：设置页等 NavHost 路由入口经此预选 Tab
                     var organizeTabRequest by remember { mutableStateOf<OrganizeTab?>(null) }
                     // 任务中心回锚一次性请求（US-15）：任务中心点击/继续/重试 → 切 chat 页 + 锚定任务卡

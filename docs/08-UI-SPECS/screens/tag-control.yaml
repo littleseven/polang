@@ -74,19 +74,31 @@ tag_control:
       done: "tag_scan_status_done = 已完成"
     principle: "环=全库口径恒定；状态色只活在弧/大数字（绿=跑，琥珀=停），容器不换色"
 
+    results_panel:                                 # v4.1（2026-10-02）：环下分隔线+3×2 成果格（查看入口）
+      principle: "成果格=查看内容；阶段行=扫描控制——浏览与操作彻底分家"
+      cells:                                       # 数字 20sp SemiBold + 6dp 彩点 + 11sp 标签 + 14dp chevron
+        - { count: "<withFace>", label: "tag_result_faces_label = 含人脸照片", dot: "#FF7EB0", tap: "相册 FACES 视图" }
+        - { count: "<personCount>", label: "tag_result_people_label = 识别人物 · N 位已命名", dot: "#9B8CFF", tap: "人物页" }
+        - { count: "<cityCount>", label: "tag_result_cities_label = 足迹城市", dot: "#22D3EE", tap: "城市选择弹层 → 相册 CITY 视图" }
+        - { count: "<groupPhotoCount>", label: "tag_result_group_label = 合照", dot: "#4ADE80", tap: "相册 GROUP 视图（face_embeddings ≥2 人聚合）" }
+        - { count: "<selfPhotoCount 或 —>", label: "tag_result_self_label = “我”的照片", dot: "warningAmber", tap: "已标记→相册 SELF 视图；未标记→snackbar 引导去人物页标记" }
+        - { count: "<withLabels>", label: "tag_result_tags_label = 已打内容标签", dot: "primary", tap: "相册 TAGGED 视图" }
+      city_sheet: "ModalBottomSheet 城市列表（getCityGroups，城市名+张数）→ 点选 CITY 请求"
+      ring_tap: "环卡整体不再可点（标签格承接已打标视图）"
+
   mutex_slots:                                     # 同槽位互斥附属卡（沿用 v3 语义）
     aesthetic_card: { visible_when: "aestheticProgress!=null 且 liveModel==null" }
     interrupted_card:
       visible_when: "liveModel==null 且 无美学进度 且 tagscan:main 任务 FAILED（进程死亡对账）"
       primary: "tag_scan_resume_breakpoint（增量续扫=断点续跑）"
 
-  stages:                                          # 点按=查看内容页；长按=重处理弹层（v4 新增）
-    lock: "无（扫描中可浏览）"
+  stages:                                          # v4.1：点按=该阶段扫描控制（StageActionSheet）；查看职责移交成果格
+    lock: "无（扫描中可操作）"
     rows:                                           # StageRow ×4，60dp 高，pad_h 12
-      - { title: "tag_pass_title_face", desc: "tag_pass_scope_face（空库回落静态键）", trailing: "<%> 12sp SemiBold primary + chevron", tap: "含人脸照片（hasFace 筛选）", long_press: "StageActionSheet(FACE)" }
-      - { title: "tag_pass_title_cluster", desc: "tag_pass_desc_cluster", trailing: "<人物数>（计数非百分比）", tap: "人物页", long_press: "StageActionSheet(PEOPLE)" }
-      - { title: "tag_pass_title_content", desc: "tag_pass_scope_content", trailing: "<%>", tap: "标签查看页 TagViewer", long_press: "StageActionSheet(CONTENT)" }
-      - { title: "tag_pass_title_aesthetic", desc: "tag_pass_scope_aesthetic", trailing: "<%>", tap: "按评分排序照片视图", long_press: "StageActionSheet(QUALITY)" }
+      - { title: "tag_pass_title_face", desc: "tag_pass_scope_face（空库回落静态键）", trailing: "<%> 12sp SemiBold primary + chevron", tap: "StageActionSheet(FACE)=阶段扫描控制" }
+      - { title: "tag_pass_title_cluster", desc: "tag_pass_desc_cluster", trailing: "<人物数>（计数非百分比）", tap: "StageActionSheet(PEOPLE)" }
+      - { title: "tag_pass_title_content", desc: "tag_pass_scope_content", trailing: "<%>", tap: "StageActionSheet(CONTENT)" }
+      - { title: "tag_pass_title_aesthetic", desc: "tag_pass_scope_aesthetic", trailing: "<%>", tap: "StageActionSheet(QUALITY)" }
     row_icon: "28dp r7 色底芯片（12% 透明度）+ 18dp 图标，色板 [#FF7EB0, #9B8CFF, #22D3EE, #4ADE80]"
     trailing_note: "行口径=tagPassProgress().percentRounded()，与环心大数字同源同舍入"
 
@@ -140,8 +152,8 @@ tag_control:
     terminal_zero_failures: "liveModel 置空回落 idle 布局；环 hint 尾词=已完成"
     terminal_with_failures: "[重试失败项][停止]"
     interrupted: "对账 FAILED → interrupted_card 断点续扫（content 内互斥槽）"
-    stage_row_tap: "四行分别 → 含人脸照片 / 人物页 / TagViewer / 评分排序视图"
-    stage_row_long_press: "弹 StageActionSheet（仅处理新增/全部重新处理）"
+    result_cell_tap: "六格分别 → FACES / 人物页 / 城市弹层→CITY / GROUP / SELF(或引导) / TAGGED"
+    stage_row_tap: "四行 → StageActionSheet 阶段扫描控制（仅处理新增/全部重新处理）"
     later_tap: "宿主 onSelectTab(ORGANIZE) 切回整理 tab"
 
   back_stack: "系统返回（Android back / iOS NavigationStack pop）"
@@ -149,7 +161,9 @@ tag_control:
   platform_differences:
     capabilities: "扫描执行链 iOS=TagScanOrchestrator（既有）；UI 状态消费同源 sessionProgress 语义"
     i18n_keys: "v4 新键：tag_scan_page_title / tag_scan_top_eta / tag_scan_top_running / tag_scan_top_paused /
-      tag_scan_ring_hint / tag_scan_status_{ready,running,paused,done} / tag_scan_btn_{start,later,pause_scan,stop,resume_scan,restart}"
+      tag_scan_ring_hint / tag_scan_status_{ready,running,paused,done} / tag_scan_btn_{start,later,pause_scan,stop,resume_scan,restart}；
+      v4.1 新键：tag_result_{faces,people,cities,group,self,tags}_label / tag_result_self_unset /
+      tag_city_sheet_{title,count} / gallery_view_{group,self}"
     allowed_differences:
       - "容器色可用两端等价 colorScheme 角色实现"
       - "四个导航目的地 iOS 侧若缺（评分排序视图/hasFace 筛选）：允许首版落地为等价页面（TagViewer/People），缺口登记台账"

@@ -22,7 +22,7 @@ import com.mamba.picme.features.chat.ChatScreen
 import com.mamba.picme.features.chat.ChatTaskAnchor
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.gallery.GalleryScreen
-import com.mamba.picme.features.gallery.GalleryViewFilter
+import com.mamba.picme.features.gallery.GalleryViewRequest
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.memories.MemoriesViewModel
@@ -73,9 +73,9 @@ fun MainPagerHost(
     onGallerySearchRequestConsumed: () -> Unit,
     onRequestGallerySearch: (query: String, personId: Long) -> Unit,
     /** 扫描页 v3 确定性视图过滤请求（已打标/含人脸/最佳照片）与出口 */
-    galleryViewRequest: GalleryViewFilter? = null,
+    galleryViewRequest: GalleryViewRequest? = null,
     onGalleryViewRequestConsumed: () -> Unit = {},
-    onRequestGalleryView: (GalleryViewFilter) -> Unit = {},
+    onRequestGalleryView: (GalleryViewRequest) -> Unit = {},
     /** 整理中心 hub「滑动整理」(Swipe to tidy)（F2 已点亮：swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
     /** 整理中心 hub 类目卡点击（organize_category/{category} 路由）。 */

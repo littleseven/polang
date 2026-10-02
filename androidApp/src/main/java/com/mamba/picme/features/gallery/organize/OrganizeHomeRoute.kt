@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.gallery.GalleryViewFilter
+import com.mamba.picme.features.gallery.GalleryViewRequest
 import com.mamba.picme.features.gallery.components.TagGenerationControlScreen
 import com.mamba.picme.features.gallery.dedup.DedupHomeRoute
 import com.mamba.picme.features.gallery.dedup.DedupUiState
@@ -67,7 +68,7 @@ fun OrganizeHomeRoute(
     onOpenCategory: (OrganizeCategory) -> Unit,
     onNavigateToTagViewer: () -> Unit,
     /** 扫描 Tab v3 确定性相册视图出口（已打标/含人脸/最佳照片） */
-    onRequestGalleryView: (GalleryViewFilter) -> Unit = {},
+    onRequestGalleryView: (GalleryViewRequest) -> Unit = {},
     /** 底 bar 页切换出口（整理项=本页，高亮且点击空操作） */
     onSwitchMainPage: (Int) -> Unit,
 ) {
@@ -107,9 +108,15 @@ fun OrganizeHomeRoute(
                     )
                     OrganizeTab.SCAN -> TagGenerationControlScreen(
                         onNavigateToTagViewer = onNavigateToTagViewer,
-                        onOpenTagged = { onRequestGalleryView(GalleryViewFilter.TAGGED) },
-                        onOpenFaces = { onRequestGalleryView(GalleryViewFilter.FACES) },
-                        onOpenBest = { onRequestGalleryView(GalleryViewFilter.BEST) },
+                        onOpenTagged = { onRequestGalleryView(GalleryViewRequest(GalleryViewFilter.TAGGED)) },
+                        onOpenFaces = { onRequestGalleryView(GalleryViewRequest(GalleryViewFilter.FACES)) },
+                        onOpenBest = { onRequestGalleryView(GalleryViewRequest(GalleryViewFilter.BEST)) },
+                        // v4.1 成果格出口：合照/“我”/城市 → 相册确定性视图
+                        onOpenGroup = { onRequestGalleryView(GalleryViewRequest(GalleryViewFilter.GROUP)) },
+                        onOpenSelf = { onRequestGalleryView(GalleryViewRequest(GalleryViewFilter.SELF)) },
+                        onOpenCity = { city ->
+                            onRequestGalleryView(GalleryViewRequest(GalleryViewFilter.CITY, city))
+                        },
                         onOpenPeople = { onSwitchMainPage(MAIN_PAGE_PEOPLE) },
                         // 「稍后」=切回整理 tab（v4 设计稿 idle 次钮）
                         onLater = { onSelectTab(OrganizeTab.ORGANIZE) },

@@ -98,6 +98,10 @@ fun TagGenerationControlScreen(
     onOpenPeople: () -> Unit = {},
     /** 「稍后」次钮出口（v4 设计稿：宿主切回整理 tab） */
     onLater: () -> Unit = {},
+    /** 成果格导航出口（v4.1：成果=查看、阶段行=扫描控制） */
+    onOpenGroup: () -> Unit = {},
+    onOpenSelf: () -> Unit = {},
+    onOpenCity: (String) -> Unit = {},
     /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）；根页无返回箭头（2026-09-06 导航统一移除）。 */
     embedded: Boolean = false,
 ) {
@@ -133,6 +137,13 @@ fun TagGenerationControlScreen(
     var remainingPass3 by remember { mutableIntStateOf(0) }
     var photoCount by remember { mutableIntStateOf(0) }
     var aestheticScored by remember { mutableIntStateOf(0) }
+    var withFaceCount by remember { mutableIntStateOf(0) }
+    var namedPersonCount by remember { mutableIntStateOf(0) }
+    var cityCount by remember { mutableIntStateOf(0) }
+    var groupPhotoCount by remember { mutableIntStateOf(0) }
+    var selfPhotoCount by remember { mutableIntStateOf(0) }
+    var cityChoices by remember { mutableStateOf<List<com.mamba.picme.data.local.CityGroupCount>>(emptyList()) }
+    var showCitySheet by remember { mutableStateOf(false) }
 
     // 阶段操作底部弹层 / 全量重处理二次确认（v4：阶段行长按弹层，RegenSheet 二级入口随设计稿移除）
     var stageSheetTarget by remember { mutableStateOf<TagStage?>(null) }
@@ -152,6 +163,11 @@ fun TagGenerationControlScreen(
                 remainingPass3 = stats.remainingForPass3
                 photoCount = stats.photoCount
                 aestheticScored = stats.aestheticScoredCount
+                withFaceCount = stats.withFace
+                namedPersonCount = stats.namedPersonCount
+                cityCount = stats.cityCount
+                groupPhotoCount = stats.groupPhotoCount
+                selfPhotoCount = stats.selfPhotoCount
             } catch (e: Exception) {
                 android.util.Log.e("TagGenControl", "refreshStats failed", e)
             }
@@ -354,8 +370,43 @@ fun TagGenerationControlScreen(
                     running = running,
                     paused = pausedState,
                     terminalDone = terminal,
-                    onOpenTagged = onOpenTagged
+                    withFaceCount = withFaceCount,
+                    peopleCount = personCount,
+                    namedPersonCount = namedPersonCount,
+                    cityCount = cityCount,
+                    groupPhotoCount = groupPhotoCount,
+                    selfPhotoCount = selfPhotoCount,
+                    taggedCount = taggedCount,
+                    onOpenFaces = onOpenFaces,
+                    onOpenPeople = onOpenPeople,
+                    onOpenTagged = onOpenTagged,
+                    onOpenGroup = onOpenGroup,
+                    onOpenSelf = onOpenSelf,
+                    onOpenCityPicker = {
+                        coroutineScope.launch {
+                            cityChoices = runCatching {
+                                AppDatabase.getDatabase(context).mediaDao().getCityGroups(60)
+                            }.getOrDefault(emptyList())
+                            showCitySheet = true
+                        }
+                    },
+                    onSelfUnset = {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(context.getString(R.string.tag_result_self_unset))
+                        }
+                    }
                 )
+
+                if (showCitySheet) {
+                    CityChooserSheet(
+                        cities = cityChoices,
+                        onDismiss = { showCitySheet = false },
+                        onPick = { city ->
+                            showCitySheet = false
+                            onOpenCity(city)
+                        }
+                    )
+                }
 
                 // 附属互斥卡（非会话制美学打分 / 进程死亡对账）
                 AnimatedVisibility(visible = aestheticProgress != null && liveModel == null) {
@@ -391,7 +442,7 @@ fun TagGenerationControlScreen(
                                 stringResource(R.string.tag_pass_scope_face, faceProgress.processed, faceProgress.total)
                             },
                             trailing = stagePercentText(faceProgress),
-                            onClick = onOpenFaces,
+                            onClick = { stageSheetTarget = TagStage.FACE },
                             onLongClick = { stageSheetTarget = TagStage.FACE }
                         )
                         StageRow(
@@ -400,7 +451,7 @@ fun TagGenerationControlScreen(
                             title = stringResource(R.string.tag_pass_title_cluster),
                             description = stringResource(R.string.tag_pass_desc_cluster),
                             trailing = if (personCount > 0) "$personCount" else "—",
-                            onClick = onOpenPeople,
+                            onClick = { stageSheetTarget = TagStage.PEOPLE },
                             onLongClick = { stageSheetTarget = TagStage.PEOPLE }
                         )
                         val contentProgress = tagPassProgress(totalMedia, remainingPass3)
@@ -414,7 +465,7 @@ fun TagGenerationControlScreen(
                                 stringResource(R.string.tag_pass_scope_content, contentProgress.processed, contentProgress.total)
                             },
                             trailing = stagePercentText(contentProgress),
-                            onClick = onNavigateToTagViewer,
+                            onClick = { stageSheetTarget = TagStage.CONTENT },
                             onLongClick = { stageSheetTarget = TagStage.CONTENT }
                         )
                         val qualityProgress = tagPassProgress(photoCount, photoCount - aestheticScored)
@@ -428,7 +479,7 @@ fun TagGenerationControlScreen(
                                 stringResource(R.string.tag_pass_scope_aesthetic, qualityProgress.processed, qualityProgress.total)
                             },
                             trailing = stagePercentText(qualityProgress),
-                            onClick = onOpenBest,
+                            onClick = { stageSheetTarget = TagStage.QUALITY },
                             onLongClick = { stageSheetTarget = TagStage.QUALITY }
                         )
                     }
@@ -464,6 +515,7 @@ fun TagGenerationControlScreen(
  * + 环心 48sp 大百分比 + 居中说明行。环=全库 AI 打标完成率（口径立法唯一百分比）；
  * 运行=绿弧+彗星动画，暂停=琥珀弧，空闲=灰数字。整卡可点跳「已打标照片」。
  */
+@Suppress("LongParameterList") // 成果面板 6 格数据+出口聚合于锚点卡；拆分收益低于可读性损失
 @Composable
 private fun RingHeroCard(
     percent: Int,
@@ -473,7 +525,20 @@ private fun RingHeroCard(
     running: Boolean,
     paused: Boolean,
     terminalDone: Boolean,
-    onOpenTagged: () -> Unit
+    withFaceCount: Int,
+    peopleCount: Int,
+    namedPersonCount: Int,
+    cityCount: Int,
+    groupPhotoCount: Int,
+    selfPhotoCount: Int,
+    taggedCount: Int,
+    onOpenFaces: () -> Unit,
+    onOpenPeople: () -> Unit,
+    onOpenTagged: () -> Unit,
+    onOpenGroup: () -> Unit,
+    onOpenSelf: () -> Unit,
+    onOpenCityPicker: () -> Unit,
+    onSelfUnset: () -> Unit
 ) {
     val accent = when {
         paused -> StatusColor.warningAmber
@@ -489,9 +554,7 @@ private fun RingHeroCard(
         }
     )
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenTagged),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
@@ -518,6 +581,175 @@ private fun RingHeroCard(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+            // ── 扫描成果面板（v4.1）：环下分隔线 + 3×2 可点成果格（查看入口）──
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+            )
+            ResultsRow(
+                ResultCellModel(
+                    count = "%,d".format(Locale.ROOT, withFaceCount),
+                    labelRes = R.string.tag_result_faces_label,
+                    dot = Color(0xFFFF7EB0),
+                    onClick = onOpenFaces
+                ),
+                ResultCellModel(
+                    count = "%,d".format(Locale.ROOT, peopleCount),
+                    label = stringResource(R.string.tag_result_people_label, namedPersonCount),
+                    dot = Color(0xFF9B8CFF),
+                    onClick = onOpenPeople
+                )
+            )
+            ResultsRow(
+                ResultCellModel(
+                    count = "%,d".format(Locale.ROOT, cityCount),
+                    labelRes = R.string.tag_result_cities_label,
+                    dot = Color(0xFF22D3EE),
+                    onClick = onOpenCityPicker
+                ),
+                ResultCellModel(
+                    count = "%,d".format(Locale.ROOT, groupPhotoCount),
+                    labelRes = R.string.tag_result_group_label,
+                    dot = Color(0xFF4ADE80),
+                    onClick = onOpenGroup
+                )
+            )
+            ResultsRow(
+                ResultCellModel(
+                    count = if (selfPhotoCount > 0) {
+                        "%,d".format(Locale.ROOT, selfPhotoCount)
+                    } else {
+                        "—"
+                    },
+                    labelRes = R.string.tag_result_self_label,
+                    dot = StatusColor.warningAmber,
+                    onClick = if (selfPhotoCount > 0) onOpenSelf else onSelfUnset
+                ),
+                ResultCellModel(
+                    count = "%,d".format(Locale.ROOT, taggedCount),
+                    labelRes = R.string.tag_result_tags_label,
+                    dot = MaterialTheme.colorScheme.primary,
+                    onClick = onOpenTagged
+                )
+            )
+        }
+    }
+}
+
+/** 成果面板单行（两格横排，各占半宽）。 */
+@Composable
+private fun ResultsRow(left: ResultCellModel, right: ResultCellModel) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ResultCell(model = left, modifier = Modifier.weight(1f))
+        ResultCell(model = right, modifier = Modifier.weight(1f))
+    }
+}
+
+/** 成果格：20sp 数字 + [彩点+标签+chevron] 行，整格可点（查看对应结果页）。 */
+private data class ResultCellModel(
+    val count: String,
+    val labelRes: Int? = null,
+    val label: String? = null,
+    val dot: Color,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun ResultCell(model: ResultCellModel, modifier: Modifier = Modifier) {
+    val text = model.label ?: model.labelRes?.let { stringResource(it) }.orEmpty()
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = model.onClick)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = model.count,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .background(model.dot, CircleShape)
+            )
+            Text(
+                text = text,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Icon(
+                Icons.Rounded.ChevronRight,
+                null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
+    }
+}
+
+/** 城市选择弹层（成果面板「足迹城市」入口）：城市+张数列表，点选进该城市照片视图。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CityChooserSheet(
+    cities: List<com.mamba.picme.data.local.CityGroupCount>,
+    onDismiss: () -> Unit,
+    onPick: (String) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(start = 20.dp, end = 20.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                stringResource(R.string.tag_city_sheet_title),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            for (city in cities) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onPick(city.city) }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = city.city,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = stringResource(R.string.tag_city_sheet_count, city.cnt),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

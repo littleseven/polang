@@ -151,6 +151,9 @@ class TagScanOrchestrator(
             val namedPersonCount = db.personDao().getNamedPersonCount()
             val photoCount = db.mediaDao().getPhotoCount()
             val aestheticScoredCount = db.mediaDao().getAestheticScoredCount()
+            val cityCount = db.mediaDao().getDistinctCityCount()
+            val groupPhotoCount = db.personDao().getGroupPhotoMediaIds().size
+            val selfPhotoCount = db.personDao().getSelfPersonMediaIds().size
 
             TagScanDbStats(
                 totalMedia = totalMedia,
@@ -163,7 +166,10 @@ class TagScanOrchestrator(
                 remainingForPass1 = remainingForPass1,
                 remainingForPass3 = remainingForPass3,
                 photoCount = photoCount,
-                aestheticScoredCount = aestheticScoredCount
+                aestheticScoredCount = aestheticScoredCount,
+                cityCount = cityCount,
+                groupPhotoCount = groupPhotoCount,
+                selfPhotoCount = selfPhotoCount
             )
         }
     }
@@ -1148,7 +1154,13 @@ class TagScanOrchestrator(
         /** 照片总数（type = 'PHOTO'，美学评分进度分母；视频不参与打分） */
         val photoCount: Int = 0,
         /** 已出 NIMA 美学分的照片数 */
-        val aestheticScoredCount: Int = 0
+        val aestheticScoredCount: Int = 0,
+        /** 足迹城市数（DISTINCT city；成果面板） */
+        val cityCount: Int = 0,
+        /** 合照数（同照片聚到 ≥2 人物；成果面板） */
+        val groupPhotoCount: Int = 0,
+        /** 「我」本人照片数（is_self 标记人物；未标记为 0） */
+        val selfPhotoCount: Int = 0
     )
 
     private fun List<StatusCount>.count(status: TagScanTaskStatus): Int {

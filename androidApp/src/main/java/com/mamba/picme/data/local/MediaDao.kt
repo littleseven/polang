@@ -494,6 +494,10 @@ interface MediaDao {
     @Query("SELECT MAX(lastTagScanAt) FROM media_assets")
     suspend fun getLatestTagScanAt(): Long?
 
+    /** 足迹城市数（DISTINCT 非空 city；扫描页成果面板） */
+    @Query("SELECT COUNT(DISTINCT city) FROM media_assets WHERE city IS NOT NULL AND city != ''")
+    suspend fun getDistinctCityCount(): Int
+
     /** 按城市分组统计媒体数量（逆地理编码城市，供 JS gallery.stats_by_city） */
     @Query(
         "SELECT city, COUNT(*) as cnt FROM media_assets " +

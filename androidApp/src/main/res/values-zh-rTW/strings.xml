@@ -1328,6 +1328,18 @@
     <string name="tag_scan_btn_stop">停止</string>
     <string name="tag_scan_btn_resume_scan">繼續掃描</string>
     <string name="tag_scan_btn_restart">重新開始</string>
+    <!-- v4.1 扫描成果面板（2026-10-02：成果格=查看入口，阶段行=扫描控制） -->
+    <string name="tag_result_faces_label">含人臉照片</string>
+    <string name="tag_result_people_label">識別人物 · %1$d 位已命名</string>
+    <string name="tag_result_cities_label">足跡城市</string>
+    <string name="tag_result_group_label">合照</string>
+    <string name="tag_result_self_label">「我」的照片</string>
+    <string name="tag_result_tags_label">已打內容標籤</string>
+    <string name="tag_result_self_unset">先在人物頁把自己標記為「我」</string>
+    <string name="tag_city_sheet_title">選擇城市</string>
+    <string name="tag_city_sheet_count">%1$d 張</string>
+    <string name="gallery_view_group">合照</string>
+    <string name="gallery_view_self">「我」的照片</string>
     <string name="tag_scan_library_line">全庫已標記 %1$d%%</string>
     <string name="tag_scan_paused_title">已暫停 · %1$s 進行到一半</string>
     <string name="tag_scan_completed_with_failures">已完成 · %1$d 張失敗</string>

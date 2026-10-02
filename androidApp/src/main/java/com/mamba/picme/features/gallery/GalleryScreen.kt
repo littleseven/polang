@@ -119,7 +119,10 @@ private const val SEARCH_DEBOUNCE_MS = 300L
  * TAGGED=已生成 AI 标签 / FACES=含人脸 / BEST=美学分降序照片。
  * 经 MainPagerHost 的 viewFilterRequest 通道进入，落 GalleryScreen 本地过滤态（isPersonFilter 同语义复用）。
  */
-enum class GalleryViewFilter { TAGGED, FACES, BEST }
+enum class GalleryViewFilter { TAGGED, FACES, BEST, GROUP, SELF, CITY }
+
+/** 相册确定性视图请求（扫描页成果格发起）：filter + CITY 时的城市名参数 */
+data class GalleryViewRequest(val filter: GalleryViewFilter, val city: String? = null)
 
 
 @OptIn(FlowPreview::class)
@@ -138,7 +141,7 @@ fun GalleryScreen(
     searchRequest: Pair<String, Long>? = null,
     onSearchRequestConsumed: () -> Unit = {},
     /** 外部确定性视图过滤请求（扫描页 v3 统计区/阶段行跳转）：TAGGED/FACES/BEST */
-    viewFilterRequest: GalleryViewFilter? = null,
+    viewFilterRequest: GalleryViewRequest? = null,
     onViewFilterRequestConsumed: () -> Unit = {},
     /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */
     onHorizontalSwipeEnabledChange: (Boolean) -> Unit = {},
@@ -262,11 +265,16 @@ fun GalleryScreen(
     // 扫描页 v3 确定性视图过滤（已打标/含人脸/最佳照片）：与人物过滤同范式——
     // DAO 取 id（或模型内建字段）过滤，不经搜索引擎；isPersonFilter=true 复用
     // 「防抖不接管」语义（label 为展示文案，交给引擎会泛化召回致张数对不上）。
-    suspend fun applyViewFilter(filter: GalleryViewFilter) {
+    suspend fun applyViewFilter(request: GalleryViewRequest) {
+        val filter = request.filter
         val label = when (filter) {
             GalleryViewFilter.TAGGED -> context.getString(R.string.gallery_view_tagged)
             GalleryViewFilter.FACES -> context.getString(R.string.gallery_view_faces)
             GalleryViewFilter.BEST -> context.getString(R.string.gallery_view_best)
+            GalleryViewFilter.GROUP -> context.getString(R.string.gallery_view_group)
+            GalleryViewFilter.SELF -> context.getString(R.string.gallery_view_self)
+            // 城市名本身即搜索标签（与人物过滤 label=人名同范式）
+            GalleryViewFilter.CITY -> request.city.orEmpty()
         }
         val finalMedia = withContext(Dispatchers.IO) {
             val db = AppDatabase.getDatabase(context)
@@ -291,6 +299,26 @@ fun GalleryScreen(
                         ids.mapNotNull { byId[it]?.toMediaAsset() }
                     }
                 }
+                GalleryViewFilter.GROUP -> {
+                    val ids = db.personDao().getGroupPhotoMediaIds()
+                    if (ids.isEmpty()) {
+                        emptyList()
+                    } else {
+                        val byId = db.mediaDao().getMediaByIds(ids).associateBy { it.id }
+                        ids.mapNotNull { byId[it]?.toMediaAsset() }
+                    }
+                }
+                GalleryViewFilter.SELF -> {
+                    val ids = db.personDao().getSelfPersonMediaIds()
+                    if (ids.isEmpty()) {
+                        emptyList()
+                    } else {
+                        val byId = db.mediaDao().getMediaByIds(ids).associateBy { it.id }
+                        ids.mapNotNull { byId[it]?.toMediaAsset() }
+                    }
+                }
+                GalleryViewFilter.CITY ->
+                    db.mediaDao().searchByLocation(request.city.orEmpty()).map { it.toMediaAsset() }
                 // hasFace 为 MediaAsset 内建字段，直接过滤全量列表
                 // （allFlatMedia 声明于本函数之后；allMedia 为同一数据的前置 StateFlow 值）
                 GalleryViewFilter.FACES -> allMedia.filter { it.hasFace }
@@ -305,14 +333,14 @@ fun GalleryScreen(
     }
 
     LaunchedEffect(viewFilterRequest) {
-        val filter = viewFilterRequest ?: return@LaunchedEffect
+        val request = viewFilterRequest ?: return@LaunchedEffect
         // 立即占位防闪烁（同 personId 分支）：DB 查询完成前不渲染全量相册
         searchQuery = context.getString(R.string.gallery_view_tagged)
         isSearchActive = true
         isPersonFilter = true
         searchResultMedia = emptyList()
         isSearchLoading = true
-        applyViewFilter(filter)
+        applyViewFilter(request)
         onViewFilterRequestConsumed()
     }
 
