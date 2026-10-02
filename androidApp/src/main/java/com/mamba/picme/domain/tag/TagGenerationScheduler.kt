@@ -790,6 +790,13 @@ class TagGenerationScheduler(
             }
         }
 
+        if (bestIndex < 0 || bestSim < ClusteringConfig.NAME_PRESERVE_MIN_SIMILARITY) {
+            // 保名未命中诊断（2026-10-12 名字清空事故）：快照在但没匹配上时必须留下现场
+            Log.w(TAG, "Name preserve MISS: snapshotCount=${availableSnapshots.size}, " +
+                "bestSim=${String.format("%.3f", bestSim)}, " +
+                "threshold=${ClusteringConfig.NAME_PRESERVE_MIN_SIMILARITY}, " +
+                "clusterFaces=$totalFaces -> new person created")
+        }
         return if (bestIndex >= 0 && bestSim >= ClusteringConfig.NAME_PRESERVE_MIN_SIMILARITY) {
             val snapshot = availableSnapshots.removeAt(bestIndex)
             if (personDao.getPerson(snapshot.personId) == null) {
@@ -1356,6 +1363,11 @@ class TagGenerationScheduler(
 
         runDbscanClustering(dao, namedSnapshots)
 
+        // 保名兜底（2026-10-02 名字/关系清空事故）：聚类期「逐簇消费快照」的质心匹配
+        // 对小命名簇会整体漏掉（簇构成随参数漂移 → 失配 → 名字被清后无人认领，
+        // 6 个命名+isSelf+全部关系一次全灭实证）。此处对未复用快照做全局二次匹配重挂。
+        reattachUnpreservedNames(namedSnapshots)
+
         if (relationSnapshots.isNotEmpty()) {
             restorePersonRelations(relationSnapshots)
         }
@@ -1518,6 +1530,58 @@ class TagGenerationScheduler(
         }
         Log.i(TAG, "Built ${snapshots.size} named person snapshots for clustering preservation")
         return snapshots
+    }
+
+    /**
+     * 保名兜底：把聚类期未被复用的命名/isSelf 快照，对重聚后的全量人物做
+     * 全局最佳质心匹配并重挂名字与 is_self（目标须为未命名人物，避免覆盖已复用者）。
+     * 关系快照按名字回挂，名字找回即关系自愈。
+     */
+    private suspend fun reattachUnpreservedNames(namedSnapshots: List<NamedPersonSnapshot>) {
+        if (namedSnapshots.isEmpty()) return
+        val persons = personDao.getAllPersons()
+        val existingIds = persons.map { it.personId }.toSet()
+        val missing = namedSnapshots.filter { it.personId !in existingIds }
+        if (missing.isEmpty()) {
+            Log.i(TAG, "Name reattachment: all ${namedSnapshots.size} snapshot(s) reused in-cluster")
+            return
+        }
+        // 现存人物质心（仅未命名者可作为重挂目标）
+        val candidates = mutableListOf<Pair<Long, FloatArray>>()
+        for (person in persons) {
+            if (!person.name.isNullOrBlank()) continue
+            val embeddings = personDao.getEmbeddingsByPerson(person.personId)
+            if (embeddings.isEmpty()) continue
+            candidates.add(person.personId to computeCentroid(embeddings.map { byteArrayToFloatArray(it.embedding) }))
+        }
+        var reattached = 0
+        for (snap in missing) {
+            var bestId = -1L
+            var bestSim = -1f
+            for ((personId, centroid) in candidates) {
+                val sim = 1f - cosineDistance(snap.centroid, centroid)
+                if (sim > bestSim) {
+                    bestSim = sim
+                    bestId = personId
+                }
+            }
+            if (bestId > 0 && bestSim >= ClusteringConfig.NAME_PRESERVE_MIN_SIMILARITY) {
+                if (!snap.name.isNullOrBlank()) {
+                    personDao.updatePersonName(bestId, snap.name)
+                    reattached++
+                }
+                if (snap.isSelf) {
+                    personDao.clearSelfFlags()
+                    personDao.setSelf(bestId, true)
+                }
+                Log.i(TAG, "Name reattached: '${snap.name}' (self=${snap.isSelf}) -> person $bestId " +
+                    "(sim=${String.format("%.3f", bestSim)})")
+            } else {
+                Log.w(TAG, "Name reattach MISS: '${snap.name}' self=${snap.isSelf}, " +
+                    "bestSim=${String.format("%.3f", bestSim)} (candidates=${candidates.size}) — name lost")
+            }
+        }
+        Log.i(TAG, "Name reattachment: $reattached/${missing.size} recovered")
     }
 
     /**

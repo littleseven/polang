@@ -660,7 +660,9 @@ class TagScanOrchestrator(
                 return
             }
             activeSessionId = sessionId
-            fullRescanPasses.clear()
+            // fullRescanPasses 不在此清：schedulePass(FULL) 先写标记再 startSession，
+            // 会话开始即清会把标记抹掉 → executeTask 永远读到 false →「全部重新处理」
+            // 静默降级为增量（2026-10-02 实锤 no-op）。改为会话收尾清（runSession finally）。
         }
 
         currentJob?.cancel()
@@ -726,6 +728,8 @@ class TagScanOrchestrator(
             sessionPolicies.remove(sessionId)
         } finally {
             releaseWakeLock()
+            // 会话收尾统一清全量标记（原在 startSession 清=执行前自抹，见上注）
+            sessionMutex.withLock { fullRescanPasses.clear() }
         }
     }
 

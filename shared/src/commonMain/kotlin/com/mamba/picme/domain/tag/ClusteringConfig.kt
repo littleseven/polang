@@ -85,7 +85,7 @@ object ClusteringConfig {
      *  越小簇越紧凑（可能漏召），越大越连通（可能混组）。
      *  与 [KNN_MIN_SIMILARITY] 配合使用：阈值收紧后，k 过大反而把弱相关样本拉进簇。
      *  当前经验值 2：在保持召回的同时抑制跨组桥接。 */
-    const val KNN_K = 2
+    const val KNN_K = 4
 
     /** k-NN 建边最小余弦相似度（= 1 - eps）。
      *  与 [COSINE_THRESHOLD] / [MERGE_SIMILARITY_THRESHOLD] 对齐（0.65）。 */
