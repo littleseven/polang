@@ -19,16 +19,18 @@ struct EngineerTaskListRow: View {
     /// 11sp 小字 / 12sp 摘要 / 14sp 标题 Medium 为 spec 值，token 阶梯无对应档不归一化）。
     private enum Metrics {
         static let cornerRadius: CGFloat = AppRadius.lg        // 16
-        static let elevationTonal: Color = .clear              // tonal_elevation 2 由底色承担（见 cardBackground）
         static let metaFontSize: CGFloat = 11
         static let titleFontSize: CGFloat = 14
         static let summaryFontSize: CGFloat = 12
         static let innerPadding: CGFloat = Spacing.md           // 12
         static let approvalBorderWidth: CGFloat = 1
+        static let tonalTintOpacity: Double = 0.08              // M3 tonalElevation 2dp = primary 着色 8%
     }
 
-    /// M3 Surface(tonalElevation = 2) → surfaceContainerHigh（色阶映射）。
-    private var cardBackground: Color { s.surfaceContainerHigh }
+    /// M3 Surface(tonalElevation = 2) = surface 底 + primary 8% 着色（Android 卡呈浅玉色，无阴影）。
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous)
+    }
 
     var body: some View {
         Button(action: onTap) {
@@ -46,8 +48,9 @@ struct EngineerTaskListRow: View {
             }
             .padding(Metrics.innerPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: Metrics.cornerRadius, style: .continuous))
+            .background(s.primary.opacity(Metrics.tonalTintOpacity), in: cardShape)
+            .background(s.surface, in: cardShape)
+            .clipShape(cardShape)   // background(in:) 只裁背景填充不裁内容，保一层内容裁剪保险
             .overlay(approvalBorder)
         }
         .buttonStyle(.plain)

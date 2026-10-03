@@ -134,8 +134,9 @@ struct UserTaskCardView: View {
         .padding(.horizontal, Spacing.lg)     // 16
         .padding(.vertical, Spacing.md)       // 12
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(s.surfaceContainerHighest)   // M3 filled Card 容器色
+        .background(s.surfaceContainerLow)   // M3 Card 容器色（#F7F7F7 亮于 bg，纸面浮层感）
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.panel, style: .continuous))
+        .shadow(color: .black.opacity(0.08), radius: 2, y: 1)   // M3 Card elevation 1dp（PersonView 卡先例）
         .contentShape(RoundedRectangle(cornerRadius: AppRadius.panel, style: .continuous))
         .onTapGesture { onTap() }   // Button 子视图手势优先，不与动作行冲突
         .accessibilityIdentifier("task_center_user_card_\(task.id)")
@@ -145,15 +146,10 @@ struct UserTaskCardView: View {
     /// 进度区（spacing_top 8）：全宽进度条（progress null → 不定进度）+ 文本行（spacing_top 4）。
     private var progressSection: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            if let progress = task.progress?.floatValue {
-                ProgressView(value: Double(progress))
-                    .progressViewStyle(.linear)
-                    .tint(s.primary)
-            } else {
-                ProgressView()
-                    .progressViewStyle(.linear)
-                    .tint(s.primary)
-            }
+            M3LinearProgressBar(
+                progress: task.progress.map { Double($0.floatValue) },
+                track: s.surfaceVariant,
+                fill: s.primary)
             HStack(spacing: Spacing.sm) {
                 if let progressText = task.progressText {
                     Text(progressText)
@@ -189,6 +185,48 @@ struct UserTaskCardView: View {
         case .cancel: return "cancel"
         case .retry: return "retry"
         }
+    }
+}
+
+// MARK: - M3 LinearProgressIndicator 等价条
+
+/// M3 LinearProgressIndicator（task-center.yaml progress_section.bar）：4pt 圆头胶囊轨道
+/// （track=surfaceVariant）+ primary 填充；progress=nil → 不定进度（滑块离屏到离屏循环扫动）。
+private struct M3LinearProgressBar: View {
+    let progress: Double?
+    let track: Color
+    let fill: Color
+
+    @State private var indeterminatePhase: CGFloat = -0.4
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(track)
+                if let progress {
+                    Capsule().fill(fill)
+                        .frame(width: progress > 0 ? max(4, geo.size.width * min(progress, 1)) : 0)
+                        .animation(.easeInOut(duration: 0.3), value: progress)
+                } else {
+                    Capsule().fill(fill)
+                        .frame(width: geo.size.width * 0.4)
+                        .offset(x: indeterminatePhase * geo.size.width)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                                indeterminatePhase = 1.0
+                            }
+                        }
+                        .onDisappear {
+                            // 无动画复位：progress nil→数值→nil 往返后 State 残留 1.0，
+                            // 不复位则 withAnimation 目标值=当前值、动画冻死在离屏位
+                            indeterminatePhase = -0.4
+                        }
+                }
+            }
+        }
+        .frame(height: 4)
+        .clipShape(Capsule())
+        .accessibilityHidden(true)
     }
 }
 

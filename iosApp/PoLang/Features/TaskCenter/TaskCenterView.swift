@@ -61,6 +61,15 @@ struct TaskCenterView: View {
                     activeCount: previewSeed.activeUserCount)
                 return
             }
+            // 真机 UI 验证通路：`-taskCenterDemo` 直灌 populated 种子（看五态工程师卡 + 活跃态进度条）
+            if ProcessInfo.processInfo.arguments.contains("-taskCenterDemo") {
+                let seed = TaskCenterPreviewSeed.populated
+                store.loadPreview(
+                    engineer: seed.engineer,
+                    userTasks: seed.userTasks,
+                    activeCount: seed.activeUserCount)
+                return
+            }
             #endif
             store.start()
         }
@@ -177,11 +186,14 @@ struct TaskCenterView: View {
             LazyVStack(spacing: 0) {
                 if !active.isEmpty {
                     sectionHeader(L("task_center_section_active"))
-                    ForEach(Array(active.enumerated()), id: \.offset) { _, row in row }
+                    // id 必须带分区前缀：两个 ForEach 的裸 offset 在 LazyVStack 内撞身份，
+                    // 后者（history）整段不渲染（真机 demo 种子双 Tab 复现确认）。
+                    // 位置型 id：行增删时状态错位/无移动动画，本列表行内无持久交互态，接受。
+                    ForEach(active.enumerated().map { SectionedRow(id: "active-\($0.offset)", content: $0.element) }) { $0.content }
                 }
                 if !history.isEmpty {
                     sectionHeader(L("task_center_section_history"))
-                    ForEach(Array(history.enumerated()), id: \.offset) { _, row in row }
+                    ForEach(history.enumerated().map { SectionedRow(id: "history-\($0.offset)", content: $0.element) }) { $0.content }
                 }
             }
             .padding(.vertical, Spacing.xs)
@@ -216,6 +228,12 @@ struct TaskCenterView: View {
 }
 
 // MARK: - 计数徽标（Tab 徽标 + Chat 顶栏角标共用）
+
+/// 分区行包装（Identifiable：active/history 两 ForEach 的裸 offset 会在 LazyVStack 撞身份）。
+private struct SectionedRow<Content: View>: Identifiable {
+    let id: String
+    let content: Content
+}
 
 /// 活跃计数徽标（spec badge / chat_topbar_task_entry.badge：M3 Badge 等价——
 /// >0 显示、>99 显示 99+（task_center_badge_overflow）；error 底白字胶囊）。
