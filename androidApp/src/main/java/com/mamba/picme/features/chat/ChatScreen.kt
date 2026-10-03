@@ -105,6 +105,7 @@ import androidx.compose.material.icons.rounded.KeyboardVoice
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.AlertDialog
@@ -2070,6 +2071,7 @@ private fun ChatInputArea(
                             }
                         }
                     },
+                    onStop = { viewModel.stopGeneration() },
                     voiceEnabled = voiceEnabled,
                     voiceModelReady = voiceModelReady,
                     onSwitchToVoice = {
@@ -2142,6 +2144,8 @@ private fun ChatTextInputMode(
     onTextChange: (String) -> Unit,
     isProcessing: Boolean,
     onSend: () -> Unit,
+    /** 流式生成中显示「停止生成」按钮时的取消回调 */
+    onStop: () -> Unit,
     /** 语音入口是否可用（2026-08-19：语音模式 ≠ DISABLED 才为 true，默认关闭） */
     voiceEnabled: Boolean,
     /** 语音依赖的 ASR 模型是否已下载就绪；未就绪时不显示语音入口 */
@@ -2277,8 +2281,17 @@ private fun ChatTextInputMode(
                     )
                 }
 
-                // 发送按钮（有内容时显示；品牌渐变实底圆钮）
-                if (hasContent && !isProcessing) {
+                // 生成中：发送槽位渲染为「停止生成」（实底圆钮，点击取消当前回合）
+                if (isProcessing) {
+                    CircularIconButton(
+                        icon = Icons.Rounded.Stop,
+                        contentDescription = stringResource(R.string.chat_stop_generation),
+                        onClick = onStop,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                        container = MaterialTheme.colorScheme.surfaceContainerHigh
+                    )
+                } else if (hasContent) {
+                    // 发送按钮（有内容时显示；品牌渐变实底圆钮）
                     CircularIconButton(
                         icon = Icons.AutoMirrored.Rounded.Send,
                         contentDescription = stringResource(R.string.chat_send),

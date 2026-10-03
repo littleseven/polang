@@ -294,6 +294,13 @@ class IntentRouter(
                     callRouterLlm(bundle, query, state, today, traceId)
                 }
             }.getOrElse { error ->
+                // 外层取消（用户停止生成）不是路由失败：穿透，让停止即时生效；
+                // 仅路由自身 1.5s 超时（TimeoutCancellationException）走降级
+                if (error is kotlinx.coroutines.CancellationException &&
+                    error !is kotlinx.coroutines.TimeoutCancellationException
+                ) {
+                    throw error
+                }
                 val path = if (error is kotlinx.coroutines.TimeoutCancellationException) {
                     RoutePath.DEGRADED_TIMEOUT
                 } else {

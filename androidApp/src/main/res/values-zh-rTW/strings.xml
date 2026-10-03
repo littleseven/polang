@@ -758,6 +758,7 @@
     <string name="floating_chat_notification_title">AI 聊天氣泡執行中</string>
     <string name="floating_chat_notification_content">點擊開啟 破浪相冊 或停止氣泡。</string>
     <string name="chat_send">發送</string>
+    <string name="chat_stop_generation">停止生成</string>
 
     <!-- AI 遠端控制無障礙服務 -->
     <string name="settings_accessibility_service_title">無障礙服務</string>

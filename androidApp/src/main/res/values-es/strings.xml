@@ -781,6 +781,7 @@
     <string name="floating_chat_notification_title">La burbuja de chat con IA está activa</string>
     <string name="floating_chat_notification_content">Toca para abrir PoLang o detener la burbuja.</string>
     <string name="chat_send">Enviar</string>
+    <string name="chat_stop_generation">Detener generación</string>
     <!-- AI Remote Control Accessibility Service -->
     <string name="settings_accessibility_service_title">Servicio de accesibilidad</string>
     <string name="settings_accessibility_service_summary">Permite que los comandos del agente o de Feishu lean elementos de la IU de Compose y realicen toques o introduzcan texto.</string>

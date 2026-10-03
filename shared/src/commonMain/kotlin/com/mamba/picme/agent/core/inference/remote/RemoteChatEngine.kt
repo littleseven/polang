@@ -29,6 +29,7 @@ import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
@@ -273,6 +274,9 @@ class RemoteChatEngine internal constructor(
                 },
                 onFailure = { Result.failure(it) },
             )
+        } catch (e: CancellationException) {
+            // 用户主动停止：穿透给调用方静默收场（同 processChatReAct 的取消语义）
+            throw e
         } catch (e: Exception) {
             Logger.e(tag, "streamChatReAct error", e)
             Result.failure(e)
@@ -333,6 +337,9 @@ class RemoteChatEngine internal constructor(
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             Logger.e(tag, "processChatReAct timeout after ${timeoutMs}ms")
             Result.failure(RuntimeException("处理超时（${timeoutMs / 1000}秒），请稍后重试"))
+        } catch (e: CancellationException) {
+            // 用户主动停止（外层协程取消）：取消必须穿透（Koog/Ktor 级联断流），不得折叠成错误结果
+            throw e
         } catch (e: Exception) {
             Logger.e(tag, "processChatReAct error", e)
             Result.failure(e)
