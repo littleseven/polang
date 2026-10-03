@@ -2,6 +2,7 @@ import SwiftUI
 import Photos
 import PhotosUI
 import SharedKit
+import MarkdownUI
 
 /// Chat 主视图（1:1 对标 Android ChatScreen.kt）。
 /// spec: specs/screens/chat.yaml
@@ -324,6 +325,22 @@ struct ChatView: View {
             }
             .onChange(of: viewModel.messages.count) { _ in scrollToBottom(proxy) }
             .onChange(of: viewModel.messages.last?.content) { _ in scrollToBottom(proxy) }
+            #if DEBUG
+            // -chatMdDemo：配置在布局前完成导致 onChange 滚动落空，延迟补滚到底；
+            // -chatMdDemoTop：锚定 torture 消息顶部（截标题/段落区验证图）
+            .task {
+                let args = ProcessInfo.processInfo.arguments
+                guard args.contains("-chatMdDemo") || args.contains("-chatMdDemoTop") else { return }
+                let anchor: UnitPoint = args.contains("-chatMdDemoTop") ? .top : .bottom
+                for ns: UInt64 in [300_000_000, 1_000_000_000, 2_000_000_000] {
+                    try? await Task.sleep(nanoseconds: ns)
+                    guard !Task.isCancelled else { return }
+                    if let lastKey = flattenedItems.last?.key {
+                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(lastKey, anchor: anchor) }
+                    }
+                }
+            }
+            #endif
         }
     }
 
@@ -541,13 +558,10 @@ struct ChatView: View {
 }
 
 // MARK: - Markdown 文本（M5 B3，spec chat.yaml §5 agent_markdown）
-// AttributedString(markdown:) 全量解析 + run 级排版阶梯（§5 typography）：
-// headings h1 1.30…h6 1.00 全 Bold、inline_code 同字号等宽（Text 自动尊重
-// inlinePresentationIntent.code）、link primary+下划线、quote italic。
+// MarkdownUI（cmark-gfm 全量方言：表格/删除线/任务列表/自动链接）AST → 原生组件，
+// 排版阶梯与派生色见 PolangMarkdownTheme（§5 typography / color_derivation）。
 // parse gating：≤1500 字同步解析；超阈异步 + 80ms 防抖（task(id:) 随文本变化
-// 取消重排——流式增量不捕获旧内容，§5 streaming 红线）。
-// 平台限制登记（gap 报告披露）：run 级背景（inline_code_bg=text α0.12）与
-// run 级段落行高 SwiftUI Text 不支持——inline_code 以等宽区分，行高沿用视图级。
+// 取消重排——流式增量每次基于当前 text 全新 parse，禁闭包捕获旧内容，§5 streaming 红线）。
 
 struct MarkdownText: View {
     let text: String
@@ -557,62 +571,37 @@ struct MarkdownText: View {
     /// 超阈异步解析防抖
     private static let debounceNs: UInt64 = 80_000_000
 
-    @State private var asyncParsed: AttributedString?
+    @Environment(\.colorScheme) private var cs
+    @State private var asyncContent: MarkdownContent?
+
+    private var theme: Theme {
+        let s = appScheme(cs)
+        return .polangChat(text: s.onSurface, link: s.primary)
+    }
 
     var body: some View {
         if text.count <= Self.syncLimit {
-            Text(Self.styled(Self.parse(text)))
+            Markdown(MarkdownContent(text))
+                .markdownTheme(theme)
         } else {
-            Text(asyncParsed ?? AttributedString(text))
-                .task(id: text) {
-                    try? await Task.sleep(nanoseconds: Self.debounceNs)
-                    guard !Task.isCancelled else { return }
-                    asyncParsed = Self.styled(Self.parse(text))
-                }
-        }
-    }
-
-    private static func parse(_ markdown: String) -> AttributedString {
-        // 流式期间文本可能不完整（未闭合 ** / ``），用 returnPartiallyParsedIfPossible
-        // 容错；整体解析失败回退纯文本。
-        (try? AttributedString(markdown: markdown, options: opts)) ?? AttributedString(markdown)
-    }
-
-    private static let opts = AttributedString.MarkdownParsingOptions(
-        interpretedSyntax: .full,
-        failurePolicy: .returnPartiallyParsedIfPossible
-    )
-
-    /// §5 typography：headings 缩放（正文 16pt 基准），全档 Bold
-    private static let headingScale: [Int: CGFloat] = [
-        1: 1.30, 2: 1.22, 3: 1.15, 4: 1.10, 5: 1.05, 6: 1.00,
-    ]
-
-    /// run 级排版阶梯：headings 缩放+Bold / quote italic / link primary+下划线。
-    private static func styled(_ attr: AttributedString) -> AttributedString {
-        var m = attr
-        let base = ChatBubbleTokens.textSize
-        for run in m.runs {
-            // 新 Foundation API：presentationIntent.components（.header(level:) / .blockQuote）
-            if let intent = run.presentationIntent {
-                for component in intent.components {
-                    switch component.kind {
-                    case .header(let level):
-                        let scale = headingScale[level] ?? 1.0
-                        m[run.range].font = .system(size: base * scale, weight: .bold)
-                    case .blockQuote:
-                        m[run.range].font = .system(size: base).italic()
-                    default:
-                        break
-                    }
+            // task 必须挂在覆盖两种 async 状态的容器上——只挂占位分支会在首次解析完成、
+            // 视图切到 Markdown 分支后随占位视图移出层级，流式后续 chunk 永不再触发重解析
+            // （消息冻结在首次异步结果，违反 §5 streaming 红线）
+            Group {
+                if let asyncContent {
+                    Markdown(asyncContent)
+                        .markdownTheme(theme)
+                } else {
+                    // 异步解析窗口先落纯文本（防空窗），解析完成后无缝替换
+                    Text(text)
                 }
             }
-            if run.link != nil {
-                m[run.range].foregroundColor = .accentColor
-                m[run.range].underlineStyle = .single
+            .task(id: text) {
+                try? await Task.sleep(nanoseconds: Self.debounceNs)
+                guard !Task.isCancelled else { return }
+                asyncContent = MarkdownContent(text)
             }
         }
-        return m
     }
 }
 

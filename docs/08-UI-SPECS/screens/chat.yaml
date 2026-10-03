@@ -862,7 +862,7 @@ platform_differences:
   implementation_paths:             # 2026-09-28 M5 iOS 跟随登记：同一 shared 契约，双端实现载体差异
     markdown_rendering:
       android: "mikepenz multiplatform-markdown-renderer 0.41.0（AST→Compose）+ 白名单内联 HTML annotator；TABLE/CODE 段自研组件承接"
-      ios: "SwiftUI AST 自绘或等价 swift 库（库自选，能力面按 §5 agent_markdown 契约表现对等）"
+      ios: "MarkdownUI 2.4.1（SPM gonzalezreal/swift-markdown-ui，cmark-gfm 全量 AST→SwiftUI）+ Theme.polangChat 落地 §5 契约；TABLE/CODE 段自研组件承接（2026-10-03 定案，原 AttributedString 方案废弃）"
     html_card:
       android: "WebView 沙盒（loadHTMLString + about:blank，禁外链脚本）+ 测高分流 + 全屏查看器"
       ios: "WKWebView 同构（html-card-two-tier spec §12：照搬同款沙箱/测高/渐隐预览/链接落地页）"
