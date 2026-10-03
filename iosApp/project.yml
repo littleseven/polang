@@ -7,6 +7,12 @@ options:
   knownRegions: ["Base", "en", "zh-Hans", "zh-Hant", "es", "fr"]
   createIntermediateGroups: true
 
+packages:
+  # Chat 正文 GFM 渲染（chat.yaml §5 agent_markdown：AST→原生组件，iOS 侧「等价 swift 库，库自选」）
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    exactVersion: 2.4.1
+
 targets:
   PoLang:
     type: application
@@ -23,6 +29,8 @@ targets:
         embed: false
       - sdk: Metal.framework
       - sdk: Accelerate.framework
+      - package: MarkdownUI
+        product: MarkdownUI
     preBuildScripts:
       - name: Build SharedKit
         script: "\"$SRCROOT/scripts/build-shared-kit.sh\"\n"
@@ -60,6 +68,8 @@ targets:
       - path: PoLangTests
     dependencies:
       - target: PoLang
+      - package: MarkdownUI
+        product: MarkdownUI
     settings:
       base:
         DEVELOPMENT_TEAM: 6NPE45262A
