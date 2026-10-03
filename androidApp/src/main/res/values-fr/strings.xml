@@ -781,6 +781,7 @@
     <string name="floating_chat_notification_title">La bulle de chat IA est active</string>
     <string name="floating_chat_notification_content">Appuyez pour ouvrir PoLang ou arrêter la bulle.</string>
     <string name="chat_send">Envoyer</string>
+    <string name="chat_stop_generation">Arrêter la génération</string>
     <!-- AI Remote Control Accessibility Service -->
     <string name="settings_accessibility_service_title">Service d\'accessibilité</string>
     <string name="settings_accessibility_service_summary">Autoriser les commandes Agent/Feishu à lire les éléments de l\'interface Compose et à effectuer des tapotements ou des saisies.</string>

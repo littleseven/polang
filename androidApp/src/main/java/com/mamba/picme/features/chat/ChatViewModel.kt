@@ -117,6 +117,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -378,6 +379,35 @@ class ChatViewModel(
     /** 当前 claude 回合协程（任务卡「停止」取消对象；finally compare-and-clear 同 [activeEngineerTaskId]）。 */
     @Volatile
     private var activeClaudeJob: Job? = null
+
+    /** 当前主聊天回合协程（输入区「停止生成」取消对象；finally compare-and-clear 同 [activeClaudeJob]）。 */
+    @Volatile
+    private var activeChatJob: Job? = null
+
+    /** 登记可停止的主聊天回合协程：sendMessage / sendImageWithIntent / sendImageMessage 共用。 */
+    private fun launchChatRound(block: suspend kotlinx.coroutines.CoroutineScope.() -> Unit) {
+        activeChatJob = viewModelScope.launch {
+            val selfJob = coroutineContext[Job]
+            try {
+                block()
+            } finally {
+                if (activeChatJob === selfJob) activeChatJob = null
+            }
+        }
+    }
+
+    /**
+     * 输入区「停止生成」：取消当前进行中的生成回合。主聊天（含图片理解/以图搜图）取消
+     * [activeChatJob]（取消经协程级联中断底层 HTTP 流）；claude 工程师回合委托任务卡
+     * 既有停止语义（裁决 ABANDONED + 断 SSE）。无进行中回合时静默 no-op。
+     */
+    fun stopGeneration() {
+        val claudeTaskId = activeEngineerTaskId
+        when {
+            activeChatJob != null -> activeChatJob?.cancel()
+            claudeTaskId != null -> stopEngineerTask(claudeTaskId)
+        }
+    }
 
     /**
      * 进入 AI 工程师模式：有持久化上下文且所属 chat 会话仍在 → 切回该会话并恢复 sid
@@ -1656,7 +1686,7 @@ class ChatViewModel(
             return
         }
 
-        viewModelScope.launch {
+        launchChatRound {
             val sessionId = _currentSessionId.value
             replyUsedSandbox = false
             // 新回合开始：清掉上一回合可能残留的脚本待补卡 ids（防跨回合泄漏）
@@ -1936,6 +1966,22 @@ class ChatViewModel(
 
                 // 7. 清理超限消息
                 cleanupIfNeeded(sessionId)
+            } catch (e: CancellationException) {
+                // 用户主动停止（stopGeneration 取消本回合）：节奏器追平已缓冲全文，
+                // 有真实生成内容（非思考中/工具状态文案）则保留半截回复落库，
+                // 静默收场不产「推理失败」气泡（对齐 sendClaudeMessage 停止语义）。
+                // 判定须在 finish() 之前取样：finish 会把 showCursor 归 false。
+                val partial = _streamingMessage.value
+                val keepPartial = partial != null && !partial.isThinking && partial.showCursor
+                pacingController.finish()
+                val finalText = _streamingMessage.value?.content.orEmpty()
+                _streamingMessage.value = null
+                if (keepPartial && finalText.isNotBlank()) {
+                    withContext(NonCancellable) {
+                        insertAgentMessage(sessionId, finalText, currentModelLabel())
+                    }
+                }
+                throw e
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to send message", e)
                 _streamingMessage.value = null
@@ -3219,7 +3265,7 @@ class ChatViewModel(
      * 注意：[ImageIntent.EDIT] 由 UI 直接跳 PhotoEditor，不应进入本方法。
      */
     fun sendImageWithIntent(uri: String, intent: ImageIntent, text: String?) {
-        viewModelScope.launch {
+        launchChatRound {
             val sessionId = _currentSessionId.value
             try {
                 ensureSessionExists(sessionId)
@@ -3257,6 +3303,10 @@ class ChatViewModel(
                     else -> sendImageMessage(Uri.fromFile(java.io.File(uri)))
                 }
                 chatSessionDao.touchSession(sessionId)
+            } catch (e: CancellationException) {
+                // 主动停止（stopGeneration）：静默收场，内部状态由各子路径自行复位
+                _isProcessing.value = false
+                throw e
             } catch (e: Exception) {
                 Logger.e(TAG, "sendImageWithIntent failed", e)
                 _isProcessing.value = false
@@ -3271,7 +3321,7 @@ class ChatViewModel(
      * Florence-2 走 ONNX caption 管线，qwen3_vl_2b 走 MNN imageInference。
      */
     fun sendImageMessage(imageUri: Uri) {
-        viewModelScope.launch {
+        launchChatRound {
             val sessionId = _currentSessionId.value
             try {
                 ensureSessionExists(sessionId)
@@ -3281,7 +3331,7 @@ class ChatViewModel(
                 val persistedUri = persistImage(imageUri)
                 if (persistedUri == null) {
                     insertAgentMessage(sessionId, stringContext().getString(R.string.chat_image_save_failed), "error")
-                    return@launch
+                    return@launchChatRound
                 }
 
                 // 1. 保存用户图片消息到 Room（使用内部存储路径）
@@ -3329,7 +3379,7 @@ class ChatViewModel(
                 if (bitmap == null) {
                     _streamingMessage.value = null
                     insertAgentMessage(sessionId, stringContext().getString(R.string.chat_image_load_failed), "error")
-                    return@launch
+                    return@launchChatRound
                 }
 
                 // 4. 按解析出的模型执行图像理解：Florence-2 走 ONNX caption 管线，其余走 MNN imageInference
@@ -3343,7 +3393,7 @@ class ChatViewModel(
                             stringContext().getString(R.string.chat_model_not_loaded_guide, modelKey),
                             "error"
                         )
-                        return@launch
+                        return@launchChatRound
                     }
                     insertAgentMessage(sessionId = sessionId, content = description, modelUsed = modelKey)
                     // 将图片分析结果保存到 MemoryManager，使后续文本消息能引用图片上下文
@@ -3353,7 +3403,7 @@ class ChatViewModel(
                         assistantResponse = description
                     )
                     cleanupIfNeeded(sessionId)
-                    return@launch
+                    return@launchChatRound
                 }
 
                 // MNN VLM（qwen3_vl_2b）：显式传 modelId 跟随设置，提示词按 UI 语言直出
@@ -3393,7 +3443,7 @@ class ChatViewModel(
                         stringContext().getString(R.string.chat_image_process_error, error?.message ?: unknown)
                     }
                     insertAgentMessage(sessionId, message, "error")
-                    return@launch
+                    return@launchChatRound
                 }
                 val response = inferenceResult.getOrThrow()
 
@@ -3420,6 +3470,11 @@ class ChatViewModel(
                 }
 
                 cleanupIfNeeded(sessionId)
+            } catch (e: CancellationException) {
+                // 主动停止（stopGeneration）：清占位静默收场（端侧 VLM 无半截流式可保留），
+                // isProcessing 由 finally 复位
+                _streamingMessage.value = null
+                throw e
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to send image message", e)
                 _streamingMessage.value = null

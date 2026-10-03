@@ -806,6 +806,7 @@
     <string name="floating_chat_notification_title">AI Chat Bubble is running</string>
     <string name="floating_chat_notification_content">Tap to open PoLang or stop the bubble.</string>
     <string name="chat_send">Send</string>
+    <string name="chat_stop_generation">Stop generating</string>
 
     <!-- AI Remote Control Accessibility Service -->
     <string name="settings_accessibility_service_title">Accessibility Service</string>
