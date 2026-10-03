@@ -31,16 +31,16 @@ struct FloatingBottomTab: View {
 
     var body: some View {
         let s = appScheme(cs)
+        // 内容包裹（不通栏）：宽 = 5×(icon24 + h16×2) + 容器 h12×2 ≈ 304pt，居中悬浮（main-nav §1）
         HStack(spacing: 0) {
             ForEach(TabItem.all, id: \.a11yId) { item in
                 tabItem(item, scheme: s)
             }
         }
-        .frame(maxWidth: .infinity)  // SpaceEvenly：五项均分胶囊宽度
         .padding(.horizontal, BottomTabTokens.containerPaddingH)
         .padding(.vertical, BottomTabTokens.containerPaddingV)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: BottomTabTokens.cornerRadius, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
         )
@@ -58,7 +58,6 @@ struct FloatingBottomTab: View {
                 .foregroundColor(selected ? s.primary : s.onSurfaceVariant)
                 .padding(.horizontal, BottomTabTokens.itemPaddingH)
                 .padding(.vertical, BottomTabTokens.itemPaddingVIconOnly)
-                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
         // UI 自动化锚点：tab_gallery / tab_organize / tab_chat / tab_person / tab_memories
