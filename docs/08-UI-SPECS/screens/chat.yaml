@@ -768,7 +768,7 @@ js_toolcalls:
       lifecycle: "EngineerTaskReducer SSE 事件驱动五态迁移（RUNNING/AWAITING_CONTINUE/AWAITING_DELIVER/COMPLETED/FAILED）+ 审批回填幂等；REPLACE upsert + Mutex 串行化落库"
       approval: "审批唯一入口（原生动作条）：running→停止（stopEngineerTask：裁决 ABANDONED+取消本回合 SSE），截断→继续/到此为止，可交付→push/暂不，失败→重试；会话含任务卡时气泡 legacy 继续/交付按钮抑制（suppressClaudeActions）"
       smoke: "/task DEBUG 调试指令注入六样本（五态+long 超一屏样本覆盖展开升格 FULLPAGE，EngineerTaskSmokeSamples）"
-      ios_status: "TODO(ios-follow)"
+      ios_status: "ios-follow/taskcenter 在途（2026-10-03）：渲染管线就绪口径——EngineerTaskHtml 上提 shared 复用 + HtmlCardView 双形态 + 原生动作条；数据源仅持久化历史（iOS 无 claude-tunnel SSE，task-center.yaml §7 台账），live 流与审批动作缺席属登记差异"
     sandbox_badge:
       show_when: "replyUsedSandbox == true"
       icon: terminal
