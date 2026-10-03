@@ -18,7 +18,15 @@ struct TaskCenterView: View {
 
     @StateObject private var store = TaskCenterStore()
     /// 手选固定（spec tabs.selection_state.user_pick：手选后脱钩默认落位；nil = 跟随默认）。
-    @State private var userPickedTab: Int? = nil
+    /// UI 自动化可用 launch arg `-taskCenterTab <0|1>` 预选 Tab（对齐 -startPage 先例）。
+    @State private var userPickedTab: Int? = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let idx = args.firstIndex(of: "-taskCenterTab"),
+              args.count > idx + 1,
+              let tab = Int(args[idx + 1]),
+              (0...1).contains(tab) else { return nil }
+        return tab
+    }()
     @Environment(\.colorScheme) private var cs
     private var s: SchemeColors { appScheme(cs) }
 

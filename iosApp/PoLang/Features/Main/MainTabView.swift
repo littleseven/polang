@@ -35,6 +35,12 @@ final class MainNavigationRouter: ObservableObject {
         if args.contains("-openCamera") {
             showCamera = true
         }
+        // UI 自动化直进任务中心通路（同 -openCamera 先例）：
+        // launch arg `-openTaskCenter` → 启动即弹任务中心 fullScreenCover；
+        // `-taskCenterTab <0|1>` 预选 Tab（0=工程师任务 1=后台任务）
+        if args.contains("-openTaskCenter") {
+            showTaskCenter = true
+        }
     }
 }
 
