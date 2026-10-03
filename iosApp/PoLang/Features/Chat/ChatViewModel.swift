@@ -175,6 +175,18 @@ final class ChatViewModel: ObservableObject {
         currentSessionId = ChatHistoryStore.shared.currentSessionId
         bridge.setSessionId(id: currentSessionId)
         messages = ChatHistoryStore.shared.loadMessages(sessionId: currentSessionId)
+        #if DEBUG
+        // -chatMdDemo(Top)：注入全语法 torture 消息（markdown 渲染真机验证通路；
+        // 哨兵 id + persist() DEBUG 过滤，不落盘不污染历史）
+        if ProcessInfo.processInfo.arguments.contains("-chatMdDemo")
+            || ProcessInfo.processInfo.arguments.contains("-chatMdDemoTop") {
+            let md = Self.tortureMarkdown
+            messages.append(ChatMessage.make(
+                id: Self.tortureMessageId,
+                type: .agentText, content: md, role: .assistant,
+                parts: [MessagePartText(partId: "p0", markdown: md, state: .done)]))
+        }
+        #endif
         restoreGachaSelections()
         threads = ChatHistoryStore.shared.loadThreads()
         actionWatcher?.cancel()
@@ -1066,7 +1078,66 @@ final class ChatViewModel: ObservableObject {
 
     private func persist() {
         // 只持久化非流式消息，落当前会话文件
-        let persisted = messages.filter { !$0.isStreaming }
+        var persisted = messages.filter { !$0.isStreaming }
+        #if DEBUG
+        // -chatMdDemo torture 消息哨兵过滤（不落盘）
+        persisted.removeAll { $0.id == Self.tortureMessageId }
+        #endif
         ChatHistoryStore.shared.saveMessages(sessionId: currentSessionId, messages: persisted)
     }
 }
+
+#if DEBUG
+extension ChatViewModel {
+
+    /// torture 消息哨兵 id（persist() DEBUG 过滤依据）
+    static let tortureMessageId = "chatmd-demo-torture"
+
+    /// -chatMdDemo torture 样本：覆盖 §5 契约全语法面（标题阶梯/强调/删除线/行内代码/
+    /// 链接/自动链接/有序无序/任务列表/引用/分割线/围栏+缩进代码块/CJK 表格）。
+    static let tortureMarkdown: String = """
+        # 一级标题 H1
+        ## 二级标题 H2
+        ### 三级标题 H3
+
+        正文段落：**加粗**、*斜体*、~~删除线~~、`inline_code()` 行内代码、\
+        [链接示例](https://example.com) 与自动链接 https://polang.app 混排。\
+        第二行接同段落（软换行）。
+
+        另一段落，验证段落间距与 16/24 行高。CJK 混排 the quick brown fox。
+
+        - 无序列表项一
+        - 无序列表项二（含 `code`）
+          - 嵌套子项
+        1. 有序列表项一
+        2. 有序列表项二
+
+        - [x] 已完成任务
+        - [ ] 待办任务
+
+        > 引用块：斜体风格。blockquote italic style check。
+        > 第二行引用。
+
+        ---
+
+        | 项目 | 数量 | 备注 |
+        | --- | --- | --- |
+        | 媒体总数 | 507 | CJK 全角字计宽验证 |
+        | 照片 Photos | 493 张 | mixed 混排 |
+        | 视频 | 14 个 | ok |
+
+        ```swift
+        func render(markdown: String) -> some View {
+            // 围栏代码块：等宽 0.80 缩放 + 横滚（长行不折行）
+            let veryLongLine = "这是一行特别特别特别特别特别特别特别特别特别特别特别特别特别长的代码注释 long long long long line"
+            return MarkdownView(content: markdown, theme: .polangChat)
+        }
+        ```
+
+        缩进代码块（4 空格，MARKDOWN 段内同待遇）：
+
+            indented code block
+            second line 也是代码
+        """
+}
+#endif
