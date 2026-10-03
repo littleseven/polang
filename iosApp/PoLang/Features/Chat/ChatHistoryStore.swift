@@ -35,22 +35,26 @@ final class ChatHistoryStore {
     private let sessionsFileName = "chat_sessions.json"
     private let currentSessionKey = "polang_chat_current_session_id"
 
-    private var sessionsFileURL: URL {
+    // 以下路径与文件读写方法 nonisolated：全会话扫描（任务中心工程师 Tab）在后台线程消费——
+    // 本类无可变存储态（仅 let 常量 + 无状态文件 I/O），脱离 MainActor 安全；legacy 兜底的
+    // 迁移写盘（loadMessages → saveMessages）为原子整文件替换，并发重写同内容幂等。
+
+    nonisolated private var sessionsFileURL: URL {
         Self.documents.appendingPathComponent(sessionsFileName)
     }
 
-    private static var documents: URL {
+    nonisolated private static var documents: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    private func messagesFileURL(sessionId: String) -> URL {
+    nonisolated private func messagesFileURL(sessionId: String) -> URL {
         Self.documents.appendingPathComponent("chat_history_\(sessionId).json")
     }
 
     // MARK: - 会话索引
 
-    /// 读取会话列表（updatedAt 倒序，对齐 Android 侧栏排序）。
-    func loadThreads() -> [ChatThread] {
+    /// 读取会话列表（updatedAt 倒序，对齐 Android 侧栏排序）。nonisolated：文件读取+解码可离主线程。
+    nonisolated func loadThreads() -> [ChatThread] {
         guard let data = try? Data(contentsOf: sessionsFileURL),
               let threads = try? JSONDecoder().decode([ChatThread].self, from: data) else { return [] }
         return threads.sorted { $0.updatedAt > $1.updatedAt }
@@ -105,8 +109,8 @@ final class ChatHistoryStore {
 
     /// 读取消息：新线格式（ChatHistoryStoreCodec，parts 双 payload）优先；
     /// 结构损坏/空文件 → 老 JSON（LegacyChatMessage）兜底迁移，迁移成功即回写新线格式
-    /// （下次读取走 codec 快路径），**不允许丢消息**。
-    func loadMessages(sessionId: String) -> [ChatMessage] {
+    /// （下次读取走 codec 快路径），**不允许丢消息**。nonisolated：全会话扫描离主线程消费。
+    nonisolated func loadMessages(sessionId: String) -> [ChatMessage] {
         guard let data = try? Data(contentsOf: messagesFileURL(sessionId: sessionId)),
               let text = String(data: data, encoding: .utf8) else { return [] }
         if let decoded = ChatHistoryStoreCodec.shared.decode(text: text) {
@@ -123,8 +127,9 @@ final class ChatHistoryStore {
     }
 
     /// 落盘消息：ChatHistoryStoreCodec 整包编码（wire 8 值分类法 + parts 嵌套数组，
-    /// 与 Android MessagePartsCodec 同一线格式；瞬态字段不落库）。
-    func saveMessages(sessionId: String, messages: [ChatMessage]) {
+    /// 与 Android MessagePartsCodec 同一线格式；瞬态字段不落库）。nonisolated：供
+    /// loadMessages 兜底迁移在后台线程回写（原子整文件替换）。
+    nonisolated func saveMessages(sessionId: String, messages: [ChatMessage]) {
         do {
             let text = ChatHistoryStoreCodec.shared.encode(messages: messages)
             try text.data(using: .utf8)?.write(to: messagesFileURL(sessionId: sessionId), options: .atomic)

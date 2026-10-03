@@ -12,6 +12,8 @@ struct ChatView: View {
     var onNavigateToGallery: ((String) -> Void)? = nil
     /// EDIT 意图：跳 PhotoEditorScreen(localIdentifier:)（MainTabView 接线）
     var onEditImage: ((String) -> Void)? = nil
+    /// 任务中心入口（task-center.yaml §6：顶栏 trailing 首枚 → MainNavigationRouter.showTaskCenter）
+    var onOpenTaskCenter: (() -> Void)? = nil
 
     @StateObject private var viewModel = ChatViewModel()
     /// 全屏图片预览（chat 图/媒体卡点击打开）
@@ -22,14 +24,15 @@ struct ChatView: View {
     @State private var showClearConfirm = false
     @State private var isSidebarOpen = false
     @State private var showPhotoPicker = false
-    /// 诚实占位：功能未实现时的说明（spec §11 允许差异外的项后续补齐）
-    @State private var comingSoonFeature: String? = nil
     /// 「自己的 Token」入口：全屏打开设置·远程模型页（chat.yaml §4.1 secondary_cta）
     @State private var showTokenConfig = false
     /// HTML 卡 FULLPAGE 全屏查看器（chat.yaml §13：卡内「查看完整内容」进入）
     @State private var htmlFullpage: HtmlFullpagePayload? = nil
     /// HTML 卡外链浮层（非 http(s) 之外的导航/新窗口链接，页内 WebView 预览）
     @State private var htmlLinkURL: URL? = nil
+    /// 任务中心角标计数（task-center.yaml §6：工程师活跃 + 后台活跃合并；iOS 无工程师
+    /// 数据链工程师活跃恒 0，实际 = registry.activeCount——台账登记差异）
+    @State private var activeTaskCount = 0
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -115,6 +118,18 @@ struct ChatView: View {
             }
             viewModel.onEditImage = { lid in self.onEditImage?(lid) }
         }
+        // 任务中心角标（SKIE StateFlow 直订阅；KotlinInt 边界 .int32Value 落地）
+        .task {
+            for await count in container.userTaskRegistry.activeCount {
+                activeTaskCount = Int(count.int32Value)
+            }
+        }
+        // 任务中心工程师列表项整卡点击 → 切到该任务所在会话（US-15 锚定降级）
+        .onReceive(NotificationCenter.default.publisher(for: .taskCenterOpenChatSession)) { note in
+            if let sessionId = note.object as? String {
+                viewModel.switchSession(sessionId)
+            }
+        }
         .confirmationDialog(
             String(localized: "Clear conversation?"),
             isPresented: $showClearConfirm,
@@ -124,17 +139,6 @@ struct ChatView: View {
                 viewModel.clearHistory()
             }
             Button(String(localized: "Cancel"), role: .cancel) {}
-        }
-        .alert(
-            String(localized: "Coming Soon"),
-            isPresented: Binding(
-                get: { comingSoonFeature != nil },
-                set: { if !$0 { comingSoonFeature = nil } }
-            )
-        ) {
-            Button(String(localized: "OK"), role: .cancel) {}
-        } message: {
-            Text(comingSoonFeature ?? "")
         }
         .alert(
             String(localized: "Unavailable"),
@@ -208,13 +212,28 @@ struct ChatView: View {
 
             Spacer()
 
-            // 上报问题（Android 走 /v1/report-issue 建 GitHub issue，iOS 通道未接）
-            Button { comingSoonFeature = String(localized: "Issue reporting is not available in this version.") } label: {
-                MatIcon(name: "mat_o_bug_report", size: TopBarTokens.iconSize)
-                    .foregroundColor(Color(.label))
+            // 任务中心入口（topbar.yaml variant_iconrow trailing 首枚 + task-center.yaml §6：
+            // 角标 = 合并活跃计数，>0 显示、>99 显示 99+；2026-09-26 ic/bug_report 迁设置页
+            // 后任务图标接替——chat 顶栏不再保留上报钮，上报走 Settings ReportIssueEntryView）。
+            // 字形：无 mat_o_assignment 资产，SF Symbols list.clipboard 代位（topbar.yaml
+            // icons.platforms：SF 仅为语义参考名——笔画视觉重量对齐免检项）。
+            Button { onOpenTaskCenter?() } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "list.clipboard")
+                        .font(.system(size: TopBarTokens.iconSize, weight: .regular))
+                        .foregroundColor(Color(.label))
+                        .frame(width: TopBarTokens.buttonSize, height: TopBarTokens.buttonSize)
+                    if activeTaskCount > 0 {
+                        TaskCountBadge(count: activeTaskCount)
+                            .offset(x: 6, y: -2)
+                    }
+                }
+                .contentShape(Rectangle())
             }
-            .frame(width: TopBarTokens.buttonSize, height: TopBarTokens.buttonSize)
-            .accessibilityIdentifier("chat_report")
+            .accessibilityIdentifier("chat_task_center_entry")
+            .accessibilityLabel(activeTaskCount > 0
+                ? String(format: L("cd_task_center_active"), Int64(activeTaskCount))
+                : L("cd_task_center"))
 
             // 新对话（= 新建会话并切换，对齐 Android onNewChat；非清空当前会话）
             Button { viewModel.newSession() } label: {
@@ -753,7 +772,8 @@ private struct MessageBubble: View {
 // （USER / legacy 桶）走 MessageBubble；带 part 的 item 按 contentType 分桶。
 // B1 工具态极简（placeholder/status = spinner、error = 三角，复用既有文案 key）；
 // B4 落地：HTML_CARD 双形态已实现（htmlCardItem——INLINE 沙箱 WebView / FULLPAGE
-// 封面卡 + 查看器浮层）；TASK_CARD 仍为占位卡（双显禁止——不渲染消息行 content 本体）。
+// 封面卡 + 查看器浮层）；TASK_CARD = EngineerTaskCardView（shared L1 模板 HTML 组装，
+// 折叠/展开 + 原生兜底；iOS 无数据链只读——双显禁止，不渲染消息行 content 本体）。
 
 private struct ChatListItemView: View {
     let item: ChatListItem
@@ -790,7 +810,7 @@ private struct ChatListItemView: View {
         case t.TYPE_MEDIA_RESULTS: mediaResultsItem
         case t.TYPE_OPTIMIZE_CANDIDATES: gachaItem
         case t.TYPE_HTML_CARD: htmlCardItem
-        case t.TYPE_TASK_CARD: pendingCardItem
+        case t.TYPE_TASK_CARD: taskCardItem
         case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
         default: EmptyView()
         }
@@ -908,21 +928,19 @@ private struct ChatListItemView: View {
         }
     }
 
-    /// TASK_CARD：B4 双形态实现前的占位卡（HTML 化在 H2 线）。
-    private var pendingCardItem: some View {
-        HStack(spacing: Spacing.sm) {
-            Image(systemName: "doc.richtext")
-                .font(.system(size: 18))
-                .foregroundColor(Color(.secondaryLabel))
-            Text(String(localized: "Coming Soon"))
-                .font(.system(size: 14))
-                .foregroundColor(Color(.secondaryLabel))
+    /// TASK_CARD（chat.yaml §13 task_card）：item 的 engineerTask 非空 →
+    /// EngineerTaskHtml 组装 + HtmlCardView 双形态渲染（折叠/展开、只读无动作条）；
+    /// 组装失败 → EngineerTaskCardView 内原生兜底卡。双显禁止——不渲染消息行 content。
+    private var taskCardItem: some View {
+        let task = (item.part as? MessagePartTaskCard)?.task ?? item.message.engineerTask
+        return Group {
+            if let task {
+                EngineerTaskCardView(
+                    task: task,
+                    onOpenFullpage: onOpenHtmlFullpage,
+                    onOpenLink: onOpenHtmlLink)
+            }
         }
-        .padding(Spacing.md)
-        .frame(maxWidth: ChatBubbleTokens.bubbleMaxWidth, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 工具态（B1 极简）：placeholder/status = spinner；error = 三角警示。文案复用

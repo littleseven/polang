@@ -35,6 +35,11 @@ final class AppContainer: ObservableObject {
     /// ChatViewModel 落 HTML_CARD 消息，M5 B4 chat.yaml §13）
     let renderHtmlBridge: RenderHtmlBridge
 
+    /// 用户任务注册表（shared UserTaskRegistry 经 iosMain 工厂 createUserTaskRegistry 构造，
+    /// 持久化 = UserTaskStoreBridge 文件 JSON；任务中心「后台任务」Tab 与顶栏角标数据源，
+    /// 契约 tmp/ios-follow/taskcenter/contracts.md §C）
+    let userTaskRegistry: UserTaskRegistry
+
     /// 美颜渲染参数（全局共享，BeautyPanelView ↔ BeautyRenderer 双向绑定）
     @Published var beautyParams = BeautyRenderer.Params()
 
@@ -59,6 +64,10 @@ final class AppContainer: ObservableObject {
         self.aiOptimizeBridge = AiOptimizeBridge.shared
         self.navigationBridge = NavigationBridge.shared
         self.renderHtmlBridge = RenderHtmlBridge.shared
+        self.userTaskRegistry = createUserTaskRegistry(bridge: UserTaskStoreBridge())
+        // 用户任务适配器注册（spec §6 组合根接线；registerAdapter 内部调 adapter.start() 起订阅）
+        userTaskRegistry.registerAdapter(adapter: TagScanTaskAdapter(registry: userTaskRegistry))
+        userTaskRegistry.registerAdapter(adapter: ModelDownloadTaskAdapter(registry: userTaskRegistry))
         setupAgentComposition()
     }
 
