@@ -16,6 +16,7 @@ import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.MediaDao
+import com.mamba.picme.data.local.RoomUserTaskStore
 import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.beauty.api.facedetect.FaceDetector
 import com.mamba.picme.beauty.api.facedetect.FaceDetectorFactory
@@ -732,7 +733,7 @@ class AppContainerImpl(
     }
 
     override val userTaskRegistry: UserTaskRegistry by lazy {
-        UserTaskRegistry(dao = database.userTaskDao(), scope = userTaskScope)
+        UserTaskRegistry(store = RoomUserTaskStore(database.userTaskDao()), scope = userTaskScope)
     }
 
     /** 幂等守卫：KDoc 约定不如代码可靠，重复调用直接返回（防双订阅） */

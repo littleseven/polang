@@ -1,5 +1,6 @@
 package com.mamba.picme.domain.usertask
 
+import com.mamba.picme.data.local.RoomUserTaskStore
 import com.mamba.picme.data.local.dao.UserTaskDao
 import com.mamba.picme.data.local.entity.UserTaskEntity
 import com.mamba.picme.domain.tag.scan.LibraryCompletion
@@ -43,7 +44,7 @@ class TagScanTaskAdapterTest {
     // runTest 默认 StandardTestDispatcher 不会自动推进，故用共享 testScheduler 的 Unconfined scope（同 UserTaskRegistryTest 先例）。
     private fun fixture(scheduler: TestCoroutineScheduler): Triple<UserTaskRegistry, TagScanTaskAdapter, FakeControl> {
         val scope = TestScope(UnconfinedTestDispatcher(scheduler))
-        val registry = UserTaskRegistry(dao = FakeDao(), scope = scope, clock = { 1000L })
+        val registry = UserTaskRegistry(store = RoomUserTaskStore(FakeDao()), scope = scope, clock = { 1000L })
         val control = FakeControl()
         val adapter = TagScanTaskAdapter(registry = registry, control = control, scope = scope)
         return Triple(registry, adapter, control)

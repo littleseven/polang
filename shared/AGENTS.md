@@ -17,11 +17,11 @@
 
 ```
 shared/src/
-├── commonMain/    ← 引擎无关层（124 个 Kotlin 文件，见 §2）
+├── commonMain/    ← 引擎无关层（131 个 Kotlin 文件，见 §2）
 ├── androidMain/   ← Android 平台实现（VLM/语音/DataStore/dispatcher actual，14 文件）
-├── iosMain/       ← iOS actual + Phase 6.2 chat 全链路（31 文件）：IosAgentComposition 组合根/ChatAgentBridge（Swift↔Kotlin 桥，多会话 setSessionId/clearHistory(sessionId:) 按 koog_memory_<sessionId> 分键隔离）/IosChatGalleryCapability（+IosChatGallerySearch 纯逻辑、IosChatSearchBridge 搜索引擎桥，契约 tmp/ios-follow/gallery-search/contracts.md §9）/IosKoogMessageMemoryStore（NSUserDefaults）/IosMediaRepository(+Bridge)/FlowWatchers/ChatUiActionDto/IosChatPrompt/IosAiOptimizeCapability(+IosAiOptimizeBridge)/IosChartCapability(+IosChartBridge)/IosRunScriptCapability(+IosRunScriptBridge)/IosRenderHtmlCapability(+IosRenderHtmlBridge，render_html 工具→HtmlCardSanitizer 清洗→Swift HtmlCardView，M5)/IosJsRuntimeSupport/IosDiagnosticLogStore/domain/chat/StreamingPacingControllerFactory/TimeProvider；唯一 stub 为 IosUnavailableImageInferenceEngine（端侧 VLM 未落地，显式空契约）
+├── iosMain/       ← iOS actual + Phase 6.2 chat 全链路（32 文件）：IosAgentComposition 组合根/ChatAgentBridge（Swift↔Kotlin 桥，多会话 setSessionId/clearHistory(sessionId:) 按 koog_memory_<sessionId> 分键隔离）/IosChatGalleryCapability（+IosChatGallerySearch 纯逻辑、IosChatSearchBridge 搜索引擎桥，契约 tmp/ios-follow/gallery-search/contracts.md §9）/IosKoogMessageMemoryStore（NSUserDefaults）/IosMediaRepository(+Bridge)/FlowWatchers/ChatUiActionDto/IosChatPrompt/IosAiOptimizeCapability(+IosAiOptimizeBridge)/IosChartCapability(+IosChartBridge)/IosRunScriptCapability(+IosRunScriptBridge)/IosRenderHtmlCapability(+IosRenderHtmlBridge，render_html 工具→HtmlCardSanitizer 清洗→Swift HtmlCardView，M5)/IosJsRuntimeSupport/IosDiagnosticLogStore/domain/chat/StreamingPacingControllerFactory/TimeProvider/domain/usertask IosUserTaskStore(+IosUserTaskStoreBridge Swift 持久化桥协议+createUserTaskRegistry 工厂，ios-follow/taskcenter)；唯一 stub 为 IosUnavailableImageInferenceEngine（端侧 VLM 未落地，显式空契约）
 ├── jvmMain/       ← JVM actual（5 文件：Platform/DispatcherProvider/AgentIdGenerator/KoogHttpClientFactoryProvider actual + domain/chat/TimeProvider.kt）
-├── commonTest/    ← 多平台测试（kotlin.test，34 文件）
+├── commonTest/    ← 多平台测试（kotlin.test，56 文件）
 ├── iosTest/       ← iOS 测试（6 文件）
 └── jvmTest/       ← JVM-only 测试（@Tool 反射清单/prompt golden/守卫扫描，7 文件）
 ```
@@ -57,7 +57,7 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 - 协议分流收口在 `RemoteModelFactory.createKoogExecutor`。
 - **Koog 实际版本 = 1.3.0**（`gradle/libs.versions.toml`；本文其余 1.1.1 表述为历史实证记录）。1.3.0 起消息模型变化：`MessagePart.Tool.Result` 内容为 `parts: List<ContentPart>`（读全文用 `output`，改写用 `copy(parts = …)`，String content 仅是便捷构造）；`MessagePart.Tool.Call` 参数字段为 `args`（非 arguments）。
 
-另有 `beauty/api/`（BeautySettings/FilterType/StyleFilter，供 beauty-api 经 `api(project(":shared"))` 透出）、`domain/`（UserPreferences/MediaRepository/StructuredFilter/tag 聚类纯算法；旧 `DuplicateGroup` 已随去重 2.0（androidApp `domain/dedup/`）于 2026-08-26 删除）。
+另有 `beauty/api/`（BeautySettings/FilterType/StyleFilter，供 beauty-api 经 `api(project(":shared"))` 透出）、`domain/`（UserPreferences/MediaRepository/StructuredFilter/tag 聚类纯算法；旧 `DuplicateGroup` 已随去重 2.0（androidApp `domain/dedup/`）于 2026-08-26 删除）。2026-10-03 任务中心上提（ios-follow/taskcenter，iOS 经 SKIE 消费）：`domain/usertask/`（UserTask 协议模型+5 枚举/UserTaskMapping 纯推导/UserTaskAdapter/UserTaskStore+UserTaskRow 存储抽象/UserTaskRegistry 混合注册表——写节流 WrittenRow（Mutex 保护）/HISTORY_KEEP=50/异常降级不穿透/trimHistory/进度内存快照，包名与 androidApp 原址相同经 api 透出，平台体系投影扩展留 androidApp 同包，Android 存储实现 = androidApp `data/local/RoomUserTaskStore`）；`domain/chat/taskcenter/`（TaskCenterPartition 分区纯逻辑 + EngineerTaskHtml 任务卡 L1 模板组装器/EngineerTaskPalette/EngineerTaskTexts/EngineerTaskThrottle，自 androidApp `features/chat/engineer/` 上提，包名改为 domain.chat.taskcenter）。
 
 > 🔴 **`domain/chat/` 消息模型的上位约束（2026-09-27 起，宪法级）**：ChatMessage/MessagePart/流式 chunk/工具状态机的一切演进以 ADR-016 + spec `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md` 为准（Vercel parts 模型：有序 parts 数组、块级 id、UIMessage/ModelMessage 双层分离、data part 默认不回灌 LLM）；type 值域与 role 另受分类法专项 spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md` 约束（3 分类 8 值 + role 升格消息级独立列）。
 >

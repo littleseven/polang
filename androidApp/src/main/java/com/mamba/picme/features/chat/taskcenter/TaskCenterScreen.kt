@@ -51,9 +51,9 @@ import com.mamba.picme.features.chat.components.EngineerTaskErrorBlock
 import com.mamba.picme.features.chat.components.EngineerTaskStatusChip
 import com.mamba.picme.features.chat.components.formatElapsed
 import com.mamba.picme.features.chat.components.taskMetaText
-import com.mamba.picme.features.chat.engineer.TaskCenterItem
-import com.mamba.picme.features.chat.engineer.TaskCenterList
-import com.mamba.picme.features.chat.engineer.TaskCenterPartition
+import com.mamba.picme.domain.chat.taskcenter.TaskCenterItem
+import com.mamba.picme.domain.chat.taskcenter.TaskCenterList
+import com.mamba.picme.domain.chat.taskcenter.TaskCenterPartition
 import com.mamba.picme.features.common.topbar.AppTopBar
 
 /**

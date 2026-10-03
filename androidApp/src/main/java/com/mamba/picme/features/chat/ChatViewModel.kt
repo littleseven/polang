@@ -88,7 +88,7 @@ import com.mamba.picme.features.chat.capability.SearchOutcome
 import com.mamba.picme.features.chat.engineer.EngineerTaskReducer
 import com.mamba.picme.features.chat.engineer.EngineerTaskSid
 import com.mamba.picme.features.chat.engineer.EngineerTaskSmokeSamples
-import com.mamba.picme.features.chat.engineer.TaskCenterPartition
+import com.mamba.picme.domain.chat.taskcenter.TaskCenterPartition
 import com.mamba.picme.features.chat.js.CapabilityDispatchHandler
 import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
