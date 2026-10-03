@@ -86,6 +86,9 @@ struct OrganizeHomeView: View {
     }
 
     // MARK: 顶部胶囊分段开关「整理 / 扫描」
+    // tag-control.yaml chrome.capsule_switch：track=surfaceVariant pad6；
+    // active=primary 实底 + onPrimary 14sp SemiBold，inactive=无底 + onSurfaceVariant 14sp Regular。
+    // 内容包裹居中（ardot organize-hub 设计稿），不通栏拉伸。
 
     private var segmentControl: some View {
         let s = appScheme(cs)
@@ -101,9 +104,9 @@ struct OrganizeHomeView: View {
                 isSelected: segment == .scan
             ) { switchSegment(.scan) }
         }
-        .padding(Spacing.xs)
-        .background(Capsule().fill(s.surfaceContainerHigh))
-        .padding(.horizontal, Spacing.lg)
+        .padding(6)
+        .background(Capsule().fill(s.surfaceVariant))
+        .frame(maxWidth: .infinity)
         .padding(.top, Spacing.sm)
         .padding(.bottom, Spacing.xs)
     }
@@ -119,13 +122,13 @@ struct OrganizeHomeView: View {
             Text(title)
                 .font(AppTypography.labelLarge.font)
                 .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundColor(isSelected ? s.onSurface : s.onSurfaceVariant)
-                .frame(maxWidth: .infinity)
+                .foregroundColor(isSelected ? s.onPrimary : s.onSurfaceVariant)
+                .padding(.horizontal, Spacing.lg)
                 .padding(.vertical, Spacing.sm)
                 .background(
                     Group {
                         if isSelected {
-                            Capsule().fill(s.surface)
+                            Capsule().fill(s.primary)
                         } else {
                             Color.clear
                         }

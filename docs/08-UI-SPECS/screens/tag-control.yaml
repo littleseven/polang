@@ -27,6 +27,7 @@ tag_control:
   background: "colorScheme.background"
   chrome:                                          # 嵌入 OrganizeHome（整理|扫描双 tab 宿主）
     capsule_switch:                                # 宿主提供（r24 track=surfaceVariant pad6）
+      form: "内容包裹居中胶囊（不通栏拉伸；ardot organize-hub 设计稿形态）"
       active_tab: "扫描 = primary 底 + onPrimary 14sp SemiBold"
       inactive_tab: "整理 = 无底 + onSurfaceVariant 14sp Regular"
     note: "embedded 态 contentWindowInsets 清零（对齐 DedupHomeScreen）；胶囊条即唯一页头"
