@@ -64,13 +64,9 @@ struct MediaPagerView: View {
     @State private var showFaceOverlay = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    /// 删除桥（会话批量：退出预览时整批 deleteMediaAwaitingOutcome 一次系统确认框）
-    private let bridge = PhMediaBridge()
+    /// 删除桥不再直用——标记落库（TagDatabase.pending_deletes），执行归 PendingDeleteExecutor。
     /// 存活列表（§16b 乐观收缩）：上滑落标记即从这里收缩跳相邻张；删空自动收起预览回网格
     @State private var liveItems: [MediaAsset]
-    /// 会话待删标记（2026-10-04 批量语义）：预览内累积，退出时整批提交一次系统确认框；
-    /// 进程被杀标记作废（一张不删，spec §16b ios_note 登记）
-    @State private var pendingDeleteUris: [String] = []
     /// 上滑删除手势阶段（只作用于当前页；详见 SwipeDeletePhase）
     @State private var swipePhase: SwipeDeletePhase = .idle
     /// 分页全屏高（§16b：结算阈值 = 页高 25%、飞出距离基准）
@@ -355,17 +351,15 @@ struct MediaPagerView: View {
 
     private func deleteCurrent() {
         guard let asset = currentAsset else { return }
-        pendingDeleteUris.append(asset.uri)
-        dismiss()  // 标记后退出大图页；退出时整批一次系统确认框（网格经观察者刷新）
+        TagDatabase.shared.addPendingDelete(uri: asset.uri, source: "media_pager")
+        dismiss()  // 标记落库后退出大图页；退出时任务化整批一次系统确认框
     }
 
-    /// 退出预览一次性提交全部待删标记（PHAssetChangeRequest 系统确认框每会话至多 1 次）。
-    /// 系统框取消 = 整批不删——照片从未离开图库，网格无需恢复；确认成功后 TagDatabase
-    /// 快照清理由 deleteMediaAwaitingOutcome 通路内联，网格经 PHPhotoLibraryObserver 刷新。
+    /// 退出预览触发待删任务执行（PHAssetChangeRequest 系统确认框每触发至多 1 次）。
+    /// 系统框取消 = 整批不删——照片从未离开图库，记录保留待下次触发；
+    /// 确认成功后记录结清、TagDatabase 快照清理由删除通路内联，网格经观察者刷新。
     private func submitPendingDeletesOnExit() {
-        let uris = pendingDeleteUris
-        guard !uris.isEmpty else { return }
-        _ = bridge.deleteMediaAwaitingOutcome(localIdentifiers: uris) { _ in }
+        PendingDeleteExecutor.shared.executePendingIfAny(trigger: .userAction)
     }
 
     // MARK: - 上滑删除（spec gallery-grid.yaml §16b swipe_up_delete）
@@ -478,9 +472,9 @@ struct MediaPagerView: View {
     }
 
     /// 落待删标记（§16b ios_note 会话批量语义）：预览内不即时调系统删除——
-    /// 标记 + 乐观收缩；退出预览时整批一次系统确认框。
+    /// 标记落库（pending_deletes，进程被杀不丢）+ 乐观收缩；退出预览任务化整批一次确认。
     private func performSwipeUpDelete(_ asset: MediaAsset) {
-        pendingDeleteUris.append(asset.uri)
+        TagDatabase.shared.addPendingDelete(uri: asset.uri, source: "media_pager")
         shrinkAfterSwipeDelete(asset)
     }
 

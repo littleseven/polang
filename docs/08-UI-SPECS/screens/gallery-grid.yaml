@@ -607,10 +607,15 @@ media_pager:
       实现校正（2026-09-15）：`PHAssetChangeRequest.deleteAssets` 系统强制弹确认框
       （"Delete Photo?"），iOS 无零弹框通路；静默删除开关在 iOS 不适用（见 §26 台账）。
       会话批量语义（2026-10-04）：预览内上滑/底栏删除只落待删标记 + 乐观收缩跳相邻张
-      （不即时调系统删除），退出预览（onDisappear）整批提交一次系统确认框——
-      每会话至多 1 次弹框，替代原「每删一张弹一次」。list_shrink 对 iOS 不再适用
-      （无逐张授权 outcome）；系统框取消 = 整批不删（照片从未离开图库，网格无需恢复）；
-      进程被杀标记作废一张不删（明示裁剪）。
+      （不即时调系统删除）；标记持久化于 TagDatabase.pending_deletes 表（uri 主键 +
+      marked_at + source）——进程被杀不丢，恢复后继续。任务化执行
+      （PendingDeleteExecutor）整批一次系统确认框，触发分两类：
+      ①userAction（预览退出）恒执行；②recovery（冷启动/回前台，仅 .background→.active——
+      系统确认框显隐只经 .inactive，不算回前台，否则「取消」会因相位复位立刻重弹）执行一次，
+      被用户取消后会话内抑制（防「取消→立刻重弹」），下次真回前台复位。
+      系统框取消 = 整批不删（照片从未离开图库，记录保留待下次触发）；
+      成功/目标已不在库 → 记录结清移除。list_shrink 对 iOS 不再适用
+      （无逐张授权 outcome）。DEBUG 测试钩子：-clearPendingDeletes 启动清空标记。
       宿主覆盖（2026-09-16）：本批仅相册大图页（MediaPagerView）接入；Chat 搜图预览与
       回忆详情两宿主缺整层预览，随宿主层落地接入同一手势组件。
 
@@ -825,8 +830,8 @@ media_pager:
 
     swipe_up_delete_silent_trash:
       android_actual: "MANAGE_MEDIA 持权 + 设置页「删除不再询问」开关开 → 直写 IS_TRASHED 静默回收（零系统弹框，API 31+）；否则 createTrashRequest 系统授权框"
-      ios_actual: "会话批量（2026-10-04）：预览内上滑/底栏删除只落待删标记 + 乐观收缩，退出预览整批 PHAssetChangeRequest.deleteAssets 一次系统确认框（每会话至多 1 次，进 Recently Deleted 30 天可恢复）；Apple 无零弹框通路，「删除不再询问」开关 iOS 不适用、不登记跟随任务"
-      note: "Android 专属能力（MANAGE_MEDIA 直写为 Android Scoped Storage 产物）；2026-09-15 校正：iOS 删除必走系统确认框，原「天然静默」表述作废；2026-10-04 校正：逐张即时弹框改为会话批量单次弹框（§16b ios_note）"
+      ios_actual: "会话批量（2026-10-04）：预览内上滑/底栏删除只落待删标记（TagDatabase.pending_deletes 持久化，杀进程不丢）+ 乐观收缩；PendingDeleteExecutor 任务化整批 deleteAssets 一次系统确认框（触发：预览退出恒执行 / 冷启动·回前台恢复执行一次，取消后会话内抑制），进 Recently Deleted 30 天可恢复；Apple 无零弹框通路，「删除不再询问」开关 iOS 不适用、不登记跟随任务"
+      note: "Android 专属能力（MANAGE_MEDIA 直写为 Android Scoped Storage 产物）；2026-09-15 校正：iOS 删除必走系统确认框，原「天然静默」表述作废；2026-10-04 校正：逐张即时弹框改为会话批量单次弹框，标记 DB 持久化任务化执行（§16b ios_note）"
 
     image_understanding:
       android_actual:
