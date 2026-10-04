@@ -98,18 +98,13 @@ final class GallerySpecUITests: XCTestCase {
         usleep(1_000_000) // 等待 fullScreenCover 转场完成
         attachScreenshot(name: "media_pager_open")
 
-        // §17 顶栏控件：用 SF Symbol 系统标签查询（identifier 被容器覆盖）
-        // pager_back → Image(chevron.left) → label: '返回'/'Back'
-        let backButton = findPagerButton(labels: ["返回", "Back"])
+        // §17 顶栏控件：用本地化无障碍标签查询（identifier 被容器覆盖）
+        // pager_back → accessibilityLabel 'close'（对齐 Android contentDescription close）
+        let backButton = findPagerButton(labels: ["关闭", "Close", "Fermer", "Cerrar"])
         XCTAssertTrue(backButton.exists, "返回按钮应存在")
 
-        // pager_info → Image(info.circle) → label: '简介'/'Info'
-        let infoButton = findPagerButton(labels: ["简介", "Info"])
-        XCTAssertTrue(infoButton.exists, "信息按钮应存在")
-
-        // pager_more → Image(ellipsis) → label: '更多'/'More'
-        let moreButton = findPagerButton(labels: ["更多", "More"])
-        XCTAssertTrue(moreButton.exists, "更多按钮应存在")
+        // pager_info / pager_more 为纯图标装饰按钮：Android contentDescription = null，
+        // iOS 对齐不设标签（[PARITY] 无障碍语义一致），此处不做标签断言。
 
         // §18 底栏控件
         // pager_share → label: '发送'/'Send'
@@ -128,6 +123,59 @@ final class GallerySpecUITests: XCTestCase {
         XCTAssertFalse(element("media_pager").waitForExistence(timeout: 3),
                        "返回后大图页应关闭")
         attachScreenshot(name: "media_pager_closed")
+    }
+
+    // MARK: - §16b 上滑删除·会话批量（2026-10-04）
+
+    /// gallery-grid.yaml §16b ios_note 会话批量语义：
+    /// 预览内上滑删除只落待删标记 + 乐观收缩，**不立即弹系统确认框**（回归：原每删一张弹一次）；
+    /// 退出预览整批提交，系统确认框每会话至多一次。
+    /// 测试全程取消系统框（"Don't Allow" 等多语兜底），照片零真实删除。
+    func testSwipeUpDeleteBatchedSingleSystemAlert() throws {
+        try requireElement("gallery_grid", timeout: 10, "初始页应为相册网格")
+
+        let firstCell = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'cell_'")).firstMatch
+        guard firstCell.waitForExistence(timeout: 5) else {
+            throw XCTSkip("相册无照片，跳过批量删除测试")
+        }
+
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        // 系统删除确认框一律取消（权限式弹窗："Delete"/"Don't Allow"，多语兜底）
+        addUIInterruptionMonitor(withDescription: "photos delete alert") { alert in
+            for label in ["Don't Allow", "Ne pas autoriser", "不允许", "Cancel", "Annuler", "取消"] {
+                let button = alert.buttons[label]
+                if button.exists { button.tap(); return true }
+            }
+            return false
+        }
+
+        // 打开大图页，上滑删除当前张
+        firstCell.tap()
+        try requireElement("media_pager", timeout: 5, "大图页应出现")
+        usleep(1_000_000)
+        element("media_pager").swipeUp()
+        usleep(1_000_000)
+
+        // 🔴 回归断言：预览内上滑后不得立即弹系统确认框（旧行为 = 每删一张弹一次）
+        XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 2),
+                       "预览内上滑删除应立即弹系统确认框 → 会话批量语义回归")
+
+        // 退出预览 → 整批提交，系统确认框恰好出现一次
+        let backButton = findPagerButton(labels: ["关闭", "Close", "Fermer", "Cerrar"])
+        XCTAssertTrue(backButton.exists, "返回按钮应存在")
+        backButton.tap()
+        XCTAssertTrue(springboard.alerts.firstMatch.waitForExistence(timeout: 6),
+                      "退出预览应弹一次整批系统确认框")
+        attachScreenshot(name: "swipe_delete_batched_alert")
+
+        // 驱动 interruption monitor 取消弹窗（需一次交互事件触发）
+        app.tap()
+        usleep(800_000)
+
+        // 取消后弹窗消失、不回弹第二次
+        XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 2),
+                       "取消后系统确认框不应再次出现")
     }
 
     // MARK: - §7 缩略图选择模式（长按触发）

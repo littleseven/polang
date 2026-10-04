@@ -20,7 +20,7 @@ private struct ShareText: Identifiable {
 
 /// 上滑删除手势状态机（spec gallery-grid.yaml §16b swipe_up_delete）：
 /// idle → dragging(offset ≤ 0：跟手上移，向下钳 0 不跟手；|offset| ≥ 页高 25% 即 armed)
-/// → flyingOut（220ms 向上飞出屏外 + 淡出）→ 成功收缩列表 / 取消·未超阈值弹回 idle。
+/// → flyingOut（220ms 向上飞出屏外 + 淡出）→ 落待删标记并乐观收缩列表 / 未超阈值弹回 idle。
 private enum SwipeDeletePhase: Equatable {
     case idle
     case dragging(offset: CGFloat)
@@ -34,8 +34,9 @@ private enum SwipeDeletePhase: Equatable {
 /// 底栏（dump：发送/编辑/证照/删除 4 位 SpaceEvenly）——编辑/证照 iOS 无对应功能（Phase 6），
 /// 保持 4 位布局节奏灰置占位，不假造交互；删除走 PHAssetChangeRequest 系统确认窗。
 /// 上滑删除（§16b swipe_up_delete）：竖直主导跟手上移、页高 25% 阈值 armed（胶囊转 error 色）、
-/// 220ms 飞出淡出后走系统删除——仅确认成功收缩列表/跳相邻张/删空收起，取消弹回停留原图；
-/// 缩放态、视频页、OCR/Vision 浮层可见时不响应。
+/// 220ms 飞出淡出后落待删标记 + 乐观收缩跳相邻张（删空收起预览）；
+/// 会话批量语义（2026-10-04，spec §16b ios_note）：预览内只标记不调系统删除，
+/// 退出预览整批一次系统确认框（每会话至多 1 次）；缩放态、视频页、OCR/Vision 浮层可见时不响应。
 /// 系统栏（§1.3 登记）：状态栏显、黑底 → preferredColorScheme(.dark) 白内容色。
 struct MediaPagerView: View {
     let items: [MediaAsset]
@@ -63,10 +64,13 @@ struct MediaPagerView: View {
     @State private var showFaceOverlay = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    /// 删除直调 Swift 桥（PHAssetChangeRequest 自带系统确认；成功后观察者驱动网格刷新）
+    /// 删除桥（会话批量：退出预览时整批 deleteMediaAwaitingOutcome 一次系统确认框）
     private let bridge = PhMediaBridge()
-    /// 存活列表（§16b list_shrink）：仅删除成功后从这里收缩；删空自动收起预览回网格
+    /// 存活列表（§16b 乐观收缩）：上滑落标记即从这里收缩跳相邻张；删空自动收起预览回网格
     @State private var liveItems: [MediaAsset]
+    /// 会话待删标记（2026-10-04 批量语义）：预览内累积，退出时整批提交一次系统确认框；
+    /// 进程被杀标记作废（一张不删，spec §16b ios_note 登记）
+    @State private var pendingDeleteUris: [String] = []
     /// 上滑删除手势阶段（只作用于当前页；详见 SwipeDeletePhase）
     @State private var swipePhase: SwipeDeletePhase = .idle
     /// 分页全屏高（§16b：结算阈值 = 页高 25%、飞出距离基准）
@@ -180,6 +184,8 @@ struct MediaPagerView: View {
         }
         // 相邻页缩略图预热（相-13，对齐 Android ±3 页预加载；PHCachingImageManager 窗口取 ±2 页）
         .onAppear { preloadAround(); markCurrentPageViewed() }
+        // 退出预览：整批提交会话待删标记（fullScreenCover/sheet 叠层不触发本钩子，仅真正离开触发）
+        .onDisappear { submitPendingDeletesOnExit() }
         .onChange(of: index) { _ in
             // 手势中断/翻页恢复路径：翻页即复位上滑删除手势（拖拽中横滑翻页不带位移跨页）
             if swipePhase != .idle { swipePhase = .idle }
@@ -215,6 +221,8 @@ struct MediaPagerView: View {
                     .contentShape(Rectangle())
             }
             .accessibilityIdentifier("pager_back")
+            // VoiceOver 读本地化「关闭」（对齐 Android MediaPager contentDescription close；[PARITY] 无障碍语义）
+            .accessibilityLabel(Text(String(localized: "close")))
             Text(formattedDate(currentAsset?.captureDate))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Color.white.opacity(0.85))
@@ -347,8 +355,17 @@ struct MediaPagerView: View {
 
     private func deleteCurrent() {
         guard let asset = currentAsset else { return }
-        _ = bridge.deleteMedia(localIdentifiers: [asset.uri])
-        dismiss()  // 删除后退出大图页；网格经 PHPhotoLibraryObserver 自动刷新
+        pendingDeleteUris.append(asset.uri)
+        dismiss()  // 标记后退出大图页；退出时整批一次系统确认框（网格经观察者刷新）
+    }
+
+    /// 退出预览一次性提交全部待删标记（PHAssetChangeRequest 系统确认框每会话至多 1 次）。
+    /// 系统框取消 = 整批不删——照片从未离开图库，网格无需恢复；确认成功后 TagDatabase
+    /// 快照清理由 deleteMediaAwaitingOutcome 通路内联，网格经 PHPhotoLibraryObserver 刷新。
+    private func submitPendingDeletesOnExit() {
+        let uris = pendingDeleteUris
+        guard !uris.isEmpty else { return }
+        _ = bridge.deleteMediaAwaitingOutcome(localIdentifiers: uris) { _ in }
     }
 
     // MARK: - 上滑删除（spec gallery-grid.yaml §16b swipe_up_delete）
@@ -460,20 +477,16 @@ struct MediaPagerView: View {
         }
     }
 
-    /// 删除通路（§16b ios_note / §26 台账）：PHAssetChangeRequest.deleteAssets 系统强制
-    /// 确认框（iOS 无静默通路）；确认成功才收缩列表，取消弹回停留原图。
+    /// 落待删标记（§16b ios_note 会话批量语义）：预览内不即时调系统删除——
+    /// 标记 + 乐观收缩；退出预览时整批一次系统确认框。
     private func performSwipeUpDelete(_ asset: MediaAsset) {
-        _ = bridge.deleteMediaAwaitingOutcome(localIdentifiers: [asset.uri]) { confirmed in
-            if confirmed {
-                shrinkAfterSwipeDelete(asset)
-            } else {
-                springBackSwipe()
-            }
-        }
+        pendingDeleteUris.append(asset.uri)
+        shrinkAfterSwipeDelete(asset)
     }
 
-    /// 🔴 列表收缩语义（§16b list_shrink: on_trashed_outcome_only）：仅删除成功后收缩；
-    /// 跳相邻张（删中间→停下一张，删末张→回退上一张）；删空自动收起预览回网格。
+    /// 乐观收缩：落标记即移除并跳相邻张（删中间→停下一张，删末张→回退上一张）；
+    /// 删空自动收起预览回网格（onDisappear 触发整批提交）。
+    /// 系统框退出时若被取消，整批不删、照片仍在图库，网格数据从未移除故无需恢复。
     private func shrinkAfterSwipeDelete(_ asset: MediaAsset) {
         if let i = liveItems.firstIndex(where: { $0.uri == asset.uri }) {
             liveItems.remove(at: i)

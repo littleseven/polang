@@ -1,6 +1,41 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "close": {
+      "comment": "无障碍：关闭（对齐 Android strings.xml close，MediaPager 顶栏返回语义）",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerrar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer"
+          }
+        }
+      }
+    },
     "\"This is me\" is not marked yet: turn on \"This is me\" on your own group first, then set relationships": {
       "extractionState": "manual",
       "localizations": {
