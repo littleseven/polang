@@ -16,7 +16,8 @@ final class GallerySpecUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-uitest"]
+        // -clearPendingDeletes：每用例干净起点（待删标记 DB 持久化，跨启动存活需显式清）
+        app.launchArguments = ["-uitest", "-clearPendingDeletes"]
         addUIInterruptionMonitor(withDescription: "permission alerts") { alert in
             for label in ["Allow Full Access", "Allow", "OK", "允许完全访问", "允许", "好"] {
                 let button = alert.buttons[label]
@@ -176,6 +177,62 @@ final class GallerySpecUITests: XCTestCase {
         // 取消后弹窗消失、不回弹第二次
         XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 2),
                        "取消后系统确认框不应再次出现")
+    }
+
+    /// gallery-grid.yaml §16b ios_note 标记持久化：预览内上滑落标记后杀进程，
+    /// 冷启动恢复执行——系统确认框恰好弹一次（记录 DB 持久化不丢）。
+    /// 全程取消系统框，照片零真实删除；结束以 -clearPendingDeletes 重启清库并断言无残留弹框。
+    func testSwipeUpDeleteMarksSurviveProcessKill() throws {
+        try requireElement("gallery_grid", timeout: 10, "初始页应为相册网格")
+
+        let firstCell = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'cell_'")).firstMatch
+        guard firstCell.waitForExistence(timeout: 5) else {
+            throw XCTSkip("相册无照片，跳过杀进程恢复测试")
+        }
+
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        addUIInterruptionMonitor(withDescription: "photos delete alert") { alert in
+            for label in ["Don't Allow", "Ne pas autoriser", "不允许", "Cancel", "Annuler", "取消"] {
+                let button = alert.buttons[label]
+                if button.exists { button.tap(); return true }
+            }
+            return false
+        }
+
+        // 打开大图页上滑落标记（DB 持久化），不退出预览直接杀进程
+        firstCell.tap()
+        try requireElement("media_pager", timeout: 5, "大图页应出现")
+        usleep(1_000_000)
+        element("media_pager").swipeUp()
+        usleep(1_000_000)
+        XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 1.5),
+                       "预览内上滑删除不得立即弹系统确认框")
+
+        app.terminate()
+
+        // 冷启动（含 -clearPendingDeletes？否——本用例 launchArguments 与 setUp 相同会清库，
+        // 故重启须去掉清空参数）→ 恢复执行恰好弹一次系统确认框
+        let relaunch = XCUIApplication()
+        relaunch.launchArguments = ["-uitest"]
+        relaunch.launch()
+        XCTAssertTrue(springboard.alerts.firstMatch.waitForExistence(timeout: 8),
+                      "杀进程后冷启动应恢复执行并弹一次整批系统确认框")
+        attachScreenshot(name: "swipe_delete_recovery_alert")
+
+        // 驱动 interruption monitor 取消；记录保留但 recovery 会话内抑制，不得重弹
+        relaunch.tap()
+        usleep(1_000_000)
+        XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 2),
+                       "取消后系统确认框不应再次出现")
+
+        // 清场：带 -clearPendingDeletes 重启 → 记录清空、无残留弹框（防污染后续用例与真机）
+        relaunch.terminate()
+        let cleanup = XCUIApplication()
+        cleanup.launchArguments = ["-uitest", "-clearPendingDeletes"]
+        cleanup.launch()
+        XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 3),
+                       "清库重启后不应再有系统确认框")
     }
 
     // MARK: - §7 缩略图选择模式（长按触发）

@@ -166,6 +166,16 @@ final class TagDatabase {
             );
             """)
 
+        // ── pending_deletes ──（预览上滑删除会话批量标记，2026-10-04：进程被杀不丢，
+        //   恢复后任务化执行一次系统确认；见 gallery-grid.yaml §16b ios_note）
+        exec("""
+            CREATE TABLE IF NOT EXISTS pending_deletes (
+                uri       TEXT PRIMARY KEY,
+                marked_at INTEGER NOT NULL,
+                source    TEXT NOT NULL
+            );
+            """)
+
         // ── tag_scan_tasks ──（对齐 Android TagScanTaskEntity + 3 索引）
         exec("""
             CREATE TABLE IF NOT EXISTS tag_scan_tasks (

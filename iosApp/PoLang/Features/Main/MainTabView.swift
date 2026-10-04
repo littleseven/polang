@@ -54,6 +54,9 @@ struct MainTabView: View {
     /// 整理页「扫描中落 SCAN tab」一次性请求（消费后清零；对齐 Android
     /// MainPagerHost onBarSwitchPage：底 bar 点整理项且 isScanning → 落 SCAN tab）
     @State private var organizeScanLanding = false
+    /// 上一 scenePhase（区分 .inactive→.active 与 .background→.active：
+    /// 系统确认框显隐只经 .inactive，不得触发待删恢复执行——否则「取消」会立刻重弹）
+    @State private var lastScenePhase: ScenePhase = .active
 
     var body: some View {
         ZStack {
@@ -105,6 +108,14 @@ struct MainTabView: View {
                 IosAgentComposition.shared.onCameraRouteChanged(active: true)
             }
             bindNavigationBridge()
+            #if DEBUG
+            // UI 测试钩子：-clearPendingDeletes 启动清空待删标记（须在恢复执行之前）
+            if ProcessInfo.processInfo.arguments.contains("-clearPendingDeletes") {
+                TagDatabase.shared.clearPendingDeletes()
+            }
+            #endif
+            // 待删任务恢复执行（杀进程不丢：pending_deletes 有记录则弹一次系统确认框）
+            PendingDeleteExecutor.shared.onAppForeground()
         }
         .onChange(of: router.currentPage) { page in
             IosAgentComposition.shared.onMainPageChanged(page: Int64(page))
@@ -131,6 +142,12 @@ struct MainTabView: View {
         .onChange(of: scenePhase) { phase in
             // 前台优先：进后台协作暂停扫描（SP-B）；回前台不自动续，由用户在扫描页点恢复
             if phase == .background { TagScanOrchestrator.shared.pauseForBackground() }
+            // 回前台（仅 .background→.active）：待删任务恢复执行（取消抑制复位 + 有记录弹一次
+            // 系统确认框）；.inactive→.active（系统确认框/控制中心显隐）不算回前台
+            if phase == .active && lastScenePhase == .background {
+                PendingDeleteExecutor.shared.onAppForeground()
+            }
+            lastScenePhase = phase
         }
         // 设置页入口请求切主页面（Gallery Cleanup → 整理页 1，对齐 Android 切 Pager 页 1；
         // 设置页是 fullScreenCover 无法直触本 router，经 NotificationCenter 解耦）
