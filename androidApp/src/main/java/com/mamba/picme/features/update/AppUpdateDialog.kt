@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -18,8 +17,8 @@ import com.mamba.picme.R
 
 /**
  * OTA 更新对话框：穷举渲染 AppUpdateState 各态。
- * Available → 立即更新/下次再说；Downloading → 进度条；ReadyToInstall → 安装；
- * Failed → 重试/取消；Idle → 不渲染。
+ * Available → 立即更新/下次再说；ReadyToInstall → 安装；Failed → 重试/取消；Idle → 不渲染。
+ * 下载无应用内进度态——后台下载由系统 DownloadManager 通知承担。
  */
 @Composable
 fun AppUpdateDialog(controller: AppUpdateController) {
@@ -31,14 +30,13 @@ fun AppUpdateDialog(controller: AppUpdateController) {
             onUpdate = { controller.startDownload() },
             onLater = { controller.dismiss() },
         )
-        is AppUpdateState.Downloading -> DownloadingDialog(current)
         is AppUpdateState.ReadyToInstall -> ReadyToInstallDialog(
             state = current,
             onInstall = { controller.installNow() },
             onLater = { controller.dismiss() },
         )
         is AppUpdateState.Failed -> FailedDialog(
-            state = current,
+            reason = current.reason,
             onRetry = { controller.startDownload() },
             onCancel = { controller.dismiss() },
         )
@@ -85,28 +83,6 @@ private fun AvailableDialog(
 }
 
 @Composable
-private fun DownloadingDialog(state: AppUpdateState.Downloading) {
-    AlertDialog(
-        onDismissRequest = {},
-        title = { Text(stringResource(R.string.ota_update_title)) },
-        text = {
-            Column {
-                Text(
-                    stringResource(
-                        R.string.ota_downloading,
-                        state.info.versionName,
-                        (state.progress * 100).toInt(),
-                    ),
-                )
-                Spacer(Modifier.height(12.dp))
-                LinearProgressIndicator(progress = { state.progress })
-            }
-        },
-        confirmButton = {},
-    )
-}
-
-@Composable
 private fun ReadyToInstallDialog(
     state: AppUpdateState.ReadyToInstall,
     onInstall: () -> Unit,
@@ -115,7 +91,7 @@ private fun ReadyToInstallDialog(
     AlertDialog(
         onDismissRequest = onLater,
         title = { Text(stringResource(R.string.ota_update_title)) },
-        text = { Text(stringResource(R.string.ota_ready_to_install, state.info.versionName)) },
+        text = { Text(stringResource(R.string.ota_ready_to_install)) },
         confirmButton = {
             TextButton(onClick = onInstall) { Text(stringResource(R.string.ota_install)) }
         },
@@ -127,14 +103,14 @@ private fun ReadyToInstallDialog(
 
 @Composable
 private fun FailedDialog(
-    state: AppUpdateState.Failed,
+    reason: String,
     onRetry: () -> Unit,
     onCancel: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(R.string.ota_update_title)) },
-        text = { Text(stringResource(R.string.ota_download_failed, state.reason)) },
+        text = { Text(stringResource(R.string.ota_download_failed, reason)) },
         confirmButton = {
             TextButton(onClick = onRetry) { Text(stringResource(R.string.ota_retry)) }
         },

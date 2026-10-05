@@ -33,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -225,8 +227,8 @@ class MainActivity : ComponentActivity() {
                     // 任务中心回锚一次性请求（US-15）：任务中心点击/继续/重试 → 切 chat 页 + 锚定任务卡
                     var chatTaskAnchor by remember { mutableStateOf<ChatTaskAnchor?>(null) }
 
-                    // OTA 自更新：冷启动静默检查（仅非 Play 渠道，controller 内部判定安装来源）；
-                    // 状态机经 AppUpdateDialog 穷举渲染（发现新版 → 下载 → 安装）
+                    // OTA 自更新：冷启动恢复 pending 下载 → 静默检查（仅非 Play 渠道）；
+                    // 后台下载由系统 DownloadManager 承担，完成后前台自动拉安装器
                     val appUpdateController = remember {
                         AppUpdateController(
                             applicationContext,
@@ -234,6 +236,21 @@ class MainActivity : ComponentActivity() {
                             app.container.otaUpdatePrefs,
                             scope,
                         )
+                    }
+                    val updateLifecycleOwner = LocalLifecycleOwner.current
+                    DisposableEffect(appUpdateController) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            when (event) {
+                                Lifecycle.Event.ON_START -> appUpdateController.onAppForegroundChanged(true)
+                                Lifecycle.Event.ON_STOP -> appUpdateController.onAppForegroundChanged(false)
+                                else -> Unit
+                            }
+                        }
+                        updateLifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose {
+                            updateLifecycleOwner.lifecycle.removeObserver(observer)
+                            appUpdateController.shutdown()
+                        }
                     }
                     LaunchedEffect(Unit) { appUpdateController.checkForUpdate() }
                     AppUpdateDialog(appUpdateController)
