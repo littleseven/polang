@@ -31,7 +31,6 @@ fun AppUpdateDialog(controller: AppUpdateController) {
             onLater = { controller.dismiss() },
         )
         is AppUpdateState.ReadyToInstall -> ReadyToInstallDialog(
-            state = current,
             onInstall = { controller.installNow() },
             onLater = { controller.dismiss() },
         )
@@ -84,7 +83,6 @@ private fun AvailableDialog(
 
 @Composable
 private fun ReadyToInstallDialog(
-    state: AppUpdateState.ReadyToInstall,
     onInstall: () -> Unit,
     onLater: () -> Unit,
 ) {

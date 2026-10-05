@@ -23,15 +23,15 @@ AppUpdateController（编排：enqueue / 完成分发 / 前后台感知 / 冷启
 OtaDownloadManager(新, data)  launchInstall（复用现有 FileProvider 通路）
 ```
 
-- **OtaDownloadManager**（data 层新增）：`enqueue(url, versionCode): Long`、`status(id): OtaDownloadStatus`（RUNNING(progress)/SUCCESSFUL(file)/FAILED(reason)/MISSING）、`clearAll()`。下载目标 `getExternalFilesDir(DIRECTORY_DOWNLOADS)/ota/polang-<versionCode>.apk`；`setNotificationVisibility(VISIBLE)`（进行中系统通知、完成自动隐藏）；`setAllowedOverMetered(true)`、`setAllowedOverRoaming(false)`
+- **OtaDownloadManager**（data 层新增）：`enqueue(url, versionCode, title): Long`（成功入队后才清旧包；title 供系统下载通知显示）、`status(id): OtaDmStatus`（RUNNING(progress)/SUCCESSFUL/FAILED(reason)/MISSING；查询失败即抛，调用方 runCatching）、`localFileFor(vc)`、`delete(id)`（dm.remove：记录+文件连删）、`clearOldFiles(except)`。下载目标 `getExternalFilesDir(DIRECTORY_DOWNLOADS)/ota/polang-<versionCode>.apk`；`setNotificationVisibility(VISIBLE)`（进行中系统通知、完成自动隐藏）；`setAllowedOverMetered(true)`、`setAllowedOverRoaming(false)`
 - **`ota_paths.xml`** 增加 `external-files-path name="ota" path="ota/"`，FileProvider 直接可装、零拷贝
-- **OtaRecoveryPolicy**（domain/update 纯函数）：`(installedVersionCode, pendingDownload?, dmStatus, downloadedVersionCode) → RecoveryAction`，分支逻辑唯一集中点，JVM 矩阵测试
-- **OtaUpdatePrefs** 新增键：`pending_download_id`(Long)、`pending_download_version_code`(Long)（下载完成转 installedRemoteKey 语义保留）
+- **OtaRecoveryPolicy**（domain/update 纯函数）：`(installedVersionCode, installedRemoteKey?, pending?, dmStatus?) → RecoveryAction`，分支逻辑唯一集中点，JVM 矩阵测试（11 用例）。陈旧判定：pending.vc 严格更低，或同 vc 且 key 等于已装构建——**同 vc 异构建（重发）不算陈旧**，保住遛狗主路径的在途下载
+- **OtaUpdatePrefs** 新增键：`pending_download_id`(Long)、`pending_download_version_code`(Long)、`pending_download_updated_at`(String)（三元组原子读/写/清；updatedAt 供安装记账重建 RemoteBuild.key）
 
 ## 数据流
 
 1. **Available → startDownload()**：enqueue → 记 prefs(id/versionCode) → state=Idle → toast「已转后台下载，完成后自动安装」→ App 正常使用
-2. **ACTION_DOWNLOAD_COMPLETE**（动态 receiver，ContextCompat.RECEIVER_NOT_EXPORTED）：校验 id 匹配 → `markInstalledRemoteKey` → 清 pending 键 → 前台（lifecycle 感知）→ `launchInstall(file)`；后台 → 完成通知（channel `ota_download_complete`，POST_NOTIFICATIONS 未授权则静默丢弃，冷启动恢复兜底）→ PendingIntent 点击拉安装
+2. **ACTION_DOWNLOAD_COMPLETE**（动态 receiver，`RECEIVER_EXPORTED`——DM 广播发自 Downloads provider 而非 system uid，NOT_EXPORTED 全版本段收不到，Google issue 302209811；安全性由 pending id 匹配 + DM 状态二次校验承担）：校验 id 匹配 → 前台（lifecycle 感知）→ `launchInstall(file)` 后**在安装发动点记账**（markInstallLaunched = markInstalledRemoteKey + 清 pending；不做 dm.remove——remove 连 APK 文件删，安装器异步读 URI 时文件必须在，清理交下次 enqueue）；两分支均发完成通知（channel `ota_complete`，覆盖 ON_STOP 滞后窗口；POST_NOTIFICATIONS 未授权则静默丢弃，冷启动恢复兜底）→ PendingIntent 点击拉安装。后台通知路径不记账（通知可能不被点，不能预 claim 安装），冷启动 OfferInstall 兜底重弹、installNow 收口——代价是通知装完后的首次冷启动多一弹，自愈
 3. **冷启动**（`checkForUpdate` 前置）：读 pending id → `OtaRecoveryPolicy` 判定 → RUNNING 静默 / SUCCESSFUL→ReadyToInstall 弹窗 / FAILED→Failed 弹窗 / 无 pending→走原 fetchLatest 流程
 4. **清理**：enqueue 新版本前 `clearAll()` 旧 APK；启动检测 versionCode 追平（已安装）→ 清文件与 prefs
 
