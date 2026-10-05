@@ -13,9 +13,9 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.3
+**版本**：0.9.4
 
-**最后更新**：2026-09-18
+**最后更新**：2026-10-05
 
 **状态**：生效中 / 已上线
 
@@ -31,7 +31,7 @@
 - **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量）
 - **推荐引擎**：`RuleEngine` — 纯规则型场景推荐（规避算法备案）
 - **遥测收集**：`TelemetryRoute` — 批量匿名事件写入 SQLite
-- **COS 存储**：`CosService` — 腾讯 COS 预签名 URL 生成
+- **COS 存储**：`CosService` — 腾讯 COS 上传/元数据/预签名 URL；APK 下载 URL 渠道路由（`apkPublicUrl(channel)`：debug 轨可经 `APK_DEBUG_PUBLIC_BASE` 指向北京轻量国内镜像，release 轨恒走 `cos.polang.net`）
 - **限流**：`RateLimiter` — per-IP 令牌桶 + 日预算熔断
 - **用户问题上报**：`IssueReportRoute` — 脱敏后入库并自动同步 GitHub issue
 
@@ -242,5 +242,5 @@ systemd `picme-api.service`：`JAVA_OPTS=-Xmx256m` + `MemoryMax=450M`，与 Open
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-09-18
+> **最后更新**：2026-10-05
 > **状态**：生效中

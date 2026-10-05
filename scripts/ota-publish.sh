@@ -10,6 +10,7 @@
 # 环境变量:
 #   POLANG_ADMIN_TOKEN   服务端 ADMIN_TOKEN（必填）
 #   POLANG_OTA_BASE_URL  服务端地址（默认 https://api.polang.net）
+#   POLANG_OTA_MIRROR_HOST  debug 轨北京轻量镜像主机（默认 xuxing）
 #
 # 渠道说明: debug 轨用本机 debug.keystore 签名（同机覆盖安装签名一致，遛狗主轨）;
 #           release 轨用 picme-release.jks（Play 对齐验证）。两轨 COS key 独立互不影响。
@@ -29,7 +30,7 @@ while [[ $# -gt 0 ]]; do
         --no-build)
             BUILD=0; shift ;;
         -h|--help)
-            sed -n '2,17p' "$0"; exit 0 ;;
+            sed -n '2,18p' "$0"; exit 0 ;;
         *)
             echo "未知参数: $1" >&2; exit 1 ;;
     esac
@@ -87,4 +88,17 @@ if [[ "$RESP" == *'"ok":true'* ]]; then
     echo "==> 发布成功：测试机下次冷启动将收到更新提示（仅非 Play 渠道安装的包）"
 else
     echo "==> 发布失败，见上方响应" >&2; exit 1
+fi
+
+# ── 4. 北京轻量镜像（debug 轨数据面：国内直下提速；release 轨继续走 COS）──
+# 镜像 URL 由 HK 端 APK_DEBUG_PUBLIC_BASE 环境变量下发（见 CosService），本步骤只推文件。
+# 镜像失败不阻断：COS 主渠道已发布成功，仅国内下载提速缺失。
+if [[ "$TYPE" == "debug" ]]; then
+    MIRROR_HOST="${POLANG_OTA_MIRROR_HOST:-xuxing}"
+    echo "==> 推送 debug 包到北京轻量镜像（$MIRROR_HOST）"
+    if scp -o ConnectTimeout=15 "$APK_PATH" "$MIRROR_HOST:/var/www/ota/apk/polang-debug.apk"; then
+        echo "==> 镜像已更新"
+    else
+        echo "!! 镜像推送失败（主渠道 COS 已发布成功，本次 OTA 不受影响）" >&2
+    fi
 fi

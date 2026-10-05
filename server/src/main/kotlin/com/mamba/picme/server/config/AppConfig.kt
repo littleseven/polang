@@ -32,6 +32,8 @@ data class AppConfig(
     val cosRegion: String,
     val cosBucket: String,
     val cosPresignTtlMin: Int,
+    // APK debug 轨国内镜像（北京轻量裸 IP + token 路径；空 = 全部走 cos.polang.net）
+    val apkDebugPublicBase: String,
     // Admin 后台
     val adminToken: String,
     val llmPrices: Map<String, Price>,
@@ -67,6 +69,7 @@ data class AppConfig(
             cosRegion = env("COS_REGION", "ap-hongkong"),
             cosBucket = env("COS_BUCKET", ""),
             cosPresignTtlMin = envInt("COS_PRESIGN_TTL_MIN", 60),
+            apkDebugPublicBase = env("APK_DEBUG_PUBLIC_BASE", ""),
             // Admin
             adminToken = env("ADMIN_TOKEN", ""),
             llmPrices = parsePrices(System.getenv("LLM_PRICES_JSON")),

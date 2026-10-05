@@ -31,6 +31,9 @@ class CosService(config: AppConfig) {
     private val region = config.cosRegion
     private val ipaKey = "ios/polang.ipa"
 
+    /** debug 轨国内镜像 base（如 http://82.157.166.5:8100/dl-<token>）；空 = 不启用。 */
+    private val apkDebugBase = config.apkDebugPublicBase.trim().trimEnd('/')
+
     private val client: COSClient? = run {
         if (config.cosSecretId.isBlank() || config.cosSecretKey.isBlank() || bucket.isBlank()) {
             logger.warn("COS not configured: secretId/key/bucket empty, APK features disabled")
@@ -51,6 +54,11 @@ class CosService(config: AppConfig) {
 
     val ipaPublicUrl: String
         get() = "https://cos.polang.net/$ipaKey"
+
+    /** APK 下载 URL：debug 轨配置了国内镜像时走镜像，否则（及 release 轨）走 COS。 */
+    fun apkPublicUrl(channel: String): String =
+        if (channel == CHANNEL_DEBUG && apkDebugBase.isNotBlank()) "$apkDebugBase/${apkKey(channel)}"
+        else cosApkUrl(channel)
 
     fun uploadApk(
         inputStream: InputStream,
@@ -163,7 +171,7 @@ class CosService(config: AppConfig) {
 
         fun apkKey(channel: String): String = "apk/polang-$channel.apk"
 
-        fun apkPublicUrl(channel: String): String = "https://cos.polang.net/${apkKey(channel)}"
+        fun cosApkUrl(channel: String): String = "https://cos.polang.net/${apkKey(channel)}"
 
         /** COS user metadata 仅允许 ASCII（参与请求签名）：中文等值需百分号编码。 */
         fun encodeMetaValue(value: String): String =
