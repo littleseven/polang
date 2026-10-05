@@ -20,7 +20,7 @@ sealed interface OtaDmStatus {
 sealed interface OtaRecoveryAction {
     /** 无 pending 或无需恢复 → 继续常规 fetchLatest 检查。 */
     data object ProceedCheck : OtaRecoveryAction
-    /** pending 陈旧（已安装该版本 / DM 记录丢失）→ 清理 pending 后走常规检查。 */
+    /** pending 陈旧（已装更高版本或同版本同构建 / DM 记录丢失）→ 清理 pending 后走常规检查。 */
     data object DiscardStale : OtaRecoveryAction
     /** 下载进行中 → 静默（系统通知已在展示进度）。 */
     data object StaySilent : OtaRecoveryAction
@@ -33,10 +33,11 @@ sealed interface OtaRecoveryAction {
 object OtaRecoveryPolicy {
     fun decide(
         installedVersionCode: Long,
+        installedRemoteKey: String?,
         pending: OtaPendingDownload?,
         dmStatus: OtaDmStatus?,
     ): OtaRecoveryAction {
-        if (pending != null && pending.versionCode <= installedVersionCode) {
+        if (pending != null && isStale(pending, installedVersionCode, installedRemoteKey)) {
             return OtaRecoveryAction.DiscardStale
         }
         if (pending == null || dmStatus == null) return OtaRecoveryAction.ProceedCheck
@@ -47,4 +48,16 @@ object OtaRecoveryPolicy {
             OtaDmStatus.Missing -> OtaRecoveryAction.DiscardStale
         }
     }
+
+    /**
+     * 陈旧 = 已装版本严格更高；或同 versionCode 且就是本机已装的那个构建（key 相同）。
+     * 同 vc 重发（key 不同）不算陈旧——那是遛狗主路径的在途更新。
+     */
+    private fun isStale(
+        pending: OtaPendingDownload,
+        installedVersionCode: Long,
+        installedRemoteKey: String?,
+    ): Boolean = pending.versionCode < installedVersionCode ||
+        (pending.versionCode == installedVersionCode &&
+            RemoteBuild(pending.versionCode, pending.updatedAt).key == installedRemoteKey)
 }
