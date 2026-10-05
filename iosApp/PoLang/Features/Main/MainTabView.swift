@@ -15,6 +15,9 @@ final class MainNavigationRouter: ObservableObject {
     @Published var showSettings = false
     /// 模型中心 fullScreenCover（Agent navigate_to(model_center)，对齐 Android model_center 路由）
     @Published var showModelCenter = false
+    /// 任务中心 fullScreenCover（chat 顶栏入口 + Agent navigate_to(task_center)，
+    /// task-center.yaml §route：iOS = fullScreenCover 形态）
+    @Published var showTaskCenter = false
 
     init() {
         // 初始页 = 相册(0)（对标 Android）；UI 自动化可用 launch arg `-startPage <0-4>` 指定起始页
@@ -31,6 +34,12 @@ final class MainNavigationRouter: ObservableObject {
         // launch arg `-openCamera` → 启动即弹相机 fullScreenCover（供 UI 测试进相机）
         if args.contains("-openCamera") {
             showCamera = true
+        }
+        // UI 自动化直进任务中心通路（同 -openCamera 先例）：
+        // launch arg `-openTaskCenter` → 启动即弹任务中心 fullScreenCover；
+        // `-taskCenterTab <0|1>` 预选 Tab（0=工程师任务 1=后台任务）
+        if args.contains("-openTaskCenter") {
+            showTaskCenter = true
         }
     }
 }
@@ -81,7 +90,8 @@ struct MainTabView: View {
                         pendingGalleryQuery = query
                         switchPage(0)
                     },
-                    onEditImage: { lid in editingImage = lid }
+                    onEditImage: { lid in editingImage = lid },
+                    onOpenTaskCenter: { router.showTaskCenter = true }
                 )
                 .environmentObject(container)
                 .tag(2)
@@ -197,6 +207,30 @@ struct MainTabView: View {
         .fullScreenCover(isPresented: $router.showModelCenter) {
             NavigationStack { ModelDownloadCenterView() }
         }
+        // 任务中心全屏路由（task-center.yaml：chat 顶栏入口主通路 + Agent navigate_to(task_center)）。
+        // 工程师列表项 → 回 chat 对应会话（cover dismiss + 切 Pager 页 2 + 通知 ChatView 切会话）；
+        // 后台任务卡 → destination 导航（TAG_SCAN_CONTROL = 整理页扫描 Tab 智能落位既有通路；
+        // MODEL_CENTER = 模型中心 cover）。
+        .fullScreenCover(isPresented: $router.showTaskCenter) {
+            TaskCenterView(
+                onClose: { router.showTaskCenter = false },
+                onOpenChatSession: { sessionId in
+                    router.showTaskCenter = false
+                    switchPage(2)
+                    NotificationCenter.default.post(
+                        name: .taskCenterOpenChatSession, object: sessionId)
+                },
+                onNavigateDestination: { destination in
+                    router.showTaskCenter = false
+                    switch destination {
+                    case .tagScanControl:
+                        organizeScanLanding = true
+                        switchPage(1)
+                    case .modelCenter:
+                        router.showModelCenter = true
+                    }
+                })
+        }
         // chat EDIT 意图：跳 PhotoEditorScreen
         .fullScreenCover(isPresented: Binding(
             get: { editingImage != nil },
@@ -222,19 +256,21 @@ struct MainTabView: View {
 
     /// Agent navigate_to 执行端绑定（main-nav.yaml §4）：
     /// camera→相机 cover / gallery→切 Pager 页 0 / settings→设置 cover /
-    /// model_center（含 Android 别名 llm/asr_model_manager 与中文别名）→模型中心 cover；
+    /// model_center（含 Android 别名 llm/asr_model_manager 与中文别名）→模型中心 cover /
+    /// task_center（含中文别名，task-center.yaml §entry）→任务中心 cover；
     /// 其余（含 debug——iOS 无 Debug 页，平台差异已登记）不受理。
     private func bindNavigationBridge() {
         let router = router
         let editing = $editingImage
         NavigationBridge.shared.handler = { destination in
-            // 同视图四 cover（camera/settings/modelCenter/editing）互斥：开一个前复位其余，
+            // 同视图五 cover（camera/settings/modelCenter/taskCenter/editing）互斥：开一个前复位其余，
             // 防 Agent 单轮连发 navigate_to 并发呈现（SwiftUI 同视图并发 cover 行为未定义）。
             // 别名与 Android NavigationCapability.parseDestination 1:1（lowercase + 中文别名）
             switch destination.lowercased() {
             case "camera", "相机", "拍照", "拍摄":
                 router.showSettings = false
                 router.showModelCenter = false
+                router.showTaskCenter = false
                 editing.wrappedValue = nil
                 router.showCamera = true
                 return true
@@ -242,6 +278,7 @@ struct MainTabView: View {
                 router.showCamera = false
                 router.showSettings = false
                 router.showModelCenter = false
+                router.showTaskCenter = false
                 editing.wrappedValue = nil
                 var transaction = Transaction()
                 transaction.animation = nil
@@ -250,6 +287,7 @@ struct MainTabView: View {
             case "settings", "设置", "配置":
                 router.showCamera = false
                 router.showModelCenter = false
+                router.showTaskCenter = false
                 editing.wrappedValue = nil
                 router.showSettings = true
                 return true
@@ -258,8 +296,16 @@ struct MainTabView: View {
                  "asr_model_manager", "asr模型管理", "语音模型管理":
                 router.showCamera = false
                 router.showSettings = false
+                router.showTaskCenter = false
                 editing.wrappedValue = nil
                 router.showModelCenter = true
+                return true
+            case "task_center", "任务中心":
+                router.showCamera = false
+                router.showSettings = false
+                router.showModelCenter = false
+                editing.wrappedValue = nil
+                router.showTaskCenter = true
                 return true
             default:
                 return false

@@ -1,0 +1,206 @@
+# ============================================================================
+# 任务中心（Task Center）屏规范 v1 — 2026-10-03 反向提取（ios-follow/taskcenter）
+# ============================================================================
+# 提取来源：Android 定稿代码真值（TaskCenterScreen.kt 503 行 / UserTaskCard.kt 206 行 /
+#           TaskCenterViewModel.kt / TaskCenterPartition.kt）+ Ardot 帧
+#           refs/ardot/chat-task_center.png（旧单 Tab 稿，卡片样式参照；双 Tab 以代码为准）、
+#           refs/ardot/task_card_states.png（工程师卡四态样式参照）
+# 双端 SSOT：
+#   Android 实现 = features/chat/taskcenter/（本 spec 反向提取的源）
+#   iOS 实现     = Features/TaskCenter/（SwiftUI，读本 spec + DesignTokens.swift，禁读 Android 源码）
+# 上位契约：spec 2026-09-25-engineer-task-card-design（US-12~16 + D7）、
+#           spec 2026-09-26-user-task-protocol-design（§7 双 Tab + UserTask 协议）
+# 顶栏形制：topbar.yaml variant_subpage（back + title，高 48，标题 17sp SemiBold）
+# Chat 顶栏入口：见本文 §6（chat.yaml 未登记，2026-10-03 本 spec 首次固化）
+#
+# 范围裁定（2026-10-03，parity 台账 §7 同步登记）：
+#   iOS 无 claude-tunnel/工程师模式数据链（SSE→Reducer→持久化整条缺席）——
+#   工程师 Tab 在 iOS 仅呈现持久化历史（当前必空）与空态；审批动作不渲染。
+#   后台任务 Tab 全功能（TAG 扫描 + 模型下载，数据源 = iOS 原生 TagScanOrchestrator /
+#   ModelDownloadManager，经 shared UserTask 协议投影）。
+
+task_center:
+  route: "task_center"                  # Android NavHost 二级页；iOS = fullScreenCover（MainNavigationRouter.showTaskCenter）
+  entry:
+    - chat_topbar_task_icon             # §6，主入口
+    - chat_task_card_view_all           # 任务卡「查看全部」（H2 已合；iOS 渲染管线就绪后接通）
+  back_stack: "系统返回/返回键 → 弹栈回 chat 页（Pager 页 2），无中间态"
+
+  # ── 页面骨架 ────────────────────────────────────────────────
+  scaffold:
+    topbar: { spec: "topbar.yaml variant_subpage", title_key: task_center_title }
+    body:
+      layout: "TabRow（双 Tab）+ 内容区（LazyColumn），纵向 Column 撑满"
+      background: surface
+
+  # ── 双 Tab ─────────────────────────────────────────────────
+  tabs:
+    height: 48                          # M3 TabRow 默认
+    items:
+      - { id: 0, title_key: task_center_tab_engineer }     # 工程师任务
+      - { id: 1, title_key: task_center_tab_background }   # 后台任务
+    badge:                              # Tab 标题右侧活跃计数徽标（M3 Badge）
+      trigger: "activeCount > 0"
+      text: "N（>99 显示 task_center_badge_overflow = 99+）"
+      offset: { start_spacing: 6 }      # 标题与徽标间距 6dp
+      semantics: "计数口径 = 该 Tab「进行中」分区条数，与 Chat 顶栏角标同口径（角标总数 = 工程师活跃 + 后台活跃，徽标为其分解）"
+    selection_state:
+      default_landing: "工程师有活跃 → Tab0；否则后台有活跃 → Tab1；均无 → Tab0"
+      user_pick: "手选后固定（rememberSaveable 跨重组/配置变更；iOS 用 @State 等价物，无需跨进程持久）"
+      decouple: "userPickedTab=null 时跟随 default（首查回流后可纠正落位），手选后脱钩"
+
+  # ── 分区（两 Tab 同构）──────────────────────────────────────
+  sections:
+    order: [active, history]            # 进行中 → 历史
+    header:
+      font_size: 13                     # sp，组件级常量（typography token 阶梯无 13sp 档，不归一化进 token）
+      weight: SemiBold
+      color: onSurfaceVariant
+      padding: { horizontal: 16, vertical: 8 }   # token spacing/lg + spacing/sm
+      title_keys: { active: task_center_section_active, history: task_center_section_history }
+    history_limit: 50                   # TaskCenterPartition.HISTORY_LIMIT / UserTaskRegistry.HISTORY_KEEP
+
+  # ── 空态 ───────────────────────────────────────────────────
+  empty_states:
+    engineer_first_query_pending: "taskList == null → 全空白（防空态文案闪现一帧）"
+    engineer_empty: { key: task_center_empty, font_size: 14, color: onSurfaceVariant, padding: 32, position: centered }
+    user_task_empty: { key: task_center_empty_user_tasks, style: bodyMedium, color: onSurfaceVariant, position: centered }
+
+  # ── 工程师任务列表项（TaskCenterListItem，US-14）─────────────
+  engineer_list_item:
+    container:
+      type: Surface
+      corner_radius: 16                 # token radius/lg
+      tonal_elevation: 2                # dp，M3 tonal
+      margin: { horizontal: 12, vertical: 4 }    # token spacing/md + spacing/xs
+      inner_padding: 12                 # token spacing/md
+      highlight: "待审批项（isAwaitingApproval）描边 1dp primary（BorderStroke）"
+      on_click: "整卡点击 → 回 chat 锚定对应任务卡（US-15；Android 经 Activity 级 chatTaskAnchor 一次性请求态）"
+      content_description: cd_engineer_task_card
+    row1_meta_line:
+      layout: "状态 chip + 会话标题 + spacer + 耗时，垂直居中"
+      status_chip: "EngineerTaskStatusChip（chip 规格见 chat.yaml §13 task_card / ChipTokens）"
+      session_title: { font_size: 11, color: onSurfaceVariant, max_lines: 1, ellipsis: true, padding_start: 8, optional: "blank 不渲染" }
+      elapsed: { text: "formatElapsed(updatedAtMs-startedAtMs)，M:SS 格式", font_size: 11, color: onSurfaceVariant }
+    row2_title:
+      text: "item.title（消息 content 或 sourceText）"
+      font_size: 14
+      weight: Medium
+      max_lines: 1
+      ellipsis: true
+      spacing_top: 6
+    row3_progress_summary:              # 按状态机分支（对齐聊天气泡卡各态文案）
+      RUNNING: "当前阶段行：chat_task_stage 插值，12sp primary（spacing_top 4）"
+      AWAITING_CONTINUE: "claude_truncated 12sp onSurfaceVariant（spacing_top 6）+ truncatedReason 11sp（可空，blank 不渲染）"
+      AWAITING_DELIVER: "chat_task_deliver_summary 插值 fileChangeCount，12sp onSurfaceVariant（spacing_top 6）+ 可选错误块"
+      COMPLETED: "resultSummary 12sp onSurfaceVariant max2 行省略（spacing_top 4，blank 不渲染）+ 已裁决（resolution≠null）时附错误块"
+      FAILED: "错误块（spacing_top 6）"
+      error_block: "EngineerTaskErrorBlock：error 色 8% 透明底圆角 8 + 错误图标 + 文本 max3 行"
+    row4_meta:
+      optional: "taskMetaText 空串不渲染（spacing_top 4）"
+      format: "轮次 N · 成本 $X.XX · N files · ⎇ branch（⎇ = deliverBranch 前缀，可空）"
+      font_size: 11
+      color: onSurfaceVariant
+    actions_row:                        # D7：仅审批动作；回调 null = 不渲染
+      AWAITING_CONTINUE_unresolved: "[继续 claude_continue | 到此为止 chat_task_abandon] TextButton 13sp，间距 8"
+      AWAITING_DELIVER_unresolved: "[交付 push claude_deliver_mode_push | 暂不 chat_task_skip_deliver] 同上"
+      FAILED: "[重试 chat_task_retry] TextButton 13sp"
+      COMPLETED_or_resolved: 不渲染
+      history_section: "只读——仅 FAILED 保留重试，其余回调 null 不渲染"
+      enabled_rule: "actionsEnabled = !isProcessing && taskId ∉ actionInFlight（禁用态 alpha 0.5）"
+    sort:
+      active: "审批中置顶，其余按 startedAtMs 倒序"
+      history: "按 updatedAtMs 倒序，封顶 50"
+
+  # ── 后台任务卡片（UserTaskCard，用户任务协议 §7）─────────────
+  user_task_card:
+    container:
+      type: Card
+      corner_radius: 12                 # token radius/panel 值复用（12；语义注记：列表卡片）
+      padding: { horizontal: 16, vertical: 12 }  # token spacing/lg + spacing/md
+      list_spacing: 8                   # LazyColumn spacedBy；token spacing/sm
+      list_padding_h: 16                # token spacing/lg
+      on_click: "整卡 → destination 导航（TAG_SCAN→扫描控制页 / MODEL_DOWNLOAD→模型中心）"
+      content_description: "cd_user_task_card 插值标题"
+    row1:
+      kind_icon: { size: 16, tint: status_color, decorative: true, mapping: "TAG_SCAN→ic/sync（Material Sync）；MODEL_DOWNLOAD→ic/download" }
+      title: { text: "displayName ?: kind 默认标题（user_task_title_tag_scan / user_task_title_model_download）", style: titleSmall, max_lines: 1, ellipsis: true, weight_1f }
+      status_text: { style: labelSmall, color: status_color, keys: "user_task_status_{pending,running,paused,completed,failed,cancelled}" }
+      spacing: { icon_title: 6, title_status: 8 }
+    status_color_rule:                  # 与顶栏角标同口径的活跃标记
+      FAILED: error
+      active_PENDING_RUNNING_PAUSED: primary
+      terminal_COMPLETED_CANCELLED: onSurfaceVariant
+    progress_section:                   # 仅活跃态渲染
+      spacing_top: 8
+      bar: "LinearProgressIndicator 全宽；progress=null → 不定进度（indeterminate）"
+      text_row:
+        spacing_top: 4
+        progress_text: { style: bodySmall, max_lines: 1, ellipsis: true, example: "128/500 或 1.2 GB / 2.0 GB" }
+        eta: { key: user_task_eta_remaining, format: "~Xh Ym left / ~Xm / <1m（etaMs≤0 或 null 不渲染）", style: bodySmall, color: onSurfaceVariant }
+    error_row:                          # errorCode 非空时渲染（spacing_top 4）
+      style: bodySmall
+      color: error
+      keys: "PROCESS_TERMINATED→user_task_error_process_terminated；PARTIAL_FAILURES→user_task_error_partial_failures 插值 errorDetail；MODEL_UNAVAILABLE→user_task_error_model_unavailable（不拼 errorDetail，displayName 已是 modelId）"
+    actions_row:
+      render_rule: "按 task.supportedActions 声明式渲染（按枚举 ordinal 排序：PAUSE/RESUME/CANCEL/RETRY），无体系 if-else；空集合不渲染"
+      style: "TextButton 右对齐（Arrangement.End）"
+      keys: "user_task_action_{pause,resume,cancel,retry}"
+
+  # ── 数据口径（iOS 实现须知）─────────────────────────────────
+  data_contract:
+    engineer_tab: "TaskCenterList(active, history) ← shared TaskCenterPartition.partition（上提 commonMain）；iOS 数据源 = ChatHistoryStore 持久化 task_card 消息（无 live SSE）"
+    user_task_tab: "List<UserTask> ← shared UserTaskRegistry.tasks（Room 元数据 + 内存进度合并流；iOS 侧 dao 注入文件/内存实现）"
+    badge_count: "activeCount = UserTaskMapping.isActive 过滤（PENDING/RUNNING/PAUSED）"
+
+# ── §6 Chat 顶栏任务中心入口（chat.yaml 补登记，2026-10-03）─────
+chat_topbar_task_entry:
+  position: "chat 顶栏 actions 首枚（trailing 组：[task, new_chat, clear_chat]，30px 节奏右对齐）"
+  icon: "ic/assignment（Material Icons Outlined assignment；SF 语义参考 list.clipboard）"
+  touch: 36                             # 热区，glyph 22 居中（topbar.yaml icons 节）
+  badge:
+    trigger: "activeTaskCount > 0（= 工程师活跃 + 后台活跃合并）"
+    text: "N（>99 → 99+，task_center_badge_overflow）"
+    component: "M3 Badge 套 BadgedBox（iOS 等价：图标右上角叠加 BadgeTokens 徽标）"
+  content_description: "activeTaskCount>0 → cd_task_center_active 插值计数；否则 cd_task_center"
+  on_click: "导航 task_center 路由"
+
+# ── §7 平台差异台账（platform_differences）─────────────────────
+platform_differences:
+  permission:
+    note: "本屏无新权限。TAG 扫描/模型下载的既有权限矩阵不变（Android FGS+POST_NOTIFICATIONS；iOS 无通知权限需求——无前台服务等价物）"
+  capabilities:
+    - feature: 工程师任务数据链（claude-tunnel SSE → Reducer → 持久化 → 审批动作）
+      android: 支持（features/chat/engineer/ 全链）
+      ios: 缺失——工程师 Tab 仅持久化历史/空态，审批动作不渲染；任务卡渲染管线就绪但无 live 流
+      resolution: "平台差异登记，iOS 工程师模式另行排期（spec 2026-09-25 §6 / 2026-09-26 §11 预留）"
+    - feature: TAG 扫描后台存活
+      android: "FGS dataSync + WakeLock + 进度通知 + 进程死亡对账（FAILED/PROCESS_TERMINATED）"
+      ios: "进程内 orchestrator，退后台即 pause（MainTabView 既有行为）；无进程死亡对账——TagScanStatusCenter 为 PassthroughSubject 无首帧回放，无对账数据源，重启后残留行原样呈现（不置 FAILED），由下次扫描事件纠正"
+      resolution: "iOS 无 FGS 等价物，对账语义降级登记为技术债"
+    - feature: 模型下载持久化与断点续传
+      android: "Room 状态 + FGS 分块下载 + 断点续传 + 启动对账（FAILED/PROCESS_TERMINATED）"
+      ios: "URLSession downloadTask 纯内存态，下载本体重启即丢（无断点续传）；启动对账已实装——$downloadStates @Published 首帧回放当前值即对账数据源，注册表残留 RUNNING 行置 FAILED(PROCESS_TERMINATED) 可重试"
+      resolution: "断点续传技术债登记；任务行不再滞留 RUNNING（首帧对账收敛为 FAILED）"
+  privacy_disclosure:
+    note: "本屏纯本地数据展示（Room/文件），无新披露项；Android Data Safety 与 iOS 隐私标签均不变"
+
+# ── 禁止事项 ─────────────────────────────────────────────────
+anti_patterns:
+  - "iOS 实现读 Android 源码翻译布局——只读本 spec + DesignTokens.swift + Ardot 帧"
+  - "手改 DesignTokens.swift——新度量进 design-tokens.json 经 gen-design-tokens.py 生成"
+  - "工程师 Tab 在 iOS 渲染审批动作按钮——无数据链支撑，误触即空转"
+  - "任务中心多卡用 WebView/HTML 渲染 UserTaskCard——多卡并存 WebView 实例成本不划算（spec §15 既定：原生组件）"
+  - "空态文案在首查未回时闪现——taskList==null 渲染空白"
+
+# ── 验收锚点 ─────────────────────────────────────────────────
+acceptance:
+  screenshots:
+    android_refs: "refs/ardot/chat-task_center.png（卡片样式参照；双 Tab 为代码新增，帧未更新——allowed_differences 登记）"
+    ios_capture: "tmp/ui-reference/task-center-{light,dark}.png（ios-auto-dev-loop 产出）"
+  pixel_diff: "SSIM ≥ 0.80（浅深色双跑）；工程师卡四态以 task_card_states.png 为观感参照（非像素基准——帧为旧单 Tab 稿）"
+  structure_zero_tolerance: "信息层级/布局结构/功能默认/文案状态/无障碍语义"
+  allowed_differences:
+    - "TabRow 材质：Android M3 TabRow 下划线指示器 vs iOS 分段控件/自定义 Tab——形制允许平台差异，选中态语义必须对齐"
+    - "工程师 Tab 空态为 iOS 常态（无数据链）——非常态差异，台账登记项"
+    - "UserTaskCard 圆角 12 映射 token radius/panel（值对齐、语义跨档）"

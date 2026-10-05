@@ -43,10 +43,10 @@ import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.features.chat.HtmlCard
-import com.mamba.picme.features.chat.engineer.EngineerTaskHtml
-import com.mamba.picme.features.chat.engineer.EngineerTaskPalette
-import com.mamba.picme.features.chat.engineer.EngineerTaskTexts
-import com.mamba.picme.features.chat.engineer.EngineerTaskThrottle
+import com.mamba.picme.domain.chat.taskcenter.EngineerTaskHtml
+import com.mamba.picme.domain.chat.taskcenter.EngineerTaskPalette
+import com.mamba.picme.domain.chat.taskcenter.EngineerTaskTexts
+import com.mamba.picme.domain.chat.taskcenter.EngineerTaskThrottle
 import java.util.Locale
 import kotlinx.coroutines.delay
 

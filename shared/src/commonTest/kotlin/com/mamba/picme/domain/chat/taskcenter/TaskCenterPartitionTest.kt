@@ -1,12 +1,12 @@
-package com.mamba.picme.features.chat.engineer
+package com.mamba.picme.domain.chat.taskcenter
 
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * [TaskCenterPartition] 分区纯逻辑分支矩阵（spec US-13/14）。
@@ -35,7 +35,7 @@ class TaskCenterPartitionTest {
         TaskCenterItem(sessionId = "s-$id", title = "t-$id", sessionTitle = null, task = task)
 
     @Test
-    fun `active predicate - running and awaiting are active, terminal and resolved are not`() {
+    fun `active predicate - running and awaiting are active while terminal and resolved are not`() {
         assertTrue(TaskCenterPartition.isActive(task("a", EngineerTaskStatus.RUNNING)))
         assertTrue(TaskCenterPartition.isActive(task("b", EngineerTaskStatus.AWAITING_CONTINUE)))
         assertTrue(TaskCenterPartition.isActive(task("c", EngineerTaskStatus.AWAITING_DELIVER)))
@@ -50,7 +50,7 @@ class TaskCenterPartitionTest {
     }
 
     @Test
-    fun `active section - awaiting approval pinned first, then startedAt desc`() {
+    fun `active section - awaiting approval pinned first then startedAt desc`() {
         val running1 = item("r1", task("r1", EngineerTaskStatus.RUNNING, startedAtMs = 300))
         val awaitingDeliver = item("ad", task("ad", EngineerTaskStatus.AWAITING_DELIVER, startedAtMs = 100))
         val running2 = item("r2", task("r2", EngineerTaskStatus.RUNNING, startedAtMs = 200))

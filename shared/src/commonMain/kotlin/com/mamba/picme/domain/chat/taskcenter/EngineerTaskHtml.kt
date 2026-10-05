@@ -1,4 +1,4 @@
-package com.mamba.picme.features.chat.engineer
+package com.mamba.picme.domain.chat.taskcenter
 
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
@@ -9,19 +9,19 @@ import com.mamba.picme.domain.chat.EngineerTaskStatus
  *
  * - HTML 来源 = 端侧模板 + [EngineerTaskState]（App 渲染，非 LLM 产物）——样式权威在 App，
  *   模板本身可信，**变量插值是唯一注入面**：所有状态文本字段（阶段/事件行/原因/摘要）入模板前
- *   一律经 [escapeHtml] 纯文本转义（spec §11），不经 [com.mamba.picme.features.chat.HtmlCardSanitizer]。
- * - CSS 变量由 [EngineerTaskPalette] 注入（composable 层从 MaterialTheme 运行时取色 → hex），
+ *   一律经 [escapeHtml] 纯文本转义（spec §11），不经 HtmlCardSanitizer（那是 LLM 产物的清洗轨）。
+ * - CSS 变量由 [EngineerTaskPalette] 注入（UI 层从主题运行时取色 → hex），
  *   Light/Dark 随主题切换（design-tokens 单源，与 Ardot taskcard 三帧逐值对齐）。
- * - 文案由 [EngineerTaskTexts] 预解析传入（stringResource 五语），组装器只做拼接与转义——纯 JVM 可测。
- * - 产物为完整文档（含 `<html`），[com.mamba.picme.features.chat.wrapHtmlDocument] 原样放行；
- *   viewport width=device-width → 1 CSS px ≈ 1 dp（测高/排版基准与 HtmlCard 管线一致）。
+ * - 文案由 [EngineerTaskTexts] 预解析传入（各端本地化预解析），组装器只做拼接与转义——纯函数可测。
+ * - 产物为完整文档（含 `<html`），宿主管线原样放行；
+ *   viewport width=device-width → 1 CSS px ≈ 1 dp/pt（测高/排版基准与 HtmlCard 管线一致）。
  *
  * 与设计稿（taskcard/collapsed、expanded、approval，Ardot 页 438:2）的既知偏差（状态无对应数据，
  * 设计值为示意）：进度 % 为活动量启发式（[progressFraction]，封顶 80%）；时间线无 ○ 待办行
  * （无阶段计划数据）；diff 行无 +a/−b 行数（状态仅 fileChangeCount，整行 onSurfaceVariant 呈现）。
  */
 
-/** 任务卡调色板：hex 字符串（"#1A1A1A" 形态），双模值由 composable 层运行时取色转换。 */
+/** 任务卡调色板：hex 字符串（"#1A1A1A" 形态），双模值由 UI 层运行时取色转换。 */
 data class EngineerTaskPalette(
     /** 卡底（scheme/surfaceContainer：Dark #1A1A1A / Light #F7F7F7）。 */
     val cardBg: String,
@@ -43,7 +43,7 @@ data class EngineerTaskPalette(
 )
 
 /**
- * 模板文案（composable 层 stringResource 预解析，含数值格式化）；null = 数据缺省时整行/整段隐藏。
+ * 模板文案（UI 层本地化预解析，含数值格式化）；null = 数据缺省时整行/整段隐藏。
  */
 data class EngineerTaskTexts(
     /** 标题前缀（「工程师任务：」）。 */
@@ -155,7 +155,7 @@ object EngineerTaskHtml {
         return document(palette, body.toString())
     }
 
-    /** HTML 实体转义（spec §11：状态文本是唯一注入面，五字符全覆盖）。 */
+    /** HTML 实体转义（spec §11：变量插值是唯一注入面，五字符全覆盖）。 */
     fun escapeHtml(raw: String): String = raw
         .replace("&", "&amp;")
         .replace("<", "&lt;")

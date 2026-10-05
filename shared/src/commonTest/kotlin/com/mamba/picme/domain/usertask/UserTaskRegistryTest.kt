@@ -1,7 +1,5 @@
 package com.mamba.picme.domain.usertask
 
-import com.mamba.picme.data.local.dao.UserTaskDao
-import com.mamba.picme.data.local.entity.UserTaskEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,31 +7,31 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class UserTaskRegistryTest {
 
-    private class FakeDao : UserTaskDao {
-        val rows = MutableStateFlow<List<UserTaskEntity>>(emptyList())
+    private class FakeStore : UserTaskStore {
+        val rows = MutableStateFlow<List<UserTaskRow>>(emptyList())
         var trimCalls = 0
             private set
         var upsertCalls = 0
             private set
         var failOnUpsert = false
 
-        override suspend fun upsert(task: UserTaskEntity) {
+        override suspend fun upsert(row: UserTaskRow) {
             upsertCalls++
             if (failOnUpsert) error("disk full")
-            rows.value = rows.value.filterNot { row -> row.id == task.id } + task
+            rows.value = rows.value.filterNot { existing -> existing.id == row.id } + row
         }
 
-        override fun observeAll(): Flow<List<UserTaskEntity>> = rows
+        override fun observeAll(): Flow<List<UserTaskRow>> = rows
 
-        override suspend fun getById(id: String): UserTaskEntity? = rows.value.firstOrNull { row -> row.id == id }
+        override suspend fun getById(id: String): UserTaskRow? = rows.value.firstOrNull { row -> row.id == id }
 
         override suspend fun activeIdsOfKind(kind: String): List<String> =
             rows.value.filter { row -> row.kind == kind && row.status in setOf("PENDING", "RUNNING", "PAUSED") }
@@ -66,17 +64,17 @@ class UserTaskRegistryTest {
 
     // stateIn(Eagerly) 的收集协程需即时跑完才能让 .value 断言同步可见：
     // runTest 默认 StandardTestDispatcher 不会自动推进，故用共享 testScheduler 的 Unconfined scope。
-    private fun registry(dao: FakeDao, testScheduler: TestCoroutineScheduler) =
+    private fun registry(store: FakeStore, testScheduler: TestCoroutineScheduler) =
         UserTaskRegistry(
-            dao = dao,
+            store = store,
             scope = TestScope(UnconfinedTestDispatcher(testScheduler)),
             clock = { 1000L },
         )
 
     @Test
     fun `upsertStatus 落库且 tasks 合并内存进度`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
         registry.updateProgress("tagscan:main", TaskProgressSnapshot(0.5f, "10/20", 3000L))
 
@@ -91,8 +89,8 @@ class UserTaskRegistryTest {
 
     @Test
     fun `activeCount 只计活动态`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.RUNNING)
         registry.upsertStatus("download:b", UserTaskKind.MODEL_DOWNLOAD, "b", UserTaskStatus.PAUSED)
         registry.upsertStatus("download:c", UserTaskKind.MODEL_DOWNLOAD, "c", UserTaskStatus.COMPLETED)
@@ -101,19 +99,19 @@ class UserTaskRegistryTest {
 
     @Test
     fun `终态 upsert 触发历史修剪且封顶 50`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         repeat(55) { i ->
             registry.upsertStatus("download:m$i", UserTaskKind.MODEL_DOWNLOAD, "m$i", UserTaskStatus.COMPLETED)
         }
-        assertTrue(dao.trimCalls >= 55)
+        assertTrue(store.trimCalls >= 55)
         assertEquals(50, registry.tasks.value.size)
     }
 
     @Test
     fun `perform 按 kind 分发到对应适配器`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         val tagAdapter = FakeAdapter(UserTaskKind.TAG_SCAN)
         val downloadAdapter = FakeAdapter(UserTaskKind.MODEL_DOWNLOAD)
         registry.registerAdapter(tagAdapter)
@@ -129,16 +127,16 @@ class UserTaskRegistryTest {
 
     @Test
     fun `perform 未知任务静默返回`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         registry.registerAdapter(FakeAdapter(UserTaskKind.TAG_SCAN))
         registry.perform("ghost", UserTaskAction.PAUSE) // 不抛异常即通过
     }
 
     @Test
     fun `perform 适配器抛异常降级为日志不穿透且任务状态不受影响`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         val tagAdapter = FakeAdapter(UserTaskKind.TAG_SCAN).apply { failOnPerform = true }
         registry.registerAdapter(tagAdapter)
         registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
@@ -152,8 +150,8 @@ class UserTaskRegistryTest {
 
     @Test
     fun `进度快照清除后回落为 null`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
         registry.updateProgress("tagscan:main", TaskProgressSnapshot(0.3f, "3/10", null))
         registry.updateProgress("tagscan:main", null)
@@ -162,12 +160,12 @@ class UserTaskRegistryTest {
 
     @Test
     fun `写库失败记日志降级不抛出且 tasks 不受影响`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.RUNNING)
         assertEquals(1, registry.tasks.value.size)
 
-        dao.failOnUpsert = true
+        store.failOnUpsert = true
         registry.upsertStatus("download:b", UserTaskKind.MODEL_DOWNLOAD, "b", UserTaskStatus.RUNNING) // 不抛出即通过
 
         assertEquals(listOf("download:a"), registry.tasks.value.map { task -> task.id })
@@ -175,32 +173,32 @@ class UserTaskRegistryTest {
 
     @Test
     fun `连续同态 upsertStatus 节流为单次落库`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         // 同态 5 连写（模拟下载 500ms 帧 / 扫描每张一帧的同态刷新）只落库 1 次
         repeat(5) {
             registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.RUNNING)
         }
-        assertEquals(1, dao.upsertCalls)
+        assertEquals(1, store.upsertCalls)
 
         // 状态迁移不节流
         registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.PAUSED)
-        assertEquals(2, dao.upsertCalls)
+        assertEquals(2, store.upsertCalls)
 
         // 写失败不入缓存：恢复后同态调用仍会重试落库
-        dao.failOnUpsert = true
+        store.failOnUpsert = true
         registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.COMPLETED)
-        assertEquals(3, dao.upsertCalls)
-        dao.failOnUpsert = false
+        assertEquals(3, store.upsertCalls)
+        store.failOnUpsert = false
         registry.upsertStatus("download:a", UserTaskKind.MODEL_DOWNLOAD, "a", UserTaskStatus.COMPLETED)
-        assertEquals(4, dao.upsertCalls)
+        assertEquals(4, store.upsertCalls)
         assertEquals(UserTaskStatus.COMPLETED, registry.tasks.value.single().status)
     }
 
     @Test
     fun `perform 行存在但 kind 未注册适配器静默返回`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         val downloadAdapter = FakeAdapter(UserTaskKind.MODEL_DOWNLOAD)
         registry.registerAdapter(downloadAdapter)
 
@@ -212,12 +210,12 @@ class UserTaskRegistryTest {
 
     @Test
     fun `perform 非法 kind 行静默返回且该行被 tasks 丢弃`() = runTest {
-        val dao = FakeDao()
-        val registry = registry(dao, testScheduler)
+        val store = FakeStore()
+        val registry = registry(store, testScheduler)
         val tagAdapter = FakeAdapter(UserTaskKind.TAG_SCAN)
         registry.registerAdapter(tagAdapter)
-        dao.rows.value = listOf(
-            UserTaskEntity(
+        store.rows.value = listOf(
+            UserTaskRow(
                 id = "ghost-row",
                 kind = "GHOST",
                 displayName = null,

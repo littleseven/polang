@@ -1,13 +1,13 @@
-package com.mamba.picme.features.chat.engineer
+package com.mamba.picme.domain.chat.taskcenter
 
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 /**
  * 任务卡 L1 模板组装器（[EngineerTaskHtml]）单测，spec《HTML 卡双形态》§7/§11/§14：

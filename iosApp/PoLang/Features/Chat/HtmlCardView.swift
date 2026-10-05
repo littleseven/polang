@@ -21,11 +21,15 @@ struct HtmlCardView: View {
     var onOpenFullpage: (String, String?) -> Void
     var onOpenLink: (URL) -> Void
     var onDisplayFinalized: (HtmlCardDisplayMode, Int32?) -> Void
+    /// INLINE 整卡点击（工程师任务卡折叠/展开触控层，chat.yaml §13 task_card）：
+    /// 非 nil 时 WebView 关交互、上叠透明触控层（模板无 a 链接，吞触控无副作用）；
+    /// nil = 既有行为（卡内直接交互）。
+    var onTap: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var cs
     private var s: SchemeColors { appScheme(cs) }
 
-    /// 卡底色（渐隐遮罩终点 = 运行时卡底色；对齐 pendingCardItem 的卡 chrome）
+    /// 卡底色（渐隐遮罩终点 = 运行时卡底色；对齐任务卡占位时代的卡 chrome——历史注记）
     private var cardBg: Color { Color(.secondarySystemBackground) }
 
     /// INLINE 最小高（spec：短卡 ≥120dp，dp≈pt）
@@ -57,7 +61,8 @@ struct HtmlCardView: View {
         meta: HtmlCardMeta,
         onOpenFullpage: @escaping (String, String?) -> Void,
         onOpenLink: @escaping (URL) -> Void,
-        onDisplayFinalized: @escaping (HtmlCardDisplayMode, Int32?) -> Void
+        onDisplayFinalized: @escaping (HtmlCardDisplayMode, Int32?) -> Void,
+        onTap: (() -> Void)? = nil
     ) {
         self.messageId = messageId
         self.part = part
@@ -65,6 +70,7 @@ struct HtmlCardView: View {
         self.onOpenFullpage = onOpenFullpage
         self.onOpenLink = onOpenLink
         self.onDisplayFinalized = onDisplayFinalized
+        self.onTap = onTap
         // 初判：display 声明 fullpage 直判预览；displayMode 已终判（持久化重渲染）从其值
         let initial: CardMode
         if let finalized = meta.displayMode {
@@ -107,10 +113,19 @@ struct HtmlCardView: View {
                 // 渲染失败 → 原生封面兜底（summary + 占位说明）
                 nativeCover(showHint: false)
             } else {
-                htmlWebView(
-                    scrollEnabled: false, showIndicators: false, interactive: true,
-                    measure: true, onHeight: { handleMeasuredHeight($0) })
-                    .frame(height: inlineHeight)
+                ZStack {
+                    htmlWebView(
+                        scrollEnabled: false, showIndicators: false,
+                        interactive: onTap == nil,
+                        measure: true, onHeight: { handleMeasuredHeight($0) })
+                        .frame(height: inlineHeight)
+                    if let onTap {
+                        // 整卡触控层（工程师任务卡折叠/展开；消费点击不消费竖拖）
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { onTap() }
+                    }
+                }
             }
         }
     }

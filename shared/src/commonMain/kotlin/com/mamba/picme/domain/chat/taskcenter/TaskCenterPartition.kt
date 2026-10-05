@@ -1,4 +1,4 @@
-package com.mamba.picme.features.chat.engineer
+package com.mamba.picme.domain.chat.taskcenter
 
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
@@ -19,7 +19,7 @@ data class TaskCenterList(
 
 /**
  * 任务中心分区纯逻辑（spec US-13/14；测试决策首层接缝，对齐 EngineerTaskReducer 先例）。
- * 输入为已解析的任务——Room metadata 的 org.json 解析是平台边界，由调用方（TaskCenterViewModel）完成。
+ * 输入为已解析的任务——持久层 metadata 的 JSON 解析是平台边界，由调用方（各端 TaskCenterViewModel）完成。
  */
 object TaskCenterPartition {
 

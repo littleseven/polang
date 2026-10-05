@@ -7,9 +7,9 @@ import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.domain.usertask.UserTask
 import com.mamba.picme.domain.usertask.UserTaskAction
 import com.mamba.picme.domain.usertask.UserTaskRegistry
-import com.mamba.picme.features.chat.engineer.TaskCenterItem
-import com.mamba.picme.features.chat.engineer.TaskCenterList
-import com.mamba.picme.features.chat.engineer.TaskCenterPartition
+import com.mamba.picme.domain.chat.taskcenter.TaskCenterItem
+import com.mamba.picme.domain.chat.taskcenter.TaskCenterList
+import com.mamba.picme.domain.chat.taskcenter.TaskCenterPartition
 import com.mamba.picme.features.chat.parseEngineerTaskState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
