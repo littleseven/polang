@@ -212,19 +212,22 @@
 - **OpenCL 守护**: `OpenClGuardian` 在 Pass 3 前 warmup，超时后自动降级 CPU 并记录设备黑名单
 - **模型加载**: `TagGenerationScheduler.ensureModelLoaded()` 优先 OpenCL（用户开启且未降级），失败/warmup 超时后降级 CPU
 - **状态观察**: 通过 `TagGenerationService.sessionProgress` StateFlow 显示进度、预计剩余时间、暂停/恢复按钮
-- **进度口径立法（2026-10-01，spec 2026-10-01-scan-progress-ux-redesign）**: 全 app 唯一对外百分比 = 库级 AI 打标完成率，计算点唯一化为 domain `domain/tag/scan/LibraryCompletion.kt` 的 `LibraryCompletion.percentRounded()`（= `TagPassProgress.percentRounded()`，Double 精确路径）；圆环（整理 Tab Stats）、扫描主卡库级轨道、前台通知 `setProgress`、任务中心进度条四面同源同舍入。任务级进度只允许「第 x/y 张」自然语言叙述（`tag_scan_narrative*`），禁止渲染为百分比。`TagPassProgress`/`tagPassProgress()`/`percentRounded()` 已自本屏包上移 `domain/tag/scan`，屏幕侧只 import 不再持有计算逻辑
+- **进度口径立法（2026-10-05 修订，取代 2026-10-01 版）**: 进度分**任务域**与**库域**两个作用域，各自单一数据源、禁止混拼（旧版「任务中心 progress = 库级 ?: 任务级」fallback 混拼已拆除）。计算核心 = shared `domain/tagscan/ScanProgressCalculator`（双端 SSOT，纯函数 + commonTest 矩阵）：
+  - **任务域加权进度**（任务中心进度条、前台通知 setProgress、扫描页顶部 progBar）：`fraction = 1 − (w₁·r₁ + w₃·r₃) / (w₁·r₁₀ + w₃·r₃₀)`，w = 各 Pass 单张实测中位耗时（冷启动默认 0.8s/7s）。自动 sweep 基线 = 启动时全库待办快照（photo-only，含未入队积压，跨 50 张链式批次连续不归零；扫描中途新增照片按基线钳制不进本轮分母 + sweep 内单调钳制）；手动会话（regenerate/单 Pass/进程重启恢复）基线 = 任务表总数。ETA 与进度同源：etaMs = 当前剩余工作量。
+  - **库域加权完成度**（扫描页圆环唯一百分比）：`( w₁×(N−r₁) + w₃×(N−r₃) ) / ( N×(w₁+w₃) )`，N = 照片总数（**photo-only**——视频永不进流水线，旧版含视频分母导致永不收敛 100% 已修：`MediaDao.getUnlabeledPhotoCount`）；新增照片拉低完成度是诚实口径，不钳制。Service 活跃期 ≥1s 节流发布，圆环缺帧时本地同公式构造（同口径，仅传输不同）。
+  - 任务级 processed/total（一媒体多任务）只允许「第 x/y 张」自然语言叙述（`tag_scan_narrative*`），禁止渲染为百分比。`TagPassProgress`/`tagPassProgress()` 保留服务阶段行（分母已统一 photo-only）。
 
 **UI 结构（v2 重设计 + 2026-10-01 扫描进度单口径锚点，英文体验优先）**:
 - 页面自上而下四个区块：`Library`（Stats 置顶：图库统计 + 语义索引覆盖）→ `Scan` → `Stages` → `Regenerate`
 - **Scan 区块（统一槽位，单口径锚点 + 分层披露）**：
-  - 空闲：`ScanActionCard`（状态 chip「Up to date / N pending」+「Scan new / Rescan all」；caption 与轨道均为 Pass3 库级口径 `tagPassProgress(totalMedia, remainingPass3)`）
+  - 空闲：`ScanActionCard`（状态 chip「Up to date / N pending」+「Scan new / Rescan all」；caption 与轨道均为库域加权完成度，见上方口径立法）
   - 会话活跃/暂停/过渡/终态失败：一张 `ScanProgressCard` 主状态卡（阶段名标题 + 「第 x/y 张」叙述行 + 库级完成率轨道 + 全部会话操作按钮；独立会话控制卡已删并入）。UI 模型全部由 domain 纯函数 `domain/tag/scan/ScanCardUiModel.kt` 的 `scanCardUiModel()` 产出（§7 边界态矩阵，JVM 全矩阵可测），UI 层零逻辑；容器色 RUNNING/过渡=primaryContainer、PAUSED=secondaryContainer、终态失败=errorContainer
   - 美学打分（非会话制）`AestheticProgressCard` 同槽位互斥（仅非扫描态显示）
   - 进程死亡对账 FAILED → `InterruptedScanCard`（主按钮 = 增量续扫断点恢复）
 - **Stages 区块**：4 个 `StageRow`（Faces/People/Content tags/Quality scores，右侧 `percentRounded()` 百分比或人数 + chevron；描述行参数化库级覆盖叙述 `tag_pass_scope_*`），点按弹 `StageActionSheet`；会话活跃（含暂停/过渡态）时整卡锁定（alpha 0.38 + 点击守卫）
 - **Regenerate 区块**：类别/时间范围 chips + 「Overwrite existing」开关（关 = 仅补齐缺失）；会话活跃时锁定（alpha 0.38 + 提交守卫）
 - **全量二次确认**：选 Reprocess everything 先弹 AlertDialog 确认再下发 intent（`intentScanPass1/2/3Full`、`intentScoreAestheticFull`）
-- **前台通知**：标题 = 阶段名/暂停/完成整句键，正文 = 叙述行（`tag_scan_narrative*`），`setProgress` = 库级 `percentRounded()`（库级暂缺回退任务级整数口径）；`formatDuration` 在 `domain/tag/scan/ScanCardUiModel.kt` 与屏幕共用
+- **前台通知**：标题 = 阶段名/暂停/完成整句键，正文 = 叙述行（`tag_scan_narrative*`），`setProgress` = 任务域加权进度（`weightedFraction`，缺帧回退库域完成度，再缺不定态）；`formatDuration` 在 `domain/tag/scan/ScanCardUiModel.kt` 与屏幕共用
 - **视觉规格对齐 Ardot 稿 `gallery/tag_control` / `gallery/tag_stage_sheet`**（两帧已迁至 `Organize` 页，帧名与 node id 171:273/172:113 未变）：卡片=surfaceContainer r16、瓦片/轨道/Cancel=surfaceVariant、弹层/确认框=surfaceContainerHighest、描边=outlineVariant、强调=primary（#8FD6C6）、渐变按钮/大数字=ChatBubbleTokens 品牌渐变；Stats 瓦片无图标（数值 17sp + 标签 11sp）、覆盖环为实色 primary 弧；弹层选项卡带单选圈（点卡片直接执行）+ 通栏 Cancel；自定义 44×26 TagSwitch 与 h28 chip（选中=primary 14% 底+描边）
 - 文案规范：按钮/标题一律短文案（Faces、Scan new、Rescan all、Regenerate），五语（EN/zh-CN/zh-TW/ES/FR）键同步，新增键以 `tag_section_*` / `tag_stage_*` / `tag_scan_*` / `tag_overwrite_*` 前缀
 

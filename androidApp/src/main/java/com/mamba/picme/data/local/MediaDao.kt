@@ -258,9 +258,15 @@ interface MediaDao {
     @Query("SELECT id FROM media_assets WHERE labels IS NULL OR labels = '' ORDER BY captureDate DESC")
     suspend fun getUnlabeledMediaIds(): List<Long>
 
-    /** 未标记 AI 标签的媒体数量 */
+    /** 未标记 AI 标签的媒体数量（含视频；展示口径用，进度计算请用 [getUnlabeledPhotoCount]） */
     @Query("SELECT COUNT(*) FROM media_assets WHERE labels IS NULL OR labels = ''")
     suspend fun getUnlabeledMediaCount(): Int
+
+    /** 未标记 AI 标签的照片数量（进度口径） */
+    // 注意 type = 'PHOTO'：图像打标只适用于照片，视频走 loadBitmap 会被 MIME 拦截返回 null，
+    // labels 永远写不进去。若不过滤，视频会永久计入“待 Pass 3”导致进度永不收敛 100%。
+    @Query("SELECT COUNT(*) FROM media_assets WHERE (labels IS NULL OR labels = '') AND type = 'PHOTO'")
+    suspend fun getUnlabeledPhotoCount(): Int
 
     /** 已生成 AI 标签的媒体 ID，按拍摄时间降序（扫描页 v3「已打标照片」视图；与 getUnlabeledMediaCount 谓词互补） */
     @Query("SELECT id FROM media_assets WHERE labels IS NOT NULL AND labels != '' ORDER BY captureDate DESC")
