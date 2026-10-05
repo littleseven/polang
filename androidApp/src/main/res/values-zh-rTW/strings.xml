@@ -1731,10 +1731,14 @@
     <string name="ota_changelog_label">更新說明</string>
     <string name="ota_update_now">立即更新</string>
     <string name="ota_update_later">下次再說</string>
-    <string name="ota_downloading">正在下載 %1$s…%2$d%%</string>
-    <string name="ota_ready_to_install">%1$s 已下載完成，立即安裝？</string>
+    <string name="ota_ready_to_install">更新包已下載完成，現在安裝嗎？</string>
     <string name="ota_install">安裝</string>
     <string name="ota_download_failed">下載失敗：%1$s</string>
     <string name="ota_retry">重試</string>
     <string name="ota_cancel">取消</string>
+    <string name="ota_background_download_toast">已轉入後台下載，完成後將自動安裝</string>
+    <string name="ota_dm_notification_title">PoLang 更新包</string>
+    <string name="ota_complete_notification_title">更新已就緒</string>
+    <string name="ota_complete_notification_text">下載完成，點擊安裝</string>
+    <string name="ota_notification_channel_name">應用更新</string>
 </resources>

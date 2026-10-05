@@ -1691,10 +1691,14 @@
     <string name="ota_changelog_label">Novedades</string>
     <string name="ota_update_now">Actualizar ahora</string>
     <string name="ota_update_later">Más tarde</string>
-    <string name="ota_downloading">Descargando %1$s… %2$d%%</string>
-    <string name="ota_ready_to_install">%1$s descargado. ¿Instalar ahora?</string>
+    <string name="ota_ready_to_install">Paquete de actualización descargado. ¿Instalar ahora?</string>
     <string name="ota_install">Instalar</string>
     <string name="ota_download_failed">Descarga fallida: %1$s</string>
     <string name="ota_retry">Reintentar</string>
     <string name="ota_cancel">Cancelar</string>
+    <string name="ota_background_download_toast">Descargando en segundo plano. Se instalará al terminar.</string>
+    <string name="ota_dm_notification_title">Paquete de actualización de PoLang</string>
+    <string name="ota_complete_notification_title">Actualización lista para instalar</string>
+    <string name="ota_complete_notification_text">Descarga completada. Toca para instalar.</string>
+    <string name="ota_notification_channel_name">Actualizaciones de la app</string>
 </resources>

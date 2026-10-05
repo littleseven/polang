@@ -1740,10 +1740,14 @@
     <string name="ota_changelog_label">What\'s new</string>
     <string name="ota_update_now">Update now</string>
     <string name="ota_update_later">Later</string>
-    <string name="ota_downloading">Downloading %1$s… %2$d%%</string>
-    <string name="ota_ready_to_install">Version %1$s downloaded. Install now?</string>
+    <string name="ota_ready_to_install">Update package downloaded. Install now?</string>
     <string name="ota_install">Install</string>
     <string name="ota_download_failed">Download failed: %1$s</string>
     <string name="ota_retry">Retry</string>
     <string name="ota_cancel">Cancel</string>
+    <string name="ota_background_download_toast">Downloading in background. It will install when ready.</string>
+    <string name="ota_dm_notification_title">PoLang Update Package</string>
+    <string name="ota_complete_notification_title">Update ready to install</string>
+    <string name="ota_complete_notification_text">Download finished. Tap to install.</string>
+    <string name="ota_notification_channel_name">App updates</string>
 </resources>
