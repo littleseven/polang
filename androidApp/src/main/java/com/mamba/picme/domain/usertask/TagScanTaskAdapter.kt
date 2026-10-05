@@ -1,12 +1,10 @@
 package com.mamba.picme.domain.usertask
 
 import androidx.annotation.VisibleForTesting
-import com.mamba.picme.domain.tag.scan.LibraryCompletion
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.service.tag.TagGenerationService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** TAG 扫描控制动词收口（StartTagScanUseCase 依赖 Context 无法在 JVM 单测构造，故收为接口）。 */
@@ -19,16 +17,17 @@ fun interface TagScanControl {
  * TAG 扫描适配器（spec §6）：整个扫描会话 = 1 个 UserTask（id 固定 tagscan:main）。
  * 订阅 Service 静态进度流；动词经 [TagScanControl] 转发。引擎零侵入。
  *
- * 口径立法（2026-10-01）：`progress` 喂**库级 AI 打标完成率**（[LibraryCompletion]），
- * 与扫描 Tab 圆环/前台通知同源同舍入；任务级 processed/total 仅以 progressText
- * 「128/500」数字中性形态辅助呈现，不再渲染为进度占比。
+ * 口径立法（2026-10-05 修订）：`progress` 喂**任务域加权进度**
+ * （[TagScanSessionProgress.weightedFraction]，公式见 shared ScanProgressCalculator）——
+ * 自动 sweep 跨链式批次连续、中途新增照片不回退；不再混拼库域完成度
+ * （库域 = LibraryCompletion，只服务圆环/统计，两个作用域各自独立）。
+ * 任务级 processed/total 仅以 progressText「128/500」数字中性形态辅助呈现。
  */
 class TagScanTaskAdapter(
     private val registry: UserTaskRegistry,
     private val control: TagScanControl,
     private val scope: CoroutineScope,
     private val progressFlow: Flow<TagScanSessionProgress?> = TagGenerationService.sessionProgress,
-    private val libraryFlow: Flow<LibraryCompletion?> = TagGenerationService.libraryCompletion,
 ) : UserTaskAdapter {
 
     override val kind: UserTaskKind = UserTaskKind.TAG_SCAN
@@ -37,18 +36,16 @@ class TagScanTaskAdapter(
     override fun start() {
         scope.launch {
             var isFirstEmission = true
-            combine(progressFlow, libraryFlow) { progress, library -> progress to library }
-                .collect { (progress, library) ->
-                    sync(progress, library, isFirstEmission)
-                    isFirstEmission = false
-                }
+            progressFlow.collect { progress ->
+                sync(progress, isFirstEmission)
+                isFirstEmission = false
+            }
         }
     }
 
     @VisibleForTesting
     internal suspend fun sync(
         progress: TagScanSessionProgress?,
-        library: LibraryCompletion? = null,
         isFirstEmission: Boolean = false,
     ) {
         val status = progress?.let { value -> UserTaskMapping.fromTagScanState(value.state) }
@@ -85,8 +82,8 @@ class TagScanTaskAdapter(
             registry.updateProgress(
                 TASK_ID,
                 TaskProgressSnapshot(
-                    // 库级口径优先；首帧空窗（libraryCompletion 尚未产出）回退任务级
-                    progress = library?.fraction
+                    // 任务域加权进度优先；老版本帧（无 weightedFraction）回退任务级计数
+                    progress = progress.weightedFraction
                         ?: if (progress.total > 0) progress.processed / progress.total.toFloat() else null,
                     // total==0 时文案同样置 null，避免误导性的 "0/0"
                     progressText = if (progress.total > 0) "${progress.processed}/${progress.total}" else null,

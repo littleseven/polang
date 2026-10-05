@@ -29,9 +29,10 @@ class GetGallerySummaryUseCase(
             val isScanning = TagGenerationService.isScanning.value
 
             val recommendation = when {
-                stats.totalMedia > 0 && stats.remainingForPass1 > stats.totalMedia * PASS1_RATIO_THRESHOLD ->
+                // 阈值判定分母用照片口径：remainingForPass1/3 均为 photo-only（视频不进流水线）
+                stats.photoCount > 0 && stats.remainingForPass1 > stats.photoCount * PASS1_RATIO_THRESHOLD ->
                     GallerySummary.ScanRecommendation.PASS1_FIRST
-                stats.totalMedia > 0 && stats.remainingForPass3 > stats.totalMedia * PASS3_RATIO_THRESHOLD ->
+                stats.photoCount > 0 && stats.remainingForPass3 > stats.photoCount * PASS3_RATIO_THRESHOLD ->
                     GallerySummary.ScanRecommendation.PASS3_FULL
                 stats.remainingForPass3 > 0 ->
                     GallerySummary.ScanRecommendation.INCREMENTAL

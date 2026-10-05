@@ -11,6 +11,9 @@ import com.mamba.picme.data.local.entity.TagScanTaskEntity
 import com.mamba.picme.data.local.entity.TagScanTaskStatus
 import com.mamba.picme.domain.tag.TagCategory
 import com.mamba.picme.domain.tag.TagGenerationScheduler
+import com.mamba.picme.domain.tagscan.ScanPassWeights
+import com.mamba.picme.domain.tagscan.ScanTaskProgress
+import com.mamba.picme.domain.tagscan.computeScanTaskProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -141,15 +144,17 @@ class TagScanOrchestrator(
             val totalMedia = db.mediaDao().getTotalCount()
             val withFace = db.mediaDao().getHasFaceCount()
             val withSemantic = db.mediaDao().getMediaWithSemanticEmbeddingCount()
-            val unlabeledCount = db.mediaDao().getUnlabeledMediaCount()
-            val withLabels = totalMedia - unlabeledCount
+            // Pass 3 剩余/已打标均为照片口径：视频永不进打标流水线（loadBitmap 被 MIME 拦截，
+            // labels 写不进去），计入会永久垫底导致进度永不收敛 100%。
+            val unlabeledCount = db.mediaDao().getUnlabeledPhotoCount()
+            val photoCount = db.mediaDao().getPhotoCount()
+            val withLabels = photoCount - unlabeledCount
             val personCount = db.personDao().getPersonCount()
             val faceEmbeddingCount = db.personDao().getAllEmbeddingCount()
             val remainingForPass1 = db.mediaDao().getMediaWithoutFaceRoiCount()
-            // Pass 3 剩余独立统计：所有无 labels 的媒体，不强制要求已有 faceRoiResult
+            // Pass 3 剩余独立统计：所有无 labels 的照片，不强制要求已有 faceRoiResult
             val remainingForPass3 = unlabeledCount
             val namedPersonCount = db.personDao().getNamedPersonCount()
-            val photoCount = db.mediaDao().getPhotoCount()
             val aestheticScoredCount = db.mediaDao().getAestheticScoredCount()
             val cityCount = db.mediaDao().getDistinctCityCount()
             val groupPhotoCount = db.personDao().getGroupPhotoMediaIds().size
@@ -223,6 +228,33 @@ class TagScanOrchestrator(
      */
     private val sessionPolicies = mutableMapOf<String, ScanQueuePolicy>()
 
+    // ── 任务域加权进度（2026-10-05 口径立法，公式见 shared ScanProgressCalculator）──
+    // 自动 sweep 基线：sweep 启动时全库待办快照（照片口径，含未入队积压）。
+    // 链式批次/阶段切换共享同一基线，分母不随 50 张一批的会话切分归零（消灭锯齿波）；
+    // 扫描中途新增照片不进入本轮分母（当前剩余按基线钳制）。
+    // -1 = 无 sweep 基线（手动会话 / 进程重启后回退任务表口径）。
+    private var sweepBaselineFace = -1
+    private var sweepBaselineTagging = -1
+    /** sweep 内单调钳制：删除照片等边界不回退 */
+    private var sweepLastFraction: Float? = null
+    /** 媒体表剩余计数节流缓存（≥1s），避免每任务两次 COUNT 全表扫描 */
+    private var sweepLastRefreshMs = 0L
+    private var sweepCachedRemainingFace = 0
+    private var sweepCachedRemainingTagging = 0
+
+    private fun resetSweepBaseline() {
+        sweepBaselineFace = -1
+        sweepBaselineTagging = -1
+        sweepLastFraction = null
+        sweepLastRefreshMs = 0L
+    }
+
+    /** 当前各 Pass 单张预估耗时权重（实测中位数，冷启动默认值兜底）。 */
+    fun currentPassWeights(): ScanPassWeights = ScanPassWeights(
+        faceDetectionMs = estimatePassDurationMs(TagScanPass.FACE_DETECTION),
+        imageTaggingMs = estimatePassDurationMs(TagScanPass.IMAGE_TAGGING),
+    )
+
     init {
         // 启动时恢复被异常中断的 RUNNING 任务
         scope.launch {
@@ -243,9 +275,25 @@ class TagScanOrchestrator(
      * 2. 失败项默认 24h 后才允许自动重试
      * 3. 按 [order] 排序，默认 newest-first 优先处理新拍摄/新添加的照片
      */
-    suspend fun scheduleAutoScan(policy: ScanQueuePolicy = ScanQueuePolicy()): String {
+    suspend fun scheduleAutoScan(policy: ScanQueuePolicy = ScanQueuePolicy()): String =
+        scheduleAutoScan(policy, continueSweep = false)
+
+    private suspend fun scheduleAutoScan(policy: ScanQueuePolicy, continueSweep: Boolean): String {
         val sessionId = newSessionId()
         logInfo(sessionId, "开始自动增量扫描: $policy")
+
+        if (!continueSweep) {
+            // 新 sweep：快照全库待办基线（照片口径，含未入队积压）。
+            // 只计入本 policy 覆盖的 Pass，不覆盖的 Pass 留在分母外，进度才能收敛 100%。
+            val coversFace = policy.passes.contains(TagScanPass.FACE_DETECTION) ||
+                policy.deferredPasses.contains(TagScanPass.FACE_DETECTION)
+            val coversTagging = policy.passes.contains(TagScanPass.IMAGE_TAGGING) ||
+                policy.deferredPasses.contains(TagScanPass.IMAGE_TAGGING)
+            sweepBaselineFace = if (coversFace) db.mediaDao().getMediaWithoutFaceRoiCount() else 0
+            sweepBaselineTagging = if (coversTagging) db.mediaDao().getUnlabeledPhotoCount() else 0
+            sweepLastFraction = null
+            sweepLastRefreshMs = 0L
+        }
 
         val before = System.currentTimeMillis() - policy.skipRecentlyTaggedMs
         // 覆盖判定只认单媒体 Pass（剔除 DBSCAN 全局任务），见 [perMediaCoveragePassNumbers]。
@@ -281,9 +329,10 @@ class TagScanOrchestrator(
             val nextPolicy = nextPhasePolicy(policy)
             if (nextPolicy != null) {
                 logInfo(sessionId, "延迟阶段切换: ${policy.passes} 全量完成 → 进入 ${nextPolicy.passes}")
-                return scheduleAutoScan(nextPolicy)
+                return scheduleAutoScan(nextPolicy, continueSweep = true)
             }
             logInfo(sessionId, "没有需要增量扫描的媒体")
+            resetSweepBaseline()
             _progress.value = TagScanSessionProgress(
                 sessionId = sessionId,
                 state = ScanSessionState.COMPLETED,
@@ -502,6 +551,7 @@ class TagScanOrchestrator(
         }
         logInfo(target, "取消扫描")
         db.tagScanTaskDao().cancelSession(target)
+        resetSweepBaseline()
         sessionMutex.withLock { activeSessionId = null }
         currentJob?.cancel()
         // 立即反馈终态，避免 JNI 阻塞导致 UI 长时间停留在“取消中”
@@ -711,11 +761,11 @@ class TagScanOrchestrator(
 
             finalizeSession(sessionId)
 
-            // 自动扫描批次链式调度：当前批次正常完成后，继续调度下一批
+            // 自动扫描批次链式调度：当前批次正常完成后，继续调度下一批（同 sweep，共享进度基线）
             val policy = sessionPolicies.remove(sessionId)
             if (policy != null && _progress.value?.state == ScanSessionState.COMPLETED) {
                 logInfo(sessionId, "当前批次完成，继续调度下一批")
-                scheduleAutoScan(policy)
+                scheduleAutoScan(policy, continueSweep = true)
             }
         } catch (e: CancellationException) {
             logInfo(sessionId, "会话被取消")
@@ -867,7 +917,7 @@ class TagScanOrchestrator(
         val pending = stats.count(TagScanTaskStatus.PENDING)
         val failed = stats.count(TagScanTaskStatus.FAILED)
 
-        val estimatedRemainingMs = estimateRemainingMs(sessionId)
+        val taskProgress = computeTaskProgress(sessionId)
 
         _progress.value = TagScanSessionProgress(
             sessionId = sessionId,
@@ -882,9 +932,92 @@ class TagScanOrchestrator(
             total = total,
             pending = pending,
             failed = failed,
-            estimatedRemainingMs = estimatedRemainingMs,
+            estimatedRemainingMs = taskProgress.etaMs,
+            weightedFraction = taskProgress.fraction,
             messages = sessionMessages.toList()
         )
+    }
+
+    /**
+     * 任务域加权进度 + ETA（2026-10-05 口径立法，公式见 shared ScanProgressCalculator）。
+     *
+     * - 自动 sweep：媒体表口径——基线 = sweep 启动时全库待办快照（照片口径，含未入队积压），
+     *   当前剩余 ≥1s 节流刷新并按基线钳制（扫描中途新增照片不进本轮分母），sweep 内单调钳制。
+     * - 手动会话（regenerate / 单 Pass / 进程重启恢复）：任务表口径——基线 = 会话任务总数，
+     *   剩余 = PENDING/RUNNING/PAUSED/FAILED（FAILED 视为待重试，对齐旧 ETA 语义）。
+     *
+     * ETA 与进度同源：etaMs = 当前剩余工作量，不再两套时间基准。
+     * DBSCAN 是全局任务不进 fraction；其耗时计入 ETA。MOBILE_CLIP 兼容任务同理只进 ETA。
+     */
+    private suspend fun computeTaskProgress(sessionId: String): ScanTaskProgress {
+        val weights = currentPassWeights()
+        if (sweepBaselineFace >= 0 || sweepBaselineTagging >= 0) {
+            val now = System.currentTimeMillis()
+            if (now - sweepLastRefreshMs >= 1000L) {
+                sweepLastRefreshMs = now
+                sweepCachedRemainingFace = db.mediaDao().getMediaWithoutFaceRoiCount()
+                sweepCachedRemainingTagging = db.mediaDao().getUnlabeledPhotoCount()
+            }
+            val result = computeScanTaskProgress(
+                baselineRemainingPass1 = sweepBaselineFace.coerceAtLeast(0).toLong(),
+                baselineRemainingPass3 = sweepBaselineTagging.coerceAtLeast(0).toLong(),
+                remainingPass1 = sweepCachedRemainingFace.toLong(),
+                remainingPass3 = sweepCachedRemainingTagging.toLong(),
+                weights = weights,
+            )
+            val fraction = result.fraction
+            val previous = sweepLastFraction
+            val monotonic = when {
+                fraction == null -> previous
+                previous == null -> fraction
+                else -> maxOf(previous, fraction)
+            }
+            sweepLastFraction = monotonic
+            return result.copy(fraction = monotonic)
+        }
+
+        val stats = db.tagScanTaskDao().countByStatusAndPass(sessionId)
+        var totalFace = 0L
+        var totalTagging = 0L
+        var remainingFace = 0L
+        var remainingTagging = 0L
+        var extraEtaMs = 0L
+        for (row in stats) {
+            val isRemaining = when (row.status) {
+                TagScanTaskStatus.PENDING, TagScanTaskStatus.RUNNING,
+                TagScanTaskStatus.PAUSED, TagScanTaskStatus.FAILED -> true
+                TagScanTaskStatus.COMPLETED, TagScanTaskStatus.CANCELLED -> false
+            }
+            when (row.pass) {
+                TagScanPass.FACE_DETECTION -> {
+                    if (row.status != TagScanTaskStatus.CANCELLED) totalFace += row.cnt
+                    if (isRemaining) remainingFace += row.cnt
+                }
+                TagScanPass.IMAGE_TAGGING -> {
+                    if (row.status != TagScanTaskStatus.CANCELLED) totalTagging += row.cnt
+                    if (isRemaining) remainingTagging += row.cnt
+                }
+                // 全局/兼容任务不进 fraction，仅按各自预估耗时计入 ETA
+                TagScanPass.DBSCAN ->
+                    if (isRemaining) extraEtaMs += row.cnt * estimatePassDurationMs(TagScanPass.DBSCAN)
+                TagScanPass.MOBILE_CLIP_ENCODING ->
+                    if (isRemaining) extraEtaMs += row.cnt * estimatePassDurationMs(TagScanPass.MOBILE_CLIP_ENCODING)
+            }
+        }
+        val result = computeScanTaskProgress(
+            baselineRemainingPass1 = totalFace,
+            baselineRemainingPass3 = totalTagging,
+            remainingPass1 = remainingFace,
+            remainingPass3 = remainingTagging,
+            weights = weights,
+        )
+        val baseEtaMs = result.etaMs
+        val etaMs = when {
+            baseEtaMs != null -> baseEtaMs + extraEtaMs
+            extraEtaMs > 0 -> extraEtaMs
+            else -> null
+        }
+        return result.copy(etaMs = etaMs)
     }
 
     private fun logInfo(sessionId: String, text: String) {
@@ -921,50 +1054,6 @@ class TagScanOrchestrator(
             deque.removeFirst()
         }
         deque.addLast(durationMs)
-    }
-
-    /**
-     * 按 Pass 估算剩余时间
-     *
-     * 策略：
-     * 1. 每个 Pass 独立维护最近 N 次任务耗时，用中位数作为该 Pass 单任务预估耗时
-     *    （比均值更抗异常值）。
-     * 2. 某 Pass 尚无样本时，使用 [DEFAULT_PASS_DURATION_MS] 默认值，避免冷启动
-     *    时 ETA 从 0 突然跳到真实值。
-     * 3. 对 pending + failed 任务按 Pass 分组，分别相乘后求和。
-     *
-     * 不再对总和做上限钳位：大图库的合法长耗时估值交给 UI（formatDuration）按天
-     * 展示（如 "1d 3h"），避免被钉死在 "24h 0m" 看似卡住。异常单任务耗时已由
-     * [recordDuration] 的 30 分钟过滤与中位数兜底。
-     */
-    private suspend fun estimateRemainingMs(sessionId: String): Long? {
-        val stats = db.tagScanTaskDao().countByStatusAndPass(sessionId)
-        val pendingByPass = stats
-            .filter { it.status == TagScanTaskStatus.PENDING }
-            .groupBy { it.pass }
-            .mapValues { entry -> entry.value.sumOf { it.cnt.toLong() } }
-        val failedByPass = stats
-            .filter { it.status == TagScanTaskStatus.FAILED }
-            .groupBy { it.pass }
-            .mapValues { entry -> entry.value.sumOf { it.cnt.toLong() } }
-
-        if (pendingByPass.isEmpty() && failedByPass.isEmpty()) return null
-
-        var totalMs = 0L
-        var hasAnyEstimate = false
-
-        for (pass in TagScanPass.entries) {
-            val pending = pendingByPass[pass] ?: 0L
-            val failed = failedByPass[pass] ?: 0L
-            val remainingTasks = pending + failed
-            if (remainingTasks <= 0) continue
-
-            val avgMs = estimatePassDurationMs(pass)
-            totalMs += avgMs * remainingTasks
-            hasAnyEstimate = true
-        }
-
-        return if (hasAnyEstimate) totalMs else null
     }
 
     private fun estimatePassDurationMs(pass: TagScanPass): Long {

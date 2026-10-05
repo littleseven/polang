@@ -22,6 +22,12 @@ data class TagScanSessionProgress(
     /** 失败任务数（status = FAILED） */
     val failed: Int = 0,
     val estimatedRemainingMs: Long? = null,
+    /**
+     * 任务域加权进度 0..1（2026-10-05 口径立法）：自动 sweep = 基线快照口径（含积压、
+     * 跨链式批次连续、中途新增照片不进分母）；手动会话 = 任务表口径。
+     * null = 无可量化工作（渲染不定态）。与库域完成度（LibraryCompletion）各自独立，禁止混拼。
+     */
+    val weightedFraction: Float? = null,
     val messages: List<ScanMessage> = emptyList()
 )
 

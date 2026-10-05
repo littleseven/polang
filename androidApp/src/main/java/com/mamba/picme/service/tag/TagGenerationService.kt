@@ -359,7 +359,12 @@ class TagGenerationService : Service() {
                 if (sessionActive && nowMs - lastLibraryRefreshMs >= 1000L) {
                     lastLibraryRefreshMs = nowMs
                     runCatching { orch.getDbStats() }.onSuccess { stats ->
-                        libraryCompletion.value = LibraryCompletion(stats.totalMedia, stats.remainingForPass3)
+                        libraryCompletion.value = LibraryCompletion(
+                            totalPhotos = stats.photoCount,
+                            remainingPass1 = stats.remainingForPass1,
+                            remainingPass3 = stats.remainingForPass3,
+                            weights = orch.currentPassWeights(),
+                        )
                     }
                 } else if (!sessionActive) {
                     libraryCompletion.value = null
@@ -677,12 +682,10 @@ class TagGenerationService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        // 口径立法（spec §4）：对外唯一百分比 = 库级完成率（percentRounded()）；
-        // 库级暂缺（首帧/非活跃清空）回退任务级整数口径，仅通知条内使用
-        val percent = libraryCompletion.value?.percentRounded()
-            ?: if (progress != null && progress.total > 0) {
-                (progress.processed * 100 / progress.total).coerceIn(0, 100)
-            } else null
+        // 口径立法（2026-10-05 修订）：通知进度条 = 任务域加权进度（weightedFraction，
+        // sweep 连续、新增照片不回退）；缺帧回退库域完成度，再缺不定态
+        val percent = progress?.weightedFraction?.let { fraction -> (fraction * 100).toInt() }
+            ?: libraryCompletion.value?.percentRounded()
         val titleRes = when (progress?.state) {
             ScanSessionState.PAUSED -> R.string.tag_gen_notification_paused
             ScanSessionState.COMPLETED -> R.string.tag_gen_notification_completed

@@ -279,13 +279,18 @@ fun TagGenerationControlScreen(
     val liveModel = cardModel?.takeIf { scanActive || it.isPaused || it.isTerminalWithFailures }
     // 本轮会话分数：活跃(含暂停/过渡)时驱动 progBar 填充与顶栏计数；空闲归零
     val sessionNarrative = liveModel?.narrative?.takeIf { it.total > 0 }
-    val sessionFraction = sessionNarrative?.let { it.processed.toFloat() / it.total } ?: 0f
-    // 环口径立法不变：全库 AI 打标完成率（唯一百分比）；本轮只以计数出现在顶栏
-    val libraryPct = libraryCompletion?.percentRounded()
-        ?: tagPassProgress(totalMedia, remainingPass3).percentRounded()
-    val libraryFraction = libraryCompletion?.fraction
-        ?: tagPassProgress(totalMedia, remainingPass3).fraction
-    val taggedCount = totalMedia - remainingPass3
+    // 本轮分数 = 任务域加权进度（sweep 连续、新增照片不回退）；老版本帧回退任务级计数
+    val sessionFraction = liveModel?.let { sessionProgress?.weightedFraction }
+        ?: sessionNarrative?.let { it.processed.toFloat() / it.total } ?: 0f
+    // 环 = 库域加权完成度（唯一百分比）；Service 流缺帧时本地同公式构造（同口径，仅传输不同）
+    val localLibrary = LibraryCompletion(
+        totalPhotos = photoCount,
+        remainingPass1 = remainingPass1,
+        remainingPass3 = remainingPass3,
+    )
+    val libraryPct = libraryCompletion?.percentRounded() ?: localLibrary.percentRounded()
+    val libraryFraction = libraryCompletion?.fraction ?: localLibrary.fraction
+    val taggedCount = photoCount - remainingPass3
     val running = liveModel?.primaryAction == ScanCardAction.PAUSE
     val pausedState = liveModel?.isPaused == true
     val terminal = sessionProgress?.state == ScanSessionState.COMPLETED
@@ -343,7 +348,7 @@ fun TagGenerationControlScreen(
                     percent = libraryPct,
                     fraction = libraryFraction,
                     labeledCount = taggedCount,
-                    totalCount = totalMedia,
+                    totalCount = photoCount,
                     running = running,
                     paused = pausedState,
                     terminalDone = terminal,
@@ -408,7 +413,7 @@ fun TagGenerationControlScreen(
                     )
                 ) {
                     Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                        val faceProgress = tagPassProgress(totalMedia, remainingPass1)
+                        val faceProgress = tagPassProgress(photoCount, remainingPass1)
                         StageRow(
                             icon = Icons.Rounded.Face,
                             iconTint = Color(0xFFFF7EB0),
@@ -431,7 +436,7 @@ fun TagGenerationControlScreen(
                             onClick = { stageSheetTarget = TagStage.PEOPLE },
                             onLongClick = { stageSheetTarget = TagStage.PEOPLE }
                         )
-                        val contentProgress = tagPassProgress(totalMedia, remainingPass3)
+                        val contentProgress = tagPassProgress(photoCount, remainingPass3)
                         StageRow(
                             icon = Icons.Rounded.Label,
                             iconTint = Color(0xFF22D3EE),

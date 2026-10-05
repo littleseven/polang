@@ -164,7 +164,8 @@ class QueryGalleryMediaUseCase(
     suspend fun tagScanAudit(): TagScanAudit = withContext(Dispatchers.IO) {
         TagScanAudit(
             totalMedia = db.mediaDao().getTotalCount(),
-            unlabeledCount = db.mediaDao().getUnlabeledMediaCount(),
+            // 照片口径：视频永不进打标流水线，计入会让 LLM 误以为永远打不完
+            unlabeledCount = db.mediaDao().getUnlabeledPhotoCount(),
             neverScannedCount = db.mediaDao().getNeverTagScannedCount(),
             lastScanAt = db.mediaDao().getLatestTagScanAt(),
         )
@@ -173,6 +174,7 @@ class QueryGalleryMediaUseCase(
     /** [tagScanAudit] 的返回结构。 */
     data class TagScanAudit(
         val totalMedia: Int,
+        /** 未打标照片数（photo-only，与进度口径一致） */
         val unlabeledCount: Int,
         /** 从未成功扫描（lastTagScanAt IS NULL）的媒体数 */
         val neverScannedCount: Int,
