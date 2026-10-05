@@ -25,8 +25,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <!-- OTA 自更新：FileProvider 安装下载的 APK（仅非 Play 渠道弹自更新） -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- REQUEST_INSTALL_PACKAGES 不在主清单声明：release/debug overlay 加回（直装渠道默认保留），
+         Play 渠道构建（-Ppolang.play.channel=true）release overlay 指向空 manifest → merge 产物天生不带。
+         机制见 build.gradle.kts playChannelBuild 段；OTA 自更新仅非 Play 渠道弹（FileProvider 声明仍在下方 application 内） -->
 
     <application
         android:name="com.mamba.picme.PoLangApplication"

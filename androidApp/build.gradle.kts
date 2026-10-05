@@ -358,42 +358,28 @@ tasks.named<Delete>("clean").configure {
 }
 
 // ---------------------------------------------------------------------------
-// Play 渠道产物剥离 REQUEST_INSTALL_PACKAGES（2026-10-02）
+// Play 渠道产物剥离 REQUEST_INSTALL_PACKAGES（2026-10-02 引入；2026-10-05 改 merge 级翻转）
 //
 // OTA 自更新（59ceaffec）为官网 APK 直装渠道引入该权限，但 Google Play 政策要求
 // Console 声明且禁止借其绕过 Play 分发自更新；App 侧 Play 渠道本就整体禁用自更新
 // （AppUpdateChecker.isSelfUpdateAllowed：installer == com.android.vending 短路），
 // 因此 Play 产物剥离该权限零行为影响。
-// 渠道约定：AAB = Play 渠道产物（build.sh aab 传 -Polang.play.channel=true，剥离）；
+// 渠道约定：AAB = Play 渠道产物（build.sh aab 传 -Ppolang.play.channel=true，剥离）；
 //           APK = 直装渠道产物（默认保留，OTA 自更新可用）。
-// 属性同时注册为任务输入：切换时 manifest 处理必然重跑，防 UP-TO-DATE 吞掉剥离。
+//
+// 机制（v2，merge 级）：权限声明只存在于 src/release 与 src/debug overlay，
+// 主清单不声明；playChannelBuild=true 时把 release sourceSet 的 manifest 重定向到
+// 空 overlay（src/release/play/AndroidManifest.xml）——merge 产物天生不带该权限，
+// merged/bundle/packaged 全链路下游无需任何 post-hoc 补丁。
+// 旧 v1（ProcessApplicationManifest doLast 按目录剥文本）已删：doLast 实际只稳定挂在
+// processReleaseMainManifest，其后 processReleaseManifest/ForPackage 会用上游输入重新
+// 生成 manifest 覆盖剥离结果（v1.0.46 首发 400 政策门事故根因）；overlay 文件本身是
+// merge 任务输入，开关切换必然重跑，无 UP-TO-DATE 吞剥离问题。
 // ---------------------------------------------------------------------------
 val playChannelBuild = providers.gradleProperty("polang.play.channel").map(String::toBoolean).orElse(false)
-// 挂 ProcessApplicationManifest doLast（release 变体）：manifest 落盘后立即按磁盘目录剥离，
-// 打包任务随后消费。属性注册为任务输入：开关切换必然重跑 manifest 处理，防 UP-TO-DATE 吞剥离。
-tasks.withType<com.android.build.gradle.tasks.ProcessApplicationManifest>().configureEach {
-    if (!name.contains("Release", ignoreCase = true)) return@configureEach
-    inputs.property("playChannel", playChannelBuild)
-    doLast {
-        if (!playChannelBuild.get()) return@doLast
-        val manifestDirs =
-            listOf(
-                layout.buildDirectory.dir("intermediates/merged_manifests/release").get().asFile,
-                layout.buildDirectory.dir("intermediates/packaged_manifests/release").get().asFile,
-            )
-        for (dir in manifestDirs) {
-            val files = dir.walkTopDown().filter { it.isFile && it.name == "AndroidManifest.xml" }
-            for (mf in files) {
-                val text = mf.readText()
-                val stripped =
-                    text.lineSequence()
-                        .filterNot { it.contains("android.permission.REQUEST_INSTALL_PACKAGES") }
-                        .joinToString("\n")
-                if (stripped != text) {
-                    mf.writeText(stripped)
-                    logger.lifecycle("PoLang:PlayChannel stripped REQUEST_INSTALL_PACKAGES from " + mf.path)
-                }
-            }
-        }
+if (playChannelBuild.get()) {
+    android.sourceSets.getByName("release") {
+        manifest.srcFile("src/release/play/AndroidManifest.xml")
     }
+    logger.lifecycle("PoLang:PlayChannel release manifest overlay -> src/release/play/AndroidManifest.xml（REQUEST_INSTALL_PACKAGES 不参与 merge）")
 }

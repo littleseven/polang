@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play 渠道专用空 manifest：build.gradle.kts 在 -Ppolang.play.channel=true 时将 release
+     sourceSet 的 manifest 重定向到本文件，使 merge 产物不带 REQUEST_INSTALL_PACKAGES
+     （Play 政策要求该权限须在 Console 声明，产物级剥离）。除注释外保持为空。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

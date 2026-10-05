@@ -4,6 +4,9 @@
     <!-- AI 远程控制无障碍服务：仅在 debug 构建中启用 -->
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
 
+    <!-- OTA 自更新装 APK（主清单已不声明，debug 直装渠道在此保留；见 build.gradle.kts playChannelBuild 段） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application>
         <service
             android:name=".accessibility.PoLangAccessibilityService"

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- OTA 自更新：FileProvider 安装下载的 APK（仅非 Play 渠道弹自更新）。
+         直装渠道（release APK 默认构建）在此加回；主清单已不声明此权限，
+         Play 渠道 AAB（-Ppolang.play.channel=true）会把本 overlay 指向空 manifest（src/release/play/）。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+</manifest>
