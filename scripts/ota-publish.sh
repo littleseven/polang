@@ -95,8 +95,8 @@ fi
 # 镜像失败不阻断：COS 主渠道已发布成功，仅国内下载提速缺失。
 if [[ "$TYPE" == "debug" ]]; then
     MIRROR_HOST="${POLANG_OTA_MIRROR_HOST:-xuxing}"
-    echo "==> 推送 debug 包到北京轻量镜像（$MIRROR_HOST）"
-    if scp -o ConnectTimeout=15 "$APK_PATH" "$MIRROR_HOST:/var/www/ota/apk/polang-debug.apk"; then
+    echo "==> 推送 debug 包到北京轻量镜像（${MIRROR_HOST}）"
+    if scp -o ConnectTimeout=15 "$APK_PATH" "${MIRROR_HOST}:/var/www/ota/apk/polang-debug.apk"; then
         echo "==> 镜像已更新"
     else
         echo "!! 镜像推送失败（主渠道 COS 已发布成功，本次 OTA 不受影响）" >&2
