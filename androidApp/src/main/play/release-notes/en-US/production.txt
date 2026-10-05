@@ -1,6 +1,3 @@
-- People search precision: parsed hits now narrow dimensions explicitly; face & time filters fixed
-- Scan page redesigned: results panel with tappable stats, unified library completion rate
-- Gallery stats ring now tracks AI tagging progress with a center label
-- Stability: fixed clustering OOM crash, blank People page, re-clustering name loss
-- Organize tab remembers last position; scan keep-alive guide is now a checklist
-- Smoother delete flow and misc fixes
+- Tag scan prompt simplified: incremental or full scan runs immediately on tap
+- Chat: streaming replies can now be stopped mid-generation with a stop button
+- Stability: fixed a crash some builds hit when opening the photo editor

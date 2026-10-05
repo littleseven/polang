@@ -62,6 +62,16 @@
 # OptimizePreset 内嵌 BeautyPreset/FilterPreset/AdjustmentPreset，Moshi 会逐层反射适配，整包保留
 -keep class com.mamba.picme.domain.agent.capability.optimize.preset.** { *; }
 
+# 全局兜底（2026-10-05）：Moshi 内置 EnumJsonAdapter 对「未标 @JsonClass 的枚举」构造时一律
+# enumClass.getField(constant.name()) 反射取常量字段；moshi 自带 consumer 规则只保护
+# @JsonClass 标注的枚举，裸枚举全靠上面按包 keep——新模型每漏一个包就再崩一次（同类第三起
+# R8×反射事故）。枚举常量字段名全局保留，代价仅 dex 字符串池几 KB。
+# 对照证据：1.0.45 mapping 中 AspectRatio.FREE→Z、MosaicMode.PIXEL→X 均被改名，
+# 仅因恰好未走 Moshi 才未崩；此规则后任何枚举进 Moshi 均免疫。
+-keepclassmembers enum * {
+    <fields>;
+}
+
 # === JS 引擎 + JSBridge（QuickJS）===
 # JS bridge：NativeHandler 工厂 object、JsBridge、JsEngine 实现经反射装配
 -keep class com.mamba.picme.agent.core.js.** { *; }
