@@ -45,7 +45,7 @@
 - Create: `infra/browser-bridge/src/ssrf.js`
 - Test: `infra/browser-bridge/test/ssrf.test.js`
 
-- [ ] **Step 1: 写 package.json + config.js**
+- [x] **Step 1: 写 package.json + config.js**
 
 `infra/browser-bridge/package.json`：
 
@@ -89,7 +89,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 2: 写失败测试 `test/ssrf.test.js`**
+- [x] **Step 2: 写失败测试 `test/ssrf.test.js`**
 
 ```js
 'use strict';
@@ -151,12 +151,12 @@ test('validatePublicUrl: hostname resolving to private ip rejected', async () =>
 });
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `cd infra/browser-bridge && npm install && npm test`
 Expected: FAIL（`Cannot find module '../src/ssrf'`）
 
-- [ ] **Step 4: 实现 `src/ssrf.js`**（借鉴 openmuse `apps/worker/src/network.ts`，MIT）
+- [x] **Step 4: 实现 `src/ssrf.js`**（借鉴 openmuse `apps/worker/src/network.ts`，MIT）
 
 ```js
 'use strict';
@@ -251,12 +251,12 @@ async function validatePublicUrl(raw, resolve = (h) => dns.lookup(h, { all: true
 module.exports = { validatePublicUrl, isPublicIp, SsrfError };
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `cd infra/browser-bridge && npm test`
 Expected: PASS（8 个用例）
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add infra/browser-bridge/package.json infra/browser-bridge/src/config.js infra/browser-bridge/src/ssrf.js infra/browser-bridge/test/ssrf.test.js
@@ -403,7 +403,7 @@ class SessionExpiredError extends Error {
   constructor() { super('session_expired'); this.code = 'session_expired'; }
 }
 class ActionFailedError extends Error {
-  constructor(code, reason) { super(reason); this.code = code; }
+  constructor(code, reason) { super(`${code}: ${reason}`); this.code = code; }
 }
 
 class Session {
@@ -491,8 +491,9 @@ class SessionManager {
     const id = crypto.randomUUID();
     const context = await this._newContext();
     try {
-      context.on('page', (popup) => { popup.close().catch(() => {}); });
       const page = await context.newPage();
+      // 必须先 newPage 再注册：'page' 事件对 newPage() 创建的主页面同样触发，先注册会误杀主页面（real-Chrome 实证）
+      context.on('page', (popup) => { popup.close().catch(() => {}); });
       page.setDefaultTimeout(this.config.navTimeoutMs);
       page.on('dialog', (dialog) => { dialog.dismiss().catch(() => {}); });
       const session = new Session(id, context, page);
@@ -529,7 +530,7 @@ class SessionManager {
       session.actionCount += 1;
       let frame;
       if (body.wantFrame || action === 'screenshot') frame = await this._captureFrame(session);
-      return this._result(session, { textExtract, elements, frame, actionMs: Date.now() - started });
+      return this.snapshot(session, { textExtract, elements, frame, actionMs: Date.now() - started });
     });
   }
 
@@ -547,12 +548,24 @@ class SessionManager {
 
   async _click(session, body) {
     const target = await this._locate(session, body);
-    await target.click({ timeout: this.config.navTimeoutMs });
+    await this._staleGuard(() => target.click({ timeout: this.config.navTimeoutMs }));
   }
 
   async _type(session, body) {
     const target = await this._locate(session, body);
-    await target.pressSequentially(String(body.text == null ? '' : body.text), { timeout: this.config.navTimeoutMs });
+    await this._staleGuard(() => target.pressSequentially(String(body.text == null ? '' : body.text), { timeout: this.config.navTimeoutMs }));
+  }
+
+  /** 缓存句柄在页面变化后失效：Playwright 原始 not-attached 错误映射为结构化 stale_element。 */
+  async _staleGuard(fn) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e && /not attached|detached|Target closed/i.test(String(e.message))) {
+        throw new ActionFailedError('stale_element', '元素已失效，请重新 extract');
+      }
+      throw e;
+    }
   }
 
   /**
@@ -593,7 +606,7 @@ class SessionManager {
     });
   }
 
-  async _result(session, extra) {
+  async snapshot(session, extra) {
     return {
       status: 'ok',
       sessionId: session.id,
@@ -610,6 +623,7 @@ class SessionManager {
     const s = this.sessions.get(id);
     if (!s) return false;
     this.sessions.delete(id);
+    await s.queue.catch(() => {}); // 先排空在途动作，避免 context 在 act 中途被关
     await s.context.close().catch(() => {});
     return true;
   }
@@ -726,7 +740,7 @@ const server = http.createServer(async (req, res) => {
         const session = await manager.open(body.url || null);
         let frame;
         if (body.wantFrame) frame = await manager.captureFrame(session);
-        return sendJson(res, 200, await manager._result(session, { frame, actionMs: 0 }));
+        return sendJson(res, 200, await manager.snapshot(session, { frame, actionMs: 0 }));
       } catch (err) {
         return sendJson(res, 200, failPayload(null, err));
       }
