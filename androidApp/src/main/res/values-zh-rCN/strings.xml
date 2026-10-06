@@ -1594,7 +1594,7 @@
     <string name="html_card_preview_failed">预览渲染失败</string>
     <string name="html_fullpage_title_default">卡片详情</string>
     <string name="html_fullpage_load_failed">内容加载失败</string>
-    <!-- Browser live card (VNC 直播卡：动作流水 + 会话状态) -->
+    <!-- Browser live card: action stream + session state -->
     <string name="browser_action_open">打开 %1$s</string>
     <string name="browser_action_navigate">跳转到 %1$s</string>
     <string name="browser_action_click">点击 %1$s</string>

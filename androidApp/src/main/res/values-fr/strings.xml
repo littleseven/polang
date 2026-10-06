@@ -1554,7 +1554,7 @@
     <string name="html_card_preview_failed">Échec du rendu de l\'aperçu</string>
     <string name="html_fullpage_title_default">Détail de la carte</string>
     <string name="html_fullpage_load_failed">Échec du chargement du contenu</string>
-    <!-- Browser live card (VNC 直播卡：动作流水 + 会话状态) -->
+    <!-- Browser live card: action stream + session state -->
     <string name="browser_action_open">Ouvrir %1$s</string>
     <string name="browser_action_navigate">Aller à %1$s</string>
     <string name="browser_action_click">Appuyer sur %1$s</string>

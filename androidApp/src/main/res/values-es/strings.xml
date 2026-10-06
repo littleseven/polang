@@ -1554,7 +1554,7 @@
     <string name="html_card_preview_failed">No se pudo renderizar la vista previa</string>
     <string name="html_fullpage_title_default">Detalle de la tarjeta</string>
     <string name="html_fullpage_load_failed">No se pudo cargar el contenido</string>
-    <!-- Browser live card (VNC 直播卡：动作流水 + 会话状态) -->
+    <!-- Browser live card: action stream + session state -->
     <string name="browser_action_open">Abrir %1$s</string>
     <string name="browser_action_navigate">Ir a %1$s</string>
     <string name="browser_action_click">Tocar %1$s</string>

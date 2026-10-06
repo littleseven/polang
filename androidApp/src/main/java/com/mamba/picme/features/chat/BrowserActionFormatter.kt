@@ -12,7 +12,7 @@ data class BrowserActionSpec(
 
 /** browser_* 动作 → 文案规格；arg 截断 24 字符防流水行过长。 */
 fun browserActionSpec(action: String, selector: String?, payload: String?): BrowserActionSpec {
-    fun cut(s: String?): String? = s?.let { if (it.length > 24) it.take(21) + "..." else it }
+    fun cut(s: String?): String? = s?.let { v -> if (v.length > 24) v.take(21) + "..." else v }
     return when (action) {
         "open" -> BrowserActionSpec(R.string.browser_action_open, cut(payload))
         "navigate" -> BrowserActionSpec(R.string.browser_action_navigate, cut(payload))
@@ -24,8 +24,9 @@ fun browserActionSpec(action: String, selector: String?, payload: String?): Brow
     }
 }
 
-/** ChatViewModel 侧入口：本地化动作流水描述。 */
+/** ChatViewModel 侧入口：本地化动作流水描述；arg 为 null 时回落空串占位，防字面 %1$s 泄漏到 UI。 */
 fun formatBrowserAction(context: Context, action: String, selector: String?, payload: String?): String {
     val spec = browserActionSpec(action, selector, payload)
-    return if (spec.arg != null) context.getString(spec.templateRes, spec.arg) else context.getString(spec.templateRes)
+    return spec.arg?.let { arg -> context.getString(spec.templateRes, arg) }
+        ?: context.getString(spec.templateRes, "")
 }

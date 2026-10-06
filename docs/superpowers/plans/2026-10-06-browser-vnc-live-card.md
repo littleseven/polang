@@ -3132,6 +3132,8 @@ git commit -m "feat(app): ChatViewModel 直播卡 live 态收口——delegate/o
 
 - [ ] **Step 1: strings 五语（新增 key）**
 
+> 插入位置：各文件 `html_fullpage_load_failed` 之后，分区注释五文件逐字一致用英文 `<!-- Browser live card: action stream + session state -->`。
+
 `values/strings.xml`（EN）：
 
 ```xml
@@ -3217,7 +3219,10 @@ git commit -m "feat(app): ChatViewModel 直播卡 live 态收口——delegate/o
 ```kotlin
 package com.mamba.picme.features.chat
 
+import com.mamba.picme.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BrowserActionFormatterTest {
@@ -3234,13 +3239,40 @@ class BrowserActionFormatterTest {
 
     @Test
     fun `type arg truncates long text`() {
-        val spec = browserActionSpec("type", "input", "x".repeat(100))
+        val long = "x".repeat(100)
+        val spec = browserActionSpec("type", "input", long)
         assertEquals(24, spec.arg!!.length)
+        assertTrue(spec.arg!!.endsWith("..."))
+        assertEquals(long.take(21), spec.arg!!.take(21))
+    }
+
+    @Test
+    fun `arg of exactly 24 chars is not truncated`() {
+        val exact = "y".repeat(24)
+        val spec = browserActionSpec("navigate", null, exact)
+        assertEquals(exact, spec.arg)
     }
 
     @Test
     fun `unknown action falls back to navigate-like display`() {
         assertEquals(BrowserActionSpec(R.string.browser_action_navigate, null), browserActionSpec("hover", null, null))
+    }
+
+    // click 走 targetText 定位时 selector 为 null → spec.arg null；formatBrowserAction 必须空串占位回落
+    // （防字面 %1$s 泄漏），Context 层行为以源码级断言钉住（避开 Robolectric 环境性预存失败）。
+    @Test
+    fun `null arg never leaks literal placeholder`() {
+        val spec = browserActionSpec("click", null, null)
+        assertEquals(R.string.browser_action_click, spec.templateRes)
+        assertNull(spec.arg)
+
+        val source = java.io.File(
+            "src/main/java/com/mamba/picme/features/chat/BrowserActionFormatter.kt",
+        ).readText()
+        assertTrue(
+            "formatBrowserAction 必须在 arg == null 时以空串占位回落，防字面 %1\$s 泄漏",
+            source.contains("?: context.getString(spec.templateRes, \"\")"),
+        )
     }
 }
 ```
@@ -3252,6 +3284,7 @@ package com.mamba.picme.features.chat
 
 import android.content.Context
 import androidx.annotation.StringRes
+import com.mamba.picme.R
 
 /** 动作流水条目的资源规格（纯 Kotlin 可测；Context 格式化收口在 [formatBrowserAction]）。 */
 data class BrowserActionSpec(
@@ -3261,7 +3294,7 @@ data class BrowserActionSpec(
 
 /** browser_* 动作 → 文案规格；arg 截断 24 字符防流水行过长。 */
 fun browserActionSpec(action: String, selector: String?, payload: String?): BrowserActionSpec {
-    fun cut(s: String?): String? = s?.let { if (it.length > 24) it.take(21) + "..." else it }
+    fun cut(s: String?): String? = s?.let { v -> if (v.length > 24) v.take(21) + "..." else v }
     return when (action) {
         "open" -> BrowserActionSpec(R.string.browser_action_open, cut(payload))
         "navigate" -> BrowserActionSpec(R.string.browser_action_navigate, cut(payload))
@@ -3273,10 +3306,11 @@ fun browserActionSpec(action: String, selector: String?, payload: String?): Brow
     }
 }
 
-/** ChatViewModel 侧入口：本地化动作流水描述。 */
+/** ChatViewModel 侧入口：本地化动作流水描述；arg 为 null 时回落空串占位，防字面 %1$s 泄漏到 UI。 */
 fun formatBrowserAction(context: Context, action: String, selector: String?, payload: String?): String {
     val spec = browserActionSpec(action, selector, payload)
-    return if (spec.arg != null) context.getString(spec.templateRes, spec.arg) else context.getString(spec.templateRes)
+    return spec.arg?.let { arg -> context.getString(spec.templateRes, arg) }
+        ?: context.getString(spec.templateRes, "")
 }
 ```
 

@@ -1603,7 +1603,7 @@
     <string name="html_card_preview_failed">Preview failed to render</string>
     <string name="html_fullpage_title_default">Card detail</string>
     <string name="html_fullpage_load_failed">Content failed to load</string>
-    <!-- Browser live card (VNC 直播卡：动作流水 + 会话状态) -->
+    <!-- Browser live card: action stream + session state -->
     <string name="browser_action_open">Open %1$s</string>
     <string name="browser_action_navigate">Go to %1$s</string>
     <string name="browser_action_click">Tap %1$s</string>
