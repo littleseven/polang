@@ -1,5 +1,6 @@
 package com.mamba.picme.domain.browser
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -31,6 +32,8 @@ object BrowserAction {
  * 动作请求 DTO（端 → 云统一形态，借鉴 openmuse：click/type 三模式定位）。
  * 定位优先级：targetIndex（extract 返回的元素序号）> targetText（可见文本匹配）> selector（CSS，兜底）。
  * 不用字段传 null；App 侧 @Tool 参数的空串/-1 哨兵由能力层归一为 null。
+ * 🔴 [targetIndex] wire 字段名为 `index`（bridge `_locate` 读 `body.index`，网关逐字节透传），
+ * Kotlin 属性名保持 targetIndex 仅为可读性；golden 测试钉桩防漂移。
  */
 @Serializable
 data class BrowserActionRequest(
@@ -39,7 +42,7 @@ data class BrowserActionRequest(
     val url: String? = null,
     val selector: String? = null,
     val targetText: String? = null,
-    val targetIndex: Int? = null,
+    @SerialName("index") val targetIndex: Int? = null,
     val text: String? = null,
     val wantFrame: Boolean = false,
 )
@@ -54,7 +57,11 @@ data class BrowserElement(
     val type: String? = null,
 )
 
-/** open/action/close 统一响应（[textExtract]/[frameJpegBase64]/[elements] 按动作与 wantFrame 可选出现）。 */
+/**
+ * open/action/close 统一响应（[textExtract]/[frameJpegBase64]/[elements] 按动作与 wantFrame 可选出现）。
+ * close 响应额外携带 [closed] 字段（bridge 返回 `{status:"ok",sessionId,closed,actionCount,lastGoodFrame}`）；
+ * 其他消费方若自行解析须配 `ignoreUnknownKeys = true`（bridge 响应字段是本模型的超集演进方向）。
+ */
 @Serializable
 data class BrowserActionResult(
     val status: String,
@@ -66,6 +73,7 @@ data class BrowserActionResult(
     val elements: List<BrowserElement>? = null,
     val actionMs: Long? = null,
     val actionCount: Int? = null,
+    val closed: Boolean? = null,
     val errorCode: String? = null,
     val reason: String? = null,
     val lastGoodFrame: String? = null,

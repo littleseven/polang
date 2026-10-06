@@ -1415,7 +1415,7 @@ git commit -m "feat(server): bridge client + per-user 并发登记 + browser_ses
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/Application.kt`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/routes/BrowserRouteTest.kt`
 
-- [ ] **Step 1: 写失败测试 `BrowserRouteTest.kt`**（形态仿 `IssueReportRouteTest.kt` + `ClaudeRouteTestSupport.kt` 的 MockEngine 工厂）
+- [x] **Step 1: 写失败测试 `BrowserRouteTest.kt`**（形态仿 `IssueReportRouteTest.kt` + `ClaudeRouteTestSupport.kt` 的 MockEngine 工厂）
 
 ```kotlin
 package com.mamba.picme.server.routes
@@ -1543,12 +1543,12 @@ class BrowserRouteTest {
 
 > 执行注意：测试里鉴权拦截器的具体形态照抄 `IssueReportRouteTest.kt:50-61`（含 TestDb/seedToken 或简化的固定 hash 注入）；`ownerTokenHash()` 取到的 owner 字符串是什么（sha256(token) 还是固定值）以该测试辅助代码为准，预置并发租约时用同一值。Stats 写库需要 `TestDb.init(Accounts, BrowserSessions)` 建表（仿 `util/TestDb.kt:13-20` 用法）。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "*BrowserRoute*"`
 Expected: FAIL（browserRoute 不存在）
 
-- [ ] **Step 3: 实现 `routes/BrowserRoute.kt`**
+- [x] **Step 3: 实现 `routes/BrowserRoute.kt`**
 
 ```kotlin
 package com.mamba.picme.server.routes
@@ -1713,7 +1713,7 @@ private fun probeSessionId(payload: String): String? =
 
 > 执行注意：①`call.ownerTokenHash()` 若在 `ClaudeChatRoute.kt` 是 file-private，把其实现（:146-151）复制到本文件；②请求体 sessionId 用 `probeSessionId(body)` 宽松解析（M1 唯一需要）；③测试辅助里的鉴权拦截器要与 `IssueReportRouteTest` 同形注入 `TokenHashKey`；④`stats.recordOpen/recordClose` 为 suspend（Task 6 挂起事务化），在路由 handler 内直接调用即可，但必须 `runCatching` 包裹 + warn 日志（统计写故障隔离，不得破坏响应契约）；⑤open 路径两处 `release(owner)`（异常/非 ok）保持 null 清理形态——租约尚未 bind；action/close 路径用 `release(owner, sessionId)` 条件形态；⑥session_expired 判定用 `probeStatus(payload)` 解析式，不做子串匹配。
 
-- [ ] **Step 4: Application.kt 装配**
+- [x] **Step 4: Application.kt 装配**
 
 `module()` 依赖构造区（仿 :144-152 既有 client 构造）加：
 
@@ -1735,7 +1735,7 @@ browserRoute(browserBridge, browserDailyLimiter, browserConcurrency, browserStat
 
 > 注意：每日配额若要求 admin 热改生效，把 `RateLimiter(config.browserDailyQuota, ...)` 换成 `RateLimiter({ SettingsService.snapshot().browserDailyQuota }, ...)` 的 provider 构造（Task 4 已备）。优先用 provider 形态。
 
-- [ ] **Step 5: 跑全部 server 测试 + commit**
+- [x] **Step 5: 跑全部 server 测试 + commit**
 
 Run: `./gradlew -p server build`
 Expected: BUILD SUCCESSFUL（含 BrowserRouteTest 五用例）
@@ -1751,7 +1751,7 @@ git commit -m "feat(server): /v1/browser/* 网关——鉴权/配额/并发登�
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminQueries.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminViews.kt`
 
-- [ ] **Step 1: AdminQueries 加统计查询**
+- [x] **Step 1: AdminQueries 加统计查询**
 
 ```kotlin
 data class BrowserOverview(val todayCount: Long, val activeCount: Long, val failureRate7d: Double)
@@ -1775,7 +1775,7 @@ fun browserOverview(now: Long = System.currentTimeMillis()): BrowserOverview = t
 
 > 执行注意：Exposed 查询 DSL 细节（`selectAll().where{}`、`isNull()`、`greaterEq` 中缀）对照 `AdminQueries.kt` 现有查询写法对齐；`and` 需要 `org.jetbrains.exposed.sql.and` import。
 
-- [ ] **Step 2: AdminViews 概览页加一行**
+- [x] **Step 2: AdminViews 概览页加一行**
 
 在概览页现有统计行同款位置加（文案英文，与后台现有风格一致）：
 
@@ -1783,7 +1783,7 @@ fun browserOverview(now: Long = System.currentTimeMillis()): BrowserOverview = t
 Browser sessions: today N · active M · 7d failure X.X%
 ```
 
-- [ ] **Step 3: 编译 + 测试 + commit**
+- [x] **Step 3: 编译 + 测试 + commit**
 
 Run: `./gradlew -p server build`
 Expected: BUILD SUCCESSFUL（AdminQueriesTest/AdminViewsTest 若有构造变化同步更新）
@@ -1884,6 +1884,7 @@ Expected: FAIL（类不存在）
 ```kotlin
 package com.mamba.picme.domain.browser
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -1915,6 +1916,8 @@ object BrowserAction {
  * 动作请求 DTO（端 → 云统一形态，借鉴 openmuse：click/type 三模式定位）。
  * 定位优先级：targetIndex（extract 返回的元素序号）> targetText（可见文本匹配）> selector（CSS，兜底）。
  * 不用字段传 null；App 侧 @Tool 参数的空串/-1 哨兵由能力层归一为 null。
+ * 🔴 [targetIndex] wire 字段名为 `index`（bridge `_locate` 读 `body.index`，网关逐字节透传），
+ * Kotlin 属性名保持 targetIndex 仅为可读性；golden 测试钉桩防漂移。
  */
 @Serializable
 data class BrowserActionRequest(
@@ -1923,7 +1926,7 @@ data class BrowserActionRequest(
     val url: String? = null,
     val selector: String? = null,
     val targetText: String? = null,
-    val targetIndex: Int? = null,
+    @SerialName("index") val targetIndex: Int? = null,
     val text: String? = null,
     val wantFrame: Boolean = false,
 )
@@ -1938,7 +1941,11 @@ data class BrowserElement(
     val type: String? = null,
 )
 
-/** open/action/close 统一响应（[textExtract]/[frameJpegBase64]/[elements] 按动作与 wantFrame 可选出现）。 */
+/**
+ * open/action/close 统一响应（[textExtract]/[frameJpegBase64]/[elements] 按动作与 wantFrame 可选出现）。
+ * close 响应额外携带 [closed] 字段（bridge 返回 `{status:"ok",sessionId,closed,actionCount,lastGoodFrame}`）；
+ * 其他消费方若自行解析须配 `ignoreUnknownKeys = true`（bridge 响应字段是本模型的超集演进方向）。
+ */
 @Serializable
 data class BrowserActionResult(
     val status: String,
@@ -1950,6 +1957,7 @@ data class BrowserActionResult(
     val elements: List<BrowserElement>? = null,
     val actionMs: Long? = null,
     val actionCount: Int? = null,
+    val closed: Boolean? = null,
     val errorCode: String? = null,
     val reason: String? = null,
     val lastGoodFrame: String? = null,
