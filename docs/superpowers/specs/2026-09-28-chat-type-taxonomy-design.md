@@ -84,7 +84,7 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 
 ### 4.2 转换与编解码
 
-- **运行时转换器纯净化**：`LegacyMessagePartsConverter` 更名 `MessagePartsConverter`（文件 `LegacyMessageParts.kt` → `MessagePartsConverter.kt`），**仅映射新 8 值**——不再双吃 legacy 13（2026-10-06 起另认 `tool_browser`：无 legacy 源，content 列存 `BrowserLive` 整颗 JSON 直通解码，见 browser-vnc 直播卡 spec §4）；未知值 → 行级 Text 兜底原则不变。签名补 role 入参（`toParts(type, content, metadata, role)`）：`image` 映射按角色分流——user 且 metadata.imageUri 在场 → [Image, Text] 图文双 part，否则 [Image(ref=content)]；agent → [Image(ref=metadata.imageUri ?: content, saved)]；
+- **运行时转换器纯净化**：`LegacyMessagePartsConverter` 更名 `MessagePartsConverter`（文件 `LegacyMessageParts.kt` → `MessagePartsConverter.kt`），**仅映射新值集**（原 8 值 + 2026-10-06 起 `tool_browser`——无 legacy 源，content 列存 `BrowserLive` 整颗 JSON 直通解码，见 browser-vnc 直播卡 spec §4）——不再双吃 legacy 13；未知值 → 行级 Text 兜底原则不变。签名补 role 入参（`toParts(type, content, metadata, role)`）：`image` 映射按角色分流——user 且 metadata.imageUri 在场 → [Image, Text] 图文双 part，否则 [Image(ref=content)]；agent → [Image(ref=metadata.imageUri ?: content, saved)]；
 - **legacy 映射收敛迁移专用**：新增 `LegacyChatTypeMigration`（shared `domain/chat/`）：`map(legacyType, content, metadata) → MigratedRow(type, role, parts)`——type 重写表 + role 推导（`user_` 前缀 → `"user"`，其余 → `"agent"`）单点收口，parts 委托 `MessagePartsConverter`（零解析逻辑重复）。**仅供 `MIGRATION_25_26` 与备份恢复两个存量数据入口使用**，运行时路径不引用；
 - `MessagePartsCodec`：线格式随 `@SerialName` 自动更新；`ignoreUnknownKeys` 前向兼容语义不变；round-trip 测试全量改写（§8）。
 
