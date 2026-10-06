@@ -2526,7 +2526,7 @@ git commit -m "feat(shared): 7 个 browser_* @Tool + prompt 规则段（golden �
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/MessagePart.kt`
 - Modify: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/MessagePartsCodecTest.kt`
 
-- [ ] **Step 1: MessagePart.kt 加子类**
+- [x] **Step 1: MessagePart.kt 加子类**
 
 在 `OptimizeCandidates`（:149-157）前插入：
 
@@ -2567,7 +2567,7 @@ data class BrowserActionEntry(
 )
 ```
 
-- [ ] **Step 2: codec 测试改钉桩 + 加 round-trip 用例**
+- [x] **Step 2: codec 测试改钉桩 + 加 round-trip 用例**
 
 `MessagePartsCodecTest.kt`：
 - `sealed descriptor locks the 8-value taxonomy`（:180-197）：`assertEquals(8, ...)` 改 `9`，serialNames 集合加 `"tool_browser"`，测试名改 9-value 措辞；
@@ -2594,7 +2594,7 @@ data class BrowserActionEntry(
 
 > 执行注意：该测试文件的 Json 实例/断言风格以现有代码为准（kotlin.test）；serial name 前缀与 category 一致性测试（:200+）是硬编码 parts 清单遍历（非反射枚举），新子类须显式加一行 `MessagePart.BrowserLive("p0", sessionId = "s")` 才有 `tool_` ↔ TOOL 锁定。
 
-- [ ] **Step 3: 跑测试 + commit**
+- [x] **Step 3: 跑测试 + commit**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*MessagePartsCodecTest*"`
 Expected: PASS
@@ -2965,6 +2965,17 @@ git commit -m "feat(app): 注册 BrowserSessionCapability（组合根注入 OkHt
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/ChatViewModel.kt`
+- Modify: `androidApp/src/main/java/com/mamba/picme/domain/usecase/AiAgentUseCase.kt`（Step 0）
+- Modify: `androidApp/src/main/java/com/mamba/picme/features/common/chat/AgentChatComponents.kt`（Step 0）
+
+- [ ] **Step 0: 补齐 AgentCommand 穷尽 when（Task 10 新增 7 子类的编译红收口）**
+
+Task 10 在 shared 侧新增 7 个 `AgentCommand.Browser*` sealed 子类后，androidApp 两处无 else 的穷尽 when 编译失败（`:androidApp:compileDebugKotlin` 红），本 Step 显式认领：
+
+1. `AiAgentUseCase.kt:178` 区域 `mapAgentCommandToLegacy`：7 个 Browser* 命令的 legacy 映射——browser_open 需映射出直播卡占位语义（对齐 Step 5 的卡片工具排除名单与 Task 13 占位管线），其余动作命令映射为不产 legacy UI 的形态（live 态由 delegate/overlay 通道承担）；按函数内既有命令的映射先例选最小语义。
+2. `AgentChatComponents.kt:252/308` 区域 `getAgentCommandDisplayName`：7 个命令的显示名——受 [I18N] 红线约束，五语字符串 key 与 Task 17 Step 1 的 strings 新增共用一批（坐标对齐，不重复定义）；若既有命令显示名走 `chat_command_*` key 先例则沿用该命名族。
+
+> 来源：Task 12 审查发现（这两处 when 不在任何 Task 文件清单内，红窗会从 Task 10 拖到 Task 20）。本 Step 完成后 `:androidApp:compileDebugKotlin` 必须恢复可编译（Task 15 的 PoLangApplication 注册缺失除外——若 Step 0 先于 Task 15 执行，capability 未注册不阻塞编译）。
 
 - [ ] **Step 1: VM 实现 BrowserSessionDelegate + live 态 StateFlow**
 
