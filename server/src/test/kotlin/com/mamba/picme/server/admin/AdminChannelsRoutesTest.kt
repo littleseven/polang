@@ -4,6 +4,7 @@ import com.mamba.picme.server.config.AppConfig
 import com.mamba.picme.server.cos.CosService
 import com.mamba.picme.server.db.Accounts
 import com.mamba.picme.server.db.AnonymousDevices
+import com.mamba.picme.server.db.BrowserSessions
 import com.mamba.picme.server.db.Db
 import com.mamba.picme.server.db.LlmCallLogs
 import com.mamba.picme.server.db.LlmChannels
@@ -43,7 +44,7 @@ class AdminChannelsRoutesTest {
     @Before
     fun setUp() {
         // /admin 概览页查 Accounts/LlmCallLogs/AnonymousDevices，故一并建表；渠道测试只需 LlmChannels。
-        TestDb.init(Accounts, LlmCallLogs, LlmChannels, AnonymousDevices)
+        TestDb.init(Accounts, LlmCallLogs, LlmChannels, AnonymousDevices, BrowserSessions)
         ChannelRegistry.setActiveForTesting(null)
     }
 

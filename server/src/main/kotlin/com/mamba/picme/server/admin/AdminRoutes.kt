@@ -109,7 +109,8 @@ fun Route.adminRoute(
             val metric = parseMetric(call.request.queryParameters["metric"])
             val ov = AdminQueries.overview(now)
             val range = AdminQueries.rangeStats(days, now, prices)
-            call.respondText(AdminViews.overviewPage(ov, range, days, metric), ContentType.Text.Html)
+            val browser = AdminQueries.browserOverview(now)
+            call.respondText(AdminViews.overviewPage(ov, range, days, metric, browser), ContentType.Text.Html)
         }
 
         get("/users") {

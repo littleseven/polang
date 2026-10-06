@@ -71,7 +71,7 @@ object AdminViews {
         }
     }
 
-    fun overviewPage(ov: OverviewRow, range: RangeStats, days: Int, metric: String): String = createHTML().html {
+    fun overviewPage(ov: OverviewRow, range: RangeStats, days: Int, metric: String, browser: BrowserOverview): String = createHTML().html {
         adminHead("概览 · PoLang 管理后台")
         body {
             navBar()
@@ -94,6 +94,9 @@ object AdminViews {
                 statCard("累计调用", compactCount(ov.totalCalls.toDouble()))
                 statCard("累计 Token", compactCount(ov.totalTokens.toDouble()))
                 statCard("累计成本 ¥", compactCost(ov.totalCost))
+            }
+            p("meta") {
+                +"Browser sessions: today ${browser.todayCount} · active ${browser.activeCount} · 7d failure ${"%.1f".format(browser.failureRate7d * 100)}%"
             }
             h2 { +"近 $days 天 · ${metricLabel(metric)}" }
             unsafe { raw(svgBars(range.days.map { dayMetricValue(it, metric) }, range.days.map { it.day }, labelFormatter = metricFormatter(metric))) }

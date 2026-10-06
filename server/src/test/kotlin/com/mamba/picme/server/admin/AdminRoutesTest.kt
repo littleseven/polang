@@ -6,6 +6,7 @@ import com.mamba.picme.server.cos.CosService
 import com.mamba.picme.server.db.AnonymousDevices
 import com.mamba.picme.server.db.Accounts
 import com.mamba.picme.server.db.AiEngineerWhitelists
+import com.mamba.picme.server.db.BrowserSessions
 import com.mamba.picme.server.db.Db
 import com.mamba.picme.server.db.LlmCallLogs
 import com.mamba.picme.server.db.ServerSettings
@@ -43,7 +44,7 @@ class AdminRoutesTest {
     private val cookieVal get() = AdminAuth.expectedCookieValue(token)
 
     private fun seed() {
-        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices)
+        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices, BrowserSessions)
         transaction(Db.instance) {
             Accounts.insert {
                 it[Accounts.id] = 1
@@ -158,7 +159,7 @@ class AdminRoutesTest {
 
     @Test
     fun `devices page lists anonymous devices raw and delete by id`() = testApplication {
-        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices)
+        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices, BrowserSessions)
         transaction(Db.instance) {
             Accounts.insert {
                 it[Accounts.id] = 1
@@ -211,7 +212,7 @@ class AdminRoutesTest {
 
     @Test
     fun `devices page filters by platform`() = testApplication {
-        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices)
+        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices, BrowserSessions)
         transaction(Db.instance) {
             Accounts.insert {
                 it[Accounts.id] = 1
@@ -305,7 +306,7 @@ class AdminRoutesTest {
 
     @Test
     fun `reset guest device quota redirects to devices`() = testApplication {
-        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices)
+        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices, BrowserSessions)
         transaction(Db.instance) {
             Accounts.insert {
                 it[Accounts.id] = 1; it[Accounts.email] = "a@x.com"; it[Accounts.tokenHash] = "h1"
@@ -331,7 +332,7 @@ class AdminRoutesTest {
 
     @Test
     fun `settings page round-trips free and guest quota`() = testApplication {
-        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices, ServerSettings, AiEngineerWhitelists)
+        TestDb.init(Accounts, LlmCallLogs, AnonymousDevices, ServerSettings, AiEngineerWhitelists, BrowserSessions)
         SettingsService.load()
         application { routing { adminRoute(token, cos, balance) } }
         val c = createClient { followRedirects = false }
