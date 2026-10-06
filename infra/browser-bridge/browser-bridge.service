@@ -1,0 +1,16 @@
+[Unit]
+Description=PoLang browser-agent-bridge (headless Chromium CDP bridge)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/browser-bridge
+EnvironmentFile=/opt/browser-bridge/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=3
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target
