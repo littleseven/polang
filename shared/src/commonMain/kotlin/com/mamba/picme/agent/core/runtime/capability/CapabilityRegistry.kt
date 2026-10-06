@@ -45,9 +45,6 @@ class CapabilityRegistry private constructor(
             CapabilityRegistry(SceneManager.getInstance())
         }
 
-        /** registry 实际生效的命令执行超时（内层），2026-10-06 起为 25s（browser 层叠对齐，见 CommandExecutor）。 */
-        const val DEFAULT_COMMAND_TIMEOUT_MS = CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS
-
         /**
          * 获取单例实例（使用默认协程作用域）
          */

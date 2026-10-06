@@ -25,4 +25,19 @@ class CommandTimeoutLayeringTest {
                 "慢页面会被内层必杀，外层超时永不生效"
         )
     }
+
+    @Test
+    fun `registry command timeout must sit inside the server budget window`() {
+        // 绝对预算区间（防「常量整体调小、相对关系仍绿」）：
+        // 下界 = 服务端 bridge navTimeoutMs=15000（慢页面 domcontentloaded 5~15s 的容忍区间）；
+        // 上界 = 网关超时 30s（客户端必须更紧，否则网关先断、错误语义劣化）。
+        assertTrue(
+            CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS > 15_000L,
+            "REGISTRY_COMMAND_TIMEOUT_MS=${CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS}ms 必须 > 服务端 navTimeout 15000ms"
+        )
+        assertTrue(
+            CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS < 30_000L,
+            "REGISTRY_COMMAND_TIMEOUT_MS=${CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS}ms 必须 < 网关超时 30000ms"
+        )
+    }
 }
