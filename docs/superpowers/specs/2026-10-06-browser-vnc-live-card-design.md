@@ -66,7 +66,9 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed
 
 1. **工具粒度 = 7 个原子动作**（open/navigate/click/type/extract/screenshot/close）而非单个宏工具——LLM 自己规划步骤，每一步都有画面更新（方案 A 直播感来源），与现有工具风格一致。
 2. **bridge 自起 headless Chromium（`--headless=new`），纯 CDP DOM 级驱动**——AI 干活不需要像素管线：省掉 Xvfb、桌面、VNC 编码整套开销，实例更轻、单机可承载会话数更高。既有 `browser-vnc` ×8 headed 池**不借用、保持原样**，定位转为：人工调试通道 + 反爬顽固站点的回退（headless 被识别时由 bridge 切到 headed 实例执行，M1 只做手动开关，自动检测回退属 M2+）。
-3. **画面按需生成（`wantFrame` 请求标志）**——帧不是每个动作的固定产物：App 侧策略决定何时要帧（M1 默认 = 直播卡可见期间的改状态动作；extract/close 不带帧）。LLM 不参与该决策，响应中帧字段可选。用户不看时不产生截图开销与流量。
+3. **画面按需生成（`wantFrame` 请求标志 + watch 模式）**——帧不是每个动作的固定产物，两级按需：
+   - **动作级（默认）**：App 侧策略决定何时要帧（M1 默认 = 直播卡可见期间的改状态动作；extract/close 不带帧）。LLM 不参与该决策，响应中帧字段可选。
+   - **watch 模式（用户正盯着看）**：bridge 调 CDP `Page.startScreencast` 吐连续 JPEG 帧流（Chromium 原生能力，无需桌面环境）；App 在卡片可见时低频轮询 `GET /v1/browser/frame?sessionId` 取最新帧（~1-2fps），停止轮询超时即关 screencast。仍是纯 HTTP 请求/响应，不新增长连接。用户不看时零截图开销零流量。
 4. **协议模型放 shared commonMain**——端云 DTO 同源（Monorepo 既定决策），iOS 跟随期零成本复用。
 5. **bridge 代码入仓 `infra/browser-bridge/`**——与 `infra/cloudflare/`、`infra/tencentscf/` 同级，systemd unit + 部署脚本随仓。
 6. **画面复用工具结果通道，零新增长连接**——不引入 WS/SSE 新通道；若后续实测过程感不足，动作通道不变、只加推流通道即平滑升级为推流方案，无返工。
@@ -93,7 +95,11 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed
 
 ### 3.2 流量预算
 
-720p 质量 60 JPEG ≈ 40-80KB/帧；一次任务按 10 个改状态动作计 ≈ 0.5-1MB。用户已确认可接受。帧按 `wantFrame` 生成，App 退后台或卡片不可见期间零帧零流量。
+720p 质量 60 JPEG ≈ 40-80KB/帧；一次任务按 10 个改状态动作计 ≈ 0.5-1MB。用户已确认可接受。帧按 `wantFrame` 生成，App 退后台或卡片不可见期间零帧零流量。watch 模式期间轮询 ~1-2fps ≈ 80-160KB/s，仅存在于用户实际观看时。
+
+### 3.3 隔离与扩容模型
+
+M1 采用**共享主机 + Chromium 自身沙箱 + fresh profile 即毁**：任务面只有「浏览网页 + 读 DOM」，无任意代码执行、无登录态，威胁面可控；per-user 并发=1 天然限制单用户资源占用。Muse 式「一人一 Secure VM（systemd-nspawn 容器）」是面向海量用户的隔离/扩容模型，列为 M2+ 扩容方向（届时横向扩容 = 加机器，bridge 无状态可圆移植）。
 
 ## 4. Chat 直播卡（新 part `tool_browser`）
 
@@ -106,6 +112,7 @@ type 分类法 spec（`2026-09-28-chat-type-taxonomy-design.md`）tool 类扩 1 
 | `OUTPUT_ERROR` | 错误卡：失败原因 + 已完成步骤数 | 落库（供重试/排查） |
 
 - M1 只有 INLINE 形态；点按帧全屏查看复用现有全屏查看器模式。不做接管输入（方案 A 决策，接管属 M2+ 候选）。
+- 卡片可见即触发 watch 模式（~1-2fps 轮询最新帧，页面加载动画等过程可见）；不可见/退后台即停轮询，bridge 侧超时自动关 screencast。
 - 流式走 M2 既有管线（`TurnStreamEvent` 工具五事件 + `TurnPartsReducer` 占位原位填充），browser 工具只是新增一个类型化占位，**不动管线主干**。
 - 卡片渲染须走 ui-parity-guard 闭环（spec → token → 截图），iOS 跟随期由 ios-follow 管线对等。
 
@@ -163,7 +170,7 @@ headless 实例轻量（无 Xvfb/桌面/VNC 编码），但机器资源仍有限
 ## 10. 分期
 
 - **M1（本 spec 全部内容）**：bridge + 服务端网关 + App 工具闭环 + INLINE 直播卡。
-- **M2 候选（不在本 spec）**：全屏查看器增强、登录态会话、headless 被反爬识别时自动回退 headed 池（M1 为手动开关）、动作密度不足时升级独立推流通道、iOS 跟随。
+- **M2 候选（不在本 spec）**：全屏查看器增强、登录态会话、headless 被反爬识别时自动回退 headed 池（M1 为手动开关）、动作密度不足时升级独立推流通道、Muse 式一人一 VM 隔离扩容（systemd-nspawn 容器 + 加机器横向扩）、iOS 跟随。
 
 ## 11. 交付审计对应
 
