@@ -189,6 +189,9 @@ private fun contentTypeOf(message: ChatMessage, part: MessagePart): String = whe
     is MessagePart.OptimizeCandidates -> ChatListItem.TYPE_OPTIMIZE_CANDIDATES
     // Image/EditResult 按消息类型已整消息路由，到不了这里；防御性落 legacy 整消息
     is MessagePart.Image, is MessagePart.EditResult -> ChatListItem.TYPE_LEGACY_MESSAGE
+    // BrowserLive 拍平/持久化映射属 browser-vnc 直播卡 Task 13；此前防御性落 legacy 整消息
+    //（此间管线未产此类 part，分支不可达）
+    is MessagePart.BrowserLive -> ChatListItem.TYPE_LEGACY_MESSAGE
 }
 
 private fun cardContentType(state: ToolPartState, doneType: String): String = when (state) {

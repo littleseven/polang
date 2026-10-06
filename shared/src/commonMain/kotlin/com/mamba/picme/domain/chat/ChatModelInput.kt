@@ -106,6 +106,10 @@ private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): L
     is MessagePart.EditResult ->
         if (description.isBlank()) emptyList() else listOf(ModelInputItem.TextMessage(role, description))
 
+    // 浏览器直播卡：帧永不回灌；正式回灌投影（结果摘要）属 browser-vnc 直播卡 Task 13，
+    // 此前不回灌任何内容（此间管线未产此类 part）。
+    is MessagePart.BrowserLive -> emptyList()
+
     // data part：默认不进上下文（spec §6）
     is MessagePart.MediaResults,
     is MessagePart.OptimizeCandidates,

@@ -145,6 +145,24 @@ class MessagePartsCodecTest {
     }
 
     @Test
+    fun `browser live part round-trips`() {
+        val parts = listOf(
+            MessagePart.BrowserLive(
+                partId = "call-1",
+                sessionId = "s-1",
+                state = ToolPartState.OUTPUT_AVAILABLE,
+                currentUrl = "https://example.com",
+                pageTitle = "Example",
+                frameJpegBase64 = "anFk",
+                actions = listOf(BrowserActionEntry("打开 example.com"), BrowserActionEntry("点击 价格")),
+                actionCount = 2,
+                resultSummary = "已查到价格",
+            ),
+        )
+        assertEquals(parts, decode(encode(parts)))
+    }
+
+    @Test
     fun `decode returns null for blank or malformed json`() {
         assertNull(MessagePartsCodec.decode(null))
         assertNull(MessagePartsCodec.decode(""))
@@ -177,19 +195,19 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `sealed descriptor locks the 8-value taxonomy`() {
+    fun `sealed descriptor locks the 9-value taxonomy`() {
         // kotlinx.serialization 1.10.0 起 sealed 描述符为 {type, value} 两元素包装，
         // 子类描述符收纳在 "value"（CONTEXTUAL kotlinx.serialization.Sealed<...>）内层——
         // 外层 elementsCount 恒为 2，须下沉一层枚举子类 @SerialName。
         val sealed = MessagePart.serializer().descriptor.getElementDescriptor(1)
-        assertEquals(8, sealed.elementsCount)
+        assertEquals(9, sealed.elementsCount)
         val serialNames = (0 until sealed.elementsCount)
             .map { sealed.getElementDescriptor(it).serialName }
             .toSet()
         assertEquals(
             setOf(
                 "text", "image",
-                "tool_chart", "tool_html", "tool_task", "tool_image_edit",
+                "tool_chart", "tool_html", "tool_task", "tool_image_edit", "tool_browser",
                 "data_media_results", "data_optimize_candidates",
             ),
             serialNames,

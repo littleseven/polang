@@ -29,7 +29,7 @@ enum class PartCategory {
  * `@Immutable` 注解不进 commonMain（ADR-013 纯度守卫禁 androidx.compose import），
  * Compose 稳定性注解属 M4 性能清单的 androidApp 侧收口。
  *
- * 序列化：kotlinx JSON（[MessagePartsCodec]），`type` 鉴别字段值遵循 8 值分类法
+ * 序列化：kotlinx JSON（[MessagePartsCodec]），`type` 鉴别字段值遵循 9 值分类法
  * （type taxonomy spec §1），`ignoreUnknownKeys` 保证前向兼容（新版本 part 字段旧版本可读）。
  */
 @Serializable
@@ -146,6 +146,30 @@ sealed interface MessagePart {
         override val category: PartCategory get() = PartCategory.TOOL
     }
 
+    /**
+     * 云端浏览器直播卡（tool_browser，spec: browser-vnc 直播卡 §4）。
+     * 瞬态轨：browser_open 占位 → 会话期间经 BrowserLiveOverlay 原位覆写（帧/动作流水）；
+     * 持久轨：会话结束落最终帧 + 结果摘要 + 动作计数（state 恒 OUTPUT_AVAILABLE /
+     * 失败 OUTPUT_ERROR）。帧永不回灌 LLM（回灌投影见 ChatModelInput）。
+     */
+    @Serializable
+    @SerialName("tool_browser")
+    data class BrowserLive(
+        override val partId: String,
+        val sessionId: String,
+        val state: ToolPartState = ToolPartState.INPUT_STREAMING,
+        val currentUrl: String = "",
+        val pageTitle: String = "",
+        val frameJpegBase64: String? = null,
+        /** 最近动作流水（至多 3 条，新在尾）。 */
+        val actions: List<BrowserActionEntry> = emptyList(),
+        val actionCount: Int = 0,
+        val resultSummary: String? = null,
+        val errorReason: String? = null,
+    ) : MessagePart {
+        override val category: PartCategory get() = PartCategory.TOOL
+    }
+
     /** AI 优化抽卡候选条（data part：默认不回灌 LLM）。 */
     @Serializable
     @SerialName("data_optimize_candidates")
@@ -156,6 +180,13 @@ sealed interface MessagePart {
         override val category: PartCategory get() = PartCategory.DATA
     }
 }
+
+/** 直播卡动作流水条目（description 已本地化——由 UI 侧组装，模型只搬运）。 */
+@Serializable
+data class BrowserActionEntry(
+    val description: String,
+    val ok: Boolean = true,
+)
 
 /** 正文段流式状态（spec §3）。 */
 enum class PartState { STREAMING, DONE }

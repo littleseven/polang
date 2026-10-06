@@ -166,6 +166,8 @@ object ChatHistoryStoreCodec {
         is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
         is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
         is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
+        // iOS 浏览器直播卡未落地（M1 Android-only）：防御性落文本，正式映射随 iOS 跟随任务
+        is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
         null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
     }
 
