@@ -41,6 +41,15 @@ class BrowserLiveOverlayTest {
     }
 
     @Test
+    fun `same content live state returns same instance after partId normalization`() {
+        // Task 16 约定 live 条目 partId=""；内容相同（仅 partId 不同）→ 归一化后相等，
+        // 原样返回零分配（钉住等值短路在归一化口径下生效）
+        val base = MessagePart.BrowserLive(partId = "call-1", sessionId = "s-1", state = ToolPartState.INPUT_AVAILABLE, pageTitle = "A")
+        val msg = msgWith(base)
+        assertSame(msg, msg.overlayLiveBrowserState(mapOf("s-1" to base.copy(partId = ""))))
+    }
+
+    @Test
     fun `non browser messages untouched`() {
         val msg = msgWith(MessagePart.Text(partId = "txt-0", markdown = "hi"))
         assertTrue(

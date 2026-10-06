@@ -2746,11 +2746,11 @@ fun ChatMessage.overlayLiveBrowserState(live: Map<String, MessagePart.BrowserLiv
     val index = parts.indexOfFirst { it is MessagePart.BrowserLive && it.sessionId in live }
     if (index < 0) return this
     val part = parts[index] as MessagePart.BrowserLive
-    val livePart = live.getValue(part.sessionId)
-    if (livePart == part) return this
-    // partId 以流式轨占位为准（key 恒定），其余字段取 live 投影
-    val newPart = livePart.copy(partId = part.partId)
-    return copy(parts = parts.toMutableList().also { it[index] = newPart })
+    // partId 以流式轨占位为准（key 恒定）：live 条目 partId 约定为 ""（Task 16），
+    // 归一化为占位 partId 后再比较/覆写——直接等值短路在该约定下恒失效
+    val normalized = live.getValue(part.sessionId).copy(partId = part.partId)
+    if (normalized == part) return this
+    return copy(parts = parts.toMutableList().also { it[index] = normalized })
 }
 ```
 
@@ -2770,9 +2770,14 @@ const val TYPE_BROWSER_LIVE = "browser_live"
 另在 `isPersistedStreamingOutput`（:155-166）加 browser 双显跳过（产物行在场才跳）：
 
 ```kotlin
-// when (this) 加分支；persistedBrowserPayloads 由 flattenChatItems 调用方仿 chart/html 集合传入
-is MessagePart.BrowserLive -> sessionId in persistedBrowserSessionIds && state == ToolPartState.OUTPUT_AVAILABLE
+// browser 分支提前于顶层 OUTPUT_AVAILABLE 守卫判定：终态（OUTPUT_AVAILABLE/OUTPUT_ERROR）且产物行在场即跳
+if (this is MessagePart.BrowserLive) {
+    val terminal = state == ToolPartState.OUTPUT_AVAILABLE || state == ToolPartState.OUTPUT_ERROR
+    return terminal && sessionId in persistedBrowserSessionIds
+}
 ```
+
+> 跳过口径与 chart/html 的差异：browser 的 **OUTPUT_ERROR 失败定格卡落库**（Task 16 Step 3 `emitBrowserCardMessage` 持久化终态），而 chart/html 的 OUTPUT_ERROR 是瞬态轨不落库——若沿用顶层「仅 OUTPUT_AVAILABLE 跳」守卫，流式错误卡会与持久化错误行双显。故 browser 分支语义 = `sessionId in persistedBrowserSessionIds && state 为终态`；sessionId 即产物行锚（content 列存整颗 JSON，不走负载等值匹配）。
 
 > 执行注意：`flattenChatItems` 签名需仿 `persistedChartPayloads`/`persistedHtmlPayloads` 增加 `persistedBrowserSessionIds: Set<String>` 参数；androidApp 侧调用点（ChatViewModel displayMessages/ChatScreen 组装处）同步传 `_messages` 中 `type="tool_browser"` 行的 sessionId 集合。改签名属 shared+androidApp 双侧同步点，落地时全局搜 `flattenChatItems` 调用点一并更新。
 
@@ -3074,7 +3079,7 @@ private fun emitBrowserCardMessage(final: MessagePart.BrowserLive) {
 private val browserPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 ```
 
-定格后**保留**在 `_browserLiveSessions`（不要移除）：overlay 会持续把流式占位 part 覆写为 `OUTPUT_AVAILABLE` 终态，Task 13 的双显跳过（`sessionId in persistedBrowserSessionIds && state == OUTPUT_AVAILABLE`）依赖这个状态才能在产物行到达后隐去流式卡；若此时移除，流式卡会回退到 reducer 喂入的 INPUT_AVAILABLE 旧态、误显示为「进行中」并恢复轮询。清理统一在 turn 结束兜底（Step 5）做：
+定格后**保留**在 `_browserLiveSessions`（不要移除）：overlay 会持续把流式占位 part 覆写为 `OUTPUT_AVAILABLE` 终态，Task 13 的双显跳过（`sessionId in persistedBrowserSessionIds && state 为终态 OUTPUT_AVAILABLE/OUTPUT_ERROR`——browser 的 OUTPUT_ERROR 落库，与 chart/html 瞬态不同）依赖这个状态才能在产物行到达后隐去流式卡；若此时移除，流式卡会回退到 reducer 喂入的 INPUT_AVAILABLE 旧态、误显示为「进行中」并恢复轮询。清理统一在 turn 结束兜底（Step 5）做：
 
 ```kotlin
 // 终态保留在 map；turn 结束兜底统一清理（见 Step 5）

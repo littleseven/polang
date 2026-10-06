@@ -12,9 +12,9 @@ fun ChatMessage.overlayLiveBrowserState(live: Map<String, MessagePart.BrowserLiv
     val index = parts.indexOfFirst { it is MessagePart.BrowserLive && it.sessionId in live }
     if (index < 0) return this
     val part = parts[index] as MessagePart.BrowserLive
-    val livePart = live.getValue(part.sessionId)
-    if (livePart == part) return this
-    // partId 以流式轨占位为准（key 恒定），其余字段取 live 投影
-    val newPart = livePart.copy(partId = part.partId)
-    return copy(parts = parts.toMutableList().also { it[index] = newPart })
+    // partId 以流式轨占位为准（key 恒定）：live 条目 partId 约定为 ""（Task 16），
+    // 归一化为占位 partId 后再比较/覆写——直接等值短路在该约定下恒失效
+    val normalized = live.getValue(part.sessionId).copy(partId = part.partId)
+    if (normalized == part) return this
+    return copy(parts = parts.toMutableList().also { it[index] = normalized })
 }

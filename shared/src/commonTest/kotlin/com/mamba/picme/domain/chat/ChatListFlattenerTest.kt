@@ -243,6 +243,76 @@ class ChatListFlattenerTest {
         assertEquals(ChatListItem.TYPE_CHART, items[0].contentType)
     }
 
+    // ── browser 直播卡双显跳过（Task 13；browser 的 OUTPUT_ERROR 落库，终态都跳）──
+
+    private fun streamingBrowser(state: ToolPartState, sessionId: String = "s-1") = ChatMessage(
+        id = "s1",
+        type = ChatMessageType.AGENT_TEXT,
+        content = "",
+        role = ModelInputRole.ASSISTANT,
+        isStreaming = true,
+        parts = listOf(MessagePart.BrowserLive(partId = "call-1", sessionId = sessionId, state = state)),
+    )
+
+    private fun persistedBrowserRow(sessionId: String = "s-1", state: ToolPartState = ToolPartState.OUTPUT_AVAILABLE) =
+        ChatMessage(
+            id = "browser_1",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "{}",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(MessagePart.BrowserLive(partId = "p0", sessionId = sessionId, state = state)),
+        )
+
+    @Test
+    fun `terminal streaming browser live part is skipped when persisted row present`() {
+        val items = flattenChatItems(
+            listOf(streamingBrowser(ToolPartState.OUTPUT_AVAILABLE), persistedBrowserRow()),
+            persistedBrowserSessionIds = setOf("s-1"),
+        )
+        // 流式定格卡跳过（双显禁止），只渲染产物行自身
+        assertEquals(listOf("browser_1:p0"), items.map { it.key })
+        assertEquals(listOf(ChatListItem.TYPE_BROWSER_LIVE), items.map { it.contentType })
+    }
+
+    @Test
+    fun `failed terminal streaming browser live part is skipped when persisted row present`() {
+        // browser 的 OUTPUT_ERROR 落库（与 chart/html 瞬态不落库不同）：失败定格卡
+        // 产物行在场同样跳过，防流式错误卡 + 持久化错误行双显
+        val items = flattenChatItems(
+            listOf(
+                streamingBrowser(ToolPartState.OUTPUT_ERROR),
+                persistedBrowserRow(state = ToolPartState.OUTPUT_ERROR),
+            ),
+            persistedBrowserSessionIds = setOf("s-1"),
+        )
+        assertEquals(listOf("browser_1:p0"), items.map { it.key })
+    }
+
+    @Test
+    fun `in-flight streaming browser live part renders even when session id in persisted set`() {
+        // 未终态（live 会话进行中）不跳：卡片按全状态自渲染原位继续显示
+        val items = flattenChatItems(
+            listOf(streamingBrowser(ToolPartState.INPUT_AVAILABLE), persistedBrowserRow()),
+            persistedBrowserSessionIds = setOf("s-1"),
+        )
+        assertEquals(listOf("s1:call-1", "browser_1:p0"), items.map { it.key })
+        assertEquals(
+            listOf(ChatListItem.TYPE_BROWSER_LIVE, ChatListItem.TYPE_BROWSER_LIVE),
+            items.map { it.contentType },
+        )
+    }
+
+    @Test
+    fun `persisted browser row always renders`() {
+        // 产物行自身（非流式）恒渲染——跳过谓词以 isStreaming 为前提，不自吞
+        val items = flattenChatItems(
+            listOf(persistedBrowserRow()),
+            persistedBrowserSessionIds = setOf("s-1"),
+        )
+        assertEquals(1, items.size)
+        assertEquals(ChatListItem.TYPE_BROWSER_LIVE, items[0].contentType)
+    }
+
     @Test
     fun `claude agent messages render as whole legacy items`() {
         val claude = ChatMessage(

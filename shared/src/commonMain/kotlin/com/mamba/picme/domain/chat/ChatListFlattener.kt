@@ -158,6 +158,11 @@ private fun wholeMessageKey(message: ChatMessage): String =
  * 消失、随后又在列表尾部出现（闪失 + 位置跳变）。匹配按负载等值（emit 时 Room
  * content 与 part 负载同源同值），精确锚定本 turn 的产物行——旧 turn 的历史卡行
  * 负载不同，不会误判提前跳过。
+ *
+ * browser 直播卡差异：OUTPUT_ERROR 的失败定格卡**落库**（chart/html 的 OUTPUT_ERROR
+ * 为瞬态轨不落库），故 browser 分支在终态（OUTPUT_AVAILABLE/OUTPUT_ERROR）且产物行
+ * 在场即跳——否则流式错误卡会与持久化错误行双显。sessionId 即产物行锚（content 列
+ * 存整颗 JSON，不走负载等值匹配）。
  */
 private fun MessagePart.isPersistedStreamingOutput(
     message: ChatMessage,
@@ -165,12 +170,15 @@ private fun MessagePart.isPersistedStreamingOutput(
     persistedHtmlPayloads: Set<String>,
     persistedBrowserSessionIds: Set<String>,
 ): Boolean {
-    if (!message.isStreaming || toolStateOrNull() != ToolPartState.OUTPUT_AVAILABLE) return false
+    if (!message.isStreaming) return false
+    if (this is MessagePart.BrowserLive) {
+        val terminal = state == ToolPartState.OUTPUT_AVAILABLE || state == ToolPartState.OUTPUT_ERROR
+        return terminal && sessionId in persistedBrowserSessionIds
+    }
+    if (toolStateOrNull() != ToolPartState.OUTPUT_AVAILABLE) return false
     return when (this) {
         is MessagePart.Chart -> svg in persistedChartPayloads
         is MessagePart.HtmlCard -> html in persistedHtmlPayloads
-        // 直播卡定格（产物行在场才跳）：sessionId 即产物行锚（content 列存整颗 JSON，不走负载等值匹配）
-        is MessagePart.BrowserLive -> sessionId in persistedBrowserSessionIds
         else -> false
     }
 }
