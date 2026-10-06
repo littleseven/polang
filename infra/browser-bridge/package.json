@@ -1,0 +1,15 @@
+{
+  "name": "browser-agent-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "playwright": "^1.49.1"
+  },
+  "scripts": {
+    "postinstall": "npx playwright install chromium",
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  }
+}
