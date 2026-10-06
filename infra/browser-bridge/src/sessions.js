@@ -99,8 +99,10 @@ class SessionManager {
     const id = crypto.randomUUID();
     const context = await this._newContext();
     try {
-      context.on('page', (popup) => { popup.close().catch(() => {}); });
       const page = await context.newPage();
+      // 必须先 newPage 再注册：'page' 事件对 newPage() 创建的主页面同样触发，
+      // 先注册会误杀主页面（real-Chrome 实证）
+      context.on('page', (popup) => { popup.close().catch(() => {}); });
       page.setDefaultTimeout(this.config.navTimeoutMs);
       page.on('dialog', (dialog) => { dialog.dismiss().catch(() => {}); });
       const session = new Session(id, context, page);
@@ -137,7 +139,7 @@ class SessionManager {
       session.actionCount += 1;
       let frame;
       if (body.wantFrame || action === 'screenshot') frame = await this._captureFrame(session);
-      return this._result(session, { textExtract, elements, frame, actionMs: Date.now() - started });
+      return this.snapshot(session, { textExtract, elements, frame, actionMs: Date.now() - started });
     });
   }
 
@@ -155,12 +157,24 @@ class SessionManager {
 
   async _click(session, body) {
     const target = await this._locate(session, body);
-    await target.click({ timeout: this.config.navTimeoutMs });
+    await this._staleGuard(() => target.click({ timeout: this.config.navTimeoutMs }));
   }
 
   async _type(session, body) {
     const target = await this._locate(session, body);
-    await target.pressSequentially(String(body.text == null ? '' : body.text), { timeout: this.config.navTimeoutMs });
+    await this._staleGuard(() => target.pressSequentially(String(body.text == null ? '' : body.text), { timeout: this.config.navTimeoutMs }));
+  }
+
+  /** 缓存句柄在页面变化后失效：Playwright 原始 not-attached 错误映射为结构化 stale_element。 */
+  async _staleGuard(fn) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e && /not attached|detached|Target closed/i.test(String(e.message))) {
+        throw new ActionFailedError('stale_element', '元素已失效，请重新 extract');
+      }
+      throw e;
+    }
   }
 
   /**
@@ -201,7 +215,8 @@ class SessionManager {
     });
   }
 
-  async _result(session, extra) {
+  /** 会话快照：server.js 跨模块消费（公开方法）。 */
+  async snapshot(session, extra) {
     return {
       status: 'ok',
       sessionId: session.id,
@@ -218,6 +233,7 @@ class SessionManager {
     const s = this.sessions.get(id);
     if (!s) return false;
     this.sessions.delete(id);
+    await s.queue.catch(() => {}); // 先排空在途动作，避免 context 在 act 中途被关
     await s.context.close().catch(() => {});
     return true;
   }

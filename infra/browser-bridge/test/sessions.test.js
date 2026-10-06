@@ -106,3 +106,47 @@ test('reap closes idle sessions', async () => {
   assert.strictEqual(contextClosed, true);
   assert.throws(() => mgr.get(s.id), SessionExpiredError);
 });
+
+test('concurrent act calls on same session execute serially in order', async () => {
+  const order = [];
+  const page = fakePage();
+  page.evaluate = async (fn) => {
+    if (typeof fn !== 'function') return '';
+    order.push('extract:start');
+    await new Promise((r) => setTimeout(r, 20));
+    order.push('extract:end');
+    return 'body';
+  };
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  const p1 = mgr.act(s, { action: 'extract' });
+  const p2 = mgr.act(s, { action: 'extract' });
+  await Promise.all([p1, p2]);
+  assert.deepStrictEqual(order, ['extract:start', 'extract:end', 'extract:start', 'extract:end']);
+  await mgr.close(s.id);
+});
+
+test('click with out-of-range index rejects with stale_element code', async () => {
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(fakePage()));
+  const s = await mgr.open(null);
+  await assert.rejects(
+    () => mgr.act(s, { action: 'click', index: 99 }),
+    (e) => e.code === 'stale_element'
+  );
+  await mgr.close(s.id);
+});
+
+test('detached cached handle maps to structured stale_element', async () => {
+  const page = fakePage();
+  page.$$ = async () => [
+    { click: async () => { throw new Error('Element is not attached to the DOM'); }, pressSequentially: async () => {}, evaluate: async (fn) => fn({ tagName: 'A', innerText: 'X', value: '', getAttribute: () => null }) },
+  ];
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.act(s, { action: 'extract' });
+  await assert.rejects(
+    () => mgr.act(s, { action: 'click', index: 0 }),
+    (e) => e.code === 'stale_element'
+  );
+  await mgr.close(s.id);
+});
