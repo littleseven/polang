@@ -279,7 +279,20 @@ fun ChatScreen(
     // 的复用错配）；USER 消息整颗单 item（§5 图文同气泡不拆）。
     // 上移到滚动 effect 之前：自动滚底/回锚以 flatItems 粒度计 index（spec §8 收口）
     val flatItems = remember(messages, pendingNonCardTool) {
-        flattenChatItems(messages, pendingNonCardTool)
+        flattenChatItems(
+            messages,
+            pendingNonCardTool,
+            // browser 直播卡双显跳过的产物行锚（Task 13 新签名）：持久化 tool_browser
+            // 产物行的 sessionId 集合。最小实现：自非流式消息的 parts 提取——Room 读侧
+            // parts 恢复接线（Task 16 Step 2 换 decode 组装口径）前集合恒空，行为与
+            // 传空集合一致；届时仅替换本提取式，flattener 契约不变。
+            persistedBrowserSessionIds = messages.asSequence()
+                .filter { !it.isStreaming }
+                .flatMap { it.parts.asSequence() }
+                .filterIsInstance<MessagePart.BrowserLive>()
+                .map { it.sessionId }
+                .toSet(),
+        )
     }
     // 会话内存在任务卡 ⇒ 气泡上的 claude 审批按钮整体抑制（US-2 审批唯一入口）；
     // remember 派生，避免流式重组期每次全量扫描（spec §8）

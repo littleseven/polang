@@ -67,6 +67,11 @@ object MessagePartsConverter {
 
             "tool_html" -> listOf(MessagePart.HtmlCard("p0", html = content, meta = parseHtmlCardMeta(meta)))
 
+            // browser 直播卡：content 列存 BrowserLive 整颗 JSON（meta 列留空）；
+            // 损坏行抛异常 → 行级 Text 兜底（对齐 toParts 的 runCatching 收口）
+            "tool_browser" ->
+                listOf(json.decodeFromString(MessagePart.BrowserLive.serializer(), content))
+
             EngineerTaskState.ROOM_TYPE ->
                 listOf(parseTaskCard(meta))
 

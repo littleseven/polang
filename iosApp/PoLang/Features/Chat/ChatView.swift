@@ -268,7 +268,10 @@ struct ChatView: View {
     private var flattenedItems: [ChatListItem] {
         ChatListFlattenerKt.flattenChatItems(
             messages: viewModel.messages,
-            pendingToolName: viewModel.pendingToolName
+            pendingToolName: viewModel.pendingToolName,
+            // browser-vnc 直播卡 Task 13 新增参数（ObjC 导出不支持 Kotlin 默认值）；
+            // iOS 直播卡未落地（M1 Android-only），传空集合，正式组装随 iOS 跟随任务
+            persistedBrowserSessionIds: []
         )
     }
 
