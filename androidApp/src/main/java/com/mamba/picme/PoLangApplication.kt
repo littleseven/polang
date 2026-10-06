@@ -172,7 +172,7 @@ class PoLangApplication : Application(), ImageLoaderFactory {
      * 不能用 DataStore 挂起读、禁 runBlocking）。SSOT = `serverAuthTokenFlow`（DataStore）
      * 与 [DeviceIdProvider]；启动后由 applicationScope 预热常驻收集（先例 = ChatViewModel
      * 把 serverAuthTokenFlow 收集进内存 StateFlow 供 claude-chat 可用性检查）。
-     * 失效语义：登出 → DataStore 写入空 token → Flow 重放射 → 缓存归 null，
+     * 失效语义：登出 → 移除 token key（Flow 映射为空串）→ 缓存归 null，
      * 后续 browser 请求即走「未登录」降级（BrowserUnavailableException("not logged in")）。
      * deviceId 稳定不变，预热一次即可；未预热完成前 provider 返回 null，仅少带 X-Device-Id。
      */
@@ -814,7 +814,9 @@ class PoLangApplication : Application(), ImageLoaderFactory {
             }
         }
         applicationScope.launch {
-            cachedDeviceId = deviceIdProvider.get()
+            runCatching { deviceIdProvider.get() }
+                .onSuccess { cachedDeviceId = it }
+            // 失败保持 null：仅少带 X-Device-Id（server 侧无害），不崩溃
         }
         val browserTransport = BrowserSessionClient(
             tokenProvider = { cachedServerAuthToken },
