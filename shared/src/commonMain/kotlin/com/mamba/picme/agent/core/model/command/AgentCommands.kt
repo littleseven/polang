@@ -467,6 +467,61 @@ sealed class AgentCommand {
         val display: String? = null
     ) : AgentCommand()
 
+    // ==================== 云端浏览器命令（spec: browser-vnc 直播卡） ====================
+
+    /**
+     * 打开云端浏览器会话（headless Chromium，远程执行）。返回 sessionId 供后续动作复用。
+     * 一次会话对应 Chat 内一张直播卡；任务完成必须调 [BrowserClose]。
+     */
+    data class BrowserOpen(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val url: String
+    ) : AgentCommand()
+
+    /** 会话内导航到新 URL。 */
+    data class BrowserNavigate(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val sessionId: String,
+        val url: String
+    ) : AgentCommand()
+
+    /** 点击元素（三模式定位，优先级 targetIndex > targetText > selector；空串/-1 为「未提供」哨兵）。 */
+    data class BrowserClick(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val sessionId: String,
+        val selector: String = "",
+        val targetText: String = "",
+        val targetIndex: Int = -1
+    ) : AgentCommand()
+
+    /** 向输入框键入文本（定位模式同 [BrowserClick]）。 */
+    data class BrowserType(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val sessionId: String,
+        val selector: String = "",
+        val targetText: String = "",
+        val targetIndex: Int = -1,
+        val text: String
+    ) : AgentCommand()
+
+    /** 提取当前页面正文文本（截断 4000 字符，结果回灌 LLM，不产帧）。 */
+    data class BrowserExtract(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val sessionId: String
+    ) : AgentCommand()
+
+    /** 抓当前页一帧（用户明确要截图时用；常规动作的帧由端侧策略自动控制）。 */
+    data class BrowserScreenshot(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val sessionId: String
+    ) : AgentCommand()
+
+    /** 关闭会话并销毁远程实例（任务结束必须调用，否则 2 分钟空闲后服务端强制回收）。 */
+    data class BrowserClose(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val sessionId: String
+    ) : AgentCommand()
+
     // ==================== 记忆命令（人物关系 + 事实记忆） ====================
 
     /**
@@ -601,6 +656,13 @@ sealed class AgentCommand {
             is ExecuteScript -> "run_gallery_script"
             is DrawChart -> "draw_chart"
             is RenderHtml -> "render_html"
+            is BrowserOpen -> "browser_open"
+            is BrowserNavigate -> "browser_navigate"
+            is BrowserClick -> "browser_click"
+            is BrowserType -> "browser_type"
+            is BrowserExtract -> "browser_extract"
+            is BrowserScreenshot -> "browser_screenshot"
+            is BrowserClose -> "browser_close"
             is RememberPersonRelation -> "remember_person_relation"
             is ForgetPersonRelation -> "forget_person_relation"
             is QueryPersonRelation -> "query_person_relation"
