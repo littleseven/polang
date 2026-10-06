@@ -192,6 +192,8 @@ import com.mamba.picme.features.chat.capability.ChatMediaWriteCapability
 import com.mamba.picme.agent.core.model.command.CommandRisk
 import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.ChatStartTagScanCapability
+import com.mamba.picme.features.chat.components.BrowserFramePreviewOverlay
+import com.mamba.picme.features.chat.components.BrowserLiveCard
 import com.mamba.picme.features.chat.components.ChatEmptyState
 import com.mamba.picme.features.chat.components.ChatPhotoPickerSheet
 import com.mamba.picme.features.chat.components.ChatRegistrationSheet
@@ -325,6 +327,8 @@ fun ChatScreen(
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
     var previewChartSvg by remember { mutableStateOf<String?>(null) }
+    // 浏览器直播卡全屏帧预览状态（base64 单帧）
+    var browserFramePreview by remember { mutableStateOf<String?>(null) }
     // HTML 卡片外链落地页预览状态（点击卡片内 <a> 链接打开）
     var previewLinkUrl by remember { mutableStateOf<String?>(null) }
     // HTML 卡全屏查看器状态（点击 fullpage 预览卡/兜底封面打开；与 HtmlLinkPreviewOverlay 同级）
@@ -337,9 +341,10 @@ fun ChatScreen(
     // 已点删除但等待媒体库刷新确认的图片 ID
     var pendingDeletedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
-    // 任一全屏预览打开（照片轮播/图片/图表/表格/HTML 外链落地页/HTML 卡全屏查看器）：禁外层横滑 + 隐藏顶栏 + 拦截返回键
+    // 任一全屏预览打开（照片轮播/图片/图表/直播帧/表格/HTML 外链落地页/HTML 卡全屏查看器）：禁外层横滑 + 隐藏顶栏 + 拦截返回键
     val anyPreviewOpen = previewAssets.isNotEmpty() || imagePreview != null ||
-        previewChartSvg != null || expandedTable != null || previewLinkUrl != null || fullpageHtmlCard != null
+        previewChartSvg != null || browserFramePreview != null || expandedTable != null ||
+        previewLinkUrl != null || fullpageHtmlCard != null
 
     // 上报外层 Pager 横滑使能：任一全屏预览打开时禁用，避免与内层预览滑动冲突
     LaunchedEffect(anyPreviewOpen) {
@@ -517,6 +522,7 @@ fun ChatScreen(
             previewAssets.isNotEmpty() -> previewAssets = emptyList()
             imagePreview != null -> imagePreview = null
             previewChartSvg != null -> previewChartSvg = null
+            browserFramePreview != null -> browserFramePreview = null
             expandedTable != null -> expandedTable = null
             // 落地页叠在全屏查看器之上，返回键先关落地页再关查看器
             previewLinkUrl != null -> previewLinkUrl = null
@@ -701,6 +707,16 @@ fun ChatScreen(
                                         }
                                     )
                                 }
+                                ChatListItem.TYPE_BROWSER_LIVE -> {
+                                    // 浏览器直播卡（spec §4）：槽位间距与 HtmlCard 分支一致
+                                    // （LazyColumn 层 horizontal padding，卡内不再加）
+                                    val browserPart = item.part as? MessagePart.BrowserLive ?: return@itemsIndexed
+                                    BrowserLiveCard(
+                                        part = browserPart,
+                                        onPollFrame = { sessionId -> viewModel.pollBrowserFrame(sessionId) },
+                                        onOpenFullPreview = { frame -> browserFramePreview = frame },
+                                    )
+                                }
                                 ChatListItem.TYPE_TASK_CARD -> {
                                     // M4（spec §7.4）：状态源 = TaskCard part（live 态经 parts 同 id
                                     // 原位覆写，500ms 节流在 displayMessages 管线）
@@ -883,6 +899,11 @@ fun ChatScreen(
                 svg = previewChartSvg,
                 onDismiss = { previewChartSvg = null }
             )
+
+            // 浏览器直播卡全屏帧预览（单帧）
+            browserFramePreview?.let { frame ->
+                BrowserFramePreviewOverlay(frame = frame, onClose = { browserFramePreview = null })
+            }
 
             // HTML 卡全屏查看器（fullpage 预览卡点击进入；z 序在落地页之下——查看器内 <a> 点击叠落地页）
             HtmlFullpageViewer(
