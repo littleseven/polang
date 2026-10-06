@@ -3557,14 +3557,14 @@ git commit -m "feat(app): BrowserLiveCard 直播卡 + 全屏帧预览 + ChatScre
 - Modify: `androidApp/AGENTS.md`（§2.1 Chat 行补直播卡句；§3.2 集成点表加 browser 直播卡一行）
 - Modify: `docs/08-UI-SPECS/screens/chat.yaml`（若该文件有卡片登记段，按既有格式登记 browser_live 卡，供 iOS 跟随消费）
 
-- [ ] **Step 1: 逐文件按上表同步**（每处改动对齐该文件既有措辞密度，不回填模块级细节到顶层 AGENTS.md）
+- [x] **Step 1: 逐文件按上表同步**（每处改动对齐该文件既有措辞密度，不回填模块级细节到顶层 AGENTS.md）
 
-- [ ] **Step 2: 跑文档门禁**
+- [x] **Step 2: 跑文档门禁**
 
 Run: `python3 scripts/check_doc_sync.py`
 Expected: 全绿（活文档引用单向 + reviews 白名单无新增）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/ shared/AGENTS.md server/AGENTS.md androidApp/AGENTS.md
