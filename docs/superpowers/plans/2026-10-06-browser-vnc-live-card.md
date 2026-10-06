@@ -1996,7 +1996,7 @@ git commit -m "feat(shared): browser 协议 DTO——状态闭集 + 双响应 + 
 - Create: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/capability/BrowserSessionCapability.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/agent/core/capability/BrowserSessionCapabilityTest.kt`
 
-- [ ] **Step 1: AgentCommands.kt 加 7 个命令**
+- [x] **Step 1: AgentCommands.kt 加 7 个命令**
 
 在 `RenderHtml`（:463-468）之后插入（KDoc 风格对齐现有命令）：
 
@@ -2069,7 +2069,7 @@ git commit -m "feat(shared): browser 协议 DTO——状态闭集 + 双响应 + 
             is BrowserClose -> "browser_close"
 ```
 
-- [ ] **Step 2: 写失败测试（fake transport 驱动 capability）**
+- [x] **Step 2: 写失败测试（fake transport 驱动 capability）**
 
 ```kotlin
 package com.mamba.picme.agent.core.capability
@@ -2208,12 +2208,12 @@ class BrowserSessionCapabilityTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserSessionCapabilityTest*"`
 Expected: FAIL（类不存在）
 
-- [ ] **Step 4: 实现 `BrowserSessionCapability.kt`**
+- [x] **Step 4: 实现 `BrowserSessionCapability.kt`**
 
 ```kotlin
 package com.mamba.picme.agent.core.capability
@@ -2256,7 +2256,8 @@ interface BrowserSessionDelegate {
  * extract/close 不带；连续帧走 [BrowserTransport.frame]（watch 模式轮询）。
  *
  * 降级不变式：一切失败（池满/会话过期/不可达/动作失败）都映射为 TextReply 结构化文本
- * 交 LLM 降级处理，不抛异常穿透 ReAct 链。
+ * 交 LLM 降级处理，不抛异常穿透 ReAct 链（CancellationException 例外，原样 rethrow
+ * 保护结构化并发/CommandExecutor 超时取消）。
  */
 class BrowserSessionCapability(
     private val transport: BrowserTransport,
@@ -2371,7 +2372,7 @@ class BrowserSessionCapability(
 }
 ```
 
-- [ ] **Step 5: 跑测试确认通过 + commit**
+- [x] **Step 5: 跑测试确认通过 + commit**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserSessionCapabilityTest*"`
 Expected: PASS
@@ -2398,7 +2399,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("要打开的完整 URL（http/https）")
         url: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserOpen(url = url))
+        dispatchCommand(AgentCommand.BrowserOpen(url = url), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_navigate")
     @LLMDescription("云端浏览器会话内导航到新 URL。")
@@ -2408,7 +2409,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("目标完整 URL（http/https）")
         url: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserNavigate(sessionId = sessionId, url = url))
+        dispatchCommand(AgentCommand.BrowserNavigate(sessionId = sessionId, url = url), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_click")
     @LLMDescription("点击云端浏览器当前页面中的元素。三种定位方式按优先级选用：targetIndex（browser_extract 返回的元素序号，最可靠）> targetText（元素可见文本）> selector（CSS 选择器，兜底）。三者至少给一个，多余传空串/-1。")
@@ -2422,7 +2423,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("CSS 选择器（如 'button.submit'）；未使用传空串")
         selector: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector))
+        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_type")
     @LLMDescription("向云端浏览器当前页面中的输入框键入文本。定位方式同 browser_click（优先 targetIndex）。")
@@ -2438,7 +2439,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("要键入的文本")
         text: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector, text = text))
+        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector, text = text), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_extract")
     @LLMDescription("提取云端浏览器当前页面的正文文本（截断 4000 字符）与可交互元素清单（每个元素带 index/tag/text/href）。阅读页面内容用它，不要用 browser_screenshot 读内容；后续 click/type 优先用清单里的 index 定位。")
@@ -2446,7 +2447,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserExtract(sessionId = sessionId))
+        dispatchCommand(AgentCommand.BrowserExtract(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_screenshot")
     @LLMDescription("抓云端浏览器当前页一帧画面。仅当用户明确要截图时使用；常规动作的过程画面已自动回传。")
@@ -2454,7 +2455,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserScreenshot(sessionId = sessionId))
+        dispatchCommand(AgentCommand.BrowserScreenshot(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_close")
     @LLMDescription("关闭云端浏览器会话并销毁远程实例。浏览任务结束后必须调用（否则服务端 2 分钟空闲后强制回收）。")
@@ -2462,10 +2463,19 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId))
+        dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 ```
 
 - [ ] **Step 2: ChatPromptRules 加 browser 行为规则段**
+
+> **决策注记（2026-10-06 review 修订）**：browser_* 工具 dispatch 超时分级为 25s
+>（`BROWSER_DISPATCH_TIMEOUT_MS`：客户端 25s > 服务端 navTimeout 15s，< 网关 30s；
+> 慢页面不被客户端 5s 级联取消必杀，避免「远端 open 成功但卡不出现 + 会话泄漏 + 重试开重复会话」），
+> 其余工具保持 5s 不变；实现方式为 `dispatchCommand`/`dispatchCommandWithTrace`/`dispatchCommandDetailed`
+> 增加 `timeoutMillis` 可选参数（默认 `DISPATCH_TIMEOUT_MS`），7 个 browser 工具显式传 25s。
+> 同时 browser_rules 节末尾补豁免句：浏览器会话期间不受 convergence_rules 的 2 次调用上限约束
+>（否则 open→动作→close 最少 4 次的固定流程与「每次请求最多 2 次工具调用」矛盾，模型有中途放弃不 close 的风险）。
+> 内嵌代码的 `dispatchCommand(...)` 一行方法体均已同步为显式传 `timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS`。
 
 读 `ChatPromptRules.kt` 的分节结构，在工具使用规则相关节后追加一节（中英文按该文件现有语言风格对齐——若为中文规则文本则用下式）：
 
@@ -2476,6 +2486,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 点击/输入优先用 browser_extract 返回的元素 index 定位，其次可见文本，CSS 选择器只作兜底；
 任务结束（含中途放弃、额度/资源报错改纯文本回答）都必须 browser_close。
 不要浏览用户未要求的站点，不要在网页上输入用户的账号密码等敏感信息。
+浏览器会话期间（browser_open 到 browser_close 之间）不受下文收敛规则的调用次数上限约束；browser_close 后立即总结回复。
 ```
 
 - [ ] **Step 3: 编译 + 重生成 prompt golden + 跑守卫测试**

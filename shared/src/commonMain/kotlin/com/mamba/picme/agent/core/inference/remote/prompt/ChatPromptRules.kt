@@ -119,6 +119,7 @@ object ChatPromptRules {
             点击/输入优先用 browser_extract 返回的元素 index 定位，其次可见文本，CSS 选择器只作兜底。
             任务结束（含中途放弃、额度/资源报错改纯文本回答）都必须 browser_close。
             不要浏览用户未要求的站点，不要在网页上输入用户的账号密码等敏感信息。
+            浏览器会话期间（browser_open 到 browser_close 之间）不受下文收敛规则的调用次数上限约束；browser_close 后立即总结回复。
             """.trimIndent()
         ),
         RuleSection(
