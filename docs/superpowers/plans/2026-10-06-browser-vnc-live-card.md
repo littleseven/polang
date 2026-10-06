@@ -2615,7 +2615,7 @@ git commit -m "feat(shared): MessagePart.BrowserLive（tool_browser）——type
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/BrowserLiveOverlayTest.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/streaming/TurnPartsReducerBrowserTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `BrowserLiveOverlayTest.kt`：
 
@@ -2708,14 +2708,14 @@ class TurnPartsReducerBrowserTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserLiveOverlayTest*" --tests "*TurnPartsReducerBrowserTest*"`
 Expected: FAIL（overlay 不存在 / reducer 无 browser 分支）
 
 > 执行注意：`ChatMessage` 的构造参数以 `domain/chat/ChatMessage.kt` 实际定义为准（上式按 role/parts 字段推断，落地时对照修正具名参数）。
 
-- [ ] **Step 3: TurnPartsReducer 三处改动**
+- [x] **Step 3: TurnPartsReducer 三处改动**
 
 ```kotlin
 // companion object 加常量
@@ -2729,7 +2729,7 @@ TOOL_BROWSER_OPEN ->
 is MessagePart.BrowserLive -> copy(state = state)
 ```
 
-- [ ] **Step 4: 新建 `BrowserLiveOverlay.kt`**
+- [x] **Step 4: 新建 `BrowserLiveOverlay.kt`**
 
 ```kotlin
 package com.mamba.picme.domain.chat
@@ -2754,7 +2754,7 @@ fun ChatMessage.overlayLiveBrowserState(live: Map<String, MessagePart.BrowserLiv
 }
 ```
 
-- [ ] **Step 5: ChatListFlattener 三处改动**
+- [x] **Step 5: ChatListFlattener 三处改动**
 
 ```kotlin
 // toolStateOrNull 加分支
@@ -2781,7 +2781,7 @@ if (this is MessagePart.BrowserLive) {
 
 > 执行注意：`flattenChatItems` 签名需仿 `persistedChartPayloads`/`persistedHtmlPayloads` 增加 `persistedBrowserSessionIds: Set<String>` 参数；androidApp 侧调用点（ChatViewModel displayMessages/ChatScreen 组装处）同步传 `_messages` 中 `type="tool_browser"` 行的 sessionId 集合。改签名属 shared+androidApp 双侧同步点，落地时全局搜 `flattenChatItems` 调用点一并更新。
 
-- [ ] **Step 6: MessagePartsConverter 加 Room 映射**
+- [x] **Step 6: MessagePartsConverter 加 Room 映射**
 
 `MessagePartsConverter.kt` type→part 映射表（:43-91，`"tool_html"` 分支 :68 后）加：
 
@@ -2793,7 +2793,7 @@ if (this is MessagePart.BrowserLive) {
 
 > 执行注意：converter 内的 Json 实例与 `fallbackText` 形态以该文件现有代码为准（`"tool_html"` 分支用的是 `parseHtmlCardMeta` 等私有函数——browser 分支 content 列直接存 BrowserLive 整颗 JSON，meta 列留空）。
 
-- [ ] **Step 7: ChatModelInput 回灌分支**
+- [x] **Step 7: ChatModelInput 回灌分支**
 
 读 `domain/chat/ChatModelInput.kt` 的 tool part 回灌投影（tool-html/tool-task 分支形态），为 `MessagePart.BrowserLive` 加投影：
 
@@ -2809,7 +2809,7 @@ is MessagePart.BrowserLive -> ModelInputItem.ToolExchange(
 
 > 执行注意：`ModelInputItem` 的真实子类型名/字段以 `ChatModelInput.kt` 现状为准（上式为语义目标：tool-call/tool-result 配对、结果只含文本摘要、帧不回灌）；同步在 `ChatModelInputTest.kt` 加一条用例（BrowserLive → 单条 tool exchange、文本含 resultSummary、不含 frameJpegBase64 任何片段）。
 
-- [ ] **Step 8: 跑全部 shared 测试 + assemble + commit**
+- [x] **Step 8: 跑全部 shared 测试 + assemble + commit**
 
 ```bash
 JITPACK=true ./gradlew :shared:jvmTest && JITPACK=true ./gradlew :shared:assemble
