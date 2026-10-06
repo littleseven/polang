@@ -17,7 +17,7 @@ object Migrations {
                 Rules, Assets, TelemetryEvents, LlmDailyCounters,
                 Accounts, EmailVerifications, LlmCallLogs, LlmChannels,
                 ApkUploads, AnonymousDevices, ServerSettings, AiEngineerWhitelists,
-                ReportedIssues, IosUdidRegistrations,
+                ReportedIssues, IosUdidRegistrations, BrowserSessions,
             )
             // 给现存表补缺失列（如 llm_channel.default_model、apk_upload.channel），幂等
             SchemaUtils.createMissingTablesAndColumns(
