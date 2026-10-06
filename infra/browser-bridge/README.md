@@ -16,6 +16,17 @@ token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入
   应将 body 发送过程中的 reset 视为 413 等价。
 - click/type 定位三模式：index（extract 返回的元素序号，LLM 首选）/ targetText / selector。
 
+## 已知接受风险（M1，2026-10-06 审查记录）
+
+- **DNS rebinding TOCTOU**：SSRF 校验（DNS 解析 + 单播许可名单）与真实连接之间存在解析竞态——
+  校验后攻击者改 DNS 应答可绕过复查。M1 接受；缓解：单播许可名单已收窄目标面 +
+  bridge 仅内网部署（token + ufw/tailscale 网卡绑定），M2+ 可评连接期 IP 钉扎。
+- **sessionId 即能力凭证**：无 owner 绑定校验——同进程内持有 sessionId 即可操作会话
+  （网关侧 per-user 并发=1 + App token 鉴权是唯一边界）。M1 接受（单用户串行语义下
+  他方拿不到 sessionId）；M2+ 多并发或跨用户面扩大时需补 owner 绑定。
+- **413 表现为连接重置**：body 超 64KB 时 `req.destroy()` 先于响应发出，客户端观察到
+  连接重置而非 413（见上方「端点契约」，发送期 reset 按 413 等价处理）。
+
 ## 冒烟
 
 ```bash

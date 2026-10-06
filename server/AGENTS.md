@@ -13,9 +13,9 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.4
+**版本**：0.9.5
 
-**最后更新**：2026-10-05
+**最后更新**：2026-10-06
 
 **状态**：生效中 / 已上线
 
@@ -33,6 +33,7 @@
 - **遥测收集**：`TelemetryRoute` — 批量匿名事件写入 SQLite
 - **COS 存储**：`CosService` — 腾讯 COS 上传/元数据/预签名 URL；APK 下载 URL 渠道路由（`apkPublicUrl(channel)`：debug 轨可经 `APK_DEBUG_PUBLIC_BASE` 指向北京轻量国内镜像，release 轨恒走 `cos.polang.net`）
 - **限流**：`RateLimiter` — per-IP 令牌桶 + 日预算熔断
+- **云端浏览器网关**：`BrowserRoute` + `browser/`（BrowserBridgeClient/BrowserConcurrencyRegistry/BrowserSessionStats）— `/v1/browser/*` 鉴权（X-App-Token）→ 每日配额 peek（open 成功才 allow 计费）→ per-user 并发=1 → 透传 xuxing browser-agent-bridge（30s 网关超时；bridge 不可达统一 503 `browser_unavailable` 且不计额度，域名结果 JSON `status` 原样透传）
 - **用户问题上报**：`IssueReportRoute` — 脱敏后入库并自动同步 GitHub issue
 
 ---
@@ -56,7 +57,12 @@ server/
 │   │   ├── ClaudeChatRoute.kt    # POST /v1/claude-chat、/v1/claude-deliver、GET /v1/claude-engineer/available
 │   │   ├── ClaudeToolResultRoute.kt # POST /v1/claude-tool-result — App tool 结果回传
 │   │   ├── IssueReportRoute.kt   # POST /v1/report-issue — 用户问题上报
+│   │   ├── BrowserRoute.kt       # /v1/browser/{open,action,close} + GET /v1/browser/frame — 云端浏览器网关
 │   │   └── DownloadRoute.kt      # GET /download — 资源下载 + iOS 安装（/download/ios、manifest.plist、udid 注册）
+│   ├── browser/
+│   │   ├── BrowserBridgeClient.kt    # xuxing bridge HTTP 客户端（X-Bridge-Token，available 探测）
+│   │   ├── BrowserConcurrencyRegistry.kt # per-user 并发=1 内存租约（重启即清，条件释放防误删新租约）
+│   │   └── BrowserSessionStats.kt    # 会话统计（管理后台概览；写故障隔离不破坏响应契约）
 │   ├── auth/
 │   │   ├── AccountService.kt     # 账号 CRUD + token 生成/校验
 │   │   ├── AppTokenAuth.kt       # X-App-Token 认证插件
@@ -101,6 +107,7 @@ server/
 │   ├── 008_llm_channel_balance.sql
 │   ├── 009_drop_diag_jobs.sql
 │   ├── 010_anonymous_device_platform.sql
+│   ├── 011_browser_session.sql
 │   └── seed_rules.sql            # 初始推荐规则
 ├── src/test/kotlin/              # 测试基建（下列为示意，实际 40 个 *Test.kt + 2 个辅助类）
 │   ├── ChannelRepositoryTest.kt
@@ -146,6 +153,10 @@ server/
 | POST | `/v1/claude-tool-result` | P1 | ✅ | X-App-Token | AI 工程师 App tool 结果回传 |
 | POST | `/v1/claude-deliver` | P1 | ✅ | X-App-Token + 白名单 | AI 工程师代码交付 |
 | GET | `/v1/claude-engineer/available` | P1 | ✅ | X-App-Token | 返回 {available, canDeliver} |
+| POST | `/v1/browser/open` | P1 | ✅ | X-App-Token | 云端浏览器开会话：每日配额 peek（成功才计费，超额 429 `quota_exceeded`）+ per-user 并发=1（占用回 `pool_exhausted`）→ 透传 bridge |
+| POST | `/v1/browser/action` | P1 | ✅ | X-App-Token | 浏览器动作透传（navigate/click/type/extract/screenshot；域名结果 JSON `status` 原样回） |
+| GET | `/v1/browser/frame` | P1 | ✅ | X-App-Token | watch 模式取帧（`?sessionId=`，bridge 一次性 page.screenshot） |
+| POST | `/v1/browser/close` | P1 | ✅ | X-App-Token | 关会话 + 释放并发租约（条件释放防误删新租约） |
 | GET | `/auth/quota` | P1 | ✅ | X-App-Token | 查询账号剩余额度 |
 | DELETE | `/auth/account` | P1 | ✅ | X-App-Token | 注销账号（软删除） |
 | DELETE | `/guest/device` | P1 | ✅ | X-App-Token | 清除访客设备记录（X-Device-Id 定位） |
@@ -162,6 +173,8 @@ server/
 | GET | `/admin/release` | P1 | ✅ | ADMIN_TOKEN | 发布页（APK/IPA 上传管理） |
 | GET | `/assets/{manifest,url}` | P1 | 🚧 | X-App-Token | COS 预签名 — 待实现 |
 | GET | `/agent/config` | P1 | 🚧 | X-App-Token | 供应商适配参数下发 — 待实现 |
+
+> **browser 路由口径（2026-10-06 核定）**：owner 身份 = `ownerTokenHash()`——只认 `X-App-Token`（全局拦截器写 TokenHashKey，兜底 `validateToken`），与 claude 系同口径；**429 仅出自 `/v1/browser/open` 的每日配额 peek**（`peek` 不扣量、成功才 `allow` 计费），action/frame/close 不查配额；`BROWSER_BRIDGE_URL` 未配/bridge 不可达 → 503 `browser_unavailable` 不计额度。**超时分级层叠（守卫测试钉住，改超时须保层叠）**：bridge navTimeout 15s < App 端 registry 内层 25s = dispatch 外层 25s（同源常量）< 网关 30s——慢页面被内层必杀，外层永不触发。
 
 ---
 
@@ -242,5 +255,5 @@ systemd `picme-api.service`：`JAVA_OPTS=-Xmx256m` + `MemoryMax=450M`，与 Open
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-10-05
+> **最后更新**：2026-10-06
 > **状态**：生效中

@@ -21,7 +21,7 @@
 {
   "id": "uuid 或 taskId", // 任务卡特例：id = taskId，REPLACE upsert
   "sessionId": "default",
-  "type": "…", // 新分类法 8 值之一（3 分类，见下）
+  "type": "…", // 新分类法 9 值之一（3 分类，见下）
   "role": "agent", // 消息角色 "user"/"agent"（v26 新列，取代 user_/agent_ type 前缀）
   "content": "…", // 按 type 语义不同，见各卡
   "timestamp": 1790000000000,
@@ -31,10 +31,10 @@
 }
 ```
 
-`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`）——**3 分类 8 值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 免前缀，协议值禁 UI 容器词）：
+`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`；2026-10-06 扩第 9 值 `tool_browser`，browser-vnc 直播卡 spec §4）——**3 分类 9 值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 免前缀，协议值禁 UI 容器词）：
 
 - **content**：`text` · `image`
-- **tool**：`tool_chart` · `tool_html` · `tool_task` · `tool_image_edit`
+- **tool**：`tool_chart` · `tool_html` · `tool_task` · `tool_image_edit` · `tool_browser`
 - **data**：`data_media_results` · `data_optimize_candidates`
 
 多 part 消息的 type 取首 part 值；role 由独立列承载。legacy 13 值（`user_text`/`agent_text`/`user_image`/`user_image_text`/`agent_image`/`command`/`plan_preview`/`media_results`/`chart`/`html_card`/`agent_edit_result`/`optimize_candidates`/`task_card`）仅存于迁移源，经 `LegacyChatTypeMigration` 一次性转正（映射见 §0.2 末表）。
@@ -316,6 +316,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 抽卡候选条 | `data_optimize_candidates` | `GachaCandidateStrip` | 原生 | —（设计稿已随交付清理） | ✅ |
 | Agent 图片结果卡 | `image`（+ role=agent） | `ChatMessageItem` isImage 分支 | 原生 | —（跟随会话帧） | ✅ |
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
+| 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay` | 原生（base64 帧位图） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
 | 流式卡片占位/工具状态/失败 item | （流式瞬态，不落 Room） | 占位骨架 / `ToolStatusChip` / 失败态（i18n `chat_card_generate_failed`） | 原生 | — | ✅（M4 拍平三分流，见 §1.3） |
 | 日期分隔 | （列表装饰，非消息） | `ChatDateChip` | 原生 | `chat_date_chip` 438:335 | ✅ |
@@ -692,6 +693,60 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 **渲染组件**：`ChatMessageItem` isImage / isEditResult 分支（原生 Compose，Coil；`ChatImageLive` 判定存活）。媒体红线：不经 LLM 排版。
 **测试**：`ChatImageLiveTest` / `ChatImageRenderer*Test` / `ChatViewModelEditResultTest`。
 **parts 协议（✅ M1 已落地）**：`MessagePart.Image(partId, ref, saved=false)` 与 `MessagePart.EditResult(partId, ref?, description, suggestions?, saved?)`——Image 的 `ref`：user 图 = 内部存储路径（saved 恒缺省）、agent 图 = 结果图 URI（保存后 `"saved": true` 写出）；EditResult 的 `description` = content 列（**回灌唯一通道**），`ref` 为 null 时整键不写出（UI 落 legacy 兜底）。partsJson 实例见 §0.2 `image` / `tool_image_edit`。**回灌**（[PRIVACY] 媒体红线：图片本体不进上下文）——Image → 英文中性占位：user `[user sent an image]` / agent `[assistant generated an image]`（`toHistoryPair` 落 `("user"|"agent", 占位)`——role 升格后标注自消息级 role 列，保多轮回合结构）；EditResult → `TextMessage(ASSISTANT, description)`（只回灌文字说明，防多轮编辑上下文断裂；结果图/ref/suggestions 均不进）。**端到端**（EditResult）：`edit_image` tool_call（`*_delta` 相对调整带步进截断：美颜 ±10/亮度 ±15 等，绝对值不限幅）→ `ChatEditProcessor` Recipe 渲染 → `tool_image_edit` 行（图 + 说明 + suggestions）→ 气泡内结果图 + 建议条；agent Image 三来源：`adjust_image` / AI 优化 fallback / 抽卡「就用这张」行改写（见 §4.5）。**M4**：AGENT_IMAGE / AGENT_EDIT_RESULT 拍平走**整消息 legacy 直通**（contentType `legacy_message`，part=null——渲染器读 legacy 字段，见 §1.3 直通清单；user 图走 USER 整颗单 item，见 §3.1）。
+
+### 4.8 浏览器直播卡 `BrowserLiveCard`（tool_browser，2026-10-06 新增）
+
+云端浏览器会话的 INLINE 直播卡（browser-vnc 直播卡 spec §4；Android 首发定稿，iOS 走 ios-follow，视觉契约固化 `docs/08-UI-SPECS/screens/chat.yaml` §18）。
+
+**协议**：
+
+```jsonc
+// ① 入口：LLM tool_call（ChatToolService @Tool browser_* 七原子工具族）
+{
+  "name": "browser_open",
+  "arguments": { "url": "https://example.com" }
+}
+// 后续动作：browser_navigate / browser_click / browser_type / browser_extract /
+// browser_screenshot / browser_close（均带 sessionId；click/type 三模式定位 index>targetText>selector）
+
+// ② 落库：会话结束定格卡——content = BrowserLive part 整颗 JSON（metadata 留空）
+{
+  "id": "browser_1790000000000_1",
+  "type": "tool_browser",
+  "role": "agent",
+  "content": {
+    "type": "tool_browser",
+    "partId": "p0",
+    "sessionId": "9f3a…",
+    "state": "OUTPUT_AVAILABLE",       // 失败 OUTPUT_ERROR
+    "currentUrl": "https://example.com/",
+    "pageTitle": "Example Domain",
+    "frameJpegBase64": "/9j/4AAQ…",     // 最终帧（720p JPEG）
+    "actions": [                        // 最近 3 步动作流水，新在尾
+      { "description": "点击「价格」", "ok": true }
+    ],
+    "actionCount": 7,
+    "resultSummary": "浏览器会话已结束，共 7 个动作"
+  },
+  "modelUsed": "browser"
+}
+```
+
+**UI**：三层结构——头部行（页面标题 + URL + 三态状态字：running 前置 14dp spinner / done「共 N 步操作」/ failed，failed 用 error 色余者 onSurfaceVariant）+ 16:9 帧区（base64 后台解码位图，点按进全屏）+ 动作流水（≤3 行，失败行 error 色）；定格态隐藏 spinner 定格最终帧。会话中 watch 轮询 1s 仅 running 态、随组合离开取消（`LaunchedEffect(sessionId, running)`）。全屏预览 = `BrowserFramePreviewOverlay`（`ChatImagePreviewOverlay` 单页子集：base64 数据源 + 双指 1x~5x 缩放/拖动 + 关闭按钮 + BackHandler，不引入新交互）。槽位与其他卡片同（LazyColumn 统一 horizontal padding，卡自身不带外边距）；外层 12dp 全圆角无 token 档（四张 chat 卡硬编码现状，chat.yaml §18 注记）。
+**渲染组件**：`BrowserLiveCard` / `BrowserFramePreviewOverlay`（`components/BrowserLiveCard.kt`）+ `BrowserActionFormatter`（动作流水文案）；live 态 = `BrowserLiveOverlay.overlayLiveBrowserState`（shared，同 sessionId 原位覆写，形态与 `overlayLiveTaskState` 同构）+ ChatViewModel `_browserLiveSessions` 内存态（500ms sample 节流）；`data/remote/picme/BrowserSessionClient`（watch 轮询 frame / turn 结束兜底 close 直连）。
+**parts 协议（✅ 2026-10-06 已落地）**：`MessagePart.BrowserLive`——
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `partId` | String | 块级 id（流式占位 = `call-N`；落库定格卡 `p0`） |
+| `sessionId` | String | 云端浏览器会话 id（overlay 覆写锚） |
+| `state` | ToolPartState | 占位 `INPUT_STREAMING`（瞬态不落库）；定格 `OUTPUT_AVAILABLE` / 失败 `OUTPUT_ERROR` |
+| `currentUrl` / `pageTitle` | String | 头部行数据源 |
+| `frameJpegBase64` | String? | 最新帧（watch 轮询/动作响应更新；**帧永不回灌 LLM**，媒体红线同 Image） |
+| `actions` | List\<BrowserActionEntry\> | 最近动作流水（至多 3 条，新在尾；`description`+`ok`） |
+| `actionCount` / `resultSummary` / `errorReason` | Int / String? / String? | 定格统计与摘要 |
+
+**回灌**（`toModelInput`，toolCallId = `"<messageId>:<partId>"` 命名空间锚）→ `ToolCall(…, "browser_session", argsSummary="")` + `ToolResult(…, resultSummary ?: 失败原因 ?: 会话概览, isError = state==OUTPUT_ERROR)`——只回灌文本摘要，帧与动作流水不进上下文（token 保护；§0.3 硬约束①②④过线）。**端到端**：`browser_open` tool_call → `BrowserSessionCapability` → 网关 `/v1/browser/open`（wantFrame=true）→ xuxing bridge → 占位 part（`INPUT_STREAMING`）经 `BrowserLiveOverlay` 逐动作原位覆写 → `browser_close`/超时定格 → `emitBrowserCardMessage` 落 `tool_browser` 行（partsJson 由 `insertMessageWithParts` 自 content 现算，`MessagePartsConverter` 认 `tool_browser` 直通解码）→ 冷启动从 Room 恢复定格卡；降级不变式：任何一环失败退化为纯文本回答，不白屏。
 
 ### 4.7 流程卡：清理确认/完成 · 游客引导 · 写操作确认
 
