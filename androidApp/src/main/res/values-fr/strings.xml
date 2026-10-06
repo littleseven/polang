@@ -1554,6 +1554,18 @@
     <string name="html_card_preview_failed">Échec du rendu de l\'aperçu</string>
     <string name="html_fullpage_title_default">Détail de la carte</string>
     <string name="html_fullpage_load_failed">Échec du chargement du contenu</string>
+    <!-- Browser live card (VNC 直播卡：动作流水 + 会话状态) -->
+    <string name="browser_action_open">Ouvrir %1$s</string>
+    <string name="browser_action_navigate">Aller à %1$s</string>
+    <string name="browser_action_click">Appuyer sur %1$s</string>
+    <string name="browser_action_type">Saisir « %1$s »</string>
+    <string name="browser_action_extract">Lire le contenu de la page</string>
+    <string name="browser_action_screenshot">Prendre une capture</string>
+    <string name="browser_live_running">Navigation…</string>
+    <string name="browser_live_done_summary">Session de navigation terminée, %1$d actions</string>
+    <string name="browser_live_failed">Échec de la session de navigation</string>
+    <string name="browser_live_view_full">Appuyer pour voir en plein écran</string>
+    <string name="browser_live_title_default">Page web</string>
     <string name="chat_write_no_valid_ids">Aucun identifiant de média valide</string>
     <string name="chat_delete_started_pending">Suppression de %1$d élément(s) initiée, en attente de l\'autorisation du système</string>
     <string name="chat_deleted_n">%1$d élément(s) supprimé(s)</string>

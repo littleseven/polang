@@ -1594,6 +1594,18 @@
     <string name="html_card_preview_failed">预览渲染失败</string>
     <string name="html_fullpage_title_default">卡片详情</string>
     <string name="html_fullpage_load_failed">内容加载失败</string>
+    <!-- Browser live card (VNC 直播卡：动作流水 + 会话状态) -->
+    <string name="browser_action_open">打开 %1$s</string>
+    <string name="browser_action_navigate">跳转到 %1$s</string>
+    <string name="browser_action_click">点击 %1$s</string>
+    <string name="browser_action_type">输入「%1$s」</string>
+    <string name="browser_action_extract">读取页面内容</string>
+    <string name="browser_action_screenshot">截取画面</string>
+    <string name="browser_live_running">正在浏览…</string>
+    <string name="browser_live_done_summary">浏览器会话已完成，共 %1$d 步操作</string>
+    <string name="browser_live_failed">浏览器会话失败</string>
+    <string name="browser_live_view_full">点按全屏查看</string>
+    <string name="browser_live_title_default">网页</string>
     <string name="chat_write_no_valid_ids">没有有效的媒体 id</string>
     <string name="chat_delete_started_pending">已发起删除 %1$d 项，等待系统授权</string>
     <string name="chat_deleted_n">已删除 %1$d 项</string>
