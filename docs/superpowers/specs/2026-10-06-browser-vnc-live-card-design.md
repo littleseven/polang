@@ -1,0 +1,165 @@
+# Browser-VNC 云端浏览器直播卡 · 设计稿
+
+> **日期**：2026-10-06
+> **状态**：已定稿待实施
+> **范围**：M1 = bridge + 服务端网关 + App 工具闭环 + INLINE 直播卡（Android 首发，iOS 走 ios-follow）
+> **上位约束**：ADR-016（Chat parts 宪法）、`2026-09-28-chat-type-taxonomy-design.md`（type 分类法）、根 AGENTS.md 全局红线
+
+## 1. 背景与目标
+
+xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（Chrome 池，`/opt/browser-vnc`）。本设计让 App 端 Koog Agent 获得云端浏览器能力：Agent 执行需要浏览网页的任务时调用云端浏览器，**用户在 Chat 里看到「Agent 每操作一步、卡片画面更新一步」的直播卡**（Operator/Manus 风格 live view）。
+
+已确认的四个选型（2026-10-06 brainstorming）：
+
+| 决策点 | 结论 |
+|--------|------|
+| 核心场景 | Agent 云端浏览器直播（非用户手动远控、非纯无 UI 工具） |
+| 画面形态 | 抓帧回传原生渲染（动作驱动抓帧，非 noVNC/WebRTC/独立推流） |
+| 会话驱动 | App Agent 驱动（Koog 工具闭环经 picme-server 转发 xuxing） |
+| 平台范围 | Android 先行，iOS 走 ios-follow 管线对等 |
+
+## 2. 整体架构
+
+```
+┌─ App (Android 首发) ──────────────────────────────┐
+│ Koog Agent                                         │
+│  └─ BrowserToolService（新，仿 ChatToolService）     │
+│       └─ @Tool: browser_open / navigate / click /  │
+│                type / extract / screenshot / close │
+│  └─ BrowserSessionCapability（新，进 CapabilityRegistry）│
+│       └─ BrowserSessionClient（HTTP，commonMain）     │
+└──────────────┬─────────────────────────────────────┘
+               │ HTTPS + X-App-Token（现有认证）
+┌──────────────▼────────── picme-server (HK) ─────────┐
+│ BrowserRoute（新）：POST /v1/browser/{action}        │
+│  └─ BrowserPoolProxy：鉴权 → 配额检查 → 转发 → 回传   │
+└──────────────┬─────────────────────────────────────┘
+               │ 内网（tailscale；无则 HK→xuxing 直连 + IP 白名单）
+┌──────────────▼──── xuxing (北京) ───────────────────┐
+│ browser-agent-bridge（新增组件，单进程）              │
+│  ├─ 会话管理：从 browser-vnc 池分配 Chrome（fresh    │
+│  │   profile，会话结束销毁）                          │
+│  ├─ CDP 执行：navigate/click/type/extract            │
+│  └─ 抓帧：动作完成后 Page.captureScreenshot → JPEG   │
+│      （720p，质量 60，约 40-80KB/帧）随响应回传        │
+└──────────────────────────────────────────────────────┘
+```
+
+### 2.1 组件边界
+
+| 组件 | 位置 | 职责 | 依赖 |
+|------|------|------|------|
+| `BrowserToolService` | shared commonMain | Koog @Tool 表面，7 个原子工具，薄封装派发（仿 `ChatToolService`：@Tool 为 dispatchCommand 薄封装、参数不用 Kotlin 默认值、suspend） | CapabilityRegistry |
+| `BrowserSessionCapability` | shared commonMain | 命令 → HTTP 调用，结构化错误映射 | BrowserSessionClient |
+| `BrowserSessionClient` + 协议模型 | shared commonMain | 请求/响应 DTO（kotlinx.serialization），纯逻辑可测；HttpClient 经 `KoogHttpClientFactoryProvider` 分流 | expect HttpClient |
+| `BrowserRoute` + `BrowserPoolProxy` | server/ | 鉴权（X-App-Token）、配额、转发、30s 网关超时 | AppConfig 新增 xuxing 地址 + X-Bridge-Token |
+| `browser-agent-bridge` | `infra/browser-bridge/` 入仓，部署 xuxing | CDP 动作执行 + 抓帧 + 会话生命周期 | Chrome DevTools Protocol |
+| Chat 直播卡渲染 | androidApp | 新 part `tool_browser` 的 UI | ADR-016 状态机 |
+
+### 2.2 关键架构决策
+
+1. **工具粒度 = 7 个原子动作**（open/navigate/click/type/extract/screenshot/close）而非单个宏工具——LLM 自己规划步骤，每一步都有画面更新（方案 A 直播感来源），与现有工具风格一致。
+2. **bridge 用 CDP 而非 VNC 协议驱动浏览器**——VNC 池 Chrome 实例开 `--remote-debugging-port`，bridge 是旁路控制面，不动现有 8 个 VNC 单元（VNC 仍可用于人工调试）。
+3. **协议模型放 shared commonMain**——端云 DTO 同源（Monorepo 既定决策），iOS 跟随期零成本复用。
+4. **bridge 代码入仓 `infra/browser-bridge/`**——与 `infra/cloudflare/`、`infra/tencentscf/` 同级，systemd unit + 部署脚本随仓。
+5. **画面复用工具结果通道，零新增长连接**——不引入 WS/SSE 新通道；若后续实测过程感不足，动作通道不变、只加推流通道即平滑升级为推流方案，无返工。
+
+## 3. 数据流
+
+以「帮我查 XX 手机最新价格」为例：
+
+```
+1. 用户消息 → Koog Agent 规划 → 决定调 browser_open(url)
+2. @Tool browser_open → BrowserSessionCapability → POST /v1/browser/open
+   → bridge 分配 Chrome（fresh profile）→ CDP 导航 → 抓帧
+   → 返回 { sessionId, status, currentUrl, pageTitle, frameJpegBase64, actionMs }
+3. 工具结果分流：llmPayload（文本摘要）回灌 LLM；
+   uiPayload（帧 + 元数据）走占位 part 原位填充（M2 已有机制，draw_chart/render_html 同款）
+4. Agent 继续调 browser_click / extract / …（每个动作重复 2-3，画面逐步更新）
+5. browser_close 或会话超时 → bridge 销毁 profile，卡片定格最终帧 + 结果摘要
+```
+
+### 3.1 响应双载荷（token 保护）
+
+工具响应分两段：**`llmPayload`**（URL/标题/页面文本摘要，回灌 LLM）与 **`uiPayload`**（帧 + 元数据，只走 UI part）。帧**不进 LLM 上下文**——遵 ADR-016「data part 默认不回灌」，避免一次浏览任务烧掉几十万 token。
+
+### 3.2 流量预算
+
+720p 质量 60 JPEG ≈ 40-80KB/帧；一次任务按 10 个动作计 ≈ 0.5-1MB。用户已确认可接受。
+
+## 4. Chat 直播卡（新 part `tool_browser`）
+
+type 分类法 spec（`2026-09-28-chat-type-taxonomy-design.md`）tool 类扩 1 值：8 值 → 9 值。
+
+| PartState | 卡片表现 | 持久化 |
+|-----------|----------|--------|
+| `INPUT_STREAMING` / `RUNNING` | 占位卡：浏览器图标 + 当前动作描述（「正在打开 example.com…」）+ 最新帧（如有） | 不落库（瞬态，同 M2 占位 parts 口径） |
+| `OUTPUT_AVAILABLE` | 直播卡：最新帧大图 + 页面标题/URL + **最近 3 步动作流水**（如 点击"价格" → 输入"iPhone 17" → 提取结果） | 会话结束落：最终帧缩略图 + 结果摘要 + 动作计数 |
+| `OUTPUT_ERROR` | 错误卡：失败原因 + 已完成步骤数 | 落库（供重试/排查） |
+
+- M1 只有 INLINE 形态；点按帧全屏查看复用现有全屏查看器模式。不做接管输入（方案 A 决策，接管属 M2+ 候选）。
+- 流式走 M2 既有管线（`TurnStreamEvent` 工具五事件 + `TurnPartsReducer` 占位原位填充），browser 工具只是新增一个类型化占位，**不动管线主干**。
+- 卡片渲染须走 ui-parity-guard 闭环（spec → token → 截图），iOS 跟随期由 ios-follow 管线对等。
+
+## 5. 会话生命周期（bridge 侧状态机）
+
+```
+Idle → Allocated(open) → Active(navigate/click/...) → Closing(close/超时) → Destroyed
+              │
+              └─ 池满 → PoolExhausted（结构化错误，Agent 降级纯文本回答）
+```
+
+- 空闲 2 分钟无动作 → 自动 Closing；硬上限 10 分钟强制回收。
+- App 进程死亡/断网：服务端超时兜底回收，不依赖客户端 close。
+
+## 6. 错误处理（分层，每层结构化可枚举）
+
+| 层 | 故障 | 表现 |
+|----|------|------|
+| bridge/CDP | 页面加载超时（15s）、元素未找到、Chrome 崩溃 | 工具返回 `{status:"action_failed", reason, lastGoodFrame}`——带最后一张好帧，卡片定格并标注失败步骤，Agent 可重试或换策略 |
+| bridge 会话 | 池满、会话已销毁 | 结构化错误码 `pool_exhausted` / `session_expired`，Agent 降级纯文本回答并告知「浏览器资源忙，稍后再试」 |
+| picme-server | xuxing 不可达 | 网关 30s 超时 → 统一错误码 `browser_unavailable`，同上降级；**不计用户额度** |
+| App | HTTP 失败/断网 | 复用现有远程推理失败处理（工具异常 → Koog 捕获 → Agent 致歉降级） |
+
+原则：**browser 能力整体可降级**——任何一环失败，体验退化为「没有直播卡的普通文本回答」，绝不白屏/卡死。
+
+## 7. 配额
+
+池仅 8 单元，稀缺资源：
+
+- per-user 并发 = 1（picme-server 内存态登记，重启即清，不落库）。
+- 单用户每日 20 会话（存 `server_setting` 可配，管理后台可改），超额返回 `quota_exceeded`。
+- 与 LLM token 额度体系解耦（browser 成本是机器资源）；管理后台「概览」加 browser 会话统计（当日数/活跃数/失败率）。
+
+## 8. 隐私与安全
+
+- [PRIVACY] 红线不触碰：帧是网页内容截图，非用户相册媒体；**卡片帧不进遥测、不进问题上报附件**。
+- M1 全部 fresh profile：无登录态、不持久 cookie、会话销毁即清空。登录态会话是 M2+ 的显式决策，本期不做。
+- bridge 只监听内网网卡（tailscale IP），不暴露公网；picme-server → bridge 带共享密钥 `X-Bridge-Token`（server.env / bridge env 双端配置）。
+- 目标 URL 校验：bridge 拒绝内网地址段（10/8、172.16/12、192.168/16、127/8、169.254/16 等），防 SSRF 借浏览器打内网。
+
+## 9. 测试策略
+
+| 层 | 测试 | 位置 |
+|----|------|------|
+| 协议模型 | DTO 序列化 round-trip、错误码枚举穷尽 | shared commonTest |
+| Capability | mock HttpClient 验证请求组装 + 错误映射 | shared commonTest |
+| 服务端 | BrowserRoute 鉴权/配额/超时（Ktor test，bridge 用 fake） | server/src/test |
+| bridge | CDP 动作执行 + 抓帧（真实 headless Chrome 集成测试，手跑） | infra/browser-bridge/tests |
+| 卡片 UI | part 状态机 reducer 用例（占位→填充→定格） | shared commonTest + androidApp |
+| 端到端 | 真机闭环：chat 发指令 → 直播卡逐步更新 → 结果落库 | dev-loop 脚本 |
+
+验证门槛沿用现有口径：`JITPACK=true ./gradlew :shared:assemble` + `:shared:jvmTest`；服务端 `./gradlew -p server build`；Android 端走 android-build-debug/dev-loop 闭环。
+
+## 10. 分期
+
+- **M1（本 spec 全部内容）**：bridge + 服务端网关 + App 工具闭环 + INLINE 直播卡。
+- **M2 候选（不在本 spec）**：全屏查看器增强、登录态会话、动作密度不足时升级独立推流通道、iOS 跟随。
+
+## 11. 交付审计对应
+
+- [ ] 新代码遵循 Agent First 原则（显式注入 / 枚举状态 / DTO 自描述 / 结构化错误码）
+- [ ] type 分类法 spec 同步扩值（8→9）
+- [ ] `server/AGENTS.md` 路由清单 + `shared/AGENTS.md` 组件表同步
+- [ ] 满足 [PRIVACY]（帧不出遥测/上报）、[I18N]（卡片文案五语）、[PARITY]（卡片固化 spec 供 iOS 跟随）红线
+- [ ] 闭环验证（编译/真机 dev-loop）通过
