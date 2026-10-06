@@ -8,3 +8,5 @@ CREATE TABLE IF NOT EXISTS browser_sessions (
     ended_at BIGINT NULL,
     outcome VARCHAR(16) NULL
 );
+CREATE INDEX IF NOT EXISTS idx_browser_sessions_session_id ON browser_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_browser_sessions_started_at ON browser_sessions(started_at);

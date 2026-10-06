@@ -967,7 +967,7 @@ git commit -m "feat(bridge): HTTP 服务（时序安全 token + 超时加固）+
 - Modify: `server/.env.example`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/ratelimit/RateLimiterTest.kt`（若已存在则追加用例）
 
-- [ ] **Step 1: AppConfig 加三个字段**
+- [x] **Step 1: AppConfig 加三个字段**
 
 data class 字段区（仿 :52-59 渠道段分组注释）追加：
 
@@ -988,7 +988,7 @@ browserDailyQuota = envInt("BROWSER_DAILY_QUOTA", 20),
 
 > `browserBridgeUrl` 默认空串 = 未配置 → 路由返回 503 `browser_unavailable`（spec §6 降级路径）。
 
-- [ ] **Step 2: `.env.example` 追加**
+- [x] **Step 2: `.env.example` 追加**
 
 ```bash
 # Browser bridge（xuxing headless Chromium 桥；留空 = browser 能力禁用，路由 503 降级）
@@ -997,7 +997,7 @@ BROWSER_BRIDGE_TOKEN=
 BROWSER_DAILY_QUOTA=20
 ```
 
-- [ ] **Step 3: RateLimiter 加 peek（不记录的检查）+ 可配 limit provider**
+- [x] **Step 3: RateLimiter 加 peek（不记录的检查）+ 可配 limit provider**
 
 读现有 `ratelimit/RateLimiter.kt`（约 26 行），改造为（保持既有 `RateLimiter(maxRequests: Int, windowMs: Long = 60_000L)` 构造签名兼容，委托到 provider 主构造）。**落地实态（2026-10-06）**：provider 主构造为 **public**（private 会让 Task 7 的 `RateLimiter({ SettingsService.snapshot().browserDailyQuota }, ...)` 热配形态不可调用）；Int 次构造保留 `windowMs` 默认值（`Application.kt` 有一参调用）；`prune` 在 `synchronized(entry)` 内调用，锁语义与原实现完全一致：
 
@@ -1038,7 +1038,7 @@ class RateLimiter(
 
 > 执行注意：落地以现有实现为准做最小改动，保留原类注释（含「不适用多实例部署」）与 per-entry `synchronized(entry)` 锁结构，只新增 `peek` 与 provider 委托构造。
 
-- [ ] **Step 4: 测试（新建或追加 RateLimiterTest）**
+- [x] **Step 4: 测试（新建或追加 RateLimiterTest）**
 
 ```kotlin
 package com.mamba.picme.server.ratelimit
@@ -1061,7 +1061,7 @@ class RateLimiterPeekTest {
 }
 ```
 
-- [ ] **Step 5: 跑测试 + commit**
+- [x] **Step 5: 跑测试 + commit**
 
 Run: `./gradlew -p server test --tests "*RateLimiter*"`
 Expected: PASS
@@ -1079,7 +1079,7 @@ git commit -m "feat(server): browser 配额基础——AppConfig 三项 + RateLi
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminRoutes.kt`（settings POST 参数）
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminViews.kt`（settings 表单输入框）
 
-- [ ] **Step 1: SettingsService 五处改动**（先例路径见 explore：`SettingsService.kt:19-20/22/25/37-53`）
+- [x] **Step 1: SettingsService 五处改动**（先例路径见 explore：`SettingsService.kt:19-20/22/25/37-53`）
 
 ```kotlin
 const val KEY_BROWSER_DAILY = "browser_daily_quota"
@@ -1089,7 +1089,7 @@ const val KEY_BROWSER_DAILY = "browser_daily_quota"
 - `readAll()` 加该 key 读取，缺省 `?: 20`；
 - `update()` 签名加 `browserDailyQuota: Int? = null`（null = 不改），非空时写库 + 刷新快照。
 
-- [ ] **Step 2: Migrations seed**
+- [x] **Step 2: Migrations seed**
 
 `db/Migrations.kt` `seedSettings`（:175-181 区域）加：
 
@@ -1099,7 +1099,7 @@ seedIfAbsent(SettingsService.KEY_BROWSER_DAILY, config.browserDailyQuota.toStrin
 
 > 对照现有 `seedIfAbsent` 签名（:183-192）传参；若现有 seed 值存 Int 转 String 形式不同，按现状对齐。
 
-- [ ] **Step 3: AdminRoutes settings 表单**
+- [x] **Step 3: AdminRoutes settings 表单**
 
 `POST /admin/settings`（:258-277）解析段加：
 
@@ -1109,11 +1109,11 @@ val browserDaily = params["browser_daily_quota"]?.toIntOrNull()
 
 并传给 `SettingsService.update(..., browserDailyQuota = browserDaily)`。
 
-- [ ] **Step 4: AdminViews settings 页**
+- [x] **Step 4: AdminViews settings 页**
 
 在现有 free/guest 额度输入框同款区块后加一行（label「Browser 每日会话配额」，`name="browser_daily_quota"`，value 取 `SettingsService.snapshot().browserDailyQuota`）。
 
-- [ ] **Step 5: 编译 + 相关测试 + commit**
+- [x] **Step 5: 编译 + 相关测试 + commit**
 
 Run: `./gradlew -p server build`
 Expected: BUILD SUCCESSFUL（现有 AdminRoutesTest/AdminViewsTest 若因 Snapshot 构造参数增加而编译失败，同步补默认参数值）
@@ -1152,7 +1152,7 @@ class BrowserConcurrencyRegistryTest {
         assertTrue(reg.tryAcquire("u1", now = 1_000L))
         assertFalse(reg.tryAcquire("u1", now = 2_000L))  // 同用户冲突
         assertTrue(reg.tryAcquire("u2", now = 2_000L))   // 不同用户互不影响
-        reg.release("u1")
+        reg.release("u1")                                 // 未 bind，走 null 清理路径
         assertTrue(reg.tryAcquire("u1", now = 3_000L))
     }
 
@@ -1170,8 +1170,50 @@ class BrowserConcurrencyRegistryTest {
         reg.tryAcquire("u1", now = 1_000L)
         reg.bind("u1", "sess-1")
         assertEquals(1, reg.activeCount())
-        reg.release("u1")
+        reg.release("u1", "sess-1")
         assertEquals(0, reg.activeCount())
+    }
+
+    @Test
+    fun `release on non-existent owner is no-op`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        reg.release("ghost")            // 不抛异常
+        reg.release("ghost", "sess-x")  // 条件路径同样不抛
+        assertEquals(0, reg.activeCount())
+        assertTrue(reg.tryAcquire("u1", now = 1_000L))
+    }
+
+    @Test
+    fun `conditional release only evicts matching session`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        reg.tryAcquire("u1", now = 1_000L)
+        reg.bind("u1", "sess-new")
+        reg.release("u1", "sess-stale") // 旧请求的出错路径 release，不匹配则保留
+        assertFalse(reg.tryAcquire("u1", now = 2_000L))
+        reg.release("u1", "sess-new")
+        assertTrue(reg.tryAcquire("u1", now = 3_000L))
+    }
+
+    @Test
+    fun `bind refreshes lease clock`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        reg.tryAcquire("u1", now = 1_000L)
+        reg.bind("u1", "sess-1") // bind 内部用 System.currentTimeMillis() 刷新租约时钟
+        // 以 bind 时刻为基准留 1s 余量：59s 内仍占坑（若时钟未刷新，按 1000L 起算早被清扫），61s 后被清扫
+        val bindNow = System.currentTimeMillis()
+        assertFalse(reg.tryAcquire("u1", now = bindNow + 59_000L))
+        assertTrue(reg.tryAcquire("u1", now = bindNow + 61_000L))
+    }
+
+    @Test
+    fun `sweep evicts expired only, keeps fresh`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        assertTrue(reg.tryAcquire("u1", now = 1_000L))
+        assertTrue(reg.tryAcquire("u2", now = 50_000L))
+        // 62s：u1 过期被清扫，u2（50s 获取，仅过 12s）仍占坑
+        assertTrue(reg.tryAcquire("u1", now = 62_000L))
+        assertFalse(reg.tryAcquire("u2", now = 62_000L))
+        assertTrue(reg.tryAcquire("u3", now = 62_000L)) // 清扫正常，第三人可进
     }
 }
 ```
@@ -1210,8 +1252,14 @@ class BrowserConcurrencyRegistry(private val leaseMs: Long = 15 * 60_000L) {
         leases[owner] = Lease(sessionId, System.currentTimeMillis())
     }
 
-    fun release(owner: String) {
-        leases.remove(owner)
+    /**
+     * 条件释放：sessionId 为 null（清理路径）或与现存租约的 sessionId 匹配时才移除；
+     * 防止过期请求的出错路径 release 误删刚被重新获取的新租约。
+     */
+    fun release(owner: String, sessionId: String? = null) {
+        leases.computeIfPresent(owner) { _, lease ->
+            if (sessionId == null || lease.sessionId == sessionId) null else lease
+        }
     }
 
     fun activeCount(): Int = leases.size
@@ -1240,13 +1288,16 @@ import io.ktor.http.contentType
  * xuxing browser-agent-bridge 的 HTTP 客户端（spec §2）：
  * 域名结果由 bridge 以 JSON status 承载，本类只做透传 + X-Bridge-Token 注入；
  * 网络异常抛给调用方（路由层统一映射 503 browser_unavailable）。
+ *
+ * 响应体所有权：调用方在每条路径（含非 2xx / 错误路径）都必须消费响应体
+ * （bodyAsText）或取消响应，否则连接不会归还连接池，最终耗尽。
  */
 class BrowserBridgeClient(
     private val httpClient: HttpClient,
     private val baseUrl: String,
     private val bridgeToken: String,
 ) {
-    val available: Boolean get() = baseUrl.isNotBlank()
+    val available: Boolean get() = baseUrl.isNotBlank() && bridgeToken.isNotBlank()
 
     suspend fun open(body: String): HttpResponse = post("$baseUrl/session", body)
 
@@ -1281,6 +1332,11 @@ object BrowserSessions : Table("browser_sessions") {
     val endedAt = long("ended_at").nullable()
     val outcome = varchar("outcome", 16).nullable() // closed / expired
     override val primaryKey = PrimaryKey(id)
+
+    init {
+        index(isUnique = false, sessionId) // recordClose 按 session_id 定位
+        index(isUnique = false, startedAt) // 概览按时间聚合
+    }
 }
 ```
 
@@ -1290,17 +1346,20 @@ object BrowserSessions : Table("browser_sessions") {
 package com.mamba.picme.server.browser
 
 import com.mamba.picme.server.db.BrowserSessions
+import com.mamba.picme.server.db.Db
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
 
 /** browser 会话统计落库（spec §7 管理后台「概览」数据源）。 */
 class BrowserSessionStats {
 
-    fun recordOpen(tokenHash: String, sessionId: String, now: Long = System.currentTimeMillis()) {
-        transaction {
+    suspend fun recordOpen(tokenHash: String, sessionId: String, now: Long = System.currentTimeMillis()) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
             BrowserSessions.insert {
                 it[BrowserSessions.tokenHash] = tokenHash
                 it[BrowserSessions.sessionId] = sessionId
@@ -1309,8 +1368,8 @@ class BrowserSessionStats {
         }
     }
 
-    fun recordClose(sessionId: String, outcome: String, now: Long = System.currentTimeMillis()) {
-        transaction {
+    suspend fun recordClose(sessionId: String, outcome: String, now: Long = System.currentTimeMillis()) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
             BrowserSessions.update({ (BrowserSessions.sessionId eq sessionId) and BrowserSessions.endedAt.isNull() }) {
                 it[endedAt] = now
                 it[BrowserSessions.outcome] = outcome
@@ -1335,6 +1394,8 @@ CREATE TABLE IF NOT EXISTS browser_sessions (
     ended_at BIGINT NULL,
     outcome VARCHAR(16) NULL
 );
+CREATE INDEX IF NOT EXISTS idx_browser_sessions_session_id ON browser_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_browser_sessions_started_at ON browser_sessions(started_at);
 ```
 
 - [ ] **Step 4: 跑测试 + commit**
@@ -1539,7 +1600,7 @@ fun Route.browserRoute(
         }
         val payload = upstream.bodyAsText()
         if (payload.contains("\"status\":\"session_expired\"")) {
-            concurrency.release(owner)
+            concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
             stats.recordClose(sessionId, "expired")
         }
         call.respondText(payload, ContentType.Application.Json, upstream.status)
@@ -1579,7 +1640,7 @@ fun Route.browserRoute(
             call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to "browser_unavailable"))
             return@post
         }
-        concurrency.release(owner)
+        concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
         stats.recordClose(sessionId, "closed")
         call.respondText(upstream.bodyAsText(), ContentType.Application.Json, upstream.status)
     }
@@ -1604,7 +1665,7 @@ private fun probeField(payload: String, field: String): String? =
         ?.takeIf { field == "sessionId" }
 ```
 
-> 执行注意：①`call.ownerTokenHash()` 若在 `ClaudeChatRoute.kt` 是 file-private，把其实现（:146-151）复制到本文件；②`probeField` 仅支持 sessionId（M1 唯一需要），按上式实现即可；③测试辅助里的鉴权拦截器要与 `IssueReportRouteTest` 同形注入 `TokenHashKey`。
+> 执行注意：①`call.ownerTokenHash()` 若在 `ClaudeChatRoute.kt` 是 file-private，把其实现（:146-151）复制到本文件；②`probeField` 仅支持 sessionId（M1 唯一需要），按上式实现即可；③测试辅助里的鉴权拦截器要与 `IssueReportRouteTest` 同形注入 `TokenHashKey`；④`stats.recordOpen/recordClose` 为 suspend（Task 6 挂起事务化），在路由 handler 内直接调用即可；⑤open 路径两处 `release(owner)`（异常/非 ok）保持 null 清理形态——租约尚未 bind；action/close 路径用 `release(owner, sessionId)` 条件形态。
 
 - [ ] **Step 4: Application.kt 装配**
 

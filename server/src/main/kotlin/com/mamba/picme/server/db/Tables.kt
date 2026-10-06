@@ -173,6 +173,11 @@ object BrowserSessions : Table("browser_sessions") {
     val endedAt = long("ended_at").nullable()
     val outcome = varchar("outcome", 16).nullable() // closed / expired
     override val primaryKey = PrimaryKey(id)
+
+    init {
+        index(isUnique = false, sessionId) // recordClose 按 session_id 定位
+        index(isUnique = false, startedAt) // 概览按时间聚合
+    }
 }
 
 // ── AI 工程师模式账号白名单（空表 = 可诊断但不可交付代码；命中邮箱才放行写链路）──

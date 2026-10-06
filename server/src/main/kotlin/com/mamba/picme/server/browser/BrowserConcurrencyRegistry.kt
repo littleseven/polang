@@ -22,8 +22,14 @@ class BrowserConcurrencyRegistry(private val leaseMs: Long = 15 * 60_000L) {
         leases[owner] = Lease(sessionId, System.currentTimeMillis())
     }
 
-    fun release(owner: String) {
-        leases.remove(owner)
+    /**
+     * 条件释放：sessionId 为 null（清理路径）或与现存租约的 sessionId 匹配时才移除；
+     * 防止过期请求的出错路径 release 误删刚被重新获取的新租约。
+     */
+    fun release(owner: String, sessionId: String? = null) {
+        leases.computeIfPresent(owner) { _, lease ->
+            if (sessionId == null || lease.sessionId == sessionId) null else lease
+        }
     }
 
     fun activeCount(): Int = leases.size

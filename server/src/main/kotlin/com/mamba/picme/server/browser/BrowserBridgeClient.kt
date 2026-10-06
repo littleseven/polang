@@ -13,13 +13,16 @@ import io.ktor.http.contentType
  * xuxing browser-agent-bridge 的 HTTP 客户端（spec §2）：
  * 域名结果由 bridge 以 JSON status 承载，本类只做透传 + X-Bridge-Token 注入；
  * 网络异常抛给调用方（路由层统一映射 503 browser_unavailable）。
+ *
+ * 响应体所有权：调用方在每条路径（含非 2xx / 错误路径）都必须消费响应体
+ * （bodyAsText）或取消响应，否则连接不会归还连接池，最终耗尽。
  */
 class BrowserBridgeClient(
     private val httpClient: HttpClient,
     private val baseUrl: String,
     private val bridgeToken: String,
 ) {
-    val available: Boolean get() = baseUrl.isNotBlank()
+    val available: Boolean get() = baseUrl.isNotBlank() && bridgeToken.isNotBlank()
 
     suspend fun open(body: String): HttpResponse = post("$baseUrl/session", body)
 
