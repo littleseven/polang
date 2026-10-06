@@ -6,7 +6,10 @@ import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
 import com.mamba.picme.domain.browser.BrowserStatus
 import com.mamba.picme.domain.browser.BrowserUnavailableException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -73,9 +76,13 @@ class BrowserSessionClient(
             .apply { deviceIdProvider()?.let { header("X-Device-Id", it) } }
     }
 
-    private fun execute(request: Request): String {
+    private suspend fun execute(request: Request): String {
         try {
-            client.newCall(request).execute().use { resp ->
+            val call = client.newCall(request)
+            // 阻塞 execute() 不响应协程取消：协程结束（含 dispatch 层超时取消）时 cancel 打断阻塞读，
+            // 避免 IO 线程+连接残留到 readTimeout 35s（对齐 ClaudeChatClient.chat 先例）
+            currentCoroutineContext().job.invokeOnCompletion { call.cancel() }
+            call.execute().use { resp ->
                 val body = resp.body?.string().orEmpty()
                 if (resp.code == HTTP_TOO_MANY_REQUESTS) {
                     // 网关 429 = 每日配额耗尽（body 为 {"error":"quota_exceeded",...} JSON，
@@ -88,6 +95,10 @@ class BrowserSessionClient(
                 if (!resp.isSuccessful) throw BrowserUnavailableException("HTTP ${resp.code}")
                 return body
             }
+        } catch (e: CancellationException) {
+            // 钉住穿透不变式：BrowserSessionCapability 依赖 CE 原样上抛（CommandExecutor 超时取消），
+            // 不许被下面的 catch-all 折叠成 BrowserUnavailableException
+            throw e
         } catch (e: BrowserUnavailableException) {
             throw e
         } catch (e: Exception) {
