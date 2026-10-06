@@ -2973,7 +2973,7 @@ git commit -m "feat(app): 注册 BrowserSessionCapability（组合根注入 OkHt
 - Modify: `androidApp/src/main/java/com/mamba/picme/domain/usecase/AiAgentUseCase.kt`（Step 0）
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/common/chat/AgentChatComponents.kt`（Step 0）
 
-- [ ] **Step 0: 补齐 AgentCommand 穷尽 when（Task 10 新增 7 子类的编译红收口）**
+- [x] **Step 0: 补齐 AgentCommand 穷尽 when（Task 10 新增 7 子类的编译红收口）**
 
 Task 10 在 shared 侧新增 7 个 `AgentCommand.Browser*` sealed 子类后，androidApp 两处无 else 的穷尽 when 编译失败（`:androidApp:compileDebugKotlin` 红），本 Step 显式认领：
 
@@ -2982,7 +2982,7 @@ Task 10 在 shared 侧新增 7 个 `AgentCommand.Browser*` sealed 子类后，an
 
 > 来源：Task 12 审查发现（这两处 when 不在任何 Task 文件清单内，红窗会从 Task 10 拖到 Task 20）。本 Step 完成后 `:androidApp:compileDebugKotlin` 必须恢复可编译（Task 15 的 PoLangApplication 注册缺失除外——若 Step 0 先于 Task 15 执行，capability 未注册不阻塞编译）。
 
-- [ ] **Step 1: VM 实现 BrowserSessionDelegate + live 态 StateFlow**
+- [x] **Step 1: VM 实现 BrowserSessionDelegate + live 态 StateFlow**
 
 ```kotlin
 // 字段区（仿 _engineerTasks 节流组合先例 :1158-1160）
@@ -3048,7 +3048,7 @@ override fun onBrowserSessionClosed(sessionId: String, finalFrameJpegBase64: Str
 
 > 执行注意：①`feedToolOutput`/`feedToolError` 的精确签名以 `ChatViewModel.kt:1117-1140` 现状为准（上式 lambda 形态对照 `emitHtmlCardMessage` 的用法 :2652-2654 对齐）；②VM 拿 `BrowserSessionCapability` 单例的方式——组合根注册的是 `BrowserSessionCapability(transport)` 构造实例，VM 侧从 `CapabilityRegistry.getInstance()` 按 name 反查或经组合根静态引用暴露，落地时选与 `ChatRunScriptCapability.getInstance()` 一致的暴露形态（若采用 companion 单例，Task 10 的类需补 `getInstance(transport)` 懒单例——以第一次构造为准缓存）；③`getString` = `context.getString`（VM 持有 Application context 的先例见 `ChatImageRenderer.kt:107`）；④`formatBrowserAction` 在 Task 17 定义。
 
-- [ ] **Step 2: displayMessages combine 接入 overlay**
+- [x] **Step 2: displayMessages combine 接入 overlay**
 
 `displayMessages`（:1165-1176）combine 增加 browser live 流（仿 `throttledEngineerTasks` 500ms 节流、首值直通）：
 
@@ -3061,7 +3061,7 @@ msg.overlayLiveTaskState(liveTasks).overlayLiveBrowserState(liveBrowser)
 
 并把 `flattenChatItems` 调用点（Task 13 Step 5 的新签名）的 `persistedBrowserSessionIds` 参数传：`_messages` 中 `type == "tool_browser"` 行 decode 出的 BrowserLive part 的 sessionId 集合（组装位置仿 chart/html payloads 集合的现有构建点）。
 
-- [ ] **Step 3: emitBrowserCardMessage（持久化定格卡）**
+- [x] **Step 3: emitBrowserCardMessage（持久化定格卡）**
 
 仿 `emitHtmlCardMessage`（:2632-2655）：
 
@@ -3087,7 +3087,7 @@ private val browserPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = 
 
 > 执行注意：`insertMessageWithParts` 的精确签名以 `data/local/ChatMessageParts.kt:50-51` 现状为准。
 
-- [ ] **Step 4: watch 模式帧轮询入口（供卡片 LaunchedEffect 调用）**
+- [x] **Step 4: watch 模式帧轮询入口（供卡片 LaunchedEffect 调用）**
 
 ```kotlin
 /** 卡片可见期间由 UI 以 ~1s 节拍驱动（spec §2.2 watch 模式）；不可见/退组合自动停止。 */
@@ -3107,13 +3107,13 @@ fun pollBrowserFrame(sessionId: String) {
 
 > 执行注意：`browserTransportOrNull()` = 从 capability 单例取 transport（Task 15 注册的实例）；若单例不可达 transport，VM 字段缓存在 setDelegate 时一并注入。
 
-- [ ] **Step 5: 卡片工具排除名单 + turn 结束兜底**
+- [x] **Step 5: 卡片工具排除名单 + turn 结束兜底**
 
 `ChatViewModel.kt:1824-1827` 的 `_pendingNonCardTool` 判定名单（卡片工具归 null）加入全部 7 个 `browser_*` 工具名（动作进度已由直播卡表达，不再出状态 chip）。
 
 turn 结束兜底（streaming message DONE 的收口点，找现有 turn 完成钩子）：对 `_browserLiveSessions` 里仍 `state != OUTPUT_AVAILABLE && != OUTPUT_ERROR` 的会话，逐个 `transport.close(sessionId)` 后按 `onBrowserSessionClosed` 同路径定格落库（LLM 忘调 browser_close 时防服务器会话泄漏 + 卡片有终态）；全部处理完后清空 `_browserLiveSessions`（终态卡已落库，新 turn 的流式消息不再含旧占位 part）。
 
-- [ ] **Step 6: 编译 + commit**
+- [x] **Step 6: 编译 + commit**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL

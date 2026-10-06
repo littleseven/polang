@@ -2907,6 +2907,8 @@ class ChatViewModel(
             val current = sessions[sessionId] ?: return@update sessions
             sessions + (sessionId to current.copy(state = ToolPartState.OUTPUT_ERROR, errorReason = reason))
         }
+        // 有意不做门控：unknown session（live 态已被 settle 移除）时错误仍进流式轨，
+        // 让失败在工具调用链上留痕（对 oldest pending 通常 no-op，无视觉副作用）。
         viewModelScope.launch { feedToolError(TurnPartsReducer.TOOL_BROWSER_OPEN, reason) }
     }
 
