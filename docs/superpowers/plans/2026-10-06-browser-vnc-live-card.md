@@ -74,6 +74,7 @@
 
 module.exports = {
   port: parseInt(process.env.BRIDGE_PORT || '8788', 10),
+  bind: process.env.BRIDGE_BIND || '0.0.0.0',
   token: process.env.BRIDGE_TOKEN || '',
   // 空串 = playwright 自带 chromium（postinstall 已装）；自定义 Chrome 路径可覆盖
   chromePath: process.env.CHROME_PATH || '',
@@ -269,7 +270,7 @@ git commit -m "feat(bridge): 骨架 + OpenMuse 级 SSRF 守卫（单播许可名
 - Create: `infra/browser-bridge/src/sessions.js`
 - Test: `infra/browser-bridge/test/sessions.test.js`
 
-- [ ] **Step 1: 写失败测试（生命周期/配额/串行/三模式定位/元素提取，Playwright 以 fake browserProvider 注入）**
+- [x] **Step 1: 写失败测试（生命周期/配额/串行/三模式定位/元素提取，Playwright 以 fake browserProvider 注入）**
 
 ```js
 'use strict';
@@ -382,12 +383,12 @@ test('reap closes idle sessions', async () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd infra/browser-bridge && npm test`
 Expected: FAIL（`Cannot find module '../src/sessions'`）
 
-- [ ] **Step 3: 实现 `src/sessions.js`**
+- [x] **Step 3: 实现 `src/sessions.js`**
 
 ```js
 'use strict';
@@ -665,7 +666,7 @@ git commit -m "feat(bridge): SessionManager——Playwright 共享 browser/临�
 - Create: `infra/browser-bridge/.env.example`
 - Create: `infra/browser-bridge/README.md`
 
-- [ ] **Step 1: 写 `src/server.js`**（token 时序安全比较 + 服务加固，借鉴 openmuse `apps/worker/src/server.ts`）
+- [x] **Step 1: 写 `src/server.js`**（token 时序安全比较 + 服务加固，借鉴 openmuse `apps/worker/src/server.ts`）
 
 ```js
 'use strict';
@@ -804,12 +805,12 @@ server.keepAliveTimeout = 5_000;
 
 setInterval(() => { manager.reap().catch(() => {}); }, 30_000).unref();
 
-server.listen(config.port, '0.0.0.0', () => {
-  console.log(`browser-agent-bridge listening on :${config.port}`);
+server.listen(config.port, config.bind, () => {
+  console.log(`browser-agent-bridge listening on ${config.bind}:${config.port}`);
 });
 ```
 
-- [ ] **Step 2: 本地冒烟（playwright postinstall 已装 chromium；无显示环境不影响 headless）**
+- [x] **Step 2: 本地冒烟（playwright postinstall 已装 chromium；无显示环境不影响 headless）**
 
 ```bash
 cd infra/browser-bridge
@@ -831,12 +832,14 @@ curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/js
 kill %1
 ```
 
-- [ ] **Step 3: 写部署件**
+- [x] **Step 3: 写部署件**
 
 `infra/browser-bridge/.env.example`：
 
 ```bash
 BRIDGE_PORT=8788
+# 生产设为 tailscale 网卡 IP，缺省 0.0.0.0 仅开发用
+BRIDGE_BIND=
 BRIDGE_TOKEN=change-me-shared-with-picme-server
 CHROME_PATH=
 MAX_SESSIONS=8
@@ -849,7 +852,7 @@ HARD_CAP_MS=600000
 ```ini
 [Unit]
 Description=PoLang browser-agent-bridge (headless Chromium CDP bridge)
-After=network.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -860,6 +863,10 @@ ExecStart=/usr/bin/node src/server.js
 Restart=on-failure
 RestartSec=3
 MemoryMax=2G
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+# 不加 ProtectHome=true：Playwright 浏览器缓存位于 ~/.cache/ms-playwright，需可读写
 
 [Install]
 WantedBy=multi-user.target
@@ -870,14 +877,16 @@ WantedBy=multi-user.target
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
+# 注意：非 tty ssh 下的 sudo systemctl restart 需要 NOPASSWD 配置；
+# 首次部署请手动在 xuxing 上执行本脚本内的 npm install / systemctl / curl 步骤。
 cd "$(dirname "$0")"
 rsync -av --delete --exclude node_modules --exclude .env ./ xuxing:/opt/browser-bridge/
-ssh xuxing 'cd /opt/browser-bridge && npm install --omit=dev && sudo systemctl restart browser-bridge && sleep 1 && curl -s -H "X-Bridge-Token: $(grep ^BRIDGE_TOKEN .env | cut -d= -f2)" http://127.0.0.1:8788/healthz'
+ssh xuxing 'cd /opt/browser-bridge && npm install --omit=dev && sudo systemctl restart browser-bridge && sleep 1 && curl --fail-with-body -s -H "X-Bridge-Token: $(grep -m1 '^BRIDGE_TOKEN=' .env | cut -d= -f2- | tr -d '\r\n')" http://127.0.0.1:8788/healthz'
 ```
 
-`infra/browser-bridge/README.md`：
+`infra/browser-bridge/README.md`（冒烟段已内联，不再引用 plan；含 413 契约说明与防火墙注记）：
 
-```markdown
+````markdown
 # browser-agent-bridge
 
 xuxing 侧云端浏览器桥：单例 headless Chromium + 每会话临时 BrowserContext（Playwright），
@@ -887,15 +896,48 @@ xuxing 侧云端浏览器桥：单例 headless Chromium + 每会话临时 Browse
 SSRF 全球单播许可名单（仅 80/443）+ 重定向落地复查 + 子请求级拦截 + WebSocket 全禁 +
 token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入）。
 
+## 端点契约
+
 - 端点：`POST /session`（open）、`POST /session/{id}/action`、`GET /session/{id}/frame`、
   `POST /session/{id}/close`、`GET /healthz`；全部要求 `X-Bridge-Token` 头。
 - 域名结果一律 HTTP 200 + JSON `status`（ok/action_failed/pool_exhausted/session_expired）。
+- 请求体超限（>64KB）时 `req.destroy()` 先于响应发出，客户端可能观察到连接重置而非 413——
+  应将 body 发送过程中的 reset 视为 413 等价。
 - click/type 定位三模式：index（extract 返回的元素序号，LLM 首选）/ targetText / selector。
-- 部署：`./deploy.sh`（rsync → npm install --omit=dev → systemctl restart → healthz）。
-- 测试：`npm test`（单测）；冒烟走 README curl 段（本文件上方示例）。
+
+## 冒烟
+
+```bash
+BRIDGE_TOKEN=test-token node src/server.js &
+curl -s -H "X-Bridge-Token: test-token" http://127.0.0.1:8788/healthz
+# → {"ok":true,"sessions":0}
+SID=$(curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com","wantFrame":true}' http://127.0.0.1:8788/session \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["sessionId"])')
+curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
+  -d '{"action":"extract"}' "http://127.0.0.1:8788/session/$SID/action"
+# → {"status":"ok",...,"textExtract":"...","elements":[...]}
+curl -s -X POST -H "X-Bridge-Token: test-token" "http://127.0.0.1:8788/session/$SID/close"
+# → {"status":"ok","closed":true,...}
+# SSRF 负例（open 即拒）
+curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
+  -d '{"url":"http://192.168.1.1/"}' http://127.0.0.1:8788/session
+# → {"status":"action_failed","errorCode":"blocked_url",...}
+kill %1
 ```
 
-- [ ] **Step 4: 赋可执行权限并 commit**
+## 部署
+
+- `./deploy.sh`（rsync → npm install --omit=dev → systemctl restart → healthz）。
+- **防火墙**：token 仅为传输层防线，生产必须配合 ufw / tailscale 限制 8788 仅内网可达；
+  `BRIDGE_BIND` 生产设为 tailscale 网卡 IP（缺省 0.0.0.0 仅开发用）。
+
+## 测试
+
+- `npm test`（单测，fake browser provider）；真实浏览器冒烟见上方 curl 段。
+````
+
+- [x] **Step 4: 赋可执行权限并 commit**
 
 ```bash
 chmod +x infra/browser-bridge/deploy.sh

@@ -1,6 +1,6 @@
 [Unit]
 Description=PoLang browser-agent-bridge (headless Chromium CDP bridge)
-After=network.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -11,6 +11,10 @@ ExecStart=/usr/bin/node src/server.js
 Restart=on-failure
 RestartSec=3
 MemoryMax=2G
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+# 不加 ProtectHome=true：Playwright 浏览器缓存位于 ~/.cache/ms-playwright，需可读写
 
 [Install]
 WantedBy=multi-user.target

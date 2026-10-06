@@ -134,6 +134,6 @@ server.keepAliveTimeout = 5_000;
 
 setInterval(() => { manager.reap().catch(() => {}); }, 30_000).unref();
 
-server.listen(config.port, '0.0.0.0', () => {
-  console.log(`browser-agent-bridge listening on :${config.port}`);
+server.listen(config.port, config.bind, () => {
+  console.log(`browser-agent-bridge listening on ${config.bind}:${config.port}`);
 });

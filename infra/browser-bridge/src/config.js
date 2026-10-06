@@ -2,6 +2,7 @@
 
 module.exports = {
   port: parseInt(process.env.BRIDGE_PORT || '8788', 10),
+  bind: process.env.BRIDGE_BIND || '0.0.0.0',
   token: process.env.BRIDGE_TOKEN || '',
   // 空串 = playwright 自带 chromium（postinstall 已装）；自定义 Chrome 路径可覆盖
   chromePath: process.env.CHROME_PATH || '',
