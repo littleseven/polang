@@ -3332,7 +3332,7 @@ git commit -m "feat(app): 动作流水格式化器 + browser 卡五语文案"
 - Create: `androidApp/src/main/java/com/mamba/picme/features/chat/components/BrowserLiveCard.kt`
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/ChatScreen.kt`
 
-- [ ] **Step 1: 实现 BrowserLiveCard**
+- [x] **Step 1: 实现 BrowserLiveCard**
 
 ```kotlin
 package com.mamba.picme.features.chat.components
@@ -3501,7 +3501,7 @@ fun BrowserLiveCard(
 
 > 执行注意：①import 的 R 包名以 androidApp 实际包名为准（`com.mamba.picme.R`）；②卡片间距/圆角若仓库有 design token（`core/designsystem/` DesignTokens），按 token 替换硬编码 dp（先例 EngineerTaskCard 的间距来源）；③`R.string.browser_live_*` 在 Task 17 已建。
 
-- [ ] **Step 2: ChatScreen 分发分支 + 全屏预览**
+- [x] **Step 2: ChatScreen 分发分支 + 全屏预览**
 
 `ChatScreen.kt` when 分发（:644-792，`TYPE_HTML_CARD` 分支 :665-689 后）加：
 
@@ -3529,7 +3529,7 @@ browserFramePreview?.let { frame ->
 
 `BrowserFramePreviewOverlay` 放 `features/chat/components/BrowserLiveCard.kt` 同文件（单帧版预览：produceState 解码 + `detectTransformGestures` 1x~5x 缩放 + 顶部关闭行，代码直接移植 `ChatImagePreviewOverlay` 的单页形态并改数据源为 base64——实现时照该 overlay 现有手势代码逐段对齐，不引入新交互）。
 
-- [ ] **Step 3: 编译 + 截图自查 + commit**
+- [x] **Step 3: 编译 + 截图自查 + commit**
 
 ```bash
 ./gradlew :androidApp:assembleDebug
