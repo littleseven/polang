@@ -9,7 +9,7 @@
 
 xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed Chrome 池，`/opt/browser-vnc`）。本设计让 App 端 Koog Agent 获得云端浏览器能力：Agent 执行需要浏览网页的任务时调用云端浏览器，**用户在 Chat 里看到「Agent 每操作一步、卡片画面更新一步」的直播卡**（Operator/Manus 风格 live view）。
 
-执行面采用 Muse 同款路线：**bridge 自起 headless Chromium、纯 CDP DOM 级驱动**，AI 干活不渲染像素（省 Xvfb/桌面/VNC 编码），画面只在用户要看时按需生成（2026-10-06 设计修订；既有 VNC headed 池保留作人工调试与反爬回退）。
+执行面采用 Muse 同款路线：**bridge 驱动 headless Chromium、纯 CDP DOM 级驱动**（Playwright 单例 browser + 每会话临时 BrowserContext，借鉴 openmuse），AI 干活不渲染像素（省 Xvfb/桌面/VNC 编码），画面只在用户要看时按需生成（2026-10-06 设计修订；既有 VNC headed 池保留作人工调试与反爬回退）。
 
 已确认的四个选型（2026-10-06 brainstorming）：
 
@@ -39,13 +39,13 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed
                │ 内网（tailscale；无则 HK→xuxing 直连 + IP 白名单）
 ┌──────────────▼──── xuxing (北京) ───────────────────┐
 │ browser-agent-bridge（新增组件，单进程）              │
-│  ├─ 会话管理：自起 headless Chromium 实例             │
-│  │   （--headless=new，fresh profile，结束销毁；      │
+│  ├─ 会话管理：单例 headless Chromium + 每会话临时      │
+│  │   BrowserContext（fresh storage，结束销毁；          │
 │  │   不借用 VNC 池单元，无 Xvfb/桌面/VNC 编码开销）    │
 │  ├─ CDP 执行：navigate/click/type/extract            │
 │  │   （DOM 级读写，不渲染像素）                       │
 │  └─ 按需抓帧：仅当请求带 wantFrame=true 时            │
-│      Page.captureScreenshot → JPEG（720p 质量 60）   │
+│      page.screenshot → JPEG（720p 质量 60）           │
 │ （既有 browser-vnc ×8 池保持原样：人工调试通道 +       │
 │  反爬顽固站点回退用 headed 实例）                     │
 └──────────────────────────────────────────────────────┘
@@ -59,19 +59,22 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed
 | `BrowserSessionCapability` | shared commonMain | 命令 → HTTP 调用，结构化错误映射 | BrowserSessionClient |
 | `BrowserSessionClient` + 协议模型 | shared commonMain | 请求/响应 DTO（kotlinx.serialization），纯逻辑可测；HttpClient 经 `KoogHttpClientFactoryProvider` 分流 | expect HttpClient |
 | `BrowserRoute` + `BrowserPoolProxy` | server/ | 鉴权（X-App-Token）、配额、转发、30s 网关超时 | AppConfig 新增 xuxing 地址 + X-Bridge-Token |
-| `browser-agent-bridge` | `infra/browser-bridge/` 入仓，部署 xuxing | CDP 动作执行 + 按需抓帧 + 会话生命周期（自起 headless Chromium） | Chrome DevTools Protocol |
+| `browser-agent-bridge` | `infra/browser-bridge/` 入仓，部署 xuxing | Playwright 动作执行 + 按需抓帧 + 会话生命周期（单例 headless Chromium + 每会话临时 BrowserContext） | Playwright / CDP |
 | Chat 直播卡渲染 | androidApp | 新 part `tool_browser` 的 UI | ADR-016 状态机 |
 
 ### 2.2 关键架构决策
 
 1. **工具粒度 = 7 个原子动作**（open/navigate/click/type/extract/screenshot/close）而非单个宏工具——LLM 自己规划步骤，每一步都有画面更新（方案 A 直播感来源），与现有工具风格一致。
-2. **bridge 自起 headless Chromium（`--headless=new`），纯 CDP DOM 级驱动**——AI 干活不需要像素管线：省掉 Xvfb、桌面、VNC 编码整套开销，实例更轻、单机可承载会话数更高。既有 `browser-vnc` ×8 headed 池**不借用、保持原样**，定位转为：人工调试通道 + 反爬顽固站点的回退（headless 被识别时由 bridge 切到 headed 实例执行，M1 只做手动开关，自动检测回退属 M2+）。
+2. **bridge 用 Playwright 驱动 headless Chromium，单例 browser 进程 + 每会话临时 BrowserContext**——AI 干活不需要像素管线：省掉 Xvfb、桌面、VNC 编码整套开销。借鉴 openmuse 验证过的形态（见决策 7）：单例 headless browser 常驻、每开一个会话建一个临时 BrowserContext（fresh storage = fresh profile 语义，关会话即毁，比每会话一个 browser 进程轻得多），`npx playwright install chromium` 安装浏览器。既有 `browser-vnc` ×8 headed 池**不借用、保持原样**，定位转为：人工调试通道 + 反爬顽固站点的回退（headless 被识别时由 bridge 切到 headed 实例执行，M1 只做手动开关，自动检测回退属 M2+）。
 3. **画面按需生成（`wantFrame` 请求标志 + watch 模式）**——帧不是每个动作的固定产物，两级按需：
    - **动作级（默认）**：App 侧策略决定何时要帧（M1 默认 = 直播卡可见期间的改状态动作；extract/close 不带帧）。LLM 不参与该决策，响应中帧字段可选。
-   - **watch 模式（用户正盯着看）**：bridge 调 CDP `Page.startScreencast` 吐连续 JPEG 帧流（Chromium 原生能力，无需桌面环境）；App 在卡片可见时低频轮询 `GET /v1/browser/frame?sessionId` 取最新帧（~1-2fps），停止轮询超时即关 screencast。仍是纯 HTTP 请求/响应，不新增长连接。用户不看时零截图开销零流量。
+   - **watch 模式（用户正盯着看）**：App 在卡片可见时低频轮询 `GET /v1/browser/frame?sessionId`（~1-2fps），bridge 每次轮询做一次性 `page.screenshot` 抓帧；停止轮询超时即不再截图。一次性截图在 1-2fps 轮询下与 CDP `Page.startScreencast` 体验等价、无 screencast ack 状态机（openmuse 的 live console 同为截图轮询，佐证此口径）；若后续要 >5fps 再升级 screencast。仍是纯 HTTP 请求/响应，不新增长连接。用户不看时零截图开销零流量。
 4. **协议模型放 shared commonMain**——端云 DTO 同源（Monorepo 既定决策），iOS 跟随期零成本复用。
 5. **bridge 代码入仓 `infra/browser-bridge/`**——与 `infra/cloudflare/`、`infra/tencentscf/` 同级，systemd unit + 部署脚本随仓。
 6. **画面复用工具结果通道，零新增长连接**——不引入 WS/SSE 新通道；若后续实测过程感不足，动作通道不变、只加推流通道即平滑升级为推流方案，无返工。
+7. **借鉴 openmuse（CopilotKit/openmuse，MIT）的已验证工程形态**——2026-10-06 调研其 `apps/worker`（Playwright 浏览器子代理）与 live console 后落位：
+   - **借鉴**：Playwright 单例 browser + 每会话临时 BrowserContext（决策 2）；SSRF 校验升级到其 `network.ts` 级别（仅 80/443 端口、禁 userinfo、禁 `.localhost/.local/.internal/.home/.lan` 后缀、IPv4 增补 CGNAT 100.64/10 与文档/保留段、IPv6 仅 2000::/3 许可名单、DNS 5s 超时）；导航后重定向落地复查（goto 后 re-validate `page.url()`）；子请求级 route 拦截 + WebSocket 全禁 + `--disable-quic` + WebRTC 防护；per-session 串行动作队列（注意 act 内抓帧须走无锁内部版，公开入口才过串行包装，否则自死锁）；extract 返回正文 + 交互元素清单 `{index,tag,text,href,type}`，click/type 三模式定位（index > targetText > selector——纯文本 LLM 猜不出盲 selector）；服务加固（token 时序安全比较、request/headers 超时、`no-store`/`nosniff`、body 64KB 上限）。
+   - **不借鉴**：持久 profile/storageState（与本设计 fresh-context 相悖）、PDF 下载、egress 代理（列为可选加固项）、Docker 部署（沿用 systemd）、坐标输入/人工接管（M2 范畴）。
 
 ## 3. 数据流
 
@@ -80,7 +83,7 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed
 ```
 1. 用户消息 → Koog Agent 规划 → 决定调 browser_open(url)
 2. @Tool browser_open → BrowserSessionCapability → POST /v1/browser/open（wantFrame=true）
-   → bridge 自起 headless Chromium（fresh profile）→ CDP 导航 → 按需抓帧
+   → bridge 建临时 BrowserContext（fresh storage）→ 导航 → 按需抓帧
    → 返回 { sessionId, status, currentUrl, pageTitle, frameJpegBase64?, actionMs }
 3. 工具结果分流：llmPayload（文本摘要）回灌 LLM；
    uiPayload（帧 + 元数据）走占位 part 原位填充（M2 已有机制，draw_chart/render_html 同款）
@@ -91,7 +94,7 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed
 
 ### 3.1 响应双载荷（token 保护）
 
-工具响应分两段：**`llmPayload`**（URL/标题/页面文本摘要，回灌 LLM）与 **`uiPayload`**（帧 + 元数据，只走 UI part）。帧**不进 LLM 上下文**——遵 ADR-016「data part 默认不回灌」，避免一次浏览任务烧掉几十万 token。
+工具响应分两段：**`llmPayload`**（URL/标题/页面文本摘要 + extract 的可交互元素清单（index/tag/text/href），回灌 LLM——元素清单让后续 click/type 用 index 回指，不用猜盲 selector）与 **`uiPayload`**（帧 + 元数据，只走 UI part）。帧**不进 LLM 上下文**——遵 ADR-016「data part 默认不回灌」，避免一次浏览任务烧掉几十万 token。
 
 ### 3.2 流量预算
 
@@ -152,7 +155,7 @@ headless 实例轻量（无 Xvfb/桌面/VNC 编码），但机器资源仍有限
 - [PRIVACY] 红线不触碰：帧是网页内容截图，非用户相册媒体；**卡片帧不进遥测、不进问题上报附件**。
 - M1 全部 fresh profile：无登录态、不持久 cookie、会话销毁即清空。登录态会话是 M2+ 的显式决策，本期不做。
 - bridge 只监听内网网卡（tailscale IP），不暴露公网；picme-server → bridge 带共享密钥 `X-Bridge-Token`（server.env / bridge env 双端配置）。
-- 目标 URL 校验：bridge 拒绝内网地址段（10/8、172.16/12、192.168/16、127/8、169.254/16 等），防 SSRF 借浏览器打内网。
+- 目标 URL 校验（SSRF 防护，openmuse `network.ts` 级）：仅允许 80/443 端口的 http/https、禁 userinfo、禁 `.localhost/.local/.internal/.home/.lan` 后缀；DNS 解析（5s 超时）后走单播许可名单——IPv4 拒绝私网/回环/链路本地/CGNAT 100.64/10/文档与保留段，IPv6 仅放行 2000::/3 全球单播；导航后重定向落地复查（re-validate `page.url()`）+ 子请求级 route 拦截（WebSocket 全禁、`--disable-quic`、WebRTC 防护），防 SSRF 借浏览器打内网。
 
 ## 9. 测试策略
 

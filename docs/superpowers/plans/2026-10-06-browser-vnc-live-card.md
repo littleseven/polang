@@ -4,9 +4,9 @@
 
 **Goal:** App 端 Koog Agent 获得云端浏览器能力——browser_* 工具闭环经 picme-server 转发 xuxing browser-agent-bridge（headless Chromium + CDP），Chat 内直播卡逐步更新画面，会话结束定格落库。
 
-**Architecture:** 四线五阶段：A = `infra/browser-bridge/`（Node 20 + puppeteer-core 自起 headless Chromium，CDP DOM 级驱动，按需抓帧）；B = picme-server `BrowserRoute`（X-App-Token 鉴权 + 配额 + per-user 并发=1 + 透传）；C = shared commonMain（协议 DTO + 7 命令 + BrowserSessionCapability + 7 @Tool + tool_browser part + 占位/overlay 管线）；D = androidApp（OkHttp transport + VM live 态 + BrowserLiveCard + 五语）；E = 文档/golden/端到端。设计 SSOT = `docs/superpowers/specs/2026-10-06-browser-vnc-live-card-design.md`（下称 spec）。
+**Architecture:** 四线五阶段：A = `infra/browser-bridge/`（Node 20 + Playwright 单例 headless Chromium + 每会话临时 BrowserContext，CDP DOM 级驱动，按需抓帧，借鉴 openmuse）；B = picme-server `BrowserRoute`（X-App-Token 鉴权 + 配额 + per-user 并发=1 + 透传）；C = shared commonMain（协议 DTO + 7 命令 + BrowserSessionCapability + 7 @Tool + tool_browser part + 占位/overlay 管线）；D = androidApp（OkHttp transport + VM live 态 + BrowserLiveCard + 五语）；E = 文档/golden/端到端。设计 SSOT = `docs/superpowers/specs/2026-10-06-browser-vnc-live-card-design.md`（下称 spec）。
 
-**Tech Stack:** Node 20 + puppeteer-core 23（bridge）；Ktor 3.0.3 server + Exposed + SQLite（网关）；Kotlin Multiplatform + kotlinx.serialization（shared）；Jetpack Compose + Coil 2.7 + OkHttp（androidApp）。
+**Tech Stack:** Node 20 + Playwright（bridge）；Ktor 3.0.3 server + Exposed + SQLite（网关）；Kotlin Multiplatform + kotlinx.serialization（shared）；Jetpack Compose + Coil 2.7 + OkHttp（androidApp）。
 
 **执行前置（根 AGENTS.md §3.4 强制）**：开工前在 `.worktrees/browser-vnc-live-card` 建隔离 worktree + 专用分支 `feat/browser-vnc-live-card`（遵循 using-git-worktrees skill），征得用户同意后动工；本计划全部改动落在该 worktree。
 
@@ -21,10 +21,21 @@
 
 ## Phase A：infra/browser-bridge（xuxing 侧 bridge，全新组件）
 
-技术决策（spec §2.2 + 计划级细化）：
-- **puppeteer-core**（不绑 Chromium 下载），`executablePath` 指向 xuxing 系统 Chrome，`headless: true`（= `--headless=new`）。
-- **帧 = 一次性 `page.screenshot`**：watch 模式轮询（1-2fps）下与 `Page.startScreencast` 体验等价、无 screencast ack 状态机；spec §2.2 watch 模式措辞在 Phase E 文档任务同步修正为一次性抓帧。
-- 域名结果全部结构化进 JSON `status` 字段（HTTP 恒 200，除 401/404 路由），App/网关以 JSON status 为准。
+技术决策（spec §2.2 + 计划级细化 + 2026-10-06 openmuse 借鉴修订）：
+
+- **Playwright**（非 puppeteer-core）——借鉴 [CopilotKit/openmuse](https://github.com/CopilotKit/openmuse)（MIT）`apps/worker` 的验证过的形态：**单例 headless browser + 每会话临时 BrowserContext**（fresh storage = fresh profile 语义，比每会话一个 browser 进程轻得多）；`npx playwright install chromium` 安装浏览器，`CHROME_PATH` env 可覆盖。
+- **帧 = 一次性 `page.screenshot`**：watch 模式轮询（1-2fps）下与 `Page.startScreencast` 体验等价、无 screencast ack 状态机（openmuse 的 live console 同为截图轮询，佐证此口径）；spec §2.2 watch 模式措辞在 Phase E 文档任务同步修正。
+- **域名结果全部结构化进 JSON `status` 字段**（HTTP 恒 200，除 401/404/413 传输层），App/网关以 JSON status 为准。
+- **openmuse 借鉴清单**（对应 `apps/worker/src/{network,browser,server}.ts`，均已在计划撰写时读源确认）：
+  1. SSRF 全球单播许可名单：仅 80/443 端口、禁 userinfo、禁 .localhost/.local/.internal/.home/.lan、IPv4 增补 CGNAT/文档段/保留段、IPv6 仅 2000::/3 许可名单、DNS 5s 超时；
+  2. **重定向落地复查**（goto 后对 `page.url()` 再校验——预导航 DNS 校验挡不住 302 跳内网）；
+  3. **子请求级拦截**（`context.route('**/*')` 每个 img/XHR/iframe 过同一校验）+ WebSocket 全禁 + `--disable-quic` + WebRTC IP 泄露防护；
+  4. per-session **串行队列**（动作与抓帧不并发）；
+  5. 服务加固：token 时序安全比较（sha256 + timingSafeEqual）、request/headers 超时、安全响应头；
+  6. `serviceWorkers: 'block'`、popup 自动关、dialog 自动 dismiss；
+  7. **交互元素提取**：extract 返回正文 + 元素清单（index/tag/text/href），click/type 支持 selector|text|index 三模式定位——纯文本 LLM 猜不出盲 CSS selector，元素清单是它唯一可靠的定位依据（openmuse 用坐标/键盘输入绕开此问题，但其背后是截图 VLM 回路；我们用元素清单达到同等可定位性且保持 DOM 级精度）；
+  8. **worker 固定评估代码**（调用方不可注入 JS——openmuse 安全边界，我们同样遵守：bridge 不接受任意 evaluate）。
+- 不借鉴（YAGNI/不符合 M1 模型）：持久 profile 与 storageState、PDF 下载捕获、egress 代理第二层（我们用路由拦截单层，代理层列为可选加固）、Docker 打包（我们用 systemd）、坐标输入与接管（M2 候选）。
 
 ### Task 1: bridge 骨架 + SSRF 守卫（TDD）
 
@@ -46,9 +57,10 @@
   "type": "commonjs",
   "engines": { "node": ">=20" },
   "dependencies": {
-    "puppeteer-core": "^23.11.1"
+    "playwright": "^1.49.1"
   },
   "scripts": {
+    "postinstall": "npx playwright install chromium",
     "start": "node src/server.js",
     "test": "node --test test/"
   }
@@ -63,7 +75,8 @@
 module.exports = {
   port: parseInt(process.env.BRIDGE_PORT || '8788', 10),
   token: process.env.BRIDGE_TOKEN || '',
-  chromePath: process.env.CHROME_PATH || '/usr/bin/google-chrome',
+  // 空串 = playwright 自带 chromium（postinstall 已装）；自定义 Chrome 路径可覆盖
+  chromePath: process.env.CHROME_PATH || '',
   maxSessions: parseInt(process.env.MAX_SESSIONS || '8', 10),
   idleTimeoutMs: parseInt(process.env.IDLE_TIMEOUT_MS || '120000', 10),
   hardCapMs: parseInt(process.env.HARD_CAP_MS || '600000', 10),
@@ -71,7 +84,8 @@ module.exports = {
   viewport: { width: 1280, height: 720 },
   frameQuality: 60,
   maxExtractChars: 4000,
-  maxBodyBytes: 1024 * 1024,
+  maxElements: 40,
+  maxBodyBytes: 64 * 1024,
 };
 ```
 
@@ -82,37 +96,58 @@ module.exports = {
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { isPrivateIp, assertPublicHttpUrl } = require('../src/ssrf');
+const { isPublicIp, validatePublicUrl } = require('../src/ssrf');
 
-test('isPrivateIp: rejects loopback / RFC1918 / link-local / multicast', () => {
-  for (const ip of ['127.0.0.1', '10.0.0.1', '172.16.0.1', '172.31.255.1',
-    '192.168.1.1', '169.254.1.1', '0.0.0.0', '224.0.0.1', '::1', 'fe80::1', 'fd00::1']) {
-    assert.strictEqual(isPrivateIp(ip), true, ip);
+test('isPublicIp: rejects loopback / RFC1918 / link-local / CGNAT / multicast / doc ranges', () => {
+  for (const ip of ['127.0.0.1', '10.0.0.1', '172.16.0.1', '172.31.255.1', '192.168.1.1',
+    '169.254.1.1', '100.64.0.1', '100.127.255.1', '0.0.0.0', '224.0.0.1',
+    '192.0.0.1', '192.0.2.1', '192.88.99.1', '198.18.0.1', '198.51.100.1', '203.0.113.1',
+    '::1', 'fe80::1', 'fd00::1', '2001:db8::1']) {
+    assert.strictEqual(isPublicIp(ip), false, ip);
   }
 });
 
-test('isPrivateIp: allows public v4/v6', () => {
+test('isPublicIp: allows public v4/v6', () => {
   for (const ip of ['8.8.8.8', '1.1.1.1', '172.15.0.1', '172.32.0.1', '2606:4700:4700::1111']) {
-    assert.strictEqual(isPrivateIp(ip), false, ip);
+    assert.strictEqual(isPublicIp(ip), true, ip);
   }
 });
 
-test('assertPublicHttpUrl: rejects non-http protocol', async () => {
-  await assert.rejects(() => assertPublicHttpUrl('file:///etc/passwd'), /bad_protocol/);
+test('validatePublicUrl: rejects non-http protocol and non-80/443 ports', async () => {
+  await assert.rejects(() => validatePublicUrl('file:///etc/passwd'), /blocked_url/);
+  await assert.rejects(() => validatePublicUrl('http://8.8.8.8:8080/'), /blocked_url/);
+  await assert.rejects(() => validatePublicUrl('https://user:pass@8.8.8.8/'), /blocked_url/);
 });
 
-test('assertPublicHttpUrl: rejects literal private IP host', async () => {
-  await assert.rejects(() => assertPublicHttpUrl('http://192.168.0.1/admin'), /private_address/);
-  await assert.rejects(() => assertPublicHttpUrl('http://127.0.0.1:8080/'), /private_address/);
+test('validatePublicUrl: rejects private/内部 hostnames', async () => {
+  await assert.rejects(() => validatePublicUrl('http://192.168.0.1/admin'), /blocked_url/);
+  await assert.rejects(() => validatePublicUrl('http://127.0.0.1/'), /blocked_url/);
+  await assert.rejects(() => validatePublicUrl('http://foo.localhost/'), /blocked_url/);
+  await assert.rejects(() => validatePublicUrl('http://gateway.internal/'), /blocked_url/);
+  await assert.rejects(() => validatePublicUrl('http://nas.lan/'), /blocked_url/);
 });
 
-test('assertPublicHttpUrl: rejects malformed url', async () => {
-  await assert.rejects(() => assertPublicHttpUrl('not a url'), /invalid_url/);
+test('validatePublicUrl: rejects malformed url', async () => {
+  await assert.rejects(() => validatePublicUrl('not a url'), /blocked_url/);
 });
 
-test('assertPublicHttpUrl: accepts public literal IP', async () => {
-  const u = await assertPublicHttpUrl('http://8.8.8.8/');
-  assert.strictEqual(u, 'http://8.8.8.8/');
+test('validatePublicUrl: accepts public literal IP on 443', async () => {
+  const u = await validatePublicUrl('https://8.8.8.8/');
+  assert.strictEqual(u.href, 'https://8.8.8.8/');
+});
+
+test('validatePublicUrl: dns failure maps to dns_failed', async () => {
+  await assert.rejects(
+    () => validatePublicUrl('https://nonexistent.invalid/', async () => { throw new Error('ENOTFOUND'); }),
+    /dns_failed/,
+  );
+});
+
+test('validatePublicUrl: hostname resolving to private ip rejected', async () => {
+  await assert.rejects(
+    () => validatePublicUrl('https://evil.example/', async () => [{ address: '10.1.2.3', family: 4 }]),
+    /blocked_url/,
+  );
 });
 ```
 
@@ -121,7 +156,7 @@ test('assertPublicHttpUrl: accepts public literal IP', async () => {
 Run: `cd infra/browser-bridge && npm install && npm test`
 Expected: FAIL（`Cannot find module '../src/ssrf'`）
 
-- [ ] **Step 4: 实现 `src/ssrf.js`**
+- [ ] **Step 4: 实现 `src/ssrf.js`**（借鉴 openmuse `apps/worker/src/network.ts`，MIT）
 
 ```js
 'use strict';
@@ -136,71 +171,105 @@ class SsrfError extends Error {
   }
 }
 
-function isPrivateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const p = ip.split('.').map(Number);
-    if (p[0] === 0) return true;
-    if (p[0] === 10) return true;
-    if (p[0] === 127) return true;
-    if (p[0] === 169 && p[1] === 254) return true;
-    if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true;
-    if (p[0] === 192 && p[1] === 168) return true;
-    if (p[0] >= 224) return true;
-    return false;
+/**
+ * 保守全球单播许可名单（借鉴 CopilotKit/openmuse apps/worker/src/network.ts，MIT）：
+ * 过渡/文档/私有/回环/组播/保留网段一律不是浏览器目的地。
+ */
+function isPublicIp(address) {
+  if (net.isIPv4(address)) {
+    const [a = 0, b = 0, c = 0] = address.split('.').map(Number);
+    return !(
+      a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||            // CGNAT 100.64/10
+      (a === 169 && b === 254) ||                      // link-local
+      (a === 172 && b >= 16 && b <= 31) ||             // RFC1918
+      (a === 192 && (b === 168 || (b === 0 && (c === 0 || c === 2)) || (b === 88 && c === 99))) ||
+      (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+      (a === 203 && b === 0 && c === 113)
+    );
   }
-  const s = ip.toLowerCase();
-  return s === '::' || s === '::1' || s.startsWith('fe80:') || s.startsWith('fc') || s.startsWith('fd');
+  if (!net.isIPv6(address) || address.includes('.') || address.includes('%')) return false;
+  const halves = address.toLowerCase().split('::');
+  const left = halves[0] ? halves[0].split(':') : [];
+  const right = halves[1] ? halves[1].split(':') : [];
+  const words = halves.length === 1
+    ? left
+    : [...left, ...Array(8 - left.length - right.length).fill('0'), ...right];
+  const first = parseInt(words[0] ?? '0', 16);
+  const second = parseInt(words[1] ?? '0', 16);
+  return (
+    first >= 0x2000 && first <= 0x3fff &&
+    !(first === 0x2001 && (second < 0x200 || second === 0xdb8)) &&
+    first !== 0x2002 &&
+    !(first === 0x3fff && second < 0x1000)
+  );
 }
 
 /**
- * 校验目标 URL：仅 http/https + 解析结果全部落在公网。
- * 抛 SsrfError（code: invalid_url / bad_protocol / dns_failed / private_address）。
+ * 校验目标 URL：仅 http/https + 仅 80/443 端口 + 无 userinfo + 非内部后缀 +
+ * 解析结果全部落在公网。抛 SsrfError（code: blocked_url / dns_failed）。
+ * resolve 注入便于测试。
  */
-async function assertPublicHttpUrl(raw) {
-  let u;
+async function validatePublicUrl(raw, resolve = (h) => dns.lookup(h, { all: true, verbatim: true })) {
+  const blocked = () => new SsrfError('blocked_url');
+  let url;
   try {
-    u = new URL(raw);
+    url = new URL(raw);
   } catch {
-    throw new SsrfError('invalid_url');
+    throw blocked();
   }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new SsrfError('bad_protocol');
-  const host = u.hostname;
-  let ips;
-  if (net.isIP(host)) {
-    ips = [host];
+  const hostname = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.username || url.password ||
+    (url.port && url.port !== '80' && url.port !== '443') ||
+    !hostname ||
+    /(^|\.)(localhost|local|internal|home|lan)$/.test(hostname)
+  ) {
+    throw blocked();
+  }
+  let addresses;
+  if (net.isIP(hostname)) {
+    addresses = [{ address: hostname, family: net.isIP(hostname) }];
   } else {
+    let timer;
     try {
-      ips = (await dns.lookup(host, { all: true })).map((r) => r.address);
+      addresses = await Promise.race([
+        resolve(hostname),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('dns timeout')), 5000); }),
+      ]);
     } catch {
       throw new SsrfError('dns_failed');
+    } finally {
+      clearTimeout(timer);
     }
   }
-  if (ips.length === 0 || ips.some(isPrivateIp)) throw new SsrfError('private_address');
-  return u.toString();
+  if (!addresses || addresses.length === 0 || addresses.some((e) => !isPublicIp(e.address))) throw blocked();
+  return url;
 }
 
-module.exports = { assertPublicHttpUrl, isPrivateIp, SsrfError };
+module.exports = { validatePublicUrl, isPublicIp, SsrfError };
 ```
 
 - [ ] **Step 5: 跑测试确认通过**
 
 Run: `cd infra/browser-bridge && npm test`
-Expected: PASS（6 个用例）
+Expected: PASS（8 个用例）
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add infra/browser-bridge/package.json infra/browser-bridge/src/config.js infra/browser-bridge/src/ssrf.js infra/browser-bridge/test/ssrf.test.js
-git commit -m "feat(bridge): browser-agent-bridge 骨架 + SSRF 守卫（私有地址段拒绝）"
+git commit -m "feat(bridge): 骨架 + OpenMuse 级 SSRF 守卫（单播许可名单/端口限制/重定向防线基础）"
 ```
 
-### Task 2: 会话管理器（SessionManager）
+### Task 2: 会话管理器（SessionManager，Playwright）
 
 **Files:**
 - Create: `infra/browser-bridge/src/sessions.js`
 - Test: `infra/browser-bridge/test/sessions.test.js`
 
-- [ ] **Step 1: 写失败测试（生命周期与配额逻辑，Chrome 以 fake 注入）**
+- [ ] **Step 1: 写失败测试（生命周期/配额/串行/三模式定位/元素提取，Playwright 以 fake browserProvider 注入）**
 
 ```js
 'use strict';
@@ -209,28 +278,49 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { SessionManager, PoolExhaustedError, SessionExpiredError } = require('../src/sessions');
 
+const CFG = {
+  maxSessions: 1, idleTimeoutMs: 60000, hardCapMs: 600000, navTimeoutMs: 5000,
+  viewport: { width: 1280, height: 720 }, frameQuality: 60, maxExtractChars: 5, maxElements: 40,
+};
+
 function fakePage() {
+  const calls = [];
+  const locator = () => ({
+    click: async () => { calls.push('locator.click'); },
+    pressSequentially: async (t) => { calls.push(`type:${t}`); },
+  });
   return {
-    url: () => 'https://example.com/',
+    calls,
+    _url: 'https://example.com/',
+    url() { return this._url; },
     title: async () => 'Example',
-    goto: async () => {},
-    click: async () => {},
-    type: async () => {},
-    evaluate: async () => 'hello body',
+    goto: async (u) => { calls.push(`goto:${u}`); },
+    setDefaultTimeout: () => {},
+    on: () => {},
+    locator,
+    getByText: () => locator(),
+    $$: async () => [
+      { click: async () => { calls.push('el.click'); }, pressSequentially: async () => {}, evaluate: async (fn) => fn({ tagName: 'A', innerText: 'Link one', value: '', getAttribute: () => null }) },
+    ],
+    evaluate: async (fn) => (typeof fn === 'function' ? 'hello body' : ''),
     screenshot: async () => Buffer.from('jpeg-bytes'),
-    setViewport: async () => {},
   };
 }
 
-function fakeLauncher() {
+function fakeBrowserProvider(page) {
   return async () => ({
-    newPage: async () => fakePage(),
-    close: async () => {},
+    newContext: async () => ({
+      route: async () => {},
+      routeWebSocket: async () => {},
+      on: () => {},
+      newPage: async () => page,
+      close: async () => {},
+    }),
   });
 }
 
 test('open allocates session and respects pool cap', async () => {
-  const mgr = new SessionManager({ maxSessions: 1, idleTimeoutMs: 60000, hardCapMs: 600000, navTimeoutMs: 5000, viewport: { width: 1280, height: 720 }, frameQuality: 60, maxExtractChars: 4000 }, fakeLauncher());
+  const mgr = new SessionManager({ ...CFG }, fakeBrowserProvider(fakePage()));
   const s = await mgr.open(null);
   assert.ok(s.id);
   await assert.rejects(() => mgr.open(null), PoolExhaustedError);
@@ -241,32 +331,53 @@ test('open allocates session and respects pool cap', async () => {
 });
 
 test('get on unknown id throws SessionExpiredError', () => {
-  const mgr = new SessionManager({ maxSessions: 8, idleTimeoutMs: 60000, hardCapMs: 600000, navTimeoutMs: 5000, viewport: {}, frameQuality: 60, maxExtractChars: 4000 }, fakeLauncher());
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(fakePage()));
   assert.throws(() => mgr.get('nope'), SessionExpiredError);
 });
 
-test('act extract truncates to maxExtractChars and counts actions', async () => {
-  const cfg = { maxSessions: 8, idleTimeoutMs: 60000, hardCapMs: 600000, navTimeoutMs: 5000, viewport: { width: 1280, height: 720 }, frameQuality: 60, maxExtractChars: 5 };
-  const mgr = new SessionManager(cfg, fakeLauncher());
+test('extract truncates text and returns interactive elements with index', async () => {
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(fakePage()));
   const s = await mgr.open(null);
   const r = await mgr.act(s, { action: 'extract' });
   assert.strictEqual(r.status, 'ok');
   assert.strictEqual(r.textExtract, 'hello');
-  const r2 = await mgr.act(s, { action: 'screenshot' });
-  assert.ok(r2.frameJpegBase64.length > 0);
-  assert.strictEqual(s.actionCount, 2);
+  assert.ok(Array.isArray(r.elements));
+  assert.strictEqual(r.elements[0].index, 0);
+  assert.strictEqual(r.elements[0].text, 'Link one');
+  await mgr.close(s.id);
+});
+
+test('click by element index uses cached handle', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.act(s, { action: 'extract' });
+  await mgr.act(s, { action: 'click', index: 0 });
+  assert.ok(page.calls.includes('el.click'));
+  await mgr.close(s.id);
+});
+
+test('click without any target fails structured', async () => {
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(fakePage()));
+  const s = await mgr.open(null);
+  await assert.rejects(() => mgr.act(s, { action: 'click' }), /missing_target/);
   await mgr.close(s.id);
 });
 
 test('reap closes idle sessions', async () => {
-  const cfg = { maxSessions: 8, idleTimeoutMs: 10, hardCapMs: 600000, navTimeoutMs: 5000, viewport: {}, frameQuality: 60, maxExtractChars: 4000 };
-  const mgr = new SessionManager(cfg, fakeLauncher());
+  const page = fakePage();
+  let contextClosed = false;
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8, idleTimeoutMs: 10 }, async () => ({
+    newContext: async () => ({
+      route: async () => {}, routeWebSocket: async () => {}, on: () => {},
+      newPage: async () => page,
+      close: async () => { contextClosed = true; },
+    }),
+  }));
   const s = await mgr.open(null);
-  let closed = false;
-  s.browser.close = async () => { closed = true; };
   s.lastActivity = Date.now() - 100;
   await mgr.reap(Date.now());
-  assert.strictEqual(closed, true);
+  assert.strictEqual(contextClosed, true);
   assert.throws(() => mgr.get(s.id), SessionExpiredError);
 });
 ```
@@ -281,9 +392,9 @@ Expected: FAIL（`Cannot find module '../src/sessions'`）
 ```js
 'use strict';
 
-const puppeteer = require('puppeteer-core');
 const crypto = require('node:crypto');
-const { assertPublicHttpUrl } = require('./ssrf');
+const { chromium } = require('playwright');
+const { validatePublicUrl } = require('./ssrf');
 
 class PoolExhaustedError extends Error {
   constructor() { super('pool_exhausted'); this.code = 'pool_exhausted'; }
@@ -296,32 +407,48 @@ class ActionFailedError extends Error {
 }
 
 class Session {
-  constructor(id, browser, page) {
+  constructor(id, context, page) {
     this.id = id;
-    this.browser = browser;
+    this.context = context;
     this.page = page;
     this.createdAt = Date.now();
     this.lastActivity = Date.now();
     this.lastGoodFrame = null;
     this.actionCount = 0;
+    this.elements = [];              // 最近 extract 的元素句柄缓存（index 定位用）
+    this.queue = Promise.resolve();  // per-session 串行队列（借鉴 openmuse serial）
   }
   touch() { this.lastActivity = Date.now(); }
 }
 
-async function defaultLauncher(config) {
-  return puppeteer.launch({
-    executablePath: config.chromePath,
-    headless: true,
-    args: ['--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-default-browser-check'],
-  });
-}
-
+/**
+ * 单例 headless browser + 每会话临时 BrowserContext（fresh storage，借鉴 openmuse
+ * apps/worker 形态）：比每会话一个 browser 进程轻，隔离语义等价 fresh profile。
+ */
 class SessionManager {
-  /** launcher 注入便于测试（返回 puppeteer Browser 形态对象）。 */
-  constructor(config, launcher = null) {
+  /** browserProvider 注入便于测试（返回带 newContext 的 browser 形态对象）。 */
+  constructor(config, browserProvider = null) {
     this.config = config;
-    this.launcher = launcher || (() => defaultLauncher(config));
+    this.browserProvider = browserProvider;
+    this.browserPromise = null;
     this.sessions = new Map();
+  }
+
+  async _browser() {
+    if (this.browserProvider) return this.browserProvider();
+    if (!this.browserPromise) {
+      this.browserPromise = chromium.launch({
+        headless: true,
+        executablePath: this.config.chromePath || undefined,
+        args: [
+          '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run',
+          '--disable-quic', '--disable-extensions',
+          '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+        ],
+      });
+      this.browserPromise.catch(() => { this.browserPromise = null; }); // 崩溃后下次重建
+    }
+    return this.browserPromise;
   }
 
   count() { return this.sessions.size; }
@@ -332,57 +459,138 @@ class SessionManager {
     return s;
   }
 
+  /** per-session 串行：动作与抓帧不并发（借鉴 openmuse serial）。 */
+  _serial(session, fn) {
+    const next = session.queue.catch(() => {}).then(fn);
+    session.queue = next;
+    return next;
+  }
+
+  async _newContext() {
+    const browser = await this._browser();
+    const context = await browser.newContext({
+      viewport: this.config.viewport,
+      serviceWorkers: 'block',
+    });
+    // 子请求级 SSRF：img/XHR/iframe 全部过同一校验（借鉴 openmuse route 拦截）
+    await context.route('**/*', async (route) => {
+      try {
+        await validatePublicUrl(route.request().url());
+        await route.continue();
+      } catch {
+        await route.abort('blockedbyclient').catch(() => {});
+      }
+    });
+    // WebSocket 全禁（防绕过 HTTP 校验的直连通道）
+    await context.routeWebSocket('**/*', (socket) => socket.close());
+    return context;
+  }
+
   async open(url) {
     if (this.sessions.size >= this.config.maxSessions) throw new PoolExhaustedError();
-    const browser = await this.launcher();
     const id = crypto.randomUUID();
+    const context = await this._newContext();
     try {
-      const page = await browser.newPage();
-      await page.setViewport(this.config.viewport);
-      const session = new Session(id, browser, page);
+      context.on('page', (popup) => { popup.close().catch(() => {}); });
+      const page = await context.newPage();
+      page.setDefaultTimeout(this.config.navTimeoutMs);
+      page.on('dialog', (dialog) => { dialog.dismiss().catch(() => {}); });
+      const session = new Session(id, context, page);
       this.sessions.set(id, session);
-      if (url) await this._navigate(session, url);
+      if (url) await this._serial(session, () => this._navigate(session, url));
       return session;
     } catch (e) {
       this.sessions.delete(id);
-      await browser.close().catch(() => {});
+      await context.close().catch(() => {});
       throw e;
     }
   }
 
   async _navigate(session, url) {
-    const safe = await assertPublicHttpUrl(url);
-    await session.page.goto(safe, { waitUntil: 'domcontentloaded', timeout: this.config.navTimeoutMs });
+    const safe = await validatePublicUrl(url);
+    await session.page.goto(safe.href, { waitUntil: 'domcontentloaded', timeout: this.config.navTimeoutMs });
+    // 重定向落地复查：302 可跳到内网，预导航校验挡不住（openmuse 实证坑位）
+    await validatePublicUrl(session.page.url());
   }
 
   async act(session, body) {
-    const started = Date.now();
-    session.touch();
-    const action = body.action;
-    let textExtract;
-    if (action === 'navigate') await this._navigate(session, body.url);
-    else if (action === 'click') await session.page.click(body.selector, { timeout: this.config.navTimeoutMs });
-    else if (action === 'type') await session.page.type(body.selector, body.text == null ? '' : String(body.text));
-    else if (action === 'extract') {
-      textExtract = await session.page.evaluate(() => (document.body ? document.body.innerText : ''));
-      if (typeof textExtract === 'string' && textExtract.length > this.config.maxExtractChars) {
-        textExtract = textExtract.slice(0, this.config.maxExtractChars);
-      }
-    } else if (action === 'screenshot') {
-      // 只抓帧，帧逻辑在下方统一处理
-    } else {
-      throw new ActionFailedError('unknown_action', `unknown action: ${action}`);
-    }
-    session.actionCount += 1;
-    let frame;
-    if (body.wantFrame || action === 'screenshot') frame = await this.captureFrame(session);
-    return this._result(session, { textExtract, frame, actionMs: Date.now() - started });
+    return this._serial(session, async () => {
+      const started = Date.now();
+      session.touch();
+      const action = body.action;
+      let textExtract;
+      let elements;
+      if (action === 'navigate') await this._navigate(session, body.url);
+      else if (action === 'click') await this._click(session, body);
+      else if (action === 'type') await this._type(session, body);
+      else if (action === 'extract') ({ textExtract, elements } = await this._extract(session));
+      else if (action === 'screenshot') { /* 帧逻辑统一在下方 */ }
+      else throw new ActionFailedError('unknown_action', `unknown action: ${action}`);
+      session.actionCount += 1;
+      let frame;
+      if (body.wantFrame || action === 'screenshot') frame = await this._captureFrame(session);
+      return this._result(session, { textExtract, elements, frame, actionMs: Date.now() - started });
+    });
   }
 
-  async captureFrame(session) {
+  /** 定位三模式：index（上次 extract 序号）> text（可见文本）> selector。 */
+  async _locate(session, body) {
+    if (typeof body.index === 'number') {
+      const handle = session.elements[body.index];
+      if (!handle) throw new ActionFailedError('stale_element', '元素序号无效或已过期，请重新 extract');
+      return handle;
+    }
+    if (body.targetText) return session.page.getByText(body.targetText, { exact: false }).first();
+    if (body.selector) return session.page.locator(body.selector).first();
+    throw new ActionFailedError('missing_target', 'click/type 需要 selector、targetText 或 index 之一');
+  }
+
+  async _click(session, body) {
+    const target = await this._locate(session, body);
+    await target.click({ timeout: this.config.navTimeoutMs });
+  }
+
+  async _type(session, body) {
+    const target = await this._locate(session, body);
+    await target.pressSequentially(String(body.text == null ? '' : body.text), { timeout: this.config.navTimeoutMs });
+  }
+
+  /**
+   * 正文 + 交互元素清单。评估代码由 worker 固定，调用方不可注入 JS
+   * （openmuse 安全边界：bridge 不接受任意 evaluate）。
+   */
+  async _extract(session) {
+    const rawText = await session.page.evaluate(() => (document.body ? document.body.innerText : ''));
+    const handles = await session.page.$$('a, button, input, select, textarea, [role="button"]');
+    const capped = handles.slice(0, this.config.maxElements);
+    const elements = await Promise.all(capped.map(async (handle, i) => {
+      const meta = await handle.evaluate((el) => ({
+        tag: el.tagName.toLowerCase(),
+        text: (el.innerText || el.value || el.getAttribute('placeholder') || el.getAttribute('aria-label') || '').trim().slice(0, 80),
+        href: el.getAttribute('href') || undefined,
+        type: el.getAttribute('type') || undefined,
+      })).catch(() => null);
+      return meta ? { index: i, ...meta } : null;
+    }));
+    session.elements = capped;
+    return {
+      textExtract: typeof rawText === 'string' ? rawText.slice(0, this.config.maxExtractChars) : '',
+      elements: elements.filter(Boolean),
+    };
+  }
+
+  /** 无锁内部抓帧（act 已持队列）；公开路径走 captureFrame 串行包装。 */
+  async _captureFrame(session) {
     const buf = await session.page.screenshot({ type: 'jpeg', quality: this.config.frameQuality });
     session.lastGoodFrame = buf.toString('base64');
     return session.lastGoodFrame;
+  }
+
+  async captureFrame(session) {
+    return this._serial(session, async () => {
+      session.touch();
+      return this._captureFrame(session);
+    });
   }
 
   async _result(session, extra) {
@@ -392,6 +600,7 @@ class SessionManager {
       currentUrl: session.page.url(),
       pageTitle: await session.page.title().catch(() => ''),
       textExtract: extra.textExtract,
+      elements: extra.elements,
       frameJpegBase64: extra.frame,
       actionMs: extra.actionMs,
     };
@@ -401,7 +610,7 @@ class SessionManager {
     const s = this.sessions.get(id);
     if (!s) return false;
     this.sessions.delete(id);
-    await s.browser.close().catch(() => {});
+    await s.context.close().catch(() => {});
     return true;
   }
 
@@ -424,13 +633,13 @@ module.exports = { SessionManager, PoolExhaustedError, SessionExpiredError, Acti
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `cd infra/browser-bridge && npm test`
-Expected: PASS（SSRF 6 + sessions 4）
+Expected: PASS（SSRF 8 + sessions 6）
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add infra/browser-bridge/src/sessions.js infra/browser-bridge/test/sessions.test.js
-git commit -m "feat(bridge): SessionManager——headless Chromium 会话生命周期 + 配额 + 抓帧"
+git commit -m "feat(bridge): SessionManager——Playwright 共享 browser/临时 context/串行队列/三模式定位"
 ```
 
 ### Task 3: HTTP 服务 + 部署件
@@ -442,17 +651,19 @@ git commit -m "feat(bridge): SessionManager——headless Chromium 会话生命�
 - Create: `infra/browser-bridge/.env.example`
 - Create: `infra/browser-bridge/README.md`
 
-- [ ] **Step 1: 写 `src/server.js`**
+- [ ] **Step 1: 写 `src/server.js`**（token 时序安全比较 + 服务加固，借鉴 openmuse `apps/worker/src/server.ts`）
 
 ```js
 'use strict';
 
+const crypto = require('node:crypto');
 const http = require('node:http');
 const config = require('./config');
 const { SessionManager, PoolExhaustedError, SessionExpiredError, ActionFailedError } = require('./sessions');
 const { SsrfError } = require('./ssrf');
 
 const manager = new SessionManager(config);
+const expectedTokenHash = crypto.createHash('sha256').update(config.token).digest();
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -482,8 +693,8 @@ function sendJson(res, code, obj) {
   res.end(payload);
 }
 
-function failPayload(res, session, err) {
-  // 域名错误一律 200 + 结构化 status（401/404 由路由层处理）
+function failPayload(session, err) {
+  // 域名错误一律 200 + 结构化 status（401/404/413 由传输层处理）
   if (err instanceof PoolExhaustedError) return { status: 'pool_exhausted', errorCode: err.code, reason: 'browser pool is full' };
   if (err instanceof SessionExpiredError) return { status: 'session_expired', errorCode: err.code, reason: 'session expired or unknown' };
   if (err instanceof SsrfError) return { status: 'action_failed', errorCode: err.code, reason: `url rejected: ${err.code}` };
@@ -494,8 +705,12 @@ function failPayload(res, session, err) {
 }
 
 const server = http.createServer(async (req, res) => {
+  res.setHeader('cache-control', 'no-store');
+  res.setHeader('x-content-type-options', 'nosniff');
   try {
-    if (req.headers['x-bridge-token'] !== config.token || !config.token) {
+    // 时序安全 token 比较（借鉴 openmuse：先哈希再 timingSafeEqual，防空 token 与长度侧信道）
+    const providedHash = crypto.createHash('sha256').update(String(req.headers['x-bridge-token'] || '')).digest();
+    if (!config.token || !crypto.timingSafeEqual(expectedTokenHash, providedHash)) {
       return sendJson(res, 401, { error: 'unauthorized' });
     }
     const url = new URL(req.url, 'http://localhost');
@@ -507,10 +722,14 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && path === '/session') {
       const body = await readBody(req);
-      const session = await manager.open(body.url || null);
-      let frame;
-      if (body.wantFrame) frame = await manager.captureFrame(session);
-      return sendJson(res, 200, await manager._result(session, { frame, actionMs: 0 }));
+      try {
+        const session = await manager.open(body.url || null);
+        let frame;
+        if (body.wantFrame) frame = await manager.captureFrame(session);
+        return sendJson(res, 200, await manager._result(session, { frame, actionMs: 0 }));
+      } catch (err) {
+        return sendJson(res, 200, failPayload(null, err));
+      }
     }
 
     const m = path.match(/^\/session\/([0-9a-f-]{36})(\/action|\/frame|\/close)?$/);
@@ -519,43 +738,55 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && suffix === '/action') {
       const body = await readBody(req);
-      const session = manager.get(id);
+      let session;
+      try {
+        session = manager.get(id);
+      } catch (err) {
+        return sendJson(res, 200, failPayload(null, err));
+      }
       try {
         return sendJson(res, 200, await manager.act(session, body));
       } catch (err) {
-        return sendJson(res, 200, failPayload(res, session, err));
+        return sendJson(res, 200, failPayload(session, err));
       }
     }
 
     if (req.method === 'GET' && suffix === '/frame') {
-      const session = manager.get(id);
-      const frame = await manager.captureFrame(session);
-      return sendJson(res, 200, {
-        status: 'ok',
-        sessionId: session.id,
-        currentUrl: session.page.url(),
-        pageTitle: await session.page.title().catch(() => ''),
-        frameJpegBase64: frame,
-      });
+      try {
+        const session = manager.get(id);
+        const frame = await manager.captureFrame(session);
+        return sendJson(res, 200, {
+          status: 'ok',
+          sessionId: session.id,
+          currentUrl: session.page.url(),
+          pageTitle: await session.page.title().catch(() => ''),
+          frameJpegBase64: frame,
+        });
+      } catch (err) {
+        return sendJson(res, 200, failPayload(null, err));
+      }
     }
 
     if (req.method === 'POST' && suffix === '/close') {
       const session = manager.sessions.get(id);
       const actionCount = session ? session.actionCount : 0;
+      const lastGoodFrame = session ? session.lastGoodFrame : null;
       const closed = await manager.close(id);
-      return sendJson(res, 200, { status: 'ok', sessionId: id, closed, actionCount });
+      return sendJson(res, 200, { status: 'ok', sessionId: id, closed, actionCount, lastGoodFrame });
     }
 
     return sendJson(res, 404, { error: 'not_found' });
   } catch (err) {
-    if (err instanceof SessionExpiredError || err instanceof PoolExhaustedError || err instanceof SsrfError || err instanceof ActionFailedError) {
-      return sendJson(res, 200, failPayload(res, null, err));
-    }
     if (err && err.message === 'bad_json') return sendJson(res, 400, { error: 'bad_json' });
     if (err && err.message === 'body_too_large') return sendJson(res, 413, { error: 'body_too_large' });
     return sendJson(res, 500, { error: 'internal', message: err && err.message ? err.message : 'unknown' });
   }
 });
+
+// 服务加固（借鉴 openmuse server.ts）
+server.requestTimeout = 30_000;
+server.headersTimeout = 10_000;
+server.keepAliveTimeout = 5_000;
 
 setInterval(() => { manager.reap().catch(() => {}); }, 30_000).unref();
 
@@ -564,27 +795,25 @@ server.listen(config.port, '0.0.0.0', () => {
 });
 ```
 
-> 注意：`manager._result` 带下划线属内部复用（open 路径与同 act 共用同一组装），实现时保持现状即可，不做额外封装。
-
-- [ ] **Step 2: 本地冒烟（本机有 Chrome 时；无则标记跳过并到 xuxing 验证）**
+- [ ] **Step 2: 本地冒烟（playwright postinstall 已装 chromium；无显示环境不影响 headless）**
 
 ```bash
 cd infra/browser-bridge
-BRIDGE_TOKEN=test-token CHROME_PATH="$(which google-chrome || which chromium || echo /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome)" node src/server.js &
+BRIDGE_TOKEN=test-token node src/server.js &
 sleep 1
 curl -s -H "X-Bridge-Token: test-token" http://127.0.0.1:8788/healthz
 # → {"ok":true,"sessions":0}
 SID=$(curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
   -d '{"url":"https://example.com","wantFrame":true}' http://127.0.0.1:8788/session | python3 -c 'import json,sys; print(json.load(sys.stdin)["sessionId"])')
 curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
-  -d '{"action":"extract"}' "http://127.0.0.1:8788/session/$SID/action" | head -c 300
-# → {"status":"ok",...,"textExtract":"Example Domain..."}
+  -d '{"action":"extract"}' "http://127.0.0.1:8788/session/$SID/action" | head -c 400
+# → {"status":"ok",...,"textExtract":"Example Domain...","elements":[{"index":0,"tag":"a","text":"More information..."}]}
 curl -s -X POST -H "X-Bridge-Token: test-token" "http://127.0.0.1:8788/session/$SID/close"
 # → {"status":"ok","closed":true,...}
-# SSRF 负例：
+# SSRF 负例（open 即拒）：
 curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
   -d '{"url":"http://192.168.1.1/"}' http://127.0.0.1:8788/session
-# → {"status":"action_failed","errorCode":"private_address",...}
+# → {"status":"action_failed","errorCode":"blocked_url",...}
 kill %1
 ```
 
@@ -595,7 +824,7 @@ kill %1
 ```bash
 BRIDGE_PORT=8788
 BRIDGE_TOKEN=change-me-shared-with-picme-server
-CHROME_PATH=/usr/bin/google-chrome
+CHROME_PATH=
 MAX_SESSIONS=8
 IDLE_TIMEOUT_MS=120000
 HARD_CAP_MS=600000
@@ -637,16 +866,19 @@ ssh xuxing 'cd /opt/browser-bridge && npm install --omit=dev && sudo systemctl r
 ```markdown
 # browser-agent-bridge
 
-xuxing 侧云端浏览器桥：自起 headless Chromium（`--headless=new`），纯 CDP DOM 级驱动，
-为 picme-server `/v1/browser/*` 提供会话执行与按需抓帧。设计 SSOT：
-`docs/superpowers/specs/2026-10-06-browser-vnc-live-card-design.md`。
+xuxing 侧云端浏览器桥：单例 headless Chromium + 每会话临时 BrowserContext（Playwright），
+纯 CDP DOM 级驱动，为 picme-server `/v1/browser/*` 提供会话执行与按需抓帧。
+设计 SSOT：`docs/superpowers/specs/2026-10-06-browser-vnc-live-card-design.md`。
+安全边界借鉴 [CopilotKit/openmuse](https://github.com/CopilotKit/openmuse)（MIT）`apps/worker`：
+SSRF 全球单播许可名单（仅 80/443）+ 重定向落地复查 + 子请求级拦截 + WebSocket 全禁 +
+token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入）。
 
 - 端点：`POST /session`（open）、`POST /session/{id}/action`、`GET /session/{id}/frame`、
   `POST /session/{id}/close`、`GET /healthz`；全部要求 `X-Bridge-Token` 头。
 - 域名结果一律 HTTP 200 + JSON `status`（ok/action_failed/pool_exhausted/session_expired）。
-- SSRF：目标 URL 解析结果落私有地址段即拒（`src/ssrf.js`）。
+- click/type 定位三模式：index（extract 返回的元素序号，LLM 首选）/ targetText / selector。
 - 部署：`./deploy.sh`（rsync → npm install --omit=dev → systemctl restart → healthz）。
-- 测试：`npm test`（单测）；`BRIDGE_INTEGRATION=1 npm test` 预留（M1 冒烟走 README curl 段）。
+- 测试：`npm test`（单测）；冒烟走 README curl 段（本文件上方示例）。
 ```
 
 - [ ] **Step 4: 赋可执行权限并 commit**
@@ -654,11 +886,10 @@ xuxing 侧云端浏览器桥：自起 headless Chromium（`--headless=new`），
 ```bash
 chmod +x infra/browser-bridge/deploy.sh
 git add infra/browser-bridge/
-git commit -m "feat(bridge): HTTP 服务 + systemd unit + 部署脚本 + README"
+git commit -m "feat(bridge): HTTP 服务（时序安全 token + 超时加固）+ systemd unit + 部署脚本 + README"
 ```
 
 ---
-
 ## Phase B：picme-server 网关（server/）
 
 背景事实（执行时对照）：路由装配在 `server/src/main/kotlin/com/mamba/picme/server/Application.kt:168-190`；鉴权是全局拦截器（`Application.kt:111-142`，`/v1/browser/**` 不在 `publicRoutes` 白名单 → 自动要求 X-App-Token）；路由内取身份用 `call.ownerTokenHash()`（`routes/ClaudeChatRoute.kt:146-151`，若该扩展为 file-private 则在 BrowserRoute.kt 复制同形实现）；反代透传范本 = `claudeDeliverRoute`（`ClaudeChatRoute.kt:93-121`）；出站 client 范本 = `issue/GitHubIssueClient.kt:45-77`；每日配额内存限流先例 = `IssueReportRoute.kt:26` + `Application.kt:166`。
@@ -1443,6 +1674,28 @@ class BrowserProtocolTest {
         val decoded = json.decodeFromString<BrowserFrameResult>(json.encodeToString(BrowserFrameResult.serializer(), r))
         assertEquals(r, decoded)
     }
+
+    @Test
+    fun `action request round-trip with element target`() {
+        val req = BrowserActionRequest(
+            sessionId = "s-1",
+            action = BrowserAction.CLICK,
+            targetIndex = 3,
+            wantFrame = true,
+        )
+        val decoded = json.decodeFromString<BrowserActionRequest>(json.encodeToString(BrowserActionRequest.serializer(), req))
+        assertEquals(req, decoded)
+    }
+
+    @Test
+    fun `action result carries interactive elements`() {
+        val decoded = json.decodeFromString<BrowserActionResult>(
+            """{"status":"ok","sessionId":"s","elements":[{"index":0,"tag":"a","text":"Sign in","href":"https://example.com/login","type":null}]}"""
+        )
+        assertEquals(1, decoded.elements?.size)
+        assertEquals("Sign in", decoded.elements?.first()?.text)
+        assertEquals("https://example.com/login", decoded.elements?.first()?.href)
+    }
 }
 ```
 
@@ -1483,7 +1736,34 @@ object BrowserAction {
     const val SCREENSHOT = "screenshot"
 }
 
-/** open/action/close 统一响应（[textExtract]/[frameJpegBase64] 按动作与 wantFrame 可选出现）。 */
+/**
+ * 动作请求 DTO（端 → 云统一形态，借鉴 openmuse：click/type 三模式定位）。
+ * 定位优先级：targetIndex（extract 返回的元素序号）> targetText（可见文本匹配）> selector（CSS，兜底）。
+ * 不用字段传 null；App 侧 @Tool 参数的空串/-1 哨兵由能力层归一为 null。
+ */
+@Serializable
+data class BrowserActionRequest(
+    val sessionId: String,
+    val action: String,
+    val url: String? = null,
+    val selector: String? = null,
+    val targetText: String? = null,
+    val targetIndex: Int? = null,
+    val text: String? = null,
+    val wantFrame: Boolean = false,
+)
+
+/** extract 返回的交互元素（LLM 凭 index/text 回指，不用猜盲 selector）。 */
+@Serializable
+data class BrowserElement(
+    val index: Int,
+    val tag: String,
+    val text: String? = null,
+    val href: String? = null,
+    val type: String? = null,
+)
+
+/** open/action/close 统一响应（[textExtract]/[frameJpegBase64]/[elements] 按动作与 wantFrame 可选出现）。 */
 @Serializable
 data class BrowserActionResult(
     val status: String,
@@ -1492,6 +1772,7 @@ data class BrowserActionResult(
     val pageTitle: String? = null,
     val textExtract: String? = null,
     val frameJpegBase64: String? = null,
+    val elements: List<BrowserElement>? = null,
     val actionMs: Long? = null,
     val actionCount: Int? = null,
     val errorCode: String? = null,
@@ -1555,18 +1836,22 @@ git commit -m "feat(shared): browser 协议 DTO——状态闭集 + 双响应 + 
         val url: String
     ) : AgentCommand()
 
-    /** 点击 CSS 选择器命中的元素。 */
+    /** 点击元素（三模式定位，优先级 targetIndex > targetText > selector；空串/-1 为「未提供」哨兵）。 */
     data class BrowserClick(
         override val commandId: Int = AgentIdGenerator.nextId(),
         val sessionId: String,
-        val selector: String
+        val selector: String = "",
+        val targetText: String = "",
+        val targetIndex: Int = -1
     ) : AgentCommand()
 
-    /** 向 CSS 选择器命中的输入框键入文本。 */
+    /** 向输入框键入文本（定位模式同 [BrowserClick]）。 */
     data class BrowserType(
         override val commandId: Int = AgentIdGenerator.nextId(),
         val sessionId: String,
-        val selector: String,
+        val selector: String = "",
+        val targetText: String = "",
+        val targetIndex: Int = -1,
         val text: String
     ) : AgentCommand()
 
@@ -1610,6 +1895,7 @@ import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.runtime.state.SceneManager
+import com.mamba.picme.domain.browser.BrowserActionRequest
 import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
 import com.mamba.picme.domain.browser.BrowserStatus
@@ -1624,14 +1910,16 @@ class BrowserSessionCapabilityTest {
 
     private class FakeTransport(var result: BrowserActionResult) : BrowserTransport {
         val calls = mutableListOf<String>()
+        var lastRequest: BrowserActionRequest? = null
         var failWith: BrowserUnavailableException? = null
         override suspend fun open(url: String, wantFrame: Boolean): BrowserActionResult {
             calls += "open:$url:$wantFrame"
             failWith?.let { throw it }
             return result
         }
-        override suspend fun action(sessionId: String, action: String, url: String?, selector: String?, text: String?, wantFrame: Boolean): BrowserActionResult {
-            calls += "action:$sessionId:$action:$wantFrame"
+        override suspend fun action(request: BrowserActionRequest): BrowserActionResult {
+            calls += "action:${request.sessionId}:${request.action}:${request.wantFrame}"
+            lastRequest = request
             failWith?.let { throw it }
             return result
         }
@@ -1708,6 +1996,17 @@ class BrowserSessionCapabilityTest {
     }
 
     @Test
+    fun `click normalizes sentinel fields to null and prefers index`() = runTest {
+        val transport = FakeTransport(BrowserActionResult(status = BrowserStatus.OK, sessionId = "s-1"))
+        val cap = BrowserSessionCapability(transport)
+        cap.execute(AgentCommand.BrowserClick(sessionId = "s-1", targetIndex = 3), context, null)
+        val req = transport.lastRequest!!
+        assertEquals(3, req.targetIndex)
+        assertEquals(null, req.targetText)
+        assertEquals(null, req.selector)
+    }
+
+    @Test
     fun `supported commands cover all seven browser tools`() {
         val cap = BrowserSessionCapability(FakeTransport(BrowserActionResult(status = BrowserStatus.OK)))
         assertEquals(
@@ -1734,6 +2033,7 @@ import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentErrorCode
 import com.mamba.picme.agent.core.model.context.PageContext
 import com.mamba.picme.domain.browser.BrowserAction
+import com.mamba.picme.domain.browser.BrowserActionRequest
 import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
 import com.mamba.picme.domain.browser.BrowserStatus
@@ -1743,7 +2043,7 @@ import kotlin.concurrent.Volatile
 /** 浏览器传输层（commonMain 无 HTTP 手段，组合根注入平台实现；测试注入 fake）。 */
 interface BrowserTransport {
     suspend fun open(url: String, wantFrame: Boolean): BrowserActionResult
-    suspend fun action(sessionId: String, action: String, url: String?, selector: String?, text: String?, wantFrame: Boolean): BrowserActionResult
+    suspend fun action(request: BrowserActionRequest): BrowserActionResult
     suspend fun frame(sessionId: String): BrowserFrameResult
     suspend fun close(sessionId: String): BrowserActionResult
 }
@@ -1789,11 +2089,32 @@ class BrowserSessionCapability(
         val reply = try {
             when (command) {
                 is AgentCommand.BrowserOpen -> onOpen(command)
-                is AgentCommand.BrowserNavigate -> onAction(command.sessionId, BrowserAction.NAVIGATE, url = command.url, selector = null, text = null, wantFrame = true)
-                is AgentCommand.BrowserClick -> onAction(command.sessionId, BrowserAction.CLICK, url = null, selector = command.selector, text = null, wantFrame = true)
-                is AgentCommand.BrowserType -> onAction(command.sessionId, BrowserAction.TYPE, url = null, selector = command.selector, text = command.text, wantFrame = true)
-                is AgentCommand.BrowserExtract -> onAction(command.sessionId, BrowserAction.EXTRACT, url = null, selector = null, text = null, wantFrame = false)
-                is AgentCommand.BrowserScreenshot -> onAction(command.sessionId, BrowserAction.SCREENSHOT, url = null, selector = null, text = null, wantFrame = true)
+                is AgentCommand.BrowserNavigate -> onAction(
+                    BrowserActionRequest(sessionId = command.sessionId, action = BrowserAction.NAVIGATE, url = command.url, wantFrame = true)
+                )
+                is AgentCommand.BrowserClick -> onAction(
+                    BrowserActionRequest(
+                        sessionId = command.sessionId, action = BrowserAction.CLICK, wantFrame = true,
+                        selector = command.selector.ifEmpty { null },
+                        targetText = command.targetText.ifEmpty { null },
+                        targetIndex = command.targetIndex.takeIf { it >= 0 },
+                    )
+                )
+                is AgentCommand.BrowserType -> onAction(
+                    BrowserActionRequest(
+                        sessionId = command.sessionId, action = BrowserAction.TYPE, wantFrame = true,
+                        selector = command.selector.ifEmpty { null },
+                        targetText = command.targetText.ifEmpty { null },
+                        targetIndex = command.targetIndex.takeIf { it >= 0 },
+                        text = command.text,
+                    )
+                )
+                is AgentCommand.BrowserExtract -> onAction(
+                    BrowserActionRequest(sessionId = command.sessionId, action = BrowserAction.EXTRACT, wantFrame = false)
+                )
+                is AgentCommand.BrowserScreenshot -> onAction(
+                    BrowserActionRequest(sessionId = command.sessionId, action = BrowserAction.SCREENSHOT, wantFrame = true)
+                )
                 is AgentCommand.BrowserClose -> onClose(command.sessionId)
                 else -> return Result.success(
                     AgentAction.Error(command.commandId, AgentErrorCode.METHOD_NOT_FOUND, "BrowserSessionCapability 不支持此命令")
@@ -1812,24 +2133,23 @@ class BrowserSessionCapability(
         return "浏览器会话已开始 sessionId=${r.sessionId}，当前页面：${r.pageTitle ?: ""}（${r.currentUrl ?: command.url}）"
     }
 
-    private suspend fun onAction(
-        sessionId: String,
-        action: String,
-        url: String?,
-        selector: String?,
-        text: String?,
-        wantFrame: Boolean,
-    ): String {
-        val r = transport.action(sessionId, action, url, selector, text, wantFrame)
+    private suspend fun onAction(request: BrowserActionRequest): String {
+        val r = transport.action(request)
         if (r.status != BrowserStatus.OK) {
-            delegate?.onBrowserSessionFailed(sessionId, r.reason ?: r.status)
+            delegate?.onBrowserSessionFailed(request.sessionId, r.reason ?: r.status)
             return degradation(r.status, r.reason)
         }
-        delegate?.onBrowserSessionAction(sessionId, action, selector, text, r.currentUrl ?: "", r.pageTitle ?: "", r.frameJpegBase64)
-        return if (action == BrowserAction.EXTRACT) {
-            "页面正文：\n${r.textExtract ?: ""}"
+        delegate?.onBrowserSessionAction(request.sessionId, request.action, request.selector, request.text, r.currentUrl ?: "", r.pageTitle ?: "", r.frameJpegBase64)
+        return if (request.action == BrowserAction.EXTRACT) {
+            val elementsHint = r.elements?.takeIf { it.isNotEmpty() }?.let { list ->
+                "\n可交互元素（click/type 优先用 index 回指）：\n" +
+                    list.joinToString("\n") { e ->
+                        "[${e.index}] <${e.tag}> ${e.text ?: ""}${e.href?.let { h -> " -> $h" } ?: ""}${e.type?.let { t -> " (type=$t)" } ?: ""}"
+                    }
+            } ?: ""
+            "页面正文：\n${r.textExtract ?: ""}$elementsHint"
         } else {
-            "已执行 $action，当前页面：${r.pageTitle ?: ""}（${r.currentUrl ?: ""}）"
+            "已执行 ${request.action}，当前页面：${r.pageTitle ?: ""}（${r.currentUrl ?: ""}）"
         }
     }
 
@@ -1895,29 +2215,37 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         dispatchCommand(AgentCommand.BrowserNavigate(sessionId = sessionId, url = url))
 
     @Tool(customName = "browser_click")
-    @LLMDescription("点击云端浏览器当前页面中 CSS 选择器命中的元素（如 'button.submit'、'a[href*=login]'）。")
+    @LLMDescription("点击云端浏览器当前页面中的元素。三种定位方式按优先级选用：targetIndex（browser_extract 返回的元素序号，最可靠）> targetText（元素可见文本）> selector（CSS 选择器，兜底）。三者至少给一个，多余传空串/-1。")
     suspend fun browserClick(
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
-        @LLMDescription("CSS 选择器")
+        @LLMDescription("browser_extract 返回的元素序号；未使用传 -1")
+        targetIndex: Int,
+        @LLMDescription("元素可见文本（如 'Sign in'）；未使用传空串")
+        targetText: String,
+        @LLMDescription("CSS 选择器（如 'button.submit'）；未使用传空串")
         selector: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, selector = selector))
+        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector))
 
     @Tool(customName = "browser_type")
-    @LLMDescription("向云端浏览器当前页面中 CSS 选择器命中的输入框键入文本。")
+    @LLMDescription("向云端浏览器当前页面中的输入框键入文本。定位方式同 browser_click（优先 targetIndex）。")
     suspend fun browserType(
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
-        @LLMDescription("CSS 选择器")
+        @LLMDescription("browser_extract 返回的元素序号；未使用传 -1")
+        targetIndex: Int,
+        @LLMDescription("输入框可见文本/占位符；未使用传空串")
+        targetText: String,
+        @LLMDescription("CSS 选择器；未使用传空串")
         selector: String,
         @LLMDescription("要键入的文本")
         text: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, selector = selector, text = text))
+        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector, text = text))
 
     @Tool(customName = "browser_extract")
-    @LLMDescription("提取云端浏览器当前页面的正文文本（截断 4000 字符）。阅读页面内容用它，不要用 browser_screenshot 读内容。")
+    @LLMDescription("提取云端浏览器当前页面的正文文本（截断 4000 字符）与可交互元素清单（每个元素带 index/tag/text/href）。阅读页面内容用它，不要用 browser_screenshot 读内容；后续 click/type 优先用清单里的 index 定位。")
     suspend fun browserExtract(
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
@@ -1949,6 +2277,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 浏览器工具（browser_*）：用户的问题需要实时网页信息（价格、新闻、赛程、文档等）时使用。
 流程固定为 browser_open → 若干动作（navigate/click/type/extract）→ browser_close；
 一次会话聚焦一个任务，提取内容用 browser_extract 而非截图；
+点击/输入优先用 browser_extract 返回的元素 index 定位，其次可见文本，CSS 选择器只作兜底；
 任务结束（含中途放弃、额度/资源报错改纯文本回答）都必须 browser_close。
 不要浏览用户未要求的站点，不要在网页上输入用户的账号密码等敏感信息。
 ```
@@ -2296,6 +2625,7 @@ git commit -m "feat(shared): tool_browser 占位管线 + live overlay + 拍平/�
 package com.mamba.picme.data.remote.picme
 
 import com.mamba.picme.agent.core.capability.BrowserTransport
+import com.mamba.picme.domain.browser.BrowserActionRequest
 import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
 import com.mamba.picme.domain.browser.BrowserUnavailableException
@@ -2329,23 +2659,8 @@ class BrowserSessionClient(
     override suspend fun open(url: String, wantFrame: Boolean): BrowserActionResult =
         post("/v1/browser/open", JSONObject().put("url", url).put("wantFrame", wantFrame).toString())
 
-    override suspend fun action(
-        sessionId: String,
-        action: String,
-        url: String?,
-        selector: String?,
-        text: String?,
-        wantFrame: Boolean,
-    ): BrowserActionResult {
-        val body = JSONObject()
-            .put("sessionId", sessionId)
-            .put("action", action)
-            .put("wantFrame", wantFrame)
-        if (url != null) body.put("url", url)
-        if (selector != null) body.put("selector", selector)
-        if (text != null) body.put("text", text)
-        return post("/v1/browser/action", body.toString())
-    }
+    override suspend fun action(request: BrowserActionRequest): BrowserActionResult =
+        post("/v1/browser/action", json.encodeToString(BrowserActionRequest.serializer(), request))
 
     override suspend fun frame(sessionId: String): BrowserFrameResult = withContext(Dispatchers.IO) {
         val request = authedBuilder("$baseUrl/v1/browser/frame?sessionId=$sessionId").get().build()
