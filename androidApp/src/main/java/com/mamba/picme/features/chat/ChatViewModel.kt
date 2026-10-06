@@ -2867,7 +2867,7 @@ class ChatViewModel(
             ),
             actionCount = 1,
         )
-        _browserLiveSessions.value = _browserLiveSessions.value + (sessionId to entry)
+        _browserLiveSessions.update { it + (sessionId to entry) }
         // browser_open 占位原位填充（拿到 sessionId；无在途调用时 feedToolOutput 内部 no-op）
         viewModelScope.launch {
             feedToolOutput(TurnPartsReducer.TOOL_BROWSER_OPEN) { toolCallId -> entry.copy(partId = toolCallId) }
@@ -2875,52 +2875,62 @@ class ChatViewModel(
     }
 
     override fun onBrowserSessionAction(sessionId: String, action: String, selector: String?, text: String?, url: String, title: String, frameJpegBase64: String?) {
-        val current = _browserLiveSessions.value[sessionId] ?: return
-        val updated = current.copy(
-            currentUrl = url.ifBlank { current.currentUrl },
-            pageTitle = title.ifBlank { current.pageTitle },
-            frameJpegBase64 = frameJpegBase64 ?: current.frameJpegBase64,
-            actions = (current.actions + BrowserActionEntry(
-                description = formatBrowserAction(stringContext(), action, selector, text ?: url)
-            )).takeLast(3),
-            actionCount = current.actionCount + 1,
-        )
-        _browserLiveSessions.value = _browserLiveSessions.value + (sessionId to updated)
+        // delegate 回调来自能力执行线程，与 pollBrowserFrame(IO) 并发：RMW 必须走 update 原子 CAS，
+        // 否则旧快照回退会丢更新（最严重：帧回退终态写入 → settle 误判非终态重复 close/落卡）
+        _browserLiveSessions.update { sessions ->
+            val current = sessions[sessionId] ?: return@update sessions
+            sessions + (sessionId to current.copy(
+                currentUrl = url.ifBlank { current.currentUrl },
+                pageTitle = title.ifBlank { current.pageTitle },
+                frameJpegBase64 = frameJpegBase64 ?: current.frameJpegBase64,
+                actions = (current.actions + BrowserActionEntry(
+                    description = formatBrowserAction(stringContext(), action, selector, text ?: url)
+                )).takeLast(3),
+                actionCount = current.actionCount + 1,
+            ))
+        }
     }
 
     override fun onBrowserSessionFrame(sessionId: String, url: String, title: String, frameJpegBase64: String) {
-        val current = _browserLiveSessions.value[sessionId] ?: return
-        _browserLiveSessions.value = _browserLiveSessions.value +
-            (sessionId to current.copy(
+        _browserLiveSessions.update { sessions ->
+            val current = sessions[sessionId] ?: return@update sessions
+            sessions + (sessionId to current.copy(
                 currentUrl = url.ifBlank { current.currentUrl },
                 pageTitle = title.ifBlank { current.pageTitle },
                 frameJpegBase64 = frameJpegBase64,
             ))
+        }
     }
 
     override fun onBrowserSessionFailed(sessionId: String, reason: String) {
-        val current = _browserLiveSessions.value[sessionId] ?: return
-        _browserLiveSessions.value = _browserLiveSessions.value +
-            (sessionId to current.copy(state = ToolPartState.OUTPUT_ERROR, errorReason = reason))
+        _browserLiveSessions.update { sessions ->
+            val current = sessions[sessionId] ?: return@update sessions
+            sessions + (sessionId to current.copy(state = ToolPartState.OUTPUT_ERROR, errorReason = reason))
+        }
         viewModelScope.launch { feedToolError(TurnPartsReducer.TOOL_BROWSER_OPEN, reason) }
     }
 
     override fun onBrowserSessionClosed(sessionId: String, finalFrameJpegBase64: String?, actionCount: Int) {
-        val current = _browserLiveSessions.value[sessionId] ?: return
-        val finalPart = current.copy(
-            state = if (current.state == ToolPartState.OUTPUT_ERROR) ToolPartState.OUTPUT_ERROR else ToolPartState.OUTPUT_AVAILABLE,
-            frameJpegBase64 = finalFrameJpegBase64 ?: current.frameJpegBase64,
-            actionCount = actionCount,
-            resultSummary = if (current.errorReason == null) {
-                stringContext().getString(R.string.browser_live_done_summary, actionCount)
-            } else {
-                null
-            },
-        )
+        var finalPart: MessagePart.BrowserLive? = null
+        _browserLiveSessions.update { sessions ->
+            val current = sessions[sessionId] ?: return@update sessions
+            val part = current.copy(
+                state = if (current.state == ToolPartState.OUTPUT_ERROR) ToolPartState.OUTPUT_ERROR else ToolPartState.OUTPUT_AVAILABLE,
+                frameJpegBase64 = finalFrameJpegBase64 ?: current.frameJpegBase64,
+                actionCount = actionCount,
+                resultSummary = if (current.errorReason == null) {
+                    stringContext().getString(R.string.browser_live_done_summary, actionCount)
+                } else {
+                    null
+                },
+            )
+            finalPart = part
+            sessions + (sessionId to part)
+        }
         // 定格后保留在 map：overlay 持续把流式占位覆写为终态，Task 13 双显跳过依赖该状态；
         // 清理统一在 turn 结束兜底（settleBrowserSessionsAtTurnEnd）
-        _browserLiveSessions.value = _browserLiveSessions.value + (sessionId to finalPart)
-        viewModelScope.launch { emitBrowserCardMessage(finalPart) }
+        val persisted = finalPart ?: return
+        viewModelScope.launch { emitBrowserCardMessage(persisted) }
     }
 
     /** 卡片可见期间由 UI 以 ~1s 节拍驱动（spec §2.2 watch 模式）；不可见/退组合自动停止。 */
@@ -2940,8 +2950,9 @@ class ChatViewModel(
 
     /**
      * turn 结束兜底（spec §6）：仍为非终态的会话逐个 close（LLM 忘调 browser_close 时防服务器
-     * 会话泄漏 + 卡片有终态），按 [onBrowserSessionClosed] 同路径定格落库；全部处理完清空
-     * [_browserLiveSessions]（终态卡已落库，新 turn 的流式消息不再含旧占位 part）。
+     * 会话泄漏 + 卡片有终态），按 [onBrowserSessionClosed] 同路径定格落库；全部处理完按快照
+     * 精确移除 [_browserLiveSessions] 中本 turn 的条目（settle 慢速 close 期间新回合
+     * browser_open 的会话不受影响）。
      */
     private fun settleBrowserSessionsAtTurnEnd() {
         val sessions = _browserLiveSessions.value
@@ -2951,10 +2962,17 @@ class ChatViewModel(
             sessions.values
                 .filter { it.state != ToolPartState.OUTPUT_AVAILABLE && it.state != ToolPartState.OUTPUT_ERROR }
                 .forEach { part ->
-                    val result = runCatching { transport?.close(part.sessionId) }.getOrNull()
+                    val result = try {
+                        transport?.close(part.sessionId)
+                    } catch (e: CancellationException) {
+                        // 结构化并发：VM 清理/协程取消原样上抛，不折叠为静默失败
+                        throw e
+                    } catch (e: Exception) {
+                        null // 失败静默：会话由服务端 2 分钟空闲回收兜底（spec §6）
+                    }
                     onBrowserSessionClosed(part.sessionId, result?.lastGoodFrame, result?.actionCount ?: part.actionCount)
                 }
-            _browserLiveSessions.value = emptyMap()
+            _browserLiveSessions.update { current -> current - sessions.keys }
         }
     }
 
