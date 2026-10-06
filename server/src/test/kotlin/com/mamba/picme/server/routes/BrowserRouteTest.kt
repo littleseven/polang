@@ -103,4 +103,42 @@ class BrowserRouteTest {
         }
         assertEquals(HttpStatusCode.TooManyRequests, resp.status)
     }
+
+    @Test
+    fun `open with non-ok bridge result neither charges quota nor holds lease`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        // 配额 1：若非 ok 也计费，第二次必定 429
+        val limiter = RateLimiter(1, 86_400_000L)
+        app(bridgeReturning("""{"status":"pool_exhausted","errorCode":"pool"}"""), concurrency, limiter)
+        repeat(2) {
+            val resp = client.post("/v1/browser/open") {
+                header(APP_TOKEN_HEADER, "test-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"url":"https://example.com"}""")
+            }
+            assertEquals(HttpStatusCode.OK, resp.status)
+        }
+        assertEquals(0, concurrency.activeCount())
+    }
+
+    @Test
+    fun `open with unreachable bridge returns 503 and neither charges quota nor holds lease`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val limiter = RateLimiter(1, 86_400_000L)
+        val bridge = BrowserBridgeClient(
+            HttpClient(MockEngine { throw java.net.ConnectException("refused") }),
+            "http://bridge",
+            "tok",
+        )
+        app(bridge, concurrency, limiter)
+        repeat(2) {
+            val resp = client.post("/v1/browser/open") {
+                header(APP_TOKEN_HEADER, "test-token")
+                contentType(ContentType.Application.Json)
+                setBody("""{"url":"https://example.com"}""")
+            }
+            assertEquals(HttpStatusCode.ServiceUnavailable, resp.status)
+        }
+        assertEquals(0, concurrency.activeCount())
+    }
 }

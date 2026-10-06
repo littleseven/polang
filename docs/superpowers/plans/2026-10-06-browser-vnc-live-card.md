@@ -1502,6 +1502,42 @@ class BrowserRouteTest {
         }
         assertEquals(HttpStatusCode.TooManyRequests, resp.status)
     }
+
+    @Test
+    fun `open with non-ok bridge result neither charges quota nor holds lease`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val limiter = RateLimiter(1, 86_400_000L) // 配额 1：若非 ok 也计费，第二次必定 429
+        app(bridgeReturning("""{"status":"pool_exhausted","errorCode":"pool"}"""), concurrency, limiter)
+        repeat(2) {
+            val resp = client.post("/v1/browser/open") {
+                header("X-App-Token", "test-token")
+                header(HttpHeaders.ContentType, "application/json")
+                setBody("""{"url":"https://example.com"}""")
+            }
+            assertEquals(HttpStatusCode.OK, resp.status)
+        }
+        assertEquals(0, concurrency.activeCount())
+    }
+
+    @Test
+    fun `open with unreachable bridge returns 503 and neither charges quota nor holds lease`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val bridge = BrowserBridgeClient(
+            HttpClient(MockEngine { throw java.net.ConnectException("refused") }),
+            "http://bridge",
+            "tok",
+        )
+        app(bridge, concurrency, RateLimiter(1, 86_400_000L))
+        repeat(2) {
+            val resp = client.post("/v1/browser/open") {
+                header("X-App-Token", "test-token")
+                header(HttpHeaders.ContentType, "application/json")
+                setBody("""{"url":"https://example.com"}""")
+            }
+            assertEquals(HttpStatusCode.ServiceUnavailable, resp.status)
+        }
+        assertEquals(0, concurrency.activeCount())
+    }
 }
 ```
 
@@ -1533,6 +1569,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("picme-browser")
 
 /**
  * 云端浏览器网关（spec §2/§6/§7）：
@@ -1575,7 +1614,9 @@ fun Route.browserRoute(
         if (sessionId != null) {
             concurrency.bind(owner, sessionId)
             dailyLimiter.allow(owner) // 成功才计额度（spec §6：browser_unavailable 不计）
-            stats.recordOpen(owner, sessionId)
+            // 统计写故障隔离：telemetry 挂不得破坏响应契约（租约已绑/额度已计）
+            runCatching { stats.recordOpen(owner, sessionId) }
+                .onFailure { logger.warn("browser stats recordOpen failed: sessionId=$sessionId", it) }
         } else {
             concurrency.release(owner)
         }
@@ -1588,7 +1629,7 @@ fun Route.browserRoute(
             return@post
         }
         val body = call.receiveText()
-        val sessionId = probeField(body, "sessionId") ?: run {
+        val sessionId = probeSessionId(body) ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_request", "message" to "sessionId required"))
             return@post
         }
@@ -1599,9 +1640,10 @@ fun Route.browserRoute(
             return@post
         }
         val payload = upstream.bodyAsText()
-        if (payload.contains("\"status\":\"session_expired\"")) {
+        if (probeStatus(payload) == "session_expired") {
             concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
-            stats.recordClose(sessionId, "expired")
+            runCatching { stats.recordClose(sessionId, "expired") }
+                .onFailure { logger.warn("browser stats recordClose failed: sessionId=$sessionId", it) }
         }
         call.respondText(payload, ContentType.Application.Json, upstream.status)
     }
@@ -1630,7 +1672,7 @@ fun Route.browserRoute(
             return@post
         }
         val body = call.receiveText()
-        val sessionId = probeField(body, "sessionId") ?: run {
+        val sessionId = probeSessionId(body) ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_request", "message" to "sessionId required"))
             return@post
         }
@@ -1641,7 +1683,8 @@ fun Route.browserRoute(
             return@post
         }
         concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
-        stats.recordClose(sessionId, "closed")
+        runCatching { stats.recordClose(sessionId, "closed") }
+            .onFailure { logger.warn("browser stats recordClose failed: sessionId=$sessionId", it) }
         call.respondText(upstream.bodyAsText(), ContentType.Application.Json, upstream.status)
     }
 }
@@ -1659,13 +1702,16 @@ private fun probeOkSessionId(payload: String): String? =
     runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()
         ?.takeIf { it.status == "ok" && !it.sessionId.isNullOrBlank() }?.sessionId
 
-/** 请求体里宽松提取字符串字段（不入库的轻量解析）。 */
-private fun probeField(payload: String, field: String): String? =
+/** 响应 payload 里解析 status 字段；解析失败返回 null。 */
+private fun probeStatus(payload: String): String? =
+    runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()?.status
+
+/** 请求体里宽松提取 sessionId 字段（不入库的轻量解析）。 */
+private fun probeSessionId(payload: String): String? =
     runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()?.sessionId
-        ?.takeIf { field == "sessionId" }
 ```
 
-> 执行注意：①`call.ownerTokenHash()` 若在 `ClaudeChatRoute.kt` 是 file-private，把其实现（:146-151）复制到本文件；②`probeField` 仅支持 sessionId（M1 唯一需要），按上式实现即可；③测试辅助里的鉴权拦截器要与 `IssueReportRouteTest` 同形注入 `TokenHashKey`；④`stats.recordOpen/recordClose` 为 suspend（Task 6 挂起事务化），在路由 handler 内直接调用即可；⑤open 路径两处 `release(owner)`（异常/非 ok）保持 null 清理形态——租约尚未 bind；action/close 路径用 `release(owner, sessionId)` 条件形态。
+> 执行注意：①`call.ownerTokenHash()` 若在 `ClaudeChatRoute.kt` 是 file-private，把其实现（:146-151）复制到本文件；②请求体 sessionId 用 `probeSessionId(body)` 宽松解析（M1 唯一需要）；③测试辅助里的鉴权拦截器要与 `IssueReportRouteTest` 同形注入 `TokenHashKey`；④`stats.recordOpen/recordClose` 为 suspend（Task 6 挂起事务化），在路由 handler 内直接调用即可，但必须 `runCatching` 包裹 + warn 日志（统计写故障隔离，不得破坏响应契约）；⑤open 路径两处 `release(owner)`（异常/非 ok）保持 null 清理形态——租约尚未 bind；action/close 路径用 `release(owner, sessionId)` 条件形态；⑥session_expired 判定用 `probeStatus(payload)` 解析式，不做子串匹配。
 
 - [ ] **Step 4: Application.kt 装配**
 
@@ -1692,7 +1738,7 @@ browserRoute(browserBridge, browserDailyLimiter, browserConcurrency, browserStat
 - [ ] **Step 5: 跑全部 server 测试 + commit**
 
 Run: `./gradlew -p server build`
-Expected: BUILD SUCCESSFUL（含 BrowserRouteTest 三用例）
+Expected: BUILD SUCCESSFUL（含 BrowserRouteTest 五用例）
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/routes/BrowserRoute.kt server/src/main/kotlin/com/mamba/picme/server/Application.kt server/src/test/kotlin/com/mamba/picme/server/routes/BrowserRouteTest.kt

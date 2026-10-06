@@ -16,6 +16,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("picme-browser")
 
 /**
  * 云端浏览器网关（spec §2/§6/§7）：
@@ -58,7 +61,9 @@ fun Route.browserRoute(
         if (sessionId != null) {
             concurrency.bind(owner, sessionId)
             dailyLimiter.allow(owner) // 成功才计额度（spec §6：browser_unavailable 不计）
-            stats.recordOpen(owner, sessionId)
+            // 统计写故障隔离：telemetry 挂不得破坏响应契约（租约已绑/额度已计）
+            runCatching { stats.recordOpen(owner, sessionId) }
+                .onFailure { logger.warn("browser stats recordOpen failed: sessionId=$sessionId", it) }
         } else {
             concurrency.release(owner)
         }
@@ -71,7 +76,7 @@ fun Route.browserRoute(
             return@post
         }
         val body = call.receiveText()
-        val sessionId = probeField(body, "sessionId") ?: run {
+        val sessionId = probeSessionId(body) ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_request", "message" to "sessionId required"))
             return@post
         }
@@ -82,9 +87,10 @@ fun Route.browserRoute(
             return@post
         }
         val payload = upstream.bodyAsText()
-        if (payload.contains("\"status\":\"session_expired\"")) {
+        if (probeStatus(payload) == "session_expired") {
             concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
-            stats.recordClose(sessionId, "expired")
+            runCatching { stats.recordClose(sessionId, "expired") }
+                .onFailure { logger.warn("browser stats recordClose failed: sessionId=$sessionId", it) }
         }
         call.respondText(payload, ContentType.Application.Json, upstream.status)
     }
@@ -113,7 +119,7 @@ fun Route.browserRoute(
             return@post
         }
         val body = call.receiveText()
-        val sessionId = probeField(body, "sessionId") ?: run {
+        val sessionId = probeSessionId(body) ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_request", "message" to "sessionId required"))
             return@post
         }
@@ -124,7 +130,8 @@ fun Route.browserRoute(
             return@post
         }
         concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
-        stats.recordClose(sessionId, "closed")
+        runCatching { stats.recordClose(sessionId, "closed") }
+            .onFailure { logger.warn("browser stats recordClose failed: sessionId=$sessionId", it) }
         call.respondText(upstream.bodyAsText(), ContentType.Application.Json, upstream.status)
     }
 }
@@ -142,7 +149,10 @@ private fun probeOkSessionId(payload: String): String? =
     runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()
         ?.takeIf { it.status == "ok" && !it.sessionId.isNullOrBlank() }?.sessionId
 
-/** 请求体里宽松提取字符串字段（不入库的轻量解析，M1 仅 sessionId）。 */
-private fun probeField(payload: String, field: String): String? =
+/** 响应 payload 里解析 status 字段；解析失败返回 null。 */
+private fun probeStatus(payload: String): String? =
+    runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()?.status
+
+/** 请求体里宽松提取 sessionId 字段（不入库的轻量解析）。 */
+private fun probeSessionId(payload: String): String? =
     runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()?.sessionId
-        ?.takeIf { field == "sessionId" }
