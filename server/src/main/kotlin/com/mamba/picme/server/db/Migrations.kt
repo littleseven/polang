@@ -177,6 +177,7 @@ object Migrations {
             val now = System.currentTimeMillis()
             seedIfAbsent(SettingsService.KEY_FREE, config.freeLlmQuota, now)
             seedIfAbsent(SettingsService.KEY_GUEST, config.guestLlmQuota, now)
+            seedIfAbsent(SettingsService.KEY_BROWSER_DAILY, config.browserDailyQuota, now)
         }
     }
 

@@ -343,12 +343,13 @@ class AdminRoutesTest {
         val post = c.post("/admin/settings") {
             cookie(AdminAuth.COOKIE_NAME, cookieVal)
             contentType(ContentType.Application.FormUrlEncoded)
-            setBody("free_llm_quota=888&guest_llm_quota=66")
+            setBody("free_llm_quota=888&guest_llm_quota=66&browser_daily_quota=33")
         }
         assertEquals(HttpStatusCode.Found, post.status)
         assertEquals("/admin/settings", post.headers[HttpHeaders.Location])
         assertEquals(888, SettingsService.snapshot().freeLlmQuota)
         assertEquals(66, SettingsService.snapshot().guestLlmQuota)
+        assertEquals(33, SettingsService.snapshot().browserDailyQuota)
     }
 
     @Test

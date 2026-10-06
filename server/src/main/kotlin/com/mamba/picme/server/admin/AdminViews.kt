@@ -399,7 +399,7 @@ object AdminViews {
                     div("section-head") {
                         h2("section-title") { +"额度默认值（全局）" }
                         p("section-desc") {
-                            +"影响：free 用于新注册账号初始上限；guest 用于未注册访客设备上限。"
+                            +"影响：free 用于新注册账号初始上限；guest 用于未注册访客设备上限；browser 用于 Browser 远程会话每日配额。"
                             br(); +"已注册账号的上限按行独立，请在「用户详情」页单独调整。"
                         }
                     }
@@ -415,6 +415,13 @@ object AdminViews {
                             label { +"访客设备上限（guest，>0）" }
                             input(type = InputType.number, name = "guest_llm_quota") {
                                 value = snap.guestLlmQuota.toString()
+                                attributes["min"] = "1"
+                            }
+                        }
+                        div("field") {
+                            label { +"Browser 每日会话配额（>0）" }
+                            input(type = InputType.number, name = "browser_daily_quota") {
+                                value = snap.browserDailyQuota.toString()
                                 attributes["min"] = "1"
                             }
                         }

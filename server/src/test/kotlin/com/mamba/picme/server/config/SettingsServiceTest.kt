@@ -33,24 +33,27 @@ class SettingsServiceTest {
     fun `update writes both fields and refreshes snapshot`() = runBlocking {
         TestDb.init(ServerSettings)
         SettingsService.load() // 空 → 默认值
-        val snap = SettingsService.update(free = 300, guest = 50)
+        val snap = SettingsService.update(free = 300, guest = 50, browserDailyQuota = 33)
         assertEquals(300, snap.freeLlmQuota)
         assertEquals(50, snap.guestLlmQuota)
+        assertEquals(33, snap.browserDailyQuota)
         assertEquals(300, SettingsService.snapshot().freeLlmQuota) // 缓存已刷新
 
         transaction(Db.instance) {
             val rows = ServerSettings.selectAll().associate { it[ServerSettings.key] to it[ServerSettings.value] }
             assertEquals(300, rows[SettingsService.KEY_FREE])
             assertEquals(50, rows[SettingsService.KEY_GUEST])
+            assertEquals(33, rows[SettingsService.KEY_BROWSER_DAILY])
         }
     }
 
     @Test
     fun `update with null leaves the other field untouched`() = runBlocking {
         TestDb.init(ServerSettings)
-        SettingsService.update(free = 200, guest = 40)
+        SettingsService.update(free = 200, guest = 40, browserDailyQuota = 7)
         SettingsService.update(free = null, guest = 9)
         assertEquals(200, SettingsService.snapshot().freeLlmQuota)
         assertEquals(9, SettingsService.snapshot().guestLlmQuota)
+        assertEquals(7, SettingsService.snapshot().browserDailyQuota)
     }
 }
