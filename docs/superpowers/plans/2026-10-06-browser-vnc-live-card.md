@@ -2942,7 +2942,7 @@ git commit -m "feat(app): BrowserSessionClient——OkHttp transport（配额/�
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/PoLangApplication.kt`（`initializeCapabilities`，:752-792 区域）
 
-- [ ] **Step 1: 构造 transport 并注册**
+- [x] **Step 1: 构造 transport 并注册**
 
 在 `initializeCapabilities()` 内现有 `orchestrator.registerCapability(...)` 序列中追加（token/deviceId provider 的来源与 Step 14-1 确认的一致——若现有 claude-chat 链路在 ViewModel 层持 token 而非 Application 层可得，则把 provider 实现为「读账号 DataStore 的挂起安全快照」，与 PoLangAuthClient 调用方同源）：
 
@@ -2956,7 +2956,7 @@ orchestrator.registerCapability(BrowserSessionCapability(browserTransport))
 
 > 执行注意：provider 必须同步返回（transport 在 IO 线程调用），若 token 存 DataStore（挂起读），用「内存缓存 + DataStore Flow 预热」模式（找现有先例，如 claude-chat 可用性检查的 token 获取方式）；不要把 runBlocking 放 provider 里。
 
-- [ ] **Step 2: 编译 + commit**
+- [x] **Step 2: 编译 + commit**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL
