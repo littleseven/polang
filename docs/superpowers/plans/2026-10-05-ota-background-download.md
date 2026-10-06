@@ -837,7 +837,7 @@ Expected: BUILD SUCCESSFUL
 Run: `grep -c "ota_" androidApp/src/main/res/values*/strings.xml`
 Expected: 五个文件 ota_ 键数一致（原 11 - ota_downloading + 5 新增 = 15）
 
-- [ ] **Step 3: 真机验收（下一个 debug 版本发布后，三场景）**
+- [x] **Step 3: 真机验收（下一个 debug 版本发布后，三场景）**（2026-10-06 经 1.0.47→1.0.48 两跳验收：①弹窗秒关+toast+系统通知进度 ②前台完成安装器自动弹 ③后台完成通知点击装，全过；1.0.48 装后下次冷启动静默确认记账闭环）
 
 ```bash
 ./scripts/ota-publish.sh --notes "后台下载+自动安装上线"
