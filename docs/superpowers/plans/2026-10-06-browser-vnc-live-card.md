@@ -2833,11 +2833,11 @@ git commit -m "feat(shared): tool_browser 占位管线 + live overlay + 拍平/�
 **Files:**
 - Create: `androidApp/src/main/java/com/mamba/picme/data/remote/picme/BrowserSessionClient.kt`
 
-- [ ] **Step 1: 读 PoLangAuthClient 确认 token/deviceId 来源与 OkHttp 用法**（执行动作，不改代码）
+- [x] **Step 1: 读 PoLangAuthClient 确认 token/deviceId 来源与 OkHttp 用法**（执行动作，不改代码）
 
 打开 `data/remote/picme/PoLangAuthClient.kt:12-140` 与它的一个调用方（如 `AppContainer.kt:366-367` 及 ChatViewModel 中 claude-chat 相关调用），确认：①X-App-Token 从哪个仓库/字段读取；②OkHttpClient 实例怎么构造/共享；③base URL 常量。后续步骤按同一来源接线。
 
-- [ ] **Step 2: 实现 BrowserSessionClient**
+- [x] **Step 2: 实现 BrowserSessionClient**
 
 ```kotlin
 package com.mamba.picme.data.remote.picme
@@ -2927,7 +2927,7 @@ class BrowserSessionClient(
 
 > 执行注意：`DEFAULT_BASE_URL` 是否带尾随斜杠以 PoLangAuthClient 现状为准（:138），拼接 `$baseUrl/v1/...` 时对齐（若常量已带 `/` 结尾则去掉路径前导 `/`）。
 
-- [ ] **Step 3: 编译 + commit**
+- [x] **Step 3: 编译 + commit**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`（或仓库现行编译任务名）
 Expected: BUILD SUCCESSFUL
