@@ -339,6 +339,7 @@ class AdminRoutesTest {
         val get = c.get("/admin/settings") { cookie(AdminAuth.COOKIE_NAME, cookieVal) }
         assertEquals(HttpStatusCode.OK, get.status)
         assertTrue(get.bodyAsText().contains("额度默认值"))
+        assertTrue(get.bodyAsText().contains("browser_daily_quota"))
 
         val post = c.post("/admin/settings") {
             cookie(AdminAuth.COOKIE_NAME, cookieVal)

@@ -30,7 +30,7 @@ class SettingsServiceTest {
     }
 
     @Test
-    fun `update writes both fields and refreshes snapshot`() = runBlocking {
+    fun `update writes all fields and refreshes snapshot`() = runBlocking {
         TestDb.init(ServerSettings)
         SettingsService.load() // 空 → 默认值
         val snap = SettingsService.update(free = 300, guest = 50, browserDailyQuota = 33)

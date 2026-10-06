@@ -419,7 +419,7 @@ object AdminViews {
                             }
                         }
                         div("field") {
-                            label { +"Browser 每日会话配额（>0）" }
+                            label { +"Browser 每日会话配额（browser，>0）" }
                             input(type = InputType.number, name = "browser_daily_quota") {
                                 value = snap.browserDailyQuota.toString()
                                 attributes["min"] = "1"
