@@ -42,7 +42,8 @@ interface BrowserSessionDelegate {
  * 保护结构化并发/CommandExecutor 超时取消）。
  */
 class BrowserSessionCapability(
-    private val transport: BrowserTransport,
+    /** 传输层只读暴露：UI 侧 watch 轮询（frame）与 turn 结束兜底（close）直接取用（Task 16）。 */
+    val transport: BrowserTransport,
 ) : BaseCapability() {
 
     @Volatile

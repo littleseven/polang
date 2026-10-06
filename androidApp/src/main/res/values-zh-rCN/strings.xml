@@ -1606,6 +1606,13 @@
     <string name="browser_live_failed">浏览器会话失败</string>
     <string name="browser_live_view_full">点按全屏查看</string>
     <string name="browser_live_title_default">网页</string>
+    <string name="chat_cmd_browser_open">打开浏览器</string>
+    <string name="chat_cmd_browser_navigate">网页导航</string>
+    <string name="chat_cmd_browser_click">点击元素</string>
+    <string name="chat_cmd_browser_type">输入文本</string>
+    <string name="chat_cmd_browser_extract">提取网页正文</string>
+    <string name="chat_cmd_browser_screenshot">网页截图</string>
+    <string name="chat_cmd_browser_close">关闭浏览器</string>
     <string name="chat_write_no_valid_ids">没有有效的媒体 id</string>
     <string name="chat_delete_started_pending">已发起删除 %1$d 项，等待系统授权</string>
     <string name="chat_deleted_n">已删除 %1$d 项</string>

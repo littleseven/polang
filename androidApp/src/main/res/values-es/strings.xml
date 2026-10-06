@@ -1566,6 +1566,13 @@
     <string name="browser_live_failed">La sesión de navegador falló</string>
     <string name="browser_live_view_full">Toca para ver a pantalla completa</string>
     <string name="browser_live_title_default">Página web</string>
+    <string name="chat_cmd_browser_open">Abrir navegador</string>
+    <string name="chat_cmd_browser_navigate">Navegar a página</string>
+    <string name="chat_cmd_browser_click">Hacer clic en elemento</string>
+    <string name="chat_cmd_browser_type">Escribir texto</string>
+    <string name="chat_cmd_browser_extract">Extraer texto de la página</string>
+    <string name="chat_cmd_browser_screenshot">Captura de página</string>
+    <string name="chat_cmd_browser_close">Cerrar navegador</string>
     <string name="chat_write_no_valid_ids">No hay IDs de medios válidos</string>
     <string name="chat_delete_started_pending">Eliminación de %1$d elemento(s) iniciada, esperando autorización del sistema</string>
     <string name="chat_deleted_n">Se eliminaron %1$d elemento(s)</string>

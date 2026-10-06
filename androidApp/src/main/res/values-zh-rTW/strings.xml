@@ -1606,6 +1606,13 @@
     <string name="browser_live_failed">瀏覽器工作階段失敗</string>
     <string name="browser_live_view_full">點按全螢幕檢視</string>
     <string name="browser_live_title_default">網頁</string>
+    <string name="chat_cmd_browser_open">開啟瀏覽器</string>
+    <string name="chat_cmd_browser_navigate">網頁導覽</string>
+    <string name="chat_cmd_browser_click">點擊元素</string>
+    <string name="chat_cmd_browser_type">輸入文字</string>
+    <string name="chat_cmd_browser_extract">擷取網頁內文</string>
+    <string name="chat_cmd_browser_screenshot">網頁截圖</string>
+    <string name="chat_cmd_browser_close">關閉瀏覽器</string>
     <string name="chat_write_no_valid_ids">沒有有效的媒體 ID</string>
     <string name="chat_delete_started_pending">已發起刪除 %1$d 項，等待系統授權</string>
     <string name="chat_deleted_n">已刪除 %1$d 項</string>
