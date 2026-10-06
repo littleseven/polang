@@ -7,14 +7,16 @@
 
 ## 1. 背景与目标
 
-xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（Chrome 池，`/opt/browser-vnc`）。本设计让 App 端 Koog Agent 获得云端浏览器能力：Agent 执行需要浏览网页的任务时调用云端浏览器，**用户在 Chat 里看到「Agent 每操作一步、卡片画面更新一步」的直播卡**（Operator/Manus 风格 live view）。
+xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（headed Chrome 池，`/opt/browser-vnc`）。本设计让 App 端 Koog Agent 获得云端浏览器能力：Agent 执行需要浏览网页的任务时调用云端浏览器，**用户在 Chat 里看到「Agent 每操作一步、卡片画面更新一步」的直播卡**（Operator/Manus 风格 live view）。
+
+执行面采用 Muse 同款路线：**bridge 自起 headless Chromium、纯 CDP DOM 级驱动**，AI 干活不渲染像素（省 Xvfb/桌面/VNC 编码），画面只在用户要看时按需生成（2026-10-06 设计修订；既有 VNC headed 池保留作人工调试与反爬回退）。
 
 已确认的四个选型（2026-10-06 brainstorming）：
 
 | 决策点 | 结论 |
 |--------|------|
 | 核心场景 | Agent 云端浏览器直播（非用户手动远控、非纯无 UI 工具） |
-| 画面形态 | 抓帧回传原生渲染（动作驱动抓帧，非 noVNC/WebRTC/独立推流） |
+| 画面形态 | 按需抓帧回传原生渲染（`wantFrame` 标志，非 noVNC/WebRTC/独立推流） |
 | 会话驱动 | App Agent 驱动（Koog 工具闭环经 picme-server 转发 xuxing） |
 | 平台范围 | Android 先行，iOS 走 ios-follow 管线对等 |
 
@@ -37,11 +39,15 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（Chrome
                │ 内网（tailscale；无则 HK→xuxing 直连 + IP 白名单）
 ┌──────────────▼──── xuxing (北京) ───────────────────┐
 │ browser-agent-bridge（新增组件，单进程）              │
-│  ├─ 会话管理：从 browser-vnc 池分配 Chrome（fresh    │
-│  │   profile，会话结束销毁）                          │
+│  ├─ 会话管理：自起 headless Chromium 实例             │
+│  │   （--headless=new，fresh profile，结束销毁；      │
+│  │   不借用 VNC 池单元，无 Xvfb/桌面/VNC 编码开销）    │
 │  ├─ CDP 执行：navigate/click/type/extract            │
-│  └─ 抓帧：动作完成后 Page.captureScreenshot → JPEG   │
-│      （720p，质量 60，约 40-80KB/帧）随响应回传        │
+│  │   （DOM 级读写，不渲染像素）                       │
+│  └─ 按需抓帧：仅当请求带 wantFrame=true 时            │
+│      Page.captureScreenshot → JPEG（720p 质量 60）   │
+│ （既有 browser-vnc ×8 池保持原样：人工调试通道 +       │
+│  反爬顽固站点回退用 headed 实例）                     │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -53,16 +59,17 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（Chrome
 | `BrowserSessionCapability` | shared commonMain | 命令 → HTTP 调用，结构化错误映射 | BrowserSessionClient |
 | `BrowserSessionClient` + 协议模型 | shared commonMain | 请求/响应 DTO（kotlinx.serialization），纯逻辑可测；HttpClient 经 `KoogHttpClientFactoryProvider` 分流 | expect HttpClient |
 | `BrowserRoute` + `BrowserPoolProxy` | server/ | 鉴权（X-App-Token）、配额、转发、30s 网关超时 | AppConfig 新增 xuxing 地址 + X-Bridge-Token |
-| `browser-agent-bridge` | `infra/browser-bridge/` 入仓，部署 xuxing | CDP 动作执行 + 抓帧 + 会话生命周期 | Chrome DevTools Protocol |
+| `browser-agent-bridge` | `infra/browser-bridge/` 入仓，部署 xuxing | CDP 动作执行 + 按需抓帧 + 会话生命周期（自起 headless Chromium） | Chrome DevTools Protocol |
 | Chat 直播卡渲染 | androidApp | 新 part `tool_browser` 的 UI | ADR-016 状态机 |
 
 ### 2.2 关键架构决策
 
 1. **工具粒度 = 7 个原子动作**（open/navigate/click/type/extract/screenshot/close）而非单个宏工具——LLM 自己规划步骤，每一步都有画面更新（方案 A 直播感来源），与现有工具风格一致。
-2. **bridge 用 CDP 而非 VNC 协议驱动浏览器**——VNC 池 Chrome 实例开 `--remote-debugging-port`，bridge 是旁路控制面，不动现有 8 个 VNC 单元（VNC 仍可用于人工调试）。
-3. **协议模型放 shared commonMain**——端云 DTO 同源（Monorepo 既定决策），iOS 跟随期零成本复用。
-4. **bridge 代码入仓 `infra/browser-bridge/`**——与 `infra/cloudflare/`、`infra/tencentscf/` 同级，systemd unit + 部署脚本随仓。
-5. **画面复用工具结果通道，零新增长连接**——不引入 WS/SSE 新通道；若后续实测过程感不足，动作通道不变、只加推流通道即平滑升级为推流方案，无返工。
+2. **bridge 自起 headless Chromium（`--headless=new`），纯 CDP DOM 级驱动**——AI 干活不需要像素管线：省掉 Xvfb、桌面、VNC 编码整套开销，实例更轻、单机可承载会话数更高。既有 `browser-vnc` ×8 headed 池**不借用、保持原样**，定位转为：人工调试通道 + 反爬顽固站点的回退（headless 被识别时由 bridge 切到 headed 实例执行，M1 只做手动开关，自动检测回退属 M2+）。
+3. **画面按需生成（`wantFrame` 请求标志）**——帧不是每个动作的固定产物：App 侧策略决定何时要帧（M1 默认 = 直播卡可见期间的改状态动作；extract/close 不带帧）。LLM 不参与该决策，响应中帧字段可选。用户不看时不产生截图开销与流量。
+4. **协议模型放 shared commonMain**——端云 DTO 同源（Monorepo 既定决策），iOS 跟随期零成本复用。
+5. **bridge 代码入仓 `infra/browser-bridge/`**——与 `infra/cloudflare/`、`infra/tencentscf/` 同级，systemd unit + 部署脚本随仓。
+6. **画面复用工具结果通道，零新增长连接**——不引入 WS/SSE 新通道；若后续实测过程感不足，动作通道不变、只加推流通道即平滑升级为推流方案，无返工。
 
 ## 3. 数据流
 
@@ -70,13 +77,14 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（Chrome
 
 ```
 1. 用户消息 → Koog Agent 规划 → 决定调 browser_open(url)
-2. @Tool browser_open → BrowserSessionCapability → POST /v1/browser/open
-   → bridge 分配 Chrome（fresh profile）→ CDP 导航 → 抓帧
-   → 返回 { sessionId, status, currentUrl, pageTitle, frameJpegBase64, actionMs }
+2. @Tool browser_open → BrowserSessionCapability → POST /v1/browser/open（wantFrame=true）
+   → bridge 自起 headless Chromium（fresh profile）→ CDP 导航 → 按需抓帧
+   → 返回 { sessionId, status, currentUrl, pageTitle, frameJpegBase64?, actionMs }
 3. 工具结果分流：llmPayload（文本摘要）回灌 LLM；
    uiPayload（帧 + 元数据）走占位 part 原位填充（M2 已有机制，draw_chart/render_html 同款）
-4. Agent 继续调 browser_click / extract / …（每个动作重复 2-3，画面逐步更新）
-5. browser_close 或会话超时 → bridge 销毁 profile，卡片定格最终帧 + 结果摘要
+4. Agent 继续调 browser_click / extract / …（改状态动作带 wantFrame，画面逐步更新；
+   extract 等纯读取动作不带帧）
+5. browser_close 或会话超时 → bridge 销毁实例与 profile，卡片定格最终帧 + 结果摘要
 ```
 
 ### 3.1 响应双载荷（token 保护）
@@ -85,7 +93,7 @@ xuxing（北京，`VM-0-13`）已有 `browser-vnc-*` ×8 systemd 单元（Chrome
 
 ### 3.2 流量预算
 
-720p 质量 60 JPEG ≈ 40-80KB/帧；一次任务按 10 个动作计 ≈ 0.5-1MB。用户已确认可接受。
+720p 质量 60 JPEG ≈ 40-80KB/帧；一次任务按 10 个改状态动作计 ≈ 0.5-1MB。用户已确认可接受。帧按 `wantFrame` 生成，App 退后台或卡片不可见期间零帧零流量。
 
 ## 4. Chat 直播卡（新 part `tool_browser`）
 
@@ -125,9 +133,10 @@ Idle → Allocated(open) → Active(navigate/click/...) → Closing(close/超时
 
 ## 7. 配额
 
-池仅 8 单元，稀缺资源：
+headless 实例轻量（无 Xvfb/桌面/VNC 编码），但机器资源仍有限：
 
 - per-user 并发 = 1（picme-server 内存态登记，重启即清，不落库）。
+- bridge 侧全局并发上限默认 8 个活跃会话（env 可配，与 VNC 池解耦——headless 会话不占用 VNC 单元），满则 `pool_exhausted`。
 - 单用户每日 20 会话（存 `server_setting` 可配，管理后台可改），超额返回 `quota_exceeded`。
 - 与 LLM token 额度体系解耦（browser 成本是机器资源）；管理后台「概览」加 browser 会话统计（当日数/活跃数/失败率）。
 
@@ -154,7 +163,7 @@ Idle → Allocated(open) → Active(navigate/click/...) → Closing(close/超时
 ## 10. 分期
 
 - **M1（本 spec 全部内容）**：bridge + 服务端网关 + App 工具闭环 + INLINE 直播卡。
-- **M2 候选（不在本 spec）**：全屏查看器增强、登录态会话、动作密度不足时升级独立推流通道、iOS 跟随。
+- **M2 候选（不在本 spec）**：全屏查看器增强、登录态会话、headless 被反爬识别时自动回退 headed 池（M1 为手动开关）、动作密度不足时升级独立推流通道、iOS 跟随。
 
 ## 11. 交付审计对应
 
