@@ -31,4 +31,14 @@ internal class RateLimiterTest {
         assertTrue(limiter.peek("u", now = 62_000L))
         assertTrue(limiter.allow("u", now = 62_000L))
     }
+
+    @Test
+    fun `provider limit is read live on each call`() {
+        var limit = 1
+        val limiter = RateLimiter({ limit }, 60_000L)
+        assertTrue(limiter.allow("u"))
+        assertFalse(limiter.allow("u"))
+        limit = 5
+        assertTrue(limiter.allow("u"))
+    }
 }

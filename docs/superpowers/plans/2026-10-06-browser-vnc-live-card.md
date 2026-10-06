@@ -999,41 +999,44 @@ BROWSER_DAILY_QUOTA=20
 
 - [ ] **Step 3: RateLimiter 加 peek（不记录的检查）+ 可配 limit provider**
 
-读现有 `ratelimit/RateLimiter.kt`（约 26 行），改造为（保持既有 `RateLimiter(limit: Int, windowMs: Long)` 构造签名兼容，委托到 provider 主构造）：
+读现有 `ratelimit/RateLimiter.kt`（约 26 行），改造为（保持既有 `RateLimiter(maxRequests: Int, windowMs: Long = 60_000L)` 构造签名兼容，委托到 provider 主构造）。**落地实态（2026-10-06）**：provider 主构造为 **public**（private 会让 Task 7 的 `RateLimiter({ SettingsService.snapshot().browserDailyQuota }, ...)` 热配形态不可调用）；Int 次构造保留 `windowMs` 默认值（`Application.kt` 有一参调用）；`prune` 在 `synchronized(entry)` 内调用，锁语义与原实现完全一致：
 
 ```kotlin
-class RateLimiter private constructor(
+class RateLimiter(
     private val limitProvider: () -> Int,
     private val windowMs: Long,
 ) {
-    constructor(limit: Int, windowMs: Long) : this({ limit }, windowMs)
+    constructor(maxRequests: Int, windowMs: Long = 60_000L) : this({ maxRequests }, windowMs)
 
-    private val hits = java.util.concurrent.ConcurrentHashMap<String, MutableList<Long>>()
+    private val log = ConcurrentHashMap<String, MutableList<Long>>()
 
-    /** 检查即记录（既有语义）。 */
-    @Synchronized
-    fun allow(key: String, now: Long = System.currentTimeMillis()): Boolean {
-        val list = prune(key, now)
-        if (list.size >= limitProvider()) return false
-        list.add(now)
-        return true
+    fun allow(ip: String, now: Long = System.currentTimeMillis()): Boolean {
+        val entry = log.computeIfAbsent(ip) { mutableListOf() }
+        synchronized(entry) {
+            prune(entry, now)
+            if (entry.size >= limitProvider()) return false
+            entry.add(now)
+            return true
+        }
     }
 
     /** 只检查不记录——成功才计费的场景（browser 会话配额）先 peek 后 allow。 */
-    @Synchronized
-    fun peek(key: String, now: Long = System.currentTimeMillis()): Boolean {
-        return prune(key, now).size < limitProvider()
+    fun peek(ip: String, now: Long = System.currentTimeMillis()): Boolean {
+        val entry = log.computeIfAbsent(ip) { mutableListOf() }
+        synchronized(entry) {
+            prune(entry, now)
+            return entry.size < limitProvider()
+        }
     }
 
-    private fun prune(key: String, now: Long): MutableList<Long> {
-        val list = hits.getOrPut(key) { mutableListOf() }
-        list.removeAll { now - it > windowMs }
-        return list
+    /** 必须在 synchronized(entry) 内调用，保证与调用方检查/写入同一把锁。 */
+    private fun prune(entry: MutableList<Long>, now: Long) {
+        entry.removeAll { it <= now - windowMs }
     }
 }
 ```
 
-> 执行注意：上式是基于 explore 事实（`ConcurrentHashMap<String, MutableList<Long>>` + 唯一 `allow` 方法）的重构稿；落地时以现有实现为准做最小改动，保留原类注释（含「不适用多实例部署」），只新增 `peek` 与 provider 委托构造。
+> 执行注意：落地以现有实现为准做最小改动，保留原类注释（含「不适用多实例部署」）与 per-entry `synchronized(entry)` 锁结构，只新增 `peek` 与 provider 委托构造。
 
 - [ ] **Step 4: 测试（新建或追加 RateLimiterTest）**
 
