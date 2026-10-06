@@ -29,6 +29,7 @@ import com.mamba.picme.data.download.RecommendedModelAutoDownloader
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.di.AppContainer
 import com.mamba.picme.di.AppContainerImpl
 import com.mamba.picme.domain.memory.MemoryContextProviderImpl
@@ -39,6 +40,7 @@ import com.mamba.picme.core.identity.DeviceIdProvider
 import com.mamba.picme.agent.core.model.config.AiAgentMode
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.AndroidAgentComposition
+import com.mamba.picme.agent.core.capability.BrowserSessionCapability
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.agent.core.intent.IntentRouter
 import com.mamba.picme.agent.core.js.JsRuntime
@@ -164,6 +166,21 @@ class PoLangApplication : Application(), ImageLoaderFactory {
      */
     @Volatile
     private var feishuDispatchJob: Job? = null
+
+    /**
+     * browser-vnc transport 的同步快照（transport 在 OkHttp IO 线程同步调用 provider，
+     * 不能用 DataStore 挂起读、禁 runBlocking）。SSOT = `serverAuthTokenFlow`（DataStore）
+     * 与 [DeviceIdProvider]；启动后由 applicationScope 预热常驻收集（先例 = ChatViewModel
+     * 把 serverAuthTokenFlow 收集进内存 StateFlow 供 claude-chat 可用性检查）。
+     * 失效语义：登出 → DataStore 写入空 token → Flow 重放射 → 缓存归 null，
+     * 后续 browser 请求即走「未登录」降级（BrowserUnavailableException("not logged in")）。
+     * deviceId 稳定不变，预热一次即可；未预热完成前 provider 返回 null，仅少带 X-Device-Id。
+     */
+    @Volatile
+    private var cachedServerAuthToken: String? = null
+
+    @Volatile
+    private var cachedDeviceId: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -789,6 +806,22 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         // render_html 排版上下文：设备/屏幕/卡片宽高 → chat system prompt 动态尾段
         orchestrator.setRenderEnvironmentProvider { buildRenderEnvironment() }
         Logger.i(TAG, "- RenderEnvironmentProvider: injected (html card layout context)")
+        // browser-vnc 直播卡：OkHttp transport 注入（token/deviceId 走上方 @Volatile 内存快照，
+        // 预热收集挂 applicationScope，与 Application 同生命周期）
+        applicationScope.launch {
+            container.userPreferencesRepository.serverAuthTokenFlow.collect { token ->
+                cachedServerAuthToken = token.ifBlank { null }
+            }
+        }
+        applicationScope.launch {
+            cachedDeviceId = deviceIdProvider.get()
+        }
+        val browserTransport = BrowserSessionClient(
+            tokenProvider = { cachedServerAuthToken },
+            deviceIdProvider = { cachedDeviceId },
+        )
+        orchestrator.registerCapability(BrowserSessionCapability(browserTransport))
+        Logger.i(TAG, "- BrowserSessionCapability: ALL-scene cloud browser (live card)")
     }
 
     /** 构建 HTML 卡片渲染环境（CSS px ≈ dp：渲染层已注入 viewport meta width=device-width）。 */
