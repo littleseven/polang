@@ -1,6 +1,13 @@
-可用工具（35）：
+可用工具（42）：
 - adjust_image: 按显式参数调整图片亮度/对比度/饱和度/色温，返回调整后的图片。
 - ai_optimize: AI 一键优化图片。
+- browser_click: 点击云端浏览器当前页面中的元素。
+- browser_close: 关闭云端浏览器会话并销毁远程实例。
+- browser_extract: 提取云端浏览器当前页面的正文文本（截断 4000 字符）与可交互元素清单（每个元素带 index/tag/text/href）。
+- browser_navigate: 云端浏览器会话内导航到新 URL。
+- browser_open: 打开云端浏览器会话并导航到指定 URL（远程 headless Chromium 执行，过程画面会以直播卡展示给用户）。
+- browser_screenshot: 抓云端浏览器当前页一帧画面。
+- browser_type: 向云端浏览器当前页面中的输入框键入文本。
 - change_language: 切换语言。
 - change_theme: 切换主题。
 - delay: 等待指定毫秒。

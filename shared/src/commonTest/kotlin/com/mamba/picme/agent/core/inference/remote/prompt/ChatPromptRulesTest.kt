@@ -24,6 +24,7 @@ class ChatPromptRulesTest {
                 "chart_tool_note",
                 "html_card_rules",
                 "script_vs_tool",
+                "browser_rules",
                 "image_edit",
                 "refinement_rules",
                 "convergence_rules",

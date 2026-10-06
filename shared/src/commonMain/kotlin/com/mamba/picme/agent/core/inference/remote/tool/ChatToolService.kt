@@ -313,6 +313,80 @@ class ChatToolService private constructor() : TraceIdAware {
         )
     )
 
+    // ── 云端浏览器（browser-vnc 直播卡） ─────────────────────────────
+
+    @Tool(customName = "browser_open")
+    @LLMDescription("打开云端浏览器会话并导航到指定 URL（远程 headless Chromium 执行，过程画面会以直播卡展示给用户）。返回 sessionId 供后续 browser_* 动作复用。需要浏览网页获取实时信息时使用；任务完成必须调 browser_close。")
+    suspend fun browserOpen(
+        @LLMDescription("要打开的完整 URL（http/https）")
+        url: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserOpen(url = url))
+
+    @Tool(customName = "browser_navigate")
+    @LLMDescription("云端浏览器会话内导航到新 URL。")
+    suspend fun browserNavigate(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+        @LLMDescription("目标完整 URL（http/https）")
+        url: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserNavigate(sessionId = sessionId, url = url))
+
+    @Tool(customName = "browser_click")
+    @LLMDescription("点击云端浏览器当前页面中的元素。三种定位方式按优先级选用：targetIndex（browser_extract 返回的元素序号，最可靠）> targetText（元素可见文本）> selector（CSS 选择器，兜底）。三者至少给一个，多余传空串/-1。")
+    suspend fun browserClick(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+        @LLMDescription("browser_extract 返回的元素序号；未使用传 -1")
+        targetIndex: Int,
+        @LLMDescription("元素可见文本（如 'Sign in'）；未使用传空串")
+        targetText: String,
+        @LLMDescription("CSS 选择器（如 'button.submit'）；未使用传空串")
+        selector: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector))
+
+    @Tool(customName = "browser_type")
+    @LLMDescription("向云端浏览器当前页面中的输入框键入文本。定位方式同 browser_click（优先 targetIndex）。")
+    suspend fun browserType(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+        @LLMDescription("browser_extract 返回的元素序号；未使用传 -1")
+        targetIndex: Int,
+        @LLMDescription("输入框可见文本/占位符；未使用传空串")
+        targetText: String,
+        @LLMDescription("CSS 选择器；未使用传空串")
+        selector: String,
+        @LLMDescription("要键入的文本")
+        text: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector, text = text))
+
+    @Tool(customName = "browser_extract")
+    @LLMDescription("提取云端浏览器当前页面的正文文本（截断 4000 字符）与可交互元素清单（每个元素带 index/tag/text/href）。阅读页面内容用它，不要用 browser_screenshot 读内容；后续 click/type 优先用清单里的 index 定位。")
+    suspend fun browserExtract(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserExtract(sessionId = sessionId))
+
+    @Tool(customName = "browser_screenshot")
+    @LLMDescription("抓云端浏览器当前页一帧画面。仅当用户明确要截图时使用；常规动作的过程画面已自动回传。")
+    suspend fun browserScreenshot(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserScreenshot(sessionId = sessionId))
+
+    @Tool(customName = "browser_close")
+    @LLMDescription("关闭云端浏览器会话并销毁远程实例。浏览任务结束后必须调用（否则服务端 2 分钟空闲后强制回收）。")
+    suspend fun browserClose(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId))
+
     // ── 记忆（人物关系 + 事实） ─────────────────────────────────────
 
     @Tool(customName = "remember_person_relation")
