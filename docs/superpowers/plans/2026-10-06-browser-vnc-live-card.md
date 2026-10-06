@@ -3130,7 +3130,7 @@ git commit -m "feat(app): ChatViewModel 直播卡 live 态收口——delegate/o
 - Test: `androidApp/src/test/java/com/mamba/picme/features/chat/BrowserActionFormatterTest.kt`
 - Modify: `androidApp/src/main/res/values/strings.xml` + `values-zh-rCN` + `values-zh-rTW` + `values-es` + `values-fr`
 
-- [ ] **Step 1: strings 五语（新增 key）**
+- [x] **Step 1: strings 五语（新增 key）**
 
 > 插入位置：各文件 `html_fullpage_load_failed` 之后，分区注释五文件逐字一致用英文 `<!-- Browser live card: action stream + session state -->`。
 
@@ -3214,7 +3214,7 @@ git commit -m "feat(app): ChatViewModel 直播卡 live 态收口——delegate/o
 <string name="browser_live_title_default">Page web</string>
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.features.chat
@@ -3277,7 +3277,7 @@ class BrowserActionFormatterTest {
 }
 ```
 
-- [ ] **Step 3: 实现 `BrowserActionFormatter.kt`**
+- [x] **Step 3: 实现 `BrowserActionFormatter.kt`**
 
 ```kotlin
 package com.mamba.picme.features.chat
@@ -3316,7 +3316,7 @@ fun formatBrowserAction(context: Context, action: String, selector: String?, pay
 
 > 执行注意：Task 16 里的 `formatBrowserAction(...)` 调用改为 `formatBrowserAction(context, ...)` 形态（本函数为准）。
 
-- [ ] **Step 4: 跑测试 + commit**
+- [x] **Step 4: 跑测试 + commit**
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "*BrowserActionFormatterTest*"`
 Expected: PASS
