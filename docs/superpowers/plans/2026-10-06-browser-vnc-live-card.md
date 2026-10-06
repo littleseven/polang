@@ -2468,13 +2468,19 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 
 - [ ] **Step 2: ChatPromptRules 加 browser 行为规则段**
 
-> **决策注记（2026-10-06 review 修订）**：browser_* 工具 dispatch 超时分级为 25s
->（`BROWSER_DISPATCH_TIMEOUT_MS`：客户端 25s > 服务端 navTimeout 15s，< 网关 30s；
-> 慢页面不被客户端 5s 级联取消必杀，避免「远端 open 成功但卡不出现 + 会话泄漏 + 重试开重复会话」），
-> 其余工具保持 5s 不变；实现方式为 `dispatchCommand`/`dispatchCommandWithTrace`/`dispatchCommandDetailed`
+> **决策注记（2026-10-06 review 修订，两轮）**：browser_* 超时为**两层**结构——
+> 外层 dispatch（ChatToolService：browser 工具 25s / 其余工具 5s）+ 内层命令执行
+>（registry 级 `CommandExecutor`：显式 25s，CrossPageCommandQueue 共用同一实例一并受益）。
+> 25s > 服务端 navTimeout 15s，< 网关 30s；既有工具外层 5s 保持最紧，内层放宽后不会单独触发，
+> 行为不变。⚠️ 内层默认 10s 曾是最紧约束导致外层 25s 永不生效（复审发现的层叠缺陷）——
+> 25s 常量为 `CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS` 单一来源，ChatToolService 的
+> `BROWSER_DISPATCH_TIMEOUT_MS` 直接引用它，两处不漂移；层叠不变式「内层 ≥ browser 外层」
+> 由 commonTest `CommandTimeoutLayeringTest` 钉住（读 registry 实例实际生效值，防构造点回退）。
+> 外层实现方式为 `dispatchCommand`/`dispatchCommandWithTrace`/`dispatchCommandDetailed`
 > 增加 `timeoutMillis` 可选参数（默认 `DISPATCH_TIMEOUT_MS`），7 个 browser 工具显式传 25s。
-> 同时 browser_rules 节末尾补豁免句：浏览器会话期间不受 convergence_rules 的 2 次调用上限约束
->（否则 open→动作→close 最少 4 次的固定流程与「每次请求最多 2 次工具调用」矛盾，模型有中途放弃不 close 的风险）。
+> 同时 browser_rules 节末尾补豁免句：浏览器会话期间不受 convergence_rules 约束
+>（含调用次数上限与重复调用限制——否则 open→动作→close 最少 4 次、extract 合法重复的固定流程
+> 与「每次请求最多 2 次工具调用」「绝不重复调用同一工具」矛盾，模型有中途放弃不 close 的风险）。
 > 内嵌代码的 `dispatchCommand(...)` 一行方法体均已同步为显式传 `timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS`。
 
 读 `ChatPromptRules.kt` 的分节结构，在工具使用规则相关节后追加一节（中英文按该文件现有语言风格对齐——若为中文规则文本则用下式）：
@@ -2486,7 +2492,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 点击/输入优先用 browser_extract 返回的元素 index 定位，其次可见文本，CSS 选择器只作兜底；
 任务结束（含中途放弃、额度/资源报错改纯文本回答）都必须 browser_close。
 不要浏览用户未要求的站点，不要在网页上输入用户的账号密码等敏感信息。
-浏览器会话期间（browser_open 到 browser_close 之间）不受下文收敛规则的调用次数上限约束；browser_close 后立即总结回复。
+浏览器会话期间（browser_open 到 browser_close 之间）不受下文收敛规则约束（含调用次数上限与重复调用限制）；browser_close 后立即总结回复。
 ```
 
 - [ ] **Step 3: 编译 + 重生成 prompt golden + 跑守卫测试**

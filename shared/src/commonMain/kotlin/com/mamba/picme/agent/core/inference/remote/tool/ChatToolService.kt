@@ -46,7 +46,8 @@ import kotlinx.coroutines.withTimeout
  *
  * **并发模型（KMP 抽取 Task 7 suspend 化）**：@Tool 方法为 suspend（Koog 1.1.1 支持 suspend
  * 工具函数），dispatch 从 `future{}.get(5s)` 阻塞桥改写为 `withTimeout` 结构化等待
- *（默认 5s；browser_* 远程慢工具族分级为 25s，见 [BROWSER_DISPATCH_TIMEOUT_MS]），
+ *（默认 5s；browser_* 远程慢工具族分级为 25s，与 registry 内层 CommandExecutor 25s 同源，
+ * 见 [BROWSER_DISPATCH_TIMEOUT_MS]），
  * 超时抛 `TimeoutCancellationException`（语义对齐旧 `java.util.concurrent.TimeoutException` 分支）；
  * `adjust_image` 的 `runBlocking` 桥同步删除（handler 本就 suspend）。
  *
@@ -66,12 +67,14 @@ class ChatToolService private constructor() : TraceIdAware {
         private const val DISPATCH_TIMEOUT_MS = 5000L
 
         /**
-         * browser_* 工具族的 dispatch 等待超时（毫秒）：云端浏览器是首个远程慢工具族，
-         * 服务端 navTimeoutMs=15000、网关 30s，客户端取 25s（> 服务端 nav 15s，< 网关 30s）——
-         * 慢页面（domcontentloaded 5~15s 常见）不被客户端 withTimeout 级联取消必杀
-         * （那会酿成「远端 open 成功但卡不出现 + 会话泄漏 + LLM 重试开重复会话」）。
+         * browser_* 工具族的外层 dispatch 等待超时（毫秒）：与 registry 内层命令执行超时同源
+         *（[CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS]，两处不漂移）。两层语义——
+         * 外层（本类，browser 工具 25s / 其余工具 5s）+ 内层（registry CommandExecutor 25s）；
+         * 25s > 服务端 navTimeout 15s、< 网关 30s，慢页面（domcontentloaded 5~15s 常见）
+         * 不被客户端 withTimeout 级联取消必杀（那会酿成「远端 open 成功但卡不出现 + 会话泄漏 +
+         * LLM 重试开重复会话」）。层叠不变式（内层 ≥ 本值）由 `CommandTimeoutLayeringTest` 钉住。
          */
-        private const val BROWSER_DISPATCH_TIMEOUT_MS = 25000L
+        internal const val BROWSER_DISPATCH_TIMEOUT_MS = CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS
 
         // KMP commonMain 无 synchronized，lazy 默认 SYNCHRONIZED 模式保证同款线程安全单例语义
         private val singleton: ChatToolService by lazy { ChatToolService() }
@@ -554,7 +557,8 @@ class ChatToolService private constructor() : TraceIdAware {
     /**
      * [dispatchCommandWithTrace] 的结构化变体：除 observation 外返回真实 [AgentAction]，
      * 供路由直执路径判定成功/失败（失败回落完整 agent loop）并提取结果基数（totalCount）。
-     * [timeoutMillis] 默认 5s；browser_* 远程慢工具族显式传 [BROWSER_DISPATCH_TIMEOUT_MS]。
+     * [timeoutMillis] 默认 5s；browser_* 远程慢工具族显式传 [BROWSER_DISPATCH_TIMEOUT_MS]
+     *（外层 25s ≤ registry 内层 CommandExecutor 25s，层叠关系见 CommandTimeoutLayeringTest）。
      */
     internal suspend fun dispatchCommandDetailed(
         command: AgentCommand,
