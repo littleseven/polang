@@ -11,6 +11,7 @@ import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
 import com.mamba.picme.domain.browser.BrowserStatus
 import com.mamba.picme.domain.browser.BrowserUnavailableException
+import kotlinx.coroutines.CancellationException
 import kotlin.concurrent.Volatile
 
 /** 浏览器传输层（commonMain 无 HTTP 手段，组合根注入平台实现；测试注入 fake）。 */
@@ -37,7 +38,8 @@ interface BrowserSessionDelegate {
  * extract/close 不带；连续帧走 [BrowserTransport.frame]（watch 模式轮询）。
  *
  * 降级不变式：一切失败（池满/会话过期/不可达/动作失败）都映射为 TextReply 结构化文本
- * 交 LLM 降级处理，不抛异常穿透 ReAct 链。
+ * 交 LLM 降级处理，不抛异常穿透 ReAct 链（CancellationException 例外，原样 rethrow
+ * 保护结构化并发/CommandExecutor 超时取消）。
  */
 class BrowserSessionCapability(
     private val transport: BrowserTransport,
@@ -93,8 +95,12 @@ class BrowserSessionCapability(
                     AgentAction.Error(command.commandId, AgentErrorCode.METHOD_NOT_FOUND, "BrowserSessionCapability 不支持此命令")
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: BrowserUnavailableException) {
             degradation(BrowserStatus.BROWSER_UNAVAILABLE, e.message ?: "network error")
+        } catch (e: Exception) {
+            degradation(BrowserStatus.ACTION_FAILED, e.message)
         }
         return Result.success(AgentAction.TextReply(commandId = command.commandId, message = reply))
     }

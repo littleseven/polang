@@ -116,6 +116,14 @@ class BrowserSessionCapabilityTest {
     }
 
     @Test
+    fun `click requests frame`() = runTest {
+        val transport = FakeTransport(BrowserActionResult(status = BrowserStatus.OK, sessionId = "s-1"))
+        val cap = BrowserSessionCapability(transport)
+        cap.execute(AgentCommand.BrowserClick(sessionId = "s-1", selector = "button"), context, null)
+        assertEquals(listOf("action:s-1:click:true"), transport.calls)
+    }
+
+    @Test
     fun `supported commands cover all seven browser tools`() {
         val cap = BrowserSessionCapability(FakeTransport(BrowserActionResult(status = BrowserStatus.OK)))
         assertEquals(

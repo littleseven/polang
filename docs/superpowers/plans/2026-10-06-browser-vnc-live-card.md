@@ -2077,7 +2077,7 @@ package com.mamba.picme.agent.core.capability
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
-import com.mamba.picme.agent.core.runtime.state.SceneManager
+import com.mamba.picme.agent.core.model.context.AgentScene
 import com.mamba.picme.domain.browser.BrowserActionRequest
 import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
@@ -2127,7 +2127,7 @@ class BrowserSessionCapabilityTest {
         override fun onBrowserSessionClosed(sessionId: String, finalFrameJpegBase64: String?, actionCount: Int) { events += "close:$sessionId:$actionCount" }
     }
 
-    private val context = AgentContext(scene = SceneManager.Scene.CHAT)
+    private val context = AgentContext(scene = AgentScene.CHAT)
 
     @Test
     fun `open success emits started event and returns sessionId payload`() = runTest {
@@ -2190,6 +2190,14 @@ class BrowserSessionCapabilityTest {
     }
 
     @Test
+    fun `click requests frame`() = runTest {
+        val transport = FakeTransport(BrowserActionResult(status = BrowserStatus.OK, sessionId = "s-1"))
+        val cap = BrowserSessionCapability(transport)
+        cap.execute(AgentCommand.BrowserClick(sessionId = "s-1", selector = "button"), context, null)
+        assertEquals(listOf("action:s-1:click:true"), transport.calls)
+    }
+
+    @Test
     fun `supported commands cover all seven browser tools`() {
         val cap = BrowserSessionCapability(FakeTransport(BrowserActionResult(status = BrowserStatus.OK)))
         assertEquals(
@@ -2221,6 +2229,7 @@ import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
 import com.mamba.picme.domain.browser.BrowserStatus
 import com.mamba.picme.domain.browser.BrowserUnavailableException
+import kotlinx.coroutines.CancellationException
 import kotlin.concurrent.Volatile
 
 /** 浏览器传输层（commonMain 无 HTTP 手段，组合根注入平台实现；测试注入 fake）。 */
@@ -2303,8 +2312,12 @@ class BrowserSessionCapability(
                     AgentAction.Error(command.commandId, AgentErrorCode.METHOD_NOT_FOUND, "BrowserSessionCapability 不支持此命令")
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: BrowserUnavailableException) {
             degradation(BrowserStatus.BROWSER_UNAVAILABLE, e.message ?: "network error")
+        } catch (e: Exception) {
+            degradation(BrowserStatus.ACTION_FAILED, e.message)
         }
         return Result.success(AgentAction.TextReply(commandId = command.commandId, message = reply))
     }
