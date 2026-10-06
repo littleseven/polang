@@ -2388,7 +2388,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/tool/ChatToolService.kt`
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/prompt/ChatPromptRules.kt`
 
-- [ ] **Step 1: ChatToolService 加 7 个 @Tool**
+- [x] **Step 1: ChatToolService 加 7 个 @Tool**
 
 在 `renderHtml`（:278-314）之后插入（@Tool 规范：customName 保线名、参数禁 Kotlin 默认值、@LLMDescription 逐参数、方法体一行 dispatchCommand）：
 
@@ -2466,7 +2466,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 ```
 
-- [ ] **Step 2: ChatPromptRules 加 browser 行为规则段**
+- [x] **Step 2: ChatPromptRules 加 browser 行为规则段**
 
 > **决策注记（2026-10-06 review 修订，两轮）**：browser_* 超时为**两层**结构——
 > 外层 dispatch（ChatToolService：browser 工具 25s / 其余工具 5s）+ 内层命令执行
@@ -2495,7 +2495,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 浏览器会话期间（browser_open 到 browser_close 之间）不受下文收敛规则约束（含调用次数上限与重复调用限制）；browser_close 后立即总结回复。
 ```
 
-- [ ] **Step 3: 编译 + 重生成 prompt golden + 跑守卫测试**
+- [x] **Step 3: 编译 + 重生成 prompt golden + 跑守卫测试**
 
 ```bash
 JITPACK=true ./gradlew :shared:compileAndroidMain
@@ -2505,7 +2505,7 @@ JITPACK=true ./gradlew :shared:jvmTest
 
 Expected: 第一次带 `POLANG_WRITE_GOLDEN=1` 重写 `shared/src/jvmTest/resources/golden/chat_system_prompt_golden.txt`（+可能 `chat_tool_inventory_golden.txt`）；第二次全绿（`ChatToolServiceInventoryTest` 自动覆盖新工具；`ChatToolManifestConsistencyTest` 锁的是 iOS manifest 8 工具集，不受影响——若其断言范围意外含 ChatToolService 反射总数，按测试内注释更新期望值并在 commit message 说明）。
 
-- [ ] **Step 4: 人工检查 golden diff（防 prompt 误伤）**
+- [x] **Step 4: 人工检查 golden diff（防 prompt 误伤）**
 
 ```bash
 git diff shared/src/jvmTest/resources/golden/
@@ -2513,7 +2513,7 @@ git diff shared/src/jvmTest/resources/golden/
 
 Expected: 仅新增 browser_* 工具条目与规则段，无既有内容被误改；有误改先修再提交。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/tool/ChatToolService.kt shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/prompt/ChatPromptRules.kt shared/src/jvmTest/resources/golden/
@@ -2592,7 +2592,7 @@ data class BrowserActionEntry(
     }
 ```
 
-> 执行注意：该测试文件的 Json 实例/断言风格以现有代码为准（kotlin.test）；serial name 前缀与 category 一致性测试（:200+）对新子类自动生效（`tool_` ↔ TOOL），无需改。
+> 执行注意：该测试文件的 Json 实例/断言风格以现有代码为准（kotlin.test）；serial name 前缀与 category 一致性测试（:200+）是硬编码 parts 清单遍历（非反射枚举），新子类须显式加一行 `MessagePart.BrowserLive("p0", sessionId = "s")` 才有 `tool_` ↔ TOOL 锁定。
 
 - [ ] **Step 3: 跑测试 + commit**
 

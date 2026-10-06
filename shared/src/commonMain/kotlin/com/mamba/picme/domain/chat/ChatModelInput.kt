@@ -12,6 +12,7 @@ package com.mamba.picme.domain.chat
  *   占位保住多轮会话的回合结构）；
  * - [MessagePart.EditResult] → 回灌其文字说明（沿旧路径 `(agent_edit_result, content)` 语义，
  *   防多轮编辑上下文断裂）；
+ * - [MessagePart.BrowserLive] → 暂不回灌（帧永不回灌，Task 13 落结果摘要投影）；
  * - [MessagePart.MediaResults] / [MessagePart.OptimizeCandidates] 等 data part
  *   **不进上下文**（对齐 Vercel convertToModelMessages 丢弃规则）。
  *

@@ -230,6 +230,7 @@ class MessagePartsCodecTest {
                 task = EngineerTaskState(taskId = "t", sourceText = "做", startedAtMs = 0L, updatedAtMs = 0L),
             ),
             MessagePart.EditResult("p0", description = "已提亮"),
+            MessagePart.BrowserLive("p0", sessionId = "s"),
             MessagePart.MediaResults(
                 "p0",
                 MediaResultsUi(query = "q", assets = emptyList(), totalCount = 0, isRefinement = false),
