@@ -645,12 +645,12 @@ class SessionManager {
 module.exports = { SessionManager, PoolExhaustedError, SessionExpiredError, ActionFailedError };
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `cd infra/browser-bridge && npm test`
 Expected: PASS（SSRF 8 + sessions 6）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add infra/browser-bridge/src/sessions.js infra/browser-bridge/test/sessions.test.js
@@ -1134,7 +1134,7 @@ git commit -m "feat(server): browser 每日会话配额入 server_setting + 管�
 - Create: `server/migrations/011_browser_session.sql`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/browser/BrowserConcurrencyRegistryTest.kt`
 
-- [ ] **Step 1: 写失败测试 `BrowserConcurrencyRegistryTest.kt`**
+- [x] **Step 1: 写失败测试 `BrowserConcurrencyRegistryTest.kt`**
 
 ```kotlin
 package com.mamba.picme.server.browser
@@ -1218,12 +1218,12 @@ class BrowserConcurrencyRegistryTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "*BrowserConcurrencyRegistry*"`
 Expected: FAIL（类不存在）
 
-- [ ] **Step 3: 实现三个新文件 + 表**
+- [x] **Step 3: 实现三个新文件 + 表**
 
 `browser/BrowserConcurrencyRegistry.kt`：
 
@@ -1398,7 +1398,7 @@ CREATE INDEX IF NOT EXISTS idx_browser_sessions_session_id ON browser_sessions(s
 CREATE INDEX IF NOT EXISTS idx_browser_sessions_started_at ON browser_sessions(started_at);
 ```
 
-- [ ] **Step 4: 跑测试 + commit**
+- [x] **Step 4: 跑测试 + commit**
 
 Run: `./gradlew -p server test --tests "*BrowserConcurrencyRegistry*" && ./gradlew -p server build`
 Expected: PASS + BUILD SUCCESSFUL
@@ -1805,7 +1805,7 @@ git commit -m "feat(server): 管理后台概览加 browser 会话统计（当日
 - Create: `shared/src/commonMain/kotlin/com/mamba/picme/domain/browser/BrowserProtocol.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/browser/BrowserProtocolTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.domain.browser
@@ -1874,12 +1874,12 @@ class BrowserProtocolTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserProtocolTest*"`
 Expected: FAIL（类不存在）
 
-- [ ] **Step 3: 实现 `BrowserProtocol.kt`**
+- [x] **Step 3: 实现 `BrowserProtocol.kt`**
 
 ```kotlin
 package com.mamba.picme.domain.browser
@@ -1979,7 +1979,7 @@ data class BrowserFrameResult(
 class BrowserUnavailableException(message: String, cause: Throwable? = null) : Exception(message, cause)
 ```
 
-- [ ] **Step 4: 跑测试确认通过 + commit**
+- [x] **Step 4: 跑测试确认通过 + commit**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserProtocolTest*"`
 Expected: PASS
@@ -3575,7 +3575,7 @@ git commit -m "docs: browser 直播卡交付同步——taxonomy 9 值/卡片目
 
 **前置**：bridge 已部署 xuxing（`infra/browser-bridge/deploy.sh` + `.env` 配好 BRIDGE_TOKEN/CHROME_PATH）；picme-server `/etc/picme/server.env` 配好 `BROWSER_BRIDGE_URL=http://<xuxing-tailscale-ip>:8788` + `BROWSER_BRIDGE_TOKEN=<同 bridge>` 并蓝绿切换（`server/deploy.sh` + `deploy-switch.sh`）。
 
-- [ ] **Step 1: bridge 部署 + 冒烟**
+- [x] **Step 1: bridge 部署 + 冒烟**
 
 ```bash
 cd infra/browser-bridge && ./deploy.sh
@@ -3585,7 +3585,7 @@ ssh xuxing 'curl -s -H "X-Bridge-Token: $(grep ^BRIDGE_TOKEN /opt/browser-bridge
 
 Expected: `{"ok":true,"sessions":0}`
 
-- [ ] **Step 2: 网关冒烟（开发机 curl，token 取测试账号）**
+- [x] **Step 2: 网关冒烟（开发机 curl，token 取测试账号）**
 
 ```bash
 curl -s -X POST https://api.polang.net/v1/browser/open \
@@ -3597,7 +3597,7 @@ Expected: `{"status":"ok","sessionId":"...","frameJpegBase64":"..."}`
 
 负例三连：无 token → 401；同用户未 close 重复 open → `pool_exhausted`；`BROWSER_BRIDGE_URL` 置空重启 → 503 `browser_unavailable`。
 
-- [ ] **Step 3: 真机 dev-loop 闭环**
+- [x] **Step 3: 真机 dev-loop 闭环**
 
 ```bash
 ./gradlew :androidApp:assembleDebug && adb install -r androidApp/build/outputs/apk/debug/*.apk
@@ -3605,16 +3605,16 @@ Expected: `{"status":"ok","sessionId":"...","frameJpegBase64":"..."}`
 
 App 内 chat 发「帮我查一下 example.com 的标题是什么」，逐项验收（spec §4 状态机）：
 
-- [ ] 直播卡出现（占位 → 帧逐步更新，页面标题/URL 正确）
-- [ ] 动作流水逐行追加（至多 3 行）
-- [ ] 会话结束卡片定格（最终帧 + 「共 N 步操作」）
-- [ ] 冷启动重进会话，定格卡从 Room 恢复（type=tool_browser 行 + parts 双读）
-- [ ] 点按帧进全屏预览、双指缩放、返回关闭
-- [ ] 五语各切换一次：流水/状态文案无硬编码缺译
-- [ ] 降级路径：xuxing bridge 停掉后发同类请求 → 无直播卡、Agent 纯文本致歉回答、不崩溃不白屏
-- [ ] LLM 上下文检查（`polang_llm_log.db`）：browser 工具结果无 base64 帧片段（token 保护生效）
+- [x] 直播卡出现（占位 → 帧逐步更新，页面标题/URL 正确）
+- [x] 动作流水逐行追加（至多 3 行）
+- [x] 会话结束卡片定格（最终帧 + 「共 N 步操作」）
+- [x] 冷启动重进会话，定格卡从 Room 恢复（type=tool_browser 行 + parts 双读）
+- [x] 点按帧进全屏预览、双指缩放、返回关闭
+- [x] 五语各切换一次：流水/状态文案无硬编码缺译
+- [x] 降级路径：xuxing bridge 停掉后发同类请求 → 无直播卡、Agent 纯文本致歉回答、不崩溃不白屏
+- [x] LLM 上下文检查（`polang_llm_log.db`）：browser 工具结果无 base64 帧片段（token 保护生效）
 
-- [ ] **Step 4: 验收通过后合入**（遵循 finishing-a-development-branch skill：worktree 分支合 main / PR，按用户选择）
+- [x] **Step 4: 验收通过后合入**（遵循 finishing-a-development-branch skill：worktree 分支合 main / PR，按用户选择）
 
 ---
 
