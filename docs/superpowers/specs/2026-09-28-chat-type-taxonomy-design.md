@@ -6,6 +6,8 @@
 > **关联文档**：`docs/03-TECHNICAL-SPECS/CHAT_CARD_CATALOG.md` §0/§0.1/§0.2/§0.3（协议总纲与 OpenAI 兼容硬约束）、`docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md`（M1~M5 主线 spec）
 >
 > 2026-09-28 修订（用户指示「无需考虑兼容问题，按理想态实现」）：运行时转换器纯净化——不再双吃 legacy 13，legacy 映射知识收敛到迁移专用 `LegacyChatTypeMigration`（§4.2/§5/§6/§8/§11 联动）。
+>
+> 2026-10-06 增补：tool 类扩第 9 值 `tool_browser`（browser-vnc 云端浏览器直播卡，spec `2026-10-06-browser-vnc-live-card-design.md` §4）——纯新增无 legacy 迁移源，命名遵循 §1.1（tool 类、kind=产物名词、非工具函数名绑定）。
 
 ---
 
@@ -23,7 +25,7 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 
 ## 1. 目标分类法（协议线）
 
-**三分类 8 值**，对齐主流协议（OpenAI Responses / Vercel AI SDK）的 content / tool / data 三族：
+**三分类 9 值**（8 值 + 2026-10-06 扩 `tool_browser`），对齐主流协议（OpenAI Responses / Vercel AI SDK）的 content / tool / data 三族：
 
 | 类目 | 新值 | 迁移源（legacy type 列值） | 语义 |
 |---|---|---|---|
@@ -33,6 +35,7 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 | tool | `tool_html` | `html_card` | render_html 产物（HTML 文档） |
 | tool | `tool_task` | `task_card` | 工程师任务状态机投影 |
 | tool | `tool_image_edit` | `agent_edit_result` | 对话式图像编辑产物 |
+| tool | `tool_browser` | —（2026-10-06 新增，无 legacy 源） | 云端浏览器会话直播卡 |
 | data | `data_media_results` | `media_results` | 相册搜索结果集 |
 | data | `data_optimize_candidates` | `optimize_candidates` | AI 优化抽卡候选组 |
 
@@ -75,13 +78,13 @@ ADR-016 parts 重构（M1~M4 已全合 main）把鉴别字段原样继承了这�
 
 ### 4.1 `MessagePart`（shared `domain/chat/MessagePart.kt`）
 
-- 8 个子类型 `@SerialName` 改为新值：`text` / `image` / `tool_chart` / `tool_html` / `tool_task` / `tool_image_edit` / `data_media_results` / `data_optimize_candidates`；
+- 8 个子类型 `@SerialName` 改为新值：`text` / `image` / `tool_chart` / `tool_html` / `tool_task` / `tool_image_edit` / `data_media_results` / `data_optimize_candidates`（2026-10-06 增第 9 子类型 `BrowserLive` → `tool_browser`，无迁移源，纯新增登记）；
 - 新增 **`PartCategory` 枚举**（`CONTENT` / `TOOL` / `DATA`）与 `MessagePart.category` 抽象属性（各子类型覆写返回常量）——类目的代码层权威承载，`when` 分派与文档登记共用；
 - 类注释更新：分类法与命名规则（§1.1）写入 KDoc，作为新增 part 的登记指引。
 
 ### 4.2 转换与编解码
 
-- **运行时转换器纯净化**：`LegacyMessagePartsConverter` 更名 `MessagePartsConverter`（文件 `LegacyMessageParts.kt` → `MessagePartsConverter.kt`），**仅映射新 8 值**——不再双吃 legacy 13；未知值 → 行级 Text 兜底原则不变。签名补 role 入参（`toParts(type, content, metadata, role)`）：`image` 映射按角色分流——user 且 metadata.imageUri 在场 → [Image, Text] 图文双 part，否则 [Image(ref=content)]；agent → [Image(ref=metadata.imageUri ?: content, saved)]；
+- **运行时转换器纯净化**：`LegacyMessagePartsConverter` 更名 `MessagePartsConverter`（文件 `LegacyMessageParts.kt` → `MessagePartsConverter.kt`），**仅映射新值集**（原 8 值 + 2026-10-06 起 `tool_browser`——无 legacy 源，content 列存 `BrowserLive` 整颗 JSON 直通解码，见 browser-vnc 直播卡 spec §4）——不再双吃 legacy 13；未知值 → 行级 Text 兜底原则不变。签名补 role 入参（`toParts(type, content, metadata, role)`）：`image` 映射按角色分流——user 且 metadata.imageUri 在场 → [Image, Text] 图文双 part，否则 [Image(ref=content)]；agent → [Image(ref=metadata.imageUri ?: content, saved)]；
 - **legacy 映射收敛迁移专用**：新增 `LegacyChatTypeMigration`（shared `domain/chat/`）：`map(legacyType, content, metadata) → MigratedRow(type, role, parts)`——type 重写表 + role 推导（`user_` 前缀 → `"user"`，其余 → `"agent"`）单点收口，parts 委托 `MessagePartsConverter`（零解析逻辑重复）。**仅供 `MIGRATION_25_26` 与备份恢复两个存量数据入口使用**，运行时路径不引用；
 - `MessagePartsCodec`：线格式随 `@SerialName` 自动更新；`ignoreUnknownKeys` 前向兼容语义不变；round-trip 测试全量改写（§8）。
 

@@ -21,6 +21,7 @@ class MigrationsSettingsTest {
             val rows = ServerSettings.selectAll().associate { it[ServerSettings.key] to it[ServerSettings.value] }
             assertEquals(config.freeLlmQuota, rows[SettingsService.KEY_FREE])
             assertEquals(config.guestLlmQuota, rows[SettingsService.KEY_GUEST])
+            assertEquals(config.browserDailyQuota, rows[SettingsService.KEY_BROWSER_DAILY])
         }
     }
 
@@ -32,7 +33,7 @@ class MigrationsSettingsTest {
         Migrations.seedSettings(config)
         transaction(Db.instance) {
             val count = ServerSettings.selectAll().count()
-            assertEquals(2L, count)
+            assertEquals(3L, count)
         }
     }
 }

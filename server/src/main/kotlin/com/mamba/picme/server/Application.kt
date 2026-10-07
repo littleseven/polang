@@ -6,6 +6,9 @@ import com.mamba.picme.server.auth.APP_TOKEN_HEADER
 import com.mamba.picme.server.auth.DEVICE_ID_HEADER
 import com.mamba.picme.server.auth.EmailService
 import com.mamba.picme.server.auth.PLATFORM_HEADER
+import com.mamba.picme.server.browser.BrowserBridgeClient
+import com.mamba.picme.server.browser.BrowserConcurrencyRegistry
+import com.mamba.picme.server.browser.BrowserSessionStats
 import com.mamba.picme.server.config.AppConfig
 import com.mamba.picme.server.config.SettingsService
 import com.mamba.picme.server.cos.CosService
@@ -26,6 +29,7 @@ import com.mamba.picme.server.routes.accountDeletionRoute
 import com.mamba.picme.server.routes.appLatestRoute
 import com.mamba.picme.server.routes.guestDeletionRoute
 import com.mamba.picme.server.routes.authRoute
+import com.mamba.picme.server.routes.browserRoute
 import com.mamba.picme.server.routes.claudeChatRoute
 import com.mamba.picme.server.routes.claudeDeliverRoute
 import com.mamba.picme.server.routes.claudeEngineerAvailabilityRoute
@@ -165,6 +169,15 @@ fun Application.module(config: AppConfig) {
     // 每账号每天最多 10 条问题上报
     val issueReportRateLimiter = RateLimiter(10, 24 * 60 * 60_000L)
 
+    // Browser 网关（spec §6：网关 30s 超时；每日配额走 SettingsService provider，admin 热改即时生效）
+    val browserHttpClient = HttpClient(io.ktor.client.engine.cio.CIO) {
+        engine { requestTimeout = 30_000 }
+    }
+    val browserBridge = BrowserBridgeClient(browserHttpClient, config.browserBridgeUrl, config.browserBridgeToken)
+    val browserConcurrency = BrowserConcurrencyRegistry()
+    val browserDailyLimiter = RateLimiter({ SettingsService.snapshot().browserDailyQuota }, 24 * 60 * 60_000L)
+    val browserStats = BrowserSessionStats()
+
     routing {
         // Public
         downloadRoute(cosService)
@@ -185,6 +198,7 @@ fun Application.module(config: AppConfig) {
         claudeDeliverRoute(claudeClient, rateLimiter)
         claudeToolResultRoute(claudeClient, rateLimiter)
         issueReportRoute(issueReportService, issueReportRateLimiter)
+        browserRoute(browserBridge, browserDailyLimiter, browserConcurrency, browserStats)
         // 管理后台（/admin/**，独立 cookie 认证）
         adminRoute(config.adminToken, cosService, balanceService, config.llmPrices, issueReportService)
     }

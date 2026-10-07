@@ -10,9 +10,11 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAddCheck
 import androidx.compose.material.icons.automirrored.rounded.ShortText
 import androidx.compose.material.icons.rounded.AspectRatio
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Delete
@@ -25,16 +27,21 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FlipCameraAndroid
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.HourglassEmpty
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.PhotoFilter
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.ToggleOn
+import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Web
@@ -300,6 +307,13 @@ private fun getAgentCommandDisplayName(context: Context, command: AgentCommand):
         is AgentCommand.RememberFact -> context.getString(R.string.chat_cmd_remember_fact)
         is AgentCommand.ForgetFact -> context.getString(R.string.chat_cmd_forget_fact)
         is AgentCommand.RecallMemory -> context.getString(R.string.chat_cmd_recall_memory)
+        is AgentCommand.BrowserOpen -> context.getString(R.string.chat_cmd_browser_open)
+        is AgentCommand.BrowserNavigate -> context.getString(R.string.chat_cmd_browser_navigate)
+        is AgentCommand.BrowserClick -> context.getString(R.string.chat_cmd_browser_click)
+        is AgentCommand.BrowserType -> context.getString(R.string.chat_cmd_browser_type)
+        is AgentCommand.BrowserExtract -> context.getString(R.string.chat_cmd_browser_extract)
+        is AgentCommand.BrowserScreenshot -> context.getString(R.string.chat_cmd_browser_screenshot)
+        is AgentCommand.BrowserClose -> context.getString(R.string.chat_cmd_browser_close)
     }
 
 /**
@@ -356,6 +370,13 @@ private fun resolveCommandIcon(command: AgentCommand): ImageVector = when (comma
     is AgentCommand.RememberFact -> Icons.Rounded.Memory
     is AgentCommand.ForgetFact -> Icons.Rounded.Memory
     is AgentCommand.RecallMemory -> Icons.Rounded.Memory
+    is AgentCommand.BrowserOpen -> Icons.Rounded.OpenInBrowser
+    is AgentCommand.BrowserNavigate -> Icons.Rounded.TravelExplore
+    is AgentCommand.BrowserClick -> Icons.Rounded.TouchApp
+    is AgentCommand.BrowserType -> Icons.Rounded.Keyboard
+    is AgentCommand.BrowserExtract -> Icons.Rounded.Article
+    is AgentCommand.BrowserScreenshot -> Icons.Rounded.Screenshot
+    is AgentCommand.BrowserClose -> Icons.Rounded.Close
 }
 
 private fun getAgentCommandDetail(context: Context, command: AgentCommand): String =

@@ -45,7 +45,9 @@ import kotlinx.coroutines.withTimeout
  * `callTool(toolName, argsJson)` 手写 when 分发。
  *
  * **并发模型（KMP 抽取 Task 7 suspend 化）**：@Tool 方法为 suspend（Koog 1.1.1 支持 suspend
- * 工具函数），dispatch 从 `future{}.get(5s)` 阻塞桥改写为 `withTimeout(5s)` 结构化等待，
+ * 工具函数），dispatch 从 `future{}.get(5s)` 阻塞桥改写为 `withTimeout` 结构化等待
+ *（默认 5s；browser_* 远程慢工具族分级为 25s，与 registry 内层 CommandExecutor 25s 同源，
+ * 见 [BROWSER_DISPATCH_TIMEOUT_MS]），
  * 超时抛 `TimeoutCancellationException`（语义对齐旧 `java.util.concurrent.TimeoutException` 分支）；
  * `adjust_image` 的 `runBlocking` 桥同步删除（handler 本就 suspend）。
  *
@@ -63,6 +65,16 @@ class ChatToolService private constructor() : TraceIdAware {
     companion object {
         /** dispatch 等待超时（毫秒），语义对齐旧 `future{}.get(5, SECONDS)`。 */
         private const val DISPATCH_TIMEOUT_MS = 5000L
+
+        /**
+         * browser_* 工具族的外层 dispatch 等待超时（毫秒）：与 registry 内层命令执行超时同源
+         *（[CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS]，两处不漂移）。两层语义——
+         * 外层（本类，browser 工具 25s / 其余工具 5s）+ 内层（registry CommandExecutor 25s）；
+         * 25s > 服务端 navTimeout 15s、< 网关 30s，慢页面（domcontentloaded 5~15s 常见）
+         * 不被客户端 withTimeout 级联取消必杀（那会酿成「远端 open 成功但卡不出现 + 会话泄漏 +
+         * LLM 重试开重复会话」）。层叠不变式（内层 ≥ 本值）由 `CommandTimeoutLayeringTest` 钉住。
+         */
+        internal const val BROWSER_DISPATCH_TIMEOUT_MS = CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS
 
         // KMP commonMain 无 synchronized，lazy 默认 SYNCHRONIZED 模式保证同款线程安全单例语义
         private val singleton: ChatToolService by lazy { ChatToolService() }
@@ -313,6 +325,80 @@ class ChatToolService private constructor() : TraceIdAware {
         )
     )
 
+    // ── 云端浏览器（browser-vnc 直播卡） ─────────────────────────────
+
+    @Tool(customName = "browser_open")
+    @LLMDescription("打开云端浏览器会话并导航到指定 URL（远程 headless Chromium 执行，过程画面会以直播卡展示给用户）。返回 sessionId 供后续 browser_* 动作复用。需要浏览网页获取实时信息时使用；任务完成必须调 browser_close。")
+    suspend fun browserOpen(
+        @LLMDescription("要打开的完整 URL（http/https）")
+        url: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserOpen(url = url), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
+    @Tool(customName = "browser_navigate")
+    @LLMDescription("云端浏览器会话内导航到新 URL。")
+    suspend fun browserNavigate(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+        @LLMDescription("目标完整 URL（http/https）")
+        url: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserNavigate(sessionId = sessionId, url = url), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
+    @Tool(customName = "browser_click")
+    @LLMDescription("点击云端浏览器当前页面中的元素。三种定位方式按优先级选用：targetIndex（browser_extract 返回的元素序号，最可靠）> targetText（元素可见文本）> selector（CSS 选择器，兜底）。三者至少给一个，多余传空串/-1。")
+    suspend fun browserClick(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+        @LLMDescription("browser_extract 返回的元素序号；未使用传 -1")
+        targetIndex: Int,
+        @LLMDescription("元素可见文本（如 'Sign in'）；未使用传空串")
+        targetText: String,
+        @LLMDescription("CSS 选择器（如 'button.submit'）；未使用传空串")
+        selector: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
+    @Tool(customName = "browser_type")
+    @LLMDescription("向云端浏览器当前页面中的输入框键入文本。定位方式同 browser_click（优先 targetIndex）。")
+    suspend fun browserType(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+        @LLMDescription("browser_extract 返回的元素序号；未使用传 -1")
+        targetIndex: Int,
+        @LLMDescription("输入框可见文本/占位符；未使用传空串")
+        targetText: String,
+        @LLMDescription("CSS 选择器；未使用传空串")
+        selector: String,
+        @LLMDescription("要键入的文本")
+        text: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector, text = text), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
+    @Tool(customName = "browser_extract")
+    @LLMDescription("提取云端浏览器当前页面的正文文本（截断 4000 字符）与可交互元素清单（每个元素带 index/tag/text/href）。阅读页面内容用它，不要用 browser_screenshot 读内容；后续 click/type 优先用清单里的 index 定位。")
+    suspend fun browserExtract(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserExtract(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
+    @Tool(customName = "browser_screenshot")
+    @LLMDescription("抓云端浏览器当前页一帧画面。仅当用户明确要截图时使用；常规动作的过程画面已自动回传。")
+    suspend fun browserScreenshot(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserScreenshot(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
+    @Tool(customName = "browser_close")
+    @LLMDescription("关闭云端浏览器会话并销毁远程实例。浏览任务结束后必须调用（否则服务端 2 分钟空闲后强制回收）。")
+    suspend fun browserClose(
+        @LLMDescription("browser_open 返回的会话 id")
+        sessionId: String,
+    ): String =
+        dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
     // ── 记忆（人物关系 + 事实） ─────────────────────────────────────
 
     @Tool(customName = "remember_person_relation")
@@ -447,16 +533,23 @@ class ChatToolService private constructor() : TraceIdAware {
 
     // ── 内部：命令分发（复用 RemoteControlToolService.dispatchCommand 范式，scene=CHAT）────
 
-    private suspend fun dispatchCommand(command: AgentCommand): String =
-        dispatchCommandWithTrace(command, traceIdHolder?.value)
+    private suspend fun dispatchCommand(
+        command: AgentCommand,
+        timeoutMillis: Long = DISPATCH_TIMEOUT_MS,
+    ): String =
+        dispatchCommandWithTrace(command, traceIdHolder?.value, timeoutMillis)
 
     /**
      * 带显式 traceId 的命令分发入口（internal）：供意图路由器直执路径（RemoteChatEngine）
-     * 复用同一条「dispatch → uiActions 发射 → observation 文本 → 5s 超时」链路，
+     * 复用同一条「dispatch → uiActions 发射 → observation 文本 → 超时等待」链路，
      * 保证路由直执与 LLM tool_calls 的执行语义完全一致（含审计 traceId 串联）。
      */
-    internal suspend fun dispatchCommandWithTrace(command: AgentCommand, traceId: String?): String =
-        dispatchCommandDetailed(command, traceId).observation
+    internal suspend fun dispatchCommandWithTrace(
+        command: AgentCommand,
+        traceId: String?,
+        timeoutMillis: Long = DISPATCH_TIMEOUT_MS,
+    ): String =
+        dispatchCommandDetailed(command, traceId, timeoutMillis).observation
 
     /** 直执路径的结构化分发结果：[action] 为 null 表示 dispatch 失败/超时（observation 为 Error 文本）。 */
     internal data class DetailedDispatch(val observation: String, val action: AgentAction?)
@@ -464,11 +557,17 @@ class ChatToolService private constructor() : TraceIdAware {
     /**
      * [dispatchCommandWithTrace] 的结构化变体：除 observation 外返回真实 [AgentAction]，
      * 供路由直执路径判定成功/失败（失败回落完整 agent loop）并提取结果基数（totalCount）。
+     * [timeoutMillis] 默认 5s；browser_* 远程慢工具族显式传 [BROWSER_DISPATCH_TIMEOUT_MS]
+     *（外层 25s ≤ registry 内层 CommandExecutor 25s，层叠关系见 CommandTimeoutLayeringTest）。
      */
-    internal suspend fun dispatchCommandDetailed(command: AgentCommand, traceId: String?): DetailedDispatch {
+    internal suspend fun dispatchCommandDetailed(
+        command: AgentCommand,
+        traceId: String?,
+        timeoutMillis: Long = DISPATCH_TIMEOUT_MS,
+    ): DetailedDispatch {
         return try {
             // 结构化等待（替代 future{}.get(5s) 阻塞桥）：超时经协程取消级联终止底层 dispatch。
-            val result = withTimeout(DISPATCH_TIMEOUT_MS) {
+            val result = withTimeout(timeoutMillis) {
                 CapabilityRegistry.getInstance()
                     .dispatch(command, AgentContext(scene = AgentScene.CHAT, traceId = traceId), null)
             }
@@ -497,7 +596,7 @@ class ChatToolService private constructor() : TraceIdAware {
                 onFailure = { DetailedDispatch("Error: ${it.message}", null) },
             )
         } catch (e: TimeoutCancellationException) {
-            // 等待 dispatch 5s 超时（语义对齐旧 java.util.concurrent.TimeoutException 分支）：
+            // 等待 dispatch 超时（语义对齐旧 java.util.concurrent.TimeoutException 分支）：
             // withTimeout 已级联取消底层 dispatch 协程，无协程裸跑。
             // 记调用方视角的等待超时，二者可经 traceId 关联。
             Logger.w(tag, "dispatchCommand wait timed out: ${command::class.simpleName}")
@@ -506,7 +605,7 @@ class ChatToolService private constructor() : TraceIdAware {
                 commandType = AgentCommand.getMethodName(command),
                 success = false,
                 errorCode = CommandExecutor.ERROR_CODE_TIMEOUT,
-                errorMessage = "dispatch wait timed out after 5s",
+                errorMessage = "dispatch wait timed out after ${timeoutMillis}ms",
                 traceId = traceId
             )
             DetailedDispatch("Error: ${e.message}", null)

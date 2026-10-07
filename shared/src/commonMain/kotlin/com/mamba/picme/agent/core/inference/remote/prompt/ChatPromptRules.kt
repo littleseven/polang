@@ -112,6 +112,17 @@ object ChatPromptRules {
             """.trimIndent()
         ),
         RuleSection(
+            id = "browser_rules",
+            body = """
+            【浏览器工具（browser_*）】用户的问题需要实时网页信息（价格、新闻、赛程、文档等）时使用。
+            流程固定为 browser_open → 若干动作（navigate/click/type/extract）→ browser_close；一次会话聚焦一个任务，提取内容用 browser_extract 而非截图。
+            点击/输入优先用 browser_extract 返回的元素 index 定位，其次可见文本，CSS 选择器只作兜底。
+            任务结束（含中途放弃、额度/资源报错改纯文本回答）都必须 browser_close。
+            不要浏览用户未要求的站点，不要在网页上输入用户的账号密码等敏感信息。
+            浏览器会话期间（browser_open 到 browser_close 之间）不受下文收敛规则约束（含调用次数上限与重复调用限制）；browser_close 后立即总结回复。
+            """.trimIndent()
+        ),
+        RuleSection(
             id = "image_edit",
             body = """
             当用户要求「调亮/调暗/提高对比度/增加饱和度/调暖色调/调冷色调」等图片调整时，使用 adjust_image（而非 ai_optimize）。adjust_image 需要明确参数：brightness(-100~100, 调亮用正值如30-50, 调暗用负值)、contrast(0~200, 默认50, 增大提高对比度)、saturation(0~200, 默认100, 增大提高饱和度)、temperature(2000~8000, 默认5000, 增大偏暖)。未提到的参数留空串。

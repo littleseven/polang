@@ -45,8 +45,6 @@ class CapabilityRegistry private constructor(
             CapabilityRegistry(SceneManager.getInstance())
         }
 
-        const val DEFAULT_COMMAND_TIMEOUT_MS = CommandExecutor.DEFAULT_TIMEOUT_MS
-
         /**
          * 获取单例实例（使用默认协程作用域）
          */
@@ -67,7 +65,13 @@ class CapabilityRegistry private constructor(
     private val registry = mutableMapOf<String, Capability>()
 
     // 委托组件
-    private val commandExecutor = CommandExecutor()
+    // 内层超时显式 25s（见 CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS）：默认 10s 会紧于
+    // browser 外层 dispatch 25s，慢页面被内层必杀而外层永不触发；既有工具外层 5s 更紧不受影响。
+    private val commandExecutor = CommandExecutor(timeoutMs = CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS)
+
+    /** 内层执行超时（毫秒），供层叠不变式守卫测试（CommandTimeoutLayeringTest）读取实际生效值。 */
+    internal val commandExecutorTimeoutMs: Long
+        get() = commandExecutor.timeoutMs
     private val commandQueue = CrossPageCommandQueue(
         sceneManager = sceneManager,
         commandExecutor = commandExecutor,

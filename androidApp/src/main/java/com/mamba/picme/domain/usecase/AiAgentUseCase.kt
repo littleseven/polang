@@ -239,6 +239,16 @@ class AiAgentUseCase(
             is AgentCommand.RememberFact -> AiAgentCommand.TextReply("记住事实")
             is AgentCommand.ForgetFact -> AiAgentCommand.TextReply("遗忘事实")
             is AgentCommand.RecallMemory -> AiAgentCommand.TextReply("检索记忆")
+            // 云端浏览器命令（browser-vnc 直播卡）：占位/直播态由 ChatViewModel delegate +
+            // TurnPartsReducer 流式轨承担（TOOL_BROWSER_OPEN 占位 part），legacy 轨（相机场景）
+            // 无卡片管线，统一兜底为文本（同 DrawChart/RenderHtml 先例）
+            is AgentCommand.BrowserOpen -> AiAgentCommand.TextReply("打开浏览器: ${command.url}")
+            is AgentCommand.BrowserNavigate -> AiAgentCommand.TextReply("浏览器导航: ${command.url}")
+            is AgentCommand.BrowserClick -> AiAgentCommand.TextReply("浏览器点击元素")
+            is AgentCommand.BrowserType -> AiAgentCommand.TextReply("浏览器输入文本")
+            is AgentCommand.BrowserExtract -> AiAgentCommand.TextReply("提取网页正文")
+            is AgentCommand.BrowserScreenshot -> AiAgentCommand.TextReply("网页截图")
+            is AgentCommand.BrowserClose -> AiAgentCommand.TextReply("关闭浏览器")
         }
     }
 

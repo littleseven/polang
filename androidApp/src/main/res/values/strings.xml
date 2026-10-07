@@ -1603,6 +1603,25 @@
     <string name="html_card_preview_failed">Preview failed to render</string>
     <string name="html_fullpage_title_default">Card detail</string>
     <string name="html_fullpage_load_failed">Content failed to load</string>
+    <!-- Browser live card: action stream + session state -->
+    <string name="browser_action_open">Open %1$s</string>
+    <string name="browser_action_navigate">Go to %1$s</string>
+    <string name="browser_action_click">Tap %1$s</string>
+    <string name="browser_action_type">Type “%1$s”</string>
+    <string name="browser_action_extract">Read page content</string>
+    <string name="browser_action_screenshot">Take screenshot</string>
+    <string name="browser_live_running">Browsing…</string>
+    <string name="browser_live_done_summary">Browser session finished, %1$d actions</string>
+    <string name="browser_live_failed">Browser session failed</string>
+    <string name="browser_live_view_full">Tap to view full screen</string>
+    <string name="browser_live_title_default">Web page</string>
+    <string name="chat_cmd_browser_open">Open browser</string>
+    <string name="chat_cmd_browser_navigate">Navigate web page</string>
+    <string name="chat_cmd_browser_click">Click element</string>
+    <string name="chat_cmd_browser_type">Input text</string>
+    <string name="chat_cmd_browser_extract">Extract page text</string>
+    <string name="chat_cmd_browser_screenshot">Screenshot page</string>
+    <string name="chat_cmd_browser_close">Close browser</string>
     <string name="chat_write_no_valid_ids">No valid media IDs</string>
     <string name="chat_delete_started_pending">Deletion of %1$d item(s) initiated, awaiting system authorization</string>
     <string name="chat_deleted_n">Deleted %1$d item(s)</string>

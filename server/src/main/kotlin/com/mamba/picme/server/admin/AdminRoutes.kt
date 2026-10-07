@@ -109,7 +109,8 @@ fun Route.adminRoute(
             val metric = parseMetric(call.request.queryParameters["metric"])
             val ov = AdminQueries.overview(now)
             val range = AdminQueries.rangeStats(days, now, prices)
-            call.respondText(AdminViews.overviewPage(ov, range, days, metric), ContentType.Text.Html)
+            val browser = AdminQueries.browserOverview(now)
+            call.respondText(AdminViews.overviewPage(ov, range, days, metric, browser), ContentType.Text.Html)
         }
 
         get("/users") {
@@ -260,19 +261,22 @@ fun Route.adminRoute(
             val params = call.receiveParameters()
             val free = params["free_llm_quota"]?.toIntOrNull()
             val guest = params["guest_llm_quota"]?.toIntOrNull()
-            if (free == null || guest == null || free <= 0 || guest <= 0) {
+            val browserDaily = params["browser_daily_quota"]?.toIntOrNull()
+            if (free == null || guest == null || free <= 0 || guest <= 0 ||
+                (browserDaily != null && browserDaily <= 0)
+            ) {
                 call.respondText(
                     AdminViews.settingsPage(
                         SettingsService.snapshot(),
                         AiEngineerWhitelistService.list(),
-                        "参数错误：两个值都必须是正整数",
+                        "参数错误：值必须是正整数",
                     ),
                     ContentType.Text.Html,
                     HttpStatusCode.BadRequest,
                 )
                 return@post
             }
-            SettingsService.update(free, guest)
+            SettingsService.update(free, guest, browserDailyQuota = browserDaily)
             call.respondRedirect("/admin/settings")
         }
 

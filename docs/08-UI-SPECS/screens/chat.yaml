@@ -136,7 +136,7 @@ parts_rendering:
   granularity:
     rule: "每个 MessagePart = LazyColumn 独立 item（一条回复的多 part 拍平为连续 items）"
     key: '"${messageId}:${partId}"'  # 块级稳定 key（流式三段式与回收锚点；分轨命名空间：瞬态 txt-N/call-N、持久 p0/p1，见 spec §3 注记）
-    content_type: "按 part 鉴别 type（text/chart/html_card/task_card/media_results/image/edit_result/optimize_candidates + user_message/legacy_message/tool_placeholder/tool_error/tool_status）——LazyColumn 复用桶，禁无 contentType（性能红线 ADR-016 §4）"
+    content_type: "按 part 鉴别 type（text/chart/html_card/task_card/media_results/image/edit_result/optimize_candidates/browser_live + user_message/legacy_message/tool_placeholder/tool_error/tool_status）——LazyColumn 复用桶，禁无 contentType（性能红线 ADR-016 §4）"
     anti_pattern: "禁止「一条回复一个巨型 item 内部 Column 排段」（回收粒度/重组隔离/测高防抖全面劣化）"
     user_note: "USER 消息（含图文 user_image_text = Image+Text 两 part）整颗单 item 渲染（2026-09-27 M4 定稿：§5 上图下文同气泡不拆 part）；claude 气泡/COMMAND/PLAN_PREVIEW/图片类消息同为整消息 legacy 渲染"
     streaming_note: "流式消息卡 part 三分流：已填充（OUTPUT_AVAILABLE）跳过（产物已落库独立消息行渲染，禁双显）；未完成渲染占位状态行；OUTPUT_ERROR 渲染失败状态行（瞬态不落库）；开放文本块以 paced 内容+光标渲染（打字机节拍保留）"
@@ -166,6 +166,9 @@ parts_rendering:
     optimize_candidates:
       component: "GachaCandidateStrip（§17）"
       change: none
+    browser_live:
+      component: "BrowserLiveCard + BrowserFramePreviewOverlay（§18）"
+      change: "2026-10-06 新增卡（browser-vnc M1）：占位 → BrowserLiveOverlay 原位覆写 → 定格落库；watch 1s 轮询仅 running 态"
   perf_notes: "性能防护清单见 spec §8（@Immutable/contentType/remember 派生态/滚底 key 收窄等，代码侧收口）；WebView 池化与消息分页明确不做"
   ios_todo:                          # spec §9：M5 走 /ios-follow 一次跟随（渲染矩阵口径登记）
     - "parts 模型：shared commonMain 直接可得（XCFramework），Swift 侧 parts 解码 + 拍平列表"
@@ -935,3 +938,69 @@ optimize_gacha:
     chat_gacha_expired:           { en: "This candidate set has expired — start a new optimization", zh-Hans: 该组候选已过期，可重新发起优化, zh-Hant: 該組候選已過期，可重新發起優化 }
     chat_gacha_confirm_failed:    { en: "Failed to apply, please try again", zh-Hans: 应用失败，请重试, zh-Hant: 套用失敗，請重試 }
     chat_gacha_reroll_unavailable: { en: "Shuffling is unavailable right now", zh-Hans: 换一组暂不可用，请稍后再试, zh-Hant: 換一組暫不可用，請稍後再試 }
+
+# ============================================================================
+# 18. 浏览器直播卡（Browser Live）— 2026-10-06 Android 首发定稿（browser-vnc M1），iOS 跟随参照本节
+# ============================================================================
+# 基准端：features/chat/components/BrowserLiveCard.kt（BrowserLiveCard + BrowserFramePreviewOverlay）/
+#         features/chat/BrowserActionFormatter.kt（动作流水文案）/
+#         ChatViewModel.kt（_browserLiveSessions + pollBrowserFrame + emitBrowserCardMessage）
+# shared 契约：MessagePart.BrowserLive（commonMain domain/chat/MessagePart.kt，iOS 经 XCFramework 获得）
+#              + BrowserLiveOverlay（live 态同 sessionId 原位覆写纯函数）
+# 协议/渲染三要素登记：docs/03-TECHNICAL-SPECS/CHAT_CARD_CATALOG.md §4.8
+browser_live:
+  message_model:
+    type: tool_browser                          # 2026-10-06 分类法扩第 9 值（spec 2026-09-28-chat-type-taxonomy-design §1）
+    payload: "MessagePart.BrowserLive{partId, sessionId, state: ToolPartState, currentUrl, pageTitle, frameJpegBase64?, actions[BrowserActionEntry{description, ok}]≤3, actionCount, resultSummary?, errorReason?}"
+    transient_track: "browser_open 类型化占位（INPUT_STREAMING，瞬态不落 Room）→ 会话期间 BrowserLiveOverlay 原位覆写（partId 恒占位值，LazyColumn key 恒定）"
+    persistence: "会话结束落定格卡：Room type=tool_browser + role=agent，content=BrowserLive 整颗 JSON（state=OUTPUT_AVAILABLE/OUTPUT_ERROR）；冷启动自 Room 恢复"
+    token_guard: "帧永不回灌 LLM——回灌仅 browser_session tool-call/tool-result 文本摘要对（ChatModelInput）"
+  card_ui:                                        # BrowserLiveCard（INLINE 形态，M1 唯一形态）
+    slot: "与其他 chat 卡同槽位——LazyColumn 统一 horizontal padding（message_list.horizontal_padding=20 外层约定，分发分支不另加），卡自身不带外边距"
+    container: { bg: surfaceVariant, padding: spacing.md /*12*/, corner_radius: 12 }
+    corner_radius_note: "外层 12dp 全圆角无 token 档——HtmlCard/GachaCandidateStrip/EngineerTaskCard/BrowserLiveCard 四卡硬编码现状；建议未来提 cardLg=12 token（spec 注记，不立项）"
+    structure: three_rows                         # 三层结构（纵向 spacedBy spacing.sm=8）
+    header_row:                                   # 第一层：标题 + URL + 状态字
+      running_spinner: { visible_when: "state ∉ {OUTPUT_AVAILABLE, OUTPUT_ERROR}", size: 14, stroke: 2 }
+      title: { text: "pageTitle.ifBlank → browser_live_title_default", style: titleSmall, maxLines: 1, ellipsis: tail }
+      url: { visible_when: "currentUrl.isNotBlank()", style: bodySmall_onSurfaceVariant, maxLines: 1 }
+      status_word:                                # 三态语义：failed 用 colorScheme.error，余者 onSurfaceVariant
+        running: { text_key: browser_live_running,  when: "其他态（含 INPUT_STREAMING）" }
+        done:    { text_key: browser_live_done_summary /*共 %1$d 步操作*/, when: "OUTPUT_AVAILABLE" }
+        failed:  { text_key: browser_live_failed,   when: "OUTPUT_ERROR", color: error }
+    frame_area:                                   # 第二层：16:9 帧区（帧在场才渲染）
+      aspect: 16:9
+      corner_radius: AppShapes.card
+      bg: surface
+      decode: "base64 JPEG → 位图后台解码（produceState + Dispatchers.Default，先例 ChartSvgImage）"
+      scale: fit
+      tap: onOpenFullPreview                      # contentDescription = browser_live_view_full
+    action_feed:                                  # 第三层：动作流水（最近 3 步，新在尾）
+      max_lines: 3
+      line: { prefix: "· ", style: bodySmall, maxLines: 1 }
+      line_color: { ok: onSurfaceVariant, failed: error }
+      error_reason: { visible_when: "errorReason != null", style: bodySmall, color: error, maxLines: 3 }
+  watch_polling:                                  # 直播感来源（spec §2.2 决策 3）
+    cadence: "1s 轮询 GET /v1/browser/frame?sessionId"
+    active_when: "仅 running 态（state ∉ 终态）；LaunchedEffect(sessionId, running) —— 卡离开组合（划出视口）/定格即自动取消"
+    throttle: "live 态合流 500ms sample 节流（BROWSER_LIVE_OVERLAY_THROTTLE_MS，与任务卡同节拍），帧高频不直接驱动全列表重组"
+  full_preview:                                   # BrowserFramePreviewOverlay = ChatImagePreviewOverlay 单页子集
+    interactions: "base64 数据源 + 双指缩放 1x~5x/拖动（缩回 1x 自动归零偏移）+ 右上关闭按钮 + BackHandler + 点背景关闭；黑底/白图标沿用全屏预览惯例，不引入新交互"
+  i18n_keys:                                      # 五语已同步（EN/zh-CN/zh-TW/ES/FR）
+    - browser_live_running
+    - browser_live_done_summary
+    - browser_live_failed
+    - browser_live_view_full
+    - browser_live_title_default
+    - browser_action_open
+    - browser_action_navigate
+    - browser_action_click
+    - browser_action_type
+    - browser_action_extract
+    - browser_action_screenshot
+  ios_todo:
+    - "卡组件：BrowserLiveCard 三层结构 SwiftUI 等价（间距/色 token 同源；12dp 圆角随四卡现状硬编码，待 cardLg token 决议）"
+    - "watch 轮询：1s 节拍仅 running 态，视图消失/定格即取消（SwiftUI .task 取消语义对齐 LaunchedEffect）"
+    - "live 态覆写：shared BrowserLiveOverlay 经 XCFramework 直接可得；500ms 节流节拍对齐"
+    - "全屏预览：BrowserFramePreviewOverlay 单帧缩放子集（对齐既有图片全屏预览手势实现）"
+    - "落库恢复：iOS ChatHistoryStore 增 tool_browser type 解码（payload=BrowserLive JSON）"

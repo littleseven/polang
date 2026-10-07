@@ -164,6 +164,22 @@ object ServerSettings : Table("server_setting") {
     override val primaryKey = PrimaryKey(key)
 }
 
+// ── browser 会话统计（browser-vnc 直播卡；管理后台「概览」数据源）──
+object BrowserSessions : Table("browser_sessions") {
+    val id = long("id").autoIncrement()
+    val tokenHash = varchar("token_hash", 64)
+    val sessionId = varchar("session_id", 64)
+    val startedAt = long("started_at")
+    val endedAt = long("ended_at").nullable()
+    val outcome = varchar("outcome", 16).nullable() // closed / expired
+    override val primaryKey = PrimaryKey(id)
+
+    init {
+        index(isUnique = false, sessionId) // recordClose 按 session_id 定位
+        index(isUnique = false, startedAt) // 概览按时间聚合
+    }
+}
+
 // ── AI 工程师模式账号白名单（空表 = 可诊断但不可交付代码；命中邮箱才放行写链路）──
 object AiEngineerWhitelists : Table("ai_engineer_whitelist") {
     val id = integer("id").autoIncrement()

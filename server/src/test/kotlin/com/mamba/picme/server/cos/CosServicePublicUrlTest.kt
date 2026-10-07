@@ -37,6 +37,9 @@ class CosServicePublicUrlTest {
         githubToken = "",
         githubIssueRepo = "",
         apkDebugPublicBase = apkDebugPublicBase,
+        browserBridgeUrl = "",
+        browserBridgeToken = "",
+        browserDailyQuota = 20,
     )
 
     @Test

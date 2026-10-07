@@ -16,12 +16,13 @@ class AdminViewsTest {
             days = listOf(DayBucket("2026-07-12", 5L, 1L, 600L, 634L, 1234L, 1.5, 4096L, 0L)),
             byModel = listOf(DimStat("glm-5.2", 3L, 1000L, 5.0)),
         )
-        val html = AdminViews.overviewPage(ov, range, days = 7, metric = "calls")
+        val html = AdminViews.overviewPage(ov, range, days = 7, metric = "calls", browser = BrowserOverview(3L, 1L, 0.125))
         assertTrue(html.contains("今日调用"))
         assertTrue(html.contains("累计"))
         assertTrue(html.contains("<svg"))
         assertTrue(html.contains("模型 Top"))
         assertTrue(html.contains("share-bar-fill"))
+        assertTrue(html.contains("Browser sessions: today 3 · active 1 · 7d failure 12.5%"))
     }
 
     @Test
@@ -77,7 +78,7 @@ class AdminViewsTest {
     fun `overview page renders sub-cent cost with precision not zero`() {
         // 今日成本 0.0044 元：%.2f 会显示 "0.00"，计费看起来没生效
         val ov = OverviewRow(1L, 0L, 5L, 7944L, 0.0044, 819L, 0L, 0L, 0L, 0L, 0.0)
-        val html = AdminViews.overviewPage(ov, rangeFixture(), days = 7, metric = "calls")
+        val html = AdminViews.overviewPage(ov, rangeFixture(), days = 7, metric = "calls", browser = BrowserOverview(0L, 0L, 0.0))
         assertTrue("sub-cent cost must not round to 0.00", html.contains("0.0044"))
     }
 

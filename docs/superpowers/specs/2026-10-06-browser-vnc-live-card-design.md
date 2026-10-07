@@ -115,7 +115,7 @@ type 分类法 spec（`2026-09-28-chat-type-taxonomy-design.md`）tool 类扩 1 
 | `OUTPUT_ERROR` | 错误卡：失败原因 + 已完成步骤数 | 落库（供重试/排查） |
 
 - M1 只有 INLINE 形态；点按帧全屏查看复用现有全屏查看器模式。不做接管输入（方案 A 决策，接管属 M2+ 候选）。
-- 卡片可见即触发 watch 模式（~1-2fps 轮询最新帧，页面加载动画等过程可见）；不可见/退后台即停轮询，bridge 侧超时自动关 screencast。
+- 卡片可见即触发 watch 模式（~1-2fps 轮询最新帧，页面加载动画等过程可见）；不可见/退后台即停轮询，bridge 侧轮询停止后即不再截图（一次性 `page.screenshot`，无 screencast 状态机）。
 - 流式走 M2 既有管线（`TurnStreamEvent` 工具五事件 + `TurnPartsReducer` 占位原位填充），browser 工具只是新增一个类型化占位，**不动管线主干**。
 - 卡片渲染须走 ui-parity-guard 闭环（spec → token → 截图），iOS 跟随期由 ios-follow 管线对等。
 

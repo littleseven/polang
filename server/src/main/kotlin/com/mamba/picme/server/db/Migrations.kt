@@ -17,7 +17,7 @@ object Migrations {
                 Rules, Assets, TelemetryEvents, LlmDailyCounters,
                 Accounts, EmailVerifications, LlmCallLogs, LlmChannels,
                 ApkUploads, AnonymousDevices, ServerSettings, AiEngineerWhitelists,
-                ReportedIssues, IosUdidRegistrations,
+                ReportedIssues, IosUdidRegistrations, BrowserSessions,
             )
             // 给现存表补缺失列（如 llm_channel.default_model、apk_upload.channel），幂等
             SchemaUtils.createMissingTablesAndColumns(
@@ -177,6 +177,7 @@ object Migrations {
             val now = System.currentTimeMillis()
             seedIfAbsent(SettingsService.KEY_FREE, config.freeLlmQuota, now)
             seedIfAbsent(SettingsService.KEY_GUEST, config.guestLlmQuota, now)
+            seedIfAbsent(SettingsService.KEY_BROWSER_DAILY, config.browserDailyQuota, now)
         }
     }
 

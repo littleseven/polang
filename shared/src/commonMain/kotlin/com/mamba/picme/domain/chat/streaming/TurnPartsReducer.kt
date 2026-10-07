@@ -152,6 +152,8 @@ class TurnPartsReducer {
             MessagePart.Chart(partId = toolCallId, svg = "", state = ToolPartState.INPUT_STREAMING)
         TOOL_RENDER_HTML ->
             MessagePart.HtmlCard(partId = toolCallId, html = "", state = ToolPartState.INPUT_STREAMING)
+        TOOL_BROWSER_OPEN ->
+            MessagePart.BrowserLive(partId = toolCallId, sessionId = "", state = ToolPartState.INPUT_STREAMING)
         else -> null
     }
 
@@ -165,6 +167,7 @@ class TurnPartsReducer {
         is MessagePart.Chart -> copy(state = state)
         is MessagePart.HtmlCard -> copy(state = state)
         is MessagePart.TaskCard -> copy(state = state)
+        is MessagePart.BrowserLive -> copy(state = state)
         else -> this // Text / data part 无工具状态机，不动
     }
 
@@ -175,6 +178,9 @@ class TurnPartsReducer {
     companion object {
         const val TOOL_DRAW_CHART = "draw_chart"
         const val TOOL_RENDER_HTML = "render_html"
+
+        /** 云端浏览器会话开启工具（有类型化占位：BrowserLive 直播卡）；其余 browser_* 动作工具不落占位。 */
+        const val TOOL_BROWSER_OPEN = "browser_open"
 
         /** 脚本沙箱工具（无类型化占位，只占位登记；直出图卡/HTML 卡经降级关联 append）。 */
         const val TOOL_RUN_GALLERY_SCRIPT = "run_gallery_script"

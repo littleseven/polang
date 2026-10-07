@@ -1594,6 +1594,25 @@
     <string name="html_card_preview_failed">預覽渲染失敗</string>
     <string name="html_fullpage_title_default">卡片詳情</string>
     <string name="html_fullpage_load_failed">內容載入失敗</string>
+    <!-- Browser live card: action stream + session state -->
+    <string name="browser_action_open">開啟 %1$s</string>
+    <string name="browser_action_navigate">前往 %1$s</string>
+    <string name="browser_action_click">點擊 %1$s</string>
+    <string name="browser_action_type">輸入「%1$s」</string>
+    <string name="browser_action_extract">讀取頁面內容</string>
+    <string name="browser_action_screenshot">擷取畫面</string>
+    <string name="browser_live_running">正在瀏覽…</string>
+    <string name="browser_live_done_summary">瀏覽器工作階段已完成，共 %1$d 步操作</string>
+    <string name="browser_live_failed">瀏覽器工作階段失敗</string>
+    <string name="browser_live_view_full">點按全螢幕檢視</string>
+    <string name="browser_live_title_default">網頁</string>
+    <string name="chat_cmd_browser_open">開啟瀏覽器</string>
+    <string name="chat_cmd_browser_navigate">網頁導覽</string>
+    <string name="chat_cmd_browser_click">點擊元素</string>
+    <string name="chat_cmd_browser_type">輸入文字</string>
+    <string name="chat_cmd_browser_extract">擷取網頁內文</string>
+    <string name="chat_cmd_browser_screenshot">網頁截圖</string>
+    <string name="chat_cmd_browser_close">關閉瀏覽器</string>
     <string name="chat_write_no_valid_ids">沒有有效的媒體 ID</string>
     <string name="chat_delete_started_pending">已發起刪除 %1$d 項，等待系統授權</string>
     <string name="chat_deleted_n">已刪除 %1$d 項</string>

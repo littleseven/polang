@@ -40,6 +40,10 @@ data class AppConfig(
     // GitHub issue 同步（用户上报问题）
     val githubToken: String,
     val githubIssueRepo: String,
+    // Browser bridge（browserBridgeUrl 空 = 未配置，路由 503 降级 browser_unavailable）
+    val browserBridgeUrl: String,
+    val browserBridgeToken: String,
+    val browserDailyQuota: Int,
 ) {
     companion object {
         fun load(): AppConfig = AppConfig(
@@ -76,6 +80,10 @@ data class AppConfig(
             // GitHub issue sync
             githubToken = env("GITHUB_TOKEN", ""),
             githubIssueRepo = env("GITHUB_ISSUE_REPO", "littleseven/polang"),
+            // Browser bridge
+            browserBridgeUrl = env("BROWSER_BRIDGE_URL", ""),
+            browserBridgeToken = env("BROWSER_BRIDGE_TOKEN", ""),
+            browserDailyQuota = envInt("BROWSER_DAILY_QUOTA", 20),
         )
 
         private fun env(key: String, default: String): String =

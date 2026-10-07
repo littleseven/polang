@@ -2,6 +2,7 @@ package com.mamba.picme.domain.chat
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 /**
@@ -241,6 +242,71 @@ class ChatModelInputTest {
             (items[1] as ModelInputItem.ToolCall).toolCallId,
             (items[2] as ModelInputItem.ToolResult).toolCallId,
         )
+    }
+
+    @Test
+    fun `browser live card replays as tool pair with text summary only`() {
+        // browser-vnc 直播卡 Task 13：tool-call/tool-result 配对，结果侧只含文本摘要
+        val message = ChatMessage(
+            id = "m-b",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.BrowserLive(
+                    partId = "p0",
+                    sessionId = "s-1",
+                    state = ToolPartState.OUTPUT_AVAILABLE,
+                    currentUrl = "https://a.com",
+                    pageTitle = "A",
+                    frameJpegBase64 = "QUJDREVGRw==",
+                    actionCount = 5,
+                    resultSummary = "已订好机票",
+                ),
+            ),
+        )
+        val items = message.toModelInput()
+        assertEquals(2, items.size)
+        val call = items[0]
+        val result = items[1]
+        assertIs<ModelInputItem.ToolCall>(call)
+        assertIs<ModelInputItem.ToolResult>(result)
+        assertEquals("browser_session", call.toolName)
+        assertEquals(call.toolCallId, result.toolCallId)
+        assertEquals("已订好机票", result.resultSummary)
+        assertEquals(false, result.isError)
+        // 帧永不回灌：任何投影文本不得含 frameJpegBase64 的键名或内容片段
+        items.forEach { item ->
+            val text = when (item) {
+                is ModelInputItem.TextMessage -> item.text
+                is ModelInputItem.ToolCall -> item.argsSummary
+                is ModelInputItem.ToolResult -> item.resultSummary
+            }
+            assertFalse(text.contains("QUJDREVGRw=="))
+            assertFalse(text.contains("frameJpegBase64"))
+        }
+    }
+
+    @Test
+    fun `failed browser session replays error reason as tool result`() {
+        val message = ChatMessage(
+            id = "m-berr",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.BrowserLive(
+                    partId = "p0",
+                    sessionId = "s-2",
+                    state = ToolPartState.OUTPUT_ERROR,
+                    errorReason = "会话超时",
+                ),
+            ),
+        )
+        val result = message.toModelInput()[1]
+        assertIs<ModelInputItem.ToolResult>(result)
+        assertEquals("浏览器会话失败：会话超时", result.resultSummary)
+        assertEquals(true, result.isError)
     }
 
     @Test

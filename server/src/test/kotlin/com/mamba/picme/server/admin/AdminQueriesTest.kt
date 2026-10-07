@@ -2,6 +2,7 @@ package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.db.AnonymousDevices
 import com.mamba.picme.server.db.Accounts
+import com.mamba.picme.server.db.BrowserSessions
 import com.mamba.picme.server.db.Db
 import com.mamba.picme.server.db.LlmCallLogs
 import com.mamba.picme.server.util.TestDb
@@ -226,6 +227,33 @@ class AdminQueriesTest {
         assertEquals(0.000947, r.costSplit.completionCost, 1e-6) // deepseek 100×8.87 + kimi 5×12（/1M）
     }
 
+    @Test
+    fun `browserOverview counts today active and 7d failure rate`() = runBlocking {
+        TestDb.init(BrowserSessions)
+
+        // 今日：一条正常关闭 + 一条活跃（未结束）
+        browserSession("s1", todayStart + 100, todayStart + 200, "closed")
+        browserSession("s2", todayStart + 300, null, null)
+        // 昨日：expired（计入 7 日窗口分子分母）
+        browserSession("s3", todayStart - day + 500, todayStart - day + 600, "expired")
+        // 8 天前：expired（在 7 日窗口外，不计入）
+        browserSession("s4", now - 8 * day, now - 8 * day + 100, "expired")
+
+        val b = AdminQueries.browserOverview(now)
+        assertEquals(2L, b.todayCount)
+        assertEquals(1L, b.activeCount)
+        assertEquals(1.0 / 3.0, b.failureRate7d, 1e-9)
+    }
+
+    @Test
+    fun `browserOverview empty db is zeros`() = runBlocking {
+        TestDb.init(BrowserSessions)
+        val b = AdminQueries.browserOverview(now)
+        assertEquals(0L, b.todayCount)
+        assertEquals(0L, b.activeCount)
+        assertEquals(0.0, b.failureRate7d, 0.0)
+    }
+
     private suspend fun account(id: Int, email: String, createdAt: Long) {
         newSuspendedTransaction(Dispatchers.IO, Db.instance) {
             Accounts.insert {
@@ -268,6 +296,18 @@ class AdminQueriesTest {
                 it[LlmCallLogs.deviceId] = deviceId
                 it[LlmCallLogs.latencyMs] = latencyMs
                 it[LlmCallLogs.createdAt] = createdAt
+            }
+        }
+    }
+
+    private suspend fun browserSession(sessionId: String, startedAt: Long, endedAt: Long?, outcome: String?) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            BrowserSessions.insert {
+                it[BrowserSessions.sessionId] = sessionId
+                it[BrowserSessions.tokenHash] = "hash-$sessionId"
+                it[BrowserSessions.startedAt] = startedAt
+                it[BrowserSessions.endedAt] = endedAt
+                it[BrowserSessions.outcome] = outcome
             }
         }
     }

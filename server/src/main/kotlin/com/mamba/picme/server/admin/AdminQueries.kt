@@ -5,10 +5,12 @@ import com.mamba.picme.server.analytics.defaultPrices
 import com.mamba.picme.server.db.AnonymousDevices
 import com.mamba.picme.server.db.Accounts
 import com.mamba.picme.server.db.ApkUploads
+import com.mamba.picme.server.db.BrowserSessions
 import com.mamba.picme.server.db.Db
 import com.mamba.picme.server.db.IosUdidRegistrations
 import com.mamba.picme.server.db.LlmCallLogs
 import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
@@ -124,6 +126,12 @@ data class LatencyStats(val count: Int, val p50: Int, val p95: Int)
 
 data class CostSplit(val promptCost: Double, val completionCost: Double)
 
+data class BrowserOverview(
+    val todayCount: Long,
+    val activeCount: Long,
+    val failureRate7d: Double,
+)
+
 data class RangeStats(
     val days: List<DayBucket>,
     val byModel: List<DimStat>,
@@ -227,6 +235,23 @@ object AdminQueries {
             errorsYest = errorsYest,
             newUsersYest = newYest,
             newDevicesYest = newDevicesYest,
+        )
+    }
+
+    /** browser 会话统计：当日开启（UTC+8 自然日，与 overview 口径一致）/ 活跃（未结束）/ 近 7 日失败率（expired 占比）。 */
+    suspend fun browserOverview(now: Long): BrowserOverview = newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+        val startToday = startOfTodayMs(now)
+        val weekStart = now - 7 * DAY_MS
+        val today = BrowserSessions.selectAll().where { BrowserSessions.startedAt greaterEq startToday }.count()
+        val active = BrowserSessions.selectAll().where { BrowserSessions.endedAt.isNull() }.count()
+        val weekTotal = BrowserSessions.selectAll().where { BrowserSessions.startedAt greaterEq weekStart }.count()
+        val weekFailed = BrowserSessions.selectAll().where {
+            (BrowserSessions.startedAt greaterEq weekStart) and (BrowserSessions.outcome eq "expired")
+        }.count()
+        BrowserOverview(
+            todayCount = today,
+            activeCount = active,
+            failureRate7d = if (weekTotal == 0L) 0.0 else weekFailed.toDouble() / weekTotal,
         )
     }
 

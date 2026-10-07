@@ -12,6 +12,8 @@ package com.mamba.picme.domain.chat
  *   占位保住多轮会话的回合结构）；
  * - [MessagePart.EditResult] → 回灌其文字说明（沿旧路径 `(agent_edit_result, content)` 语义，
  *   防多轮编辑上下文断裂）；
+ * - [MessagePart.BrowserLive] → tool-call/tool-result 语义对（帧永不回灌，结果侧只含
+ *   文本摘要：resultSummary / 失败原因 / 会话概览兜底）；
  * - [MessagePart.MediaResults] / [MessagePart.OptimizeCandidates] 等 data part
  *   **不进上下文**（对齐 Vercel convertToModelMessages 丢弃规则）。
  *
@@ -106,6 +108,20 @@ private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): L
     is MessagePart.EditResult ->
         if (description.isBlank()) emptyList() else listOf(ModelInputItem.TextMessage(role, description))
 
+    // 浏览器直播卡：帧永不回灌（媒体红线同 Image）；tool-call/tool-result 配对，
+    // 结果侧只含文本摘要（resultSummary / 失败原因 / 会话概览兜底）。
+    is MessagePart.BrowserLive -> listOf(
+        ModelInputItem.ToolCall(namespacedToolCallId(messageId), TOOL_BROWSER_SESSION, argsSummary = ""),
+        ModelInputItem.ToolResult(
+            namespacedToolCallId(messageId),
+            TOOL_BROWSER_SESSION,
+            resultSummary = resultSummary
+                ?: errorReason?.let { "浏览器会话失败：$it" }
+                ?: "浏览器会话（${pageTitle.ifBlank { currentUrl }}），共 $actionCount 个动作",
+            isError = state == ToolPartState.OUTPUT_ERROR,
+        ),
+    )
+
     // data part：默认不进上下文（spec §6）
     is MessagePart.MediaResults,
     is MessagePart.OptimizeCandidates,
@@ -117,6 +133,7 @@ private fun MessagePart.namespacedToolCallId(messageId: String): String = "$mess
 private const val TOOL_DRAW_CHART = "draw_chart"
 private const val TOOL_RENDER_HTML = "render_html"
 private const val TOOL_ENGINEER_TASK = "engineer_task"
+private const val TOOL_BROWSER_SESSION = "browser_session"
 
 private const val USER_IMAGE_PLACEHOLDER = "[user sent an image]"
 private const val AGENT_IMAGE_PLACEHOLDER = "[assistant generated an image]"

@@ -19,10 +19,22 @@ import kotlin.concurrent.Volatile
  * （见 [recorder]），只记录纯指标，不含命令参数与业务内容。
  */
 class CommandExecutor(
-    private val timeoutMs: Long = DEFAULT_TIMEOUT_MS
+    internal val timeoutMs: Long = DEFAULT_TIMEOUT_MS
 ) {
     companion object {
         const val DEFAULT_TIMEOUT_MS = 10_000L
+
+        /**
+         * registry 内层命令执行超时（毫秒）：[CapabilityRegistry] 与 CrossPageCommandQueue 共用实例
+         * 的显式构造值。25s 对齐 browser 远端预算链（服务端 navTimeout 15s < 25s < 网关 30s）——
+         * 内层若紧于 browser 外层 dispatch 超时，慢页面（domcontentloaded 5~15s）会被内层必杀、
+         * 外层 25s 永不生效（2026-10-06 review 发现的层叠缺陷）。
+         * 既有工具外层 dispatch 5s 更紧，内层放宽后不会单独触发，行为不变；
+         * browser_* 外层 dispatch 超时（ChatToolService.BROWSER_DISPATCH_TIMEOUT_MS）引用本常量，两处不漂移。
+         * 层叠不变式由 commonTest `CommandTimeoutLayeringTest` 钉住。
+         */
+        const val REGISTRY_COMMAND_TIMEOUT_MS = 25_000L
+
         const val ERROR_CODE_TIMEOUT = -32002
         const val ERROR_CODE_EXECUTION_FAILED = -32005
 

@@ -74,6 +74,7 @@
 
 module.exports = {
   port: parseInt(process.env.BRIDGE_PORT || '8788', 10),
+  bind: process.env.BRIDGE_BIND || '0.0.0.0',
   token: process.env.BRIDGE_TOKEN || '',
   // 空串 = playwright 自带 chromium（postinstall 已装）；自定义 Chrome 路径可覆盖
   chromePath: process.env.CHROME_PATH || '',
@@ -269,7 +270,7 @@ git commit -m "feat(bridge): 骨架 + OpenMuse 级 SSRF 守卫（单播许可名
 - Create: `infra/browser-bridge/src/sessions.js`
 - Test: `infra/browser-bridge/test/sessions.test.js`
 
-- [ ] **Step 1: 写失败测试（生命周期/配额/串行/三模式定位/元素提取，Playwright 以 fake browserProvider 注入）**
+- [x] **Step 1: 写失败测试（生命周期/配额/串行/三模式定位/元素提取，Playwright 以 fake browserProvider 注入）**
 
 ```js
 'use strict';
@@ -382,12 +383,12 @@ test('reap closes idle sessions', async () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd infra/browser-bridge && npm test`
 Expected: FAIL（`Cannot find module '../src/sessions'`）
 
-- [ ] **Step 3: 实现 `src/sessions.js`**
+- [x] **Step 3: 实现 `src/sessions.js`**
 
 ```js
 'use strict';
@@ -644,12 +645,12 @@ class SessionManager {
 module.exports = { SessionManager, PoolExhaustedError, SessionExpiredError, ActionFailedError };
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `cd infra/browser-bridge && npm test`
 Expected: PASS（SSRF 8 + sessions 6）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add infra/browser-bridge/src/sessions.js infra/browser-bridge/test/sessions.test.js
@@ -665,7 +666,7 @@ git commit -m "feat(bridge): SessionManager——Playwright 共享 browser/临�
 - Create: `infra/browser-bridge/.env.example`
 - Create: `infra/browser-bridge/README.md`
 
-- [ ] **Step 1: 写 `src/server.js`**（token 时序安全比较 + 服务加固，借鉴 openmuse `apps/worker/src/server.ts`）
+- [x] **Step 1: 写 `src/server.js`**（token 时序安全比较 + 服务加固，借鉴 openmuse `apps/worker/src/server.ts`）
 
 ```js
 'use strict';
@@ -804,12 +805,12 @@ server.keepAliveTimeout = 5_000;
 
 setInterval(() => { manager.reap().catch(() => {}); }, 30_000).unref();
 
-server.listen(config.port, '0.0.0.0', () => {
-  console.log(`browser-agent-bridge listening on :${config.port}`);
+server.listen(config.port, config.bind, () => {
+  console.log(`browser-agent-bridge listening on ${config.bind}:${config.port}`);
 });
 ```
 
-- [ ] **Step 2: 本地冒烟（playwright postinstall 已装 chromium；无显示环境不影响 headless）**
+- [x] **Step 2: 本地冒烟（playwright postinstall 已装 chromium；无显示环境不影响 headless）**
 
 ```bash
 cd infra/browser-bridge
@@ -831,12 +832,14 @@ curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/js
 kill %1
 ```
 
-- [ ] **Step 3: 写部署件**
+- [x] **Step 3: 写部署件**
 
 `infra/browser-bridge/.env.example`：
 
 ```bash
 BRIDGE_PORT=8788
+# 生产设为 tailscale 网卡 IP，缺省 0.0.0.0 仅开发用
+BRIDGE_BIND=
 BRIDGE_TOKEN=change-me-shared-with-picme-server
 CHROME_PATH=
 MAX_SESSIONS=8
@@ -849,7 +852,7 @@ HARD_CAP_MS=600000
 ```ini
 [Unit]
 Description=PoLang browser-agent-bridge (headless Chromium CDP bridge)
-After=network.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -860,6 +863,10 @@ ExecStart=/usr/bin/node src/server.js
 Restart=on-failure
 RestartSec=3
 MemoryMax=2G
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+# 不加 ProtectHome=true：Playwright 浏览器缓存位于 ~/.cache/ms-playwright，需可读写
 
 [Install]
 WantedBy=multi-user.target
@@ -870,14 +877,25 @@ WantedBy=multi-user.target
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
+# 注意：非 tty ssh 下的 sudo systemctl restart 需要 NOPASSWD 配置；
+# 首次部署请手动在 xuxing 上执行本脚本内的 npm install / systemctl / curl 步骤。
 cd "$(dirname "$0")"
 rsync -av --delete --exclude node_modules --exclude .env ./ xuxing:/opt/browser-bridge/
-ssh xuxing 'cd /opt/browser-bridge && npm install --omit=dev && sudo systemctl restart browser-bridge && sleep 1 && curl -s -H "X-Bridge-Token: $(grep ^BRIDGE_TOKEN .env | cut -d= -f2)" http://127.0.0.1:8788/healthz'
+ssh xuxing bash -s <<'EOF'
+set -euo pipefail
+cd /opt/browser-bridge
+npm install --omit=dev
+sudo systemctl restart browser-bridge
+sleep 1
+curl --fail-with-body -s \
+  -H "X-Bridge-Token: $(grep -m1 '^BRIDGE_TOKEN=' .env | cut -d= -f2- | tr -d '\r\n')" \
+  http://127.0.0.1:8788/healthz
+EOF
 ```
 
-`infra/browser-bridge/README.md`：
+`infra/browser-bridge/README.md`（冒烟段已内联，不再引用 plan；含 413 契约说明与防火墙注记）：
 
-```markdown
+````markdown
 # browser-agent-bridge
 
 xuxing 侧云端浏览器桥：单例 headless Chromium + 每会话临时 BrowserContext（Playwright），
@@ -887,15 +905,48 @@ xuxing 侧云端浏览器桥：单例 headless Chromium + 每会话临时 Browse
 SSRF 全球单播许可名单（仅 80/443）+ 重定向落地复查 + 子请求级拦截 + WebSocket 全禁 +
 token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入）。
 
+## 端点契约
+
 - 端点：`POST /session`（open）、`POST /session/{id}/action`、`GET /session/{id}/frame`、
   `POST /session/{id}/close`、`GET /healthz`；全部要求 `X-Bridge-Token` 头。
 - 域名结果一律 HTTP 200 + JSON `status`（ok/action_failed/pool_exhausted/session_expired）。
+- 请求体超限（>64KB）时 `req.destroy()` 先于响应发出，客户端可能观察到连接重置而非 413——
+  应将 body 发送过程中的 reset 视为 413 等价。
 - click/type 定位三模式：index（extract 返回的元素序号，LLM 首选）/ targetText / selector。
-- 部署：`./deploy.sh`（rsync → npm install --omit=dev → systemctl restart → healthz）。
-- 测试：`npm test`（单测）；冒烟走 README curl 段（本文件上方示例）。
+
+## 冒烟
+
+```bash
+BRIDGE_TOKEN=test-token node src/server.js &
+curl -s -H "X-Bridge-Token: test-token" http://127.0.0.1:8788/healthz
+# → {"ok":true,"sessions":0}
+SID=$(curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com","wantFrame":true}' http://127.0.0.1:8788/session \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["sessionId"])')
+curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
+  -d '{"action":"extract"}' "http://127.0.0.1:8788/session/$SID/action"
+# → {"status":"ok",...,"textExtract":"...","elements":[...]}
+curl -s -X POST -H "X-Bridge-Token: test-token" "http://127.0.0.1:8788/session/$SID/close"
+# → {"status":"ok","closed":true,...}
+# SSRF 负例（open 即拒）
+curl -s -X POST -H "X-Bridge-Token: test-token" -H 'Content-Type: application/json' \
+  -d '{"url":"http://192.168.1.1/"}' http://127.0.0.1:8788/session
+# → {"status":"action_failed","errorCode":"blocked_url",...}
+kill %1
 ```
 
-- [ ] **Step 4: 赋可执行权限并 commit**
+## 部署
+
+- `./deploy.sh`（rsync → npm install --omit=dev → systemctl restart → healthz）。
+- **防火墙**：token 仅为传输层防线，生产必须配合 ufw / tailscale 限制 8788 仅内网可达；
+  `BRIDGE_BIND` 生产设为 tailscale 网卡 IP（缺省 0.0.0.0 仅开发用）。
+
+## 测试
+
+- `npm test`（单测，fake browser provider）；真实浏览器冒烟见上方 curl 段。
+````
+
+- [x] **Step 4: 赋可执行权限并 commit**
 
 ```bash
 chmod +x infra/browser-bridge/deploy.sh
@@ -916,7 +967,7 @@ git commit -m "feat(bridge): HTTP 服务（时序安全 token + 超时加固）+
 - Modify: `server/.env.example`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/ratelimit/RateLimiterTest.kt`（若已存在则追加用例）
 
-- [ ] **Step 1: AppConfig 加三个字段**
+- [x] **Step 1: AppConfig 加三个字段**
 
 data class 字段区（仿 :52-59 渠道段分组注释）追加：
 
@@ -937,7 +988,7 @@ browserDailyQuota = envInt("BROWSER_DAILY_QUOTA", 20),
 
 > `browserBridgeUrl` 默认空串 = 未配置 → 路由返回 503 `browser_unavailable`（spec §6 降级路径）。
 
-- [ ] **Step 2: `.env.example` 追加**
+- [x] **Step 2: `.env.example` 追加**
 
 ```bash
 # Browser bridge（xuxing headless Chromium 桥；留空 = browser 能力禁用，路由 503 降级）
@@ -946,45 +997,48 @@ BROWSER_BRIDGE_TOKEN=
 BROWSER_DAILY_QUOTA=20
 ```
 
-- [ ] **Step 3: RateLimiter 加 peek（不记录的检查）+ 可配 limit provider**
+- [x] **Step 3: RateLimiter 加 peek（不记录的检查）+ 可配 limit provider**
 
-读现有 `ratelimit/RateLimiter.kt`（约 26 行），改造为（保持既有 `RateLimiter(limit: Int, windowMs: Long)` 构造签名兼容，委托到 provider 主构造）：
+读现有 `ratelimit/RateLimiter.kt`（约 26 行），改造为（保持既有 `RateLimiter(maxRequests: Int, windowMs: Long = 60_000L)` 构造签名兼容，委托到 provider 主构造）。**落地实态（2026-10-06）**：provider 主构造为 **public**（private 会让 Task 7 的 `RateLimiter({ SettingsService.snapshot().browserDailyQuota }, ...)` 热配形态不可调用）；Int 次构造保留 `windowMs` 默认值（`Application.kt` 有一参调用）；`prune` 在 `synchronized(entry)` 内调用，锁语义与原实现完全一致：
 
 ```kotlin
-class RateLimiter private constructor(
+class RateLimiter(
     private val limitProvider: () -> Int,
     private val windowMs: Long,
 ) {
-    constructor(limit: Int, windowMs: Long) : this({ limit }, windowMs)
+    constructor(maxRequests: Int, windowMs: Long = 60_000L) : this({ maxRequests }, windowMs)
 
-    private val hits = java.util.concurrent.ConcurrentHashMap<String, MutableList<Long>>()
+    private val log = ConcurrentHashMap<String, MutableList<Long>>()
 
-    /** 检查即记录（既有语义）。 */
-    @Synchronized
-    fun allow(key: String, now: Long = System.currentTimeMillis()): Boolean {
-        val list = prune(key, now)
-        if (list.size >= limitProvider()) return false
-        list.add(now)
-        return true
+    fun allow(ip: String, now: Long = System.currentTimeMillis()): Boolean {
+        val entry = log.computeIfAbsent(ip) { mutableListOf() }
+        synchronized(entry) {
+            prune(entry, now)
+            if (entry.size >= limitProvider()) return false
+            entry.add(now)
+            return true
+        }
     }
 
     /** 只检查不记录——成功才计费的场景（browser 会话配额）先 peek 后 allow。 */
-    @Synchronized
-    fun peek(key: String, now: Long = System.currentTimeMillis()): Boolean {
-        return prune(key, now).size < limitProvider()
+    fun peek(ip: String, now: Long = System.currentTimeMillis()): Boolean {
+        val entry = log.computeIfAbsent(ip) { mutableListOf() }
+        synchronized(entry) {
+            prune(entry, now)
+            return entry.size < limitProvider()
+        }
     }
 
-    private fun prune(key: String, now: Long): MutableList<Long> {
-        val list = hits.getOrPut(key) { mutableListOf() }
-        list.removeAll { now - it > windowMs }
-        return list
+    /** 必须在 synchronized(entry) 内调用，保证与调用方检查/写入同一把锁。 */
+    private fun prune(entry: MutableList<Long>, now: Long) {
+        entry.removeAll { it <= now - windowMs }
     }
 }
 ```
 
-> 执行注意：上式是基于 explore 事实（`ConcurrentHashMap<String, MutableList<Long>>` + 唯一 `allow` 方法）的重构稿；落地时以现有实现为准做最小改动，保留原类注释（含「不适用多实例部署」），只新增 `peek` 与 provider 委托构造。
+> 执行注意：落地以现有实现为准做最小改动，保留原类注释（含「不适用多实例部署」）与 per-entry `synchronized(entry)` 锁结构，只新增 `peek` 与 provider 委托构造。
 
-- [ ] **Step 4: 测试（新建或追加 RateLimiterTest）**
+- [x] **Step 4: 测试（新建或追加 RateLimiterTest）**
 
 ```kotlin
 package com.mamba.picme.server.ratelimit
@@ -1007,7 +1061,7 @@ class RateLimiterPeekTest {
 }
 ```
 
-- [ ] **Step 5: 跑测试 + commit**
+- [x] **Step 5: 跑测试 + commit**
 
 Run: `./gradlew -p server test --tests "*RateLimiter*"`
 Expected: PASS
@@ -1025,7 +1079,7 @@ git commit -m "feat(server): browser 配额基础——AppConfig 三项 + RateLi
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminRoutes.kt`（settings POST 参数）
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminViews.kt`（settings 表单输入框）
 
-- [ ] **Step 1: SettingsService 五处改动**（先例路径见 explore：`SettingsService.kt:19-20/22/25/37-53`）
+- [x] **Step 1: SettingsService 五处改动**（先例路径见 explore：`SettingsService.kt:19-20/22/25/37-53`）
 
 ```kotlin
 const val KEY_BROWSER_DAILY = "browser_daily_quota"
@@ -1035,7 +1089,7 @@ const val KEY_BROWSER_DAILY = "browser_daily_quota"
 - `readAll()` 加该 key 读取，缺省 `?: 20`；
 - `update()` 签名加 `browserDailyQuota: Int? = null`（null = 不改），非空时写库 + 刷新快照。
 
-- [ ] **Step 2: Migrations seed**
+- [x] **Step 2: Migrations seed**
 
 `db/Migrations.kt` `seedSettings`（:175-181 区域）加：
 
@@ -1045,7 +1099,7 @@ seedIfAbsent(SettingsService.KEY_BROWSER_DAILY, config.browserDailyQuota.toStrin
 
 > 对照现有 `seedIfAbsent` 签名（:183-192）传参；若现有 seed 值存 Int 转 String 形式不同，按现状对齐。
 
-- [ ] **Step 3: AdminRoutes settings 表单**
+- [x] **Step 3: AdminRoutes settings 表单**
 
 `POST /admin/settings`（:258-277）解析段加：
 
@@ -1055,11 +1109,11 @@ val browserDaily = params["browser_daily_quota"]?.toIntOrNull()
 
 并传给 `SettingsService.update(..., browserDailyQuota = browserDaily)`。
 
-- [ ] **Step 4: AdminViews settings 页**
+- [x] **Step 4: AdminViews settings 页**
 
 在现有 free/guest 额度输入框同款区块后加一行（label「Browser 每日会话配额」，`name="browser_daily_quota"`，value 取 `SettingsService.snapshot().browserDailyQuota`）。
 
-- [ ] **Step 5: 编译 + 相关测试 + commit**
+- [x] **Step 5: 编译 + 相关测试 + commit**
 
 Run: `./gradlew -p server build`
 Expected: BUILD SUCCESSFUL（现有 AdminRoutesTest/AdminViewsTest 若因 Snapshot 构造参数增加而编译失败，同步补默认参数值）
@@ -1080,7 +1134,7 @@ git commit -m "feat(server): browser 每日会话配额入 server_setting + 管�
 - Create: `server/migrations/011_browser_session.sql`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/browser/BrowserConcurrencyRegistryTest.kt`
 
-- [ ] **Step 1: 写失败测试 `BrowserConcurrencyRegistryTest.kt`**
+- [x] **Step 1: 写失败测试 `BrowserConcurrencyRegistryTest.kt`**
 
 ```kotlin
 package com.mamba.picme.server.browser
@@ -1098,7 +1152,7 @@ class BrowserConcurrencyRegistryTest {
         assertTrue(reg.tryAcquire("u1", now = 1_000L))
         assertFalse(reg.tryAcquire("u1", now = 2_000L))  // 同用户冲突
         assertTrue(reg.tryAcquire("u2", now = 2_000L))   // 不同用户互不影响
-        reg.release("u1")
+        reg.release("u1")                                 // 未 bind，走 null 清理路径
         assertTrue(reg.tryAcquire("u1", now = 3_000L))
     }
 
@@ -1116,18 +1170,60 @@ class BrowserConcurrencyRegistryTest {
         reg.tryAcquire("u1", now = 1_000L)
         reg.bind("u1", "sess-1")
         assertEquals(1, reg.activeCount())
-        reg.release("u1")
+        reg.release("u1", "sess-1")
         assertEquals(0, reg.activeCount())
+    }
+
+    @Test
+    fun `release on non-existent owner is no-op`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        reg.release("ghost")            // 不抛异常
+        reg.release("ghost", "sess-x")  // 条件路径同样不抛
+        assertEquals(0, reg.activeCount())
+        assertTrue(reg.tryAcquire("u1", now = 1_000L))
+    }
+
+    @Test
+    fun `conditional release only evicts matching session`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        reg.tryAcquire("u1", now = 1_000L)
+        reg.bind("u1", "sess-new")
+        reg.release("u1", "sess-stale") // 旧请求的出错路径 release，不匹配则保留
+        assertFalse(reg.tryAcquire("u1", now = 2_000L))
+        reg.release("u1", "sess-new")
+        assertTrue(reg.tryAcquire("u1", now = 3_000L))
+    }
+
+    @Test
+    fun `bind refreshes lease clock`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        reg.tryAcquire("u1", now = 1_000L)
+        reg.bind("u1", "sess-1") // bind 内部用 System.currentTimeMillis() 刷新租约时钟
+        // 以 bind 时刻为基准留 1s 余量：59s 内仍占坑（若时钟未刷新，按 1000L 起算早被清扫），61s 后被清扫
+        val bindNow = System.currentTimeMillis()
+        assertFalse(reg.tryAcquire("u1", now = bindNow + 59_000L))
+        assertTrue(reg.tryAcquire("u1", now = bindNow + 61_000L))
+    }
+
+    @Test
+    fun `sweep evicts expired only, keeps fresh`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        assertTrue(reg.tryAcquire("u1", now = 1_000L))
+        assertTrue(reg.tryAcquire("u2", now = 50_000L))
+        // 62s：u1 过期被清扫，u2（50s 获取，仅过 12s）仍占坑
+        assertTrue(reg.tryAcquire("u1", now = 62_000L))
+        assertFalse(reg.tryAcquire("u2", now = 62_000L))
+        assertTrue(reg.tryAcquire("u3", now = 62_000L)) // 清扫正常，第三人可进
     }
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "*BrowserConcurrencyRegistry*"`
 Expected: FAIL（类不存在）
 
-- [ ] **Step 3: 实现三个新文件 + 表**
+- [x] **Step 3: 实现三个新文件 + 表**
 
 `browser/BrowserConcurrencyRegistry.kt`：
 
@@ -1156,8 +1252,14 @@ class BrowserConcurrencyRegistry(private val leaseMs: Long = 15 * 60_000L) {
         leases[owner] = Lease(sessionId, System.currentTimeMillis())
     }
 
-    fun release(owner: String) {
-        leases.remove(owner)
+    /**
+     * 条件释放：sessionId 为 null（清理路径）或与现存租约的 sessionId 匹配时才移除；
+     * 防止过期请求的出错路径 release 误删刚被重新获取的新租约。
+     */
+    fun release(owner: String, sessionId: String? = null) {
+        leases.computeIfPresent(owner) { _, lease ->
+            if (sessionId == null || lease.sessionId == sessionId) null else lease
+        }
     }
 
     fun activeCount(): Int = leases.size
@@ -1186,13 +1288,16 @@ import io.ktor.http.contentType
  * xuxing browser-agent-bridge 的 HTTP 客户端（spec §2）：
  * 域名结果由 bridge 以 JSON status 承载，本类只做透传 + X-Bridge-Token 注入；
  * 网络异常抛给调用方（路由层统一映射 503 browser_unavailable）。
+ *
+ * 响应体所有权：调用方在每条路径（含非 2xx / 错误路径）都必须消费响应体
+ * （bodyAsText）或取消响应，否则连接不会归还连接池，最终耗尽。
  */
 class BrowserBridgeClient(
     private val httpClient: HttpClient,
     private val baseUrl: String,
     private val bridgeToken: String,
 ) {
-    val available: Boolean get() = baseUrl.isNotBlank()
+    val available: Boolean get() = baseUrl.isNotBlank() && bridgeToken.isNotBlank()
 
     suspend fun open(body: String): HttpResponse = post("$baseUrl/session", body)
 
@@ -1227,6 +1332,11 @@ object BrowserSessions : Table("browser_sessions") {
     val endedAt = long("ended_at").nullable()
     val outcome = varchar("outcome", 16).nullable() // closed / expired
     override val primaryKey = PrimaryKey(id)
+
+    init {
+        index(isUnique = false, sessionId) // recordClose 按 session_id 定位
+        index(isUnique = false, startedAt) // 概览按时间聚合
+    }
 }
 ```
 
@@ -1236,17 +1346,20 @@ object BrowserSessions : Table("browser_sessions") {
 package com.mamba.picme.server.browser
 
 import com.mamba.picme.server.db.BrowserSessions
+import com.mamba.picme.server.db.Db
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
 
 /** browser 会话统计落库（spec §7 管理后台「概览」数据源）。 */
 class BrowserSessionStats {
 
-    fun recordOpen(tokenHash: String, sessionId: String, now: Long = System.currentTimeMillis()) {
-        transaction {
+    suspend fun recordOpen(tokenHash: String, sessionId: String, now: Long = System.currentTimeMillis()) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
             BrowserSessions.insert {
                 it[BrowserSessions.tokenHash] = tokenHash
                 it[BrowserSessions.sessionId] = sessionId
@@ -1255,8 +1368,8 @@ class BrowserSessionStats {
         }
     }
 
-    fun recordClose(sessionId: String, outcome: String, now: Long = System.currentTimeMillis()) {
-        transaction {
+    suspend fun recordClose(sessionId: String, outcome: String, now: Long = System.currentTimeMillis()) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
             BrowserSessions.update({ (BrowserSessions.sessionId eq sessionId) and BrowserSessions.endedAt.isNull() }) {
                 it[endedAt] = now
                 it[BrowserSessions.outcome] = outcome
@@ -1281,9 +1394,11 @@ CREATE TABLE IF NOT EXISTS browser_sessions (
     ended_at BIGINT NULL,
     outcome VARCHAR(16) NULL
 );
+CREATE INDEX IF NOT EXISTS idx_browser_sessions_session_id ON browser_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_browser_sessions_started_at ON browser_sessions(started_at);
 ```
 
-- [ ] **Step 4: 跑测试 + commit**
+- [x] **Step 4: 跑测试 + commit**
 
 Run: `./gradlew -p server test --tests "*BrowserConcurrencyRegistry*" && ./gradlew -p server build`
 Expected: PASS + BUILD SUCCESSFUL
@@ -1300,7 +1415,7 @@ git commit -m "feat(server): bridge client + per-user 并发登记 + browser_ses
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/Application.kt`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/routes/BrowserRouteTest.kt`
 
-- [ ] **Step 1: 写失败测试 `BrowserRouteTest.kt`**（形态仿 `IssueReportRouteTest.kt` + `ClaudeRouteTestSupport.kt` 的 MockEngine 工厂）
+- [x] **Step 1: 写失败测试 `BrowserRouteTest.kt`**（形态仿 `IssueReportRouteTest.kt` + `ClaudeRouteTestSupport.kt` 的 MockEngine 工厂）
 
 ```kotlin
 package com.mamba.picme.server.routes
@@ -1387,17 +1502,53 @@ class BrowserRouteTest {
         }
         assertEquals(HttpStatusCode.TooManyRequests, resp.status)
     }
+
+    @Test
+    fun `open with non-ok bridge result neither charges quota nor holds lease`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val limiter = RateLimiter(1, 86_400_000L) // 配额 1：若非 ok 也计费，第二次必定 429
+        app(bridgeReturning("""{"status":"pool_exhausted","errorCode":"pool"}"""), concurrency, limiter)
+        repeat(2) {
+            val resp = client.post("/v1/browser/open") {
+                header("X-App-Token", "test-token")
+                header(HttpHeaders.ContentType, "application/json")
+                setBody("""{"url":"https://example.com"}""")
+            }
+            assertEquals(HttpStatusCode.OK, resp.status)
+        }
+        assertEquals(0, concurrency.activeCount())
+    }
+
+    @Test
+    fun `open with unreachable bridge returns 503 and neither charges quota nor holds lease`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val bridge = BrowserBridgeClient(
+            HttpClient(MockEngine { throw java.net.ConnectException("refused") }),
+            "http://bridge",
+            "tok",
+        )
+        app(bridge, concurrency, RateLimiter(1, 86_400_000L))
+        repeat(2) {
+            val resp = client.post("/v1/browser/open") {
+                header("X-App-Token", "test-token")
+                header(HttpHeaders.ContentType, "application/json")
+                setBody("""{"url":"https://example.com"}""")
+            }
+            assertEquals(HttpStatusCode.ServiceUnavailable, resp.status)
+        }
+        assertEquals(0, concurrency.activeCount())
+    }
 }
 ```
 
 > 执行注意：测试里鉴权拦截器的具体形态照抄 `IssueReportRouteTest.kt:50-61`（含 TestDb/seedToken 或简化的固定 hash 注入）；`ownerTokenHash()` 取到的 owner 字符串是什么（sha256(token) 还是固定值）以该测试辅助代码为准，预置并发租约时用同一值。Stats 写库需要 `TestDb.init(Accounts, BrowserSessions)` 建表（仿 `util/TestDb.kt:13-20` 用法）。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "*BrowserRoute*"`
 Expected: FAIL（browserRoute 不存在）
 
-- [ ] **Step 3: 实现 `routes/BrowserRoute.kt`**
+- [x] **Step 3: 实现 `routes/BrowserRoute.kt`**
 
 ```kotlin
 package com.mamba.picme.server.routes
@@ -1418,6 +1569,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("picme-browser")
 
 /**
  * 云端浏览器网关（spec §2/§6/§7）：
@@ -1460,7 +1614,9 @@ fun Route.browserRoute(
         if (sessionId != null) {
             concurrency.bind(owner, sessionId)
             dailyLimiter.allow(owner) // 成功才计额度（spec §6：browser_unavailable 不计）
-            stats.recordOpen(owner, sessionId)
+            // 统计写故障隔离：telemetry 挂不得破坏响应契约（租约已绑/额度已计）
+            runCatching { stats.recordOpen(owner, sessionId) }
+                .onFailure { logger.warn("browser stats recordOpen failed: sessionId=$sessionId", it) }
         } else {
             concurrency.release(owner)
         }
@@ -1473,7 +1629,7 @@ fun Route.browserRoute(
             return@post
         }
         val body = call.receiveText()
-        val sessionId = probeField(body, "sessionId") ?: run {
+        val sessionId = probeSessionId(body) ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_request", "message" to "sessionId required"))
             return@post
         }
@@ -1484,9 +1640,10 @@ fun Route.browserRoute(
             return@post
         }
         val payload = upstream.bodyAsText()
-        if (payload.contains("\"status\":\"session_expired\"")) {
-            concurrency.release(owner)
-            stats.recordClose(sessionId, "expired")
+        if (probeStatus(payload) == "session_expired") {
+            concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
+            runCatching { stats.recordClose(sessionId, "expired") }
+                .onFailure { logger.warn("browser stats recordClose failed: sessionId=$sessionId", it) }
         }
         call.respondText(payload, ContentType.Application.Json, upstream.status)
     }
@@ -1515,7 +1672,7 @@ fun Route.browserRoute(
             return@post
         }
         val body = call.receiveText()
-        val sessionId = probeField(body, "sessionId") ?: run {
+        val sessionId = probeSessionId(body) ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_request", "message" to "sessionId required"))
             return@post
         }
@@ -1525,8 +1682,9 @@ fun Route.browserRoute(
             call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to "browser_unavailable"))
             return@post
         }
-        concurrency.release(owner)
-        stats.recordClose(sessionId, "closed")
+        concurrency.release(owner, sessionId) // 条件释放：不误删重新获取的新租约
+        runCatching { stats.recordClose(sessionId, "closed") }
+            .onFailure { logger.warn("browser stats recordClose failed: sessionId=$sessionId", it) }
         call.respondText(upstream.bodyAsText(), ContentType.Application.Json, upstream.status)
     }
 }
@@ -1544,15 +1702,18 @@ private fun probeOkSessionId(payload: String): String? =
     runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()
         ?.takeIf { it.status == "ok" && !it.sessionId.isNullOrBlank() }?.sessionId
 
-/** 请求体里宽松提取字符串字段（不入库的轻量解析）。 */
-private fun probeField(payload: String, field: String): String? =
+/** 响应 payload 里解析 status 字段；解析失败返回 null。 */
+private fun probeStatus(payload: String): String? =
+    runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()?.status
+
+/** 请求体里宽松提取 sessionId 字段（不入库的轻量解析）。 */
+private fun probeSessionId(payload: String): String? =
     runCatching { probeJson.decodeFromString<StatusProbe>(payload) }.getOrNull()?.sessionId
-        ?.takeIf { field == "sessionId" }
 ```
 
-> 执行注意：①`call.ownerTokenHash()` 若在 `ClaudeChatRoute.kt` 是 file-private，把其实现（:146-151）复制到本文件；②`probeField` 仅支持 sessionId（M1 唯一需要），按上式实现即可；③测试辅助里的鉴权拦截器要与 `IssueReportRouteTest` 同形注入 `TokenHashKey`。
+> 执行注意：①`call.ownerTokenHash()` 若在 `ClaudeChatRoute.kt` 是 file-private，把其实现（:146-151）复制到本文件；②请求体 sessionId 用 `probeSessionId(body)` 宽松解析（M1 唯一需要）；③测试辅助里的鉴权拦截器要与 `IssueReportRouteTest` 同形注入 `TokenHashKey`；④`stats.recordOpen/recordClose` 为 suspend（Task 6 挂起事务化），在路由 handler 内直接调用即可，但必须 `runCatching` 包裹 + warn 日志（统计写故障隔离，不得破坏响应契约）；⑤open 路径两处 `release(owner)`（异常/非 ok）保持 null 清理形态——租约尚未 bind；action/close 路径用 `release(owner, sessionId)` 条件形态；⑥session_expired 判定用 `probeStatus(payload)` 解析式，不做子串匹配。
 
-- [ ] **Step 4: Application.kt 装配**
+- [x] **Step 4: Application.kt 装配**
 
 `module()` 依赖构造区（仿 :144-152 既有 client 构造）加：
 
@@ -1574,10 +1735,10 @@ browserRoute(browserBridge, browserDailyLimiter, browserConcurrency, browserStat
 
 > 注意：每日配额若要求 admin 热改生效，把 `RateLimiter(config.browserDailyQuota, ...)` 换成 `RateLimiter({ SettingsService.snapshot().browserDailyQuota }, ...)` 的 provider 构造（Task 4 已备）。优先用 provider 形态。
 
-- [ ] **Step 5: 跑全部 server 测试 + commit**
+- [x] **Step 5: 跑全部 server 测试 + commit**
 
 Run: `./gradlew -p server build`
-Expected: BUILD SUCCESSFUL（含 BrowserRouteTest 三用例）
+Expected: BUILD SUCCESSFUL（含 BrowserRouteTest 五用例）
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/routes/BrowserRoute.kt server/src/main/kotlin/com/mamba/picme/server/Application.kt server/src/test/kotlin/com/mamba/picme/server/routes/BrowserRouteTest.kt
@@ -1590,7 +1751,7 @@ git commit -m "feat(server): /v1/browser/* 网关——鉴权/配额/并发登�
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminQueries.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/admin/AdminViews.kt`
 
-- [ ] **Step 1: AdminQueries 加统计查询**
+- [x] **Step 1: AdminQueries 加统计查询**
 
 ```kotlin
 data class BrowserOverview(val todayCount: Long, val activeCount: Long, val failureRate7d: Double)
@@ -1614,7 +1775,7 @@ fun browserOverview(now: Long = System.currentTimeMillis()): BrowserOverview = t
 
 > 执行注意：Exposed 查询 DSL 细节（`selectAll().where{}`、`isNull()`、`greaterEq` 中缀）对照 `AdminQueries.kt` 现有查询写法对齐；`and` 需要 `org.jetbrains.exposed.sql.and` import。
 
-- [ ] **Step 2: AdminViews 概览页加一行**
+- [x] **Step 2: AdminViews 概览页加一行**
 
 在概览页现有统计行同款位置加（文案英文，与后台现有风格一致）：
 
@@ -1622,7 +1783,7 @@ fun browserOverview(now: Long = System.currentTimeMillis()): BrowserOverview = t
 Browser sessions: today N · active M · 7d failure X.X%
 ```
 
-- [ ] **Step 3: 编译 + 测试 + commit**
+- [x] **Step 3: 编译 + 测试 + commit**
 
 Run: `./gradlew -p server build`
 Expected: BUILD SUCCESSFUL（AdminQueriesTest/AdminViewsTest 若有构造变化同步更新）
@@ -1644,7 +1805,7 @@ git commit -m "feat(server): 管理后台概览加 browser 会话统计（当日
 - Create: `shared/src/commonMain/kotlin/com/mamba/picme/domain/browser/BrowserProtocol.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/browser/BrowserProtocolTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.domain.browser
@@ -1713,16 +1874,17 @@ class BrowserProtocolTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserProtocolTest*"`
 Expected: FAIL（类不存在）
 
-- [ ] **Step 3: 实现 `BrowserProtocol.kt`**
+- [x] **Step 3: 实现 `BrowserProtocol.kt`**
 
 ```kotlin
 package com.mamba.picme.domain.browser
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -1754,6 +1916,8 @@ object BrowserAction {
  * 动作请求 DTO（端 → 云统一形态，借鉴 openmuse：click/type 三模式定位）。
  * 定位优先级：targetIndex（extract 返回的元素序号）> targetText（可见文本匹配）> selector（CSS，兜底）。
  * 不用字段传 null；App 侧 @Tool 参数的空串/-1 哨兵由能力层归一为 null。
+ * 🔴 [targetIndex] wire 字段名为 `index`（bridge `_locate` 读 `body.index`，网关逐字节透传），
+ * Kotlin 属性名保持 targetIndex 仅为可读性；golden 测试钉桩防漂移。
  */
 @Serializable
 data class BrowserActionRequest(
@@ -1762,7 +1926,7 @@ data class BrowserActionRequest(
     val url: String? = null,
     val selector: String? = null,
     val targetText: String? = null,
-    val targetIndex: Int? = null,
+    @SerialName("index") val targetIndex: Int? = null,
     val text: String? = null,
     val wantFrame: Boolean = false,
 )
@@ -1777,7 +1941,11 @@ data class BrowserElement(
     val type: String? = null,
 )
 
-/** open/action/close 统一响应（[textExtract]/[frameJpegBase64]/[elements] 按动作与 wantFrame 可选出现）。 */
+/**
+ * open/action/close 统一响应（[textExtract]/[frameJpegBase64]/[elements] 按动作与 wantFrame 可选出现）。
+ * close 响应额外携带 [closed] 字段（bridge 返回 `{status:"ok",sessionId,closed,actionCount,lastGoodFrame}`）；
+ * 其他消费方若自行解析须配 `ignoreUnknownKeys = true`（bridge 响应字段是本模型的超集演进方向）。
+ */
 @Serializable
 data class BrowserActionResult(
     val status: String,
@@ -1789,6 +1957,7 @@ data class BrowserActionResult(
     val elements: List<BrowserElement>? = null,
     val actionMs: Long? = null,
     val actionCount: Int? = null,
+    val closed: Boolean? = null,
     val errorCode: String? = null,
     val reason: String? = null,
     val lastGoodFrame: String? = null,
@@ -1810,7 +1979,7 @@ data class BrowserFrameResult(
 class BrowserUnavailableException(message: String, cause: Throwable? = null) : Exception(message, cause)
 ```
 
-- [ ] **Step 4: 跑测试确认通过 + commit**
+- [x] **Step 4: 跑测试确认通过 + commit**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserProtocolTest*"`
 Expected: PASS
@@ -1827,7 +1996,7 @@ git commit -m "feat(shared): browser 协议 DTO——状态闭集 + 双响应 + 
 - Create: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/capability/BrowserSessionCapability.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/agent/core/capability/BrowserSessionCapabilityTest.kt`
 
-- [ ] **Step 1: AgentCommands.kt 加 7 个命令**
+- [x] **Step 1: AgentCommands.kt 加 7 个命令**
 
 在 `RenderHtml`（:463-468）之后插入（KDoc 风格对齐现有命令）：
 
@@ -1900,7 +2069,7 @@ git commit -m "feat(shared): browser 协议 DTO——状态闭集 + 双响应 + 
             is BrowserClose -> "browser_close"
 ```
 
-- [ ] **Step 2: 写失败测试（fake transport 驱动 capability）**
+- [x] **Step 2: 写失败测试（fake transport 驱动 capability）**
 
 ```kotlin
 package com.mamba.picme.agent.core.capability
@@ -1908,7 +2077,7 @@ package com.mamba.picme.agent.core.capability
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
-import com.mamba.picme.agent.core.runtime.state.SceneManager
+import com.mamba.picme.agent.core.model.context.AgentScene
 import com.mamba.picme.domain.browser.BrowserActionRequest
 import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
@@ -1958,7 +2127,7 @@ class BrowserSessionCapabilityTest {
         override fun onBrowserSessionClosed(sessionId: String, finalFrameJpegBase64: String?, actionCount: Int) { events += "close:$sessionId:$actionCount" }
     }
 
-    private val context = AgentContext(scene = SceneManager.Scene.CHAT)
+    private val context = AgentContext(scene = AgentScene.CHAT)
 
     @Test
     fun `open success emits started event and returns sessionId payload`() = runTest {
@@ -2021,6 +2190,14 @@ class BrowserSessionCapabilityTest {
     }
 
     @Test
+    fun `click requests frame`() = runTest {
+        val transport = FakeTransport(BrowserActionResult(status = BrowserStatus.OK, sessionId = "s-1"))
+        val cap = BrowserSessionCapability(transport)
+        cap.execute(AgentCommand.BrowserClick(sessionId = "s-1", selector = "button"), context, null)
+        assertEquals(listOf("action:s-1:click:true"), transport.calls)
+    }
+
+    @Test
     fun `supported commands cover all seven browser tools`() {
         val cap = BrowserSessionCapability(FakeTransport(BrowserActionResult(status = BrowserStatus.OK)))
         assertEquals(
@@ -2031,12 +2208,12 @@ class BrowserSessionCapabilityTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserSessionCapabilityTest*"`
 Expected: FAIL（类不存在）
 
-- [ ] **Step 4: 实现 `BrowserSessionCapability.kt`**
+- [x] **Step 4: 实现 `BrowserSessionCapability.kt`**
 
 ```kotlin
 package com.mamba.picme.agent.core.capability
@@ -2052,6 +2229,7 @@ import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
 import com.mamba.picme.domain.browser.BrowserStatus
 import com.mamba.picme.domain.browser.BrowserUnavailableException
+import kotlinx.coroutines.CancellationException
 import kotlin.concurrent.Volatile
 
 /** 浏览器传输层（commonMain 无 HTTP 手段，组合根注入平台实现；测试注入 fake）。 */
@@ -2078,7 +2256,8 @@ interface BrowserSessionDelegate {
  * extract/close 不带；连续帧走 [BrowserTransport.frame]（watch 模式轮询）。
  *
  * 降级不变式：一切失败（池满/会话过期/不可达/动作失败）都映射为 TextReply 结构化文本
- * 交 LLM 降级处理，不抛异常穿透 ReAct 链。
+ * 交 LLM 降级处理，不抛异常穿透 ReAct 链（CancellationException 例外，原样 rethrow
+ * 保护结构化并发/CommandExecutor 超时取消）。
  */
 class BrowserSessionCapability(
     private val transport: BrowserTransport,
@@ -2134,8 +2313,12 @@ class BrowserSessionCapability(
                     AgentAction.Error(command.commandId, AgentErrorCode.METHOD_NOT_FOUND, "BrowserSessionCapability 不支持此命令")
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: BrowserUnavailableException) {
             degradation(BrowserStatus.BROWSER_UNAVAILABLE, e.message ?: "network error")
+        } catch (e: Exception) {
+            degradation(BrowserStatus.ACTION_FAILED, e.message)
         }
         return Result.success(AgentAction.TextReply(commandId = command.commandId, message = reply))
     }
@@ -2189,7 +2372,7 @@ class BrowserSessionCapability(
 }
 ```
 
-- [ ] **Step 5: 跑测试确认通过 + commit**
+- [x] **Step 5: 跑测试确认通过 + commit**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserSessionCapabilityTest*"`
 Expected: PASS
@@ -2205,7 +2388,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/tool/ChatToolService.kt`
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/prompt/ChatPromptRules.kt`
 
-- [ ] **Step 1: ChatToolService 加 7 个 @Tool**
+- [x] **Step 1: ChatToolService 加 7 个 @Tool**
 
 在 `renderHtml`（:278-314）之后插入（@Tool 规范：customName 保线名、参数禁 Kotlin 默认值、@LLMDescription 逐参数、方法体一行 dispatchCommand）：
 
@@ -2216,7 +2399,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("要打开的完整 URL（http/https）")
         url: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserOpen(url = url))
+        dispatchCommand(AgentCommand.BrowserOpen(url = url), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_navigate")
     @LLMDescription("云端浏览器会话内导航到新 URL。")
@@ -2226,7 +2409,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("目标完整 URL（http/https）")
         url: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserNavigate(sessionId = sessionId, url = url))
+        dispatchCommand(AgentCommand.BrowserNavigate(sessionId = sessionId, url = url), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_click")
     @LLMDescription("点击云端浏览器当前页面中的元素。三种定位方式按优先级选用：targetIndex（browser_extract 返回的元素序号，最可靠）> targetText（元素可见文本）> selector（CSS 选择器，兜底）。三者至少给一个，多余传空串/-1。")
@@ -2240,7 +2423,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("CSS 选择器（如 'button.submit'）；未使用传空串")
         selector: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector))
+        dispatchCommand(AgentCommand.BrowserClick(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_type")
     @LLMDescription("向云端浏览器当前页面中的输入框键入文本。定位方式同 browser_click（优先 targetIndex）。")
@@ -2256,7 +2439,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("要键入的文本")
         text: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector, text = text))
+        dispatchCommand(AgentCommand.BrowserType(sessionId = sessionId, targetIndex = targetIndex, targetText = targetText, selector = selector, text = text), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_extract")
     @LLMDescription("提取云端浏览器当前页面的正文文本（截断 4000 字符）与可交互元素清单（每个元素带 index/tag/text/href）。阅读页面内容用它，不要用 browser_screenshot 读内容；后续 click/type 优先用清单里的 index 定位。")
@@ -2264,7 +2447,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserExtract(sessionId = sessionId))
+        dispatchCommand(AgentCommand.BrowserExtract(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_screenshot")
     @LLMDescription("抓云端浏览器当前页一帧画面。仅当用户明确要截图时使用；常规动作的过程画面已自动回传。")
@@ -2272,7 +2455,7 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserScreenshot(sessionId = sessionId))
+        dispatchCommand(AgentCommand.BrowserScreenshot(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 
     @Tool(customName = "browser_close")
     @LLMDescription("关闭云端浏览器会话并销毁远程实例。浏览任务结束后必须调用（否则服务端 2 分钟空闲后强制回收）。")
@@ -2280,10 +2463,25 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
         @LLMDescription("browser_open 返回的会话 id")
         sessionId: String,
     ): String =
-        dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId))
+        dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
 ```
 
-- [ ] **Step 2: ChatPromptRules 加 browser 行为规则段**
+- [x] **Step 2: ChatPromptRules 加 browser 行为规则段**
+
+> **决策注记（2026-10-06 review 修订，两轮）**：browser_* 超时为**两层**结构——
+> 外层 dispatch（ChatToolService：browser 工具 25s / 其余工具 5s）+ 内层命令执行
+>（registry 级 `CommandExecutor`：显式 25s，CrossPageCommandQueue 共用同一实例一并受益）。
+> 25s > 服务端 navTimeout 15s，< 网关 30s；既有工具外层 5s 保持最紧，内层放宽后不会单独触发，
+> 行为不变。⚠️ 内层默认 10s 曾是最紧约束导致外层 25s 永不生效（复审发现的层叠缺陷）——
+> 25s 常量为 `CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS` 单一来源，ChatToolService 的
+> `BROWSER_DISPATCH_TIMEOUT_MS` 直接引用它，两处不漂移；层叠不变式「内层 ≥ browser 外层」
+> 由 commonTest `CommandTimeoutLayeringTest` 钉住（读 registry 实例实际生效值，防构造点回退）。
+> 外层实现方式为 `dispatchCommand`/`dispatchCommandWithTrace`/`dispatchCommandDetailed`
+> 增加 `timeoutMillis` 可选参数（默认 `DISPATCH_TIMEOUT_MS`），7 个 browser 工具显式传 25s。
+> 同时 browser_rules 节末尾补豁免句：浏览器会话期间不受 convergence_rules 约束
+>（含调用次数上限与重复调用限制——否则 open→动作→close 最少 4 次、extract 合法重复的固定流程
+> 与「每次请求最多 2 次工具调用」「绝不重复调用同一工具」矛盾，模型有中途放弃不 close 的风险）。
+> 内嵌代码的 `dispatchCommand(...)` 一行方法体均已同步为显式传 `timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS`。
 
 读 `ChatPromptRules.kt` 的分节结构，在工具使用规则相关节后追加一节（中英文按该文件现有语言风格对齐——若为中文规则文本则用下式）：
 
@@ -2294,9 +2492,10 @@ git commit -m "feat(shared): 7 个 browser 命令 + BrowserSessionCapability（�
 点击/输入优先用 browser_extract 返回的元素 index 定位，其次可见文本，CSS 选择器只作兜底；
 任务结束（含中途放弃、额度/资源报错改纯文本回答）都必须 browser_close。
 不要浏览用户未要求的站点，不要在网页上输入用户的账号密码等敏感信息。
+浏览器会话期间（browser_open 到 browser_close 之间）不受下文收敛规则约束（含调用次数上限与重复调用限制）；browser_close 后立即总结回复。
 ```
 
-- [ ] **Step 3: 编译 + 重生成 prompt golden + 跑守卫测试**
+- [x] **Step 3: 编译 + 重生成 prompt golden + 跑守卫测试**
 
 ```bash
 JITPACK=true ./gradlew :shared:compileAndroidMain
@@ -2306,7 +2505,7 @@ JITPACK=true ./gradlew :shared:jvmTest
 
 Expected: 第一次带 `POLANG_WRITE_GOLDEN=1` 重写 `shared/src/jvmTest/resources/golden/chat_system_prompt_golden.txt`（+可能 `chat_tool_inventory_golden.txt`）；第二次全绿（`ChatToolServiceInventoryTest` 自动覆盖新工具；`ChatToolManifestConsistencyTest` 锁的是 iOS manifest 8 工具集，不受影响——若其断言范围意外含 ChatToolService 反射总数，按测试内注释更新期望值并在 commit message 说明）。
 
-- [ ] **Step 4: 人工检查 golden diff（防 prompt 误伤）**
+- [x] **Step 4: 人工检查 golden diff（防 prompt 误伤）**
 
 ```bash
 git diff shared/src/jvmTest/resources/golden/
@@ -2314,7 +2513,7 @@ git diff shared/src/jvmTest/resources/golden/
 
 Expected: 仅新增 browser_* 工具条目与规则段，无既有内容被误改；有误改先修再提交。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/tool/ChatToolService.kt shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/prompt/ChatPromptRules.kt shared/src/jvmTest/resources/golden/
@@ -2327,7 +2526,7 @@ git commit -m "feat(shared): 7 个 browser_* @Tool + prompt 规则段（golden �
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/MessagePart.kt`
 - Modify: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/MessagePartsCodecTest.kt`
 
-- [ ] **Step 1: MessagePart.kt 加子类**
+- [x] **Step 1: MessagePart.kt 加子类**
 
 在 `OptimizeCandidates`（:149-157）前插入：
 
@@ -2368,7 +2567,7 @@ data class BrowserActionEntry(
 )
 ```
 
-- [ ] **Step 2: codec 测试改钉桩 + 加 round-trip 用例**
+- [x] **Step 2: codec 测试改钉桩 + 加 round-trip 用例**
 
 `MessagePartsCodecTest.kt`：
 - `sealed descriptor locks the 8-value taxonomy`（:180-197）：`assertEquals(8, ...)` 改 `9`，serialNames 集合加 `"tool_browser"`，测试名改 9-value 措辞；
@@ -2393,9 +2592,9 @@ data class BrowserActionEntry(
     }
 ```
 
-> 执行注意：该测试文件的 Json 实例/断言风格以现有代码为准（kotlin.test）；serial name 前缀与 category 一致性测试（:200+）对新子类自动生效（`tool_` ↔ TOOL），无需改。
+> 执行注意：该测试文件的 Json 实例/断言风格以现有代码为准（kotlin.test）；serial name 前缀与 category 一致性测试（:200+）是硬编码 parts 清单遍历（非反射枚举），新子类须显式加一行 `MessagePart.BrowserLive("p0", sessionId = "s")` 才有 `tool_` ↔ TOOL 锁定。
 
-- [ ] **Step 3: 跑测试 + commit**
+- [x] **Step 3: 跑测试 + commit**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*MessagePartsCodecTest*"`
 Expected: PASS
@@ -2416,7 +2615,7 @@ git commit -m "feat(shared): MessagePart.BrowserLive（tool_browser）——type
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/BrowserLiveOverlayTest.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/streaming/TurnPartsReducerBrowserTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `BrowserLiveOverlayTest.kt`：
 
@@ -2509,14 +2708,14 @@ class TurnPartsReducerBrowserTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "*BrowserLiveOverlayTest*" --tests "*TurnPartsReducerBrowserTest*"`
 Expected: FAIL（overlay 不存在 / reducer 无 browser 分支）
 
 > 执行注意：`ChatMessage` 的构造参数以 `domain/chat/ChatMessage.kt` 实际定义为准（上式按 role/parts 字段推断，落地时对照修正具名参数）。
 
-- [ ] **Step 3: TurnPartsReducer 三处改动**
+- [x] **Step 3: TurnPartsReducer 三处改动**
 
 ```kotlin
 // companion object 加常量
@@ -2530,7 +2729,7 @@ TOOL_BROWSER_OPEN ->
 is MessagePart.BrowserLive -> copy(state = state)
 ```
 
-- [ ] **Step 4: 新建 `BrowserLiveOverlay.kt`**
+- [x] **Step 4: 新建 `BrowserLiveOverlay.kt`**
 
 ```kotlin
 package com.mamba.picme.domain.chat
@@ -2547,15 +2746,15 @@ fun ChatMessage.overlayLiveBrowserState(live: Map<String, MessagePart.BrowserLiv
     val index = parts.indexOfFirst { it is MessagePart.BrowserLive && it.sessionId in live }
     if (index < 0) return this
     val part = parts[index] as MessagePart.BrowserLive
-    val livePart = live.getValue(part.sessionId)
-    if (livePart == part) return this
-    // partId 以流式轨占位为准（key 恒定），其余字段取 live 投影
-    val newPart = livePart.copy(partId = part.partId)
-    return copy(parts = parts.toMutableList().also { it[index] = newPart })
+    // partId 以流式轨占位为准（key 恒定）：live 条目 partId 约定为 ""（Task 16），
+    // 归一化为占位 partId 后再比较/覆写——直接等值短路在该约定下恒失效
+    val normalized = live.getValue(part.sessionId).copy(partId = part.partId)
+    if (normalized == part) return this
+    return copy(parts = parts.toMutableList().also { it[index] = normalized })
 }
 ```
 
-- [ ] **Step 5: ChatListFlattener 三处改动**
+- [x] **Step 5: ChatListFlattener 三处改动**
 
 ```kotlin
 // toolStateOrNull 加分支
@@ -2571,13 +2770,18 @@ const val TYPE_BROWSER_LIVE = "browser_live"
 另在 `isPersistedStreamingOutput`（:155-166）加 browser 双显跳过（产物行在场才跳）：
 
 ```kotlin
-// when (this) 加分支；persistedBrowserPayloads 由 flattenChatItems 调用方仿 chart/html 集合传入
-is MessagePart.BrowserLive -> sessionId in persistedBrowserSessionIds && state == ToolPartState.OUTPUT_AVAILABLE
+// browser 分支提前于顶层 OUTPUT_AVAILABLE 守卫判定：终态（OUTPUT_AVAILABLE/OUTPUT_ERROR）且产物行在场即跳
+if (this is MessagePart.BrowserLive) {
+    val terminal = state == ToolPartState.OUTPUT_AVAILABLE || state == ToolPartState.OUTPUT_ERROR
+    return terminal && sessionId in persistedBrowserSessionIds
+}
 ```
+
+> 跳过口径与 chart/html 的差异：browser 的 **OUTPUT_ERROR 失败定格卡落库**（Task 16 Step 3 `emitBrowserCardMessage` 持久化终态），而 chart/html 的 OUTPUT_ERROR 是瞬态轨不落库——若沿用顶层「仅 OUTPUT_AVAILABLE 跳」守卫，流式错误卡会与持久化错误行双显。故 browser 分支语义 = `sessionId in persistedBrowserSessionIds && state 为终态`；sessionId 即产物行锚（content 列存整颗 JSON，不走负载等值匹配）。
 
 > 执行注意：`flattenChatItems` 签名需仿 `persistedChartPayloads`/`persistedHtmlPayloads` 增加 `persistedBrowserSessionIds: Set<String>` 参数；androidApp 侧调用点（ChatViewModel displayMessages/ChatScreen 组装处）同步传 `_messages` 中 `type="tool_browser"` 行的 sessionId 集合。改签名属 shared+androidApp 双侧同步点，落地时全局搜 `flattenChatItems` 调用点一并更新。
 
-- [ ] **Step 6: MessagePartsConverter 加 Room 映射**
+- [x] **Step 6: MessagePartsConverter 加 Room 映射**
 
 `MessagePartsConverter.kt` type→part 映射表（:43-91，`"tool_html"` 分支 :68 后）加：
 
@@ -2589,7 +2793,7 @@ is MessagePart.BrowserLive -> sessionId in persistedBrowserSessionIds && state =
 
 > 执行注意：converter 内的 Json 实例与 `fallbackText` 形态以该文件现有代码为准（`"tool_html"` 分支用的是 `parseHtmlCardMeta` 等私有函数——browser 分支 content 列直接存 BrowserLive 整颗 JSON，meta 列留空）。
 
-- [ ] **Step 7: ChatModelInput 回灌分支**
+- [x] **Step 7: ChatModelInput 回灌分支**
 
 读 `domain/chat/ChatModelInput.kt` 的 tool part 回灌投影（tool-html/tool-task 分支形态），为 `MessagePart.BrowserLive` 加投影：
 
@@ -2605,7 +2809,7 @@ is MessagePart.BrowserLive -> ModelInputItem.ToolExchange(
 
 > 执行注意：`ModelInputItem` 的真实子类型名/字段以 `ChatModelInput.kt` 现状为准（上式为语义目标：tool-call/tool-result 配对、结果只含文本摘要、帧不回灌）；同步在 `ChatModelInputTest.kt` 加一条用例（BrowserLive → 单条 tool exchange、文本含 resultSummary、不含 frameJpegBase64 任何片段）。
 
-- [ ] **Step 8: 跑全部 shared 测试 + assemble + commit**
+- [x] **Step 8: 跑全部 shared 测试 + assemble + commit**
 
 ```bash
 JITPACK=true ./gradlew :shared:jvmTest && JITPACK=true ./gradlew :shared:assemble
@@ -2629,11 +2833,11 @@ git commit -m "feat(shared): tool_browser 占位管线 + live overlay + 拍平/�
 **Files:**
 - Create: `androidApp/src/main/java/com/mamba/picme/data/remote/picme/BrowserSessionClient.kt`
 
-- [ ] **Step 1: 读 PoLangAuthClient 确认 token/deviceId 来源与 OkHttp 用法**（执行动作，不改代码）
+- [x] **Step 1: 读 PoLangAuthClient 确认 token/deviceId 来源与 OkHttp 用法**（执行动作，不改代码）
 
 打开 `data/remote/picme/PoLangAuthClient.kt:12-140` 与它的一个调用方（如 `AppContainer.kt:366-367` 及 ChatViewModel 中 claude-chat 相关调用），确认：①X-App-Token 从哪个仓库/字段读取；②OkHttpClient 实例怎么构造/共享；③base URL 常量。后续步骤按同一来源接线。
 
-- [ ] **Step 2: 实现 BrowserSessionClient**
+- [x] **Step 2: 实现 BrowserSessionClient**
 
 ```kotlin
 package com.mamba.picme.data.remote.picme
@@ -2723,7 +2927,7 @@ class BrowserSessionClient(
 
 > 执行注意：`DEFAULT_BASE_URL` 是否带尾随斜杠以 PoLangAuthClient 现状为准（:138），拼接 `$baseUrl/v1/...` 时对齐（若常量已带 `/` 结尾则去掉路径前导 `/`）。
 
-- [ ] **Step 3: 编译 + commit**
+- [x] **Step 3: 编译 + commit**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`（或仓库现行编译任务名）
 Expected: BUILD SUCCESSFUL
@@ -2738,7 +2942,7 @@ git commit -m "feat(app): BrowserSessionClient——OkHttp transport（配额/�
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/PoLangApplication.kt`（`initializeCapabilities`，:752-792 区域）
 
-- [ ] **Step 1: 构造 transport 并注册**
+- [x] **Step 1: 构造 transport 并注册**
 
 在 `initializeCapabilities()` 内现有 `orchestrator.registerCapability(...)` 序列中追加（token/deviceId provider 的来源与 Step 14-1 确认的一致——若现有 claude-chat 链路在 ViewModel 层持 token 而非 Application 层可得，则把 provider 实现为「读账号 DataStore 的挂起安全快照」，与 PoLangAuthClient 调用方同源）：
 
@@ -2752,7 +2956,7 @@ orchestrator.registerCapability(BrowserSessionCapability(browserTransport))
 
 > 执行注意：provider 必须同步返回（transport 在 IO 线程调用），若 token 存 DataStore（挂起读），用「内存缓存 + DataStore Flow 预热」模式（找现有先例，如 claude-chat 可用性检查的 token 获取方式）；不要把 runBlocking 放 provider 里。
 
-- [ ] **Step 2: 编译 + commit**
+- [x] **Step 2: 编译 + commit**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL
@@ -2766,8 +2970,19 @@ git commit -m "feat(app): 注册 BrowserSessionCapability（组合根注入 OkHt
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/ChatViewModel.kt`
+- Modify: `androidApp/src/main/java/com/mamba/picme/domain/usecase/AiAgentUseCase.kt`（Step 0）
+- Modify: `androidApp/src/main/java/com/mamba/picme/features/common/chat/AgentChatComponents.kt`（Step 0）
 
-- [ ] **Step 1: VM 实现 BrowserSessionDelegate + live 态 StateFlow**
+- [x] **Step 0: 补齐 AgentCommand 穷尽 when（Task 10 新增 7 子类的编译红收口）**
+
+Task 10 在 shared 侧新增 7 个 `AgentCommand.Browser*` sealed 子类后，androidApp 两处无 else 的穷尽 when 编译失败（`:androidApp:compileDebugKotlin` 红），本 Step 显式认领：
+
+1. `AiAgentUseCase.kt:178` 区域 `mapAgentCommandToLegacy`：7 个 Browser* 命令的 legacy 映射——browser_open 需映射出直播卡占位语义（对齐 Step 5 的卡片工具排除名单与 Task 13 占位管线），其余动作命令映射为不产 legacy UI 的形态（live 态由 delegate/overlay 通道承担）；按函数内既有命令的映射先例选最小语义。
+2. `AgentChatComponents.kt:252/308` 区域 `getAgentCommandDisplayName`：7 个命令的显示名——受 [I18N] 红线约束，五语字符串 key 与 Task 17 Step 1 的 strings 新增共用一批（坐标对齐，不重复定义）；若既有命令显示名走 `chat_command_*` key 先例则沿用该命名族。
+
+> 来源：Task 12 审查发现（这两处 when 不在任何 Task 文件清单内，红窗会从 Task 10 拖到 Task 20）。本 Step 完成后 `:androidApp:compileDebugKotlin` 必须恢复可编译（Task 15 的 PoLangApplication 注册缺失除外——若 Step 0 先于 Task 15 执行，capability 未注册不阻塞编译）。
+
+- [x] **Step 1: VM 实现 BrowserSessionDelegate + live 态 StateFlow**
 
 ```kotlin
 // 字段区（仿 _engineerTasks 节流组合先例 :1158-1160）
@@ -2833,7 +3048,7 @@ override fun onBrowserSessionClosed(sessionId: String, finalFrameJpegBase64: Str
 
 > 执行注意：①`feedToolOutput`/`feedToolError` 的精确签名以 `ChatViewModel.kt:1117-1140` 现状为准（上式 lambda 形态对照 `emitHtmlCardMessage` 的用法 :2652-2654 对齐）；②VM 拿 `BrowserSessionCapability` 单例的方式——组合根注册的是 `BrowserSessionCapability(transport)` 构造实例，VM 侧从 `CapabilityRegistry.getInstance()` 按 name 反查或经组合根静态引用暴露，落地时选与 `ChatRunScriptCapability.getInstance()` 一致的暴露形态（若采用 companion 单例，Task 10 的类需补 `getInstance(transport)` 懒单例——以第一次构造为准缓存）；③`getString` = `context.getString`（VM 持有 Application context 的先例见 `ChatImageRenderer.kt:107`）；④`formatBrowserAction` 在 Task 17 定义。
 
-- [ ] **Step 2: displayMessages combine 接入 overlay**
+- [x] **Step 2: displayMessages combine 接入 overlay**
 
 `displayMessages`（:1165-1176）combine 增加 browser live 流（仿 `throttledEngineerTasks` 500ms 节流、首值直通）：
 
@@ -2846,7 +3061,7 @@ msg.overlayLiveTaskState(liveTasks).overlayLiveBrowserState(liveBrowser)
 
 并把 `flattenChatItems` 调用点（Task 13 Step 5 的新签名）的 `persistedBrowserSessionIds` 参数传：`_messages` 中 `type == "tool_browser"` 行 decode 出的 BrowserLive part 的 sessionId 集合（组装位置仿 chart/html payloads 集合的现有构建点）。
 
-- [ ] **Step 3: emitBrowserCardMessage（持久化定格卡）**
+- [x] **Step 3: emitBrowserCardMessage（持久化定格卡）**
 
 仿 `emitHtmlCardMessage`（:2632-2655）：
 
@@ -2864,7 +3079,7 @@ private fun emitBrowserCardMessage(final: MessagePart.BrowserLive) {
 private val browserPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 ```
 
-定格后**保留**在 `_browserLiveSessions`（不要移除）：overlay 会持续把流式占位 part 覆写为 `OUTPUT_AVAILABLE` 终态，Task 13 的双显跳过（`sessionId in persistedBrowserSessionIds && state == OUTPUT_AVAILABLE`）依赖这个状态才能在产物行到达后隐去流式卡；若此时移除，流式卡会回退到 reducer 喂入的 INPUT_AVAILABLE 旧态、误显示为「进行中」并恢复轮询。清理统一在 turn 结束兜底（Step 5）做：
+定格后**保留**在 `_browserLiveSessions`（不要移除）：overlay 会持续把流式占位 part 覆写为 `OUTPUT_AVAILABLE` 终态，Task 13 的双显跳过（`sessionId in persistedBrowserSessionIds && state 为终态 OUTPUT_AVAILABLE/OUTPUT_ERROR`——browser 的 OUTPUT_ERROR 落库，与 chart/html 瞬态不同）依赖这个状态才能在产物行到达后隐去流式卡；若此时移除，流式卡会回退到 reducer 喂入的 INPUT_AVAILABLE 旧态、误显示为「进行中」并恢复轮询。清理统一在 turn 结束兜底（Step 5）做：
 
 ```kotlin
 // 终态保留在 map；turn 结束兜底统一清理（见 Step 5）
@@ -2872,7 +3087,7 @@ private val browserPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = 
 
 > 执行注意：`insertMessageWithParts` 的精确签名以 `data/local/ChatMessageParts.kt:50-51` 现状为准。
 
-- [ ] **Step 4: watch 模式帧轮询入口（供卡片 LaunchedEffect 调用）**
+- [x] **Step 4: watch 模式帧轮询入口（供卡片 LaunchedEffect 调用）**
 
 ```kotlin
 /** 卡片可见期间由 UI 以 ~1s 节拍驱动（spec §2.2 watch 模式）；不可见/退组合自动停止。 */
@@ -2892,13 +3107,13 @@ fun pollBrowserFrame(sessionId: String) {
 
 > 执行注意：`browserTransportOrNull()` = 从 capability 单例取 transport（Task 15 注册的实例）；若单例不可达 transport，VM 字段缓存在 setDelegate 时一并注入。
 
-- [ ] **Step 5: 卡片工具排除名单 + turn 结束兜底**
+- [x] **Step 5: 卡片工具排除名单 + turn 结束兜底**
 
 `ChatViewModel.kt:1824-1827` 的 `_pendingNonCardTool` 判定名单（卡片工具归 null）加入全部 7 个 `browser_*` 工具名（动作进度已由直播卡表达，不再出状态 chip）。
 
 turn 结束兜底（streaming message DONE 的收口点，找现有 turn 完成钩子）：对 `_browserLiveSessions` 里仍 `state != OUTPUT_AVAILABLE && != OUTPUT_ERROR` 的会话，逐个 `transport.close(sessionId)` 后按 `onBrowserSessionClosed` 同路径定格落库（LLM 忘调 browser_close 时防服务器会话泄漏 + 卡片有终态）；全部处理完后清空 `_browserLiveSessions`（终态卡已落库，新 turn 的流式消息不再含旧占位 part）。
 
-- [ ] **Step 6: 编译 + commit**
+- [x] **Step 6: 编译 + commit**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL
@@ -2915,7 +3130,9 @@ git commit -m "feat(app): ChatViewModel 直播卡 live 态收口——delegate/o
 - Test: `androidApp/src/test/java/com/mamba/picme/features/chat/BrowserActionFormatterTest.kt`
 - Modify: `androidApp/src/main/res/values/strings.xml` + `values-zh-rCN` + `values-zh-rTW` + `values-es` + `values-fr`
 
-- [ ] **Step 1: strings 五语（新增 key）**
+- [x] **Step 1: strings 五语（新增 key）**
+
+> 插入位置：各文件 `html_fullpage_load_failed` 之后，分区注释五文件逐字一致用英文 `<!-- Browser live card: action stream + session state -->`。
 
 `values/strings.xml`（EN）：
 
@@ -2997,12 +3214,15 @@ git commit -m "feat(app): ChatViewModel 直播卡 live 态收口——delegate/o
 <string name="browser_live_title_default">Page web</string>
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.features.chat
 
+import com.mamba.picme.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BrowserActionFormatterTest {
@@ -3019,24 +3239,52 @@ class BrowserActionFormatterTest {
 
     @Test
     fun `type arg truncates long text`() {
-        val spec = browserActionSpec("type", "input", "x".repeat(100))
+        val long = "x".repeat(100)
+        val spec = browserActionSpec("type", "input", long)
         assertEquals(24, spec.arg!!.length)
+        assertTrue(spec.arg!!.endsWith("..."))
+        assertEquals(long.take(21), spec.arg!!.take(21))
+    }
+
+    @Test
+    fun `arg of exactly 24 chars is not truncated`() {
+        val exact = "y".repeat(24)
+        val spec = browserActionSpec("navigate", null, exact)
+        assertEquals(exact, spec.arg)
     }
 
     @Test
     fun `unknown action falls back to navigate-like display`() {
         assertEquals(BrowserActionSpec(R.string.browser_action_navigate, null), browserActionSpec("hover", null, null))
     }
+
+    // click 走 targetText 定位时 selector 为 null → spec.arg null；formatBrowserAction 必须空串占位回落
+    // （防字面 %1$s 泄漏），Context 层行为以源码级断言钉住（避开 Robolectric 环境性预存失败）。
+    @Test
+    fun `null arg never leaks literal placeholder`() {
+        val spec = browserActionSpec("click", null, null)
+        assertEquals(R.string.browser_action_click, spec.templateRes)
+        assertNull(spec.arg)
+
+        val source = java.io.File(
+            "src/main/java/com/mamba/picme/features/chat/BrowserActionFormatter.kt",
+        ).readText()
+        assertTrue(
+            "formatBrowserAction 必须在 arg == null 时以空串占位回落，防字面 %1\$s 泄漏",
+            source.contains("?: context.getString(spec.templateRes, \"\")"),
+        )
+    }
 }
 ```
 
-- [ ] **Step 3: 实现 `BrowserActionFormatter.kt`**
+- [x] **Step 3: 实现 `BrowserActionFormatter.kt`**
 
 ```kotlin
 package com.mamba.picme.features.chat
 
 import android.content.Context
 import androidx.annotation.StringRes
+import com.mamba.picme.R
 
 /** 动作流水条目的资源规格（纯 Kotlin 可测；Context 格式化收口在 [formatBrowserAction]）。 */
 data class BrowserActionSpec(
@@ -3046,7 +3294,7 @@ data class BrowserActionSpec(
 
 /** browser_* 动作 → 文案规格；arg 截断 24 字符防流水行过长。 */
 fun browserActionSpec(action: String, selector: String?, payload: String?): BrowserActionSpec {
-    fun cut(s: String?): String? = s?.let { if (it.length > 24) it.take(21) + "..." else it }
+    fun cut(s: String?): String? = s?.let { v -> if (v.length > 24) v.take(21) + "..." else v }
     return when (action) {
         "open" -> BrowserActionSpec(R.string.browser_action_open, cut(payload))
         "navigate" -> BrowserActionSpec(R.string.browser_action_navigate, cut(payload))
@@ -3058,16 +3306,17 @@ fun browserActionSpec(action: String, selector: String?, payload: String?): Brow
     }
 }
 
-/** ChatViewModel 侧入口：本地化动作流水描述。 */
+/** ChatViewModel 侧入口：本地化动作流水描述；arg 为 null 时回落空串占位，防字面 %1$s 泄漏到 UI。 */
 fun formatBrowserAction(context: Context, action: String, selector: String?, payload: String?): String {
     val spec = browserActionSpec(action, selector, payload)
-    return if (spec.arg != null) context.getString(spec.templateRes, spec.arg) else context.getString(spec.templateRes)
+    return spec.arg?.let { arg -> context.getString(spec.templateRes, arg) }
+        ?: context.getString(spec.templateRes, "")
 }
 ```
 
 > 执行注意：Task 16 里的 `formatBrowserAction(...)` 调用改为 `formatBrowserAction(context, ...)` 形态（本函数为准）。
 
-- [ ] **Step 4: 跑测试 + commit**
+- [x] **Step 4: 跑测试 + commit**
 
 Run: `./gradlew :androidApp:testDebugUnitTest --tests "*BrowserActionFormatterTest*"`
 Expected: PASS
@@ -3083,7 +3332,7 @@ git commit -m "feat(app): 动作流水格式化器 + browser 卡五语文案"
 - Create: `androidApp/src/main/java/com/mamba/picme/features/chat/components/BrowserLiveCard.kt`
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/ChatScreen.kt`
 
-- [ ] **Step 1: 实现 BrowserLiveCard**
+- [x] **Step 1: 实现 BrowserLiveCard**
 
 ```kotlin
 package com.mamba.picme.features.chat.components
@@ -3252,7 +3501,7 @@ fun BrowserLiveCard(
 
 > 执行注意：①import 的 R 包名以 androidApp 实际包名为准（`com.mamba.picme.R`）；②卡片间距/圆角若仓库有 design token（`core/designsystem/` DesignTokens），按 token 替换硬编码 dp（先例 EngineerTaskCard 的间距来源）；③`R.string.browser_live_*` 在 Task 17 已建。
 
-- [ ] **Step 2: ChatScreen 分发分支 + 全屏预览**
+- [x] **Step 2: ChatScreen 分发分支 + 全屏预览**
 
 `ChatScreen.kt` when 分发（:644-792，`TYPE_HTML_CARD` 分支 :665-689 后）加：
 
@@ -3280,7 +3529,7 @@ browserFramePreview?.let { frame ->
 
 `BrowserFramePreviewOverlay` 放 `features/chat/components/BrowserLiveCard.kt` 同文件（单帧版预览：produceState 解码 + `detectTransformGestures` 1x~5x 缩放 + 顶部关闭行，代码直接移植 `ChatImagePreviewOverlay` 的单页形态并改数据源为 base64——实现时照该 overlay 现有手势代码逐段对齐，不引入新交互）。
 
-- [ ] **Step 3: 编译 + 截图自查 + commit**
+- [x] **Step 3: 编译 + 截图自查 + commit**
 
 ```bash
 ./gradlew :androidApp:assembleDebug
@@ -3308,14 +3557,14 @@ git commit -m "feat(app): BrowserLiveCard 直播卡 + 全屏帧预览 + ChatScre
 - Modify: `androidApp/AGENTS.md`（§2.1 Chat 行补直播卡句；§3.2 集成点表加 browser 直播卡一行）
 - Modify: `docs/08-UI-SPECS/screens/chat.yaml`（若该文件有卡片登记段，按既有格式登记 browser_live 卡，供 iOS 跟随消费）
 
-- [ ] **Step 1: 逐文件按上表同步**（每处改动对齐该文件既有措辞密度，不回填模块级细节到顶层 AGENTS.md）
+- [x] **Step 1: 逐文件按上表同步**（每处改动对齐该文件既有措辞密度，不回填模块级细节到顶层 AGENTS.md）
 
-- [ ] **Step 2: 跑文档门禁**
+- [x] **Step 2: 跑文档门禁**
 
 Run: `python3 scripts/check_doc_sync.py`
 Expected: 全绿（活文档引用单向 + reviews 白名单无新增）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/ shared/AGENTS.md server/AGENTS.md androidApp/AGENTS.md
@@ -3326,7 +3575,7 @@ git commit -m "docs: browser 直播卡交付同步——taxonomy 9 值/卡片目
 
 **前置**：bridge 已部署 xuxing（`infra/browser-bridge/deploy.sh` + `.env` 配好 BRIDGE_TOKEN/CHROME_PATH）；picme-server `/etc/picme/server.env` 配好 `BROWSER_BRIDGE_URL=http://<xuxing-tailscale-ip>:8788` + `BROWSER_BRIDGE_TOKEN=<同 bridge>` 并蓝绿切换（`server/deploy.sh` + `deploy-switch.sh`）。
 
-- [ ] **Step 1: bridge 部署 + 冒烟**
+- [x] **Step 1: bridge 部署 + 冒烟**
 
 ```bash
 cd infra/browser-bridge && ./deploy.sh
@@ -3336,7 +3585,7 @@ ssh xuxing 'curl -s -H "X-Bridge-Token: $(grep ^BRIDGE_TOKEN /opt/browser-bridge
 
 Expected: `{"ok":true,"sessions":0}`
 
-- [ ] **Step 2: 网关冒烟（开发机 curl，token 取测试账号）**
+- [x] **Step 2: 网关冒烟（开发机 curl，token 取测试账号）**
 
 ```bash
 curl -s -X POST https://api.polang.net/v1/browser/open \
@@ -3348,7 +3597,7 @@ Expected: `{"status":"ok","sessionId":"...","frameJpegBase64":"..."}`
 
 负例三连：无 token → 401；同用户未 close 重复 open → `pool_exhausted`；`BROWSER_BRIDGE_URL` 置空重启 → 503 `browser_unavailable`。
 
-- [ ] **Step 3: 真机 dev-loop 闭环**
+- [x] **Step 3: 真机 dev-loop 闭环**
 
 ```bash
 ./gradlew :androidApp:assembleDebug && adb install -r androidApp/build/outputs/apk/debug/*.apk
@@ -3356,16 +3605,16 @@ Expected: `{"status":"ok","sessionId":"...","frameJpegBase64":"..."}`
 
 App 内 chat 发「帮我查一下 example.com 的标题是什么」，逐项验收（spec §4 状态机）：
 
-- [ ] 直播卡出现（占位 → 帧逐步更新，页面标题/URL 正确）
-- [ ] 动作流水逐行追加（至多 3 行）
-- [ ] 会话结束卡片定格（最终帧 + 「共 N 步操作」）
-- [ ] 冷启动重进会话，定格卡从 Room 恢复（type=tool_browser 行 + parts 双读）
-- [ ] 点按帧进全屏预览、双指缩放、返回关闭
-- [ ] 五语各切换一次：流水/状态文案无硬编码缺译
-- [ ] 降级路径：xuxing bridge 停掉后发同类请求 → 无直播卡、Agent 纯文本致歉回答、不崩溃不白屏
-- [ ] LLM 上下文检查（`polang_llm_log.db`）：browser 工具结果无 base64 帧片段（token 保护生效）
+- [x] 直播卡出现（占位 → 帧逐步更新，页面标题/URL 正确）
+- [x] 动作流水逐行追加（至多 3 行）
+- [x] 会话结束卡片定格（最终帧 + 「共 N 步操作」）
+- [x] 冷启动重进会话，定格卡从 Room 恢复（type=tool_browser 行 + parts 双读）
+- [x] 点按帧进全屏预览、双指缩放、返回关闭
+- [x] 五语各切换一次：流水/状态文案无硬编码缺译
+- [x] 降级路径：xuxing bridge 停掉后发同类请求 → 无直播卡、Agent 纯文本致歉回答、不崩溃不白屏
+- [x] LLM 上下文检查（`polang_llm_log.db`）：browser 工具结果无 base64 帧片段（token 保护生效）
 
-- [ ] **Step 4: 验收通过后合入**（遵循 finishing-a-development-branch skill：worktree 分支合 main / PR，按用户选择）
+- [x] **Step 4: 验收通过后合入**（遵循 finishing-a-development-branch skill：worktree 分支合 main / PR，按用户选择）
 
 ---
 

@@ -29,6 +29,12 @@ package com.mamba.picme.domain.chat
 fun flattenChatItems(
     messages: List<ChatMessage>,
     pendingToolName: String? = null,
+    /**
+     * 已落库 tool_browser 产物行的 sessionId 集合（browser 直播卡双显跳过锚，Task 13）：
+     * 由调用方自消息列表提取（仿 chart/html payloads 的调用方口径），流式占位卡的
+     * OUTPUT_AVAILABLE 定格态在产物行在场时跳过。
+     */
+    persistedBrowserSessionIds: Set<String> = emptySet(),
 ): List<ChatListItem> {
     val items = ArrayList<ChatListItem>(messages.size * 2)
     // 已落库产物行的负载集（🟡3）：chart/html 独立消息行的 content 与 part 负载同源同值
@@ -52,7 +58,7 @@ fun flattenChatItems(
         }
         val turn = currentTurn
         val turnStart = items.isEmpty() || items.last().turnIndex != turn
-        flattenMessage(message, turn, turnStart, persistedChartPayloads, persistedHtmlPayloads, items)
+        flattenMessage(message, turn, turnStart, persistedChartPayloads, persistedHtmlPayloads, persistedBrowserSessionIds, items)
     }
     // 同 turn 相邻 agent 文本合并标记（段落间距收窄）：后一 item 与前一 item 同为 agent
     // 文本且同 turn 即并入连续文本流（覆盖消息内跨轮文本与消息间相邻文本两种形态）
@@ -91,6 +97,7 @@ private fun flattenMessage(
     turnStart: Boolean,
     persistedChartPayloads: Set<String>,
     persistedHtmlPayloads: Set<String>,
+    persistedBrowserSessionIds: Set<String>,
     out: MutableList<ChatListItem>,
 ) {
     // USER 消息与 legacy 整消息渲染类型：单 item（part = null，渲染器读 legacy 字段）
@@ -112,7 +119,7 @@ private fun flattenMessage(
     }
     // agent 消息按 part 拍平（跳过产物行已渲染的已填充卡 part）
     val visible = message.parts.filterNot { part ->
-        part.isPersistedStreamingOutput(message, persistedChartPayloads, persistedHtmlPayloads)
+        part.isPersistedStreamingOutput(message, persistedChartPayloads, persistedHtmlPayloads, persistedBrowserSessionIds)
     }
     visible.forEachIndexed { index, part ->
         out += ChatListItem(
@@ -151,13 +158,24 @@ private fun wholeMessageKey(message: ChatMessage): String =
  * 消失、随后又在列表尾部出现（闪失 + 位置跳变）。匹配按负载等值（emit 时 Room
  * content 与 part 负载同源同值），精确锚定本 turn 的产物行——旧 turn 的历史卡行
  * 负载不同，不会误判提前跳过。
+ *
+ * browser 直播卡差异：OUTPUT_ERROR 的失败定格卡**落库**（chart/html 的 OUTPUT_ERROR
+ * 为瞬态轨不落库），故 browser 分支在终态（OUTPUT_AVAILABLE/OUTPUT_ERROR）且产物行
+ * 在场即跳——否则流式错误卡会与持久化错误行双显。sessionId 即产物行锚（content 列
+ * 存整颗 JSON，不走负载等值匹配）。
  */
 private fun MessagePart.isPersistedStreamingOutput(
     message: ChatMessage,
     persistedChartPayloads: Set<String>,
     persistedHtmlPayloads: Set<String>,
+    persistedBrowserSessionIds: Set<String>,
 ): Boolean {
-    if (!message.isStreaming || toolStateOrNull() != ToolPartState.OUTPUT_AVAILABLE) return false
+    if (!message.isStreaming) return false
+    if (this is MessagePart.BrowserLive) {
+        val terminal = state == ToolPartState.OUTPUT_AVAILABLE || state == ToolPartState.OUTPUT_ERROR
+        return terminal && sessionId in persistedBrowserSessionIds
+    }
+    if (toolStateOrNull() != ToolPartState.OUTPUT_AVAILABLE) return false
     return when (this) {
         is MessagePart.Chart -> svg in persistedChartPayloads
         is MessagePart.HtmlCard -> html in persistedHtmlPayloads
@@ -169,6 +187,7 @@ private fun MessagePart.toolStateOrNull(): ToolPartState? = when (this) {
     is MessagePart.Chart -> state
     is MessagePart.HtmlCard -> state
     is MessagePart.TaskCard -> state
+    is MessagePart.BrowserLive -> state
     else -> null
 }
 
@@ -189,6 +208,8 @@ private fun contentTypeOf(message: ChatMessage, part: MessagePart): String = whe
     is MessagePart.OptimizeCandidates -> ChatListItem.TYPE_OPTIMIZE_CANDIDATES
     // Image/EditResult 按消息类型已整消息路由，到不了这里；防御性落 legacy 整消息
     is MessagePart.Image, is MessagePart.EditResult -> ChatListItem.TYPE_LEGACY_MESSAGE
+    // 直播卡全状态自渲染（占位/运行/定格/错误都由卡片处理，不走通用 placeholder chip）
+    is MessagePart.BrowserLive -> ChatListItem.TYPE_BROWSER_LIVE
 }
 
 private fun cardContentType(state: ToolPartState, doneType: String): String = when (state) {
@@ -230,6 +251,9 @@ data class ChatListItem(
         const val TYPE_TASK_CARD = "task_card"
         const val TYPE_MEDIA_RESULTS = "media_results"
         const val TYPE_OPTIMIZE_CANDIDATES = "optimize_candidates"
+
+        /** 浏览器直播卡（tool_browser，全状态自渲染：占位/运行/定格/错误一卡到底）。 */
+        const val TYPE_BROWSER_LIVE = "browser_live"
 
         /** 卡片工具占位（INPUT_STREAMING/INPUT_AVAILABLE，spec §4 占位契约）。 */
         const val TYPE_TOOL_PLACEHOLDER = "tool_placeholder"
