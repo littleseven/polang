@@ -7,7 +7,8 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/opt/browser-bridge
 EnvironmentFile=/opt/browser-bridge/.env
-ExecStart=/usr/bin/node src/server.js
+# xuxing 上 node 经 nvm 安装，/usr/local/bin/node 是指向 nvm 当前版本的符号链接（首次部署时创建）
+ExecStart=/usr/local/bin/node src/server.js
 Restart=on-failure
 RestartSec=3
 MemoryMax=2G
