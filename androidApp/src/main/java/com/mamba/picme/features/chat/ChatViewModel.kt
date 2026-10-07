@@ -2916,12 +2916,16 @@ class ChatViewModel(
         var finalPart: MessagePart.BrowserLive? = null
         _browserLiveSessions.update { sessions ->
             val current = sessions[sessionId] ?: return@update sessions
+            // 步数口径统一：bridge actionCount 只计 navigate/click/type/extract/screenshot（不含 open/close），
+            // 本地 current.actionCount 从 open=1 起累计。定格取 max(本地累计, bridge + open 1 步)，
+            // 防「流水 2 行却显示共 1 步」「纯 open 会话显示共 0 步」的口径漂移（Task 20 验收观察项 1/2）。
+            val displayCount = maxOf(current.actionCount, actionCount + 1)
             val part = current.copy(
                 state = if (current.state == ToolPartState.OUTPUT_ERROR) ToolPartState.OUTPUT_ERROR else ToolPartState.OUTPUT_AVAILABLE,
                 frameJpegBase64 = finalFrameJpegBase64 ?: current.frameJpegBase64,
-                actionCount = actionCount,
+                actionCount = displayCount,
                 resultSummary = if (current.errorReason == null) {
-                    stringContext().getString(R.string.browser_live_done_summary, actionCount)
+                    stringContext().getString(R.string.browser_live_done_summary, displayCount)
                 } else {
                     null
                 },
@@ -2972,7 +2976,10 @@ class ChatViewModel(
                     } catch (e: Exception) {
                         null // 失败静默：会话由服务端 2 分钟空闲回收兜底（spec §6）
                     }
-                    onBrowserSessionClosed(part.sessionId, result?.lastGoodFrame, result?.actionCount ?: part.actionCount)
+                    // actionCount 为 bridge 语义（不含 open）；close 失败回退时把本地口径
+                    // （open=1 起累计）减 1 换算成 bridge 口径，经 onBrowserSessionClosed 的
+                    // +1 还原为本地值，避免兜底路径虚增一步。
+                    onBrowserSessionClosed(part.sessionId, result?.lastGoodFrame, result?.actionCount ?: (part.actionCount - 1))
                 }
             _browserLiveSessions.update { current -> current - sessions.keys }
         }
