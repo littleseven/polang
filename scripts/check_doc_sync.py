@@ -23,12 +23,14 @@ EXCLUDED_DIRS = (
     ".git/",
     ".worktrees/",
     ".claude/worktrees/",
+    ".qoder/worktrees/",   # Qoder 工具 worktree 镜像（同 .claude/worktrees）
     "docs-site/docs/",   # sync-docs.sh 生成物
     "build/",
     "temp/gpupixel/",
     "tmp/",
     "iosApp/Pods/",
     "iosApp/build/",
+    "node_modules/",      # npm vendor 树（browser-bridge 等，同 iosApp/Pods 性质）
     ".lingma/skills/",
     ".kimi/skills/",
     ".openclaw/skills/",

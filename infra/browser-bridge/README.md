@@ -1,7 +1,8 @@
 # browser-agent-bridge
 
 xuxing 侧云端浏览器桥：单例 headless Chromium + 每会话临时 BrowserContext（Playwright），
-纯 CDP DOM 级驱动，为 picme-server `/v1/browser/*` 提供会话执行与按需抓帧。
+纯 CDP DOM 级驱动，为 picme-server `/v1/browser/*` 提供会话执行、按需抓帧与 WS screencast
+推流（M2，2026-10-09）。
 设计 SSOT：`docs/superpowers/specs/2026-10-06-browser-vnc-live-card-design.md`。
 安全边界借鉴 [CopilotKit/openmuse](https://github.com/CopilotKit/openmuse)（MIT）`apps/worker`：
 SSRF 全球单播许可名单（仅 80/443）+ 重定向落地复查 + 子请求级拦截 + WebSocket 全禁 +
@@ -9,11 +10,23 @@ token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入
 
 ## 端点契约
 
-- 端点：`POST /session`（open）、`POST /session/{id}/action`、`GET /session/{id}/frame`、
+- HTTP 端点：`POST /session`（open）、`POST /session/{id}/action`、`GET /session/{id}/frame`、
   `POST /session/{id}/close`、`GET /healthz`；全部要求 `X-Bridge-Token` 头。
+- WS 端点（M2 推流通道）：`GET /ws?sessionId=..&token=..`——token 与 HTTP `X-Bridge-Token`
+  同源（SHA-256 时序安全比较，不符 401 断连）；连接即启动 CDP `Page.startScreencast`
+  （幂等；jpeg quality 60 / maxWidth·maxHeight 1280·720 / everyNthFrame 2，config.js
+  `screencast*` 四键可调）；客户端发 `{"type":"watch_stop"}` 或最后一个听众断开时自动停
+  screencast（无消费者不空抓）。Server→Client：帧 = binary JPEG 字节 + text
+  `{"type":"frame_meta",...}`、动作结果 = text `{"type":"action_result",...}`、异常 = text
+  `{"type":"error",...}`（code：bad_request/session_expired/screencast_failed）；
+  Client→Server：`{"type":"action","actionId","action":{...}}`（action 体与 HTTP
+  `/session/{id}/action` 同构，参数平铺顶层）或 `{"type":"watch_stop"}`。
 - 域名结果一律 HTTP 200 + JSON `status`（ok/action_failed/pool_exhausted/session_expired）。
 - 请求体超限（>64KB）时 `req.destroy()` 先于响应发出，客户端可能观察到连接重置而非 413——
   应将 body 发送过程中的 reset 视为 413 等价。
+- 动作清单：navigate/click/type/extract/screenshot（HTTP 契约）+ clickAt/typeText/scroll/drag
+  （M2 接管动作，仅 WS 通道使用，坐标为 CSS 页面坐标：clickAt 鼠标点 (x,y)、typeText 全局
+  键盘输入 text、scroll 滚轮增量 (dx,dy)、drag (fromX,fromY)→(toX,toY) 连续拖拽）。
 - click/type 定位三模式：index（extract 返回的元素序号，LLM 首选）/ targetText / selector。
 
 ## 已知接受风险（M1，2026-10-06 审查记录）

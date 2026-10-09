@@ -316,7 +316,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 抽卡候选条 | `data_optimize_candidates` | `GachaCandidateStrip` | 原生 | —（设计稿已随交付清理） | ✅ |
 | Agent 图片结果卡 | `image`（+ role=agent） | `ChatMessageItem` isImage 分支 | 原生 | —（跟随会话帧） | ✅ |
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
-| 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay` | 原生（base64 帧位图） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
+| 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay`（M2 全屏接管） | 原生（帧位图：M2 WS binary 推流 / HTTP base64） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
 | 流式卡片占位/工具状态/失败 item | （流式瞬态，不落 Room） | 占位骨架 / `ToolStatusChip` / 失败态（i18n `chat_card_generate_failed`） | 原生 | — | ✅（M4 拍平三分流，见 §1.3） |
 | 日期分隔 | （列表装饰，非消息） | `ChatDateChip` | 原生 | `chat_date_chip` 438:335 | ✅ |
@@ -715,9 +715,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ![cleanup](../assets/chat-cards/chat_cleanup_card-dark.png?v=20260927-4) ![cleanup_done](../assets/chat-cards/chat_cleanup_done_card-dark.png?v=20260927-4) ![nudge](../assets/chat-cards/chat_nudge_card-dark.png?v=20260927-4)
 
-### 4.8 浏览器直播卡 `BrowserLiveCard`（tool_browser，2026-10-06 新增）
+### 4.8 浏览器直播卡 `BrowserLiveCard`（tool_browser，2026-10-06 新增；2026-10-09 M2 WS 推流 + 全屏接管）
 
-云端浏览器会话的 INLINE 直播卡（browser-vnc 直播卡 spec §4；Android 首发定稿，iOS 走 ios-follow，视觉契约固化 `docs/08-UI-SPECS/screens/chat.yaml` §18）。
+云端浏览器会话的 INLINE 直播卡（browser-vnc 直播卡 spec §4；Android 首发定稿，iOS 走 ios-follow，视觉契约固化 `docs/08-UI-SPECS/screens/chat.yaml` §18）。M2（2026-10-09）：watch 通道升级 WS 推流（screencast binary 帧），点按帧进全屏接管 overlay。
 
 **协议**：
 
@@ -753,8 +753,8 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 }
 ```
 
-**UI**：三层结构——头部行（页面标题 + URL + 三态状态字：running 前置 14dp spinner / done「共 N 步操作」/ failed，failed 用 error 色余者 onSurfaceVariant）+ 16:9 帧区（base64 后台解码位图，点按进全屏）+ 动作流水（≤3 行，失败行 error 色）；定格态隐藏 spinner 定格最终帧。会话中 watch 轮询 1s 仅 running 态、随组合离开取消（`LaunchedEffect(sessionId, running)`）。全屏预览 = `BrowserFramePreviewOverlay`（`ChatImagePreviewOverlay` 单页子集：base64 数据源 + 双指 1x~5x 缩放/拖动 + 关闭按钮 + BackHandler，不引入新交互）。槽位与其他卡片同（LazyColumn 统一 horizontal padding，卡自身不带外边距）；外层 12dp 全圆角无 token 档（四张 chat 卡硬编码现状，chat.yaml §18 注记）。
-**渲染组件**：`BrowserLiveCard` / `BrowserFramePreviewOverlay`（`components/BrowserLiveCard.kt`）+ `BrowserActionFormatter`（动作流水文案）；live 态 = `BrowserLiveOverlay.overlayLiveBrowserState`（shared，同 sessionId 原位覆写，形态与 `overlayLiveTaskState` 同构）+ ChatViewModel `_browserLiveSessions` 内存态（500ms sample 节流）；`data/remote/picme/BrowserSessionClient`（watch 轮询 frame / turn 结束兜底 close 直连）。
+**UI**：三层结构——头部行（页面标题 + URL + 三态状态字：running 前置 14dp spinner / done「共 N 步操作」/ failed，failed 用 error 色余者 onSurfaceVariant）+ 16:9 帧区（base64 后台解码位图，点按进全屏）+ 动作流水（≤3 行，失败行 error 色）；定格态隐藏 spinner 定格最终帧。会话中 watch 通道（M2，2026-10-09）= WS 推流（`LaunchedEffect(sessionId, running)` 启动 + `DisposableEffect` onDispose 断开；screencast binary 帧 + frame_meta），HTTP 轮询 1s 保留回退。全屏 = `BrowserFramePreviewOverlay`（M1 为纯预览：base64 数据源 + 双指 1x~5x 缩放/拖动 + 关闭按钮 + BackHandler；M2 升级双模式——Interact（默认）：点按→clickAt（坐标经 ContentScale.Fit 映射回帧坐标）、拖动→scroll（方向取反符合触屏惯例）、底部输入框→typeText，坐标动作经 WS 下发；Zoom：双指 1x~5x 缩放/拖动）。槽位与其他卡片同（LazyColumn 统一 horizontal padding，卡自身不带外边距）；外层 12dp 全圆角无 token 档（四张 chat 卡硬编码现状，chat.yaml §18 注记）。
+**渲染组件**：`BrowserLiveCard` / `BrowserFramePreviewOverlay`（`components/BrowserLiveCard.kt`）+ `BrowserActionFormatter`（动作流水文案）；live 态 = `BrowserLiveOverlay.overlayLiveBrowserState`（shared，同 sessionId 原位覆写，形态与 `overlayLiveTaskState` 同构）+ ChatViewModel `_browserLiveSessions` 内存态（500ms sample 节流；M2 起 WS 帧事件原位覆写，非主动断开仅降级记日志不标会话失败）；`data/remote/picme/BrowserWebSocketClient`（M2：OkHttp WS，frameEvents/disconnectEvents 两 SharedFlow，`sendBrowserAction` 坐标动作）+ `data/remote/picme/BrowserSessionClient`（HTTP watch 轮询回退 / turn 结束兜底 close 直连）。
 **parts 协议（✅ 2026-10-06 已落地）**：`MessagePart.BrowserLive`——
 
 | 字段 | 类型 | 含义 |
@@ -763,7 +763,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 | `sessionId` | String | 云端浏览器会话 id（overlay 覆写锚） |
 | `state` | ToolPartState | 占位 `INPUT_STREAMING`（瞬态不落库）；定格 `OUTPUT_AVAILABLE` / 失败 `OUTPUT_ERROR` |
 | `currentUrl` / `pageTitle` | String | 头部行数据源 |
-| `frameJpegBase64` | String? | 最新帧（watch 轮询/动作响应更新；**帧永不回灌 LLM**，媒体红线同 Image） |
+| `frameJpegBase64` | String? | 最新帧（M2 WS 推流 / HTTP 轮询回退 / 动作响应更新；**帧永不回灌 LLM**，媒体红线同 Image） |
 | `actions` | List\<BrowserActionEntry\> | 最近动作流水（至多 3 条，新在尾；`description`+`ok`） |
 | `actionCount` / `resultSummary` / `errorReason` | Int / String? / String? | 定格统计与摘要 |
 
