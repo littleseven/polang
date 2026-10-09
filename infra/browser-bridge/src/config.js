@@ -15,4 +15,8 @@ module.exports = {
   maxExtractChars: 4000,
   maxElements: 40,
   maxBodyBytes: 64 * 1024,
+  screencastQuality: 60,
+  screencastMaxWidth: 1280,
+  screencastMaxHeight: 720,
+  screencastEveryNthFrame: 2,
 };

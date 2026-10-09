@@ -5,6 +5,7 @@ import com.mamba.picme.core.agenttools.AppToolExecutor
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.dao.PersonDao
+import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
 import com.mamba.picme.data.remote.picme.ClaudeChatClient
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.data.repository.MediaFeedbackRepository
@@ -57,7 +58,9 @@ class ChatViewModelDependencies(
      * 显式注入（Agent First 显式优于隐式）：单测传测试调度器保 runTest 确定性
      * （直接写死 Dispatchers.Default 会逃出 runTest 调度器，advanceUntilIdle 等不到）。
      */
-    val messageDecodeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    val messageDecodeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** 浏览器直播 WS 推流客户端；null = 未接线（单测默认），直播卡回退 HTTP 轮询。 */
+    val browserWebSocketClient: BrowserWebSocketClient? = null
 ) {
     /**
      * app_tool_request 采集执行器（spec §3.1）。null = 未接线（单测默认不注入则功能关闭）。

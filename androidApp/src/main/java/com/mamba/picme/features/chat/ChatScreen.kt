@@ -327,8 +327,8 @@ fun ChatScreen(
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
     var previewChartSvg by remember { mutableStateOf<String?>(null) }
-    // 浏览器直播卡全屏帧预览状态（base64 单帧）
-    var browserFramePreview by remember { mutableStateOf<String?>(null) }
+    // 浏览器直播卡全屏交互接管状态（帧 + 会话上下文）
+    var browserFramePreview by remember { mutableStateOf<BrowserFramePreviewState?>(null) }
     // HTML 卡片外链落地页预览状态（点击卡片内 <a> 链接打开）
     var previewLinkUrl by remember { mutableStateOf<String?>(null) }
     // HTML 卡全屏查看器状态（点击 fullpage 预览卡/兜底封面打开；与 HtmlLinkPreviewOverlay 同级）
@@ -713,8 +713,23 @@ fun ChatScreen(
                                     val browserPart = item.part as? MessagePart.BrowserLive ?: return@itemsIndexed
                                     BrowserLiveCard(
                                         part = browserPart,
-                                        onPollFrame = { sessionId -> viewModel.pollBrowserFrame(sessionId) },
-                                        onOpenFullPreview = { frame -> browserFramePreview = frame },
+                                        onWatchSession = { sessionId -> viewModel.watchBrowserSession(sessionId) },
+                                        onUnwatchSession = { sessionId -> viewModel.unwatchBrowserSession(sessionId) },
+                                        onOpenFullPreview = { frame ->
+                                            // 解码 bitmap 边界取帧尺寸（坐标映射需要）
+                                            val opts = android.graphics.BitmapFactory.Options().apply {
+                                                inJustDecodeBounds = true
+                                            }
+                                            android.util.Base64.decode(frame, android.util.Base64.DEFAULT).let {
+                                                android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size, opts)
+                                            }
+                                            browserFramePreview = BrowserFramePreviewState(
+                                                sessionId = browserPart.sessionId,
+                                                frameBase64 = frame,
+                                                frameWidth = opts.outWidth,
+                                                frameHeight = opts.outHeight,
+                                            )
+                                        },
                                     )
                                 }
                                 ChatListItem.TYPE_TASK_CARD -> {
@@ -900,9 +915,18 @@ fun ChatScreen(
                 onDismiss = { previewChartSvg = null }
             )
 
-            // 浏览器直播卡全屏帧预览（单帧）
-            browserFramePreview?.let { frame ->
-                BrowserFramePreviewOverlay(frame = frame, onClose = { browserFramePreview = null })
+            // 浏览器直播卡全屏交互接管（M2 takeover）
+            browserFramePreview?.let { preview ->
+                BrowserFramePreviewOverlay(
+                    frame = preview.frameBase64,
+                    sessionId = preview.sessionId,
+                    frameWidth = preview.frameWidth,
+                    frameHeight = preview.frameHeight,
+                    onAction = { action, params ->
+                        viewModel.sendBrowserAction(preview.sessionId, action, params)
+                    },
+                    onClose = { browserFramePreview = null }
+                )
             }
 
             // HTML 卡全屏查看器（fullpage 预览卡点击进入；z 序在落地页之下——查看器内 <a> 点击叠落地页）
@@ -2603,6 +2627,17 @@ private fun ChatVoiceInputMode(
 data class ChatImagePreviewState(
     val pages: List<ImagePreviewPage>,
     val initialIndex: Int
+)
+
+/**
+ * 浏览器直播帧全屏交互接管状态：会话上下文 + base64 帧 + 帧像素尺寸。
+ * 帧尺寸在打开时从解码 bitmap 提取（ContentScale.Fit 坐标映射需要原始帧宽高）。
+ */
+data class BrowserFramePreviewState(
+    val sessionId: String,
+    val frameBase64: String,
+    val frameWidth: Int = 0,
+    val frameHeight: Int = 0,
 )
 
 /**

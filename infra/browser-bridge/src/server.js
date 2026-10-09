@@ -5,6 +5,7 @@ const http = require('node:http');
 const config = require('./config');
 const { SessionManager, PoolExhaustedError, SessionExpiredError, ActionFailedError } = require('./sessions');
 const { SsrfError } = require('./ssrf');
+const { setupWebSocket } = require('./ws');
 
 const manager = new SessionManager(config);
 const expectedTokenHash = crypto.createHash('sha256').update(config.token).digest();
@@ -131,6 +132,9 @@ const server = http.createServer(async (req, res) => {
 server.requestTimeout = 30_000;
 server.headersTimeout = 10_000;
 server.keepAliveTimeout = 5_000;
+
+// WebSocket 推流（screencast 模式）
+setupWebSocket(server, manager, config);
 
 setInterval(() => { manager.reap().catch(() => {}); }, 30_000).unref();
 

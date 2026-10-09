@@ -28,6 +28,7 @@ import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
+import io.ktor.server.websocket.WebSockets
 import io.ktor.server.testing.TestApplicationBuilder
 import io.ktor.server.testing.testApplication
 import org.junit.Assert.assertEquals
@@ -53,6 +54,7 @@ class BrowserRouteTest {
         TestDb.init(Accounts, BrowserSessions)
         application {
             install(ContentNegotiation) { json(appJson) }
+            install(WebSockets)
             intercept(ApplicationCallPipeline.Plugins) {
                 call.request.headers[APP_TOKEN_HEADER]
                     ?.let { AccountService.sha256(it) }

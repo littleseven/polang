@@ -7,6 +7,7 @@ const { SessionManager, PoolExhaustedError, SessionExpiredError } = require('../
 const CFG = {
   maxSessions: 1, idleTimeoutMs: 60000, hardCapMs: 600000, navTimeoutMs: 5000,
   viewport: { width: 1280, height: 720 }, frameQuality: 60, maxExtractChars: 5, maxElements: 40,
+  screencastQuality: 60, screencastMaxWidth: 1280, screencastMaxHeight: 720, screencastEveryNthFrame: 2,
 };
 
 function fakePage() {
@@ -30,6 +31,23 @@ function fakePage() {
     ],
     evaluate: async (fn) => (typeof fn === 'function' ? 'hello body' : ''),
     screenshot: async () => Buffer.from('jpeg-bytes'),
+    mouse: {
+      click: async (x, y) => { calls.push(`mouse.click:${x},${y}`); },
+      wheel: async (dx, dy) => { calls.push(`mouse.wheel:${dx},${dy}`); },
+      move: async (x, y) => { calls.push(`mouse.move:${x},${y}`); },
+      down: async () => { calls.push('mouse.down'); },
+      up: async () => { calls.push('mouse.up'); },
+    },
+    keyboard: {
+      type: async (t) => { calls.push(`keyboard.type:${t}`); },
+    },
+    context: () => ({
+      newCDPSession: async () => ({
+        on: () => {},
+        send: async (method) => { calls.push(`cdp:${method}`); },
+        detach: async () => { calls.push('cdp:detach'); },
+      }),
+    }),
   };
 }
 
@@ -149,4 +167,114 @@ test('detached cached handle maps to structured stale_element', async () => {
     (e) => e.code === 'stale_element'
   );
   await mgr.close(s.id);
+});
+
+// ── 接管模式坐标 action ──────────────────────────────────────────────
+
+test('clickAt sends mouse.click with coordinates', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  const r = await mgr.act(s, { action: 'clickAt', x: 100, y: 200 });
+  assert.strictEqual(r.status, 'ok');
+  assert.ok(page.calls.includes('mouse.click:100,200'));
+  await mgr.close(s.id);
+});
+
+test('clickAt rejects non-finite coordinates', async () => {
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(fakePage()));
+  const s = await mgr.open(null);
+  await assert.rejects(
+    () => mgr.act(s, { action: 'clickAt', x: 'abc', y: 200 }),
+    (e) => e.code === 'invalid_coords'
+  );
+  await mgr.close(s.id);
+});
+
+test('typeText sends keyboard.type', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  const r = await mgr.act(s, { action: 'typeText', text: 'hello world' });
+  assert.strictEqual(r.status, 'ok');
+  assert.ok(page.calls.includes('keyboard.type:hello world'));
+  await mgr.close(s.id);
+});
+
+test('scroll sends mouse.wheel', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  const r = await mgr.act(s, { action: 'scroll', dx: 0, dy: -300 });
+  assert.strictEqual(r.status, 'ok');
+  assert.ok(page.calls.includes('mouse.wheel:0,-300'));
+  await mgr.close(s.id);
+});
+
+test('drag sends mouse move/down/up sequence', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  const r = await mgr.act(s, { action: 'drag', fromX: 10, fromY: 20, toX: 110, toY: 220 });
+  assert.strictEqual(r.status, 'ok');
+  assert.ok(page.calls.includes('mouse.move:10,20'));
+  assert.ok(page.calls.includes('mouse.down'));
+  assert.ok(page.calls.includes('mouse.move:110,220'));
+  assert.ok(page.calls.includes('mouse.up'));
+  await mgr.close(s.id);
+});
+
+// ── CDP Screencast ──────────────────────────────────────────────────
+
+test('startScreencast is idempotent and stopScreencast cleans up', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.startScreencast(s.id);
+  assert.strictEqual(mgr.isScreencastActive(s.id), true);
+  await mgr.startScreencast(s.id); // idempotent
+  assert.strictEqual(mgr.isScreencastActive(s.id), true);
+  await mgr.stopScreencast(s.id);
+  assert.strictEqual(mgr.isScreencastActive(s.id), false);
+  assert.ok(page.calls.includes('cdp:Page.startScreencast'));
+  assert.ok(page.calls.includes('cdp:Page.stopScreencast'));
+  assert.ok(page.calls.includes('cdp:detach'));
+  await mgr.close(s.id);
+});
+
+test('screencast listener receives frames', async () => {
+  const page = fakePage();
+  let frameHandler = null;
+  const origContext = page.context;
+  page.context = () => ({
+    newCDPSession: async () => ({
+      on: (event, handler) => { if (event === 'Page.screencastFrame') frameHandler = handler; },
+      send: async () => {},
+      detach: async () => {},
+    }),
+  });
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  const frames = [];
+  mgr.addScreencastListener(s.id, (b64, meta) => frames.push({ b64, meta }));
+  await mgr.startScreencast(s.id);
+  // Simulate a CDP screencast frame
+  frameHandler({
+    data: Buffer.from('fake-jpeg').toString('base64'),
+    sessionId: 1,
+    metadata: { seq: 42, width: 1280, height: 720 },
+  });
+  assert.strictEqual(frames.length, 1);
+  assert.strictEqual(frames[0].b64, Buffer.from('fake-jpeg').toString('base64'));
+  assert.strictEqual(frames[0].meta.seq, 42);
+  await mgr.close(s.id);
+});
+
+test('close stops screencast', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.startScreencast(s.id);
+  await mgr.close(s.id);
+  assert.strictEqual(mgr.isScreencastActive(s.id), false);
 });
