@@ -485,6 +485,11 @@ private fun WebView.loadHtmlOnce(html: String) {
  *   替代手动 dispatchNestedPreScroll（实测在 Compose interop 链路上不可靠，几乎滑不动）；
  * - 内容可竖滚（异常兜底）：保持 isNestedScrollingEnabled=false，
  *   WebView 自滚、父链无感知（防 LazyColumn pre-scroll 抢占 delta 导致卡死）。
+ *
+ * 水平方向（2026-10-09）：HTML 卡可能含横滑组件（图片轮播/横滚 Tab/拖拽滑块），
+ * 与外层 HorizontalPager 页面切换存在手势竞争——MOVE 时若内容可水平滚动则
+ * requestDisallowInterceptTouchEvent(true) 阻止父链拦截，让 WebView 完整消费水平手势；
+ * 若内容不可水平滚动则返回 false，手势正常冒泡到父链触发页面切换。
  */
 private class ChatHtmlWebView(context: Context) : WebView(context) {
     init {
@@ -492,10 +497,21 @@ private class ChatHtmlWebView(context: Context) : WebView(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_MOVE &&
-            !canScrollVertically(-1) && !canScrollVertically(1)
-        ) {
-            return false
+        if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+            val canScrollHorizontally =
+                canScrollHorizontally(-1) || canScrollHorizontally(1)
+            if (canScrollHorizontally) {
+                // 卡内横滑组件可滚：禁止父链（LazyColumn/HorizontalPager）拦截，
+                // 让 WebView 完整消费水平手势（图片轮播/横滚 Tab 正常工作）
+                parent?.requestDisallowInterceptTouchEvent(true)
+            } else {
+                // 内容不可水平滚动：手势让回父链，页面左右滑切换正常触发
+                return false
+            }
+            val canScrollVertically = canScrollVertically(-1) || canScrollVertically(1)
+            if (!canScrollVertically) {
+                return false
+            }
         }
         return super.onTouchEvent(event)
     }
