@@ -56,7 +56,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.res.stringResource
@@ -440,18 +444,58 @@ private fun HtmlWebView(
     onOpenLink: ((String) -> Unit)? = null,
     onRenderFailed: (() -> Unit)? = null
 ) {
+    // WebView 引用：Compose 层水平手势消费后经 scrollBy 手动转发滚动
+    var webViewRef by remember { mutableStateOf<ChatHtmlWebView?>(null) }
+
     AndroidView(
-        modifier = modifier,
+        modifier = modifier
+            .pointerInput(Unit) {
+                // 水平手势消费 + scrollBy 转发：
+                // Compose 事件分发从内到外——本 handler 先于外层 HorizontalPager 执行。
+                // 检测水平拖动（|dx| > |dy|）时 consume 阻止 HorizontalPager 抢手势，
+                // 同时经 webViewRef.scrollBy() 手动转发水平位移给 WebView 内容，
+                // 实现卡内横滑组件（图片轮播/横滚 Tab）的正常滚动。
+                // 竖直拖动不消费——LazyColumn 正常接管。
+                // 点击不消费——WebView 内点击/超链接正常。
+                awaitEachGesture {
+                    val down = awaitPointerEvent()
+                    if (down.changes.none { it.changedToDown() }) return@awaitEachGesture
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+
+                        if (change.changedToUp()) break
+
+                        if (change.pressed) {
+                            val dragAmount = change.position - change.previousPosition
+                            if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y)) {
+                                // 水平拖动：consume 阻止 HorizontalPager 页面切换
+                                change.consume()
+                                // 手动转发水平滚动给 WebView 内容
+                                webViewRef?.scrollBy(
+                                    (-dragAmount.x).toInt(),
+                                    0
+                                )
+                            }
+                        }
+                    }
+                }
+            },
         factory = { context ->
             ChatHtmlWebView(context).apply {
                 applyCardSandbox(measureEnabled, onContentHeightCssPx, onOpenLink, onRenderFailed)
                 loadHtmlOnce(html)
+                webViewRef = this
             }
         },
         update = { webView ->
             // 预览态禁触摸/聚焦（JS 仍运行）；inline 态恢复默认可交互
             webView.isFocusable = !previewMode
             webView.isClickable = !previewMode
+            if (webView is ChatHtmlWebView) {
+                webViewRef = webView
+            }
             if (webView.tag != html) {
                 webView.loadHtmlOnce(html)
             }
@@ -459,6 +503,9 @@ private fun HtmlWebView(
         onRelease = { webView ->
             webView.stopLoading()
             webView.destroy()
+            if (webViewRef === webView) {
+                webViewRef = null
+            }
         }
     )
 }
@@ -487,11 +534,20 @@ private fun WebView.loadHtmlOnce(html: String) {
  *   WebView 自滚、父链无感知（防 LazyColumn pre-scroll 抢占 delta 导致卡死）。
  *
  * 水平方向（2026-10-09）：HTML 卡可能含横滑组件（图片轮播/横滚 Tab/拖拽滑块），
- * 与外层 HorizontalPager 页面切换存在手势竞争——MOVE 时若内容可水平滚动则
- * requestDisallowInterceptTouchEvent(true) 阻止父链拦截，让 WebView 完整消费水平手势；
- * 若内容不可水平滚动则返回 false，手势正常冒泡到父链触发页面切换。
+ * 与外层 HorizontalPager 页面切换存在手势竞争。
+ *
+ * 第一次修复尝试在 onTouchEvent 中用 requestDisallowInterceptTouchEvent 阻止父链——
+ * **无效**，因为 Compose 组件（LazyColumn/HorizontalPager）不走传统 ViewGroup 的
+ * onInterceptTouchEvent 机制，requestDisallowInterceptTouchEvent 对 Compose 父链无效。
+ *
+ * 正确方案：双管齐下——
+ * 1. Compose 层：AndroidView modifier 上挂 pointerInput handler，检测水平拖动，
+ *    当 WebView 可水平滚动时 consume() 手势（阻止传播到外层 HorizontalPager）；
+ * 2. View 层：dispatchTouchEvent 中检测水平滑动方向，当 WebView 可水平滚动时
+ *    直接消费事件（不调用 super），确保 WebView 内部横滑组件收到完整手势流。
  */
 private class ChatHtmlWebView(context: Context) : WebView(context) {
+
     init {
         isNestedScrollingEnabled = false
     }
