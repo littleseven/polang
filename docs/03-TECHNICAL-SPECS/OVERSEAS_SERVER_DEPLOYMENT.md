@@ -132,7 +132,7 @@ Nginx 1.24（Ubuntu apt 安装，**非宝塔**）承担：
 - **TLS 终止**：certbot 自动申请/续期 Let's Encrypt 证书
 - **反向代理**：`api.polang.net` → `127.0.0.1:8080`（Ktor 后端）
 - **静态托管**：`polang.net` → 项目官网 + 隐私声明（过审用）
-- **WebSocket 支持**：`/v1/chat/completions` 流式 SSE 透传
+- **WebSocket 支持**：`/v1/chat/completions` 流式 SSE 透传；`/v1/browser/ws` WS 帧流代理（browser-vnc M2，`location /` 需 Upgrade/Connection 头透传）
 
 ### 5.2 关键配置片段
 
@@ -151,6 +151,10 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # WebSocket 透传（browser-vnc M2 帧流代理 /v1/browser/ws，2026-10-10 补；
+        # 缺这两行 WS upgrade 在 nginx 层被剥成普通 GET，Ktor 回 400）
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         # SSE 流式透传
         proxy_buffering off;
         proxy_cache off;
