@@ -182,6 +182,12 @@ class PoLangApplication : Application(), ImageLoaderFactory {
     @Volatile
     private var cachedDeviceId: String? = null
 
+    /** 供 AppContainer 读取的 token provider（browser WS 客户端 DI 用）。 */
+    fun cachedServerAuthTokenProvider(): String? = cachedServerAuthToken
+
+    /** 供 AppContainer 读取的 deviceId provider（browser WS 客户端 DI 用）。 */
+    fun cachedDeviceIdProvider(): String? = cachedDeviceId
+
     override fun onCreate() {
         super.onCreate()
 

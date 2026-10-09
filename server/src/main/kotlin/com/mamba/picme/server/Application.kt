@@ -56,6 +56,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.defaultheaders.DefaultHeaders
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.respond
+import io.ktor.server.websocket.WebSockets
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -97,6 +98,7 @@ private val publicRoutes = setOf(
 fun Application.module(config: AppConfig) {
     install(CallLogging) { level = Level.INFO }
     install(DefaultHeaders)
+    install(WebSockets)
     install(ContentNegotiation) { json(appJson) }
     install(StatusPages) {
         exception<BadRequestException> { call, _ ->

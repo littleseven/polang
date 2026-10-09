@@ -4,6 +4,10 @@ import com.mamba.picme.server.browser.BrowserBridgeClient
 import com.mamba.picme.server.browser.BrowserConcurrencyRegistry
 import com.mamba.picme.server.browser.BrowserSessionStats
 import com.mamba.picme.server.ratelimit.RateLimiter
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -14,6 +18,16 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.readReason
+import io.ktor.websocket.readText
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -133,6 +147,84 @@ fun Route.browserRoute(
         runCatching { stats.recordClose(sessionId, "closed") }
             .onFailure { logger.warn("browser stats recordClose failed: sessionId=$sessionId", it) }
         call.respondText(upstream.bodyAsText(), ContentType.Application.Json, upstream.status)
+    }
+
+    // --- WebSocket 帧流代理（M2：App ↔ bridge 双向转发） ---
+    // 认证已由全局拦截器完成（X-App-Token → ownerTokenHash）。
+    // App 连接 wss://server/v1/browser/ws?sessionId=xxx，
+    // 服务端用 Ktor WS client 连 bridge ws://bridge/ws?sessionId=xxx&token=bridgeToken，
+    // 二进制 JPEG 帧 + 文本控制消息双向透传。
+    val wsClient = HttpClient(CIO) { install(WebSockets) }
+
+    webSocket("/v1/browser/ws") {
+        val serverSession = this
+        val owner = call.ownerTokenHash() ?: run {
+            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "unauthorized"))
+            return@webSocket
+        }
+        val sessionId = call.request.queryParameters["sessionId"] ?: run {
+            close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "sessionId required"))
+            return@webSocket
+        }
+        if (!bridge.available) {
+            close(CloseReason(CloseReason.Codes.SERVICE_RESTART, "browser_unavailable"))
+            return@webSocket
+        }
+
+        val bridgeWsUrl = bridge.wsUrl(sessionId)
+        if (bridgeWsUrl == null) {
+            close(CloseReason(CloseReason.Codes.SERVICE_RESTART, "browser_unavailable"))
+            return@webSocket
+        }
+
+        logger.info("browser WS proxy: owner=$owner sessionId=$sessionId → $bridgeWsUrl")
+
+        try {
+            wsClient.webSocket(bridgeWsUrl) {
+                val upstream = this
+
+                // App → bridge：文本 action 消息透传（独立协程）
+                val appToBridge = CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+                    try {
+                        for (frame in serverSession.incoming) {
+                            when (frame) {
+                                is Frame.Text -> upstream.send(Frame.Text(frame.readText()))
+                                is Frame.Binary -> upstream.send(Frame.Binary(true, frame.data))
+                                is Frame.Close -> {
+                                    upstream.close(frame.readReason() ?: CloseReason(CloseReason.Codes.NORMAL, "app closed"))
+                                    return@launch
+                                }
+                                else -> {}
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        logger.debug("browser WS app→bridge forward ended: ${e.message}")
+                    }
+                }
+
+                // bridge → App：二进制 JPEG 帧 + 文本元数据
+                try {
+                    for (frame in upstream.incoming) {
+                        when (frame) {
+                            is Frame.Binary -> serverSession.send(Frame.Binary(true, frame.data))
+                            is Frame.Text -> serverSession.send(Frame.Text(frame.readText()))
+                            is Frame.Close -> {
+                                serverSession.close(frame.readReason() ?: CloseReason(CloseReason.Codes.NORMAL, "bridge closed"))
+                                return@webSocket
+                            }
+                            else -> {}
+                        }
+                    }
+                } catch (e: Throwable) {
+                    logger.debug("browser WS bridge→app forward ended: ${e.message}")
+                }
+
+                appToBridge.cancel()
+            }
+        } catch (e: Throwable) {
+            logger.warn("browser WS proxy failed: sessionId=$sessionId, ${e.message}")
+            close(CloseReason(CloseReason.Codes.INTERNAL_ERROR, "bridge connection failed"))
+        }
     }
 }
 

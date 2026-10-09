@@ -81,6 +81,7 @@ import com.mamba.picme.domain.usecase.OcrProcessor
 import com.mamba.picme.features.chat.ChatEditStateHolder
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.data.remote.picme.AppUpdateClient
+import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.features.chat.ChatImageRenderer
 import com.mamba.picme.features.chat.ChatOptimizeGachaController
@@ -365,6 +366,8 @@ interface AppContainer {
     val controlledVocab: ControlledVocab
     /** 服务端账号客户端（内含独立 OkHttpClient，进程级单例；设置页账号区与 chat 依赖共用） */
     val picMeAuthClient: PoLangAuthClient
+    /** 浏览器直播 WS 推流客户端（M2）；token/deviceId 由 PoLangApplication 预热缓存后注入 */
+    val browserWebSocketClient: BrowserWebSocketClient
 
     /** 去重 2.0：MD5/pHash 缓存 DAO（增量扫描） */
     val dedupHashDao: DedupHashDao
@@ -1021,6 +1024,13 @@ class AppContainerImpl(
 
     override val picMeAuthClient: PoLangAuthClient by lazy { PoLangAuthClient() }
 
+    override val browserWebSocketClient: BrowserWebSocketClient by lazy {
+        BrowserWebSocketClient(
+            tokenProvider = { (context.applicationContext as? com.mamba.picme.PoLangApplication)?.cachedServerAuthTokenProvider() },
+            deviceIdProvider = { (context.applicationContext as? com.mamba.picme.PoLangApplication)?.cachedDeviceIdProvider() },
+        )
+    }
+
     private val chatViewModelDependencies: ChatViewModelDependencies by lazy {
         ChatViewModelDependencies(
             context = context,
@@ -1042,7 +1052,8 @@ class AppContainerImpl(
             chatImageStore = chatImageStore,
             saveChatEditResultUseCase = saveChatEditResultUseCase,
             optimizeGachaController = chatOptimizeGachaController,
-            tagGenerationScheduler = tagGenerationScheduler
+            tagGenerationScheduler = tagGenerationScheduler,
+            browserWebSocketClient = browserWebSocketClient
         ).also { deps ->
             // app_tool_request 采集执行器：工厂依赖容器内数据源，构造后回填（先于 ChatViewModel 创建）
             deps.appToolExecutor = buildAppToolExecutor(deps)

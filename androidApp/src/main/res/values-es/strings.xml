@@ -1566,6 +1566,10 @@
     <string name="browser_live_failed">La sesión de navegador falló</string>
     <string name="browser_live_view_full">Toca para ver a pantalla completa</string>
     <string name="browser_live_title_default">Página web</string>
+    <string name="browser_takeover_mode_interact">Cambiar a modo interactivo</string>
+    <string name="browser_takeover_mode_zoom">Cambiar a modo zoom</string>
+    <string name="browser_takeover_input_hint">Escribir en el navegador…</string>
+    <string name="browser_takeover_send">Enviar</string>
     <string name="chat_cmd_browser_open">Abrir navegador</string>
     <string name="chat_cmd_browser_navigate">Navegar a página</string>
     <string name="chat_cmd_browser_click">Hacer clic en elemento</string>

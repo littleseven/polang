@@ -37,6 +37,13 @@ class BrowserBridgeClient(
             header("X-Bridge-Token", bridgeToken)
         }
 
+    /** 构造 bridge WebSocket URL（WS 代理用）；bridge 不可用时返回 null。 */
+    fun wsUrl(sessionId: String): String? {
+        if (!available) return null
+        val wsBase = baseUrl.replaceFirst("http://", "ws://").replaceFirst("https://", "wss://")
+        return "$wsBase/ws?sessionId=$sessionId&token=$bridgeToken"
+    }
+
     private suspend fun post(url: String, body: String): HttpResponse =
         httpClient.post(url) {
             header("X-Bridge-Token", bridgeToken)

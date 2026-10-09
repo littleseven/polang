@@ -1606,6 +1606,10 @@
     <string name="browser_live_failed">浏览器会话失败</string>
     <string name="browser_live_view_full">点按全屏查看</string>
     <string name="browser_live_title_default">网页</string>
+    <string name="browser_takeover_mode_interact">切换到交互模式</string>
+    <string name="browser_takeover_mode_zoom">切换到缩放模式</string>
+    <string name="browser_takeover_input_hint">输入到浏览器…</string>
+    <string name="browser_takeover_send">发送</string>
     <string name="chat_cmd_browser_open">打开浏览器</string>
     <string name="chat_cmd_browser_navigate">网页导航</string>
     <string name="chat_cmd_browser_click">点击元素</string>

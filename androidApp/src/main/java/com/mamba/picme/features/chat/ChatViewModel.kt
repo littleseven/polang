@@ -262,6 +262,7 @@ class ChatViewModel(
     private val optimizeGachaController = dependencies.optimizeGachaController
     private val tagGenerationScheduler = dependencies.tagGenerationScheduler
     private val messageDecodeDispatcher = dependencies.messageDecodeDispatcher
+    private val browserWebSocketClient = dependencies.browserWebSocketClient
 
     private val mediaFeedbackUseCase = MediaFeedbackUseCase(mediaFeedbackRepository)
     private val authClient = dependencies.picMeAuthClient
@@ -1284,6 +1285,22 @@ class ChatViewModel(
         }
         // browser-vnc 直播卡：VM 作为会话事件出口（帧/动作流水只走 delegate 通道，不回灌 LLM）
         browserSessionCapability()?.setDelegate(this)
+        // M2 WS 推流：帧事件 → _browserLiveSessions 原位覆写
+        browserWebSocketClient?.let { wsClient ->
+            viewModelScope.launch {
+                wsClient.frameEvents.collect { event ->
+                    onBrowserSessionFrame(event.sessionId, "", "", event.frameJpegBase64)
+                }
+            }
+            viewModelScope.launch {
+                wsClient.disconnectEvents.collect { event ->
+                    // 非主动断开（网络抖动/bridge 重启）：仅降级——卡片保留最后一帧，
+                    // 后续 HTTP 动作帧（delegate 通道）仍会更新；不把整条会话标失败
+                    // （WS 只是 watch 增强层，标失败会误伤进行中的会话并污染 reducer 终态）
+                    Log.w(TAG, "browser WS disconnected: session=${event.sessionId}, reason=${event.reason}")
+                }
+            }
+        }
     }
 
     private fun refreshClaudeAvailability(token: String) {
@@ -2850,6 +2867,8 @@ class ChatViewModel(
         ChatToolService.getInstance().adjustImageHandler = null
         // browser 直播卡 delegate 反注册（capability 是组合根单例，VM 销毁后不得继续持有）
         browserSessionCapability()?.setDelegate(null)
+        // M2 WS 推流：断开所有活跃连接
+        browserWebSocketClient?.disconnectAll()
     }
 
     // ── BrowserSessionDelegate：云端浏览器直播卡 live 态（browser-vnc spec §4）─────────
@@ -2939,8 +2958,43 @@ class ChatViewModel(
         viewModelScope.launch { emitBrowserCardMessage(persisted) }
     }
 
-    /** 卡片可见期间由 UI 以 ~1s 节拍驱动（spec §2.2 watch 模式）；不可见/退组合自动停止。 */
-    fun pollBrowserFrame(sessionId: String) {
+    /**
+     * 启动 WS 推流 watch（M2）：连接 bridge WebSocket，帧经 [BrowserWebSocketClient.frameEvents]
+     * 推送到 [_browserLiveSessions]。WS 不可用时回退 HTTP 轮询（spec §6 降级）。
+     */
+    fun watchBrowserSession(sessionId: String) {
+        val wsClient = browserWebSocketClient
+        if (wsClient != null) {
+            wsClient.connect(sessionId)
+        } else {
+            // 回退：WS 客户端未接线时走 HTTP 轮询（单测/降级场景）
+            pollBrowserFrame(sessionId)
+        }
+    }
+
+    /** 停止 WS 推流 watch（卡片离开组合/会话终态时调用）。 */
+    fun unwatchBrowserSession(sessionId: String) {
+        browserWebSocketClient?.disconnect(sessionId)
+    }
+
+    /**
+     * 发送 takeover 动作到云端浏览器（经 WS 通道，M2 接管模式）。
+     * action 为 bridge 动作名（clickAt / typeText / scroll / drag），params 为动作参数 JSON。
+     */
+    fun sendBrowserAction(sessionId: String, action: String, params: JSONObject) {
+        val actionId = "takeover-${System.currentTimeMillis()}"
+        // bridge sessions.js 从动作体顶层读参数（body.x/body.y/...），params 必须平铺进动作对象
+        val payload = JSONObject().put("action", action)
+        val keys = params.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            payload.put(key, params.get(key))
+        }
+        browserWebSocketClient?.sendAction(sessionId, actionId, payload)
+    }
+
+    /** HTTP 轮询回退（WS 未接线或连接失败时）。 */
+    private fun pollBrowserFrame(sessionId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val transport = browserSessionCapability()?.transport ?: return@launch
             runCatching { transport.frame(sessionId) }

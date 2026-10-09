@@ -25,10 +25,13 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     // 管理后台：服务端渲染 HTML（kotlinx.html 由其传递依赖带入）
     implementation("io.ktor:ktor-server-html-builder:$ktorVersion")
+    // Browser VNC WebSocket 代理（App ↔ bridge 双向帧转发）
+    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
     // Ktor client（LLM 流式代理）
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-client-websockets:$ktorVersion")
     // Exposed + SQLite + HikariCP
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")

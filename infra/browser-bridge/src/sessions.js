@@ -25,6 +25,8 @@ class Session {
     this.actionCount = 0;
     this.elements = [];              // 最近 extract 的元素句柄缓存（index 定位用）
     this.queue = Promise.resolve();  // per-session 串行队列（借鉴 openmuse serial）
+    this.screencast = null;          // CDP screencast 客户端（WebSocket 推流模式）
+    this.screencastListeners = new Set(); // frame 推送回调集合
   }
   touch() { this.lastActivity = Date.now(); }
 }
@@ -133,6 +135,10 @@ class SessionManager {
       if (action === 'navigate') await this._navigate(session, body.url);
       else if (action === 'click') await this._click(session, body);
       else if (action === 'type') await this._type(session, body);
+      else if (action === 'clickAt') await this._clickAt(session, body);
+      else if (action === 'typeText') await this._typeText(session, body);
+      else if (action === 'scroll') await this._scroll(session, body);
+      else if (action === 'drag') await this._drag(session, body);
       else if (action === 'extract') ({ textExtract, elements } = await this._extract(session));
       else if (action === 'screenshot') { /* 帧逻辑统一在下方 */ }
       else throw new ActionFailedError('unknown_action', `unknown action: ${action}`);
@@ -163,6 +169,42 @@ class SessionManager {
   async _type(session, body) {
     const target = await this._locate(session, body);
     await this._staleGuard(() => target.pressSequentially(String(body.text == null ? '' : body.text), { timeout: this.config.navTimeoutMs }));
+  }
+
+  /** 坐标点击（接管模式）：直接 mouse.click，不走 _locate。 */
+  async _clickAt(session, body) {
+    const x = Number(body.x), y = Number(body.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new ActionFailedError('invalid_coords', 'clickAt 需要有限数值 x/y');
+    }
+    await session.page.mouse.click(x, y);
+  }
+
+  /** 全局键盘输入（接管模式）：无需定位元素。 */
+  async _typeText(session, body) {
+    const text = String(body.text == null ? '' : body.text);
+    if (!text) return;
+    await session.page.keyboard.type(text);
+  }
+
+  /** 滚轮（接管模式）：dx/dy 为像素增量。 */
+  async _scroll(session, body) {
+    const dx = Number(body.dx) || 0;
+    const dy = Number(body.dy) || 0;
+    await session.page.mouse.wheel(dx, dy);
+  }
+
+  /** 拖拽（接管模式）：from→to 连续移动。 */
+  async _drag(session, body) {
+    const fx = Number(body.fromX), fy = Number(body.fromY);
+    const tx = Number(body.toX), ty = Number(body.toY);
+    if (![fx, fy, tx, ty].every(Number.isFinite)) {
+      throw new ActionFailedError('invalid_coords', 'drag 需要有限数值 fromX/fromY/toX/toY');
+    }
+    await session.page.mouse.move(fx, fy);
+    await session.page.mouse.down();
+    await session.page.mouse.move(tx, ty, { steps: 10 });
+    await session.page.mouse.up();
   }
 
   /** 缓存句柄在页面变化后失效：Playwright 原始 not-attached 错误映射为结构化 stale_element。 */
@@ -208,6 +250,64 @@ class SessionManager {
     return session.lastGoodFrame;
   }
 
+  // ── CDP Screencast（WebSocket 推流模式）─────────────────────────────
+
+  /**
+   * 启动 screencast：Playwright CDP session 订阅 Page.screencastFrame，
+   * 每帧推送到所有已注册 listener。幂等（重复调用直接返回）。
+   */
+  async startScreencast(sessionId) {
+    const session = this.get(sessionId);
+    if (session.screencast) return; // already running
+    const cdp = await session.page.context().newCDPSession(session.page);
+    session.screencast = cdp;
+    cdp.on('Page.screencastFrame', (event) => {
+      const frameB64 = event.data;
+      session.lastGoodFrame = frameB64;
+      const meta = {
+        seq: event.metadata?.seq || 0,
+        width: event.metadata?.width || this.config.viewport.width,
+        height: event.metadata?.height || this.config.viewport.height,
+        timestamp: Date.now(),
+      };
+      for (const listener of session.screencastListeners) {
+        try { listener(frameB64, meta); } catch { /* listener 故障隔离 */ }
+      }
+      // ack 必须回，否则 Chromium 停止推帧
+      cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => {});
+    });
+    await cdp.send('Page.startScreencast', {
+      format: 'jpeg',
+      quality: this.config.screencastQuality,
+      maxWidth: this.config.screencastMaxWidth,
+      maxHeight: this.config.screencastMaxHeight,
+      everyNthFrame: this.config.screencastEveryNthFrame,
+    });
+  }
+
+  /** 停止 screencast 并清理 CDP session。幂等。 */
+  async stopScreencast(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session?.screencast) return;
+    const cdp = session.screencast;
+    session.screencast = null;
+    try { await cdp.send('Page.stopScreencast'); } catch { /* already stopped */ }
+    try { await cdp.detach(); } catch { /* already detached */ }
+  }
+
+  /** 注册 screencast 帧 listener，返回取消函数。 */
+  addScreencastListener(sessionId, listener) {
+    const session = this.get(sessionId);
+    session.screencastListeners.add(listener);
+    return () => { session.screencastListeners.delete(listener); };
+  }
+
+  /** 当前 screencast 是否在运行。 */
+  isScreencastActive(sessionId) {
+    const session = this.sessions.get(sessionId);
+    return !!session?.screencast;
+  }
+
   async captureFrame(session) {
     return this._serial(session, async () => {
       session.touch();
@@ -233,6 +333,7 @@ class SessionManager {
     const s = this.sessions.get(id);
     if (!s) return false;
     this.sessions.delete(id);
+    await this.stopScreencast(id); // 先停 screencast，避免 CDP session 泄漏
     await s.queue.catch(() => {}); // 先排空在途动作，避免 context 在 act 中途被关
     await s.context.close().catch(() => {});
     return true;

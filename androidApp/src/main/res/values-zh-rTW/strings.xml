@@ -1606,6 +1606,10 @@
     <string name="browser_live_failed">瀏覽器工作階段失敗</string>
     <string name="browser_live_view_full">點按全螢幕檢視</string>
     <string name="browser_live_title_default">網頁</string>
+    <string name="browser_takeover_mode_interact">切換到互動模式</string>
+    <string name="browser_takeover_mode_zoom">切換到縮放模式</string>
+    <string name="browser_takeover_input_hint">輸入到瀏覽器…</string>
+    <string name="browser_takeover_send">傳送</string>
     <string name="chat_cmd_browser_open">開啟瀏覽器</string>
     <string name="chat_cmd_browser_navigate">網頁導覽</string>
     <string name="chat_cmd_browser_click">點擊元素</string>
