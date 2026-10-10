@@ -715,9 +715,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ![cleanup](../assets/chat-cards/chat_cleanup_card-dark.png?v=20260927-4) ![cleanup_done](../assets/chat-cards/chat_cleanup_done_card-dark.png?v=20260927-4) ![nudge](../assets/chat-cards/chat_nudge_card-dark.png?v=20260927-4)
 
-### 4.8 浏览器直播卡 `BrowserLiveCard`（tool_browser，2026-10-06 新增；2026-10-09 M2 WS 推流 + 全屏接管）
+### 4.8 浏览器直播卡 `BrowserLiveCard`（tool_browser，2026-10-06 新增；2026-10-09 M2 WS 推流 + 全屏接管；2026-10-11 M2.5 接管页三段布局 + 路由捷径 + 租约自愈）
 
-云端浏览器会话的 INLINE 直播卡（browser-vnc 直播卡 spec §4；Android 首发定稿，iOS 走 ios-follow，视觉契约固化 `docs/08-UI-SPECS/screens/chat.yaml` §18）。M2（2026-10-09）：watch 通道升级 WS 推流（screencast binary 帧），点按帧进全屏接管 overlay。
+云端浏览器会话的 INLINE 直播卡（browser-vnc 直播卡 spec §4；Android 首发定稿，iOS 走 ios-follow，视觉契约固化 `docs/08-UI-SPECS/screens/chat.yaml` §18）。M2（2026-10-09）：watch 通道升级 WS 推流（screencast binary 帧），点按帧进全屏接管 overlay。M2.5（2026-10-11）：接管页三段布局重构（顶栏返回/状态胶囊四态/暂停/Interact↔Zoom 模式切换 + IME 附件行特殊键 key action + 暂停停流不停会话，详见 chat.yaml §18 full_preview）；意图路由增浏览器捷径 `BROWSE_WEB`（「用浏览器打开 X」零延迟直落全量 agent loop，不再误路由相册搜索，ADR-015）；server 网关 busy 自愈（App 进程死亡租约泄漏不再锁死：open 撞占用经 bridge `/session/{id}/status` 探测，仅 `session_expired` 判死条件释放重试）；bridge 增 `key` action（Enter/Tab/Esc 白名单）与 screencast 30s 节流 touch 保活。
 
 **协议**：
 

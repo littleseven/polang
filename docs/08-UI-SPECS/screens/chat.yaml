@@ -940,7 +940,7 @@ optimize_gacha:
     chat_gacha_reroll_unavailable: { en: "Shuffling is unavailable right now", zh-Hans: 换一组暂不可用，请稍后再试, zh-Hant: 換一組暫不可用，請稍後再試 }
 
 # ============================================================================
-# 18. 浏览器直播卡（Browser Live）— 2026-10-06 Android 首发定稿（browser-vnc M1），iOS 跟随参照本节
+# 18. 浏览器直播卡（Browser Live）— 2026-10-06 Android 首发定稿（browser-vnc M1）+ M2 2026-10-09 WS 推流/全屏接管 + M2.5 2026-10-11 接管页三段布局，iOS 跟随参照本节
 # ============================================================================
 # 基准端：features/chat/components/BrowserLiveCard.kt（BrowserLiveCard + BrowserFramePreviewOverlay）/
 #         features/chat/BrowserActionFormatter.kt（动作流水文案）/
@@ -955,7 +955,7 @@ browser_live:
     transient_track: "browser_open 类型化占位（INPUT_STREAMING，瞬态不落 Room）→ 会话期间 BrowserLiveOverlay 原位覆写（partId 恒占位值，LazyColumn key 恒定）"
     persistence: "会话结束落定格卡：Room type=tool_browser + role=agent，content=BrowserLive 整颗 JSON（state=OUTPUT_AVAILABLE/OUTPUT_ERROR）；冷启动自 Room 恢复"
     token_guard: "帧永不回灌 LLM——回灌仅 browser_session tool-call/tool-result 文本摘要对（ChatModelInput）"
-  card_ui:                                        # BrowserLiveCard（INLINE 形态，M1 唯一形态）
+  card_ui:                                        # BrowserLiveCard（INLINE 形态）
     slot: "与其他 chat 卡同槽位——LazyColumn 统一 horizontal padding（message_list.horizontal_padding=20 外层约定，分发分支不另加），卡自身不带外边距"
     container: { bg: surfaceVariant, padding: spacing.md /*12*/, corner_radius: 12 }
     corner_radius_note: "外层 12dp 全圆角无 token 档——HtmlCard/GachaCandidateStrip/EngineerTaskCard/BrowserLiveCard 四卡硬编码现状；建议未来提 cardLg=12 token（spec 注记，不立项）"
@@ -980,13 +980,31 @@ browser_live:
       line: { prefix: "· ", style: bodySmall, maxLines: 1 }
       line_color: { ok: onSurfaceVariant, failed: error }
       error_reason: { visible_when: "errorReason != null", style: bodySmall, color: error, maxLines: 3 }
-  watch_polling:                                  # 直播感来源（spec §2.2 决策 3）
-    cadence: "1s 轮询 GET /v1/browser/frame?sessionId"
-    active_when: "仅 running 态（state ∉ 终态）；LaunchedEffect(sessionId, running) —— 卡离开组合（划出视口）/定格即自动取消"
+  watch_channel:                                  # 直播感来源：M2（2026-10-09）WS 推流升级，HTTP 轮询退居回退
+    primary: "WS /v1/browser/ws 双向代理 → bridge screencast binary 帧推送；watch 挂点 2026-10-10 起在全屏接管页（INLINE 卡只吃动作级截图）；bridge 帧回调 30s 节流 touch 保活（M2.5）"
+    fallback: "HTTP 1s 轮询 GET /v1/browser/frame?sessionId（WS 不可用时回退）"
+    active_when: "仅 running 态（state ∉ 终态）；接管页离开组合/定格即自动取消"
     throttle: "live 态合流 500ms sample 节流（BROWSER_LIVE_OVERLAY_THROTTLE_MS，与任务卡同节拍），帧高频不直接驱动全列表重组"
-  full_preview:                                   # BrowserFramePreviewOverlay = ChatImagePreviewOverlay 单页子集
-    interactions: "base64 数据源 + 双指缩放 1x~5x/拖动（缩回 1x 自动归零偏移）+ 右上关闭按钮 + BackHandler + 点背景关闭；黑底/白图标沿用全屏预览惯例，不引入新交互"
-  i18n_keys:                                      # 五语已同步（EN/zh-CN/zh-TW/ES/FR）
+    pause_semantics: "暂停 = 停流不停会话（M2.5）：unwatch 停止推流、云端会话保活；已知限制——暂停 >bridge idleTimeout(120s) 会话被 idle reap，resume 后由 server busy 自愈兜底"
+  full_preview:                                   # BrowserFramePreviewOverlay = 全屏交互接管页（M2 引入，M2.5 三段布局重构）
+    layout: three_zones                           # 顶栏 / 帧区 / 底栏（底栏仅 Interact 模式）
+    top_bar:
+      back: { position: top_left, behavior: "Zoom 且 scale>1x 先复位，否则退出（BackHandler 同语义）" }
+      status_capsule: "四态：LIVE / 已暂停 / 会话已结束 / 重连中（5s 无新帧启发式 FRAME_STALE_MS）+ 页面域名"
+      pause_toggle: "暂停=停流不停会话：pausedFrame 本地定格 + 已暂停水印，action 全拦截 toast（browser_takeover_paused_toast）；onPausedChanged 回调 ChatScreen 协调 unwatch/re-watch（ChatViewModel 零改动）"
+      mode_switch: { interact: browser_takeover_mode_interact, zoom: browser_takeover_mode_zoom }
+      style: 圆形半透明按钮沿用全屏预览惯例
+    frame_area:
+      scale: "ContentScale.Fit 居中；结束态叠 30% 黑 + 「会话已结束」水印；帧外黑边无操作（M2.5 删除黑边误触 close）"
+    modes:
+      interact: "默认。点按→clickAt（mapOffsetToPage 屏幕→CSS 页面坐标）、拖动→scroll（20px 节流）、双指捏合→自动切 Zoom 并完成本次缩放"
+      zoom: "双指 1x~5x 缩放 / 单指平移 / 双击复位；底栏隐藏，首次进入一次性手势提示 3.5s（browser_takeover_zoom_hint）"
+    bottom_bar:
+      visible_when: 仅 Interact 模式
+      ime_attachment_row: "仅键盘弹出可见：⏎ Enter / Tab / Esc 特殊键 → WS action `key` → bridge page.keyboard.press（白名单三键）"
+      input_row: "输入框（hint=browser_takeover_input_hint）+ 发送（browser_takeover_send）→ typeText；imePadding 只挂底栏，键盘弹出帧区不重排；发送后清空文本不收键盘"
+    exit_guard: "退出 running 会话 toast 提示（browser_takeover_exit_hint_running）"
+  i18n_keys:                                      # 五语已同步（EN/zh-CN/zh-TW/ES/FR）；browser_takeover_* 族 2026-10-11 M2.5 新增
     - browser_live_running
     - browser_live_done_summary
     - browser_live_failed
@@ -998,9 +1016,25 @@ browser_live:
     - browser_action_type
     - browser_action_extract
     - browser_action_screenshot
+    - browser_takeover_status_live
+    - browser_takeover_status_paused
+    - browser_takeover_status_ended
+    - browser_takeover_status_reconnecting
+    - browser_takeover_pause
+    - browser_takeover_resume
+    - browser_takeover_paused_toast
+    - browser_takeover_mode_interact
+    - browser_takeover_mode_zoom
+    - browser_takeover_zoom_hint
+    - browser_takeover_input_hint
+    - browser_takeover_send
+    - browser_takeover_key_enter
+    - browser_takeover_key_tab
+    - browser_takeover_key_esc
+    - browser_takeover_exit_hint_running
   ios_todo:
     - "卡组件：BrowserLiveCard 三层结构 SwiftUI 等价（间距/色 token 同源；12dp 圆角随四卡现状硬编码，待 cardLg token 决议）"
-    - "watch 轮询：1s 节拍仅 running 态，视图消失/定格即取消（SwiftUI .task 取消语义对齐 LaunchedEffect）"
+    - "watch 通道：WS 推流优先 + HTTP 1s 轮询回退，仅 running 态，视图消失/定格即取消（SwiftUI .task 取消语义对齐 LaunchedEffect）"
     - "live 态覆写：shared BrowserLiveOverlay 经 XCFramework 直接可得；500ms 节流节拍对齐"
-    - "全屏预览：BrowserFramePreviewOverlay 单帧缩放子集（对齐既有图片全屏预览手势实现）"
+    - "全屏接管页：三段布局（顶栏返回/状态胶囊四态/暂停/模式切换）+ Interact/Zoom 双模式 + IME 附件行特殊键（key action 三键白名单）+ 暂停停流不停会话——读本节 full_preview 契约，不读 Android 源码"
     - "落库恢复：iOS ChatHistoryStore 增 tool_browser type 解码（payload=BrowserLive JSON）"
