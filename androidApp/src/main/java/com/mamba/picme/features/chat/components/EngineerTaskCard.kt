@@ -1,17 +1,19 @@
 package com.mamba.picme.features.chat.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -53,15 +55,19 @@ import kotlinx.coroutines.delay
 /**
  * 工程师任务卡（2026-09-27 H2 HTML 化，spec《HTML 卡双形态》§7 对 9-25 spec D2 的渲染层修订）：
  * **L1 模板 HTML**（[EngineerTaskHtml] 组装，端侧模板 + 状态 JSON，样式权威在 App）经 [HtmlCard]
- * 双形态渲染——折叠/展开为 INLINE（点击整卡切换），展开超 1.0 屏自动升格 FULLPAGE 预览 → 全屏查看器；
- * + **原生 Compose 动作条**外置卡底（零 JS 桥接红线不动，D5 审批外置语义延续），与卡同宽续接圆角。
+ * 双形态渲染——折叠/展开为 INLINE（点击整卡切换），展开超 1.0 屏自动升格 FULLPAGE 预览 → 全屏查看器。
+ *
+ * 卡片为**上下两分区单卡容器**（2026-09-27 Muse 修订，外置动作条方案作废；design taskcard 四帧）：
+ * 上半 = HTML 信息区（r16 卡容器内），下半 = **原生 Compose 动作区**（surfaceContainerHigh 底 + hairline
+ * 分隔，零 JS 桥接红线不动，动作状态与卡片同源）——running=整宽胶囊[停止]、approval=radio 选项列表
+ * （继续执行/到此为止）、deliver=[暂不|推送交付]双胶囊、failed=[重试]主胶囊、completed 无动作区。
  *
  * - 500ms 合帧：SSE 状态微更新经 [rememberThrottledTask] 节流（状态/裁决跃迁即时），
  *   WebView 按全文判等重载——无变化帧零开销；
  * - displayMode **粘滞但不落库**（spec §10：任务卡 HTML 是渲染期产物）——仅 FULLPAGE 方向粘滞
  *   （跨合帧不回缩），INLINE 每帧重判保持可升格；
  * - 测高缓存 key 形态域（`taskcard:<id>:exp|col`）——状态重生成不失效缓存，避免占位→测高跳变；
- * - 组装失败（模板异常）→ [EngineerTaskFallbackCard] 原生兜底（spec §9.3），动作条不受影响。
+ * - 组装失败（模板异常）→ [EngineerTaskFallbackCard] 原生兜底（spec §9.3），动作区不受影响。
  *
  * 纯渲染无状态；动作回调由 ChatScreen 接到 ChatViewModel（[actionsEnabled] 门控对齐 VM 侧守卫）。
  * 任务中心列表项继续用原生紧凑形态（同页多卡并存，WebView 实例成本不划算，spec §7）。
@@ -87,7 +93,7 @@ fun EngineerTaskCard(
     val throttled = rememberThrottledTask(task)
     val palette = rememberEngineerTaskPalette()
     val texts = engineerTaskTexts(throttled)
-    // 组装失败兜底（spec §9.3）：模板/插值异常 → 原生摘要卡，动作条照常
+    // 组装失败兜底（spec §9.3）：模板/插值异常 → 原生摘要卡，动作区照常
     val html = remember(throttled, expanded, palette, texts) {
         runCatching { EngineerTaskHtml.assemble(throttled, expanded, palette, texts) }.getOrNull()
     }
@@ -98,53 +104,58 @@ fun EngineerTaskCard(
     // 形态终判粘滞（仅内存，不落库——spec §10）：FULLPAGE 方向跨合帧保持，INLINE 每帧重判可升格
     var resolvedMode by remember(throttled.taskId, expanded) { mutableStateOf<HtmlCardDisplayMode?>(null) }
     val cd = stringResource(R.string.cd_engineer_task_card)
-    Column(
+    // 单卡容器（两分区改版）：上 = HTML 信息区，下 = 原生动作区，外层统一 r16 裁剪
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
             .semantics { contentDescription = cd },
     ) {
-        if (html == null) {
-            EngineerTaskFallbackCard(throttled)
-        } else {
-            HtmlCard(
-                html = html,
-                // FULLPAGE 粘滞：html 每次重生成都以 meta 复位形态；INLINE 传 null 走重测
-                meta = if (resolvedMode == HtmlCardDisplayMode.FULLPAGE) {
-                    HtmlCardMeta(displayMode = HtmlCardDisplayMode.FULLPAGE)
-                } else {
-                    null
-                },
-                cacheKey = "taskcard:${throttled.taskId}:${if (expanded) "exp" else "col"}",
-                viewportHeightDp = viewportHeightDp,
-                previewViewportHeightDp = previewViewportHeightDp,
-                isListScrolling = isListScrolling,
-                onOpenFullpage = { onOpenFullpage(html, throttled.sourceText) },
-                onDisplayModeResolved = { mode, _ -> resolvedMode = mode },
-                cardColor = MaterialTheme.colorScheme.surfaceContainer,
-                cardShape = if (hasBar) {
-                    RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
-                } else {
-                    RoundedCornerShape(12.dp)
-                },
-                cardTonalElevation = 0.dp,
-                contentPadding = 0.dp,
-                onInlineCardTap = onToggleExpand,
-                inlineTapLabel = stringResource(
-                    if (expanded) R.string.chat_card_collapse_hint else R.string.chat_card_expand_hint
-                ),
-            )
-        }
-        if (hasBar) {
-            EngineerTaskNativeActionBar(
-                task = throttled,
-                actionsEnabled = actionsEnabled,
-                onStop = onStop,
-                onContinue = onContinue,
-                onAbandon = onAbandon,
-                onDeliver = onDeliver,
-                onSkipDeliver = onSkipDeliver,
-                onRetry = onRetry,
-            )
+        Column {
+            if (html == null) {
+                EngineerTaskFallbackCard(throttled)
+            } else {
+                HtmlCard(
+                    html = html,
+                    // FULLPAGE 粘滞：html 每次重生成都以 meta 复位形态；INLINE 传 null 走重测
+                    meta = if (resolvedMode == HtmlCardDisplayMode.FULLPAGE) {
+                        HtmlCardMeta(displayMode = HtmlCardDisplayMode.FULLPAGE)
+                    } else {
+                        null
+                    },
+                    cacheKey = "taskcard:${throttled.taskId}:${if (expanded) "exp" else "col"}",
+                    viewportHeightDp = viewportHeightDp,
+                    previewViewportHeightDp = previewViewportHeightDp,
+                    isListScrolling = isListScrolling,
+                    onOpenFullpage = { onOpenFullpage(html, throttled.sourceText) },
+                    onDisplayModeResolved = { mode, _ -> resolvedMode = mode },
+                    cardColor = MaterialTheme.colorScheme.surfaceContainer,
+                    cardShape = if (hasBar) {
+                        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
+                    } else {
+                        RoundedCornerShape(16.dp)
+                    },
+                    cardTonalElevation = 0.dp,
+                    contentPadding = 0.dp,
+                    onInlineCardTap = onToggleExpand,
+                    inlineTapLabel = stringResource(
+                        if (expanded) R.string.chat_card_collapse_hint else R.string.chat_card_expand_hint
+                    ),
+                )
+            }
+            if (hasBar) {
+                EngineerTaskActionZone(
+                    task = throttled,
+                    actionsEnabled = actionsEnabled,
+                    onStop = onStop,
+                    onContinue = onContinue,
+                    onAbandon = onAbandon,
+                    onDeliver = onDeliver,
+                    onSkipDeliver = onSkipDeliver,
+                    onRetry = onRetry,
+                )
+            }
         }
     }
 }
@@ -200,6 +211,7 @@ private fun engineerTaskTexts(task: EngineerTaskState): EngineerTaskTexts {
     val costText = task.costCents?.let { cents -> stringResource(R.string.chat_task_meta_cost, cents / 100.0) }
     return EngineerTaskTexts(
         titlePrefix = stringResource(R.string.chat_task_title_prefix),
+        badgeLabel = stringResource(R.string.chat_task_badge),
         chipRunning = stringResource(R.string.chat_task_status_running),
         chipAwaiting = stringResource(R.string.chat_task_status_awaiting),
         chipCompleted = stringResource(R.string.chat_task_status_completed),
@@ -237,13 +249,14 @@ private fun engineerTaskTexts(task: EngineerTaskState): EngineerTaskTexts {
 }
 
 /**
- * 原生动作条（spec §7「审批动作条原生外置」；design taskcard/expanded、approval 帧）：
- * surfaceContainerHigh 底、顶角 0 底角 12 与 HTML 卡续接；running=[停止] /
- * approval=[继续 | 到此为止] / deliver=[交付 push | 暂不] / failed=[重试]。
+ * 卡内原生动作区（spec §7 2026-09-27 Muse 修订；design taskcard/collapsed、approval、done 帧）：
+ * surfaceContainerHigh 底 + 顶 hairline（outlineVariant），由外层卡容器统一裁剪底圆角。
+ * 四态映射：running=整宽胶囊[停止]、approval=radio 选项列表（继续执行/到此为止）、
+ * deliver=[暂不|推送交付]双胶囊、failed=[重试]主胶囊。
  */
 @Suppress("LongParameterList")
 @Composable
-private fun EngineerTaskNativeActionBar(
+private fun EngineerTaskActionZone(
     task: EngineerTaskState,
     actionsEnabled: Boolean,
     onStop: () -> Unit,
@@ -253,52 +266,83 @@ private fun EngineerTaskNativeActionBar(
     onSkipDeliver: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp),
-        modifier = Modifier.fillMaxWidth(),
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(scheme.surfaceContainerHigh),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .heightIn(min = 28.dp),
+                .height(1.dp)
+                .background(scheme.outlineVariant),
+        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(
+                if (task.status == EngineerTaskStatus.AWAITING_CONTINUE) 6.dp else 8.dp
+            ),
+            modifier = Modifier.padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = 10.dp,
+                bottom = if (task.status == EngineerTaskStatus.AWAITING_CONTINUE) 12.dp else 14.dp,
+            ),
         ) {
             when (task.status) {
-                EngineerTaskStatus.RUNNING -> SecondaryTaskAction(
+                EngineerTaskStatus.RUNNING -> TaskCapsuleButton(
                     label = stringResource(R.string.chat_task_stop),
+                    primary = false,
                     enabled = actionsEnabled,
                     onClick = onStop,
                 )
                 EngineerTaskStatus.AWAITING_CONTINUE -> {
-                    SecondaryTaskAction(
-                        label = stringResource(R.string.chat_task_abandon),
-                        enabled = actionsEnabled,
-                        onClick = onAbandon,
+                    Text(
+                        text = stringResource(R.string.chat_task_choose_next),
+                        fontSize = 10.sp,
+                        color = scheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.weight(1f))
-                    PrimaryTaskAction(
-                        label = stringResource(R.string.claude_continue),
+                    RadioOptionRow(
+                        label = stringResource(R.string.chat_task_option_continue),
+                        desc = stringResource(R.string.chat_task_option_continue_desc),
                         enabled = actionsEnabled,
                         onClick = onContinue,
                     )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(scheme.outlineVariant),
+                    )
+                    RadioOptionRow(
+                        label = stringResource(R.string.chat_task_abandon),
+                        desc = stringResource(R.string.chat_task_option_abandon_desc),
+                        enabled = actionsEnabled,
+                        onClick = onAbandon,
+                    )
                 }
-                EngineerTaskStatus.AWAITING_DELIVER -> {
-                    SecondaryTaskAction(
+                EngineerTaskStatus.AWAITING_DELIVER -> Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    TaskCapsuleButton(
                         label = stringResource(R.string.chat_task_skip_deliver),
+                        primary = false,
                         enabled = actionsEnabled,
                         onClick = onSkipDeliver,
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(modifier = Modifier.weight(1f))
-                    PrimaryTaskAction(
-                        label = stringResource(R.string.claude_deliver_mode_push),
+                    TaskCapsuleButton(
+                        label = stringResource(R.string.chat_task_deliver_push),
+                        primary = true,
                         enabled = actionsEnabled,
                         onClick = onDeliver,
+                        modifier = Modifier.weight(1f),
                     )
                 }
-                EngineerTaskStatus.FAILED -> SecondaryTaskAction(
+                EngineerTaskStatus.FAILED -> TaskCapsuleButton(
                     label = stringResource(R.string.chat_task_retry),
+                    primary = true,
                     enabled = actionsEnabled,
                     onClick = onRetry,
                 )
@@ -308,45 +352,83 @@ private fun EngineerTaskNativeActionBar(
     }
 }
 
-/** 次级动作：onSurfaceVariant 文字钮（design「停止任务 / 到此为止 / 暂不」）。 */
+/** 整宽胶囊按钮（design BtnStop/BtnLater/BtnDeliver：h36 r18，12sp SemiBold 居中）。 */
 @Composable
-private fun SecondaryTaskAction(label: String, enabled: Boolean, onClick: () -> Unit) {
-    Text(
-        text = label,
-        fontSize = 13.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.5f),
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-    )
-}
-
-/** 主动作 pill（design「继续 / 交付 push」）：primary 底 onPrimary 字，r17。 */
-@Composable
-private fun PrimaryTaskAction(label: String, enabled: Boolean, onClick: () -> Unit) {
+private fun TaskCapsuleButton(
+    label: String,
+    primary: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val alpha = if (enabled) 1f else 0.5f
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(17.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f))
-            .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 16.dp, vertical = 7.dp),
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background((if (primary) scheme.primary else scheme.surfaceVariant).copy(alpha = alpha))
+            .clickable(enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = (if (primary) scheme.onPrimary else scheme.onSurface).copy(alpha = alpha),
         )
     }
 }
 
-/** 模板组装失败的纯文本兜底卡（spec §9.3：状态 + 标题；动作条由父层照常渲染）。 */
+/** 审批选项行（design OptionRow：18dp 描边圆 + 12sp SemiBold 标题 + 10sp 描述，整行可点）。 */
+@Composable
+private fun RadioOptionRow(
+    label: String,
+    desc: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val alpha = if (enabled) 1f else 0.5f
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled) { onClick() }
+            .padding(vertical = 6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(scheme.surfaceContainer)
+                .border(1.dp, scheme.onSurfaceVariant.copy(alpha = alpha), CircleShape),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = scheme.onSurface.copy(alpha = alpha),
+            )
+            Text(
+                text = desc,
+                fontSize = 10.sp,
+                color = scheme.onSurfaceVariant.copy(alpha = alpha),
+            )
+        }
+    }
+}
+
+/** 模板组装失败的纯文本兜底卡（spec §9.3：状态 + 标题；动作区由父层照常渲染）。 */
 @Composable
 private fun EngineerTaskFallbackCard(task: EngineerTaskState) {
+    // 直角矩形：由外层卡容器统一裁剪圆角（两分区改版后与动作区无缝衔接）
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(0.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(12.dp)) {
@@ -388,17 +470,22 @@ internal fun EngineerTaskStatusChip(task: EngineerTaskState) {
             EngineerTaskStatus.FAILED -> R.string.chat_task_status_failed
         }
     }
-    val color = when {
-        task.resolution != null || task.status == EngineerTaskStatus.COMPLETED -> MaterialTheme.colorScheme.onSurfaceVariant
-        task.status == EngineerTaskStatus.FAILED -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
+    // 实心 chip（对齐 design taskcard 四帧与 HTML 模板）：resolved=中性底，failed=error 底，其余=primary 底
+    val (bg, fg) = when {
+        task.resolution != null ->
+            MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurfaceVariant
+        task.status == EngineerTaskStatus.FAILED ->
+            MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
+        else ->
+            MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
     }
-    Surface(shape = RoundedCornerShape(999.dp), color = color.copy(alpha = 0.12f)) {
+    Surface(shape = RoundedCornerShape(6.dp), color = bg) {
         Text(
             text = stringResource(labelRes),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            fontSize = 11.sp,
-            color = color,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
         )
     }
 }

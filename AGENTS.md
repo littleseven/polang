@@ -288,7 +288,7 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **★ Chat 消息模型与渲染宪法（ADR-016，已定稿待实施；整合原 ADR-014）** | `docs/02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md`（Vercel parts 协议 + ChatGPT AST 渲染 + 沙箱卡双形态 + tokens SSOT；**Chat 域消息模型/流式/渲染一切改动的上位约束**；原 ADR-014 富内容渲染已并入——D3 沙箱/D4 iOS/D5 样式分级编号语义不变，编号 014 永久留空）+ spec `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md`（parts 模型/chunk 流式/工具状态机/Turn 聚合/性能顺车修复，M1~M5 分期） |
 | **意图路由契约与路由器（ADR-015，M1/M2 已实施）** | `docs/02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md`（LLM 管意图、代码管策略）+ spec `docs/superpowers/specs/2026-09-25-intent-routing-contract-design.md`（M1 止血 + M2 路由器主干已落地，M3 分支化在途） |
 | **工程师任务卡（P1+任务中心已落地，渲染层改 HTML）** | `docs/superpowers/specs/2026-09-25-engineer-task-card-design.md`（任务卡 + 任务中心页，Muse 范式；US-4~6 回联待 P2 网关改造） |
-| **HTML 卡双形态 + 任务卡 HTML 化（H1 已合 main）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器；H2 任务卡 L1 模板 HTML 化待做；设计稿 Ardot `HtmlCard` 页 8 帧） |
+| **HTML 卡双形态 + 任务卡 HTML 化（H1/H2 已合 main）** | `docs/superpowers/specs/2026-09-26-html-card-two-tier-design.md`（Inline/Fullpage 双形态 + 混合分流 + 全屏查看器；H2 任务卡 L1 模板 HTML 化含 09-27 两分区改版——动作区收进卡内：running 胶囊[停止] / approval radio 选项 / deliver 双胶囊 / failed 主胶囊；设计稿 Ardot `HtmlCard` 页 9 帧） |
 | **用户任务协议 + 任务中心双 Tab（M1 已落地）** | `docs/superpowers/specs/2026-09-26-user-task-protocol-design.md`（`UserTask` 协议 + 混合注册表（Room 元数据 + 内存进度）+ 任务中心双 Tab；M1 = TAG 扫描 + 模型下载，实现见 `androidApp` `domain/usertask/`；M2/M3 = 去重/美学/重聚类） |
 | **任务范式定位升格** | `docs/superpowers/specs/2026-09-26-task-paradigm-positioning-design.md`（PRODUCT.md v3.1 §6.6 任务范式线 + Muse Top5 落位） |
 | **产品定义** | `PRODUCT.md` |

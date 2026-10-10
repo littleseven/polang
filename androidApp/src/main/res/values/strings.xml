@@ -1418,6 +1418,12 @@
     <string name="chat_task_skip_deliver">Not now</string>
     <string name="chat_task_retry">Retry</string>
     <string name="chat_task_stop">Stop task</string>
+    <string name="chat_task_badge">TASK · HTML</string>
+    <string name="chat_task_choose_next">Choose next step</string>
+    <string name="chat_task_option_continue">Continue</string>
+    <string name="chat_task_option_continue_desc">Continue with the current plan until the task is done</string>
+    <string name="chat_task_option_abandon_desc">Keep completed changes and end the task</string>
+    <string name="chat_task_deliver_push">Push delivery</string>
     <string name="chat_task_title_prefix">Engineer task: </string>
     <string name="chat_task_meta_elapsed">Elapsed %1$s</string>
     <string name="chat_task_reason_prefix">Reason: </string>

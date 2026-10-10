@@ -83,6 +83,7 @@ struct EngineerTaskCardView: View {
         let costText = costCents.map { EngineerTaskFormat.costText(cents: $0) }
         return EngineerTaskTexts(
             titlePrefix: L("chat_task_title_prefix"),
+            badgeLabel: L("chat_task_badge"),
             chipRunning: L("chat_task_status_running"),
             chipAwaiting: L("chat_task_status_awaiting"),
             chipCompleted: L("chat_task_status_completed"),

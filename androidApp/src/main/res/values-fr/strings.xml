@@ -1374,6 +1374,12 @@
     <string name="chat_task_skip_deliver">Plus tard</string>
     <string name="chat_task_retry">Réessayer</string>
     <string name="chat_task_stop">Arrêter la tâche</string>
+    <string name="chat_task_badge">TASK · HTML</string>
+    <string name="chat_task_choose_next">Choisir la suite</string>
+    <string name="chat_task_option_continue">Continuer</string>
+    <string name="chat_task_option_continue_desc">Poursuivre le plan actuel jusqu\'à la fin de la tâche</string>
+    <string name="chat_task_option_abandon_desc">Garder les modifications effectuées et terminer la tâche</string>
+    <string name="chat_task_deliver_push">Pousser la livraison</string>
     <string name="chat_task_title_prefix">Tâche d\'ingénieur : </string>
     <string name="chat_task_meta_elapsed">Durée %1$s</string>
     <string name="chat_task_reason_prefix">Motif : </string>

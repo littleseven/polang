@@ -1409,6 +1409,12 @@
     <string name="chat_task_skip_deliver">暂不</string>
     <string name="chat_task_retry">重试</string>
     <string name="chat_task_stop">停止任务</string>
+    <string name="chat_task_badge">TASK · HTML</string>
+    <string name="chat_task_choose_next">请选择下一步</string>
+    <string name="chat_task_option_continue">继续执行</string>
+    <string name="chat_task_option_continue_desc">按当前方案继续，直到任务完成</string>
+    <string name="chat_task_option_abandon_desc">保留已完成的修改，结束任务</string>
+    <string name="chat_task_deliver_push">推送交付</string>
     <string name="chat_task_title_prefix">工程师任务：</string>
     <string name="chat_task_meta_elapsed">耗时 %1$s</string>
     <string name="chat_task_reason_prefix">截断原因：</string>

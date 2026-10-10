@@ -1374,6 +1374,12 @@
     <string name="chat_task_skip_deliver">Ahora no</string>
     <string name="chat_task_retry">Reintentar</string>
     <string name="chat_task_stop">Detener tarea</string>
+    <string name="chat_task_badge">TASK · HTML</string>
+    <string name="chat_task_choose_next">Elige el siguiente paso</string>
+    <string name="chat_task_option_continue">Continuar</string>
+    <string name="chat_task_option_continue_desc">Seguir con el plan actual hasta terminar la tarea</string>
+    <string name="chat_task_option_abandon_desc">Conservar los cambios realizados y terminar la tarea</string>
+    <string name="chat_task_deliver_push">Entregar push</string>
     <string name="chat_task_title_prefix">Tarea de ingeniería: </string>
     <string name="chat_task_meta_elapsed">Tiempo %1$s</string>
     <string name="chat_task_reason_prefix">Motivo: </string>

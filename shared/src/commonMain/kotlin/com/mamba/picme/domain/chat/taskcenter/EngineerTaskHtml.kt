@@ -11,14 +11,16 @@ import com.mamba.picme.domain.chat.EngineerTaskStatus
  *   模板本身可信，**变量插值是唯一注入面**：所有状态文本字段（阶段/事件行/原因/摘要）入模板前
  *   一律经 [escapeHtml] 纯文本转义（spec §11），不经 HtmlCardSanitizer（那是 LLM 产物的清洗轨）。
  * - CSS 变量由 [EngineerTaskPalette] 注入（UI 层从主题运行时取色 → hex），
- *   Light/Dark 随主题切换（design-tokens 单源，与 Ardot taskcard 三帧逐值对齐）。
+ *   Light/Dark 随主题切换（design-tokens 单源，与 Ardot taskcard 四帧逐值对齐）。
  * - 文案由 [EngineerTaskTexts] 预解析传入（各端本地化预解析），组装器只做拼接与转义——纯函数可测。
  * - 产物为完整文档（含 `<html`），宿主管线原样放行；
  *   viewport width=device-width → 1 CSS px ≈ 1 dp/pt（测高/排版基准与 HtmlCard 管线一致）。
+ * - 卡片为上下两分区（2026-09-27 Muse 修订）：本模板只渲染上半信息区（InfoZone）；
+ *   下半动作区（停止/radio 选项/双按钮/重试）由原生层在卡容器内组合（零 JS 桥接红线不动）。
  *
- * 与设计稿（taskcard/collapsed、expanded、approval，Ardot 页 438:2）的既知偏差（状态无对应数据，
- * 设计值为示意）：进度 % 为活动量启发式（[progressFraction]，封顶 80%）；时间线无 ○ 待办行
- * （无阶段计划数据）；diff 行无 +a/−b 行数（状态仅 fileChangeCount，整行 onSurfaceVariant 呈现）。
+ * 与设计稿（taskcard/collapsed、expanded、approval、done，Ardot 页 438:2，帧 438:181/438:208/438:264/444:31）
+ * 的既知偏差（状态无对应数据，设计值为示意）：进度 % 为活动量启发式（[progressFraction]，封顶 80%）；
+ * 时间线无 ○ 待办行（无阶段计划数据）；diff 行无 +a/−b 行数（状态仅 fileChangeCount，整行 onSurfaceVariant 呈现）。
  */
 
 /** 任务卡调色板：hex 字符串（"#1A1A1A" 形态），双模值由 UI 层运行时取色转换。 */
@@ -48,6 +50,8 @@ data class EngineerTaskPalette(
 data class EngineerTaskTexts(
     /** 标题前缀（「工程师任务：」）。 */
     val titlePrefix: String,
+    /** 右上来源徽章（「TASK · HTML」）。默认值为五语同形的固定技术标签，Android 经 stringResource 显式传入。 */
+    val badgeLabel: String = "TASK · HTML",
     val chipRunning: String,
     val chipAwaiting: String,
     val chipCompleted: String,
@@ -104,6 +108,7 @@ object EngineerTaskHtml {
         texts: EngineerTaskTexts,
     ): String {
         val body = StringBuilder()
+        body.append("""<div class="badge-row"><span class="badge">${escapeHtml(texts.badgeLabel)}</span></div>""")
         body.append(headerRow(task, texts))
         when (task.status) {
             EngineerTaskStatus.RUNNING -> {
@@ -174,18 +179,19 @@ object EngineerTaskHtml {
     // ---- 段落构件 ---------------------------------------------------------------
 
     private fun headerRow(task: EngineerTaskState, texts: EngineerTaskTexts): String {
+        // chipBg/chipFg 为 :root CSS 变量名（kebab-case，与 document() 定义严格一致）
         val (chipText, chipBg, chipFg) = when (task.resolution) {
             EngineerTaskResolution.CONTINUED -> Triple(texts.chipResolvedContinued, "neutral", "neutral-fg")
             EngineerTaskResolution.ABANDONED -> Triple(texts.chipResolvedAbandoned, "neutral", "neutral-fg")
             EngineerTaskResolution.DELIVERED -> Triple(texts.chipResolvedDelivered, "neutral", "neutral-fg")
             EngineerTaskResolution.DELIVER_SKIPPED -> Triple(texts.chipResolvedSkipped, "neutral", "neutral-fg")
             null -> when (task.status) {
-                EngineerTaskStatus.RUNNING -> Triple(texts.chipRunning, "primary", "onPrimary")
-                EngineerTaskStatus.COMPLETED -> Triple(texts.chipCompleted, "neutral", "neutral-fg")
+                EngineerTaskStatus.RUNNING -> Triple(texts.chipRunning, "primary", "on-primary")
+                EngineerTaskStatus.COMPLETED -> Triple(texts.chipCompleted, "primary", "on-primary")
                 EngineerTaskStatus.AWAITING_CONTINUE,
                 EngineerTaskStatus.AWAITING_DELIVER,
-                -> Triple(texts.chipAwaiting, "error", "onError")
-                EngineerTaskStatus.FAILED -> Triple(texts.chipFailed, "error", "onError")
+                -> Triple(texts.chipAwaiting, "error", "on-error")
+                EngineerTaskStatus.FAILED -> Triple(texts.chipFailed, "error", "on-error")
             }
         }
         val chipStyle = "background:var(--$chipBg);color:var(--$chipFg)"
@@ -274,25 +280,29 @@ object EngineerTaskHtml {
 --neutral:${palette.neutralChipBg};--neutral-fg:${palette.neutralChipFg}}
 html,body{margin:0;padding:0}
 body{background:var(--card-bg);display:flow-root;overflow-wrap:break-word;
-padding:10px 12px 12px;font-family:system-ui,-apple-system,'PingFang SC','Segoe UI',Roboto,sans-serif;
+padding:12px 16px 14px;font-family:system-ui,-apple-system,'PingFang SC','Segoe UI',Roboto,sans-serif;
 font-size:12.5px;color:var(--on-surface)}
-.hdr{display:flex;align-items:center;gap:8px}
+.badge-row{display:flex;justify-content:flex-end}
+.badge{border-radius:8px;padding:2px 8px;font-size:10px;font-weight:600;
+background:var(--surface-variant);color:var(--on-surface-variant)}
+.hdr{display:flex;align-items:center;gap:8px;margin-top:8px}
 .ico{width:28px;height:28px;border-radius:7px;background:var(--icon-bg);color:var(--primary);
-display:flex;align-items:center;justify-content:center;font-size:14px;flex:none}
-.ttl{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip{flex:none;border-radius:6px;padding:3px 8px;font-size:10.5px}
-.stage{margin-top:8px}
-.small{margin-top:8px;font-size:11px;color:var(--on-surface-variant)}
-.body-line{margin-top:8px}
-.hint{margin-top:8px;font-size:11px;color:var(--on-surface-variant)}
+display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+.ttl{flex:1;min-width:0;font-size:14px;font-weight:600;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{flex:none;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600}
+.stage{margin-top:8px;font-size:12px}
+.small{margin-top:8px;font-size:10px;color:var(--on-surface-variant)}
+.body-line{margin-top:8px;font-size:12px}
+.hint{margin-top:8px;font-size:10px;color:var(--on-surface-variant);text-align:center}
 .ptrack{margin-top:8px;height:4px;border-radius:2px;overflow:hidden}
 .pfill{height:100%;border-radius:2px}
 .eblock{margin-top:8px;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5}
 .divider{margin-top:8px;height:1px}
-.tlrow{display:flex;gap:8px;margin-top:8px;font-size:12px;align-items:baseline}
-.tlmark{width:14px;flex:none;font-size:12px}
-.evcap{margin-top:8px;font-size:11px;color:var(--on-surface-variant)}
-.ev{margin-top:4px;font-size:11px;color:var(--on-surface-variant)}
+.tlrow{display:flex;gap:8px;margin-top:8px;font-size:12px;line-height:16px;align-items:baseline}
+.tlmark{width:14px;flex:none;font-size:12px;text-align:center}
+.evcap{margin-top:8px;font-size:10px;font-weight:600;color:var(--on-surface-variant)}
+.ev{margin-top:4px;font-size:10px;color:var(--on-surface-variant);
+font-family:ui-monospace,Menlo,'Courier New',monospace}
 </style></head><body>$body</body></html>"""
 
     private const val TITLE_SEP = " ｜ "

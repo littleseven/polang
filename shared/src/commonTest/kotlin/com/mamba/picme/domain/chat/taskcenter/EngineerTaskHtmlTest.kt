@@ -40,6 +40,7 @@ class EngineerTaskHtmlTest {
         deliverSummary: String? = null,
     ) = EngineerTaskTexts(
         titlePrefix = "工程师任务：",
+        badgeLabel = "TASK · HTML",
         chipRunning = "进行中",
         chipAwaiting = "待审批",
         chipCompleted = "已完成",
@@ -110,6 +111,8 @@ class EngineerTaskHtmlTest {
     @Test
     fun `collapsed running card contains header stage meta progress and expand hint`() {
         val html = EngineerTaskHtml.assemble(runningTask(), expanded = false, palette = palette, texts = texts())
+        assertTrue(html.contains("TASK · HTML"))
+        assertTrue(html.contains("<div class=\"badge-row\">"))
         assertTrue(html.contains("进行中"))
         assertTrue(html.contains("工程师任务：修复相册扫描时的崩溃"))
         assertTrue(html.contains("Edit · 正在修改 TagScanOrchestrator.kt"))
@@ -120,6 +123,16 @@ class EngineerTaskHtmlTest {
         // 折叠态不含明细段
         assertFalse(html.contains("最近事件"))
         assertFalse(html.contains("<div class=\"divider\""))
+    }
+
+    @Test
+    fun `completed chip uses primary solid style`() {
+        // design taskcard/done 帧：已完成 chip 与进行中同为 primary 实底白字；resolved 裁决态才走 neutral
+        val task = runningTask().copy(status = EngineerTaskStatus.COMPLETED, resultSummary = "修复完成")
+        val html = EngineerTaskHtml.assemble(task, expanded = false, palette = palette, texts = texts())
+        assertTrue(html.contains("已完成"))
+        assertTrue(html.contains("background:var(--primary);color:var(--on-primary)"))
+        assertFalse(html.contains("background:var(--neutral)"))
     }
 
     @Test
