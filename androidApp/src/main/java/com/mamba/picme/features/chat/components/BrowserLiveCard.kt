@@ -1,49 +1,55 @@
 package com.mamba.picme.features.chat.components
 
-import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,18 +62,20 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.ToolPartState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -181,13 +189,23 @@ fun BrowserLiveCard(
     }
 }
 
+/** 5s 无新帧判定为重连中（WS 断连/网络抖动期间给状态反馈；上游帧 500ms 节流，阈值留足裕量）。 */
+private const val FRAME_STALE_MS = 5_000L
+
 /**
- * 浏览器直播帧全屏交互接管（M2 takeover）：
+ * 浏览器直播帧全屏交互接管（M2 takeover → M2.5 重构：三段布局 + 暂停 + 特殊键）：
+ * - 顶栏：返回（左上，替代原右上 Close X）+ 状态胶囊（LIVE/已暂停/会话已结束/重连中 + 页面域名）
+ *   + 暂停/继续 + 模式切换；圆形半透明按钮风格沿用现状。
+ * - 帧区：ContentScale.Fit 居中；结束态叠 30% 黑 + 「会话已结束」水印，暂停态定格 + 「已暂停」水印。
+ * - 底栏（仅 Interact 模式）：IME 附件行（⏎ Enter / Tab / Esc，仅键盘弹出可见）+ 输入行；
+ *   imePadding 只挂底栏，键盘弹出帧区不重排；发送后清空文本不收键盘。
  * 两种模式——
- * - **Interact**（默认）：点按→clickAt、拖动→scroll、底部输入框→typeText；
- *   坐标经 [mapOffsetToPage] 从屏幕映射到 CSS 页面坐标。
- * - **Zoom**：双指 1x~5x 缩放/拖动（原预览行为，供检查细节）。
- * 模式经右上按钮切换；右上另有关闭按钮。黑底/白图标沿用全屏预览惯例。
+ * - **Interact**（默认）：点按→clickAt（[mapOffsetToPage] 屏幕→CSS 页面坐标）、拖动→scroll（20px 节流）、
+ *   双指捏合→自动切 Zoom 模式并完成本次缩放；帧外黑边无操作。
+ * - **Zoom**：双指 1x~5x 缩放 / 单指平移 / 双击复位；底栏隐藏，首次进入显示一次性手势提示。
+ * 系统返回/顶栏返回：Zoom 且 scale>1x 先复位，否则退出。
+ * 暂停 = 客户端停流不停会话：帧定格在暂停时刻，action 全部拦截并 toast「已暂停」；
+ * 暂停期间由调用侧（ChatScreen）经 [onPausedChanged] unwatch 停推流，恢复 re-watch。
  */
 @Composable
 fun BrowserFramePreviewOverlay(
@@ -195,36 +213,112 @@ fun BrowserFramePreviewOverlay(
     sessionId: String,
     frameWidth: Int,
     frameHeight: Int,
+    sessionRunning: Boolean,
+    currentUrl: String?,
+    onPausedChanged: (Boolean) -> Unit,
     onAction: (String, JSONObject) -> Unit,
     onClose: () -> Unit,
 ) {
-    BackHandler { onClose() }
-    val bitmap = rememberBrowserFrameBitmap(frame)
+    val context = LocalContext.current
+    val pausedToast = stringResource(R.string.browser_takeover_paused_toast)
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isZoomMode by remember { mutableStateOf(false) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     var inputText by remember { mutableStateOf("") }
-    // === VNC 推流实验开关（throwaway spike 2026-10-10，验完即删，不合 main）===
-    var showNoVncSpike by remember { mutableStateOf(false) }
+    var isPaused by remember { mutableStateOf(false) }
+    // 暂停时刻定格帧（暂停期间 live 帧即使刷新也不消费）
+    var pausedFrame by remember { mutableStateOf<String?>(null) }
+    val displayFrame = pausedFrame ?: frame
+    val bitmap = rememberBrowserFrameBitmap(displayFrame)
+
+    // 重连启发式：running 且未暂停时，FRAME_STALE_MS 无新帧 → ↻ 重连中
+    var lastFrameAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(frame) { lastFrameAt = System.currentTimeMillis() }
+    var reconnecting by remember { mutableStateOf(false) }
+    LaunchedEffect(sessionRunning, isPaused) {
+        if (sessionRunning && !isPaused) {
+            lastFrameAt = System.currentTimeMillis()
+            while (true) {
+                delay(1000)
+                reconnecting = System.currentTimeMillis() - lastFrameAt > FRAME_STALE_MS
+            }
+        } else {
+            reconnecting = false
+        }
+    }
+
+    // Zoom 模式首次进入显示一次性手势提示（3.5s 自动消失；提前切走则下次进入再提示）
+    var zoomHintShown by rememberSaveable { mutableStateOf(false) }
+    var zoomHintVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(isZoomMode) {
+        if (isZoomMode && !zoomHintShown) {
+            zoomHintShown = true
+            zoomHintVisible = true
+            delay(3500)
+            zoomHintVisible = false
+        }
+    }
+
+    // 暂停期间 action 拦截 + toast「已暂停」（2s 节流防 scroll 手势连续触发 toast 风暴）；
+    // 结束态静默丢弃（定格画面可浏览，水印承担状态提示）。返回是否真正下发。
+    var lastPausedToastAt by remember { mutableLongStateOf(0L) }
+    val tryDispatch: (String, JSONObject) -> Boolean = { action, params ->
+        when {
+            isPaused -> {
+                val now = System.currentTimeMillis()
+                if (now - lastPausedToastAt > 2000) {
+                    lastPausedToastAt = now
+                    Toast.makeText(context, pausedToast, Toast.LENGTH_SHORT).show()
+                }
+                false
+            }
+            sessionRunning -> {
+                onAction(action, params)
+                true
+            }
+            else -> false
+        }
+    }
+
+    // 发送输入：下发成功才清空文本；不收键盘（连续输入场景）
+    val sendInput: () -> Unit = {
+        val text = inputText
+        if (text.isNotBlank() && tryDispatch("typeText", JSONObject().put("text", text))) {
+            inputText = ""
+        }
+    }
+
+    // 返回：Zoom 且 scale>1x 先复位，否则退出
+    val exitOrResetZoom: () -> Unit = {
+        if (isZoomMode && scale > 1.01f) {
+            scale = 1f
+            offset = Offset.Zero
+        } else {
+            onClose()
+        }
+    }
+    BackHandler(onBack = exitOrResetZoom)
+
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val inputEnabled = sessionRunning && !isPaused
+    val pageHost = remember(currentUrl) {
+        currentUrl?.let { url -> runCatching { Uri.parse(url).host }.getOrNull() }
+            ?.takeIf { host -> host.isNotBlank() }
+    }
+    val circleButtonModifier = Modifier
+        .size(40.dp)
+        .clip(CircleShape)
+        .background(Color.Black.copy(alpha = 0.5f))
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClose
-            ),
+            .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        if (showNoVncSpike) {
-            // === VNC 推流实验（throwaway spike 2026-10-10）===
-            // WebView 直接加载 noVNC（HK nginx /novnc-exp/ → Tailscale → xuxing websockify → Xvnc headed Chrome）。
-            // 触摸/缩放由 noVNC 前端自处理；resize=scale 让 1920x1080 桌面适配屏幕。
-            NoVncSpikeWebView(modifier = Modifier.fillMaxSize())
-        } else if (bitmap != null) {
+        if (bitmap != null) {
             val imageModifier = if (isZoomMode) {
                 Modifier
                     .fillMaxSize()
@@ -235,6 +329,12 @@ fun BrowserFramePreviewOverlay(
                             scale = nextScale
                             offset = if (nextScale <= 1.01f) Offset.Zero else offset + pan
                         }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = {
+                            scale = 1f
+                            offset = Offset.Zero
+                        })
                     }
                     .graphicsLayer {
                         scaleX = scale
@@ -253,29 +353,32 @@ fun BrowserFramePreviewOverlay(
                                 tapOffset, containerSize, frameWidth, frameHeight
                             )
                             if (page != null) {
-                                onAction("clickAt", JSONObject()
+                                tryDispatch("clickAt", JSONObject()
                                     .put("x", page.x.toInt())
                                     .put("y", page.y.toInt()))
                             }
                         }
                     }
                     .pointerInput(sessionId) {
+                        // 单指拖动 → scroll（20px 节流，取反：手指下滑=内容跟随=页面上滚 wheel 负值）；
+                        // 双指捏合 → 自动切 Zoom 模式并完成本次缩放
                         var accumulated = Offset.Zero
-                        detectDragGestures(
-                            onDragStart = { accumulated = Offset.Zero },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                accumulated += dragAmount
-                                // 每 20px 发送一次 scroll，避免消息风暴；
-                                // 取反：手指下滑（dy>0）= 内容跟随手指 = 页面上滚（wheel 负值）
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            if (zoom != 1f) {
+                                isZoomMode = true
+                                val nextScale = (scale * zoom).coerceIn(1f, 5f)
+                                scale = nextScale
+                                offset = if (nextScale <= 1.01f) Offset.Zero else offset + pan
+                            } else {
+                                accumulated += pan
                                 if (accumulated.y > 20 || accumulated.y < -20) {
-                                    onAction("scroll", JSONObject()
+                                    tryDispatch("scroll", JSONObject()
                                         .put("dx", 0)
                                         .put("dy", -accumulated.y.toInt()))
                                     accumulated = Offset.Zero
                                 }
                             }
-                        )
+                        }
                     }
             }
 
@@ -287,39 +390,71 @@ fun BrowserFramePreviewOverlay(
             )
         }
 
-        // 顶部工具栏：关闭 + 模式切换
+        // 终态/暂停水印（无 pointerInput，不拦截帧手势）
+        if (!sessionRunning) {
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f)))
+            TakeoverWatermark(text = stringResource(R.string.browser_takeover_status_ended))
+        } else if (isPaused) {
+            TakeoverWatermark(text = stringResource(R.string.browser_takeover_status_paused))
+        }
+
+        // 顶栏：返回（左）+ 状态胶囊（中）+ 暂停/继续 + 模式切换（右）
         Row(
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
                 .statusBarsPadding()
                 .padding(Spacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            // === VNC 推流实验切换（throwaway spike 2026-10-10，验完即删）===
-            TextButton(
-                onClick = { showNoVncSpike = !showNoVncSpike },
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-            ) {
-                Text(
-                    text = "VNC",
-                    color = if (showNoVncSpike) Color.Green else Color.White
+            IconButton(onClick = exitOrResetZoom, modifier = circleButtonModifier) {
+                Icon(
+                    imageVector = Icons.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.back),
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
             }
-            // 模式切换
+            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.Center) {
+                TakeoverStatusPill(
+                    sessionRunning = sessionRunning,
+                    isPaused = isPaused,
+                    reconnecting = reconnecting,
+                    pageHost = pageHost,
+                )
+            }
+            if (sessionRunning) {
+                IconButton(
+                    onClick = {
+                        val next = !isPaused
+                        pausedFrame = if (next) displayFrame else null
+                        isPaused = next
+                        onPausedChanged(next)
+                    },
+                    modifier = circleButtonModifier
+                ) {
+                    Icon(
+                        imageVector = if (isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                        contentDescription = stringResource(
+                            if (isPaused) R.string.browser_takeover_resume else R.string.browser_takeover_pause
+                        ),
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
             IconButton(
                 onClick = {
                     isZoomMode = !isZoomMode
                     if (!isZoomMode) { scale = 1f; offset = Offset.Zero }
                 },
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
+                modifier = circleButtonModifier
             ) {
                 Icon(
-                    imageVector = if (isZoomMode) Icons.Rounded.PlayArrow else Icons.Rounded.ZoomIn,
+                    imageVector = if (isZoomMode) Icons.Rounded.TouchApp else Icons.Rounded.ZoomIn,
                     contentDescription = if (isZoomMode) {
                         stringResource(R.string.browser_takeover_mode_interact)
                     } else {
@@ -329,60 +464,161 @@ fun BrowserFramePreviewOverlay(
                     modifier = Modifier.size(24.dp)
                 )
             }
-            // 关闭
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = stringResource(R.string.close),
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
         }
 
-        // 底部输入区（仅 Interact 模式；noVNC 实验态由 noVNC 前端自处理输入）
-        if (!isZoomMode && !showNoVncSpike) {
-            Row(
+        // 底栏（仅 Interact 模式）：IME 附件行（仅键盘弹出可见）+ 输入行；
+        // imePadding 只挂底栏 → 键盘弹出帧区不重排（输入行浮在黑底上）
+        if (!isZoomMode) {
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .imePadding()
                     .navigationBarsPadding()
-                    .padding(Spacing.md)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(R.string.browser_takeover_input_hint), color = Color.Gray) },
-                    singleLine = true,
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.Gray,
-                    )
-                )
-                TextButton(
-                    onClick = {
-                        if (inputText.isNotBlank()) {
-                            onAction("typeText", JSONObject().put("text", inputText))
-                            inputText = ""
+                if (imeVisible && inputEnabled) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_enter)) {
+                            tryDispatch("key", JSONObject().put("key", "Enter"))
                         }
-                    },
-                    enabled = inputText.isNotBlank()
+                        TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_tab)) {
+                            tryDispatch("key", JSONObject().put("key", "Tab"))
+                        }
+                        TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_esc)) {
+                            tryDispatch("key", JSONObject().put("key", "Escape"))
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(stringResource(R.string.browser_takeover_send), color = Color.White)
+                    OutlinedTextField(
+                        value = inputText,
+                        onValueChange = { value -> inputText = value },
+                        modifier = Modifier.weight(1f),
+                        enabled = inputEnabled,
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.browser_takeover_input_hint),
+                                color = if (inputEnabled) Color.Gray else Color.DarkGray
+                            )
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { sendInput() }),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            disabledTextColor = Color.Gray,
+                            focusedBorderColor = Color.White,
+                            unfocusedBorderColor = Color.Gray,
+                            disabledBorderColor = Color.DarkGray,
+                        )
+                    )
+                    TextButton(
+                        onClick = sendInput,
+                        enabled = inputEnabled && inputText.isNotBlank()
+                    ) {
+                        Text(
+                            stringResource(R.string.browser_takeover_send),
+                            color = if (inputEnabled) Color.White else Color.Gray
+                        )
+                    }
                 }
             }
         }
+
+        // Zoom 模式一次性手势提示
+        if (zoomHintVisible) {
+            Text(
+                text = stringResource(R.string.browser_takeover_zoom_hint),
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(Spacing.xl)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+            )
+        }
+    }
+}
+
+/** 顶栏状态胶囊：● LIVE（绿）/ ⏸ 已暂停（黄）/ ■ 会话已结束（灰）/ ↻ 重连中（橙），后接页面域名。 */
+@Composable
+private fun TakeoverStatusPill(
+    sessionRunning: Boolean,
+    isPaused: Boolean,
+    reconnecting: Boolean,
+    pageHost: String?,
+) {
+    val (dotColor, labelRes) = when {
+        !sessionRunning -> Color.Gray to R.string.browser_takeover_status_ended
+        isPaused -> Color(0xFFFFC107) to R.string.browser_takeover_status_paused
+        reconnecting -> Color(0xFFFF9800) to R.string.browser_takeover_status_reconnecting
+        else -> Color(0xFF4CAF50) to R.string.browser_takeover_status_live
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color.Black.copy(alpha = 0.5f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(modifier = Modifier
+            .size(8.dp)
+            .clip(CircleShape)
+            .background(dotColor))
+        Text(
+            text = stringResource(labelRes),
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+        )
+        if (pageHost != null) {
+            Text(
+                text = "· $pageHost",
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** 帧区中央水印（结束态/暂停态）。 */
+@Composable
+private fun TakeoverWatermark(text: String) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = text,
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .clip(RoundedCornerShape(percent = 50))
+                .background(Color.Black.copy(alpha = 0.5f))
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+        )
+    }
+}
+
+/** IME 附件行特殊键按钮（点击不收键盘——TextButton 不持焦点，键盘保持弹出）。 */
+@Composable
+private fun TakeoverKeyButton(label: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color.Black.copy(alpha = 0.5f))
+    ) {
+        Text(text = label, color = Color.White, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -430,31 +666,4 @@ private fun rememberBrowserFrameBitmap(frameBase64: String): ImageBitmap? {
         }
     }
     return bitmap
-}
-
-// === VNC 推流实验（throwaway spike 2026-10-10，验完即删，不合 main）===
-// 链路：App WebView → https://api.polang.net/novnc-exp/（HK nginx，正式证书）
-//   → wss /novnc-exp/websockify?t=***（token 门禁）→ Tailscale → xuxing websockify:6080 → Xvnc:99 headed Chrome。
-// 实验结论用于决定 headed/VNC 路线是否值得做正式实现（对比现有 CDP JPEG 管线）。
-private const val NOVNC_SPIKE_URL =
-    "https://api.polang.net/novnc-exp/vnc_lite.html" +
-        "?resize=scale" +
-        "&path=novnc-exp/websockify?t=vncexp26" +
-        "&password=PoVNC26x"
-
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-private fun NoVncSpikeWebView(modifier: Modifier = Modifier) {
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                webViewClient = WebViewClient()
-                loadUrl(NOVNC_SPIKE_URL)
-            }
-        },
-        onRelease = { webView -> webView.destroy() },
-        modifier = modifier
-    )
 }

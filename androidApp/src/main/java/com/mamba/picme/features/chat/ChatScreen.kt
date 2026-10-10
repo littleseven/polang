@@ -930,8 +930,11 @@ fun ChatScreen(
                 val sessionRunning = livePart != null &&
                     livePart.state != ToolPartState.OUTPUT_AVAILABLE &&
                     livePart.state != ToolPartState.OUTPUT_ERROR
-                LaunchedEffect(preview.sessionId, sessionRunning) {
-                    if (sessionRunning) {
+                // 暂停 = 客户端停流不停会话：overlay 本地暂停态经 onPausedChanged 同步，
+                // paused 期间 unwatch 停 WS 推流（帧定格在暂停时刻），恢复 re-watch
+                var previewPaused by remember(preview.sessionId) { mutableStateOf(false) }
+                LaunchedEffect(preview.sessionId, sessionRunning, previewPaused) {
+                    if (sessionRunning && !previewPaused) {
                         viewModel.watchBrowserSession(preview.sessionId)
                     } else {
                         viewModel.unwatchBrowserSession(preview.sessionId)
@@ -940,15 +943,25 @@ fun ChatScreen(
                 DisposableEffect(preview.sessionId) {
                     onDispose { viewModel.unwatchBrowserSession(preview.sessionId) }
                 }
+                val exitHintRunning = stringResource(R.string.browser_takeover_exit_hint_running)
                 BrowserFramePreviewOverlay(
                     frame = livePart?.frameJpegBase64 ?: preview.frameBase64,
                     sessionId = preview.sessionId,
                     frameWidth = preview.frameWidth,
                     frameHeight = preview.frameHeight,
+                    sessionRunning = sessionRunning,
+                    currentUrl = livePart?.currentUrl,
+                    onPausedChanged = { paused -> previewPaused = paused },
                     onAction = { action, params ->
                         viewModel.sendBrowserAction(preview.sessionId, action, params)
                     },
-                    onClose = { browserFramePreview = null }
+                    onClose = {
+                        // 会话仍 running 时退出：提示会话存活、可从卡片重新进入
+                        if (sessionRunning) {
+                            Toast.makeText(context, exitHintRunning, Toast.LENGTH_SHORT).show()
+                        }
+                        browserFramePreview = null
+                    }
                 )
             }
 
