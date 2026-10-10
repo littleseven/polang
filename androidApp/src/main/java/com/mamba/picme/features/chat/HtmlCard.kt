@@ -174,6 +174,12 @@ fun HtmlCard(
     onInlineCardTap: (() -> Unit)? = null,
     /** INLINE 触控层的 onClickLabel（无障碍）。 */
     inlineTapLabel: String? = null,
+    /**
+     * 外层 Pager 横滑锁（手势期禁页面切换）：交互态卡片（非预览态）内按下置 true、
+     * 抬手/取消置 false。宿主据此关闭 HorizontalPager 的 userScrollEnabled——
+     * 确定性消除卡内横滑与页面切换的手势竞争（consume 竞态方案的兜底替代）。
+     */
+    onPagerSwipeLock: ((Boolean) -> Unit)? = null,
 ) {
     val configuration = LocalConfiguration.current
     val effectiveViewportHeightDp =
@@ -293,7 +299,8 @@ fun HtmlCard(
                         }
                     },
                     onOpenLink = onOpenLink,
-                    onRenderFailed = { renderFailed = true }
+                    onRenderFailed = { renderFailed = true },
+                    onPagerSwipeLock = onPagerSwipeLock
                 )
             }
             if (isFullpage) {
@@ -443,52 +450,37 @@ private fun HtmlWebView(
     previewMode: Boolean = false,
     onContentHeightCssPx: ((Int) -> Unit)? = null,
     onOpenLink: ((String) -> Unit)? = null,
-    onRenderFailed: (() -> Unit)? = null
+    onRenderFailed: (() -> Unit)? = null,
+    onPagerSwipeLock: ((Boolean) -> Unit)? = null
 ) {
-    // WebView 引用：Compose 层水平手势消费后经 scrollBy 手动转发滚动
-    var webViewRef by remember { mutableStateOf<ChatHtmlWebView?>(null) }
+    // lambda 每次重组都是新实例，用 rememberUpdatedState 防抖 pointerInput 重启
+    val currentSwipeLock by rememberUpdatedState(onPagerSwipeLock)
 
     AndroidView(
         modifier = modifier
-            .pointerInput(Unit) {
-                // 水平手势消费 + scrollBy 转发：
-                // Compose 事件分发三阶段——Initial（外→内）、Main（内→外）、Final（外→内）。
-                // HorizontalPager 的拖拽跟踪在 Initial pass 开始，如果在 Main pass 才 consume，
-                // Pager 已经开始了拖拽，来不及阻止。必须在 Initial pass 中消费水平手势。
-                // 同时经 webViewRef.scrollBy() 手动转发水平位移给 WebView 内容，
-                // 实现卡内横滑组件（图片轮播/横滚 Tab）的正常滚动。
-                // 竖直拖动不消费——LazyColumn 正常接管。
-                // 点击不消费——WebView 内点击/超链接正常。
-                //
-                // 用 forEachGesture 而非 awaitEachGesture：awaitEachGesture 内部从 Main pass
-                // 开始，会错过 Initial pass 中 HorizontalPager 的拖拽起始事件。
-                // forEachGesture + awaitPointerEventScope 让我们从 Initial pass 开始拦截。
+            .pointerInput(previewMode) {
+                // 外层 Pager 横滑锁（确定性方案，替代 consume 竞态）：
+                // 交互态卡片内按下即禁 HorizontalPager 页面切换，抬手/取消恢复——
+                // 卡内横滑组件（图片轮播/横滚 Tab）由 WebView 原生滚动接管，
+                // 页面切换手势在卡片上被整体忽略（产品要求）。
+                // 不 consume 任何事件：WebView 点击/横滑/JS 交互全部原生直达；
+                // 竖直滚动仍由 ChatHtmlWebView.onTouchEvent 让渡给 LazyColumn。
+                // 预览态（previewMode）WebView 本就不可触摸，无需锁。
+                if (previewMode) return@pointerInput
                 forEachGesture {
                     awaitPointerEventScope {
-                        // Initial pass：等待手指按下（在 HorizontalPager 之前）
-                        val downInitial = awaitPointerEvent(PointerEventPass.Initial)
-                        if (downInitial.changes.none { it.changedToDown() }) return@awaitPointerEventScope
+                        // Initial pass（外→内）等按下，尽早锁
+                        val down = awaitPointerEvent(PointerEventPass.Initial)
+                        if (down.changes.none { it.changedToDown() }) return@awaitPointerEventScope
 
-                        while (true) {
-                            // Initial pass：在 HorizontalPager 之前拦截水平手势
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            val change = event.changes.firstOrNull() ?: break
-
-                            if (change.changedToUp()) break
-
-                            if (change.pressed) {
-                                val dragAmount = change.position - change.previousPosition
-                                if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y)) {
-                                    // 水平拖动：在 Initial pass consume，
-                                    // HorizontalPager 在 Initial pass 中就看不到手势，无法开始拖拽
-                                    change.consume()
-                                    // 手动转发水平滚动给 WebView 内容
-                                    webViewRef?.scrollBy(
-                                        (-dragAmount.x).toInt(),
-                                        0
-                                    )
-                                }
-                            }
+                        currentSwipeLock?.invoke(true)
+                        try {
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                            } while (event.changes.any { it.pressed })
+                        } finally {
+                            // 抬手/手势取消/重组——任何路径都必须解锁，防 Pager 永久卡死
+                            currentSwipeLock?.invoke(false)
                         }
                     }
                 }
@@ -497,16 +489,12 @@ private fun HtmlWebView(
             ChatHtmlWebView(context).apply {
                 applyCardSandbox(measureEnabled, onContentHeightCssPx, onOpenLink, onRenderFailed)
                 loadHtmlOnce(html)
-                webViewRef = this
             }
         },
         update = { webView ->
             // 预览态禁触摸/聚焦（JS 仍运行）；inline 态恢复默认可交互
             webView.isFocusable = !previewMode
             webView.isClickable = !previewMode
-            if (webView is ChatHtmlWebView) {
-                webViewRef = webView
-            }
             if (webView.tag != html) {
                 webView.loadHtmlOnce(html)
             }
@@ -514,9 +502,6 @@ private fun HtmlWebView(
         onRelease = { webView ->
             webView.stopLoading()
             webView.destroy()
-            if (webViewRef === webView) {
-                webViewRef = null
-            }
         }
     )
 }
@@ -544,18 +529,14 @@ private fun WebView.loadHtmlOnce(html: String) {
  * - 内容可竖滚（异常兜底）：保持 isNestedScrollingEnabled=false，
  *   WebView 自滚、父链无感知（防 LazyColumn pre-scroll 抢占 delta 导致卡死）。
  *
- * 水平方向（2026-10-09）：HTML 卡可能含横滑组件（图片轮播/横滚 Tab/拖拽滑块），
+ * 水平方向（2026-10-09 起 3 次迭代）：HTML 卡可能含横滑组件（图片轮播/横滚 Tab），
  * 与外层 HorizontalPager 页面切换存在手势竞争。
  *
- * 第一次修复尝试在 onTouchEvent 中用 requestDisallowInterceptTouchEvent 阻止父链——
- * **无效**，因为 Compose 组件（LazyColumn/HorizontalPager）不走传统 ViewGroup 的
- * onInterceptTouchEvent 机制，requestDisallowInterceptTouchEvent 对 Compose 父链无效。
- *
- * 正确方案：双管齐下——
- * 1. Compose 层：AndroidView modifier 上挂 pointerInput handler，检测水平拖动，
- *    当 WebView 可水平滚动时 consume() 手势（阻止传播到外层 HorizontalPager）；
- * 2. View 层：dispatchTouchEvent 中检测水平滑动方向，当 WebView 可水平滚动时
- *    直接消费事件（不调用 super），确保 WebView 内部横滑组件收到完整手势流。
+ * 演进：① requestDisallowInterceptTouchEvent——对 Compose 父链无效（Compose 不走
+ * ViewGroup onInterceptTouchEvent）；② Compose 层 pointerInput consume + scrollBy 转发——
+ * 与 Pager 拖拽跟踪存在 pass 时序竞态，不可靠；③ 终案 = 按下即禁 Pager 横滑
+ * （onPagerSwipeLock → userScrollEnabled=false），WebView 原生接管卡内横滑。
+ * 本类的水平分支仅作兜底（对 Compose 无效，对嵌套在传统 ViewGroup 的场景仍有效）。
  */
 private class ChatHtmlWebView(context: Context) : WebView(context) {
 

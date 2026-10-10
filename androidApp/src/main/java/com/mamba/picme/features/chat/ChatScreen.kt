@@ -346,9 +346,13 @@ fun ChatScreen(
         previewChartSvg != null || browserFramePreview != null || expandedTable != null ||
         previewLinkUrl != null || fullpageHtmlCard != null
 
-    // 上报外层 Pager 横滑使能：任一全屏预览打开时禁用，避免与内层预览滑动冲突
-    LaunchedEffect(anyPreviewOpen) {
-        onHorizontalSwipeEnabledChange(!anyPreviewOpen)
+    // HTML 交互卡手势期锁（2026-10-10）：卡内按下即禁外层 Pager 横滑，抬手恢复——
+    // 确定性消除卡内横滑组件与页面切换的手势竞争（consume 竞态方案已废弃）
+    var htmlCardGestureActive by remember { mutableStateOf(false) }
+
+    // 上报外层 Pager 横滑使能：任一全屏预览打开 或 HTML 卡手势进行中 时禁用
+    LaunchedEffect(anyPreviewOpen, htmlCardGestureActive) {
+        onHorizontalSwipeEnabledChange(!anyPreviewOpen && !htmlCardGestureActive)
     }
 
     // 媒体库全量数据：用于感知删除完成并同步清理 preview/chat 消息
@@ -704,7 +708,8 @@ fun ChatScreen(
                                         },
                                         onDisplayModeResolved = { mode, measuredPx ->
                                             viewModel.persistHtmlCardDisplayMode(item.message.id, mode, measuredPx)
-                                        }
+                                        },
+                                        onPagerSwipeLock = { locked -> htmlCardGestureActive = locked }
                                     )
                                 }
                                 ChatListItem.TYPE_BROWSER_LIVE -> {
