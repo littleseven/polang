@@ -40,6 +40,7 @@ function fakePage() {
     },
     keyboard: {
       type: async (t) => { calls.push(`keyboard.type:${t}`); },
+      press: async (k) => { calls.push(`keyboard.press:${k}`); },
     },
     context: () => ({
       newCDPSession: async () => ({
@@ -224,6 +225,32 @@ test('drag sends mouse move/down/up sequence', async () => {
   await mgr.close(s.id);
 });
 
+test('key presses whitelisted special key', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  const r = await mgr.act(s, { action: 'key', key: 'Enter' });
+  assert.strictEqual(r.status, 'ok');
+  assert.ok(page.calls.includes('keyboard.press:Enter'));
+  await mgr.close(s.id);
+});
+
+test('key rejects non-whitelisted key names', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await assert.rejects(
+    () => mgr.act(s, { action: 'key', key: 'Delete' }),
+    (e) => e.code === 'invalid_key'
+  );
+  await assert.rejects(
+    () => mgr.act(s, { action: 'key' }),
+    (e) => e.code === 'invalid_key'
+  );
+  assert.ok(!page.calls.some((c) => c.startsWith('keyboard.press:')));
+  await mgr.close(s.id);
+});
+
 // ── CDP Screencast ──────────────────────────────────────────────────
 
 test('startScreencast is idempotent and stopScreencast cleans up', async () => {
@@ -267,6 +294,39 @@ test('screencast listener receives frames', async () => {
   assert.strictEqual(frames.length, 1);
   assert.strictEqual(frames[0].b64, Buffer.from('fake-jpeg').toString('base64'));
   assert.strictEqual(frames[0].meta.seq, 42);
+  await mgr.close(s.id);
+});
+
+test('screencast frames touch lastActivity with 30s throttle (pure watch counts as active)', async () => {
+  const page = fakePage();
+  let frameHandler = null;
+  page.context = () => ({
+    newCDPSession: async () => ({
+      on: (event, handler) => { if (event === 'Page.screencastFrame') frameHandler = handler; },
+      send: async () => {},
+      detach: async () => {},
+    }),
+  });
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.startScreencast(s.id);
+  const fireFrame = () => frameHandler({
+    data: Buffer.from('fake-jpeg').toString('base64'),
+    sessionId: 1,
+    metadata: { seq: 1, width: 1280, height: 720 },
+  });
+  // 30s 节流窗内的帧不 touch
+  const t0 = s.lastActivity;
+  fireFrame();
+  assert.strictEqual(s.lastActivity, t0);
+  // 闲置超 30s 后的帧触发 touch（纯 watch 保活，防 idle reap 误杀观看中会话）
+  s.lastActivity = Date.now() - 31_000;
+  fireFrame();
+  const t1 = s.lastActivity;
+  assert.ok(Date.now() - t1 < 1000);
+  // 紧接着的下一帧落在节流窗内，不再 touch
+  fireFrame();
+  assert.strictEqual(s.lastActivity, t1);
   await mgr.close(s.id);
 });
 

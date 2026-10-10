@@ -37,6 +37,12 @@ class BrowserBridgeClient(
             header("X-Bridge-Token", bridgeToken)
         }
 
+    /** 轻量活性探测（busy 自愈用）：bridge 不可达时抛异常，由调用方保守处理。 */
+    suspend fun sessionStatus(sessionId: String): HttpResponse =
+        httpClient.get("$baseUrl/session/$sessionId/status") {
+            header("X-Bridge-Token", bridgeToken)
+        }
+
     /** 构造 bridge WebSocket URL（WS 代理用）；bridge 不可用时返回 null。 */
     fun wsUrl(sessionId: String): String? {
         if (!available) return null

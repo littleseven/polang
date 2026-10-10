@@ -7,8 +7,9 @@ const { SessionManager, PoolExhaustedError, SessionExpiredError, ActionFailedErr
 const { SsrfError } = require('./ssrf');
 const { setupWebSocket } = require('./ws');
 
-const manager = new SessionManager(config);
-const expectedTokenHash = crypto.createHash('sha256').update(config.token).digest();
+/** 构造 HTTP server（manager 注入便于测试）；listen 由入口段负责。 */
+function createServer(manager, config) {
+  const expectedTokenHash = crypto.createHash('sha256').update(config.token).digest();
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -77,7 +78,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    const m = path.match(/^\/session\/([0-9a-f-]{36})(\/action|\/frame|\/close)?$/);
+    const m = path.match(/^\/session\/([0-9a-f-]{36})(\/action|\/frame|\/close|\/status)?$/);
     if (!m) return sendJson(res, 404, { error: 'not_found' });
     const [, id, suffix] = m;
 
@@ -112,6 +113,21 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (req.method === 'GET' && suffix === '/status') {
+      // 轻量活性探测（不抓帧不串行排队）：供网关 busy 自愈判断租约对应会话是否真活
+      try {
+        const session = manager.get(id);
+        return sendJson(res, 200, {
+          status: 'ok',
+          sessionId: session.id,
+          currentUrl: session.page.url(),
+          lastActivity: session.lastActivity,
+        });
+      } catch (err) {
+        return sendJson(res, 200, failPayload(null, err));
+      }
+    }
+
     if (req.method === 'POST' && suffix === '/close') {
       const session = manager.sessions.get(id);
       const actionCount = session ? session.actionCount : 0;
@@ -136,8 +152,18 @@ server.keepAliveTimeout = 5_000;
 // WebSocket 推流（screencast 模式）
 setupWebSocket(server, manager, config);
 
-setInterval(() => { manager.reap().catch(() => {}); }, 30_000).unref();
+  return server;
+}
 
-server.listen(config.port, config.bind, () => {
-  console.log(`browser-agent-bridge listening on ${config.bind}:${config.port}`);
-});
+if (require.main === module) {
+  const manager = new SessionManager(config);
+  const server = createServer(manager, config);
+
+  setInterval(() => { manager.reap().catch(() => {}); }, 30_000).unref();
+
+  server.listen(config.port, config.bind, () => {
+    console.log(`browser-agent-bridge listening on ${config.bind}:${config.port}`);
+  });
+}
+
+module.exports = { createServer };

@@ -14,6 +14,12 @@ class ActionFailedError extends Error {
   constructor(code, reason) { super(`${code}: ${reason}`); this.code = code; }
 }
 
+/** key action 白名单：仅放行客户端全屏接管需要的特殊键，拒绝任意键名防注入。 */
+const KEY_WHITELIST = new Set(['Enter', 'Tab', 'Escape']);
+
+/** screencast 帧回调的 lastActivity touch 节流间隔（纯 watch 保活，30s 最多一次）。 */
+const SCREENCAST_TOUCH_THROTTLE_MS = 30_000;
+
 class Session {
   constructor(id, context, page) {
     this.id = id;
@@ -139,6 +145,7 @@ class SessionManager {
       else if (action === 'typeText') await this._typeText(session, body);
       else if (action === 'scroll') await this._scroll(session, body);
       else if (action === 'drag') await this._drag(session, body);
+      else if (action === 'key') await this._key(session, body);
       else if (action === 'extract') ({ textExtract, elements } = await this._extract(session));
       else if (action === 'screenshot') { /* 帧逻辑统一在下方 */ }
       else throw new ActionFailedError('unknown_action', `unknown action: ${action}`);
@@ -185,6 +192,15 @@ class SessionManager {
     const text = String(body.text == null ? '' : body.text);
     if (!text) return;
     await session.page.keyboard.type(text);
+  }
+
+  /** 特殊键（接管模式）：白名单校验后 keyboard.press。 */
+  async _key(session, body) {
+    const key = String(body.key == null ? '' : body.key);
+    if (!KEY_WHITELIST.has(key)) {
+      throw new ActionFailedError('invalid_key', `key 仅支持: ${[...KEY_WHITELIST].join(' / ')}`);
+    }
+    await session.page.keyboard.press(key);
   }
 
   /** 滚轮（接管模式）：dx/dy 为像素增量。 */
@@ -264,11 +280,17 @@ class SessionManager {
     cdp.on('Page.screencastFrame', (event) => {
       const frameB64 = event.data;
       session.lastGoodFrame = frameB64;
+      // 纯 watch（只看不操作）也算活跃：节流 touch（30s 最多一次），防 idle reap 误杀
+      // 观看中的会话。已知限制：客户端暂停（unwatch）后无帧回调即无 touch 源，
+      // 暂停 > idleTimeoutMs（默认 120s）会话仍会被回收——resume 后发现死了由
+      // 网关 busy 自愈（session_expired → 释放重开）覆盖，客户端仅需记日志。
+      const now = Date.now();
+      if (now - session.lastActivity >= SCREENCAST_TOUCH_THROTTLE_MS) session.touch();
       const meta = {
         seq: event.metadata?.seq || 0,
         width: event.metadata?.width || this.config.viewport.width,
         height: event.metadata?.height || this.config.viewport.height,
-        timestamp: Date.now(),
+        timestamp: now,
       };
       for (const listener of session.screencastListeners) {
         try { listener(frameB64, meta); } catch { /* listener 故障隔离 */ }

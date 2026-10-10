@@ -11,12 +11,16 @@ token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入
 ## 端点契约
 
 - HTTP 端点：`POST /session`（open）、`POST /session/{id}/action`、`GET /session/{id}/frame`、
-  `POST /session/{id}/close`、`GET /healthz`；全部要求 `X-Bridge-Token` 头。
+  `GET /session/{id}/status`（轻量活性探测，返回 `{status:"ok",sessionId,currentUrl,lastActivity}`，
+  不存在/已死回 session_expired；供网关 busy 自愈）、`POST /session/{id}/close`、`GET /healthz`；
+  全部要求 `X-Bridge-Token` 头。
 - WS 端点（M2 推流通道）：`GET /ws?sessionId=..&token=..`——token 与 HTTP `X-Bridge-Token`
   同源（SHA-256 时序安全比较，不符 401 断连）；连接即启动 CDP `Page.startScreencast`
   （幂等；jpeg quality 60 / maxWidth·maxHeight 1280·720 / everyNthFrame 2，config.js
   `screencast*` 四键可调）；客户端发 `{"type":"watch_stop"}` 或最后一个听众断开时自动停
-  screencast（无消费者不空抓）。Server→Client：帧 = binary JPEG 字节 + text
+  screencast（无消费者不空抓）。帧回调对 lastActivity 做节流 touch（30s 最多一次）——纯 watch
+  （只看不操作）计为活跃，不会被 idle reap 误杀；但客户端暂停（unwatch）期间无 touch 源，
+  暂停 > idleTimeoutMs（默认 120s）会话仍会被回收，resume 后由网关 busy 自愈重开。Server→Client：帧 = binary JPEG 字节 + text
   `{"type":"frame_meta",...}`、动作结果 = text `{"type":"action_result",...}`、异常 = text
   `{"type":"error",...}`（code：bad_request/session_expired/screencast_failed）；
   Client→Server：`{"type":"action","actionId","action":{...}}`（action 体与 HTTP
@@ -24,9 +28,10 @@ token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入
 - 域名结果一律 HTTP 200 + JSON `status`（ok/action_failed/pool_exhausted/session_expired）。
 - 请求体超限（>64KB）时 `req.destroy()` 先于响应发出，客户端可能观察到连接重置而非 413——
   应将 body 发送过程中的 reset 视为 413 等价。
-- 动作清单：navigate/click/type/extract/screenshot（HTTP 契约）+ clickAt/typeText/scroll/drag
+- 动作清单：navigate/click/type/extract/screenshot（HTTP 契约）+ clickAt/typeText/scroll/drag/key
   （M2 接管动作，仅 WS 通道使用，坐标为 CSS 页面坐标：clickAt 鼠标点 (x,y)、typeText 全局
-  键盘输入 text、scroll 滚轮增量 (dx,dy)、drag (fromX,fromY)→(toX,toY) 连续拖拽）。
+  键盘输入 text、scroll 滚轮增量 (dx,dy)、drag (fromX,fromY)→(toX,toY) 连续拖拽、key 特殊键
+  `keyboard.press`，key 参数白名单 Enter/Tab/Escape，其余键名回 invalid_key 防注入）。
 - click/type 定位三模式：index（extract 返回的元素序号，LLM 首选）/ targetText / selector。
 
 ## 已知接受风险（M1，2026-10-06 审查记录）

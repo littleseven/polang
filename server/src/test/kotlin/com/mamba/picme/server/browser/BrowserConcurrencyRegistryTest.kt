@@ -76,4 +76,25 @@ class BrowserConcurrencyRegistryTest {
         assertFalse(reg.tryAcquire("u2", now = 62_000L))
         assertTrue(reg.tryAcquire("u3", now = 62_000L)) // 清扫正常，第三人可进
     }
+
+    @Test
+    fun `default lease outlives bridge hardCap 10min`() {
+        // 不变式：默认租约必须 > bridge 会话 hardCap（10min），否则活跃会话会形成双活窗口
+        val reg = BrowserConcurrencyRegistry()
+        assertTrue(reg.tryAcquire("u1", now = 1_000L))
+        assertFalse(reg.tryAcquire("u1", now = 1_000L + 10 * 60_000L)) // hardCap 时点租约仍在
+        assertTrue(reg.tryAcquire("u1", now = 1_000L + 16 * 60_000L))  // 15min 后才过期
+    }
+
+    @Test
+    fun `leaseSessionId returns bound session or null`() {
+        val reg = BrowserConcurrencyRegistry(leaseMs = 60_000L)
+        assertEquals(null, reg.leaseSessionId("ghost"))        // 无租约
+        reg.tryAcquire("u1", now = 1_000L)
+        assertEquals(null, reg.leaseSessionId("u1"))           // 租约未 bind（极端中间态）
+        reg.bind("u1", "sess-1")
+        assertEquals("sess-1", reg.leaseSessionId("u1"))
+        reg.release("u1", "sess-1")
+        assertEquals(null, reg.leaseSessionId("u1"))           // 释放后清空
+    }
 }

@@ -60,8 +60,32 @@ fun Route.browserRoute(
             return@post
         }
         if (!concurrency.tryAcquire(owner)) {
-            call.respondText(BUSY_USER_PAYLOAD, ContentType.Application.Json, HttpStatusCode.OK)
-            return@post
+            // busy 自愈：App 崩后 bridge 会话已被回收但租约残存（历史实测锁死最长 15min），
+            // 探测租约对应会话活性——仅 bridge 明确回 session_expired 才判死释放重取；
+            // 真活 / 探测失败（bridge 不可达）/ 响应解析失败（如反代 502 HTML）/ 其它 status
+            // 一律保守维持 BUSY，绝不误杀活会话。
+            val leasedSessionId = concurrency.leaseSessionId(owner)
+            val healed = if (leasedSessionId == null) {
+                false // 极端中间态（tryAcquire 后 bind 前）：维持 BUSY
+            } else {
+                val dead = try {
+                    probeStatus(bridge.sessionStatus(leasedSessionId).bodyAsText()) == "session_expired"
+                } catch (e: Throwable) {
+                    false
+                }
+                if (!dead) {
+                    false
+                } else {
+                    concurrency.release(owner, leasedSessionId) // 条件释放：不误删并发重取的新租约
+                    runCatching { stats.recordClose(leasedSessionId, "reaped_heal") }
+                        .onFailure { logger.warn("browser stats recordClose failed: sessionId=$leasedSessionId", it) }
+                    concurrency.tryAcquire(owner)
+                }
+            }
+            if (!healed) {
+                call.respondText(BUSY_USER_PAYLOAD, ContentType.Application.Json, HttpStatusCode.OK)
+                return@post
+            }
         }
         val upstream = try {
             bridge.open(call.receiveText())

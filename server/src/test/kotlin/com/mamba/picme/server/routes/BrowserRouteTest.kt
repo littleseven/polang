@@ -104,6 +104,106 @@ class BrowserRouteTest {
         assertTrue(resp.bodyAsText().contains("pool_exhausted"))
     }
 
+    // --- busy 自愈（租约残存但 bridge 会话已死 → 探测释放重取） ---
+
+    /** 按路径分发的 fake bridge：/status 与 open 各回各的 payload。 */
+    private fun bridgeDispatching(statusPayload: String, openPayload: String): BrowserBridgeClient =
+        BrowserBridgeClient(
+            HttpClient(MockEngine { request ->
+                val payload = if (request.url.encodedPath.endsWith("/status")) statusPayload else openPayload
+                respond(payload, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            }),
+            "http://bridge",
+            "tok",
+        )
+
+    @Test
+    fun `open self-heals busy lease when bridge session is dead`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val owner = AccountService.sha256("test-token")
+        concurrency.tryAcquire(owner)
+        concurrency.bind(owner, "s-dead")
+        val bridge = bridgeDispatching(
+            statusPayload = """{"status":"session_expired","errorCode":"session_expired","reason":"session expired or unknown"}""",
+            openPayload = """{"status":"ok","sessionId":"s-new","currentUrl":"https://example.com"}""",
+        )
+        app(bridge, concurrency, RateLimiter(20, 86_400_000L))
+        val resp = client.post("/v1/browser/open") {
+            header(APP_TOKEN_HEADER, "test-token")
+            contentType(ContentType.Application.Json)
+            setBody("""{"url":"https://example.com"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        assertTrue(resp.bodyAsText().contains("\"sessionId\":\"s-new\""))
+        assertEquals(1, concurrency.activeCount())
+        assertEquals("s-new", concurrency.leaseSessionId(owner))
+    }
+
+    @Test
+    fun `open stays busy when bridge session is alive`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val owner = AccountService.sha256("test-token")
+        concurrency.tryAcquire(owner)
+        concurrency.bind(owner, "s-live")
+        val bridge = bridgeDispatching(
+            statusPayload = """{"status":"ok","sessionId":"s-live","currentUrl":"https://example.com","lastActivity":123}""",
+            openPayload = """{"status":"ok","sessionId":"s-new"}""",
+        )
+        app(bridge, concurrency, RateLimiter(20, 86_400_000L))
+        val resp = client.post("/v1/browser/open") {
+            header(APP_TOKEN_HEADER, "test-token")
+            contentType(ContentType.Application.Json)
+            setBody("""{"url":"https://example.com"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        assertTrue(resp.bodyAsText().contains("pool_exhausted"))
+        assertEquals("s-live", concurrency.leaseSessionId(owner))
+    }
+
+    @Test
+    fun `open stays busy when status probe fails (bridge unreachable)`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val owner = AccountService.sha256("test-token")
+        concurrency.tryAcquire(owner)
+        concurrency.bind(owner, "s-live")
+        val bridge = BrowserBridgeClient(
+            HttpClient(MockEngine { throw java.net.ConnectException("refused") }),
+            "http://bridge",
+            "tok",
+        )
+        app(bridge, concurrency, RateLimiter(20, 86_400_000L))
+        val resp = client.post("/v1/browser/open") {
+            header(APP_TOKEN_HEADER, "test-token")
+            contentType(ContentType.Application.Json)
+            setBody("""{"url":"https://example.com"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        assertTrue(resp.bodyAsText().contains("pool_exhausted"))
+        assertEquals("s-live", concurrency.leaseSessionId(owner)) // 探测失败绝不误杀活租约
+    }
+
+    @Test
+    fun `open stays busy when status probe payload is not session_expired`() = testApplication {
+        // 判死收紧：仅明确 session_expired 才释放重取；反代 502 HTML 等解析失败场景保守 BUSY
+        val concurrency = BrowserConcurrencyRegistry()
+        val owner = AccountService.sha256("test-token")
+        concurrency.tryAcquire(owner)
+        concurrency.bind(owner, "s-live")
+        val bridge = bridgeDispatching(
+            statusPayload = "<html>502 Bad Gateway</html>",
+            openPayload = """{"status":"ok","sessionId":"s-new"}""",
+        )
+        app(bridge, concurrency, RateLimiter(20, 86_400_000L))
+        val resp = client.post("/v1/browser/open") {
+            header(APP_TOKEN_HEADER, "test-token")
+            contentType(ContentType.Application.Json)
+            setBody("""{"url":"https://example.com"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        assertTrue(resp.bodyAsText().contains("pool_exhausted"))
+        assertEquals("s-live", concurrency.leaseSessionId(owner))
+    }
+
     @Test
     fun `open rejected over daily quota`() = testApplication {
         val limiter = RateLimiter(0, 86_400_000L) // 配额 0
