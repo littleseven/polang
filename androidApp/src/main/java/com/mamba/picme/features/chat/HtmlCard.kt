@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.LruCache
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.webkit.ConsoleMessage
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
@@ -521,44 +522,62 @@ private fun WebView.loadHtmlOnce(html: String) {
 
 /**
  * 聊天卡片专用 WebView 的嵌套滚动策略。inline 卡已完全撑开（无高度上限、自身不滚动），
- * 竖直拖动手势应**全部让渡给外层聊天列表**，WebView 只保留点击/横滑等卡内交互：
- * - 内容不可竖滚（常态）：MOVE 直接返回 false，且不调用 requestDisallowInterceptTouchEvent，
- *   Compose 父链（LazyColumn）越过 touch slop 后经 onInterceptTouchEvent 接管手势流，
- *   WebView 收 ACTION_CANCEL、列表顺畅滚动——这是 WebView 嵌进 LazyColumn 的标准做法，
- *   替代手动 dispatchNestedPreScroll（实测在 Compose interop 链路上不可靠，几乎滑不动）；
- * - 内容可竖滚（异常兜底）：保持 isNestedScrollingEnabled=false，
- *   WebView 自滚、父链无感知（防 LazyColumn pre-scroll 抢占 delta 导致卡死）。
+ * 手势按**方向**分流（2026-10-10 方向判定版）：
+ * - **水平主导**（|dx|>|dy|，越过 touch slop 后判定）：整条手势流留 WebView——
+ *   滑杆/轮播等 JS 拖拽控件是 touch 事件驱动而非滚动驱动（canScrollHorizontally 为 false），
+ *   一旦 MOVE 返回 false，LazyColumn 会因微小竖直分量抢走手势流（WebView 收 CANCEL、
+ *   滑杆中断），所以水平手势必须全程由 WebView 持有；
+ * - **竖直主导**：内容不可竖滚（常态）→ MOVE 返回 false 让渡 LazyColumn 接管手势流
+ *   （WebView 嵌 LazyColumn 的标准做法，替代手动 dispatchNestedPreScroll——
+ *   实测在 Compose interop 链路上不可靠，几乎滑不动）；内容可竖滚（异常兜底）→
+ *   保持 isNestedScrollingEnabled=false，WebView 自滚、父链无感知；
+ * - **未定相**（slop 内）：事件先交 WebView（滑杆小位移也要即时响应），判定后才可能让渡。
  *
- * 水平方向（2026-10-09 起 3 次迭代）：HTML 卡可能含横滑组件（图片轮播/横滚 Tab），
- * 与外层 HorizontalPager 页面切换存在手势竞争。
- *
- * 演进：① requestDisallowInterceptTouchEvent——对 Compose 父链无效（Compose 不走
- * ViewGroup onInterceptTouchEvent）；② Compose 层 pointerInput consume + scrollBy 转发——
- * 与 Pager 拖拽跟踪存在 pass 时序竞态，不可靠；③ 终案 = 按下即禁 Pager 横滑
- * （onPagerSwipeLock → userScrollEnabled=false），WebView 原生接管卡内横滑。
- * 本类的水平分支仅作兜底（对 Compose 无效，对嵌套在传统 ViewGroup 的场景仍有效）。
+ * 水平方向与外层 HorizontalPager 的竞争已由 Compose 层 onPagerSwipeLock 终案解决
+ * （按下即禁 userScrollEnabled，见 HtmlWebView）；本类不再处理页面切换冲突。
  */
 private class ChatHtmlWebView(context: Context) : WebView(context) {
+
+    private enum class GesturePhase { UNDECIDED, HORIZONTAL, VERTICAL }
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var downX = 0f
+    private var downY = 0f
+    private var gesturePhase = GesturePhase.UNDECIDED
 
     init {
         isNestedScrollingEnabled = false
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_MOVE) {
-            val canScrollHorizontally =
-                canScrollHorizontally(-1) || canScrollHorizontally(1)
-            if (canScrollHorizontally) {
-                // 卡内横滑组件可滚：禁止父链（LazyColumn/HorizontalPager）拦截，
-                // 让 WebView 完整消费水平手势（图片轮播/横滚 Tab 正常工作）
-                parent?.requestDisallowInterceptTouchEvent(true)
-            } else {
-                // 内容不可水平滚动：手势让回父链，页面左右滑切换正常触发
-                return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
+                gesturePhase = GesturePhase.UNDECIDED
             }
-            val canScrollVertically = canScrollVertically(-1) || canScrollVertically(1)
-            if (!canScrollVertically) {
-                return false
+            MotionEvent.ACTION_MOVE -> {
+                if (gesturePhase == GesturePhase.UNDECIDED) {
+                    val dx = event.x - downX
+                    val dy = event.y - downY
+                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                        gesturePhase =
+                            if (abs(dx) > abs(dy)) GesturePhase.HORIZONTAL else GesturePhase.VERTICAL
+                        if (gesturePhase == GesturePhase.HORIZONTAL) {
+                            // 对传统 ViewGroup 父链的兜底（对 Compose 无效，无害）
+                            parent?.requestDisallowInterceptTouchEvent(true)
+                        }
+                    }
+                    // 未定相：WebView 先持有流（滑杆小位移即时响应），让渡发生在判定之后
+                    return super.onTouchEvent(event)
+                }
+                if (gesturePhase == GesturePhase.HORIZONTAL) {
+                    // 水平主导：整条流留 WebView，LazyColumn 不得因竖直分量抢走（滑杆中断根因）
+                    return super.onTouchEvent(event)
+                }
+                // 竖直主导：内容不可竖滚 → 让渡 LazyColumn
+                val canScrollVertically = canScrollVertically(-1) || canScrollVertically(1)
+                if (!canScrollVertically) return false
             }
         }
         return super.onTouchEvent(event)
