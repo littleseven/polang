@@ -9,6 +9,7 @@ import com.mamba.picme.domain.chat.ChatMessageType
 import com.mamba.picme.domain.chat.ChatListItem
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.ModelInputRole
+import com.mamba.picme.domain.chat.ToolPartState
 import com.mamba.picme.domain.chat.flattenChatItems
 import com.mamba.picme.domain.model.VoiceCommandMode
 import com.mamba.picme.domain.chat.LlmPerformance
@@ -276,6 +277,8 @@ fun ChatScreen(
     val gachaSelections by viewModel.gachaSelections.collectAsStateWithLifecycle()
     val gachaRerolling by viewModel.gachaRerolling.collectAsStateWithLifecycle()
     val pendingNonCardTool by viewModel.pendingNonCardTool.collectAsStateWithLifecycle()
+    // 浏览器会话 live 态（500ms 节流）：全屏接管页的推流帧来源；INLINE 卡经 displayMessages 覆写吃到
+    val liveBrowserSessions by viewModel.throttledBrowserLiveSessions.collectAsStateWithLifecycle(emptyMap())
     // ADR-016 M4（spec §7.2）：渲染源切到 parts——拍平为 LazyColumn 独立 item，
     // key="${messageId}:${partId}" + contentType 复用桶（修「有 key 无 contentType」
     // 的复用错配）；USER 消息整颗单 item（§5 图文同气泡不拆）。
@@ -713,8 +716,6 @@ fun ChatScreen(
                                     val browserPart = item.part as? MessagePart.BrowserLive ?: return@itemsIndexed
                                     BrowserLiveCard(
                                         part = browserPart,
-                                        onWatchSession = { sessionId -> viewModel.watchBrowserSession(sessionId) },
-                                        onUnwatchSession = { sessionId -> viewModel.unwatchBrowserSession(sessionId) },
                                         onOpenFullPreview = { frame ->
                                             // 解码 bitmap 边界取帧尺寸（坐标映射需要）
                                             val opts = android.graphics.BitmapFactory.Options().apply {
@@ -915,10 +916,27 @@ fun ChatScreen(
                 onDismiss = { previewChartSvg = null }
             )
 
-            // 浏览器直播卡全屏交互接管（M2 takeover）
+            // 浏览器直播卡全屏交互接管（M2 takeover）：
+            // 推流挂在全屏页——打开且会话 running 时 watch（WS 推流 + HTTP 轮询回退），
+            // 关闭/会话终态 unwatch；帧跟随 live 态更新（无新帧时回落打开时的快照帧）。
+            // INLINE 卡只吃动作级截图，不发起推流。
             browserFramePreview?.let { preview ->
+                val livePart = liveBrowserSessions[preview.sessionId]
+                val sessionRunning = livePart != null &&
+                    livePart.state != ToolPartState.OUTPUT_AVAILABLE &&
+                    livePart.state != ToolPartState.OUTPUT_ERROR
+                LaunchedEffect(preview.sessionId, sessionRunning) {
+                    if (sessionRunning) {
+                        viewModel.watchBrowserSession(preview.sessionId)
+                    } else {
+                        viewModel.unwatchBrowserSession(preview.sessionId)
+                    }
+                }
+                DisposableEffect(preview.sessionId) {
+                    onDispose { viewModel.unwatchBrowserSession(preview.sessionId) }
+                }
                 BrowserFramePreviewOverlay(
-                    frame = preview.frameBase64,
+                    frame = livePart?.frameJpegBase64 ?: preview.frameBase64,
                     sessionId = preview.sessionId,
                     frameWidth = preview.frameWidth,
                     frameHeight = preview.frameHeight,
