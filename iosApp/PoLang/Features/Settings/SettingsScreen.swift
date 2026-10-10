@@ -394,8 +394,23 @@ final class PoLangAuthClient {
     }
     private func statusCode(_ resp: URLResponse) -> Int { (resp as? HTTPURLResponse)?.statusCode ?? -1 }
 
+    /// App 界面语言 → BCP-47 语言标签（与服务端 EmailLanguage.resolve 口径对齐：
+    /// AppSettings 显式选择优先，"system" 回退系统首选语言；下划线归一为连字符）
+    private static func currentLanguageTag() -> String {
+        switch AppSettings.shared.appLanguage {
+        case "english": return "en"
+        case "chinese_simplified": return "zh-Hans"
+        case "chinese_traditional": return "zh-Hant"
+        case "spanish": return "es"
+        case "french": return "fr"
+        default:
+            return (Locale.preferredLanguages.first ?? "en")
+                .replacingOccurrences(of: "_", with: "-")
+        }
+    }
+
     func sendCode(email: String) async throws {
-        let (data, resp) = try await URLSession.shared.data(for:request("/auth/email/send", method: "POST", body: ["email": email]))
+        let (data, resp) = try await URLSession.shared.data(for:request("/auth/email/send", method: "POST", body: ["email": email, "lang": Self.currentLanguageTag()]))
         if !(200..<300).contains(statusCode(resp)) { throw AuthError(code: statusCode(resp), message: errMsg(data)) }
     }
     func verify(email: String, code: String) async throws -> AuthResult {

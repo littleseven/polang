@@ -24,7 +24,7 @@ val DeviceIdKey = AttributeKey<String>("deviceId")
 val PlatformKey = AttributeKey<String>("platform")
 
 @Serializable
-data class EmailSendRequest(val email: String)
+data class EmailSendRequest(val email: String, val lang: String? = null)
 
 @Serializable
 data class EmailVerifyRequest(val email: String, val code: String)
@@ -41,7 +41,7 @@ fun Route.authRoute(
     post("/auth/email/send") {
         val req = call.receive<EmailSendRequest>()
         val code = AccountService.createVerification(req.email)
-        val sent = emailService.sendVerificationCode(req.email, code)
+        val sent = emailService.sendVerificationCode(req.email, code, req.lang)
         if (sent) {
             call.respond(mapOf("sent" to true))
         } else {

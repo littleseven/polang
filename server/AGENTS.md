@@ -66,7 +66,8 @@ server/
 │   ├── auth/
 │   │   ├── AccountService.kt     # 账号 CRUD + token 生成/校验
 │   │   ├── AppTokenAuth.kt       # X-App-Token 认证插件
-│   │   ├── EmailService.kt       # 验证码发送（SMTP）
+│   │   ├── EmailService.kt       # 验证码发送（Resend API，按 lang 渲染五语模板，缺省中英双语）
+│   │   ├── EmailLanguage.kt      # 邮件语言枚举（EN/zh-CN/zh-TW/ES/FR + 双语缺省）+ BCP-47 标签归一化
 │   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理
 │   │   └── AiEngineerWhitelistService.kt # AI 工程师交付白名单
 │   ├── admin/
@@ -184,13 +185,14 @@ server/
 ### 4.1 客户端认证（邮箱注册动态 Token）
 
 ```
-App → POST /auth/email/send (email) → 服务端发送验证码
+App → POST /auth/email/send (email, lang?) → 服务端按 lang 发送对应语言验证码邮件
 App → POST /auth/email/verify (email, code) → 返回 picme_at_* token
 App → 后续请求带 X-App-Token: <picme_at_*>
 服务端 → SHA-256(token) 匹配 account.token_hash
 ```
 
 - `/healthz`、`/auth/email/send`、`/auth/email/verify` 免鉴权
+- `lang` 为可选 BCP-47 标签（客户端上报 App 界面语言）；缺省或无法识别时发中英双语邮件（向后兼容旧客户端），zh-Hant/HK/MO 归一为 zh-TW，其余 zh* 为 zh-CN（`EmailLanguage.resolve`）
 - 注册用户请求亦带 `X-Device-Id`,用于管理后台 device 维度展示（访客用 X-Device-Id 记设备级试用额度）
 - 每账户有 `FREE_LLM_QUOTA` 免费试用额度（默认 100 次），用尽返回 403
 - 额度默认值持久化于 `server_setting` 表（`free_llm_quota` / `guest_llm_quota`）；env 仅在首次启动播种，之后由 `/admin/settings` 管理，运行时经 `SettingsService` 内存快照下发（热路径零 DB 读）。单账号上限可在「用户详情」页单独覆盖（`account.llm_calls_limit`，0=禁用）

@@ -148,7 +148,7 @@ server/   # = polang/server/（rootProject.name = "picme-server"）
 | POST | `/recommend` | P0 | ✅ | `{scene, locale, clientVersion?}` | `{params:{...}, ruleVersion}` | 可缓存；不限流 |
 | POST | `/telemetry` | P0 | ✅ | `{events:[{type, payload}]}` | `{accepted:n}` | 不缓存；批量 |
 | POST | `/v1/chat/completions` | P0 | ✅ | OpenAI 兼容 `{messages, model?, stream?}` | OpenAI 兼容响应 / **SSE** 流 | 限流 + 计费（Channel 路由） |
-| POST | `/auth/email/send` | P0 | ✅ | `{email}` | `{ok}` | 限流 |
+| POST | `/auth/email/send` | P0 | ✅ | `{email, lang?}` | `{ok}` | 限流；lang=BCP-47 标签，决定验证码邮件语言（缺省/未知发中英双语） |
 | POST | `/auth/email/verify` | P0 | ✅ | `{email, code}` | `{token}` | — |
 | GET | `/auth/quota` | P0 | ✅ | —（X-App-Token） | `{used, limit, ...}` | 不缓存 |
 | DELETE | `/auth/account` | P0 | ✅ | —（X-App-Token） | 200/404 | 账号软注销 |
