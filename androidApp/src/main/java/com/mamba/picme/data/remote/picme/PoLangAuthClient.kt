@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class PoLangAuthClient(
@@ -25,9 +26,21 @@ class PoLangAuthClient(
 
     private val jsonMedia = "application/json".toMediaType()
 
-    suspend fun sendVerificationCode(email: String): Result<Unit> = withContext(Dispatchers.IO) {
+    /**
+     * 发送邮箱验证码。
+     *
+     * @param lang BCP-47 语言标签，决定验证码邮件语言；默认取 App 当前语言
+     *             （MainActivity.setLocale 已同步 Locale.setDefault）。
+     */
+    suspend fun sendVerificationCode(
+        email: String,
+        lang: String = Locale.getDefault().toLanguageTag(),
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val body = JSONObject().put("email", email).toString()
+            val body = JSONObject()
+                .put("email", email)
+                .put("lang", lang)
+                .toString()
             val req = Request.Builder()
                 .url("$baseUrl/auth/email/send")
                 .post(body.toRequestBody(jsonMedia))
