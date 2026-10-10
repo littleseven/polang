@@ -41,6 +41,35 @@ class IntentRouterTest {
     }
 
     @Test
+    fun `browser shortcut hits before gating without touching provider`() = runTest {
+        var providerCalled = false
+        val router = IntentRouter {
+            providerCalled = true
+            null
+        }
+        // 裸 URL 查询不含相册域信号：门控本会 GATED_PASSTHROUGH，浏览器捷径必须先命中
+        val result = router.route("https://sina.com 有什么新闻", state, "2026-09-26", traceId = null)
+        assertEquals(RoutePath.BROWSER_SHORTCUT, result.path)
+        assertEquals(IntentId.BROWSE_WEB, result.output.deliverable)
+        assertEquals(1.0, result.output.confidence)
+        assertEquals(0, result.latencyMs)
+        assertTrue(!providerCalled, "浏览器捷径不得触发 executor provider")
+    }
+
+    @Test
+    fun `browser shortcut hits browser phrase via route`() = runTest {
+        var providerCalled = false
+        val router = IntentRouter {
+            providerCalled = true
+            null
+        }
+        val result = router.route("用浏览器打开新浪体育", state, "2026-09-26", traceId = null)
+        assertEquals(RoutePath.BROWSER_SHORTCUT, result.path)
+        assertEquals(IntentId.BROWSE_WEB, result.output.deliverable)
+        assertTrue(!providerCalled, "浏览器捷径不得触发 executor provider")
+    }
+
+    @Test
     fun `null executor bundle degrades to OPEN_QA`() = runTest {
         val router = IntentRouter { null }
         val result = router.route("帮我分析一下去年照片的构图风格", state, "2026-09-26", traceId = null)

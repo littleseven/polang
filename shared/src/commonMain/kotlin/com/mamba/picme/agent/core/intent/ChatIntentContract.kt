@@ -42,6 +42,9 @@ enum class IntentId {
     /** 打开/跳转页面（相机/相册/设置等）。 */
     NAVIGATE,
 
+    /** 用浏览器打开/浏览网页或网站（交付物 = 浏览器直播卡 + 文字总结）。 */
+    BROWSE_WEB,
+
     /** 改设置（主题/语言/开关/模型）。 */
     SETTINGS,
 
@@ -135,6 +138,17 @@ object ChatIntentContract {
             uiContract = UiArtifact.NAV_EFFECT,
             allowedTools = listOf("navigate_to", "go_back", "launch_app", "open_system_settings"),
             ruleText = "仅明确口令（去/回/打开 + 页面名）才导航，模糊表述拦截为文本提示",
+        ),
+        IntentDef(
+            id = IntentId.BROWSE_WEB,
+            uiContract = UiArtifact.TEXT_ONLY,
+            allowedTools = listOf(
+                "browser_open", "browser_navigate", "browser_click", "browser_type",
+                "browser_extract", "browser_screenshot", "browser_close",
+            ),
+            // 防相册误路由的契约锚点：浏览器请求严禁落到相册搜索/脚本取数
+            forbiddenTools = listOf("search_media", "refine_media_search", "run_gallery_script"),
+            ruleText = "浏览器/网页任务一律 browser_open 起会话，严禁当作相册搜索",
         ),
         IntentDef(
             id = IntentId.SETTINGS,

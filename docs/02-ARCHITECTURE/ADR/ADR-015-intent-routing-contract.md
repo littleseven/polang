@@ -22,15 +22,15 @@
 
 **LLM 管语义理解（输出意图），代码管路由策略（查表执行）**：
 
-1. **意图契约表**（`ChatIntentContract`）：10 意图闭集 × UI 产出物契约 × 工具白/黑名单的声明式纯数据，allowed∩forbidden=∅ 由测试机器校验——规则矛盾在设计上不可能再发生。
-2. **意图路由器**（`IntentRouter`）：本地信号门控（寒暄直通零延迟）→ pattern 捷径（最热句式短路，负面语素防劫持）→ 专用 LLM 闭集分类（~1k token prompt、temperature=0、JSON 强校验、1.5s 硬超时 + schema 重试 1 次 + 低置信降级）。一切失败同路回落完整 agent loop——**路由器永不拦截能力**。
+1. **意图契约表**（`ChatIntentContract`）：11 意图闭集（2026-10-11 增 `BROWSE_WEB`：云端浏览器打开网页，直落全量 agent loop，绝不 DirectSearch）× UI 产出物契约 × 工具白/黑名单的声明式纯数据，allowed∩forbidden=∅ 由测试机器校验——规则矛盾在设计上不可能再发生。
+2. **意图路由器**（`IntentRouter`）：浏览器捷径（URL 或浏览器/网页/网站关键词零延迟短路，负面语素「打不开/无法/为什么/怎么/如何」+ 媒体名词防劫持，执行序先于一切门控）→ 本地信号门控（寒暄直通零延迟）→ pattern 捷径（最热句式短路，负面语素防劫持）→ 专用 LLM 闭集分类（~1k token prompt、temperature=0、JSON 强校验、1.5s 硬超时 + schema 重试 1 次 + 低置信降级）。一切失败同路回落完整 agent loop——**路由器永不拦截能力**。
 3. **确定性策略层**（`ChatRoutingPolicy`）：意图→命令查表执行。M2 仅 VIEW_PHOTOS/REFINE_RESULTS 直执（经 `ChatToolService.dispatchCommandWithTrace` 与 tool_calls 同一 dispatch 链路）；其余意图与 secondary 双产出物回落全量 agent（M3 分支化再逐个接管）。
 4. **路由可观测**：每回合判定落 `routing_audit_log`（仅路由维度指标、不含用户 query 原文，守 ADR-008），路由器 LLM 调用落 `llm_call_log`（source=`chat-intent-router`）——「护栏前路由正确率」可度量，为 M3 裁剪提供数据。
 
 ## 3. 为什么不选替代方案
 
 - **不修 prompt 了事**：D1-D4 是结构问题，措辞修补无法消除「模型在互斥规则里自由选路」的自由度；
-- **不让路由器直接输出工具调用**：退化为把选路问题搬家，flash 档同样不稳；意图闭集（10 类）比工具面（35+）小一个量级，分类错误率与 prompt 长度都显著更低；
+- **不让路由器直接输出工具调用**：退化为把选路问题搬家，flash 档同样不稳；意图闭集（11 类）比工具面（35+）小一个量级，分类错误率与 prompt 长度都显著更低；
 - **不做本地小模型分类**：端侧文本 LLM 已移除（2026-08-02），不为其回归；门控+pattern 已覆盖零延迟需求。
 
 ## 4. 影响面

@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * 确定性路由策略层测试（spec §3.3）：直执判定、refine 基数规则、回落规则。
@@ -174,5 +175,31 @@ class ChatRoutingPolicyTest {
             )
             assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision, "intent=$intent 应回落")
         }
+    }
+
+    // ── BROWSE_WEB（浏览器任务走 agent loop，绝不落 DirectSearch）────────────
+
+    @Test
+    fun `browse web routes to full agent loop with intent reason`() {
+        val decision = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.BROWSE_WEB)),
+            noBase,
+            originalQuery = "用浏览器打开新浪体育",
+        )
+        val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
+        assertTrue("BROWSE_WEB" in loop.reason, "reason 应含 BROWSE_WEB: ${loop.reason}")
+    }
+
+    @Test
+    fun `browser shortcut path dispatches by intent not bounced by path check`() {
+        // BROWSER_SHORTCUT 与 LLM_ROUTER/PATTERN_SHORTCUT 同权：reason 记 intent 而非 path，
+        // 审计不失真，未来直执扩展不被 path 检查挡
+        val decision = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.BROWSE_WEB, confidence = 1.0), RoutePath.BROWSER_SHORTCUT),
+            noBase,
+            originalQuery = "打开 https://example.com 看看",
+        )
+        val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
+        assertEquals("intent:BROWSE_WEB", loop.reason)
     }
 }

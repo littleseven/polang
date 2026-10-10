@@ -39,7 +39,10 @@ object ChatRoutingPolicy {
     fun decide(result: RoutingResult, state: CompactChatState, originalQuery: String): RouteDecision {
         val output = result.output
         // 非 LLM 判定路径（门控直通/降级）一律回落完整 agent
-        if (result.path != RoutePath.LLM_ROUTER && result.path != RoutePath.PATTERN_SHORTCUT) {
+        if (result.path != RoutePath.LLM_ROUTER &&
+            result.path != RoutePath.PATTERN_SHORTCUT &&
+            result.path != RoutePath.BROWSER_SHORTCUT
+        ) {
             return RouteDecision.FullAgentLoop("path:${result.path}")
         }
         // 双产出物（secondary 非空）M2 暂回落全量 agent 顺序处理（M3 分支化后顺序分发）
@@ -72,6 +75,9 @@ object ChatRoutingPolicy {
                         intent = output.toSearchIntent(query = originalQuery),
                     )
                 }
+            // 浏览器任务走完整 agent loop 执行 browser_* 工具链，绝不落 DirectSearch
+            // （forbiddenTools 契约锚点见 ChatIntentContract.BROWSE_WEB）
+            IntentId.BROWSE_WEB -> RouteDecision.FullAgentLoop("intent:${output.deliverable}")
             else -> RouteDecision.FullAgentLoop("intent:${output.deliverable}")
         }
     }

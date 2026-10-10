@@ -21,6 +21,8 @@ import kotlinx.serialization.json.Json
  * 可靠性工程（评审决议）：
  * - **本地信号门控**（[IntentRouterCore.shouldRoute]）：寒暄/明显开放问答直通 OPEN_QA，
  *   零额外延迟；门控只放行不拦截（误判代价 = 多走一次全量 agent，与现状同，无回退风险）。
+ * - **浏览器捷径**（[IntentRouterCore.matchBrowserShortcut]）：URL 或浏览器域词组确定性
+ *   短路 BROWSE_WEB，优先于门控——防「用浏览器打开 X」被硬分类成 VIEW_PHOTOS 误路由相册搜索。
  * - **pattern 捷径**（[IntentRouterCore.matchPatternShortcut]）：仅「看/找/看看/给我看…照片」
  *   最热句式零延迟短路；配负面样例（"看看照片里有没有糊的"是 ANALYZE 非 VIEW）防劫持。
  * - **1.5s 硬超时 + schema 失败重试 1 次 + 同路降级**：网络错/schema 仍败/超时/低置信
@@ -51,8 +53,9 @@ data class RouterOutput(
     val hasFace: Boolean?,
 )
 
-/** 路由路径（审计维度）：pattern 捷径 / LLM 路由器 / 门控直通 / 降级。 */
+/** 路由路径（审计维度）：浏览器/pattern 捷径 / LLM 路由器 / 门控直通 / 降级。 */
 enum class RoutePath {
+    BROWSER_SHORTCUT,
     PATTERN_SHORTCUT,
     LLM_ROUTER,
     GATED_PASSTHROUGH,
@@ -138,6 +141,38 @@ object IntentRouterCore {
     }
 
     /**
+     * 浏览器捷径：URL 或「浏览器/网页/网站 + 打开/访问/浏览/看看」确定性短路到 BROWSE_WEB
+     * （零延迟零成本，且优先于门控——裸 URL 查询不含相册域信号，门控会直接 GATED_PASSTHROUGH
+     * 短路掉捷径）。两类排除，防捷径劫持语义：
+     * - 媒体名词（照片/图片/相册/截图/相片/影片…）：如「看看浏览器截图的照片」语义是看照片；
+     * - 疑问/否定语素（打不开/无法/为什么/怎么/如何）：如「为什么打不开网页」「浏览器怎么
+     *   用不了」是求助而非打开请求。注意「打不开」必须在动词匹配前否决（其含子串「打开」）；
+     *   「吗」不入否决表——「用浏览器打开新浪体育吗」仍是正常请求。
+     * 返回 null = 不命中，走门控/后续路径。
+     */
+    fun matchBrowserShortcut(query: String): RouterOutput? {
+        val trimmed = query.trim()
+        if (BROWSER_SHORTCUT_MEDIA_NOUNS.any { trimmed.contains(it) }) return null
+        if (BROWSER_NEGATIVE_MORPHEMES.any { trimmed.contains(it) }) return null
+        val hasUrl = URL_PATTERN.containsMatchIn(trimmed)
+        val hasBrowserPhrase = BROWSER_NOUNS.any { trimmed.contains(it) } &&
+            BROWSER_VERBS.any { trimmed.contains(it) }
+        if (!hasUrl && !hasBrowserPhrase) return null
+        return RouterOutput(
+            deliverable = IntentId.BROWSE_WEB,
+            confidence = 1.0,
+            isRefinement = false,
+            secondary = null,
+            person = null,
+            fromMs = null,
+            toMs = null,
+            label = null,
+            constraint = null,
+            hasFace = null,
+        )
+    }
+
+    /**
      * 解析路由器 LLM 输出（容错：截取首个 JSON 对象、忽略未知字段、枚举/类型失败返回 null）。
      * null = schema 校验失败（调用方重试 1 次后降级）。
      */
@@ -181,6 +216,7 @@ object IntentRouterCore {
 - RENDER_RICH_HTML：明确要求做 HTML 卡片/可交互组件/报告页
 - MEMORY：记住/忘掉/查询事实或人物关系（"记住小宝是我儿子""我女儿是谁"）
 - NAVIGATE：明确口令跳转页面（"打开相机""去设置""返回"）
+- BROWSE_WEB：用浏览器打开/浏览网页或网站（交付物=浏览器直播卡+文字总结）
 - SETTINGS：改设置（主题/语言/开关/下载模型）
 - OPEN_QA：其它一切（闲聊/知识问答/无法确定一律归此）
 规则：
@@ -194,7 +230,9 @@ object IntentRouterCore {
 用户"去年夏天有人脸的照片" → {"deliverable":"VIEW_PHOTOS","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":true}
 用户"只要4月的"（上一轮有搜索卡片） → {"deliverable":"REFINE_RESULTS","confidence":0.9,"isRefinement":true,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":"4月的","hasFace":null}
 用户"看看照片里有没有糊的" → {"deliverable":"ANALYZE_STATS","confidence":0.8,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":"糊","constraint":null,"hasFace":null}
-用户"今天天气怎么样" → {"deliverable":"OPEN_QA","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}"""
+用户"今天天气怎么样" → {"deliverable":"OPEN_QA","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}
+用户"用浏览器打开新浪体育" → {"deliverable":"BROWSE_WEB","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}
+用户"打开 https://example.com 看看" → {"deliverable":"BROWSE_WEB","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}"""
 
     /** 路由器 user payload：当前日期 + 紧凑对话状态 + 用户原文。 */
     fun buildUserPayload(query: String, today: String, state: CompactChatState): String =
@@ -215,6 +253,18 @@ object IntentRouterCore {
     // pattern 捷径的媒体名词与观看动词（最热句式）；弱信号层共用（需与媒体名词共现）
     private val MEDIA_NOUNS = listOf("照片", "图片", "合照", "视频", "相册", "截图")
     private val VIEW_VERBS = listOf("看", "找", "搜", "画")
+
+    // 浏览器捷径：URL 形态 + 浏览器域名词/动作词（与媒体名词互斥，见 matchBrowserShortcut）
+    private val URL_PATTERN = Regex("""https?://|www\.""", RegexOption.IGNORE_CASE)
+    private val BROWSER_NOUNS = listOf("浏览器", "网页", "网站")
+    private val BROWSER_VERBS = listOf("打开", "访问", "浏览", "看看")
+
+    // 浏览器捷径的媒体名词排除表：MEDIA_NOUNS + 粤语/繁体常用「相片/影片」
+    // （独立于 MEDIA_NOUNS，避免外溢改变 pattern 捷径与门控弱信号层行为）
+    private val BROWSER_SHORTCUT_MEDIA_NOUNS = MEDIA_NOUNS + listOf("相片", "影片")
+
+    // 浏览器捷径的疑问/否定语素：命中即「求助/提问」非「打开请求」，归门控/路由器
+    private val BROWSER_NEGATIVE_MORPHEMES = listOf("打不开", "无法", "为什么", "怎么", "如何")
 
     // 捷径负面语素：命中则语义非「看照片」（分析/计数/画图/疑问），归路由器
     private val NEGATIVE_MORPHEMES = listOf(
@@ -258,7 +308,7 @@ class IntentRouter(
     }
 
     /**
-     * 路由判定：门控 → pattern 捷径 → LLM 闭集分类（1.5s 硬超时 + schema 重试 1 次）
+     * 路由判定：浏览器捷径 → 门控 → pattern 捷径 → LLM 闭集分类（1.5s 硬超时 + schema 重试 1 次）
      * → 失败分类同路降级 OPEN_QA。任何路径都会落审计记录。
      */
     suspend fun route(
@@ -268,6 +318,13 @@ class IntentRouter(
         traceId: String?,
     ): RoutingResult {
         val started = Clock.System.now().toEpochMilliseconds()
+
+        // ⓪ 浏览器捷径：优先于一切（含门控）——裸 URL 查询不含相册域信号，
+        // 门控会直接 GATED_PASSTHROUGH 把它短路掉，必须最先判定
+        IntentRouterCore.matchBrowserShortcut(query)?.let { shortcut ->
+            return RoutingResult(shortcut, RoutePath.BROWSER_SHORTCUT, 0)
+                .also { result -> audit(result, traceId) }
+        }
 
         // ① 本地信号门控：寒暄/开放问答直通，零额外延迟
         if (!IntentRouterCore.shouldRoute(query)) {

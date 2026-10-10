@@ -69,6 +69,87 @@ class IntentRouterCoreTest {
         assertNull(IntentRouterCore.matchPatternShortcut("看一下")) // 无媒体名词
     }
 
+    // ── 浏览器捷径 ──────────────────────────────────────────────────
+
+    @Test
+    fun `browser shortcut hits url queries`() {
+        listOf(
+            "用浏览器打开新浪体育 https://sports.sina.com.cn",
+            "打开 https://example.com 看看",
+            "https://sina.com 有什么新闻",
+            "帮我看看 www.weibo.com 热搜",
+        ).forEach { query ->
+            val hit = IntentRouterCore.matchBrowserShortcut(query)
+            assertNotNull(hit, "应命中浏览器捷径: $query")
+            assertEquals(IntentId.BROWSE_WEB, hit.deliverable)
+            assertEquals(1.0, hit.confidence)
+            assertNull(hit.secondary)
+            assertNull(hit.person)
+            assertFalse(hit.isRefinement)
+        }
+    }
+
+    @Test
+    fun `browser shortcut hits browser phrase combos`() {
+        listOf("用浏览器打开新浪体育", "打开网页版微博", "访问这个网站", "浏览一下网页").forEach { query ->
+            val hit = IntentRouterCore.matchBrowserShortcut(query)
+            assertNotNull(hit, "应命中浏览器捷径: $query")
+            assertEquals(IntentId.BROWSE_WEB, hit.deliverable)
+        }
+    }
+
+    @Test
+    fun `browser shortcut rejects media noun queries`() {
+        // 媒体名词共现 = 看照片语义，不归浏览器捷径
+        listOf(
+            "看看浏览器截图的照片",
+            "打开相册里的网页截图",
+            "找一下存的产品图片 https://example.com",
+        ).forEach { query ->
+            assertNull(IntentRouterCore.matchBrowserShortcut(query), "不应命中浏览器捷径: $query")
+        }
+    }
+
+    @Test
+    fun `browser shortcut rejects cantonese traditional media nouns`() {
+        // 粤语/繁体常用媒体名词（相片/影片）同样排除
+        listOf(
+            "看看浏览器里存的相片",
+            "找一下浏览器下载的影片",
+            "把相片上传到 https://example.com",
+        ).forEach { query ->
+            assertNull(IntentRouterCore.matchBrowserShortcut(query), "不应命中浏览器捷径: $query")
+        }
+    }
+
+    @Test
+    fun `browser shortcut rejects question and negation morphemes`() {
+        // 疑问/否定语素 = 求助而非打开请求（"打不开"含子串"打开"，必须在动词匹配前否决）
+        listOf(
+            "为什么打不开网页",
+            "浏览器怎么用不了",
+            "如何访问这个网站",
+            "网页无法访问",
+        ).forEach { query ->
+            assertNull(IntentRouterCore.matchBrowserShortcut(query), "不应命中浏览器捷径: $query")
+        }
+    }
+
+    @Test
+    fun `browser shortcut keeps polite request ending with ma`() {
+        // "吗" 不入否决表：礼貌疑问尾的正常打开请求仍命中
+        val hit = IntentRouterCore.matchBrowserShortcut("用浏览器打开新浪体育吗")
+        assertNotNull(hit, "带「吗」的正常打开请求应命中捷径")
+        assertEquals(IntentId.BROWSE_WEB, hit.deliverable)
+    }
+
+    @Test
+    fun `browser shortcut rejects plain open-camera style queries`() {
+        // 无 URL 无浏览器词：不命中
+        assertNull(IntentRouterCore.matchBrowserShortcut("打开相机"))
+        assertNull(IntentRouterCore.matchBrowserShortcut("今天天气怎么样"))
+    }
+
     // ── 路由器输出容错解析 ──────────────────────────────────────────
 
     @Test

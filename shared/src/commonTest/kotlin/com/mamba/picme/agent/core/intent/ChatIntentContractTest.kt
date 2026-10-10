@@ -36,4 +36,15 @@ class ChatIntentContractTest {
         assertTrue("search_media" in def.allowedTools)
         assertEquals(UiArtifact.MEDIA_RESULTS_CARD, def.uiContract)
     }
+
+    @Test
+    fun `browse web forbids gallery search tools`() {
+        // 防相册误路由锚点：浏览器意图严禁落到 search_media / refine_media_search / 脚本取数
+        val def = ChatIntentContract.of(IntentId.BROWSE_WEB)
+        assertTrue("browser_open" in def.allowedTools)
+        assertTrue("search_media" in def.forbiddenTools)
+        assertTrue("refine_media_search" in def.forbiddenTools)
+        assertTrue("run_gallery_script" in def.forbiddenTools)
+        assertEquals(UiArtifact.TEXT_ONLY, def.uiContract)
+    }
 }
