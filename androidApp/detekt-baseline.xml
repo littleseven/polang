@@ -2,8 +2,13 @@
 <SmellBaseline>
   <ManuallySuppressedIssues></ManuallySuppressedIssues>
   <CurrentIssues>
-    <ID>ComplexCondition:ChatScreen.kt$previewAssets.isEmpty() &amp;&amp; imagePreview == null &amp;&amp; previewChartSvg == null &amp;&amp; expandedTable == null</ID>
+    <ID>ComplexCondition:BlurAnalyzerTest.kt$BlurAnalyzerTest$x == 0 || x == 7 || y == 0 || y == 7</ID>
+    <ID>ComplexCondition:BrowserLiveCard.kt$container.width == 0 || container.height == 0 || frameW == 0 || frameH == 0</ID>
+    <ID>ComplexCondition:BrowserLiveCard.kt$relX &lt; 0 || relY &lt; 0 || relX &gt; renderedW || relY &gt; renderedH</ID>
+    <ID>ComplexCondition:CameraScreen.kt$pendingAvatarCapture != null &amp;&amp; isActivePage &amp;&amp; isCameraMemoryHydrated &amp;&amp; avatarRestoreLensFacing == null</ID>
     <ID>ComplexCondition:ChatViewModel.kt$ChatViewModel$!json.has("prompt_len") &amp;&amp; !json.has("decode_len") &amp;&amp; !json.has("decode_time_ms") &amp;&amp; !json.has("prefill_time_ms")</ID>
+    <ID>ComplexCondition:DedupViewModel.kt$DedupViewModel$sender != null &amp;&amp; current != null &amp;&amp; _pendingTrash.value == null &amp;&amp; current.deleteUris == uris</ID>
+    <ID>ComplexCondition:DedupViewModel.kt$DedupViewModel$sender != null &amp;&amp; current != null &amp;&amp; _pendingTrash.value == null &amp;&amp; tabBatchUris(current) == uris</ID>
     <ID>ComplexCondition:FacePasteBack.kt$FacePasteBack$u &lt; 0f || u &gt; maxSrc || v &lt; 0f || v &gt; maxSrc</ID>
     <ID>ComplexCondition:GalleryScreen.kt$isSearchActive &amp;&amp; searchQuery.isNotBlank() &amp;&amp; searchEngine != null &amp;&amp; !isPersonFilter</ID>
     <ID>ComplexCondition:ImageUtils.kt$ImageUtils$bmp == null || bmp.isRecycled || bmp.width != width || bmp.height != height</ID>
@@ -25,19 +30,22 @@
     <ID>ComplexInterface:TagScanTaskDao.kt$TagScanTaskDao</ID>
     <ID>ComplexInterface:UserSettingsRepository.kt$UserSettingsRepository</ID>
     <ID>CyclomaticComplexMethod:AccessibilityNodeDumper.kt$AccessibilityNodeDumper$private fun visitNode( node: AccessibilityNodeInfo, out: JSONObject, depth: Int, screenW: Int, screenH: Int )</ID>
+    <ID>CyclomaticComplexMethod:AdaptiveFaceClusterer.kt$AdaptiveFaceClusterer$private fun buildKnnGraph( embeddings: List&lt;FloatArray&gt;, k: Int, minSimilarity: Float ): Array&lt;IntArray&gt;</ID>
     <ID>CyclomaticComplexMethod:AiChatScreen.kt$@Composable private fun VoiceInputMode( onSwitchToText: () -&gt; Unit, onVoiceResult: (String) -&gt; Unit, context: Context, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
+    <ID>CyclomaticComplexMethod:BrowserLiveCard.kt$@Composable fun BrowserFramePreviewOverlay( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onClose: () -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:CameraAgentCommandHandler.kt$CameraAgentCommandHandler$fun handleCommand(cmd: AiAgentCommand)</ID>
-    <ID>CyclomaticComplexMethod:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null )</ID>
+    <ID>CyclomaticComplexMethod:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null, /** 拍照处理结束回调（仅照片路径）：供头像拍摄会话在落库后设置封面 */ onPhotoCompleted: (Boolean) -&gt; Unit = {} )</ID>
     <ID>CyclomaticComplexMethod:CameraFrameAnalyzer.kt$@ExperimentalGetImage internal fun handleImageAnalysisFrameMediaPipe( imageProxy: ImageProxy, previewView: PreviewView, faceDetector: FaceDetector, lensFacing: Int, detectionEngineMode: EngineType, adaptiveFaceDetectionIntervalEnabled: Boolean = true, faceDetectIntervalProfile: FaceDetectIntervalProfile = FaceDetectIntervalProfile.BALANCED, showFaceDebugOverlay: Boolean = false, onFacePointChanged: (Offset) -&gt; Unit, onFaceWarpParamsChanged: (FaceWarpParams) -&gt; Unit, onShowFocusIndicatorChanged: (Boolean) -&gt; Unit, existingWarpParams: FaceWarpParams? = null, beautyEnabled: Boolean = false )</ID>
     <ID>CyclomaticComplexMethod:CameraPreviewContent.kt$@Composable private fun BoxScope.CameraPreviewDebugStatus(uiState: CameraPreviewUiState)</ID>
-    <ID>CyclomaticComplexMethod:CameraScreen.kt$@SuppressLint("MissingPermission", "UnusedMaterial3ScaffoldPaddingParameter") @OptIn(ExperimentalMaterial3Api::class) @ExperimentalGetImage @Composable fun CameraContent( viewModel: MediaViewModel, onNavigateToGallery: () -&gt; Unit, onNavigateBack: () -&gt; Unit = {}, settingsViewModel: SettingsViewModel? = null, /** 是否为主页面 Pager 中的当前活跃页：非活跃时解绑相机并暂停语音/模型加载 */ isActivePage: Boolean = true )</ID>
+    <ID>CyclomaticComplexMethod:CameraScreen.kt$@SuppressLint("MissingPermission", "UnusedMaterial3ScaffoldPaddingParameter") @OptIn(ExperimentalMaterial3Api::class) @ExperimentalGetImage @Composable fun CameraContent( viewModel: MediaViewModel, onNavigateToGallery: () -&gt; Unit, onNavigateBack: () -&gt; Unit = {}, settingsViewModel: SettingsViewModel? = null, /** 路由/页面可见性门控：非活跃时解绑相机并暂停语音/模型加载（路由化后由路由生命周期 ≥RESUMED 驱动） */ isActivePage: Boolean = true )</ID>
     <ID>CyclomaticComplexMethod:ChatScreen.kt$@Composable private fun ChatVoiceInputMode( onSwitchToText: () -&gt; Unit, onVoiceResult: (String) -&gt; Unit, asrEngine: AsrEngine, scope: CoroutineScope )</ID>
-    <ID>CyclomaticComplexMethod:ChatViewModel.kt$ChatViewModel$fun sendClaudeMessage(text: String)</ID>
+    <ID>CyclomaticComplexMethod:ChatViewModel.kt$ChatViewModel$fun sendClaudeMessage(text: String, actionInFlightTaskId: String? = null, resumeSid: String? = null)</ID>
     <ID>CyclomaticComplexMethod:ClaudeChatClient.kt$ClaudeSseParser$fun parse(sse: String): List&lt;ClaudeEvent&gt;</ID>
+    <ID>CyclomaticComplexMethod:DedupScanner.kt$DedupScanner$private suspend fun FlowCollector&lt;DedupScanEvent&gt;.runScan( items: List&lt;ScanItem&gt;, config: DedupScanConfig, )</ID>
     <ID>CyclomaticComplexMethod:FaceClusterEngine.kt$FaceClusterEngine$suspend fun mergeSmallClusters( threshold: Float = ClusteringConfig.MERGE_SIMILARITY_THRESHOLD ): Int</ID>
     <ID>CyclomaticComplexMethod:FaceClusterEngine.kt$FaceClusterEngine$suspend fun splitOvermergedClusters( intraMin: Float = ClusteringConfig.SPLIT_INTRA_MIN, crossMax: Float = ClusteringConfig.SPLIT_CROSS_MAX, minSize: Int = ClusteringConfig.SPLIT_MIN_CLUSTER_SIZE ): Int</ID>
     <ID>CyclomaticComplexMethod:FacePasteBack.kt$FacePasteBack$fun pasteBack( origPixels: IntArray, origW: Int, origH: Int, restoredPixels: IntArray, inverseMatrix: FloatArray, alphaMask: FloatArray ): IntArray</ID>
-    <ID>CyclomaticComplexMethod:GalleryScreen.kt$@OptIn(FlowPreview::class) @Composable fun GalleryScreen( navController: NavController, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel, onNavigateToChat: () -&gt; Unit, onNavigateToCamera: () -&gt; Unit, onNavigateToSettings: () -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDebug: () -&gt; Unit, onNavigateToTagControl: () -&gt; Unit = {}, onNavigateToPeople: () -&gt; Unit = {}, /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */ searchRequest: Pair&lt;String, Long&gt;? = null, onSearchRequestConsumed: () -&gt; Unit = {}, /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */ onHorizontalSwipeEnabledChange: (Boolean) -&gt; Unit = {}, /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true )</ID>
+    <ID>CyclomaticComplexMethod:GalleryScreen.kt$@OptIn(FlowPreview::class) @Composable fun GalleryScreen( navController: NavController, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel, onNavigateToCamera: () -&gt; Unit, onNavigateToSettings: () -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDebug: () -&gt; Unit, /** 底 bar 页切换出口（整理/聊天/人物/回忆；相册为本页，选中项空操作；人物过滤态返回也复用） */ onSwitchMainPage: (Int) -&gt; Unit = {}, /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */ searchRequest: Pair&lt;String, Long&gt;? = null, onSearchRequestConsumed: () -&gt; Unit = {}, /** 外部确定性视图过滤请求（扫描页 v3 统计区/阶段行跳转）：TAGGED/FACES/BEST */ viewFilterRequest: GalleryViewRequest? = null, onViewFilterRequestConsumed: () -&gt; Unit = {}, /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */ onHorizontalSwipeEnabledChange: (Boolean) -&gt; Unit = {}, /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true, )</ID>
     <ID>CyclomaticComplexMethod:IDPhotoScreen.kt$@Suppress("LongMethod") // 待重构：抽 IDPhoto 控制面板子组件 @Composable fun IDPhotoScreen( sourceUri: String, viewModel: IDPhotoViewModel, onNavigateBack: () -&gt; Unit, onSaved: () -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:ImageProcessor.kt$private fun List&lt;Face&gt;.toFaceData(imageWidth: Int, imageHeight: Int): FaceData?</ID>
     <ID>CyclomaticComplexMethod:ImageUtils.kt$ImageUtils$@ExperimentalGetImage fun imageProxyToNv21(imageProxy: ImageProxy): ByteBuffer?</ID>
@@ -45,15 +53,17 @@
     <ID>CyclomaticComplexMethod:LlmModelDownloadManager.kt$LlmModelDownloadManager$fun downloadModel(modelId: String, modelConfig: ModelConfig? = null): Flow&lt;DownloadProgress&gt;</ID>
     <ID>CyclomaticComplexMethod:LlmModelDownloadManager.kt$LlmModelDownloadManager$fun resumeDownload(modelId: String, modelConfig: ModelConfig? = null): Flow&lt;DownloadProgress&gt;</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$@ExperimentalGetImage @Suppress("OPT_IN_USAGE_ERROR") @OptIn(ExperimentalMaterial3Api::class) override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>CyclomaticComplexMethod:MediaSearchEngine.kt$MediaSearchEngine$suspend fun search( query: String, llmSearch: (suspend (String) -&gt; StructuredFilter?)? = null, enableSemanticSearch: Boolean = true, limitToIds: Set&lt;Long&gt;? = null ): SearchResult</ID>
     <ID>CyclomaticComplexMethod:OpusMtTranslator.kt$OpusMtTranslator$@Suppress("UNCHECKED_CAST") private fun translateInternal(input: String): String</ID>
+    <ID>CyclomaticComplexMethod:PersonQueryResolver.kt$PersonQueryResolver$suspend fun resolve(query: String): ResolvedPersons</ID>
     <ID>CyclomaticComplexMethod:QueryGalleryMediaUseCase.kt$QueryGalleryMediaUseCase$suspend operator fun invoke(filter: QueryFilter): GalleryQueryResult</ID>
     <ID>CyclomaticComplexMethod:SampleDataGenerator.kt$SampleDataGenerator$private suspend fun generateData( context: Context, repository: MediaRepository, keywords: List&lt;String&gt;, prefix: String )</ID>
     <ID>CyclomaticComplexMethod:TagDataBackupRepository.kt$TagDataBackupRepository$suspend fun importFromFile( file: File, dryRun: Boolean = false ): RestoreResult</ID>
-    <ID>CyclomaticComplexMethod:TagGenerationControlScreen.kt$@Composable private fun ScanProgressCard(progress: TagScanSessionProgress)</ID>
-    <ID>CyclomaticComplexMethod:TagGenerationControlScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TagGenerationControlScreen( onNavigateBack: () -&gt; Unit, onNavigateToTagViewer: () -&gt; Unit = {}, header: @Composable (() -&gt; Unit)? = null )</ID>
+    <ID>CyclomaticComplexMethod:TagGenerationControlScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TagGenerationControlScreen( onNavigateToTagViewer: () -&gt; Unit = {}, /** v3 统计区/阶段行跳转出口：主卡统计区→已打标照片；人脸行→含人脸照片；质量行→最佳照片 */ onOpenTagged: () -&gt; Unit = {}, onOpenFaces: () -&gt; Unit = {}, onOpenBest: () -&gt; Unit = {}, /** 人物行→人物页（宿主切主页面） */ onOpenPeople: () -&gt; Unit = {}, /** 「稍后」次钮出口（v4 设计稿：宿主切回整理 tab） */ onLater: () -&gt; Unit = {}, /** 成果格导航出口（v4.1：成果=查看、阶段行=扫描控制） */ onOpenGroup: () -&gt; Unit = {}, onOpenSelf: () -&gt; Unit = {}, onOpenCity: (String) -&gt; Unit = {}, /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）；根页无返回箭头（2026-09-06 导航统一移除）。 */ embedded: Boolean = false, )</ID>
     <ID>CyclomaticComplexMethod:TagGenerationScheduler.kt$TagGenerationScheduler$private fun dbscanCluster( embeddings: Map&lt;Long, List&lt;FloatArray&gt;&gt;, flatIndex: List&lt;Pair&lt;Long, Int&gt;&gt;, eps: Float, minPts: Int ): Map&lt;Int, List&lt;Pair&lt;Long, Int&gt;&gt;&gt;</ID>
     <ID>CyclomaticComplexMethod:TagGenerationScheduler.kt$TagGenerationScheduler$private suspend fun runDbscanClustering( dao: com.mamba.picme.data.local.MediaDao, namedPersonSnapshots: List&lt;NamedPersonSnapshot&gt; = emptyList() )</ID>
     <ID>CyclomaticComplexMethod:TagGenerationService.kt$TagGenerationService$override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int</ID>
+    <ID>CyclomaticComplexMethod:TagScanOrchestrator.kt$TagScanOrchestrator$private suspend fun computeTaskProgress(sessionId: String): ScanTaskProgress</ID>
     <ID>CyclomaticComplexMethod:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$private fun buildSemanticDescription( view: View, screenWidth: Int, screenHeight: Int, maxTextLength: Int = MAX_TEXT_LENGTH ): String?</ID>
     <ID>CyclomaticComplexMethod:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$private fun visitNode( view: View, out: JSONObject, screenWidth: Int, screenHeight: Int, depth: Int )</ID>
     <ID>CyclomaticComplexMethod:WakeWordEngine.kt$WakeWordEngine$fun start(onTranscript: (String) -&gt; Unit)</ID>
@@ -80,9 +90,13 @@
     <ID>ImplicitDefaultLocale:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$String.format("%.1f", top * 100.0 / screenHeight)</ID>
     <ID>ImplicitDefaultLocale:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$String.format("%.1f", x * 100.0 / screenWidth)</ID>
     <ID>ImplicitDefaultLocale:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$String.format("%.1f", y * 100.0 / screenHeight)</ID>
+    <ID>InstanceOfCheckForException:ChatViewModel.kt$ChatViewModel$e is CancellationException</ID>
+    <ID>InstanceOfCheckForException:LlmModelDownloadManager.kt$LlmModelDownloadManager$e is DownloadIntegrityException</ID>
     <ID>InstanceOfCheckForException:PexelsViewModel.kt$PexelsViewModel$e is CancellationException</ID>
     <ID>InstanceOfCheckForException:SampleDataGenerator.kt$SampleDataGenerator$e is CancellationException</ID>
     <ID>InvalidPackageDeclaration:ToolSpecificationTest.kt$package com.mamba.picme.agent.core.inference.remote.tool</ID>
+    <ID>LargeClass:DedupViewModelTest.kt$DedupViewModelTest</ID>
+    <ID>LargeClass:FaceClusterEngine.kt$FaceClusterEngine</ID>
     <ID>LargeClass:GpuBeautyProcessor.kt$GpuBeautyProcessor : BeautyProcessor</ID>
     <ID>LargeClass:LlmModelDownloadManager.kt$LlmModelDownloadManager</ID>
     <ID>LargeClass:MainActivity.kt$MainActivity : ComponentActivity</ID>
@@ -93,12 +107,15 @@
     <ID>LargeClass:TagScanOrchestrator.kt$TagScanOrchestrator</ID>
     <ID>LargeClass:UserPreferencesRepository.kt$UserPreferencesRepository : UserSettingsRepository</ID>
     <ID>LongMethod:AdjustPanel.kt$@Composable fun AdjustPanel( adjustments: AdjustmentRecipe, onChange: (AdjustmentRecipe) -&gt; Unit )</ID>
-    <ID>LongMethod:AiChatScreen.kt$@Composable private fun TextInputMode( text: String, onTextChange: (String) -&gt; Unit, isProcessing: Boolean, onSend: () -&gt; Unit, onSwitchToVoice: () -&gt; Unit, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
+    <ID>LongMethod:AiChatScreen.kt$@Composable private fun TextInputMode( text: String, onTextChange: (String) -&gt; Unit, isProcessing: Boolean, onSend: () -&gt; Unit, onSwitchToVoice: () -&gt; Unit, /** 语音入口是否可用（2026-08-19：语音模式 ≠ DISABLED 才为 true，默认关闭） */ voiceEnabled: Boolean, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
     <ID>LongMethod:AiChatScreen.kt$@Composable private fun VoiceInputMode( onSwitchToText: () -&gt; Unit, onVoiceResult: (String) -&gt; Unit, context: Context, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
+    <ID>LongMethod:BackgroundScanGuardUi.kt$@Composable fun BackgroundScanGuardDialog( issues: List&lt;BackgroundScanGuard.Issue&gt;, onContinue: () -&gt; Unit, onDontRemind: () -&gt; Unit )</ID>
     <ID>LongMethod:BackupRestoreActivity.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun BackupRestoreScreen(onBack: () -&gt; Unit)</ID>
     <ID>LongMethod:BeautyPanel.kt$@Composable fun BeautyPanel( settings: BeautySettings, onSettingsChanged: (BeautySettings) -&gt; Unit, onDismiss: () -&gt; Unit, maxHeightRatio: Float = BeautyPanelTokens.heightRatio )</ID>
+    <ID>LongMethod:BrowserLiveCard.kt$@Composable fun BrowserFramePreviewOverlay( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onClose: () -&gt; Unit, )</ID>
+    <ID>LongMethod:BrowserLiveCard.kt$@Composable fun BrowserLiveCard( part: MessagePart.BrowserLive, onOpenFullPreview: (String) -&gt; Unit, // 传 base64 帧 modifier: Modifier = Modifier, )</ID>
     <ID>LongMethod:CameraAgentCommandHandler.kt$CameraAgentCommandHandler$fun handleCommand(cmd: AiAgentCommand)</ID>
-    <ID>LongMethod:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null )</ID>
+    <ID>LongMethod:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null, /** 拍照处理结束回调（仅照片路径）：供头像拍摄会话在落库后设置封面 */ onPhotoCompleted: (Boolean) -&gt; Unit = {} )</ID>
     <ID>LongMethod:CameraDebugOverlay.kt$@Composable private fun FaceDebugOverlayBigBeauty( bigBeautyLandmarks: GpuPixelLandmarks, aspectRatio: Int = AspectRatio.RATIO_FULL, roiRect: RectF? = null )</ID>
     <ID>LongMethod:CameraDebugOverlay.kt$@Composable private fun FaceDebugOverlaySingle( faceWarpParams: FaceWarpParams, slimFaceValue: Float, aspectRatio: Int = AspectRatio.RATIO_FULL )</ID>
     <ID>LongMethod:CameraDebugOverlay.kt$private fun DrawScope.drawBigEyeControlPoints(points: List&lt;Offset&gt;)</ID>
@@ -109,24 +126,33 @@
     <ID>LongMethod:CameraPreviewContent.kt$@Composable internal fun CameraPreviewContent( previewView: @Composable () -&gt; Unit, uiState: CameraPreviewUiState, actions: CameraPreviewActions, aiAgentUseCase: AiAgentUseCase? = null, aiAgentChatVisible: Boolean = false, aiAgentMessages: List&lt;AgentMessage&gt; = emptyList(), aiAgentIsProcessing: Boolean = false, onAiAgentChatVisibleChange: (Boolean) -&gt; Unit = {}, onAiAgentMessagesChange: (List&lt;AgentMessage&gt;) -&gt; Unit = {}, onAiAgentIsProcessingChange: (Boolean) -&gt; Unit = {}, voiceCoordinator: VoiceCommandCoordinator? = null, isWakeWordActive: Boolean = false, onAiAgentCommand: ((AiAgentCommand) -&gt; Unit)? = null, onUpdateVoiceCoordinatorState: (() -&gt; Unit)? = null )</ID>
     <ID>LongMethod:CameraPreviewContent.kt$@Composable private fun BoxScope.CameraPreviewDebugStatus(uiState: CameraPreviewUiState)</ID>
     <ID>LongMethod:CameraPreviewContent.kt$@OptIn(ExperimentalLayoutApi::class) // statusBarsIgnoringVisibility：沉浸式下仍避让刘海 @Composable private fun BoxScope.CameraTopControls( uiState: CameraPreviewUiState, actions: CameraPreviewActions )</ID>
-    <ID>LongMethod:CameraScreen.kt$@OptIn(ExperimentalPermissionsApi::class) @ExperimentalGetImage @Composable fun CameraScreen( onNavigateToGallery: () -&gt; Unit, onNavigateBack: () -&gt; Unit = {}, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel? = null, /** 是否为主页面 Pager 中的当前活跃页：非活跃时门控相机绑定/沉浸式/语音与模型加载 */ isActivePage: Boolean = true )</ID>
-    <ID>LongMethod:CameraScreen.kt$@SuppressLint("MissingPermission", "UnusedMaterial3ScaffoldPaddingParameter") @OptIn(ExperimentalMaterial3Api::class) @ExperimentalGetImage @Composable fun CameraContent( viewModel: MediaViewModel, onNavigateToGallery: () -&gt; Unit, onNavigateBack: () -&gt; Unit = {}, settingsViewModel: SettingsViewModel? = null, /** 是否为主页面 Pager 中的当前活跃页：非活跃时解绑相机并暂停语音/模型加载 */ isActivePage: Boolean = true )</ID>
+    <ID>LongMethod:CameraScreen.kt$@OptIn(ExperimentalPermissionsApi::class) @ExperimentalGetImage @Composable fun CameraScreen( onNavigateToGallery: () -&gt; Unit, onNavigateBack: () -&gt; Unit = {}, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel? = null, /** 路由/页面可见性门控：Pager 时代为当前活跃页；路由化后由路由生命周期（≥RESUMED）驱动，非活跃时门控相机绑定/沉浸式/语音与模型加载 */ isActivePage: Boolean = true )</ID>
+    <ID>LongMethod:CameraScreen.kt$@SuppressLint("MissingPermission", "UnusedMaterial3ScaffoldPaddingParameter") @OptIn(ExperimentalMaterial3Api::class) @ExperimentalGetImage @Composable fun CameraContent( viewModel: MediaViewModel, onNavigateToGallery: () -&gt; Unit, onNavigateBack: () -&gt; Unit = {}, settingsViewModel: SettingsViewModel? = null, /** 路由/页面可见性门控：非活跃时解绑相机并暂停语音/模型加载（路由化后由路由生命周期 ≥RESUMED 驱动） */ isActivePage: Boolean = true )</ID>
     <ID>LongMethod:CameraScreenModels.kt$internal fun buildCameraPreviewActions( lensFacing: Int, onLensFacingChanged: (Int) -&gt; Unit, onActualLensFacingChanged: (Int) -&gt; Unit, panelState: CameraPanelState, cameraControl: androidx.camera.core.CameraControl?, onCurrentGridChanged: (GridType) -&gt; Unit, onNavigateToGallery: () -&gt; Unit, onCaptureClick: () -&gt; Unit, onCaptureModeChanged: (MediaType) -&gt; Unit, onSelectedFilterChanged: (FilterType) -&gt; Unit, onStyleFilterSelected: (StyleFilter) -&gt; Unit, onBeautySettingsChanged: (BeautySettings) -&gt; Unit, onAspectRatioChanged: (Int) -&gt; Unit, onExposureCompensationChanged: (Int) -&gt; Unit, onWhiteBalanceModeChanged: (Int) -&gt; Unit, onWhiteBalanceTemperatureChanged: (Float) -&gt; Unit, onToggleVoiceControl: () -&gt; Unit, onToggleAiAgentPanel: () -&gt; Unit, onToggleLogs: () -&gt; Unit, onLlmRelease: () -&gt; Unit = {}, onFaceDetectRelease: () -&gt; Unit = {}, onNavigateBack: () -&gt; Unit = {} ): CameraPreviewActions</ID>
-    <ID>LongMethod:CameraUseCasesBinder.kt$@ExperimentalGetImage internal fun bindCameraUseCases( context: Context, lifecycleOwner: LifecycleOwner, cameraProviderFuture: ListenableFuture&lt;ProcessCameraProvider&gt;, lensFacing: Int, captureMode: MediaType, aspectRatio: Int, previewView: PreviewView, bindPreviewSurfaceProvider: (Preview) -&gt; Unit, cameraExecutor: Executor, isBeautyEnabled: () -&gt; Boolean, beautyStrategy: BeautyStrategy, detectionEngineMode: EngineType, adaptiveFaceDetectionIntervalEnabled: Boolean, faceDetectIntervalProfile: FaceDetectIntervalProfile, videoCapture: VideoCapture&lt;Recorder&gt;, faceDetector: FaceDetector, onImageCaptureChanged: (ImageCapture) -&gt; Unit, onCameraControlChanged: (CameraControl) -&gt; Unit, onZoomRatioChanged: (Float) -&gt; Unit, onZoomRangeChanged: (minZoom: Float, maxZoom: Float) -&gt; Unit, onActualLensFacingChanged: (Int) -&gt; Unit, onFacePointChanged: (Offset) -&gt; Unit, onFaceWarpParamsChanged: (FaceWarpParams) -&gt; Unit, onShowFocusIndicatorChanged: (Boolean) -&gt; Unit )</ID>
+    <ID>LongMethod:CameraUseCasesBinder.kt$@ExperimentalGetImage internal fun bindCameraUseCases( context: Context, lifecycleOwner: LifecycleOwner, cameraProviderFuture: ListenableFuture&lt;ProcessCameraProvider&gt;, lensFacing: Int, captureMode: MediaType, aspectRatio: Int, previewView: PreviewView, bindPreviewSurfaceProvider: (Preview) -&gt; Unit, cameraExecutor: Executor, isBeautyEnabled: () -&gt; Boolean, beautyStrategy: BeautyStrategy, detectionEngineMode: EngineType, adaptiveFaceDetectionIntervalEnabled: Boolean, faceDetectIntervalProfile: FaceDetectIntervalProfile, videoCapture: VideoCapture&lt;Recorder&gt;, faceDetector: FaceDetector, onImageCaptureChanged: (ImageCapture) -&gt; Unit, onCameraControlChanged: (CameraControl) -&gt; Unit, onZoomRatioChanged: (Float) -&gt; Unit, onZoomRangeChanged: (minZoom: Float, maxZoom: Float) -&gt; Unit, onActualLensFacingChanged: (Int) -&gt; Unit, onFacePointChanged: (Offset) -&gt; Unit, onFaceWarpParamsChanged: (FaceWarpParams) -&gt; Unit, onShowFocusIndicatorChanged: (Boolean) -&gt; Unit, onBindFailed: () -&gt; Unit = {} )</ID>
+    <ID>LongMethod:ChatRegistrationSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ChatRegistrationSheet( guestMessageCount: Int, onDismiss: () -&gt; Unit, onUseOwnKey: () -&gt; Unit, sendCode: (String, (Result&lt;Unit&gt;) -&gt; Unit) -&gt; Unit, verifyCode: (String, String, (Result&lt;*&gt;) -&gt; Unit) -&gt; Unit, )</ID>
     <ID>LongMethod:ChatScreen.kt$@Composable @OptIn(ExperimentalFoundationApi::class) private fun ChatImagePreviewOverlay( state: ChatImagePreviewState?, onSave: (messageId: String, onDone: (Boolean) -&gt; Unit) -&gt; Unit, onPageChanged: (ImagePreviewPage) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
     <ID>LongMethod:ChatScreen.kt$@Composable private fun ChartPreviewOverlay( svg: String?, onDismiss: () -&gt; Unit )</ID>
     <ID>LongMethod:ChatScreen.kt$@Composable private fun ChatVoiceInputMode( onSwitchToText: () -&gt; Unit, onVoiceResult: (String) -&gt; Unit, asrEngine: AsrEngine, scope: CoroutineScope )</ID>
-    <ID>LongMethod:ChatViewModel.kt$ChatViewModel$fun sendClaudeMessage(text: String)</ID>
+    <ID>LongMethod:ChatViewModel.kt$ChatViewModel$fun sendClaudeMessage(text: String, actionInFlightTaskId: String? = null, resumeSid: String? = null)</ID>
     <ID>LongMethod:ChatViewModel.kt$ChatViewModel$fun sendImageMessage(imageUri: Uri)</ID>
     <ID>LongMethod:ColorSelectors.kt$@Composable fun LipColorSelector( strength: Float, colorIndex: Int, onStrengthChanged: (Float) -&gt; Unit, onColorIndexChanged: (Int) -&gt; Unit, onReset: () -&gt; Unit )</ID>
     <ID>LongMethod:CommunicationChannelScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CommunicationChannelScreen( viewModel: CommunicationChannelViewModel, isConnected: Boolean, isConfigured: Boolean, onNavigateBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:DedupHomeHub.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable private fun OrganizeCategoryCard( card: CategoryBoard, onClick: () -&gt; Unit, )</ID>
+    <ID>LongMethod:DedupHomeScreen.kt$@Composable fun DedupHomeRoute( viewModel: DedupViewModel, /** 离页回调：仅服务扫描态「后台运行」按钮（根页无返回箭头，2026-09-06 导航统一）。 */ onNavigateBack: () -&gt; Unit, /** 整理中心 hub「滑动整理」(Swipe to tidy)（F2 已点亮：MainActivity 导航 swipe_review 路由）。 */ onQuickTidy: () -&gt; Unit = {}, /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */ onOpenCategory: (OrganizeCategory) -&gt; Unit = {}, /** hub 引导态类目卡点击：切到合并页 SCAN tab（embedded 模式由 OrganizeHomeRoute 注入 tab 切换）。 */ onOpenScan: () -&gt; Unit = {}, /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）。 */ embedded: Boolean = false, )</ID>
+    <ID>LongMethod:DedupHomeScreen.kt$@Composable private fun DedupCleanedContent( state: DedupUiState.Cleaned, onUndoAll: () -&gt; Unit, )</ID>
+    <ID>LongMethod:DedupHomeScreen.kt$@Composable private fun DedupResultsContent( state: DedupUiState.Results, onSmartSelectAll: () -&gt; Unit, onSelectTab: (DedupLevel) -&gt; Unit, onOpenGroupDetail: (String) -&gt; Unit, )</ID>
+    <ID>LongMethod:DedupHomeScreen.kt$@Composable private fun DedupScanningContent( state: DedupUiState.Scanning, onOpenGroupDetail: (String) -&gt; Unit, )</ID>
+    <ID>LongMethod:DedupScanner.kt$DedupScanner$private suspend fun FlowCollector&lt;DedupScanEvent&gt;.runScan( items: List&lt;ScanItem&gt;, config: DedupScanConfig, )</ID>
+    <ID>LongMethod:FaceClusterEngine.kt$FaceClusterEngine$suspend fun mergeSmallClusters( threshold: Float = ClusteringConfig.MERGE_SIMILARITY_THRESHOLD ): Int</ID>
     <ID>LongMethod:FilterPanel.kt$@Composable private fun FilterChip( item: FilterListItem, isSelected: Boolean, onClick: () -&gt; Unit, context: android.content.Context )</ID>
     <ID>LongMethod:FilterSelector.kt$@Composable private fun FilterItem( label: String, isSelected: Boolean, assetPath: String, itemWidth: Dp, onClick: () -&gt; Unit )</ID>
     <ID>LongMethod:FloatingChatBubbleService.kt$@Composable private fun FloatingChatPanel( viewModel: ChatViewModel, onClose: () -&gt; Unit )</ID>
     <ID>LongMethod:GachaCandidateBar.kt$@Composable fun GachaCandidateBar( run: PhotoEditorViewModel.GachaRunUiState, onApply: () -&gt; Unit, onReroll: () -&gt; Unit, onPreview: (Int) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
-    <ID>LongMethod:GalleryScreen.kt$@OptIn(FlowPreview::class) @Composable fun GalleryScreen( navController: NavController, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel, onNavigateToChat: () -&gt; Unit, onNavigateToCamera: () -&gt; Unit, onNavigateToSettings: () -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDebug: () -&gt; Unit, onNavigateToTagControl: () -&gt; Unit = {}, onNavigateToPeople: () -&gt; Unit = {}, /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */ searchRequest: Pair&lt;String, Long&gt;? = null, onSearchRequestConsumed: () -&gt; Unit = {}, /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */ onHorizontalSwipeEnabledChange: (Boolean) -&gt; Unit = {}, /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true )</ID>
+    <ID>LongMethod:GalleryScreen.kt$@OptIn(FlowPreview::class) @Composable fun GalleryScreen( navController: NavController, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel, onNavigateToCamera: () -&gt; Unit, onNavigateToSettings: () -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDebug: () -&gt; Unit, /** 底 bar 页切换出口（整理/聊天/人物/回忆；相册为本页，选中项空操作；人物过滤态返回也复用） */ onSwitchMainPage: (Int) -&gt; Unit = {}, /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */ searchRequest: Pair&lt;String, Long&gt;? = null, onSearchRequestConsumed: () -&gt; Unit = {}, /** 外部确定性视图过滤请求（扫描页 v3 统计区/阶段行跳转）：TAGGED/FACES/BEST */ viewFilterRequest: GalleryViewRequest? = null, onViewFilterRequestConsumed: () -&gt; Unit = {}, /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */ onHorizontalSwipeEnabledChange: (Boolean) -&gt; Unit = {}, /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true, )</ID>
     <ID>LongMethod:GalleryScriptHandlers.kt$fun registerGalleryHandlers( runtime: JsRuntime, getGallerySummaryUseCase: GetGallerySummaryUseCase, queryGalleryMediaUseCase: QueryGalleryMediaUseCase, personDao: PersonDao, controlledVocab: ControlledVocab, scanProgressProvider: () -&gt; TagScanSessionProgress?, )</ID>
     <ID>LongMethod:GetGroupedMediaUseCase.kt$GetGroupedMediaUseCase$operator fun invoke(media: List&lt;MediaAsset&gt;, mode: GroupingMode): List&lt;GroupedMedia&gt;</ID>
+    <ID>LongMethod:GlobalAgentPanel.kt$@Composable fun GlobalAgentPanel( state: GlobalAgentPanelState, orchestrator: AgentOrchestrator, agentContext: AgentContext, pageContext: PageContext? = null, modifier: Modifier = Modifier )</ID>
     <ID>LongMethod:GpuBeautyProcessor.kt$GpuBeautyProcessor$override suspend fun applySlimFace(bitmap: Bitmap, strength: Float, faces: List&lt;Face&gt;, isFrontCamera: Boolean): Bitmap</ID>
     <ID>LongMethod:GpuBeautyProcessor.kt$GpuBeautyProcessor$private fun applyLipColorRegional( bitmap: Bitmap, strength: Float, colorIndex: Int, faces: List&lt;Face&gt; ): Bitmap</ID>
     <ID>LongMethod:ImageEditScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ImageEditContent( originalBitmap: Bitmap?, mosaicShader: BitmapShader?, actions: MutableList&lt;DrawAction&gt;, currentMode: EditMode, currentColor: Int, onModeChange: (EditMode) -&gt; Unit, onColorChange: (Int) -&gt; Unit, onUndo: () -&gt; Unit, onSave: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
@@ -141,15 +167,17 @@
     <ID>LongMethod:LlmModelManagerScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) @Composable fun ModelCenterScreen( viewModel: SettingsViewModel, initialCategoryTag: String = "", onNavigateBack: () -&gt; Unit )</ID>
     <ID>LongMethod:LogOverlay.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun LogOverlay( onDismiss: () -&gt; Unit )</ID>
     <ID>LongMethod:MainActivity.kt$MainActivity$@ExperimentalGetImage @Suppress("OPT_IN_USAGE_ERROR") @OptIn(ExperimentalMaterial3Api::class) override fun onCreate(savedInstanceState: Bundle?)</ID>
-    <ID>LongMethod:MainPagerHost.kt$@Suppress("LongParameterList") @OptIn(ExperimentalFoundationApi::class) @Composable fun MainPagerHost( pagerState: PagerState, chatViewModel: ChatViewModel, mediaViewModel: MediaViewModel, settingsViewModel: SettingsViewModel, personViewModel: PersonViewModel, navController: NavHostController, onSwitchPage: (Int) -&gt; Unit, gallerySearchRequest: Pair&lt;String, Long&gt;?, onGallerySearchRequestConsumed: () -&gt; Unit, onRequestGallerySearch: (query: String, personId: Long) -&gt; Unit )</ID>
-    <ID>LongMethod:MediaGrid.kt$@Composable fun MediaGrid( context: Context, groupedMedia: List&lt;GroupedMedia&gt;, selectedIds: List&lt;Long&gt;, isSelectionMode: Boolean, thumbnailPositions: Map&lt;Long, Rect&gt;, mediaById: Map&lt;Long, MediaAsset&gt;, thumbnailCache: ThumbnailCache? = null, onThumbnailPositioned: (Long, Rect) -&gt; Unit, onMediaClick: (MediaAsset) -&gt; Unit, onMediaLongClick: (MediaAsset) -&gt; Unit, onDragSelectionStart: (MediaAsset) -&gt; Unit, onDragSelectionItem: (MediaAsset) -&gt; Unit, onDragSelectionEnd: () -&gt; Unit, onGroupTitleClick: ((GroupedMedia) -&gt; Unit)? = null, personNameMap: Map&lt;String, String&gt;? = null )</ID>
+    <ID>LongMethod:MainPagerHost.kt$@Suppress("LongParameterList") @OptIn(ExperimentalFoundationApi::class) @Composable fun MainPagerHost( pagerState: PagerState, chatViewModel: ChatViewModel, mediaViewModel: MediaViewModel, settingsViewModel: SettingsViewModel, personViewModel: PersonViewModel, dedupViewModel: DedupViewModel, /** Memory 页 / 详情页共用的 Activity 级 VM */ memoriesViewModel: MemoriesViewModel, navController: NavHostController, onSwitchPage: (Int) -&gt; Unit, gallerySearchRequest: Pair&lt;String, Long&gt;?, onGallerySearchRequestConsumed: () -&gt; Unit, onRequestGallerySearch: (query: String, personId: Long) -&gt; Unit, /** 扫描页 v3 确定性视图过滤请求（已打标/含人脸/最佳照片）与出口 */ galleryViewRequest: GalleryViewRequest? = null, onGalleryViewRequestConsumed: () -&gt; Unit = {}, onRequestGalleryView: (GalleryViewRequest) -&gt; Unit = {}, /** 整理中心 hub「滑动整理」(Swipe to tidy)（F2 已点亮：swipe_review 路由）。 */ onQuickTidy: () -&gt; Unit = {}, /** 整理中心 hub 类目卡点击（organize_category/{category} 路由）。 */ onOpenCategory: (OrganizeCategory) -&gt; Unit = {}, /** Memory 页大卡点击 → 回忆详情页（memory_detail/{memoryId} 路由）。 */ onNavigateToMemoryDetail: (String) -&gt; Unit = {}, /** 整理+扫描合并页扫描 Tab 内「查看标签」出口（tag_viewer 路由）。 */ onNavigateToTagViewer: () -&gt; Unit = {}, /** 外部入口（设置页）一次性请求合并页 Tab；null = 无请求。 */ organizeTabRequest: OrganizeTab? = null, onOrganizeTabRequestConsumed: () -&gt; Unit = {}, /** 任务中心回锚请求（US-15）：切 chat 页 + 切会话 + 滚动锚定任务卡；null = 无请求。 */ taskAnchor: ChatTaskAnchor? = null, onTaskAnchorConsumed: () -&gt; Unit = {}, /** 后台用户任务活跃数（用户任务协议 §7）：透传 ChatScreen 合并顶栏角标 */ activeUserTaskCount: Int = 0, )</ID>
     <ID>LongMethod:MediaPager.kt$@Composable private fun OcrResultOverlay( ocrState: StateFlow&lt;MediaViewModel.OcrResult?&gt;, onDismiss: () -&gt; Unit )</ID>
     <ID>LongMethod:MediaPager.kt$@Composable private fun VisionResultOverlay( result: String?, isLoading: Boolean, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:MediaSearchEngine.kt$MediaSearchEngine$@Suppress("CyclomaticComplexMethod") private suspend fun executeFilter( filter: StructuredFilter, rawQuery: String = "", personOutcome: PersonSearchOutcome? = null ): List&lt;MediaAsset&gt;</ID>
+    <ID>LongMethod:MemoryDetailScreen.kt$@Suppress("LongParameterList") @Composable fun MemoryDetailScreen( memory: Memory?, assetsByUri: Map&lt;String, MediaAsset&gt;, mediaViewModel: MediaViewModel, onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -&gt; Unit, onNavigateToIDPhoto: (uri: String) -&gt; Unit, onNavigateBack: () -&gt; Unit, )</ID>
     <ID>LongMethod:MemoryFactsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun MemoryFactsScreen( viewModel: MemoryFactsViewModel, onNavigateBack: () -&gt; Unit )</ID>
     <ID>LongMethod:OpusMtTranslator.kt$OpusMtTranslator$@Suppress("UNCHECKED_CAST") private fun translateInternal(input: String): String</ID>
-    <ID>LongMethod:PersonInfoScreen.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable fun PersonInfoScreen( person: PersonEntity, relation: RelationDisplayItem?, cover: PersonCover?, photos: List&lt;MediaEntity&gt;, onSave: (RelationPredicate?, String, Boolean) -&gt; Unit, onNavigateBack: () -&gt; Unit, onUpdateCover: (MediaEntity) -&gt; Unit, onUpdateName: (String) -&gt; Unit, /** 仅给该人物聚类（重新）打美学/人脸画质分 + 刷新封面；null=不显示该入口。 */ onRescore: (suspend () -&gt; Unit)? = null )</ID>
-    <ID>LongMethod:PersonScreen.kt$@Composable fun PersonScreen( viewModel: PersonViewModel, onNavigateBack: () -&gt; Unit, onNavigateToGallery: (Long) -&gt; Unit, /** 是否为当前激活的主页面 page（非激活时禁用顶栏 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true )</ID>
+    <ID>LongMethod:OrganizeCategoryScreen.kt$@Composable private fun OrganizeGridContent( state: OrganizeCategoryUiState.Ready, onToggle: (String) -&gt; Unit, )</ID>
+    <ID>LongMethod:PersonScreen.kt$@Composable fun PersonScreen( viewModel: PersonViewModel, onNavigateToGallery: (Long) -&gt; Unit, /** 人物编辑页相机角标：登记 pending 头像拍摄后切到相机页（Pager 页 0） */ onNavigateToCamera: () -&gt; Unit = {}, /** 底 bar 页切换出口（相册/整理/聊天/回忆；人物为本页，选中项空操作） */ onSwitchMainPage: (Int) -&gt; Unit = {}, )</ID>
     <ID>LongMethod:PhotoEditorScreen.kt$@Composable fun PhotoEditorScreen( sourceUri: String, recipeUri: String?, autoOptimize: Boolean = false, viewModel: PhotoEditorViewModel, onNavigateBack: () -&gt; Unit, onEditSaved: (String) -&gt; Unit )</ID>
+    <ID>LongMethod:PoLangApplication.kt$PoLangApplication$override fun onCreate()</ID>
     <ID>LongMethod:PoLangApplication.kt$PoLangApplication$private fun observeRemotePhotoCapture()</ID>
     <ID>LongMethod:ProModeControls.kt$@Composable fun ProModeControlsContent( exposure: Int, exposureRange: IntRange, onExposureChange: (Int) -&gt; Unit, whiteBalance: Int, onWhiteBalanceChange: (Int) -&gt; Unit, onTemperatureManualChange: () -&gt; Unit = {}, beautySettings: BeautySettings = BeautySettings(), onBeautySettingsChanged: (BeautySettings) -&gt; Unit = {}, modifier: Modifier = Modifier )</ID>
     <ID>LongMethod:SampleDataGenerator.kt$SampleDataGenerator$private suspend fun generateData( context: Context, repository: MediaRepository, keywords: List&lt;String&gt;, prefix: String )</ID>
@@ -159,21 +187,20 @@
     <ID>LongMethod:SettingsRemoteModels.kt$@OptIn(ExperimentalLayoutApi::class) @Composable internal fun AddProviderModelDialog( onDismiss: () -&gt; Unit, onConfirm: (RemoteModelConfig) -&gt; Unit )</ID>
     <ID>LongMethod:SettingsScreen.kt$@Composable private fun RemoteModelRow( config: RemoteModelConfig, isSelected: Boolean, onSelect: () -&gt; Unit, onMore: () -&gt; Unit )</ID>
     <ID>LongMethod:SettingsScreen.kt$@Composable private fun RemoteModelsListSection( configsJson: String, onConfigsChange: (String) -&gt; Unit, selectedModelId: String, onSelectedModelChange: (String) -&gt; Unit, onAddProvider: () -&gt; Unit )</ID>
-    <ID>LongMethod:SettingsScreen.kt$@Composable private fun SettingsAccountHeroCard(onClick: () -&gt; Unit)</ID>
-    <ID>LongMethod:SettingsScreen.kt$@Suppress("LongParameterList") // 待重构：SettingsScreen 抽 SettingsNav holder @Composable private fun SettingsMainMenu( themeMode: ThemeMode, onThemeModeSelected: (ThemeMode) -&gt; Unit, appLanguage: AppLanguage, onAppLanguageSelected: (AppLanguage) -&gt; Unit, developerOptionsUnlocked: Boolean, onUnlockDeveloperOptions: () -&gt; Unit, onNavigateToCategory: (SettingsCategory) -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDataPrivacy: () -&gt; Unit, onNavigateToCommunicationChannel: () -&gt; Unit, onNavigateToMemoryFacts: () -&gt; Unit, onNavigateToPeople: () -&gt; Unit, onNavigateToTagControl: () -&gt; Unit )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@Composable private fun SettingsAccountHeroCard( onClick: () -&gt; Unit, /** 头像右下角相机角标：进相机拍摄「我」的头像 */ onCaptureAvatarClick: () -&gt; Unit = {} )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@Suppress("LongParameterList") // 待重构：SettingsScreen 抽 SettingsNav holder @Composable private fun SettingsMainMenu( themeMode: ThemeMode, onThemeModeSelected: (ThemeMode) -&gt; Unit, appLanguage: AppLanguage, onAppLanguageSelected: (AppLanguage) -&gt; Unit, developerOptionsUnlocked: Boolean, onUnlockDeveloperOptions: () -&gt; Unit, onNavigateToCategory: (SettingsCategory) -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDataPrivacy: () -&gt; Unit, onNavigateToCommunicationChannel: () -&gt; Unit, onNavigateToMemoryFacts: () -&gt; Unit, onNavigateToPeople: () -&gt; Unit, onNavigateToTagControl: () -&gt; Unit, onNavigateToDedupHome: () -&gt; Unit, onCaptureSelfAvatar: () -&gt; Unit )</ID>
     <ID>LongMethod:TagDataBackupRepository.kt$TagDataBackupRepository$suspend fun exportToFile(file: File): ExportResult</ID>
     <ID>LongMethod:TagDataBackupRepository.kt$TagDataBackupRepository$suspend fun importFromFile( file: File, dryRun: Boolean = false ): RestoreResult</ID>
-    <ID>LongMethod:TagGenerationControlScreen.kt$@Composable private fun PassControlCard( title: String, description: String, progress: TagPassProgress?, progressText: String, onIncremental: () -&gt; Unit, onFull: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
-    <ID>LongMethod:TagGenerationControlScreen.kt$@Composable private fun ScanProgressCard(progress: TagScanSessionProgress)</ID>
-    <ID>LongMethod:TagGenerationControlScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TagGenerationControlScreen( onNavigateBack: () -&gt; Unit, onNavigateToTagViewer: () -&gt; Unit = {}, header: @Composable (() -&gt; Unit)? = null )</ID>
-    <ID>LongMethod:TagGenerationControlScreen.kt$@Suppress("LongParameterList") // 待重构：抽 stats 数据类 @Composable private fun StatsCard( totalMedia: Int, withFace: Int, withLabels: Int, withSemantic: Int, personCount: Int, namedPersonCount: Int, embeddingCount: Int, remainingPass1: Int, remainingPass3: Int, onNavigateToTagViewer: () -&gt; Unit )</ID>
+    <ID>LongMethod:TagGenerationControlScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TagGenerationControlScreen( onNavigateToTagViewer: () -&gt; Unit = {}, /** v3 统计区/阶段行跳转出口：主卡统计区→已打标照片；人脸行→含人脸照片；质量行→最佳照片 */ onOpenTagged: () -&gt; Unit = {}, onOpenFaces: () -&gt; Unit = {}, onOpenBest: () -&gt; Unit = {}, /** 人物行→人物页（宿主切主页面） */ onOpenPeople: () -&gt; Unit = {}, /** 「稍后」次钮出口（v4 设计稿：宿主切回整理 tab） */ onLater: () -&gt; Unit = {}, /** 成果格导航出口（v4.1：成果=查看、阶段行=扫描控制） */ onOpenGroup: () -&gt; Unit = {}, onOpenSelf: () -&gt; Unit = {}, onOpenCity: (String) -&gt; Unit = {}, /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）；根页无返回箭头（2026-09-06 导航统一移除）。 */ embedded: Boolean = false, )</ID>
+    <ID>LongMethod:TagGenerationControlScreen.kt$@Suppress("LongParameterList") // 成果面板 6 格数据+出口聚合于锚点卡；拆分收益低于可读性损失 @Composable private fun RingHeroCard( percent: Int, fraction: Float, labeledCount: Int, totalCount: Int, running: Boolean, paused: Boolean, terminalDone: Boolean, withFaceCount: Int, peopleCount: Int, namedPersonCount: Int, cityCount: Int, groupPhotoCount: Int, selfPhotoCount: Int, taggedCount: Int, onOpenFaces: () -&gt; Unit, onOpenPeople: () -&gt; Unit, onOpenTagged: () -&gt; Unit, onOpenGroup: () -&gt; Unit, onOpenSelf: () -&gt; Unit, onOpenCityPicker: () -&gt; Unit, onSelfUnset: () -&gt; Unit )</ID>
     <ID>LongMethod:TagGenerationScheduler.kt$TagGenerationScheduler$private suspend fun runDbscanClustering( dao: com.mamba.picme.data.local.MediaDao, namedPersonSnapshots: List&lt;NamedPersonSnapshot&gt; = emptyList() )</ID>
     <ID>LongMethod:TagGenerationService.kt$TagGenerationService$override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int</ID>
     <ID>LongMethod:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$private fun visitNode( view: View, out: JSONObject, screenWidth: Int, screenHeight: Int, depth: Int )</ID>
     <ID>LongMethod:WakeWordEngine.kt$WakeWordEngine$fun start(onTranscript: (String) -&gt; Unit)</ID>
     <ID>LongParameterList:AiChatScreen.kt$( messages: List&lt;AgentMessage&gt;, isProcessing: Boolean, onSendMessage: (String) -&gt; Unit, onCommand: (AiAgentCommand) -&gt; Unit, autoExecutePlans: Boolean, onDismiss: () -&gt; Unit, onPlanConfirm: () -&gt; Unit, onPlanCancel: () -&gt; Unit, modifier: Modifier = Modifier, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
     <ID>LongParameterList:AiChatScreen.kt$( visible: Boolean, messages: List&lt;AgentMessage&gt;, isProcessing: Boolean, onVisibleChange: (Boolean) -&gt; Unit, onSendMessage: (String) -&gt; Unit, onCommand: (AiAgentCommand) -&gt; Unit, modifier: Modifier = Modifier, consumedBottomInset: Dp = 0.dp, autoExecutePlans: Boolean = true, onPlanConfirm: () -&gt; Unit = {}, onPlanCancel: () -&gt; Unit = {}, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
-    <ID>LongParameterList:CameraCaptureActions.kt$( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null )</ID>
+    <ID>LongParameterList:BrowserLiveCard.kt$( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onClose: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:CameraCaptureActions.kt$( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null, /** 拍照处理结束回调（仅照片路径）：供头像拍摄会话在落库后设置封面 */ onPhotoCompleted: (Boolean) -&gt; Unit = {} )</ID>
     <ID>LongParameterList:CameraControlButtons.kt$( isBeautySelected: Boolean, isRatioSelected: Boolean, isGridSelected: Boolean, isFilterSelected: Boolean, isProSelected: Boolean, onToggleBeauty: () -&gt; Unit, onToggleRatio: () -&gt; Unit, onToggleGrid: () -&gt; Unit, onToggleFilter: () -&gt; Unit, onToggleProPanel: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>LongParameterList:CameraControls.kt$( lastMedia: MediaAsset?, zoomRatio: Float, minZoomRatio: Float, maxZoomRatio: Float, captureMode: MediaType, isRecording: Boolean, onZoomPresetClick: (Float) -&gt; Unit, onGalleryClick: () -&gt; Unit, onCaptureClick: () -&gt; Unit, onFlipCamera: () -&gt; Unit, onModeChange: (MediaType) -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>LongParameterList:CameraFrameAnalyzer.kt$( faceX: Float, faceY: Float, imageProxyWidth: Int, imageProxyHeight: Int, previewWidth: Float, previewHeight: Float, rotationDegrees: Int, lensFacing: Int )</ID>
@@ -183,26 +210,31 @@
     <ID>LongParameterList:CameraOverlays.kt$( isStable: Boolean, gridType: GridType, facePoint: Offset?, focusAlpha: Float, showInfo: Boolean, lensFacing: Int, captureMode: MediaType, zoomRatio: Float, aspectRatio: Int, selectedFilter: FilterType, beautySettings: BeautySettings, exposureCompensation: Int, whiteBalanceMode: Int, currentScene: ScenePreset, modifier: Modifier = Modifier )</ID>
     <ID>LongParameterList:CameraPreviewContent.kt$( previewView: @Composable () -&gt; Unit, uiState: CameraPreviewUiState, actions: CameraPreviewActions, aiAgentUseCase: AiAgentUseCase? = null, aiAgentChatVisible: Boolean = false, aiAgentMessages: List&lt;AgentMessage&gt; = emptyList(), aiAgentIsProcessing: Boolean = false, onAiAgentChatVisibleChange: (Boolean) -&gt; Unit = {}, onAiAgentMessagesChange: (List&lt;AgentMessage&gt;) -&gt; Unit = {}, onAiAgentIsProcessingChange: (Boolean) -&gt; Unit = {}, voiceCoordinator: VoiceCommandCoordinator? = null, isWakeWordActive: Boolean = false, onAiAgentCommand: ((AiAgentCommand) -&gt; Unit)? = null, onUpdateVoiceCoordinatorState: (() -&gt; Unit)? = null )</ID>
     <ID>LongParameterList:CameraScreenModels.kt$( lensFacing: Int, onLensFacingChanged: (Int) -&gt; Unit, onActualLensFacingChanged: (Int) -&gt; Unit, panelState: CameraPanelState, cameraControl: androidx.camera.core.CameraControl?, onCurrentGridChanged: (GridType) -&gt; Unit, onNavigateToGallery: () -&gt; Unit, onCaptureClick: () -&gt; Unit, onCaptureModeChanged: (MediaType) -&gt; Unit, onSelectedFilterChanged: (FilterType) -&gt; Unit, onStyleFilterSelected: (StyleFilter) -&gt; Unit, onBeautySettingsChanged: (BeautySettings) -&gt; Unit, onAspectRatioChanged: (Int) -&gt; Unit, onExposureCompensationChanged: (Int) -&gt; Unit, onWhiteBalanceModeChanged: (Int) -&gt; Unit, onWhiteBalanceTemperatureChanged: (Float) -&gt; Unit, onToggleVoiceControl: () -&gt; Unit, onToggleAiAgentPanel: () -&gt; Unit, onToggleLogs: () -&gt; Unit, onLlmRelease: () -&gt; Unit = {}, onFaceDetectRelease: () -&gt; Unit = {}, onNavigateBack: () -&gt; Unit = {} )</ID>
-    <ID>LongParameterList:CameraScreenModels.kt$( selectedFilter: FilterType, selectedStyleFilter: StyleFilter, faceDetectionEngineMode: FaceDetectionEngineMode, facePoint: Offset?, faceWarpParams: FaceWarpParams, showFaceDebugOverlay: Boolean, focusIndicatorAlpha: Float, lastMedia: MediaAsset?, zoomRatio: Float, minZoomRatio: Float, maxZoomRatio: Float, captureMode: MediaType, isRecording: Boolean, isStable: Boolean, panelState: CameraPanelState, showCameraInfo: Boolean, debugUiEnabled: Boolean, currentScene: ScenePreset, currentGrid: GridType, beautySettings: BeautySettings, beautyDebugState: BeautyDebugState, aspectRatio: Int, lensFacing: Int, exposureCompensation: Int, exposureRange: IntRange, whiteBalanceMode: Int, beautyStrategy: BeautyStrategy, isVoiceControlEnabled: Boolean, voiceEntryEnabled: Boolean, roiStageConfig: StageConfig, landmarkStageConfig: StageConfig, showLogOverlay: Boolean )</ID>
-    <ID>LongParameterList:CameraUseCasesBinder.kt$( context: Context, lifecycleOwner: LifecycleOwner, cameraProviderFuture: ListenableFuture&lt;ProcessCameraProvider&gt;, lensFacing: Int, captureMode: MediaType, aspectRatio: Int, previewView: PreviewView, bindPreviewSurfaceProvider: (Preview) -&gt; Unit, cameraExecutor: Executor, isBeautyEnabled: () -&gt; Boolean, beautyStrategy: BeautyStrategy, detectionEngineMode: EngineType, adaptiveFaceDetectionIntervalEnabled: Boolean, faceDetectIntervalProfile: FaceDetectIntervalProfile, videoCapture: VideoCapture&lt;Recorder&gt;, faceDetector: FaceDetector, onImageCaptureChanged: (ImageCapture) -&gt; Unit, onCameraControlChanged: (CameraControl) -&gt; Unit, onZoomRatioChanged: (Float) -&gt; Unit, onZoomRangeChanged: (minZoom: Float, maxZoom: Float) -&gt; Unit, onActualLensFacingChanged: (Int) -&gt; Unit, onFacePointChanged: (Offset) -&gt; Unit, onFaceWarpParamsChanged: (FaceWarpParams) -&gt; Unit, onShowFocusIndicatorChanged: (Boolean) -&gt; Unit )</ID>
+    <ID>LongParameterList:CameraScreenModels.kt$( selectedFilter: FilterType, selectedStyleFilter: StyleFilter, faceDetectionEngineMode: FaceDetectionEngineMode, facePoint: Offset?, faceWarpParams: FaceWarpParams, showFaceDebugOverlay: Boolean, focusIndicatorAlpha: Float, lastMedia: MediaAsset?, zoomRatio: Float, minZoomRatio: Float, maxZoomRatio: Float, captureMode: MediaType, isRecording: Boolean, isStable: Boolean, panelState: CameraPanelState, showCameraInfo: Boolean, debugUiEnabled: Boolean, currentScene: ScenePreset, currentGrid: GridType, beautySettings: BeautySettings, beautyDebugState: BeautyDebugState, aspectRatio: Int, lensFacing: Int, exposureCompensation: Int, exposureRange: IntRange, whiteBalanceMode: Int, beautyStrategy: BeautyStrategy, isVoiceControlEnabled: Boolean, voiceEntryEnabled: Boolean, aiChatEntryEnabled: Boolean, roiStageConfig: StageConfig, landmarkStageConfig: StageConfig, showLogOverlay: Boolean )</ID>
+    <ID>LongParameterList:CameraUseCasesBinder.kt$( context: Context, lifecycleOwner: LifecycleOwner, cameraProviderFuture: ListenableFuture&lt;ProcessCameraProvider&gt;, lensFacing: Int, captureMode: MediaType, aspectRatio: Int, previewView: PreviewView, bindPreviewSurfaceProvider: (Preview) -&gt; Unit, cameraExecutor: Executor, isBeautyEnabled: () -&gt; Boolean, beautyStrategy: BeautyStrategy, detectionEngineMode: EngineType, adaptiveFaceDetectionIntervalEnabled: Boolean, faceDetectIntervalProfile: FaceDetectIntervalProfile, videoCapture: VideoCapture&lt;Recorder&gt;, faceDetector: FaceDetector, onImageCaptureChanged: (ImageCapture) -&gt; Unit, onCameraControlChanged: (CameraControl) -&gt; Unit, onZoomRatioChanged: (Float) -&gt; Unit, onZoomRangeChanged: (minZoom: Float, maxZoom: Float) -&gt; Unit, onActualLensFacingChanged: (Int) -&gt; Unit, onFacePointChanged: (Offset) -&gt; Unit, onFaceWarpParamsChanged: (FaceWarpParams) -&gt; Unit, onShowFocusIndicatorChanged: (Boolean) -&gt; Unit, onBindFailed: () -&gt; Unit = {} )</ID>
     <ID>LongParameterList:ChatOptimizeGachaController.kt$ChatOptimizeGachaController$( messageId: String, imageUri: String, sessionId: String, scene: Scene, usedFingerprints: Set&lt;String&gt;, scored: List&lt;ScoredCandidate&gt;, recommendedIndex: Int, drawIndex: Int, explanation: String )</ID>
     <ID>LongParameterList:DebugScreen.kt$( isGenerating: Boolean, isPaused: Boolean, progress: String, filterText: String, filteredLogs: List&lt;String&gt;, onFilterTextChange: (String) -&gt; Unit, onPauseResume: () -&gt; Unit, onStop: () -&gt; Unit, onPopulatePerson: () -&gt; Unit, onPopulateLandscape: () -&gt; Unit, onPopulateSwimwear: () -&gt; Unit, onPopulateSexy: () -&gt; Unit, onClearData: () -&gt; Unit, onScreenshot: () -&gt; Unit )</ID>
     <ID>LongParameterList:DebugScreen.kt$( isGenerating: Boolean, isPaused: Boolean, progress: String, logs: List&lt;String&gt;, pexelsViewModel: PexelsViewModel, onNavigateBack: () -&gt; Unit, onPauseResume: () -&gt; Unit, onStop: () -&gt; Unit, onPopulatePerson: () -&gt; Unit, onPopulateLandscape: () -&gt; Unit, onPopulateSwimwear: () -&gt; Unit, onPopulateSexy: () -&gt; Unit, onClearData: () -&gt; Unit, onScreenshot: () -&gt; Unit )</ID>
-    <ID>LongParameterList:GalleryScreen.kt$( navController: NavController, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel, onNavigateToChat: () -&gt; Unit, onNavigateToCamera: () -&gt; Unit, onNavigateToSettings: () -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDebug: () -&gt; Unit, onNavigateToTagControl: () -&gt; Unit = {}, onNavigateToPeople: () -&gt; Unit = {}, /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */ searchRequest: Pair&lt;String, Long&gt;? = null, onSearchRequestConsumed: () -&gt; Unit = {}, /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */ onHorizontalSwipeEnabledChange: (Boolean) -&gt; Unit = {}, /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true )</ID>
+    <ID>LongParameterList:DedupHomeHub.kt$( config: DedupScanConfig, policy: KeepPolicy, board: OrganizeBoard, onQuickTidy: () -&gt; Unit, onOpenCategory: (OrganizeCategory) -&gt; Unit, onOpenScan: () -&gt; Unit, onStartScan: (DedupScanConfig) -&gt; Unit, onOpenKeepRules: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:GalleryScreen.kt$( navController: NavController, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel, onNavigateToCamera: () -&gt; Unit, onNavigateToSettings: () -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDebug: () -&gt; Unit, /** 底 bar 页切换出口（整理/聊天/人物/回忆；相册为本页，选中项空操作；人物过滤态返回也复用） */ onSwitchMainPage: (Int) -&gt; Unit = {}, /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */ searchRequest: Pair&lt;String, Long&gt;? = null, onSearchRequestConsumed: () -&gt; Unit = {}, /** 外部确定性视图过滤请求（扫描页 v3 统计区/阶段行跳转）：TAGGED/FACES/BEST */ viewFilterRequest: GalleryViewRequest? = null, onViewFilterRequestConsumed: () -&gt; Unit = {}, /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */ onHorizontalSwipeEnabledChange: (Boolean) -&gt; Unit = {}, /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true, )</ID>
     <ID>LongParameterList:GalleryTopBar.kt$( isSelectionMode: Boolean, selectedCount: Int, groupingMode: GroupingMode, onNavigateBack: (() -&gt; Unit)? = null, onNavigateToSettings: () -&gt; Unit = {}, onToggleSelectionMode: () -&gt; Unit, onSelectAll: () -&gt; Unit, onDeleteSelected: () -&gt; Unit, onShareSelected: () -&gt; Unit, onGroupingModeSelected: (GroupingMode) -&gt; Unit, onSearchClick: () -&gt; Unit = {}, onTagScanClick: () -&gt; Unit = {}, onToggleScan: () -&gt; Unit = {}, onNavigateToModelCenter: () -&gt; Unit = {} )</ID>
+    <ID>LongParameterList:HtmlCard.kt$( html: String, modifier: Modifier = Modifier, measureEnabled: Boolean = true, previewMode: Boolean = false, onContentHeightCssPx: ((Int) -&gt; Unit)? = null, onOpenLink: ((String) -&gt; Unit)? = null, onRenderFailed: (() -&gt; Unit)? = null, onPagerSwipeLock: ((Boolean) -&gt; Unit)? = null )</ID>
     <ID>LongParameterList:ImageEditScreen.kt$( originalBitmap: Bitmap?, mosaicShader: BitmapShader?, actions: MutableList&lt;DrawAction&gt;, currentMode: EditMode, currentColor: Int, onModeChange: (EditMode) -&gt; Unit, onColorChange: (Int) -&gt; Unit, onUndo: () -&gt; Unit, onSave: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
     <ID>LongParameterList:ImageProcessor.kt$ImageProcessor$( context: Context, imageCapture: ImageCapture, viewModel: MediaViewModel, filter: FilterType, beauty: BeautySettings, lensFacing: Int, mode: MediaType, cachedFaces: List&lt;Face&gt;, beautyStrategy: BeautyStrategy, coroutineScope: CoroutineScope?, source: String? = null, onPhotoFinished: (success: Boolean) -&gt; Unit = {} )</ID>
     <ID>LongParameterList:ImageProcessor.kt$ImageProcessor$( context: Context, imageCapture: ImageCapture, viewModel: MediaViewModel, filter: FilterType, beauty: BeautySettings, lensFacing: Int, mode: MediaType, cachedFaces: List&lt;Face&gt;, beautyStrategy: BeautyStrategy, executor: Executor, source: String? = null, onPhotoFinished: (success: Boolean) -&gt; Unit = {} )</ID>
     <ID>LongParameterList:ImageProcessor.kt$ImageProcessorImpl$( context: Context, bitmap: Bitmap, name: String, viewModel: MediaViewModel, hasFace: Boolean, faceId: String?, mode: MediaType, source: String? = null )</ID>
+    <ID>LongParameterList:KeepPolicyEngineTest.kt$KeepPolicyEngineTest$( uri: String, sizeBytes: Long = 1_000_000, pixelArea: Int = 12_000_000, captureDate: Long = 1_000L, modifiedAt: Long = captureDate, aestheticScore: Float? = null, contentType: DedupContentType = DedupContentType.GENERAL, faceQualityScore: Float? = null, )</ID>
     <ID>LongParameterList:LlmModelManagerScreen.kt$( category: ModelCategory, models: List&lt;ModelConfig&gt;, downloadedIds: Set&lt;String&gt;, downloadStates: Map&lt;String, DownloadState&gt;, tagTranslations: Map&lt;String, String&gt;, autoDownloadRecommended: Boolean, onDownload: (ModelConfig) -&gt; Unit, onCancel: (ModelConfig) -&gt; Unit, onPause: (ModelConfig) -&gt; Unit, onDelete: (ModelConfig) -&gt; Unit, onShowProperties: (ModelConfig) -&gt; Unit, onDownloadAllRequired: () -&gt; Unit, onAutoDownloadRecommendedChange: (Boolean) -&gt; Unit )</ID>
     <ID>LongParameterList:LlmModelManagerScreen.kt$( downloadState: DownloadState?, isDownloaded: Boolean = false, isDownloading: Boolean, isPaused: Boolean, onDownload: () -&gt; Unit, onCancel: () -&gt; Unit, onPause: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
     <ID>LongParameterList:LlmModelManagerScreen.kt$( model: ModelConfig, downloadState: DownloadState?, isDownloaded: Boolean = false, tagTranslations: Map&lt;String, String&gt;, onDownload: () -&gt; Unit, onCancel: () -&gt; Unit, onPause: () -&gt; Unit, onDelete: () -&gt; Unit, onShowProperties: () -&gt; Unit )</ID>
     <ID>LongParameterList:MediaDao.kt$MediaDao$( mediaId: Long, labels: String?, ocrText: String?, latitude: Double?, longitude: Double?, locationName: String?, city: String?, indexedAt: Long )</ID>
-    <ID>LongParameterList:MediaGrid.kt$( context: Context, groupedMedia: List&lt;GroupedMedia&gt;, selectedIds: List&lt;Long&gt;, isSelectionMode: Boolean, thumbnailPositions: Map&lt;Long, Rect&gt;, mediaById: Map&lt;Long, MediaAsset&gt;, thumbnailCache: ThumbnailCache? = null, onThumbnailPositioned: (Long, Rect) -&gt; Unit, onMediaClick: (MediaAsset) -&gt; Unit, onMediaLongClick: (MediaAsset) -&gt; Unit, onDragSelectionStart: (MediaAsset) -&gt; Unit, onDragSelectionItem: (MediaAsset) -&gt; Unit, onDragSelectionEnd: () -&gt; Unit, onGroupTitleClick: ((GroupedMedia) -&gt; Unit)? = null, personNameMap: Map&lt;String, String&gt;? = null )</ID>
-    <ID>LongParameterList:PersonInfoScreen.kt$( person: PersonEntity, relation: RelationDisplayItem?, cover: PersonCover?, photos: List&lt;MediaEntity&gt;, onSave: (RelationPredicate?, String, Boolean) -&gt; Unit, onNavigateBack: () -&gt; Unit, onUpdateCover: (MediaEntity) -&gt; Unit, onUpdateName: (String) -&gt; Unit, /** 仅给该人物聚类（重新）打美学/人脸画质分 + 刷新封面；null=不显示该入口。 */ onRescore: (suspend () -&gt; Unit)? = null )</ID>
+    <ID>LongParameterList:PersonInfoScreen.kt$( person: PersonEntity, relation: RelationDisplayItem?, cover: PersonCover?, photos: List&lt;MediaEntity&gt;, onSave: (name: String, relation: RelationPredicate?, customLabel: String, isSelf: Boolean) -&gt; Unit, onNavigateBack: () -&gt; Unit, onUpdateCover: (MediaEntity) -&gt; Unit, /** 仅给该人物聚类（重新）打美学/人脸画质分 + 刷新封面；null=不显示该入口。 */ onRescore: (suspend () -&gt; Unit)? = null, /** 相机角标：进相机拍摄该人物封面（2026-08-26 起角标不再打开封面选择 Sheet） */ onCaptureAvatar: (() -&gt; Unit)? = null )</ID>
     <ID>LongParameterList:PersonListItem.kt$( person: PersonEntity, cover: PersonCover?, relation: RelationDisplayItem?, photoCount: Int = person.faceCount, isEditingName: Boolean, onCoverClick: () -&gt; Unit, onNameClick: () -&gt; Unit, onNameSave: (String) -&gt; Unit, onNameCancel: () -&gt; Unit, onInfoClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>LongParameterList:ProModeControls.kt$( exposure: Int, exposureRange: IntRange, onExposureChange: (Int) -&gt; Unit, whiteBalance: Int, onWhiteBalanceChange: (Int) -&gt; Unit, onTemperatureManualChange: () -&gt; Unit = {}, beautySettings: BeautySettings = BeautySettings(), onBeautySettingsChanged: (BeautySettings) -&gt; Unit = {}, modifier: Modifier = Modifier )</ID>
+    <ID>LongParameterList:SettingsBaseComponents.kt$( title: String, checked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, horizontalPadding: Dp = 12.dp, rowHeight: Dp = SettingsTokens.toggleRowHeight, icon: ImageVector? = null, iconBlockColor: Color = Color.Transparent, subtitle: String? = null )</ID>
     <ID>LongParameterList:SettingsScreen.kt$( title: String, stage: DetectionStage, config: StageConfig, onModelTypeSelected: (DetectionModelType) -&gt; Unit, onDevicePreferenceSelected: (InferenceDevicePreference) -&gt; Unit, isModelDownloaded: (DetectionModelType) -&gt; Boolean, getModelId: (DetectionModelType, DetectionStage) -&gt; String?, downloadModel: (String, ModelConfig) -&gt; Unit, downloadStates: Map&lt;String, DownloadState&gt;, allModels: List&lt;ModelConfig&gt;, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongParameterList:TagGenerationControlScreen.kt$( onNavigateToTagViewer: () -&gt; Unit = {}, /** v3 统计区/阶段行跳转出口：主卡统计区→已打标照片；人脸行→含人脸照片；质量行→最佳照片 */ onOpenTagged: () -&gt; Unit = {}, onOpenFaces: () -&gt; Unit = {}, onOpenBest: () -&gt; Unit = {}, /** 人物行→人物页（宿主切主页面） */ onOpenPeople: () -&gt; Unit = {}, /** 「稍后」次钮出口（v4 设计稿：宿主切回整理 tab） */ onLater: () -&gt; Unit = {}, /** 成果格导航出口（v4.1：成果=查看、阶段行=扫描控制） */ onOpenGroup: () -&gt; Unit = {}, onOpenSelf: () -&gt; Unit = {}, onOpenCity: (String) -&gt; Unit = {}, /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）；根页无返回箭头（2026-09-06 导航统一移除）。 */ embedded: Boolean = false, )</ID>
+    <ID>LongParameterList:TaskCenterScreen.kt$( item: TaskCenterItem, actionsEnabled: Boolean, onClick: () -&gt; Unit, onContinue: (() -&gt; Unit)? = null, onAbandon: (() -&gt; Unit)? = null, onDeliver: (() -&gt; Unit)? = null, onSkipDeliver: (() -&gt; Unit)? = null, onRetry: (() -&gt; Unit)? = null, )</ID>
     <ID>LoopWithTooManyJumpStatements:ChatImageStoreImpl.kt$ChatImageStoreImpl$while</ID>
     <ID>LoopWithTooManyJumpStatements:ClaudeChatClient.kt$ClaudeSseParser$for</ID>
     <ID>LoopWithTooManyJumpStatements:FaceClusterEngine.kt$FaceClusterEngine$for</ID>
@@ -223,11 +255,22 @@
     <ID>LoopWithTooManyJumpStatements:TagGenerationScheduler.kt$TagGenerationScheduler$while</ID>
     <ID>LoopWithTooManyJumpStatements:ThumbnailCache.kt$ThumbnailCache$for</ID>
     <ID>LoopWithTooManyJumpStatements:WakeWordEngine.kt$WakeWordEngine$while</ID>
+    <ID>MagicNumber:AdaptiveFaceClusterer.kt$AdaptiveFaceClusterer$2f</ID>
+    <ID>MagicNumber:AddRemoteProviderScreen.kt$0xFF000000</ID>
+    <ID>MagicNumber:AddRemoteProviderScreen.kt$0xFF0052D9</ID>
+    <ID>MagicNumber:AddRemoteProviderScreen.kt$0xFF4D6BFE</ID>
+    <ID>MagicNumber:AddRemoteProviderScreen.kt$0xFF4F378B</ID>
+    <ID>MagicNumber:AddRemoteProviderScreen.kt$0xFF938F99</ID>
+    <ID>MagicNumber:AddRemoteProviderScreen.kt$0xFFD97757</ID>
     <ID>MagicNumber:AdminCentroidIndex.kt$AdminCentroidIndex$180.0</ID>
     <ID>MagicNumber:AiAgentUseCase.kt$AiAgentUseCase$40</ID>
     <ID>MagicNumber:AppToolExecutor.kt$AppToolExecutor$1024</ID>
+    <ID>MagicNumber:AppUpdateController.kt$AppUpdateController$26</ID>
+    <ID>MagicNumber:AppUpdateController.kt$AppUpdateController$30</ID>
+    <ID>MagicNumber:AppUpdateDialog.kt$1024.0</ID>
     <ID>MagicNumber:BeautyCapability.kt$BeautyCapability$1280</ID>
     <ID>MagicNumber:BeautyCapability.kt$BeautyCapability$720</ID>
+    <ID>MagicNumber:BrowserActionFormatter.kt$21</ID>
     <ID>MagicNumber:CameraAgentCommandHandler.kt$CameraAgentCommandHandler$2</ID>
     <ID>MagicNumber:CameraDebugOverlay.kt$0.0001f</ID>
     <ID>MagicNumber:CameraDebugOverlay.kt$0.005f</ID>
@@ -326,16 +369,10 @@
     <ID>MagicNumber:CandidateSampler.kt$CandidateSampler$200f</ID>
     <ID>MagicNumber:CandidateSampler.kt$CandidateSampler$8000f</ID>
     <ID>MagicNumber:CandidateSampler.kt$CandidateSampler.Companion$50</ID>
-    <ID>MagicNumber:ChatEmptyState.kt$0xFF22D3EE</ID>
-    <ID>MagicNumber:ChatEmptyState.kt$0xFF4ADE80</ID>
-    <ID>MagicNumber:ChatEmptyState.kt$0xFF6BA6FF</ID>
-    <ID>MagicNumber:ChatEmptyState.kt$0xFF9B8CFF</ID>
-    <ID>MagicNumber:ChatEmptyState.kt$0xFFFF7EB0</ID>
-    <ID>MagicNumber:ChatEmptyState.kt$0xFFFFB020</ID>
-    <ID>MagicNumber:ChatEmptyState.kt$6</ID>
     <ID>MagicNumber:ChatImageStoreImpl.kt$ChatImageStoreImpl$10000</ID>
     <ID>MagicNumber:ChatScreen.kt$0xFF</ID>
     <ID>MagicNumber:ChatScreen.kt$ChatModelOption.Remote$0xFF2196F3</ID>
+    <ID>MagicNumber:ChatViewModel.kt$ChatViewModel$50</ID>
     <ID>MagicNumber:ChineseQueryTranslator.kt$ChineseQueryTranslator$0.5f</ID>
     <ID>MagicNumber:ClaudeChatClient.kt$ClaudeChatClient$1024</ID>
     <ID>MagicNumber:CodeFormerRestorer.kt$CodeFormerRestorer$0xFF</ID>
@@ -343,9 +380,23 @@
     <ID>MagicNumber:CoilConfig.kt$CoilConfig$0.35</ID>
     <ID>MagicNumber:CoilConfig.kt$CoilConfig$1024</ID>
     <ID>MagicNumber:CoilConfig.kt$CoilConfig$250L</ID>
+    <ID>MagicNumber:ConfidenceGrader.kt$ConfidenceGrader$1_000_000L</ID>
     <ID>MagicNumber:CoverSelector.kt$CoverSelector$9f</ID>
+    <ID>MagicNumber:DedupComponents.kt$1024</ID>
+    <ID>MagicNumber:DedupComponents.kt$1024.0</ID>
+    <ID>MagicNumber:DedupModels.kt$DedupGroup.Companion$36</ID>
+    <ID>MagicNumber:DedupScanner.kt$DedupScanner$0.114</ID>
+    <ID>MagicNumber:DedupScanner.kt$DedupScanner$0.299</ID>
+    <ID>MagicNumber:DedupScanner.kt$DedupScanner$0.587</ID>
+    <ID>MagicNumber:DedupScanner.kt$DedupScanner$0xFF</ID>
     <ID>MagicNumber:EdiffiqaScorer.kt$EdiffiqaScorer$0xFF</ID>
     <ID>MagicNumber:EdiffiqaScorer.kt$EdiffiqaScorer$127.5f</ID>
+    <ID>MagicNumber:EngineerTaskSmokeSamples.kt$EngineerTaskSmokeSamples$150_000</ID>
+    <ID>MagicNumber:EngineerTaskSmokeSamples.kt$EngineerTaskSmokeSamples$300_000</ID>
+    <ID>MagicNumber:EngineerTaskSmokeSamples.kt$EngineerTaskSmokeSamples$30_000</ID>
+    <ID>MagicNumber:EngineerTaskSmokeSamples.kt$EngineerTaskSmokeSamples$400_000</ID>
+    <ID>MagicNumber:EngineerTaskSmokeSamples.kt$EngineerTaskSmokeSamples$600_000</ID>
+    <ID>MagicNumber:EngineerTaskSmokeSamples.kt$EngineerTaskSmokeSamples$90_000</ID>
     <ID>MagicNumber:FaceAwareAlignment.kt$6f</ID>
     <ID>MagicNumber:FaceClusterEngine.kt$FaceClusterEngine$0.2f</ID>
     <ID>MagicNumber:FaceClusterEngine.kt$FaceClusterEngine$0xFF</ID>
@@ -415,6 +466,7 @@
     <ID>MagicNumber:HeuristicSceneAnalyzer.kt$HeuristicSceneAnalyzer$0.299f</ID>
     <ID>MagicNumber:HeuristicSceneAnalyzer.kt$HeuristicSceneAnalyzer$0.587f</ID>
     <ID>MagicNumber:HeuristicSceneAnalyzer.kt$HeuristicSceneAnalyzer$0xFF</ID>
+    <ID>MagicNumber:HtmlCardSanitizer.kt$HtmlCardSanitizer$1024</ID>
     <ID>MagicNumber:IdCardRecognizer.kt$IdCardRecognizer$0.25f</ID>
     <ID>MagicNumber:IdCardRecognizer.kt$IdCardRecognizer$1.5f</ID>
     <ID>MagicNumber:ImageEditScreen.kt$95</ID>
@@ -428,7 +480,6 @@
     <ID>MagicNumber:KwakeWordKwsEngine.kt$KwakeWordKwsEngine$5000</ID>
     <ID>MagicNumber:LlmModelDownloadManager.kt$LlmModelDownloadManager$1_048_576</ID>
     <ID>MagicNumber:LlmModelDownloadManager.kt$LlmModelDownloadManager$200</ID>
-    <ID>MagicNumber:LlmModelDownloadManager.kt$LlmModelDownloadManager$206</ID>
     <ID>MagicNumber:LlmModelDownloadManager.kt$LlmModelDownloadManager$404</ID>
     <ID>MagicNumber:LlmModelDownloadManager.kt$LlmModelDownloadManager$7L</ID>
     <ID>MagicNumber:LlmModelDownloadManager.kt$LlmModelDownloadManager$8192</ID>
@@ -436,8 +487,13 @@
     <ID>MagicNumber:LlmModelManagerScreen.kt$1024.0</ID>
     <ID>MagicNumber:LocationIndexer.kt$LocationIndexer$40</ID>
     <ID>MagicNumber:LocationIndexer.kt$LocationIndexer$50</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$0x1b</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$0x66</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$400</ID>
     <ID>MagicNumber:MediaViewModel.kt$MediaViewModel$20</ID>
+    <ID>MagicNumber:MemoryMosaic.kt$MemoryMosaic$0xFF</ID>
+    <ID>MagicNumber:MemoryMosaic.kt$MemoryMosaic$13</ID>
+    <ID>MagicNumber:MemoryMosaic.kt$MemoryMosaic$17</ID>
     <ID>MagicNumber:MobileClipOnnxBackend.kt$MobileClipOnnxBackend$0xFF</ID>
     <ID>MagicNumber:MobileClipTokenizer.kt$MobileClipTokenizer$0xFF</ID>
     <ID>MagicNumber:MobileClipTokenizer.kt$MobileClipTokenizer$256</ID>
@@ -457,6 +513,11 @@
     <ID>MagicNumber:OpusMtTranslator.kt$OpusMtTranslator$0.2f</ID>
     <ID>MagicNumber:OpusMtTranslator.kt$OpusMtTranslator$0.5f</ID>
     <ID>MagicNumber:OpusMtTranslator.kt$OpusMtTranslator$65000L</ID>
+    <ID>MagicNumber:OrganizeRepositoryImpl.kt$OrganizeRepositoryImpl$0xFF</ID>
+    <ID>MagicNumber:OrganizeRepositoryImpl.kt$OrganizeRepositoryImpl$114</ID>
+    <ID>MagicNumber:OrganizeRepositoryImpl.kt$OrganizeRepositoryImpl$1_000_000</ID>
+    <ID>MagicNumber:OrganizeRepositoryImpl.kt$OrganizeRepositoryImpl$299</ID>
+    <ID>MagicNumber:OrganizeRepositoryImpl.kt$OrganizeRepositoryImpl$587</ID>
     <ID>MagicNumber:PerceptualHash.kt$PerceptualHash$1024</ID>
     <ID>MagicNumber:PerceptualHash.kt$PerceptualHash$31</ID>
     <ID>MagicNumber:PerceptualHash.kt$PerceptualHash$63</ID>
@@ -519,6 +580,7 @@
     <ID>MagicNumber:SemanticSearchEngine.kt$SemanticSearchEngine$1e-6f</ID>
     <ID>MagicNumber:SettingsScreen.kt$0xFF4F378B</ID>
     <ID>MagicNumber:SettingsScreen.kt$0xFF938F99</ID>
+    <ID>MagicNumber:SettingsScreen.kt$0xFFD97757</ID>
     <ID>MagicNumber:TagGenerationPipeline.kt$TagGenerationPipeline$0.8f</ID>
     <ID>MagicNumber:TagGenerationPipeline.kt$TagGenerationPipeline$212</ID>
     <ID>MagicNumber:TagGenerationPipeline.kt$TagGenerationPipeline$49</ID>
@@ -562,23 +624,35 @@
     <ID>MagicNumber:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$40f</ID>
     <ID>MatchingDeclarationName:AnthropicApiClient.kt$ClaudeCodingApiClient</ID>
     <ID>MatchingDeclarationName:BeautyPanel.kt$BeautyTab</ID>
+    <ID>MatchingDeclarationName:BrowserActionFormatter.kt$BrowserActionSpec</ID>
     <ID>MatchingDeclarationName:ExpandableFabMenu.kt$ExpandableFabMenuItem</ID>
     <ID>MatchingDeclarationName:FloatingBottomTab.kt$FloatingBottomTabItem</ID>
     <ID>MatchingDeclarationName:GalleryQuotes.kt$GalleryQuote</ID>
     <ID>MatchingDeclarationName:OcrUseCase.kt$OcrProcessor</ID>
     <ID>MatchingDeclarationName:SettingsScreen.kt$SettingsCategory</ID>
+    <ID>MatchingDeclarationName:SilentTrashGuidance.kt$SilentTrashGuidanceController : TrashGuidanceGate</ID>
     <ID>MaxLineLength:AiAgentUseCaseParseTest.kt$AiAgentUseCaseParseTest$appendLine("1. 调整美颜: {\"action\":\"adjust_beauty\",\"smoothing\":0-100,\"whitening\":0-100,\"slim_face\":-50~50,\"big_eyes\":0-100,\"lip_color\":0-100,\"blush\":0-100}")</ID>
     <ID>MaxLineLength:AiChatScreen.kt$Logger.d(TAG, "Finger DOWN detected -&gt; voiceCoordinator=${voiceCoordinator != null}, isVoiceAvailable=$isVoiceAvailable")</ID>
     <ID>MaxLineLength:AppDatabase.kt$AppDatabase.Companion.&lt;no name provided&gt;$"CREATE UNIQUE INDEX IF NOT EXISTS `index_person_relations_subjectPersonId_predicate_objectPersonId` ON `person_relations` (`subjectPersonId`, `predicate`, `objectPersonId`)"</ID>
     <ID>MaxLineLength:CameraFrameAnalyzer.kt$Logger.dThrottled("Camera", "nv21_path", "[Perf] NV21 ROI(${detectionEngineMode.name}) + Bitmap Landmark: ${lmElapsed}ms, roi=${nv21Result}")</ID>
     <ID>MaxLineLength:CameraFrameAnalyzer.kt$Logger.dThrottled("Camera", "yuv_nv21", "[Perf] YUV→NV21 (${detectionEngineMode.name}): ${nv21Elapsed}ms, size=${imageProxy.width}x${imageProxy.height}")</ID>
     <ID>MaxLineLength:CameraPreviewContent.kt$"Face OK C(${"%.2f".format(uiState.faceWarpParams.faceCenterX)},${"%.2f".format(uiState.faceWarpParams.faceCenterY)}) R${"%.2f".format(uiState.faceWarpParams.faceRadius)}"</ID>
+    <ID>MaxLineLength:CameraPreviewContent.kt$normalizedReason.contains("surface not ready") || normalizedReason.contains("surface unavailable") -&gt; stringResource(R.string.camera_provider_reason_surface_not_ready)</ID>
     <ID>MaxLineLength:CameraPreviewContent.kt$val perfCompact = "FPS ${"%.1f".format(uiState.beautyDebugState.fps)} | ${uiState.beautyDebugState.processingMs}ms/${uiState.beautyDebugState.delayMs}ms | D${uiState.beautyDebugState.nullFrames}"</ID>
     <ID>MaxLineLength:ChatViewModel.kt$ChatViewModel$Logger.w(TAG, "Capability dispatch failed in chat, falling back to full response. error=${actionValue.message}, detail=${actionValue.detail}")</ID>
-    <ID>MaxLineLength:DesignTokens.kt$CameraTokens$/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定深青玉 #0F766E（非 colorScheme.primary，白字对比度保障）。 */</ID>
+    <ID>MaxLineLength:ChatViewModel.kt$ChatViewModel$override</ID>
+    <ID>MaxLineLength:DesignTokens.kt$CameraTokens$/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。 2026-09-22 v3.0 cameraAccent 换微信绿 #07C160。 */</ID>
+    <ID>MaxLineLength:DesignTokens.kt$ChatBubbleTokens$/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。 2026-09-22 v3.0.1 形态对齐：气泡 12+尾4、输入 8、弹层 12（spec §1）。 */</ID>
+    <ID>MaxLineLength:DesignTokens.kt$EditorTokens$/** 图片编辑器组件几何（结构 token）。内容色板（markup 7 色/lip 12 色/blush 3 色）见 DESIGN_TOKENS_SPEC.md palette 附录，属产品内容数据不入 token。2026-08-19 editor.yaml §18 redesign_a 提案入库：canvasDark/gachaBarBg/overlayAlpha 三档（glassOverlay white@0.06/0.08 拆分）/toolRailItemSize/paramTileSize。canvasPureBlack/toolLabelSize/paramLabelSize/ratioChipSize/topBarButtonSize/unselectedLabelColor 2026-08-19 绑定清扫候选入库。 */</ID>
     <ID>MaxLineLength:DesignTokens.kt$IdPhotoTokens$/** 证照屏（IDPhoto）。强制深色屏：内容底近黑硬编码，Android PoLangForcedDarkTheme / iOS .preferredColorScheme(.dark)+AppColorScheme.dark 对齐 scheme。colorBlue/Red/White 为合成内容色（既作底色数据也作色板 UI 色，双端像素一致）。 */</ID>
-    <ID>MaxLineLength:DesignTokens.kt$SearchFieldTokens$/** SearchTopBar 内嵌胶囊搜索框（Gallery/Chat 共用 SearchField）。ios-follow gallery-search 2026-08-11 自 Android SearchField.kt 反向提取。颜色全走 colorScheme 角色：bg=surfaceVariant@0.7，icon/placeholder/clear=onSurface@0.5/0.4/0.5，cursor=primary。 */</ID>
-    <ID>MaxLineLength:DesignTokens.kt$SettingsTokens$/** 设置页通用结构。SettingsClickableRow=主行模式，section=分组卡片容器。list*=主菜单列表式（2026-08-17 重设计，iOS 式分组列表）；图标块色映射（行到 vibrant 系、statusColor、colorScheme 角色的对应）属 UI 结构不入 token，双端各自在代码中映射并保持一致。注意注释内勿出现连续斜杠星号（会截断 Android KDoc 块注释）。 */</ID>
+    <ID>MaxLineLength:DesignTokens.kt$ModelCenterTokens$/** 模型下载中心专属 token。getTagColor 代码用主题角色(recommended/chat/beauty-camera→tertiary/primary)与下方固定 hex 存在分歧，iOS 以本表固定 hex 为准。 2026-09-22 v3.0.5 tagColorChat→#576B95。 */</ID>
+    <ID>MaxLineLength:DesignTokens.kt$PagerTokens$/** 5 页 App Shell（Gallery=0/Organize=1/Chat=2/People=3/Memory=4）HorizontalPager（2026-09-06 主导航统一，相机已移出 Pager 改全屏路由）。overlayMaxWidth 2026-08-19 迁移 iPhone 15 画布宽 400→393。 */</ID>
+    <ID>MaxLineLength:DesignTokens.kt$SearchFieldTokens$/** SearchTopBar 内嵌胶囊搜索框（Gallery/Chat 共用 SearchField）。ios-follow gallery-search 2026-08-11 自 Android SearchField.kt 反向提取。颜色全走 colorScheme 角色：bg=surfaceVariant@0.7，icon/placeholder/clear=onSurface@0.5/0.4/0.5，cursor=primary。height=整胶囊高度（2026-08-19 绑定清扫候选入库）。 */</ID>
+    <ID>MaxLineLength:DesignTokens.kt$SettingsTokens$/** 设置页通用结构。SettingsClickableRow=主行模式，section=分组卡片容器。list*=主菜单列表式（2026-08-17 重设计，iOS 式分组列表）；图标块色映射（行到 vibrant 系、statusColor、colorScheme 角色的对应）属 UI 结构不入 token，双端各自在代码中映射并保持一致。listLabelColumnWidth/listSegmentedHeight/listSegmentedRadius 2026-08-19 自画布回流（sync --check NEW）；dialogOptionRowHeight 2026-08-19 绑定清扫候选入库；themeSwatch* 同日随主题弹框预览块删除而撤销（0edd118d3）；listDividerColor 同日撤销——分隔线改绑 scheme/outlineVariant（双 mode，浅色下不再呈深线）。注意注释内勿出现连续斜杠星号（会截断 Android KDoc 块注释）。 2026-09-24 v3.0.6 listSectionSpacing 24→8（微信组间距）。 */</ID>
+    <ID>MaxLineLength:DesignTokens.kt$StatusColor$/** 语义状态色（不随主题）。success/warning/error/info 跨 camera/chat/settings/idphoto/tag 复用。注意 statusError(#E53935)=产品 Material Red，与 colorScheme.error(#B3261E M3) 不同。 2026-09-22 v3.0.5 微信化统一：success 双绿合一→#07C160(品牌绿)；info→#576B95(微信链接蓝,弃Material蓝)。 */</ID>
+    <ID>MaxLineLength:EngineerTaskReducerTest.kt$EngineerTaskReducerTest$val awaiting = EngineerTaskReducer.reduce(running(), ClaudeEvent.Done(turns = 1, truncated = true, reason = "max_turns"), canDeliver = true, nowMs = 1100L)</ID>
+    <ID>MaxLineLength:EngineerTaskReducerTest.kt$EngineerTaskReducerTest$val next = EngineerTaskReducer.reduce(running(), ClaudeEvent.Error("timeout", truncated = true, reason = "phase_timeout"), canDeliver = false, nowMs = 1100L)</ID>
+    <ID>MaxLineLength:FaceClusterEngine.kt$FaceClusterEngine$Log.w(TAG, "Glint360K R100 model file exists but FAILED to load (likely corrupted): ${modelFile.absolutePath}. Re-download the model in Model Center to recover.")</ID>
     <ID>MaxLineLength:FaceDetectionCacheTest.kt$FaceDetectionCacheGetTest.Companion$arrayOf&lt;Any&gt;("get after clear returns null", { FaceDetectionCache.updateLandmarks106(FloatArray(212) { it / 212f }); FaceDetectionCache.clear() }, true, -1)</ID>
     <ID>MaxLineLength:FaceDetectionCacheTest.kt$FaceDetectionCacheIsValidTest.Companion$arrayOf&lt;Any&gt;("isValid after clear returns false", { FaceDetectionCache.updateLandmarks106(FloatArray(212) { it / 212f }); FaceDetectionCache.clear() }, false)</ID>
     <ID>MaxLineLength:ImageProcessor.kt$ImageProcessorImpl$Logger.d(TAG, "processPhoto called: enabled=${beauty.enabled}, smoothing=${beauty.smoothing}, whitening=${beauty.whitening}, slimFace=${beauty.slimFace}, bigEyes=${beauty.bigEyes}, faces=${faces.size}, hasPreDetected=${preDetectedFaceData != null}")</ID>
@@ -632,6 +706,9 @@
     <ID>MayBeConst:DesignTokens.kt$ChatBubbleTokens$val typingMs = 400</ID>
     <ID>MayBeConst:DesignTokens.kt$ChipTokens$val unselectedContainerAlpha = 0.5f</ID>
     <ID>MayBeConst:DesignTokens.kt$EditorTokens$val cropTransformButtonBgAlpha = 0.45f</ID>
+    <ID>MayBeConst:DesignTokens.kt$EditorTokens$val overlayAlphaHover = 0.08f</ID>
+    <ID>MayBeConst:DesignTokens.kt$EditorTokens$val overlayAlphaPrimary = 0.06f</ID>
+    <ID>MayBeConst:DesignTokens.kt$EditorTokens$val overlayAlphaTrack = 0.12f</ID>
     <ID>MayBeConst:DesignTokens.kt$IdPhotoTokens$val sizeChipUnselectedBorderAlpha = 0.5f</ID>
     <ID>MayBeConst:DesignTokens.kt$PersonTokens$val coverAspectRatio = 1.0f</ID>
     <ID>MayBeConst:DesignTokens.kt$PersonTokens$val coverPickerColumns = 3</ID>
@@ -645,7 +722,7 @@
     <ID>MayBeConst:DesignTokens.kt$ShutterTokens$val flashAlpha = 0.6f</ID>
     <ID>MayBeConst:DesignTokens.kt$ShutterTokens$val flashFadeMs = 80</ID>
     <ID>MayBeConst:DesignTokens.kt$ShutterTokens$val pressDebounceMs = 500</ID>
-    <ID>NestedBlockDepth:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null )</ID>
+    <ID>NestedBlockDepth:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null, /** 拍照处理结束回调（仅照片路径）：供头像拍摄会话在落库后设置封面 */ onPhotoCompleted: (Boolean) -&gt; Unit = {} )</ID>
     <ID>NestedBlockDepth:CameraFrameAnalyzer.kt$@ExperimentalGetImage internal fun handleImageAnalysisFrameMediaPipe( imageProxy: ImageProxy, previewView: PreviewView, faceDetector: FaceDetector, lensFacing: Int, detectionEngineMode: EngineType, adaptiveFaceDetectionIntervalEnabled: Boolean = true, faceDetectIntervalProfile: FaceDetectIntervalProfile = FaceDetectIntervalProfile.BALANCED, showFaceDebugOverlay: Boolean = false, onFacePointChanged: (Offset) -&gt; Unit, onFaceWarpParamsChanged: (FaceWarpParams) -&gt; Unit, onShowFocusIndicatorChanged: (Boolean) -&gt; Unit, existingWarpParams: FaceWarpParams? = null, beautyEnabled: Boolean = false )</ID>
     <ID>NestedBlockDepth:MediaIndexingWorker.kt$MediaIndexingWorker$private suspend fun doFullIndex()</ID>
     <ID>NestedBlockDepth:MobileClipTokenizer.kt$MobileClipTokenizer$private fun loadFromTokenizerJson(file: File): Boolean</ID>
@@ -658,6 +735,7 @@
     <ID>OptionalUnit:CameraScreen.kt$val nextMode = if (voiceCommandMode == VoiceCommandMode.DISABLED) { VoiceCommandMode.WAKE_WORD } else { VoiceCommandMode.DISABLED } coroutineScope.launch { userPreferencesRepository.updateVoiceCommandMode(nextMode) Logger.i(TAG, "Voice control toggled to: $nextMode") } if (nextMode == VoiceCommandMode.DISABLED &amp;&amp; !aiAgentChatVisible) { asrEngine.release() Logger.i(TAG, "Voice feature closed, release ASR") } Unit</ID>
     <ID>OptionalUnit:ClaudeChatClient.kt$ClaudeChatClient$val body = JSONObject() .put("requestId", requestId) .put("payload", payload) .toString() val req = Request.Builder() .url("$baseUrl/v1/claude-tool-result") .header("X-App-Token", token) .post(body.toRequestBody(jsonMedia)) .build() val resp = deliverClient.newCall(req).execute() // use：无论成败都 close，让连接归还连接池（错误路径 body.string() 本身会关闭） resp.use { if (!it.isSuccessful) { throw RuntimeException("HTTP ${it.code}: ${it.body?.string().orEmpty()}") } } Unit</ID>
     <ID>ReturnCount:CameraFrameAnalyzer.kt$FaceDetectionFrameCounter$fun shouldDetect(currentFaceCenter: Offset? = null): Boolean</ID>
+    <ID>ReturnCount:CategoryArbiter.kt$CategoryArbiter$fun classify(item: OrganizeItem): OrganizeCategory?</ID>
     <ID>ReturnCount:ChineseQueryTranslator.kt$ChineseQueryTranslator$private fun isTranslationValid(input: String, output: String): Boolean</ID>
     <ID>ReturnCount:QuerySegmenter.kt$QuerySegmenter$private fun findNextSegment(query: String): Segment?</ID>
     <ID>SpacingBetweenPackageAndImports:CameraRuntimeState.kt$ </ID>
@@ -668,6 +746,7 @@
     <ID>SwallowedException:ImageEditScreen.kt$e: Exception</ID>
     <ID>SwallowedException:ImageProcessor.kt$ImageProcessorImpl$e: IllegalStateException</ID>
     <ID>SwallowedException:Logger.kt$Logger$exception: RuntimeException</ID>
+    <ID>SwallowedException:MarkdownStreamRobustnessTest.kt$MarkdownStreamRobustnessTest$t: Throwable</ID>
     <ID>SwallowedException:MediaPager.kt$e: Exception</ID>
     <ID>SwallowedException:MediaStoreObserver.kt$MediaStoreObserver$e: SecurityException</ID>
     <ID>SwallowedException:OpenClGuardian.kt$OpenClGuardian$e: Exception</ID>
@@ -676,20 +755,27 @@
     <ID>SwallowedException:SystemCapability.kt$SystemCapability$e: Exception</ID>
     <ID>SwallowedException:TagIndexUpdater.kt$TagIndexUpdater$e: Exception</ID>
     <ID>SwallowedException:TagScanOrchestrator.kt$TagScanOrchestrator$e: Exception</ID>
+    <ID>ThrowsCount:BrowserSessionClient.kt$BrowserSessionClient$private suspend fun execute(request: Request): String</ID>
     <ID>TooGenericExceptionCaught:AestheticScoreWorker.kt$AestheticScoreWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AiOptimizeCapability.kt$AiOptimizeCapability$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AppUpdateController.kt$AppUpdateController$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AssetPresetRepository.kt$AssetPresetRepository$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BackgroundScanGuard.kt$BackgroundScanGuard$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BackupRestoreActivity.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BatteryOptimizationUtils.kt$BatteryOptimizationUtils$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BrowserSessionClient.kt$BrowserSessionClient$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CameraCaptureActions.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CameraFrameAnalyzer.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CameraFrameAnalyzer.kt$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:CameraUseCasesBinder.kt$cleanupError: Exception</ID>
+    <ID>TooGenericExceptionCaught:CameraUseCasesBinder.kt$error: Exception</ID>
     <ID>TooGenericExceptionCaught:CandidateRenderer.kt$CandidateRenderer$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ChatSearchCapability.kt$ChatSearchCapability$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ChatViewModel.kt$ChatViewModel$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ChineseQueryTranslator.kt$ChineseQueryTranslator$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ClaudeChatClient.kt$ClaudeChatClient$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:CodeFormerRestorer.kt$CodeFormerRestorer$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DedupScanner.kt$DedupScanner$e: Exception</ID>
     <ID>TooGenericExceptionCaught:EdiffiqaScorer.kt$EdiffiqaScorer$e: Exception</ID>
     <ID>TooGenericExceptionCaught:FaceClusterEngine.kt$FaceClusterEngine$e: Exception</ID>
     <ID>TooGenericExceptionCaught:FeishuChannelHandler.kt$FeishuChannelHandler$e: Exception</ID>
@@ -756,8 +842,10 @@
     <ID>TooGenericExceptionThrown:ClaudeChatClient.kt$ClaudeChatClient$throw RuntimeException("empty body")</ID>
     <ID>TooManyFunctions:AccessibilityActionPerformer.kt$AccessibilityActionPerformer</ID>
     <ID>TooManyFunctions:AiChatScreen.kt$com.mamba.picme.features.common.chat.AiChatScreen.kt</ID>
+    <ID>TooManyFunctions:AppDatabase.kt$AppDatabase : RoomDatabase</ID>
     <ID>TooManyFunctions:CameraDebugOverlay.kt$com.mamba.picme.features.camera.CameraDebugOverlay.kt</ID>
     <ID>TooManyFunctions:CameraThreadRegistry.kt$CameraThreadRegistry</ID>
+    <ID>TooManyFunctions:DedupViewModel.kt$DedupViewModel : ViewModel</ID>
     <ID>TooManyFunctions:FloatingChatBubbleService.kt$FloatingChatBubbleService : Service</ID>
     <ID>TooManyFunctions:GalleryJs.kt$com.mamba.picme.features.chat.js.GalleryJs.kt</ID>
     <ID>TooManyFunctions:GpuBeautyProcessor.kt$GpuBeautyProcessor : BeautyProcessor</ID>
@@ -765,17 +853,20 @@
     <ID>TooManyFunctions:LlmModelManagerScreen.kt$com.mamba.picme.features.settings.LlmModelManagerScreen.kt</ID>
     <ID>TooManyFunctions:Logger.kt$Logger</ID>
     <ID>TooManyFunctions:MediaDao.kt$MediaDao</ID>
+    <ID>TooManyFunctions:MediaPager.kt$com.mamba.picme.features.gallery.components.MediaPager.kt</ID>
     <ID>TooManyFunctions:MediaRepositoryImpl.kt$MediaRepositoryImpl : AndroidMediaRepository</ID>
     <ID>TooManyFunctions:MediaViewModel.kt$MediaViewModel : ViewModel</ID>
     <ID>TooManyFunctions:ModelPathConfig.kt$ModelPathConfig</ID>
     <ID>TooManyFunctions:PersonDao.kt$PersonDao</ID>
     <ID>TooManyFunctions:PersonRelationDao.kt$PersonRelationDao</ID>
     <ID>TooManyFunctions:PersonRepository.kt$PersonRepository</ID>
+    <ID>TooManyFunctions:PoLangApplication.kt$PoLangApplication : ApplicationImageLoaderFactory</ID>
     <ID>TooManyFunctions:QueryParser.kt$QueryParser</ID>
     <ID>TooManyFunctions:RemoteControlToolService.kt$RemoteControlToolService : ToolSet</ID>
     <ID>TooManyFunctions:SampleDataGenerator.kt$SampleDataGenerator</ID>
     <ID>TooManyFunctions:SettingsScreen.kt$com.mamba.picme.features.settings.SettingsScreen.kt</ID>
     <ID>TooManyFunctions:SettingsViewModel.kt$SettingsViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:TagGenerationControlScreen.kt$com.mamba.picme.features.gallery.components.TagGenerationControlScreen.kt</ID>
     <ID>TooManyFunctions:TagGenerationPipeline.kt$TagGenerationPipeline</ID>
     <ID>TooManyFunctions:TagGenerationScheduler.kt$TagGenerationScheduler</ID>
     <ID>TooManyFunctions:TagGenerationService.kt$TagGenerationService$Companion</ID>
@@ -790,21 +881,24 @@
     <ID>UnconditionalJumpStatementInLoop:FaceClusterEngine.kt$FaceClusterEngine$for (person in persons) { val entities = personDao.getEmbeddingsByPerson(person.personId) if (entities.size &lt; minSize) continue val feats = entities.map { entity -&gt; byteArrayToFloatArray(entity.embedding) } val (halfA, halfB) = twoWayPartition(feats) if (halfA.size &lt; 2 || halfB.size &lt; 2) continue val intraA = meanPairwiseSim(feats, halfA) val intraB = meanPairwiseSim(feats, halfB) val cross = meanCrossSim(feats, halfA, halfB) if (intraA &lt; intraMin || intraB &lt; intraMin || cross &gt; crossMax) continue // 较小的一半 spin off 为新 person，较大的一半留在原 person val (keepIdx, spinIdx) = if (halfA.size &gt;= halfB.size) halfA to halfB else halfB to halfA val spinMediaIds = spinIdx.map { idx -&gt; entities[idx].mediaId }.distinct() val newPersonId = personDao.insertPerson( PersonEntity(faceCount = spinIdx.size, coverMediaId = spinMediaIds.firstOrNull()) ) for (idx in spinIdx) { personDao.assignEmbedding(entities[idx].embeddingId, newPersonId) } if (spinMediaIds.isNotEmpty()) { personDao.setMediaFaceIds(spinMediaIds, newPersonId.toString()) } val keepMediaIds = keepIdx.map { idx -&gt; entities[idx].mediaId }.distinct() personDao.updatePersonStats( person.personId, faceCount = keepIdx.size, coverMediaId = keepMediaIds.firstOrNull() ?: person.coverMediaId ) centroidCache.remove(person.personId) totalSplits++ didSplit = true Log.i( TAG, "splitOvermergedClusters: ${person.personId} -&gt; keep ${keepIdx.size} + new $newPersonId ${spinIdx.size} " + "(intraA=${"%.2f".format(intraA)} intraB=${"%.2f".format(intraB)} cross=${"%.2f".format(cross)})" ) break // 拆分后 personId 变化，重新拉 persons }</ID>
     <ID>UnusedImports:AppContainer.kt$import com.mamba.picme.agent.core.facade.AgentOrchestrator</ID>
     <ID>UnusedImports:AppContainer.kt$import com.mamba.picme.data.indexing.IndexingTaskQueue</ID>
+    <ID>UnusedImports:AppTopBar.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:BeautySelectors.kt$import androidx.compose.material.icons.rounded.LineStyle</ID>
+    <ID>UnusedImports:BrowserWebSocketClient.kt$import com.mamba.picme.domain.browser.BrowserStatus</ID>
     <ID>UnusedImports:ChatImageStoreImpl.kt$import android.net.Uri</ID>
     <ID>UnusedImports:ChatScreen.kt$import androidx.compose.animation.core.FastOutSlowInEasing</ID>
     <ID>UnusedImports:ChatScreen.kt$import androidx.compose.animation.core.MutableTransitionState</ID>
     <ID>UnusedImports:ChatScreen.kt$import androidx.compose.animation.core.tween</ID>
     <ID>UnusedImports:ChatScreen.kt$import androidx.compose.animation.slideInVertically</ID>
     <ID>UnusedImports:ChatScreen.kt$import androidx.compose.material.icons.rounded.Edit</ID>
+    <ID>UnusedImports:ChatScreen.kt$import androidx.compose.material3.OutlinedTextField</ID>
     <ID>UnusedImports:ChatScreen.kt$import com.mamba.picme.features.chat.ChatThreadSidebar</ID>
     <ID>UnusedImports:ChatThreadSidebar.kt$import androidx.compose.material.icons.rounded.Search</ID>
-    <ID>UnusedImports:ChatViewModel.kt$import android.content.Context</ID>
     <ID>UnusedImports:ChatViewModel.kt$import com.mamba.picme.agent.core.runtime.execution.InferenceResult</ID>
     <ID>UnusedImports:ChatViewModel.kt$import com.mamba.picme.data.local.ChatMessageDao</ID>
     <ID>UnusedImports:ChatViewModel.kt$import com.mamba.picme.domain.repository.UserSettingsRepository</ID>
     <ID>UnusedImports:ChatViewModel.kt$import kotlinx.coroutines.delay</ID>
     <ID>UnusedImports:ChatViewModelClaudeSidTest.kt$import io.mockk.every</ID>
+    <ID>UnusedImports:FloatingBottomTab.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:FloatingChatBubbleService.kt$import androidx.compose.foundation.clickable</ID>
     <ID>UnusedImports:FloatingChatBubbleService.kt$import androidx.compose.foundation.interaction.MutableInteractionSource</ID>
     <ID>UnusedImports:FloatingChatBubbleService.kt$import androidx.compose.foundation.layout.height</ID>
@@ -819,11 +913,12 @@
     <ID>UnusedImports:GalleryScreen.kt$import androidx.compose.material3.OutlinedTextField</ID>
     <ID>UnusedImports:GalleryScreen.kt$import androidx.compose.material3.Switch</ID>
     <ID>UnusedImports:GalleryScreen.kt$import com.mamba.picme.data.local.entity.PersonEntity</ID>
-    <ID>UnusedImports:GalleryScreen.kt$import com.mamba.picme.domain.person.PersonRepository</ID>
     <ID>UnusedImports:GalleryScreen.kt$import com.mamba.picme.domain.person.RelationSource</ID>
     <ID>UnusedImports:GalleryScreen.kt$import com.mamba.picme.features.common.PersonRelationPicker</ID>
     <ID>UnusedImports:GalleryScreen.kt$import com.mamba.picme.features.common.SearchField</ID>
+    <ID>UnusedImports:HtmlCard.kt$import androidx.compose.ui.input.pointer.changedToUp</ID>
     <ID>UnusedImports:KinshipLexiconTest.kt$import org.junit.Assert.assertTrue</ID>
+    <ID>UnusedImports:MainPagerHost.kt$import androidx.compose.runtime.collectAsState</ID>
     <ID>UnusedImports:MediaIndexingWorker.kt$import com.mamba.picme.data.local.dao.LocationDao</ID>
     <ID>UnusedImports:MediaIndexingWorker.kt$import com.mamba.picme.data.local.dao.OcrWordDao</ID>
     <ID>UnusedImports:MemoryFactsScreen.kt$import androidx.compose.foundation.rememberScrollState</ID>
@@ -835,9 +930,9 @@
     <ID>UnusedImports:ModelSelector.kt$import androidx.compose.ui.graphics.Color</ID>
     <ID>UnusedImports:PersonScreen.kt$import androidx.compose.foundation.layout.displayCutoutPadding</ID>
     <ID>UnusedImports:PoLangApplication.kt$import com.mamba.picme.BuildConfig</ID>
-    <ID>UnusedImports:PoLangApplication.kt$import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs</ID>
     <ID>UnusedImports:PoLangApplication.kt$import kotlinx.coroutines.flow.catch</ID>
     <ID>UnusedImports:PoLangApplication.kt$import kotlinx.coroutines.flow.drop</ID>
+    <ID>UnusedImports:ProviderConfigScreen.kt$import androidx.compose.material.icons.rounded.ExpandMore</ID>
     <ID>UnusedImports:QuickActionBar.kt$import androidx.compose.ui.graphics.Color</ID>
     <ID>UnusedImports:RemoteControlToolService.kt$import com.mamba.picme.beauty.api.BeautySettings</ID>
     <ID>UnusedImports:RemoteControlToolService.kt$import com.mamba.picme.beauty.api.FilterType</ID>
@@ -850,13 +945,20 @@
     <ID>UnusedImports:SettingsAiAgent.kt$import com.mamba.picme.data.download.ModelConfig</ID>
     <ID>UnusedImports:SettingsAiAgent.kt$import java.util.Locale</ID>
     <ID>UnusedImports:SettingsBaseComponents.kt$import androidx.compose.foundation.layout.fillMaxHeight</ID>
-    <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.foundation.layout.Spacer</ID>
+    <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.foundation.layout.width</ID>
+    <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material.icons.automirrored.rounded.Label</ID>
     <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material.icons.rounded.CheckCircle</ID>
     <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material3.HorizontalDivider</ID>
     <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material3.RadioButton</ID>
     <ID>UnusedImports:SettingsVoice.kt$import androidx.compose.foundation.layout.Arrangement</ID>
     <ID>UnusedImports:SystemCapability.kt$import android.content.pm.ApplicationInfo</ID>
-    <ID>UnusedImports:TagGenerationControlScreen.kt$import androidx.compose.ui.text.style.TextAlign</ID>
+    <ID>UnusedImports:TagGenerationControlScreen.kt$import androidx.annotation.StringRes</ID>
+    <ID>UnusedImports:TagGenerationControlScreen.kt$import androidx.compose.animation.core.RepeatMode</ID>
+    <ID>UnusedImports:TagGenerationControlScreen.kt$import androidx.compose.ui.graphics.drawscope.rotate</ID>
+    <ID>UnusedImports:TagGenerationControlScreen.kt$import androidx.compose.ui.graphics.graphicsLayer</ID>
+    <ID>UnusedImports:TagGenerationControlScreen.kt$import com.mamba.picme.domain.tag.scan.ScanStage</ID>
+    <ID>UnusedImports:TagGenerationControlScreen.kt$import com.mamba.picme.domain.tag.scan.TagScanSessionProgress</ID>
+    <ID>UnusedImports:TagGenerationControlScreen.kt$import kotlin.math.roundToInt</ID>
     <ID>UnusedImports:TagGenerationService.kt$import kotlinx.coroutines.flow.StateFlow</ID>
     <ID>UnusedImports:TagGenerationService.kt$import kotlinx.coroutines.flow.asStateFlow</ID>
     <ID>UnusedParameter:AiChatPanel.kt$currentAsset: MediaAsset</ID>
@@ -868,7 +970,6 @@
     <ID>UnusedParameter:BeautyPanel.kt$onDismiss: () -&gt; Unit</ID>
     <ID>UnusedParameter:CameraDebugOverlay.kt$slimFaceValue: Float</ID>
     <ID>UnusedParameter:CameraScreen.kt$settingsViewModel: SettingsViewModel? = null</ID>
-    <ID>UnusedParameter:ChatScreen.kt$onModelMenuToggle: () -&gt; Unit</ID>
     <ID>UnusedParameter:ChatViewModel.kt$ChatViewModel$feedbackState: Map&lt;String, FeedbackAction&gt;</ID>
     <ID>UnusedParameter:ChatViewModel.kt$ChatViewModel$query: String</ID>
     <ID>UnusedParameter:ClaudeAgentRenderer.kt$ClaudeAgentRenderer.Companion$tool: String</ID>
@@ -886,7 +987,10 @@
     <ID>UnusedParameter:MediaSearchEngineFeedbackTest.kt$MediaSearchEngineFeedbackTest$mediaId: String</ID>
     <ID>UnusedParameter:SampleDataGenerator.kt$SampleDataGenerator$bitmap: Bitmap</ID>
     <ID>UnusedParameter:SearchRanker.kt$SearchRanker$filter: StructuredFilter</ID>
-    <ID>UnusedParameter:TagGenerationControlScreen.kt$withLabels: Int</ID>
+    <ID>UnusedParameter:SettingsScreen.kt$onNavigateToTagViewer: () -&gt; Unit = {}</ID>
+    <ID>UnusedParameter:TagGenerationControlScreen.kt$onNavigateToTagViewer: () -&gt; Unit = {}</ID>
+    <ID>UnusedParameter:TagGenerationControlScreen.kt$onOpenBest: () -&gt; Unit = {}</ID>
+    <ID>UnusedParameter:TagGenerationControlScreen.kt$running: Boolean</ID>
     <ID>UnusedParameter:TagGenerationPipeline.kt$TagGenerationPipeline$stage2Result: Stage2Result?</ID>
     <ID>UnusedParameter:TagGenerationScheduler.kt$TagGenerationScheduler$maxPhotos: Int = INCREMENTAL_MAX_PHOTOS</ID>
     <ID>UnusedParameter:TagGenerationScheduler.kt$TagGenerationScheduler$progressCallback: suspend (processed: Int, total: Int) -&gt; Unit = { _, _ -&gt; }</ID>
@@ -898,7 +1002,7 @@
     <ID>UnusedPrivateMember:CameraDebugOverlay.kt$@Composable private fun FaceDebugStatusPanel( requestedLabel: String, requestedColor: Color, detectionLabel: String, detectionColor: Color, modifier: Modifier = Modifier )</ID>
     <ID>UnusedPrivateMember:CameraOverlays.kt$@Composable private fun OcrTextPreviewOverlay( text: String, modifier: Modifier = Modifier )</ID>
     <ID>UnusedPrivateMember:CameraOverlays.kt$private fun DrawScope.drawCorners( color: Color, strokeWidth: Float, bracketLen: Float )</ID>
-    <ID>UnusedPrivateMember:CameraPreviewContent.kt$private fun mapProviderFailReason(reason: String): String</ID>
+    <ID>UnusedPrivateMember:CameraPreviewContent.kt$@Composable private fun mapProviderFailReason(reason: String): String</ID>
     <ID>UnusedPrivateMember:CameraScreen.kt$private fun BeautySettings.requiresFaceDetection(): Boolean</ID>
     <ID>UnusedPrivateMember:FloatingChatBubbleService.kt$FloatingChatBubbleService$private fun updateBubblePosition(deltaX: Float, deltaY: Float)</ID>
     <ID>UnusedPrivateMember:LlmModelDownloadManager.kt$LlmModelDownloadManager$private fun fetchMarketData(): ModelMarketData</ID>
@@ -906,6 +1010,7 @@
     <ID>UnusedPrivateMember:LlmModelDownloadManager.kt$LlmModelDownloadManager$private fun saveCachedMarketData(data: ModelMarketData)</ID>
     <ID>UnusedPrivateMember:LlmModelDownloadManager.kt$LlmModelDownloadManager$private suspend fun fetchFileInfos(sources: Map&lt;String, String&gt;): List&lt;ModelFileInfo&gt;</ID>
     <ID>UnusedPrivateMember:MemoryFactsScreen.kt$@Composable private fun PersonRelationRow( relation: RelationDisplayItem, onEdit: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
+    <ID>UnusedPrivateMember:TagGenerationControlScreen.kt$@Composable private fun SectionHeader(title: String, hint: String? = null)</ID>
     <ID>UnusedPrivateMember:TagGenerationScheduler.kt$TagGenerationScheduler$private fun unloadLlm()</ID>
     <ID>UnusedPrivateMember:TagNormalizer.kt$TagNormalizer$private fun bestMatchAcrossCategories(input: String): String</ID>
     <ID>UnusedPrivateProperty:AiAgentUseCase.kt$AiAgentUseCase$context: Context</ID>
@@ -921,7 +1026,6 @@
     <ID>UnusedPrivateProperty:FloatingChatBubbleService.kt$val scope = rememberCoroutineScope()</ID>
     <ID>UnusedPrivateProperty:GalleryScreen.kt$val currentMedia = selectedMediaIndex?.let { allFlatMedia.getOrNull(it) }</ID>
     <ID>UnusedPrivateProperty:GalleryScreen.kt$val selectedItems = selectedIds.mapNotNull { mediaById[it] }</ID>
-    <ID>UnusedPrivateProperty:GlobalAgentPanel.kt$val context = LocalContext.current</ID>
     <ID>UnusedPrivateProperty:IdCardRecognizer.kt$IdCardRecognizer$private val context: Context</ID>
     <ID>UnusedPrivateProperty:ImageProcessor.kt$ImageProcessorImpl$private val beautyProcessor: BeautyProcessor</ID>
     <ID>UnusedPrivateProperty:KeywordSpotterEngineTest.kt$KeywordSpotterEngineTest$/** * KWS 模型必需文件列表（与 KeywordSpotterEngine 内部保持一致） */ private val requiredKwsFiles = listOf( "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "tokens.txt", "keywords.txt" )</ID>
@@ -934,8 +1038,7 @@
     <ID>UnusedPrivateProperty:OpenClGuardian.kt$OpenClGuardian$private val context: Context</ID>
     <ID>UnusedPrivateProperty:PersonRelationCapability.kt$PersonRelationCapability$val result = personRepository.declareRelation( subjectPersonId = person.personId, predicate = predicate, source = RelationSource.CHAT_DECLARATION, customLabel = customLabel )</ID>
     <ID>UnusedPrivateProperty:RestoreTagDataUseCase.kt$RestoreTagDataUseCase$private val context: Context</ID>
-    <ID>UnusedPrivateProperty:TagGenerationControlScreen.kt$val isCancelled = currentState == ScanSessionState.CANCELLED</ID>
-    <ID>UnusedPrivateProperty:TagGenerationControlScreen.kt$val isCancelling = currentState == ScanSessionState.CANCELLING</ID>
+    <ID>UnusedPrivateProperty:TagGenerationControlScreen.kt$val currentState = sessionProgress?.state</ID>
     <ID>UnusedPrivateProperty:TagGenerationScheduler.kt$TagGenerationScheduler$private var currentJob: Job? = null</ID>
     <ID>UnusedPrivateProperty:TagGenerationScheduler.kt$TagGenerationScheduler.Companion$/** 批次大小：每处理此数量照片后强制冷却 */ private const val BATCH_SIZE = 10</ID>
     <ID>UnusedPrivateProperty:TagGenerationScheduler.kt$TagGenerationScheduler.Companion$/** 批次间强制冷却时间（ms） */ private const val BATCH_COOLDOWN_MS = 15_000L</ID>
@@ -952,7 +1055,8 @@
     <ID>UseCheckOrError:RemoteControlToolService.kt$RemoteControlToolService$throw IllegalStateException("UI thread operation timed out after ${timeoutMs}ms")</ID>
     <ID>UseCheckOrError:SentencePieceTestViewModel.kt$SentencePieceTestViewModel$throw IllegalStateException("Source model not found: $sourceModelPath")</ID>
     <ID>UseCheckOrError:SentencePieceTestViewModel.kt$SentencePieceTestViewModel$throw IllegalStateException("Target model not found: $targetModelPath")</ID>
-    <ID>UseIfInsteadOfWhen:AgentChatComponents.kt$when (cmd) { is AgentCommand.BatchExecute -&gt; { val total = cmd.commands.size cmd.commands.mapIndexed { index, subCmd -&gt; AgentMessage.CommandExecution( commandName = getAgentCommandDisplayName(subCmd), commandIcon = resolveCommandIcon(subCmd), status = AgentMessage.CommandExecution.Status.SUCCESS, detail = getAgentCommandDetail(subCmd), index = index + 1, total = total ) } } else -&gt; listOf( AgentMessage.CommandExecution( commandName = getAgentCommandDisplayName(cmd), commandIcon = resolveCommandIcon(cmd), status = AgentMessage.CommandExecution.Status.SUCCESS, detail = getAgentCommandDetail(cmd), index = 0, total = 1 ) ) }</ID>
+    <ID>UseCheckOrError:TagGenerationScheduler.kt$TagGenerationScheduler$throw IllegalStateException("Face clustering OOM at ${flatIndex.size} faces")</ID>
+    <ID>UseIfInsteadOfWhen:AgentChatComponents.kt$when (cmd) { is AgentCommand.BatchExecute -&gt; { val total = cmd.commands.size cmd.commands.mapIndexed { index, subCmd -&gt; AgentMessage.CommandExecution( commandName = getAgentCommandDisplayName(context, subCmd), commandIcon = resolveCommandIcon(subCmd), status = AgentMessage.CommandExecution.Status.SUCCESS, detail = getAgentCommandDetail(context, subCmd), index = index + 1, total = total ) } } else -&gt; listOf( AgentMessage.CommandExecution( commandName = getAgentCommandDisplayName(context, cmd), commandIcon = resolveCommandIcon(cmd), status = AgentMessage.CommandExecution.Status.SUCCESS, detail = getAgentCommandDetail(context, cmd), index = 0, total = 1 ) ) }</ID>
     <ID>UseIfInsteadOfWhen:AiOptimizeCapability.kt$AiOptimizeCapability$when (command) { COMMAND_NAME -&gt; "AI 一键优化图片，参数: image_uri (图片URI)" else -&gt; "未知命令" }</ID>
     <ID>UseIfInsteadOfWhen:AiOptimizeCapability.kt$AiOptimizeCapability$when (pageContext) { is GalleryContext -&gt; pageContext.currentMedia?.uri.orEmpty() else -&gt; "" }</ID>
     <ID>UseIfInsteadOfWhen:CameraRuntimeState.kt$when (aspectRatio) { AspectRatio.RATIO_FULL -&gt; PreviewView.ScaleType.FILL_CENTER else -&gt; PreviewView.ScaleType.FIT_CENTER }</ID>
@@ -961,32 +1065,30 @@
     <ID>UseIfInsteadOfWhen:FaceClusterEngine.kt$FaceClusterEngine$when { (counts[bestA] ?: 0) &lt;= smallSize &amp;&amp; (counts[bestB] ?: 0) &lt;= smallSize -&gt; min(threshold, smallThreshold) else -&gt; threshold }</ID>
     <ID>UseIfInsteadOfWhen:FloatingChatBubbleService.kt$FloatingChatBubbleService$when (action) { ACTION_STOP -&gt; { stopSelf() return START_NOT_STICKY } else -&gt; { startForeground(NOTIFICATION_ID, buildNotification()) if (!isPanelExpanded) showBubble() } }</ID>
     <ID>UseIfInsteadOfWhen:LlmCallLogScreen.kt$when { anchor != null -&gt; LlmTurnDetailPager( anchor = anchor, vm = vm, onBack = { detailAnchor = null }, modifier = Modifier.fillMaxSize().padding(padding) ) else -&gt; { Column(modifier = Modifier.fillMaxSize().padding(padding)) { TabRow(selectedTabIndex = selectedTab.ordinal) { Tab( selected = selectedTab == LogTab.LLM, onClick = { selectedTab = LogTab.LLM }, text = { Text(stringResource(R.string.llm_call_log_tab_llm)) } ) Tab( selected = selectedTab == LogTab.TOOL, onClick = { selectedTab = LogTab.TOOL }, text = { Text(stringResource(R.string.llm_call_log_tab_tool)) } ) Tab( selected = selectedTab == LogTab.JS, onClick = { selectedTab = LogTab.JS }, text = { Text(stringResource(R.string.llm_call_log_tab_js)) } ) } val isEmpty = when (selectedTab) { LogTab.LLM -&gt; items.isEmpty() LogTab.TOOL -&gt; toolItems.isEmpty() LogTab.JS -&gt; jsRunItems.isEmpty() } if (isEmpty) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text( text = stringResource(R.string.llm_call_log_empty), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant ) } } else { LazyColumn( modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp) ) { when (selectedTab) { LogTab.LLM -&gt; items(items, key = { it.id }) { row -&gt; LlmCallLogRow(row = row) { detailAnchor = TurnRecordItem.Llm(it) } } LogTab.TOOL -&gt; items(toolItems, key = { it.id }) { row -&gt; ToolCallLogRow(row = row) { detailAnchor = TurnRecordItem.Tool(it) } } LogTab.JS -&gt; items(jsRunItems, key = { it.id }) { row -&gt; JsRunLogRow(row = row) { detailAnchor = TurnRecordItem.Js(it) } } } } } } } }</ID>
+    <ID>UseIfInsteadOfWhen:MainActivity.kt$MainActivity$when (destination) { NavigationCapability.Destination.GALLERY -&gt; switchMainPage(MAIN_PAGE_GALLERY) else -&gt; Unit }</ID>
     <ID>UseIfInsteadOfWhen:MediaRepositoryImpl.kt$MediaRepositoryImpl$when (mediaType) { MediaType.VIDEO -&gt; 2L else -&gt; 1L }</ID>
+    <ID>UseIfInsteadOfWhen:MediaSearchEngine.kt$MediaSearchEngine$when { resolved.personIds.size &gt;= 2 -&gt; { val ids = resolved.personIds.toList() dao.getMediaByPersonsCooccurrence(ids, ids.size) .mapTo(mutableSetOf()) { it.id } } else -&gt; { val personId = resolved.personIds.first() dao.getMediaByPerson(personId).mapTo(mutableSetOf()) { it.id } } }</ID>
     <ID>UseIfInsteadOfWhen:PexelsSection.kt$when (kind) { PexelsErrorKind.RATE_LIMITED -&gt; R.string.pexels_error_rate_limited else -&gt; R.string.pexels_error_network }</ID>
     <ID>UseIfInsteadOfWhen:PexelsSection.kt$when (val s = state) { is PexelsUiState.NoKey -&gt; PexelsKeyInput( invalidPrevious = s.invalidPrevious, onSave = viewModel::saveKey ) else -&gt; { PexelsTopBar( onSearch = viewModel::search, onChangeKey = viewModel::clearKey ) Box(modifier = Modifier.weight(1f)) { when (s) { PexelsUiState.Loading -&gt; PexelsLoading() is PexelsUiState.Error -&gt; PexelsError( kind = s.kind, onRetry = viewModel::retry ) is PexelsUiState.Ready -&gt; PexelsPhotoGrid( state = s, onToggle = viewModel::toggleSelect, onLoadMore = viewModel::loadMore ) is PexelsUiState.NoKey -&gt; Unit } } PexelsAttribution() if (s is PexelsUiState.Ready) { PexelsDownloadBar( state = s, onDownloadSelected = viewModel::downloadSelected, onDownloadBatch = viewModel::downloadBatch ) } } }</ID>
     <ID>UseIfInsteadOfWhen:PlanProgressBubble.kt$when (state) { is ExecutionState.Running -&gt; state.completedSteps to state.totalSteps else -&gt; 0 to plan.steps.size }</ID>
-    <ID>UseIfInsteadOfWhen:QueryParser.kt$QueryParser$when (lang) { AppLanguage.ENGLISH -&gt; ENGLISH_STOP_WORDS else -&gt; CHINESE_STOP_WORDS }</ID>
     <ID>UseIfInsteadOfWhen:QuerySegmenter.kt$QuerySegmenter$when (segment.type) { SegmentType.OCR -&gt; ocrKeywords.add(segment.text) else -&gt; contentKeywords.add(segment.text) }</ID>
     <ID>UseIfInsteadOfWhen:RemoteControlToolService.kt$RemoteControlToolService$when { rootView is RecyclerView -&gt; { val d = if (isPage) rootView.height else rootView.height / 3 rootView.smoothScrollBy(0, if (dir == "down") d else -d) "Scrolled $direction in RecyclerView" } else -&gt; { val recyclerView = findRecyclerView(rootView) if (recyclerView != null) { val d = if (isPage) recyclerView.height else recyclerView.height / 3 recyclerView.smoothScrollBy(0, if (dir == "down") d else -d) "Scrolled $direction in RecyclerView" } else { val scrollView = findScrollView(rootView) if (scrollView != null) { val d = if (isPage) scrollView.height else scrollView.height / 3 scrollView.smoothScrollBy(0, if (dir == "down") d else -d) "Scrolled $direction in ScrollView" } else { "Error: No scrollable container found on current screen" } } } }</ID>
     <ID>UseIfInsteadOfWhen:SettingsViewModel.kt$SettingsViewModel$when (modelType) { DetectionModelType.DET_500M_MNN -&gt; { if (modelDownloadManager.isModelDownloaded("face-det-retina500m-mnn")) { "face-det-retina500m-mnn" } else if (modelDownloadManager.isModelDownloaded("face-det-retina10g-mnn")) { "face-det-retina10g-mnn" } else { "face-det-retina500m-mnn" } } else -&gt; null }</ID>
     <ID>UseIfInsteadOfWhen:SettingsViewModel.kt$SettingsViewModel$when (modelType) { DetectionModelType.FACE_2D106_MNN -&gt; "face-landmark-2d106-mnn" else -&gt; null }</ID>
     <ID>UseIfInsteadOfWhen:TagDataBackupRepository.kt$TagDataBackupRepository$when (name) { // 兼容枚举重命名前的旧备份：QWEN_TAGGING → IMAGE_TAGGING "QWEN_TAGGING" -&gt; TagScanPass.IMAGE_TAGGING else -&gt; runCatching { TagScanPass.valueOf(name) }.getOrDefault(TagScanPass.IMAGE_TAGGING) }</ID>
+    <ID>UseIfInsteadOfWhen:Theme.kt$when { dynamicColor &amp;&amp; Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S -&gt; colorScheme.surfaceContainerLowest else -&gt; if (darkTheme) CellDark else CellLight }</ID>
     <ID>UseIfInsteadOfWhen:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$when (view) { is TextView -&gt; view.text?.toString()?.trim() else -&gt; view.contentDescription?.toString()?.trim() }</ID>
     <ID>UseIfInsteadOfWhen:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$when (view) { is TextView -&gt; { val text = view.text?.toString()?.trim() if (!text.isNullOrEmpty()) { out.put("text", if (text.length &gt; MAX_TEXT_LENGTH) text.take(MAX_TEXT_LENGTH) + "…" else text) } if (view.contentDescription?.isNotEmpty() == true) { out.put("content_desc", view.contentDescription) } } else -&gt; { if (view.contentDescription?.isNotEmpty() == true) { out.put("content_desc", view.contentDescription) } } }</ID>
     <ID>UseRequire:FaceClusterEngine.kt$FaceClusterEngine$throw IllegalArgumentException("Invalid crop region: x=$cropX, y=$cropY, w=$cropW, h=$cropH")</ID>
     <ID>VariableNaming:RemoteCommandDispatcher.kt$RemoteCommandDispatcher$/** ReAct 循环超时（毫秒）— 多轮交互需要更长 timeout */ private val TIMEOUT_MS = 120_000L</ID>
-    <ID>WildcardImport:AgentChatComponents.kt$import androidx.compose.material.icons.rounded.*</ID>
     <ID>WildcardImport:AiAgentUseCaseParseTest.kt$import org.junit.Assert.*</ID>
-    <ID>WildcardImport:AiChatScreen.kt$import androidx.compose.material.icons.rounded.*</ID>
     <ID>WildcardImport:BeautySettingsTest.kt$import org.junit.Assert.*</ID>
-    <ID>WildcardImport:CameraCommandMessages.kt$import androidx.compose.material.icons.rounded.*</ID>
     <ID>WildcardImport:GetGroupedMediaUseCaseTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:LipColorAlgorithmTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:SentencePieceTestScreen.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:SentencePieceTestScreen.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:SentencePieceTestScreen.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:TagGenerationControlScreen.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:TagGenerationControlScreen.kt$import androidx.compose.material.icons.rounded.*</ID>
     <ID>WildcardImport:TagGenerationControlScreen.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:TagGenerationControlScreen.kt$import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:ToolSpecificationTest.kt$import org.junit.Assert.*</ID>

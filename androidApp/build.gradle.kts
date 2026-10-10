@@ -381,5 +381,7 @@ if (playChannelBuild.get()) {
     android.sourceSets.getByName("release") {
         manifest.srcFile("src/release/play/AndroidManifest.xml")
     }
-    logger.lifecycle("PoLang:PlayChannel release manifest overlay -> src/release/play/AndroidManifest.xml（REQUEST_INSTALL_PACKAGES 不参与 merge）")
+    logger.lifecycle(
+        "PoLang:PlayChannel release manifest overlay -> src/release/play/AndroidManifest.xml（REQUEST_INSTALL_PACKAGES 不参与 merge）",
+    )
 }
