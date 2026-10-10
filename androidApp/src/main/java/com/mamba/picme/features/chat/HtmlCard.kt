@@ -56,7 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDown
@@ -460,34 +460,34 @@ private fun HtmlWebView(
                 // 竖直拖动不消费——LazyColumn 正常接管。
                 // 点击不消费——WebView 内点击/超链接正常。
                 //
-                // 用 awaitEachGesture + awaitPointerEvent(PointerEventPass.Initial) 而非
-                // forEachGesture：awaitEachGesture 内部从 Main pass 开始，会错过 Initial pass
-                // 中 HorizontalPager 的拖拽起始事件。awaitPointerEvent(Initial) 确保我们在
-                // Pager 之前看到手势。
-                awaitEachGesture {
-                    // 先吃掉 Main pass 的 ACTION_DOWN（awaitEachGesture 内部机制），
-                    // 然后主动切到 Initial pass 拦截水平拖动
-                    val downMain = awaitPointerEvent(PointerEventPass.Main)
-                    if (downMain.changes.none { it.changedToDown() }) return@awaitEachGesture
+                // 用 forEachGesture 而非 awaitEachGesture：awaitEachGesture 内部从 Main pass
+                // 开始，会错过 Initial pass 中 HorizontalPager 的拖拽起始事件。
+                // forEachGesture + awaitPointerEventScope 让我们从 Initial pass 开始拦截。
+                forEachGesture {
+                    awaitPointerEventScope {
+                        // Initial pass：等待手指按下（在 HorizontalPager 之前）
+                        val downInitial = awaitPointerEvent(PointerEventPass.Initial)
+                        if (downInitial.changes.none { it.changedToDown() }) return@awaitPointerEventScope
 
-                    while (true) {
-                        // Initial pass：在 HorizontalPager 之前拦截水平手势
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull() ?: break
+                        while (true) {
+                            // Initial pass：在 HorizontalPager 之前拦截水平手势
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull() ?: break
 
-                        if (change.changedToUp()) break
+                            if (change.changedToUp()) break
 
-                        if (change.pressed) {
-                            val dragAmount = change.position - change.previousPosition
-                            if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y)) {
-                                // 水平拖动：在 Initial pass consume，
-                                // HorizontalPager 在 Initial pass 中就看不到手势，无法开始拖拽
-                                change.consume()
-                                // 手动转发水平滚动给 WebView 内容
-                                webViewRef?.scrollBy(
-                                    (-dragAmount.x).toInt(),
-                                    0
-                                )
+                            if (change.pressed) {
+                                val dragAmount = change.position - change.previousPosition
+                                if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y)) {
+                                    // 水平拖动：在 Initial pass consume，
+                                    // HorizontalPager 在 Initial pass 中就看不到手势，无法开始拖拽
+                                    change.consume()
+                                    // 手动转发水平滚动给 WebView 内容
+                                    webViewRef?.scrollBy(
+                                        (-dragAmount.x).toInt(),
+                                        0
+                                    )
+                                }
                             }
                         }
                     }
