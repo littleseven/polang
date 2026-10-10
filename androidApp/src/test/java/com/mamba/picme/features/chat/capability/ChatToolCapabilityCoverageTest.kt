@@ -41,7 +41,14 @@ class ChatToolCapabilityCoverageTest {
         "launch_app" to "SystemCapability（依赖 Context）",
         "open_system_settings" to "SystemCapability（依赖 Context）",
         "delay" to "registry 内建（AgentCommand.Delay 由 CapabilityRegistry 直接处理）",
-        "finish" to "agent 控制指令（无对应 AgentCommand）"
+        "finish" to "agent 控制指令（无对应 AgentCommand）",
+        "browser_open" to "BrowserSessionCapability（BrowserTransport 容器注入）",
+        "browser_navigate" to "BrowserSessionCapability（BrowserTransport 容器注入）",
+        "browser_click" to "BrowserSessionCapability（BrowserTransport 容器注入）",
+        "browser_type" to "BrowserSessionCapability（BrowserTransport 容器注入）",
+        "browser_extract" to "BrowserSessionCapability（BrowserTransport 容器注入）",
+        "browser_screenshot" to "BrowserSessionCapability（BrowserTransport 容器注入）",
+        "browser_close" to "BrowserSessionCapability（BrowserTransport 容器注入）"
     )
 
     private val covered: Set<String> = (
