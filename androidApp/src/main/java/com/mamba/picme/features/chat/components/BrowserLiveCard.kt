@@ -37,8 +37,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -70,31 +68,18 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * 云端浏览器直播卡（spec §4，INLINE 形态，M2 WebSocket 推流）：
- * 最新帧大图 + 页面标题/URL + 最近 3 步动作流水；会话中经 [onWatchSession] 启动 WS 推流，
- * 离开组合经 [onUnwatchSession] 断开；定格/失败渲染终态。点按帧进全屏预览（[BrowserFramePreviewOverlay]）。
+ * 云端浏览器直播卡（spec §4，INLINE 形态）：
+ * 最新帧大图 + 页面标题/URL + 最近 3 步动作流水；定格/失败渲染终态。
+ * 帧来源 = 动作级截图（改状态工具动作带 wantFrame，经 delegate 回灌 live 态），INLINE 卡不发起推流；
+ * WS 推流只挂全屏接管页（[BrowserFramePreviewOverlay] 打开期间，由调用侧驱动 watch/unwatch）。
  */
 @Composable
 fun BrowserLiveCard(
     part: MessagePart.BrowserLive,
-    onWatchSession: (String) -> Unit,
-    onUnwatchSession: (String) -> Unit,
     onOpenFullPreview: (String) -> Unit, // 传 base64 帧
     modifier: Modifier = Modifier,
 ) {
-    // WS 推流：仅会话进行中连接；离开组合（划出视口）经 DisposableEffect 断开
-    // （LaunchedEffect 取消不会执行 else 分支，单靠它会在卡片滚出视口后泄漏 WS 连接）
     val running = part.state != ToolPartState.OUTPUT_AVAILABLE && part.state != ToolPartState.OUTPUT_ERROR
-    LaunchedEffect(part.sessionId, running) {
-        if (running) {
-            onWatchSession(part.sessionId)
-        } else {
-            onUnwatchSession(part.sessionId)
-        }
-    }
-    DisposableEffect(part.sessionId) {
-        onDispose { onUnwatchSession(part.sessionId) }
-    }
 
     Column(
         modifier = modifier
