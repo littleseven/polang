@@ -1,7 +1,10 @@
 package com.mamba.picme.features.chat.components
 
+import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -58,6 +61,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.Spacing
@@ -201,6 +205,8 @@ fun BrowserFramePreviewOverlay(
     var isZoomMode by remember { mutableStateOf(false) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     var inputText by remember { mutableStateOf("") }
+    // === VNC 推流实验开关（throwaway spike 2026-10-10，验完即删，不合 main）===
+    var showNoVncSpike by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -213,7 +219,12 @@ fun BrowserFramePreviewOverlay(
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (bitmap != null) {
+        if (showNoVncSpike) {
+            // === VNC 推流实验（throwaway spike 2026-10-10）===
+            // WebView 直接加载 noVNC（HK nginx /novnc-exp/ → Tailscale → xuxing websockify → Xvnc headed Chrome）。
+            // 触摸/缩放由 noVNC 前端自处理；resize=scale 让 1920x1080 桌面适配屏幕。
+            NoVncSpikeWebView(modifier = Modifier.fillMaxSize())
+        } else if (bitmap != null) {
             val imageModifier = if (isZoomMode) {
                 Modifier
                     .fillMaxSize()
@@ -284,6 +295,18 @@ fun BrowserFramePreviewOverlay(
                 .padding(Spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
+            // === VNC 推流实验切换（throwaway spike 2026-10-10，验完即删）===
+            TextButton(
+                onClick = { showNoVncSpike = !showNoVncSpike },
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.5f))
+            ) {
+                Text(
+                    text = "VNC",
+                    color = if (showNoVncSpike) Color.Green else Color.White
+                )
+            }
             // 模式切换
             IconButton(
                 onClick = {
@@ -323,8 +346,8 @@ fun BrowserFramePreviewOverlay(
             }
         }
 
-        // 底部输入区（仅 Interact 模式）
-        if (!isZoomMode) {
+        // 底部输入区（仅 Interact 模式；noVNC 实验态由 noVNC 前端自处理输入）
+        if (!isZoomMode && !showNoVncSpike) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -407,4 +430,31 @@ private fun rememberBrowserFrameBitmap(frameBase64: String): ImageBitmap? {
         }
     }
     return bitmap
+}
+
+// === VNC 推流实验（throwaway spike 2026-10-10，验完即删，不合 main）===
+// 链路：App WebView → https://api.polang.net/novnc-exp/（HK nginx，正式证书）
+//   → wss /novnc-exp/websockify?t=***（token 门禁）→ Tailscale → xuxing websockify:6080 → Xvnc:99 headed Chrome。
+// 实验结论用于决定 headed/VNC 路线是否值得做正式实现（对比现有 CDP JPEG 管线）。
+private const val NOVNC_SPIKE_URL =
+    "https://api.polang.net/novnc-exp/vnc_lite.html" +
+        "?resize=scale" +
+        "&path=novnc-exp/websockify?t=vncexp26" +
+        "&password=PoVNC26x"
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun NoVncSpikeWebView(modifier: Modifier = Modifier) {
+    AndroidView(
+        factory = { context ->
+            WebView(context).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                webViewClient = WebViewClient()
+                loadUrl(NOVNC_SPIKE_URL)
+            }
+        },
+        onRelease = { webView -> webView.destroy() },
+        modifier = modifier
+    )
 }
