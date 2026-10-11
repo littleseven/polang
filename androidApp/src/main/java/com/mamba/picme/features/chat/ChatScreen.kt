@@ -955,6 +955,10 @@ fun ChatScreen(
                     onAction = { action, params ->
                         viewModel.sendBrowserAction(preview.sessionId, action, params)
                     },
+                    // M2.6 Muse 形态：接管=登记豁免+停 agent；交还=解除豁免；停止任务=close 会话
+                    onTakeControl = { viewModel.takeControlBrowserSession(preview.sessionId) },
+                    onReturnControl = { viewModel.releaseBrowserSessionControl(preview.sessionId) },
+                    onStopTask = { viewModel.stopBrowserSession(preview.sessionId) },
                     onClose = {
                         // 会话仍 running 时退出：提示会话存活、可从卡片重新进入
                         if (sessionRunning) {

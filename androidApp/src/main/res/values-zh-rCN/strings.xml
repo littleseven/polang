@@ -1628,6 +1628,11 @@
     <string name="browser_takeover_exit_hint_running">会话继续运行，可从卡片重新进入</string>
     <string name="browser_takeover_paused_toast">已暂停</string>
     <string name="browser_takeover_zoom_hint">双指缩放 · 单指平移 · 双击复位</string>
+    <string name="browser_takeover_take_control">接管浏览器</string>
+    <string name="browser_takeover_in_control">你正在控制</string>
+    <string name="browser_takeover_return_control">交还控制</string>
+    <string name="browser_takeover_stop_task">停止任务</string>
+    <string name="browser_takeover_back_to_chat">返回对话</string>
     <string name="chat_cmd_browser_open">打开浏览器</string>
     <string name="chat_cmd_browser_navigate">网页导航</string>
     <string name="chat_cmd_browser_click">点击元素</string>

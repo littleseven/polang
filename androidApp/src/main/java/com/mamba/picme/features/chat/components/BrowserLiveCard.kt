@@ -193,17 +193,23 @@ fun BrowserLiveCard(
 private const val FRAME_STALE_MS = 5_000L
 
 /**
- * 浏览器直播帧全屏交互接管（M2 takeover → M2.5 重构：三段布局 + 暂停 + 特殊键）：
- * - 顶栏：返回（左上，替代原右上 Close X）+ 状态胶囊（LIVE/已暂停/会话已结束/重连中 + 页面域名）
- *   + 暂停/继续 + 模式切换；圆形半透明按钮风格沿用现状。
- * - 帧区：ContentScale.Fit 居中；结束态叠 30% 黑 + 「会话已结束」水印，暂停态定格 + 「已暂停」水印。
- * - 底栏（仅 Interact 模式）：IME 附件行（⏎ Enter / Tab / Esc，仅键盘弹出可见）+ 输入行；
- *   imePadding 只挂底栏，键盘弹出帧区不重排；发送后清空文本不收键盘。
- * 两种模式——
- * - **Interact**（默认）：点按→clickAt（[mapOffsetToPage] 屏幕→CSS 页面坐标）、拖动→scroll（20px 节流）、
- *   双指捏合→自动切 Zoom 模式并完成本次缩放；帧外黑边无操作。
- * - **Zoom**：双指 1x~5x 缩放 / 单指平移 / 双击复位；底栏隐藏，首次进入显示一次性手势提示。
- * 系统返回/顶栏返回：Zoom 且 scale>1x 先复位，否则退出。
+ * 浏览器直播帧全屏接管页（M2 takeover → M2.5 三段布局 → M2.6 复刻 Meta Muse 观看窗形态）。
+ * 三态状态机（observing/in_control 为 overlay 本地态，ended 由 sessionRunning 驱动）——
+ * - **observing**（默认，running 且未接管）：顶栏仅 返回 + 状态胶囊（LIVE/重连中 + 域名）；
+ *   帧区只读缩放（双指 1x~5x / 单指平移 / 双击复位），点击与拖动不下发任何 action；
+ *   底部唯一大胶囊 CTA「接管浏览器」。
+ * - **in_control**（点 CTA 进入）：进入即 [onTakeControl]（VM 登记受控豁免 + 停 agent ≈
+ *   Muse「接管即暂停 agent」；无真暂停/续跑基建，交还不续跑——差异登记于 chat.yaml §18）；
+ *   顶栏胶囊「你正在控制」（蓝点）+ 暂停推流 + Interact/Zoom 子模式切换；
+ *   帧区 Interact：点按→clickAt（[mapOffsetToPage] 屏幕→CSS 页面坐标）、拖动→scroll
+ *   （20px 节流）、捏合→自动切 Zoom 子模式并完成本次缩放；
+ *   底栏 = 控制行（交还控制 | 停止任务）+ IME 附件行（⏎/Tab/Esc 仅键盘弹出可见）+ 输入行。
+ *   交还控制 = 回 observing（暂停中则自动恢复推流）；停止任务 = [onStopTask] close 会话，
+ *   状态随 onBrowserSessionClosed 自然流转 ended。
+ * - **ended**（会话终态）：叠 30% 黑 + 「会话已结束」水印；帧区同 observing 只读缩放；
+ *   底部「返回对话」大胶囊 CTA（无输入行——死会话不暴露输入）。
+ * 顶栏状态胶囊五态优先级：已结束(灰) > 已暂停(黄) > 重连中(橙,FRAME_STALE_MS) > 你正在控制(蓝) > LIVE(绿)。
+ * 系统返回/顶栏返回：缩放 scale>1x 先复位，否则退出。
  * 暂停 = 客户端停流不停会话：帧定格在暂停时刻，action 全部拦截并 toast「已暂停」；
  * 暂停期间由调用侧（ChatScreen）经 [onPausedChanged] unwatch 停推流，恢复 re-watch。
  */
@@ -217,12 +223,16 @@ fun BrowserFramePreviewOverlay(
     currentUrl: String?,
     onPausedChanged: (Boolean) -> Unit,
     onAction: (String, JSONObject) -> Unit,
+    onTakeControl: () -> Unit,
+    onReturnControl: () -> Unit,
+    onStopTask: () -> Unit,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
     val pausedToast = stringResource(R.string.browser_takeover_paused_toast)
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var inControl by rememberSaveable { mutableStateOf(false) }
     var isZoomMode by remember { mutableStateOf(false) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     var inputText by remember { mutableStateOf("") }
@@ -231,6 +241,8 @@ fun BrowserFramePreviewOverlay(
     var pausedFrame by remember { mutableStateOf<String?>(null) }
     val displayFrame = pausedFrame ?: frame
     val bitmap = rememberBrowserFrameBitmap(displayFrame)
+    // 会话终态强制 ended：受控态随之失效（派生值，不写回避免组合期副作用）
+    val effectiveInControl = sessionRunning && inControl
 
     // 重连启发式：running 且未暂停时，FRAME_STALE_MS 无新帧 → ↻ 重连中
     var lastFrameAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -248,11 +260,12 @@ fun BrowserFramePreviewOverlay(
         }
     }
 
-    // Zoom 模式首次进入显示一次性手势提示（3.5s 自动消失；提前切走则下次进入再提示）
+    // 缩放首次启用（observing 捏合 / in_control Zoom 子模式）显示一次性手势提示（3.5s 自动消失）
     var zoomHintShown by rememberSaveable { mutableStateOf(false) }
     var zoomHintVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(isZoomMode) {
-        if (isZoomMode && !zoomHintShown) {
+    val zoomEngaged = isZoomMode || scale > 1.01f
+    LaunchedEffect(zoomEngaged) {
+        if (zoomEngaged && !zoomHintShown) {
             zoomHintShown = true
             zoomHintVisible = true
             delay(3500)
@@ -289,9 +302,9 @@ fun BrowserFramePreviewOverlay(
         }
     }
 
-    // 返回：Zoom 且 scale>1x 先复位，否则退出
+    // 返回：缩放 scale>1x 先复位，否则退出
     val exitOrResetZoom: () -> Unit = {
-        if (isZoomMode && scale > 1.01f) {
+        if (scale > 1.01f) {
             scale = 1f
             offset = Offset.Zero
         } else {
@@ -319,7 +332,46 @@ fun BrowserFramePreviewOverlay(
         contentAlignment = Alignment.Center
     ) {
         if (bitmap != null) {
-            val imageModifier = if (isZoomMode) {
+            // in_control 的 Interact 子模式 = 坐标交互；其余（observing / ended / in_control Zoom）= 只读缩放
+            val imageModifier = if (effectiveInControl && !isZoomMode) {
+                Modifier
+                    .fillMaxSize()
+                    .padding(Spacing.lg)
+                    .onSizeChanged { containerSize = it }
+                    .pointerInput(sessionId) {
+                        detectTapGestures { tapOffset ->
+                            val page = mapOffsetToPage(
+                                tapOffset, containerSize, frameWidth, frameHeight
+                            )
+                            if (page != null) {
+                                tryDispatch("clickAt", JSONObject()
+                                    .put("x", page.x.toInt())
+                                    .put("y", page.y.toInt()))
+                            }
+                        }
+                    }
+                    .pointerInput(sessionId) {
+                        // 单指拖动 → scroll（20px 节流，取反：手指下滑=内容跟随=页面上滚 wheel 负值）；
+                        // 双指捏合 → 自动切 Zoom 子模式并完成本次缩放
+                        var accumulated = Offset.Zero
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            if (zoom != 1f) {
+                                isZoomMode = true
+                                val nextScale = (scale * zoom).coerceIn(1f, 5f)
+                                scale = nextScale
+                                offset = if (nextScale <= 1.01f) Offset.Zero else offset + pan
+                            } else {
+                                accumulated += pan
+                                if (accumulated.y > 20 || accumulated.y < -20) {
+                                    tryDispatch("scroll", JSONObject()
+                                        .put("dx", 0)
+                                        .put("dy", -accumulated.y.toInt()))
+                                    accumulated = Offset.Zero
+                                }
+                            }
+                        }
+                    }
+            } else {
                 Modifier
                     .fillMaxSize()
                     .padding(Spacing.lg)
@@ -342,44 +394,6 @@ fun BrowserFramePreviewOverlay(
                         translationX = offset.x
                         translationY = offset.y
                     }
-            } else {
-                Modifier
-                    .fillMaxSize()
-                    .padding(Spacing.lg)
-                    .onSizeChanged { containerSize = it }
-                    .pointerInput(sessionId) {
-                        detectTapGestures { tapOffset ->
-                            val page = mapOffsetToPage(
-                                tapOffset, containerSize, frameWidth, frameHeight
-                            )
-                            if (page != null) {
-                                tryDispatch("clickAt", JSONObject()
-                                    .put("x", page.x.toInt())
-                                    .put("y", page.y.toInt()))
-                            }
-                        }
-                    }
-                    .pointerInput(sessionId) {
-                        // 单指拖动 → scroll（20px 节流，取反：手指下滑=内容跟随=页面上滚 wheel 负值）；
-                        // 双指捏合 → 自动切 Zoom 模式并完成本次缩放
-                        var accumulated = Offset.Zero
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            if (zoom != 1f) {
-                                isZoomMode = true
-                                val nextScale = (scale * zoom).coerceIn(1f, 5f)
-                                scale = nextScale
-                                offset = if (nextScale <= 1.01f) Offset.Zero else offset + pan
-                            } else {
-                                accumulated += pan
-                                if (accumulated.y > 20 || accumulated.y < -20) {
-                                    tryDispatch("scroll", JSONObject()
-                                        .put("dx", 0)
-                                        .put("dy", -accumulated.y.toInt()))
-                                    accumulated = Offset.Zero
-                                }
-                            }
-                        }
-                    }
             }
 
             Image(
@@ -400,7 +414,7 @@ fun BrowserFramePreviewOverlay(
             TakeoverWatermark(text = stringResource(R.string.browser_takeover_status_paused))
         }
 
-        // 顶栏：返回（左）+ 状态胶囊（中）+ 暂停/继续 + 模式切换（右）
+        // 顶栏：返回（左）+ 状态胶囊（中）+ 暂停/继续 + 模式切换（右，仅 in_control）
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -423,10 +437,11 @@ fun BrowserFramePreviewOverlay(
                     sessionRunning = sessionRunning,
                     isPaused = isPaused,
                     reconnecting = reconnecting,
+                    inControl = effectiveInControl,
                     pageHost = pageHost,
                 )
             }
-            if (sessionRunning) {
+            if (effectiveInControl) {
                 IconButton(
                     onClick = {
                         val next = !isPaused
@@ -445,94 +460,133 @@ fun BrowserFramePreviewOverlay(
                         modifier = Modifier.size(24.dp)
                     )
                 }
-            }
-            IconButton(
-                onClick = {
-                    isZoomMode = !isZoomMode
-                    if (!isZoomMode) { scale = 1f; offset = Offset.Zero }
-                },
-                modifier = circleButtonModifier
-            ) {
-                Icon(
-                    imageVector = if (isZoomMode) Icons.Rounded.TouchApp else Icons.Rounded.ZoomIn,
-                    contentDescription = if (isZoomMode) {
-                        stringResource(R.string.browser_takeover_mode_interact)
-                    } else {
-                        stringResource(R.string.browser_takeover_mode_zoom)
+                IconButton(
+                    onClick = {
+                        isZoomMode = !isZoomMode
+                        if (!isZoomMode) { scale = 1f; offset = Offset.Zero }
                     },
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        // 底栏（仅 Interact 模式）：IME 附件行（仅键盘弹出可见）+ 输入行；
-        // imePadding 只挂底栏 → 键盘弹出帧区不重排（输入行浮在黑底上）
-        if (!isZoomMode) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .imePadding()
-                    .navigationBarsPadding()
-                    .padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                if (imeVisible && inputEnabled) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_enter)) {
-                            tryDispatch("key", JSONObject().put("key", "Enter"))
-                        }
-                        TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_tab)) {
-                            tryDispatch("key", JSONObject().put("key", "Tab"))
-                        }
-                        TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_esc)) {
-                            tryDispatch("key", JSONObject().put("key", "Escape"))
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = circleButtonModifier
                 ) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { value -> inputText = value },
-                        modifier = Modifier.weight(1f),
-                        enabled = inputEnabled,
-                        placeholder = {
-                            Text(
-                                stringResource(R.string.browser_takeover_input_hint),
-                                color = if (inputEnabled) Color.Gray else Color.DarkGray
-                            )
+                    Icon(
+                        imageVector = if (isZoomMode) Icons.Rounded.TouchApp else Icons.Rounded.ZoomIn,
+                        contentDescription = if (isZoomMode) {
+                            stringResource(R.string.browser_takeover_mode_interact)
+                        } else {
+                            stringResource(R.string.browser_takeover_mode_zoom)
                         },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { sendInput() }),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            disabledTextColor = Color.Gray,
-                            focusedBorderColor = Color.White,
-                            unfocusedBorderColor = Color.Gray,
-                            disabledBorderColor = Color.DarkGray,
-                        )
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
-                    TextButton(
-                        onClick = sendInput,
-                        enabled = inputEnabled && inputText.isNotBlank()
-                    ) {
-                        Text(
-                            stringResource(R.string.browser_takeover_send),
-                            color = if (inputEnabled) Color.White else Color.Gray
+                }
+            }
+        }
+
+        // 底栏按态切换（imePadding 只挂底栏，键盘弹出帧区不重排）：
+        // ended=「返回对话」CTA；observing=「接管浏览器」CTA；
+        // in_control Interact=控制行+IME 附件行+输入行；in_control Zoom=空（手势提示顶替）
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            when {
+                !sessionRunning -> TakeoverCtaButton(
+                    text = stringResource(R.string.browser_takeover_back_to_chat),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    onClick = onClose,
+                )
+                !effectiveInControl -> TakeoverCtaButton(
+                    text = stringResource(R.string.browser_takeover_take_control),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    onClick = {
+                        inControl = true
+                        onTakeControl()
+                    },
+                )
+                !isZoomMode -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        TakeoverCtaButton(
+                            text = stringResource(R.string.browser_takeover_return_control),
+                            containerColor = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                inControl = false
+                                onReturnControl()
+                                // 交还即回观看态：暂停中自动恢复推流（observing 无暂停入口）
+                                if (isPaused) {
+                                    isPaused = false
+                                    pausedFrame = null
+                                    onPausedChanged(false)
+                                }
+                            },
                         )
+                        TakeoverCtaButton(
+                            text = stringResource(R.string.browser_takeover_stop_task),
+                            containerColor = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f),
+                            onClick = onStopTask,
+                        )
+                    }
+                    if (imeVisible && inputEnabled) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_enter)) {
+                                tryDispatch("key", JSONObject().put("key", "Enter"))
+                            }
+                            TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_tab)) {
+                                tryDispatch("key", JSONObject().put("key", "Tab"))
+                            }
+                            TakeoverKeyButton(label = stringResource(R.string.browser_takeover_key_esc)) {
+                                tryDispatch("key", JSONObject().put("key", "Escape"))
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = inputText,
+                            onValueChange = { value -> inputText = value },
+                            modifier = Modifier.weight(1f),
+                            enabled = inputEnabled,
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.browser_takeover_input_hint),
+                                    color = if (inputEnabled) Color.Gray else Color.DarkGray
+                                )
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { sendInput() }),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                disabledTextColor = Color.Gray,
+                                focusedBorderColor = Color.White,
+                                unfocusedBorderColor = Color.Gray,
+                                disabledBorderColor = Color.DarkGray,
+                            )
+                        )
+                        TextButton(
+                            onClick = sendInput,
+                            enabled = inputEnabled && inputText.isNotBlank()
+                        ) {
+                            Text(
+                                stringResource(R.string.browser_takeover_send),
+                                color = if (inputEnabled) Color.White else Color.Gray
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Zoom 模式一次性手势提示
+        // 缩放一次性手势提示
         if (zoomHintVisible) {
             Text(
                 text = stringResource(R.string.browser_takeover_zoom_hint),
@@ -550,18 +604,41 @@ fun BrowserFramePreviewOverlay(
     }
 }
 
-/** 顶栏状态胶囊：● LIVE（绿）/ ⏸ 已暂停（黄）/ ■ 会话已结束（灰）/ ↻ 重连中（橙），后接页面域名。 */
+/** Muse 形态底部大胶囊 CTA（接管浏览器/返回对话/交还控制/停止任务共用）；圆形半透明按钮体系的大号延伸。 */
+@Composable
+private fun TakeoverCtaButton(
+    text: String,
+    containerColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(percent = 50))
+            .background(containerColor)
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = text, color = Color.White, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/** 顶栏状态胶囊：● LIVE（绿）/ ✋ 你正在控制（蓝）/ ⏸ 已暂停（黄）/ ■ 会话已结束（灰）/ ↻ 重连中（橙），后接页面域名。 */
 @Composable
 private fun TakeoverStatusPill(
     sessionRunning: Boolean,
     isPaused: Boolean,
     reconnecting: Boolean,
+    inControl: Boolean,
     pageHost: String?,
 ) {
     val (dotColor, labelRes) = when {
         !sessionRunning -> Color.Gray to R.string.browser_takeover_status_ended
         isPaused -> Color(0xFFFFC107) to R.string.browser_takeover_status_paused
         reconnecting -> Color(0xFFFF9800) to R.string.browser_takeover_status_reconnecting
+        inControl -> Color(0xFF2196F3) to R.string.browser_takeover_in_control
         else -> Color(0xFF4CAF50) to R.string.browser_takeover_status_live
     }
     Row(

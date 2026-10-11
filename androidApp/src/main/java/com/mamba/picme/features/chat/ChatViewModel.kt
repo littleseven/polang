@@ -2932,6 +2932,7 @@ class ChatViewModel(
     }
 
     override fun onBrowserSessionClosed(sessionId: String, finalFrameJpegBase64: String?, actionCount: Int) {
+        browserUserControlledSessions -= sessionId // 会话关闭后受控豁免失效（防泄漏）
         var finalPart: MessagePart.BrowserLive? = null
         _browserLiveSessions.update { sessions ->
             val current = sessions[sessionId] ?: return@update sessions
@@ -2993,6 +2994,48 @@ class ChatViewModel(
         browserWebSocketClient?.sendAction(sessionId, actionId, payload)
     }
 
+    /**
+     * 用户接管中的浏览器会话 id（M2.6 Muse 形态）：turn 结束兜底 close 豁免——接管已停 agent，
+     * 但会话须存活供用户继续操作。主线程写、[settleBrowserSessionsAtTurnEnd] IO 线程读，用同步集合。
+     */
+    private val browserUserControlledSessions = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /**
+     * Muse「接管浏览器」：登记受控豁免（[settleBrowserSessionsAtTurnEnd] 跳过该会话）后取消
+     * 当前生成回合 ≈ Muse「接管即暂停 agent」。无真暂停/续跑基建：交还控制不续跑 agent。
+     */
+    fun takeControlBrowserSession(sessionId: String) {
+        browserUserControlledSessions += sessionId
+        stopGeneration()
+    }
+
+    /** Muse「交还控制」：解除受控豁免（agent 不续跑；会话由 bridge 空闲回收或下轮兜底 close 善后）。 */
+    fun releaseBrowserSessionControl(sessionId: String) {
+        browserUserControlledSessions -= sessionId
+    }
+
+    /**
+     * Muse「停止任务」：显式 close 会话，按 [onBrowserSessionClosed] 同路径定格落库。
+     * close 失败静默：服务端 2 分钟空闲回收兜底（spec §6）。
+     */
+    fun stopBrowserSession(sessionId: String) {
+        browserUserControlledSessions -= sessionId
+        val part = _browserLiveSessions.value[sessionId] ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = try {
+                browserSessionCapability()?.transport?.close(sessionId)
+            } catch (e: CancellationException) {
+                // 结构化并发：VM 清理/协程取消原样上抛，不折叠为静默失败
+                throw e
+            } catch (e: Exception) {
+                null // 失败静默：会话由服务端 2 分钟空闲回收兜底（spec §6）
+            }
+            // actionCount 换算同 settleBrowserSessionsAtTurnEnd（bridge 口径不含 open）
+            onBrowserSessionClosed(sessionId, result?.lastGoodFrame, result?.actionCount ?: (part.actionCount - 1))
+            _browserLiveSessions.update { it - sessionId }
+        }
+    }
+
     /** HTTP 轮询回退（WS 未接线或连接失败时）。 */
     private fun pollBrowserFrame(sessionId: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -3012,16 +3055,18 @@ class ChatViewModel(
      * turn 结束兜底（spec §6）：仍为非终态的会话逐个 close（LLM 忘调 browser_close 时防服务器
      * 会话泄漏 + 卡片有终态），按 [onBrowserSessionClosed] 同路径定格落库；全部处理完按快照
      * 精确移除 [_browserLiveSessions] 中本 turn 的条目（settle 慢速 close 期间新回合
-     * browser_open 的会话不受影响）。
+     * browser_open 的会话不受影响）。M2.6 Muse 接管豁免：[browserUserControlledSessions]
+     * 中的会话跳过 close（agent 已停，页面留给用户操作），也不从 live 态移除。
      */
     private fun settleBrowserSessionsAtTurnEnd() {
         val sessions = _browserLiveSessions.value
         if (sessions.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             val transport = browserSessionCapability()?.transport
-            sessions.values
+            val closing = sessions.values
                 .filter { it.state != ToolPartState.OUTPUT_AVAILABLE && it.state != ToolPartState.OUTPUT_ERROR }
-                .forEach { part ->
+                .filter { it.sessionId !in browserUserControlledSessions }
+            closing.forEach { part ->
                     val result = try {
                         transport?.close(part.sessionId)
                     } catch (e: CancellationException) {
@@ -3035,7 +3080,7 @@ class ChatViewModel(
                     // +1 还原为本地值，避免兜底路径虚增一步。
                     onBrowserSessionClosed(part.sessionId, result?.lastGoodFrame, result?.actionCount ?: (part.actionCount - 1))
                 }
-            _browserLiveSessions.update { current -> current - sessions.keys }
+            _browserLiveSessions.update { current -> current - closing.map { it.sessionId }.toSet() }
         }
     }
 
