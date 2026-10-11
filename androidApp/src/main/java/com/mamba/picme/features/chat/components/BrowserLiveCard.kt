@@ -45,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -192,6 +193,12 @@ fun BrowserLiveCard(
 /** 5s 无新帧判定为重连中（WS 断连/网络抖动期间给状态反馈；上游帧 500ms 节流，阈值留足裕量）。 */
 private const val FRAME_STALE_MS = 5_000L
 
+/** 接管动作后 2s 无新帧即「页面加载中」（动作必触发重绘/导航，与页面静止区分）。 */
+private const val PAGE_LOADING_STALE_MS = 2_000L
+
+/** 「页面加载中」只跟随动作出现，超过该窗口未回帧则恢复「你正在控制」（防长导航常驻）。 */
+private const val PAGE_LOADING_WINDOW_MS = 20_000L
+
 /**
  * 浏览器直播帧全屏接管页（M2 takeover → M2.5 三段布局 → M2.6 复刻 Meta Muse 观看窗形态）。
  * 三态状态机（observing/in_control 为 overlay 本地态，ended 由 sessionRunning 驱动）——
@@ -208,7 +215,7 @@ private const val FRAME_STALE_MS = 5_000L
  *   状态随 onBrowserSessionClosed 自然流转 ended。
  * - **ended**（会话终态）：叠 30% 黑 + 「会话已结束」水印；帧区同 observing 只读缩放；
  *   底部「返回对话」大胶囊 CTA（无输入行——死会话不暴露输入）。
- * 顶栏状态胶囊五态优先级：已结束(灰) > 已暂停(黄) > 重连中(橙,FRAME_STALE_MS) > 你正在控制(蓝) > LIVE(绿)。
+ * 顶栏状态胶囊六态优先级：已结束(灰) > 已暂停(黄) > 重连中(橙,FRAME_STALE_MS) > 页面加载中(蓝,动作后无新帧) > 你正在控制(蓝) > LIVE(绿)。
  * 系统返回/顶栏返回：缩放 scale>1x 先复位，否则退出。
  * 暂停 = 客户端停流不停会话：帧定格在暂停时刻，action 全部拦截并 toast「已暂停」；
  * 暂停期间由调用侧（ChatScreen）经 [onPausedChanged] unwatch 停推流，恢复 re-watch。
@@ -221,6 +228,9 @@ fun BrowserFramePreviewOverlay(
     frameHeight: Int,
     sessionRunning: Boolean,
     currentUrl: String?,
+    /** WS 推流是否已连接：CDP screencast 只在页面重绘时推帧，静态页帧恒旧≠断流——
+     * 「重连中」必须结合 socket 状态判定（连接健康 + 帧过期才算真断流）。 */
+    streamConnected: Boolean,
     onPausedChanged: (Boolean) -> Unit,
     onAction: (String, JSONObject) -> Unit,
     onTakeControl: () -> Unit,
@@ -244,19 +254,30 @@ fun BrowserFramePreviewOverlay(
     // 会话终态强制 ended：受控态随之失效（派生值，不写回避免组合期副作用）
     val effectiveInControl = sessionRunning && inControl
 
-    // 重连启发式：running 且未暂停时，FRAME_STALE_MS 无新帧 → ↻ 重连中
+    // 重连判定：socket 断开且帧过期（FRAME_STALE_MS 无新帧）才算真断流；
+    // socket 健康但无新帧 = 页面静止（CDP 只在重绘时推帧），不扰用户；
+    // 打开瞬间有快照帧垫底 + WS 握手期内不闪「重连中」
     var lastFrameAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(frame) { lastFrameAt = System.currentTimeMillis() }
+    // 接管动作下发时刻：动作后页面导航/重绘期间无新帧（新浪实测 10-18s），
+    // 需与「页面静止」区分——动作后 PAGE_LOADING_WINDOW_MS 内帧过期即「页面加载中」
+    var lastActionAt by remember { mutableLongStateOf(0L) }
     var reconnecting by remember { mutableStateOf(false) }
-    LaunchedEffect(sessionRunning, isPaused) {
+    var pageLoading by remember { mutableStateOf(false) }
+    LaunchedEffect(sessionRunning, isPaused, streamConnected, effectiveInControl) {
         if (sessionRunning && !isPaused) {
             lastFrameAt = System.currentTimeMillis()
             while (true) {
                 delay(1000)
-                reconnecting = System.currentTimeMillis() - lastFrameAt > FRAME_STALE_MS
+                val now = System.currentTimeMillis()
+                reconnecting = !streamConnected && now - lastFrameAt > FRAME_STALE_MS
+                pageLoading = effectiveInControl && streamConnected &&
+                    now - lastFrameAt > PAGE_LOADING_STALE_MS &&
+                    now - lastActionAt < PAGE_LOADING_WINDOW_MS
             }
         } else {
             reconnecting = false
+            pageLoading = false
         }
     }
 
@@ -287,6 +308,7 @@ fun BrowserFramePreviewOverlay(
                 false
             }
             sessionRunning -> {
+                lastActionAt = System.currentTimeMillis()
                 onAction(action, params)
                 true
             }
@@ -315,6 +337,9 @@ fun BrowserFramePreviewOverlay(
 
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    // 底栏内容高度（不含 IME inset）：IME 弹出时帧区底部额外收缩该高度，
+    // 让控制行/附件行/输入行落在帧区下方的黑带内而非压在帧内容上
+    var bottomBarContentHeight by remember { mutableIntStateOf(0) }
     val inputEnabled = sessionRunning && !isPaused
     val pageHost = remember(currentUrl) {
         currentUrl?.let { url -> runCatching { Uri.parse(url).host }.getOrNull() }
@@ -332,11 +357,28 @@ fun BrowserFramePreviewOverlay(
         contentAlignment = Alignment.Center
     ) {
         if (bitmap != null) {
+            // 帧容器：imePadding 让帧区随键盘收缩；IME 弹出时再额外收缩底栏内容高度
+            // （控制行+附件行+输入行），底栏整体落在帧区下方黑带内、不再压帧。
+            // padding 挂容器层，Image 自身 fillMaxSize → onSizeChanged 测到的即
+            // ContentScale.Fit 实际内容区，接管态 clickAt 坐标映射无 padding 偏差
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
+                    .padding(
+                        bottom = if (imeVisible) {
+                            with(density) { bottomBarContentHeight.toDp() }
+                        } else {
+                            0.dp
+                        }
+                    )
+                    .padding(Spacing.lg),
+                contentAlignment = Alignment.Center
+            ) {
             // in_control 的 Interact 子模式 = 坐标交互；其余（observing / ended / in_control Zoom）= 只读缩放
             val imageModifier = if (effectiveInControl && !isZoomMode) {
                 Modifier
                     .fillMaxSize()
-                    .padding(Spacing.lg)
                     .onSizeChanged { containerSize = it }
                     .pointerInput(sessionId) {
                         detectTapGestures { tapOffset ->
@@ -374,7 +416,6 @@ fun BrowserFramePreviewOverlay(
             } else {
                 Modifier
                     .fillMaxSize()
-                    .padding(Spacing.lg)
                     .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             val nextScale = (scale * zoom).coerceIn(1f, 5f)
@@ -402,6 +443,7 @@ fun BrowserFramePreviewOverlay(
                 modifier = imageModifier,
                 contentScale = ContentScale.Fit
             )
+            }
         }
 
         // 终态/暂停水印（无 pointerInput，不拦截帧手势）
@@ -437,6 +479,7 @@ fun BrowserFramePreviewOverlay(
                     sessionRunning = sessionRunning,
                     isPaused = isPaused,
                     reconnecting = reconnecting,
+                    pageLoading = pageLoading,
                     inControl = effectiveInControl,
                     pageHost = pageHost,
                 )
@@ -481,15 +524,22 @@ fun BrowserFramePreviewOverlay(
             }
         }
 
-        // 底栏按态切换（imePadding 只挂底栏，键盘弹出帧区不重排）：
+        // 底栏按态切换（imePadding 底栏与帧区共用：键盘弹出时底栏推起、帧区收缩避让）：
         // ended=「返回对话」CTA；observing=「接管浏览器」CTA；
         // in_control Interact=控制行+IME 附件行+输入行；in_control Zoom=空（手势提示顶替）
+        // 外层消费 IME/导航栏 inset；内层为实际内容，onSizeChanged 量出内容高度（不含 IME），
+        // 供帧容器在 IME 弹出时收缩避让
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .imePadding()
-                .navigationBarsPadding()
+                .navigationBarsPadding(),
+        ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { bottomBarContentHeight = it.height }
                 .padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
@@ -585,6 +635,7 @@ fun BrowserFramePreviewOverlay(
                 }
             }
         }
+        }
 
         // 缩放一次性手势提示
         if (zoomHintVisible) {
@@ -625,12 +676,13 @@ private fun TakeoverCtaButton(
     }
 }
 
-/** 顶栏状态胶囊：● LIVE（绿）/ ✋ 你正在控制（蓝）/ ⏸ 已暂停（黄）/ ■ 会话已结束（灰）/ ↻ 重连中（橙），后接页面域名。 */
+/** 顶栏状态胶囊：● LIVE（绿）/ ✋ 你正在控制（蓝）/ ⏸ 已暂停（黄）/ ■ 会话已结束（灰）/ ↻ 重连中（橙）/ ↻ 页面加载中（蓝），后接页面域名。 */
 @Composable
 private fun TakeoverStatusPill(
     sessionRunning: Boolean,
     isPaused: Boolean,
     reconnecting: Boolean,
+    pageLoading: Boolean,
     inControl: Boolean,
     pageHost: String?,
 ) {
@@ -638,6 +690,7 @@ private fun TakeoverStatusPill(
         !sessionRunning -> Color.Gray to R.string.browser_takeover_status_ended
         isPaused -> Color(0xFFFFC107) to R.string.browser_takeover_status_paused
         reconnecting -> Color(0xFFFF9800) to R.string.browser_takeover_status_reconnecting
+        pageLoading -> Color(0xFF2196F3) to R.string.browser_takeover_status_page_loading
         inControl -> Color(0xFF2196F3) to R.string.browser_takeover_in_control
         else -> Color(0xFF4CAF50) to R.string.browser_takeover_status_live
     }

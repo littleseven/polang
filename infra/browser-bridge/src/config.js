@@ -15,8 +15,10 @@ module.exports = {
   maxExtractChars: 4000,
   maxElements: 40,
   maxBodyBytes: 64 * 1024,
-  screencastQuality: 60,
+  screencastQuality: 45,
   screencastMaxWidth: 1280,
   screencastMaxHeight: 720,
-  screencastEveryNthFrame: 2,
+  // 产能须压到客户端路径带宽量级（HK→国内实测 110-140KB/s，server 代理另有 90KB/s 字节闸门丢帧）：
+  // quality 45 ≈ 70-80KB/帧；everyNthFrame 4 ≈ 2-3fps 产出，超闸门的帧由 server 丢弃（直播语义保最新）
+  screencastEveryNthFrame: 4,
 };

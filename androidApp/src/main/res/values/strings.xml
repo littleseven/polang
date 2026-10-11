@@ -1643,6 +1643,7 @@
     <string name="browser_takeover_status_paused">Paused</string>
     <string name="browser_takeover_status_ended">Session ended</string>
     <string name="browser_takeover_status_reconnecting">Reconnecting…</string>
+    <string name="browser_takeover_status_page_loading">Loading page…</string>
     <string name="browser_takeover_pause">Pause stream</string>
     <string name="browser_takeover_resume">Resume stream</string>
     <string name="browser_takeover_key_enter">⏎ Enter</string>

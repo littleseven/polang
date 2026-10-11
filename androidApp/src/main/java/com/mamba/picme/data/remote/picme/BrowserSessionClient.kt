@@ -51,6 +51,15 @@ class BrowserSessionClient(
     override suspend fun action(request: BrowserActionRequest): BrowserActionResult =
         post("/v1/browser/action", json.encodeToString(BrowserActionRequest.serializer(), request))
 
+    /**
+     * takeover 动作原文透传（clickAt/typeText/scroll/drag/key——携带 x/y/dx/dy 等 DTO 外字段，
+     * 服务端 action 路由原文转发 bridge）。
+     * 刻意走独立 HTTP 通道而非 WS：推帧洪泛时 WS 下行被二进制帧占满，action_result 实测排队
+     * >13s 才到（经代理同连接实测 0.10s vs 帧流中的 7.4s）；HTTP 响应同步返回动作结果。
+     */
+    suspend fun rawAction(sessionId: String, actionJson: JSONObject): BrowserActionResult =
+        post("/v1/browser/action", actionJson.put("sessionId", sessionId).toString())
+
     override suspend fun frame(sessionId: String): BrowserFrameResult = withContext(Dispatchers.IO) {
         val request = authedBuilder("$baseUrl/v1/browser/frame?sessionId=$sessionId").get().build()
         val body = execute(request)

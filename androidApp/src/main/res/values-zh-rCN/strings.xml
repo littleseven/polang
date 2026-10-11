@@ -1634,6 +1634,7 @@
     <string name="browser_takeover_status_paused">已暂停</string>
     <string name="browser_takeover_status_ended">会话已结束</string>
     <string name="browser_takeover_status_reconnecting">重连中…</string>
+    <string name="browser_takeover_status_page_loading">页面加载中…</string>
     <string name="browser_takeover_pause">暂停推流</string>
     <string name="browser_takeover_resume">继续推流</string>
     <string name="browser_takeover_key_enter">⏎ 回车</string>

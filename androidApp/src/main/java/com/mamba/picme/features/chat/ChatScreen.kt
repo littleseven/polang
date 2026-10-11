@@ -279,6 +279,8 @@ fun ChatScreen(
     val pendingNonCardTool by viewModel.pendingNonCardTool.collectAsStateWithLifecycle()
     // 浏览器会话 live 态（500ms 节流）：全屏接管页的推流帧来源；INLINE 卡经 displayMessages 覆写吃到
     val liveBrowserSessions by viewModel.throttledBrowserLiveSessions.collectAsStateWithLifecycle(emptyMap())
+    // WS 推流连接态：接管页「重连中」判定的 socket 依据（CDP 静态页面不推帧≠断流）
+    val browserStreamConnected by viewModel.browserStreamConnected.collectAsStateWithLifecycle()
     // ADR-016 M4（spec §7.2）：渲染源切到 parts——拍平为 LazyColumn 独立 item，
     // key="${messageId}:${partId}" + contentType 复用桶（修「有 key 无 contentType」
     // 的复用错配）；USER 消息整颗单 item（§5 图文同气泡不拆）。
@@ -951,6 +953,7 @@ fun ChatScreen(
                     frameHeight = preview.frameHeight,
                     sessionRunning = sessionRunning,
                     currentUrl = livePart?.currentUrl,
+                    streamConnected = browserStreamConnected.contains(preview.sessionId),
                     onPausedChanged = { paused -> previewPaused = paused },
                     onAction = { action, params ->
                         viewModel.sendBrowserAction(preview.sessionId, action, params)

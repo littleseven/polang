@@ -1594,6 +1594,7 @@
     <string name="browser_takeover_status_paused">En pausa</string>
     <string name="browser_takeover_status_ended">Sesión finalizada</string>
     <string name="browser_takeover_status_reconnecting">Reconectando…</string>
+    <string name="browser_takeover_status_page_loading">Cargando página…</string>
     <string name="browser_takeover_pause">Pausar transmisión</string>
     <string name="browser_takeover_resume">Reanudar transmisión</string>
     <string name="browser_takeover_key_enter">⏎ Intro</string>
