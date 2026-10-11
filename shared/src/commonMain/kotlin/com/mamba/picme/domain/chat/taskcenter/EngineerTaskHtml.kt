@@ -82,6 +82,23 @@ data class EngineerTaskTexts(
     val filesChanged: String? = null,
     /** AWAITING_DELIVER 摘要行（「已修改 N 个文件…」）。 */
     val deliverSummary: String? = null,
+    /**
+     * 阶段时间线名词标签（「读取文件/编辑代码…」），键 = 工具名（Read/Edit/Bash/Grep/Glob/file_change），
+     * 兜底键 "tool"；空 Map = 未本地化，时间线回退展示原始工具名。
+     */
+    val stageLabels: Map<String, String> = emptyMap(),
+    /** 当前阶段动词（「正在修改…」，RUNNING 阶段行用），键同 [stageLabels]。 */
+    val stageVerbs: Map<String, String> = emptyMap(),
+    /** 截断原因本地化（协议值 "max_turns" → 「达到最大轮次」）；null = 回退协议原文。 */
+    val reasonMaxTurns: String? = null,
+    /** 截断原因本地化（协议值 "phase_timeout" → 「阶段超时」）；null = 回退协议原文。 */
+    val reasonPhaseTimeout: String? = null,
+)
+
+/** [EngineerTaskHtml.stageMaps] 的强类型返回包装（Swift 侧属性直取，免 KotlinPair 强转）。 */
+data class EngineerTaskStageMaps(
+    val labels: Map<String, String>,
+    val verbs: Map<String, String>,
 )
 
 @Suppress("TooManyFunctions") // 模板组装器按段落拆私有构件（header/meta/timeline/events…），职责单一
@@ -113,14 +130,14 @@ object EngineerTaskHtml {
         when (task.status) {
             EngineerTaskStatus.RUNNING -> {
                 task.stage?.takeIf { stage -> stage.isNotBlank() }?.let { stage ->
-                    body.append(line(escapeHtml(stage), CSS_STAGE))
+                    body.append(line(escapeHtml(stageLine(stage, texts)), CSS_STAGE))
                 }
                 body.append(metaLine(task, texts))
                 body.append(progressTrack(task, palette))
             }
             EngineerTaskStatus.AWAITING_CONTINUE -> {
                 task.truncatedReason?.takeIf { reason -> reason.isNotBlank() }?.let { reason ->
-                    body.append(line(texts.reasonPrefix + escapeHtml(reason), CSS_BODY))
+                    body.append(line(texts.reasonPrefix + escapeHtml(truncatedReasonLabel(reason, texts)), CSS_BODY))
                 }
                 body.append(usedLine(texts))
                 task.resultSummary?.takeIf { summary -> summary.isNotBlank() }?.let { summary ->
@@ -149,7 +166,7 @@ object EngineerTaskHtml {
         if (task.recentStages.isNotEmpty()) {
             if (expanded) {
                 body.append(divider(palette))
-                body.append(timeline(task, palette))
+                body.append(timeline(task, palette, texts))
                 body.append(events(task, texts))
                 texts.filesChanged?.let { files ->
                     body.append(line(escapeHtml(files), CSS_SMALL))
@@ -167,6 +184,98 @@ object EngineerTaskHtml {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&#39;")
+
+    /**
+     * 截断原因文案：协议值（max_turns/phase_timeout）映射本地化（design approval「达到最大轮次」），
+     * 未提供文案或未知协议值回退原文。
+     */
+    fun truncatedReasonLabel(reason: String, texts: EngineerTaskTexts): String = when (reason) {
+        REASON_MAX_TURNS -> texts.reasonMaxTurns ?: reason
+        REASON_PHASE_TIMEOUT -> texts.reasonPhaseTimeout ?: reason
+        else -> reason
+    }
+
+    /**
+     * 阶段串解析（reducer 产出格式）：「Read  path」→ (Read, path)、
+     * 「file_change:path」→ (file_change, path)；无细节时 detail 为空串。
+     */
+    fun parseStage(stage: String): Pair<String, String> =
+        if (stage.startsWith(FILE_CHANGE_PREFIX)) {
+            STAGE_FILE_CHANGE_KEY to stage.removePrefix(FILE_CHANGE_PREFIX).trim()
+        } else {
+            stage.substringBefore(' ').trim() to stage.substringAfter(' ', "").trim()
+        }
+
+    /**
+     * 当前阶段行（design collapsed/expanded：「Edit · 正在修改 TagScanOrchestrator.kt」）：
+     * 原始工具名 + 本地化动词 + 细节；file_change 事件走「标签 · 细节」（不带动词）；
+     * 未提供动词表时回退原始串。
+     */
+    fun stageLine(stage: String, texts: EngineerTaskTexts): String {
+        if (texts.stageVerbs.isEmpty()) return stage
+        val (key, detail) = parseStage(stage)
+        if (key == STAGE_FILE_CHANGE_KEY) {
+            val label = texts.stageLabels[key] ?: return stage
+            return if (detail.isEmpty()) label else label + STAGE_HEAD_SEP + detail
+        }
+        val verb = texts.stageVerbs[key] ?: texts.stageVerbs[STAGE_FALLBACK_KEY] ?: return stage
+        return buildString {
+            append(key).append(STAGE_HEAD_SEP).append(verb)
+            if (detail.isNotEmpty()) append(' ').append(detail)
+        }
+    }
+
+    /**
+     * 时间线行文案：本地化阶段名 + 细节（「读取文件 · Xxx.kt」）；
+     * 未提供标签表时回退原始工具串（兼容旧调用方/缺省文案）。
+     */
+    fun timelineLabel(stage: String, texts: EngineerTaskTexts): String {
+        if (texts.stageLabels.isEmpty()) return stage
+        val (key, detail) = parseStage(stage)
+        val label = texts.stageLabels[key] ?: texts.stageLabels[STAGE_FALLBACK_KEY] ?: return stage
+        return if (detail.isEmpty()) label else label + STAGE_HEAD_SEP + detail
+    }
+
+    /**
+     * 阶段标签/动词表工厂（iOS Swift 免桥接 Kotlin Map：平铺传入本地化串，返回强类型包装）。
+     * 键集合（Read/Edit/Write/Bash/Grep/Glob/file_change/tool）是双端唯一事实来源。
+     */
+    @Suppress("LongParameterList") // 12 个键位平铺是跨端免桥接的代价，键含义成对自明
+    fun stageMaps(
+        labelRead: String,
+        labelEdit: String,
+        labelBash: String,
+        labelSearch: String,
+        labelFileChange: String,
+        labelTool: String,
+        verbRead: String,
+        verbEdit: String,
+        verbBash: String,
+        verbSearch: String,
+        verbFileChange: String,
+        verbTool: String,
+    ): EngineerTaskStageMaps = EngineerTaskStageMaps(
+        labels = mapOf(
+            "Read" to labelRead,
+            "Edit" to labelEdit,
+            "Write" to labelEdit,
+            "Bash" to labelBash,
+            "Grep" to labelSearch,
+            "Glob" to labelSearch,
+            STAGE_FILE_CHANGE_KEY to labelFileChange,
+            STAGE_FALLBACK_KEY to labelTool,
+        ),
+        verbs = mapOf(
+            "Read" to verbRead,
+            "Edit" to verbEdit,
+            "Write" to verbEdit,
+            "Bash" to verbBash,
+            "Grep" to verbSearch,
+            "Glob" to verbSearch,
+            STAGE_FILE_CHANGE_KEY to verbFileChange,
+            STAGE_FALLBACK_KEY to verbTool,
+        ),
+    )
 
     /**
      * 进度启发式（RUNNING 态展示）：观察到的活动量（阶段数）驱动、封顶 80%——
@@ -239,8 +348,9 @@ object EngineerTaskHtml {
      * 时间线：✓ 已完成（primary）→ RUNNING 态末条 ● 当前（primary + 文字 primary，
      * 对齐 design taskcard/expanded 帧）；非 RUNNING（暂停/终态）无「当前」概念，全 ✓。
      * 无 ○ 待办行（状态无阶段计划数据，设计稿 ○ 行系示意）。
+     * 行文案经 [timelineLabel] 本地化为「中文阶段名 · 细节」，未提供标签表时回退原始工具串。
      */
-    private fun timeline(task: EngineerTaskState, palette: EngineerTaskPalette): String {
+    private fun timeline(task: EngineerTaskState, palette: EngineerTaskPalette, texts: EngineerTaskTexts): String {
         val stages = task.recentStages
         val rows = StringBuilder()
         if (stages.size > TIMELINE_MAX_ROWS) {
@@ -253,7 +363,7 @@ object EngineerTaskHtml {
             val labelColor = if (isCurrent) palette.primary else palette.onSurface
             rows.append(
                 """<div class="tlrow"><span class="tlmark" style="color:${palette.primary}">$mark</span>""" +
-                    """<span style="color:$labelColor">${escapeHtml(stageLabel)}</span></div>"""
+                    """<span style="color:$labelColor">${escapeHtml(timelineLabel(stageLabel, texts))}</span></div>"""
             )
         }
         return rows.toString()
@@ -306,6 +416,12 @@ font-family:ui-monospace,Menlo,'Courier New',monospace}
 </style></head><body>$body</body></html>"""
 
     private const val TITLE_SEP = " ｜ "
+    private const val REASON_MAX_TURNS = "max_turns"
+    private const val REASON_PHASE_TIMEOUT = "phase_timeout"
+    private const val FILE_CHANGE_PREFIX = "file_change:"
+    private const val STAGE_FILE_CHANGE_KEY = "file_change"
+    private const val STAGE_FALLBACK_KEY = "tool"
+    private const val STAGE_HEAD_SEP = " · "
     private const val CSS_STAGE = "stage"
     private const val CSS_SMALL = "small"
     private const val CSS_BODY = "body-line"

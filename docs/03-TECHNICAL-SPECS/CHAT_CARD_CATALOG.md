@@ -122,8 +122,8 @@ M1 期 partsJson 为 legacy 三列的纯函数双写（写接缝 `data/local/Cha
     "sourceText": "修复相册扫描时的崩溃",
     "sid": "claude-9a…",
     "status": "AWAITING_CONTINUE",
-    "stage": "Edit · TagScanOrchestrator.kt",
-    "recentStages": ["读取文件", "分析堆栈", "编辑代码"],
+    "stage": "Edit  TagScanOrchestrator.kt", // 「工具名␣␣细节」，渲染期本地化为「工具名 · 正在修改 细节」
+    "recentStages": ["Read  TagScanOrchestrator.kt", "Edit  2 files", "Bash  ./gradlew compile"], // 原始工具串，时间线中文名渲染期映射（stageMaps）
     "turns": 50,
     "costCents": 128,
     "startedAtMs": 1790000000000,
@@ -543,8 +543,8 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
       "sourceText": "修复相册扫描时的崩溃",
       "sid": "claude-9a…",
       "status": "AWAITING_CONTINUE", // RUNNING | AWAITING_CONTINUE | AWAITING_DELIVER | COMPLETED | FAILED
-      "stage": "Edit · TagScanOrchestrator.kt",
-      "recentStages": ["读取文件", "分析堆栈", "编辑代码"],
+      "stage": "Edit  TagScanOrchestrator.kt", // 「工具名␣␣细节」（file_change:path 特例），渲染期本地化为「工具名 · 正在修改 细节」
+      "recentStages": ["Read  TagScanOrchestrator.kt", "Edit  2 files", "Bash  ./gradlew compile"], // 原始工具串；时间线中文名（读取文件…）由 stageMaps 渲染期映射
       "turns": 50,
       "costCents": 128,
       "startedAtMs": 1790000000000,
@@ -571,7 +571,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ![collapsed](../assets/chat-cards/taskcard-collapsed.png?v=20260927-4) ![expanded](../assets/chat-cards/taskcard-expanded.png?v=20260927-4) ![approval](../assets/chat-cards/taskcard-approval.png?v=20260927-4) ![done](../assets/chat-cards/taskcard-done.png?v=20260927-4)
 
-**渲染组件**：`EngineerTaskCard` + `EngineerTaskNativeActionBar`（现实现动作条外置卡底）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。机制：`EngineerTaskHtml`（L1 端侧模板 + 状态 JSON 组装完整 HTML，CSS 变量走 tokens）经 `HtmlCard` 双形态渲染；displayMode 粘滞不落库；500ms 合帧节流（`EngineerTaskThrottle`）；状态文本 HTML escape（唯一注入面）；停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
+**渲染组件**：`EngineerTaskCard`（两分区单卡：HTML 信息区 + 卡内原生动作区 `EngineerTaskActionZone`，外层 r16 + outlineVariant 描边——浅色主题动作区底 surfaceContainerHigh 与列表底同色，描边防「悬浮式脱节」）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。机制：`EngineerTaskHtml`（L1 端侧模板 + 状态 JSON 组装完整 HTML，CSS 变量走 tokens）经 `HtmlCard` 双形态渲染；displayMode 粘滞不落库；500ms 合帧节流（`EngineerTaskThrottle`）；状态文本 HTML escape（唯一注入面）；阶段串格式「工具名␣␣细节」/「file_change:path」（reducer `stageLabel` 产出），渲染期经 `parseStage`/`stageMaps` 本地化为「中文阶段名 · 细节」（时间线）与「工具名 · 正在X 细节」（当前阶段行）；停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
 **parts 协议（✅ M1/M2 已落地）**：`MessagePart.TaskCard`——
 
 | 字段 | 类型 | 含义 |

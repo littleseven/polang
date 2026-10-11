@@ -99,7 +99,14 @@ struct EngineerTaskListRow: View {
             summaryText(L("claude_truncated"), color: s.onSurfaceVariant, top: Spacing.sm - 2)
             if let reason = task.truncatedReason?
                 .trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
-                summaryText(reason, fontSize: Metrics.metaFontSize, color: s.onSurfaceVariant, top: Spacing.xs)
+                // 协议值本地化（max_turns/phase_timeout → 五语文案），未知值回退原文
+                let reasonText: String
+                switch reason {
+                case "max_turns": reasonText = L("chat_task_reason_max_turns")
+                case "phase_timeout": reasonText = L("chat_task_reason_phase_timeout")
+                default: reasonText = reason
+                }
+                summaryText(reasonText, fontSize: Metrics.metaFontSize, color: s.onSurfaceVariant, top: Spacing.xs)
             }
         case .awaitingDeliver:
             summaryText(

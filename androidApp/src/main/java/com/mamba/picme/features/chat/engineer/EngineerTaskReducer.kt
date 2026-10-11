@@ -4,6 +4,7 @@ import com.mamba.picme.data.remote.picme.ClaudeEvent
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
+import org.json.JSONObject
 
 /**
  * 工程师任务卡状态机（spec §5 测试决策首层接缝；纯逻辑，对齐 ClaudeSseParser 先例）。
@@ -28,11 +29,12 @@ object EngineerTaskReducer {
     ): EngineerTaskState = when (event) {
         is ClaudeEvent.Session -> state.copy(sid = event.sid, updatedAtMs = nowMs)
         is ClaudeEvent.AssistantText -> state
-        is ClaudeEvent.ToolUse -> state.pushStage(event.tool, nowMs)
+        is ClaudeEvent.ToolUse -> state.pushStage(stageLabel(event.tool, event.input), nowMs)
         is ClaudeEvent.AppToolRequest -> state.pushStage(event.tool, nowMs)
         is ClaudeEvent.ToolResult -> state
         is ClaudeEvent.FileChange ->
-            state.copy(fileChangeCount = state.fileChangeCount + 1).pushStage("file_change:${event.path}", nowMs)
+            state.copy(fileChangeCount = state.fileChangeCount + 1)
+                .pushStage("file_change:${event.path.substringAfterLast('/')}", nowMs)
         is ClaudeEvent.Cost -> state.copy(turns = event.turns, costCents = event.cents, updatedAtMs = nowMs)
         is ClaudeEvent.Error ->
             if (event.truncated) {
@@ -82,4 +84,25 @@ object EngineerTaskReducer {
 
     private fun EngineerTaskState.pushStage(label: String, nowMs: Long): EngineerTaskState =
         copy(stage = label, recentStages = (recentStages + label).takeLast(MAX_STAGES), updatedAtMs = nowMs)
+
+    /**
+     * 阶段标签：工具名 + 关键参数细节（design expanded 最近事件「Read  Xxx.kt」「Bash  ./gradlew …」）。
+     * 细节取自工具入参（文件路径取 basename，命令/模式原样截断），与工具名以两空格分隔——
+     * 卡片模板 [parseStage] 按此格式解析（工具 token + 细节），勿改分隔约定。
+     */
+    internal fun stageLabel(tool: String, input: JSONObject): String {
+        val detail = when (tool) {
+            "Read", "Edit", "Write", "NotebookEdit" ->
+                input.optString("file_path").substringAfterLast('/')
+            "Bash" -> input.optString("command")
+            "Grep", "Glob" -> input.optString("pattern")
+            "WebFetch" -> input.optString("url")
+            "WebSearch" -> input.optString("query")
+            "Task" -> input.optString("description")
+            else -> ""
+        }.replace(Regex("\\s+"), " ").trim().take(DETAIL_MAX)
+        return if (detail.isEmpty()) tool else "$tool  $detail"
+    }
+
+    private const val DETAIL_MAX = 80
 }

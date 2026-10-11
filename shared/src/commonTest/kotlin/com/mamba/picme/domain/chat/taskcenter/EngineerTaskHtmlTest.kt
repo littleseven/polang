@@ -38,6 +38,10 @@ class EngineerTaskHtmlTest {
         usedCost: String? = metaCost,
         filesChanged: String? = "3 files changed",
         deliverSummary: String? = null,
+        stageLabels: Map<String, String> = emptyMap(),
+        stageVerbs: Map<String, String> = emptyMap(),
+        reasonMaxTurns: String? = null,
+        reasonPhaseTimeout: String? = null,
     ) = EngineerTaskTexts(
         titlePrefix = "工程师任务：",
         badgeLabel = "TASK · HTML",
@@ -62,6 +66,10 @@ class EngineerTaskHtmlTest {
         usedCost = usedCost,
         filesChanged = filesChanged,
         deliverSummary = deliverSummary,
+        stageLabels = stageLabels,
+        stageVerbs = stageVerbs,
+        reasonMaxTurns = reasonMaxTurns,
+        reasonPhaseTimeout = reasonPhaseTimeout,
     )
 
     private fun runningTask(
@@ -236,6 +244,92 @@ class EngineerTaskHtmlTest {
         val html = EngineerTaskHtml.assemble(task, expanded = true, palette = palette, texts = texts())
         assertTrue(html.contains("&#10003;"))
         assertFalse(html.contains("&#9679;"))
+    }
+
+    // ---- 截断原因本地化（协议值 max_turns/phase_timeout → 本地文案，未知值回退原文）----
+
+    @Test
+    fun `truncatedReasonLabel maps protocol values and falls back to raw`() {
+        val localized = texts(reasonMaxTurns = "达到最大轮次", reasonPhaseTimeout = "阶段超时")
+        assertEquals("达到最大轮次", EngineerTaskHtml.truncatedReasonLabel("max_turns", localized))
+        assertEquals("阶段超时", EngineerTaskHtml.truncatedReasonLabel("phase_timeout", localized))
+        // 未知协议值 → 原文
+        assertEquals("other_reason", EngineerTaskHtml.truncatedReasonLabel("other_reason", localized))
+        // 未提供文案 → 协议原文
+        assertEquals("max_turns", EngineerTaskHtml.truncatedReasonLabel("max_turns", texts()))
+    }
+
+    @Test
+    fun `awaiting continue renders localized truncated reason`() {
+        val task = runningTask().copy(status = EngineerTaskStatus.AWAITING_CONTINUE, truncatedReason = "max_turns")
+        val html = EngineerTaskHtml.assemble(
+            task, expanded = false, palette = palette,
+            texts = texts(reasonMaxTurns = "达到最大轮次"),
+        )
+        assertTrue(html.contains("截断原因：达到最大轮次"))
+        assertFalse(html.contains("max_turns"))
+    }
+
+    // ---- 阶段本地化（时间线中文名 + 当前阶段动词 + 细节，design taskcard/expanded）----
+
+    private fun zhStageMaps() = EngineerTaskHtml.stageMaps(
+        labelRead = "读取文件", labelEdit = "编辑代码", labelBash = "执行命令",
+        labelSearch = "搜索代码", labelFileChange = "文件变更", labelTool = "调用工具",
+        verbRead = "正在读取", verbEdit = "正在修改", verbBash = "正在执行",
+        verbSearch = "正在搜索", verbFileChange = "正在变更", verbTool = "正在处理",
+    )
+
+    @Test
+    fun `parseStage splits tool token and detail`() {
+        assertEquals("Read" to "TagScanOrchestrator.kt", EngineerTaskHtml.parseStage("Read  TagScanOrchestrator.kt"))
+        assertEquals("file_change" to "Login.kt", EngineerTaskHtml.parseStage("file_change:Login.kt"))
+        assertEquals("Edit" to "", EngineerTaskHtml.parseStage("Edit"))
+    }
+
+    @Test
+    fun `stageLine renders tool verb and detail`() {
+        val maps = zhStageMaps()
+        val localized = texts(stageLabels = maps.labels, stageVerbs = maps.verbs)
+        assertEquals(
+            "Edit · 正在修改 TagScanOrchestrator.kt",
+            EngineerTaskHtml.stageLine("Edit  TagScanOrchestrator.kt", localized),
+        )
+        assertEquals("文件变更 · Login.kt", EngineerTaskHtml.stageLine("file_change:Login.kt", localized))
+        // 未知工具 → 兜底动词
+        assertEquals("Foo · 正在处理", EngineerTaskHtml.stageLine("Foo", localized))
+        // 未本地化 → 回退原始串
+        assertEquals("Edit  X.kt", EngineerTaskHtml.stageLine("Edit  X.kt", texts()))
+    }
+
+    @Test
+    fun `timeline rows use localized labels while events keep raw tool strings`() {
+        val maps = zhStageMaps()
+        val html = EngineerTaskHtml.assemble(
+            runningTask(
+                stage = "Bash  ./gradlew compile",
+                recentStages = listOf("Read  TagScanOrchestrator.kt", "Edit  2 files", "Bash  ./gradlew compile"),
+            ),
+            expanded = true,
+            palette = palette,
+            texts = texts(stageLabels = maps.labels, stageVerbs = maps.verbs),
+        )
+        // 时间线 = 中文名 · 细节；RUNNING 末条为当前（primary 色）
+        assertTrue(html.contains("读取文件 · TagScanOrchestrator.kt"))
+        assertTrue(html.contains("color:#07C160\">执行命令 · ./gradlew compile"))
+        // 最近事件段保留原始工具串（等宽字体）
+        assertTrue(html.contains("Read  TagScanOrchestrator.kt"))
+        // 当前阶段行 = 工具名 · 动词 细节
+        assertTrue(html.contains("Bash · 正在执行 ./gradlew compile"))
+    }
+
+    @Test
+    fun `stageMaps factory covers known tool keys with fallback`() {
+        val maps = zhStageMaps()
+        assertEquals("编辑代码", maps.labels["Write"])
+        assertEquals("搜索代码", maps.labels["Glob"])
+        assertEquals("调用工具", maps.labels["tool"])
+        assertEquals("正在修改", maps.verbs["Write"])
+        assertEquals("正在处理", maps.verbs["tool"])
     }
 
     // ---- resolution / 终态 ----

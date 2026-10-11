@@ -39,6 +39,26 @@ class EngineerTaskReducerTest {
     }
 
     @Test
+    fun `stage label carries tool argument detail`() {
+        // design expanded 最近事件「Read  Xxx.kt」「Bash  ./gradlew …」：文件取 basename，命令原样（截断 80）
+        assertEquals(
+            "Read  TagScanOrchestrator.kt",
+            EngineerTaskReducer.stageLabel("Read", JSONObject("""{"file_path":"/repo/app/TagScanOrchestrator.kt"}""")),
+        )
+        assertEquals(
+            "Bash  ./gradlew :androidApp:compileDebugKotlin",
+            EngineerTaskReducer.stageLabel("Bash", JSONObject("""{"command":"./gradlew :androidApp:compileDebugKotlin"}""")),
+        )
+        assertEquals(
+            "Grep  detekt",
+            EngineerTaskReducer.stageLabel("Grep", JSONObject("""{"pattern":"detekt"}""")),
+        )
+        // 无参/未知工具 → 仅工具名；多空白归一
+        assertEquals("Tool", EngineerTaskReducer.stageLabel("Tool", JSONObject()))
+        assertEquals("Bash  ./gradlew build", EngineerTaskReducer.stageLabel("Bash", JSONObject("""{"command":"./gradlew   build"}""")))
+    }
+
+    @Test
     fun `assistant text and tool result do not change card`() {
         val state = running()
         assertEquals(state, EngineerTaskReducer.reduce(state, ClaudeEvent.AssistantText("hello"), canDeliver = false, nowMs = 1100L))

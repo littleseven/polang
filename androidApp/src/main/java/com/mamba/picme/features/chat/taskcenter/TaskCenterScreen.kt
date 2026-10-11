@@ -417,7 +417,11 @@ private fun TaskProgressSummary(task: EngineerTaskState) {
             )
             task.truncatedReason?.takeIf { reason -> reason.isNotBlank() }?.let { reason ->
                 Text(
-                    text = reason,
+                    text = when (reason) {
+                        "max_turns" -> stringResource(R.string.chat_task_reason_max_turns)
+                        "phase_timeout" -> stringResource(R.string.chat_task_reason_phase_timeout)
+                        else -> reason
+                    },
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

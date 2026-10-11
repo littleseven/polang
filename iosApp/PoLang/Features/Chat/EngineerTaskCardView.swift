@@ -81,6 +81,20 @@ struct EngineerTaskCardView: View {
         let costCents = task.costCents.map { Int(truncating: $0) }
         let turnsText = turns > 0 ? EngineerTaskFormat.turnsText(turns) : nil
         let costText = costCents.map { EngineerTaskFormat.costText(cents: $0) }
+        // 阶段时间线名词标签 + 当前阶段动词（与 Android 同工厂，键集合唯一事实来源）
+        let stageMaps = EngineerTaskHtml.shared.stageMaps(
+            labelRead: L("chat_task_stage_read"),
+            labelEdit: L("chat_task_stage_edit"),
+            labelBash: L("chat_task_stage_bash"),
+            labelSearch: L("chat_task_stage_search"),
+            labelFileChange: L("chat_task_stage_filechange"),
+            labelTool: L("chat_task_stage_tool"),
+            verbRead: L("chat_task_stage_verb_read"),
+            verbEdit: L("chat_task_stage_verb_edit"),
+            verbBash: L("chat_task_stage_verb_bash"),
+            verbSearch: L("chat_task_stage_verb_search"),
+            verbFileChange: L("chat_task_stage_verb_filechange"),
+            verbTool: L("chat_task_stage_verb_tool"))
         return EngineerTaskTexts(
             titlePrefix: L("chat_task_title_prefix"),
             badgeLabel: L("chat_task_badge"),
@@ -108,7 +122,11 @@ struct EngineerTaskCardView: View {
                 : nil,
             deliverSummary: task.status == .awaitingDeliver
                 ? String(format: L("chat_task_deliver_summary"), Int64(task.fileChangeCount))
-                : nil)
+                : nil,
+            stageLabels: stageMaps.labels,
+            stageVerbs: stageMaps.verbs,
+            reasonMaxTurns: L("chat_task_reason_max_turns"),
+            reasonPhaseTimeout: L("chat_task_reason_phase_timeout"))
     }
 
     // MARK: - 原生兜底卡（组装失败：状态 chip + 标题 + 阶段行）

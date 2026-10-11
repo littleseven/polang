@@ -1,5 +1,6 @@
 package com.mamba.picme.features.chat.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -104,10 +105,12 @@ fun EngineerTaskCard(
     // 形态终判粘滞（仅内存，不落库——spec §10）：FULLPAGE 方向跨合帧保持，INLINE 每帧重判可升格
     var resolvedMode by remember(throttled.taskId, expanded) { mutableStateOf<HtmlCardDisplayMode?>(null) }
     val cd = stringResource(R.string.cd_engineer_task_card)
-    // 单卡容器（两分区改版）：上 = HTML 信息区，下 = 原生动作区，外层统一 r16 裁剪
+    // 单卡容器（两分区改版）：上 = HTML 信息区，下 = 原生动作区，外层统一 r16 裁剪；
+    // 浅色主题下动作区底（surfaceContainerHigh #EDEDED）与聊天列表底同色，1dp 描边保证卡缘可读、两区连体
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .semantics { contentDescription = cd },
@@ -209,6 +212,22 @@ private fun androidx.compose.ui.graphics.Color.toCssHex(): String =
 private fun engineerTaskTexts(task: EngineerTaskState): EngineerTaskTexts {
     val turnsText = if (task.turns > 0) stringResource(R.string.chat_task_meta_turns, task.turns) else null
     val costText = task.costCents?.let { cents -> stringResource(R.string.chat_task_meta_cost, cents / 100.0) }
+    // 阶段时间线名词标签（design taskcard/expanded：读取文件/编辑代码…）与当前阶段动词（正在修改…）；
+    // 键集合由 stageMaps 工厂统一定义（iOS 同工厂免桥接 Kotlin Map）
+    val (stageLabels, stageVerbs) = EngineerTaskHtml.stageMaps(
+        labelRead = stringResource(R.string.chat_task_stage_read),
+        labelEdit = stringResource(R.string.chat_task_stage_edit),
+        labelBash = stringResource(R.string.chat_task_stage_bash),
+        labelSearch = stringResource(R.string.chat_task_stage_search),
+        labelFileChange = stringResource(R.string.chat_task_stage_filechange),
+        labelTool = stringResource(R.string.chat_task_stage_tool),
+        verbRead = stringResource(R.string.chat_task_stage_verb_read),
+        verbEdit = stringResource(R.string.chat_task_stage_verb_edit),
+        verbBash = stringResource(R.string.chat_task_stage_verb_bash),
+        verbSearch = stringResource(R.string.chat_task_stage_verb_search),
+        verbFileChange = stringResource(R.string.chat_task_stage_verb_filechange),
+        verbTool = stringResource(R.string.chat_task_stage_verb_tool),
+    )
     return EngineerTaskTexts(
         titlePrefix = stringResource(R.string.chat_task_title_prefix),
         badgeLabel = stringResource(R.string.chat_task_badge),
@@ -245,6 +264,10 @@ private fun engineerTaskTexts(task: EngineerTaskState): EngineerTaskTexts {
         } else {
             null
         },
+        stageLabels = stageLabels,
+        stageVerbs = stageVerbs,
+        reasonMaxTurns = stringResource(R.string.chat_task_reason_max_turns),
+        reasonPhaseTimeout = stringResource(R.string.chat_task_reason_phase_timeout),
     )
 }
 
@@ -365,6 +388,7 @@ private fun TaskCapsuleButton(
     val alpha = if (enabled) 1f else 0.5f
     Box(
         modifier = modifier
+            .fillMaxWidth()
             .height(36.dp)
             .clip(RoundedCornerShape(18.dp))
             .background((if (primary) scheme.primary else scheme.surfaceVariant).copy(alpha = alpha))
