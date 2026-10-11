@@ -25,9 +25,9 @@ function fakePage() {
     setDefaultTimeout: () => {},
     on: () => {},
     locator,
-    getByText: () => locator(),
+    getByText: () => ({ first: locator }),
     $$: async () => [
-      { click: async () => { calls.push('el.click'); }, pressSequentially: async () => {}, evaluate: async (fn) => fn({ tagName: 'A', innerText: 'Link one', value: '', getAttribute: () => null }) },
+      { click: async () => { calls.push('el.click'); }, fill: async (t) => { calls.push(`el.fill:${t}`); }, evaluate: async (fn) => fn({ tagName: 'A', innerText: 'Link one', value: '', getAttribute: () => null }) },
     ],
     evaluate: async (fn) => (typeof fn === 'function' ? 'hello body' : ''),
     screenshot: async () => Buffer.from('jpeg-bytes'),
@@ -102,6 +102,25 @@ test('click by element index uses cached handle', async () => {
   await mgr.close(s.id);
 });
 
+test('type by element index uses ElementHandle.fill (handles lack pressSequentially)', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.act(s, { action: 'extract' });
+  await mgr.act(s, { action: 'type', index: 0, text: 'SF1234567890' });
+  assert.ok(page.calls.includes('el.fill:SF1234567890'));
+  await mgr.close(s.id);
+});
+
+test('type by targetText uses locator pressSequentially', async () => {
+  const page = fakePage();
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.act(s, { action: 'type', targetText: '查询', text: 'hello' });
+  assert.ok(page.calls.includes('type:hello'));
+  await mgr.close(s.id);
+});
+
 test('click without any target fails structured', async () => {
   const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(fakePage()));
   const s = await mgr.open(null);
@@ -167,6 +186,37 @@ test('detached cached handle maps to structured stale_element', async () => {
     () => mgr.act(s, { action: 'click', index: 0 }),
     (e) => e.code === 'stale_element'
   );
+  await mgr.close(s.id);
+});
+
+test('click falls back to force click on actionability timeout', async () => {
+  const page = fakePage();
+  page.$$ = async () => [
+    { click: async (opts) => { if (!opts || !opts.force) throw new Error('Timeout 15000ms exceeded'); page.calls.push('el.click.force'); },
+      dispatchEvent: async (ev) => { page.calls.push(`el.dispatch:${ev}`); },
+      evaluate: async (fn) => fn({ tagName: 'DIV', innerText: '查询', value: '', getAttribute: () => null }) },
+  ];
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.act(s, { action: 'extract' });
+  await mgr.act(s, { action: 'click', index: 0 });
+  assert.ok(page.calls.includes('el.click.force'));
+  assert.ok(!page.calls.includes('el.dispatch:click'));
+  await mgr.close(s.id);
+});
+
+test('click falls back to dispatchEvent when force click also times out', async () => {
+  const page = fakePage();
+  page.$$ = async () => [
+    { click: async () => { throw new Error('Timeout 3000ms exceeded'); },
+      dispatchEvent: async (ev) => { page.calls.push(`el.dispatch:${ev}`); },
+      evaluate: async (fn) => fn({ tagName: 'DIV', innerText: '查询', value: '', getAttribute: () => null }) },
+  ];
+  const mgr = new SessionManager({ ...CFG, maxSessions: 8 }, fakeBrowserProvider(page));
+  const s = await mgr.open(null);
+  await mgr.act(s, { action: 'extract' });
+  await mgr.act(s, { action: 'click', index: 0 });
+  assert.ok(page.calls.includes('el.dispatch:click'));
   await mgr.close(s.id);
 });
 

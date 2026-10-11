@@ -33,6 +33,9 @@ token 时序安全比较 + worker 固定评估代码（不接受任意 JS 注入
   键盘输入 text、scroll 滚轮增量 (dx,dy)、drag (fromX,fromY)→(toX,toY) 连续拖拽、key 特殊键
   `keyboard.press`，key 参数白名单 Enter/Tab/Escape，其余键名回 invalid_key 防注入）。
 - click/type 定位三模式：index（extract 返回的元素序号，LLM 首选）/ targetText / selector。
+  index 模式拿到 ElementHandle：type 用 `fill` 填值（handle 无 pressSequentially，2026-10-11 热修），
+  click 遇 actionability 超时自动降级 force click（3s 短超时保层叠）→ `dispatchEvent('click')`
+  （div 按钮/联想浮层遮挡场景，2026-10-11 快递100 实测驱动）。
 
 ## 已知接受风险（M1，2026-10-06 审查记录）
 

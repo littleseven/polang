@@ -170,12 +170,35 @@ class SessionManager {
 
   async _click(session, body) {
     const target = await this._locate(session, body);
-    await this._staleGuard(() => target.click({ timeout: this.config.navTimeoutMs }));
+    const timeout = this.config.navTimeoutMs;
+    await this._staleGuard(async () => {
+      try {
+        await target.click({ timeout });
+      } catch (e) {
+        // div 按钮/输入后联想浮层遮挡常触发 actionability 超时——降级 force click（短超时保层叠不变式），再退 dispatchEvent
+        if (!/timeout/i.test(e && e.message || '')) throw e;
+        try {
+          await target.click({ timeout: Math.min(3000, timeout), force: true });
+        } catch (e2) {
+          if (typeof target.dispatchEvent !== 'function') throw e2;
+          await target.dispatchEvent('click');
+        }
+      }
+    });
   }
 
   async _type(session, body) {
     const target = await this._locate(session, body);
-    await this._staleGuard(() => target.pressSequentially(String(body.text == null ? '' : body.text), { timeout: this.config.navTimeoutMs }));
+    const text = String(body.text == null ? '' : body.text);
+    await this._staleGuard(async () => {
+      // index 模式拿到的是 ElementHandle（无 pressSequentially）——fill 直接填值（清空重写 + 触发 input/change）；
+      // Locator（targetText/selector 模式）走 pressSequentially 逐键输入。
+      if (typeof target.pressSequentially === 'function') {
+        await target.pressSequentially(text, { timeout: this.config.navTimeoutMs });
+      } else {
+        await target.fill(text, { timeout: this.config.navTimeoutMs });
+      }
+    });
   }
 
   /** 坐标点击（接管模式）：直接 mouse.click，不走 _locate。 */
