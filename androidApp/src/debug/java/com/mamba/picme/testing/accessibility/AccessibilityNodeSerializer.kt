@@ -3,6 +3,7 @@ package com.mamba.picme.testing.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.mamba.picme.testing.accessibility.model.Bounds
 import com.mamba.picme.testing.accessibility.model.UiNode
 import com.mamba.picme.testing.accessibility.model.UiWindow
@@ -11,7 +12,7 @@ import org.json.JSONObject
 class AccessibilityNodeSerializer(private val targetPackage: String? = null) {
 
     fun dump(service: AccessibilityService, maxDepth: Int = 50): JSONObject {
-        val root = service.rootInActiveWindow
+        val root = resolveServiceRoot(service, targetPackage)
             ?: return JSONObject().apply {
                 put("window", UiWindow(title = null, width = 0, height = 0).toJson())
                 put(
@@ -97,4 +98,38 @@ class AccessibilityNodeSerializer(private val targetPackage: String? = null) {
             children = children
         )
     }
+}
+
+/**
+ * 解析无障碍树根（debug E2E 基建，2026-10-11）：
+ * `rootInActiveWindow` 在 MIUI 浮窗/服务重绑等时机偶发返回「无子节点的空根」，
+ * 改为从 `service.windows` 选目标包（或活跃）的 TYPE_APPLICATION 窗口取其 root，
+ * 并 `refresh()` 强制拉取最新快照；全部落空才回退 `rootInActiveWindow`。
+ * 返回节点由调用方负责 recycle。
+ */
+internal fun resolveServiceRoot(
+    service: AccessibilityService,
+    packageName: String? = null,
+): AccessibilityNodeInfo? {
+    val appWindows = service.windows.orEmpty()
+        .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+    // 顺序：活跃窗口 > 包名匹配（同包多窗口时活跃优先，避免命中空浮窗/弹窗根）
+    var chosen: AccessibilityWindowInfo? = appWindows.firstOrNull { it.isActive }
+    if (chosen == null && packageName != null) {
+        for (w in appWindows) {
+            val r = w.root ?: continue
+            val match = r.packageName?.toString() == packageName
+            r.recycle()
+            if (match) {
+                chosen = w
+                break
+            }
+        }
+    }
+    if (chosen == null) {
+        chosen = appWindows.firstOrNull()
+    }
+    val root = chosen?.root ?: service.rootInActiveWindow ?: return null
+    root.refresh()
+    return root
 }

@@ -130,22 +130,39 @@ class UiAutomationRpcServer(
 
     private fun handleDump(request: RpcRequest): RpcResponse {
         val params = request.params ?: JSONObject()
-        val packageName = params.optString("package", null)
+        // org.json 陷阱：客户端显式传 "package": null 时 optString 返回字符串 "null"，
+        // 会被当成包名过滤导致空树——必须用 isNull 判空（isNull 对缺省与 JSONObject.NULL 均为 true）
+        val packageName = params.optStringOrNull("package")
         val maxDepth = params.optInt("maxDepth", 50)
         val serializer = AccessibilityNodeSerializer(targetPackage = packageName)
         val result = serializer.dump(service, maxDepth)
+        // 诊断：窗口列表与根状态（排查 rootInActiveWindow 空根问题，2026-10-11）
+        val diag = JSONArray()
+        service.windows.orEmpty().forEach { w ->
+            val r = w.root
+            diag.put(JSONObject().apply {
+                put("type", w.type)
+                put("active", w.isActive)
+                put("title", w.title?.toString())
+                put("rootPkg", r?.packageName?.toString())
+                put("rootChildren", r?.childCount)
+            })
+            r?.recycle()
+        }
+        result.put("debugWindows", diag)
+        result.put("debugRootNull", service.rootInActiveWindow == null)
         return RpcResponse.success(request.id, result)
     }
 
     private fun handleFind(request: RpcRequest): RpcResponse {
         val params = request.params ?: JSONObject()
-        val text = params.optString("text", null)
-        val contentDescription = params.optString("contentDescription", null)
-        val className = params.optString("className", null)
+        val text = params.optStringOrNull("text")
+        val contentDescription = params.optStringOrNull("contentDescription")
+        val className = params.optStringOrNull("className")
         val clickable = if (params.has("clickable")) params.getBoolean("clickable") else null
         val scrollable = if (params.has("scrollable")) params.getBoolean("scrollable") else null
 
-        val root = service.rootInActiveWindow
+        val root = resolveServiceRoot(service)
             ?: return RpcResponse.error(request.id, code = -32001, message = "No active window")
 
         val matches = findNodes(root, text, contentDescription, className, clickable, scrollable)
@@ -281,9 +298,9 @@ class UiAutomationRpcServer(
         params: JSONObject,
         walkToClickableAncestor: Boolean = true
     ): AccessibilityNodeInfo? {
-        val root = service.rootInActiveWindow ?: return null
-        val text = params.optString("text", null)
-        val contentDescription = params.optString("contentDescription", null)
+        val root = resolveServiceRoot(service) ?: return null
+        val text = params.optStringOrNull("text")
+        val contentDescription = params.optStringOrNull("contentDescription")
         val boundsObj = params.optJSONObject("bounds")
 
         val matches = findNodes(
@@ -336,3 +353,7 @@ class UiAutomationRpcServer(
         return target
     }
 }
+
+/** org.json 陷阱防护：显式 null（JSONObject.NULL）与缺省一样视为「未传」，避免 optString 返回字符串 "null"。 */
+private fun JSONObject.optStringOrNull(name: String): String? =
+    if (isNull(name)) null else getString(name)

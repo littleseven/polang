@@ -174,7 +174,10 @@ class UiDriverClient:
         return result.get("pong", False)
 
     def dump_ui(self, package: Optional[str] = None, max_depth: int = 50) -> UiNode:
-        result = self._call("ui.dump", {"package": package, "maxDepth": max_depth})
+        params: dict[str, Any] = {"maxDepth": max_depth}
+        if package is not None:
+            params["package"] = package
+        result = self._call("ui.dump", params)
         return UiNode.from_json(result.get("nodes", {}))
 
     def find_nodes(
