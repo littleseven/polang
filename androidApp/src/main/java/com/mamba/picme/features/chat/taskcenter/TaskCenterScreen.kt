@@ -24,6 +24,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,11 +58,13 @@ import com.mamba.picme.domain.chat.taskcenter.TaskCenterPartition
 import com.mamba.picme.features.common.topbar.AppTopBar
 
 /**
- * 任务中心页（spec US-12~16 + D7 + 用户任务协议 §7）：双 Tab「工程师任务 | 后台任务」。
+ * 任务中心页（spec US-12~16 + D7 + 用户任务协议 §7，2026-10-11 改版）：用户任务第一 Tab，
+ * 工程师任务第二 Tab 且仅白名单账号可见（ai_engineer_whitelist，复用 [ChatViewModel.canDeliverClaude]；
+ * 非白名单不渲染 TabRow，直接展示用户任务列表）。
  * 工程师 Tab：跨会话聚合工程师任务，分区「进行中/历史」，只读管理 + 审批动作
  * （继续/交付/重试/暂不/到此为止），不做任务编辑/删除；审批动作经 Activity 级共享
  * [ChatViewModel] 的 FromCenter 入口（prime 补种 + sessionId 显式落库）。
- * 后台任务 Tab：`UserTask` 卡片列表（UserTaskCard），动作经 `performUserTaskAction`。
+ * 用户任务 Tab：`UserTask` 卡片列表（UserTaskCard），动作经 `performUserTaskAction`。
  *
  * @param onOpenTaskInChat 回 chat 锚定对应任务卡（US-15）：(sessionId, taskId) → 由 Activity 层驱动切页+滚动
  * @param onOpenUserTaskDestination 用户任务卡片点击 → destination 导航（Task 9 接线；默认空实现保底）
@@ -79,14 +82,18 @@ fun TaskCenterScreen(
     val actionInFlight by chatViewModel.engineerActionInFlight.collectAsStateWithLifecycle()
     val userTasks by taskCenterViewModel.userTasks.collectAsStateWithLifecycle()
     val activeUserTaskCount by taskCenterViewModel.activeUserTaskCount.collectAsStateWithLifecycle()
-    // 默认 Tab：工程师有活跃 → 工程师；否则后台有活跃 → 后台；均无 → 工程师（现状兼容，spec §7）。
+    // 工程师任务 Tab 仅白名单账号可见（2026-10-11）：复用 canDeliverClaude（ai_engineer_whitelist 同一位）。
+    // 该态常态只在进入工程师模式时刷新，进任务中心需主动拉一次（无 token 时 no-op，保持隐藏）。
+    val engineerTabVisible by chatViewModel.canDeliverClaude.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { chatViewModel.ensureClaudeAvailabilityRefreshed() }
+    // 默认 Tab：用户任务有活跃 → 用户任务；否则工程师可见且有活跃 → 工程师；均无 → 用户任务（第一 Tab）。
     // 手选态与默认落位解耦：userPickedTab=null 时跟随 defaultTab（taskList 首查回流后仍可纠正落位），
-    // 用户点选后固定手选（rememberSaveable 跨重组/配置变更保留）
-    val defaultTab = remember(taskList, activeUserTaskCount) {
-        if ((taskList?.active?.size ?: 0) > 0) 0 else if (activeUserTaskCount > 0) 1 else 0
+    // 用户点选后固定手选（rememberSaveable 跨重组/配置变更保留）；工程师 Tab 不可见时强制落位用户任务。
+    val defaultTab = remember(taskList, activeUserTaskCount, engineerTabVisible) {
+        if (activeUserTaskCount > 0) 0 else if (engineerTabVisible && (taskList?.active?.size ?: 0) > 0) 1 else 0
     }
     var userPickedTab by rememberSaveable { mutableStateOf<Int?>(null) }
-    val selectedTab = userPickedTab ?: defaultTab
+    val selectedTab = if (engineerTabVisible) userPickedTab ?: defaultTab else 0
 
     Scaffold(
         topBar = {
@@ -101,45 +108,47 @@ fun TaskCenterScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            TabRow(selectedTabIndex = selectedTab) {
-                // Tab 级活跃计数徽标：分解 Chat 顶栏角标总数（= 工程师活跃 + 后台活跃），
-                // 让用户一眼定位角标指的是哪些任务（2026-09-26 真机反馈）
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { userPickedTab = 0 },
-                    text = {
-                        TaskCenterTabLabel(
-                            title = stringResource(R.string.task_center_tab_engineer),
-                            activeCount = taskList?.active?.size ?: 0,
-                        )
-                    },
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { userPickedTab = 1 },
-                    text = {
-                        TaskCenterTabLabel(
-                            title = stringResource(R.string.task_center_tab_background),
-                            activeCount = activeUserTaskCount,
-                        )
-                    },
-                )
+            if (engineerTabVisible) {
+                TabRow(selectedTabIndex = selectedTab) {
+                    // Tab 级活跃计数徽标：分解 Chat 顶栏角标总数（= 工程师活跃 + 后台活跃），
+                    // 让用户一眼定位角标指的是哪些任务（2026-09-26 真机反馈）
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { userPickedTab = 0 },
+                        text = {
+                            TaskCenterTabLabel(
+                                title = stringResource(R.string.task_center_tab_background),
+                                activeCount = activeUserTaskCount,
+                            )
+                        },
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { userPickedTab = 1 },
+                        text = {
+                            TaskCenterTabLabel(
+                                title = stringResource(R.string.task_center_tab_engineer),
+                                activeCount = taskList?.active?.size ?: 0,
+                            )
+                        },
+                    )
+                }
             }
-            if (selectedTab == 0) {
-                EngineerTaskTab(
-                    taskList = taskList,
-                    isProcessing = isProcessing,
-                    actionInFlight = actionInFlight,
-                    chatViewModel = chatViewModel,
-                    onOpenTaskInChat = onOpenTaskInChat,
-                )
-            } else {
+            if (!engineerTabVisible || selectedTab == 0) {
                 UserTaskTab(
                     userTasks = userTasks,
                     onAction = { taskId, action ->
                         taskCenterViewModel.performUserTaskAction(taskId, action)
                     },
                     onOpenDestination = onOpenUserTaskDestination,
+                )
+            } else {
+                EngineerTaskTab(
+                    taskList = taskList,
+                    isProcessing = isProcessing,
+                    actionInFlight = actionInFlight,
+                    chatViewModel = chatViewModel,
+                    onOpenTaskInChat = onOpenTaskInChat,
                 )
             }
         }

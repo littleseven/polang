@@ -614,7 +614,8 @@ fun ChatScreen(
                     onOpenSidebar = { isSidebarOpen = true },
                     onNewChat = { viewModel.newSession() },
                     onClearChat = { viewModel.clearChat() },
-                    activeTaskCount = activeEngineerTaskCount + activeUserTaskCount,
+                    // 角标 = 工程师活跃（仅白名单计入，与任务中心 Tab 门控同口径）+ 用户任务活跃
+                    activeTaskCount = (if (canDeliverClaude) activeEngineerTaskCount else 0) + activeUserTaskCount,
                     onNavigateToTaskCenter = onNavigateToTaskCenter,
                     isActivePage = isActivePage
                 )

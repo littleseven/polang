@@ -1311,6 +1311,15 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * 按需刷新工程师白名单态（2026-10-11 任务中心门控：工程师 Tab 仅白名单可见）。
+     * 常态下 [refreshClaudeAvailability] 只在进入工程师模式时触发；任务中心等入口
+     * 需要在未进入工程师模式时也拿到白名单位。无 token（访客/未登录）时 no-op，保持隐藏。
+     */
+    fun ensureClaudeAvailabilityRefreshed() {
+        _serverAuthToken.value.takeIf { it.isNotBlank() }?.let { refreshClaudeAvailability(it) }
+    }
+
     /** 远程模式且未注册（无 server token）→ 访客试用，由服务端设备级额度放行。 */
     val isGuestMode: StateFlow<Boolean> = combine(_currentModel, _serverAuthToken) { model, token ->
         model is ChatModelOption.Remote && token.isBlank()
