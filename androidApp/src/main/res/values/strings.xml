@@ -1635,8 +1635,6 @@
     <string name="browser_live_failed">Browser session failed</string>
     <string name="browser_live_view_full">Tap to view full screen</string>
     <string name="browser_live_title_default">Web page</string>
-    <string name="browser_takeover_mode_interact">Switch to interact mode</string>
-    <string name="browser_takeover_mode_zoom">Switch to zoom mode</string>
     <string name="browser_takeover_input_hint">Type to browser…</string>
     <string name="browser_takeover_send">Send</string>
     <string name="browser_takeover_status_live">LIVE</string>

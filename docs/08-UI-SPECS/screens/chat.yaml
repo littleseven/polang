@@ -1005,8 +1005,8 @@ browser_live:
         bottom_cta: "底部居中大胶囊 CTA「接管浏览器」（browser_takeover_take_control）——唯一交互入口"
       in_control:                                 # 接管态：点 CTA 进入
         entry_semantics: "进入即 viewModel.takeControlBrowserSession()：登记受控豁免 + stopGeneration() 停 agent ≈ Muse「接管即暂停 agent」（无真暂停/续跑基建，本差异登记于此）"
-        top_bar: "返回 + 状态胶囊「你正在控制」（browser_takeover_in_control，蓝点；暂停/重连优先显示）+ 暂停推流 + Interact/Zoom 模式切换"
-        frame_gestures: "Interact：点按→clickAt / 拖动→scroll（20px 节流）/ 捏合→自动切 Zoom 子模式；Zoom 子模式：1x~5x + 平移 + 双击复位"
+        top_bar: "返回 + 状态胶囊「你正在控制」（browser_takeover_in_control，蓝点；暂停/重连优先显示）+ 暂停推流（M2.8 起无子模式切换按钮）"
+        frame_gestures: "M2.8（2026-10-11）手势统一免模式切换：点按→clickAt（缩放态经 graphicsLayer 逆变换 invertViewTransform 还原内容坐标再映射 CSS）/ 1x 单指拖动→scroll（20px 节流）/ 捏合→就地缩放 1x~5x / 缩放态单指拖动→平移视野 / 双击→复位"
         bottom_bar:
           control_row: "「交还控制」（browser_takeover_return_control→回 observing，agent 不续跑）|「停止任务」（browser_takeover_stop_task→close 会话+关页落定格卡）"
           ime_attachment_row: "仅键盘弹出可见：⏎ Enter / Tab / Esc → action `key`（白名单三键）"
@@ -1043,8 +1043,6 @@ browser_live:
     - browser_takeover_pause
     - browser_takeover_resume
     - browser_takeover_paused_toast
-    - browser_takeover_mode_interact
-    - browser_takeover_mode_zoom
     - browser_takeover_zoom_hint
     - browser_takeover_input_hint
     - browser_takeover_send

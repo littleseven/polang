@@ -1586,8 +1586,6 @@
     <string name="browser_live_failed">Échec de la session de navigation</string>
     <string name="browser_live_view_full">Appuyer pour voir en plein écran</string>
     <string name="browser_live_title_default">Page web</string>
-    <string name="browser_takeover_mode_interact">Passer en mode interactif</string>
-    <string name="browser_takeover_mode_zoom">Passer en mode zoom</string>
     <string name="browser_takeover_input_hint">Saisir dans le navigateur…</string>
     <string name="browser_takeover_send">Envoyer</string>
     <string name="browser_takeover_status_live">EN DIRECT</string>

@@ -32,8 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.TouchApp
-import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -207,9 +205,10 @@ private const val PAGE_LOADING_WINDOW_MS = 20_000L
  *   底部唯一大胶囊 CTA「接管浏览器」。
  * - **in_control**（点 CTA 进入）：进入即 [onTakeControl]（VM 登记受控豁免 + 停 agent ≈
  *   Muse「接管即暂停 agent」；无真暂停/续跑基建，交还不续跑——差异登记于 chat.yaml §18）；
- *   顶栏胶囊「你正在控制」（蓝点）+ 暂停推流 + Interact/Zoom 子模式切换；
- *   帧区 Interact：点按→clickAt（[mapOffsetToPage] 屏幕→CSS 页面坐标）、拖动→scroll
- *   （20px 节流）、捏合→自动切 Zoom 子模式并完成本次缩放；
+ *   顶栏胶囊「你正在控制」（蓝点）+ 暂停推流；
+ *   帧区手势统一（M2.8，无子模式切换）：点按→clickAt（缩放态经 [invertViewTransform]
+ *   逆变换还原内容坐标，再由 [mapOffsetToPage] 映射 CSS 页面坐标）、1x 拖动→scroll
+ *   （20px 节流）、捏合→就地缩放 1x~5x、缩放态单指拖动→平移视野、双击→复位；
  *   底栏 = 控制行（交还控制 | 停止任务）+ IME 附件行（⏎/Tab/Esc 仅键盘弹出可见）+ 输入行。
  *   交还控制 = 回 observing（暂停中则自动恢复推流）；停止任务 = [onStopTask] close 会话，
  *   状态随 onBrowserSessionClosed 自然流转 ended。
@@ -243,7 +242,6 @@ fun BrowserFramePreviewOverlay(
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var inControl by rememberSaveable { mutableStateOf(false) }
-    var isZoomMode by remember { mutableStateOf(false) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     var inputText by remember { mutableStateOf("") }
     var isPaused by remember { mutableStateOf(false) }
@@ -281,10 +279,10 @@ fun BrowserFramePreviewOverlay(
         }
     }
 
-    // 缩放首次启用（observing 捏合 / in_control Zoom 子模式）显示一次性手势提示（3.5s 自动消失）
+    // 缩放首次启用（捏合就地缩放）显示一次性手势提示（3.5s 自动消失）
     var zoomHintShown by rememberSaveable { mutableStateOf(false) }
     var zoomHintVisible by remember { mutableStateOf(false) }
-    val zoomEngaged = isZoomMode || scale > 1.01f
+    val zoomEngaged = scale > 1.01f
     LaunchedEffect(zoomEngaged) {
         if (zoomEngaged && !zoomHintShown) {
             zoomHintShown = true
@@ -375,43 +373,63 @@ fun BrowserFramePreviewOverlay(
                     .padding(Spacing.lg),
                 contentAlignment = Alignment.Center
             ) {
-            // in_control 的 Interact 子模式 = 坐标交互；其余（observing / ended / in_control Zoom）= 只读缩放
-            val imageModifier = if (effectiveInControl && !isZoomMode) {
+            // M2.8 手势统一：in_control 不再分 Interact/Zoom 子模式——点按/拖动/捏合全部直接
+            // 作用于帧上：点按→clickAt（缩放态按 graphicsLayer 逆变换还原内容坐标再映射 CSS）、
+            // 1x 拖动→scroll、捏合→就地缩放（1x~5x）、缩放态单指拖动→平移视野、双击→复位；
+            // observing / ended = 只读缩放（不下发任何 action）
+            val imageModifier = if (effectiveInControl) {
                 Modifier
                     .fillMaxSize()
                     .onSizeChanged { containerSize = it }
                     .pointerInput(sessionId) {
-                        detectTapGestures { tapOffset ->
-                            val page = mapOffsetToPage(
-                                tapOffset, containerSize, frameWidth, frameHeight
-                            )
-                            if (page != null) {
-                                tryDispatch("clickAt", JSONObject()
-                                    .put("x", page.x.toInt())
-                                    .put("y", page.y.toInt()))
+                        detectTapGestures(
+                            onDoubleTap = {
+                                scale = 1f
+                                offset = Offset.Zero
+                            },
+                            onTap = { tapOffset ->
+                                val content = invertViewTransform(tapOffset, containerSize, scale, offset)
+                                val page = mapOffsetToPage(
+                                    content, containerSize, frameWidth, frameHeight
+                                )
+                                if (page != null) {
+                                    tryDispatch("clickAt", JSONObject()
+                                        .put("x", page.x.toInt())
+                                        .put("y", page.y.toInt()))
+                                }
                             }
-                        }
+                        )
                     }
                     .pointerInput(sessionId) {
-                        // 单指拖动 → scroll（20px 节流，取反：手指下滑=内容跟随=页面上滚 wheel 负值）；
-                        // 双指捏合 → 自动切 Zoom 子模式并完成本次缩放
+                        // 捏合 → 就地缩放（视野操作不下发）；缩放态单指拖动 → 平移视野；
+                        // 1x 单指拖动 → scroll（20px 节流，取反：手指下滑=内容跟随=页面上滚 wheel 负值）
                         var accumulated = Offset.Zero
                         detectTransformGestures { _, pan, zoom, _ ->
-                            if (zoom != 1f) {
-                                isZoomMode = true
-                                val nextScale = (scale * zoom).coerceIn(1f, 5f)
-                                scale = nextScale
-                                offset = if (nextScale <= 1.01f) Offset.Zero else offset + pan
-                            } else {
-                                accumulated += pan
-                                if (accumulated.y > 20 || accumulated.y < -20) {
-                                    tryDispatch("scroll", JSONObject()
-                                        .put("dx", 0)
-                                        .put("dy", -accumulated.y.toInt()))
+                            when {
+                                zoom != 1f -> {
+                                    val nextScale = (scale * zoom).coerceIn(1f, 5f)
+                                    scale = nextScale
+                                    offset = if (nextScale <= 1.01f) Offset.Zero else offset + pan
                                     accumulated = Offset.Zero
+                                }
+                                scale > 1.01f -> offset += pan
+                                else -> {
+                                    accumulated += pan
+                                    if (accumulated.y > 20 || accumulated.y < -20) {
+                                        tryDispatch("scroll", JSONObject()
+                                            .put("dx", 0)
+                                            .put("dy", -accumulated.y.toInt()))
+                                        accumulated = Offset.Zero
+                                    }
                                 }
                             }
                         }
+                    }
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
                     }
             } else {
                 Modifier
@@ -456,7 +474,7 @@ fun BrowserFramePreviewOverlay(
             TakeoverWatermark(text = stringResource(R.string.browser_takeover_status_paused))
         }
 
-        // 顶栏：返回（左）+ 状态胶囊（中）+ 暂停/继续 + 模式切换（右，仅 in_control）
+        // 顶栏：返回（左）+ 状态胶囊（中）+ 暂停/继续（右，仅 in_control）
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -503,30 +521,11 @@ fun BrowserFramePreviewOverlay(
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                IconButton(
-                    onClick = {
-                        isZoomMode = !isZoomMode
-                        if (!isZoomMode) { scale = 1f; offset = Offset.Zero }
-                    },
-                    modifier = circleButtonModifier
-                ) {
-                    Icon(
-                        imageVector = if (isZoomMode) Icons.Rounded.TouchApp else Icons.Rounded.ZoomIn,
-                        contentDescription = if (isZoomMode) {
-                            stringResource(R.string.browser_takeover_mode_interact)
-                        } else {
-                            stringResource(R.string.browser_takeover_mode_zoom)
-                        },
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
             }
         }
 
         // 底栏按态切换（imePadding 底栏与帧区共用：键盘弹出时底栏推起、帧区收缩避让）：
-        // ended=「返回对话」CTA；observing=「接管浏览器」CTA；
-        // in_control Interact=控制行+IME 附件行+输入行；in_control Zoom=空（手势提示顶替）
+        // ended=「返回对话」CTA；observing=「接管浏览器」CTA；in_control=控制行+IME 附件行+输入行
         // 外层消费 IME/导航栏 inset；内层为实际内容，onSizeChanged 量出内容高度（不含 IME），
         // 供帧容器在 IME 弹出时收缩避让
         Column(
@@ -557,7 +556,7 @@ fun BrowserFramePreviewOverlay(
                         onTakeControl()
                     },
                 )
-                !isZoomMode -> {
+                else -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         TakeoverCtaButton(
                             text = stringResource(R.string.browser_takeover_return_control),
@@ -782,6 +781,16 @@ private fun mapOffsetToPage(
 
     // 映射回 CSS 页面坐标
     return Offset(relX / scale, relY / scale)
+}
+
+/** graphicsLayer 逆变换：屏幕触点 → 未缩放内容坐标（scale 绕容器中心、后加 translation）。 */
+private fun invertViewTransform(tap: Offset, container: IntSize, scale: Float, offset: Offset): Offset {
+    val cx = container.width / 2f
+    val cy = container.height / 2f
+    return Offset(
+        (tap.x - cx - offset.x) / scale + cx,
+        (tap.y - cy - offset.y) / scale + cy,
+    )
 }
 
 /** base64 JPEG → ImageBitmap，后台线程解码（先例 ChartSvgImage.kt:39-68）。 */
