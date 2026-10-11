@@ -1588,6 +1588,11 @@
     <string name="browser_takeover_exit_hint_running">La sesión sigue activa; vuelve a entrar desde la tarjeta</string>
     <string name="browser_takeover_paused_toast">Transmisión en pausa</string>
     <string name="browser_takeover_zoom_hint">Pellizca para ampliar · arrastra para mover · doble toque para restablecer</string>
+    <string name="browser_takeover_take_control">Tomar el control del navegador</string>
+    <string name="browser_takeover_in_control">Tienes el control</string>
+    <string name="browser_takeover_return_control">Devolver el control</string>
+    <string name="browser_takeover_stop_task">Detener tarea</string>
+    <string name="browser_takeover_back_to_chat">Volver al chat</string>
     <string name="chat_cmd_browser_open">Abrir navegador</string>
     <string name="chat_cmd_browser_navigate">Navegar a página</string>
     <string name="chat_cmd_browser_click">Hacer clic en elemento</string>

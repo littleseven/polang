@@ -1637,6 +1637,11 @@
     <string name="browser_takeover_exit_hint_running">Session keeps running — reopen it from the card</string>
     <string name="browser_takeover_paused_toast">Stream paused</string>
     <string name="browser_takeover_zoom_hint">Pinch to zoom · drag to pan · double-tap to reset</string>
+    <string name="browser_takeover_take_control">Take control of the browser</string>
+    <string name="browser_takeover_in_control">You\'re in control</string>
+    <string name="browser_takeover_return_control">Return control</string>
+    <string name="browser_takeover_stop_task">Stop task</string>
+    <string name="browser_takeover_back_to_chat">Back to chat</string>
     <string name="chat_cmd_browser_open">Open browser</string>
     <string name="chat_cmd_browser_navigate">Navigate web page</string>
     <string name="chat_cmd_browser_click">Click element</string>
