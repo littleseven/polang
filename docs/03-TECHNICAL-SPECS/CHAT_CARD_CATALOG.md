@@ -814,6 +814,7 @@ legacy 13 值 → 新 type（+role）迁移映射见 §0.2 末表（`LegacyChatT
 | 主题 | 文档 |
 |---|---|
 | 渲染架构宪法 | `docs/02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md`（+ 实施 spec 2026-09-27-chat-parts-rendering-design） |
+| 请求/回复全链路协议 | `docs/03-TECHNICAL-SPECS/CHAT_PROTOCOL_TECH_SPEC.md`（路由→组装→流式→落库→历史双轨；本目录管逐卡实例，链路级归该文档） |
 | type 分类法（3 分类 8 值 + role 列） | `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`（2026-09-28 重构：serialName 改值 + `PartCategory` + role 升格 Room v26） |
 | 富内容渲染决策（原 ADR-014 D1~D6） | 已并入 ADR-016（D2 渲染 / D3 沙箱 / D4 iOS / D5 样式 / D6 不做；编号 014 永久留空） |
 | HTML/图表/脚本实现 SSOT | `docs/03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md` §5/§7/§7.1 |

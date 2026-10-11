@@ -308,6 +308,7 @@ AI 可直接解析 Spec 中的任务标记，生成执行计划：
 | **Design Token SSOT 规范** | `docs/03-TECHNICAL-SPECS/DESIGN_TOKENS_SPEC.md`（token codegen 工作流：`design-tokens.json` 唯一 SSOT → `gen-design-tokens.py` 生成双端镜像 + `--check` 门禁；Ardot/Figma 仅预览层） |
 | **JS Engine** | `docs/03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md`（QuickJS 沙箱 + JSBridge：run_gallery_script 取数、draw_chart 图卡、capability.dispatch 写通路） |
 | **Chat 卡片目录** | `docs/03-TECHNICAL-SPECS/CHAT_CARD_CATALOG.md`（每张卡片的协议/parts 形态/回灌/渲染三要素登记 + 端到端例子；M1/M2 parts 落地态已并入） |
+| **Chat 请求/回复协议** | `docs/03-TECHNICAL-SPECS/CHAT_PROTOCOL_TECH_SPEC.md`（主聊天流全链路实况 SSOT：意图路由→请求组装→SSE 流式→工具双通道→落库→历史双轨；卡片级实例归卡片目录） |
 | **能力注册与实现** | `docs/04-AGENT-CAPABILITIES/CAPABILITY_REGISTRY.md`（含实现指南与生命周期规范） |
 | **开发规范** | `docs/05-DEVELOPMENT/DEVELOPMENT.md`（含代码审查与任务标记规范） |
 | **本地开发环境** | `docs/05-DEVELOPMENT/LOCAL_ENVIRONMENT.md` |

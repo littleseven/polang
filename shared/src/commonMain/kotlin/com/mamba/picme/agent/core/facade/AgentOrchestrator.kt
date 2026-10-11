@@ -12,6 +12,8 @@ import com.mamba.picme.agent.core.inference.remote.tool.MemoryContextProvider
 import com.mamba.picme.agent.core.inference.remote.tool.ToolInventory
 import com.mamba.picme.agent.core.inference.remote.react.RemoteReActAgentCallback
 import com.mamba.picme.agent.core.inference.remote.koog.KoogReActAgent
+import com.mamba.picme.agent.core.inference.remote.koog.KoogSessionMemoryRebuilder
+import com.mamba.picme.domain.chat.ModelInputItem
 import com.mamba.picme.agent.core.inference.remote.react.RemoteReActAgentConfig
 import com.mamba.picme.agent.core.inference.remote.react.AgentExecutionMetrics
 import com.mamba.picme.agent.core.inference.remote.RemoteChatEngine
@@ -570,6 +572,9 @@ class AgentOrchestrator private constructor(
     /** Koog 记忆存储（对话回写用；组合根注入，与 agent 运行期记忆同一 koog_memory_ 键空间）。 */
     private val koogMemoryStore: ChatMemoryStore get() = deps.chatMemoryStore
 
+    /** 短期记忆冷启动重建器（分层记忆 spec M4；纯委派，store 即组合根注入实例）。 */
+    private val memoryRebuilder = KoogSessionMemoryRebuilder(deps.chatMemoryStore)
+
     /** 相机对话历史回写（fire-and-forget，与原 LocalCameraAgent.saveConversation 同语义）。 */
     private fun saveCameraConversation(sessionId: String, userInput: String, assistantResponse: String) {
         backgroundScope.launch {
@@ -604,5 +609,16 @@ class AgentOrchestrator private constructor(
             )
         )
     }
+
+    /**
+     * 短期记忆冷启动重建（分层记忆 spec M4：Room 长期归档 = SSOT，Koog 记忆 = 可重建的
+     * 派生缓存）：`koog_memory_` 为空而平台长期归档有历史时（备份恢复/缓存被清/换机），
+     * 经 [projector]（Android = Room partsJson → `toModelInput` 投影）重建热窗口；
+     * 短期轨非空时幂等跳过。调用方须 runCatching 兜底——重建失败不阻断对话（spec 决策 9）。
+     */
+    suspend fun rebuildChatMemoryIfEmpty(
+        sessionId: String,
+        projector: suspend (sessionId: String) -> List<ModelInputItem>,
+    ): Boolean = memoryRebuilder.rebuildIfEmpty(sessionId, projector)
 
 }

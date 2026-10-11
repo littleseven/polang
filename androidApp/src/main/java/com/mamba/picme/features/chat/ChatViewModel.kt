@@ -137,6 +137,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "ChatViewModel"
 private const val MAX_MESSAGES = 500
+/** 分层记忆 M4：短期轨冷启动重建时从 Room 长期轨投影的最近消息条数（save 侧 8000 token/10 条裁剪兜底）。 */
+private const val MEMORY_REBUILD_MESSAGE_LIMIT = 50
 /** ADR-016 M2：任务卡 live 态 overlay 节流（SSE 高频事件不直接驱动全列表重组）。 */
 private const val ENGINEER_TASK_OVERLAY_THROTTLE_MS = 500L
 /** browser-vnc 直播卡 live 态 overlay 节流（与任务卡同 500ms 节拍；帧高频不直接驱动全列表重组）。 */
@@ -1651,6 +1653,9 @@ class ChatViewModel(
                 chatImageStore.evictForSession(sessionId)
                 chatMessageDao.deleteAllMessagesBySession(sessionId)
                 chatSessionDao.deleteSession(sessionId)
+                // 分层记忆 M4 删除传播：Room 长期轨已删，短期轨（Koog 记忆）同步清除，防已删会话记忆泄漏
+                runCatching { orchestrator.clearChatMemory(sessionId) }
+                    .onFailure { error -> Logger.w(TAG, "Failed to clear session memory: ${error.message}") }
                 // 会话级内存缓存同步清理，避免已删会话的搜索结果/快照/排除集残留
                 lastResultAssets.remove(sessionId)
                 pendingScriptMediaIds.remove(sessionId)
@@ -1860,6 +1865,18 @@ class ChatViewModel(
                     TAG,
                     "chat inference: model=${selectedModel.displayName}, baseUrl=${selectedModel.remoteConfig.baseUrl}"
                 )
+                // 分层记忆 M4 冷启动重建：备份恢复/缓存被清后短期轨（Koog 记忆）为空时，
+                // 从 Room 长期轨投影最近历史兜底，防「屏幕上可见历史、模型完全失忆」断裂；
+                // 失败仅记日志，绝不阻断对话
+                runCatching {
+                    orchestrator.rebuildChatMemoryIfEmpty(sessionId) { sid ->
+                        chatMessageDao.getRecentMessages(sid, MEMORY_REBUILD_MESSAGE_LIMIT)
+                            .asReversed()
+                            .flatMap { entity -> entity.toModelInputItems() }
+                    }
+                }.onFailure { error ->
+                    Logger.w(TAG, "Failed to rebuild session memory: ${error.message}")
+                }
                 // 用户选了图片时，把 URI 注入 input 让 ReAct LLM 知道（ai_optimize 需 image_uri）
                 val effectiveInput = if (imageUri != null) {
                     "[用户选择了图片：$imageUri，请基于这张图片处理] $text"
@@ -3932,6 +3949,9 @@ class ChatViewModel(
                 optimizeGachaController?.discardPending(sessionId)
                 chatMessageDao.deleteAllMessagesBySession(sessionId)
                 chatSessionDao.updateTitle(sessionId, "New Chat")
+                // 分层记忆 M4 删除传播：短期轨（Koog 记忆）同步清除，下次推理从零窗口起步
+                runCatching { orchestrator.clearChatMemory(sessionId) }
+                    .onFailure { error -> Logger.w(TAG, "Failed to clear session memory: ${error.message}") }
                 _messages.value = emptyList()
                 // 选中态是纯 UI 内存态，消息删光后整体清理，回退到推荐卡高亮即可
                 _gachaSelections.value = emptyMap()

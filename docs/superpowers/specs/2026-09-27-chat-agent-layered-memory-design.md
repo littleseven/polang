@@ -1,7 +1,7 @@
 # Chat Agent 分层记忆系统设计（Layered Agent Memory）
 
 > **日期**：2026-09-27
-> **状态**：M1 + M2 已实施（feat/chat-memory-m2 分支）；M3 待排期
+> **状态**：M1 + M2 已实施（feat/chat-memory-m2 分支）；M4 已实施（feat/chat-memory-tiers 分支，2026-10-11）；M3 待排期
 > **来源**：记忆管理专项调研会话（参考系：ChatGPT Memory、Claude Code auto-compact、Vercel AI SDK parts）
 > **关联**：ADR-012（对话记忆三分边界）、ADR-016（chat 消息模型宪法，互不侵入）、ADR-008（[PRIVACY]）、`docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md`
 >
@@ -14,6 +14,14 @@
 > - **存储**：`ChatMemoryStore` 加 `loadSummary/saveSummary/clearSummary`（摘要键 `koog_summary_` 独立于历史键 `koog_memory_`；`clear` 会话销毁才一并清）；双端 actual（Android DataStore / iOS NSUserDefaults）同步落地，失败降级 null/静默。
 > - **注入**：`composeChatSystemPrompt`（top-level 纯函数）把摘要段拼在记忆快照后（`【会话摘要】` 标记）；`KoogChatAgent` 的 agent 重建键 = 记忆快照 + 摘要 version（压缩后 version 变 → 重建 → 新摘要烘焙进 system prompt）；每轮 `runChat` 开头 `maybeCompact` + `loadSummary` 新鲜渲染。
 > - **测试**：`SessionCompactionTest`（21 例：槽位解析/合并/渲染/序列化/候选选择/prompt 构造）+ `ChatMemoryStoreSummaryTest`（6 例契约）+ `SessionCompactorTest`（9 例触发/合并/失败跳过）+ `ComposeChatSystemPromptTest`（5 例注入语义）。
+>
+> **M4 实施记录（2026-10-11，feat/chat-memory-tiers）**：双轨改主从制落地——
+> - **投影映射器**：`inference/remote/koog/KoogMemoryProjection.kt`（`List<ModelInputItem>.toKoogMemoryMessages()`）——长期轨回灌项 → Koog Message 组装（文本按 role 落 User/Assistant；ToolCall/ToolResult 落 Assistant(Call)+User(Result) 相邻配对；空 argsSummary 落 `"{}"`；isError 追加 ` (failed)` 文本标记——Koog 1.3.0 Tool.Result 无 isError 字段，口径同工程师隧道 `toHistoryPair`）。
+> - **重建器**：`KoogSessionMemoryRebuilder`（`rebuildIfEmpty`）——短期轨非空幂等跳过（正常路径一次 load 零投影开销）；短期轨空且长期轨投影为空（全新会话）不写；否则投影+save（裁剪由 `assembleForPersistence` 统一承担）。
+> - **接缝**：`AgentOrchestrator.rebuildChatMemoryIfEmpty(sessionId, projector)`——projector 由平台层注入（Android = Room `chat_messages` 经 `ChatMessageEntity.toModelInputItems()` 投影），iOS 不调即零行为变化。
+> - **接线（androidApp ChatViewModel）**：`sendMessage` 推理发起前 runCatching 兜底重建（投影最近 50 条）；`deleteSession`/`clearChat` 删除 Room 长期轨后同步 `clearChatMemory`（修掉「会话已删、Koog 记忆残留」泄漏）。
+> - **测试**：`KoogMemoryProjectionTest`（7 例：role 映射/配对/空 args/failed 标记/顺序/持久化组装后配对保持）+ `KoogSessionMemoryRebuilderTest`（4 例：幂等跳过/重建写入/空投影不写/session 隔离）。
+> - **明确不做**：`recall_chat_history` 主动召回工具（按需拉取长期轨任意段）留后续；iOS 侧接线留 ios-follow。
 
 ---
 
@@ -76,6 +84,15 @@
 - **US-3.4 治理**：设置页可查看全部事实、单条删除、一键清空；删除下轮即时生效。
 - **US-3.5 时效衰减**：事实带 `lastConfirmedAt`，超 90 天未再确认标记 stale、不再注入。
 
+### M4：主从制——Room 长期轨 SSOT + Koog 短期派生缓存（已实施 2026-10-11）
+
+与 L1/L2/L3 上下文组装分层正交——本层管**持久化主从关系**（历史双轨谁说了算）。
+
+- **US-4.1 主从定位**：Room `chat_messages`（partsJson 归档）升格为聊天历史的长期记忆唯一事实源（SSOT）；Koog ChatMemory（`koog_memory_` 键）降为可丢弃、可从长期轨重建的短期派生缓存。两轨不再并列对等。
+- **US-4.2 冷启动重建**：备份恢复/换机/缓存被清后，短期轨为空而 Room 仍有历史——直接跑 agent loop 会让模型对屏幕上用户可见的历史完全失忆。`KoogSessionMemoryRebuilder.rebuildIfEmpty` 在推理发起前兜底重建：`sendMessage` 前置钩子投影 Room 最近 50 条，预算/老化/条数裁剪由 store save 统一承担；短期轨非空则幂等跳过；失败仅记日志绝不阻断对话（决策 9 同语义）。
+- **US-4.3 回灌转换器复用**：投影链路 = Room entity `toModelInputItems()`（UIMessage→ModelMessage，ADR-016 D1 双层分离）→ `toKoogMemoryMessages()`（引擎组装，`inference/remote/koog/`）。`toModelInput` 一个转换器同时服务工程师隧道与主聊天流重建；卡片 part 已是 Call/Result 语义对，投影产物天然满足 store 三不变式配对。
+- **US-4.4 删除传播**：`deleteSession`/`clearChat` 删除 Room 长期轨后同步 `AgentOrchestrator.clearChatMemory(sessionId)` 清短期轨（历史+摘要全清），修掉「会话已删、Koog 记忆残留」泄漏。
+
 ## 5. 已定决策
 
 1. 三层模型与分期顺序 **M1 → M2 → M3**；M1 不依赖任何新基建，先行交付。
@@ -87,6 +104,8 @@
 7. 摘要/抽取仅**文本**经 server 网关远程推理；图片一律 `media://` id 占位（[PRIVACY]）。
 8. 摘要与 system prompt 同样**不落盘**，每轮由摘要记录新鲜渲染。
 9. 失败模式：摘要请求失败 → 本轮跳过 compaction（下次再试），**绝不因记忆系统阻断对话**。
+10. 双轨改**主从制**（2026-10-11 用户拍板）：Room = 长期 SSOT，Koog ChatMemory = 可丢弃可重建的派生缓存；重建为**被动冷启动**（短期轨空才触发），主动召回工具留后续。
+11. 重建投影上限取 Room 最近 **50 条**——save 侧 8000 token 预算/10 条上限裁剪后实际生效≈最近几轮，符合短期窗口语义；长期完整性由 Room 归档与 L2 摘要承担。
 
 ## 6. 测试决策
 
@@ -103,6 +122,8 @@
 - 跨设备记忆同步（账号体系联动后置）
 - 多用户/家庭共享记忆
 - 图片内容记忆（media 不远程；端侧 VLM 打标属 TAG 域既有管线，不并入）
+- `recall_chat_history` 主动召回工具（按需把长期轨任意段拉进上下文）——M4 只交付被动冷启动重建
+- M4 的 iOS 侧接线（`IosAgentComposition` 不调 `rebuildChatMemoryIfEmpty` 即零行为变化，留 ios-follow）
 - M3 记忆治理 UI 的 iOS 实现（走 [PARITY] spec 流程另行固化）
 - 不改 Koog 框架内部（全部落在 store/组装层/prompt 装配层）
 - ChatPart/UIMessage 消息模型变更（ADR-016 域，互不侵入）
