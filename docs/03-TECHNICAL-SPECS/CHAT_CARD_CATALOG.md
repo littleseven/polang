@@ -571,7 +571,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ![collapsed](../assets/chat-cards/taskcard-collapsed.png?v=20260927-4) ![expanded](../assets/chat-cards/taskcard-expanded.png?v=20260927-4) ![approval](../assets/chat-cards/taskcard-approval.png?v=20260927-4) ![done](../assets/chat-cards/taskcard-done.png?v=20260927-4)
 
-**渲染组件**：`EngineerTaskCard`（两分区单卡：HTML 信息区 + 卡内原生动作区 `EngineerTaskActionZone`，外层 r16 + outlineVariant 描边——浅色主题动作区底 surfaceContainerHigh 与列表底同色，描边防「悬浮式脱节」）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。机制：`EngineerTaskHtml`（L1 端侧模板 + 状态 JSON 组装完整 HTML，CSS 变量走 tokens）经 `HtmlCard` 双形态渲染；displayMode 粘滞不落库；500ms 合帧节流（`EngineerTaskThrottle`）；状态文本 HTML escape（唯一注入面）；阶段串格式「工具名␣␣细节」/「file_change:path」（reducer `stageLabel` 产出），渲染期经 `parseStage`/`stageMaps` 本地化为「中文阶段名 · 细节」（时间线）与「工具名 · 正在X 细节」（当前阶段行）；停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
+**渲染组件**：`EngineerTaskCard`（两分区单卡：HTML 信息区 + 卡内原生动作区 `EngineerTaskActionZone`，外层 r16；整卡统一 **cell 底**（Light 纯白 / Dark #1A1A1A）——2026-10-11 Light 连体定稿（design taskcard/light-\*）：上下两区同色、分区仅靠动作区顶 hairline（outlineVariant），白卡从微信灰列表底自然浮起，无描边）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。机制：`EngineerTaskHtml`（L1 端侧模板 + 状态 JSON 组装完整 HTML，CSS 变量走 tokens）经 `HtmlCard` 双形态渲染；displayMode 粘滞不落库；500ms 合帧节流（`EngineerTaskThrottle`）；状态文本 HTML escape（唯一注入面）；阶段串格式「工具名␣␣细节」/「file_change:path」（reducer `stageLabel` 产出），渲染期经 `parseStage`/`stageMaps` 本地化为「中文阶段名 · 细节」（时间线）与「工具名 · 正在X 细节」（当前阶段行）；停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
 **parts 协议（✅ M1/M2 已落地）**：`MessagePart.TaskCard`——
 
 | 字段 | 类型 | 含义 |

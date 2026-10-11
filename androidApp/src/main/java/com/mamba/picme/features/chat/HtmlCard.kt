@@ -100,7 +100,8 @@ import kotlin.math.roundToInt
  *   WebView 不可聚焦不可点击（JS 仍运行，仅触摸不到达）；不参与 ResizeObserver 高度跟随。
  *   渲染失败（onRenderProcessGone/加载错误）→ 原生封面兜底（summary + 提示条），点击仍进全屏。
  *
- * 分流判定结果（displayMode + 测高）随消息 metadata 持久化，会话重开/列表回收后形态不跳变。
+ * 分流判定结果（displayMode + 测高）随消息 metadata 持久化，会话重开/列表回收后形态不跳变；
+ * 不落库的调用方（任务卡 spec §10）由进程级 [displayModeCache] 兜底跨回收粘滞。
  *
  * **滑动防抖**（inline 卡）：测高结果按 [cacheKey]（消息 id）进程级缓存（重回视口零高度动画）+
  * 列表滑动途中冻结高度更新（滚停后一次性应用）+ 小于 [HEIGHT_UPDATE_THRESHOLD_PX]px 的抖动忽略；
@@ -136,6 +137,14 @@ const val CARD_HORIZONTAL_CHROME_DP = 48
  * 2026-09-26 改为消息 id 字符串 key。）
  */
 private val measuredHeightCache = LruCache<String, Int>(64)
+
+/**
+ * 形态终判进程级缓存（key 语义同 [measuredHeightCache]）：displayMode 的持久化（metadata）依赖宿主
+ * 回写，而任务卡按 spec §10 明示「HTML 是渲染期产物」不落库——列表回收后 displayMode 复位 null，
+ * 重回视口重走「待测高占位/inline 高 → 重判 FULLPAGE → 跳预览高」链，滑动中反复回收即高度来回跳变。
+ * 缓存终判结果（ FULLPAGE 含判定时的测高），回屏直接以终判形态出现，零重判零跳变。
+ */
+private val displayModeCache = LruCache<String, HtmlCardDisplayMode>(64)
 
 /** 高度更新最小幅度（CSS px ≈ dp）：低于此值的测高抖动（小数取整等）直接忽略，不触发动画。 */
 private const val HEIGHT_UPDATE_THRESHOLD_PX = 2
@@ -191,27 +200,31 @@ fun HtmlCard(
     val previewHeight = (effectivePreviewViewportHeightDp * HtmlCardDisplay.PREVIEW_HEIGHT_FRACTION)
         .roundToInt().dp.coerceAtLeast(CARD_MIN_HEIGHT)
 
-    // 形态终判：持久化值（会话重开/回收后形态不跳变）> display=fullpage 免测高直判 > null（待测高）
-    var displayMode by remember(html) {
+    // 形态终判：进程级终判缓存（任务卡等不落库调用方的跨回收粘滞）> 持久化值 > display=fullpage
+    // 免测高直判 > null（待测高）。remember key 用 cacheKey 而非 html：默认 cacheKey=html 行为等价；
+    // 任务卡显式形态域 key（taskcard:<id>:exp|col）下 html 每秒级刷新（耗时字段）不复位终判链。
+    var displayMode by remember(cacheKey) {
         mutableStateOf(
-            meta?.displayMode
+            displayModeCache.get(cacheKey)
+                ?: meta?.displayMode
                 ?: if (HtmlCardDisplay.isDeclaredFullpage(meta?.display)) {
                     HtmlCardDisplayMode.FULLPAGE
                 } else {
                     null
                 }
-            )
+        )
     }
     // display=fullpage 直判的回写终判（免测高；宿主按已有值幂等跳过重复落库）
-    LaunchedEffect(html) {
+    LaunchedEffect(cacheKey) {
         if (meta?.displayMode == null && displayMode == HtmlCardDisplayMode.FULLPAGE) {
+            displayModeCache.put(cacheKey, HtmlCardDisplayMode.FULLPAGE)
             onDisplayModeResolved(HtmlCardDisplayMode.FULLPAGE, null)
         }
     }
 
-    // 内容测高（CSS px ≈ dp，模板已注入 viewport meta width=device-width）；html 变化时复位，
+    // 内容测高（CSS px ≈ dp，模板已注入 viewport meta width=device-width）；cacheKey 变化时复位，
     // 初值取进程级缓存 / 持久化测高——重回视口（含进程重建）的卡片直接以最终高度出现，不走占位高度动画
-    var measuredHeightDp by remember(html) {
+    var measuredHeightDp by remember(cacheKey) {
         mutableIntStateOf(
             measuredHeightCache.get(cacheKey)
                 ?: meta?.measuredHeightPx?.takeIf { px -> px > 0 }
@@ -219,10 +232,10 @@ fun HtmlCard(
         )
     }
     // 滑动途中冻结高度更新（列表项边滚边变高是滑动抖动主因），最新值挂起，滚动停止后一次性应用
-    var pendingHeightDp by remember(html) { mutableIntStateOf(-1) }
+    var pendingHeightDp by remember(cacheKey) { mutableIntStateOf(-1) }
     val currentIsScrolling by rememberUpdatedState(isListScrolling)
     // 预览态渲染失败（onRenderProcessGone/主帧加载错误）→ 原生封面兜底
-    var renderFailed by remember(html) { mutableStateOf(false) }
+    var renderFailed by remember(cacheKey) { mutableStateOf(false) }
 
     // inline 卡完全撑开：高度 = 内容全高（≥ [CARD_MIN_HEIGHT]）、不内滚，
     // 竖直滚动全交外层列表——WebView 永不竖滚，与 LazyColumn 的手势冲突从根上消失
@@ -290,6 +303,7 @@ fun HtmlCard(
                                     fullpageThresholdPx = thresholdPx
                                 )
                                 displayMode = decided
+                                displayModeCache.put(cacheKey, decided)
                                 onDisplayModeResolved(decided, px)
                                 if (decided == HtmlCardDisplayMode.INLINE) applyMeasuredHeight(px)
                             }

@@ -1,6 +1,5 @@
 package com.mamba.picme.features.chat.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,6 +45,7 @@ import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.features.chat.HtmlCard
+import com.mamba.picme.core.designsystem.cell
 import com.mamba.picme.domain.chat.taskcenter.EngineerTaskHtml
 import com.mamba.picme.domain.chat.taskcenter.EngineerTaskPalette
 import com.mamba.picme.domain.chat.taskcenter.EngineerTaskTexts
@@ -59,7 +59,7 @@ import kotlinx.coroutines.delay
  * 双形态渲染——折叠/展开为 INLINE（点击整卡切换），展开超 1.0 屏自动升格 FULLPAGE 预览 → 全屏查看器。
  *
  * 卡片为**上下两分区单卡容器**（2026-09-27 Muse 修订，外置动作条方案作废；design taskcard 四帧）：
- * 上半 = HTML 信息区（r16 卡容器内），下半 = **原生 Compose 动作区**（surfaceContainerHigh 底 + hairline
+ * 上半 = HTML 信息区（r16 卡容器内），下半 = **原生 Compose 动作区**（与卡面统一 cell 底 + hairline
  * 分隔，零 JS 桥接红线不动，动作状态与卡片同源）——running=整宽胶囊[停止]、approval=radio 选项列表
  * （继续执行/到此为止）、deliver=[暂不|推送交付]双胶囊、failed=[重试]主胶囊、completed 无动作区。
  *
@@ -106,11 +106,11 @@ fun EngineerTaskCard(
     var resolvedMode by remember(throttled.taskId, expanded) { mutableStateOf<HtmlCardDisplayMode?>(null) }
     val cd = stringResource(R.string.cd_engineer_task_card)
     // 单卡容器（两分区改版）：上 = HTML 信息区，下 = 原生动作区，外层统一 r16 裁剪；
-    // 浅色主题下动作区底（surfaceContainerHigh #EDEDED）与聊天列表底同色，1dp 描边保证卡缘可读、两区连体
+    // 整卡统一 cell 底（Light 纯白 / Dark #1A1A1A，token v3.0「灰底白组」槽）——上下两区同色，
+    // 分区仅靠动作区顶 hairline；白卡从微信灰列表底（#EDEDED）自然浮起，无需描边（design taskcard/light-*）
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.cell,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
             .semantics { contentDescription = cd },
@@ -133,7 +133,7 @@ fun EngineerTaskCard(
                     isListScrolling = isListScrolling,
                     onOpenFullpage = { onOpenFullpage(html, throttled.sourceText) },
                     onDisplayModeResolved = { mode, _ -> resolvedMode = mode },
-                    cardColor = MaterialTheme.colorScheme.surfaceContainer,
+                    cardColor = MaterialTheme.colorScheme.cell,
                     cardShape = if (hasBar) {
                         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
                     } else {
@@ -187,7 +187,7 @@ private fun rememberThrottledTask(task: EngineerTaskState): EngineerTaskState {
 private fun rememberEngineerTaskPalette(): EngineerTaskPalette {
     val scheme = MaterialTheme.colorScheme
     return EngineerTaskPalette(
-        cardBg = scheme.surfaceContainer.toCssHex(),
+        cardBg = scheme.cell.toCssHex(),
         iconBlockBg = scheme.surfaceContainerHigh.toCssHex(),
         primary = scheme.primary.toCssHex(),
         onPrimary = scheme.onPrimary.toCssHex(),
@@ -273,7 +273,8 @@ private fun engineerTaskTexts(task: EngineerTaskState): EngineerTaskTexts {
 
 /**
  * 卡内原生动作区（spec §7 2026-09-27 Muse 修订；design taskcard/collapsed、approval、done 帧）：
- * surfaceContainerHigh 底 + 顶 hairline（outlineVariant），由外层卡容器统一裁剪底圆角。
+ * 与卡面统一 cell 底（Light 纯白 / Dark #1A1A1A，2026-10-11 Light 连体定稿）+ 顶 hairline
+ * （outlineVariant）作唯一分区线，由外层卡容器统一裁剪底圆角。
  * 四态映射：running=整宽胶囊[停止]、approval=radio 选项列表（继续执行/到此为止）、
  * deliver=[暂不|推送交付]双胶囊、failed=[重试]主胶囊。
  */
@@ -293,7 +294,7 @@ private fun EngineerTaskActionZone(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(scheme.surfaceContainerHigh),
+            .background(scheme.cell),
     ) {
         Box(
             modifier = Modifier

@@ -60,7 +60,7 @@ struct EngineerTaskCardView: View {
 
     private var palette: EngineerTaskPalette {
         EngineerTaskPalette(
-            cardBg: s.surfaceContainer.hexRgb,          // 卡底（scheme/surfaceContainer）
+            cardBg: s.cell.hexRgb,                      // 卡底（cell：Light 纯白 / Dark #1A1A1A，与 Android 同 token）
             iconBlockBg: s.surfaceContainerHigh.hexRgb, // ⚙ 图标块底（surfaceContainerHigh）
             primary: s.primary.hexRgb,
             onPrimary: s.onPrimary.hexRgb,
