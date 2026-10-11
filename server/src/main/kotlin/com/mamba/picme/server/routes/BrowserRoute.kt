@@ -27,6 +27,9 @@ import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -214,6 +217,11 @@ fun Route.browserRoute(
                             when (frame) {
                                 is Frame.Text -> upstream.send(Frame.Text(frame.readText()))
                                 is Frame.Binary -> upstream.send(Frame.Binary(true, frame.data))
+                                // Ktor（pingPeriod 禁用默认下）不自动回 pong，ping 透传到应用层：
+                                // OkHttp pingInterval(20s) 收不到 pong 即判死断连
+                                // （"sent ping but didn't receive pong within 20000ms"）——
+                                // 必须在代理层本地应答；ping 属逐跳控制帧，不转发 bridge
+                                is Frame.Ping -> serverSession.send(Frame.Pong(frame.data))
                                 is Frame.Close -> {
                                     upstream.close(frame.readReason() ?: CloseReason(CloseReason.Codes.NORMAL, "app closed"))
                                     return@launch
@@ -226,11 +234,41 @@ fun Route.browserRoute(
                     }
                 }
 
-                // bridge → App：二进制 JPEG 帧 + 文本元数据
+                // bridge → App：二进制 JPEG 帧 + 文本元数据。
+                // 帧是有损直播语义：bridge 产能（~5fps×110KB）远超客户端路径带宽（实测 110-140KB/s）。
+                // 无闸门全量转发时，积压在 nginx/OS 发送缓冲里膨胀到数十秒——pong 等控制消息
+                // 排队超时（OkHttp 20s 无 pong 判死断连），「直播」画面也变成陈旧回放。
+                // 两道闸：① 字节令牌桶（预算保守低于实测路径下限，超预算直接丢帧，从源头
+                // 防止下游积压形成）；② 容量 1 的 DROP_OLDEST 通道（本进程内不排队）。
+                // 文本/控制帧直发不丢——它们小且关键（frame_meta/error）。
+                var windowStartMs = System.currentTimeMillis()
+                var windowBytes = 0
+                val frameQueue = Channel<Frame.Binary>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+                val frameSender = CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+                    try {
+                        for (frame in frameQueue) {
+                            serverSession.send(Frame.Binary(true, frame.data))
+                        }
+                    } catch (e: Throwable) {
+                        logger.debug("browser WS frame sender ended: ${e.message}")
+                    }
+                }
                 try {
                     for (frame in upstream.incoming) {
                         when (frame) {
-                            is Frame.Binary -> serverSession.send(Frame.Binary(true, frame.data))
+                            is Frame.Binary -> {
+                                val now = System.currentTimeMillis()
+                                if (now - windowStartMs >= 1000) {
+                                    windowStartMs = now
+                                    windowBytes = 0
+                                }
+                                // 窗口首帧无条件放行（帧可能大于预算，永不全黑）；
+                                // 后续帧超预算丢弃：直播语义下旧帧无价值
+                                if (windowBytes == 0 || windowBytes + frame.data.size <= FRAME_BYTE_BUDGET_PER_SEC) {
+                                    windowBytes += frame.data.size
+                                    frameQueue.trySend(frame)
+                                }
+                            }
                             is Frame.Text -> serverSession.send(Frame.Text(frame.readText()))
                             is Frame.Close -> {
                                 serverSession.close(frame.readReason() ?: CloseReason(CloseReason.Codes.NORMAL, "bridge closed"))
@@ -243,6 +281,9 @@ fun Route.browserRoute(
                     logger.debug("browser WS bridge→app forward ended: ${e.message}")
                 }
 
+                frameQueue.close()
+                frameSender.cancel()
+
                 appToBridge.cancel()
             }
         } catch (e: Throwable) {
@@ -254,6 +295,9 @@ fun Route.browserRoute(
 
 private const val BUSY_USER_PAYLOAD =
     """{"status":"pool_exhausted","errorCode":"user_concurrency","reason":"active browser session exists, close it first"}"""
+
+/** WS 推帧字节预算（B/s）：实测 App↔HK 路径 110-140KB/s，保守取下限之下，防下游积压。 */
+private const val FRAME_BYTE_BUDGET_PER_SEC = 90_000
 
 private val probeJson = Json { ignoreUnknownKeys = true }
 

@@ -1586,14 +1586,13 @@
     <string name="browser_live_failed">La sesión de navegador falló</string>
     <string name="browser_live_view_full">Toca para ver a pantalla completa</string>
     <string name="browser_live_title_default">Página web</string>
-    <string name="browser_takeover_mode_interact">Cambiar a modo interactivo</string>
-    <string name="browser_takeover_mode_zoom">Cambiar a modo zoom</string>
     <string name="browser_takeover_input_hint">Escribir en el navegador…</string>
     <string name="browser_takeover_send">Enviar</string>
     <string name="browser_takeover_status_live">EN DIRECTO</string>
     <string name="browser_takeover_status_paused">En pausa</string>
     <string name="browser_takeover_status_ended">Sesión finalizada</string>
     <string name="browser_takeover_status_reconnecting">Reconectando…</string>
+    <string name="browser_takeover_status_page_loading">Cargando página…</string>
     <string name="browser_takeover_pause">Pausar transmisión</string>
     <string name="browser_takeover_resume">Reanudar transmisión</string>
     <string name="browser_takeover_key_enter">⏎ Intro</string>

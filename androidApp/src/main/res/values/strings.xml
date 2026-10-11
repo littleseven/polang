@@ -1635,14 +1635,13 @@
     <string name="browser_live_failed">Browser session failed</string>
     <string name="browser_live_view_full">Tap to view full screen</string>
     <string name="browser_live_title_default">Web page</string>
-    <string name="browser_takeover_mode_interact">Switch to interact mode</string>
-    <string name="browser_takeover_mode_zoom">Switch to zoom mode</string>
     <string name="browser_takeover_input_hint">Type to browser…</string>
     <string name="browser_takeover_send">Send</string>
     <string name="browser_takeover_status_live">LIVE</string>
     <string name="browser_takeover_status_paused">Paused</string>
     <string name="browser_takeover_status_ended">Session ended</string>
     <string name="browser_takeover_status_reconnecting">Reconnecting…</string>
+    <string name="browser_takeover_status_page_loading">Loading page…</string>
     <string name="browser_takeover_pause">Pause stream</string>
     <string name="browser_takeover_resume">Resume stream</string>
     <string name="browser_takeover_key_enter">⏎ Enter</string>

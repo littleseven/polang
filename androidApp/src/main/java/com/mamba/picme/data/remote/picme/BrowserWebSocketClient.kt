@@ -7,8 +7,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -26,7 +30,10 @@ import java.util.concurrent.TimeUnit
  * 协议（bridge ws.js 同源）：
  *   Server → Client  binary: JPEG 帧字节
  *   Server → Client  text:    {"type":"frame_meta",seq,width,height,timestamp}
- *   Client → Server  text:    {"type":"action","actionId":"...","action":{...}}
+ *
+ * takeover 动作（clickAt/typeText/scroll/...）M2.7 起走 HTTP 原文透传
+ * （[BrowserSessionClient.rawAction]），不再经本连接：推帧洪泛时 WS 下行被二进制帧
+ * 占满，动作回执排队在帧后实测 >13s 不可达；WS 仅保留帧接收与连接健康感知。
  *
  * 帧以 [SharedFlow] 推送，UI 侧 collect 后更新 StateFlow。
  * 主动断开（[disconnect]/[disconnectAll]）不产生事件；非主动断开（网络/对端关闭）
@@ -58,6 +65,13 @@ class BrowserWebSocketClient(
 
     private val _disconnectEvents = MutableSharedFlow<DisconnectEvent>(extraBufferCapacity = 4)
     val disconnectEvents: SharedFlow<DisconnectEvent> = _disconnectEvents.asSharedFlow()
+
+    /**
+     * 已握手成功（onOpen）的会话集合。UI 据此区分「页面静止无新帧」与「真断流」：
+     * CDP screencast 只在页面重绘时推帧，静态页面帧恒旧但连接健康——不能再报「重连中」。
+     */
+    private val _connectedSessions = MutableStateFlow<Set<String>>(emptySet())
+    val connectedSessions: StateFlow<Set<String>> = _connectedSessions.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val client = OkHttpClient.Builder()
@@ -96,6 +110,7 @@ class BrowserWebSocketClient(
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(TAG, "WS onOpen: session=$sessionId")
                 activeConnections[sessionId] = webSocket
+                _connectedSessions.update { it + sessionId }
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
@@ -131,7 +146,15 @@ class BrowserWebSocketClient(
                             emitDisconnect(sessionId, "$code: $message")
                         }
                         "action_result" -> {
-                            // takeover 动作结果，当前版本不处理（由 HTTP action 通道承载）
+                            // takeover 动作结果：结构化可观测——客户端不再静默吞掉 bridge 失败
+                            // （此前 action_failed 无声丢失，点击失准/动作未达无法区分）
+                            val status = json.optString("status", "unknown")
+                            val error = json.optString("error", "")
+                            if (status == "ok") {
+                                Log.d(TAG, "action_result ok: session=$sessionId url=${json.optString("currentUrl")}")
+                            } else {
+                                Log.w(TAG, "action_result $status: session=$sessionId error=$error")
+                            }
                         }
                     }
                 } catch (_: Exception) {
@@ -146,6 +169,7 @@ class BrowserWebSocketClient(
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d(TAG, "WS onClosed: session=$sessionId, code=$code, reason=$reason")
                 activeConnections.remove(sessionId)
+                _connectedSessions.update { it - sessionId }
                 // 主动断开（unwatch/VM 销毁）不上报——否则会误触发降级处理
                 if (intentionalCloses.remove(sessionId)) return
                 emitDisconnect(sessionId, "closed: $code $reason")
@@ -154,6 +178,7 @@ class BrowserWebSocketClient(
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WS onFailure: session=$sessionId, error=${t.message}")
                 activeConnections.remove(sessionId)
+                _connectedSessions.update { it - sessionId }
                 if (intentionalCloses.remove(sessionId)) return
                 val reason = t.message ?: response?.message ?: "unknown"
                 emitDisconnect(sessionId, "failure: $reason")
@@ -166,6 +191,7 @@ class BrowserWebSocketClient(
 
     /** 断开指定会话的 WebSocket 连接（主动断开，不上报 disconnectEvents）。 */
     fun disconnect(sessionId: String) {
+        _connectedSessions.update { it - sessionId }
         val ws = activeConnections.remove(sessionId) ?: return
         intentionalCloses.add(sessionId)
         ws.close(1000, "client disconnect")
@@ -176,16 +202,7 @@ class BrowserWebSocketClient(
         intentionalCloses.addAll(activeConnections.keys)
         activeConnections.values.forEach { it.close(1000, "client disconnect all") }
         activeConnections.clear()
-    }
-
-    /** 发送 takeover 动作（坐标点击/输入/滚动）到 bridge。 */
-    fun sendAction(sessionId: String, actionId: String, action: JSONObject) {
-        val ws = activeConnections[sessionId] ?: return
-        val payload = JSONObject()
-            .put("type", "action")
-            .put("actionId", actionId)
-            .put("action", action)
-        ws.send(payload.toString())
+        _connectedSessions.value = emptySet()
     }
 
     private fun buildWebSocketUrl(sessionId: String): String {

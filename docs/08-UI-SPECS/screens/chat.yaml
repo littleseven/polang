@@ -986,6 +986,16 @@ browser_live:
     active_when: "仅 running 态（state ∉ 终态）；接管页离开组合/定格即自动取消"
     throttle: "live 态合流 500ms sample 节流（BROWSER_LIVE_OVERLAY_THROTTLE_MS，与任务卡同节拍），帧高频不直接驱动全列表重组"
     pause_semantics: "暂停 = 停流不停会话（M2.5）：unwatch 停止推流、云端会话保活；已知限制——暂停 >bridge idleTimeout(120s) 会话被 idle reap，resume 后由 server busy 自愈兜底"
+  action_channel:                               # M2.7（2026-10-11）：takeover 动作改走 HTTP，与帧流物理隔离
+    primary: "HTTP POST /v1/browser/action 原文透传（clickAt/typeText/scroll/drag/key 带 x/y/dx/dy 等 DTO 外字段，BrowserSessionClient.rawAction）；VM 按会话串行保序（HTTP 无单通道顺序语义）"
+    why_not_ws: "WS 下行被 binary 帧洪泛占满时，同连接的 action_result 排队在帧后——真机实测 >13s 不可达、经代理空载 0.10s；动作看似 sent=true 实则卡死"
+    ws_role: "WS 仅保留帧接收 + 连接健康感知（connectedSessions）；Ktor 代理层必须本地应答 ping/pong（OkHttp pingInterval 20s 无 pong 即判死）"
+  session_lifecycle:                            # M2.7（2026-10-11）竞态修复：turn 结束兜底 close 改宽限期调度
+    settle_grace: "turn 结束不立即 close——宽限 90s（BROWSER_SETTLE_GRACE_MS < bridge idleTimeout 120s）后仍非终态且未被接管/观看才 close 定格；修复「turn 刚结束用户进卡接管 → close 已在途 → 动作全 session_expired」竞态（真机实测）"
+    exemptions: "接管中（browserUserControlledSessions）/ 观看中（browserWatchedSessions，overlay watch 期间）豁免宽限 close；进卡 watch / 接管均取消待决 close"
+    flush_on_new_round: "新回合开始（launchChatRound）立即 flush 待决宽限 close——per-user 并发=1，须为下个 browser_open 腾出席位"
+    exit_close: "观看页退出（unwatch）且无回合在跑、未接管 → 立即 close 定格（不留着等 idle reap 白占席位）；turn 仍在跑则保留（toast 提示可从卡片重进）"
+    anchor_fix: "running 卡唯一锚点=流式占位消息（turn 结束即清除）、定格卡等宽限 close 才落库——窗口期卡片从列表消失（M2.7 真机实测）；displayMessages 为无锚 live 会话合成瞬态占位消息（id=browser_live_anchor_{sessionId}，parts=[BrowserLive]），Room 定格卡到达后 sessionId 入 anchoredIds 自动让位（无双显）"
   full_preview:                                   # BrowserFramePreviewOverlay = 全屏接管页（M2 引入；M2.5 三段布局；M2.6 复刻 Meta Muse 观看窗形态）
     muse_form:                                    # M2.6（2026-10-11）：复刻 Meta Muse 浏览器观看窗——观看默认 / 显式接管 / 停止任务三态
       states: [observing, in_control, ended]      # 状态机：observing=观看默认（只读）；in_control=用户接管（agent 停手）；ended=会话终态
@@ -995,23 +1005,23 @@ browser_live:
         bottom_cta: "底部居中大胶囊 CTA「接管浏览器」（browser_takeover_take_control）——唯一交互入口"
       in_control:                                 # 接管态：点 CTA 进入
         entry_semantics: "进入即 viewModel.takeControlBrowserSession()：登记受控豁免 + stopGeneration() 停 agent ≈ Muse「接管即暂停 agent」（无真暂停/续跑基建，本差异登记于此）"
-        top_bar: "返回 + 状态胶囊「你正在控制」（browser_takeover_in_control，蓝点；暂停/重连优先显示）+ 暂停推流 + Interact/Zoom 模式切换"
-        frame_gestures: "Interact：点按→clickAt / 拖动→scroll（20px 节流）/ 捏合→自动切 Zoom 子模式；Zoom 子模式：1x~5x + 平移 + 双击复位"
+        top_bar: "返回 + 状态胶囊「你正在控制」（browser_takeover_in_control，蓝点；暂停/重连优先显示）+ 暂停推流（M2.8 起无子模式切换按钮）"
+        frame_gestures: "M2.8（2026-10-11）手势统一免模式切换：点按→clickAt（缩放态经 graphicsLayer 逆变换 invertViewTransform 还原内容坐标再映射 CSS）/ 1x 单指拖动→scroll（20px 节流）/ 捏合→就地缩放 1x~5x / 缩放态单指拖动→平移视野 / 双击→复位"
         bottom_bar:
           control_row: "「交还控制」（browser_takeover_return_control→回 observing，agent 不续跑）|「停止任务」（browser_takeover_stop_task→close 会话+关页落定格卡）"
-          ime_attachment_row: "仅键盘弹出可见：⏎ Enter / Tab / Esc → WS action `key`（白名单三键）"
-          input_row: "输入框 + 发送 → typeText；imePadding 只挂底栏帧区不重排；发送后清空不收键盘"
+          ime_attachment_row: "仅键盘弹出可见：⏎ Enter / Tab / Esc → action `key`（白名单三键）"
+          input_row: "输入框 + 发送 → typeText；imePadding 底栏与帧区共用（键盘弹出底栏推起、帧区收缩避让，不压帧）；IME 弹出时帧区额外收缩底栏内容高度（M2.7 修：控制行/输入行落在帧区下方黑带内，不再压帧内容）；发送后清空不收键盘"
       ended:                                      # 终态
         overlay: "30% 黑 + 「会话已结束」水印；底栏仅「返回对话」大胶囊 CTA（browser_takeover_back_to_chat=onClose）；无输入行（M2.6 修：死会话隐藏底栏输入）"
       state_note: "observing/in_control 为 overlay 本地态；会话终态（OUTPUT_AVAILABLE/OUTPUT_ERROR）强制 ended"
     layout: three_zones                           # 顶栏 / 帧区 / 底栏（各态底栏内容见 muse_form）
     top_bar:
       back: { position: top_left, behavior: "Zoom 且 scale>1x 先复位，否则退出（BackHandler 同语义）" }
-      status_capsule: "五态优先级：已结束(灰) > 已暂停(黄) > 重连中(橙,5s 无新帧 FRAME_STALE_MS) > 你正在控制(蓝) > LIVE(绿)；后接页面域名"
+      status_capsule: "六态优先级：已结束(灰) > 已暂停(黄) > 重连中(橙,socket 断开且 5s 无新帧——CDP screencast 只在页面重绘时推帧，静态页帧恒旧≠断流，须 socket 感知) > 页面加载中(蓝,in_control 且动作下发后 2s 无新帧、20s 窗口内——点击触发导航期间帧流暂停可达 10-18s) > 你正在控制(蓝) > LIVE(绿)；后接页面域名"
       pause_toggle: "仅 in_control。暂停=停流不停会话：pausedFrame 本地定格 + 已暂停水印，action 全拦截 toast（browser_takeover_paused_toast）；onPausedChanged 回调 ChatScreen 协调 unwatch/re-watch"
       style: 圆形半透明按钮沿用全屏预览惯例
     frame_area:
-      scale: "ContentScale.Fit 居中；结束态叠 30% 黑 + 「会话已结束」水印；帧外黑边无操作"
+      scale: "ContentScale.Fit 居中；结束态叠 30% 黑 + 「会话已结束」水印；帧外黑边无操作；padding 挂容器层（Image fillMaxSize 测得即 Fit 内容区，clickAt 映射无 padding 偏差）；imePadding 帧区随键盘收缩，IME 弹出时额外收缩底栏内容高度（底栏 onSizeChanged 测量、不含 IME inset）"
     exit_guard: "退出 running 会话 toast 提示（browser_takeover_exit_hint_running）"
   i18n_keys:                                      # 五语已同步（EN/zh-CN/zh-TW/ES/FR）；browser_takeover_* 族 2026-10-11 M2.5 新增
     - browser_live_running
@@ -1029,11 +1039,10 @@ browser_live:
     - browser_takeover_status_paused
     - browser_takeover_status_ended
     - browser_takeover_status_reconnecting
+    - browser_takeover_status_page_loading
     - browser_takeover_pause
     - browser_takeover_resume
     - browser_takeover_paused_toast
-    - browser_takeover_mode_interact
-    - browser_takeover_mode_zoom
     - browser_takeover_zoom_hint
     - browser_takeover_input_hint
     - browser_takeover_send
