@@ -470,6 +470,15 @@ private fun HtmlWebView(
 ) {
     // lambda 每次重组都是新实例，用 rememberUpdatedState 防抖 pointerInput 重启
     val currentSwipeLock by rememberUpdatedState(onPagerSwipeLock)
+    // 回调/measureEnabled 走 rememberUpdatedState 活派发（2026-10-11 修复）：
+    // WebViewClient/WebChromeClient 只在 factory 安装一次，而 HtmlCard 侧状态按 cacheKey
+    // remember（任务卡 taskcard:<id>:exp|col 切换时产生新状态对象）——直接捕获首个闭包会让
+    // 后续测高全部写入被替换的旧状态/旧 key（展开测高污染 col 缓存 → 收起后大片空白且永不自愈）；
+    // trampoline 读取的 State 实例跨重组稳定，保证测高永远落到当前 cacheKey 的活状态上。
+    val currentMeasureEnabled by rememberUpdatedState(measureEnabled)
+    val currentMeasureCallback by rememberUpdatedState(onContentHeightCssPx)
+    val currentOpenLink by rememberUpdatedState(onOpenLink)
+    val currentRenderFailed by rememberUpdatedState(onRenderFailed)
 
     AndroidView(
         modifier = modifier
@@ -502,7 +511,12 @@ private fun HtmlWebView(
             },
         factory = { context ->
             ChatHtmlWebView(context).apply {
-                applyCardSandbox(measureEnabled, onContentHeightCssPx, onOpenLink, onRenderFailed)
+                applyCardSandbox(
+                    measureEnabled = { currentMeasureEnabled },
+                    onContentHeightCssPx = { px -> currentMeasureCallback?.invoke(px) },
+                    onOpenLink = { url -> currentOpenLink?.invoke(url) },
+                    onRenderFailed = { currentRenderFailed?.invoke() },
+                )
                 loadHtmlOnce(html)
             }
         },
@@ -649,7 +663,7 @@ private fun WebView.reportContentHeight(onContentHeightCssPx: (Int) -> Unit) {
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.applyCardSandbox(
-    measureEnabled: Boolean,
+    measureEnabled: () -> Boolean,
     onContentHeightCssPx: ((Int) -> Unit)?,
     onOpenLink: ((String) -> Unit)?,
     onRenderFailed: (() -> Unit)?
@@ -722,7 +736,7 @@ private fun WebView.applyCardSandbox(
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
-            if (!measureEnabled) return
+            if (!measureEnabled()) return
             // 高度 watcher 与布局无关（ResizeObserver 注册即生效），先行注入；
             // 上报侧已对「布局完成前虚高」做丢弃（见 onConsoleMessage）
             view.evaluateJavascript(HEIGHT_WATCHER_JS, null)
