@@ -2,7 +2,7 @@
 
 > 只保留仍 govern 现状的决策记录；被推翻且无追溯刚需的决策直接删除，编号永久留空不复用。
 
-## 现役 ADR（11 篇）
+## 现役 ADR（13 篇）
 
 | 编号 | 标题 | 一句话决策 |
 |------|------|-----------|
@@ -17,6 +17,8 @@
 | [ADR-013](02-ARCHITECTURE/ADR/ADR-013-kmp-architecture-contract.md) | KMP 架构契约 | 只共享业务逻辑绝不共享 UI（不做 CMP）；跨 Swift seam 必须扁平；commonMain 纯度构建期守卫 |
 | [ADR-015](02-ARCHITECTURE/ADR/ADR-015-intent-routing-contract.md) | 意图路由契约与路由器 | LLM 管语义理解（意图闭集分类），代码管路由策略（查表执行）；门控+pattern+1.5s 超时降级，路由器永不拦截能力 |
 | [ADR-016](02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md) | Chat 消息内容模型与渲染架构（整合原 ADR-014） | 数据层对齐 Vercel parts（有序 parts 数组 + chunk 三段式 + 工具状态机 + UIMessage/ModelMessage 双层）；渲染层对齐 ChatGPT（markdown AST→原生受控组件 + 卡片独立 block + Turn 聚合 + WebView 永不渲染正文）；沙箱卡双形态 + D5 L1/L2/L3 样式分级（LLM 永不产代码只产数据）；不做全量 HTML 会话/文内锚点/JS 桥/消息树 |
+| [ADR-017](02-ARCHITECTURE/ADR/ADR-017-backend-inference-system.md) | 后端推理体系架构 | 推理后端独立成域（接入鉴权/渠道路由/密钥托管/流式代理/计费用量/可观测六子域）；网关通道与 BYOK 直连通道双通道一等公民、与服务器能力正交；媒体推理 100% 端侧不变；本期不做云端多模态推理与多渠道 failover |
+| [ADR-018](02-ARCHITECTURE/ADR/ADR-018-cloud-agent-session-state.md) | 云端 Agent 会话状态模型 | 事件溯源（agent_event 追加流 + source/role/parent 三维 + pending action 不变式）+ 工具副作用可逆注册表（借 Koog RollbackToolRegistry 思想）；云端编排 + 端云双域工具桥；云端会话独立域、端侧只读镜像；BYOK 请求级透传（零留存）+ 端侧编排兜底 |
 
 ## 维护规则
 
