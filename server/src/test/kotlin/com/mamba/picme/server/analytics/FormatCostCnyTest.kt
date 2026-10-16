@@ -16,10 +16,10 @@ class FormatCostCnyTest(private val cost: Double, private val expected: String) 
         @Parameterized.Parameters(name = "{0} -> {1}")
         @JvmStatic
         fun data(): Collection<Array<out Any>> = listOf(
-            arrayOf(0.0044, "0.0044"),
-            arrayOf(0.0007, "0.0007"),
-            arrayOf(12.34, "12.34"),
-            arrayOf(0.0, "0.00"),
+            arrayOf<Any>(0.0044, "0.0044"),
+            arrayOf<Any>(0.0007, "0.0007"),
+            arrayOf<Any>(12.34, "12.34"),
+            arrayOf<Any>(0.0, "0.00"),
         )
     }
 

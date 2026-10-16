@@ -1,5 +1,7 @@
 package com.mamba.picme.server.db
 
+import com.mamba.picme.server.agent.AgentEvents
+import com.mamba.picme.server.agent.AgentSessions
 import com.mamba.picme.server.config.AppConfig
 import com.mamba.picme.server.config.SettingsService
 import com.mamba.picme.server.llm.serializeModelMap
@@ -18,6 +20,8 @@ object Migrations {
                 Accounts, EmailVerifications, LlmCallLogs, LlmChannels,
                 ApkUploads, AnonymousDevices, ServerSettings, AiEngineerWhitelists,
                 ReportedIssues, IosUdidRegistrations, BrowserSessions,
+                // 云端 Agent 会话域（ADR-018）：会话元数据 + 事件流
+                AgentSessions, AgentEvents,
             )
             // 给现存表补缺失列（如 llm_channel.default_model、apk_upload.channel），幂等
             SchemaUtils.createMissingTablesAndColumns(

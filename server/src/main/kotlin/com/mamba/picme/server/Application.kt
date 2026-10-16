@@ -1,6 +1,10 @@
 package com.mamba.picme.server
 
 import com.mamba.picme.server.admin.adminRoute
+import com.mamba.picme.server.agent.AgentExecutorFactory
+import com.mamba.picme.server.agent.AgentRunner
+import com.mamba.picme.server.agent.ServerToolDispatcher
+import com.mamba.picme.server.agent.agentRoute
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.auth.APP_TOKEN_HEADER
 import com.mamba.picme.server.auth.DEVICE_ID_HEADER
@@ -180,6 +184,12 @@ fun Application.module(config: AppConfig) {
     val browserDailyLimiter = RateLimiter({ SettingsService.snapshot().browserDailyQuota }, 24 * 60 * 60_000L)
     val browserStats = BrowserSessionStats()
 
+    // 云端 Agent 运行器（ADR-018）：Koog JVM loop + 事件溯源落流 + BYOK 透传（零留存）
+    val agentRunner = AgentRunner(
+        executorFactory = AgentExecutorFactory(),
+        dispatcher = ServerToolDispatcher.default(),
+    )
+
     routing {
         // Public
         downloadRoute(cosService)
@@ -201,6 +211,8 @@ fun Application.module(config: AppConfig) {
         claudeToolResultRoute(claudeClient, rateLimiter)
         issueReportRoute(issueReportService, issueReportRateLimiter)
         browserRoute(browserBridge, browserDailyLimiter, browserConcurrency, browserStats)
+        // 云端 Agent 会话域（ADR-017/018）：/agent/** 走上方 app-token 拦截器，M1 仅注册账号
+        agentRoute(agentRunner)
         // 管理后台（/admin/**，独立 cookie 认证）
         adminRoute(config.adminToken, cosService, balanceService, config.llmPrices, issueReportService)
     }

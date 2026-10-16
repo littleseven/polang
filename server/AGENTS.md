@@ -42,7 +42,7 @@
 
 ```
 server/
-├── build.gradle.kts              # Kotlin 2.0.21 + Ktor 3.0.3 + Exposed 0.55.0 + SQLite
+├── build.gradle.kts              # Kotlin 2.3.10（随 Koog 1.3.0 元数据升级）+ Ktor 3.0.3 + Exposed 0.55.0 + SQLite
 ├── settings.gradle.kts           # rootProject.name = "picme-server"
 ├── src/main/kotlin/com/mamba/picme/server/
 │   ├── Application.kt            # Ktor 入口：插件装配（Routing/ContentNegotiation/Auth/StatusPages/CallLogging）
@@ -86,6 +86,18 @@ server/
 │   │   ├── ChannelBalanceService.kt # 渠道上游余额查询/缓存
 │   │   ├── LlmProxy.kt           # 流式代理 + 上游路由
 │   │   └── LlmRoute.kt           # /v1/chat/completions 端点
+│   ├── agent/                    # 云端 Agent 会话域（ADR-017/018，Koog JVM + 事件溯源）
+│   │   ├── AgentEvent.kt         # 事件模型：五型载荷 + source/role/parentId 三维 + payload 编解码
+│   │   ├── AgentTables.kt        # agent_session / agent_event 表（事件只追加，id 即事件序）
+│   │   ├── AgentSessionRepository.kt # 会话生命周期状态机（running/…/finished/error）
+│   │   ├── AgentEventRepository.kt   # 追加/回放/pending action 不变式查询
+│   │   ├── AgentProjection.kt    # 事件流 → LLM 视图投影（Condenser 最小实现，策略可替换）
+│   │   ├── AgentExecutorFactory.kt # Koog 执行器组装（OpenAI 兼容；CF_AIG 改写 cf-aig-authorization）
+│   │   ├── AgentLlmTarget.kt     # 运行目标解析（网关渠道 modelMap 映射 / BYOK 透传）
+│   │   ├── ServerTools.kt        # 服务端工具（M1: server_time）+ pending 重放派器
+│   │   ├── CloudAgentStrategy.kt # 单跑 ReAct 策略（自 :shared poLangSingleRunStrategy 移植）
+│   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish
+│   │   └── AgentRoutes.kt        # /agent/** REST + SSE（BYOK X-User-Api-Key 零留存）
 │   ├── recommend/RuleEngine.kt   # 规则查询 + 参数组装
 │   ├── cos/CosService.kt         # COS 预签名 URL
 │   ├── ratelimit/RateLimiter.kt  # 内存令牌桶 + 日预算
@@ -109,6 +121,7 @@ server/
 │   ├── 009_drop_diag_jobs.sql
 │   ├── 010_anonymous_device_platform.sql
 │   ├── 011_browser_session.sql
+│   ├── 012_agent_session.sql     # 云端 Agent 会话域（ADR-018）
 │   └── seed_rules.sql            # 初始推荐规则
 ├── src/test/kotlin/              # 测试基建（下列为示意，实际 40 个 *Test.kt + 2 个辅助类）
 │   ├── ChannelRepositoryTest.kt
@@ -134,6 +147,11 @@ server/
 | POST | `/telemetry` | P0 | ✅ | X-App-Token | 批量匿名遥测 |
 | POST | `/v1/chat/completions` | P0 | ✅ | X-App-Token | LLM 代理（流式 SSE） |
 | POST | `/chat/completions` | P0 | ✅ | X-App-Token | 旧路径兼容 |
+| POST | `/agent/sessions` | P1 | ✅ | X-App-Token | 云端 Agent 建会话（channel=gateway\|byok，ADR-018） |
+| GET | `/agent/sessions` | P1 | ✅ | X-App-Token | 我的云端会话列表 |
+| GET | `/agent/sessions/{id}/events` | P1 | ✅ | X-App-Token | 事件流分页回放（after/limit） |
+| POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存） |
+| POST | `/agent/sessions/{id}/finish` | P1 | ✅ | X-App-Token | 关闭会话（终态） |
 | POST | `/auth/email/send` | P0 | ✅ | 无 | 发送验证码 |
 | POST | `/auth/email/verify` | P0 | ✅ | 无 | 校验码换 token |
 | GET | `/admin/**` | P1 | ✅ | ADMIN_TOKEN | 管理后台 SSR |

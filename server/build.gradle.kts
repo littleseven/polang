@@ -1,8 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "2.0.21"
-    kotlin("plugin.serialization") version "2.0.21"
+    // 2.3.10：与根 monorepo libs.versions.toml 对齐；Koog 1.3.0 元数据按 2.3.0 编译，
+    // Kotlin < 2.3 拒绝读取（"incompatible version of Kotlin"）。
+    kotlin("jvm") version "2.3.10"
+    kotlin("plugin.serialization") version "2.3.10"
     application
 }
 
@@ -45,6 +47,14 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.12")
     // QR code generation (server-side, no CDN dependency)
     implementation("com.google.zxing:core:3.5.3")
+
+    // Koog 云端 Agent 运行时（ADR-017/018：Koog JVM 定向）。
+    // 版本与 :shared 对齐（1.3.0，勿各自漂移——两端事件/协议语义需同版互认）。
+    // serialization-jackson 排除沿用 :shared 约定（Koog 主链路走 kotlinx-serialization；
+    // JVM 侧不排也能跑，但少拉 jackson-module-kotlin 一整棵树，两项目保持一致）。
+    implementation("ai.koog:koog-agents:1.3.0") {
+        exclude(group = "ai.koog", module = "serialization-jackson")
+    }
 
     // 测试（server 首次引入测试基建）
     testImplementation("junit:junit:4.13.2")
