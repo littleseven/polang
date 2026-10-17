@@ -134,34 +134,23 @@ Nginx 1.24（Ubuntu apt 安装，**非宝塔**）承担：
 - **静态托管**：`polang.net` → 项目官网 + 隐私声明（过审用）
 - **WebSocket 支持**：`/v1/chat/completions` 流式 SSE 透传；`/v1/browser/ws` WS 帧流代理（browser-vnc M2，`location /` 需 Upgrade/Connection 头透传）
 
-### 5.2 关键配置片段
+### 5.2 关键配置
 
-```nginx
-# api.polang.net — 反代 Ktor 后端
-server {
-    listen 443 ssl http2;
-    server_name api.polang.net;
-    ssl_certificate /etc/letsencrypt/live/api.polang.net/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.polang.net/privkey.pem;
+picme 反代段落的仓库 SSOT：**`server/deploy/nginx/api.polang.net.conf`**（与线上
+`/etc/nginx/sites-enabled/api.polang.net` 的 `location /` 保持一致；线上同一 server block
+还承载其它租户段落——/muse/ OpenMuse 隧道、/tunnel chisel——不在本仓库管理）。
 
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        # WebSocket 透传（browser-vnc M2 帧流代理 /v1/browser/ws，2026-10-10 补；
-        # 缺这两行 WS upgrade 在 nginx 层被剥成普通 GET，Ktor 回 400）
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        # SSE 流式透传
-        proxy_buffering off;
-        proxy_cache off;
-    }
-}
+关键不变式：
+
+- **SSE/WS 透传**：`proxy_buffering off` + Upgrade/Connection 头透传（缺这两行
+  `/v1/browser/ws` 的 WS upgrade 会在 nginx 层被剥成普通 GET，Ktor 回 400）。
+- **超时不变式（2026-10-17 核定）**：`proxy_read_timeout 300s` 必须 **>** 云端 Agent
+  工具桥端侧挂起窗 120s（`DeviceToolService.DEFAULT_TIMEOUT_MS`）——否则工具桥静默期
+  被 nginx 掐断、SSE 轮次异常终结；同时覆盖长 SSE 生成的慢 chunk 间隔。
+  `/v1/browser/ws` 有 ping/pong 保活（M2.7），不受读超时影响。
 
 # polang.net — 静态官网
+```nginx
 server {
     listen 443 ssl http2;
     server_name polang.net;

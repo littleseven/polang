@@ -34,7 +34,7 @@
 - **COS 存储**：`CosService` — 腾讯 COS 上传/元数据/预签名 URL；APK 下载 URL 渠道路由（`apkPublicUrl(channel)`：debug 轨可经 `APK_DEBUG_PUBLIC_BASE` 指向北京轻量国内镜像，release 轨恒走 `cos.polang.net`）
 - **限流**：`RateLimiter` — per-IP 令牌桶 + 日预算熔断
 - **云端浏览器网关**：`BrowserRoute` + `browser/`（BrowserBridgeClient/BrowserConcurrencyRegistry/BrowserSessionStats）— `/v1/browser/*` 鉴权（X-App-Token）→ 每日配额 peek（open 成功才 allow 计费）→ per-user 并发=1 → 透传 xuxing browser-agent-bridge（30s 网关超时；bridge 不可达统一 503 `browser_unavailable` 且不计额度，域名结果 JSON `status` 原样透传）；M2（2026-10-09）增 `WS /v1/browser/ws` 帧流双向代理（App↔bridge 文本/二进制帧透传，鉴权/owner 校验同 HTTP 路由，失败以 WS close code 表达）；M2.5（2026-10-11）busy 自愈——open 撞占用时经 bridge `GET /session/{id}/status` 探测，仅 `session_expired` 判死后条件释放重试（`reaped_heal`），探测失败/其它状态保守 BUSY；M2.7（2026-10-11）WS 链路修复——代理应答 bridge Ping（回 Pong，OkHttp pingInterval 无 pong 判死）+ bridge→app 帧字节闸门（90KB/s 令牌窗口、窗口首帧无条件放行防全黑、容量 1 DROP_OLDEST 不排队，防 HK↔国内窄带积压堵死 pong/文本帧）
-- **云端 Agent 会话域**：`agent/` 包（ADR-017/018，Koog JVM + 事件溯源 `agent_session`/`agent_event` 两表，`/agent/**` REST + SSE；BYOK X-User-Api-Key 请求级透传零留存）——M2（2026-10-17）工具桥双通道：SSE `tool_request` 帧下行 + `POST /agent/sessions/{id}/tool-results` 上行（`AgentBridgeRegistry` 挂起表 + `DeviceToolService` 端侧只读三件套适配，409 `tool_request_not_pending`）
+- **云端 Agent 会话域**：`agent/` 包（ADR-017/018，Koog JVM + 事件溯源 `agent_session`/`agent_event` 两表，`/agent/**` REST + SSE；BYOK X-User-Api-Key 请求级透传零留存）——M2（2026-10-17）工具桥双通道：SSE `tool_request` 帧下行 + `POST /agent/sessions/{id}/tool-results` 上行（`AgentBridgeRegistry` 挂起表 + `DeviceToolService` 端侧只读三件套适配，409 `tool_request_not_pending`）；M2.6（2026-10-17）per-user 跑轮并发=1（`AgentRoundGate` 内存租约，占用回 409 `round_in_flight`，占位在配额扣减之前）
 - **用户问题上报**：`IssueReportRoute` — 脱敏后入库并自动同步 GitHub issue
 
 ---
@@ -97,6 +97,7 @@ server/
 │   │   ├── AgentLlmTarget.kt     # 运行目标解析（网关渠道 modelMap 映射 / BYOK 透传）
 │   │   ├── ServerTools.kt        # 服务端工具（M1: server_time）+ pending 重放派器
 │   │   ├── AgentBridgeRegistry.kt # 工具桥挂起表（requestId→Deferred，断线 failAll 清理）
+│   │   ├── AgentRoundGate.kt     # per-user 跑轮并发=1 内存租约（M2.6；故意无 TTL，一轮最长 20 迭代×(LLM+120s 工具)，重启即清）
 │   │   ├── DeviceToolService.kt  # 端侧只读三件套 Koog 适配（tool_request 帧 + 120s 挂起）
 │   │   ├── CloudAgentStrategy.kt # 单跑 ReAct 策略（自 :shared poLangSingleRunStrategy 移植）
 │   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish
@@ -153,7 +154,7 @@ server/
 | POST | `/agent/sessions` | P1 | ✅ | X-App-Token | 云端 Agent 建会话（channel=gateway\|byok，ADR-018） |
 | GET | `/agent/sessions` | P1 | ✅ | X-App-Token | 我的云端会话列表 |
 | GET | `/agent/sessions/{id}/events` | P1 | ✅ | X-App-Token | 事件流分页回放（after/limit） |
-| POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存） |
+| POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存；per-user 并发=1，占用回 409 `round_in_flight` 不耗配额） |
 | POST | `/agent/sessions/{id}/tool-results` | P1 | ✅ | X-App-Token | 端侧工具结果上行（409 tool_request_not_pending；ADR-018 工具桥） |
 | POST | `/agent/sessions/{id}/finish` | P1 | ✅ | X-App-Token | 关闭会话（终态） |
 | POST | `/auth/email/send` | P0 | ✅ | 无 | 发送验证码 |
@@ -258,6 +259,8 @@ deploy-switch.sh                   # 服务器端蓝绿：备份 → 切换 → 
 ```
 
 systemd `picme-api.service`：`JAVA_OPTS=-Xmx256m` + `MemoryMax=450M`，与 OpenClaw 共享 2G 盒子。
+
+nginx picme 反代段落仓库 SSOT：`server/deploy/nginx/api.polang.net.conf`（2026-10-17 入册；不变式 `proxy_read_timeout 300s` > 工具桥挂起窗 120s，详见文件头注释与 `OVERSEAS_SERVER_DEPLOYMENT.md` §5.2）。
 
 ---
 

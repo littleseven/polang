@@ -75,7 +75,10 @@ class AgentRoutesTest {
         )
     }
 
-    private fun ApplicationTestBuilder.installAgentApp(runner: AgentRunner) {
+    private fun ApplicationTestBuilder.installAgentApp(
+        runner: AgentRunner,
+        roundGate: AgentRoundGate = AgentRoundGate(),
+    ) {
         application {
             install(ContentNegotiation) { json() }
             intercept(ApplicationCallPipeline.Plugins) {
@@ -83,7 +86,7 @@ class AgentRoutesTest {
                     ?.let { AccountService.sha256(it) }
                     ?.let { call.attributes.put(TokenHashKey, it) }
             }
-            routing { agentRoute(runner, AgentBridgeRegistry()) }
+            routing { agentRoute(runner, AgentBridgeRegistry(), roundGate = roundGate) }
         }
     }
 
@@ -347,6 +350,67 @@ class AgentRoutesTest {
         }
         assertEquals(HttpStatusCode.BadRequest, resp.status)
         assertTrue(resp.bodyAsText().contains("byok_key_required"))
+    }
+
+    @Test
+    fun `round gate busy returns 409 and quota is not charged`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
+        val account = runBlocking { AccountService.createOrRefresh("busy@x.com", 100) }
+        activateGateway()
+        // 测试内手动占位，模拟该用户已有在跑轮（避免真并发，client 并发语义不稳）
+        val gate = AgentRoundGate()
+        assertTrue(gate.tryAcquire(AccountService.sha256(account.token)))
+        installAgentApp(mockRunner(), roundGate = gate)
+
+        val created = client.post("/agent/sessions") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"model":"deepseek-chat","channel":"gateway"}""")
+        }
+        val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
+
+        val resp = client.post("/agent/sessions/$sessionId/messages") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"content":"hi"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, resp.status)
+        assertTrue(resp.bodyAsText().contains("round_in_flight"))
+        // busy 拒绝在配额扣减之前，不消耗配额
+        val used = transaction(Db.instance) { Accounts.selectAll().single()[Accounts.llmCallsUsed] }
+        assertEquals(0, used)
+    }
+
+    @Test
+    fun `round gate released after round, next message succeeds`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
+        val account = runBlocking { AccountService.createOrRefresh("relay@x.com", 100) }
+        activateGateway()
+        installAgentApp(
+            mockRunner(
+                HttpStatusCode.OK to chatResponse("第一轮"),
+                HttpStatusCode.OK to chatResponse("第二轮"),
+            ),
+        )
+
+        val created = client.post("/agent/sessions") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"model":"deepseek-chat","channel":"gateway"}""")
+        }
+        val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
+
+        repeat(2) { round ->
+            val resp = client.post("/agent/sessions/$sessionId/messages") {
+                header(APP_TOKEN_HEADER, account.token)
+                contentType(ContentType.Application.Json)
+                setBody("""{"content":"第${round + 1}轮"}""")
+            }
+            assertEquals("round ${round + 1} should pass the gate", HttpStatusCode.OK, resp.status)
+            assertTrue(resp.bodyAsText().contains("\"kind\":\"done\""))
+        }
+        val used = transaction(Db.instance) { Accounts.selectAll().single()[Accounts.llmCallsUsed] }
+        assertEquals(2, used)
     }
 
     @Test
