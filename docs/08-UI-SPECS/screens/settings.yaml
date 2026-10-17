@@ -133,6 +133,20 @@ remote_model:
         effect: "chat system prompt 尾段注入性格段（五语按界面语言选段），下一条消息生效；default 不注入"
         desc_per_option: true
         ios_note: "⚠️ 2026-10-02 前 iOS UI 不可达（孤儿 AiAgentSettingsView）而 ChatViewModel 已消费（恒 default）——本批次落地页面即接通"
+    - cloud_agent_byok:                      # 云端 Agent BYOK 授权（ADR-018 M2，2026-10-17 追齐批登记）
+        type: switch                         # DebugOptionRow 形态：图标块 + 标题 + 副标题 + 尾部 Switch
+        icon: cloud
+        icon_block: vibrantBlue
+        title: cloud_agent_byok_consent_title      # 单行 maxLines=1 省略（09ef46776 溢出修复口径）
+        subtitle: cloud_agent_byok_consent_subtitle # ≤2 行 maxLines=2 省略
+        default: false
+        semantics: "开 = 允许云端 Agent 会话以 BYOK 通道透传用户自己的 API key；关 = 只能走网关通道"
+        zero_retention: "🔴 BYOK key 零留存红线——本开关只是授权位；key 本体仅随 postMessage 的 X-User-Api-Key 头透传，不进 URL/body/日志/任何持久化（双端同守）"
+        persistence:
+          android: "DataStore cloud_agent_byok_consent (Boolean, UserPreferencesRepository)"
+          ios: "UserDefaults cloud_agent_byok_consent (Bool)"
+        effect: "云端 Agent 调试页通道解析（CloudAgentChannelResolver 语义）：有 BYOK 配置且本开关 on → Byok 通道；有配置但 off → NeedConsent 弹窗（不静默回退）；无配置 → Gateway"
+        spec_ref: "cloud-agent.yaml §2（弹窗）/§4（通道解析状态机）"
 
 # ============================================================================
 # 3b. 本地模型分类页（local_model，2026-10-02 补 spec；Android :554-704）
@@ -479,6 +493,12 @@ developer:
             type: nav_row
             title: "Accessibility Service"
             ios_state: disabled_android_only     # Android 系统无障碍设置跳转，iOS 无等价
+        - cloud_agent_chat:                    # 云端 Agent 调试页入口（ADR-018 M2，2026-10-17 追齐批登记）
+            type: nav_row
+            title: cloud_agent_entry_title
+            icon: cloud
+            icon_block: warningAmber
+            ios_state: implement_now             # → CloudAgentChatView（spec cloud-agent.yaml）
 
 # ============================================================================
 # 6.6 诊断日志查看器（DiagnosticLogView，自开发者选项进入，2026-08-15）

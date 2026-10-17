@@ -4,6 +4,7 @@ import ai.koog.agents.core.tools.ToolRegistry
 import com.mamba.picme.agent.core.capability.IosAiOptimizeCapability
 import com.mamba.picme.agent.core.capability.IosChartCapability
 import com.mamba.picme.agent.core.capability.IosChatGalleryCapability
+import com.mamba.picme.agent.core.capability.IosCloudAgentToolBridge
 import com.mamba.picme.agent.core.capability.IosNavigationCapability
 import com.mamba.picme.agent.core.capability.IosRenderHtmlCapability
 import com.mamba.picme.agent.core.capability.IosRunScriptCapability
@@ -70,6 +71,14 @@ object IosAgentComposition {
      * [initialize] 完成后方可访问。
      */
     var chatBridge: ChatAgentBridge? = null
+        private set
+
+    /**
+     * 云端 Agent 工具桥（ADR-018 M2，2026-10-17），Swift 侧 CloudAgentChatStore 的
+     * tool_request 执行入口；持有自有 [IosChatGalleryCapability] 实例绕过场景注册表。
+     * [initialize] 完成后方可访问。
+     */
+    var cloudAgentToolBridge: IosCloudAgentToolBridge? = null
         private set
 
     /**
@@ -147,6 +156,10 @@ object IosAgentComposition {
         // 注册 iOS chat 相册能力（T4），使 ChatToolService.dispatchCommand → CapabilityRegistry(CHAT) 路由可达
         val chatGalleryCapability = IosChatGalleryCapability(mediaRepository, bridge, searchBridge)
         orchestrator.registerCapability(chatGalleryCapability)
+
+        // 云端 Agent 工具桥（ADR-018 M2）：自有能力实例，绕过场景注册表（调试页 UNKNOWN 场景
+        // 会被 registry 排队返回占位文本——Android 真机实证，场景解耦挂账 M3）
+        cloudAgentToolBridge = IosCloudAgentToolBridge(mediaRepository, bridge, searchBridge)
 
         // 注册 iOS chat 图表能力（draw_chart 执行端 → ChartJsEngine 端侧渲染）
         orchestrator.registerCapability(IosChartCapability(chartBridge))

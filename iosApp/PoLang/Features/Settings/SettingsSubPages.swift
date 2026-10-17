@@ -328,6 +328,19 @@ struct DeveloperSettingsView: View {
             androidOnlyRow(L("JSBridge"))
             SettingsListDivider()
             androidOnlyRow(L("Accessibility Service"))
+            SettingsListDivider()
+            // 云端 Agent 调试页入口（ADR-018 M2，settings.yaml §6.5 cloud_agent_chat，implement_now）
+            NavigationLink {
+                CloudAgentChatView()
+            } label: {
+                SettingsListRow(
+                    title: L("Cloud Agent (experimental)"),
+                    icon: .sf("cloud"),
+                    iconBlock: .warningAmber,
+                    showChevron: true
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -736,7 +749,8 @@ private struct SettingsListGroup<Content: View>: View {
 }
 
 /// 行式开关行：图标块 + 标题(+副题) + Switch，量规对齐 SettingsListRow。
-private struct SettingsIconToggleRow: View {
+/// 标题单行省略 / 副题 ≤2 行（spec settings.yaml cloud_agent_byok 的 09ef46776 溢出修复口径，全行统一）。
+struct SettingsIconToggleRow: View {
     let title: String
     var subtitle: String? = nil
     let icon: SettingsListIcon
@@ -755,10 +769,14 @@ private struct SettingsIconToggleRow: View {
                 Text(title)
                     .font(.system(size: SettingsTokens.listTitleFontSize))
                     .foregroundColor(s.onSurface)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 if let subtitle {
                     Text(subtitle)
                         .font(AppTypography.bodySmall.font)
                         .foregroundColor(s.onSurfaceVariant)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
                 }
             }
             Spacer()

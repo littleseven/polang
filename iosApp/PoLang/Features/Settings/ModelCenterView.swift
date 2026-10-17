@@ -25,6 +25,7 @@ struct ModelCenterView: View {
             VStack(spacing: SettingsTokens.listSectionSpacing) {
                 remoteModelsSection
                 AssistantPersonaSection()
+                CloudAgentByokSection()
             }
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.sm)
@@ -250,6 +251,29 @@ private struct AssistantPersonaSection: View {
 
     private var selectedDesc: String {
         options.first { $0.value == persona }?.desc ?? options[0].desc
+    }
+}
+
+// MARK: - Cloud Agent BYOK 授权（spec §3 remote_model.cloud_agent_byok，ADR-018 M2）
+
+/// 云端 Agent BYOK 授权开关行（图标块 + 标题单行省略 + 副题 ≤2 行 + 尾部 Switch）。
+/// 开 = 允许云端 Agent 会话以 BYOK 通道透传用户自己的 API key；关 = 只能走网关通道。
+/// 🔴 BYOK key 零留存红线：本开关只是授权位；key 本体仅随 postMessage 的
+/// X-User-Api-Key 头透传，不进 URL/body/日志/任何持久化（双端同守）。
+/// 持久化：UserDefaults `cloud_agent_byok_consent`（Bool，默认 false，对位 Android DataStore 同键）。
+private struct CloudAgentByokSection: View {
+    @AppStorage("cloud_agent_byok_consent") private var consent = false
+
+    var body: some View {
+        SettingsListSection {
+            SettingsIconToggleRow(
+                title: L("Cloud Agent uses my API key"),
+                subtitle: L("Sent with each request — never stored or logged"),
+                icon: .sf("cloud"),
+                iconBlock: .vibrantBlue,
+                isOn: $consent
+            )
+        }
     }
 }
 

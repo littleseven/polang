@@ -1,0 +1,128 @@
+# ============================================================================
+# 云端 Agent 调试聊天页规格书（Cloud Agent Debug Chat Spec）
+# ============================================================================
+# 基准端：Android features/cloudagent/（2026-10-17 定稿，main@09ef46776）
+# 用途：iOS 实现的唯一输入，不读 Android 源码
+# 性质：开发者选项 DEBUG 构建入口的实验页（ADR-018 M2），豁免 PARITY 零容差比对，
+#      但信息层级/状态机/文案 key 必须一致；设置页 BYOK 授权行不豁免（归 settings.yaml §3）。
+# 协议上位：ADR-018（事件溯源 + 工具桥 + BYOK 零留存）+ spec《cloud-agent-tool-bridge-design》
+
+# ============================================================================
+# 1. 总体结构与入口
+# ============================================================================
+root:
+  type: navigation_page                      # iOS：NavigationStack push 页
+  entry: "设置 → Developer Options → Developer Tools 组 → cloud_agent_entry_title 行（#if DEBUG 整组可见）"
+  background: "systemBackground"
+  navigation_title: cloud_agent_title        # 「Cloud Agent」
+
+# ============================================================================
+# 2. 状态机（UiState 四态闭集，穷举渲染）
+# ============================================================================
+states:
+  preparing:                                 # 进入页即 prepare()：读登录态/模型配置/授权开关 → 建会话
+    render: "居中 ProgressView"
+    guard: "prepare 幂等（重复触发直接返回，双击守卫）"
+  need_byok_consent:                         # 有 BYOK 配置但授权开关 off
+    render: alert_dialog
+    title: cloud_agent_byok_dialog_title
+    message: cloud_agent_byok_dialog_message
+    actions:
+      - { label: cloud_agent_byok_dialog_go_settings, role: primary, behavior: "跳设置 remote_model 页（授权开关所在页）" }
+      - { label: cloud_agent_byok_dialog_use_gateway, role: secondary, behavior: "改用网关通道建会话（本次会话级，不写授权开关）" }
+    rule: "🔴 不静默回退——必须用户显式二选一"
+  failed:                                    # reason == not_logged_in 或建会话/网络失败
+    render: "居中错误文本（error 色）"
+    mapping: "reason==not_logged_in → cloud_agent_not_logged_in；否则原文展示"
+  chat:                                      # 会话就绪：sessionId + channel + messages + inFlight
+    render: "§3 消息列表 + 输入栏"
+    channel_capsule:                         # 顶栏标题旁通道胶囊（仅 chat 态显示）
+      text: "cloud_agent_channel_gateway / cloud_agent_channel_byok"
+      style: "圆角 10 胶囊，secondaryContainer 底，11pt"
+
+# ============================================================================
+# 3. Chat 态布局
+# ============================================================================
+chat_layout:
+  message_list:
+    type: scrollable_list                    # LazyColumn / ScrollView+LazyVStack
+    padding: 12
+    spacing: 8
+    auto_scroll: "新消息到达滚到底部"
+    bubbles:
+      user:      { align: trailing, background: "primaryContainer", text: "onPrimaryContainer 14pt 纯文本", corner: 16, max_width: 300 }
+      assistant: { align: leading,  background: "surfaceVariant",   text: "markdown 渲染（iOS 复用 AgentTextView AST 渲染，与 chat 正文同源）", corner: 16, max_width: 300 }
+      tool:      { align: leading,  text: "12pt onSurfaceVariant，文案 cloud_agent_tool_call（含工具名 %@ 占位）", mono_exempt: true }
+      error:     { align: leading,  text: "13pt error 色" }
+    thinking_row: "inFlight 时列表尾部显示 cloud_agent_thinking 行"
+  input_bar:
+    field: { placeholder: cloud_agent_input_hint, max_lines: 3 }
+    send_button: { icon: "arrow.up / send", label: cloud_agent_send, visible_when: "!inFlight && input非空" }
+    stop_button: { label: cloud_agent_stop, visible_when: inFlight, behavior: "取消穿透断流（取消 SSE 读取协程/Task）" }
+
+# ============================================================================
+# 4. 通道解析（CloudAgentChannelResolver 语义，双端同规则）
+# ============================================================================
+channel_resolution:
+  inputs: ["远程模型配置（shared RemoteModelConfigs 同格式，iOS 经 ModelConfigStore 读）", "cloud_agent_byok_consent 开关"]
+  rules:
+    - "无已配置远程模型 或 配置无 apiKey → Gateway（channel=gateway, model 由服务端网关决定）"
+    - "有配置且有 apiKey 且开关 on → Byok(modelId, baseUrl, apiKey)"
+    - "有配置且有 apiKey 但开关 off → NeedConsent（§2 need_byok_consent 弹窗）"
+  byok_zero_retention: "🔴 apiKey 读出后仅存 ViewModel 私有字段，仅随 postMessage 的 X-User-Api-Key 头透传；不进 URL/body/日志/UserDefaults 新键/任何持久化"
+
+# ============================================================================
+# 5. 网络协议契约（实现细节 SSOT 节录；服务端已上生产 api.polang.net）
+# ============================================================================
+network:
+  base_url: "https://api.polang.net"
+  common_headers: ["X-App-Token: <服务端登录 token>", "X-Platform: ios"]
+  endpoints:
+    create_session: { method: POST, path: "/agent/sessions", body: "{channel, model, byok_base_url}", response: "{session_id, status, channel, model}", errors: "byok 缺参 → 400 byok_base_url_required / model_required" }
+    post_message:   { method: POST, path: "/agent/sessions/{id}/messages", headers: ["+ X-User-Api-Key（仅 BYOK 通道且 key 非空）"], body: "{content}", response: "SSE 流（长连接，读超时=0）" }
+    post_tool_result: { method: POST, path: "/agent/sessions/{id}/tool-results", body: "{request_id, ok, result}", response: "200 {accepted:true} / 409 tool_request_not_pending" }
+    finish_session: { method: POST, path: "/agent/sessions/{id}/finish", body: "{}", response: "200" }
+  sse_frames:                                # `\n\n` 分块，取 data: 行 JSON，按 kind 分发，未知 kind 容错忽略
+    event:        "下行 | {id, type, source, role, payload, created_at} | 只上屏 type==message && role==assistant 的 payload.content"
+    tool_request: "下行 | {request_id, tool, args, timeout_ms=120000} | 端执行不阻塞收帧（并发执行，完成即上行）"
+    done:         "下行 | {session_status} | 清 inFlight"
+    error:        "下行 | {message} | 追加 ERROR 消息 + 清 inFlight"
+  tool_execution:                            # 端侧工具三件套——本体在 shared commonMain ChatToolService，iOS 经 SKIE 直调
+    tools:
+      - { name: get_gallery_summary, args: "无" }
+      - { name: search_media, args: "query / person / fromMs / toMs / hasFace（全 String，空容忍）" }
+      - { name: refine_media_search, args: "constraint / fromMs / toMs" }
+    result_contract: "文本结果；失败以 `error: <message>` 前缀判定 ok=false；超 32_000 字符截断 + `\\n…[truncated]`"
+    unknown_tool: "error: unknown_tool:<tool>"
+  message_storage: "🔴 消息纯内存态不落库（M3 才做镜像）；每轮对话只开一条 SSE"
+
+# ============================================================================
+# 6. 平台差异台账（platform_differences）
+# ============================================================================
+platform_differences:
+  transport:
+    android: "OkHttp readTimeout=0 + byteStream 手工 \\n\\n 分帧"
+    ios: "URLSession bytes(for:) AsyncSequence 行解析（全仓首个 SSE 客户端，无 EventSource 先例）"
+  consent_storage:
+    android: "DataStore cloud_agent_byok_consent"
+    ios: "UserDefaults cloud_agent_byok_consent"
+  model_config:
+    both: "shared RemoteModelConfigs.fromJson/toJson 同格式（iOS ModelConfigStore 已在用）——零差距"
+  tool_engine:
+    both: "shared commonMain ChatToolService.getInstance()——iOS 经 SKIE 调，双端同源零重写"
+  markdown:
+    android: "AgentMarkdown（mikepenz）"
+    ios: "AgentTextView（ADR-016 M5 AST 渲染已对齐）"
+  debug_gating:
+    android: "BuildConfig.DEBUG"
+    ios: "#if DEBUG"
+  out_of_scope:
+    - "工程师隧道 app_get_* 五件套（线 B）的 iOS 缺口（日志环缓冲/崩溃落盘）——单独立项，不在本批"
+    - "GET /agent/sessions/{id}/events 事件回放——Android VM 未消费，iOS 首版不做，台账登记"
+
+# ============================================================================
+# 7. allowed_differences（豁免登记）
+# ============================================================================
+allowed_differences:
+  - "调试实验页豁免 PARITY 零容差截图比对；气泡配色/圆角引用语义色即可，不与 Android 像素级对齐"
+  - "iOS 返回手势/导航栏形态遵循 SwiftUI 惯例，不复刻 Android 顶栏确切布局"

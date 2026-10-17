@@ -637,8 +637,11 @@ class ChatToolService private constructor() : TraceIdAware {
      * 2026-09-29 增补 hasFace——此前人脸约束只写进 query 时被结构化路径整句丢弃）。
      * 四者全空 → null（走 onSearchMedia 的字符串路径）；任一非空 → 结构化过滤精确执行。
      * person 槽位原样透传（称谓→人物名的消歧由引擎层 PersonQueryResolver / 调用方先做）。
+     *
+     * internal（2026-10-17，cloud-agent-m2 iOS 批）：iosMain `IosCloudAgentToolBridge` 直调
+     * `IosChatGalleryCapability` 绕过场景注册表，intent 组装逻辑同源复用（纯可见性放宽，零行为变化）。
      */
-    private fun structuredSearchIntent(
+    internal fun structuredSearchIntent(
         query: String,
         person: String,
         fromMs: String,
@@ -665,8 +668,10 @@ class ChatToolService private constructor() : TraceIdAware {
     /**
      * 把 refine_media_search 的 fromMs/toMs 解析成 [SearchIntent]（timeRange）。
      * 二者都空 → null（走 onRefineMediaSearch 的字符串路径）；任一非空 → 结构化时间，走精确交集。
+     *
+     * internal（2026-10-17，cloud-agent-m2 iOS 批）：同 [structuredSearchIntent] 的复用缘起。
      */
-    private fun refineTimeIntent(fromMs: String, toMs: String): SearchIntent? {
+    internal fun refineTimeIntent(fromMs: String, toMs: String): SearchIntent? {
         val start = fromMs.trim().toLongOrNull()
         val end = toMs.trim().toLongOrNull()
         if (start == null && end == null) return null
