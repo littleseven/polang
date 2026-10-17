@@ -88,6 +88,6 @@ ADR-008 红线不变：媒体文件不上云；端侧工具回传的 Observation
 |------|------|------|
 | 架构决策（本文档） | ✅ 生效中（用户评审通过） | 2026-10-14 |
 | 服务端实现 M1（`server/agent/` 包 + `agent_session`/`agent_event` 两表 + `/agent/**` REST/SSE + BYOK 透传零留存守卫测试；事件溯源/pending 不变式/投影/决策 1a 元数据落地） | ✅ 完成（299 测试全绿） | 2026-10-17 |
-| 端侧工具桥 + BYOK 授权 UI | 未开始 | — |
+| 端侧工具桥 + BYOK 授权 UI（+ 最小聊天页，调试入口实验页） | ✅ 完成 | 2026-10-17 |
 
 > M1 已录边界（详见 `server/AGENTS.md` §2 agent/ 包注释与 AgentRoutes KDoc）：SSE 帧为持久化事件级（无 token delta）；投影仅 Message 直映射 + 最新 Condensation 作 system；服务端工具仅 server_time（闭环验证用，可逆集合为空）；同会话并发轮无互斥；Agent 轮次不写 llm_call_log（审计即事件流）。
