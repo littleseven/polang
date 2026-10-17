@@ -104,6 +104,34 @@ class AgentRoutesBridgeTest {
     }
 
     @Test
+    fun `tool-results ok=false normalizes to single error prefix`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents)
+        val account = runBlocking { AccountService.createOrRefresh("errpfx@x.com", 100) }
+        val session = AgentSessionRepository.create(
+            AccountService.sha256(account.token), AgentChannelKind.GATEWAY, "", "",
+        )
+        val bridge = AgentBridgeRegistry()
+        application {
+            install(ContentNegotiation) { json() }
+            intercept(ApplicationCallPipeline.Plugins) {
+                call.request.headers[APP_TOKEN_HEADER]
+                    ?.let { AccountService.sha256(it) }
+                    ?.let { call.attributes.put(TokenHashKey, it) }
+            }
+            routing { agentRoute(newRunner(toolCallThenTextEngine()), bridge) }
+        }
+        // 端侧上行 result 已带 "error: " 前缀（DeviceToolExecutor 契约），云端不得二次包裹
+        val deferred = bridge.register(session.id, "tr_err")
+        val resp = client.post("/agent/sessions/${session.id}/tool-results") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"request_id":"tr_err","ok":false,"result":"error: unknown_tool:x"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        assertEquals("error: unknown_tool:x", deferred.await())
+    }
+
+    @Test
     fun `tool-results on other owner's session returns 404`() = testApplication {
         TestDb.init(Accounts, AgentSessions, AgentEvents)
         val owner = runBlocking { AccountService.createOrRefresh("owner@x.com", 100) }

@@ -158,7 +158,8 @@ fun Route.agentRoute(
             val ok = (body["ok"] as? JsonPrimitive)?.contentOrNull?.toBooleanStrictOrNull() ?: false
             val result = (body["result"] as? JsonPrimitive)?.contentOrNull.orEmpty()
             // ok=false：端执行异常，result 为错误描述，云端以 "error: <描述>" 作为工具返回值（spec §3.2）
-            val text = if (ok) result else "error: $result"
+            // 协议契约：上行 result 可能已带 "error: " 前缀（DeviceToolExecutor 契约），服务端归一化为恰好一个
+            val text = if (ok) result else "error: " + result.removePrefix("error: ")
             if (!bridge.complete(requestId, text)) {
                 return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "tool_request_not_pending"))
             }
