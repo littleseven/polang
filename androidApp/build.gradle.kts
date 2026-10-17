@@ -299,6 +299,7 @@ dependencies {
     testImplementation(libs.androidx.core)
     testImplementation(libs.androidx.junit)
     testImplementation(libs.mockk)
+    testImplementation(libs.mockwebserver)
     testImplementation(libs.robolectric)
     // 让 JVM 单元测试能使用真实的 org.json 实现，而非 Android stub
     testImplementation("org.json:json:20231013")
