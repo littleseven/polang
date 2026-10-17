@@ -86,7 +86,7 @@ docs/superpowers/
 
 ## 6. 索引（在途/活跃 SSOT 白名单 = 活文档可引用本目录文档的唯一许可集）
 
-- **specs（16 篇，均为在途/活跃 SSOT）**：
+- **specs（17 篇，均为在途/活跃 SSOT）**：
   - `2026-08-08-face-restoration-ondevice-design.md` — 人脸修复方向（未实施，待排期）
   - `2026-08-10-ios-follow-command-design.md` — /ios-follow 六阶段管线设计 SSOT（AGENTS §7 引用）
   - `2026-08-13-ios-chat-rich-features-design.md` — iOS Chat 富交互（批次③沙盒写操作在途）
@@ -103,6 +103,7 @@ docs/superpowers/
   - `2026-09-27-chat-agent-layered-memory-design.md` — Chat Agent 分层记忆系统（L1 预算制/L2 滚动摘要/L3 事实库，M1~M3 分期；M1 已合 main，M2/M3 待排期）
   - `2026-09-28-chat-type-taxonomy-design.md` — chat type 分类法（content/tool/data 三分类 + 命名规则 + role 上提；chat-parts 线配套 spec）
   - `2026-10-06-browser-vnc-live-card-design.md` — Browser-VNC 云端浏览器直播卡（M1 已定稿待实施：bridge + 服务端网关 + 工具闭环 + INLINE 直播卡）
+  - `2026-10-17-cloud-agent-tool-bridge-design.md` — 云端 Agent M2 工具桥 + BYOK 授权 UI + 最小聊天页（ADR-018 实施 spec，已定稿待评审）
 - **plans（2 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）
 
 ---
