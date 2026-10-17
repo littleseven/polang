@@ -290,6 +290,14 @@ class SettingsViewModel(
             initialValue = false
         )
 
+    /** 云端 Agent BYOK 授权（默认关；ADR-018 决策 4） */
+    val cloudAgentByokConsent: StateFlow<Boolean> = repository.cloudAgentByokConsentFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     val localAsrModel: StateFlow<String> = repository.localAsrModelFlow
         .stateIn(
             scope = viewModelScope,
@@ -1073,6 +1081,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             Logger.d("UX", "Media manage silent trash changed: $enabled")
             repository.updateMediaManageSilentTrash(enabled)
+        }
+    }
+
+    fun setCloudAgentByokConsent(enabled: Boolean) {
+        viewModelScope.launch {
+            Logger.d("UX", "Cloud agent BYOK consent changed: $enabled")
+            repository.updateCloudAgentByokConsent(enabled)
         }
     }
 

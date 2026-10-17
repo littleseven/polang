@@ -222,6 +222,7 @@ fun SettingsScreen(
     val voiceEntryEnabled by viewModel.voiceEntryEnabled.collectAsState()
     val aiChatEntryEnabled by viewModel.aiChatEntryEnabled.collectAsState()
     val mediaManageSilentTrashEnabled by viewModel.mediaManageSilentTrashEnabled.collectAsState()
+    val cloudAgentByokConsent by viewModel.cloudAgentByokConsent.collectAsState()
     val localAsrModel by viewModel.localAsrModel.collectAsState()
     val localKwsModel by viewModel.localKwsModel.collectAsState()
     val logModuleConfig by viewModel.logModuleConfig.collectAsState()
@@ -348,6 +349,8 @@ fun SettingsScreen(
             onAiChatEntryEnabledChange = { viewModel.setAiChatEntryEnabled(it) },
             mediaManageSilentTrashEnabled = mediaManageSilentTrashEnabled,
             onMediaManageSilentTrashEnabledChange = { viewModel.setMediaManageSilentTrashEnabled(it) },
+            cloudAgentByokConsent = cloudAgentByokConsent,
+            onCloudAgentByokConsentChange = { viewModel.setCloudAgentByokConsent(it) },
             localAsrModel = localAsrModel,
             onLocalAsrModelChange = { viewModel.setLocalAsrModel(it) },
             localKwsModel = localKwsModel,
@@ -425,6 +428,8 @@ private fun SettingsContent(
     onAiChatEntryEnabledChange: (Boolean) -> Unit,
     mediaManageSilentTrashEnabled: Boolean,
     onMediaManageSilentTrashEnabledChange: (Boolean) -> Unit,
+    cloudAgentByokConsent: Boolean = false,
+    onCloudAgentByokConsentChange: (Boolean) -> Unit = {},
     localAsrModel: String,
     onLocalAsrModelChange: (String) -> Unit,
     localKwsModel: String,
@@ -540,6 +545,17 @@ private fun SettingsContent(
                     onSelectedModelChange = onAiAgentSelectedRemoteModelChange,
                     onAddProvider = onNavigateToAddProvider
                 )
+                Spacer(modifier = Modifier.height(SettingsTokens.listSectionSpacing))
+                SettingsListSection {
+                    DebugOptionRow(
+                        title = stringResource(R.string.cloud_agent_byok_consent_title),
+                        subtitle = stringResource(R.string.cloud_agent_byok_consent_subtitle),
+                        checked = cloudAgentByokConsent,
+                        onCheckedChange = onCloudAgentByokConsentChange,
+                        icon = Icons.Rounded.Cloud,
+                        iconBlockColor = AppColors.vibrantBlue
+                    )
+                }
                 Spacer(modifier = Modifier.height(SettingsTokens.listSectionSpacing))
                 SettingsSection(title = stringResource(R.string.assistant_persona)) {
                     AssistantPersonaSelection(

@@ -542,6 +542,8 @@
     <string name="ai_agent_mode_off">Desactivado</string>
     <string name="ai_agent_mode_remote">Modelo remoto</string>
     <string name="assistant_persona">Personalidad del asistente</string>
+    <string name="cloud_agent_byok_consent_title">Permitir que el agente en la nube use mi clave API</string>
+    <string name="cloud_agent_byok_consent_subtitle">La clave se envía con cada solicitud y se procesa solo en memoria del servidor: nunca se guarda ni se registra</string>
     <string name="assistant_persona_default">Predeterminada</string>
     <string name="assistant_persona_default_desc">Respuestas estándar, equilibradas y neutras</string>
     <string name="assistant_persona_warm">Cálida y cercana</string>

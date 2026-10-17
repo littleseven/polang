@@ -170,6 +170,9 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         val TELEGRAM_BOT_TOKEN = stringPreferencesKey("telegram_bot_token")
         val TELEGRAM_ALLOWED_CHAT_ID = stringPreferencesKey("telegram_allowed_chat_id")
 
+        // 云端 Agent BYOK 授权（默认关；开=API Key 随请求透传服务器内存处理，零留存）
+        val CLOUD_AGENT_BYOK_CONSENT = booleanPreferencesKey("cloud_agent_byok_consent")
+
         // 服务端邮箱认证
         val SERVER_AUTH_TOKEN = stringPreferencesKey("server_auth_token")
         val SERVER_AUTH_EMAIL = stringPreferencesKey("server_auth_email")
@@ -1270,6 +1273,25 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.TELEGRAM_BOT_TOKEN] = botToken
             preferences[PreferencesKeys.TELEGRAM_ALLOWED_CHAT_ID] = allowedChatId
+        }
+    }
+
+    // ── 云端 Agent BYOK 授权 ─────────────────────────────────────
+    override val cloudAgentByokConsentFlow: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.CLOUD_AGENT_BYOK_CONSENT] ?: false
+        }
+
+    override suspend fun updateCloudAgentByokConsent(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CLOUD_AGENT_BYOK_CONSENT] = enabled
         }
     }
 

@@ -205,6 +205,11 @@ interface UserSettingsRepository {
     val telegramAllowedChatIdFlow: Flow<String>
     suspend fun updateTelegramConfig(botToken: String, allowedChatId: String)
 
+    // ── 云端 Agent BYOK 授权（ADR-018 决策 4） ──────────────────
+    /** 允许云端 Agent 使用我的 API Key（默认关；开=key 随请求透传服务器内存处理，零留存）。 */
+    val cloudAgentByokConsentFlow: Flow<Boolean>
+    suspend fun updateCloudAgentByokConsent(enabled: Boolean)
+
     // ── 服务端邮箱认证 ──────────────────────────────────────────
     val serverAuthTokenFlow: Flow<String>
     val serverAuthEmailFlow: Flow<String>

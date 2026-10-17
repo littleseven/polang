@@ -545,6 +545,8 @@
     <string name="ai_agent_mode_off">关闭</string>
     <string name="ai_agent_mode_remote">远程模型</string>
     <string name="assistant_persona">助手性格</string>
+    <string name="cloud_agent_byok_consent_title">允许云端 Agent 使用我的 API Key</string>
+    <string name="cloud_agent_byok_consent_subtitle">Key 仅在会话期间随请求发送至服务器内存处理，服务器不保存、不写日志</string>
     <string name="assistant_persona_default">默认</string>
     <string name="assistant_persona_default_desc">中性简洁的标准回复</string>
     <string name="assistant_persona_warm">温暖贴心</string>
