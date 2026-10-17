@@ -298,6 +298,14 @@ class SettingsViewModel(
             initialValue = false
         )
 
+    /** 云端 Agent 编排开关（默认关=本地编排；ADR-018 实验线） */
+    val cloudAgentEnabled: StateFlow<Boolean> = repository.cloudAgentEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     val localAsrModel: StateFlow<String> = repository.localAsrModelFlow
         .stateIn(
             scope = viewModelScope,
@@ -1088,6 +1096,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             Logger.d("UX", "Cloud agent BYOK consent changed: $enabled")
             repository.updateCloudAgentByokConsent(enabled)
+        }
+    }
+
+    fun setCloudAgentEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            Logger.d("UX", "Cloud agent orchestration changed: $enabled")
+            repository.updateCloudAgentEnabled(enabled)
         }
     }
 

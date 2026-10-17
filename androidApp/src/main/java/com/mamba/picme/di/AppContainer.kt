@@ -11,6 +11,7 @@ import com.mamba.picme.beauty.api.BeautyProcessor
 import com.mamba.picme.core.image.GpuBeautyProcessor
 import com.mamba.picme.core.image.ImageProcessor
 import com.mamba.picme.core.image.ImageProcessorImpl
+import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
@@ -85,6 +86,7 @@ import com.mamba.picme.features.chat.ChatEditStateHolder
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.data.remote.picme.AppUpdateClient
 import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
+import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudAgentClient
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.features.chat.ChatImageRenderer
@@ -1061,7 +1063,9 @@ class AppContainerImpl(
             saveChatEditResultUseCase = saveChatEditResultUseCase,
             optimizeGachaController = chatOptimizeGachaController,
             tagGenerationScheduler = tagGenerationScheduler,
-            browserWebSocketClient = browserWebSocketClient
+            browserWebSocketClient = browserWebSocketClient,
+            cloudAgentApi = cloudAgentApi,
+            deviceToolExecutor = deviceToolExecutor
         ).also { deps ->
             // app_tool_request 采集执行器：工厂依赖容器内数据源，构造后回填（先于 ChatViewModel 创建）
             deps.appToolExecutor = buildAppToolExecutor(deps)
@@ -1131,11 +1135,44 @@ class AppContainerImpl(
         )
     }
 
+    /**
+     * 云端 Agent 相册工具的无头执行器（ADR-018 M2）：绕过场景注册表直执，
+     * 不再委托 ChatToolService（后者依赖 ChatScreen 存活期绑定的 Delegate + CHAT 场景，
+     * 云端 Agent 页双重不满足会被注册表入队而永不执行）。
+     */
+    private val cloudAgentGalleryTools: CloudAgentGalleryTools by lazy {
+        CloudAgentGalleryTools(
+            searchByQuery = { query, limitToIds ->
+                mediaSearchEngine.search(query, limitToIds = limitToIds).media
+            },
+            searchByFilter = { filter, limitToIds ->
+                mediaSearchEngine.search(filter = filter, limitToIds = limitToIds).media
+            },
+            gallerySummary = { includeDetails -> getGallerySummaryUseCase(includeDetails) },
+        )
+    }
+
+    /** 云端 Agent SSE 客户端（调试页与 Chat 页云端模式共用实例）。 */
+    private val cloudAgentApi: CloudAgentApi by lazy { CloudAgentClient() }
+
+    /** 云端工具桥端侧执行器（调试页与 Chat 页云端模式共用实例）。 */
+    private val deviceToolExecutor: DeviceToolExecutor by lazy {
+        DeviceToolExecutor(
+            gallerySummary = { cloudAgentGalleryTools.getGallerySummary() },
+            searchMedia = { query, person, fromMs, toMs, hasFace ->
+                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace)
+            },
+            refineSearch = { constraint, fromMs, toMs ->
+                cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)
+            },
+        )
+    }
+
     override fun createCloudAgentChatViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
         initializer {
             CloudAgentChatViewModel(
-                api = CloudAgentClient(),
-                deviceToolExecutor = DeviceToolExecutor(),
+                api = cloudAgentApi,
+                deviceToolExecutor = deviceToolExecutor,
                 settingsRepository = userPreferencesRepository,
             )
         }

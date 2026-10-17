@@ -35,7 +35,6 @@ import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.agent.core.model.context.SearchIntent
 import com.mamba.picme.agent.core.model.context.SearchResultSnapshot
-import com.mamba.picme.agent.core.model.context.TimeRange
 import com.mamba.picme.agent.core.model.context.toReplyLanguage
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
@@ -65,6 +64,7 @@ import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.data.local.toModelInputItems
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.ClaudeEvent
+import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.domain.repository.UserSettingsRepository
@@ -73,9 +73,7 @@ import com.mamba.picme.domain.tag.TaggerModelSelector
 import com.mamba.picme.agent.core.model.command.FeedbackAction
 import com.mamba.picme.agent.core.model.command.FeedbackTarget
 import com.mamba.picme.domain.model.AppLanguage
-import com.mamba.picme.domain.model.StructuredFilter
 import com.mamba.picme.domain.search.MediaFeedbackUseCase
-import com.mamba.picme.domain.search.QueryParser
 import com.mamba.picme.domain.usecase.StartTagScanResult
 import com.mamba.picme.service.tag.TagGenerationService
 import android.util.Log
@@ -105,6 +103,10 @@ import com.mamba.picme.domain.chat.streaming.ChatStreamTurnAdapter
 import com.mamba.picme.domain.chat.streaming.StreamingPacingController
 import com.mamba.picme.domain.chat.streaming.TurnPartsReducer
 import com.mamba.picme.domain.chat.streaming.TurnStreamEvent
+import com.mamba.picme.features.cloudagent.CloudAgentChannelChoice
+import com.mamba.picme.features.cloudagent.CloudAgentChannelResolver
+import com.mamba.picme.features.cloudagent.CloudAgentTurnRunner
+import com.mamba.picme.features.cloudagent.CloudTurnEvent
 import com.mamba.picme.features.gallery.MediaViewModel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -189,6 +191,9 @@ enum class RemoteModelSource(@StringRes val labelRes: Int) {
  */
 private const val STREAMING_THINKING_HINT_RES = R.string.chat_thinking
 
+/** 云端 Agent 回合落库消息的 modelUsed 标签（ADR-018 实验线）。 */
+private const val CLOUD_MODEL_LABEL = "cloud"
+
 /**
  * Chat 首页 ViewModel — 管理聊天状态与数据流
  *
@@ -269,6 +274,8 @@ class ChatViewModel(
     private val tagGenerationScheduler = dependencies.tagGenerationScheduler
     private val messageDecodeDispatcher = dependencies.messageDecodeDispatcher
     private val browserWebSocketClient = dependencies.browserWebSocketClient
+    private val cloudAgentApi = dependencies.cloudAgentApi
+    private val deviceToolExecutor = dependencies.deviceToolExecutor
 
     /** 已建立 WS 推流连接的浏览器会话集合（无 WS 客户端时恒空集，UI 侧按未连接降级展示）。 */
     val browserStreamConnected: StateFlow<Set<String>> =
@@ -1078,25 +1085,6 @@ class ChatViewModel(
     /** 当前会话最近一条用户图片消息的持久化 URI，供 ai_optimize 指代「这张照片】。 */
     private val _lastUserImageUri = MutableStateFlow<String?>(null)
 
-    /**
-     * 时间专属词集合。当 [SearchIntent.timeRange] 已经表达了时间范围时，
-     * 这些词不应再作为内容关键词去匹配标签/OCR/文件名，否则会导致时间候选集与空标签候选集交集为空。
-     */
-    private val timeOnlyKeywords = setOf(
-        "去年", "今年", "明年", "前年", "后年",
-        "春天", "夏天", "秋天", "冬天", "春季", "夏季", "秋季", "冬季",
-        "上半年", "下半年", "近半年", "最近半年", "半年",
-        "近一年", "最近一年", "一年", "近几年", "最近几年",
-        "最近", "近三个月", "近3个月",
-        "今天", "昨天", "前天", "明天", "后天",
-        "上周", "本周", "下周",
-        "上星期", "这星期", "下星期", "上个星期", "这个星期", "下个星期",
-        "上个月", "这个月", "下个月", "上月", "今月", "下月"
-    )
-
-    /** 匹配“3月”“12月”“五月”等月份表达。 */
-    private val monthKeywordRegex = Regex("""^(\d{1,2}月|[一二三四五六七八九十]{1,3}月)$""")
-
     private val orchestrator = AgentOrchestrator.getInstance()
 
     private val _currentSessionId = MutableStateFlow("default")
@@ -1864,6 +1852,16 @@ class ChatViewModel(
                     isStreaming = true,
                     isThinking = true
                 )
+
+                // 云端 Agent 实验分支（设置页开关，ADR-018）：复用上方用户消息落库与占位消息，
+                // 跳过本地编排（pacing/记忆/ReAct/能力分发）；带图消息降级为纯文本（开关副文案已声明）。
+                if (cloudAgentApi != null && deviceToolExecutor != null &&
+                    userSettingsRepository.cloudAgentEnabledFlow.first()
+                ) {
+                    runCloudTurn(sessionId, text)
+                    return@launchChatRound
+                }
+
                 pacingController.start()
 
                 // 3.5 获取相册摘要并注入上下文
@@ -2134,6 +2132,172 @@ class ChatViewModel(
         return when (_currentModel.value) {
             is ChatModelOption.Remote -> "remote_deepseek"
         }
+    }
+
+    // ── 云端 Agent 实验分支（ADR-018；设置页开关开启后 sendMessage 拦截至此） ─────────────
+
+    /** 本地会话 → 云端会话映射（内存态：重启/失效即重建；历史回放属 M3）。 */
+    private data class CloudSession(val sessionId: String, val channel: String, val byokApiKey: String)
+
+    private val cloudSessions = mutableMapOf<String, CloudSession>()
+
+    /**
+     * 云端编排回合：占位消息以整条消息粒度实时更新（云端无 token 流式），SSE 收尾后统一落 Room。
+     * 取消经 launchChatRound Job 穿透断流——runTurn 抛 CancellationException 时本函数不执行收尾，
+     * 半截文本由 sendMessage 外层 catch(CancellationException) 按既有语义保留。
+     */
+    private suspend fun runCloudTurn(sessionId: String, text: String) {
+        val api = cloudAgentApi ?: return
+        val executor = deviceToolExecutor ?: return
+
+        // 登录态：/agent 会话需服务端账号 token（访客设备级额度仅覆盖 /llm 链路）
+        val token = userSettingsRepository.serverAuthTokenFlow.first()
+        if (token.isBlank()) {
+            _streamingMessage.value = null
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(R.string.cloud_agent_login_required),
+                CLOUD_MODEL_LABEL
+            )
+            return
+        }
+
+        // 通道解析（网关 / BYOK / 未授权引导），与调试页 prepare() 同一套规则
+        val configsJson = userSettingsRepository.aiAgentRemoteModelConfigsFlow.first()
+        val selectedKey = userSettingsRepository.aiAgentSelectedRemoteModelFlow.first()
+        val config = if (configsJson.isBlank()) {
+            null
+        } else {
+            val configs = RemoteModelConfigs.fromJson(configsJson)
+            configs.configs.find { c -> c.uniqueKey == selectedKey }
+                ?: configs.getConfigByModelId(selectedKey)
+        }
+        val consent = userSettingsRepository.cloudAgentByokConsentFlow.first()
+        val choice = CloudAgentChannelResolver.resolve(config, consent)
+        if (choice is CloudAgentChannelChoice.NeedConsent) {
+            _streamingMessage.value = null
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(R.string.cloud_agent_consent_required),
+                CLOUD_MODEL_LABEL
+            )
+            return
+        }
+
+        val runner = CloudAgentTurnRunner(api, executor, viewModelScope)
+        val session = ensureCloudSession(api, token, sessionId, choice)
+        if (session == null) {
+            _streamingMessage.value = null
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(
+                    R.string.chat_inference_error,
+                    stringContext().getString(R.string.chat_unknown_error)
+                ),
+                "error"
+            )
+            return
+        }
+
+        val answer = StringBuilder()
+        var serverError: String? = null
+        var result = runCloudTurnOnce(runner, token, session, text, answer) { serverError = it }
+        // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
+        if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
+            Logger.w(TAG, "Cloud session ${session.sessionId} invalid, recreating")
+            cloudSessions.remove(sessionId)
+            answer.clear()
+            serverError = null
+            _streamingMessage.value = _streamingMessage.value?.copy(
+                content = stringContext().getString(STREAMING_THINKING_HINT_RES),
+                isThinking = true,
+                showCursor = false
+            )
+            val fresh = ensureCloudSession(api, token, sessionId, choice)
+            if (fresh != null) {
+                result = runCloudTurnOnce(runner, token, fresh, text, answer) { serverError = it }
+            }
+        }
+
+        // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
+        _streamingMessage.value = null
+        when {
+            result.isFailure -> insertAgentMessage(
+                sessionId,
+                stringContext().getString(
+                    R.string.chat_inference_error,
+                    result.exceptionOrNull()?.message
+                        ?: stringContext().getString(R.string.chat_unknown_error)
+                ),
+                "error"
+            )
+            serverError != null -> insertAgentMessage(sessionId, serverError.orEmpty(), "error")
+            answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
+            else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
+        }
+    }
+
+    /** 单趟云端回合：帧事件驱动占位气泡；终态（Error 帧）经 [onServerError] 传出。 */
+    private suspend fun runCloudTurnOnce(
+        runner: CloudAgentTurnRunner,
+        token: String,
+        session: CloudSession,
+        text: String,
+        answer: StringBuilder,
+        onServerError: (String) -> Unit,
+    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey) { event ->
+        when (event) {
+            is CloudTurnEvent.AssistantText -> {
+                if (answer.isNotEmpty()) answer.append("\n\n")
+                answer.append(event.text)
+                _streamingMessage.value = _streamingMessage.value?.copy(
+                    content = answer.toString(),
+                    isThinking = false,
+                    showCursor = true
+                )
+            }
+            is CloudTurnEvent.ToolCall -> {
+                _streamingMessage.value = _streamingMessage.value?.copy(
+                    content = stringContext().getString(R.string.chat_calling_tool),
+                    isThinking = false,
+                    showCursor = false
+                )
+            }
+            is CloudTurnEvent.Error -> onServerError(event.message)
+            CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理
+        }
+    }
+
+    /** 懒建并缓存云端会话（每本地 sessionId 一条）；建会话失败返回 null 由调用方报错。 */
+    private suspend fun ensureCloudSession(
+        api: CloudAgentApi,
+        token: String,
+        localSessionId: String,
+        choice: CloudAgentChannelChoice,
+    ): CloudSession? {
+        cloudSessions[localSessionId]?.let { return it }
+        val channel: String
+        val model: String
+        val baseUrl: String
+        val key: String
+        when (choice) {
+            CloudAgentChannelChoice.Gateway -> {
+                channel = "gateway"; model = ""; baseUrl = ""; key = ""
+            }
+            is CloudAgentChannelChoice.Byok -> {
+                channel = "byok"; model = choice.model; baseUrl = choice.baseUrl; key = choice.apiKey
+            }
+            CloudAgentChannelChoice.NeedConsent -> return null // 调用方已拦截，防御兜底
+        }
+        val sessionId = api.createSession(token, channel, model, baseUrl).getOrNull()
+            ?.optString("session_id")?.takeIf { it.isNotBlank() } ?: return null
+        return CloudSession(sessionId, channel, key).also { cloudSessions[localSessionId] = it }
+    }
+
+    /** 会话失效判定：HTTP 404 / 服务端 session_not_found 语义（403 配额类不重试）。 */
+    private fun isCloudSessionInvalid(error: Throwable?): Boolean {
+        val message = error?.message.orEmpty()
+        return message.contains("HTTP 404") || message.contains("session_not_found", ignoreCase = true)
     }
 
     /**
@@ -2467,7 +2631,7 @@ class ChatViewModel(
         val start = System.currentTimeMillis()
         val result = runCatching {
             if (intent != null) {
-                val filter = searchIntentToStructuredFilter(withStringParseBackstop(intent, query))
+                val filter = ChatGallerySearch.structuredFilterOf(intent, query)
                 mediaSearchEngine.search(filter = filter)
             } else {
                 mediaSearchEngine.search(query)
@@ -2503,7 +2667,7 @@ class ChatViewModel(
         val result = runCatching {
             if (intent != null) {
                 // LLM 已给出标准化意图：直接在 prior 内执行结构化过滤
-                val filter = searchIntentToStructuredFilter(withStringParseBackstop(intent, constraint))
+                val filter = ChatGallerySearch.structuredFilterOf(intent, constraint)
                 mediaSearchEngine.search(filter = filter, limitToIds = priorIds).media
             } else {
                 // 兜底：字符串解析 + in-set 过滤
@@ -2532,65 +2696,6 @@ class ChatViewModel(
         lastResultAssets[sessionId] = refined
         recordSearchSnapshot(sessionId, constraint, refined.size, isRefinement = true)
         return SearchOutcome(constraint, refined.map { it.id }, refined.size, isRefinement = true)
-    }
-
-    /**
-     * 字符串解析兜底（2026-09-29 hasFaces / 2026-09-30 timeRange）：结构化入口（路由器
-     * 直执 / search_media 工具）一旦填了任一结构化参数，就跳过字符串解析路径；上游漏填的
-     * 维度会被整句丢弃（实证：LLM 只传 hasFace 不传 fromMs/toMs 时，"去年夏天"约束丢失，
-     * 返回其他年份的人脸照片）。这里对原始文本再跑一次规则判定（与字符串搜索路径
-     * [QueryParser] 同口径），把丢失的人脸/时间约束补回；上游已显式给出的维度尊重上游，
-     * 不覆盖。
-     */
-    private fun withStringParseBackstop(intent: SearchIntent, rawText: String): SearchIntent {
-        var result = intent
-        if (result.hasFaces == null && QueryParser.isPeopleSearch(rawText)) {
-            result = result.copy(hasFaces = true)
-        }
-        if (result.timeRange == null) {
-            QueryParser.parseTimeRange(rawText)?.let { parsed ->
-                result = result.copy(
-                    timeRange = TimeRange(startMs = parsed.startMs, endMs = parsed.endMs)
-                )
-            }
-        }
-        return result
-    }
-
-    /**
-     * 将 :shared 的 [SearchIntent] 转换为 app 层的 [StructuredFilter]。
-     *
-     * 转换前先做时间词清洗：只要 [SearchIntent.timeRange] 已给出，就把“夏天”“去年”等
-     * 时间专属词从 keywords / ocrKeywords / locationKeywords 中剔除，避免引擎把
-     * 时间约束与空内容候选集取交集导致 0 结果。
-     */
-    private fun searchIntentToStructuredFilter(intent: SearchIntent): StructuredFilter {
-        val sanitized = sanitizeTimeKeywords(intent)
-        return StructuredFilter(
-            timeRange = sanitized.timeRange?.let {
-                com.mamba.picme.domain.model.TimeRange(startMs = it.startMs, endMs = it.endMs)
-            },
-            keywords = sanitized.keywords,
-            ocrKeywords = sanitized.ocrKeywords,
-            locationKeywords = sanitized.locationKeywords,
-            personName = sanitized.personName,
-            hasFaces = sanitized.hasFaces,
-            needsLlm = false
-        )
-    }
-
-    /**
-     * 当意图中同时存在 [timeRange] 和时间专属词时，剔除这些时间专属词。
-     * 这是 Prompt 约束之外的第二层保险，防止小模型/远程模型仍把“夏天”当成内容关键词。
-     */
-    private fun sanitizeTimeKeywords(intent: SearchIntent): SearchIntent {
-        if (intent.timeRange == null) return intent
-        fun isTimeOnly(word: String): Boolean = word in timeOnlyKeywords || monthKeywordRegex.matches(word)
-        return intent.copy(
-            keywords = intent.keywords.filterNot(::isTimeOnly),
-            ocrKeywords = intent.ocrKeywords.filterNot(::isTimeOnly),
-            locationKeywords = intent.locationKeywords.filterNot(::isTimeOnly)
-        )
     }
 
     private fun recordSearchSnapshot(

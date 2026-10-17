@@ -79,8 +79,8 @@ class ChatGallerySummaryCapability private constructor() : BaseCapability() {
         return try {
             if (command is AgentCommand.GetGallerySummary) {
                 val summary = d.onGetGallerySummary(command.includeDetails)
-                val message = summary?.let { formatSummaryForReply(it) }
-                    ?: "我还没拿到你的相册数据，可能是首次使用或尚未完成同步。我可以帮你启动 TAG 扫描，让人脸、场景和物体标签都生成出来。要开始吗？"
+                val message = summary?.let { formatGallerySummaryForReply(it) }
+                    ?: GALLERY_SUMMARY_UNAVAILABLE_HINT
                 Result.success(
                     AgentAction.TextReply(
                         commandId = command.commandId,
@@ -107,32 +107,40 @@ class ChatGallerySummaryCapability private constructor() : BaseCapability() {
             )
         }
     }
+}
 
-    private fun formatSummaryForReply(summary: GallerySummary): String {
-        return buildString {
-            append("当前相册共有 ${summary.totalMedia} 个媒体")
-            if (summary.totalPhotos > 0 || summary.totalVideos > 0) {
-                append("（${summary.totalPhotos} 张照片")
-                if (summary.totalVideos > 0) append("，${summary.totalVideos} 个视频")
-                append("）")
-            }
-            append("；检测到 ${summary.hasFaceCount} 张含人脸的照片，聚类出 ${summary.personClusterCount} 个人物")
-            if (summary.namedPersonCount > 0) {
-                append("（其中 ${summary.namedPersonCount} 个已命名）")
-            }
-            append("。已打标 ${summary.labeledCount} 张，未打标 ${summary.unlabeledCount} 张")
-            when (summary.recommendation) {
-                GallerySummary.ScanRecommendation.NONE -> append("。目前状态良好，无需扫描。")
-                GallerySummary.ScanRecommendation.INCREMENTAL -> append("。建议运行增量扫描补齐未打标照片。")
-                GallerySummary.ScanRecommendation.PASS3_FULL -> append("。未打标比例较高，建议执行内容标签全量扫描。")
-                GallerySummary.ScanRecommendation.PASS1_FIRST -> append("。大量照片尚未完成人脸检测，建议先执行人脸检测扫描。")
-            }
-            if (summary.isScanning) {
-                append(" [当前扫描中")
-                summary.currentPass?.let { append(" · $it") }
-                summary.scanProgressText?.let { append(" · $it") }
-                append("]")
-            }
+/** 相册数据不可用时的引导文案（chat 链路与云端 Agent 工具桥共用同一口径）。 */
+internal const val GALLERY_SUMMARY_UNAVAILABLE_HINT =
+    "我还没拿到你的相册数据，可能是首次使用或尚未完成同步。我可以帮你启动 TAG 扫描，让人脸、场景和物体标签都生成出来。要开始吗？"
+
+/**
+ * 相册摘要 → 模型观测/回复文本（自 [ChatGallerySummaryCapability] 提升为顶层，
+ * 供云端 Agent 工具桥 CloudAgentGalleryTools 同源复用）。
+ */
+internal fun formatGallerySummaryForReply(summary: GallerySummary): String {
+    return buildString {
+        append("当前相册共有 ${summary.totalMedia} 个媒体")
+        if (summary.totalPhotos > 0 || summary.totalVideos > 0) {
+            append("（${summary.totalPhotos} 张照片")
+            if (summary.totalVideos > 0) append("，${summary.totalVideos} 个视频")
+            append("）")
+        }
+        append("；检测到 ${summary.hasFaceCount} 张含人脸的照片，聚类出 ${summary.personClusterCount} 个人物")
+        if (summary.namedPersonCount > 0) {
+            append("（其中 ${summary.namedPersonCount} 个已命名）")
+        }
+        append("。已打标 ${summary.labeledCount} 张，未打标 ${summary.unlabeledCount} 张")
+        when (summary.recommendation) {
+            GallerySummary.ScanRecommendation.NONE -> append("。目前状态良好，无需扫描。")
+            GallerySummary.ScanRecommendation.INCREMENTAL -> append("。建议运行增量扫描补齐未打标照片。")
+            GallerySummary.ScanRecommendation.PASS3_FULL -> append("。未打标比例较高，建议执行内容标签全量扫描。")
+            GallerySummary.ScanRecommendation.PASS1_FIRST -> append("。大量照片尚未完成人脸检测，建议先执行人脸检测扫描。")
+        }
+        if (summary.isScanning) {
+            append(" [当前扫描中")
+            summary.currentPass?.let { append(" · $it") }
+            summary.scanProgressText?.let { append(" · $it") }
+            append("]")
         }
     }
 }

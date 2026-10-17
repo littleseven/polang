@@ -224,6 +224,7 @@ fun SettingsScreen(
     val aiChatEntryEnabled by viewModel.aiChatEntryEnabled.collectAsState()
     val mediaManageSilentTrashEnabled by viewModel.mediaManageSilentTrashEnabled.collectAsState()
     val cloudAgentByokConsent by viewModel.cloudAgentByokConsent.collectAsState()
+    val cloudAgentEnabled by viewModel.cloudAgentEnabled.collectAsState()
     val localAsrModel by viewModel.localAsrModel.collectAsState()
     val localKwsModel by viewModel.localKwsModel.collectAsState()
     val logModuleConfig by viewModel.logModuleConfig.collectAsState()
@@ -352,6 +353,8 @@ fun SettingsScreen(
             onMediaManageSilentTrashEnabledChange = { viewModel.setMediaManageSilentTrashEnabled(it) },
             cloudAgentByokConsent = cloudAgentByokConsent,
             onCloudAgentByokConsentChange = { viewModel.setCloudAgentByokConsent(it) },
+            cloudAgentEnabled = cloudAgentEnabled,
+            onCloudAgentEnabledChange = { viewModel.setCloudAgentEnabled(it) },
             localAsrModel = localAsrModel,
             onLocalAsrModelChange = { viewModel.setLocalAsrModel(it) },
             localKwsModel = localKwsModel,
@@ -432,6 +435,8 @@ private fun SettingsContent(
     onMediaManageSilentTrashEnabledChange: (Boolean) -> Unit,
     cloudAgentByokConsent: Boolean = false,
     onCloudAgentByokConsentChange: (Boolean) -> Unit = {},
+    cloudAgentEnabled: Boolean = false,
+    onCloudAgentEnabledChange: (Boolean) -> Unit = {},
     localAsrModel: String,
     onLocalAsrModelChange: (String) -> Unit,
     localKwsModel: String,
@@ -550,6 +555,14 @@ private fun SettingsContent(
                 )
                 Spacer(modifier = Modifier.height(SettingsTokens.listSectionSpacing))
                 SettingsListSection {
+                    DebugOptionRow(
+                        title = stringResource(R.string.cloud_agent_entry_title),
+                        subtitle = stringResource(R.string.cloud_agent_chat_toggle_subtitle),
+                        checked = cloudAgentEnabled,
+                        onCheckedChange = onCloudAgentEnabledChange,
+                        icon = Icons.Rounded.Cloud,
+                        iconBlockColor = AppColors.vibrantBlue
+                    )
                     DebugOptionRow(
                         title = stringResource(R.string.cloud_agent_byok_consent_title),
                         subtitle = stringResource(R.string.cloud_agent_byok_consent_subtitle),

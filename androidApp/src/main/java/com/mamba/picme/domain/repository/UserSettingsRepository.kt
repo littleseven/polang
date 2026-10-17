@@ -210,6 +210,11 @@ interface UserSettingsRepository {
     val cloudAgentByokConsentFlow: Flow<Boolean>
     suspend fun updateCloudAgentByokConsent(enabled: Boolean)
 
+    // ── 云端 Agent 编排开关（ADR-018 实验线） ────────────────────
+    /** Chat 页回合走云端 Agent 编排（默认关=本地编排；实验：仅相册只读工具，回复不出卡片）。 */
+    val cloudAgentEnabledFlow: Flow<Boolean>
+    suspend fun updateCloudAgentEnabled(enabled: Boolean)
+
     // ── 服务端邮箱认证 ──────────────────────────────────────────
     val serverAuthTokenFlow: Flow<String>
     val serverAuthEmailFlow: Flow<String>

@@ -560,6 +560,9 @@
     <string name="cloud_agent_byok_consent_title">Cloud Agent uses my API key</string>
     <string name="cloud_agent_byok_consent_subtitle">Sent with each request — never stored or logged</string>
     <string name="cloud_agent_entry_title">Cloud Agent (experimental)</string>
+    <string name="cloud_agent_chat_toggle_subtitle">Chat runs on the cloud agent: read-only gallery Q&amp;A only, no cards; messages with photos fall back to plain text</string>
+    <string name="cloud_agent_login_required">Sign in on the Settings page before using Cloud Agent</string>
+    <string name="cloud_agent_consent_required">The selected provider uses your own API key — enable \"Cloud Agent uses my API key\" in Settings → Remote Model first</string>
     <string name="cloud_agent_title">Cloud Agent</string>
     <string name="cloud_agent_channel_gateway">Gateway</string>
     <string name="cloud_agent_channel_byok">BYOK</string>

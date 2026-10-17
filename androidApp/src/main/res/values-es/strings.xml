@@ -545,6 +545,9 @@
     <string name="cloud_agent_byok_consent_title">Agente en la nube con mi clave API</string>
     <string name="cloud_agent_byok_consent_subtitle">Se envía con cada solicitud; nunca se guarda</string>
     <string name="cloud_agent_entry_title">Agente en la nube (experimental)</string>
+    <string name="cloud_agent_chat_toggle_subtitle">El chat usa el agente en la nube: solo consultas de lectura de la galería, sin tarjetas; los mensajes con fotos se envían como texto</string>
+    <string name="cloud_agent_login_required">Inicia sesión en Ajustes antes de usar el agente en la nube</string>
+    <string name="cloud_agent_consent_required">El proveedor elegido usa tu propia clave API: actívalo en Ajustes → Modelo remoto primero</string>
     <string name="cloud_agent_title">Agente en la nube</string>
     <string name="cloud_agent_channel_gateway">Puerta de enlace</string>
     <string name="cloud_agent_channel_byok">BYOK</string>

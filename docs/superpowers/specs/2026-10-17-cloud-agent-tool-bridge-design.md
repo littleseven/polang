@@ -29,8 +29,8 @@
 │ CloudAgentChatScreen（调试入口实验页）                 │
 │   └─ CloudAgentChatViewModel（内存态消息列表）         │
 │        ├─ CloudAgentClient（OkHttp：REST + SSE）       │
-│        └─ DeviceToolExecutor ──→ ChatToolService       │
-│            （tool 名映射 + 截断脱敏）   （现有 handler）│
+│        └─ DeviceToolExecutor ──→ CloudAgentGalleryTools│
+│            （tool 名映射 + 截断脱敏）（无头直执，见 §5 勘误）│
 └───────┬───────────────────────▲──────────────────────┘
         │ POST messages（SSE）  │ POST tool-results
 ┌───────▼───────────────────────┴──────────────────────┐
@@ -115,7 +115,7 @@ data: {"kind":"tool_request","request_id":"tr_<uuid8>","tool":"search_media","ar
 - **Scope**：`androidApp/src/main/java/com/mamba/picme/features/cloudagent/`（新包）+ `core/agenttools/`
 - **新增**：
   1. `CloudAgentClient.kt`——OkHttp；`createSession/listSessions/getEvents(after,limit)/finish` + `postMessage(sessionId, content): Flow<CloudFrame>`（SSE 逐帧）+ `postToolResult(sessionId, requestId, ok, result)`；BYOK 会话的 `postMessage` 自动带 `X-User-Api-Key`（M1 语义：缺头 400；从当前选中 BYOK 配置取）
-  2. `DeviceToolExecutor.kt`——`suspend fun execute(tool: String, args: JsonObject): String`；映射 `get_gallery_summary`/`search_media`/`refine_media_search` → `ChatToolService.getInstance()` 对应 handler；结果 ≤32KB 截断（AppToolExecutor 范式）；未知工具返回 `error: unknown_tool`
+  2. `DeviceToolExecutor.kt`——`suspend fun execute(tool: String, args: JsonObject): String`；映射 `get_gallery_summary`/`search_media`/`refine_media_search`；结果 ≤32KB 截断（AppToolExecutor 范式）；未知工具返回 `error: unknown_tool`。**2026-10-17 勘误**：handler 原设计委托 `ChatToolService.getInstance()`（经 CapabilityRegistry scene=CHAT dispatch）——chat 相册能力 Delegate 仅 ChatScreen 存活期绑定、云端 Agent 页又非 CHAT 场景，命令被注册表入队并回「正在切换页面」占位文案，永不真正执行（真机遛狗发现）。已改为注入 `CloudAgentGalleryTools`（`core/agenttools/`）无头直执：直注 `mediaSearchEngine`/`getGallerySummaryUseCase`，绕过场景注册表（对齐 iOS `IosCloudAgentToolBridge` 路线），意图组装同源 `GallerySearchIntents`（shared 公共纯函数）+ `ChatGallerySearch.structuredFilterOf`；DeviceToolExecutor 三个 handler 无默认值、强制显式注入
   3. `CloudAgentChatViewModel.kt`——状态：`Idle / Loading / Streaming(messages) / Error`；消息为内存态 data class 列表；遇 `tool_request` 帧 → DeviceToolExecutor 执行 → 上行 → 继续收帧
   4. `CloudAgentChatScreen.kt`——最小聊天页：消息气泡列表（复用现有文本/Markdown 渲染组件）+ 输入框 + 发送/停止；顶部通道标记（网关/BYOK）
   5. 调试入口：SettingsScreen 调试区加「云端 Agent（实验）」入口（创建或复用会话后进入聊天页）
@@ -143,7 +143,7 @@ App: POST /agent/sessions/{id}/messages {content:"我上周拍的猫"}
   → Server: 落 user Message 事件 → SSE 帧 event
   → Koog LLM 轮 → 决定调 search_media（DeviceTool）
   → Server: 落 Action 事件 → SSE 帧 event + 帧 tool_request → 挂起
-  → App: 收 tool_request → DeviceToolExecutor → ChatToolService.searchMedia → 文本结果
+  → App: 收 tool_request → DeviceToolExecutor → CloudAgentGalleryTools.searchMedia（无头直执）→ 文本结果
   → App: POST tool-results {request_id, ok:true, result}
   → Server: deferred complete → Koog 继续 → 落 Observation → LLM 二轮 → 答复
   → Server: 落 assistant Message + Finish → SSE 帧 event×2 + done
@@ -177,6 +177,16 @@ App: POST /agent/sessions/{id}/messages {content:"我上周拍的猫"}
 | AC-M2-A1 | 调试入口进入云端聊天页，网关通道完整对话（含一次工具调用） | 真机遛狗 |
 | AC-M2-A2 | BYOK 授权门：未授权弹窗、授权后 key 透传且双端零留存 | 单测 + 真机抓包 |
 | AC-M2-DOC | server/AGENTS.md 路由清单与包结构同步；androidApp AGENTS.md 新包登记；ADR-018 §6 状态更新 | 文档检查 |
+
+### M2.5 Chat 主页实验接入（2026-10-17 追加）
+
+Debug 页遛狗通过后，云端编排经设置页开关接入 Chat 主页：
+
+- **开关**：DataStore `cloud_agent_enabled`（默认关=本地编排），设置 → 远程模型区「云端 Agent（实验）」开关行，副文案显式声明能力降级（仅相册只读问答、回复不出卡片、带图消息降级纯文本）。
+- **共享回合内核**：`CloudAgentTurnRunner`（`features/cloudagent/`）自 `CloudAgentChatViewModel` 提取——SSE 收帧 / ToolRequest 端执行 + postToolResult 上行 / 事件回调（AssistantText/ToolCall/Error/Done），调试页与 Chat 主页共用同一内核防状态机漂移。
+- **ChatViewModel 云端分支**：`sendMessage` 在占位消息创建后拦截（用户消息落库/访客计数/自动命名复用，跳过 pacing/记忆/ReAct/能力分发）；云端会话按本地 sessionId 懒建复用（内存映射，失效重建重试一次，历史回放属 M3）；未登录/未授权插入引导消息；AssistantText 整条粒度更新占位气泡，SSE 收尾统一落 Room（modelUsed="cloud"）。
+- **依赖注入**：`ChatViewModelDependencies` 新增可空 `cloudAgentApi`/`deviceToolExecutor`（默认 null=未接线，单测不受影响）；AppContainer 两实例提升为容器级 lazy，调试页工厂与 Chat 共用。
+- **验收**：开关开 → Chat 页相册问答走云端工具闭环；开关关 → 本地路径零回归；`CloudAgentTurnRunnerTest` 覆盖帧分发/工具上行/错误传播。
 
 ## 10. 交付沉淀管线（DoD 提醒）
 
