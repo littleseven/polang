@@ -99,14 +99,7 @@ struct EngineerTaskListRow: View {
             summaryText(L("claude_truncated"), color: s.onSurfaceVariant, top: Spacing.sm - 2)
             if let reason = task.truncatedReason?
                 .trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
-                // 协议值本地化（max_turns/phase_timeout → 五语文案），未知值回退原文
-                let reasonText: String
-                switch reason {
-                case "max_turns": reasonText = L("chat_task_reason_max_turns")
-                case "phase_timeout": reasonText = L("chat_task_reason_phase_timeout")
-                default: reasonText = reason
-                }
-                summaryText(reasonText, fontSize: Metrics.metaFontSize, color: s.onSurfaceVariant, top: Spacing.xs)
+                summaryText(Self.localizedTruncatedReason(reason), fontSize: Metrics.metaFontSize, color: s.onSurfaceVariant, top: Spacing.xs)
             }
         case .awaitingDeliver:
             summaryText(
@@ -134,6 +127,16 @@ struct EngineerTaskListRow: View {
             .foregroundColor(color)
             .padding(.top, top)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 截断原因协议值本地化（max_turns/phase_timeout → 五语文案），未知值回退原文。
+    /// 独立函数而非 @ViewBuilder 内联 let+分支赋值（后者触发 buildExpression 误解析，编译失败）。
+    private static func localizedTruncatedReason(_ reason: String) -> String {
+        switch reason {
+        case "max_turns": return L("chat_task_reason_max_turns")
+        case "phase_timeout": return L("chat_task_reason_phase_timeout")
+        default: return reason
+        }
     }
 
     /// 错误块（EngineerTaskErrorBlock 等价）：error 色 8% 透明底圆角 8 + 错误图标 + 文本 max3 行。
