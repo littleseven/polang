@@ -103,6 +103,13 @@ data: {"kind":"tool_request","request_id":"tr_<uuid8>","tool":"search_media","ar
 - **约束**：`AgentBridgeRegistry` 的挂起条目必须设超时兜底且随 SSE 连接关闭清理（防泄漏）；帧写出与事件帧写出共用同一 writer（保序）
 - **Acceptance**：AC-M2-S1（工具全链路）、AC-M2-S2（超时/断线/409）
 
+### 4.1 M2.6 加固（2026-10-17）：per-user 跑轮并发闸
+
+- **新增** `AgentRoundGate.kt`——内存租约（`ConcurrentHashMap.newKeySet`），`tryAcquire/release/activeCount`；**故意无 TTL**（一轮理论最长 20 迭代 ×（LLM + 120s 工具挂起），TTL 会在合法长轮上误放双轮；进程崩溃内存表即清，无需兜底），单实例语义同 `RateLimiter`/`BrowserConcurrencyRegistry`
+- **`AgentRoutes` messages 路由**：`tryAcquire` 在配额扣减**之前**占位（busy 拒绝不消耗配额），整段跑轮包 try/finally 严格配对释放（含 no_active_channel/quota_exceeded 等 early return）；占用时回 409 `round_in_flight`
+- **消除的边界**：同会话并发跑轮（两轮事件交错落库、投影互不可见、任一轮抛错连坐置 ERROR，原 M1 已知边界）；失控/恶意客户端并发开 N 条 SSE 长轮打满上游与 2C2G 单机
+- **测试**：`AgentRoundGateTest`（租约语义）+ `AgentRoutesTest` 两例（busy 409 不耗配额；轮后释放可再跑）——测试内手动占位，避免真并发（client 并发语义不稳）
+
 ## 5. Android 组件 [agent-task:cloud-m2-android]
 
 - **Scope**：`androidApp/src/main/java/com/mamba/picme/features/cloudagent/`（新包）+ `core/agenttools/`

@@ -55,13 +55,16 @@ private const val DEFAULT_SYSTEM_PROMPT =
  * BYOK 零留存：X-User-Api-Key 仅在本请求内存中组装 [AgentLlmTarget]，不落库、不进日志、
  * 不消耗网关配额（守卫测试 AgentRoutesTest 钉死）。工具桥链路不接触 target/key。
  *
- * M1 已知边界：同会话并发跑轮无互斥（单用户单端先行；并发守卫为后续里程碑）；
+ * M2.6 起 per-user 跑轮并发=1（[AgentRoundGate]，messages 路由 try/finally 严格配对释放）：
+ * 有在跑轮时回 409 `round_in_flight`（占位在配额扣减之前，拒绝不消耗配额）——
+ * 原 M1 已知边界（同会话并发跑轮事件交错 + 连坐置 ERROR）由此消除。
  * 云端 Agent 轮次不写 llm_call_log（审计数据源即事件流；用量指标经配额计数）。
  */
 fun Route.agentRoute(
     runner: AgentRunner,
     bridge: AgentBridgeRegistry,
     deviceTimeoutMs: Long = DeviceToolService.DEFAULT_TIMEOUT_MS,
+    roundGate: AgentRoundGate = AgentRoundGate(),
 ) {
     route("/agent") {
         post("/sessions") {
@@ -181,76 +184,88 @@ fun Route.agentRoute(
             val content = (body["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
                 ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "content_required"))
 
-            // 通道解析 + 配额（网关扣减；BYOK 零接触）
-            var gatewayQuotaCharged = false
-            val target = when (session.channelKind) {
-                AgentChannelKind.GATEWAY -> {
-                    val channel = ChannelRegistry.active()
-                        ?: return@post call.respond(
-                            HttpStatusCode.ServiceUnavailable,
-                            mapOf("error" to "no_active_channel"),
-                        )
-                    val t = AgentTargetResolver.fromChannel(channel, session.model)
-                        ?: return@post call.respond(
-                            HttpStatusCode.ServiceUnavailable,
-                            mapOf("error" to "channel_unavailable", "channel" to channel.name),
-                        )
-                    if (!AccountService.checkAndIncrementQuota(tokenHash)) {
-                        return@post call.respond(
-                            HttpStatusCode.Forbidden,
-                            mapOf("error" to "quota_exceeded", "tier" to "account"),
-                        )
-                    }
-                    gatewayQuotaCharged = true
-                    t
-                }
-                AgentChannelKind.BYOK -> {
-                    // 零留存：key 只在本请求内存存活，永不进入 Repository/日志调用链
-                    val key = call.request.headers[BYOK_API_KEY_HEADER]?.takeIf { it.isNotBlank() }
-                        ?: return@post call.respond(
-                            HttpStatusCode.BadRequest,
-                            mapOf("error" to "byok_key_required"),
-                        )
-                    AgentTargetResolver.byok(key, session.byokBaseUrl, session.model)
-                }
+            // per-user 跑轮并发闸（M2.6）：须在配额扣减之前占位，busy 拒绝不消耗配额
+            if (!roundGate.tryAcquire(tokenHash)) {
+                return@post call.respond(
+                    HttpStatusCode.Conflict,
+                    mapOf("error" to "round_in_flight", "message" to "previous round still running"),
+                )
             }
+            try {
+                // 通道解析 + 配额（网关扣减；BYOK 零接触）
+                var gatewayQuotaCharged = false
+                val target = when (session.channelKind) {
+                    AgentChannelKind.GATEWAY -> {
+                        val channel = ChannelRegistry.active()
+                            ?: return@post call.respond(
+                                HttpStatusCode.ServiceUnavailable,
+                                mapOf("error" to "no_active_channel"),
+                            )
+                        val t = AgentTargetResolver.fromChannel(channel, session.model)
+                            ?: return@post call.respond(
+                                HttpStatusCode.ServiceUnavailable,
+                                mapOf("error" to "channel_unavailable", "channel" to channel.name),
+                            )
+                        if (!AccountService.checkAndIncrementQuota(tokenHash)) {
+                            return@post call.respond(
+                                HttpStatusCode.Forbidden,
+                                mapOf("error" to "quota_exceeded", "tier" to "account"),
+                            )
+                        }
+                        gatewayQuotaCharged = true
+                        t
+                    }
+                    AgentChannelKind.BYOK -> {
+                        // 零留存：key 只在本请求内存存活，永不进入 Repository/日志调用链
+                        val key = call.request.headers[BYOK_API_KEY_HEADER]?.takeIf { it.isNotBlank() }
+                            ?: return@post call.respond(
+                                HttpStatusCode.BadRequest,
+                                mapOf("error" to "byok_key_required"),
+                            )
+                        AgentTargetResolver.byok(key, session.byokBaseUrl, session.model)
+                    }
+                }
 
-            call.respondTextWriter(ContentType.Text.EventStream) {
-                val deviceTools = DeviceToolService(session.id, bridge, deviceTimeoutMs) { frame ->
-                    writeSseFrame(frame.toJson())
+                call.respondTextWriter(ContentType.Text.EventStream) {
+                    val deviceTools = DeviceToolService(session.id, bridge, deviceTimeoutMs) { frame ->
+                        writeSseFrame(frame.toJson())
+                    }
+                    val toolRegistry = ToolRegistry {
+                        tools(ServerToolService().asToolsByClass() + deviceTools.asToolsByClass())
+                    }
+                    try {
+                        runner.runTurn(
+                            session = session,
+                            userMessage = content,
+                            target = target,
+                            systemPrompt = DEFAULT_SYSTEM_PROMPT,
+                            toolRegistry = toolRegistry,
+                            onEvent = { event ->
+                                writeSseFrame(buildJsonObject {
+                                    put("kind", "event")
+                                    put("event", eventJson(event))
+                                })
+                            },
+                        )
+                        writeSseFrame(buildJsonObject {
+                            put("kind", "done")
+                            put("session_status", AgentSessionStatus.RUNNING.wire)
+                        })
+                    } catch (e: Throwable) {
+                        AgentSessionRepository.updateStatus(session.id, AgentSessionStatus.ERROR)
+                        if (gatewayQuotaCharged) AccountService.revertQuota(tokenHash)
+                        writeSseFrame(buildJsonObject {
+                            put("kind", "error")
+                            put("message", e.message?.take(200) ?: "internal error")
+                        })
+                    } finally {
+                        // 连接关闭（正常结束/异常/端断线）清理该会话桥挂起项，防泄漏
+                        bridge.failAll(session.id, "connection_closed")
+                    }
                 }
-                val toolRegistry = ToolRegistry {
-                    tools(ServerToolService().asToolsByClass() + deviceTools.asToolsByClass())
-                }
-                try {
-                    runner.runTurn(
-                        session = session,
-                        userMessage = content,
-                        target = target,
-                        systemPrompt = DEFAULT_SYSTEM_PROMPT,
-                        toolRegistry = toolRegistry,
-                        onEvent = { event ->
-                            writeSseFrame(buildJsonObject {
-                                put("kind", "event")
-                                put("event", eventJson(event))
-                            })
-                        },
-                    )
-                    writeSseFrame(buildJsonObject {
-                        put("kind", "done")
-                        put("session_status", AgentSessionStatus.RUNNING.wire)
-                    })
-                } catch (e: Throwable) {
-                    AgentSessionRepository.updateStatus(session.id, AgentSessionStatus.ERROR)
-                    if (gatewayQuotaCharged) AccountService.revertQuota(tokenHash)
-                    writeSseFrame(buildJsonObject {
-                        put("kind", "error")
-                        put("message", e.message?.take(200) ?: "internal error")
-                    })
-                } finally {
-                    // 连接关闭（正常结束/异常/端断线）清理该会话桥挂起项，防泄漏
-                    bridge.failAll(session.id, "connection_closed")
-                }
+            } finally {
+                // 租约严格配对释放（含上方一切 early return）；无 TTL——见 AgentRoundGate 不变式
+                roundGate.release(tokenHash)
             }
         }
     }
