@@ -105,10 +105,11 @@ class KoogChatAgent(
     @Volatile private var running = false
     private var currentSessionId: String = "default"
 
-    // 记忆快照 + 摘要版本驱动的懒重建（两者任一变更才重建 AIAgent；executor/store/provider 复用）。
+    // 记忆快照 + 摘要版本 + 工具子集驱动的懒重建（三者任一变更才重建 AIAgent；executor/store/provider 复用）。
     // 摘要每轮新鲜渲染（US-2.4），但其变化经 version 反映——压缩后 version 变 → 重建 → 新摘要烘焙。
     private var builtSnapshot: String? = null
     private var builtSummaryVersion: Int = -1
+    private var builtToolSetKey: String? = null
     private var builtAgent: AIAgent<String, String>? = null
 
     fun setSessionId(sessionId: String) {
@@ -118,8 +119,22 @@ class KoogChatAgent(
     fun isRunning(): Boolean = running
 
     /**
+     * 意图级工具子集覆写（M3 分支化，2026-10-17）：引擎层按路由契约把 tool schema 裁到
+     * 意图白名单时，单次 runChat 携带此覆写——[registry] 与 [systemPrompt]（子集清单段
+     * 同源生成 + 动态尾段）替换构造期的全量默认值；[key] 进 AIAgent 重建键，子集切换
+     * 与记忆快照/摘要变更同级触发重建（executor/memoryStore/historyProvider 仍单份复用，
+     * 不为每个子集各建 executor）。
+     */
+    class ChatToolSetOverride(
+        val key: String,
+        val registry: ToolRegistry,
+        val systemPrompt: String,
+    )
+
+    /**
      * 执行一次 chat ReAct（suspend）。返回 (summary, metrics)；异常向上抛（由 processChatReAct 的
      * withTimeout/catch 处理；取消经 withTimeout 级联）。
+     * [toolSetOverride] 非空时本轮按意图子集裁剪工具面与 prompt 清单段（见 [ChatToolSetOverride]）。
      */
     suspend fun runChat(
         input: String,
@@ -127,6 +142,7 @@ class KoogChatAgent(
         onPartialText: (snapshot: String) -> Unit,
         onToolCall: (toolName: String, args: String) -> Unit,
         onRoundStarted: () -> Unit = {},
+        toolSetOverride: ChatToolSetOverride? = null,
     ): Pair<String, AgentExecutionMetrics> {
         running = true
         traceIdHolder.value = traceId
@@ -145,7 +161,7 @@ class KoogChatAgent(
             // M2：加载会话摘要（US-2.4），作为 system 段注入 + 版本纳入 agent 重建键。
             val summary = runCatching { memoryStoreRef.loadSummary(currentSessionId) }.getOrNull()
             val summaryText = summary?.slots?.render()?.ifBlank { null }
-            val summaryResult = agent(summaryText, summary?.version ?: 0).run(input, currentSessionId)
+            val summaryResult = agent(summaryText, summary?.version ?: 0, toolSetOverride).run(input, currentSessionId)
             val latencyMs = Clock.System.now().toEpochMilliseconds() - started
             summaryResult to AgentExecutionMetrics(
                 latencyMs = latencyMs,
@@ -163,28 +179,35 @@ class KoogChatAgent(
     }
 
     /**
-     * 取或按「记忆快照 + 摘要版本」新鲜度重建 AIAgent（M2：摘要变更同样触发重建，
-     * 使新压缩的摘要即时烘焙进 system prompt）。
+     * 取或按「记忆快照 + 摘要版本 + 工具子集」新鲜度重建 AIAgent（M2：摘要变更同样触发重建，
+     * 使新压缩的摘要即时烘焙进 system prompt；M3：意图子集切换同级触发，覆写 registry/prompt
+     * 即时生效）。
      */
-    private fun agent(summaryText: String?, summaryVersion: Int): AIAgent<String, String> {
+    private fun agent(summaryText: String?, summaryVersion: Int, toolSet: ChatToolSetOverride?): AIAgent<String, String> {
         val snapshot = config.memoryContextProvider?.snapshot()?.trim()?.ifEmpty { null }
         val cached = builtAgent
-        if (cached != null && snapshot == builtSnapshot && summaryVersion == builtSummaryVersion) {
+        if (cached != null && snapshot == builtSnapshot && summaryVersion == builtSummaryVersion &&
+            toolSet?.key == builtToolSetKey
+        ) {
             return cached
         }
-        val agent = buildAgent(composeSystemPrompt(snapshot, summaryText))
+        val agent = buildAgent(
+            systemPrompt = composeSystemPrompt(snapshot, summaryText, toolSet),
+            registry = toolSet?.registry ?: toolRegistry,
+        )
         builtAgent = agent
         builtSnapshot = snapshot
         builtSummaryVersion = summaryVersion
+        builtToolSetKey = toolSet?.key
         Logger.i(
             tag,
             "Built Koog AIAgent: model=${config.modelName}, snapshotLen=${snapshot?.length ?: 0}, " +
-                "summaryV=$summaryVersion",
+                "summaryV=$summaryVersion, toolSet=${toolSet?.key ?: "full"}",
         )
         return agent
     }
 
-    private fun buildAgent(systemPrompt: String): AIAgent<String, String> =
+    private fun buildAgent(systemPrompt: String, registry: ToolRegistry): AIAgent<String, String> =
         // 自定义策略：修复 Koog 1.1.1 内建 singleRunStrategy 丢「文本+tool_calls 同帧」
         // 工具调用的缺陷（chat 多轮工具任务同样受影响），详见 poLangSingleRunStrategy KDoc。
         //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
@@ -194,7 +217,7 @@ class KoogChatAgent(
             .graphStrategy(poLangSingleRunStrategy())
             .promptExecutor(executorBundle.executor)
             .llmModel(executorBundle.model)
-            .toolRegistry(toolRegistry)
+            .toolRegistry(registry)
             // baseParams（temperature 钳制 + DeepSeek thinking=disabled + maxTokens）必须经 polangSystemPrompt
             // 烘焙进 Prompt；不能用 .systemPrompt(String)——它从空 Prompt.Empty 扩展，丢弃全部 params。
             .prompt(polangSystemPrompt(id = "polang-chat", systemPrompt = systemPrompt, params = executorBundle.baseParams))
@@ -261,9 +284,10 @@ class KoogChatAgent(
      * base system prompt + 【关于用户】记忆快照 + 【会话摘要】段（M2，US-2.4）。
      * 摘要段拼在快照后；空则跳过（零开销）。每轮新鲜渲染（[CompactionSlots.render]），
      * 与 system prompt 同样不落盘——摘要记录落盘，渲染文本现算（不变式①语义）。
+     * M3：意图子集覆写时 base 取子集 prompt（清单段与覆写 registry 同源），否则取 config 全量。
      */
-    private fun composeSystemPrompt(snapshot: String?, summaryText: String?): String =
-        composeChatSystemPrompt(config.systemPrompt, snapshot, summaryText)
+    private fun composeSystemPrompt(snapshot: String?, summaryText: String?, toolSet: ChatToolSetOverride?): String =
+        composeChatSystemPrompt(toolSet?.systemPrompt ?: config.systemPrompt, snapshot, summaryText)
 
     /**
      * 网关鉴权 header（与 RemoteReActAgent 经 MambaAgentFactory.customHeader 注入的等价）：

@@ -35,6 +35,7 @@ object UsageRecorder {
                 it[LlmCallLogs.promptTokens] = usage?.prompt
                 it[LlmCallLogs.completionTokens] = usage?.completion
                 it[LlmCallLogs.totalTokens] = usage?.total
+                it[LlmCallLogs.cachedTokens] = usage?.cached
                 it[LlmCallLogs.costCny] = cost
                 it[LlmCallLogs.respBytes] = respBytes
                 it[LlmCallLogs.status] = status

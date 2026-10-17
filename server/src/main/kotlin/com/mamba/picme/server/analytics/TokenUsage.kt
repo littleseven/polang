@@ -5,8 +5,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
-/** 上游 OpenAI 兼容响应里 usage 的三件套。 */
-data class TokenUsage(val prompt: Int, val completion: Int, val total: Int)
+/** 上游 OpenAI 兼容响应里 usage 的三件套 + prompt 缓存命中（prompt_tokens_details.cached_tokens）。 */
+data class TokenUsage(val prompt: Int, val completion: Int, val total: Int, val cached: Int? = null)
 
 /** 模型单价：¥ / 1M tokens，输入/输出分开。用于成本估算。 */
 data class Price(val inPerMillion: Double, val outPerMillion: Double)
@@ -57,7 +57,10 @@ private fun parseUsage(usage: JsonObject): TokenUsage? {
     if (prompt == null && completion == null && total == null) return null
     val p = prompt ?: 0
     val c = completion ?: 0
-    return TokenUsage(p, c, total ?: (p + c))
+    // prompt 前缀缓存命中数（DeepSeek context caching 等）：上游不给则为 null，
+    // 记账与展示据此区分「可观测命中」与「不可观测」（2026-10-17 成本治理可观测性补洞）。
+    val cached = (usage["prompt_tokens_details"] as? JsonObject)?.int("cached_tokens")
+    return TokenUsage(p, c, total ?: (p + c), cached)
 }
 
 private fun JsonObject.int(key: String): Int? =

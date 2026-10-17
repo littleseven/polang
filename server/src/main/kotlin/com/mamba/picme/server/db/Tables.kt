@@ -104,6 +104,9 @@ object LlmCallLogs : Table("llm_call_log") {
     val promptTokens = integer("prompt_tokens").nullable()
     val completionTokens = integer("completion_tokens").nullable()
     val totalTokens = integer("total_tokens").nullable()
+    // prompt 前缀缓存命中 token 数（usage.prompt_tokens_details.cached_tokens，2026-10-17）；
+    // null = 上游未上报（不可观测），0 = 上报但未命中
+    val cachedTokens = integer("cached_tokens").nullable()
     val costCny = double("cost_cny").default(0.0)
     val respBytes = integer("resp_bytes").default(0)
     val status = varchar("status", 24) // ok | upstream_error | blocked_quota | blocked_rate

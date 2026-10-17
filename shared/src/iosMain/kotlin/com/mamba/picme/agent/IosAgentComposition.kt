@@ -135,6 +135,8 @@ object IosAgentComposition {
                 imageEngineProvider = { IosUnavailableImageInferenceEngine() },
                 chatToolDescriptors = ChatToolManifest.buildDescriptors(),
                 chatToolRegistry = ToolRegistry { tools(chatTools) },
+                // M3 意图级工具裁剪：iOS 手工清单同源注入（子集过滤与 Android 同路径）
+                chatTools = chatTools,
                 cameraToolDescriptors = emptyList(), // 相机 AI 指令不在 Chat v1 范围
                 cameraToolRegistry = ToolRegistry { },
                 remoteImToolRegistryProvider = { ToolRegistry { } }, // 飞书 RPA 不在 iOS 范围

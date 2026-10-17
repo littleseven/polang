@@ -72,6 +72,8 @@ object AndroidAgentComposition {
                 imageEngineProvider = { engine },
                 chatToolDescriptors = chatTools.map { it.descriptor },
                 chatToolRegistry = ToolRegistry { tools(chatTools) },
+                // M3 意图级工具裁剪：同源工具对象清单注入引擎（子集 registry/prompt 自它过滤派生）
+                chatTools = chatTools,
                 cameraToolDescriptors = cameraTools.map { it.descriptor },
                 cameraToolRegistry = ToolRegistry { tools(cameraTools) },
                 // 飞书 RPA 工具集按需构建：飞书 agent 懒创建时才取 WindowManager；
