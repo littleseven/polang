@@ -21,6 +21,7 @@ import org.json.JSONObject
  * 生命周期：prepare()（通道解析 + 建会话，幂等）→ Chat 态 send()/stop() 循环。
  * 一轮只开一条 SSE：tool_request 帧到达即 launch 端执行 + 上行（不阻塞收帧循环）。
  * BYOK key 仅存本类私有字段（内存态），随 postMessage 头发送；绝不进日志（Logger 调用不含 key）。
+ * onFrame 回调抵达于 Dispatchers.IO（网络线程），状态写依赖 StateFlow 自身线程安全。
  */
 class CloudAgentChatViewModel(
     private val api: CloudAgentApi,
@@ -50,9 +51,12 @@ class CloudAgentChatViewModel(
     private var byokApiKey: String = ""
     private var turnJob: Job? = null
     private var msgSeq = 0L
+    private var prepareStarted = false
 
-    /** 入口：通道解析（spec §6 表）→ 建会话。幂等（非 Preparing 直接返回）。 */
+    /** 入口：通道解析（spec §6 表）→ 建会话。幂等（同步守卫防快速双击竞态 + 非 Preparing 直接返回）。 */
     fun prepare() {
+        if (prepareStarted) return
+        prepareStarted = true
         if (_state.value !is UiState.Preparing) return
         viewModelScope.launch {
             val token = settingsRepository.serverAuthTokenFlow.first()
@@ -89,9 +93,14 @@ class CloudAgentChatViewModel(
     private suspend fun createAndEnter(channel: String, model: String, byokBaseUrl: String, key: String) {
         api.createSession(appToken, channel, model, byokBaseUrl)
             .onSuccess { json ->
+                val sessionId = json.optString("session_id")
+                if (sessionId.isBlank()) {
+                    _state.value = UiState.Failed("bad_session_response")
+                    return@onSuccess
+                }
                 byokApiKey = key
                 _state.value = UiState.Chat(
-                    sessionId = json.optString("session_id"),
+                    sessionId = sessionId,
                     channel = channel,
                     messages = emptyList(),
                     inFlight = false,
@@ -112,8 +121,10 @@ class CloudAgentChatViewModel(
                 appToken,
                 chat.sessionId,
                 text,
-                byokApiKey.takeIf { it.isNotBlank() },
+                byokApiKey.takeIf { key -> key.isNotBlank() },
             ) { frame -> onFrame(frame) }
+            // 流干净结束但无 Done 帧的兜底（Done 已清则为幂等 no-op）
+            result.onSuccess { setInFlight(false) }
             result.onFailure { e ->
                 append(UiMessage(++msgSeq, Role.ERROR, e.message ?: "network error"))
                 setInFlight(false)

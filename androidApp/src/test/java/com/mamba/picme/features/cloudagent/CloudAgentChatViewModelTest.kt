@@ -6,10 +6,10 @@ import com.mamba.picme.data.remote.picme.CloudFrame
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -41,6 +41,9 @@ class CloudAgentChatViewModelTest {
         var createdModel: String? = null
         var createdBaseUrl: String? = null
         var sentByokKey: String? = null
+        var postCount = 0
+        /** 非空时 postMessage 先挂起等闸门，供 inFlight 确定性测试。 */
+        var gate: CompletableDeferred<Unit>? = null
         val toolResults = mutableListOf<Triple<String, Boolean, String>>()
         var framesScript: suspend (CloudAgentChatViewModelTest.FakeApi, (CloudFrame) -> Unit) -> Unit =
             { _, onFrame -> onFrame(CloudFrame.Done("running")) }
@@ -52,7 +55,9 @@ class CloudAgentChatViewModelTest {
         override suspend fun getEvents(token: String, sessionId: String, after: Long, limit: Int) = Result.success(emptyList<JSONObject>())
         override suspend fun finish(token: String, sessionId: String) = Result.success(Unit)
         override suspend fun postMessage(token: String, sessionId: String, content: String, byokApiKey: String?, onFrame: (CloudFrame) -> Unit): Result<Unit> {
+            postCount++
             sentByokKey = byokApiKey
+            gate?.await()
             framesScript(this, onFrame)
             return Result.success(Unit)
         }
@@ -155,6 +160,42 @@ class CloudAgentChatViewModelTest {
         val s = vm.state.value as CloudAgentChatViewModel.UiState.Chat
         assertEquals(CloudAgentChatViewModel.Role.ERROR, s.messages.last().role)
         assertEquals("quota exhausted", s.messages.last().text)
+    }
+
+    @Test
+    fun `stop after completed send keeps inFlight false and next send works`() = runTest {
+        val api = FakeApi() // 默认脚本：立即 Done
+        val vm = newVm(api)
+        vm.prepare()
+        vm.send("first")
+        vm.stop()
+        val s1 = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(false, s1.inFlight)
+        vm.send("second")
+        val s2 = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(2, s2.messages.count { m -> m.role == CloudAgentChatViewModel.Role.USER })
+        assertEquals(2, api.postCount)
+        assertEquals(false, s2.inFlight)
+    }
+
+    @Test
+    fun `second send while inFlight is ignored`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val api = FakeApi()
+        api.gate = gate // postMessage 挂起，inFlight 确定性保持 true
+        val vm = newVm(api)
+        vm.prepare()
+        vm.send("first")
+        val s1 = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(true, s1.inFlight)
+        assertEquals(1, s1.messages.count { m -> m.role == CloudAgentChatViewModel.Role.USER })
+        vm.send("second") // inFlight 中应被忽略
+        assertEquals(1, api.postCount)
+        val s2 = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(1, s2.messages.count { m -> m.role == CloudAgentChatViewModel.Role.USER })
+        gate.complete(Unit) // 放行后默认脚本发 Done，收伞
+        val s3 = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(false, s3.inFlight)
     }
 
     @Test
