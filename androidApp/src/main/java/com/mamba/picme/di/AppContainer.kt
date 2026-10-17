@@ -11,6 +11,7 @@ import com.mamba.picme.beauty.api.BeautyProcessor
 import com.mamba.picme.core.image.GpuBeautyProcessor
 import com.mamba.picme.core.image.ImageProcessor
 import com.mamba.picme.core.image.ImageProcessorImpl
+import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
@@ -1131,11 +1132,36 @@ class AppContainerImpl(
         )
     }
 
+    /**
+     * 云端 Agent 相册工具的无头执行器（ADR-018 M2）：绕过场景注册表直执，
+     * 不再委托 ChatToolService（后者依赖 ChatScreen 存活期绑定的 Delegate + CHAT 场景，
+     * 云端 Agent 页双重不满足会被注册表入队而永不执行）。
+     */
+    private val cloudAgentGalleryTools: CloudAgentGalleryTools by lazy {
+        CloudAgentGalleryTools(
+            searchByQuery = { query, limitToIds ->
+                mediaSearchEngine.search(query, limitToIds = limitToIds).media
+            },
+            searchByFilter = { filter, limitToIds ->
+                mediaSearchEngine.search(filter = filter, limitToIds = limitToIds).media
+            },
+            gallerySummary = { includeDetails -> getGallerySummaryUseCase(includeDetails) },
+        )
+    }
+
     override fun createCloudAgentChatViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
         initializer {
             CloudAgentChatViewModel(
                 api = CloudAgentClient(),
-                deviceToolExecutor = DeviceToolExecutor(),
+                deviceToolExecutor = DeviceToolExecutor(
+                    gallerySummary = { cloudAgentGalleryTools.getGallerySummary() },
+                    searchMedia = { query, person, fromMs, toMs, hasFace ->
+                        cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace)
+                    },
+                    refineSearch = { constraint, fromMs, toMs ->
+                        cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)
+                    },
+                ),
                 settingsRepository = userPreferencesRepository,
             )
         }

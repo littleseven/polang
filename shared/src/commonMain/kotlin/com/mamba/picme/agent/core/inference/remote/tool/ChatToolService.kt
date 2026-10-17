@@ -10,7 +10,6 @@ import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentScene
 import com.mamba.picme.agent.core.model.context.SearchIntent
-import com.mamba.picme.agent.core.model.context.TimeRange
 import com.mamba.picme.agent.core.inference.remote.log.TraceIdAware
 import com.mamba.picme.agent.core.inference.remote.log.TraceIdHolder
 import com.mamba.picme.agent.core.platform.logging.Logger
@@ -633,13 +632,9 @@ class ChatToolService private constructor() : TraceIdAware {
             .getOrDefault(FeedbackAction.LIKE)
 
     /**
-     * 把 search_media 的 person/fromMs/toMs/hasFace 组装成 [SearchIntent]（M1 透传，spec §3.4-1；
-     * 2026-09-29 增补 hasFace——此前人脸约束只写进 query 时被结构化路径整句丢弃）。
-     * 四者全空 → null（走 onSearchMedia 的字符串路径）；任一非空 → 结构化过滤精确执行。
-     * person 槽位原样透传（称谓→人物名的消歧由引擎层 PersonQueryResolver / 调用方先做）。
-     *
-     * internal（2026-10-17，cloud-agent-m2 iOS 批）：iosMain `IosCloudAgentToolBridge` 直调
-     * `IosChatGalleryCapability` 绕过场景注册表，intent 组装逻辑同源复用（纯可见性放宽，零行为变化）。
+     * 把 search_media 的 person/fromMs/toMs/hasFace 组装成 [SearchIntent]。
+     * 实现已收口 [GallerySearchIntents]（端云各链路同源 SSOT）；本包装保留给
+     * iosMain `IosCloudAgentToolBridge` 同模块 internal 复用（2026-10-17，cloud-agent-m2 iOS 批）。
      */
     internal fun structuredSearchIntent(
         query: String,
@@ -647,37 +642,12 @@ class ChatToolService private constructor() : TraceIdAware {
         fromMs: String,
         toMs: String,
         hasFace: String
-    ): SearchIntent? {
-        val start = fromMs.trim().toLongOrNull()
-        val end = toMs.trim().toLongOrNull()
-        val personName = person.trim().ifBlank { null }
-        val wantsFace = hasFace.trim().equals("true", ignoreCase = true)
-        if (personName == null && start == null && end == null && !wantsFace) return null
-        return SearchIntent(
-            query = query,
-            timeRange = if (start != null || end != null) {
-                TimeRange(startMs = start ?: 0L, endMs = end ?: Long.MAX_VALUE)
-            } else {
-                null
-            },
-            personName = personName,
-            hasFaces = if (wantsFace) true else null,
-        )
-    }
+    ): SearchIntent? = GallerySearchIntents.structuredSearchIntent(query, person, fromMs, toMs, hasFace)
 
     /**
      * 把 refine_media_search 的 fromMs/toMs 解析成 [SearchIntent]（timeRange）。
-     * 二者都空 → null（走 onRefineMediaSearch 的字符串路径）；任一非空 → 结构化时间，走精确交集。
-     *
-     * internal（2026-10-17，cloud-agent-m2 iOS 批）：同 [structuredSearchIntent] 的复用缘起。
+     * 实现已收口 [GallerySearchIntents]；internal 包装缘起同 [structuredSearchIntent]。
      */
-    internal fun refineTimeIntent(fromMs: String, toMs: String): SearchIntent? {
-        val start = fromMs.trim().toLongOrNull()
-        val end = toMs.trim().toLongOrNull()
-        if (start == null && end == null) return null
-        return SearchIntent(
-            query = "",
-            timeRange = TimeRange(startMs = start ?: 0L, endMs = end ?: Long.MAX_VALUE),
-        )
-    }
+    internal fun refineTimeIntent(fromMs: String, toMs: String): SearchIntent? =
+        GallerySearchIntents.refineTimeIntent(fromMs, toMs)
 }

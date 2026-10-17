@@ -29,8 +29,8 @@
 │ CloudAgentChatScreen（调试入口实验页）                 │
 │   └─ CloudAgentChatViewModel（内存态消息列表）         │
 │        ├─ CloudAgentClient（OkHttp：REST + SSE）       │
-│        └─ DeviceToolExecutor ──→ ChatToolService       │
-│            （tool 名映射 + 截断脱敏）   （现有 handler）│
+│        └─ DeviceToolExecutor ──→ CloudAgentGalleryTools│
+│            （tool 名映射 + 截断脱敏）（无头直执，见 §5 勘误）│
 └───────┬───────────────────────▲──────────────────────┘
         │ POST messages（SSE）  │ POST tool-results
 ┌───────▼───────────────────────┴──────────────────────┐
@@ -108,7 +108,7 @@ data: {"kind":"tool_request","request_id":"tr_<uuid8>","tool":"search_media","ar
 - **Scope**：`androidApp/src/main/java/com/mamba/picme/features/cloudagent/`（新包）+ `core/agenttools/`
 - **新增**：
   1. `CloudAgentClient.kt`——OkHttp；`createSession/listSessions/getEvents(after,limit)/finish` + `postMessage(sessionId, content): Flow<CloudFrame>`（SSE 逐帧）+ `postToolResult(sessionId, requestId, ok, result)`；BYOK 会话的 `postMessage` 自动带 `X-User-Api-Key`（M1 语义：缺头 400；从当前选中 BYOK 配置取）
-  2. `DeviceToolExecutor.kt`——`suspend fun execute(tool: String, args: JsonObject): String`；映射 `get_gallery_summary`/`search_media`/`refine_media_search` → `ChatToolService.getInstance()` 对应 handler；结果 ≤32KB 截断（AppToolExecutor 范式）；未知工具返回 `error: unknown_tool`
+  2. `DeviceToolExecutor.kt`——`suspend fun execute(tool: String, args: JsonObject): String`；映射 `get_gallery_summary`/`search_media`/`refine_media_search`；结果 ≤32KB 截断（AppToolExecutor 范式）；未知工具返回 `error: unknown_tool`。**2026-10-17 勘误**：handler 原设计委托 `ChatToolService.getInstance()`（经 CapabilityRegistry scene=CHAT dispatch）——chat 相册能力 Delegate 仅 ChatScreen 存活期绑定、云端 Agent 页又非 CHAT 场景，命令被注册表入队并回「正在切换页面」占位文案，永不真正执行（真机遛狗发现）。已改为注入 `CloudAgentGalleryTools`（`core/agenttools/`）无头直执：直注 `mediaSearchEngine`/`getGallerySummaryUseCase`，绕过场景注册表（对齐 iOS `IosCloudAgentToolBridge` 路线），意图组装同源 `GallerySearchIntents`（shared 公共纯函数）+ `ChatGallerySearch.structuredFilterOf`；DeviceToolExecutor 三个 handler 无默认值、强制显式注入
   3. `CloudAgentChatViewModel.kt`——状态：`Idle / Loading / Streaming(messages) / Error`；消息为内存态 data class 列表；遇 `tool_request` 帧 → DeviceToolExecutor 执行 → 上行 → 继续收帧
   4. `CloudAgentChatScreen.kt`——最小聊天页：消息气泡列表（复用现有文本/Markdown 渲染组件）+ 输入框 + 发送/停止；顶部通道标记（网关/BYOK）
   5. 调试入口：SettingsScreen 调试区加「云端 Agent（实验）」入口（创建或复用会话后进入聊天页）
@@ -136,7 +136,7 @@ App: POST /agent/sessions/{id}/messages {content:"我上周拍的猫"}
   → Server: 落 user Message 事件 → SSE 帧 event
   → Koog LLM 轮 → 决定调 search_media（DeviceTool）
   → Server: 落 Action 事件 → SSE 帧 event + 帧 tool_request → 挂起
-  → App: 收 tool_request → DeviceToolExecutor → ChatToolService.searchMedia → 文本结果
+  → App: 收 tool_request → DeviceToolExecutor → CloudAgentGalleryTools.searchMedia（无头直执）→ 文本结果
   → App: POST tool-results {request_id, ok:true, result}
   → Server: deferred complete → Koog 继续 → 落 Observation → LLM 二轮 → 答复
   → Server: 落 assistant Message + Finish → SSE 帧 event×2 + done

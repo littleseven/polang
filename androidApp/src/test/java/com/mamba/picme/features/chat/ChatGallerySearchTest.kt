@@ -2,6 +2,8 @@ package com.mamba.picme.features.chat
 
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
+import com.mamba.picme.agent.core.model.context.SearchIntent
+import com.mamba.picme.agent.core.model.context.TimeRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -187,6 +189,46 @@ class ChatGallerySearchTest {
         // 供 MediaSearchEngine 解析为时间范围过滤，而不是作为标签子串匹配。
         assertEquals("近半年", ChatGallerySearch.cleanConstraint("只要近半年的"))
         assertEquals("近半年", ChatGallerySearch.cleanConstraint("只保留近半年的照片"))
+    }
+
+    // ── structuredFilterOf：SearchIntent → StructuredFilter（自 ChatViewModel 收口）──
+
+    @Test
+    fun `structuredFilterOf backfills hasFaces from raw text when intent omits it`() {
+        val intent = SearchIntent(query = "有人脸的合照", personName = "大宝")
+        val filter = ChatGallerySearch.structuredFilterOf(intent, "有人脸的合照")
+        assertEquals(true, filter.hasFaces)
+        assertEquals("大宝", filter.personName)
+    }
+
+    @Test
+    fun `structuredFilterOf keeps explicit hasFaces from upstream`() {
+        val intent = SearchIntent(query = "风景", hasFaces = false)
+        val filter = ChatGallerySearch.structuredFilterOf(intent, "风景")
+        assertEquals(false, filter.hasFaces)
+    }
+
+    @Test
+    fun `structuredFilterOf strips time-only keywords when timeRange present`() {
+        val intent = SearchIntent(
+            query = "去年夏天海边",
+            timeRange = TimeRange(startMs = 100L, endMs = 200L),
+            keywords = listOf("夏天", "海边"),
+        )
+        val filter = ChatGallerySearch.structuredFilterOf(intent, "去年夏天海边")
+        assertEquals(listOf("海边"), filter.keywords)
+        assertEquals(100L, filter.timeRange?.startMs)
+        assertEquals(200L, filter.timeRange?.endMs)
+    }
+
+    @Test
+    fun `structuredFilterOf backfills timeRange from raw text and strips the time keyword`() {
+        // rawText「夏天」被字符串兜底解析出 timeRange 后，时间专属词随即从 keywords 剔除
+        //（否则时间候选集与空标签候选集交集为 0）
+        val intent = SearchIntent(query = "夏天", keywords = listOf("夏天"))
+        val filter = ChatGallerySearch.structuredFilterOf(intent, "夏天")
+        assertTrue(filter.timeRange != null)
+        assertEquals(emptyList<String>(), filter.keywords)
     }
 
     @Test

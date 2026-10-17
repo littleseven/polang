@@ -4,6 +4,10 @@ import com.mamba.picme.domain.chat.MediaResultsUi
 
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
+import com.mamba.picme.agent.core.model.context.SearchIntent
+import com.mamba.picme.agent.core.model.context.TimeRange
+import com.mamba.picme.domain.model.StructuredFilter
+import com.mamba.picme.domain.search.QueryParser
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -84,6 +88,93 @@ object ChatGallerySearch {
         )
         genderMap[cleaned]?.let { normalized -> cleaned = normalized }
         return cleaned
+    }
+
+    // ── SearchIntent → StructuredFilter 转换（自 ChatViewModel 收口，chat 链路与云端 Agent 工具桥共用）──
+
+    /**
+     * 时间专属词集合。当 [SearchIntent.timeRange] 已经表达了时间范围时，
+     * 这些词不应再作为内容关键词去匹配标签/OCR/文件名，否则会导致时间候选集与空标签候选集交集为空。
+     */
+    private val timeOnlyKeywords = setOf(
+        "去年", "今年", "明年", "前年", "后年",
+        "春天", "夏天", "秋天", "冬天", "春季", "夏季", "秋季", "冬季",
+        "上半年", "下半年", "近半年", "最近半年", "半年",
+        "近一年", "最近一年", "一年", "近几年", "最近几年",
+        "最近", "近三个月", "近3个月",
+        "今天", "昨天", "前天", "明天", "后天",
+        "上周", "本周", "下周",
+        "上星期", "这星期", "下星期", "上个星期", "这个星期", "下个星期",
+        "上个月", "这个月", "下个月", "上月", "今月", "下月"
+    )
+
+    /** 匹配“3月”“12月”“五月”等月份表达。 */
+    private val monthKeywordRegex = Regex("""^(\d{1,2}月|[一二三四五六七八九十]{1,3}月)$""")
+
+    /**
+     * [SearchIntent] → [StructuredFilter] 一站式转换（字符串解析兜底 + 时间词清洗 + 结构转换）。
+     * chat 链路（ChatViewModel）与云端 Agent 工具桥（CloudAgentGalleryTools）共用同一入口。
+     */
+    fun structuredFilterOf(intent: SearchIntent, rawText: String): StructuredFilter =
+        searchIntentToStructuredFilter(withStringParseBackstop(intent, rawText))
+
+    /**
+     * 字符串解析兜底（2026-09-29 hasFaces / 2026-09-30 timeRange）：结构化入口（路由器
+     * 直执 / search_media 工具）一旦填了任一结构化参数，就跳过字符串解析路径；上游漏填的
+     * 维度会被整句丢弃（实证：LLM 只传 hasFace 不传 fromMs/toMs 时，"去年夏天"约束丢失，
+     * 返回其他年份的人脸照片）。这里对原始文本再跑一次规则判定（与字符串搜索路径
+     * [QueryParser] 同口径），把丢失的人脸/时间约束补回；上游已显式给出的维度尊重上游，
+     * 不覆盖。
+     */
+    fun withStringParseBackstop(intent: SearchIntent, rawText: String): SearchIntent {
+        var result = intent
+        if (result.hasFaces == null && QueryParser.isPeopleSearch(rawText)) {
+            result = result.copy(hasFaces = true)
+        }
+        if (result.timeRange == null) {
+            QueryParser.parseTimeRange(rawText)?.let { parsed ->
+                result = result.copy(
+                    timeRange = TimeRange(startMs = parsed.startMs, endMs = parsed.endMs)
+                )
+            }
+        }
+        return result
+    }
+
+    /**
+     * 将 :shared 的 [SearchIntent] 转换为 app 层的 [StructuredFilter]。
+     *
+     * 转换前先做时间词清洗：只要 [SearchIntent.timeRange] 已给出，就把“夏天”“去年”等
+     * 时间专属词从 keywords / ocrKeywords / locationKeywords 中剔除，避免引擎把
+     * 时间约束与空内容候选集取交集导致 0 结果。
+     */
+    fun searchIntentToStructuredFilter(intent: SearchIntent): StructuredFilter {
+        val sanitized = sanitizeTimeKeywords(intent)
+        return StructuredFilter(
+            timeRange = sanitized.timeRange?.let {
+                com.mamba.picme.domain.model.TimeRange(startMs = it.startMs, endMs = it.endMs)
+            },
+            keywords = sanitized.keywords,
+            ocrKeywords = sanitized.ocrKeywords,
+            locationKeywords = sanitized.locationKeywords,
+            personName = sanitized.personName,
+            hasFaces = sanitized.hasFaces,
+            needsLlm = false
+        )
+    }
+
+    /**
+     * 当意图中同时存在 [SearchIntent.timeRange] 和时间专属词时，剔除这些时间专属词。
+     * 这是 Prompt 约束之外的第二层保险，防止小模型/远程模型仍把“夏天”当成内容关键词。
+     */
+    private fun sanitizeTimeKeywords(intent: SearchIntent): SearchIntent {
+        if (intent.timeRange == null) return intent
+        fun isTimeOnly(word: String): Boolean = word in timeOnlyKeywords || monthKeywordRegex.matches(word)
+        return intent.copy(
+            keywords = intent.keywords.filterNot(::isTimeOnly),
+            ocrKeywords = intent.ocrKeywords.filterNot(::isTimeOnly),
+            locationKeywords = intent.locationKeywords.filterNot(::isTimeOnly)
+        )
     }
 
     /** 把展示用 assets 序列化为 Room content JSON（id/uri/type/captureDate/fileName）。 */

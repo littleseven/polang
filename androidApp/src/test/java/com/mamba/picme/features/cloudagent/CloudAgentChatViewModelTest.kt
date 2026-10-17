@@ -74,7 +74,15 @@ class CloudAgentChatViewModelTest {
     fun tearDown() { Dispatchers.resetMain() }
 
     private fun newVm(api: FakeApi): CloudAgentChatViewModel =
-        CloudAgentChatViewModel(api, DeviceToolExecutor(gallerySummary = { "相册 42 张" }), repository)
+        CloudAgentChatViewModel(
+            api,
+            DeviceToolExecutor(
+                gallerySummary = { "相册 42 张" },
+                searchMedia = { _, _, _, _, _ -> "找到 0 张" },
+                refineSearch = { _, _, _ -> "error: no base" },
+            ),
+            repository,
+        )
 
     @Test
     fun `prepare without user config enters gateway chat`() = runTest {
