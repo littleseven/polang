@@ -13,7 +13,10 @@ version = "0.9.3"
 
 repositories { mavenCentral() }
 
-val ktorVersion = "3.0.3"
+// Koog 1.3.0 传递依赖把 ktor-client/server-core 抬到 3.3.3；混用 3.0.3 的
+// default-headers 二进制引用 kotlinx-datetime 0.6 API（Clock$System 在 0.7 已删），
+// 运行时首个响应即 CNFE。故全族对齐 3.3.3。
+val ktorVersion = "3.3.3"
 val exposedVersion = "0.55.0"
 
 dependencies {
