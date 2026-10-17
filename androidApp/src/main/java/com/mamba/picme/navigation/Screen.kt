@@ -38,6 +38,8 @@ sealed class Screen(val route: String) {
         fun createRoute(providerId: String): String = "settings/provider_config/$providerId"
     }
     data object Debug : Screen("debug")
+    /** 云端 Agent 最小聊天页（调试入口实验页，仅 DEBUG 构建注册与入口可见） */
+    data object CloudAgentChat : Screen("cloud_agent_chat")
     data object JsBridge : Screen("jsbridge")
     data object SearchTest : Screen("search_test")
     data object LlmLog : Screen("llm_log")

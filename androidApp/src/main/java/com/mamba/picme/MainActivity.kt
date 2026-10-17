@@ -58,6 +58,8 @@ import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.chat.ChatTaskAnchor
 import com.mamba.picme.features.chat.taskcenter.TaskCenterScreen
 import com.mamba.picme.features.chat.taskcenter.TaskCenterViewModel
+import com.mamba.picme.features.cloudagent.CloudAgentChatScreen
+import com.mamba.picme.features.cloudagent.CloudAgentChatViewModel
 import com.mamba.picme.features.debug.DebugScreen
 import com.mamba.picme.features.debug.JsBridgeScreen
 import com.mamba.picme.features.debug.LlmCallLogScreen
@@ -544,6 +546,9 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToDebug = {
                                         navController.navigate(Screen.Debug.route, navOptions { launchSingleTop = true })
                                     },
+                                    onNavigateToCloudAgentChat = {
+                                        navController.navigate(Screen.CloudAgentChat.route, navOptions { launchSingleTop = true })
+                                    },
                                     onNavigateToJsBridge = {
                                         navController.navigate(Screen.JsBridge.route, navOptions { launchSingleTop = true })
                                     },
@@ -626,6 +631,9 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onNavigateToDebug = {
                                         navController.navigate(Screen.Debug.route, navOptions { launchSingleTop = true })
+                                    },
+                                    onNavigateToCloudAgentChat = {
+                                        navController.navigate(Screen.CloudAgentChat.route, navOptions { launchSingleTop = true })
                                     },
                                     onNavigateToJsBridge = {
                                         navController.navigate(Screen.JsBridge.route, navOptions { launchSingleTop = true })
@@ -792,6 +800,22 @@ class MainActivity : ComponentActivity() {
                                 composable(Screen.SentencePieceTest.route) {
                                     SentencePieceTestScreen(
                                         onNavigateBack = { navController.popBackStack() }
+                                    )
+                                }
+                                // 云端 Agent 最小聊天页（调试入口实验页，仅 DEBUG 构建注册路由）
+                                composable(Screen.CloudAgentChat.route) {
+                                    val cloudAgentViewModel: CloudAgentChatViewModel = viewModel(
+                                        factory = app.container.createCloudAgentChatViewModelFactory()
+                                    )
+                                    CloudAgentChatScreen(
+                                        viewModel = cloudAgentViewModel,
+                                        onNavigateBack = { navController.popBackStack() },
+                                        onGoRemoteModelSettings = {
+                                            navController.navigate(
+                                                Screen.SettingsCategory.createRoute(SettingsCategory.REMOTE_MODEL.name.lowercase()),
+                                                navOptions { launchSingleTop = true }
+                                            )
+                                        },
                                     )
                                 }
                             }

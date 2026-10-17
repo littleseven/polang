@@ -2,6 +2,8 @@ package com.mamba.picme.di
 
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mamba.picme.agent.core.platform.voice.KeywordSpotterEngine
 import com.mamba.picme.beauty.api.PhotoProcessor
 import com.mamba.picme.beauty.render.GlBeautyPreviewProviderFactory
@@ -9,6 +11,7 @@ import com.mamba.picme.beauty.api.BeautyProcessor
 import com.mamba.picme.core.image.GpuBeautyProcessor
 import com.mamba.picme.core.image.ImageProcessor
 import com.mamba.picme.core.image.ImageProcessorImpl
+import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
 import com.mamba.picme.data.local.AppDatabase
@@ -82,6 +85,7 @@ import com.mamba.picme.features.chat.ChatEditStateHolder
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.data.remote.picme.AppUpdateClient
 import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
+import com.mamba.picme.data.remote.picme.CloudAgentClient
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.features.chat.ChatImageRenderer
 import com.mamba.picme.features.chat.ChatOptimizeGachaController
@@ -91,6 +95,7 @@ import com.mamba.picme.features.chat.buildAppToolExecutor
 import com.mamba.picme.features.chat.capability.MemoryCapability
 import com.mamba.picme.features.chat.capability.PersonRelationCapability
 import com.mamba.picme.features.chat.taskcenter.TaskCenterViewModel
+import com.mamba.picme.features.cloudagent.CloudAgentChatViewModel
 import com.mamba.picme.domain.matting.MattingEngine
 import com.mamba.picme.domain.matting.MattingEngineImpl
 import com.mamba.picme.domain.memory.MemoryRepository
@@ -403,6 +408,9 @@ interface AppContainer {
 
     /** 任务中心页 ViewModel 工厂（无参数：跨会话任务卡聚合，DAO 由容器注入） */
     fun createTaskCenterViewModelFactory(): ViewModelProvider.Factory
+
+    /** 云端 Agent 最小聊天页 ViewModel 工厂（调试入口实验页；每次进入新建 VM，消息仅内存态） */
+    fun createCloudAgentChatViewModelFactory(): ViewModelProvider.Factory
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
@@ -1121,6 +1129,16 @@ class AppContainerImpl(
             chatSessionDao = database.chatSessionDao(),
             userTaskRegistry = userTaskRegistry,
         )
+    }
+
+    override fun createCloudAgentChatViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            CloudAgentChatViewModel(
+                api = CloudAgentClient(),
+                deviceToolExecutor = DeviceToolExecutor(),
+                settingsRepository = userPreferencesRepository,
+            )
+        }
     }
 
     override fun createIDPhotoViewModelFactory(): ViewModelProvider.Factory {

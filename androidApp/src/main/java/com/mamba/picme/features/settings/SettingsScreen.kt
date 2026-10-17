@@ -182,6 +182,7 @@ fun SettingsScreen(
     onNavigateToTagViewer: () -> Unit = {},
     onNavigateToDedupHome: () -> Unit = {},
     onNavigateToDebug: () -> Unit = {},
+    onNavigateToCloudAgentChat: () -> Unit = {},
     onNavigateToJsBridge: () -> Unit = {},
     onNavigateToSearchTest: () -> Unit = {},
     onNavigateToLlmLog: () -> Unit = {},
@@ -369,6 +370,7 @@ fun SettingsScreen(
             onNavigateToTagViewer = onNavigateToTagViewer,
             onNavigateToDedupHome = onNavigateToDedupHome,
             onNavigateToDebug = onNavigateToDebug,
+            onNavigateToCloudAgentChat = onNavigateToCloudAgentChat,
             onNavigateToJsBridge = onNavigateToJsBridge,
             onNavigateToSearchTest = onNavigateToSearchTest,
             onNavigateToLlmLog = onNavigateToLlmLog,
@@ -462,6 +464,7 @@ private fun SettingsContent(
     onNavigateToTagViewer: () -> Unit = {},
     onNavigateToDedupHome: () -> Unit = {},
     onNavigateToDebug: () -> Unit = {},
+    onNavigateToCloudAgentChat: () -> Unit = {},
     onNavigateToJsBridge: () -> Unit = {},
     onNavigateToSearchTest: () -> Unit = {},
     onNavigateToLlmLog: () -> Unit = {},
@@ -1157,6 +1160,14 @@ private fun SettingsContent(
                             title = stringResource(R.string.jsbridge_entry_title),
                             onClick = onNavigateToJsBridge,
                             icon = Icons.Rounded.Code,
+                            iconBlockColor = StatusColor.warningAmber
+                        )
+                        SettingsListDivider()
+                        // 云端 Agent（实验）最小聊天页（cloud-agent M2 调试入口）
+                        SettingsListRow(
+                            title = stringResource(R.string.cloud_agent_entry_title),
+                            onClick = onNavigateToCloudAgentChat,
+                            icon = Icons.Rounded.Cloud,
                             iconBlockColor = StatusColor.warningAmber
                         )
                         SettingsListDivider()
