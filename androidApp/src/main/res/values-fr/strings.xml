@@ -542,8 +542,8 @@
     <string name="ai_agent_mode_off">Désactivé</string>
     <string name="ai_agent_mode_remote">Modèle distant</string>
     <string name="assistant_persona">Personnalité de l\'assistant</string>
-    <string name="cloud_agent_byok_consent_title">Autoriser l\'agent cloud à utiliser ma clé API</string>
-    <string name="cloud_agent_byok_consent_subtitle">La clé est envoyée avec chaque requête et traitée uniquement en mémoire serveur — jamais stockée ni journalisée</string>
+    <string name="cloud_agent_byok_consent_title">Agent cloud avec ma clé API</string>
+    <string name="cloud_agent_byok_consent_subtitle">Envoyée à chaque requête, jamais stockée ni journalisée</string>
     <string name="cloud_agent_entry_title">Agent cloud (expérimental)</string>
     <string name="cloud_agent_title">Agent cloud</string>
     <string name="cloud_agent_channel_gateway">Passerelle</string>

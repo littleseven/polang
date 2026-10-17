@@ -542,8 +542,8 @@
     <string name="ai_agent_mode_off">Desactivado</string>
     <string name="ai_agent_mode_remote">Modelo remoto</string>
     <string name="assistant_persona">Personalidad del asistente</string>
-    <string name="cloud_agent_byok_consent_title">Permitir que el agente en la nube use mi clave API</string>
-    <string name="cloud_agent_byok_consent_subtitle">La clave se envía con cada solicitud y se procesa solo en memoria del servidor: nunca se guarda ni se registra</string>
+    <string name="cloud_agent_byok_consent_title">Agente en la nube con mi clave API</string>
+    <string name="cloud_agent_byok_consent_subtitle">Se envía con cada solicitud; nunca se guarda</string>
     <string name="cloud_agent_entry_title">Agente en la nube (experimental)</string>
     <string name="cloud_agent_title">Agente en la nube</string>
     <string name="cloud_agent_channel_gateway">Puerta de enlace</string>

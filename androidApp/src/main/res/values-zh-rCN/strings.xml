@@ -545,8 +545,8 @@
     <string name="ai_agent_mode_off">关闭</string>
     <string name="ai_agent_mode_remote">远程模型</string>
     <string name="assistant_persona">助手性格</string>
-    <string name="cloud_agent_byok_consent_title">允许云端 Agent 使用我的 API Key</string>
-    <string name="cloud_agent_byok_consent_subtitle">Key 仅在会话期间随请求发送至服务器内存处理，服务器不保存、不写日志</string>
+    <string name="cloud_agent_byok_consent_title">云端 Agent 使用我的 Key</string>
+    <string name="cloud_agent_byok_consent_subtitle">Key 随请求透传，服务器不保存、不记录</string>
     <string name="cloud_agent_entry_title">云端 Agent（实验）</string>
     <string name="cloud_agent_title">云端 Agent</string>
     <string name="cloud_agent_channel_gateway">网关通道</string>

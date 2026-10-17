@@ -557,8 +557,8 @@
     <string name="ai_agent_mode_off">Disabled</string>
     <string name="ai_agent_mode_remote">Remote Model</string>
     <string name="assistant_persona">Assistant Personality</string>
-    <string name="cloud_agent_byok_consent_title">Allow cloud agent to use my API key</string>
-    <string name="cloud_agent_byok_consent_subtitle">Key is sent per request and processed in server memory only — never stored or logged</string>
+    <string name="cloud_agent_byok_consent_title">Cloud Agent uses my API key</string>
+    <string name="cloud_agent_byok_consent_subtitle">Sent with each request — never stored or logged</string>
     <string name="cloud_agent_entry_title">Cloud Agent (experimental)</string>
     <string name="cloud_agent_title">Cloud Agent</string>
     <string name="cloud_agent_channel_gateway">Gateway</string>
