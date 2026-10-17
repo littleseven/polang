@@ -1,5 +1,7 @@
 package com.mamba.picme.server.agent
 
+import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.agents.core.tools.reflect.asToolsByClass
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.llm.ChannelRegistry
 import com.mamba.picme.server.routes.TokenHashKey
@@ -38,15 +40,29 @@ private const val DEFAULT_SYSTEM_PROMPT =
  *   `data: {"kind":"event","event":{…}}`（每个落流事件一帧，序一致）→ 终结帧
  *   `{"kind":"done"}` 或 `{"kind":"error","message":…}`。HTTP 恒 200（错误经帧传递，
  *   与 SSE 语义一致）；前置失败（鉴权/配额/参数）仍为常规错误码。
+ *   M2 起新增 `{"kind":"tool_request","request_id","tool","args","timeout_ms"}` 帧——
+ *   设备工具调用经工具桥下发给端侧执行（传输层信号，不落事件流）；与 event/done/error
+ *   帧共用同一 writer 天然保序。设备工具集每轮在路由层以当轮 writer 构造并合成进
+ *   ToolRegistry（服务端工具 + 设备工具），[AgentRunner] 零改动。
+ * - `POST /agent/sessions/{id}/tool-results`：端侧工具结果上行（M2）。body
+ *   `{"request_id","ok","result"}` → `200 {"accepted":true}` / `400 request_id_required` /
+ *   `404 session_not_found`（他人会话同口径，不泄露存在性）/ `409 tool_request_not_pending`
+ *   （requestId 未知或已完成——迟到上行安全）。ok=false 时云端以 `error: <result>` 作为
+ *   工具返回值（Observation 照常落流）。连接关闭（正常/异常/端断线）经 `bridge.failAll`
+ *   清理该会话挂起项，等待方以 error 文本闭环，防泄漏。
  * - `POST /agent/sessions/{id}/finish`：关闭会话（终态 FINISHED）。
  *
  * BYOK 零留存：X-User-Api-Key 仅在本请求内存中组装 [AgentLlmTarget]，不落库、不进日志、
- * 不消耗网关配额（守卫测试 AgentRoutesTest 钉死）。
+ * 不消耗网关配额（守卫测试 AgentRoutesTest 钉死）。工具桥链路不接触 target/key。
  *
  * M1 已知边界：同会话并发跑轮无互斥（单用户单端先行；并发守卫为后续里程碑）；
  * 云端 Agent 轮次不写 llm_call_log（审计数据源即事件流；用量指标经配额计数）。
  */
-fun Route.agentRoute(runner: AgentRunner) {
+fun Route.agentRoute(
+    runner: AgentRunner,
+    bridge: AgentBridgeRegistry,
+    deviceTimeoutMs: Long = DeviceToolService.DEFAULT_TIMEOUT_MS,
+) {
     route("/agent") {
         post("/sessions") {
             val tokenHash = call.attributes.getOrNull(TokenHashKey)
@@ -131,6 +147,24 @@ fun Route.agentRoute(runner: AgentRunner) {
             call.respond(buildJsonObject { put("status", AgentSessionStatus.FINISHED.wire) })
         }
 
+        post("/sessions/{id}/tool-results") {
+            val tokenHash = call.attributes.getOrNull(TokenHashKey)
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "unauthorized"))
+            val session = findOwned(call.parameters["id"].orEmpty(), tokenHash)
+                ?: return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "session_not_found"))
+            val body = call.receive<JsonObject>()
+            val requestId = (body["request_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "request_id_required"))
+            val ok = (body["ok"] as? JsonPrimitive)?.contentOrNull?.toBooleanStrictOrNull() ?: false
+            val result = (body["result"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            // ok=false：端执行异常，result 为错误描述，云端以 "error: <描述>" 作为工具返回值（spec §3.2）
+            val text = if (ok) result else "error: $result"
+            if (!bridge.complete(requestId, text)) {
+                return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "tool_request_not_pending"))
+            }
+            call.respond(buildJsonObject { put("accepted", true) })
+        }
+
         post("/sessions/{id}/messages") {
             val tokenHash = call.attributes.getOrNull(TokenHashKey)
                 ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "unauthorized"))
@@ -181,13 +215,19 @@ fun Route.agentRoute(runner: AgentRunner) {
             }
 
             call.respondTextWriter(ContentType.Text.EventStream) {
+                val deviceTools = DeviceToolService(session.id, bridge, deviceTimeoutMs) { frame ->
+                    writeSseFrame(frame.toJson())
+                }
+                val toolRegistry = ToolRegistry {
+                    tools(ServerToolService().asToolsByClass() + deviceTools.asToolsByClass())
+                }
                 try {
                     runner.runTurn(
                         session = session,
                         userMessage = content,
                         target = target,
                         systemPrompt = DEFAULT_SYSTEM_PROMPT,
-                        toolRegistry = ServerToolService.defaultRegistry(),
+                        toolRegistry = toolRegistry,
                         onEvent = { event ->
                             writeSseFrame(buildJsonObject {
                                 put("kind", "event")
@@ -206,6 +246,9 @@ fun Route.agentRoute(runner: AgentRunner) {
                         put("kind", "error")
                         put("message", e.message?.take(200) ?: "internal error")
                     })
+                } finally {
+                    // 连接关闭（正常结束/异常/端断线）清理该会话桥挂起项，防泄漏
+                    bridge.failAll(session.id, "connection_closed")
                 }
             }
         }

@@ -83,7 +83,7 @@ class AgentRoutesTest {
                     ?.let { AccountService.sha256(it) }
                     ?.let { call.attributes.put(TokenHashKey, it) }
             }
-            routing { agentRoute(runner) }
+            routing { agentRoute(runner, AgentBridgeRegistry()) }
         }
     }
 

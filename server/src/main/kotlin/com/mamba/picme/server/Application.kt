@@ -1,6 +1,7 @@
 package com.mamba.picme.server
 
 import com.mamba.picme.server.admin.adminRoute
+import com.mamba.picme.server.agent.AgentBridgeRegistry
 import com.mamba.picme.server.agent.AgentExecutorFactory
 import com.mamba.picme.server.agent.AgentRunner
 import com.mamba.picme.server.agent.ServerToolDispatcher
@@ -189,6 +190,8 @@ fun Application.module(config: AppConfig) {
         executorFactory = AgentExecutorFactory(),
         dispatcher = ServerToolDispatcher.default(),
     )
+    // 工具桥挂起表（M2）：设备工具 requestId → Deferred；/agent 路由与 tool-results 上行共享
+    val agentBridge = AgentBridgeRegistry()
 
     routing {
         // Public
@@ -212,7 +215,7 @@ fun Application.module(config: AppConfig) {
         issueReportRoute(issueReportService, issueReportRateLimiter)
         browserRoute(browserBridge, browserDailyLimiter, browserConcurrency, browserStats)
         // 云端 Agent 会话域（ADR-017/018）：/agent/** 走上方 app-token 拦截器，M1 仅注册账号
-        agentRoute(agentRunner)
+        agentRoute(agentRunner, agentBridge)
         // 管理后台（/admin/**，独立 cookie 认证）
         adminRoute(config.adminToken, cosService, balanceService, config.llmPrices, issueReportService)
     }
