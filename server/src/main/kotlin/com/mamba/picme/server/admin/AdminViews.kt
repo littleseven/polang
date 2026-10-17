@@ -322,6 +322,7 @@ object AdminViews {
                     th { +"Prompt" }
                     th { +"Completion" }
                     th { +"Total" }
+                    th { +"Cached" }
                     th { +"成本 ¥" }
                     th { +"字节" }
                     th { +"状态" }
@@ -335,6 +336,8 @@ object AdminViews {
                         td { +(c.promptTokens?.toString() ?: "—") }
                         td { +(c.completionTokens?.toString() ?: "—") }
                         td { +(c.totalTokens?.toString() ?: "—") }
+                        // null = 上游未上报（不可观测）；0 = 上报但未命中
+                        td { +(c.cachedTokens?.toString() ?: "—") }
                         td { +fmt(c.costCny) }
                         td { +c.respBytes.toString() }
                         td { +c.status }

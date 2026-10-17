@@ -23,8 +23,32 @@ object ChatRoutingPolicy {
         /** 直执 refine_media_search（在上一轮基数内取交集）。 */
         data class DirectRefine(val constraint: String, val intent: SearchIntent?) : RouteDecision
 
-        /** 回落完整 agent loop（[reason] 进路由审计，供降级率/放行率统计）。 */
-        data class FullAgentLoop(val reason: String) : RouteDecision
+        /**
+         * 回落完整 agent loop（[reason] 进路由审计，供降级率/放行率统计）。
+         *
+         * [toolNames] = 意图级工具子集（M3 分支化落地，2026-10-17）：契约表 allowedTools +
+         * 通用工具（finish/delay），引擎层据此裁剪 tool schema 与 prompt 清单段（每轮
+         * 请求不再全量携带 43 个 schema，成本治理）；null = 完整工具面（OPEN_QA / 降级路径 /
+         * secondary 双产出物等判定不可靠场景一律保守全量，路由器永不拦截能力）。
+         */
+        data class FullAgentLoop(val reason: String, val toolNames: Set<String>? = null) : RouteDecision
+    }
+
+    /**
+     * 任何子集都保留的通用工具：finish（终止语义兜底——规则虽要求「不要调用 finish」，
+     * 但裁掉 schema 后模型一旦旧习复发直接报未知工具错误，留它成本仅一条 schema）与 delay。
+     */
+    private val UNIVERSAL_TOOLS = setOf("finish", "delay")
+
+    /**
+     * 意图 → 工具子集（契约表 allowedTools 的消费点，原「M3 分支化时裁剪工具面的依据」落地）。
+     * allowedTools 为空（OPEN_QA）→ null 保留完整工具面；forbiddenTools 由契约校验
+     * （allowed∩forbidden=∅，ChatIntentContractTest）保证不会混入白名单。
+     */
+    internal fun toolSubsetFor(intent: IntentId): Set<String>? {
+        val allowed = ChatIntentContract.of(intent).allowedTools
+        if (allowed.isEmpty()) return null
+        return allowed.toSet() + UNIVERSAL_TOOLS
     }
 
     /**
@@ -77,8 +101,12 @@ object ChatRoutingPolicy {
                 }
             // 浏览器任务走完整 agent loop 执行 browser_* 工具链，绝不落 DirectSearch
             // （forbiddenTools 契约锚点见 ChatIntentContract.BROWSE_WEB）
-            IntentId.BROWSE_WEB -> RouteDecision.FullAgentLoop("intent:${output.deliverable}")
-            else -> RouteDecision.FullAgentLoop("intent:${output.deliverable}")
+            // 其余意图同样回落 FullAgentLoop，但携带契约工具子集（引擎层裁剪 schema）；
+            // secondary 双产出物已在上方拦截为全量（null），单意图判定可靠才裁剪。
+            else -> RouteDecision.FullAgentLoop(
+                reason = "intent:${output.deliverable}",
+                toolNames = toolSubsetFor(output.deliverable),
+            )
         }
     }
 

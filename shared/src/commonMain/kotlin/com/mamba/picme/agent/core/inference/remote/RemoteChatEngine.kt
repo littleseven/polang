@@ -1,5 +1,6 @@
 package com.mamba.picme.agent.core.inference.remote
 
+import ai.koog.agents.core.tools.ToolBase
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.message.Message
@@ -30,6 +31,8 @@ import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
@@ -55,6 +58,7 @@ class RemoteChatEngine internal constructor(
     chatToolDescriptors: List<ToolDescriptor>,
     private val chatToolRegistry: ToolRegistry,
     private val chatPromptBuilder: (List<ToolDescriptor>) -> String = ::buildChatSystemPrompt,
+    private val chatTools: List<ToolBase<*, *>>? = null,
 ) {
 
     private val tag = "RemoteChatEngine"
@@ -92,6 +96,48 @@ class RemoteChatEngine internal constructor(
                 (renderEnvironment?.let { "\n\n${it.toPromptSegment()}" } ?: "") +
                 (personaPromptSegment(persona, replyLanguage)?.let { "\n\n$it" } ?: "") +
                 "\n\n${replyLanguageRuleSegment(replyLanguage)}"
+
+        /**
+         * 子集 prompt 追加的工具范围约束（M3 review 修订）：规则段 [ChatPromptRules] 恒全量渲染
+         *（分节与工具族对应但暂不按子集过滤，保留前缀结构），其中引用了可能不在子集里的工具——
+         * 显式声明本轮可用范围，防模型幻觉调用未提供 schema 的工具（报错浪费一轮）。
+         */
+        private const val SUBSET_TOOL_RANGE_NOTE =
+            "\n\n【本轮工具范围】本轮仅提供上方清单所列工具；规则中提及但清单未列的工具本轮不可用，禁止调用。"
+
+        /**
+         * 意图工具子集的纯计算部分（M3，可单测）：契约子集 ∩ 平台可用工具名。
+         *
+         * 返回 null = 保守回退全量工具面，两种触发：
+         * - 交集为空（契约全数腐烂的极端兜底，宁可全量不可无工具）；
+         * - 不可用项超过半数（missing.size * 2 > toolNames.size，review 修订 2026-10-17）——
+         *   平台工具面远窄于契约（如 iOS 手工清单无 finish/delay）时子集严重缩水，
+         *   裁出的残缺的子集比全量更易困住模型，不如全量。
+         *
+         * 返回非 null 时 [ToolSubsetResolution.missing] 记录被丢弃的契约引用（正常应为空——
+         * Android 由 ChatIntentContractToolNamesTest 编译期守卫，运行期出现即契约漂移信号）。
+         */
+        internal fun resolveToolSubset(
+            available: Set<String>,
+            toolNames: Set<String>,
+        ): ToolSubsetResolution? {
+            val hits = toolNames.intersect(available)
+            if (hits.isEmpty()) return null
+            val missing = toolNames - available
+            if (missing.size * 2 > toolNames.size) return null
+            return ToolSubsetResolution(
+                names = hits,
+                key = hits.sorted().joinToString(","),
+                missing = missing,
+            )
+        }
+
+        /** [resolveToolSubset] 命中结果：[key] 为排序后工具名串（子集身份，prompt 缓存与 AIAgent 重建键共用）。 */
+        internal data class ToolSubsetResolution(
+            val names: Set<String>,
+            val key: String,
+            val missing: Set<String>,
+        )
     }
 
     // ── chat ReAct Agent（懒创建）────────────────────────────────────
@@ -110,6 +156,24 @@ class RemoteChatEngine internal constructor(
     private val chatSystemPrompt = chatPromptBuilder(chatToolDescriptors)
 
     /**
+     * 意图子集 base prompt 缓存（key = 排序后工具名串）：同子集逐字节复用，保 prompt 前缀稳定。
+     * orchestratorDispatcher 是线程池（Android 固定 2 线程 / iOS Dispatchers.Default），重叠回合
+     * 可并发进入（runChat 的 running 互斥是 check-then-act），普通 HashMap 并发写有结构损坏
+     * 风险——get/put 经 [toolSetPromptCacheLock] 串行化（review 修订 2026-10-17）。
+     */
+    private val toolSetPromptCache = mutableMapOf<String, String>()
+    private val toolSetPromptCacheLock = Mutex()
+
+    /**
+     * 路由闸门结果（M3 意图级工具裁剪）：直执已处理 / 回落 agent loop（携带契约工具子集，
+     * null = 完整工具面——降级路径、直执失败回退、secondary 双产出物等判定不可靠场景保守全量）。
+     */
+    private sealed interface RoutingGate {
+        class Handled(val result: Result<StreamChatResult>) : RoutingGate
+        class FallThrough(val toolNames: Set<String>?) : RoutingGate
+    }
+
+    /**
      * 流式自由聊天（chat 远程 ReAct）。流式期间经 [onEvent] 实时上报：
      * 模型逐 token 增量以 [ChatStreamEvent.TextSnapshot]（本轮累计全文）下发，
      * 进入工具调用轮时下发 [ChatStreamEvent.ToolCallStarted]；多轮记忆由 DataStoreChatMemory 承担。
@@ -122,20 +186,26 @@ class RemoteChatEngine internal constructor(
         Logger.d(tag, "streamChat: input='$input'")
         // 意图路由（spec《意图路由契约与意图路由器》M2）：LLM 管意图、代码管策略。
         // 命中最热意图（看照片/细化结果）时直执确定性命令、跳过全量 agent loop；
-        // 其余（含门控直通与一切降级）原路走 chat 远程 ReAct（ADR-005 协议分离），行为不变。
-        routeAndMaybeExecute(input, agentContext, onEvent)?.let { return it }
-        Logger.i(tag, "streamChat routing to Chat ReAct")
-        return streamChatReAct(input, agentContext, onEvent)
+        // 其余回落 chat 远程 ReAct（ADR-005 协议分离）——M3 起回落携带契约工具子集，
+        // 引擎按子集裁剪 tool schema 与 prompt 清单段（成本治理：不再每轮全量 43 个 schema）。
+        when (val gate = routeAndMaybeExecute(input, agentContext, onEvent)) {
+            is RoutingGate.Handled -> return gate.result
+            is RoutingGate.FallThrough -> {
+                Logger.i(tag, "streamChat routing to Chat ReAct (toolSet=${gate.toolNames?.size ?: "full"})")
+                return streamChatReAct(input, agentContext, onEvent, gate.toolNames)
+            }
+        }
     }
 
     /**
      * 意图路由入口：门控/pattern/LLM 闭集分类 → [ChatRoutingPolicy] 查表 → 直执或回落。
      *
-     * 返回 null = 回落完整 agent loop；非 null = 已直执（DirectSearch/DirectRefine）。
+     * 返回 [RoutingGate.FallThrough] = 回落完整 agent loop（携带决策给出的工具子集，null = 全量）；
+     * [RoutingGate.Handled] = 已直执（DirectSearch/DirectRefine）。
      * 直执语义（review 决议）：
      * - 复用 [ChatToolService.dispatchCommandDetailed]（uiActions 发射 + observation + 5s 超时
-     *   与 LLM tool_calls 路径同源）；dispatch 失败/业务错误（非 MediaResults）→ 返回 null
-     *   回落完整 agent loop（降级语义的自然延伸，错误不经直执路径直达用户）。
+     *   与 LLM tool_calls 路径同源）；dispatch 失败/业务错误（非 MediaResults）→ FallThrough(null)
+     *   回落完整 agent loop 且**保守用全量工具面**（偏离剧本的恢复场景给模型完整自由度）。
      * - 成功时不产 LLM 总结：结果以 [StreamChatResult.directReply] 结构化回执返回，
      *   用户气泡由平台层本地化渲染（observation 硬编码中文模板只进记忆/审计，I18N 红线）；
      *   该轮 user+observation 补写 Koog 会话记忆（直执跳过 agent loop，否则多轮指代断裂）。
@@ -149,7 +219,7 @@ class RemoteChatEngine internal constructor(
         input: String,
         agentContext: AgentContext,
         onEvent: (ChatStreamEvent) -> Unit
-    ): Result<StreamChatResult>? = withContext(configurator.dispatcherProvider.orchestratorDispatcher) {
+    ): RoutingGate = withContext(configurator.dispatcherProvider.orchestratorDispatcher) {
         val persona = agentContext.persona
         val replyLanguage = agentContext.replyLanguage
         // 路由器实例无状态（审计口在 companion），按回合构造、provider 闭包捕获本轮配置
@@ -170,8 +240,8 @@ class RemoteChatEngine internal constructor(
         )
         when (val decision = ChatRoutingPolicy.decide(routing, state, input)) {
             is ChatRoutingPolicy.RouteDecision.FullAgentLoop -> {
-                Logger.d(tag, "router fallback to agent loop: ${decision.reason}")
-                null
+                Logger.d(tag, "router fallback to agent loop: ${decision.reason} (toolSet=${decision.toolNames?.size ?: "full"})")
+                RoutingGate.FallThrough(decision.toolNames)
             }
             is ChatRoutingPolicy.RouteDecision.DirectSearch -> executeDirect(
                 command = AgentCommand.SearchMedia(query = decision.query, intent = decision.intent),
@@ -179,16 +249,20 @@ class RemoteChatEngine internal constructor(
                 input = input,
                 agentContext = agentContext,
                 onEvent = onEvent,
-            )
+            ).toGate()
             is ChatRoutingPolicy.RouteDecision.DirectRefine -> executeDirect(
                 command = AgentCommand.RefineMediaSearch(constraint = decision.constraint, intent = decision.intent),
                 kind = DirectRouteReply.Kind.REFINE,
                 input = input,
                 agentContext = agentContext,
                 onEvent = onEvent,
-            )
+            ).toGate()
         }
     }
+
+    /** 直执结果 → 闸门：成功 Handled；失败 FallThrough(null)——回退场景保守全量工具面。 */
+    private fun Result<StreamChatResult>?.toGate(): RoutingGate =
+        this?.let { RoutingGate.Handled(it) } ?: RoutingGate.FallThrough(null)
 
     /**
      * 直执一条搜索/细化命令：成功 → [DirectRouteReply] 结构化回执 + 补写会话记忆；
@@ -243,7 +317,8 @@ class RemoteChatEngine internal constructor(
     private suspend fun streamChatReAct(
         input: String,
         agentContext: AgentContext,
-        onEvent: (ChatStreamEvent) -> Unit
+        onEvent: (ChatStreamEvent) -> Unit,
+        toolNames: Set<String>? = null,
     ): Result<StreamChatResult> {
         val startTime = Clock.System.now().toEpochMilliseconds()
         return try {
@@ -253,7 +328,8 @@ class RemoteChatEngine internal constructor(
                 traceId = agentContext.traceId,
                 persona = agentContext.persona,
                 replyLanguage = agentContext.replyLanguage,
-                onEvent = onEvent
+                onEvent = onEvent,
+                toolNames = toolNames,
             ).fold(
                 onSuccess = { (summary, metrics) ->
                     val latencyMs = Clock.System.now().toEpochMilliseconds() - startTime
@@ -300,7 +376,8 @@ class RemoteChatEngine internal constructor(
         traceId: String? = null,
         persona: AssistantPersona = AssistantPersona.DEFAULT,
         replyLanguage: ReplyLanguage = ReplyLanguage.SIMPLIFIED_CHINESE,
-        onEvent: ((ChatStreamEvent) -> Unit)? = null
+        onEvent: ((ChatStreamEvent) -> Unit)? = null,
+        toolNames: Set<String>? = null,
     ): Result<Pair<String, AgentExecutionMetrics?>> = withContext(configurator.dispatcherProvider.orchestratorDispatcher) {
         Logger.d(tag, "processChatReAct: input='$input', sessionId='$sessionId', timeout=${timeoutMs}ms")
 
@@ -313,6 +390,9 @@ class RemoteChatEngine internal constructor(
         }
 
         agent.setSessionId(sessionId)
+        // M3 意图级工具裁剪：路由契约子集 → 覆写 registry + prompt 清单段（同源过滤，零漂移）；
+        // 未注入 chatTools（裁剪不可用的平台）或判定不可靠（null）时恒为全量默认。
+        val toolSetOverride = resolveToolSetOverride(toolNames, persona, replyLanguage)
 
         return@withContext try {
             val (summary, metrics) = withTimeout(timeoutMs) {
@@ -331,6 +411,7 @@ class RemoteChatEngine internal constructor(
                         // M4：显式轮边界（spec §10 收口），turn 装配器替代快照差分猜测
                         onEvent?.invoke(ChatStreamEvent.RoundStarted)
                     },
+                    toolSetOverride = toolSetOverride,
                 )
             }
             Result.success(summary to metrics)
@@ -344,6 +425,59 @@ class RemoteChatEngine internal constructor(
             Logger.e(tag, "processChatReAct error", e)
             Result.failure(e)
         }
+    }
+
+    /**
+     * 路由契约工具子集 → 本轮覆写（M3，2026-10-17）。
+     *
+     * 同源不变式不变（spec §4 设计不变式 8）：子集 registry 与 prompt 清单段都自同一份
+     * [chatTools] 过滤派生，禁手写漂移；子集判定（交集 / 空交集与过半缺失回退）收口在纯函数
+     * [resolveToolSubset]（commonTest 直接覆盖）。
+     *
+     * 返回 null 的场景（一律落全量默认）：未请求裁剪（[toolNames] = null）/ 平台未注入
+     * [chatTools] / [resolveToolSubset] 判定保守全量（空交集或缺失过半，如 iOS 窄工具面）。
+     *
+     * 新鲜度语义：子集 prompt 的动态尾段冻结在「该 toolSetKey 对应 AIAgent 上次构建时」
+     *（全量路径冻结在 KoogChatAgent 构建时）——同 key 内逐字节稳定（前缀缓存目标），
+     * 跨午夜/语言旋转后不同 key 的日期行可不同，属可接受微差。
+     */
+    private suspend fun resolveToolSetOverride(
+        toolNames: Set<String>?,
+        persona: AssistantPersona,
+        replyLanguage: ReplyLanguage,
+    ): KoogChatAgent.ChatToolSetOverride? {
+        if (toolNames == null) return null
+        val all = chatTools ?: return null
+        val available = all.mapTo(mutableSetOf()) { it.descriptor.name }
+        val resolution = resolveToolSubset(available, toolNames)
+        if (resolution == null) {
+            Logger.w(
+                tag,
+                "tool subset fallback to full registry (requested=$toolNames, unavailable=${toolNames - available})",
+            )
+            return null
+        }
+        if (resolution.missing.isNotEmpty()) {
+            // 契约漂移信号（Android 有编译期守卫，正常为空；iOS 窄工具面由过半阈值拦截，
+            // 走到这的零星缺失按 key 低频出现，debug 级即可）
+            Logger.d(tag, "tool subset dropped unavailable tools: ${resolution.missing}")
+        }
+        val filtered = all.filter { it.descriptor.name in resolution.names }
+        val basePrompt = toolSetPromptCacheLock.withLock {
+            toolSetPromptCache.getOrPut(resolution.key) {
+                chatPromptBuilder(filtered.map { it.descriptor }) + SUBSET_TOOL_RANGE_NOTE
+            }
+        }
+        return KoogChatAgent.ChatToolSetOverride(
+            key = resolution.key,
+            registry = ToolRegistry { tools(filtered) },
+            systemPrompt = basePrompt + buildPromptSuffix(
+                persona,
+                replyLanguage,
+                today(),
+                renderEnvironment = configurator.getRenderEnvironmentProvider()?.invoke(),
+            ),
+        )
     }
 
     /**

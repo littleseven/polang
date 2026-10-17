@@ -15,7 +15,7 @@
 
 **版本**：0.9.6
 
-**最后更新**：2026-10-09
+**最后更新**：2026-10-17
 
 **状态**：生效中 / 已上线
 
@@ -26,7 +26,7 @@
 `server/` 是独立的 Ktor Gradle 工程（`rootProject.name = "picme-server"`），**不纳入 Android `settings.gradle.kts`**。通过 `./gradlew -p server` 独立构建和运行。
 
 **核心职责**：
-- **AI 网关**：`LlmProxy` + `ChannelRegistry` — 按模型自动路由到 Cloudflare AI Gateway 或腾讯 TokenHub；`stream=true` 请求 SSE 逐 chunk 透传（原样转发 stream/stream_options），usage 从流尾帧解析计费；非流式请求强制 `stream=false` 走完整响应体解析
+- **AI 网关**：`LlmProxy` + `ChannelRegistry` — 按模型自动路由到 Cloudflare AI Gateway 或腾讯 TokenHub；`stream=true` 请求 SSE 逐 chunk 透传（原样转发 stream/stream_options），usage 从流尾帧解析计费（含 `prompt_tokens_details.cached_tokens` 前缀缓存命中采集，`llm_call_log.cached_tokens`，2026-10-17）；非流式请求强制 `stream=false` 走完整响应体解析
 - **账号体系**：`EmailService` + `AccountService` + `AppTokenAuth` — 邮箱注册、动态 Token、SHA-256 校验
 - **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量）
 - **推荐引擎**：`RuleEngine` — 纯规则型场景推荐（规避算法备案）
@@ -125,6 +125,7 @@ server/
 │   ├── 010_anonymous_device_platform.sql
 │   ├── 011_browser_session.sql
 │   ├── 012_agent_session.sql     # 云端 Agent 会话域（ADR-018）
+│   ├── 013_llm_call_log_cached_tokens.sql  # prompt 前缀缓存命中列（2026-10-17）
 │   └── seed_rules.sql            # 初始推荐规则
 ├── src/test/kotlin/              # 测试基建（下列为示意，实际 40 个 *Test.kt + 2 个辅助类）
 │   ├── ChannelRepositoryTest.kt
@@ -280,5 +281,5 @@ systemd `picme-api.service`：`JAVA_OPTS=-Xmx256m` + `MemoryMax=450M`，与 Open
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-10-09
+> **最后更新**：2026-10-17
 > **状态**：生效中

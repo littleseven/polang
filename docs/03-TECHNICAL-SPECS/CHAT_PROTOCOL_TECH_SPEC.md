@@ -2,6 +2,7 @@
 
 > **定位**：主聊天流「用户输入 → 远程 LLM → 流式响应 → 渲染/落库 → 历史回灌」全链路协议的**系统描述 SSOT**。ADR-016 管「为什么这么设计」（决策宪法），本文管「现在是怎么跑的」（链路实况）；卡片级协议实例（每张卡的 tool_call 入参 / Room 落库 JSON / parts 形态）见 `CHAT_CARD_CATALOG.md`，本文只到链路级，不重复逐卡登记。
 > **日期**：2026-10-11 建立（基于 main 分支实况勘察，Koog 1.3.0，Room v26）
+> **增补**：2026-10-17 §2.8 线格式实例（SSE 帧骨架 ↔ 合并响应 ↔ 三轮 ReAct walkthrough）；M3 意图级工具裁剪落地（§1.4）+ server 侧 cached_tokens 可观测（§5 缺口两条核销/降级）。
 > **上游**：ADR-016（parts 模型/渲染架构）、ADR-015（意图路由契约）、ADR-008（隐私红线）
 > **维护规则**：链路改造（请求组装/流式事件/落库路径/历史管线任一变动）须同一原子提交内同步本文；行号引用会漂移，以文件级锚点为准。
 
@@ -101,9 +102,11 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 **params 烘焙**：`polangSystemPrompt(...)`（koog/KoogPromptFactory.kt）——🔴 必须走 Koog prompt DSL 传 params，否则 temperature/maxTokens/thinking 丢失。AIAgent 按「记忆快照内容 + 摘要 version」新鲜度懒重建。
 
-### 1.4 工具集（ChatToolService，42 个 @Tool）
+### 1.4 工具集（ChatToolService，43 个 @Tool）
 
 全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 5s（browser_* 族 25s）。
+
+**意图级工具子集（M3 分支化落地，2026-10-17，成本治理）**：契约表 `ChatIntentContract.allowedTools` 从声明转为执行——路由判定为单一意图且路径可靠（LLM_ROUTER / PATTERN_SHORTCUT / BROWSER_SHORTCUT）时，`ChatRoutingPolicy.toolSubsetFor` 产出「契约白名单 + 通用工具（finish/delay）」子集，经 `RouteDecision.FullAgentLoop.toolNames` 传到引擎层；`RemoteChatEngine.resolveToolSetOverride` 自同一份 `chatTools`（组合根新增注入，与 registry/descriptors 同源）过滤派生子集 registry + 子集 prompt 清单段（不变式 8 不破坏），以 `KoogChatAgent.ChatToolSetOverride` 按轮覆写——AIAgent 重建键加 toolSetKey（与记忆快照/摘要版本同级），**KoogChatAgent 单实例单 executor 不为子集多建**。**保守全量（null）场景**：OPEN_QA / 一切降级路径 / secondary 双产出物 / 直执失败回退 / 平台未注入 chatTools / 子集过滤为空——路由器永不拦截能力的语义不变。子集 base prompt 按 key 缓存逐字节复用（保前缀稳定）。**权衡**：不同意图的相邻回合 system prompt/tools 前缀不同，会碎片化上游前缀缓存——用缓存碎片换 ~40 条 schema（约 2-4k token/轮 × ReAct 轮数）的确定削减。iOS 经 `ChatToolManifest.tools` 同路径注入（8 工具手工清单）。
 
 | 分组 | 工具 |
 |---|---|
@@ -224,6 +227,79 @@ TurnPartsReducer 规则：
 | browser WS 断开 | 保留最后一帧 | 仅记日志，不标失败 | — |
 | 意图路由超时/低置信 | 无感知 | — | 降级 OPEN_QA 走完整 loop |
 
+### 2.8 线格式实例（SSE 帧 ↔ 合并响应 ↔ 三轮 ReAct walkthrough，2026-10-17 增补）
+
+> **口径**：本节为**协议还原实例**——依据 OpenAI 兼容线格式 + 网关 `LlmProxy` 透传实现（`ProxyResult.Streaming` 逐 chunk 转发）+ `LlmRouteStreamTest` 固化帧形（`data: {...}\n\n` / usage 帧 / `[DONE]`）推断，非逐字节抓包（请求体录制仍是 §5 已知缺口）。文本内容为演示，结构与字段与实况一致。
+
+**SSE 帧骨架**（任何一轮 LLM 流，无论切多少刀，固定只有 4 类帧 + 随机增量帧）：
+
+```
+data: {首帧: delta.role="assistant", delta.content=""}   ← 开场占位
+      〔delta.content 增量 × N〕    — 切点随机无语义（推理 batch + flush 时机），消费端只做拼接
+      〔delta.tool_calls 增量 × M〕 — 骨架帧（id/name + 空 arguments）→ arguments 残片按 index 拼装，拼齐前是非法 JSON
+data: {delta:{}, finish_reason="tool_calls"|"stop"}      ← 唯一动作开关
+data: {choices: [], usage: {...}}                        ← 记账帧（stream_options.include_usage 恒开）
+data: [DONE]                                             ← 字面量哨兵
+```
+
+**流式 ≡ 非流式，信息量完全等价**：合并后一轮 = 一条 assistant 消息（content + 可选 tool_calls）+ finish_reason + usage。流式只是把该对象按生成顺序切片、贴逐帧重复信封（`id`/`object`/`created`/`model`/`index` 恒等冗余，文本增量帧有效负载率可低至个位数百分比）。
+
+**三轮 ReAct 完整实例**（用户输入「帮我看看去年夏天海边的照片，顺便画个每月统计图」；每轮请求的 model/stream/temperature=0.7/max_tokens=4096/tools[42] 相同，以下省略，只列 messages 增量）：
+
+```
+第 1 轮请求 messages = [
+  system(base +【关于用户】+【会话摘要】+ 日期 + RenderEnvironment + 回复语言),
+  user("帮我看看去年夏天海边的照片，顺便画个每月统计图")
+]
+第 1 轮响应（合并后）= {
+  choices: [{
+    message: {
+      role: "assistant",
+      content: "找到了！去年夏天海边共 87 张。",
+      tool_calls: [{ id: "call_7f2a", type: "function",
+        function: { name: "search_media", arguments: "{\"query\":\"去年夏天的海边\"}" } }]
+    },
+    finish_reason: "tool_calls"
+  }],
+  usage: { prompt_tokens: 3210, completion_tokens: 64, total_tokens: 3274 }
+}
+→ App：执行 search_media → data_media_results 卡落库 → observation "找到 87 张去年夏天的海边照片" 回喂
+
+第 2 轮请求 messages = 第 1 轮全量 + [
+  assistant(content="找到了！去年夏天海边共 87 张。", tool_calls=[call_7f2a/search_media]),   // 调用声明
+  tool(tool_call_id="call_7f2a", content="找到 87 张去年夏天的海边照片")                        // 执行结果，id 严格配对
+]
+第 2 轮响应（合并后）= {
+  choices: [{
+    message: { role: "assistant", content: "各月分布如下：",
+      tool_calls: [{ id: "call_91d4", type: "function",
+        function: { name: "draw_chart",
+          arguments: "{\"type\":\"bar\",\"title\":\"每月新增照片\",\"labels\":\"6月,7月,8月\",\"values\":\"128,96,214\",\"unit\":\"张\"}" } }]
+    },
+    finish_reason: "tool_calls"
+  }],
+  usage: { prompt_tokens: 3560, completion_tokens: 92, total_tokens: 3652 }
+}
+→ App：draw_chart → QuickJS Chart.bar 生成 SVG → tool_chart 卡落库 → summary observation 回喂
+
+第 3 轮请求 messages = 第 2 轮全量 + [
+  assistant(content="各月分布如下：", tool_calls=[call_91d4/draw_chart]),
+  tool(tool_call_id="call_91d4", content="已生成柱状图：每月新增照片（6月:128, 7月:96, 8月:214 张）")
+]
+第 3 轮响应（合并后）= {
+  choices: [{ message: { role: "assistant", content: "点击卡片可横滑浏览全部照片。" },
+              finish_reason: "stop" }],                                  // 纯文本 = 终止
+  usage: { prompt_tokens: 3720, completion_tokens: 18, total_tokens: 3738 }
+}
+→ App：onTextMessage → nodeFinish，收尾文本落库，回合结束
+```
+
+**三条协议规律**：
+
+1. **请求是只增不减的累加器**：第 N 轮请求 = 第 N-1 轮全量 + 上轮 assistant 消息 + tool 结果消息；messages 数组即 ReAct 账本（短期轨 8000 token 预算/老化/摘要负责兜底体积，§3.2）。
+2. **Call↔Result 配对铁律**：回灌时 `assistant.tool_calls[i].id` 与下一条 `tool.tool_call_id` 必须严格一致——OpenAI 硬校验，孤儿 tool 消息或缺结果均 400（`toModelInput` 拆对、`sanitizeToolPairing` 双向剔除守此律）。
+3. **finish_reason 只有两种走向**：`tool_calls` = 执行工具再来一轮；`stop` = 纯文本终止。每轮请求/响应骨架一模一样，区别全在 messages 的累加上。
+
 ---
 
 ## 3. 历史与上下文：主从三级（本链路最易误读处）
@@ -280,7 +356,9 @@ Room `chat_messages`（partsJson 富归档）是聊天历史的唯一事实源�
 
 | 缺口 | 现状 | 影响 |
 |---|---|---|
-| 请求体逐字 JSON 无录制 | `LlmCallRecord.requestJson=""`（Koog EventHandler 不暴露原始请求；DEBUG 需 Ktor Logging） | 协议实证靠推断；排查线格式问题需抓包 |
+| 请求体逐字 JSON 无录制 | `LlmCallRecord.requestJson=""`（Koog EventHandler 不暴露原始请求；DEBUG 需 Ktor Logging） | 协议实证靠推断（§2.8 为还原实例非抓包）；排查线格式问题需抓包 |
+| ~~主聊天流 tools schema 无意图级裁剪~~ ✅ 已落地（2026-10-17，M3） | 契约 allowedTools 转执行：路由可靠单意图 → 子集 registry + prompt 同源过滤（§1.4）；OPEN_QA/降级/secondary/子集空交集或缺失过半 保守全量 | — |
+| prompt 前缀缓存未显式利用 | ✅ 可观测性已补（2026-10-17）：server 网关解析 `prompt_tokens_details.cached_tokens` 落 `llm_call_log.cached_tokens`（migration 013）+ 管理后台用户详情 Cached 列（依赖 TokenHub/CF 网关原样透传该嵌套对象；DeepSeek 旧版平铺字段 `prompt_cache_hit_tokens` 不采集）；**App 侧仍拿不到**（Koog 1.3.0 `createMetaInfo` 丢弃 cachedTokens，实证字节码 mask=48）；缓存**主动利用**（前缀稳定化之外的命中提升）未做 | 命中率可量化后再评估前缀重排收益；BYOK 直连不经网关无此观测 |
 | tool schema 转换在 Koog 内部 | `AbstractOpenAILLMClient` 序列化，仓库外 | schema 问题升级依赖 Koog 版本 |
 | Room 回灌在主链路的消费面 | toModelInput 已服务工程师隧道 + M4 冷启动重建（§3.2）；主动召回工具（recall_chat_history）未做 | 长会话中远期历史仍只能靠短期轨摘要触及，无法按需召回任意段 |
 | iOS 链路 | `ChatAgentBridge`（shared iosMain）消费同一 ChatStreamEvent，Swift ChatViewModel 对称实现 | 本文以 Android 主链路为准，iOS 差异走 parity 台账 |

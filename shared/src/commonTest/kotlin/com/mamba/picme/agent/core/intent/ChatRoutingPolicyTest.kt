@@ -202,4 +202,84 @@ class ChatRoutingPolicyTest {
         val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
         assertEquals("intent:BROWSE_WEB", loop.reason)
     }
+
+    // ── 意图级工具子集（M3，2026-10-17：契约 allowedTools 消费点）────────────
+
+    @Test
+    fun `browse web loop carries browser tool subset plus universal tools`() {
+        val decision = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.BROWSE_WEB)),
+            noBase,
+            originalQuery = "用浏览器打开新浪体育",
+        )
+        val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
+        assertEquals(
+            setOf(
+                "browser_open", "browser_navigate", "browser_click", "browser_type",
+                "browser_extract", "browser_screenshot", "browser_close",
+                "finish", "delay",
+            ),
+            loop.toolNames,
+        )
+        // forbiddenTools（search_media/refine_media_search/run_gallery_script）不得混入
+        assertTrue("run_gallery_script" !in loop.toolNames!!)
+        assertTrue("search_media" !in loop.toolNames)
+    }
+
+    @Test
+    fun `single-intent fallbacks carry contract subset`() {
+        val expected = mapOf(
+            IntentId.ANALYZE_STATS to setOf("run_gallery_script", "get_gallery_summary"),
+            IntentId.DRAW_CHART to setOf("run_gallery_script", "draw_chart", "get_gallery_summary"),
+            IntentId.EDIT_IMAGE to setOf("adjust_image", "edit_image", "ai_optimize"),
+            IntentId.RENDER_RICH_HTML to setOf("run_gallery_script", "render_html", "draw_chart", "search_media"),
+            IntentId.MEMORY to setOf(
+                "remember_fact", "forget_fact", "recall_memory",
+                "remember_person_relation", "forget_person_relation", "list_person_relations",
+            ),
+            IntentId.NAVIGATE to setOf("navigate_to", "go_back", "launch_app", "open_system_settings"),
+            IntentId.SETTINGS to setOf(
+                "change_theme", "change_language", "toggle_setting", "download_model", "switch_face_engine",
+            ),
+        )
+        expected.forEach { (intent, tools) ->
+            val decision = ChatRoutingPolicy.decide(
+                result(routerOutput(intent)),
+                withBase,
+                originalQuery = "任意输入",
+            )
+            val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision, "intent=$intent")
+            assertEquals(tools + setOf("finish", "delay"), loop.toolNames, "intent=$intent 子集")
+        }
+    }
+
+    @Test
+    fun `open qa keeps full tool surface`() {
+        // OPEN_QA allowedTools 为空（契约：M3 再按使用率裁剪）→ null = 完整工具面
+        val decision = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.OPEN_QA)),
+            noBase,
+            originalQuery = "随便聊聊",
+        )
+        val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
+        assertNull(loop.toolNames)
+    }
+
+    @Test
+    fun `secondary or degraded paths keep full tool surface`() {
+        // secondary 双产出物：判定不可靠，保守全量
+        val secondary = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.VIEW_PHOTOS, secondary = IntentId.DRAW_CHART)),
+            noBase,
+            originalQuery = "找照片并画图",
+        )
+        assertNull(assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(secondary).toolNames)
+        // 降级路径：无可靠意图，保守全量
+        val degraded = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.BROWSE_WEB), RoutePath.DEGRADED_TIMEOUT),
+            noBase,
+            originalQuery = "打开网页",
+        )
+        assertNull(assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(degraded).toolNames)
+    }
 }

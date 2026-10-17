@@ -93,6 +93,34 @@ class TokenUsageTest {
         assertEquals(0.0, costCny(null, "m", mapOf("m" to Price(2.0, 8.0))), 0.0)
     }
 
+    // ── cached_tokens：prompt 前缀缓存命中解析（2026-10-17）──
+
+    @Test
+    fun `parses cached tokens from prompt_tokens_details`() {
+        val json = """{"usage":{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150,""" +
+            """"prompt_tokens_details":{"cached_tokens":64}}}"""
+        val u = fromUpstreamBytes(json.toByteArray())
+        assertEquals(TokenUsage(100, 50, 150, cached = 64), u)
+    }
+
+    @Test
+    fun `missing prompt_tokens_details leaves cached null`() {
+        val u = fromUpstreamBytes(
+            """{"usage":{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150}}""".toByteArray(),
+        )
+        assertEquals(TokenUsage(100, 50, 150, cached = null), u)
+    }
+
+    @Test
+    fun `sse usage frame parses cached tokens`() {
+        val sse = "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n" +
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":7," +
+            "\"total_tokens\":19,\"prompt_tokens_details\":{\"cached_tokens\":0}}}\n\n" +
+            "data: [DONE]\n\n"
+        // 上报了但命中 0 ≠ 不可观测（null）
+        assertEquals(TokenUsage(12, 7, 19, cached = 0), fromSseStream(sse))
+    }
+
     // ── defaultPrices：路由在役的 DeepSeek 模型必须计得上价 ──
 
     @Test

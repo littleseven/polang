@@ -1,5 +1,6 @@
 package com.mamba.picme.agent.core.facade
 
+import ai.koog.agents.core.tools.ToolBase
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
 import com.mamba.picme.agent.core.inference.local.ImageInferenceEngine
@@ -41,6 +42,14 @@ data class AgentDependencies(
 
     /** chat 场域工具注册表（与 [chatToolDescriptors] 同源展开）。 */
     val chatToolRegistry: ToolRegistry,
+
+    /**
+     * chat 场域工具对象清单（与 [chatToolRegistry] 同源，M3 意图级裁剪用）：引擎按路由契约
+     * 子集过滤它重建子集 registry + prompt 清单段。null = 平台未注入 → 裁剪不可用，恒全量
+     *（行为与 M2 一致）。类型 `ToolBase<*, *>` 是 Koog KMP 类型，commonMain 可引用；
+     * 反射展开仍在 JVM 组合根完成（asToolsByClass），iOS 经 ChatToolManifest 手工清单注入。
+     */
+    val chatTools: List<ToolBase<*, *>>? = null,
 
     /** 相机场域工具描述元数据（CameraToolService 反射展开），system prompt 清单段用。 */
     val cameraToolDescriptors: List<ToolDescriptor>,
