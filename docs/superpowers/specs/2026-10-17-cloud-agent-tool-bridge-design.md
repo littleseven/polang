@@ -171,6 +171,16 @@ App: POST /agent/sessions/{id}/messages {content:"我上周拍的猫"}
 | AC-M2-A2 | BYOK 授权门：未授权弹窗、授权后 key 透传且双端零留存 | 单测 + 真机抓包 |
 | AC-M2-DOC | server/AGENTS.md 路由清单与包结构同步；androidApp AGENTS.md 新包登记；ADR-018 §6 状态更新 | 文档检查 |
 
+### M2.5 Chat 主页实验接入（2026-10-17 追加）
+
+Debug 页遛狗通过后，云端编排经设置页开关接入 Chat 主页：
+
+- **开关**：DataStore `cloud_agent_enabled`（默认关=本地编排），设置 → 远程模型区「云端 Agent（实验）」开关行，副文案显式声明能力降级（仅相册只读问答、回复不出卡片、带图消息降级纯文本）。
+- **共享回合内核**：`CloudAgentTurnRunner`（`features/cloudagent/`）自 `CloudAgentChatViewModel` 提取——SSE 收帧 / ToolRequest 端执行 + postToolResult 上行 / 事件回调（AssistantText/ToolCall/Error/Done），调试页与 Chat 主页共用同一内核防状态机漂移。
+- **ChatViewModel 云端分支**：`sendMessage` 在占位消息创建后拦截（用户消息落库/访客计数/自动命名复用，跳过 pacing/记忆/ReAct/能力分发）；云端会话按本地 sessionId 懒建复用（内存映射，失效重建重试一次，历史回放属 M3）；未登录/未授权插入引导消息；AssistantText 整条粒度更新占位气泡，SSE 收尾统一落 Room（modelUsed="cloud"）。
+- **依赖注入**：`ChatViewModelDependencies` 新增可空 `cloudAgentApi`/`deviceToolExecutor`（默认 null=未接线，单测不受影响）；AppContainer 两实例提升为容器级 lazy，调试页工厂与 Chat 共用。
+- **验收**：开关开 → Chat 页相册问答走云端工具闭环；开关关 → 本地路径零回归；`CloudAgentTurnRunnerTest` 覆盖帧分发/工具上行/错误传播。
+
 ## 10. 交付沉淀管线（DoD 提醒）
 
 合 main 前：桥协议 → `docs/03-TECHNICAL-SPECS/`（CHAT_PROTOCOL 或新 TECH_SPEC）；路由/包结构 → `server/AGENTS.md`；端侧实现约束 → `androidApp/AGENTS.md`；ADR-018 §6 状态表更新；本 spec `git rm`（git 历史即归档），README §6 白名单摘除。

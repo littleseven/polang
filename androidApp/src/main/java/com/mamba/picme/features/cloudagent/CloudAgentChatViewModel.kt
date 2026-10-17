@@ -4,9 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
-import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
-import com.mamba.picme.data.remote.picme.CloudFrame
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,16 +12,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 云端 Agent 最小聊天页状态机（spec §5，调试入口实验页；内存态消息列表，不落 Room——镜像属 M3）。
  *
  * 生命周期：prepare()（通道解析 + 建会话，幂等）→ Chat 态 send()/stop() 循环。
- * 一轮只开一条 SSE：tool_request 帧到达即 launch 端执行 + 上行（不阻塞收帧循环）。
+ * 回合内核（SSE 收帧/工具桥上行）委托 [CloudAgentTurnRunner]——Chat 主页云端模式共用同一内核。
  * BYOK key 仅存本类私有字段（内存态），随 postMessage 头发送；绝不进日志（Logger 调用不含 key）。
- * onFrame 回调抵达于 Dispatchers.IO（网络线程），Chat 态写经 StateFlow.update CAS 安全；消息 id 由 AtomicLong 保证唯一单调。
+ * onEvent 回调抵达于 Dispatchers.IO（网络线程），Chat 态写经 StateFlow.update CAS 安全；消息 id 由 AtomicLong 保证唯一单调。
  */
 class CloudAgentChatViewModel(
     private val api: CloudAgentApi,
@@ -54,6 +51,7 @@ class CloudAgentChatViewModel(
     private var turnJob: Job? = null
     private val msgSeq = AtomicLong(0L)
     private var prepareStarted = false
+    private val turnRunner = CloudAgentTurnRunner(api, deviceToolExecutor, viewModelScope)
 
     /** 入口：通道解析（spec §6 表）→ 建会话。幂等（同步守卫防快速双击竞态 + 非 Preparing 直接返回）。 */
     fun prepare() {
@@ -119,12 +117,24 @@ class CloudAgentChatViewModel(
         turnJob = viewModelScope.launch {
             append(UiMessage(msgSeq.incrementAndGet(), Role.USER, text))
             setInFlight(true)
-            val result = api.postMessage(
+            val result = turnRunner.runTurn(
                 appToken,
                 chat.sessionId,
                 text,
-                byokApiKey.takeIf { key -> key.isNotBlank() },
-            ) { frame -> onFrame(frame) }
+                byokApiKey,
+            ) { event ->
+                when (event) {
+                    is CloudTurnEvent.AssistantText ->
+                        append(UiMessage(msgSeq.incrementAndGet(), Role.ASSISTANT, event.text))
+                    is CloudTurnEvent.ToolCall ->
+                        append(UiMessage(msgSeq.incrementAndGet(), Role.TOOL, event.tool))
+                    is CloudTurnEvent.Error -> {
+                        append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, event.message))
+                        setInFlight(false)
+                    }
+                    CloudTurnEvent.Done -> setInFlight(false)
+                }
+            }
             // 流干净结束但无 Done 帧的兜底（Done 已清则为幂等 no-op）
             result.onSuccess { setInFlight(false) }
             result.onFailure { e ->
@@ -140,45 +150,8 @@ class CloudAgentChatViewModel(
         setInFlight(false)
     }
 
-    private fun onFrame(frame: CloudFrame) {
-        val chat = _state.value as? UiState.Chat ?: return
-        when (frame) {
-            is CloudFrame.Event -> handleEvent(frame.event)
-            is CloudFrame.ToolRequest -> {
-                append(UiMessage(msgSeq.incrementAndGet(), Role.TOOL, frame.tool))
-                // 端执行不阻塞收帧循环
-                viewModelScope.launch {
-                    val result = deviceToolExecutor.execute(frame.tool, frame.args)
-                    api.postToolResult(
-                        appToken,
-                        chat.sessionId,
-                        frame.requestId,
-                        ok = !result.startsWith("error:"),
-                        result = result,
-                    ).onFailure { e -> Logger.w(TAG, "postToolResult failed: ${e.message}") }
-                }
-            }
-            is CloudFrame.Done -> setInFlight(false)
-            is CloudFrame.Error -> {
-                append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, frame.message))
-                setInFlight(false)
-            }
-        }
-    }
-
-    private fun handleEvent(event: JSONObject) {
-        val payload = event.optJSONObject("payload") ?: return
-        when (event.optString("type")) {
-            // 助手答复（user 回声跳过——本地已先上屏）
-            "message" -> if (event.optString("role") == "assistant") {
-                append(UiMessage(msgSeq.incrementAndGet(), Role.ASSISTANT, payload.optString("content")))
-            }
-            else -> Unit // action/observation/finish 不上屏（TOOL 行由 tool_request 帧驱动）
-        }
-    }
-
     private fun append(message: UiMessage) {
-        // CAS：onFrame 在网络线程，读-改-写须原子化；非 Chat 态（stop/失败后的迟到帧）为 no-op
+        // CAS：onEvent 在网络线程，读-改-写须原子化；非 Chat 态（stop/失败后的迟到帧）为 no-op
         _state.update { current ->
             if (current is UiState.Chat) current.copy(messages = current.messages + message) else current
         }
@@ -188,9 +161,5 @@ class CloudAgentChatViewModel(
         _state.update { current ->
             if (current is UiState.Chat) current.copy(inFlight = inFlight) else current
         }
-    }
-
-    companion object {
-        private const val TAG = "CloudAgent"
     }
 }

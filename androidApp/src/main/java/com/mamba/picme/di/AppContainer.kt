@@ -86,6 +86,7 @@ import com.mamba.picme.features.chat.ChatEditStateHolder
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.data.remote.picme.AppUpdateClient
 import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
+import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudAgentClient
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.features.chat.ChatImageRenderer
@@ -1062,7 +1063,9 @@ class AppContainerImpl(
             saveChatEditResultUseCase = saveChatEditResultUseCase,
             optimizeGachaController = chatOptimizeGachaController,
             tagGenerationScheduler = tagGenerationScheduler,
-            browserWebSocketClient = browserWebSocketClient
+            browserWebSocketClient = browserWebSocketClient,
+            cloudAgentApi = cloudAgentApi,
+            deviceToolExecutor = deviceToolExecutor
         ).also { deps ->
             // app_tool_request 采集执行器：工厂依赖容器内数据源，构造后回填（先于 ChatViewModel 创建）
             deps.appToolExecutor = buildAppToolExecutor(deps)
@@ -1149,19 +1152,27 @@ class AppContainerImpl(
         )
     }
 
+    /** 云端 Agent SSE 客户端（调试页与 Chat 页云端模式共用实例）。 */
+    private val cloudAgentApi: CloudAgentApi by lazy { CloudAgentClient() }
+
+    /** 云端工具桥端侧执行器（调试页与 Chat 页云端模式共用实例）。 */
+    private val deviceToolExecutor: DeviceToolExecutor by lazy {
+        DeviceToolExecutor(
+            gallerySummary = { cloudAgentGalleryTools.getGallerySummary() },
+            searchMedia = { query, person, fromMs, toMs, hasFace ->
+                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace)
+            },
+            refineSearch = { constraint, fromMs, toMs ->
+                cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)
+            },
+        )
+    }
+
     override fun createCloudAgentChatViewModelFactory(): ViewModelProvider.Factory = viewModelFactory {
         initializer {
             CloudAgentChatViewModel(
-                api = CloudAgentClient(),
-                deviceToolExecutor = DeviceToolExecutor(
-                    gallerySummary = { cloudAgentGalleryTools.getGallerySummary() },
-                    searchMedia = { query, person, fromMs, toMs, hasFace ->
-                        cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace)
-                    },
-                    refineSearch = { constraint, fromMs, toMs ->
-                        cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)
-                    },
-                ),
+                api = cloudAgentApi,
+                deviceToolExecutor = deviceToolExecutor,
                 settingsRepository = userPreferencesRepository,
             )
         }

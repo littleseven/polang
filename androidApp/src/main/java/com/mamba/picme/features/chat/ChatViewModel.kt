@@ -64,6 +64,7 @@ import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.data.local.toModelInputItems
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.ClaudeEvent
+import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.domain.repository.UserSettingsRepository
@@ -102,6 +103,10 @@ import com.mamba.picme.domain.chat.streaming.ChatStreamTurnAdapter
 import com.mamba.picme.domain.chat.streaming.StreamingPacingController
 import com.mamba.picme.domain.chat.streaming.TurnPartsReducer
 import com.mamba.picme.domain.chat.streaming.TurnStreamEvent
+import com.mamba.picme.features.cloudagent.CloudAgentChannelChoice
+import com.mamba.picme.features.cloudagent.CloudAgentChannelResolver
+import com.mamba.picme.features.cloudagent.CloudAgentTurnRunner
+import com.mamba.picme.features.cloudagent.CloudTurnEvent
 import com.mamba.picme.features.gallery.MediaViewModel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -186,6 +191,9 @@ enum class RemoteModelSource(@StringRes val labelRes: Int) {
  */
 private const val STREAMING_THINKING_HINT_RES = R.string.chat_thinking
 
+/** 云端 Agent 回合落库消息的 modelUsed 标签（ADR-018 实验线）。 */
+private const val CLOUD_MODEL_LABEL = "cloud"
+
 /**
  * Chat 首页 ViewModel — 管理聊天状态与数据流
  *
@@ -266,6 +274,8 @@ class ChatViewModel(
     private val tagGenerationScheduler = dependencies.tagGenerationScheduler
     private val messageDecodeDispatcher = dependencies.messageDecodeDispatcher
     private val browserWebSocketClient = dependencies.browserWebSocketClient
+    private val cloudAgentApi = dependencies.cloudAgentApi
+    private val deviceToolExecutor = dependencies.deviceToolExecutor
 
     /** 已建立 WS 推流连接的浏览器会话集合（无 WS 客户端时恒空集，UI 侧按未连接降级展示）。 */
     val browserStreamConnected: StateFlow<Set<String>> =
@@ -1842,6 +1852,16 @@ class ChatViewModel(
                     isStreaming = true,
                     isThinking = true
                 )
+
+                // 云端 Agent 实验分支（设置页开关，ADR-018）：复用上方用户消息落库与占位消息，
+                // 跳过本地编排（pacing/记忆/ReAct/能力分发）；带图消息降级为纯文本（开关副文案已声明）。
+                if (cloudAgentApi != null && deviceToolExecutor != null &&
+                    userSettingsRepository.cloudAgentEnabledFlow.first()
+                ) {
+                    runCloudTurn(sessionId, text)
+                    return@launchChatRound
+                }
+
                 pacingController.start()
 
                 // 3.5 获取相册摘要并注入上下文
@@ -2112,6 +2132,172 @@ class ChatViewModel(
         return when (_currentModel.value) {
             is ChatModelOption.Remote -> "remote_deepseek"
         }
+    }
+
+    // ── 云端 Agent 实验分支（ADR-018；设置页开关开启后 sendMessage 拦截至此） ─────────────
+
+    /** 本地会话 → 云端会话映射（内存态：重启/失效即重建；历史回放属 M3）。 */
+    private data class CloudSession(val sessionId: String, val channel: String, val byokApiKey: String)
+
+    private val cloudSessions = mutableMapOf<String, CloudSession>()
+
+    /**
+     * 云端编排回合：占位消息以整条消息粒度实时更新（云端无 token 流式），SSE 收尾后统一落 Room。
+     * 取消经 launchChatRound Job 穿透断流——runTurn 抛 CancellationException 时本函数不执行收尾，
+     * 半截文本由 sendMessage 外层 catch(CancellationException) 按既有语义保留。
+     */
+    private suspend fun runCloudTurn(sessionId: String, text: String) {
+        val api = cloudAgentApi ?: return
+        val executor = deviceToolExecutor ?: return
+
+        // 登录态：/agent 会话需服务端账号 token（访客设备级额度仅覆盖 /llm 链路）
+        val token = userSettingsRepository.serverAuthTokenFlow.first()
+        if (token.isBlank()) {
+            _streamingMessage.value = null
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(R.string.cloud_agent_login_required),
+                CLOUD_MODEL_LABEL
+            )
+            return
+        }
+
+        // 通道解析（网关 / BYOK / 未授权引导），与调试页 prepare() 同一套规则
+        val configsJson = userSettingsRepository.aiAgentRemoteModelConfigsFlow.first()
+        val selectedKey = userSettingsRepository.aiAgentSelectedRemoteModelFlow.first()
+        val config = if (configsJson.isBlank()) {
+            null
+        } else {
+            val configs = RemoteModelConfigs.fromJson(configsJson)
+            configs.configs.find { c -> c.uniqueKey == selectedKey }
+                ?: configs.getConfigByModelId(selectedKey)
+        }
+        val consent = userSettingsRepository.cloudAgentByokConsentFlow.first()
+        val choice = CloudAgentChannelResolver.resolve(config, consent)
+        if (choice is CloudAgentChannelChoice.NeedConsent) {
+            _streamingMessage.value = null
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(R.string.cloud_agent_consent_required),
+                CLOUD_MODEL_LABEL
+            )
+            return
+        }
+
+        val runner = CloudAgentTurnRunner(api, executor, viewModelScope)
+        val session = ensureCloudSession(api, token, sessionId, choice)
+        if (session == null) {
+            _streamingMessage.value = null
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(
+                    R.string.chat_inference_error,
+                    stringContext().getString(R.string.chat_unknown_error)
+                ),
+                "error"
+            )
+            return
+        }
+
+        val answer = StringBuilder()
+        var serverError: String? = null
+        var result = runCloudTurnOnce(runner, token, session, text, answer) { serverError = it }
+        // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
+        if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
+            Logger.w(TAG, "Cloud session ${session.sessionId} invalid, recreating")
+            cloudSessions.remove(sessionId)
+            answer.clear()
+            serverError = null
+            _streamingMessage.value = _streamingMessage.value?.copy(
+                content = stringContext().getString(STREAMING_THINKING_HINT_RES),
+                isThinking = true,
+                showCursor = false
+            )
+            val fresh = ensureCloudSession(api, token, sessionId, choice)
+            if (fresh != null) {
+                result = runCloudTurnOnce(runner, token, fresh, text, answer) { serverError = it }
+            }
+        }
+
+        // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
+        _streamingMessage.value = null
+        when {
+            result.isFailure -> insertAgentMessage(
+                sessionId,
+                stringContext().getString(
+                    R.string.chat_inference_error,
+                    result.exceptionOrNull()?.message
+                        ?: stringContext().getString(R.string.chat_unknown_error)
+                ),
+                "error"
+            )
+            serverError != null -> insertAgentMessage(sessionId, serverError.orEmpty(), "error")
+            answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
+            else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
+        }
+    }
+
+    /** 单趟云端回合：帧事件驱动占位气泡；终态（Error 帧）经 [onServerError] 传出。 */
+    private suspend fun runCloudTurnOnce(
+        runner: CloudAgentTurnRunner,
+        token: String,
+        session: CloudSession,
+        text: String,
+        answer: StringBuilder,
+        onServerError: (String) -> Unit,
+    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey) { event ->
+        when (event) {
+            is CloudTurnEvent.AssistantText -> {
+                if (answer.isNotEmpty()) answer.append("\n\n")
+                answer.append(event.text)
+                _streamingMessage.value = _streamingMessage.value?.copy(
+                    content = answer.toString(),
+                    isThinking = false,
+                    showCursor = true
+                )
+            }
+            is CloudTurnEvent.ToolCall -> {
+                _streamingMessage.value = _streamingMessage.value?.copy(
+                    content = stringContext().getString(R.string.chat_calling_tool),
+                    isThinking = false,
+                    showCursor = false
+                )
+            }
+            is CloudTurnEvent.Error -> onServerError(event.message)
+            CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理
+        }
+    }
+
+    /** 懒建并缓存云端会话（每本地 sessionId 一条）；建会话失败返回 null 由调用方报错。 */
+    private suspend fun ensureCloudSession(
+        api: CloudAgentApi,
+        token: String,
+        localSessionId: String,
+        choice: CloudAgentChannelChoice,
+    ): CloudSession? {
+        cloudSessions[localSessionId]?.let { return it }
+        val channel: String
+        val model: String
+        val baseUrl: String
+        val key: String
+        when (choice) {
+            CloudAgentChannelChoice.Gateway -> {
+                channel = "gateway"; model = ""; baseUrl = ""; key = ""
+            }
+            is CloudAgentChannelChoice.Byok -> {
+                channel = "byok"; model = choice.model; baseUrl = choice.baseUrl; key = choice.apiKey
+            }
+            CloudAgentChannelChoice.NeedConsent -> return null // 调用方已拦截，防御兜底
+        }
+        val sessionId = api.createSession(token, channel, model, baseUrl).getOrNull()
+            ?.optString("session_id")?.takeIf { it.isNotBlank() } ?: return null
+        return CloudSession(sessionId, channel, key).also { cloudSessions[localSessionId] = it }
+    }
+
+    /** 会话失效判定：HTTP 404 / 服务端 session_not_found 语义（403 配额类不重试）。 */
+    private fun isCloudSessionInvalid(error: Throwable?): Boolean {
+        val message = error?.message.orEmpty()
+        return message.contains("HTTP 404") || message.contains("session_not_found", ignoreCase = true)
     }
 
     /**

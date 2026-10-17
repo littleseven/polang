@@ -548,6 +548,9 @@
     <string name="cloud_agent_byok_consent_title">雲端 Agent 使用我的 Key</string>
     <string name="cloud_agent_byok_consent_subtitle">Key 隨請求透傳，伺服器不儲存、不記錄</string>
     <string name="cloud_agent_entry_title">雲端 Agent（實驗）</string>
+    <string name="cloud_agent_chat_toggle_subtitle">開啟後聊天走雲端編排：僅相簿唯讀問答，回覆不出卡片；附圖訊息降級為純文字</string>
+    <string name="cloud_agent_login_required">使用雲端 Agent 前請先在設定頁登入帳號</string>
+    <string name="cloud_agent_consent_required">已選擇自帶 Key 的供應商但尚未授權：請到「設定 → 遠端模型」開啟「雲端 Agent 使用我的 Key」</string>
     <string name="cloud_agent_title">雲端 Agent</string>
     <string name="cloud_agent_channel_gateway">閘道通道</string>
     <string name="cloud_agent_channel_byok">BYOK 通道</string>

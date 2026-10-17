@@ -173,6 +173,9 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         // 云端 Agent BYOK 授权（默认关；开=API Key 随请求透传服务器内存处理，零留存）
         val CLOUD_AGENT_BYOK_CONSENT = booleanPreferencesKey("cloud_agent_byok_consent")
 
+        // 云端 Agent 编排开关（默认关=本地编排；开=Chat 页回合走云端 SSE 链路，ADR-018 实验线）
+        val CLOUD_AGENT_ENABLED = booleanPreferencesKey("cloud_agent_enabled")
+
         // 服务端邮箱认证
         val SERVER_AUTH_TOKEN = stringPreferencesKey("server_auth_token")
         val SERVER_AUTH_EMAIL = stringPreferencesKey("server_auth_email")
@@ -1292,6 +1295,25 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
     override suspend fun updateCloudAgentByokConsent(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.CLOUD_AGENT_BYOK_CONSENT] = enabled
+        }
+    }
+
+    // ── 云端 Agent 编排开关 ─────────────────────────────────────
+    override val cloudAgentEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.CLOUD_AGENT_ENABLED] ?: false
+        }
+
+    override suspend fun updateCloudAgentEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CLOUD_AGENT_ENABLED] = enabled
         }
     }
 

@@ -2,11 +2,13 @@ package com.mamba.picme.features.chat
 
 import android.content.Context
 import com.mamba.picme.core.agenttools.AppToolExecutor
+import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
 import com.mamba.picme.data.remote.picme.ClaudeChatClient
+import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
 import com.mamba.picme.data.repository.MediaFeedbackRepository
 import com.mamba.picme.domain.repository.ChatImageStore
@@ -60,7 +62,11 @@ class ChatViewModelDependencies(
      */
     val messageDecodeDispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** 浏览器直播 WS 推流客户端；null = 未接线（单测默认），直播卡回退 HTTP 轮询。 */
-    val browserWebSocketClient: BrowserWebSocketClient? = null
+    val browserWebSocketClient: BrowserWebSocketClient? = null,
+    /** 云端 Agent SSE 客户端（ADR-018 实验线）；null = 未接线（单测默认），云端开关视为关。 */
+    val cloudAgentApi: CloudAgentApi? = null,
+    /** 云端工具桥端侧执行器；null = 未接线（单测默认），云端开关视为关。 */
+    val deviceToolExecutor: DeviceToolExecutor? = null
 ) {
     /**
      * app_tool_request 采集执行器（spec §3.1）。null = 未接线（单测默认不注入则功能关闭）。
