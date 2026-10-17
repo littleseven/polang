@@ -1,6 +1,7 @@
 package com.mamba.picme.server.agent
 
 import com.mamba.picme.server.llm.AuthStyle
+import com.mamba.picme.server.llm.ChannelConfig
 import com.mamba.picme.server.util.TestDb
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -198,5 +199,20 @@ class AgentRunnerTest {
         val (_, headers) = capturedRequests.single()
         assertEquals(listOf("Bearer cf-token-123"), headers["cf-aig-authorization"])
         assertTrue(headers["Authorization"].isNullOrEmpty())
+    }
+
+    @Test
+    fun `resolver channel endpoint produces exact upstream path (no double v1)`() = runBlocking {
+        // 2026-10-17 真机遛狗实踩：完整 endpoint 直接当 Koog baseUrl 会拼出 /v1/v1/chat/completions
+        val session = newSession()
+        val channel = ChannelConfig(
+            3, "DeepSeek", "direct", "https://api.deepseek.com/v1/chat/completions",
+            AuthStyle.BEARER, "tok-abc", emptyMap(), "test-model",
+        )
+        val target = AgentTargetResolver.fromChannel(channel, "test-model")!!
+        runnerWith(HttpStatusCode.OK to chatResponse("ok"))
+            .runTurn(session, "hi", target, "sys", ServerToolService.defaultRegistry())
+
+        assertEquals("/v1/chat/completions", capturedRequests.single().first)
     }
 }

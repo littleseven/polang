@@ -54,7 +54,7 @@ class AgentExecutorFactory(
         }
         val client = OpenAILLMClient(
             target.apiKey,
-            OpenAIClientSettings(baseUrl = target.baseUrl),
+            OpenAIClientSettings(baseUrl = target.baseUrl, chatCompletionsPath = target.chatCompletionsPath),
             factory,
         )
         val params = LLMParams(
