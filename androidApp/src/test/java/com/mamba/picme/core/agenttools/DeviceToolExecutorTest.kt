@@ -1,5 +1,6 @@
 package com.mamba.picme.core.agenttools
 
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -35,10 +36,10 @@ class DeviceToolExecutorTest {
 
     @Test
     fun `result over limit is truncated`() = runTest {
-        val big = "x".repeat(DeviceToolExecutor.MAX_RESULT_CHARS + 500)
+        val big = "x".repeat(CloudAgentToolContract.MAX_RESULT_CHARS + 500)
         val exec = executor(gallery = { big })
         val out = exec.execute("get_gallery_summary", JSONObject())
-        assertTrue(out.length <= DeviceToolExecutor.MAX_RESULT_CHARS + 20)
+        assertTrue(out.length <= CloudAgentToolContract.MAX_RESULT_CHARS + 20)
         assertTrue(out.endsWith("[truncated]"))
     }
 

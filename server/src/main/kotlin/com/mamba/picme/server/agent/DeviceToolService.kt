@@ -38,6 +38,9 @@ data class ToolRequestFrame(
  * 每轮由路由层以当轮 SSE writer 构造新实例（onToolRequest 捕获 writer），不进单例。
  * @Tool 参数全部必填无默认值（Koog 反射派发约束，对齐端侧 ChatToolService 先例）。
  * M2 只读三件套；写类工具等决策 1a 逆操作执行链（M3）。
+ *
+ * 工具名/`error:` 前缀/32_000 字符截断的 SSOT = shared commonMain `CloudAgentToolContract`
+ *（M3 收口；server 不依赖 :shared，本类持字面量副本——改契约常量须双向同步核对）。
  */
 class DeviceToolService(
     private val sessionId: String,

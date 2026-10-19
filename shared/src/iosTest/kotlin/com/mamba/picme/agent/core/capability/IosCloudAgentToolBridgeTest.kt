@@ -1,5 +1,6 @@
 package com.mamba.picme.agent.core.capability
 
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import com.mamba.picme.data.IosChatSearchBridge
 import com.mamba.picme.data.IosMediaItem
 import com.mamba.picme.data.IosMediaRepository
@@ -74,27 +75,27 @@ class IosCloudAgentToolBridgeTest {
     fun errorActionMapsToErrorPrefix() = runTest {
         // fetchAllMedia 抛异常 → capability 兜底 AgentAction.Error → "error: " 前缀（契约 ok=false 判定）
         val bridge = newBridge(mediaBridge = ThrowingBridge())
-        val result = bridge.execute(IosCloudAgentToolBridge.TOOL_GET_GALLERY_SUMMARY, emptyMap())
+        val result = bridge.execute(CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY, emptyMap())
         assertTrue(result.startsWith("error:"), "expected error prefix, got: $result")
     }
 
     @Test
     fun truncationIsCharBasedWithSuffix() {
-        val long = "x".repeat(IosCloudAgentToolBridge.MAX_RESULT_CHARS + 100)
-        val truncated = IosCloudAgentToolBridge.truncate(long)
-        assertTrue(truncated.endsWith(IosCloudAgentToolBridge.TRUNCATED_SUFFIX))
+        val long = "x".repeat(CloudAgentToolContract.MAX_RESULT_CHARS + 100)
+        val truncated = CloudAgentToolContract.truncate(long)
+        assertTrue(truncated.endsWith(CloudAgentToolContract.TRUNCATED_SUFFIX))
         assertEquals(
-            IosCloudAgentToolBridge.MAX_RESULT_CHARS + IosCloudAgentToolBridge.TRUNCATED_SUFFIX.length,
+            CloudAgentToolContract.MAX_RESULT_CHARS + CloudAgentToolContract.TRUNCATED_SUFFIX.length,
             truncated.length
         )
         // 未超限原样返回
-        val exact = "y".repeat(IosCloudAgentToolBridge.MAX_RESULT_CHARS)
-        assertEquals(exact, IosCloudAgentToolBridge.truncate(exact))
+        val exact = "y".repeat(CloudAgentToolContract.MAX_RESULT_CHARS)
+        assertEquals(exact, CloudAgentToolContract.truncate(exact))
     }
 
     @Test
     fun gallerySummaryReturnsText() = runTest {
-        val result = newBridge().execute(IosCloudAgentToolBridge.TOOL_GET_GALLERY_SUMMARY, emptyMap())
+        val result = newBridge().execute(CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY, emptyMap())
         assertTrue(!result.startsWith("error:"), "unexpected error: $result")
         assertTrue(result.contains("2 个媒体"), "expected media count, got: $result")
     }
@@ -110,7 +111,7 @@ class IosCloudAgentToolBridgeTest {
             )
         )
         val result = newBridge(searchBridge = searchBridge).execute(
-            IosCloudAgentToolBridge.TOOL_SEARCH_MEDIA,
+            CloudAgentToolContract.TOOL_SEARCH_MEDIA,
             mapOf("query" to "猫", "person" to "", "fromMs" to "", "toMs" to "", "hasFace" to ""),
         )
         assertEquals("找到 1 张「猫」的照片", result)
@@ -119,7 +120,7 @@ class IosCloudAgentToolBridgeTest {
     @Test
     fun refineWithoutBaseFallsBackToFreshSearch() = runTest {
         val result = newBridge().execute(
-            IosCloudAgentToolBridge.TOOL_REFINE_MEDIA_SEARCH,
+            CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
             mapOf("constraint" to "夜景", "fromMs" to "", "toMs" to ""),
         )
         assertTrue(!result.startsWith("error:"), "unexpected error: $result")

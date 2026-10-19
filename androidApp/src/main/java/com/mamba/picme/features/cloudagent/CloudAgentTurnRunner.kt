@@ -1,5 +1,6 @@
 package com.mamba.picme.features.cloudagent
 
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
@@ -58,7 +59,7 @@ class CloudAgentTurnRunner(
                         appToken,
                         sessionId,
                         frame.requestId,
-                        ok = !result.startsWith("error:"),
+                        ok = !CloudAgentToolContract.isError(result),
                         result = result,
                     ).onFailure { e -> Logger.w(TAG, "postToolResult failed: ${e.message}") }
                 }

@@ -1,5 +1,6 @@
 package com.mamba.picme.core.agenttools
 
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
@@ -13,7 +14,7 @@ import org.json.JSONObject
  * 入队并立即回「正在切换页面」占位文案，永不真正执行——defaults 即该故障的温床，已移除。
  *
  * M2 只读三件套；写类工具（delete/share/select）不在映射表——云端会话里它们即未知工具。
- * 结果截断按字符计（32_000，AppToolExecutor 32KB 语义的文本版——字节截断会切坏 UTF-8）。
+ * 工具名/错误前缀/截断契约收口 shared [CloudAgentToolContract]（M3，双端 + server 同源）。
  */
 class DeviceToolExecutor(
     private val gallerySummary: suspend () -> String,
@@ -24,34 +25,26 @@ class DeviceToolExecutor(
     suspend fun execute(tool: String, args: JSONObject): String {
         val result = try {
             when (tool) {
-                "get_gallery_summary" -> gallerySummary()
-                "search_media" -> searchMedia(
+                CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> gallerySummary()
+                CloudAgentToolContract.TOOL_SEARCH_MEDIA -> searchMedia(
                     args.optString("query"),
                     args.optString("person"),
                     args.optString("fromMs"),
                     args.optString("toMs"),
                     args.optString("hasFace"),
                 )
-                "refine_media_search" -> refineSearch(
+                CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> refineSearch(
                     args.optString("constraint"),
                     args.optString("fromMs"),
                     args.optString("toMs"),
                 )
-                else -> return "error: unknown_tool:$tool"
+                else -> return CloudAgentToolContract.unknownTool(tool)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            return "error: ${e.message ?: e.javaClass.simpleName}"
+            return "${CloudAgentToolContract.ERROR_PREFIX} ${e.message ?: e.javaClass.simpleName}"
         }
-        return truncate(result)
-    }
-
-    private fun truncate(text: String): String =
-        if (text.length <= MAX_RESULT_CHARS) text
-        else text.take(MAX_RESULT_CHARS) + "\n…[truncated]"
-
-    companion object {
-        const val MAX_RESULT_CHARS = 32_000
+        return CloudAgentToolContract.truncate(result)
     }
 }

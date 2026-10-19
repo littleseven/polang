@@ -1,6 +1,7 @@
 package com.mamba.picme.agent.core.capability
 
 import com.mamba.picme.agent.core.inference.remote.tool.ChatToolService
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
@@ -22,9 +23,12 @@ import kotlinx.coroutines.CancellationException
  * 结果契约（与 Android DeviceToolExecutor 语义对齐；MediaResults 摘要文案按云端无卡场景裁剪——
  * Android 带「，已展示在卡片中」尾巴，本桥无卡片故不含）：
  * - 文本结果；失败以 `error: <message>` 前缀判定 ok=false（[AgentAction.Error] → error 前缀）；
- * - 超 [MAX_RESULT_CHARS] **字符**截断 + `\n…[truncated]`（字符非字节——不切半 UTF-8）；
+ * - 超 [CloudAgentToolContract.MAX_RESULT_CHARS] **字符**截断 + `\n…[truncated]`（字符非字节——不切半 UTF-8）；
  * - 未知工具 → `error: unknown_tool:<tool>`；
  * - 写类工具（delete/share/select 等）不在映射表——云端会话里即未知工具（M2 只读三件套）。
+ *
+ * 工具名/错误前缀/截断常量的 SSOT = commonMain [CloudAgentToolContract]（M3 收口，
+ * Android DeviceToolExecutor 同源；server 与 Swift 侧持字面量副本，改动须同步核对）。
  *
  * 信号 6 铁律：一切异常（除 [CancellationException] 透传）在 Kotlin 侧兜底为 error 前缀字符串，
  * 绝不逃逸到 Swift。
@@ -45,27 +49,27 @@ class IosCloudAgentToolBridge(
     suspend fun execute(tool: String, args: Map<String, String>): String {
         val result = try {
             when (tool) {
-                TOOL_GET_GALLERY_SUMMARY -> getGallerySummary()
-                TOOL_SEARCH_MEDIA -> searchMedia(
+                CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> getGallerySummary()
+                CloudAgentToolContract.TOOL_SEARCH_MEDIA -> searchMedia(
                     query = args["query"].orEmpty(),
                     person = args["person"].orEmpty(),
                     fromMs = args["fromMs"].orEmpty(),
                     toMs = args["toMs"].orEmpty(),
                     hasFace = args["hasFace"].orEmpty(),
                 )
-                TOOL_REFINE_MEDIA_SEARCH -> refineMediaSearch(
+                CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> refineMediaSearch(
                     constraint = args["constraint"].orEmpty(),
                     fromMs = args["fromMs"].orEmpty(),
                     toMs = args["toMs"].orEmpty(),
                 )
-                else -> return "$ERROR_PREFIX unknown_tool:$tool"
+                else -> return CloudAgentToolContract.unknownTool(tool)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            return "$ERROR_PREFIX ${e.message ?: "unknown"}"
+            return "${CloudAgentToolContract.ERROR_PREFIX} ${e.message ?: "unknown"}"
         }
-        return truncate(result)
+        return CloudAgentToolContract.truncate(result)
     }
 
     /** @Tool get_gallery_summary 对等：相册摘要。 */
@@ -107,34 +111,14 @@ class IosCloudAgentToolBridge(
         )
         return result.fold(
             onSuccess = { action -> actionToText(action) },
-            onFailure = { "$ERROR_PREFIX ${it.message ?: "dispatch failed"}" },
+            onFailure = { "${CloudAgentToolContract.ERROR_PREFIX} ${it.message ?: "dispatch failed"}" },
         )
     }
 
     private fun actionToText(action: AgentAction): String = when (action) {
         is AgentAction.TextReply -> action.message
         is AgentAction.MediaResults -> "找到 ${action.totalCount} 张「${action.query}」的照片"
-        is AgentAction.Error -> "$ERROR_PREFIX ${action.message}"
+        is AgentAction.Error -> "${CloudAgentToolContract.ERROR_PREFIX} ${action.message}"
         else -> "ok"
-    }
-
-    companion object {
-        const val TOOL_GET_GALLERY_SUMMARY = "get_gallery_summary"
-        const val TOOL_SEARCH_MEDIA = "search_media"
-        const val TOOL_REFINE_MEDIA_SEARCH = "refine_media_search"
-
-        /** 失败前缀（契约：hasPrefix("error:") → ok=false）。 */
-        const val ERROR_PREFIX = "error:"
-
-        /** 结果截断上限（字符，非字节；与 Android DeviceToolExecutor.MAX_RESULT_CHARS 同源）。 */
-        const val MAX_RESULT_CHARS = 32_000
-
-        /** 截断后缀（契约逐字）。 */
-        const val TRUNCATED_SUFFIX = "\n…[truncated]"
-
-        /** 字符截断（契约 §2：字符非字节——UTF-8 不切半字；String.take 即字符语义）。 */
-        internal fun truncate(text: String): String =
-            if (text.length <= MAX_RESULT_CHARS) text
-            else text.take(MAX_RESULT_CHARS) + TRUNCATED_SUFFIX
     }
 }

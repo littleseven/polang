@@ -224,7 +224,7 @@ final class CloudAgentChatStore: ObservableObject {
 
     // MARK: - 内部
 
-    /// 失败前缀（契约 §2：hasPrefix("error:") → ok=false；与 shared IosCloudAgentToolBridge 同源常量）。
+    /// 失败前缀（契约 §2：hasPrefix("error:") → ok=false；SSOT = shared commonMain CloudAgentToolContract.ERROR_PREFIX，改动须同步）。
     private static let errorPrefix = "error:"
 
     private func append(_ message: Message) {
