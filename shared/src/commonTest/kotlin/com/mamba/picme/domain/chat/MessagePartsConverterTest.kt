@@ -6,8 +6,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * [MessagePartsConverter] 新 8 值分类法映射 + `image` 角色双分支 + 未知/异常兜底
- * （type taxonomy spec §4.2；legacy 13 值 → 新 8 值的收编映射见 [LegacyChatTypeMigrationTest]）。
+ * [MessagePartsConverter] 新 9 值分类法映射 + `image` 角色双分支 + 未知/异常兜底
+ * （type taxonomy spec §4.2；legacy 13 值 → 新分类法的收编映射见 [LegacyChatTypeMigrationTest]）。
  */
 class MessagePartsConverterTest {
 

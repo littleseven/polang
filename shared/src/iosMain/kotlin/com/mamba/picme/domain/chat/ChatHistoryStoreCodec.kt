@@ -104,7 +104,7 @@ object ChatHistoryStoreCodec {
         )
     }
 
-    /** ChatMessageType 12 值 UI 枚举 → wire 8 值分类法（role 变体归并，role 列承载）。 */
+    /** ChatMessageType 12 值 UI 枚举 → wire 9 值分类法（role 变体归并，role 列承载）。 */
     private fun wireTypeOf(type: ChatMessageType): String = when (type) {
         ChatMessageType.USER_TEXT, ChatMessageType.AGENT_TEXT -> "text"
         ChatMessageType.USER_IMAGE, ChatMessageType.USER_IMAGE_TEXT, ChatMessageType.AGENT_IMAGE -> "image"
