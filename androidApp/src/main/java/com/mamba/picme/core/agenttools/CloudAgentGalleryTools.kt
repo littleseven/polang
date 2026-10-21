@@ -5,6 +5,9 @@ import com.mamba.picme.agent.core.model.context.GallerySummary
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.data.local.LocalHandleStore
+import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
+import com.mamba.picme.domain.chat.a2ui.ScanPhotoEntry
 import com.mamba.picme.domain.model.StructuredFilter
 import com.mamba.picme.features.chat.ChatGallerySearch
 import com.mamba.picme.features.chat.capability.GALLERY_SUMMARY_UNAVAILABLE_HINT
@@ -12,6 +15,8 @@ import com.mamba.picme.features.chat.capability.formatGallerySummaryForReply
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * 云端 Agent 相册工具的无头执行器（ADR-018 M2 Android 修复）。
@@ -33,9 +38,12 @@ class CloudAgentGalleryTools(
     private val searchByQuery: suspend (query: String, limitToIds: Set<Long>?) -> List<MediaAsset>,
     private val searchByFilter: suspend (filter: StructuredFilter, limitToIds: Set<Long>?) -> List<MediaAsset>,
     private val gallerySummary: suspend (includeDetails: Boolean) -> GallerySummary?,
+    private val localHandleStore: LocalHandleStore,
 ) {
 
     private val tag = "CloudAgentGalleryTools"
+
+    private val handleJson = Json { encodeDefaults = true }
 
     /**
      * 图集卡透出回调（云端 Agent 图集卡恢复，2026-10-20）：搜索/细化命中非空时回调完整的
@@ -50,6 +58,16 @@ class CloudAgentGalleryTools(
     /** refine_media_search 的搜索基数（chat 链路 lastResultAssets 的无头等价物，单槽位即可——云端会话串行）。 */
     private val refineBaseMutex = Mutex()
     private var refineBase: List<MediaAsset> = emptyList()
+
+    /** 命中集注册本地句柄，返回 opaque token（无 uri——D2 结构保证）。 */
+    private suspend fun registerScanHandle(photos: List<MediaAsset>): String {
+        val entries = photos.map { asset -> ScanPhotoEntry(id = asset.id, captureDate = asset.captureDate) }
+        val handleId = localHandleStore.put(
+            A2uiCardContract.DOMAIN_SCAN,
+            handleJson.encodeToString(entries),
+        )
+        return A2uiCardContract.formatHandleToken(A2uiCardContract.DOMAIN_SCAN, handleId)
+    }
 
     suspend fun getGallerySummary(): String {
         val summary = try {
@@ -88,7 +106,7 @@ class CloudAgentGalleryTools(
         if (photos.isNotEmpty()) {
             mediaResultsListener?.invoke(query, photos, photos.size, false)
         }
-        return "找到 ${photos.size} 张「$query」的照片"
+        return "找到 ${photos.size} 张「$query」的照片（数据句柄 ${registerScanHandle(photos)}）"
     }
 
     suspend fun refineMediaSearch(constraint: String, fromMs: String, toMs: String): String {
@@ -122,6 +140,6 @@ class CloudAgentGalleryTools(
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
         mediaResultsListener?.invoke(constraint, refined, refined.size, true)
-        return "在上一轮结果内找到 ${refined.size} 张「$constraint」的照片"
+        return "在上一轮结果内找到 ${refined.size} 张「$constraint」的照片（数据句柄 ${registerScanHandle(refined)}）"
     }
 }

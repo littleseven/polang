@@ -57,9 +57,10 @@ import com.mamba.picme.data.model.MediaEntity
         ChatImageCacheEntity::class,
         OptimizeFeedbackEntity::class,
         DedupHashEntity::class,
-        UserTaskEntity::class
+        UserTaskEntity::class,
+        LocalHandleEntity::class
     ],
-    version = 26,
+    version = 27,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -80,6 +81,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun optimizeFeedbackDao(): OptimizeFeedbackDao
     abstract fun dedupHashDao(): DedupHashDao
     abstract fun userTaskDao(): UserTaskDao
+    abstract fun localHandleDao(): LocalHandleDao
 
     companion object {
         @Volatile
@@ -101,7 +103,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
                         MIGRATION_23_24, MIGRATION_24_25,
-                        MIGRATION_25_26
+                        MIGRATION_25_26, MIGRATION_26_27
                     )
                     .build()
                 INSTANCE = instance
@@ -547,6 +549,25 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `chat_messages` ADD COLUMN `role` TEXT NOT NULL DEFAULT 'agent'")
                 migrateChatMessageTypes(database)
+            }
+        }
+
+        /**
+         * Migration 26 → 27：新增 local_handle 表（hybrid M2 D2：命中集引用式锚点，
+         * payloadJson 由 domain 决定，scan = List<ScanPhotoEntry>，无 uri/路径）。
+         */
+        internal val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `local_handle` (
+                        `handleId` TEXT NOT NULL PRIMARY KEY,
+                        `domain` TEXT NOT NULL,
+                        `payloadJson` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

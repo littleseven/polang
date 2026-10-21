@@ -19,6 +19,7 @@ import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.DedupHashDao
+import com.mamba.picme.data.local.LocalHandleStore
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.RoomUserTaskStore
 import com.mamba.picme.data.local.dao.PersonDao
@@ -1150,6 +1151,7 @@ class AppContainerImpl(
                 mediaSearchEngine.search(filter = filter, limitToIds = limitToIds).media
             },
             gallerySummary = { includeDetails -> getGallerySummaryUseCase(includeDetails) },
+            localHandleStore = LocalHandleStore(database.localHandleDao()),
         )
     }
 
