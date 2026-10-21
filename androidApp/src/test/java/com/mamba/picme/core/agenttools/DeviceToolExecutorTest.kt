@@ -53,4 +53,22 @@ class DeviceToolExecutorTest {
         )
         assertEquals(listOf("猫", "儿子", "100", "200", "true"), captured)
     }
+
+    @Test
+    fun `handler result containing content uri is blocked by projection gate`() = runTest {
+        val exec = executor(search = { _, _, _, _, _ -> "找到 2 张 content://media/external/images/1" })
+        assertEquals(
+            "error: projection_blocked:search_media",
+            exec.execute("search_media", JSONObject().put("query", "x")),
+        )
+    }
+
+    @Test
+    fun `handler error leaking storage path is blocked by projection gate`() = runTest {
+        val exec = executor(gallery = { throw IllegalStateException("/storage/emulated/0/db locked") })
+        assertEquals(
+            "error: projection_blocked:get_gallery_summary",
+            exec.execute("get_gallery_summary", JSONObject()),
+        )
+    }
 }

@@ -1,6 +1,7 @@
 package com.mamba.picme.core.agenttools
 
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
+import com.mamba.picme.agent.core.inference.remote.tool.CloudToolProjectionGate
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
@@ -15,6 +16,7 @@ import org.json.JSONObject
  *
  * M2 只读三件套；写类工具（delete/share/select）不在映射表——云端会话里它们即未知工具。
  * 工具名/错误前缀/截断契约收口 shared [CloudAgentToolContract]（M3，双端 + server 同源）。
+ * 出端结果一律过 shared [CloudToolProjectionGate] 投影闸（混合架构 M1，fail-closed）。
  */
 class DeviceToolExecutor(
     private val gallerySummary: suspend () -> String,
@@ -43,8 +45,8 @@ class DeviceToolExecutor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            return "${CloudAgentToolContract.ERROR_PREFIX} ${e.message ?: e.javaClass.simpleName}"
+            "${CloudAgentToolContract.ERROR_PREFIX} ${e.message ?: e.javaClass.simpleName}"
         }
-        return CloudAgentToolContract.truncate(result)
+        return CloudAgentToolContract.truncate(CloudToolProjectionGate.gate(tool, result))
     }
 }
