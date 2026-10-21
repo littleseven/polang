@@ -562,6 +562,7 @@
     <string name="cloud_agent_input_hint">发送消息…</string>
     <string name="cloud_agent_thinking">思考中…</string>
     <string name="cloud_agent_tool_call">正在调用 %1$s…</string>
+    <string name="cloud_agent_html_card_blocked">卡片内容未通过安全检查</string>
     <string name="cloud_agent_stop">停止</string>
     <string name="cloud_agent_send">发送</string>
     <string name="assistant_persona_default">默认</string>

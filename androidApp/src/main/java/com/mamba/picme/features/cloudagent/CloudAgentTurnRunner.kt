@@ -17,6 +17,9 @@ sealed interface CloudTurnEvent {
     /** 服务端下发 tool_request，端侧已受理执行。 */
     data class ToolCall(val tool: String) : CloudTurnEvent
 
+    /** 云端 render_html 产物（H5 卡）：完整自包含 HTML + 一句话摘要。 */
+    data class HtmlCard(val html: String, val summary: String) : CloudTurnEvent
+
     data class Error(val message: String) : CloudTurnEvent
 
     /** 本轮 SSE 正常收尾（done 帧）。 */
@@ -75,6 +78,13 @@ class CloudAgentTurnRunner(
             // 助手答复（user 回声跳过——本地已先上屏）
             "message" -> if (event.optString("role") == "assistant") {
                 onEvent(CloudTurnEvent.AssistantText(payload.optString("content")))
+            }
+            // render_html 产物卡（html 为空不上屏空卡）
+            "html_card" -> {
+                val html = payload.optString("html")
+                if (html.isNotBlank()) {
+                    onEvent(CloudTurnEvent.HtmlCard(html, payload.optString("summary")))
+                }
             }
             else -> Unit // action/observation/finish 不上屏（ToolCall 由 tool_request 帧驱动）
         }

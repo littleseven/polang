@@ -574,6 +574,7 @@
     <string name="cloud_agent_input_hint">Message…</string>
     <string name="cloud_agent_thinking">Thinking…</string>
     <string name="cloud_agent_tool_call">Calling %1$s…</string>
+    <string name="cloud_agent_html_card_blocked">Card content blocked by safety check</string>
     <string name="cloud_agent_stop">Stop</string>
     <string name="cloud_agent_send">Send</string>
     <string name="assistant_persona_default">Default</string>

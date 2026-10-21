@@ -31,9 +31,19 @@ class CloudAgentChatViewModel(
     private val cloudAgentGalleryTools: CloudAgentGalleryTools,
 ) : ViewModel() {
 
-    /** 媒体卡消息经 [media] 携带渲染数据；其余 role 恒为 null。 */
-    data class UiMessage(val id: Long, val role: Role, val text: String, val media: MediaResultsUi? = null)
-    enum class Role { USER, ASSISTANT, TOOL, ERROR, MEDIA }
+    /** 媒体卡消息经 [media] 携带渲染数据、H5 卡消息经 [htmlCard] 携带；其余 role 恒为 null。 */
+    data class UiMessage(
+        val id: Long,
+        val role: Role,
+        val text: String,
+        val media: MediaResultsUi? = null,
+        val htmlCard: HtmlCardUi? = null,
+    )
+
+    /** 云端 render_html 产物卡的 UI 数据（HTML 渲染前由 Screen 过 HtmlCardSanitizer）。 */
+    data class HtmlCardUi(val html: String, val summary: String)
+
+    enum class Role { USER, ASSISTANT, TOOL, ERROR, MEDIA, HTML_CARD }
 
     sealed interface UiState {
         data object Preparing : UiState
@@ -150,6 +160,15 @@ class CloudAgentChatViewModel(
                             append(UiMessage(msgSeq.incrementAndGet(), Role.ASSISTANT, event.text))
                         is CloudTurnEvent.ToolCall ->
                             append(UiMessage(msgSeq.incrementAndGet(), Role.TOOL, event.tool))
+                        is CloudTurnEvent.HtmlCard ->
+                            append(
+                                UiMessage(
+                                    msgSeq.incrementAndGet(),
+                                    Role.HTML_CARD,
+                                    text = event.summary,
+                                    htmlCard = HtmlCardUi(event.html, event.summary),
+                                ),
+                            )
                         is CloudTurnEvent.Error -> {
                             append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, event.message))
                             setInFlight(false)
