@@ -100,7 +100,8 @@ play {
 android {
     ndkVersion = "28.2.13676358"
     namespace = "com.mamba.picme"
-    compileSdk = 36
+    // androidx.a2ui 1.0.0-alpha01 要求 compileSdk >= 37（AAR metadata 硬校验）
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.mamba.picme"
@@ -326,6 +327,11 @@ dependencies {
 
     // KMP shared 模块（Phase 4：原 runtime-core 引擎无关逻辑已全部迁入；模块已删）
     implementation(project(":shared"))
+    // androidx.a2ui（hybrid M2：云端 Agent 下发 A2UI 信封骨架，端上渲染 data_ui 卡）
+    implementation(libs.androidx.a2ui.model)
+    implementation(libs.androidx.a2ui.engine)
+    implementation(libs.androidx.a2ui.compose.ui)
+    implementation(libs.androidx.compose.material3.a2ui)
     // Koog agent 框架：androidApp 侧直接使用（RemoteControlToolService 的 @Tool/@LLMDescription、
     // AndroidAgentComposition 的 ToolRegistry/asToolsByClass）；原 :runtime-core 已删除，
     // 改直接依赖。serialization-jackson 排除理由同 :shared（minSdk 24 D8 限制）。

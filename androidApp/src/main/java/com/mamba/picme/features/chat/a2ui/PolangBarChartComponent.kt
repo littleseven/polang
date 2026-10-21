@@ -1,0 +1,119 @@
+package com.mamba.picme.features.chat.a2ui
+
+import androidx.a2ui.compose.runtime.A2uiComponentProperties
+import androidx.a2ui.compose.runtime.A2uiComponentScope
+import androidx.a2ui.compose.runtime.A2uiProperty
+import androidx.a2ui.compose.ui.A2uiComponent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+/**
+ * polang 目录自研组件：月度照片计数柱状图（A2UI 线格式侧 name="BarChart"）。
+ *
+ * 数据全部经数据模型绑定（GenUI 只生成骨架不生成数据）：buckets=[{label,count}]，
+ * selected=选中桶 label。桶点选经 dispatchAction("event"/selectBucket) 由
+ * A2uiCardHost 的 A2uiActionInterceptor 消费（不上行，§3.4 不变式）。
+ * 样式走 design token（MaterialTheme.colorScheme.primary），禁硬编码色值。
+ */
+class PolangBarChartComponent : A2uiComponent {
+
+    override val name: String = NAME
+    override val description: String =
+        "月度照片计数柱状图。buckets 为 [{label: String, count: Int}] 列表（数据模型绑定，必填）；selected 为选中桶 label（可空）。"
+
+    override val properties: List<A2uiProperty<*>> = listOf(TITLE, BUCKETS, SELECTED)
+
+    @Composable
+    override fun A2uiComponentScope.isReady(properties: A2uiComponentProperties): Boolean =
+        properties.bind(BUCKETS) != null
+
+    @Composable
+    override fun A2uiComponentScope.Content(properties: A2uiComponentProperties, modifier: Modifier) {
+        val title = properties.bind(TITLE)
+        val rawBuckets = properties.bind(BUCKETS)
+        val selected = properties.bind(SELECTED)
+        val buckets = rawBuckets.asBuckets()
+        if (buckets.isEmpty()) {
+            // 数据未到/类型错：isReady 已挡，这里防御性空渲染
+            Box(modifier = modifier)
+            return
+        }
+        val maxCount = buckets.maxOf { bucket -> bucket.count }.coerceAtLeast(1)
+        val barColor = MaterialTheme.colorScheme.primary
+        Column(modifier = modifier.fillMaxWidth()) {
+            title?.let { text ->
+                Text(text = text, style = MaterialTheme.typography.titleSmall)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().height(BAR_AREA_HEIGHT),
+                horizontalArrangement = Arrangement.spacedBy(BAR_GAP),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                for (bucket in buckets) {
+                    val isSelected = bucket.label == selected
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(BAR_AREA_HEIGHT * bucket.count / maxCount)
+                                .background(
+                                    if (isSelected) barColor else barColor.copy(alpha = 0.45f)
+                                )
+                                .clickable {
+                                    dispatchAction(
+                                        mapOf(
+                                            "event" to mapOf(
+                                                "name" to EVENT_SELECT_BUCKET,
+                                                "context" to mapOf("bucket" to bucket.label),
+                                            )
+                                        )
+                                    )
+                                }
+                        )
+                        Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+
+    private data class Bucket(val label: String, val count: Int)
+
+    private fun Any?.asBuckets(): List<Bucket> {
+        val list = this as? List<*> ?: return emptyList()
+        return list.mapNotNull { item ->
+            val map = item as? Map<*, *> ?: return@mapNotNull null
+            val label = map["label"] as? String ?: return@mapNotNull null
+            val count = (map["count"] as? Number)?.toInt() ?: return@mapNotNull null
+            Bucket(label = label, count = count)
+        }
+    }
+
+    companion object {
+        const val NAME = "BarChart"
+        const val EVENT_SELECT_BUCKET = "selectBucket"
+
+        private val TITLE = A2uiProperty.dynamicString("title", description = "图表标题")
+        private val BUCKETS =
+            A2uiProperty.dynamicValue("buckets", required = true, description = "[{label,count}] 月桶列表")
+        private val SELECTED = A2uiProperty.dynamicString("selected", description = "选中桶 label")
+
+        private val BAR_AREA_HEIGHT = 120.dp
+        private val BAR_GAP = 6.dp
+    }
+}
