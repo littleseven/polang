@@ -9,10 +9,10 @@ import androidx.a2ui.model.protocol.A2uiServerToClientMessage
 import androidx.compose.material3.a2ui.A2uiSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * data_ui 卡的渲染宿主：一颗 processor 一张卡（surface 粒度隔离，互不重放串台）。
@@ -51,14 +51,19 @@ fun A2uiCardHost(
         resolvedMessages.forEach { message -> processor.processMessage(message) }
         true
     }
-    val surfaces by processor.activeSurfaces.collectAsState()
+    val surfaces by processor.activeSurfaces.collectAsStateWithLifecycle()
     val surface = surfaces.firstOrNull { surfaceModel -> surfaceModel.id == surfaceId }
     if (surface != null) {
         A2uiSurface(surfaceModel = surface, modifier = modifier)
     }
 }
 
-/** messagesJson（信封 JSON 数组）逐封解析——A2uiJsonMessageParser 单信封一 parse。 */
+/**
+ * messagesJson（信封 JSON 数组）逐封解析——A2uiJsonMessageParser 单信封一 parse。
+ *
+ * 错误契约：畸形输入（非 JSON 数组 / 元素非对象 / 信封缺字段）抛
+ * `org.json.JSONException` 或 parser 校验异常，调用方负责兜底降级（占位卡）。
+ */
 fun parseA2uiEnvelopes(messagesJson: String): List<A2uiServerToClientMessage> {
     val parser = A2uiJsonMessageParser { input -> AndroidA2uiJsonReader(input) }
     val array = org.json.JSONArray(messagesJson)

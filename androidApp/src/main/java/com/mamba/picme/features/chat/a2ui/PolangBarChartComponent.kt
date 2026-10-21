@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
  * selected=选中桶 label。桶点选经 dispatchAction("event"/selectBucket) 由
  * A2uiCardHost 的 A2uiActionInterceptor 消费（不上行，§3.4 不变式）。
  * 样式走 design token（MaterialTheme.colorScheme.primary），禁硬编码色值。
+ *
+ * 注意：[description] 会进 catalog schema 发给云端 LLM，与 server RenderUiToolService
+ * 的 @LLMDescription 是内容对齐关系——改动须双向核对（同 A2uiCardContract 文件头约定）。
  */
 class PolangBarChartComponent : A2uiComponent {
 
@@ -100,7 +103,8 @@ class PolangBarChartComponent : A2uiComponent {
             val map = item as? Map<*, *> ?: return@mapNotNull null
             val label = map["label"] as? String ?: return@mapNotNull null
             val count = (map["count"] as? Number)?.toInt() ?: return@mapNotNull null
-            Bucket(label = label, count = count)
+            // count 钳制非负：数据模型是半信任输入，负高度会在 layout 期抛异常
+            Bucket(label = label, count = count.coerceAtLeast(0))
         }
     }
 
