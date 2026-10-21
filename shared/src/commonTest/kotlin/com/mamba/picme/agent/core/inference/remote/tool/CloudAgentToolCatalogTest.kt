@@ -38,6 +38,18 @@ class CloudAgentToolCatalogTest {
     }
 
     @Test
+    fun `render_html is CLOUD executor with summary-only receipt`() {
+        val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_HTML)
+        assertNotNull(spec, "missing spec for render_html")
+        assertEquals("render_html", CloudAgentToolContract.TOOL_RENDER_HTML)
+        assertEquals(ToolExecutor.CLOUD, spec.executor)
+        assertTrue(
+            spec.projectionSchema.contains("summary"),
+            "render_html projection must declare summary-only receipt",
+        )
+    }
+
+    @Test
     fun `write tools have no spec - unknown to cloud`() {
         assertNull(CloudAgentToolCatalog.specFor("delete_media"))
     }
