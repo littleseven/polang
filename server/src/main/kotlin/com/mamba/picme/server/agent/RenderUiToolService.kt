@@ -29,7 +29,7 @@ class RenderUiToolService {
    结果尾部的「handle: scan/<id>」。禁止臆造 handleId，禁止把路径/uri/清单写进任何字段；
 5. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示。"""
     )
-    fun renderUi(
+    suspend fun renderUi(
         @LLMDescription("A2UI surface 唯一 id（与 createSurface.surfaceId 一致，建议 sf-<8位hex>）")
         surfaceId: String,
         @LLMDescription("A2UI v0.9 信封 JSON 数组原文")

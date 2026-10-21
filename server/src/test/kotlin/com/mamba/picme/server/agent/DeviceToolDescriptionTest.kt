@@ -31,4 +31,13 @@ class DeviceToolDescriptionTest {
             assertTrue("$name description must state exclusion", description.contains("不含文件路径"))
         }
     }
+
+    @Test
+    fun `media search descriptions declare handle token`() {
+        // 与 shared CloudAgentToolCatalog.projectionSchema 的 handle 子句双向同步（混合架构 M2）
+        listOf("search_media", "refine_media_search").forEach { name ->
+            val description = descriptors.getValue(name).descriptor.description
+            assertTrue("$name description must declare handle", description.contains("handle: scan/"))
+        }
+    }
 }

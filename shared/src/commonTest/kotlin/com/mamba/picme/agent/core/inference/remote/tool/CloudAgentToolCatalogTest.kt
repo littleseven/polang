@@ -59,6 +59,7 @@ class CloudAgentToolCatalogTest {
         val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_UI)
         assertNotNull(spec)
         assertEquals(ToolExecutor.CLOUD, spec.executor)
+        assertTrue(spec.projectionSchema.contains("不适用"), "CLOUD 工具 projectionSchema 须显式声明不适用")
     }
 
     @Test

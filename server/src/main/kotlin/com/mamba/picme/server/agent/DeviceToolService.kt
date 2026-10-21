@@ -56,7 +56,7 @@ class DeviceToolService(
         executeOnDevice("get_gallery_summary", buildJsonObject {})
 
     @Tool(customName = "search_media")
-    @LLMDescription("在用户手机相册搜索照片，结果以文本摘要回传（投影：仅数量+命中说明，不含文件路径与媒体清单）。query 自然语言搜索词；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）。")
+    @LLMDescription("在用户手机相册搜索照片，结果以文本摘要回传（投影：仅数量+命中说明+尾部 opaque 数据句柄「handle: scan/<id>」（供 render_ui 数据绑定，禁止臆造 handleId），不含文件路径与媒体清单）。query 自然语言搜索词；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓，无则空串") person: String,
@@ -75,7 +75,7 @@ class DeviceToolService(
     )
 
     @Tool(customName = "refine_media_search")
-    @LLMDescription("在上一轮 search_media 结果内细化过滤（如'只要夜景'），结果以文本摘要回传（投影：仅数量，不含文件路径与媒体清单）。constraint 细化条件；fromMs/toMs 毫秒串（空串=不限）。上一轮无搜索基数时设备会返回错误，此时改用 search_media。")
+    @LLMDescription("在上一轮 search_media 结果内细化过滤（如'只要夜景'），结果以文本摘要回传（投影：仅数量+尾部 opaque 数据句柄「handle: scan/<id>」（供 render_ui 数据绑定，禁止臆造 handleId），不含文件路径与媒体清单）。constraint 细化条件；fromMs/toMs 毫秒串（空串=不限）。上一轮无搜索基数时设备会返回错误，此时改用 search_media。")
     suspend fun refineMediaSearch(
         @LLMDescription("细化条件") constraint: String,
         @LLMDescription("时间起点毫秒串，空串=不限") fromMs: String,
