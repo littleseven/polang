@@ -235,7 +235,11 @@ fun Route.agentRoute(
                         writeSseFrame(frame.toJson())
                     }
                     val toolRegistry = ToolRegistry {
-                        tools(ServerToolService().asToolsByClass() + deviceTools.asToolsByClass())
+                        tools(
+                            ServerToolService().asToolsByClass() +
+                                deviceTools.asToolsByClass() +
+                                RenderUiToolService().asToolsByClass()
+                        )
                     }
                     try {
                         runner.runTurn(

@@ -53,4 +53,23 @@ class CloudAgentToolCatalogTest {
             assertTrue(projection.contains("不含"), "$name projection must state exclusion clause")
         }
     }
+
+    @Test
+    fun renderUi_isCloudToolWithNoProjectionSurface() {
+        val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_UI)
+        assertNotNull(spec)
+        assertEquals(ToolExecutor.CLOUD, spec.executor)
+    }
+
+    @Test
+    fun mediaSearchProjection_declaresHandleToken() {
+        for (tool in listOf(
+            CloudAgentToolContract.TOOL_SEARCH_MEDIA,
+            CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
+        )) {
+            val spec = CloudAgentToolCatalog.specFor(tool)!!
+            assertTrue(spec.projectionSchema.contains("handle:"), "$tool 未声明 handle token")
+            assertTrue(spec.projectionSchema.contains("不含"), "$tool 缺排除子句")
+        }
+    }
 }

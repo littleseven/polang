@@ -39,13 +39,19 @@ object CloudAgentToolCatalog {
             name = CloudAgentToolContract.TOOL_SEARCH_MEDIA,
             executor = ToolExecutor.LOCAL,
             resultSchema = "List<MediaAsset> 完整资产列表（含 uri）+ 总数",
-            projectionSchema = "计数文本「找到 N 张『query』的照片」：仅数量+命中说明，不含文件路径/uri/媒体清单",
+            projectionSchema = "计数文本「找到 N 张『query』的照片」+ 尾部 opaque 数据句柄「handle: scan/<id>」：仅数量+命中说明+句柄 id，不含文件路径/uri/媒体清单",
         ),
         CloudToolSpec(
             name = CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
             executor = ToolExecutor.LOCAL,
             resultSchema = "List<MediaAsset> 细化后完整资产列表（含 uri）+ 基数/命中数",
-            projectionSchema = "计数文本「在上一轮结果内找到 N 张」：仅数量，不含文件路径/uri/媒体清单",
+            projectionSchema = "计数文本「在上一轮结果内找到 N 张」+ 尾部 opaque 数据句柄「handle: scan/<id>」：仅数量+句柄 id，不含文件路径/uri/媒体清单",
+        ),
+        CloudToolSpec(
+            name = CloudAgentToolContract.TOOL_RENDER_UI,
+            executor = ToolExecutor.CLOUD,
+            resultSchema = "A2UI v0.9 信封 JSON 数组（骨架+绑定槽位），经 action 事件下行端侧渲染",
+            projectionSchema = "不适用：CLOUD 工具无端侧数据出端；确认文本仅含 surfaceId，不含媒体数据",
         ),
     ).associateBy { spec -> spec.name }
 

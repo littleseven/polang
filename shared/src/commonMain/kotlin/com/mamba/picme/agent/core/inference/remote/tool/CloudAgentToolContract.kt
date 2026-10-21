@@ -16,6 +16,7 @@ object CloudAgentToolContract {
     const val TOOL_GET_GALLERY_SUMMARY = "get_gallery_summary"
     const val TOOL_SEARCH_MEDIA = "search_media"
     const val TOOL_REFINE_MEDIA_SEARCH = "refine_media_search"
+    const val TOOL_RENDER_UI = "render_ui"
 
     /** 失败前缀（契约：结果 hasPrefix(ERROR_PREFIX) → ok=false；服务端/端侧/TurnRunner 同口径）。 */
     const val ERROR_PREFIX = "error:"
