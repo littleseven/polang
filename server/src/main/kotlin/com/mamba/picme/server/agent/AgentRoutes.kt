@@ -5,6 +5,7 @@ import ai.koog.agents.core.tools.reflect.asToolsByClass
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.llm.ChannelRegistry
 import com.mamba.picme.server.routes.TokenHashKey
+import com.mamba.picme.server.routes.isDebugQuotaBypass
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -206,13 +207,16 @@ fun Route.agentRoute(
                                 HttpStatusCode.ServiceUnavailable,
                                 mapOf("error" to "channel_unavailable", "channel" to channel.name),
                             )
-                        if (!AccountService.checkAndIncrementQuota(tokenHash)) {
+                        // debug 包豁免（DEBUG_QUOTA_BYPASS + X-App-Channel: debug）：
+                        // 跳过扣减；gatewayQuotaCharged 仅在真实扣减时置位，保证 revert 严格配对
+                        val quotaBypass = call.isDebugQuotaBypass()
+                        if (!quotaBypass && !AccountService.checkAndIncrementQuota(tokenHash)) {
                             return@post call.respond(
                                 HttpStatusCode.Forbidden,
                                 mapOf("error" to "quota_exceeded", "tier" to "account"),
                             )
                         }
-                        gatewayQuotaCharged = true
+                        gatewayQuotaCharged = !quotaBypass
                         t
                     }
                     AgentChannelKind.BYOK -> {

@@ -1,11 +1,13 @@
 package com.mamba.picme.server.llm
 
 import com.mamba.picme.server.analytics.defaultPrices
+import com.mamba.picme.server.auth.APP_CHANNEL_HEADER
 import com.mamba.picme.server.auth.APP_TOKEN_HEADER
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.db.Accounts
 import com.mamba.picme.server.db.Db
 import com.mamba.picme.server.db.LlmCallLogs
+import com.mamba.picme.server.routes.DebugQuotaBypassKey
 import com.mamba.picme.server.routes.TokenHashKey
 import com.mamba.picme.server.util.TestDb
 import io.ktor.client.HttpClient
@@ -33,6 +35,7 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -94,14 +97,87 @@ class LlmRouteStreamTest {
                 assertEquals(sseBody, resp.bodyAsText())
             }
 
-            val row = transaction(Db.instance) { LlmCallLogs.selectAll().single() }
-            assertEquals("glm-5.2", row[LlmCallLogs.model])
-            assertEquals("TestChan", row[LlmCallLogs.provider])
-            assertEquals(12, row[LlmCallLogs.promptTokens])
-            assertEquals(7, row[LlmCallLogs.completionTokens])
-            assertEquals(19, row[LlmCallLogs.totalTokens])
-            assertEquals(sseBody.toByteArray().size, row[LlmCallLogs.respBytes])
-            assertEquals("ok", row[LlmCallLogs.status])
+            // 流式 usage 记账在 body 透传完成后才落库（见类注释时序差）：断言前有界轮询等行出现，
+            // 同 class  preceded 测试拖慢 post-body 写库时不再假阴性
+            var row = transaction(Db.instance) { LlmCallLogs.selectAll().singleOrNull() }
+            val deadline = System.currentTimeMillis() + 5_000
+            while (row == null && System.currentTimeMillis() < deadline) {
+                Thread.sleep(50)
+                row = transaction(Db.instance) { LlmCallLogs.selectAll().singleOrNull() }
+            }
+            assertTrue("usage row should be recorded", row != null)
+            val usageRow = row!!
+            assertEquals("glm-5.2", usageRow[LlmCallLogs.model])
+            assertEquals("TestChan", usageRow[LlmCallLogs.provider])
+            assertEquals(12, usageRow[LlmCallLogs.promptTokens])
+            assertEquals(7, usageRow[LlmCallLogs.completionTokens])
+            assertEquals(19, usageRow[LlmCallLogs.totalTokens])
+            assertEquals(sseBody.toByteArray().size, usageRow[LlmCallLogs.respBytes])
+            assertEquals("ok", usageRow[LlmCallLogs.status])
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test
+    fun `debug channel skips account quota when bypass enabled`() = runBlocking {
+        TestDb.init(Accounts, LlmCallLogs)
+        val account = AccountService.createOrRefresh("dbg-llm@x.com", 0) // 额度已尽（limit=0）
+        val engine = MockEngine {
+            respond(
+                """{"id":"c1","object":"chat.completion","created":1730000000,"model":"glm-5.2",
+                   "choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],
+                   "usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}""".trimIndent(),
+                HttpStatusCode.OK,
+                headersOf("Content-Type", "application/json"),
+            )
+        }
+        ChannelRegistry.setActiveForTesting(
+            ChannelConfig(
+                1, "TestChan", "direct", "http://up.example/chat",
+                AuthStyle.BEARER, "tok-abc",
+                mapOf("deepseek-chat" to "glm-5.2"), "glm-5.2",
+            ),
+        )
+        val proxy = LlmProxy(HttpClient(engine), maxTokensCap = 4096)
+
+        val server = embeddedServer(ServerCIO, port = 0, host = "127.0.0.1") {
+            install(ContentNegotiation) { json() }
+            // 复刻 Application.module：token → TokenHashKey；DEBUG_QUOTA_BYPASS 开 + debug 渠道头 → 豁免标记
+            intercept(ApplicationCallPipeline.Plugins) {
+                call.request.headers[APP_TOKEN_HEADER]
+                    ?.let { AccountService.sha256(it) }
+                    ?.let { call.attributes.put(TokenHashKey, it) }
+                if (call.request.headers[APP_CHANNEL_HEADER] == "debug") {
+                    call.attributes.put(DebugQuotaBypassKey, true)
+                }
+            }
+            routing { llmRoute(proxy, null, defaultPrices()) }
+        }.start(wait = false)
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            HttpClient(CIO).use { http ->
+                // 豁免：debug 头 → 200，额度计数不增
+                val bypassed = http.post("http://127.0.0.1:$port/v1/chat/completions") {
+                    header(APP_TOKEN_HEADER, account.token)
+                    header(APP_CHANNEL_HEADER, "debug")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"model":"deepseek-chat"}""")
+                }
+                assertEquals(HttpStatusCode.OK, bypassed.status)
+
+                // 控制组：无 debug 头（env 开但头缺失）→ 照常 403
+                val blocked = http.post("http://127.0.0.1:$port/v1/chat/completions") {
+                    header(APP_TOKEN_HEADER, account.token)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"model":"deepseek-chat"}""")
+                }
+                assertEquals(HttpStatusCode.Forbidden, blocked.status)
+                assertTrue(blocked.bodyAsText().contains("quota_exceeded"))
+            }
+            // 豁免只跳扣减：额度计数保持 0；用量照记（一条 ok + 一条 blocked_quota）
+            assertEquals(0, transaction(Db.instance) { Accounts.selectAll().single()[Accounts.llmCallsUsed] })
+            assertEquals(2, transaction(Db.instance) { LlmCallLogs.selectAll().count() })
         } finally {
             server.stop()
         }

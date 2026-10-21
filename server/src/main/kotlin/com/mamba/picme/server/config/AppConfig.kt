@@ -44,6 +44,9 @@ data class AppConfig(
     val browserBridgeUrl: String,
     val browserBridgeToken: String,
     val browserDailyQuota: Int,
+    // debug 包额度豁免总闸（默认关）：开时 X-App-Channel: debug 请求跳过三处额度扣减
+    // （/v1/chat/completions 账号+访客、/agent 网关回合、/v1/browser/open 每日配额），用量照记
+    val debugQuotaBypass: Boolean = false,
 ) {
     companion object {
         fun load(): AppConfig = AppConfig(
@@ -84,6 +87,7 @@ data class AppConfig(
             browserBridgeUrl = env("BROWSER_BRIDGE_URL", ""),
             browserBridgeToken = env("BROWSER_BRIDGE_TOKEN", ""),
             browserDailyQuota = envInt("BROWSER_DAILY_QUOTA", 20),
+            debugQuotaBypass = parseEnvBool(System.getenv("DEBUG_QUOTA_BYPASS")),
         )
 
         private fun env(key: String, default: String): String =
@@ -91,6 +95,10 @@ data class AppConfig(
 
         private fun envInt(key: String, default: Int): Int =
             System.getenv(key)?.toIntOrNull() ?: default
+
+        /** "true"/"1"（大小写不敏感）视为开；null/其它 → false（豁免默认关，显式开启才生效）。 */
+        internal fun parseEnvBool(raw: String?): Boolean =
+            raw != null && (raw.equals("true", ignoreCase = true) || raw == "1")
 
         /**
          * 解析 LLM_PRICES_JSON 覆盖默认单价。格式 {"model":{"in":1.5,"out":6.0}}，合并覆盖默认。

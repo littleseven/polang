@@ -1,5 +1,6 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.server.auth.APP_CHANNEL_HEADER
 import com.mamba.picme.server.auth.APP_TOKEN_HEADER
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.db.Accounts
@@ -8,6 +9,7 @@ import com.mamba.picme.server.db.LlmCallLogs
 import com.mamba.picme.server.llm.AuthStyle
 import com.mamba.picme.server.llm.ChannelConfig
 import com.mamba.picme.server.llm.ChannelRegistry
+import com.mamba.picme.server.routes.DebugQuotaBypassKey
 import com.mamba.picme.server.routes.TokenHashKey
 import com.mamba.picme.server.util.TestDb
 import ai.koog.http.client.ktor.KtorKoogHttpClient
@@ -78,6 +80,7 @@ class AgentRoutesTest {
     private fun ApplicationTestBuilder.installAgentApp(
         runner: AgentRunner,
         roundGate: AgentRoundGate = AgentRoundGate(),
+        debugBypass: Boolean = false,
     ) {
         application {
             install(ContentNegotiation) { json() }
@@ -85,6 +88,10 @@ class AgentRoutesTest {
                 call.request.headers[APP_TOKEN_HEADER]
                     ?.let { AccountService.sha256(it) }
                     ?.let { call.attributes.put(TokenHashKey, it) }
+                // 复刻 Application.module：DEBUG_QUOTA_BYPASS 开 + debug 渠道头 → 豁免标记
+                if (debugBypass && call.request.headers[APP_CHANNEL_HEADER] == "debug") {
+                    call.attributes.put(DebugQuotaBypassKey, true)
+                }
             }
             routing { agentRoute(runner, AgentBridgeRegistry(), roundGate = roundGate) }
         }
@@ -276,6 +283,60 @@ class AgentRoutesTest {
         val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
         val resp = client.post("/agent/sessions/$sessionId/messages") {
             header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"content":"hi"}""")
+        }
+        assertEquals(HttpStatusCode.Forbidden, resp.status)
+        assertTrue(resp.bodyAsText().contains("quota_exceeded"))
+    }
+
+    @Test
+    fun `gateway message from debug channel skips quota when bypass enabled`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
+        val account = runBlocking { AccountService.createOrRefresh("dbg@x.com", 0) } // 额度已尽
+        activateGateway()
+        val engine = MockEngine {
+            respond(chatResponse("ok"), HttpStatusCode.OK, headersOf("Content-Type", ContentType.Application.Json.toString()))
+        }
+        val runner = AgentRunner(
+            executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
+            dispatcher = ServerToolDispatcher.default(),
+        )
+        installAgentApp(runner, debugBypass = true)
+        val created = client.post("/agent/sessions") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"model":"deepseek-chat","channel":"gateway"}""")
+        }
+        val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
+        val resp = client.post("/agent/sessions/$sessionId/messages") {
+            header(APP_TOKEN_HEADER, account.token)
+            header(APP_CHANNEL_HEADER, "debug")
+            contentType(ContentType.Application.Json)
+            setBody("""{"content":"hi"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        assertTrue(resp.bodyAsText().contains("\"done\""))
+        // 豁免只跳扣减：额度计数保持 0
+        val used = transaction(Db.instance) { Accounts.selectAll().single()[Accounts.llmCallsUsed] }
+        assertEquals(0, used)
+    }
+
+    @Test
+    fun `debug channel header without bypass switch still returns 403`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
+        val account = runBlocking { AccountService.createOrRefresh("dbgoff@x.com", 0) }
+        activateGateway()
+        installAgentApp(mockRunner(), debugBypass = false)
+        val created = client.post("/agent/sessions") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"model":"deepseek-chat","channel":"gateway"}""")
+        }
+        val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
+        val resp = client.post("/agent/sessions/$sessionId/messages") {
+            header(APP_TOKEN_HEADER, account.token)
+            header(APP_CHANNEL_HEADER, "debug") // 头可伪造：env 关（未打标）时照常 403
             contentType(ContentType.Application.Json)
             setBody("""{"content":"hi"}""")
         }

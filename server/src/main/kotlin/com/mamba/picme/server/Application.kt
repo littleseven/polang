@@ -8,6 +8,7 @@ import com.mamba.picme.server.agent.AgentRunner
 import com.mamba.picme.server.agent.ServerToolDispatcher
 import com.mamba.picme.server.agent.agentRoute
 import com.mamba.picme.server.auth.AccountService
+import com.mamba.picme.server.auth.APP_CHANNEL_HEADER
 import com.mamba.picme.server.auth.APP_TOKEN_HEADER
 import com.mamba.picme.server.auth.DEVICE_ID_HEADER
 import com.mamba.picme.server.auth.EmailService
@@ -27,6 +28,7 @@ import com.mamba.picme.server.llm.ChannelRegistry
 import com.mamba.picme.server.llm.ChannelBalanceService
 import com.mamba.picme.server.llm.llmRoute
 import com.mamba.picme.server.ratelimit.RateLimiter
+import com.mamba.picme.server.routes.DebugQuotaBypassKey
 import com.mamba.picme.server.routes.DeviceIdKey
 import com.mamba.picme.server.routes.EmailKey
 import com.mamba.picme.server.routes.PlatformKey
@@ -128,6 +130,11 @@ fun Application.module(config: AppConfig) {
         val rawToken = call.request.headers[APP_TOKEN_HEADER]
         val platform = call.request.headers[PLATFORM_HEADER]?.takeIf { it.isNotBlank() }
         platform?.let { call.attributes.put(PlatformKey, it) }
+        // debug 包额度豁免：env 总闸 + X-App-Channel: debug 头双满足才打标（头可伪造，env 默认关兜底）；
+        // 须在 token/访客分支之前打标，访客 LLM 路径同样受益
+        if (config.debugQuotaBypass && call.request.headers[APP_CHANNEL_HEADER] == "debug") {
+            call.attributes.put(DebugQuotaBypassKey, true)
+        }
         val authResult = rawToken?.let { AccountService.validateToken(it) }
         if (authResult?.valid == true) {
             // 有效账号 token → 存 hash + email 供下游额度校验与白名单判定

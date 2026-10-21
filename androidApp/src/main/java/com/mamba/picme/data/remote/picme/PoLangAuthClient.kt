@@ -1,5 +1,7 @@
 package com.mamba.picme.data.remote.picme
 
+import com.mamba.picme.data.remote.APP_CHANNEL_HEADER
+import com.mamba.picme.data.remote.appChannelValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -20,6 +22,7 @@ class PoLangAuthClient(
         .addInterceptor { chain ->
             chain.proceed(chain.request().newBuilder()
                 .addHeader("X-Platform", "android")
+                .addHeader(APP_CHANNEL_HEADER, appChannelValue)
                 .build())
         }
         .build()

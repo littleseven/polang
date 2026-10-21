@@ -58,7 +58,9 @@ fun Route.browserRoute(
             call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to "browser_unavailable"))
             return@post
         }
-        if (!dailyLimiter.peek(owner)) {
+        // debug 包豁免（DEBUG_QUOTA_BYPASS + X-App-Channel: debug）：跳过每日配额 peek/计费
+        val quotaBypass = call.isDebugQuotaBypass()
+        if (!quotaBypass && !dailyLimiter.peek(owner)) {
             call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "quota_exceeded", "tier" to "account"))
             return@post
         }
@@ -101,7 +103,7 @@ fun Route.browserRoute(
         val sessionId = probeOkSessionId(payload)
         if (sessionId != null) {
             concurrency.bind(owner, sessionId)
-            dailyLimiter.allow(owner) // 成功才计额度（spec §6：browser_unavailable 不计）
+            if (!quotaBypass) dailyLimiter.allow(owner) // 成功才计额度（spec §6：browser_unavailable 不计）
             // 统计写故障隔离：telemetry 挂不得破坏响应契约（租约已绑/额度已计）
             runCatching { stats.recordOpen(owner, sessionId) }
                 .onFailure { logger.warn("browser stats recordOpen failed: sessionId=$sessionId", it) }

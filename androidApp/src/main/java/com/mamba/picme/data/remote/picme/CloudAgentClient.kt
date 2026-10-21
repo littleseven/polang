@@ -1,5 +1,7 @@
 package com.mamba.picme.data.remote.picme
 
+import com.mamba.picme.data.remote.APP_CHANNEL_HEADER
+import com.mamba.picme.data.remote.appChannelValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -82,14 +84,24 @@ class CloudAgentClient(private val baseUrl: String = DEFAULT_BASE_URL) : CloudAg
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS) // SSE 长连接不超时（服务端 120s 工具超时兜底）
         .addInterceptor { chain ->
-            chain.proceed(chain.request().newBuilder().addHeader("X-Platform", "android").build())
+            chain.proceed(
+                chain.request().newBuilder()
+                    .addHeader("X-Platform", "android")
+                    .addHeader(APP_CHANNEL_HEADER, appChannelValue)
+                    .build(),
+            )
         }
         .build()
     private val apiClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .addInterceptor { chain ->
-            chain.proceed(chain.request().newBuilder().addHeader("X-Platform", "android").build())
+            chain.proceed(
+                chain.request().newBuilder()
+                    .addHeader("X-Platform", "android")
+                    .addHeader(APP_CHANNEL_HEADER, appChannelValue)
+                    .build(),
+            )
         }
         .build()
     private val jsonMedia = "application/json".toMediaType()

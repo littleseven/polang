@@ -16,3 +16,10 @@ const val DEVICE_ID_HEADER = "X-Device-Id"
  * 客户端平台标识 header。值为 "android" / "ios" 等，用于 llm_call_log.platform 列与管理后台展示。
  */
 const val PLATFORM_HEADER = "X-Platform"
+
+/**
+ * 客户端构建渠道 header。值为 "debug" / "release"（Android 由 BuildConfig.DEBUG 派生；iOS 暂不上报）。
+ * 唯一用途：与服务端 DEBUG_QUOTA_BYPASS env 配套实现 debug 包额度豁免。
+ * 🔴 头可被任意客户端伪造——env 开关（默认关）是总闸，生产要堵洞关 env 即可，不改代码。
+ */
+const val APP_CHANNEL_HEADER = "X-App-Channel"

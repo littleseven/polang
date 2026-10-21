@@ -1,6 +1,7 @@
 package com.mamba.picme.server.routes
 
 import com.mamba.picme.server.appJson
+import com.mamba.picme.server.auth.APP_CHANNEL_HEADER
 import com.mamba.picme.server.auth.APP_TOKEN_HEADER
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.browser.BrowserBridgeClient
@@ -60,6 +61,7 @@ class BrowserRouteTest {
         bridge: BrowserBridgeClient,
         concurrency: BrowserConcurrencyRegistry,
         limiter: RateLimiter,
+        debugBypass: Boolean = false,
     ) {
         TestDb.init(Accounts, BrowserSessions)
         application {
@@ -69,14 +71,17 @@ class BrowserRouteTest {
                 call.request.headers[APP_TOKEN_HEADER]
                     ?.let { AccountService.sha256(it) }
                     ?.let { call.attributes.put(TokenHashKey, it) }
+                // 复刻 Application.module：DEBUG_QUOTA_BYPASS 开 + debug 渠道头 → 豁免标记
+                if (debugBypass && call.request.headers[APP_CHANNEL_HEADER] == "debug") {
+                    call.attributes.put(DebugQuotaBypassKey, true)
+                }
             }
             routing { browserRoute(bridge, limiter, concurrency, BrowserSessionStats()) }
         }
     }
 
     @Test
-    fun `open proxies to bridge and binds concurrency on ok`() = testApplication {
-        val concurrency = BrowserConcurrencyRegistry()
+    fun `open proxies to bridge and binds concurrency on ok`() = testApplication {        val concurrency = BrowserConcurrencyRegistry()
         val bridge = bridgeReturning("""{"status":"ok","sessionId":"s-1","currentUrl":"https://example.com"}""")
         app(bridge, concurrency, RateLimiter(20, 86_400_000L))
         val resp = client.post("/v1/browser/open") {
@@ -87,6 +92,41 @@ class BrowserRouteTest {
         assertEquals(HttpStatusCode.OK, resp.status)
         assertTrue(resp.bodyAsText().contains("\"sessionId\":\"s-1\""))
         assertEquals(1, concurrency.activeCount())
+    }
+
+    // --- debug 包额度豁免（DEBUG_QUOTA_BYPASS + X-App-Channel: debug） ---
+
+    @Test
+    fun `open skips daily quota for debug channel when bypass enabled`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val limiter = RateLimiter(1, 86_400_000L)
+        limiter.allow(AccountService.sha256("test-token")) // 预耗尽每日配额
+        val bridge = bridgeReturning("""{"status":"ok","sessionId":"s-dbg","currentUrl":"https://example.com"}""")
+        app(bridge, concurrency, limiter, debugBypass = true)
+        val resp = client.post("/v1/browser/open") {
+            header(APP_TOKEN_HEADER, "test-token")
+            header(APP_CHANNEL_HEADER, "debug")
+            contentType(ContentType.Application.Json)
+            setBody("""{"url":"https://example.com"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        assertTrue(resp.bodyAsText().contains("\"sessionId\":\"s-dbg\""))
+    }
+
+    @Test
+    fun `open without bypass switch still 429 for debug channel`() = testApplication {
+        val concurrency = BrowserConcurrencyRegistry()
+        val limiter = RateLimiter(1, 86_400_000L)
+        limiter.allow(AccountService.sha256("test-token")) // 预耗尽每日配额
+        app(bridgeReturning("{}"), concurrency, limiter, debugBypass = false)
+        val resp = client.post("/v1/browser/open") {
+            header(APP_TOKEN_HEADER, "test-token")
+            header(APP_CHANNEL_HEADER, "debug") // 头可伪造：env 关（未打标）时照常 429
+            contentType(ContentType.Application.Json)
+            setBody("""{"url":"https://example.com"}""")
+        }
+        assertEquals(HttpStatusCode.TooManyRequests, resp.status)
+        assertTrue(resp.bodyAsText().contains("quota_exceeded"))
     }
 
     @Test

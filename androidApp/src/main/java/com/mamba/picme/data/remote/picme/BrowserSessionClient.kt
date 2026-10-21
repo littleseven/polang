@@ -1,6 +1,8 @@
 package com.mamba.picme.data.remote.picme
 
 import com.mamba.picme.agent.core.capability.BrowserTransport
+import com.mamba.picme.data.remote.APP_CHANNEL_HEADER
+import com.mamba.picme.data.remote.appChannelValue
 import com.mamba.picme.domain.browser.BrowserActionRequest
 import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
@@ -40,6 +42,7 @@ class BrowserSessionClient(
             chain.proceed(
                 chain.request().newBuilder()
                     .addHeader("X-Platform", "android")
+                    .addHeader(APP_CHANNEL_HEADER, appChannelValue)
                     .build()
             )
         }

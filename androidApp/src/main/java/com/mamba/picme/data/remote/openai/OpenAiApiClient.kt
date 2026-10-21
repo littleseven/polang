@@ -1,6 +1,8 @@
 package com.mamba.picme.data.remote.openai
 
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.data.remote.APP_CHANNEL_HEADER
+import com.mamba.picme.data.remote.appChannelValue
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -55,6 +57,8 @@ class OpenAiApiClient(
                 }
 
                 requestBuilder.addHeader("X-Platform", "android")
+                // 构建渠道头（debug 包额度豁免配套，见 AppChannel.kt）
+                requestBuilder.addHeader(APP_CHANNEL_HEADER, appChannelValue)
 
                 chain.proceed(requestBuilder.build())
             }

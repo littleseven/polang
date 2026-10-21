@@ -10,6 +10,7 @@ import com.mamba.picme.server.ratelimit.RateLimiter
 import com.mamba.picme.server.routes.DeviceIdKey
 import com.mamba.picme.server.routes.PlatformKey
 import com.mamba.picme.server.routes.TokenHashKey
+import com.mamba.picme.server.routes.isDebugQuotaBypass
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -60,26 +61,31 @@ fun Route.llmRoute(
             val isGuest = tokenHash == null
             val accountId = tokenHash?.let { AccountService.idForTokenHash(it) }
             val guestLlmQuota = SettingsService.snapshot().guestLlmQuota
+            // debug 包豁免（DEBUG_QUOTA_BYPASS + X-App-Channel: debug）：跳过扣减，用量照记；
+            // 未扣减则错误回滚也须跳过（revert 与 increment 严格配对）
+            val quotaBypass = call.isDebugQuotaBypass()
 
             // Quota check — account OR guest（各只增量一次）
-            if (isGuest) {
-                val guest = GuestService.checkAndIncrementQuota(deviceId!!, guestLlmQuota, platform)
-                if (!guest.allowed) {
+            if (!quotaBypass) {
+                if (isGuest) {
+                    val guest = GuestService.checkAndIncrementQuota(deviceId!!, guestLlmQuota, platform)
+                    if (!guest.allowed) {
+                        call.respond(
+                            HttpStatusCode.Forbidden,
+                            mapOf("error" to "quota_exceeded", "tier" to "guest", "message" to "guest quota used up"),
+                        )
+                        return@post
+                    }
+                } else if (!AccountService.checkAndIncrementQuota(tokenHash)) {
+                    accountId?.let {
+                        UsageRecorder.log(it, requestedModel, "", null, 0, "blocked_quota", null, prices, deviceId = deviceId, platform = platform)
+                    }
                     call.respond(
                         HttpStatusCode.Forbidden,
-                        mapOf("error" to "quota_exceeded", "tier" to "guest", "message" to "guest quota used up"),
+                        mapOf("error" to "quota_exceeded", "tier" to "account", "message" to "free quota used up"),
                     )
                     return@post
                 }
-            } else if (!AccountService.checkAndIncrementQuota(tokenHash)) {
-                accountId?.let {
-                    UsageRecorder.log(it, requestedModel, "", null, 0, "blocked_quota", null, prices, deviceId = deviceId, platform = platform)
-                }
-                call.respond(
-                    HttpStatusCode.Forbidden,
-                    mapOf("error" to "quota_exceeded", "tier" to "account", "message" to "free quota used up"),
-                )
-                return@post
             }
 
             val started = System.currentTimeMillis()
@@ -160,8 +166,10 @@ fun Route.llmRoute(
                     }
                 }
                 is ProxyResult.Error -> {
-                    // LLM call failed — revert quota increment
-                    if (isGuest) GuestService.revertQuota(deviceId!!) else AccountService.revertQuota(tokenHash)
+                    // LLM call failed — revert quota increment（豁免请求未扣减，跳过回滚保持配对）
+                    if (!quotaBypass) {
+                        if (isGuest) GuestService.revertQuota(deviceId!!) else AccountService.revertQuota(tokenHash)
+                    }
                     accountId?.let {
                         UsageRecorder.log(it, requestedModel, "", null, 0, result.logStatus, null, prices, deviceId = deviceId, platform = platform)
                     }

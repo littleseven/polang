@@ -6,6 +6,7 @@ import com.mamba.picme.server.auth.EmailService
 import com.mamba.picme.server.auth.GuestService
 import com.mamba.picme.server.config.SettingsService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -22,6 +23,16 @@ val EmailKey = AttributeKey<String>("email")
 val DeviceIdKey = AttributeKey<String>("deviceId")
 
 val PlatformKey = AttributeKey<String>("platform")
+
+/**
+ * debug 包额度豁免标记：全局拦截器在 DEBUG_QUOTA_BYPASS 开 + X-App-Channel: debug 双满足时写入。
+ * 命中后三处额度点（llmRoute 账号/访客、agentRoute 网关回合、browserRoute 每日配额）跳过扣减，
+ * 用量照记 llm_call_log——豁免的是计数，不是可观测性。
+ */
+val DebugQuotaBypassKey = AttributeKey<Boolean>("debugQuotaBypass")
+
+/** 本请求是否命中 debug 包额度豁免。 */
+fun ApplicationCall.isDebugQuotaBypass(): Boolean = attributes.getOrNull(DebugQuotaBypassKey) != null
 
 @Serializable
 data class EmailSendRequest(val email: String, val lang: String? = null)
