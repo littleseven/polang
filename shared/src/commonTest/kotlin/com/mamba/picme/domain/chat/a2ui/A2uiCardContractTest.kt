@@ -2,6 +2,7 @@ package com.mamba.picme.domain.chat.a2ui
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class A2uiCardContractTest {
@@ -11,7 +12,7 @@ class A2uiCardContractTest {
         val token = A2uiCardContract.formatHandleToken(A2uiCardContract.DOMAIN_SCAN, "abc123")
         assertEquals("handle: scan/abc123", token)
         // 投影闸 FORBIDDEN 含 "local://" 字面量：opaque token 绝不含 scheme
-        kotlin.test.assertFalse(token.contains(A2uiCardContract.HANDLE_SCHEME))
+        assertFalse(token.contains(A2uiCardContract.HANDLE_SCHEME))
     }
 
     @Test
@@ -34,5 +35,15 @@ class A2uiCardContractTest {
         assertNull(A2uiCardContract.parseLocalHandle("local://scan"))
         assertNull(A2uiCardContract.parseLocalHandle("local:///7f3a"))
         assertNull(A2uiCardContract.parseLocalHandle(""))
+    }
+
+    @Test
+    fun parseLocalHandle_emptyIdRejected_emptyFragmentNormalizedToNull() {
+        assertNull(A2uiCardContract.parseLocalHandle("local://scan/"))
+        // 空 fragment 不拒绝，归一为 null
+        assertEquals(
+            LocalHandle(domain = "scan", id = "7f3a", fragment = null),
+            A2uiCardContract.parseLocalHandle("local://scan/7f3a#"),
+        )
     }
 }

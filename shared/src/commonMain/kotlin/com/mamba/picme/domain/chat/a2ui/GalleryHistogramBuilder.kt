@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ScanPhotoEntry(
     val id: Long,
+    /** 拍摄时刻，epoch milliseconds。 */
     val captureDate: Long,
 )
 
@@ -31,7 +32,7 @@ object GalleryHistogramBuilder {
         timeZone: TimeZone = TimeZone.currentSystemDefault(),
     ): List<HistogramBucket> {
         if (entries.isEmpty()) return emptyList()
-        val counts = LinkedHashMap<String, Int>()
+        val counts = mutableMapOf<String, Int>()
         for (entry in entries) {
             val date = Instant.fromEpochMilliseconds(entry.captureDate)
                 .toLocalDateTime(timeZone).date
