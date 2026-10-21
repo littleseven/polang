@@ -311,6 +311,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | Agent 文本流（markdown） | `text`（+ role=agent） | `ChatAgentTextPart`（M4 拍平 item）→ `AgentMarkdown`（M3）+ AgentTable/CodeBlock | 原生（AST 管线） | chat-conversation 帧 | ✅ |
 | 图表卡 | `tool_chart` | `ChartSvgCard` / `ChartSvgImage` | SVG 栅格化 | —（生成物无固定帧） | ✅ |
 | HTML 卡（双形态） | `tool_html` | `HtmlCard` / `HtmlFullpageViewer` | WebView | `htmlcard/inline` 438:3 · `preview` 438:60 · `fullpage` 438:98 | ✅ |
+| 云端 Agent H5 卡 | `tool_html`（主聊天云端回合）/ 调试页内存消息（不落 Room） | `HtmlCard`（复用 §4.2 同族） | WebView | —（同 HTML 卡族） | ✅ Android（2026-10-22）；iOS 挂账（§4.9） |
 | 工程师任务卡 | `tool_task` | `EngineerTaskCard` + 原生动作条 | WebView L1 模板 | `taskcard/*` 438:181/208/264/444:31 | ✅（两分区改版待实现迁移） |
 | 搜索结果卡 | `data_media_results` | `MediaResultsCarousel` | 原生 | `chat_photo_card` 387:143 | ✅ |
 | 抽卡候选条 | `data_optimize_candidates` | `GachaCandidateStrip` | 原生 | —（设计稿已随交付清理） | ✅ |
@@ -768,6 +769,36 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 | `actionCount` / `resultSummary` / `errorReason` | Int / String? / String? | 定格统计与摘要 |
 
 **回灌**（`toModelInput`，toolCallId = `"<messageId>:<partId>"` 命名空间锚）→ `ToolCall(…, "browser_session", argsSummary="")` + `ToolResult(…, resultSummary ?: 失败原因 ?: 会话概览, isError = state==OUTPUT_ERROR)`——只回灌文本摘要，帧与动作流水不进上下文（token 保护；§0.3 硬约束①②④过线）。**端到端**：`browser_open` tool_call → `BrowserSessionCapability` → 网关 `/v1/browser/open`（wantFrame=true）→ xuxing bridge → 占位 part（`INPUT_STREAMING`）经 `BrowserLiveOverlay` 逐动作原位覆写 → `browser_close`/超时定格 → `emitBrowserCardMessage` 落 `tool_browser` 行（partsJson 由 `insertMessageWithParts` 自 content 现算，`MessagePartsConverter` 认 `tool_browser` 直通解码）→ 冷启动从 Room 恢复定格卡；降级不变式：任何一环失败退化为纯文本回答，不白屏。
+
+### 4.9 云端 Agent H5 卡（render_html 云→端，2026-10-22）
+
+云端 Agent（ADR-017/018 会话域）服务端工具 `render_html` 产出的 H5 卡——与 §4.2 HTML 卡同族渲染、协议来源不同：HTML 是**模型在云端生成**的产物，方向为**云→端**（不经端侧 `capability` 回执链路，也不经 `CloudToolProjectionGate`——该闸只管端→云出端投影）。
+
+**协议**：
+
+```jsonc
+// ① 入口：云端 LLM tool_call（server 侧 Koog 工具 render_html，shared Catalog 登记 executor=CLOUD）
+{
+  "name": "render_html",
+  "arguments": {
+    "html": "<div style='width:100%…'>…仪表盘…</div>",
+    "summary": "NVIDIA 2026 Q3 业绩概览"
+  }
+}
+
+// ② 下行：HTML 本体不进 LLM 上下文——服务端落 agent_event 第六型载荷 + SSE kind=event 帧
+// AgentEventPayload.HtmlCard（wire：type=html_card / source=environment / role=tool）
+{ "type": "html_card", "source": "environment", "role": "tool",
+  "payload": { "html": "<div…>…</div>", "summary": "NVIDIA 2026 Q3 业绩概览" } }
+
+// ③ 落库（主聊天云端回合）：复用 emitHtmlCardMessage，与 §4.2 同形态（content=HTML、metadata.html_card）
+{ "type": "tool_html", "role": "agent", "content": "<div…>…</div>", "metadata": { "html_card": { "…": "…" } } }
+```
+
+**回灌**：summary-only——LLM 只见 `render_html → <summary>` 回执，HTML 本体不入上下文（token 保护，同 §4.2 口径）；超限 128_000 字符回 `error: html_too_large` 且 sink 不触发（与端侧 `HtmlCardSanitizer` 128KB 口径对齐）。
+**渲染**：Android ✅——`CloudAgentTurnRunner` 新增 `CloudTurnEvent.HtmlCard`；调试页（CloudAgentChatScreen）插 `Role.HTML_CARD` 内存消息，复用主聊天 `HtmlCard` 组件 + `HtmlCardSanitizer` 清洗（Rejected 降级纯文本）；主聊天云端回合复用 `emitHtmlCardMessage` 落 Room（tool_html，走 §4.2 双形态全链路）。iOS 挂账 ios-follow（云端页 html_card 解码容错 + WKWebView 卡渲染）。
+**pending 重放**：断线重连/重放路径经 `ServerToolDispatcher.withHtmlCardSink` 派生 run 级 sink 副本，卡片重新出现在事件流。
+**测试**：server `ServerRenderHtmlToolTest` / `AgentRunnerTest` / `AgentEventPayloadTest`；Android `CloudAgentTurnRunnerTest` / `CloudAgentChatViewModelTest`。
 
 ---
 

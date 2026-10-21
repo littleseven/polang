@@ -18,7 +18,8 @@ enum class AgentEventType(val wire: String) {
     ACTION("action"),
     OBSERVATION("observation"),
     CONDENSATION("condensation"),
-    FINISH("finish");
+    FINISH("finish"),
+    HTML_CARD("html_card");
 
     companion object {
         fun fromWire(wire: String): AgentEventType =
@@ -103,6 +104,16 @@ sealed class AgentEventPayload {
     @SerialName("finish")
     data class Finish(val reason: String) : AgentEventPayload() {
         override fun type() = AgentEventType.FINISH
+    }
+
+    /**
+     * render_html 产出的 H5 卡本体（summary-only 回执语义：HTML 不进 LLM 上下文，
+     * 只经事件流下行端上渲染）。投影层只消费 Message，本载荷天然不进模型视图。
+     */
+    @Serializable
+    @SerialName("html_card")
+    data class HtmlCard(val html: String, val summary: String) : AgentEventPayload() {
+        override fun type() = AgentEventType.HTML_CARD
     }
 }
 

@@ -17,6 +17,13 @@ object CloudAgentToolContract {
     const val TOOL_SEARCH_MEDIA = "search_media"
     const val TOOL_REFINE_MEDIA_SEARCH = "refine_media_search"
 
+    /**
+     * H5 卡片渲染工具（server 侧执行，CLOUD）：模型产出 HTML + summary，HTML 本体不进 LLM
+     * 上下文——模型只得到 summary 回执（省 token，对齐主聊天 render_html 语义）；HTML 卡
+     * 本体经 AgentEvent HtmlCard 载荷下行端上渲染。
+     */
+    const val TOOL_RENDER_HTML = "render_html"
+
     /** 失败前缀（契约：结果 hasPrefix(ERROR_PREFIX) → ok=false；服务端/端侧/TurnRunner 同口径）。 */
     const val ERROR_PREFIX = "error:"
 

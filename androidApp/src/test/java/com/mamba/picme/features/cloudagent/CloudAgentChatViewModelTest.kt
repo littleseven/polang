@@ -165,6 +165,27 @@ class CloudAgentChatViewModelTest {
     }
 
     @Test
+    fun `html card frame appends html card message with payload`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { _, onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":2,"type":"html_card","source":"environment","role":"tool","payload":{"type":"html_card","html":"<p>hello</p>","summary":"一张问候卡"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val vm = newVm(api)
+        vm.prepare()
+        vm.send("画张卡片")
+        val s = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        val card = s.messages.last()
+        assertEquals(CloudAgentChatViewModel.Role.HTML_CARD, card.role)
+        assertEquals(CloudAgentChatViewModel.HtmlCardUi("<p>hello</p>", "一张问候卡"), card.htmlCard)
+        assertEquals(false, s.inFlight)
+    }
+
+    @Test
     fun `error frame appends error message`() = runTest {
         val api = FakeApi()
         api.framesScript = { _, onFrame -> onFrame(CloudFrame.Error("quota exhausted")) }

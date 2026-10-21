@@ -2284,6 +2284,28 @@ class ChatViewModel(
                     showCursor = false
                 )
             }
+            is CloudTurnEvent.HtmlCard -> {
+                // 云端 render_html 产物：清洗后复用 emitHtmlCardMessage 落 Room（DB Flow 驱动上屏；
+                // 其内部 feedToolOutput 在云端回合无 pending 占位时 no-op，安全）。
+                // Rejected 降级：summary 并入答复文本收尾上屏，不落卡不崩溃。
+                val htmlEvent = event
+                viewModelScope.launch {
+                    when (val sanitized = HtmlCardSanitizer.sanitize(htmlEvent.html)) {
+                        is HtmlCardSanitizer.Result.Ok ->
+                            emitHtmlCardMessage(
+                                sanitized.html,
+                                summary = htmlEvent.summary.ifBlank { null }
+                            )
+                        is HtmlCardSanitizer.Result.Rejected -> {
+                            Logger.w(TAG, "Cloud html_card rejected: ${sanitized.reason}")
+                            if (htmlEvent.summary.isNotBlank()) {
+                                if (answer.isNotEmpty()) answer.append("\n\n")
+                                answer.append(htmlEvent.summary)
+                            }
+                        }
+                    }
+                }
+            }
             is CloudTurnEvent.Error -> onServerError(event.message)
             CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理
         }

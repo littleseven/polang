@@ -13,6 +13,7 @@ import io.ktor.http.fullPath
 import ai.koog.http.client.ktor.KtorKoogHttpClient
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -118,6 +119,82 @@ class AgentRunnerTest {
         // pending 不变式：工具闭环后无 pending
         assertTrue(AgentEventRepository.pendingActions(session.id).isEmpty())
         assertEquals(AgentEventPayload.Message("现在是中午"), events[3].payload)
+    }
+
+    @Test
+    fun `render html turn appends html card event between action and observation`() = runBlocking {
+        val session = newSession()
+        val cards = mutableListOf<Pair<String, String>>()
+        val emitted = mutableListOf<AgentEvent>()
+        // 与生产接线同形态：sink 落 HtmlCard 事件并经同一 SSE 通道下行（AgentRoutes 写 kind=event 帧）
+        val sink: suspend (String, String) -> Unit = { html, summary ->
+            cards += html to summary
+            val event = AgentEventRepository.append(
+                session.id, AgentEventSource.ENVIRONMENT, AgentEventRole.TOOL,
+                payload = AgentEventPayload.HtmlCard(html, summary),
+            )
+            emitted += event
+        }
+        val registry = ServerToolService.defaultRegistry(onHtmlCard = sink)
+        // arguments 在外层 JSON 内是字符串值，内层引号须反斜杠转义（OpenAI wire 形态）
+        val args = """{\"html\":\"<html>卡</html>\",\"summary\":\"周报\"}"""
+        runnerWith(
+            HttpStatusCode.OK to toolCallResponse("call_1", "render_html", args),
+            HttpStatusCode.OK to chatResponse("已为你生成周报卡片"),
+        ).runTurn(session, "出个周报卡", gatewayTarget, "sys", registry) { emitted += it }
+
+        val events = AgentEventRepository.listBySession(session.id)
+        assertEquals(
+            listOf(
+                AgentEventType.MESSAGE, AgentEventType.ACTION, AgentEventType.HTML_CARD,
+                AgentEventType.OBSERVATION, AgentEventType.MESSAGE, AgentEventType.FINISH,
+            ),
+            events.map { it.type },
+        )
+        assertEquals(events.map { it.id }, emitted.map { it.id })
+        val card = events[2].payload as AgentEventPayload.HtmlCard
+        assertEquals("<html>卡</html>", card.html)
+        assertEquals("周报", card.summary)
+        assertEquals(AgentEventSource.ENVIRONMENT, events[2].source)
+        assertEquals(AgentEventRole.TOOL, events[2].role)
+        val observation = events[3].payload as AgentEventPayload.Observation
+        // LLM 只见 summary 回执，HTML 本体不进上下文（Koog 字符串结果以 JsonPrimitive 带引号，既有约定）
+        assertTrue(observation.content.contains("已渲染 HTML 卡片：周报"))
+        assertFalse(observation.content.contains("<html>"))
+        assertEquals(listOf("<html>卡</html>" to "周报"), cards)
+    }
+
+    @Test
+    fun `pending render html action replay re-emits html card event`() = runBlocking {
+        val session = newSession()
+        val orphaned = AgentEventRepository.append(
+            session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
+            payload = AgentEventPayload.Action(
+                "render_html", """{"html":"<p>重播</p>","summary":"旧卡"}""", reversible = false,
+            ),
+        )
+        val cards = mutableListOf<Pair<String, String>>()
+        runnerWith(HttpStatusCode.OK to chatResponse("继续"))
+            .runTurn(
+                session, "继续", gatewayTarget, "sys", ServerToolService.defaultRegistry(),
+                onHtmlCard = { html, summary ->
+                    cards += html to summary
+                    AgentEventRepository.append(
+                        session.id, AgentEventSource.ENVIRONMENT, AgentEventRole.TOOL,
+                        payload = AgentEventPayload.HtmlCard(html, summary),
+                    )
+                },
+            )
+
+        // 崩溃恢复重放：卡片重新出现在事件流
+        assertEquals(listOf("<p>重播</p>" to "旧卡"), cards)
+        val events = AgentEventRepository.listBySession(session.id)
+        val card = events.mapNotNull { it.payload as? AgentEventPayload.HtmlCard }.single()
+        assertEquals("<p>重播</p>", card.html)
+        val obs = events.mapNotNull { it.payload as? AgentEventPayload.Observation }
+            .single { o -> o.actionEventId == orphaned.id }
+        assertEquals("已渲染 HTML 卡片：旧卡", obs.content)
+        assertTrue(AgentEventRepository.pendingActions(session.id).isEmpty())
     }
 
     @Test

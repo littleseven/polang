@@ -23,6 +23,9 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  *   （路由层据此置会话 ERROR + 回退配额）。
  *
  * 每个事件落流后回调 [onEvent]（SSE 发射点），顺序与事件序一致。
+ * render_html 的 HTML 本体不走 Observation（LLM 只见 summary 回执），经 [onHtmlCard]
+ * sink 侧路落 HtmlCard 事件——活轮由路由层把它注入 ToolRegistry 的 ServerToolService，
+ * pending 重放由本类经 [ServerToolDispatcher.withHtmlCardSink] 绑定当轮 sink。
  *
  * ⚠️ Koog 1.3.0 EventHandler 的 Interceptor 是**同步非 suspend** 接口（javap 核实），
  * 钩子内落库只能 runBlocking 桥到 Dispatchers.IO。Koog 事件在自身执行线程触发、
@@ -45,6 +48,7 @@ class AgentRunner(
         target: AgentLlmTarget,
         systemPrompt: String,
         toolRegistry: ToolRegistry,
+        onHtmlCard: suspend (html: String, summary: String) -> Unit = { _, _ -> },
         onEvent: suspend (AgentEvent) -> Unit = {},
     ): AgentEvent {
         // 1. 投影（先于本轮用户消息落流）
@@ -61,7 +65,7 @@ class AgentRunner(
         )
 
         // 3. pending 重放
-        replayPending(session.id, onEvent)
+        replayPending(session.id, onEvent, onHtmlCard)
 
         // 4-5. Koog loop + 收尾
         val built = executorFactory.create(target)
@@ -161,11 +165,17 @@ class AgentRunner(
     }
 
     /** pending action 不变式：恢复时按追加序优先执行 pending，补 Observation 闭环。 */
-    private suspend fun replayPending(sessionId: String, onEvent: suspend (AgentEvent) -> Unit) {
+    private suspend fun replayPending(
+        sessionId: String,
+        onEvent: suspend (AgentEvent) -> Unit,
+        onHtmlCard: suspend (html: String, summary: String) -> Unit,
+    ) {
+        // render_html 重放须绑定当轮 sink：卡片重新落 HtmlCard 事件并随 SSE 下行
+        val scopedDispatcher = dispatcher.withHtmlCardSink(onHtmlCard)
         AgentEventRepository.pendingActions(sessionId).forEach { pending ->
             val action = pending.payload as AgentEventPayload.Action
             val content = try {
-                dispatcher.dispatch(action.tool, action.argsJson)
+                scopedDispatcher.dispatch(action.tool, action.argsJson)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

@@ -113,6 +113,41 @@ class CloudAgentTurnRunnerTest {
     }
 
     @Test
+    fun `html card event is forwarded with html and summary`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":2,"type":"html_card","source":"environment","role":"tool","payload":{"type":"html_card","html":"<p>hello</p>","summary":"一张问候卡"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画张卡片", null) { events.add(it) }
+        assertEquals(
+            listOf(CloudTurnEvent.HtmlCard("<p>hello</p>", "一张问候卡"), CloudTurnEvent.Done),
+            events,
+        )
+    }
+
+    @Test
+    fun `html card with blank html is dropped`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":3,"type":"html_card","source":"environment","role":"tool","payload":{"type":"html_card","html":"","summary":"空卡"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画张卡片", null) { events.add(it) }
+        assertEquals(listOf(CloudTurnEvent.Done), events)
+    }
+
+    @Test
     fun `error frame is forwarded as error event`() = runTest {
         val api = FakeApi()
         api.framesScript = { onFrame -> onFrame(CloudFrame.Error("quota exhausted")) }

@@ -11,6 +11,10 @@ package com.mamba.picme.agent.core.inference.remote.tool
  *
  * 完整结果（resultSchema 描述的结构，如 search_media 的 List<MediaAsset>）永不离开设备；
  * M2 起经 local:// handle 端上补全引用。本表是 [PRIVACY] 闸的审计入口。
+ *
+ * CLOUD 条目（如 render_html）语义相反：执行位在 server，不存在「出端」数据面，
+ * projectionSchema 描述的是「回给 LLM 的面」（summary-only 回执）而非出端白名单，
+ * 不经 [CloudToolProjectionGate]（该闸只管端→云方向）。
  */
 
 /** 工具执行位。 */
@@ -46,6 +50,12 @@ object CloudAgentToolCatalog {
             executor = ToolExecutor.LOCAL,
             resultSchema = "List<MediaAsset> 细化后完整资产列表（含 uri）+ 基数/命中数",
             projectionSchema = "计数文本「在上一轮结果内找到 N 张」：仅数量，不含文件路径/uri/媒体清单",
+        ),
+        CloudToolSpec(
+            name = CloudAgentToolContract.TOOL_RENDER_HTML,
+            executor = ToolExecutor.CLOUD,
+            resultSchema = "无（HTML 不入 LLM 上下文；卡本体经 AgentEvent HtmlCard 载荷下行端上）",
+            projectionSchema = "LLM 仅见 summary 回执文本；HTML 为模型生成物下行端上渲染，方向为出云入端，不经 CloudToolProjectionGate（该闸只管端→云）",
         ),
     ).associateBy { spec -> spec.name }
 

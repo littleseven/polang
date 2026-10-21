@@ -39,6 +39,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mamba.picme.R
+import com.mamba.picme.domain.chat.HtmlCardMeta
+import com.mamba.picme.features.chat.HtmlCard
+import com.mamba.picme.features.chat.HtmlCardSanitizer
+import com.mamba.picme.features.chat.HtmlFullpageContent
+import com.mamba.picme.features.chat.HtmlFullpageViewer
+import com.mamba.picme.features.chat.HtmlLinkPreviewOverlay
 import com.mamba.picme.features.chat.components.MediaResultsCarousel
 import com.mamba.picme.features.common.chat.AgentMarkdown
 
@@ -126,6 +132,10 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
     LaunchedEffect(chat.messages.size) {
         if (chat.messages.isNotEmpty()) listState.animateScrollToItem(chat.messages.size - 1)
     }
+    // H5 卡全屏查看器 / 外链落地页的页内态（调试页不落 Room，display 终判走 HtmlCard 进程级缓存）
+    var fullpageHtmlCard by remember { mutableStateOf<HtmlFullpageContent?>(null) }
+    var previewLinkUrl by remember { mutableStateOf<String?>(null) }
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -153,6 +163,30 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
                             mediaResults = media,
                             onCardClick = { },
                         )
+                    }
+                    CloudAgentChatViewModel.Role.HTML_CARD -> message.htmlCard?.let { card ->
+                        // 渲染对象是不可信云端产物：渲染前过清洗器；Rejected 降级纯文本，不白屏不崩溃
+                        when (val sanitized = remember(message.id) { HtmlCardSanitizer.sanitize(card.html) }) {
+                            is HtmlCardSanitizer.Result.Ok -> HtmlCard(
+                                html = sanitized.html,
+                                meta = HtmlCardMeta(summary = card.summary.ifBlank { null }),
+                                cacheKey = "cloud_html_${message.id}",
+                                isListScrolling = listState.isScrollInProgress,
+                                onOpenLink = { url -> previewLinkUrl = url },
+                                onOpenFullpage = {
+                                    fullpageHtmlCard = HtmlFullpageContent(
+                                        html = sanitized.html,
+                                        title = card.summary.ifBlank { null },
+                                    )
+                                },
+                            )
+                            is HtmlCardSanitizer.Result.Rejected -> Text(
+                                text = stringResource(R.string.cloud_agent_html_card_blocked) +
+                                    if (card.summary.isNotBlank()) "\n${card.summary}" else "",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
@@ -195,6 +229,18 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
                 }
             }
         }
+    }
+        // H5 卡全屏查看器（z 序在落地页之下——查看器内 <a> 点击叠落地页）
+        HtmlFullpageViewer(
+            content = fullpageHtmlCard,
+            onOpenLink = { url -> previewLinkUrl = url },
+            onDismiss = { fullpageHtmlCard = null },
+        )
+        // H5 卡外链落地页（全屏内置浏览器）
+        HtmlLinkPreviewOverlay(
+            url = previewLinkUrl,
+            onDismiss = { previewLinkUrl = null },
+        )
     }
 }
 

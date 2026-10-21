@@ -562,6 +562,7 @@
     <string name="cloud_agent_input_hint">傳送訊息…</string>
     <string name="cloud_agent_thinking">思考中…</string>
     <string name="cloud_agent_tool_call">正在調用 %1$s…</string>
+    <string name="cloud_agent_html_card_blocked">卡片內容未通過安全檢查</string>
     <string name="cloud_agent_stop">停止</string>
     <string name="cloud_agent_send">傳送</string>
     <string name="assistant_persona_default">預設</string>
