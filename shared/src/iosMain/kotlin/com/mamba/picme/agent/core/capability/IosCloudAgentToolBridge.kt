@@ -2,6 +2,7 @@ package com.mamba.picme.agent.core.capability
 
 import com.mamba.picme.agent.core.inference.remote.tool.ChatToolService
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
+import com.mamba.picme.agent.core.inference.remote.tool.CloudToolProjectionGate
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
@@ -29,6 +30,7 @@ import kotlinx.coroutines.CancellationException
  *
  * 工具名/错误前缀/截断常量的 SSOT = commonMain [CloudAgentToolContract]（M3 收口，
  * Android DeviceToolExecutor 同源；server 与 Swift 侧持字面量副本，改动须同步核对）。
+ * 出端结果一律过 [CloudToolProjectionGate] 投影闸（混合架构 M1，fail-closed），与 Android DeviceToolExecutor 同闸。
  *
  * 信号 6 铁律：一切异常（除 [CancellationException] 透传）在 Kotlin 侧兜底为 error 前缀字符串，
  * 绝不逃逸到 Swift。
@@ -67,9 +69,9 @@ class IosCloudAgentToolBridge(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            return "${CloudAgentToolContract.ERROR_PREFIX} ${e.message ?: "unknown"}"
+            "${CloudAgentToolContract.ERROR_PREFIX} ${e.message ?: "unknown"}"
         }
-        return CloudAgentToolContract.truncate(result)
+        return CloudAgentToolContract.truncate(CloudToolProjectionGate.gate(tool, result))
     }
 
     /** @Tool get_gallery_summary 对等：相册摘要。 */
