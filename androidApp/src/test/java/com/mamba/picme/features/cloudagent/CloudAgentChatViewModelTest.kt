@@ -2,8 +2,7 @@ package com.mamba.picme.features.cloudagent
 
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
-import com.mamba.picme.data.local.LocalHandleDao
-import com.mamba.picme.data.local.LocalHandleEntity
+import com.mamba.picme.data.local.FakeLocalHandleDao
 import com.mamba.picme.data.local.LocalHandleStore
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
@@ -37,20 +36,6 @@ class CloudAgentChatViewModelTest {
         every { aiAgentRemoteModelConfigsFlow } answers { configsFlow }
         every { aiAgentSelectedRemoteModelFlow } answers { selectedFlow }
         every { cloudAgentByokConsentFlow } answers { consentFlow }
-    }
-
-    /** 内存版 handle DAO：CloudAgentGalleryTools 构造依赖的最小 fake。 */
-    private class FakeHandleDao : LocalHandleDao {
-        val rows = mutableMapOf<String, LocalHandleEntity>()
-        override suspend fun upsert(handle: LocalHandleEntity) {
-            rows[handle.handleId] = handle
-        }
-        override suspend fun byId(handleId: String): LocalHandleEntity? = rows[handleId]
-        override suspend fun deleteOlderThan(beforeMs: Long): Int {
-            val doomed = rows.values.filter { row -> row.createdAt < beforeMs }.map { row -> row.handleId }
-            doomed.forEach { handleId -> rows.remove(handleId) }
-            return doomed.size
-        }
     }
 
     /** 假客户端：记录调用，frames 脚本化。 */
@@ -104,7 +89,7 @@ class CloudAgentChatViewModelTest {
                 searchByQuery = { _, _ -> emptyList() },
                 searchByFilter = { _, _ -> emptyList() },
                 gallerySummary = { null },
-                localHandleStore = LocalHandleStore(FakeHandleDao()),
+                localHandleStore = LocalHandleStore(FakeLocalHandleDao()),
             ),
         )
 

@@ -69,6 +69,22 @@ class CloudAgentGalleryTools(
         return A2uiCardContract.formatHandleToken(A2uiCardContract.DOMAIN_SCAN, handleId)
     }
 
+    /**
+     * 前缀文本 + 句柄 token 尾缀，注册失败降级为纯前缀（评审 R1-F1）：
+     * Room 写失败（SQLiteException/磁盘满）时搜索本身已成功，只记日志、不带 token 返回，
+     * 不抛异常、不走 `error:` 协议（避免成功搜索被云端当成工具失败）。
+     */
+    private suspend fun appendHandleSuffix(prefix: String, photos: List<MediaAsset>): String {
+        return try {
+            "$prefix（数据句柄 ${registerScanHandle(photos)}）"
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.w(tag, "scan handle registration failed, degrading to plain text", e)
+            prefix
+        }
+    }
+
     suspend fun getGallerySummary(): String {
         val summary = try {
             gallerySummary(false)
@@ -103,10 +119,12 @@ class CloudAgentGalleryTools(
         }
         refineBaseMutex.withLock { refineBase = photos }
         Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size}")
-        if (photos.isNotEmpty()) {
-            mediaResultsListener?.invoke(query, photos, photos.size, false)
+        // 空命中不注册句柄（评审 R1-F2）：无意义锚点 + 垃圾行，与 refine 空分支同口径
+        if (photos.isEmpty()) {
+            return "找到 0 张「$query」的照片"
         }
-        return "找到 ${photos.size} 张「$query」的照片（数据句柄 ${registerScanHandle(photos)}）"
+        mediaResultsListener?.invoke(query, photos, photos.size, false)
+        return appendHandleSuffix("找到 ${photos.size} 张「$query」的照片", photos)
     }
 
     suspend fun refineMediaSearch(constraint: String, fromMs: String, toMs: String): String {
@@ -140,6 +158,6 @@ class CloudAgentGalleryTools(
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
         mediaResultsListener?.invoke(constraint, refined, refined.size, true)
-        return "在上一轮结果内找到 ${refined.size} 张「$constraint」的照片（数据句柄 ${registerScanHandle(refined)}）"
+        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} 张「$constraint」的照片", refined)
     }
 }

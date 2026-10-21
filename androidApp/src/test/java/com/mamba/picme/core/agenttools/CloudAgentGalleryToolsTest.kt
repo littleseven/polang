@@ -3,6 +3,7 @@ package com.mamba.picme.core.agenttools
 import com.mamba.picme.agent.core.model.context.GallerySummary
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
+import com.mamba.picme.data.local.FakeLocalHandleDao
 import com.mamba.picme.data.local.LocalHandleDao
 import com.mamba.picme.data.local.LocalHandleEntity
 import com.mamba.picme.data.local.LocalHandleStore
@@ -18,19 +19,6 @@ import org.junit.Test
 
 class CloudAgentGalleryToolsTest {
 
-    private class FakeHandleDao : LocalHandleDao {
-        val rows = mutableMapOf<String, LocalHandleEntity>()
-        override suspend fun upsert(handle: LocalHandleEntity) {
-            rows[handle.handleId] = handle
-        }
-        override suspend fun byId(handleId: String): LocalHandleEntity? = rows[handleId]
-        override suspend fun deleteOlderThan(beforeMs: Long): Int {
-            val doomed = rows.values.filter { row -> row.createdAt < beforeMs }.map { row -> row.handleId }
-            doomed.forEach { handleId -> rows.remove(handleId) }
-            return doomed.size
-        }
-    }
-
     private fun asset(id: Long, type: MediaType = MediaType.PHOTO, labels: String? = null) =
         MediaAsset(id = id, uri = "content://m/$id", type = type, captureDate = id, fileName = "f$id.jpg", labels = labels)
 
@@ -38,7 +26,7 @@ class CloudAgentGalleryToolsTest {
         byQuery: suspend (String, Set<Long>?) -> List<MediaAsset> = { _, _ -> emptyList() },
         byFilter: suspend (StructuredFilter, Set<Long>?) -> List<MediaAsset> = { _, _ -> emptyList() },
         summary: suspend (Boolean) -> GallerySummary? = { null },
-        handleStore: LocalHandleStore = LocalHandleStore(FakeHandleDao()),
+        handleStore: LocalHandleStore = LocalHandleStore(FakeLocalHandleDao()),
     ) = CloudAgentGalleryTools(
         searchByQuery = byQuery,
         searchByFilter = byFilter,
@@ -192,11 +180,11 @@ class CloudAgentGalleryToolsTest {
         assertEquals(1, calls) // 仅 search 那次
     }
 
-    // ── local:// handle 注册（D2：命中集引用式不上云）────────────────
+    // ── opaque handle 注册（D2：命中集引用式不上云）────────────────
 
     @Test
     fun `search hit registers scan handle and appends opaque token`() = runTest {
-        val dao = FakeHandleDao()
+        val dao = FakeLocalHandleDao()
         val t = tools(
             byQuery = { _, _ -> listOf(asset(1), asset(2)) },
             handleStore = LocalHandleStore(dao),
@@ -211,5 +199,35 @@ class CloudAgentGalleryToolsTest {
         val entries = Json.decodeFromString<List<ScanPhotoEntry>>(payloadJson)
         assertEquals(2, entries.size)
         assertEquals(listOf(1L, 2L), entries.map { entry -> entry.id })
+    }
+
+    @Test
+    fun `search empty hit returns plain text and registers nothing`() = runTest {
+        val dao = FakeLocalHandleDao()
+        val t = tools(
+            byQuery = { _, _ -> emptyList() },
+            handleStore = LocalHandleStore(dao),
+        )
+        val out = t.searchMedia("没有的东西", "", "", "", "")
+        // 评审 R1-F2：空命中不注册句柄、不带 token（与 refine 空分支同口径）
+        assertFalse(out.contains("数据句柄"))
+        assertTrue(dao.rows.isEmpty())
+    }
+
+    @Test
+    fun `handle registration failure degrades to plain text without error prefix`() = runTest {
+        val failingDao = object : LocalHandleDao {
+            override suspend fun upsert(handle: LocalHandleEntity) {
+                throw IllegalStateException("disk full")
+            }
+            override suspend fun byId(handleId: String): LocalHandleEntity? = null
+            override suspend fun deleteOlderThan(beforeMs: Long): Int = 0
+        }
+        val t = tools(
+            byQuery = { _, _ -> listOf(asset(1), asset(2)) },
+            handleStore = LocalHandleStore(failingDao),
+        )
+        // 评审 R1-F1：搜索成功但 Room 写失败 → 降级为无 token 前缀，不走 error: 协议
+        assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", ""))
     }
 }

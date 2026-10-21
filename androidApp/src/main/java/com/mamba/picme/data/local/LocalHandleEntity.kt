@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 
 /**
- * local:// handle 的本地数据锚点（D2：完整结果引用式，不内联不上云）。
+ * opaque handle（`handle: <domain>/<id>`）的本地数据锚点（D2：完整结果引用式，不内联不上云）。
  * payloadJson 结构由 domain 决定：scan = List<ScanPhotoEntry>（shared a2ui 包）。
  */
 @Entity(tableName = "local_handle")

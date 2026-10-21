@@ -8,7 +8,7 @@ interface HandleLookup {
 }
 
 /**
- * local:// handle 注册/解析入口。handleId = 12 位随机 hex（对云 opaque，无可猜语义）。
+ * opaque handle（`handle: <domain>/<id>`）注册/解析入口。handleId = 12 位随机 hex（对云 opaque，无可猜语义）。
  */
 class LocalHandleStore(
     private val dao: LocalHandleDao,
