@@ -206,6 +206,7 @@ private fun contentTypeOf(message: ChatMessage, part: MessagePart): String = whe
     is MessagePart.TaskCard -> ChatListItem.TYPE_TASK_CARD
     is MessagePart.MediaResults -> ChatListItem.TYPE_MEDIA_RESULTS
     is MessagePart.OptimizeCandidates -> ChatListItem.TYPE_OPTIMIZE_CANDIDATES
+    is MessagePart.A2uiCard -> ChatListItem.TYPE_A2UI_CARD
     // Image/EditResult 按消息类型已整消息路由，到不了这里；防御性落 legacy 整消息
     is MessagePart.Image, is MessagePart.EditResult -> ChatListItem.TYPE_LEGACY_MESSAGE
     // 直播卡全状态自渲染（占位/运行/定格/错误都由卡片处理，不走通用 placeholder chip）
@@ -254,6 +255,9 @@ data class ChatListItem(
 
         /** 浏览器直播卡（tool_browser，全状态自渲染：占位/运行/定格/错误一卡到底）。 */
         const val TYPE_BROWSER_LIVE = "browser_live"
+
+        /** A2UI GenUI 卡（data_ui，hybrid-m2-a2ui M2）。 */
+        const val TYPE_A2UI_CARD = "a2ui_card"
 
         /** 卡片工具占位（INPUT_STREAMING/INPUT_AVAILABLE，spec §4 占位契约）。 */
         const val TYPE_TOOL_PLACEHOLDER = "tool_placeholder"

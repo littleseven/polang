@@ -72,6 +72,11 @@ object MessagePartsConverter {
             "tool_browser" ->
                 listOf(json.decodeFromString(MessagePart.BrowserLive.serializer(), content))
 
+            // A2UI GenUI 卡（hybrid-m2-a2ui）：content 列存 A2uiCard 整颗 JSON，
+            // 同 tool_browser 先例——损坏行抛异常 → 行级 Text 兜底
+            "data_ui" ->
+                listOf(json.decodeFromString(MessagePart.A2uiCard.serializer(), content))
+
             EngineerTaskState.ROOM_TYPE ->
                 listOf(parseTaskCard(meta))
 

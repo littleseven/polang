@@ -243,6 +243,30 @@ class ChatListFlattenerTest {
         assertEquals(ChatListItem.TYPE_CHART, items[0].contentType)
     }
 
+    // ── A2UI GenUI 卡分派（hybrid-m2-a2ui M2 T1） ─────────────────
+
+    @Test
+    fun `a2ui card part flattens to a2ui card content type`() {
+        val message = ChatMessage(
+            id = "a1",
+            type = ChatMessageType.A2UI_CARD,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.A2uiCard(
+                    partId = "p0",
+                    surfaceId = "sf-1",
+                    messagesJson = "[]",
+                    fallbackSummary = "327 张，数据在原设备",
+                ),
+            ),
+        )
+        val items = flattenChatItems(listOf(message))
+        assertEquals(1, items.size)
+        assertEquals(ChatListItem.TYPE_A2UI_CARD, items[0].contentType)
+        assertEquals("a1:p0", items[0].key)
+    }
+
     // ── browser 直播卡双显跳过（Task 13；browser 的 OUTPUT_ERROR 落库，终态都跳）──
 
     private fun streamingBrowser(state: ToolPartState, sessionId: String = "s-1") = ChatMessage(
