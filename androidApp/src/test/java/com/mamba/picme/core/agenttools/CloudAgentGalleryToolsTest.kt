@@ -110,4 +110,55 @@ class CloudAgentGalleryToolsTest {
         assertEquals(setOf(7L, 8L), capturedIds)
         assertEquals("在上一轮结果内找到 1 张「4月的」的照片", out)
     }
+
+    // ── mediaResultsListener 透出（云端图集卡恢复）────────────────
+
+    @Test
+    fun `search hit emits listener with photo assets`() = runTest {
+        val hits = mutableListOf<Triple<String, List<MediaAsset>, Boolean>>()
+        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO), asset(3)) })
+        t.mediaResultsListener = { query, assets, _, isRefinement ->
+            hits.add(Triple(query, assets, isRefinement))
+        }
+        t.searchMedia("猫", "", "", "", "")
+        assertEquals(1, hits.size)
+        assertEquals("猫", hits[0].first)
+        assertEquals(false, hits[0].third)
+        // 只透出 PHOTO（与回传文本的计数口径一致），VIDEO 被过滤
+        assertEquals(listOf(1L, 3L), hits[0].second.map { it.id })
+    }
+
+    @Test
+    fun `refine hit emits listener with refinement flag`() = runTest {
+        val hits = mutableListOf<Pair<String, Boolean>>()
+        val base = listOf(asset(1, labels = "夜景"), asset(2, labels = "白天"))
+        val t = tools(byQuery = { _, ids ->
+            if (ids == null) base else base.filter { it.id in ids && it.labels == "夜景" }
+        })
+        t.mediaResultsListener = { query, _, _, isRefinement -> hits.add(query to isRefinement) }
+        t.searchMedia("猫", "", "", "", "")
+        t.refineMediaSearch("夜景", "", "")
+        assertEquals(listOf("猫" to false, "夜景" to true), hits)
+    }
+
+    @Test
+    fun `empty result does not emit listener`() = runTest {
+        var calls = 0
+        val t = tools(byQuery = { _, _ -> emptyList() })
+        t.mediaResultsListener = { _, _, _, _ -> calls++ }
+        t.searchMedia("没有的东西", "", "", "", "")
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `refine empty in-set does not emit listener and keeps base`() = runTest {
+        var calls = 0
+        val t = tools(byQuery = { _, ids ->
+            if (ids == null) listOf(asset(1)) else emptyList()
+        })
+        t.mediaResultsListener = { _, _, _, _ -> calls++ }
+        t.searchMedia("猫", "", "", "", "")
+        t.refineMediaSearch("不存在", "", "")
+        assertEquals(1, calls) // 仅 search 那次
+    }
 }

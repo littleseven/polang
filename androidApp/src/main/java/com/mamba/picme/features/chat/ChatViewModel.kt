@@ -276,6 +276,7 @@ class ChatViewModel(
     private val browserWebSocketClient = dependencies.browserWebSocketClient
     private val cloudAgentApi = dependencies.cloudAgentApi
     private val deviceToolExecutor = dependencies.deviceToolExecutor
+    private val cloudAgentGalleryTools = dependencies.cloudAgentGalleryTools
 
     /** 已建立 WS 推流连接的浏览器会话集合（无 WS 客户端时恒空集，UI 侧按未连接降级展示）。 */
     val browserStreamConnected: StateFlow<Set<String>> =
@@ -2199,41 +2200,61 @@ class ChatViewModel(
             return
         }
 
-        val answer = StringBuilder()
-        var serverError: String? = null
-        var result = runCloudTurnOnce(runner, token, session, text, answer) { serverError = it }
-        // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
-        if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
-            Logger.w(TAG, "Cloud session ${session.sessionId} invalid, recreating")
-            cloudSessions.remove(sessionId)
-            answer.clear()
-            serverError = null
-            _streamingMessage.value = _streamingMessage.value?.copy(
-                content = stringContext().getString(STREAMING_THINKING_HINT_RES),
-                isThinking = true,
-                showCursor = false
-            )
-            val fresh = ensureCloudSession(api, token, sessionId, choice)
-            if (fresh != null) {
-                result = runCloudTurnOnce(runner, token, fresh, text, answer) { serverError = it }
+        // 图集卡透出：工具命中时经 listener 把资产列表本地落卡（数据不出设备，回传服务器的
+        // 仍是纯文本计数）；Room upsert 去重保证同一用户回合只留最新卡。回合结束 finally 摘除，
+        // 避免跨回合残留（取消路径也走 finally）。
+        cloudAgentGalleryTools?.mediaResultsListener = { query, assets, totalCount, isRefinement ->
+            viewModelScope.launch {
+                insertMediaResultsMessage(
+                    sessionId,
+                    MediaResultsUi(
+                        query = query,
+                        assets = assets.take(MAX_CARDS),
+                        totalCount = totalCount,
+                        isRefinement = isRefinement
+                    )
+                )
             }
         }
+        try {
+            val answer = StringBuilder()
+            var serverError: String? = null
+            var result = runCloudTurnOnce(runner, token, session, text, answer) { serverError = it }
+            // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
+            if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
+                Logger.w(TAG, "Cloud session ${session.sessionId} invalid, recreating")
+                cloudSessions.remove(sessionId)
+                answer.clear()
+                serverError = null
+                _streamingMessage.value = _streamingMessage.value?.copy(
+                    content = stringContext().getString(STREAMING_THINKING_HINT_RES),
+                    isThinking = true,
+                    showCursor = false
+                )
+                val fresh = ensureCloudSession(api, token, sessionId, choice)
+                if (fresh != null) {
+                    result = runCloudTurnOnce(runner, token, fresh, text, answer) { serverError = it }
+                }
+            }
 
-        // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
-        _streamingMessage.value = null
-        when {
-            result.isFailure -> insertAgentMessage(
-                sessionId,
-                stringContext().getString(
-                    R.string.chat_inference_error,
-                    result.exceptionOrNull()?.message
-                        ?: stringContext().getString(R.string.chat_unknown_error)
-                ),
-                "error"
-            )
-            serverError != null -> insertAgentMessage(sessionId, serverError.orEmpty(), "error")
-            answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
-            else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
+            // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
+            _streamingMessage.value = null
+            when {
+                result.isFailure -> insertAgentMessage(
+                    sessionId,
+                    stringContext().getString(
+                        R.string.chat_inference_error,
+                        result.exceptionOrNull()?.message
+                            ?: stringContext().getString(R.string.chat_unknown_error)
+                    ),
+                    "error"
+                )
+                serverError != null -> insertAgentMessage(sessionId, serverError.orEmpty(), "error")
+                answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
+                else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
+            }
+        } finally {
+            cloudAgentGalleryTools?.mediaResultsListener = null
         }
     }
 

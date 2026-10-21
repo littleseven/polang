@@ -1,5 +1,6 @@
 package com.mamba.picme.features.cloudagent
 
+import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
@@ -82,6 +83,11 @@ class CloudAgentChatViewModelTest {
                 refineSearch = { _, _, _ -> "error: no base" },
             ),
             repository,
+            CloudAgentGalleryTools(
+                searchByQuery = { _, _ -> emptyList() },
+                searchByFilter = { _, _ -> emptyList() },
+                gallerySummary = { null },
+            ),
         )
 
     @Test

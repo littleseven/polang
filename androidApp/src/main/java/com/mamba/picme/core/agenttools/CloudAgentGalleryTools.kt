@@ -37,6 +37,16 @@ class CloudAgentGalleryTools(
 
     private val tag = "CloudAgentGalleryTools"
 
+    /**
+     * 图集卡透出回调（云端 Agent 图集卡恢复，2026-10-20）：搜索/细化命中非空时回调完整的
+     * PHOTO 资产列表（query、资产、总数、是否细化）。**数据不出设备**——回传服务器的仍是
+     * 纯文本计数；资产列表仅经本回调给 UI 层本地渲染卡片（BrowserSessionDelegate 同款
+     * delegate 先例）。由发起云端回合的 ViewModel 挂接、回合结束摘除；串行成立的前提 =
+     * server per-user 跑轮并发闸 = 1（M2.6）+ 调试页/主聊天页不会同时发回合。
+     */
+    var mediaResultsListener: ((query: String, assets: List<MediaAsset>, totalCount: Int, isRefinement: Boolean) -> Unit)? =
+        null
+
     /** refine_media_search 的搜索基数（chat 链路 lastResultAssets 的无头等价物，单槽位即可——云端会话串行）。 */
     private val refineBaseMutex = Mutex()
     private var refineBase: List<MediaAsset> = emptyList()
@@ -75,6 +85,9 @@ class CloudAgentGalleryTools(
         }
         refineBaseMutex.withLock { refineBase = photos }
         Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size}")
+        if (photos.isNotEmpty()) {
+            mediaResultsListener?.invoke(query, photos, photos.size, false)
+        }
         return "找到 ${photos.size} 张「$query」的照片"
     }
 
@@ -108,6 +121,7 @@ class CloudAgentGalleryTools(
         }
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
+        mediaResultsListener?.invoke(constraint, refined, refined.size, true)
         return "在上一轮结果内找到 ${refined.size} 张「$constraint」的照片"
     }
 }

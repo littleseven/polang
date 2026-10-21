@@ -1065,7 +1065,8 @@ class AppContainerImpl(
             tagGenerationScheduler = tagGenerationScheduler,
             browserWebSocketClient = browserWebSocketClient,
             cloudAgentApi = cloudAgentApi,
-            deviceToolExecutor = deviceToolExecutor
+            deviceToolExecutor = deviceToolExecutor,
+            cloudAgentGalleryTools = cloudAgentGalleryTools
         ).also { deps ->
             // app_tool_request 采集执行器：工厂依赖容器内数据源，构造后回填（先于 ChatViewModel 创建）
             deps.appToolExecutor = buildAppToolExecutor(deps)
@@ -1174,6 +1175,7 @@ class AppContainerImpl(
                 api = cloudAgentApi,
                 deviceToolExecutor = deviceToolExecutor,
                 settingsRepository = userPreferencesRepository,
+                cloudAgentGalleryTools = cloudAgentGalleryTools,
             )
         }
     }

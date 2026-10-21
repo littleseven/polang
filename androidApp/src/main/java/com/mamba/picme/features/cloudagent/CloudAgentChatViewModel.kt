@@ -3,8 +3,10 @@ package com.mamba.picme.features.cloudagent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
+import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.remote.picme.CloudAgentApi
+import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,10 +28,12 @@ class CloudAgentChatViewModel(
     private val api: CloudAgentApi,
     private val deviceToolExecutor: DeviceToolExecutor,
     private val settingsRepository: UserSettingsRepository,
+    private val cloudAgentGalleryTools: CloudAgentGalleryTools,
 ) : ViewModel() {
 
-    data class UiMessage(val id: Long, val role: Role, val text: String)
-    enum class Role { USER, ASSISTANT, TOOL, ERROR }
+    /** 媒体卡消息经 [media] 携带渲染数据；其余 role 恒为 null。 */
+    data class UiMessage(val id: Long, val role: Role, val text: String, val media: MediaResultsUi? = null)
+    enum class Role { USER, ASSISTANT, TOOL, ERROR, MEDIA }
 
     sealed interface UiState {
         data object Preparing : UiState
@@ -117,29 +121,50 @@ class CloudAgentChatViewModel(
         turnJob = viewModelScope.launch {
             append(UiMessage(msgSeq.incrementAndGet(), Role.USER, text))
             setInFlight(true)
-            val result = turnRunner.runTurn(
-                appToken,
-                chat.sessionId,
-                text,
-                byokApiKey,
-            ) { event ->
-                when (event) {
-                    is CloudTurnEvent.AssistantText ->
-                        append(UiMessage(msgSeq.incrementAndGet(), Role.ASSISTANT, event.text))
-                    is CloudTurnEvent.ToolCall ->
-                        append(UiMessage(msgSeq.incrementAndGet(), Role.TOOL, event.tool))
-                    is CloudTurnEvent.Error -> {
-                        append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, event.message))
-                        setInFlight(false)
-                    }
-                    CloudTurnEvent.Done -> setInFlight(false)
-                }
+            // 图集卡透出：工具命中时把资产列表插为媒体卡消息（数据不出设备，回传服务器仍是
+            // 纯文本计数）；回合结束 finally 摘除，避免跨回合残留（stop() 取消路径也走 finally）。
+            cloudAgentGalleryTools.mediaResultsListener = { query, assets, totalCount, isRefinement ->
+                append(
+                    UiMessage(
+                        msgSeq.incrementAndGet(),
+                        Role.MEDIA,
+                        text = query,
+                        media = MediaResultsUi(
+                            query = query,
+                            assets = assets.take(MAX_MEDIA_CARDS),
+                            totalCount = totalCount,
+                            isRefinement = isRefinement,
+                        ),
+                    )
+                )
             }
-            // 流干净结束但无 Done 帧的兜底（Done 已清则为幂等 no-op）
-            result.onSuccess { setInFlight(false) }
-            result.onFailure { e ->
-                append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, e.message ?: "network error"))
-                setInFlight(false)
+            try {
+                val result = turnRunner.runTurn(
+                    appToken,
+                    chat.sessionId,
+                    text,
+                    byokApiKey,
+                ) { event ->
+                    when (event) {
+                        is CloudTurnEvent.AssistantText ->
+                            append(UiMessage(msgSeq.incrementAndGet(), Role.ASSISTANT, event.text))
+                        is CloudTurnEvent.ToolCall ->
+                            append(UiMessage(msgSeq.incrementAndGet(), Role.TOOL, event.tool))
+                        is CloudTurnEvent.Error -> {
+                            append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, event.message))
+                            setInFlight(false)
+                        }
+                        CloudTurnEvent.Done -> setInFlight(false)
+                    }
+                }
+                // 流干净结束但无 Done 帧的兜底（Done 已清则为幂等 no-op）
+                result.onSuccess { setInFlight(false) }
+                result.onFailure { e ->
+                    append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, e.message ?: "network error"))
+                    setInFlight(false)
+                }
+            } finally {
+                cloudAgentGalleryTools.mediaResultsListener = null
             }
         }
     }
@@ -163,3 +188,6 @@ class CloudAgentChatViewModel(
         }
     }
 }
+
+/** 媒体卡横滑展示上限（与主聊天页 ChatViewModel.MAX_CARDS 同约定）。 */
+private const val MAX_MEDIA_CARDS = 20

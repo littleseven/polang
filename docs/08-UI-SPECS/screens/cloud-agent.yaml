@@ -1,7 +1,8 @@
 # ============================================================================
 # 云端 Agent 调试聊天页规格书（Cloud Agent Debug Chat Spec）
 # ============================================================================
-# 基准端：Android features/cloudagent/（2026-10-17 定稿，main@09ef46776）
+# 基准端：Android features/cloudagent/（2026-10-17 定稿，main@09ef46776；
+#      2026-10-21 增补图集卡气泡，见 §3 media）
 # 用途：iOS 实现的唯一输入，不读 Android 源码
 # 性质：开发者选项 DEBUG 构建入口的实验页（ADR-018 M2），豁免 PARITY 零容差比对，
 #      但信息层级/状态机/文案 key 必须一致；设置页 BYOK 授权行不豁免（归 settings.yaml §3）。
@@ -54,6 +55,10 @@ chat_layout:
       assistant: { align: leading,  background: "surfaceVariant",   text: "markdown 渲染（iOS 复用 AgentTextView AST 渲染，与 chat 正文同源）", corner: 16, max_width: 300 }
       tool:      { align: leading,  text: "12pt onSurfaceVariant，文案 cloud_agent_tool_call（含工具名 %@ 占位）", mono_exempt: true }
       error:     { align: leading,  text: "13pt error 色" }
+      media:                                # 图集卡（2026-10-21 增补）：search_media/refine_media_search 命中时插入
+        render: "复用主聊天页同款图集横滑卡（Android MediaResultsCarousel / iOS 对应组件），资产上限 20 张"
+        data_source: "🔴 CloudAgentGalleryTools.mediaResultsListener 端侧回调（数据不出设备，回传服务器的仍是纯文本计数）；调试页纯内存态不落库，主聊天页云端回合经同一回调落 Room（data_media_results，同用户回合 upsert 去重留最新卡）"
+        interaction: "调试页点击动作从简（实验页豁免）；主聊天页点击行为与本地链路一致"
     thinking_row: "inFlight 时列表尾部显示 cloud_agent_thinking 行"
   input_bar:
     field: { placeholder: cloud_agent_input_hint, max_lines: 3 }
@@ -119,6 +124,7 @@ platform_differences:
   out_of_scope:
     - "工程师隧道 app_get_* 五件套（线 B）的 iOS 缺口（日志环缓冲/崩溃落盘）——单独立项，不在本批"
     - "GET /agent/sessions/{id}/events 事件回放——Android VM 未消费，iOS 首版不做，台账登记"
+    - "图集卡 media 气泡（§3 media，2026-10-21 Android 已落）：iOS 调试页未接 CloudAgentChatStore 工具回调 + 无 M2.5 主聊天云端回合入口——待 iOS 跟随批次补齐，台账登记"
 
 # ============================================================================
 # 7. allowed_differences（豁免登记）

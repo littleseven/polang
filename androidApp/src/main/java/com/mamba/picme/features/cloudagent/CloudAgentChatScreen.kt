@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mamba.picme.R
+import com.mamba.picme.features.chat.components.MediaResultsCarousel
 import com.mamba.picme.features.common.chat.AgentMarkdown
 
 /**
@@ -146,6 +147,13 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.error,
                     )
+                    CloudAgentChatViewModel.Role.MEDIA -> message.media?.let { media ->
+                        // 调试页图集卡：复用主聊天页同款横滑卡组件；点击动作从简（实验页豁免 PARITY）
+                        MediaResultsCarousel(
+                            mediaResults = media,
+                            onCardClick = { },
+                        )
+                    }
                 }
             }
             if (chat.inFlight) {
