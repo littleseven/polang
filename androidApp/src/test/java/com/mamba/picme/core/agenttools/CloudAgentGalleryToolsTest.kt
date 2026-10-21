@@ -209,7 +209,7 @@ class CloudAgentGalleryToolsTest {
             handleStore = LocalHandleStore(dao),
         )
         val out = t.searchMedia("没有的东西", "", "", "", "")
-        // 评审 R1-F2：空命中不注册句柄、不带 token（与 refine 空分支同口径）
+        // 空命中不注册句柄、不带 token（与 refine 空分支同口径）
         assertFalse(out.contains("数据句柄"))
         assertTrue(dao.rows.isEmpty())
     }
@@ -227,7 +227,7 @@ class CloudAgentGalleryToolsTest {
             byQuery = { _, _ -> listOf(asset(1), asset(2)) },
             handleStore = LocalHandleStore(failingDao),
         )
-        // 评审 R1-F1：搜索成功但 Room 写失败 → 降级为无 token 前缀，不走 error: 协议
+        // 搜索成功但 Room 写失败 → 降级为无 token 前缀，不走 error: 协议
         assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", ""))
     }
 }

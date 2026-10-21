@@ -70,7 +70,7 @@ class CloudAgentGalleryTools(
     }
 
     /**
-     * 前缀文本 + 句柄 token 尾缀，注册失败降级为纯前缀（评审 R1-F1）：
+     * 前缀文本 + 句柄 token 尾缀，注册失败降级为纯前缀：
      * Room 写失败（SQLiteException/磁盘满）时搜索本身已成功，只记日志、不带 token 返回，
      * 不抛异常、不走 `error:` 协议（避免成功搜索被云端当成工具失败）。
      */
@@ -119,7 +119,7 @@ class CloudAgentGalleryTools(
         }
         refineBaseMutex.withLock { refineBase = photos }
         Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size}")
-        // 空命中不注册句柄（评审 R1-F2）：无意义锚点 + 垃圾行，与 refine 空分支同口径
+        // 空命中不注册句柄：空集句柄是无意义锚点 + 垃圾行，与 refine 空分支同口径
         if (photos.isEmpty()) {
             return "找到 0 张「$query」的照片"
         }
