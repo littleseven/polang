@@ -41,6 +41,7 @@ data class ToolRequestFrame(
  *
  * 工具名/`error:` 前缀/32_000 字符截断的 SSOT = shared commonMain `CloudAgentToolContract`
  *（M3 收口；server 不依赖 :shared，本类持字面量副本——改契约常量须双向同步核对）。
+ * @LLMDescription 的投影承诺面与 shared CloudAgentToolCatalog.projectionSchema 逐字对齐（混合架构 M1），改动须双向同步核对。
  */
 class DeviceToolService(
     private val sessionId: String,
@@ -50,12 +51,12 @@ class DeviceToolService(
 ) {
 
     @Tool(customName = "get_gallery_summary")
-    @LLMDescription("获取用户手机相册摘要（照片/视频总数、人物聚类数、已打标数等）。工具在用户设备上执行，结果以文本回传。")
+    @LLMDescription("获取用户手机相册摘要（照片/视频总数、人物聚类数、已打标数等）。工具在用户设备上执行，结果以文本摘要回传（投影：仅计数与文本元数据，不含文件路径与媒体清单）。")
     suspend fun getGallerySummary(): String =
         executeOnDevice("get_gallery_summary", buildJsonObject {})
 
     @Tool(customName = "search_media")
-    @LLMDescription("在用户手机相册搜索照片，结果以文本摘要回传（数量+命中说明）。query 自然语言搜索词；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）。")
+    @LLMDescription("在用户手机相册搜索照片，结果以文本摘要回传（投影：仅数量+命中说明，不含文件路径与媒体清单）。query 自然语言搜索词；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓，无则空串") person: String,
@@ -74,7 +75,7 @@ class DeviceToolService(
     )
 
     @Tool(customName = "refine_media_search")
-    @LLMDescription("在上一轮 search_media 结果内细化过滤（如'只要夜景'）。constraint 细化条件；fromMs/toMs 毫秒串（空串=不限）。上一轮无搜索基数时设备会返回错误，此时改用 search_media。")
+    @LLMDescription("在上一轮 search_media 结果内细化过滤（如'只要夜景'），结果以文本摘要回传（投影：仅数量，不含文件路径与媒体清单）。constraint 细化条件；fromMs/toMs 毫秒串（空串=不限）。上一轮无搜索基数时设备会返回错误，此时改用 search_media。")
     suspend fun refineMediaSearch(
         @LLMDescription("细化条件") constraint: String,
         @LLMDescription("时间起点毫秒串，空串=不限") fromMs: String,
