@@ -45,6 +45,8 @@ private const val DEFAULT_SYSTEM_PROMPT =
  *   设备工具调用经工具桥下发给端侧执行（传输层信号，不落事件流）；与 event/done/error
  *   帧共用同一 writer 天然保序。设备工具集每轮在路由层以当轮 writer 构造并合成进
  *   ToolRegistry（服务端工具 + 设备工具），[AgentRunner] 零改动。
+ *   render_html（服务端工具）同理以当轮 writer 构造 sink：HTML 本体落 HtmlCard 事件
+ *   （type=html_card）经 kind=event 帧下行，LLM 上下文只见 summary 回执。
  * - `POST /agent/sessions/{id}/tool-results`：端侧工具结果上行（M2）。body
  *   `{"request_id","ok","result"}` → `200 {"accepted":true}` / `400 request_id_required` /
  *   `404 session_not_found`（他人会话同口径，不泄露存在性）/ `409 tool_request_not_pending`
@@ -234,8 +236,24 @@ fun Route.agentRoute(
                     val deviceTools = DeviceToolService(session.id, bridge, deviceTimeoutMs) { frame ->
                         writeSseFrame(frame.toJson())
                     }
+                    // render_html 侧路（summary-only 回执）：HTML 本体落 HtmlCard 事件并经同一
+                    // SSE kind=event 帧下行；source/role 对齐工具类事件约定（Observation 同款）。
+                    // sink 在工具体内执行，先于 onToolCallCompleted 的 Observation 落流，保事件序。
+                    val htmlCardSink: suspend (html: String, summary: String) -> Unit = { html, summary ->
+                        val event = AgentEventRepository.append(
+                            session.id, AgentEventSource.ENVIRONMENT, AgentEventRole.TOOL,
+                            payload = AgentEventPayload.HtmlCard(html, summary),
+                        )
+                        writeSseFrame(buildJsonObject {
+                            put("kind", "event")
+                            put("event", eventJson(event))
+                        })
+                    }
                     val toolRegistry = ToolRegistry {
-                        tools(ServerToolService().asToolsByClass() + deviceTools.asToolsByClass())
+                        tools(
+                            ServerToolService(onHtmlCard = htmlCardSink).asToolsByClass() +
+                                deviceTools.asToolsByClass(),
+                        )
                     }
                     try {
                         runner.runTurn(
@@ -244,6 +262,7 @@ fun Route.agentRoute(
                             target = target,
                             systemPrompt = DEFAULT_SYSTEM_PROMPT,
                             toolRegistry = toolRegistry,
+                            onHtmlCard = htmlCardSink,
                             onEvent = { event ->
                                 writeSseFrame(buildJsonObject {
                                     put("kind", "event")

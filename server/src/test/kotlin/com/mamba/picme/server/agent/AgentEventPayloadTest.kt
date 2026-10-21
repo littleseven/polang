@@ -45,6 +45,15 @@ class AgentEventPayloadTest {
     }
 
     @Test
+    fun `html card payload round-trips with chinese quotes and newlines`() {
+        val html = "<html><body><h1>相册周报 \"精选\" '单引号'</h1>\n<p>换行与&nbsp;实体</p></body></html>"
+        val p = AgentEventPayload.HtmlCard(html = html, summary = "相册周报卡")
+        val decoded = AgentEventPayloadCodec.decode(AgentEventPayloadCodec.encode(p))
+        assertEquals(p, decoded)
+        assertEquals(html, (decoded as AgentEventPayload.HtmlCard).html)
+    }
+
+    @Test
     fun `payload type maps to distinct event type wire values`() {
         val wires = listOf(
             AgentEventPayload.Message("").type(),
@@ -52,9 +61,13 @@ class AgentEventPayloadTest {
             AgentEventPayload.Observation(1L, "").type(),
             AgentEventPayload.Condensation("", 0L).type(),
             AgentEventPayload.Finish("").type(),
+            AgentEventPayload.HtmlCard("", "").type(),
         ).map { it.wire }
-        assertEquals(5, wires.toSet().size)
-        assertEquals(setOf("message", "action", "observation", "condensation", "finish"), wires.toSet())
+        assertEquals(6, wires.toSet().size)
+        assertEquals(
+            setOf("message", "action", "observation", "condensation", "finish", "html_card"),
+            wires.toSet(),
+        )
     }
 
     @Test
