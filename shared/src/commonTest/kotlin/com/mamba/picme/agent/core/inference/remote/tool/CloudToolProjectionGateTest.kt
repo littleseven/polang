@@ -71,7 +71,7 @@ class CloudToolProjectionGateTest {
     }
 
     @Test
-    fun `blocked output itself passes the gate (idempotent safe)`() {
+    fun `blocked output itself passes the gate - idempotent safe`() {
         val blocked = CloudToolProjectionGate.gate("search_media", "content://x")
         assertEquals(blocked, CloudToolProjectionGate.gate("search_media", blocked))
         assertTrue(blocked.startsWith(CloudToolProjectionGate.BLOCKED_PREFIX))

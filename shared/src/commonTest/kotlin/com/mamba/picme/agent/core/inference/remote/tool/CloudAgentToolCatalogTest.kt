@@ -38,7 +38,7 @@ class CloudAgentToolCatalogTest {
     }
 
     @Test
-    fun `write tools have no spec (unknown to cloud)`() {
+    fun `write tools have no spec - unknown to cloud`() {
         assertNull(CloudAgentToolCatalog.specFor("delete_media"))
     }
 
