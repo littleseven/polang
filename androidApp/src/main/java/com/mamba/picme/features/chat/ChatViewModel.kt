@@ -3615,6 +3615,14 @@ class ChatViewModel(
         )
     }
 
+    /**
+     * 非挂起包装（终审 m2）：组合作用域随页面离开即取消会丢选择态，
+     * 统一改由 viewModelScope 承载，UI 层无需自带 launch。
+     */
+    fun persistA2uiViewStateAsync(messageId: String, viewState: String) {
+        viewModelScope.launch { persistA2uiViewState(messageId, viewState) }
+    }
+
     private suspend fun ensureSessionExists(sessionId: String) {
         val existing = chatSessionDao.getSession(sessionId)
         if (existing == null) {

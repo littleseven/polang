@@ -843,9 +843,8 @@ fun ChatScreen(
                                             resolver = a2uiHandleResolver,
                                             catalog = polangA2uiCatalog,
                                             onViewStateChange = { viewState ->
-                                                scope.launch {
-                                                    viewModel.persistA2uiViewState(item.message.id, viewState)
-                                                }
+                                                // 终审 m2：走 viewModelScope 包装，页面离开不丢持久化
+                                                viewModel.persistA2uiViewStateAsync(item.message.id, viewState)
                                             },
                                             degradedContent = { summary -> A2uiCardDegraded(summary) },
                                         )

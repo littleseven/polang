@@ -52,6 +52,15 @@ class HandleResolverTest {
     }
 
     @Test
+    fun resolve_nonObjectElement_degradesWithoutThrow() = runTest {
+        // 终审 M1：顶层数组内含非对象元素，optJSONObject 防护 → Degraded 而非 JSONException 逃逸
+        val resolver = HandleResolver(FakeLookup(emptyMap()))
+        val result = resolver.resolve("sf-1", """["oops"]""")
+        assertTrue(result is A2uiResolution.Degraded)
+        assertEquals("envelope_invalid", (result as A2uiResolution.Degraded).reason)
+    }
+
+    @Test
     fun resolve_noHandle_passesThrough() = runTest {
         val resolver = HandleResolver(FakeLookup(emptyMap()))
         val json = """[{"version":"v0.9","createSurface":{"surfaceId":"sf-1","catalogId":"x"}}]"""
