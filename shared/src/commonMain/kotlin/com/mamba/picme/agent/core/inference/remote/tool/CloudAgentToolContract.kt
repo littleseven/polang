@@ -16,6 +16,7 @@ object CloudAgentToolContract {
     const val TOOL_GET_GALLERY_SUMMARY = "get_gallery_summary"
     const val TOOL_SEARCH_MEDIA = "search_media"
     const val TOOL_REFINE_MEDIA_SEARCH = "refine_media_search"
+    const val TOOL_RENDER_UI = "render_ui"
 
     /**
      * H5 卡片渲染工具（server 侧执行，CLOUD）：模型产出 HTML + summary，HTML 本体不进 LLM

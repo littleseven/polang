@@ -19,6 +19,8 @@ import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.DedupHashDao
+import com.mamba.picme.data.local.LocalHandleStore
+import com.mamba.picme.features.chat.a2ui.HandleResolver
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.RoomUserTaskStore
 import com.mamba.picme.data.local.dao.PersonDao
@@ -416,6 +418,9 @@ interface AppContainer {
 
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
+
+    /** A2UI 卡 local:// handle 填槽解析器（hybrid M2 T7；与 gallery 工具共用同一 LocalHandleStore 实例） */
+    val a2uiHandleResolver: HandleResolver
 
     /**
      * 启动用户任务适配器（spec §6 组合根接线）。
@@ -1137,6 +1142,18 @@ class AppContainerImpl(
     }
 
     /**
+     * local:// handle 存储（T3）：gallery 工具（handle 注册）与 A2UI HandleResolver（填槽查取）
+     * 共用同一实例，保证注册/解析看到同一份数据。
+     */
+    private val localHandleStore: LocalHandleStore by lazy {
+        LocalHandleStore(database.localHandleDao())
+    }
+
+    override val a2uiHandleResolver: HandleResolver by lazy {
+        HandleResolver(localHandleStore)
+    }
+
+    /**
      * 云端 Agent 相册工具的无头执行器（ADR-018 M2）：绕过场景注册表直执，
      * 不再委托 ChatToolService（后者依赖 ChatScreen 存活期绑定的 Delegate + CHAT 场景，
      * 云端 Agent 页双重不满足会被注册表入队而永不执行）。
@@ -1150,6 +1167,7 @@ class AppContainerImpl(
                 mediaSearchEngine.search(filter = filter, limitToIds = limitToIds).media
             },
             gallerySummary = { includeDetails -> getGallerySummaryUseCase(includeDetails) },
+            localHandleStore = localHandleStore,
         )
     }
 

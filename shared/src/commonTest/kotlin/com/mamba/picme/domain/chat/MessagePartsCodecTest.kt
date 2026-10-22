@@ -195,12 +195,12 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `sealed descriptor locks the 9-value taxonomy`() {
+    fun `sealed descriptor locks the 10-value taxonomy`() {
         // kotlinx.serialization 1.10.0 起 sealed 描述符为 {type, value} 两元素包装，
         // 子类描述符收纳在 "value"（CONTEXTUAL kotlinx.serialization.Sealed<...>）内层——
         // 外层 elementsCount 恒为 2，须下沉一层枚举子类 @SerialName。
         val sealed = MessagePart.serializer().descriptor.getElementDescriptor(1)
-        assertEquals(9, sealed.elementsCount)
+        assertEquals(10, sealed.elementsCount)
         val serialNames = (0 until sealed.elementsCount)
             .map { sealed.getElementDescriptor(it).serialName }
             .toSet()
@@ -208,7 +208,7 @@ class MessagePartsCodecTest {
             setOf(
                 "text", "image",
                 "tool_chart", "tool_html", "tool_task", "tool_image_edit", "tool_browser",
-                "data_media_results", "data_optimize_candidates",
+                "data_media_results", "data_optimize_candidates", "data_ui",
             ),
             serialNames,
         )

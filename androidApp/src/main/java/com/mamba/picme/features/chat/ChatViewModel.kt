@@ -11,6 +11,7 @@ import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
@@ -403,6 +404,9 @@ class ChatViewModel(
 
     /** 直播卡持久化 JSON（读侧 [decodePartsOrLegacy] 同款契约：未知字段忽略、默认值省略）。 */
     private val browserPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+
+    /** A2UI 卡持久化 JSON（与 converter 同配置，防 roundtrip 漂移；encodeDefaults=true 固定线格式五键）。 */
+    private val a2uiCardJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /**
      * Task 15 组合根注册的云端浏览器能力单例（capability 未注册时 null → 直播卡链路整体静默降级）。
@@ -2218,13 +2222,17 @@ class ChatViewModel(
         }
         try {
             val answer = StringBuilder()
+            // A2UI 卡落库队列：onEvent 回调非挂起不能直接写 Room，先快照「卡前文本 + 卡事件」，
+            // SSE 结束后在挂起上下文按序落库（保证云端文本、工具结果卡、A2UI 图表卡按序渲染，US-2）
+            val a2uiFlushes = mutableListOf<Pair<String, CloudTurnEvent.A2uiCard>>()
             var serverError: String? = null
-            var result = runCloudTurnOnce(runner, token, session, text, answer) { serverError = it }
+            var result = runCloudTurnOnce(runner, token, session, text, answer, a2uiFlushes) { serverError = it }
             // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
             if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
                 Logger.w(TAG, "Cloud session ${session.sessionId} invalid, recreating")
                 cloudSessions.remove(sessionId)
                 answer.clear()
+                a2uiFlushes.clear()
                 serverError = null
                 _streamingMessage.value = _streamingMessage.value?.copy(
                     content = stringContext().getString(STREAMING_THINKING_HINT_RES),
@@ -2233,12 +2241,18 @@ class ChatViewModel(
                 )
                 val fresh = ensureCloudSession(api, token, sessionId, choice)
                 if (fresh != null) {
-                    result = runCloudTurnOnce(runner, token, fresh, text, answer) { serverError = it }
+                    result = runCloudTurnOnce(runner, token, fresh, text, answer, a2uiFlushes) { serverError = it }
                 }
             }
 
             // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
             _streamingMessage.value = null
+            // A2UI 卡按序落库：先落卡前已累积文本（text 行），再落 data_ui 行；
+            // 卡后文本由下方既有 flush 收口成下一条 text 行
+            for ((pendingText, card) in a2uiFlushes) {
+                if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
+                insertA2uiCardMessage(sessionId, card)
+            }
             when {
                 result.isFailure -> insertAgentMessage(
                     sessionId,
@@ -2265,6 +2279,7 @@ class ChatViewModel(
         session: CloudSession,
         text: String,
         answer: StringBuilder,
+        a2uiFlushes: MutableList<Pair<String, CloudTurnEvent.A2uiCard>>,
         onServerError: (String) -> Unit,
     ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey) { event ->
         when (event) {
@@ -2305,6 +2320,11 @@ class ChatViewModel(
                         }
                     }
                 }
+            }
+            is CloudTurnEvent.A2uiCard -> {
+                // onEvent 回调非挂起不能直接写 Room：快照卡前已累积文本并清空，SSE 结束后按序落库
+                a2uiFlushes += answer.toString() to event
+                answer.clear()
             }
             is CloudTurnEvent.Error -> onServerError(event.message)
             CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理
@@ -3572,6 +3592,51 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * 插入 A2UI 卡消息（type=data_ui + role=agent）。走 tool_browser 先例：
+     * content 列存整颗 part JSON，insertMessageWithParts 内部经 converter 双写 partsJson。
+     */
+    private suspend fun insertA2uiCardMessage(
+        sessionId: String,
+        event: CloudTurnEvent.A2uiCard,
+    ) {
+        val part = MessagePart.A2uiCard(
+            partId = "p0",
+            surfaceId = event.surfaceId,
+            messagesJson = event.messagesJson,
+            fallbackSummary = event.fallbackSummary,
+        )
+        chatMessageDao.insertMessageWithParts(
+            ChatMessageEntity(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                type = A2uiCardContract.PART_TYPE,
+                role = "agent",
+                content = a2uiCardJson.encodeToString(MessagePart.A2uiCard.serializer(), part),
+                timestamp = System.currentTimeMillis(),
+                modelUsed = "cloud_agent",
+            )
+        )
+        chatSessionDao.touchSession(sessionId)
+    }
+
+    /**
+     * A2UI 卡交互态持久化（US-7）：viewState 写回 part（同 message id REPLACE upsert，
+     * insertMessageWithParts 重算 partsJson 防漂移）。重建时作为初始填槽恢复。
+     */
+    suspend fun persistA2uiViewState(messageId: String, viewState: String) {
+        val entity = chatMessageDao.getMessageById(messageId) ?: return
+        val part = runCatching {
+            a2uiCardJson.decodeFromString(MessagePart.A2uiCard.serializer(), entity.content)
+        }.getOrNull() ?: return
+        val updated = part.copy(viewState = viewState)
+        chatMessageDao.insertMessageWithParts(
+            entity.copy(
+                content = a2uiCardJson.encodeToString(MessagePart.A2uiCard.serializer(), updated)
+            )
+        )
+    }
+
     private suspend fun ensureSessionExists(sessionId: String) {
         val existing = chatSessionDao.getSession(sessionId)
         if (existing == null) {
@@ -4265,6 +4330,7 @@ class ChatViewModel(
                 is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
                 is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
                 is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
+                is MessagePart.A2uiCard -> ChatMessageType.A2UI_CARD
                 // BrowserLive 直播卡 UI 映射属 browser-vnc 直播卡后续 Task；此前防御性落文本
                 //（此间管线未产此类 part，分支不可达）
                 is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT

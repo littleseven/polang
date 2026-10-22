@@ -252,7 +252,8 @@ fun Route.agentRoute(
                     val toolRegistry = ToolRegistry {
                         tools(
                             ServerToolService(onHtmlCard = htmlCardSink).asToolsByClass() +
-                                deviceTools.asToolsByClass(),
+                                deviceTools.asToolsByClass() +
+                                RenderUiToolService().asToolsByClass()
                         )
                     }
                     try {

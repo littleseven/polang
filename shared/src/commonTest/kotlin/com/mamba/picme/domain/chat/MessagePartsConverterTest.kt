@@ -3,10 +3,11 @@ package com.mamba.picme.domain.chat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
- * [MessagePartsConverter] 新 8 值分类法映射 + `image` 角色双分支 + 未知/异常兜底
- * （type taxonomy spec §4.2；legacy 13 值 → 新 8 值的收编映射见 [LegacyChatTypeMigrationTest]）。
+ * [MessagePartsConverter] 新 9 值分类法映射 + `image` 角色双分支 + 未知/异常兜底
+ * （type taxonomy spec §4.2；legacy 13 值 → 新分类法的收编映射见 [LegacyChatTypeMigrationTest]）。
  */
 class MessagePartsConverterTest {
 
@@ -115,5 +116,30 @@ class MessagePartsConverterTest {
         assertEquals(ToolPartState.OUTPUT_ERROR, EngineerTaskStatus.FAILED.toToolPartState())
         // 编译期穷尽性：新增 EngineerTaskStatus 枚举值会让 when 编译失败，此断言同步兜底
         assertEquals(5, EngineerTaskStatus.entries.size)
+    }
+
+    // ── A2UI GenUI 卡（hybrid-m2-a2ui M2 T1） ────────────────────
+
+    @Test
+    fun dataUiRow_decodesToA2uiCardPart() {
+        val part = MessagePart.A2uiCard(
+            partId = "p0",
+            surfaceId = "sf-1",
+            messagesJson = "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-1\",\"catalogId\":\"https://polang.mamba.com/a2ui/catalog/v1\"}}]",
+            fallbackSummary = "327 张，数据在原设备",
+            viewState = null,
+        )
+        val content = kotlinx.serialization.json.Json.encodeToString(MessagePart.A2uiCard.serializer(), part)
+        val parts = MessagePartsConverter.toParts("data_ui", content, null, ModelInputRole.ASSISTANT)
+        assertEquals(1, parts.size)
+        assertEquals(part, parts[0])
+    }
+
+    @Test
+    fun dataUiRow_corruptContent_fallsBackToText() {
+        // 行级兜底（spec §4.2）：data_ui 解析异常 → 原文 Text part，不允许丢消息
+        val parts = MessagePartsConverter.toParts("data_ui", "{broken", null, ModelInputRole.ASSISTANT)
+        assertEquals(1, parts.size)
+        assertTrue(parts[0] is MessagePart.Text)
     }
 }

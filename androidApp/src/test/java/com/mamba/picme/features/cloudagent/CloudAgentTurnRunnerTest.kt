@@ -178,4 +178,41 @@ class CloudAgentTurnRunnerTest {
         assertTrue(result.isFailure)
         assertEquals("HTTP 500: boom", result.exceptionOrNull()?.message)
     }
+
+    @Test
+    fun `render_ui action frame emits a2ui card event`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject(
+                        """{"id":2,"type":"action","source":"agent","role":"assistant","payload":{"tool":"render_ui","argsJson":"{\"surfaceId\":\"sf-1\",\"messagesJson\":\"[{}]\",\"fallbackSummary\":\"327 张\"}"}}"""
+                    ),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
+        val card = events.filterIsInstance<CloudTurnEvent.A2uiCard>().single()
+        assertEquals("sf-1", card.surfaceId)
+        assertEquals("[{}]", card.messagesJson)
+        assertEquals("327 张", card.fallbackSummary)
+    }
+
+    @Test
+    fun `action frame of other tool is ignored`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":3,"type":"action","source":"agent","role":"assistant","payload":{"tool":"search_media","argsJson":"{}"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
+        assertEquals(listOf(CloudTurnEvent.Done), events)
+    }
 }

@@ -125,6 +125,7 @@ private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): L
     // data part：默认不进上下文（spec §6）
     is MessagePart.MediaResults,
     is MessagePart.OptimizeCandidates,
+    is MessagePart.A2uiCard,
     -> emptyList()
 }
 

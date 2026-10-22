@@ -23,4 +23,5 @@ enum class ChatMessageType {
     HTML_CARD,
     TASK_CARD,
     OPTIMIZE_CANDIDATES,
+    A2UI_CARD,
 }

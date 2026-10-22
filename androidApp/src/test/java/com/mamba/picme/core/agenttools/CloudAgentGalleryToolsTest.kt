@@ -3,9 +3,17 @@ package com.mamba.picme.core.agenttools
 import com.mamba.picme.agent.core.model.context.GallerySummary
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
+import com.mamba.picme.data.local.FakeLocalHandleDao
+import com.mamba.picme.data.local.LocalHandleDao
+import com.mamba.picme.data.local.LocalHandleEntity
+import com.mamba.picme.data.local.LocalHandleStore
+import com.mamba.picme.domain.chat.a2ui.ScanPhotoEntry
 import com.mamba.picme.domain.model.StructuredFilter
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,7 +26,17 @@ class CloudAgentGalleryToolsTest {
         byQuery: suspend (String, Set<Long>?) -> List<MediaAsset> = { _, _ -> emptyList() },
         byFilter: suspend (StructuredFilter, Set<Long>?) -> List<MediaAsset> = { _, _ -> emptyList() },
         summary: suspend (Boolean) -> GallerySummary? = { null },
-    ) = CloudAgentGalleryTools(searchByQuery = byQuery, searchByFilter = byFilter, gallerySummary = summary)
+        handleStore: LocalHandleStore = LocalHandleStore(FakeLocalHandleDao()),
+    ) = CloudAgentGalleryTools(
+        searchByQuery = byQuery,
+        searchByFilter = byFilter,
+        gallerySummary = summary,
+        localHandleStore = handleStore,
+    )
+
+    /** 命中回文本新形态（D2 投影）：前缀 + opaque token 尾缀。 */
+    private fun handleTextOf(prefix: String): Regex =
+        Regex(Regex.escape(prefix) + "（数据句柄 handle: scan/[0-9a-f]{12}）")
 
     @Test
     fun `summary null falls back to guidance text`() = runTest {
@@ -47,7 +65,7 @@ class CloudAgentGalleryToolsTest {
             assertEquals("猫", q); assertEquals(null, ids)
             listOf(asset(1), asset(2, MediaType.VIDEO), asset(3))
         })
-        assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", ""))
+        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "")))
     }
 
     @Test
@@ -56,7 +74,7 @@ class CloudAgentGalleryToolsTest {
         val t = tools(byFilter = { f, _ -> capturedFilter = f; listOf(asset(1)) })
         val out = t.searchMedia("去年夏天海边", "", "", "", "true")
         assertEquals(true, capturedFilter?.hasFaces)
-        assertEquals("找到 1 张「去年夏天海边」的照片", out)
+        assertTrue(handleTextOf("找到 1 张「去年夏天海边」的照片").matches(out))
     }
 
     @Test
@@ -79,8 +97,8 @@ class CloudAgentGalleryToolsTest {
             // ids == null：全局搜索（search_media）；非 null：refine 的 in-set 召回
             if (ids == null) base else base.filter { it.id in ids }
         })
-        assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", ""))
-        assertEquals("在上一轮结果内找到 1 张「夜景」的照片", t.refineMediaSearch("夜景", "", ""))
+        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "")))
+        assertTrue(handleTextOf("在上一轮结果内找到 1 张「夜景」的照片").matches(t.refineMediaSearch("夜景", "", "")))
     }
 
     @Test
@@ -108,7 +126,7 @@ class CloudAgentGalleryToolsTest {
         t.searchMedia("猫", "", "", "", "")
         val out = t.refineMediaSearch("4月的", "100", "200")
         assertEquals(setOf(7L, 8L), capturedIds)
-        assertEquals("在上一轮结果内找到 1 张「4月的」的照片", out)
+        assertTrue(handleTextOf("在上一轮结果内找到 1 张「4月的」的照片").matches(out))
     }
 
     // ── mediaResultsListener 透出（云端图集卡恢复）────────────────
@@ -160,5 +178,56 @@ class CloudAgentGalleryToolsTest {
         t.searchMedia("猫", "", "", "", "")
         t.refineMediaSearch("不存在", "", "")
         assertEquals(1, calls) // 仅 search 那次
+    }
+
+    // ── opaque handle 注册（D2：命中集引用式不上云）────────────────
+
+    @Test
+    fun `search hit registers scan handle and appends opaque token`() = runTest {
+        val dao = FakeLocalHandleDao()
+        val t = tools(
+            byQuery = { _, _ -> listOf(asset(1), asset(2)) },
+            handleStore = LocalHandleStore(dao),
+        )
+        val out = t.searchMedia("猫", "", "", "", "")
+        val match = Regex(".*（数据句柄 handle: scan/([0-9a-f]{12})）$").find(out)
+        assertTrue("返回文本须以 opaque token 收尾：$out", match != null)
+        val handleId = match!!.groupValues[1]
+        val payloadJson = dao.rows.getValue(handleId).payloadJson
+        // D2：payload 只序列化 ScanPhotoEntry(id/captureDate)，结构保证无 uri
+        assertFalse(payloadJson.contains("\"uri\""))
+        val entries = Json.decodeFromString<List<ScanPhotoEntry>>(payloadJson)
+        assertEquals(2, entries.size)
+        assertEquals(listOf(1L, 2L), entries.map { entry -> entry.id })
+    }
+
+    @Test
+    fun `search empty hit returns plain text and registers nothing`() = runTest {
+        val dao = FakeLocalHandleDao()
+        val t = tools(
+            byQuery = { _, _ -> emptyList() },
+            handleStore = LocalHandleStore(dao),
+        )
+        val out = t.searchMedia("没有的东西", "", "", "", "")
+        // 空命中不注册句柄、不带 token（与 refine 空分支同口径）
+        assertFalse(out.contains("数据句柄"))
+        assertTrue(dao.rows.isEmpty())
+    }
+
+    @Test
+    fun `handle registration failure degrades to plain text without error prefix`() = runTest {
+        val failingDao = object : LocalHandleDao {
+            override suspend fun upsert(handle: LocalHandleEntity) {
+                throw IllegalStateException("disk full")
+            }
+            override suspend fun byId(handleId: String): LocalHandleEntity? = null
+            override suspend fun deleteOlderThan(beforeMs: Long): Int = 0
+        }
+        val t = tools(
+            byQuery = { _, _ -> listOf(asset(1), asset(2)) },
+            handleStore = LocalHandleStore(failingDao),
+        )
+        // 搜索成功但 Room 写失败 → 降级为无 token 前缀，不走 error: 协议
+        assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", ""))
     }
 }

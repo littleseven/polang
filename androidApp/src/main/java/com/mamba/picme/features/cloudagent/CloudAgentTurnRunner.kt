@@ -22,6 +22,13 @@ sealed interface CloudTurnEvent {
 
     data class Error(val message: String) : CloudTurnEvent
 
+    /** render_ui 云端发卡（A2UI 骨架+绑定槽位；数据端上补全）。 */
+    data class A2uiCard(
+        val surfaceId: String,
+        val messagesJson: String,
+        val fallbackSummary: String,
+    ) : CloudTurnEvent
+
     /** 本轮 SSE 正常收尾（done 帧）。 */
     data object Done : CloudTurnEvent
 }
@@ -86,7 +93,20 @@ class CloudAgentTurnRunner(
                     onEvent(CloudTurnEvent.HtmlCard(html, payload.optString("summary")))
                 }
             }
-            else -> Unit // action/observation/finish 不上屏（ToolCall 由 tool_request 帧驱动）
+            "action" -> {
+                if (payload.optString("tool") == CloudAgentToolContract.TOOL_RENDER_UI) {
+                    val args = JSONObject(payload.optString("argsJson"))
+                    onEvent(
+                        CloudTurnEvent.A2uiCard(
+                            surfaceId = args.getString("surfaceId"),
+                            messagesJson = args.getString("messagesJson"),
+                            fallbackSummary = args.optString("fallbackSummary"),
+                        )
+                    )
+                }
+                // 其它工具的 action 帧维持忽略（ToolCall 由 tool_request 帧驱动）
+            }
+            else -> Unit // observation/finish 不上屏（ToolCall 由 tool_request 帧驱动）
         }
     }
 

@@ -3,6 +3,8 @@ package com.mamba.picme.features.cloudagent
 import com.mamba.picme.BuildConfig
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
+import com.mamba.picme.data.local.FakeLocalHandleDao
+import com.mamba.picme.data.local.LocalHandleStore
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
 import com.mamba.picme.domain.repository.UserSettingsRepository
@@ -91,6 +93,7 @@ class CloudAgentChatViewModelTest {
                 searchByQuery = { _, _ -> emptyList() },
                 searchByFilter = { _, _ -> emptyList() },
                 gallerySummary = { null },
+                localHandleStore = LocalHandleStore(FakeLocalHandleDao()),
             ),
         )
 
