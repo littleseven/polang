@@ -77,8 +77,14 @@ interface CloudAgentApi {
  * 云端 Agent 客户端（ADR-018 决策 3/4，M2）。OkHttp + X-App-Token + org.json（ClaudeChatClient 同款）。
  * BYOK 零留存锚点：[byokApiKey] 只在 [postMessage] 的 X-User-Api-Key 头出现——
  * 不进 URL、不进 body、不进日志；其余方法连参数都没有。
+ *
+ * [deviceIdProvider]：同步快照 provider（BrowserSessionClient 先例），未注册访客试用/调试页
+ * 免登录双通道共用 X-Device-Id 头；未预热完成前返回 null 仅少带头，不影响已登录主链路。
  */
-class CloudAgentClient(private val baseUrl: String = DEFAULT_BASE_URL) : CloudAgentApi {
+class CloudAgentClient(
+    private val baseUrl: String = DEFAULT_BASE_URL,
+    private val deviceIdProvider: () -> String? = { null },
+) : CloudAgentApi {
 
     private val sseClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -88,6 +94,7 @@ class CloudAgentClient(private val baseUrl: String = DEFAULT_BASE_URL) : CloudAg
                 chain.request().newBuilder()
                     .addHeader("X-Platform", "android")
                     .addHeader(APP_CHANNEL_HEADER, appChannelValue)
+                    .apply { deviceIdProvider()?.let { id -> addHeader("X-Device-Id", id) } }
                     .build(),
             )
         }
@@ -100,6 +107,7 @@ class CloudAgentClient(private val baseUrl: String = DEFAULT_BASE_URL) : CloudAg
                 chain.request().newBuilder()
                     .addHeader("X-Platform", "android")
                     .addHeader(APP_CHANNEL_HEADER, appChannelValue)
+                    .apply { deviceIdProvider()?.let { id -> addHeader("X-Device-Id", id) } }
                     .build(),
             )
         }

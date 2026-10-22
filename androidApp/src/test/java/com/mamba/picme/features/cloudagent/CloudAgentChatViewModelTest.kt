@@ -1,5 +1,6 @@
 package com.mamba.picme.features.cloudagent
 
+import com.mamba.picme.BuildConfig
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.remote.picme.CloudAgentApi
@@ -21,8 +22,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
 class CloudAgentChatViewModelTest {
 
     private val tokenFlow = MutableStateFlow("pl-token")
@@ -234,10 +238,24 @@ class CloudAgentChatViewModelTest {
     }
 
     @Test
-    fun `not logged in fails prepare`() = runTest {
+    fun `not logged in fails prepare on release`() = runTest {
+        // release 维持登录闸；debug 构建放宽为免登录（服务端访客身份兜底），按构建类型分断言
+        org.junit.Assume.assumeFalse(BuildConfig.DEBUG)
         tokenFlow.value = ""
         val vm = newVm(FakeApi())
         vm.prepare()
         assertTrue(vm.state.value is CloudAgentChatViewModel.UiState.Failed)
+    }
+
+    @Test
+    fun `not logged in enters guest chat on debug`() = runTest {
+        org.junit.Assume.assumeTrue(BuildConfig.DEBUG)
+        tokenFlow.value = ""
+        val api = FakeApi()
+        val vm = newVm(api)
+        vm.prepare()
+        val s = vm.state.value
+        assertTrue(s is CloudAgentChatViewModel.UiState.Chat)
+        assertEquals("gateway", (s as CloudAgentChatViewModel.UiState.Chat).channel)
     }
 }

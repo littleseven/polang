@@ -221,6 +221,7 @@ App → 后续请求带 X-App-Token: <picme_at_*>
 - 每账户有 `FREE_LLM_QUOTA` 免费试用额度（默认 100 次），用尽返回 403
 - 额度默认值持久化于 `server_setting` 表（`free_llm_quota` / `guest_llm_quota`）；env 仅在首次启动播种，之后由 `/admin/settings` 管理，运行时经 `SettingsService` 内存快照下发（热路径零 DB 读）。单账号上限可在「用户详情」页单独覆盖（`account.llm_calls_limit`，0=禁用）
 - **debug 包额度豁免**（2026-10-21）：`DEBUG_QUOTA_BYPASS=true` + 请求头 `X-App-Channel: debug` 双满足时跳过三处额度扣减（`/v1/chat/completions` 账号+访客、`/agent/sessions/{id}/messages` 网关回合、`/v1/browser/open` 每日配额 peek/计费），用量照记 `llm_call_log`；Android debug 包由 `data/remote/AppChannel.kt` 自动带头（BuildConfig.DEBUG 派生，release 发 "release"），iOS 暂不上报。头可伪造——env（默认关）是总闸。全局拦截器打标 `DebugQuotaBypassKey`，路由经 `call.isDebugQuotaBypass()` 判定；豁免请求的错误回滚（revertQuota）同步跳过，保证 increment/revert 严格配对
+- **debug 包免登录（云端 Agent 调试页访客身份，2026-10-22）**：复用 DEBUG_QUOTA_BYPASS 双闸——env 开 + `X-App-Channel: debug` + `X-Device-Id` 三满足且无有效账号 token 时，全局拦截器合成稳定访客身份 `debug-guest:` + sha256("debug-guest:"+deviceId) 写入 `TokenHashKey` + `DeviceIdKey`，`/agent/**` 由此免注册可达（会话/并发闸/审计按设备维度收敛）；前缀与真实账号 token_hash（64 hex）区分，绝不落 account 表。客户端侧 CloudAgentChatViewModel DEBUG 构建放宽 not_logged_in 闸（空 token 继续）+ CloudAgentClient 补发 X-Device-Id 头（deviceIdProvider 注入）。env 默认关 = 生产全封
 - Token 持久化在 `account` 表，`token_hash` 字段 SHA-256 存储
 
 ### 4.2 管理后台认证

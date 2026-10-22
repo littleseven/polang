@@ -2,6 +2,7 @@ package com.mamba.picme.features.cloudagent
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mamba.picme.BuildConfig
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
@@ -74,7 +75,9 @@ class CloudAgentChatViewModel(
         if (_state.value !is UiState.Preparing) return
         viewModelScope.launch {
             val token = settingsRepository.serverAuthTokenFlow.first()
-            if (token.isBlank()) {
+            // 未登录：release 维持登录闸；debug 放宽——空 token 继续，服务端 DEBUG_QUOTA_BYPASS
+            // 双闸（env + X-App-Channel: debug + X-Device-Id）合成访客身份兜底，调试页免注册遛狗。
+            if (token.isBlank() && !BuildConfig.DEBUG) {
                 _state.value = UiState.Failed("not_logged_in")
                 return@launch
             }

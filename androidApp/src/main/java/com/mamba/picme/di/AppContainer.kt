@@ -1153,8 +1153,12 @@ class AppContainerImpl(
         )
     }
 
-    /** 云端 Agent SSE 客户端（调试页与 Chat 页云端模式共用实例）。 */
-    private val cloudAgentApi: CloudAgentApi by lazy { CloudAgentClient() }
+    /** 云端 Agent SSE 客户端（调试页与 Chat 页云端模式共用实例）；deviceId 同步快照供 X-Device-Id 头。 */
+    private val cloudAgentApi: CloudAgentApi by lazy {
+        CloudAgentClient(
+            deviceIdProvider = { (context.applicationContext as? com.mamba.picme.PoLangApplication)?.cachedDeviceIdProvider() },
+        )
+    }
 
     /** 云端工具桥端侧执行器（调试页与 Chat 页云端模式共用实例）。 */
     private val deviceToolExecutor: DeviceToolExecutor by lazy {
