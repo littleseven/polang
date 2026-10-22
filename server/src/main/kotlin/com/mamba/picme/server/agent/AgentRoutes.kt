@@ -16,6 +16,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.response.respondTextWriter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -27,6 +30,16 @@ import kotlinx.serialization.json.putJsonObject
 
 /** BYOK 透传头（ADR-018 决策 4：请求级透传，零留存）。 */
 const val BYOK_API_KEY_HEADER = "X-User-Api-Key"
+
+/**
+ * 单轮跑轮超时上限（M2.7 安全网）：15 分钟。
+ *
+ * 合法长轮上界 = 20 迭代 × (LLM 延迟 ~30s + 工具执行 ~15s) ≈ 15 分钟。
+ * Koog 1.3.0 EventHandler 同步钩子内 runBlocking 阻断协程取消传递，
+ * 客户端断开后 loop 可能继续空转——此超时确保最坏情况下协程被取消、
+ * finally 释放租约（2026-10-22 生产事故：368s 后轮租约仍占用，后续 409）。
+ */
+private const val ROUND_TIMEOUT_MS: Long = 15 * 60 * 1000L
 
 private const val DEFAULT_SYSTEM_PROMPT =
     "你是 PoLang 云端 Agent。用中文简洁回答。需要服务器时间时调用 server_time 工具。"
@@ -61,6 +74,11 @@ private const val DEFAULT_SYSTEM_PROMPT =
  * M2.6 起 per-user 跑轮并发=1（[AgentRoundGate]，messages 路由 try/finally 严格配对释放）：
  * 有在跑轮时回 409 `round_in_flight`（占位在配额扣减之前，拒绝不消耗配额）——
  * 原 M1 已知边界（同会话并发跑轮事件交错 + 连坐置 ERROR）由此消除。
+ * M2.7 起单轮超时安全网（[ROUND_TIMEOUT_MS] = 15 分钟）：
+ * Koog 1.3.0 EventHandler 同步钩子内 runBlocking 阻断取消传递，客户端断开后
+ * loop 可能继续空转、finally 不执行、租约卡死（2026-10-22 生产事故）。
+ * withTimeoutOrNull 确保最坏情况下协程被取消、finally 必然释放租约。
+ * 超时/断线不置会话 ERROR（会话仍可用）、不回退配额（LLM 调用已发生）。
  * 云端 Agent 轮次不写 llm_call_log（审计数据源即事件流；用量指标经配额计数）。
  */
 fun Route.agentRoute(
@@ -257,31 +275,53 @@ fun Route.agentRoute(
                         )
                     }
                     try {
-                        runner.runTurn(
-                            session = session,
-                            userMessage = content,
-                            target = target,
-                            systemPrompt = DEFAULT_SYSTEM_PROMPT,
-                            toolRegistry = toolRegistry,
-                            onHtmlCard = htmlCardSink,
-                            onEvent = { event ->
-                                writeSseFrame(buildJsonObject {
-                                    put("kind", "event")
-                                    put("event", eventJson(event))
-                                })
-                            },
-                        )
-                        writeSseFrame(buildJsonObject {
-                            put("kind", "done")
-                            put("session_status", AgentSessionStatus.RUNNING.wire)
-                        })
+                        // M2.7 安全网：Koog 1.3.0 EventHandler 同步钩子内 runBlocking 阻断
+                        // 协程取消传递——客户端断开后 loop 可能继续空转、finally 不执行，
+                        // 导致租约永不释放（2026-10-22 生产事故）。withTimeoutOrNull 确保
+                        // 最坏情况下协程被取消、finally 释放租约。15 分钟上限对合法长轮
+                        // （20 迭代 × ~45s）足够宽裕。
+                        val finishEvent = withTimeoutOrNull(ROUND_TIMEOUT_MS) {
+                            runner.runTurn(
+                                session = session,
+                                userMessage = content,
+                                target = target,
+                                systemPrompt = DEFAULT_SYSTEM_PROMPT,
+                                toolRegistry = toolRegistry,
+                                onHtmlCard = htmlCardSink,
+                                onEvent = { event ->
+                                    writeSseFrame(buildJsonObject {
+                                        put("kind", "event")
+                                        put("event", eventJson(event))
+                                    })
+                                },
+                            )
+                        }
+                        if (finishEvent != null) {
+                            writeSseFrame(buildJsonObject {
+                                put("kind", "done")
+                                put("session_status", AgentSessionStatus.RUNNING.wire)
+                            })
+                        } else {
+                            // 超时取消：会话仍可用（不置 ERROR），配额已消耗（LLM 调用已发生，不回退）
+                            writeSseFrame(buildJsonObject {
+                                put("kind", "error")
+                                put("message", "round_timeout")
+                            })
+                        }
                     } catch (e: Throwable) {
-                        AgentSessionRepository.updateStatus(session.id, AgentSessionStatus.ERROR)
-                        if (gatewayQuotaCharged) AccountService.revertQuota(tokenHash)
-                        writeSseFrame(buildJsonObject {
-                            put("kind", "error")
-                            put("message", e.message?.take(200) ?: "internal error")
-                        })
+                        // 端断线/取消：不置 ERROR（会话仍可用）、不回退配额（LLM 调用已发生）
+                        if (e !is CancellationException) {
+                            AgentSessionRepository.updateStatus(session.id, AgentSessionStatus.ERROR)
+                            if (gatewayQuotaCharged) AccountService.revertQuota(tokenHash)
+                        }
+                        try {
+                            writeSseFrame(buildJsonObject {
+                                put("kind", "error")
+                                put("message", e.message?.take(200) ?: "internal error")
+                            })
+                        } catch (_: Throwable) {
+                            // 通道已关闭（端断线），无法写入错误帧——静默吞掉
+                        }
                     } finally {
                         // 连接关闭（正常结束/异常/端断线）清理该会话桥挂起项，防泄漏
                         bridge.failAll(session.id, "connection_closed")

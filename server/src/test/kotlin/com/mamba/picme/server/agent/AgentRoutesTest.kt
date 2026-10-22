@@ -16,6 +16,8 @@ import ai.koog.http.client.ktor.KtorKoogHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -25,6 +27,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.headersOf
+import io.ktor.network.sockets.SocketTimeoutException
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
@@ -45,6 +48,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 云端 Agent 路由面端到端（ADR-018：独立会话域 + BYOK 透传零留存）。
@@ -472,6 +478,81 @@ class AgentRoutesTest {
         }
         val used = transaction(Db.instance) { Accounts.selectAll().single()[Accounts.llmCallsUsed] }
         assertEquals(2, used)
+    }
+
+    @Test
+    fun `client disconnect releases round gate and does not mark session error`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
+        val account = runBlocking { AccountService.createOrRefresh("disc@x.com", 100) }
+        activateGateway()
+
+        // MockEngine 挂起：模拟 LLM 长时间不返回（客户端等不及断开）
+        val latch = CountDownLatch(1)
+        val engine = MockEngine { _ ->
+            latch.await(10, TimeUnit.SECONDS)
+            respond("{}", HttpStatusCode.OK)
+        }
+        val runner = AgentRunner(
+            executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
+            dispatcher = ServerToolDispatcher.default(),
+        )
+        val gate = AgentRoundGate()
+        installAgentApp(runner, roundGate = gate)
+
+        val created = client.post("/agent/sessions") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"model":"deepseek-chat","channel":"gateway"}""")
+        }
+        val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
+
+        // 独立线程发 SSE 请求 → 等 LLM 挂起 → 客户端超时断开
+        val disconnectLatch = CountDownLatch(1)
+        val thread = Thread {
+            runBlocking {
+                try {
+                    client.post("/agent/sessions/$sessionId/messages") {
+                        header(APP_TOKEN_HEADER, account.token)
+                        contentType(ContentType.Application.Json)
+                        setBody("""{"content":"hi"}""")
+                        timeout { requestTimeoutMillis = 300 }
+                    }
+                } catch (_: Throwable) {
+                    // 客户端超时断开，预期行为
+                }
+                disconnectLatch.countDown()
+            }
+        }
+        thread.start()
+        // 等 MockEngine 的 latch.await 被命中（确保服务端进入 LLM 调用）
+        Thread.sleep(200)
+        disconnectLatch.await(5, TimeUnit.SECONDS)
+
+        // 断开后：Koog loop 阻塞在 MockEngine 的 latch.await 上，
+        // 客户端超时断开 → Ktor 取消承载协程 → withTimeoutOrNull 协作取消 →
+        // finally 释放租约。轮询等待协程取消传递（需一两个 dispatch 周期）。
+        val deadline = System.currentTimeMillis() + 5_000
+        while (gate.activeCount() > 0 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50)
+        }
+        assertEquals("round gate should be released after client disconnect", 0, gate.activeCount())
+
+        // 会话不应被置为 ERROR（断线不是 LLM/服务端错误）
+        val session = AgentSessionRepository.find(sessionId)
+        assertTrue("session should not be ERROR after disconnect", session?.status != AgentSessionStatus.ERROR)
+
+        // 配额不应回退（LLM 调用已发起）
+        val used = transaction(Db.instance) { Accounts.selectAll().single()[Accounts.llmCallsUsed] }
+        assertEquals("quota should not be reverted on disconnect", 1, used)
+
+        // 下一轮应能通过闸
+        latch.countDown() // 释放 MockEngine 让后续请求能完成
+        val resp2 = client.post("/agent/sessions/$sessionId/messages") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"content":"second"}""")
+        }
+        assertEquals(HttpStatusCode.OK, resp2.status)
     }
 
     @Test
