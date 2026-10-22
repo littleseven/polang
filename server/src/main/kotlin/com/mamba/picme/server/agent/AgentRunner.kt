@@ -86,7 +86,8 @@ class AgentRunner(
                                 session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
                                 payload = AgentEventPayload.Action(
                                     tool = ctx.toolName,
-                                    argsJson = ctx.toolArgs.toString(),
+                                    // Koog 私有 JSON 树 toString 零转义，必须走 kotlinx 映射（见 ToolArgsWireJson.kt）
+                                    argsJson = toolArgsWireJson(ctx.toolArgs),
                                     reversible = ctx.toolName in reversibleTools,
                                 ),
                             )
