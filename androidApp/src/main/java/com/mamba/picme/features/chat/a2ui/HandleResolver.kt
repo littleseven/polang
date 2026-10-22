@@ -36,6 +36,7 @@ class HandleResolver(
 
     suspend fun resolve(surfaceId: String, messagesJson: String): A2uiResolution =
         withContext(Dispatchers.Default) {
+            val parser = A2uiJsonMessageParser { input -> AndroidA2uiJsonReader(input) }
             val array = runCatching { JSONArray(messagesJson) }
                 .getOrElse { return@withContext A2uiResolution.Degraded("messages_json_malformed") }
             val filled = mutableListOf<A2uiServerToClientMessage>()
@@ -43,13 +44,13 @@ class HandleResolver(
                 val envelope = array.getJSONObject(index)
                 val dataModel = envelope.optJSONObject("updateDataModel")
                 if (dataModel == null) {
-                    filled += parseEnvelope(envelope)
+                    filled += parseEnvelope(parser, envelope)
                         ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
                     continue
                 }
                 val value = dataModel.opt("value")
                 if (value !is String || !value.startsWith(A2uiCardContract.HANDLE_SCHEME)) {
-                    filled += parseEnvelope(envelope)
+                    filled += parseEnvelope(parser, envelope)
                         ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
                     continue
                 }
@@ -75,11 +76,11 @@ class HandleResolver(
             A2uiResolution.Ready(filled)
         }
 
-    private fun parseEnvelope(envelope: JSONObject): A2uiServerToClientMessage? =
-        runCatching {
-            A2uiJsonMessageParser { input -> AndroidA2uiJsonReader(input) }
-                .parse(envelope.toString())
-        }.getOrNull()
+    private fun parseEnvelope(
+        parser: A2uiJsonMessageParser,
+        envelope: JSONObject,
+    ): A2uiServerToClientMessage? =
+        runCatching { parser.parse(envelope.toString()) }.getOrNull()
 
     private fun List<HistogramBucket>.toPlainList(): List<Map<String, Any>> =
         map { bucket -> mapOf("label" to bucket.label, "count" to bucket.count) }

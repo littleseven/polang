@@ -16,6 +16,7 @@ import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -64,7 +65,7 @@ fun A2uiCardHost(
     when (val current = resolution) {
         null -> A2uiSurfaceDefaults.LoadingIndicator()
         is A2uiResolution.Degraded -> degradedContent(part.fallbackSummary)
-        is A2uiResolution.Ready -> {
+        is A2uiResolution.Ready -> key(part.partId) {
             val processor = remember(part.surfaceId) {
                 A2uiMessageProcessor(
                     catalogs = listOf(catalog),

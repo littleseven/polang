@@ -322,7 +322,7 @@ fun ChatScreen(
         (context.applicationContext as PoLangApplication).container.a2uiHandleResolver
     }
     val uriHandler = LocalUriHandler.current
-    val polangA2uiCatalog = remember {
+    val polangA2uiCatalog = remember(uriHandler) {
         polangA2uiCatalog(A2uiUrlOpener { url -> uriHandler.openUri(url) })
     }
     // 任务中心回锚（US-15）两阶段自动滚底抑制：pending（等待锚定）+ hold（锚定后防流式
