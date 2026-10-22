@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * debug 包访客身份合成（免登录双闸）：稳定 hash + 前缀可区分 + 与真实账号 token_hash 不撞。
+ * debug 包访客身份合成（免登录双闸）：稳定 hash + 64 hex 同形 + 输入域隔离零碰撞。
  */
 class DebugGuestAuthTest {
 
@@ -21,10 +21,9 @@ class DebugGuestAuthTest {
     }
 
     @Test
-    fun `hash carries debug guest prefix and is not raw account token hash`() {
+    fun `hash is 64 hex fitting agent session token hash column`() {
         val hash = debugGuestTokenHash("dev-1")
-        assertTrue(hash.startsWith("debug-guest:"))
-        // 真实账号 token_hash = 64 hex（无冒号前缀），访客身份绝不与之同形
-        assertEquals(64, hash.removePrefix("debug-guest:").length)
+        assertEquals(64, hash.length)
+        assertTrue(hash.all { it in '0'..'9' || it in 'a'..'f' })
     }
 }

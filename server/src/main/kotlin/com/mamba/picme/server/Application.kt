@@ -158,7 +158,8 @@ fun Application.module(config: AppConfig) {
         // debug 包免登录（云端 Agent 调试页真机遛狗）：复用 DEBUG_QUOTA_BYPASS 双闸——
         // env 总闸 + X-App-Channel: debug 头 + X-Device-Id 三满足才合成访客身份（稳定 hash，
         // 同设备同 hash → 会话/并发闸/审计按设备维度收敛）；env 默认关 = 生产全封。
-        // 访客 hash 带 "debug-guest:" 前缀，与真实账号 token_hash（64 hex）区分，绝不落 account 表。
+        // 访客 hash = sha256("debug-guest:" + deviceId)，64 hex 与真实账号 token_hash 同形；
+        // 输入域隔离（真实 token 为 picme_at_* 格式）保证零碰撞，绝不落 account 表。
         val isDebugChannel = call.attributes.getOrNull(DebugQuotaBypassKey) != null
         if (isDebugChannel && !deviceId.isNullOrBlank()) {
             call.attributes.put(DeviceIdKey, deviceId)
@@ -243,8 +244,10 @@ fun Application.module(config: AppConfig) {
 }
 
 /**
- * debug 包访客身份合成：同设备稳定 hash（sha256("debug-guest:" + deviceId)），
- * 带前缀与真实账号 token_hash（64 hex）区分；仅 DEBUG_QUOTA_BYPASS 双闸内使用。
+ * debug 包访客身份合成：同设备稳定 hash = sha256("debug-guest:" + deviceId)，
+ * 64 hex 与真实账号 token_hash 同形同宽（VARCHAR(64) 可落）；
+ * 输入域隔离（真实 token 为 picme_at_* 格式）保证零碰撞；
+ * 仅 DEBUG_QUOTA_BYPASS 双闸内使用。
  */
 internal fun debugGuestTokenHash(deviceId: String): String =
-    "debug-guest:" + AccountService.sha256("debug-guest:$deviceId")
+    AccountService.sha256("debug-guest:$deviceId")
