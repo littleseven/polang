@@ -41,7 +41,9 @@ class HandleResolver(
                 .getOrElse { return@withContext A2uiResolution.Degraded("messages_json_malformed") }
             val filled = mutableListOf<A2uiServerToClientMessage>()
             for (index in 0 until array.length()) {
-                val envelope = array.getJSONObject(index)
+                // 元素级防护：非对象元素（如 ["oops"]）不得逃逸 withContext 炸主线程（终审 M1）
+                val envelope = array.optJSONObject(index)
+                    ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
                 val dataModel = envelope.optJSONObject("updateDataModel")
                 if (dataModel == null) {
                     filled += parseEnvelope(parser, envelope)

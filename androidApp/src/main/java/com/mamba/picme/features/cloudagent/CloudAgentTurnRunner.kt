@@ -95,14 +95,16 @@ class CloudAgentTurnRunner(
             }
             "action" -> {
                 if (payload.optString("tool") == CloudAgentToolContract.TOOL_RENDER_UI) {
-                    val args = JSONObject(payload.optString("argsJson"))
-                    onEvent(
+                    // 终审 m5：render_ui 参数解析容错——坏帧记日志忽略，不拖垮整回合
+                    runCatching {
+                        val args = JSONObject(payload.optString("argsJson"))
                         CloudTurnEvent.A2uiCard(
                             surfaceId = args.getString("surfaceId"),
                             messagesJson = args.getString("messagesJson"),
                             fallbackSummary = args.optString("fallbackSummary"),
                         )
-                    )
+                    }.onSuccess { card -> onEvent(card) }
+                        .onFailure { e -> Logger.w(TAG, "render_ui action frame ignored: ${e.message}") }
                 }
                 // 其它工具的 action 帧维持忽略（ToolCall 由 tool_request 帧驱动）
             }

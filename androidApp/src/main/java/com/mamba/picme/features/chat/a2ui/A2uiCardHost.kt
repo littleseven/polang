@@ -45,7 +45,9 @@ fun A2uiCardHost(
     degradedContent: @Composable (summary: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val resolution by produceState<A2uiResolution?>(initialValue = null, part.partId) {
+    // 键粒度收到整颗 part（data class 可比）：viewState 回流产生新 part 即重解析、
+    // 按最新 viewState 重填 /selected（终审 m3——恢复语义，/selected 在恢复路径最后追加，时序正确）
+    val resolution by produceState<A2uiResolution?>(initialValue = null, part) {
         value = resolver.resolve(part.surfaceId, part.messagesJson)
         // viewState 初始填槽（US-7 确定性重建）：selected=<label> → 追加 updateDataModel
         val ready = value as? A2uiResolution.Ready
@@ -66,6 +68,10 @@ fun A2uiCardHost(
         null -> A2uiSurfaceDefaults.LoadingIndicator()
         is A2uiResolution.Degraded -> degradedContent(part.fallbackSummary)
         is A2uiResolution.Ready -> key(part.partId) {
+            // 点选即时高亮（终审 M2）：拦截器除持久化外，经 processorRef 就地回写 /selected。
+            // also 赋值在 remember 块内：键失效重建时 ref 同步指向新 processor，不留悬空引用。
+            // 类型全限定：compose.ui.A2uiMessageProcessor 是工厂函数（同名），类本体在 model.processor
+            var processorRef: androidx.a2ui.model.processor.A2uiMessageProcessor? = null
             val processor = remember(part.surfaceId) {
                 A2uiMessageProcessor(
                     catalogs = listOf(catalog),
@@ -76,6 +82,14 @@ fun A2uiCardHost(
                             ) {
                                 (action.context["bucket"] as? String)?.let { bucket ->
                                     onViewStateChange("selected=$bucket")
+                                    // processMessage 仅入队，拦截器挂起回调内调用安全
+                                    processorRef?.processMessage(
+                                        A2uiUpdateDataModelMessage(
+                                            surfaceId = part.surfaceId,
+                                            path = "/selected",
+                                            value = bucket,
+                                        )
+                                    )
                                 }
                                 null // 消费：不上行
                             } else {
@@ -83,7 +97,7 @@ fun A2uiCardHost(
                             }
                         }
                     ),
-                )
+                ).also { created -> processorRef = created }
             }
             // processMessage 只入队：须挂 collectMessages 处理循环，消息才会真正落到 surface
             LaunchedEffect(processor) { processor.collectMessages() }
