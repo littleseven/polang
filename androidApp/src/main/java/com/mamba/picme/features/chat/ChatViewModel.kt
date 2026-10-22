@@ -3598,6 +3598,23 @@ class ChatViewModel(
         chatSessionDao.touchSession(sessionId)
     }
 
+    /**
+     * A2UI 卡交互态持久化（US-7）：viewState 写回 part（同 message id REPLACE upsert，
+     * insertMessageWithParts 重算 partsJson 防漂移）。重建时作为初始填槽恢复。
+     */
+    suspend fun persistA2uiViewState(messageId: String, viewState: String) {
+        val entity = chatMessageDao.getMessageById(messageId) ?: return
+        val part = runCatching {
+            a2uiCardJson.decodeFromString(MessagePart.A2uiCard.serializer(), entity.content)
+        }.getOrNull() ?: return
+        val updated = part.copy(viewState = viewState)
+        chatMessageDao.insertMessageWithParts(
+            entity.copy(
+                content = a2uiCardJson.encodeToString(MessagePart.A2uiCard.serializer(), updated)
+            )
+        )
+    }
+
     private suspend fun ensureSessionExists(sessionId: String) {
         val existing = chatSessionDao.getSession(sessionId)
         if (existing == null) {

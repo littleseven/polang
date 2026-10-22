@@ -268,6 +268,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.play.services)
+    // hybrid M2 T7：HandleResolver 注入 kotlinx.datetime.TimeZone（月桶时区），shared 仅 implementation 不外露。
+    implementation(libs.kotlinx.datetime)
     implementation(libs.accompanist.permissions)
     implementation(libs.play.services.location)
     implementation(libs.androidx.camera.camera2)

@@ -1589,6 +1589,8 @@
     <string name="chat_result_executed">✅ Exécuté : %1$s</string>
     <string name="chat_chart_generated">Graphique généré</string>
     <string name="chat_html_card_generated">Carte générée</string>
+    <string name="chat_a2ui_card_unavailable">Données de la carte indisponibles</string>
+    <string name="chat_a2ui_card_data_elsewhere">%1$s (données sur l\'appareil d\'origine)</string>
     <string name="html_card_view_full">Appuyez pour voir tout le contenu</string>
     <string name="html_card_preview_failed">Échec du rendu de l\'aperçu</string>
     <string name="html_fullpage_title_default">Détail de la carte</string>

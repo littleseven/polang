@@ -1589,6 +1589,8 @@
     <string name="chat_result_executed">✅ Se ejecutó %1$s</string>
     <string name="chat_chart_generated">Gráfico generado</string>
     <string name="chat_html_card_generated">Tarjeta generada</string>
+    <string name="chat_a2ui_card_unavailable">Tarjeta de datos no disponible</string>
+    <string name="chat_a2ui_card_data_elsewhere">%1$s (datos en el dispositivo original)</string>
     <string name="html_card_view_full">Toca para ver el contenido completo</string>
     <string name="html_card_preview_failed">No se pudo renderizar la vista previa</string>
     <string name="html_fullpage_title_default">Detalle de la tarjeta</string>
