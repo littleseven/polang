@@ -5,6 +5,7 @@ import androidx.a2ui.compose.ui.A2uiMessageProcessor
 import androidx.a2ui.model.processor.A2uiActionInterceptor
 import androidx.a2ui.model.protocol.A2uiEventAction
 import androidx.a2ui.model.protocol.A2uiUpdateDataModelMessage
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,10 +20,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mamba.picme.BuildConfig
 import com.mamba.picme.R
 import com.mamba.picme.domain.chat.MessagePart
 
@@ -108,7 +111,19 @@ fun A2uiCardHost(
             val surfaces by processor.activeSurfaces.collectAsStateWithLifecycle()
             val surface = surfaces.firstOrNull { surfaceModel -> surfaceModel.id == part.surfaceId }
             if (surface != null) {
-                A2uiSurface(surfaceModel = surface, modifier = modifier)
+                if (BuildConfig.DEBUG) {
+                    // debug 徽标 overlay：显性标注此卡由 A2UI 协议驱动，点击开蓝图查看器
+                    Box(modifier = modifier) {
+                        A2uiSurface(surfaceModel = surface)
+                        A2uiDebugBadge(
+                            surfaceId = part.surfaceId,
+                            messagesJson = part.messagesJson,
+                            modifier = Modifier.align(Alignment.TopEnd),
+                        )
+                    }
+                } else {
+                    A2uiSurface(surfaceModel = surface, modifier = modifier)
+                }
             }
         }
     }

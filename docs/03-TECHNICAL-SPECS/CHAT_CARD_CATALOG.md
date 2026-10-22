@@ -816,6 +816,11 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   HandleResolver 填槽，缺失降级占位卡（US-6）。
 - **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui 下发
   BarChart 骨架（buckets 绑定 local://scan/<id>#histogram）→ 端上月桶填槽渲染。
+- **调试入口（DEBUG 构建）**：Ready 态卡右上角挂 debug 徽标（`A2UI v0.9 · sf-xxxxxxxx`，
+  `A2uiDebugBadge`），点击开蓝图查看器（AlertDialog 逐条列 createSurface/updateComponents/
+  updateDataModel pretty JSON + 复制全部；messagesJson 非法时降级显示原文+原因，永不崩聊天页）；
+  解析纯函数 `parseBlueprintMessages`（`A2uiBlueprintDebugger.kt`），徽标内容为协议标识符无自然语言，
+  [I18N] 豁免，release 包 `BuildConfig.DEBUG` 门控零痕迹。
 
 ---
 
