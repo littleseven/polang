@@ -317,6 +317,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | Agent 图片结果卡 | `image`（+ role=agent） | `ChatMessageItem` isImage 分支 | 原生 | —（跟随会话帧） | ✅ |
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
 | 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay`（M2 全屏接管） | 原生（帧位图：M2 WS binary 推流 / HTTP base64） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
+| A2UI GenUI 卡 | `data_ui` | `A2uiCardHost`（androidx.a2ui 官方渲染器，polang catalog = material + BarChart） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ✅（hybrid M2，2026-10-21） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
 | 流式卡片占位/工具状态/失败 item | （流式瞬态，不落 Room） | 占位骨架 / `ToolStatusChip` / 失败态（i18n `chat_card_generate_failed`） | 原生 | — | ✅（M4 拍平三分流，见 §1.3） |
 | 日期分隔 | （列表装饰，非消息） | `ChatDateChip` | 原生 | `chat_date_chip` 438:335 | ✅ |
@@ -768,6 +769,22 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 | `actionCount` / `resultSummary` / `errorReason` | Int / String? / String? | 定格统计与摘要 |
 
 **回灌**（`toModelInput`，toolCallId = `"<messageId>:<partId>"` 命名空间锚）→ `ToolCall(…, "browser_session", argsSummary="")` + `ToolResult(…, resultSummary ?: 失败原因 ?: 会话概览, isError = state==OUTPUT_ERROR)`——只回灌文本摘要，帧与动作流水不进上下文（token 保护；§0.3 硬约束①②④过线）。**端到端**：`browser_open` tool_call → `BrowserSessionCapability` → 网关 `/v1/browser/open`（wantFrame=true）→ xuxing bridge → 占位 part（`INPUT_STREAMING`）经 `BrowserLiveOverlay` 逐动作原位覆写 → `browser_close`/超时定格 → `emitBrowserCardMessage` 落 `tool_browser` 行（partsJson 由 `insertMessageWithParts` 自 content 现算，`MessagePartsConverter` 认 `tool_browser` 直通解码）→ 冷启动从 Room 恢复定格卡；降级不变式：任何一环失败退化为纯文本回答，不白屏。
+
+---
+
+## data_ui · A2UI GenUI 卡（hybrid M2）
+
+- **协议**：`ChatMessageEntity.type = "data_ui"`，content 列存整颗 `MessagePart.A2uiCard` part JSON
+  （tool_browser 先例）；云端经 render_ui 工具 action 帧下发，端上 TurnRunner 拦截落库。
+- **parts 形态**：`MessagePart.A2uiCard(partId, surfaceId, messagesJson, fallbackSummary, viewState)`，
+  category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7）。
+- **回灌**：不回灌 LLM（ChatModelInput data part 分支 emptyList）；messagesJson 只含骨架+local://
+  绑定，handle id 对云 opaque（D2）。
+- **渲染**：ChatScreen TYPE_A2UI_CARD → A2uiCardHost（androidx.a2ui 官方渲染器，
+  polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract）；
+  HandleResolver 填槽，缺失降级占位卡（US-6）。
+- **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui 下发
+  BarChart 骨架（buckets 绑定 local://scan/<id>#histogram）→ 端上月桶填槽渲染。
 
 ---
 
