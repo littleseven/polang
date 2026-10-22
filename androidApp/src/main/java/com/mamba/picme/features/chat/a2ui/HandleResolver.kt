@@ -50,33 +50,63 @@ class HandleResolver(
                         ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
                     continue
                 }
+                val modelSurfaceId = dataModel.optString("surfaceId", surfaceId)
+                val dataBatch = dataModel.optJSONObject("data")
+                if (dataBatch != null) {
+                    // 防御纵深（fix-a2ui-blueprint-contract）：server 描述已禁止 data 批量形式，
+                    // 端侧对存量/越约蓝图逐 key 展开为 path="/"+key 的单绑定消息再过 handle 解析
+                    val keys = dataBatch.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val batchValue = dataBatch.opt(key)
+                        if (batchValue is String && batchValue.startsWith(A2uiCardContract.HANDLE_SCHEME)) {
+                            when (val resolution = resolveHandle(modelSurfaceId, "/$key", batchValue)) {
+                                is A2uiResolution.Ready -> filled += resolution.messages
+                                is A2uiResolution.Degraded -> return@withContext resolution
+                            }
+                        } else {
+                            filled += A2uiUpdateDataModelMessage(
+                                surfaceId = modelSurfaceId,
+                                path = "/$key",
+                                value = batchValue,
+                            )
+                        }
+                    }
+                    continue
+                }
                 val value = dataModel.opt("value")
                 if (value !is String || !value.startsWith(A2uiCardContract.HANDLE_SCHEME)) {
                     filled += parseEnvelope(parser, envelope)
                         ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
                     continue
                 }
-                val handle = A2uiCardContract.parseLocalHandle(value)
-                    ?: return@withContext A2uiResolution.Degraded("handle_malformed")
-                val payload = lookup.payloadOf(handle.domain, handle.id)
-                    ?: return@withContext A2uiResolution.Degraded("handle_missing")
-                val replacement: Any = when (handle.domain) {
-                    A2uiCardContract.DOMAIN_SCAN -> {
-                        val entries = runCatching {
-                            json.decodeFromString<List<ScanPhotoEntry>>(payload)
-                        }.getOrElse { return@withContext A2uiResolution.Degraded("payload_malformed") }
-                        GalleryHistogramBuilder.buildMonthly(entries, timeZone).toPlainList()
-                    }
-                    else -> return@withContext A2uiResolution.Degraded("domain_unknown")
+                when (val resolution = resolveHandle(modelSurfaceId, dataModel.optString("path", "/"), value)) {
+                    is A2uiResolution.Ready -> filled += resolution.messages
+                    is A2uiResolution.Degraded -> return@withContext resolution
                 }
-                filled += A2uiUpdateDataModelMessage(
-                    surfaceId = dataModel.optString("surfaceId", surfaceId),
-                    path = dataModel.optString("path", "/"),
-                    value = replacement,
-                )
             }
             A2uiResolution.Ready(filled)
         }
+
+    /** local:// handle → 填槽消息；任一环节失败 → Degraded（宁缺毋滥，不混真假数据）。 */
+    private suspend fun resolveHandle(surfaceId: String, path: String, handle: String): A2uiResolution {
+        val parsed = A2uiCardContract.parseLocalHandle(handle)
+            ?: return A2uiResolution.Degraded("handle_malformed")
+        val payload = lookup.payloadOf(parsed.domain, parsed.id)
+            ?: return A2uiResolution.Degraded("handle_missing")
+        val replacement: Any = when (parsed.domain) {
+            A2uiCardContract.DOMAIN_SCAN -> {
+                val entries = runCatching {
+                    json.decodeFromString<List<ScanPhotoEntry>>(payload)
+                }.getOrElse { return A2uiResolution.Degraded("payload_malformed") }
+                GalleryHistogramBuilder.buildMonthly(entries, timeZone).toPlainList()
+            }
+            else -> return A2uiResolution.Degraded("domain_unknown")
+        }
+        return A2uiResolution.Ready(
+            listOf(A2uiUpdateDataModelMessage(surfaceId = surfaceId, path = path, value = replacement)),
+        )
+    }
 
     private fun parseEnvelope(
         parser: A2uiJsonMessageParser,

@@ -35,4 +35,43 @@ class RenderUiToolServiceTest {
             descriptor.description.contains("https://polang.mamba.com/a2ui/catalog/v1"),
         )
     }
+
+    // fix-a2ui-blueprint-contract：sf-a2u1c0de 事故复盘——LLM 输出 data 批量形式 / Button 用
+    // label+secondary / 缺 childId+action，全部越出 alpha01 目录 schema，端上永 loading + Error 占位。
+    // 以下契约测试钉住收紧后的线格式约束字面量。
+    @Test
+    fun `render_ui description pins single path-value updateDataModel form`() {
+        assertTrue(
+            "description 须钉住 updateDataModel 单 path/value 形式并禁止 data 批量形式",
+            descriptor.description.contains("\"path\"") &&
+                descriptor.description.contains("\"value\"") &&
+                descriptor.description.contains("\"data\""),
+        )
+    }
+
+    @Test
+    fun `render_ui description pins Button contract`() {
+        assertTrue(
+            "description 须钉住 Button 契约：childId 包 Text + action，禁 label，variant 白名单",
+            descriptor.description.contains("childId") &&
+                descriptor.description.contains("action") &&
+                descriptor.description.contains("default/primary/borderless"),
+        )
+    }
+
+    @Test
+    fun `render_ui description pins Text variant whitelist`() {
+        assertTrue(
+            "description 须钉住 Text variant 白名单",
+            descriptor.description.contains("h1/h2/h3/h4/h5/caption/body"),
+        )
+    }
+
+    @Test
+    fun `render_ui description pins BarChart selected as label string`() {
+        assertTrue(
+            "description 须钉住 selected 是桶 label 字符串（与 PolangBarChartComponent description 双向核对）",
+            descriptor.description.contains("选中桶 label"),
+        )
+    }
 }
