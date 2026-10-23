@@ -60,6 +60,15 @@ class RenderUiToolServiceTest {
     }
 
     @Test
+    fun `render_ui description pins action event wrap format`() {
+        assertTrue(
+            "description 须钉住 action 须包 \"event\" 层：action={\"event\":{\"name\":...}}",
+            descriptor.description.contains("\"event\"") &&
+                descriptor.description.contains("禁止平写"),
+        )
+    }
+
+    @Test
     fun `render_ui description pins Text variant whitelist`() {
         assertTrue(
             "description 须钉住 Text variant 白名单",

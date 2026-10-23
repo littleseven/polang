@@ -28,6 +28,7 @@ class RenderUiToolService {
    Text 的 variant 仅 h1/h2/h3/h4/h5/caption/body；
    Button 必须给 "child"（子组件 id 字符串，指向一个 Text 组件作按钮文字，
    禁止用 "label" 属性）和 action，variant 仅 default/primary/borderless；
+   action 格式：{"event": {"name": "<事件名>"}}（"event" 层必填，禁止平写 "name"）；
    BarChart（柱状图）：title=标题字符串，buckets=[{label,count}] 绑定数据模型，
    selected=选中桶 label 字符串（不是下标）；
 5. 数据不进 JSON：凡涉及相册数据的值，updateDataModel 的字符串值写绑定
