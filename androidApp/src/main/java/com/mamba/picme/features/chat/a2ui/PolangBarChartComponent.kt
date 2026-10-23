@@ -17,7 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.mamba.picme.core.designsystem.A2uiCardTokens
 
 /**
  * polang 目录自研组件：月度照片计数柱状图（A2UI 线格式侧 name="BarChart"）。
@@ -60,8 +60,8 @@ class PolangBarChartComponent : A2uiComponent {
                 Text(text = text, style = MaterialTheme.typography.titleSmall)
             }
             Row(
-                modifier = Modifier.fillMaxWidth().height(BAR_AREA_HEIGHT),
-                horizontalArrangement = Arrangement.spacedBy(BAR_GAP),
+                modifier = Modifier.fillMaxWidth().height(A2uiCardTokens.barAreaHeight),
+                horizontalArrangement = Arrangement.spacedBy(A2uiCardTokens.barGap),
                 verticalAlignment = Alignment.Bottom,
             ) {
                 for (bucket in buckets) {
@@ -73,9 +73,10 @@ class PolangBarChartComponent : A2uiComponent {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(BAR_AREA_HEIGHT * bucket.count / maxCount)
+                                .height(A2uiCardTokens.barAreaHeight * bucket.count / maxCount)
                                 .background(
-                                    if (isSelected) barColor else barColor.copy(alpha = 0.45f)
+                                    if (isSelected) barColor
+                                    else barColor.copy(alpha = A2uiCardTokens.barUnselectedAlpha)
                                 )
                                 .clickable {
                                     dispatchAction(
@@ -116,8 +117,5 @@ class PolangBarChartComponent : A2uiComponent {
         private val BUCKETS =
             A2uiProperty.dynamicValue("buckets", required = true, description = "[{label,count}] 月桶列表")
         private val SELECTED = A2uiProperty.dynamicString("selected", description = "选中桶 label")
-
-        private val BAR_AREA_HEIGHT = 120.dp
-        private val BAR_GAP = 6.dp
     }
 }

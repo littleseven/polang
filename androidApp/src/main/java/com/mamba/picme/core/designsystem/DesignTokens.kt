@@ -456,3 +456,12 @@ object IdPhotoTokens {
     val colorRed = Color(0xFFD9001B)
     val colorWhite = Color.White
 }
+
+/** A2UI 数据卡（data_ui BarChart + 降级卡 + debug 蓝图查看器）。barAreaHeight=柱状图绘图区高; barGap=柱间距; barUnselectedAlpha=未选中柱透明度; debugBadgeRadius=debug 徽标圆角; debugMaxHeight=蓝图查看器最大高。 */
+object A2uiCardTokens {
+    val barAreaHeight = 120.dp
+    val barGap = 6.dp
+    val barUnselectedAlpha = 0.45f
+    val debugBadgeRadius = 12.dp
+    val debugMaxHeight = 420.dp
+}
