@@ -449,6 +449,34 @@ class AgentRoutesTest {
     }
 
     @Test
+    fun `round gate busy 409 carries retry_after hint`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
+        val account = runBlocking { AccountService.createOrRefresh("busyhint@x.com", 100) }
+        activateGateway()
+        val gate = AgentRoundGate()
+        assertTrue(gate.tryAcquire(AccountService.sha256(account.token)))
+        installAgentApp(mockRunner(), roundGate = gate)
+
+        val created = client.post("/agent/sessions") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"model":"deepseek-chat","channel":"gateway"}""")
+        }
+        val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
+
+        val resp = client.post("/agent/sessions/$sessionId/messages") {
+            header(APP_TOKEN_HEADER, account.token)
+            contentType(ContentType.Application.Json)
+            setBody("""{"content":"hi"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, resp.status)
+        val body = json.parseToJsonElement(resp.bodyAsText()).jsonObject
+        assertEquals("round_in_flight", body["error"]!!.jsonPrimitive.content)
+        val retryAfter = body["retry_after"]!!.jsonPrimitive.content.toLong()
+        assertTrue("retry_after should be positive, got $retryAfter", retryAfter > 0)
+    }
+
+    @Test
     fun `round gate released after round, next message succeeds`() = testApplication {
         TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
         val account = runBlocking { AccountService.createOrRefresh("relay@x.com", 100) }

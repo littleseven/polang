@@ -577,6 +577,7 @@
     <string name="cloud_agent_html_card_blocked">Card content blocked by safety check</string>
     <string name="cloud_agent_stop">Stop</string>
     <string name="cloud_agent_send">Send</string>
+    <string name="cloud_agent_round_in_flight">Previous round still running, please wait a moment and try again</string>
     <string name="assistant_persona_default">Default</string>
     <string name="assistant_persona_default_desc">Balanced, neutral standard replies</string>
     <string name="assistant_persona_warm">Warm &amp; Caring</string>

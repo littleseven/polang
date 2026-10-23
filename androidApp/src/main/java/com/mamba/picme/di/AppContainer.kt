@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.mamba.picme.R
 import com.mamba.picme.agent.core.platform.voice.KeywordSpotterEngine
 import com.mamba.picme.beauty.api.PhotoProcessor
 import com.mamba.picme.beauty.render.GlBeautyPreviewProviderFactory
@@ -1198,6 +1199,7 @@ class AppContainerImpl(
                 deviceToolExecutor = deviceToolExecutor,
                 settingsRepository = userPreferencesRepository,
                 cloudAgentGalleryTools = cloudAgentGalleryTools,
+                roundInFlightHint = { context.getString(R.string.cloud_agent_round_in_flight) },
             )
         }
     }

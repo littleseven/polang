@@ -95,6 +95,7 @@ class CloudAgentChatViewModelTest {
                 gallerySummary = { null },
                 localHandleStore = LocalHandleStore(FakeLocalHandleDao()),
             ),
+            roundInFlightHint = { "上一轮还在跑，请稍候" },
         )
 
     @Test
@@ -202,6 +203,24 @@ class CloudAgentChatViewModelTest {
         val s = vm.state.value as CloudAgentChatViewModel.UiState.Chat
         assertEquals(CloudAgentChatViewModel.Role.ERROR, s.messages.last().role)
         assertEquals("quota exhausted", s.messages.last().text)
+    }
+
+    @Test
+    fun `409 round_in_flight failure appends wait hint not raw http error`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { _, _ ->
+            // 模拟 CloudAgentClient 非 2xx 抛出的原始异常（含服务端 JSON 体）
+            throw RuntimeException("""HTTP 409: {"error":"round_in_flight","message":"previous round still running","retry_after":"15"}""")
+        }
+        val vm = newVm(api)
+        vm.prepare()
+        vm.send("hi")
+        val s = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(CloudAgentChatViewModel.Role.ERROR, s.messages.last().role)
+        // 上屏的是等待提示，不是原始 HTTP 错误串
+        assertEquals("上一轮还在跑，请稍候", s.messages.last().text)
+        assertEquals(false, s.messages.last().text.contains("HTTP 409"))
+        assertEquals(false, s.inFlight)
     }
 
     @Test

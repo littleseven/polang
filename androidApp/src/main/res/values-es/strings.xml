@@ -562,6 +562,7 @@
     <string name="cloud_agent_html_card_blocked">Contenido de la tarjeta bloqueado por la comprobación de seguridad</string>
     <string name="cloud_agent_stop">Detener</string>
     <string name="cloud_agent_send">Enviar</string>
+    <string name="cloud_agent_round_in_flight">El turno anterior sigue en ejecución, espera un momento e inténtalo de nuevo</string>
     <string name="assistant_persona_default">Predeterminada</string>
     <string name="assistant_persona_default_desc">Respuestas estándar, equilibradas y neutras</string>
     <string name="assistant_persona_warm">Cálida y cercana</string>

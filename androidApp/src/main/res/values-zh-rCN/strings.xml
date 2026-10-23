@@ -565,6 +565,7 @@
     <string name="cloud_agent_html_card_blocked">卡片内容未通过安全检查</string>
     <string name="cloud_agent_stop">停止</string>
     <string name="cloud_agent_send">发送</string>
+    <string name="cloud_agent_round_in_flight">上一轮还在跑，请稍候再试</string>
     <string name="assistant_persona_default">默认</string>
     <string name="assistant_persona_default_desc">中性简洁的标准回复</string>
     <string name="assistant_persona_warm">温暖贴心</string>

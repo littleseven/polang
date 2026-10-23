@@ -562,6 +562,7 @@
     <string name="cloud_agent_html_card_blocked">Contenu de la carte bloqué par le contrôle de sécurité</string>
     <string name="cloud_agent_stop">Arrêter</string>
     <string name="cloud_agent_send">Envoyer</string>
+    <string name="cloud_agent_round_in_flight">Le tour précédent est encore en cours, attends un instant et réessaie</string>
     <string name="assistant_persona_default">Par défaut</string>
     <string name="assistant_persona_default_desc">Réponses standard équilibrées et neutres</string>
     <string name="assistant_persona_warm">Chaleureux et bienveillant</string>

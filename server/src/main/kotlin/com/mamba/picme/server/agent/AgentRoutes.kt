@@ -41,6 +41,12 @@ const val BYOK_API_KEY_HEADER = "X-User-Api-Key"
  */
 private const val ROUND_TIMEOUT_MS: Long = 15 * 60 * 1000L
 
+/**
+ * 409 round_in_flight 建议重试间隔（秒）。一轮典型时长 30s~2min（LLM 延迟 + 工具执行），
+ * 15s 在「尽快重试」与「不给在跑轮添压」间折中；端侧据此延迟重发，而非立刻撞闸。
+ */
+private const val ROUND_RETRY_AFTER_S: Long = 15L
+
 private const val DEFAULT_SYSTEM_PROMPT =
     "你是 PoLang 云端 Agent。用中文简洁回答。需要服务器时间时调用 server_time 工具。"
 
@@ -209,7 +215,12 @@ fun Route.agentRoute(
             if (!roundGate.tryAcquire(tokenHash)) {
                 return@post call.respond(
                     HttpStatusCode.Conflict,
-                    mapOf("error" to "round_in_flight", "message" to "previous round still running"),
+                    mapOf(
+                        "error" to "round_in_flight",
+                        "message" to "previous round still running",
+                        // 建议重试间隔（秒）：端侧据此延迟重试而非立刻重发（409 UX 改进）
+                        "retry_after" to ROUND_RETRY_AFTER_S.toString(),
+                    ),
                 )
             }
             try {

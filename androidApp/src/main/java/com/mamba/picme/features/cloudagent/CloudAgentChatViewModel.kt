@@ -9,6 +9,7 @@ import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.repository.UserSettingsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,8 @@ class CloudAgentChatViewModel(
     private val deviceToolExecutor: DeviceToolExecutor,
     private val settingsRepository: UserSettingsRepository,
     private val cloudAgentGalleryTools: CloudAgentGalleryTools,
+    /** 409 round_in_flight 上屏提示文案（生产注入走资源文件，VM 不持 Context 保持纯 JVM 可测）。 */
+    private val roundInFlightHint: () -> String = { "Previous round still running, please wait" },
 ) : ViewModel() {
 
     /** 媒体卡消息经 [media] 携带渲染数据、H5 卡消息经 [htmlCard] 携带；其余 role 恒为 null。 */
@@ -185,9 +188,17 @@ class CloudAgentChatViewModel(
                 // 流干净结束但无 Done 帧的兜底（Done 已清则为幂等 no-op）
                 result.onSuccess { setInFlight(false) }
                 result.onFailure { e ->
-                    append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, e.message ?: "network error"))
+                    val msg = if (isRoundInFlight(e)) roundInFlightHint() else e.message ?: "network error"
+                    append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, msg))
                     setInFlight(false)
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // CloudAgentClient 非 2xx 直接抛异常（非 Result.failure），此处兜底上屏
+                val msg = if (isRoundInFlight(e)) roundInFlightHint() else e.message ?: "network error"
+                append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, msg))
+                setInFlight(false)
             } finally {
                 cloudAgentGalleryTools.mediaResultsListener = null
             }
@@ -198,6 +209,15 @@ class CloudAgentChatViewModel(
     fun stop() {
         turnJob?.cancel()
         setInFlight(false)
+    }
+
+    /**
+     * 判定失败是否为 409 round_in_flight（服务端 per-user 跑轮互斥闸）。
+     * CloudAgentClient 非 2xx 抛 RuntimeException("HTTP 409: {json}")，匹配双特征防误判。
+     */
+    private fun isRoundInFlight(e: Throwable): Boolean {
+        val msg = e.message ?: return false
+        return msg.contains("HTTP 409") && msg.contains("round_in_flight")
     }
 
     private fun append(message: UiMessage) {

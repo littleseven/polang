@@ -2254,6 +2254,11 @@ class ChatViewModel(
                 insertA2uiCardMessage(sessionId, card)
             }
             when {
+                result.isFailure && isCloudRoundInFlight(result.exceptionOrNull()) -> insertAgentMessage(
+                    sessionId,
+                    stringContext().getString(R.string.cloud_agent_round_in_flight),
+                    "error"
+                )
                 result.isFailure -> insertAgentMessage(
                     sessionId,
                     stringContext().getString(
@@ -2266,6 +2271,27 @@ class ChatViewModel(
                 serverError != null -> insertAgentMessage(sessionId, serverError.orEmpty(), "error")
                 answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
                 else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // CloudAgentClient 非 2xx 直接抛异常（非 Result.failure），此处兜底上屏
+            _streamingMessage.value = null
+            if (isCloudRoundInFlight(e)) {
+                insertAgentMessage(
+                    sessionId,
+                    stringContext().getString(R.string.cloud_agent_round_in_flight),
+                    "error"
+                )
+            } else {
+                insertAgentMessage(
+                    sessionId,
+                    stringContext().getString(
+                        R.string.chat_inference_error,
+                        e.message ?: stringContext().getString(R.string.chat_unknown_error)
+                    ),
+                    "error"
+                )
             }
         } finally {
             cloudAgentGalleryTools?.mediaResultsListener = null
@@ -2361,6 +2387,12 @@ class ChatViewModel(
     private fun isCloudSessionInvalid(error: Throwable?): Boolean {
         val message = error?.message.orEmpty()
         return message.contains("HTTP 404") || message.contains("session_not_found", ignoreCase = true)
+    }
+
+    /** 409 round_in_flight 判定：服务端 per-user 跑轮互斥闸（双特征匹配防误判）。 */
+    private fun isCloudRoundInFlight(error: Throwable?): Boolean {
+        val message = error?.message.orEmpty()
+        return message.contains("HTTP 409") && message.contains("round_in_flight")
     }
 
     /**
