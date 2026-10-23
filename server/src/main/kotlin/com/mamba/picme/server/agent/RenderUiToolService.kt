@@ -34,7 +34,13 @@ class RenderUiToolService {
 5. 数据不进 JSON：凡涉及相册数据的值，updateDataModel 的字符串值写绑定
    "local://scan/<handleId>#histogram"，handleId 来自 search_media/refine_media_search
    结果尾部的「handle: scan/<id>」。禁止臆造 handleId，禁止把路径/uri/清单写进任何字段；
-6. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示。"""
+6. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示；
+7. 样式只用语义令牌（禁具体数值）：
+   Text 增可选 "role" 属性：HEADLINE|SUBHEAD|BODY|CAPTION（默认 BODY）；
+   颜色增可选 "colorRole"：PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
+   间距增可选 "spacing"：COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
+   BarChart 的 title 增可选 "titleRole"：HEADLINE|SUBHEAD|BODY|CAPTION（默认 SUBHEAD）；
+   禁止输出 fontSize/padding/color 等具体数值字段，端侧会忽略或拒绝渲染。"""
     )
     suspend fun renderUi(
         @LLMDescription("A2UI surface 唯一 id（与 createSurface.surfaceId 一致，建议 sf-<8位hex>）")

@@ -27,6 +27,17 @@ object A2uiCardContract {
     /** A2UI 协议版本（SUPPORTED_VERSIONS = ["v0.9", "v0.9.1"]，M2 固定 v0.9）。 */
     const val PROTOCOL_VERSION = "v0.9"
 
+    // ── 语义样式令牌线格式键（A2uiStyleTokens 配套） ──────────────────────
+
+    /** Text 组件语义层级键（value = HEADLINE|SUBHEAD|BODY|CAPTION）。 */
+    const val ROLE_KEY = "role"
+
+    /** 颜色语义角色键（value = PRIMARY|SURFACE|ERROR|ON_SURFACE）。 */
+    const val COLOR_ROLE_KEY = "colorRole"
+
+    /** 间距语义角色键（value = COMPACT|STANDARD|COMFORTABLE）。 */
+    const val SPACING_KEY = "spacing"
+
     /** 上行 opaque token：`handle: scan/<id>`（无 scheme，过投影闸）。 */
     fun formatHandleToken(domain: String, id: String): String = "handle: $domain/$id"
 

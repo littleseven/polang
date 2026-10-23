@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 
 /**
  * polang 目录自研组件：月度照片计数柱状图（A2UI 线格式侧 name="BarChart"）。
@@ -36,7 +37,7 @@ class PolangBarChartComponent : A2uiComponent {
     override val description: String =
         "月度照片计数柱状图。buckets 为 [{label: String, count: Int}] 列表（数据模型绑定，必填）；selected 为选中桶 label（可空）。"
 
-    override val properties: List<A2uiProperty<*>> = listOf(TITLE, BUCKETS, SELECTED)
+    override val properties: List<A2uiProperty<*>> = listOf(TITLE, TITLE_ROLE, BUCKETS, SELECTED)
 
     @Composable
     override fun A2uiComponentScope.isReady(properties: A2uiComponentProperties): Boolean =
@@ -45,6 +46,7 @@ class PolangBarChartComponent : A2uiComponent {
     @Composable
     override fun A2uiComponentScope.Content(properties: A2uiComponentProperties, modifier: Modifier) {
         val title = properties.bind(TITLE)
+        val titleRole = A2uiStyleMapper.parseTextRole(properties.bind(TITLE_ROLE))
         val rawBuckets = properties.bind(BUCKETS)
         val selected = properties.bind(SELECTED)
         val buckets = rawBuckets.asBuckets()
@@ -57,7 +59,7 @@ class PolangBarChartComponent : A2uiComponent {
         val barColor = MaterialTheme.colorScheme.primary
         Column(modifier = modifier.fillMaxWidth()) {
             title?.let { text ->
-                Text(text = text, style = MaterialTheme.typography.titleSmall)
+                Text(text = text, style = A2uiStyleMapper.textStyle(titleRole ?: A2uiTextRole.SUBHEAD))
             }
             Row(
                 modifier = Modifier.fillMaxWidth().height(BAR_AREA_HEIGHT),
@@ -113,6 +115,10 @@ class PolangBarChartComponent : A2uiComponent {
         const val EVENT_SELECT_BUCKET = "selectBucket"
 
         private val TITLE = A2uiProperty.dynamicString("title", description = "图表标题")
+        private val TITLE_ROLE = A2uiProperty.dynamicString(
+            "titleRole",
+            description = "标题语义层级：HEADLINE|SUBHEAD|BODY|CAPTION（默认 SUBHEAD）",
+        )
         private val BUCKETS =
             A2uiProperty.dynamicValue("buckets", required = true, description = "[{label,count}] 月桶列表")
         private val SELECTED = A2uiProperty.dynamicString("selected", description = "选中桶 label")
