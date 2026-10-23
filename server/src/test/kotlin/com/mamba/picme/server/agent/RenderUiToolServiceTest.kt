@@ -52,8 +52,8 @@ class RenderUiToolServiceTest {
     @Test
     fun `render_ui description pins Button contract`() {
         assertTrue(
-            "description 须钉住 Button 契约：childId 包 Text + action，禁 label，variant 白名单",
-            descriptor.description.contains("childId") &&
+            "description 须钉住 Button 契约：child 包 Text + action，禁 label，variant 白名单",
+            descriptor.description.contains("\"child\"") &&
                 descriptor.description.contains("action") &&
                 descriptor.description.contains("default/primary/borderless"),
         )
