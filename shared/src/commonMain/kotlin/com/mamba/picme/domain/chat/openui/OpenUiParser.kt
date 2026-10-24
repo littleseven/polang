@@ -80,10 +80,17 @@ internal object OpenUiParser {
                 OpenUiStatement(raw.name, classify(raw.isStateName, expr), expr)
             }
             OpenUiParseResult(statements, sourceHadText = true)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // §8.1「模型写的任何东西不得让客户端崩溃」（review 🟡3）：StackOverflowError
+            // 等 Error 也不得逃逸，统一映射 parse-exception 致命降级
             OpenUiParseResult(emptyList(), sourceHadText = true, parseException = true)
         }
     }
+
+    /** AST 嵌套深度上限（§8.1 双保险之一；另一道是顶层 catch Throwable）。 */
+    private const val MAX_EXPR_DEPTH = 256
+
+    private class OpenUiDepthLimitException : Exception("expression nesting over $MAX_EXPR_DEPTH")
 
     /** 行尾中缀/逗号算符 → 换行延续（splitStatements 近似边界，非完整算符状态机）。 */
     private val infixContinuationKinds = setOf(
@@ -331,6 +338,8 @@ internal object OpenUiParser {
 
         fun parse(): OpenUiExpr = parseExpr(0)
 
+        private var exprDepth = 0
+
         private fun cur(): OpenUiToken = tokens.getOrNull(pos) ?: EOF_TOKEN
 
         private fun peekNext(): OpenUiToken = tokens.getOrNull(pos + 1) ?: EOF_TOKEN
@@ -360,11 +369,18 @@ internal object OpenUiParser {
         }
 
         private fun parseExpr(minPrec: Int): OpenUiExpr {
-            var left = parsePrefix()
-            while (infixPrecedence(cur()) > minPrec) {
-                left = parseInfix(left)
+            // §8.1：AST 嵌套深度上限（review 🟡3），超限 → OpenUiDepthLimitException
+            // → 顶层 parse-exception 致命降级（不崩客户端）
+            if (++exprDepth > MAX_EXPR_DEPTH) throw OpenUiDepthLimitException()
+            try {
+                var left = parsePrefix()
+                while (infixPrecedence(cur()) > minPrec) {
+                    left = parseInfix(left)
+                }
+                return left
+            } finally {
+                exprDepth--
             }
-            return left
         }
 
         private fun parsePrefix(): OpenUiExpr {

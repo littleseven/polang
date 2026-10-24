@@ -230,6 +230,18 @@ class OpenUiEngineTest {
         }
     }
 
+    @Test
+    fun `deep nesting does not crash and degrades to parse failure`() = runTest {
+        // §8.1 MUST「模型写的任何东西不得让客户端崩溃」（review 🟡3）：
+        // 数千层嵌套 → 深度上限/Throwable 兜底 → Failed，不 StackOverflow
+        val program = "a = " + "[".repeat(5000) + "1" + "]".repeat(5000)
+        val result = OpenUiSession(program, noTools).prepare()
+        assertIs<OpenUiResult.Failed>(result)
+        assertTrue(
+            result.errors.any { error -> error.code == "parse-exception" || error.code == "parse-failed" },
+        )
+    }
+
     // ── @Set/@Reset 重求值（§6.3 M1 简化） ───────────────────────────
 
     @Test

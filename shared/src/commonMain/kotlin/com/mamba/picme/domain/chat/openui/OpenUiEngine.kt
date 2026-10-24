@@ -63,7 +63,25 @@ class OpenUiSession(
     suspend fun prepare(): OpenUiResult {
         lastResult?.let { cached -> return cached }
         prepared = true
+        return try {
+            prepareInternal()
+        } catch (e: CancellationException) {
+            throw e // 协程取消穿透（同 runQuery 口径）
+        } catch (t: Throwable) {
+            // §8.1「模型写的任何东西不得让客户端崩溃」（review 🟡3）：解析/求值链路上的
+            // StackOverflowError 等 Error 也不逃逸，致命降级 parse-exception
+            fail(
+                listOf(
+                    OpenUiError(
+                        "parse-exception",
+                        message = "解析/求值崩溃兜底：${t.message ?: t::class.simpleName}",
+                    )
+                )
+            )
+        }
+    }
 
+    private suspend fun prepareInternal(): OpenUiResult {
         val parsed = OpenUiParser.parse(program)
         if (parsed.parseException) {
             return fail(listOf(OpenUiError("parse-exception", message = "解析器自身异常")))
