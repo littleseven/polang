@@ -41,7 +41,12 @@ class RenderOpenUiToolService {
    handle id 只在 program 里引用，回复正文禁止向用户展示 handle id；
 5. 交互约定：含 BarChart 的程序首行写 `${'$'}selected = ""`，BarChart 的 selected 参数传 `${'$'}selected`
    （端侧点选高亮回写该变量；裸字符串字面量不参与回写，点选高亮会静默失效）；
-6. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示。"""
+6. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示；
+7. 完整黄金示例（统计卡标准骨架——照此结构写：root = 语句必须有、独占一行、
+   组件引用前面语句的变量名；program 不要包 markdown 代码围栏）：
+   ${'$'}selected = ""
+   buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])
+   root = Card([Text("相册按月分布", "HEADLINE"), Text("按月统计", "CAPTION"), BarChart("每月照片数", buckets, ${'$'}selected)])"""
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

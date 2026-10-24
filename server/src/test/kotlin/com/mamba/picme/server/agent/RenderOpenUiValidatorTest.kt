@@ -45,6 +45,33 @@ class RenderOpenUiValidatorTest {
     }
 
     @Test
+    fun `query line before root statement passes`() {
+        // 2026-10-24 真机事故回归：剥离顺序先注释后字符串时，handle 里 local:// 的
+        // // 被当注释截断留下奇数引号，字符串全局配对跨行吞掉后续 root 语句，
+        // 合法程序被误报「缺 root」死循环烧光 20 迭代（validWithQuery 的 Query 在末行
+        // 恰好掩盖此 bug）。Query 行在前、root 行在后的真实 LLM 输出钉住。
+        val program = """
+            ${'$'}selected = ""
+            buckets = Query("local_handle", { handle: "local://scan/f9d33db29ed6#histogram" }, [])
+            root = Card([Text("2026 年照片月度分布", "HEADLINE"), Text("共 148 张，按拍摄月份统计", "CAPTION"), BarChart("每月照片数", buckets, ${'$'}selected)])
+        """.trimIndent()
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `tool description golden example passes validation`() {
+        // 与 RenderOpenUiToolService @LLMDescription 规则 7 的黄金示例逐字同源
+        // （占位 <id> 换成合法 handleId 形态）；改示例必须同步改这里——
+        // A2UI 线 RENDER_UI_EXAMPLE 同款「示例自身过校验」防漂移钉住
+        val golden = """
+            ${'$'}selected = ""
+            buckets = Query("local_handle", { handle: "local://scan/f9d33db29ed6#histogram" }, [])
+            root = Card([Text("相册按月分布", "HEADLINE"), Text("按月统计", "CAPTION"), BarChart("每月照片数", buckets, ${'$'}selected)])
+        """.trimIndent()
+        assertNull(RenderOpenUiValidator.validateToError(golden))
+    }
+
+    @Test
     fun `no root statement falls back to first Card entry`() {
         assertNull(RenderOpenUiValidator.validateToError("""page = Card([Text("x")])"""))
     }
