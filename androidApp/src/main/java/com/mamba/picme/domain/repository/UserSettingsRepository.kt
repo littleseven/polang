@@ -215,6 +215,11 @@ interface UserSettingsRepository {
     val cloudAgentEnabledFlow: Flow<Boolean>
     suspend fun updateCloudAgentEnabled(enabled: Boolean)
 
+    // ── GenUI 线格式开关（openui P2 对比实验） ────────────────────
+    /** GenUI 线格式："a2ui"（默认）/ "openui"；未知值归一 a2ui。经 X-GenUI-Format 头分流 server 工具。 */
+    val genUiFormatFlow: Flow<String>
+    suspend fun updateGenUiFormat(format: String)
+
     // ── 服务端邮箱认证 ──────────────────────────────────────────
     val serverAuthTokenFlow: Flow<String>
     val serverAuthEmailFlow: Flow<String>

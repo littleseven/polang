@@ -176,6 +176,9 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         // 云端 Agent 编排开关（默认关=本地编排；开=Chat 页回合走云端 SSE 链路，ADR-018 实验线）
         val CLOUD_AGENT_ENABLED = booleanPreferencesKey("cloud_agent_enabled")
 
+        // GenUI 线格式开关（openui P2 对比实验："a2ui" / "openui"，默认 a2ui）
+        val GENUI_FORMAT = stringPreferencesKey("genui_format")
+
         // 服务端邮箱认证
         val SERVER_AUTH_TOKEN = stringPreferencesKey("server_auth_token")
         val SERVER_AUTH_EMAIL = stringPreferencesKey("server_auth_email")
@@ -1317,6 +1320,25 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         }
     }
 
+    // ── GenUI 线格式开关（openui P2）─────────────────────────────
+    override val genUiFormatFlow: Flow<String> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            normalizeGenUiFormat(preferences[PreferencesKeys.GENUI_FORMAT])
+        }
+
+    override suspend fun updateGenUiFormat(format: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.GENUI_FORMAT] = normalizeGenUiFormat(format)
+        }
+    }
+
     // ── 服务端邮箱认证 ──────────────────────────────────────────
     override val serverAuthTokenFlow: Flow<String> = context.dataStore.data
         .catch { exception ->
@@ -1386,3 +1408,7 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         }
     }
 }
+
+/** GenUI 线格式归一化（openui P2）：只放行 "a2ui"/"openui"，缺省/未知值归一默认 a2ui。 */
+private fun normalizeGenUiFormat(raw: String?): String =
+    if (raw == "a2ui" || raw == "openui") raw else "a2ui"

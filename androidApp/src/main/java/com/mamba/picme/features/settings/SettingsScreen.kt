@@ -225,6 +225,7 @@ fun SettingsScreen(
     val mediaManageSilentTrashEnabled by viewModel.mediaManageSilentTrashEnabled.collectAsState()
     val cloudAgentByokConsent by viewModel.cloudAgentByokConsent.collectAsState()
     val cloudAgentEnabled by viewModel.cloudAgentEnabled.collectAsState()
+    val genUiFormat by viewModel.genUiFormat.collectAsState()
     val localAsrModel by viewModel.localAsrModel.collectAsState()
     val localKwsModel by viewModel.localKwsModel.collectAsState()
     val logModuleConfig by viewModel.logModuleConfig.collectAsState()
@@ -355,6 +356,8 @@ fun SettingsScreen(
             onCloudAgentByokConsentChange = { viewModel.setCloudAgentByokConsent(it) },
             cloudAgentEnabled = cloudAgentEnabled,
             onCloudAgentEnabledChange = { viewModel.setCloudAgentEnabled(it) },
+            genUiFormat = genUiFormat,
+            onGenUiFormatChange = { viewModel.setGenUiFormat(it) },
             localAsrModel = localAsrModel,
             onLocalAsrModelChange = { viewModel.setLocalAsrModel(it) },
             localKwsModel = localKwsModel,
@@ -437,6 +440,8 @@ private fun SettingsContent(
     onCloudAgentByokConsentChange: (Boolean) -> Unit = {},
     cloudAgentEnabled: Boolean = false,
     onCloudAgentEnabledChange: (Boolean) -> Unit = {},
+    genUiFormat: String = "a2ui",
+    onGenUiFormatChange: (String) -> Unit = {},
     localAsrModel: String,
     onLocalAsrModelChange: (String) -> Unit,
     localKwsModel: String,
@@ -571,6 +576,46 @@ private fun SettingsContent(
                         icon = Icons.Rounded.Cloud,
                         iconBlockColor = AppColors.vibrantBlue
                     )
+                    // GenUI 协议行（openui P2 对比实验）：品牌名不翻译，行尾显示当前值
+                    var showGenUiFormatDialog by remember { mutableStateOf(false) }
+                    SettingsListRow(
+                        title = stringResource(R.string.settings_genui_format_title),
+                        subtitle = stringResource(R.string.settings_genui_format_subtitle),
+                        icon = Icons.Rounded.Cloud,
+                        iconBlockColor = AppColors.vibrantBlue,
+                        valueText = if (genUiFormat == "openui") "OpenUI" else "A2UI",
+                        onClick = { showGenUiFormatDialog = true }
+                    )
+                    if (showGenUiFormatDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showGenUiFormatDialog = false },
+                            title = { Text(stringResource(R.string.settings_genui_format_title)) },
+                            text = {
+                                Column {
+                                    listOf("a2ui" to "A2UI", "openui" to "OpenUI")
+                                        .forEach { (value, label) ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        onGenUiFormatChange(value)
+                                                        showGenUiFormatDialog = false
+                                                    },
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                RadioButton(selected = genUiFormat == value, onClick = null)
+                                                Text(label)
+                                            }
+                                        }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showGenUiFormatDialog = false }) {
+                                    Text(stringResource(R.string.cancel))
+                                }
+                            }
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(SettingsTokens.listSectionSpacing))
                 SettingsSection(title = stringResource(R.string.assistant_persona)) {
