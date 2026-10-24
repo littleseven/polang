@@ -55,7 +55,16 @@ fun OpenUiNodeRenderer(
             horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OpenUiChildren(node, state, onAction)
+            // 子组件等宽分栏：无 weight 时首栏按内容占宽，后续栏被压成单字竖条
+            // （2026-10-24 复杂图文排版真机事故）
+            val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+            for (child in children) {
+                if (child is OpenUiValue.ComponentVal) {
+                    OpenUiNodeRenderer(child, state, onAction, Modifier.weight(1f))
+                } else {
+                    Box(modifier = Modifier.weight(1f)) // null 字面量/被剔除元素：等宽空占位
+                }
+            }
         }
         "Column" -> Column(
             modifier = modifier,

@@ -29,8 +29,10 @@ class RenderOpenUiToolService {
 3. 可用组件签名（逐字遵守，禁发明属性）：
    - Text(text*, role?, colorRole?)：role∈HEADLINE|SUBHEAD|BODY|CAPTION（默认 BODY），
      colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
+     ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
    - Row(children*, spacing?) / Column(children*, spacing?) / Card(children*, spacing?)：
      children 是组件数组（[组件1, 组件2]），spacing∈COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
+     Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；
    - Button(label*, action?)：action 形如 @OpenUrl("https://...")；
    - BarChart(title?, buckets*, selected?)：buckets 是 [{label,count}] 数据引用；
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
