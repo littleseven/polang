@@ -20,6 +20,7 @@ import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.DedupHashDao
+import com.mamba.picme.data.local.HandleLookup
 import com.mamba.picme.data.local.LocalHandleStore
 import com.mamba.picme.features.chat.a2ui.HandleResolver
 import com.mamba.picme.data.local.MediaDao
@@ -422,6 +423,9 @@ interface AppContainer {
 
     /** A2UI 卡 local:// handle 填槽解析器（hybrid M2 T7；与 gallery 工具共用同一 LocalHandleStore 实例） */
     val a2uiHandleResolver: HandleResolver
+
+    /** OpenUI 卡 Query("local_handle") 的端侧取数接缝（openui P2；与 A2UI 共用同一 LocalHandleStore 实例） */
+    val localHandleLookup: HandleLookup
 
     /**
      * 启动用户任务适配器（spec §6 组合根接线）。
@@ -1153,6 +1157,8 @@ class AppContainerImpl(
     override val a2uiHandleResolver: HandleResolver by lazy {
         HandleResolver(localHandleStore)
     }
+
+    override val localHandleLookup: HandleLookup get() = localHandleStore
 
     /**
      * 云端 Agent 相册工具的无头执行器（ADR-018 M2）：绕过场景注册表直执，

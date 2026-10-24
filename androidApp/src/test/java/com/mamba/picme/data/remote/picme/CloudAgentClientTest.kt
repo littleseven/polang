@@ -60,7 +60,7 @@ class CloudAgentClientTest {
         server.start()
         val client = CloudAgentClient(server.url("/").toString().removeSuffix("/"))
         val frames = mutableListOf<CloudFrame>()
-        val result = client.postMessage("tok", "s_1", "hi", byokApiKey = "sk-secret", onFrame = { frame -> frames.add(frame) })
+        val result = client.postMessage("tok", "s_1", "hi", byokApiKey = "sk-secret", genUiFormat = "a2ui", onFrame = { frame -> frames.add(frame) })
         assertTrue(result.isSuccess)
         assertEquals(3, frames.size)
         assertTrue(frames[0] is CloudFrame.Event)
@@ -69,6 +69,7 @@ class CloudAgentClientTest {
         val recorded = server.takeRequest()
         // BYOK 零留存锚点：key 只出现在这一个 header，不进 body
         assertEquals("sk-secret", recorded.getHeader("X-User-Api-Key"))
+        assertEquals("a2ui", recorded.getHeader("X-GenUI-Format"))
         assertTrue(!recorded.body.readUtf8().contains("sk-secret"))
         server.shutdown()
     }
@@ -79,8 +80,11 @@ class CloudAgentClientTest {
         server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody("data: {\"kind\":\"done\"}\n\n"))
         server.start()
         val client = CloudAgentClient(server.url("/").toString().removeSuffix("/"))
-        client.postMessage("tok", "s_1", "hi", byokApiKey = null, onFrame = {})
-        assertEquals(null, server.takeRequest().getHeader("X-User-Api-Key"))
+        client.postMessage("tok", "s_1", "hi", byokApiKey = null, genUiFormat = "", onFrame = {})
+        val recorded = server.takeRequest()
+        assertEquals(null, recorded.getHeader("X-User-Api-Key"))
+        // 空 genUiFormat 不发协议头（非 openui 时 server 侧按默认 A2UI 工具集处理）
+        assertEquals(null, recorded.getHeader("X-GenUI-Format"))
         server.shutdown()
     }
 

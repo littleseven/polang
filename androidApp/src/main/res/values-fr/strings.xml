@@ -546,6 +546,8 @@
     <string name="cloud_agent_byok_consent_subtitle">Envoyée à chaque requête, jamais stockée ni journalisée</string>
     <string name="cloud_agent_entry_title">Agent cloud (expérimental)</string>
     <string name="cloud_agent_chat_toggle_subtitle">Le chat passe par l\'agent cloud : galerie en lecture seule, sans cartes ; les messages avec photo sont envoyés en texte</string>
+    <string name="settings_genui_format_title">Protocole GenUI</string>
+    <string name="settings_genui_format_subtitle">Expérience comparative : quel format d\'UI générative utilisent les cartes de l\'agent cloud (A2UI / OpenUI)</string>
     <string name="cloud_agent_login_required">Connectez-vous dans les Réglages avant d\'utiliser l\'agent cloud</string>
     <string name="cloud_agent_consent_required">Le fournisseur choisi utilise votre propre clé API : activez l\'option dans Réglages → Modèle distant d\'abord</string>
     <string name="cloud_agent_title">Agent cloud</string>

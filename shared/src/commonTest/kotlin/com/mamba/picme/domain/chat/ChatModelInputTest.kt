@@ -196,6 +196,25 @@ class ChatModelInputTest {
     }
 
     @Test
+    fun `openui card data part never enters the model context`() {
+        // openui P1：data part 默认不回灌 LLM，对齐 A2uiCard/MediaResults/OptimizeCandidates
+        val message = ChatMessage(
+            id = "m-openui",
+            type = ChatMessageType.OPENUI_CARD,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.OpenUiCard(
+                    partId = "p0",
+                    program = "root = Card([Text(\"hi\")])",
+                    fallbackSummary = "327 张，数据在原设备",
+                ),
+            ),
+        )
+        assertEquals(emptyList(), message.toModelInput())
+    }
+
+    @Test
     fun `images replay as neutral placeholders keeping turn structure`() {
         // 图片本体不进上下文（[PRIVACY]）；英文中性占位保住多轮会话的回合结构（spec §6）
         assertEquals(

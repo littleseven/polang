@@ -19,6 +19,7 @@ class CloudAgentTurnRunnerTest {
     /** 假客户端：frames 脚本化，记录 postMessage/postToolResult 调用。 */
     private class FakeApi : CloudAgentApi {
         var sentByokKey: String? = null
+        var sentGenUiFormat: String? = null
         var failMessage: Throwable? = null
         val toolResults = mutableListOf<Triple<String, Boolean, String>>()
         var framesScript: ((CloudFrame) -> Unit) -> Unit = { onFrame -> onFrame(CloudFrame.Done("running")) }
@@ -33,9 +34,11 @@ class CloudAgentTurnRunnerTest {
             sessionId: String,
             content: String,
             byokApiKey: String?,
+            genUiFormat: String,
             onFrame: (CloudFrame) -> Unit,
         ): Result<Unit> {
             sentByokKey = byokApiKey
+            sentGenUiFormat = genUiFormat
             failMessage?.let { return Result.failure(it) }
             framesScript(onFrame)
             return Result.success(Unit)
@@ -214,5 +217,49 @@ class CloudAgentTurnRunnerTest {
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
         assertEquals(listOf(CloudTurnEvent.Done), events)
+    }
+
+    @Test
+    fun `render_ui_openui action frame emits openui card event`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject(
+                        """{"id":4,"type":"action","source":"agent","role":"assistant",""" +
+                            """"payload":{"tool":"render_ui_openui","argsJson":"{\"program\":\"root = Card([])\",\"fallbackSummary\":\"327 张\"}"}}"""
+                    ),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
+        val card = events.filterIsInstance<CloudTurnEvent.OpenUiCard>().single()
+        assertEquals("root = Card([])", card.program)
+        assertEquals("327 张", card.fallbackSummary)
+    }
+
+    @Test
+    fun `render_ui_openui action frame with malformed argsJson is ignored`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":5,"type":"action","source":"agent","role":"assistant","payload":{"tool":"render_ui_openui","argsJson":"not-json"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
+        assertEquals(listOf(CloudTurnEvent.Done), events)
+    }
+
+    @Test
+    fun `genui format is passed through to postMessage`() = runTest {
+        val api = FakeApi()
+        newRunner(api).runTurn("token", "s_1", "hi", null, genUiFormat = "openui") {}
+        assertEquals("openui", api.sentGenUiFormat)
     }
 }

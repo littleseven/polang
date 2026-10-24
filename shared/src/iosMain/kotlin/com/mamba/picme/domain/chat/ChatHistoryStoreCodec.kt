@@ -104,7 +104,7 @@ object ChatHistoryStoreCodec {
         )
     }
 
-    /** ChatMessageType 12 值 UI 枚举 → wire 9 值分类法（role 变体归并，role 列承载）。 */
+    /** ChatMessageType 13 值 UI 枚举 → wire 11 值分类法（role 变体归并，role 列承载）。 */
     private fun wireTypeOf(type: ChatMessageType): String = when (type) {
         ChatMessageType.USER_TEXT, ChatMessageType.AGENT_TEXT -> "text"
         ChatMessageType.USER_IMAGE, ChatMessageType.USER_IMAGE_TEXT, ChatMessageType.AGENT_IMAGE -> "image"
@@ -115,6 +115,7 @@ object ChatHistoryStoreCodec {
         ChatMessageType.MEDIA_RESULTS -> "data_media_results"
         ChatMessageType.OPTIMIZE_CANDIDATES -> "data_optimize_candidates"
         ChatMessageType.A2UI_CARD -> "data_ui"
+        ChatMessageType.OPENUI_CARD -> "data_ui_openui"
     }
 
     // ── decode：DTO → domain（parts-first 投影，对齐 androidApp toUiModel M4） ──
@@ -169,6 +170,8 @@ object ChatHistoryStoreCodec {
         is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
         // 对齐 androidApp toUiModel：A2UI GenUI 卡（hybrid-m2-a2ui M2）
         is MessagePart.A2uiCard -> ChatMessageType.A2UI_CARD
+        // OpenUI 卡 M1 Android-only（openui P1）：iOS 未落地，防御性落文本，正式映射随 iOS 跟随任务
+        is MessagePart.OpenUiCard -> ChatMessageType.AGENT_TEXT
         // iOS 浏览器直播卡未落地（M1 Android-only）：防御性落文本，正式映射随 iOS 跟随任务
         is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
         null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT

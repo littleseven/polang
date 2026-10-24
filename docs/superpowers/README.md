@@ -86,7 +86,7 @@ docs/superpowers/
 
 ## 6. 索引（在途/活跃 SSOT 白名单 = 活文档可引用本目录文档的唯一许可集）
 
-- **specs（18 篇，均为在途/活跃 SSOT）**：
+- **specs（19 篇，均为在途/活跃 SSOT）**：
   - `2026-08-08-face-restoration-ondevice-design.md` — 人脸修复方向（未实施，待排期）
   - `2026-08-10-ios-follow-command-design.md` — /ios-follow 六阶段管线设计 SSOT（AGENTS §7 引用）
   - `2026-08-13-ios-chat-rich-features-design.md` — iOS Chat 富交互（批次③沙盒写操作在途）
@@ -105,6 +105,7 @@ docs/superpowers/
   - `2026-10-06-browser-vnc-live-card-design.md` — Browser-VNC 云端浏览器直播卡（M1 已定稿待实施：bridge + 服务端网关 + 工具闭环 + INLINE 直播卡）
   - `2026-10-17-cloud-agent-tool-bridge-design.md` — 云端 Agent M2 工具桥 + BYOK 授权 UI + 最小聊天页（ADR-018 实施 spec，已定稿待评审）
   - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×A2UI GenUI 混合架构（投影出端 + local:// handle + L1 A2UI/L2 HTML 沙箱双级卡，M1~M3 分期；M1 投影通路已合 main，M2/M3 在途）
+  - `2026-10-24-openui-wire-format-toggle-design.md` — OpenUI 线格式并行接入 + GenUI 协议开关（A2UI/OpenUI 双格式对比实验，M1 Android-only 在途）
 - **plans（3 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）
 
 ---
@@ -120,3 +121,4 @@ docs/superpowers/
 | 2026-09-28 | 机制升级：§2 生命周期升级为「单向引用 + 沉淀管线」（AGENTS.md §4.3）；check_doc_sync.py 新增第 5 项（活文档→过程目录单向引用）与第 6 项（reviews 白名单）检查 |
 | 2026-10-21 | 索引补录 `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md`（云端×端侧混合执行 + A2UI GenUI，M1~M3 在途） |
 | 2026-10-21 | M1 投影通路交付：plan `2026-10-21-hybrid-m1-projection.md` 按沉淀管线移除（结论已落 shared/androidApp/server 模块 AGENTS.md，git 历史可查），spec 保留（M2/M3 在途） |
+| 2026-10-24 | 索引补录 `2026-10-24-openui-wire-format-toggle-design.md`（OpenUI 线格式并行接入 + GenUI 协议开关，M1 在途） |

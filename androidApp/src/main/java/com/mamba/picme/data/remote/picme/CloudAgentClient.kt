@@ -68,6 +68,7 @@ interface CloudAgentApi {
         sessionId: String,
         content: String,
         byokApiKey: String?,
+        genUiFormat: String,
         onFrame: (CloudFrame) -> Unit,
     ): Result<Unit>
     suspend fun postToolResult(token: String, sessionId: String, requestId: String, ok: Boolean, result: String): Result<Unit>
@@ -158,6 +159,7 @@ class CloudAgentClient(
         sessionId: String,
         content: String,
         byokApiKey: String?,
+        genUiFormat: String,
         onFrame: (CloudFrame) -> Unit,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         // 不用 runCatching：协程取消必须穿透（停止按钮语义，ClaudeChatClient.chat 先例）
@@ -167,6 +169,8 @@ class CloudAgentClient(
                 .url("$baseUrl/agent/sessions/$sessionId/messages")
                 .header("X-App-Token", token)
                 .apply { if (!byokApiKey.isNullOrBlank()) header("X-User-Api-Key", byokApiKey) }
+                // GenUI 线格式分流头（openui P2）：server 按头二选一注册 render_ui/render_ui_openui
+                .apply { if (genUiFormat.isNotBlank()) header("X-GenUI-Format", genUiFormat) }
                 .post(body.toRequestBody(jsonMedia))
                 .build()
             val call = sseClient.newCall(req)

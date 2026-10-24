@@ -77,6 +77,10 @@ object MessagePartsConverter {
             "data_ui" ->
                 listOf(json.decodeFromString(MessagePart.A2uiCard.serializer(), content))
 
+            // OpenUI GenUI 卡（openui P1）：content 列存 OpenUiCard 整颗 JSON，同 data_ui 先例
+            "data_ui_openui" ->
+                listOf(json.decodeFromString(MessagePart.OpenUiCard.serializer(), content))
+
             EngineerTaskState.ROOM_TYPE ->
                 listOf(parseTaskCard(meta))
 

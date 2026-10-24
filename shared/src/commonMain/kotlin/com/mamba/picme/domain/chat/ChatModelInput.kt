@@ -126,6 +126,7 @@ private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): L
     is MessagePart.MediaResults,
     is MessagePart.OptimizeCandidates,
     is MessagePart.A2uiCard,
+    is MessagePart.OpenUiCard,
     -> emptyList()
 }
 

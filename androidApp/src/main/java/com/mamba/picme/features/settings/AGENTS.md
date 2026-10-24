@@ -134,6 +134,7 @@
 **Agent 模式设置**
 - **远程模式**：使用云端 LLM API（OpenAI 兼容协议）；端侧文本 LLM（qwen3_5_2b）已移除，相机/聊天指令统一走远程 tool_calls 链路
 - **云端 Agent 编排开关（2026-10-17 新增，ADR-018 M2.5）**：`cloudAgentEnabled`（DataStore `cloud_agent_enabled`，默认 false），远程模型区开关行（BYOK 授权行之前）；开 = Chat 页回合走云端 Agent SSE 编排（实验降级：仅相册只读工具、无卡片、带图降级纯文本），关 = 本地编排
+- **GenUI 协议选择（2026-10-24 新增，openui-genui 并行接入）**：`genUiFormat`（DataStore `genui_format`，默认 a2ui，仅放行 a2ui/openui 归一），云端 Agent 区单选行；生效路径 = Chat 页云端回合请求头 `X-GenUI-Format` → server 侧 render_ui/render_ui_openui 工具互斥注册
 - **关闭模式**：禁用 Agent
 - **隐私级别**：`STRICT` / `PERMISSIVE`；运行时输入分级为 `PUBLIC` / `SENSITIVE` / `RESTRICTED`
 - **助手性格（2026-08-22 新增）**：远程模型页「助手性格」单选（默认/温暖贴心/活泼幽默/简洁干练，`assistant_persona` DataStore 枚举），经 `AgentContext.persona` 注入 chat system prompt 尾段；DEFAULT 不注入

@@ -58,6 +58,12 @@ object CloudAgentToolCatalog {
             projectionSchema = "不适用：CLOUD 工具无端侧数据出端；确认文本仅含 surfaceId，不含媒体数据",
         ),
         CloudToolSpec(
+            name = CloudAgentToolContract.TOOL_RENDER_UI_OPENUI,
+            executor = ToolExecutor.CLOUD,
+            resultSchema = "OpenUI Lang 1.0 程序（骨架+Query 绑定，无数据），经 action 事件下行端侧渲染",
+            projectionSchema = "不适用：CLOUD 工具无端侧数据出端；确认文本为固定回执，不含媒体数据",
+        ),
+        CloudToolSpec(
             name = CloudAgentToolContract.TOOL_RENDER_HTML,
             executor = ToolExecutor.CLOUD,
             resultSchema = "无（HTML 不入 LLM 上下文；卡本体经 AgentEvent HtmlCard 载荷下行端上）",
