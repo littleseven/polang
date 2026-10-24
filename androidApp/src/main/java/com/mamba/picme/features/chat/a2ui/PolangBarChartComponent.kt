@@ -77,7 +77,7 @@ class PolangBarChartComponent : A2uiComponent {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(A2uiCardTokens.barAreaHeight * bucket.count / maxCount)
+                                .height(barChartBarHeight(bucket.count, maxCount))
                                 .background(
                                     if (isSelected) barColor
                                     else barColor.copy(alpha = A2uiCardTokens.barUnselectedAlpha)
@@ -133,4 +133,15 @@ class PolangBarChartComponent : A2uiComponent {
             description = "选中桶 label，必须写数据绑定 {\"path\":\"/selected\"}（禁裸字符串）",
         )
     }
+}
+
+/**
+ * 柱高公式（2026-10-24 标签裁剪事故修复）：满高柱 = 绘图区高 - 标签预留高。
+ * 内层 Column = 柱 Box + 标签 Text，Row 定高 barAreaHeight——柱若顶满整个绘图区，
+ * 标签会被挤出 Row 边界裁掉（单桶图退化为无标签纯色块）。预留 barLabelHeight 后
+ * 柱+标签恒不超高，任何桶的标签都可见。
+ */
+internal fun barChartBarHeight(count: Int, maxCount: Int): androidx.compose.ui.unit.Dp {
+    val plotHeight = A2uiCardTokens.barAreaHeight - A2uiCardTokens.barLabelHeight
+    return plotHeight * count.coerceAtLeast(0) / maxCount.coerceAtLeast(1)
 }
