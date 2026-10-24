@@ -59,6 +59,8 @@ class PolangBarChartComponent : A2uiComponent {
         }
         val maxCount = buckets.maxOf { bucket -> bucket.count }.coerceAtLeast(1)
         val barColor = MaterialTheme.colorScheme.primary
+        // 多桶抽稀（2026-10-24 all_years 事故：~80 桶标签全量渲染叠成一坨数字串）
+        val labelInterval = barChartLabelInterval(buckets.size)
         Column(modifier = modifier.fillMaxWidth()) {
             title?.let { text ->
                 Text(text = text, style = A2uiStyleMapper.textStyle(titleRole ?: A2uiTextRole.SUBHEAD))
@@ -68,7 +70,7 @@ class PolangBarChartComponent : A2uiComponent {
                 horizontalArrangement = Arrangement.spacedBy(A2uiCardTokens.barGap),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                for (bucket in buckets) {
+                buckets.forEachIndexed { index, bucket ->
                     val isSelected = bucket.label == selected
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -93,7 +95,12 @@ class PolangBarChartComponent : A2uiComponent {
                                     )
                                 }
                         )
-                        Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                        // 抽稀位也占满标签高：柱底对齐依赖「柱+标签」恒高（barChartBarHeight KDoc）
+                        if (index % labelInterval == 0 || isSelected) {
+                            Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                        } else {
+                            Box(modifier = Modifier.height(A2uiCardTokens.barLabelHeight))
+                        }
                     }
                 }
             }
@@ -145,3 +152,16 @@ internal fun barChartBarHeight(count: Int, maxCount: Int): androidx.compose.ui.u
     val plotHeight = A2uiCardTokens.barAreaHeight - A2uiCardTokens.barLabelHeight
     return plotHeight * count.coerceAtLeast(0) / maxCount.coerceAtLeast(1)
 }
+
+/**
+ * 标签抽稀间隔（2026-10-24 all_years 事故修复）：桶数超过 [MAX_UNTHINNED_LABELS] 后按
+ * 「可见标签 ≤ [MAX_VISIBLE_LABELS]」取间隔，每第 N 桶才渲染标签（选中桶恒显示）。
+ * 12 桶及以内（典型单年逐月图）行为不变；80 桶（全部年份逐月）从 80 坨叠字降到 8 个标签。
+ */
+internal fun barChartLabelInterval(bucketCount: Int): Int {
+    if (bucketCount <= MAX_UNTHINNED_LABELS) return 1
+    return (bucketCount + MAX_VISIBLE_LABELS - 1) / MAX_VISIBLE_LABELS
+}
+
+private const val MAX_UNTHINNED_LABELS = 12
+private const val MAX_VISIBLE_LABELS = 8

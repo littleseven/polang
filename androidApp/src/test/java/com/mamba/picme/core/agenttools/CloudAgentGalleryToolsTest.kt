@@ -27,11 +27,13 @@ class CloudAgentGalleryToolsTest {
         byFilter: suspend (StructuredFilter, Set<Long>?) -> List<MediaAsset> = { _, _ -> emptyList() },
         summary: suspend (Boolean) -> GallerySummary? = { null },
         handleStore: LocalHandleStore = LocalHandleStore(FakeLocalHandleDao()),
+        allPhotos: suspend () -> List<MediaAsset> = { emptyList() },
     ) = CloudAgentGalleryTools(
         searchByQuery = byQuery,
         searchByFilter = byFilter,
         gallerySummary = summary,
         localHandleStore = handleStore,
+        allPhotos = allPhotos,
     )
 
     /** 命中回文本新形态（D2 投影）：前缀 + opaque token 尾缀。 */
@@ -75,6 +77,30 @@ class CloudAgentGalleryToolsTest {
         val out = t.searchMedia("去年夏天海边", "", "", "", "true")
         assertEquals(true, capturedFilter?.hasFaces)
         assertTrue(handleTextOf("找到 1 张「去年夏天海边」的照片").matches(out))
+    }
+
+    @Test
+    fun `blank query without filters returns all photos via dedicated channel`() = runTest {
+        var queryPathUsed = false
+        val t = tools(
+            byQuery = { _, _ -> queryPathUsed = true; emptyList() },
+            allPhotos = { listOf(asset(1), asset(2, MediaType.VIDEO), asset(3)) },
+        )
+        val out = t.searchMedia("", "", "", "", "")
+        assertFalse("空 query 不得走语义搜索路径（blank 短路返回空）", queryPathUsed)
+        // VIDEO 仍被过滤，展示名兜底为「全部」
+        assertTrue(handleTextOf("找到 2 张「全部」的照片").matches(out))
+    }
+
+    @Test
+    fun `blank query with time filter still goes to filter path`() = runTest {
+        var capturedFilter: StructuredFilter? = null
+        val t = tools(
+            byFilter = { f, _ -> capturedFilter = f; listOf(asset(1)) },
+            allPhotos = { error("有结构化约束时不得走全量通道") },
+        )
+        t.searchMedia("", "", "100", "200", "")
+        assertEquals(100L, capturedFilter?.timeRange?.startMs)
     }
 
     @Test

@@ -77,9 +77,11 @@ class AgentRunner(
         // 4-5. Koog loop + 收尾
         val built = executorFactory.create(target)
         val actionIds = mutableMapOf<String, Long>()
+        // 假发卡守卫（每轮新实例）：卡工具 Action 过门控 → 标记；终结消息假声称 → 策略层回环纠正
+        val cardGuard = CardClaimGuard()
         try {
             val agent = AIAgent.builder()
-                .graphStrategy(cloudAgentStrategy())
+                .graphStrategy(cloudAgentStrategy(cardGuard))
                 .promptExecutor(built.executor)
                 .llmModel(built.model)
                 .toolRegistry(toolRegistry)
@@ -107,6 +109,14 @@ class AgentRunner(
                     }
                     events.onToolCallCompleted { ctx ->
                         runBlocking {
+                            // 卡工具成功回执 = 卡真实落流下行，假发卡守卫据此放行终结消息。
+                            // 挂在 completed 而非 starting：render_html 无发射点门控（html_too_large
+                            // 在工具体内才判定），过门控≠送达；工具体校验失败统一回 "error: …" 文本
+                            if (ctx.toolName in CardClaimGuard.CARD_TOOLS &&
+                                ctx.toolResult?.toString()?.trim('"')?.startsWith("error:") != true
+                            ) {
+                                cardGuard.markCardSent()
+                            }
                             val actionId = ctx.toolCallId?.let { actionIds[it] } ?: 0L
                             emit(
                                 onEvent,

@@ -58,7 +58,9 @@ private const val ROUND_TIMEOUT_MS: Long = 15 * 60 * 1000L
 private const val ROUND_RETRY_AFTER_S: Long = 15L
 
 private const val DEFAULT_SYSTEM_PROMPT =
-    "你是 PoLang 云端 Agent。用中文简洁回答。需要服务器时间时调用 server_time 工具。"
+    "你是 PoLang 云端 Agent。用中文简洁回答。需要服务器时间时调用 server_time 工具。" +
+        "向用户展示卡片必须实际调用当前会话可用的发卡工具（render_ui / render_ui_openui / render_html）且未被拒绝；" +
+        "未调用工具时禁止声称卡片已下发/已生成，改用文字直接回答。"
 
 /**
  * 云端 Agent 路由面（ADR-018 决策 3：独立会话域；决策 4：BYOK 透传）。

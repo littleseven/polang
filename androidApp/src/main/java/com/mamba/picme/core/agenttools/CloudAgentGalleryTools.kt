@@ -39,6 +39,7 @@ class CloudAgentGalleryTools(
     private val searchByFilter: suspend (filter: StructuredFilter, limitToIds: Set<Long>?) -> List<MediaAsset>,
     private val gallerySummary: suspend (includeDetails: Boolean) -> GallerySummary?,
     private val localHandleStore: LocalHandleStore,
+    private val allPhotos: suspend () -> List<MediaAsset>,
 ) {
 
     private val tag = "CloudAgentGalleryTools"
@@ -106,10 +107,14 @@ class CloudAgentGalleryTools(
     ): String {
         val intent = GallerySearchIntents.structuredSearchIntent(query, person, fromMs, toMs, hasFace)
         val photos = try {
-            if (intent != null) {
-                searchByFilter(ChatGallerySearch.structuredFilterOf(intent, query), null)
-            } else {
-                searchByQuery(query, null)
+            when {
+                intent != null ->
+                    searchByFilter(ChatGallerySearch.structuredFilterOf(intent, query), null)
+                // 空 query 且无结构化约束 = 全量语义（LLM 把「我所有照片」剥光约束后只剩空串）。
+                // 语义搜索 blank 短路返回空（MediaSearchEngine.search L99），空过滤器交集也是空集，
+                // 全集必须走独立取数通道——否则 LLM 只能拿 fromMs=0 撞大运（2026-10-24 all_years 实测）
+                query.isBlank() -> allPhotos()
+                else -> searchByQuery(query, null)
             }.filter { it.type == MediaType.PHOTO }
         } catch (e: CancellationException) {
             throw e
@@ -120,11 +125,12 @@ class CloudAgentGalleryTools(
         refineBaseMutex.withLock { refineBase = photos }
         Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size}")
         // 空命中不注册句柄：空集句柄是无意义锚点 + 垃圾行，与 refine 空分支同口径
+        val displayQuery = query.ifBlank { "全部" }
         if (photos.isEmpty()) {
-            return "找到 0 张「$query」的照片"
+            return "找到 0 张「$displayQuery」的照片"
         }
-        mediaResultsListener?.invoke(query, photos, photos.size, false)
-        return appendHandleSuffix("找到 ${photos.size} 张「$query」的照片", photos)
+        mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
+        return appendHandleSuffix("找到 ${photos.size} 张「$displayQuery」的照片", photos)
     }
 
     suspend fun refineMediaSearch(constraint: String, fromMs: String, toMs: String): String {

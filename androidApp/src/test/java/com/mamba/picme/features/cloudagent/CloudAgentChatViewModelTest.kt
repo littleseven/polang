@@ -101,6 +101,7 @@ class CloudAgentChatViewModelTest {
             CloudAgentGalleryTools(
                 searchByQuery = { _, _ -> emptyList() },
                 searchByFilter = { _, _ -> emptyList() },
+                allPhotos = { emptyList() },
                 gallerySummary = { null },
                 localHandleStore = LocalHandleStore(FakeLocalHandleDao()),
             ),
