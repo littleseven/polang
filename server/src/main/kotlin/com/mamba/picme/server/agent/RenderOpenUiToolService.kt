@@ -38,6 +38,7 @@ class RenderOpenUiToolService {
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
    search_media/refine_media_search 结果尾部的「handle: scan/<id>」；
    禁止臆造 handleId，禁止把路径/uri/媒体清单写进 program 任何位置；
+   handle id 只在 program 里引用，回复正文禁止向用户展示 handle id；
 5. 交互约定：含 BarChart 的程序首行写 `${'$'}selected = ""`，BarChart 的 selected 参数传 `${'$'}selected`
    （端侧点选高亮回写该变量；裸字符串字面量不参与回写，点选高亮会静默失效）；
 6. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示。"""

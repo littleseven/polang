@@ -53,7 +53,8 @@ internal const val RENDER_UI_RULES = """向用户下发一张 A2UI 原生渲染�
    不要承诺「点了之后我会帮你…」类需要服务器感知的后续动作；
 5. 数据不进 JSON：凡涉及相册数据的值，updateDataModel 的字符串值写绑定
    "local://scan/<handleId>#histogram"，handleId 来自 search_media/refine_media_search
-   结果尾部的「handle: scan/<id>」。禁止臆造 handleId，禁止把路径/uri/清单写进任何字段；
+   结果尾部的「handle: scan/<id>」。禁止臆造 handleId，禁止把路径/uri/清单写进任何字段，
+   handle id 只在绑定值里引用，回复正文禁止向用户展示 handle id；
 6. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示；
 7. 样式只用语义令牌（禁具体数值）：
    Text 增可选 "role" 属性：HEADLINE|SUBHEAD|BODY|CAPTION（默认 BODY）；

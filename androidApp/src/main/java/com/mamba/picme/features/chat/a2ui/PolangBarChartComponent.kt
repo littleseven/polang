@@ -198,7 +198,7 @@ internal const val BAR_CHART_SCROLL_THRESHOLD = 24
 internal val BAR_CHART_SCROLL_BAR_WIDTH = 12.dp
 
 /** 抽稀标签定宽：抽稀位邻居是空占位，宽出部分不重叠；不折行防逐字竖排。 */
-internal val BAR_CHART_LABEL_WIDTH = 56.dp
+internal val BAR_CHART_LABEL_WIDTH = 68.dp
 
 /** 抽稀后的桶标签：定宽、单行、不折行、居中（柱列中心对齐由调用侧 Column 保证）。 */
 @Composable
