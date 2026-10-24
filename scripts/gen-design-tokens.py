@@ -72,20 +72,20 @@ ENUM_NAMES = {
     "chatContext": "ChatContextTokens", "chatSidebar": "ChatSidebarTokens", "settings": "SettingsTokens",
     "editor": "EditorTokens", "gallery": "GalleryTokens",
     "modelCenter": "ModelCenterTokens", "person": "PersonTokens", "motion": "AppMotion",
-    "idphoto": "IdPhotoTokens",
+    "idphoto": "IdPhotoTokens", "a2uiCard": "A2uiCardTokens",
 }
 # iOS 文件中的枚举输出顺序（含专用模板位置）
 IOS_ORDER = ["spacing", "radius", "icon", "color", "typography", "colorScheme", "alpha",
              "statusColor", "motion", "elevation", "topBar", "shutter", "beautyPanel",
              "appSlider", "bottomTab", "bottomSheet", "chip", "badge", "camera",
              "chatBubble", "chatCarousel", "memoryPage", "chatContext", "chatSidebar", "settings", "editor",
-             "grid", "gallery", "searchField", "pager", "modelCenter", "person", "idphoto"]
+             "grid", "gallery", "searchField", "pager", "modelCenter", "person", "idphoto", "a2uiCard"]
 # Android 组件 token 文件的 object 顺序（spacing/radius/color/typography/colorScheme 有独立文件，不重复）
 ANDROID_TOKENS_ORDER = ["icon", "alpha", "statusColor", "motion", "elevation", "topBar",
                         "shutter", "beautyPanel", "appSlider", "bottomTab", "bottomSheet",
                         "chip", "badge", "camera", "chatBubble", "chatCarousel", "memoryPage", "chatContext",
                         "chatSidebar", "settings", "editor", "grid", "gallery", "searchField", "pager",
-                        "modelCenter", "person", "idphoto"]
+                        "modelCenter", "person", "idphoto", "a2uiCard"]
 
 SWIFT_WEIGHTS = {"Normal": ".regular", "Medium": ".medium", "SemiBold": ".semibold", "Bold": ".bold"}
 KOTLIN_WEIGHTS = {"Normal": "FontWeight.Normal", "Medium": "FontWeight.Medium",
@@ -335,7 +335,7 @@ MARK_NAMES = {
     "settings": "Settings", "editor": "Editor", "grid": "Grid", "gallery": "Gallery（相册页结构）",
     "searchField": "SearchField（SearchTopBar 内嵌胶囊搜索框）", "pager": "Pager",
     "modelCenter": "Model Center", "person": "Person（人物页列表+详情，聚类模型）",
-    "idphoto": "ID Photo（证照屏，强制深色）",
+    "idphoto": "ID Photo（证照屏，强制深色）", "a2uiCard": "A2UI Card（数据卡/降级卡/debug 查看器）",
 }
 
 

@@ -644,6 +644,14 @@
     "photoCountFontSize": 13,
     "relationChipRadius": 8
   },
+  "a2uiCard": {
+    "_comment": "A2UI 数据卡（data_ui BarChart + 降级卡 + debug 蓝图查看器）。barAreaHeight=柱状图绘图区高; barGap=柱间距; barUnselectedAlpha=未选中柱透明度; debugBadgeRadius=debug 徽标圆角; debugMaxHeight=蓝图查看器最大高。",
+    "barAreaHeight": 120,
+    "barGap": 6,
+    "barUnselectedAlpha": 0.45,
+    "debugBadgeRadius": 12,
+    "debugMaxHeight": 420
+  },
   "idphoto": {
     "_comment": "证照屏（IDPhoto）。强制深色屏：内容底近黑硬编码，Android PoLangForcedDarkTheme / iOS .preferredColorScheme(.dark)+AppColorScheme.dark 对齐 scheme。colorBlue/Red/White 为合成内容色（既作底色数据也作色板 UI 色，双端像素一致）。",
     "screenBackground": "#FF101010",

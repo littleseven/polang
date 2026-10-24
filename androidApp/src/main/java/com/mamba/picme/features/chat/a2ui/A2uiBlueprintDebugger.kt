@@ -25,7 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
+import com.mamba.picme.core.designsystem.A2uiCardTokens
+import com.mamba.picme.core.designsystem.Spacing
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -96,10 +97,13 @@ fun A2uiDebugBadge(
         modifier = modifier
             .background(
                 color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.92f),
-                shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
+                shape = RoundedCornerShape(
+                    topStart = A2uiCardTokens.debugBadgeRadius,
+                    bottomStart = A2uiCardTokens.debugBadgeRadius,
+                ),
             )
             .clickable { showViewer = true }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
     ) {
         Text(
             text = "A2UI $version · $shortId",
@@ -139,9 +143,9 @@ private fun A2uiBlueprintViewerDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 420.dp)
+                    .heightIn(max = A2uiCardTokens.debugMaxHeight)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 when (parse) {
                     is BlueprintParse.Ok -> parse.messages.forEachIndexed { index, message ->

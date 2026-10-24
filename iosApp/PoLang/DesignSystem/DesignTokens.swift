@@ -702,6 +702,16 @@ enum IdPhotoTokens {
     static let colorWhite = Color.white
 }
 
+// MARK: - A2UI Card（数据卡/降级卡/debug 查看器）
+
+enum A2uiCardTokens {
+    static let barAreaHeight: CGFloat = 120
+    static let barGap: CGFloat = 6
+    static let barUnselectedAlpha: Double = 0.45
+    static let debugBadgeRadius: CGFloat = 12
+    static let debugMaxHeight: CGFloat = 420
+}
+
 // MARK: - Color(hex:) 工具（ARGB 十六进制，与 JSON 一致）
 
 private extension Color {
