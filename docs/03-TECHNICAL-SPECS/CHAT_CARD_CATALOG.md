@@ -873,11 +873,16 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **回灌**：不回灌 LLM（data part 分支 emptyList 同 data_ui）；program 只含骨架 + Query
   local_handle 绑定，handle id 对云 opaque（D2 对偶）。
 - **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，
-  polang OpenUI 组件库六组件 Card/Row/Column/Text/Button/BarChart，schema 见 shared
+  polang OpenUI 组件库七组件 Card/Row/Column/Text/Button/BarChart/Image，schema 见 shared
   OpenUiLibrary）；Query("local_handle") 经 AppContainer `localHandleLookup` 端侧补全
-  （scan domain → GalleryHistogramBuilder 月桶），handle 失败/prepare Failed 降级占位卡
+  （scan domain → `#histogram`/省略 = GalleryHistogramBuilder 月桶；`#photos`（2026-10-24，
+  spec《openui-image-component-design》）= ScanPhotoProjection 照片清单 [{id,date}] cap 60
+  保持搜索相关度原序），handle 失败/prepare Failed 降级占位卡
   （复用 A2uiCardDegraded，US-6 同口径）；样式令牌只读复用 A2uiStyleMapper，BarChart 视觉
-  与 PolangBarChartComponent 逐项对齐（A2uiCardTokens + primary 色 + 选中 45% alpha 规则）。
+  与 PolangBarChartComponent 逐项对齐（A2uiCardTokens + primary 色 + 选中 45% alpha 规则）；
+  Image（图文混排）渲染期经 AppContainer `openUiPhotoResolver` 端侧 id→uri 解析
+  （[PRIVACY] uri 不出端），Coil AsyncImage + faceAwareVerticalAlignment(faceFocusY)，
+  aspect 渲染期缺省 4:3 clamp [0.5,2.5]，解析不到/加载中 = 同形 surfaceVariant 占位。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；@OpenUrl 走系统浏览器，@ToAssistant M1 仅记日志不路由。

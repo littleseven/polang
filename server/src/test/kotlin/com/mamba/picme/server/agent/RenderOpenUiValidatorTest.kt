@@ -72,6 +72,56 @@ class RenderOpenUiValidatorTest {
     }
 
     @Test
+    fun `image component program passes`() {
+        // 图文混排：Image(photo*, aspect?) 引用 #photos 投影元素 id（spec 设计 D3/D5）
+        val program = """
+            photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
+            root = Card([Text("海边之旅", "HEADLINE"), Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), Text(photos[0].date, "CAPTION")])
+        """.trimIndent()
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `image with literal aspect number passes`() {
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
+root = Card([Image(photos[0].id, 1.5)])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `photos fragment handle form passes`() {
+        // LOCAL_HANDLE_FORM 容许任意 fragment；#photos 是 scan 句柄的合法投影形态
+        val program = """
+            photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
+            root = Card([Image(photos[0].id)])
+        """.trimIndent()
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `image with media path literal is still rejected`() {
+        // [PRIVACY] 不变式：photo 只许句柄投影 id，MEDIA_PATH 禁令对 Image 同样生效
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([Image("content://media/external/images/media/101")])""",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("媒体路径"))
+    }
+
+    @Test
+    fun `tool description image golden example passes validation`() {
+        // 规则 8 第二个黄金示例（图文混排卡）自身过校验，防描述与校验器脱节
+        val golden = """
+            photos = Query("local_handle", { handle: "local://scan/f9d33db29ed6#photos" }, [])
+            root = Card([Text("海边之旅", "HEADLINE"), Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), Text(photos[0].date, "CAPTION")])
+        """.trimIndent()
+        assertNull(RenderOpenUiValidator.validateToError(golden))
+    }
+
+    @Test
     fun `no root statement falls back to first Card entry`() {
         assertNull(RenderOpenUiValidator.validateToError("""page = Card([Text("x")])"""))
     }

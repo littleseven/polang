@@ -423,6 +423,57 @@ class OpenUiEngineTest {
         assertEquals("local_handle", tools.calls[0].first)
     }
 
+    // ── Image 组件（spec《openui-image-component-design》D3） ──────
+
+    @Test
+    fun `image renders from photos projection id reference`() = runTest {
+        // mock local_handle 返回 #photos 投影形态 [{id, date}]；photo 经 photos[0].id 求值为 Num
+        val tools = FakeTools(
+            result = OpenUiValue.Arr(
+                listOf(
+                    OpenUiValue.Obj(
+                        mapOf(
+                            "id" to OpenUiValue.Num(101.0),
+                            "date" to OpenUiValue.Str("2026-10-01"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val program = """
+            photos = Query("local_handle", { handle: "local://scan/7f3a#photos" }, [])
+            root = Card([Text("海边之旅", "HEADLINE"), Image(photos[0].id), Text(photos[0].date, "CAPTION")])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, tools.resolver).prepare())
+        assertEquals(emptyList(), result.errors)
+        val children = childrenOf(result.root)
+        assertEquals(3, children.size)
+        val image = children[1]
+        assertIs<OpenUiValue.ComponentVal>(image)
+        assertEquals("Image", image.type)
+        assertEquals(OpenUiValue.Num(101.0), image.props["photo"])
+        // aspect 无默认字面量（渲染期缺省 4:3）
+        assertEquals(null, image.props["aspect"])
+    }
+
+    @Test
+    fun `image with explicit aspect keeps the number`() = runTest {
+        val program = """root = Card([Image(42, 1.5)])"""
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        val image = childrenOf(result.root).single()
+        assertIs<OpenUiValue.ComponentVal>(image)
+        assertEquals(OpenUiValue.Num(42.0), image.props["photo"])
+        assertEquals(OpenUiValue.Num(1.5), image.props["aspect"])
+    }
+
+    @Test
+    fun `image missing required photo drops the component`() = runTest {
+        val program = """root = Card([Image(), Text("ok")])"""
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(1, childrenOf(result.root).size)
+        assertTrue(result.errors.any { error -> error.code == "missing-required" })
+    }
+
     // ── 契约字面量 ──────────────────────────────────────────────────
 
     @Test
@@ -433,5 +484,6 @@ class OpenUiEngineTest {
         assertNull(OpenUiContract.selectedOfViewState(null))
         assertEquals("data_ui_openui", OpenUiContract.PART_TYPE)
         assertEquals("local_handle", OpenUiContract.TOOL_LOCAL_HANDLE)
+        assertEquals("photos", OpenUiContract.FRAGMENT_PHOTOS)
     }
 }

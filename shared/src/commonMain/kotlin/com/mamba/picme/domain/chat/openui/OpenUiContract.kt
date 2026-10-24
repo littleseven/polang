@@ -18,6 +18,13 @@ object OpenUiContract {
     /** BarChart 选中桶的绑定 state 变量名。 */
     const val STATE_SELECTED = "\$selected"
 
+    /**
+     * scan 句柄的 #photos fragment（spec《openui-image-component-design》D2）：
+     * `local://scan/<id>#photos` → 端侧投影 [{id, date}]（ScanPhotoProjection，cap 60）。
+     * server `RenderOpenUiToolService` 描述文本持字面量副本，改动须双向同步核对。
+     */
+    const val FRAGMENT_PHOTOS = "photos"
+
     /** viewState 线格式："selected=<label>"（与 A2UI 线同约定）。 */
     fun viewStateOfSelected(label: String): String = "selected=$label"
 

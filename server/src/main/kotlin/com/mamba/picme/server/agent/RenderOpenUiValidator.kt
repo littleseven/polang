@@ -33,8 +33,8 @@ object RenderOpenUiValidator {
     /** program 长度上限（对齐 render_html 128_000 字符先例）。 */
     const val MAX_PROGRAM_LENGTH = 128_000
 
-    /** 组件白名单（生成引导面，与 shared OpenUiLibrary 六组件对齐）。 */
-    private val ALLOWED_COMPONENTS = setOf("Text", "Row", "Column", "Card", "Button", "BarChart")
+    /** 组件白名单（生成引导面，与 shared OpenUiLibrary 七组件对齐）。 */
+    private val ALLOWED_COMPONENTS = setOf("Text", "Row", "Column", "Card", "Button", "BarChart", "Image")
 
     /** 组件外唯一允许的大写调用：Query（宿主取数语句）。 */
     private val ALLOWED_CALLS = ALLOWED_COMPONENTS + "Query"
@@ -90,7 +90,7 @@ object RenderOpenUiValidator {
             violations += "缺 root = 语句（root 是组件树入口；无 root 时兜底的首个 Card 语句也缺失）"
         }
 
-        // 2. 组件名白名单：大写开头调用只允许六组件 + Query
+        // 2. 组件名白名单：大写开头调用只允许七组件 + Query
         CALL_NAME.findAll(stripped)
             .map { match -> match.groupValues[1] }
             .toSet()

@@ -326,6 +326,10 @@ fun ChatScreen(
     val openUiHandleLookup = remember {
         (context.applicationContext as PoLangApplication).container.localHandleLookup
     }
+    // 图文混排：OpenUI Image 组件 photoId → uri 端侧解析接缝（[PRIVACY] uri 不出端）
+    val openUiPhotoResolver = remember {
+        (context.applicationContext as PoLangApplication).container.openUiPhotoResolver
+    }
     val uriHandler = LocalUriHandler.current
     val polangA2uiCatalog = remember(uriHandler) {
         polangA2uiCatalog(A2uiUrlOpener { url -> uriHandler.openUri(url) })
@@ -863,6 +867,7 @@ fun ChatScreen(
                                         OpenUiCardHost(
                                             part = part,
                                             handleLookup = openUiHandleLookup,
+                                            photoResolver = openUiPhotoResolver,
                                             onViewStateChange = { viewState ->
                                                 viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
                                             },

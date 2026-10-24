@@ -23,6 +23,8 @@ import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.HandleLookup
 import com.mamba.picme.data.local.LocalHandleStore
 import com.mamba.picme.features.chat.a2ui.HandleResolver
+import com.mamba.picme.features.chat.openui.OpenUiPhoto
+import com.mamba.picme.features.chat.openui.OpenUiPhotoResolver
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.RoomUserTaskStore
 import com.mamba.picme.data.local.dao.PersonDao
@@ -427,6 +429,12 @@ interface AppContainer {
 
     /** OpenUI 卡 Query("local_handle") 的端侧取数接缝（openui P2；与 A2UI 共用同一 LocalHandleStore 实例） */
     val localHandleLookup: HandleLookup
+
+    /**
+     * OpenUI Image 组件 photoId → uri 的端侧解析接缝（spec《openui-image-component-design》D4）。
+     * [PRIVACY]：uri 只在渲染期端侧解析，不进 program / handle payload / 不回灌 LLM。
+     */
+    val openUiPhotoResolver: OpenUiPhotoResolver
 
     /**
      * 启动用户任务适配器（spec §6 组合根接线）。
@@ -1160,6 +1168,14 @@ class AppContainerImpl(
     }
 
     override val localHandleLookup: HandleLookup get() = localHandleStore
+
+    override val openUiPhotoResolver: OpenUiPhotoResolver by lazy {
+        OpenUiPhotoResolver { photoId ->
+            database.mediaDao().getMediaById(photoId)?.let { entity ->
+                OpenUiPhoto(uri = entity.uri, faceFocusY = entity.faceFocusY)
+            }
+        }
+    }
 
     /**
      * 云端 Agent 相册工具的无头执行器（ADR-018 M2）：绕过场景注册表直执，

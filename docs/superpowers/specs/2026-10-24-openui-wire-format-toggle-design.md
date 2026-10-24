@@ -69,7 +69,9 @@ data class OpenUiCard(
 | `Card` | `children*`, `spacing?` | Card（library root 组件） |
 | `Button` | `label*`, `action?` | Button |
 | `BarChart` | `title?`, `buckets*`, `selected?` | BarChart（buckets=[{label,count}]；selected 传 `$selected` 绑定） |
+| `Image` | `photo*`, `aspect?` | 相册照片（图文混排，2026-10-24 新增第七组件，详见 spec《openui-image-component-design》）：photo = `local://scan/<id>#photos` 投影元素的 id（渲染期端侧 id→uri，uri 不进 program/payload，[PRIVACY]）；aspect 宽高比（渲染期缺省 4:3，clamp [0.5, 2.5]） |
 
+- scan 句柄 fragment 分流（2026-10-24，spec《openui-image-component-design》D2）：`#histogram`（或省略）= 月桶 `[{label,count}]`（BarChart 统计卡）；`#photos` = 照片清单 `[{id, date}]`（保持搜索相关度原序，cap 60，date="yyyy-MM-dd"，Image/Text 图文混排卡）；未知 fragment → 整卡 Degraded。
 - 库 schema 在 shared `OpenUiLibrary.kt` 以数据声明（组件名 → 参数列表：名/类型/必填/默认值/enum 域），验证与渲染共用同一份（自描述，Agent First §2.3）。
 - entry 规则：必须 `root = ...` 语句；fallback = 第一条值为 `Card(...)` 调用的 value 语句（OpenUI spec §2.2，library root = Card）。无 entry → `no-root` 致命 → 降级卡。
 - [I18N]：静态 label 由 LLM 产出属动态内容豁免；端上自建文案（降级卡）复用 `chat_a2ui_card_unavailable` / `chat_a2ui_card_data_elsewhere` 两条既有五语资源。

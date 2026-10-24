@@ -39,7 +39,8 @@ data class OpenUiProp(
 data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
 
 /**
- * polang OpenUI 组件库（与 A2UI catalog 逐项对偶，保证两线可比性；spec §4.2）。
+ * polang OpenUI 组件库（七组件；与 A2UI catalog 逐项对偶，保证两线可比性；spec §4.2
+ * + spec《openui-image-component-design》D3）。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
  * OpenUiNodeRenderer）共用同一份。
  */
@@ -98,6 +99,16 @@ object OpenUiLibrary {
                     ),
                 ),
                 OpenUiProp("selected", OpenUiPropType.BINDABLE_STRING),
+            ),
+        ),
+        // 图文混排（spec《openui-image-component-design》D3）：photo = #photos 投影元素的 id
+        // （求值为 Num，渲染期端侧 id→uri，uri 不进 program/payload）；aspect 宽高比
+        // 无 schema 默认字面量，渲染期缺省 4:3 并 clamp [0.5, 2.5]
+        OpenUiComponent(
+            "Image",
+            listOf(
+                OpenUiProp("photo", OpenUiPropType.NUMBER, required = true),
+                OpenUiProp("aspect", OpenUiPropType.NUMBER),
             ),
         ),
     ).associateBy { component -> component.name }

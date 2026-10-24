@@ -19,6 +19,7 @@ import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
 import com.mamba.picme.domain.chat.a2ui.GalleryHistogramBuilder
 import com.mamba.picme.domain.chat.a2ui.ScanPhotoEntry
+import com.mamba.picme.domain.chat.a2ui.ScanPhotoProjection
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiResult
@@ -47,6 +48,7 @@ import kotlinx.serialization.json.Json
 fun OpenUiCardHost(
     part: MessagePart.OpenUiCard,
     handleLookup: HandleLookup,
+    photoResolver: OpenUiPhotoResolver,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -105,6 +107,7 @@ fun OpenUiCardHost(
                 Box(modifier = modifier) {
                     OpenUiReadyContent(
                         session = current.session,
+                        photoResolver = photoResolver,
                         onViewStateChange = onViewStateChange,
                     )
                     OpenUiDebugBadge(
@@ -116,6 +119,7 @@ fun OpenUiCardHost(
             } else {
                 OpenUiReadyContent(
                     session = current.session,
+                    photoResolver = photoResolver,
                     onViewStateChange = onViewStateChange,
                     modifier = modifier,
                 )
@@ -139,7 +143,9 @@ private sealed interface HandleResolution {
 private class OpenUiHandleException(reason: String) : Exception(reason)
 
 /**
- * local_handle 工具实现：handle → HandleLookup payload → 按 domain 算数据（scan=月桶）。
+ * local_handle 工具实现：handle → HandleLookup payload → 按 domain + fragment 投影分流
+ * （scan：空/histogram = 月桶统计卡；#photos = 照片 id 清单投影，图文混排卡，
+ * spec《openui-image-component-design》D2）。
  * 任一环节失败返回 [HandleResolution.Err]（宿主侧置 handleFailed 并抛
  * [OpenUiHandleException]，engine 回退 defaults 后统判降级）。
  */
@@ -161,18 +167,35 @@ private suspend fun resolveLocalHandle(
             if (error is CancellationException) throw error // 协程取消穿透
             return HandleResolution.Err("payload 不可解析：${error.message}")
         }
-    return HandleResolution.Ok(
-        OpenUiValue.Arr(
-            GalleryHistogramBuilder.buildMonthly(entries).map { bucket ->
-                OpenUiValue.Obj(
-                    mapOf(
-                        "label" to OpenUiValue.Str(bucket.label),
-                        "count" to OpenUiValue.Num(bucket.count.toDouble()),
+    return when (val fragment = parsed.fragment) {
+        // 现状默认：月桶直方图（BarChart 统计卡）
+        null, "", "histogram" -> HandleResolution.Ok(
+            OpenUiValue.Arr(
+                GalleryHistogramBuilder.buildMonthly(entries).map { bucket ->
+                    OpenUiValue.Obj(
+                        mapOf(
+                            "label" to OpenUiValue.Str(bucket.label),
+                            "count" to OpenUiValue.Num(bucket.count.toDouble()),
+                        )
                     )
-                )
-            }
+                }
+            )
         )
-    )
+        // 图文混排：照片 id 清单投影（[{id, date}]，保持搜索相关度原序，cap 60）
+        OpenUiContract.FRAGMENT_PHOTOS -> HandleResolution.Ok(
+            OpenUiValue.Arr(
+                ScanPhotoProjection.toPhotoRefs(entries).map { ref ->
+                    OpenUiValue.Obj(
+                        mapOf(
+                            "id" to OpenUiValue.Num(ref.id.toDouble()),
+                            "date" to OpenUiValue.Str(ref.date),
+                        )
+                    )
+                }
+            )
+        )
+        else -> HandleResolution.Err("未知 fragment：$fragment")
+    }
 }
 
 private val hostJson = Json { ignoreUnknownKeys = true }
@@ -180,6 +203,7 @@ private val hostJson = Json { ignoreUnknownKeys = true }
 @Composable
 private fun OpenUiReadyContent(
     session: OpenUiSession,
+    photoResolver: OpenUiPhotoResolver,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -211,6 +235,7 @@ private fun OpenUiReadyContent(
         OpenUiNodeRenderer(
             node = component,
             state = stateSnapshot,
+            photoResolver = photoResolver,
             onAction = dispatch,
             modifier = modifier,
         )

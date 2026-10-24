@@ -1,0 +1,19 @@
+package com.mamba.picme.features.chat.openui
+
+/**
+ * OpenUI Image 组件渲染期解析到的照片（spec《openui-image-component-design》D4）。
+ * uri 只在端侧存在——不进 program、不进 handle payload、不回灌 LLM（[PRIVACY]）。
+ */
+data class OpenUiPhoto(
+    val uri: String,
+    val faceFocusY: Float?,
+)
+
+/**
+ * OpenUI Image 组件 photoId → 端侧媒体解析接缝（DI 显式注入，Agent First §2.1）。
+ * 实现 = AppContainer 内 `MediaDao.getMediaById` 映射；解析不到（已删除/未索引）→ null，
+ * 渲染层落占位（半信任输入防御，不炸整卡）。
+ */
+fun interface OpenUiPhotoResolver {
+    suspend fun resolve(photoId: Long): OpenUiPhoto?
+}

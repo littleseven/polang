@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,11 +18,17 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.Spacing
+import com.mamba.picme.core.image.faceAwareVerticalAlignment
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
@@ -33,20 +40,23 @@ import com.mamba.picme.features.chat.a2ui.barChartBarHeight
 import com.mamba.picme.features.chat.a2ui.barChartLabelInterval
 
 /**
- * OpenUI 组件树 → Compose 递归渲染（openui P2；与 OpenUiLibrary 六组件一一对应）。
+ * OpenUI 组件树 → Compose 递归渲染（openui P2；与 OpenUiLibrary 七组件一一对应）。
  *
  * 语义样式令牌（role/colorRole/spacing）只读复用 [A2uiStyleMapper]（两线同一套
  * Design Token 映射，保证双端/双线视觉一致）；BarChart 视觉与 PolangBarChartComponent
  * 逐项对齐（同一 A2uiCardTokens + 柱高公式 barChartBarHeight + 标签抽稀
- * barChartLabelInterval + primary 色 + 选中高亮规则）。
+ * barChartLabelInterval + primary 色 + 选中高亮规则）；Image 经 [photoResolver]
+ * 渲染期端侧 id→uri 解析（[PRIVACY]：uri 不出端，spec《openui-image-component-design》D4）。
  *
  * 半信任输入防御：未知组件/null 字面量 → 空 Box 占位，不炸整卡；BarChart buckets
- * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）。
+ * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）；Image 解析不到/加载中 →
+ * surfaceVariant 占位 Box（同形防跳动）。
  */
 @Composable
 fun OpenUiNodeRenderer(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
     onAction: (OpenUiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -56,7 +66,7 @@ fun OpenUiNodeRenderer(
                 modifier = Modifier.padding(Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(node.spacingDp()),
             ) {
-                OpenUiChildren(node, state, onAction)
+                OpenUiChildren(node, state, photoResolver, onAction)
             }
         }
         "Row" -> Row(
@@ -69,7 +79,7 @@ fun OpenUiNodeRenderer(
             val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
             for (child in children) {
                 if (child is OpenUiValue.ComponentVal) {
-                    OpenUiNodeRenderer(child, state, onAction, Modifier.weight(1f))
+                    OpenUiNodeRenderer(child, state, photoResolver, onAction, Modifier.weight(1f))
                 } else {
                     Box(modifier = Modifier.weight(1f)) // null 字面量/被剔除元素：等宽空占位
                 }
@@ -79,7 +89,7 @@ fun OpenUiNodeRenderer(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(node.spacingDp()),
         ) {
-            OpenUiChildren(node, state, onAction)
+            OpenUiChildren(node, state, photoResolver, onAction)
         }
         "Text" -> {
             val text = (node.props["text"] as? OpenUiValue.Str)?.v ?: return
@@ -102,6 +112,7 @@ fun OpenUiNodeRenderer(
             }
         }
         "BarChart" -> OpenUiBarChart(node, state, onAction, modifier)
+        "Image" -> OpenUiPhotoImage(node, photoResolver, modifier)
         else -> Box(modifier = modifier) // 未知组件：空占位，不炸整卡
     }
 }
@@ -110,15 +121,55 @@ fun OpenUiNodeRenderer(
 private fun OpenUiChildren(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
     onAction: (OpenUiAction) -> Unit,
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
     for (child in children) {
         if (child is OpenUiValue.ComponentVal) {
-            OpenUiNodeRenderer(child, state, onAction)
+            OpenUiNodeRenderer(child, state, photoResolver, onAction)
         } else {
             Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }
+    }
+}
+
+/** Image（图文混排）：photo = #photos 投影元素的 id（渲染期端侧 id→uri，[PRIVACY] uri 不出端）。 */
+@Composable
+private fun OpenUiPhotoImage(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    modifier: Modifier = Modifier,
+) {
+    val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
+    // aspect 宽高比（宽/高）：渲染期缺省 4:3，clamp 到 [0.5, 2.5]（schema 无默认字面量）
+    val aspect = (node.props["aspect"] as? OpenUiValue.Num)?.v
+        ?.let { raw -> raw.coerceIn(0.5, 2.5) } ?: (4.0 / 3.0)
+    val frameModifier = modifier
+        .fillMaxWidth()
+        .aspectRatio(aspect.toFloat())
+        .clip(AppShapes.card)
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    if (photoId == null) {
+        // 缺必填 photo（schema 校验已丢组件，此处仅防御兜底）：同形占位，不炸整卡
+        Box(modifier = frameModifier)
+        return
+    }
+    val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
+        value = photoResolver.resolve(photoId)
+    }
+    val resolved = photo
+    if (resolved == null) {
+        // 解析中/解析失败（已删除/未索引）：同形同参 surfaceVariant 占位
+        Box(modifier = frameModifier)
+    } else {
+        AsyncImage(
+            model = resolved.uri,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
+            modifier = frameModifier,
+        )
     }
 }
 

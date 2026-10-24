@@ -35,10 +35,18 @@ class RenderOpenUiToolService {
      Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；
    - Button(label*, action?)：action 形如 @OpenUrl("https://...")；
    - BarChart(title?, buckets*, selected?)：buckets 是 [{label,count}] 数据引用；
+   - Image(photo*, aspect?)：相册照片（图文混排用）；photo 只许填 photos 数组元素的
+     id（如 photos[0].id），禁止写字面量数字 id（防臆造）；aspect 是宽高比
+     （宽/高，默认 1.33，横图可传 1.5~1.78，竖图 0.75）；
+     Row([Image(...), Image(...)]) 可多张并排等宽；
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
    `buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])`
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
    search_media/refine_media_search 结果尾部的「handle: scan/<id>」；
+   照片清单取数写法逐字为
+   `photos = Query("local_handle", { handle: "local://scan/<id>#photos" }, [])`，
+   得到 [{id, date}]（按搜索相关度排序，最多 60 张，date 是 "yyyy-MM-dd"
+   拍摄日期可直接给 Text 用）；
    禁止臆造 handleId，禁止把路径/uri/媒体清单写进 program 任何位置；
    handle id 只在 program 里引用，回复正文禁止向用户展示 handle id；
 5. Query 推荐独占整条语句右侧（先 `buckets = Query("local_handle", …, [])` 单独成行，
@@ -50,7 +58,10 @@ class RenderOpenUiToolService {
    组件引用前面语句的变量名；program 不要包 markdown 代码围栏）：
    ${'$'}selected = ""
    buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])
-   root = Card([Text("相册按月分布", "HEADLINE"), Text("按月统计", "CAPTION"), BarChart("每月照片数", buckets, ${'$'}selected)])"""
+   root = Card([Text("相册按月分布", "HEADLINE"), Text("按月统计", "CAPTION"), BarChart("每月照片数", buckets, ${'$'}selected)])
+   图文混排黄金示例（搜索拿 handle 后，照片与文字同卡混排）：
+   photos = Query("local_handle", { handle: "local://scan/<id>#photos" }, [])
+   root = Card([Text("海边之旅", "HEADLINE"), Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), Text(photos[0].date, "CAPTION")])"""
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")
