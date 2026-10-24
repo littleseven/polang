@@ -30,9 +30,13 @@ object RenderUiValidator {
     const val CATALOG_ID = "https://polang.net/a2ui/catalog/v1.json"
     const val PROTOCOL_VERSION = "v0.9"
 
-    /** [AgentRunner] 发射点门控入口：按工具名分发，非 render_ui 一律放行。 */
-    fun gate(toolName: String, argsJson: String): String? =
-        if (toolName == TOOL_NAME) validateArgsJson(argsJson) else null
+    /** [AgentRunner] 发射点门控入口：按工具名分发——render_ui 走 A2UI 校验，
+     *  render_ui_openui 走 OpenUI 结构校验（review 🟡4 对偶），其余一律放行。 */
+    fun gate(toolName: String, argsJson: String): String? = when (toolName) {
+        TOOL_NAME -> validateArgsJson(argsJson)
+        RenderOpenUiValidator.TOOL_NAME -> RenderOpenUiValidator.validateArgsJson(argsJson)
+        else -> null
+    }
 
     private val ALLOWED_COMPONENTS = setOf("Text", "Row", "Column", "Card", "Button", "BarChart")
 

@@ -47,5 +47,10 @@ class RenderOpenUiToolService {
         program: String,
         @LLMDescription("投影级降级摘要（数据缺失时端上展示的占位文案）")
         fallbackSummary: String,
-    ): String = "UI 已下发端侧渲染（OpenUI）"
+    ): String {
+        // 与发射点门控同源校验（review 🟡4 对偶）：非法回 error 文本作 Observation
+        // 回灌，LLM 同轮修正重试（同 RenderUiToolService 闭环口径）
+        RenderOpenUiValidator.validateToError(program)?.let { error -> return error }
+        return "UI 已下发端侧渲染（OpenUI）"
+    }
 }
