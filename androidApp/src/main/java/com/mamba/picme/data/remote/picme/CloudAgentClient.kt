@@ -1,5 +1,6 @@
 package com.mamba.picme.data.remote.picme
 
+import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.APP_CHANNEL_HEADER
 import com.mamba.picme.data.remote.appChannelValue
 import kotlinx.coroutines.CancellationException
@@ -165,6 +166,7 @@ class CloudAgentClient(
         // 不用 runCatching：协程取消必须穿透（停止按钮语义，ClaudeChatClient.chat 先例）
         try {
             val body = JSONObject().put("content", content).toString()
+            Logger.d("CloudAgent", "postMessage session=${sessionId.take(8)} genUiFormat=$genUiFormat")
             val req = Request.Builder()
                 .url("$baseUrl/agent/sessions/$sessionId/messages")
                 .header("X-App-Token", token)
