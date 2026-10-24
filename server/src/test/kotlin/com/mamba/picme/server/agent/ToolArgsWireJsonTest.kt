@@ -20,7 +20,7 @@ import org.junit.Test
 class ToolArgsWireJsonTest {
 
     private val messagesJson =
-        """[{"version":"v0.9","createSurface":{"surfaceId":"sf-test1234","catalogId":"https://polang.mamba.com/a2ui/catalog/v1"}},""" +
+        """[{"version":"v0.9","createSurface":{"surfaceId":"sf-test1234","catalogId":"https://polang.net/a2ui/catalog/v1"}},""" +
             """{"updateDataModel":{"surfaceId":"sf-test1234","data":{"buckets":"local://scan/32737b0771fb#histogram","selected":""}}}]"""
     private val fallbackSummary = "今年共 144 张照片，月度分布图数据在原设备"
 

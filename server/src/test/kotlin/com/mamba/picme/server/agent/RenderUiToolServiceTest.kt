@@ -32,7 +32,7 @@ class RenderUiToolServiceTest {
     fun `render_ui description pins catalogId literal`() {
         assertTrue(
             "description 须钉住 catalogId 字面量（与 shared A2uiCardContract 双向同步）",
-            descriptor.description.contains("https://polang.mamba.com/a2ui/catalog/v1"),
+            descriptor.description.contains("https://polang.net/a2ui/catalog/v1"),
         )
     }
 

@@ -16,8 +16,13 @@ object A2uiCardContract {
     /** ChatMessageEntity.type / converter 分支键。 */
     const val PART_TYPE = "data_ui"
 
-    /** polang A2UI catalog 唯一 id（createSurface.catalogId 必须等于它）。 */
-    const val CATALOG_ID = "https://polang.mamba.com/a2ui/catalog/v1"
+    /**
+     * polang A2UI catalog 唯一 id（createSurface.catalogId 必须等于它）。
+     * 纯标识符（XML namespace 惯例：自有域名作命名空间，不要求可解引用），
+     * 端侧仅做等值匹配、从不发起网络请求；域名归项目所有（polang.net 官网，
+     * 见 OVERSEAS_SERVER_DEPLOYMENT.md 子域规划）。
+     */
+    const val CATALOG_ID = "https://polang.net/a2ui/catalog/v1"
 
     const val HANDLE_SCHEME = "local://"
 
