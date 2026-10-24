@@ -2,9 +2,11 @@ package com.mamba.picme.domain.chat.openui
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 
 /**
@@ -213,6 +215,19 @@ class OpenUiEngineTest {
         """.trimIndent()
         val result = rendered(OpenUiSession(program, tools.resolver).prepare())
         assertTrue(result.errors.any { error -> error.code == "tool-error" })
+    }
+
+    @Test
+    fun `query tool cancellation propagates instead of degrading`() = runTest {
+        // 协程取消必须穿透（review 🟡2）：吞掉会让调用方 cancel 失效
+        val tools = FakeTools(error = CancellationException("cancelled"))
+        val program = """
+            root = Card([BarChart("t", buckets)])
+            buckets = Query("local_handle", {}, [])
+        """.trimIndent()
+        assertFailsWith<CancellationException> {
+            OpenUiSession(program, tools.resolver).prepare()
+        }
     }
 
     // ── @Set/@Reset 重求值（§6.3 M1 简化） ───────────────────────────

@@ -1,5 +1,7 @@
 package com.mamba.picme.domain.chat.openui
 
+import kotlinx.coroutines.CancellationException
+
 /**
  * 宿主工具调用（Query 语句，§6.4）。工具缺失时实现方抛 [OpenUiToolNotFoundException]，
  * engine 捕获记 tool-not-found 错误并用 defaults；其他异常记 tool-error 同样回退 defaults。
@@ -193,6 +195,9 @@ class OpenUiSession(
                 e.message ?: "工具缺失：$toolName",
             )
             defaults
+        } catch (e: CancellationException) {
+            // 协程取消必须穿透（review 🟡2）：吞掉会让调用方 cancel 失效、回合无法中止
+            throw e
         } catch (e: Exception) {
             runtime.errors += OpenUiError(
                 "tool-error",
