@@ -60,6 +60,9 @@ class CloudAgentGalleryTools(
     private val refineBaseMutex = Mutex()
     private var refineBase: List<MediaAsset> = emptyList()
 
+    /** refine 的图集卡透出跟随产生基数的 search_media 的 display 意图（同 mutex 保护）。 */
+    private var refineDisplay = false
+
     /** 命中集注册本地句柄，返回 opaque token（无 uri——D2 结构保证）。 */
     private suspend fun registerScanHandle(photos: List<MediaAsset>): String {
         val entries = photos.map { asset -> ScanPhotoEntry(id = asset.id, captureDate = asset.captureDate) }
@@ -98,12 +101,18 @@ class CloudAgentGalleryTools(
         return summary?.let { formatGallerySummaryForReply(it) } ?: GALLERY_SUMMARY_UNAVAILABLE_HINT
     }
 
+    /**
+     * @param display "true" = 用户明确想浏览/挑选照片本身，命中集透出为横滑图集卡；
+     * 其余（统计/计数/为 render_ui 发卡取数）一律 "false"，卡片不打扰（2026-10-24
+     * 真机实测事故类：取数型搜索无脑出图集卡刷屏）。
+     */
     suspend fun searchMedia(
         query: String,
         person: String,
         fromMs: String,
         toMs: String,
         hasFace: String,
+        display: String,
     ): String {
         val intent = GallerySearchIntents.structuredSearchIntent(query, person, fromMs, toMs, hasFace)
         val photos = try {
@@ -122,14 +131,15 @@ class CloudAgentGalleryTools(
             Logger.w(tag, "searchMedia failed for '$query'", e)
             return "error: ${e.message ?: "search failed"}"
         }
-        refineBaseMutex.withLock { refineBase = photos }
-        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size}")
+        val showCard = display == "true"
+        refineBaseMutex.withLock { refineBase = photos; refineDisplay = showCard }
+        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size} display=$showCard")
         // 空命中不注册句柄：空集句柄是无意义锚点 + 垃圾行，与 refine 空分支同口径
         val displayQuery = query.ifBlank { "全部" }
         if (photos.isEmpty()) {
             return "找到 0 张「$displayQuery」的照片"
         }
-        mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
+        if (showCard) mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
         return appendHandleSuffix("找到 ${photos.size} 张「$displayQuery」的照片", photos)
     }
 
@@ -163,7 +173,8 @@ class CloudAgentGalleryTools(
         }
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
-        mediaResultsListener?.invoke(constraint, refined, refined.size, true)
+        // 透出跟随基数搜索的 display 意图：取数型搜索的细化同样不出卡
+        if (refineDisplay) mediaResultsListener?.invoke(constraint, refined, refined.size, true)
         return appendHandleSuffix("在上一轮结果内找到 ${refined.size} 张「$constraint」的照片", refined)
     }
 }

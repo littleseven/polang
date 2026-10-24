@@ -1193,8 +1193,8 @@ class AppContainerImpl(
     private val deviceToolExecutor: DeviceToolExecutor by lazy {
         DeviceToolExecutor(
             gallerySummary = { cloudAgentGalleryTools.getGallerySummary() },
-            searchMedia = { query, person, fromMs, toMs, hasFace ->
-                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace)
+            searchMedia = { query, person, fromMs, toMs, hasFace, display ->
+                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace, display)
             },
             refineSearch = { constraint, fromMs, toMs ->
                 cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)

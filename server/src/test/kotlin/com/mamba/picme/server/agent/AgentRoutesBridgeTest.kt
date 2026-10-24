@@ -60,7 +60,7 @@ class AgentRoutesBridgeTest {
         return MockEngine {
             val n = callCount.incrementAndGet()
             val body = if (n == 1) {
-                """{"id":"c1","object":"chat.completion","created":0,"model":"glm-5.2","choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"search_media","arguments":"{\"query\":\"猫\",\"person\":\"\",\"fromMs\":\"\",\"toMs\":\"\",\"hasFace\":\"\"}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}"""
+                """{"id":"c1","object":"chat.completion","created":0,"model":"glm-5.2","choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"search_media","arguments":"{\"query\":\"猫\",\"person\":\"\",\"fromMs\":\"\",\"toMs\":\"\",\"hasFace\":\"\",\"display\":\"false\"}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}"""
             } else {
                 """{"id":"c2","object":"chat.completion","created":0,"model":"glm-5.2","choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"找到 3 张猫的照片。"}}],"usage":{"prompt_tokens":20,"completion_tokens":8,"total_tokens":28}}"""
             }

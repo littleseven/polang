@@ -101,7 +101,7 @@ server/
 │   │   ├── CardClaimGuard.kt     # 假发卡守卫：终结消息声称发卡但当轮无卡工具 Action 过门控 → 策略层 correctFakeCardClaim 节点纠正（上限 1 次）
 │   │   ├── AgentBridgeRegistry.kt # 工具桥挂起表（requestId→Deferred，断线 failAll 清理）
 │   │   ├── AgentRoundGate.kt     # per-user 跑轮并发=1 内存租约（M2.6；故意无 TTL，一轮最长 20 迭代×(LLM+120s 工具)，重启即清）
-│   │   ├── DeviceToolService.kt  # 端侧只读三件套 Koog 适配（tool_request 帧 + 120s 挂起；M1 起 @LLMDescription 只承诺投影面，对齐 shared CloudAgentToolCatalog.projectionSchema）
+│   │   ├── DeviceToolService.kt  # 端侧只读三件套 Koog 适配（tool_request 帧 + 120s 挂起；M1 起 @LLMDescription 只承诺投影面，对齐 shared CloudAgentToolCatalog.projectionSchema；search_media 增 display 参数（2026-10-24）：'true'=端侧透出横滑图集卡（用户明确想浏览照片时），取数/统计一律 'false'）
 │   │   ├── CloudAgentStrategy.kt # 单跑 ReAct 策略（自 :shared poLangSingleRunStrategy 移植）
 │   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish
 │   │   └── AgentRoutes.kt        # /agent/** REST + SSE（BYOK X-User-Api-Key 零留存）

@@ -56,13 +56,14 @@ class DeviceToolService(
         executeOnDevice("get_gallery_summary", buildJsonObject {})
 
     @Tool(customName = "search_media")
-    @LLMDescription("在用户手机相册搜索照片，结果以文本摘要回传（投影：仅数量+命中说明+尾部 opaque 数据句柄「handle: scan/<id>」（供 render_ui 数据绑定，禁止臆造 handleId），不含文件路径与媒体清单）。query 自然语言搜索词（留空=全相册所有照片，统计全库时直接留空即可）；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）。")
+    @LLMDescription("在用户手机相册搜索照片，结果以文本摘要回传（投影：仅数量+命中说明+尾部 opaque 数据句柄「handle: scan/<id>」（供 render_ui 数据绑定，禁止臆造 handleId），不含文件路径与媒体清单）。query 自然语言搜索词（留空=全相册所有照片，统计全库时直接留空即可）；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）；display 传 'true' 时命中照片以横滑图集卡直接展示给用户——仅当用户明确想浏览/挑选照片本身时传 'true'（如「给我看看」「找些…的照片」）；统计、计数、为 render_ui/render_html 发卡取数等一律传 'false'（不展示不打扰）。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓，无则空串") person: String,
         @LLMDescription("时间起点毫秒串，空串=不限") fromMs: String,
         @LLMDescription("时间终点毫秒串，空串=不限") toMs: String,
         @LLMDescription("'true'=只要含人脸；空串=不限") hasFace: String,
+        @LLMDescription("'true'=展示横滑图集卡（用户想浏览照片时）；取数/统计一律 'false'") display: String,
     ): String = executeOnDevice(
         "search_media",
         buildJsonObject {
@@ -71,6 +72,7 @@ class DeviceToolService(
             put("fromMs", fromMs)
             put("toMs", toMs)
             put("hasFace", hasFace)
+            put("display", display)
         },
     )
 
