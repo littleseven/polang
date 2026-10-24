@@ -830,6 +830,33 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ---
 
+## data_ui_openui · OpenUI GenUI 卡（openui P2，与 data_ui 线并行）
+
+- **开关**：设置页「GenUI 协议」单选（DataStore `genui_format`，默认 a2ui）→ Chat 页云端回合
+  请求头 `X-GenUI-Format` → server 侧互斥注册 render_ui（A2UI）/render_ui_openui（OpenUI），
+  同一回合只产一种 GenUI 卡。
+- **协议**：`ChatMessageEntity.type = "data_ui_openui"`，content 列存整颗 `MessagePart.OpenUiCard`
+  part JSON；云端经 render_ui_openui 工具 action 帧下发（OpenUI Lang 1.0 程序整帧，无流式），
+  端上 TurnRunner 拦截落库。
+- **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState)`，
+  category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）。
+- **回灌**：不回灌 LLM（data part 分支 emptyList 同 data_ui）；program 只含骨架 + Query
+  local_handle 绑定，handle id 对云 opaque（D2 对偶）。
+- **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，
+  polang OpenUI 组件库六组件 Card/Row/Column/Text/Button/BarChart，schema 见 shared
+  OpenUiLibrary）；Query("local_handle") 经 AppContainer `localHandleLookup` 端侧补全
+  （scan domain → GalleryHistogramBuilder 月桶），handle 失败/prepare Failed 降级占位卡
+  （复用 A2uiCardDegraded，US-6 同口径）；样式令牌只读复用 A2uiStyleMapper，BarChart 视觉
+  与 PolangBarChartComponent 逐项对齐（A2uiCardTokens + primary 色 + 选中 45% alpha 规则）。
+- **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
+  session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
+  `$selected`）；@OpenUrl 走系统浏览器，@ToAssistant M1 仅记日志不路由。
+- **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui_openui
+  下发 BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"}））→
+  端上求值填槽渲染。
+
+---
+
 ## 5. 规划中卡片
 
 ### 5.1 审批三要素卡（📋 spec 定稿待实施）
