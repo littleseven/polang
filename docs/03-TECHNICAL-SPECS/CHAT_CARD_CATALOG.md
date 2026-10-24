@@ -812,7 +812,10 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **回灌**：不回灌 LLM（ChatModelInput data part 分支 emptyList）；messagesJson 只含骨架+local://
   绑定，handle id 对云 opaque（D2）。
 - **渲染**：ChatScreen TYPE_A2UI_CARD → A2uiCardHost（androidx.a2ui 官方渲染器，
-  polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract）；
+  polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract，
+  为可解引用 URL——GET 返回官网静态 catalog JSON schema
+  `docs-site/a2ui/catalog/v1.json`，由 `A2uiCatalogDescriptorSyncTest` 从运行态 catalog
+  序列化生成并对账（regen 方式见测试类头注释），deploy-docs-site.sh 发布）；
   HandleResolver 填槽，缺失降级占位卡（US-6）。BarChart 柱高公式 = (barAreaHeight −
   barLabelHeight) × count/maxCount（`barChartBarHeight` 纯函数，2026-10-24 修复：
   满高柱顶满定高 Row 会把柱下月份标签挤出裁掉，单桶图退化为无标签纯色块）。
@@ -832,7 +835,8 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **测试**：`A2uiComponentAvailabilityTest`（引擎层：19 组件注册清单 + v0.9 必填属性契约 +
   逐组件蓝图落成 active surface + 数据绑定落位 + 负路径降级）/ `A2uiComponentRenderSmokeTest`
   （渲染层：19 组件同框 Compose 实渲冒烟，Robolectric native graphics）/ `HandleResolverTest` /
-  `BarChartSelectedBindingNormalizationTest` / `A2uiBlueprintDebuggerTest` / `PolangA2uiCatalogTest`。
+  `BarChartSelectedBindingNormalizationTest` / `A2uiBlueprintDebuggerTest` / `PolangA2uiCatalogTest` /
+  `A2uiCatalogDescriptorSyncTest`（官网 catalog 描述文件对账 + `REGEN_A2UI_CATALOG=true` 再生成）。
   测试夹具注意：surface actor 生命周期挂在收集协程 scope 上，scope 取消即回收数据模型，
   承载 scope 必须活到断言结束。
 

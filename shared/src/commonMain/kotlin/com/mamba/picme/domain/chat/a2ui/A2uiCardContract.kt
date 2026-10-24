@@ -18,11 +18,11 @@ object A2uiCardContract {
 
     /**
      * polang A2UI catalog 唯一 id（createSurface.catalogId 必须等于它）。
-     * 纯标识符（XML namespace 惯例：自有域名作命名空间，不要求可解引用），
-     * 端侧仅做等值匹配、从不发起网络请求；域名归项目所有（polang.net 官网，
-     * 见 OVERSEAS_SERVER_DEPLOYMENT.md 子域规划）。
+     * 可解引用 URL：GET 返回 catalog JSON schema（官网静态文件 docs-site/a2ui/catalog/v1.json，
+     * 由 androidApp `A2uiCatalogDescriptorSyncTest` 生成并对账，部署走 deploy-docs-site.sh）；
+     * 端侧仍仅做等值匹配、从不发起网络请求。
      */
-    const val CATALOG_ID = "https://polang.net/a2ui/catalog/v1"
+    const val CATALOG_ID = "https://polang.net/a2ui/catalog/v1.json"
 
     const val HANDLE_SCHEME = "local://"
 

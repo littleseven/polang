@@ -21,7 +21,7 @@ class RenderUiToolService {
 约束（必须全部满足，否则端上拒绝渲染或静默丢失数据）：
 1. messagesJson 是 A2UI v0.9 信封 JSON 数组，每个信封含 "version": "v0.9" 与
    createSurface / updateComponents / updateDataModel 之一；
-2. createSurface 的 catalogId 必须是 "https://polang.net/a2ui/catalog/v1"；
+2. createSurface 的 catalogId 必须是 "https://polang.net/a2ui/catalog/v1.json"；
 3. updateDataModel 一信封只写一个绑定：必须含 "path"（如 "/buckets"）与 "value" 两键，
    禁止使用 "data" 批量形式（端上解析器不识别该键，数据会被静默丢弃）；
 4. 组件只用：Text / Row / Column / Card / Button / BarChart。

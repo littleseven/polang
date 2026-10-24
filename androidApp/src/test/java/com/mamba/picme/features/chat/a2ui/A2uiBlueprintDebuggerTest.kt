@@ -13,7 +13,7 @@ class A2uiBlueprintDebuggerTest {
 
     // 载荷形态对齐生产实物（2026-10-22 sf-4603b33a：嵌套中文 + local:// handle）
     private val productionLikeJson =
-        """[{"version":"v0.9","createSurface":{"surfaceId":"sf-test1234","catalogId":"https://polang.net/a2ui/catalog/v1"}},""" +
+        """[{"version":"v0.9","createSurface":{"surfaceId":"sf-test1234","catalogId":"https://polang.net/a2ui/catalog/v1.json"}},""" +
             """{"version":"v0.9","updateComponents":{"surfaceId":"sf-test1234","root":"root","components":[{"id":"root","component":"Column","children":["title"]},{"id":"title","component":"Text","text":"2026 年照片月度分布","variant":"h2"}]}},""" +
             """{"version":"v0.9","updateDataModel":{"surfaceId":"sf-test1234","data":{"buckets":"local://scan/32737b0771fb#histogram","selected":""}}}]"""
 

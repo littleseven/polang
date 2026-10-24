@@ -125,7 +125,7 @@ class MessagePartsConverterTest {
         val part = MessagePart.A2uiCard(
             partId = "p0",
             surfaceId = "sf-1",
-            messagesJson = "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-1\",\"catalogId\":\"https://polang.net/a2ui/catalog/v1\"}}]",
+            messagesJson = "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-1\",\"catalogId\":\"https://polang.net/a2ui/catalog/v1.json\"}}]",
             fallbackSummary = "327 张，数据在原设备",
             viewState = null,
         )
