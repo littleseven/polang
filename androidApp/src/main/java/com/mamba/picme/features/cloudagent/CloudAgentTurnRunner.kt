@@ -29,6 +29,12 @@ sealed interface CloudTurnEvent {
         val fallbackSummary: String,
     ) : CloudTurnEvent
 
+    /** render_ui_openui 云端发卡（OpenUI Lang 1.0 程序；数据端上 local_handle 补全）。 */
+    data class OpenUiCard(
+        val program: String,
+        val fallbackSummary: String,
+    ) : CloudTurnEvent
+
     /** 本轮 SSE 正常收尾（done 帧）。 */
     data object Done : CloudTurnEvent
 }
@@ -52,12 +58,14 @@ class CloudAgentTurnRunner(
         sessionId: String,
         text: String,
         byokApiKey: String?,
+        genUiFormat: String = "a2ui",
         onEvent: (CloudTurnEvent) -> Unit,
     ): Result<Unit> = api.postMessage(
         appToken,
         sessionId,
         text,
         byokApiKey?.takeIf { key -> key.isNotBlank() },
+        genUiFormat,
     ) { frame ->
         when (frame) {
             is CloudFrame.Event -> handleEvent(frame.event, onEvent)
@@ -105,6 +113,16 @@ class CloudAgentTurnRunner(
                         )
                     }.onSuccess { card -> onEvent(card) }
                         .onFailure { e -> Logger.w(TAG, "render_ui action frame ignored: ${e.message}") }
+                } else if (payload.optString("tool") == CloudAgentToolContract.TOOL_RENDER_UI_OPENUI) {
+                    // render_ui_openui 同款容错（openui P2）：坏帧记日志忽略
+                    runCatching {
+                        val args = JSONObject(payload.optString("argsJson"))
+                        CloudTurnEvent.OpenUiCard(
+                            program = args.getString("program"),
+                            fallbackSummary = args.optString("fallbackSummary"),
+                        )
+                    }.onSuccess { card -> onEvent(card) }
+                        .onFailure { e -> Logger.w(TAG, "render_ui_openui action frame ignored: ${e.message}") }
                 }
                 // 其它工具的 action 帧维持忽略（ToolCall 由 tool_request 帧驱动）
             }

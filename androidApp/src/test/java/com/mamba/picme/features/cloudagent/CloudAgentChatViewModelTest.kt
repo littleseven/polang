@@ -35,11 +35,13 @@ class CloudAgentChatViewModelTest {
     private val configsFlow = MutableStateFlow("")
     private val selectedFlow = MutableStateFlow("")
     private val consentFlow = MutableStateFlow(false)
+    private val genUiFormatFlow = MutableStateFlow("a2ui")
     private val repository: UserSettingsRepository = mockk {
         every { serverAuthTokenFlow } answers { tokenFlow }
         every { aiAgentRemoteModelConfigsFlow } answers { configsFlow }
         every { aiAgentSelectedRemoteModelFlow } answers { selectedFlow }
         every { cloudAgentByokConsentFlow } answers { consentFlow }
+        every { genUiFormatFlow } answers { this@CloudAgentChatViewModelTest.genUiFormatFlow }
     }
 
     /** 假客户端：记录调用，frames 脚本化。 */
@@ -61,7 +63,7 @@ class CloudAgentChatViewModelTest {
         }
         override suspend fun getEvents(token: String, sessionId: String, after: Long, limit: Int) = Result.success(emptyList<JSONObject>())
         override suspend fun finish(token: String, sessionId: String) = Result.success(Unit)
-        override suspend fun postMessage(token: String, sessionId: String, content: String, byokApiKey: String?, onFrame: (CloudFrame) -> Unit): Result<Unit> {
+        override suspend fun postMessage(token: String, sessionId: String, content: String, byokApiKey: String?, genUiFormat: String, onFrame: (CloudFrame) -> Unit): Result<Unit> {
             postCount++
             sentByokKey = byokApiKey
             gate?.await()

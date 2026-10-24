@@ -12,6 +12,7 @@ import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
+import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
@@ -2178,6 +2179,8 @@ class ChatViewModel(
                 ?: configs.getConfigByModelId(selectedKey)
         }
         val consent = userSettingsRepository.cloudAgentByokConsentFlow.first()
+        // GenUI 线格式（openui P2）：随请求头 X-GenUI-Format 透传 server 工具分流
+        val genUiFormat = userSettingsRepository.genUiFormatFlow.first()
         val choice = CloudAgentChannelResolver.resolve(config, consent)
         if (choice is CloudAgentChannelChoice.NeedConsent) {
             _streamingMessage.value = null
@@ -2225,14 +2228,19 @@ class ChatViewModel(
             // A2UI 卡落库队列：onEvent 回调非挂起不能直接写 Room，先快照「卡前文本 + 卡事件」，
             // SSE 结束后在挂起上下文按序落库（保证云端文本、工具结果卡、A2UI 图表卡按序渲染，US-2）
             val a2uiFlushes = mutableListOf<Pair<String, CloudTurnEvent.A2uiCard>>()
+            // OpenUI 卡同款队列（openui P2）。与 a2uiFlushes 并列不合并的前提：server 按
+            // X-GenUI-Format 头互斥注册 render_ui/render_ui_openui，一回合只会产一种卡，
+            // 跨队列交错序不可能出现
+            val openUiFlushes = mutableListOf<Pair<String, CloudTurnEvent.OpenUiCard>>()
             var serverError: String? = null
-            var result = runCloudTurnOnce(runner, token, session, text, answer, a2uiFlushes) { serverError = it }
+            var result = runCloudTurnOnce(runner, token, session, text, answer, a2uiFlushes, openUiFlushes, genUiFormat) { serverError = it }
             // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
             if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
                 Logger.w(TAG, "Cloud session ${session.sessionId} invalid, recreating")
                 cloudSessions.remove(sessionId)
                 answer.clear()
                 a2uiFlushes.clear()
+                openUiFlushes.clear()
                 serverError = null
                 _streamingMessage.value = _streamingMessage.value?.copy(
                     content = stringContext().getString(STREAMING_THINKING_HINT_RES),
@@ -2241,7 +2249,7 @@ class ChatViewModel(
                 )
                 val fresh = ensureCloudSession(api, token, sessionId, choice)
                 if (fresh != null) {
-                    result = runCloudTurnOnce(runner, token, fresh, text, answer, a2uiFlushes) { serverError = it }
+                    result = runCloudTurnOnce(runner, token, fresh, text, answer, a2uiFlushes, openUiFlushes, genUiFormat) { serverError = it }
                 }
             }
 
@@ -2252,6 +2260,10 @@ class ChatViewModel(
             for ((pendingText, card) in a2uiFlushes) {
                 if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
                 insertA2uiCardMessage(sessionId, card)
+            }
+            for ((pendingText, card) in openUiFlushes) {
+                if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
+                insertOpenUiCardMessage(sessionId, card)
             }
             when {
                 result.isFailure && isCloudRoundInFlight(result.exceptionOrNull()) -> insertAgentMessage(
@@ -2306,8 +2318,10 @@ class ChatViewModel(
         text: String,
         answer: StringBuilder,
         a2uiFlushes: MutableList<Pair<String, CloudTurnEvent.A2uiCard>>,
+        openUiFlushes: MutableList<Pair<String, CloudTurnEvent.OpenUiCard>>,
+        genUiFormat: String,
         onServerError: (String) -> Unit,
-    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey) { event ->
+    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey, genUiFormat) { event ->
         when (event) {
             is CloudTurnEvent.AssistantText -> {
                 if (answer.isNotEmpty()) answer.append("\n\n")
@@ -2350,6 +2364,11 @@ class ChatViewModel(
             is CloudTurnEvent.A2uiCard -> {
                 // onEvent 回调非挂起不能直接写 Room：快照卡前已累积文本并清空，SSE 结束后按序落库
                 a2uiFlushes += answer.toString() to event
+                answer.clear()
+            }
+            is CloudTurnEvent.OpenUiCard -> {
+                // A2uiCard 同款快照（openui P2）
+                openUiFlushes += answer.toString() to event
                 answer.clear()
             }
             is CloudTurnEvent.Error -> onServerError(event.message)
@@ -3675,6 +3694,52 @@ class ChatViewModel(
      */
     fun persistA2uiViewStateAsync(messageId: String, viewState: String) {
         viewModelScope.launch { persistA2uiViewState(messageId, viewState) }
+    }
+
+    /**
+     * 插入 OpenUI 卡消息（type=data_ui_openui + role=agent，openui P2）。走 tool_browser 先例：
+     * content 列存整颗 part JSON，insertMessageWithParts 内部经 converter 双写 partsJson。
+     */
+    private suspend fun insertOpenUiCardMessage(
+        sessionId: String,
+        event: CloudTurnEvent.OpenUiCard,
+    ) {
+        val part = MessagePart.OpenUiCard(
+            partId = "p0",
+            program = event.program,
+            fallbackSummary = event.fallbackSummary,
+        )
+        chatMessageDao.insertMessageWithParts(
+            ChatMessageEntity(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                type = OpenUiContract.PART_TYPE,
+                role = "agent",
+                content = a2uiCardJson.encodeToString(MessagePart.OpenUiCard.serializer(), part),
+                timestamp = System.currentTimeMillis(),
+                modelUsed = "cloud_agent",
+            )
+        )
+        chatSessionDao.touchSession(sessionId)
+    }
+
+    /** OpenUI 卡交互态持久化（US-7 对偶，openui P2）：同 part id 覆写，重建时作初始 state。 */
+    suspend fun persistOpenUiViewState(messageId: String, viewState: String) {
+        val entity = chatMessageDao.getMessageById(messageId) ?: return
+        val part = runCatching {
+            a2uiCardJson.decodeFromString(MessagePart.OpenUiCard.serializer(), entity.content)
+        }.getOrNull() ?: return
+        val updated = part.copy(viewState = viewState)
+        chatMessageDao.insertMessageWithParts(
+            entity.copy(
+                content = a2uiCardJson.encodeToString(MessagePart.OpenUiCard.serializer(), updated)
+            )
+        )
+    }
+
+    /** 非挂起包装（同 persistA2uiViewStateAsync 终审 m2 口径）。 */
+    fun persistOpenUiViewStateAsync(messageId: String, viewState: String) {
+        viewModelScope.launch { persistOpenUiViewState(messageId, viewState) }
     }
 
     private suspend fun ensureSessionExists(sessionId: String) {
