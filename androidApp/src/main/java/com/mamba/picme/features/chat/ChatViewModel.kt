@@ -4371,6 +4371,7 @@ class ChatViewModel(
                 is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
                 is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
                 is MessagePart.A2uiCard -> ChatMessageType.A2UI_CARD
+                is MessagePart.OpenUiCard -> ChatMessageType.OPENUI_CARD
                 // BrowserLive 直播卡 UI 映射属 browser-vnc 直播卡后续 Task；此前防御性落文本
                 //（此间管线未产此类 part，分支不可达）
                 is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT

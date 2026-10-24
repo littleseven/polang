@@ -142,4 +142,28 @@ class MessagePartsConverterTest {
         assertEquals(1, parts.size)
         assertTrue(parts[0] is MessagePart.Text)
     }
+
+    // ── OpenUI GenUI 卡（openui P1） ────────────────────────────────
+
+    @Test
+    fun dataUiOpenUiRow_decodesToOpenUiCardPart() {
+        val part = MessagePart.OpenUiCard(
+            partId = "p0",
+            program = "root = Card([Text(\"hi\")])",
+            fallbackSummary = "327 张，数据在原设备",
+            viewState = "selected=2026-09",
+        )
+        val content = kotlinx.serialization.json.Json.encodeToString(MessagePart.OpenUiCard.serializer(), part)
+        val parts = MessagePartsConverter.toParts("data_ui_openui", content, null, ModelInputRole.ASSISTANT)
+        assertEquals(1, parts.size)
+        assertEquals(part, parts[0])
+    }
+
+    @Test
+    fun dataUiOpenUiRow_corruptContent_fallsBackToText() {
+        // 行级兜底（spec §4.2）：data_ui_openui 解析异常 → 原文 Text part，不允许丢消息
+        val parts = MessagePartsConverter.toParts("data_ui_openui", "{broken", null, ModelInputRole.ASSISTANT)
+        assertEquals(1, parts.size)
+        assertTrue(parts[0] is MessagePart.Text)
+    }
 }

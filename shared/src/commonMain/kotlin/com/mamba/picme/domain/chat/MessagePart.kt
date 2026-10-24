@@ -140,6 +140,25 @@ sealed interface MessagePart {
         override val category: PartCategory get() = PartCategory.DATA
     }
 
+    /**
+     * OpenUI GenUI 卡（data part：默认不回灌 LLM，openui P1）。
+     *
+     * [program] 为 OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据），
+     * 数据经 Query("local_handle") 端上补全（隐私闸对偶 D2/D6）。
+     * [fallbackSummary] 为投影级降级摘要（云端可持有）。
+     * [viewState] 为交互态（"selected=<label>"，同 part id 覆写持久化，对偶 US-7）。
+     */
+    @Serializable
+    @SerialName("data_ui_openui")
+    data class OpenUiCard(
+        override val partId: String,
+        val program: String,
+        val fallbackSummary: String,
+        val viewState: String? = null,
+    ) : MessagePart {
+        override val category: PartCategory get() = PartCategory.DATA
+    }
+
     /** 图片块（user_image / agent_image / user_image_text 的图）。媒体红线：原生 block，不经 LLM 排版。 */
     @Serializable
     @SerialName("image")

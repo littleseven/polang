@@ -267,6 +267,29 @@ class ChatListFlattenerTest {
         assertEquals("a1:p0", items[0].key)
     }
 
+    // ── OpenUI GenUI 卡分派（openui P1） ────────────────────────────
+
+    @Test
+    fun `openui card part flattens to openui card content type`() {
+        val message = ChatMessage(
+            id = "o1",
+            type = ChatMessageType.OPENUI_CARD,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.OpenUiCard(
+                    partId = "p0",
+                    program = "root = Card([Text(\"hi\")])",
+                    fallbackSummary = "327 张，数据在原设备",
+                ),
+            ),
+        )
+        val items = flattenChatItems(listOf(message))
+        assertEquals(1, items.size)
+        assertEquals(ChatListItem.TYPE_OPENUI_CARD, items[0].contentType)
+        assertEquals("o1:p0", items[0].key)
+    }
+
     // ── browser 直播卡双显跳过（Task 13；browser 的 OUTPUT_ERROR 落库，终态都跳）──
 
     private fun streamingBrowser(state: ToolPartState, sessionId: String = "s-1") = ChatMessage(
