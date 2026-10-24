@@ -75,6 +75,15 @@ class CloudAgentToolCatalogTest {
     }
 
     @Test
+    fun renderUiOpenUi_isCloudToolWithNoProjectionSurface() {
+        val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_UI_OPENUI)
+        assertNotNull(spec, "missing spec for render_ui_openui")
+        assertEquals("render_ui_openui", CloudAgentToolContract.TOOL_RENDER_UI_OPENUI)
+        assertEquals(ToolExecutor.CLOUD, spec.executor)
+        assertTrue(spec.projectionSchema.contains("不适用"), "CLOUD 工具 projectionSchema 须显式声明不适用")
+    }
+
+    @Test
     fun mediaSearchProjection_declaresHandleToken() {
         for (tool in listOf(
             CloudAgentToolContract.TOOL_SEARCH_MEDIA,

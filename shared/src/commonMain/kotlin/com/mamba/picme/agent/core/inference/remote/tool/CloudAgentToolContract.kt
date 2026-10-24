@@ -19,6 +19,13 @@ object CloudAgentToolContract {
     const val TOOL_RENDER_UI = "render_ui"
 
     /**
+     * OpenUI 线格式发卡工具（server 侧执行，CLOUD；openui P2）：与 render_ui 互斥注册
+     * （X-GenUI-Format 头分流），模型产出 OpenUI Lang 1.0 program + fallbackSummary，
+     * program 经 action 事件下行端侧解析渲染，数据仍经 local_handle 端上补全。
+     */
+    const val TOOL_RENDER_UI_OPENUI = "render_ui_openui"
+
+    /**
      * H5 卡片渲染工具（server 侧执行，CLOUD）：模型产出 HTML + summary，HTML 本体不进 LLM
      * 上下文——模型只得到 summary 回执（省 token，对齐主聊天 render_html 语义）；HTML 卡
      * 本体经 AgentEvent HtmlCard 载荷下行端上渲染。

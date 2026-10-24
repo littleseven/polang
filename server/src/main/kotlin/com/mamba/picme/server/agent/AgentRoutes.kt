@@ -32,6 +32,16 @@ import kotlinx.serialization.json.putJsonObject
 const val BYOK_API_KEY_HEADER = "X-User-Api-Key"
 
 /**
+ * GenUI 线格式选择头（openui P2）：`openui` → 注册 render_ui_openui（OpenUI Lang），
+ * 其余（缺头/未知值）一律注册 render_ui（A2UI，向后兼容）。两工具互斥注册，
+ * LLM 一轮只见一套描述。
+ */
+const val GENUI_FORMAT_HEADER = "X-GenUI-Format"
+
+/** [GENUI_FORMAT_HEADER] 的 OpenUI 取值。 */
+const val GENUI_FORMAT_OPENUI = "openui"
+
+/**
  * 单轮跑轮超时上限（M2.7 安全网）：15 分钟。
  *
  * 合法长轮上界 = 20 迭代 × (LLM 延迟 ~30s + 工具执行 ~15s) ≈ 15 分钟。
@@ -282,7 +292,12 @@ fun Route.agentRoute(
                         tools(
                             ServerToolService(onHtmlCard = htmlCardSink).asToolsByClass() +
                                 deviceTools.asToolsByClass() +
-                                RenderUiToolService().asToolsByClass()
+                                // GenUI 线格式分流（openui P2）：互斥注册，LLM 一轮只见一套描述
+                                if (call.request.headers[GENUI_FORMAT_HEADER] == GENUI_FORMAT_OPENUI) {
+                                    RenderOpenUiToolService().asToolsByClass()
+                                } else {
+                                    RenderUiToolService().asToolsByClass()
+                                }
                         )
                     }
                     try {
