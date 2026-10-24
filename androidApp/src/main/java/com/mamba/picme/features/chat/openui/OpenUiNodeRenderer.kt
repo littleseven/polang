@@ -7,11 +7,13 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,8 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -33,11 +37,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -57,6 +58,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -69,6 +71,7 @@ import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.core.designsystem.components.AppSlider
 import com.mamba.picme.core.image.faceAwareVerticalAlignment
+import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
@@ -83,10 +86,11 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
 /**
  * OpenUI 组件树 → Compose 递归渲染（openui P2 + M2/M3 二十一组件；与 OpenUiLibrary 一一对应）。
  *
- * 语义样式令牌（role/colorRole/spacing）只读复用 [A2uiStyleMapper]（两线同一套
- * Design Token 映射，保证双端/双线视觉一致）；BarChart 视觉与 PolangBarChartComponent
- * 逐项对齐（同一 A2uiCardTokens + 柱高公式 barChartBarHeight + 标签抽稀
- * barChartLabelInterval + primary 色 + 选中高亮规则）；Image 经 [photoResolver]
+ * 语义样式令牌（role/colorRole/spacing）：枚举解析与 colorRole 颜色映射只读复用
+ * [A2uiStyleMapper]；字阶/间距阶梯自 M4 起走 OpenUI 专属 [OpenUiCardTokens]（A2UI 是
+ * 对比实验对照组，样式冻结）。BarChart 几何与 PolangBarChartComponent 逐项对齐（同一
+ * A2uiCardTokens + 柱高公式 barChartBarHeight + 标签抽稀 barChartLabelInterval + 选中高亮规则，
+ * M4 起单系列柱色换色板首色）；Image 经 [photoResolver]
  * 渲染期端侧 id→uri 解析（[PRIVACY]：uri 不出端，spec《openui-image-component-design》D4）。
  *
  * M2（2026-10-24，spec《openui-component-library-m2-design》）：
@@ -101,7 +105,7 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
  *
  * M3（2026-10-24，spec《openui-component-library-m3-design》）+7：
  * - Table：表头行 + 数据行（[MAX_TABLE_ROWS] 护栏），等宽列，列宽合计超容器宽时横滑；
- * - PieChart：Canvas 扇形 + 图例列，色板 = colorScheme 角色 + 透明度阶梯（BarChart 同族），
+ * - PieChart：Canvas 扇形 + 图例列（M4 起色板换 6 色相离散色，见 [OpenUiCardTokens.chartPalette]），
  *   [MAX_PIE_SLICES] 护栏；
  * - LineChart：Canvas 折线 + 数据点 + 横轴标签抽稀（barChartLabelInterval 先例），
  *   values 缺位 = null 断点断开折线，[MAX_LINE_SERIES] 护栏；
@@ -110,6 +114,25 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
  * - Accordion：展开集是渲染期 remember 本地态（Tabs 同口径，键 = items 标题列表）；
  * - Switch：M3 Switch 配 token 色（AppSlider 红线只管滑杆，Switch 无既有封装），
  *   checked BINDABLE_BOOLEAN 与 CheckBox 同构（点按 → @Set 回写，裸字面量只读）。
+ *
+ * M4（2026-10-25，spec《openui-visual-m4-design》卡内视觉规范，A2UI 对照组零改动）：
+ * - 字阶/间距/Divider/Image 圆角收口 OpenUI 专属 [OpenUiCardTokens]：字阶 20B/15SB/14/12，
+ *   组件间距默认 md、Section（SUBHEAD/图表/表格）前 lg，Divider 0.5dp 弱色，Image 12dp 圆角；
+ * - 图表色板弃「colorScheme 角色 + alpha 阶梯」同族色，换 [OpenUiCardTokens.chartPalette]
+ *   6 色相离散色（蓝/橙/绿/紫/红/青）；BarChart 单系列用板首色（蓝），选中高亮沿用 primary；
+ * - Tabs 弃 M3 TabRow/ScrollableTabRow，改自绘胶囊分段控件（surfaceVariant 圆角容器 +
+ *   primary 选中胶囊），>4 页签横滑；选中态 remember 键 = 页签标题列表（M2 口径不变）；
+ * - 空绑定兜底：Text/Markdown 含 Binding 且解析结果 trim 后以 `:`/`：` 结尾 → 丢组件不渲染。
+ *
+ * M4.2（2026-10-25 真机验收修复，非视觉项）：
+ * - Image 无界宽上下文（HORIZONTAL List 横滑行内 fillMaxWidth 失效、aspectRatio 双维无界
+ *   塌 0×0）落固定条目宽 [OpenUiCardTokens.horizontalImageWidth]；
+ * - Row 同上下文 weight 分栏失效（无限宽约束下子项拿不到宽度）→ 无界宽时子项按内容
+ *   自尺寸、不挂 weight（BoxWithConstraints 判界）；
+ * - photoResolver 接线升级双通道（AppContainer）：Room 正 id 直查 + 未索引系统媒体负
+ *   synthetic id 经 allMedia 反查（此前直查 DAO 致负 id 恒 null、Image 永久占位）。
+ * - BarChart 点桶回写目标跟随 selected 的绑定变量（LLM 自定义变量名如 $month 时硬写
+ *   $selected 会点了没反应）；未绑定才回落 [OpenUiContract.STATE_SELECTED]。
  *
  * 半信任输入防御：未知组件/null 字面量 → 空 Box 占位，不炸整卡；BarChart buckets
  * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）；Image 解析不到/加载中 →
@@ -125,11 +148,8 @@ fun OpenUiNodeRenderer(
 ) {
     when (node.type) {
         "Card" -> Card(modifier = modifier.fillMaxWidth(), shape = AppShapes.card) {
-            Column(
-                modifier = Modifier.padding(Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(node.spacingDp()),
-            ) {
-                OpenUiChildren(node, state, photoResolver, onAction)
+            Column(modifier = Modifier.padding(Spacing.lg)) {
+                OpenUiGappedChildren(node, state, photoResolver, onAction)
             }
         }
         "Row" -> run {
@@ -142,47 +162,61 @@ fun OpenUiNodeRenderer(
                         (component.props["axis"] as? OpenUiValue.Str)?.v == "VERTICAL"
                 } == true
             }
-            Row(
+            // M4.2：无界宽上下文（HORIZONTAL List 横滑行内）weight 分栏失效（无限宽约束
+            // 下子项拿不到宽度），子项改按内容自尺寸——Image 等由自身 BoxWithConstraints
+            // 兜底固定条目宽；有界上下文保持等宽分栏（2026-10-24 复杂图文排版事故修复口径）
+            BoxWithConstraints(
                 modifier = if (hasVerticalDivider) modifier.height(IntrinsicSize.Min) else modifier,
-                horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 子组件等宽分栏：无 weight 时首栏按内容占宽，后续栏被压成单字竖条
-                // （2026-10-24 复杂图文排版真机事故）；Divider 是分隔符不参与分栏
-                for (child in children) {
-                    if (child is OpenUiValue.ComponentVal) {
-                        val childModifier =
-                            if (child.type == "Divider") Modifier else Modifier.weight(1f)
-                        OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
-                    } else {
-                        Box(modifier = Modifier.weight(1f)) // null 字面量/被剔除元素：等宽空占位
+                val weightsUsable = maxWidth != Dp.Infinity
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // 子组件等宽分栏：无 weight 时首栏按内容占宽，后续栏被压成单字竖条；
+                    // Divider 是分隔符不参与分栏
+                    for (child in children) {
+                        if (child is OpenUiValue.ComponentVal) {
+                            val childModifier =
+                                if (child.type == "Divider" || !weightsUsable) {
+                                    Modifier
+                                } else {
+                                    Modifier.weight(1f)
+                                }
+                            OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
+                        } else {
+                            // null 字面量/被剔除元素：等宽空占位
+                            Box(modifier = if (weightsUsable) Modifier.weight(1f) else Modifier)
+                        }
                     }
                 }
             }
         }
-        "Column" -> Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(node.spacingDp()),
-        ) {
-            OpenUiChildren(node, state, photoResolver, onAction)
+        "Column" -> Column(modifier = modifier) {
+            OpenUiGappedChildren(node, state, photoResolver, onAction)
         }
         "Text" -> {
             // M2：text 升 BINDABLE_STRING——Binding 从 state 快照读；Str 直取，Num/Bool
             // 回退文本形态（Text($level) 绑 Slider 数字变量是 LLM 自然写法，review 🟡2）；
-            // 解析不出丢该 Text 不炸卡
-            val text = when (val prop = node.props["text"]) {
-                is OpenUiValue.Str -> prop.v
-                is OpenUiValue.Binding -> state[prop.name]?.let { bound -> openUiPrimitiveText(bound) }
+            // 解析不出丢该 Text 不炸卡；M4：空绑定兜底（冒号尾前缀）同口径丢组件
+            val textProp = node.props["text"]
+            val text = when (textProp) {
+                is OpenUiValue.Str -> textProp.v
+                is OpenUiValue.Binding -> state[textProp.name]?.let { bound -> openUiPrimitiveText(bound) }
                 else -> null
             } ?: return
+            if (isEmptyBindingFallback(text)) return
+            val role = A2uiStyleMapper.parseTextRole((node.props["role"] as? OpenUiValue.Str)?.v)
+            val colorRole = A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
             Text(
                 text = text,
-                style = A2uiStyleMapper.textStyle(
-                    A2uiStyleMapper.parseTextRole((node.props["role"] as? OpenUiValue.Str)?.v)
-                ),
-                color = A2uiStyleMapper.color(
-                    A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
-                ),
+                style = OpenUiCardTokens.textStyle(role),
+                // CAPTION 未显式声明 colorRole 时弱色（M4 §1.1 字阶：CAPTION 12sp 弱色）
+                color = if (role == A2uiTextRole.CAPTION && colorRole == null) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    A2uiStyleMapper.color(colorRole)
+                },
                 modifier = modifier,
             )
         }
@@ -213,20 +247,61 @@ fun OpenUiNodeRenderer(
     }
 }
 
+/**
+ * Card/Column 内容排布（M4 §1.1 间距阶梯）：组件间默认 [spacingDp]（md），Section 起头
+ * （SUBHEAD 标题/图表/表格）前升为 [OpenUiCardTokens.sectionGap]（lg）。null 字面量渲染
+ * 零尺寸空占位但不贡献间距；Text/Markdown 的确定性丢弃形态（绑定解析不出/空绑定冒号尾，
+ * §1.4）布局前预过滤不占隙（review 🟡2：被丢组件前后各贡献一个 Spacer 会形成双倍空隙）。
+ */
 @Composable
-private fun OpenUiChildren(
+private fun OpenUiGappedChildren(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
     onAction: (OpenUiAction) -> Unit,
 ) {
-    OpenUiChildList(
-        (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty(),
-        state,
-        photoResolver,
-        onAction,
-    )
+    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .filter { child -> child !is OpenUiValue.ComponentVal || child.willRenderTextLike(state) }
+    val gap = node.spacingDp()
+    var first = true
+    for (child in children) {
+        if (child is OpenUiValue.ComponentVal) {
+            if (!first) {
+                Spacer(
+                    modifier = Modifier.height(
+                        if (child.isSectionStart()) maxOf(gap, OpenUiCardTokens.sectionGap) else gap
+                    )
+                )
+            }
+            first = false
+            OpenUiNodeRenderer(child, state, photoResolver, onAction)
+        } else {
+            Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
+        }
+    }
 }
+
+/**
+ * Text/Markdown 可渲染性预判（与两处分支的丢弃口径严格同构）：Str 字面量恒渲染；
+ * Binding 解析不出（state 缺/值形态不支持）或空绑定冒号尾（§1.4）→ 丢。
+ */
+private fun OpenUiValue.ComponentVal.willRenderTextLike(state: Map<String, OpenUiValue>): Boolean {
+    if (type != "Text" && type != "Markdown") return true
+    return when (val prop = props["text"]) {
+        is OpenUiValue.Str -> !isEmptyBindingFallback(prop.v)
+        is OpenUiValue.Binding -> {
+            val resolved = state[prop.name]?.let { bound -> openUiPrimitiveText(bound) }
+            resolved != null && !isEmptyBindingFallback(resolved)
+        }
+        else -> false
+    }
+}
+
+/** Section 起头判定（M4 §1.1）：SUBHEAD 标题 / 图表 / 表格。 */
+private fun OpenUiValue.ComponentVal.isSectionStart(): Boolean =
+    type == "BarChart" || type == "PieChart" || type == "LineChart" || type == "Table" ||
+        (type == "Text" &&
+            A2uiStyleMapper.parseTextRole((props["role"] as? OpenUiValue.Str)?.v) == A2uiTextRole.SUBHEAD)
 
 /** 渲染任意组件数组槽（children / Tabs 页签内容）：非组件元素（null 字面量/被剔除）空占位。 */
 @Composable
@@ -256,38 +331,58 @@ private fun OpenUiPhotoImage(
     // aspect 宽高比（宽/高）：渲染期缺省 4:3，clamp 到 [0.5, 2.5]（schema 无默认字面量）
     val aspect = (node.props["aspect"] as? OpenUiValue.Num)?.v
         ?.let { raw -> raw.coerceIn(0.5, 2.5) } ?: (4.0 / 3.0)
-    val frameModifier = modifier
-        .fillMaxWidth()
-        .aspectRatio(aspect.toFloat())
-        .clip(AppShapes.card)
-        .background(MaterialTheme.colorScheme.surfaceVariant)
-    if (photoId == null) {
-        // 缺必填 photo（schema 校验已丢组件，此处仅防御兜底）：同形占位，不炸整卡
-        Box(modifier = frameModifier)
-        return
-    }
-    val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
-        value = photoResolver.resolve(photoId)
-    }
-    val resolved = photo
-    if (resolved == null) {
-        // 解析中/解析失败（已删除/未索引）：同形同参 surfaceVariant 占位
-        Box(modifier = frameModifier)
-    } else {
-        AsyncImage(
-            model = resolved.uri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
-            modifier = frameModifier,
-        )
+    BoxWithConstraints(modifier = modifier) {
+        // M4.2：无界宽上下文（HORIZONTAL List 横滑行内 fillMaxWidth 失效、aspectRatio
+        // 双维无界塌成 0×0）落固定条目宽；有界上下文保持铺满
+        val frameModifier = (
+            if (maxWidth != Dp.Infinity) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier.width(OpenUiCardTokens.horizontalImageWidth)
+            }
+            )
+            .aspectRatio(aspect.toFloat())
+            .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius)) // M4 §1.1：直角 → 12dp
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+        if (photoId == null) {
+            // 缺必填 photo（schema 校验已丢组件，此处仅防御兜底）：同形占位，不炸整卡
+            Box(modifier = frameModifier)
+            return@BoxWithConstraints
+        }
+        val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
+            value = photoResolver.resolve(photoId)
+        }
+        val resolved = photo
+        if (resolved == null) {
+            // 解析中/解析失败（已删除/未索引）：同形同参 surfaceVariant 占位
+            Box(modifier = frameModifier)
+        } else {
+            AsyncImage(
+                model = resolved.uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
+                modifier = frameModifier,
+            )
+        }
     }
 }
 
 private fun OpenUiValue.ComponentVal.spacingDp() =
-    A2uiStyleMapper.spacing(
+    OpenUiCardTokens.spacing(
         A2uiStyleMapper.parseSpacingRole((props["spacing"] as? OpenUiValue.Str)?.v)
     )
+
+/**
+ * 空绑定兜底（M4 §1.4，M4.1 放宽）：解析结果 trim 后以 `:`/`：` 结尾（绑定值为空只剩
+ * 「当前选中：」式前缀）→ 丢该组件不渲染。不再限 prop 形态：Str+Binding 拼接写法
+ * （Text("当前选中: " + $selected)，黄金示例同款）eval 后槽位已是 Str、无法回溯绑定
+ * 来源。已知误伤面：静态冒号尾文本（如「备注：」）同丢（review 🔵6 记录在案，可接受）。
+ */
+private fun isEmptyBindingFallback(resolved: String): Boolean {
+    val trimmed = resolved.trim()
+    return trimmed.endsWith(":") || trimmed.endsWith("：")
+}
 
 /** List VERTICAL 限高（spec §2：约 320dp，规避聊天 LazyColumn 内嵌滚动的嵌套滚动事故）。 */
 private val LIST_VERTICAL_MAX_HEIGHT = 320.dp
@@ -312,13 +407,22 @@ private fun OpenUiIcon(node: OpenUiValue.ComponentVal, modifier: Modifier = Modi
     )
 }
 
-/** Divider：axis=HORIZONTAL（默认）横线 / VERTICAL 竖线。 */
+/** Divider：axis=HORIZONTAL（默认）横线 / VERTICAL 竖线；M4 §1.1：0.5dp 弱色线。 */
 @Composable
 private fun OpenUiDivider(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val dividerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = OpenUiCardTokens.dividerAlpha)
     if ((node.props["axis"] as? OpenUiValue.Str)?.v == "VERTICAL") {
-        VerticalDivider(modifier = modifier)
+        VerticalDivider(
+            modifier = modifier,
+            thickness = OpenUiCardTokens.dividerThickness,
+            color = dividerColor,
+        )
     } else {
-        HorizontalDivider(modifier = modifier.fillMaxWidth())
+        HorizontalDivider(
+            modifier = modifier.fillMaxWidth(),
+            thickness = OpenUiCardTokens.dividerThickness,
+            color = dividerColor,
+        )
     }
 }
 
@@ -356,7 +460,10 @@ private fun OpenUiList(
 /** Tabs 页签数据（title + 组件数组内容）。 */
 private data class OpenUiTab(val title: String, val children: List<OpenUiValue>)
 
-/** Tabs：选中页签是渲染期 remember 本地态，不进 OpenUI state（纯 UI 导航，无 LLM 语义）。 */
+/**
+ * Tabs：选中页签是渲染期 remember 本地态，不进 OpenUI state（纯 UI 导航，无 LLM 语义）。
+ * M4 §1.3：弃 M3 TabRow/ScrollableTabRow（亮绿指示条刺眼），改自绘胶囊分段控件。
+ */
 @Composable
 private fun OpenUiTabs(
     node: OpenUiValue.ComponentVal,
@@ -379,30 +486,66 @@ private fun OpenUiTabs(
     var selectedTab by remember(tabs.map { tab -> tab.title }) { mutableIntStateOf(0) }
     val safeIndex = selectedTab.coerceIn(0, tabs.size - 1)
     Column(modifier = modifier.fillMaxWidth()) {
-        // 页签多（>4）时 TabRow 挤压截断 → ScrollableTabRow 横滑（review 🟡4）
-        if (tabs.size > 4) {
-            ScrollableTabRow(selectedTabIndex = safeIndex, edgePadding = 0.dp) {
-                tabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = index == safeIndex,
-                        onClick = { selectedTab = index },
-                        text = { Text(text = tab.title) },
-                    )
-                }
-            }
-        } else {
-            TabRow(selectedTabIndex = safeIndex) {
-                tabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = index == safeIndex,
-                        onClick = { selectedTab = index },
-                        text = { Text(text = tab.title) },
-                    )
-                }
-            }
-        }
+        OpenUiTabsCapsuleRow(
+            titles = tabs.map { tab -> tab.title },
+            selectedIndex = safeIndex,
+            onSelect = { index -> selectedTab = index },
+        )
         Column(modifier = Modifier.padding(top = Spacing.sm)) {
             OpenUiChildList(tabs[safeIndex].children, state, photoResolver, onAction)
+        }
+    }
+}
+
+/**
+ * Tabs 胶囊分段控件（M4 §1.3）：圆角容器（surfaceVariant 底）+ 选中胶囊（primary 底
+ * onPrimary 字）+ 未选中（onSurfaceVariant 字）；≤4 页签等分宽，>4 页签横滑
+ * （weight 在无限宽约束下崩，Table 同口径）。
+ */
+@Composable
+private fun OpenUiTabsCapsuleRow(
+    titles: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val scrollable = titles.size > 4
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(OpenUiCardTokens.tabsContainerPadding)
+            .then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+    ) {
+        titles.forEachIndexed { index, title ->
+            val selected = index == selectedIndex
+            Box(
+                modifier = (if (scrollable) Modifier else Modifier.weight(1f))
+                    // review 🔵3：自绘胶囊补齐 M3 Tab 内建的触达高度与选中语义（TalkBack 可读「已选中」）
+                    .defaultMinSize(minHeight = 40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+                    )
+                    .selectable(selected = selected, role = Role.Tab) { onSelect(index) }
+                    .padding(
+                        horizontal = OpenUiCardTokens.tabsItemPaddingH,
+                        vertical = OpenUiCardTokens.tabsItemPaddingV,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = title,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -554,7 +697,7 @@ private fun OpenUiSlider(
 
 private data class Bucket(val label: String, val count: Int)
 
-/** BarChart：视觉与 PolangBarChartComponent 逐项对齐；点桶 = @Set($selected, label)。 */
+/** BarChart：几何与 PolangBarChartComponent 逐项对齐；M4 起单系列柱色换色板首色（蓝）；点桶 = @Set(selected 绑定变量, label)。 */
 @Composable
 private fun OpenUiBarChart(
     node: OpenUiValue.ComponentVal,
@@ -574,13 +717,19 @@ private fun OpenUiBarChart(
         return
     }
     // selected 是 BINDABLE_STRING：Binding → 从 state 快照读；Str 字面量 → 直接用（LLM 意图预选）
-    val selected = when (val prop = node.props["selected"]) {
-        is OpenUiValue.Binding -> (state[prop.name] as? OpenUiValue.Str)?.v
-        is OpenUiValue.Str -> prop.v
+    val selectedProp = node.props["selected"]
+    // M4.2：点桶回写目标跟随 selected 的绑定变量（LLM 会自定义变量名，如 $month——
+    // 2026-10-25 真机事故：硬写 $selected 而卡读 $month → 点了没反应）；未绑定回落 $selected
+    val selectedTarget = (selectedProp as? OpenUiValue.Binding)?.name ?: OpenUiContract.STATE_SELECTED
+    val selected = when (selectedProp) {
+        is OpenUiValue.Binding -> (state[selectedProp.name] as? OpenUiValue.Str)?.v
+        is OpenUiValue.Str -> selectedProp.v
         else -> null
     }
     val maxCount = buckets.maxOf { bucket -> bucket.count }.coerceAtLeast(1)
-    val barColor = MaterialTheme.colorScheme.primary
+    // M4 §1.2：单系列柱色 = 色板首色（蓝）；选中高亮沿用 primary 语义
+    val barColor = OpenUiCardTokens.chartSingleSeries
+    val selectedBarColor = MaterialTheme.colorScheme.primary
     // 多桶抽稀：与 PolangBarChartComponent 同一 barChartLabelInterval（all_years ~80 桶
     // 全量标签叠成数字串的事故在 A2UI 侧已修，此处保持逐项对齐）
     val labelInterval = barChartLabelInterval(buckets.size)
@@ -588,7 +737,7 @@ private fun OpenUiBarChart(
     val scrollMode = buckets.size > BAR_CHART_SCROLL_THRESHOLD
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
-            Text(text = text, style = MaterialTheme.typography.titleSmall)
+            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
         }
         Row(
             modifier = (
@@ -616,7 +765,7 @@ private fun OpenUiBarChart(
                             .fillMaxWidth()
                             .height(barChartBarHeight(bucket.count, maxCount))
                             .background(
-                                if (isSelected) barColor
+                                if (isSelected) selectedBarColor
                                 else barColor.copy(alpha = A2uiCardTokens.barUnselectedAlpha)
                             )
                             .clickable {
@@ -624,7 +773,7 @@ private fun OpenUiBarChart(
                                     OpenUiAction(
                                         name = "Set",
                                         args = listOf(OpenUiValue.Str(bucket.label)),
-                                        target = OpenUiContract.STATE_SELECTED,
+                                        target = selectedTarget,
                                     )
                                 )
                             }
@@ -653,20 +802,6 @@ private fun openUiPrimitiveText(value: OpenUiValue): String? = when (value) {
     is OpenUiValue.Num -> if (value.v % 1.0 == 0.0) value.v.toLong().toString() else value.v.toString()
     is OpenUiValue.Bool -> value.v.toString()
     else -> null
-}
-
-/** 饼图/折线系列色板：BarChart 同族 token（colorScheme 角色 + 透明度阶梯派生）。 */
-@Composable
-private fun openUiChartPalette(): List<Color> {
-    val scheme = MaterialTheme.colorScheme
-    return listOf(
-        scheme.primary,
-        scheme.tertiary,
-        scheme.secondary,
-        scheme.primary.copy(alpha = 0.55f),
-        scheme.tertiary.copy(alpha = 0.55f),
-        scheme.secondary.copy(alpha = 0.55f),
-    )
 }
 
 private const val MAX_TABLE_ROWS = 50
@@ -742,10 +877,10 @@ private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = 
         Box(modifier = modifier)
         return
     }
-    val palette = openUiChartPalette()
+    val palette = OpenUiCardTokens.chartPalette
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
-            Text(text = text, style = MaterialTheme.typography.titleSmall)
+            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
         }
         Row(
             modifier = Modifier.padding(top = Spacing.sm),
@@ -824,7 +959,7 @@ private fun OpenUiLineChart(node: OpenUiValue.ComponentVal, modifier: Modifier =
         Box(modifier = modifier)
         return
     }
-    val palette = openUiChartPalette()
+    val palette = OpenUiCardTokens.chartPalette
     val allValues = series.flatMap { serie -> serie.values.filterNotNull() }
     val minValue = allValues.min()
     val maxValue = allValues.max()
@@ -832,7 +967,7 @@ private fun OpenUiLineChart(node: OpenUiValue.ComponentVal, modifier: Modifier =
     val labelInterval = barChartLabelInterval(labels.size)
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
-            Text(text = text, style = MaterialTheme.typography.titleSmall)
+            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
         }
         Canvas(
             modifier = Modifier
@@ -953,7 +1088,7 @@ private fun OpenUiCallout(node: OpenUiValue.ComponentVal, modifier: Modifier = M
 /**
  * Markdown：复用 [AgentMarkdown]（mikepenz，全 app 唯一 Agent 正文 Markdown 入口，禁新引
  * markdown 依赖）；text BINDABLE_STRING——Binding 从 state 快照读，解析不出丢该组件不炸卡
- * （同 Text 口径）。
+ * （同 Text 口径）；M4：空绑定兜底（冒号尾前缀）同 Text 口径丢组件。
  */
 @Composable
 private fun OpenUiMarkdown(
@@ -961,11 +1096,13 @@ private fun OpenUiMarkdown(
     state: Map<String, OpenUiValue>,
     modifier: Modifier = Modifier,
 ) {
-    val text = when (val prop = node.props["text"]) {
-        is OpenUiValue.Str -> prop.v
-        is OpenUiValue.Binding -> state[prop.name]?.let { bound -> openUiPrimitiveText(bound) }
+    val textProp = node.props["text"]
+    val text = when (textProp) {
+        is OpenUiValue.Str -> textProp.v
+        is OpenUiValue.Binding -> state[textProp.name]?.let { bound -> openUiPrimitiveText(bound) }
         else -> null
     } ?: return
+    if (isEmptyBindingFallback(text)) return
     AgentMarkdown(
         content = text,
         color = MaterialTheme.colorScheme.onSurface,

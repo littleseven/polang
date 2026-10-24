@@ -1171,8 +1171,11 @@ class AppContainerImpl(
 
     override val openUiPhotoResolver: OpenUiPhotoResolver by lazy {
         OpenUiPhotoResolver { photoId ->
-            database.mediaDao().getMediaById(photoId)?.let { entity ->
-                OpenUiPhoto(uri = entity.uri, faceFocusY = entity.faceFocusY)
+            // repository.getMediaById 双通道：Room 正 id 直查 DAO；未索引系统媒体的负
+            // synthetic id（-(mediaStoreId*10+typeSalt)，扫描快照持有此类 id）经 allMedia
+            // 合并流反查——2026-10-25 真机事故：直查 DAO 恒 null → Image 永久占位
+            repository.getMediaById(photoId)?.let { asset ->
+                OpenUiPhoto(uri = asset.uri, faceFocusY = asset.faceFocusY)
             }
         }
     }
