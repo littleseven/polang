@@ -827,6 +827,12 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   updateDataModel pretty JSON + 复制全部；messagesJson 非法时降级显示原文+原因，永不崩聊天页）；
   解析纯函数 `parseBlueprintMessages`（`A2uiBlueprintDebugger.kt`），徽标内容为协议标识符无自然语言，
   [I18N] 豁免，release 包 `BuildConfig.DEBUG` 门控零痕迹。
+- **测试**：`A2uiComponentAvailabilityTest`（引擎层：19 组件注册清单 + v0.9 必填属性契约 +
+  逐组件蓝图落成 active surface + 数据绑定落位 + 负路径降级）/ `A2uiComponentRenderSmokeTest`
+  （渲染层：19 组件同框 Compose 实渲冒烟，Robolectric native graphics）/ `HandleResolverTest` /
+  `BarChartSelectedBindingNormalizationTest` / `A2uiBlueprintDebuggerTest` / `PolangA2uiCatalogTest`。
+  测试夹具注意：surface actor 生命周期挂在收集协程 scope 上，scope 取消即回收数据模型，
+  承载 scope 必须活到断言结束。
 
 ---
 
