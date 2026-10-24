@@ -78,8 +78,11 @@ object RenderOpenUiValidator {
         if (MEDIA_PATH.containsMatchIn(program)) {
             violations += "禁止把媒体路径/uri 写进 program（隐私投影契约），相册数据一律走 Query(\"local_handle\", …) 绑定"
         }
-        // 剥离字符串字面量与行注释后再扫结构（防文案内容误伤）
-        val stripped = STRING_LITERAL.replace(LINE_COMMENT.replace(program, ""), "\"\"")
+        // 剥离字符串字面量与行注释后再扫结构（防文案内容误伤）。
+        // 顺序必须是先字符串后注释：handle 里的 local:// 含 //，先剥注释会把
+        // 字符串内部截断留下奇数引号，后续字符串全局配对跨行吞掉 root 语句
+        // （2026-10-24 真机事故：合法两步写法被误报「缺 root」死循环）
+        val stripped = LINE_COMMENT.replace(STRING_LITERAL.replace(program, "\"\""), "")
 
         // 1. root 入口：root = 语句存在，或存在 Card 调用兜底 entry（spec §2.2）
         if (!ROOT_STATEMENT.containsMatchIn(stripped) && !CARD_CALL.containsMatchIn(stripped)) {
