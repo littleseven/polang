@@ -21,8 +21,9 @@ import kotlinx.serialization.json.jsonPrimitive
  * - 官网 catalog schema `docs-site/a2ui/catalog/v1.json`（组件必填属性，
  *   由 androidApp `A2uiCatalogDescriptorSyncTest` 从运行态 catalog 生成）。
  *
- * 注意组件白名单是**工具描述契约**（6 个），窄于 catalog 全集（19 个）——
- * catalog 是端侧渲染能力面，白名单是云端生成引导面。
+ * 注意组件白名单（17 个）= catalog 全集（19 个）减去 Video/AudioPlayer
+ * （端侧是空盒占位渲染，未实装，见 androidApp PolangA2uiCatalog）——
+ * catalog 是端侧渲染能力面，白名单 = 能力面减去未实装项，两者必须保持这个关系。
  */
 object RenderUiValidator {
 
@@ -38,15 +39,29 @@ object RenderUiValidator {
         else -> null
     }
 
-    private val ALLOWED_COMPONENTS = setOf("Text", "Row", "Column", "Card", "Button", "BarChart")
+    private val ALLOWED_COMPONENTS = setOf(
+        "Text", "Image", "Icon", "Row", "Column", "List", "Card", "Tabs", "Modal", "Divider",
+        "Button", "TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput", "BarChart",
+    )
 
     /** 各组件必填属性（对齐 catalog schema 的 required，去掉合成字段 component）。 */
     private val REQUIRED_PROPS = mapOf(
         "Text" to setOf("text"),
+        "Image" to setOf("url"),
+        "Icon" to setOf("name"),
         "Row" to setOf("children"),
         "Column" to setOf("children"),
+        "List" to setOf("children"),
         "Card" to setOf("child"),
+        "Tabs" to setOf("tabs"),
+        "Modal" to setOf("trigger", "content"),
+        "Divider" to emptySet(),
         "Button" to setOf("child", "action"),
+        "TextField" to setOf("label"),
+        "CheckBox" to setOf("label", "value"),
+        "ChoicePicker" to setOf("options", "value"),
+        "Slider" to setOf("value", "max"),
+        "DateTimeInput" to setOf("value"),
         "BarChart" to setOf("buckets"),
     )
 
@@ -58,6 +73,29 @@ object RenderUiValidator {
     private val TEXT_ROLES = setOf("HEADLINE", "SUBHEAD", "BODY", "CAPTION")
     private val COLOR_ROLES = setOf("PRIMARY", "SURFACE", "ERROR", "ON_SURFACE")
     private val SPACINGS = setOf("COMPACT", "STANDARD", "COMFORTABLE")
+    private val JUSTIFY_VALUES = setOf("start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly", "stretch")
+    private val ALIGN_VALUES = setOf("start", "center", "end", "stretch")
+    private val LIST_DIRECTIONS = setOf("vertical", "horizontal")
+    private val DIVIDER_AXES = setOf("horizontal", "vertical")
+    private val IMAGE_FITS = setOf("contain", "cover", "fill", "none", "scaleDown")
+    private val IMAGE_VARIANTS = setOf("icon", "avatar", "smallFeature", "mediumFeature", "largeFeature", "header")
+    private val TEXT_FIELD_VARIANTS = setOf("longText", "number", "shortText", "obscured")
+    private val CHOICE_PICKER_VARIANTS = setOf("mutuallyExclusive", "multipleSelection")
+    private val CHOICE_PICKER_DISPLAY_STYLES = setOf("checkbox", "chips")
+
+    /** catalog v1.json Icon.name 预定义枚举（svgPath 自由形式未开放——LLM 臆造矢量路径必渲染垃圾）。
+     *  与 docs-site/a2ui/catalog/v1.json 的对账由 RenderUiValidatorTest 钉住（防手抄漂移）。 */
+    internal val ICON_NAMES = setOf(
+        "accountCircle", "add", "arrowBack", "arrowForward", "attachFile", "calendarToday",
+        "call", "camera", "check", "close", "delete", "download", "edit", "error", "event",
+        "fastForward", "favorite", "favoriteOff", "folder", "help", "home", "info",
+        "locationOn", "lock", "lockOpen", "mail", "menu", "moreHoriz", "moreVert",
+        "notifications", "notificationsOff", "pause", "payment", "person", "phone", "photo",
+        "play", "print", "refresh", "rewind", "search", "send", "settings", "share",
+        "shoppingCart", "skipNext", "skipPrevious", "star", "starHalf", "starOff", "stop",
+        "upload", "visibility", "visibilityOff", "volumeDown", "volumeMute", "volumeOff",
+        "volumeUp", "warning",
+    )
 
     /** 禁用具体样式数值字段（样式只走语义令牌）。 */
     private val FORBIDDEN_STYLE_KEYS = setOf("fontSize", "padding", "color", "margin", "width", "height")
@@ -238,6 +276,66 @@ object RenderUiValidator {
         checkEnum(where, component, "spacing", SPACINGS, violations)
         when (name) {
             "Text" -> checkEnum(where, component, "variant", TEXT_VARIANTS, violations)
+            "Row", "Column" -> {
+                checkEnum(where, component, "justify", JUSTIFY_VALUES, violations)
+                checkEnum(where, component, "align", ALIGN_VALUES, violations)
+            }
+            "List" -> {
+                checkEnum(where, component, "direction", LIST_DIRECTIONS, violations)
+                checkEnum(where, component, "align", ALIGN_VALUES, violations)
+            }
+            "Divider" -> checkEnum(where, component, "axis", DIVIDER_AXES, violations)
+            "Image" -> {
+                checkEnum(where, component, "fit", IMAGE_FITS, violations)
+                checkEnum(where, component, "variant", IMAGE_VARIANTS, violations)
+                val url = component["url"].stringOrNull()
+                if (url != null && !url.startsWith("https://")) {
+                    violations += "$where: Image.url 只接受 https:// 公网图片地址（实际 \"$url\"）——相册照片永不出设备，禁本地路径/uri"
+                }
+            }
+            "Icon" -> {
+                val iconName = component["name"]
+                val literal = iconName.stringOrNull()
+                val binding = iconName.objectOrNull()
+                when {
+                    literal != null && literal !in ICON_NAMES ->
+                        violations += "$where: Icon.name \"$literal\" 不在预定义图标集（如 photo/person/star/check/warning/settings/search 等，禁臆造）"
+                    binding?.containsKey("svgPath") == true ->
+                        violations += "$where: Icon.name 禁用 svgPath 自由形式（矢量路径臆造必渲染垃圾），只用预定义图标名或数据绑定"
+                    literal == null && binding?.containsKey("path") != true ->
+                        violations += "$where: Icon.name 必须是预定义图标名字符串或 {\"path\":…} 数据绑定（禁数字/布尔等标量）"
+                    else -> Unit
+                }
+            }
+            "Tabs" -> {
+                val tabs = component["tabs"] as? JsonArray
+                if (tabs == null) {
+                    violations += "$where: Tabs.tabs 必须是 [{\"title\",\"child\"}] 数组"
+                } else {
+                    if (tabs.isEmpty()) violations += "$where: Tabs.tabs 至少一个页签"
+                    tabs.forEachIndexed { ti, item ->
+                        val tab = item.objectOrNull()
+                        if (tab == null) {
+                            violations += "$where: tabs[$ti] 不是对象（须含 title 与 child）"
+                            return@forEachIndexed
+                        }
+                        if (tab["title"].stringOrNull() == null) {
+                            violations += "$where: tabs[$ti] 缺 \"title\" 页签标题"
+                        }
+                        val tabChild = tab["child"].stringOrNull()
+                        if (tabChild == null) {
+                            violations += "$where: tabs[$ti] 缺 \"child\" 组件 id"
+                        } else if (tabChild !in ids) {
+                            violations += "$where: tabs[$ti].child 引用了未定义的组件 id \"$tabChild\""
+                        }
+                    }
+                }
+            }
+            "TextField" -> checkEnum(where, component, "variant", TEXT_FIELD_VARIANTS, violations)
+            "ChoicePicker" -> {
+                checkEnum(where, component, "variant", CHOICE_PICKER_VARIANTS, violations)
+                checkEnum(where, component, "displayStyle", CHOICE_PICKER_DISPLAY_STYLES, violations)
+            }
             "Button" -> {
                 checkEnum(where, component, "variant", BUTTON_VARIANTS, violations)
                 if (component.containsKey("label")) {

@@ -16,10 +16,12 @@ import kotlinx.serialization.json.JsonPrimitive
  *    LLM 书写成功率都有同轮修正机会）。
  *
  * 结构级轻量校验（server 不依赖 :shared，DeviceToolService 字面量副本先例）：
- * 不跑完整 parser，只做正则级五项——root 入口存在性 / 组件名白名单 /
- * Query local_handle 形态 / Query 语句位（禁内联，§2.1）/ program 长度上限
+ * 不跑完整 parser，只做正则级四项——root 入口存在性 / 组件名白名单 /
+ * Query local_handle 形态 / program 长度上限
  * （对齐 render_html 128_000 先例）+ 隐私投影禁令（媒体路径禁入 program）。规则与 shared `OpenUiContract`/`OpenUiLibrary`
  * 字面量副本对齐，改动须双向同步核对。
+ * （2026-10-24 起不再禁内联 Query：端侧引擎已支持内联提升（fix/a2ui 0e5856b10），
+ * 原「内联判 inline-reserved 静默丢弃」根因已根治，服务端不再误杀合法负载。）
  *
  * 近似边界：扫描前剥离字符串字面量与行注释防文案误伤；剥离后仍非完整语法分析，
  * 漏判（放行坏负载）由端侧 engine 降级兜底，误判（错杀好负载）优先避免。
@@ -43,8 +45,6 @@ object RenderOpenUiValidator {
     private val ROOT_STATEMENT = Regex("""(?m)^\s*root\s*=""")
     private val CARD_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Card\s*\(""")
     private val QUERY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(\s*"((?:[^"\\]|\\.)*)"""")
-    private val QUERY_ANY = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(""")
-    private val STMT_ASSIGNMENT_PREFIX = Regex("""\s*${'$'}?\w+\s*=\s*""")
     private val LOCAL_HANDLE_REF = Regex("""local://[^\s"}\],)]*""")
     private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#[^\s"}\],)]+)?""")
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
@@ -63,7 +63,8 @@ object RenderOpenUiValidator {
 
     /** 校验并直接给回错误文本：null = 合法放行。 */
     fun validateToError(program: String): String? =
-        validate(program).takeIf { violations -> violations.isNotEmpty() }?.let(::errorText)
+        validate(program).takeIf { violations -> violations.isNotEmpty() }
+            ?.let { violations -> errorText(violations, program) }
 
     /** 校验核心：返回全部违规描述（空 = 合法）。 */
     fun validate(program: String): List<String> {
@@ -81,7 +82,7 @@ object RenderOpenUiValidator {
         // 剥离字符串字面量与行注释后再扫结构（防文案内容误伤）。
         // 顺序必须是先字符串后注释：handle 里的 local:// 含 //，先剥注释会把
         // 字符串内部截断留下奇数引号，后续字符串全局配对跨行吞掉 root 语句
-        // （2026-10-24 真机事故：合法两步写法被误报「缺 root」死循环）
+        // （2026-10-24 真机事故：合法两步写法被误报「缺 root」死循环烧光 20 迭代）
         val stripped = LINE_COMMENT.replace(STRING_LITERAL.replace(program, "\"\""), "")
 
         // 1. root 入口：root = 语句存在，或存在 Card 调用兜底 entry（spec §2.2）
@@ -117,21 +118,19 @@ object RenderOpenUiValidator {
             violations += "Query(\"local_handle\", …) 缺 handle 参数：args 对象须含 { handle: \"local://scan/<id>#histogram\" }"
         }
 
-        // 4. Query 禁止内联（OpenUI Lang §2.1：Query 只允许独占语句右侧；内联在组件参数
-        //    会判 inline-reserved、组件静默丢弃——2026-10-24 真机柱图消失事故）
-        QUERY_ANY.findAll(stripped).forEach { match ->
-            val lineStart = stripped.lastIndexOf('\n', match.range.first)
-                .let { index -> if (index < 0) 0 else index + 1 }
-            val linePrefix = stripped.substring(lineStart, match.range.first)
-            if (!STMT_ASSIGNMENT_PREFIX.matches(linePrefix)) {
-                violations += "Query 必须独占整条语句右侧（先 `buckets = Query(\"local_handle\", …, [])` 单独成行，组件参数里引用 buckets），禁止内联进组件参数（内联触发 inline-reserved，组件会被静默丢弃）"
-            }
-        }
         return violations
     }
 
-    private fun errorText(violations: List<String>): String = buildString {
+    private fun errorText(violations: List<String>, program: String = ""): String = buildString {
         append("error: render_ui_openui 负载校验未通过，本次未下发端侧。逐条修正后重新调用 render_ui_openui：")
         violations.forEach { violation -> append("\n- ").append(violation) }
+        // 回显收到内容开头（2026-10-24 all_years 事故：LLM 连续 4 次「缺 root」却无法从错误文本
+        // 自纠——回显可定位 markdown 围栏/单行程序/root 非行首类偏差，program 是 LLM 生成的
+        // 骨架（数据禁令保证无用户数据），回显无隐私面）
+        val preview = program.replace("\n", "\\n").take(120)
+        append("\n本次收到 program 开头：").append(preview)
+        if (violations.any { it.startsWith("缺 root") } && program.contains("root")) {
+            append("（注意：你的 program 里出现了 root 但不在行首/被包裹——root = 必须独占一行行首，且 program 不要包 markdown 代码围栏）")
+        }
     }
 }

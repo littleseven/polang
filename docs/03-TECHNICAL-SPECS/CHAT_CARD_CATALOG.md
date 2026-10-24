@@ -812,6 +812,16 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   `AgentRunner.actionGate` 才能拦住坏负载到端）——非法负载不落 Action、不下行、不进 pending
   重放，工具体回 `error: …` 逐条违规清单经 Observation 回灌，LLM 同轮修正重试；工具描述内嵌
   黄金示例 few-shot（`RENDER_UI_EXAMPLE` 常量被测试钉住自身过校验）。
+  **组件白名单 17**（2026-10-24 真机穷举后从 6 扩齐）：catalog 19 组件中放行
+  Text/Image/Icon/Row/Column/List/Card/Tabs/Divider/Button/CheckBox/TextField/ChoicePicker/
+  Slider/DateTimeInput/BarChart——Video/AudioPlayer 端侧仅空盒占位（未引 Media3）故拒之；
+  Image.url 字面量必须 https://（禁本地路径/相册 uri，[PRIVACY] 红线），Icon.name 限 59 枚
+  预定义枚举且禁 svgPath。**假发卡守卫**（同日修复，实测 5/13 用例 LLM 不调 render_ui 就声称
+  「卡片已下发 ✅」）：`CardClaimGuard` 挂 cloudAgentStrategy 的 correctFakeCardClaim 节点——
+  终结消息命中发卡声明模式 + 当轮无卡工具 Action 过门控 → 追加 user 纠正消息就地重发
+  LLM 请求（上限 1 次防死循环），LLM 要么真实调用工具、要么改写回复删除发卡表述；
+  Koog `onTextMessage{block}` 是分片过滤器而非门控（空串也算命中），门控条件必须写
+  `onCondition`（事故记录见 CloudAgentStrategy KDoc）。
 - **parts 形态**：`MessagePart.A2uiCard(partId, surfaceId, messagesJson, fallbackSummary, viewState)`，
   category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7）。
 - **回灌**：不回灌 LLM（ChatModelInput data part 分支 emptyList）；messagesJson 只含骨架+local://
@@ -823,14 +833,17 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   序列化生成并对账（regen 方式见测试类头注释），deploy-docs-site.sh 发布）；
   HandleResolver 填槽，缺失降级占位卡（US-6）。BarChart 柱高公式 = (barAreaHeight −
   barLabelHeight) × count/maxCount（`barChartBarHeight` 纯函数，2026-10-24 修复：
-  满高柱顶满定高 Row 会把柱下月份标签挤出裁掉，单桶图退化为无标签纯色块）。
+  满高柱顶满定高 Row 会把柱下月份标签挤出裁掉，单桶图退化为无标签纯色块）；
+  标签抽稀 `barChartLabelInterval`（同日修复：>12 桶时按 ceil(count/8) 间隔抽稀，
+  选中桶恒显示，抽稀位以同高 Box 占位保持柱底对齐——多月桶标签不再挤成数字串）。
 - **交互态**：BarChart 点柱 → selectBucket 事件本地消费（不上行）→ 回写数据模型
   `/selected` 高亮 + viewState `selected=<label>` 持久化（US-7 恢复填槽同路径）。
   **防御纵深**（2026-10-24 sf-012a0 事故）：契约要求蓝图 selected 写 `{"path":"/selected"}`
   数据绑定；LLM 偶发写裸字符串字面量（不订阅数据模型 → 高亮静默失效），HandleResolver
   对 updateComponents 内 BarChart 组件归一化改绑（非空字面量播种为初始选中），
   纯函数 `normalizeBarChartSelectedBinding`，同 data 批量展开先例。
-- **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui 下发
+- **端到端例子**：「统计我今年的照片」→ search_media（display=false 取数不出图集卡，
+  2026-10-24 门控）命中注册 handle → 云端 render_ui 下发
   BarChart 骨架（buckets 绑定 local://scan/<id>#histogram）→ 端上月桶填槽渲染。
 - **调试入口（DEBUG 构建）**：Ready 态卡右上角挂 debug 徽标（`A2UI v0.9 · sf-xxxxxxxx`，
   `A2uiDebugBadge`），点击开蓝图查看器（AlertDialog 逐条列 createSurface/updateComponents/

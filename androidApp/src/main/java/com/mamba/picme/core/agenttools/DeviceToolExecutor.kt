@@ -20,7 +20,7 @@ import org.json.JSONObject
  */
 class DeviceToolExecutor(
     private val gallerySummary: suspend () -> String,
-    private val searchMedia: suspend (String, String, String, String, String) -> String,
+    private val searchMedia: suspend (String, String, String, String, String, String) -> String,
     private val refineSearch: suspend (String, String, String) -> String,
 ) {
 
@@ -34,6 +34,8 @@ class DeviceToolExecutor(
                     args.optString("fromMs"),
                     args.optString("toMs"),
                     args.optString("hasFace"),
+                    // 旧版 server 不下发该参数时缺省 "false"（不出卡），安全侧缺省
+                    args.optString("display", "false"),
                 )
                 CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> refineSearch(
                     args.optString("constraint"),

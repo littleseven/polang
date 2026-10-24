@@ -18,12 +18,13 @@ class DeviceToolServiceTest {
             // 模拟端侧上行：写帧后立即补结果
             bridge.complete(frame.requestId, "找到 3 张猫")
         }
-        val result = service.searchMedia("猫", "", "", "", "")
+        val result = service.searchMedia("猫", "", "", "", "", "false")
         assertEquals("找到 3 张猫", result)
         assertEquals(1, frames.size)
         val frame = frames.single()
         assertEquals("search_media", frame.tool)
         assertEquals("猫", frame.args["query"]!!.jsonPrimitive.content)
+        assertEquals("false", frame.args["display"]!!.jsonPrimitive.content)
         assertTrue(frame.requestId.startsWith("tr_"))
         assertEquals(DeviceToolService.DEFAULT_TIMEOUT_MS, frame.timeoutMs)
         // 帧 JSON 线格式钉死（spec §3.1）

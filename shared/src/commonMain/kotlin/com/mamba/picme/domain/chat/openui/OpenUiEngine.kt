@@ -95,6 +95,54 @@ class OpenUiSession(
         // 重名后写覆盖（§2.4）
         val byName = linkedMapOf<String, OpenUiStatement>()
         parsed.statements.forEach { statement -> byName[statement.name] = statement }
+
+        // 内联 Query 提升（2026-10-24 all_years 事故：LLM 用命名实参把 buckets=Query(...) 内联进
+        // BarChart 调用，值位置 inline-reserved 禁则致整条卡降级）：非语句右值位置的 QueryCall
+        // 提升为合成 QUERY 语句（prepare 期统一求值一次的语义不变，applyAction 重求值仍读缓存），
+        // 原位留 Ref。Mutation 保持不执行，不做提升。
+        var hoistCounter = 0
+        val synthetic = mutableListOf<OpenUiStatement>()
+        fun hoist(node: OpenUiExpr): OpenUiExpr = when (node) {
+            is OpenUiExpr.QueryCall -> {
+                var name = "__inline_query_${hoistCounter++}"
+                while (byName.containsKey(name) || synthetic.any { it.name == name }) {
+                    name = "__inline_query_${hoistCounter++}"
+                }
+                synthetic += OpenUiStatement(name, OpenUiStatementKind.QUERY, node)
+                OpenUiExpr.Ref(name)
+            }
+            is OpenUiExpr.Assign -> node.copy(value = hoist(node.value))
+            is OpenUiExpr.Arr -> node.copy(items = node.items.map { element -> hoist(element) })
+            is OpenUiExpr.Obj -> node.copy(entries = node.entries.map { (key, v) -> key to hoist(v) })
+            is OpenUiExpr.CompCall -> node.copy(args = node.args.map { arg -> hoist(arg) })
+            is OpenUiExpr.AtCall -> node.copy(args = node.args.map { arg -> hoist(arg) })
+            is OpenUiExpr.ActionCall -> node.copy(args = node.args.map { arg -> hoist(arg) })
+            is OpenUiExpr.Member -> node.copy(target = hoist(node.target))
+            is OpenUiExpr.Index -> node.copy(target = hoist(node.target), index = hoist(node.index))
+            is OpenUiExpr.Unary -> node.copy(operand = hoist(node.operand))
+            is OpenUiExpr.Binary -> node.copy(left = hoist(node.left), right = hoist(node.right))
+            is OpenUiExpr.Ternary -> node.copy(
+                cond = hoist(node.cond),
+                then = hoist(node.then),
+                otherwise = hoist(node.otherwise),
+            )
+            else -> node
+        }
+        val hoisted = byName.values.toList().map { statement ->
+            val expr = statement.expr
+            if (statement.kind == OpenUiStatementKind.QUERY && expr is OpenUiExpr.QueryCall) {
+                // 语句右值本身的 QueryCall 不提升，只深入其 args（嵌套 Query 仍提升）
+                OpenUiStatement(
+                    statement.name,
+                    statement.kind,
+                    expr.copy(args = expr.args.map { arg -> hoist(arg) }),
+                )
+            } else {
+                OpenUiStatement(statement.name, statement.kind, hoist(expr))
+            }
+        }
+        byName.clear()
+        (hoisted + synthetic).forEach { statement -> byName[statement.name] = statement }
         statements = byName
         orderedStatements = byName.values.toList()
 

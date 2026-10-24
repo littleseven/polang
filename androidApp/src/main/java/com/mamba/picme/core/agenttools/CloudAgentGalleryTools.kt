@@ -39,11 +39,16 @@ class CloudAgentGalleryTools(
     private val searchByFilter: suspend (filter: StructuredFilter, limitToIds: Set<Long>?) -> List<MediaAsset>,
     private val gallerySummary: suspend (includeDetails: Boolean) -> GallerySummary?,
     private val localHandleStore: LocalHandleStore,
+    private val allPhotos: suspend () -> List<MediaAsset>,
 ) {
 
     private val tag = "CloudAgentGalleryTools"
 
     private val handleJson = Json { encodeDefaults = true }
+
+    /** display=true 且图集卡实际透出时的回执尾注（search/refine 共用，见 searchMedia 内注释）。 */
+    private val CARD_SHOWN_NOTE =
+        "，横滑图集卡已在聊天中展示（用户可直接翻看；回复时告知照片已在上方卡片展示即可，无需再搜索/细化/发卡）"
 
     /**
      * 图集卡透出回调（云端 Agent 图集卡恢复，2026-10-20）：搜索/细化命中非空时回调完整的
@@ -58,6 +63,9 @@ class CloudAgentGalleryTools(
     /** refine_media_search 的搜索基数（chat 链路 lastResultAssets 的无头等价物，单槽位即可——云端会话串行）。 */
     private val refineBaseMutex = Mutex()
     private var refineBase: List<MediaAsset> = emptyList()
+
+    /** refine 的图集卡透出跟随产生基数的 search_media 的 display 意图（同 mutex 保护）。 */
+    private var refineDisplay = false
 
     /** 命中集注册本地句柄，返回 opaque token（无 uri——D2 结构保证）。 */
     private suspend fun registerScanHandle(photos: List<MediaAsset>): String {
@@ -97,19 +105,29 @@ class CloudAgentGalleryTools(
         return summary?.let { formatGallerySummaryForReply(it) } ?: GALLERY_SUMMARY_UNAVAILABLE_HINT
     }
 
+    /**
+     * @param display "true" = 用户明确想浏览/挑选照片本身，命中集透出为横滑图集卡；
+     * 其余（统计/计数/为 render_ui 发卡取数）一律 "false"，卡片不打扰（2026-10-24
+     * 真机实测事故类：取数型搜索无脑出图集卡刷屏）。
+     */
     suspend fun searchMedia(
         query: String,
         person: String,
         fromMs: String,
         toMs: String,
         hasFace: String,
+        display: String,
     ): String {
         val intent = GallerySearchIntents.structuredSearchIntent(query, person, fromMs, toMs, hasFace)
         val photos = try {
-            if (intent != null) {
-                searchByFilter(ChatGallerySearch.structuredFilterOf(intent, query), null)
-            } else {
-                searchByQuery(query, null)
+            when {
+                intent != null ->
+                    searchByFilter(ChatGallerySearch.structuredFilterOf(intent, query), null)
+                // 空 query 且无结构化约束 = 全量语义（LLM 把「我所有照片」剥光约束后只剩空串）。
+                // 语义搜索 blank 短路返回空（MediaSearchEngine.search L99），空过滤器交集也是空集，
+                // 全集必须走独立取数通道——否则 LLM 只能拿 fromMs=0 撞大运（2026-10-24 all_years 实测）
+                query.isBlank() -> allPhotos()
+                else -> searchByQuery(query, null)
             }.filter { it.type == MediaType.PHOTO }
         } catch (e: CancellationException) {
             throw e
@@ -117,14 +135,21 @@ class CloudAgentGalleryTools(
             Logger.w(tag, "searchMedia failed for '$query'", e)
             return "error: ${e.message ?: "search failed"}"
         }
-        refineBaseMutex.withLock { refineBase = photos }
-        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size}")
+        val showCard = display == "true"
+        refineBaseMutex.withLock { refineBase = photos; refineDisplay = showCard }
+        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size} display=$showCard")
         // 空命中不注册句柄：空集句柄是无意义锚点 + 垃圾行，与 refine 空分支同口径
+        val displayQuery = query.ifBlank { "全部" }
         if (photos.isEmpty()) {
-            return "找到 0 张「$query」的照片"
+            return "找到 0 张「$displayQuery」的照片"
         }
-        mediaResultsListener?.invoke(query, photos, photos.size, false)
-        return appendHandleSuffix("找到 ${photos.size} 张「$query」的照片", photos)
+        // 卡实际透出（display=true 且监听器在位）时回执必须明说：LLM 只看得见文本回执，
+        // 不说它会认为「没有照片清单」继续 refine 甚至声称发卡失败——
+        // 2026-10-24 browse_carousel 事故：卡已出，终结消息却写「没能把照片图集发给你」
+        val cardShown = showCard && mediaResultsListener != null
+        if (cardShown) mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
+        val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
+        return appendHandleSuffix("找到 ${photos.size} 张「$displayQuery」的照片$cardNote", photos)
     }
 
     suspend fun refineMediaSearch(constraint: String, fromMs: String, toMs: String): String {
@@ -157,7 +182,10 @@ class CloudAgentGalleryTools(
         }
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
-        mediaResultsListener?.invoke(constraint, refined, refined.size, true)
-        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} 张「$constraint」的照片", refined)
+        // 透出跟随基数搜索的 display 意图：取数型搜索的细化同样不出卡
+        val cardShown = refineDisplay && mediaResultsListener != null
+        if (cardShown) mediaResultsListener?.invoke(constraint, refined, refined.size, true)
+        val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
+        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} 张「$constraint」的照片$cardNote", refined)
     }
 }

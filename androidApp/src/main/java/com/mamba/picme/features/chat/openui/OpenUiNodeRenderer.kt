@@ -2,6 +2,7 @@ package com.mamba.picme.features.chat.openui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -23,13 +26,19 @@ import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.features.chat.a2ui.A2uiStyleMapper
+import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_BAR_WIDTH
+import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_THRESHOLD
+import com.mamba.picme.features.chat.a2ui.BarChartBucketLabel
+import com.mamba.picme.features.chat.a2ui.barChartBarHeight
+import com.mamba.picme.features.chat.a2ui.barChartLabelInterval
 
 /**
  * OpenUI 组件树 → Compose 递归渲染（openui P2；与 OpenUiLibrary 六组件一一对应）。
  *
  * 语义样式令牌（role/colorRole/spacing）只读复用 [A2uiStyleMapper]（两线同一套
  * Design Token 映射，保证双端/双线视觉一致）；BarChart 视觉与 PolangBarChartComponent
- * 逐项对齐（同一 A2uiCardTokens + primary 色 + 选中高亮规则）。
+ * 逐项对齐（同一 A2uiCardTokens + 柱高公式 barChartBarHeight + 标签抽稀
+ * barChartLabelInterval + primary 色 + 选中高亮规则）。
  *
  * 半信任输入防御：未知组件/null 字面量 → 空 Box 占位，不炸整卡；BarChart buckets
  * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）。
@@ -147,25 +156,40 @@ private fun OpenUiBarChart(
     }
     val maxCount = buckets.maxOf { bucket -> bucket.count }.coerceAtLeast(1)
     val barColor = MaterialTheme.colorScheme.primary
+    // 多桶抽稀：与 PolangBarChartComponent 同一 barChartLabelInterval（all_years ~80 桶
+    // 全量标签叠成数字串的事故在 A2UI 侧已修，此处保持逐项对齐）
+    val labelInterval = barChartLabelInterval(buckets.size)
+    // 超多桶横滑模式（同 PolangBarChartComponent：桶数过阈 weight 列归零，柱体隐身）
+    val scrollMode = buckets.size > BAR_CHART_SCROLL_THRESHOLD
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
             Text(text = text, style = MaterialTheme.typography.titleSmall)
         }
         Row(
-            modifier = Modifier.fillMaxWidth().height(A2uiCardTokens.barAreaHeight),
+            modifier = (
+                if (scrollMode) {
+                    Modifier.horizontalScroll(rememberScrollState())
+                } else {
+                    Modifier.fillMaxWidth()
+                }
+                ).height(A2uiCardTokens.barAreaHeight),
             horizontalArrangement = Arrangement.spacedBy(A2uiCardTokens.barGap),
             verticalAlignment = Alignment.Bottom,
         ) {
-            for (bucket in buckets) {
+            buckets.forEachIndexed { index, bucket ->
                 val isSelected = bucket.label == selected
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(1f),
+                    modifier = if (scrollMode) {
+                        Modifier.width(BAR_CHART_SCROLL_BAR_WIDTH)
+                    } else {
+                        Modifier.weight(1f)
+                    },
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(A2uiCardTokens.barAreaHeight * bucket.count / maxCount)
+                            .height(barChartBarHeight(bucket.count, maxCount))
                             .background(
                                 if (isSelected) barColor
                                 else barColor.copy(alpha = A2uiCardTokens.barUnselectedAlpha)
@@ -180,7 +204,16 @@ private fun OpenUiBarChart(
                                 )
                             }
                     )
-                    Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                    // 抽稀位也占满标签高：柱底对齐依赖「柱+标签」恒高（barChartBarHeight KDoc）
+                    if (index % labelInterval == 0 || isSelected) {
+                        if (labelInterval > 1) {
+                            BarChartBucketLabel(bucket.label)
+                        } else {
+                            Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                        }
+                    } else {
+                        Box(modifier = Modifier.height(A2uiCardTokens.barLabelHeight))
+                    }
                 }
             }
         }

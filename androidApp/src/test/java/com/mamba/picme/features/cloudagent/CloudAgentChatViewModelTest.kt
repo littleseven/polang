@@ -94,13 +94,14 @@ class CloudAgentChatViewModelTest {
             api,
             DeviceToolExecutor(
                 gallerySummary = { "相册 42 张" },
-                searchMedia = { _, _, _, _, _ -> "找到 0 张" },
+                searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
                 refineSearch = { _, _, _ -> "error: no base" },
             ),
             repository,
             CloudAgentGalleryTools(
                 searchByQuery = { _, _ -> emptyList() },
                 searchByFilter = { _, _ -> emptyList() },
+                allPhotos = { emptyList() },
                 gallerySummary = { null },
                 localHandleStore = LocalHandleStore(FakeLocalHandleDao()),
             ),

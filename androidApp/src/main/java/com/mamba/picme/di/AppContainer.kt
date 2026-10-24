@@ -150,6 +150,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class MediaViewModelDependencies(
     val repository: AndroidMediaRepository,
@@ -1175,6 +1176,9 @@ class AppContainerImpl(
             },
             gallerySummary = { includeDetails -> getGallerySummaryUseCase(includeDetails) },
             localHandleStore = localHandleStore,
+            // 空 query 全量通道：语义搜索 blank 短路返回空，全相册须直取 repository 快照；
+            // allMedia 冷缓存是全库 MediaStore 查询（万级 200-500ms），必须离开主线程
+            allPhotos = { withContext(Dispatchers.IO) { repository.allMedia.first() } },
         )
     }
 
@@ -1189,8 +1193,8 @@ class AppContainerImpl(
     private val deviceToolExecutor: DeviceToolExecutor by lazy {
         DeviceToolExecutor(
             gallerySummary = { cloudAgentGalleryTools.getGallerySummary() },
-            searchMedia = { query, person, fromMs, toMs, hasFace ->
-                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace)
+            searchMedia = { query, person, fromMs, toMs, hasFace, display ->
+                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace, display)
             },
             refineSearch = { constraint, fromMs, toMs ->
                 cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)

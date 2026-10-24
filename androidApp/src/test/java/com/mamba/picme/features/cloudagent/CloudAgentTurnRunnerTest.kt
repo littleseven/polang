@@ -55,7 +55,7 @@ class CloudAgentTurnRunnerTest {
 
     private fun newRunner(api: FakeApi, executor: DeviceToolExecutor = DeviceToolExecutor(
         gallerySummary = { "相册 42 张" },
-        searchMedia = { _, _, _, _, _ -> "找到 0 张" },
+        searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
         refineSearch = { _, _, _ -> "error: no base" },
     )) = CloudAgentTurnRunner(api, executor, CoroutineScope(UnconfinedTestDispatcher()))
 

@@ -1,10 +1,16 @@
 package com.mamba.picme.server.agent
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * render_ui 负载校验器测试：每个违规类一例 + 黄金示例/合法夹具全过。
@@ -193,9 +199,134 @@ class RenderUiValidatorTest {
 
     @Test
     fun `component outside allowlist`() {
+        // Video/AudioPlayer 端侧是空盒占位渲染（PolangA2uiCatalog），未实装即不开放
         assertHasViolation(
-            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Image","url":"https://x.co/a.png"}""")),
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Video","url":"https://x.co/a.mp4"}""")),
             "不在白名单",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"AudioPlayer","url":"https://x.co/a.mp3"}""")),
+            "不在白名单",
+        )
+    }
+
+    @Test
+    fun `full seventeen component card passes`() {
+        val json = envelopeArray(
+            createSurface(),
+            updateComponents(
+                """
+                {"id":"root","component":"Column","children":["t","img","ic","row","list","card","tabs","modal","div","btn","tf","cb","cp","sl","dt","chart"],"justify":"spaceBetween","align":"center"},
+                {"id":"t","component":"Text","text":"标题","variant":"h3"},
+                {"id":"img","component":"Image","url":"https://x.co/a.png","fit":"cover","variant":"header"},
+                {"id":"ic","component":"Icon","name":"photo"},
+                {"id":"row","component":"Row","children":["t2"],"justify":"start","align":"stretch"},
+                {"id":"t2","component":"Text","text":"行内"},
+                {"id":"list","component":"List","children":["t3"],"direction":"horizontal","align":"start"},
+                {"id":"t3","component":"Text","text":"列表项"},
+                {"id":"card","component":"Card","child":"t4"},
+                {"id":"t4","component":"Text","text":"卡内"},
+                {"id":"tabs","component":"Tabs","tabs":[{"title":"页一","child":"t5"}]},
+                {"id":"t5","component":"Text","text":"页签内容"},
+                {"id":"modal","component":"Modal","trigger":"btn","content":"t6"},
+                {"id":"t6","component":"Text","text":"弹层"},
+                {"id":"div","component":"Divider","axis":"vertical"},
+                {"id":"btn","component":"Button","child":"btn-label","action":{"event":{"name":"go"}},"variant":"borderless"},
+                {"id":"btn-label","component":"Text","text":"点我"},
+                {"id":"tf","component":"TextField","label":"名字","variant":"shortText"},
+                {"id":"cb","component":"CheckBox","label":"同意","value":true},
+                {"id":"cp","component":"ChoicePicker","options":[{"label":"A","value":"a"}],"value":["a"],"variant":"multipleSelection","displayStyle":"chips"},
+                {"id":"sl","component":"Slider","label":"强度","value":5,"min":0,"max":10},
+                {"id":"dt","component":"DateTimeInput","label":"时间","value":"2026-10-24","enableDate":true},
+                {"id":"chart","component":"BarChart","buckets":{"path":"/buckets"},"selected":{"path":"/selected"}}
+                """,
+            ),
+            updateData("/buckets", "\"local://scan/ab12cd34#histogram\""),
+            updateData("/selected", "\"2026-10\""),
+        )
+        assertEquals(emptyList<String>(), RenderUiValidator.validate(sid, json))
+    }
+
+    @Test
+    fun `image url must be https public address`() {
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Image","url":"content://media/1"}""")),
+            "https://",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Image","url":"file:///storage/emulated/0/a.jpg"}""")),
+            "https://",
+        )
+    }
+
+    @Test
+    fun `icon name outside predefined set rejected`() {
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Icon","name":"beautify"}""")),
+            "不在预定义图标集",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Icon","name":{"svgPath":"M0 0h24"}}""")),
+            "svgPath",
+        )
+        // 非字符串非绑定标量（数字/布尔）不得落空放行
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Icon","name":123}""")),
+            "数据绑定",
+        )
+    }
+
+    /** ICON_NAMES 手抄副本防漂移：与官网 catalog 描述文件逐项对账（server 独立检出无该文件时跳过）。 */
+    @Test
+    fun `icon names stay in sync with published catalog descriptor`() {
+        val catalogFile = File("../docs-site/a2ui/catalog/v1.json")
+        assumeTrue("server 独立检出无官网目录，跳过对账", catalogFile.isFile)
+        val enum = Json.parseToJsonElement(catalogFile.readText())
+            .jsonObject.getValue("components").jsonObject
+            .getValue("Icon").jsonObject
+            .getValue("properties").jsonObject
+            .getValue("name").jsonObject
+            .getValue("oneOf").jsonArray[0].jsonObject
+            .getValue("enum").jsonArray
+            .map { it.jsonPrimitive.content }.toSet()
+        assertEquals(
+            "RenderUiValidator.ICON_NAMES 与 docs-site catalog v1.json Icon 枚举漂移",
+            enum,
+            RenderUiValidator.ICON_NAMES,
+        )
+    }
+
+    @Test
+    fun `tabs items must reference defined children`() {
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Tabs","tabs":[{"title":"一","child":"ghost"}]}""")),
+            "未定义的组件 id \"ghost\"",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Tabs","tabs":[]}""")),
+            "至少一个页签",
+        )
+        assertHasViolation(
+            envelopeArray(
+                createSurface(),
+                updateComponents(
+                    """{"id":"root","component":"Tabs","tabs":[{"child":"t"}]},""" +
+                        """{"id":"t","component":"Text","text":"x"}""",
+                ),
+            ),
+            "缺 \"title\"",
+        )
+    }
+
+    @Test
+    fun `layout enums validated`() {
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Row","children":[],"justify":"diagonal"}""")),
+            "非法值 \"diagonal\"",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"List","children":[],"direction":"diagonal"}""")),
+            "非法值 \"diagonal\"",
         )
     }
 

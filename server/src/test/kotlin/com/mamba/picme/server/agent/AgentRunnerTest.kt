@@ -367,4 +367,122 @@ class AgentRunnerTest {
     /** toolCallResponse 把 args 平铺进 JSON 字符串字段，内嵌引号/反斜杠须预转义。 */
     private fun jsonArgsEscape(raw: String): String =
         raw.replace("\\", "\\\\").replace("\"", "\\\"")
+
+    // ── 假发卡纠正回环（CardClaimGuard，2026-10-24 穷举实测事故类）──────────
+
+    /**
+     * 终结消息声称发卡但当轮无卡工具 Action：策略层不落该答复，追加纠正消息回环重答，
+     * 最终落流的只有改写后的答复；第二轮 LLM 请求的 prompt 必须携带纠正指令。
+     */
+    @Test
+    fun `fake card claim is intercepted and re-answered with correction prompt`() = runBlocking {
+        val session = newSession()
+        val bodies = mutableListOf<String>()
+        val responses = ArrayDeque(
+            listOf(
+                chatResponse("三种按钮样式卡片已下发 ✅"),
+                chatResponse("三种按钮样式分别为 primary/default/borderless，请告诉我要生成哪种。"),
+            ),
+        )
+        val engine = MockEngine { request ->
+            bodies += (request.body as io.ktor.http.content.TextContent).text
+            respond(
+                content = responses.removeFirst(),
+                status = HttpStatusCode.OK,
+                headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+            )
+        }
+        val runner = AgentRunner(
+            executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
+            dispatcher = ServerToolDispatcher.default(),
+        )
+        val finish = runner.runTurn(session, "生成三个按钮的卡", gatewayTarget, "sys", ServerToolService.defaultRegistry())
+
+        assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+        assertEquals("假声称应触发一次回环重答（共 2 次 LLM 调用）", 2, bodies.size)
+        assertTrue("第二轮 prompt 应携带纠正指令", bodies[1].contains("并未成功调用"))
+        val events = AgentEventRepository.listBySession(session.id)
+        val assistantTexts = events
+            .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
+            .map { event -> (event.payload as AgentEventPayload.Message).content }
+        assertEquals(
+            "假声称的那条答复不得落流（用户不可见）",
+            listOf("三种按钮样式分别为 primary/default/borderless，请告诉我要生成哪种。"),
+            assistantTexts,
+        )
+    }
+
+    /** 真发过卡的终结消息不误伤：单轮一次 LLM 调用直接收尾。 */
+    @Test
+    fun `card claim after real render_ui action is not intercepted`() = runBlocking {
+        val session = newSession()
+        val goodArgs = buildJsonObject {
+            put("surfaceId", "sf-ok000002")
+            put(
+                "messagesJson",
+                "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-ok000002\",\"catalogId\":\"${RenderUiValidator.CATALOG_ID}\"}}," +
+                    "{\"version\":\"v0.9\",\"updateComponents\":{\"surfaceId\":\"sf-ok000002\",\"components\":[{\"id\":\"root\",\"component\":\"Text\",\"text\":\"hi\"}]}}]",
+            )
+            put("fallbackSummary", "摘要")
+        }.toString()
+        val registry = ToolRegistry { tools(RenderUiToolService().asToolsByClass()) }
+
+        runnerWith(
+            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui", jsonArgsEscape(goodArgs)),
+            HttpStatusCode.OK to chatResponse("卡片已下发 ✅"),
+            actionGate = RenderUiValidator::gate,
+        ).runTurn(session, "发张统计卡", gatewayTarget, "sys", registry)
+
+        val events = AgentEventRepository.listBySession(session.id)
+        val assistantTexts = events
+            .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
+            .map { event -> (event.payload as AgentEventPayload.Message).content }
+        assertEquals(listOf("卡片已下发 ✅"), assistantTexts)
+    }
+
+    /**
+     * 门控拒绝后的假声称仍触发纠正（review 补洞）：render_ui 坏负载被发射点门控拦下
+     * （不落 Action），工具体 error 回灌后 LLM 若仍声称「卡片已下发」，守卫不得因
+     * 「调用过工具」而放行——标记只认工具成功回执。
+     */
+    @Test
+    fun `fake claim after gated render_ui rejection is still corrected`() = runBlocking {
+        val session = newSession()
+        val bodies = mutableListOf<String>()
+        val badArgs = jsonArgsEscape("""{"surfaceId":"sf-bad","messagesJson":"[]"}""")
+        val responses = ArrayDeque(
+            listOf(
+                toolCallResponse("call_1", "render_ui", badArgs),
+                chatResponse("卡片已下发 ✅"),
+                chatResponse("抱歉，卡片参数有误未能生成，请换个描述再试。"),
+            ),
+        )
+        val engine = MockEngine { request ->
+            bodies += (request.body as io.ktor.http.content.TextContent).text
+            respond(
+                content = responses.removeFirst(),
+                status = HttpStatusCode.OK,
+                headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+            )
+        }
+        val runner = AgentRunner(
+            executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
+            dispatcher = ServerToolDispatcher.default(),
+            actionGate = RenderUiValidator::gate,
+        )
+        runner.runTurn(session, "发卡", gatewayTarget, "sys", ToolRegistry { tools(RenderUiToolService().asToolsByClass()) })
+
+        assertEquals("被拒卡 + 假声称 + 纠正重答 = 3 次 LLM 调用", 3, bodies.size)
+        assertTrue("第三轮 prompt 应携带纠正指令", bodies[2].contains("并未成功调用"))
+        val events = AgentEventRepository.listBySession(session.id)
+        assertEquals(
+            "被拒负载不落 Action",
+            0,
+            events.count { event -> event.type == AgentEventType.ACTION },
+        )
+        val assistantTexts = events
+            .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
+            .map { event -> (event.payload as AgentEventPayload.Message).content }
+        assertEquals(listOf("抱歉，卡片参数有误未能生成，请换个描述再试。"), assistantTexts)
+    }
 }
