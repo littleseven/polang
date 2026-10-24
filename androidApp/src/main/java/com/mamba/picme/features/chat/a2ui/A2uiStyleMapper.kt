@@ -33,7 +33,9 @@ object A2uiStyleMapper {
     @Composable
     fun color(role: A2uiColorRole?): Color = when (role) {
         A2uiColorRole.PRIMARY -> MaterialTheme.colorScheme.primary
-        A2uiColorRole.SURFACE -> MaterialTheme.colorScheme.surfaceVariant
+        // SURFACE 仅被文字色消费：surfaceVariant 是填充色，在卡面上隐形
+        // （2026-10-24 真机仪表盘小字全隐形事故）——M3 弱化文字正解是 onSurfaceVariant
+        A2uiColorRole.SURFACE -> MaterialTheme.colorScheme.onSurfaceVariant
         A2uiColorRole.ERROR -> MaterialTheme.colorScheme.error
         A2uiColorRole.ON_SURFACE,
         null -> MaterialTheme.colorScheme.onSurface
