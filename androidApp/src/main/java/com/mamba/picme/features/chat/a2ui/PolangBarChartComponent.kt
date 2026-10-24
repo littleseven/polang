@@ -6,17 +6,23 @@ import androidx.a2ui.compose.runtime.A2uiProperty
 import androidx.a2ui.compose.ui.A2uiComponent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 
@@ -61,12 +67,21 @@ class PolangBarChartComponent : A2uiComponent {
         val barColor = MaterialTheme.colorScheme.primary
         // 多桶抽稀（2026-10-24 all_years 事故：~80 桶标签全量渲染叠成一坨数字串）
         val labelInterval = barChartLabelInterval(buckets.size)
+        // 超多桶横滑模式（2026-10-24 all_years 二次事故：~310 桶时间距先吃光宽度，weight 列
+        // 归零 → 柱体隐身、标签逐字竖排）：桶数过阈后改横滑，每柱定宽，标签随抽稀加宽不折行
+        val scrollMode = buckets.size > BAR_CHART_SCROLL_THRESHOLD
         Column(modifier = modifier.fillMaxWidth()) {
             title?.let { text ->
                 Text(text = text, style = A2uiStyleMapper.textStyle(titleRole ?: A2uiTextRole.SUBHEAD))
             }
             Row(
-                modifier = Modifier.fillMaxWidth().height(A2uiCardTokens.barAreaHeight),
+                modifier = (
+                    if (scrollMode) {
+                        Modifier.horizontalScroll(rememberScrollState())
+                    } else {
+                        Modifier.fillMaxWidth()
+                    }
+                    ).height(A2uiCardTokens.barAreaHeight),
                 horizontalArrangement = Arrangement.spacedBy(A2uiCardTokens.barGap),
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -74,7 +89,11 @@ class PolangBarChartComponent : A2uiComponent {
                     val isSelected = bucket.label == selected
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f),
+                        modifier = if (scrollMode) {
+                            Modifier.width(BAR_CHART_SCROLL_BAR_WIDTH)
+                        } else {
+                            Modifier.weight(1f)
+                        },
                     ) {
                         Box(
                             modifier = Modifier
@@ -97,7 +116,11 @@ class PolangBarChartComponent : A2uiComponent {
                         )
                         // 抽稀位也占满标签高：柱底对齐依赖「柱+标签」恒高（barChartBarHeight KDoc）
                         if (index % labelInterval == 0 || isSelected) {
-                            Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                            if (labelInterval > 1) {
+                                BarChartBucketLabel(bucket.label)
+                            } else {
+                                Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                            }
                         } else {
                             Box(modifier = Modifier.height(A2uiCardTokens.barLabelHeight))
                         }
@@ -165,3 +188,27 @@ internal fun barChartLabelInterval(bucketCount: Int): Int {
 
 private const val MAX_UNTHINNED_LABELS = 12
 private const val MAX_VISIBLE_LABELS = 8
+
+// ── 横滑模式（两线共享：PolangBarChartComponent + OpenUiBarChart） ─────────────
+
+/** 桶数阈值：超过后柱区切横滑（weight 分列在时间距吃光宽度后会归零——2026-10-24 all_years 二次事故）。 */
+internal const val BAR_CHART_SCROLL_THRESHOLD = 24
+
+/** 横滑模式单柱宽（间距仍走 token barGap）。 */
+internal val BAR_CHART_SCROLL_BAR_WIDTH = 12.dp
+
+/** 抽稀标签定宽：抽稀位邻居是空占位，宽出部分不重叠；不折行防逐字竖排。 */
+internal val BAR_CHART_LABEL_WIDTH = 56.dp
+
+/** 抽稀后的桶标签：定宽、单行、不折行、居中（柱列中心对齐由调用侧 Column 保证）。 */
+@Composable
+internal fun BarChartBucketLabel(label: String, modifier: Modifier = Modifier) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        modifier = modifier.requiredWidth(BAR_CHART_LABEL_WIDTH),
+        maxLines = 1,
+        softWrap = false,
+        textAlign = TextAlign.Center,
+    )
+}
