@@ -165,6 +165,7 @@ import com.mamba.picme.R
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.features.chat.a2ui.A2uiCardDegraded
 import com.mamba.picme.features.chat.a2ui.A2uiCardHost
+import com.mamba.picme.features.chat.openui.OpenUiCardHost
 import com.mamba.picme.features.chat.a2ui.polangA2uiCatalog
 import androidx.a2ui.model.catalog.functions.A2uiUrlOpener
 import androidx.compose.material.icons.outlined.Menu
@@ -320,6 +321,10 @@ fun ChatScreen(
     // catalog 的 urlOpener 桥到 Compose uriHandler（卡内链接经系统浏览器打开）
     val a2uiHandleResolver = remember {
         (context.applicationContext as PoLangApplication).container.a2uiHandleResolver
+    }
+    // openui P2：OpenUI 卡 local_handle Query 取数接缝（与 A2UI 共用同一 LocalHandleStore）
+    val openUiHandleLookup = remember {
+        (context.applicationContext as PoLangApplication).container.localHandleLookup
     }
     val uriHandler = LocalUriHandler.current
     val polangA2uiCatalog = remember(uriHandler) {
@@ -847,6 +852,20 @@ fun ChatScreen(
                                                 viewModel.persistA2uiViewStateAsync(item.message.id, viewState)
                                             },
                                             degradedContent = { summary -> A2uiCardDegraded(summary) },
+                                        )
+                                    }
+                                }
+                                ChatListItem.TYPE_OPENUI_CARD -> {
+                                    // openui P2：data_ui_openui 卡——session 求值渲染（US-7 对偶：
+                                    // 交互态经 onViewStateChange 持久化）；handle 缺失等 → 降级占位卡
+                                    val part = item.part as? MessagePart.OpenUiCard
+                                    if (part != null) {
+                                        OpenUiCardHost(
+                                            part = part,
+                                            handleLookup = openUiHandleLookup,
+                                            onViewStateChange = { viewState ->
+                                                viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
+                                            },
                                         )
                                     }
                                 }
