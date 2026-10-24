@@ -813,7 +813,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   绑定，handle id 对云 opaque（D2）。
 - **渲染**：ChatScreen TYPE_A2UI_CARD → A2uiCardHost（androidx.a2ui 官方渲染器，
   polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract）；
-  HandleResolver 填槽，缺失降级占位卡（US-6）。
+  HandleResolver 填槽，缺失降级占位卡（US-6）。BarChart 柱高公式 = (barAreaHeight −
+  barLabelHeight) × count/maxCount（`barChartBarHeight` 纯函数，2026-10-24 修复：
+  满高柱顶满定高 Row 会把柱下月份标签挤出裁掉，单桶图退化为无标签纯色块）。
 - **交互态**：BarChart 点柱 → selectBucket 事件本地消费（不上行）→ 回写数据模型
   `/selected` 高亮 + viewState `selected=<label>` 持久化（US-7 恢复填槽同路径）。
   **防御纵深**（2026-10-24 sf-012a0 事故）：契约要求蓝图 selected 写 `{"path":"/selected"}`
