@@ -30,12 +30,19 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  * ⚠️ Koog 1.3.0 EventHandler 的 Interceptor 是**同步非 suspend** 接口（javap 核实），
  * 钩子内落库只能 runBlocking 桥到 Dispatchers.IO。Koog 事件在自身执行线程触发、
  * DB 在 IO 池，无同池死锁；M1 规模下可接受。若 Koog 后续开放 suspend 钩子应迁回。
+ *
+ * [actionGate]：Action 事件发射点门控（2026-10-24 render_ui 校验）。Action 事件在
+ * onToolCallStarting（工具体执行**之前**）落流+下行，工具体内的校验拦不住坏负载到端，
+ * 故校验必须挂在这里——返回非 null 错误文本时该次调用**不落 Action、不 SSE 下行**
+ * （端侧永远见不到坏卡；工具体独立校验同源规则，回错误文本给 LLM 同轮修正）。
+ * 被拒调用无 Action 落库，天然不进入 pending 重放。
  */
 class AgentRunner(
     private val executorFactory: AgentExecutorFactory,
     private val dispatcher: ServerToolDispatcher,
     private val reversibleTools: Set<String> = ServerToolService.REVERSIBLE_TOOLS,
     private val maxIterations: Int = 20,
+    private val actionGate: (toolName: String, argsJson: String) -> String? = { _, _ -> null },
 ) {
 
     /**
@@ -82,12 +89,15 @@ class AgentRunner(
                     events.onToolCallStarting { ctx ->
                         // 同步钩子 → runBlocking 桥（见类 KDoc ⚠️）
                         runBlocking {
+                            // Koog 私有 JSON 树 toString 零转义，必须走 kotlinx 映射（见 ToolArgsWireJson.kt）
+                            val argsJson = toolArgsWireJson(ctx.toolArgs)
+                            // 发射点门控：被拒负载不落 Action、不下行（见类 KDoc actionGate 段）
+                            if (actionGate(ctx.toolName, argsJson) != null) return@runBlocking
                             val action = AgentEventRepository.append(
                                 session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
                                 payload = AgentEventPayload.Action(
                                     tool = ctx.toolName,
-                                    // Koog 私有 JSON 树 toString 零转义，必须走 kotlinx 映射（见 ToolArgsWireJson.kt）
-                                    argsJson = toolArgsWireJson(ctx.toolArgs),
+                                    argsJson = argsJson,
                                     reversible = ctx.toolName in reversibleTools,
                                 ),
                             )

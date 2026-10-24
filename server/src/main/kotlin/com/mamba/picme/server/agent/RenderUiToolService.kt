@@ -4,23 +4,26 @@ import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.agents.core.tools.annotations.Tool
 
 /**
- * render_ui——云端 Agent 的 A2UI 发卡工具（hybrid M2，spec §3.3 L1 卡）。
- *
- * 工具体是 CLOUD 侧空执行：A2UI 负载不经 tool-result 回环，而是经
- * AgentRunner.onToolCallStarting 落的 action 事件（tool+argsJson）随 SSE 下行，
- * 端侧 CloudAgentTurnRunner "action" 分支拦截渲染。工具只回确认文本。
- *
- * ⚠️ @LLMDescription 与 shared `A2uiCardContract` 的字面量（CATALOG_ID/版本/handle 约定）
- * 是字面量副本关系（server 不依赖 :shared），改动须双向同步核对。
+ * render_ui 黄金示例（P1 few-shot：LLM 模仿示例结构的可靠性远高于遵守散文规则）。
+ * 纯 JSON 数组（无前后散文），以便 `RenderUiValidatorTest` 直接喂校验器钉住
+ * 「示例本身过校验」——示例与校验器永不脱节。
+ * 占位符形态即合法形态（sf-xxxxxxxx / scan/ab12cd34），防止 LLM 学到非法占位符。
  */
-class RenderUiToolService {
+internal const val RENDER_UI_EXAMPLE = """[
+ {"version":"v0.9","createSurface":{"surfaceId":"sf-a1b2c3d4","catalogId":"https://polang.net/a2ui/catalog/v1.json"}},
+ {"version":"v0.9","updateComponents":{"surfaceId":"sf-a1b2c3d4","components":[
+  {"id":"root","component":"Column","children":["title","chart"]},
+  {"id":"title","component":"Text","text":"今年照片统计","variant":"h3"},
+  {"id":"chart","component":"BarChart","buckets":{"path":"/buckets"},"selected":{"path":"/selected"}}
+ ]}},
+ {"version":"v0.9","updateDataModel":{"surfaceId":"sf-a1b2c3d4","path":"/buckets","value":"local://scan/ab12cd34#histogram"}},
+ {"version":"v0.9","updateDataModel":{"surfaceId":"sf-a1b2c3d4","path":"/selected","value":"2026-10"}}
+]"""
 
-    @Tool(customName = "render_ui")
-    @LLMDescription(
-        """向用户下发一张 A2UI 原生渲染卡（图表/统计可视化首选，优于 render_html）。
-约束（必须全部满足，否则端上拒绝渲染或静默丢失数据）：
+internal const val RENDER_UI_RULES = """向用户下发一张 A2UI 原生渲染卡（图表/统计可视化首选，优于 render_html）。
+约束（必须全部满足——服务端会逐条校验，不通过则本次不下发并返回错误清单，修正后重新调用）：
 1. messagesJson 是 A2UI v0.9 信封 JSON 数组，每个信封含 "version": "v0.9" 与
-   createSurface / updateComponents / updateDataModel 之一；
+   createSurface / updateComponents / updateDataModel 之一；首个信封必须是 createSurface；
 2. createSurface 的 catalogId 必须是 "https://polang.net/a2ui/catalog/v1.json"；
 3. updateDataModel 一信封只写一个绑定：必须含 "path"（如 "/buckets"）与 "value" 两键，
    禁止使用 "data" 批量形式（端上解析器不识别该键，数据会被静默丢弃）；
@@ -43,6 +46,28 @@ class RenderUiToolService {
    间距增可选 "spacing"：COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
    BarChart 的 title 增可选 "titleRole"：HEADLINE|SUBHEAD|BODY|CAPTION（默认 SUBHEAD）；
    禁止输出 fontSize/padding/color 等具体数值字段，端侧会忽略或拒绝渲染。"""
+
+/**
+ * render_ui——云端 Agent 的 A2UI 发卡工具（hybrid M2，spec §3.3 L1 卡）。
+ *
+ * 工身体是 CLOUD 侧空执行：A2UI 负载不经 tool-result 回环，而是经
+ * AgentRunner.onToolCallStarting 落的 action 事件（tool+argsJson）随 SSE 下行，
+ * 端侧 CloudAgentTurnRunner "action" 分支拦截渲染。工具只回确认文本。
+ *
+ * 服务端校验（2026-10-24，sf-012a0/sf-a2u1c0de 两类事故的系统性修复）：
+ * 负载先过 [RenderUiValidator]——发射点门控（非法负载不落 action 事件、不下行端侧）
+ * + 工具体回错误文本（Koog Observation 回灌，LLM 同轮修正重试）。
+ *
+ * ⚠️ @LLMDescription 与 shared `A2uiCardContract` 的字面量（CATALOG_ID/版本/handle 约定）
+ * 是字面量副本关系（server 不依赖 :shared），改动须双向同步核对。
+ */
+class RenderUiToolService {
+
+    @Tool(customName = "render_ui")
+    @LLMDescription(
+        RENDER_UI_RULES +
+            "\n示例（月度照片统计完整卡；surfaceId/handleId 替换为真实值，结构原样照抄）：\n" +
+            RENDER_UI_EXAMPLE,
     )
     suspend fun renderUi(
         @LLMDescription("A2UI surface 唯一 id（与 createSurface.surfaceId 一致，建议 sf-<8位hex>）")
@@ -51,5 +76,8 @@ class RenderUiToolService {
         messagesJson: String,
         @LLMDescription("投影级降级摘要（数据缺失时端上展示的占位文案）")
         fallbackSummary: String,
-    ): String = "UI 已下发端侧渲染（surfaceId=$surfaceId）"
+    ): String {
+        RenderUiValidator.validateToError(surfaceId, messagesJson)?.let { error -> return error }
+        return "UI 已下发端侧渲染（surfaceId=$surfaceId）"
+    }
 }
