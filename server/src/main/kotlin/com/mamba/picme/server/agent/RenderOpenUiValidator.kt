@@ -61,7 +61,8 @@ object RenderOpenUiValidator {
 
     /** 校验并直接给回错误文本：null = 合法放行。 */
     fun validateToError(program: String): String? =
-        validate(program).takeIf { violations -> violations.isNotEmpty() }?.let(::errorText)
+        validate(program).takeIf { violations -> violations.isNotEmpty() }
+            ?.let { violations -> errorText(violations, program) }
 
     /** 校验核心：返回全部违规描述（空 = 合法）。 */
     fun validate(program: String): List<String> {
@@ -114,8 +115,16 @@ object RenderOpenUiValidator {
         return violations
     }
 
-    private fun errorText(violations: List<String>): String = buildString {
+    private fun errorText(violations: List<String>, program: String = ""): String = buildString {
         append("error: render_ui_openui 负载校验未通过，本次未下发端侧。逐条修正后重新调用 render_ui_openui：")
         violations.forEach { violation -> append("\n- ").append(violation) }
+        // 回显收到内容开头（2026-10-24 all_years 事故：LLM 连续 4 次「缺 root」却无法从错误文本
+        // 自纠——回显可定位 markdown 围栏/单行程序/root 非行首类偏差，program 是 LLM 生成的
+        // 骨架（数据禁令保证无用户数据），回显无隐私面）
+        val preview = program.replace("\n", "\\n").take(120)
+        append("\n本次收到 program 开头：").append(preview)
+        if (violations.any { it.startsWith("缺 root") } && program.contains("root")) {
+            append("（注意：你的 program 里出现了 root 但不在行首/被包裹——root = 必须独占一行行首，且 program 不要包 markdown 代码围栏）")
+        }
     }
 }
