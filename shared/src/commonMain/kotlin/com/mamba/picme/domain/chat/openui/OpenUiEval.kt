@@ -425,8 +425,12 @@ internal class OpenUiRuntime(
             val cmp = if (aNum != null && bNum != null) {
                 aNum.compareTo(bNum)
             } else {
-                // 无 locale 排序（commonMain 无 java.util.Locale）：普通 compareTo，规范歧义处
-                openUiToText(av).compareTo(openUiToText(bv))
+                // locale 序近似（commonMain 无 java.util.Locale，review 🟡5）：
+                // 大小写不敏感主比较 + 码点序 tiebreak，对齐 spec §3.4 示例（a 排在 B 前）
+                val aText = openUiToText(av)
+                val bText = openUiToText(bv)
+                aText.lowercase().compareTo(bText.lowercase())
+                    .takeIf { it != 0 } ?: aText.compareTo(bText)
             }
             if (desc) -cmp else cmp
         }

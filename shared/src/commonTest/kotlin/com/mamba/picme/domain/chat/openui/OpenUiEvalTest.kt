@@ -225,6 +225,11 @@ class OpenUiEvalTest {
             OpenUiValue.Arr(listOf(OpenUiValue.Str("apple"), OpenUiValue.Str("banana"))),
             eval("""x = @Sort(["banana", "apple"], "")"""),
         )
+        // §3.4 显式示例（review 🟡5）：locale 序近似——大小写不敏感主比较，a 排在 B 前
+        assertEquals(
+            OpenUiValue.Arr(listOf(OpenUiValue.Str("a"), OpenUiValue.Str("B"))),
+            eval("""x = @Sort(["B", "a"], "")"""),
+        )
         // 非数组原样返回
         assertEquals(OpenUiValue.Str("x"), eval("""x = @Sort("x", "")"""))
     }
