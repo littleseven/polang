@@ -10,10 +10,11 @@ import androidx.a2ui.model.protocol.A2uiDataPath
 import com.mamba.picme.data.local.HandleLookup
 import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -344,7 +345,9 @@ class A2uiComponentAvailabilityTest {
 
     /**
      * 喂入蓝图并等待首个 client error（负路径断言用）。
-     * 确定性等待（而非定长 delay）：满载全量回归时 actor 调度延迟不定。
+     * outboundEvents 声明为无 replay 的 Flow（引擎 tryEmit 即发即弃），订阅晚于
+     * 发射即丢消息：转发收集用 UNDISPATCHED 启动，订阅注册同步完成后才喂消息；
+     * 落进无限容量 Channel，等待用确定性事件而非定长 delay（满载时调度延迟不定）。
      */
     private suspend fun awaitClientError(
         sid: String,
@@ -354,16 +357,22 @@ class A2uiComponentAvailabilityTest {
         try {
             val processor = A2uiMessageProcessor(catalogs = listOf(catalog))
             scope.launch { processor.collectMessages() }
-            // outboundEvents 是无 replay 的 SharedFlow：必须先挂收集再喂消息，否则先发的错误被错过
-            val errorDeferred = scope.async {
-                processor.outboundEvents.first { message -> message is A2uiClientErrorMessage }
+            val received = Channel<A2uiClientToServerMessage>(Channel.UNLIMITED)
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                processor.outboundEvents.collect { message -> received.trySend(message) }
             }
             val resolution = resolver.resolve(sid, messagesJson)
             assertTrue(resolution is A2uiResolution.Ready)
             (resolution as A2uiResolution.Ready).messages.forEach { message ->
                 processor.processMessage(message)
             }
-            return withTimeout(10_000) { errorDeferred.await() }
+            return withTimeout(30_000) {
+                var message = received.receive()
+                while (message !is A2uiClientErrorMessage) {
+                    message = received.receive()
+                }
+                message
+            }
         } finally {
             scope.cancel()
         }
