@@ -1,10 +1,12 @@
 package com.mamba.picme.features.chat.openui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -15,10 +17,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -27,6 +34,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -42,13 +51,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.core.designsystem.AppShapes
+import com.mamba.picme.core.designsystem.AppSliderTokens
+import com.mamba.picme.core.designsystem.BadgeTokens
+import com.mamba.picme.core.designsystem.IconSize
 import com.mamba.picme.core.designsystem.Spacing
+import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.core.designsystem.components.AppSlider
 import com.mamba.picme.core.image.faceAwareVerticalAlignment
 import com.mamba.picme.domain.chat.openui.OpenUiAction
@@ -60,9 +78,10 @@ import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_THRESHOLD
 import com.mamba.picme.features.chat.a2ui.BarChartBucketLabel
 import com.mamba.picme.features.chat.a2ui.barChartBarHeight
 import com.mamba.picme.features.chat.a2ui.barChartLabelInterval
+import com.mamba.picme.features.common.chat.AgentMarkdown
 
 /**
- * OpenUI 组件树 → Compose 递归渲染（openui P2 + M2 十四组件；与 OpenUiLibrary 一一对应）。
+ * OpenUI 组件树 → Compose 递归渲染（openui P2 + M2/M3 二十一组件；与 OpenUiLibrary 一一对应）。
  *
  * 语义样式令牌（role/colorRole/spacing）只读复用 [A2uiStyleMapper]（两线同一套
  * Design Token 映射，保证双端/双线视觉一致）；BarChart 视觉与 PolangBarChartComponent
@@ -79,6 +98,18 @@ import com.mamba.picme.features.chat.a2ui.barChartLabelInterval
  * - CheckBox/ChoicePicker/Slider 交互经 @Set 写 state（渲染期构造 OpenUiAction，与 BarChart
  *   点选同机制）；Binding 缺失（LLM 传裸字面量）→ 只读展示不写入（BarChart 裸字面量口径）；
  * - Slider 渲染用 AppSlider（全 app 滑杆红线，禁裸 M3 Slider）。
+ *
+ * M3（2026-10-24，spec《openui-component-library-m3-design》）+7：
+ * - Table：表头行 + 数据行（[MAX_TABLE_ROWS] 护栏），等宽列，列宽合计超容器宽时横滑；
+ * - PieChart：Canvas 扇形 + 图例列，色板 = colorScheme 角色 + 透明度阶梯（BarChart 同族），
+ *   [MAX_PIE_SLICES] 护栏；
+ * - LineChart：Canvas 折线 + 数据点 + 横轴标签抽稀（barChartLabelInterval 先例），
+ *   values 缺位 = null 断点断开折线，[MAX_LINE_SERIES] 护栏；
+ * - Callout：tone（INFO/SUCCESS/WARNING/ERROR）→ StatusColor 色块 + Icon 映射 + 可选加粗 title；
+ * - Markdown：复用 [AgentMarkdown]（mikepenz，全 app 唯一 Agent 正文 Markdown 入口）；
+ * - Accordion：展开集是渲染期 remember 本地态（Tabs 同口径，键 = items 标题列表）；
+ * - Switch：M3 Switch 配 token 色（AppSlider 红线只管滑杆，Switch 无既有封装），
+ *   checked BINDABLE_BOOLEAN 与 CheckBox 同构（点按 → @Set 回写，裸字面量只读）。
  *
  * 半信任输入防御：未知组件/null 字面量 → 空 Box 占位，不炸整卡；BarChart buckets
  * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）；Image 解析不到/加载中 →
@@ -141,13 +172,7 @@ fun OpenUiNodeRenderer(
             // 解析不出丢该 Text 不炸卡
             val text = when (val prop = node.props["text"]) {
                 is OpenUiValue.Str -> prop.v
-                is OpenUiValue.Binding -> when (val bound = state[prop.name]) {
-                    is OpenUiValue.Str -> bound.v
-                    is OpenUiValue.Num ->
-                        if (bound.v % 1.0 == 0.0) bound.v.toLong().toString() else bound.v.toString()
-                    is OpenUiValue.Bool -> bound.v.toString()
-                    else -> null
-                }
+                is OpenUiValue.Binding -> state[prop.name]?.let { bound -> openUiPrimitiveText(bound) }
                 else -> null
             } ?: return
             Text(
@@ -177,6 +202,13 @@ fun OpenUiNodeRenderer(
         "CheckBox" -> OpenUiCheckBox(node, state, onAction, modifier)
         "ChoicePicker" -> OpenUiChoicePicker(node, state, onAction, modifier)
         "Slider" -> OpenUiSlider(node, state, onAction, modifier)
+        "Table" -> OpenUiTable(node, modifier)
+        "PieChart" -> OpenUiPieChart(node, modifier)
+        "LineChart" -> OpenUiLineChart(node, modifier)
+        "Callout" -> OpenUiCallout(node, modifier)
+        "Markdown" -> OpenUiMarkdown(node, state, modifier)
+        "Accordion" -> OpenUiAccordion(node, state, photoResolver, onAction, modifier)
+        "Switch" -> OpenUiSwitch(node, state, onAction, modifier)
         else -> Box(modifier = modifier) // 未知组件：空占位，不炸整卡
     }
 }
@@ -610,5 +642,452 @@ private fun OpenUiBarChart(
                 }
             }
         }
+    }
+}
+
+// ── M3 七组件（2026-10-24，spec《openui-component-library-m3-design》§4.3） ──────
+
+/** 原始值单元格/标签的文本形态（Num 整数不带小数点，同 Text 绑定回退口径；null/其他 → null）。 */
+private fun openUiPrimitiveText(value: OpenUiValue): String? = when (value) {
+    is OpenUiValue.Str -> value.v
+    is OpenUiValue.Num -> if (value.v % 1.0 == 0.0) value.v.toLong().toString() else value.v.toString()
+    is OpenUiValue.Bool -> value.v.toString()
+    else -> null
+}
+
+/** 饼图/折线系列色板：BarChart 同族 token（colorScheme 角色 + 透明度阶梯派生）。 */
+@Composable
+private fun openUiChartPalette(): List<Color> {
+    val scheme = MaterialTheme.colorScheme
+    return listOf(
+        scheme.primary,
+        scheme.tertiary,
+        scheme.secondary,
+        scheme.primary.copy(alpha = 0.55f),
+        scheme.tertiary.copy(alpha = 0.55f),
+        scheme.secondary.copy(alpha = 0.55f),
+    )
+}
+
+private const val MAX_TABLE_ROWS = 50
+private val TABLE_CELL_MIN_WIDTH = 88.dp
+
+/** Table：表头行 + 数据行（[MAX_TABLE_ROWS] 护栏）；等宽列，列宽合计超容器宽时横滑；缺 cell 渲染空串。 */
+@Composable
+private fun OpenUiTable(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val columns = (node.props["columns"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        ((item as? OpenUiValue.Obj)?.v?.get("label") as? OpenUiValue.Str)?.v
+    }
+    // 扁平元素（schema 合法的非嵌套行，LLM 笔误模式）剔除而非渲染成整行空单元格
+    val rows = (node.props["rows"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .mapNotNull { rowValue -> (rowValue as? OpenUiValue.Arr)?.v }
+        .take(MAX_TABLE_ROWS)
+    if (columns.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // 等宽列；列宽合计放得下就均铺满宽，放不下定宽横滑（weight 在无限宽约束下会崩）
+        val fitsWidth = TABLE_CELL_MIN_WIDTH * columns.size <= maxWidth
+        Column(
+            modifier = if (fitsWidth) Modifier.fillMaxWidth() else Modifier.horizontalScroll(rememberScrollState()),
+        ) {
+            Row {
+                columns.forEach { label ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = if (fitsWidth) Modifier.weight(1f) else Modifier.width(TABLE_CELL_MIN_WIDTH),
+                    )
+                }
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.xs))
+            rows.forEach { cells ->
+                Row(modifier = Modifier.padding(vertical = Spacing.xs)) {
+                    columns.forEachIndexed { index, _ ->
+                        Text(
+                            text = cells.getOrNull(index)?.let { cell -> openUiPrimitiveText(cell) } ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = if (fitsWidth) Modifier.weight(1f) else Modifier.width(TABLE_CELL_MIN_WIDTH),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class PieSlice(val label: String, val value: Double)
+
+private const val MAX_PIE_SLICES = 12
+private val PIE_CHART_SIZE = 120.dp
+
+/** PieChart：Canvas 扇形（-90° 起顺时针）+ 图例列（色点 + label + value）；value 钳非负（BarChart 同口径）。 */
+@Composable
+private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v
+    val slices = (node.props["slices"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val label = (obj["label"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        val value = (obj["value"] as? OpenUiValue.Num)?.v ?: return@mapNotNull null
+        PieSlice(label = label, value = value.coerceAtLeast(0.0))
+    }.take(MAX_PIE_SLICES)
+    val total = slices.sumOf { slice -> slice.value }
+    if (slices.isEmpty() || total <= 0.0) {
+        Box(modifier = modifier)
+        return
+    }
+    val palette = openUiChartPalette()
+    Column(modifier = modifier.fillMaxWidth()) {
+        title?.let { text ->
+            Text(text = text, style = MaterialTheme.typography.titleSmall)
+        }
+        Row(
+            modifier = Modifier.padding(top = Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Canvas(modifier = Modifier.size(PIE_CHART_SIZE)) {
+                var startAngle = -90f
+                slices.forEachIndexed { index, slice ->
+                    val sweep = (slice.value / total * 360.0).toFloat()
+                    if (sweep > 0f) {
+                        drawArc(
+                            color = palette[index % palette.size],
+                            startAngle = startAngle,
+                            sweepAngle = sweep,
+                            useCenter = true,
+                        )
+                    }
+                    startAngle += sweep
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                slices.forEachIndexed { index, slice ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(Spacing.sm)
+                                .clip(CircleShape)
+                                .background(palette[index % palette.size]),
+                        )
+                        Text(text = slice.label, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = openUiPrimitiveText(OpenUiValue.Num(slice.value)) ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class LineSeries(val name: String, val values: List<Double?>)
+
+private const val MAX_LINE_SERIES = 4
+private const val MAX_LINE_LABELS = 200
+
+/**
+ * LineChart：Canvas 折线 + 数据点 + 横轴标签抽稀（barChartLabelInterval 先例）；
+ * values 与 labels 按位对齐，缺位补 null 断点（断开折线不连线）。
+ * 点按槽中心布点（与标签行 weight Box 中心严格对齐，BarChart 桶列同径）；
+ * min==max 平线居中（normalized=0.5，防贴底边裁点）。
+ */
+@Composable
+private fun OpenUiLineChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v
+    val labels = (node.props["labels"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .take(MAX_LINE_LABELS)
+        .map { value -> openUiPrimitiveText(value) ?: "" }
+    val series = (node.props["series"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val name = (obj["name"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        val rawValues = (obj["values"] as? OpenUiValue.Arr)?.v.orEmpty()
+        LineSeries(
+            name = name,
+            values = (0 until labels.size).map { index ->
+                (rawValues.getOrNull(index) as? OpenUiValue.Num)?.v
+            },
+        )
+    }.filter { serie -> serie.values.any { value -> value != null } }.take(MAX_LINE_SERIES)
+    if (labels.isEmpty() || series.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val palette = openUiChartPalette()
+    val allValues = series.flatMap { serie -> serie.values.filterNotNull() }
+    val minValue = allValues.min()
+    val maxValue = allValues.max()
+    val range = if (maxValue > minValue) maxValue - minValue else 1.0
+    val labelInterval = barChartLabelInterval(labels.size)
+    Column(modifier = modifier.fillMaxWidth()) {
+        title?.let { text ->
+            Text(text = text, style = MaterialTheme.typography.titleSmall)
+        }
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(A2uiCardTokens.barAreaHeight),
+        ) {
+            val pointRadius = 3.dp.toPx()
+            fun pointAt(index: Int, value: Double): Offset {
+                val normalized =
+                    if (maxValue > minValue) (value - minValue) / range else 0.5
+                return Offset(
+                    x = (index + 0.5f) * size.width / labels.size,
+                    y = pointRadius + (size.height - pointRadius * 2) * (1f - normalized.toFloat()),
+                )
+            }
+            series.forEachIndexed { seriesIndex, serie ->
+                val color = palette[seriesIndex % palette.size]
+                var previous: Offset? = null
+                serie.values.forEachIndexed { index, value ->
+                    if (value == null) {
+                        previous = null // null 断点：断开折线
+                    } else {
+                        val point = pointAt(index, value)
+                        previous?.let { from ->
+                            drawLine(color = color, start = from, end = point, strokeWidth = 2.dp.toPx())
+                        }
+                        drawCircle(color = color, radius = pointRadius, center = point)
+                        previous = point
+                    }
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth().height(A2uiCardTokens.barLabelHeight)) {
+            labels.forEachIndexed { index, label ->
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    if (index % labelInterval == 0) {
+                        Text(text = label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    }
+                }
+            }
+        }
+        if (series.size > 1) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                series.forEachIndexed { index, serie ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(Spacing.sm)
+                                .clip(CircleShape)
+                                .background(palette[index % palette.size]),
+                        )
+                        Text(text = serie.name, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Callout：tone → StatusColor 色块容器 + Icon 映射（INFO=info/SUCCESS=check/WARNING=warning/
+ * ERROR=error）+ 可选 title 加粗行。
+ */
+@Composable
+private fun OpenUiCallout(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val text = (node.props["text"] as? OpenUiValue.Str)?.v ?: return
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v
+    val tone = (node.props["tone"] as? OpenUiValue.Str)?.v ?: "INFO"
+    val toneColor = when (tone) {
+        "SUCCESS" -> StatusColor.success
+        "WARNING" -> StatusColor.warning
+        "ERROR" -> StatusColor.error
+        else -> StatusColor.info
+    }
+    val iconName = when (tone) {
+        "SUCCESS" -> "check"
+        "WARNING" -> "warning"
+        "ERROR" -> "error"
+        else -> "info"
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(AppShapes.card)
+            .background(toneColor.copy(alpha = BadgeTokens.tagBackgroundAlpha))
+            .padding(Spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        openUiIcon(iconName)?.let { image ->
+            Icon(
+                imageVector = image,
+                contentDescription = null,
+                tint = toneColor,
+                modifier = Modifier.size(IconSize.md),
+            )
+        }
+        Column {
+            title?.let { heading ->
+                Text(
+                    text = heading,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = toneColor,
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+/**
+ * Markdown：复用 [AgentMarkdown]（mikepenz，全 app 唯一 Agent 正文 Markdown 入口，禁新引
+ * markdown 依赖）；text BINDABLE_STRING——Binding 从 state 快照读，解析不出丢该组件不炸卡
+ * （同 Text 口径）。
+ */
+@Composable
+private fun OpenUiMarkdown(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    modifier: Modifier = Modifier,
+) {
+    val text = when (val prop = node.props["text"]) {
+        is OpenUiValue.Str -> prop.v
+        is OpenUiValue.Binding -> state[prop.name]?.let { bound -> openUiPrimitiveText(bound) }
+        else -> null
+    } ?: return
+    AgentMarkdown(
+        content = text,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        modifier = modifier.fillMaxWidth(),
+    )
+}
+
+private data class AccordionItem(val title: String, val children: List<OpenUiValue>)
+
+/** Accordion 分区数护栏（Tabs MAX_TABS/List MAX_LIST_CHILDREN 同口径：LLM 生成面无界，渲染端 take 兜底）。 */
+private const val MAX_ACCORDION_ITEMS = 12
+
+/**
+ * Accordion：展开集是渲染期 remember 本地态，不进 OpenUI state（纯 UI 导航，Tabs 同口径）；
+ * 键 = items 标题列表（Tabs review 🟡3：node 相等性随 state 派生值变化会把展开态重置）。
+ */
+@Composable
+private fun OpenUiAccordion(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        AccordionItem(title = title, children = (obj["children"] as? OpenUiValue.Arr)?.v.orEmpty())
+    }.take(MAX_ACCORDION_ITEMS)
+    if (items.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    var expanded by remember(items.map { item -> item.title }) { mutableStateOf(emptySet<Int>()) }
+    Column(modifier = modifier.fillMaxWidth()) {
+        items.forEachIndexed { index, item ->
+            val isExpanded = index in expanded
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        expanded = if (isExpanded) expanded - index else expanded + index
+                    }
+                    .padding(vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (isExpanded) {
+                        Icons.Filled.KeyboardArrowDown
+                    } else {
+                        Icons.Filled.KeyboardArrowRight
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                )
+            }
+            if (isExpanded) {
+                Column(modifier = Modifier.padding(bottom = Spacing.xs)) {
+                    OpenUiChildList(item.children, state, photoResolver, onAction)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Switch：checked BINDABLE_BOOLEAN（CheckBox 同构）——Binding → state 快照读，点按 →
+ * @Set(绑定变量, !当前值)；裸 Bool 字面量只读展示不写入。M3 Switch 配 token 色
+ * （AppSlider 红线只管滑杆，Switch 无既有封装）。
+ */
+@Composable
+private fun OpenUiSwitch(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = (node.props["label"] as? OpenUiValue.Str)?.v ?: return
+    val checkedProp = node.props["checked"]
+    val bindingName = (checkedProp as? OpenUiValue.Binding)?.name
+    val checked = when (checkedProp) {
+        is OpenUiValue.Binding -> (state[checkedProp.name] as? OpenUiValue.Bool)?.v
+        is OpenUiValue.Bool -> checkedProp.v
+        else -> null
+    } ?: return
+    val toggle: (Boolean) -> Unit = { newValue ->
+        bindingName?.let { name ->
+            onAction(
+                OpenUiAction(
+                    name = "Set",
+                    args = listOf(OpenUiValue.Bool(newValue)),
+                    target = name,
+                )
+            )
+        }
+    }
+    // 整行 toggleable（同 CheckBox：扩大热区 + 无障碍）；Switch 本体挂 null 防双击
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = toggle),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                checkedThumbColor = AppSliderTokens.thumbColor,
+            ),
+        )
     }
 }

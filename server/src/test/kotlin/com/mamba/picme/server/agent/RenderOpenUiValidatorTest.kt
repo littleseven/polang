@@ -317,6 +317,40 @@ root = Card([Image(photos[0].id, 1.5)])""",
         assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_INTERACTIVE_PROGRAM))
     }
 
+    // ── M3 七新组件（2026-10-24，spec《openui-component-library-m3-design》） ──
+
+    @Test
+    fun `m3 seven new components pass whitelist`() {
+        // 七组件逐个独立成卡（白名单只认组件名，形态细节由端侧 schema 兜底）
+        val cases = listOf(
+            "Table([{label: \"月份\"}], [[\"2026-01\", 12]])",
+            "PieChart(\"占比\", [{label: \"人像\", value: 42}])",
+            "LineChart(\"趋势\", [\"01\", \"02\"], [{name: \"全部\", values: [1, 2]}])",
+            "Callout(\"结论\", \"提示\", \"WARNING\")",
+            "Markdown(\"# 标题\\n- 甲\")",
+            "Accordion([{title: \"明细\", children: [Text(\"x\")]}])",
+            "Switch(\"通知\", ${'$'}flag)",
+        )
+        cases.forEach { component ->
+            val program = "${'$'}flag = true\nroot = Card([$component])"
+            assertNull("应放行: $component", RenderOpenUiValidator.validateToError(program))
+        }
+    }
+
+    @Test
+    fun `m3 lookalike component name is rejected`() {
+        // 反面：不在二十一组件白名单内的近名组件仍被拒（如 DataTable/Grid）
+        val error = RenderOpenUiValidator.validateToError("""root = Card([DataTable("x")])""")
+        assertNotNull(error)
+        assertTrue(error!!.contains("DataTable"))
+    }
+
+    @Test
+    fun `tool description report golden example passes validation`() {
+        // 图文报表黄金示例（Table + PieChart + Callout）同源引用同一常量（GOLDEN_* 钉法先例）
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_REPORT_PROGRAM))
+    }
+
     // ── argsJson 与 gate 分发 ───────────────────────────────────────
 
     @Test

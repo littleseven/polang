@@ -33,12 +33,15 @@ object RenderOpenUiValidator {
     /** program 长度上限（对齐 render_html 128_000 字符先例）。 */
     const val MAX_PROGRAM_LENGTH = 128_000
 
-    /** 组件白名单（生成引导面，与 shared OpenUiLibrary 十四组件对齐：M2（2026-10-24）
+    /** 组件白名单（生成引导面，与 shared OpenUiLibrary 二十一组件对齐：M2（2026-10-24）
      *  +Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider——spec §2 枚举 7 个新组件，
-     *  spec 标题「十三」系计数笔误，以 §2 枚举为准）。 */
+     *  spec 标题「十三」系计数笔误，以 §2 枚举为准；M3（2026-10-24，
+     *  spec《openui-component-library-m3-design》）
+     *  +Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch）。 */
     private val ALLOWED_COMPONENTS = setOf(
         "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
         "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
+        "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
     )
 
     /**
@@ -132,7 +135,7 @@ object RenderOpenUiValidator {
             violations += "缺 root = 语句（root 是组件树入口；无 root 时兜底的首个 Card 语句也缺失）"
         }
 
-        // 2. 组件名白名单：大写开头调用只允许十四组件 + Query
+        // 2. 组件名白名单：大写开头调用只允许二十一组件 + Query
         CALL_NAME.findAll(stripped)
             .map { match -> match.groupValues[1] }
             .toSet()

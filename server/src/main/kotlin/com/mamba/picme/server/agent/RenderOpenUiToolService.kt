@@ -56,6 +56,17 @@ class RenderOpenUiToolService {
                 "CheckBox(\"只看精选\", " + D + "onlyFavorites)])"
 
         /**
+         * 图文报表黄金示例（M3，spec《openui-component-library-m3-design》§4.2）：
+         * Table + PieChart + Callout 组合（纯骨架无 Query 绑定亦可发卡）。
+         */
+        const val GOLDEN_REPORT_PROGRAM =
+            "root = Card([Text(\"相册健康报告\", \"HEADLINE\"), " +
+                "Callout(\"本月新增 328 张，存储占用健康\", \"结论\", \"SUCCESS\"), " +
+                "PieChart(\"类目占比\", [{label: \"人像\", value: 142}, {label: \"风景\", value: 98}]), " +
+                "Table([{label: \"月份\"}, {label: \"数量\"}], " +
+                "[[\"2026-01\", 128], [\"2026-02\", 200]])])"
+
+        /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
          * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
          * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
@@ -106,6 +117,20 @@ class RenderOpenUiToolService {
    - Slider(label?, value*, min?, max?)：value 传 ${'$'}数字绑定，min/max 默认 0/100，
      拖动结束回写数值；裸数字字面量只读；label 可省略，省略时 value 须写命名实参
      （形如 Slider(value=${'$'}level)——位置参数首槽是 label）；
+   - Table(columns*, rows*)：行式表格；columns 是 [{label: "列名"}]，rows 是行式
+     嵌套数组 [[cell, ...], ...]（每行一条内层数组，cell 只许字符串/数字/布尔，
+     单元格数与 columns 对齐）；
+   - PieChart(title?, slices*)：占比分布；slices 是 [{label: "分类名", value: 数值}]；
+   - LineChart(title?, labels*, series*)：趋势折线；labels 是横轴标签数组
+     ["x1", ...]，series 是 [{name: "系列名", values: [数值, ...]}]
+     （values 长度与 labels 对齐）；
+   - Callout(text*, title?, tone?)：结论/告警高亮块，tone∈INFO|SUCCESS|WARNING|ERROR
+     （默认 INFO）；
+   - Markdown(text*)：富文本正文（标题/加粗/列表混排），text 可传 ${'$'}绑定
+     （同 Text 口径）；
+   - Accordion(items*)：可折叠分区；items 是 [{title: "分区标题", children: [组件...]}]；
+   - Switch(label*, checked*)：开关式布尔（与 CheckBox 语义对偶），checked 传
+     ${'$'}布尔绑定，点按回写；裸 true/false 字面量只读不回写；
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
    `buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])`
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
@@ -118,10 +143,10 @@ class RenderOpenUiToolService {
    handle id 只在 program 里引用，回复正文禁止向用户展示 handle id；
 5. Query 推荐独占整条语句右侧（先 `buckets = Query("local_handle", …, [])` 单独成行，
    组件参数里引用 buckets——见规则 7 黄金示例；端侧引擎已支持内联提升，独占写法最稳）；
-6. state 与交互约定（交互组件 = BarChart/CheckBox/ChoicePicker/Slider，可绑定文案 = Text）：
+6. state 与交互约定（交互组件 = BarChart/CheckBox/ChoicePicker/Slider/Switch，可绑定文案 = Text）：
    每个用到的 ${'$'}变量先独占一行声明默认值（如 `${'$'}selected = ""`、`${'$'}level = 50`、
    `${'$'}flag = false`），再传给组件的可绑定参数（BarChart selected / CheckBox checked /
-   ChoicePicker selected / Slider value / Text text）；端侧点选/勾选/拖值 → 回写该变量并
+   Switch checked / ChoicePicker selected / Slider value / Text text）；端侧点选/勾选/拖值 → 回写该变量并
    整卡重渲染（如 Text(${'$'}selected) 随点选刷新显示当前选中项）；传裸字面量则只读展示
    不回写（BarChart 裸字符串点选高亮静默失效）；交互 state 不持久化，`${'$'}selected`
    之外变量重开卡回默认值；
@@ -134,7 +159,9 @@ class RenderOpenUiToolService {
    图文混排黄金示例（搜索拿 handle 后，照片与文字同卡混排）：
 """ + GOLDEN_MIXED_PROGRAM + """
    交互相册卡黄金示例（BarChart 点选 + Text 联动文案 + CheckBox 勾选回写）：
-""" + GOLDEN_INTERACTIVE_PROGRAM
+""" + GOLDEN_INTERACTIVE_PROGRAM + """
+   图文报表黄金示例（M3：Table + PieChart + Callout 组合，纯骨架无 Query 绑定亦可发卡）：
+""" + GOLDEN_REPORT_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

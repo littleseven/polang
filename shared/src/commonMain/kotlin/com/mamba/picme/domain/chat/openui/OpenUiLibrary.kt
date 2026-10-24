@@ -24,6 +24,13 @@ enum class OpenUiPropType {
 
     /** 数字字面量或 $binding（语义同 BINDABLE_STRING；Slider.value）。 */
     BINDABLE_NUMBER,
+
+    /**
+     * 原始值数组（M3；Table.rows / LineChart.labels/series[].values）：元素限 Str/Num/Bool
+     * 或**一层嵌套 Arr**（表格行 `[[cell,...],...]`），两层嵌套拒。不收 Binding
+     * （数组整体绑定无交互语义，M3 不需要）。
+     */
+    PRIMITIVE_ARRAY,
 }
 
 /**
@@ -45,11 +52,14 @@ data class OpenUiProp(
 data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
 
 /**
- * polang OpenUI 组件库（十四组件，M2（2026-10-24，spec《openui-component-library-m2-design》）
+ * polang OpenUI 组件库（二十一组件，M2（2026-10-24，spec《openui-component-library-m2-design》）
  * 七组件扩至十四：+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider（§2 枚举 7 个新组件；
  * spec 标题「十三」与 §5「+6」系计数笔误，以 §2 枚举为准），Text.text 升
  * BINDABLE_STRING；与 A2UI catalog 逐项对偶，保证两线可比性；spec §4.2
  * + spec《openui-image-component-design》D3）。
+ * M3（2026-10-24，spec《openui-component-library-m3-design》）十四组件扩至二十一：
+ * +Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch，新增 prop 类型
+ * PRIMITIVE_ARRAY 打开图表/表格数据面。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
  * OpenUiNodeRenderer）共用同一份。
  */
@@ -235,6 +245,104 @@ object OpenUiLibrary {
                 OpenUiProp("value", OpenUiPropType.BINDABLE_NUMBER, required = true),
                 OpenUiProp("min", OpenUiPropType.NUMBER, default = OpenUiValue.Num(0.0)),
                 OpenUiProp("max", OpenUiPropType.NUMBER, default = OpenUiValue.Num(100.0)),
+            ),
+        ),
+        // ── M3 七组件（spec《openui-component-library-m3-design》§3） ──────────
+        // Table：行式表格。columns = [{label}]；rows = [[cell,...],...]（一层嵌套
+        // PRIMITIVE_ARRAY，cell=string/number/bool；缺 cell 渲染期补空串，行式嵌套
+        // 数组是 LLM 书写实测最稳形态，spec §3 取舍）
+        OpenUiComponent(
+            "Table",
+            listOf(
+                OpenUiProp(
+                    "columns",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                    ),
+                ),
+                OpenUiProp("rows", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+            ),
+        ),
+        // PieChart：slices = [{label, value}]（字段名 value 与 BarChart buckets 的 count
+        // 刻意不同——各自语义自描述，schema 层各自独立无共享，spec §3 取舍）
+        OpenUiComponent(
+            "PieChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "slices",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("value", OpenUiPropType.NUMBER, required = true),
+                    ),
+                ),
+            ),
+        ),
+        // LineChart：双数组（labels + series[].values，趋势图 x 轴共享，避免每 series
+        // 重复 label 串烧 token）；series[].values = OBJECT_ARRAY 嵌套 PRIMITIVE_ARRAY
+        // （Tabs 的 COMPONENT_LIST 递归同机制）；values 长度与 labels 对齐，缺补 null 断点
+        OpenUiComponent(
+            "LineChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp("labels", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                OpenUiProp(
+                    "series",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                    ),
+                ),
+            ),
+        ),
+        // Callout：结论/告警高亮块；tone 默认 INFO
+        OpenUiComponent(
+            "Callout",
+            listOf(
+                OpenUiProp("text", OpenUiPropType.STRING, required = true),
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "tone",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("INFO"),
+                    enumValues = listOf("INFO", "SUCCESS", "WARNING", "ERROR"),
+                ),
+            ),
+        ),
+        // Markdown：富文本正文；text BINDABLE_STRING（同 M2 Text 口径，$绑定联动）
+        OpenUiComponent(
+            "Markdown",
+            listOf(OpenUiProp("text", OpenUiPropType.BINDABLE_STRING, required = true)),
+        ),
+        // Accordion：items = [{title, children: [组件...]}]（OBJECT_ARRAY 嵌套
+        // COMPONENT_LIST，Tabs 同构）；展开态是渲染期本地态不进 OpenUI state
+        OpenUiComponent(
+            "Accordion",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("children", OpenUiPropType.COMPONENT_LIST, required = true),
+                    ),
+                ),
+            ),
+        ),
+        // Switch：checked BINDABLE_BOOLEAN（CheckBox 同构：点按 → @Set 回写，
+        // 裸字面量只读展示不写入）
+        OpenUiComponent(
+            "Switch",
+            listOf(
+                OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                OpenUiProp("checked", OpenUiPropType.BINDABLE_BOOLEAN, required = true),
             ),
         ),
     ).associateBy { component -> component.name }

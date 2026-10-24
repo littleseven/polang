@@ -873,8 +873,12 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **回灌**：不回灌 LLM（data part 分支 emptyList 同 data_ui）；program 只含骨架 + Query
   local_handle 绑定，handle id 对云 opaque（D2 对偶）。
 - **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，
-  polang OpenUI 组件库十四组件（M2，2026-10-24，spec《openui-component-library-m2-design》）：
-  Card/Row/Column/Text/Button/BarChart/Image + Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider，
+  polang OpenUI 组件库二十一组件（M2+M3，2026-10-24，spec《openui-component-library-m2-design》/
+  《openui-component-library-m3-design》）：
+  Card/Row/Column/Text/Button/BarChart/Image + Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider
+  + Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch（M3 新增 prop 类型 PRIMITIVE_ARRAY：
+  元素限 Str/Num/Bool 或一层嵌套 Arr，两层嵌套/类型混杂 → 必填丢组件；可嵌套进 OBJECT_ARRAY
+  objectFields（LineChart.series[].values），Tabs COMPONENT_LIST 递归同机制），
   schema 见 shared OpenUiLibrary）；Query("local_handle") 经 AppContainer `localHandleLookup` 端侧补全
   （scan domain → `#histogram`/省略 = GalleryHistogramBuilder 月桶；`#photos`（2026-10-24，
   spec《openui-image-component-design》）= ScanPhotoProjection 照片清单 [{id,date}] cap 60
@@ -888,6 +892,14 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   Icon name→Material 图标映射 `OpenUiIconMap`（59 枚枚举，schema/A2UI 副本源/server 白名单/描述四处同源，跨 build 残余漂移风险见 `OpenUiLibrary.iconNames` KDoc）；
   List VERTICAL 限高 320dp 纵向滚动（嵌套滚动规避）、HORIZONTAL 横滑行；Tabs 选中页签 =
   渲染期 remember 本地态不进 state；Slider 用 AppSlider（全 app 滑杆红线）。
+  M3 渲染细则：Table 表头+数据行（take 50 护栏、等宽列、超宽横滑、缺 cell 补空串）；
+  PieChart/LineChart = Canvas 自绘（扇形/折线+数据点，色板 = colorScheme 角色+透明度阶梯
+  BarChart 同族，slices take 12 / series take 4 护栏，LineChart 横轴标签抽稀同 BarChart、
+  values 缺位 = null 断点）；Callout = StatusColor 色块 + tone→Icon 映射（INFO=info/
+  SUCCESS=check/WARNING=warning/ERROR=error）+ 可选加粗 title；Markdown 复用 AgentMarkdown
+  （全 app 唯一 Agent 正文入口）；Accordion 展开集 = 渲染期 remember 本地态（Tabs 同口径）；
+  Switch = M3 Switch + token 色（AppSlider 红线只管滑杆），checked BINDABLE_BOOLEAN 与
+  CheckBox 同构回写。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量

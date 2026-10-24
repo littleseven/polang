@@ -11,6 +11,11 @@ import kotlinx.coroutines.test.runTest
  * 七组件 → 十四组件 schema 钉住（§2 枚举 7 新组件；spec 标题「十三」/+6 系计数笔误）
  * + BINDABLE_BOOLEAN/BINDABLE_NUMBER 校验
  * （字面量/Binding/类型错各一例）+ Tabs.tabs 嵌套组件递归校验 + @Set 写 Num/Bool state。
+ *
+ * M3（2026-10-24，spec《openui-component-library-m3-design》）：十四 → 二十一组件
+ * （+Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch）+ PRIMITIVE_ARRAY 校验
+ * （Str/Num/Bool/一层嵌套 Arr；两层嵌套拒、元素类型混杂 → 必填 type-mismatch 丢组件）+
+ * LineChart.series[].values OBJECT_ARRAY 嵌套 PRIMITIVE_ARRAY 递归。
  */
 class OpenUiLibraryM2Test {
 
@@ -35,14 +40,17 @@ class OpenUiLibraryM2Test {
     // ── 组件清单与 Icon 枚举同源钉住 ─────────────────────────────────
 
     @Test
-    fun `library registers exactly fourteen components`() {
+    fun `library registers exactly twenty one components`() {
         // M2 实装 14 组件：既有 7 + §2 枚举 7 新组件（Icon/Divider/List/Tabs/CheckBox/
-        // ChoicePicker/Slider）——spec 标题「十三」与 §5「+6→13」为计数笔误，以 §2 枚举为准
+        // ChoicePicker/Slider）——spec 标题「十三」与 §5「+6→13」为计数笔误，以 §2 枚举为准；
+        // M3（spec《openui-component-library-m3-design》§2）+7：
+        // Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch
         assertEquals(
             setOf(
                 "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
                 "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
-            ).also { expected -> assertEquals(14, expected.size) },
+                "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
+            ).also { expected -> assertEquals(21, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }
@@ -200,5 +208,296 @@ class OpenUiLibraryM2Test {
         assertEquals(OpenUiValue.Binding("\$flag"), childAt(root, 0).props["checked"])
         assertEquals(OpenUiValue.Binding("\$level"), childAt(root, 1).props["value"])
         assertEquals(OpenUiValue.Str("开"), childAt(root, 2).props["text"])
+    }
+
+    // ── M3 七组件（2026-10-24，spec《openui-component-library-m3-design》） ──
+
+    @Test
+    fun `m3 component signatures are pinned verbatim`() {
+        // 位置参数序 = 声明序（spec §3 逐字为契）：逐组件钉住 (prop 名, 类型, 必填)
+        fun signature(component: String): List<Triple<String, OpenUiPropType, Boolean>> =
+            OpenUiLibrary.components.getValue(component).props.map { prop ->
+                Triple(prop.name, prop.type, prop.required)
+            }
+        assertEquals(
+            listOf(
+                Triple("columns", OpenUiPropType.OBJECT_ARRAY, true),
+                Triple("rows", OpenUiPropType.PRIMITIVE_ARRAY, true),
+            ),
+            signature("Table"),
+        )
+        assertEquals(
+            listOf(
+                Triple("title", OpenUiPropType.STRING, false),
+                Triple("slices", OpenUiPropType.OBJECT_ARRAY, true),
+            ),
+            signature("PieChart"),
+        )
+        assertEquals(
+            listOf(
+                Triple("title", OpenUiPropType.STRING, false),
+                Triple("labels", OpenUiPropType.PRIMITIVE_ARRAY, true),
+                Triple("series", OpenUiPropType.OBJECT_ARRAY, true),
+            ),
+            signature("LineChart"),
+        )
+        assertEquals(
+            listOf(
+                Triple("text", OpenUiPropType.STRING, true),
+                Triple("title", OpenUiPropType.STRING, false),
+                Triple("tone", OpenUiPropType.ENUM, false),
+            ),
+            signature("Callout"),
+        )
+        assertEquals(
+            listOf(Triple("text", OpenUiPropType.BINDABLE_STRING, true)),
+            signature("Markdown"),
+        )
+        assertEquals(
+            listOf(Triple("items", OpenUiPropType.OBJECT_ARRAY, true)),
+            signature("Accordion"),
+        )
+        assertEquals(
+            listOf(
+                Triple("label", OpenUiPropType.STRING, true),
+                Triple("checked", OpenUiPropType.BINDABLE_BOOLEAN, true),
+            ),
+            signature("Switch"),
+        )
+        // Callout tone 枚举域与默认值
+        val tone = OpenUiLibrary.components.getValue("Callout").props.single { prop -> prop.name == "tone" }
+        assertEquals(listOf("INFO", "SUCCESS", "WARNING", "ERROR"), tone.enumValues)
+        assertEquals(OpenUiValue.Str("INFO"), tone.default)
+        // LineChart.series[].values = OBJECT_ARRAY 嵌套 PRIMITIVE_ARRAY（spec §3）
+        val seriesValues = OpenUiLibrary.components.getValue("LineChart").props
+            .single { prop -> prop.name == "series" }.objectFields
+            .single { field -> field.name == "values" }
+        assertEquals(OpenUiPropType.PRIMITIVE_ARRAY, seriesValues.type)
+        assertTrue(seriesValues.required)
+        // Accordion.items[].children = OBJECT_ARRAY 嵌套 COMPONENT_LIST（Tabs 同构）
+        val itemChildren = OpenUiLibrary.components.getValue("Accordion").props
+            .single { prop -> prop.name == "items" }.objectFields
+            .single { field -> field.name == "children" }
+        assertEquals(OpenUiPropType.COMPONENT_LIST, itemChildren.type)
+    }
+
+    // ── Table（PRIMITIVE_ARRAY 一层嵌套行） ─────────────────────────────
+
+    @Test
+    fun `table accepts column objects and nested primitive rows`() = runTest {
+        val program = """
+            root = Card([Table([{label: "月份"}, {label: "数量"}], [["2026-01", 12], ["2026-02", true]])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val table = childAt(result.root, 0)
+        assertEquals("Table", table.type)
+        val rows = table.props["rows"]
+        assertIs<OpenUiValue.Arr>(rows)
+        assertEquals(2, rows.v.size)
+        val firstRow = rows.v[0]
+        assertIs<OpenUiValue.Arr>(firstRow)
+        assertEquals(OpenUiValue.Str("2026-01"), firstRow.v[0])
+        assertEquals(OpenUiValue.Num(12.0), firstRow.v[1])
+    }
+
+    @Test
+    fun `table rows with two level nesting drop the component`() = runTest {
+        // PRIMITIVE_ARRAY 只许一层嵌套：[[["a"]]] 两层 → type-mismatch 丢组件不炸卡（spec §2）
+        val result = rendered(
+            OpenUiSession(
+                """root = Card([Table([{label: "m"}], [[["a"]]]), Text("ok")])""",
+                noTools,
+            ).prepare(),
+        )
+        assertEquals(1, childrenOf(result.root).size)
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    @Test
+    fun `table rows with mixed element types drop the component`() = runTest {
+        // 元素类型混杂（行内混入对象）按既有口径：必填 prop type-mismatch → 丢组件
+        val result = rendered(
+            OpenUiSession(
+                """root = Card([Table([{label: "m"}], [[{label: "x"}]]), Text("ok")])""",
+                noTools,
+            ).prepare(),
+        )
+        assertEquals(1, childrenOf(result.root).size)
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    @Test
+    fun `table rows non array drops the component`() = runTest {
+        val result = rendered(
+            OpenUiSession("""root = Card([Table([{label: "m"}], "nope"), Text("ok")])""", noTools).prepare(),
+        )
+        assertEquals(1, childrenOf(result.root).size)
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    // ── PieChart ─────────────────────────────────────────────────────
+
+    @Test
+    fun `pie chart accepts label value slices and optional title`() = runTest {
+        val program = """
+            root = Card([PieChart("类目占比", [{label: "人像", value: 42}, {label: "风景", value: 18}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val pie = childAt(result.root, 0)
+        assertEquals("PieChart", pie.type)
+        val slices = pie.props["slices"]
+        assertIs<OpenUiValue.Arr>(slices)
+        val first = slices.v[0]
+        assertIs<OpenUiValue.Obj>(first)
+        assertEquals(OpenUiValue.Str("人像"), first.v["label"])
+        assertEquals(OpenUiValue.Num(42.0), first.v["value"])
+    }
+
+    @Test
+    fun `pie chart slice missing value is left out`() = runTest {
+        // OBJECT_ARRAY 既有口径：形态不符元素剔除，其余保留
+        val program = """
+            root = Card([PieChart("占比", [{label: "人像", value: 42}, {label: "风景"}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        val slices = childAt(result.root, 0).props["slices"]
+        assertIs<OpenUiValue.Arr>(slices)
+        assertEquals(1, slices.v.size)
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    // ── LineChart（OBJECT_ARRAY 嵌套 PRIMITIVE_ARRAY 递归） ─────────────
+
+    @Test
+    fun `line chart accepts labels and series with nested value arrays`() = runTest {
+        val program = """
+            root = Card([LineChart("拍摄趋势", ["2026-01", "2026-02"], [{name: "全部", values: [12, 20]}, {name: "人像", values: [5, 9]}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val chart = childAt(result.root, 0)
+        assertEquals("LineChart", chart.type)
+        val labels = chart.props["labels"]
+        assertIs<OpenUiValue.Arr>(labels)
+        assertEquals(OpenUiValue.Str("2026-01"), labels.v[0])
+        val series = chart.props["series"]
+        assertIs<OpenUiValue.Arr>(series)
+        val first = series.v[0]
+        assertIs<OpenUiValue.Obj>(first)
+        val values = first.v["values"]
+        assertIs<OpenUiValue.Arr>(values)
+        assertEquals(OpenUiValue.Num(12.0), values.v[0])
+    }
+
+    @Test
+    fun `line chart series with non primitive values element is left out`() = runTest {
+        // 嵌套 PRIMITIVE_ARRAY 元素形态不符 → 该 series 元素剔除（OBJECT_ARRAY 口径），其余保留
+        val program = """
+            root = Card([LineChart("趋势", ["a", "b"], [{name: "好", values: [1, 2]}, {name: "坏", values: [{label: "x"}]}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        val series = childAt(result.root, 0).props["series"]
+        assertIs<OpenUiValue.Arr>(series)
+        assertEquals(1, series.v.size)
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    // ── Callout ──────────────────────────────────────────────────────
+
+    @Test
+    fun `callout defaults tone to info and accepts explicit tone`() = runTest {
+        val program = """
+            root = Card([Callout("默认提示"), Callout("告警", "注意", "WARNING")])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        assertEquals(OpenUiValue.Str("INFO"), childAt(result.root, 0).props["tone"])
+        val explicit = childAt(result.root, 1)
+        assertEquals(OpenUiValue.Str("注意"), explicit.props["title"])
+        assertEquals(OpenUiValue.Str("WARNING"), explicit.props["tone"])
+    }
+
+    @Test
+    fun `callout invalid tone falls back to default`() = runTest {
+        // ENUM 带默认值的既有口径：非法值 type-mismatch → 落 schema 默认（§8.2）
+        val result = rendered(
+            OpenUiSession("""root = Card([Callout("提示", "t", "FATAL")])""", noTools).prepare(),
+        )
+        assertEquals(OpenUiValue.Str("INFO"), childAt(result.root, 0).props["tone"])
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    // ── Markdown（BINDABLE_STRING，同 Text 口径） ─────────────────────
+
+    @Test
+    fun `markdown accepts literal and binding`() = runTest {
+        val program = """
+            ${'$'}body = "**结论**"
+            root = Card([Markdown("# 标题\n- 甲"), Markdown(${'$'}body)])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        assertEquals(OpenUiValue.Str("# 标题\n- 甲"), childAt(result.root, 0).props["text"])
+        assertEquals(OpenUiValue.Binding("\$body"), childAt(result.root, 1).props["text"])
+    }
+
+    // ── Accordion（OBJECT_ARRAY 嵌套 COMPONENT_LIST，Tabs 同构） ─────────
+
+    @Test
+    fun `accordion validates nested component arrays in item fields`() = runTest {
+        val program = """
+            root = Card([Accordion([{title: "明细", children: [Text("一月 12 张"), Icon("photo")]}, {title: "空区", children: []}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val accordion = childAt(result.root, 0)
+        assertEquals("Accordion", accordion.type)
+        val items = accordion.props["items"]
+        assertIs<OpenUiValue.Arr>(items)
+        assertEquals(2, items.v.size)
+        val first = items.v[0]
+        assertIs<OpenUiValue.Obj>(first)
+        assertEquals(OpenUiValue.Str("明细"), first.v["title"])
+        val children = first.v["children"]
+        assertIs<OpenUiValue.Arr>(children)
+        assertIs<OpenUiValue.ComponentVal>(children.v[0])
+    }
+
+    @Test
+    fun `accordion items with non component children are left out`() = runTest {
+        // children 字段不是组件数组 → 该 item 元素形态不符剔除（Tabs M2 同口径），其余保留
+        val program = """
+            root = Card([Accordion([{title: "坏", children: 5}, {title: "好", children: [Text("x")]}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        val items = childAt(result.root, 0).props["items"]
+        assertIs<OpenUiValue.Arr>(items)
+        assertEquals(1, items.v.size)
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    // ── Switch（BINDABLE_BOOLEAN，CheckBox 同构） ──────────────────────
+
+    @Test
+    fun `switch accepts binding and literal`() = runTest {
+        val program = """
+            ${'$'}enabled = false
+            root = Card([Switch("通知", ${'$'}enabled), Switch("锁定", true)])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        assertEquals(OpenUiValue.Binding("\$enabled"), childAt(result.root, 0).props["checked"])
+        assertEquals(OpenUiValue.Bool(true), childAt(result.root, 1).props["checked"])
+    }
+
+    @Test
+    fun `switch rejects wrong checked type and drops the component`() = runTest {
+        val result = rendered(
+            OpenUiSession("""root = Card([Switch("通知", "yes"), Text("ok")])""", noTools).prepare(),
+        )
+        assertEquals(1, childrenOf(result.root).size)
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
     }
 }

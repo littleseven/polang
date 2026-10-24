@@ -638,6 +638,17 @@ internal class OpenUiRuntime(
                 }
                 return PropOutcome.Store(OpenUiValue.Arr(items))
             }
+            OpenUiPropType.PRIMITIVE_ARRAY -> {
+                // M3（spec §2）：元素限 Str/Num/Bool 或一层嵌套 Arr（表格行）；任一元素
+                // 不符（含两层嵌套）即整体 type-mismatch——必填丢组件不炸卡（§8.2 既有口径）
+                if (value !is OpenUiValue.Arr || !value.v.all { element ->
+                        primitiveArrayElementOk(element)
+                    }
+                ) {
+                    return typeMismatch(component, prop, statementId)
+                }
+                return PropOutcome.Store(value)
+            }
             else -> {
                 val ok = when (prop.type) {
                     OpenUiPropType.STRING -> value is OpenUiValue.Str
@@ -674,8 +685,21 @@ internal class OpenUiRuntime(
                     value.v.all { element ->
                         element is OpenUiValue.ComponentVal || element is OpenUiValue.Null
                     }
+            // LineChart.series[].values（M3）：对象数组字段内的原始值数组递归校验，
+            // 与 PRIMITIVE_ARRAY 槽位同口径（Tabs COMPONENT_LIST 递归同机制）
+            OpenUiPropType.PRIMITIVE_ARRAY ->
+                value is OpenUiValue.Arr && value.v.all { element -> primitiveArrayElementOk(element) }
             else -> true
         }
+    }
+
+    /** PRIMITIVE_ARRAY 元素形态：Str/Num/Bool 或一层嵌套 Arr（内层元素同限原始值；两层嵌套拒）。 */
+    private fun primitiveArrayElementOk(element: OpenUiValue): Boolean = when (element) {
+        is OpenUiValue.Str, is OpenUiValue.Num, is OpenUiValue.Bool -> true
+        is OpenUiValue.Arr -> element.v.all { inner ->
+            inner is OpenUiValue.Str || inner is OpenUiValue.Num || inner is OpenUiValue.Bool
+        }
+        else -> false
     }
 
     /** §8.2 type-mismatch 恢复：schema 默认值 → 可选剔除 → 必填丢组件。 */
