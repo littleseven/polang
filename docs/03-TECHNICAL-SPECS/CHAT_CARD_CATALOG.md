@@ -885,7 +885,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   （[PRIVACY] uri 不出端），Coil AsyncImage + faceAwareVerticalAlignment(faceFocusY)，
   aspect 渲染期缺省 4:3 clamp [0.5,2.5]，解析不到/加载中 = 同形 surfaceVariant 占位；
   M2 渲染细则：Text.text BINDABLE_STRING（Binding 从 state 读，解析不出丢该 Text 不炸卡）；
-  Icon name→Material 图标映射 `OpenUiIconMap`（59 枚枚举，schema/server 白名单/描述三方同源）；
+  Icon name→Material 图标映射 `OpenUiIconMap`（59 枚枚举，schema/A2UI 副本源/server 白名单/描述四处同源，跨 build 残余漂移风险见 `OpenUiLibrary.iconNames` KDoc）；
   List VERTICAL 限高 320dp 纵向滚动（嵌套滚动规避）、HORIZONTAL 横滑行；Tabs 选中页签 =
   渲染期 remember 本地态不进 state；Slider 用 AppSlider（全 app 滑杆红线）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→

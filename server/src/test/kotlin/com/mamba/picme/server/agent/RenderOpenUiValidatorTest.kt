@@ -264,9 +264,9 @@ root = Card([Image(photos[0].id, 1.5)])""",
         assertTrue(error!!.contains("超长"))
     }
 
-    // ── M2 六组件（2026-10-24，spec《openui-component-library-m2-design》） ──
+    // ── M2 七新组件（2026-10-24，spec《openui-component-library-m2-design》） ──
 
-    /** M2 交互复合卡：六新组件 + $绑定 全放行。 */
+    /** M2 交互复合卡：七新组件 + $绑定 全放行。 */
     private val validM2Interactive = """
         ${'$'}level = 50
         ${'$'}flag = false

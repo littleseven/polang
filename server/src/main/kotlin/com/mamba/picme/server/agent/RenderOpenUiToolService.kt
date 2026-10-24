@@ -79,7 +79,8 @@ class RenderOpenUiToolService {
    大写开头、只用位置参数；字符串一律双引号；
 2. 必须有 `root = ...` 语句（root 是整个组件树的入口）；
 3. 可用组件签名（逐字遵守，禁发明属性）：
-   - Text(text*, role?, colorRole?)：role∈HEADLINE|SUBHEAD|BODY|CAPTION（默认 BODY），
+   - Text(text*, role?, colorRole?)：text 可传 ${'$'}绑定变量（字符串/数字/布尔自动转文本，
+     如 Text(${'$'}selected) 显示柱图点选月份）；role∈HEADLINE|SUBHEAD|BODY|CAPTION（默认 BODY），
      colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
      text 可传 ${'$'}绑定（如 Text(${'$'}selected)），随 state 回写联动刷新（见规则 6）；

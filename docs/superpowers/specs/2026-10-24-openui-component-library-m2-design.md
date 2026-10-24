@@ -1,5 +1,7 @@
 # OpenUI 组件库 M2：七组件 → 十三组件 + 可绑定 Text 设计
 
+> **勘误（2026-10-24，in-file）**：标题与 §1/§5/§6/§7 的「十三 / +6」系计数笔误——§2 实际枚举 7 个新组件（Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider），7 既有 + 7 新 = **14 组件**。一切以 §2 枚举与代码为准。
+
 > **日期**：2026-10-24
 > **状态**：已定稿（Android 先行；iOS 跟随走 ios-follow）
 > **上位约束**：`2026-10-24-openui-wire-format-toggle-design.md`（OpenUI 主 spec §4.2 组件库）、`2026-10-24-openui-image-component-design.md`（Image/#photos）、ADR-016

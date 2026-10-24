@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -24,11 +26,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mamba.picme.core.designsystem.A2uiCardTokens
@@ -96,19 +101,31 @@ fun OpenUiNodeRenderer(
                 OpenUiChildren(node, state, photoResolver, onAction)
             }
         }
-        "Row" -> Row(
-            modifier = modifier,
-            horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // 子组件等宽分栏：无 weight 时首栏按内容占宽，后续栏被压成单字竖条
-            // （2026-10-24 复杂图文排版真机事故）
+        "Row" -> run {
             val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
-            for (child in children) {
-                if (child is OpenUiValue.ComponentVal) {
-                    OpenUiNodeRenderer(child, state, photoResolver, onAction, Modifier.weight(1f))
-                } else {
-                    Box(modifier = Modifier.weight(1f)) // null 字面量/被剔除元素：等宽空占位
+            // 含 VERTICAL Divider 时行高取内容本征高：fillMaxHeight 竖线在无限高约束下会
+            // 撑到父级最大高度（长竖线穿卡），ChatScreen.kt:1564 的 IntrinsicSize.Min 先例
+            val hasVerticalDivider = children.any { child ->
+                (child as? OpenUiValue.ComponentVal)?.let { component ->
+                    component.type == "Divider" &&
+                        (component.props["axis"] as? OpenUiValue.Str)?.v == "VERTICAL"
+                } == true
+            }
+            Row(
+                modifier = if (hasVerticalDivider) modifier.height(IntrinsicSize.Min) else modifier,
+                horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // 子组件等宽分栏：无 weight 时首栏按内容占宽，后续栏被压成单字竖条
+                // （2026-10-24 复杂图文排版真机事故）；Divider 是分隔符不参与分栏
+                for (child in children) {
+                    if (child is OpenUiValue.ComponentVal) {
+                        val childModifier =
+                            if (child.type == "Divider") Modifier else Modifier.weight(1f)
+                        OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
+                    } else {
+                        Box(modifier = Modifier.weight(1f)) // null 字面量/被剔除元素：等宽空占位
+                    }
                 }
             }
         }
@@ -119,10 +136,18 @@ fun OpenUiNodeRenderer(
             OpenUiChildren(node, state, photoResolver, onAction)
         }
         "Text" -> {
-            // M2：text 升 BINDABLE_STRING——Binding 从 state 快照读；解析不出丢该 Text 不炸卡
+            // M2：text 升 BINDABLE_STRING——Binding 从 state 快照读；Str 直取，Num/Bool
+            // 回退文本形态（Text($level) 绑 Slider 数字变量是 LLM 自然写法，review 🟡2）；
+            // 解析不出丢该 Text 不炸卡
             val text = when (val prop = node.props["text"]) {
                 is OpenUiValue.Str -> prop.v
-                is OpenUiValue.Binding -> (state[prop.name] as? OpenUiValue.Str)?.v
+                is OpenUiValue.Binding -> when (val bound = state[prop.name]) {
+                    is OpenUiValue.Str -> bound.v
+                    is OpenUiValue.Num ->
+                        if (bound.v % 1.0 == 0.0) bound.v.toLong().toString() else bound.v.toString()
+                    is OpenUiValue.Bool -> bound.v.toString()
+                    else -> null
+                }
                 else -> null
             } ?: return
             Text(
@@ -232,8 +257,12 @@ private fun OpenUiValue.ComponentVal.spacingDp() =
         A2uiStyleMapper.parseSpacingRole((props["spacing"] as? OpenUiValue.Str)?.v)
     )
 
-/** List VERTICAL 限高（spec §2：约 320dp，规避聊天 LazyColumn 内嵌滚动的嵌套事故）。 */
+/** List VERTICAL 限高（spec §2：约 320dp，规避聊天 LazyColumn 内嵌滚动的嵌套滚动事故）。 */
 private val LIST_VERTICAL_MAX_HEIGHT = 320.dp
+
+/** 单 List 子项上限 / 单 Tabs 页签上限（review 🟡4：LLM 生成面无界，渲染端 take 兜底）。 */
+private const val MAX_LIST_CHILDREN = 50
+private const val MAX_TABS = 8
 
 /** Icon：name → Material 图标映射（A2UI catalog v1 59 枚同口径，见 [openUiIcon]）。 */
 @Composable
@@ -270,7 +299,7 @@ private fun OpenUiList(
     onAction: (OpenUiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_LIST_CHILDREN)
     val spacing = node.spacingDp()
     if ((node.props["direction"] as? OpenUiValue.Str)?.v == "HORIZONTAL") {
         Row(
@@ -308,22 +337,36 @@ private fun OpenUiTabs(
         val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
         val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
         OpenUiTab(title = title, children = (obj["children"] as? OpenUiValue.Arr)?.v.orEmpty())
-    }
+    }.take(MAX_TABS)
     if (tabs.isEmpty()) {
         Box(modifier = modifier)
         return
     }
-    // remember(node)：node 数据类相等（tabs 内容未变）时跨 state 回写重求值保持选中页签
-    var selectedTab by remember(node) { mutableIntStateOf(0) }
+    // 键 = 页签标题列表而非整颗 node：页签内容含 state 派生值时，@Set 回写重求值会改变
+    // node 相等性，以 node 为键会把选中页签重置回 0（review 🟡3）
+    var selectedTab by remember(tabs.map { tab -> tab.title }) { mutableIntStateOf(0) }
     val safeIndex = selectedTab.coerceIn(0, tabs.size - 1)
     Column(modifier = modifier.fillMaxWidth()) {
-        TabRow(selectedTabIndex = safeIndex) {
-            tabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = index == safeIndex,
-                    onClick = { selectedTab = index },
-                    text = { Text(text = tab.title) },
-                )
+        // 页签多（>4）时 TabRow 挤压截断 → ScrollableTabRow 横滑（review 🟡4）
+        if (tabs.size > 4) {
+            ScrollableTabRow(selectedTabIndex = safeIndex, edgePadding = 0.dp) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = index == safeIndex,
+                        onClick = { selectedTab = index },
+                        text = { Text(text = tab.title) },
+                    )
+                }
+            }
+        } else {
+            TabRow(selectedTabIndex = safeIndex) {
+                tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = index == safeIndex,
+                        onClick = { selectedTab = index },
+                        text = { Text(text = tab.title) },
+                    )
+                }
             }
         }
         Column(modifier = Modifier.padding(top = Spacing.sm)) {
@@ -351,21 +394,23 @@ private fun OpenUiCheckBox(
         is OpenUiValue.Bool -> checkedProp.v
         else -> null
     } ?: return
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = { newValue ->
-                bindingName?.let { name ->
-                    onAction(
-                        OpenUiAction(
-                            name = "Set",
-                            args = listOf(OpenUiValue.Bool(newValue)),
-                            target = name,
-                        )
-                    )
-                }
-            },
-        )
+    val toggle: (Boolean) -> Unit = { newValue ->
+        bindingName?.let { name ->
+            onAction(
+                OpenUiAction(
+                    name = "Set",
+                    args = listOf(OpenUiValue.Bool(newValue)),
+                    target = name,
+                )
+            )
+        }
+    }
+    // 整行 toggleable（label 也可点，扩大热区 + 无障碍，review 🔵3）；Checkbox 本体挂 null 防双击
+    Row(
+        modifier = modifier.toggleable(value = checked, role = Role.Checkbox, onValueChange = toggle),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -448,8 +493,10 @@ private fun OpenUiSlider(
         is OpenUiValue.Num -> valueProp.v
         else -> null
     } ?: return
-    // remember(node)：props 含 Binding 引用（回写后不变），拖动态跨 state 回写重求值保持
+    // 拖动态跨重组保持；外部写入（其他组件 @Set 同变量 / 重开卡重种）经
+    // LaunchedEffect 回写同步 thumb（review 🟡3）；拖动期 resolved 不变（Set 只在拖动结束发）
     var dragValue by remember(node) { mutableStateOf(resolved.toFloat().coerceIn(min, max)) }
+    LaunchedEffect(resolved) { dragValue = resolved.toFloat().coerceIn(min, max) }
     Column(modifier = modifier.fillMaxWidth()) {
         label?.let { text ->
             Text(text = text, style = MaterialTheme.typography.labelSmall)
