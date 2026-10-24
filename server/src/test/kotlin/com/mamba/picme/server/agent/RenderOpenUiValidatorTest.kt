@@ -147,6 +147,26 @@ root = Card([Image(photos[0].id, 1.5)])""",
     }
 
     @Test
+    fun `quoted action string is rejected`() {
+        // 2026-10-24 真机事故：LLM 把 action 包成字符串（"@OpenUrl(...)"），
+        // 端侧 ACTION 校验 type-mismatch 按钮静默惰性——服务端同轮纠错拦截
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([Button("查看全部", "@OpenUrl(\"https://example.com/album\")")])""",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("裸动作表达式"))
+    }
+
+    @Test
+    fun `bare action expression passes`() {
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([Button("查看全部", @OpenUrl("https://example.com/album"))])""",
+            ),
+        )
+    }
+
+    @Test
     fun `no root statement falls back to first Card entry`() {
         assertNull(RenderOpenUiValidator.validateToError("""page = Card([Text("x")])"""))
     }

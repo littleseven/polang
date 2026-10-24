@@ -57,7 +57,8 @@ class RenderOpenUiToolService {
    - Row(children*, spacing?) / Column(children*, spacing?) / Card(children*, spacing?)：
      children 是组件数组（[组件1, 组件2]），spacing∈COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
      Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；
-   - Button(label*, action?)：action 形如 @OpenUrl("https://...")；
+   - Button(label*, action?)：action 是裸动作表达式、最外层不要加引号，
+     形如 Button("查看", @OpenUrl("https://..."))（"@OpenUrl(...)" 包成字符串会被拒）；
    - BarChart(title?, buckets*, selected?)：buckets 是 [{label,count}] 数据引用；
    - Image(photo*, aspect?)：相册照片（图文混排用）；photo 只许填 photos 数组元素的
      id（如 photos[0].id），禁止写字面量数字 id（防臆造）；aspect 是宽高比

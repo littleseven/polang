@@ -53,6 +53,10 @@ object RenderOpenUiValidator {
     private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#(histogram|photos))?""")
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
 
+    /** 动作表达式被包成字符串（2026-10-24 真机事故：LLM 写 "@OpenUrl(...)" 致端侧
+     *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。 */
+    private val QUOTED_ACTION = Regex(""""@(OpenUrl|Set|Reset|ToAssistant)\s*\(""")
+
     /** 单卡 Image 数上限（2026-10-24 review 🟡3 OOM 护栏）：全宽图每张约 3.5MB 位图，
      *  整卡同屏组合存活，60 张投影上限是 token 保护而非内存保护——超过即同轮纠错。 */
     const val MAX_IMAGE_COMPONENTS = 12
@@ -86,6 +90,9 @@ object RenderOpenUiValidator {
         }
         if (MEDIA_PATH.containsMatchIn(program)) {
             violations += "禁止把媒体路径/uri 写进 program（隐私投影契约），相册数据一律走 Query(\"local_handle\", …) 绑定"
+        }
+        QUOTED_ACTION.findAll(program).forEach { match ->
+            violations += "动作表达式被包成了字符串（${match.value}…）：Button 的 action 是裸动作表达式，去掉最外层那对引号——写 Button(\"查看\", @OpenUrl(\"https://…\"))，不要 Button(\"查看\", \"@OpenUrl(…)\")"
         }
         // 剥离字符串字面量与行注释后再扫结构（防文案内容误伤）。
         // 顺序必须是先字符串后注释：handle 里的 local:// 含 //，先剥注释会把
