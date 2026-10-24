@@ -807,13 +807,23 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 - **协议**：`ChatMessageEntity.type = "data_ui"`，content 列存整颗 `MessagePart.A2uiCard` part JSON
   （tool_browser 先例）；云端经 render_ui 工具 action 帧下发，端上 TurnRunner 拦截落库。
+  **服务端校验闭环**（2026-10-24，sf-012a0/sf-a2u1c0de 事故修复）：render_ui 负载在服务端
+  `RenderUiValidator` 过发射点门控（Action 事件先于工具体落流，校验必须挂在
+  `AgentRunner.actionGate` 才能拦住坏负载到端）——非法负载不落 Action、不下行、不进 pending
+  重放，工具体回 `error: …` 逐条违规清单经 Observation 回灌，LLM 同轮修正重试；工具描述内嵌
+  黄金示例 few-shot（`RENDER_UI_EXAMPLE` 常量被测试钉住自身过校验）。
 - **parts 形态**：`MessagePart.A2uiCard(partId, surfaceId, messagesJson, fallbackSummary, viewState)`，
   category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7）。
 - **回灌**：不回灌 LLM（ChatModelInput data part 分支 emptyList）；messagesJson 只含骨架+local://
   绑定，handle id 对云 opaque（D2）。
 - **渲染**：ChatScreen TYPE_A2UI_CARD → A2uiCardHost（androidx.a2ui 官方渲染器，
-  polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract）；
-  HandleResolver 填槽，缺失降级占位卡（US-6）。
+  polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract，
+  为可解引用 URL——GET 返回官网静态 catalog JSON schema
+  `docs-site/a2ui/catalog/v1.json`，由 `A2uiCatalogDescriptorSyncTest` 从运行态 catalog
+  序列化生成并对账（regen 方式见测试类头注释），deploy-docs-site.sh 发布）；
+  HandleResolver 填槽，缺失降级占位卡（US-6）。BarChart 柱高公式 = (barAreaHeight −
+  barLabelHeight) × count/maxCount（`barChartBarHeight` 纯函数，2026-10-24 修复：
+  满高柱顶满定高 Row 会把柱下月份标签挤出裁掉，单桶图退化为无标签纯色块）。
 - **交互态**：BarChart 点柱 → selectBucket 事件本地消费（不上行）→ 回写数据模型
   `/selected` 高亮 + viewState `selected=<label>` 持久化（US-7 恢复填槽同路径）。
   **防御纵深**（2026-10-24 sf-012a0 事故）：契约要求蓝图 selected 写 `{"path":"/selected"}`
@@ -827,6 +837,13 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   updateDataModel pretty JSON + 复制全部；messagesJson 非法时降级显示原文+原因，永不崩聊天页）；
   解析纯函数 `parseBlueprintMessages`（`A2uiBlueprintDebugger.kt`），徽标内容为协议标识符无自然语言，
   [I18N] 豁免，release 包 `BuildConfig.DEBUG` 门控零痕迹。
+- **测试**：`A2uiComponentAvailabilityTest`（引擎层：19 组件注册清单 + v0.9 必填属性契约 +
+  逐组件蓝图落成 active surface + 数据绑定落位 + 负路径降级）/ `A2uiComponentRenderSmokeTest`
+  （渲染层：19 组件同框 Compose 实渲冒烟，Robolectric native graphics）/ `HandleResolverTest` /
+  `BarChartSelectedBindingNormalizationTest` / `A2uiBlueprintDebuggerTest` / `PolangA2uiCatalogTest` /
+  `A2uiCatalogDescriptorSyncTest`（官网 catalog 描述文件对账 + `REGEN_A2UI_CATALOG=true` 再生成）。
+  测试夹具注意：surface actor 生命周期挂在收集协程 scope 上，scope 取消即回收数据模型，
+  承载 scope 必须活到断言结束。
 
 ---
 

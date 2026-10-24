@@ -16,8 +16,13 @@ object A2uiCardContract {
     /** ChatMessageEntity.type / converter 分支键。 */
     const val PART_TYPE = "data_ui"
 
-    /** polang A2UI catalog 唯一 id（createSurface.catalogId 必须等于它）。 */
-    const val CATALOG_ID = "https://polang.mamba.com/a2ui/catalog/v1"
+    /**
+     * polang A2UI catalog 唯一 id（createSurface.catalogId 必须等于它）。
+     * 可解引用 URL：GET 返回 catalog JSON schema（官网静态文件 docs-site/a2ui/catalog/v1.json，
+     * 由 androidApp `A2uiCatalogDescriptorSyncTest` 生成并对账，部署走 deploy-docs-site.sh）；
+     * 端侧仍仅做等值匹配、从不发起网络请求。
+     */
+    const val CATALOG_ID = "https://polang.net/a2ui/catalog/v1.json"
 
     const val HANDLE_SCHEME = "local://"
 

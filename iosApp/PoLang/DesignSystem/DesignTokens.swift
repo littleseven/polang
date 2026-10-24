@@ -707,6 +707,7 @@ enum IdPhotoTokens {
 enum A2uiCardTokens {
     static let barAreaHeight: CGFloat = 120
     static let barGap: CGFloat = 6
+    static let barLabelHeight: CGFloat = 20
     static let barUnselectedAlpha: Double = 0.45
     static let debugBadgeRadius: CGFloat = 12
     static let debugMaxHeight: CGFloat = 420

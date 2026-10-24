@@ -11,7 +11,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.http.fullPath
 import ai.koog.http.client.ktor.KtorKoogHttpClient
+import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.agents.core.tools.reflect.asToolsByClass
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -47,7 +51,10 @@ class AgentRunnerTest {
          "usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}
     """.trimIndent()
 
-    private fun runnerWith(vararg responses: Pair<HttpStatusCode, String>): AgentRunner {
+    private fun runnerWith(
+        vararg responses: Pair<HttpStatusCode, String>,
+        actionGate: (String, String) -> String? = { _, _ -> null },
+    ): AgentRunner {
         val queue = ArrayDeque(responses.toList())
         val engine = MockEngine { request ->
             capturedRequests += request.url.fullPath to request.headers.entries().map { it.key to it.value }.toMap()
@@ -57,6 +64,7 @@ class AgentRunnerTest {
         return AgentRunner(
             executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
             dispatcher = ServerToolDispatcher.default(),
+            actionGate = actionGate,
         )
     }
 
@@ -292,4 +300,71 @@ class AgentRunnerTest {
 
         assertEquals("/v1/chat/completions", capturedRequests.single().first)
     }
+
+    // ── render_ui 发射点门控（actionGate，2026-10-24）─────────────────────
+
+    /**
+     * 非法 render_ui 负载：不落 Action 事件（坏卡永不到端侧），工具体回 error 文本
+     * 经 Observation 回灌 LLM，同轮可修正重试。
+     */
+    @Test
+    fun `invalid render_ui payload is gated - no action event, error observation fed back`() = runBlocking {
+        val session = newSession()
+        val badArgs = buildJsonObject {
+            put("surfaceId", "sf-bad00001")
+            put(
+                "messagesJson",
+                "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-bad00001\",\"catalogId\":\"https://wrong.example/x\"}}]",
+            )
+            put("fallbackSummary", "摘要")
+        }.toString()
+        val registry = ToolRegistry { tools(RenderUiToolService().asToolsByClass()) }
+
+        runnerWith(
+            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui", jsonArgsEscape(badArgs)),
+            HttpStatusCode.OK to chatResponse("收到错误，已修正"),
+            actionGate = RenderUiValidator::gate,
+        ).runTurn(session, "发张统计卡", gatewayTarget, "sys", registry)
+
+        val events = AgentEventRepository.listBySession(session.id)
+        assertFalse("被拒负载不得落 Action 事件", events.any { event -> event.type == AgentEventType.ACTION })
+        val observation = events.single { event -> event.type == AgentEventType.OBSERVATION }
+        val content = (observation.payload as AgentEventPayload.Observation).content
+        // ctx.toolResult.toString() 对字符串结果带引号包装，不断言 startsWith
+        assertTrue("Observation 应携带校验错误回灌 LLM，实际：$content", content.contains("error: render_ui 负载校验未通过"))
+        assertTrue(content.contains("catalogId"))
+    }
+
+    /** 合法 render_ui 负载：门控放行，Action 事件正常落流下行。 */
+    @Test
+    fun `valid render_ui payload passes gate and emits action event`() = runBlocking {
+        val session = newSession()
+        val goodArgs = buildJsonObject {
+            put("surfaceId", "sf-ok000001")
+            put(
+                "messagesJson",
+                "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-ok000001\",\"catalogId\":\"${RenderUiValidator.CATALOG_ID}\"}}," +
+                    "{\"version\":\"v0.9\",\"updateComponents\":{\"surfaceId\":\"sf-ok000001\",\"components\":[{\"id\":\"root\",\"component\":\"Text\",\"text\":\"hi\"}]}}]",
+            )
+            put("fallbackSummary", "摘要")
+        }.toString()
+        val registry = ToolRegistry { tools(RenderUiToolService().asToolsByClass()) }
+
+        runnerWith(
+            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui", jsonArgsEscape(goodArgs)),
+            HttpStatusCode.OK to chatResponse("卡已发"),
+            actionGate = RenderUiValidator::gate,
+        ).runTurn(session, "发张统计卡", gatewayTarget, "sys", registry)
+
+        val events = AgentEventRepository.listBySession(session.id)
+        val action = events.single { event -> event.type == AgentEventType.ACTION }
+        assertEquals("render_ui", (action.payload as AgentEventPayload.Action).tool)
+        // Observation 与 Action 正常配对闭环
+        val observation = events.single { event -> event.type == AgentEventType.OBSERVATION }
+        assertEquals(action.id, (observation.payload as AgentEventPayload.Observation).actionEventId)
+    }
+
+    /** toolCallResponse 把 args 平铺进 JSON 字符串字段，内嵌引号/反斜杠须预转义。 */
+    private fun jsonArgsEscape(raw: String): String =
+        raw.replace("\\", "\\\\").replace("\"", "\\\"")
 }
