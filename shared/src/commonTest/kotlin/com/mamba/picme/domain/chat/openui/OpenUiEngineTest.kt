@@ -264,9 +264,10 @@ class OpenUiEngineTest {
         session.applyAction(OpenUiAction("Set", listOf(OpenUiValue.Str("一月")), target = "\$selected"))
 
         assertEquals(OpenUiValue.Str("一月"), session.state["\$selected"])
+        // M2：Text.text 升 BINDABLE_STRING——$selected 原文收 Binding，渲染期从 state 读
         val text = childrenOf(session.rootOrNull()!!).first()
         assertIs<OpenUiValue.ComponentVal>(text)
-        assertEquals(OpenUiValue.Str("一月"), text.props["text"])
+        assertEquals(OpenUiValue.Binding("\$selected"), text.props["text"])
         // Query 结果缓存：重求值不重跑
         assertEquals(1, tools.calls.size)
         // 绑定属性重建后仍是 Binding
@@ -373,7 +374,9 @@ class OpenUiEngineTest {
         rendered(session.prepare())
         val text = childrenOf(session.rootOrNull()!!).single()
         assertIs<OpenUiValue.ComponentVal>(text)
-        assertEquals(OpenUiValue.Str("x"), text.props["text"])
+        // M2：Text($selected) 存 Binding；初始 state 覆盖默认值由渲染期解析体现
+        assertEquals(OpenUiValue.Binding("\$selected"), text.props["text"])
+        assertEquals(OpenUiValue.Str("x"), session.state["\$selected"])
     }
 
     // ── 端到端（设计 spec §4.3 示例程序） ────────────────────────────

@@ -1,5 +1,6 @@
 package com.mamba.picme.server.agent
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -261,6 +262,59 @@ root = Card([Image(photos[0].id, 1.5)])""",
         val error = RenderOpenUiValidator.validateToError(program)
         assertNotNull(error)
         assertTrue(error!!.contains("超长"))
+    }
+
+    // ── M2 六组件（2026-10-24，spec《openui-component-library-m2-design》） ──
+
+    /** M2 交互复合卡：六新组件 + $绑定 全放行。 */
+    private val validM2Interactive = """
+        ${'$'}level = 50
+        ${'$'}flag = false
+        ${'$'}choice = "a"
+        root = Card([Icon("photo"), Divider(), List([Text("x")], "HORIZONTAL"), Tabs([{title: "t", children: [Text("y")]}]), CheckBox("精选", ${'$'}flag), ChoicePicker("排序", [{label: "时间", value: "a"}], ${'$'}choice), Slider(value = ${'$'}level)])
+    """.trimIndent()
+
+    @Test
+    fun `m2 six new components pass whitelist`() {
+        assertNull(RenderOpenUiValidator.validateToError(validM2Interactive))
+    }
+
+    @Test
+    fun `icon with predefined name passes`() {
+        assertNull(RenderOpenUiValidator.validateToError("""root = Card([Icon("warning")])"""))
+    }
+
+    @Test
+    fun `icon with unknown name is rejected`() {
+        // 禁臆造图标名（svgPath 同口径）：服务端同轮纠错，不放行到端侧静默丢组件
+        val error = RenderOpenUiValidator.validateToError("""root = Card([Icon("explode")])""")
+        assertNotNull(error)
+        assertTrue(error!!.contains("explode") && error.contains("预定义图标集"))
+    }
+
+    @Test
+    fun `icon names match a2ui validator whitelist`() {
+        // 字面量副本同源钉住：RenderUiValidator.ICON_NAMES 是副本源（spec §5）
+        assertEquals(59, RenderOpenUiValidator.ICON_NAMES.size)
+        assertEquals(
+            RenderUiValidator.ICON_NAMES,
+            RenderOpenUiValidator.ICON_NAMES,
+        )
+    }
+
+    @Test
+    fun `tool description icon list matches validator whitelist`() {
+        // 工具描述内嵌清单 ↔ 校验器白名单同源钉住（spec §5 三处字面量副本）
+        assertEquals(
+            RenderOpenUiValidator.ICON_NAMES.sorted().joinToString(", "),
+            RenderOpenUiToolService.ICON_NAMES_TEXT,
+        )
+    }
+
+    @Test
+    fun `tool description interactive golden example passes validation`() {
+        // 交互黄金示例同源引用同一常量（GOLDEN_STATS_PROGRAM 钉法先例）
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_INTERACTIVE_PROGRAM))
     }
 
     // ── argsJson 与 gate 分发 ───────────────────────────────────────

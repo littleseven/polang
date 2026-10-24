@@ -118,6 +118,16 @@ internal fun openUiResolvePath(value: OpenUiValue, path: String): OpenUiValue {
  * 引用提升：语句任意顺序互引；环在成环点按未解析（§2.3，栈检测）。同一语句被两处
  * 引用分别求值（树复制，state store 共享，Query 结果经 queryResults 共享）。
  */
+/**
+ * 可绑定 prop 类型闭集（M2：BINDABLE_STRING/BOOLEAN/NUMBER）——字面量或 `$binding` 皆收，
+ * `$var` 原文收为 [OpenUiValue.Binding]，渲染期从 state 快照解析。
+ */
+private val BINDABLE_PROP_TYPES = setOf(
+    OpenUiPropType.BINDABLE_STRING,
+    OpenUiPropType.BINDABLE_BOOLEAN,
+    OpenUiPropType.BINDABLE_NUMBER,
+)
+
 internal class OpenUiRuntime(
     private val statements: Map<String, OpenUiStatement>,
     val store: MutableMap<String, OpenUiValue>,
@@ -552,8 +562,9 @@ internal class OpenUiRuntime(
                 }
                 continue
             }
-            // 可绑定属性收 $var 原文为 Binding（§5.2；库内仅 BarChart.selected）
-            if (prop.type == OpenUiPropType.BINDABLE_STRING && argExpr is OpenUiExpr.StateRef) {
+            // 可绑定属性收 $var 原文为 Binding（§5.2；BINDABLE_STRING/BOOLEAN/NUMBER
+            // 三类同口径：字面量或 Binding 皆收，Binding 渲染期从 state 快照解析）
+            if (prop.type in BINDABLE_PROP_TYPES && argExpr is OpenUiExpr.StateRef) {
                 props[prop.name] = OpenUiValue.Binding(argExpr.name)
                 continue
             }
@@ -635,6 +646,10 @@ internal class OpenUiRuntime(
                     OpenUiPropType.ENUM -> value is OpenUiValue.Str && value.v in prop.enumValues
                     OpenUiPropType.BINDABLE_STRING ->
                         value is OpenUiValue.Str || value is OpenUiValue.Binding
+                    OpenUiPropType.BINDABLE_BOOLEAN ->
+                        value is OpenUiValue.Bool || value is OpenUiValue.Binding
+                    OpenUiPropType.BINDABLE_NUMBER ->
+                        value is OpenUiValue.Num || value is OpenUiValue.Binding
                     OpenUiPropType.ACTION ->
                         value is OpenUiValue.ActionVal ||
                             (value is OpenUiValue.Arr && value.v.all { e -> e is OpenUiValue.ActionVal })
@@ -652,6 +667,13 @@ internal class OpenUiRuntime(
             OpenUiPropType.NUMBER -> value is OpenUiValue.Num
             OpenUiPropType.BOOLEAN -> value is OpenUiValue.Bool
             OpenUiPropType.ENUM -> value is OpenUiValue.Str && value.v in field.enumValues
+            // Tabs.tabs.children（M2）：对象数组字段内的组件数组递归校验——
+            // 元素只收组件（显式 null 字面量保留，与 COMPONENT_LIST 槽位同口径）
+            OpenUiPropType.COMPONENT_LIST ->
+                value is OpenUiValue.Arr &&
+                    value.v.all { element ->
+                        element is OpenUiValue.ComponentVal || element is OpenUiValue.Null
+                    }
             else -> true
         }
     }

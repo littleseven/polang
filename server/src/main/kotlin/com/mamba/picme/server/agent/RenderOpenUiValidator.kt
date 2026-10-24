@@ -33,8 +33,31 @@ object RenderOpenUiValidator {
     /** program 长度上限（对齐 render_html 128_000 字符先例）。 */
     const val MAX_PROGRAM_LENGTH = 128_000
 
-    /** 组件白名单（生成引导面，与 shared OpenUiLibrary 七组件对齐）。 */
-    private val ALLOWED_COMPONENTS = setOf("Text", "Row", "Column", "Card", "Button", "BarChart", "Image")
+    /** 组件白名单（生成引导面，与 shared OpenUiLibrary 十四组件对齐：M2（2026-10-24）
+     *  +Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider——spec §2 枚举 7 个新组件，
+     *  spec 标题「十三」系计数笔误，以 §2 枚举为准）。 */
+    private val ALLOWED_COMPONENTS = setOf(
+        "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
+        "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
+    )
+
+    /**
+     * Icon.name 59 枚预定义图标名白名单（M2，禁 svgPath 同口径）——字面量副本三方同步：
+     * [RenderUiValidator.ICON_NAMES]（副本源，A2UI catalog v1）↔ 本清单 ↔ shared
+     * `OpenUiLibrary.iconNames` ENUM 域 ↔ `RenderOpenUiToolService.ICON_NAMES_TEXT`
+     * 描述内嵌清单，改动须四处核对（测试钉住同源）。
+     */
+    internal val ICON_NAMES = setOf(
+        "accountCircle", "add", "arrowBack", "arrowForward", "attachFile", "calendarToday",
+        "call", "camera", "check", "close", "delete", "download", "edit", "error", "event",
+        "fastForward", "favorite", "favoriteOff", "folder", "help", "home", "info",
+        "locationOn", "lock", "lockOpen", "mail", "menu", "moreHoriz", "moreVert",
+        "notifications", "notificationsOff", "pause", "payment", "person", "phone", "photo",
+        "play", "print", "refresh", "rewind", "search", "send", "settings", "share",
+        "shoppingCart", "skipNext", "skipPrevious", "star", "starHalf", "starOff", "stop",
+        "upload", "visibility", "visibilityOff", "volumeDown", "volumeMute", "volumeOff",
+        "volumeUp", "warning",
+    )
 
     /** 组件外唯一允许的大写调用：Query（宿主取数语句）。 */
     private val ALLOWED_CALLS = ALLOWED_COMPONENTS + "Query"
@@ -46,6 +69,10 @@ object RenderOpenUiValidator {
     private val CARD_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Card\s*\(""")
     private val QUERY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(\s*"((?:[^"\\]|\\.)*)"""")
     private val IMAGE_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(""")
+
+    /** Icon 首参字符串字面量抽取（M2 Icon name 白名单校验；须在字符串剥离前扫原文，
+     *  同 QUERY_CALL 口径）。非字符串首参（如 $绑定）不匹配，由端侧 schema 兜底。 */
+    private val ICON_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Icon\s*\(\s*"([^"\\]*)"""")
     private val LOCAL_HANDLE_REF = Regex("""local://[^\s"}\],)]*""")
 
     /** fragment 闭集白名单（2026-10-24 review 🟡4）：typo（如 #photo）在服务端同轮纠错，
@@ -105,7 +132,7 @@ object RenderOpenUiValidator {
             violations += "缺 root = 语句（root 是组件树入口；无 root 时兜底的首个 Card 语句也缺失）"
         }
 
-        // 2. 组件名白名单：大写开头调用只允许七组件 + Query
+        // 2. 组件名白名单：大写开头调用只允许十四组件 + Query
         CALL_NAME.findAll(stripped)
             .map { match -> match.groupValues[1] }
             .toSet()
@@ -137,6 +164,14 @@ object RenderOpenUiValidator {
         val imageCount = IMAGE_CALL.findAll(stripped).count()
         if (imageCount > MAX_IMAGE_COMPONENTS) {
             violations += "Image 组件 $imageCount 个超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张图，防整卡同屏位图 OOM；精简到最关键的几张）"
+        }
+
+        // 5. Icon name 白名单（M2，正则级）：禁臆造图标名在服务端同轮纠错
+        ICON_CALL.findAll(program).forEach { match ->
+            val iconName = match.groupValues[1]
+            if (iconName !in ICON_NAMES) {
+                violations += "Icon name \"$iconName\" 不在预定义图标集（59 枚，如 photo/person/star/check/warning/settings/search 等，禁臆造，全量清单见工具描述）"
+            }
         }
 
         return violations

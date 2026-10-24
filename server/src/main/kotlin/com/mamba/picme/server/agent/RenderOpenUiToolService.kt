@@ -41,6 +41,34 @@ class RenderOpenUiToolService {
                 "root = Card([Text(\"海边之旅\", \"HEADLINE\"), " +
                 "Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), " +
                 "Text(photos[0].date, \"CAPTION\")])"
+
+        /**
+         * 交互黄金示例（M2，spec《openui-component-library-m2-design》§5）：
+         * BarChart 点选 + Text($selected) 联动文案 + CheckBox 勾选回写。
+         */
+        const val GOLDEN_INTERACTIVE_PROGRAM =
+            D + "selected = \"\"\n" +
+                D + "onlyFavorites = false\n" +
+                "buckets = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#histogram\" }, [])\n" +
+                "root = Card([Text(\"我的相册\", \"HEADLINE\"), " +
+                "BarChart(\"每月照片数\", buckets, " + D + "selected), " +
+                "Text(\"当前选中: \" + " + D + "selected, \"CAPTION\"), " +
+                "CheckBox(\"只看精选\", " + D + "onlyFavorites)])"
+
+        /**
+         * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
+         * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
+         * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
+         */
+        const val ICON_NAMES_TEXT =
+            "accountCircle, add, arrowBack, arrowForward, attachFile, calendarToday, call, " +
+                "camera, check, close, delete, download, edit, error, event, fastForward, " +
+                "favorite, favoriteOff, folder, help, home, info, locationOn, lock, lockOpen, " +
+                "mail, menu, moreHoriz, moreVert, notifications, notificationsOff, pause, " +
+                "payment, person, phone, photo, play, print, refresh, rewind, search, send, " +
+                "settings, share, shoppingCart, skipNext, skipPrevious, star, starHalf, " +
+                "starOff, stop, upload, visibility, visibilityOff, volumeDown, volumeMute, " +
+                "volumeOff, volumeUp, warning"
     }
 
     @Tool(customName = "render_ui_openui")
@@ -54,6 +82,7 @@ class RenderOpenUiToolService {
    - Text(text*, role?, colorRole?)：role∈HEADLINE|SUBHEAD|BODY|CAPTION（默认 BODY），
      colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
+     text 可传 ${'$'}绑定（如 Text(${'$'}selected)），随 state 回写联动刷新（见规则 6）；
    - Row(children*, spacing?) / Column(children*, spacing?) / Card(children*, spacing?)：
      children 是组件数组（[组件1, 组件2]），spacing∈COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
      Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；
@@ -64,6 +93,18 @@ class RenderOpenUiToolService {
      id（如 photos[0].id），禁止写字面量数字 id（防臆造）；aspect 是宽高比
      （宽/高，默认 1.33，横图可传 1.5~1.78，竖图 0.75）；
      Row([Image(...), Image(...)]) 可多张并排等宽；单卡图片≤12 张（内存上限）；
+   - Icon(name*, colorRole?)：name 只用预定义图标名（59 枚清单见规则 6 末），禁臆造；
+   - Divider(axis?)：分隔线，axis∈HORIZONTAL|VERTICAL（默认 HORIZONTAL）；
+   - List(children*, direction?, spacing?)：direction∈VERTICAL|HORIZONTAL（默认 VERTICAL
+     限高纵向滚动，HORIZONTAL 横滑行）；
+   - Tabs(tabs*)：tabs 是 [{title: "页签标题", children: [组件...]}]，至少一个页签；
+   - CheckBox(label*, checked*)：checked 传 ${'$'}布尔绑定（见规则 6），点按回写；
+     裸 true/false 字面量只读不回写；
+   - ChoicePicker(label?, options*, selected*)：options 是 [{label: "显示文案", value: "值"}]，
+     selected 传 ${'$'}字符串绑定，点选回写 value；裸字面量只读；
+   - Slider(label?, value*, min?, max?)：value 传 ${'$'}数字绑定，min/max 默认 0/100，
+     拖动结束回写数值；裸数字字面量只读；label 可省略，省略时 value 须写命名实参
+     （形如 Slider(value=${'$'}level)——位置参数首槽是 label）；
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
    `buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])`
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
@@ -76,14 +117,23 @@ class RenderOpenUiToolService {
    handle id 只在 program 里引用，回复正文禁止向用户展示 handle id；
 5. Query 推荐独占整条语句右侧（先 `buckets = Query("local_handle", …, [])` 单独成行，
    组件参数里引用 buckets——见规则 7 黄金示例；端侧引擎已支持内联提升，独占写法最稳）；
-6. 交互约定：含 BarChart 的程序首行写 `${'$'}selected = ""`，BarChart 的 selected 参数传 `${'$'}selected`
-   （端侧点选高亮回写该变量；裸字符串字面量不参与回写，点选高亮会静默失效）；
+6. state 与交互约定（交互组件 = BarChart/CheckBox/ChoicePicker/Slider，可绑定文案 = Text）：
+   每个用到的 ${'$'}变量先独占一行声明默认值（如 `${'$'}selected = ""`、`${'$'}level = 50`、
+   `${'$'}flag = false`），再传给组件的可绑定参数（BarChart selected / CheckBox checked /
+   ChoicePicker selected / Slider value / Text text）；端侧点选/勾选/拖值 → 回写该变量并
+   整卡重渲染（如 Text(${'$'}selected) 随点选刷新显示当前选中项）；传裸字面量则只读展示
+   不回写（BarChart 裸字符串点选高亮静默失效）；交互 state 不持久化，`${'$'}selected`
+   之外变量重开卡回默认值；
+   Icon 预定义图标名清单（59 枚，逐字使用，禁臆造）：
+""" + ICON_NAMES_TEXT + """
 7. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示；
 8. 完整黄金示例（统计卡标准骨架——照此结构写：root = 语句必须有、独占一行、
    组件引用前面语句的变量名；program 不要包 markdown 代码围栏）：
 """ + GOLDEN_STATS_PROGRAM + """
    图文混排黄金示例（搜索拿 handle 后，照片与文字同卡混排）：
-""" + GOLDEN_MIXED_PROGRAM
+""" + GOLDEN_MIXED_PROGRAM + """
+   交互相册卡黄金示例（BarChart 点选 + Text 联动文案 + CheckBox 勾选回写）：
+""" + GOLDEN_INTERACTIVE_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

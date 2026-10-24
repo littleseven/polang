@@ -63,14 +63,23 @@ data class OpenUiCard(
 
 | 组件 | 位置参数（* = 必填） | 对偶 A2UI |
 |---|---|---|
-| `Text` | `text*`, `role?`, `colorRole?` | Text + 语义样式令牌（role=HEADLINE/SUBHEAD/BODY/CAPTION，colorRole=PRIMARY/SURFACE/ERROR/ON_SURFACE，端侧经 A2uiStyleMapper 同款映射走 design token） |
+| `Text` | `text*`, `role?`, `colorRole?` | Text + 语义样式令牌（role=HEADLINE/SUBHEAD/BODY/CAPTION，colorRole=PRIMARY/SURFACE/ERROR/ON_SURFACE，端侧经 A2uiStyleMapper 同款映射走 design token）；M2 起 text 为 BINDABLE_STRING（字面量照收；`$绑定` 渲染期从 state 读，解析不出丢该 Text 不炸卡） |
 | `Row` | `children*`, `spacing?` | Row（spacing=COMPACT/STANDARD/COMFORTABLE） |
 | `Column` | `children*`, `spacing?` | Column |
 | `Card` | `children*`, `spacing?` | Card（library root 组件） |
 | `Button` | `label*`, `action?` | Button |
 | `BarChart` | `title?`, `buckets*`, `selected?` | BarChart（buckets=[{label,count}]；selected 传 `$selected` 绑定） |
 | `Image` | `photo*`, `aspect?` | 相册照片（图文混排，2026-10-24 新增第七组件，详见 spec《openui-image-component-design》）：photo = `local://scan/<id>#photos` 投影元素的 id（渲染期端侧 id→uri，uri 不进 program/payload，[PRIVACY]）；aspect 宽高比（渲染期缺省 4:3，clamp [0.5, 2.5]） |
+| `Icon` | `name*`, `colorRole?` | Icon（M2，2026-10-24）：name = A2UI catalog v1 的 59 枚预定义图标名（禁 svgPath 同口径；三处字面量副本 = shared ENUM 域 ↔ server 白名单 ↔ 工具描述清单，测试钉住同源） |
+| `Divider` | `axis?` | Divider（M2）：axis=HORIZONTAL\|VERTICAL（默认 HORIZONTAL） |
+| `List` | `children*`, `direction?`, `spacing?` | List（M2）：direction=VERTICAL\|HORIZONTAL（默认 VERTICAL 限高约 320dp 纵向滚动——聊天 LazyColumn 嵌套滚动规避；HORIZONTAL 横滑行） |
+| `Tabs` | `tabs*` | Tabs（M2）：tabs=[{title, children: [组件...]}]；选中页签是渲染期 remember 本地态，不进 OpenUI state（纯 UI 导航无 LLM 语义） |
+| `CheckBox` | `label*`, `checked*` | CheckBox（M2）：checked BINDABLE_BOOLEAN（Bool 字面量或 `$绑定`）；点按 → `@Set(<绑定变量>, !当前值)`；裸字面量只读不回写 |
+| `ChoicePicker` | `label?`, `options*`, `selected*` | ChoicePicker（M2）：options=[{label,value}] 单选 chips 行；selected BINDABLE_STRING，点选 → `@Set(<绑定变量>, value)` |
+| `Slider` | `label?`, `value*`, `min?`, `max?` | Slider（M2）：value BINDABLE_NUMBER，min/max 默认 0/100，拖动结束 → `@Set(<绑定变量>, 数值)`；渲染用 AppSlider（全 app 滑杆红线，禁裸 M3 Slider） |
 
+- M2（2026-10-24，spec《openui-component-library-m2-design》）：七组件扩至十四（§2 枚举 7 个新组件；该 spec 标题「十三」与 §5「+6」系计数笔误，以 §2 枚举为准），新增 prop 类型 BINDABLE_BOOLEAN/BINDABLE_NUMBER（语义同 BINDABLE_STRING：字面量或 `$binding` 皆收，Binding 原样存 props、渲染期从 state 快照解析——BarChart.selected 既有机制）；交互组件经 `@Set` 写 state（applyAction 对任意 target 写任意 OpenUiValue，已泛化），`onViewStateChange` 持久化仍只针对 `$selected`（M2 口径）。
+- A2UI↔OpenUI 刻意差异台账（M2 记入）：OpenUI 线**不补** Modal/TextField/DateTimeInput（聊天卡内嵌弹层/IME 输入 UX 存疑，刻意差异）；OpenUI 独有 Image 相册照片能力（A2UI 线 Image.url 限公网 https）；`@Each` 列表渲染仍不做。
 - scan 句柄 fragment 分流（2026-10-24，spec《openui-image-component-design》D2）：`#histogram`（或省略）= 月桶 `[{label,count}]`（BarChart 统计卡）；`#photos` = 照片清单 `[{id, date}]`（保持搜索相关度原序，cap 60，date="yyyy-MM-dd"，Image/Text 图文混排卡）；未知 fragment → 整卡 Degraded。
 - 库 schema 在 shared `OpenUiLibrary.kt` 以数据声明（组件名 → 参数列表：名/类型/必填/默认值/enum 域），验证与渲染共用同一份（自描述，Agent First §2.3）。
 - entry 规则：必须 `root = ...` 语句；fallback = 第一条值为 `Card(...)` 调用的 value 语句（OpenUI spec §2.2，library root = Card）。无 entry → `no-root` 致命 → 降级卡。
