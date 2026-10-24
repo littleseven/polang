@@ -46,6 +46,10 @@ class CloudAgentGalleryTools(
 
     private val handleJson = Json { encodeDefaults = true }
 
+    /** display=true 且图集卡实际透出时的回执尾注（search/refine 共用，见 searchMedia 内注释）。 */
+    private val CARD_SHOWN_NOTE =
+        "，横滑图集卡已在聊天中展示（用户可直接翻看；回复时告知照片已在上方卡片展示即可，无需再搜索/细化/发卡）"
+
     /**
      * 图集卡透出回调（云端 Agent 图集卡恢复，2026-10-20）：搜索/细化命中非空时回调完整的
      * PHOTO 资产列表（query、资产、总数、是否细化）。**数据不出设备**——回传服务器的仍是
@@ -139,8 +143,13 @@ class CloudAgentGalleryTools(
         if (photos.isEmpty()) {
             return "找到 0 张「$displayQuery」的照片"
         }
-        if (showCard) mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
-        return appendHandleSuffix("找到 ${photos.size} 张「$displayQuery」的照片", photos)
+        // 卡实际透出（display=true 且监听器在位）时回执必须明说：LLM 只看得见文本回执，
+        // 不说它会认为「没有照片清单」继续 refine 甚至声称发卡失败——
+        // 2026-10-24 browse_carousel 事故：卡已出，终结消息却写「没能把照片图集发给你」
+        val cardShown = showCard && mediaResultsListener != null
+        if (cardShown) mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
+        val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
+        return appendHandleSuffix("找到 ${photos.size} 张「$displayQuery」的照片$cardNote", photos)
     }
 
     suspend fun refineMediaSearch(constraint: String, fromMs: String, toMs: String): String {
@@ -174,7 +183,9 @@ class CloudAgentGalleryTools(
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
         // 透出跟随基数搜索的 display 意图：取数型搜索的细化同样不出卡
-        if (refineDisplay) mediaResultsListener?.invoke(constraint, refined, refined.size, true)
-        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} 张「$constraint」的照片", refined)
+        val cardShown = refineDisplay && mediaResultsListener != null
+        if (cardShown) mediaResultsListener?.invoke(constraint, refined, refined.size, true)
+        val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
+        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} 张「$constraint」的照片$cardNote", refined)
     }
 }

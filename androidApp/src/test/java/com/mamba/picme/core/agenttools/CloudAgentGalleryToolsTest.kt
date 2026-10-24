@@ -164,12 +164,24 @@ class CloudAgentGalleryToolsTest {
         t.mediaResultsListener = { query, assets, _, isRefinement ->
             hits.add(Triple(query, assets, isRefinement))
         }
-        t.searchMedia("猫", "", "", "", "", "true")
+        val out = t.searchMedia("猫", "", "", "", "", "true")
         assertEquals(1, hits.size)
         assertEquals("猫", hits[0].first)
         assertEquals(false, hits[0].third)
         // 只透出 PHOTO（与回传文本的计数口径一致），VIDEO 被过滤
         assertEquals(listOf(1L, 3L), hits[0].second.map { it.id })
+        // 卡已透出必须写进回执：LLM 只看得见文本，不知卡已展示会继续 refine/声称失败
+        // （2026-10-24 browse_carousel 事故：卡已出却回复「没能把照片图集发给你」）
+        assertTrue("display=true 且卡透出时回执须明说：$out", out.contains("横滑图集卡已在聊天中展示"))
+    }
+
+    @Test
+    fun `display true without listener does not claim card shown`() = runTest {
+        // 无头场景（监听器未挂）卡未透出，回执不得声称已展示（诚实口径）
+        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2)) })
+        val out = t.searchMedia("猫", "", "", "", "", "true")
+        assertFalse(out.contains("图集卡已在聊天中展示"))
+        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(out))
     }
 
     @Test
