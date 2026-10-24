@@ -24,6 +24,7 @@ import com.mamba.picme.domain.chat.openui.OpenUiToolNotFoundException
 import com.mamba.picme.domain.chat.openui.OpenUiToolResolver
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.features.chat.a2ui.A2uiCardDegraded
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 
 /**
@@ -52,11 +53,12 @@ fun OpenUiCardHost(
         var handleFailed = false
         val tools = OpenUiToolResolver { name, args ->
             if (name != OpenUiContract.TOOL_LOCAL_HANDLE) throw OpenUiToolNotFoundException(name)
-            try {
-                resolveLocalHandle(handleLookup, args)
-            } catch (e: Exception) {
+            val resolved = resolveLocalHandle(handleLookup, args)
+            if (resolved is HandleResolution.Ok) {
+                resolved.value
+            } else {
                 handleFailed = true
-                throw e
+                throw OpenUiHandleException((resolved as HandleResolution.Err).reason)
             }
         }
         val selected = OpenUiContract.selectedOfViewState(part.viewState)
@@ -94,36 +96,50 @@ private sealed interface OpenUiResolution {
     data class Ready(val session: OpenUiSession) : OpenUiResolution
 }
 
+/** local_handle 取数结果（密封结果替代多 throw，detekt ThrowsCount）。 */
+private sealed interface HandleResolution {
+    data class Ok(val value: OpenUiValue) : HandleResolution
+    data class Err(val reason: String) : HandleResolution
+}
+
+/** handle 任一环节失败信号：engine 捕获记 tool-error 回退 defaults，宿主统判降级。 */
+private class OpenUiHandleException(reason: String) : Exception(reason)
+
 /**
  * local_handle 工具实现：handle → HandleLookup payload → 按 domain 算数据（scan=月桶）。
- * 任一环节失败抛异常（宿主侧置 handleFailed，engine 回退 defaults 后统判降级）。
+ * 任一环节失败返回 [HandleResolution.Err]（宿主侧置 handleFailed 并抛
+ * [OpenUiHandleException]，engine 回退 defaults 后统判降级）。
  */
 private suspend fun resolveLocalHandle(
     handleLookup: HandleLookup,
     args: Map<String, OpenUiValue>,
-): OpenUiValue {
+): HandleResolution {
     val handle = (args["handle"] as? OpenUiValue.Str)?.v
-        ?: throw IllegalArgumentException("local_handle 缺 handle 参数")
+        ?: return HandleResolution.Err("local_handle 缺 handle 参数")
     val parsed = A2uiCardContract.parseLocalHandle(handle)
-        ?: throw IllegalArgumentException("handle 不可解析：$handle")
+        ?: return HandleResolution.Err("handle 不可解析：$handle")
     val payload = handleLookup.payloadOf(parsed.domain, parsed.id)
-        ?: throw NoSuchElementException("handle 缺失：$handle")
-    return when (parsed.domain) {
-        A2uiCardContract.DOMAIN_SCAN -> {
-            val entries = hostJson.decodeFromString<List<ScanPhotoEntry>>(payload)
-            OpenUiValue.Arr(
-                GalleryHistogramBuilder.buildMonthly(entries).map { bucket ->
-                    OpenUiValue.Obj(
-                        mapOf(
-                            "label" to OpenUiValue.Str(bucket.label),
-                            "count" to OpenUiValue.Num(bucket.count.toDouble()),
-                        )
-                    )
-                }
-            )
-        }
-        else -> throw IllegalArgumentException("未知 domain：${parsed.domain}")
+        ?: return HandleResolution.Err("handle 缺失：$handle")
+    if (parsed.domain != A2uiCardContract.DOMAIN_SCAN) {
+        return HandleResolution.Err("未知 domain：${parsed.domain}")
     }
+    val entries = runCatching { hostJson.decodeFromString<List<ScanPhotoEntry>>(payload) }
+        .getOrElse { error ->
+            if (error is CancellationException) throw error // 协程取消穿透
+            return HandleResolution.Err("payload 不可解析：${error.message}")
+        }
+    return HandleResolution.Ok(
+        OpenUiValue.Arr(
+            GalleryHistogramBuilder.buildMonthly(entries).map { bucket ->
+                OpenUiValue.Obj(
+                    mapOf(
+                        "label" to OpenUiValue.Str(bucket.label),
+                        "count" to OpenUiValue.Num(bucket.count.toDouble()),
+                    )
+                )
+            }
+        )
+    )
 }
 
 private val hostJson = Json { ignoreUnknownKeys = true }

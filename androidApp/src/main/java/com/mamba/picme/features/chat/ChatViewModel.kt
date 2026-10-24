@@ -2153,10 +2153,103 @@ class ChatViewModel(
      * 半截文本由 sendMessage 外层 catch(CancellationException) 按既有语义保留。
      */
     private suspend fun runCloudTurn(sessionId: String, text: String) {
-        val api = cloudAgentApi ?: return
-        val executor = deviceToolExecutor ?: return
+        val prepared = prepareCloudTurn(sessionId) ?: return
 
-        // 登录态：/agent 会话需服务端账号 token（访客设备级额度仅覆盖 /llm 链路）
+        // 图集卡透出：工具命中时经 listener 把资产列表本地落卡（数据不出设备，回传服务器的
+        // 仍是纯文本计数）；Room upsert 去重保证同一用户回合只留最新卡。回合结束 finally 摘除，
+        // 避免跨回合残留（取消路径也走 finally）。
+        cloudAgentGalleryTools?.mediaResultsListener = { query, assets, totalCount, isRefinement ->
+            viewModelScope.launch {
+                insertMediaResultsMessage(
+                    sessionId,
+                    MediaResultsUi(
+                        query = query,
+                        assets = assets.take(MAX_CARDS),
+                        totalCount = totalCount,
+                        isRefinement = isRefinement
+                    )
+                )
+            }
+        }
+        try {
+            val answer = StringBuilder()
+            val cards = CloudTurnCardFlush(prepared.genUiFormat)
+            var serverError: String? = null
+            var result = runCloudTurnOnce(
+                prepared.runner, prepared.token, prepared.session, text, answer, cards
+            ) { serverError = it }
+            // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
+            if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
+                Logger.w(TAG, "Cloud session ${prepared.session.sessionId} invalid, recreating")
+                cloudSessions.remove(sessionId)
+                answer.clear()
+                cards.clear()
+                serverError = null
+                _streamingMessage.value = _streamingMessage.value?.copy(
+                    content = stringContext().getString(STREAMING_THINKING_HINT_RES),
+                    isThinking = true,
+                    showCursor = false
+                )
+                val fresh = ensureCloudSession(prepared.api, prepared.token, sessionId, prepared.choice)
+                if (fresh != null) {
+                    result = runCloudTurnOnce(
+                        prepared.runner, prepared.token, fresh, text, answer, cards
+                    ) { serverError = it }
+                }
+            }
+
+            // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
+            _streamingMessage.value = null
+            flushCloudTurnCards(sessionId, cards)
+            finishCloudTurn(sessionId, result, serverError, answer)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // CloudAgentClient 非 2xx 直接抛异常（非 Result.failure），此处兜底上屏
+            _streamingMessage.value = null
+            handleCloudTurnException(sessionId, e)
+        } finally {
+            cloudAgentGalleryTools?.mediaResultsListener = null
+        }
+    }
+
+    /** 云端回合前置产物（runCloudTurn 拆出，detekt LongMethod/Cyclomatic 收口）。 */
+    private class CloudTurnPrepared(
+        val api: CloudAgentApi,
+        val runner: CloudAgentTurnRunner,
+        val token: String,
+        val session: CloudSession,
+        val choice: CloudAgentChannelChoice,
+        val genUiFormat: String,
+    )
+
+    /**
+     * 两线 GenUI 卡落库队列 + 线格式（runCloudTurnOnce 参数收拢，detekt LongParameterList）。
+     * onEvent 回调非挂起不能直接写 Room，先快照「卡前文本 + 卡事件」，SSE 结束后在挂起上下文
+     * 按序落库（保证云端文本、工具结果卡、GenUI 图表卡按序渲染，US-2）。两队列并列不合并的
+     * 前提：server 按 X-GenUI-Format 头互斥注册 render_ui/render_ui_openui，一回合只会产
+     * 一种卡，跨队列交错序不可能出现。
+     */
+    private class CloudTurnCardFlush(
+        val genUiFormat: String,
+        val a2uiFlushes: MutableList<Pair<String, CloudTurnEvent.A2uiCard>> = mutableListOf(),
+        val openUiFlushes: MutableList<Pair<String, CloudTurnEvent.OpenUiCard>> = mutableListOf(),
+    ) {
+        fun clear() {
+            a2uiFlushes.clear()
+            openUiFlushes.clear()
+        }
+    }
+
+    /**
+     * 云端回合前置准备：依赖/登录态（/agent 会话需服务端账号 token，访客设备级额度仅覆盖
+     * /llm 链路）/通道解析（网关 / BYOK / 未授权引导，与调试页 prepare() 同一套规则）/
+     * GenUI 线格式读取/会话懒建。任一闸不过则就地报错上屏并返回 null。
+     */
+    private suspend fun prepareCloudTurn(sessionId: String): CloudTurnPrepared? {
+        val api = cloudAgentApi ?: return null
+        val executor = deviceToolExecutor ?: return null
+
         val token = userSettingsRepository.serverAuthTokenFlow.first()
         if (token.isBlank()) {
             _streamingMessage.value = null
@@ -2165,10 +2258,9 @@ class ChatViewModel(
                 stringContext().getString(R.string.cloud_agent_login_required),
                 CLOUD_MODEL_LABEL
             )
-            return
+            return null
         }
 
-        // 通道解析（网关 / BYOK / 未授权引导），与调试页 prepare() 同一套规则
         val configsJson = userSettingsRepository.aiAgentRemoteModelConfigsFlow.first()
         val selectedKey = userSettingsRepository.aiAgentSelectedRemoteModelFlow.first()
         val config = if (configsJson.isBlank()) {
@@ -2189,7 +2281,7 @@ class ChatViewModel(
                 stringContext().getString(R.string.cloud_agent_consent_required),
                 CLOUD_MODEL_LABEL
             )
-            return
+            return null
         }
 
         val runner = CloudAgentTurnRunner(api, executor, viewModelScope)
@@ -2204,109 +2296,68 @@ class ChatViewModel(
                 ),
                 "error"
             )
-            return
+            return null
         }
+        return CloudTurnPrepared(api, runner, token, session, choice, genUiFormat)
+    }
 
-        // 图集卡透出：工具命中时经 listener 把资产列表本地落卡（数据不出设备，回传服务器的
-        // 仍是纯文本计数）；Room upsert 去重保证同一用户回合只留最新卡。回合结束 finally 摘除，
-        // 避免跨回合残留（取消路径也走 finally）。
-        cloudAgentGalleryTools?.mediaResultsListener = { query, assets, totalCount, isRefinement ->
-            viewModelScope.launch {
-                insertMediaResultsMessage(
-                    sessionId,
-                    MediaResultsUi(
-                        query = query,
-                        assets = assets.take(MAX_CARDS),
-                        totalCount = totalCount,
-                        isRefinement = isRefinement
-                    )
-                )
-            }
+    /** SSE 结束后按序落库两线 GenUI 卡：先落卡前已累积文本（text 行），再落卡行。 */
+    private suspend fun flushCloudTurnCards(sessionId: String, cards: CloudTurnCardFlush) {
+        for ((pendingText, card) in cards.a2uiFlushes) {
+            if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
+            insertA2uiCardMessage(sessionId, card)
         }
-        try {
-            val answer = StringBuilder()
-            // A2UI 卡落库队列：onEvent 回调非挂起不能直接写 Room，先快照「卡前文本 + 卡事件」，
-            // SSE 结束后在挂起上下文按序落库（保证云端文本、工具结果卡、A2UI 图表卡按序渲染，US-2）
-            val a2uiFlushes = mutableListOf<Pair<String, CloudTurnEvent.A2uiCard>>()
-            // OpenUI 卡同款队列（openui P2）。与 a2uiFlushes 并列不合并的前提：server 按
-            // X-GenUI-Format 头互斥注册 render_ui/render_ui_openui，一回合只会产一种卡，
-            // 跨队列交错序不可能出现
-            val openUiFlushes = mutableListOf<Pair<String, CloudTurnEvent.OpenUiCard>>()
-            var serverError: String? = null
-            var result = runCloudTurnOnce(runner, token, session, text, answer, a2uiFlushes, openUiFlushes, genUiFormat) { serverError = it }
-            // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
-            if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
-                Logger.w(TAG, "Cloud session ${session.sessionId} invalid, recreating")
-                cloudSessions.remove(sessionId)
-                answer.clear()
-                a2uiFlushes.clear()
-                openUiFlushes.clear()
-                serverError = null
-                _streamingMessage.value = _streamingMessage.value?.copy(
-                    content = stringContext().getString(STREAMING_THINKING_HINT_RES),
-                    isThinking = true,
-                    showCursor = false
-                )
-                val fresh = ensureCloudSession(api, token, sessionId, choice)
-                if (fresh != null) {
-                    result = runCloudTurnOnce(runner, token, fresh, text, answer, a2uiFlushes, openUiFlushes, genUiFormat) { serverError = it }
-                }
-            }
+        for ((pendingText, card) in cards.openUiFlushes) {
+            if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
+            insertOpenUiCardMessage(sessionId, card)
+        }
+    }
 
-            // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
-            _streamingMessage.value = null
-            // A2UI 卡按序落库：先落卡前已累积文本（text 行），再落 data_ui 行；
-            // 卡后文本由下方既有 flush 收口成下一条 text 行
-            for ((pendingText, card) in a2uiFlushes) {
-                if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
-                insertA2uiCardMessage(sessionId, card)
-            }
-            for ((pendingText, card) in openUiFlushes) {
-                if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
-                insertOpenUiCardMessage(sessionId, card)
-            }
-            when {
-                result.isFailure && isCloudRoundInFlight(result.exceptionOrNull()) -> insertAgentMessage(
-                    sessionId,
-                    stringContext().getString(R.string.cloud_agent_round_in_flight),
-                    "error"
-                )
-                result.isFailure -> insertAgentMessage(
-                    sessionId,
-                    stringContext().getString(
-                        R.string.chat_inference_error,
-                        result.exceptionOrNull()?.message
-                            ?: stringContext().getString(R.string.chat_unknown_error)
-                    ),
-                    "error"
-                )
-                serverError != null -> insertAgentMessage(sessionId, serverError.orEmpty(), "error")
-                answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
-                else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // CloudAgentClient 非 2xx 直接抛异常（非 Result.failure），此处兜底上屏
-            _streamingMessage.value = null
-            if (isCloudRoundInFlight(e)) {
-                insertAgentMessage(
-                    sessionId,
-                    stringContext().getString(R.string.cloud_agent_round_in_flight),
-                    "error"
-                )
-            } else {
-                insertAgentMessage(
-                    sessionId,
-                    stringContext().getString(
-                        R.string.chat_inference_error,
-                        e.message ?: stringContext().getString(R.string.chat_unknown_error)
-                    ),
-                    "error"
-                )
-            }
-        } finally {
-            cloudAgentGalleryTools?.mediaResultsListener = null
+    /** 云端回合终态收尾上屏：失败（409 跑轮占用单独文案）/服务端错误帧/正文三态。 */
+    private suspend fun finishCloudTurn(
+        sessionId: String,
+        result: Result<Unit>,
+        serverError: String?,
+        answer: StringBuilder,
+    ) {
+        when {
+            result.isFailure && isCloudRoundInFlight(result.exceptionOrNull()) -> insertAgentMessage(
+                sessionId,
+                stringContext().getString(R.string.cloud_agent_round_in_flight),
+                "error"
+            )
+            result.isFailure -> insertAgentMessage(
+                sessionId,
+                stringContext().getString(
+                    R.string.chat_inference_error,
+                    result.exceptionOrNull()?.message
+                        ?: stringContext().getString(R.string.chat_unknown_error)
+                ),
+                "error"
+            )
+            serverError != null -> insertAgentMessage(sessionId, serverError, "error")
+            answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
+            else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
+        }
+    }
+
+    /** 云端回合异常兜底上屏（CloudAgentClient 非 2xx 直抛路径）。 */
+    private suspend fun handleCloudTurnException(sessionId: String, error: Exception) {
+        if (isCloudRoundInFlight(error)) {
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(R.string.cloud_agent_round_in_flight),
+                "error"
+            )
+        } else {
+            insertAgentMessage(
+                sessionId,
+                stringContext().getString(
+                    R.string.chat_inference_error,
+                    error.message ?: stringContext().getString(R.string.chat_unknown_error)
+                ),
+                "error"
+            )
         }
     }
 
@@ -2317,11 +2368,9 @@ class ChatViewModel(
         session: CloudSession,
         text: String,
         answer: StringBuilder,
-        a2uiFlushes: MutableList<Pair<String, CloudTurnEvent.A2uiCard>>,
-        openUiFlushes: MutableList<Pair<String, CloudTurnEvent.OpenUiCard>>,
-        genUiFormat: String,
+        cards: CloudTurnCardFlush,
         onServerError: (String) -> Unit,
-    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey, genUiFormat) { event ->
+    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey, cards.genUiFormat) { event ->
         when (event) {
             is CloudTurnEvent.AssistantText -> {
                 if (answer.isNotEmpty()) answer.append("\n\n")
@@ -2363,12 +2412,12 @@ class ChatViewModel(
             }
             is CloudTurnEvent.A2uiCard -> {
                 // onEvent 回调非挂起不能直接写 Room：快照卡前已累积文本并清空，SSE 结束后按序落库
-                a2uiFlushes += answer.toString() to event
+                cards.a2uiFlushes += answer.toString() to event
                 answer.clear()
             }
             is CloudTurnEvent.OpenUiCard -> {
                 // A2uiCard 同款快照（openui P2）
-                openUiFlushes += answer.toString() to event
+                cards.openUiFlushes += answer.toString() to event
                 answer.clear()
             }
             is CloudTurnEvent.Error -> onServerError(event.message)

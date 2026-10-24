@@ -96,9 +96,10 @@ private fun OpenUiChildren(
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
     for (child in children) {
-        when (child) {
-            is OpenUiValue.ComponentVal -> OpenUiNodeRenderer(child, state, onAction)
-            else -> Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
+        if (child is OpenUiValue.ComponentVal) {
+            OpenUiNodeRenderer(child, state, onAction)
+        } else {
+            Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }
     }
 }

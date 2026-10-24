@@ -226,7 +226,8 @@ class CloudAgentTurnRunnerTest {
             onFrame(
                 CloudFrame.Event(
                     JSONObject(
-                        """{"id":4,"type":"action","source":"agent","role":"assistant","payload":{"tool":"render_ui_openui","argsJson":"{\"program\":\"root = Card([])\",\"fallbackSummary\":\"327 张\"}"}}"""
+                        """{"id":4,"type":"action","source":"agent","role":"assistant",""" +
+                            """"payload":{"tool":"render_ui_openui","argsJson":"{\"program\":\"root = Card([])\",\"fallbackSummary\":\"327 张\"}"}}"""
                     ),
                 ),
             )
