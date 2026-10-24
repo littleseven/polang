@@ -30,7 +30,7 @@ internal sealed interface OpenUiExpr {
     /** `$name` 状态引用（name 含 `$` 前缀）。 */
     data class StateRef(val name: String) : OpenUiExpr
 
-    /** 表达式内的 `$name = expr` 绑定赋值（§1.5，M1 不求值，仅保证可解析）。 */
+    /** 表达式内的 `$name = expr` 绑定赋值（§1.5，M1 不求值，仅保证可解析）；兼作组件调用命名实参标记（name=expr）。 */
     data class Assign(val target: String, val value: OpenUiExpr) : OpenUiExpr
 
     data class Arr(val items: List<OpenUiExpr>) : OpenUiExpr
@@ -564,7 +564,17 @@ internal object OpenUiParser {
             eat(OpenUiTokenKind.LPAREN)
             val args = mutableListOf<OpenUiExpr>()
             while (cur().kind != OpenUiTokenKind.RPAREN && cur().kind != OpenUiTokenKind.EOF) {
-                args += parseExpr(0)
+                // 命名实参（2026-10-24 all_years 事故：`title="x"` 曾被切成 Ref/Null/Lit 三个
+                // 位置参数，BarChart 实得 9 参整条卡降级）：IDENT + `=` → Assign 标记节点，
+                // 由 evalComponent 按 prop 名归位；其它调用形态（Query/@fn）仍按位置求值。
+                if (cur().kind == OpenUiTokenKind.IDENT && peekNext().kind == OpenUiTokenKind.EQUALS) {
+                    val argName = cur().text
+                    adv() // 参数名
+                    adv() // =
+                    args += OpenUiExpr.Assign(argName, parseExpr(0))
+                } else {
+                    args += parseExpr(0)
+                }
                 if (cur().kind == OpenUiTokenKind.COMMA) adv()
             }
             eat(OpenUiTokenKind.RPAREN)

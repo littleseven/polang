@@ -177,7 +177,8 @@ internal class OpenUiRuntime(
             },
         )
         is OpenUiExpr.QueryCall, is OpenUiExpr.MutationCall ->
-            // Query/Mutation 仅合法作为整条右值（§2.1）
+            // Query 内联形态已在 prepare 提升为合成语句（OpenUiEngine.prepareInternal），
+            // 正常不会走到这里；Mutation M1 不执行，仍守 inline-reserved
             if (valuePosition) {
                 errors += OpenUiError("inline-reserved", statementId, "Query/Mutation 不能内联在值位置")
                 null
@@ -505,17 +506,38 @@ internal class OpenUiRuntime(
             errors += OpenUiError("unknown-component", statementId, "未知组件 ${call.type}")
             return null
         }
-        if (call.args.size > spec.props.size) {
+        // 命名实参归位（2026-10-24 all_years 事故：LLM 写 name=value 被位置化误配整条卡降级）：
+        // Assign 节点按 prop 名绑定（后写覆盖，同语句重复名收口），位置参数按 spec 序填未占用槽位。
+        val bound = HashMap<String, OpenUiExpr>()
+        val positional = mutableListOf<OpenUiExpr>()
+        for (arg in call.args) {
+            if (arg is OpenUiExpr.Assign) {
+                if (spec.props.none { prop -> prop.name == arg.target }) {
+                    errors += OpenUiError("unknown-prop", statementId, "${call.type}.${arg.target} 未知参数名")
+                } else {
+                    bound[arg.target] = arg.value
+                }
+            } else {
+                positional += arg
+            }
+        }
+        if (positional.size + bound.size > spec.props.size) {
             errors += OpenUiError(
                 "excess-args",
                 statementId,
-                "${call.type} 期望 ${spec.props.size} 个参数，实得 ${call.args.size}，多余丢弃",
+                "${call.type} 期望 ${spec.props.size} 个参数，实得 ${positional.size + bound.size}，多余丢弃",
             )
         }
+        var cursor = 0
+        for (arg in positional) {
+            while (cursor < spec.props.size && bound.containsKey(spec.props[cursor].name)) cursor++
+            if (cursor >= spec.props.size) break // 多余位置参数丢弃（excess-args 已记）
+            bound[spec.props[cursor].name] = arg
+            cursor++
+        }
         val props = linkedMapOf<String, OpenUiValue>()
-        for (index in spec.props.indices) {
-            val prop = spec.props[index]
-            val argExpr = call.args.getOrNull(index)
+        for (prop in spec.props) {
+            val argExpr = bound[prop.name]
             if (argExpr == null) {
                 when {
                     !prop.required -> prop.default?.let { default -> props[prop.name] = default }
