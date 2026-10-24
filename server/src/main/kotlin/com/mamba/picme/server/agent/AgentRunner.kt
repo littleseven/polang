@@ -41,7 +41,7 @@ class AgentRunner(
     private val executorFactory: AgentExecutorFactory,
     private val dispatcher: ServerToolDispatcher,
     private val reversibleTools: Set<String> = ServerToolService.REVERSIBLE_TOOLS,
-    private val maxIterations: Int = 20,
+    private val maxIterations: Int = 100,
     private val actionGate: (toolName: String, argsJson: String) -> String? = { _, _ -> null },
 ) {
 
