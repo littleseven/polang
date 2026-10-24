@@ -107,6 +107,24 @@ class RenderOpenUiValidatorTest {
     }
 
     @Test
+    fun `inline query inside component args is rejected`() {
+        // 2026-10-24 真机事故形态：Query 内联在 BarChart 参数里（§2.1 只允许独占语句右侧）
+        val error = RenderOpenUiValidator.validateToError(
+            """
+            ${'$'}selected = ""
+            root = Card([Text("月度分布"), BarChart("每月照片数", Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#histogram" }, []), ${'$'}selected)])
+            """.trimIndent(),
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("inline-reserved"))
+    }
+
+    @Test
+    fun `query as standalone statement rhs passes`() {
+        assertNull(RenderOpenUiValidator.validateToError(validWithQuery))
+    }
+
+    @Test
     fun `media path in program is rejected`() {
         val error = RenderOpenUiValidator.validateToError(
             "root = Card([Text(\"content://media/1\")])",

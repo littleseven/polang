@@ -72,6 +72,20 @@ fun OpenUiCardHost(
             },
         )
         val result = session.prepare()
+        // 可观测性：Rendered 也可能携带非致命错误（如 inline-reserved 导致组件静默丢弃），
+        // 必须打出来——2026-10-24 真机柱图消失事故即因缺此日志难以定位
+        val errors = when (result) {
+            is OpenUiResult.Rendered -> result.errors
+            is OpenUiResult.Failed -> result.errors
+        }
+        if (errors.isNotEmpty()) {
+            Logger.w(
+                "Chat",
+                "OpenUI 卡 prepare 错误(${errors.size}): " + errors.joinToString("; ") { error ->
+                    "${error.code}@${error.statementId}: ${error.message}"
+                },
+            )
+        }
         value = when {
             handleFailed -> OpenUiResolution.Degraded
             result is OpenUiResult.Rendered -> OpenUiResolution.Ready(session)
