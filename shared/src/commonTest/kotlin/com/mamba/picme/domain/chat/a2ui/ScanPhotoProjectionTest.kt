@@ -48,4 +48,16 @@ class ScanPhotoProjectionTest {
     fun toPhotoRefs_emptyEntries_returnsEmpty() {
         assertEquals(emptyList(), ScanPhotoProjection.toPhotoRefs(emptyList(), timeZone = utc))
     }
+
+    @Test
+    fun toPhotoRefs_formatsDateInNonUtcTimezone() {
+        // 跨日偏移边界：epoch 0 在纽约（UTC-5/-4）是 1969-12-31 傍晚——
+        // 手写格式化 + 时区组合最易错处钉住（review 🔵6）
+        val newYork = TimeZone.of("America/New_York")
+        val refs = ScanPhotoProjection.toPhotoRefs(
+            listOf(ScanPhotoEntry(id = 1, captureDate = 0L)),
+            timeZone = newYork,
+        )
+        assertEquals("1969-12-31", refs.single().date)
+    }
 }

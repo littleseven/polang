@@ -168,8 +168,9 @@ private suspend fun resolveLocalHandle(
             return HandleResolution.Err("payload 不可解析：${error.message}")
         }
     return when (val fragment = parsed.fragment) {
-        // 现状默认：月桶直方图（BarChart 统计卡）
-        null, "", "histogram" -> HandleResolution.Ok(
+        // 现状默认：月桶直方图（BarChart 统计卡）。
+        // parseLocalHandle 已把空 fragment 归一为 null，"" 分支不存在
+        null, "histogram" -> HandleResolution.Ok(
             OpenUiValue.Arr(
                 GalleryHistogramBuilder.buildMonthly(entries).map { bucket ->
                     OpenUiValue.Obj(

@@ -19,6 +19,30 @@ import ai.koog.agents.core.tools.annotations.Tool
  */
 class RenderOpenUiToolService {
 
+    companion object {
+        // 字符串模板插值只许引用 const（编译期常量约束），$selected 的 $ 由此而来
+        private const val D = "$"
+
+        /**
+         * 黄金示例（program 骨架 SSOT）：@LLMDescription 内嵌文本与
+         * RenderOpenUiValidatorTest 同源引用（A2UI 线 RENDER_UI_EXAMPLE 先例），
+         * 改示例测试必红——防描述与校验器脱节。handleId 用合法形态的样例值
+         * （<id> 占位过不了 LOCAL_HANDLE_FORM 形态校验，示例必须自身合法）。
+         */
+        const val GOLDEN_STATS_PROGRAM =
+            D + "selected = \"\"\n" +
+                "buckets = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#histogram\" }, [])\n" +
+                "root = Card([Text(\"相册按月分布\", \"HEADLINE\"), Text(\"按月统计\", \"CAPTION\"), " +
+                "BarChart(\"每月照片数\", buckets, " + D + "selected)])"
+
+        /** 图文混排黄金示例（搜索拿 handle 后，照片与文字同卡混排）。 */
+        const val GOLDEN_MIXED_PROGRAM =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+                "root = Card([Text(\"海边之旅\", \"HEADLINE\"), " +
+                "Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), " +
+                "Text(photos[0].date, \"CAPTION\")])"
+    }
+
     @Tool(customName = "render_ui_openui")
     @LLMDescription(
         """向用户下发一张 OpenUI 原生渲染卡（图表/统计可视化首选，优于 render_html）。
@@ -38,7 +62,7 @@ class RenderOpenUiToolService {
    - Image(photo*, aspect?)：相册照片（图文混排用）；photo 只许填 photos 数组元素的
      id（如 photos[0].id），禁止写字面量数字 id（防臆造）；aspect 是宽高比
      （宽/高，默认 1.33，横图可传 1.5~1.78，竖图 0.75）；
-     Row([Image(...), Image(...)]) 可多张并排等宽；
+     Row([Image(...), Image(...)]) 可多张并排等宽；单卡图片≤12 张（内存上限）；
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
    `buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])`
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
@@ -56,12 +80,9 @@ class RenderOpenUiToolService {
 7. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示；
 8. 完整黄金示例（统计卡标准骨架——照此结构写：root = 语句必须有、独占一行、
    组件引用前面语句的变量名；program 不要包 markdown 代码围栏）：
-   ${'$'}selected = ""
-   buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])
-   root = Card([Text("相册按月分布", "HEADLINE"), Text("按月统计", "CAPTION"), BarChart("每月照片数", buckets, ${'$'}selected)])
+""" + GOLDEN_STATS_PROGRAM + """
    图文混排黄金示例（搜索拿 handle 后，照片与文字同卡混排）：
-   photos = Query("local_handle", { handle: "local://scan/<id>#photos" }, [])
-   root = Card([Text("海边之旅", "HEADLINE"), Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), Text(photos[0].date, "CAPTION")])"""
+""" + GOLDEN_MIXED_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

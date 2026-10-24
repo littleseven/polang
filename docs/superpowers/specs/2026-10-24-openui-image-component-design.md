@@ -24,7 +24,8 @@ LLM program: photos = Query("local_handle", { handle: "local://scan/<id>#photos"
 端侧: handle → LocalHandleStore payload（ScanPhotoEntry{id,captureDate} 清单，现有）
       → #photos 投影 → [{id: Num, date: "yyyy-MM-dd"}]（cap 60）
       → Image 渲染期 photoId → MediaDao.getMediaById → (uri, faceFocusY)
-      → Coil AsyncImage（复用 ThumbnailCacheFetcher 双级缓存管线）
+      → Coil AsyncImage（原生管线按目标尺寸降采样解码；ThumbnailCacheFetcher
+        只拦 ≤360px 请求，全宽卡图不命中，故不宣称复用双级缩略图缓存）
 ```
 
 uri 只在渲染期端侧解析，不进 program、不进 handle payload、不回灌 LLM。
@@ -38,7 +39,7 @@ uri 只在渲染期端侧解析，不进 program、不进 handle payload、不�
 | 空 / `histogram`（现状） | `[{label, count}]` 月桶 | BarChart 统计卡 |
 | `photos`（新增） | `[{id, date}]`（cap 60，保持搜索相关度原序，date="yyyy-MM-dd"） | Image 图文混排卡 |
 
-未知 fragment → `HandleResolution.Err`（整卡降级，宁缺毋滥口径不变）。
+未知 fragment → `HandleResolution.Err`（整卡降级，宁缺毋滥口径不变）；服务端 validator 的 fragment 闭集白名单（`#histogram|#photos`）把 typo 拦在同轮纠错（review 🟡4），单卡 Image 数 ≤12 的 OOM 护栏同在服务端（review 🟡3）。
 
 投影纯函数落 shared commonMain `domain/chat/a2ui/ScanPhotoProjection.kt`（与 `GalleryHistogramBuilder` 同包同理）：`toPhotoRefs(entries, cap=60, timeZone)` → `List<PhotoRef(id: Long, date: String)>`，kotlinx-datetime 格式化，纯函数可测。
 

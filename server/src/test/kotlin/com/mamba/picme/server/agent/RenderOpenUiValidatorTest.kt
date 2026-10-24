@@ -60,15 +60,9 @@ class RenderOpenUiValidatorTest {
 
     @Test
     fun `tool description golden example passes validation`() {
-        // 与 RenderOpenUiToolService @LLMDescription 规则 7 的黄金示例逐字同源
-        // （占位 <id> 换成合法 handleId 形态）；改示例必须同步改这里——
-        // A2UI 线 RENDER_UI_EXAMPLE 同款「示例自身过校验」防漂移钉住
-        val golden = """
-            ${'$'}selected = ""
-            buckets = Query("local_handle", { handle: "local://scan/f9d33db29ed6#histogram" }, [])
-            root = Card([Text("相册按月分布", "HEADLINE"), Text("按月统计", "CAPTION"), BarChart("每月照片数", buckets, ${'$'}selected)])
-        """.trimIndent()
-        assertNull(RenderOpenUiValidator.validateToError(golden))
+        // 黄金示例与 @LLMDescription 同源引用同一常量（RENDER_UI_EXAMPLE 先例）：
+        // 改示例或收紧校验器都会红此测试——防描述与校验器脱节
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_STATS_PROGRAM))
     }
 
     @Test
@@ -93,7 +87,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
 
     @Test
     fun `photos fragment handle form passes`() {
-        // LOCAL_HANDLE_FORM 容许任意 fragment；#photos 是 scan 句柄的合法投影形态
+        // #photos 在 fragment 白名单内（histogram|photos，2026-10-24 收敛）
         val program = """
             photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
             root = Card([Image(photos[0].id)])
@@ -113,12 +107,43 @@ root = Card([Image(photos[0].id, 1.5)])""",
 
     @Test
     fun `tool description image golden example passes validation`() {
-        // 规则 8 第二个黄金示例（图文混排卡）自身过校验，防描述与校验器脱节
-        val golden = """
-            photos = Query("local_handle", { handle: "local://scan/f9d33db29ed6#photos" }, [])
-            root = Card([Text("海边之旅", "HEADLINE"), Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), Text(photos[0].date, "CAPTION")])
-        """.trimIndent()
-        assertNull(RenderOpenUiValidator.validateToError(golden))
+        // 图文混排黄金示例同图源引用（同 GOLDEN_STATS_PROGRAM 钉法）
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM))
+    }
+
+    @Test
+    fun `unknown handle fragment is rejected`() {
+        // fragment 闭集白名单（2026-10-24 review 🟡4）：#photo 这类 typo 在服务端
+        // 同轮纠错，不放行到端侧整卡静默降级
+        val error = RenderOpenUiValidator.validateToError(
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photo\" }, [])\n" +
+                "root = Card([Image(photos[0].id)])",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("#histogram") && error.contains("#photos"))
+    }
+
+    @Test
+    fun `image count over limit is rejected`() {
+        // OOM 护栏（2026-10-24 review 🟡3）：全宽图每张约 3.5MB 位图，整卡同屏存活
+        val images = (1..(RenderOpenUiValidator.MAX_IMAGE_COMPONENTS + 1))
+            .joinToString(", ") { index -> "Image(photos[$index].id)" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([$images])"
+        val error = RenderOpenUiValidator.validateToError(program)
+        assertNotNull(error)
+        assertTrue(error!!.contains("Image") && error.contains("上限"))
+    }
+
+    @Test
+    fun `image count at limit passes`() {
+        val images = (1..RenderOpenUiValidator.MAX_IMAGE_COMPONENTS)
+            .joinToString(", ") { index -> "Image(photos[$index].id)" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([$images])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
     @Test

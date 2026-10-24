@@ -119,9 +119,9 @@ shared commonMain `domain/chat/openui/`（🔴 纯度：只许 `kotlin.*`/`kotli
 `RenderOpenUiToolService.kt`（照 `RenderUiToolService` 注解模式）：
 
 - `@Tool(customName = "render_ui_openui")`，参数 `(program: String, fallbackSummary: String)`，返回确认文本（A2UI 版同型，action 帧通道复用 `AgentRunner.onToolCallStarting` 零改动）。
-- `@LLMDescription` 要点：OpenUI Lang 一句话语法（`名 = 表达式`、组件调用、位置参数、字符串双引号）；§4.2 六组件签名逐字；数据禁令（相册数据一律 `Query("local_handle", {handle:"local://scan/<id>#histogram"}, [])`，handleId 只许来自 search_media/refine_media_search 结果尾部，禁臆造禁路径/uri）；`$selected` 绑定约定；fallbackSummary 写投影级摘要。
+- `@LLMDescription` 要点：OpenUI Lang 一句话语法（`名 = 表达式`、组件调用、位置参数、字符串双引号）；§4.2 七组件签名逐字（2026-10-24 +Image，spec《openui-image-component-design》）；数据禁令（相册数据一律 `Query("local_handle", {handle:"local://scan/<id>#histogram"}, [])`，handleId 只许来自 search_media/refine_media_search 结果尾部，禁臆造禁路径/uri）；`$selected` 绑定约定；fallbackSummary 写投影级摘要。
 - `CloudAgentToolContract.TOOL_RENDER_UI_OPENUI = "render_ui_openui"` + `CloudAgentToolCatalog` 加 CLOUD 条目。
-- **校验闭环对等（2026-10-24 review 补）**：main 线 `1caa81fea` 给 render_ui 落了发射点门控（`RenderUiValidator.gate` + 错误回灌）；OpenUI 侧对等实现 `RenderOpenUiValidator`——结构级轻量校验（不跑完整 parser，server 不依赖 :shared）：root 入口存在性（含 Card 兜底 entry）/ 组件名白名单（六组件 + Query，剥离字符串与注释后正则扫大写调用）/ Query local_handle 形态 / program ≤128_000（对齐 render_html 先例）+ 媒体路径禁令；违规与 render_ui 同口径错误回灌（LLM 同轮修正）。**对比实验口径对齐：两条 GenUI 线的 LLM 书写成功率都有同轮修正机会。**
+- **校验闭环对等（2026-10-24 review 补）**：main 线 `1caa81fea` 给 render_ui 落了发射点门控（`RenderUiValidator.gate` + 错误回灌）；OpenUI 侧对等实现 `RenderOpenUiValidator`——结构级轻量校验（不跑完整 parser，server 不依赖 :shared）：root 入口存在性（含 Card 兜底 entry）/ 组件名白名单（七组件 + Query，剥离字符串与注释后正则扫大写调用）/ Query local_handle 形态 / program ≤128_000（对齐 render_html 先例）+ 媒体路径禁令；违规与 render_ui 同口径错误回灌（LLM 同轮修正）。**对比实验口径对齐：两条 GenUI 线的 LLM 书写成功率都有同轮修正机会。**
 
 ## 6. 端侧分派与落库
 

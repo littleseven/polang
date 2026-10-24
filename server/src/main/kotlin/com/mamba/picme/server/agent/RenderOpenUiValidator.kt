@@ -45,9 +45,17 @@ object RenderOpenUiValidator {
     private val ROOT_STATEMENT = Regex("""(?m)^\s*root\s*=""")
     private val CARD_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Card\s*\(""")
     private val QUERY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(\s*"((?:[^"\\]|\\.)*)"""")
+    private val IMAGE_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(""")
     private val LOCAL_HANDLE_REF = Regex("""local://[^\s"}\],)]*""")
-    private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#[^\s"}\],)]+)?""")
+
+    /** fragment 闭集白名单（2026-10-24 review 🟡4）：typo（如 #photo）在服务端同轮纠错，
+     *  不放行到端侧整卡降级。新增 fragment 须同步 shared OpenUiContract + OpenUiCardHost。 */
+    private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#(histogram|photos))?""")
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
+
+    /** 单卡 Image 数上限（2026-10-24 review 🟡3 OOM 护栏）：全宽图每张约 3.5MB 位图，
+     *  整卡同屏组合存活，60 张投影上限是 token 保护而非内存保护——超过即同轮纠错。 */
+    const val MAX_IMAGE_COMPONENTS = 12
 
     /** 校验工具调用参数（wire JSON：{"program","fallbackSummary"}）。null = 合法放行。 */
     fun validateArgsJson(argsJson: String): String? {
@@ -111,11 +119,17 @@ object RenderOpenUiValidator {
         }
         LOCAL_HANDLE_REF.findAll(program).forEach { match ->
             if (!LOCAL_HANDLE_FORM.matches(match.value)) {
-                violations += "handle \"${match.value}\" 必须是 local://scan/<handleId> 形态；handleId 只许来自 search_media/refine_media_search 结果尾部，禁止臆造"
+                violations += "handle \"${match.value}\" 必须是 local://scan/<handleId> 形态（fragment 只许 #histogram/#photos 或省略）；handleId 只许来自 search_media/refine_media_search 结果尾部，禁止臆造"
             }
         }
         if (hasLocalHandleQuery && !program.contains("local://scan/")) {
-            violations += "Query(\"local_handle\", …) 缺 handle 参数：args 对象须含 { handle: \"local://scan/<id>#histogram\" }"
+            violations += "Query(\"local_handle\", …) 缺 handle 参数：args 对象须含 { handle: \"local://scan/<id>#histogram\" }（取照片清单用 #photos）"
+        }
+
+        // 4. Image 数量上限（OOM 护栏，见 MAX_IMAGE_COMPONENTS KDoc）
+        val imageCount = IMAGE_CALL.findAll(stripped).count()
+        if (imageCount > MAX_IMAGE_COMPONENTS) {
+            violations += "Image 组件 $imageCount 个超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张图，防整卡同屏位图 OOM；精简到最关键的几张）"
         }
 
         return violations
