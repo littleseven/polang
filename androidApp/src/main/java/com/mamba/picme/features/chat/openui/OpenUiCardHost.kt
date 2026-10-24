@@ -1,5 +1,6 @@
 package com.mamba.picme.features.chat.openui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -8,8 +9,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import com.mamba.picme.BuildConfig
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.HandleLookup
 import com.mamba.picme.domain.chat.MessagePart
@@ -96,11 +99,27 @@ fun OpenUiCardHost(
         null -> A2uiSurfaceDefaults.LoadingIndicator()
         OpenUiResolution.Degraded -> A2uiCardDegraded(part.fallbackSummary, modifier)
         is OpenUiResolution.Ready -> key(part.partId) {
-            OpenUiReadyContent(
-                session = current.session,
-                onViewStateChange = onViewStateChange,
-                modifier = modifier,
-            )
+            if (BuildConfig.DEBUG) {
+                // debug 徽标 overlay（与 A2uiCardHost 对偶）：显性标注此卡由 OpenUI 协议驱动，
+                // 点击开程序原文查看器
+                Box(modifier = modifier) {
+                    OpenUiReadyContent(
+                        session = current.session,
+                        onViewStateChange = onViewStateChange,
+                    )
+                    OpenUiDebugBadge(
+                        partId = part.partId,
+                        program = part.program,
+                        modifier = Modifier.align(Alignment.TopEnd),
+                    )
+                }
+            } else {
+                OpenUiReadyContent(
+                    session = current.session,
+                    onViewStateChange = onViewStateChange,
+                    modifier = modifier,
+                )
+            }
         }
     }
 }
