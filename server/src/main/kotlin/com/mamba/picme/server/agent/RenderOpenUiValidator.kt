@@ -16,9 +16,9 @@ import kotlinx.serialization.json.JsonPrimitive
  *    LLM 书写成功率都有同轮修正机会）。
  *
  * 结构级轻量校验（server 不依赖 :shared，DeviceToolService 字面量副本先例）：
- * 不跑完整 parser，只做正则级四项——root 入口存在性 / 组件名白名单 /
- * Query local_handle 形态 / program 长度上限（对齐 render_html 128_000 先例）+
- * 隐私投影禁令（媒体路径禁入 program）。规则与 shared `OpenUiContract`/`OpenUiLibrary`
+ * 不跑完整 parser，只做正则级五项——root 入口存在性 / 组件名白名单 /
+ * Query local_handle 形态 / Query 语句位（禁内联，§2.1）/ program 长度上限
+ * （对齐 render_html 128_000 先例）+ 隐私投影禁令（媒体路径禁入 program）。规则与 shared `OpenUiContract`/`OpenUiLibrary`
  * 字面量副本对齐，改动须双向同步核对。
  *
  * 近似边界：扫描前剥离字符串字面量与行注释防文案误伤；剥离后仍非完整语法分析，
@@ -43,6 +43,8 @@ object RenderOpenUiValidator {
     private val ROOT_STATEMENT = Regex("""(?m)^\s*root\s*=""")
     private val CARD_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Card\s*\(""")
     private val QUERY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(\s*"((?:[^"\\]|\\.)*)"""")
+    private val QUERY_ANY = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(""")
+    private val STMT_ASSIGNMENT_PREFIX = Regex("""\s*${'$'}?\w+\s*=\s*""")
     private val LOCAL_HANDLE_REF = Regex("""local://[^\s"}\],)]*""")
     private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#[^\s"}\],)]+)?""")
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
@@ -110,6 +112,17 @@ object RenderOpenUiValidator {
         }
         if (hasLocalHandleQuery && !program.contains("local://scan/")) {
             violations += "Query(\"local_handle\", …) 缺 handle 参数：args 对象须含 { handle: \"local://scan/<id>#histogram\" }"
+        }
+
+        // 4. Query 禁止内联（OpenUI Lang §2.1：Query 只允许独占语句右侧；内联在组件参数
+        //    会判 inline-reserved、组件静默丢弃——2026-10-24 真机柱图消失事故）
+        QUERY_ANY.findAll(stripped).forEach { match ->
+            val lineStart = stripped.lastIndexOf('\n', match.range.first)
+                .let { index -> if (index < 0) 0 else index + 1 }
+            val linePrefix = stripped.substring(lineStart, match.range.first)
+            if (!STMT_ASSIGNMENT_PREFIX.matches(linePrefix)) {
+                violations += "Query 必须独占整条语句右侧（先 `buckets = Query(\"local_handle\", …, [])` 单独成行，组件参数里引用 buckets），禁止内联进组件参数（内联触发 inline-reserved，组件会被静默丢弃）"
+            }
         }
         return violations
     }
