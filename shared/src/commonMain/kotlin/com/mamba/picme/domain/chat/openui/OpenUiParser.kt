@@ -85,6 +85,17 @@ internal object OpenUiParser {
         }
     }
 
+    /** 行尾中缀/逗号算符 → 换行延续（splitStatements 近似边界，非完整算符状态机）。 */
+    private val infixContinuationKinds = setOf(
+        OpenUiTokenKind.COMMA, OpenUiTokenKind.COLON, OpenUiTokenKind.QUESTION,
+        OpenUiTokenKind.EQUALS, OpenUiTokenKind.EQEQ, OpenUiTokenKind.NOTEQ,
+        OpenUiTokenKind.GREATER, OpenUiTokenKind.GREATEREQ,
+        OpenUiTokenKind.LESS, OpenUiTokenKind.LESSEQ,
+        OpenUiTokenKind.AND, OpenUiTokenKind.OR,
+        OpenUiTokenKind.PLUS, OpenUiTokenKind.MINUS,
+        OpenUiTokenKind.STAR, OpenUiTokenKind.SLASH, OpenUiTokenKind.PERCENT,
+    )
+
     private fun classify(isStateName: Boolean, expr: OpenUiExpr): OpenUiStatementKind = when {
         expr is OpenUiExpr.QueryCall -> OpenUiStatementKind.QUERY
         expr is OpenUiExpr.MutationCall -> OpenUiStatementKind.MUTATION
@@ -257,9 +268,18 @@ internal object OpenUiParser {
             val exprTokens = mutableListOf<OpenUiToken>()
             var depth = 0
             var ternaryDepth = 0
+            // depth-0 三元冒号已消耗但 else 操作数未至（§1.4 规则 3：`:` 后换行延续）；
+            // 任一非换行 token 到来即清零。缺此标志时 `a = c ? "x" :` 换行即断句、else 静默丢
+            var elsePending = false
             while (pos < tokens.size && tokens[pos].kind != OpenUiTokenKind.EOF) {
                 val kind = tokens[pos].kind
-                if (kind == OpenUiTokenKind.NEWLINE && depth <= 0 && ternaryDepth <= 0) {
+                // 近似边界（review 🟡1）：除三元 `?`/`:` 前瞻与 elsePending 外，再以「行尾是
+                // 中缀/逗号算符」做换行延续（如 `b +\n c`）；非完整算符状态机——行尾是完整
+                // 操作数但表达式实际未完的其它形态（如调用缺右括号已被 depth 覆盖除外）不保证
+                val trailingOperator = exprTokens.lastOrNull()?.kind in infixContinuationKinds
+                if (kind == OpenUiTokenKind.NEWLINE && depth <= 0 && ternaryDepth <= 0 &&
+                    !elsePending && !trailingOperator
+                ) {
                     // 换行前前瞻：下一有意义 token 是 `?` 则三元跨行延续
                     var peek = pos + 1
                     while (peek < tokens.size && tokens[peek].kind == OpenUiTokenKind.NEWLINE) peek++
@@ -276,13 +296,18 @@ internal object OpenUiParser {
                     pos++
                     continue
                 }
-                when (kind) {
-                    OpenUiTokenKind.LPAREN, OpenUiTokenKind.LBRACK, OpenUiTokenKind.LBRACE -> depth++
-                    OpenUiTokenKind.RPAREN, OpenUiTokenKind.RBRACK, OpenUiTokenKind.RBRACE ->
-                        if (depth > 0) depth--
-                    OpenUiTokenKind.QUESTION -> if (depth == 0) ternaryDepth++
-                    OpenUiTokenKind.COLON -> if (depth == 0 && ternaryDepth > 0) ternaryDepth--
-                    else -> Unit
+                if (kind == OpenUiTokenKind.COLON && depth == 0 && ternaryDepth > 0) {
+                    ternaryDepth--
+                    elsePending = true
+                } else {
+                    elsePending = false
+                    when (kind) {
+                        OpenUiTokenKind.LPAREN, OpenUiTokenKind.LBRACK, OpenUiTokenKind.LBRACE -> depth++
+                        OpenUiTokenKind.RPAREN, OpenUiTokenKind.RBRACK, OpenUiTokenKind.RBRACE ->
+                            if (depth > 0) depth--
+                        OpenUiTokenKind.QUESTION -> if (depth == 0) ternaryDepth++
+                        else -> Unit
+                    }
                 }
                 exprTokens += tokens[pos]
                 pos++

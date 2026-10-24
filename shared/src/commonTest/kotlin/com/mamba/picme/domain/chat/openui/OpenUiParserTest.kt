@@ -59,6 +59,30 @@ class OpenUiParserTest {
         assertEquals(listOf("status", "next"), statementNames(program))
     }
 
+    @Test
+    fun `ternary else on next line after colon continues`() {
+        // §1.4 规则 3：depth-0 三元冒号消耗后 else 操作数在下一行，不得断句静默丢 else
+        val program = """
+            status = 1 > 2 ? "Has items" :
+              "Empty"
+            next = 1
+        """.trimIndent()
+        assertEquals(listOf("status", "next"), statementNames(program))
+        assertEquals(OpenUiValue.Str("Empty"), evaluate(program, "status"))
+    }
+
+    @Test
+    fun `ternary else expression spanning lines continues on trailing operator`() {
+        // 尽力而为近似：else 表达式行尾是中缀算符时换行延续（非完整算符状态机）
+        val program = """
+            total = false ? 10 : 1 +
+              2
+            next = 3
+        """.trimIndent()
+        assertEquals(listOf("total", "next"), statementNames(program))
+        assertEquals(OpenUiValue.Num(3.0), evaluate(program, "total"))
+    }
+
     // ── fence 抽取与注释剥离（§1.2） ────────────────────────────────
 
     @Test
