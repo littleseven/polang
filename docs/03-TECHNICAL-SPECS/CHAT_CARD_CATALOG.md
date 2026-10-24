@@ -814,6 +814,12 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **渲染**：ChatScreen TYPE_A2UI_CARD → A2uiCardHost（androidx.a2ui 官方渲染器，
   polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract）；
   HandleResolver 填槽，缺失降级占位卡（US-6）。
+- **交互态**：BarChart 点柱 → selectBucket 事件本地消费（不上行）→ 回写数据模型
+  `/selected` 高亮 + viewState `selected=<label>` 持久化（US-7 恢复填槽同路径）。
+  **防御纵深**（2026-10-24 sf-012a0 事故）：契约要求蓝图 selected 写 `{"path":"/selected"}`
+  数据绑定；LLM 偶发写裸字符串字面量（不订阅数据模型 → 高亮静默失效），HandleResolver
+  对 updateComponents 内 BarChart 组件归一化改绑（非空字面量播种为初始选中），
+  纯函数 `normalizeBarChartSelectedBinding`，同 data 批量展开先例。
 - **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui 下发
   BarChart 骨架（buckets 绑定 local://scan/<id>#histogram）→ 端上月桶填槽渲染。
 - **调试入口（DEBUG 构建）**：Ready 态卡右上角挂 debug 徽标（`A2UI v0.9 · sf-xxxxxxxx`，

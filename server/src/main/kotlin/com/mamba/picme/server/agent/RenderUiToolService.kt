@@ -29,8 +29,10 @@ class RenderUiToolService {
    Button 必须给 "child"（子组件 id 字符串，指向一个 Text 组件作按钮文字，
    禁止用 "label" 属性）和 action，variant 仅 default/primary/borderless；
    action 格式：{"event": {"name": "<事件名>"}}（"event" 层必填，禁止平写 "name"）；
-   BarChart（柱状图）：title=标题字符串，buckets=[{label,count}] 绑定数据模型，
-   selected=选中桶 label 字符串（不是下标）；
+   BarChart（柱状图）：title=标题字符串，buckets 必须写数据绑定 {"path":"/buckets"}
+   （[{label,count}] 数据经 updateDataModel 下发，禁裸写数据）；
+   "selected" 必须写数据绑定 {"path":"/selected"}——端侧点选高亮回写该路径，
+   禁裸字符串字面量（裸值不订阅数据模型，点选高亮会静默失效）；
 5. 数据不进 JSON：凡涉及相册数据的值，updateDataModel 的字符串值写绑定
    "local://scan/<handleId>#histogram"，handleId 来自 search_media/refine_media_search
    结果尾部的「handle: scan/<id>」。禁止臆造 handleId，禁止把路径/uri/清单写进任何字段；

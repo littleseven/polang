@@ -46,6 +46,25 @@ class HandleResolver(
                     ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
                 val dataModel = envelope.optJSONObject("updateDataModel")
                 if (dataModel == null) {
+                    val updateComponents = envelope.optJSONObject("updateComponents")
+                    if (updateComponents != null) {
+                        // BarChart selected 裸值归一化（2026-10-24 sf-012a0 事故，同 data 批量展开
+                        // 的防御纵深）：裸字面量不订阅数据模型，点选高亮静默失效——改绑 /selected；
+                        // 非空字面量（LLM 意图预选）在组件消息之后播种回数据模型，时序保证初值生效
+                        val seed = normalizeBarChartSelectedBinding(updateComponents)
+                        filled += parseEnvelope(parser, envelope)
+                            ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
+                        if (seed != null) {
+                            val componentSurfaceId =
+                                updateComponents.optString("surfaceId", surfaceId)
+                            filled += A2uiUpdateDataModelMessage(
+                                surfaceId = componentSurfaceId,
+                                path = A2uiCardContract.DATA_PATH_SELECTED,
+                                value = seed,
+                            )
+                        }
+                        continue
+                    }
                     filled += parseEnvelope(parser, envelope)
                         ?: return@withContext A2uiResolution.Degraded("envelope_invalid")
                     continue
@@ -116,4 +135,29 @@ class HandleResolver(
 
     private fun List<HistogramBucket>.toPlainList(): List<Map<String, Any>> =
         map { bucket -> mapOf("label" to bucket.label, "count" to bucket.count) }
+}
+
+/**
+ * BarChart selected 裸值归一化（纯函数，测试锚点；防御纵深同 data 批量展开）。
+ *
+ * 契约要求 selected 写 {"path":"/selected"} 数据绑定；LLM 偶发写裸字符串字面量
+ * （如 "selected": ""）或干脆缺键——两者都不订阅数据模型，点选高亮静默失效。
+ * 对 updateComponents 载荷内每个 BarChart 组件：selected 非 JSONObject（绑定形态）
+ * 一律改写/补写为 {"path":"/selected"}。
+ *
+ * @return 需播种回数据模型的初始选中值（非空裸字面量，LLM 意图预选）；否则 null。
+ *         播种消息由调用方置于组件消息之后（时序保证初值覆盖默认态）。
+ */
+internal fun normalizeBarChartSelectedBinding(updateComponents: JSONObject): String? {
+    val components = updateComponents.optJSONArray("components") ?: return null
+    var seed: String? = null
+    for (index in 0 until components.length()) {
+        val component = components.optJSONObject(index) ?: continue
+        if (component.optString("component") != PolangBarChartComponent.NAME) continue
+        val raw = component.opt("selected")
+        if (raw is JSONObject) continue // 已是绑定形态（含 {"path":...}），不动
+        component.put("selected", JSONObject(mapOf("path" to A2uiCardContract.DATA_PATH_SELECTED)))
+        (raw as? String)?.takeIf { it.isNotEmpty() }?.let { literal -> seed = literal }
+    }
+    return seed
 }

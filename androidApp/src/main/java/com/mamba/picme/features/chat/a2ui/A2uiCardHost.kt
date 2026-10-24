@@ -29,6 +29,7 @@ import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
 
 /**
  * data_ui 卡的渲染宿主：一颗 processor 一张卡（surface 粒度隔离，互不重放串台）。
@@ -62,7 +63,7 @@ fun A2uiCardHost(
             value = ready.copy(
                 messages = ready.messages + A2uiUpdateDataModelMessage(
                     surfaceId = part.surfaceId,
-                    path = "/selected",
+                    path = A2uiCardContract.DATA_PATH_SELECTED,
                     value = selected,
                 )
             )
@@ -90,7 +91,7 @@ fun A2uiCardHost(
                                     processorRef?.processMessage(
                                         A2uiUpdateDataModelMessage(
                                             surfaceId = part.surfaceId,
-                                            path = "/selected",
+                                            path = A2uiCardContract.DATA_PATH_SELECTED,
                                             value = bucket,
                                         )
                                     )

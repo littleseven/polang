@@ -27,6 +27,16 @@ object A2uiCardContract {
     /** A2UI 协议版本（SUPPORTED_VERSIONS = ["v0.9", "v0.9.1"]，M2 固定 v0.9）。 */
     const val PROTOCOL_VERSION = "v0.9"
 
+    /** BarChart 数据模型路径：月桶列表（updateDataModel 写 [{label,count}]）。 */
+    const val DATA_PATH_BUCKETS = "/buckets"
+
+    /**
+     * BarChart 数据模型路径：选中桶 label。蓝图侧 selected 属性必须写 {"path":"/selected"}
+     * 绑定（裸字符串字面量不订阅数据模型，点选高亮静默失效——2026-10-24 sf-012a0 事故）；
+     * 端侧点选回写与 viewState 恢复也走此路径。
+     */
+    const val DATA_PATH_SELECTED = "/selected"
+
     // ── 语义样式令牌线格式键（A2uiStyleTokens 配套） ──────────────────────
 
     /** Text 组件语义层级键（value = HEADLINE|SUBHEAD|BODY|CAPTION）。 */

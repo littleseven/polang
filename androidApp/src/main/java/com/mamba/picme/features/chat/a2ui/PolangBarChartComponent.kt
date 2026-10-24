@@ -35,7 +35,9 @@ class PolangBarChartComponent : A2uiComponent {
 
     override val name: String = NAME
     override val description: String =
-        "月度照片计数柱状图。buckets 为 [{label: String, count: Int}] 列表（数据模型绑定，必填）；selected 为选中桶 label（可空）。"
+        "月度照片计数柱状图。buckets 为 [{label: String, count: Int}] 列表，必须写数据绑定 " +
+            "{\"path\":\"/buckets\"}（数据经 updateDataModel 下发，禁裸写数据）；selected 必须写数据绑定 " +
+            "{\"path\":\"/selected\"}（端侧点选高亮回写该路径），禁止写裸字符串字面量。"
 
     override val properties: List<A2uiProperty<*>> = listOf(TITLE, TITLE_ROLE, BUCKETS, SELECTED)
 
@@ -121,7 +123,14 @@ class PolangBarChartComponent : A2uiComponent {
             description = "标题语义层级：HEADLINE|SUBHEAD|BODY|CAPTION（默认 SUBHEAD）",
         )
         private val BUCKETS =
-            A2uiProperty.dynamicValue("buckets", required = true, description = "[{label,count}] 月桶列表")
-        private val SELECTED = A2uiProperty.dynamicString("selected", description = "选中桶 label")
+            A2uiProperty.dynamicValue(
+                "buckets",
+                required = true,
+                description = "[{label,count}] 月桶列表，必须写数据绑定 {\"path\":\"/buckets\"}",
+            )
+        private val SELECTED = A2uiProperty.dynamicString(
+            "selected",
+            description = "选中桶 label，必须写数据绑定 {\"path\":\"/selected\"}（禁裸字符串）",
+        )
     }
 }

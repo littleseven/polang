@@ -77,10 +77,15 @@ class RenderUiToolServiceTest {
     }
 
     @Test
-    fun `render_ui description pins BarChart selected as label string`() {
+    fun `render_ui description pins BarChart selected as path binding`() {
+        // 2026-10-24 sf-012a0 事故：LLM 把 selected 写成裸字符串（实测 "selected": ""），
+        // 裸值不订阅数据模型 → 端上点选高亮静默失效。钉住绑定形态引导
+        // （与 PolangBarChartComponent description 双向核对）。
         assertTrue(
-            "description 须钉住 selected 是桶 label 字符串（与 PolangBarChartComponent description 双向核对）",
-            descriptor.description.contains("选中桶 label"),
+            "description 须钉住 selected 必须写 {\"path\":\"/selected\"} 数据绑定且禁裸字符串",
+            descriptor.description.contains("\"selected\"") &&
+                descriptor.description.contains("\"/selected\"") &&
+                descriptor.description.contains("禁裸字符串"),
         )
     }
 }
