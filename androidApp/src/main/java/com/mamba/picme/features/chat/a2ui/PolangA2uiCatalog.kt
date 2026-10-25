@@ -4,14 +4,18 @@ import androidx.a2ui.compose.ui.A2uiCatalog
 import androidx.a2ui.model.catalog.functions.A2uiLocaleProvider
 import androidx.a2ui.model.catalog.functions.A2uiMessageFormatter
 import androidx.a2ui.model.catalog.functions.A2uiUrlOpener
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.a2ui.catalog.A2uiAudioPlayerRenderer
 import androidx.compose.material3.a2ui.catalog.A2uiImageRenderer
 import androidx.compose.material3.a2ui.catalog.A2uiVideoRenderer
 import androidx.compose.material3.a2ui.catalog.MaterialA2uiBasicCatalogV1Defaults
 import androidx.compose.material3.a2ui.catalog.materialA2uiBasicCatalogV1
 import coil.compose.AsyncImage
+import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
+import com.mamba.picme.features.chat.media.ChatAudioPlayer
+import com.mamba.picme.features.chat.media.ChatVideoPlayer
 
 /**
  * polang A2UI catalog（D6：A2UI 只作线格式，目录抽象是自己的）。
@@ -30,15 +34,24 @@ fun polangA2uiCatalog(urlOpener: A2uiUrlOpener): A2uiCatalog {
                 )
             }
         ),
-        // M2 surfaces 不用 video/audioPlayer：最小占位实现（渲染空盒），不引 Media3 依赖
+        // Video/AudioPlayer 真渲染（Media3，共用件 features/chat/media/），卡内不自动播
         video = MaterialA2uiBasicCatalogV1Defaults.video(
-            A2uiVideoRenderer { _, modifier, _ ->
-                Box(modifier = modifier)
+            A2uiVideoRenderer { url, modifier, onError ->
+                ChatVideoPlayer(
+                    url = url,
+                    modifier = modifier.fillMaxWidth().height(A2uiCardTokens.videoHeight),
+                    onError = onError,
+                )
             }
         ),
         audioPlayer = MaterialA2uiBasicCatalogV1Defaults.audioPlayer(
-            A2uiAudioPlayerRenderer { _, _, modifier, _ ->
-                Box(modifier = modifier)
+            A2uiAudioPlayerRenderer { url, description, modifier, onError ->
+                ChatAudioPlayer(
+                    url = url,
+                    description = description,
+                    modifier = modifier.fillMaxWidth().height(A2uiCardTokens.audioPlayerHeight),
+                    onError = onError,
+                )
             }
         ),
         urlOpener = urlOpener,

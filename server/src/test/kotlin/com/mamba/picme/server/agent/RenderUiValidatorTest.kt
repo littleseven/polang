@@ -199,27 +199,56 @@ class RenderUiValidatorTest {
 
     @Test
     fun `component outside allowlist`() {
-        // Video/AudioPlayer 端侧是空盒占位渲染（PolangA2uiCatalog），未实装即不开放
         assertHasViolation(
-            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Video","url":"https://x.co/a.mp4"}""")),
-            "不在白名单",
-        )
-        assertHasViolation(
-            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"AudioPlayer","url":"https://x.co/a.mp3"}""")),
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"NoSuchWidget","text":"boom"}""")),
             "不在白名单",
         )
     }
 
     @Test
-    fun `full seventeen component card passes`() {
+    fun `video and audio player with https url pass`() {
         val json = envelopeArray(
             createSurface(),
             updateComponents(
                 """
-                {"id":"root","component":"Column","children":["t","img","ic","row","list","card","tabs","modal","div","btn","tf","cb","cp","sl","dt","chart"],"justify":"spaceBetween","align":"center"},
+                {"id":"root","component":"Column","children":["vid","aud"]},
+                {"id":"vid","component":"Video","url":"https://x.co/a.mp4"},
+                {"id":"aud","component":"AudioPlayer","url":"https://x.co/a.mp3","description":"口播"}
+                """,
+            ),
+        )
+        assertEquals(emptyList<String>(), RenderUiValidator.validate(sid, json))
+    }
+
+    @Test
+    fun `media url must be https public address`() {
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Video","url":"content://media/1"}""")),
+            "Video.url 只接受 https://",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"AudioPlayer","url":"file:///storage/emulated/0/a.mp3"}""")),
+            "AudioPlayer.url 只接受 https://",
+        )
+        // url 必填
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"root","component":"Video"}""")),
+            "Video 缺必填属性 \"url\"",
+        )
+    }
+
+    @Test
+    fun `full nineteen component card passes`() {
+        val json = envelopeArray(
+            createSurface(),
+            updateComponents(
+                """
+                {"id":"root","component":"Column","children":["t","img","ic","vid","aud","row","list","card","tabs","modal","div","btn","tf","cb","cp","sl","dt","chart"],"justify":"spaceBetween","align":"center"},
                 {"id":"t","component":"Text","text":"标题","variant":"h3"},
                 {"id":"img","component":"Image","url":"https://x.co/a.png","fit":"cover","variant":"header"},
                 {"id":"ic","component":"Icon","name":"photo"},
+                {"id":"vid","component":"Video","url":"https://x.co/a.mp4"},
+                {"id":"aud","component":"AudioPlayer","url":"https://x.co/a.mp3","description":"口播"},
                 {"id":"row","component":"Row","children":["t2"],"justify":"start","align":"stretch"},
                 {"id":"t2","component":"Text","text":"行内"},
                 {"id":"list","component":"List","children":["t3"],"direction":"horizontal","align":"start"},

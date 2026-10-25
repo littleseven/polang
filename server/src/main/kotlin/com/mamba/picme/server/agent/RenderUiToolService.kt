@@ -27,7 +27,7 @@ internal const val RENDER_UI_RULES = """向用户下发一张 A2UI 原生渲染�
 2. createSurface 的 catalogId 必须是 "https://polang.net/a2ui/catalog/v1.json"；
 3. updateDataModel 一信封只写一个绑定：必须含 "path"（如 "/buckets"）与 "value" 两键，
    禁止使用 "data" 批量形式（端上解析器不识别该键，数据会被静默丢弃）；
-4. 组件只用以下 17 种（Video/AudioPlayer 未开放，使用即被拒）：
+4. 组件只用以下 19 种：
    布局：Column/Row（"children":["子组件id",...]，可选 justify=start/center/end/spaceBetween/spaceAround/spaceEvenly/stretch、
    align=start/center/end/stretch）；List（children + direction=vertical/horizontal）；Card（"child":"子组件id"）；
    Divider（axis=horizontal/vertical）；Tabs（"tabs":[{"title":"…","child":"组件id"}]，至少一个）；
@@ -39,7 +39,9 @@ internal const val RENDER_UI_RULES = """向用户下发一张 A2UI 原生渲染�
    send/settings/share/shoppingCart/skipNext/skipPrevious/star/starHalf/starOff/stop/upload/visibility/visibilityOff/
    volumeDown/volumeMute/volumeOff/volumeUp/warning，禁臆造、禁 svgPath）；
    Image（url 必须 https:// 公网图片地址，禁本地路径与相册 uri——相册照片永不出设备；可选 fit=contain/cover/fill/none/
-   scaleDown，variant=icon/avatar/smallFeature/mediumFeature/largeFeature/header）。
+   scaleDown，variant=icon/avatar/smallFeature/mediumFeature/largeFeature/header）；
+   Video（url 必须 https:// 公网视频地址，同 Image 隐私口径，卡内不自动播、用户点播放）；
+   AudioPlayer（url 必须 https:// 公网音频地址 + 可选 description 说明文字）。
    交互：Button（"child" 指向一个 Text 组件作按钮文字（禁 "label" 属性）+ action，
    action 格式 {"event": {"name": "<事件名>"}}（"event" 层必填，禁止平写 "name"），variant 仅 default/primary/borderless）；
    TextField（label，variant=shortText/longText/number/obscured）；CheckBox（label + value 布尔）；

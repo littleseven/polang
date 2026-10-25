@@ -21,9 +21,9 @@ import kotlinx.serialization.json.jsonPrimitive
  * - 官网 catalog schema `docs-site/a2ui/catalog/v1.json`（组件必填属性，
  *   由 androidApp `A2uiCatalogDescriptorSyncTest` 从运行态 catalog 生成）。
  *
- * 注意组件白名单（17 个）= catalog 全集（19 个）减去 Video/AudioPlayer
- * （端侧是空盒占位渲染，未实装，见 androidApp PolangA2uiCatalog）——
- * catalog 是端侧渲染能力面，白名单 = 能力面减去未实装项，两者必须保持这个关系。
+ * 注意组件白名单（19 个）= catalog 全集（19 个）：Video/AudioPlayer 已实装
+ * （Media3 真渲染，2026-10-25 起；见 androidApp features/chat/media/ChatMediaPlayers），
+ * 两者必须保持这个关系。
  */
 object RenderUiValidator {
 
@@ -40,7 +40,8 @@ object RenderUiValidator {
     }
 
     private val ALLOWED_COMPONENTS = setOf(
-        "Text", "Image", "Icon", "Row", "Column", "List", "Card", "Tabs", "Modal", "Divider",
+        "Text", "Image", "Icon", "Video", "AudioPlayer",
+        "Row", "Column", "List", "Card", "Tabs", "Modal", "Divider",
         "Button", "TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput", "BarChart",
     )
 
@@ -49,6 +50,8 @@ object RenderUiValidator {
         "Text" to setOf("text"),
         "Image" to setOf("url"),
         "Icon" to setOf("name"),
+        "Video" to setOf("url"),
+        "AudioPlayer" to setOf("url"),
         "Row" to setOf("children"),
         "Column" to setOf("children"),
         "List" to setOf("children"),
@@ -291,6 +294,12 @@ object RenderUiValidator {
                 val url = component["url"].stringOrNull()
                 if (url != null && !url.startsWith("https://")) {
                     violations += "$where: Image.url 只接受 https:// 公网图片地址（实际 \"$url\"）——相册照片永不出设备，禁本地路径/uri"
+                }
+            }
+            "Video", "AudioPlayer" -> {
+                val url = component["url"].stringOrNull()
+                if (url != null && !url.startsWith("https://")) {
+                    violations += "$where: $name.url 只接受 https:// 公网媒体地址（实际 \"$url\"）——相册媒体永不出设备，禁本地路径/uri"
                 }
             }
             "Icon" -> {

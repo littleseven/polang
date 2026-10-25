@@ -812,9 +812,11 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   `AgentRunner.actionGate` 才能拦住坏负载到端）——非法负载不落 Action、不下行、不进 pending
   重放，工具体回 `error: …` 逐条违规清单经 Observation 回灌，LLM 同轮修正重试；工具描述内嵌
   黄金示例 few-shot（`RENDER_UI_EXAMPLE` 常量被测试钉住自身过校验）。
-  **组件白名单 17**（2026-10-24 真机穷举后从 6 扩齐）：catalog 19 组件中放行
-  Text/Image/Icon/Row/Column/List/Card/Tabs/Divider/Button/CheckBox/TextField/ChoicePicker/
-  Slider/DateTimeInput/BarChart——Video/AudioPlayer 端侧仅空盒占位（未引 Media3）故拒之；
+  **组件白名单 19**（2026-10-24 真机穷举后从 6 扩至 17；2026-10-25 补满官方标准全集）：
+  catalog 19 组件全量放行 Text/Image/Icon/Video/AudioPlayer/Row/Column/List/Card/Tabs/Divider/
+  Button/CheckBox/TextField/ChoicePicker/Slider/DateTimeInput/BarChart——Video/AudioPlayer
+  端侧 Media3 真渲染（共用件 `features/chat/media/ChatMediaPlayers.kt`，卡内不自动播、
+  离开组合即释放），url 同 Image 口径限 https:// 公网地址；
   Image.url 字面量必须 https://（禁本地路径/相册 uri，[PRIVACY] 红线），Icon.name 限 59 枚
   预定义枚举且禁 svgPath。**假发卡守卫**（同日修复，实测 5/13 用例 LLM 不调 render_ui 就声称
   「卡片已下发 ✅」）：`CardClaimGuard` 挂 cloudAgentStrategy 的 correctFakeCardClaim 节点——

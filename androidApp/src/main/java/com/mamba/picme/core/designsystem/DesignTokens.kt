@@ -457,12 +457,14 @@ object IdPhotoTokens {
     val colorWhite = Color.White
 }
 
-/** A2UI 数据卡（data_ui BarChart + 降级卡 + debug 蓝图查看器）。barAreaHeight=柱状图绘图区高（含标签行）; barGap=柱间距; barLabelHeight=柱下月份标签预留高（满高柱须预留防裁剪）; barUnselectedAlpha=未选中柱透明度; debugBadgeRadius=debug 徽标圆角; debugMaxHeight=蓝图查看器最大高。 */
+/** A2UI 数据卡（data_ui BarChart + 降级卡 + debug 蓝图查看器 + 媒体卡）。barAreaHeight=柱状图绘图区高（含标签行）; barGap=柱间距; barLabelHeight=柱下月份标签预留高（满高柱须预留防裁剪）; barUnselectedAlpha=未选中柱透明度; debugBadgeRadius=debug 徽标圆角; debugMaxHeight=蓝图查看器最大高; videoHeight=Video 组件卡内高度; audioPlayerHeight=AudioPlayer 组件紧凑条高度。 */
 object A2uiCardTokens {
     val barAreaHeight = 120.dp
     val barGap = 6.dp
     val barLabelHeight = 20.dp
     val barUnselectedAlpha = 0.45f
+    val videoHeight = 200.dp
+    val audioPlayerHeight = 72.dp
     val debugBadgeRadius = 12.dp
     val debugMaxHeight = 420.dp
 }
