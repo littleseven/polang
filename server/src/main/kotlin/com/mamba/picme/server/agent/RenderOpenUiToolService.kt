@@ -112,6 +112,7 @@ class RenderOpenUiToolService {
      Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；
    - Button(label*, action?)：action 是裸动作表达式、最外层不要加引号，
      形如 Button("查看", @OpenUrl("https://..."))（"@OpenUrl(...)" 包成字符串会被拒）；
+     一卡 Button ≤3 个（行为色面积收敛，次要动作并入主 Button 或改 Markdown 文本）；
    - BarChart(title?, buckets*, selected?)：buckets 是 [{label,count}] 数据引用；
      buckets >12 个时先聚合（按年/按季）再发卡，避免超密横滑柱图；
    - Image(photo*, aspect?)：相册照片（图文混排用）；photo 只许填 photos 数组元素的
@@ -189,6 +190,14 @@ class RenderOpenUiToolService {
         // 与发射点门控同源校验（review 🟡4 对偶）：非法回 error 文本作 Observation
         // 回灌，LLM 同轮修正重试（同 RenderUiToolService 闭环口径）
         RenderOpenUiValidator.validateToError(program)?.let { error -> return error }
-        return "UI 已下发端侧渲染（OpenUI）"
+        // 构图软警告（设计规范第一刀配套）：卡照发，建议附在回执里供下次发卡改进
+        val warnings = RenderOpenUiValidator.lintComposition(program)
+        return buildString {
+            append("UI 已下发端侧渲染（OpenUI）")
+            if (warnings.isNotEmpty()) {
+                append("。构图建议（本卡已下发、无需重发，下次发卡请改进）：")
+                warnings.forEach { warning -> append("\n- ").append(warning) }
+            }
+        }
     }
 }

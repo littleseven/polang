@@ -91,6 +91,42 @@ object RenderOpenUiValidator {
      *  整卡同屏组合存活，60 张投影上限是 token 保护而非内存保护——超过即同轮纠错。 */
     const val MAX_IMAGE_COMPONENTS = 12
 
+    /** 构图软警告阈值（2026-10-25，设计规范 §1.1/§4.1）：与工具描述规则同源。 */
+    const val MAX_DISPLAY_TEXTS = 4
+    const val MAX_BUTTONS = 3
+
+    /** DISPLAY role Text 计数（扫原文——role 在字符串字面量里，剥离后不可见）。
+     *  括号只允许出现在字符串字面量内（stat 增量写法 `Text("1,234 (+56)", "DISPLAY")`
+     *  不误判）；残留漏判：首参含括号表达式（Text(String($x), …)）与跨行调用。
+     *  误伤面（lint 级可接受）：`Text("DISPLAY")` 首参恰为该词的极端写法、注释内
+     *  死代码（raw 扫描不剥注释——先剥注释会踩 2026-10-24 local:// 截断事故）。 */
+    private val TEXT_DISPLAY_CALL =
+        Regex("""(?<![@${'$'}A-Za-z0-9_])Text\s*\((?:[^()"\\]|"(?:[^"\\]|\\.)*")*"DISPLAY"""")
+
+    private val BUTTON_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Button\s*\(""")
+
+    /**
+     * 构图软警告（2026-10-25，设计规范第一刀配套）：不拒卡、不落违规，工具体
+     * Observation 附带「本卡已下发、无需重发，下次发卡改进」提示——硬校验管合法性，
+     * lint 管美观下限。规则来源：
+     * - DISPLAY ≤4（规范 §4.1 stat tile：一屏大数字过多 = 没有重点）；
+     * - Button ≤3（规范 §1.1 行为色面积：Button 是 primary 大色块面积的主要代理
+     *   分量——Tabs 选中胶囊/Slider/Switch/图表选中高亮不在 lint 面内）。
+     */
+    fun lintComposition(program: String): List<String> {
+        val warnings = mutableListOf<String>()
+        val displayCount = TEXT_DISPLAY_CALL.findAll(program).count()
+        if (displayCount > MAX_DISPLAY_TEXTS) {
+            warnings += "DISPLAY 大数字 $displayCount 个超建议上限（一屏 ≤$MAX_DISPLAY_TEXTS 个，stat tile 只放最关键指标，其余改 BODY/CAPTION 或收进 Table）"
+        }
+        val stripped = LINE_COMMENT.replace(STRING_LITERAL.replace(program, "\"\""), "")
+        val buttonCount = BUTTON_CALL.findAll(stripped).count()
+        if (buttonCount > MAX_BUTTONS) {
+            warnings += "Button $buttonCount 个超建议上限（一卡 primary 大色块 ≤$MAX_BUTTONS 处，行为色面积收敛；次要动作并入一个主 Button 或改 Markdown 文本链接）"
+        }
+        return warnings
+    }
+
     /** 校验工具调用参数（wire JSON：{"program","fallbackSummary"}）。null = 合法放行。 */
     fun validateArgsJson(argsJson: String): String? {
         val args = try {

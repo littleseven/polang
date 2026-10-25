@@ -357,6 +357,56 @@ root = Card([Image(photos[0].id, 1.5)])""",
         assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM))
     }
 
+    // ── 构图软警告（2026-10-25，设计规范第一刀配套） ──────────────────
+
+    @Test
+    fun `lint warns when display texts exceed four but does not reject the card`() {
+        val tiles = (1..5).joinToString(", ") { i -> "Text(\"$i\", \"DISPLAY\")" }
+        val program = "root = Card([$tiles])"
+        val warnings = RenderOpenUiValidator.lintComposition(program)
+        assertEquals(1, warnings.size)
+        assertTrue(warnings[0].contains("DISPLAY"))
+        // 软警告不拒卡：硬校验仍放行
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `lint clean at display threshold and stat tile golden stays clean`() {
+        val tiles = (1..4).joinToString(", ") { i -> "Text(\"$i\", \"DISPLAY\")" }
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition("root = Card([$tiles])"))
+        assertEquals(
+            emptyList<String>(),
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM),
+        )
+    }
+
+    @Test
+    fun `lint warns when buttons exceed three`() {
+        val buttons = (1..4).joinToString(", ") { i -> "Button(\"b$i\")" }
+        val warnings = RenderOpenUiValidator.lintComposition("root = Card([$buttons])")
+        assertEquals(1, warnings.size)
+        assertTrue(warnings[0].contains("Button"))
+    }
+
+    @Test
+    fun `lint ignores component names inside text literals`() {
+        // 字符串剥离后计数：文案里出现 Button/DISPLAY 字样不计入
+        val program = """root = Card([Text("Button 是按钮组件，DISPLAY 是大数字"), Button("确定")])"""
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(program))
+    }
+
+    @Test
+    fun `lint clean at button threshold and dual violations produce two warnings`() {
+        val threeButtons = (1..3).joinToString(", ") { i -> "Button(\"b$i\")" }
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition("root = Card([$threeButtons])"))
+        val tiles = (1..5).joinToString(", ") { i -> "Text(\"$i\", \"DISPLAY\")" }
+        val buttons = (1..4).joinToString(", ") { i -> "Button(\"b$i\")" }
+        assertEquals(
+            2,
+            RenderOpenUiValidator.lintComposition("root = Card([$tiles, $buttons])").size,
+        )
+    }
+
     // ── argsJson 与 gate 分发 ───────────────────────────────────────
 
     @Test
@@ -377,6 +427,13 @@ root = Card([Image(photos[0].id, 1.5)])""",
         assertNull(
             RenderUiValidator.gate("render_ui_openui", argsJson(validWithQuery)),
         )
+    }
+
+    @Test
+    fun `gate never blocks lint-overflow card - soft warnings are not hard rejects`() {
+        // lint 超限（10 个 DISPLAY）只是构图建议，发射点门控必须放行（防 lint 误接进 gate 的回归）
+        val tiles = (1..10).joinToString(", ") { i -> "Text(\"$i\", \"DISPLAY\")" }
+        assertNull(RenderUiValidator.gate("render_ui_openui", argsJson("root = Card([$tiles])")))
     }
 
     @Test
