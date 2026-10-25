@@ -27,6 +27,9 @@ internal const val RENDER_UI_RULES = """向用户下发一张 A2UI 原生渲染�
 2. createSurface 的 catalogId 必须是 "https://polang.net/a2ui/catalog/v1.json"；
 3. updateDataModel 一信封只写一个绑定：必须含 "path"（如 "/buckets"）与 "value" 两键，
    禁止使用 "data" 批量形式（端上解析器不识别该键，数据会被静默丢弃）；
+   交互组件（TextField/CheckBox/ChoicePicker/Slider/DateTimeInput）的 "value" 必须写数据绑定
+   {"path":"/..."} 并用 updateDataModel 下发初值，禁裸字面量——裸值没有数据模型回写路径，
+   端侧控件会置灰不可交互；
 4. 组件只用以下 19 种：
    布局：Column/Row（"children":["子组件id",...]，可选 justify=start/center/end/spaceBetween/spaceAround/spaceEvenly/stretch、
    align=start/center/end/stretch）；List（children + direction=vertical/horizontal）；Card（"child":"子组件id"）；
@@ -44,9 +47,9 @@ internal const val RENDER_UI_RULES = """向用户下发一张 A2UI 原生渲染�
    AudioPlayer（url 必须 https:// 公网音频地址 + 可选 description 说明文字）。
    交互：Button（"child" 指向一个 Text 组件作按钮文字（禁 "label" 属性）+ action，
    action 格式 {"event": {"name": "<事件名>"}}（"event" 层必填，禁止平写 "name"），variant 仅 default/primary/borderless）；
-   TextField（label，variant=shortText/longText/number/obscured）；CheckBox（label + value 布尔）；
-   ChoicePicker（"options":[{"label":"…","value":"…"}]，value=选中值数组，variant=mutuallyExclusive/multipleSelection，可选 displayStyle=checkbox/chips）；
-   Slider（value + max，可选 min/label）；DateTimeInput（value ISO 日期串，可选 enableDate/enableTime）。
+   TextField（label + value 数据绑定，variant=shortText/longText/number/obscured）；CheckBox（label + value 数据绑定布尔）；
+   ChoicePicker（"options":[{"label":"…","value":"…"}]，value=选中值数组数据绑定，variant=mutuallyExclusive/multipleSelection，可选 displayStyle=checkbox/chips）；
+   Slider（value 数据绑定 + max，可选 min/label）；DateTimeInput（value 数据绑定 ISO 日期串，可选 enableDate/enableTime）。
    图表：BarChart（title=标题字符串，buckets 必须写数据绑定 {"path":"/buckets"}
    （[{label,count}] 数据经 updateDataModel 下发，禁裸写数据）；
    "selected" 必须写数据绑定 {"path":"/selected"}——端侧点选高亮回写该路径，

@@ -45,9 +45,12 @@ object RenderUiValidator {
         "Button", "TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput", "BarChart",
     )
 
+    /** 交互组件：value 必须数据绑定（裸字面量无回写路径，端侧置灰）。 */
+    private val INTERACTIVE_VALUE_COMPONENTS =
+        setOf("TextField", "CheckBox", "ChoicePicker", "Slider", "DateTimeInput")
+
     /** 各组件必填属性（对齐 catalog schema 的 required，去掉合成字段 component）。 */
-    private val REQUIRED_PROPS = mapOf(
-        "Text" to setOf("text"),
+    private val REQUIRED_PROPS = mapOf(        "Text" to setOf("text"),
         "Image" to setOf("url"),
         "Icon" to setOf("name"),
         "Video" to setOf("url"),
@@ -273,6 +276,15 @@ object RenderUiValidator {
     ) {
         FORBIDDEN_STYLE_KEYS.filter { key -> component.containsKey(key) }
             .forEach { key -> violations += "$where: 禁止具体样式数值字段 \"$key\"，样式只用 role/colorRole/spacing 语义令牌" }
+        // 交互组件 value 必须数据绑定（2026-10-25 行程卡置灰事故：裸字面量没有数据模型
+        // 回写路径，端侧 bindUpdater 返回 null，控件渲染为 disabled）
+        if (name in INTERACTIVE_VALUE_COMPONENTS) {
+            val value = component["value"]
+            if (value != null && value.bindingPath() == null) {
+                violations += "$where: $name.value 必须写数据绑定 {\"path\":\"/...\"}（初值经 updateDataModel 下发）" +
+                    "——裸字面量没有回写路径，端侧控件置灰不可交互"
+            }
+        }
         checkEnum(where, component, "role", TEXT_ROLES, violations)
         checkEnum(where, component, "titleRole", TEXT_ROLES, violations)
         checkEnum(where, component, "colorRole", COLOR_ROLES, violations)

@@ -818,7 +818,12 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   端侧 Media3 真渲染（共用件 `features/chat/media/ChatMediaPlayers.kt`，卡内不自动播、
   离开组合即释放），url 同 Image 口径限 https:// 公网地址；
   Image.url 字面量必须 https://（禁本地路径/相册 uri，[PRIVACY] 红线），Icon.name 限 59 枚
-  预定义枚举且禁 svgPath。**假发卡守卫**（同日修复，实测 5/13 用例 LLM 不调 render_ui 就声称
+  预定义枚举且禁 svgPath。**交互组件 value 强制数据绑定**（2026-10-25 行程卡置灰事故）：
+  TextField/CheckBox/ChoicePicker/Slider/DateTimeInput 的 value 必须写 {"path":...} 且初值经
+  updateDataModel 下发——裸字面量没有数据模型回写路径，端侧 bindUpdater 返回 null，
+  控件渲染为 disabled 置灰。**纵向 List 端侧封顶**（同日行程 Tab 崩溃修复）：官方 List 纵向
+  走 LazyColumn，聊天卡挂在消息流 LazyColumn item 的无限高约束里必崩，端侧
+  `BoundedVerticalA2uiList` 覆写 TypedContent 封顶 `listMaxHeight`（320dp）内部自滚。**假发卡守卫**（同日修复，实测 5/13 用例 LLM 不调 render_ui 就声称
   「卡片已下发 ✅」）：`CardClaimGuard` 挂 cloudAgentStrategy 的 correctFakeCardClaim 节点——
   终结消息命中发卡声明模式 + 当轮无卡工具 Action 过门控 → 追加 user 纠正消息就地重发
   LLM 请求（上限 1 次防死循环），LLM 要么真实调用工具、要么改写回复删除发卡表述；

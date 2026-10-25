@@ -97,7 +97,7 @@ server/
 │   │   ├── AgentLlmTarget.kt     # 运行目标解析（网关渠道 modelMap 映射 / BYOK 透传）
 │   │   ├── ServerTools.kt        # 服务端工具（server_time + render_html H5 卡通道，summary-only 回执，2026-10-22）+ pending 重放派器
 │   │   ├── RenderUiToolService.kt # render_ui A2UI 发卡工具（CLOUD 侧空执行，负载经 action 事件下行）+ 黄金示例 few-shot
-│   │   ├── RenderUiValidator.kt  # render_ui 负载校验器：发射点门控（AgentRunner.actionGate）+ 工具体错误回灌，同源规则零漂移；组件白名单 19（官方全集）+ Image/Video/AudioPlayer url https 限 + Icon 枚举
+│   │   ├── RenderUiValidator.kt  # render_ui 负载校验器：发射点门控（AgentRunner.actionGate）+ 工具体错误回灌，同源规则零漂移；组件白名单 19（官方全集）+ Image/Video/AudioPlayer url https 限 + Icon 枚举 + 交互组件 value 强制数据绑定（裸字面量端侧置灰）
 │   │   ├── CardClaimGuard.kt     # 假发卡守卫：终结消息声称发卡但当轮无卡工具 Action 过门控 → 策略层 correctFakeCardClaim 节点纠正（上限 1 次）
 │   │   ├── AgentBridgeRegistry.kt # 工具桥挂起表（requestId→Deferred，断线 failAll 清理）
 │   │   ├── AgentRoundGate.kt     # per-user 跑轮并发=1 内存租约（M2.6；故意无 TTL，一轮最长 20 迭代×(LLM+120s 工具)，重启即清）

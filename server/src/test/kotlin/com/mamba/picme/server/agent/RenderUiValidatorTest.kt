@@ -263,17 +263,50 @@ class RenderUiValidatorTest {
                 {"id":"btn","component":"Button","child":"btn-label","action":{"event":{"name":"go"}},"variant":"borderless"},
                 {"id":"btn-label","component":"Text","text":"点我"},
                 {"id":"tf","component":"TextField","label":"名字","variant":"shortText"},
-                {"id":"cb","component":"CheckBox","label":"同意","value":true},
-                {"id":"cp","component":"ChoicePicker","options":[{"label":"A","value":"a"}],"value":["a"],"variant":"multipleSelection","displayStyle":"chips"},
-                {"id":"sl","component":"Slider","label":"强度","value":5,"min":0,"max":10},
-                {"id":"dt","component":"DateTimeInput","label":"时间","value":"2026-10-24","enableDate":true},
+                {"id":"cb","component":"CheckBox","label":"同意","value":{"path":"/cbVal"}},
+                {"id":"cp","component":"ChoicePicker","options":[{"label":"A","value":"a"}],"value":{"path":"/cpVal"},"variant":"multipleSelection","displayStyle":"chips"},
+                {"id":"sl","component":"Slider","label":"强度","value":{"path":"/slVal"},"min":0,"max":10},
+                {"id":"dt","component":"DateTimeInput","label":"时间","value":{"path":"/dtVal"},"enableDate":true},
                 {"id":"chart","component":"BarChart","buckets":{"path":"/buckets"},"selected":{"path":"/selected"}}
                 """,
             ),
             updateData("/buckets", "\"local://scan/ab12cd34#histogram\""),
             updateData("/selected", "\"2026-10\""),
+            updateData("/cbVal", "true"),
+            updateData("/cpVal", "[\"a\"]"),
+            updateData("/slVal", "5"),
+            updateData("/dtVal", "\"2026-10-24\""),
         )
         assertEquals(emptyList<String>(), RenderUiValidator.validate(sid, json))
+    }
+
+    @Test
+    fun `interactive component literal value rejected, must data bind`() {
+        // 2026-10-25 行程卡置灰事故：裸字面量没有回写路径，端侧控件 disabled
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"sl","component":"Slider","value":5,"max":10}""")),
+            "数据绑定",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"cb","component":"CheckBox","label":"同意","value":true}""")),
+            "数据绑定",
+        )
+        assertHasViolation(
+            envelopeArray(createSurface(), updateComponents("""{"id":"dt","component":"DateTimeInput","value":"2026-10-24"}""")),
+            "数据绑定",
+        )
+        // 绑定写法放行
+        assertEquals(
+            emptyList<String>(),
+            RenderUiValidator.validate(
+                sid,
+                envelopeArray(
+                    createSurface(),
+                    updateComponents("""{"id":"sl","component":"Slider","value":{"path":"/v"},"max":10}"""),
+                    updateData("/v", "5"),
+                ),
+            ),
+        )
     }
 
     @Test
