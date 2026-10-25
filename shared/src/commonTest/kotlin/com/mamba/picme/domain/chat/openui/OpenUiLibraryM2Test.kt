@@ -149,6 +149,20 @@ class OpenUiLibraryM2Test {
         assertEquals(OpenUiValue.Binding("\$selected"), childAt(result.root, 1).props["text"])
     }
 
+    // ── Text DISPLAY role（2026-10-25，设计规范 §2.1 统计大数字） ──────
+
+    @Test
+    fun `text role enum includes display and program validates`() = runTest {
+        val roleProp = OpenUiLibrary.components.getValue("Text").props.single { prop -> prop.name == "role" }
+        assertEquals(listOf("HEADLINE", "SUBHEAD", "BODY", "CAPTION", "DISPLAY"), roleProp.enumValues)
+        val program = """
+            root = Card([Text("7,120", "DISPLAY"), Text("照片总数", "CAPTION")])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        assertEquals(OpenUiValue.Str("DISPLAY"), childAt(result.root, 0).props["role"])
+    }
+
     // ── Tabs.tabs 嵌套组件递归校验 ───────────────────────────────────
 
     @Test

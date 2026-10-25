@@ -22,6 +22,18 @@ object OpenUiCardTokens {
 
     // ── 字阶（spec §1.1：HEADLINE 20sp/Bold、SUBHEAD 15sp/SemiBold、BODY 14sp、CAPTION 12sp） ──
 
+    /**
+     * DISPLAY 大数字（设计规范 §2：stat tile 统计数值专用，32sp Bold + tnum 等宽数字
+     * 让多栏数字纵向对齐）。OpenUI 专属 role（A2uiTextRole 四值之外，A2UI 对照组冻结）。
+     */
+    val displayStyle: TextStyle
+        @Composable get() = MaterialTheme.typography.displaySmall.copy(
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 38.sp,
+            fontFeatureSettings = "tnum",
+        )
+
     @Composable
     fun textStyle(role: A2uiTextRole?): TextStyle = when (role) {
         A2uiTextRole.HEADLINE -> MaterialTheme.typography.titleLarge.copy(
@@ -62,6 +74,17 @@ object OpenUiCardTokens {
 
     /** HORIZONTAL List 内 Image 条目宽（无界宽上下文兜底尺寸，MediaResultsCarousel 横滑条目先例）。 */
     val horizontalImageWidth: Dp = 200.dp
+
+    // ── 图表细节（设计规范 §3：柱端圆角/柱道/环形饼图） ──
+
+    /** BarChart 柱端圆角（topStart/topEnd）。 */
+    val barCornerRadius: Dp = 4.dp
+
+    /** BarChart 满高柱道底色 alpha（onSurface × alpha，给稀疏数据以结构感）。 */
+    const val barTrackAlpha: Float = 0.06f
+
+    /** PieChart 环形描边宽（donut，中心承载总值）。 */
+    val pieRingWidth: Dp = 26.dp
 
     // ── Tabs 胶囊分段控件（spec §1.3） ──
 

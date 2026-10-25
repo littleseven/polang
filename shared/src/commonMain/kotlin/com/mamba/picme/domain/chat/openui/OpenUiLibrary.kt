@@ -68,7 +68,7 @@ object OpenUiLibrary {
     /** LibrarySpec root 组件（§2.2 fallback entry 的判定组件）。 */
     const val ROOT_COMPONENT = "Card"
 
-    private val textRoles = listOf("HEADLINE", "SUBHEAD", "BODY", "CAPTION")
+    private val textRoles = listOf("HEADLINE", "SUBHEAD", "BODY", "CAPTION", "DISPLAY")
     private val colorRoles = listOf("PRIMARY", "SURFACE", "ERROR", "ON_SURFACE")
     private val spacings = listOf("COMPACT", "STANDARD", "COMFORTABLE")
 

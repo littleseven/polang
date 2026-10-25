@@ -351,6 +351,12 @@ root = Card([Image(photos[0].id, 1.5)])""",
         assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_REPORT_PROGRAM))
     }
 
+    @Test
+    fun `tool description stat tile golden example passes validation`() {
+        // stat tile 黄金示例（DISPLAY 大数字 + CAPTION 标签，设计规范 §4.1）同源钉住
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM))
+    }
+
     // ── argsJson 与 gate 分发 ───────────────────────────────────────
 
     @Test

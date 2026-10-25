@@ -67,6 +67,16 @@ class RenderOpenUiToolService {
                 "[[\"2026-01\", 128], [\"2026-02\", 200]])])"
 
         /**
+         * 统计大数字黄金示例（stat tile 构图，设计规范 §4.1）：DISPLAY 数字 + CAPTION 弱色
+         * 标签，Row 等宽分栏放 2~4 个。反模式：Text("7894 张照片") 纯文本统计行。
+         */
+        const val GOLDEN_STAT_TILE_PROGRAM =
+            "root = Card([Text(\"相册年度统计\", \"HEADLINE\"), " +
+                "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片总数\", \"CAPTION\")]), " +
+                "Column([Text(\"771\", \"DISPLAY\"), Text(\"视频总数\", \"CAPTION\")]), " +
+                "Column([Text(\"12\", \"DISPLAY\"), Text(\"覆盖月份\", \"CAPTION\")])])])"
+
+        /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
          * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
          * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
@@ -91,7 +101,9 @@ class RenderOpenUiToolService {
 2. 必须有 `root = ...` 语句（root 是整个组件树的入口）；
 3. 可用组件签名（逐字遵守，禁发明属性）：
    - Text(text*, role?, colorRole?)：text 可传 ${'$'}绑定变量（字符串/数字/布尔自动转文本，
-     如 Text(${'$'}selected) 显示柱图点选月份）；role∈HEADLINE|SUBHEAD|BODY|CAPTION（默认 BODY），
+     如 Text(${'$'}selected) 显示柱图点选月份）；role∈HEADLINE|SUBHEAD|BODY|CAPTION|DISPLAY
+     （默认 BODY；DISPLAY 是统计大数字 32sp 加粗等宽数字，stat tile 专用，形如
+     Text("7,120", "DISPLAY")，一屏 ≤4 个），
      colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
      text 可传 ${'$'}绑定（如 Text(${'$'}selected)），随 state 回写联动刷新（见规则 6）；
@@ -101,11 +113,13 @@ class RenderOpenUiToolService {
    - Button(label*, action?)：action 是裸动作表达式、最外层不要加引号，
      形如 Button("查看", @OpenUrl("https://..."))（"@OpenUrl(...)" 包成字符串会被拒）；
    - BarChart(title?, buckets*, selected?)：buckets 是 [{label,count}] 数据引用；
+     buckets >12 个时先聚合（按年/按季）再发卡，避免超密横滑柱图；
    - Image(photo*, aspect?)：相册照片（图文混排用）；photo 只许填 photos 数组元素的
      id（如 photos[0].id），禁止写字面量数字 id（防臆造）；aspect 是宽高比
      （宽/高，默认 1.33，横图可传 1.5~1.78，竖图 0.75）；
      Row([Image(...), Image(...)]) 可多张并排等宽；单卡图片≤12 张（内存上限）；
    - Icon(name*, colorRole?)：name 只用预定义图标名（59 枚清单见规则 6 末），禁臆造；
+     装饰性图标省略 colorRole（自动弱色），PRIMARY 只留强调性图标；
    - Divider(axis?)：分隔线，axis∈HORIZONTAL|VERTICAL（默认 HORIZONTAL）；
    - List(children*, direction?, spacing?)：direction∈VERTICAL|HORIZONTAL（默认 VERTICAL
      限高纵向滚动，HORIZONTAL 横滑行）；
@@ -161,7 +175,10 @@ class RenderOpenUiToolService {
    交互相册卡黄金示例（BarChart 点选 + Text 联动文案 + CheckBox 勾选回写）：
 """ + GOLDEN_INTERACTIVE_PROGRAM + """
    图文报表黄金示例（M3：Table + PieChart + Callout 组合，纯骨架无 Query 绑定亦可发卡）：
-""" + GOLDEN_REPORT_PROGRAM
+""" + GOLDEN_REPORT_PROGRAM + """
+   统计大数字黄金示例（stat tile 构图，设计规范 §4.1：DISPLAY 数字 + CAPTION 弱色标签，
+   三个指标并排——有 2~4 个关键统计数字时优先用此构图，别只写一段 BODY 文案）：
+""" + GOLDEN_STAT_TILE_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

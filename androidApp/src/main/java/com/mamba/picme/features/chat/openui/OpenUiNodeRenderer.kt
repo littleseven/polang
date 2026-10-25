@@ -53,7 +53,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -206,8 +208,19 @@ fun OpenUiNodeRenderer(
                 else -> null
             } ?: return
             if (isEmptyBindingFallback(text)) return
-            val role = A2uiStyleMapper.parseTextRole((node.props["role"] as? OpenUiValue.Str)?.v)
+            val roleStr = (node.props["role"] as? OpenUiValue.Str)?.v
             val colorRole = A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
+            // DISPLAY（设计规范 §2：stat tile 大数字）：OpenUI 专属 role，A2uiTextRole 之外
+            if (roleStr == "DISPLAY") {
+                Text(
+                    text = text,
+                    style = OpenUiCardTokens.displayStyle,
+                    color = A2uiStyleMapper.color(colorRole),
+                    modifier = modifier,
+                )
+                return
+            }
+            val role = A2uiStyleMapper.parseTextRole(roleStr)
             Text(
                 text = text,
                 style = OpenUiCardTokens.textStyle(role),
@@ -397,12 +410,14 @@ private fun OpenUiIcon(node: OpenUiValue.ComponentVal, modifier: Modifier = Modi
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
     // schema ENUM 域 + server 白名单双层已校验，null 仅防御兜底（丢组件不炸卡）
     val image = openUiIcon(name) ?: return
+    // 设计规范 §1.1 职责分离：装饰 Icon 无 colorRole 时弱色（onSurfaceVariant），
+    // primary 只留强调性图标（行为色面积收敛）
+    val colorRole = A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
     Icon(
         imageVector = image,
         contentDescription = null,
-        tint = A2uiStyleMapper.color(
-            A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
-        ),
+        tint = colorRole?.let { role -> A2uiStyleMapper.color(role) }
+            ?: MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
     )
 }
@@ -760,24 +775,48 @@ private fun OpenUiBarChart(
                         Modifier.weight(1f)
                     },
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(barChartBarHeight(bucket.count, maxCount))
-                            .background(
-                                if (isSelected) selectedBarColor
-                                else barColor.copy(alpha = A2uiCardTokens.barUnselectedAlpha)
-                            )
-                            .clickable {
-                                onAction(
-                                    OpenUiAction(
-                                        name = "Set",
-                                        args = listOf(OpenUiValue.Str(bucket.label)),
-                                        target = selectedTarget,
+                    // 设计规范 §3.1：满高柱道（track）+ 圆角柱端——稀疏数据也有结构感
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(barChartBarHeight(maxCount, maxCount))
+                                .clip(
+                                    RoundedCornerShape(
+                                        topStart = OpenUiCardTokens.barCornerRadius,
+                                        topEnd = OpenUiCardTokens.barCornerRadius,
                                     )
                                 )
-                            }
-                    )
+                                .background(
+                                    MaterialTheme.colorScheme.onSurface
+                                        .copy(alpha = OpenUiCardTokens.barTrackAlpha)
+                                )
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(barChartBarHeight(bucket.count, maxCount))
+                                .clip(
+                                    RoundedCornerShape(
+                                        topStart = OpenUiCardTokens.barCornerRadius,
+                                        topEnd = OpenUiCardTokens.barCornerRadius,
+                                    )
+                                )
+                                .background(
+                                    if (isSelected) selectedBarColor
+                                    else barColor.copy(alpha = A2uiCardTokens.barUnselectedAlpha)
+                                )
+                                .clickable {
+                                    onAction(
+                                        OpenUiAction(
+                                            name = "Set",
+                                            args = listOf(OpenUiValue.Str(bucket.label)),
+                                            target = selectedTarget,
+                                        )
+                                    )
+                                }
+                        )
+                    }
                     // 抽稀位也占满标签高：柱底对齐依赖「柱+标签」恒高（barChartBarHeight KDoc）
                     if (index % labelInterval == 0 || isSelected) {
                         if (labelInterval > 1) {
@@ -887,20 +926,41 @@ private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = 
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Canvas(modifier = Modifier.size(PIE_CHART_SIZE)) {
-                var startAngle = -90f
-                slices.forEachIndexed { index, slice ->
-                    val sweep = (slice.value / total * 360.0).toFloat()
-                    if (sweep > 0f) {
-                        drawArc(
-                            color = palette[index % palette.size],
-                            startAngle = startAngle,
-                            sweepAngle = sweep,
-                            useCenter = true,
-                        )
+            // 设计规范 §3.2：donut 环形（弃实心饼）+ 中心总值（数据文本无文案，[I18N]）
+            Box(
+                modifier = Modifier.size(PIE_CHART_SIZE),
+                contentAlignment = Alignment.Center,
+            ) {
+                val ringWidth = OpenUiCardTokens.pieRingWidth
+                Canvas(modifier = Modifier.matchParentSize()) {
+                    var startAngle = -90f
+                    val stroke = Stroke(width = ringWidth.toPx())
+                    // 描边以弧形路径为中心向两侧各扩一半：内缩半描边，环外缘恰贴画布边界
+                    val inset = stroke.width / 2
+                    val arcTopLeft = Offset(inset, inset)
+                    val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
+                    slices.forEachIndexed { index, slice ->
+                        val sweep = (slice.value / total * 360.0).toFloat()
+                        if (sweep > 0f) {
+                            drawArc(
+                                color = palette[index % palette.size],
+                                startAngle = startAngle,
+                                sweepAngle = sweep,
+                                useCenter = false,
+                                topLeft = arcTopLeft,
+                                size = arcSize,
+                                style = stroke,
+                            )
+                        }
+                        startAngle += sweep
                     }
-                    startAngle += sweep
                 }
+                Text(
+                    text = openUiPrimitiveText(OpenUiValue.Num(total)) ?: "",
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                )
             }
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 slices.forEachIndexed { index, slice ->
