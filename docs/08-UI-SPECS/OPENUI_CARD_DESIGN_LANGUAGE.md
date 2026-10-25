@@ -118,8 +118,26 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 | Callout | StatusColor 色块 + tone 图标 |
 | Markdown | AgentMarkdown（mikepenz 唯一入口） |
 | Accordion | 标题行 + 箭头，展开态渲染期本地态 |
+| **M5 新增（2026-10-25 全量补全，89 项注册）** | |
+| Stack / Separator / MarkDownRenderer | 官方别名：direction=row→Row/缺省→Column（gap 七档→Spacing、wrap→Flow*）；Separator→Divider 同皮肤；MarkDownRenderer→Markdown 同渲染 |
+| CardHeader / InlineHeader | SUBHEAD 标题 + CAPTION 弱色副题（prop 名 subtitle/description 各一） |
+| TextContent / Label / BoldText | size→字阶映射（small→CAPTION … large-heavy→HEADLINE）；Label=CAPTION 弱色；BoldText=Bold + subtext 弱 |
+| TextCallout | variant 小写→tone 色（danger→error、neutral→弱色），Callout 同款色块 |
+| CodeBlock | 等宽字体 + surfaceVariant 圆角块 + 横滑，language 弱色标注 |
+| ImageBlock / ImageGallery | https src（[PRIVACY] 正则硬校验）；Gallery 横滑定宽 200dp，仅展示无大图页 |
+| Tag / TagBlock | 胶囊（tonal 0.12 + variant→tone 色），TagBlock FlowRow 平铺 |
+| IconText / ImageText / ImageTextLarge | 徽章/缩略图 + 标题副题列；Large=通栏 16:9 图 + 粗标题 |
+| EntityList / ListBlock / Steps | 双列 key/value 行；序号圆点/缩略图列表（action 走宿主动作）；纵向步骤条（序号圆点 + 连接线） |
+| Carousel / Buttons / IconButton | 横滑定宽条目；按钮组 Row/Column 平铺；M3 IconButton + surfaceVariant 圆底 |
+| Modal | open BINDABLE_BOOLEAN 真值弹 Dialog；关闭 → @Set($open, false) |
+| Form / FormControl / Input / TextArea / Select / DatePicker / CheckBoxGroup / RadioGroup / SwitchGroup / Chips / OptionCards / EditableTable | 表单族：name 键控 → 交互即 @Set($name, 值) 直写 state（$ 前缀），他处经 $name 绑定读；Form 仅视觉分组；OutlinedTextField/FilterChip/OutlinedCard 等 M3 件 + token 色 |
+| AreaChart / HorizontalBarChart / RadarChart / RadialChart / SingleStackedBarChart / ScatterChart | §3 图表皮肤同族：chartPalette 离散色 + CAPTION 弱标签 + 图例；Area=线下填充 0.2、Radar=蛛网多边形、Radial=同心环弧、Scatter=散点 z→半径 |
+| SnippetCardBlock / OverviewCardBlock / ContextCardBlock / CompositeCardBlock / VisualCardBlock | Block 壳：items≥1，layout grid=FlowRow 双列 / carousel=横滑 200dp；Visual=大图底 + 渐变蒙层白字 |
+| MetricIndicatorInline / MetricIndicatorWithStrikethrough | DISPLAY 大数字 + trend ↑success/↓error；删除线旧值 |
+| 元素形状 19 件（*Item/Series/Slice/Point/ScatterSeries） | 仅作父组件数组元素的对象形状，独立出现渲染空占位 |
 
 ## 6. 变更记录
 
 - v1（2026-10-25）：初版。落地件 = M4（字阶/间距/色板/Tabs 胶囊/空绑定兜底）+ M4.2（Image 链路三修）+ 本轮（DISPLAY 字阶、BarChart 柱道与圆角柱端、PieChart 环形化、Icon 默认弱色、stat tile 构图食谱入 server prompt）。
 - v1.1（2026-10-25）：Image 体验二修——aspect 缺省改为按照片真实比例渲染（MediaStore 元数据；API<29 无 WIDTH/HEIGHT 列走 BitmapFactory 边界解码兜底；宽 sanity 界 [0.3, 3.0]，界外极长全景图轻微裁切；显式传 aspect 仍生效 = 强制造型，clamp [0.5, 2.5]）；Image 可点击，经宿主动作 OpenPhoto 打开 PhotoEditor 大图页（Gallery 同款入口）。
+- v2（2026-10-25）：OpenUI 官方组件库全量补全（21→官方 82 适配 81，注册 89 项，Col 列式 Table 刻意不收）——渲染层四域分文件（OpenUiContentRenderers 24 / OpenUiFormRenderers 12 / OpenUiChartRenderers 6 + 既有三图官方 prop 扩展 / OpenUiCardBlockRenderers 7），dispatch 按集合分派；BarChart 增 labels+series 官方数据面（grouped/stacked）、PieChart 增 pie 实心、LineChart 增 step 阶梯；表单族确立 name→$name 直写约定；§5 速查表同步。

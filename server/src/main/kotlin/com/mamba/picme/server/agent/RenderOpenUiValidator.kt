@@ -16,10 +16,12 @@ import kotlinx.serialization.json.JsonPrimitive
  *    LLM 书写成功率都有同轮修正机会）。
  *
  * 结构级轻量校验（server 不依赖 :shared，DeviceToolService 字面量副本先例）：
- * 不跑完整 parser，只做正则级四项——root 入口存在性 / 组件名白名单 /
+ * 不跑完整 parser，只做正则级——root 入口存在性 / 组件名白名单 /
  * Query local_handle 形态 / program 长度上限
- * （对齐 render_html 128_000 先例）+ 隐私投影禁令（媒体路径禁入 program）。规则与 shared `OpenUiContract`/`OpenUiLibrary`
- * 字面量副本对齐，改动须双向同步核对。
+ * （对齐 render_html 128_000 先例）+ 隐私投影禁令（媒体路径禁入 program）+
+ * Image 图片来源校验（photo/src 二缺一）+ 图片地址键 https 限（src/bgImageSrc/image，
+ * [PRIVACY] 同 A2UI Image.url 口径）。规则与 shared
+ * `OpenUiContract`/`OpenUiLibrary` 字面量副本对齐，改动须双向同步核对。
  * （2026-10-24 起不再禁内联 Query：端侧引擎已支持内联提升（fix/a2ui 0e5856b10），
  * 原「内联判 inline-reserved 静默丢弃」根因已根治，服务端不再误杀合法负载。）
  *
@@ -33,15 +35,45 @@ object RenderOpenUiValidator {
     /** program 长度上限（对齐 render_html 128_000 字符先例）。 */
     const val MAX_PROGRAM_LENGTH = 128_000
 
-    /** 组件白名单（生成引导面，与 shared OpenUiLibrary 二十一组件对齐：M2（2026-10-24）
-     *  +Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider——spec §2 枚举 7 个新组件，
-     *  spec 标题「十三」系计数笔误，以 §2 枚举为准；M3（2026-10-24，
-     *  spec《openui-component-library-m3-design》）
-     *  +Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch）。 */
-    private val ALLOWED_COMPONENTS = setOf(
+    /**
+     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 八十九项字面量
+     * 副本对齐：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
+     * M3（2026-10-24）+Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch；
+     * 2026-10-25 官方组件库全量补全（spec《openui-full-library-design》）21→89——
+     * 官方 82 组件适配 81（Col 列式 Table 刻意不收，行式为唯一形态）+ 本仓既有 8；
+     * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
+     * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
+     * 不做 per-component prop schema 校验）。
+     * internal 供测试钉住全清单（字面量副本同源核对）。
+     */
+    internal val ALLOWED_COMPONENTS = setOf(
+        // 本仓既有 + M2/M3 扩（原二十一组件）
         "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
         "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
         "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
+        // 官方别名（schema 注册官方名，渲染复用既有实现）
+        "Stack", "Separator", "MarkDownRenderer",
+        // 官方内容/布局
+        "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
+        "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
+        "BoldText", "IconText", "ImageText", "ImageTextLarge", "EntityList",
+        "ListBlock", "Steps", "Carousel", "Buttons", "IconButton", "Modal",
+        // 官方表单（name 键控 → 交互即 @Set($<name>, 值) 直写 state）
+        "Form", "FormControl", "Input", "TextArea", "Select", "DatePicker",
+        "CheckBoxGroup", "RadioGroup", "SwitchGroup", "Chips", "OptionCards", "EditableTable",
+        // 官方图表
+        "AreaChart", "HorizontalBarChart", "RadarChart", "RadialChart",
+        "SingleStackedBarChart", "ScatterChart",
+        // 官方卡块（items* + layout?=grid|carousel + action?）
+        "MetricIndicatorInline", "MetricIndicatorWithStrikethrough",
+        "SnippetCardBlock", "OverviewCardBlock", "ContextCardBlock",
+        "CompositeCardBlock", "VisualCardBlock",
+        // 元素形状（仅作父组件数组元素，独立出现渲染空占位）
+        "TabItem", "AccordionItem", "ListItem", "StepsItem", "SelectItem",
+        "CheckBoxItem", "RadioItem", "SwitchItem", "ChipItem", "OptionCard",
+        "Series", "Slice", "ScatterSeries", "Point",
+        "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
+        "CompositeCardItem", "VisualCardItem",
     )
 
     /**
@@ -71,7 +103,25 @@ object RenderOpenUiValidator {
     private val ROOT_STATEMENT = Regex("""(?m)^\s*root\s*=""")
     private val CARD_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Card\s*\(""")
     private val QUERY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(\s*"((?:[^"\\]|\\.)*)"""")
-    private val IMAGE_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(""")
+
+    /** Image 调用实参抽取（2026-10-25 官方对齐：photo 降可选 + src https 公网图）。
+     *  实参全是标量无嵌套调用，`[^()]*` 足够；剥离字符串会丢 src 判定信息，扫原文
+     *  （同 QUERY_CALL/ICON_CALL 口径——Markdown 文案内写 Image(…) 字样会被一并分析，
+     *  属已记录的近似边界，漏判/误判优先保放行好负载）。 */
+    private val IMAGE_CALL_ARGS = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(([^()]*)\)""")
+
+    /** 图片地址键字符串字面量抽取（命名 `src = "…"` 与对象字段 `{src: "…"}` 两种形态；
+     *  全组件生效——键名闭集 src / bgImageSrc（VisualCardBlock）/ image（ListBlock 缩略图）
+     *  三种，词边界防误伤 images/imageSize 等近名键）。分组 1 = 键名，分组 2 = 地址。 */
+    private val SRC_STRING =
+        Regex("""(?<![A-Za-z0-9_])(bgImageSrc|src|image)\s*[:=]\s*"((?:[^"\\]|\\.)*)"""")
+
+    private val NAMED_ARG = Regex("""^[A-Za-z_][A-Za-z0-9_]*\s*=""")
+    private val NAMED_PHOTO = Regex("""(?<![A-Za-z0-9_])photo\s*=""")
+    private val NAMED_SRC = Regex("""(?<![A-Za-z0-9_])src\s*=""")
+
+    /** Image 实参分析时字符串字面量的占位符（与剥离替换同形，便于按占位符定位位置参数）。 */
+    private const val STR_PLACEHOLDER = "\"\""
 
     /** Icon 首参字符串字面量抽取（M2 Icon name 白名单校验；须在字符串剥离前扫原文，
      *  同 QUERY_CALL 口径）。非字符串首参（如 $绑定）不匹配，由端侧 schema 兜底。 */
@@ -87,8 +137,11 @@ object RenderOpenUiValidator {
      *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。 */
     private val QUOTED_ACTION = Regex(""""@(OpenUrl|Set|Reset|ToAssistant)\s*\(""")
 
-    /** 单卡 Image 数上限（2026-10-24 review 🟡3 OOM 护栏）：全宽图每张约 3.5MB 位图，
-     *  整卡同屏组合存活，60 张投影上限是 token 保护而非内存保护——超过即同轮纠错。 */
+    /** 单卡图片总数上限（2026-10-24 review 🟡3 OOM 护栏；2026-10-25 口径从 Image 调用数
+     *  扩为整卡位图总数——Image 调用 + ImageGallery images / ImageBlock / ImageText /
+     *  VisualCardBlock bgImageSrc / ListBlock image 等一切 src 类图片地址合计）：全宽图
+     *  每张约 3.5MB 位图，整卡同屏组合存活，60 张投影上限是 token 保护而非内存保护——
+     *  超过即同轮纠错。 */
     const val MAX_IMAGE_COMPONENTS = 12
 
     /** 构图软警告阈值（2026-10-25，设计规范 §1.1/§4.1）：与工具描述规则同源。 */
@@ -171,13 +224,13 @@ object RenderOpenUiValidator {
             violations += "缺 root = 语句（root 是组件树入口；无 root 时兜底的首个 Card 语句也缺失）"
         }
 
-        // 2. 组件名白名单：大写开头调用只允许二十一组件 + Query
+        // 2. 组件名白名单：大写开头调用只允许八十九组件 + Query
         CALL_NAME.findAll(stripped)
             .map { match -> match.groupValues[1] }
             .toSet()
             .filter { name -> name !in ALLOWED_CALLS }
             .forEach { name ->
-                violations += "组件/调用 \"$name\" 不在白名单（只用 ${ALLOWED_COMPONENTS.sorted().joinToString("/")} 组件 + Query 取数）"
+                violations += "组件/调用 \"$name\" 不在白名单（89 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
             }
 
         // 3. Query 形态：唯一宿主工具 local_handle；handle 必须是 local://scan/<id> 形态
@@ -199,10 +252,16 @@ object RenderOpenUiValidator {
             violations += "Query(\"local_handle\", …) 缺 handle 参数：args 对象须含 { handle: \"local://scan/<id>#histogram\" }（取照片清单用 #photos）"
         }
 
-        // 4. Image 数量上限（OOM 护栏，见 MAX_IMAGE_COMPONENTS KDoc）
-        val imageCount = IMAGE_CALL.findAll(stripped).count()
+        // 4. 图片数量上限（OOM 护栏，见 MAX_IMAGE_COMPONENTS KDoc；2026-10-25 口径扩为
+        //    整卡同屏位图总数）：Image(…) 调用数 + 全部图片地址键（src/bgImageSrc/image）
+        //    字面量数——Image(src=…) 的 src 落在 Image 调用区间内，只计一次不双计
+        val imageCalls = IMAGE_CALL_ARGS.findAll(program).toList()
+        val imageCallRanges = imageCalls.map { match -> match.range }
+        val srcOutsideImage = SRC_STRING.findAll(program)
+            .count { match -> imageCallRanges.none { range -> match.range.first in range } }
+        val imageCount = imageCalls.size + srcOutsideImage
         if (imageCount > MAX_IMAGE_COMPONENTS) {
-            violations += "Image 组件 $imageCount 个超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张图，防整卡同屏位图 OOM；精简到最关键的几张）"
+            violations += "图片 $imageCount 张超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张——Image 组件与 ImageGallery/ImageBlock/ImageText 等 src 类图片合计，防整卡同屏位图 OOM；精简到最关键的几张）"
         }
 
         // 5. Icon name 白名单（M2，正则级）：禁臆造图标名在服务端同轮纠错
@@ -210,6 +269,60 @@ object RenderOpenUiValidator {
             val iconName = match.groupValues[1]
             if (iconName !in ICON_NAMES) {
                 violations += "Icon name \"$iconName\" 不在预定义图标集（59 枚，如 photo/person/star/check/warning/settings/search 等，禁臆造，全量清单见工具描述）"
+            }
+        }
+
+        // 6. 图片地址 https 硬校验（2026-10-25 官方对齐，[PRIVACY] 同 A2UI Image.url
+        //    口径）：任意组件的 src/bgImageSrc/image 键（`键 = "…"` 或 `{键: "…"}` 形态）
+        //    字符串字面量都必须 https 公网地址
+        SRC_STRING.findAll(program).forEach { match ->
+            val key = match.groupValues[1]
+            val url = match.groupValues[2]
+            if (!url.startsWith("https://")) {
+                violations += "$key 只接受 https:// 公网图片地址（实际 \"$url\"）——相册照片走 Image(photo) 投影 id，禁本地路径/uri"
+            }
+        }
+
+        // 7. Image 图片来源（photo/src 二缺一）：渲染层虽兜底丢占位，prompt 层引导
+        //    LLM 必给其一——皆无在服务端同轮纠错；位置参数形态 src（第三个位置参数是
+        //    字符串字面量）同样限 https
+        IMAGE_CALL_ARGS.findAll(program).forEach { match ->
+            val args = match.groupValues[1]
+            val tokenized = STRING_LITERAL.replace(args, STR_PLACEHOLDER)
+            val parts = tokenized.split(',')
+                .map { part -> part.trim() }
+                .filter { part -> part.isNotEmpty() }
+            val positional = parts.filter { part -> !NAMED_ARG.containsMatchIn(part) }
+            val hasPhoto = NAMED_PHOTO.containsMatchIn(args) ||
+                (positional.isNotEmpty() && positional[0] != STR_PLACEHOLDER)
+            val hasSrc = NAMED_SRC.containsMatchIn(args) ||
+                positional.getOrNull(2) == STR_PLACEHOLDER
+            if (!hasPhoto && !hasSrc) {
+                violations += "Image 缺图片来源：photo（相册投影 id，如 photos[0].id）与 src（\"https://…\" 公网图）必须给其一"
+            }
+            if (positional.getOrNull(2) == STR_PLACEHOLDER) {
+                // 位置序 photo, aspect, src, alt——按占位符次序定位第三个位置参数
+                // 对应的字符串字面量
+                var literalOrdinal = 0
+                var positionalIndex = 0
+                var srcLiteralOrdinal = -1
+                parts.forEach { part ->
+                    val isNamed = NAMED_ARG.containsMatchIn(part)
+                    if (!isNamed && part == STR_PLACEHOLDER && positionalIndex == 2 && srcLiteralOrdinal < 0) {
+                        srcLiteralOrdinal = literalOrdinal
+                    }
+                    literalOrdinal += part.split(STR_PLACEHOLDER).size - 1
+                    if (!isNamed) positionalIndex++
+                }
+                // STRING_LITERAL 的分组只覆盖最后一个重复单元（量词在分组外），
+                // 取完整字面量须用 match.value 去首尾引号
+                val srcLiteral = STRING_LITERAL.findAll(args)
+                    .map { literal -> literal.value.removeSurrounding("\"") }
+                    .toList()
+                    .getOrNull(srcLiteralOrdinal)
+                if (srcLiteral != null && !srcLiteral.startsWith("https://")) {
+                    violations += "Image.src 只接受 https:// 公网图片地址（实际 \"$srcLiteral\"）——相册照片走 photo 投影 id，禁本地路径/uri"
+                }
             }
         }
 

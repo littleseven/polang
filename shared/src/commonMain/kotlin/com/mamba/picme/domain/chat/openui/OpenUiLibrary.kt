@@ -52,14 +52,13 @@ data class OpenUiProp(
 data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
 
 /**
- * polang OpenUI 组件库（二十一组件，M2（2026-10-24，spec《openui-component-library-m2-design》）
- * 七组件扩至十四：+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider（§2 枚举 7 个新组件；
- * spec 标题「十三」与 §5「+6」系计数笔误，以 §2 枚举为准），Text.text 升
- * BINDABLE_STRING；与 A2UI catalog 逐项对偶，保证两线可比性；spec §4.2
- * + spec《openui-image-component-design》D3）。
- * M3（2026-10-24，spec《openui-component-library-m3-design》）十四组件扩至二十一：
- * +Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch，新增 prop 类型
- * PRIMITIVE_ARRAY 打开图表/表格数据面。
+ * polang OpenUI 组件库（八十九项注册 = 官方 81/82 + 本仓别名与既有 8 项）。
+ * M2（2026-10-24，spec《openui-component-library-m2-design》）七扩十四；M3（同日，
+ * spec《openui-component-library-m3-design》）十四扩二十一；2026-10-25 全量补全
+ * （spec《openui-full-library-design》）：对齐官方 openuiLibrary（thesysdev/openui）
+ * 82 组件——补 81（Col 列式 Table 刻意不收，行式为唯一形态），官方同名异构组件
+ * （Callout/Tabs/Accordion/Table/Image/Card/Button）保本仓签名向后兼容，别名
+ * Stack/Separator/MarkDownRenderer 渲染复用既有实现，表单 name 键控 → @Set($name) 直写。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
  * OpenUiNodeRenderer）共用同一份。
  */
@@ -119,38 +118,72 @@ object OpenUiLibrary {
         ),
         OpenUiComponent("Row", listOf(childrenProp, spacingProp)),
         OpenUiComponent("Column", listOf(childrenProp, spacingProp)),
-        OpenUiComponent("Card", listOf(childrenProp, spacingProp)),
+        // Card：2026-10-25 全量补全增可选 title（官方 fixtures 形态；有则渲染头部标题区）
+        OpenUiComponent("Card", listOf(childrenProp, spacingProp, OpenUiProp("title", OpenUiPropType.STRING))),
         OpenUiComponent(
             "Button",
             listOf(
                 OpenUiProp("label", OpenUiPropType.STRING, required = true),
                 OpenUiProp("action", OpenUiPropType.ACTION),
+                // 2026-10-25 官方对齐：variant→Filled/Tonal/Text 映射；size 收而不用（卡内统一触控尺寸）
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("primary"),
+                    enumValues = listOf("primary", "secondary", "tertiary"),
+                ),
+                OpenUiProp(
+                    "size",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("medium"),
+                    enumValues = listOf("extra-small", "small", "medium", "large"),
+                ),
             ),
         ),
         OpenUiComponent(
             "BarChart",
             listOf(
                 OpenUiProp("title", OpenUiPropType.STRING),
+                // 2026-10-25 全量补全：buckets 降可选——官方 labels+series 形态为另一合法数据面
+                // （buckets / labels+series 二缺一，渲染层防御：皆无 → 占位不炸卡）
                 OpenUiProp(
                     "buckets",
                     OpenUiPropType.OBJECT_ARRAY,
-                    required = true,
                     objectFields = listOf(
                         OpenUiProp("label", OpenUiPropType.STRING, required = true),
                         OpenUiProp("count", OpenUiPropType.NUMBER, required = true),
                     ),
                 ),
                 OpenUiProp("selected", OpenUiPropType.BINDABLE_STRING),
+                OpenUiProp("labels", OpenUiPropType.PRIMITIVE_ARRAY),
+                OpenUiProp(
+                    "series",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    objectFields = listOf(
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                    ),
+                ),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("grouped"),
+                    enumValues = listOf("grouped", "stacked"),
+                ),
             ),
         ),
         // 图文混排（spec《openui-image-component-design》D3）：photo = #photos 投影元素的 id
         // （求值为 Num，渲染期端侧 id→uri，uri 不进 program/payload）；aspect 宽高比
-        // 无 schema 默认字面量，渲染期缺省 4:3 并 clamp [0.5, 2.5]
+        // 无 schema 默认字面量，渲染期缺省按真实比例。
+        // 2026-10-25 官方对齐：photo 降可选，增 src（https 公网图，[PRIVACY] validator 正则
+        // 硬校验，A2UI Image.url 同口径）+ alt；photo/src 二缺一，皆无渲染层丢占位
         OpenUiComponent(
             "Image",
             listOf(
-                OpenUiProp("photo", OpenUiPropType.NUMBER, required = true),
+                OpenUiProp("photo", OpenUiPropType.NUMBER),
                 OpenUiProp("aspect", OpenUiPropType.NUMBER),
+                OpenUiProp("src", OpenUiPropType.STRING),
+                OpenUiProp("alt", OpenUiPropType.STRING),
             ),
         ),
         // ── M2 六组件（spec《openui-component-library-m2-design》§2） ──────────
@@ -267,6 +300,7 @@ object OpenUiLibrary {
         ),
         // PieChart：slices = [{label, value}]（字段名 value 与 BarChart buckets 的 count
         // 刻意不同——各自语义自描述，schema 层各自独立无共享，spec §3 取舍）
+        // 2026-10-25 官方对齐：variant donut（默认，M4 环形）/ pie（实心扇形）
         OpenUiComponent(
             "PieChart",
             listOf(
@@ -279,6 +313,12 @@ object OpenUiLibrary {
                         OpenUiProp("label", OpenUiPropType.STRING, required = true),
                         OpenUiProp("value", OpenUiPropType.NUMBER, required = true),
                     ),
+                ),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("donut"),
+                    enumValues = listOf("donut", "pie"),
                 ),
             ),
         ),
@@ -299,9 +339,16 @@ object OpenUiLibrary {
                         OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
                     ),
                 ),
+                // 2026-10-25 官方对齐：折线插值形态（渲染 linear/step；natural≈linear 简化）
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("linear"),
+                    enumValues = listOf("linear", "natural", "step"),
+                ),
             ),
         ),
-        // Callout：结论/告警高亮块；tone 默认 INFO
+        // Callout：结论/告警高亮块；tone 默认 INFO（2026-10-25 增 NEUTRAL 对齐官方五档）
         OpenUiComponent(
             "Callout",
             listOf(
@@ -311,7 +358,7 @@ object OpenUiLibrary {
                     "tone",
                     OpenUiPropType.ENUM,
                     default = OpenUiValue.Str("INFO"),
-                    enumValues = listOf("INFO", "SUCCESS", "WARNING", "ERROR"),
+                    enumValues = listOf("INFO", "SUCCESS", "WARNING", "ERROR", "NEUTRAL"),
                 ),
             ),
         ),
@@ -343,6 +390,902 @@ object OpenUiLibrary {
             listOf(
                 OpenUiProp("label", OpenUiPropType.STRING, required = true),
                 OpenUiProp("checked", OpenUiPropType.BINDABLE_BOOLEAN, required = true),
+            ),
+        ),
+        // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》）────────────────
+        // 官方 openuiLibrary（thesysdev/openui）82 组件补 81（Col 列式 Table 刻意不收——
+        // 行式 Table 为唯一形态，防双形态精神分裂）。表单组件 name 键控 → 渲染期交互即
+        // @Set($<name>, 值) 直写 state（Slider/CheckBox 既有口径），他处经 $name 绑定读。
+        // 数据形状组件（Series/Slice/Point/ScatterSeries/SelectItem 等 Item 形）仅在父槽
+        // 内有语义，独立出现渲染为空占位（半信任输入防御既有口径）。
+
+        // ── 别名（官方名注册，渲染复用既有实现）──
+        // Stack(direction=row→Row / 缺省 column→Column；wrap=true→FlowRow/FlowColumn；
+        // gap 六档映射既有 spacing token；align/justify 映射主轴/交叉轴排布)
+        OpenUiComponent(
+            "Stack",
+            listOf(
+                childrenProp,
+                OpenUiProp(
+                    "direction",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("column"),
+                    enumValues = listOf("row", "column"),
+                ),
+                OpenUiProp(
+                    "gap",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("m"),
+                    enumValues = listOf("none", "xs", "s", "m", "l", "xl", "2xl"),
+                ),
+                OpenUiProp(
+                    "align",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("start"),
+                    enumValues = listOf("start", "center", "end", "stretch", "baseline"),
+                ),
+                OpenUiProp(
+                    "justify",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("start"),
+                    enumValues = listOf("start", "center", "end", "between", "around", "evenly"),
+                ),
+                OpenUiProp("wrap", OpenUiPropType.BOOLEAN, default = OpenUiValue.Bool(false)),
+            ),
+        ),
+        OpenUiComponent(
+            "Separator",
+            listOf(
+                OpenUiProp(
+                    "orientation",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("horizontal"),
+                    enumValues = listOf("horizontal", "vertical"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "MarkDownRenderer",
+            listOf(
+                OpenUiProp("textMarkdown", OpenUiPropType.BINDABLE_STRING, required = true),
+                OpenUiProp("variant", OpenUiPropType.STRING),
+            ),
+        ),
+        // TabItem/AccordionItem：官方页签/折叠项组件形（本仓 Tabs/Accordion 收 {title,children}
+        // 对象形为 prompt 主形态；组件形注册保底，独立出现渲染 content 直排）
+        OpenUiComponent(
+            "TabItem",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("trigger", OpenUiPropType.STRING, required = true),
+                OpenUiProp("content", OpenUiPropType.COMPONENT_LIST, required = true),
+            ),
+        ),
+        OpenUiComponent(
+            "AccordionItem",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("trigger", OpenUiPropType.STRING, required = true),
+                OpenUiProp("content", OpenUiPropType.COMPONENT_LIST, required = true),
+            ),
+        ),
+
+        // ── 内容/布局 ──
+        OpenUiComponent(
+            "CardHeader",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("subtitle", OpenUiPropType.STRING),
+            ),
+        ),
+        // InlineHeader：官方「轻量标题+描述对」，与 CardHeader 同渲染
+        OpenUiComponent(
+            "InlineHeader",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("description", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "TextContent",
+            listOf(
+                OpenUiProp("text", OpenUiPropType.BINDABLE_STRING, required = true),
+                // size→字阶映射：small→CAPTION、default→BODY、large→SUBHEAD、
+                // small-heavy→SUBHEAD、large-heavy→HEADLINE（渲染层映射表）
+                OpenUiProp(
+                    "size",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("default"),
+                    enumValues = listOf("small", "default", "large", "small-heavy", "large-heavy"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "TextCallout",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("description", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("neutral"),
+                    enumValues = listOf("neutral", "info", "success", "warning", "danger"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "CodeBlock",
+            listOf(
+                OpenUiProp("codeString", OpenUiPropType.STRING, required = true),
+                OpenUiProp("language", OpenUiPropType.STRING),
+            ),
+        ),
+        // ImageBlock：官方纯 src 形态（https 限，[PRIVACY] validator 正则硬校验）
+        OpenUiComponent(
+            "ImageBlock",
+            listOf(
+                OpenUiProp("src", OpenUiPropType.STRING, required = true),
+                OpenUiProp("alt", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "ImageGallery",
+            listOf(
+                OpenUiProp(
+                    "images",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("src", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("alt", OpenUiPropType.STRING),
+                        OpenUiProp("details", OpenUiPropType.STRING),
+                    ),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "Tag",
+            listOf(
+                OpenUiProp("text", OpenUiPropType.STRING, required = true),
+                OpenUiProp("icon", OpenUiPropType.ENUM, enumValues = iconNames),
+                OpenUiProp(
+                    "size",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("md"),
+                    enumValues = listOf("sm", "md", "lg"),
+                ),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("neutral"),
+                    enumValues = listOf("neutral", "info", "success", "warning", "danger"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "TagBlock",
+            listOf(OpenUiProp("tags", OpenUiPropType.PRIMITIVE_ARRAY, required = true)),
+        ),
+        OpenUiComponent(
+            "Label",
+            listOf(OpenUiProp("text", OpenUiPropType.STRING, required = true)),
+        ),
+        // 卡块内构件（官方限定卡块内使用，本仓不强制位置——渲染递归位置无关）
+        OpenUiComponent(
+            "BoldText",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.BINDABLE_STRING, required = true),
+                OpenUiProp("subtext", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "size",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("sm"),
+                    enumValues = listOf("xs", "sm", "md", "lg"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "IconText",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("icon", OpenUiPropType.ENUM, enumValues = iconNames),
+                OpenUiProp("subtitle", OpenUiPropType.STRING),
+                OpenUiProp("bold", OpenUiPropType.BOOLEAN, default = OpenUiValue.Bool(false)),
+                OpenUiProp(
+                    "layout",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("horizontal"),
+                    enumValues = listOf("horizontal", "vertical"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "ImageText",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("src", OpenUiPropType.STRING),
+                OpenUiProp("subtitle", OpenUiPropType.STRING),
+                OpenUiProp("imageSize", OpenUiPropType.NUMBER),
+            ),
+        ),
+        OpenUiComponent(
+            "ImageTextLarge",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("src", OpenUiPropType.STRING),
+                OpenUiProp("subtitle", OpenUiPropType.STRING),
+            ),
+        ),
+        // EntityList：官方 header/footer 是 {left,right} 对象——schema 无单对象 prop 型，
+        // 拍平为 headerLeft/headerRight/footerLeft/footerRight 四个可选串
+        OpenUiComponent(
+            "EntityList",
+            listOf(
+                OpenUiProp(
+                    "rows",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("left", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("right", OpenUiPropType.STRING, required = true),
+                    ),
+                ),
+                OpenUiProp("headerLeft", OpenUiPropType.STRING),
+                OpenUiProp("headerRight", OpenUiPropType.STRING),
+                OpenUiProp("footerLeft", OpenUiPropType.STRING),
+                OpenUiProp("footerRight", OpenUiPropType.STRING),
+            ),
+        ),
+        // ListBlock：带序号/缩略图列表；item.action 经宿主动作通道（OpenUiEval
+        // objectFieldOk ACTION 分支，2026-10-25 增）
+        OpenUiComponent(
+            "ListBlock",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("subtitle", OpenUiPropType.STRING),
+                        OpenUiProp("image", OpenUiPropType.STRING),
+                        OpenUiProp("actionLabel", OpenUiPropType.STRING),
+                        OpenUiProp("action", OpenUiPropType.ACTION),
+                    ),
+                ),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("number"),
+                    enumValues = listOf("number", "image"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "ListItem",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("subtitle", OpenUiPropType.STRING),
+                OpenUiProp("image", OpenUiPropType.STRING),
+                OpenUiProp("actionLabel", OpenUiPropType.STRING),
+                OpenUiProp("action", OpenUiPropType.ACTION),
+            ),
+        ),
+        OpenUiComponent(
+            "Steps",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("details", OpenUiPropType.STRING),
+                    ),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "StepsItem",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("details", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "Carousel",
+            listOf(
+                childrenProp,
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("card"),
+                    enumValues = listOf("card", "sunk"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "Buttons",
+            listOf(
+                OpenUiProp("buttons", OpenUiPropType.COMPONENT_LIST, required = true),
+                OpenUiProp(
+                    "direction",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("row"),
+                    enumValues = listOf("row", "column"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "IconButton",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("icon", OpenUiPropType.ENUM, required = true, enumValues = iconNames),
+                OpenUiProp("action", OpenUiPropType.ACTION),
+            ),
+        ),
+        // Modal：open BINDABLE_BOOLEAN——state 真值时渲染 Dialog；X/遮罩关闭 →
+        // @Set($open, false) 回写（官方 reactive 语义的本仓适配）
+        OpenUiComponent(
+            "Modal",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("open", OpenUiPropType.BINDABLE_BOOLEAN, required = true),
+                childrenProp,
+            ),
+        ),
+
+        // ── 表单（name 键控 → @Set($name, ...) 直写 state）──
+        OpenUiComponent(
+            "Form",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                childrenProp,
+            ),
+        ),
+        // FormControl.input 单组件槽：COMPONENT_LIST 收（通常一项，渲染直排）
+        OpenUiComponent(
+            "FormControl",
+            listOf(
+                OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                OpenUiProp("input", OpenUiPropType.COMPONENT_LIST, required = true),
+                OpenUiProp("hint", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "Input",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("placeholder", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "type",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("text"),
+                    enumValues = listOf("text", "email", "password", "number", "url"),
+                ),
+                OpenUiProp("rules", OpenUiPropType.PRIMITIVE_ARRAY),
+            ),
+        ),
+        OpenUiComponent(
+            "TextArea",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("placeholder", OpenUiPropType.STRING),
+                OpenUiProp("rows", OpenUiPropType.NUMBER),
+                OpenUiProp("rules", OpenUiPropType.PRIMITIVE_ARRAY),
+            ),
+        ),
+        OpenUiComponent(
+            "Select",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                    ),
+                ),
+                OpenUiProp("placeholder", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "SelectItem",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("label", OpenUiPropType.STRING, required = true),
+            ),
+        ),
+        OpenUiComponent(
+            "DatePicker",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("mode", OpenUiPropType.ENUM, required = true, enumValues = listOf("single", "range")),
+            ),
+        ),
+        OpenUiComponent(
+            "CheckBoxGroup",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("description", OpenUiPropType.STRING),
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("defaultChecked", OpenUiPropType.BOOLEAN),
+                    ),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "CheckBoxItem",
+            listOf(
+                OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                OpenUiProp("description", OpenUiPropType.STRING),
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("defaultChecked", OpenUiPropType.BOOLEAN),
+            ),
+        ),
+        OpenUiComponent(
+            "RadioGroup",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("description", OpenUiPropType.STRING),
+                        OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                    ),
+                ),
+                OpenUiProp("defaultValue", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "RadioItem",
+            listOf(
+                OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                OpenUiProp("description", OpenUiPropType.STRING),
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+            ),
+        ),
+        OpenUiComponent(
+            "SwitchGroup",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("description", OpenUiPropType.STRING),
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("defaultChecked", OpenUiPropType.BOOLEAN),
+                    ),
+                ),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("clear"),
+                    enumValues = listOf("clear", "card", "sunk"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "SwitchItem",
+            listOf(
+                OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                OpenUiProp("description", OpenUiPropType.STRING),
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("defaultChecked", OpenUiPropType.BOOLEAN),
+            ),
+        ),
+        // Chips/OptionCards：type=single 写 $name=值；multiple 写 $name=逗号串
+        // （官方默认值刻意相反：Chips=multiple、OptionCards=single，保持一致）
+        OpenUiComponent(
+            "Chips",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("icon", OpenUiPropType.ENUM, enumValues = iconNames),
+                    ),
+                ),
+                OpenUiProp(
+                    "type",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("multiple"),
+                    enumValues = listOf("single", "multiple"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "ChipItem",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("label", OpenUiPropType.STRING, required = true),
+                OpenUiProp("icon", OpenUiPropType.ENUM, enumValues = iconNames),
+            ),
+        ),
+        OpenUiComponent(
+            "OptionCards",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("subtitle", OpenUiPropType.STRING),
+                    ),
+                ),
+                OpenUiProp(
+                    "type",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("single"),
+                    enumValues = listOf("single", "multiple"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "OptionCard",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("subtitle", OpenUiPropType.STRING),
+            ),
+        ),
+        // EditableTable：官方 Save 提交制简化为单元格即写（@Set($name, JSON 行数组)，
+        // prompt 注明）；columns[].options（select 列选项）不收——schema 不支持
+        // OBJECT_ARRAY 嵌套 OBJECT_ARRAY，select 列按 text 渲染
+        OpenUiComponent(
+            "EditableTable",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp(
+                    "columns",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp(
+                            "type",
+                            OpenUiPropType.ENUM,
+                            required = true,
+                            enumValues = listOf("text", "number", "date-single", "select", "url"),
+                        ),
+                        OpenUiProp("key", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("header", OpenUiPropType.STRING, required = true),
+                    ),
+                ),
+                OpenUiProp(
+                    "data",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("id", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                    ),
+                ),
+            ),
+        ),
+
+        // ── 图表（Series/Slice/Point/ScatterSeries 为数据形状，独立出现渲染空占位）──
+        OpenUiComponent(
+            "AreaChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp("labels", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                OpenUiProp(
+                    "series",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                    ),
+                ),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("linear"),
+                    enumValues = listOf("linear", "natural", "step"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "HorizontalBarChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp("labels", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                OpenUiProp(
+                    "series",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                    ),
+                ),
+                OpenUiProp(
+                    "variant",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("grouped"),
+                    enumValues = listOf("grouped", "stacked"),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "RadarChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp("labels", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                OpenUiProp(
+                    "series",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                    ),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "RadialChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "slices",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("category", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("value", OpenUiPropType.NUMBER, required = true),
+                    ),
+                ),
+            ),
+        ),
+        OpenUiComponent(
+            "SingleStackedBarChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "slices",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("category", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("value", OpenUiPropType.NUMBER, required = true),
+                    ),
+                ),
+            ),
+        ),
+        // ScatterChart.points 用 PRIMITIVE_ARRAY 嵌套点（[[x,y],...]）——schema 不支持
+        // OBJECT_ARRAY 嵌套 OBJECT_ARRAY，点坐标数组形对 LLM 书写也更省 token
+        OpenUiComponent(
+            "ScatterChart",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp(
+                    "datasets",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("points", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                    ),
+                ),
+                OpenUiProp("xLabel", OpenUiPropType.STRING),
+                OpenUiProp("yLabel", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "Series",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("values", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+            ),
+        ),
+        OpenUiComponent(
+            "Slice",
+            listOf(
+                OpenUiProp("category", OpenUiPropType.STRING, required = true),
+                OpenUiProp("value", OpenUiPropType.NUMBER, required = true),
+            ),
+        ),
+        OpenUiComponent(
+            "ScatterSeries",
+            listOf(
+                OpenUiProp("name", OpenUiPropType.STRING, required = true),
+                OpenUiProp("points", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+            ),
+        ),
+        OpenUiComponent(
+            "Point",
+            listOf(
+                OpenUiProp("x", OpenUiPropType.NUMBER, required = true),
+                OpenUiProp("y", OpenUiPropType.NUMBER, required = true),
+                OpenUiProp("z", OpenUiPropType.NUMBER),
+            ),
+        ),
+
+        // ── 卡块（Block 壳：items* + layout?=grid/carousel + action?；grid→双列 FlowRow、
+        // carousel→横滑定宽条目；action 点击卡经宿主动作通道）──
+        OpenUiComponent(
+            "MetricIndicatorInline",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("subtext", OpenUiPropType.STRING),
+                OpenUiProp("trendDirection", OpenUiPropType.ENUM, enumValues = listOf("up", "down")),
+                OpenUiProp("trendValue", OpenUiPropType.NUMBER),
+            ),
+        ),
+        OpenUiComponent(
+            "MetricIndicatorWithStrikethrough",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("subtext", OpenUiPropType.STRING),
+                OpenUiProp("previousValue", OpenUiPropType.STRING),
+                OpenUiProp("trendDirection", OpenUiPropType.ENUM, enumValues = listOf("up", "down")),
+                OpenUiProp("trendValue", OpenUiPropType.NUMBER),
+            ),
+        ),
+        OpenUiComponent(
+            "SnippetCardBlock",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("lhs", OpenUiPropType.COMPONENT_LIST, required = true),
+                        OpenUiProp("rhs", OpenUiPropType.COMPONENT_LIST),
+                    ),
+                ),
+                OpenUiProp(
+                    "layout",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("grid"),
+                    enumValues = listOf("grid", "carousel"),
+                ),
+                OpenUiProp("action", OpenUiPropType.ACTION),
+            ),
+        ),
+        OpenUiComponent(
+            "SnippetCardItem",
+            listOf(
+                OpenUiProp("lhs", OpenUiPropType.COMPONENT_LIST, required = true),
+                OpenUiProp("rhs", OpenUiPropType.COMPONENT_LIST),
+            ),
+        ),
+        OpenUiComponent(
+            "OverviewCardBlock",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("top", OpenUiPropType.COMPONENT_LIST, required = true),
+                        OpenUiProp("bottom", OpenUiPropType.COMPONENT_LIST),
+                    ),
+                ),
+                OpenUiProp(
+                    "layout",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("grid"),
+                    enumValues = listOf("grid", "carousel"),
+                ),
+                OpenUiProp("action", OpenUiPropType.ACTION),
+            ),
+        ),
+        OpenUiComponent(
+            "OverviewCardItem",
+            listOf(
+                OpenUiProp("top", OpenUiPropType.COMPONENT_LIST, required = true),
+                OpenUiProp("bottom", OpenUiPropType.COMPONENT_LIST),
+            ),
+        ),
+        OpenUiComponent(
+            "ContextCardBlock",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("body", OpenUiPropType.STRING),
+                    ),
+                ),
+                OpenUiProp(
+                    "layout",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("grid"),
+                    enumValues = listOf("grid", "carousel"),
+                ),
+                OpenUiProp("action", OpenUiPropType.ACTION),
+            ),
+        ),
+        OpenUiComponent(
+            "ContextCardItem",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("body", OpenUiPropType.STRING),
+            ),
+        ),
+        OpenUiComponent(
+            "CompositeCardBlock",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("header", OpenUiPropType.COMPONENT_LIST),
+                        OpenUiProp("body", OpenUiPropType.COMPONENT_LIST, required = true),
+                        OpenUiProp("footer", OpenUiPropType.COMPONENT_LIST),
+                    ),
+                ),
+                OpenUiProp(
+                    "layout",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("grid"),
+                    enumValues = listOf("grid", "carousel"),
+                ),
+                OpenUiProp("action", OpenUiPropType.ACTION),
+            ),
+        ),
+        OpenUiComponent(
+            "CompositeCardItem",
+            listOf(
+                OpenUiProp("header", OpenUiPropType.COMPONENT_LIST),
+                OpenUiProp("body", OpenUiPropType.COMPONENT_LIST, required = true),
+                OpenUiProp("footer", OpenUiPropType.COMPONENT_LIST),
+            ),
+        ),
+        OpenUiComponent(
+            "VisualCardBlock",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("body", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("bgImageSrc", OpenUiPropType.STRING),
+                        OpenUiProp("tag", OpenUiPropType.STRING),
+                    ),
+                ),
+                OpenUiProp(
+                    "layout",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("grid"),
+                    enumValues = listOf("grid", "carousel"),
+                ),
+                OpenUiProp("action", OpenUiPropType.ACTION),
+            ),
+        ),
+        OpenUiComponent(
+            "VisualCardItem",
+            listOf(
+                OpenUiProp("body", OpenUiPropType.STRING, required = true),
+                OpenUiProp("bgImageSrc", OpenUiPropType.STRING),
+                OpenUiProp("tag", OpenUiPropType.STRING),
             ),
         ),
     ).associateBy { component -> component.name }

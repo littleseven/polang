@@ -470,11 +470,12 @@ class OpenUiEngineTest {
     }
 
     @Test
-    fun `image missing required photo drops the component`() = runTest {
+    fun `image without photo or src stays for placeholder rendering`() = runTest {
+        // 2026-10-25 全量补全：photo 降可选（+src 公网图），皆无 → 渲染层兜底占位不丢组件
         val program = """root = Card([Image(), Text("ok")])"""
         val result = rendered(OpenUiSession(program, noTools).prepare())
-        assertEquals(1, childrenOf(result.root).size)
-        assertTrue(result.errors.any { error -> error.code == "missing-required" })
+        assertEquals(2, childrenOf(result.root).size)
+        assertTrue(result.errors.none { error -> error.code == "missing-required" })
     }
 
     // ── 契约字面量 ──────────────────────────────────────────────────

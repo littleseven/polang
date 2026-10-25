@@ -339,10 +339,241 @@ root = Card([Image(photos[0].id, 1.5)])""",
 
     @Test
     fun `m3 lookalike component name is rejected`() {
-        // 反面：不在二十一组件白名单内的近名组件仍被拒（如 DataTable/Grid）
+        // 反面：不在白名单内的近名组件仍被拒（如 DataTable/Grid）
         val error = RenderOpenUiValidator.validateToError("""root = Card([DataTable("x")])""")
         assertNotNull(error)
         assertTrue(error!!.contains("DataTable"))
+    }
+
+    // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
+
+    @Test
+    fun `whitelist pins all 89 openui library components`() {
+        // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
+        // OpenUiLibrary.components 的 89 个 key 逐字一致，改动须双向同步核对
+        // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
+        //  改组件清单时人工双端核对）
+        val expected = setOf(
+            // 本仓既有 + M2/M3 扩（原二十一组件）
+            "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
+            "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
+            "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
+            // 官方别名
+            "Stack", "Separator", "MarkDownRenderer",
+            // 官方内容/布局
+            "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
+            "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
+            "BoldText", "IconText", "ImageText", "ImageTextLarge", "EntityList",
+            "ListBlock", "Steps", "Carousel", "Buttons", "IconButton", "Modal",
+            // 官方表单
+            "Form", "FormControl", "Input", "TextArea", "Select", "DatePicker",
+            "CheckBoxGroup", "RadioGroup", "SwitchGroup", "Chips", "OptionCards", "EditableTable",
+            // 官方图表
+            "AreaChart", "HorizontalBarChart", "RadarChart", "RadialChart",
+            "SingleStackedBarChart", "ScatterChart",
+            // 官方卡块
+            "MetricIndicatorInline", "MetricIndicatorWithStrikethrough",
+            "SnippetCardBlock", "OverviewCardBlock", "ContextCardBlock",
+            "CompositeCardBlock", "VisualCardBlock",
+            // 元素形状
+            "TabItem", "AccordionItem", "ListItem", "StepsItem", "SelectItem",
+            "CheckBoxItem", "RadioItem", "SwitchItem", "ChipItem", "OptionCard",
+            "Series", "Slice", "ScatterSeries", "Point",
+            "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
+            "CompositeCardItem", "VisualCardItem",
+        )
+        assertEquals(89, expected.size)
+        assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
+    }
+
+    @Test
+    fun `official expansion components pass whitelist`() {
+        // 各分组代表组件 + 元素形状组件（白名单只认组件名，形态细节由端侧 schema 兜底）
+        val cases = listOf(
+            "Stack([Text(\"x\")], \"row\", \"m\")",
+            "Separator(\"vertical\")",
+            "MarkDownRenderer(\"# 标题\")",
+            "CardHeader(\"标题\", \"副题\")",
+            "TextCallout(\"提示\", \"说明\", \"warning\")",
+            "ImageBlock(\"https://cos.polang.net/a.png\")",
+            "Tag(\"精选\", \"star\")",
+            "ListBlock([{title: \"一\"}], \"number\")",
+            "Steps([{title: \"第一步\"}])",
+            "Modal(\"弹窗\", ${'$'}open, [Text(\"x\")])",
+            "Form(\"f\", [Input(\"city\")])",
+            "Select(\"s\", [{value: \"a\", label: \"甲\"}])",
+            "Chips(\"c\", [{value: \"a\", label: \"甲\"}], \"single\")",
+            "EditableTable(\"t\", [{type: \"text\", key: \"k\", header: \"列\"}], [{id: \"1\", values: [\"v\"]}])",
+            "AreaChart(\"趋势\", [\"01\"], [{name: \"全部\", values: [1]}])",
+            "RadarChart(\"能力\", [\"a\"], [{name: \"我\", values: [1]}])",
+            "RadialChart(\"环\", [{category: \"甲\", value: 1}])",
+            "ScatterChart(\"散点\", [{name: \"s\", points: [[1, 2]]}])",
+            "MetricIndicatorInline(\"+12%\")",
+            "SnippetCardBlock([{lhs: [Text(\"k\")], rhs: [Text(\"v\")]}])",
+            "VisualCardBlock([{body: \"封面\"}])",
+            // 元素形状（仅作父组件数组元素的对象形状，白名单放行，位置约束端侧兜底）
+            "TabItem(\"v\", \"触发\", [Text(\"x\")])",
+            "Series(\"系列\", [1, 2])",
+            "Slice(\"甲\", 1)",
+            "Point(1, 2)",
+        )
+        cases.forEach { component ->
+            val program = "${'$'}open = false\nroot = Card([$component])"
+            assertNull("应放行: $component", RenderOpenUiValidator.validateToError(program))
+        }
+    }
+
+    @Test
+    fun `official col component is deliberately rejected`() {
+        // 官方 Col 列式 Table 刻意不收（spec §3.1：行式 Table 为唯一形态，防双形态精神分裂）
+        val error = RenderOpenUiValidator.validateToError("""root = Card([Col("x")])""")
+        assertNotNull(error)
+        assertTrue(error!!.contains("Col"))
+    }
+
+    // ── Image src 校验（2026-10-25 官方对齐：photo 降可选 + src https 限） ──
+
+    @Test
+    fun `image with only photo passes`() {
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
+root = Card([Image(photos[0].id)])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `image with only https src passes`() {
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([Image(src = "https://cos.polang.net/banner.png", alt = "封面")])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `image with positional https src passes`() {
+        // 位置参数形态（photo, aspect, src, alt）：第三个位置参数的 https 字符串同样放行
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
+root = Card([Image(photos[0].id, 1.5, "https://cos.polang.net/banner.png")])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `image with non-https named src is rejected`() {
+        // [PRIVACY] 同 A2UI Image.url 口径：http/本地路径一律拒
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([Image(src = "http://insecure.example.com/a.png")])""",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("https://"))
+    }
+
+    @Test
+    fun `image with non-https positional src is rejected`() {
+        val error = RenderOpenUiValidator.validateToError(
+            """photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
+root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("Image.src") && error.contains("https://"))
+    }
+
+    @Test
+    fun `image without photo and src is rejected`() {
+        // photo/src 二缺一：渲染层虽兜底丢占位，prompt 层引导 LLM 必给其一（服务端同轮纠错）
+        val error = RenderOpenUiValidator.validateToError("""root = Card([Image()])""")
+        assertNotNull(error)
+        assertTrue(error!!.contains("photo") && error.contains("src"))
+    }
+
+    @Test
+    fun `image gallery with non-https src is rejected`() {
+        // src https 限全组件生效：ImageGallery 的 {src: "…"} 对象字段形态同样硬校验
+        val gallery = RenderOpenUiValidator.validateToError(
+            """root = Card([ImageGallery([{src: "http://insecure.example.com/a.png"}])])""",
+        )
+        assertNotNull(gallery)
+        assertTrue(gallery!!.contains("https://"))
+    }
+
+    // ── 图片地址键名闭集（src/bgImageSrc/image，review 🟡7） ─────────────
+
+    @Test
+    fun `visual card bgImageSrc non-https is rejected`() {
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([VisualCardBlock([{body: "封面", bgImageSrc: "http://insecure.example.com/bg.png"}])])""",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("bgImageSrc") && error.contains("https://"))
+    }
+
+    @Test
+    fun `visual card bgImageSrc https passes`() {
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([VisualCardBlock([{body: "封面", bgImageSrc: "https://cos.polang.net/bg.png"}])])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `listblock image non-https is rejected`() {
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([ListBlock([{title: "一", image: "http://insecure.example.com/t.png"}], "image")])""",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("image") && error.contains("https://"))
+    }
+
+    @Test
+    fun `listblock image https passes`() {
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([ListBlock([{title: "一", image: "https://cos.polang.net/t.png"}], "image")])""",
+            ),
+        )
+    }
+
+    // ── 整卡位图总数护栏（review 🟡8：Image 调用 + src 类图片合计 ≤12） ──
+
+    @Test
+    fun `image gallery with 13 https images is rejected`() {
+        val items = (1..13).joinToString(", ") { i -> "{src: \"https://cos.polang.net/$i.png\"}" }
+        val error = RenderOpenUiValidator.validateToError("root = Card([ImageGallery([$items])])")
+        assertNotNull(error)
+        assertTrue(error!!.contains("上限"))
+    }
+
+    @Test
+    fun `image gallery with 12 https images passes`() {
+        val items = (1..12).joinToString(", ") { i -> "{src: \"https://cos.polang.net/$i.png\"}" }
+        assertNull(RenderOpenUiValidator.validateToError("root = Card([ImageGallery([$items])])"))
+    }
+
+    @Test
+    fun `image photo plus gallery 12 images exceeds combined limit`() {
+        // 合计口径：1 个 Image(photo) + 12 张 gallery = 13 张位图 → 超上限
+        val items = (1..12).joinToString(", ") { i -> "{src: \"https://cos.polang.net/$i.png\"}" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([Image(photos[0].id), ImageGallery([$items])])"
+        val error = RenderOpenUiValidator.validateToError(program)
+        assertNotNull(error)
+        assertTrue(error!!.contains("上限"))
+    }
+
+    @Test
+    fun `image src inside image call is not double counted`() {
+        // Image(src=…) 的 src 落在 Image 调用区间内只计一次：1 + 11 = 12 张 → 放行
+        val items = (1..11).joinToString(", ") { i -> "{src: \"https://cos.polang.net/$i.png\"}" }
+        val program =
+            "root = Card([Image(src = \"https://cos.polang.net/cover.png\"), ImageGallery([$items])])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
     @Test

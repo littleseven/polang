@@ -99,54 +99,108 @@ class RenderOpenUiToolService {
 1. program 是 OpenUI Lang 1.0 程序：每行一条语句，形如 `名 = 表达式`；组件调用
    大写开头、只用位置参数；字符串一律双引号；
 2. 必须有 `root = ...` 语句（root 是整个组件树的入口）；
-3. 可用组件签名（逐字遵守，禁发明属性）：
+3. 可用组件签名（逐字遵守，禁发明属性；* 为必填）：
    - Text(text*, role?, colorRole?)：text 可传 ${'$'}绑定变量（字符串/数字/布尔自动转文本，
-     如 Text(${'$'}selected) 显示柱图点选月份）；role∈HEADLINE|SUBHEAD|BODY|CAPTION|DISPLAY
-     （默认 BODY；DISPLAY 是统计大数字 32sp 加粗等宽数字，stat tile 专用，形如
-     Text("7,120", "DISPLAY")，一屏 ≤4 个），
+     如 Text(${'$'}selected) 显示柱图点选月份），随 state 回写联动刷新（见规则 6）；
+     role∈HEADLINE|SUBHEAD|BODY|CAPTION|DISPLAY（默认 BODY；DISPLAY 是统计大数字 32sp
+     加粗等宽数字，stat tile 专用，形如 Text("7,120", "DISPLAY")，一屏 ≤4 个），
      colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
-     text 可传 ${'$'}绑定（如 Text(${'$'}selected)），随 state 回写联动刷新（见规则 6）；
-   - Row(children*, spacing?) / Column(children*, spacing?) / Card(children*, spacing?)：
+   - Row(children*, spacing?) / Column(children*, spacing?) / Card(children*, spacing?, title?)：
      children 是组件数组（[组件1, 组件2]），spacing∈COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
-     Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；
-   - Button(label*, action?)：action 是裸动作表达式、最外层不要加引号，
+     Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；Card 有 title 时渲染头部标题区；
+   - Button(label*, action?, variant?, size?)：action 是裸动作表达式、最外层不要加引号，
      形如 Button("查看", @OpenUrl("https://..."))（"@OpenUrl(...)" 包成字符串会被拒）；
+     variant∈primary|secondary|tertiary（默认 primary，映射实心/淡色/文字按钮）；size 收而不用；
      一卡 Button ≤3 个（行为色面积收敛，次要动作并入主 Button 或改 Markdown 文本）；
-   - BarChart(title?, buckets*, selected?)：buckets 是 [{label,count}] 数据引用；
-     buckets >12 个时先聚合（按年/按季）再发卡，避免超密横滑柱图；
-   - Image(photo*, aspect?)：相册照片（图文混排用）；photo 只许填 photos 数组元素的
-     id（如 photos[0].id），禁止写字面量数字 id（防臆造）；aspect 是宽高比
-     （宽/高）——省略时端侧按照片真实比例渲染（竖屏图不再被横框拦腰，推荐省略），只有要
-     强制造型（统一方块拼图/横幅封面）才显式传（横图 1.5~1.78，竖图 0.75）；
-     Row([Image(...), Image(...)]) 可多张并排等宽；单卡图片≤12 张（内存上限）；
+   - BarChart(title?, buckets?, selected?, labels?, series?, variant?)：buckets 是 [{label,count}]
+     数据引用；或官方形态 labels=["x1",...] + series=[{name, values:[数值,...]}]（两种数据面二选一）；
+     variant∈grouped|stacked（多系列并排/堆叠）；buckets >12 个时先聚合（按年/按季）再发卡，
+     避免超密横滑柱图；
+   - Image(photo?, aspect?, src?, alt?)：photo 与 src 二缺一必给——photo 只许填 photos 数组元素的
+     id（如 photos[0].id），禁止写字面量数字 id（防臆造）；src 是 https:// 公网图片地址
+     （禁本地路径/uri）；aspect 是宽高比（宽/高）——省略时端侧按照片真实比例渲染
+     （竖屏图不再被横框拦腰，推荐省略），只有要强制造型（统一方块拼图/横幅封面）才显式传
+     （横图 1.5~1.78，竖图 0.75）；Row([Image(...), Image(...)]) 可多张并排等宽；
+     单卡图片≤12 张（内存上限）；
    - Icon(name*, colorRole?)：name 只用预定义图标名（59 枚清单见规则 6 末），禁臆造；
      装饰性图标省略 colorRole（自动弱色），PRIMARY 只留强调性图标；
-   - Divider(axis?)：分隔线，axis∈HORIZONTAL|VERTICAL（默认 HORIZONTAL）；
+   - Divider(axis?=HORIZONTAL|VERTICAL) / Separator(orientation?=horizontal|vertical)：分隔线（同义别名）；
    - List(children*, direction?, spacing?)：direction∈VERTICAL|HORIZONTAL（默认 VERTICAL
      限高纵向滚动，HORIZONTAL 横滑行）；
    - Tabs(tabs*)：tabs 是 [{title: "页签标题", children: [组件...]}]，至少一个页签；
-   - CheckBox(label*, checked*)：checked 传 ${'$'}布尔绑定（见规则 6），点按回写；
-     裸 true/false 字面量只读不回写；
+   - CheckBox(label*, checked*) / Switch(label*, checked*)：布尔项与开关（语义对偶），
+     checked 传 ${'$'}布尔绑定（见规则 6），点按回写；裸 true/false 字面量只读不回写；
    - ChoicePicker(label?, options*, selected*)：options 是 [{label: "显示文案", value: "值"}]，
      selected 传 ${'$'}字符串绑定，点选回写 value；裸字面量只读；
    - Slider(label?, value*, min?, max?)：value 传 ${'$'}数字绑定，min/max 默认 0/100，
      拖动结束回写数值；裸数字字面量只读；label 可省略，省略时 value 须写命名实参
      （形如 Slider(value=${'$'}level)——位置参数首槽是 label）；
-   - Table(columns*, rows*)：行式表格；columns 是 [{label: "列名"}]，rows 是行式
-     嵌套数组 [[cell, ...], ...]（每行一条内层数组，cell 只许字符串/数字/布尔，
+   - Table(columns*, rows*)：行式表格（唯一表格形态，无列式）；columns 是 [{label: "列名"}]，
+     rows 是行式嵌套数组 [[cell, ...], ...]（每行一条内层数组，cell 只许字符串/数字/布尔，
      单元格数与 columns 对齐）；
-   - PieChart(title?, slices*)：占比分布；slices 是 [{label: "分类名", value: 数值}]；
-   - LineChart(title?, labels*, series*)：趋势折线；labels 是横轴标签数组
+   - PieChart(title?, slices*, variant?)：占比分布；slices 是 [{label: "分类名", value: 数值}]；
+     variant∈donut|pie（默认 donut 环形）；
+   - LineChart(title?, labels*, series*, variant?)：趋势折线；labels 是横轴标签数组
      ["x1", ...]，series 是 [{name: "系列名", values: [数值, ...]}]
-     （values 长度与 labels 对齐）；
-   - Callout(text*, title?, tone?)：结论/告警高亮块，tone∈INFO|SUCCESS|WARNING|ERROR
+     （values 长度与 labels 对齐）；variant∈linear|natural|step（折线插值形态）；
+   - Callout(text*, title?, tone?)：结论/告警高亮块，tone∈INFO|SUCCESS|WARNING|ERROR|NEUTRAL
      （默认 INFO）；
-   - Markdown(text*)：富文本正文（标题/加粗/列表混排），text 可传 ${'$'}绑定
-     （同 Text 口径）；
+   - Markdown(text*) / MarkDownRenderer(textMarkdown*, variant?)：富文本正文（同义别名，
+     标题/加粗/列表混排），text 可传 ${'$'}绑定（同 Text 口径）；
    - Accordion(items*)：可折叠分区；items 是 [{title: "分区标题", children: [组件...]}]；
-   - Switch(label*, checked*)：开关式布尔（与 CheckBox 语义对偶），checked 传
-     ${'$'}布尔绑定，点按回写；裸 true/false 字面量只读不回写；
+   ── 官方组件库扩充（同套语法，数据/绑定/动作写法与上面完全一致）──
+   - 布局容器：Stack(children*, direction?=row|column, gap?=none|xs|s|m|l|xl|2xl, align?, justify?, wrap?)
+     （direction=row 同 Row、缺省 column 同 Column，wrap=true 自动换行）/
+     Carousel(children*, variant?=card|sunk)（横滑卡片行）/
+     Buttons(buttons*=[Button...], direction?=row|column) /
+     Modal(title*, open*, children*)（open 传 ${'$'}布尔绑定，真值时弹窗，关闭即回写 false）；
+   - 标题与文案：CardHeader(title*, subtitle?) / InlineHeader(title*, description?) /
+     TextContent(text*, size?=small|default|large|small-heavy|large-heavy) /
+     Label(text*)（弱色小标签）/ BoldText(value*, subtext?, size?=xs|sm|md|lg)（value 可传 ${'$'}绑定）；
+   - 高亮与标签：TextCallout(title*, description?, variant?=neutral|info|success|warning|danger)
+     （走 Callout 渲染）/ Tag(text*, icon?, size?=sm|md|lg, variant?=neutral|info|success|warning|danger) /
+     TagBlock(tags*=["标签", ...]) / CodeBlock(codeString*, language?)（等宽代码块）；
+   - 图文项：IconText(title*, icon?, subtitle?, bold?, layout?=horizontal|vertical) /
+     ImageText(title*, src?, subtitle?, imageSize?) / ImageTextLarge(title*, src?, subtitle?) /
+     ImageBlock(src*, alt?) / ImageGallery(images*=[{src*, alt?, details?}])
+     （一切 src/bgImageSrc/image 图片地址一律 https:// 公网图、禁本地路径/uri；相册照片仍走 Image(photo) 投影通道）；
+   - 列表：EntityList(rows*=[{left*, right*}], headerLeft?, headerRight?, footerLeft?, footerRight?)（双列键值行）/
+     ListBlock(items*=[{title*, subtitle?, image?, actionLabel?, action?}], variant?=number|image) /
+     Steps(items*=[{title*, details?}])（纵向步骤条）；
+   - 表单（name 键控直写 state：用户交互即 @Set(${'$'}<name>, 值)——如 Input(name="city")
+     键入后 Text("城市: " + ${'$'}city) 经 ${'$'}name 绑定联动读；Form 仅视觉分组，无提交作用域；
+     ${'$'}变量同样先独占一行声明默认值）：
+     Form(name*, children*) / FormControl(label*, input*=[输入组件], hint?) /
+     Input(name*, placeholder?, type?=text|email|password|number|url) / TextArea(name*, placeholder?, rows?) /
+     Select(name*, items*=[{value*, label*}], placeholder?) / DatePicker(name*, mode*=single|range) /
+     CheckBoxGroup(name*, items*=[{label*, description?, name*, defaultChecked?}])（每项写 ${'$'}<item.name>）/
+     RadioGroup(name*, items*=[{label*, description?, value*}], defaultValue?) /
+     SwitchGroup(items*=[{label*, description?, name*, defaultChecked?}], variant?=clear|card|sunk)（每项写 ${'$'}<item.name>）/
+     Chips(name*, items*=[{value*, label*, icon?}], type?=single|multiple) /
+     OptionCards(name*, items*=[{value*, title*, subtitle?}], type?=single|multiple)
+     （type=single 写 ${'$'}name=值；multiple 写 ${'$'}name=逗号拼接串——选项 value 内禁止逗号）/
+     EditableTable(name*, columns*=[{type*=text|number|date-single|select|url, key*, header*}],
+     data*=[{id*, values*}])（单元格编辑即写 @Set(${'$'}name, JSON 行数组)）；
+   - 图表（labels/series 形态同 LineChart）：AreaChart(title?, labels*, series*, variant?) /
+     HorizontalBarChart(title?, labels*, series*, variant?=grouped|stacked) /
+     RadarChart(title?, labels*, series*) /
+     RadialChart(title?, slices*=[{category*, value*}]) /
+     SingleStackedBarChart(title?, slices*=[{category*, value*}]) /
+     ScatterChart(title?, datasets*=[{name*, points*=[[x,y],...]}], xLabel?, yLabel?)；
+   - 卡块（共性：items* + layout?=grid|carousel 双列网格/横滑 + action? 点击卡动作）：
+     MetricIndicatorInline(value*, subtext?, trendDirection?=up|down, trendValue?) /
+     MetricIndicatorWithStrikethrough(value*, subtext?, previousValue?, trendDirection?, trendValue?) /
+     SnippetCardBlock(items*=[{lhs*=[组件], rhs?=[组件]}]) /
+     OverviewCardBlock(items*=[{top*=[组件], bottom?=[组件]}]) /
+     ContextCardBlock(items*=[{title*, body?}]) /
+     CompositeCardBlock(items*=[{header?=[组件], body*=[组件], footer?=[组件]}]) /
+     VisualCardBlock(items*=[{body*, bgImageSrc?, tag?}])；
+   - 元素形状（仅作父组件数组元素的对象形状，不独立使用——优先用上面对象数组写法，
+     组件形仅保底）：TabItem / AccordionItem / ListItem / StepsItem / SelectItem /
+     CheckBoxItem / RadioItem / SwitchItem / ChipItem / OptionCard / Series / Slice /
+     ScatterSeries / Point / SnippetCardItem / OverviewCardItem / ContextCardItem /
+     CompositeCardItem / VisualCardItem；
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
    `buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])`
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
@@ -159,7 +213,8 @@ class RenderOpenUiToolService {
    handle id 只在 program 里引用，回复正文禁止向用户展示 handle id；
 5. Query 推荐独占整条语句右侧（先 `buckets = Query("local_handle", …, [])` 单独成行，
    组件参数里引用 buckets——见规则 7 黄金示例；端侧引擎已支持内联提升，独占写法最稳）；
-6. state 与交互约定（交互组件 = BarChart/CheckBox/ChoicePicker/Slider/Switch，可绑定文案 = Text）：
+6. state 与交互约定（交互组件 = BarChart/CheckBox/ChoicePicker/Slider/Switch/Modal +
+   表单组件（name 键控 @Set 直写，见规则 3 表单段），可绑定文案 = Text/Markdown/BoldText）：
    每个用到的 ${'$'}变量先独占一行声明默认值（如 `${'$'}selected = ""`、`${'$'}level = 50`、
    `${'$'}flag = false`），再传给组件的可绑定参数（BarChart selected / CheckBox checked /
    Switch checked / ChoicePicker selected / Slider value / Text text）；端侧点选/勾选/拖值 → 回写该变量并

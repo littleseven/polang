@@ -40,17 +40,38 @@ class OpenUiLibraryM2Test {
     // ── 组件清单与 Icon 枚举同源钉住 ─────────────────────────────────
 
     @Test
-    fun `library registers exactly twenty one components`() {
-        // M2 实装 14 组件：既有 7 + §2 枚举 7 新组件（Icon/Divider/List/Tabs/CheckBox/
-        // ChoicePicker/Slider）——spec 标题「十三」与 §5「+6→13」为计数笔误，以 §2 枚举为准；
-        // M3（spec《openui-component-library-m3-design》§2）+7：
-        // Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch
+    fun `library registers the full official component set`() {
+        // 2026-10-25 全量补全（spec《openui-full-library-design》）：官方 openuiLibrary
+        // 82 组件覆盖 81（Col 列式 Table 刻意不收）+ 本仓既有 8 项（Row/Column/Divider/
+        // List/CheckBox/ChoicePicker/Switch/Markdown）= 89 注册项
         assertEquals(
             setOf(
+                // 既有 21（M1~M3）
                 "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
                 "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
                 "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
-            ).also { expected -> assertEquals(21, expected.size) },
+                // 别名 5
+                "Stack", "Separator", "MarkDownRenderer", "TabItem", "AccordionItem",
+                // 内容/布局 23
+                "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
+                "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label", "BoldText",
+                "IconText", "ImageText", "ImageTextLarge", "EntityList", "ListBlock",
+                "ListItem", "Steps", "StepsItem", "Carousel", "Buttons", "IconButton", "Modal",
+                // 表单 18
+                "Form", "FormControl", "Input", "TextArea", "Select", "SelectItem",
+                "DatePicker", "CheckBoxGroup", "CheckBoxItem", "RadioGroup", "RadioItem",
+                "SwitchGroup", "SwitchItem", "Chips", "ChipItem", "OptionCards", "OptionCard",
+                "EditableTable",
+                // 图表 10
+                "AreaChart", "HorizontalBarChart", "RadarChart", "RadialChart",
+                "SingleStackedBarChart", "ScatterChart", "Series", "Slice", "ScatterSeries",
+                "Point",
+                // 卡块 12
+                "MetricIndicatorInline", "MetricIndicatorWithStrikethrough",
+                "SnippetCardBlock", "SnippetCardItem", "OverviewCardBlock", "OverviewCardItem",
+                "ContextCardBlock", "ContextCardItem", "CompositeCardBlock", "CompositeCardItem",
+                "VisualCardBlock", "VisualCardItem",
+            ).also { expected -> assertEquals(89, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }
@@ -244,6 +265,7 @@ class OpenUiLibraryM2Test {
             listOf(
                 Triple("title", OpenUiPropType.STRING, false),
                 Triple("slices", OpenUiPropType.OBJECT_ARRAY, true),
+                Triple("variant", OpenUiPropType.ENUM, false),
             ),
             signature("PieChart"),
         )
@@ -252,6 +274,7 @@ class OpenUiLibraryM2Test {
                 Triple("title", OpenUiPropType.STRING, false),
                 Triple("labels", OpenUiPropType.PRIMITIVE_ARRAY, true),
                 Triple("series", OpenUiPropType.OBJECT_ARRAY, true),
+                Triple("variant", OpenUiPropType.ENUM, false),
             ),
             signature("LineChart"),
         )
@@ -278,9 +301,9 @@ class OpenUiLibraryM2Test {
             ),
             signature("Switch"),
         )
-        // Callout tone 枚举域与默认值
+        // Callout tone 枚举域与默认值（2026-10-25 全量补全：+NEUTRAL 对齐官方五档）
         val tone = OpenUiLibrary.components.getValue("Callout").props.single { prop -> prop.name == "tone" }
-        assertEquals(listOf("INFO", "SUCCESS", "WARNING", "ERROR"), tone.enumValues)
+        assertEquals(listOf("INFO", "SUCCESS", "WARNING", "ERROR", "NEUTRAL"), tone.enumValues)
         assertEquals(OpenUiValue.Str("INFO"), tone.default)
         // LineChart.series[].values = OBJECT_ARRAY 嵌套 PRIMITIVE_ARRAY（spec §3）
         val seriesValues = OpenUiLibrary.components.getValue("LineChart").props

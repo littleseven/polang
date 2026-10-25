@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -138,6 +140,12 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
  * - BarChart 点桶回写目标跟随 selected 的绑定变量（LLM 自定义变量名如 $month 时硬写
  *   $selected 会点了没反应）；未绑定才回落 [OpenUiContract.STATE_SELECTED]。
  *
+ * M5（2026-10-25 全量补全，spec《2026-10-25-openui-full-library-design》§3.4）：
+ * - BarChart/PieChart/LineChart 三图官方 prop 扩展（BarChart buckets 缺省时启用
+ *   labels+series+variant=grouped/stacked 官方形态；PieChart variant=donut/pie 实心；
+ *   LineChart variant=step 阶梯）；6 个新图表（AreaChart/HorizontalBarChart/RadarChart/
+ *   RadialChart/SingleStackedBarChart/ScatterChart）在 OpenUiChartRenderers.kt。
+ *
  * 半信任输入防御：未知组件/null 字面量 → 空 Box 占位，不炸整卡；BarChart buckets
  * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）；Image 解析不到/加载中 →
  * surfaceVariant 占位 Box（同形防跳动）。
@@ -153,6 +161,15 @@ fun OpenUiNodeRenderer(
     when (node.type) {
         "Card" -> Card(modifier = modifier.fillMaxWidth(), shape = AppShapes.card) {
             Column(modifier = Modifier.padding(Spacing.lg)) {
+                // M5：可选 title（官方 fixtures 形态）→ 头部 SUBHEAD 标题行
+                (node.props["title"] as? OpenUiValue.Str)?.v?.let { cardTitle ->
+                    Text(
+                        text = cardTitle,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(OpenUiCardTokens.sectionGap))
+                }
                 OpenUiGappedChildren(node, state, photoResolver, onAction)
             }
         }
@@ -237,9 +254,18 @@ fun OpenUiNodeRenderer(
         }
         "Button" -> {
             val label = (node.props["label"] as? OpenUiValue.Str)?.v ?: return
-            val actions = (node.props["action"] as? OpenUiValue.ActionVal)?.actions.orEmpty()
-            Button(onClick = { actions.forEach(onAction) }, modifier = modifier) {
-                Text(text = label)
+            val actions = openUiActionsOf(node.props["action"])
+            // M5 官方对齐：variant → Filled/Tonal/Text 三态（size 收而不用，卡内统一触控尺寸）
+            when ((node.props["variant"] as? OpenUiValue.Str)?.v) {
+                "secondary" -> FilledTonalButton(onClick = { actions.forEach(onAction) }, modifier = modifier) {
+                    Text(text = label)
+                }
+                "tertiary" -> TextButton(onClick = { actions.forEach(onAction) }, modifier = modifier) {
+                    Text(text = label)
+                }
+                else -> Button(onClick = { actions.forEach(onAction) }, modifier = modifier) {
+                    Text(text = label)
+                }
             }
         }
         "BarChart" -> OpenUiBarChart(node, state, onAction, modifier)
@@ -258,7 +284,13 @@ fun OpenUiNodeRenderer(
         "Markdown" -> OpenUiMarkdown(node, state, modifier)
         "Accordion" -> OpenUiAccordion(node, state, photoResolver, onAction, modifier)
         "Switch" -> OpenUiSwitch(node, state, onAction, modifier)
-        else -> Box(modifier = modifier) // 未知组件：空占位，不炸整卡
+        // M5（2026-10-25 全量补全）：68 新组件按域分派四个渲染文件（内容/布局、表单、
+        // 图表、卡块）；元素形状组件（ListItem/Series 等）不在任何集合 → else 空占位
+        in openUiContentComponentNames -> OpenUiContentNode(node, state, photoResolver, onAction, modifier)
+        in openUiFormComponentNames -> OpenUiFormNode(node, state, photoResolver, onAction, modifier)
+        in openUiChartComponentNames -> OpenUiChartNode(node, state, photoResolver, onAction, modifier)
+        in openUiCardBlockComponentNames -> OpenUiCardBlockNode(node, state, photoResolver, onAction, modifier)
+        else -> Box(modifier = modifier) // 未知组件/元素形状独立出现：空占位，不炸整卡
     }
 }
 
@@ -312,9 +344,10 @@ private fun OpenUiValue.ComponentVal.willRenderTextLike(state: Map<String, OpenU
     }
 }
 
-/** Section 起头判定（M4 §1.1）：SUBHEAD 标题 / 图表 / 表格。 */
+/** Section 起头判定（M4 §1.1）：SUBHEAD 标题 / 图表 / 表格；M5：新图表同档。 */
 private fun OpenUiValue.ComponentVal.isSectionStart(): Boolean =
     type == "BarChart" || type == "PieChart" || type == "LineChart" || type == "Table" ||
+        type in openUiChartComponentNames ||
         (type == "Text" &&
             A2uiStyleMapper.parseTextRole((props["role"] as? OpenUiValue.Str)?.v) == A2uiTextRole.SUBHEAD)
 
@@ -360,8 +393,19 @@ private fun OpenUiPhotoImage(
             .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius)) // M4 §1.1：直角 → 12dp
             .background(frameBackground)
         if (photoId == null) {
-            // 缺必填 photo（schema 校验已丢组件，此处仅防御兜底）：同形占位，不炸整卡
-            Box(modifier = frameFor(frameAspectOf(propAspect, null)))
+            // M5：photo 降可选后增 src（https 公网图，[PRIVACY] server 正则硬校验 + 端侧前缀
+            // 防御双闸）通道；photo/src 皆无 → 同形占位，不炸整卡
+            val src = (node.props["src"] as? OpenUiValue.Str)?.v?.takeIf { it.startsWith("https://") }
+            if (src == null) {
+                Box(modifier = frameFor(frameAspectOf(propAspect, null)))
+                return@BoxWithConstraints
+            }
+            AsyncImage(
+                model = src,
+                contentDescription = (node.props["alt"] as? OpenUiValue.Str)?.v,
+                contentScale = ContentScale.Crop,
+                modifier = frameFor(frameAspectOf(propAspect, null)),
+            )
             return@BoxWithConstraints
         }
         val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
@@ -753,7 +797,9 @@ private fun OpenUiBarChart(
         Bucket(label = label, count = count.coerceAtLeast(0))
     }
     if (buckets.isEmpty()) {
-        Box(modifier = modifier)
+        // M5 官方对齐（2026-10-25）：buckets 缺省时启用 labels+series+variant 官方形态；
+        // 两形态皆无 → 空占位（schema 已降为二缺一，渲染层防御兜底）
+        OpenUiSeriesBarChart(node, modifier)
         return
     }
     // selected 是 BINDABLE_STRING：Binding → 从 state 快照读；Str 字面量 → 直接用（LLM 意图预选）
@@ -858,6 +904,175 @@ private fun OpenUiBarChart(
     }
 }
 
+/**
+ * BarChart 官方形态（M5，2026-10-25 全量补全）：labels + series[{name, values}] +
+ * variant=grouped（默认，每 label 一组并排柱，柱宽均分）/stacked（每 label 单柱分段堆叠）；
+ * series>1 加图例行。几何复用 buckets 形态同一 token 面（barAreaHeight/barGap/
+ * barChartLabelInterval/柱道+圆角柱端）；官方形态无 selected 绑定语义——不点选不回写
+ * （buckets 形态点桶回写不变）。labels/series 解析不出 → 空占位不炸卡。
+ */
+@Composable
+private fun OpenUiSeriesBarChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v
+    val labels = (node.props["labels"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .take(MAX_LINE_LABELS)
+        .map { value -> openUiPrimitiveText(value) ?: "" }
+    val series = (node.props["series"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val name = (obj["name"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        val rawValues = (obj["values"] as? OpenUiValue.Arr)?.v.orEmpty()
+        LineSeries(
+            name = name,
+            values = (0 until labels.size).map { index ->
+                (rawValues.getOrNull(index) as? OpenUiValue.Num)?.v
+            },
+        )
+    }.filter { serie -> serie.values.any { value -> value != null } }.take(MAX_LINE_SERIES)
+    if (labels.isEmpty() || series.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val stacked = (node.props["variant"] as? OpenUiValue.Str)?.v == "stacked"
+    val palette = OpenUiCardTokens.chartPalette
+    val labelInterval = barChartLabelInterval(labels.size)
+    val scrollMode = labels.size > BAR_CHART_SCROLL_THRESHOLD
+    val plotHeight = A2uiCardTokens.barAreaHeight - A2uiCardTokens.barLabelHeight
+    val globalMax = series.flatMap { serie -> serie.values.filterNotNull() }.max().coerceAtLeast(1.0)
+    val maxGroupTotal = labels.indices
+        .maxOf { index -> series.sumOf { serie -> serie.values[index] ?: 0.0 } }
+        .coerceAtLeast(1.0)
+    val barShape = RoundedCornerShape(
+        topStart = OpenUiCardTokens.barCornerRadius,
+        topEnd = OpenUiCardTokens.barCornerRadius,
+    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        title?.let { text ->
+            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+        }
+        Row(
+            modifier = (
+                if (scrollMode) {
+                    Modifier.horizontalScroll(rememberScrollState())
+                } else {
+                    Modifier.fillMaxWidth()
+                }
+                ).height(A2uiCardTokens.barAreaHeight),
+            horizontalArrangement = Arrangement.spacedBy(A2uiCardTokens.barGap),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            labels.forEachIndexed { index, label ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = if (scrollMode) {
+                        Modifier.width(BAR_CHART_SCROLL_BAR_WIDTH * (if (stacked) 1 else series.size))
+                    } else {
+                        Modifier.weight(1f)
+                    },
+                ) {
+                    if (stacked) {
+                        // 单柱分段堆叠：满高柱道 + 按组总值占比定高的段柱（series[0] 在底部）
+                        val groupTotal = series.sumOf { serie -> serie.values[index] ?: 0.0 }
+                        Box(contentAlignment = Alignment.BottomCenter) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(plotHeight)
+                                    .clip(barShape)
+                                    .background(
+                                        MaterialTheme.colorScheme.onSurface
+                                            .copy(alpha = OpenUiCardTokens.barTrackAlpha)
+                                    )
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(plotHeight * (groupTotal / maxGroupTotal).toFloat())
+                                    .clip(barShape),
+                            ) {
+                                for (seriesIndex in series.indices.reversed()) {
+                                    val value = series[seriesIndex].values[index] ?: 0.0
+                                    if (value > 0.0 && groupTotal > 0.0) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .weight(value.toFloat())
+                                                .background(palette[seriesIndex % palette.size]),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // grouped：每 series 一根并排柱，柱宽均分，柱高按值/全局 max
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(A2uiCardTokens.barGap),
+                            verticalAlignment = Alignment.Bottom,
+                        ) {
+                            series.forEachIndexed { seriesIndex, serie ->
+                                val value = (serie.values[index] ?: 0.0).coerceAtLeast(0.0)
+                                Box(
+                                    contentAlignment = Alignment.BottomCenter,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(plotHeight)
+                                            .clip(barShape)
+                                            .background(
+                                                MaterialTheme.colorScheme.onSurface
+                                                    .copy(alpha = OpenUiCardTokens.barTrackAlpha)
+                                            )
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(plotHeight * (value / globalMax).toFloat())
+                                            .clip(barShape)
+                                            .background(palette[seriesIndex % palette.size])
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    // 抽稀位也占满标签高：柱底对齐依赖「柱+标签」恒高（barChartBarHeight KDoc）
+                    if (index % labelInterval == 0) {
+                        if (labelInterval > 1) {
+                            BarChartBucketLabel(label)
+                        } else {
+                            Text(text = label, style = MaterialTheme.typography.labelSmall)
+                        }
+                    } else {
+                        Box(modifier = Modifier.height(A2uiCardTokens.barLabelHeight))
+                    }
+                }
+            }
+        }
+        if (series.size > 1) {
+            Row(
+                modifier = Modifier.padding(top = Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                series.forEachIndexed { index, serie ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(Spacing.sm)
+                                .clip(CircleShape)
+                                .background(palette[index % palette.size]),
+                        )
+                        Text(text = serie.name, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ── M3 七组件（2026-10-24，spec《openui-component-library-m3-design》§4.3） ──────
 
 /** 原始值单元格/标签的文本形态（Num 整数不带小数点，同 Text 绑定回退口径；null/其他 → null）。 */
@@ -870,6 +1085,17 @@ private fun openUiPrimitiveText(value: OpenUiValue): String? = when (value) {
 
 private const val MAX_TABLE_ROWS = 50
 private val TABLE_CELL_MIN_WIDTH = 88.dp
+
+/**
+ * action prop 统一解包（M5，review 🟡6）：eval 层收单个 ActionVal 或 Arr<ActionVal>
+ * （含 OBJECT_ARRAY 元素内动作，OpenUiEval objectFieldOk ACTION 分支），渲染层三处
+ * 消费点（Button / 内容域 contentActions / 卡块壳点击）都经此函数，数组形态逐个执行。
+ */
+internal fun openUiActionsOf(value: OpenUiValue?): List<OpenUiAction> = when (value) {
+    is OpenUiValue.ActionVal -> value.actions
+    is OpenUiValue.Arr -> value.v.filterIsInstance<OpenUiValue.ActionVal>().flatMap { it.actions }
+    else -> emptyList()
+}
 
 /** Table：表头行 + 数据行（[MAX_TABLE_ROWS] 护栏）；等宽列，列宽合计超容器宽时横滑；缺 cell 渲染空串。 */
 @Composable
@@ -926,10 +1152,12 @@ private data class PieSlice(val label: String, val value: Double)
 private const val MAX_PIE_SLICES = 12
 private val PIE_CHART_SIZE = 120.dp
 
-/** PieChart：Canvas 扇形（-90° 起顺时针）+ 图例列（色点 + label + value）；value 钳非负（BarChart 同口径）。 */
+/** PieChart：Canvas 扇形（-90° 起顺时针）+ 图例列（色点 + label + value）；value 钳非负（BarChart 同口径）。M5：variant=donut（默认，环形+中心总值）/pie（实心扇形，无中心文本）。 */
 @Composable
 private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v
+    // M5 官方对齐（2026-10-25）：variant=donut（默认）/pie（实心扇形，内半径 0）
+    val solidPie = (node.props["variant"] as? OpenUiValue.Str)?.v == "pie"
     val slices = (node.props["slices"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
         val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
         val label = (obj["label"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
@@ -951,7 +1179,7 @@ private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = 
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 设计规范 §3.2：donut 环形（弃实心饼）+ 中心总值（数据文本无文案，[I18N]）
+            // 设计规范 §3.2 + M5 variant：donut 环形 + 中心总值（数据文本无文案，[I18N]）；pie 实心扇形
             Box(
                 modifier = Modifier.size(PIE_CHART_SIZE),
                 contentAlignment = Alignment.Center,
@@ -959,33 +1187,51 @@ private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = 
                 val ringWidth = OpenUiCardTokens.pieRingWidth
                 Canvas(modifier = Modifier.matchParentSize()) {
                     var startAngle = -90f
-                    val stroke = Stroke(width = ringWidth.toPx())
-                    // 描边以弧形路径为中心向两侧各扩一半：内缩半描边，环外缘恰贴画布边界
-                    val inset = stroke.width / 2
-                    val arcTopLeft = Offset(inset, inset)
-                    val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
-                    slices.forEachIndexed { index, slice ->
-                        val sweep = (slice.value / total * 360.0).toFloat()
-                        if (sweep > 0f) {
-                            drawArc(
-                                color = palette[index % palette.size],
-                                startAngle = startAngle,
-                                sweepAngle = sweep,
-                                useCenter = false,
-                                topLeft = arcTopLeft,
-                                size = arcSize,
-                                style = stroke,
-                            )
+                    if (solidPie) {
+                        // pie：实心扇形（useCenter，内半径 0）
+                        slices.forEachIndexed { index, slice ->
+                            val sweep = (slice.value / total * 360.0).toFloat()
+                            if (sweep > 0f) {
+                                drawArc(
+                                    color = palette[index % palette.size],
+                                    startAngle = startAngle,
+                                    sweepAngle = sweep,
+                                    useCenter = true,
+                                )
+                            }
+                            startAngle += sweep
                         }
-                        startAngle += sweep
+                    } else {
+                        // donut：描边以弧形路径为中心向两侧各扩一半：内缩半描边，环外缘恰贴画布边界
+                        val stroke = Stroke(width = ringWidth.toPx())
+                        val inset = stroke.width / 2
+                        val arcTopLeft = Offset(inset, inset)
+                        val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
+                        slices.forEachIndexed { index, slice ->
+                            val sweep = (slice.value / total * 360.0).toFloat()
+                            if (sweep > 0f) {
+                                drawArc(
+                                    color = palette[index % palette.size],
+                                    startAngle = startAngle,
+                                    sweepAngle = sweep,
+                                    useCenter = false,
+                                    topLeft = arcTopLeft,
+                                    size = arcSize,
+                                    style = stroke,
+                                )
+                            }
+                            startAngle += sweep
+                        }
                     }
                 }
-                Text(
-                    text = openUiPrimitiveText(OpenUiValue.Num(total)) ?: "",
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip,
-                )
+                if (!solidPie) {
+                    Text(
+                        text = openUiPrimitiveText(OpenUiValue.Num(total)) ?: "",
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip,
+                    )
+                }
             }
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 slices.forEachIndexed { index, slice ->
@@ -1045,6 +1291,9 @@ private fun OpenUiLineChart(node: OpenUiValue.ComponentVal, modifier: Modifier =
         return
     }
     val palette = OpenUiCardTokens.chartPalette
+    // M5 官方对齐（2026-10-25）：variant=step 阶梯折线（水平→垂直两段）；
+    // natural≈linear 简化（spec §3.1 口径），缺省 linear 直线段
+    val stepVariant = (node.props["variant"] as? OpenUiValue.Str)?.v == "step"
     val allValues = series.flatMap { serie -> serie.values.filterNotNull() }
     val minValue = allValues.min()
     val maxValue = allValues.max()
@@ -1077,7 +1326,13 @@ private fun OpenUiLineChart(node: OpenUiValue.ComponentVal, modifier: Modifier =
                     } else {
                         val point = pointAt(index, value)
                         previous?.let { from ->
-                            drawLine(color = color, start = from, end = point, strokeWidth = 2.dp.toPx())
+                            if (stepVariant) {
+                                // step：水平到本槽 x → 垂直到本槽值
+                                drawLine(color = color, start = from, end = Offset(point.x, from.y), strokeWidth = 2.dp.toPx())
+                                drawLine(color = color, start = Offset(point.x, from.y), end = point, strokeWidth = 2.dp.toPx())
+                            } else {
+                                drawLine(color = color, start = from, end = point, strokeWidth = 2.dp.toPx())
+                            }
                         }
                         drawCircle(color = color, radius = pointRadius, center = point)
                         previous = point
@@ -1128,6 +1383,8 @@ private fun OpenUiCallout(node: OpenUiValue.ComponentVal, modifier: Modifier = M
         "SUCCESS" -> StatusColor.success
         "WARNING" -> StatusColor.warning
         "ERROR" -> StatusColor.error
+        // M5：NEUTRAL（官方五档对齐）→ 弱色，与 TextCallout(variant=neutral) 同口径
+        "NEUTRAL" -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> StatusColor.info
     }
     val iconName = when (tone) {

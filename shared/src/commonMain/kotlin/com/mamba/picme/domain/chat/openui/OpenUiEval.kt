@@ -685,6 +685,11 @@ internal class OpenUiRuntime(
                     value.v.all { element ->
                         element is OpenUiValue.ComponentVal || element is OpenUiValue.Null
                     }
+            // ListItem.action（2026-10-25 全量补全）：对象数组字段内的动作表达式，
+            // 与 ACTION 槽位同口径（裸动作或 ActionVal 数组）
+            OpenUiPropType.ACTION ->
+                value is OpenUiValue.ActionVal ||
+                    (value is OpenUiValue.Arr && value.v.all { element -> element is OpenUiValue.ActionVal })
             // LineChart.series[].values（M3）：对象数组字段内的原始值数组递归校验，
             // 与 PRIMITIVE_ARRAY 槽位同口径（Tabs COMPONENT_LIST 递归同机制）
             OpenUiPropType.PRIMITIVE_ARRAY ->

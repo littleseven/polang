@@ -37,6 +37,22 @@ class RenderOpenUiToolServiceTest {
     }
 
     @Test
+    fun `description pins full library expansion sections`() {
+        // 2026-10-25 官方全量补全（spec《openui-full-library-design》）：
+        // 表单 name 键控写入约定 / 元素形状组件不独立使用 / Image photo·src 二缺一
+        assertTrue(descriptor.description.contains("name 键控"))
+        assertTrue(descriptor.description.contains("@Set(${'$'}<name>, 值)"))
+        assertTrue(descriptor.description.contains("仅作父组件数组元素的对象形状，不独立使用"))
+        assertTrue(descriptor.description.contains("photo 与 src 二缺一必给"))
+        assertTrue(descriptor.description.contains("选项 value 内禁止逗号"))
+        // 新组件代表签名入描述（LLM 唯一可见的组件文档）
+        listOf("Stack(", "Form(", "RadarChart(", "SnippetCardBlock(", "EditableTable(")
+            .forEach { signature ->
+                assertTrue("描述缺 $signature", descriptor.description.contains(signature))
+            }
+    }
+
+    @Test
     fun `receipt for clean program is bare confirmation`() = runBlocking {
         val receipt = service.renderUiOpenUi("""root = Card([Text("ok")])""", "摘要")
         assertEquals("UI 已下发端侧渲染（OpenUI）", receipt)

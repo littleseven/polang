@@ -13,6 +13,7 @@
     <ID>ComplexCondition:GalleryScreen.kt$isSearchActive &amp;&amp; searchQuery.isNotBlank() &amp;&amp; searchEngine != null &amp;&amp; !isPersonFilter</ID>
     <ID>ComplexCondition:ImageUtils.kt$ImageUtils$bmp == null || bmp.isRecycled || bmp.width != width || bmp.height != height</ID>
     <ID>ComplexCondition:LlmModelDownloadManager.kt$LlmModelDownloadManager$name.isNotEmpty() &amp;&amp; path.isNotEmpty() &amp;&amp; !path.contains("/") &amp;&amp; type == "blob" &amp;&amp; !name.startsWith(".")</ID>
+    <ID>ComplexCondition:OpenUiChartRenderers.kt$point.z != null &amp;&amp; zMin != null &amp;&amp; zMax != null &amp;&amp; zMax &gt; zMin</ID>
     <ID>ComplexCondition:OpusMtTranslator.kt$OpusMtTranslator$dk != null &amp;&amp; dv != null &amp;&amp; ek != null &amp;&amp; ev != null</ID>
     <ID>ComplexCondition:RemoteCommandDispatcher.kt$RemoteCommandDispatcher$reply.contains("拍") &amp;&amp; (reply.contains("好") || reply.contains("成功") || reply.contains("完成"))</ID>
     <ID>ComplexCondition:RemoteControlToolService.kt$RemoteControlToolService$x &lt; 0 || x &gt;= size[0] || y &lt; 0 || y &gt;= size[1]</ID>
@@ -32,7 +33,7 @@
     <ID>CyclomaticComplexMethod:AccessibilityNodeDumper.kt$AccessibilityNodeDumper$private fun visitNode( node: AccessibilityNodeInfo, out: JSONObject, depth: Int, screenW: Int, screenH: Int )</ID>
     <ID>CyclomaticComplexMethod:AdaptiveFaceClusterer.kt$AdaptiveFaceClusterer$private fun buildKnnGraph( embeddings: List&lt;FloatArray&gt;, k: Int, minSimilarity: Float ): Array&lt;IntArray&gt;</ID>
     <ID>CyclomaticComplexMethod:AiChatScreen.kt$@Composable private fun VoiceInputMode( onSwitchToText: () -&gt; Unit, onVoiceResult: (String) -&gt; Unit, context: Context, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
-    <ID>CyclomaticComplexMethod:BrowserLiveCard.kt$@Composable fun BrowserFramePreviewOverlay( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onClose: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:BrowserLiveCard.kt$@Composable fun BrowserFramePreviewOverlay( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, /** WS 推流是否已连接：CDP screencast 只在页面重绘时推帧，静态页帧恒旧≠断流—— * 「重连中」必须结合 socket 状态判定（连接健康 + 帧过期才算真断流）。 */ streamConnected: Boolean, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onTakeControl: () -&gt; Unit, onReturnControl: () -&gt; Unit, onStopTask: () -&gt; Unit, onClose: () -&gt; Unit, )</ID>
     <ID>CyclomaticComplexMethod:CameraAgentCommandHandler.kt$CameraAgentCommandHandler$fun handleCommand(cmd: AiAgentCommand)</ID>
     <ID>CyclomaticComplexMethod:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null, /** 拍照处理结束回调（仅照片路径）：供头像拍摄会话在落库后设置封面 */ onPhotoCompleted: (Boolean) -&gt; Unit = {} )</ID>
     <ID>CyclomaticComplexMethod:CameraFrameAnalyzer.kt$@ExperimentalGetImage internal fun handleImageAnalysisFrameMediaPipe( imageProxy: ImageProxy, previewView: PreviewView, faceDetector: FaceDetector, lensFacing: Int, detectionEngineMode: EngineType, adaptiveFaceDetectionIntervalEnabled: Boolean = true, faceDetectIntervalProfile: FaceDetectIntervalProfile = FaceDetectIntervalProfile.BALANCED, showFaceDebugOverlay: Boolean = false, onFacePointChanged: (Offset) -&gt; Unit, onFaceWarpParamsChanged: (FaceWarpParams) -&gt; Unit, onShowFocusIndicatorChanged: (Boolean) -&gt; Unit, existingWarpParams: FaceWarpParams? = null, beautyEnabled: Boolean = false )</ID>
@@ -46,6 +47,7 @@
     <ID>CyclomaticComplexMethod:FaceClusterEngine.kt$FaceClusterEngine$suspend fun splitOvermergedClusters( intraMin: Float = ClusteringConfig.SPLIT_INTRA_MIN, crossMax: Float = ClusteringConfig.SPLIT_CROSS_MAX, minSize: Int = ClusteringConfig.SPLIT_MIN_CLUSTER_SIZE ): Int</ID>
     <ID>CyclomaticComplexMethod:FacePasteBack.kt$FacePasteBack$fun pasteBack( origPixels: IntArray, origW: Int, origH: Int, restoredPixels: IntArray, inverseMatrix: FloatArray, alphaMask: FloatArray ): IntArray</ID>
     <ID>CyclomaticComplexMethod:GalleryScreen.kt$@OptIn(FlowPreview::class) @Composable fun GalleryScreen( navController: NavController, viewModel: MediaViewModel, settingsViewModel: SettingsViewModel, onNavigateToCamera: () -&gt; Unit, onNavigateToSettings: () -&gt; Unit, onNavigateToModelCenter: () -&gt; Unit, onNavigateToDebug: () -&gt; Unit, /** 底 bar 页切换出口（整理/聊天/人物/回忆；相册为本页，选中项空操作；人物过滤态返回也复用） */ onSwitchMainPage: (Int) -&gt; Unit = {}, /** 外部搜索/人物过滤请求：(query, personId)，来自 Chat 搜索结果跳转或人物页跳转 */ searchRequest: Pair&lt;String, Long&gt;? = null, onSearchRequestConsumed: () -&gt; Unit = {}, /** 外部确定性视图过滤请求（扫描页 v3 统计区/阶段行跳转）：TAGGED/FACES/BEST */ viewFilterRequest: GalleryViewRequest? = null, onViewFilterRequestConsumed: () -&gt; Unit = {}, /** 上报是否允许外层主页面 Pager 横滑（详情/多选时禁用） */ onHorizontalSwipeEnabledChange: (Boolean) -&gt; Unit = {}, /** 是否为当前激活的主页面 page（非激活时禁用内部 BackHandler，避免跨页抢占系统返回键） */ isActivePage: Boolean = true, )</ID>
+    <ID>CyclomaticComplexMethod:HandleResolver.kt$HandleResolver$suspend fun resolve(surfaceId: String, messagesJson: String): A2uiResolution</ID>
     <ID>CyclomaticComplexMethod:IDPhotoScreen.kt$@Suppress("LongMethod") // 待重构：抽 IDPhoto 控制面板子组件 @Composable fun IDPhotoScreen( sourceUri: String, viewModel: IDPhotoViewModel, onNavigateBack: () -&gt; Unit, onSaved: () -&gt; Unit )</ID>
     <ID>CyclomaticComplexMethod:ImageProcessor.kt$private fun List&lt;Face&gt;.toFaceData(imageWidth: Int, imageHeight: Int): FaceData?</ID>
     <ID>CyclomaticComplexMethod:ImageUtils.kt$ImageUtils$@ExperimentalGetImage fun imageProxyToNv21(imageProxy: ImageProxy): ByteBuffer?</ID>
@@ -54,6 +56,9 @@
     <ID>CyclomaticComplexMethod:LlmModelDownloadManager.kt$LlmModelDownloadManager$fun resumeDownload(modelId: String, modelConfig: ModelConfig? = null): Flow&lt;DownloadProgress&gt;</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$@ExperimentalGetImage @Suppress("OPT_IN_USAGE_ERROR") @OptIn(ExperimentalMaterial3Api::class) override fun onCreate(savedInstanceState: Bundle?)</ID>
     <ID>CyclomaticComplexMethod:MediaSearchEngine.kt$MediaSearchEngine$suspend fun search( query: String, llmSearch: (suspend (String) -&gt; StructuredFilter?)? = null, enableSemanticSearch: Boolean = true, limitToIds: Set&lt;Long&gt;? = null ): SearchResult</ID>
+    <ID>CyclomaticComplexMethod:OpenUiChartRenderers.kt$@Composable private fun OpenUiScatterChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier)</ID>
+    <ID>CyclomaticComplexMethod:OpenUiFormRenderers.kt$@Composable private fun OpenUiEditableTable( node: OpenUiValue.ComponentVal, onAction: (OpenUiAction) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>CyclomaticComplexMethod:OpenUiNodeRenderer.kt$@Composable private fun OpenUiSeriesBarChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier)</ID>
     <ID>CyclomaticComplexMethod:OpusMtTranslator.kt$OpusMtTranslator$@Suppress("UNCHECKED_CAST") private fun translateInternal(input: String): String</ID>
     <ID>CyclomaticComplexMethod:PersonQueryResolver.kt$PersonQueryResolver$suspend fun resolve(query: String): ResolvedPersons</ID>
     <ID>CyclomaticComplexMethod:QueryGalleryMediaUseCase.kt$QueryGalleryMediaUseCase$suspend operator fun invoke(filter: QueryFilter): GalleryQueryResult</ID>
@@ -95,6 +100,7 @@
     <ID>InstanceOfCheckForException:PexelsViewModel.kt$PexelsViewModel$e is CancellationException</ID>
     <ID>InstanceOfCheckForException:SampleDataGenerator.kt$SampleDataGenerator$e is CancellationException</ID>
     <ID>InvalidPackageDeclaration:ToolSpecificationTest.kt$package com.mamba.picme.agent.core.inference.remote.tool</ID>
+    <ID>LargeClass:AppContainer.kt$AppContainerImpl : AppContainer</ID>
     <ID>LargeClass:DedupViewModelTest.kt$DedupViewModelTest</ID>
     <ID>LargeClass:FaceClusterEngine.kt$FaceClusterEngine</ID>
     <ID>LargeClass:GpuBeautyProcessor.kt$GpuBeautyProcessor : BeautyProcessor</ID>
@@ -106,13 +112,14 @@
     <ID>LargeClass:TagGenerationScheduler.kt$TagGenerationScheduler</ID>
     <ID>LargeClass:TagScanOrchestrator.kt$TagScanOrchestrator</ID>
     <ID>LargeClass:UserPreferencesRepository.kt$UserPreferencesRepository : UserSettingsRepository</ID>
+    <ID>LongMethod:A2uiComponentRenderSmokeTest.kt$A2uiComponentRenderSmokeTest$@Test fun allNineteenComponents_renderTogetherWithoutCrash()</ID>
     <ID>LongMethod:AdjustPanel.kt$@Composable fun AdjustPanel( adjustments: AdjustmentRecipe, onChange: (AdjustmentRecipe) -&gt; Unit )</ID>
     <ID>LongMethod:AiChatScreen.kt$@Composable private fun TextInputMode( text: String, onTextChange: (String) -&gt; Unit, isProcessing: Boolean, onSend: () -&gt; Unit, onSwitchToVoice: () -&gt; Unit, /** 语音入口是否可用（2026-08-19：语音模式 ≠ DISABLED 才为 true，默认关闭） */ voiceEnabled: Boolean, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
     <ID>LongMethod:AiChatScreen.kt$@Composable private fun VoiceInputMode( onSwitchToText: () -&gt; Unit, onVoiceResult: (String) -&gt; Unit, context: Context, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
     <ID>LongMethod:BackgroundScanGuardUi.kt$@Composable fun BackgroundScanGuardDialog( issues: List&lt;BackgroundScanGuard.Issue&gt;, onContinue: () -&gt; Unit, onDontRemind: () -&gt; Unit )</ID>
     <ID>LongMethod:BackupRestoreActivity.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun BackupRestoreScreen(onBack: () -&gt; Unit)</ID>
     <ID>LongMethod:BeautyPanel.kt$@Composable fun BeautyPanel( settings: BeautySettings, onSettingsChanged: (BeautySettings) -&gt; Unit, onDismiss: () -&gt; Unit, maxHeightRatio: Float = BeautyPanelTokens.heightRatio )</ID>
-    <ID>LongMethod:BrowserLiveCard.kt$@Composable fun BrowserFramePreviewOverlay( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onClose: () -&gt; Unit, )</ID>
+    <ID>LongMethod:BrowserLiveCard.kt$@Composable fun BrowserFramePreviewOverlay( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, /** WS 推流是否已连接：CDP screencast 只在页面重绘时推帧，静态页帧恒旧≠断流—— * 「重连中」必须结合 socket 状态判定（连接健康 + 帧过期才算真断流）。 */ streamConnected: Boolean, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onTakeControl: () -&gt; Unit, onReturnControl: () -&gt; Unit, onStopTask: () -&gt; Unit, onClose: () -&gt; Unit, )</ID>
     <ID>LongMethod:BrowserLiveCard.kt$@Composable fun BrowserLiveCard( part: MessagePart.BrowserLive, onOpenFullPreview: (String) -&gt; Unit, // 传 base64 帧 modifier: Modifier = Modifier, )</ID>
     <ID>LongMethod:CameraAgentCommandHandler.kt$CameraAgentCommandHandler$fun handleCommand(cmd: AiAgentCommand)</ID>
     <ID>LongMethod:CameraCaptureActions.kt$@SuppressLint("MissingPermission") internal fun handleCaptureClick( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null, /** 拍照处理结束回调（仅照片路径）：供头像拍摄会话在落库后设置封面 */ onPhotoCompleted: (Boolean) -&gt; Unit = {} )</ID>
@@ -136,6 +143,7 @@
     <ID>LongMethod:ChatScreen.kt$@Composable private fun ChatVoiceInputMode( onSwitchToText: () -&gt; Unit, onVoiceResult: (String) -&gt; Unit, asrEngine: AsrEngine, scope: CoroutineScope )</ID>
     <ID>LongMethod:ChatViewModel.kt$ChatViewModel$fun sendClaudeMessage(text: String, actionInFlightTaskId: String? = null, resumeSid: String? = null)</ID>
     <ID>LongMethod:ChatViewModel.kt$ChatViewModel$fun sendImageMessage(imageUri: Uri)</ID>
+    <ID>LongMethod:CloudAgentChatScreen.kt$@Composable private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: CloudAgentChatViewModel)</ID>
     <ID>LongMethod:ColorSelectors.kt$@Composable fun LipColorSelector( strength: Float, colorIndex: Int, onStrengthChanged: (Float) -&gt; Unit, onColorIndexChanged: (Int) -&gt; Unit, onReset: () -&gt; Unit )</ID>
     <ID>LongMethod:CommunicationChannelScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun CommunicationChannelScreen( viewModel: CommunicationChannelViewModel, isConnected: Boolean, isConfigured: Boolean, onNavigateBack: () -&gt; Unit )</ID>
     <ID>LongMethod:DedupHomeHub.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable private fun OrganizeCategoryCard( card: CategoryBoard, onClick: () -&gt; Unit, )</ID>
@@ -144,6 +152,7 @@
     <ID>LongMethod:DedupHomeScreen.kt$@Composable private fun DedupResultsContent( state: DedupUiState.Results, onSmartSelectAll: () -&gt; Unit, onSelectTab: (DedupLevel) -&gt; Unit, onOpenGroupDetail: (String) -&gt; Unit, )</ID>
     <ID>LongMethod:DedupHomeScreen.kt$@Composable private fun DedupScanningContent( state: DedupUiState.Scanning, onOpenGroupDetail: (String) -&gt; Unit, )</ID>
     <ID>LongMethod:DedupScanner.kt$DedupScanner$private suspend fun FlowCollector&lt;DedupScanEvent&gt;.runScan( items: List&lt;ScanItem&gt;, config: DedupScanConfig, )</ID>
+    <ID>LongMethod:EngineerTaskCard.kt$@Suppress("LongParameterList") @Composable private fun EngineerTaskActionZone( task: EngineerTaskState, actionsEnabled: Boolean, onStop: () -&gt; Unit, onContinue: () -&gt; Unit, onAbandon: () -&gt; Unit, onDeliver: () -&gt; Unit, onSkipDeliver: () -&gt; Unit, onRetry: () -&gt; Unit, )</ID>
     <ID>LongMethod:FaceClusterEngine.kt$FaceClusterEngine$suspend fun mergeSmallClusters( threshold: Float = ClusteringConfig.MERGE_SIMILARITY_THRESHOLD ): Int</ID>
     <ID>LongMethod:FilterPanel.kt$@Composable private fun FilterChip( item: FilterListItem, isSelected: Boolean, onClick: () -&gt; Unit, context: android.content.Context )</ID>
     <ID>LongMethod:FilterSelector.kt$@Composable private fun FilterItem( label: String, isSelected: Boolean, assetPath: String, itemWidth: Dp, onClick: () -&gt; Unit )</ID>
@@ -173,6 +182,15 @@
     <ID>LongMethod:MediaSearchEngine.kt$MediaSearchEngine$@Suppress("CyclomaticComplexMethod") private suspend fun executeFilter( filter: StructuredFilter, rawQuery: String = "", personOutcome: PersonSearchOutcome? = null ): List&lt;MediaAsset&gt;</ID>
     <ID>LongMethod:MemoryDetailScreen.kt$@Suppress("LongParameterList") @Composable fun MemoryDetailScreen( memory: Memory?, assetsByUri: Map&lt;String, MediaAsset&gt;, mediaViewModel: MediaViewModel, onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -&gt; Unit, onNavigateToIDPhoto: (uri: String) -&gt; Unit, onNavigateBack: () -&gt; Unit, )</ID>
     <ID>LongMethod:MemoryFactsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun MemoryFactsScreen( viewModel: MemoryFactsViewModel, onNavigateBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:OpenUiChartRenderers.kt$@Composable private fun OpenUiHorizontalBarChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier)</ID>
+    <ID>LongMethod:OpenUiChartRenderers.kt$@Composable private fun OpenUiScatterChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier)</ID>
+    <ID>LongMethod:OpenUiContentRenderers.kt$@Composable private fun OpenUiContentListBlock( node: OpenUiValue.ComponentVal, onAction: (OpenUiAction) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:OpenUiFormRenderers.kt$@Composable private fun OpenUiEditableTable( node: OpenUiValue.ComponentVal, onAction: (OpenUiAction) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:OpenUiNodeRenderer.kt$@Composable fun OpenUiNodeRenderer( node: OpenUiValue.ComponentVal, state: Map&lt;String, OpenUiValue&gt;, photoResolver: OpenUiPhotoResolver, onAction: (OpenUiAction) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:OpenUiNodeRenderer.kt$@Composable private fun OpenUiBarChart( node: OpenUiValue.ComponentVal, state: Map&lt;String, OpenUiValue&gt;, onAction: (OpenUiAction) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:OpenUiNodeRenderer.kt$@Composable private fun OpenUiLineChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier)</ID>
+    <ID>LongMethod:OpenUiNodeRenderer.kt$@Composable private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier)</ID>
+    <ID>LongMethod:OpenUiNodeRenderer.kt$@Composable private fun OpenUiSeriesBarChart(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier)</ID>
     <ID>LongMethod:OpusMtTranslator.kt$OpusMtTranslator$@Suppress("UNCHECKED_CAST") private fun translateInternal(input: String): String</ID>
     <ID>LongMethod:OrganizeCategoryScreen.kt$@Composable private fun OrganizeGridContent( state: OrganizeCategoryUiState.Ready, onToggle: (String) -&gt; Unit, )</ID>
     <ID>LongMethod:PersonScreen.kt$@Composable fun PersonScreen( viewModel: PersonViewModel, onNavigateToGallery: (Long) -&gt; Unit, /** 人物编辑页相机角标：登记 pending 头像拍摄后切到相机页（Pager 页 0） */ onNavigateToCamera: () -&gt; Unit = {}, /** 底 bar 页切换出口（相册/整理/聊天/回忆；人物为本页，选中项空操作） */ onSwitchMainPage: (Int) -&gt; Unit = {}, )</ID>
@@ -199,7 +217,7 @@
     <ID>LongMethod:WakeWordEngine.kt$WakeWordEngine$fun start(onTranscript: (String) -&gt; Unit)</ID>
     <ID>LongParameterList:AiChatScreen.kt$( messages: List&lt;AgentMessage&gt;, isProcessing: Boolean, onSendMessage: (String) -&gt; Unit, onCommand: (AiAgentCommand) -&gt; Unit, autoExecutePlans: Boolean, onDismiss: () -&gt; Unit, onPlanConfirm: () -&gt; Unit, onPlanCancel: () -&gt; Unit, modifier: Modifier = Modifier, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
     <ID>LongParameterList:AiChatScreen.kt$( visible: Boolean, messages: List&lt;AgentMessage&gt;, isProcessing: Boolean, onVisibleChange: (Boolean) -&gt; Unit, onSendMessage: (String) -&gt; Unit, onCommand: (AiAgentCommand) -&gt; Unit, modifier: Modifier = Modifier, consumedBottomInset: Dp = 0.dp, autoExecutePlans: Boolean = true, onPlanConfirm: () -&gt; Unit = {}, onPlanCancel: () -&gt; Unit = {}, voiceCoordinator: VoiceCommandCoordinator? = null )</ID>
-    <ID>LongParameterList:BrowserLiveCard.kt$( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onClose: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:BrowserLiveCard.kt$( frame: String, sessionId: String, frameWidth: Int, frameHeight: Int, sessionRunning: Boolean, currentUrl: String?, /** WS 推流是否已连接：CDP screencast 只在页面重绘时推帧，静态页帧恒旧≠断流—— * 「重连中」必须结合 socket 状态判定（连接健康 + 帧过期才算真断流）。 */ streamConnected: Boolean, onPausedChanged: (Boolean) -&gt; Unit, onAction: (String, JSONObject) -&gt; Unit, onTakeControl: () -&gt; Unit, onReturnControl: () -&gt; Unit, onStopTask: () -&gt; Unit, onClose: () -&gt; Unit, )</ID>
     <ID>LongParameterList:CameraCaptureActions.kt$( context: Context, captureMode: MediaType, isRecording: Boolean, recording: Recording?, videoCapture: VideoCapture&lt;Recorder&gt;, viewModel: MediaViewModel, imageCapture: ImageCapture?, imageProcessor: ImageProcessor, selectedFilter: FilterType, beautySettings: BeautySettings, lensFacing: Int, cachedFaces: List&lt;Face&gt; = emptyList(), beautyStrategy: BeautyStrategy = BeautyStrategy.BIG_BEAUTY, glPreviewProvider: BeautyPreviewEngine?, beautyVideoRecorder: BeautyVideoRecorder?, onRecordingChanged: (Recording?) -&gt; Unit, onIsRecordingChanged: (Boolean) -&gt; Unit, coroutineScope: CoroutineScope? = null, cameraStateManager: CameraStateManager? = null, /** 拍照处理结束回调（仅照片路径）：供头像拍摄会话在落库后设置封面 */ onPhotoCompleted: (Boolean) -&gt; Unit = {} )</ID>
     <ID>LongParameterList:CameraControlButtons.kt$( isBeautySelected: Boolean, isRatioSelected: Boolean, isGridSelected: Boolean, isFilterSelected: Boolean, isProSelected: Boolean, onToggleBeauty: () -&gt; Unit, onToggleRatio: () -&gt; Unit, onToggleGrid: () -&gt; Unit, onToggleFilter: () -&gt; Unit, onToggleProPanel: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>LongParameterList:CameraControls.kt$( lastMedia: MediaAsset?, zoomRatio: Float, minZoomRatio: Float, maxZoomRatio: Float, captureMode: MediaType, isRecording: Boolean, onZoomPresetClick: (Float) -&gt; Unit, onGalleryClick: () -&gt; Unit, onCaptureClick: () -&gt; Unit, onFlipCamera: () -&gt; Unit, onModeChange: (MediaType) -&gt; Unit, modifier: Modifier = Modifier )</ID>
@@ -242,6 +260,8 @@
     <ID>LoopWithTooManyJumpStatements:FacePasteBack.kt$FacePasteBack$for</ID>
     <ID>LoopWithTooManyJumpStatements:FaceRestoreSpike.kt$FaceRestoreSpike$for</ID>
     <ID>LoopWithTooManyJumpStatements:GpuBeautyProcessor.kt$GpuBeautyProcessor$for</ID>
+    <ID>LoopWithTooManyJumpStatements:HandleResolver.kt$HandleResolver$for</ID>
+    <ID>LoopWithTooManyJumpStatements:HandleResolver.kt$for</ID>
     <ID>LoopWithTooManyJumpStatements:KwakeWordKwsEngine.kt$KwakeWordKwsEngine$while</ID>
     <ID>LoopWithTooManyJumpStatements:LlmModelDownloadManager.kt$LlmModelDownloadManager$for</ID>
     <ID>LoopWithTooManyJumpStatements:MediaRepositoryImpl.kt$MediaRepositoryImpl$for</ID>
@@ -375,6 +395,8 @@
     <ID>MagicNumber:ChatViewModel.kt$ChatViewModel$50</ID>
     <ID>MagicNumber:ChineseQueryTranslator.kt$ChineseQueryTranslator$0.5f</ID>
     <ID>MagicNumber:ClaudeChatClient.kt$ClaudeChatClient$1024</ID>
+    <ID>MagicNumber:CloudAgentClient.kt$CloudAgentClient$1024</ID>
+    <ID>MagicNumber:CloudAgentClient.kt$CloudSseParser$120_000L</ID>
     <ID>MagicNumber:CodeFormerRestorer.kt$CodeFormerRestorer$0xFF</ID>
     <ID>MagicNumber:CodeFormerRestorer.kt$CodeFormerRestorer$127.5f</ID>
     <ID>MagicNumber:CoilConfig.kt$CoilConfig$0.35</ID>
@@ -631,6 +653,9 @@
     <ID>MatchingDeclarationName:OcrUseCase.kt$OcrProcessor</ID>
     <ID>MatchingDeclarationName:SettingsScreen.kt$SettingsCategory</ID>
     <ID>MatchingDeclarationName:SilentTrashGuidance.kt$SilentTrashGuidanceController : TrashGuidanceGate</ID>
+    <ID>MaxLineLength:A2uiBlueprintDebuggerTest.kt$A2uiBlueprintDebuggerTest$"""{"version":"v0.9","updateComponents":{"surfaceId":"sf-test1234","root":"root","components":[{"id":"root","component":"Column","children":["title"]},{"id":"title","component":"Text","text":"2026 年照片月度分布","variant":"h2"}]}},"""</ID>
+    <ID>MaxLineLength:A2uiComponentAvailabilityTest.kt$A2uiComponentAvailabilityTest$components = """{"id":"target","component":"ChoicePicker","options":[{"label":"Opt A","value":"a"},{"label":"Opt B","value":"b"}],"value":["a"],"variant":"mutuallyExclusive"}"""</ID>
+    <ID>MaxLineLength:A2uiComponentAvailabilityTest.kt$A2uiComponentAvailabilityTest$components = """{"id":"target","component":"Image","url":"https://example.com/pic.png","description":"pic","fit":"cover","variant":"smallFeature"}"""</ID>
     <ID>MaxLineLength:AiAgentUseCaseParseTest.kt$AiAgentUseCaseParseTest$appendLine("1. 调整美颜: {\"action\":\"adjust_beauty\",\"smoothing\":0-100,\"whitening\":0-100,\"slim_face\":-50~50,\"big_eyes\":0-100,\"lip_color\":0-100,\"blush\":0-100}")</ID>
     <ID>MaxLineLength:AiChatScreen.kt$Logger.d(TAG, "Finger DOWN detected -&gt; voiceCoordinator=${voiceCoordinator != null}, isVoiceAvailable=$isVoiceAvailable")</ID>
     <ID>MaxLineLength:AppDatabase.kt$AppDatabase.Companion.&lt;no name provided&gt;$"CREATE UNIQUE INDEX IF NOT EXISTS `index_person_relations_subjectPersonId_predicate_objectPersonId` ON `person_relations` (`subjectPersonId`, `predicate`, `objectPersonId`)"</ID>
@@ -641,6 +666,13 @@
     <ID>MaxLineLength:CameraPreviewContent.kt$val perfCompact = "FPS ${"%.1f".format(uiState.beautyDebugState.fps)} | ${uiState.beautyDebugState.processingMs}ms/${uiState.beautyDebugState.delayMs}ms | D${uiState.beautyDebugState.nullFrames}"</ID>
     <ID>MaxLineLength:ChatViewModel.kt$ChatViewModel$Logger.w(TAG, "Capability dispatch failed in chat, falling back to full response. error=${actionValue.message}, detail=${actionValue.detail}")</ID>
     <ID>MaxLineLength:ChatViewModel.kt$ChatViewModel$override</ID>
+    <ID>MaxLineLength:CloudAgentChatViewModelTest.kt$CloudAgentChatViewModelTest$JSONObject("""{"id":2,"type":"html_card","source":"environment","role":"tool","payload":{"type":"html_card","html":"&lt;p&gt;hello&lt;/p&gt;","summary":"一张问候卡"}}""")</ID>
+    <ID>MaxLineLength:CloudAgentChatViewModelTest.kt$CloudAgentChatViewModelTest$configsFlow.value = """[{"modelId":"kimi-k2.6","providerId":"kimi-official","protocol":"OPENAI","apiKey":"sk-xyz","baseUrl":"https://api.moonshot.cn/v1/","gatewayToken":""}]"""</ID>
+    <ID>MaxLineLength:CloudAgentClientTest.kt$CloudAgentClientTest$val</ID>
+    <ID>MaxLineLength:CloudAgentClientTest.kt$CloudAgentClientTest$val tr = CloudSseParser.parseBlock("""data: {"kind":"tool_request","request_id":"tr_ab12","tool":"search_media","args":{"query":"猫"},"timeout_ms":120000}""")</ID>
+    <ID>MaxLineLength:CloudAgentTurnRunnerTest.kt$CloudAgentTurnRunnerTest$"""{"id":2,"type":"action","source":"agent","role":"assistant","payload":{"tool":"render_ui","argsJson":"{\"surfaceId\":\"sf-1\",\"messagesJson\":\"[{}]\",\"fallbackSummary\":\"327 张\"}"}}"""</ID>
+    <ID>MaxLineLength:CloudAgentTurnRunnerTest.kt$CloudAgentTurnRunnerTest$JSONObject("""{"id":2,"type":"html_card","source":"environment","role":"tool","payload":{"type":"html_card","html":"&lt;p&gt;hello&lt;/p&gt;","summary":"一张问候卡"}}""")</ID>
+    <ID>MaxLineLength:DesignTokens.kt$A2uiCardTokens$/** A2UI 数据卡（data_ui BarChart + 降级卡 + debug 蓝图查看器）。barAreaHeight=柱状图绘图区高（含标签行）; barGap=柱间距; barLabelHeight=柱下月份标签预留高（满高柱须预留防裁剪）; barUnselectedAlpha=未选中柱透明度; debugBadgeRadius=debug 徽标圆角; debugMaxHeight=蓝图查看器最大高。 */</ID>
     <ID>MaxLineLength:DesignTokens.kt$CameraTokens$/** 相机强制深色 overlay 专属（2026-08-18 按 Ardot 画布 specs/screens/refs/ardot/camera-*.png 高精度还原）。focusRing 复用 color.focusRing。cameraAccent=固定能量绿 #2FE385（主题无关单值；2026-09-13 v2.2.3 起，原深青玉 #0F766E 退役为主 accent，2026-09-20 以 tealAccent 名义随画布回流，仍用于个别工具 chip/辅助点缀）。 2026-09-22 v3.0 cameraAccent 换微信绿 #07C160。 */</ID>
     <ID>MaxLineLength:DesignTokens.kt$ChatBubbleTokens$/** 聊天气泡（2026-08-18 豆包范式，同日二修去头像）：AI 消息=无气泡+通栏纯文本；用户气泡=品牌实色 userBubbleBg；品牌渐变 brandGradientStart→End（发送钮/空态 Logo 与标题）；输入卡 r28+描边。userBubbleOn/tryChipHeight/inputBottomPadding/messageGap 2026-08-19 绑定清扫候选入库。 2026-09-22 v3.0 用户气泡换微信绿 #95EC69+深字（暗色变体待 B2 定）。 2026-09-22 v3.0.1 形态对齐：气泡 12+尾4、输入 8、弹层 12（spec §1）。 */</ID>
     <ID>MaxLineLength:DesignTokens.kt$EditorTokens$/** 图片编辑器组件几何（结构 token）。内容色板（markup 7 色/lip 12 色/blush 3 色）见 DESIGN_TOKENS_SPEC.md palette 附录，属产品内容数据不入 token。2026-08-19 editor.yaml §18 redesign_a 提案入库：canvasDark/gachaBarBg/overlayAlpha 三档（glassOverlay white@0.06/0.08 拆分）/toolRailItemSize/paramTileSize。canvasPureBlack/toolLabelSize/paramLabelSize/ratioChipSize/topBarButtonSize/unselectedLabelColor 2026-08-19 绑定清扫候选入库。 */</ID>
@@ -669,6 +701,7 @@
     <ID>MaxLineLength:SemanticSearchEngine.kt$SemanticSearchEngine$Log.w(TAG, "Semantic recall empty: query='$query' -&gt; candidates=${queryCandidates}, imageCandidates=${candidates.size}, stats=[$scoreStats], nan=$nanCount, zeroNorm=$zeroNormCount")</ID>
     <ID>MaxLineLength:SentencePieceTestViewModel.kt$SentencePieceTestViewModel$log("模型文件已确认: source=${sourceFile.absolutePath} (${sourceFile.length()} bytes), target=${targetFile.absolutePath} (${targetFile.length()} bytes)")</ID>
     <ID>MaxLineLength:WakeWordEngine.kt$WakeWordEngine$Logger.i(tag, "Triggering ASR (stability: $consecutiveSpeechFrames frames, confidence: ${(consecutiveSpeechFrames * 100 / VAD_STABILITY_FRAMES)}%)")</ID>
+    <ID>MayBeConst:DesignTokens.kt$A2uiCardTokens$val barUnselectedAlpha = 0.45f</ID>
     <ID>MayBeConst:DesignTokens.kt$AppMotion$val blinkMs = 500</ID>
     <ID>MayBeConst:DesignTokens.kt$AppMotion$val fastMs = 150</ID>
     <ID>MayBeConst:DesignTokens.kt$AppMotion$val galleryPreviewFadeMs = 300</ID>
@@ -734,6 +767,8 @@
     <ID>NewLineAtEndOfFile:PipelineModels.kt$com.mamba.picme.domain.tag.PipelineModels.kt</ID>
     <ID>OptionalUnit:CameraScreen.kt$val nextMode = if (voiceCommandMode == VoiceCommandMode.DISABLED) { VoiceCommandMode.WAKE_WORD } else { VoiceCommandMode.DISABLED } coroutineScope.launch { userPreferencesRepository.updateVoiceCommandMode(nextMode) Logger.i(TAG, "Voice control toggled to: $nextMode") } if (nextMode == VoiceCommandMode.DISABLED &amp;&amp; !aiAgentChatVisible) { asrEngine.release() Logger.i(TAG, "Voice feature closed, release ASR") } Unit</ID>
     <ID>OptionalUnit:ClaudeChatClient.kt$ClaudeChatClient$val body = JSONObject() .put("requestId", requestId) .put("payload", payload) .toString() val req = Request.Builder() .url("$baseUrl/v1/claude-tool-result") .header("X-App-Token", token) .post(body.toRequestBody(jsonMedia)) .build() val resp = deliverClient.newCall(req).execute() // use：无论成败都 close，让连接归还连接池（错误路径 body.string() 本身会关闭） resp.use { if (!it.isSuccessful) { throw RuntimeException("HTTP ${it.code}: ${it.body?.string().orEmpty()}") } } Unit</ID>
+    <ID>OptionalUnit:CloudAgentClient.kt$CloudAgentClient$post("$baseUrl/agent/sessions/$sessionId/finish", token, "{}") Unit</ID>
+    <ID>OptionalUnit:CloudAgentClient.kt$CloudAgentClient$val body = JSONObject() .put("request_id", requestId) .put("ok", ok) .put("result", result) .toString() post("$baseUrl/agent/sessions/$sessionId/tool-results", token, body) Unit</ID>
     <ID>ReturnCount:CameraFrameAnalyzer.kt$FaceDetectionFrameCounter$fun shouldDetect(currentFaceCenter: Offset? = null): Boolean</ID>
     <ID>ReturnCount:CategoryArbiter.kt$CategoryArbiter$fun classify(item: OrganizeItem): OrganizeCategory?</ID>
     <ID>ReturnCount:ChineseQueryTranslator.kt$ChineseQueryTranslator$private fun isTranslationValid(input: String, output: String): Boolean</ID>
@@ -756,6 +791,7 @@
     <ID>SwallowedException:TagIndexUpdater.kt$TagIndexUpdater$e: Exception</ID>
     <ID>SwallowedException:TagScanOrchestrator.kt$TagScanOrchestrator$e: Exception</ID>
     <ID>ThrowsCount:BrowserSessionClient.kt$BrowserSessionClient$private suspend fun execute(request: Request): String</ID>
+    <ID>TooGenericExceptionCaught:A2uiBlueprintDebugger.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AestheticScoreWorker.kt$AestheticScoreWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AiOptimizeCapability.kt$AiOptimizeCapability$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AppUpdateController.kt$AppUpdateController$e: Exception</ID>
@@ -774,8 +810,12 @@
     <ID>TooGenericExceptionCaught:ChatViewModel.kt$ChatViewModel$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ChineseQueryTranslator.kt$ChineseQueryTranslator$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ClaudeChatClient.kt$ClaudeChatClient$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:CloudAgentChatViewModel.kt$CloudAgentChatViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CloudAgentClient.kt$CloudAgentClient$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:CloudAgentGalleryTools.kt$CloudAgentGalleryTools$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CodeFormerRestorer.kt$CodeFormerRestorer$e: Exception</ID>
     <ID>TooGenericExceptionCaught:DedupScanner.kt$DedupScanner$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DeviceToolExecutor.kt$DeviceToolExecutor$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:EdiffiqaScorer.kt$EdiffiqaScorer$e: Exception</ID>
     <ID>TooGenericExceptionCaught:FaceClusterEngine.kt$FaceClusterEngine$e: Exception</ID>
     <ID>TooGenericExceptionCaught:FeishuChannelHandler.kt$FeishuChannelHandler$e: Exception</ID>
@@ -840,11 +880,19 @@
     <ID>TooGenericExceptionThrown:ClaudeChatClient.kt$ClaudeChatClient$throw RuntimeException("HTTP ${resp.code}: $text")</ID>
     <ID>TooGenericExceptionThrown:ClaudeChatClient.kt$ClaudeChatClient$throw RuntimeException("HTTP ${resp.code}: ${resp.body?.string().orEmpty()}")</ID>
     <ID>TooGenericExceptionThrown:ClaudeChatClient.kt$ClaudeChatClient$throw RuntimeException("empty body")</ID>
+    <ID>TooGenericExceptionThrown:CloudAgentChatViewModelTest.kt$CloudAgentChatViewModelTest$throw RuntimeException("""HTTP 409: {"error":"round_in_flight","message":"previous round still running","retry_after":"15"}""")</ID>
+    <ID>TooGenericExceptionThrown:CloudAgentClient.kt$CloudAgentClient$throw RuntimeException("HTTP ${resp.code}: $t")</ID>
+    <ID>TooGenericExceptionThrown:CloudAgentClient.kt$CloudAgentClient$throw RuntimeException("HTTP ${resp.code}: $text")</ID>
+    <ID>TooGenericExceptionThrown:CloudAgentClient.kt$CloudAgentClient$throw RuntimeException("HTTP ${resp.code}: ${resp.body?.string().orEmpty()}")</ID>
+    <ID>TooGenericExceptionThrown:CloudAgentClient.kt$CloudAgentClient$throw RuntimeException("empty body")</ID>
     <ID>TooManyFunctions:AccessibilityActionPerformer.kt$AccessibilityActionPerformer</ID>
     <ID>TooManyFunctions:AiChatScreen.kt$com.mamba.picme.features.common.chat.AiChatScreen.kt</ID>
+    <ID>TooManyFunctions:AndroidA2uiJsonReader.kt$AndroidA2uiJsonReader : A2uiJsonReader</ID>
+    <ID>TooManyFunctions:AppContainer.kt$AppContainerImpl : AppContainer</ID>
     <ID>TooManyFunctions:AppDatabase.kt$AppDatabase : RoomDatabase</ID>
     <ID>TooManyFunctions:CameraDebugOverlay.kt$com.mamba.picme.features.camera.CameraDebugOverlay.kt</ID>
     <ID>TooManyFunctions:CameraThreadRegistry.kt$CameraThreadRegistry</ID>
+    <ID>TooManyFunctions:ChatGallerySearch.kt$ChatGallerySearch</ID>
     <ID>TooManyFunctions:DedupViewModel.kt$DedupViewModel : ViewModel</ID>
     <ID>TooManyFunctions:FloatingChatBubbleService.kt$FloatingChatBubbleService : Service</ID>
     <ID>TooManyFunctions:GalleryJs.kt$com.mamba.picme.features.chat.js.GalleryJs.kt</ID>
@@ -857,6 +905,9 @@
     <ID>TooManyFunctions:MediaRepositoryImpl.kt$MediaRepositoryImpl : AndroidMediaRepository</ID>
     <ID>TooManyFunctions:MediaViewModel.kt$MediaViewModel : ViewModel</ID>
     <ID>TooManyFunctions:ModelPathConfig.kt$ModelPathConfig</ID>
+    <ID>TooManyFunctions:OpenUiContentRenderers.kt$com.mamba.picme.features.chat.openui.OpenUiContentRenderers.kt</ID>
+    <ID>TooManyFunctions:OpenUiFormRenderers.kt$com.mamba.picme.features.chat.openui.OpenUiFormRenderers.kt</ID>
+    <ID>TooManyFunctions:OpenUiNodeRenderer.kt$com.mamba.picme.features.chat.openui.OpenUiNodeRenderer.kt</ID>
     <ID>TooManyFunctions:PersonDao.kt$PersonDao</ID>
     <ID>TooManyFunctions:PersonRelationDao.kt$PersonRelationDao</ID>
     <ID>TooManyFunctions:PersonRepository.kt$PersonRepository</ID>
@@ -879,6 +930,7 @@
     <ID>TrailingWhitespace:BeautyCapability.kt$com.mamba.picme.capability.BeautyCapability.kt</ID>
     <ID>TrailingWhitespace:LlmModelDownloadManager.kt$com.mamba.picme.data.download.LlmModelDownloadManager.kt</ID>
     <ID>UnconditionalJumpStatementInLoop:FaceClusterEngine.kt$FaceClusterEngine$for (person in persons) { val entities = personDao.getEmbeddingsByPerson(person.personId) if (entities.size &lt; minSize) continue val feats = entities.map { entity -&gt; byteArrayToFloatArray(entity.embedding) } val (halfA, halfB) = twoWayPartition(feats) if (halfA.size &lt; 2 || halfB.size &lt; 2) continue val intraA = meanPairwiseSim(feats, halfA) val intraB = meanPairwiseSim(feats, halfB) val cross = meanCrossSim(feats, halfA, halfB) if (intraA &lt; intraMin || intraB &lt; intraMin || cross &gt; crossMax) continue // 较小的一半 spin off 为新 person，较大的一半留在原 person val (keepIdx, spinIdx) = if (halfA.size &gt;= halfB.size) halfA to halfB else halfB to halfA val spinMediaIds = spinIdx.map { idx -&gt; entities[idx].mediaId }.distinct() val newPersonId = personDao.insertPerson( PersonEntity(faceCount = spinIdx.size, coverMediaId = spinMediaIds.firstOrNull()) ) for (idx in spinIdx) { personDao.assignEmbedding(entities[idx].embeddingId, newPersonId) } if (spinMediaIds.isNotEmpty()) { personDao.setMediaFaceIds(spinMediaIds, newPersonId.toString()) } val keepMediaIds = keepIdx.map { idx -&gt; entities[idx].mediaId }.distinct() personDao.updatePersonStats( person.personId, faceCount = keepIdx.size, coverMediaId = keepMediaIds.firstOrNull() ?: person.coverMediaId ) centroidCache.remove(person.personId) totalSplits++ didSplit = true Log.i( TAG, "splitOvermergedClusters: ${person.personId} -&gt; keep ${keepIdx.size} + new $newPersonId ${spinIdx.size} " + "(intraA=${"%.2f".format(intraA)} intraB=${"%.2f".format(intraB)} cross=${"%.2f".format(cross)})" ) break // 拆分后 personId 变化，重新拉 persons }</ID>
+    <ID>UnusedImports:A2uiBlueprintDebugger.kt$import kotlinx.serialization.json.jsonObject</ID>
     <ID>UnusedImports:AppContainer.kt$import com.mamba.picme.agent.core.facade.AgentOrchestrator</ID>
     <ID>UnusedImports:AppContainer.kt$import com.mamba.picme.data.indexing.IndexingTaskQueue</ID>
     <ID>UnusedImports:AppTopBar.kt$import androidx.compose.ui.unit.dp</ID>
@@ -896,7 +948,6 @@
     <ID>UnusedImports:ChatViewModel.kt$import com.mamba.picme.agent.core.runtime.execution.InferenceResult</ID>
     <ID>UnusedImports:ChatViewModel.kt$import com.mamba.picme.data.local.ChatMessageDao</ID>
     <ID>UnusedImports:ChatViewModel.kt$import com.mamba.picme.domain.repository.UserSettingsRepository</ID>
-    <ID>UnusedImports:ChatViewModel.kt$import kotlinx.coroutines.delay</ID>
     <ID>UnusedImports:ChatViewModelClaudeSidTest.kt$import io.mockk.every</ID>
     <ID>UnusedImports:FloatingBottomTab.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:FloatingChatBubbleService.kt$import androidx.compose.foundation.clickable</ID>
@@ -949,7 +1000,6 @@
     <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material.icons.automirrored.rounded.Label</ID>
     <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material.icons.rounded.CheckCircle</ID>
     <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material3.HorizontalDivider</ID>
-    <ID>UnusedImports:SettingsScreen.kt$import androidx.compose.material3.RadioButton</ID>
     <ID>UnusedImports:SettingsVoice.kt$import androidx.compose.foundation.layout.Arrangement</ID>
     <ID>UnusedImports:SystemCapability.kt$import android.content.pm.ApplicationInfo</ID>
     <ID>UnusedImports:TagGenerationControlScreen.kt$import androidx.annotation.StringRes</ID>
@@ -985,6 +1035,9 @@
     <ID>UnusedParameter:LlmCallLogScreen.kt$onBack: () -&gt; Unit</ID>
     <ID>UnusedParameter:MediaPager.kt$onAiOptimize: (MediaAsset) -&gt; Unit</ID>
     <ID>UnusedParameter:MediaSearchEngineFeedbackTest.kt$MediaSearchEngineFeedbackTest$mediaId: String</ID>
+    <ID>UnusedParameter:OpenUiChartRenderers.kt$onAction: (OpenUiAction) -&gt; Unit</ID>
+    <ID>UnusedParameter:OpenUiChartRenderers.kt$photoResolver: OpenUiPhotoResolver</ID>
+    <ID>UnusedParameter:OpenUiChartRenderers.kt$state: Map&lt;String, OpenUiValue&gt;</ID>
     <ID>UnusedParameter:SampleDataGenerator.kt$SampleDataGenerator$bitmap: Bitmap</ID>
     <ID>UnusedParameter:SearchRanker.kt$SearchRanker$filter: StructuredFilter</ID>
     <ID>UnusedParameter:SettingsScreen.kt$onNavigateToTagViewer: () -&gt; Unit = {}</ID>
@@ -1010,6 +1063,7 @@
     <ID>UnusedPrivateMember:LlmModelDownloadManager.kt$LlmModelDownloadManager$private fun saveCachedMarketData(data: ModelMarketData)</ID>
     <ID>UnusedPrivateMember:LlmModelDownloadManager.kt$LlmModelDownloadManager$private suspend fun fetchFileInfos(sources: Map&lt;String, String&gt;): List&lt;ModelFileInfo&gt;</ID>
     <ID>UnusedPrivateMember:MemoryFactsScreen.kt$@Composable private fun PersonRelationRow( relation: RelationDisplayItem, onEdit: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
+    <ID>UnusedPrivateMember:OpenUiContentRenderers.kt$@Composable private fun OpenUiContentImagePlaceholder(modifier: Modifier = Modifier)</ID>
     <ID>UnusedPrivateMember:TagGenerationControlScreen.kt$@Composable private fun SectionHeader(title: String, hint: String? = null)</ID>
     <ID>UnusedPrivateMember:TagGenerationScheduler.kt$TagGenerationScheduler$private fun unloadLlm()</ID>
     <ID>UnusedPrivateMember:TagNormalizer.kt$TagNormalizer$private fun bestMatchAcrossCategories(input: String): String</ID>
@@ -1051,6 +1105,7 @@
     <ID>UseCheckOrError:CameraThreadRegistry.kt$CameraThreadRegistry$throw IllegalStateException("AnalysisHandlerThread handler is null")</ID>
     <ID>UseCheckOrError:CameraThreadRegistry.kt$CameraThreadRegistry$throw IllegalStateException("CameraHandlerThread handler is null")</ID>
     <ID>UseCheckOrError:CameraThreadRegistry.kt$CameraThreadRegistry$throw IllegalStateException("CameraThreadRegistry not initialized. Call initialize() first.")</ID>
+    <ID>UseCheckOrError:CloudAgentGalleryToolsTest.kt$CloudAgentGalleryToolsTest.&lt;no name provided&gt;$throw IllegalStateException("disk full")</ID>
     <ID>UseCheckOrError:ImageProcessor.kt$ImageProcessorImpl$throw IllegalStateException("PhotoProcessor is null, GPU photo processing not available")</ID>
     <ID>UseCheckOrError:RemoteControlToolService.kt$RemoteControlToolService$throw IllegalStateException("UI thread operation timed out after ${timeoutMs}ms")</ID>
     <ID>UseCheckOrError:SentencePieceTestViewModel.kt$SentencePieceTestViewModel$throw IllegalStateException("Source model not found: $sourceModelPath")</ID>
@@ -1064,6 +1119,7 @@
     <ID>UseIfInsteadOfWhen:CameraUseCasesBinder.kt$when { useCaseGroup != null -&gt; { cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, useCaseGroup) } else -&gt; { when (captureMode) { MediaType.PHOTO, MediaType.DOCUMENT -&gt; { cameraProvider.bindToLifecycle( lifecycleOwner, cameraSelector, preview!!, imageCapture, imageAnalysis ) } MediaType.VIDEO -&gt; { cameraProvider.bindToLifecycle( lifecycleOwner, cameraSelector, preview!!, videoCapture, imageAnalysis ) } } } }</ID>
     <ID>UseIfInsteadOfWhen:FaceClusterEngine.kt$FaceClusterEngine$when { (counts[bestA] ?: 0) &lt;= smallSize &amp;&amp; (counts[bestB] ?: 0) &lt;= smallSize -&gt; min(threshold, smallThreshold) else -&gt; threshold }</ID>
     <ID>UseIfInsteadOfWhen:FloatingChatBubbleService.kt$FloatingChatBubbleService$when (action) { ACTION_STOP -&gt; { stopSelf() return START_NOT_STICKY } else -&gt; { startForeground(NOTIFICATION_ID, buildNotification()) if (!isPanelExpanded) showBubble() } }</ID>
+    <ID>UseIfInsteadOfWhen:HandleResolver.kt$HandleResolver$when (parsed.domain) { A2uiCardContract.DOMAIN_SCAN -&gt; { val entries = runCatching { json.decodeFromString&lt;List&lt;ScanPhotoEntry&gt;&gt;(payload) }.getOrElse { return A2uiResolution.Degraded("payload_malformed") } GalleryHistogramBuilder.buildMonthly(entries, timeZone).toPlainList() } else -&gt; return A2uiResolution.Degraded("domain_unknown") }</ID>
     <ID>UseIfInsteadOfWhen:LlmCallLogScreen.kt$when { anchor != null -&gt; LlmTurnDetailPager( anchor = anchor, vm = vm, onBack = { detailAnchor = null }, modifier = Modifier.fillMaxSize().padding(padding) ) else -&gt; { Column(modifier = Modifier.fillMaxSize().padding(padding)) { TabRow(selectedTabIndex = selectedTab.ordinal) { Tab( selected = selectedTab == LogTab.LLM, onClick = { selectedTab = LogTab.LLM }, text = { Text(stringResource(R.string.llm_call_log_tab_llm)) } ) Tab( selected = selectedTab == LogTab.TOOL, onClick = { selectedTab = LogTab.TOOL }, text = { Text(stringResource(R.string.llm_call_log_tab_tool)) } ) Tab( selected = selectedTab == LogTab.JS, onClick = { selectedTab = LogTab.JS }, text = { Text(stringResource(R.string.llm_call_log_tab_js)) } ) } val isEmpty = when (selectedTab) { LogTab.LLM -&gt; items.isEmpty() LogTab.TOOL -&gt; toolItems.isEmpty() LogTab.JS -&gt; jsRunItems.isEmpty() } if (isEmpty) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text( text = stringResource(R.string.llm_call_log_empty), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant ) } } else { LazyColumn( modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp) ) { when (selectedTab) { LogTab.LLM -&gt; items(items, key = { it.id }) { row -&gt; LlmCallLogRow(row = row) { detailAnchor = TurnRecordItem.Llm(it) } } LogTab.TOOL -&gt; items(toolItems, key = { it.id }) { row -&gt; ToolCallLogRow(row = row) { detailAnchor = TurnRecordItem.Tool(it) } } LogTab.JS -&gt; items(jsRunItems, key = { it.id }) { row -&gt; JsRunLogRow(row = row) { detailAnchor = TurnRecordItem.Js(it) } } } } } } } }</ID>
     <ID>UseIfInsteadOfWhen:MainActivity.kt$MainActivity$when (destination) { NavigationCapability.Destination.GALLERY -&gt; switchMainPage(MAIN_PAGE_GALLERY) else -&gt; Unit }</ID>
     <ID>UseIfInsteadOfWhen:MediaRepositoryImpl.kt$MediaRepositoryImpl$when (mediaType) { MediaType.VIDEO -&gt; 2L else -&gt; 1L }</ID>
@@ -1080,6 +1136,7 @@
     <ID>UseIfInsteadOfWhen:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$when (view) { is TextView -&gt; view.text?.toString()?.trim() else -&gt; view.contentDescription?.toString()?.trim() }</ID>
     <ID>UseIfInsteadOfWhen:ViewHierarchyExtractor.kt$ViewHierarchyExtractor$when (view) { is TextView -&gt; { val text = view.text?.toString()?.trim() if (!text.isNullOrEmpty()) { out.put("text", if (text.length &gt; MAX_TEXT_LENGTH) text.take(MAX_TEXT_LENGTH) + "…" else text) } if (view.contentDescription?.isNotEmpty() == true) { out.put("content_desc", view.contentDescription) } } else -&gt; { if (view.contentDescription?.isNotEmpty() == true) { out.put("content_desc", view.contentDescription) } } }</ID>
     <ID>UseRequire:FaceClusterEngine.kt$FaceClusterEngine$throw IllegalArgumentException("Invalid crop region: x=$cropX, y=$cropY, w=$cropW, h=$cropH")</ID>
+    <ID>VariableNaming:CloudAgentGalleryTools.kt$CloudAgentGalleryTools$/** display=true 且图集卡实际透出时的回执尾注（search/refine 共用，见 searchMedia 内注释）。 */ private val CARD_SHOWN_NOTE = "，横滑图集卡已在聊天中展示（用户可直接翻看；回复时告知照片已在上方卡片展示即可，无需再搜索/细化/发卡）"</ID>
     <ID>VariableNaming:RemoteCommandDispatcher.kt$RemoteCommandDispatcher$/** ReAct 循环超时（毫秒）— 多轮交互需要更长 timeout */ private val TIMEOUT_MS = 120_000L</ID>
     <ID>WildcardImport:AiAgentUseCaseParseTest.kt$import org.junit.Assert.*</ID>
     <ID>WildcardImport:BeautySettingsTest.kt$import org.junit.Assert.*</ID>

@@ -1,0 +1,1182 @@
+package com.mamba.picme.features.chat.openui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowColumn
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
+import com.mamba.picme.core.designsystem.AppShapes
+import com.mamba.picme.core.designsystem.BadgeTokens
+import com.mamba.picme.core.designsystem.IconSize
+import com.mamba.picme.core.designsystem.Spacing
+import com.mamba.picme.core.designsystem.StatusColor
+import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
+import com.mamba.picme.domain.chat.openui.OpenUiAction
+import com.mamba.picme.domain.chat.openui.OpenUiValue
+import com.mamba.picme.features.common.chat.AgentMarkdown
+
+/**
+ * OpenUI 官方组件库全量补全·内容/布局批次（M4a，2026-10-25，spec《openui-full-library-design》§3.1/§3.2）。
+ *
+ * 24 项 = 别名 3（Stack/Separator/MarkDownRenderer 渲染复用既有语义）+ 内容/布局 21
+ * （CardHeader/InlineHeader/TextContent/TextCallout/CodeBlock/ImageBlock/ImageGallery/Tag/
+ * TagBlock/Label/BoldText/IconText/ImageText/ImageTextLarge/EntityList/ListBlock/Steps/
+ * Carousel/Buttons/IconButton/Modal）。样式 token 收口 [OpenUiCardTokens]（M4 口径）；
+ * BINDABLE_* prop 从 state 快照解析（Binding 缺失/解析不出丢组件或只读展示，与 Text/
+ * CheckBox 既有口径一致）；交互回写经 @Set(绑定变量, 值)；https 网络图 coil 渲染、非
+ * https/加载中落 surfaceVariant 同形占位（半信任防御，不炸整卡）。dispatch 接线在
+ * [OpenUiNodeRenderer] 统一收口，本文件不改动既有分支。
+ */
+
+/** 本批次负责的组件名集合（OpenUiNodeRenderer dispatch 接线依据）。 */
+internal val openUiContentComponentNames: Set<String> = setOf(
+    "Stack", "Separator", "MarkDownRenderer",
+    "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
+    "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label", "BoldText",
+    "IconText", "ImageText", "ImageTextLarge", "EntityList", "ListBlock",
+    "Steps", "Carousel", "Buttons", "IconButton", "Modal",
+)
+
+/** 单组件数组/子项上限（MAX_LIST_CHILDREN=50 同口径：LLM 生成面无界，渲染端 take 兜底）。 */
+private const val MAX_CONTENT_ITEMS = 50
+
+private val CONTENT_BADGE_SIZE = 20.dp
+private val CONTENT_ICON_BADGE_SIZE = 36.dp
+private val CONTENT_LIST_IMAGE_SIZE = 48.dp
+
+/** 内容/布局批次 dispatch：未知组件 → 空占位，不炸整卡（半信任输入防御既有口径）。 */
+@Composable
+internal fun OpenUiContentNode(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (node.type) {
+        "Stack" -> OpenUiContentStack(node, state, photoResolver, onAction, modifier)
+        "Separator" -> OpenUiContentSeparator(node, modifier)
+        "MarkDownRenderer" -> OpenUiContentMarkdownRenderer(node, state, modifier)
+        "CardHeader" -> OpenUiContentHeader(
+            title = (node.props["title"] as? OpenUiValue.Str)?.v,
+            subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v,
+            modifier = modifier,
+        )
+        "InlineHeader" -> OpenUiContentHeader(
+            title = (node.props["title"] as? OpenUiValue.Str)?.v,
+            subtitle = (node.props["description"] as? OpenUiValue.Str)?.v,
+            modifier = modifier,
+        )
+        "TextContent" -> OpenUiContentTextContent(node, state, modifier)
+        "TextCallout" -> OpenUiContentTextCallout(node, modifier)
+        "CodeBlock" -> OpenUiContentCodeBlock(node, modifier)
+        "ImageBlock" -> OpenUiContentImageBlock(node, modifier)
+        "ImageGallery" -> OpenUiContentImageGallery(node, modifier)
+        "Tag" -> OpenUiContentTagNode(node, modifier)
+        "TagBlock" -> OpenUiContentTagBlock(node, modifier)
+        "Label" -> {
+            val text = (node.props["text"] as? OpenUiValue.Str)?.v ?: return
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = modifier,
+            )
+        }
+        "BoldText" -> OpenUiContentBoldText(node, state, modifier)
+        "IconText" -> OpenUiContentIconText(node, modifier)
+        "ImageText" -> OpenUiContentImageText(node, modifier)
+        "ImageTextLarge" -> OpenUiContentImageTextLarge(node, modifier)
+        "EntityList" -> OpenUiContentEntityList(node, modifier)
+        "ListBlock" -> OpenUiContentListBlock(node, onAction, modifier)
+        "Steps" -> OpenUiContentSteps(node, modifier)
+        "Carousel" -> OpenUiContentCarousel(node, state, photoResolver, onAction, modifier)
+        "Buttons" -> OpenUiContentButtons(node, state, photoResolver, onAction, modifier)
+        "IconButton" -> OpenUiContentIconButton(node, onAction, modifier)
+        "Modal" -> OpenUiContentModal(node, state, photoResolver, onAction, modifier)
+        else -> Box(modifier = modifier)
+    }
+}
+
+// ── 共用解析工具 ─────────────────────────────────────────────────────
+
+/** BINDABLE_STRING 解析（Text 分支同构）：Str 直取；Binding 从 state 快照读（Num/Bool 回退文本形态）。 */
+private fun resolveContentBindableText(prop: OpenUiValue?, state: Map<String, OpenUiValue>): String? =
+    when (prop) {
+        is OpenUiValue.Str -> prop.v
+        is OpenUiValue.Binding -> state[prop.name]?.let { bound -> openUiContentPrimitiveText(bound) }
+        else -> null
+    }
+
+/** 原始值的文本形态（Num 整数不带小数点；OpenUiNodeRenderer.openUiPrimitiveText 同口径私有副本）。 */
+private fun openUiContentPrimitiveText(value: OpenUiValue): String? = when (value) {
+    is OpenUiValue.Str -> value.v
+    is OpenUiValue.Num -> if (value.v % 1.0 == 0.0) value.v.toLong().toString() else value.v.toString()
+    is OpenUiValue.Bool -> value.v.toString()
+    else -> null
+}
+
+/** 空绑定兜底（OpenUiNodeRenderer.isEmptyBindingFallback 同口径私有副本）：冒号尾前缀 → 丢组件。 */
+private fun isEmptyBindingFallback(resolved: String): Boolean {
+    val trimmed = resolved.trim()
+    return trimmed.endsWith(":") || trimmed.endsWith("：")
+}
+
+/** https 公网图白名单（[PRIVACY]：server validator 正则硬校验，渲染层仍防御；非 https → null 落占位）。 */
+private fun httpsSrcOrNull(raw: String?): String? =
+    raw?.takeIf { src -> src.startsWith("https://") }
+
+/** variant 小写（neutral/info/success/warning/danger）→ StatusColor；neutral/缺省 → 弱色。 */
+@Composable
+private fun contentToneColor(variant: String?): Color = when (variant) {
+    "info" -> StatusColor.info
+    "success" -> StatusColor.success
+    "warning" -> StatusColor.warning
+    "danger" -> StatusColor.error
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+private fun contentToneIcon(variant: String?): String = when (variant) {
+    "success" -> "check"
+    "warning" -> "warning"
+    "danger" -> "error"
+    else -> "info"
+}
+
+/** ACTION prop → 动作列表（单 ActionVal 或数组形态都打平，主文件 openUiActionsOf 同径）。 */
+private fun contentActions(prop: OpenUiValue?): List<OpenUiAction> = openUiActionsOf(prop)
+
+/** 同形占位（https 图缺失/非法时防跳动，Image 解析失败占位同口径）。 */
+@Composable
+private fun OpenUiContentImagePlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    )
+}
+
+/** https 网络图：coil AsyncImage + Crop + 12dp 圆角 + surfaceVariant 底；非法 src → 同形占位不炸。 */
+@Composable
+private fun OpenUiContentNetworkImage(
+    src: String?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    val valid = httpsSrcOrNull(src)
+    val frame = modifier
+        .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    if (valid == null) {
+        Box(modifier = frame)
+    } else {
+        AsyncImage(
+            model = valid,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = frame,
+        )
+    }
+}
+
+/** 序号圆点徽标（ListBlock number / Steps 共用：primary 底白字 12sp）。 */
+@Composable
+private fun OpenUiContentNumberBadge(number: Int) {
+    Box(
+        modifier = Modifier
+            .size(CONTENT_BADGE_SIZE)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = number.toString(),
+            color = MaterialTheme.colorScheme.onPrimary,
+            fontSize = 12.sp,
+            maxLines = 1,
+        )
+    }
+}
+
+// ── 别名 3 ──────────────────────────────────────────────────────────
+
+/**
+ * Stack：direction=row→Row / 缺省 column→Column；wrap=true→FlowRow/FlowColumn；
+ * gap 六档（none/xs/s/m/l/xl/2xl）映射既有 Spacing 阶梯；align→交叉轴、justify→主轴排布。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OpenUiContentStack(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_CONTENT_ITEMS)
+    val isRow = (node.props["direction"] as? OpenUiValue.Str)?.v == "row"
+    val gap = stackGapDp((node.props["gap"] as? OpenUiValue.Str)?.v)
+    val wrap = (node.props["wrap"] as? OpenUiValue.Bool)?.v ?: false
+    val align = (node.props["align"] as? OpenUiValue.Str)?.v
+    val justify = (node.props["justify"] as? OpenUiValue.Str)?.v
+    if (isRow) {
+        val crossAxis = when (align) {
+            "center" -> Alignment.CenterVertically
+            "end" -> Alignment.Bottom
+            else -> Alignment.Top // start/stretch/baseline 兜底
+        }
+        val mainAxis = rowMainAxis(justify, gap)
+        if (wrap) {
+            FlowRow(
+                modifier = modifier,
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                OpenUiContentChildren(children, state, photoResolver, onAction)
+            }
+        } else {
+            Row(
+                modifier = modifier,
+                horizontalArrangement = mainAxis,
+                verticalAlignment = crossAxis,
+            ) {
+                OpenUiContentChildren(children, state, photoResolver, onAction)
+            }
+        }
+    } else {
+        val crossAxis = when (align) {
+            "center" -> Alignment.CenterHorizontally
+            "end" -> Alignment.End
+            else -> Alignment.Start // start/stretch/baseline 兜底
+        }
+        val mainAxis = columnMainAxis(justify, gap)
+        if (wrap) {
+            FlowColumn(
+                modifier = modifier,
+                verticalArrangement = Arrangement.spacedBy(gap),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                OpenUiContentChildren(children, state, photoResolver, onAction)
+            }
+        } else {
+            Column(
+                modifier = modifier,
+                verticalArrangement = mainAxis,
+                horizontalAlignment = crossAxis,
+            ) {
+                OpenUiContentChildren(children, state, photoResolver, onAction)
+            }
+        }
+    }
+}
+
+/** Stack.gap 枚举 → Spacing 阶梯（最小档 xs；2xl 超阶梯取 32dp）。 */
+private fun stackGapDp(raw: String?): Dp = when (raw) {
+    "none" -> 0.dp
+    "xs" -> Spacing.xs
+    "s" -> Spacing.sm
+    "l" -> Spacing.lg
+    "xl" -> Spacing.xl
+    "2xl" -> 32.dp
+    else -> Spacing.md // m / 缺省
+}
+
+private fun rowMainAxis(justify: String?, gap: Dp): Arrangement.Horizontal = when (justify) {
+    "between" -> Arrangement.SpaceBetween
+    "around" -> Arrangement.SpaceAround
+    "evenly" -> Arrangement.SpaceEvenly
+    "center" -> Arrangement.spacedBy(gap, Alignment.CenterHorizontally)
+    "end" -> Arrangement.spacedBy(gap, Alignment.End)
+    else -> Arrangement.spacedBy(gap)
+}
+
+private fun columnMainAxis(justify: String?, gap: Dp): Arrangement.Vertical = when (justify) {
+    "between" -> Arrangement.SpaceBetween
+    "around" -> Arrangement.SpaceAround
+    "evenly" -> Arrangement.SpaceEvenly
+    "center" -> Arrangement.spacedBy(gap, Alignment.CenterVertically)
+    "end" -> Arrangement.spacedBy(gap, Alignment.Bottom)
+    else -> Arrangement.spacedBy(gap)
+}
+
+/** 子组件递归渲染（null 字面量/被剔除元素空占位，OpenUiChildList 同口径）。 */
+@Composable
+private fun OpenUiContentChildren(
+    children: List<OpenUiValue>,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+) {
+    for (child in children) {
+        if (child is OpenUiValue.ComponentVal) {
+            OpenUiNodeRenderer(child, state, photoResolver, onAction)
+        } else {
+            Box(modifier = Modifier)
+        }
+    }
+}
+
+/** Separator：orientation=vertical→VerticalDivider / 缺省 horizontal→HorizontalDivider（0.5dp 弱色线，M4 token）。 */
+@Composable
+private fun OpenUiContentSeparator(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val dividerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = OpenUiCardTokens.dividerAlpha)
+    if ((node.props["orientation"] as? OpenUiValue.Str)?.v == "vertical") {
+        VerticalDivider(
+            modifier = modifier,
+            thickness = OpenUiCardTokens.dividerThickness,
+            color = dividerColor,
+        )
+    } else {
+        HorizontalDivider(
+            modifier = modifier.fillMaxWidth(),
+            thickness = OpenUiCardTokens.dividerThickness,
+            color = dividerColor,
+        )
+    }
+}
+
+/** MarkDownRenderer：textMarkdown BINDABLE_STRING（Markdown 同口径）；variant 收而不用。 */
+@Composable
+private fun OpenUiContentMarkdownRenderer(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    modifier: Modifier = Modifier,
+) {
+    val text = resolveContentBindableText(node.props["textMarkdown"], state) ?: return
+    if (isEmptyBindingFallback(text)) return
+    AgentMarkdown(
+        content = text,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        modifier = modifier.fillMaxWidth(),
+    )
+}
+
+// ── 内容/布局 21 ─────────────────────────────────────────────────────
+
+/** CardHeader/InlineHeader 同渲染（官方语义即轻量标题对）：SUBHEAD 标题 + CAPTION 弱色副题。 */
+@Composable
+private fun OpenUiContentHeader(title: String?, subtitle: String?, modifier: Modifier = Modifier) {
+    if (title == null) return
+    Column(modifier = modifier) {
+        Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+        subtitle?.let { text ->
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** TextContent 字阶映射（spec §3.2）：small→CAPTION、default→BODY、large/small-heavy→SUBHEAD、large-heavy→HEADLINE。 */
+private fun textContentRole(raw: String?): A2uiTextRole = when (raw) {
+    "small" -> A2uiTextRole.CAPTION
+    "large", "small-heavy" -> A2uiTextRole.SUBHEAD
+    "large-heavy" -> A2uiTextRole.HEADLINE
+    else -> A2uiTextRole.BODY
+}
+
+/** TextContent：text BINDABLE_STRING + size→字阶（绑定解析不出/冒号尾丢组件，Text 同口径）。 */
+@Composable
+private fun OpenUiContentTextContent(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    modifier: Modifier = Modifier,
+) {
+    val text = resolveContentBindableText(node.props["text"], state) ?: return
+    if (isEmptyBindingFallback(text)) return
+    val role = textContentRole((node.props["size"] as? OpenUiValue.Str)?.v)
+    Text(
+        text = text,
+        style = OpenUiCardTokens.textStyle(role),
+        color = if (role == A2uiTextRole.CAPTION) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        modifier = modifier,
+    )
+}
+
+/** TextCallout：variant 小写映射 tone（danger→ERROR 红、neutral→弱色），渲染镜像 OpenUiCallout 模式。 */
+@Composable
+private fun OpenUiContentTextCallout(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
+    val description = (node.props["description"] as? OpenUiValue.Str)?.v
+    val variant = (node.props["variant"] as? OpenUiValue.Str)?.v
+    val toneColor = contentToneColor(variant)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(AppShapes.card)
+            .background(toneColor.copy(alpha = BadgeTokens.tagBackgroundAlpha))
+            .padding(Spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        openUiIcon(contentToneIcon(variant))?.let { image ->
+            Icon(
+                imageVector = image,
+                contentDescription = null,
+                tint = toneColor,
+                modifier = Modifier.size(IconSize.md),
+            )
+        }
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = toneColor,
+            )
+            description?.let { text ->
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+/** CodeBlock：等宽字体 surfaceVariant 块 + 横滑；language 作弱色小字标注（LLM 内容串，零新增文案）。 */
+@Composable
+private fun OpenUiContentCodeBlock(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val code = (node.props["codeString"] as? OpenUiValue.Str)?.v ?: return
+    val language = (node.props["language"] as? OpenUiValue.Str)?.v
+    Column(modifier = modifier.fillMaxWidth()) {
+        language?.let { lang ->
+            Text(
+                text = lang,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(AppShapes.card)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .horizontalScroll(rememberScrollState())
+                .padding(Spacing.md),
+        ) {
+            Text(
+                text = code,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+/** ImageBlock：官方纯 src 形态（https 限）；无 aspect 元数据，缺省 4:3 框（Image 兜底比例同口径）。 */
+@Composable
+private fun OpenUiContentImageBlock(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val src = (node.props["src"] as? OpenUiValue.Str)?.v
+    val alt = (node.props["alt"] as? OpenUiValue.Str)?.v
+    OpenUiContentNetworkImage(
+        src = src,
+        contentDescription = alt,
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(4f / 3f),
+    )
+}
+
+/** ImageGallery：横滑定宽条目（List HORIZONTAL 同径）；https 图仅展示不做大图页；details 作弱色小字注脚。 */
+@Composable
+private fun OpenUiContentImageGallery(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val images = (node.props["images"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .mapNotNull { item -> (item as? OpenUiValue.Obj)?.v }
+        .take(MAX_CONTENT_ITEMS)
+    if (images.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        images.forEach { obj ->
+            val src = (obj["src"] as? OpenUiValue.Str)?.v
+            val alt = (obj["alt"] as? OpenUiValue.Str)?.v
+            val details = (obj["details"] as? OpenUiValue.Str)?.v
+            Column(modifier = Modifier.width(OpenUiCardTokens.horizontalImageWidth)) {
+                OpenUiContentNetworkImage(
+                    src = src,
+                    contentDescription = alt,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(4f / 3f),
+                )
+                details?.let { text ->
+                    Text(
+                        text = text,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = Spacing.xs),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Tag 节点：小胶囊（tonal 圆角 50% + 内边距），variant→tone 色，icon 可选（12-16dp 随 size）。 */
+@Composable
+private fun OpenUiContentTagNode(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val text = (node.props["text"] as? OpenUiValue.Str)?.v ?: return
+    val icon = (node.props["icon"] as? OpenUiValue.Str)?.v
+    val size = (node.props["size"] as? OpenUiValue.Str)?.v
+    val variant = (node.props["variant"] as? OpenUiValue.Str)?.v
+    OpenUiContentTagChip(text = text, icon = icon, size = size, variant = variant, modifier = modifier)
+}
+
+/** Tag 胶囊本体（Tag / TagBlock 共用）。 */
+@Composable
+private fun OpenUiContentTagChip(
+    text: String,
+    icon: String?,
+    size: String?,
+    variant: String?,
+    modifier: Modifier = Modifier,
+) {
+    val toneColor = contentToneColor(variant)
+    val iconSize = when (size) {
+        "sm" -> 12.dp
+        "lg" -> 16.dp
+        else -> 14.dp
+    }
+    val textRole = when (size) {
+        "sm" -> A2uiTextRole.CAPTION
+        "lg" -> A2uiTextRole.SUBHEAD
+        else -> A2uiTextRole.BODY
+    }
+    Row(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(toneColor.copy(alpha = BadgeTokens.tagBackgroundAlpha))
+            .padding(horizontal = BadgeTokens.tagPaddingH, vertical = BadgeTokens.tagPaddingV),
+        horizontalArrangement = Arrangement.spacedBy(BadgeTokens.tagDotLabelGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon?.let { name -> openUiIcon(name) }?.let { image ->
+            Icon(
+                imageVector = image,
+                contentDescription = null,
+                tint = toneColor,
+                modifier = Modifier.size(iconSize),
+            )
+        }
+        Text(
+            text = text,
+            style = OpenUiCardTokens.textStyle(textRole),
+            color = toneColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** TagBlock：字符串数组 FlowRow 平铺（元素取文本形态，非串元素剔除）。 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OpenUiContentTagBlock(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val tags = (node.props["tags"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .mapNotNull { value -> openUiContentPrimitiveText(value) }
+        .take(MAX_CONTENT_ITEMS)
+    if (tags.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        tags.forEach { tag ->
+            OpenUiContentTagChip(text = tag, icon = null, size = "md", variant = "neutral")
+        }
+    }
+}
+
+/** BoldText：value BINDABLE_STRING + Bold（官方卡块构件，本仓允许任意位置）；subtext 弱色小字。 */
+@Composable
+private fun OpenUiContentBoldText(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    modifier: Modifier = Modifier,
+) {
+    val value = resolveContentBindableText(node.props["value"], state) ?: return
+    if (isEmptyBindingFallback(value)) return
+    val subtext = (node.props["subtext"] as? OpenUiValue.Str)?.v
+    val role = when ((node.props["size"] as? OpenUiValue.Str)?.v) {
+        "xs" -> A2uiTextRole.CAPTION
+        "md" -> A2uiTextRole.SUBHEAD
+        "lg" -> A2uiTextRole.HEADLINE
+        else -> A2uiTextRole.BODY
+    }
+    Column(modifier = modifier) {
+        Text(
+            text = value,
+            style = OpenUiCardTokens.textStyle(role).copy(fontWeight = FontWeight.Bold),
+        )
+        subtext?.let { text ->
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** IconText：Row(icon 徽章圆底 + Column(title BODY + subtitle CAPTION 弱色))；layout=vertical→Column 居中。 */
+@Composable
+private fun OpenUiContentIconText(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
+    val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
+    val icon = (node.props["icon"] as? OpenUiValue.Str)?.v?.let { name -> openUiIcon(name) }
+    val bold = (node.props["bold"] as? OpenUiValue.Bool)?.v ?: false
+    val vertical = (node.props["layout"] as? OpenUiValue.Str)?.v == "vertical"
+    val badge: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier
+                .size(CONTENT_ICON_BADGE_SIZE)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            icon?.let { image ->
+                Icon(
+                    imageVector = image,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(IconSize.sm),
+                )
+            }
+        }
+    }
+    val texts: @Composable () -> Unit = {
+        Text(
+            text = title,
+            style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+            fontWeight = if (bold) FontWeight.Bold else null,
+        )
+        subtitle?.let { text ->
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    if (vertical) {
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            badge()
+            Column(horizontalAlignment = Alignment.CenterHorizontally) { texts() }
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            badge()
+            Column { texts() }
+        }
+    }
+}
+
+/** ImageText：Row(48dp 圆角图（imageSize 可覆盖，钳 24..96）+ 标题/副题列)；src https 限。 */
+@Composable
+private fun OpenUiContentImageText(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
+    val src = (node.props["src"] as? OpenUiValue.Str)?.v
+    val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
+    val imageSize = ((node.props["imageSize"] as? OpenUiValue.Num)?.v ?: 48.0)
+        .coerceIn(24.0, 96.0).dp
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OpenUiContentNetworkImage(
+            src = src,
+            contentDescription = title,
+            modifier = Modifier.size(imageSize),
+        )
+        Column {
+            Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+            subtitle?.let { text ->
+                Text(
+                    text = text,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** ImageTextLarge：Column(通栏图 16:9 + 粗标题 + 副题)；src https 限、缺失落同形占位。 */
+@Composable
+private fun OpenUiContentImageTextLarge(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
+    val src = (node.props["src"] as? OpenUiValue.Str)?.v
+    val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
+    Column(modifier = modifier.fillMaxWidth()) {
+        OpenUiContentNetworkImage(
+            src = src,
+            contentDescription = title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f),
+        )
+        Text(
+            text = title,
+            style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = Spacing.sm),
+        )
+        subtitle?.let { text ->
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** EntityList：header（SUBHEAD/弱色）+ 双列 key/value 行（left BODY / right BODY 弱）+ footer（CAPTION 弱）。 */
+@Composable
+private fun OpenUiContentEntityList(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val rows = (node.props["rows"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val left = (obj["left"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        val right = (obj["right"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        left to right
+    }.take(MAX_CONTENT_ITEMS)
+    if (rows.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val headerLeft = (node.props["headerLeft"] as? OpenUiValue.Str)?.v
+    val headerRight = (node.props["headerRight"] as? OpenUiValue.Str)?.v
+    val footerLeft = (node.props["footerLeft"] as? OpenUiValue.Str)?.v
+    val footerRight = (node.props["footerRight"] as? OpenUiValue.Str)?.v
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (headerLeft != null || headerRight != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.xs),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                headerLeft?.let { text ->
+                    Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+                }
+                headerRight?.let { text ->
+                    Text(
+                        text = text,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        rows.forEach { (left, right) ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = left, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+                Text(
+                    text = right,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (footerLeft != null || footerRight != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                footerLeft?.let { text ->
+                    Text(
+                        text = text,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                footerRight?.let { text ->
+                    Text(
+                        text = text,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private data class ContentListItem(
+    val title: String,
+    val subtitle: String?,
+    val image: String?,
+    val actionLabel: String?,
+    val actions: List<OpenUiAction>,
+)
+
+/** ListBlock：variant=number→序号圆点 / =image→48dp https 缩略图；action 存在行可点，actionLabel 尾部胶囊。 */
+@Composable
+private fun OpenUiContentListBlock(
+    node: OpenUiValue.ComponentVal,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        ContentListItem(
+            title = title,
+            subtitle = (obj["subtitle"] as? OpenUiValue.Str)?.v,
+            image = (obj["image"] as? OpenUiValue.Str)?.v,
+            actionLabel = (obj["actionLabel"] as? OpenUiValue.Str)?.v,
+            actions = contentActions(obj["action"]),
+        )
+    }.take(MAX_CONTENT_ITEMS)
+    if (items.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val imageVariant = (node.props["variant"] as? OpenUiValue.Str)?.v == "image"
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        items.forEachIndexed { index, item ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (item.actions.isNotEmpty()) {
+                            Modifier.clickable { item.actions.forEach(onAction) }
+                        } else {
+                            Modifier
+                        }
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (imageVariant) {
+                    OpenUiContentNetworkImage(
+                        src = item.image,
+                        contentDescription = item.title,
+                        modifier = Modifier.size(CONTENT_LIST_IMAGE_SIZE),
+                    )
+                } else {
+                    OpenUiContentNumberBadge(index + 1)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    item.subtitle?.let { text ->
+                        Text(
+                            text = text,
+                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                item.actionLabel?.let { label ->
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(
+                                MaterialTheme.colorScheme.primary
+                                    .copy(alpha = BadgeTokens.tagBackgroundAlpha)
+                            )
+                            .padding(
+                                horizontal = BadgeTokens.tagPaddingH,
+                                vertical = BadgeTokens.tagPaddingV,
+                            ),
+                    ) {
+                        Text(
+                            text = label,
+                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Steps：纵向步骤条——序号圆点（primary 底白字，从 1 起）+ 标题/details；行间左侧 1dp 弱色连接线。 */
+@Composable
+private fun OpenUiContentSteps(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        title to (obj["details"] as? OpenUiValue.Str)?.v
+    }.take(MAX_CONTENT_ITEMS)
+    if (items.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val lineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = OpenUiCardTokens.dividerAlpha)
+    Column(modifier = modifier.fillMaxWidth()) {
+        items.forEachIndexed { index, (title, details) ->
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (index > 0) {
+                        Box(
+                            modifier = Modifier
+                                .width(OpenUiCardTokens.dividerThickness)
+                                .height(Spacing.sm)
+                                .background(lineColor)
+                        )
+                    }
+                    OpenUiContentNumberBadge(index + 1)
+                    if (index < items.lastIndex) {
+                        Box(
+                            modifier = Modifier
+                                .width(OpenUiCardTokens.dividerThickness)
+                                .height(Spacing.sm)
+                                .background(lineColor)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.padding(bottom = Spacing.sm)) {
+                    Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+                    details?.let { text ->
+                        Text(
+                            text = text,
+                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Carousel：横滑定宽条目（horizontalImageWidth，List HORIZONTAL 同径），子组件递归渲染；variant 收而不用。 */
+@Composable
+private fun OpenUiContentCarousel(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_CONTENT_ITEMS)
+    if (children.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        for (child in children) {
+            if (child is OpenUiValue.ComponentVal) {
+                Box(modifier = Modifier.width(OpenUiCardTokens.horizontalImageWidth)) {
+                    OpenUiNodeRenderer(child, state, photoResolver, onAction)
+                }
+            }
+        }
+    }
+}
+
+/** Buttons：buttons 组件数组平铺（direction=row 默认 Row 8dp 间距 / column→Column），递归渲染。 */
+@Composable
+private fun OpenUiContentButtons(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val buttons = (node.props["buttons"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_CONTENT_ITEMS)
+    if (buttons.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    if ((node.props["direction"] as? OpenUiValue.Str)?.v == "column") {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            OpenUiContentChildren(buttons, state, photoResolver, onAction)
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            OpenUiContentChildren(buttons, state, photoResolver, onAction)
+        }
+    }
+}
+
+/** IconButton：M3 IconButton 包 surfaceVariant 圆底；icon 走 59 枚举（解析不到丢组件）；action 逐个喂 onAction。 */
+@Composable
+private fun OpenUiContentIconButton(
+    node: OpenUiValue.ComponentVal,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
+    val image = (node.props["icon"] as? OpenUiValue.Str)?.v?.let { icon -> openUiIcon(icon) } ?: return
+    val actions = contentActions(node.props["action"])
+    IconButton(
+        onClick = { actions.forEach(onAction) },
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+    ) {
+        Icon(
+            imageVector = image,
+            contentDescription = name,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(IconSize.md),
+        )
+    }
+}
+
+/**
+ * Modal：open BINDABLE_BOOLEAN——Binding 从 state 读 Bool，真值时弹 Dialog（标题 + children + 关闭行）；
+ * X/遮罩关闭 → @Set(绑定变量, false)；裸字面量 true（LLM 未按约定传绑定，review 🔴4）→ 本地
+ * remember 态兜底关闭，不渲染永久死弹窗；open=false/解析不出 → 零尺寸 Box。
+ */
+@Composable
+private fun OpenUiContentModal(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
+    val openProp = node.props["open"]
+    val bindingName = (openProp as? OpenUiValue.Binding)?.name
+    val boundOpen = when (openProp) {
+        is OpenUiValue.Binding -> (state[openProp.name] as? OpenUiValue.Bool)?.v
+        is OpenUiValue.Bool -> openProp.v
+        else -> null
+    } ?: false
+    // 无绑定的字面量 true：关闭态只进本地 remember（写不进 state）；有绑定时本地态恒 false 不参与
+    var locallyDismissed by remember(node) { mutableStateOf(false) }
+    val open = boundOpen && (bindingName != null || !locallyDismissed)
+    if (!open) {
+        Box(modifier = modifier)
+        return
+    }
+    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_CONTENT_ITEMS)
+    val close: () -> Unit = {
+        if (bindingName != null) {
+            onAction(
+                OpenUiAction(
+                    name = "Set",
+                    args = listOf(OpenUiValue.Bool(false)),
+                    target = bindingName,
+                )
+            )
+        } else {
+            locallyDismissed = true
+        }
+    }
+    Dialog(onDismissRequest = close) {
+        Card(shape = AppShapes.card) {
+            Column(modifier = Modifier.padding(Spacing.lg)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = title,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = close, modifier = Modifier.size(IconSize.lg)) {
+                        openUiIcon("close")?.let { image ->
+                            Icon(
+                                imageVector = image,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(IconSize.sm),
+                            )
+                        }
+                    }
+                }
+                Column(
+                    modifier = Modifier.padding(top = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    OpenUiContentChildren(children, state, photoResolver, onAction)
+                }
+            }
+        }
+    }
+}
