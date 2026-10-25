@@ -51,6 +51,7 @@ fun OpenUiCardHost(
     photoResolver: OpenUiPhotoResolver,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
+    onPhotoClick: (uri: String) -> Unit = {},
 ) {
     // 键粒度收到整颗 part（data class 可比）：viewState 回流产生新 part 即重建 session、
     // 按最新 viewState 重种 $selected（同 A2uiCardHost 恢复语义）
@@ -109,6 +110,7 @@ fun OpenUiCardHost(
                         session = current.session,
                         photoResolver = photoResolver,
                         onViewStateChange = onViewStateChange,
+                        onPhotoClick = onPhotoClick,
                     )
                     OpenUiDebugBadge(
                         partId = part.partId,
@@ -122,6 +124,7 @@ fun OpenUiCardHost(
                     photoResolver = photoResolver,
                     onViewStateChange = onViewStateChange,
                     modifier = modifier,
+                    onPhotoClick = onPhotoClick,
                 )
             }
         }
@@ -207,6 +210,7 @@ private fun OpenUiReadyContent(
     photoResolver: OpenUiPhotoResolver,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
+    onPhotoClick: (uri: String) -> Unit = {},
 ) {
     // applyAction 后快照刷新触发重组（session 内部状态非 Compose 可观测）
     var stateSnapshot by remember(session) { mutableStateOf(session.state) }
@@ -227,6 +231,9 @@ private fun OpenUiReadyContent(
             "OpenUrl" -> (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let { url ->
                 runCatching { uriHandler.openUri(url) }
             }
+            // Image 点击看大图（宿主动作，program 不可达——渲染层 resolved uri 直发，
+            // 不出端不回落 program；ChatScreen 落 PhotoEditor 页，Gallery 同款入口）
+            "OpenPhoto" -> (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let(onPhotoClick)
             // M1 不上行（§3.4 不变式对偶）：只留结构化日志线索
             "ToAssistant" -> Logger.d("Chat", "OpenUI @ToAssistant 本地消费（不上行）: ${action.args}")
             else -> Logger.d("Chat", "OpenUI 未知动作: ${action.name}")

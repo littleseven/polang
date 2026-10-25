@@ -1,6 +1,10 @@
 package com.mamba.picme.di
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -1175,10 +1179,57 @@ class AppContainerImpl(
             // synthetic id（-(mediaStoreId*10+typeSalt)，扫描快照持有此类 id）经 allMedia
             // 合并流反查——2026-10-25 真机事故：直查 DAO 恒 null → Image 永久占位
             repository.getMediaById(photoId)?.let { asset ->
-                OpenUiPhoto(uri = asset.uri, faceFocusY = asset.faceFocusY)
+                OpenUiPhoto(
+                    uri = asset.uri,
+                    faceFocusY = asset.faceFocusY,
+                    aspectRatio = queryMediaAspectRatio(asset.uri),
+                )
             }
         }
     }
+
+    /** MediaStore 元数据取真实宽高比（宽/高）。
+     *  API 29+ 直查 WIDTH/HEIGHT 列（纯元数据不解码位图）；API<29 无此列（投影未知列
+     *  MediaProvider 直接抛 IllegalArgumentException，非缺列返 -1），兜底 openInputStream +
+     *  BitmapFactory 边界解码（inJustDecodeBounds 只读文件头）。
+     *  取不到（权限/已删除/解码失败）→ null，渲染层回落 4:3。命中结果进程内缓存（uri 维度不可变）。 */
+    private suspend fun queryMediaAspectRatio(uri: String): Float? = withContext(Dispatchers.IO) {
+        mediaAspectRatioCache[uri]?.let { return@withContext it }
+        val ratio = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.contentResolver.query(
+                    Uri.parse(uri),
+                    arrayOf(MediaStore.MediaColumns.WIDTH, MediaStore.MediaColumns.HEIGHT),
+                    null,
+                    null,
+                    null,
+                )?.use { cursor ->
+                    if (!cursor.moveToFirst()) return@use null
+                    val widthCol = cursor.getColumnIndex(MediaStore.MediaColumns.WIDTH)
+                    val heightCol = cursor.getColumnIndex(MediaStore.MediaColumns.HEIGHT)
+                    if (widthCol < 0 || heightCol < 0) return@use null
+                    val width = cursor.getLong(widthCol)
+                    val height = cursor.getLong(heightCol)
+                    if (width > 0 && height > 0) width.toFloat() / height.toFloat() else null
+                }
+            } else {
+                context.contentResolver.openInputStream(Uri.parse(uri))?.use { stream ->
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeStream(stream, null, options)
+                    if (options.outWidth > 0 && options.outHeight > 0) {
+                        options.outWidth.toFloat() / options.outHeight.toFloat()
+                    } else {
+                        null
+                    }
+                }
+            }
+        }.getOrNull()
+        if (ratio != null) mediaAspectRatioCache[uri] = ratio
+        ratio
+    }
+
+    /** uri → 真实宽高比进程内缓存（媒体文件内容不可变，uri 复用安全；未命中不缓存负结果）。 */
+    private val mediaAspectRatioCache = java.util.concurrent.ConcurrentHashMap<String, Float>()
 
     /**
      * 云端 Agent 相册工具的无头执行器（ADR-018 M2）：绕过场景注册表直执，

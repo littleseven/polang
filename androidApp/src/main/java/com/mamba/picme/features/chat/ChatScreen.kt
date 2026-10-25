@@ -871,6 +871,8 @@ fun ChatScreen(
                                             onViewStateChange = { viewState ->
                                                 viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
                                             },
+                                            // Image 点击看大图：Gallery 同款 PhotoEditor 入口
+                                            onPhotoClick = { uri -> onNavigateToPhotoEditor(uri, false) },
                                         )
                                     }
                                 }

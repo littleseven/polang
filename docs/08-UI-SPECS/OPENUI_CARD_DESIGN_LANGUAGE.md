@@ -109,7 +109,7 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 | BarChart | §3.1 |
 | PieChart | §3.2 |
 | LineChart | §3.3 |
-| Image | 12dp 圆角；占位同形 surfaceVariant；横滑 List 内固定条目宽 200dp |
+| Image | 12dp 圆角；占位同形 surfaceVariant；横滑 List 内固定条目宽 200dp；aspect 缺省按照片真实比例（元数据宽 sanity 界 [0.3, 3.0]，界外极长图轻微裁切），显式传 = 强制造型（clamp [0.5, 2.5]）；点击看大图（宿主动作 OpenPhoto → PhotoEditor 页） |
 | Icon | 无 colorRole → onSurfaceVariant 弱色；PRIMARY 仅强调性图标 |
 | Divider | 0.5dp，onSurface × 0.08 |
 | Tabs | 胶囊分段控件（surfaceVariant 容器 + primary 选中胶囊），>4 横滑 |
@@ -122,3 +122,4 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 ## 6. 变更记录
 
 - v1（2026-10-25）：初版。落地件 = M4（字阶/间距/色板/Tabs 胶囊/空绑定兜底）+ M4.2（Image 链路三修）+ 本轮（DISPLAY 字阶、BarChart 柱道与圆角柱端、PieChart 环形化、Icon 默认弱色、stat tile 构图食谱入 server prompt）。
+- v1.1（2026-10-25）：Image 体验二修——aspect 缺省改为按照片真实比例渲染（MediaStore 元数据；API<29 无 WIDTH/HEIGHT 列走 BitmapFactory 边界解码兜底；宽 sanity 界 [0.3, 3.0]，界外极长全景图轻微裁切；显式传 aspect 仍生效 = 强制造型，clamp [0.5, 2.5]）；Image 可点击，经宿主动作 OpenPhoto 打开 PhotoEditor 大图页（Gallery 同款入口）。

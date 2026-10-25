@@ -7,6 +7,9 @@ package com.mamba.picme.features.chat.openui
 data class OpenUiPhoto(
     val uri: String,
     val faceFocusY: Float?,
+    /** 照片真实宽高比（宽/高，MediaStore 元数据；null=取不到 → 渲染层回落 4:3）。
+     *  aspect prop 缺省时渲染层按它定框（宽 sanity 界 [0.3, 3.0]），竖屏图不再被横框拦腰。 */
+    val aspectRatio: Float? = null,
 )
 
 /**

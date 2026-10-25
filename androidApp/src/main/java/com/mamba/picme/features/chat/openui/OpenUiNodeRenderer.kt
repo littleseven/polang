@@ -58,12 +58,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.AppSliderTokens
@@ -241,7 +243,7 @@ fun OpenUiNodeRenderer(
             }
         }
         "BarChart" -> OpenUiBarChart(node, state, onAction, modifier)
-        "Image" -> OpenUiPhotoImage(node, photoResolver, modifier)
+        "Image" -> OpenUiPhotoImage(node, photoResolver, onAction, modifier)
         "Icon" -> OpenUiIcon(node, modifier)
         "Divider" -> OpenUiDivider(node, modifier)
         "List" -> OpenUiList(node, state, photoResolver, onAction, modifier)
@@ -338,16 +340,16 @@ private fun OpenUiChildList(
 private fun OpenUiPhotoImage(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
-    // aspect 宽高比（宽/高）：渲染期缺省 4:3，clamp 到 [0.5, 2.5]（schema 无默认字面量）
-    val aspect = (node.props["aspect"] as? OpenUiValue.Num)?.v
-        ?.let { raw -> raw.coerceIn(0.5, 2.5) } ?: (4.0 / 3.0)
+    val propAspect = (node.props["aspect"] as? OpenUiValue.Num)?.v
+    val frameBackground = MaterialTheme.colorScheme.surfaceVariant
     BoxWithConstraints(modifier = modifier) {
         // M4.2：无界宽上下文（HORIZONTAL List 横滑行内 fillMaxWidth 失效、aspectRatio
         // 双维无界塌成 0×0）落固定条目宽；有界上下文保持铺满
-        val frameModifier = (
+        fun frameFor(aspect: Double) = (
             if (maxWidth != Dp.Infinity) {
                 Modifier.fillMaxWidth()
             } else {
@@ -356,10 +358,10 @@ private fun OpenUiPhotoImage(
             )
             .aspectRatio(aspect.toFloat())
             .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius)) // M4 §1.1：直角 → 12dp
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(frameBackground)
         if (photoId == null) {
             // 缺必填 photo（schema 校验已丢组件，此处仅防御兜底）：同形占位，不炸整卡
-            Box(modifier = frameModifier)
+            Box(modifier = frameFor(frameAspectOf(propAspect, null)))
             return@BoxWithConstraints
         }
         val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
@@ -368,18 +370,41 @@ private fun OpenUiPhotoImage(
         val resolved = photo
         if (resolved == null) {
             // 解析中/解析失败（已删除/未索引）：同形同参 surfaceVariant 占位
-            Box(modifier = frameModifier)
+            Box(modifier = frameFor(frameAspectOf(propAspect, null)))
         } else {
             AsyncImage(
                 model = resolved.uri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
-                modifier = frameModifier,
+                modifier = frameFor(frameAspectOf(propAspect, resolved.aspectRatio)).clickable(
+                    // 点击看大图：宿主动作通道（OpenUrl 先例），ChatScreen 落 PhotoEditor 页
+                    onClickLabel = stringResource(R.string.cd_image_preview),
+                    role = Role.Image,
+                ) {
+                    onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                },
             )
         }
     }
 }
+
+/**
+ * Image 框宽高比（宽/高）决策链（纯函数，OpenUiFrameAspectTest 钉住）：
+ * LLM 显式 aspect（半信任输入，clamp [0.5, 2.5]）> 照片元数据真实比例（端侧可信数据，
+ * 宽 sanity 界 [0.3, 3.0] 只防脏元数据——不套 LLM 窄 clamp，9:19.5 竖屏截图 0.46 被夹到
+ * 0.5 仍会拦腰裁，2026-10-25 review 🟡1）> 4:3 兜底。
+ */
+internal fun frameAspectOf(propAspect: Double?, metadataRatio: Float?): Double =
+    propAspect?.coerceIn(PROP_ASPECT_MIN, PROP_ASPECT_MAX)
+        ?: metadataRatio?.toDouble()?.coerceIn(METADATA_ASPECT_MIN, METADATA_ASPECT_MAX)
+        ?: FALLBACK_ASPECT
+
+private const val PROP_ASPECT_MIN = 0.5
+private const val PROP_ASPECT_MAX = 2.5
+private const val METADATA_ASPECT_MIN = 0.3
+private const val METADATA_ASPECT_MAX = 3.0
+private const val FALLBACK_ASPECT = 4.0 / 3.0
 
 private fun OpenUiValue.ComponentVal.spacingDp() =
     OpenUiCardTokens.spacing(
