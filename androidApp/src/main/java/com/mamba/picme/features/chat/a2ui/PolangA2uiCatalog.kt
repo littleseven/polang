@@ -54,6 +54,9 @@ fun polangA2uiCatalog(urlOpener: A2uiUrlOpener): A2uiCatalog {
                 )
             }
         ),
+        // 纵向 List 封顶（防聊天流无限高测量崩溃，见 BoundedVerticalA2uiList 文件头）
+        // 纵向 List 封顶（防聊天流无限高测量崩溃，见 BoundedVerticalA2uiList 文件头）
+        list = BoundedVerticalA2uiList(maxHeight = A2uiCardTokens.listMaxHeight),
         urlOpener = urlOpener,
         messageFormatter = A2uiMessageFormatter { pattern, locale, arguments ->
             android.icu.text.MessageFormat(pattern, locale).format(arguments)

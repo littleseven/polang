@@ -645,13 +645,14 @@
     "relationChipRadius": 8
   },
   "a2uiCard": {
-    "_comment": "A2UI 数据卡（data_ui BarChart + 降级卡 + debug 蓝图查看器 + 媒体卡）。barAreaHeight=柱状图绘图区高（含标签行）; barGap=柱间距; barLabelHeight=柱下月份标签预留高（满高柱须预留防裁剪）; barUnselectedAlpha=未选中柱透明度; debugBadgeRadius=debug 徽标圆角; debugMaxHeight=蓝图查看器最大高; videoHeight=Video 组件卡内高度; audioPlayerHeight=AudioPlayer 组件紧凑条高度。",
+    "_comment": "A2UI 数据卡（data_ui BarChart + 降级卡 + debug 蓝图查看器 + 媒体卡）。barAreaHeight=柱状图绘图区高（含标签行）; barGap=柱间距; barLabelHeight=柱下月份标签预留高（满高柱须预留防裁剪）; barUnselectedAlpha=未选中柱透明度; debugBadgeRadius=debug 徽标圆角; debugMaxHeight=蓝图查看器最大高; videoHeight=Video 组件卡内高度; audioPlayerHeight=AudioPlayer 组件紧凑条高度; listMaxHeight=纵向 List 组件在无限高父容器（聊天流 LazyColumn item）里的封顶高（防 LazyColumn 无限高测量崩溃）。",
     "barAreaHeight": 120,
     "barGap": 6,
     "barLabelHeight": 20,
     "barUnselectedAlpha": 0.45,
     "videoHeight": 200,
     "audioPlayerHeight": 72,
+    "listMaxHeight": 320,
     "debugBadgeRadius": 12,
     "debugMaxHeight": 420
   },

@@ -711,6 +711,7 @@ enum A2uiCardTokens {
     static let barUnselectedAlpha: Double = 0.45
     static let videoHeight: CGFloat = 200
     static let audioPlayerHeight: CGFloat = 72
+    static let listMaxHeight: CGFloat = 320
     static let debugBadgeRadius: CGFloat = 12
     static let debugMaxHeight: CGFloat = 420
 }

@@ -137,4 +137,57 @@ class A2uiComponentRenderSmokeTest {
             scope.cancel()
         }
     }
+
+    /**
+     * 回归：2026-10-25 行程 Tab 崩溃——纵向 List（内层 LazyColumn）在无限高父容器
+     * （聊天消息流 LazyColumn item）里测量即 IllegalStateException。
+     * BoundedVerticalA2uiList 封顶后本场景必须存活性渲染。
+     */
+    @Test
+    fun verticalList_insideUnboundedHeightParent_doesNotCrash() {
+        val sid = "sf-bounded-list"
+        val messagesJson = """
+            [
+              {"version":"v0.9","createSurface":{"surfaceId":"$sid","catalogId":"${A2uiCardContract.CATALOG_ID}"}},
+              {"version":"v0.9","updateComponents":{"surfaceId":"$sid","components":[
+                {"id":"root","component":"Column","children":["lst"]},
+                {"id":"lst","component":"List","direction":"vertical","children":["i1","i2","i3"]},
+                {"id":"i1","component":"Text","text":"bounded-list-item-1"},
+                {"id":"i2","component":"Text","text":"bounded-list-item-2"},
+                {"id":"i3","component":"Text","text":"bounded-list-item-3"}
+              ]}}
+            ]
+        """.trimIndent()
+
+        val resolver = HandleResolver(EmptyLookup)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val surface = runBlocking {
+                val processor = A2uiMessageProcessor(
+                    catalogs = listOf(polangA2uiCatalog(A2uiUrlOpener { })),
+                )
+                scope.launch { processor.collectMessages() }
+                val resolution = resolver.resolve(sid, messagesJson)
+                assertTrue(resolution is A2uiResolution.Ready)
+                (resolution as A2uiResolution.Ready).messages.forEach { message ->
+                    processor.processMessage(message)
+                }
+                withTimeout(10_000) {
+                    processor.activeSurfaces.first { list -> list.any { item -> item.id == sid } }
+                }.first { item -> item.id == sid }
+            }
+            composeRule.setContent {
+                MaterialTheme {
+                    // 聊天流同款宿主：LazyColumn item 以无限高约束测量内容
+                    androidx.compose.foundation.lazy.LazyColumn {
+                        item { A2uiSurface(surfaceModel = surface) }
+                    }
+                }
+            }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText("bounded-list-item-1").assertExists()
+        } finally {
+            scope.cancel()
+        }
+    }
 }
