@@ -1,7 +1,7 @@
 # OpenUI 自研客户端对齐 androidx A2UI Compose 适配层设计
 
 > **日期**：2026-10-26
-> **状态**：P1 实施中（P2~P4 规划）
+> **状态**：P1 已合 main（v1.0.62）；P2 实施中；P3~P4 规划
 > **上位约束**：ADR-013（commonMain 纯度：禁 androidx.compose 入 shared）/ ADR-016 / [PRIVACY] / §3.4 工作区隔离
 > **动机**：OpenUI 线渲染器全自研（spec《openui-wire-format-toggle-design》D 决策），用户定方向：
 > 自研应重点参考 androidx.a2ui 官方 Compose 适配方法。本文盘点代差并给出对齐路线。
@@ -54,8 +54,51 @@ material3-a2ui 皮肤），核心机制四条：
 
 ## 4. P2~P4 规划（后续周期）
 
-- **P2 流式**：Parser 增量喂入 + Eval「引用未就绪→挂起子树」+ isReady 门控渲染。
-  触服务端/端侧协议双侧（SSE 分片帧），工作量大，独立 spec。
+### P2 流式（本周期实施，2026-10-26 调研定稿）
+
+**调研结论（读码核实）**，工作量比原估小一档——**引擎零改动**：
+
+1. Koog 1.3.0 `nodeLLMRequest` 底层流式执行，`onLLMStreamingFrameReceived` 钩子携带
+   `StreamFrame.ToolCallDelta(id, name, content, index)`（content = 工具 args JSON 增量，
+   name 仅首帧）——服务端无需改策略/执行器，EventHandler 加钩子即可拿到
+   render_ui_openui 的 program 增量。
+2. `OpenUiParser.autoClose`（§4 流末规则：闭合未终结字符串 + 逆序闭合括号）本就为
+   截断输入设计；未到位引用走 dropped 哨兵在 children/数组处剔除、标量处收 Null——
+   前缀 parse+eval 天然产出「渐进生长的部分树」，无需新增 isReady 门控。
+3. 流式预览用**空 resolver**（Query 不取数，数据组件先渲染 defaults 空态），
+   正式帧到达后仍由现有整卡通道落库渲染真数据——预览纯渐进增强，不碰持久化语义。
+
+**服务端**（`server/agent/`）：
+
+- 新 `OpenUiProgramStreamExtractor`：累积 args 原文 → 定位 `"program"` 键 → 逐字符解
+  JSON 字符串转义（含 \uXXXX、转义中途断帧）→ 输出 program 前缀；`feed(delta): String?`。
+- 新 `OpenUiToolCallStreamTracker`：ToolCallDelta 按 id（缺省 index）归组累积，name 首帧
+  登记；只跟踪 render_ui_openui；节流发射（≥48 新字符且距上次 ≥80ms，finish 时补尾）。
+- `AgentRunner.runTurn` 增 `onOpenUiProgramDelta: (String) -> Unit = {}` 参数（ephemeral，
+  **不落 agent_event**——事件溯源只收最终 Action）；EventHandler 装
+  `onLLMStreamingFrameReceived`（同步钩子 runBlocking 桥，同 onToolCallStarting 先例）。
+- `AgentRoutes` 把回调接上 SSE writer：`{"kind":"openui_delta","program":"<前缀>"}`。
+  旧端 `CloudSseParser` 未知 kind 返回 null 忽略——**后向兼容，新旧端可混跑**。
+
+**端侧**（androidApp）：
+
+- `CloudFrame` 增 `OpenUiDelta(program)`（瞬态帧，同 tool_request 不落事件流）；
+  `CloudSseParser` 认 `openui_delta`；`CloudTurnEvent` 增 `OpenUiCardDelta(program)`。
+- `ChatViewModel`：`_openUiStreamProgram: MutableStateFlow<String?>`——delta 到就更新
+  （StateFlow 天然 conflate）；正式 `OpenUiCard` 帧/Error/Done 清空。非 suspend onEvent
+  直接写 flow，无 Room 触碰。
+- 新 `OpenUiStreamingCard` composable（chat/openui/）：`produceState(program)` 内新建
+  `OpenUiSession(prefix, resolver = { Null })`（每次前缀一个 session，parse+eval KB 级
+  亚毫秒～数毫秒，StateFlow conflation 防积压）；Rendered → OpenUiNodeRenderer 只读渲染
+  （action 全部忽略——预览期不交互、不写 viewState）；Failed → 保留上一帧好预览；
+  无 root 前缀期 → LoadingIndicator。挂在聊天列表底部流式区（_streamingMessage 旁）。
+
+**验收**：服务端提取器/跟踪器单测（转义断帧/乱序字段/节流补尾）；端侧对黄金程序
+每 50 字符切片 preview 不崩溃；真机 openui 线发卡可见卡片随流生长，正式帧到达后
+数据/交互完整不回归。
+
+### P3/P4（后续周期）
+
 - **P3 逐节点兜底**：prop 级失败从「丢组件」升级为「渲 ErrorFallback 占位」（可观测性更好）；
   数据缺失整卡降级（宁缺毋滥）保留不变。
 - **P4 组件契约化**：每个组件收敛为「schema+渲染同处」的类，巨型 when 退化为注册表查找；

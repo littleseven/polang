@@ -142,6 +142,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "ChatViewModel"
 private const val MAX_MESSAGES = 500
+
+/** OpenUI 流式预览合成瞬态消息 id（openui P2）：ChatScreen 据此分流到只读预览渲染。 */
+internal const val OPENUI_STREAM_PREVIEW_ID = "openui_stream_preview_msg"
 /** 分层记忆 M4：短期轨冷启动重建时从 Room 长期轨投影的最近消息条数（save 侧 8000 token/10 条裁剪兜底）。 */
 private const val MEMORY_REBUILD_MESSAGE_LIMIT = 50
 /** ADR-016 M2：任务卡 live 态 overlay 节流（SSE 高频事件不直接驱动全列表重组）。 */
@@ -1105,6 +1108,14 @@ class ChatViewModel(
     private val _streamingMessage = MutableStateFlow<ChatMessageUi?>(null)
     val streamingMessage: StateFlow<ChatMessageUi?> = _streamingMessage.asStateFlow()
 
+    /**
+     * OpenUI 流式预览（openui P2，spec《2026-10-26-openui-compose-alignment-design》§4 P2）：
+     * 服务端 openui_delta 帧的 program 前缀。瞬态内存轨（不落 Room），StateFlow 天然
+     * conflate 防帧积压；正式 OpenUiCard 帧落库后/回合终止时清空。
+     */
+    private val _openUiStreamProgram = MutableStateFlow<String?>(null)
+    val openUiStreamProgram: StateFlow<String?> = _openUiStreamProgram.asStateFlow()
+
     private val pacingController = StreamingPacingController(
         scope = viewModelScope,
         onPaced = { text, cursor ->
@@ -1215,7 +1226,13 @@ class ChatViewModel(
      * sessionId 进入 anchoredIds，合成消息自动让位（无双显）。
      */
     val displayMessages: StateFlow<List<ChatMessageUi>> =
-        combine(_messages, _streamingMessage, throttledEngineerTasks, throttledBrowserLiveSessions) { messages, streaming, liveTasks, liveBrowser ->
+        combine(
+            _messages,
+            _streamingMessage,
+            throttledEngineerTasks,
+            throttledBrowserLiveSessions,
+            _openUiStreamProgram,
+        ) { messages, streaming, liveTasks, liveBrowser, openUiPreview ->
             val base = if (streaming != null) messages + streaming else messages
             val overlaid = if (liveTasks.isEmpty() && liveBrowser.isEmpty()) {
                 base
@@ -1225,7 +1242,7 @@ class ChatViewModel(
                 // 防漂移）；非任务卡/无变化消息引用相等原样返回（零分配）。
                 base.map { msg -> msg.overlayLiveTaskState(liveTasks).overlayLiveBrowserState(liveBrowser) }
             }
-            if (liveBrowser.isEmpty()) {
+            val anchored = if (liveBrowser.isEmpty()) {
                 overlaid
             } else {
                 val anchoredIds = overlaid.asSequence()
@@ -1244,6 +1261,26 @@ class ChatViewModel(
                             parts = listOf(part),
                         )
                     }
+            }
+            // openui P2 流式预览：合成瞬态消息挂列表尾部（browser_live_anchor 同款先例），
+            // ChatScreen 按 OPENUI_STREAM_PREVIEW_ID 分流到 OpenUiStreamingCard 只读预览；
+            // 正式卡落库后本预览清空让位（无双显）
+            if (openUiPreview.isNullOrBlank()) {
+                anchored
+            } else {
+                anchored + ChatMessageUi(
+                    id = OPENUI_STREAM_PREVIEW_ID,
+                    type = ChatMessageType.AGENT_TEXT,
+                    role = ModelInputRole.ASSISTANT,
+                    content = "",
+                    parts = listOf(
+                        MessagePart.OpenUiCard(
+                            partId = "openui_stream_preview",
+                            program = openUiPreview,
+                            fallbackSummary = "",
+                        ),
+                    ),
+                )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -2175,6 +2212,7 @@ class ChatViewModel(
             val answer = StringBuilder()
             val cards = CloudTurnCardFlush(prepared.genUiFormat)
             var serverError: String? = null
+            _openUiStreamProgram.value = null // 防上回合异常残留（openui P2 流式预览）
             var result = runCloudTurnOnce(
                 prepared.runner, prepared.token, prepared.session, text, answer, cards
             ) { serverError = it }
@@ -2210,6 +2248,7 @@ class ChatViewModel(
             handleCloudTurnException(sessionId, e)
         } finally {
             cloudAgentGalleryTools?.mediaResultsListener = null
+            _openUiStreamProgram.value = null // 取消/异常路径兜底（openui P2）
         }
     }
 
@@ -2310,6 +2349,8 @@ class ChatViewModel(
         for ((pendingText, card) in cards.openUiFlushes) {
             if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
             insertOpenUiCardMessage(sessionId, card)
+            // 正式卡落库后流式预览让位（Room Flow 重放前的空窗仅一帧量级，无双显）
+            _openUiStreamProgram.value = null
         }
     }
 
@@ -2419,6 +2460,10 @@ class ChatViewModel(
                 // A2uiCard 同款快照（openui P2）
                 cards.openUiFlushes += answer.toString() to event
                 answer.clear()
+            }
+            is CloudTurnEvent.OpenUiCardDelta -> {
+                // openui P2 流式预览：瞬态内存轨，正式卡帧在 flushCloudTurnCards 落库后清空
+                _openUiStreamProgram.value = event.program
             }
             is CloudTurnEvent.Error -> onServerError(event.message)
             CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理

@@ -166,6 +166,7 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.features.chat.a2ui.A2uiCardDegraded
 import com.mamba.picme.features.chat.a2ui.A2uiCardHost
 import com.mamba.picme.features.chat.openui.OpenUiCardHost
+import com.mamba.picme.features.chat.openui.OpenUiStreamingCard
 import com.mamba.picme.features.chat.a2ui.polangA2uiCatalog
 import androidx.a2ui.model.catalog.functions.A2uiUrlOpener
 import androidx.compose.material.icons.outlined.Menu
@@ -864,16 +865,25 @@ fun ChatScreen(
                                     // 交互态经 onViewStateChange 持久化）；handle 缺失等 → 降级占位卡
                                     val part = item.part as? MessagePart.OpenUiCard
                                     if (part != null) {
-                                        OpenUiCardHost(
-                                            part = part,
-                                            handleLookup = openUiHandleLookup,
-                                            photoResolver = openUiPhotoResolver,
-                                            onViewStateChange = { viewState ->
-                                                viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
-                                            },
-                                            // Image 点击看大图：Gallery 同款 PhotoEditor 入口
-                                            onPhotoClick = { uri -> onNavigateToPhotoEditor(uri, false) },
-                                        )
+                                        if (item.message.id == OPENUI_STREAM_PREVIEW_ID) {
+                                            // openui P2 流式预览：只读、空 resolver（Query 不取数），
+                                            // 正式卡帧落库后由下方 OpenUiCardHost 接管
+                                            OpenUiStreamingCard(
+                                                program = part.program,
+                                                photoResolver = openUiPhotoResolver,
+                                            )
+                                        } else {
+                                            OpenUiCardHost(
+                                                part = part,
+                                                handleLookup = openUiHandleLookup,
+                                                photoResolver = openUiPhotoResolver,
+                                                onViewStateChange = { viewState ->
+                                                    viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
+                                                },
+                                                // Image 点击看大图：Gallery 同款 PhotoEditor 入口
+                                                onPhotoClick = { uri -> onNavigateToPhotoEditor(uri, false) },
+                                            )
+                                        }
                                     }
                                 }
                                 else -> {

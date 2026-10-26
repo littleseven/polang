@@ -32,6 +32,17 @@ class CloudAgentClientTest {
     }
 
     @Test
+    fun `parseBlock parses openui delta frame and tolerates empty program`() {
+        // openui P2 流式预览帧（瞬态，不落事件流）
+        val delta = CloudSseParser.parseBlock("""data: {"kind":"openui_delta","program":"root = Card(["}""")
+        assertTrue(delta is CloudFrame.OpenUiDelta)
+        assertEquals("root = Card([", (delta as CloudFrame.OpenUiDelta).program)
+        // 空前缀无意义忽略；缺字段忽略
+        assertEquals(null, CloudSseParser.parseBlock("""data: {"kind":"openui_delta","program":""}"""))
+        assertEquals(null, CloudSseParser.parseBlock("""data: {"kind":"openui_delta"}"""))
+    }
+
+    @Test
     fun `createSession posts channel fields and returns session json`() = runTest {
         val server = MockWebServer()
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"session_id":"s_1","status":"running","channel":"byok","model":"kimi-k2.6"}"""))

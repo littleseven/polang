@@ -241,6 +241,27 @@ class CloudAgentTurnRunnerTest {
     }
 
     @Test
+    fun `openui delta frame emits card delta event`() = runTest {
+        // openui P2 流式预览：openui_delta 帧 → OpenUiCardDelta 上屏事件（不落库）
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(CloudFrame.OpenUiDelta("root = Card(["))
+            onFrame(CloudFrame.OpenUiDelta("root = Card([header])"))
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
+        assertEquals(
+            listOf(
+                CloudTurnEvent.OpenUiCardDelta("root = Card(["),
+                CloudTurnEvent.OpenUiCardDelta("root = Card([header])"),
+                CloudTurnEvent.Done,
+            ),
+            events,
+        )
+    }
+
+    @Test
     fun `render_ui_openui action frame with malformed argsJson is ignored`() = runTest {
         val api = FakeApi()
         api.framesScript = { onFrame ->
