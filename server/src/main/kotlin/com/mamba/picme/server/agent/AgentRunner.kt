@@ -38,11 +38,12 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  * （端侧永远见不到坏卡；工具体独立校验同源规则，回错误文本给 LLM 同轮修正）。
  * 被拒调用无 Action 落库，天然不进入 pending 重放。
  *
- * [onOpenUiProgramDelta]：render_ui_openui 流式预览旁路（openui P2）。Koog 1.3.0
- * nodeLLMRequest 底层流式执行，ToolCallDelta 帧携带工具 args JSON 增量——本回调把
- * 已到达的 program 前缀（节流后）推向 SSE，**不落 agent_event**（事件溯源只收最终
- * Action，预览帧是瞬态传输信号，同 tool_request 口径）。正式 action 帧仍是唯一权威
- * 负载；端侧新旧版本混跑安全（旧端忽略未知 kind 帧）。
+ * [onOpenUiProgramDelta]：render_ui_openui 流式预览旁路（openui P2）。策略层 LLM 节点经
+ * `requestLLMStreaming()` 逐帧收集（见 cloudAgentStrategy 差异 3；内建 nodeLLMRequest 是
+ * 一次性请求，不产 StreamFrame），Koog OpenAI 客户端把工具 args JSON 增量以 ToolCallDelta
+ * 逐帧透传至 EventHandler 钩子——本回调把已到达的 program 前缀（节流后）推向 SSE，
+ * **不落 agent_event**（事件溯源只收最终 Action，预览帧是瞬态传输信号，同 tool_request
+ * 口径）。正式 action 帧仍是唯一权威负载；端侧新旧版本混跑安全（旧端忽略未知 kind 帧）。
  */
 class AgentRunner(
     private val executorFactory: AgentExecutorFactory,

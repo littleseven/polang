@@ -68,4 +68,37 @@ class OpenUiToolCallStreamTrackerTest {
         // 防御：首帧无 name（协议异常）登记为未知流，不发射也不崩溃
         assertNull(t.onDelta(id = null, name = null, content = "{\"program\": \"root = Card([])\"}", index = 0))
     }
+
+    @Test
+    fun `id-less follow-up frames attribute by index alias`() {
+        val t = tracker()
+        // 真实提供商形态（2026-10-26 真机实证）：首帧带 id/name，后续帧 id 缺失只带 index
+        assertNull(t.onDelta(id = "call_1", name = "render_ui_openui", content = "{\"program\": \"root", index = 0))
+        val emitted = t.onDelta(id = null, name = null, content = " = Card([Text(\\\"hi\\\")])", index = 0)
+        assertEquals("root = Card([Text(\"hi\")])", emitted)
+        // onComplete 同样 id 缺失 → index 别名解析后补尾
+        clock += 1000
+        t.onDelta(id = null, name = null, content = ", tail", index = 0)
+        assertEquals("root = Card([Text(\"hi\")]), tail", t.onComplete(id = null, index = 0))
+    }
+
+    @Test
+    fun `id-less frames without index attribute to the single open stream`() {
+        val t = tracker()
+        assertNull(t.onDelta(id = "call_1", name = "render_ui_openui", content = "{\"program\": \"root", index = null))
+        val emitted = t.onDelta(id = null, name = null, content = " = Card([Text(\\\"hi\\\")])", index = null)
+        assertEquals("root = Card([Text(\"hi\")])", emitted)
+    }
+
+    @Test
+    fun `id-less frames without index are dropped when multiple streams open`() {
+        val t = tracker()
+        // 两个流都登记后，无 id 无 index 的帧无法安全归属 → 丢弃（宁丢不串流）
+        assertNull(t.onDelta(id = "call_1", name = "search_media", content = "{\"query\": \"a\"}", index = 0))
+        assertNull(t.onDelta(id = "call_2", name = "render_ui_openui", content = "{\"program\": \"root", index = 1))
+        assertNull(t.onDelta(id = null, name = null, content = " = Card([])", index = null))
+        // 带 index 的帧仍按别名正确归组
+        val emitted = t.onDelta(id = null, name = null, content = " = Card([Text(\\\"hi\\\")])", index = 1)
+        assertEquals("root = Card([Text(\"hi\")])", emitted)
+    }
 }

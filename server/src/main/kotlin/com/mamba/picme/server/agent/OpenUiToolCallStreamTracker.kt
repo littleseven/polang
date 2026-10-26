@@ -20,6 +20,7 @@ internal class OpenUiToolCallStreamTracker(
 
     private class Stream(
         var name: String?,
+        val index: Int?,
         val extractor: OpenUiProgramStreamExtractor,
     )
 
@@ -41,7 +42,7 @@ internal class OpenUiToolCallStreamTracker(
 
     /** 工具调用流收尾：补尾发射（前缀有推进才发）。 */
     fun onComplete(id: String?, index: Int?): String? {
-        val stream = streams[keyOf(id, index)] ?: return null
+        val stream = resolve(id, index) ?: return null
         if (stream.name != toolName) return null
         // extractor 无增量可喂，直接重提取终态（终帧 content 已在最后的 onDelta 喂入）
         val prefix = stream.extractor.feed("") ?: return null
@@ -51,13 +52,28 @@ internal class OpenUiToolCallStreamTracker(
     private fun streamFor(id: String?, name: String?, index: Int?): Stream? {
         // 首帧（带 name）必登记；后续帧按 key 归组。name 显式非本工具 → 登记后短路忽略，
         // 防同 key 后续帧误归属（id 缺失时 index 归组，name 以首帧为准）
-        val key = keyOf(id, index)
-        val existing = streams[key]
-        if (existing != null) return existing
-        if (streams.isEmpty() || name != null) {
-            return Stream(name, OpenUiProgramStreamExtractor()).also { streams[key] = it }
+        streams[keyOf(id, index)]?.let { return it }
+        if (name == null) {
+            // OpenAI 协议只在首帧带 id/name，后续增量帧 id 缺失（2026-10-26 真机日志实证：
+            // DeepSeek 后续 chunk 无 id，key 错位导致整条流被丢弃）→ 按 index 别名回溯首帧
+            // 登记的流；index 也缺省时单流场景归属唯一流，多流无法安全归属则丢弃
+            val resolved = resolve(id, index)
+            if (resolved != null) return resolved
+            if (streams.isEmpty()) {
+                return Stream(null, index, OpenUiProgramStreamExtractor()).also { streams[keyOf(id, index)] = it }
+            }
+            return null
         }
-        return null
+        return Stream(name, index, OpenUiProgramStreamExtractor()).also { streams[keyOf(id, index)] = it }
+    }
+
+    private fun resolve(id: String?, index: Int?): Stream? {
+        streams[keyOf(id, index)]?.let { return it }
+        if (index != null) {
+            streams.values.singleOrNull { it.index == index }?.let { return it }
+        }
+        // id/index 全缺：只有一个已登记流时归属它（多流并行无法安全归属，宁可丢帧不串流）
+        return streams.values.singleOrNull()
     }
 
     private fun keyOf(id: String?, index: Int?): String =

@@ -57,7 +57,7 @@ class AgentRoutesBridgeTest {
     /** MockEngine 两轮：第一轮 tool_calls(search_media)，第二轮最终文本。 */
     private fun toolCallThenTextEngine(): MockEngine {
         val callCount = AtomicInteger(0)
-        return MockEngine {
+        return MockEngine { request ->
             val n = callCount.incrementAndGet()
             val body = if (n == 1) {
                 """{"id":"c1","object":"chat.completion","created":0,"model":"glm-5.2","choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"search_media","arguments":"{\"query\":\"猫\",\"person\":\"\",\"fromMs\":\"\",\"toMs\":\"\",\"hasFace\":\"\",\"display\":\"false\"}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}"""

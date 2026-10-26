@@ -368,6 +368,63 @@ class AgentRunnerTest {
     private fun jsonArgsEscape(raw: String): String =
         raw.replace("\\", "\\\\").replace("\"", "\\\"")
 
+    // ── openui P2 流式预览（真 CIO 回环：MockEngine 不支持 SSECapability）──────────
+
+    /**
+     * render_ui_openui 工具调用的 args 增量经 SSE chunk 流下行：Koog OpenAI 客户端解析 →
+     * ToolCallDelta 逐帧 → EventHandler 钩子 → OpenUiToolCallStreamTracker →
+     * onOpenUiProgramDelta 收到单调生长的 program 前缀，尾帧 = 完整 program；
+     * 正式 Action 落流不受影响（权威负载）。MockEngine 不支持 SSE，须真 CIO 服务器回环。
+     */
+    @Test
+    fun `openui tool call streams program prefixes via delta callback`() = runBlocking {
+        val session = newSession()
+        val program = RenderOpenUiToolService.GOLDEN_STATS_PROGRAM
+        val argsJson = buildJsonObject {
+            put("program", program)
+            put("fallbackSummary", "统计卡")
+        }.toString()
+        val toolCallOneShot = toolCallResponse("call_1", "render_ui_openui", jsonArgsEscape(argsJson))
+
+        val callCount = java.util.concurrent.atomic.AtomicInteger(0)
+        val sseServer = RawSseStubServer { body, n ->
+            val oneShot = if (n == 1) toolCallOneShot else chatResponse("卡已发")
+            if (body.contains("\"stream\":true")) {
+                MockLlmSse.toSseBody(oneShot) to "text/event-stream"
+            } else {
+                oneShot to "application/json"
+            }
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val deltas = mutableListOf<String>()
+            val registry = ToolRegistry { tools(RenderOpenUiToolService().asToolsByClass()) }
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+                actionGate = RenderUiValidator::gate,
+            ).runTurn(session, "发卡", target, "sys", registry, onOpenUiProgramDelta = { deltas += it })
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertTrue("流式预览应至少产生首发+补尾两帧，实际 ${deltas.size} 帧", deltas.size >= 2)
+            deltas.zipWithNext().forEach { (prev, next) ->
+                assertTrue("前缀须单调生长", next.length > prev.length && next.startsWith(prev))
+            }
+            assertEquals("尾帧须等于完整 program", program, deltas.last())
+            // 正式卡照常落 Action（权威负载不受预览旁路影响）
+            val events = AgentEventRepository.listBySession(session.id)
+            assertTrue(events.any { event -> event.type == AgentEventType.ACTION })
+            assertEquals(2, sseServer.callCount.get()) // 发卡 + 收尾文本各一次，无回退重试
+        } finally {
+            sseServer.close()
+        }
+    }
+
     // ── 假发卡纠正回环（CardClaimGuard，2026-10-24 穷举实测事故类）──────────
 
     /**
