@@ -880,6 +880,11 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **回灌**：不回灌 LLM（data part 分支 emptyList 同 data_ui）；program 只含骨架 + Query
   local_handle 绑定，handle id 对云 opaque（D2 对偶）。
 - **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，
+  宿主侧 P1 响应式状态（2026-10-26，spec《2026-10-26-openui-compose-alignment-design》，
+  对齐 androidx bind 粒度订阅语义）：session.state 经宿主边界转 SnapshotStateMap 逐键增量
+  同步（`syncWith`），per-key 读追踪使 action 后仅订阅变更键的节点重组；root 树 data class
+  相等门控——绑定全保留的卡在纯交互后零树级重组（真机验证：勾选 CheckBox 时焦点中的
+  Input 文本与焦点均不丢）；
   polang OpenUI 组件库二十一组件（M2+M3，2026-10-24，spec《openui-component-library-m2-design》/
   《openui-component-library-m3-design》）：
   Card/Row/Column/Text/Button/BarChart/Image + Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider

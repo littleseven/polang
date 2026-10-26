@@ -5,6 +5,7 @@ import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -212,8 +213,13 @@ private fun OpenUiReadyContent(
     modifier: Modifier = Modifier,
     onPhotoClick: (uri: String) -> Unit = {},
 ) {
-    // applyAction 后快照刷新触发重组（session 内部状态非 Compose 可观测）
-    var stateSnapshot by remember(session) { mutableStateOf(session.state) }
+    // P1 响应式状态（spec《2026-10-26-openui-compose-alignment-design》§3，对齐 androidx
+    // bind 粒度订阅语义）：session.state 非 Compose 可观测（ADR-013 禁 compose 入 commonMain，
+    // 边界转换只能宿主侧做），SnapshotStateMap 逐键增量同步换 per-key 读追踪——action 后
+    // 只有订阅了变更键的节点重组，不再整表替换全量失效。
+    val stateMap = remember(session) {
+        mutableStateMapOf<String, OpenUiValue>().apply { putAll(session.state) }
+    }
     var root by remember(session) { mutableStateOf(session.rootOrNull()) }
     val uriHandler = LocalUriHandler.current
     val dispatch: (OpenUiAction) -> Unit = { action ->
@@ -221,8 +227,12 @@ private fun OpenUiReadyContent(
             "Set", "Reset" -> {
                 val before = (session.state[OpenUiContract.STATE_SELECTED] as? OpenUiValue.Str)?.v
                 session.applyAction(action)
-                stateSnapshot = session.state
-                root = session.rootOrNull()
+                stateMap.syncWith(session.state)
+                // root 相等门控：绑定全保留为 Binding 的树在纯交互 action 后结构不变（data class
+                // 结构化相等），不换引用即零树级重组（ComponentVal props 含 Map 非 stable 类型，
+                // 不比等必全树重组）；烘焙引用场景树必变，照常更新
+                val newRoot = session.rootOrNull()
+                if (newRoot != root) root = newRoot
                 val after = (session.state[OpenUiContract.STATE_SELECTED] as? OpenUiValue.Str)?.v
                 if (after != before) {
                     onViewStateChange(after?.let(OpenUiContract::viewStateOfSelected) ?: "")
@@ -242,10 +252,22 @@ private fun OpenUiReadyContent(
     root?.let { component ->
         OpenUiNodeRenderer(
             node = component,
-            state = stateSnapshot,
+            state = stateMap,
             photoResolver = photoResolver,
             onAction = dispatch,
             modifier = modifier,
         )
+    }
+}
+
+/**
+ * 逐键增量同步（P1，spec §3.1）：删消失键、写变更键、不动未变键——配合 SnapshotStateMap
+ * 的 per-key 读追踪，只有订阅变更键的组合节点失效。整表替换（putAll 前 clear）会让所有
+ * 订阅者全量失效，退化回旧的快照拷贝语义，禁那样写。
+ */
+internal fun MutableMap<String, OpenUiValue>.syncWith(latest: Map<String, OpenUiValue>) {
+    (keys - latest.keys).forEach(::remove)
+    latest.forEach { (key, value) ->
+        if (this[key] != value) this[key] = value
     }
 }
