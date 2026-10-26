@@ -873,8 +873,16 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   请求头 `X-GenUI-Format` → server 侧互斥注册 render_ui（A2UI）/render_ui_openui（OpenUI），
   同一回合只产一种 GenUI 卡。
 - **协议**：`ChatMessageEntity.type = "data_ui_openui"`，content 列存整颗 `MessagePart.OpenUiCard`
-  part JSON；云端经 render_ui_openui 工具 action 帧下发（OpenUI Lang 1.0 程序整帧，无流式），
-  端上 TurnRunner 拦截落库。
+  part JSON；云端经 render_ui_openui 工具 action 帧下发（OpenUI Lang 1.0 程序），
+  端上 TurnRunner 拦截落库。**流式预览**（P2，2026-10-26，spec《2026-10-26-openui-compose-alignment-design》）：
+  服务端 Koog EventHandler `onLLMStreamingFrameReceived` 捕获 ToolCallDelta →
+  `OpenUiToolCallStreamTracker` 按 id 归组 + `OpenUiProgramStreamExtractor` 解 program
+  前缀（JSON 感知键定位 + 转义断帧容错）→ 节流（≥48 字符且 ≥80ms，首发免时间窗）经
+  SSE `kind=openui_delta` 瞬态帧旁路下行（不落 agent_event；旧端忽略未知 kind 后向兼容）；
+  端侧合成瞬态预览消息（`OPENUI_STREAM_PREVIEW_ID`）挂列表尾，ChatScreen 分流
+  `OpenUiStreamingCard`——每帧前缀新建 session 解析（parser autoClose 流末规则 +
+  dropped 哨兵剔除未到位引用，卡片随流生长，引擎零改动），空 resolver 不取数
+  （Query 组件先渲 defaults 空态），只读不交互；正式 action 帧落库后预览让位。
 - **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState)`，
   category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）。
 - **回灌**：不回灌 LLM（data part 分支 emptyList 同 data_ui）；program 只含骨架 + Query

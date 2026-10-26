@@ -76,6 +76,9 @@ private const val DEFAULT_SYSTEM_PROMPT =
  *   设备工具调用经工具桥下发给端侧执行（传输层信号，不落事件流）；与 event/done/error
  *   帧共用同一 writer 天然保序。设备工具集每轮在路由层以当轮 writer 构造并合成进
  *   ToolRegistry（服务端工具 + 设备工具），[AgentRunner] 零改动。
+ *   openui P2 起新增 `{"kind":"openui_delta","program":"<已到达前缀>"}` 帧——
+ *   render_ui_openui 工具 args 流式增量的 program 前缀旁路（瞬态预览，不落事件流）；
+ *   端侧新旧版本混跑安全（旧端忽略未知 kind），正式 action 帧仍是唯一权威负载。
  *   render_html（服务端工具）同理以当轮 writer 构造 sink：HTML 本体落 HtmlCard 事件
  *   （type=html_card）经 kind=event 帧下行，LLM 上下文只见 summary 回执。
  * - `POST /agent/sessions/{id}/tool-results`：端侧工具结果上行（M2）。body
@@ -316,6 +319,14 @@ fun Route.agentRoute(
                                 systemPrompt = DEFAULT_SYSTEM_PROMPT,
                                 toolRegistry = toolRegistry,
                                 onHtmlCard = htmlCardSink,
+                                // openui P2 流式预览：program 前缀瞬态帧（不落事件流，与
+                                // event/done/error 共用同一 writer 保序；旧端忽略未知 kind）
+                                onOpenUiProgramDelta = { prefix ->
+                                    writeSseFrame(buildJsonObject {
+                                        put("kind", "openui_delta")
+                                        put("program", prefix)
+                                    })
+                                },
                                 onEvent = { event ->
                                     writeSseFrame(buildJsonObject {
                                         put("kind", "event")

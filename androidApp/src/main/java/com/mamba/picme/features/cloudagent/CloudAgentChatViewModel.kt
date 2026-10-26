@@ -186,6 +186,7 @@ class CloudAgentChatViewModel(
                                 "render_ui_openui(len=${event.program.length})"
                             )
                         )
+                        is CloudTurnEvent.OpenUiCardDelta -> Unit // 流式预览主页专属（openui P2），调试页忽略
                         is CloudTurnEvent.Error -> {
                             append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, event.message))
                             setInFlight(false)

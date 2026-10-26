@@ -3,6 +3,7 @@ package com.mamba.picme.server.agent
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.features.eventHandler.feature.EventHandler
+import ai.koog.prompt.streaming.StreamFrame
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -36,6 +37,13 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  * 故校验必须挂在这里——返回非 null 错误文本时该次调用**不落 Action、不 SSE 下行**
  * （端侧永远见不到坏卡；工具体独立校验同源规则，回错误文本给 LLM 同轮修正）。
  * 被拒调用无 Action 落库，天然不进入 pending 重放。
+ *
+ * [onOpenUiProgramDelta]：render_ui_openui 流式预览旁路（openui P2）。策略层 LLM 节点经
+ * `requestLLMStreaming()` 逐帧收集（见 cloudAgentStrategy 差异 3；内建 nodeLLMRequest 是
+ * 一次性请求，不产 StreamFrame），Koog OpenAI 客户端把工具 args JSON 增量以 ToolCallDelta
+ * 逐帧透传至 EventHandler 钩子——本回调把已到达的 program 前缀（节流后）推向 SSE，
+ * **不落 agent_event**（事件溯源只收最终 Action，预览帧是瞬态传输信号，同 tool_request
+ * 口径）。正式 action 帧仍是唯一权威负载；端侧新旧版本混跑安全（旧端忽略未知 kind 帧）。
  */
 class AgentRunner(
     private val executorFactory: AgentExecutorFactory,
@@ -56,6 +64,7 @@ class AgentRunner(
         systemPrompt: String,
         toolRegistry: ToolRegistry,
         onHtmlCard: suspend (html: String, summary: String) -> Unit = { _, _ -> },
+        onOpenUiProgramDelta: suspend (programPrefix: String) -> Unit = {},
         onEvent: suspend (AgentEvent) -> Unit = {},
     ): AgentEvent {
         // 1. 投影（先于本轮用户消息落流）
@@ -79,6 +88,8 @@ class AgentRunner(
         val actionIds = mutableMapOf<String, Long>()
         // 假发卡守卫（每轮新实例）：卡工具 Action 过门控 → 标记；终结消息假声称 → 策略层回环纠正
         val cardGuard = CardClaimGuard()
+        // OpenUI 流式预览跟踪器（每轮新实例）：ToolCallDelta → program 前缀节流发射
+        val openUiStreamTracker = OpenUiToolCallStreamTracker()
         try {
             val agent = AIAgent.builder()
                 .graphStrategy(cloudAgentStrategy(cardGuard))
@@ -88,6 +99,22 @@ class AgentRunner(
                 .prompt(cloudAgentPrompt("polang-cloud-agent", systemPrompt, projected, built.params))
                 .maxIterations(maxIterations)
                 .install(EventHandler.Feature) { events ->
+                    events.onLLMStreamingFrameReceived { ctx ->
+                        // openui P2 流式预览：render_ui_openui 的 args 增量 → program 前缀旁路
+                        // 下行（不落事件流）。同步钩子 → runBlocking 桥（同 onToolCallStarting）
+                        val prefix = when (val frame = ctx.streamFrame) {
+                            is StreamFrame.ToolCallDelta -> openUiStreamTracker.onDelta(
+                                frame.id, frame.name, frame.content, frame.index,
+                            )
+                            is StreamFrame.ToolCallComplete -> openUiStreamTracker.onComplete(
+                                frame.id, frame.index,
+                            )
+                            else -> null
+                        }
+                        if (prefix != null) {
+                            runBlocking { onOpenUiProgramDelta(prefix) }
+                        }
+                    }
                     events.onToolCallStarting { ctx ->
                         // 同步钩子 → runBlocking 桥（见类 KDoc ⚠️）
                         runBlocking {

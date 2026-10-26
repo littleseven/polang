@@ -35,6 +35,9 @@ sealed interface CloudTurnEvent {
         val fallbackSummary: String,
     ) : CloudTurnEvent
 
+    /** render_ui_openui 流式预览（openui P2）：已到达的 program 前缀，正式卡帧前渐进上屏。 */
+    data class OpenUiCardDelta(val program: String) : CloudTurnEvent
+
     /** 本轮 SSE 正常收尾（done 帧）。 */
     data object Done : CloudTurnEvent
 }
@@ -69,6 +72,7 @@ class CloudAgentTurnRunner(
     ) { frame ->
         when (frame) {
             is CloudFrame.Event -> handleEvent(frame.event, onEvent)
+            is CloudFrame.OpenUiDelta -> onEvent(CloudTurnEvent.OpenUiCardDelta(frame.program))
             is CloudFrame.ToolRequest -> {
                 onEvent(CloudTurnEvent.ToolCall(frame.tool))
                 toolScope.launch {

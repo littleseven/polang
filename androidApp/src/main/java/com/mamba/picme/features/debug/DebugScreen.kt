@@ -71,6 +71,7 @@ import com.mamba.picme.features.debug.pexels.PexelsImageSaver
 import com.mamba.picme.features.debug.pexels.PexelsKeyStore
 import com.mamba.picme.features.debug.pexels.PexelsSection
 import com.mamba.picme.features.debug.pexels.PexelsViewModel
+import com.mamba.picme.features.debug.openui.OpenUiComponentGallery
 import com.mamba.picme.features.gallery.MediaViewModel
 import kotlinx.coroutines.launch
 
@@ -211,6 +212,12 @@ private fun DebugContent(
                     onClick = { selectedTab = 1 },
                     text = { Text(stringResource(R.string.debug_tab_pexels)) }
                 )
+                Tab(
+                    // "OpenUI" 是协议标识符（OpenUiBlueprintDebugger 徽标同口径），[I18N] 豁免
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("OpenUI") }
+                )
             }
             when (selectedTab) {
                 0 -> GenerateTabContent(
@@ -231,6 +238,8 @@ private fun DebugContent(
                 )
 
                 1 -> PexelsSection(viewModel = pexelsViewModel)
+
+                2 -> OpenUiComponentGallery()
             }
         }
     }
