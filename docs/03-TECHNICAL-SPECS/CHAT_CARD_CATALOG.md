@@ -893,15 +893,13 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   同步（`syncWith`），per-key 读追踪使 action 后仅订阅变更键的节点重组；root 树 data class
   相等门控——绑定全保留的卡在纯交互后零树级重组（真机验证：勾选 CheckBox 时焦点中的
   Input 文本与焦点均不丢）；
-  polang OpenUI 组件库二十一组件（M2+M3，2026-10-24，spec《openui-component-library-m2-design》/
-  《openui-component-library-m3-design》）：
+  polang OpenUI 组件库二十一组件（M2+M3，2026-10-24）：
   Card/Row/Column/Text/Button/BarChart/Image + Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider
   + Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch（M3 新增 prop 类型 PRIMITIVE_ARRAY：
   元素限 Str/Num/Bool 或一层嵌套 Arr，两层嵌套/类型混杂 → 必填丢组件；可嵌套进 OBJECT_ARRAY
   objectFields（LineChart.series[].values），Tabs COMPONENT_LIST 递归同机制），
   schema 见 shared OpenUiLibrary）；Query("local_handle") 经 AppContainer `localHandleLookup` 端侧补全
-  （scan domain → `#histogram`/省略 = GalleryHistogramBuilder 月桶；`#photos`（2026-10-24，
-  spec《openui-image-component-design》）= ScanPhotoProjection 照片清单 [{id,date}] cap 60
+  （scan domain → `#histogram`/省略 = GalleryHistogramBuilder 月桶；`#photos`（2026-10-24）= ScanPhotoProjection 照片清单 [{id,date}] cap 60
   保持搜索相关度原序），handle 失败/prepare Failed 降级占位卡
   （复用 A2uiCardDegraded，US-6 同口径）；样式令牌只读复用 A2uiStyleMapper，BarChart 视觉
   与 PolangBarChartComponent 逐项对齐（A2uiCardTokens + primary 色 + 选中 45% alpha 规则）；

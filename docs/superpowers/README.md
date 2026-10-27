@@ -100,7 +100,7 @@ docs/superpowers/
   - `2026-09-26-user-task-protocol-design.md` — 用户任务协议 + 任务中心双 Tab（M2/M3 在途）
   - `2026-09-26-task-paradigm-positioning-design.md` — 任务范式定位升格（已实施：PRODUCT.md v3.1 定位句 + §6.6 任务线）
   - `2026-09-27-chat-parts-rendering-design.md` — Chat parts 消息模型与渲染架构（ADR-016 实施 spec，已定稿待实施）
-  - `2026-09-27-chat-agent-layered-memory-design.md` — Chat Agent 分层记忆系统（L1 预算制/L2 滚动摘要/L3 事实库，M1~M3 分期；M1 已合 main，M2/M3 待排期）
+  - `2026-09-27-chat-agent-layered-memory-design.md` — Chat Agent 分层记忆系统（L1 预算制/L2 滚动摘要/L3 事实库 + M4 主从制；M1/M2/M4 已合 main，M3 跨会话事实库待排期）
   - `2026-09-28-chat-type-taxonomy-design.md` — chat type 分类法（content/tool/data 三分类 + 命名规则 + role 上提；chat-parts 线配套 spec）
   - `2026-10-06-browser-vnc-live-card-design.md` — Browser-VNC 云端浏览器直播卡（M1 已定稿待实施：bridge + 服务端网关 + 工具闭环 + INLINE 直播卡）
   - `2026-10-17-cloud-agent-tool-bridge-design.md` — 云端 Agent M2 工具桥 + BYOK 授权 UI + 最小聊天页（ADR-018 实施 spec，已定稿待评审）
@@ -124,3 +124,4 @@ docs/superpowers/
 | 2026-10-21 | M1 投影通路交付：plan `2026-10-21-hybrid-m1-projection.md` 按沉淀管线移除（结论已落 shared/androidApp/server 模块 AGENTS.md，git 历史可查），spec 保留（M2/M3 在途） |
 | 2026-10-24 | 索引补录 `2026-10-24-openui-wire-format-toggle-design.md`（OpenUI 线格式并行接入 + GenUI 协议开关，M1 在途） |
 | 2026-10-26 | 索引补录 `2026-10-26-openui-compose-alignment-design.md`（OpenUI 对齐 Compose 适配层，P1 已合 main，P2~P4 在途） |
+| 2026-10-27 | 交付沉淀：删除 7 篇已交付未登记 spec（scan-entry-and-stats-ring / ota-background-download / openui-component-library-m2 / openui-component-library-m3 / openui-image-component / openui-full-library / openui-visual-m4——结论已落 FEATURES §3.6 / androidApp·shared·server AGENTS.md / CHAT_CARD_CATALOG / OPENUI_CARD_DESIGN_LANGUAGE，git 历史可查），活文档内对应 spec 引用同步摘除；修正 §6 分层记忆条目状态（M1/M2/M4 已合 main，M3 事实库待排期） |

@@ -50,6 +50,10 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
     ├─ 冷启动重建：短期轨空 ← Room 最近 50 条经 toModelInput 投影（sendMessage 前置兜底）
     └─ 删除传播：deleteSession/clearChat → clearChatMemory 同步清短期轨
   工程师隧道 = Room partsJson → toModelInput → toHistoryPair（GET_CHAT_HISTORY）
+
+云端回合（并行链路，2026-10 起）：CloudAgentClient → picme-server /agent/**（服务端 Koog，ADR-017/018）
+  GenUI 卡 render_ui/render_ui_openui 经 SSE action 帧下行 → 端侧落库 data_ui / data_ui_openui
+  OpenUI 流式预览经 SSE kind=openui_delta 瞬态帧旁路（不落库）——详见 §2.9
 ```
 
 ---
@@ -299,6 +303,16 @@ data: [DONE]                                             ← 字面量哨兵
 1. **请求是只增不减的累加器**：第 N 轮请求 = 第 N-1 轮全量 + 上轮 assistant 消息 + tool 结果消息；messages 数组即 ReAct 账本（短期轨 8000 token 预算/老化/摘要负责兜底体积，§3.2）。
 2. **Call↔Result 配对铁律**：回灌时 `assistant.tool_calls[i].id` 与下一条 `tool.tool_call_id` 必须严格一致——OpenAI 硬校验，孤儿 tool 消息或缺结果均 400（`toModelInput` 拆对、`sanitizeToolPairing` 双向剔除守此律）。
 3. **finish_reason 只有两种走向**：`tool_calls` = 执行工具再来一轮；`stop` = 纯文本终止。每轮请求/响应骨架一模一样，区别全在 messages 的累加上。
+
+### 2.9 云端 Agent 回合与 GenUI 卡通道（2026-10-27 增补）
+
+> 前述 §1~§2.8 是**端侧 Koog 回合**（经 `/llm` 网关）。2026-10 起主聊天页存在第二条并行链路——**云端 Agent 回合**（ADR-017/018，服务端 Koog + 事件溯源），GenUI 卡（A2UI/OpenUI）只从该链路产出。本节只登记主聊天流口径；卡片级三要素归 `CHAT_CARD_CATALOG.md`，服务端实现归 `server/AGENTS.md`，端侧渲染宿主归 androidApp chat 模块 AGENTS.md §2.2。
+
+- **链路**：`CloudAgentClient`（androidApp `data/remote/picme/`）→ picme-server `/agent/**` REST + SSE；端侧工具经 SSE `tool_request` 帧下行 + `POST /agent/sessions/{id}/tool-results` 上行回传（工具桥双通道）；端侧结果出端统一过 shared `CloudToolProjectionGate` 投影闸（fail-closed，[PRIVACY]）。
+- **GenUI 格式分流（2026-10-24）**：请求头 `X-GenUI-Format: a2ui|openui`（缺省 a2ui）→ server 侧**互斥**注册 `render_ui`（A2UI JSON）或 `render_ui_openui`（OpenUI Lang 1.0 程序），同一回合只产一种 GenUI 卡；两条线同口径过 `RenderUiValidator`/`RenderOpenUiValidator` **发射点门控**（挂在 Koog onToolCallStarting：非法负载不落 Action、不 SSE 下行、不进 pending 重放）+ 工具体同源校验回 `error: …` 违规清单作 observation 回灌，LLM 同轮修正重试。
+- **卡下发与落库**：合法负载经 SSE action 帧下行 → 端侧拦截落库 `data_ui`（A2uiCard）/ `data_ui_openui`（OpenUiCard 整颗 part JSON 存 content 列）；data part 不回灌 LLM。
+- **OpenUI 流式预览（P2，2026-10-26）**：server Koog EventHandler `onLLMStreamingFrameReceived` 捕获 render_ui_openui 的 ToolCallDelta → `OpenUiToolCallStreamTracker` 按 toolCall id 归组（缺 id 帧按 index/单流别名归组）+ `OpenUiProgramStreamExtractor` JSON 感知解 program 前缀（转义断帧容错）→ 节流（≥48 字符且 ≥80ms，首发免时间窗）后经 SSE `kind=openui_delta` **瞬态帧旁路下行**（不落 agent_event，正式 action 帧唯一权威；旧端忽略未知 kind 后向兼容）→ 端侧合成 `OPENUI_STREAM_PREVIEW_ID` 瞬态预览消息挂列表尾，`OpenUiStreamingCard` 每帧前缀新建 session 解析渐进渲染；正式卡落库后预览让位。
+- **图集卡透出（2026-10-21/24）**：云端回合 search_media 命中经 `CloudAgentGalleryTools.mediaResultsListener` 端侧回调本地渲染媒体卡（媒体不出设备，回传仅文本计数）；`display="true"` 意图门控——仅当 LLM 判用户明确想浏览/挑选才出卡。
 
 ---
 
