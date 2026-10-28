@@ -99,10 +99,10 @@ docs/superpowers/
   - `2026-09-26-html-card-two-tier-design.md`（+ 同名 mockup.html）— HTML 卡双形态 + 任务卡 HTML 化（已定稿待实施）
   - `2026-09-26-user-task-protocol-design.md` — 用户任务协议 + 任务中心双 Tab（M2/M3 在途）
   - `2026-09-26-task-paradigm-positioning-design.md` — 任务范式定位升格（已实施：PRODUCT.md v3.1 定位句 + §6.6 任务线）
-  - `2026-09-27-chat-parts-rendering-design.md` — Chat parts 消息模型与渲染架构（ADR-016 实施 spec，已定稿待实施）
+  - `2026-09-27-chat-parts-rendering-design.md` — Chat parts 消息模型与渲染架构（ADR-016 实施 spec；M1~M4 已合 main，M5 瞬态 parts 落 Room 待排期）
   - `2026-09-27-chat-agent-layered-memory-design.md` — Chat Agent 分层记忆系统（L1 预算制/L2 滚动摘要/L3 事实库 + M4 主从制；M1/M2/M4 已合 main，M3 跨会话事实库待排期）
   - `2026-09-28-chat-type-taxonomy-design.md` — chat type 分类法（content/tool/data 三分类 + 命名规则 + role 上提；chat-parts 线配套 spec）
-  - `2026-10-06-browser-vnc-live-card-design.md` — Browser-VNC 云端浏览器直播卡（M1 已定稿待实施：bridge + 服务端网关 + 工具闭环 + INLINE 直播卡）
+  - `2026-10-06-browser-vnc-live-card-design.md` — Browser-VNC 云端浏览器直播卡（M1/M2 已合 main：bridge + 服务端网关 + 工具闭环 + INLINE 直播卡 + WS 推流 + 全屏接管 Muse 三态交互 M2.5~M2.8）
   - `2026-10-17-cloud-agent-tool-bridge-design.md` — 云端 Agent M2 工具桥 + BYOK 授权 UI + 最小聊天页（ADR-018 实施 spec，已定稿待评审）
   - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×A2UI GenUI 混合架构（投影出端 + local:// handle + L1 A2UI/L2 HTML 沙箱双级卡，M1~M3 分期；M1 投影通路已合 main，M2/M3 在途）
   - `2026-10-24-openui-wire-format-toggle-design.md` — OpenUI 线格式并行接入 + GenUI 协议开关（A2UI/OpenUI 双格式对比实验，M1 Android-only 在途）
