@@ -920,7 +920,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   CheckBox 同构回写。
   M5（2026-10-25）组件库 21→89 项官方全量补全（细则见
   `docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md` §5 速查表）。
-  align 结构治理（2026-10-30，spec《2026-10-30-openui-align-spacing-design》）：Row/Column/Card
+  align 结构治理（2026-10-30，spec 已随交付清理，git 历史可查）：Row/Column/Card
   补 `align` prop，词汇/语义/缺省严格对齐官方 thesysdev/openui Stack（CSS align-items：
   五值 start|center|end|stretch|baseline，缺省 stretch = 子项铺满交叉轴——Row 子栏
   fillMaxHeight、Column/Card 子项 fillMaxWidth；baseline 首行基线对齐，列向兜底 start）；
