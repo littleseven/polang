@@ -104,8 +104,9 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 | 组件 | 皮肤要点 |
 |------|----------|
 | Card | AppShapes.card + Spacing.lg 内边距；嵌套 = L1 surface |
+| Row/Column/Card align | 交叉轴五值 start\|center\|end\|stretch\|baseline（官方 align-items 语义，缺省 stretch = 子项铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；baseline = 首行基线对齐，列向兜底 start）；stat tile 数字栏写 `align="center"`、高矮栏顶线对齐写 `align="start"` |
 | Text | §2 字阶；DISPLAY 32B tnum；CAPTION 默认弱色 |
-| Button | M3 Button（primary 行为色） |
+| Button | M3 Button（primary 行为色，primary 占满整行宽度；stretch 容器内各 variant 均整宽 = 官方主流形态） |
 | BarChart | §3.1 |
 | PieChart | §3.2 |
 | LineChart | §3.3 |
@@ -119,7 +120,7 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 | Markdown | AgentMarkdown（mikepenz 唯一入口） |
 | Accordion | 标题行 + 箭头，展开态渲染期本地态 |
 | **M5 新增（2026-10-25 全量补全，89 项注册）** | |
-| Stack / Separator / MarkDownRenderer | 官方别名：direction=row→Row/缺省→Column（gap 七档→Spacing、wrap→Flow*）；Separator→Divider 同皮肤；MarkDownRenderer→Markdown 同渲染 |
+| Stack / Separator / MarkDownRenderer | 官方别名：direction=row→Row/缺省→Column（gap 七档→Spacing、wrap→Flow*；align 五值官方语义缺省 stretch、justify 六值主轴分布，wrap=true 时 stretch/baseline 退化容器基线）；Separator→Divider 同皮肤；MarkDownRenderer→Markdown 同渲染 |
 | CardHeader / InlineHeader | SUBHEAD 标题 + CAPTION 弱色副题（prop 名 subtitle/description 各一） |
 | TextContent / Label / BoldText | size→字阶映射（small→CAPTION … large-heavy→HEADLINE）；Label=CAPTION 弱色；BoldText=Bold + subtext 弱 |
 | TextCallout | variant 小写→tone 色（danger→error、neutral→弱色），Callout 同款色块 |
@@ -141,3 +142,4 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 - v1（2026-10-25）：初版。落地件 = M4（字阶/间距/色板/Tabs 胶囊/空绑定兜底）+ M4.2（Image 链路三修）+ 本轮（DISPLAY 字阶、BarChart 柱道与圆角柱端、PieChart 环形化、Icon 默认弱色、stat tile 构图食谱入 server prompt）。
 - v1.1（2026-10-25）：Image 体验二修——aspect 缺省改为按照片真实比例渲染（MediaStore 元数据；API<29 无 WIDTH/HEIGHT 列走 BitmapFactory 边界解码兜底；宽 sanity 界 [0.3, 3.0]，界外极长全景图轻微裁切；显式传 aspect 仍生效 = 强制造型，clamp [0.5, 2.5]）；Image 可点击，经宿主动作 OpenPhoto 打开 PhotoEditor 大图页（Gallery 同款入口）。
 - v2（2026-10-25）：OpenUI 官方组件库全量补全（21→官方 82 适配 81，注册 89 项，Col 列式 Table 刻意不收）——渲染层四域分文件（OpenUiContentRenderers 24 / OpenUiFormRenderers 12 / OpenUiChartRenderers 6 + 既有三图官方 prop 扩展 / OpenUiCardBlockRenderers 7），dispatch 按集合分派；BarChart 增 labels+series 官方数据面（grouped/stacked）、PieChart 增 pie 实心、LineChart 增 step 阶梯；表单族确立 name→$name 直写约定；§5 速查表同步。
+- v3（2026-10-30，spec 已随交付清理，git 历史可查）：align 结构治理——Row/Column/Card 补 `align` prop，词汇/语义/缺省严格对齐官方 thesysdev/openui Stack（CSS align-items：五值 start\|center\|end\|stretch\|baseline，缺省 stretch = 子项铺满交叉轴；baseline 首行基线对齐，列向兜底 start 文档化偏差）；Stack 别名 align 缺省同步修正 start→stretch；主按钮（variant=primary）整行宽；server 工具描述官方语义行文 + stat tile 黄金示例三栏 `align="center"` + lint 软警告（DISPLAY+Row 未居中提示）。

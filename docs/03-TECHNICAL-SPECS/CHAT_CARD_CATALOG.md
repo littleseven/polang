@@ -918,6 +918,14 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   （全 app 唯一 Agent 正文入口）；Accordion 展开集 = 渲染期 remember 本地态（Tabs 同口径）；
   Switch = M3 Switch + token 色（AppSlider 红线只管滑杆），checked BINDABLE_BOOLEAN 与
   CheckBox 同构回写。
+  M5（2026-10-25）组件库 21→89 项官方全量补全（细则见
+  `docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md` §5 速查表）。
+  align 结构治理（2026-10-30，spec 已随交付清理，git 历史可查）：Row/Column/Card
+  补 `align` prop，词汇/语义/缺省严格对齐官方 thesysdev/openui Stack（CSS align-items：
+  五值 start|center|end|stretch|baseline，缺省 stretch = 子项铺满交叉轴——Row 子栏
+  fillMaxHeight、Column/Card 子项 fillMaxWidth；baseline 首行基线对齐，列向兜底 start）；
+  Stack 别名 align 缺省同步修正 start→stretch；主按钮（variant=primary）整行宽；
+  stat tile 数字栏居中写 `align="center"`（server 黄金示例范式 + lint 软警告）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量

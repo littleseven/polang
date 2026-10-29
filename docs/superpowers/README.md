@@ -125,3 +125,4 @@ docs/superpowers/
 | 2026-10-24 | 索引补录 `2026-10-24-openui-wire-format-toggle-design.md`（OpenUI 线格式并行接入 + GenUI 协议开关，M1 在途） |
 | 2026-10-26 | 索引补录 `2026-10-26-openui-compose-alignment-design.md`（OpenUI 对齐 Compose 适配层，P1 已合 main，P2~P4 在途） |
 | 2026-10-27 | 交付沉淀：删除 7 篇已交付未登记 spec（scan-entry-and-stats-ring / ota-background-download / openui-component-library-m2 / openui-component-library-m3 / openui-image-component / openui-full-library / openui-visual-m4——结论已落 FEATURES §3.6 / androidApp·shared·server AGENTS.md / CHAT_CARD_CATALOG / OPENUI_CARD_DESIGN_LANGUAGE，git 历史可查），活文档内对应 spec 引用同步摘除；修正 §6 分层记忆条目状态（M1/M2/M4 已合 main，M3 事实库待排期） |
+| 2026-10-30 | 交付沉淀：spec `2026-10-30-openui-align-spacing-design.md` 当日交付当日按沉淀管线移除（结论已落 OPENUI_CARD_DESIGN_LANGUAGE v3 / CHAT_CARD_CATALOG data_ui_openui 节 / shared·server AGENTS.md，git 历史可查），活文档内 spec 引用同步摘除 |

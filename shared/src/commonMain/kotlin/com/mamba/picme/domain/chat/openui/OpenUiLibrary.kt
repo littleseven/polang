@@ -70,6 +70,7 @@ object OpenUiLibrary {
     private val textRoles = listOf("HEADLINE", "SUBHEAD", "BODY", "CAPTION", "DISPLAY")
     private val colorRoles = listOf("PRIMARY", "SURFACE", "ERROR", "ON_SURFACE")
     private val spacings = listOf("COMPACT", "STANDARD", "COMFORTABLE")
+    private val aligns = listOf("start", "center", "end", "stretch", "baseline")
 
     /**
      * Icon.name 的 59 枚预定义图标名（A2UI catalog v1 同口径，禁 svgPath 自由形式）。
@@ -116,10 +117,38 @@ object OpenUiLibrary {
                 ),
             ),
         ),
-        OpenUiComponent("Row", listOf(childrenProp, spacingProp)),
-        OpenUiComponent("Column", listOf(childrenProp, spacingProp)),
+        // 2026-10-30 align 结构治理：三容器补 align——词汇/语义/缺省严格对齐官方
+        // thesysdev/openui Stack（CSS align-items 语义）：start|center|end|stretch|baseline
+        // 五值，缺省 stretch（官方缺省）= 子项铺满交叉轴（Row 子栏撑满行高、Column/Card
+        // 内容撑满整宽），baseline = 子项首行基线对齐；stat tile 数字栏居中写
+        // align="center"。justify 不引入（Row 恒 weight 分栏、Column 恒 wrap 高，
+        // 主轴分布无意义场景）
+        OpenUiComponent(
+            "Row",
+            listOf(
+                childrenProp,
+                spacingProp,
+                OpenUiProp("align", OpenUiPropType.ENUM, default = OpenUiValue.Str("stretch"), enumValues = aligns),
+            ),
+        ),
+        OpenUiComponent(
+            "Column",
+            listOf(
+                childrenProp,
+                spacingProp,
+                OpenUiProp("align", OpenUiPropType.ENUM, default = OpenUiValue.Str("stretch"), enumValues = aligns),
+            ),
+        ),
         // Card：2026-10-25 全量补全增可选 title（官方 fixtures 形态；有则渲染头部标题区）
-        OpenUiComponent("Card", listOf(childrenProp, spacingProp, OpenUiProp("title", OpenUiPropType.STRING))),
+        OpenUiComponent(
+            "Card",
+            listOf(
+                childrenProp,
+                spacingProp,
+                OpenUiProp("title", OpenUiPropType.STRING),
+                OpenUiProp("align", OpenUiPropType.ENUM, default = OpenUiValue.Str("stretch"), enumValues = aligns),
+            ),
+        ),
         OpenUiComponent(
             "Button",
             listOf(
@@ -421,8 +450,10 @@ object OpenUiLibrary {
                 OpenUiProp(
                     "align",
                     OpenUiPropType.ENUM,
-                    default = OpenUiValue.Str("start"),
-                    enumValues = listOf("start", "center", "end", "stretch", "baseline"),
+                    // 官方缺省 = stretch（官方 schema optional 无显式缺省，CSS align-items
+                    // 默认 stretch；2026-10-30 由 start 修正对齐官方语义）
+                    default = OpenUiValue.Str("stretch"),
+                    enumValues = aligns,
                 ),
                 OpenUiProp(
                     "justify",

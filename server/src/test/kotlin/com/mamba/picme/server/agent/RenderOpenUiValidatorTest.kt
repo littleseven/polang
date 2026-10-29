@@ -638,6 +638,27 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         )
     }
 
+    @Test
+    fun `lint warns when stat tile row lacks center align`() {
+        val program = "root = Card([Text(\"统计\", \"HEADLINE\"), " +
+            "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片\", \"CAPTION\")])])])"
+        val warnings = RenderOpenUiValidator.lintComposition(program)
+        assertEquals(1, warnings.size)
+        assertTrue(warnings[0].contains("align"))
+        // 软警告不拒卡：硬校验仍放行（align 属端侧 schema 面，server 半信任不拦）
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `lint clean when stat tile columns carry center align or no row present`() {
+        val centered =
+            "root = Card([Row([Column([Text(\"7,120\", \"DISPLAY\")], align = \"center\")])])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(centered))
+        // DISPLAY 直排无 Row 分栏（非 stat tile 形态）不触发
+        val flat = "root = Card([Text(\"7,120\", \"DISPLAY\"), Text(\"照片\", \"CAPTION\")])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(flat))
+    }
+
     // ── argsJson 与 gate 分发 ───────────────────────────────────────
 
     @Test
