@@ -537,4 +537,54 @@ class OpenUiLibraryM2Test {
         assertEquals(1, childrenOf(result.root).size)
         assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
     }
+
+    // ── Row/Column/Card align prop（2026-10-30 align 结构治理） ──────
+
+    @Test
+    fun `container align prop registered with official stack vocabulary and stretch default`() {
+        val aligns = listOf("start", "center", "end", "stretch", "baseline")
+        val rowAlign = OpenUiLibrary.components.getValue("Row").props.single { prop -> prop.name == "align" }
+        assertEquals(aligns, rowAlign.enumValues)
+        // 缺省 = 官方 CSS align-items 缺省 stretch（thesysdev/openui Stack schema 口径）
+        assertEquals(OpenUiValue.Str("stretch"), rowAlign.default)
+        val columnAlign = OpenUiLibrary.components.getValue("Column").props.single { prop -> prop.name == "align" }
+        assertEquals(aligns, columnAlign.enumValues)
+        assertEquals(OpenUiValue.Str("stretch"), columnAlign.default)
+        val cardAlign = OpenUiLibrary.components.getValue("Card").props.single { prop -> prop.name == "align" }
+        assertEquals(aligns, cardAlign.enumValues)
+        assertEquals(OpenUiValue.Str("stretch"), cardAlign.default)
+        // 官方 Stack 本体同口径（2026-10-30 由 start 修正）
+        val stackAlign = OpenUiLibrary.components.getValue("Stack").props.single { prop -> prop.name == "align" }
+        assertEquals(aligns, stackAlign.enumValues)
+        assertEquals(OpenUiValue.Str("stretch"), stackAlign.default)
+    }
+
+    @Test
+    fun `stat tile program with center aligned columns validates`() = runTest {
+        val program = """
+            root = Card([Text("相册年度统计", "HEADLINE"), Row([Column([Text("7,120", "DISPLAY"), Text("照片总数", "CAPTION")], align = "center"), Column([Text("771", "DISPLAY"), Text("视频总数", "CAPTION")], align = "center")])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val row = childAt(result.root, 1)
+        val firstLane = row.props["children"]
+        assertIs<OpenUiValue.Arr>(firstLane)
+        val lane = firstLane.v[0]
+        assertIs<OpenUiValue.ComponentVal>(lane)
+        assertEquals(OpenUiValue.Str("center"), lane.props["align"])
+    }
+
+    @Test
+    fun `unknown align value falls back to default with error recorded`() = runTest {
+        // typeMismatch 三分支（OpenUiEval）：有 default → 存默认值（不丢组件、不炸卡）
+        val result = rendered(
+            OpenUiSession(
+                """root = Card([Column([Text("x")], align = "middle"), Text("ok")])""",
+                noTools,
+            ).prepare(),
+        )
+        assertEquals(2, childrenOf(result.root).size)
+        assertEquals(OpenUiValue.Str("stretch"), childAt(result.root, 0).props["align"])
+        assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
 }

@@ -158,6 +158,12 @@ object RenderOpenUiValidator {
 
     private val BUTTON_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Button\s*\(""")
 
+    /** stat tile 未居中 lint（2026-10-30 align 治理配套）：DISPLAY + Row 分栏但全文无
+     *  align = "center" → 数字贴栏首错落。扫原文近似判定（lint 级可接受误伤面：
+     *  DISPLAY 图卡混排无数字栏场景会误报，建议口径不影响发卡）。 */
+    private val ROW_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Row\s*\(""")
+    private val ALIGN_CENTER = Regex("""align\s*=\s*"center"""")
+
     /**
      * 构图软警告（2026-10-25，设计规范第一刀配套）：不拒卡、不落违规，工具体
      * Observation 附带「本卡已下发、无需重发，下次发卡改进」提示——硬校验管合法性，
@@ -176,6 +182,11 @@ object RenderOpenUiValidator {
         val buttonCount = BUTTON_CALL.findAll(stripped).count()
         if (buttonCount > MAX_BUTTONS) {
             warnings += "Button $buttonCount 个超建议上限（一卡 primary 大色块 ≤$MAX_BUTTONS 处，行为色面积收敛；次要动作并入一个主 Button 或改 Markdown 文本链接）"
+        }
+        if (TEXT_DISPLAY_CALL.containsMatchIn(program) && ROW_CALL.containsMatchIn(program) &&
+            !ALIGN_CENTER.containsMatchIn(program)
+        ) {
+            warnings += "stat tile 数字栏未居中（检测到 DISPLAY 大数字 + Row 分栏但无 align = \"center\"，数字贴栏首错落；每个数字栏 Column 补 align = \"center\"）"
         }
         return warnings
     }

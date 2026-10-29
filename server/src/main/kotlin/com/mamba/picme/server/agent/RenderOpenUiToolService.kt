@@ -72,9 +72,9 @@ class RenderOpenUiToolService {
          */
         const val GOLDEN_STAT_TILE_PROGRAM =
             "root = Card([Text(\"相册年度统计\", \"HEADLINE\"), " +
-                "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片总数\", \"CAPTION\")]), " +
-                "Column([Text(\"771\", \"DISPLAY\"), Text(\"视频总数\", \"CAPTION\")]), " +
-                "Column([Text(\"12\", \"DISPLAY\"), Text(\"覆盖月份\", \"CAPTION\")])])])"
+                "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片总数\", \"CAPTION\")], align = \"center\"), " +
+                "Column([Text(\"771\", \"DISPLAY\"), Text(\"视频总数\", \"CAPTION\")], align = \"center\"), " +
+                "Column([Text(\"12\", \"DISPLAY\"), Text(\"覆盖月份\", \"CAPTION\")], align = \"center\")])])"
 
         /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
@@ -106,12 +106,19 @@ class RenderOpenUiToolService {
      加粗等宽数字，stat tile 专用，形如 Text("7,120", "DISPLAY")，一屏 ≤4 个），
      colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
-   - Row(children*, spacing?) / Column(children*, spacing?) / Card(children*, spacing?, title?)：
+   - Row(children*, spacing?, align?) / Column(children*, spacing?, align?) /
+     Card(children*, spacing?, title?, align?)：
      children 是组件数组（[组件1, 组件2]），spacing∈COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
+     align 是交叉轴对齐∈start|center|end|stretch|baseline（官方 align-items 语义，缺省
+     stretch = 子组件铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；start/center/end
+     = 顶/中/底（Row）或左/中/右（Column/Card）对齐，baseline = 子组件首行基线对齐）——
+     stat tile 数字栏写 align = "center"，高矮不一的栏顶线对齐写 align = "start"；
+     正文/表单缺省 stretch 即为官方形态无需显式传；
      Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；Card 有 title 时渲染头部标题区；
    - Button(label*, action?, variant?, size?)：action 是裸动作表达式、最外层不要加引号，
      形如 Button("查看", @OpenUrl("https://..."))（"@OpenUrl(...)" 包成字符串会被拒）；
-     variant∈primary|secondary|tertiary（默认 primary，映射实心/淡色/文字按钮）；size 收而不用；
+     variant∈primary|secondary|tertiary（默认 primary 实心主按钮、占满整行宽度——主 CTA
+     独占一行；secondary 淡色 / tertiary 文字按钮为内容宽）；size 收而不用；
      一卡 Button ≤3 个（行为色面积收敛，次要动作并入主 Button 或改 Markdown 文本）；
    - BarChart(title?, buckets?, selected?, labels?, series?, variant?)：buckets 是 [{label,count}]
      数据引用；或官方形态 labels=["x1",...] + series=[{name, values:[数值,...]}]（两种数据面二选一）；
@@ -151,7 +158,8 @@ class RenderOpenUiToolService {
    - Accordion(items*)：可折叠分区；items 是 [{title: "分区标题", children: [组件...]}]；
    ── 官方组件库扩充（同套语法，数据/绑定/动作写法与上面完全一致）──
    - 布局容器：Stack(children*, direction?=row|column, gap?=none|xs|s|m|l|xl|2xl, align?, justify?, wrap?)
-     （direction=row 同 Row、缺省 column 同 Column，wrap=true 自动换行）/
+     （direction=row 同 Row、缺省 column 同 Column，wrap=true 自动换行；align 同上方官方
+     align-items 语义五值、缺省 stretch，justify 是主轴分布∈start|center|end|between|around|evenly）/
      Carousel(children*, variant?=card|sunk)（横滑卡片行）/
      Buttons(buttons*=[Button...], direction?=row|column) /
      Modal(title*, open*, children*)（open 传 ${'$'}布尔绑定，真值时弹窗，关闭即回写 false）；

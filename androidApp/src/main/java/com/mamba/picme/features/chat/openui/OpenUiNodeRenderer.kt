@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -160,7 +161,13 @@ fun OpenUiNodeRenderer(
 ) {
     when (node.type) {
         "Card" -> Card(modifier = modifier.fillMaxWidth(), shape = AppShapes.card) {
-            Column(modifier = Modifier.padding(Spacing.lg)) {
+            // 2026-10-30 align 治理（官方语义）：内容列恒 fillMaxWidth 使 align 相对卡宽
+            // 生效；缺省 stretch（官方 CSS 缺省）= 子组件撑满整宽
+            val alignRaw = node.alignRaw()
+            Column(
+                modifier = Modifier.padding(Spacing.lg).fillMaxWidth(),
+                horizontalAlignment = openUiColumnAlign(alignRaw),
+            ) {
                 // M5：可选 title（官方 fixtures 形态）→ 头部 SUBHEAD 标题行
                 (node.props["title"] as? OpenUiValue.Str)?.v?.let { cardTitle ->
                     Text(
@@ -170,7 +177,10 @@ fun OpenUiNodeRenderer(
                     )
                     Spacer(modifier = Modifier.height(OpenUiCardTokens.sectionGap))
                 }
-                OpenUiGappedChildren(node, state, photoResolver, onAction)
+                OpenUiGappedChildren(
+                    node, state, photoResolver, onAction,
+                    childModifier = if (alignRaw == "stretch") Modifier.fillMaxWidth() else Modifier,
+                )
             }
         }
         "Row" -> run {
@@ -190,20 +200,32 @@ fun OpenUiNodeRenderer(
                 modifier = if (hasVerticalDivider) modifier.height(IntrinsicSize.Min) else modifier,
             ) {
                 val weightsUsable = maxWidth != Dp.Infinity
+                val alignRaw = node.alignRaw()
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
-                    verticalAlignment = Alignment.CenterVertically,
+                    // 2026-10-30 align 治理（官方语义）：start/center/end 容器直映射；
+                    // stretch/baseline 由子项修饰符承担（见下）
+                    verticalAlignment = openUiRowAlign(alignRaw),
                 ) {
                     // 子组件等宽分栏：无 weight 时首栏按内容占宽，后续栏被压成单字竖条；
                     // Divider 是分隔符不参与分栏
                     for (child in children) {
                         if (child is OpenUiValue.ComponentVal) {
-                            val childModifier =
+                            val weightMod =
                                 if (child.type == "Divider" || !weightsUsable) {
                                     Modifier
                                 } else {
                                     Modifier.weight(1f)
                                 }
+                            val childModifier = when {
+                                // 分隔符自带竖向尺寸管理，不参与交叉轴语义
+                                child.type == "Divider" -> weightMod
+                                // 官方 stretch：子栏撑满行高（无界高约束下退化为原高，幂等安全）
+                                alignRaw == "stretch" -> weightMod.fillMaxHeight()
+                                // 官方 baseline：子栏首行基线对齐（RowScope 作用域修饰符）
+                                alignRaw == "baseline" -> weightMod.alignByBaseline()
+                                else -> weightMod
+                            }
                             OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
                         } else {
                             // null 字面量/被剔除元素：等宽空占位
@@ -213,8 +235,20 @@ fun OpenUiNodeRenderer(
                 }
             }
         }
-        "Column" -> Column(modifier = modifier) {
-            OpenUiGappedChildren(node, state, photoResolver, onAction)
+        "Column" -> run {
+            // 2026-10-30 align 治理（官方语义）：stat tile 数字栏 align="center" 居中
+            // 可表达；缺省 stretch（官方 CSS 缺省）= 子组件撑满整宽。列恒 fillMaxWidth
+            // 使对齐相对父宽生效（Row weight 栏内本就填满栏宽，fillMaxWidth 幂等）
+            val alignRaw = node.alignRaw()
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                horizontalAlignment = openUiColumnAlign(alignRaw),
+            ) {
+                OpenUiGappedChildren(
+                    node, state, photoResolver, onAction,
+                    childModifier = if (alignRaw == "stretch") Modifier.fillMaxWidth() else Modifier,
+                )
+            }
         }
         "Text" -> {
             // M2：text 升 BINDABLE_STRING——Binding 从 state 快照读；Str 直取，Num/Bool
@@ -263,7 +297,9 @@ fun OpenUiNodeRenderer(
                 "tertiary" -> TextButton(onClick = { actions.forEach(onAction) }, modifier = modifier) {
                     Text(text = label)
                 }
-                else -> Button(onClick = { actions.forEach(onAction) }, modifier = modifier) {
+                // 2026-10-30 align 治理：主按钮 full-width（卡底主 CTA 独占一行，
+                // Row weight 栏内填满所在栏）；secondary/tertiary 保持内容宽
+                else -> Button(onClick = { actions.forEach(onAction) }, modifier = modifier.fillMaxWidth()) {
                     Text(text = label)
                 }
             }
@@ -306,6 +342,8 @@ private fun OpenUiGappedChildren(
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
     onAction: (OpenUiAction) -> Unit,
+    // 2026-10-30 align 治理：stretch 语义由父容器传入（fillMaxWidth 撑满整宽），其余对齐缺省
+    childModifier: Modifier = Modifier,
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
         .filter { child -> child !is OpenUiValue.ComponentVal || child.willRenderTextLike(state) }
@@ -321,7 +359,7 @@ private fun OpenUiGappedChildren(
                 )
             }
             first = false
-            OpenUiNodeRenderer(child, state, photoResolver, onAction)
+            OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
         } else {
             Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }
@@ -454,6 +492,30 @@ private fun OpenUiValue.ComponentVal.spacingDp() =
     OpenUiCardTokens.spacing(
         A2uiStyleMapper.parseSpacingRole((props["spacing"] as? OpenUiValue.Str)?.v)
     )
+
+/** 2026-10-30 align 治理：三容器 align prop 原文（schema 已枚举校验五值，缺省 stretch 求值期物化）。 */
+private fun OpenUiValue.ComponentVal.alignRaw() = (props["align"] as? OpenUiValue.Str)?.v
+
+/**
+ * Row 交叉轴（竖向，官方 align-items 语义）：start/center/end 容器直映射；
+ * stretch（子栏 fillMaxHeight）/baseline（子栏 alignByBaseline）由子项修饰符承担，容器基线 Top。
+ */
+private fun openUiRowAlign(raw: String?): Alignment.Vertical = when (raw) {
+    "center" -> Alignment.CenterVertically
+    "end" -> Alignment.Bottom
+    else -> Alignment.Top // start/stretch/baseline：stretch/baseline 见子项修饰符
+}
+
+/**
+ * Column/Card 交叉轴（横向，官方 align-items 语义）：start/center/end 容器直映射；
+ * stretch 由子项 fillMaxWidth 承担；baseline 无列向对应概念兜底 start（文档化偏差，
+ * CSS baseline 在 column 主轴场景本就罕见）。
+ */
+private fun openUiColumnAlign(raw: String?): Alignment.Horizontal = when (raw) {
+    "center" -> Alignment.CenterHorizontally
+    "end" -> Alignment.End
+    else -> Alignment.Start // start/stretch/baseline：stretch 见子项 fillMaxWidth
+}
 
 /**
  * 空绑定兜底（M4 §1.4，M4.1 放宽）：解析结果 trim 后以 `:`/`：` 结尾（绑定值为空只剩

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.FlowColumn
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -242,6 +243,10 @@ private fun OpenUiContentNumberBadge(number: Int) {
 /**
  * Stack：direction=row→Row / 缺省 column→Column；wrap=true→FlowRow/FlowColumn；
  * gap 六档（none/xs/s/m/l/xl/2xl）映射既有 Spacing 阶梯；align→交叉轴、justify→主轴排布。
+ * 2026-10-30 官方语义对齐：缺省 stretch（官方 CSS 缺省）——row 向 stretch 子项
+ * fillMaxHeight、column 向 stretch 子项 fillMaxWidth；baseline row 向子项
+ * alignByBaseline（column 向无对应概念兜底 start，文档化偏差）；
+ * wrap=true（Flow*）不支持交叉轴修饰符，stretch/baseline 退化为容器基线。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -262,7 +267,7 @@ private fun OpenUiContentStack(
         val crossAxis = when (align) {
             "center" -> Alignment.CenterVertically
             "end" -> Alignment.Bottom
-            else -> Alignment.Top // start/stretch/baseline 兜底
+            else -> Alignment.Top // start/stretch/baseline：stretch/baseline 由子项修饰符承担
         }
         val mainAxis = rowMainAxis(justify, gap)
         if (wrap) {
@@ -279,14 +284,21 @@ private fun OpenUiContentStack(
                 horizontalArrangement = mainAxis,
                 verticalAlignment = crossAxis,
             ) {
-                OpenUiContentChildren(children, state, photoResolver, onAction)
+                OpenUiContentChildren(
+                    children, state, photoResolver, onAction,
+                    childModifier = when (align) {
+                        "stretch" -> Modifier.fillMaxHeight()
+                        "baseline" -> Modifier.alignByBaseline()
+                        else -> Modifier
+                    },
+                )
             }
         }
     } else {
         val crossAxis = when (align) {
             "center" -> Alignment.CenterHorizontally
             "end" -> Alignment.End
-            else -> Alignment.Start // start/stretch/baseline 兜底
+            else -> Alignment.Start // start/stretch/baseline：stretch 由子项 fillMaxWidth 承担
         }
         val mainAxis = columnMainAxis(justify, gap)
         if (wrap) {
@@ -303,7 +315,10 @@ private fun OpenUiContentStack(
                 verticalArrangement = mainAxis,
                 horizontalAlignment = crossAxis,
             ) {
-                OpenUiContentChildren(children, state, photoResolver, onAction)
+                OpenUiContentChildren(
+                    children, state, photoResolver, onAction,
+                    childModifier = if (align == "stretch") Modifier.fillMaxWidth() else Modifier,
+                )
             }
         }
     }
@@ -345,10 +360,12 @@ private fun OpenUiContentChildren(
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
     onAction: (OpenUiAction) -> Unit,
+    // 2026-10-30 官方语义对齐：Stack stretch/baseline 由父容器传入的交叉轴子项修饰符
+    childModifier: Modifier = Modifier,
 ) {
     for (child in children) {
         if (child is OpenUiValue.ComponentVal) {
-            OpenUiNodeRenderer(child, state, photoResolver, onAction)
+            OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
         } else {
             Box(modifier = Modifier)
         }
