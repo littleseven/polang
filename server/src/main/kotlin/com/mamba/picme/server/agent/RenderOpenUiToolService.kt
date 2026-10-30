@@ -88,6 +88,19 @@ class RenderOpenUiToolService {
                 "ImageText(\"城市夜景\", photo = photos[2].id, subtitle = \"2026-07-20\")])"
 
         /**
+         * 通用布局黄金示例（2026-10-30 通用布局原语批次）：四宫格照片墙（Grid columns=2）
+         * + 1:2 按比例左图右文（Row weights + align 居中）——经典版式的通用原语写法。
+         */
+        const val GOLDEN_LAYOUT_PROGRAM =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+                "root = Card([Text(\"本周精选\", \"HEADLINE\"), " +
+                "Grid([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id), Image(photos[3].id)], columns = 2), " +
+                "Spacer(\"s\"), " +
+                "Row([Image(photos[4].id), " +
+                "Column([Text(\"海边日落\"), Text(\"2026-07-18 · 三亚\", \"CAPTION\")])], " +
+                "weights = [1, 2], align = \"center\")])"
+
+        /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
          * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
          * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
@@ -117,7 +130,7 @@ class RenderOpenUiToolService {
      加粗等宽数字，stat tile 专用，形如 Text("7,120", "DISPLAY")，一屏 ≤4 个），
      colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
-   - Row(children*, spacing?, align?) / Column(children*, spacing?, align?) /
+   - Row(children*, spacing?, align?, weights?) / Column(children*, spacing?, align?) /
      Card(children*, spacing?, title?, align?)：
      children 是组件数组（[组件1, 组件2]），spacing∈COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
      align 是交叉轴对齐∈start|center|end|stretch|baseline（官方 align-items 语义，缺省
@@ -125,7 +138,19 @@ class RenderOpenUiToolService {
      = 顶/中/底（Row）或左/中/右（Column/Card）对齐，baseline = 子组件首行基线对齐）——
      stat tile 数字栏写 align = "center"，高矮不一的栏顶线对齐写 align = "start"；
      正文/表单缺省 stretch 即为官方形态无需显式传；
-     Row 的子组件等宽分栏（左右两栏排版写法 Row([左栏组件, 右栏组件])）；Card 有 title 时渲染头部标题区；
+     Row 的子组件默认等宽分栏；weights 是数字数组、与子组件一一对应按比例分栏（CSS
+     flex-grow 语义）——按比例左图右文写法 Row([Image(photos[0].id), Column([...])],
+     weights = [1, 2], align = "center")（Divider/Spacer 分隔件不占 weights 槽位）；
+     Card 有 title 时渲染头部标题区；
+   - Grid(children*, columns?, spacing?, align?)：通用 N 列网格（四宫格写法
+     Grid([a, b, c, d], columns = 2)），columns∈1..4（默认 2），children 按序填满各行、
+     每格等宽；spacing/align 同 Row 词汇；多宫格照片墙/双列统计格都用它；
+   - Box(children*, align?)：通用叠放容器——children 按数组序从底到顶叠放，align 是
+     九值方位∈topStart|topCenter|topEnd|centerStart|center|centerEnd|bottomStart|
+     bottomCenter|bottomEnd（默认 topStart）——图上叠文字/角标写法
+     Box([Image(photos[0].id), Tag("精选")], align = "bottomStart")；
+   - Spacer(size?)：通用留白件，size∈xs|s|m|l|xl（默认 m）——Row 内占宽、Column/Card
+     内占高，段落间节奏控制写法 Spacer("s")；
    - Button(label*, action?, variant?, size?)：action 是裸动作表达式、最外层不要加引号，
      形如 Button("查看", @OpenUrl("https://..."))（"@OpenUrl(...)" 包成字符串会被拒）；
      variant∈primary|secondary|tertiary（默认 primary 实心主按钮、占满整行宽度——主 CTA
@@ -257,14 +282,20 @@ class RenderOpenUiToolService {
    统计大数字黄金示例（stat tile 构图，设计规范 §4.1：DISPLAY 数字 + CAPTION 弱色标签，
    三个指标并排——有 2~4 个关键统计数字时优先用此构图，别只写一段 BODY 文案）：
 """ + GOLDEN_STAT_TILE_PROGRAM + """
-   图文排版食谱（相册照片与文字同卡时按场景选型，版式已被组件结构性锁死，照方抓药）：
-   - 单图主打+标题说明 → ImageTextLarge(title, photo=photos[i].id, subtitle=...)；
-   - 多张图各配一句短说明 → 多个 ImageText(title, photo=photos[i].id) 叠在 Column 里（小图左、文字右）；
+   通用布局食谱（经典版式照方抓药，通用原语组合优先于业务组合组件）：
+   - 四宫格/三宫格/双列网格 → Grid([图或组件...], columns = 2|3)（格内等宽自动对齐）；
+   - 按比例左图右文（上下对齐）→ Row([Image(photos[i].id), Column([Text(标题), Text(副题, "CAPTION")])],
+     weights = [1, 2], align = "center")（图窄文宽改 [1, 3]，顶线对齐改 align = "start"）；
+   - 图上叠文字/角标/浮层 → Box([Image(...), Tag(...) 或 Text(...)], align = "bottomStart")；
+   - 段落间节奏留白 → Spacer("s") / Spacer("m")；
    - 纯多图并排不带说明 → Row([Image(photos[0].id), Image(photos[1].id)])（≤4 张）；
-   - 头图+正文段落 → ImageTextLarge 后接 Markdown；
-   ⚠️ 不支持文字环绕图片（float wrap 无此形态），也别用 Row 裸拼 Image+Text 自造图文项
-   （Row 等宽分栏会把图拉成半宽）——图文组合一律用 ImageText/ImageTextLarge；
-   图文排版黄金示例：
+   - 一行写法便捷糖（不想组合时）：ImageTextLarge(title, photo=photos[i].id, subtitle=...)
+     单图主打、多个 ImageText(title, photo=photos[i].id) 叠 Column 小图列表；
+   ⚠️ 不支持文字环绕图片（float wrap 无此形态）；Row 裸拼 Image+Text 必须传 weights
+   按比例分栏，否则等宽分栏会把缩略图拉成半宽栏（lint 会提示）；
+   通用布局黄金示例（四宫格照片墙 + 1:2 左图右文）：
+""" + GOLDEN_LAYOUT_PROGRAM + """
+   图文排版黄金示例（ImageTextLarge/ImageText 便捷糖形态）：
 """ + GOLDEN_PHOTO_TEXT_PROGRAM
     )
     suspend fun renderUiOpenUi(

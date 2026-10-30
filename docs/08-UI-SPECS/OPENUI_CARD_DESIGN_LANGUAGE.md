@@ -105,6 +105,10 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 |------|----------|
 | Card | AppShapes.card + Spacing.lg 内边距；嵌套 = L1 surface |
 | Row/Column/Card align | 交叉轴五值 start\|center\|end\|stretch\|baseline（官方 align-items 语义，缺省 stretch = 子项铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；baseline = 首行基线对齐，列向兜底 start）；stat tile 数字栏写 `align="center"`、高矮栏顶线对齐写 `align="start"` |
+| Row weights | 按比例分栏（2026-10-30，CSS flex-grow 语义）：数字数组与组件子项一一对应（Divider/Spacer 不占槽位），缺省/个数不符回退全 1 等宽；左图右文 = `weights=[1,2]` 配 `align="center"` |
+| Grid | 通用 N 列网格（2026-10-30）：columns 1..4 缺省 2，children 按序填满各行、cell 等宽 `weight(1f)`，末行缺格补空位保持列对齐；四宫格 = `columns=2`；spacing/align 同 Row 词汇 |
+| Box | 通用叠放容器（2026-10-30）：children 按数组序从底到顶叠放；align 九值 contentAlignment（缺省 topStart = Compose 官方缺省）；图上叠文字/角标 = `Box([Image, Tag], align="bottomStart")` |
+| Spacer | 通用留白件（2026-10-30）：size∈xs\|s\|m\|l\|xl → Spacing.xs/sm/md/lg/xl（缺省 m）；Row 内占宽、Column/Card 内占高；不参与 Row 分栏（与 Divider 同口径） |
 | Text | §2 字阶；DISPLAY 32B tnum；CAPTION 默认弱色 |
 | Button | M3 Button（primary 行为色，primary 占满整行宽度；stretch 容器内各 variant 均整宽 = 官方主流形态） |
 | BarChart | §3.1 |
@@ -144,3 +148,4 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 - v2（2026-10-25）：OpenUI 官方组件库全量补全（21→官方 82 适配 81，注册 89 项，Col 列式 Table 刻意不收）——渲染层四域分文件（OpenUiContentRenderers 24 / OpenUiFormRenderers 12 / OpenUiChartRenderers 6 + 既有三图官方 prop 扩展 / OpenUiCardBlockRenderers 7），dispatch 按集合分派；BarChart 增 labels+series 官方数据面（grouped/stacked）、PieChart 增 pie 实心、LineChart 增 step 阶梯；表单族确立 name→$name 直写约定；§5 速查表同步。
 - v3（2026-10-30，spec 已随交付清理，git 历史可查）：align 结构治理——Row/Column/Card 补 `align` prop，词汇/语义/缺省严格对齐官方 thesysdev/openui Stack（CSS align-items：五值 start\|center\|end\|stretch\|baseline，缺省 stretch = 子项铺满交叉轴；baseline 首行基线对齐，列向兜底 start 文档化偏差）；Stack 别名 align 缺省同步修正 start→stretch；主按钮（variant=primary）整行宽；server 工具描述官方语义行文 + stat tile 黄金示例三栏 `align="center"` + lint 软警告（DISPLAY+Row 未居中提示）。
 - v4（2026-10-30，spec 已随交付清理，git 历史可查）：图文组合固化——ImageText/ImageTextLarge 补 `photo` prop（相册投影 id，与 src 二选一、photo 优先），图文版式被组件结构性锁死（小图左+标题副题列 / 通栏 16:9 图+粗标题），相册图文不再 Row 裸拼 Image+Text（等宽分栏反模式）；server 工具描述增图文排版食谱段 + 黄金示例 + lint 软警告（Row 内 Image+Text 裸拼提示）；单卡图片上限口径补 photo 键计数。文字环绕图片（float wrap）不支持，食谱声明替代形态。
+- v5（2026-10-30，spec 已随交付清理，git 历史可查）：通用布局原语批次——设计方向从业务组合组件转向通用布局原语（用户定调「通用布局组件而不是业务组件」）。新增 Grid（通用 N 列网格，columns 1..4 缺省 2，四宫格 = columns 2）/ Box（通用叠放容器，align 九值 contentAlignment 缺省 topStart = Compose 官方缺省）/ Spacer（通用留白件，size∈xs\|s\|m\|l\|xl → 间距 token，缺省 m）三组件 + Row 增 `weights` prop（CSS flex-grow 语义按比例分栏，左图右文 = `weights=[1,2]` 配 align 上下对齐）；组件总数 89→92。lint 修订：Row 裸拼 Image+Text 仅无 weights 时警告（weights 比例分栏是认可的经典版式写法）；工具描述「通用布局食谱」段 + 黄金示例（四宫格照片墙 + 1:2 左图右文）；ImageText/ImageTextLarge 保留为便捷糖，泛化组合优先通用原语。官方核查：thesysdev/openui 通用布局仅 Stack 一件（无 per-child weight/Grid/Box/Spacer），本批次属本仓刻意扩展，词汇/缺省严格对齐官方/CSS/Compose。

@@ -53,6 +53,8 @@ object RenderOpenUiValidator {
         "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
         // 官方别名（schema 注册官方名，渲染复用既有实现）
         "Stack", "Separator", "MarkDownRenderer",
+        // 通用布局原语批次（2026-10-30 本仓扩展：四宫格/比例分栏/叠放/留白经典版式）
+        "Grid", "Box", "Spacer",
         // 官方内容/布局
         "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
         "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
@@ -172,6 +174,9 @@ object RenderOpenUiValidator {
     private val IMAGE_ANY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(""")
     private val TEXT_ANY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Text\s*\(""")
 
+    /** Row weights 键检测（lint 豁免依据：比例分栏是认可写法，无 weights 的等宽裸拼才警告）。 */
+    private val NAMED_WEIGHTS = Regex("""(?<![A-Za-z0-9_])weights\s*=""")
+
     /**
      * 构图软警告（2026-10-25，设计规范第一刀配套）：不拒卡、不落违规，工具体
      * Observation 附带「本卡已下发、无需重发，下次发卡改进」提示——硬校验管合法性，
@@ -197,8 +202,12 @@ object RenderOpenUiValidator {
             warnings += "stat tile 数字栏未居中（检测到 DISPLAY 大数字 + Row 分栏但无 align = \"center\"，数字贴栏首错落；每个数字栏 Column 补 align = \"center\"）"
         }
         callArgSpans(stripped, ROW_CALL).forEach { args ->
-            if (IMAGE_ANY_CALL.containsMatchIn(args) && TEXT_ANY_CALL.containsMatchIn(args)) {
-                warnings += "Row 内裸拼 Image + Text（图文项反模式：Row 等宽分栏会把缩略图拉成半宽栏、图文对齐散落）——图文组合改用 ImageText（小图左+文字右）或 ImageTextLarge（通栏图+标题副题），版式已被组件结构性锁死"
+            // 2026-10-30 通用布局原语批次修订：weights 比例分栏是认可的经典版式写法，
+            // 仅无 weights 的等宽裸拼才警告（等宽分栏把缩略图拉成半宽栏）
+            if (IMAGE_ANY_CALL.containsMatchIn(args) && TEXT_ANY_CALL.containsMatchIn(args) &&
+                !NAMED_WEIGHTS.containsMatchIn(args)
+            ) {
+                warnings += "Row 内等宽裸拼 Image + Text（缩略图会被拉成半宽栏、图文对齐散落）——按比例左图右文给 Row 传 weights（如 weights = [1, 2] 图窄文宽，上下对齐配 align）；一行写法便捷糖可用 ImageText（小图左+文字右）/ ImageTextLarge（通栏图+标题副题）"
             }
         }
         return warnings
@@ -280,7 +289,7 @@ object RenderOpenUiValidator {
             .toSet()
             .filter { name -> name !in ALLOWED_CALLS }
             .forEach { name ->
-                violations += "组件/调用 \"$name\" 不在白名单（89 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
+                violations += "组件/调用 \"$name\" 不在白名单（92 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
             }
 
         // 3. Query 形态：唯一宿主工具 local_handle；handle 必须是 local://scan/<id> 形态

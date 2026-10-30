@@ -44,13 +44,16 @@ class OpenUiLibraryM2Test {
     fun `library registers the full official component set`() {
         // 2026-10-25 全量补全（spec《openui-full-library-design》）：官方 openuiLibrary
         // 82 组件覆盖 81（Col 列式 Table 刻意不收）+ 本仓既有 8 项（Row/Column/Divider/
-        // List/CheckBox/ChoicePicker/Switch/Markdown）= 89 注册项
+        // List/CheckBox/ChoicePicker/Switch/Markdown）= 89 注册项；
+        // 2026-10-30 通用布局原语批次 +Grid/Box/Spacer（本仓扩展）= 92 注册项
         assertEquals(
             setOf(
                 // 既有 21（M1~M3）
                 "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
                 "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
                 "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
+                // 通用布局原语批次 3（2026-10-30 本仓扩展）
+                "Grid", "Box", "Spacer",
                 // 别名 5
                 "Stack", "Separator", "MarkDownRenderer", "TabItem", "AccordionItem",
                 // 内容/布局 23
@@ -72,7 +75,7 @@ class OpenUiLibraryM2Test {
                 "SnippetCardBlock", "SnippetCardItem", "OverviewCardBlock", "OverviewCardItem",
                 "ContextCardBlock", "ContextCardItem", "CompositeCardBlock", "CompositeCardItem",
                 "VisualCardBlock", "VisualCardItem",
-            ).also { expected -> assertEquals(89, expected.size) },
+            ).also { expected -> assertEquals(92, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }
@@ -639,5 +642,57 @@ class OpenUiLibraryM2Test {
         assertIs<OpenUiValue.ComponentVal>(small)
         assertEquals("ImageText", small.type)
         assertEquals(OpenUiValue.Num(102.0), small.props["photo"])
+    }
+
+    // ── 通用布局原语批次（2026-10-30）：Grid/Box/Spacer + Row.weights ──────
+
+    @Test
+    fun `layout primitives registered with official aligned vocabulary`() {
+        val aligns = listOf("start", "center", "end", "stretch", "baseline")
+        val grid = OpenUiLibrary.components.getValue("Grid")
+        val columnsProp = grid.props.single { prop -> prop.name == "columns" }
+        assertEquals(OpenUiPropType.NUMBER, columnsProp.type)
+        assertEquals(OpenUiValue.Num(2.0), columnsProp.default)
+        assertEquals(aligns, grid.props.single { prop -> prop.name == "align" }.enumValues)
+        val boxAlign = OpenUiLibrary.components.getValue("Box").props.single { prop -> prop.name == "align" }
+        assertEquals(
+            listOf(
+                "topStart", "topCenter", "topEnd",
+                "centerStart", "center", "centerEnd",
+                "bottomStart", "bottomCenter", "bottomEnd",
+            ),
+            boxAlign.enumValues,
+        )
+        // 缺省 topStart = Compose Box 官方缺省
+        assertEquals(OpenUiValue.Str("topStart"), boxAlign.default)
+        val spacerSize = OpenUiLibrary.components.getValue("Spacer").props.single { prop -> prop.name == "size" }
+        assertEquals(listOf("xs", "s", "m", "l", "xl"), spacerSize.enumValues)
+        assertEquals(OpenUiValue.Str("m"), spacerSize.default)
+        val rowWeights = OpenUiLibrary.components.getValue("Row").props.single { prop -> prop.name == "weights" }
+        assertEquals(OpenUiPropType.PRIMITIVE_ARRAY, rowWeights.type)
+        assertFalse(rowWeights.required)
+    }
+
+    @Test
+    fun `layout primitives program evaluates with defaults materialized`() = runTest {
+        val program = """
+            root = Card([Grid([Text("a"), Text("b"), Text("c"), Text("d")], columns = 2), Box([Text("x")]), Spacer("s"), Row([Text("l"), Text("r")], weights = [1, 2])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val grid = childAt(result.root, 0)
+        assertEquals("Grid", grid.type)
+        assertEquals(OpenUiValue.Num(2.0), grid.props["columns"])
+        val box = childAt(result.root, 1)
+        assertEquals("Box", box.type)
+        assertEquals(OpenUiValue.Str("topStart"), box.props["align"])
+        val spacer = childAt(result.root, 2)
+        assertEquals("Spacer", spacer.type)
+        assertEquals(OpenUiValue.Str("s"), spacer.props["size"])
+        val row = childAt(result.root, 3)
+        assertEquals(
+            OpenUiValue.Arr(listOf(OpenUiValue.Num(1.0), OpenUiValue.Num(2.0))),
+            row.props["weights"],
+        )
     }
 }

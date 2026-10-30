@@ -72,6 +72,16 @@ object OpenUiLibrary {
     private val spacings = listOf("COMPACT", "STANDARD", "COMFORTABLE")
     private val aligns = listOf("start", "center", "end", "stretch", "baseline")
 
+    /** Box 叠放容器的 contentAlignment 九值（Compose 官方词汇，缺省 topStart = Box 官方缺省）。 */
+    private val boxAligns = listOf(
+        "topStart", "topCenter", "topEnd",
+        "centerStart", "center", "centerEnd",
+        "bottomStart", "bottomCenter", "bottomEnd",
+    )
+
+    /** Spacer 留白档位（官方 Stack gap 词汇子集）→ Spacing.xs/sm/md/lg/xl。 */
+    private val spacerSizes = listOf("xs", "s", "m", "l", "xl")
+
     /**
      * Icon.name 的 59 枚预定义图标名（A2UI catalog v1 同口径，禁 svgPath 自由形式）。
      * 字面量副本四处同步：server `RenderUiValidator.ICON_NAMES`（副本源）↔
@@ -129,6 +139,10 @@ object OpenUiLibrary {
                 childrenProp,
                 spacingProp,
                 OpenUiProp("align", OpenUiPropType.ENUM, default = OpenUiValue.Str("stretch"), enumValues = aligns),
+                // 2026-10-30 通用布局原语批次：按比例分栏（CSS flex-grow 语义）——数字数组
+                // 与组件子项一一对应，缺省/个数不符渲染期回退全 1（现行等宽）；Divider/Spacer
+                // 分隔件不占槽位。左图右文 = Row([图, 文栏], weights = [1, 2])
+                OpenUiProp("weights", OpenUiPropType.PRIMITIVE_ARRAY),
             ),
         ),
         OpenUiComponent(
@@ -147,6 +161,38 @@ object OpenUiLibrary {
                 spacingProp,
                 OpenUiProp("title", OpenUiPropType.STRING),
                 OpenUiProp("align", OpenUiPropType.ENUM, default = OpenUiValue.Str("stretch"), enumValues = aligns),
+            ),
+        ),
+        // ── 通用布局原语批次（2026-10-30，spec《2026-10-30-openui-layout-primitives-design》）：
+        // 官方 Stack 之外的三个经典版式原语（本仓刻意扩展，词汇/缺省严格对齐官方/CSS/Compose）
+        // Grid：通用 N 列网格（四宫格 = columns 2）；columns 渲染期 clamp [1,4]
+        OpenUiComponent(
+            "Grid",
+            listOf(
+                childrenProp,
+                OpenUiProp("columns", OpenUiPropType.NUMBER, default = OpenUiValue.Num(2.0)),
+                spacingProp,
+                OpenUiProp("align", OpenUiPropType.ENUM, default = OpenUiValue.Str("stretch"), enumValues = aligns),
+            ),
+        ),
+        // Box：通用叠放容器——children 按数组序从底到顶叠放，align 九值 contentAlignment
+        OpenUiComponent(
+            "Box",
+            listOf(
+                childrenProp,
+                OpenUiProp(
+                    "align",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("topStart"),
+                    enumValues = boxAligns,
+                ),
+            ),
+        ),
+        // Spacer：通用留白件（Row 内占宽、Column/Card 内占高，不参与 Row weight 分栏）
+        OpenUiComponent(
+            "Spacer",
+            listOf(
+                OpenUiProp("size", OpenUiPropType.ENUM, default = OpenUiValue.Str("m"), enumValues = spacerSizes),
             ),
         ),
         OpenUiComponent(
