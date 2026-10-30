@@ -926,6 +926,14 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   fillMaxHeight、Column/Card 子项 fillMaxWidth；baseline 首行基线对齐，列向兜底 start）；
   Stack 别名 align 缺省同步修正 start→stretch；主按钮（variant=primary）整行宽；
   stat tile 数字栏居中写 `align="center"`（server 黄金示例范式 + lint 软警告）。
+  图文组合固化（2026-10-30，spec《2026-10-30-openui-photo-text-composite-design》）：
+  ImageText/ImageTextLarge 补 `photo` prop（相册投影 id `photos[i].id`，与 src 二选一、
+  photo 优先；渲染走 openUiPhotoResolver 端侧 id→uri + 人脸聚焦 + 点击 OpenPhoto 大图，
+  Image 组件同径，[PRIVACY] uri 不出端）——相册图文版式被组合组件结构性锁死，替代
+  Row 裸拼 Image+Text 反模式（等宽分栏把缩略图拉成半宽栏）；server 工具描述增图文
+  排版食谱段（场景→组件选型，文字环绕 float wrap 不支持并声明替代形态）+ 黄金示例
+  + lint 软警告（Row 实参区间内 Image+Text 裸拼，括号配对截取防误伤纯多图 Row）；
+  单卡图片上限口径补 Image 调用区间外的命名 photo 键计数。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量

@@ -107,6 +107,7 @@ docs/superpowers/
   - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×A2UI GenUI 混合架构（投影出端 + local:// handle + L1 A2UI/L2 HTML 沙箱双级卡，M1~M3 分期；M1 投影通路已合 main，M2/M3 在途）
   - `2026-10-24-openui-wire-format-toggle-design.md` — OpenUI 线格式并行接入 + GenUI 协议开关（A2UI/OpenUI 双格式对比实验，M1 Android-only 在途）
   - `2026-10-26-openui-compose-alignment-design.md` — OpenUI 客户端对齐官方 A2UI Compose 适配层（P1 响应式状态粒度重组、P2 流式预览均已合 main；P3 逐节点兜底 / P4 组件契约化在途）
+  - `2026-10-30-openui-photo-text-composite-design.md` — OpenUI 图文组合组件固化（ImageText/ImageTextLarge 接相册 photo 投影 + 图文排版食谱 + lint，在途）
 - **plans（3 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）
 
 ---

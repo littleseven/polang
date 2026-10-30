@@ -164,6 +164,14 @@ object RenderOpenUiValidator {
     private val ROW_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Row\s*\(""")
     private val ALIGN_CENTER = Regex("""align\s*=\s*"center"""")
 
+    /** Row 裸拼图文 lint（2026-10-30 图文组合固化配套）：Row 实参区间内同时出现
+     *  Image( 与 Text( → 图文项反模式（等宽分栏把缩略图拉成半宽栏）。纯多图并排
+     *  Row([Image, Image]) 是食谱合法形态不误报；实参区间用括号配对扫描精确截取
+     *  （正则窗口法会把 Row 之后的 Text 错算进来，误伤 GOLDEN_MIXED 黄金示例）。
+     *  词边界防误伤 ImageText(/ImageGallery(/TextContent(/TextCallout( 等近名组件。 */
+    private val IMAGE_ANY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(""")
+    private val TEXT_ANY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Text\s*\(""")
+
     /**
      * 构图软警告（2026-10-25，设计规范第一刀配套）：不拒卡、不落违规，工具体
      * Observation 附带「本卡已下发、无需重发，下次发卡改进」提示——硬校验管合法性，
@@ -188,7 +196,38 @@ object RenderOpenUiValidator {
         ) {
             warnings += "stat tile 数字栏未居中（检测到 DISPLAY 大数字 + Row 分栏但无 align = \"center\"，数字贴栏首错落；每个数字栏 Column 补 align = \"center\"）"
         }
+        callArgSpans(stripped, ROW_CALL).forEach { args ->
+            if (IMAGE_ANY_CALL.containsMatchIn(args) && TEXT_ANY_CALL.containsMatchIn(args)) {
+                warnings += "Row 内裸拼 Image + Text（图文项反模式：Row 等宽分栏会把缩略图拉成半宽栏、图文对齐散落）——图文组合改用 ImageText（小图左+文字右）或 ImageTextLarge（通栏图+标题副题），版式已被组件结构性锁死"
+            }
+        }
         return warnings
+    }
+
+    /** 大写调用的实参区间扫描：从 call 正则命中处起括号配对到闭合（嵌套调用/数组
+     *  一并含入）。调用方须传剥离字符串后的文本（引号内括号已抹除，配对不受干扰）。 */
+    private fun callArgSpans(stripped: String, call: Regex): List<String> {
+        val spans = mutableListOf<String>()
+        call.findAll(stripped).forEach { match ->
+            var depth = 0
+            var end = -1
+            for (index in match.range.last until stripped.length) {
+                when (stripped[index]) {
+                    '(' -> depth++
+                    ')' -> {
+                        depth--
+                        if (depth == 0) {
+                            end = index
+                            break
+                        }
+                    }
+                }
+            }
+            if (end > match.range.last) {
+                spans += stripped.substring(match.range.last + 1, end)
+            }
+        }
+        return spans
     }
 
     /** 校验工具调用参数（wire JSON：{"program","fallbackSummary"}）。null = 合法放行。 */
@@ -265,14 +304,18 @@ object RenderOpenUiValidator {
 
         // 4. 图片数量上限（OOM 护栏，见 MAX_IMAGE_COMPONENTS KDoc；2026-10-25 口径扩为
         //    整卡同屏位图总数）：Image(…) 调用数 + 全部图片地址键（src/bgImageSrc/image）
-        //    字面量数——Image(src=…) 的 src 落在 Image 调用区间内，只计一次不双计
+        //    字面量数 + Image 调用区间外的命名 photo 键数（2026-10-30 图文组合固化：
+        //    ImageText/ImageTextLarge 的 photo = 投影同样产生位图）——Image(src=…) 的
+        //    src 与 Image(photo=…) 的 photo 落在 Image 调用区间内，只计一次不双计
         val imageCalls = IMAGE_CALL_ARGS.findAll(program).toList()
         val imageCallRanges = imageCalls.map { match -> match.range }
         val srcOutsideImage = SRC_STRING.findAll(program)
             .count { match -> imageCallRanges.none { range -> match.range.first in range } }
-        val imageCount = imageCalls.size + srcOutsideImage
+        val photoOutsideImage = NAMED_PHOTO.findAll(program)
+            .count { match -> imageCallRanges.none { range -> match.range.first in range } }
+        val imageCount = imageCalls.size + srcOutsideImage + photoOutsideImage
         if (imageCount > MAX_IMAGE_COMPONENTS) {
-            violations += "图片 $imageCount 张超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张——Image 组件与 ImageGallery/ImageBlock/ImageText 等 src 类图片合计，防整卡同屏位图 OOM；精简到最关键的几张）"
+            violations += "图片 $imageCount 张超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张——Image 组件与 ImageGallery/ImageBlock/ImageText 等 src 类图片地址及 ImageText/ImageTextLarge 的 photo 投影合计，防整卡同屏位图 OOM；精简到最关键的几张）"
         }
 
         // 5. Icon name 白名单（M2，正则级）：禁臆造图标名在服务端同轮纠错

@@ -77,6 +77,17 @@ class RenderOpenUiToolService {
                 "Column([Text(\"12\", \"DISPLAY\"), Text(\"覆盖月份\", \"CAPTION\")], align = \"center\")])])"
 
         /**
+         * 图文排版黄金示例（2026-10-30 图文组合固化）：相册照片走 ImageTextLarge/ImageText
+         * 组合组件的 photo 键（版式结构性锁死），不再 Row 裸拼 Image+Text。
+         */
+        const val GOLDEN_PHOTO_TEXT_PROGRAM =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+                "root = Card([Text(\"本周精选\", \"HEADLINE\"), " +
+                "ImageTextLarge(\"海边日落\", photo = photos[0].id, subtitle = \"2026-07-18\"), " +
+                "ImageText(\"山顶云海\", photo = photos[1].id, subtitle = \"2026-07-19\"), " +
+                "ImageText(\"城市夜景\", photo = photos[2].id, subtitle = \"2026-07-20\")])"
+
+        /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
          * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
          * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
@@ -170,9 +181,11 @@ class RenderOpenUiToolService {
      （走 Callout 渲染）/ Tag(text*, icon?, size?=sm|md|lg, variant?=neutral|info|success|warning|danger) /
      TagBlock(tags*=["标签", ...]) / CodeBlock(codeString*, language?)（等宽代码块）；
    - 图文项：IconText(title*, icon?, subtitle?, bold?, layout?=horizontal|vertical) /
-     ImageText(title*, src?, subtitle?, imageSize?) / ImageTextLarge(title*, src?, subtitle?) /
+     ImageText(title*, photo?, src?, subtitle?, imageSize?) / ImageTextLarge(title*, photo?, src?, subtitle?) /
      ImageBlock(src*, alt?) / ImageGallery(images*=[{src*, alt?, details?}])
-     （一切 src/bgImageSrc/image 图片地址一律 https:// 公网图、禁本地路径/uri；相册照片仍走 Image(photo) 投影通道）；
+     （ImageText/ImageTextLarge 的 photo 与 src 二选一——photo 写 photos[0].id 相册投影
+     （与 Image(photo) 同通道，禁字面量数字），src 是 https:// 公网图；其余 src/bgImageSrc/image
+     图片地址一律 https:// 公网图、禁本地路径/uri）；
    - 列表：EntityList(rows*=[{left*, right*}], headerLeft?, headerRight?, footerLeft?, footerRight?)（双列键值行）/
      ListBlock(items*=[{title*, subtitle?, image?, actionLabel?, action?}], variant?=number|image) /
      Steps(items*=[{title*, details?}])（纵向步骤条）；
@@ -243,7 +256,16 @@ class RenderOpenUiToolService {
 """ + GOLDEN_REPORT_PROGRAM + """
    统计大数字黄金示例（stat tile 构图，设计规范 §4.1：DISPLAY 数字 + CAPTION 弱色标签，
    三个指标并排——有 2~4 个关键统计数字时优先用此构图，别只写一段 BODY 文案）：
-""" + GOLDEN_STAT_TILE_PROGRAM
+""" + GOLDEN_STAT_TILE_PROGRAM + """
+   图文排版食谱（相册照片与文字同卡时按场景选型，版式已被组件结构性锁死，照方抓药）：
+   - 单图主打+标题说明 → ImageTextLarge(title, photo=photos[i].id, subtitle=...)；
+   - 多张图各配一句短说明 → 多个 ImageText(title, photo=photos[i].id) 叠在 Column 里（小图左、文字右）；
+   - 纯多图并排不带说明 → Row([Image(photos[0].id), Image(photos[1].id)])（≤4 张）；
+   - 头图+正文段落 → ImageTextLarge 后接 Markdown；
+   ⚠️ 不支持文字环绕图片（float wrap 无此形态），也别用 Row 裸拼 Image+Text 自造图文项
+   （Row 等宽分栏会把图拉成半宽）——图文组合一律用 ImageText/ImageTextLarge；
+   图文排版黄金示例：
+""" + GOLDEN_PHOTO_TEXT_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

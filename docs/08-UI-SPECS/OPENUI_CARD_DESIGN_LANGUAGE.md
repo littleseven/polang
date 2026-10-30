@@ -127,7 +127,7 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 | CodeBlock | 等宽字体 + surfaceVariant 圆角块 + 横滑，language 弱色标注 |
 | ImageBlock / ImageGallery | https src（[PRIVACY] 正则硬校验）；Gallery 横滑定宽 200dp，仅展示无大图页 |
 | Tag / TagBlock | 胶囊（tonal 0.12 + variant→tone 色），TagBlock FlowRow 平铺 |
-| IconText / ImageText / ImageTextLarge | 徽章/缩略图 + 标题副题列；Large=通栏 16:9 图 + 粗标题 |
+| IconText / ImageText / ImageTextLarge | 徽章/缩略图 + 标题副题列；Large=通栏 16:9 图 + 粗标题。ImageText/ImageTextLarge 图双源（2026-10-30）：`photo` 相册投影 id（photos[i].id，人脸聚焦 + 点击 OpenPhoto 大图，Image 同径）优先，`src` https 公网图兜底；未解析/非法 → 同形占位 |
 | EntityList / ListBlock / Steps | 双列 key/value 行；序号圆点/缩略图列表（action 走宿主动作）；纵向步骤条（序号圆点 + 连接线） |
 | Carousel / Buttons / IconButton | 横滑定宽条目；按钮组 Row/Column 平铺；M3 IconButton + surfaceVariant 圆底 |
 | Modal | open BINDABLE_BOOLEAN 真值弹 Dialog；关闭 → @Set($open, false) |
@@ -143,3 +143,4 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 - v1.1（2026-10-25）：Image 体验二修——aspect 缺省改为按照片真实比例渲染（MediaStore 元数据；API<29 无 WIDTH/HEIGHT 列走 BitmapFactory 边界解码兜底；宽 sanity 界 [0.3, 3.0]，界外极长全景图轻微裁切；显式传 aspect 仍生效 = 强制造型，clamp [0.5, 2.5]）；Image 可点击，经宿主动作 OpenPhoto 打开 PhotoEditor 大图页（Gallery 同款入口）。
 - v2（2026-10-25）：OpenUI 官方组件库全量补全（21→官方 82 适配 81，注册 89 项，Col 列式 Table 刻意不收）——渲染层四域分文件（OpenUiContentRenderers 24 / OpenUiFormRenderers 12 / OpenUiChartRenderers 6 + 既有三图官方 prop 扩展 / OpenUiCardBlockRenderers 7），dispatch 按集合分派；BarChart 增 labels+series 官方数据面（grouped/stacked）、PieChart 增 pie 实心、LineChart 增 step 阶梯；表单族确立 name→$name 直写约定；§5 速查表同步。
 - v3（2026-10-30，spec 已随交付清理，git 历史可查）：align 结构治理——Row/Column/Card 补 `align` prop，词汇/语义/缺省严格对齐官方 thesysdev/openui Stack（CSS align-items：五值 start\|center\|end\|stretch\|baseline，缺省 stretch = 子项铺满交叉轴；baseline 首行基线对齐，列向兜底 start 文档化偏差）；Stack 别名 align 缺省同步修正 start→stretch；主按钮（variant=primary）整行宽；server 工具描述官方语义行文 + stat tile 黄金示例三栏 `align="center"` + lint 软警告（DISPLAY+Row 未居中提示）。
+- v4（2026-10-30，spec《2026-10-30-openui-photo-text-composite-design》）：图文组合固化——ImageText/ImageTextLarge 补 `photo` prop（相册投影 id，与 src 二选一、photo 优先），图文版式被组件结构性锁死（小图左+标题副题列 / 通栏 16:9 图+粗标题），相册图文不再 Row 裸拼 Image+Text（等宽分栏反模式）；server 工具描述增图文排版食谱段 + 黄金示例 + lint 软警告（Row 内 Image+Text 裸拼提示）；单卡图片上限口径补 photo 键计数。文字环绕图片（float wrap）不支持，食谱声明替代形态。
