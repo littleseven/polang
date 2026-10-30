@@ -659,6 +659,63 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(flat))
     }
 
+    // ── 图文组合固化（2026-10-30）：photo 键计数 + Row 裸拼图文 lint ──────
+
+    @Test
+    fun `tool description photo text golden example passes validation and lint`() {
+        // 图文排版黄金示例（ImageTextLarge/ImageText 组合 + photo 投影键）同源钉住
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_PHOTO_TEXT_PROGRAM))
+        assertEquals(
+            emptyList<String>(),
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_PHOTO_TEXT_PROGRAM),
+        )
+    }
+
+    @Test
+    fun `image text photo keys count toward image limit`() {
+        // 13 个 ImageText(photo=…) 各产一张位图 → 超上限；photo 键在 Image 调用区间外计入
+        val items = (1..13).joinToString(", ") { i -> "ImageText(\"t$i\", photo = photos[0].id)" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([$items])"
+        val error = RenderOpenUiValidator.validateToError(program)
+        assertNotNull(error)
+        assertTrue(error!!.contains("上限"))
+    }
+
+    @Test
+    fun `named photo inside image call is not double counted`() {
+        // Image(photo=…) 的 photo 键落在 Image 调用区间内只计一次：1 + 11 = 12 张 → 放行
+        val items = (1..11).joinToString(", ") { i -> "{src: \"https://cos.polang.net/$i.png\"}" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([Image(photo = photos[0].id), ImageGallery([$items])])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `lint warns when row mixes bare image with text but does not reject the card`() {
+        // 图文项反模式：Row 等宽分栏 + Image + Text 裸拼
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([Row([Image(photos[0].id), Column([Text(\"标题\"), Text(\"副题\", \"CAPTION\")])])])"
+        val warnings = RenderOpenUiValidator.lintComposition(program)
+        assertEquals(1, warnings.size)
+        assertTrue(warnings[0].contains("ImageText"))
+        // 软警告不拒卡：硬校验仍放行
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `lint clean for pure multi image row and text after row does not false trip`() {
+        // 纯多图并排是食谱合法形态；Row 之后的卡级 Text 不被窗口误算进 Row 实参区间
+        // （GOLDEN_MIXED 黄金示例正是此形态——括号配对截取防回归）
+        assertEquals(
+            emptyList<String>(),
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM),
+        )
+    }
+
     // ── argsJson 与 gate 分发 ───────────────────────────────────────
 
     @Test

@@ -630,10 +630,14 @@ object OpenUiLibrary {
                 ),
             ),
         ),
+        // 2026-10-30 图文组合固化：ImageText/ImageTextLarge 增 photo（#photos 投影元素 id，
+        // 与 Image.photo 完全同口径，求值为 Num、渲染期端侧 id→uri）——相册场景不再被迫
+        // Row/Column 裸拼撞等宽分栏；photo/src 二选一，皆无同形占位
         OpenUiComponent(
             "ImageText",
             listOf(
                 OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("photo", OpenUiPropType.NUMBER),
                 OpenUiProp("src", OpenUiPropType.STRING),
                 OpenUiProp("subtitle", OpenUiPropType.STRING),
                 OpenUiProp("imageSize", OpenUiPropType.NUMBER),
@@ -643,6 +647,7 @@ object OpenUiLibrary {
             "ImageTextLarge",
             listOf(
                 OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("photo", OpenUiPropType.NUMBER),
                 OpenUiProp("src", OpenUiPropType.STRING),
                 OpenUiProp("subtitle", OpenUiPropType.STRING),
             ),

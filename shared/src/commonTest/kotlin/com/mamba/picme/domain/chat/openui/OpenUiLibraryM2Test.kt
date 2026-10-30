@@ -2,6 +2,7 @@ package com.mamba.picme.domain.chat.openui
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -586,5 +587,57 @@ class OpenUiLibraryM2Test {
         assertEquals(2, childrenOf(result.root).size)
         assertEquals(OpenUiValue.Str("stretch"), childAt(result.root, 0).props["align"])
         assertTrue(result.errors.any { error -> error.code == "type-mismatch" })
+    }
+
+    // ── ImageText/ImageTextLarge photo prop（2026-10-30 图文组合固化） ──────
+
+    @Test
+    fun `image text composites register optional photo number prop`() {
+        val photoProp = OpenUiLibrary.components.getValue("ImageText").props
+            .single { prop -> prop.name == "photo" }
+        assertEquals(OpenUiPropType.NUMBER, photoProp.type)
+        assertFalse(photoProp.required)
+        val largePhotoProp = OpenUiLibrary.components.getValue("ImageTextLarge").props
+            .single { prop -> prop.name == "photo" }
+        assertEquals(OpenUiPropType.NUMBER, largePhotoProp.type)
+        assertFalse(largePhotoProp.required)
+    }
+
+    @Test
+    fun `image text composites evaluate photo id from projection element`() = runTest {
+        // mock local_handle 返回 #photos 投影形态 [{id, date}]（同 Image 投影用例口径）
+        val photos = OpenUiValue.Arr(
+            listOf(
+                OpenUiValue.Obj(
+                    mapOf(
+                        "id" to OpenUiValue.Num(101.0),
+                        "date" to OpenUiValue.Str("2026-07-18"),
+                    ),
+                ),
+                OpenUiValue.Obj(
+                    mapOf(
+                        "id" to OpenUiValue.Num(102.0),
+                        "date" to OpenUiValue.Str("2026-07-19"),
+                    ),
+                ),
+            ),
+        )
+        val tools = OpenUiToolResolver { name, _ ->
+            if (name == "local_handle") photos else throw OpenUiToolNotFoundException(name)
+        }
+        val program = """
+            photos = Query("local_handle", { handle: "local://scan/7f3a#photos" }, [])
+            root = Card([ImageTextLarge("海边日落", photo = photos[0].id, subtitle = "2026-07-18"), ImageText("山顶云海", photo = photos[1].id)])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, tools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val large = childrenOf(result.root)[0]
+        assertIs<OpenUiValue.ComponentVal>(large)
+        assertEquals("ImageTextLarge", large.type)
+        assertEquals(OpenUiValue.Num(101.0), large.props["photo"])
+        val small = childrenOf(result.root)[1]
+        assertIs<OpenUiValue.ComponentVal>(small)
+        assertEquals("ImageText", small.type)
+        assertEquals(OpenUiValue.Num(102.0), small.props["photo"])
     }
 }

@@ -30,6 +30,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,7 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.AppShapes
+import com.mamba.picme.core.image.faceAwareVerticalAlignment
 import com.mamba.picme.core.designsystem.BadgeTokens
 import com.mamba.picme.core.designsystem.IconSize
 import com.mamba.picme.core.designsystem.Spacing
@@ -125,8 +130,8 @@ internal fun OpenUiContentNode(
         }
         "BoldText" -> OpenUiContentBoldText(node, state, modifier)
         "IconText" -> OpenUiContentIconText(node, modifier)
-        "ImageText" -> OpenUiContentImageText(node, modifier)
-        "ImageTextLarge" -> OpenUiContentImageTextLarge(node, modifier)
+        "ImageText" -> OpenUiContentImageText(node, photoResolver, onAction, modifier)
+        "ImageTextLarge" -> OpenUiContentImageTextLarge(node, photoResolver, onAction, modifier)
         "EntityList" -> OpenUiContentEntityList(node, modifier)
         "ListBlock" -> OpenUiContentListBlock(node, onAction, modifier)
         "Steps" -> OpenUiContentSteps(node, modifier)
@@ -215,6 +220,44 @@ private fun OpenUiContentNetworkImage(
             contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
             modifier = frame,
+        )
+    }
+}
+
+/**
+ * 相册投影图（2026-10-30 图文组合固化：ImageText/ImageTextLarge 的 photo 键，与 Image
+ * 组件同径）——端侧 id→uri（[PRIVACY] uri 不出端）+ 人脸聚焦对齐 + 点击 OpenPhoto 大图；
+ * 解析中/解析失败（已删除/未索引）→ 同形 surfaceVariant 占位，不炸整卡。
+ */
+@Composable
+private fun OpenUiContentPhotoImage(
+    photoId: Long?,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
+        value = photoId?.let { id -> photoResolver.resolve(id) }
+    }
+    val frame = modifier
+        .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    val resolved = photo
+    if (resolved == null) {
+        Box(modifier = frame)
+    } else {
+        AsyncImage(
+            model = resolved.uri,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
+            modifier = frame.clickable(
+                // 点击看大图：宿主动作通道（OpenUrl 先例），ChatScreen 落 PhotoEditor 页
+                onClickLabel = stringResource(R.string.cd_image_preview),
+                role = Role.Image,
+            ) {
+                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+            },
         )
     }
 }
@@ -754,12 +797,18 @@ private fun OpenUiContentIconText(node: OpenUiValue.ComponentVal, modifier: Modi
     }
 }
 
-/** ImageText：Row(48dp 圆角图（imageSize 可覆盖，钳 24..96）+ 标题/副题列)；src https 限。 */
+/** ImageText：Row(48dp 圆角图（imageSize 可覆盖，钳 24..96）+ 标题/副题列)；图双源——photo 相册投影优先，src https 兜底。 */
 @Composable
-private fun OpenUiContentImageText(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+private fun OpenUiContentImageText(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
     val src = (node.props["src"] as? OpenUiValue.Str)?.v
     val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
+    val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
     val imageSize = ((node.props["imageSize"] as? OpenUiValue.Num)?.v ?: 48.0)
         .coerceIn(24.0, 96.0).dp
     Row(
@@ -767,11 +816,20 @@ private fun OpenUiContentImageText(node: OpenUiValue.ComponentVal, modifier: Mod
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OpenUiContentNetworkImage(
-            src = src,
-            contentDescription = title,
-            modifier = Modifier.size(imageSize),
-        )
+        if (photoId != null) {
+            OpenUiContentPhotoImage(
+                photoId = photoId,
+                photoResolver = photoResolver,
+                onAction = onAction,
+                modifier = Modifier.size(imageSize),
+            )
+        } else {
+            OpenUiContentNetworkImage(
+                src = src,
+                contentDescription = title,
+                modifier = Modifier.size(imageSize),
+            )
+        }
         Column {
             Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
             subtitle?.let { text ->
@@ -785,20 +843,37 @@ private fun OpenUiContentImageText(node: OpenUiValue.ComponentVal, modifier: Mod
     }
 }
 
-/** ImageTextLarge：Column(通栏图 16:9 + 粗标题 + 副题)；src https 限、缺失落同形占位。 */
+/** ImageTextLarge：Column(通栏图 16:9 + 粗标题 + 副题)；图双源——photo 相册投影优先，src https 兜底、缺失落同形占位。 */
 @Composable
-private fun OpenUiContentImageTextLarge(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+private fun OpenUiContentImageTextLarge(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
     val src = (node.props["src"] as? OpenUiValue.Str)?.v
     val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
+    val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
     Column(modifier = modifier.fillMaxWidth()) {
-        OpenUiContentNetworkImage(
-            src = src,
-            contentDescription = title,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f),
-        )
+        if (photoId != null) {
+            OpenUiContentPhotoImage(
+                photoId = photoId,
+                photoResolver = photoResolver,
+                onAction = onAction,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f),
+            )
+        } else {
+            OpenUiContentNetworkImage(
+                src = src,
+                contentDescription = title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f),
+            )
+        }
         Text(
             text = title,
             style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
