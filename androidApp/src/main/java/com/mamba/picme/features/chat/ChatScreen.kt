@@ -880,8 +880,20 @@ fun ChatScreen(
                                                 onViewStateChange = { viewState ->
                                                     viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
                                                 },
-                                                // Image 点击看大图：Gallery 同款 PhotoEditor 入口
-                                                onPhotoClick = { uri -> onNavigateToPhotoEditor(uri, false) },
+                                                // Image 点击看大图：chat 内预览浮层单页（不跳 PhotoEditor 编辑页）
+                                                onPhotoClick = { uri ->
+                                                    imagePreview = ChatImagePreviewState(
+                                                        pages = listOf(
+                                                            ImagePreviewPage(
+                                                                messageId = item.message.id,
+                                                                rawUri = uri,
+                                                                isEditableResult = false,
+                                                                isSaved = false,
+                                                            ),
+                                                        ),
+                                                        initialIndex = 0,
+                                                    )
+                                                },
                                             )
                                         }
                                     }

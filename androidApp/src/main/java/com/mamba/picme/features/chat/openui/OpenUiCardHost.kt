@@ -242,7 +242,7 @@ private fun OpenUiReadyContent(
                 runCatching { uriHandler.openUri(url) }
             }
             // Image 点击看大图（宿主动作，program 不可达——渲染层 resolved uri 直发，
-            // 不出端不回落 program；ChatScreen 落 PhotoEditor 页，Gallery 同款入口）
+            // 不出端不回落 program；ChatScreen 落 chat 内预览浮层）
             "OpenPhoto" -> (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let(onPhotoClick)
             // M1 不上行（§3.4 不变式对偶）：只留结构化日志线索
             "ToAssistant" -> Logger.d("Chat", "OpenUI @ToAssistant 本地消费（不上行）: ${action.args}")
