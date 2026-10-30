@@ -926,7 +926,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   fillMaxHeight、Column/Card 子项 fillMaxWidth；baseline 首行基线对齐，列向兜底 start）；
   Stack 别名 align 缺省同步修正 start→stretch；主按钮（variant=primary）整行宽；
   stat tile 数字栏居中写 `align="center"`（server 黄金示例范式 + lint 软警告）。
-  图文组合固化（2026-10-30，spec《2026-10-30-openui-photo-text-composite-design》）：
+  图文组合固化（2026-10-30，spec 已随交付清理，git 历史可查）：
   ImageText/ImageTextLarge 补 `photo` prop（相册投影 id `photos[i].id`，与 src 二选一、
   photo 优先；渲染走 openUiPhotoResolver 端侧 id→uri + 人脸聚焦 + 点击 OpenPhoto 大图，
   Image 组件同径，[PRIVACY] uri 不出端）——相册图文版式被组合组件结构性锁死，替代
