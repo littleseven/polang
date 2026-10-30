@@ -934,7 +934,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   排版食谱段（场景→组件选型，文字环绕 float wrap 不支持并声明替代形态）+ 黄金示例
   + lint 软警告（Row 实参区间内 Image+Text 裸拼，括号配对截取防误伤纯多图 Row）；
   单卡图片上限口径补 Image 调用区间外的命名 photo 键计数。
-  通用布局原语批次（2026-10-30，spec《2026-10-30-openui-layout-primitives-design》）：
+  通用布局原语批次（2026-10-30，spec 已随交付清理，git 历史可查）：
   设计方向转向通用布局组件（业务组合组件降级为便捷糖）——组件库 89→92 新增
   Grid(children*, columns?, spacing?, align?)（通用 N 列网格，columns clamp [1,4] 缺省 2，
   cell 等宽 weight(1f)，末行缺格补空位；四宫格 = columns 2）/ Box(children*, align?)
