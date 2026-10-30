@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # ota-publish.sh — OTA 一键发包：构建 APK → 提取版本信息 → 上传自建 OTA 渠道（腾讯 COS 经 picme-server /admin/apk/upload）
 #
+# ⚠️ 发包前必须先递增 androidApp/build.gradle.kts 的 versionCode/versionName——版本号
+#    硬编码在构建脚本里，本脚本只提取不自增；同 versionCode 重复发包测试机收不到更新提示。
+#
 # 用法:
 #   ./scripts/ota-publish.sh                          # debug 轨（默认）：assembleDebug → 上传 debug 渠道
 #   ./scripts/ota-publish.sh --type release           # release 轨：build.sh release（需 POLANG_RELEASE_* 签名环境变量）
 #   ./scripts/ota-publish.sh --notes "修复打标崩溃"    # 更新说明（App 更新弹窗展示）
 #   ./scripts/ota-publish.sh --no-build               # 跳过构建，直接上传已有产物
+#   ./scripts/ota-publish.sh --allow-same-version     # 允许同 versionCode 重传（仅镜像/上传修复场景）
 #
 # 环境变量:
 #   POLANG_ADMIN_TOKEN   服务端 ADMIN_TOKEN（必填）
@@ -19,6 +23,7 @@ set -euo pipefail
 TYPE="debug"
 NOTES=""
 BUILD=1
+ALLOW_SAME_VERSION=0
 BASE_URL="${POLANG_OTA_BASE_URL:-https://api.polang.net}"
 
 while [[ $# -gt 0 ]]; do
@@ -29,6 +34,8 @@ while [[ $# -gt 0 ]]; do
             NOTES="$2"; shift 2 ;;
         --no-build)
             BUILD=0; shift ;;
+        --allow-same-version)
+            ALLOW_SAME_VERSION=1; shift ;;
         -h|--help)
             sed -n '2,18p' "$0"; exit 0 ;;
         *)
@@ -72,6 +79,16 @@ VERSION_CODE="$("$APKANALYZER" manifest version-code "$APK_PATH")"
 VERSION_NAME="$("$APKANALYZER" manifest version-name "$APK_PATH")"
 APK_SIZE="$(stat -f%z "$APK_PATH")"
 echo "==> $TYPE | v$VERSION_NAME ($VERSION_CODE) | $((APK_SIZE / 1024 / 1024)) MB"
+
+# ── 2.5 版本递增守卫（2026-10-30：versionCode 硬编码在 build.gradle.kts，不递增
+#    重复发包测试机收不到更新提示——上传前先问服务端当前线上版本）──
+LATEST_JSON="$(curl -fsS "$BASE_URL/api/app/latest?channel=$TYPE" || true)"
+LATEST_CODE="$(printf '%s' "$LATEST_JSON" | sed -n 's/.*"versionCode":\([0-9]*\).*/\1/p')"
+if [[ "$ALLOW_SAME_VERSION" != "1" && -n "$LATEST_CODE" && "$VERSION_CODE" -le "$LATEST_CODE" ]]; then
+    echo "版本未递增：本地 v$VERSION_NAME ($VERSION_CODE) <= 线上 ($LATEST_CODE)（$TYPE 渠道）" >&2
+    echo "先递增 androidApp/build.gradle.kts 的 versionCode/versionName；确需同版本重传加 --allow-same-version" >&2
+    exit 1
+fi
 
 # ── 3. 上传 ─────────────────────────────────────────────
 echo "==> 上传到 ${BASE_URL}（${TYPE} 渠道）"
