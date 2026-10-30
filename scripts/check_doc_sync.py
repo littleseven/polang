@@ -290,6 +290,8 @@ REVIEWS_WHITELIST = {
         "PARITY 现行差异审计快照（PARITY_MASTER_PLAN/skills 引用）",
     "2026-08-10-kmp-best-practices-architecture-review.md":
         "KMP 路线评估快照（含行动项，AGENTS.md §7 引用）",
+    "2026-10-30-ai-coding-methodology-evolution.md":
+        "AI Coding 方法演进复盘快照（2026-03~10 五阶段 + 里程碑时间线）",
 }
 
 PROCESS_REF_PATTERN = re.compile(
