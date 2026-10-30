@@ -252,7 +252,7 @@ private fun OpenUiContentPhotoImage(
             contentScale = ContentScale.Crop,
             alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
             modifier = frame.clickable(
-                // 点击看大图：宿主动作通道（OpenUrl 先例），ChatScreen 落 PhotoEditor 页
+                // 点击看大图：宿主动作通道（OpenUrl 先例），ChatScreen 落 chat 内预览浮层
                 onClickLabel = stringResource(R.string.cd_image_preview),
                 role = Role.Image,
             ) {
