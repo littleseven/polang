@@ -934,6 +934,17 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   排版食谱段（场景→组件选型，文字环绕 float wrap 不支持并声明替代形态）+ 黄金示例
   + lint 软警告（Row 实参区间内 Image+Text 裸拼，括号配对截取防误伤纯多图 Row）；
   单卡图片上限口径补 Image 调用区间外的命名 photo 键计数。
+  通用布局原语批次（2026-10-30，spec《2026-10-30-openui-layout-primitives-design》）：
+  设计方向转向通用布局组件（业务组合组件降级为便捷糖）——组件库 89→92 新增
+  Grid(children*, columns?, spacing?, align?)（通用 N 列网格，columns clamp [1,4] 缺省 2，
+  cell 等宽 weight(1f)，末行缺格补空位；四宫格 = columns 2）/ Box(children*, align?)
+  （通用叠放容器，children 按数组序从底到顶叠放，align 九值 contentAlignment 缺省
+  topStart = Compose 官方缺省）/ Spacer(size?)（通用留白件，size∈xs|s|m|l|xl →
+  Spacing token 缺省 m，Row 内占宽 Column/Card 内占高，不参与 Row 分栏）+ Row 增
+  `weights` prop（PRIMITIVE_ARRAY，CSS flex-grow 语义按比例分栏，槽位只数组件子项、
+  Divider/Spacer 不占，个数不符回退全 1 等宽；左图右文 = weights=[1,2] 配 align）；
+  lint 第四条修订（Row 内 Image+Text 裸拼仅无 weights 时警告）；工具描述「通用布局
+  食谱」段 + 黄金示例 `GOLDEN_LAYOUT_PROGRAM`（四宫格照片墙 + 1:2 左图右文）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量

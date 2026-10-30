@@ -201,6 +201,15 @@ fun OpenUiNodeRenderer(
             ) {
                 val weightsUsable = maxWidth != Dp.Infinity
                 val alignRaw = node.alignRaw()
+                // 2026-10-30 通用布局原语批次：weights 按比例分栏（CSS flex-grow 语义）——
+                // 槽位只数组件子项（Divider/Spacer 分隔件不占），个数不符回退全 1 等宽
+                val declaredWeights = (node.props["weights"] as? OpenUiValue.Arr)?.v
+                    ?.mapNotNull { value -> (value as? OpenUiValue.Num)?.v?.toFloat() }
+                val weightableCount = children.count { child ->
+                    child is OpenUiValue.ComponentVal && child.type != "Divider" && child.type != "Spacer"
+                }
+                val effectiveWeights = declaredWeights?.takeIf { declared -> declared.size == weightableCount }
+                var weightSlot = 0
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
                     // 2026-10-30 align 治理（官方语义）：start/center/end 容器直映射；
@@ -208,18 +217,26 @@ fun OpenUiNodeRenderer(
                     verticalAlignment = openUiRowAlign(alignRaw),
                 ) {
                     // 子组件等宽分栏：无 weight 时首栏按内容占宽，后续栏被压成单字竖条；
-                    // Divider 是分隔符不参与分栏
+                    // Divider/Spacer 是分隔件不参与分栏
                     for (child in children) {
                         if (child is OpenUiValue.ComponentVal) {
+                            val isSeparator = child.type == "Divider" || child.type == "Spacer"
+                            val slotWeight = if (isSeparator) {
+                                1f
+                            } else {
+                                val w = effectiveWeights?.getOrNull(weightSlot) ?: 1f
+                                weightSlot++
+                                w
+                            }
                             val weightMod =
-                                if (child.type == "Divider" || !weightsUsable) {
+                                if (isSeparator || !weightsUsable) {
                                     Modifier
                                 } else {
-                                    Modifier.weight(1f)
+                                    Modifier.weight(slotWeight)
                                 }
                             val childModifier = when {
-                                // 分隔符自带竖向尺寸管理，不参与交叉轴语义
-                                child.type == "Divider" -> weightMod
+                                // 分隔件自带竖向尺寸管理，不参与交叉轴语义
+                                isSeparator -> weightMod
                                 // 官方 stretch：子栏撑满行高（无界高约束下退化为原高，幂等安全）
                                 alignRaw == "stretch" -> weightMod.fillMaxHeight()
                                 // 官方 baseline：子栏首行基线对齐（RowScope 作用域修饰符）
@@ -249,6 +266,64 @@ fun OpenUiNodeRenderer(
                     childModifier = if (alignRaw == "stretch") Modifier.fillMaxWidth() else Modifier,
                 )
             }
+        }
+        // ── 通用布局原语批次（2026-10-30，spec《2026-10-30-openui-layout-primitives-design》）──
+        "Grid" -> run {
+            // 通用 N 列网格（四宫格 = columns 2）：children 分块成多行 Row，cell 等宽
+            // weight(1f)，末行缺 cell 补空位保持列对齐；align 交叉轴语义同 Row
+            val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+            val columns = ((node.props["columns"] as? OpenUiValue.Num)?.v ?: 2.0)
+                .toInt().coerceIn(1, 4)
+            val alignRaw = node.alignRaw()
+            BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+                // 无界宽上下文（HORIZONTAL List 内）weight 失效，cell 改按内容自尺寸（Row 同径）
+                val weightsUsable = maxWidth != Dp.Infinity
+                Column(verticalArrangement = Arrangement.spacedBy(node.spacingDp())) {
+                    children.chunked(columns).forEach { rowChildren ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(node.spacingDp()),
+                            verticalAlignment = openUiRowAlign(alignRaw),
+                        ) {
+                            rowChildren.forEach { child ->
+                                if (child is OpenUiValue.ComponentVal) {
+                                    val weightMod = if (weightsUsable) Modifier.weight(1f) else Modifier
+                                    val childModifier = when {
+                                        alignRaw == "stretch" -> weightMod.fillMaxHeight()
+                                        alignRaw == "baseline" -> weightMod.alignByBaseline()
+                                        else -> weightMod
+                                    }
+                                    OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
+                                } else {
+                                    Box(modifier = if (weightsUsable) Modifier.weight(1f) else Modifier)
+                                }
+                            }
+                            repeat(columns - rowChildren.size) {
+                                Box(modifier = if (weightsUsable) Modifier.weight(1f) else Modifier)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "Box" -> run {
+            // 通用叠放容器：children 按数组序从底到顶叠放，align 九值 contentAlignment
+            // （缺省 topStart = Compose Box 官方缺省）；Box 尺寸 = 最大子件
+            val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+            Box(
+                modifier = modifier,
+                contentAlignment = openUiBoxAlign(node.alignRaw()),
+            ) {
+                children.forEach { child ->
+                    if (child is OpenUiValue.ComponentVal) {
+                        OpenUiNodeRenderer(child, state, photoResolver, onAction, Modifier)
+                    }
+                }
+            }
+        }
+        "Spacer" -> {
+            // 通用留白件：Row 内占宽、Column/Card 内占高（size 双维，Row stretch 下高被
+            // 行高接管、Column stretch 下宽被整宽接管，视觉均为单维缝隙）；不参与分栏
+            Spacer(modifier = modifier.size(openUiSpacerSize(node.props["size"])))
         }
         "Text" -> {
             // M2：text 升 BINDABLE_STRING——Binding 从 state 快照读；Str 直取，Num/Bool
@@ -516,6 +591,29 @@ private fun openUiColumnAlign(raw: String?): Alignment.Horizontal = when (raw) {
     "end" -> Alignment.End
     else -> Alignment.Start // start/stretch/baseline：stretch 见子项 fillMaxWidth
 }
+
+/** Box 叠放容器 contentAlignment 九值（2026-10-30 通用布局原语批次；缺省 topStart = Compose Box 官方缺省）。 */
+private fun openUiBoxAlign(raw: String?): Alignment = when (raw) {
+    "topCenter" -> Alignment.TopCenter
+    "topEnd" -> Alignment.TopEnd
+    "centerStart" -> Alignment.CenterStart
+    "center" -> Alignment.Center
+    "centerEnd" -> Alignment.CenterEnd
+    "bottomStart" -> Alignment.BottomStart
+    "bottomCenter" -> Alignment.BottomCenter
+    "bottomEnd" -> Alignment.BottomEnd
+    else -> Alignment.TopStart
+}
+
+/** Spacer 留白档位（官方 gap 词汇子集）→ 间距 token（禁魔法数，缺省 m）。 */
+private fun openUiSpacerSize(prop: OpenUiValue?): Dp =
+    when ((prop as? OpenUiValue.Str)?.v) {
+        "xs" -> Spacing.xs
+        "s" -> Spacing.sm
+        "l" -> Spacing.lg
+        "xl" -> Spacing.xl
+        else -> Spacing.md
+    }
 
 /**
  * 空绑定兜底（M4 §1.4，M4.1 放宽）：解析结果 trim 后以 `:`/`：` 结尾（绑定值为空只剩

@@ -348,16 +348,18 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 89 openui library components`() {
+    fun `whitelist pins all 92 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 的 89 个 key 逐字一致，改动须双向同步核对
+        // OpenUiLibrary.components 的 92 个 key 逐字一致，改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
-        //  改组件清单时人工双端核对）
+        //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）
         val expected = setOf(
             // 本仓既有 + M2/M3 扩（原二十一组件）
             "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
             "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
             "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
+            // 通用布局原语批次（2026-10-30 本仓扩展）
+            "Grid", "Box", "Spacer",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -382,7 +384,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(89, expected.size)
+        assertEquals(92, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 
@@ -714,6 +716,29 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             emptyList<String>(),
             RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM),
         )
+    }
+
+    // ── 通用布局原语批次（2026-10-30）：Grid/Box/Spacer + Row.weights ──────
+
+    @Test
+    fun `tool description layout golden example passes validation and lint`() {
+        // 通用布局黄金示例（四宫格 Grid + 1:2 左图右文 Row weights）同源钉住
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM))
+        assertEquals(
+            emptyList<String>(),
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM),
+        )
+    }
+
+    @Test
+    fun `lint exempts row image text composition carrying weights`() {
+        // weights 比例分栏是认可的经典版式写法（2026-10-30 lint 修订）：同样 Image+Text
+        // 同 Row，带 weights 不警告、不带才警告（无 weights 用例见上文既有测试）
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([Row([Image(photos[0].id), Column([Text(\"标题\"), Text(\"副题\", \"CAPTION\")])], weights = [1, 2], align = \"center\")])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(program))
+        assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
     // ── argsJson 与 gate 分发 ───────────────────────────────────────
