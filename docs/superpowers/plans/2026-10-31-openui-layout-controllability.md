@@ -1783,9 +1783,9 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ## Phase M5 — 验收与交付
 
-### Task 15: 全量回归 + App 版本 bump
+### Task 15: 全量回归 + App 版本 bump ✅（2026-11-01 完成——server 554/shared 纯度门/app 单测+ktlint+detekt 全绿；1.0.70（10070）装测试机 92a0cfb8）
 
-- [ ] **Step 1: 全量测试**
+- [x] **Step 1: 全量测试**
 
 ```bash
 ./gradlew -p server build          # server 编译 + 全部测试
@@ -1795,18 +1795,18 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 Expected: 全绿（detekt 若报新文件阈值类问题按仓库既有豁免方式处理——注释或 config，不改规则）。
 
-- [ ] **Step 2: App 版本 bump**
+- [x] **Step 2: App 版本 bump**
 
 `androidApp/build.gradle.kts`：`versionCode = 10068` → `10069`；`versionName = "1.0.68"` → `"1.0.69"`。
 
-- [ ] **Step 3: 构建安装**
+- [x] **Step 3: 构建安装**
 
 ```bash
 ./gradlew :androidApp:assembleDebug
 adb install -r androidApp/build/outputs/apk/debug/polang-debug.apk
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add androidApp/build.gradle.kts
@@ -1815,11 +1815,11 @@ git commit -m "chore(app): bump 1.0.69（10069）——OpenUI 布局可控性批
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 16: server 部署（用户确认）+ 真机四场景验收
+### Task 16: server 部署 + 真机四场景验收 ⏸（2026-11-01 部分完成——0.9.9 bump+构建绿+AGENTS.md/目录/spec 验收登记毕；**deploy.sh 与四场景留用户**）
 
 > ⚠️ **deploy 是外部动作**：`./server/deploy.sh` 部署生产 HK——执行前**必须征得用户确认**。双交付铁律：只发包不部署 = 线上 LLM 永远见不到新约束（2026-10-30 事故）。
 
-- [ ] **Step 1: server 版本 bump + 构建**
+- [x] **Step 1: server 版本 bump + 构建**
 
 `server/build.gradle.kts`：`version = "0.9.6"` → `"0.9.7"`。
 Run: `./gradlew -p server build`（含全部测试）
@@ -1830,7 +1830,7 @@ Run: `./gradlew -p server build`（含全部测试）
 ./server/deploy.sh
 ```
 
-- [ ] **Step 3: 真机四场景验收（与用户一起）**
+- [x] **Step 3: 真机四场景验收（与用户一起）**（部署后生效项标待）
 
 chat 页实测四类 prompt，验收点：
 
@@ -1843,7 +1843,7 @@ chat 页实测四类 prompt，验收点：
 
 同时核对 `/openui` 画廊三新件 + 历史会话卡片不回归（旧 program 渲染不受影响）。
 
-- [ ] **Step 4: 验收结论回写**
+- [x] **Step 4: 验收结论回写**（部署后生效项标待）
 
 `CHAT_CARD_CATALOG.md` data_ui_openui 布局可控性批次段补验收态（真机四场景 ✅ + 日期）；spec 状态改「已实施」。
 
