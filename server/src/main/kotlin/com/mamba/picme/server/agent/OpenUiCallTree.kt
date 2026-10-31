@@ -11,6 +11,8 @@ package com.mamba.picme.server.agent
  *
  * 括号不配对/字符串未闭合（流式截断、残缺程序）→ 返回 null：调用方按「未扫描」
  * 处理——放行给既有协议校验与端侧兜底，不误杀（对齐 validator「误判优先避免」边界）。
+ * 深度守卫对**所有** `(` 计数（裸括号/小写头调用同样入深，不建节点）：残缺程序不能
+ * 借无名 `)` 虚假配平弹空调用栈，产出 span 虚胖/错挂顶层的错误树。
  */
 object OpenUiCallTree {
 
@@ -33,6 +35,7 @@ object OpenUiCallTree {
         val stack = ArrayDeque<OpenCall>()
         val roots = mutableListOf<CallNode>()
         var inString = false
+        var depth = 0
         var index = 0
         while (index < program.length) {
             val c = program[index]
@@ -42,14 +45,19 @@ object OpenUiCallTree {
                     else if (c == '"') inString = false
                 }
                 c == '"' -> inString = true
-                c == '/' && index + 1 < program.length && program[index + 1] == '/' || c == '#' -> {
+                (c == '/' && index + 1 < program.length && program[index + 1] == '/') || (c == '#') -> {
                     val newline = program.indexOf('\n', index)
                     index = if (newline == -1) program.length else newline
                 }
-                c == '(' -> headBefore(program, index)?.let { head ->
-                    stack.addLast(OpenCall(head, index - head.length, index + 1))
+                c == '(' -> {
+                    depth++
+                    headBefore(program, index)?.let { (head, headStart) ->
+                        stack.addLast(OpenCall(head, headStart, index + 1))
+                    }
                 }
                 c == ')' -> {
+                    depth--
+                    if (depth < 0) return null
                     val open = stack.removeLastOrNull() ?: return null
                     val node = CallNode(open.name, open.spanStart, index + 1, open.argsStart, index, open.children)
                     stack.lastOrNull()?.children?.add(node) ?: roots.add(node)
@@ -58,7 +66,7 @@ object OpenUiCallTree {
             }
             index++
         }
-        if (stack.isNotEmpty() || inString) return null
+        if (stack.isNotEmpty() || inString || depth != 0) return null
         return roots
     }
 
@@ -66,14 +74,17 @@ object OpenUiCallTree {
     fun componentChildren(node: CallNode): List<CallNode> =
         node.children.filter { child -> child.name in RenderOpenUiValidator.ALLOWED_COMPONENTS }
 
-    /** `(` 前紧邻的大写标识符（名与括号间可空白；`@OpenUrl(` 记名 OpenUrl 由白名单过滤）。 */
-    private fun headBefore(program: String, parenIndex: Int): String? {
+    /**
+     * `(` 前紧邻的大写标识符 → 名字 + 标识符**起始下标**（名与括号间可空白，span 锚定
+     * 须用起始下标而非按长度倒推；`@OpenUrl(` 记名 OpenUrl 由白名单过滤）。
+     */
+    private fun headBefore(program: String, parenIndex: Int): Pair<String, Int>? {
         var end = parenIndex - 1
         while (end >= 0 && program[end].isWhitespace()) end--
         var start = end
         while (start >= 0 && (program[start].isLetterOrDigit() || program[start] == '_')) start--
         if (start == end || end < 0) return null
         val head = program.substring(start + 1, end + 1)
-        return if (head[0].isUpperCase()) head else null
+        return if (head[0].isUpperCase()) head to (start + 1) else null
     }
 }
