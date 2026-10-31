@@ -1,11 +1,11 @@
 {
   "endpoint": "http://127.0.0.1:50501/api/v1/mcp",
-  "exportedAt": "2026-10-01T23:32:00+08:00",
+  "exportedAt": "2026-10-31T23:56:07+08:00",
   "file": {
     "id": "715061534788814",
     "name": "polang-ui-spec",
     "permission": "readwrite",
-    "url": "cocraft://localhost/file/715061534788814?node_id=438%3A328"
+    "url": "cocraft://localhost/file/715061534788814?node_id=553%3A1"
   },
   "note": "云端画布为编辑工作区；本目录快照由 export-ardot-snapshot.py 生成（多页聚合，2026-08-16 起），重跑覆盖。变量 SSOT=shared/src/commonMain/resources/design-tokens.json，不在本快照内。",
   "pages": [
@@ -91,26 +91,6 @@
           "id": "107:353",
           "name": "gallery/selection",
           "png": "gallery-selection.png"
-        },
-        {
-          "id": "172:113",
-          "name": "gallery/tag_stage_sheet",
-          "png": "gallery-tag_stage_sheet.png"
-        },
-        {
-          "id": "478:10",
-          "name": "gallery/tag_control",
-          "png": "gallery-tag_control.png"
-        },
-        {
-          "id": "478:89",
-          "name": "gallery/tag_control_running",
-          "png": "gallery-tag_control_running.png"
-        },
-        {
-          "id": "479:5",
-          "name": "gallery/tag_control_paused",
-          "png": "gallery-tag_control_paused.png"
         }
       ],
       "id": "103:1",
@@ -322,6 +302,26 @@
           "id": "189:216",
           "name": "dedup/cleaned",
           "png": "dedup-cleaned.png"
+        },
+        {
+          "id": "478:10",
+          "name": "organize/tag_control",
+          "png": "organize-tag_control.png"
+        },
+        {
+          "id": "478:89",
+          "name": "organize/tag_control_running",
+          "png": "organize-tag_control_running.png"
+        },
+        {
+          "id": "479:5",
+          "name": "organize/tag_control_paused",
+          "png": "organize-tag_control_paused.png"
+        },
+        {
+          "id": "172:113",
+          "name": "organize/tag_stage_sheet",
+          "png": "organize-tag_stage_sheet.png"
         }
       ],
       "id": "267:21",
@@ -390,16 +390,6 @@
           "id": "152:128",
           "name": "feature-graphic/zh-CN",
           "png": "feature-graphic-zh-CN.png"
-        },
-        {
-          "id": "152:134",
-          "name": "feature-graphic/en-US",
-          "png": "feature-graphic-en-US.png"
-        },
-        {
-          "id": "152:140",
-          "name": "feature-graphic/zh-TW",
-          "png": "feature-graphic-zh-TW.png"
         },
         {
           "id": "300:113",
@@ -520,6 +510,16 @@
           "id": "302:159",
           "name": "08-privacy/zh-TW-design",
           "png": "08-privacy-zh-TW-design.png"
+        },
+        {
+          "id": "510:30",
+          "name": "feature-graphic/en-US",
+          "png": "feature-graphic-en-US.png"
+        },
+        {
+          "id": "510:65",
+          "name": "feature-graphic/zh-TW",
+          "png": "feature-graphic-zh-TW.png"
         }
       ],
       "id": "392:22",
@@ -678,12 +678,68 @@
           "id": "444:31",
           "name": "taskcard/done",
           "png": "taskcard-done.png"
+        },
+        {
+          "id": "523:1",
+          "name": "taskcard/light-collapsed",
+          "png": "taskcard-light-collapsed.png"
+        },
+        {
+          "id": "523:35",
+          "name": "taskcard/light-approval",
+          "png": "taskcard-light-approval.png"
         }
       ],
       "id": "438:2",
       "name": "HtmlCard"
+    },
+    {
+      "frames": [
+        {
+          "id": "553:5",
+          "name": "pattern-stats-report",
+          "png": "pattern-stats-report.png"
+        },
+        {
+          "id": "553:53",
+          "name": "pattern-album-groups",
+          "png": "pattern-album-groups.png"
+        },
+        {
+          "id": "553:79",
+          "name": "pattern-compare",
+          "png": "pattern-compare.png"
+        },
+        {
+          "id": "553:89",
+          "name": "pattern-timeline",
+          "png": "pattern-timeline.png"
+        },
+        {
+          "id": "553:119",
+          "name": "comp-comparerow",
+          "png": "comp-comparerow.png"
+        },
+        {
+          "id": "553:207",
+          "name": "pattern-image-text",
+          "png": "pattern-image-text.png"
+        },
+        {
+          "id": "553:220",
+          "name": "comp-timeline",
+          "png": "comp-timeline.png"
+        },
+        {
+          "id": "553:263",
+          "name": "comp-chartgrid",
+          "png": "comp-chartgrid.png"
+        }
+      ],
+      "id": "553:1",
+      "name": "OpenUILayouts"
     }
   ],
   "scale": 1,
-  "structureSha256": "77bf0fbbcc08ba8e5d74c1fe707bb630345fb33cdd6752755a5c742bfcf2f73e"
+  "structureSha256": "344a4020e57688403a8ec89d9f353ef320e270beadee399344ce2f48c9abd04c"
 }

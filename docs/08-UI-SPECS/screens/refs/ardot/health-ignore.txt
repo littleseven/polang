@@ -123,3 +123,13 @@ tag_control_paused/Body/HeroCard/heroRow
 tag_control_paused/Body/HeroCard/btnRow
 tag_control_paused/capsule_switch
 tag_control_paused/Body/secRowStages
+
+# ── OpenUILayouts 版式范式页（2026-10-31 布局可控性批次）────────────────────
+# 该页为 OpenUI 组件/版式的规格示意页（非生产 UI），dup 组均为同页多态展示
+# （代码才是组件，画布帧不收编）；单页扫描的 catalog drift 为已知假阳性
+# （catalog 组件散布多页，全量审计另行覆盖）。
+# SVG 矢量色无法绑变量（弧线/折线/数据点），色值与 chart/* 变量同源
+# （#64B5F6/#FFB74D/#81C784），代码侧 SSOT = OpenUiCardTokens.chartPalette：
+OpenUILayouts/pattern-stats-report/chartGrid/pieCell/donutRow/donutWrap/donut/Vector
+OpenUILayouts/comp-chartgrid/stateCard/chartGrid/chartCell/lineChart/Vector
+OpenUILayouts/comp-chartgrid/stateCard/chartGrid/chartCell/lineChart/Ellipse
