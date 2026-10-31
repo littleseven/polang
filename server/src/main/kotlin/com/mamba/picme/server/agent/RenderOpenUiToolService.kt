@@ -117,11 +117,14 @@ class RenderOpenUiToolService {
         /**
          * 相册 APP 构图黄金示例（2026-10-31 相册 APP 组合方式批次）：CardHeader 时间分组
          * 标题 + PhotoGrid 方形照片网格 + AvatarRow 人物头像条——相册 APP 签名形态一行调用，
-         * 不再 Grid+Image / Row 拼装。
+         * 不再 Grid+Image / Row 拼装。actionLabel 必配 action（2026-10-31 真机回归补：
+         * 只传 actionLabel 不传 action 曾致「查看全部」点击无效；@ToAssistant 以用户消息
+         * 上行回话，端侧有同文案兜底但显式文案语境更准）。
          */
         const val GOLDEN_PHOTO_PROGRAM =
             "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([CardHeader(\"2026年7月\", subtitle = \"128 张\"), " +
+                "root = Card([CardHeader(\"2026年7月\", subtitle = \"128 张\", " +
+                "actionLabel = \"查看全部\", action = @ToAssistant(\"查看全部 2026年7月的照片\")), " +
                 "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id, " +
                 "photos[4].id, photos[5].id], columns = 3), " +
                 "AvatarRow([{photo: photos[0].id, label: \"妈妈\"}, {photo: photos[1].id, label: \"宝宝\"}])])"
@@ -254,7 +257,8 @@ class RenderOpenUiToolService {
      替代 Grid+Image 拼装，元素写 photos[0].id 投影、禁字面量数字）/ AvatarRow(items*=[{photo*,
      label?}])（人物圆形头像横滑条：圆形人脸聚焦 + 名字居下，photo 写 photos[0].id 投影）；
      CardHeader 增可选 actionLabel/action（分组标题尾部「查看全部」动作位——
-     CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部")）；
+     CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部",
+     action = @ToAssistant("查看全部 2026年7月的照片"))，有 actionLabel 必配 action）；
    - 表单（name 键控直写 state：用户交互即 @Set(${'$'}<name>, 值)——如 Input(name="city")
      键入后 Text("城市: " + ${'$'}city) 经 ${'$'}name 绑定联动读；Form 仅视觉分组，无提交作用域；
      ${'$'}变量同样先独占一行声明默认值）：
@@ -355,14 +359,16 @@ class RenderOpenUiToolService {
    相册 APP 构图规则（2026-10-31，对标 Google Photos/Apple 照片/小米相册签名形态——
    相册类卡片按此构图，别再自由拼装）：
    - 时间分组网格（相册主视图签名形态）→ CardHeader("2026年7月", subtitle = "128 张",
-     actionLabel = "查看全部") + PhotoGrid(photos = [...], columns = 3)；
+     actionLabel = "查看全部", action = @ToAssistant("查看全部 2026年7月的照片")) +
+     PhotoGrid(photos = [...], columns = 3)；
    - 人物区（面孔签名形态）→ AvatarRow([{photo: photos[i].id, label: "妈妈"}, ...])；
    - 回顾卡（年度/月度杂志感）→ Banner 首屏 + StatRow 关键数字 + PhotoGrid 摘选；
    - 相册列表（封面 + 名称 + 计数）→ List([ListItem(title, photo = photos[i].id,
      subtitle = 日期, trailing = "128 张"), ...])；
    - 回忆条（大卡横滑）→ VisualCardBlock([...], layout = "carousel")（既有件）；
    ⚠️ 照片网格 ≥2 张一律 PhotoGrid，禁用 Grid+Image 拼装（帧随各图真实比例会犬牙交错，
-   lint 会提示）；
+   lint 会提示）；CardHeader 有 actionLabel 必须配 action（@ToAssistant("查看全部 xx")
+   以用户消息上行回话——缺省端侧虽兜底发同文案，显式写语境更准，lint 会提示）；
    相册 APP 构图黄金示例（时间分组网格 + 人物头像条——相册卡签名骨架）：
 """ + GOLDEN_PHOTO_PROGRAM
     )

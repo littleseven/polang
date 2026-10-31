@@ -132,7 +132,7 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 
 | 签名形态 | 固化构图 | 出处 |
 |----------|----------|------|
-| 时间分组网格（相册主视图） | `CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部") + PhotoGrid(photos = [...], columns = 3)` | 三家主视图 = 日期/月份分组头 + 方形等宽网格 |
+| 时间分组网格（相册主视图） | `CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部", action = @ToAssistant("查看全部 2026年7月的照片")) + PhotoGrid(photos = [...], columns = 3)` | 三家主视图 = 日期/月份分组头 + 方形等宽网格 |
 | 人物区（面孔） | `AvatarRow([{photo: photos[i].id, label: "妈妈"}, ...])` | Google Photos/Apple 人物页 = 圆形头像 + 名字 |
 | 回顾卡（年度/月度杂志感） | Banner 首屏 + StatRow 关键数字 + PhotoGrid 摘选 | Apple 回忆 / Google Photos 年度回顾 |
 | 相册列表（封面+名称+计数） | `List([ListItem(title, photo = …, subtitle = 日期, trailing = "128 张"), ...])` | 三家相册 Tab 列表行 |
@@ -140,7 +140,7 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 
 - **PhotoGrid 是照片网格唯一形态**：cell 恒 1:1 Crop + 人脸聚焦 + 2dp 密缝 + 整网格 12dp 圆角（本机相册页 MediaGrid 同形态），columns 2|3|4 缺省 3，单件 ≤12 张（单卡图片上限同口径）；⚠️ 禁用 Grid+Image 拼装照片网格（v7 起 Image 帧随各图真实比例，网格犬牙交错，server lint 会提示）；
 - **AvatarRow**：56dp 圆形 Crop + 人脸聚焦 + CAPTION 名字居下，横滑；photo 写相册投影 id；
-- **CardHeader 尾部动作位**：actionLabel/action 可选——「分组标题 + 查看全部 >」是相册 APP 日期分组头签名形态，actionLabel 缺省不渲染尾部；
+- **CardHeader 尾部动作位**：actionLabel/action 可选——「分组标题 + 查看全部 >」是相册 APP 日期分组头签名形态，actionLabel 缺省不渲染尾部；**有 actionLabel 必配 action**（v8.1 真机回归：只传 actionLabel 曾致点击无效——action 缺省端侧兜底合成 `@ToAssistant("查看全部：<标题>")` 以用户消息上行，显式 `action = @ToAssistant("查看全部 2026年7月的照片")` 语境更准，server lint 会提示）；
 - 网格/头像是刻意裁切件（§4.5 例外），人像构图由人脸聚焦保障。
 
 ## 5. 组件皮肤速查（渲染器现状对齐表）
@@ -205,3 +205,4 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - v7（2026-10-31，纯渲染层批次，schema/server 零改动）：图片帧比例治理——§4.5 决策链全组件统一（显式 aspect > 图片真实比例 > 组件缺省框），真实比例双源 = 相册元数据（既有）+ 网络图 coil intrinsic（新增，加载后采集、单帧过渡）；Image 网络 src 支路告别恒 4:3、ImageTextLarge/Banner 告别写死 16:9（竖构图题图不再拦腰裁）、ImageBlock 帧随 intrinsic、ImageGallery 改定高变宽经典画廊形态；`frameAspectOf` 兜底比例参数化（组件缺省框随调用方），新增 `intrinsicAspectOf`（NaN/零维防御）；定尺寸缩略图与 VisualCard 背景保持 Crop 不变；OpenUiFrameAspectTest +4 用例钉住 fallback 参数化与 intrinsic 同径语义。
 - v8（2026-10-31，无 spec，结论直落本文件 §4.6）：相册 APP 组合方式批次——学习 Google Photos / Apple 照片 / 小米相册签名组合形态固化为组件与构图规则（用户定调「学习主要相册 APP 的 UI 组合方式，实现为布局组件和规则」）。新增 PhotoGrid（相册主视图签名形态：方形 1:1 cell + 人脸聚焦裁切 + 2dp 密缝 + 整网格 12dp 圆角，photos* 数组 ≤12 张，columns 缺省 3）+ AvatarRow（人物区签名形态：56dp 圆形头像横滑条，items [{photo*, label?}]）；CardHeader 扩 `actionLabel`/`action`（「查看全部 >」分组头签名形态）。组件总数 95→97。两组件刻意绕开 §4.5 真实比例链——均匀方形/圆形裁切即设计语义（网格节奏感优先于单图比例保真）。server 图片计数口径扩 photos 数组括号配对扫描（防 `photos[0].id` 嵌套括号截断）；lint 第五条：Grid 内 Image≥2 引导换 PhotoGrid；工具描述 GOLDEN_PHOTO_PROGRAM 黄金示例 + 「相册 APP 构图规则」食谱段；GOLDEN_LAYOUT_PROGRAM 四宫格照片墙同步改 PhotoGrid（Grid 只留图表/混合内容）。
 
+- v8.1（2026-10-31，真机回归修复，无 spec）：「查看全部」点击无效根治——根因 = 黄金示例/食谱只传 actionLabel 不传 action（LLM 照样画瓢）+ 渲染层无动作兜底 + @ToAssistant M1 起仅记日志不路由。三处同修：①@ToAssistant 实路由上行（OpenUiCardHost.onToAssistant → ChatScreen viewModel.sendMessage，以用户消息发进会话）；②渲染层缺省动作兜底（`headerActionsOrDefault`：actionLabel 在场且 action 缺省 → 合成 @ToAssistant("actionLabel：title")，OpenUiHeaderActionTest 钉住）；③server GOLDEN_PHOTO_PROGRAM/食谱/签名段全部改为 actionLabel+action 成对 + lint 第六条（CardHeader 有 actionLabel 缺 action → 引导显式 @ToAssistant）。版本 10069/1.0.69 + server 0.9.7。

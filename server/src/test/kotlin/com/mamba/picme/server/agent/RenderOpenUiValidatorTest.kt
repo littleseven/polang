@@ -849,6 +849,21 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(fixed))
     }
 
+    // ── 查看全部缺省动作兜底批次（2026-10-31）：lint 第六条 ──────────────
+
+    @Test
+    fun `header actionLabel without action triggers lint`() {
+        // 真机回归根因：黄金示例只传 actionLabel 不传 action，按钮可点态无动作——lint 引导
+        // 显式配 @ToAssistant（端侧有同文案兜底，但显式文案语境更准）
+        val bare =
+            "root = Card([CardHeader(\"最近月份\", actionLabel = \"查看全部\")])"
+        assertEquals(1, RenderOpenUiValidator.lintComposition(bare).size)
+        val wired =
+            "root = Card([CardHeader(\"最近月份\", actionLabel = \"查看全部\", " +
+                "action = @ToAssistant(\"查看全部 最近月份\"))])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wired))
+    }
+
     // ── argsJson 与 gate 分发 ───────────────────────────────────────
 
     @Test
