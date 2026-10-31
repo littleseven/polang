@@ -12,9 +12,10 @@ package com.mamba.picme.server.agent
  *
  * 近似边界（已知保守口径，设计如此）：N1/N4 的键检测扫节点 args 全区间（含子树
  * 原文），子树出现过 weights/align 即跳过追加（漏补无害）；N3 的「裸」同样扫全区间
- * 原文——唯一子自带命名实参的容器不解包（多一层壳无害）；连续 Spacer 之间夹行注释
- * 时，N2 删除吃逗号只回吞空白，注释后的逗号会残留（极端输入风格，不崩，交由既有
- * 协议校验兜底）。
+ * 原文——唯一子自带命名实参的容器不解包（多一层壳无害），且裸判定只认命名实参，
+ * 位置实参（如 spacing 枚举）随解包丢弃属规格内行为；行注释属死输入域——客户端
+ * lexer 不支持注释，注释程序本就整卡致命降级、与矫正器无关（可忽略），其活变体
+ * args 尾随逗号已由分离符归一吸收（见 appendNamedArg）。
  */
 object OpenUiLayoutNormalizer {
 
@@ -28,6 +29,7 @@ object OpenUiLayoutNormalizer {
     private val NAMED_WEIGHTS = Regex("""(?<![A-Za-z0-9_])weights\s*=""")
     private val NAMED_ALIGN = Regex("""(?<![A-Za-z0-9_])align\s*=""")
     private val QUOTED_SIZE = Regex(""""(xs|s|m|l|xl)"""")
+    private val STRING_LITERAL = Regex(""""([^"\\]|\\.)*"""")
 
     /** 入口：无需矫正/扫描失败/内部异常 → 原文返回。幂等。 */
     fun normalize(program: String): String =
@@ -106,12 +108,12 @@ object OpenUiLayoutNormalizer {
         if ("N1" !in DISABLED_RULES && node.name == "Row" && needsWeights(node, comps, original)) {
             val imageFirst = comps.first().name == "Image"
             val weights = if (imageFirst) "[1, 2]" else "[2, 1]"
-            args = args.trimEnd() + ", weights = " + weights
+            args = appendNamedArg(args, "weights", weights)
         }
         val n4Fired = "N4" !in DISABLED_RULES && node.name == "Column" && parentName == "Row" &&
             containsDisplay(node, original) && !NAMED_ALIGN.containsMatchIn(stripStrings(args))
         if (n4Fired) {
-            args = args.trimEnd() + ", align = \"center\""
+            args = appendNamedArg(args, "align", "\"center\"")
         }
         // N3：单子裸容器解包。「裸」按容器自身**原文** args 判定——子项改写注入的命名
         // 实参不算数（唯一子 Row 被 N1 补 weights 不遮蔽父容器解包，但 N4 刚给本节点
@@ -141,6 +143,16 @@ object OpenUiLayoutNormalizer {
         return text
     }
 
+    /**
+     * 追加命名实参——分离符归一：args 呈尾随逗号形态（`...],)` / `..., )`）时复用既有
+     * 逗号（评审 I-1：双逗号会让客户端 parsePrefix 撞 COMMA 抛异常，整卡致命降级）。
+     */
+    private fun appendNamedArg(args: String, key: String, rendered: String): String {
+        val base = args.trimEnd()
+        val sep = if (base.endsWith(",")) " " else ", "
+        return base + sep + key + " = " + rendered
+    }
+
     private fun needsWeights(
         node: OpenUiCallTree.CallNode,
         comps: List<OpenUiCallTree.CallNode>,
@@ -155,7 +167,7 @@ object OpenUiLayoutNormalizer {
         original.substring(node.spanStart, node.spanEnd).contains("\"DISPLAY\"")
 
     private fun stripStrings(text: String): String =
-        text.replace(Regex(""""([^"\\]|\\.)*""""), "\"\"")
+        text.replace(STRING_LITERAL, "\"\"")
 
     private fun spacerSize(node: OpenUiCallTree.CallNode, original: String): Int {
         val text = original.substring(node.spanStart, node.spanEnd)

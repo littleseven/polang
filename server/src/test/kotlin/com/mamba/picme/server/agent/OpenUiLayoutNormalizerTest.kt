@@ -57,6 +57,32 @@ class OpenUiLayoutNormalizerTest {
         )
     }
 
+    // 评审 I-1：args 尾随逗号形态下追加命名实参不得产出双逗号——客户端 parseCall
+    // 本可容忍尾随逗号，双逗号会让 parsePrefix 抛异常 → 整卡致命降级 fallback
+    @Test
+    fun `n1 tolerates trailing comma after children array`() {
+        val trailing = "root = Card([Row([Image(photos[0].id), Text(\"说明\")],)])"
+        assertEquals(
+            "root = Card([Row([Image(photos[0].id), Text(\"说明\")], weights = [1, 2])])",
+            OpenUiLayoutNormalizer.normalize(trailing),
+        )
+        // 数组内尾随逗号（客户端本就容忍的形态）同样不得被改写出双逗号
+        val insideArray = "root = Card([Row([Image(photos[0].id), Text(\"说明\"),])])"
+        assertEquals(
+            "root = Card([Row([Image(photos[0].id), Text(\"说明\"),], weights = [1, 2])])",
+            OpenUiLayoutNormalizer.normalize(insideArray),
+        )
+    }
+
+    @Test
+    fun `n4 tolerates trailing comma in column args`() {
+        val program = "root = Card([Row([Column([Text(\"7,120\", \"DISPLAY\")],), Text(\"x\")])])"
+        assertEquals(
+            "root = Card([Row([Column([Text(\"7,120\", \"DISPLAY\")], align = \"center\"), Text(\"x\")])])",
+            OpenUiLayoutNormalizer.normalize(program),
+        )
+    }
+
     // N2：连续 Spacer 合并取最大档；纵向流 xs/xl 降档
     @Test
     fun `n2 merges consecutive spacers keeping max size`() {
@@ -125,6 +151,8 @@ class OpenUiLayoutNormalizerTest {
     fun `golden programs pass through unchanged`() {
         listOf(
             RenderOpenUiToolService.GOLDEN_STATS_PROGRAM,
+            // 三图 Row = N1 多图跳过的教学示例
+            RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM,
             RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM,
             RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM,
             RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM,
