@@ -22,7 +22,7 @@
 
 ## Phase M1 — 规则引擎（server，TDD）
 
-### Task 1: OpenUiCallTree 调用树扫描器 ✅（2026-10-31 完成，commit 451b30001）
+### Task 1: OpenUiCallTree 调用树扫描器 ✅（2026-10-31 完成，commit 451b30001 + 评审修复 9b65523d4；spec ✅ / 质量 Needs fixes→修复→复审 Approved）
 
 **Files:**
 - Create: `server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiCallTree.kt`
