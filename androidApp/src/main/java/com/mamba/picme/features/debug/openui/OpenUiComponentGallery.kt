@@ -380,6 +380,26 @@ private val demoGroups: List<OpenUiDemoGroup> = listOf(
             ),
         ),
     ),
+    // 布局可控性批次（2026-10-31）：CompareRow/Timeline/ChartGrid 固化件（spec
+    // 《2026-10-31-openui-layout-controllability》§5）；CompareRow 照片走相册投影 id
+    // （画廊 resolver 恒 null → 占位框为预期形态），ChartGrid 为图表横向并排唯一合法出口
+    OpenUiDemoGroup(
+        "布局可控性批次",
+        listOf(
+            OpenUiComponentDemo(
+                "CompareRow",
+                """root = Card([CompareRow(beforePhoto = 101, afterPhoto = 102, beforeLabel = "替换前", afterLabel = "替换后")])""",
+            ),
+            OpenUiComponentDemo(
+                "Timeline",
+                """root = Card([Timeline([{title: "三亚日落", subtitle: "海边散步", time: "2026-07-18"}, {title: "山顶云海", time: "2026-07-19"}, {title: "返程"}])])""",
+            ),
+            OpenUiComponentDemo(
+                "ChartGrid",
+                """root = Card([ChartGrid([BarChart("月新增", [{label: "7月", count: 12}]), PieChart("占比", [{label: "人像", value: 4}])])])""",
+            ),
+        ),
+    ),
 )
 
 private val elementShapeNote =

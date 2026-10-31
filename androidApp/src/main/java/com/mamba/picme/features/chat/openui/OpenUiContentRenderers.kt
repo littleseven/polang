@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowColumn
@@ -185,6 +186,7 @@ internal fun OpenUiContentNode(
         // ── 布局可控性批次（2026-10-31）──
         "CompareRow" -> OpenUiContentCompareRow(node, photoResolver, onAction, modifier)
         "Timeline" -> OpenUiContentTimeline(node, photoResolver, onAction, modifier)
+        "ChartGrid" -> OpenUiContentChartGrid(node, state, photoResolver, onAction, modifier)
         else -> Box(modifier = modifier)
     }
 }
@@ -2116,6 +2118,49 @@ private fun OpenUiContentTimeline(
                         style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+        }
+    }
+}
+
+// ── 布局可控性批次·ChartGrid（双列图表网格，spec《2026-10-31-openui-layout-controllability》§5）──
+
+/** ChartGrid 子项护栏（每格一张图，2×2 封顶——双图并排为主形态）。 */
+private const val CHART_GRID_MAX_CHILDREN = 4
+
+/**
+ * ChartGrid：双列图表网格（columns 恒 2）——Row/Grid 内图表横向并排被 R3 门禁禁止，
+ * 本件是唯一合法出口；子项经 [OpenUiNodeRenderer] 全量 dispatch 递归渲染（图表族），
+ * 末行缺格补空位保持列对齐（Grid 同口径）；无界宽上下文按内容自尺寸（Grid 同径）。
+ */
+@Composable
+private fun OpenUiContentChartGrid(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .filterIsInstance<OpenUiValue.ComponentVal>()
+        .take(CHART_GRID_MAX_CHILDREN)
+    if (children.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val weightsUsable = maxWidth != Dp.Infinity
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            children.chunked(2).forEach { rowChildren ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    rowChildren.forEach { child ->
+                        val cellModifier = if (weightsUsable) Modifier.weight(1f) else Modifier
+                        OpenUiNodeRenderer(child, state, photoResolver, onAction, cellModifier)
+                    }
+                    if (rowChildren.size == 1 && weightsUsable) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
