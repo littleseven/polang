@@ -44,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -86,6 +87,8 @@ internal val openUiContentComponentNames: Set<String> = setOf(
     "StatRow", "StatItem", "Banner", "ListItem",
     // 相册 APP 组合方式批次（2026-10-31）：PhotoGrid/AvatarRow 新增
     "PhotoGrid", "AvatarRow",
+    // 布局可控性批次（2026-10-31）：CompareRow/Timeline/ChartGrid 新增（dispatch 分支随各任务落地）
+    "CompareRow", "Timeline", "ChartGrid",
 )
 
 /** 单组件数组/子项上限（MAX_LIST_CHILDREN=50 同口径：LLM 生成面无界，渲染端 take 兜底）。 */
@@ -177,6 +180,8 @@ internal fun OpenUiContentNode(
         // ── 相册 APP 组合方式批次（2026-10-31）──
         "PhotoGrid" -> OpenUiContentPhotoGrid(node, photoResolver, onAction, modifier)
         "AvatarRow" -> OpenUiContentAvatarRow(node, photoResolver, onAction, modifier)
+        // ── 布局可控性批次（2026-10-31）──
+        "CompareRow" -> OpenUiContentCompareRow(node, photoResolver, onAction, modifier)
         else -> Box(modifier = modifier)
     }
 }
@@ -1883,6 +1888,110 @@ private fun OpenUiContentAvatarRow(
                     )
                 }
             }
+        }
+    }
+}
+
+// ── 布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》）──
+// CompareRow = 前后对比固化件（修图/优化效果）；图片处理通则：等比缩放不变形 + 裁剪溢出
+// （帧按设计语言 §4.5 决策链定，帧内 ContentScale.Crop——均匀裁切即对比语义，§4.5 例外口径）。
+
+/** CompareRow 统一帧缺省 4:3（设计语言 §5：双侧同帧，异比例各自成帧会高低错位破坏对比语义）。 */
+private const val COMPARE_ROW_FALLBACK_ASPECT = 4.0 / 3.0
+
+/**
+ * CompareRow：左右等宽双图统一帧（显式 aspect > before 图真实比例 > after 图真实比例
+ * > 4:3——双侧同帧）+ 等比缩放填满 + Crop 裁溢出 + 人脸聚焦 + 图下标签；photo 投影优先 /
+ * src https 兜底（Banner 双源同款）；点击 OpenPhoto 大图（Image 同口径）；解析中/失败侧
+ * 落同形占位，不炸整卡。
+ */
+@Composable
+private fun OpenUiContentCompareRow(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val beforeId = (node.props["beforePhoto"] as? OpenUiValue.Num)?.v?.toLong()
+    val afterId = (node.props["afterPhoto"] as? OpenUiValue.Num)?.v?.toLong()
+    val ids = listOfNotNull(beforeId, afterId)
+    val resolved by produceState<Map<Long, OpenUiPhoto>>(emptyMap(), ids) {
+        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
+    }
+    val frameAspect = frameAspectOf(
+        (node.props["aspect"] as? OpenUiValue.Num)?.v,
+        resolved[beforeId]?.aspectRatio ?: resolved[afterId]?.aspectRatio,
+        COMPARE_ROW_FALLBACK_ASPECT,
+    ).toFloat()
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        OpenUiCompareSide(
+            photo = beforeId?.let { id -> resolved[id] },
+            src = (node.props["beforeSrc"] as? OpenUiValue.Str)?.v,
+            label = (node.props["beforeLabel"] as? OpenUiValue.Str)?.v,
+            frameAspect = frameAspect,
+            onAction = onAction,
+            modifier = Modifier.weight(1f),
+        )
+        OpenUiCompareSide(
+            photo = afterId?.let { id -> resolved[id] },
+            src = (node.props["afterSrc"] as? OpenUiValue.Str)?.v,
+            label = (node.props["afterLabel"] as? OpenUiValue.Str)?.v,
+            frameAspect = frameAspect,
+            onAction = onAction,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun OpenUiCompareSide(
+    photo: OpenUiPhoto?,
+    src: String?,
+    label: String?,
+    frameAspect: Float,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        val frame = Modifier
+            .fillMaxWidth()
+            .aspectRatio(frameAspect)
+            .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+        when {
+            photo != null -> AsyncImage(
+                model = photo.uri,
+                contentDescription = label,
+                contentScale = ContentScale.Crop,
+                alignment = faceAwareVerticalAlignment(photo.faceFocusY),
+                modifier = frame.clickable(
+                    onClickLabel = stringResource(R.string.cd_image_preview),
+                    role = Role.Image,
+                ) {
+                    onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                },
+            )
+            src != null && src.startsWith("https://") -> AsyncImage(
+                model = src,
+                contentDescription = label,
+                contentScale = ContentScale.Crop,
+                modifier = frame,
+            )
+            else -> Box(modifier = frame)
+        }
+        if (!label.isNullOrBlank()) {
+            Text(
+                text = label,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.xs),
+            )
         }
     }
 }
