@@ -207,13 +207,13 @@ git commit -m "feat(server): OpenUiCallTree 调用树扫描器——布局规则
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 2: OpenUiLayoutNormalizer（N1~N4 无声矫正）
+### Task 2: OpenUiLayoutNormalizer（N1~N4 无声矫正）✅（2026-10-31 完成，commits b6c9111ba+d6605235c+e620c8f27；spec ✅ 两轮 / 质量 ✅ Needs fixes→修复→复审 Approved；16 测试 + 全量 540 绿）
 
 **Files:**
 - Create: `server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutNormalizer.kt`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/OpenUiLayoutNormalizerTest.kt`
 
-- [ ] **Step 1: 写失败测试（逐规则用例 + 黄金程序不动点 + 幂等）**
+- [x] **Step 1: 写失败测试（逐规则用例 + 黄金程序不动点 + 幂等）**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -322,12 +322,12 @@ class OpenUiLayoutNormalizerTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutNormalizerTest"`
 Expected: 编译失败 `unresolved reference: OpenUiLayoutNormalizer`
 
-- [ ] **Step 3: 实现 OpenUiLayoutNormalizer**
+- [x] **Step 3: 实现 OpenUiLayoutNormalizer**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -484,12 +484,12 @@ object OpenUiLayoutNormalizer {
 
 > 注：N2 合并删除子节点时连带吃掉前导逗号（`renderNode` 内 replacement 为空串的分支）——否则数组里留空洞 `[, ]` 解析失败；测试 `n2 merges consecutive spacers keeping max size` 钉住该行为。
 
-- [ ] **Step 4: 跑测试确认通过（红→绿循环内允许按测试微调实现）**
+- [x] **Step 4: 跑测试确认通过（红→绿循环内允许按测试微调实现）**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutNormalizerTest"`
 Expected: PASS（N1 期望串精确匹配；如空格差异按实际输出修断言或实现，保持「追加 `, weights = [1, 2]`」语义）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutNormalizer.kt \
