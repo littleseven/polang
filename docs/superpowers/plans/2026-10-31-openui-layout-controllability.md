@@ -1734,7 +1734,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 - [ ] **Step 3: 计数文案同步**
 
-`RenderOpenUiValidator`：三处陈旧计数同步——:367 LLM 可见文案「95 组件全量清单」、:39 KDoc「九十五项」、:361 注释「八十九组件」→ 全部改 100/百项；`ALLOWED_COMPONENTS` KDoc 批次链末尾补 `2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）。`；工具描述约束段补一句「签名件（Banner/PhotoGrid/StatRow/AvatarRow）与照片网格须为 Card/Grid 直接子级」（R2/R4 绕行软引导，Task 3 评审建议）
+`RenderOpenUiValidator`：三处陈旧计数同步——:367 LLM 可见文案「95 组件全量清单」、:39 KDoc「九十五项」、:361 注释「八十九组件」→ 全部改 100/百项；`ALLOWED_COMPONENTS` KDoc 批次链末尾补 `2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）。`；工具描述约束段补一句「签名件（Banner/PhotoGrid/StatRow/AvatarRow）与照片网格须为 Card/Grid 直接子级」（R2/R4 绕行软引导，Task 3 评审建议）；**Task 4 评审 I-1 挂账**——工具描述三处机制措辞随 lint 退役失实须改：RenderOpenUiToolService.kt:343「Row 裸拼…（lint 会提示）」→「会被无声矫正自动补 weights」、:92/:177「Grid 内放 ≥2 个 Image 会被 lint 引导」与 :370 同款 →「会被布局门禁拒卡」
 
 - [ ] **Step 4: 测试钉住新黄金**
 
