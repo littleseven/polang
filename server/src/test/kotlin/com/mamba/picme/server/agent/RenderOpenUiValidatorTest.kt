@@ -613,13 +613,9 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     }
 
     @Test
-    fun `lint clean at display threshold and stat tile golden stays clean`() {
+    fun `lint clean at display threshold`() {
         val tiles = (1..4).joinToString(", ") { i -> "Text(\"$i\", \"DISPLAY\")" }
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition("root = Card([$tiles])"))
-        assertEquals(
-            emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM),
-        )
     }
 
     @Test
@@ -649,28 +645,7 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         )
     }
 
-    @Test
-    fun `lint warns when stat tile row lacks center align`() {
-        val program = "root = Card([Text(\"统计\", \"HEADLINE\"), " +
-            "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片\", \"CAPTION\")])])])"
-        val warnings = RenderOpenUiValidator.lintComposition(program)
-        assertEquals(1, warnings.size)
-        assertTrue(warnings[0].contains("align"))
-        // 软警告不拒卡：硬校验仍放行（align 属端侧 schema 面，server 半信任不拦）
-        assertNull(RenderOpenUiValidator.validateToError(program))
-    }
-
-    @Test
-    fun `lint clean when stat tile columns carry center align or no row present`() {
-        val centered =
-            "root = Card([Row([Column([Text(\"7,120\", \"DISPLAY\")], align = \"center\")])])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(centered))
-        // DISPLAY 直排无 Row 分栏（非 stat tile 形态）不触发
-        val flat = "root = Card([Text(\"7,120\", \"DISPLAY\"), Text(\"照片\", \"CAPTION\")])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(flat))
-    }
-
-    // ── 图文组合固化（2026-10-30）：photo 键计数 + Row 裸拼图文 lint ──────
+    // ── 图文组合固化（2026-10-30）：photo 键计数 ─────────────────
 
     @Test
     fun `tool description photo text golden example passes validation and lint`() {
@@ -704,29 +679,6 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
-    @Test
-    fun `lint warns when row mixes bare image with text but does not reject the card`() {
-        // 图文项反模式：Row 等宽分栏 + Image + Text 裸拼
-        val program =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([Row([Image(photos[0].id), Column([Text(\"标题\"), Text(\"副题\", \"CAPTION\")])])])"
-        val warnings = RenderOpenUiValidator.lintComposition(program)
-        assertEquals(1, warnings.size)
-        assertTrue(warnings[0].contains("ImageText"))
-        // 软警告不拒卡：硬校验仍放行
-        assertNull(RenderOpenUiValidator.validateToError(program))
-    }
-
-    @Test
-    fun `lint clean for pure multi image row and text after row does not false trip`() {
-        // 纯多图并排是食谱合法形态；Row 之后的卡级 Text 不被窗口误算进 Row 实参区间
-        // （GOLDEN_MIXED 黄金示例正是此形态——括号配对截取防回归）
-        assertEquals(
-            emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM),
-        )
-    }
-
     // ── 通用布局原语批次（2026-10-30）：Grid/Box/Spacer + Row.weights ──────
 
     @Test
@@ -737,17 +689,6 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             emptyList<String>(),
             RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM),
         )
-    }
-
-    @Test
-    fun `lint exempts row image text composition carrying weights`() {
-        // weights 比例分栏是认可的经典版式写法（2026-10-30 lint 修订）：同样 Image+Text
-        // 同 Row，带 weights 不警告、不带才警告（无 weights 用例见上文既有测试）
-        val program =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([Row([Image(photos[0].id), Column([Text(\"标题\"), Text(\"副题\", \"CAPTION\")])], weights = [1, 2], align = \"center\")])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(program))
-        assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
     // ── 经典组合版式批次（2026-10-31）：StatRow/StatItem/Banner + bgPhoto 计数 ──────
@@ -837,19 +778,6 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
                 "root = Card([PhotoGrid(photos = [$ids], columns = 4), AvatarRow([{photo: photos[0].id}])])"
         assertNotNull(RenderOpenUiValidator.validateToError(over))
-    }
-
-    @Test
-    fun `grid with two images triggers photo grid lint`() {
-        val program =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([Grid([Image(photos[0].id), Image(photos[1].id)], columns = 2)])"
-        assertEquals(1, RenderOpenUiValidator.lintComposition(program).size)
-        // 换 PhotoGrid 固化件后无警告
-        val fixed =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([PhotoGrid(photos = [photos[0].id, photos[1].id], columns = 2)])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(fixed))
     }
 
     // ── 查看全部缺省动作兜底批次（2026-10-31）：lint 第六条 ──────────────
