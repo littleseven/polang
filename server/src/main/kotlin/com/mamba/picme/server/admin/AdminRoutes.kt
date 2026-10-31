@@ -247,6 +247,88 @@ fun Route.adminRoute(
             call.respondText(AdminViews.trafficPage(AdminQueries.rangeStats(days, now, prices), days, metric), ContentType.Text.Html)
         }
 
+        // ── M2 推理追溯：调用流水 / Agent 会话回放（全部只读 GET）──
+
+        // 调用流水：id 倒序游标分页（before），status/provider/model/account_id 筛选。
+        get("/llm/calls") {
+            if (!call.adminGuard(adminToken)) return@get
+            val beforeParam = call.request.queryParameters["before"]
+            val before = beforeParam?.toLongOrNull()
+            if (beforeParam != null && before == null) {
+                call.respondText("bad request", contentType = ContentType.Text.Plain, status = HttpStatusCode.BadRequest)
+                return@get
+            }
+            val accountIdParam = call.request.queryParameters["account_id"]
+            val accountId = accountIdParam?.toIntOrNull()
+            if (accountIdParam != null && accountId == null) {
+                call.respondText("bad request", contentType = ContentType.Text.Plain, status = HttpStatusCode.BadRequest)
+                return@get
+            }
+            val status = call.request.queryParameters["status"]?.takeIf { it.isNotBlank() }
+            val provider = call.request.queryParameters["provider"]?.takeIf { it.isNotBlank() }
+            val model = call.request.queryParameters["model"]?.takeIf { it.isNotBlank() }
+            val limit = 50
+            val rows = AdminQueries.llmCalls(before, limit, status, provider, model, accountId)
+            // 游标 = 当页末行 id；满页才给下一页链接，防末页死循环
+            val nextBefore = if (rows.size == limit) rows.last().id else null
+            call.respondText(
+                AdminViews.llmCallsPage(rows, status, provider, model, accountId, nextBefore),
+                ContentType.Text.Html,
+            )
+        }
+
+        // Agent 会话列表：seq 倒序游标分页（before_seq），account_id 筛选。
+        get("/agent/sessions") {
+            if (!call.adminGuard(adminToken)) return@get
+            val beforeSeqParam = call.request.queryParameters["before_seq"]
+            val beforeSeq = beforeSeqParam?.toLongOrNull()
+            if (beforeSeqParam != null && beforeSeq == null) {
+                call.respondText("bad request", contentType = ContentType.Text.Plain, status = HttpStatusCode.BadRequest)
+                return@get
+            }
+            val accountIdParam = call.request.queryParameters["account_id"]
+            val accountId = accountIdParam?.toIntOrNull()
+            if (accountIdParam != null && accountId == null) {
+                call.respondText("bad request", contentType = ContentType.Text.Plain, status = HttpStatusCode.BadRequest)
+                return@get
+            }
+            val limit = 50
+            val rows = AdminQueries.agentSessions(beforeSeq, limit, accountId)
+            val nextBeforeSeq = if (rows.size == limit) rows.last().seq else null
+            call.respondText(
+                AdminViews.agentSessionsPage(rows, accountId, nextBeforeSeq),
+                ContentType.Text.Html,
+            )
+        }
+
+        // 会话回放：事件 id 升序（after 游标，单页 200）；未知 sessionId → 404。
+        get("/agent/sessions/{id}") {
+            if (!call.adminGuard(adminToken)) return@get
+            val id = call.parameters["id"]
+            if (id.isNullOrBlank()) {
+                call.respondText("bad request", contentType = ContentType.Text.Plain, status = HttpStatusCode.BadRequest)
+                return@get
+            }
+            val afterParam = call.request.queryParameters["after"]
+            val after = afterParam?.toLongOrNull()
+            if (afterParam != null && after == null) {
+                call.respondText("bad request", contentType = ContentType.Text.Plain, status = HttpStatusCode.BadRequest)
+                return@get
+            }
+            val session = AdminQueries.agentSessionSummary(id)
+            if (session == null) {
+                call.respondText("not found", contentType = ContentType.Text.Plain, status = HttpStatusCode.NotFound)
+                return@get
+            }
+            val limit = 200
+            val events = AdminQueries.agentSessionEvents(id, after ?: 0, limit)
+            val nextAfter = if (events.size == limit) events.last().id else null
+            call.respondText(
+                AdminViews.agentSessionDetailPage(session, events, nextAfter),
+                ContentType.Text.Html,
+            )
+        }
+
         get("/settings") {
             if (!call.adminGuard(adminToken)) return@get
             val msg = call.request.queryParameters["msg"]
