@@ -3,7 +3,6 @@ package com.mamba.picme.features.cloudagent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.BuildConfig
-import com.mamba.picme.R
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
@@ -36,17 +35,8 @@ class CloudAgentChatViewModel(
     private val cloudAgentGalleryTools: CloudAgentGalleryTools,
     /** 409 round_in_flight 上屏提示文案（生产注入走资源文件，VM 不持 Context 保持纯 JVM 可测）。 */
     private val roundInFlightHint: () -> String = { "Previous round still running, please wait" },
-    /** 步骤时间线文案解析（resId → 本地化文案；生产注入 context.getString，缺省回退英文兜底）。 */
-    private val stepLabel: (Int) -> String = { resId ->
-        when (resId) {
-            R.string.cloud_agent_step_gallery_summary -> "Looking through your gallery…"
-            R.string.cloud_agent_step_search_media -> "Searching your photos…"
-            R.string.cloud_agent_step_refine_search -> "Refining the search…"
-            R.string.cloud_agent_step_compose_card -> "Composing a card…"
-            R.string.cloud_agent_step_build_page -> "Building a page…"
-            else -> "Working…"
-        }
-    },
+    /** 步骤时间线文案解析（resId → 本地化文案；必填——生产注入 context.getString，测试注入桩，省略即编译错误以防英文兜底漂移）。 */
+    private val stepLabel: (Int) -> String,
 ) : ViewModel() {
 
     /** 媒体卡消息经 [media] 携带渲染数据、H5 卡消息经 [htmlCard] 携带；其余 role 恒为 null。 */
@@ -160,7 +150,7 @@ class CloudAgentChatViewModel(
         turnJob = viewModelScope.launch {
             append(UiMessage(msgSeq.incrementAndGet(), Role.USER, text))
             setInFlight(true)
-            // 回合开始清空步骤时间线（上回合残留不跨年）
+            // 回合开始清空步骤时间线（上回合残留不跨回合）
             stepTimeline.clear()
             _steps.value = emptyList()
             // 图集卡透出：工具命中时把资产列表插为媒体卡消息（数据不出设备，回传服务器仍是

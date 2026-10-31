@@ -74,7 +74,7 @@ FAILED 步的标签 = `"{label} — {failedHint}"`（em dash `—` 分隔），`
 
 | 时机 | 行为 |
 |------|------|
-| 回合开始（send） | `clear()` + 快照置空（上回合残留不跨年） |
+| 回合开始（send） | `clear()` + 快照置空（上回合残留不跨回合） |
 | StepStarted（已知工具） | 追加 RUNNING 步，刷新快照；主聊天页同步退出 isThinking |
 | StepFinished | 命中 RUNNING 步 → SUCCESS/FAILED + 回填耗时，刷新快照 |
 | 回合结束（Done / Error / 失败兜底 / stop() 取消） | `clear()` + 快照置空；步骤随流式气泡 / inFlight 区一起消失 |
