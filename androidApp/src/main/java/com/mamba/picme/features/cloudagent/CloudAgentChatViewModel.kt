@@ -3,10 +3,13 @@ package com.mamba.picme.features.cloudagent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.BuildConfig
+import com.mamba.picme.R
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
+import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
+import com.mamba.picme.domain.chat.AgentStepUi
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import kotlinx.coroutines.CancellationException
@@ -33,6 +36,17 @@ class CloudAgentChatViewModel(
     private val cloudAgentGalleryTools: CloudAgentGalleryTools,
     /** 409 round_in_flight 上屏提示文案（生产注入走资源文件，VM 不持 Context 保持纯 JVM 可测）。 */
     private val roundInFlightHint: () -> String = { "Previous round still running, please wait" },
+    /** 步骤时间线文案解析（resId → 本地化文案；生产注入 context.getString，缺省回退英文兜底）。 */
+    private val stepLabel: (Int) -> String = { resId ->
+        when (resId) {
+            R.string.cloud_agent_step_gallery_summary -> "Looking through your gallery…"
+            R.string.cloud_agent_step_search_media -> "Searching your photos…"
+            R.string.cloud_agent_step_refine_search -> "Refining the search…"
+            R.string.cloud_agent_step_compose_card -> "Composing a card…"
+            R.string.cloud_agent_step_build_page -> "Building a page…"
+            else -> "Working…"
+        }
+    },
 ) : ViewModel() {
 
     /** 媒体卡消息经 [media] 携带渲染数据、H5 卡消息经 [htmlCard] 携带；其余 role 恒为 null。 */
@@ -63,6 +77,15 @@ class CloudAgentChatViewModel(
 
     private val _state = MutableStateFlow<UiState>(UiState.Preparing)
     val state: StateFlow<UiState> = _state
+
+    /**
+     * 云端回合步骤时间线（瞬态，不落 Room）：reducer 消费 StepStarted/StepFinished，
+     * [steps] 为快照流，回合开始/结束（含 stop() 取消路径）清空。
+     * 单线程契约：onEvent 由 SSE reader 串行回调，单回合内无并发。
+     */
+    private val stepTimeline = AgentStepTimeline()
+    private val _steps = MutableStateFlow<List<AgentStepUi>>(emptyList())
+    val steps: StateFlow<List<AgentStepUi>> = _steps
 
     private var appToken: String = ""
     private var byokApiKey: String = ""
@@ -137,6 +160,9 @@ class CloudAgentChatViewModel(
         turnJob = viewModelScope.launch {
             append(UiMessage(msgSeq.incrementAndGet(), Role.USER, text))
             setInFlight(true)
+            // 回合开始清空步骤时间线（上回合残留不跨年）
+            stepTimeline.clear()
+            _steps.value = emptyList()
             // 图集卡透出：工具命中时把资产列表插为媒体卡消息（数据不出设备，回传服务器仍是
             // 纯文本计数）；回合结束 finally 摘除，避免跨回合残留（stop() 取消路径也走 finally）。
             cloudAgentGalleryTools.mediaResultsListener = { query, assets, totalCount, isRefinement ->
@@ -187,7 +213,25 @@ class CloudAgentChatViewModel(
                             )
                         )
                         is CloudTurnEvent.OpenUiCardDelta -> Unit // 流式预览主页专属（openui P2），调试页忽略
-                        is CloudTurnEvent.StepStarted, is CloudTurnEvent.StepFinished -> Unit // 步骤时间线事件（后续任务渲染），调试页暂忽略
+                        is CloudTurnEvent.StepStarted -> {
+                            val labelRes = agentStepLabelRes(event.tool)
+                            if (labelRes == null) {
+                                // server_time 契约不上时间线；未知工具跳过并告警一记（不污染进度表达）
+                                if (event.tool != "server_time") {
+                                    Logger.w(TAG, "cloud step: unknown tool ${event.tool}, skipped")
+                                }
+                            } else {
+                                stepTimeline.start(event.stepId, stepLabel(labelRes))
+                                _steps.value = stepTimeline.steps
+                            }
+                        }
+                        is CloudTurnEvent.StepFinished -> {
+                            // 未知 id（孤儿 observation / 上回合 pending 重放）被 reducer 忽略返回 null，刷快照无害
+                            stepTimeline.finish(event.stepId, event.ok)?.let { step ->
+                                Logger.d(TAG, "cloud step: ${step.label} -> ${step.status}")
+                            }
+                            _steps.value = stepTimeline.steps
+                        }
                         is CloudTurnEvent.Error -> {
                             append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, event.message))
                             setInFlight(false)
@@ -211,6 +255,9 @@ class CloudAgentChatViewModel(
                 setInFlight(false)
             } finally {
                 cloudAgentGalleryTools.mediaResultsListener = null
+                // 回合结束（含 stop() 取消穿透路径）瞬态步骤清空
+                stepTimeline.clear()
+                _steps.value = emptyList()
             }
         }
     }
@@ -246,3 +293,5 @@ class CloudAgentChatViewModel(
 
 /** 媒体卡横滑展示上限（与主聊天页 ChatViewModel.MAX_CARDS 同约定）。 */
 private const val MAX_MEDIA_CARDS = 20
+
+private const val TAG = "PoLang:CloudAgent"

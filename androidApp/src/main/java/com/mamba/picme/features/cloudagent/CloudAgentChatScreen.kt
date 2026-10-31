@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,9 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mamba.picme.R
+import com.mamba.picme.domain.chat.AgentStepStatus
+import com.mamba.picme.domain.chat.AgentStepUi
 import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.features.chat.HtmlCard
 import com.mamba.picme.features.chat.HtmlCardSanitizer
@@ -129,6 +133,7 @@ fun CloudAgentChatScreen(
 @Composable
 private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: CloudAgentChatViewModel) {
     val listState = rememberLazyListState()
+    val steps by viewModel.steps.collectAsState()
     LaunchedEffect(chat.messages.size) {
         if (chat.messages.isNotEmpty()) listState.animateScrollToItem(chat.messages.size - 1)
     }
@@ -192,11 +197,16 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
             }
             if (chat.inFlight) {
                 item {
-                    Text(
-                        text = stringResource(R.string.cloud_agent_thinking),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    // 有步骤渲染时间线（同主聊天页视觉），尚未有步骤时回退 thinking 占位
+                    if (steps.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.cloud_agent_thinking),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        AgentStepsTimeline(steps)
+                    }
                 }
             }
         }
@@ -263,6 +273,54 @@ private fun Bubble(text: String, isUser: Boolean) {
                         lineHeight = 20.sp,
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 云端 agent 回合步骤时间线（瞬态，仅 inFlight 区渲染；调用方保证 steps 非空）。
+ * 与主聊天页 ChatScreen 同款视觉（调试页自持一份，不跨 features 包引用私有 composable）：
+ * 每步 = 状态图标（RUNNING 12dp 旋转指示 / ✓ / ⚠）+ 13sp 步骤标签；FAILED 标签追加失败提示文案。
+ */
+@Composable
+private fun AgentStepsTimeline(steps: List<AgentStepUi>) {
+    val failedHint = stringResource(R.string.cloud_agent_step_failed_hint)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        steps.forEach { step ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                when (step.status) {
+                    AgentStepStatus.RUNNING -> CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        strokeWidth = 1.5.dp,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    AgentStepStatus.SUCCESS -> Text(
+                        text = "✓",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 13.sp,
+                    )
+                    AgentStepStatus.FAILED -> Text(
+                        text = "⚠",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                    )
+                }
+                val label = if (step.status == AgentStepStatus.FAILED) {
+                    "${step.label} — $failedHint"
+                } else {
+                    step.label
+                }
+                Text(
+                    text = label,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

@@ -1280,6 +1280,7 @@ class AppContainerImpl(
                 settingsRepository = userPreferencesRepository,
                 cloudAgentGalleryTools = cloudAgentGalleryTools,
                 roundInFlightHint = { context.getString(R.string.cloud_agent_round_in_flight) },
+                stepLabel = { resId -> context.getString(resId) },
             )
         }
     }

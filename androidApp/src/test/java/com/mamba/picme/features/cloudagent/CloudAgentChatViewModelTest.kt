@@ -1,12 +1,14 @@
 package com.mamba.picme.features.cloudagent
 
 import com.mamba.picme.BuildConfig
+import com.mamba.picme.R
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.local.FakeLocalHandleDao
 import com.mamba.picme.data.local.LocalHandleStore
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
+import com.mamba.picme.domain.chat.AgentStepStatus
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -106,6 +108,7 @@ class CloudAgentChatViewModelTest {
                 localHandleStore = LocalHandleStore(FakeLocalHandleDao()),
             ),
             roundInFlightHint = { "上一轮还在跑，请稍候" },
+            stepLabel = { resId -> "label:$resId" },
         )
 
     @Test
@@ -289,5 +292,51 @@ class CloudAgentChatViewModelTest {
         val s = vm.state.value
         assertTrue(s is CloudAgentChatViewModel.UiState.Chat)
         assertEquals("gateway", (s as CloudAgentChatViewModel.UiState.Chat).channel)
+    }
+
+    @Test
+    fun `action and observation frames drive transient steps state`() = runTest {
+        val holdAfterStart = CompletableDeferred<Unit>()
+        val holdAfterFinish = CompletableDeferred<Unit>()
+        val api = FakeApi()
+        api.framesScript = { _, onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":11,"type":"action","source":"agent","role":"assistant","payload":{"type":"action","tool":"search_media","argsJson":"{}"}}"""),
+                ),
+            )
+            // server_time 契约不上时间线（agentStepLabelRes 返回 null 静默跳过）
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":12,"type":"action","source":"agent","role":"assistant","payload":{"type":"action","tool":"server_time","argsJson":"{}"}}"""),
+                ),
+            )
+            holdAfterStart.await()
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":13,"type":"observation","source":"environment","role":"tool","payload":{"type":"observation","actionEventId":11,"content":"找到 3 张"}}"""),
+                ),
+            )
+            holdAfterFinish.await()
+            onFrame(CloudFrame.Done("running"))
+        }
+        val vm = newVm(api)
+        vm.prepare()
+        vm.send("找照片")
+        // action 帧已到达：一步 RUNNING（label 经注入 resolver 解析；server_time 被跳过）
+        val running = vm.steps.value
+        assertEquals(1, running.size)
+        assertEquals(AgentStepStatus.RUNNING, running[0].status)
+        assertEquals("label:" + R.string.cloud_agent_step_search_media, running[0].label)
+        holdAfterStart.complete(Unit)
+        // observation 帧收尾：RUNNING → SUCCESS
+        val finished = vm.steps.value
+        assertEquals(1, finished.size)
+        assertEquals(AgentStepStatus.SUCCESS, finished[0].status)
+        holdAfterFinish.complete(Unit)
+        // 回合结束：瞬态步骤清空、inFlight 收伞
+        val s = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(false, s.inFlight)
+        assertTrue(vm.steps.value.isEmpty())
     }
 }
