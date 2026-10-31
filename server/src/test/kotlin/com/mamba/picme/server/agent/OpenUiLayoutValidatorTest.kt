@@ -90,7 +90,7 @@ class OpenUiLayoutValidatorTest {
 
     @Test
     fun `node count boundary is exact at sixty`() {
-        // 59 Text + Card = 恰 60 节点（上限），放行；61 节点用例已有（node count guard）
+        // 59 Text + Card = 恰 60 节点（上限），放行；62 节点用例已有（node count guard：61 Text + Card）
         val parts = (1..59).joinToString(", ") { i -> "Text(\"$i\")" }
         val program = "root = Card([$parts])"
         assertEquals(emptyList<String>(), OpenUiLayoutValidator.validate(program))

@@ -36,8 +36,8 @@ object RenderOpenUiValidator {
     const val MAX_PROGRAM_LENGTH = 128_000
 
     /**
-     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 百项字面量
-     * 副本对齐：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
+     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 字面量
+     * 副本对齐（100 含三新件——Task 7 落地 shared +3 后齐平，当前 shared=97）：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
      * M3（2026-10-24）+Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch；
      * 2026-10-25 官方组件库全量补全（spec《openui-full-library-design》）21→89——
      * 官方 82 组件适配 81（Col 列式 Table 刻意不收，行式为唯一形态）+ 本仓既有 8；

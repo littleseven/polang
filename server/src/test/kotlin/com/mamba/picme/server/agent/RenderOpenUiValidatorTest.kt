@@ -350,7 +350,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
     @Test
     fun `whitelist pins all 100 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 的 100 个 key 逐字一致，改动须双向同步核对
+        // OpenUiLibrary.components 逐字一致（100 含三新件——Task 7 落地 shared +3 后生效，当前 shared=97），改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
         //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
         //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
@@ -780,7 +780,7 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertNotNull(RenderOpenUiValidator.validateToError(over))
     }
 
-    // ── 查看全部缺省动作兜底批次（2026-10-31）：lint 第六条 ──────────────
+    // ── 查看全部缺省动作兜底批次（2026-10-31）：lint 第三条（收编后末条） ──────────────
 
     @Test
     fun `header actionLabel without action triggers lint`() {
