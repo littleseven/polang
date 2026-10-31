@@ -22,6 +22,8 @@ class OpenUiLayoutValidatorTest {
             RenderOpenUiToolService.GOLDEN_PHOTO_TEXT_PROGRAM,
             RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM,
             RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM,
+            RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM,
+            RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM,
         ).forEach { golden ->
             assertEquals(golden, emptyList<String>(), OpenUiLayoutValidator.validate(golden))
         }

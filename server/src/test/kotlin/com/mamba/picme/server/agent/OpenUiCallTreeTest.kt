@@ -86,6 +86,8 @@ class OpenUiCallTreeTest {
             RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM,
             RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM,
             RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM,
+            RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM,
+            RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM,
         ).forEach { golden ->
             assertTrue(golden, OpenUiCallTree.parse(golden) != null)
         }
