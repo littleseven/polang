@@ -318,8 +318,7 @@ object RenderOpenUiValidator {
         } ?: return errorText(listOf("工具参数不是合法 JSON 对象"))
         val program = (args["program"] as? JsonPrimitive)?.takeIf { it.isString }?.content
             ?: return errorText(listOf("工具参数缺 program 字符串"))
-        validate(program).takeIf { violations -> violations.isNotEmpty() }
-            ?.let { violations -> return errorText(violations, program) }
+        validateToError(program)?.let { error -> return error }
         // 布局门禁（2026-10-31）：对矫正后程序做结构校验（transformer 已归一化则此处幂等）；
         // 门禁必须对 normalize 后文本重 parse（矫正 span 已失效，勿与矫正共享树）
         val layoutViolations = OpenUiLayoutValidator.validate(OpenUiLayoutNormalizer.normalize(program))

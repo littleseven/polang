@@ -38,7 +38,11 @@ object OpenUiLayoutNormalizer {
     /** 入口：无需矫正/扫描失败/内部异常 → 原文返回。幂等。 */
     fun normalize(program: String): String =
         runCatching { normalizeInternal(program) }
-            .onFailure { e -> logger.debug("normalize 静默放行：{}", e.toString()) }
+            // warn 而非 debug：runCatching 只兜矫正器自身 bug（残缺程序走 parse null 不到此）——
+            // 稀有 + 高信号；生产 INFO 级下 debug 会让安全网成黑洞（Task 12+13 质量 I-1）
+            .onFailure { e ->
+                logger.warn("normalize 静默放行：{} | program 开头：{}", e.toString(), program.take(120))
+            }
             .getOrDefault(program)
 
     private fun normalizeInternal(program: String): String {

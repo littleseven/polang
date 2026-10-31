@@ -909,6 +909,19 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     fun `transformArgs passthrough for other tools and malformed json`() {
         assertEquals("x", RenderOpenUiValidator.transformArgs("other_tool", "x"))
         assertEquals("not json", RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, "not json"))
+        // 合法 JSON 但缺 program / 非对象 → 原样透传
+        assertEquals(
+            """{"fallbackSummary":"s"}""",
+            RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, """{"fallbackSummary":"s"}"""),
+        )
+        assertEquals("[1]", RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, "[1]"))
+    }
+
+    @Test
+    fun `transformArgs identity shortcut keeps wire bytes intact`() {
+        // 黄金程序（无需矫正）恒等短路：原 argsJson 字节级返回，不被 JsonObject 重序列化改写
+        val argsJson = """{"program":"${RenderOpenUiToolService.GOLDEN_STATS_PROGRAM}","fallbackSummary":"s"}"""
+        assertEquals(argsJson, RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, argsJson))
     }
 
     @Test

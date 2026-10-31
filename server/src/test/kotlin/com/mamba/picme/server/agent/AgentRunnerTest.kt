@@ -567,6 +567,13 @@ class AgentRunnerTest {
         val events = AgentEventRepository.listBySession(session.id)
         val action = events.single { event -> event.type == AgentEventType.ACTION }
         val actionArgs = (action.payload as AgentEventPayload.Action).argsJson
-        assertTrue("Action 应携带矫正后 program，实际：$actionArgs", actionArgs.contains("weights = [1, 2]"))
+        // 断全等（normalizer 输出确定）：捕多改/漏改，不只证「补了 weights」
+        val emittedProgram = kotlinx.serialization.json.Json.parseToJsonElement(actionArgs)
+            .let { root -> (root as kotlinx.serialization.json.JsonObject)["program"] }
+            ?.let { prim -> (prim as kotlinx.serialization.json.JsonPrimitive).content }
+        assertEquals(
+            "root = Card([Row([Image(photos[0].id), Text(\"说明\")], weights = [1, 2])])",
+            emittedProgram,
+        )
     }
 }
