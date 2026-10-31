@@ -894,6 +894,9 @@ fun ChatScreen(
                                                         initialIndex = 0,
                                                     )
                                                 },
+                                                // 卡内回话入口（CardHeader「查看全部」等）：
+                                                // @ToAssistant 以用户消息发进会话
+                                                onToAssistant = { text -> viewModel.sendMessage(text) },
                                             )
                                         }
                                     }

@@ -224,6 +224,15 @@ object RenderOpenUiValidator {
     /** Grid 调用（lint：Grid 内平铺 Image ≥2 张 → 引导 PhotoGrid 固化件）。 */
     private val GRID_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Grid\s*\(""")
 
+    /** CardHeader 调用（lint：actionLabel 无 action 配对 → 引导补 @ToAssistant，2026-10-31 真机回归）。 */
+    private val CARD_HEADER_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])CardHeader\s*\(""")
+
+    /** actionLabel 命名键检测（「查看全部」类尾部动作位在场的依据）。 */
+    private val NAMED_ACTION_LABEL = Regex("""(?<![A-Za-z0-9_])actionLabel\s*=""")
+
+    /** action 命名键检测（不含 actionLabel——`action\s*=` 在 actionLabel 处因后跟 L 不命中）。 */
+    private val NAMED_ACTION = Regex("""(?<![A-Za-z0-9_])action\s*=""")
+
     /**
      * 构图软警告（2026-10-25，设计规范第一刀配套）：不拒卡、不落违规，工具体
      * Observation 附带「本卡已下发、无需重发，下次发卡改进」提示——硬校验管合法性，
@@ -263,6 +272,13 @@ object RenderOpenUiValidator {
             // v7 起），网格犬牙交错——≥2 张即引导换固化件
             if (IMAGE_ANY_CALL.findAll(args).count() >= 2) {
                 warnings += "Grid 内平铺 Image ≥2 张——照片网格请换 PhotoGrid(photos = [photos[0].id, photos[1].id, ...], columns = 2|3|4) 固化件（方形 1:1 + 人脸聚焦 + 2dp 密缝，相册 APP 主视图签名形态）；Grid+Image 拼装的帧随各图真实比例会犬牙交错"
+            }
+        }
+        callArgSpans(stripped, CARD_HEADER_CALL).forEach { args ->
+            // 2026-10-31 真机回归「查看全部点击无效」：只传 actionLabel 不传 action 时端侧
+            // 虽有同文案 @ToAssistant 兜底，但显式 action 文案语境更准（兜底只有标题上下文）
+            if (NAMED_ACTION_LABEL.containsMatchIn(args) && !NAMED_ACTION.containsMatchIn(args)) {
+                warnings += "CardHeader 有 actionLabel 但缺 action——尾部「查看全部」类动作位请显式配 action = @ToAssistant(\"查看全部 <分组语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
             }
         }
         return warnings

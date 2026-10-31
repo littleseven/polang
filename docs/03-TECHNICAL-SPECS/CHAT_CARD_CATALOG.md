@@ -979,7 +979,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量
   （渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入；持久化仍只针对
-  `$selected`，其余交互 state 重开卡回默认值）；@OpenUrl 走系统浏览器，@ToAssistant M1 仅记日志不路由。
+  `$selected`，其余交互 state 重开卡回默认值）；@OpenUrl 走系统浏览器；@ToAssistant 自
+  2026-10-31 起上行——以用户消息发进会话（CardHeader「查看全部」缺省动作等同文案兜底），
+  M1 及之前仅记日志不路由。
 - **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui_openui
   下发 BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"}））→
   端上求值填槽渲染。

@@ -131,3 +131,4 @@ docs/superpowers/
 | 2026-10-31 | 交付沉淀：spec `2026-10-31-openui-classic-layouts-design.md` 当日交付当日按沉淀管线移除（结论已落 OPENUI_CARD_DESIGN_LANGUAGE v6 / CHAT_CARD_CATALOG data_ui_openui 节 / shared·server AGENTS.md，git 历史可查），活文档内 spec 引用同步摘除 |
 | 2026-10-31 | 图片帧比例治理批次（OpenUI §4.5 决策链：显式 aspect > 真实比例[相册元数据/网络图 intrinsic] > 组件缺省框；ImageGallery 定高变宽）——纯渲染层无 spec，结论直落 OPENUI_CARD_DESIGN_LANGUAGE v7 / CHAT_CARD_CATALOG data_ui_openui 节 |
 | 2026-10-31 | 相册 APP 组合方式批次（PhotoGrid 方形照片网格 + AvatarRow 人物头像条 + CardHeader 查看全部动作；组件 95→97；lint 第五条 Grid 装照片引导 PhotoGrid）——无 spec，结论直落 OPENUI_CARD_DESIGN_LANGUAGE v8 §4.6 / CHAT_CARD_CATALOG data_ui_openui 节 |
+| 2026-10-31 | 「查看全部」点击无效真机回归修复（@ToAssistant 实路由上行 + 渲染层缺省动作兜底 + server 黄金示例/lint 第六条）——无 spec，结论直落 OPENUI_CARD_DESIGN_LANGUAGE v8.1 / CHAT_CARD_CATALOG data_ui_openui 节 |
