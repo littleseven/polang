@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowColumn
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -183,6 +184,7 @@ internal fun OpenUiContentNode(
         "AvatarRow" -> OpenUiContentAvatarRow(node, photoResolver, onAction, modifier)
         // ── 布局可控性批次（2026-10-31）──
         "CompareRow" -> OpenUiContentCompareRow(node, photoResolver, onAction, modifier)
+        "Timeline" -> OpenUiContentTimeline(node, photoResolver, onAction, modifier)
         else -> Box(modifier = modifier)
     }
 }
@@ -1979,7 +1981,7 @@ private fun OpenUiCompareSide(
                     onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
                 },
             )
-            src != null && src.startsWith("https://") -> AsyncImage(
+            httpsSrcOrNull(src) != null -> AsyncImage(
                 model = src,
                 contentDescription = label,
                 contentScale = ContentScale.Crop,
@@ -1997,6 +1999,125 @@ private fun OpenUiCompareSide(
                     .fillMaxWidth()
                     .padding(top = Spacing.xs),
             )
+        }
+    }
+}
+
+// ── 布局可控性批次·Timeline（时间轴，spec《2026-10-31-openui-layout-controllability》§5）──
+
+/** Timeline 轴列：节点圆点 8dp（primary）+ 连接线 2dp（outlineVariant），末节点无连线。 */
+private val TIMELINE_DOT_SIZE = 8.dp
+private val TIMELINE_AXIS_WIDTH = 2.dp
+
+private data class TimelineEntry(
+    val title: String,
+    val subtitle: String?,
+    val time: String?,
+    val photoId: Long?,
+)
+
+/**
+ * Timeline：时间轴固化件——轴线 + 节点圆点 + 内容行（可选 photo 48dp 定尺寸缩略图
+ * Crop，ListItem 同径 + 标题 BODY/副题 CAPTION 弱色 + 右侧时间 CAPTION 弱色）；
+ * items 端侧解析（[PRIVACY] uri 不出端），title 缺失丢行不炸卡；末节点不画连接线。
+ */
+@Composable
+private fun OpenUiContentTimeline(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val entries = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        TimelineEntry(
+            title = title,
+            subtitle = (obj["subtitle"] as? OpenUiValue.Str)?.v,
+            time = (obj["time"] as? OpenUiValue.Str)?.v,
+            photoId = (obj["photo"] as? OpenUiValue.Num)?.v?.toLong(),
+        )
+    }.take(MAX_CONTENT_ITEMS)
+    if (entries.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val ids = entries.mapNotNull { entry -> entry.photoId }
+    val resolved by produceState<Map<Long, OpenUiPhoto>>(emptyMap(), ids) {
+        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
+    }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        entries.forEachIndexed { index, entry ->
+            // IntrinsicSize.Min 让轴列连接线随内容行等高拉伸
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(TIMELINE_DOT_SIZE),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(TIMELINE_DOT_SIZE)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                    if (index < entries.lastIndex) {
+                        Box(
+                            modifier = Modifier
+                                .width(TIMELINE_AXIS_WIDTH)
+                                .weight(1f)
+                                .background(MaterialTheme.colorScheme.outlineVariant),
+                        )
+                    }
+                }
+                entry.photoId?.let { id ->
+                    val photo = resolved[id]
+                    val thumb = Modifier
+                        .size(CONTENT_LIST_IMAGE_SIZE)
+                        .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                    if (photo == null) {
+                        Box(modifier = thumb)
+                    } else {
+                        AsyncImage(
+                            model = photo.uri,
+                            contentDescription = entry.title,
+                            contentScale = ContentScale.Crop,
+                            alignment = faceAwareVerticalAlignment(photo.faceFocusY),
+                            modifier = thumb.clickable(
+                                onClickLabel = stringResource(R.string.cd_image_preview),
+                                role = Role.Image,
+                            ) {
+                                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                            },
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = entry.title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+                    if (!entry.subtitle.isNullOrBlank()) {
+                        Text(
+                            text = entry.subtitle,
+                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (!entry.time.isNullOrBlank()) {
+                    Text(
+                        text = entry.time,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
