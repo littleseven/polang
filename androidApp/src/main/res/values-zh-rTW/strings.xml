@@ -568,6 +568,12 @@
     <string name="cloud_agent_stop">停止</string>
     <string name="cloud_agent_send">傳送</string>
     <string name="cloud_agent_round_in_flight">上一輪還在跑，請稍候再試</string>
+    <string name="cloud_agent_step_gallery_summary">正在瀏覽相簿概況…</string>
+    <string name="cloud_agent_step_search_media">正在搜尋照片…</string>
+    <string name="cloud_agent_step_refine_search">正在細化搜尋…</string>
+    <string name="cloud_agent_step_compose_card">正在產生卡片…</string>
+    <string name="cloud_agent_step_build_page">正在產生頁面…</string>
+    <string name="cloud_agent_step_failed_hint">未成功，換個方式試試…</string>
     <string name="assistant_persona_default">預設</string>
     <string name="assistant_persona_default_desc">中性簡潔的標準回覆</string>
     <string name="assistant_persona_warm">溫暖貼心</string>

@@ -1,5 +1,7 @@
 package com.mamba.picme.features.cloudagent
 
+import com.mamba.picme.R
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import com.mamba.picme.domain.chat.AgentStepStatus
 import com.mamba.picme.domain.chat.AgentStepUi
 import org.junit.Assert.assertEquals
@@ -80,5 +82,36 @@ class AgentStepTimelineTest {
         assertNotNull(duration)
         assertTrue(duration!! >= 0L)
         assertEquals(duration, timeline.steps.single().durationMs)
+    }
+
+    @Test
+    fun `label mapping covers cloud tools and nulls for server_time and unknown tools`() {
+        assertEquals(
+            R.string.cloud_agent_step_gallery_summary,
+            agentStepLabelRes(CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY),
+        )
+        assertEquals(
+            R.string.cloud_agent_step_search_media,
+            agentStepLabelRes(CloudAgentToolContract.TOOL_SEARCH_MEDIA),
+        )
+        assertEquals(
+            R.string.cloud_agent_step_refine_search,
+            agentStepLabelRes(CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH),
+        )
+        assertEquals(
+            R.string.cloud_agent_step_compose_card,
+            agentStepLabelRes(CloudAgentToolContract.TOOL_RENDER_UI),
+        )
+        assertEquals(
+            R.string.cloud_agent_step_compose_card,
+            agentStepLabelRes(CloudAgentToolContract.TOOL_RENDER_UI_OPENUI),
+        )
+        assertEquals(
+            R.string.cloud_agent_step_build_page,
+            agentStepLabelRes(CloudAgentToolContract.TOOL_RENDER_HTML),
+        )
+        // server_time 契约无常量（字面量）；未知工具同落 null，不上时间线
+        assertNull(agentStepLabelRes("server_time"))
+        assertNull(agentStepLabelRes("totally_unknown_tool"))
     }
 }

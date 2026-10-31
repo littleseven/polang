@@ -1,5 +1,7 @@
 package com.mamba.picme.features.cloudagent
 
+import com.mamba.picme.R
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import com.mamba.picme.domain.chat.AgentStepStatus
 import com.mamba.picme.domain.chat.AgentStepUi
 
@@ -50,4 +52,20 @@ class AgentStepTimeline {
         _steps.clear()
         startedAtMs.clear()
     }
+}
+
+/**
+ * 云端 Agent 工具名 → 步骤时间线文案资源；null = 不上时间线。
+ * 工具名常量收口 [CloudAgentToolContract]；`server_time` 契约无常量（字面量），同落 null。
+ */
+fun agentStepLabelRes(tool: String): Int? = when (tool) {
+    CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> R.string.cloud_agent_step_gallery_summary
+    CloudAgentToolContract.TOOL_SEARCH_MEDIA -> R.string.cloud_agent_step_search_media
+    CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> R.string.cloud_agent_step_refine_search
+    CloudAgentToolContract.TOOL_RENDER_UI,
+    CloudAgentToolContract.TOOL_RENDER_UI_OPENUI,
+    -> R.string.cloud_agent_step_compose_card
+    CloudAgentToolContract.TOOL_RENDER_HTML -> R.string.cloud_agent_step_build_page
+    "server_time" -> null
+    else -> null
 }

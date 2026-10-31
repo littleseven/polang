@@ -565,6 +565,12 @@
     <string name="cloud_agent_stop">Arrêter</string>
     <string name="cloud_agent_send">Envoyer</string>
     <string name="cloud_agent_round_in_flight">Le tour précédent est encore en cours, attends un instant et réessaie</string>
+    <string name="cloud_agent_step_gallery_summary">Parcours de votre galerie…</string>
+    <string name="cloud_agent_step_search_media">Recherche dans vos photos…</string>
+    <string name="cloud_agent_step_refine_search">Affinage de la recherche…</string>
+    <string name="cloud_agent_step_compose_card">Création d\'une carte…</string>
+    <string name="cloud_agent_step_build_page">Génération d\'une page…</string>
+    <string name="cloud_agent_step_failed_hint">échec, essai d\'une autre approche…</string>
     <string name="assistant_persona_default">Par défaut</string>
     <string name="assistant_persona_default_desc">Réponses standard équilibrées et neutres</string>
     <string name="assistant_persona_warm">Chaleureux et bienveillant</string>
