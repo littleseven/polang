@@ -150,6 +150,11 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
  * 半信任输入防御：未知组件/null 字面量 → 空 Box 占位，不炸整卡；BarChart buckets
  * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）；Image 解析不到/加载中 →
  * surfaceVariant 占位 Box（同形防跳动）。
+ *
+ * M6（2026-10-31 图片比例治理）：帧宽高比决策链全组件统一——显式 aspect prop >
+ * 图片真实比例（相册元数据 / 网络图 intrinsic，加载成功采集、单帧过渡）> 组件缺省框；
+ * 帧=真实比例时 Crop 退化为无损铺满。[frameAspectOf] 兜底比例参数化，
+ * [intrinsicAspectOf] 为 coil intrinsic 采集入口（内容批组件接线见 OpenUiContentRenderers）。
  */
 @Composable
 fun OpenUiNodeRenderer(
@@ -514,11 +519,18 @@ private fun OpenUiPhotoImage(
                 Box(modifier = frameFor(frameAspectOf(propAspect, null)))
                 return@BoxWithConstraints
             }
+            // 2026-10-31 图片比例治理：网络图加载成功后采 intrinsic 真实比例（端侧可信
+            // 数据，元数据同口径宽界 [0.3,3.0]），帧随真实比例过渡——帧=真实比例时 Crop
+            // 退化为无损铺满，竖图不再被缺省 4:3 横框拦腰裁
+            var srcRatio by remember(src) { mutableStateOf<Float?>(null) }
             AsyncImage(
                 model = src,
                 contentDescription = (node.props["alt"] as? OpenUiValue.Str)?.v,
                 contentScale = ContentScale.Crop,
-                modifier = frameFor(frameAspectOf(propAspect, null)),
+                onSuccess = { successState ->
+                    intrinsicAspectOf(successState.painter.intrinsicSize)?.let { srcRatio = it }
+                },
+                modifier = frameFor(frameAspectOf(propAspect, srcRatio)),
             )
             return@BoxWithConstraints
         }
@@ -549,14 +561,23 @@ private fun OpenUiPhotoImage(
 
 /**
  * Image 框宽高比（宽/高）决策链（纯函数，OpenUiFrameAspectTest 钉住）：
- * LLM 显式 aspect（半信任输入，clamp [0.5, 2.5]）> 照片元数据真实比例（端侧可信数据，
- * 宽 sanity 界 [0.3, 3.0] 只防脏元数据——不套 LLM 窄 clamp，9:19.5 竖屏截图 0.46 被夹到
- * 0.5 仍会拦腰裁，2026-10-25 review 🟡1）> 4:3 兜底。
+ * LLM 显式 aspect（半信任输入，clamp [0.5, 2.5]）> 图片真实比例（端侧可信数据——相册
+ * 元数据 / 网络图 intrinsic 同径，宽 sanity 界 [0.3, 3.0] 只防脏数据——不套 LLM 窄
+ * clamp，9:19.5 竖屏截图 0.46 被夹到 0.5 仍会拦腰裁，2026-10-25 review 🟡1）> [fallback]
+ * （组件缺省框：Image/ImageBlock 4:3、Banner/ImageTextLarge 16:9，2026-10-31 参数化）。
  */
-internal fun frameAspectOf(propAspect: Double?, metadataRatio: Float?): Double =
+internal fun frameAspectOf(
+    propAspect: Double?,
+    metadataRatio: Float?,
+    fallback: Double = FALLBACK_ASPECT,
+): Double =
     propAspect?.coerceIn(PROP_ASPECT_MIN, PROP_ASPECT_MAX)
         ?: metadataRatio?.toDouble()?.coerceIn(METADATA_ASPECT_MIN, METADATA_ASPECT_MAX)
-        ?: FALLBACK_ASPECT
+        ?: fallback
+
+/** coil intrinsic Size → 宽高比（Unspecified(NaN 维)/零维 → null：矢量图等无本征尺寸防御；NaN > 0f 恒 false 天然过滤）。 */
+internal fun intrinsicAspectOf(size: Size): Float? =
+    if (size.width > 0f && size.height > 0f) size.width / size.height else null
 
 private const val PROP_ASPECT_MIN = 0.5
 private const val PROP_ASPECT_MAX = 2.5

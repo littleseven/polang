@@ -37,4 +37,28 @@ class OpenUiFrameAspectTest {
     fun `neither source falls back to 4_3`() {
         assertEquals(4.0 / 3.0, frameAspectOf(null, null), 1e-9)
     }
+
+    // ── 2026-10-31 比例治理：fallback 参数化（Banner/ImageTextLarge 16:9 缺省框） ──
+
+    @Test
+    fun `custom fallback used when no prop and no metadata`() {
+        assertEquals(16.0 / 9.0, frameAspectOf(null, null, 16.0 / 9.0), 1e-9)
+    }
+
+    @Test
+    fun `metadata beats custom fallback`() {
+        // 竖构图照片（3:4=0.75）在 16:9 缺省框组件里也必须按真实比例成帧
+        assertEquals(0.75, frameAspectOf(null, 0.75f, 16.0 / 9.0), 1e-9)
+    }
+
+    @Test
+    fun `explicit prop beats metadata with custom fallback`() {
+        assertEquals(2.0, frameAspectOf(2.0, 0.75f, 16.0 / 9.0), 1e-9)
+    }
+
+    @Test
+    fun `network intrinsic ratio walks metadata path`() {
+        // intrinsic 与相册元数据同径（端侧可信数据）：竖图 0.46 不被 LLM 窄 clamp 夹
+        assertEquals(0.46, frameAspectOf(null, 0.46f, 16.0 / 9.0), 1e-6)
+    }
 }
