@@ -20,7 +20,7 @@
 
 ---
 
-## Phase M1 — 规则引擎（server，TDD）
+## Phase M1 — 规则引擎（server，TDD）　**✅ 2026-10-31 封板：Task 1-4 全过两关评审（CallTree/Normalizer/Validator/lint 收编），server 全量 543 tests 绿**
 
 ### Task 1: OpenUiCallTree 调用树扫描器 ✅（2026-10-31 完成，commit 451b30001 + 评审修复 9b65523d4；spec ✅ / 质量 Needs fixes→修复→复审 Approved）
 
@@ -750,13 +750,13 @@ git commit -m "feat(server): OpenUiLayoutValidator 结构门禁 R1-R4 + 白名�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 4: lintComposition 收编（退役被矫正层吸收的软警告）
+### Task 4: lintComposition 收编（退役被矫正层吸收的软警告）✅（2026-10-31 完成，commits 23da1853b+19373210d；spec ✅ / 质量 ✅ Approved 附挂账（I-1 三处机制措辞 → Task 14；三处一行修已落地）；全量 543/0 绿）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt`（`lintComposition`）
 - Modify: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidatorTest.kt`（相关 lint 断言删除）
 
-- [ ] **Step 1: 改测试先行（删除三条退役 lint 的断言，保留 DISPLAY≤4/Button≤3 断言）**
+- [x] **Step 1: 改测试先行（删除三条退役 lint 的断言，保留 DISPLAY≤4/Button≤3 断言）**
 
 `lintComposition` 保留规则：`DISPLAY 大数字 ≤4` 与 `Button ≤3` 两条（未进本批硬层）。删除以下三段软警告代码及其测试断言：
 
@@ -774,16 +774,16 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 测试侧：`RenderOpenUiValidatorTest` 中对上述三段警告的断言（如 `lintComposition(GOLDEN_STAT_TILE_PROGRAM)` 相关、构造违规 program 断言警告文本的用例）整段删除；DISPLAY/Button 两条的断言保留不动。
 
-- [ ] **Step 2: 删除实现三段分支**
+- [x] **Step 2: 删除实现三段分支**
 
 按 Step 1 清单删 `lintComposition` 内三个 `warnings +=` 分支（连同不再使用的私有正则 `ROW_CALL`/`ALIGN_CENTER`/`IMAGE_ANY_CALL`/`TEXT_ANY_CALL`/`NAMED_WEIGHTS`/`GRID_CALL`——先 grep 确认无其他引用再删；`callArgSpans` 仍被保留分支使用则留）。
 
-- [ ] **Step 3: 跑测试**
+- [x] **Step 3: 跑测试**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest"`
 Expected: PASS（黄金程序 lint 断言仅剩 DISPLAY/Button 两条口径）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt \
