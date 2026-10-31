@@ -959,6 +959,14 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   口径扩 bgPhoto 键 + 对象字段冒号形态（`{bgPhoto: …}` 同 `photo =` 计位图）；
   工具描述增经典组合版式食谱五则 + 黄金示例 `GOLDEN_CLASSIC_PROGRAM`（Banner +
   StatRow + ListItem 相册卡骨架，companion const 测试同源钉住）。
+  图片帧比例治理批次（2026-10-31，纯渲染层，schema/server 零改动）：
+  「布局时图片内容考虑图片比例及缩放」落地——帧宽高比决策链全组件统一：显式 aspect
+  prop > 图片真实比例（相册元数据既有 + 网络图 coil intrinsic 新增采集，加载成功单帧
+  过渡，宽 sanity 界 [0.3, 3.0]）> 组件缺省框；Image 网络 src 支路告别恒 4:3、
+  ImageTextLarge/Banner 告别写死 16:9（竖构图题图不再拦腰裁）、ImageBlock 帧随
+  intrinsic、ImageGallery 改定高变宽经典画廊形态（等高不齐宽）；`frameAspectOf`
+  兜底比例参数化 + 新增 `intrinsicAspectOf`；定尺寸缩略图（ImageText/ListItem/
+  ListBlock 48dp）与 VisualCard 背景保持 Crop 裁切不变。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量

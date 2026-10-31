@@ -88,7 +88,7 @@ Banner("我的相册年度杂志", photo = photos[0].id, subtitle = "2026 · 12 
 
 - **2026-10-31 起首选 Banner 组件**（通栏题图横幅固化：图 + 底部渐变蒙层 + 左下白字标题/副题）；
   多图封面（2~3 张并排）仍用 `Row([Image, Image, Image])`；导语用 Markdown（关键数字加粗）而非纯 Text；
-- Banner 图双源：photo 相册投影优先 / src https；aspect 缺省 16:9，竖图主题显式传 0.75。
+- Banner 图双源：photo 相册投影优先 / src https；**2026-10-31 比例治理（v7）起帧随图片真实比例自适应**（相册元数据 / 网络图 intrinsic，加载后采集单帧过渡），显式 aspect 仅用于强制造型（钳 [0.5, 2.5]），竖图不再需要手动传 0.75。
 
 ### 4.2.1 经典列表行（ListTile）
 
@@ -110,6 +110,21 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - 柱图 buckets > 12 时 LLM 应先聚合（按年/按季）或在回复正文说明，不原样塞 160 桶横滑；
 - 单卡 Image ≤ 12 张（协议护栏），照片页横滑 List 每屏 2~3 列构图最佳。
 
+### 4.5 图片帧比例决策链（2026-10-31 v7 起，全组件统一）
+
+```
+帧宽高比 = 显式 aspect prop（半信任，钳 [0.5, 2.5] = 强制造型）
+        > 图片真实比例（端侧可信：相册 MediaStore 元数据 / 网络图 coil intrinsic 加载后采集，
+          宽 sanity 界 [0.3, 3.0] 只防脏数据）
+        > 组件缺省框（Image/ImageBlock 4:3、Banner/ImageTextLarge 16:9）
+```
+
+- 帧 = 真实比例时 `ContentScale.Crop` 退化为无损铺满——**竖图不再被缺省横框拦腰裁**，这是「布局时图片内容考虑图片比例及缩放」的落地口径；
+- 覆盖组件：Image / ImageBlock / ImageTextLarge / Banner（通栏图全量）；ImageGallery 改**定高变宽**经典画廊形态（各条目帧随自身真实比例，等高不齐宽）；
+- 定尺寸缩略图（ImageText 48dp / ListItem 48dp / ListBlock 48dp）与 VisualCard 背景图保持 Crop 裁切——缩略图/背景填充语义上裁切即正确；
+- LLM 侧零负担：无需为竖图手传 aspect，显式 aspect 仅用于强制造型（如横幅必须 16:9）；
+- 实现：`frameAspectOf(prop, realRatio, fallback)` 纯函数（OpenUiFrameAspectTest 钉住）+ `intrinsicAspectOf`（coil intrinsic 采集，NaN/零维防御）；加载中按缺省框占位，加载成功单帧过渡到真实比例。
+
 ## 5. 组件皮肤速查（渲染器现状对齐表）
 
 | 组件 | 皮肤要点 |
@@ -125,7 +140,7 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | BarChart | §3.1 |
 | PieChart | §3.2 |
 | LineChart | §3.3 |
-| Image | 12dp 圆角；占位同形 surfaceVariant；横滑 List 内固定条目宽 200dp；aspect 缺省按照片真实比例（元数据宽 sanity 界 [0.3, 3.0]，界外极长图轻微裁切），显式传 = 强制造型（clamp [0.5, 2.5]）；点击看大图（宿主动作 OpenPhoto → chat 内预览浮层单页，2026-10-30 由 PhotoEditor 编辑页改为预览页） |
+| Image | 12dp 圆角；占位同形 surfaceVariant；横滑 List 内固定条目宽 200dp；aspect 缺省按图片真实比例（§4.5：相册元数据 / 网络图 intrinsic 同径，宽 sanity 界 [0.3, 3.0]，界外极长图轻微裁切），显式传 = 强制造型（clamp [0.5, 2.5]）；点击看大图（宿主动作 OpenPhoto → chat 内预览浮层单页，2026-10-30 由 PhotoEditor 编辑页改为预览页） |
 | Icon | 无 colorRole → onSurfaceVariant 弱色；PRIMARY 仅强调性图标 |
 | Divider | 0.5dp，onSurface × 0.08 |
 | Tabs | 胶囊分段控件（surfaceVariant 容器 + primary 选中胶囊），>4 横滑 |
@@ -152,7 +167,7 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | MetricIndicatorInline / MetricIndicatorWithStrikethrough | DISPLAY 大数字 + trend ↑success/↓error；删除线旧值 |
 | **经典组合版式批次（2026-10-31，95 项注册）** | |
 | StatRow / StatItem | 经典统计行（§4.1 固化件）：items [{value*, label?}] 等分 weight，DISPLAY 数字 + CAPTION 弱色标签居中；StatItem 独立 = 单项统计格 |
-| Banner | 通栏题图横幅（§4.2 固化件）：photo 相册投影优先 / src https，底部渐变蒙层 + 左下白字标题副题；aspect 缺省 16:9（clamp [0.5, 2.5]）；无图 = surfaceVariant 纯色底 + 主题色文字；photo 图点击 OpenPhoto 大图 |
+| Banner | 通栏题图横幅（§4.2 固化件）：photo 相册投影优先 / src https，底部渐变蒙层 + 左下白字标题副题；帧 = 显式 aspect > 图片真实比例 > 16:9 缺省（§4.5）；无图 = surfaceVariant 纯色底 + 主题色文字；photo 图点击 OpenPhoto 大图 |
 | ListItem | 经典列表行（§4.2.1，实渲染化）：前件 photo 48dp 图 > image https 图 > icon 36dp 圆形徽章三选一 + 标题 BODY（≤2 行）/副题 CAPTION 弱 + trailing 弱色小字 / actionLabel 胶囊；action 整行可点 |
 | 元素形状 18 件（*Item/Series/Slice/Point/ScatterSeries） | 仅作父组件数组元素的对象形状，独立出现渲染空占位（ListItem 2026-10-31 起升格出组） |
 
@@ -165,3 +180,4 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - v4（2026-10-30，spec 已随交付清理，git 历史可查）：图文组合固化——ImageText/ImageTextLarge 补 `photo` prop（相册投影 id，与 src 二选一、photo 优先），图文版式被组件结构性锁死（小图左+标题副题列 / 通栏 16:9 图+粗标题），相册图文不再 Row 裸拼 Image+Text（等宽分栏反模式）；server 工具描述增图文排版食谱段 + 黄金示例 + lint 软警告（Row 内 Image+Text 裸拼提示）；单卡图片上限口径补 photo 键计数。文字环绕图片（float wrap）不支持，食谱声明替代形态。
 - v5（2026-10-30，spec 已随交付清理，git 历史可查）：通用布局原语批次——设计方向从业务组合组件转向通用布局原语（用户定调「通用布局组件而不是业务组件」）。新增 Grid（通用 N 列网格，columns 1..4 缺省 2，四宫格 = columns 2）/ Box（通用叠放容器，align 九值 contentAlignment 缺省 topStart = Compose 官方缺省）/ Spacer（通用留白件，size∈xs\|s\|m\|l\|xl → 间距 token，缺省 m）三组件 + Row 增 `weights` prop（CSS flex-grow 语义按比例分栏，左图右文 = `weights=[1,2]` 配 align 上下对齐）；组件总数 89→92。lint 修订：Row 裸拼 Image+Text 仅无 weights 时警告（weights 比例分栏是认可的经典版式写法）；工具描述「通用布局食谱」段 + 黄金示例（四宫格照片墙 + 1:2 左图右文）；ImageText/ImageTextLarge 保留为便捷糖，泛化组合优先通用原语。官方核查：thesysdev/openui 通用布局仅 Stack 一件（无 per-child weight/Grid/Box/Spacer），本批次属本仓刻意扩展，词汇/缺省严格对齐官方/CSS/Compose。
 - v6（2026-10-31，spec 已随交付清理，git 历史可查）：经典组合版式批次——原语之上固化经典构图（用户定调「布局丑问题依旧没有解决，应该做一些经典的布局组件」），LLM 一行调用即得正确版式，不再依赖原语拼装纪律。新增 StatRow（经典统计行 = §4.1 stat tile 组件化，items [{value*, label?}] 等分居中，lint 第三条「stat tile 未居中」的根治——警告文案同步引导换 StatRow）/ StatItem（元素形状保底）/ Banner（通栏题图横幅 = §4.2 Hero 组件化，photo 相册投影 + 渐变蒙层白字，aspect 缺省 16:9）；ListItem 实渲染化（经典 ListTile：前件 photo/image/icon 三选一 + 标题副题 + trailing，`List([ListItem...])` 经典列表成形，新增 photo/icon/trailing props 向后兼容）；VisualCardBlock/VisualCardItem +bgPhoto（题图卡相册投影，与 bgImageSrc 二选一、bgPhoto 优先）。组件总数 92→95；server 图片计数口径扩 `bgPhoto` 键 + 对象字段冒号形态（`{bgPhoto: …}` 同 `photo =` 计位图）；工具描述增经典组合版式食谱五则 + 黄金示例 GOLDEN_CLASSIC_PROGRAM。刻意不做 SectionHeader（CardHeader/InlineHeader 已是同义件）。
+- v7（2026-10-31，纯渲染层批次，schema/server 零改动）：图片帧比例治理——§4.5 决策链全组件统一（显式 aspect > 图片真实比例 > 组件缺省框），真实比例双源 = 相册元数据（既有）+ 网络图 coil intrinsic（新增，加载后采集、单帧过渡）；Image 网络 src 支路告别恒 4:3、ImageTextLarge/Banner 告别写死 16:9（竖构图题图不再拦腰裁）、ImageBlock 帧随 intrinsic、ImageGallery 改定高变宽经典画廊形态；`frameAspectOf` 兜底比例参数化（组件缺省框随调用方），新增 `intrinsicAspectOf`（NaN/零维防御）；定尺寸缩略图与 VisualCard 背景保持 Crop 不变；OpenUiFrameAspectTest +4 用例钉住 fallback 参数化与 intrinsic 同径语义。

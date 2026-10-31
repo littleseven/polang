@@ -282,6 +282,81 @@ private fun OpenUiContentPhotoImage(
     }
 }
 
+/**
+ * 2026-10-31 图片比例治理（布局时帧随图片真实比例）：通栏图决策链全组件统一为
+ * 显式 aspect prop > 图片真实比例（相册元数据 / 网络图 intrinsic，加载成功采集、
+ * 单帧过渡）> 组件缺省框（[fallbackAspect]）。帧=真实比例时 Crop 退化为无损铺满，
+ * 竖图不再被缺省横框拦腰裁；解析中/加载中按缺省框占位（同形防跳动既有口径）。
+ */
+
+/** 相册投影自适应通栏图：帧 = frameAspectOf(propAspect, 元数据真实比例, fallback)。 */
+@Composable
+private fun OpenUiAdaptivePhotoImage(
+    photoId: Long,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    propAspect: Double?,
+    fallbackAspect: Float,
+    modifier: Modifier = Modifier,
+) {
+    val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
+        value = photoResolver.resolve(photoId)
+    }
+    val resolved = photo
+    val frame = modifier
+        .fillMaxWidth()
+        .aspectRatio(frameAspectOf(propAspect, resolved?.aspectRatio, fallbackAspect.toDouble()).toFloat())
+        .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    if (resolved == null) {
+        Box(modifier = frame)
+    } else {
+        AsyncImage(
+            model = resolved.uri,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
+            modifier = frame.clickable(
+                onClickLabel = stringResource(R.string.cd_image_preview),
+                role = Role.Image,
+            ) {
+                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+            },
+        )
+    }
+}
+
+/** 网络图自适应通栏帧：coil onSuccess 采 intrinsic 真实比例（remember 键=src，换图重置）。 */
+@Composable
+private fun OpenUiAdaptiveNetworkImage(
+    src: String?,
+    contentDescription: String?,
+    propAspect: Double?,
+    fallbackAspect: Float,
+    modifier: Modifier = Modifier,
+) {
+    val valid = httpsSrcOrNull(src)
+    var srcRatio by remember(valid) { mutableStateOf<Float?>(null) }
+    val frame = modifier
+        .fillMaxWidth()
+        .aspectRatio(frameAspectOf(propAspect, srcRatio, fallbackAspect.toDouble()).toFloat())
+        .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    if (valid == null) {
+        Box(modifier = frame)
+    } else {
+        AsyncImage(
+            model = valid,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            onSuccess = { successState ->
+                intrinsicAspectOf(successState.painter.intrinsicSize)?.let { srcRatio = it }
+            },
+            modifier = frame,
+        )
+    }
+}
+
 /** 序号圆点徽标（ListBlock number / Steps 共用：primary 底白字 12sp）。 */
 @Composable
 private fun OpenUiContentNumberBadge(number: Int) {
@@ -592,21 +667,26 @@ private fun OpenUiContentCodeBlock(node: OpenUiValue.ComponentVal, modifier: Mod
     }
 }
 
-/** ImageBlock：官方纯 src 形态（https 限）；无 aspect 元数据，缺省 4:3 框（Image 兜底比例同口径）。 */
+/** ImageBlock：官方纯 src 形态（https 限）；2026-10-31 比例治理——帧随 intrinsic 真实比例，缺省 4:3 框。 */
 @Composable
 private fun OpenUiContentImageBlock(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
     val src = (node.props["src"] as? OpenUiValue.Str)?.v
     val alt = (node.props["alt"] as? OpenUiValue.Str)?.v
-    OpenUiContentNetworkImage(
+    OpenUiAdaptiveNetworkImage(
         src = src,
         contentDescription = alt,
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(4f / 3f),
+        propAspect = null,
+        fallbackAspect = 4f / 3f,
+        modifier = modifier,
     )
 }
 
-/** ImageGallery：横滑定宽条目（List HORIZONTAL 同径）；https 图仅展示不做大图页；details 作弱色小字注脚。 */
+/** ImageGallery 条目高（2026-10-31 比例治理：定高变宽经典画廊形态）：= 原条目宽 × 3/4（与原 4:3 条目视觉等高）。 */
+private val GALLERY_IMAGE_HEIGHT = OpenUiCardTokens.horizontalImageWidth * 0.75f
+
+/** ImageGallery：横滑定高变宽条目——各图帧随自身 intrinsic 真实比例（加载后采集，
+ *  sanity 界 [0.3,3.0]，缺省 4:3 占位），不再统一 4:3 裁切；https 图仅展示不做大图页；
+ *  details 作弱色小字注脚。 */
 @Composable
 private fun OpenUiContentImageGallery(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
     val images = (node.props["images"] as? OpenUiValue.Arr)?.v.orEmpty()
@@ -624,14 +704,28 @@ private fun OpenUiContentImageGallery(node: OpenUiValue.ComponentVal, modifier: 
             val src = (obj["src"] as? OpenUiValue.Str)?.v
             val alt = (obj["alt"] as? OpenUiValue.Str)?.v
             val details = (obj["details"] as? OpenUiValue.Str)?.v
-            Column(modifier = Modifier.width(OpenUiCardTokens.horizontalImageWidth)) {
-                OpenUiContentNetworkImage(
-                    src = src,
-                    contentDescription = alt,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(4f / 3f),
-                )
+            val valid = httpsSrcOrNull(src)
+            var srcRatio by remember(valid) { mutableStateOf<Float?>(null) }
+            val frameAspect = frameAspectOf(null, srcRatio).toFloat()
+            Column(modifier = Modifier.width(GALLERY_IMAGE_HEIGHT * frameAspect)) {
+                val frame = Modifier
+                    .fillMaxWidth()
+                    .height(GALLERY_IMAGE_HEIGHT)
+                    .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                if (valid == null) {
+                    Box(modifier = frame)
+                } else {
+                    AsyncImage(
+                        model = valid,
+                        contentDescription = alt,
+                        contentScale = ContentScale.Crop,
+                        onSuccess = { successState ->
+                            intrinsicAspectOf(successState.painter.intrinsicSize)?.let { srcRatio = it }
+                        },
+                        modifier = frame,
+                    )
+                }
                 details?.let { text ->
                     Text(
                         text = text,
@@ -863,7 +957,8 @@ private fun OpenUiContentImageText(
     }
 }
 
-/** ImageTextLarge：Column(通栏图 16:9 + 粗标题 + 副题)；图双源——photo 相册投影优先，src https 兜底、缺失落同形占位。 */
+/** ImageTextLarge：Column(通栏图 + 粗标题 + 副题)；图双源——photo 相册投影优先，src https
+ *  兜底、缺失落同形占位；2026-10-31 比例治理——帧随图片真实比例（元数据/intrinsic），缺省 16:9。 */
 @Composable
 private fun OpenUiContentImageTextLarge(
     node: OpenUiValue.ComponentVal,
@@ -877,21 +972,19 @@ private fun OpenUiContentImageTextLarge(
     val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
     Column(modifier = modifier.fillMaxWidth()) {
         if (photoId != null) {
-            OpenUiContentPhotoImage(
+            OpenUiAdaptivePhotoImage(
                 photoId = photoId,
                 photoResolver = photoResolver,
                 onAction = onAction,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f),
+                propAspect = null,
+                fallbackAspect = 16f / 9f,
             )
         } else {
-            OpenUiContentNetworkImage(
+            OpenUiAdaptiveNetworkImage(
                 src = src,
                 contentDescription = title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f),
+                propAspect = null,
+                fallbackAspect = 16f / 9f,
             )
         }
         Text(
@@ -1346,6 +1439,8 @@ private const val BANNER_FALLBACK_ASPECT = 16f / 9f
  * 蒙层 + 左下白字标题/副题（VisualCardItem 有图形态的单卡版）；photo/src 皆无 →
  * surfaceVariant 纯色底 + 主题色文字（VisualCardItem 无图形态同口径）；photo 图点击
  * 看大图走 OpenPhoto 宿主动作（OpenUiContentPhotoImage 既有口径）。
+ * 2026-10-31 比例治理：帧决策链 = 显式 aspect > 图片真实比例（相册元数据 / 网络图
+ * intrinsic 加载后采集）> 16:9 缺省——竖构图题图不再被 16:9 横框拦腰裁。
  */
 @Composable
 private fun OpenUiContentBanner(
@@ -1358,8 +1453,16 @@ private fun OpenUiContentBanner(
     val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
     val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
     val httpsSrc = httpsSrcOrNull((node.props["src"] as? OpenUiValue.Str)?.v)
-    val aspect = ((node.props["aspect"] as? OpenUiValue.Num)?.v ?: BANNER_FALLBACK_ASPECT.toDouble())
-        .coerceIn(0.5, 2.5).toFloat()
+    val propAspect = (node.props["aspect"] as? OpenUiValue.Num)?.v
+    val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
+        value = photoId?.let { id -> photoResolver.resolve(id) }
+    }
+    var srcRatio by remember(httpsSrc) { mutableStateOf<Float?>(null) }
+    val aspect = frameAspectOf(
+        propAspect,
+        photo?.aspectRatio ?: srcRatio,
+        BANNER_FALLBACK_ASPECT.toDouble(),
+    ).toFloat()
     val hasImage = photoId != null || httpsSrc != null
     Box(
         modifier = modifier
@@ -1368,18 +1471,28 @@ private fun OpenUiContentBanner(
             .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (photoId != null) {
-            OpenUiContentPhotoImage(
-                photoId = photoId,
-                photoResolver = photoResolver,
-                onAction = onAction,
-                modifier = Modifier.matchParentSize(),
+        val resolved = photo
+        if (resolved != null) {
+            AsyncImage(
+                model = resolved.uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = faceAwareVerticalAlignment(resolved.faceFocusY),
+                modifier = Modifier.matchParentSize().clickable(
+                    onClickLabel = stringResource(R.string.cd_image_preview),
+                    role = Role.Image,
+                ) {
+                    onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                },
             )
-        } else if (httpsSrc != null) {
+        } else if (photoId == null && httpsSrc != null) {
             AsyncImage(
                 model = httpsSrc,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
+                onSuccess = { successState ->
+                    intrinsicAspectOf(successState.painter.intrinsicSize)?.let { srcRatio = it }
+                },
                 modifier = Modifier.matchParentSize(),
             )
         }
