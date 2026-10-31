@@ -358,18 +358,25 @@ internal class OpenUiRuntime(
             "Ceil" -> OpenUiValue.Num(ceil(openUiToNumber(arg(expr.args, 0, stack, statementId))))
             // M1 不实施 @Each（spec §4.5）：求值为 null，不报错（它是合法内置）
             "Each" -> OpenUiValue.Null
-            "Set" -> evalSetAction(expr, stack, statementId)
-            "Reset" -> evalResetAction(expr)
-            "Run" -> {
+            OpenUiContract.Actions.SET -> evalSetAction(expr, stack, statementId)
+            OpenUiContract.Actions.RESET -> evalResetAction(expr)
+            OpenUiContract.Actions.RUN -> {
+                // M1 不实施 @Run（spec §4.5）：仍产出具名 action，宿主显式识别并忽略（Logger.w）——
+                // 若降级为 ActionVal(emptyList)（ACTION 槽位类型校验不看空满，照常通过），
+                // 按钮渲染可点但点击静默无任何可观测信号；具名 action 让宿主路由能告警留痕。
                 val ref = expr.args.getOrNull(0) as? OpenUiExpr.Ref
                 OpenUiValue.ActionVal(
-                    if (ref == null) emptyList() else listOf(OpenUiAction("Run", emptyList(), target = ref.name)),
+                    if (ref == null) {
+                        emptyList()
+                    } else {
+                        listOf(OpenUiAction(OpenUiContract.Actions.RUN, emptyList(), target = ref.name))
+                    },
                 )
             }
-            "ToAssistant" -> OpenUiValue.ActionVal(
+            OpenUiContract.Actions.TO_ASSISTANT -> OpenUiValue.ActionVal(
                 listOf(
                     OpenUiAction(
-                        "ToAssistant",
+                        OpenUiContract.Actions.TO_ASSISTANT,
                         buildList {
                             add(arg(expr.args, 0, stack, statementId))
                             if (expr.args.size > 1) add(arg(expr.args, 1, stack, statementId))
@@ -377,8 +384,8 @@ internal class OpenUiRuntime(
                     ),
                 ),
             )
-            "OpenUrl" -> OpenUiValue.ActionVal(
-                listOf(OpenUiAction("OpenUrl", listOf(arg(expr.args, 0, stack, statementId)))),
+            OpenUiContract.Actions.OPEN_URL -> OpenUiValue.ActionVal(
+                listOf(OpenUiAction(OpenUiContract.Actions.OPEN_URL, listOf(arg(expr.args, 0, stack, statementId)))),
             )
             else -> {
                 // M1 无 library 自定义 function/action 注册（spec §4.5）
@@ -462,7 +469,7 @@ internal class OpenUiRuntime(
         val target = expr.args.getOrNull(0) as? OpenUiExpr.StateRef
             ?: return OpenUiValue.ActionVal(emptyList())
         val value = arg(expr.args, 1, stack, statementId)
-        return OpenUiValue.ActionVal(listOf(OpenUiAction("Set", listOf(value), target = target.name)))
+        return OpenUiValue.ActionVal(listOf(OpenUiAction(OpenUiContract.Actions.SET, listOf(value), target = target.name)))
     }
 
     /** @Reset($a, $b, ...)：args=全部变量名（Str），target=首个。 */
@@ -472,7 +479,7 @@ internal class OpenUiRuntime(
         return OpenUiValue.ActionVal(
             listOf(
                 OpenUiAction(
-                    "Reset",
+                    OpenUiContract.Actions.RESET,
                     targets.map { name -> OpenUiValue.Str(name) },
                     target = targets.first(),
                 ),

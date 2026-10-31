@@ -830,4 +830,67 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertNotNull(RenderUiValidator.gate("render_ui", argsJson(validMinimal)))
         assertNull(RenderUiValidator.gate("search_media", " whatever "))
     }
+
+    // ── 动作契约批次（2026-11-01 review Y2/Y5/Y6） ─────────────────────
+
+    @Test
+    fun `quoted run and wrapper action strings are rejected`() {
+        // QUOTED_ACTION 词表补 Run|Action（review Y2，词表 = shared OpenUiContract.Actions
+        // 字面量副本）："@Run(…)" 与 "@Action([…])" 同为字符串包裹动作表达式，端侧
+        // ACTION 槽位 type-mismatch 静默惰性，服务端同轮纠错
+        listOf(
+            """root = Card([Button("b", "@Run(mutation)")])""",
+            """root = Card([Button("b", "@Action([@Set(${'$'}a, 1)])")])""",
+        ).forEach { program ->
+            val error = RenderOpenUiValidator.validateToError(program)
+            assertNotNull("应拒绝: $program", error)
+            assertTrue(error!!.contains("动作表达式被包成了字符串"))
+        }
+        // 裸 @Run（合法语法形态）不误伤
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([Button("b", @Run(mut))])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `open url literal gate rejects non https and passes https`() {
+        // review Y5：@OpenUrl 字面量首参限 https（与图片 src https 硬校验同族，外链零闸补齐）
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([Button("b", @OpenUrl("https://polang.net/x"))])""",
+            ),
+        )
+        listOf("file:///etc/passwd", "market://details?id=x", "javascript:alert(1)").forEach { url ->
+            val error = RenderOpenUiValidator.validateToError(
+                """root = Card([Button("b", @OpenUrl("$url"))])""",
+            )
+            assertNotNull("应拒绝: $url", error)
+            assertTrue(error!!.contains("@OpenUrl 只接受 https://"))
+        }
+        // 表达式形态（@OpenUrl($u)）不可静态判定，放行由端侧 dispatch scheme 闸兜底
+        val binding =
+            "${'$'}u = \"https://polang.net\"\nroot = Card([Button(\"b\", @OpenUrl(${'$'}u))])"
+        assertNull(RenderOpenUiValidator.validateToError(binding))
+    }
+
+    @Test
+    fun `list item and list block actionLabel without action trigger lint`() {
+        // review Y6：死按钮兜底从 CardHeader 扩展到 ListItem（命名键 = 形态）与
+        // ListBlock（items 对象字段冒号形态）
+        val bareItem = "root = Card([ListItem(\"行\", icon = \"photo\", actionLabel = \"查看\")])"
+        assertEquals(1, RenderOpenUiValidator.lintComposition(bareItem).size)
+        val bareBlock = "root = Card([ListBlock([{title: \"行\", actionLabel: \"查看\"}])])"
+        assertEquals(1, RenderOpenUiValidator.lintComposition(bareBlock).size)
+        // 显式 action 配对后不警告
+        val wiredItem =
+            "root = Card([ListItem(\"行\", actionLabel = \"查看\", " +
+                "action = @ToAssistant(\"查看 行\"))])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wiredItem))
+        val wiredBlock =
+            "root = Card([ListBlock([{title: \"行\", actionLabel: \"查看\", " +
+                "action: @ToAssistant(\"查看 行\")}])])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wiredBlock))
+    }
 }

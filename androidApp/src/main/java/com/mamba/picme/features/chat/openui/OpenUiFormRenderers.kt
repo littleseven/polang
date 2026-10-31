@@ -68,6 +68,7 @@ import com.mamba.picme.core.designsystem.AppSliderTokens
 import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
+import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 import org.json.JSONArray
 import org.json.JSONObject
@@ -166,7 +167,7 @@ private fun openUiFormText(value: OpenUiValue?): String? = when (value) {
 
 /** 构造 @Set 动作（target = state 变量名）。 */
 private fun formSetAction(stateKey: String, value: OpenUiValue): OpenUiAction =
-    OpenUiAction(name = "Set", args = listOf(value), target = stateKey)
+    OpenUiAction(name = OpenUiContract.Actions.SET, args = listOf(value), target = stateKey)
 
 /** 逗号串多选值解析（空段剔除）。 */
 private fun parseMultiValues(raw: String?): Set<String> =

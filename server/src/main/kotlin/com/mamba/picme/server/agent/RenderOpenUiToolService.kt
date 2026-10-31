@@ -246,7 +246,8 @@ class RenderOpenUiToolService {
      Steps(items*=[{title*, details?}])（纵向步骤条）/
      ListItem(title*, subtitle?, photo?, image?, icon?, trailing?, actionLabel?, action?)（经典列表行：
      前件三选一——photo 相册投影 48dp 图（写 photos[0].id，禁字面量数字）> image https 图 > icon 徽章
-     （59 枚枚举名）；trailing 是尾部弱色小字（如日期/计数）；List([ListItem(...)]) 即经典列表，独立用亦可）；
+     （59 枚枚举名）；trailing 是尾部弱色小字（如日期/计数）；List([ListItem(...)]) 即经典列表，独立用亦可；
+     ListItem/ListBlock 同 CardHeader 口径：有 actionLabel 必配 action（@ToAssistant("<动作> <行语境>")），缺省 lint 提示）；
    - 经典组合版式（固化构图，优先于原语拼装）：StatRow(items*=[{value*, label?}])（经典统计行：
      2~4 项等分，每项 DISPLAY 大数字 + CAPTION 弱色标签居中——统计数字首选，替代
      Row+Column+Text("DISPLAY") 拼装）/ Banner(title*, subtitle?, photo?, src?, aspect?)（通栏题图横幅：
@@ -312,8 +313,8 @@ class RenderOpenUiToolService {
    `${'$'}flag = false`），再传给组件的可绑定参数（BarChart selected / CheckBox checked /
    Switch checked / ChoicePicker selected / Slider value / Text text）；端侧点选/勾选/拖值 → 回写该变量并
    整卡重渲染（如 Text(${'$'}selected) 随点选刷新显示当前选中项）；传裸字面量则只读展示
-   不回写（BarChart 裸字符串点选高亮静默失效）；交互 state 不持久化，`${'$'}selected`
-   之外变量重开卡回默认值；
+   不回写（BarChart 裸字符串点选高亮静默失效）；交互 state 的字符串标量（`${'$'}selected`
+   及表单文本等全部 Str 变量）持久化、重开卡恢复，Bool/Num 不持久化回声明默认值；
    Icon 预定义图标名清单（59 枚，逐字使用，禁臆造）：
 """ + ICON_NAMES_TEXT + """
 7. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示；

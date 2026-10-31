@@ -60,6 +60,7 @@ import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
+import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.features.common.chat.AgentMarkdown
 
@@ -120,7 +121,7 @@ internal fun OpenUiContentNode(
                 modifier = modifier,
                 // 2026-10-31 相册 APP 组合方式批次：分组标题尾部动作（「查看全部 >」形态）
                 actionLabel = headerActionLabel,
-                actions = headerActionsOrDefault(
+                actions = labeledActionsOrDefault(
                     headerActionLabel,
                     headerTitle,
                     contentActions(node.props["action"]),
@@ -235,19 +236,20 @@ private fun contentToneIcon(variant: String?): String = when (variant) {
 private fun contentActions(prop: OpenUiValue?): List<OpenUiAction> = openUiActionsOf(prop)
 
 /**
- * CardHeader 尾部动作兜底（2026-10-31 真机回归修复「查看全部点击无效」）：LLM 按黄金
- * 示例常只传 actionLabel 不传 action，若原样渲染则按钮呈可点态却无动作。actionLabel 在
- * 场且 action 缺省时，合成 @ToAssistant("actionLabel：title")——点击即以用户消息上行，
- * 让 LLM 展开完整分组；显式 action 永远优先（OpenUiHeaderActionTest 钉住）。
+ * 「actionLabel 在场但 action 缺省」兜底（2026-10-31 真机回归修复「查看全部点击无效」）：
+ * LLM 按黄金示例常只传 actionLabel 不传 action，若原样渲染则按钮呈可点态却无动作。
+ * actionLabel 在场且 action 缺省时，合成 @ToAssistant("actionLabel：title")——点击即以
+ * 用户消息上行，让 LLM 展开完整分组；显式 action 永远优先（OpenUiLabeledActionTest 钉住）。
+ * 适用 CardHeader 尾部动作 / ListBlock 行 / ListItem 行（2026-11-01 review Y6 扩展）。
  */
-internal fun headerActionsOrDefault(
+internal fun labeledActionsOrDefault(
     actionLabel: String?,
     title: String?,
     actions: List<OpenUiAction>,
 ): List<OpenUiAction> {
     if (actions.isNotEmpty() || actionLabel == null) return actions
     val text = if (title != null) "$actionLabel：$title" else actionLabel
-    return listOf(OpenUiAction("ToAssistant", listOf(OpenUiValue.Str(text))))
+    return listOf(OpenUiAction(OpenUiContract.Actions.TO_ASSISTANT, listOf(OpenUiValue.Str(text))))
 }
 
 /** 同形占位（https 图缺失/非法时防跳动，Image 解析失败占位同口径）。 */
@@ -315,7 +317,7 @@ private fun OpenUiContentPhotoImage(
                 onClickLabel = stringResource(R.string.cd_image_preview),
                 role = Role.Image,
             ) {
-                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
             },
         )
     }
@@ -359,7 +361,7 @@ private fun OpenUiAdaptivePhotoImage(
                 onClickLabel = stringResource(R.string.cd_image_preview),
                 role = Role.Image,
             ) {
-                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
             },
         )
     }
@@ -600,7 +602,7 @@ private fun OpenUiContentHeader(
 ) {
     if (title == null) return
     // 2026-10-31 相册 APP 组合方式批次：actionLabel 在场 → 分组标题行（相册 APP 日期
-    // 分组头「标题 + 查看全部 >」签名形态）；action 缺省由 headerActionsOrDefault 兜底
+    // 分组头「标题 + 查看全部 >」签名形态）；action 缺省由 labeledActionsOrDefault 兜底
     // 合成 @ToAssistant 上行（点击即回话展开分组，不再渲染无效按钮）
     if (actionLabel == null) {
         Column(modifier = modifier) {
@@ -1175,12 +1177,14 @@ private fun OpenUiContentListBlock(
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
         val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
         val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        val actionLabel = (obj["actionLabel"] as? OpenUiValue.Str)?.v
         ContentListItem(
             title = title,
             subtitle = (obj["subtitle"] as? OpenUiValue.Str)?.v,
             image = (obj["image"] as? OpenUiValue.Str)?.v,
-            actionLabel = (obj["actionLabel"] as? OpenUiValue.Str)?.v,
-            actions = contentActions(obj["action"]),
+            actionLabel = actionLabel,
+            // review Y6：与 CardHeader 同兜底——actionLabel 在场 action 缺省合成 @ToAssistant
+            actions = labeledActionsOrDefault(actionLabel, title, contentActions(obj["action"])),
         )
     }.take(MAX_CONTENT_ITEMS)
     if (items.isEmpty()) {
@@ -1423,7 +1427,7 @@ private fun OpenUiContentModal(
         if (bindingName != null) {
             onAction(
                 OpenUiAction(
-                    name = "Set",
+                    name = OpenUiContract.Actions.SET,
                     args = listOf(OpenUiValue.Bool(false)),
                     target = bindingName,
                 )
@@ -1568,7 +1572,7 @@ private fun OpenUiContentBanner(
                     onClickLabel = stringResource(R.string.cd_image_preview),
                     role = Role.Image,
                 ) {
-                    onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
                 },
             )
         } else if (photoId == null && httpsSrc != null) {
@@ -1650,7 +1654,8 @@ private fun OpenUiContentListItem(
     val icon = (node.props["icon"] as? OpenUiValue.Str)?.v?.let { name -> openUiIcon(name) }
     val trailing = (node.props["trailing"] as? OpenUiValue.Str)?.v
     val actionLabel = (node.props["actionLabel"] as? OpenUiValue.Str)?.v
-    val actions = contentActions(node.props["action"])
+    // review Y6：与 CardHeader 同兜底——actionLabel 在场 action 缺省合成 @ToAssistant（行可点上行）
+    val actions = labeledActionsOrDefault(actionLabel, title, contentActions(node.props["action"]))
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -1804,7 +1809,7 @@ private fun OpenUiContentPhotoGrid(
                                 onClickLabel = stringResource(R.string.cd_image_preview),
                                 role = Role.Image,
                             ) {
-                                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
                             },
                         )
                     }
@@ -1873,7 +1878,7 @@ private fun OpenUiContentAvatarRow(
                             onClickLabel = stringResource(R.string.cd_image_preview),
                             role = Role.Image,
                         ) {
-                            onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                            onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
                         },
                     )
                 }
