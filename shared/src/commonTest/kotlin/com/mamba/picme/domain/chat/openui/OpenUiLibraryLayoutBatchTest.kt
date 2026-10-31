@@ -28,8 +28,9 @@ class OpenUiLibraryLayoutBatchTest {
         assertEquals(OpenUiPropType.OBJECT_ARRAY, items.type)
         assertEquals(
             listOf("title", "subtitle", "time", "photo"),
-            items.objectFields?.map { field -> field.name },
+            items.objectFields.map { field -> field.name },
         )
+        assertTrue(items.objectFields.first { field -> field.name == "title" }.required)
 
         val chartGrid = registry.getValue("ChartGrid")
         val children = chartGrid.props.single()

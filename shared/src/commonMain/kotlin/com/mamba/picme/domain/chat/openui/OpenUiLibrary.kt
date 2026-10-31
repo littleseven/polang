@@ -63,6 +63,8 @@ data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
  * 2026-10-31 经典组合版式批次（spec《2026-10-31-openui-classic-layouts-design》）：
  * +StatRow/StatItem/Banner，ListItem 实渲染化扩展（photo/icon/trailing），
  * VisualCardBlock/VisualCardItem +bgPhoto。
+ * 2026-10-30 通用布局原语批次：+Grid/Box/Spacer，Row +weights。
+ * 2026-10-31 相册 APP 组合方式批次：+PhotoGrid/AvatarRow，CardHeader +actionLabel/action。
  * 2026-10-31 布局可控性批次（spec《2026-10-31-openui-layout-controllability》）：
  * +CompareRow/Timeline/ChartGrid。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
@@ -1497,13 +1499,7 @@ object OpenUiLibrary {
         // 合法出口；children 限图表族（server 门禁同条拦截）
         OpenUiComponent(
             "ChartGrid",
-            listOf(
-                OpenUiProp(
-                    "children",
-                    OpenUiPropType.COMPONENT_LIST,
-                    required = true,
-                ),
-            ),
+            listOf(childrenProp),
         ),
     ).associateBy { component -> component.name }
 }
