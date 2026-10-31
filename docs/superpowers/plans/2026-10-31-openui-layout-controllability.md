@@ -799,17 +799,17 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 > ⚠️ **本阶段是交互检查点任务**：画布创作经 ardot MCP 工具进行，帧定稿需**用户在画布上评审**（画布轮播选型惯例）。执行者每完成一帧即请用户过目，别攒到最后。规范依据 `/ardot-design-ops` skill（token 绑定/快照导出/语言台账规程）。
 
-### Task 5: OpenUILayouts 画布页——4 范式帧 + 3 新件帧
+### Task 5: OpenUILayouts 画布页 ✅（2026-11-01 完成——扩展为八帧：四场景范式 + 图文混排双态 + 三新件规格；comp-timeline/comp-chartgrid 按用户反馈重做（卡内语境/轴线连续/图表完整形态/末格真实留空）；页内重排组内 80/分组 160）
 
 **Deliverables（Ardot 文件 = polang-ui-spec，fileId `715061534788814`）：**
 - 新建画布页 `OpenUILayouts`
 - 7 个帧：`pattern-stats-report` / `pattern-album-groups` / `pattern-compare` / `pattern-timeline` / `comp-comparerow` / `comp-timeline` / `comp-chartgrid`
 
-- [ ] **Step 1: 建页与帧骨架**
+- [x] **Step 1: 建页与帧骨架**
 
 经 ardot MCP `create_new_page` 建 `OpenUILayouts` 页；每帧宽 360（聊天卡内容宽）、高随内容 hug。帧内元素全部绑定既有 token 变量（色/字阶/间距走 variables，禁裸值——token 门禁会查）。
 
-- [ ] **Step 2: 画 4 个场景范式帧（正例整卡 = 场景唯一正确版式）**
+- [x] **Step 2: 画 4 个场景范式帧（正例整卡 = 场景唯一正确版式）**
 
 | 帧 | 区块顺序（自上而下） | 关键规范 |
 |----|---------------------|----------|
@@ -820,7 +820,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 内容示例数据用相册场景中文文案（年度报告/2026年7月分组/背景替换前后/海边之旅）。
 
-- [ ] **Step 3: 画 3 个新件帧（组件规格帧，供渲染实现对照）**
+- [x] **Step 3: 画 3 个新件帧（组件规格帧，供渲染实现对照）**
 
 | 帧 | 内容 |
 |----|------|
@@ -828,15 +828,15 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 | `comp-timeline` | Timeline 单件：3 节点（含 photo 前件/无 photo 纯文字两形态），末节点无连接线 |
 | `comp-chartgrid` | ChartGrid 单件：双图并排（BarChart+LineChart）+ 单图形态（末格空位） |
 
-- [ ] **Step 4: 用户画布评审（检查点）**
+- [x] **Step 4: 用户画布评审（检查点）**
 
 请用户在 Ardot 画布逐帧过目定稿；改动意见现场迭代。R1 深度等规则数值如需随帧调整，回改 `OpenUiLayoutValidator` 常量并同步 spec §2.2 标注。
 
-- [ ] **Step 5: Light 模式切换验证**
+- [x] **Step 5: Light 模式切换验证**
 
 按全域可切体系逐帧切 Light 模式检查（apply_variables 静默变白坑在册——变量绑定必须走绑定而非写死色值）。
 
-### Task 5.5: 既有组件对帧校准（2026-10-31 用户追加：review 之前 OpenUI 组件，参照 Ardot 设计样式修正）
+### Task 5.5: 既有组件对帧校准 ✅（2026-10-31 完成，commit 1e6f70ac3——代码侧 10 项 + 帧侧 3 项 + sync-ignore 5 变量）
 
 以 OpenUILayouts 七帧为新 SSOT，双向校准（代码改到帧；帧简化处补帧到组件实貌）：
 
@@ -858,19 +858,19 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 画布新增变量 5 个（chart/blue|orange|green|track、statusColor/successTonal）已登记 sync-ignore.txt（代码侧 chartPalette 归属 OpenUiCardTokens，token 管线收编留跟进项）。验证：`:androidApp:compileDebugKotlin` + `:androidApp:testDebugUnitTest` 绿。
 
-### Task 6: 快照入库 + 设计语言文档 v9 + 目录登记
+### Task 6: 快照入库 + 设计语言文档 v9 + 目录登记 ✅（2026-11-01 完成，commit 5cf7f929c + 文档提交——健康检查本页 literal=0（8 SVG 台账豁免）/drift 全量对账归零；Light 验证 8/8；快照仅提交本批产物，在途变更留待归属）
 
 **Files:**
 - Modify: `docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md`
 - Modify: `docs/03-TECHNICAL-SPECS/CHAT_CARD_CATALOG.md`（data_ui_openui 节追加批次行）
 - 快照 refs: `docs/08-UI-SPECS/screens/refs/ardot/`
 
-- [ ] **Step 1: 导出快照**
+- [x] **Step 1: 导出快照**
 
 Run: `python3 scripts/export-ardot-snapshot.py`（导 OpenUILayouts 页七帧；Dark 出图）
 然后核对残留：`ls docs/08-UI-SPECS/screens/refs/ardot/ | grep openui`（快照不清理旧帧——改名/删除的旧 PNG 要 `git rm`）。
 
-- [ ] **Step 2: 设计语言文档升 v9**
+- [x] **Step 2: 设计语言文档升 v9**
 
 `OPENUI_CARD_DESIGN_LANGUAGE.md` 三处：
 
@@ -895,7 +895,7 @@ Run: `python3 scripts/export-ardot-snapshot.py`（导 OpenUILayouts 页七帧；
 
 ④ §6 变更记录补 v9 条目（概述：布局可控性批次——矫正+门禁混合约束、三新件 97→100、四场景版式范式、Ardot OpenUILayouts 页建立）。
 
-- [ ] **Step 3: CHAT_CARD_CATALOG 登记**
+- [x] **Step 3: CHAT_CARD_CATALOG 登记**
 
 `CHAT_CARD_CATALOG.md` data_ui_openui 节（相册 APP 组合方式批次段之后）追加：
 
@@ -911,7 +911,7 @@ Run: `python3 scripts/export-ardot-snapshot.py`（导 OpenUILayouts 页七帧；
   出口），组件总数 97→100。lint 三条软警告退役（收编进矫正/门禁）。
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md \

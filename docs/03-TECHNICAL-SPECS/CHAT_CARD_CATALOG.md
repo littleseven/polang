@@ -975,6 +975,19 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   比例决策链（均匀裁切即设计语义）；server 计数口径扩 photos 数组括号配对扫描 + lint
   第五条（Grid 内 Image≥2 → 引导 PhotoGrid）；黄金示例 `GOLDEN_PHOTO_PROGRAM`，
   GOLDEN_LAYOUT_PROGRAM 照片墙同步改 PhotoGrid。设计语言文档新增 §4.6 相册构图规则。
+  布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》，
+  Ardot OpenUILayouts 页八帧 + 对帧校准 13 项）：
+  保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层——server 无声矫正
+  （OpenUiLayoutNormalizer：图文 Row 自动补 weights/连续 Spacer 合并/单子裸容器
+  解包/stat 数字栏自动居中）+ 结构门禁（OpenUiLayoutValidator：Card 嵌套≤2/容器链≤4/
+  通栏签名件同层去重/图表禁横向分栏/Grid 照片墙升硬，违规 Observation 回灌同轮重试）；
+  矫正经 AgentRunner argsTransformer 改写 Action argsJson，端侧渲染器零改动。
+  新增 CompareRow（前后对比统一帧）/Timeline（时间轴）/ChartGrid（双图并排，R3 合法
+  出口），组件总数 97→100。lint 三条软警告退役（收编进矫正/门禁）。版式范式八帧
+  （统计报告/相册分组/前后对比/时间轴/图文混排双态 + 三新件规格）入
+  refs/ardot/pattern-*、comp-*；既有组件对帧校准 13 项（Card 16dp 圆角/Banner
+  HEADLINE 题字+蒙层参数/图表标题 CAPTION 弱色/Callout 12dp+IconSize.sm 等）。
+  设计语言文档升 v9（§0 原则 4「组合收敛在规则层」+ §4.7 版式范式）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量
