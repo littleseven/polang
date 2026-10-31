@@ -66,4 +66,19 @@ class RenderOpenUiToolServiceTest {
         assertTrue(receipt.contains("无需重发"))
         assertTrue(receipt.contains("DISPLAY"))
     }
+
+    @Test
+    fun `tool body rejects layout violation and confirms normalized program`() = runBlocking {
+        val layoutBad = service.renderUiOpenUi(
+            "root = Card([Text(\"a\"), Card([Text(\"b\"), Card([Text(\"c\")])])])",
+            "摘要",
+        )
+        assertTrue("实际：$layoutBad", layoutBad.startsWith("error: render_ui_openui 布局门禁未通过"))
+
+        val normalizable = service.renderUiOpenUi(
+            "root = Card([Row([Image(photos[0].id), Text(\"说明\")])])",
+            "摘要",
+        )
+        assertTrue("实际：$normalizable", normalizable.startsWith("UI 已下发端侧渲染"))
+    }
 }

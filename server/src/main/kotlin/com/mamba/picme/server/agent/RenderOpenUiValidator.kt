@@ -44,7 +44,7 @@ object RenderOpenUiValidator {
      * 2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
      * 2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
      * 2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
- * 2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
+     * 2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
      * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
      * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
@@ -318,7 +318,30 @@ object RenderOpenUiValidator {
         } ?: return errorText(listOf("工具参数不是合法 JSON 对象"))
         val program = (args["program"] as? JsonPrimitive)?.takeIf { it.isString }?.content
             ?: return errorText(listOf("工具参数缺 program 字符串"))
-        return validateToError(program)
+        validate(program).takeIf { violations -> violations.isNotEmpty() }
+            ?.let { violations -> return errorText(violations, program) }
+        // 布局门禁（2026-10-31）：对矫正后程序做结构校验（transformer 已归一化则此处幂等）；
+        // 门禁必须对 normalize 后文本重 parse（矫正 span 已失效，勿与矫正共享树）
+        val layoutViolations = OpenUiLayoutValidator.validate(OpenUiLayoutNormalizer.normalize(program))
+        if (layoutViolations.isNotEmpty()) return OpenUiLayoutValidator.errorText(layoutViolations, program)
+        return null
+    }
+
+    /**
+     * 发射点矫正入口（[AgentRunner.argsTransformer] 消费，2026-10-31 布局可控性批次）：
+     * render_ui_openui 的 program 经 [OpenUiLayoutNormalizer] 无声归一化后重组 argsJson；
+     * 其余工具 / argsJson 非 JSON / 缺 program → 原样返回。幂等（gate 内二次调用无变化）。
+     */
+    fun transformArgs(toolName: String, argsJson: String): String {
+        if (toolName != TOOL_NAME) return argsJson
+        val args = runCatching { Json.parseToJsonElement(argsJson) }.getOrNull() as? JsonObject
+            ?: return argsJson
+        val program = (args["program"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: return argsJson
+        val normalized = OpenUiLayoutNormalizer.normalize(program)
+        if (normalized == program) return argsJson
+        val rewritten = JsonObject(args.toMutableMap().apply { put("program", JsonPrimitive(normalized)) })
+        return rewritten.toString()
     }
 
     /** 校验并直接给回错误文本：null = 合法放行。 */

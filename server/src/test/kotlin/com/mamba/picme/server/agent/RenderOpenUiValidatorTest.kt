@@ -893,4 +893,29 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
                 "action: @ToAssistant(\"查看 行\")}])])"
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wiredBlock))
     }
+
+    // ── 布局可控性批次接线（2026-10-31）：transformArgs 发射点矫正 + 布局门禁 ──
+
+    @Test
+    fun `transformArgs normalizes program in argsJson`() {
+        val argsJson = """{"program":"root = Card([Row([Image(photos[0].id), Text(\"说明\")])])","fallbackSummary":"摘要"}"""
+        val transformed = RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, argsJson)
+        assertTrue("transformArgs 应补 weights 分栏，实际：$transformed", transformed.contains("weights = [1, 2]"))
+        // 幂等：再过一遍无变化
+        assertEquals(transformed, RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, transformed))
+    }
+
+    @Test
+    fun `transformArgs passthrough for other tools and malformed json`() {
+        assertEquals("x", RenderOpenUiValidator.transformArgs("other_tool", "x"))
+        assertEquals("not json", RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, "not json"))
+    }
+
+    @Test
+    fun `validateArgsJson rejects layout violations`() {
+        val argsJson = """{"program":"root = Card([Text(\"a\"), Card([Text(\"b\"), Card([Text(\"c\")])])])","fallbackSummary":"s"}"""
+        val error = RenderOpenUiValidator.validateArgsJson(argsJson)
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.startsWith("error: render_ui_openui 布局门禁未通过"))
+    }
 }

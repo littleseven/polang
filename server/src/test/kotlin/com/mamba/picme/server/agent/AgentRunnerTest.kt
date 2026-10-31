@@ -54,6 +54,7 @@ class AgentRunnerTest {
     private fun runnerWith(
         vararg responses: Pair<HttpStatusCode, String>,
         actionGate: (String, String) -> String? = { _, _ -> null },
+        argsTransformer: (toolName: String, argsJson: String) -> String = { _, argsJson -> argsJson },
     ): AgentRunner {
         val queue = ArrayDeque(responses.toList())
         val engine = MockEngine { request ->
@@ -65,6 +66,7 @@ class AgentRunnerTest {
             executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
             dispatcher = ServerToolDispatcher.default(),
             actionGate = actionGate,
+            argsTransformer = argsTransformer,
         )
     }
 
@@ -541,5 +543,30 @@ class AgentRunnerTest {
             .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
             .map { event -> (event.payload as AgentEventPayload.Message).content }
         assertEquals(listOf("抱歉，卡片参数有误未能生成，请换个描述再试。"), assistantTexts)
+    }
+
+    // ── 发射点矫正（argsTransformer，2026-10-31 布局可控性批次）─────────────────
+
+    /** 发射点矫正：render_ui_openui 的反模式 program 经 argsTransformer 归一化后落 Action。 */
+    @Test
+    fun `argsTransformer rewrites action argsJson for render_ui_openui`() = runBlocking {
+        val session = newSession()
+        val args = buildJsonObject {
+            put("program", "root = Card([Row([Image(photos[0].id), Text(\"说明\")])])")
+            put("fallbackSummary", "摘要")
+        }.toString()
+        val registry = ToolRegistry { tools(RenderOpenUiToolService().asToolsByClass()) }
+
+        runnerWith(
+            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui_openui", jsonArgsEscape(args)),
+            HttpStatusCode.OK to chatResponse("卡已发"),
+            actionGate = RenderUiValidator::gate,
+            argsTransformer = RenderOpenUiValidator::transformArgs,
+        ).runTurn(session, "发张卡", gatewayTarget, "sys", registry)
+
+        val events = AgentEventRepository.listBySession(session.id)
+        val action = events.single { event -> event.type == AgentEventType.ACTION }
+        val actionArgs = (action.payload as AgentEventPayload.Action).argsJson
+        assertTrue("Action 应携带矫正后 program，实际：$actionArgs", actionArgs.contains("weights = [1, 2]"))
     }
 }

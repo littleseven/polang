@@ -1,5 +1,7 @@
 package com.mamba.picme.server.agent
 
+import org.slf4j.LoggerFactory
+
 /**
  * OpenUI 布局无声矫正器（2026-10-31 布局可控性批次，spec §2.1）——只做「有唯一
  * 正确解」的机械性改写，不改组件选型与内容（不替 LLM 做语义决策）：
@@ -22,6 +24,8 @@ object OpenUiLayoutNormalizer {
     /** 规则开关（spec §2.3：误伤止血——把规则名（"N1"~"N4"）加进集合即关该条，不改代码）。 */
     internal val DISABLED_RULES: Set<String> = emptySet()
 
+    private val logger = LoggerFactory.getLogger("picme-agent")
+
     private val UNWRAP_CONTAINERS = setOf("Row", "Column", "Grid", "Box", "Stack")
     private val VERTICAL_FLOW_PARENTS = setOf("Column", "Card")
     private val SPACER_RANK = mapOf("xs" to 0, "s" to 1, "m" to 2, "l" to 3, "xl" to 4)
@@ -33,7 +37,9 @@ object OpenUiLayoutNormalizer {
 
     /** 入口：无需矫正/扫描失败/内部异常 → 原文返回。幂等。 */
     fun normalize(program: String): String =
-        runCatching { normalizeInternal(program) }.getOrDefault(program)
+        runCatching { normalizeInternal(program) }
+            .onFailure { e -> logger.debug("normalize 静默放行：{}", e.toString()) }
+            .getOrDefault(program)
 
     private fun normalizeInternal(program: String): String {
         val roots = OpenUiCallTree.parse(program) ?: return program

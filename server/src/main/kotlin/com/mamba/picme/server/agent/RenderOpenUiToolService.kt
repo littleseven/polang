@@ -382,8 +382,16 @@ class RenderOpenUiToolService {
         // 与发射点门控同源校验（review 🟡4 对偶）：非法回 error 文本作 Observation
         // 回灌，LLM 同轮修正重试（同 RenderUiToolService 闭环口径）
         RenderOpenUiValidator.validateToError(program)?.let { error -> return error }
-        // 构图软警告（设计规范第一刀配套）：卡照发，建议附在回执里供下次发卡改进
-        val warnings = RenderOpenUiValidator.lintComposition(program)
+        // 布局门禁（2026-10-31 布局可控性批次）：矫正后程序过结构校验，违规同轮退回；
+        // 机械性问题已被 normalize 无声修复，此处见到的都是结构反模式
+        val normalized = OpenUiLayoutNormalizer.normalize(program)
+        val layoutViolations = OpenUiLayoutValidator.validate(normalized)
+        if (layoutViolations.isNotEmpty()) {
+            // 回显用 LLM 原始 program（非 normalized）——保留 2026-10-24 自纠定位能力
+            return OpenUiLayoutValidator.errorText(layoutViolations, program)
+        }
+        // 构图软警告（DISPLAY≤4 / Button≤3 / CardHeader 配对提醒）：卡照发，建议附在回执里供下次发卡改进
+        val warnings = RenderOpenUiValidator.lintComposition(normalized)
         return buildString {
             append("UI 已下发端侧渲染（OpenUI）")
             if (warnings.isNotEmpty()) {

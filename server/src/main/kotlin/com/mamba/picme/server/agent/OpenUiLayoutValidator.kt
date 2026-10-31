@@ -103,7 +103,7 @@ object OpenUiLayoutValidator {
         return violations
     }
 
-    /** 门禁错误文本（对齐 RenderOpenUiValidator errorText 文风：逐条 + 回显开头）。 */
+    /** 门禁错误文本（对齐 [RenderOpenUiValidator] errorText 文风：逐条 + 回显开头）。 */
     fun errorText(violations: List<String>, program: String): String = buildString {
         append("error: render_ui_openui 布局门禁未通过，本次未下发端侧。逐条修正后重新调用 render_ui_openui：")
         violations.forEach { violation -> append("\n- ").append(violation) }
