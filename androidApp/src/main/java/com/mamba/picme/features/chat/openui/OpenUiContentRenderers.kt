@@ -1980,7 +1980,7 @@ private fun OpenUiCompareSide(
                     onClickLabel = stringResource(R.string.cd_image_preview),
                     role = Role.Image,
                 ) {
-                    onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
                 },
             )
             httpsSrcOrNull(src) != null -> AsyncImage(
@@ -2097,7 +2097,7 @@ private fun OpenUiContentTimeline(
                                 onClickLabel = stringResource(R.string.cd_image_preview),
                                 role = Role.Image,
                             ) {
-                                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
                             },
                         )
                     }
@@ -2117,6 +2117,8 @@ private fun OpenUiContentTimeline(
                         text = entry.time,
                         style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
