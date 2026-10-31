@@ -1460,7 +1460,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ---
 
-## Phase M4 — server 接线（矫正落流 + 门禁闭环 + prompt 重组）
+## Phase M4 — server 接线（矫正落流 + 门禁闭环 + prompt 重组）　**✅ 2026-11-01 封板：Task 12-14 全过评审，矫正/门禁/描述三层接线完备**
 
 ### Task 12: AgentRunner argsTransformer 钩子 ✅（2026-11-01 完成，与 Task 13 合并交付 commit 8d4e2d6d6 + 评审收口 5def5b355；spec ✅ 8 契约/质量 ✅ Approved + I-1/I-2/M-1/M-3 全收；552/0 绿）
 
@@ -1673,14 +1673,14 @@ git commit -m "feat(server): 布局矫正+门禁接线——argsTransformer 改�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 14: 工具描述重组（版式菜单 + 新组件签名 + 新黄金）+ 计数同步
+### Task 14: 工具描述重组 ✅（2026-11-01 完成，commits 4da73ce5a+I-1 补钉；spec ✅ 零缺陷（字节码级拼接验证）/ 质量 ✅ Approved + I-1 已收；554/0 绿）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiToolService.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt`（计数文案）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiToolServiceTest.kt`
 
-- [ ] **Step 1: companion 增两个黄金示例常量（`GOLDEN_PHOTO_PROGRAM` 之后）**
+- [x] **Step 1: companion 增两个黄金示例常量（`GOLDEN_PHOTO_PROGRAM` 之后）**
 
 ```kotlin
         /** 前后对比黄金示例（2026-10-31 布局可控性批次）：CompareRow 统一双图帧。 */
@@ -1700,7 +1700,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
                 "{title: \"返程\", time: \"2026-07-20\"}])])"
 ```
 
-- [ ] **Step 2: @LLMDescription 三处插入**
+- [x] **Step 2: @LLMDescription 三处插入**
 
 ① 组件签名段：相册组合件块（`CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部")）；` 行）之后插：
 
@@ -1744,11 +1744,11 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 """ + GOLDEN_TIMELINE_PROGRAM
 ```
 
-- [ ] **Step 3: 计数文案同步**
+- [x] **Step 3: 计数文案同步**
 
 `RenderOpenUiValidator`：三处陈旧计数同步——:367 LLM 可见文案「95 组件全量清单」、:39 KDoc「九十五项」、:361 注释「八十九组件」→ 全部改 100/百项；`ALLOWED_COMPONENTS` KDoc 批次链末尾补 `2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）。`；工具描述约束段补一句「签名件（Banner/PhotoGrid/StatRow/AvatarRow）与照片网格须为 Card/Grid 直接子级」（R2/R4 绕行软引导，Task 3 评审建议）；**Task 4 评审 I-1 挂账**——工具描述三处机制措辞随 lint 退役失实须改：RenderOpenUiToolService.kt:343「Row 裸拼…（lint 会提示）」→「会被无声矫正自动补 weights」、:92/:177「Grid 内放 ≥2 个 Image 会被 lint 引导」与 :370 同款 →「会被布局门禁拒卡」
 
-- [ ] **Step 4: 测试钉住新黄金**
+- [x] **Step 4: 测试钉住新黄金**
 
 `RenderOpenUiToolServiceTest` 追加：
 
@@ -1765,7 +1765,7 @@ fun `layout batch golden programs pass protocol and layout gates`() {
 }
 ```
 
-- [ ] **Step 5: 跑测试 + Commit**
+- [x] **Step 5: 跑测试 + Commit**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest"`
 Expected: PASS
