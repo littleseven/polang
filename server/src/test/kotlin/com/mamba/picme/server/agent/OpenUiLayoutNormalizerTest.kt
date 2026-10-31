@@ -81,6 +81,45 @@ class OpenUiLayoutNormalizerTest {
         )
     }
 
+    // 评审修 1：N3 裸判定不得被子项改写注入的命名实参遮蔽——唯一子 Row 被 N1 补
+    // weights 后，自身全裸的父容器仍须解包
+    @Test
+    fun `n3 unwraps bare container even when only child gained weights`() {
+        val program = "root = Card([Column([Row([Image(photos[0].id), Text(\"a\")])])])"
+        val once = OpenUiLayoutNormalizer.normalize(program)
+        assertEquals(
+            "root = Card([Row([Image(photos[0].id), Text(\"a\")], weights = [1, 2])])",
+            once,
+        )
+        assertEquals(once, OpenUiLayoutNormalizer.normalize(once))
+    }
+
+    // 评审修 2 反例 A：N2 合并腾空后的单 Spacer 容器不再二跳解包（幂等）
+    @Test
+    fun `container holding single merged spacer stays put`() {
+        val program = "root = Card([Row([Spacer(\"s\"), Spacer(\"l\")])])"
+        val once = OpenUiLayoutNormalizer.normalize(program)
+        assertEquals("root = Card([Row([Spacer(\"l\")])])", once)
+        assertEquals(once, OpenUiLayoutNormalizer.normalize(once))
+    }
+
+    // 评审修 2 反例 B：merge 取最大档产出的字面量在纵向流同样降档（xl 不残留）
+    @Test
+    fun `merged spacer downgrades max size in vertical flow`() {
+        val program = "root = Card([Column([Spacer(\"s\"), Spacer(\"xl\")])])"
+        val once = OpenUiLayoutNormalizer.normalize(program)
+        assertEquals("root = Card([Column([Spacer(\"l\")])])", once)
+        assertEquals(once, OpenUiLayoutNormalizer.normalize(once))
+    }
+
+    // 评审修 3：唯一子为非组件调用（@动作）不解包——回退拼接会剥掉 @ 前缀，
+    // 产出白名单外裸调用
+    @Test
+    fun `n3 keeps container whose only child is a non-component call`() {
+        val program = "root = Card([Column([@ToAssistant(\"hi\")])])"
+        assertEquals(program, OpenUiLayoutNormalizer.normalize(program))
+    }
+
     // 不动点 + 幂等 + 安全
     @Test
     fun `golden programs pass through unchanged`() {

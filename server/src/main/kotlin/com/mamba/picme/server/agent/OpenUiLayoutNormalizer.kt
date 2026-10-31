@@ -9,6 +9,12 @@ package com.mamba.picme.server.agent
  * - N4 stat 拼装居中：Row 直接子级 Column 含 DISPLAY 大数字未 align="center" → 补。
  * 自底向上重写（span 锚定原文，非调用区文本原样保留）；幂等。扫描失败/任何意外
  * 原文返回（runCatching 安全网：挂生产发射路径，宁可放过不可崩）。
+ *
+ * 近似边界（已知保守口径，设计如此）：N1/N4 的键检测扫节点 args 全区间（含子树
+ * 原文），子树出现过 weights/align 即跳过追加（漏补无害）；N3 的「裸」同样扫全区间
+ * 原文——唯一子自带命名实参的容器不解包（多一层壳无害）；连续 Spacer 之间夹行注释
+ * 时，N2 删除吃逗号只回吞空白，注释后的逗号会残留（极端输入风格，不崩，交由既有
+ * 协议校验兜底）。
  */
 object OpenUiLayoutNormalizer {
 
@@ -47,8 +53,16 @@ object OpenUiLayoutNormalizer {
             if ("N2" !in DISABLED_RULES && runStart >= 0 && runEndExclusive - runStart >= 2) {
                 val run = comps.subList(runStart, runEndExclusive)
                 val maxSize = run.maxOf { spacer -> spacerSize(spacer, original) }
+                // 合并产出的字面量同样过纵向流降档（xs→s / xl→l）——否则最大档 xl 绕过
+                // 降档子规则在纵向流残留，二次 normalize 才修正（幂等反例）
+                val size = rankToSize(maxSize)
+                val finalSize = if (node.name in VERTICAL_FLOW_PARENTS) {
+                    size.replace("xs", "s").replace("xl", "l")
+                } else {
+                    size
+                }
                 run.forEachIndexed { i, spacer ->
-                    childText[spacer] = if (i == 0) "Spacer(\"${rankToSize(maxSize)}\")" else ""
+                    childText[spacer] = if (i == 0) "Spacer(\"$finalSize\")" else ""
                 }
             }
             runStart = -1
@@ -88,25 +102,32 @@ object OpenUiLayoutNormalizer {
                 replacement,
             )
         }
-        // N1 / N4：本节点命名实参追加（原文无该键才补）
+        // N1 / N4：本节点命名实参追加（原文无该键才补）；n4Fired 供 N3 让位判定
         if ("N1" !in DISABLED_RULES && node.name == "Row" && needsWeights(node, comps, original)) {
             val imageFirst = comps.first().name == "Image"
             val weights = if (imageFirst) "[1, 2]" else "[2, 1]"
             args = args.trimEnd() + ", weights = " + weights
         }
-        if ("N4" !in DISABLED_RULES && node.name == "Column" && parentName == "Row" &&
+        val n4Fired = "N4" !in DISABLED_RULES && node.name == "Column" && parentName == "Row" &&
             containsDisplay(node, original) && !NAMED_ALIGN.containsMatchIn(stripStrings(args))
-        ) {
+        if (n4Fired) {
             args = args.trimEnd() + ", align = \"center\""
         }
-        // N3：单子裸容器解包——「裸」以改写后的最终 args 判定（N4 已补 align 的 stat 列
-        // 不再是裸容器，解包让位于居中）；单子可能是非组件调用（@动作/Query），childText
-        // 未收录 → 回退其原文 span。
+        // N3：单子裸容器解包。「裸」按容器自身**原文** args 判定——子项改写注入的命名
+        // 实参不算数（唯一子 Row 被 N1 补 weights 不遮蔽父容器解包，但 N4 刚给本节点
+        // 补的 align 算：stat 列须保壳居中）；唯一子须是组件且非 Spacer：非组件调用
+        // （@动作/Query）的回退拼接会剥掉 @ 前缀产出白名单外裸调用，Spacer 单子解包
+        // 会让 N2 合并腾空的容器在二次 normalize 再跳一层（幂等反例）——两者保守不解包。
         if ("N3" !in DISABLED_RULES && node.name in UNWRAP_CONTAINERS &&
-            node.children.size == 1 && !NAMED_ARG.containsMatchIn(stripStrings(args))
+            node.children.size == 1 && !n4Fired
         ) {
             val only = node.children.single()
-            return childText[only] ?: original.substring(only.spanStart, only.spanEnd)
+            val bareOwnArgs = !NAMED_ARG.containsMatchIn(
+                stripStrings(original.substring(node.argsStart, node.argsEnd)),
+            )
+            if (only.name != "Spacer" && bareOwnArgs) {
+                childText[only]?.let { unwrapped -> return unwrapped }
+            }
         }
         return original.substring(node.spanStart, node.argsStart) + args + ")"
     }
