@@ -626,7 +626,9 @@ private fun OpenUiContentHeader(
         }
         Text(
             text = actionLabel,
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+            // 2026-10-31 对帧校准（OpenUILayouts pattern-album-groups）：尾部动作位
+            // CAPTION 12 弱一档（帧 SSOT；原 BODY 14）
+            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clickable(
                 enabled = actions.isNotEmpty(),
@@ -1467,7 +1469,12 @@ private fun OpenUiContentModal(
 /** 单项统计格（StatRow 项 / StatItem 独立保底共用）：DISPLAY 大数字 + CAPTION 弱色标签居中。 */
 @Composable
 private fun OpenUiContentStatCell(value: String, label: String?, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        // 2026-10-31 对帧校准（OpenUILayouts pattern-stats-report）：数字与标签 2dp 间隙
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         Text(
             text = value,
             style = OpenUiCardTokens.displayStyle,
@@ -1571,14 +1578,15 @@ private fun OpenUiContentBanner(
             )
         }
         if (hasImage) {
-            // 底部黑色渐变蒙层（文字可读性，VisualCardItem 同口径）：transparent → Black 0.7
+            // 底部黑色渐变蒙层（文字可读性，VisualCardItem 同口径）：2026-10-31 对帧校准
+            // （OpenUILayouts pattern-stats-report）——上 38% 全透明，下缘 Black 0.55
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.7f),
+                            0.62f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.55f),
                         )
                     )
             )
@@ -1597,8 +1605,9 @@ private fun OpenUiContentBanner(
             }
             Text(
                 text = title,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
-                fontWeight = FontWeight.Bold,
+                // 2026-10-31 对帧校准（OpenUILayouts pattern-stats-report）：题字升 HEADLINE
+                // 20 Bold（帧 SSOT；原 SUBHEAD 15+Bold 覆写）
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.HEADLINE),
                 color = textColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1834,7 +1843,8 @@ private fun OpenUiContentAvatarRow(
     }
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        // 2026-10-31 对帧校准（OpenUILayouts pattern-album-groups）：头像间距 12dp（md）
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         items.forEach { (id, label) ->
             Column(

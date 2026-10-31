@@ -836,6 +836,28 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 按全域可切体系逐帧切 Light 模式检查（apply_variables 静默变白坑在册——变量绑定必须走绑定而非写死色值）。
 
+### Task 5.5: 既有组件对帧校准（2026-10-31 用户追加：review 之前 OpenUI 组件，参照 Ardot 设计样式修正）
+
+以 OpenUILayouts 七帧为新 SSOT，双向校准（代码改到帧；帧简化处补帧到组件实貌）：
+
+| # | 组件.参数 | 代码原值 | 帧值 | 动作 |
+|---|----------|---------|------|------|
+| 1 | Card 壳圆角 | AppShapes.card=8 | 16 | 代码→16（画布 chat 卡惯例，硬编码注记同 BrowserLiveCard 先例） |
+| 2 | Banner 题字 | SUBHEAD15+Bold | HEADLINE 20 Bold | 代码→HEADLINE |
+| 3 | Banner 蒙层 | 全高 0→Black0.7 | 62%→底 0.55 | 代码→帧参数 |
+| 4 | StatCell 数字/标签间距 | 0 | 2dp | 代码→spacedBy(2.dp) |
+| 5 | CardHeader actionLabel | BODY14 | CAPTION12 | 代码→CAPTION |
+| 6 | AvatarRow 头像间距 | sm=8 | md=12 | 代码→Spacing.md |
+| 7 | 图表标题（Bar/Pie/共享 helper） | SUBHEAD15 | CAPTION12 弱色 | 代码→CAPTION+弱色 |
+| 8 | BarChart 轴标签 | labelSmall11 | CAPTION12 弱 | 代码→CAPTION 弱 |
+| 9 | BarChart 柱道 | 有 | 帧缺失 | **补帧**（chart/track 变量 + 双帧 barCell 重构） |
+| 10 | PieChart 中心总值 | 有 | 帧缺失 | **补帧**（donutWrap+中心文本） |
+| 11 | PieChart 图例行距 | xs=4 | 帧 6（随手值） | **帧→4**（代码 token 为准） |
+| 12 | Callout 圆角 | 8 | 12 | 代码→12 |
+| 13 | Callout 图标 | IconSize.md=22 | 18 | 代码→IconSize.sm |
+
+画布新增变量 5 个（chart/blue|orange|green|track、statusColor/successTonal）已登记 sync-ignore.txt（代码侧 chartPalette 归属 OpenUiCardTokens，token 管线收编留跟进项）。验证：`:androidApp:compileDebugKotlin` + `:androidApp:testDebugUnitTest` 绿。
+
 ### Task 6: 快照入库 + 设计语言文档 v9 + 目录登记
 
 **Files:**

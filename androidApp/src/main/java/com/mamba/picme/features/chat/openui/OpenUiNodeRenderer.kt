@@ -165,7 +165,9 @@ fun OpenUiNodeRenderer(
     modifier: Modifier = Modifier,
 ) {
     when (node.type) {
-        "Card" -> Card(modifier = modifier.fillMaxWidth(), shape = AppShapes.card) {
+        // 2026-10-31 对帧校准（OpenUILayouts 七帧）：卡壳 16dp 圆角=画布 chat 卡惯例
+        // （AppShapes.card=8 无此档，BrowserLiveCard 12 硬编码先例同款注记）
+        "Card" -> Card(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
             // 2026-10-30 align 治理（官方语义）：内容列恒 fillMaxWidth 使 align 相对卡宽
             // 生效；缺省 stretch（官方 CSS 缺省）= 子组件撑满整宽
             val alignRaw = node.alignRaw()
@@ -1005,7 +1007,12 @@ private fun OpenUiBarChart(
     val scrollMode = buckets.size > BAR_CHART_SCROLL_THRESHOLD
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
-            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Row(
             modifier = (
@@ -1075,7 +1082,12 @@ private fun OpenUiBarChart(
                         if (labelInterval > 1) {
                             BarChartBucketLabel(bucket.label)
                         } else {
-                            Text(text = bucket.label, style = MaterialTheme.typography.labelSmall)
+                            // 2026-10-31 对帧校准（OpenUILayouts）：轴标签 CAPTION 弱色
+                            Text(
+                                text = bucket.label,
+                                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     } else {
                         Box(modifier = Modifier.height(A2uiCardTokens.barLabelHeight))
@@ -1129,7 +1141,12 @@ private fun OpenUiSeriesBarChart(node: OpenUiValue.ComponentVal, modifier: Modif
     )
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
-            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Row(
             modifier = (
@@ -1354,7 +1371,12 @@ private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = 
     val palette = OpenUiCardTokens.chartPalette
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
-            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Row(
             modifier = Modifier.padding(top = Spacing.sm),
@@ -1578,7 +1600,9 @@ private fun OpenUiCallout(node: OpenUiValue.ComponentVal, modifier: Modifier = M
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(AppShapes.card)
+            // 2026-10-31 对帧校准（OpenUILayouts pattern-stats-report）：12dp 圆角
+            // （AppShapes.card=8 无此档，硬编码同 BrowserLiveCard 先例）
+            .clip(RoundedCornerShape(12.dp))
             .background(toneColor.copy(alpha = BadgeTokens.tagBackgroundAlpha))
             .padding(Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -1588,7 +1612,8 @@ private fun OpenUiCallout(node: OpenUiValue.ComponentVal, modifier: Modifier = M
                 imageVector = image,
                 contentDescription = null,
                 tint = toneColor,
-                modifier = Modifier.size(IconSize.md),
+                // 2026-10-31 对帧校准：tone 图标 18dp（IconSize.sm）
+                modifier = Modifier.size(IconSize.sm),
             )
         }
         Column {
