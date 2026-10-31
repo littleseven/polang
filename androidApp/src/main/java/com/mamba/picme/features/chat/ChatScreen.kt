@@ -13,6 +13,8 @@ import com.mamba.picme.domain.chat.ToolPartState
 import com.mamba.picme.domain.chat.flattenChatItems
 import com.mamba.picme.domain.model.VoiceCommandMode
 import com.mamba.picme.domain.chat.LlmPerformance
+import com.mamba.picme.domain.chat.AgentStepStatus
+import com.mamba.picme.domain.chat.AgentStepUi
 import com.mamba.picme.domain.chat.ClaudeStepStatus
 import com.mamba.picme.domain.chat.ClaudeStepUi
 import com.mamba.picme.domain.chat.markdown.MarkdownTable
@@ -115,6 +117,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
@@ -1662,6 +1665,53 @@ private fun ClaudeAgentSteps(steps: List<ClaudeStepUi>) {
     }
 }
 
+/**
+ * 云端 agent 回合步骤时间线（瞬态，仅流式占位气泡渲染；调用方保证 steps 非空）。
+ * 每步 = 状态图标（RUNNING 旋转指示 / ✓ / ⚠）+ 步骤标签；FAILED 标签追加失败提示文案。
+ */
+@Composable
+private fun AgentStepsTimeline(steps: List<AgentStepUi>) {
+    val failedHint = stringResource(R.string.cloud_agent_step_failed_hint)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        steps.forEach { step ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                when (step.status) {
+                    AgentStepStatus.RUNNING -> CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        strokeWidth = 1.5.dp,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    AgentStepStatus.SUCCESS -> Text(
+                        text = "✓",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 13.sp,
+                    )
+                    AgentStepStatus.FAILED -> Text(
+                        text = "⚠",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                    )
+                }
+                val label = if (step.status == AgentStepStatus.FAILED) {
+                    "${step.label} — $failedHint"
+                } else {
+                    step.label
+                }
+                Text(
+                    text = label,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 @Suppress("LongMethod", "CyclomaticComplexMethod") // 待重构：消息项多类型分支，抽分发器
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -1707,6 +1757,11 @@ private fun ChatMessageItem(
                 // claude agent 消息：文本以 claudeAgent.text 为准（流式期 content=""，text 累积 delta）。
                 val displayText = message.claudeAgent?.text ?: message.content
                 if (message.isStreaming) {
+                    // 云端回合步骤时间线（瞬态）：置于三点/文本之上；空列表不渲染（布局零位移）
+                    if (message.agentSteps.isNotEmpty()) {
+                        AgentStepsTimeline(steps = message.agentSteps)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
                     if (message.isThinking) {
                         TypingIndicator()
                     } else {
