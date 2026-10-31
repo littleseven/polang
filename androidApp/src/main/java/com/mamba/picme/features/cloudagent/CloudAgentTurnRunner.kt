@@ -61,7 +61,7 @@ class CloudAgentTurnRunner(
         sessionId: String,
         text: String,
         byokApiKey: String?,
-        genUiFormat: String = "a2ui",
+        genUiFormat: String = "openui",
         onEvent: (CloudTurnEvent) -> Unit,
     ): Result<Unit> = api.postMessage(
         appToken,

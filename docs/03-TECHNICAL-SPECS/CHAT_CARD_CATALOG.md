@@ -869,7 +869,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ## data_ui_openui · OpenUI GenUI 卡（openui P2，与 data_ui 线并行）
 
-- **开关**：设置页「GenUI 协议」单选（DataStore `genui_format`，默认 a2ui）→ Chat 页云端回合
+- **开关**：设置页「GenUI 协议」单选（DataStore `genui_format`，默认 openui，2026-11-01 起；显式存量 a2ui 不翻）→ Chat 页云端回合
   请求头 `X-GenUI-Format` → server 侧互斥注册 render_ui（A2UI）/render_ui_openui（OpenUI），
   同一回合只产一种 GenUI 卡。
 - **协议**：`ChatMessageEntity.type = "data_ui_openui"`，content 列存整颗 `MessagePart.OpenUiCard`

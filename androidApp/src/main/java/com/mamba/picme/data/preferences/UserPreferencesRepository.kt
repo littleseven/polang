@@ -176,7 +176,7 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         // 云端 Agent 编排开关（默认关=本地编排；开=Chat 页回合走云端 SSE 链路，ADR-018 实验线）
         val CLOUD_AGENT_ENABLED = booleanPreferencesKey("cloud_agent_enabled")
 
-        // GenUI 线格式开关（openui P2 对比实验："a2ui" / "openui"，默认 a2ui）
+        // GenUI 线格式开关（openui P2 对比实验："a2ui" / "openui"，默认 openui，2026-11-01 起）
         val GENUI_FORMAT = stringPreferencesKey("genui_format")
 
         // 服务端邮箱认证
@@ -1409,6 +1409,6 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
     }
 }
 
-/** GenUI 线格式归一化（openui P2）：只放行 "a2ui"/"openui"，缺省/未知值归一默认 a2ui。 */
+/** GenUI 线格式归一化（openui P2）：只放行 "a2ui"/"openui"，缺省/未知值归一默认 openui（2026-11-01 起）。 */
 private fun normalizeGenUiFormat(raw: String?): String =
-    if (raw == "a2ui" || raw == "openui") raw else "a2ui"
+    if (raw == "a2ui" || raw == "openui") raw else "openui"

@@ -440,7 +440,7 @@ private fun SettingsContent(
     onCloudAgentByokConsentChange: (Boolean) -> Unit = {},
     cloudAgentEnabled: Boolean = false,
     onCloudAgentEnabledChange: (Boolean) -> Unit = {},
-    genUiFormat: String = "a2ui",
+    genUiFormat: String = "openui",
     onGenUiFormatChange: (String) -> Unit = {},
     localAsrModel: String,
     onLocalAsrModelChange: (String) -> Unit,

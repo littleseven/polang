@@ -216,7 +216,7 @@ interface UserSettingsRepository {
     suspend fun updateCloudAgentEnabled(enabled: Boolean)
 
     // ── GenUI 线格式开关（openui P2 对比实验） ────────────────────
-    /** GenUI 线格式："a2ui"（默认）/ "openui"；未知值归一 a2ui。经 X-GenUI-Format 头分流 server 工具。 */
+    /** GenUI 线格式："openui"（默认，2026-11-01 起）/ "a2ui"；未知值归一 openui。经 X-GenUI-Format 头分流 server 工具。 */
     val genUiFormatFlow: Flow<String>
     suspend fun updateGenUiFormat(format: String)
 

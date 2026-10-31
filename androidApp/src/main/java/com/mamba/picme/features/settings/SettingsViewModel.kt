@@ -306,12 +306,12 @@ class SettingsViewModel(
             initialValue = false
         )
 
-    /** GenUI 线格式（openui P2 对比实验："a2ui" / "openui"，默认 a2ui） */
+    /** GenUI 线格式（openui P2 对比实验："a2ui" / "openui"，默认 openui，2026-11-01 起） */
     val genUiFormat: StateFlow<String> = repository.genUiFormatFlow
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = "a2ui"
+            initialValue = "openui"
         )
 
     val localAsrModel: StateFlow<String> = repository.localAsrModelFlow
