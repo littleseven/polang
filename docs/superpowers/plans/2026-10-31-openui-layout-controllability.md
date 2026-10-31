@@ -1580,7 +1580,7 @@ fun `tool body rejects layout violation and confirms normalized program`() {
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.AgentRunnerTest"`
 Expected: 编译失败（`transformArgs` 未定义）/ 断言失败
 
-- [ ] **Step 3: 实现**
+- [ ] **Step 3: 实现**（含质量评审延后项：`OpenUiLayoutNormalizer.normalize` 的 runCatching catch 里补 slf4j debug 日志——logger 惯例 `picme-agent` 同 AgentRunner，矫正静默放过要有观测面）
 
 `RenderOpenUiValidator.kt` 新增两段：
 
