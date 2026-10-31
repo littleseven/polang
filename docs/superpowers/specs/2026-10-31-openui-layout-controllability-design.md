@@ -70,10 +70,12 @@ LLM 自由组合（词汇 = 97 件 + 本批 3 新件）
 
 ### 3.1 新件 schema 草案（Ardot 定稿后可回填修订）
 
+**图片处理通则**（本批新件统一，用户定调「图片内容进行比例缩放和裁剪」）：图片一律**等比缩放不变形 + 裁剪溢出**——帧宽高比按设计语言 §4.5 决策链定帧，帧内 ContentScale.Crop；对比/缩略图类的均匀裁切即设计语义（§4.5 例外口径，同 PhotoGrid/ListItem）。
+
 | 组件 | props 草案 | 语义 |
 |------|-----------|------|
-| CompareRow | `beforePhoto*` / `afterPhoto*`（相册投影 id）、`beforeLabel?` / `afterLabel?`、`beforeSrc?` / `afterSrc?`（https 兜底，photo 优先——Banner 双源同款约定） | 前后对比：左右等宽双图 + 图下标签 + 中缝分隔；点击 OpenPhoto。修图/优化效果对比表达位 |
-| Timeline | `items*`（OBJECT_ARRAY：[{title*, subtitle?, time?, photo?}]） | 时间轴：轴线 + 节点圆点 + 内容行（photo 前件走 openUiPhotoResolver 同径）；回忆/事件流 |
+| CompareRow | `beforePhoto*` / `afterPhoto*`（相册投影 id）、`beforeLabel?` / `afterLabel?`、`beforeSrc?` / `afterSrc?`（https 兜底，photo 优先——Banner 双源同款约定）、`aspect?`（双侧统一帧） | 前后对比：左右等宽双图**统一帧**（显式 aspect > 图真实比例 > 4:3，双侧同帧——异比例双图各自成帧高低错位，破坏对比语义）+ 等比缩放填满 + Crop 裁溢出 + 人脸聚焦 + 图下标签 + 中缝分隔；点击 OpenPhoto。修图/优化效果对比表达位 |
+| Timeline | `items*`（OBJECT_ARRAY：[{title*, subtitle?, time?, photo?}]） | 时间轴：轴线 + 节点圆点 + 内容行（photo 前件 = 定尺寸缩略图 48dp + Crop，openUiPhotoResolver 同径）；回忆/事件流 |
 | ChartGrid | `children*`（COMPONENT_LIST，限图表族——非图表子项按 R3 同条拦截） | 双图并排：columns 固定 2，图表在等宽格内自适应；R3 的合法出口 |
 
 ## 4. server prompt 重组
