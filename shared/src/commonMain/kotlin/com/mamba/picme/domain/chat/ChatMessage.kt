@@ -135,6 +135,20 @@ data class ClaudeStepUi(
 
 enum class ClaudeStepStatus { RUNNING, SUCCESS, FAILED }
 
+/**
+ * 云端 Agent 回合的一步（瞬态，不落 Room）。
+ *
+ * [durationMs] 为 finish 时记录的执行耗时（spec §5.5 结构化日志数据源）；RUNNING 态为 null。
+ */
+data class AgentStepUi(
+    val stepId: Long,
+    val label: String,
+    val status: AgentStepStatus,
+    val durationMs: Long? = null,
+)
+
+enum class AgentStepStatus { RUNNING, SUCCESS, FAILED }
+
 /** claude 交付按钮状态。pending=true 显示按钮；交付完成后置 false。 */
 data class ClaudeDeliverUi(val sid: String, val pending: Boolean)
 
