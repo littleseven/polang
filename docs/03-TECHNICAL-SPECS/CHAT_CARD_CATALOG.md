@@ -989,12 +989,17 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   HEADLINE 题字+蒙层参数/图表标题 CAPTION 弱色/Callout 12dp+IconSize.sm 等）。
   设计语言文档升 v9（§0 原则 4「组合收敛在规则层」+ §4.7 版式范式）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
-  session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
-  `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量
-  （渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入；持久化仍只针对
-  `$selected`，其余交互 state 重开卡回默认值）；@OpenUrl 走系统浏览器；@ToAssistant 自
-  2026-10-31 起上行——以用户消息发进会话（CardHeader「查看全部」缺省动作等同文案兜底），
-  M1 及之前仅记日志不路由。
+  session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
+  同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
+  viewState 线格式 2026-11-01 泛化为 `name=value;…` 键值对（`%`/`=`/`;` percent-编码，旧
+  `selected=<label>` 为一阶子集，旧数据可读），持久化范围扩为当前 store 全部 Str 标量
+  （选择态与表单文本同径恢复；Bool/Num 不持久化回声明默认值），恢复路径经 initialState
+  种 `$name`；宿主 produceState 键收窄为 partId+program，viewState 回流不再重建 session
+  （指纹比对防重复写与回流循环）；@OpenUrl 端侧 scheme 闸只放行 http/https（server 对
+  字面量首参另有 https 同轮纠错）；@Run M1 未实施，宿主显式识别并告警（不静默吞）；
+  @ToAssistant 自 2026-10-31 起上行——以用户消息发进会话（CardHeader/ListItem/ListBlock
+  的 actionLabel 缺省动作由 labeledActionsOrDefault 兜底合成同文案），M1 及之前仅记日志
+  不路由。
 - **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui_openui
   下发 BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"}））→
   端上求值填槽渲染。
