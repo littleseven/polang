@@ -546,7 +546,7 @@ object AdminViews {
             }
             if (nextAfter != null) {
                 p("trace-more") {
-                    a("/admin/agent/sessions/${session.id}?after=$nextAfter") { +"更早事件 →" }
+                    a("/admin/agent/sessions/${session.id}?after=$nextAfter") { +"后续事件 →" }
                 }
             }
         }
@@ -2046,9 +2046,9 @@ object AdminViews {
         else -> "st-muted"
     }
 
-    /** 假 running：status=running 但最后事件距今 >30min（状态机不回收，视图层标注，见 spec §7）。 */
+    /** 假 running：status=running 且最后事件（缺省回退创建时间，不误标首轮未落库的年轻会话）距今 >30min。 */
     private fun isStalled(s: AgentSessionRow): Boolean =
-        s.status == "running" && (s.lastEventAt ?: 0L) < System.currentTimeMillis() - STALLED_THRESHOLD_MS
+        s.status == "running" && (s.lastEventAt ?: s.createdAt) < System.currentTimeMillis() - STALLED_THRESHOLD_MS
 
     private fun isOrphanObservation(p: AgentEventPayload.Observation, actionIds: Set<Long>): Boolean =
         p.actionEventId == 0L || p.actionEventId !in actionIds

@@ -148,11 +148,12 @@ class AdminViewsTest {
         id: String = "abcdef1234567890",
         status: String = "running",
         lastEventAt: Long? = System.currentTimeMillis() - 31 * 60_000L,
+        createdAt: Long = 1_700_000_000_000L,
         seq: Long = 99,
     ) = AgentSessionRow(
         id = id, userLabel = "a***@x.com", status = status, channelKind = "gateway",
         model = "glm-5.2", eventCount = 12, lastEventAt = lastEventAt,
-        createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_100_000L, seq = seq,
+        createdAt = createdAt, updatedAt = 1_700_000_100_000L, seq = seq,
     )
 
     private fun eventRow(
@@ -239,6 +240,19 @@ class AdminViewsTest {
     }
 
     @Test
+    fun `agent sessions page does not stall-badge young running session without events`() {
+        val now = System.currentTimeMillis()
+        val rows = listOf(
+            // 刚建会话、首轮事件未落库（lastEventAt=null，createdAt 在 30min 内）→ 不标 stalled
+            sessionRow(id = "ddddddddd0000001", status = "running", lastEventAt = null, createdAt = now - 5 * 60_000L, seq = 100),
+            // 废弃 running（lastEventAt=null，createdAt 超 30min）→ 仍标 stalled
+            sessionRow(id = "eeeeeeeee0000002", status = "running", lastEventAt = null, createdAt = now - 45 * 60_000L, seq = 99),
+        )
+        val html = AdminViews.agentSessionsPage(rows, accountId = null, nextBeforeSeq = null)
+        assertTrue("stalled badge expected exactly once (abandoned only)", html.split("stalled").size - 1 == 1)
+    }
+
+    @Test
     fun `agent session detail renders messages actions observations with delta ms and escaping`() {
         val t0 = 1_700_000_000_000L
         val events = listOf(
@@ -269,8 +283,10 @@ class AdminViewsTest {
         assertTrue("orphan badge expected twice", html.split("门控拦截").size - 1 == 2)
         // error 前缀标红
         assertTrue(html.contains("ev-err"))
-        // 底部翻页
+        // 底部翻页（事件 id 升序，after 指向更新的事件）
         assertTrue(html.contains("href=\"/admin/agent/sessions/abcdef1234567890?after=5\""))
+        assertTrue(html.contains("后续事件"))
+        assertFalse(html.contains("更早事件"))
     }
 
     @Test
