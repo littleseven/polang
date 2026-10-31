@@ -1462,14 +1462,14 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ## Phase M4 — server 接线（矫正落流 + 门禁闭环 + prompt 重组）
 
-### Task 12: AgentRunner argsTransformer 钩子（矫正改写 Action argsJson）
+### Task 12: AgentRunner argsTransformer 钩子 ✅（2026-11-01 完成，与 Task 13 合并交付 commit 8d4e2d6d6 + 评审收口 5def5b355；spec ✅ 8 契约/质量 ✅ Approved + I-1/I-2/M-1/M-3 全收；552/0 绿）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/AgentRunner.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/Application.kt`（约 :210 `actionGate = RenderUiValidator::gate,` 处）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/AgentRunnerTest.kt`
 
-- [ ] **Step 1: 写失败测试（AgentRunnerTest 末尾追加，脚手架照 `valid render_ui payload passes gate and emits action event` 用例同款）**
+- [x] **Step 1: 写失败测试（AgentRunnerTest 末尾追加，脚手架照 `valid render_ui payload passes gate and emits action event` 用例同款）**
 
 ```kotlin
     /** 发射点矫正：render_ui_openui 的反模式 program 经 argsTransformer 归一化后落 Action。 */
@@ -1498,7 +1498,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 同步扩展 `runnerWith` 测试辅助：增可选参 `argsTransformer: (String, String) -> String = { _, argsJson -> argsJson }` 透传给 `AgentRunner` 构造（照该辅助内 `actionGate` 可选参既有写法）。
 
-- [ ] **Step 2: 实现钩子**
+- [x] **Step 2: 实现钩子**
 
 `AgentRunner.kt` 构造参数区（`actionGate` 参数下一行）加：
 
@@ -1529,16 +1529,16 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 > `transformArgs` 本体在 Task 13 实现——Task 12/13 顺序执行（12 先写钩子与测试骨架会编译失败，可与 13 合并为一个红→绿循环；两任务合并 commit 亦可）。
 
-- [ ] **Step 3: Commit（与 Task 13 合并 commit 见下）**
+- [x] **Step 3: Commit（与 Task 13 合并 commit 见下）**
 
-### Task 13: RenderOpenUiValidator 接线（transformArgs + 布局门禁进双消费点）+ 工具体改造
+### Task 13: RenderOpenUiValidator 接线 ✅（同 Task 12 合并交付）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiToolService.kt`（`renderUiOpenUi` 工具体）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidatorTest.kt` + `RenderOpenUiToolServiceTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `RenderOpenUiValidatorTest` 追加：
 
@@ -1587,12 +1587,12 @@ fun `tool body rejects layout violation and confirms normalized program`() {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.AgentRunnerTest"`
 Expected: 编译失败（`transformArgs` 未定义）/ 断言失败
 
-- [ ] **Step 3: 实现**（含顺手清单：①质量评审延后项——normalize 的 runCatching catch 补 slf4j debug 日志（`picme-agent` 惯例），矫正静默放过要有观测面；②装饰级微瑕——RenderOpenUiValidator.kt:47 KDoc 缩进对齐、OpenUiLayoutValidator.errorText KDoc 补 `[]` 链接；③Task 3 评审边界备注——门禁必须对 normalize 后文本**重 parse**（勿与矫正共享树）；errorText 回显用 **LLM 原始 program**（保 2026-10-24 自纠定位能力））
+- [x] **Step 3: 实现**（含顺手清单：①质量评审延后项——normalize 的 runCatching catch 补 slf4j debug 日志（`picme-agent` 惯例），矫正静默放过要有观测面；②装饰级微瑕——RenderOpenUiValidator.kt:47 KDoc 缩进对齐、OpenUiLayoutValidator.errorText KDoc 补 `[]` 链接；③Task 3 评审边界备注——门禁必须对 normalize 后文本**重 parse**（勿与矫正共享树）；errorText 回显用 **LLM 原始 program**（保 2026-10-24 自纠定位能力））
 
 `RenderOpenUiValidator.kt` 新增两段：
 
@@ -1655,12 +1655,12 @@ Expected: 编译失败（`transformArgs` 未定义）/ 断言失败
 
 > **重试上限语义勘误（spec §6 对齐）**：spec 所写「重试上限 1 次」在 A2UI 线的实际实现形态是 Koog agent loop 的 `maxIterations` 迭代预算（工具回 error → LLM 看 Observation 自行重调，无独立计数器；「上限 1 次」专指 CardClaimGuard 的纠正回环）。本批次沿用同款实际形态（AgentRunner 既有 `maxIterations` 兜底），**不新增独立重试计数器**——行为与 A2UI 线完全对齐，spec 表述按此口径理解。
 
-- [ ] **Step 4: 跑三个测试类确认通过**
+- [x] **Step 4: 跑三个测试类确认通过**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.AgentRunnerTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit（含 Task 12 的钩子与接线）**
+- [x] **Step 5: Commit（含 Task 12 的钩子与接线）**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/AgentRunner.kt \
