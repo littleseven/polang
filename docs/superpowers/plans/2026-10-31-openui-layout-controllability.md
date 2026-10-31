@@ -22,13 +22,15 @@
 
 ## Phase M1 — 规则引擎（server，TDD）
 
-### Task 1: OpenUiCallTree 调用树扫描器
+### Task 1: OpenUiCallTree 调用树扫描器 ✅（2026-10-31 完成，commit 451b30001）
 
 **Files:**
 - Create: `server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiCallTree.kt`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/OpenUiCallTreeTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+> 落地勘误（spec 评审核实）：① 测试断言库用 `org.junit.Assert`（同目录 72 文件惯例；kotlin-test 仅是 ktor-server-test-host 的传递依赖，不可依赖）；② 「未闭串」夹具改为 `Text("未闭串\")` 转义形态——原夹具括号实际配对、断言必红（计划代码笔误）。下文 Step 1/3 代码块保留计划原貌，以 commit 451b30001 实际代码为准。
+
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -101,12 +103,12 @@ private fun componentChildren(node: OpenUiCallTree.CallNode): List<OpenUiCallTre
     OpenUiCallTree.componentChildren(node)
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiCallTreeTest"`
 Expected: 编译失败 `unresolved reference: OpenUiCallTree`
 
-- [ ] **Step 3: 实现 OpenUiCallTree**
+- [x] **Step 3: 实现 OpenUiCallTree**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -190,12 +192,12 @@ object OpenUiCallTree {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiCallTreeTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiCallTree.kt \
