@@ -926,18 +926,18 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ## Phase M3 — 三新件落地（shared schema + Android 渲染器）
 
-### Task 7: shared OpenUiLibrary schema +3（测试先行）
+### Task 7: shared OpenUiLibrary schema +3（测试先行）✅（2026-10-31 完成，commits e266eba1d+6adf35584；spec ✅ / 质量 ✅ Approved + 四项顺手收口；jvmTest 全绿）
 
 **Files:**
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt`（AvatarRow 条目之后、`.associateBy` 之前）
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibraryLayoutBatchTest.kt`
 
-- [ ] **Step 1: 基线核对**
+- [x] **Step 1: 基线核对**
 
 Run: `grep -c "OpenUiComponent(" shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt`
 Expected: 与文档口径 97 一致（如有出入，以实际数为 N，测试断言总数写 N+3）。
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.domain.chat.openui
@@ -977,12 +977,12 @@ class OpenUiLibraryLayoutBatchTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `./gradlew :shared:jvmTest --tests "com.mamba.picme.domain.chat.openui.OpenUiLibraryLayoutBatchTest"`
 Expected: 编译失败或 `getValue` 抛 NoSuchElementException
 
-- [ ] **Step 4: 加 schema 三条**
+- [x] **Step 4: 加 schema 三条**
 
 ```kotlin
         // ── 布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》）──
@@ -1033,12 +1033,12 @@ Expected: 编译失败或 `getValue` 抛 NoSuchElementException
         ),
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `./gradlew :shared:jvmTest --tests "com.mamba.picme.domain.chat.openui.OpenUiLibraryLayoutBatchTest"`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt \
