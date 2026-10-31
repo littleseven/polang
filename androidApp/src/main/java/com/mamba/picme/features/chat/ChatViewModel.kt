@@ -105,10 +105,12 @@ import com.mamba.picme.domain.chat.streaming.ChatStreamTurnAdapter
 import com.mamba.picme.domain.chat.streaming.StreamingPacingController
 import com.mamba.picme.domain.chat.streaming.TurnPartsReducer
 import com.mamba.picme.domain.chat.streaming.TurnStreamEvent
+import com.mamba.picme.features.cloudagent.AgentStepTimeline
 import com.mamba.picme.features.cloudagent.CloudAgentChannelChoice
 import com.mamba.picme.features.cloudagent.CloudAgentChannelResolver
 import com.mamba.picme.features.cloudagent.CloudAgentTurnRunner
 import com.mamba.picme.features.cloudagent.CloudTurnEvent
+import com.mamba.picme.features.cloudagent.agentStepLabelRes
 import com.mamba.picme.features.gallery.MediaViewModel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -2185,6 +2187,12 @@ class ChatViewModel(
     private val cloudSessions = mutableMapOf<String, CloudSession>()
 
     /**
+     * 云端回合步骤时间线 reducer（瞬态，跟随 VM 生命周期，每回合开头 clear）。
+     * 单线程契约：onEvent 回调顺序消费（SSE reader 串行），快照经 `_streamingMessage.copy(agentSteps=...)` 上屏。
+     */
+    private val cloudStepTimeline = AgentStepTimeline()
+
+    /**
      * 云端编排回合：占位消息以整条消息粒度实时更新（云端无 token 流式），SSE 收尾后统一落 Room。
      * 取消经 launchChatRound Job 穿透断流——runTurn 抛 CancellationException 时本函数不执行收尾，
      * 半截文本由 sendMessage 外层 catch(CancellationException) 按既有语义保留。
@@ -2213,6 +2221,7 @@ class ChatViewModel(
             val cards = CloudTurnCardFlush(prepared.genUiFormat)
             var serverError: String? = null
             _openUiStreamProgram.value = null // 防上回合异常残留（openui P2 流式预览）
+            cloudStepTimeline.clear() // 步骤时间线同为回合级瞬态，开局清空
             var result = runCloudTurnOnce(
                 prepared.runner, prepared.token, prepared.session, text, answer, cards
             ) { serverError = it }
@@ -2223,10 +2232,12 @@ class ChatViewModel(
                 answer.clear()
                 cards.clear()
                 serverError = null
+                cloudStepTimeline.clear()
                 _streamingMessage.value = _streamingMessage.value?.copy(
                     content = stringContext().getString(STREAMING_THINKING_HINT_RES),
                     isThinking = true,
-                    showCursor = false
+                    showCursor = false,
+                    agentSteps = emptyList(),
                 )
                 val fresh = ensureCloudSession(prepared.api, prepared.token, sessionId, prepared.choice)
                 if (fresh != null) {
@@ -2422,13 +2433,7 @@ class ChatViewModel(
                     showCursor = true
                 )
             }
-            is CloudTurnEvent.ToolCall -> {
-                _streamingMessage.value = _streamingMessage.value?.copy(
-                    content = stringContext().getString(R.string.chat_calling_tool),
-                    isThinking = false,
-                    showCursor = false
-                )
-            }
+            is CloudTurnEvent.ToolCall -> Unit // 步骤时间线接管进度表达（M1），保留事件供调试页
             is CloudTurnEvent.HtmlCard -> {
                 // 云端 render_html 产物：清洗后复用 emitHtmlCardMessage 落 Room（DB Flow 驱动上屏；
                 // 其内部 feedToolOutput 在云端回合无 pending 占位时 no-op，安全）。
@@ -2466,7 +2471,27 @@ class ChatViewModel(
                 _openUiStreamProgram.value = event.program
             }
             is CloudTurnEvent.Error -> onServerError(event.message)
-            is CloudTurnEvent.StepStarted, is CloudTurnEvent.StepFinished -> Unit // 步骤时间线事件（后续任务渲染），本回合暂忽略
+            is CloudTurnEvent.StepStarted -> {
+                val labelRes = agentStepLabelRes(event.tool)
+                if (labelRes == null) {
+                    // server_time 契约不上时间线；未知工具跳过并告警一记（不污染进度表达）
+                    if (event.tool != "server_time") {
+                        Logger.w(TAG, "cloud step: unknown tool ${event.tool}, skipped")
+                    }
+                } else {
+                    cloudStepTimeline.start(event.stepId, stringContext().getString(labelRes))
+                    _streamingMessage.update { msg ->
+                        msg?.copy(agentSteps = cloudStepTimeline.steps, isThinking = false)
+                    }
+                }
+            }
+            is CloudTurnEvent.StepFinished -> {
+                // 未知 id（孤儿 observation / 上回合 pending 重放）被 reducer 忽略返回 null，update 无害
+                cloudStepTimeline.finish(event.stepId, event.ok)?.let { step ->
+                    Logger.d(TAG, "cloud step: ${step.label} -> ${step.status}")
+                }
+                _streamingMessage.update { msg -> msg?.copy(agentSteps = cloudStepTimeline.steps) }
+            }
             CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理
         }
     }

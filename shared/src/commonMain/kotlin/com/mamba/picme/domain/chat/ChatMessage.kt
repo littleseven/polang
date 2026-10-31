@@ -47,6 +47,8 @@ data class ChatMessage(
     val showCursor: Boolean = false,
     /** 思考中（首 token 到达前）：UI 显示三点 typing indicator。 */
     val isThinking: Boolean = false,
+    /** 云端回合步骤时间线（瞬态，仅流式占位消息持有，不落 Room）。 */
+    val agentSteps: List<AgentStepUi> = emptyList(),
     /** claude-tunnel agent 气泡状态（文本流式 + 步骤列表 + 文件改动）。 */
     val claudeAgent: ClaudeAgentState? = null,
     /** claude agent 气泡的交付动作；非空且 pending=true 时渲染「交付」按钮。 */
