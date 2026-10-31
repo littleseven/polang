@@ -499,7 +499,7 @@ git commit -m "feat(server): OpenUiLayoutNormalizer 无声矫正——weights/Sp
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 3: OpenUiLayoutValidator（R1~R4 结构门禁 + 节点数护栏）
+### Task 3: OpenUiLayoutValidator（R1~R4 结构门禁 + 节点数护栏）✅（2026-10-31 完成，commit 61b9035d2；spec ✅（12 对抗探针）/ 质量 ✅ Approved（14 探针零反例）；8 测试 + 全量 548 绿）
 
 **Files:**
 - Create: `server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutValidator.kt`
@@ -507,7 +507,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Modify: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidatorTest.kt`（白名单钉住断言的 expected 集合 +3 名）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/OpenUiLayoutValidatorTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -598,12 +598,12 @@ class OpenUiLayoutValidatorTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutValidatorTest"`
 Expected: 编译失败 `unresolved reference: OpenUiLayoutValidator`（ChartGrid 用例另需 Step 3 的白名单 +3）
 
-- [ ] **Step 3: 实现校验器 + 白名单扩名**
+- [x] **Step 3: 实现校验器 + 白名单扩名**
 
 `OpenUiLayoutValidator.kt`：
 
@@ -733,12 +733,12 @@ object OpenUiLayoutValidator {
 
 同步更新 `RenderOpenUiValidatorTest` 白名单钉住断言的 expected 集合（文件内 `assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)` 处）加同名三项。
 
-- [ ] **Step 4: 跑本任务测试 + 白名单钉住测试**
+- [x] **Step 4: 跑本任务测试 + 白名单钉住测试**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutValidator.kt \
@@ -1580,7 +1580,7 @@ fun `tool body rejects layout violation and confirms normalized program`() {
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.AgentRunnerTest"`
 Expected: 编译失败（`transformArgs` 未定义）/ 断言失败
 
-- [ ] **Step 3: 实现**（含质量评审延后项：`OpenUiLayoutNormalizer.normalize` 的 runCatching catch 里补 slf4j debug 日志——logger 惯例 `picme-agent` 同 AgentRunner，矫正静默放过要有观测面）
+- [ ] **Step 3: 实现**（含顺手清单：①质量评审延后项——normalize 的 runCatching catch 补 slf4j debug 日志（`picme-agent` 惯例），矫正静默放过要有观测面；②装饰级微瑕——RenderOpenUiValidator.kt:47 KDoc 缩进对齐、OpenUiLayoutValidator.errorText KDoc 补 `[]` 链接；③Task 3 评审边界备注——门禁必须对 normalize 后文本**重 parse**（勿与矫正共享树）；errorText 回显用 **LLM 原始 program**（保 2026-10-24 自纠定位能力））
 
 `RenderOpenUiValidator.kt` 新增两段：
 
@@ -1734,7 +1734,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 - [ ] **Step 3: 计数文案同步**
 
-`RenderOpenUiValidator`：`validate()` 白名单违规文案 `（95 组件全量清单见 render_ui_openui 工具描述…` 改 `100 组件`；`ALLOWED_COMPONENTS` KDoc 批次链末尾补 `2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）。`
+`RenderOpenUiValidator`：三处陈旧计数同步——:367 LLM 可见文案「95 组件全量清单」、:39 KDoc「九十五项」、:361 注释「八十九组件」→ 全部改 100/百项；`ALLOWED_COMPONENTS` KDoc 批次链末尾补 `2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）。`；工具描述约束段补一句「签名件（Banner/PhotoGrid/StatRow/AvatarRow）与照片网格须为 Card/Grid 直接子级」（R2/R4 绕行软引导，Task 3 评审建议）
 
 - [ ] **Step 4: 测试钉住新黄金**
 
