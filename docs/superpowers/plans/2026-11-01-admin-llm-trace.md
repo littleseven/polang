@@ -99,14 +99,16 @@ git commit -m "feat(admin): llmCalls paged query with filters for call log strea
   ```kotlin
   data class AgentSessionRow(
       val id: String,                 // 对外 uuid
-      val userLabel: String,          // 脱敏邮箱；无关联账号 = tokenHash 前 8 位
+      val seq: Long,                  // 内部分页游标（Task 4 的 nextBeforeSeq 取当页末行 seq；review 收编）
+      val userLabel: String,          // 脱敏邮箱；无关联/已注销账号 = tokenHash 前 8 位
       val status: String, val channelKind: String, val model: String,
       val eventCount: Long, val lastEventAt: Long?,   // stalled 判定用（视图层 >30min）
       val createdAt: Long, val updatedAt: Long,
   )
   data class AgentEventRow(
       val id: Long, val type: String, val source: String, val role: String,
-      val parentId: Long?, val payload: AgentEventPayload?,  // decode 失败 = null（视图降级显示截断原文）
+      val parentId: Long?, val payload: AgentEventPayload?,  // decode 失败 = null（视图降级显示截断原文，此时 payloadRaw 带原文）
+      val payloadRaw: String? = null, // 仅 decode 失败时填原文（review 收编；成功保持 null 不复制大文本）
       val createdAt: Long,
   )
   /** seq 倒序游标（beforeSeq 严格小于）；accountId 可空 = 经 Accounts.tokenHash 过滤。 */
