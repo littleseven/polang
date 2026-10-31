@@ -216,17 +216,49 @@ class OpenUiSession(
     fun applyAction(action: OpenUiAction) {
         if (!prepared) return
         when (action.name) {
-            "Set" -> action.target?.let { target ->
+            OpenUiContract.Actions.SET -> action.target?.let { target ->
                 store[target] = action.args.getOrNull(0) ?: OpenUiValue.Null
             }
-            "Reset" -> {
+            OpenUiContract.Actions.RESET -> {
                 val targets = action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
                     .ifEmpty { listOfNotNull(action.target) }
                 targets.forEach { target -> store[target] = declaredDefault(target) }
             }
             else -> return // @ToAssistant/@OpenUrl 由渲染层消费，不动 store
         }
-        reevaluate()
+        reevaluateSafely()
+    }
+
+    /**
+     * §8.1 交互路径同口径兜底（2026-11-01 review Y3）：action 触发的重求值与 prepare 一样
+     * 「不得让客户端崩溃」——用户点击在主线程同步进这里，任何求值路径未来的非全函数
+     * 回归都不能逃逸；崩溃时保留 lastResult 旧树不动，错误并入 errors（宿主经
+     * [lastErrors] 观测）。当前 eval 层是全函数（公开语言面无确定性 throw 路径），
+     * 本兜底是未来回归的保险丝，故无单测钉住触发路径（注入测试缝的成本大于收益）。
+     */
+    private fun reevaluateSafely() {
+        try {
+            reevaluate()
+        } catch (e: CancellationException) {
+            throw e // 协程取消穿透（与 prepare 口径对齐）
+        } catch (t: Throwable) {
+            val error = OpenUiError(
+                "action-exception",
+                message = "动作重求值崩溃兜底：${t.message ?: t::class.simpleName}",
+            )
+            lastResult = when (val current = lastResult) {
+                is OpenUiResult.Rendered -> current.copy(errors = current.errors + error)
+                is OpenUiResult.Failed -> current.copy(errors = current.errors + error)
+                null -> OpenUiResult.Failed(listOf(error))
+            }
+        }
+    }
+
+    /** 最近一次求值（prepare 或 applyAction 重求值）的错误快照——宿主观测 action 期错误的唯一出口。 */
+    fun lastErrors(): List<OpenUiError> = when (val result = lastResult) {
+        is OpenUiResult.Rendered -> result.errors
+        is OpenUiResult.Failed -> result.errors
+        null -> emptyList()
     }
 
     /** 当前组件树根（prepare 后可用）。 */

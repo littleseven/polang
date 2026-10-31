@@ -330,7 +330,12 @@ internal object OpenUiParser {
     private val builtinNames = setOf(
         "Count", "First", "Last", "Sum", "Avg", "Min", "Max",
         "Filter", "Sort", "Round", "Abs", "Floor", "Ceil", "Each",
-        "Set", "Reset", "Run", "ToAssistant", "OpenUrl", "Action",
+        OpenUiContract.Actions.SET,
+        OpenUiContract.Actions.RESET,
+        OpenUiContract.Actions.RUN,
+        OpenUiContract.Actions.TO_ASSISTANT,
+        OpenUiContract.Actions.OPEN_URL,
+        OpenUiContract.Actions.WRAPPER,
     )
 
     private class ExpressionParser(private val tokens: List<OpenUiToken>) {
@@ -420,7 +425,7 @@ internal object OpenUiParser {
                 OpenUiTokenKind.TYPE -> {
                     // 内置/保留名须带 @（仅 Action 豁免）；Count(x) 解析为引用 Count，参数丢失
                     if (peekNext().kind == OpenUiTokenKind.LPAREN &&
-                        (!builtinNames.contains(token.text) || token.text == "Action")
+                        (!builtinNames.contains(token.text) || token.text == OpenUiContract.Actions.WRAPPER)
                     ) {
                         parseCall(token.text)
                     } else {
@@ -581,7 +586,7 @@ internal object OpenUiParser {
             return when {
                 name.startsWith("@") -> {
                     val atName = name.removePrefix("@")
-                    if (atName.equals("Action", ignoreCase = true)) {
+                    if (atName.equals(OpenUiContract.Actions.WRAPPER, ignoreCase = true)) {
                         OpenUiExpr.ActionCall(args)
                     } else {
                         OpenUiExpr.AtCall(atName, args)
@@ -589,7 +594,7 @@ internal object OpenUiParser {
                 }
                 name == "Query" -> OpenUiExpr.QueryCall(args)
                 name == "Mutation" -> OpenUiExpr.MutationCall(args)
-                name.equals("Action", ignoreCase = true) -> OpenUiExpr.ActionCall(args)
+                name.equals(OpenUiContract.Actions.WRAPPER, ignoreCase = true) -> OpenUiExpr.ActionCall(args)
                 else -> OpenUiExpr.CompCall(name, args)
             }
         }

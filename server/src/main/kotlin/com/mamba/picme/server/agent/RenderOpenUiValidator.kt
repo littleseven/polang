@@ -184,8 +184,19 @@ object RenderOpenUiValidator {
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
 
     /** 动作表达式被包成字符串（2026-10-24 真机事故：LLM 写 "@OpenUrl(...)" 致端侧
-     *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。 */
-    private val QUOTED_ACTION = Regex(""""@(OpenUrl|Set|Reset|ToAssistant)\s*\(""")
+     *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。
+     *  词表 = shared `OpenUiContract.Actions` 字面量副本（含 WRAPPER "Action"），
+     *  改动须双向同步核对。 */
+    private val QUOTED_ACTION = Regex(""""@(OpenUrl|Set|Reset|ToAssistant|Run|Action)\s*\(""")
+
+    /** @OpenUrl 字符串字面量首参抽取（2026-11-01 review Y5：与 Image src 的 https 硬校验
+     *  同族——外链动作此前零闸，`@OpenUrl("file://…")` 等非法 scheme 直达端侧）。
+     *  须在字符串剥离前扫原文（同 QUOTED_ACTION 口径）；表达式形态（@OpenUrl($url)）
+     *  不可静态判定，端侧 dispatch 有 scheme 闸兜底。
+     *  近似边界（同 IMAGE_CALL_ARGS 既有口径）：Markdown 文案/单引号串内写 @OpenUrl("…")
+     *  字样会被一并分析——单引号串剥离阶段不识别，文案里的非 https 示例会以违规误伤，
+     *  漏判/误判优先保放行好负载。 */
+    private val OPEN_URL_LITERAL = Regex("""(?<![A-Za-z0-9_"])@OpenUrl\s*\(\s*"((?:[^"\\]|\\.)*)"""")
 
     /** 单卡图片总数上限（2026-10-24 review 🟡3 OOM 护栏；2026-10-25 口径从 Image 调用数
      *  扩为整卡位图总数——Image 调用 + ImageGallery images / ImageBlock / ImageText /
@@ -230,6 +241,16 @@ object RenderOpenUiValidator {
 
     /** CardHeader 调用（lint：actionLabel 无 action 配对 → 引导补 @ToAssistant，2026-10-31 真机回归）。 */
     private val CARD_HEADER_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])CardHeader\s*\(""")
+
+    /** ListItem 调用（lint 同上，2026-11-01 review Y6 扩展）。 */
+    private val LIST_ITEM_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])ListItem\s*\(""")
+
+    /** ListBlock 调用（lint 同上；items 是对象数组，字段为冒号形态 `{actionLabel: "…"}`）。 */
+    private val LIST_BLOCK_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])ListBlock\s*\(""")
+
+    /** 对象字段冒号形态的 actionLabel/action 检测（ListBlock items 元素形状）。 */
+    private val OBJ_ACTION_LABEL = Regex("""(?<![A-Za-z0-9_])actionLabel\s*:""")
+    private val OBJ_ACTION = Regex("""(?<![A-Za-z0-9_])action\s*:""")
 
     /** actionLabel 命名键检测（「查看全部」类尾部动作位在场的依据）。 */
     private val NAMED_ACTION_LABEL = Regex("""(?<![A-Za-z0-9_])actionLabel\s*=""")
@@ -283,6 +304,18 @@ object RenderOpenUiValidator {
             // 虽有同文案 @ToAssistant 兜底，但显式 action 文案语境更准（兜底只有标题上下文）
             if (NAMED_ACTION_LABEL.containsMatchIn(args) && !NAMED_ACTION.containsMatchIn(args)) {
                 warnings += "CardHeader 有 actionLabel 但缺 action——尾部「查看全部」类动作位请显式配 action = @ToAssistant(\"查看全部 <分组语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
+            }
+        }
+        // 2026-11-01 review Y6：同病灶扩展到 ListItem（命名键 = 形态）与 ListBlock（对象字段
+        // 冒号形态，按调用区间近似判定——任一 actionLabel 在场而全区间无 action 才警告）
+        callArgSpans(stripped, LIST_ITEM_CALL).forEach { args ->
+            if (NAMED_ACTION_LABEL.containsMatchIn(args) && !NAMED_ACTION.containsMatchIn(args)) {
+                warnings += "ListItem 有 actionLabel 但缺 action——行尾动作位请显式配 action = @ToAssistant(\"<动作> <行语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
+            }
+        }
+        callArgSpans(stripped, LIST_BLOCK_CALL).forEach { args ->
+            if (OBJ_ACTION_LABEL.containsMatchIn(args) && !OBJ_ACTION.containsMatchIn(args)) {
+                warnings += "ListBlock 有 actionLabel 但缺 action——行尾动作位请显式配 action: @ToAssistant(\"<动作> <行语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
             }
         }
         return warnings
@@ -346,6 +379,14 @@ object RenderOpenUiValidator {
         }
         QUOTED_ACTION.findAll(program).forEach { match ->
             violations += "动作表达式被包成了字符串（${match.value}…）：Button 的 action 是裸动作表达式，去掉最外层那对引号——写 Button(\"查看\", @OpenUrl(\"https://…\"))，不要 Button(\"查看\", \"@OpenUrl(…)\")"
+        }
+        // 2026-11-01 review Y5：@OpenUrl 字面量首参限 https（与图片 src https 硬校验同族，
+        // [PRIVACY] 外链零闸补齐）；表达式形态端侧 dispatch scheme 闸兜底
+        OPEN_URL_LITERAL.findAll(program).forEach { match ->
+            val url = match.groupValues[1]
+            if (!url.startsWith("https://")) {
+                violations += "@OpenUrl 只接受 https:// 公网地址（实际 \"$url\"）——外链动作禁本地路径/file 协议；相册照片用 Image(photo = photos[i].id) / PhotoGrid(photos = […]) 展示，Button 外链只用于 https 公网页"
+            }
         }
         // 剥离字符串字面量与行注释后再扫结构（防文案内容误伤）。
         // 顺序必须是先字符串后注释：handle 里的 local:// 含 //，先剥注释会把

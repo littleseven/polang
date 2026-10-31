@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -40,10 +41,11 @@ import kotlinx.serialization.json.Json
  *
  * Query("local_handle", ...) 经 [HandleLookup] 端侧补全数据（隐私闸对偶：GenUI 只生成骨架
  * 不生成数据）；任一 handle 缺失/不可解析 → 置 handleFailed 并抛异常（engine 回退 defaults），
- * prepare 后统判降级。viewState `selected=<label>` 种 `$selected` 初始 state（US-7 对偶）。
+ * prepare 后统判降级。viewState 键值对（`name=value;…`，2026-11-01 泛化，旧
+ * `selected=<label>` 为子集）解码全部 Str 标量种初始 state（US-7 对偶）。
  *
- * 用户交互（@Set/@Reset）本地消费不出端（§3.4 不变式对偶），$selected 变化经
- * [onViewStateChange] 写本地交互态。@ToAssistant 上行（2026-10-31 起）：经
+ * 用户交互（@Set/@Reset）本地消费不出端（§3.4 不变式对偶），任意 Str state 变化经
+ * [onViewStateChange] 持久化写回 part。@ToAssistant 上行（2026-10-31 起）：经
  * [onToAssistant] 以用户消息发进会话（CardHeader「查看全部」等卡内回话入口）。
  */
 @Composable
@@ -56,9 +58,11 @@ fun OpenUiCardHost(
     onPhotoClick: (uri: String) -> Unit = {},
     onToAssistant: (text: String) -> Unit = {},
 ) {
-    // 键粒度收到整颗 part（data class 可比）：viewState 回流产生新 part 即重建 session、
-    // 按最新 viewState 重种 $selected（同 A2uiCardHost 恢复语义）
-    val resolution by produceState<OpenUiResolution?>(initialValue = null, part) {
+    // 键粒度收窄为 partId+program（2026-11-01 review Y4 修复）：viewState 回流只变
+    // viewState 字段，不再重建 session——此前以整颗 part 为键，卡内任意 $selected 写入
+    // 都会触发 Room 回流→session 重建→其他交互 state（表单文本/开关）全丢。
+    // viewState 仅在首次构建时解码为 initialState 填槽（恢复语义不变）。
+    val resolution by produceState<OpenUiResolution?>(initialValue = null, part.partId, part.program) {
         var handleFailed = false
         val tools = OpenUiToolResolver { name, args ->
             if (name != OpenUiContract.TOOL_LOCAL_HANDLE) throw OpenUiToolNotFoundException(name)
@@ -70,15 +74,15 @@ fun OpenUiCardHost(
                 throw OpenUiHandleException((resolved as HandleResolution.Err).reason)
             }
         }
-        val selected = OpenUiContract.selectedOfViewState(part.viewState)
+        // viewState 泛化（同 Y4）：全部键值对映射回 $name → Str 填槽（旧格式
+        // "selected=<label>" 是其一阶子集，旧数据恢复行为不变）
+        val initialState = OpenUiContract.decodeViewState(part.viewState)
+            .map { (name, value) -> "\$$name" to OpenUiValue.Str(value) }
+            .toMap()
         val session = OpenUiSession(
             program = part.program,
             tools = tools,
-            initialState = if (selected != null) {
-                mapOf(OpenUiContract.STATE_SELECTED to OpenUiValue.Str(selected))
-            } else {
-                emptyMap()
-            },
+            initialState = initialState,
         )
         val result = session.prepare()
         // 可观测性：Rendered 也可能携带非致命错误（如 inline-reserved 导致组件静默丢弃），
@@ -115,6 +119,7 @@ fun OpenUiCardHost(
                         onViewStateChange = onViewStateChange,
                         onPhotoClick = onPhotoClick,
                         onToAssistant = onToAssistant,
+                        initialViewState = part.viewState,
                     )
                     OpenUiDebugBadge(
                         partId = part.partId,
@@ -130,6 +135,7 @@ fun OpenUiCardHost(
                     modifier = modifier,
                     onPhotoClick = onPhotoClick,
                     onToAssistant = onToAssistant,
+                    initialViewState = part.viewState,
                 )
             }
         }
@@ -217,6 +223,7 @@ private fun OpenUiReadyContent(
     modifier: Modifier = Modifier,
     onPhotoClick: (uri: String) -> Unit = {},
     onToAssistant: (text: String) -> Unit = {},
+    initialViewState: String?,
 ) {
     // P1 响应式状态（spec《2026-10-26-openui-compose-alignment-design》§3，对齐 androidx
     // bind 粒度订阅语义）：session.state 非 Compose 可观测（ADR-013 禁 compose 入 commonMain，
@@ -226,37 +233,66 @@ private fun OpenUiReadyContent(
         mutableStateMapOf<String, OpenUiValue>().apply { putAll(session.state) }
     }
     var root by remember(session) { mutableStateOf(session.rootOrNull()) }
+    // 已发射 viewState 指纹（归一化后比对，同值不重复持久化；初值取 part 携带态的归一化，
+    // 避免冷启动首轮 Set 同值时多写一次 Room）
+    var lastEmittedViewState by remember(session) {
+        mutableStateOf(OpenUiContract.encodeViewState(OpenUiContract.decodeViewState(initialViewState)))
+    }
+    // prepare 期错误已在装载日志打过；此计数器支撑 action 期增量观测（Y3 配套，见 dispatch）
+    var seenErrorCount by remember(session) { mutableIntStateOf(session.lastErrors().size) }
     val uriHandler = LocalUriHandler.current
     val dispatch: (OpenUiAction) -> Unit = { action ->
-        when (action.name) {
-            "Set", "Reset" -> {
-                val before = (session.state[OpenUiContract.STATE_SELECTED] as? OpenUiValue.Str)?.v
+        when (openUiActionRouteOf(action.name)) {
+            OpenUiActionRoute.STATE_WRITE -> {
                 session.applyAction(action)
+                // action 期错误唯一观测出口（Y3 配套）：reevaluateSafely 崩溃兜底或重求期
+                // 错误并入 lastErrors，增量打一条（prepare 期错误已在装载时打过）
+                val latestErrors = session.lastErrors()
+                if (latestErrors.size > seenErrorCount) {
+                    latestErrors.drop(seenErrorCount).forEach { error ->
+                        Logger.w("Chat", "OpenUI 卡 action 重求期错误: ${error.code}@${error.statementId}: ${error.message}")
+                    }
+                    seenErrorCount = latestErrors.size
+                }
                 stateMap.syncWith(session.state)
                 // root 相等门控：绑定全保留为 Binding 的树在纯交互 action 后结构不变（data class
                 // 结构化相等），不换引用即零树级重组（ComponentVal props 含 Map 非 stable 类型，
                 // 不比等必全树重组）；烘焙引用场景树必变，照常更新
                 val newRoot = session.rootOrNull()
                 if (newRoot != root) root = newRoot
-                val after = (session.state[OpenUiContract.STATE_SELECTED] as? OpenUiValue.Str)?.v
-                if (after != before) {
-                    onViewStateChange(after?.let(OpenUiContract::viewStateOfSelected) ?: "")
+                // viewState 泛化（2026-11-01 review Y4）：持久化全部 Str 标量 state 而不只
+                // $selected——BarChart M4.2 自定义绑定变量（$month 等）的点选跨重建也能恢复；
+                // produceState 键已收窄为 partId+program，回流不重建 session，无回流循环
+                val encoded = OpenUiContract.encodeViewState(strStateSnapshot(session.state))
+                if (encoded != lastEmittedViewState) {
+                    lastEmittedViewState = encoded
+                    onViewStateChange(encoded)
                 }
             }
-            "OpenUrl" -> (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let { url ->
-                runCatching { uriHandler.openUri(url) }
+            OpenUiActionRoute.OPEN_URL -> (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let { url ->
+                // scheme 闸（2026-11-01 review Y5）：与 Image src 的 https 校验同族防御
+                if (isOpenUrlAllowed(url)) {
+                    runCatching { uriHandler.openUri(url) }
+                } else {
+                    Logger.w("Chat", "OpenUI @OpenUrl 非 http(s) 地址被拦截: $url")
+                }
             }
             // Image 点击看大图（宿主动作，program 不可达——渲染层 resolved uri 直发，
             // 不出端不回落 program；ChatScreen 落 chat 内预览浮层）
-            "OpenPhoto" -> (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let(onPhotoClick)
+            OpenUiActionRoute.OPEN_PHOTO ->
+                (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let(onPhotoClick)
             // @ToAssistant 上行（2026-10-31 真机回归修复，原为 M1 只记日志不路由）：
-            // 卡内回话入口（CardHeader「查看全部」缺省动作等）以用户消息发进会话
-            "ToAssistant" -> {
+            // 卡内回话入口（CardHeader「查看全部」缺省动作等）以用户消息发进会话。
+            // M1 只取首参（review B1）：eval 收第二参（官方 payload 语义）但上行通道未定义，丢弃
+            OpenUiActionRoute.TO_ASSISTANT -> {
                 val text = (action.args.firstOrNull() as? OpenUiValue.Str)?.v.orEmpty()
                 Logger.d("Chat", "OpenUI @ToAssistant 上行: $text")
                 if (text.isNotBlank()) onToAssistant(text)
             }
-            else -> Logger.d("Chat", "OpenUI 未知动作: ${action.name}")
+            // @Run（Mutation 执行）M1 未实现：显式识别并告警，不落「未知动作」静默吞（review Y2）
+            OpenUiActionRoute.RUN_UNSUPPORTED ->
+                Logger.w("Chat", "OpenUI @Run(${action.target.orEmpty()}) M1 未实现，忽略")
+            OpenUiActionRoute.UNKNOWN -> Logger.w("Chat", "OpenUI 未知动作: ${action.name}")
         }
     }
     root?.let { component ->
@@ -269,6 +305,30 @@ private fun OpenUiReadyContent(
         )
     }
 }
+
+/** dispatch 路由分类（纯函数，清单测试钉住与 [OpenUiContract.ENGINE_ACTIONS] 的覆盖关系）。 */
+internal enum class OpenUiActionRoute { STATE_WRITE, OPEN_URL, OPEN_PHOTO, TO_ASSISTANT, RUN_UNSUPPORTED, UNKNOWN }
+
+internal fun openUiActionRouteOf(name: String): OpenUiActionRoute = when (name) {
+    OpenUiContract.Actions.SET, OpenUiContract.Actions.RESET -> OpenUiActionRoute.STATE_WRITE
+    OpenUiContract.Actions.OPEN_URL -> OpenUiActionRoute.OPEN_URL
+    OpenUiContract.Actions.OPEN_PHOTO -> OpenUiActionRoute.OPEN_PHOTO
+    OpenUiContract.Actions.TO_ASSISTANT -> OpenUiActionRoute.TO_ASSISTANT
+    OpenUiContract.Actions.RUN -> OpenUiActionRoute.RUN_UNSUPPORTED
+    else -> OpenUiActionRoute.UNKNOWN
+}
+
+/** @OpenUrl scheme 闸（2026-11-01 review Y5）：只放行 http/https，拦截 file://、intent://、market:// 等。 */
+internal fun isOpenUrlAllowed(url: String): Boolean {
+    // scheme 大小写不敏感（URI 规范）；容忍首参带空白
+    val scheme = url.trim().substringBefore("://").lowercase()
+    return scheme == "https" || scheme == "http"
+}
+
+/** viewState 持久化快照：store 中全部 Str 标量（选择态与表单文本同径；Bool/Num 不持久化）。 */
+private fun strStateSnapshot(state: Map<String, OpenUiValue>): Map<String, String> =
+    state.mapNotNull { (key, value) -> (value as? OpenUiValue.Str)?.v?.let { text -> key to text } }
+        .toMap()
 
 /**
  * 逐键增量同步（P1，spec §3.1）：删消失键、写变更键、不动未变键——配合 SnapshotStateMap

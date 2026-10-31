@@ -554,7 +554,7 @@ private fun OpenUiPhotoImage(
                     onClickLabel = stringResource(R.string.cd_image_preview),
                     role = Role.Image,
                 ) {
-                    onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
                 },
             )
         }
@@ -841,7 +841,7 @@ private fun OpenUiCheckBox(
         bindingName?.let { name ->
             onAction(
                 OpenUiAction(
-                    name = "Set",
+                    name = OpenUiContract.Actions.SET,
                     args = listOf(OpenUiValue.Bool(newValue)),
                     target = name,
                 )
@@ -900,7 +900,7 @@ private fun OpenUiChoicePicker(
                         bindingName?.let { name ->
                             onAction(
                                 OpenUiAction(
-                                    name = "Set",
+                                    name = OpenUiContract.Actions.SET,
                                     args = listOf(OpenUiValue.Str(optionValue)),
                                     target = name,
                                 )
@@ -952,7 +952,7 @@ private fun OpenUiSlider(
                 bindingName?.let { name ->
                     onAction(
                         OpenUiAction(
-                            name = "Set",
+                            name = OpenUiContract.Actions.SET,
                             args = listOf(OpenUiValue.Num(dragValue.toDouble())),
                             target = name,
                         )
@@ -1069,7 +1069,7 @@ private fun OpenUiBarChart(
                                 .clickable {
                                     onAction(
                                         OpenUiAction(
-                                            name = "Set",
+                                            name = OpenUiContract.Actions.SET,
                                             args = listOf(OpenUiValue.Str(bucket.label)),
                                             target = selectedTarget,
                                         )
@@ -1748,7 +1748,7 @@ private fun OpenUiSwitch(
         bindingName?.let { name ->
             onAction(
                 OpenUiAction(
-                    name = "Set",
+                    name = OpenUiContract.Actions.SET,
                     args = listOf(OpenUiValue.Bool(newValue)),
                     target = name,
                 )
