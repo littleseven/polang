@@ -156,6 +156,9 @@ class OpenUiLayoutNormalizerTest {
             RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM,
             RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM,
             RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM,
+            // 布局可控性批次两黄金（Task 14 I-1 补钉）
+            RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM,
+            RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM,
         ).forEach { golden ->
             assertEquals(golden, golden, OpenUiLayoutNormalizer.normalize(golden))
         }

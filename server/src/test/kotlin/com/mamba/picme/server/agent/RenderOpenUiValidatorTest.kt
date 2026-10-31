@@ -744,6 +744,18 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM),
         )
     }
+    @Test
+    fun `tool description layout batch golden examples pass validation and lint`() {
+        // Task 14 I-1 补钉：companion KDoc「与 RenderOpenUiValidatorTest 同源引用」SSOT 位
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM))
+        assertTrue(
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM).isEmpty(),
+        )
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM))
+        assertTrue(
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM).isEmpty(),
+        )
+    }
 
     @Test
     fun `photo pattern components pass whitelist`() {
