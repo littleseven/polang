@@ -1,5 +1,7 @@
 package com.mamba.picme.server.admin
 
+import com.mamba.picme.server.agent.AgentEventPayload
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -126,6 +128,202 @@ class AdminViewsTest {
         )
         val html = AdminViews.devicesPage(rows, usersCount = 0L, guestLimit = 100)
         assertTrue(html.contains("—"))
+    }
+
+    // ---------- M2 管理后台推理追溯：调用流水 / Agent 会话回放 ----------
+
+    private fun llmRow(
+        id: Long,
+        emailMasked: String? = "a***@x.com",
+        model: String = "glm-5.2",
+        provider: String = "CLOUDFLARE",
+        status: String = "ok",
+    ) = LlmCallListRow(
+        id = id, accountId = 7, emailMasked = emailMasked, model = model, provider = provider,
+        promptTokens = 100, completionTokens = 50, cachedTokens = 10, costCny = 0.0044,
+        status = status, latencyMs = 1234, platform = "android", createdAt = 1_700_000_000_000L + id,
+    )
+
+    private fun sessionRow(
+        id: String = "abcdef1234567890",
+        status: String = "running",
+        lastEventAt: Long? = System.currentTimeMillis() - 31 * 60_000L,
+        seq: Long = 99,
+    ) = AgentSessionRow(
+        id = id, userLabel = "a***@x.com", status = status, channelKind = "gateway",
+        model = "glm-5.2", eventCount = 12, lastEventAt = lastEventAt,
+        createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_100_000L, seq = seq,
+    )
+
+    private fun eventRow(
+        id: Long,
+        type: String,
+        payload: AgentEventPayload?,
+        role: String = "assistant",
+        payloadRaw: String? = null,
+        createdAt: Long = 1_700_000_000_000L + id * 1000,
+    ) = AgentEventRow(
+        id = id, type = type, source = "agent", role = role, parentId = null,
+        payload = payload, payloadRaw = payloadRaw, createdAt = createdAt,
+    )
+
+    @Test
+    fun `llm calls page renders rows status colors user links and pagination`() {
+        val rows = listOf(
+            llmRow(id = 101),
+            llmRow(id = 100, emailMasked = null, status = "upstream_error"),
+            llmRow(id = 99, status = "blocked_quota"),
+        )
+        val html = AdminViews.llmCallsPage(rows, status = null, provider = null, model = null, accountId = null, nextBefore = 99)
+        assertTrue(html.contains("调用流水"))
+        assertTrue(html.contains("a***@x.com"))
+        assertTrue(html.contains("href=\"/admin/users/7\""))
+        assertTrue(html.contains("已注销")) // emailMasked=null → 已注销不崩溃
+        assertTrue(html.contains("glm-5.2"))
+        assertTrue(html.contains("CLOUDFLARE"))
+        assertTrue(html.contains("st-ok"))
+        assertTrue(html.contains("st-error"))
+        assertTrue(html.contains("st-blocked"))
+        assertTrue(html.contains("0.0044"))
+        assertTrue(html.contains("1234"))
+        assertTrue(html.contains("android"))
+        // 分页链接带齐筛选参数（此处全空，至少带 before）
+        assertTrue(html.contains("href=\"/admin/llm/calls?before=99"))
+        assertTrue(html.contains("更早"))
+    }
+
+    @Test
+    fun `llm calls page escapes user controlled model name`() {
+        val rows = listOf(llmRow(id = 1, model = "<script>alert(1)</script>"))
+        val html = AdminViews.llmCallsPage(rows, status = null, provider = null, model = null, accountId = null, nextBefore = null)
+        assertFalse(html.contains("<script>alert(1)</script>"))
+        assertTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"))
+    }
+
+    @Test
+    fun `llm calls page keeps filters in pagination link and shows account filter chip`() {
+        val html = AdminViews.llmCallsPage(
+            listOf(llmRow(id = 50)), status = "ok", provider = "TOKENHUB", model = "deep seek",
+            accountId = 7, nextBefore = 50,
+        )
+        assertTrue(html.contains("按用户筛选中"))
+        // 清除链接回到不带 account_id 的列表
+        assertTrue(html.contains("href=\"/admin/llm/calls?status=ok&amp;provider=TOKENHUB&amp;model=deep+seek\""))
+        // 分页链接带齐全部筛选参数（model 需 URL 编码）
+        assertTrue(
+            html.contains("before=50") && html.contains("status=ok") &&
+                html.contains("provider=TOKENHUB") && html.contains("model=deep+seek") && html.contains("account_id=7"),
+        )
+        // 筛选表单回显当前值
+        assertTrue(html.contains("value=\"deep seek\""))
+        assertTrue(html.contains("selected"))
+    }
+
+    @Test
+    fun `agent sessions page renders rows stalled badge and before_seq pagination`() {
+        val now = System.currentTimeMillis()
+        val rows = listOf(
+            sessionRow(id = "abcdef1234567890", status = "running", lastEventAt = now - 31 * 60_000L, seq = 99),
+            sessionRow(id = "bbbbbbbb99999999", status = "running", lastEventAt = now - 60_000L, seq = 98),
+            sessionRow(id = "cccccccc88888888", status = "finished", lastEventAt = null, seq = 97),
+        )
+        val html = AdminViews.agentSessionsPage(rows, accountId = null, nextBeforeSeq = 97)
+        assertTrue(html.contains("href=\"/admin/agent/sessions/abcdef1234567890\""))
+        assertTrue(html.contains("abcdef12")) // 短码
+        assertTrue(html.contains("a***@x.com"))
+        assertTrue(html.contains("gateway"))
+        assertTrue(html.contains("glm-5.2"))
+        // stalled 仅出现在假 running（>30min 无事件）那一行
+        assertTrue("stalled badge expected exactly once", html.split("stalled").size - 1 == 1)
+        assertTrue(html.contains("href=\"/admin/agent/sessions?before_seq=97\""))
+    }
+
+    @Test
+    fun `agent session detail renders messages actions observations with delta ms and escaping`() {
+        val t0 = 1_700_000_000_000L
+        val events = listOf(
+            eventRow(1, "message", AgentEventPayload.Message("你好 <b>世界</b>"), role = "user", createdAt = t0),
+            eventRow(2, "action", AgentEventPayload.Action("search_media", "{\"q\":\"<script>alert(1)</script>\"}", true), createdAt = t0 + 1000),
+            eventRow(3, "observation", AgentEventPayload.Observation(2, "ok 3 条"), role = "tool", createdAt = t0 + 1500),
+            eventRow(4, "observation", AgentEventPayload.Observation(0, "error: gated by validator"), role = "tool", createdAt = t0 + 2500),
+            eventRow(5, "observation", AgentEventPayload.Observation(999, "no parent on this page"), role = "tool", createdAt = t0 + 3000),
+        )
+        val html = AdminViews.agentSessionDetailPage(sessionRow(), events, nextAfter = 5)
+        // 角色分色块
+        assertTrue(html.contains("ev-user"))
+        assertTrue(html.contains("ev-assistant") || html.contains("ev-action"))
+        // 转义铁律：消息与 argsJson 均不出现原始尖括号载荷
+        assertFalse(html.contains("<b>世界</b>"))
+        assertFalse(html.contains("<script>alert(1)</script>"))
+        assertTrue(html.contains("&lt;b&gt;世界&lt;/b&gt;"))
+        assertTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"))
+        // action 工具名 + 折叠详情
+        assertTrue(html.contains("search_media"))
+        assertTrue(html.contains("<details>"))
+        // Δms：相邻事件差值
+        assertTrue(html.contains("+1000ms"))
+        assertTrue(html.contains("+500ms"))
+        // 孤儿 observation（actionEventId=0 / 页内无配对）徽标，照常成条
+        assertTrue(html.contains("error: gated by validator"))
+        assertTrue(html.contains("no parent on this page"))
+        assertTrue("orphan badge expected twice", html.split("门控拦截").size - 1 == 2)
+        // error 前缀标红
+        assertTrue(html.contains("ev-err"))
+        // 底部翻页
+        assertTrue(html.contains("href=\"/admin/agent/sessions/abcdef1234567890?after=5\""))
+    }
+
+    @Test
+    fun `agent session detail renders html card summary only and finish banner and condensation`() {
+        val t0 = 1_700_000_000_000L
+        val events = listOf(
+            eventRow(1, "html_card", AgentEventPayload.HtmlCard("<div>secret-html-body</div>", "照片墙卡片"), createdAt = t0),
+            eventRow(2, "condensation", AgentEventPayload.Condensation("前文压缩摘要", 1), createdAt = t0 + 100),
+            eventRow(3, "finish", AgentEventPayload.Finish("done"), createdAt = t0 + 200),
+        )
+        val html = AdminViews.agentSessionDetailPage(sessionRow(), events, nextAfter = null)
+        // H5 卡只显示 summary + 字符数，绝不渲染 HTML 本体
+        assertTrue(html.contains("照片墙卡片"))
+        assertTrue(html.contains("字符"))
+        assertFalse(html.contains("secret-html-body"))
+        // condensation 摘要行
+        assertTrue(html.contains("前文压缩摘要"))
+        // finish 通栏横幅
+        assertTrue(html.contains("ev-finish"))
+        assertTrue(html.contains("done"))
+    }
+
+    @Test
+    fun `agent session detail degrades undecodable payload with truncated escaped raw`() {
+        val raw = "x".repeat(500)
+        val events = listOf(
+            eventRow(1, "action", payload = null, payloadRaw = raw),
+        )
+        val html = AdminViews.agentSessionDetailPage(sessionRow(), events, nextAfter = null)
+        assertTrue(html.contains("无法解析的事件载荷"))
+        assertTrue(html.contains("ev-warn"))
+        // 截断 200 字符：不出现完整 500 x
+        assertTrue(html.contains("x".repeat(200)))
+        assertFalse(html.contains("x".repeat(201)))
+    }
+
+    @Test
+    fun `nav bar links to llm calls and agent sessions`() {
+        val html = AdminViews.usersPage(emptyList(), devicesCount = 0L)
+        assertTrue(html.contains("href=\"/admin/llm/calls\""))
+        assertTrue(html.contains("href=\"/admin/agent/sessions\""))
+    }
+
+    @Test
+    fun `user detail page links to llm calls and agent sessions filtered by account`() {
+        val d = UserDetail(
+            id = 42, email = "a@x.com", status = "active", createdAt = 1_700_000_000_000L,
+            llmCallsUsed = 3, llmCallsLimit = 100, calls = 3L, totalTokens = 1000L,
+            cost = 0.5, blocked = 0L, bytes = 2048L, lastActive = null,
+        )
+        val html = AdminViews.userDetailPage(d, emptyList())
+        assertTrue(html.contains("href=\"/admin/llm/calls?account_id=42\""))
+        assertTrue(html.contains("href=\"/admin/agent/sessions?account_id=42\""))
     }
 
 }

@@ -1,6 +1,7 @@
 package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.appJson
+import com.mamba.picme.server.agent.AgentEventPayload
 import com.mamba.picme.server.analytics.formatCostCny
 import com.mamba.picme.server.auth.AiEngineerWhitelistService
 import com.mamba.picme.server.config.SettingsService
@@ -14,10 +15,12 @@ import kotlinx.html.FormMethod
 import kotlinx.html.HTML
 import kotlinx.html.InputType
 import kotlinx.html.a
+import kotlinx.html.b
 import kotlinx.html.body
 import kotlinx.html.ButtonType
 import kotlinx.html.br
 import kotlinx.html.button
+import kotlinx.html.details
 import kotlinx.html.div
 import kotlinx.html.form
 import kotlinx.html.h1
@@ -36,6 +39,7 @@ import kotlinx.html.section
 import kotlinx.html.select
 import kotlinx.html.span
 import kotlinx.html.style
+import kotlinx.html.summary
 import kotlinx.html.table
 import kotlinx.html.td
 import kotlinx.html.textArea
@@ -56,6 +60,9 @@ import kotlin.math.abs
  * 每个 page 函数返回完整 HTML 字符串，由 AdminRoutes 用 respondText 输出。
  */
 object AdminViews {
+
+    /** stalled 判定阈值：running 会话最后事件距今超过 30min（spec §7 假 running 标注口径）。 */
+    private const val STALLED_THRESHOLD_MS = 30L * 60 * 1000
 
     fun loginPage(failed: Boolean = false): String = createHTML().html {
         adminHead("登录 · PoLang 管理后台")
@@ -313,7 +320,13 @@ object AdminViews {
                     input(type = InputType.submit, classes = "btn-sm btn-primary") { value = "改上限" }
                 }
             }
-            h2 { +"最近调用（${calls.size}）" }
+            h2 {
+                +"最近调用（${calls.size}）"
+                +" "
+                a("/admin/llm/calls?account_id=${d.id}", classes = "meta-inline") { +"调用流水 →" }
+                +" "
+                a("/admin/agent/sessions?account_id=${d.id}", classes = "meta-inline") { +"Agent 会话 →" }
+            }
             table {
                 tr {
                     th { +"时间" }
@@ -343,6 +356,197 @@ object AdminViews {
                         td { +c.status }
                         td { +(c.latencyMs?.toString() ?: "—") }
                     }
+                }
+            }
+        }
+    }
+
+    // ---------- M2 管理后台推理追溯：调用流水 / Agent 会话回放（只读） ----------
+
+    fun llmCallsPage(
+        rows: List<LlmCallListRow>,
+        status: String?,
+        provider: String?,
+        model: String?,
+        accountId: Int?,
+        nextBefore: Long?,
+    ): String = createHTML().html {
+        adminHead("调用流水 · PoLang 管理后台")
+        body {
+            navBar()
+            h1 { +"调用流水（${rows.size}）" }
+            form(action = "/admin/llm/calls", method = FormMethod.get, classes = "trace-filter") {
+                select {
+                    name = "status"
+                    option { value = ""; selected = status == null; +"全部状态" }
+                    listOf("ok", "upstream_error", "blocked_quota", "blocked_rate").forEach { s ->
+                        option { value = s; selected = status == s; +s }
+                    }
+                }
+                select {
+                    name = "provider"
+                    option { value = ""; selected = provider == null; +"全部渠道" }
+                    listOf("CLOUDFLARE", "TOKENHUB").forEach { p ->
+                        option { value = p; selected = provider == p; +p }
+                    }
+                }
+                textInput(name = "model") {
+                    placeholder = "model 精确匹配"
+                    value = model ?: ""
+                }
+                if (accountId != null) {
+                    input(type = InputType.hidden, name = "account_id") { value = accountId.toString() }
+                    span("trace-chip") {
+                        +"按用户筛选中 #$accountId "
+                        a("/admin/llm/calls${queryString("status" to status, "provider" to provider, "model" to model)}") { +"×清除" }
+                    }
+                }
+                input(type = InputType.submit, classes = "btn-sm btn-primary") { value = "筛选" }
+            }
+            table {
+                tr {
+                    th { +"时间" }
+                    th { +"用户" }
+                    th { +"模型" }
+                    th { +"渠道" }
+                    th { +"Prompt" }
+                    th { +"Completion" }
+                    th { +"Cached" }
+                    th { +"成本 ¥" }
+                    th { +"延迟 ms" }
+                    th { +"状态" }
+                    th { +"平台" }
+                }
+                rows.forEach { c ->
+                    tr {
+                        td { +fmtTs(c.createdAt) }
+                        td { a("/admin/users/${c.accountId}") { +(c.emailMasked ?: "已注销") } }
+                        td { +c.model }
+                        td { +c.provider }
+                        td { +(c.promptTokens?.toString() ?: "—") }
+                        td { +(c.completionTokens?.toString() ?: "—") }
+                        // null = 上游未上报（不可观测）；0 = 上报但未命中
+                        td { +(c.cachedTokens?.toString() ?: "—") }
+                        td { +fmt(c.costCny) }
+                        td { +(c.latencyMs?.toString() ?: "—") }
+                        td { span("st-badge ${llmStatusClass(c.status)}") { +c.status } }
+                        td { +(c.platform ?: "—") }
+                    }
+                }
+            }
+            if (nextBefore != null) {
+                p("trace-more") {
+                    a(
+                        "/admin/llm/calls${queryString(
+                            "before" to nextBefore.toString(),
+                            "status" to status,
+                            "provider" to provider,
+                            "model" to model,
+                            "account_id" to accountId?.toString(),
+                        )}",
+                    ) { +"更早 50 条 →" }
+                }
+            }
+        }
+    }
+
+    fun agentSessionsPage(
+        rows: List<AgentSessionRow>,
+        accountId: Int?,
+        nextBeforeSeq: Long?,
+    ): String = createHTML().html {
+        adminHead("Agent 会话 · PoLang 管理后台")
+        body {
+            navBar()
+            h1 { +"Agent 会话（${rows.size}）" }
+            if (accountId != null) {
+                p("trace-filter") {
+                    span("trace-chip") {
+                        +"按用户筛选中 #$accountId "
+                        a("/admin/agent/sessions") { +"×清除" }
+                    }
+                }
+            }
+            table {
+                tr {
+                    th { +"会话" }
+                    th { +"用户" }
+                    th { +"状态" }
+                    th { +"渠道" }
+                    th { +"模型" }
+                    th { +"事件数" }
+                    th { +"创建时间" }
+                    th { +"更新时间" }
+                }
+                rows.forEach { s ->
+                    tr {
+                        td { a("/admin/agent/sessions/${s.id}") { +s.id.take(8) } }
+                        td { +s.userLabel }
+                        td {
+                            span("st-badge ${sessionStatusClass(s.status)}") { +s.status }
+                            if (isStalled(s)) {
+                                +" "
+                                span("st-badge st-muted") { +"stalled" }
+                            }
+                        }
+                        td { +s.channelKind }
+                        td { +s.model }
+                        td { +s.eventCount.toString() }
+                        td { +fmtTs(s.createdAt) }
+                        td { +fmtTs(s.updatedAt) }
+                    }
+                }
+            }
+            if (nextBeforeSeq != null) {
+                p("trace-more") {
+                    a(
+                        "/admin/agent/sessions${queryString(
+                            "before_seq" to nextBeforeSeq.toString(),
+                            "account_id" to accountId?.toString(),
+                        )}",
+                    ) { +"更早 50 条 →" }
+                }
+            }
+        }
+    }
+
+    fun agentSessionDetailPage(
+        session: AgentSessionRow,
+        events: List<AgentEventRow>,
+        nextAfter: Long?,
+    ): String = createHTML().html {
+        adminHead("会话回放 ${session.id.take(8)} · PoLang 管理后台")
+        body {
+            navBar()
+            h1 { +"会话回放 ${session.id.take(8)}" }
+            div("cards") {
+                statCard("用户", session.userLabel)
+                statCard("状态", session.status)
+                statCard("渠道", session.channelKind)
+                statCard("模型", session.model)
+                statCard("事件数", session.eventCount.toString())
+            }
+            p("meta") { +"创建于 ${fmtTs(session.createdAt)} · 更新于 ${fmtTs(session.updatedAt)}" }
+            // Observation 配对锚点：页内 action 事件 id 集合
+            val actionIds = events.filter { it.type == "action" }.map { it.id }.toHashSet()
+            div("ev-list") {
+                var prevAt: Long? = null
+                events.forEach { e ->
+                    val delta = prevAt?.let { e.createdAt - it }
+                    div("ev ${eventClass(e, actionIds)}") {
+                        div("ev-meta") {
+                            +fmtTs(e.createdAt)
+                            +" · #${e.id} · ${e.type}/${e.source}/${e.role}"
+                            delta?.let { +" · +${it}ms" }
+                        }
+                        eventBody(e, actionIds)
+                    }
+                    prevAt = e.createdAt
+                }
+            }
+            if (nextAfter != null) {
+                p("trace-more") {
+                    a("/admin/agent/sessions/${session.id}?after=$nextAfter") { +"更早事件 →" }
                 }
             }
         }
@@ -1496,6 +1700,33 @@ object AdminViews {
                         .empty-state{text-align:center;padding:32px 24px;color:var(--c-text-3);font-size:var(--fs-md);border:1px dashed var(--c-border);border-radius:var(--r-md)}
                         .settings-section table{border-radius:var(--r-md)}
                         .settings-section .form-actions{border-top:none;margin-top:0;padding-top:0;justify-content:flex-end}
+                        /* 调用流水 / Agent 会话回放页面（M2 推理追溯） */
+                        .st-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:var(--fs-xs);font-weight:500;white-space:nowrap}
+                        .st-ok{color:var(--c-success);background:var(--c-success-bg);border:1px solid var(--c-success-border)}
+                        .st-error{color:var(--c-danger);background:var(--c-danger-bg);border:1px solid var(--c-danger-border)}
+                        .st-blocked{color:var(--c-warning);background:var(--c-warning-bg);border:1px solid var(--c-warning-border)}
+                        .st-muted{color:var(--c-text-3);background:#f5f5f5;border:1px solid #d9d9d9}
+                        .trace-filter{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:1200px;margin:8px auto 16px;padding:0 24px;font-size:var(--fs-sm)}
+                        .trace-filter select,.trace-filter input[type=text]{padding:6px 10px;border:1px solid #d9d9d9;border-radius:var(--r-sm);font-size:var(--fs-sm);font-family:inherit}
+                        .trace-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:var(--c-warning-bg);border:1px solid var(--c-warning-border);border-radius:12px;font-size:var(--fs-xs);color:var(--c-text-2)}
+                        .trace-chip a{color:var(--c-primary);text-decoration:none;font-weight:500}
+                        .trace-more{max-width:1200px;margin:16px auto;padding:0 24px}
+                        .trace-more a{color:var(--c-primary);text-decoration:none;font-weight:500}
+                        .ev-list{max-width:1200px;margin:16px auto;padding:0 24px}
+                        .ev{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);padding:12px 16px;margin-bottom:8px;box-shadow:var(--shadow-sm);font-size:var(--fs-sm)}
+                        .ev-meta{font-size:var(--fs-xs);color:var(--c-text-3);margin-bottom:6px;font-variant-numeric:tabular-nums}
+                        .ev-user{border-left:4px solid var(--c-primary)}
+                        .ev-assistant{border-left:4px solid var(--c-success)}
+                        .ev-action{border-left:4px solid var(--c-warning)}
+                        .ev-obs{margin-left:32px;background:#fafafa}
+                        .ev-err{color:var(--c-danger)}
+                        .ev-warn{background:var(--c-warning-bg);border-color:var(--c-warning-border)}
+                        .ev-card{border-left:4px solid var(--c-primary)}
+                        .ev-cond{color:var(--c-text-3);background:#fafafa}
+                        .ev-finish{text-align:center;font-weight:600}
+                        .ev pre{background:#f5f5f5;padding:8px;border-radius:var(--r-sm);overflow-x:auto;font-size:var(--fs-xs);margin:8px 0 0;white-space:pre-wrap;word-break:break-all}
+                        .ev details{margin-top:8px}
+                        .ev summary{cursor:pointer;color:var(--c-text-3);font-size:var(--fs-xs)}
                         @media (max-width:640px){
                         body>h1{font-size:20px}
                         body>h2{font-size:14px}
@@ -1691,6 +1922,8 @@ object AdminViews {
                 a("/admin", classes = "nav-link") { +"概览" }
                 a("/admin/users", classes = "nav-link") { +"用户" }
                 a("/admin/traffic", classes = "nav-link") { +"流量" }
+                a("/admin/llm/calls", classes = "nav-link") { +"调用" }
+                a("/admin/agent/sessions", classes = "nav-link") { +"Agent" }
                 a("/admin/channels", classes = "nav-link") { +"渠道" }
                 a("/admin/settings", classes = "nav-link") { +"设置" }
                 a("/admin/diagnosis", classes = "nav-link") { +"问题诊断" }
@@ -1790,6 +2023,90 @@ object AdminViews {
 
     private fun esc(s: String): String =
         s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    // ---------- M2 推理追溯页面辅助 ----------
+
+    /** 组装查询串；空值/空白参数剔除，值 URL 编码。返回 ""（无参数）或 "?a=1&b=2"。 */
+    private fun queryString(vararg pairs: Pair<String, String?>): String {
+        val q = pairs.filter { !it.second.isNullOrBlank() }
+            .joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, Charsets.UTF_8)}" }
+        return if (q.isEmpty()) "" else "?$q"
+    }
+
+    private fun llmStatusClass(status: String): String = when {
+        status == "ok" -> "st-ok"
+        status == "upstream_error" -> "st-error"
+        status.startsWith("blocked") -> "st-blocked"
+        else -> "st-muted"
+    }
+
+    private fun sessionStatusClass(status: String): String = when (status) {
+        "running" -> "st-ok"
+        "error" -> "st-error"
+        else -> "st-muted"
+    }
+
+    /** 假 running：status=running 但最后事件距今 >30min（状态机不回收，视图层标注，见 spec §7）。 */
+    private fun isStalled(s: AgentSessionRow): Boolean =
+        s.status == "running" && (s.lastEventAt ?: 0L) < System.currentTimeMillis() - STALLED_THRESHOLD_MS
+
+    private fun isOrphanObservation(p: AgentEventPayload.Observation, actionIds: Set<Long>): Boolean =
+        p.actionEventId == 0L || p.actionEventId !in actionIds
+
+    private fun eventClass(e: AgentEventRow, actionIds: Set<Long>): String = when (val p = e.payload) {
+        null -> "ev-warn"
+        is AgentEventPayload.Message -> if (e.role == "user") "ev-user" else "ev-assistant"
+        is AgentEventPayload.Action -> "ev-action"
+        is AgentEventPayload.Observation -> buildString {
+            append("ev-obs")
+            if (isOrphanObservation(p, actionIds)) append(" ev-orphan")
+            if (p.content.startsWith("error")) append(" ev-err")
+        }
+        is AgentEventPayload.HtmlCard -> "ev-card"
+        is AgentEventPayload.Finish -> "ev-finish " + when (p.reason) {
+            "done" -> "st-ok"
+            "error" -> "st-error"
+            else -> "st-muted"
+        }
+        is AgentEventPayload.Condensation -> "ev-cond"
+    }
+
+    /**
+     * 事件体渲染。转义铁律：一切用户内容经 `+`（kotlinx.html 默认转义）上屏；
+     * html_card 只显示 summary + 字符数，永不渲染 HTML 本体。
+     */
+    private fun FlowContent.eventBody(e: AgentEventRow, actionIds: Set<Long>) {
+        when (val p = e.payload) {
+            null -> {
+                span { +"无法解析的事件载荷" }
+                if (!e.payloadRaw.isNullOrEmpty()) {
+                    pre { +e.payloadRaw.take(200) }
+                }
+            }
+            is AgentEventPayload.Message -> div("ev-content") { +p.content }
+            is AgentEventPayload.Action -> {
+                div("ev-content") {
+                    b { +p.tool }
+                    if (p.reversible) span("meta-inline") { +"（可逆）" }
+                }
+                details {
+                    summary { +"argsJson" }
+                    pre { +p.argsJson }
+                }
+            }
+            is AgentEventPayload.Observation -> {
+                // 孤儿 observation（门控拦截痕迹）不隐藏，徽标标注后照常成条
+                if (isOrphanObservation(p, actionIds)) {
+                    span("st-badge st-blocked") { +"门控拦截/未配对" }
+                    +" "
+                }
+                span { +p.content }
+            }
+            is AgentEventPayload.HtmlCard -> div("ev-content") { +"H5 卡：${p.summary}（${p.html.length} 字符）" }
+            is AgentEventPayload.Finish -> span { +"终态：${p.reason}" }
+            is AgentEventPayload.Condensation -> div("meta-inline") { +"上下文压缩至 #${p.upToEventId}：${p.summary}" }
+        }
+    }
 
     private fun fmt(d: Double): String = formatCostCny(d)
 
