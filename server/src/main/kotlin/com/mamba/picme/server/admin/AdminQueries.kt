@@ -10,6 +10,8 @@ import com.mamba.picme.server.db.Db
 import com.mamba.picme.server.db.IosUdidRegistrations
 import com.mamba.picme.server.db.LlmCallLogs
 import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.SortOrder
@@ -100,6 +102,23 @@ data class CallRow(
     val respBytes: Int,
     val status: String,
     val latencyMs: Int?,
+    val createdAt: Long,
+)
+
+/** M2 管理后台推理追溯：llm_call_log 全量流水行（含账号维度，跨用户列表用）。 */
+data class LlmCallListRow(
+    val id: Long,
+    val accountId: Int,
+    val emailMasked: String?, // null = 账号已注销
+    val model: String,
+    val provider: String,
+    val promptTokens: Int?,
+    val completionTokens: Int?,
+    val cachedTokens: Int?,
+    val costCny: Double,
+    val status: String,
+    val latencyMs: Int?,
+    val platform: String?,
     val createdAt: Long,
 )
 
@@ -605,5 +624,53 @@ object AdminQueries {
     private fun maskDeviceId(deviceId: String): String = when {
         deviceId.length <= 10 -> "••••" + deviceId.takeLast(4)
         else -> deviceId.take(6) + "••••" + deviceId.takeLast(4)
+    }
+
+    // ── M2: 管理后台推理追溯 ──────────────────────────────────
+
+    /**
+     * llm_call_log 全量流水，id 倒序游标分页（before = 严格小于；传 null 取最新页）。
+     * 筛选均可空；leftJoin account 取邮箱脱敏，账号已注销（deletedAt 非空）或 join 未命中 → emailMasked = null（「已注销」由视图层渲染）。
+     */
+    suspend fun llmCalls(
+        before: Long?,
+        limit: Int = 50,
+        status: String? = null,
+        provider: String? = null,
+        model: String? = null,
+        accountId: Int? = null,
+    ): List<LlmCallListRow> = newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+        LlmCallLogs
+            .join(Accounts, JoinType.LEFT, onColumn = LlmCallLogs.accountId, otherColumn = Accounts.id)
+            .selectAll()
+            .where {
+                var cond: Op<Boolean> = Op.TRUE
+                before?.let { cond = cond and (LlmCallLogs.id less it) }
+                status?.let { cond = cond and (LlmCallLogs.status eq it) }
+                provider?.let { cond = cond and (LlmCallLogs.provider eq it) }
+                model?.let { cond = cond and (LlmCallLogs.model eq it) }
+                accountId?.let { cond = cond and (LlmCallLogs.accountId eq it) }
+                cond
+            }
+            .orderBy(LlmCallLogs.id to SortOrder.DESC)
+            .limit(limit)
+            .map { r ->
+                val deleted = r.getOrNull(Accounts.deletedAt) != null
+                LlmCallListRow(
+                    id = r[LlmCallLogs.id],
+                    accountId = r[LlmCallLogs.accountId],
+                    emailMasked = if (deleted) null else r.getOrNull(Accounts.email)?.let { maskEmail(it) },
+                    model = r[LlmCallLogs.model],
+                    provider = r[LlmCallLogs.provider],
+                    promptTokens = r[LlmCallLogs.promptTokens],
+                    completionTokens = r[LlmCallLogs.completionTokens],
+                    cachedTokens = r[LlmCallLogs.cachedTokens],
+                    costCny = r[LlmCallLogs.costCny],
+                    status = r[LlmCallLogs.status],
+                    latencyMs = r[LlmCallLogs.latencyMs],
+                    platform = r[LlmCallLogs.platform],
+                    createdAt = r[LlmCallLogs.createdAt],
+                )
+            }
     }
 }

@@ -254,6 +254,112 @@ class AdminQueriesTest {
         assertEquals(0.0, b.failureRate7d, 0.0)
     }
 
+    // ── M2: llmCalls 流水查询 ──────────────────────────────────
+
+    @Test
+    fun `llmCalls returns rows desc with masked email`() = runBlocking {
+        TestDb.init(Accounts, LlmCallLogs)
+        account(1, "alice@x.com", todayStart - 5 * day)
+        account(2, "bob@x.com", todayStart + 10)
+        logRow(1, "deepseek-chat", "CLOUDFLARE", 100, 50, 150, 1.0, 1024, "ok", todayStart + 1000, latencyMs = 200)
+        logRow(1, "deepseek-chat", "CLOUDFLARE", null, null, null, 0.0, 0, "blocked_quota", todayStart + 2000)
+        logRow(2, "kimi-k2.6", "TOKENHUB", 10, 5, 15, 0.5, 100, "ok", todayStart + 3000)
+
+        val rows = AdminQueries.llmCalls(before = null, limit = 50)
+        assertEquals(3, rows.size)
+        // id 自增 → id 倒序 = 后插入在前
+        assertTrue(rows[0].id > rows[1].id && rows[1].id > rows[2].id)
+        val kimi = rows[0]
+        assertEquals("kimi-k2.6", kimi.model)
+        assertEquals("TOKENHUB", kimi.provider)
+        assertEquals(2, kimi.accountId)
+        assertEquals("b***@x.com", kimi.emailMasked)
+        assertEquals(10, kimi.promptTokens)
+        assertEquals(5, kimi.completionTokens)
+        assertEquals(0.5, kimi.costCny, 0.000001)
+        assertEquals("ok", kimi.status)
+        val blocked = rows[1]
+        assertEquals("blocked_quota", blocked.status)
+        assertEquals("a***@x.com", blocked.emailMasked)
+        assertNull(blocked.promptTokens)
+        assertEquals(200, rows[2].latencyMs)
+    }
+
+    @Test
+    fun `llmCalls before cursor paginates without overlap`() = runBlocking {
+        TestDb.init(Accounts, LlmCallLogs)
+        account(1, "a@x.com", todayStart - day)
+        repeat(55) { i ->
+            logRow(1, "deepseek-chat", "CLOUDFLARE", 1, 1, 2, 0.1, 10, "ok", todayStart + i)
+        }
+
+        val page1 = AdminQueries.llmCalls(before = null, limit = 50)
+        assertEquals(50, page1.size)
+        val page2 = AdminQueries.llmCalls(before = page1.last().id, limit = 50)
+        assertEquals(5, page2.size)
+
+        // 不重不漏：两页并集 = 全部 55 条
+        val allIds = (page1 + page2).map { it.id }
+        assertEquals(55, allIds.distinct().size)
+        // before = 严格小于：第二页全部 id < 第一页末行 id
+        assertTrue(page2.all { it.id < page1.last().id })
+        // 各页内部均 id 倒序
+        assertEquals(page1.map { it.id }, page1.map { it.id }.sortedDescending())
+        assertEquals(page2.map { it.id }, page2.map { it.id }.sortedDescending())
+        // 第三页为空
+        assertTrue(AdminQueries.llmCalls(before = page2.last().id, limit = 50).isEmpty())
+    }
+
+    @Test
+    fun `llmCalls filters by status and provider and accountId`() = runBlocking {
+        TestDb.init(Accounts, LlmCallLogs)
+        account(1, "a@x.com", todayStart - day)
+        account(2, "b@x.com", todayStart)
+        logRow(1, "deepseek-chat", "CLOUDFLARE", 1, 1, 2, 0.1, 10, "ok", todayStart + 1)
+        logRow(1, "deepseek-chat", "CLOUDFLARE", null, null, null, 0.0, 0, "upstream_error", todayStart + 2)
+        logRow(1, "kimi-k2.6", "TOKENHUB", 1, 1, 2, 0.1, 10, "ok", todayStart + 3)
+        logRow(2, "deepseek-chat", "CLOUDFLARE", 1, 1, 2, 0.1, 10, "ok", todayStart + 4)
+
+        val errors = AdminQueries.llmCalls(before = null, status = "upstream_error")
+        assertEquals(1, errors.size)
+        assertEquals("upstream_error", errors[0].status)
+
+        val tokenHub = AdminQueries.llmCalls(before = null, provider = "TOKENHUB")
+        assertEquals(1, tokenHub.size)
+        assertEquals("kimi-k2.6", tokenHub[0].model)
+
+        val deepseek = AdminQueries.llmCalls(before = null, model = "deepseek-chat")
+        assertEquals(3, deepseek.size)
+
+        val account2 = AdminQueries.llmCalls(before = null, accountId = 2)
+        assertEquals(1, account2.size)
+        assertEquals(2, account2[0].accountId)
+
+        // 组合筛选：账号 1 + ok + CLOUDFLARE → 仅第一条
+        val combo = AdminQueries.llmCalls(before = null, status = "ok", provider = "CLOUDFLARE", accountId = 1)
+        assertEquals(1, combo.size)
+        assertEquals("ok", combo[0].status)
+        assertEquals("CLOUDFLARE", combo[0].provider)
+
+        // 无命中
+        assertTrue(AdminQueries.llmCalls(before = null, status = "blocked_rate").isEmpty())
+    }
+
+    @Test
+    fun `llmCalls soft-deleted account yields null emailMasked`() = runBlocking {
+        TestDb.init(Accounts, LlmCallLogs)
+        account(1, "alice@x.com", todayStart - day)
+        deletedAccount(2, "gone@x.com", todayStart - day)
+        logRow(1, "deepseek-chat", "CLOUDFLARE", 1, 1, 2, 0.1, 10, "ok", todayStart + 1)
+        logRow(2, "deepseek-chat", "CLOUDFLARE", 1, 1, 2, 0.1, 10, "ok", todayStart + 2)
+
+        val rows = AdminQueries.llmCalls(before = null)
+        assertEquals(2, rows.size)
+        // join null（账号已注销）→ 查询层给 null，「已注销」由视图层渲染
+        assertNull(rows.first { it.accountId == 2 }.emailMasked)
+        assertEquals("a***@x.com", rows.first { it.accountId == 1 }.emailMasked)
+    }
+
     private suspend fun account(id: Int, email: String, createdAt: Long) {
         newSuspendedTransaction(Dispatchers.IO, Db.instance) {
             Accounts.insert {
@@ -264,6 +370,22 @@ class AdminQueriesTest {
                 it[Accounts.llmCallsUsed] = 0
                 it[Accounts.llmCallsLimit] = 100
                 it[Accounts.createdAt] = createdAt
+            }
+        }
+    }
+
+    /** 与 AccountService 软删除同形：status=deleted + email 改写 + deletedAt 落时间。 */
+    private suspend fun deletedAccount(id: Int, origEmail: String, createdAt: Long) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            Accounts.insert {
+                it[Accounts.id] = id
+                it[Accounts.email] = "deleted_${id}__${origEmail}"
+                it[Accounts.tokenHash] = "hash$id"
+                it[Accounts.status] = "deleted"
+                it[Accounts.llmCallsUsed] = 0
+                it[Accounts.llmCallsLimit] = 100
+                it[Accounts.createdAt] = createdAt
+                it[Accounts.deletedAt] = createdAt + 1000
             }
         }
     }
