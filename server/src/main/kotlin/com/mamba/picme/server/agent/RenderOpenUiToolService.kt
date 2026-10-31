@@ -101,6 +101,19 @@ class RenderOpenUiToolService {
                 "weights = [1, 2], align = \"center\")])"
 
         /**
+         * 经典组合版式黄金示例（2026-10-31 经典组合版式批次）：Banner 题图横幅 +
+         * StatRow 统计行 + List([ListItem...]) 经典列表——固化构图一行调用，
+         * 不再 Row+Column+Text(DISPLAY) 拼装。
+         */
+        const val GOLDEN_CLASSIC_PROGRAM =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+                "root = Card([Banner(\"本周精选\", photo = photos[0].id, subtitle = \"2026-07-18 · 三亚\"), " +
+                "StatRow([{value: \"7,120\", label: \"照片总数\"}, {value: \"128\", label: \"本周新增\"}, " +
+                "{value: \"12\", label: \"覆盖月份\"}]), " +
+                "ListItem(\"海边日落\", photo = photos[1].id, trailing = \"07-18\"), " +
+                "ListItem(\"山顶云海\", photo = photos[2].id, trailing = \"07-19\")])"
+
+        /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
          * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
          * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
@@ -213,7 +226,15 @@ class RenderOpenUiToolService {
      图片地址一律 https:// 公网图、禁本地路径/uri）；
    - 列表：EntityList(rows*=[{left*, right*}], headerLeft?, headerRight?, footerLeft?, footerRight?)（双列键值行）/
      ListBlock(items*=[{title*, subtitle?, image?, actionLabel?, action?}], variant?=number|image) /
-     Steps(items*=[{title*, details?}])（纵向步骤条）；
+     Steps(items*=[{title*, details?}])（纵向步骤条）/
+     ListItem(title*, subtitle?, photo?, image?, icon?, trailing?, actionLabel?, action?)（经典列表行：
+     前件三选一——photo 相册投影 48dp 图（写 photos[0].id，禁字面量数字）> image https 图 > icon 徽章
+     （59 枚枚举名）；trailing 是尾部弱色小字（如日期/计数）；List([ListItem(...)]) 即经典列表，独立用亦可）；
+   - 经典组合版式（固化构图，优先于原语拼装）：StatRow(items*=[{value*, label?}])（经典统计行：
+     2~4 项等分，每项 DISPLAY 大数字 + CAPTION 弱色标签居中——统计数字首选，替代
+     Row+Column+Text("DISPLAY") 拼装）/ Banner(title*, subtitle?, photo?, src?, aspect?)（通栏题图横幅：
+     图 + 底部渐变蒙层 + 左下白字标题；photo 写 photos[0].id 相册投影、src 是 https:// 公网图，
+     二选一，皆无纯色底；aspect 缺省 16:9）；
    - 表单（name 键控直写 state：用户交互即 @Set(${'$'}<name>, 值)——如 Input(name="city")
      键入后 Text("城市: " + ${'$'}city) 经 ${'$'}name 绑定联动读；Form 仅视觉分组，无提交作用域；
      ${'$'}变量同样先独占一行声明默认值）：
@@ -241,12 +262,14 @@ class RenderOpenUiToolService {
      OverviewCardBlock(items*=[{top*=[组件], bottom?=[组件]}]) /
      ContextCardBlock(items*=[{title*, body?}]) /
      CompositeCardBlock(items*=[{header?=[组件], body*=[组件], footer?=[组件]}]) /
-     VisualCardBlock(items*=[{body*, bgImageSrc?, tag?}])；
+     VisualCardBlock(items*=[{body*, bgPhoto?, bgImageSrc?, tag?}])（题图卡：bgPhoto 相册投影 id
+     （photos[0].id，禁字面量数字）与 bgImageSrc https 公网图二选一、bgPhoto 优先）；
    - 元素形状（仅作父组件数组元素的对象形状，不独立使用——优先用上面对象数组写法，
-     组件形仅保底）：TabItem / AccordionItem / ListItem / StepsItem / SelectItem /
+     组件形仅保底；ListItem 已升格为经典列表行见上方列表段）：TabItem / AccordionItem /
+     StepsItem / SelectItem /
      CheckBoxItem / RadioItem / SwitchItem / ChipItem / OptionCard / Series / Slice /
      ScatterSeries / Point / SnippetCardItem / OverviewCardItem / ContextCardItem /
-     CompositeCardItem / VisualCardItem；
+     CompositeCardItem / VisualCardItem / StatItem；
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
    `buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])`
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
@@ -293,10 +316,21 @@ class RenderOpenUiToolService {
      单图主打、多个 ImageText(title, photo=photos[i].id) 叠 Column 小图列表；
    ⚠️ 不支持文字环绕图片（float wrap 无此形态）；Row 裸拼 Image+Text 必须传 weights
    按比例分栏，否则等宽分栏会把缩略图拉成半宽栏（lint 会提示）；
+   经典组合版式（2026-10-31，固化构图优先于原语拼装）：
+   - 统计数字行（2~4 个关键指标）→ StatRow([{value: "7,120", label: "照片"}, ...])
+     （等分居中构图已固化，别再 Row+Column+Text("DISPLAY") 拼装）；
+   - 通栏题图横幅（单图主打 + 标题叠字）→ Banner("标题", photo = photos[i].id, subtitle = ...)；
+   - 经典列表行（图/图标 + 标题副题 + 尾部小字）→ List([ListItem("标题", photo = photos[i].id,
+     trailing = "07-18"), ...]) 或多行 ListItem 直接排进 Card；
+   - 双列题图卡（相册照片）→ VisualCardBlock([{body: "精选", bgPhoto: photos[i].id}])；
+   - 页内分区标题 → CardHeader("分区标题", "可选副题")；
    通用布局黄金示例（四宫格照片墙 + 1:2 左图右文）：
 """ + GOLDEN_LAYOUT_PROGRAM + """
    图文排版黄金示例（ImageTextLarge/ImageText 便捷糖形态）：
-""" + GOLDEN_PHOTO_TEXT_PROGRAM
+""" + GOLDEN_PHOTO_TEXT_PROGRAM + """
+   经典组合版式黄金示例（Banner 题图横幅 + StatRow 统计行 + ListItem 列表行——
+   相册卡首选骨架）：
+""" + GOLDEN_CLASSIC_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

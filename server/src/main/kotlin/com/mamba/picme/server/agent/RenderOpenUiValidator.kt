@@ -36,14 +36,17 @@ object RenderOpenUiValidator {
     const val MAX_PROGRAM_LENGTH = 128_000
 
     /**
-     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 八十九项字面量
+     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 九十五项字面量
      * 副本对齐：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
      * M3（2026-10-24）+Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch；
      * 2026-10-25 官方组件库全量补全（spec《openui-full-library-design》）21→89——
      * 官方 82 组件适配 81（Col 列式 Table 刻意不收，行式为唯一形态）+ 本仓既有 8；
+     * 2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
+     * 2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
      * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
-     * 不做 per-component prop schema 校验）。
+     * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
+     * 实渲染化，独立/列表内皆可）。
      * internal 供测试钉住全清单（字面量副本同源核对）。
      */
     internal val ALLOWED_COMPONENTS = setOf(
@@ -55,6 +58,8 @@ object RenderOpenUiValidator {
         "Stack", "Separator", "MarkDownRenderer",
         // 通用布局原语批次（2026-10-30 本仓扩展：四宫格/比例分栏/叠放/留白经典版式）
         "Grid", "Box", "Spacer",
+        // 经典组合版式批次（2026-10-31 本仓扩展：统计行/题图横幅固化构图）
+        "StatRow", "StatItem", "Banner",
         // 官方内容/布局
         "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
         "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
@@ -119,7 +124,10 @@ object RenderOpenUiValidator {
         Regex("""(?<![A-Za-z0-9_])(bgImageSrc|src|image)\s*[:=]\s*"((?:[^"\\]|\\.)*)"""")
 
     private val NAMED_ARG = Regex("""^[A-Za-z_][A-Za-z0-9_]*\s*=""")
-    private val NAMED_PHOTO = Regex("""(?<![A-Za-z0-9_])photo\s*=""")
+    /** photo 类键（2026-10-31 扩 bgPhoto + 对象字段冒号形态：VisualCardBlock items 的
+     *  `{bgPhoto: …}` 对象字面量字段同样产生位图，计入单卡图片上限；命名实参 `photo =`
+     *  与对象字段 `photo:`/`bgPhoto:` 两种写法同规）。 */
+    private val NAMED_PHOTO = Regex("""(?<![A-Za-z0-9_])(bgPhoto|photo)\s*[:=]""")
     private val NAMED_SRC = Regex("""(?<![A-Za-z0-9_])src\s*=""")
 
     /** Image 实参分析时字符串字面量的占位符（与剥离替换同形，便于按占位符定位位置参数）。 */
@@ -199,7 +207,7 @@ object RenderOpenUiValidator {
         if (TEXT_DISPLAY_CALL.containsMatchIn(program) && ROW_CALL.containsMatchIn(program) &&
             !ALIGN_CENTER.containsMatchIn(program)
         ) {
-            warnings += "stat tile 数字栏未居中（检测到 DISPLAY 大数字 + Row 分栏但无 align = \"center\"，数字贴栏首错落；每个数字栏 Column 补 align = \"center\"）"
+            warnings += "stat tile 数字栏未居中（检测到 DISPLAY 大数字 + Row 分栏但无 align = \"center\"，数字贴栏首错落；每个数字栏 Column 补 align = \"center\"，或直接换 StatRow([{value, label}, ...]) 组件一行固化构图）"
         }
         callArgSpans(stripped, ROW_CALL).forEach { args ->
             // 2026-10-30 通用布局原语批次修订：weights 比例分栏是认可的经典版式写法，
@@ -289,7 +297,7 @@ object RenderOpenUiValidator {
             .toSet()
             .filter { name -> name !in ALLOWED_CALLS }
             .forEach { name ->
-                violations += "组件/调用 \"$name\" 不在白名单（92 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
+                violations += "组件/调用 \"$name\" 不在白名单（95 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
             }
 
         // 3. Query 形态：唯一宿主工具 local_handle；handle 必须是 local://scan/<id> 形态
