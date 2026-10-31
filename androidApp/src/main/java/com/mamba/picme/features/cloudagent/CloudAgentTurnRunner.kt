@@ -17,6 +17,12 @@ sealed interface CloudTurnEvent {
     /** 服务端下发 tool_request，端侧已受理执行。 */
     data class ToolCall(val tool: String) : CloudTurnEvent
 
+    /** 一步开始（action 事件；stepId = 服务端事件 id）。 */
+    data class StepStarted(val stepId: Long, val tool: String) : CloudTurnEvent
+
+    /** 一步结束（observation 事件；stepId = payload.actionEventId；ok = content 非 "error" 前缀）。 */
+    data class StepFinished(val stepId: Long, val ok: Boolean) : CloudTurnEvent
+
     /** 云端 render_html 产物（H5 卡）：完整自包含 HTML + 一句话摘要。 */
     data class HtmlCard(val html: String, val summary: String) : CloudTurnEvent
 
@@ -106,6 +112,8 @@ class CloudAgentTurnRunner(
                 }
             }
             "action" -> {
+                // 步骤时间线：所有 action 帧先发 StepStarted（含发卡工具），再做卡解析
+                onEvent(CloudTurnEvent.StepStarted(event.optLong("id"), payload.optString("tool")))
                 if (payload.optString("tool") == CloudAgentToolContract.TOOL_RENDER_UI) {
                     // 终审 m5：render_ui 参数解析容错——坏帧记日志忽略，不拖垮整回合
                     runCatching {
@@ -128,9 +136,21 @@ class CloudAgentTurnRunner(
                     }.onSuccess { card -> onEvent(card) }
                         .onFailure { e -> Logger.w(TAG, "render_ui_openui action frame ignored: ${e.message}") }
                 }
-                // 其它工具的 action 帧维持忽略（ToolCall 由 tool_request 帧驱动）
+                // 其它工具的 action 帧不出卡（步骤事件已在上方发出；ToolCall 由 tool_request 帧驱动）
             }
-            else -> Unit // observation/finish 不上屏（ToolCall 由 tool_request 帧驱动）
+            // observation → 步骤收尾；actionEventId=0 为渲染门控例行产生的孤儿帧，跳过
+            "observation" -> {
+                val actionEventId = payload.optLong("actionEventId")
+                if (actionEventId != 0L) {
+                    onEvent(
+                        CloudTurnEvent.StepFinished(
+                            actionEventId,
+                            !payload.optString("content").startsWith("error"),
+                        ),
+                    )
+                }
+            }
+            else -> Unit // finish/condensation 不上屏（ToolCall 由 tool_request 帧驱动）
         }
     }
 

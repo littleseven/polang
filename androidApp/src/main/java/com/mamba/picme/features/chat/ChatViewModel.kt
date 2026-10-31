@@ -2466,6 +2466,7 @@ class ChatViewModel(
                 _openUiStreamProgram.value = event.program
             }
             is CloudTurnEvent.Error -> onServerError(event.message)
+            is CloudTurnEvent.StepStarted, is CloudTurnEvent.StepFinished -> Unit // 步骤时间线事件（后续任务渲染），本回合暂忽略
             CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理
         }
     }

@@ -204,7 +204,7 @@ class CloudAgentTurnRunnerTest {
     }
 
     @Test
-    fun `action frame of other tool is ignored`() = runTest {
+    fun `action frame of other tool emits StepStarted without card`() = runTest {
         val api = FakeApi()
         api.framesScript = { onFrame ->
             onFrame(
@@ -216,7 +216,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.StepStarted(3L, "search_media"), CloudTurnEvent.Done), events)
     }
 
     @Test
@@ -262,7 +262,7 @@ class CloudAgentTurnRunnerTest {
     }
 
     @Test
-    fun `render_ui_openui action frame with malformed argsJson is ignored`() = runTest {
+    fun `render_ui_openui action frame with malformed argsJson emits StepStarted but no card`() = runTest {
         val api = FakeApi()
         api.framesScript = { onFrame ->
             onFrame(
@@ -274,7 +274,94 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
+        assertEquals(listOf(CloudTurnEvent.StepStarted(5L, "render_ui_openui"), CloudTurnEvent.Done), events)
+    }
+
+    @Test
+    fun `action event emits StepStarted and observation emits StepFinished`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":11,"type":"action","source":"agent","role":"assistant","payload":{"type":"action","tool":"search_media","argsJson":"{}"}}"""),
+                ),
+            )
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":12,"type":"observation","source":"environment","role":"tool","payload":{"type":"observation","actionEventId":11,"content":"找到 3 张"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "搜照片", null) { events.add(it) }
+        assertEquals(
+            listOf(
+                CloudTurnEvent.StepStarted(11L, "search_media"),
+                CloudTurnEvent.StepFinished(11L, true),
+                CloudTurnEvent.Done,
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun `observation with error content emits StepFinished ok=false`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":21,"type":"observation","source":"environment","role":"tool","payload":{"type":"observation","actionEventId":20,"content":"error: timeout"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
+        assertEquals(listOf(CloudTurnEvent.StepFinished(20L, false), CloudTurnEvent.Done), events)
+    }
+
+    @Test
+    fun `orphan observation with actionEventId 0 is skipped`() = runTest {
+        // 服务端渲染门控例行产生的孤儿 observation（actionEventId=0）不上屏
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject("""{"id":31,"type":"observation","source":"environment","role":"tool","payload":{"type":"observation","actionEventId":0,"content":"渲染门控"}}"""),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
         assertEquals(listOf(CloudTurnEvent.Done), events)
+    }
+
+    @Test
+    fun `render_ui action emits both StepStarted and A2uiCard`() = runTest {
+        // 发卡工具同样先发 StepStarted（在卡事件之前），A2uiCard 行为不回归
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.Event(
+                    JSONObject(
+                        """{"id":2,"type":"action","source":"agent","role":"assistant","payload":{"tool":"render_ui","argsJson":"{\"surfaceId\":\"sf-1\",\"messagesJson\":\"[{}]\",\"fallbackSummary\":\"327 张\"}"}}"""
+                    ),
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
+        assertEquals(
+            listOf(
+                CloudTurnEvent.StepStarted(2L, "render_ui"),
+                CloudTurnEvent.A2uiCard("sf-1", "[{}]", "327 张"),
+                CloudTurnEvent.Done,
+            ),
+            events,
+        )
     }
 
     @Test
