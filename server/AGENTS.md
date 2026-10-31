@@ -13,9 +13,9 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.5
+**版本**：0.9.8
 
-**最后更新**：2026-10-31
+**最后更新**：2026-11-01
 
 **状态**：生效中 / 已上线
 
@@ -28,7 +28,7 @@
 **核心职责**：
 - **AI 网关**：`LlmProxy` + `ChannelRegistry` — 按模型自动路由到 Cloudflare AI Gateway 或腾讯 TokenHub；`stream=true` 请求 SSE 逐 chunk 透传（原样转发 stream/stream_options），usage 从流尾帧解析计费（含 `prompt_tokens_details.cached_tokens` 前缀缓存命中采集，`llm_call_log.cached_tokens`，2026-10-17）；非流式请求强制 `stream=false` 走完整响应体解析
 - **账号体系**：`EmailService` + `AccountService` + `AppTokenAuth` — 邮箱注册、动态 Token、SHA-256 校验
-- **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量）
+- **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量/渠道/设置/问题诊断/发包 + M2 推理追溯：调用流水/Agent 会话回放）
 - **推荐引擎**：`RuleEngine` — 纯规则型场景推荐（规避算法备案）
 - **遥测收集**：`TelemetryRoute` — 批量匿名事件写入 SQLite
 - **COS 存储**：`CosService` — 腾讯 COS 上传/元数据/预签名 URL；APK 下载 URL 渠道路由（`apkPublicUrl(channel)`：debug 轨可经 `APK_DEBUG_PUBLIC_BASE` 指向北京轻量国内镜像，release 轨恒走 `cos.polang.net`）
@@ -72,10 +72,10 @@ server/
 │   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理
 │   │   └── AiEngineerWhitelistService.kt # AI 工程师交付白名单
 │   ├── admin/
-│   │   ├── AdminRoutes.kt        # /admin/** 路由注册（含 /admin/diagnosis 问题诊断页）
+│   │   ├── AdminRoutes.kt        # /admin/** 路由注册（含 /admin/diagnosis 问题诊断页 + M2 推理追溯三路由：/admin/llm/calls、/admin/agent/sessions[/{id}]）
 │   │   ├── AdminAuth.kt          # ADMIN_TOKEN + cookie 认证
-│   │   ├── AdminViews.kt         # kotlinx.html SSR 页面
-│   │   └── AdminQueries.kt       # 运营数据查询
+│   │   ├── AdminViews.kt         # kotlinx.html SSR 页面（含调用流水/Agent 会话回放页）
+│   │   └── AdminQueries.kt       # 运营数据查询（含 llmCalls 游标分页查询 / agent 会话与事件回放查询）
 │   ├── issue/
 │   │   ├── IssueReportService.kt # 问题上报存库 + GitHub 同步
 │   │   ├── IssueSanitizer.kt     # 隐私脱敏
@@ -174,6 +174,9 @@ server/
 | POST | `/admin/settings/whitelist` | P1 | ✅ | ADMIN_TOKEN | 添加 AI 工程师白名单邮箱 |
 | POST | `/admin/settings/whitelist/revoke` | P1 | ✅ | ADMIN_TOKEN | 移除 AI 工程师白名单邮箱 |
 | GET | `/admin/diagnosis` | P1 | ✅ | ADMIN_TOKEN | 用户上报问题列表（状态流转 / 手动同步 GitHub） |
+| GET | `/admin/llm/calls` | P1 | ✅ | ADMIN_TOKEN | 调用流水（llm_call_log id 倒序游标 `before`，单页 50，满页才给下一页链接防末页死循环；`status`/`provider`/`model`/`account_id` 筛选；非法 `before`/`account_id` 回 400） |
+| GET | `/admin/agent/sessions` | P1 | ✅ | ADMIN_TOKEN | Agent 会话列表（seq 倒序游标 `before_seq`，单页 50；`account_id` 筛选；非法游标/参数回 400） |
+| GET | `/admin/agent/sessions/{id}` | P1 | ✅ | ADMIN_TOKEN | 会话事件回放（事件 id 升序 `after` 游标，单页 200；未知 sessionId 回 404） |
 | POST | `/admin/users/{id}/reset-quota` | P1 | ✅ | ADMIN_TOKEN | 清零单账号已用额度（保留 llm_call_log 历史） |
 | POST | `/admin/users/{id}/limit` | P1 | ✅ | ADMIN_TOKEN | 改单账号调用上限（0=禁用但保留 token） |
 | POST | `/admin/devices/{id}/reset-quota` | P1 | ✅ | ADMIN_TOKEN | 清零访客设备已用额度 |
@@ -294,5 +297,5 @@ nginx picme 反代段落仓库 SSOT：`server/deploy/nginx/api.polang.net.conf`�
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-10-25
+> **最后更新**：2026-11-01
 > **状态**：生效中
