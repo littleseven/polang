@@ -88,13 +88,14 @@ class RenderOpenUiToolService {
                 "ImageText(\"城市夜景\", photo = photos[2].id, subtitle = \"2026-07-20\")])"
 
         /**
-         * 通用布局黄金示例（2026-10-30 通用布局原语批次）：四宫格照片墙（Grid columns=2）
-         * + 1:2 按比例左图右文（Row weights + align 居中）——经典版式的通用原语写法。
+         * 通用布局黄金示例（2026-10-30 通用布局原语批次；2026-10-31 相册批次修订）：
+         * 照片墙走 PhotoGrid 固化件（Grid 装 Image 已被 lint 引导至 PhotoGrid），
+         * Grid/Row weights 留给图表与混合内容的比例分栏（1:2 按比例左图右文）。
          */
         const val GOLDEN_LAYOUT_PROGRAM =
             "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
                 "root = Card([Text(\"本周精选\", \"HEADLINE\"), " +
-                "Grid([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id), Image(photos[3].id)], columns = 2), " +
+                "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id], columns = 2), " +
                 "Spacer(\"s\"), " +
                 "Row([Image(photos[4].id), " +
                 "Column([Text(\"海边日落\"), Text(\"2026-07-18 · 三亚\", \"CAPTION\")])], " +
@@ -112,6 +113,18 @@ class RenderOpenUiToolService {
                 "{value: \"12\", label: \"覆盖月份\"}]), " +
                 "ListItem(\"海边日落\", photo = photos[1].id, trailing = \"07-18\"), " +
                 "ListItem(\"山顶云海\", photo = photos[2].id, trailing = \"07-19\")])"
+
+        /**
+         * 相册 APP 构图黄金示例（2026-10-31 相册 APP 组合方式批次）：CardHeader 时间分组
+         * 标题 + PhotoGrid 方形照片网格 + AvatarRow 人物头像条——相册 APP 签名形态一行调用，
+         * 不再 Grid+Image / Row 拼装。
+         */
+        const val GOLDEN_PHOTO_PROGRAM =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+                "root = Card([CardHeader(\"2026年7月\", subtitle = \"128 张\"), " +
+                "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id, " +
+                "photos[4].id, photos[5].id], columns = 3), " +
+                "AvatarRow([{photo: photos[0].id, label: \"妈妈\"}, {photo: photos[1].id, label: \"宝宝\"}])])"
 
         /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
@@ -155,9 +168,10 @@ class RenderOpenUiToolService {
      flex-grow 语义）——按比例左图右文写法 Row([Image(photos[0].id), Column([...])],
      weights = [1, 2], align = "center")（Divider/Spacer 分隔件不占 weights 槽位）；
      Card 有 title 时渲染头部标题区；
-   - Grid(children*, columns?, spacing?, align?)：通用 N 列网格（四宫格写法
+   - Grid(children*, columns?, spacing?, align?)：通用 N 列网格（写法
      Grid([a, b, c, d], columns = 2)），columns∈1..4（默认 2），children 按序填满各行、
-     每格等宽；spacing/align 同 Row 词汇；多宫格照片墙/双列统计格都用它；
+     每格等宽；spacing/align 同 Row 词汇；装图表/混合内容用它，装相册照片请用
+     PhotoGrid 固化件（Grid 内放 ≥2 个 Image 会被 lint 引导）；
    - Box(children*, align?)：通用叠放容器——children 按数组序从底到顶叠放，align 是
      九值方位∈topStart|topCenter|topEnd|centerStart|center|centerEnd|bottomStart|
      bottomCenter|bottomEnd（默认 topStart）——图上叠文字/角标写法
@@ -235,6 +249,12 @@ class RenderOpenUiToolService {
      Row+Column+Text("DISPLAY") 拼装）/ Banner(title*, subtitle?, photo?, src?, aspect?)（通栏题图横幅：
      图 + 底部渐变蒙层 + 左下白字标题；photo 写 photos[0].id 相册投影、src 是 https:// 公网图，
      二选一，皆无纯色底；aspect 缺省 16:9）；
+   - 相册组合件（相册 APP 签名形态固化，照片网格/人物条首选）：PhotoGrid(photos*=[相册投影 id
+     数组], columns?=2|3|4 缺省 3)（方形 1:1 + 人脸聚焦 + 密缝照片网格，单件最多 12 张——
+     替代 Grid+Image 拼装，元素写 photos[0].id 投影、禁字面量数字）/ AvatarRow(items*=[{photo*,
+     label?}])（人物圆形头像横滑条：圆形人脸聚焦 + 名字居下，photo 写 photos[0].id 投影）；
+     CardHeader 增可选 actionLabel/action（分组标题尾部「查看全部」动作位——
+     CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部")）；
    - 表单（name 键控直写 state：用户交互即 @Set(${'$'}<name>, 值)——如 Input(name="city")
      键入后 Text("城市: " + ${'$'}city) 经 ${'$'}name 绑定联动读；Form 仅视觉分组，无提交作用域；
      ${'$'}变量同样先独占一行声明默认值）：
@@ -306,7 +326,8 @@ class RenderOpenUiToolService {
    三个指标并排——有 2~4 个关键统计数字时优先用此构图，别只写一段 BODY 文案）：
 """ + GOLDEN_STAT_TILE_PROGRAM + """
    通用布局食谱（经典版式照方抓药，通用原语组合优先于业务组合组件）：
-   - 四宫格/三宫格/双列网格 → Grid([图或组件...], columns = 2|3)（格内等宽自动对齐）；
+   - 照片网格（四宫格/三宫格/双列照片墙）→ PhotoGrid(photos = [...], columns = 2|3)
+     （方形人脸聚焦裁切已固化；Grid 只用于图表/混合内容网格）；
    - 按比例左图右文（上下对齐）→ Row([Image(photos[i].id), Column([Text(标题), Text(副题, "CAPTION")])],
      weights = [1, 2], align = "center")（图窄文宽改 [1, 3]，顶线对齐改 align = "start"）；
    - 图上叠文字/角标/浮层 → Box([Image(...), Tag(...) 或 Text(...)], align = "bottomStart")；
@@ -324,13 +345,26 @@ class RenderOpenUiToolService {
      trailing = "07-18"), ...]) 或多行 ListItem 直接排进 Card；
    - 双列题图卡（相册照片）→ VisualCardBlock([{body: "精选", bgPhoto: photos[i].id}])；
    - 页内分区标题 → CardHeader("分区标题", "可选副题")；
-   通用布局黄金示例（四宫格照片墙 + 1:2 左图右文）：
+   通用布局黄金示例（PhotoGrid 照片墙 + 1:2 左图右文）：
 """ + GOLDEN_LAYOUT_PROGRAM + """
    图文排版黄金示例（ImageTextLarge/ImageText 便捷糖形态）：
 """ + GOLDEN_PHOTO_TEXT_PROGRAM + """
    经典组合版式黄金示例（Banner 题图横幅 + StatRow 统计行 + ListItem 列表行——
    相册卡首选骨架）：
-""" + GOLDEN_CLASSIC_PROGRAM
+""" + GOLDEN_CLASSIC_PROGRAM + """
+   相册 APP 构图规则（2026-10-31，对标 Google Photos/Apple 照片/小米相册签名形态——
+   相册类卡片按此构图，别再自由拼装）：
+   - 时间分组网格（相册主视图签名形态）→ CardHeader("2026年7月", subtitle = "128 张",
+     actionLabel = "查看全部") + PhotoGrid(photos = [...], columns = 3)；
+   - 人物区（面孔签名形态）→ AvatarRow([{photo: photos[i].id, label: "妈妈"}, ...])；
+   - 回顾卡（年度/月度杂志感）→ Banner 首屏 + StatRow 关键数字 + PhotoGrid 摘选；
+   - 相册列表（封面 + 名称 + 计数）→ List([ListItem(title, photo = photos[i].id,
+     subtitle = 日期, trailing = "128 张"), ...])；
+   - 回忆条（大卡横滑）→ VisualCardBlock([...], layout = "carousel")（既有件）；
+   ⚠️ 照片网格 ≥2 张一律 PhotoGrid，禁用 Grid+Image 拼装（帧随各图真实比例会犬牙交错，
+   lint 会提示）；
+   相册 APP 构图黄金示例（时间分组网格 + 人物头像条——相册卡签名骨架）：
+""" + GOLDEN_PHOTO_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")

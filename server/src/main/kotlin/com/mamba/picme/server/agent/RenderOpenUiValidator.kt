@@ -43,6 +43,7 @@ object RenderOpenUiValidator {
      * 官方 82 组件适配 81（Col 列式 Table 刻意不收，行式为唯一形态）+ 本仓既有 8；
      * 2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
      * 2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
+     * 2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
      * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
      * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
@@ -60,6 +61,8 @@ object RenderOpenUiValidator {
         "Grid", "Box", "Spacer",
         // 经典组合版式批次（2026-10-31 本仓扩展：统计行/题图横幅固化构图）
         "StatRow", "StatItem", "Banner",
+        // 相册 APP 组合方式批次（2026-10-31 本仓扩展：方形照片网格/人物头像条签名形态）
+        "PhotoGrid", "AvatarRow",
         // 官方内容/布局
         "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
         "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
@@ -130,6 +133,39 @@ object RenderOpenUiValidator {
     private val NAMED_PHOTO = Regex("""(?<![A-Za-z0-9_])(bgPhoto|photo)\s*[:=]""")
     private val NAMED_SRC = Regex("""(?<![A-Za-z0-9_])src\s*=""")
 
+    /** photos 数组起始（2026-10-31 PhotoGrid 位图计数）：`photos = […]` / `{photos: […]}`。
+     *  元素含嵌套下标括号（photos[0].id），正则 [^\]]* 会在首个 ] 截断，故只定位起始、
+     *  元素计数走 [countPhotosArrayBitmaps] 括号配对扫描。`photos = Query(…)` 取数语句
+     *  等号后是 Query 非 [，天然不匹配。 */
+    private val PHOTOS_ARRAY_START = Regex("""(?<![A-Za-z0-9_])photos\s*[:=]\s*\[""")
+
+    /** PhotoGrid photos 数组元素计数（每个元素 = 一张位图，计入单卡图片上限）：
+     *  括号配对扫描数组区间，按顶层逗号分隔数元素（空数组 = 0）。 */
+    private fun countPhotosArrayBitmaps(program: String): Int {
+        var total = 0
+        PHOTOS_ARRAY_START.findAll(program).forEach { match ->
+            var depth = 1
+            var index = match.range.last + 1
+            var elements = 0
+            var cellHasContent = false
+            while (index < program.length && depth > 0) {
+                when (program[index]) {
+                    '[', '(' -> depth++
+                    ']', ')' -> depth--
+                    ',' -> if (depth == 1) {
+                        if (cellHasContent) elements++
+                        cellHasContent = false
+                    }
+                    else -> if (depth == 1 && !program[index].isWhitespace()) cellHasContent = true
+                }
+                index++
+            }
+            if (cellHasContent) elements++
+            total += elements
+        }
+        return total
+    }
+
     /** Image 实参分析时字符串字面量的占位符（与剥离替换同形，便于按占位符定位位置参数）。 */
     private const val STR_PLACEHOLDER = "\"\""
 
@@ -185,6 +221,9 @@ object RenderOpenUiValidator {
     /** Row weights 键检测（lint 豁免依据：比例分栏是认可写法，无 weights 的等宽裸拼才警告）。 */
     private val NAMED_WEIGHTS = Regex("""(?<![A-Za-z0-9_])weights\s*=""")
 
+    /** Grid 调用（lint：Grid 内平铺 Image ≥2 张 → 引导 PhotoGrid 固化件）。 */
+    private val GRID_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Grid\s*\(""")
+
     /**
      * 构图软警告（2026-10-25，设计规范第一刀配套）：不拒卡、不落违规，工具体
      * Observation 附带「本卡已下发、无需重发，下次发卡改进」提示——硬校验管合法性，
@@ -216,6 +255,14 @@ object RenderOpenUiValidator {
                 !NAMED_WEIGHTS.containsMatchIn(args)
             ) {
                 warnings += "Row 内等宽裸拼 Image + Text（缩略图会被拉成半宽栏、图文对齐散落）——按比例左图右文给 Row 传 weights（如 weights = [1, 2] 图窄文宽，上下对齐配 align）；一行写法便捷糖可用 ImageText（小图左+文字右）/ ImageTextLarge（通栏图+标题副题）"
+            }
+        }
+        callArgSpans(stripped, GRID_CALL).forEach { args ->
+            // 2026-10-31 相册 APP 组合方式批次：照片网格有固化件 PhotoGrid（方形 1:1 +
+            // 人脸聚焦 + 2dp 密缝）；Grid+Image 拼装里 Image 帧随各图真实比例（2026-10-31
+            // v7 起），网格犬牙交错——≥2 张即引导换固化件
+            if (IMAGE_ANY_CALL.findAll(args).count() >= 2) {
+                warnings += "Grid 内平铺 Image ≥2 张——照片网格请换 PhotoGrid(photos = [photos[0].id, photos[1].id, ...], columns = 2|3|4) 固化件（方形 1:1 + 人脸聚焦 + 2dp 密缝，相册 APP 主视图签名形态）；Grid+Image 拼装的帧随各图真实比例会犬牙交错"
             }
         }
         return warnings
@@ -330,9 +377,10 @@ object RenderOpenUiValidator {
             .count { match -> imageCallRanges.none { range -> match.range.first in range } }
         val photoOutsideImage = NAMED_PHOTO.findAll(program)
             .count { match -> imageCallRanges.none { range -> match.range.first in range } }
-        val imageCount = imageCalls.size + srcOutsideImage + photoOutsideImage
+        val imageCount = imageCalls.size + srcOutsideImage + photoOutsideImage +
+            countPhotosArrayBitmaps(program)
         if (imageCount > MAX_IMAGE_COMPONENTS) {
-            violations += "图片 $imageCount 张超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张——Image 组件与 ImageGallery/ImageBlock/ImageText 等 src 类图片地址及 ImageText/ImageTextLarge 的 photo 投影合计，防整卡同屏位图 OOM；精简到最关键的几张）"
+            violations += "图片 $imageCount 张超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张——Image 组件与 ImageGallery/ImageBlock/ImageText 等 src 类图片地址、ImageText/ImageTextLarge 的 photo 投影及 PhotoGrid photos 数组元素合计，防整卡同屏位图 OOM；精简到最关键的几张）"
         }
 
         // 5. Icon name 白名单（M2，正则级）：禁臆造图标名在服务端同轮纠错

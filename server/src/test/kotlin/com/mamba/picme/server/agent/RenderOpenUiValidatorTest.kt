@@ -348,12 +348,13 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 95 openui library components`() {
+    fun `whitelist pins all 97 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 的 95 个 key 逐字一致，改动须双向同步核对
+        // OpenUiLibrary.components 的 97 个 key 逐字一致，改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
         //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
-        //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）
+        //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
+        //  2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）
         val expected = setOf(
             // 本仓既有 + M2/M3 扩（原二十一组件）
             "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
@@ -363,6 +364,8 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "Grid", "Box", "Spacer",
             // 经典组合版式批次（2026-10-31 本仓扩展）
             "StatRow", "StatItem", "Banner",
+            // 相册 APP 组合方式批次（2026-10-31 本仓扩展）
+            "PhotoGrid", "AvatarRow",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -387,7 +390,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(95, expected.size)
+        assertEquals(97, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 
@@ -725,7 +728,7 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
 
     @Test
     fun `tool description layout golden example passes validation and lint`() {
-        // 通用布局黄金示例（四宫格 Grid + 1:2 左图右文 Row weights）同源钉住
+        // 通用布局黄金示例（PhotoGrid 照片墙 + 1:2 左图右文 Row weights）同源钉住
         assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM))
         assertEquals(
             emptyList<String>(),
@@ -784,6 +787,66 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
                 "root = Card([Banner(\"a\", photo = photos[0].id), Banner(\"b\", photo = photos[1].id), " +
                 "VisualCardBlock([{body: \"c\", bgPhoto: photos[2].id}])])"
         assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    // ── 相册 APP 组合方式批次（2026-10-31）：PhotoGrid/AvatarRow + photos 数组计数 ──
+
+    @Test
+    fun `tool description photo pattern golden example passes validation and lint`() {
+        // 相册 APP 构图黄金示例（CardHeader + PhotoGrid + AvatarRow）同源钉住（GOLDEN_* 钉法先例）
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM))
+        assertEquals(
+            emptyList<String>(),
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM),
+        )
+    }
+
+    @Test
+    fun `photo pattern components pass whitelist`() {
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([CardHeader(\"2026年7月\", actionLabel = \"查看全部\"), " +
+                "PhotoGrid(photos = [photos[0].id, photos[1].id], columns = 2), " +
+                "AvatarRow([{photo: photos[0].id, label: \"妈妈\"}])])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `photo grid array elements count toward image limit`() {
+        // photos 数组每个元素 = 一张位图（元素含嵌套下标括号 photos[0].id，计数走括号
+        // 配对扫描而非正则截断）；13 张单网格即超单卡上限
+        val ids = (0..12).joinToString(", ") { i -> "photos[$i].id" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([PhotoGrid(photos = [$ids])])"
+        assertNotNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `photo grid array within limit passes and query statement not counted`() {
+        // 取数语句 photos = Query(...) 不产生位图；12 张网格 + 2 头像 = 14>12 拒、12 张网格独行放行
+        val ids = (0..11).joinToString(", ") { i -> "photos[$i].id" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([PhotoGrid(photos = [$ids], columns = 4)])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
+        val over =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([PhotoGrid(photos = [$ids], columns = 4), AvatarRow([{photo: photos[0].id}])])"
+        assertNotNull(RenderOpenUiValidator.validateToError(over))
+    }
+
+    @Test
+    fun `grid with two images triggers photo grid lint`() {
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([Grid([Image(photos[0].id), Image(photos[1].id)], columns = 2)])"
+        assertEquals(1, RenderOpenUiValidator.lintComposition(program).size)
+        // 换 PhotoGrid 固化件后无警告
+        val fixed =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([PhotoGrid(photos = [photos[0].id, photos[1].id], columns = 2)])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(fixed))
     }
 
     // ── argsJson 与 gate 分发 ───────────────────────────────────────

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowColumn
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -83,6 +84,8 @@ internal val openUiContentComponentNames: Set<String> = setOf(
     "Steps", "Carousel", "Buttons", "IconButton", "Modal",
     // 经典组合版式批次（2026-10-31）：StatRow/StatItem/Banner 新增 + ListItem 实渲染化
     "StatRow", "StatItem", "Banner", "ListItem",
+    // 相册 APP 组合方式批次（2026-10-31）：PhotoGrid/AvatarRow 新增
+    "PhotoGrid", "AvatarRow",
 )
 
 /** 单组件数组/子项上限（MAX_LIST_CHILDREN=50 同口径：LLM 生成面无界，渲染端 take 兜底）。 */
@@ -109,6 +112,10 @@ internal fun OpenUiContentNode(
             title = (node.props["title"] as? OpenUiValue.Str)?.v,
             subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v,
             modifier = modifier,
+            // 2026-10-31 相册 APP 组合方式批次：分组标题尾部动作（「查看全部 >」形态）
+            actionLabel = (node.props["actionLabel"] as? OpenUiValue.Str)?.v,
+            actions = contentActions(node.props["action"]),
+            onAction = onAction,
         )
         "InlineHeader" -> OpenUiContentHeader(
             title = (node.props["title"] as? OpenUiValue.Str)?.v,
@@ -159,6 +166,9 @@ internal fun OpenUiContentNode(
         }
         "Banner" -> OpenUiContentBanner(node, photoResolver, onAction, modifier)
         "ListItem" -> OpenUiContentListItem(node, photoResolver, onAction, modifier)
+        // ── 相册 APP 组合方式批次（2026-10-31）──
+        "PhotoGrid" -> OpenUiContentPhotoGrid(node, photoResolver, onAction, modifier)
+        "AvatarRow" -> OpenUiContentAvatarRow(node, photoResolver, onAction, modifier)
         else -> Box(modifier = modifier)
     }
 }
@@ -551,17 +561,56 @@ private fun OpenUiContentMarkdownRenderer(
 
 /** CardHeader/InlineHeader 同渲染（官方语义即轻量标题对）：SUBHEAD 标题 + CAPTION 弱色副题。 */
 @Composable
-private fun OpenUiContentHeader(title: String?, subtitle: String?, modifier: Modifier = Modifier) {
+private fun OpenUiContentHeader(
+    title: String?,
+    subtitle: String?,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    actions: List<OpenUiAction> = emptyList(),
+    onAction: (OpenUiAction) -> Unit = {},
+) {
     if (title == null) return
-    Column(modifier = modifier) {
-        Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
-        subtitle?.let { text ->
-            Text(
-                text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    // 2026-10-31 相册 APP 组合方式批次：actionLabel 在场 → 分组标题行（相册 APP 日期
+    // 分组头「标题 + 查看全部 >」签名形态）；action 缺省时尾部仅展示文案不可点
+    if (actionLabel == null) {
+        Column(modifier = modifier) {
+            Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            subtitle?.let { text ->
+                Text(
+                    text = text,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
+        return
+    }
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            subtitle?.let { text ->
+                Text(
+                    text = text,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(
+            text = actionLabel,
+            style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable(
+                enabled = actions.isNotEmpty(),
+                onClickLabel = actionLabel,
+                role = Role.Button,
+            ) {
+                actions.forEach(onAction)
+            },
+        )
     }
 }
 
@@ -1648,6 +1697,156 @@ private fun OpenUiContentListItem(
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                 )
+            }
+        }
+    }
+}
+
+// ── 相册 APP 组合方式批次（2026-10-31）────────────────────────────────────
+// 主流相册 APP（Google Photos / Apple 照片 / 小米相册）签名组合形态固化件：
+// PhotoGrid = 方形照片网格（三家主视图签名）；AvatarRow = 人物圆形头像横滑条
+//（Google Photos 人物条签名）。刻意绕过 §4.5 真实比例链——网格/头像的均匀
+// 裁切本身就是设计语义（方形网格、圆形头像），人脸聚焦兜底构图。
+
+/** PhotoGrid 单件照片数护栏（单卡图片上限同口径，防整卡同屏位图 OOM）。 */
+private const val PHOTO_GRID_MAX = 12
+
+/** PhotoGrid cell 间隙（相册 APP 网格密缝签名，2dp；不用间距 token）。 */
+private val PHOTO_GRID_GAP = 2.dp
+
+/**
+ * PhotoGrid：方形照片网格固化件——cell 恒 1:1 Crop + 人脸聚焦 + 2dp 密缝，整网格
+ * 12dp 圆角；photos 相册投影 id 数组端侧批量解析（[PRIVACY] uri 不出端），点击
+ * OpenPhoto 大图（Image 同口径）；解析中/失败格落 surfaceVariant 同形占位，不炸整卡；
+ * 末行缺格补空位保持列对齐（Grid 同口径）。
+ */
+@Composable
+private fun OpenUiContentPhotoGrid(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val ids = (node.props["photos"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .mapNotNull { item -> (item as? OpenUiValue.Num)?.v?.toLong() }
+        .take(PHOTO_GRID_MAX)
+    if (ids.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val columns = ((node.props["columns"] as? OpenUiValue.Num)?.v?.toInt() ?: 3).coerceIn(2, 4)
+    val resolved by produceState<Map<Long, OpenUiPhoto>>(initialValue = emptyMap(), ids) {
+        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }
+            .toMap()
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius)),
+        verticalArrangement = Arrangement.spacedBy(PHOTO_GRID_GAP),
+    ) {
+        ids.chunked(columns).forEach { rowIds ->
+            Row(horizontalArrangement = Arrangement.spacedBy(PHOTO_GRID_GAP)) {
+                rowIds.forEach { id ->
+                    val photo = resolved[id]
+                    val frame = Modifier
+                        .weight(1f)
+                        .aspectRatio(1f)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                    if (photo == null) {
+                        Box(modifier = frame)
+                    } else {
+                        AsyncImage(
+                            model = photo.uri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            alignment = faceAwareVerticalAlignment(photo.faceFocusY),
+                            modifier = frame.clickable(
+                                onClickLabel = stringResource(R.string.cd_image_preview),
+                                role = Role.Image,
+                            ) {
+                                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                            },
+                        )
+                    }
+                }
+                repeat(columns - rowIds.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+/** AvatarRow 头像直径（Google Photos 人物条签名形态的卡内紧凑档）。 */
+private val AVATAR_SIZE = 56.dp
+
+/**
+ * AvatarRow：人物圆形头像横滑条——56dp 圆形 Crop + 人脸聚焦 + CAPTION 名字居下；
+ * items [{photo 相册投影 id*, label?}] 端侧批量解析（[PRIVACY] uri 不出端），点击
+ * OpenPhoto 大图（Image 同口径）；解析中/失败项落同形占位，不炸整卡。
+ */
+@Composable
+private fun OpenUiContentAvatarRow(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val photoId = (obj["photo"] as? OpenUiValue.Num)?.v?.toLong() ?: return@mapNotNull null
+        photoId to (obj["label"] as? OpenUiValue.Str)?.v
+    }.take(MAX_CONTENT_ITEMS)
+    if (items.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val ids = items.map { item -> item.first }
+    val resolved by produceState<Map<Long, OpenUiPhoto>>(initialValue = emptyMap(), ids) {
+        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }
+            .toMap()
+    }
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        items.forEach { (id, label) ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.width(AVATAR_SIZE + Spacing.sm),
+            ) {
+                val photo = resolved[id]
+                val frame = Modifier
+                    .size(AVATAR_SIZE)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                if (photo == null) {
+                    Box(modifier = frame)
+                } else {
+                    AsyncImage(
+                        model = photo.uri,
+                        contentDescription = label,
+                        contentScale = ContentScale.Crop,
+                        alignment = faceAwareVerticalAlignment(photo.faceFocusY),
+                        modifier = frame.clickable(
+                            onClickLabel = stringResource(R.string.cd_image_preview),
+                            role = Role.Image,
+                        ) {
+                            onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                        },
+                    )
+                }
+                label?.let { text ->
+                    Text(
+                        text = text,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = Spacing.xs),
+                    )
+                }
             }
         }
     }
