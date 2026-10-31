@@ -1923,8 +1923,16 @@ private fun OpenUiContentCompareRow(
 ) {
     val beforeId = (node.props["beforePhoto"] as? OpenUiValue.Num)?.v?.toLong()
     val afterId = (node.props["afterPhoto"] as? OpenUiValue.Num)?.v?.toLong()
+    // 双源校验产物先行（Banner 二段式同款）：判真/使用同一值，防校验逻辑演化分叉
+    val beforeSrcValid = httpsSrcOrNull((node.props["beforeSrc"] as? OpenUiValue.Str)?.v)
+    val afterSrcValid = httpsSrcOrNull((node.props["afterSrc"] as? OpenUiValue.Str)?.v)
+    // 空内容护栏（Timeline/ChartGrid/PhotoGrid 同款）：photo id 与合法 src 全缺 → 空占位
+    if (beforeId == null && afterId == null && beforeSrcValid == null && afterSrcValid == null) {
+        Box(modifier = modifier)
+        return
+    }
     val ids = listOfNotNull(beforeId, afterId)
-    val resolved by produceState<Map<Long, OpenUiPhoto>>(emptyMap(), ids) {
+    val resolved by produceState(initialValue = emptyMap<Long, OpenUiPhoto>(), ids) {
         value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
     }
     val frameAspect = frameAspectOf(
@@ -1938,7 +1946,7 @@ private fun OpenUiContentCompareRow(
     ) {
         OpenUiCompareSide(
             photo = beforeId?.let { id -> resolved[id] },
-            src = (node.props["beforeSrc"] as? OpenUiValue.Str)?.v,
+            src = beforeSrcValid,
             label = (node.props["beforeLabel"] as? OpenUiValue.Str)?.v,
             frameAspect = frameAspect,
             onAction = onAction,
@@ -1946,7 +1954,7 @@ private fun OpenUiContentCompareRow(
         )
         OpenUiCompareSide(
             photo = afterId?.let { id -> resolved[id] },
-            src = (node.props["afterSrc"] as? OpenUiValue.Str)?.v,
+            src = afterSrcValid,
             label = (node.props["afterLabel"] as? OpenUiValue.Str)?.v,
             frameAspect = frameAspect,
             onAction = onAction,
@@ -1983,7 +1991,7 @@ private fun OpenUiCompareSide(
                     onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
                 },
             )
-            httpsSrcOrNull(src) != null -> AsyncImage(
+            src != null -> AsyncImage(
                 model = src,
                 contentDescription = label,
                 contentScale = ContentScale.Crop,
@@ -2045,7 +2053,7 @@ private fun OpenUiContentTimeline(
         return
     }
     val ids = entries.mapNotNull { entry -> entry.photoId }
-    val resolved by produceState<Map<Long, OpenUiPhoto>>(emptyMap(), ids) {
+    val resolved by produceState(initialValue = emptyMap<Long, OpenUiPhoto>(), ids) {
         value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
     }
     Column(
@@ -2134,7 +2142,9 @@ private const val CHART_GRID_MAX_CHILDREN = 4
 /**
  * ChartGrid：双列图表网格（columns 恒 2）——Row/Grid 内图表横向并排被 R3 门禁禁止，
  * 本件是唯一合法出口；子项经 [OpenUiNodeRenderer] 全量 dispatch 递归渲染（图表族），
- * 末行缺格补空位保持列对齐（Grid 同口径）；无界宽上下文按内容自尺寸（Grid 同径）。
+ * 非组件子项静默丢弃（生成面已被 R3「只装图表族」拦截，端侧兜底——与 Grid 渲染
+ * null 占位的口径差异为有意为之：脏输入不保留网格几何）；末行缺格补 Spacer 空位
+ * 保持列对齐；无界宽上下文按内容自尺寸（Grid 同径）。
  */
 @Composable
 private fun OpenUiContentChartGrid(

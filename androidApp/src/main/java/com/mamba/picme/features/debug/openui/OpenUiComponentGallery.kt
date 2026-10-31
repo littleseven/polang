@@ -396,7 +396,7 @@ private val demoGroups: List<OpenUiDemoGroup> = listOf(
             ),
             OpenUiComponentDemo(
                 "ChartGrid",
-                """root = Card([ChartGrid([BarChart("月新增", [{label: "7月", count: 12}]), PieChart("占比", [{label: "人像", value: 4}])])])""",
+                """root = Card([ChartGrid([BarChart("月新增", [{label: "7月", count: 12}]), PieChart("占比", [{label: "人像", value: 4}]), LineChart("周趋势", ["一", "二"], [{name: "张数", values: [3, 5]}])])])""",
             ),
         ),
     ),
