@@ -43,7 +43,8 @@ import kotlinx.serialization.json.Json
  * prepare 后统判降级。viewState `selected=<label>` 种 `$selected` 初始 state（US-7 对偶）。
  *
  * 用户交互（@Set/@Reset）本地消费不出端（§3.4 不变式对偶），$selected 变化经
- * [onViewStateChange] 写本地交互态。
+ * [onViewStateChange] 写本地交互态。@ToAssistant 上行（2026-10-31 起）：经
+ * [onToAssistant] 以用户消息发进会话（CardHeader「查看全部」等卡内回话入口）。
  */
 @Composable
 fun OpenUiCardHost(
@@ -53,6 +54,7 @@ fun OpenUiCardHost(
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
     onPhotoClick: (uri: String) -> Unit = {},
+    onToAssistant: (text: String) -> Unit = {},
 ) {
     // 键粒度收到整颗 part（data class 可比）：viewState 回流产生新 part 即重建 session、
     // 按最新 viewState 重种 $selected（同 A2uiCardHost 恢复语义）
@@ -112,6 +114,7 @@ fun OpenUiCardHost(
                         photoResolver = photoResolver,
                         onViewStateChange = onViewStateChange,
                         onPhotoClick = onPhotoClick,
+                        onToAssistant = onToAssistant,
                     )
                     OpenUiDebugBadge(
                         partId = part.partId,
@@ -126,6 +129,7 @@ fun OpenUiCardHost(
                     onViewStateChange = onViewStateChange,
                     modifier = modifier,
                     onPhotoClick = onPhotoClick,
+                    onToAssistant = onToAssistant,
                 )
             }
         }
@@ -212,6 +216,7 @@ private fun OpenUiReadyContent(
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
     onPhotoClick: (uri: String) -> Unit = {},
+    onToAssistant: (text: String) -> Unit = {},
 ) {
     // P1 响应式状态（spec《2026-10-26-openui-compose-alignment-design》§3，对齐 androidx
     // bind 粒度订阅语义）：session.state 非 Compose 可观测（ADR-013 禁 compose 入 commonMain，
@@ -244,8 +249,13 @@ private fun OpenUiReadyContent(
             // Image 点击看大图（宿主动作，program 不可达——渲染层 resolved uri 直发，
             // 不出端不回落 program；ChatScreen 落 chat 内预览浮层）
             "OpenPhoto" -> (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let(onPhotoClick)
-            // M1 不上行（§3.4 不变式对偶）：只留结构化日志线索
-            "ToAssistant" -> Logger.d("Chat", "OpenUI @ToAssistant 本地消费（不上行）: ${action.args}")
+            // @ToAssistant 上行（2026-10-31 真机回归修复，原为 M1 只记日志不路由）：
+            // 卡内回话入口（CardHeader「查看全部」缺省动作等）以用户消息发进会话
+            "ToAssistant" -> {
+                val text = (action.args.firstOrNull() as? OpenUiValue.Str)?.v.orEmpty()
+                Logger.d("Chat", "OpenUI @ToAssistant 上行: $text")
+                if (text.isNotBlank()) onToAssistant(text)
+            }
             else -> Logger.d("Chat", "OpenUI 未知动作: ${action.name}")
         }
     }

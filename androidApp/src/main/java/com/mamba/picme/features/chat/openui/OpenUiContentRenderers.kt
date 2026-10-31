@@ -108,15 +108,23 @@ internal fun OpenUiContentNode(
         "Stack" -> OpenUiContentStack(node, state, photoResolver, onAction, modifier)
         "Separator" -> OpenUiContentSeparator(node, modifier)
         "MarkDownRenderer" -> OpenUiContentMarkdownRenderer(node, state, modifier)
-        "CardHeader" -> OpenUiContentHeader(
-            title = (node.props["title"] as? OpenUiValue.Str)?.v,
-            subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v,
-            modifier = modifier,
-            // 2026-10-31 相册 APP 组合方式批次：分组标题尾部动作（「查看全部 >」形态）
-            actionLabel = (node.props["actionLabel"] as? OpenUiValue.Str)?.v,
-            actions = contentActions(node.props["action"]),
-            onAction = onAction,
-        )
+        "CardHeader" -> {
+            val headerTitle = (node.props["title"] as? OpenUiValue.Str)?.v
+            val headerActionLabel = (node.props["actionLabel"] as? OpenUiValue.Str)?.v
+            OpenUiContentHeader(
+                title = headerTitle,
+                subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v,
+                modifier = modifier,
+                // 2026-10-31 相册 APP 组合方式批次：分组标题尾部动作（「查看全部 >」形态）
+                actionLabel = headerActionLabel,
+                actions = headerActionsOrDefault(
+                    headerActionLabel,
+                    headerTitle,
+                    contentActions(node.props["action"]),
+                ),
+                onAction = onAction,
+            )
+        }
         "InlineHeader" -> OpenUiContentHeader(
             title = (node.props["title"] as? OpenUiValue.Str)?.v,
             subtitle = (node.props["description"] as? OpenUiValue.Str)?.v,
@@ -220,6 +228,22 @@ private fun contentToneIcon(variant: String?): String = when (variant) {
 
 /** ACTION prop → 动作列表（单 ActionVal 或数组形态都打平，主文件 openUiActionsOf 同径）。 */
 private fun contentActions(prop: OpenUiValue?): List<OpenUiAction> = openUiActionsOf(prop)
+
+/**
+ * CardHeader 尾部动作兜底（2026-10-31 真机回归修复「查看全部点击无效」）：LLM 按黄金
+ * 示例常只传 actionLabel 不传 action，若原样渲染则按钮呈可点态却无动作。actionLabel 在
+ * 场且 action 缺省时，合成 @ToAssistant("actionLabel：title")——点击即以用户消息上行，
+ * 让 LLM 展开完整分组；显式 action 永远优先（OpenUiHeaderActionTest 钉住）。
+ */
+internal fun headerActionsOrDefault(
+    actionLabel: String?,
+    title: String?,
+    actions: List<OpenUiAction>,
+): List<OpenUiAction> {
+    if (actions.isNotEmpty() || actionLabel == null) return actions
+    val text = if (title != null) "$actionLabel：$title" else actionLabel
+    return listOf(OpenUiAction("ToAssistant", listOf(OpenUiValue.Str(text))))
+}
 
 /** 同形占位（https 图缺失/非法时防跳动，Image 解析失败占位同口径）。 */
 @Composable
@@ -571,7 +595,8 @@ private fun OpenUiContentHeader(
 ) {
     if (title == null) return
     // 2026-10-31 相册 APP 组合方式批次：actionLabel 在场 → 分组标题行（相册 APP 日期
-    // 分组头「标题 + 查看全部 >」签名形态）；action 缺省时尾部仅展示文案不可点
+    // 分组头「标题 + 查看全部 >」签名形态）；action 缺省由 headerActionsOrDefault 兜底
+    // 合成 @ToAssistant 上行（点击即回话展开分组，不再渲染无效按钮）
     if (actionLabel == null) {
         Column(modifier = modifier) {
             Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
