@@ -348,13 +348,14 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 97 openui library components`() {
+    fun `whitelist pins all 100 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 的 97 个 key 逐字一致，改动须双向同步核对
+        // OpenUiLibrary.components 的 100 个 key 逐字一致，改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
         //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
         //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
-        //  2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）
+        //  2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
+        //  2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）
         val expected = setOf(
             // 本仓既有 + M2/M3 扩（原二十一组件）
             "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
@@ -366,6 +367,8 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "StatRow", "StatItem", "Banner",
             // 相册 APP 组合方式批次（2026-10-31 本仓扩展）
             "PhotoGrid", "AvatarRow",
+            // 布局可控性批次（2026-10-31：前后对比/时间轴固化件 + 双图并排图表网格）
+            "CompareRow", "Timeline", "ChartGrid",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -390,7 +393,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(97, expected.size)
+        assertEquals(100, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 

@@ -44,6 +44,7 @@ object RenderOpenUiValidator {
      * 2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
      * 2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
      * 2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
+ * 2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
      * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
      * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
@@ -63,6 +64,9 @@ object RenderOpenUiValidator {
         "StatRow", "StatItem", "Banner",
         // 相册 APP 组合方式批次（2026-10-31 本仓扩展：方形照片网格/人物头像条签名形态）
         "PhotoGrid", "AvatarRow",
+        // 布局可控性批次（2026-10-31）：前后对比/时间轴固化件 + 双图并排图表网格
+        // （R3 门禁的合法出口；渲染器与工具描述在 App/M4 批次落地）
+        "CompareRow", "Timeline", "ChartGrid",
         // 官方内容/布局
         "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
         "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
