@@ -1064,13 +1064,13 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
     "CompareRow", "Timeline", "ChartGrid",
 ```
 
-`OpenUiContentNode` when 里 `"AvatarRow" -> …` 分支后加：
+`OpenUiContentNode` when 里 `"AvatarRow" -> …` 分支后**只加 CompareRow 一行**（Timeline/ChartGrid 分支随 Task 9/10 各自落地——三名先入集合无副作用，分支悬空会编译失败）：
 
 ```kotlin
         "CompareRow" -> OpenUiContentCompareRow(node, photoResolver, onAction, modifier)
-        "Timeline" -> OpenUiContentTimeline(node, photoResolver, onAction, modifier)
-        "ChartGrid" -> OpenUiContentChartGrid(node, state, photoResolver, onAction, modifier)
 ```
+
+> ⚠️ Task 8 spec 评审勘误（da5caa054 as-built）：本节原文写一次挂三分支，实际只挂 CompareRow（三分支在该时点不可编译）。Task 9/10 各含自己的 dispatch 插入步骤。
 
 - [ ] **Step 2: 实现（文件末尾 PhotoGrid/AvatarRow 实现之后追加）**
 
@@ -1199,7 +1199,13 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 实现（CompareSide 之后追加；dispatch 已在 Task 8 注册）**
+- [ ] **Step 1: 实现（CompareSide 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
+
+`OpenUiContentNode` when 的 `"CompareRow" -> …` 分支后加：
+
+```kotlin
+        "Timeline" -> OpenUiContentTimeline(node, photoResolver, onAction, modifier)
+```
 
 ```kotlin
 /** Timeline 轴列：节点圆点 8dp（primary）+ 连接线 2dp（outlineVariant）。 */
@@ -1320,7 +1326,7 @@ private fun OpenUiContentTimeline(
 }
 ```
 
-- [ ] **Step 2: 编译验证**
+- [ ] **Step 2: 编译验证**（顺手项：把 CompareSide 的内联 `src.startsWith("https://")` 改为复用同文件 `httpsSrcOrNull(src) != null`——Task 8 spec 评审 🔵2）
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL（`height`/`IntrinsicSize` import 按需补）
@@ -1339,7 +1345,13 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 实现（Timeline 之后追加）**
+- [ ] **Step 1: 实现（Timeline 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
+
+`OpenUiContentNode` when 的 `"Timeline" -> …` 分支后加：
+
+```kotlin
+        "ChartGrid" -> OpenUiContentChartGrid(node, state, photoResolver, onAction, modifier)
+```
 
 ```kotlin
 /** ChartGrid 子项护栏（每格一张图，2×2 封顶——双图并排为主形态）。 */
