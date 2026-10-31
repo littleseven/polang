@@ -1,5 +1,9 @@
 package com.mamba.picme.server.admin
 
+import com.mamba.picme.server.agent.AgentEventPayload
+import com.mamba.picme.server.agent.AgentEventPayloadCodec
+import com.mamba.picme.server.agent.AgentEvents
+import com.mamba.picme.server.agent.AgentSessions
 import com.mamba.picme.server.analytics.Price
 import com.mamba.picme.server.analytics.defaultPrices
 import com.mamba.picme.server.db.AnonymousDevices
@@ -12,7 +16,10 @@ import com.mamba.picme.server.db.LlmCallLogs
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.Op
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.count
+import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
@@ -119,6 +126,33 @@ data class LlmCallListRow(
     val status: String,
     val latencyMs: Int?,
     val platform: String?,
+    val createdAt: Long,
+)
+
+/** M2 管理后台 Agent 会话列表行。stalled 判定（lastEventAt >30min）归视图层。 */
+data class AgentSessionRow(
+    val id: String,                 // 对外 uuid
+    val userLabel: String,          // 脱敏邮箱；无关联账号（含已注销）= tokenHash 前 8 位
+    val status: String,
+    val channelKind: String,
+    val model: String,
+    val eventCount: Long,
+    val lastEventAt: Long?,         // stalled 判定用（视图层 >30min）
+    val createdAt: Long,
+    val updatedAt: Long,
+    val seq: Long,                  // before_seq 分页游标（路由取末行 seq）
+)
+
+/** M2 管理后台 Agent 事件回放行。payload decode 失败 = null（视图降级显示截断原文，此时 payloadRaw 带原文）。 */
+data class AgentEventRow(
+    val id: Long,
+    val type: String,
+    val source: String,
+    val role: String,
+    val parentId: Long?,
+    val payload: AgentEventPayload?,
+    /** 仅 decode 失败时填原始 payloadJson（成功时保持 null，不复制大文本——html_card 可达 128k 字符）。 */
+    val payloadRaw: String? = null,
     val createdAt: Long,
 )
 
@@ -672,5 +706,105 @@ object AdminQueries {
                     createdAt = r[LlmCallLogs.createdAt],
                 )
             }
+    }
+
+    /**
+     * Agent 会话列表，seq 倒序游标分页（beforeSeq = 严格小于；传 null 取最新页）。
+     * accountId 经 Accounts.tokenHash 过滤（账号不存在 → 空列表）。
+     * userLabel：tokenHash 能关联到未注销账号 → 脱敏邮箱，否则 tokenHash 前 8 位。
+     */
+    suspend fun agentSessions(beforeSeq: Long?, limit: Int = 50, accountId: Int? = null): List<AgentSessionRow> =
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            val tokenHashFilter = if (accountId != null) {
+                Accounts.selectAll().where { Accounts.id eq accountId }
+                    .firstOrNull()?.get(Accounts.tokenHash) ?: return@newSuspendedTransaction emptyList()
+            } else null
+            val rows = AgentSessions.selectAll()
+                .where {
+                    var cond: Op<Boolean> = Op.TRUE
+                    beforeSeq?.let { cond = cond and (AgentSessions.seq less it) }
+                    tokenHashFilter?.let { cond = cond and (AgentSessions.tokenHash eq it) }
+                    cond
+                }
+                .orderBy(AgentSessions.seq to SortOrder.DESC)
+                .limit(limit)
+                .toList()
+            buildSessionRows(rows)
+        }
+
+    /** 单会话摘要（详情页头部）；未知 sessionId → null。 */
+    suspend fun agentSessionSummary(sessionId: String): AgentSessionRow? =
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            val row = AgentSessions.selectAll().where { AgentSessions.id eq sessionId }.firstOrNull()
+                ?: return@newSuspendedTransaction null
+            buildSessionRows(listOf(row)).single()
+        }
+
+    /**
+     * 会话事件回放，id 升序（after = 严格大于），limit 上限 200。
+     * 全量保留：孤儿 observation（actionEventId=0 门控拦截痕迹）不过滤。
+     * payload 逐行 runCatching decode，失败 → null（视图降级显示截断原文）。
+     */
+    suspend fun agentSessionEvents(sessionId: String, after: Long = 0, limit: Int = 200): List<AgentEventRow> =
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            AgentEvents.selectAll()
+                .where { (AgentEvents.sessionId eq sessionId) and (AgentEvents.id greater after) }
+                .orderBy(AgentEvents.id to SortOrder.ASC)
+                .limit(limit.coerceIn(1, 200))
+                .map { r ->
+                    val raw = r[AgentEvents.payloadJson]
+                    val decoded = runCatching { AgentEventPayloadCodec.decode(raw) }.getOrNull()
+                    AgentEventRow(
+                        id = r[AgentEvents.id],
+                        type = r[AgentEvents.type],
+                        source = r[AgentEvents.eventSource],
+                        role = r[AgentEvents.role],
+                        parentId = r[AgentEvents.parentId],
+                        payload = decoded,
+                        payloadRaw = if (decoded == null) raw else null,
+                        createdAt = r[AgentEvents.createdAt],
+                    )
+                }
+        }
+
+    /**
+     * 会话行组装：eventCount/lastEventAt 走一次按 sessionId 分组的聚合查询
+     * （DB 端 group by，不物化 payload_json——html_card 载荷可达 128k 字符，2G 盒子红线）；
+     * userLabel 走一次 tokenHash inList 批量查账号。
+     */
+    private fun buildSessionRows(rows: List<ResultRow>): List<AgentSessionRow> {
+        if (rows.isEmpty()) return emptyList()
+        val sessionIds = rows.map { it[AgentSessions.id] }
+        val eventCountExpr = AgentEvents.id.count()
+        val lastEventExpr = AgentEvents.createdAt.max()
+        val stats = AgentEvents
+            .select(AgentEvents.sessionId, eventCountExpr, lastEventExpr)
+            .where { AgentEvents.sessionId inList sessionIds }
+            .groupBy(AgentEvents.sessionId)
+            .associate { it[AgentEvents.sessionId] to (it[eventCountExpr] to it[lastEventExpr]) }
+        val hashes = rows.map { it[AgentSessions.tokenHash] }.distinct()
+        val accountsByHash = Accounts.selectAll()
+            .where { Accounts.tokenHash inList hashes }
+            .associate { it[Accounts.tokenHash] to (it[Accounts.email] to it[Accounts.deletedAt]) }
+        return rows.map { r ->
+            val uuid = r[AgentSessions.id]
+            val hash = r[AgentSessions.tokenHash]
+            val account = accountsByHash[hash]
+            // 已注销账号（deletedAt 非空）按未关联处理，回落 tokenHash 前 8
+            val label = if (account != null && account.second == null) maskEmail(account.first) else hash.take(8)
+            val (eventCount, lastEventAt) = stats[uuid] ?: (0L to null)
+            AgentSessionRow(
+                id = uuid,
+                userLabel = label,
+                status = r[AgentSessions.status],
+                channelKind = r[AgentSessions.channelKind],
+                model = r[AgentSessions.model],
+                eventCount = eventCount,
+                lastEventAt = lastEventAt,
+                createdAt = r[AgentSessions.createdAt],
+                updatedAt = r[AgentSessions.updatedAt],
+                seq = r[AgentSessions.seq],
+            )
+        }
     }
 }

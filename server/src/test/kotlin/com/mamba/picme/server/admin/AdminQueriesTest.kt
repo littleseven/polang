@@ -1,5 +1,9 @@
 package com.mamba.picme.server.admin
 
+import com.mamba.picme.server.agent.AgentEventPayload
+import com.mamba.picme.server.agent.AgentEventPayloadCodec
+import com.mamba.picme.server.agent.AgentEvents
+import com.mamba.picme.server.agent.AgentSessions
 import com.mamba.picme.server.db.AnonymousDevices
 import com.mamba.picme.server.db.Accounts
 import com.mamba.picme.server.db.BrowserSessions
@@ -360,6 +364,147 @@ class AdminQueriesTest {
         assertEquals("a***@x.com", rows.first { it.accountId == 1 }.emailMasked)
     }
 
+    // ── M2: Agent 会话/事件回放查询 ──────────────────────────
+
+    @Test
+    fun `agentSessions paged desc with eventCount and user label`() = runBlocking {
+        TestDb.init(Accounts, AgentSessions, AgentEvents)
+        account(1, "alice@x.com", todayStart - day)                 // tokenHash = "hash1"
+        deletedAccount(2, "gone@x.com", todayStart - day)           // tokenHash = "hash2"
+        agentSession("sess-a1", "hash1", status = "finished", createdAt = todayStart, updatedAt = todayStart + 1000)
+        agentSession("sess-b2", "abcdef1234567890deadbeef", createdAt = todayStart + 10, updatedAt = todayStart + 20)
+        agentSession("sess-c3", "hash2", createdAt = todayStart + 20, updatedAt = todayStart + 30)
+        agentEvent("sess-a1", "message", "user", "user", AgentEventPayloadCodec.encode(AgentEventPayload.Message("hi")), todayStart + 100)
+        agentEvent("sess-a1", "finish", "agent", "assistant", AgentEventPayloadCodec.encode(AgentEventPayload.Finish("done")), todayStart + 900)
+        agentEvent("sess-b2", "message", "user", "user", AgentEventPayloadCodec.encode(AgentEventPayload.Message("yo")), todayStart + 15)
+
+        // seq 自增：a1=1, b2=2, c3=3 → 倒序 c3, b2, a1
+        val page1 = AdminQueries.agentSessions(beforeSeq = null, limit = 2)
+        assertEquals(2, page1.size)
+        // 软删除账号按未关联处理 → 回落 tokenHash 前 8
+        assertEquals("sess-c3", page1[0].id)
+        assertEquals("hash2".take(8), page1[0].userLabel)
+        assertEquals(0L, page1[0].eventCount)
+        assertNull(page1[0].lastEventAt)
+        // 无关联账号 → tokenHash 前 8
+        assertEquals("sess-b2", page1[1].id)
+        assertEquals("abcdef12", page1[1].userLabel)
+        assertEquals(1L, page1[1].eventCount)
+        assertEquals(todayStart + 15, page1[1].lastEventAt)
+
+        // beforeSeq = 严格小于：第二页只剩 a1，不重不漏
+        val page2 = AdminQueries.agentSessions(beforeSeq = page1.last().seq, limit = 2)
+        assertEquals(1, page2.size)
+        val a1 = page2[0]
+        assertEquals("sess-a1", a1.id)
+        assertEquals("a***@x.com", a1.userLabel) // 关联到账号 → 脱敏邮箱
+        assertEquals("finished", a1.status)
+        assertEquals("gateway", a1.channelKind)
+        assertEquals("kimi-k2.6", a1.model)
+        assertEquals(2L, a1.eventCount)
+        assertEquals(todayStart + 900, a1.lastEventAt)
+        assertEquals(todayStart, a1.createdAt)
+        assertEquals(todayStart + 1000, a1.updatedAt)
+        // 第三页为空
+        assertTrue(AdminQueries.agentSessions(beforeSeq = a1.seq, limit = 2).isEmpty())
+    }
+
+    @Test
+    fun `agentSessions accountId filter resolves via tokenHash`() = runBlocking {
+        TestDb.init(Accounts, AgentSessions, AgentEvents)
+        account(1, "alice@x.com", todayStart - day)   // tokenHash = "hash1"
+        account(3, "c@x.com", todayStart - day)   // tokenHash = "hash3"
+        agentSession("sess-1a", "hash1", createdAt = todayStart, updatedAt = todayStart)
+        agentSession("sess-1b", "hash1", createdAt = todayStart + 1, updatedAt = todayStart + 1)
+        agentSession("sess-3a", "hash3", createdAt = todayStart + 2, updatedAt = todayStart + 2)
+        agentSession("sess-x", "orphanhash999", createdAt = todayStart + 3, updatedAt = todayStart + 3)
+
+        val acc1 = AdminQueries.agentSessions(beforeSeq = null, accountId = 1)
+        assertEquals(2, acc1.size)
+        assertTrue(acc1.all { it.userLabel == "a***@x.com" })
+        // seq 倒序：1b 在 1a 前
+        assertEquals("sess-1b", acc1[0].id)
+        assertEquals("sess-1a", acc1[1].id)
+
+        val acc3 = AdminQueries.agentSessions(beforeSeq = null, accountId = 3)
+        assertEquals(1, acc3.size)
+        assertEquals("sess-3a", acc3[0].id)
+
+        // 未知 accountId → 空列表
+        assertTrue(AdminQueries.agentSessions(beforeSeq = null, accountId = 999).isEmpty())
+    }
+
+    @Test
+    fun `agentSessionEvents after cursor asc and payload decoded`() = runBlocking {
+        TestDb.init(Accounts, AgentSessions, AgentEvents)
+        agentSession("sess-ev", "hash9", createdAt = todayStart, updatedAt = todayStart)
+        agentEvent("sess-ev", "message", "user", "user", AgentEventPayloadCodec.encode(AgentEventPayload.Message("查一下照片")), todayStart)
+        agentEvent("sess-ev", "action", "agent", "assistant", AgentEventPayloadCodec.encode(AgentEventPayload.Action("search_media", """{"q":"cat"}""", reversible = false)), todayStart + 10)
+        // 孤儿 observation（actionEventId=0，门控拦截痕迹）必须保留
+        agentEvent("sess-ev", "observation", "environment", "tool", AgentEventPayloadCodec.encode(AgentEventPayload.Observation(actionEventId = 0, content = "error: rejected by gate")), todayStart + 20)
+        // 别的会话事件不混入
+        agentEvent("sess-other", "message", "user", "user", AgentEventPayloadCodec.encode(AgentEventPayload.Message("other")), todayStart + 30)
+
+        val events = AdminQueries.agentSessionEvents("sess-ev")
+        assertEquals(3, events.size)
+        // id 升序
+        assertEquals(events.map { it.id }, events.map { it.id }.sorted())
+        val action = events[1]
+        assertEquals("action", action.type)
+        assertEquals("agent", action.source)
+        assertEquals("assistant", action.role)
+        val actionPayload = action.payload as AgentEventPayload.Action
+        assertEquals("search_media", actionPayload.tool)
+        assertEquals("""{"q":"cat"}""", actionPayload.argsJson)
+        // decode 成功 → payloadRaw 保持 null（不复制大文本）
+        assertNull(action.payloadRaw)
+        // 孤儿 observation 保留且 decode 为 Observation(actionEventId=0)
+        val orphan = events[2].payload as AgentEventPayload.Observation
+        assertEquals(0L, orphan.actionEventId)
+        assertEquals("error: rejected by gate", orphan.content)
+
+        // after 游标 = 严格大于：跳过第一条
+        val afterFirst = AdminQueries.agentSessionEvents("sess-ev", after = events[0].id)
+        assertEquals(2, afterFirst.size)
+        assertEquals("action", afterFirst[0].type)
+        // limit 截断
+        assertEquals(1, AdminQueries.agentSessionEvents("sess-ev", limit = 1).size)
+    }
+
+    @Test
+    fun `agentSessionEvents undecodable payload yields null payload`() = runBlocking {
+        TestDb.init(Accounts, AgentSessions, AgentEvents)
+        agentSession("sess-bad", "hash9", createdAt = todayStart, updatedAt = todayStart)
+        agentEvent("sess-bad", "action", "agent", "assistant", "{broken", todayStart)
+
+        val events = AdminQueries.agentSessionEvents("sess-bad") // 不抛
+        assertEquals(1, events.size)
+        assertEquals("action", events[0].type)
+        assertNull(events[0].payload)
+        // 降级契约：decode 失败时 payloadRaw 带原文供视图截断展示
+        assertEquals("{broken", events[0].payloadRaw)
+    }
+
+    @Test
+    fun `agentSessionSummary returns null for unknown session`() = runBlocking {
+        TestDb.init(Accounts, AgentSessions, AgentEvents)
+        account(1, "alice@x.com", todayStart - day)
+        agentSession("sess-sum", "hash1", status = "error", createdAt = todayStart, updatedAt = todayStart + 50)
+        agentEvent("sess-sum", "message", "user", "user", AgentEventPayloadCodec.encode(AgentEventPayload.Message("hi")), todayStart + 40)
+
+        assertNull(AdminQueries.agentSessionSummary("no-such-session"))
+        val row = AdminQueries.agentSessionSummary("sess-sum")!!
+        assertEquals("sess-sum", row.id)
+        assertEquals("a***@x.com", row.userLabel)
+        assertEquals("error", row.status)
+        assertEquals("gateway", row.channelKind)
+        assertEquals("kimi-k2.6", row.model)
+        assertEquals(1L, row.eventCount)
+        assertEquals(todayStart + 40, row.lastEventAt)
+        assertEquals(todayStart, row.createdAt)
+        assertEquals(todayStart + 50, row.updatedAt)
+    }
+
     private suspend fun account(id: Int, email: String, createdAt: Long) {
         newSuspendedTransaction(Dispatchers.IO, Db.instance) {
             Accounts.insert {
@@ -430,6 +575,50 @@ class AdminQueriesTest {
                 it[BrowserSessions.startedAt] = startedAt
                 it[BrowserSessions.endedAt] = endedAt
                 it[BrowserSessions.outcome] = outcome
+            }
+        }
+    }
+
+    private suspend fun agentSession(
+        uuid: String,
+        tokenHash: String,
+        status: String = "running",
+        channelKind: String = "gateway",
+        model: String = "kimi-k2.6",
+        createdAt: Long,
+        updatedAt: Long,
+    ) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            AgentSessions.insert {
+                it[id] = uuid
+                it[AgentSessions.tokenHash] = tokenHash
+                it[AgentSessions.status] = status
+                it[AgentSessions.channelKind] = channelKind
+                it[AgentSessions.model] = model
+                it[AgentSessions.createdAt] = createdAt
+                it[AgentSessions.updatedAt] = updatedAt
+            }
+        }
+    }
+
+    private suspend fun agentEvent(
+        sessionId: String,
+        type: String,
+        source: String,
+        role: String,
+        payloadJson: String,
+        createdAt: Long,
+        parentId: Long? = null,
+    ) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            AgentEvents.insert {
+                it[AgentEvents.sessionId] = sessionId
+                it[AgentEvents.type] = type
+                it[eventSource] = source
+                it[AgentEvents.role] = role
+                it[AgentEvents.parentId] = parentId
+                it[AgentEvents.payloadJson] = payloadJson
+                it[AgentEvents.createdAt] = createdAt
             }
         }
     }
