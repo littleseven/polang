@@ -988,6 +988,10 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   refs/ardot/pattern-*、comp-*；既有组件对帧校准 13 项（Card 16dp 圆角/Banner
   HEADLINE 题字+蒙层参数/图表标题 CAPTION 弱色/Callout 12dp+IconSize.sm 等）。
   设计语言文档升 v9（§0 原则 4「组合收敛在规则层」+ §4.7 版式范式）。
+  验收态（2026-11-01）：server 全量 554 测试绿 / shared jvmTest + 纯度门绿 /
+  androidApp 单测 + ktlint + detekt 绿 / 真机画廊三新件目检通过（ui-driver）；
+  App 1.0.70（10070）已装测试机；server 0.9.9 构建就绪——**生产部署与
+  真机四场景验收待用户执行**（双交付铁律，部署后 LLM 才见新约束）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
