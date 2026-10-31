@@ -70,23 +70,34 @@ DISPLAY 与其他 role 的差异不仅是字号：tnum 让多栏 stat tile 的�
 ### 4.1 Stat Tile（统计大数字）
 
 ```
-Row([Column([Text("7,120","DISPLAY"), Text("照片总数","CAPTION")]),
-     Column([Text("771","DISPLAY"),   Text("视频总数","CAPTION")]),
-     Column([Text("12","DISPLAY"),    Text("覆盖月份","CAPTION")])])
+StatRow([{value: "7,120", label: "照片总数"},
+         {value: "771",   label: "视频总数"},
+         {value: "12",    label: "覆盖月份"}])
 ```
 
-- Row 等宽分栏正好承载 2~4 个 tile；每 tile = DISPLAY 数字 + CAPTION 弱色标签；
-- **反模式**：`Text("7894 张照片")` 纯文本统计行（数字不突出、无可比性）；
+- **2026-10-31 起首选 StatRow 组件**（经典统计行固化：等分 + DISPLAY 数字 + CAPTION 弱色标签居中，一行调用）；
+  手写拼装形态 `Row([Column([Text("7,120","DISPLAY"), Text("照片总数","CAPTION")], align="center"), ...])` 仍合法但降级为备用；
+- 一行 2~4 个 tile 最佳；**反模式**：`Text("7894 张照片")` 纯文本统计行（数字不突出、无可比性）；
 - 装饰 Icon 不进 stat tile；需要图标引导时单列 Icon 组件且**省略 colorRole**（自动弱色）。
 
 ### 4.2 Hero 封面
 
 ```
-Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row([Image, Image, Image])
+Banner("我的相册年度杂志", photo = photos[0].id, subtitle = "2026 · 12 个月")
 ```
 
-- 导语用 Markdown（关键数字加粗）而非纯 Text；
-- 封面图 Row 等宽 2~3 张，竖图 aspect 0.75、横图 1.5~1.78。
+- **2026-10-31 起首选 Banner 组件**（通栏题图横幅固化：图 + 底部渐变蒙层 + 左下白字标题/副题）；
+  多图封面（2~3 张并排）仍用 `Row([Image, Image, Image])`；导语用 Markdown（关键数字加粗）而非纯 Text；
+- Banner 图双源：photo 相册投影优先 / src https；aspect 缺省 16:9，竖图主题显式传 0.75。
+
+### 4.2.1 经典列表行（ListTile）
+
+```
+List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · 三亚", trailing = "128 张"), ...])
+```
+
+- **2026-10-31 起 ListItem 实渲染化**（原纯元素形状升格）：前件三选一（photo 48dp 图 > image https 图 > icon 徽章）+ 标题/副题 + trailing 弱色小字；`List([ListItem...])` 纵向限高滚动即经典列表，独立用亦可；
+- 前件缺省时是纯文字行（标题+副题+尾部），也是合法形态。
 
 ### 4.3 交互区（底部控制台）
 
@@ -137,9 +148,13 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 | Modal | open BINDABLE_BOOLEAN 真值弹 Dialog；关闭 → @Set($open, false) |
 | Form / FormControl / Input / TextArea / Select / DatePicker / CheckBoxGroup / RadioGroup / SwitchGroup / Chips / OptionCards / EditableTable | 表单族：name 键控 → 交互即 @Set($name, 值) 直写 state（$ 前缀），他处经 $name 绑定读；Form 仅视觉分组；OutlinedTextField/FilterChip/OutlinedCard 等 M3 件 + token 色 |
 | AreaChart / HorizontalBarChart / RadarChart / RadialChart / SingleStackedBarChart / ScatterChart | §3 图表皮肤同族：chartPalette 离散色 + CAPTION 弱标签 + 图例；Area=线下填充 0.2、Radar=蛛网多边形、Radial=同心环弧、Scatter=散点 z→半径 |
-| SnippetCardBlock / OverviewCardBlock / ContextCardBlock / CompositeCardBlock / VisualCardBlock | Block 壳：items≥1，layout grid=FlowRow 双列 / carousel=横滑 200dp；Visual=大图底 + 渐变蒙层白字 |
+| SnippetCardBlock / OverviewCardBlock / ContextCardBlock / CompositeCardBlock / VisualCardBlock | Block 壳：items≥1，layout grid=FlowRow 双列 / carousel=横滑 200dp；Visual=大图底 + 渐变蒙层白字，题图双源（2026-10-31）：bgPhoto 相册投影 id 优先 / bgImageSrc https |
 | MetricIndicatorInline / MetricIndicatorWithStrikethrough | DISPLAY 大数字 + trend ↑success/↓error；删除线旧值 |
-| 元素形状 19 件（*Item/Series/Slice/Point/ScatterSeries） | 仅作父组件数组元素的对象形状，独立出现渲染空占位 |
+| **经典组合版式批次（2026-10-31，95 项注册）** | |
+| StatRow / StatItem | 经典统计行（§4.1 固化件）：items [{value*, label?}] 等分 weight，DISPLAY 数字 + CAPTION 弱色标签居中；StatItem 独立 = 单项统计格 |
+| Banner | 通栏题图横幅（§4.2 固化件）：photo 相册投影优先 / src https，底部渐变蒙层 + 左下白字标题副题；aspect 缺省 16:9（clamp [0.5, 2.5]）；无图 = surfaceVariant 纯色底 + 主题色文字；photo 图点击 OpenPhoto 大图 |
+| ListItem | 经典列表行（§4.2.1，实渲染化）：前件 photo 48dp 图 > image https 图 > icon 36dp 圆形徽章三选一 + 标题 BODY（≤2 行）/副题 CAPTION 弱 + trailing 弱色小字 / actionLabel 胶囊；action 整行可点 |
+| 元素形状 18 件（*Item/Series/Slice/Point/ScatterSeries） | 仅作父组件数组元素的对象形状，独立出现渲染空占位（ListItem 2026-10-31 起升格出组） |
 
 ## 6. 变更记录
 
@@ -149,3 +164,4 @@ Text("我的相册年度杂志","HEADLINE") + Markdown("…**7,891**…") + Row(
 - v3（2026-10-30，spec 已随交付清理，git 历史可查）：align 结构治理——Row/Column/Card 补 `align` prop，词汇/语义/缺省严格对齐官方 thesysdev/openui Stack（CSS align-items：五值 start\|center\|end\|stretch\|baseline，缺省 stretch = 子项铺满交叉轴；baseline 首行基线对齐，列向兜底 start 文档化偏差）；Stack 别名 align 缺省同步修正 start→stretch；主按钮（variant=primary）整行宽；server 工具描述官方语义行文 + stat tile 黄金示例三栏 `align="center"` + lint 软警告（DISPLAY+Row 未居中提示）。
 - v4（2026-10-30，spec 已随交付清理，git 历史可查）：图文组合固化——ImageText/ImageTextLarge 补 `photo` prop（相册投影 id，与 src 二选一、photo 优先），图文版式被组件结构性锁死（小图左+标题副题列 / 通栏 16:9 图+粗标题），相册图文不再 Row 裸拼 Image+Text（等宽分栏反模式）；server 工具描述增图文排版食谱段 + 黄金示例 + lint 软警告（Row 内 Image+Text 裸拼提示）；单卡图片上限口径补 photo 键计数。文字环绕图片（float wrap）不支持，食谱声明替代形态。
 - v5（2026-10-30，spec 已随交付清理，git 历史可查）：通用布局原语批次——设计方向从业务组合组件转向通用布局原语（用户定调「通用布局组件而不是业务组件」）。新增 Grid（通用 N 列网格，columns 1..4 缺省 2，四宫格 = columns 2）/ Box（通用叠放容器，align 九值 contentAlignment 缺省 topStart = Compose 官方缺省）/ Spacer（通用留白件，size∈xs\|s\|m\|l\|xl → 间距 token，缺省 m）三组件 + Row 增 `weights` prop（CSS flex-grow 语义按比例分栏，左图右文 = `weights=[1,2]` 配 align 上下对齐）；组件总数 89→92。lint 修订：Row 裸拼 Image+Text 仅无 weights 时警告（weights 比例分栏是认可的经典版式写法）；工具描述「通用布局食谱」段 + 黄金示例（四宫格照片墙 + 1:2 左图右文）；ImageText/ImageTextLarge 保留为便捷糖，泛化组合优先通用原语。官方核查：thesysdev/openui 通用布局仅 Stack 一件（无 per-child weight/Grid/Box/Spacer），本批次属本仓刻意扩展，词汇/缺省严格对齐官方/CSS/Compose。
+- v6（2026-10-31，spec 已随交付清理，git 历史可查）：经典组合版式批次——原语之上固化经典构图（用户定调「布局丑问题依旧没有解决，应该做一些经典的布局组件」），LLM 一行调用即得正确版式，不再依赖原语拼装纪律。新增 StatRow（经典统计行 = §4.1 stat tile 组件化，items [{value*, label?}] 等分居中，lint 第三条「stat tile 未居中」的根治——警告文案同步引导换 StatRow）/ StatItem（元素形状保底）/ Banner（通栏题图横幅 = §4.2 Hero 组件化，photo 相册投影 + 渐变蒙层白字，aspect 缺省 16:9）；ListItem 实渲染化（经典 ListTile：前件 photo/image/icon 三选一 + 标题副题 + trailing，`List([ListItem...])` 经典列表成形，新增 photo/icon/trailing props 向后兼容）；VisualCardBlock/VisualCardItem +bgPhoto（题图卡相册投影，与 bgImageSrc 二选一、bgPhoto 优先）。组件总数 92→95；server 图片计数口径扩 `bgPhoto` 键 + 对象字段冒号形态（`{bgPhoto: …}` 同 `photo =` 计位图）；工具描述增经典组合版式食谱五则 + 黄金示例 GOLDEN_CLASSIC_PROGRAM。刻意不做 SectionHeader（CardHeader/InlineHeader 已是同义件）。

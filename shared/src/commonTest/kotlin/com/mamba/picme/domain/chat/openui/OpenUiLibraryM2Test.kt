@@ -45,7 +45,8 @@ class OpenUiLibraryM2Test {
         // 2026-10-25 全量补全（spec《openui-full-library-design》）：官方 openuiLibrary
         // 82 组件覆盖 81（Col 列式 Table 刻意不收）+ 本仓既有 8 项（Row/Column/Divider/
         // List/CheckBox/ChoicePicker/Switch/Markdown）= 89 注册项；
-        // 2026-10-30 通用布局原语批次 +Grid/Box/Spacer（本仓扩展）= 92 注册项
+        // 2026-10-30 通用布局原语批次 +Grid/Box/Spacer（本仓扩展）= 92 注册项；
+        // 2026-10-31 经典组合版式批次 +StatRow/StatItem/Banner（本仓扩展）= 95 注册项
         assertEquals(
             setOf(
                 // 既有 21（M1~M3）
@@ -75,7 +76,9 @@ class OpenUiLibraryM2Test {
                 "SnippetCardBlock", "SnippetCardItem", "OverviewCardBlock", "OverviewCardItem",
                 "ContextCardBlock", "ContextCardItem", "CompositeCardBlock", "CompositeCardItem",
                 "VisualCardBlock", "VisualCardItem",
-            ).also { expected -> assertEquals(92, expected.size) },
+                // 经典组合版式批次 3（2026-10-31 本仓扩展）
+                "StatRow", "StatItem", "Banner",
+            ).also { expected -> assertEquals(95, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }
@@ -694,5 +697,102 @@ class OpenUiLibraryM2Test {
             OpenUiValue.Arr(listOf(OpenUiValue.Num(1.0), OpenUiValue.Num(2.0))),
             row.props["weights"],
         )
+    }
+
+    // ── 经典组合版式批次（2026-10-31）：StatRow/StatItem/Banner + ListItem/VisualCard 扩展 ──
+
+    @Test
+    fun `classic layout components registered with expected schema`() {
+        val statRow = OpenUiLibrary.components.getValue("StatRow")
+        val itemsProp = statRow.props.single { prop -> prop.name == "items" }
+        assertEquals(OpenUiPropType.OBJECT_ARRAY, itemsProp.type)
+        assertTrue(itemsProp.required)
+        assertEquals(
+            listOf("value", "label"),
+            itemsProp.objectFields.map { prop -> prop.name },
+        )
+        assertTrue(itemsProp.objectFields[0].required)
+        assertFalse(itemsProp.objectFields[1].required)
+
+        val statItem = OpenUiLibrary.components.getValue("StatItem")
+        assertEquals(
+            listOf("value", "label"),
+            statItem.props.map { prop -> prop.name },
+        )
+        assertTrue(statItem.props[0].required)
+
+        val banner = OpenUiLibrary.components.getValue("Banner")
+        assertEquals(
+            listOf("title", "subtitle", "photo", "src", "aspect"),
+            banner.props.map { prop -> prop.name },
+        )
+        assertTrue(banner.props[0].required)
+        assertEquals(OpenUiPropType.NUMBER, banner.props.single { prop -> prop.name == "photo" }.type)
+
+        // ListItem 扩展：+photo/icon/trailing（既有 prop 全保留向后兼容）
+        val listItem = OpenUiLibrary.components.getValue("ListItem")
+        assertEquals(
+            listOf("title", "subtitle", "image", "actionLabel", "action", "photo", "icon", "trailing"),
+            listItem.props.map { prop -> prop.name },
+        )
+        assertEquals(OpenUiPropType.NUMBER, listItem.props.single { prop -> prop.name == "photo" }.type)
+        assertEquals(
+            OpenUiLibrary.iconNames,
+            listItem.props.single { prop -> prop.name == "icon" }.enumValues,
+        )
+
+        // VisualCardBlock/VisualCardItem 扩展：+bgPhoto（NUMBER 可选）
+        val blockFields = OpenUiLibrary.components.getValue("VisualCardBlock").props
+            .single { prop -> prop.name == "items" }.objectFields
+        assertEquals(
+            listOf("body", "bgImageSrc", "bgPhoto", "tag"),
+            blockFields.map { prop -> prop.name },
+        )
+        assertEquals(
+            OpenUiPropType.NUMBER,
+            blockFields.single { prop -> prop.name == "bgPhoto" }.type,
+        )
+        assertEquals(
+            listOf("body", "bgImageSrc", "bgPhoto", "tag"),
+            OpenUiLibrary.components.getValue("VisualCardItem").props.map { prop -> prop.name },
+        )
+    }
+
+    @Test
+    fun `classic layout program evaluates with photo projections`() = runTest {
+        // mock local_handle 返回 #photos 投影形态 [{id, date}]（同 Image 投影用例口径）
+        val photos = OpenUiValue.Arr(
+            listOf(
+                OpenUiValue.Obj(
+                    mapOf(
+                        "id" to OpenUiValue.Num(101.0),
+                        "date" to OpenUiValue.Str("2026-07-18"),
+                    ),
+                ),
+            ),
+        )
+        val tools = OpenUiToolResolver { name, _ ->
+            if (name == "local_handle") photos else throw OpenUiToolNotFoundException(name)
+        }
+        val program = """
+            photos = Query("local_handle", { handle: "local://scan/7f3a#photos" }, [])
+            root = Card([Banner("本周精选", photo = photos[0].id, subtitle = "2026-07-18"), StatRow([{value: "7,120", label: "照片"}, {value: "12", label: "月份"}]), ListItem("海边日落", photo = photos[0].id, trailing = "07-18"), VisualCardBlock([{body: "精选", bgPhoto: photos[0].id}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, tools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val banner = childAt(result.root, 0)
+        assertEquals("Banner", banner.type)
+        assertEquals(OpenUiValue.Num(101.0), banner.props["photo"])
+        val statRow = childAt(result.root, 1)
+        assertEquals("StatRow", statRow.type)
+        val statItems = (statRow.props["items"] as OpenUiValue.Arr).v
+        assertEquals(2, statItems.size)
+        val listItem = childAt(result.root, 2)
+        assertEquals("ListItem", listItem.type)
+        assertEquals(OpenUiValue.Num(101.0), listItem.props["photo"])
+        val block = childAt(result.root, 3)
+        assertEquals("VisualCardBlock", block.type)
+        val blockItem = ((block.props["items"] as OpenUiValue.Arr).v[0] as OpenUiValue.Obj).v
+        assertEquals(OpenUiValue.Num(101.0), blockItem["bgPhoto"])
     }
 }

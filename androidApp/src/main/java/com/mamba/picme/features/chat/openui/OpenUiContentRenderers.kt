@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -80,6 +81,8 @@ internal val openUiContentComponentNames: Set<String> = setOf(
     "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label", "BoldText",
     "IconText", "ImageText", "ImageTextLarge", "EntityList", "ListBlock",
     "Steps", "Carousel", "Buttons", "IconButton", "Modal",
+    // 经典组合版式批次（2026-10-31）：StatRow/StatItem/Banner 新增 + ListItem 实渲染化
+    "StatRow", "StatItem", "Banner", "ListItem",
 )
 
 /** 单组件数组/子项上限（MAX_LIST_CHILDREN=50 同口径：LLM 生成面无界，渲染端 take 兜底）。 */
@@ -139,6 +142,23 @@ internal fun OpenUiContentNode(
         "Buttons" -> OpenUiContentButtons(node, state, photoResolver, onAction, modifier)
         "IconButton" -> OpenUiContentIconButton(node, onAction, modifier)
         "Modal" -> OpenUiContentModal(node, state, photoResolver, onAction, modifier)
+        // ── 经典组合版式批次（2026-10-31）──
+        "StatRow" -> OpenUiContentStatRow(node, modifier)
+        "StatItem" -> {
+            // 元素形状保底：独立出现按单项统计渲染（缺 value 丢组件同 StatRow item 口径）
+            val value = (node.props["value"] as? OpenUiValue.Str)?.v
+            if (value == null) {
+                Box(modifier = modifier)
+            } else {
+                OpenUiContentStatCell(
+                    value = value,
+                    label = (node.props["label"] as? OpenUiValue.Str)?.v,
+                    modifier = modifier,
+                )
+            }
+        }
+        "Banner" -> OpenUiContentBanner(node, photoResolver, onAction, modifier)
+        "ListItem" -> OpenUiContentListItem(node, photoResolver, onAction, modifier)
         else -> Box(modifier = modifier)
     }
 }
@@ -1268,6 +1288,253 @@ private fun OpenUiContentModal(
                 ) {
                     OpenUiContentChildren(children, state, photoResolver, onAction)
                 }
+            }
+        }
+    }
+}
+
+// ── 经典组合版式批次（2026-10-31，spec《2026-10-31-openui-classic-layouts-design》）────
+// StatRow/Banner 新增 + ListItem 实渲染化：原语之上的固化经典构图，LLM 一行调用即得
+// 正确版式（stat tile 构图不再靠 Row+Column+Text(DISPLAY) 拼装纪律）。
+
+/** 单项统计格（StatRow 项 / StatItem 独立保底共用）：DISPLAY 大数字 + CAPTION 弱色标签居中。 */
+@Composable
+private fun OpenUiContentStatCell(value: String, label: String?, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = OpenUiCardTokens.displayStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        label?.let { text ->
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** StatRow：经典统计行——2~4 项等分（weight 1f），item 缺 value 剔除、全丢 → 空占位。 */
+@Composable
+private fun OpenUiContentStatRow(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val value = (obj["value"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        value to (obj["label"] as? OpenUiValue.Str)?.v
+    }.take(MAX_CONTENT_ITEMS)
+    if (items.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    Row(modifier = modifier.fillMaxWidth()) {
+        items.forEach { (value, label) ->
+            OpenUiContentStatCell(value = value, label = label, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/** Banner 缺省宽高比 16:9（显式 aspect 钳 [0.5, 2.5]，Image PROP_ASPECT 同口径）。 */
+private const val BANNER_FALLBACK_ASPECT = 16f / 9f
+
+/**
+ * Banner：通栏题图横幅——图（photo 相册投影优先 / src https，二选一）+ 底部黑色渐变
+ * 蒙层 + 左下白字标题/副题（VisualCardItem 有图形态的单卡版）；photo/src 皆无 →
+ * surfaceVariant 纯色底 + 主题色文字（VisualCardItem 无图形态同口径）；photo 图点击
+ * 看大图走 OpenPhoto 宿主动作（OpenUiContentPhotoImage 既有口径）。
+ */
+@Composable
+private fun OpenUiContentBanner(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
+    val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
+    val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
+    val httpsSrc = httpsSrcOrNull((node.props["src"] as? OpenUiValue.Str)?.v)
+    val aspect = ((node.props["aspect"] as? OpenUiValue.Num)?.v ?: BANNER_FALLBACK_ASPECT.toDouble())
+        .coerceIn(0.5, 2.5).toFloat()
+    val hasImage = photoId != null || httpsSrc != null
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(aspect)
+            .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        if (photoId != null) {
+            OpenUiContentPhotoImage(
+                photoId = photoId,
+                photoResolver = photoResolver,
+                onAction = onAction,
+                modifier = Modifier.matchParentSize(),
+            )
+        } else if (httpsSrc != null) {
+            AsyncImage(
+                model = httpsSrc,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+        if (hasImage) {
+            // 底部黑色渐变蒙层（文字可读性，VisualCardItem 同口径）：transparent → Black 0.7
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.7f),
+                        )
+                    )
+            )
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(Spacing.md),
+        ) {
+            // 有图：白字压渐变蒙层；纯色底：跟随主题 onSurface（浅底白字不可读）
+            val textColor = if (hasImage) Color.White else MaterialTheme.colorScheme.onSurface
+            val subColor = if (hasImage) {
+                Color.White.copy(alpha = 0.85f)
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Text(
+                text = title,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.let { text ->
+                Text(
+                    text = text,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = subColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * ListItem（2026-10-31 实渲染化，经典 ListTile 行）：前件三选一（photo 相册投影 48dp
+ * 圆角图 / image https 48dp / icon 36dp 圆形徽章，优先级 photo > image > icon）+
+ * 标题 BODY（≤2 行）/副题 CAPTION 弱色（≤1 行）+ 尾部 trailing 弱色小字 / actionLabel
+ * 胶囊（ListBlock 同形）；action 存在整行可点（宿主动作通道）。
+ */
+@Composable
+private fun OpenUiContentListItem(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
+    val subtitle = (node.props["subtitle"] as? OpenUiValue.Str)?.v
+    val image = (node.props["image"] as? OpenUiValue.Str)?.v
+    val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
+    val icon = (node.props["icon"] as? OpenUiValue.Str)?.v?.let { name -> openUiIcon(name) }
+    val trailing = (node.props["trailing"] as? OpenUiValue.Str)?.v
+    val actionLabel = (node.props["actionLabel"] as? OpenUiValue.Str)?.v
+    val actions = contentActions(node.props["action"])
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (actions.isNotEmpty()) {
+                    Modifier.clickable { actions.forEach(onAction) }
+                } else {
+                    Modifier
+                }
+            ),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when {
+            photoId != null -> OpenUiContentPhotoImage(
+                photoId = photoId,
+                photoResolver = photoResolver,
+                onAction = onAction,
+                modifier = Modifier.size(CONTENT_LIST_IMAGE_SIZE),
+            )
+            image != null -> OpenUiContentNetworkImage(
+                src = image,
+                contentDescription = title,
+                modifier = Modifier.size(CONTENT_LIST_IMAGE_SIZE),
+            )
+            icon != null -> Box(
+                modifier = Modifier
+                    .size(CONTENT_ICON_BADGE_SIZE)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(IconSize.sm),
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.let { text ->
+                Text(
+                    text = text,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        trailing?.let { text ->
+            Text(
+                text = text,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        actionLabel?.let { label ->
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        MaterialTheme.colorScheme.primary
+                            .copy(alpha = BadgeTokens.tagBackgroundAlpha)
+                    )
+                    .padding(
+                        horizontal = BadgeTokens.tagPaddingH,
+                        vertical = BadgeTokens.tagPaddingV,
+                    ),
+            ) {
+                Text(
+                    text = label,
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                )
             }
         }
     }

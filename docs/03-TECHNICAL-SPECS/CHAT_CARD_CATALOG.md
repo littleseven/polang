@@ -945,6 +945,20 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   Divider/Spacer 不占，个数不符回退全 1 等宽；左图右文 = weights=[1,2] 配 align）；
   lint 第四条修订（Row 内 Image+Text 裸拼仅无 weights 时警告）；工具描述「通用布局
   食谱」段 + 黄金示例 `GOLDEN_LAYOUT_PROGRAM`（四宫格照片墙 + 1:2 左图右文）。
+  经典组合版式批次（2026-10-31，spec 已随交付清理，git 历史可查）：
+  原语之上固化经典构图（用户定调「布局丑问题依旧没有解决，应该做一些经典的布局
+  组件」）——组件库 92→95 新增 StatRow(items*=[{value*, label?}])（经典统计行 =
+  stat tile 组件化：等分 + DISPLAY 数字 + CAPTION 弱色标签居中，lint 第三条根治）/
+  StatItem（元素形状保底）/ Banner(title*, subtitle?, photo?, src?, aspect?)（通栏题图
+  横幅：photo 相册投影优先 / src https，底部渐变蒙层 + 左下白字标题，aspect 缺省
+  16:9 clamp [0.5, 2.5]，无图 surfaceVariant 纯色底）；ListItem 实渲染化（经典
+  ListTile：前件 photo 48dp 图 > image https 图 > icon 徽章三选一 + 标题/副题 +
+  trailing 弱色小字 + actionLabel 胶囊，action 整行可点；`List([ListItem...])` 经典
+  列表成形，新增 photo/icon/trailing props 向后兼容）；VisualCardBlock/VisualCardItem
+  +bgPhoto（题图卡相册投影，与 bgImageSrc 二选一、bgPhoto 优先）；server 图片计数
+  口径扩 bgPhoto 键 + 对象字段冒号形态（`{bgPhoto: …}` 同 `photo =` 计位图）；
+  工具描述增经典组合版式食谱五则 + 黄金示例 `GOLDEN_CLASSIC_PROGRAM`（Banner +
+  StatRow + ListItem 相册卡骨架，companion const 测试同源钉住）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量

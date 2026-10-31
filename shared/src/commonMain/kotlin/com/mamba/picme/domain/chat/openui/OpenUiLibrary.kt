@@ -52,13 +52,17 @@ data class OpenUiProp(
 data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
 
 /**
- * polang OpenUI 组件库（八十九项注册 = 官方 81/82 + 本仓别名与既有 8 项）。
+ * polang OpenUI 组件库（九十五项注册 = 官方 81/82 + 本仓别名与既有 8 项 + 通用布局原语
+ * 3 项 + 经典组合版式 3 项）。
  * M2（2026-10-24，spec《openui-component-library-m2-design》）七扩十四；M3（同日，
  * spec《openui-component-library-m3-design》）十四扩二十一；2026-10-25 全量补全
  * （spec《openui-full-library-design》）：对齐官方 openuiLibrary（thesysdev/openui）
  * 82 组件——补 81（Col 列式 Table 刻意不收，行式为唯一形态），官方同名异构组件
  * （Callout/Tabs/Accordion/Table/Image/Card/Button）保本仓签名向后兼容，别名
  * Stack/Separator/MarkDownRenderer 渲染复用既有实现，表单 name 键控 → @Set($name) 直写。
+ * 2026-10-31 经典组合版式批次（spec《2026-10-31-openui-classic-layouts-design》）：
+ * +StatRow/StatItem/Banner，ListItem 实渲染化扩展（photo/icon/trailing），
+ * VisualCardBlock/VisualCardItem +bgPhoto。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
  * OpenUiNodeRenderer）共用同一份。
  */
@@ -743,6 +747,9 @@ object OpenUiLibrary {
                 ),
             ),
         ),
+        // 2026-10-31 经典组合版式批次：ListItem 实渲染化（经典 ListTile 行，不再是纯元素
+        // 形状）——前件三选一（photo 相册投影 48dp 图 / image https 图 / icon 圆形徽章），
+        // trailing 尾部弱色小字；List([ListItem(...)]) 即经典列表。既有 prop 全保留向后兼容
         OpenUiComponent(
             "ListItem",
             listOf(
@@ -751,6 +758,9 @@ object OpenUiLibrary {
                 OpenUiProp("image", OpenUiPropType.STRING),
                 OpenUiProp("actionLabel", OpenUiPropType.STRING),
                 OpenUiProp("action", OpenUiPropType.ACTION),
+                OpenUiProp("photo", OpenUiPropType.NUMBER),
+                OpenUiProp("icon", OpenUiPropType.ENUM, enumValues = iconNames),
+                OpenUiProp("trailing", OpenUiPropType.STRING),
             ),
         ),
         OpenUiComponent(
@@ -1340,6 +1350,8 @@ object OpenUiLibrary {
                 OpenUiProp("footer", OpenUiPropType.COMPONENT_LIST),
             ),
         ),
+        // 2026-10-31 经典组合版式批次：items 增 bgPhoto（相册投影 id，与 bgImageSrc
+        // 二选一、bgPhoto 优先）——题图卡可用相册照片（本 app 核心场景）
         OpenUiComponent(
             "VisualCardBlock",
             listOf(
@@ -1350,6 +1362,7 @@ object OpenUiLibrary {
                     objectFields = listOf(
                         OpenUiProp("body", OpenUiPropType.STRING, required = true),
                         OpenUiProp("bgImageSrc", OpenUiPropType.STRING),
+                        OpenUiProp("bgPhoto", OpenUiPropType.NUMBER),
                         OpenUiProp("tag", OpenUiPropType.STRING),
                     ),
                 ),
@@ -1367,7 +1380,48 @@ object OpenUiLibrary {
             listOf(
                 OpenUiProp("body", OpenUiPropType.STRING, required = true),
                 OpenUiProp("bgImageSrc", OpenUiPropType.STRING),
+                OpenUiProp("bgPhoto", OpenUiPropType.NUMBER),
                 OpenUiProp("tag", OpenUiPropType.STRING),
+            ),
+        ),
+
+        // ── 经典组合版式批次（2026-10-31，spec《2026-10-31-openui-classic-layouts-design》）：
+        // 原语之上的固化经典构图——LLM 一行调用即得正确版式，不再依赖原语拼装纪律 ──
+        // StatRow：经典统计行（stat tile 黄金构图组件化）——2~4 项等分，每项 DISPLAY 大数字
+        // + CAPTION 弱色标签居中（渲染期 take(6) 护栏）
+        OpenUiComponent(
+            "StatRow",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("label", OpenUiPropType.STRING),
+                    ),
+                ),
+            ),
+        ),
+        // StatItem：StatRow 元素形状（保底；独立出现按单项统计渲染）
+        OpenUiComponent(
+            "StatItem",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.STRING, required = true),
+                OpenUiProp("label", OpenUiPropType.STRING),
+            ),
+        ),
+        // Banner：通栏题图横幅——图（photo 相册投影优先 / src https，二缺一）+ 底部渐变
+        // 蒙层 + 左下白字标题/副题（VisualCardItem 有图形态的单卡版）；aspect 缺省 16:9，
+        // 显式传 clamp [0.5, 2.5]（Image 同口径）；photo/src 皆无 → surfaceVariant 纯色底
+        OpenUiComponent(
+            "Banner",
+            listOf(
+                OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                OpenUiProp("subtitle", OpenUiPropType.STRING),
+                OpenUiProp("photo", OpenUiPropType.NUMBER),
+                OpenUiProp("src", OpenUiPropType.STRING),
+                OpenUiProp("aspect", OpenUiPropType.NUMBER),
             ),
         ),
     ).associateBy { component -> component.name }

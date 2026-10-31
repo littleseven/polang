@@ -128,3 +128,4 @@ docs/superpowers/
 | 2026-10-30 | 交付沉淀：spec `2026-10-30-openui-align-spacing-design.md` 当日交付当日按沉淀管线移除（结论已落 OPENUI_CARD_DESIGN_LANGUAGE v3 / CHAT_CARD_CATALOG data_ui_openui 节 / shared·server AGENTS.md，git 历史可查），活文档内 spec 引用同步摘除 |
 | 2026-10-30 | 交付沉淀：spec `2026-10-30-openui-photo-text-composite-design.md` 当日交付当日按沉淀管线移除（结论已落 OPENUI_CARD_DESIGN_LANGUAGE v4 / CHAT_CARD_CATALOG data_ui_openui 节 / shared·server AGENTS.md，git 历史可查），活文档内 spec 引用同步摘除 |
 | 2026-10-30 | 交付沉淀：spec `2026-10-30-openui-layout-primitives-design.md` 当日交付当日按沉淀管线移除（结论已落 OPENUI_CARD_DESIGN_LANGUAGE v5 / CHAT_CARD_CATALOG data_ui_openui 节 / shared·server AGENTS.md，git 历史可查），活文档内 spec 引用同步摘除 |
+| 2026-10-31 | 交付沉淀：spec `2026-10-31-openui-classic-layouts-design.md` 当日交付当日按沉淀管线移除（结论已落 OPENUI_CARD_DESIGN_LANGUAGE v6 / CHAT_CARD_CATALOG data_ui_openui 节 / shared·server AGENTS.md，git 历史可查），活文档内 spec 引用同步摘除 |

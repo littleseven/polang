@@ -21,6 +21,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +37,7 @@ import coil.compose.AsyncImage
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
+import com.mamba.picme.core.image.faceAwareVerticalAlignment
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiValue
@@ -50,8 +53,10 @@ import com.mamba.picme.domain.chat.openui.OpenUiValue
  * 渲染分支负责（M4a/M4d 各司其职，渲染器位置无关）。
  *
  * 半信任输入防御（§6）：未知组件 → 空 Box 占位；item 缺必填字段剔除，全丢 → 空 Box；
- * items 上限 [MAX_BLOCK_ITEMS] 护栏；VisualCardBlock bgImageSrc 限 https（[PRIVACY] 同
- * Image src 口径），非 https → surfaceVariant 纯色底。
+ * items 上限 [MAX_BLOCK_ITEMS] 护栏；VisualCardBlock 题图双源——bgPhoto 相册投影 id
+ * （2026-10-31 经典组合版式批次，端侧 id→uri + 人脸聚焦，与 bgImageSrc 二选一、
+ * bgPhoto 优先）/ bgImageSrc 限 https（[PRIVACY] 同 Image src 口径），皆无 →
+ * surfaceVariant 纯色底。
  */
 internal val openUiCardBlockComponentNames: Set<String> = setOf(
     "SnippetCardBlock",
@@ -82,7 +87,7 @@ internal fun OpenUiCardBlockNode(
         "OverviewCardBlock" -> OpenUiOverviewCardBlock(node, state, photoResolver, onAction, modifier)
         "ContextCardBlock" -> OpenUiContextCardBlock(node, onAction, modifier)
         "CompositeCardBlock" -> OpenUiCompositeCardBlock(node, state, photoResolver, onAction, modifier)
-        "VisualCardBlock" -> OpenUiVisualCardBlock(node, onAction, modifier)
+        "VisualCardBlock" -> OpenUiVisualCardBlock(node, photoResolver, onAction, modifier)
         "MetricIndicatorInline" -> OpenUiMetricIndicator(node, withStrikethrough = false, modifier = modifier)
         "MetricIndicatorWithStrikethrough" -> OpenUiMetricIndicator(node, withStrikethrough = true, modifier = modifier)
         else -> Box(modifier = modifier) // 未知组件：空占位，不炸整卡
@@ -345,13 +350,19 @@ private fun OpenUiCompositeCardBlock(
     }
 }
 
-// ── VisualCardBlock（大图底 + 底部文字板） ───────────────────────────────
+// ── VisualCardBlock（大图底 + 底部文字板；2026-10-31 +bgPhoto 相册投影题图） ──────────
 
-private data class VisualCardItemData(val body: String, val bgImageSrc: String?, val tag: String?)
+private data class VisualCardItemData(
+    val body: String,
+    val bgImageSrc: String?,
+    val bgPhoto: Long?,
+    val tag: String?,
+)
 
 @Composable
 private fun OpenUiVisualCardBlock(
     node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
     onAction: (OpenUiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -360,6 +371,7 @@ private fun OpenUiVisualCardBlock(
         VisualCardItemData(
             body = body,
             bgImageSrc = item.stringProp("bgImageSrc"),
+            bgPhoto = ((item as? OpenUiValue.Obj)?.v?.get("bgPhoto") as? OpenUiValue.Num)?.v?.toLong(),
             tag = item.stringProp("tag"),
         )
     }.take(MAX_BLOCK_ITEMS)
@@ -368,14 +380,26 @@ private fun OpenUiVisualCardBlock(
         return
     }
     OpenUiCardBlockShell(node, items, onAction, modifier) { item, itemModifier ->
-        OpenUiVisualCardItem(item, itemModifier)
+        OpenUiVisualCardItem(item, photoResolver, itemModifier)
     }
 }
 
 @Composable
-private fun OpenUiVisualCardItem(item: VisualCardItemData, modifier: Modifier = Modifier) {
-    // bgImageSrc 限 https（[PRIVACY]：Image src 同口径）；缺失/非 https → surfaceVariant 纯色底
+private fun OpenUiVisualCardItem(
+    item: VisualCardItemData,
+    photoResolver: OpenUiPhotoResolver,
+    modifier: Modifier = Modifier,
+) {
+    // bgImageSrc 限 https（[PRIVACY]：Image src 同口径）；bgPhoto（2026-10-31）= 相册投影 id，
+    // 端侧 id→uri 解析（uri 不出端），与 bgImageSrc 二选一、bgPhoto 优先；皆无/解析中 →
+    // surfaceVariant 纯色底
     val httpsSrc = item.bgImageSrc?.takeIf { src -> src.startsWith("https://") }
+    val resolvedPhoto by produceState<OpenUiPhoto?>(initialValue = null, item.bgPhoto) {
+        value = item.bgPhoto?.let { id -> photoResolver.resolve(id) }
+    }
+    val photoUri = resolvedPhoto?.uri
+    val photoFocusY = resolvedPhoto?.faceFocusY
+    val hasImage = item.bgPhoto != null || httpsSrc != null
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -383,13 +407,23 @@ private fun OpenUiVisualCardItem(item: VisualCardItemData, modifier: Modifier = 
             .clip(AppShapes.card)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (httpsSrc != null) {
+        if (photoUri != null) {
+            AsyncImage(
+                model = photoUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = faceAwareVerticalAlignment(photoFocusY),
+                modifier = Modifier.matchParentSize(),
+            )
+        } else if (item.bgPhoto == null && httpsSrc != null) {
             AsyncImage(
                 model = httpsSrc,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
             )
+        }
+        if (hasImage) {
             // 底部黑色渐变蒙层（文字可读性）：transparent → Black 0.7
             Box(
                 modifier = Modifier
@@ -423,8 +457,8 @@ private fun OpenUiVisualCardItem(item: VisualCardItemData, modifier: Modifier = 
         Text(
             text = item.body,
             style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD).copy(fontWeight = FontWeight.Bold),
-            // 有图：白字压渐变蒙层；纯色底：跟随主题 onSurface（浅底白字不可读）
-            color = if (httpsSrc != null) Color.White else MaterialTheme.colorScheme.onSurface,
+            // 有图（photo/https）：白字压渐变蒙层；纯色底：跟随主题 onSurface（浅底白字不可读）
+            color = if (hasImage) Color.White else MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.align(Alignment.BottomStart).padding(Spacing.md),

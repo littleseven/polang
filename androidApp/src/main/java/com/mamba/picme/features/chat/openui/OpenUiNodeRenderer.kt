@@ -396,7 +396,8 @@ fun OpenUiNodeRenderer(
         "Accordion" -> OpenUiAccordion(node, state, photoResolver, onAction, modifier)
         "Switch" -> OpenUiSwitch(node, state, onAction, modifier)
         // M5（2026-10-25 全量补全）：68 新组件按域分派四个渲染文件（内容/布局、表单、
-        // 图表、卡块）；元素形状组件（ListItem/Series 等）不在任何集合 → else 空占位
+        // 图表、卡块）；元素形状组件（Series/Slice 等）不在任何集合 → else 空占位
+        // （2026-10-31 起 ListItem 例外：经典 ListTile 实渲染化，入内容域集合）
         in openUiContentComponentNames -> OpenUiContentNode(node, state, photoResolver, onAction, modifier)
         in openUiFormComponentNames -> OpenUiFormNode(node, state, photoResolver, onAction, modifier)
         in openUiChartComponentNames -> OpenUiChartNode(node, state, photoResolver, onAction, modifier)

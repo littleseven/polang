@@ -348,11 +348,12 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 92 openui library components`() {
+    fun `whitelist pins all 95 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 的 92 个 key 逐字一致，改动须双向同步核对
+        // OpenUiLibrary.components 的 95 个 key 逐字一致，改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
-        //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）
+        //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
+        //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）
         val expected = setOf(
             // 本仓既有 + M2/M3 扩（原二十一组件）
             "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
@@ -360,6 +361,8 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
             // 通用布局原语批次（2026-10-30 本仓扩展）
             "Grid", "Box", "Spacer",
+            // 经典组合版式批次（2026-10-31 本仓扩展）
+            "StatRow", "StatItem", "Banner",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -377,14 +380,14 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "MetricIndicatorInline", "MetricIndicatorWithStrikethrough",
             "SnippetCardBlock", "OverviewCardBlock", "ContextCardBlock",
             "CompositeCardBlock", "VisualCardBlock",
-            // 元素形状
+            // 元素形状（ListItem 2026-10-31 起升格为可独立渲染的经典列表行，仍在白名单）
             "TabItem", "AccordionItem", "ListItem", "StepsItem", "SelectItem",
             "CheckBoxItem", "RadioItem", "SwitchItem", "ChipItem", "OptionCard",
             "Series", "Slice", "ScatterSeries", "Point",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(92, expected.size)
+        assertEquals(95, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 
@@ -738,6 +741,48 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
                 "root = Card([Row([Image(photos[0].id), Column([Text(\"标题\"), Text(\"副题\", \"CAPTION\")])], weights = [1, 2], align = \"center\")])"
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(program))
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    // ── 经典组合版式批次（2026-10-31）：StatRow/StatItem/Banner + bgPhoto 计数 ──────
+
+    @Test
+    fun `tool description classic golden example passes validation and lint`() {
+        // 经典组合版式黄金示例（Banner + StatRow + ListItem）同源钉住（GOLDEN_* 钉法先例）
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM))
+        assertEquals(
+            emptyList<String>(),
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM),
+        )
+    }
+
+    @Test
+    fun `classic layout components pass whitelist`() {
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([Banner(\"精选\", photo = photos[0].id), " +
+                "StatRow([{value: \"1\", label: \"a\"}]), " +
+                "ListItem(\"行\", icon = \"photo\", trailing = \"x\"), " +
+                "StatItem(\"2\", \"b\")])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `bgPhoto keys count toward image limit`() {
+        // bgPhoto（VisualCardBlock/Banner 题图投影）同 photo 口径计入单卡位图上限（OOM 护栏）
+        val items = (1..13).joinToString(", ") { i -> "{body: \"b$i\", bgPhoto: photos[0].id}" }
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([VisualCardBlock([$items])])"
+        assertNotNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `banner photo and bgPhoto within limit pass`() {
+        val program =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
+                "root = Card([Banner(\"a\", photo = photos[0].id), Banner(\"b\", photo = photos[1].id), " +
+                "VisualCardBlock([{body: \"c\", bgPhoto: photos[2].id}])])"
         assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
