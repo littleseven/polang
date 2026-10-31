@@ -924,7 +924,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ---
 
-## Phase M3 — 三新件落地（shared schema + Android 渲染器）
+## Phase M3 — 三新件落地（shared schema + Android 渲染器）　**✅ 2026-11-01 封板：Task 7-11 全过评审，97→100 组件端侧全落地，真机画廊验证通过**
 
 ### Task 7: shared OpenUiLibrary schema +3（测试先行）✅（2026-10-31 完成，commits e266eba1d+6adf35584；spec ✅ / 质量 ✅ Approved + 四项顺手收口；jvmTest 全绿）
 
@@ -1050,12 +1050,12 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 > **渲染器任务说明**：Compose 渲染无单测基建（OpenUI 线惯例：真机/画廊冒烟验证 + 纯函数单测），TDD 不适用于本三任务的 UI 部分；视觉正确性经 Task 11 调试画廊（`/openui` DEBUG 入口）目检。import 缺失按编译提示补齐（`TextAlign`/`BoxWithConstraints`/`Dp`/`height`/`IntrinsicSize` 等，同文件既有惯例）。三件渲染全部照 `OpenUiContentPhotoGrid`/`OpenUiContentAvatarRow` 现行模式写（props 解析 → photoResolver 批量解析 → 占位兜底 → OpenPhoto 点击）。
 
-### Task 8: CompareRow 渲染器（前后对比）
+### Task 8: CompareRow 渲染器（前后对比）✅（2026-11-01 完成，commits da5caa054+后续质量收口；spec ✅ / 质量 ✅ 合并轮 Approved）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 注册组件名与 dispatch**
+- [x] **Step 1: 注册组件名与 dispatch**
 
 `openUiContentComponentNames` 集合 `"PhotoGrid", "AvatarRow",` 行后加：
 
@@ -1072,7 +1072,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 > ⚠️ Task 8 spec 评审勘误（da5caa054 as-built）：本节原文写一次挂三分支，实际只挂 CompareRow（三分支在该时点不可编译）。Task 9/10 各含自己的 dispatch 插入步骤。
 
-- [ ] **Step 2: 实现（文件末尾 PhotoGrid/AvatarRow 实现之后追加）**
+- [x] **Step 2: 实现（文件末尾 PhotoGrid/AvatarRow 实现之后追加）**
 
 ```kotlin
 // ── 布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》）──
@@ -1180,12 +1180,12 @@ private fun OpenUiCompareSide(
 }
 ```
 
-- [ ] **Step 3: 编译验证**
+- [x] **Step 3: 编译验证**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL（import 缺失按报错补：`TextAlign`、`RoundedCornerShape`、`clip`、`background` 等按同文件既有 import 检查）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt
@@ -1194,12 +1194,12 @@ git commit -m "feat(openui): CompareRow 前后对比渲染器——双图统一�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 9: Timeline 渲染器（时间轴）
+### Task 9: Timeline 渲染器（时间轴）✅（2026-11-01 完成，commits 97e08968a+一行修；spec ✅（帧契约像素级吻合）/ 质量 ✅ 合并轮 Approved）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 实现（CompareSide 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
+- [x] **Step 1: 实现（CompareSide 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
 
 `OpenUiContentNode` when 的 `"CompareRow" -> …` 分支后加：
 
@@ -1326,12 +1326,12 @@ private fun OpenUiContentTimeline(
 }
 ```
 
-- [ ] **Step 2: 编译验证**（顺手项：把 CompareSide 的内联 `src.startsWith("https://")` 改为复用同文件 `httpsSrcOrNull(src) != null`——Task 8 spec 评审 🔵2）
+- [x] **Step 2: 编译验证**（顺手项：把 CompareSide 的内联 `src.startsWith("https://")` 改为复用同文件 `httpsSrcOrNull(src) != null`——Task 8 spec 评审 🔵2）
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL（`height`/`IntrinsicSize` import 按需补）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt
@@ -1340,12 +1340,12 @@ git commit -m "feat(openui): Timeline 时间轴渲染器——轴线节点 + 48d
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 10: ChartGrid 渲染器（双图并排）
+### Task 10: ChartGrid 渲染器（双图并排）✅（2026-11-01 完成，commit 12050d791；spec ✅（委托链对抗验证）/ 质量 ✅ 合并轮 Approved）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 实现（Timeline 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
+- [x] **Step 1: 实现（Timeline 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
 
 `OpenUiContentNode` when 的 `"Timeline" -> …` 分支后加：
 
@@ -1398,12 +1398,12 @@ private fun OpenUiContentChartGrid(
 
 > 注：`OpenUiNodeRenderer` 是全量 dispatch 入口（`OpenUiNodeRenderer.kt` 顶层 @Composable，Tabs/Grid 递归同径）；跨文件 internal 可见性已满足（同为 `features.chat.openui` 包）。
 
-- [ ] **Step 2: 编译验证**
+- [x] **Step 2: 编译验证**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL（`BoxWithConstraints`/`Dp` import 按需补）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt
@@ -1412,12 +1412,12 @@ git commit -m "feat(openui): ChartGrid 双图并排图表网格——R3 门禁�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 11: 调试画廊 demo 三条 + 画廊目检
+### Task 11: 调试画廊 demo 三条 + 画廊目检 ✅（2026-11-01 完成——三卡真机目检干净（ui-driver 驱动 + a11y 漏报经像素采样证伪）；demo 后补三子项演练末格留空 91a79f4b4）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/debug/openui/OpenUiComponentGallery.kt`（`demoGroups`）
 
-- [ ] **Step 1: 加三条 demo（结构照抄 demoGroups 内 PhotoGrid 条目——同构 `OpenUiComponentDemo`；program 文本如下）**
+- [x] **Step 1: 加三条 demo（结构照抄 demoGroups 内 PhotoGrid 条目——同构 `OpenUiComponentDemo`；program 文本如下）**
 
 ```kotlin
 // 布局可控性批次（2026-10-31）
@@ -1440,7 +1440,7 @@ OpenUiComponentDemo(
 
 （demo 的 photo id 沿用画廊既有占位形态——画廊 photoResolver 恒 null，渲染占位框即预期形态。若 `OpenUiComponentDemo` 构造签名不同——如带分组/描述参数——以 PhotoGrid 条目实参形态为准照抄改写。）
 
-- [ ] **Step 2: 构建安装 + 画廊目检**
+- [x] **Step 2: 构建安装 + 画廊目检**
 
 ```bash
 ./gradlew :androidApp:assembleDebug
@@ -1449,7 +1449,7 @@ adb install -r androidApp/build/outputs/apk/debug/polang-debug.apk
 
 设备进 DEBUG 画廊页（`/openui` 入口）目检三新卡：CompareRow 双格同帧、Timeline 轴线贯通、ChartGrid 双图等宽；卡片上方无 ✗/⚠ 标注。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/debug/openui/OpenUiComponentGallery.kt
