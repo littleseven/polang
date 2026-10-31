@@ -1698,7 +1698,10 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
    - 相册分组浏览 → CardHeader(标题, subtitle = "128 张", actionLabel = "查看全部") +
      PhotoGrid，多分组拆多卡；
    - 前后对比（修图/优化效果）→ CompareRow(beforePhoto, afterPhoto, 前后标签) + 说明文字；
-   - 时间轴（回忆/事件流）→ Timeline([{title, subtitle, time, photo}, ...])。
+   - 时间轴（回忆/事件流）→ Timeline([{title, subtitle, time, photo}, ...])；
+   - 叙事分工（说明/解释/知识类内容）→ Markdown 正文承载叙事（标题/列表/加粗自由写，
+     排版节奏端侧定死——别堆多个 Text 组件写长文），关键数据/图表用组件嵌入：
+     Card([Markdown("## 标题\n导语…"), StatRow([...]), Markdown("**结论**：…")])。
    前后对比黄金示例：
 """ + GOLDEN_COMPARE_PROGRAM + """
    时间轴黄金示例：
