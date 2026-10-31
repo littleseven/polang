@@ -123,7 +123,25 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - 覆盖组件：Image / ImageBlock / ImageTextLarge / Banner（通栏图全量）；ImageGallery 改**定高变宽**经典画廊形态（各条目帧随自身真实比例，等高不齐宽）；
 - 定尺寸缩略图（ImageText 48dp / ListItem 48dp / ListBlock 48dp）与 VisualCard 背景图保持 Crop 裁切——缩略图/背景填充语义上裁切即正确；
 - LLM 侧零负担：无需为竖图手传 aspect，显式 aspect 仅用于强制造型（如横幅必须 16:9）；
-- 实现：`frameAspectOf(prop, realRatio, fallback)` 纯函数（OpenUiFrameAspectTest 钉住）+ `intrinsicAspectOf`（coil intrinsic 采集，NaN/零维防御）；加载中按缺省框占位，加载成功单帧过渡到真实比例。
+- 实现：`frameAspectOf(prop, realRatio, fallback)` 纯函数（OpenUiFrameAspectTest 钉住）+ `intrinsicAspectOf`（coil intrinsic 采集，NaN/零维防御）；加载中按缺省框占位，加载成功单帧过渡到真实比例；
+- **刻意例外（2026-10-31 v8）**：PhotoGrid cell 恒 1:1、AvatarRow 恒圆形——网格/头像的均匀裁切本身是设计语义，不走真实比例链（人脸聚焦兜底构图）。
+
+### 4.6 相册 APP 构图规则（2026-10-31 v8，对标 Google Photos / Apple 照片 / 小米相册）
+
+相册类卡片按主流相册 APP 的签名组合形态构图，LLM 一行调用固化件，不再自由拼装：
+
+| 签名形态 | 固化构图 | 出处 |
+|----------|----------|------|
+| 时间分组网格（相册主视图） | `CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部") + PhotoGrid(photos = [...], columns = 3)` | 三家主视图 = 日期/月份分组头 + 方形等宽网格 |
+| 人物区（面孔） | `AvatarRow([{photo: photos[i].id, label: "妈妈"}, ...])` | Google Photos/Apple 人物页 = 圆形头像 + 名字 |
+| 回顾卡（年度/月度杂志感） | Banner 首屏 + StatRow 关键数字 + PhotoGrid 摘选 | Apple 回忆 / Google Photos 年度回顾 |
+| 相册列表（封面+名称+计数） | `List([ListItem(title, photo = …, subtitle = 日期, trailing = "128 张"), ...])` | 三家相册 Tab 列表行 |
+| 回忆条（大卡横滑） | `VisualCardBlock([...], layout = "carousel")`（既有件） | Google Photos Memories 条 |
+
+- **PhotoGrid 是照片网格唯一形态**：cell 恒 1:1 Crop + 人脸聚焦 + 2dp 密缝 + 整网格 12dp 圆角（本机相册页 MediaGrid 同形态），columns 2|3|4 缺省 3，单件 ≤12 张（单卡图片上限同口径）；⚠️ 禁用 Grid+Image 拼装照片网格（v7 起 Image 帧随各图真实比例，网格犬牙交错，server lint 会提示）；
+- **AvatarRow**：56dp 圆形 Crop + 人脸聚焦 + CAPTION 名字居下，横滑；photo 写相册投影 id；
+- **CardHeader 尾部动作位**：actionLabel/action 可选——「分组标题 + 查看全部 >」是相册 APP 日期分组头签名形态，actionLabel 缺省不渲染尾部；
+- 网格/头像是刻意裁切件（§4.5 例外），人像构图由人脸聚焦保障。
 
 ## 5. 组件皮肤速查（渲染器现状对齐表）
 
@@ -170,6 +188,10 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | Banner | 通栏题图横幅（§4.2 固化件）：photo 相册投影优先 / src https，底部渐变蒙层 + 左下白字标题副题；帧 = 显式 aspect > 图片真实比例 > 16:9 缺省（§4.5）；无图 = surfaceVariant 纯色底 + 主题色文字；photo 图点击 OpenPhoto 大图 |
 | ListItem | 经典列表行（§4.2.1，实渲染化）：前件 photo 48dp 图 > image https 图 > icon 36dp 圆形徽章三选一 + 标题 BODY（≤2 行）/副题 CAPTION 弱 + trailing 弱色小字 / actionLabel 胶囊；action 整行可点 |
 | 元素形状 18 件（*Item/Series/Slice/Point/ScatterSeries） | 仅作父组件数组元素的对象形状，独立出现渲染空占位（ListItem 2026-10-31 起升格出组） |
+| **相册 APP 组合方式批次（2026-10-31，97 项注册）** | |
+| PhotoGrid | 方形照片网格（§4.6 固化件）：photos* 相册投影 id 数组 + columns 2\|3\|4 缺省 3；cell 恒 1:1 Crop + 人脸聚焦 + 2dp 密缝，整网格 12dp 圆角；≤12 张；点击 OpenPhoto |
+| AvatarRow | 人物圆形头像横滑条（§4.6 固化件）：items [{photo*, label?}]；56dp 圆形 Crop + 人脸聚焦 + CAPTION 名字居下；点击 OpenPhoto |
+| CardHeader+actionLabel/action | 分组标题尾部动作位（§4.6）：「标题/副题 + 查看全部 >」相册 APP 日期分组头签名形态；actionLabel 缺省不渲染尾部 |
 
 ## 6. 变更记录
 
@@ -181,3 +203,5 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - v5（2026-10-30，spec 已随交付清理，git 历史可查）：通用布局原语批次——设计方向从业务组合组件转向通用布局原语（用户定调「通用布局组件而不是业务组件」）。新增 Grid（通用 N 列网格，columns 1..4 缺省 2，四宫格 = columns 2）/ Box（通用叠放容器，align 九值 contentAlignment 缺省 topStart = Compose 官方缺省）/ Spacer（通用留白件，size∈xs\|s\|m\|l\|xl → 间距 token，缺省 m）三组件 + Row 增 `weights` prop（CSS flex-grow 语义按比例分栏，左图右文 = `weights=[1,2]` 配 align 上下对齐）；组件总数 89→92。lint 修订：Row 裸拼 Image+Text 仅无 weights 时警告（weights 比例分栏是认可的经典版式写法）；工具描述「通用布局食谱」段 + 黄金示例（四宫格照片墙 + 1:2 左图右文）；ImageText/ImageTextLarge 保留为便捷糖，泛化组合优先通用原语。官方核查：thesysdev/openui 通用布局仅 Stack 一件（无 per-child weight/Grid/Box/Spacer），本批次属本仓刻意扩展，词汇/缺省严格对齐官方/CSS/Compose。
 - v6（2026-10-31，spec 已随交付清理，git 历史可查）：经典组合版式批次——原语之上固化经典构图（用户定调「布局丑问题依旧没有解决，应该做一些经典的布局组件」），LLM 一行调用即得正确版式，不再依赖原语拼装纪律。新增 StatRow（经典统计行 = §4.1 stat tile 组件化，items [{value*, label?}] 等分居中，lint 第三条「stat tile 未居中」的根治——警告文案同步引导换 StatRow）/ StatItem（元素形状保底）/ Banner（通栏题图横幅 = §4.2 Hero 组件化，photo 相册投影 + 渐变蒙层白字，aspect 缺省 16:9）；ListItem 实渲染化（经典 ListTile：前件 photo/image/icon 三选一 + 标题副题 + trailing，`List([ListItem...])` 经典列表成形，新增 photo/icon/trailing props 向后兼容）；VisualCardBlock/VisualCardItem +bgPhoto（题图卡相册投影，与 bgImageSrc 二选一、bgPhoto 优先）。组件总数 92→95；server 图片计数口径扩 `bgPhoto` 键 + 对象字段冒号形态（`{bgPhoto: …}` 同 `photo =` 计位图）；工具描述增经典组合版式食谱五则 + 黄金示例 GOLDEN_CLASSIC_PROGRAM。刻意不做 SectionHeader（CardHeader/InlineHeader 已是同义件）。
 - v7（2026-10-31，纯渲染层批次，schema/server 零改动）：图片帧比例治理——§4.5 决策链全组件统一（显式 aspect > 图片真实比例 > 组件缺省框），真实比例双源 = 相册元数据（既有）+ 网络图 coil intrinsic（新增，加载后采集、单帧过渡）；Image 网络 src 支路告别恒 4:3、ImageTextLarge/Banner 告别写死 16:9（竖构图题图不再拦腰裁）、ImageBlock 帧随 intrinsic、ImageGallery 改定高变宽经典画廊形态；`frameAspectOf` 兜底比例参数化（组件缺省框随调用方），新增 `intrinsicAspectOf`（NaN/零维防御）；定尺寸缩略图与 VisualCard 背景保持 Crop 不变；OpenUiFrameAspectTest +4 用例钉住 fallback 参数化与 intrinsic 同径语义。
+- v8（2026-10-31，无 spec，结论直落本文件 §4.6）：相册 APP 组合方式批次——学习 Google Photos / Apple 照片 / 小米相册签名组合形态固化为组件与构图规则（用户定调「学习主要相册 APP 的 UI 组合方式，实现为布局组件和规则」）。新增 PhotoGrid（相册主视图签名形态：方形 1:1 cell + 人脸聚焦裁切 + 2dp 密缝 + 整网格 12dp 圆角，photos* 数组 ≤12 张，columns 缺省 3）+ AvatarRow（人物区签名形态：56dp 圆形头像横滑条，items [{photo*, label?}]）；CardHeader 扩 `actionLabel`/`action`（「查看全部 >」分组头签名形态）。组件总数 95→97。两组件刻意绕开 §4.5 真实比例链——均匀方形/圆形裁切即设计语义（网格节奏感优先于单图比例保真）。server 图片计数口径扩 photos 数组括号配对扫描（防 `photos[0].id` 嵌套括号截断）；lint 第五条：Grid 内 Image≥2 引导换 PhotoGrid；工具描述 GOLDEN_PHOTO_PROGRAM 黄金示例 + 「相册 APP 构图规则」食谱段；GOLDEN_LAYOUT_PROGRAM 四宫格照片墙同步改 PhotoGrid（Grid 只留图表/混合内容）。
+

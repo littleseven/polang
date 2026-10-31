@@ -557,6 +557,10 @@ object OpenUiLibrary {
             listOf(
                 OpenUiProp("title", OpenUiPropType.STRING, required = true),
                 OpenUiProp("subtitle", OpenUiPropType.STRING),
+                // 2026-10-31 相册 APP 组合方式批次：分组标题尾部动作（相册 APP 日期分组头
+                // 「查看全部 >」签名形态）；actionLabel 缺省不渲染尾部，action 缺省仅展示文案
+                OpenUiProp("actionLabel", OpenUiPropType.STRING),
+                OpenUiProp("action", OpenUiPropType.ACTION),
             ),
         ),
         // InlineHeader：官方「轻量标题+描述对」，与 CardHeader 同渲染
@@ -1422,6 +1426,34 @@ object OpenUiLibrary {
                 OpenUiProp("photo", OpenUiPropType.NUMBER),
                 OpenUiProp("src", OpenUiPropType.STRING),
                 OpenUiProp("aspect", OpenUiPropType.NUMBER),
+            ),
+        ),
+        // ── 相册 APP 组合方式批次（2026-10-31）：主流相册 APP（Google Photos/Apple 照片/
+        // 小米相册）签名组合形态的固化件，照片网格/人物条不再 Grid+Image / Row 拼装 ──
+        // PhotoGrid：方形照片网格固化件（三家主视图签名形态）——cell 恒 1:1 Crop + 人脸
+        // 聚焦 + 2dp 密缝，整网格 12dp 圆角；photos 为相册投影 id 数组（photos[0].id 元素，
+        // 禁字面量数字），渲染期 take(12) 护栏（单卡图片上限同口径）
+        OpenUiComponent(
+            "PhotoGrid",
+            listOf(
+                OpenUiProp("photos", OpenUiPropType.PRIMITIVE_ARRAY, required = true),
+                OpenUiProp("columns", OpenUiPropType.NUMBER, default = OpenUiValue.Num(3.0)),
+            ),
+        ),
+        // AvatarRow：人物圆形头像横滑条（Google Photos 人物条签名形态）——56dp 圆形
+        // Crop + 人脸聚焦 + CAPTION 名字居下；items [{photo*（相册投影 id）, label?}]
+        OpenUiComponent(
+            "AvatarRow",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("photo", OpenUiPropType.NUMBER, required = true),
+                        OpenUiProp("label", OpenUiPropType.STRING),
+                    ),
+                ),
             ),
         ),
     ).associateBy { component -> component.name }

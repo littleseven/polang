@@ -46,7 +46,8 @@ class OpenUiLibraryM2Test {
         // 82 组件覆盖 81（Col 列式 Table 刻意不收）+ 本仓既有 8 项（Row/Column/Divider/
         // List/CheckBox/ChoicePicker/Switch/Markdown）= 89 注册项；
         // 2026-10-30 通用布局原语批次 +Grid/Box/Spacer（本仓扩展）= 92 注册项；
-        // 2026-10-31 经典组合版式批次 +StatRow/StatItem/Banner（本仓扩展）= 95 注册项
+        // 2026-10-31 经典组合版式批次 +StatRow/StatItem/Banner（本仓扩展）= 95 注册项；
+        // 2026-10-31 相册 APP 组合方式批次 +PhotoGrid/AvatarRow（本仓扩展）= 97 注册项
         assertEquals(
             setOf(
                 // 既有 21（M1~M3）
@@ -78,7 +79,9 @@ class OpenUiLibraryM2Test {
                 "VisualCardBlock", "VisualCardItem",
                 // 经典组合版式批次 3（2026-10-31 本仓扩展）
                 "StatRow", "StatItem", "Banner",
-            ).also { expected -> assertEquals(95, expected.size) },
+                // 相册 APP 组合方式批次 2（2026-10-31 本仓扩展）
+                "PhotoGrid", "AvatarRow",
+            ).also { expected -> assertEquals(97, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }
@@ -794,5 +797,70 @@ class OpenUiLibraryM2Test {
         assertEquals("VisualCardBlock", block.type)
         val blockItem = ((block.props["items"] as OpenUiValue.Arr).v[0] as OpenUiValue.Obj).v
         assertEquals(OpenUiValue.Num(101.0), blockItem["bgPhoto"])
+    }
+
+    // ── 相册 APP 组合方式批次（2026-10-31）：PhotoGrid / AvatarRow / CardHeader 动作 ──
+
+    @Test
+    fun `photo grid schema and projection eval`() = runTest {
+        val photos = OpenUiValue.Arr(
+            listOf(
+                OpenUiValue.Obj(
+                    mapOf(
+                        "id" to OpenUiValue.Num(101.0),
+                        "date" to OpenUiValue.Str("2026-07-18"),
+                    ),
+                ),
+                OpenUiValue.Obj(
+                    mapOf(
+                        "id" to OpenUiValue.Num(102.0),
+                        "date" to OpenUiValue.Str("2026-07-19"),
+                    ),
+                ),
+            ),
+        )
+        val tools = OpenUiToolResolver { name, _ ->
+            if (name == "local_handle") photos else throw OpenUiToolNotFoundException(name)
+        }
+        val program = """
+            photos = Query("local_handle", { handle: "local://scan/7f3a#photos" }, [])
+            root = Card([CardHeader("2026年7月", actionLabel = "查看全部", action = OpenUrl("polang://gallery")), PhotoGrid(photos = [photos[0].id, photos[1].id], columns = 2), AvatarRow([{photo: photos[0].id, label: "妈妈"}, {photo: photos[1].id}])])
+        """.trimIndent()
+        val result = rendered(OpenUiSession(program, tools).prepare())
+        assertEquals(emptyList(), result.errors)
+        val header = childAt(result.root, 0)
+        assertEquals("CardHeader", header.type)
+        assertEquals(OpenUiValue.Str("查看全部"), header.props["actionLabel"])
+        val grid = childAt(result.root, 1)
+        assertEquals("PhotoGrid", grid.type)
+        assertEquals(
+            OpenUiValue.Arr(listOf(OpenUiValue.Num(101.0), OpenUiValue.Num(102.0))),
+            grid.props["photos"],
+        )
+        assertEquals(OpenUiValue.Num(2.0), grid.props["columns"])
+        val avatars = childAt(result.root, 2)
+        assertEquals("AvatarRow", avatars.type)
+        val items = (avatars.props["items"] as OpenUiValue.Arr).v
+        assertEquals(2, items.size)
+        val first = (items[0] as OpenUiValue.Obj).v
+        assertEquals(OpenUiValue.Num(101.0), first["photo"])
+        assertEquals(OpenUiValue.Str("妈妈"), first["label"])
+    }
+
+    @Test
+    fun `photo grid columns default is 3`() {
+        val columns = OpenUiLibrary.components.getValue("PhotoGrid").props.single { prop -> prop.name == "columns" }
+        assertEquals(OpenUiValue.Num(3.0), columns.default)
+        val photos = OpenUiLibrary.components.getValue("PhotoGrid").props.single { prop -> prop.name == "photos" }
+        assertEquals(OpenUiPropType.PRIMITIVE_ARRAY, photos.type)
+        assertEquals(true, photos.required)
+    }
+
+    @Test
+    fun `avatar row item photo is required number`() {
+        val items = OpenUiLibrary.components.getValue("AvatarRow").props.single { prop -> prop.name == "items" }
+        val photo = items.objectFields.single { field -> field.name == "photo" }
+        assertEquals(OpenUiPropType.NUMBER, photo.type)
+        assertEquals(true, photo.required)
     }
 }

@@ -967,6 +967,14 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   intrinsic、ImageGallery 改定高变宽经典画廊形态（等高不齐宽）；`frameAspectOf`
   兜底比例参数化 + 新增 `intrinsicAspectOf`；定尺寸缩略图（ImageText/ListItem/
   ListBlock 48dp）与 VisualCard 背景保持 Crop 裁切不变。
+  相册 APP 组合方式批次（2026-10-31，无 spec，结论直落设计语言文档）：
+  学习 Google Photos / Apple 照片 / 小米相册签名形态固化——新增 PhotoGrid（相册主视图：
+  方形 1:1 cell + 人脸聚焦 + 2dp 密缝 + 整网格 12dp 圆角，photos* ≤12 张，columns 缺省 3）
+  + AvatarRow（人物区：56dp 圆形头像横滑条，[{photo*, label?}]）；CardHeader 扩
+  `actionLabel`/`action`（「查看全部 >」分组头）。组件总数 95→97。两组件刻意绕开图片帧
+  比例决策链（均匀裁切即设计语义）；server 计数口径扩 photos 数组括号配对扫描 + lint
+  第五条（Grid 内 Image≥2 → 引导 PhotoGrid）；黄金示例 `GOLDEN_PHOTO_PROGRAM`，
+  GOLDEN_LAYOUT_PROGRAM 照片墙同步改 PhotoGrid。设计语言文档新增 §4.6 相册构图规则。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
   `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量
