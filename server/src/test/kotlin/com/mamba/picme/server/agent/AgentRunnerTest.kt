@@ -486,12 +486,17 @@ class AgentRunnerTest {
         }
     }
 
-    /** 默认模式（forwardContentDeltas=false）：content TextDelta 不透传（零行为变化红线）。 */
+    /**
+     * 默认模式（forwardContentDeltas=false）：content TextDelta 不透传（零行为变化红线）。
+     * content 须 ≥48（tracker minEmitChars）：透传若被误开，尾帧必发射 → 负断言有判别力。
+     */
     @Test
     fun `default mode does not forward content deltas`() = runBlocking {
         val session = newSession()
+        val content = "meta = Text(\"${"统计".repeat(10)}\")\nroot = Card([Text(\"hi\")])"
+        assertTrue("测试前置：content 须超节流首发阈值", content.length >= 48)
         val sseServer = RawSseStubServer { _, _ ->
-            MockLlmSse.streamingText("plain answer") to "text/event-stream"
+            MockLlmSse.streamingText(content) to "text/event-stream"
         }
         try {
             val target = AgentLlmTarget(
