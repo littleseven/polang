@@ -53,6 +53,16 @@ class CloudAgentTurnRunnerTest {
         JSONObject("""{"id":1,"type":"message","source":"agent","role":"assistant","payload":{"type":"message","content":"$text"}}"""),
     )
 
+    /** assistant message 帧（内容含引号/换行时走 JSONObject.put 避免转义事故）。 */
+    private fun assistantMessageFrame(content: String) = CloudFrame.Event(
+        JSONObject()
+            .put("id", 1)
+            .put("type", "message")
+            .put("source", "agent")
+            .put("role", "assistant")
+            .put("payload", JSONObject().put("type", "message").put("content", content)),
+    )
+
     private fun newRunner(api: FakeApi, executor: DeviceToolExecutor = DeviceToolExecutor(
         gallerySummary = { "相册 42 张" },
         searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
@@ -369,5 +379,46 @@ class CloudAgentTurnRunnerTest {
         val api = FakeApi()
         newRunner(api).runTurn("token", "s_1", "hi", null, genUiFormat = "openui") {}
         assertEquals("openui", api.sentGenUiFormat)
+    }
+
+    @Test
+    fun `openui mode parses assistant message as OpenUiCard`() = runTest {
+        val api = FakeApi()
+        val program = "// summary: 统计\nroot = Card([Text(\"hi\")])"
+        api.framesScript = { onFrame ->
+            onFrame(assistantMessageFrame(program))
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "openui") { events.add(it) }
+        val card = events.filterIsInstance<CloudTurnEvent.OpenUiCard>().single()
+        assertEquals(program, card.program)
+        assertEquals("统计", card.fallbackSummary)
+        assertTrue(events.filterIsInstance<CloudTurnEvent.AssistantText>().isEmpty())
+    }
+
+    @Test
+    fun `openui mode falls back to AssistantText for non-program message`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(assistantMessageFrame("兜底文本"))
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "openui") { events.add(it) }
+        assertEquals("兜底文本", events.filterIsInstance<CloudTurnEvent.AssistantText>().single().text)
+    }
+
+    @Test
+    fun `a2ui mode keeps assistant message as text`() = runTest {
+        val api = FakeApi()
+        val text = "root = Card([Text(\"hi\")])" // a2ui 线下即使是程序形态也不解析
+        api.framesScript = { onFrame ->
+            onFrame(assistantMessageFrame(text))
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "a2ui") { events.add(it) }
+        assertEquals(text, events.filterIsInstance<CloudTurnEvent.AssistantText>().single().text)
     }
 }
