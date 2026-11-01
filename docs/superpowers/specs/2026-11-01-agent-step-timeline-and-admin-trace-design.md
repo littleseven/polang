@@ -1,7 +1,7 @@
 # Agent 步骤时间线（用户可见）+ 管理后台推理追溯 设计
 
 > **日期**：2026-11-01
-> **状态**：待评审
+> **状态**：M1（Android 步骤时间线）+ M2（管理后台推理追溯）已合 main；M3 iOS 条件跟随在途
 > **范围**：`server/`（管理后台）、`androidApp/`（主聊天 + 云端 Agent 调试页）、`shared/`（如需）、`iosApp/`（跟随，条件触发）
 > **关联**：ADR-016（Chat parts 渲染宪法）、ADR-018（云端 Agent 会话域）、`docs/08-UI-SPECS/PARITY_MASTER_PLAN.md`
 

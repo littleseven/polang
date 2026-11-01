@@ -1,9 +1,9 @@
 # OpenUI 自研客户端对齐 androidx A2UI Compose 适配层设计
 
 > **日期**：2026-10-26
-> **状态**：P1 已合 main（v1.0.62）；P2 实施中；P3~P4 规划
+> **状态**：P1 已合 main（v1.0.62）；P2 已合 main（流式预览，后随 2026-11-01 turn-native 演进为 content delta 跟踪）；P3~P4 待排期
 > **上位约束**：ADR-013（commonMain 纯度：禁 androidx.compose 入 shared）/ ADR-016 / [PRIVACY] / §3.4 工作区隔离
-> **动机**：OpenUI 线渲染器全自研（spec《openui-wire-format-toggle-design》D 决策），用户定方向：
+> **动机**：OpenUI 线渲染器全自研（2026-10-24 选型决策，spec 已随交付清理，git 历史可查），用户定方向：
 > 自研应重点参考 androidx.a2ui 官方 Compose 适配方法。本文盘点代差并给出对齐路线。
 
 ## 1. androidx 适配层机制摘要（参考基准）

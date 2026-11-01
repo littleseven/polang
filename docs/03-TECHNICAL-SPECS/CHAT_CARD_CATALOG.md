@@ -21,7 +21,7 @@
 {
   "id": "uuid 或 taskId", // 任务卡特例：id = taskId，REPLACE upsert
   "sessionId": "default",
-  "type": "…", // 新分类法 9 值之一（3 分类，见下）
+  "type": "…", // 新分类法 11 值之一（3 分类，见下）
   "role": "agent", // 消息角色 "user"/"agent"（v26 新列，取代 user_/agent_ type 前缀）
   "content": "…", // 按 type 语义不同，见各卡
   "timestamp": 1790000000000,
@@ -31,11 +31,11 @@
 }
 ```
 
-`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`；2026-10-06 扩第 9 值 `tool_browser`，browser-vnc 直播卡 spec §4）——**3 分类 9 值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 免前缀，协议值禁 UI 容器词）：
+`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`；2026-10-06 扩 `tool_browser`（browser-vnc 直播卡 spec §4）；2026-10-22/24 扩 GenUI 卡 `data_ui`/`data_ui_openui`）——**3 分类 11 值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 免前缀，协议值禁 UI 容器词）：
 
 - **content**：`text` · `image`
 - **tool**：`tool_chart` · `tool_html` · `tool_task` · `tool_image_edit` · `tool_browser`
-- **data**：`data_media_results` · `data_optimize_candidates`
+- **data**：`data_media_results` · `data_optimize_candidates` · `data_ui`（A2UI GenUI 卡） · `data_ui_openui`（OpenUI GenUI 卡，2026-11-01 起回合原生）
 
 多 part 消息的 type 取首 part 值；role 由独立列承载。legacy 13 值（`user_text`/`agent_text`/`user_image`/`user_image_text`/`agent_image`/`command`/`plan_preview`/`media_results`/`chart`/`html_card`/`agent_edit_result`/`optimize_candidates`/`task_card`）仅存于迁移源，经 `LegacyChatTypeMigration` 一次性转正（映射见 §0.2 末表）。
 
@@ -43,7 +43,7 @@
 
 ### 0.1 协议一致性现状与 parts 重构（2026-09-27）
 
-**legacy 13-type 协议本身不统一**——这正是 ADR-016 parts 重构的动机，盘点如下（其中「僵尸类型」「type 值域混杂」两项已随 2026-09-28 分类法重构根治；下文各卡「落库协议」示例均为**新分类法形态**——type 为 8 值之一 + 独立 `role` 列，legacy 13 值仅存于迁移源）：
+**legacy 13-type 协议本身不统一**——这正是 ADR-016 parts 重构的动机，盘点如下（其中「僵尸类型」「type 值域混杂」两项已随 2026-09-28 分类法重构根治；下文各卡「落库协议」示例均为**新分类法形态**——type 为 11 值之一 + 独立 `role` 列，legacy 13 值仅存于迁移源）：
 
 | 不统一点 | 现状 |
 |---|---|
@@ -52,9 +52,9 @@
 | `id` / `timestamp` 语义特例 | tool_task：id=taskId（REPLACE upsert）、timestamp=startedAtMs（锚定提交位置） |
 | serde 位置 | org.json 扩展在 androidApp shim（`ChatModelCommonMainShim.kt`），非 commonMain 纯 Kotlin |
 | 僵尸类型 | ✅ 已根治（2026-09-28 分类法重构）：~~`command` / `plan_preview` 主聊天流无专属渲染分支（真正消费者在平行浮动面板体系，§6）~~——两值删除并入 `text`，存量行经 MIGRATION_25_26 转正 |
-| type 值域混杂 | ✅ 已根治（2026-09-28 分类法重构）：~~13 值扁平混杂，content/tool/data 不分，role 靠 user_/agent_ 前缀~~——3 分类 8 值 + `role` 升格独立列（见 §0 type 全集） |
+| type 值域混杂 | ✅ 已根治（2026-09-28 分类法重构）：~~13 值扁平混杂，content/tool/data 不分，role 靠 user_/agent_ 前缀~~——3 分类（现 11 值）+ `role` 升格独立列（见 §0 type 全集） |
 
-**parts 重构（✅ M1-M4 已落地：M1-M3 已合 main `46a6e91fb`；M4 在 `feat/chat-parts-m4` 待合）**：按 ADR-016 对齐 OpenAI Responses / Vercel parts 协议——Room 增 `partsJson` 列（v24→v25 迁移全量回填），一条消息 = 有序 parts 数组，kotlinx JSON 鉴别字段 `type`（2026-09-28 分类法重构后 = 新 3 分类 8 值：6 个 serialName 改值 + `PartCategory` 分类载体 getter，不进线格式），`ignoreUnknownKeys` 前向兼容 + `encodeDefaults=false` 紧凑落库；legacy 三列经转换器全枚举迁移，**行级 Text 兜底不允许丢消息**。转换器现为 `MessagePartsConverter`（原 `LegacyMessagePartsConverter` 已改名——仅认新 8 值 + `role` 入参）；legacy 13→8 映射知识单点收编 `LegacyChatTypeMigration`（仅供 Room MIGRATION_25_26 与备份恢复，运行时不双吃）。M2 流式三件套（`domain/chat/streaming/`：TurnStreamEvent / ChatStreamTurnAdapter / TurnPartsReducer + `TaskCardOverlay`）已落地：占位契约（`ToolInputStart` 即插占位 part，`draw_chart`/`render_html` 类型化占位）→ 产物原位填充；错误双轨（持久化错误轨 = TaskCard，Chart/HtmlCard/脚本错误瞬态不落库，详见 §4.3）。M3 正文换 `AgentMarkdown`（§3.2）；M4 渲染源切 parts + Turn 聚合（§1.3）。落库线格式实例：
+**parts 重构（✅ M1-M4 已合 main）**：按 ADR-016 对齐 OpenAI Responses / Vercel parts 协议——Room 增 `partsJson` 列（v24→v25 迁移全量回填），一条消息 = 有序 parts 数组，kotlinx JSON 鉴别字段 `type`（2026-09-28 分类法重构改 3 分类值集，后续扩至 11 值：serialName 改值 + `PartCategory` 分类载体 getter，不进线格式），`ignoreUnknownKeys` 前向兼容 + `encodeDefaults=false` 紧凑落库；legacy 三列经转换器全枚举迁移，**行级 Text 兜底不允许丢消息**。转换器现为 `MessagePartsConverter`（原 `LegacyMessagePartsConverter` 已改名——仅认新分类法值 + `role` 入参，`tool_browser`/`data_ui`/`data_ui_openui` 为直通解码分支）；legacy 13→8 映射知识单点收编 `LegacyChatTypeMigration`（仅供 Room MIGRATION_25_26 与备份恢复，运行时不双吃）。M2 流式三件套（`domain/chat/streaming/`：TurnStreamEvent / ChatStreamTurnAdapter / TurnPartsReducer + `TaskCardOverlay`）已落地：占位契约（`ToolInputStart` 即插占位 part，`draw_chart`/`render_html` 类型化占位）→ 产物原位填充；错误双轨（持久化错误轨 = TaskCard，Chart/HtmlCard/脚本错误瞬态不落库，详见 §4.3）。M3 正文换 `AgentMarkdown`（§3.2）；M4 渲染源切 parts + Turn 聚合（§1.3）。落库线格式实例：
 
 ```jsonc
 // partsJson 列（M1/M2 已落地；encodeDefaults=false → state="DONE"/saved=false 等缺省字段不写出）
@@ -77,7 +77,7 @@
 ]
 ```
 
-M1 期 partsJson 为 legacy 三列的纯函数双写（写接缝 `data/local/ChatMessageParts.kt`）；M2 起流式以 parts 为权威装配（占位/瞬态不落 Room），legacy 三列仍为持久化写面；**M4 起渲染源已切 parts**（`ChatListFlattener` 拍平，UI 不再读 legacy 字段选卡——见 §1.3）。各卡「落库协议」示例为新分类法形态（type 8 值 + `role` 列；标量列持久化写面不变），parts 形态见 §0.2 与各卡「parts 协议」小节。
+M1 期 partsJson 为 legacy 三列的纯函数双写（写接缝 `data/local/ChatMessageParts.kt`）；M2 起流式以 parts 为权威装配（占位/瞬态不落 Room），legacy 三列仍为持久化写面；**M4 起渲染源已切 parts**（`ChatListFlattener` 拍平，UI 不再读 legacy 字段选卡——见 §1.3）。各卡「落库协议」示例为新分类法形态（type 11 值 + `role` 列；标量列持久化写面不变），parts 形态见 §0.2 与各卡「parts 协议」小节。
 
 ### 0.2 目标协议（parts 形态）逐类型示例
 
@@ -289,9 +289,9 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 - **样式权威**：design-tokens.json → codegen 双端镜像（ADR-016 D5）；HTML/L1 模板 CSS 变量走 MaterialTheme tokens，Light/Dark 随主题。
 - **媒体红线**（ADR-008）：相册图/编辑结果走原生消息（MEDIA_RESULTS/AGENT_IMAGE），不经 LLM 排版、不上传远程。
 
-### 1.3 ADR-016 parts 模型（✅ M1-M4 已落地：M1-M3 合 main `46a6e91fb`；M4 在 `feat/chat-parts-m4` 待合，真机验收待补）
+### 1.3 ADR-016 parts 模型（✅ M1-M4 已合 main；M4 真机验收待补）
 
-一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2，type 值域（3 分类 8 值 + role 列）见 `2026-09-28-chat-type-taxonomy-design.md`。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；M3 = 正文 `AgentMarkdown`（§3.2）。
+一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates/BrowserLive/A2uiCard/OpenUiCard），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2，type 值域（3 分类 11 值 + role 列）见 `2026-09-28-chat-type-taxonomy-design.md`。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；M3 = 正文 `AgentMarkdown`（§3.2）。
 
 **M4 渲染源切 parts + Turn 聚合**（spec §7.2/§7.3/§8）：
 
@@ -318,7 +318,8 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | Agent 图片结果卡 | `image`（+ role=agent） | `ChatMessageItem` isImage 分支 | 原生 | —（跟随会话帧） | ✅ |
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
 | 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay`（M2 全屏接管） | 原生（帧位图：M2 WS binary 推流 / HTTP base64） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
-| A2UI GenUI 卡 | `data_ui` | `A2uiCardHost`（androidx.a2ui 官方渲染器，polang catalog = material + BarChart） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ✅（hybrid M2，2026-10-21） |
+| A2UI GenUI 卡 | `data_ui` | `A2uiCardHost`（androidx.a2ui 官方渲染器，polang catalog = material + BarChart） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ✅（hybrid M2，2026-10-21；2026-11-01 起为回退闸——默认线为 OpenUI） |
+| OpenUI GenUI 卡 | `data_ui_openui` | `OpenUiCardHost`（自研 Compose 渲染器，101 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生，默认线） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
 | 流式卡片占位/工具状态/失败 item | （流式瞬态，不落 Room） | 占位骨架 / `ToolStatusChip` / 失败态（i18n `chat_card_generate_failed`） | 原生 | — | ✅（M4 拍平三分流，见 §1.3） |
 | 日期分隔 | （列表装饰，非消息） | `ChatDateChip` | 原生 | `chat_date_chip` 438:335 | ✅ |
@@ -993,7 +994,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   比例决策链（均匀裁切即设计语义）；server 计数口径扩 photos 数组括号配对扫描 + lint
   第五条（Grid 内 Image≥2 → 引导 PhotoGrid）；黄金示例 `GOLDEN_PHOTO_PROGRAM`，
   GOLDEN_LAYOUT_PROGRAM 照片墙同步改 PhotoGrid。设计语言文档新增 §4.6 相册构图规则。
-  布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》，
+  布局可控性批次（2026-10-31，spec 已随交付清理，git 历史可查——
   Ardot OpenUILayouts 页八帧 + 对帧校准 13 项）：
   保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层——server 无声矫正
   （OpenUiLayoutNormalizer：图文 Row 自动补 weights/连续 Spacer 合并/单子裸容器
@@ -1023,14 +1024,13 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   Modifier.weight 抛 IllegalArgumentException 击穿渲染层，`OpenUiRowWeightsTest`
   钉住）；`OpenUiDispatchCoverageTest` 钉住「端侧分发集合 == 注册表 − 元素形状」
   （补齐 server 侧 101 项白名单钉住在端侧的缺口）。
-  验收态（2026-11-01）：server 全量 554 测试绿 / shared jvmTest + 纯度门绿 /
-  androidApp 单测 + ktlint + detekt 绿 / 真机画廊三新件目检通过（ui-driver）；
-  App 1.0.70（10070）已装测试机；server 0.9.9 **已部署生产**（2026-11-01，
-  healthz 三连验证；首次部署被并行会话 0.9.8 工件覆盖，重发后生效——多会话
-  部署竞态在案）。**真机四场景验收 ✅ 全过（2026-11-01，ui-driver）**：
-  ①统计报告卡（StatRow+柱图+PhotoGrid 全套）②相册分组卡（CardHeader+
-  actionLabel 查看全部 + StatRow + Callout 小结）③CompareRow 前后对比卡
-  ④硬约束内化——模型主动引用 7.5「Card 最多嵌套 2 层」自我合规，门禁零触发。
+  验收态（2026-11-01）：server/shared/androidApp 测试与门禁全绿；server 0.9.9
+  已部署生产；**真机四场景验收 ✅ 全过（ui-driver）**：①统计报告卡
+  （StatRow+柱图+PhotoGrid 全套）②相册分组卡（CardHeader+actionLabel 查看全部
+  + StatRow + Callout 小结）③CompareRow 前后对比卡 ④硬约束内化——模型主动
+  引用「Card 最多嵌套 2 层」自我合规，门禁零触发。（发卡类改动须 App 发包与
+  server 部署双交付、多会话部署竞态两条教训已立法 `server/AGENTS.md`
+  「发卡类改动双交付铁律」。）
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
@@ -1062,10 +1062,10 @@ DESTRUCTIVE 批量删除的聚合确认卡：数量 + 珍贵信号（收藏/老�
 
 ### 5.2 ADR-016 parts 模型现状（M1-M4 已合 main；真机验收待补）
 
-一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线换代。卡片 UI/渲染形态**不变**（ADR-016 D2）。已落地：M1（`MessagePart.kt` sealed 八类 + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt`（已改名 `MessagePartsConverter.kt`，仅认新 8 值；legacy 映射收编 `LegacyChatTypeMigration.kt`——2026-09-28 分类法重构）全枚举迁移/行级兜底 + Room v24→v25 回填 + 回灌转换）、M2（`domain/chat/streaming/` 三件套 + `TaskCardOverlay` 任务卡迁入 parts + Chart/HtmlCard `state` 字段 + 回灌 `"<messageId>:<partId>"` 命名空间 id + `RoundStarted` 显式轮边界）、M3（`AgentMarkdown` AST 正文，jeziellago 移除）、M4（渲染源切 parts：`ChatListFlattener` 拍平 + Turn 聚合视觉层 + §8 性能收口；验收 `M4_CHAT_FLATTEN_ACCEPTANCE.md`，**真机冒烟/重组实测/截图基线待补**）。M5 = iOS ios-follow 跟随。**2026-09-28 分类法重构**（spec `2026-09-28-chat-type-taxonomy-design.md`）：6 个 part serialName 改值为 3 分类 8 值 + `PartCategory` 分类载体（getter-only，不进线格式）；`role` 升格消息级独立列（Room v25→v26，MIGRATION_25_26 单事务加列 + 全量改写）；运行时转换器纯净化（legacy 13→8 映射仅存 `LegacyChatTypeMigration`，服务迁移与备份恢复）。线格式实例见 §0.1/§0.2，各卡 parts 协议见 §3/§4 各节，渲染矩阵见 §1.3 + chat.yaml §3.2。数据形态（spec §3，已按实现校准）：
+一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线换代。卡片 UI/渲染形态**不变**（ADR-016 D2）。已落地：M1（`MessagePart.kt` sealed + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt`（已改名 `MessagePartsConverter.kt`，仅认新分类法值；legacy 映射收编 `LegacyChatTypeMigration.kt`——2026-09-28 分类法重构）全枚举迁移/行级兜底 + Room v24→v25 回填 + 回灌转换）、M2（`domain/chat/streaming/` 三件套 + `TaskCardOverlay` 任务卡迁入 parts + Chart/HtmlCard `state` 字段 + 回灌 `"<messageId>:<partId>"` 命名空间 id + `RoundStarted` 显式轮边界）、M3（`AgentMarkdown` AST 正文，jeziellago 移除）、M4（渲染源切 parts：`ChatListFlattener` 拍平 + Turn 聚合视觉层 + §8 性能收口；验收 `M4_CHAT_FLATTEN_ACCEPTANCE.md`，**真机冒烟/重组实测/截图基线待补**）。M5 = 瞬态 parts 落 Room（待排期）；iOS 跟随走 ios-follow 管线。**2026-09-28 分类法重构**（spec `2026-09-28-chat-type-taxonomy-design.md`）：6 个 part serialName 改值为 3 分类值集（时点 8 值，后续扩至 11 值） + `PartCategory` 分类载体（getter-only，不进线格式）；`role` 升格消息级独立列（Room v25→v26，MIGRATION_25_26 单事务加列 + 全量改写）；运行时转换器纯净化（legacy 13→8 映射仅存 `LegacyChatTypeMigration`，服务迁移与备份恢复）。线格式实例见 §0.1/§0.2，各卡 parts 协议见 §3/§4 各节，渲染矩阵见 §1.3 + chat.yaml §3.2。数据形态（spec §3，已按实现校准）：
 
 ```kotlin
-// shared commonMain（M1-M3 已合 main；M4 ChatListFlattener 在 feat/chat-parts-m4）
+// shared commonMain（M1-M4 已合 main）
 sealed interface MessagePart { val partId: String }
 // Text(markdown, state: PartState) | Chart(svg, state: ToolPartState) | HtmlCard(html, meta: HtmlCardMeta, state: ToolPartState)
 // TaskCard(toolCallId, state, task: EngineerTaskState) | MediaResults(results: MediaResultsUi) | Image(ref, saved) | EditResult(…) | OptimizeCandidates(…)
@@ -1098,7 +1098,7 @@ legacy 13 值 → 新 type（+role）迁移映射见 §0.2 末表（`LegacyChatT
 |---|---|
 | 渲染架构宪法 | `docs/02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md`（+ 实施 spec 2026-09-27-chat-parts-rendering-design） |
 | 请求/回复全链路协议 | `docs/03-TECHNICAL-SPECS/CHAT_PROTOCOL_TECH_SPEC.md`（路由→组装→流式→落库→历史双轨；本目录管逐卡实例，链路级归该文档） |
-| type 分类法（3 分类 8 值 + role 列） | `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`（2026-09-28 重构：serialName 改值 + `PartCategory` + role 升格 Room v26） |
+| type 分类法（3 分类 11 值 + role 列） | `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`（2026-09-28 重构：serialName 改值 + `PartCategory` + role 升格 Room v26） |
 | 富内容渲染决策（原 ADR-014 D1~D6） | 已并入 ADR-016（D2 渲染 / D3 沙箱 / D4 iOS / D5 样式 / D6 不做；编号 014 永久留空） |
 | HTML/图表/脚本实现 SSOT | `docs/03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md` §5/§7/§7.1 |
 | Turn 聚合 + 拍平渲染矩阵（视觉 SSOT） | `docs/08-UI-SPECS/screens/chat.yaml` §3.1 turn_aggregation / §3.2 parts_rendering（M4 已落地 ✅，iOS TODO 口径） |

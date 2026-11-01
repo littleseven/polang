@@ -1,6 +1,6 @@
 # OpenUI 卡内设计语言（OpenUI Card Design Language）
 
-> **状态**：生效中（v1，2026-10-25）
+> **状态**：生效中（v10，2026-11-01；批次史见 §6 变更记录）
 > **适用**：OpenUI 协议渲染的全部聊天卡片（`data_ui_openui`），Android 先行，iOS 跟随
 > **上位约束**：根 `AGENTS.md`（[PARITY]/[I18N] 红线）、`docs/08-UI-SPECS/PARITY_MASTER_PLAN.md`
 > **实现锚点**：`androidApp/.../openui/OpenUiCardTokens.kt`（token SSOT）、`OpenUiNodeRenderer.kt`（组件皮肤）、server `RenderOpenUiToolService`（LLM 构图引导）
@@ -10,7 +10,7 @@
 1. **样式收敛在渲染器**：LLM 只选择组件与数据，不控制任何样式数值。一切颜色/字号/间距/圆角由 token 与组件皮肤定死——这是 OpenUI 与 render_html（H5 线）的本质差异，也是风格一致性的保证。
 2. **A2UI 是对照组，样式冻结**：OpenUI 的一切视觉演进不进 A2UI 线（`A2uiCardTokens`/`A2uiStyleMapper` 只读复用几何尺寸与枚举解析）。没有规范约束的渲染结果就是对照组本身。
 3. **规范即 PARITY 契约**：本文档是 OpenUI 卡片的视觉 SSOT。iOS 跟随实现以本文档 + token 为准，不读 Android 源码；双端截图比对以本文档的组件皮肤小节为验收清单。
-4. **组合收敛在规则层**（2026-10-31 v9）：LLM 自由组合，组合合法性由 server 确定性规则保证（无声矫正 OpenUiLayoutNormalizer + 结构门禁 OpenUiLayoutValidator，spec《2026-10-31-openui-layout-controllability》）；「不奇怪」是规则保证的下限，「最优」仍靠版式范式菜单软引导。版式范式的视觉 SSOT = Ardot OpenUILayouts 页（§4.7）。
+4. **组合收敛在规则层**（2026-10-31 v9）：LLM 自由组合，组合合法性由 server 确定性规则保证（无声矫正 OpenUiLayoutNormalizer + 结构门禁 OpenUiLayoutValidator；spec 已随交付清理，git 历史可查）；「不奇怪」是规则保证的下限，「最优」仍靠版式范式菜单软引导。版式范式的视觉 SSOT = Ardot OpenUILayouts 页（§4.7）。
 
 ## 1. 色彩系统
 
@@ -230,5 +230,5 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 
 - v8.1（2026-10-31，真机回归修复，无 spec）：「查看全部」点击无效根治——根因 = 黄金示例/食谱只传 actionLabel 不传 action（LLM 照样画瓢）+ 渲染层无动作兜底 + @ToAssistant M1 起仅记日志不路由。三处同修：①@ToAssistant 实路由上行（OpenUiCardHost.onToAssistant → ChatScreen viewModel.sendMessage，以用户消息发进会话）；②渲染层缺省动作兜底（`headerActionsOrDefault`：actionLabel 在场且 action 缺省 → 合成 @ToAssistant("actionLabel：title")，OpenUiHeaderActionTest 钉住）；③server GOLDEN_PHOTO_PROGRAM/食谱/签名段全部改为 actionLabel+action 成对 + lint 第六条（CardHeader 有 actionLabel 缺 action → 引导显式 @ToAssistant）。版本 10069/1.0.69 + server 0.9.7。
 
-- v9（2026-10-31，spec《2026-10-31-openui-layout-controllability》）：布局可控性批次——保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层：server 无声矫正 OpenUiLayoutNormalizer（N1 图文 Row 自动补 weights / N2 连续 Spacer 合并+纵向降档 / N3 单子裸容器解包 / N4 stat 数字栏自动居中）+ 结构门禁 OpenUiLayoutValidator（R1 Card 嵌套≤2 与容器链≤4 / R2 通栏签名件一卡一件 / R3 图表禁横向分栏 / R4 Grid 照片墙引导 PhotoGrid / NODE_CAP ≤60）。新增 CompareRow/Timeline/ChartGrid 三件（97→100）与 Ardot OpenUILayouts 版式范式页八帧（§4.7，Light 验证 8/8）；既有组件对帧校准 13 项（Card 16dp/Banner HEADLINE+蒙层/图表标题 CAPTION 弱色等）；lint 三条软警告退役（stat 居中与图文 weights 收编进矫正、Grid 照片墙升硬 R4）。画布新增 chart/*×4、statusColor/successTonal 变量（sync-ignore 台账，代码 SSOT=OpenUiCardTokens）。
+- v9（2026-10-31，spec 已随交付清理，git 历史可查）：布局可控性批次——保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层：server 无声矫正 OpenUiLayoutNormalizer（N1 图文 Row 自动补 weights / N2 连续 Spacer 合并+纵向降档 / N3 单子裸容器解包 / N4 stat 数字栏自动居中）+ 结构门禁 OpenUiLayoutValidator（R1 Card 嵌套≤2 与容器链≤4 / R2 通栏签名件一卡一件 / R3 图表禁横向分栏 / R4 Grid 照片墙引导 PhotoGrid / NODE_CAP ≤60）。新增 CompareRow/Timeline/ChartGrid 三件（97→100）与 Ardot OpenUILayouts 版式范式页八帧（§4.7，Light 验证 8/8）；既有组件对帧校准 13 项（Card 16dp/Banner HEADLINE+蒙层/图表标题 CAPTION 弱色等）；lint 三条软警告退役（stat 居中与图文 weights 收编进矫正、Grid 照片墙升硬 R4）。画布新增 chart/*×4、statusColor/successTonal 变量（sync-ignore 台账，代码 SSOT=OpenUiCardTokens）。
 - v10（2026-11-01，无 spec）：间距词汇统一批次——此前提示词有三套间距词汇（Row/Column/Card/Grid/List 的 COMPACT\|STANDARD\|COMFORTABLE、Stack.gap 的 none\|xs\|s\|m\|l\|xl\|2xl、Spacer 的 xs\|s\|m\|l\|xl），且各档无 dp 语义与使用规则（对照官方 spec §5.2「描述应说明单位/范围/各枚举何时用」）。统一为官方七档 t-shirt scale（none\|xs\|s\|m\|l\|xl\|2xl → 0/4/8/12/16/24/32dp，8pt 网格）：shared `OpenUiLibrary.spacings` 扩十值（新七档 + legacy 三别名保存量卡合法）、spacingProp 缺省 STANDARD→m（12dp 等价零视觉变化）、Spacer 扩 2xl 全档对称；渲染层三处映射（容器 spacing / Stack.gap / Spacer.size）收编 `OpenUiCardTokens.spacingDpOf` 单一映射（OpenUiSpacingTokensTest 钉住）；server DSL_RULES 签名改统一词汇 + 新增 7.6 间距与节奏规则（档位 dp 语义表 + 默认不写/一卡 ≤2 档/分区 > 组内/Card 自带内边距五条）；OpenUiLayoutNormalizer N2 降档改显式映射表（修 `replace("xl","l")` 把 "2xl" 腐蚀成 "2l" 隐患）+ SPACER_RANK/QUOTED_SIZE 扩 2xl。数值链闭合：prompt 词汇 ↔ shared schema ↔ spacingDpOf ↔ Spacing ↔ design-tokens.json ↔ Ardot 画布变量（六档值全等）。

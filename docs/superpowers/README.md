@@ -86,7 +86,7 @@ docs/superpowers/
 
 ## 6. 索引（在途/活跃 SSOT 白名单 = 活文档可引用本目录文档的唯一许可集）
 
-- **specs（21 篇，均为在途/活跃 SSOT）**：
+- **specs（20 篇，均为在途/活跃 SSOT）**：
   - `2026-08-08-face-restoration-ondevice-design.md` — 人脸修复方向（未实施，待排期）
   - `2026-08-10-ios-follow-command-design.md` — /ios-follow 六阶段管线设计 SSOT（AGENTS §7 引用）
   - `2026-08-13-ios-chat-rich-features-design.md` — iOS Chat 富交互（批次③沙盒写操作在途）
@@ -104,11 +104,10 @@ docs/superpowers/
   - `2026-09-28-chat-type-taxonomy-design.md` — chat type 分类法（content/tool/data 三分类 + 命名规则 + role 上提；chat-parts 线配套 spec）
   - `2026-10-06-browser-vnc-live-card-design.md` — Browser-VNC 云端浏览器直播卡（M1/M2 已合 main：bridge + 服务端网关 + 工具闭环 + INLINE 直播卡 + WS 推流 + 全屏接管 Muse 三态交互 M2.5~M2.8）
   - `2026-10-17-cloud-agent-tool-bridge-design.md` — 云端 Agent M2 工具桥 + BYOK 授权 UI + 最小聊天页（ADR-018 实施 spec，已定稿待评审）
-  - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×A2UI GenUI 混合架构（投影出端 + local:// handle + L1 A2UI/L2 HTML 沙箱双级卡，M1~M3 分期；M1 投影通路已合 main，M2/M3 在途）
-  - `2026-10-24-openui-wire-format-toggle-design.md` — OpenUI 线格式并行接入 + GenUI 协议开关（A2UI/OpenUI 双格式对比实验，M1 Android-only 在途）
+  - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×GenUI 混合架构（投影出端 + local:// handle；M1 投影通路 + M2 A2UI L1 卡已合 main，M3 沙箱交互态/iOS 待排期；D4 选型已被 OpenUI 翻转——OpenUI 现为默认线格式（回合原生），A2UI 为回退闸）
   - `2026-10-26-openui-compose-alignment-design.md` — OpenUI 客户端对齐官方 A2UI Compose 适配层（P1 响应式状态粒度重组、P2 流式预览均已合 main；P3 逐节点兜底 / P4 组件契约化在途）
   - `2026-11-01-agent-step-timeline-and-admin-trace-design.md` — Agent 步骤时间线（用户可见）+ 管理后台推理追溯（M1 Android 时间线 + M2 后台追溯已合 main；M3 iOS 条件跟随在途）
-- **plans（5 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）；`2026-11-01-agent-step-timeline.md`（M1 Android 步骤时间线，与同名 spec 配套）；`2026-11-01-admin-llm-trace.md`（M2 管理后台推理追溯，与同名 spec 配套）
+- **plans（3 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）
 
 ---
 
@@ -134,3 +133,4 @@ docs/superpowers/
 | 2026-10-31 | 相册 APP 组合方式批次（PhotoGrid 方形照片网格 + AvatarRow 人物头像条 + CardHeader 查看全部动作；组件 95→97；lint 第五条 Grid 装照片引导 PhotoGrid）——无 spec，结论直落 OPENUI_CARD_DESIGN_LANGUAGE v8 §4.6 / CHAT_CARD_CATALOG data_ui_openui 节 |
 | 2026-10-31 | 「查看全部」点击无效真机回归修复（@ToAssistant 实路由上行 + 渲染层缺省动作兜底 + server 黄金示例/lint 第六条）——无 spec，结论直落 OPENUI_CARD_DESIGN_LANGUAGE v8.1 / CHAT_CARD_CATALOG data_ui_openui 节 |
 | 2026-11-01 | 交付沉淀：spec `2026-11-01-openui-turn-native-design.md` + plan `2026-11-01-openui-turn-native.md` 按沉淀管线移除（OpenUI 回合原生 M1——结论已落 CHAT_CARD_CATALOG data_ui_openui 节 / CHAT_PROTOCOL_TECH_SPEC §2.9 / server·shared AGENTS.md，git 历史可查）；真机遛狗六场景待执行 |
+| 2026-11-01 | OpenUI/协议线交付沉淀第三轮（12 篇）：specs 2——`openui-wire-format-toggle`（双格式对比实验已收口：OpenUI 转正默认线并于同日升级回合原生，开关现行语义落 CHAT_PROTOCOL §2.9 + 目录 data_ui_openui 节）/ `openui-layout-controllability`（批次已合 main + 四场景验收全过，结论落设计语言 v9 + 目录）；plans 10——`agent-step-timeline`/`admin-llm-trace`（M1/M2 已合 main，spec 留 M3 在途）/ `hybrid-m2-a2ui`（M2 已合 main）/ `cloud-agent-observability`（被 admin-llm-trace 线取代）/ `chat-type-taxonomy`（重构已转正）/ scan×2、`cos-backup-and-tailscale`、`ota-background-download`（均已上线，配套 spec 前轮已清理）。同步：三篇在途 spec 状态头刷新（hybrid D4 翻转注记 / compose-alignment P2 已合 / step-timeline M1+M2 已合）；活文档过时口径修正（目录 type 全集 9→11 值 + 总表补 data_ui_openui 行 + M4 已合 main；shared/AGENTS openui 批次编年压缩为机制要点+指针；设计语言状态头 v1→v10） |
