@@ -54,6 +54,16 @@ class RenderOpenUiToolServiceTest {
     }
 
     @Test
+    fun `description pins Html component signature`() {
+        // 2026-11-01 review 🟡2：Html 是 turn-native 线 HTML 唯一通路，签名必须入描述——
+        // 裸名单形态模型只能猜必填参数（猜错 missing-required 静默丢组件）
+        assertTrue("描述缺 Html(", descriptor.description.contains("Html(html*)"))
+        assertTrue("描述缺 Html 清洗约束", descriptor.description.contains("禁远程 <script src>"))
+        // 规则 1 修订：位置参数按签名序 + 可选参数推荐命名实参（黄金示例同款写法）
+        assertTrue("规则 1 应为命名实参口径", descriptor.description.contains("命名实参"))
+    }
+
+    @Test
     fun `receipt for clean program is bare confirmation`() = runBlocking {
         val receipt = service.renderUiOpenUi("""root = Card([Text("ok")])""", "摘要")
         assertEquals("UI 已下发端侧渲染（OpenUI）", receipt)

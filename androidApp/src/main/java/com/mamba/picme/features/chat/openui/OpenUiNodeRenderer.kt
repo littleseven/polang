@@ -236,7 +236,11 @@ fun OpenUiNodeRenderer(
                             val slotWeight = if (isSeparator) {
                                 1f
                             } else {
-                                val w = effectiveWeights?.getOrNull(weightSlot) ?: 1f
+                                // 值域防御（2026-11-01 review 🔴1）：weights 经 schema 只保证
+                                // 「数字数组」，零/负值/NaN 直通 Modifier.weight() 会抛
+                                // IllegalArgumentException（require(weight > 0)）击穿渲染层——
+                                // 非法槽位回退 1f 等宽
+                                val w = openUiSafeWeight(effectiveWeights?.getOrNull(weightSlot) ?: 1f)
                                 weightSlot++
                                 w
                             }
@@ -634,6 +638,14 @@ internal fun frameAspectOf(
 /** coil intrinsic Size → 宽高比（Unspecified(NaN 维)/零维 → null：矢量图等无本征尺寸防御；NaN > 0f 恒 false 天然过滤）。 */
 internal fun intrinsicAspectOf(size: Size): Float? =
     if (size.width > 0f && size.height > 0f) size.width / size.height else null
+
+/**
+ * Row.weights 单槽值域防御（半信任输入，2026-11-01 review 🔴1，OpenUiRowWeightsTest 钉住）：
+ * 零/负值/NaN/Infinity 一律回退 1f 等宽——Compose Modifier.weight() 内部
+ * require(weight > 0.0)，非法值直通会在 measure 期抛 IllegalArgumentException 击穿整卡。
+ */
+internal fun openUiSafeWeight(value: Float): Float =
+    if (value > 0f && value.isFinite()) value else 1f
 
 private const val PROP_ASPECT_MIN = 0.5
 private const val PROP_ASPECT_MAX = 2.5
