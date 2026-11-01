@@ -407,9 +407,16 @@ fun OpenUiNodeRenderer(
         // FULLPAGE 语义（点击弹全屏查看器）需宿主接 onOpenFullpage 回调，本期未接。
         "Html" -> run {
             val rawHtml = (node.props["html"] as? OpenUiValue.Str)?.v.orEmpty()
-            // 审查修复 I3：sanitize（4 趟正则，输入最大 128KB）按 rawHtml 记忆化，
-            // 避免重组重复执行；Rejected 分支 Logger.w 同理不再每次重组重打
-            val sanitized = remember(rawHtml) { HtmlCardSanitizer.sanitize(rawHtml) }
+            // 复审修复：sanitize（4 趟正则，输入最大 128KB）按 rawHtml 记忆化避免重组重复执行；
+            // Rejected 降级日志收进同一记忆化块——每个 rawHtml 只清洗一次、只打一次 WARN
+            // （日志留在组合体的 when 分支里会每次重组重打，LazyColumn 回收重进视口即刷屏）
+            val sanitized = remember(rawHtml) {
+                HtmlCardSanitizer.sanitize(rawHtml).also { result ->
+                    if (result is HtmlCardSanitizer.Result.Rejected) {
+                        Logger.w("Chat", "OpenUI Html component rejected: ${result.reason}")
+                    }
+                }
+            }
             when (sanitized) {
                 is HtmlCardSanitizer.Result.Ok -> HtmlCard(
                     html = sanitized.html,
@@ -417,7 +424,6 @@ fun OpenUiNodeRenderer(
                     modifier = modifier.fillMaxWidth(),
                 )
                 is HtmlCardSanitizer.Result.Rejected -> {
-                    Logger.w("Chat", "OpenUI Html component rejected: ${sanitized.reason}")
                     Text(
                         text = stringResource(R.string.chat_a2ui_card_unavailable),
                         style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
