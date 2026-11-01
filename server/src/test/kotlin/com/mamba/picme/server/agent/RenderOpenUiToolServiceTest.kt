@@ -3,6 +3,7 @@ package com.mamba.picme.server.agent
 import ai.koog.agents.core.tools.reflect.asToolsByClass
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -65,5 +66,32 @@ class RenderOpenUiToolServiceTest {
         assertTrue(receipt.startsWith("UI 已下发端侧渲染（OpenUI）"))
         assertTrue(receipt.contains("无需重发"))
         assertTrue(receipt.contains("DISPLAY"))
+    }
+
+    @Test
+    fun `tool body rejects layout violation and confirms normalized program`() = runBlocking {
+        val layoutBad = service.renderUiOpenUi(
+            "root = Card([Text(\"a\"), Card([Text(\"b\"), Card([Text(\"c\")])])])",
+            "摘要",
+        )
+        assertTrue("实际：$layoutBad", layoutBad.startsWith("error: render_ui_openui 布局门禁未通过"))
+
+        val normalizable = service.renderUiOpenUi(
+            "root = Card([Row([Image(photos[0].id), Text(\"说明\")])])",
+            "摘要",
+        )
+        assertTrue("实际：$normalizable", normalizable.startsWith("UI 已下发端侧渲染"))
+    }
+
+    @Test
+    fun `layout batch golden programs pass protocol and layout gates`() {
+        listOf(
+            RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM,
+            RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM,
+        ).forEach { golden ->
+            assertNull("协议校验应过：$golden", RenderOpenUiValidator.validateToError(golden))
+            assertTrue("布局门禁应过：$golden", OpenUiLayoutValidator.validate(golden).isEmpty())
+            assertTrue("黄金程序不应被矫正改写", OpenUiLayoutNormalizer.normalize(golden) == golden)
+        }
     }
 }

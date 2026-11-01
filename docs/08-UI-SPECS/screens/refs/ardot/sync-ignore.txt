@@ -10,3 +10,13 @@
 # codegen 无双端 BOOLEAN 域，永不回流。
 sysbar-dark
 sysbar-light
+
+# OpenUI chartPalette / successTonal（COLOR，2026-10-31 OpenUILayouts 版式范式页引入）：
+# 图表数据色板与 Callout 淡色底在代码侧归属 OpenUiCardTokens/A2uiStyleMapper（render 时
+# 实时合成），design-tokens.json 无对应域——画布变量仅设计稿渲染用，不回流 token 管线；
+# 收编（chartPalette 入 design-tokens）留作跟进项。
+chart/blue
+chart/orange
+chart/green
+chart/track
+statusColor/successTonal

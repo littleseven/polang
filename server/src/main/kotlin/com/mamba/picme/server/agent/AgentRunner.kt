@@ -51,6 +51,11 @@ class AgentRunner(
     private val reversibleTools: Set<String> = ServerToolService.REVERSIBLE_TOOLS,
     private val maxIterations: Int = 100,
     private val actionGate: (toolName: String, argsJson: String) -> String? = { _, _ -> null },
+
+    /** 发射点矫正（2026-10-31 布局可控性批次）：Action 落流前的 argsJson 改写钩子
+     *  （render_ui_openui 的 program 无声归一化）；缺省 identity。改写发生在
+     *  [actionGate] 校验之前——门禁见到的是矫正后的 program。 */
+    private val argsTransformer: (toolName: String, argsJson: String) -> String = { _, argsJson -> argsJson },
 ) {
 
     /**
@@ -119,7 +124,9 @@ class AgentRunner(
                         // 同步钩子 → runBlocking 桥（见类 KDoc ⚠️）
                         runBlocking {
                             // Koog 私有 JSON 树 toString 零转义，必须走 kotlinx 映射（见 ToolArgsWireJson.kt）
-                            val argsJson = toolArgsWireJson(ctx.toolArgs)
+                            val rawArgsJson = toolArgsWireJson(ctx.toolArgs)
+                            // 发射点矫正：render_ui_openui program 先归一化再校验/落流
+                            val argsJson = argsTransformer(ctx.toolName, rawArgsJson)
                             // 发射点门控：被拒负载不落 Action、不下行（见类 KDoc actionGate 段）
                             if (actionGate(ctx.toolName, argsJson) != null) return@runBlocking
                             val action = AgentEventRepository.append(

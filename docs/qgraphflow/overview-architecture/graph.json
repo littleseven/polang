@@ -1,0 +1,904 @@
+{
+  "meta": {
+    "title": "PoLang 代码结构总览",
+    "subtitle": "Monorepo：7 个 Gradle 模块 + Ktor 服务端 + iOS 应用，Agent First 架构",
+    "sourceRef": "polang@735086888",
+    "scope": "polang 仓库模块结构与依赖关系（repo 级总览）",
+    "diagramType": "architecture",
+    "locale": "zh-CN"
+  },
+  "groups": [
+    {
+      "id": "g-android",
+      "label": "Android App 进程（polang-debug.apk）",
+      "kind": "runtime",
+      "position": {
+        "x": 1693.5,
+        "y": 32
+      },
+      "size": {
+        "width": 434,
+        "height": 372
+      }
+    },
+    {
+      "id": "g-ios",
+      "label": "iOS App 进程（PoLang.app）",
+      "kind": "runtime",
+      "position": {
+        "x": 2112.5,
+        "y": 1226
+      },
+      "size": {
+        "width": 544,
+        "height": 297
+      }
+    },
+    {
+      "id": "g-server",
+      "label": "picme-server 进程（Ktor）",
+      "kind": "runtime",
+      "position": {
+        "x": 948.5,
+        "y": 853
+      },
+      "size": {
+        "width": 831,
+        "height": 281
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "android-app",
+      "label": ":androidApp",
+      "kind": "business",
+      "subtitle": "Android 主应用：智能相册产品本体",
+      "groupId": "g-android",
+      "module": "app",
+      "tags": [
+        "core"
+      ],
+      "facts": [
+        "Compose UI，features/ 下 17 个特性包：gallery / camera / editor / chat / search / person / tagviewer / idphoto / translation / update 等",
+        "Clean Architecture：features → domain(usecase/repository) → data",
+        "data/remote/ 含 picme 服务客户端与 OpenAI/Anthropic 直连客户端"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "settings.gradle.kts",
+        "lineStart": 28,
+        "lineEnd": 28,
+        "symbol": "include(:androidApp)"
+      },
+      "position": {
+        "x": 1725.5,
+        "y": 90
+      },
+      "size": {
+        "width": 370,
+        "height": 115
+      }
+    },
+    {
+      "id": "shared",
+      "label": ":shared",
+      "kind": "business",
+      "subtitle": "KMP Agent 编排层（Agent 中枢，双端复用）",
+      "module": "agent",
+      "tags": [
+        "core"
+      ],
+      "facts": [
+        "commonMain（引擎无关层）：AgentOrchestrator / CapabilityRegistry / KoogChatAgent / KoogReActAgent / RemoteChatEngine / PrivacyGuard / JS 沙箱",
+        "androidMain（平台实现）：LocalLlmEngine（仅保留 VLM 打标）/ 语音 ASR / DataStore",
+        "包名 com.mamba.picme.agent.core；产物 SharedKit.xcframework 供 iOS 复用"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "settings.gradle.kts",
+        "lineStart": 34,
+        "lineEnd": 34,
+        "symbol": "include(:shared)"
+      },
+      "position": {
+        "x": 509,
+        "y": 1765
+      },
+      "size": {
+        "width": 473,
+        "height": 115
+      }
+    },
+    {
+      "id": "koog",
+      "label": "Koog",
+      "kind": "framework",
+      "subtitle": "JetBrains KMP Agent 框架（ai.koog:koog-agents 1.3.0）",
+      "module": "agent",
+      "facts": [
+        "远程推理编排（OpenAI 兼容协议 + tool_calls）",
+        "2026-08 由自维护 langchain4j fork 迁移而来"
+      ],
+      "position": {
+        "x": 493.5,
+        "y": 2094
+      },
+      "size": {
+        "width": 480,
+        "height": 139
+      }
+    },
+    {
+      "id": "beauty-api",
+      "label": ":engines:beauty-api",
+      "kind": "component",
+      "subtitle": "纯 Kotlin 美颜 API 契约层",
+      "module": "beauty",
+      "facts": [
+        "BeautySettings / FilterType / StyleFilter / Face / FaceDetector / FrameSyncConfig",
+        "零 Android / OpenGL 依赖"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "settings.gradle.kts",
+        "lineStart": 29,
+        "lineEnd": 29,
+        "symbol": "include(:engines:beauty-api)"
+      },
+      "position": {
+        "x": 1724.5,
+        "y": 1290.667
+      },
+      "size": {
+        "width": 324,
+        "height": 115
+      }
+    },
+    {
+      "id": "beauty-engine",
+      "label": ":engines:beauty-engine",
+      "kind": "component",
+      "subtitle": "自研 OpenGL ES + EGL 实时美颜引擎",
+      "module": "beauty",
+      "facts": [
+        "分层：api / render（OpenGL ES + EGL 管线）/ internal（人脸检测适配器）",
+        "多引擎人脸检测统一 106 点：MediaPipe 468→106（默认）+ MNN 2D106 兜底",
+        "无第三方美颜 SDK（GPUPixel 已移除）"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "settings.gradle.kts",
+        "lineStart": 30,
+        "lineEnd": 30,
+        "symbol": "include(:engines:beauty-engine)"
+      },
+      "position": {
+        "x": 2125.5,
+        "y": 646
+      },
+      "size": {
+        "width": 419,
+        "height": 115
+      }
+    },
+    {
+      "id": "mnn-core",
+      "label": ":engines:mnn-core",
+      "kind": "component",
+      "subtitle": "MNN 推理引擎 JNI 封装",
+      "module": "inference",
+      "facts": [
+        "端侧推理底座：VLM 打标 / 人脸关键点共用"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "settings.gradle.kts",
+        "lineStart": 31,
+        "lineEnd": 31,
+        "symbol": "include(:engines:mnn-core)"
+      },
+      "position": {
+        "x": 1044,
+        "y": 2463
+      },
+      "size": {
+        "width": 295,
+        "height": 115
+      }
+    },
+    {
+      "id": "agent-native",
+      "label": ":engines:agent-native",
+      "kind": "component",
+      "subtitle": "VLM JNI 桥（libagent_native.so）",
+      "module": "inference",
+      "facts": [
+        "编译产 AAR，供 :shared androidMain 消费（Qwen3-VL-2B 端侧打标链路）"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "settings.gradle.kts",
+        "lineStart": 32,
+        "lineEnd": 32,
+        "symbol": "include(:engines:agent-native)"
+      },
+      "position": {
+        "x": 1433.5,
+        "y": 2106
+      },
+      "size": {
+        "width": 417,
+        "height": 115
+      }
+    },
+    {
+      "id": "sentencepiece",
+      "label": ":engines:sentencepiece",
+      "kind": "component",
+      "subtitle": "tokenizer（分词器）",
+      "module": "inference",
+      "facts": [
+        "独立底层库，无项目内依赖"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "settings.gradle.kts",
+        "lineStart": 33,
+        "lineEnd": 33,
+        "symbol": "include(:engines:sentencepiece)"
+      },
+      "position": {
+        "x": 2893.5,
+        "y": 646
+      },
+      "size": {
+        "width": 348,
+        "height": 115
+      }
+    },
+    {
+      "id": "ios-app",
+      "label": "iosApp",
+      "kind": "system",
+      "subtitle": "iOS SwiftUI 应用（Xcode 工程，PoLang.app）",
+      "groupId": "g-ios",
+      "module": "ios",
+      "facts": [
+        "经 build-shared-kit.sh 构建并链接 shared 的 SharedKit.xcframework",
+        "双端 UI 一致性：读 UI spec 而非 Android 源码"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "iosApp/PoLang.xcodeproj/project.pbxproj",
+        "lineStart": 614,
+        "lineEnd": 614,
+        "symbol": "SharedKit.xcframework"
+      },
+      "position": {
+        "x": 2144.5,
+        "y": 1284
+      },
+      "size": {
+        "width": 480,
+        "height": 115
+      }
+    },
+    {
+      "id": "server",
+      "label": "server",
+      "kind": "system",
+      "subtitle": "picme-server：自建 Ktor 后端",
+      "groupId": "g-server",
+      "module": "server",
+      "facts": [
+        "包：auth（账号/游客/白名单）/ admin / cos / ratelimit / issue / analytics / recommend / config",
+        "支撑 AI 工程师模式 claude-chat 隧道与 OTA 自更新 APK 分发"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "server/src/main/kotlin/com/mamba/picme/server/Application.kt",
+        "lineStart": 90,
+        "lineEnd": 100,
+        "symbol": "Application.module"
+      },
+      "position": {
+        "x": 980.5,
+        "y": 911
+      },
+      "size": {
+        "width": 353,
+        "height": 115
+      }
+    },
+    {
+      "id": "server-llm",
+      "label": "LlmRoute + LlmProxy",
+      "kind": "service",
+      "subtitle": "服务端 LLM 网关（多通道路由）",
+      "groupId": "g-server",
+      "module": "server",
+      "facts": [
+        "路由 /v1/chat/completions 与 /chat/completions",
+        "模型名按渠道 model_map 映射，真实 API key 只存 DB 渠道配置",
+        "stream=true 走 SSE 流式透传"
+      ],
+      "source": {
+        "kind": "source",
+        "file": "server/src/main/kotlin/com/mamba/picme/server/llm/LlmRoute.kt",
+        "lineStart": 32,
+        "lineEnd": 40,
+        "symbol": "Route.llmRoute"
+      },
+      "position": {
+        "x": 1397.5,
+        "y": 911
+      },
+      "size": {
+        "width": 350,
+        "height": 115
+      }
+    },
+    {
+      "id": "remote-llm",
+      "label": "远程 LLM 上游",
+      "kind": "external",
+      "subtitle": "OpenAI 兼容推理服务（渠道可配置）",
+      "module": "agent",
+      "facts": [
+        "端侧 Agent 远程推理目标（chat 默认远程）",
+        "媒体文件不上传（[PRIVACY] 红线，ADR-008）"
+      ],
+      "position": {
+        "x": 32,
+        "y": 2094
+      },
+      "size": {
+        "width": 386,
+        "height": 115
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "android-app",
+      "target": "shared",
+      "kind": "depends",
+      "label": "implementation(project(\":shared\")) · AiAgentUseCase Facade",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1850.5,
+            "y": 217
+          },
+          {
+            "x": 1850.5,
+            "y": 440
+          },
+          {
+            "x": 721.5,
+            "y": 440
+          },
+          {
+            "x": 721.5,
+            "y": 1753
+          }
+        ],
+        "labelAt": {
+          "x": 721.5,
+          "y": 993.5
+        }
+      }
+    },
+    {
+      "id": "e2",
+      "source": "android-app",
+      "target": "beauty-api",
+      "kind": "depends",
+      "label": "implementation(project(\":engines:beauty-api\"))",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1898.5,
+            "y": 217
+          },
+          {
+            "x": 1898.5,
+            "y": 1278.667
+          }
+        ],
+        "labelAt": {
+          "x": 1898.5,
+          "y": 703.5
+        }
+      }
+    },
+    {
+      "id": "e3",
+      "source": "android-app",
+      "target": "beauty-engine",
+      "kind": "depends",
+      "label": "implementation(project(\":engines:beauty-engine\"))",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1922.5,
+            "y": 217
+          },
+          {
+            "x": 1922.5,
+            "y": 488
+          },
+          {
+            "x": 2335,
+            "y": 488
+          },
+          {
+            "x": 2335,
+            "y": 634
+          }
+        ],
+        "labelAt": {
+          "x": 2335,
+          "y": 539
+        }
+      }
+    },
+    {
+      "id": "e4",
+      "source": "android-app",
+      "target": "mnn-core",
+      "kind": "depends",
+      "label": "implementation(project(\":engines:mnn-core\"))",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1946.5,
+            "y": 217
+          },
+          {
+            "x": 1946.5,
+            "y": 464
+          },
+          {
+            "x": 2868.5,
+            "y": 464
+          },
+          {
+            "x": 2868.5,
+            "y": 2415
+          },
+          {
+            "x": 1179.5,
+            "y": 2415
+          },
+          {
+            "x": 1179.5,
+            "y": 2451
+          }
+        ],
+        "labelAt": {
+          "x": 2868.5,
+          "y": 1642
+        }
+      }
+    },
+    {
+      "id": "e5",
+      "source": "android-app",
+      "target": "sentencepiece",
+      "kind": "depends",
+      "label": "implementation(project(\":engines:sentencepiece\"))",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1970.5,
+            "y": 217
+          },
+          {
+            "x": 1970.5,
+            "y": 440
+          },
+          {
+            "x": 3067.5,
+            "y": 440
+          },
+          {
+            "x": 3067.5,
+            "y": 634
+          }
+        ],
+        "labelAt": {
+          "x": 3067.5,
+          "y": 539
+        }
+      }
+    },
+    {
+      "id": "e6",
+      "source": "shared",
+      "target": "koog",
+      "kind": "depends",
+      "label": "ai.koog:koog-agents 1.3.0",
+      "evidence": "config",
+      "route": {
+        "via": [
+          {
+            "x": 733.5,
+            "y": 1892
+          },
+          {
+            "x": 733.5,
+            "y": 2082
+          }
+        ],
+        "labelAt": {
+          "x": 733.5,
+          "y": 1987
+        }
+      }
+    },
+    {
+      "id": "e7",
+      "source": "shared",
+      "target": "mnn-core",
+      "kind": "depends",
+      "label": "androidMain implementation(project(\":engines:mnn-core\"))",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 757.5,
+            "y": 1892
+          },
+          {
+            "x": 757.5,
+            "y": 1928
+          },
+          {
+            "x": 1203.5,
+            "y": 1928
+          },
+          {
+            "x": 1203.5,
+            "y": 2451
+          }
+        ],
+        "labelAt": {
+          "x": 1203.5,
+          "y": 2163.5
+        }
+      }
+    },
+    {
+      "id": "e8",
+      "source": "shared",
+      "target": "agent-native",
+      "kind": "depends",
+      "label": "androidMain implementation(project(\":engines:agent-native\")) · AAR",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 781.5,
+            "y": 1892
+          },
+          {
+            "x": 781.5,
+            "y": 1904
+          },
+          {
+            "x": 1642,
+            "y": 1904
+          },
+          {
+            "x": 1642,
+            "y": 2094
+          }
+        ],
+        "labelAt": {
+          "x": 1642,
+          "y": 1987
+        }
+      }
+    },
+    {
+      "id": "e9",
+      "source": "agent-native",
+      "target": "mnn-core",
+      "kind": "depends",
+      "label": "implementation(project(\":engines:mnn-core\"))",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1642,
+            "y": 2233
+          },
+          {
+            "x": 1642,
+            "y": 2439
+          },
+          {
+            "x": 1227.5,
+            "y": 2439
+          },
+          {
+            "x": 1227.5,
+            "y": 2451
+          }
+        ],
+        "labelAt": {
+          "x": 1642,
+          "y": 2340
+        }
+      }
+    },
+    {
+      "id": "e10",
+      "source": "beauty-engine",
+      "target": "beauty-api",
+      "kind": "depends",
+      "label": "implementation(project(\":engines:beauty-api\"))",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 2323,
+            "y": 773
+          },
+          {
+            "x": 2323,
+            "y": 1170
+          },
+          {
+            "x": 1874.5,
+            "y": 1170
+          },
+          {
+            "x": 1874.5,
+            "y": 1278.667
+          }
+        ],
+        "labelAt": {
+          "x": 2323,
+          "y": 993.5
+        }
+      }
+    },
+    {
+      "id": "e11",
+      "source": "beauty-engine",
+      "target": "mnn-core",
+      "kind": "depends",
+      "label": "implementation(project(\":engines:mnn-core\")) · MNN 2D106 检测",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 2347,
+            "y": 773
+          },
+          {
+            "x": 2347,
+            "y": 785
+          },
+          {
+            "x": 2680.5,
+            "y": 785
+          },
+          {
+            "x": 2680.5,
+            "y": 2391
+          },
+          {
+            "x": 1155.5,
+            "y": 2391
+          },
+          {
+            "x": 1155.5,
+            "y": 2451
+          }
+        ],
+        "labelAt": {
+          "x": 2680.5,
+          "y": 1822.5
+        }
+      }
+    },
+    {
+      "id": "e12",
+      "source": "beauty-api",
+      "target": "shared",
+      "kind": "depends",
+      "label": "api(project(\":shared\")) · 共享类型",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1886.5,
+            "y": 1417.667
+          },
+          {
+            "x": 1886.5,
+            "y": 1717
+          },
+          {
+            "x": 745.5,
+            "y": 1717
+          },
+          {
+            "x": 745.5,
+            "y": 1753
+          }
+        ],
+        "labelAt": {
+          "x": 1886.5,
+          "y": 1642
+        }
+      }
+    },
+    {
+      "id": "e13",
+      "source": "ios-app",
+      "target": "shared",
+      "kind": "depends",
+      "label": "链接 SharedKit.xcframework（KMP 产物）",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 2384.5,
+            "y": 1411
+          },
+          {
+            "x": 2384.5,
+            "y": 1741
+          },
+          {
+            "x": 769.5,
+            "y": 1741
+          },
+          {
+            "x": 769.5,
+            "y": 1753
+          }
+        ],
+        "labelAt": {
+          "x": 2384.5,
+          "y": 1642
+        }
+      }
+    },
+    {
+      "id": "e14",
+      "source": "android-app",
+      "target": "server",
+      "kind": "request",
+      "label": "HTTPS：账号登录 / OTA 自更新 / 问题上报 / claude-chat 隧道",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1874.5,
+            "y": 217
+          },
+          {
+            "x": 1874.5,
+            "y": 464
+          },
+          {
+            "x": 1157,
+            "y": 464
+          },
+          {
+            "x": 1157,
+            "y": 829
+          },
+          {
+            "x": 1221.5,
+            "y": 829
+          },
+          {
+            "x": 1221.5,
+            "y": 899
+          },
+          {
+            "x": 1157,
+            "y": 899
+          },
+          {
+            "x": 1157,
+            "y": 899
+          }
+        ],
+        "labelAt": {
+          "x": 1157,
+          "y": 539
+        }
+      }
+    },
+    {
+      "id": "e15",
+      "source": "shared",
+      "target": "remote-llm",
+      "kind": "request",
+      "label": "chat/completions 远程推理（经 Koog 编排）",
+      "evidence": "document",
+      "route": {
+        "via": [
+          {
+            "x": 709.5,
+            "y": 1892
+          },
+          {
+            "x": 709.5,
+            "y": 1904
+          },
+          {
+            "x": 426,
+            "y": 1904
+          },
+          {
+            "x": 426,
+            "y": 2038
+          },
+          {
+            "x": 213,
+            "y": 2038
+          },
+          {
+            "x": 213,
+            "y": 2082
+          }
+        ],
+        "labelAt": {
+          "x": 426,
+          "y": 1987
+        }
+      }
+    },
+    {
+      "id": "e16",
+      "source": "server-llm",
+      "target": "remote-llm",
+      "kind": "request",
+      "label": "转发到当前生效渠道（SSE 透传）",
+      "evidence": "source",
+      "route": {
+        "via": [
+          {
+            "x": 1572.5,
+            "y": 1038
+          },
+          {
+            "x": 1572.5,
+            "y": 1693
+          },
+          {
+            "x": 237,
+            "y": 1693
+          },
+          {
+            "x": 237,
+            "y": 2082
+          }
+        ],
+        "labelAt": {
+          "x": 1572.5,
+          "y": 1642
+        }
+      }
+    }
+  ],
+  "layout": {
+    "version": "adaptive-v2-elkjs-0.11.0",
+    "strategy": "layered-0"
+  }
+}

@@ -89,7 +89,7 @@ class RenderOpenUiToolService {
 
         /**
          * 通用布局黄金示例（2026-10-30 通用布局原语批次；2026-10-31 相册批次修订）：
-         * 照片墙走 PhotoGrid 固化件（Grid 装 Image 已被 lint 引导至 PhotoGrid），
+         * 照片墙走 PhotoGrid 固化件（Grid 装 Image 会被布局门禁退回），
          * Grid/Row weights 留给图表与混合内容的比例分栏（1:2 按比例左图右文）。
          */
         const val GOLDEN_LAYOUT_PROGRAM =
@@ -128,6 +128,22 @@ class RenderOpenUiToolService {
                 "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id, " +
                 "photos[4].id, photos[5].id], columns = 3), " +
                 "AvatarRow([{photo: photos[0].id, label: \"妈妈\"}, {photo: photos[1].id, label: \"宝宝\"}])])"
+
+        /** 前后对比黄金示例（2026-10-31 布局可控性批次）：CompareRow 统一双图帧。 */
+        const val GOLDEN_COMPARE_PROGRAM =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+                "root = Card([Text(\"背景替换效果\", \"HEADLINE\"), " +
+                "CompareRow(beforePhoto = photos[0].id, afterPhoto = photos[1].id, " +
+                "beforeLabel = \"替换前\", afterLabel = \"替换后\"), " +
+                "Text(\"已保留人物主体，背景换成海边黄昏\", \"CAPTION\")])"
+
+        /** 时间轴黄金示例（2026-10-31 布局可控性批次）：回忆/事件流。 */
+        const val GOLDEN_TIMELINE_PROGRAM =
+            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+                "root = Card([Text(\"海边之旅\", \"HEADLINE\"), " +
+                "Timeline([{title: \"三亚日落\", subtitle: \"海边散步两小时\", time: \"2026-07-18\", photo: photos[0].id}, " +
+                "{title: \"山顶云海\", subtitle: \"清晨登山\", time: \"2026-07-19\", photo: photos[1].id}, " +
+                "{title: \"返程\", time: \"2026-07-20\"}])])"
 
         /**
          * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
@@ -174,7 +190,7 @@ class RenderOpenUiToolService {
    - Grid(children*, columns?, spacing?, align?)：通用 N 列网格（写法
      Grid([a, b, c, d], columns = 2)），columns∈1..4（默认 2），children 按序填满各行、
      每格等宽；spacing/align 同 Row 词汇；装图表/混合内容用它，装相册照片请用
-     PhotoGrid 固化件（Grid 内放 ≥2 个 Image 会被 lint 引导）；
+     PhotoGrid 固化件（Grid 内放 ≥2 个 Image 会被布局门禁退回）；
    - Box(children*, align?)：通用叠放容器——children 按数组序从底到顶叠放，align 是
      九值方位∈topStart|topCenter|topEnd|centerStart|center|centerEnd|bottomStart|
      bottomCenter|bottomEnd（默认 topStart）——图上叠文字/角标写法
@@ -246,7 +262,8 @@ class RenderOpenUiToolService {
      Steps(items*=[{title*, details?}])（纵向步骤条）/
      ListItem(title*, subtitle?, photo?, image?, icon?, trailing?, actionLabel?, action?)（经典列表行：
      前件三选一——photo 相册投影 48dp 图（写 photos[0].id，禁字面量数字）> image https 图 > icon 徽章
-     （59 枚枚举名）；trailing 是尾部弱色小字（如日期/计数）；List([ListItem(...)]) 即经典列表，独立用亦可）；
+     （59 枚枚举名）；trailing 是尾部弱色小字（如日期/计数）；List([ListItem(...)]) 即经典列表，独立用亦可；
+     ListItem/ListBlock 同 CardHeader 口径：有 actionLabel 必配 action（@ToAssistant("<动作> <行语境>")），缺省 lint 提示）；
    - 经典组合版式（固化构图，优先于原语拼装）：StatRow(items*=[{value*, label?}])（经典统计行：
      2~4 项等分，每项 DISPLAY 大数字 + CAPTION 弱色标签居中——统计数字首选，替代
      Row+Column+Text("DISPLAY") 拼装）/ Banner(title*, subtitle?, photo?, src?, aspect?)（通栏题图横幅：
@@ -259,6 +276,13 @@ class RenderOpenUiToolService {
      CardHeader 增可选 actionLabel/action（分组标题尾部「查看全部」动作位——
      CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部",
      action = @ToAssistant("查看全部 2026年7月的照片"))，有 actionLabel 必配 action）；
+   - 布局可控性批次（2026-10-31）：CompareRow(beforePhoto*, afterPhoto*, beforeLabel?,
+     afterLabel?, beforeSrc?, afterSrc?, aspect?)（前后对比：左右等宽双图统一帧 + 等比
+     缩放裁剪 + 图下标签——修图/优化效果对比首选；photo 写 photos[0].id 投影、src 是
+     https 公网图兜底，二选一 photo 优先）/ Timeline(items*=[{title*, subtitle?, time?,
+     photo?}])（时间轴：轴线 + 节点 + 内容行，photo 48dp 缩略图——回忆/事件流首选）/
+     ChartGrid(children*=[图表组件...])（双列图表网格——图表禁横向并排，双图并排唯一
+     合法形态）；
    - 表单（name 键控直写 state：用户交互即 @Set(${'$'}<name>, 值)——如 Input(name="city")
      键入后 Text("城市: " + ${'$'}city) 经 ${'$'}name 绑定联动读；Form 仅视觉分组，无提交作用域；
      ${'$'}变量同样先独占一行声明默认值）：
@@ -312,11 +336,18 @@ class RenderOpenUiToolService {
    `${'$'}flag = false`），再传给组件的可绑定参数（BarChart selected / CheckBox checked /
    Switch checked / ChoicePicker selected / Slider value / Text text）；端侧点选/勾选/拖值 → 回写该变量并
    整卡重渲染（如 Text(${'$'}selected) 随点选刷新显示当前选中项）；传裸字面量则只读展示
-   不回写（BarChart 裸字符串点选高亮静默失效）；交互 state 不持久化，`${'$'}selected`
-   之外变量重开卡回默认值；
+   不回写（BarChart 裸字符串点选高亮静默失效）；交互 state 的字符串标量（`${'$'}selected`
+   及表单文本等全部 Str 变量）持久化、重开卡恢复，Bool/Num 不持久化回声明默认值；
    Icon 预定义图标名清单（59 枚，逐字使用，禁臆造）：
 """ + ICON_NAMES_TEXT + """
 7. fallbackSummary 写投影级摘要（如「327 张，数据在原设备」），端上数据缺失时降级展示；
+   7.5 布局结构硬约束（服务端校验，违规会整卡退回重写）：Card 嵌套 ≤2 层；容器
+     （Row/Column/Grid/Box/Stack）嵌套链 ≤4；Banner/PhotoGrid/StatRow/AvatarRow 须为
+     Card 直接子级且一卡各一件；图表禁止与其它组件横向并排（双图用 ChartGrid）；
+     Grid 内 ≥2 张 Image 必须换 PhotoGrid。机械性问题（图文 Row 缺 weights、stat 数字
+     未居中、单子容器包裹、连续 Spacer）服务端会自动修正，无需手写；
+     签名件与照片网格若经 Column 等容器中转包裹，视觉上同层重复同样会被判违规——
+     直接放 Card 下即可；
 8. 完整黄金示例（统计卡标准骨架——照此结构写：root = 语句必须有、独占一行、
    组件引用前面语句的变量名；program 不要包 markdown 代码围栏）：
 """ + GOLDEN_STATS_PROGRAM + """
@@ -340,7 +371,7 @@ class RenderOpenUiToolService {
    - 一行写法便捷糖（不想组合时）：ImageTextLarge(title, photo=photos[i].id, subtitle=...)
      单图主打、多个 ImageText(title, photo=photos[i].id) 叠 Column 小图列表；
    ⚠️ 不支持文字环绕图片（float wrap 无此形态）；Row 裸拼 Image+Text 必须传 weights
-   按比例分栏，否则等宽分栏会把缩略图拉成半宽栏（lint 会提示）；
+   按比例分栏，否则等宽分栏会把缩略图拉成半宽栏（缺省时服务端会自动补 weights）；
    经典组合版式（2026-10-31，固化构图优先于原语拼装）：
    - 统计数字行（2~4 个关键指标）→ StatRow([{value: "7,120", label: "照片"}, ...])
      （等分居中构图已固化，别再 Row+Column+Text("DISPLAY") 拼装）；
@@ -367,10 +398,24 @@ class RenderOpenUiToolService {
      subtitle = 日期, trailing = "128 张"), ...])；
    - 回忆条（大卡横滑）→ VisualCardBlock([...], layout = "carousel")（既有件）；
    ⚠️ 照片网格 ≥2 张一律 PhotoGrid，禁用 Grid+Image 拼装（帧随各图真实比例会犬牙交错，
-   lint 会提示）；CardHeader 有 actionLabel 必须配 action（@ToAssistant("查看全部 xx")
+   布局门禁会退回）；CardHeader 有 actionLabel 必须配 action（@ToAssistant("查看全部 xx")
    以用户消息上行回话——缺省端侧虽兜底发同文案，显式写语境更准，lint 会提示）；
    相册 APP 构图黄金示例（时间分组网格 + 人物头像条——相册卡签名骨架）：
-""" + GOLDEN_PHOTO_PROGRAM
+""" + GOLDEN_PHOTO_PROGRAM + """
+   版式范式菜单（2026-10-31 布局可控性批次；标准骨架——结构照此组合）：
+   - 统计报告（月度/年度回顾）→ Banner 题图 + StatRow 关键数字 + 图表（单图直排 / 双图
+     ChartGrid）+ Callout 结论；
+   - 相册分组浏览 → CardHeader(标题, subtitle = "128 张", actionLabel = "查看全部") +
+     PhotoGrid，多分组拆多卡；
+   - 前后对比（修图/优化效果）→ CompareRow(beforePhoto, afterPhoto, 前后标签) + 说明文字；
+   - 时间轴（回忆/事件流）→ Timeline([{title, subtitle, time, photo}, ...])；
+   - 叙事分工（说明/解释/知识类内容）→ Markdown 正文承载叙事（标题/列表/加粗自由写，
+     排版节奏端侧定死——别堆多个 Text 组件写长文），关键数据/图表用组件嵌入：
+     Card([Markdown("## 标题\n导语…"), StatRow([...]), Markdown("**结论**：…")])。
+   前后对比黄金示例：
+""" + GOLDEN_COMPARE_PROGRAM + """
+   时间轴黄金示例：
+""" + GOLDEN_TIMELINE_PROGRAM
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")
@@ -381,8 +426,16 @@ class RenderOpenUiToolService {
         // 与发射点门控同源校验（review 🟡4 对偶）：非法回 error 文本作 Observation
         // 回灌，LLM 同轮修正重试（同 RenderUiToolService 闭环口径）
         RenderOpenUiValidator.validateToError(program)?.let { error -> return error }
-        // 构图软警告（设计规范第一刀配套）：卡照发，建议附在回执里供下次发卡改进
-        val warnings = RenderOpenUiValidator.lintComposition(program)
+        // 布局门禁（2026-10-31 布局可控性批次）：矫正后程序过结构校验，违规同轮退回；
+        // 机械性问题已被 normalize 无声修复，此处见到的都是结构反模式
+        val normalized = OpenUiLayoutNormalizer.normalize(program)
+        val layoutViolations = OpenUiLayoutValidator.validate(normalized)
+        if (layoutViolations.isNotEmpty()) {
+            // 回显用 LLM 原始 program（非 normalized）——保留 2026-10-24 自纠定位能力
+            return OpenUiLayoutValidator.errorText(layoutViolations, program)
+        }
+        // 构图软警告（DISPLAY≤4 / Button≤3 / CardHeader 配对提醒）：卡照发，建议附在回执里供下次发卡改进
+        val warnings = RenderOpenUiValidator.lintComposition(normalized)
         return buildString {
             append("UI 已下发端侧渲染（OpenUI）")
             if (warnings.isNotEmpty()) {

@@ -36,14 +36,15 @@ object RenderOpenUiValidator {
     const val MAX_PROGRAM_LENGTH = 128_000
 
     /**
-     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 九十五项字面量
-     * 副本对齐：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
+     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 字面量
+     * 副本对齐（100 含三新件——Task 7 落地 shared +3 后齐平，当前 shared=97）：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
      * M3（2026-10-24）+Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch；
      * 2026-10-25 官方组件库全量补全（spec《openui-full-library-design》）21→89——
      * 官方 82 组件适配 81（Col 列式 Table 刻意不收，行式为唯一形态）+ 本仓既有 8；
      * 2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
      * 2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
      * 2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
+     * 2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
      * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
      * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
@@ -63,6 +64,9 @@ object RenderOpenUiValidator {
         "StatRow", "StatItem", "Banner",
         // 相册 APP 组合方式批次（2026-10-31 本仓扩展：方形照片网格/人物头像条签名形态）
         "PhotoGrid", "AvatarRow",
+        // 布局可控性批次（2026-10-31）：前后对比/时间轴固化件 + 双图并排图表网格
+        // （R3 门禁的合法出口；渲染器与工具描述在 App/M4 批次落地）
+        "CompareRow", "Timeline", "ChartGrid",
         // 官方内容/布局
         "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
         "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
@@ -180,8 +184,19 @@ object RenderOpenUiValidator {
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
 
     /** 动作表达式被包成字符串（2026-10-24 真机事故：LLM 写 "@OpenUrl(...)" 致端侧
-     *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。 */
-    private val QUOTED_ACTION = Regex(""""@(OpenUrl|Set|Reset|ToAssistant)\s*\(""")
+     *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。
+     *  词表 = shared `OpenUiContract.Actions` 字面量副本（含 WRAPPER "Action"），
+     *  改动须双向同步核对。 */
+    private val QUOTED_ACTION = Regex(""""@(OpenUrl|Set|Reset|ToAssistant|Run|Action)\s*\(""")
+
+    /** @OpenUrl 字符串字面量首参抽取（2026-11-01 review Y5：与 Image src 的 https 硬校验
+     *  同族——外链动作此前零闸，`@OpenUrl("file://…")` 等非法 scheme 直达端侧）。
+     *  须在字符串剥离前扫原文（同 QUOTED_ACTION 口径）；表达式形态（@OpenUrl($url)）
+     *  不可静态判定，端侧 dispatch 有 scheme 闸兜底。
+     *  近似边界（同 IMAGE_CALL_ARGS 既有口径）：Markdown 文案/单引号串内写 @OpenUrl("…")
+     *  字样会被一并分析——单引号串剥离阶段不识别，文案里的非 https 示例会以违规误伤，
+     *  漏判/误判优先保放行好负载。 */
+    private val OPEN_URL_LITERAL = Regex("""(?<![A-Za-z0-9_"])@OpenUrl\s*\(\s*"((?:[^"\\]|\\.)*)"""")
 
     /** 单卡图片总数上限（2026-10-24 review 🟡3 OOM 护栏；2026-10-25 口径从 Image 调用数
      *  扩为整卡位图总数——Image 调用 + ImageGallery images / ImageBlock / ImageText /
@@ -204,28 +219,18 @@ object RenderOpenUiValidator {
 
     private val BUTTON_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Button\s*\(""")
 
-    /** stat tile 未居中 lint（2026-10-30 align 治理配套）：DISPLAY + Row 分栏但全文无
-     *  align = "center" → 数字贴栏首错落。扫原文近似判定（lint 级可接受误伤面：
-     *  DISPLAY 图卡混排无数字栏场景会误报，建议口径不影响发卡）。 */
-    private val ROW_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Row\s*\(""")
-    private val ALIGN_CENTER = Regex("""align\s*=\s*"center"""")
-
-    /** Row 裸拼图文 lint（2026-10-30 图文组合固化配套）：Row 实参区间内同时出现
-     *  Image( 与 Text( → 图文项反模式（等宽分栏把缩略图拉成半宽栏）。纯多图并排
-     *  Row([Image, Image]) 是食谱合法形态不误报；实参区间用括号配对扫描精确截取
-     *  （正则窗口法会把 Row 之后的 Text 错算进来，误伤 GOLDEN_MIXED 黄金示例）。
-     *  词边界防误伤 ImageText(/ImageGallery(/TextContent(/TextCallout( 等近名组件。 */
-    private val IMAGE_ANY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(""")
-    private val TEXT_ANY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Text\s*\(""")
-
-    /** Row weights 键检测（lint 豁免依据：比例分栏是认可写法，无 weights 的等宽裸拼才警告）。 */
-    private val NAMED_WEIGHTS = Regex("""(?<![A-Za-z0-9_])weights\s*=""")
-
-    /** Grid 调用（lint：Grid 内平铺 Image ≥2 张 → 引导 PhotoGrid 固化件）。 */
-    private val GRID_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Grid\s*\(""")
-
     /** CardHeader 调用（lint：actionLabel 无 action 配对 → 引导补 @ToAssistant，2026-10-31 真机回归）。 */
     private val CARD_HEADER_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])CardHeader\s*\(""")
+
+    /** ListItem 调用（lint 同上，2026-11-01 review Y6 扩展）。 */
+    private val LIST_ITEM_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])ListItem\s*\(""")
+
+    /** ListBlock 调用（lint 同上；items 是对象数组，字段为冒号形态 `{actionLabel: "…"}`）。 */
+    private val LIST_BLOCK_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])ListBlock\s*\(""")
+
+    /** 对象字段冒号形态的 actionLabel/action 检测（ListBlock items 元素形状）。 */
+    private val OBJ_ACTION_LABEL = Regex("""(?<![A-Za-z0-9_])actionLabel\s*:""")
+    private val OBJ_ACTION = Regex("""(?<![A-Za-z0-9_])action\s*:""")
 
     /** actionLabel 命名键检测（「查看全部」类尾部动作位在场的依据）。 */
     private val NAMED_ACTION_LABEL = Regex("""(?<![A-Za-z0-9_])actionLabel\s*=""")
@@ -240,6 +245,10 @@ object RenderOpenUiValidator {
      * - DISPLAY ≤4（规范 §4.1 stat tile：一屏大数字过多 = 没有重点）；
      * - Button ≤3（规范 §1.1 行为色面积：Button 是 primary 大色块面积的主要代理
      *   分量——Tabs 选中胶囊/Slider/Switch/图表选中高亮不在 lint 面内）。
+     * （2026-10-31 布局可控性批次收编：stat 居中/图文 Row weights/Grid 照片墙三条软警告
+     * 退役——前两条由 OpenUiLayoutNormalizer（N4/N1）无声矫正吸收，第三条升硬为
+     * OpenUiLayoutValidator R4 门禁；本函数保留 DISPLAY≤4 与 Button≤3 两条计数软建议
+     * 及 CardHeader actionLabel 配对提醒。）
      */
     fun lintComposition(program: String): List<String> {
         val warnings = mutableListOf<String>()
@@ -252,33 +261,23 @@ object RenderOpenUiValidator {
         if (buttonCount > MAX_BUTTONS) {
             warnings += "Button $buttonCount 个超建议上限（一卡 primary 大色块 ≤$MAX_BUTTONS 处，行为色面积收敛；次要动作并入一个主 Button 或改 Markdown 文本链接）"
         }
-        if (TEXT_DISPLAY_CALL.containsMatchIn(program) && ROW_CALL.containsMatchIn(program) &&
-            !ALIGN_CENTER.containsMatchIn(program)
-        ) {
-            warnings += "stat tile 数字栏未居中（检测到 DISPLAY 大数字 + Row 分栏但无 align = \"center\"，数字贴栏首错落；每个数字栏 Column 补 align = \"center\"，或直接换 StatRow([{value, label}, ...]) 组件一行固化构图）"
-        }
-        callArgSpans(stripped, ROW_CALL).forEach { args ->
-            // 2026-10-30 通用布局原语批次修订：weights 比例分栏是认可的经典版式写法，
-            // 仅无 weights 的等宽裸拼才警告（等宽分栏把缩略图拉成半宽栏）
-            if (IMAGE_ANY_CALL.containsMatchIn(args) && TEXT_ANY_CALL.containsMatchIn(args) &&
-                !NAMED_WEIGHTS.containsMatchIn(args)
-            ) {
-                warnings += "Row 内等宽裸拼 Image + Text（缩略图会被拉成半宽栏、图文对齐散落）——按比例左图右文给 Row 传 weights（如 weights = [1, 2] 图窄文宽，上下对齐配 align）；一行写法便捷糖可用 ImageText（小图左+文字右）/ ImageTextLarge（通栏图+标题副题）"
-            }
-        }
-        callArgSpans(stripped, GRID_CALL).forEach { args ->
-            // 2026-10-31 相册 APP 组合方式批次：照片网格有固化件 PhotoGrid（方形 1:1 +
-            // 人脸聚焦 + 2dp 密缝）；Grid+Image 拼装里 Image 帧随各图真实比例（2026-10-31
-            // v7 起），网格犬牙交错——≥2 张即引导换固化件
-            if (IMAGE_ANY_CALL.findAll(args).count() >= 2) {
-                warnings += "Grid 内平铺 Image ≥2 张——照片网格请换 PhotoGrid(photos = [photos[0].id, photos[1].id, ...], columns = 2|3|4) 固化件（方形 1:1 + 人脸聚焦 + 2dp 密缝，相册 APP 主视图签名形态）；Grid+Image 拼装的帧随各图真实比例会犬牙交错"
-            }
-        }
         callArgSpans(stripped, CARD_HEADER_CALL).forEach { args ->
             // 2026-10-31 真机回归「查看全部点击无效」：只传 actionLabel 不传 action 时端侧
             // 虽有同文案 @ToAssistant 兜底，但显式 action 文案语境更准（兜底只有标题上下文）
             if (NAMED_ACTION_LABEL.containsMatchIn(args) && !NAMED_ACTION.containsMatchIn(args)) {
                 warnings += "CardHeader 有 actionLabel 但缺 action——尾部「查看全部」类动作位请显式配 action = @ToAssistant(\"查看全部 <分组语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
+            }
+        }
+        // 2026-11-01 review Y6：同病灶扩展到 ListItem（命名键 = 形态）与 ListBlock（对象字段
+        // 冒号形态，按调用区间近似判定——任一 actionLabel 在场而全区间无 action 才警告）
+        callArgSpans(stripped, LIST_ITEM_CALL).forEach { args ->
+            if (NAMED_ACTION_LABEL.containsMatchIn(args) && !NAMED_ACTION.containsMatchIn(args)) {
+                warnings += "ListItem 有 actionLabel 但缺 action——行尾动作位请显式配 action = @ToAssistant(\"<动作> <行语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
+            }
+        }
+        callArgSpans(stripped, LIST_BLOCK_CALL).forEach { args ->
+            if (OBJ_ACTION_LABEL.containsMatchIn(args) && !OBJ_ACTION.containsMatchIn(args)) {
+                warnings += "ListBlock 有 actionLabel 但缺 action——行尾动作位请显式配 action: @ToAssistant(\"<动作> <行语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
             }
         }
         return warnings
@@ -319,7 +318,29 @@ object RenderOpenUiValidator {
         } ?: return errorText(listOf("工具参数不是合法 JSON 对象"))
         val program = (args["program"] as? JsonPrimitive)?.takeIf { it.isString }?.content
             ?: return errorText(listOf("工具参数缺 program 字符串"))
-        return validateToError(program)
+        validateToError(program)?.let { error -> return error }
+        // 布局门禁（2026-10-31）：对矫正后程序做结构校验（transformer 已归一化则此处幂等）；
+        // 门禁必须对 normalize 后文本重 parse（矫正 span 已失效，勿与矫正共享树）
+        val layoutViolations = OpenUiLayoutValidator.validate(OpenUiLayoutNormalizer.normalize(program))
+        if (layoutViolations.isNotEmpty()) return OpenUiLayoutValidator.errorText(layoutViolations, program)
+        return null
+    }
+
+    /**
+     * 发射点矫正入口（[AgentRunner.argsTransformer] 消费，2026-10-31 布局可控性批次）：
+     * render_ui_openui 的 program 经 [OpenUiLayoutNormalizer] 无声归一化后重组 argsJson；
+     * 其余工具 / argsJson 非 JSON / 缺 program → 原样返回。幂等（gate 内二次调用无变化）。
+     */
+    fun transformArgs(toolName: String, argsJson: String): String {
+        if (toolName != TOOL_NAME) return argsJson
+        val args = runCatching { Json.parseToJsonElement(argsJson) }.getOrNull() as? JsonObject
+            ?: return argsJson
+        val program = (args["program"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: return argsJson
+        val normalized = OpenUiLayoutNormalizer.normalize(program)
+        if (normalized == program) return argsJson
+        val rewritten = JsonObject(args.toMutableMap().apply { put("program", JsonPrimitive(normalized)) })
+        return rewritten.toString()
     }
 
     /** 校验并直接给回错误文本：null = 合法放行。 */
@@ -343,6 +364,14 @@ object RenderOpenUiValidator {
         QUOTED_ACTION.findAll(program).forEach { match ->
             violations += "动作表达式被包成了字符串（${match.value}…）：Button 的 action 是裸动作表达式，去掉最外层那对引号——写 Button(\"查看\", @OpenUrl(\"https://…\"))，不要 Button(\"查看\", \"@OpenUrl(…)\")"
         }
+        // 2026-11-01 review Y5：@OpenUrl 字面量首参限 https（与图片 src https 硬校验同族，
+        // [PRIVACY] 外链零闸补齐）；表达式形态端侧 dispatch scheme 闸兜底
+        OPEN_URL_LITERAL.findAll(program).forEach { match ->
+            val url = match.groupValues[1]
+            if (!url.startsWith("https://")) {
+                violations += "@OpenUrl 只接受 https:// 公网地址（实际 \"$url\"）——外链动作禁本地路径/file 协议；相册照片用 Image(photo = photos[i].id) / PhotoGrid(photos = […]) 展示，Button 外链只用于 https 公网页"
+            }
+        }
         // 剥离字符串字面量与行注释后再扫结构（防文案内容误伤）。
         // 顺序必须是先字符串后注释：handle 里的 local:// 含 //，先剥注释会把
         // 字符串内部截断留下奇数引号，后续字符串全局配对跨行吞掉 root 语句
@@ -354,13 +383,13 @@ object RenderOpenUiValidator {
             violations += "缺 root = 语句（root 是组件树入口；无 root 时兜底的首个 Card 语句也缺失）"
         }
 
-        // 2. 组件名白名单：大写开头调用只允许八十九组件 + Query
+        // 2. 组件名白名单：大写开头调用只允许一百组件 + Query
         CALL_NAME.findAll(stripped)
             .map { match -> match.groupValues[1] }
             .toSet()
             .filter { name -> name !in ALLOWED_CALLS }
             .forEach { name ->
-                violations += "组件/调用 \"$name\" 不在白名单（95 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
+                violations += "组件/调用 \"$name\" 不在白名单（100 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
             }
 
         // 3. Query 形态：唯一宿主工具 local_handle；handle 必须是 local://scan/<id> 形态

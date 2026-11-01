@@ -348,13 +348,14 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 97 openui library components`() {
+    fun `whitelist pins all 100 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 的 97 个 key 逐字一致，改动须双向同步核对
+        // OpenUiLibrary.components 逐字一致（100 含三新件——Task 7 落地 shared +3 后生效，当前 shared=97），改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
         //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
         //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
-        //  2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）
+        //  2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
+        //  2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）
         val expected = setOf(
             // 本仓既有 + M2/M3 扩（原二十一组件）
             "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
@@ -366,6 +367,8 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "StatRow", "StatItem", "Banner",
             // 相册 APP 组合方式批次（2026-10-31 本仓扩展）
             "PhotoGrid", "AvatarRow",
+            // 布局可控性批次（2026-10-31：前后对比/时间轴固化件 + 双图并排图表网格）
+            "CompareRow", "Timeline", "ChartGrid",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -390,7 +393,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(97, expected.size)
+        assertEquals(100, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 
@@ -610,13 +613,9 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     }
 
     @Test
-    fun `lint clean at display threshold and stat tile golden stays clean`() {
+    fun `lint clean at display threshold`() {
         val tiles = (1..4).joinToString(", ") { i -> "Text(\"$i\", \"DISPLAY\")" }
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition("root = Card([$tiles])"))
-        assertEquals(
-            emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM),
-        )
     }
 
     @Test
@@ -646,28 +645,7 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         )
     }
 
-    @Test
-    fun `lint warns when stat tile row lacks center align`() {
-        val program = "root = Card([Text(\"统计\", \"HEADLINE\"), " +
-            "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片\", \"CAPTION\")])])])"
-        val warnings = RenderOpenUiValidator.lintComposition(program)
-        assertEquals(1, warnings.size)
-        assertTrue(warnings[0].contains("align"))
-        // 软警告不拒卡：硬校验仍放行（align 属端侧 schema 面，server 半信任不拦）
-        assertNull(RenderOpenUiValidator.validateToError(program))
-    }
-
-    @Test
-    fun `lint clean when stat tile columns carry center align or no row present`() {
-        val centered =
-            "root = Card([Row([Column([Text(\"7,120\", \"DISPLAY\")], align = \"center\")])])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(centered))
-        // DISPLAY 直排无 Row 分栏（非 stat tile 形态）不触发
-        val flat = "root = Card([Text(\"7,120\", \"DISPLAY\"), Text(\"照片\", \"CAPTION\")])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(flat))
-    }
-
-    // ── 图文组合固化（2026-10-30）：photo 键计数 + Row 裸拼图文 lint ──────
+    // ── 图文组合固化（2026-10-30）：photo 键计数 ─────────────────
 
     @Test
     fun `tool description photo text golden example passes validation and lint`() {
@@ -701,29 +679,6 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
-    @Test
-    fun `lint warns when row mixes bare image with text but does not reject the card`() {
-        // 图文项反模式：Row 等宽分栏 + Image + Text 裸拼
-        val program =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([Row([Image(photos[0].id), Column([Text(\"标题\"), Text(\"副题\", \"CAPTION\")])])])"
-        val warnings = RenderOpenUiValidator.lintComposition(program)
-        assertEquals(1, warnings.size)
-        assertTrue(warnings[0].contains("ImageText"))
-        // 软警告不拒卡：硬校验仍放行
-        assertNull(RenderOpenUiValidator.validateToError(program))
-    }
-
-    @Test
-    fun `lint clean for pure multi image row and text after row does not false trip`() {
-        // 纯多图并排是食谱合法形态；Row 之后的卡级 Text 不被窗口误算进 Row 实参区间
-        // （GOLDEN_MIXED 黄金示例正是此形态——括号配对截取防回归）
-        assertEquals(
-            emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM),
-        )
-    }
-
     // ── 通用布局原语批次（2026-10-30）：Grid/Box/Spacer + Row.weights ──────
 
     @Test
@@ -734,17 +689,6 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             emptyList<String>(),
             RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM),
         )
-    }
-
-    @Test
-    fun `lint exempts row image text composition carrying weights`() {
-        // weights 比例分栏是认可的经典版式写法（2026-10-30 lint 修订）：同样 Image+Text
-        // 同 Row，带 weights 不警告、不带才警告（无 weights 用例见上文既有测试）
-        val program =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([Row([Image(photos[0].id), Column([Text(\"标题\"), Text(\"副题\", \"CAPTION\")])], weights = [1, 2], align = \"center\")])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(program))
-        assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
     // ── 经典组合版式批次（2026-10-31）：StatRow/StatItem/Banner + bgPhoto 计数 ──────
@@ -800,6 +744,18 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM),
         )
     }
+    @Test
+    fun `tool description layout batch golden examples pass validation and lint`() {
+        // Task 14 I-1 补钉：companion KDoc「与 RenderOpenUiValidatorTest 同源引用」SSOT 位
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM))
+        assertTrue(
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM).isEmpty(),
+        )
+        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM))
+        assertTrue(
+            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM).isEmpty(),
+        )
+    }
 
     @Test
     fun `photo pattern components pass whitelist`() {
@@ -836,20 +792,7 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertNotNull(RenderOpenUiValidator.validateToError(over))
     }
 
-    @Test
-    fun `grid with two images triggers photo grid lint`() {
-        val program =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([Grid([Image(photos[0].id), Image(photos[1].id)], columns = 2)])"
-        assertEquals(1, RenderOpenUiValidator.lintComposition(program).size)
-        // 换 PhotoGrid 固化件后无警告
-        val fixed =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/7f3a9b1c2d3e#photos\" }, [])\n" +
-                "root = Card([PhotoGrid(photos = [photos[0].id, photos[1].id], columns = 2)])"
-        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(fixed))
-    }
-
-    // ── 查看全部缺省动作兜底批次（2026-10-31）：lint 第六条 ──────────────
+    // ── 查看全部缺省动作兜底批次（2026-10-31）：lint 第三条（收编后末条） ──────────────
 
     @Test
     fun `header actionLabel without action triggers lint`() {
@@ -898,5 +841,106 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         // render_ui 仍走 A2UI 信封校验（openui program 不是合法 A2UI 负载）
         assertNotNull(RenderUiValidator.gate("render_ui", argsJson(validMinimal)))
         assertNull(RenderUiValidator.gate("search_media", " whatever "))
+    }
+
+    // ── 动作契约批次（2026-11-01 review Y2/Y5/Y6） ─────────────────────
+
+    @Test
+    fun `quoted run and wrapper action strings are rejected`() {
+        // QUOTED_ACTION 词表补 Run|Action（review Y2，词表 = shared OpenUiContract.Actions
+        // 字面量副本）："@Run(…)" 与 "@Action([…])" 同为字符串包裹动作表达式，端侧
+        // ACTION 槽位 type-mismatch 静默惰性，服务端同轮纠错
+        listOf(
+            """root = Card([Button("b", "@Run(mutation)")])""",
+            """root = Card([Button("b", "@Action([@Set(${'$'}a, 1)])")])""",
+        ).forEach { program ->
+            val error = RenderOpenUiValidator.validateToError(program)
+            assertNotNull("应拒绝: $program", error)
+            assertTrue(error!!.contains("动作表达式被包成了字符串"))
+        }
+        // 裸 @Run（合法语法形态）不误伤
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([Button("b", @Run(mut))])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `open url literal gate rejects non https and passes https`() {
+        // review Y5：@OpenUrl 字面量首参限 https（与图片 src https 硬校验同族，外链零闸补齐）
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([Button("b", @OpenUrl("https://polang.net/x"))])""",
+            ),
+        )
+        listOf("file:///etc/passwd", "market://details?id=x", "javascript:alert(1)").forEach { url ->
+            val error = RenderOpenUiValidator.validateToError(
+                """root = Card([Button("b", @OpenUrl("$url"))])""",
+            )
+            assertNotNull("应拒绝: $url", error)
+            assertTrue(error!!.contains("@OpenUrl 只接受 https://"))
+        }
+        // 表达式形态（@OpenUrl($u)）不可静态判定，放行由端侧 dispatch scheme 闸兜底
+        val binding =
+            "${'$'}u = \"https://polang.net\"\nroot = Card([Button(\"b\", @OpenUrl(${'$'}u))])"
+        assertNull(RenderOpenUiValidator.validateToError(binding))
+    }
+
+    @Test
+    fun `list item and list block actionLabel without action trigger lint`() {
+        // review Y6：死按钮兜底从 CardHeader 扩展到 ListItem（命名键 = 形态）与
+        // ListBlock（items 对象字段冒号形态）
+        val bareItem = "root = Card([ListItem(\"行\", icon = \"photo\", actionLabel = \"查看\")])"
+        assertEquals(1, RenderOpenUiValidator.lintComposition(bareItem).size)
+        val bareBlock = "root = Card([ListBlock([{title: \"行\", actionLabel: \"查看\"}])])"
+        assertEquals(1, RenderOpenUiValidator.lintComposition(bareBlock).size)
+        // 显式 action 配对后不警告
+        val wiredItem =
+            "root = Card([ListItem(\"行\", actionLabel = \"查看\", " +
+                "action = @ToAssistant(\"查看 行\"))])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wiredItem))
+        val wiredBlock =
+            "root = Card([ListBlock([{title: \"行\", actionLabel: \"查看\", " +
+                "action: @ToAssistant(\"查看 行\")}])])"
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wiredBlock))
+    }
+
+    // ── 布局可控性批次接线（2026-10-31）：transformArgs 发射点矫正 + 布局门禁 ──
+
+    @Test
+    fun `transformArgs normalizes program in argsJson`() {
+        val argsJson = """{"program":"root = Card([Row([Image(photos[0].id), Text(\"说明\")])])","fallbackSummary":"摘要"}"""
+        val transformed = RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, argsJson)
+        assertTrue("transformArgs 应补 weights 分栏，实际：$transformed", transformed.contains("weights = [1, 2]"))
+        // 幂等：再过一遍无变化
+        assertEquals(transformed, RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, transformed))
+    }
+
+    @Test
+    fun `transformArgs passthrough for other tools and malformed json`() {
+        assertEquals("x", RenderOpenUiValidator.transformArgs("other_tool", "x"))
+        assertEquals("not json", RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, "not json"))
+        // 合法 JSON 但缺 program / 非对象 → 原样透传
+        assertEquals(
+            """{"fallbackSummary":"s"}""",
+            RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, """{"fallbackSummary":"s"}"""),
+        )
+        assertEquals("[1]", RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, "[1]"))
+    }
+
+    @Test
+    fun `transformArgs identity shortcut keeps wire bytes intact`() {
+        // 黄金程序（无需矫正）恒等短路：原 argsJson 字节级返回，不被 JsonObject 重序列化改写
+        val argsJson = """{"program":"${RenderOpenUiToolService.GOLDEN_STATS_PROGRAM}","fallbackSummary":"s"}"""
+        assertEquals(argsJson, RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, argsJson))
+    }
+
+    @Test
+    fun `validateArgsJson rejects layout violations`() {
+        val argsJson = """{"program":"root = Card([Text(\"a\"), Card([Text(\"b\"), Card([Text(\"c\")])])])","fallbackSummary":"s"}"""
+        val error = RenderOpenUiValidator.validateArgsJson(argsJson)
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.startsWith("error: render_ui_openui 布局门禁未通过"))
     }
 }

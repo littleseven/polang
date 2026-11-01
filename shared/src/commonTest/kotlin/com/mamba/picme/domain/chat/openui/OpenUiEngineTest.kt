@@ -490,4 +490,103 @@ class OpenUiEngineTest {
         assertEquals("local_handle", OpenUiContract.TOOL_LOCAL_HANDLE)
         assertEquals("photos", OpenUiContract.FRAGMENT_PHOTOS)
     }
+
+    // ── 动作名契约（2026-11-01 review Y1/Y7） ──────────────────────────
+
+    @Test
+    fun `contract action names and engine action set are pinned`() {
+        // 动作名词表字面量钉住：server RenderOpenUiValidator 持副本，改动须双向同步核对
+        assertEquals("Set", OpenUiContract.Actions.SET)
+        assertEquals("Reset", OpenUiContract.Actions.RESET)
+        assertEquals("Run", OpenUiContract.Actions.RUN)
+        assertEquals("ToAssistant", OpenUiContract.Actions.TO_ASSISTANT)
+        assertEquals("OpenUrl", OpenUiContract.Actions.OPEN_URL)
+        assertEquals("OpenPhoto", OpenUiContract.Actions.OPEN_PHOTO)
+        assertEquals("Action", OpenUiContract.Actions.WRAPPER)
+        // eval 可产出的全集（宿主 dispatch 必须穷尽覆盖，androidApp 侧路由清单测试钉住）
+        assertEquals(
+            setOf("Set", "Reset", "Run", "ToAssistant", "OpenUrl"),
+            OpenUiContract.ENGINE_ACTIONS,
+        )
+    }
+
+    // ── viewState 键值对泛化（2026-11-01 review Y4/Y7） ───────────────
+
+    @Test
+    fun `viewState encodes and decodes key value pairs with escaping`() {
+        val entries = mapOf(
+            "selected" to "一月",
+            "month" to "a=b;c%d",
+            "weird=name" to "v",
+        )
+        val encoded = OpenUiContract.encodeViewState(entries)
+        // 转义后分隔符不泄漏（% / = / ; 三字符 percent-编码）
+        assertTrue(encoded.contains("a%3Db%3Bc%25d"))
+        assertTrue(encoded.contains("weird%3Dname"))
+        assertEquals(entries, OpenUiContract.decodeViewState(encoded))
+    }
+
+    @Test
+    fun `viewState encode strips dollar prefix from state keys`() {
+        // store 键含 $ 前缀，线格式 name 不含——恢复时由宿主映射回 $name → Str
+        assertEquals("selected=x", OpenUiContract.encodeViewState(mapOf("\$selected" to "x")))
+    }
+
+    @Test
+    fun `viewState decode keeps legacy subset and tolerates malformed segments`() {
+        // 旧格式 "selected=<label>" 是一阶子集，旧数据恢复行为不变
+        assertEquals(
+            mapOf("selected" to "一月"),
+            OpenUiContract.decodeViewState("selected=一月"),
+        )
+        assertEquals("一月", OpenUiContract.selectedOfViewState("selected=一月"))
+        // 畸形段（无 = / 空名 / 空段）丢弃，与旧解析的容错口径一致
+        assertEquals(
+            mapOf("a" to "1"),
+            OpenUiContract.decodeViewState("garbage;a=1;=x;;"),
+        )
+        assertEquals(emptyMap(), OpenUiContract.decodeViewState(null))
+        assertEquals(emptyMap(), OpenUiContract.decodeViewState(""))
+    }
+
+    // ── 计数器模式与 @Set 防御分支（review Y7） ────────────────────────
+
+    @Test
+    fun `counter pattern set action args refresh after re-evaluation`() = runTest {
+        // @Set($n, $n + 1)：渲染期烘焙的 action 参数在 applyAction 重求值后随 store
+        // 刷新——连点计数器必须 1→2→3，而不是永远写回渲染初值 1
+        val program = """
+            ${'$'}n = 0
+            root = Card([Button("plus", @Set(${'$'}n, ${'$'}n + 1))])
+        """.trimIndent()
+        val session = OpenUiSession(program, noTools)
+        rendered(session.prepare())
+        val firstButton = childrenOf(session.rootOrNull()!!).single()
+        assertIs<OpenUiValue.ComponentVal>(firstButton)
+        val firstAction = (firstButton.props["action"] as OpenUiValue.ActionVal).actions.single()
+        assertEquals(OpenUiAction("Set", listOf(OpenUiValue.Num(1.0)), target = "\$n"), firstAction)
+
+        session.applyAction(firstAction)
+
+        assertEquals(OpenUiValue.Num(1.0), session.state["\$n"])
+        val secondButton = childrenOf(session.rootOrNull()!!).single()
+        assertIs<OpenUiValue.ComponentVal>(secondButton)
+        val secondAction = (secondButton.props["action"] as OpenUiValue.ActionVal).actions.single()
+        assertEquals(OpenUiAction("Set", listOf(OpenUiValue.Num(2.0)), target = "\$n"), secondAction)
+    }
+
+    @Test
+    fun `set action with non state ref target degrades to empty action list`() = runTest {
+        // @Set("x", 1)：首参非 $变量引用 → evalSetAction 防御分支产出
+        // ActionVal(emptyList)（静默 no-op），不臆造 target 写穿 store
+        val program = """root = Card([Button("bad", @Set("x", 1))])"""
+        val session = OpenUiSession(program, noTools)
+        val result = rendered(session.prepare())
+        val button = childrenOf(result.root).single()
+        assertIs<OpenUiValue.ComponentVal>(button)
+        val action = button.props["action"]
+        assertIs<OpenUiValue.ActionVal>(action)
+        assertEquals(emptyList<OpenUiAction>(), action.actions)
+        assertNull(session.state["x"])
+    }
 }

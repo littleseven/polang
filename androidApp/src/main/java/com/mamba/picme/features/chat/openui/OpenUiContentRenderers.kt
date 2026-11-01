@@ -5,10 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowColumn
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -44,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -59,6 +62,7 @@ import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
+import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.features.common.chat.AgentMarkdown
 
@@ -86,6 +90,8 @@ internal val openUiContentComponentNames: Set<String> = setOf(
     "StatRow", "StatItem", "Banner", "ListItem",
     // 相册 APP 组合方式批次（2026-10-31）：PhotoGrid/AvatarRow 新增
     "PhotoGrid", "AvatarRow",
+    // 布局可控性批次（2026-10-31）：CompareRow/Timeline/ChartGrid 新增（dispatch 分支随各任务落地）
+    "CompareRow", "Timeline", "ChartGrid",
 )
 
 /** 单组件数组/子项上限（MAX_LIST_CHILDREN=50 同口径：LLM 生成面无界，渲染端 take 兜底）。 */
@@ -117,7 +123,7 @@ internal fun OpenUiContentNode(
                 modifier = modifier,
                 // 2026-10-31 相册 APP 组合方式批次：分组标题尾部动作（「查看全部 >」形态）
                 actionLabel = headerActionLabel,
-                actions = headerActionsOrDefault(
+                actions = labeledActionsOrDefault(
                     headerActionLabel,
                     headerTitle,
                     contentActions(node.props["action"]),
@@ -177,6 +183,10 @@ internal fun OpenUiContentNode(
         // ── 相册 APP 组合方式批次（2026-10-31）──
         "PhotoGrid" -> OpenUiContentPhotoGrid(node, photoResolver, onAction, modifier)
         "AvatarRow" -> OpenUiContentAvatarRow(node, photoResolver, onAction, modifier)
+        // ── 布局可控性批次（2026-10-31）──
+        "CompareRow" -> OpenUiContentCompareRow(node, photoResolver, onAction, modifier)
+        "Timeline" -> OpenUiContentTimeline(node, photoResolver, onAction, modifier)
+        "ChartGrid" -> OpenUiContentChartGrid(node, state, photoResolver, onAction, modifier)
         else -> Box(modifier = modifier)
     }
 }
@@ -230,19 +240,20 @@ private fun contentToneIcon(variant: String?): String = when (variant) {
 private fun contentActions(prop: OpenUiValue?): List<OpenUiAction> = openUiActionsOf(prop)
 
 /**
- * CardHeader 尾部动作兜底（2026-10-31 真机回归修复「查看全部点击无效」）：LLM 按黄金
- * 示例常只传 actionLabel 不传 action，若原样渲染则按钮呈可点态却无动作。actionLabel 在
- * 场且 action 缺省时，合成 @ToAssistant("actionLabel：title")——点击即以用户消息上行，
- * 让 LLM 展开完整分组；显式 action 永远优先（OpenUiHeaderActionTest 钉住）。
+ * 「actionLabel 在场但 action 缺省」兜底（2026-10-31 真机回归修复「查看全部点击无效」）：
+ * LLM 按黄金示例常只传 actionLabel 不传 action，若原样渲染则按钮呈可点态却无动作。
+ * actionLabel 在场且 action 缺省时，合成 @ToAssistant("actionLabel：title")——点击即以
+ * 用户消息上行，让 LLM 展开完整分组；显式 action 永远优先（OpenUiLabeledActionTest 钉住）。
+ * 适用 CardHeader 尾部动作 / ListBlock 行 / ListItem 行（2026-11-01 review Y6 扩展）。
  */
-internal fun headerActionsOrDefault(
+internal fun labeledActionsOrDefault(
     actionLabel: String?,
     title: String?,
     actions: List<OpenUiAction>,
 ): List<OpenUiAction> {
     if (actions.isNotEmpty() || actionLabel == null) return actions
     val text = if (title != null) "$actionLabel：$title" else actionLabel
-    return listOf(OpenUiAction("ToAssistant", listOf(OpenUiValue.Str(text))))
+    return listOf(OpenUiAction(OpenUiContract.Actions.TO_ASSISTANT, listOf(OpenUiValue.Str(text))))
 }
 
 /** 同形占位（https 图缺失/非法时防跳动，Image 解析失败占位同口径）。 */
@@ -310,7 +321,7 @@ private fun OpenUiContentPhotoImage(
                 onClickLabel = stringResource(R.string.cd_image_preview),
                 role = Role.Image,
             ) {
-                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
             },
         )
     }
@@ -354,7 +365,7 @@ private fun OpenUiAdaptivePhotoImage(
                 onClickLabel = stringResource(R.string.cd_image_preview),
                 role = Role.Image,
             ) {
-                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
             },
         )
     }
@@ -595,7 +606,7 @@ private fun OpenUiContentHeader(
 ) {
     if (title == null) return
     // 2026-10-31 相册 APP 组合方式批次：actionLabel 在场 → 分组标题行（相册 APP 日期
-    // 分组头「标题 + 查看全部 >」签名形态）；action 缺省由 headerActionsOrDefault 兜底
+    // 分组头「标题 + 查看全部 >」签名形态）；action 缺省由 labeledActionsOrDefault 兜底
     // 合成 @ToAssistant 上行（点击即回话展开分组，不再渲染无效按钮）
     if (actionLabel == null) {
         Column(modifier = modifier) {
@@ -626,7 +637,9 @@ private fun OpenUiContentHeader(
         }
         Text(
             text = actionLabel,
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+            // 2026-10-31 对帧校准（OpenUILayouts pattern-album-groups）：尾部动作位
+            // CAPTION 12 弱一档（帧 SSOT；原 BODY 14）
+            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clickable(
                 enabled = actions.isNotEmpty(),
@@ -1168,12 +1181,14 @@ private fun OpenUiContentListBlock(
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
         val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
         val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        val actionLabel = (obj["actionLabel"] as? OpenUiValue.Str)?.v
         ContentListItem(
             title = title,
             subtitle = (obj["subtitle"] as? OpenUiValue.Str)?.v,
             image = (obj["image"] as? OpenUiValue.Str)?.v,
-            actionLabel = (obj["actionLabel"] as? OpenUiValue.Str)?.v,
-            actions = contentActions(obj["action"]),
+            actionLabel = actionLabel,
+            // review Y6：与 CardHeader 同兜底——actionLabel 在场 action 缺省合成 @ToAssistant
+            actions = labeledActionsOrDefault(actionLabel, title, contentActions(obj["action"])),
         )
     }.take(MAX_CONTENT_ITEMS)
     if (items.isEmpty()) {
@@ -1416,7 +1431,7 @@ private fun OpenUiContentModal(
         if (bindingName != null) {
             onAction(
                 OpenUiAction(
-                    name = "Set",
+                    name = OpenUiContract.Actions.SET,
                     args = listOf(OpenUiValue.Bool(false)),
                     target = bindingName,
                 )
@@ -1467,7 +1482,12 @@ private fun OpenUiContentModal(
 /** 单项统计格（StatRow 项 / StatItem 独立保底共用）：DISPLAY 大数字 + CAPTION 弱色标签居中。 */
 @Composable
 private fun OpenUiContentStatCell(value: String, label: String?, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        // 2026-10-31 对帧校准（OpenUILayouts pattern-stats-report）：数字与标签 2dp 间隙
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         Text(
             text = value,
             style = OpenUiCardTokens.displayStyle,
@@ -1556,7 +1576,7 @@ private fun OpenUiContentBanner(
                     onClickLabel = stringResource(R.string.cd_image_preview),
                     role = Role.Image,
                 ) {
-                    onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(resolved.uri))))
+                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
                 },
             )
         } else if (photoId == null && httpsSrc != null) {
@@ -1571,14 +1591,15 @@ private fun OpenUiContentBanner(
             )
         }
         if (hasImage) {
-            // 底部黑色渐变蒙层（文字可读性，VisualCardItem 同口径）：transparent → Black 0.7
+            // 底部黑色渐变蒙层（文字可读性，VisualCardItem 同口径）：2026-10-31 对帧校准
+            // （OpenUILayouts pattern-stats-report）——上 38% 全透明，下缘 Black 0.55
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.7f),
+                            0.62f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.55f),
                         )
                     )
             )
@@ -1597,8 +1618,9 @@ private fun OpenUiContentBanner(
             }
             Text(
                 text = title,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
-                fontWeight = FontWeight.Bold,
+                // 2026-10-31 对帧校准（OpenUILayouts pattern-stats-report）：题字升 HEADLINE
+                // 20 Bold（帧 SSOT；原 SUBHEAD 15+Bold 覆写）
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.HEADLINE),
                 color = textColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1636,7 +1658,8 @@ private fun OpenUiContentListItem(
     val icon = (node.props["icon"] as? OpenUiValue.Str)?.v?.let { name -> openUiIcon(name) }
     val trailing = (node.props["trailing"] as? OpenUiValue.Str)?.v
     val actionLabel = (node.props["actionLabel"] as? OpenUiValue.Str)?.v
-    val actions = contentActions(node.props["action"])
+    // review Y6：与 CardHeader 同兜底——actionLabel 在场 action 缺省合成 @ToAssistant（行可点上行）
+    val actions = labeledActionsOrDefault(actionLabel, title, contentActions(node.props["action"]))
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -1790,7 +1813,7 @@ private fun OpenUiContentPhotoGrid(
                                 onClickLabel = stringResource(R.string.cd_image_preview),
                                 role = Role.Image,
                             ) {
-                                onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
                             },
                         )
                     }
@@ -1834,7 +1857,8 @@ private fun OpenUiContentAvatarRow(
     }
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        // 2026-10-31 对帧校准（OpenUILayouts pattern-album-groups）：头像间距 12dp（md）
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         items.forEach { (id, label) ->
             Column(
@@ -1858,7 +1882,7 @@ private fun OpenUiContentAvatarRow(
                             onClickLabel = stringResource(R.string.cd_image_preview),
                             role = Role.Image,
                         ) {
-                            onAction(OpenUiAction("OpenPhoto", listOf(OpenUiValue.Str(photo.uri))))
+                            onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
                         },
                     )
                 }
@@ -1871,6 +1895,284 @@ private fun OpenUiContentAvatarRow(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = Spacing.xs),
                     )
+                }
+            }
+        }
+    }
+}
+
+// ── 布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》）──
+// CompareRow = 前后对比固化件（修图/优化效果）；图片处理通则：等比缩放不变形 + 裁剪溢出
+// （帧按设计语言 §4.5 决策链定，帧内 ContentScale.Crop——均匀裁切即对比语义，§4.5 例外口径）。
+
+/** CompareRow 统一帧缺省 4:3（设计语言 §5：双侧同帧，异比例各自成帧会高低错位破坏对比语义）。 */
+private const val COMPARE_ROW_FALLBACK_ASPECT = 4.0 / 3.0
+
+/**
+ * CompareRow：左右等宽双图统一帧（显式 aspect > before 图真实比例 > after 图真实比例
+ * > 4:3——双侧同帧）+ 等比缩放填满 + Crop 裁溢出 + 人脸聚焦 + 图下标签；photo 投影优先 /
+ * src https 兜底（Banner 双源同款）；点击 OpenPhoto 大图（Image 同口径）；解析中/失败侧
+ * 落同形占位，不炸整卡。
+ */
+@Composable
+private fun OpenUiContentCompareRow(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val beforeId = (node.props["beforePhoto"] as? OpenUiValue.Num)?.v?.toLong()
+    val afterId = (node.props["afterPhoto"] as? OpenUiValue.Num)?.v?.toLong()
+    // 双源校验产物先行（Banner 二段式同款）：判真/使用同一值，防校验逻辑演化分叉
+    val beforeSrcValid = httpsSrcOrNull((node.props["beforeSrc"] as? OpenUiValue.Str)?.v)
+    val afterSrcValid = httpsSrcOrNull((node.props["afterSrc"] as? OpenUiValue.Str)?.v)
+    // 空内容护栏（Timeline/ChartGrid/PhotoGrid 同款）：photo id 与合法 src 全缺 → 空占位
+    if (beforeId == null && afterId == null && beforeSrcValid == null && afterSrcValid == null) {
+        Box(modifier = modifier)
+        return
+    }
+    val ids = listOfNotNull(beforeId, afterId)
+    val resolved by produceState(initialValue = emptyMap<Long, OpenUiPhoto>(), ids) {
+        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
+    }
+    val frameAspect = frameAspectOf(
+        (node.props["aspect"] as? OpenUiValue.Num)?.v,
+        resolved[beforeId]?.aspectRatio ?: resolved[afterId]?.aspectRatio,
+        COMPARE_ROW_FALLBACK_ASPECT,
+    ).toFloat()
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        OpenUiCompareSide(
+            photo = beforeId?.let { id -> resolved[id] },
+            src = beforeSrcValid,
+            label = (node.props["beforeLabel"] as? OpenUiValue.Str)?.v,
+            frameAspect = frameAspect,
+            onAction = onAction,
+            modifier = Modifier.weight(1f),
+        )
+        OpenUiCompareSide(
+            photo = afterId?.let { id -> resolved[id] },
+            src = afterSrcValid,
+            label = (node.props["afterLabel"] as? OpenUiValue.Str)?.v,
+            frameAspect = frameAspect,
+            onAction = onAction,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun OpenUiCompareSide(
+    photo: OpenUiPhoto?,
+    src: String?,
+    label: String?,
+    frameAspect: Float,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        val frame = Modifier
+            .fillMaxWidth()
+            .aspectRatio(frameAspect)
+            .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+        when {
+            photo != null -> AsyncImage(
+                model = photo.uri,
+                contentDescription = label,
+                contentScale = ContentScale.Crop,
+                alignment = faceAwareVerticalAlignment(photo.faceFocusY),
+                modifier = frame.clickable(
+                    onClickLabel = stringResource(R.string.cd_image_preview),
+                    role = Role.Image,
+                ) {
+                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
+                },
+            )
+            src != null -> AsyncImage(
+                model = src,
+                contentDescription = label,
+                contentScale = ContentScale.Crop,
+                modifier = frame,
+            )
+            else -> Box(modifier = frame)
+        }
+        if (!label.isNullOrBlank()) {
+            Text(
+                text = label,
+                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.xs),
+            )
+        }
+    }
+}
+
+// ── 布局可控性批次·Timeline（时间轴，spec《2026-10-31-openui-layout-controllability》§5）──
+
+/** Timeline 轴列：节点圆点 8dp（primary）+ 连接线 2dp（outlineVariant），末节点无连线。 */
+private val TIMELINE_DOT_SIZE = 8.dp
+private val TIMELINE_AXIS_WIDTH = 2.dp
+
+private data class TimelineEntry(
+    val title: String,
+    val subtitle: String?,
+    val time: String?,
+    val photoId: Long?,
+)
+
+/**
+ * Timeline：时间轴固化件——轴线 + 节点圆点 + 内容行（可选 photo 48dp 定尺寸缩略图
+ * Crop，ListItem 同径 + 标题 BODY/副题 CAPTION 弱色 + 右侧时间 CAPTION 弱色）；
+ * items 端侧解析（[PRIVACY] uri 不出端），title 缺失丢行不炸卡；末节点不画连接线。
+ */
+@Composable
+private fun OpenUiContentTimeline(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val entries = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
+        val obj = (item as? OpenUiValue.Obj)?.v ?: return@mapNotNull null
+        val title = (obj["title"] as? OpenUiValue.Str)?.v ?: return@mapNotNull null
+        TimelineEntry(
+            title = title,
+            subtitle = (obj["subtitle"] as? OpenUiValue.Str)?.v,
+            time = (obj["time"] as? OpenUiValue.Str)?.v,
+            photoId = (obj["photo"] as? OpenUiValue.Num)?.v?.toLong(),
+        )
+    }.take(MAX_CONTENT_ITEMS)
+    if (entries.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    val ids = entries.mapNotNull { entry -> entry.photoId }
+    val resolved by produceState(initialValue = emptyMap<Long, OpenUiPhoto>(), ids) {
+        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
+    }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        entries.forEachIndexed { index, entry ->
+            // IntrinsicSize.Min 让轴列连接线随内容行等高拉伸
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(TIMELINE_DOT_SIZE),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(TIMELINE_DOT_SIZE)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                    if (index < entries.lastIndex) {
+                        Box(
+                            modifier = Modifier
+                                .width(TIMELINE_AXIS_WIDTH)
+                                .weight(1f)
+                                .background(MaterialTheme.colorScheme.outlineVariant),
+                        )
+                    }
+                }
+                entry.photoId?.let { id ->
+                    val photo = resolved[id]
+                    val thumb = Modifier
+                        .size(CONTENT_LIST_IMAGE_SIZE)
+                        .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                    if (photo == null) {
+                        Box(modifier = thumb)
+                    } else {
+                        AsyncImage(
+                            model = photo.uri,
+                            contentDescription = entry.title,
+                            contentScale = ContentScale.Crop,
+                            alignment = faceAwareVerticalAlignment(photo.faceFocusY),
+                            modifier = thumb.clickable(
+                                onClickLabel = stringResource(R.string.cd_image_preview),
+                                role = Role.Image,
+                            ) {
+                                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
+                            },
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = entry.title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+                    if (!entry.subtitle.isNullOrBlank()) {
+                        Text(
+                            text = entry.subtitle,
+                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (!entry.time.isNullOrBlank()) {
+                    Text(
+                        text = entry.time,
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── 布局可控性批次·ChartGrid（双列图表网格，spec《2026-10-31-openui-layout-controllability》§5）──
+
+/** ChartGrid 子项护栏（每格一张图，2×2 封顶——双图并排为主形态）。 */
+private const val CHART_GRID_MAX_CHILDREN = 4
+
+/**
+ * ChartGrid：双列图表网格（columns 恒 2）——Row/Grid 内图表横向并排被 R3 门禁禁止，
+ * 本件是唯一合法出口；子项经 [OpenUiNodeRenderer] 全量 dispatch 递归渲染（图表族），
+ * 非组件子项静默丢弃（生成面已被 R3「只装图表族」拦截，端侧兜底——与 Grid 渲染
+ * null 占位的口径差异为有意为之：脏输入不保留网格几何）；末行缺格补 Spacer 空位
+ * 保持列对齐；无界宽上下文按内容自尺寸（Grid 同径）。
+ */
+@Composable
+private fun OpenUiContentChartGrid(
+    node: OpenUiValue.ComponentVal,
+    state: Map<String, OpenUiValue>,
+    photoResolver: OpenUiPhotoResolver,
+    onAction: (OpenUiAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+        .filterIsInstance<OpenUiValue.ComponentVal>()
+        .take(CHART_GRID_MAX_CHILDREN)
+    if (children.isEmpty()) {
+        Box(modifier = modifier)
+        return
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val weightsUsable = maxWidth != Dp.Infinity
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            children.chunked(2).forEach { rowChildren ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    rowChildren.forEach { child ->
+                        val cellModifier = if (weightsUsable) Modifier.weight(1f) else Modifier
+                        OpenUiNodeRenderer(child, state, photoResolver, onAction, cellModifier)
+                    }
+                    if (rowChildren.size == 1 && weightsUsable) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }

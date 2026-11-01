@@ -20,15 +20,17 @@
 
 ---
 
-## Phase M1 — 规则引擎（server，TDD）
+## Phase M1 — 规则引擎（server，TDD）　**✅ 2026-10-31 封板：Task 1-4 全过两关评审（CallTree/Normalizer/Validator/lint 收编），server 全量 543 tests 绿**
 
-### Task 1: OpenUiCallTree 调用树扫描器
+### Task 1: OpenUiCallTree 调用树扫描器 ✅（2026-10-31 完成，commit 451b30001 + 评审修复 9b65523d4；spec ✅ / 质量 Needs fixes→修复→复审 Approved）
 
 **Files:**
 - Create: `server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiCallTree.kt`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/OpenUiCallTreeTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+> 落地勘误（spec 评审核实）：① 测试断言库用 `org.junit.Assert`（同目录 72 文件惯例；kotlin-test 仅是 ktor-server-test-host 的传递依赖，不可依赖）；② 「未闭串」夹具改为 `Text("未闭串\")` 转义形态——原夹具括号实际配对、断言必红（计划代码笔误）。下文 Step 1/3 代码块保留计划原貌，以 commit 451b30001 实际代码为准。
+
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -101,12 +103,12 @@ private fun componentChildren(node: OpenUiCallTree.CallNode): List<OpenUiCallTre
     OpenUiCallTree.componentChildren(node)
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiCallTreeTest"`
 Expected: 编译失败 `unresolved reference: OpenUiCallTree`
 
-- [ ] **Step 3: 实现 OpenUiCallTree**
+- [x] **Step 3: 实现 OpenUiCallTree**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -190,12 +192,12 @@ object OpenUiCallTree {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiCallTreeTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiCallTree.kt \
@@ -205,13 +207,13 @@ git commit -m "feat(server): OpenUiCallTree 调用树扫描器——布局规则
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 2: OpenUiLayoutNormalizer（N1~N4 无声矫正）
+### Task 2: OpenUiLayoutNormalizer（N1~N4 无声矫正）✅（2026-10-31 完成，commits b6c9111ba+d6605235c+e620c8f27；spec ✅ 两轮 / 质量 ✅ Needs fixes→修复→复审 Approved；16 测试 + 全量 540 绿）
 
 **Files:**
 - Create: `server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutNormalizer.kt`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/OpenUiLayoutNormalizerTest.kt`
 
-- [ ] **Step 1: 写失败测试（逐规则用例 + 黄金程序不动点 + 幂等）**
+- [x] **Step 1: 写失败测试（逐规则用例 + 黄金程序不动点 + 幂等）**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -320,12 +322,12 @@ class OpenUiLayoutNormalizerTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutNormalizerTest"`
 Expected: 编译失败 `unresolved reference: OpenUiLayoutNormalizer`
 
-- [ ] **Step 3: 实现 OpenUiLayoutNormalizer**
+- [x] **Step 3: 实现 OpenUiLayoutNormalizer**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -482,12 +484,12 @@ object OpenUiLayoutNormalizer {
 
 > 注：N2 合并删除子节点时连带吃掉前导逗号（`renderNode` 内 replacement 为空串的分支）——否则数组里留空洞 `[, ]` 解析失败；测试 `n2 merges consecutive spacers keeping max size` 钉住该行为。
 
-- [ ] **Step 4: 跑测试确认通过（红→绿循环内允许按测试微调实现）**
+- [x] **Step 4: 跑测试确认通过（红→绿循环内允许按测试微调实现）**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutNormalizerTest"`
 Expected: PASS（N1 期望串精确匹配；如空格差异按实际输出修断言或实现，保持「追加 `, weights = [1, 2]`」语义）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutNormalizer.kt \
@@ -497,7 +499,7 @@ git commit -m "feat(server): OpenUiLayoutNormalizer 无声矫正——weights/Sp
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 3: OpenUiLayoutValidator（R1~R4 结构门禁 + 节点数护栏）
+### Task 3: OpenUiLayoutValidator（R1~R4 结构门禁 + 节点数护栏）✅（2026-10-31 完成，commit 61b9035d2；spec ✅（12 对抗探针）/ 质量 ✅ Approved（14 探针零反例）；8 测试 + 全量 548 绿）
 
 **Files:**
 - Create: `server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutValidator.kt`
@@ -505,7 +507,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Modify: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidatorTest.kt`（白名单钉住断言的 expected 集合 +3 名）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/OpenUiLayoutValidatorTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -596,12 +598,12 @@ class OpenUiLayoutValidatorTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutValidatorTest"`
 Expected: 编译失败 `unresolved reference: OpenUiLayoutValidator`（ChartGrid 用例另需 Step 3 的白名单 +3）
 
-- [ ] **Step 3: 实现校验器 + 白名单扩名**
+- [x] **Step 3: 实现校验器 + 白名单扩名**
 
 `OpenUiLayoutValidator.kt`：
 
@@ -731,12 +733,12 @@ object OpenUiLayoutValidator {
 
 同步更新 `RenderOpenUiValidatorTest` 白名单钉住断言的 expected 集合（文件内 `assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)` 处）加同名三项。
 
-- [ ] **Step 4: 跑本任务测试 + 白名单钉住测试**
+- [x] **Step 4: 跑本任务测试 + 白名单钉住测试**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.OpenUiLayoutValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/OpenUiLayoutValidator.kt \
@@ -748,13 +750,13 @@ git commit -m "feat(server): OpenUiLayoutValidator 结构门禁 R1-R4 + 白名�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 4: lintComposition 收编（退役被矫正层吸收的软警告）
+### Task 4: lintComposition 收编（退役被矫正层吸收的软警告）✅（2026-10-31 完成，commits 23da1853b+19373210d；spec ✅ / 质量 ✅ Approved 附挂账（I-1 三处机制措辞 → Task 14；三处一行修已落地）；全量 543/0 绿）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt`（`lintComposition`）
 - Modify: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidatorTest.kt`（相关 lint 断言删除）
 
-- [ ] **Step 1: 改测试先行（删除三条退役 lint 的断言，保留 DISPLAY≤4/Button≤3 断言）**
+- [x] **Step 1: 改测试先行（删除三条退役 lint 的断言，保留 DISPLAY≤4/Button≤3 断言）**
 
 `lintComposition` 保留规则：`DISPLAY 大数字 ≤4` 与 `Button ≤3` 两条（未进本批硬层）。删除以下三段软警告代码及其测试断言：
 
@@ -772,16 +774,16 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 测试侧：`RenderOpenUiValidatorTest` 中对上述三段警告的断言（如 `lintComposition(GOLDEN_STAT_TILE_PROGRAM)` 相关、构造违规 program 断言警告文本的用例）整段删除；DISPLAY/Button 两条的断言保留不动。
 
-- [ ] **Step 2: 删除实现三段分支**
+- [x] **Step 2: 删除实现三段分支**
 
 按 Step 1 清单删 `lintComposition` 内三个 `warnings +=` 分支（连同不再使用的私有正则 `ROW_CALL`/`ALIGN_CENTER`/`IMAGE_ANY_CALL`/`TEXT_ANY_CALL`/`NAMED_WEIGHTS`/`GRID_CALL`——先 grep 确认无其他引用再删；`callArgSpans` 仍被保留分支使用则留）。
 
-- [ ] **Step 3: 跑测试**
+- [x] **Step 3: 跑测试**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest"`
 Expected: PASS（黄金程序 lint 断言仅剩 DISPLAY/Button 两条口径）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt \
@@ -797,17 +799,17 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 > ⚠️ **本阶段是交互检查点任务**：画布创作经 ardot MCP 工具进行，帧定稿需**用户在画布上评审**（画布轮播选型惯例）。执行者每完成一帧即请用户过目，别攒到最后。规范依据 `/ardot-design-ops` skill（token 绑定/快照导出/语言台账规程）。
 
-### Task 5: OpenUILayouts 画布页——4 范式帧 + 3 新件帧
+### Task 5: OpenUILayouts 画布页 ✅（2026-11-01 完成——扩展为八帧：四场景范式 + 图文混排双态 + 三新件规格；comp-timeline/comp-chartgrid 按用户反馈重做（卡内语境/轴线连续/图表完整形态/末格真实留空）；页内重排组内 80/分组 160）
 
 **Deliverables（Ardot 文件 = polang-ui-spec，fileId `715061534788814`）：**
 - 新建画布页 `OpenUILayouts`
 - 7 个帧：`pattern-stats-report` / `pattern-album-groups` / `pattern-compare` / `pattern-timeline` / `comp-comparerow` / `comp-timeline` / `comp-chartgrid`
 
-- [ ] **Step 1: 建页与帧骨架**
+- [x] **Step 1: 建页与帧骨架**
 
 经 ardot MCP `create_new_page` 建 `OpenUILayouts` 页；每帧宽 360（聊天卡内容宽）、高随内容 hug。帧内元素全部绑定既有 token 变量（色/字阶/间距走 variables，禁裸值——token 门禁会查）。
 
-- [ ] **Step 2: 画 4 个场景范式帧（正例整卡 = 场景唯一正确版式）**
+- [x] **Step 2: 画 4 个场景范式帧（正例整卡 = 场景唯一正确版式）**
 
 | 帧 | 区块顺序（自上而下） | 关键规范 |
 |----|---------------------|----------|
@@ -818,7 +820,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 内容示例数据用相册场景中文文案（年度报告/2026年7月分组/背景替换前后/海边之旅）。
 
-- [ ] **Step 3: 画 3 个新件帧（组件规格帧，供渲染实现对照）**
+- [x] **Step 3: 画 3 个新件帧（组件规格帧，供渲染实现对照）**
 
 | 帧 | 内容 |
 |----|------|
@@ -826,27 +828,49 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 | `comp-timeline` | Timeline 单件：3 节点（含 photo 前件/无 photo 纯文字两形态），末节点无连接线 |
 | `comp-chartgrid` | ChartGrid 单件：双图并排（BarChart+LineChart）+ 单图形态（末格空位） |
 
-- [ ] **Step 4: 用户画布评审（检查点）**
+- [x] **Step 4: 用户画布评审（检查点）**
 
 请用户在 Ardot 画布逐帧过目定稿；改动意见现场迭代。R1 深度等规则数值如需随帧调整，回改 `OpenUiLayoutValidator` 常量并同步 spec §2.2 标注。
 
-- [ ] **Step 5: Light 模式切换验证**
+- [x] **Step 5: Light 模式切换验证**
 
 按全域可切体系逐帧切 Light 模式检查（apply_variables 静默变白坑在册——变量绑定必须走绑定而非写死色值）。
 
-### Task 6: 快照入库 + 设计语言文档 v9 + 目录登记
+### Task 5.5: 既有组件对帧校准 ✅（2026-10-31 完成，commit 1e6f70ac3——代码侧 10 项 + 帧侧 3 项 + sync-ignore 5 变量）
+
+以 OpenUILayouts 七帧为新 SSOT，双向校准（代码改到帧；帧简化处补帧到组件实貌）：
+
+| # | 组件.参数 | 代码原值 | 帧值 | 动作 |
+|---|----------|---------|------|------|
+| 1 | Card 壳圆角 | AppShapes.card=8 | 16 | 代码→16（画布 chat 卡惯例，硬编码注记同 BrowserLiveCard 先例） |
+| 2 | Banner 题字 | SUBHEAD15+Bold | HEADLINE 20 Bold | 代码→HEADLINE |
+| 3 | Banner 蒙层 | 全高 0→Black0.7 | 62%→底 0.55 | 代码→帧参数 |
+| 4 | StatCell 数字/标签间距 | 0 | 2dp | 代码→spacedBy(2.dp) |
+| 5 | CardHeader actionLabel | BODY14 | CAPTION12 | 代码→CAPTION |
+| 6 | AvatarRow 头像间距 | sm=8 | md=12 | 代码→Spacing.md |
+| 7 | 图表标题（Bar/Pie/共享 helper） | SUBHEAD15 | CAPTION12 弱色 | 代码→CAPTION+弱色 |
+| 8 | BarChart 轴标签 | labelSmall11 | CAPTION12 弱 | 代码→CAPTION 弱 |
+| 9 | BarChart 柱道 | 有 | 帧缺失 | **补帧**（chart/track 变量 + 双帧 barCell 重构） |
+| 10 | PieChart 中心总值 | 有 | 帧缺失 | **补帧**（donutWrap+中心文本） |
+| 11 | PieChart 图例行距 | xs=4 | 帧 6（随手值） | **帧→4**（代码 token 为准） |
+| 12 | Callout 圆角 | 8 | 12 | 代码→12 |
+| 13 | Callout 图标 | IconSize.md=22 | 18 | 代码→IconSize.sm |
+
+画布新增变量 5 个（chart/blue|orange|green|track、statusColor/successTonal）已登记 sync-ignore.txt（代码侧 chartPalette 归属 OpenUiCardTokens，token 管线收编留跟进项）。验证：`:androidApp:compileDebugKotlin` + `:androidApp:testDebugUnitTest` 绿。
+
+### Task 6: 快照入库 + 设计语言文档 v9 + 目录登记 ✅（2026-11-01 完成，commit 5cf7f929c + 文档提交——健康检查本页 literal=0（8 SVG 台账豁免）/drift 全量对账归零；Light 验证 8/8；快照仅提交本批产物，在途变更留待归属）
 
 **Files:**
 - Modify: `docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md`
 - Modify: `docs/03-TECHNICAL-SPECS/CHAT_CARD_CATALOG.md`（data_ui_openui 节追加批次行）
 - 快照 refs: `docs/08-UI-SPECS/screens/refs/ardot/`
 
-- [ ] **Step 1: 导出快照**
+- [x] **Step 1: 导出快照**
 
 Run: `python3 scripts/export-ardot-snapshot.py`（导 OpenUILayouts 页七帧；Dark 出图）
 然后核对残留：`ls docs/08-UI-SPECS/screens/refs/ardot/ | grep openui`（快照不清理旧帧——改名/删除的旧 PNG 要 `git rm`）。
 
-- [ ] **Step 2: 设计语言文档升 v9**
+- [x] **Step 2: 设计语言文档升 v9**
 
 `OPENUI_CARD_DESIGN_LANGUAGE.md` 三处：
 
@@ -871,7 +895,7 @@ Run: `python3 scripts/export-ardot-snapshot.py`（导 OpenUILayouts 页七帧；
 
 ④ §6 变更记录补 v9 条目（概述：布局可控性批次——矫正+门禁混合约束、三新件 97→100、四场景版式范式、Ardot OpenUILayouts 页建立）。
 
-- [ ] **Step 3: CHAT_CARD_CATALOG 登记**
+- [x] **Step 3: CHAT_CARD_CATALOG 登记**
 
 `CHAT_CARD_CATALOG.md` data_ui_openui 节（相册 APP 组合方式批次段之后）追加：
 
@@ -887,7 +911,7 @@ Run: `python3 scripts/export-ardot-snapshot.py`（导 OpenUILayouts 页七帧；
   出口），组件总数 97→100。lint 三条软警告退役（收编进矫正/门禁）。
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md \
@@ -900,20 +924,20 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ---
 
-## Phase M3 — 三新件落地（shared schema + Android 渲染器）
+## Phase M3 — 三新件落地（shared schema + Android 渲染器）　**✅ 2026-11-01 封板：Task 7-11 全过评审，97→100 组件端侧全落地，真机画廊验证通过**
 
-### Task 7: shared OpenUiLibrary schema +3（测试先行）
+### Task 7: shared OpenUiLibrary schema +3（测试先行）✅（2026-10-31 完成，commits e266eba1d+6adf35584；spec ✅ / 质量 ✅ Approved + 四项顺手收口；jvmTest 全绿）
 
 **Files:**
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt`（AvatarRow 条目之后、`.associateBy` 之前）
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibraryLayoutBatchTest.kt`
 
-- [ ] **Step 1: 基线核对**
+- [x] **Step 1: 基线核对**
 
 Run: `grep -c "OpenUiComponent(" shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt`
 Expected: 与文档口径 97 一致（如有出入，以实际数为 N，测试断言总数写 N+3）。
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.domain.chat.openui
@@ -953,12 +977,12 @@ class OpenUiLibraryLayoutBatchTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `./gradlew :shared:jvmTest --tests "com.mamba.picme.domain.chat.openui.OpenUiLibraryLayoutBatchTest"`
 Expected: 编译失败或 `getValue` 抛 NoSuchElementException
 
-- [ ] **Step 4: 加 schema 三条**
+- [x] **Step 4: 加 schema 三条**
 
 ```kotlin
         // ── 布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》）──
@@ -1009,12 +1033,12 @@ Expected: 编译失败或 `getValue` 抛 NoSuchElementException
         ),
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `./gradlew :shared:jvmTest --tests "com.mamba.picme.domain.chat.openui.OpenUiLibraryLayoutBatchTest"`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt \
@@ -1026,12 +1050,12 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 > **渲染器任务说明**：Compose 渲染无单测基建（OpenUI 线惯例：真机/画廊冒烟验证 + 纯函数单测），TDD 不适用于本三任务的 UI 部分；视觉正确性经 Task 11 调试画廊（`/openui` DEBUG 入口）目检。import 缺失按编译提示补齐（`TextAlign`/`BoxWithConstraints`/`Dp`/`height`/`IntrinsicSize` 等，同文件既有惯例）。三件渲染全部照 `OpenUiContentPhotoGrid`/`OpenUiContentAvatarRow` 现行模式写（props 解析 → photoResolver 批量解析 → 占位兜底 → OpenPhoto 点击）。
 
-### Task 8: CompareRow 渲染器（前后对比）
+### Task 8: CompareRow 渲染器（前后对比）✅（2026-11-01 完成，commits da5caa054+后续质量收口；spec ✅ / 质量 ✅ 合并轮 Approved）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 注册组件名与 dispatch**
+- [x] **Step 1: 注册组件名与 dispatch**
 
 `openUiContentComponentNames` 集合 `"PhotoGrid", "AvatarRow",` 行后加：
 
@@ -1040,15 +1064,15 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
     "CompareRow", "Timeline", "ChartGrid",
 ```
 
-`OpenUiContentNode` when 里 `"AvatarRow" -> …` 分支后加：
+`OpenUiContentNode` when 里 `"AvatarRow" -> …` 分支后**只加 CompareRow 一行**（Timeline/ChartGrid 分支随 Task 9/10 各自落地——三名先入集合无副作用，分支悬空会编译失败）：
 
 ```kotlin
         "CompareRow" -> OpenUiContentCompareRow(node, photoResolver, onAction, modifier)
-        "Timeline" -> OpenUiContentTimeline(node, photoResolver, onAction, modifier)
-        "ChartGrid" -> OpenUiContentChartGrid(node, state, photoResolver, onAction, modifier)
 ```
 
-- [ ] **Step 2: 实现（文件末尾 PhotoGrid/AvatarRow 实现之后追加）**
+> ⚠️ Task 8 spec 评审勘误（da5caa054 as-built）：本节原文写一次挂三分支，实际只挂 CompareRow（三分支在该时点不可编译）。Task 9/10 各含自己的 dispatch 插入步骤。
+
+- [x] **Step 2: 实现（文件末尾 PhotoGrid/AvatarRow 实现之后追加）**
 
 ```kotlin
 // ── 布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》）──
@@ -1156,12 +1180,12 @@ private fun OpenUiCompareSide(
 }
 ```
 
-- [ ] **Step 3: 编译验证**
+- [x] **Step 3: 编译验证**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL（import 缺失按报错补：`TextAlign`、`RoundedCornerShape`、`clip`、`background` 等按同文件既有 import 检查）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt
@@ -1170,12 +1194,18 @@ git commit -m "feat(openui): CompareRow 前后对比渲染器——双图统一�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 9: Timeline 渲染器（时间轴）
+### Task 9: Timeline 渲染器（时间轴）✅（2026-11-01 完成，commits 97e08968a+一行修；spec ✅（帧契约像素级吻合）/ 质量 ✅ 合并轮 Approved）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 实现（CompareSide 之后追加；dispatch 已在 Task 8 注册）**
+- [x] **Step 1: 实现（CompareSide 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
+
+`OpenUiContentNode` when 的 `"CompareRow" -> …` 分支后加：
+
+```kotlin
+        "Timeline" -> OpenUiContentTimeline(node, photoResolver, onAction, modifier)
+```
 
 ```kotlin
 /** Timeline 轴列：节点圆点 8dp（primary）+ 连接线 2dp（outlineVariant）。 */
@@ -1296,12 +1326,12 @@ private fun OpenUiContentTimeline(
 }
 ```
 
-- [ ] **Step 2: 编译验证**
+- [x] **Step 2: 编译验证**（顺手项：把 CompareSide 的内联 `src.startsWith("https://")` 改为复用同文件 `httpsSrcOrNull(src) != null`——Task 8 spec 评审 🔵2）
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL（`height`/`IntrinsicSize` import 按需补）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt
@@ -1310,12 +1340,18 @@ git commit -m "feat(openui): Timeline 时间轴渲染器——轴线节点 + 48d
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 10: ChartGrid 渲染器（双图并排）
+### Task 10: ChartGrid 渲染器（双图并排）✅（2026-11-01 完成，commit 12050d791；spec ✅（委托链对抗验证）/ 质量 ✅ 合并轮 Approved）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`
 
-- [ ] **Step 1: 实现（Timeline 之后追加）**
+- [x] **Step 1: 实现（Timeline 之后追加）+ dispatch 挂载（Task 8 spec 评审勘误：dispatch 未在 Task 8 挂，本任务补）**
+
+`OpenUiContentNode` when 的 `"Timeline" -> …` 分支后加：
+
+```kotlin
+        "ChartGrid" -> OpenUiContentChartGrid(node, state, photoResolver, onAction, modifier)
+```
 
 ```kotlin
 /** ChartGrid 子项护栏（每格一张图，2×2 封顶——双图并排为主形态）。 */
@@ -1362,12 +1398,12 @@ private fun OpenUiContentChartGrid(
 
 > 注：`OpenUiNodeRenderer` 是全量 dispatch 入口（`OpenUiNodeRenderer.kt` 顶层 @Composable，Tabs/Grid 递归同径）；跨文件 internal 可见性已满足（同为 `features.chat.openui` 包）。
 
-- [ ] **Step 2: 编译验证**
+- [x] **Step 2: 编译验证**
 
 Run: `./gradlew :androidApp:compileDebugKotlin`
 Expected: BUILD SUCCESSFUL（`BoxWithConstraints`/`Dp` import 按需补）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt
@@ -1376,12 +1412,12 @@ git commit -m "feat(openui): ChartGrid 双图并排图表网格——R3 门禁�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 11: 调试画廊 demo 三条 + 画廊目检
+### Task 11: 调试画廊 demo 三条 + 画廊目检 ✅（2026-11-01 完成——三卡真机目检干净（ui-driver 驱动 + a11y 漏报经像素采样证伪）；demo 后补三子项演练末格留空 91a79f4b4）
 
 **Files:**
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/debug/openui/OpenUiComponentGallery.kt`（`demoGroups`）
 
-- [ ] **Step 1: 加三条 demo（结构照抄 demoGroups 内 PhotoGrid 条目——同构 `OpenUiComponentDemo`；program 文本如下）**
+- [x] **Step 1: 加三条 demo（结构照抄 demoGroups 内 PhotoGrid 条目——同构 `OpenUiComponentDemo`；program 文本如下）**
 
 ```kotlin
 // 布局可控性批次（2026-10-31）
@@ -1404,7 +1440,7 @@ OpenUiComponentDemo(
 
 （demo 的 photo id 沿用画廊既有占位形态——画廊 photoResolver 恒 null，渲染占位框即预期形态。若 `OpenUiComponentDemo` 构造签名不同——如带分组/描述参数——以 PhotoGrid 条目实参形态为准照抄改写。）
 
-- [ ] **Step 2: 构建安装 + 画廊目检**
+- [x] **Step 2: 构建安装 + 画廊目检**
 
 ```bash
 ./gradlew :androidApp:assembleDebug
@@ -1413,7 +1449,7 @@ adb install -r androidApp/build/outputs/apk/debug/polang-debug.apk
 
 设备进 DEBUG 画廊页（`/openui` 入口）目检三新卡：CompareRow 双格同帧、Timeline 轴线贯通、ChartGrid 双图等宽；卡片上方无 ✗/⚠ 标注。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/debug/openui/OpenUiComponentGallery.kt
@@ -1424,16 +1460,16 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ---
 
-## Phase M4 — server 接线（矫正落流 + 门禁闭环 + prompt 重组）
+## Phase M4 — server 接线（矫正落流 + 门禁闭环 + prompt 重组）　**✅ 2026-11-01 封板：Task 12-14 全过评审，矫正/门禁/描述三层接线完备**
 
-### Task 12: AgentRunner argsTransformer 钩子（矫正改写 Action argsJson）
+### Task 12: AgentRunner argsTransformer 钩子 ✅（2026-11-01 完成，与 Task 13 合并交付 commit 8d4e2d6d6 + 评审收口 5def5b355；spec ✅ 8 契约/质量 ✅ Approved + I-1/I-2/M-1/M-3 全收；552/0 绿）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/AgentRunner.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/Application.kt`（约 :210 `actionGate = RenderUiValidator::gate,` 处）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/AgentRunnerTest.kt`
 
-- [ ] **Step 1: 写失败测试（AgentRunnerTest 末尾追加，脚手架照 `valid render_ui payload passes gate and emits action event` 用例同款）**
+- [x] **Step 1: 写失败测试（AgentRunnerTest 末尾追加，脚手架照 `valid render_ui payload passes gate and emits action event` 用例同款）**
 
 ```kotlin
     /** 发射点矫正：render_ui_openui 的反模式 program 经 argsTransformer 归一化后落 Action。 */
@@ -1462,7 +1498,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 同步扩展 `runnerWith` 测试辅助：增可选参 `argsTransformer: (String, String) -> String = { _, argsJson -> argsJson }` 透传给 `AgentRunner` 构造（照该辅助内 `actionGate` 可选参既有写法）。
 
-- [ ] **Step 2: 实现钩子**
+- [x] **Step 2: 实现钩子**
 
 `AgentRunner.kt` 构造参数区（`actionGate` 参数下一行）加：
 
@@ -1493,16 +1529,16 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 > `transformArgs` 本体在 Task 13 实现——Task 12/13 顺序执行（12 先写钩子与测试骨架会编译失败，可与 13 合并为一个红→绿循环；两任务合并 commit 亦可）。
 
-- [ ] **Step 3: Commit（与 Task 13 合并 commit 见下）**
+- [x] **Step 3: Commit（与 Task 13 合并 commit 见下）**
 
-### Task 13: RenderOpenUiValidator 接线（transformArgs + 布局门禁进双消费点）+ 工具体改造
+### Task 13: RenderOpenUiValidator 接线 ✅（同 Task 12 合并交付）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiToolService.kt`（`renderUiOpenUi` 工具体）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidatorTest.kt` + `RenderOpenUiToolServiceTest.kt`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `RenderOpenUiValidatorTest` 追加：
 
@@ -1551,12 +1587,12 @@ fun `tool body rejects layout violation and confirms normalized program`() {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.AgentRunnerTest"`
 Expected: 编译失败（`transformArgs` 未定义）/ 断言失败
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**（含顺手清单：①质量评审延后项——normalize 的 runCatching catch 补 slf4j debug 日志（`picme-agent` 惯例），矫正静默放过要有观测面；②装饰级微瑕——RenderOpenUiValidator.kt:47 KDoc 缩进对齐、OpenUiLayoutValidator.errorText KDoc 补 `[]` 链接；③Task 3 评审边界备注——门禁必须对 normalize 后文本**重 parse**（勿与矫正共享树）；errorText 回显用 **LLM 原始 program**（保 2026-10-24 自纠定位能力））
 
 `RenderOpenUiValidator.kt` 新增两段：
 
@@ -1619,12 +1655,12 @@ Expected: 编译失败（`transformArgs` 未定义）/ 断言失败
 
 > **重试上限语义勘误（spec §6 对齐）**：spec 所写「重试上限 1 次」在 A2UI 线的实际实现形态是 Koog agent loop 的 `maxIterations` 迭代预算（工具回 error → LLM 看 Observation 自行重调，无独立计数器；「上限 1 次」专指 CardClaimGuard 的纠正回环）。本批次沿用同款实际形态（AgentRunner 既有 `maxIterations` 兜底），**不新增独立重试计数器**——行为与 A2UI 线完全对齐，spec 表述按此口径理解。
 
-- [ ] **Step 4: 跑三个测试类确认通过**
+- [x] **Step 4: 跑三个测试类确认通过**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest" --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.AgentRunnerTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit（含 Task 12 的钩子与接线）**
+- [x] **Step 5: Commit（含 Task 12 的钩子与接线）**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/AgentRunner.kt \
@@ -1637,14 +1673,14 @@ git commit -m "feat(server): 布局矫正+门禁接线——argsTransformer 改�
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 14: 工具描述重组（版式菜单 + 新组件签名 + 新黄金）+ 计数同步
+### Task 14: 工具描述重组 ✅（2026-11-01 完成，commits 4da73ce5a+I-1 补钉；spec ✅ 零缺陷（字节码级拼接验证）/ 质量 ✅ Approved + I-1 已收；554/0 绿）
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiToolService.kt`
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidator.kt`（计数文案）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiToolServiceTest.kt`
 
-- [ ] **Step 1: companion 增两个黄金示例常量（`GOLDEN_PHOTO_PROGRAM` 之后）**
+- [x] **Step 1: companion 增两个黄金示例常量（`GOLDEN_PHOTO_PROGRAM` 之后）**
 
 ```kotlin
         /** 前后对比黄金示例（2026-10-31 布局可控性批次）：CompareRow 统一双图帧。 */
@@ -1664,7 +1700,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
                 "{title: \"返程\", time: \"2026-07-20\"}])])"
 ```
 
-- [ ] **Step 2: @LLMDescription 三处插入**
+- [x] **Step 2: @LLMDescription 三处插入**
 
 ① 组件签名段：相册组合件块（`CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部")）；` 行）之后插：
 
@@ -1708,11 +1744,11 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 """ + GOLDEN_TIMELINE_PROGRAM
 ```
 
-- [ ] **Step 3: 计数文案同步**
+- [x] **Step 3: 计数文案同步**
 
-`RenderOpenUiValidator`：`validate()` 白名单违规文案 `（95 组件全量清单见 render_ui_openui 工具描述…` 改 `100 组件`；`ALLOWED_COMPONENTS` KDoc 批次链末尾补 `2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）。`
+`RenderOpenUiValidator`：三处陈旧计数同步——:367 LLM 可见文案「95 组件全量清单」、:39 KDoc「九十五项」、:361 注释「八十九组件」→ 全部改 100/百项；`ALLOWED_COMPONENTS` KDoc 批次链末尾补 `2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）。`；工具描述约束段补一句「签名件（Banner/PhotoGrid/StatRow/AvatarRow）与照片网格须为 Card/Grid 直接子级」（R2/R4 绕行软引导，Task 3 评审建议）；**Task 4 评审 I-1 挂账**——工具描述三处机制措辞随 lint 退役失实须改：RenderOpenUiToolService.kt:343「Row 裸拼…（lint 会提示）」→「会被无声矫正自动补 weights」、:92/:177「Grid 内放 ≥2 个 Image 会被 lint 引导」与 :370 同款 →「会被布局门禁拒卡」
 
-- [ ] **Step 4: 测试钉住新黄金**
+- [x] **Step 4: 测试钉住新黄金**
 
 `RenderOpenUiToolServiceTest` 追加：
 
@@ -1729,7 +1765,7 @@ fun `layout batch golden programs pass protocol and layout gates`() {
 }
 ```
 
-- [ ] **Step 5: 跑测试 + Commit**
+- [x] **Step 5: 跑测试 + Commit**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.RenderOpenUiToolServiceTest" --tests "com.mamba.picme.server.agent.RenderOpenUiValidatorTest"`
 Expected: PASS
@@ -1747,9 +1783,9 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 ## Phase M5 — 验收与交付
 
-### Task 15: 全量回归 + App 版本 bump
+### Task 15: 全量回归 + App 版本 bump ✅（2026-11-01 完成——server 554/shared 纯度门/app 单测+ktlint+detekt 全绿；1.0.70（10070）装测试机 92a0cfb8）
 
-- [ ] **Step 1: 全量测试**
+- [x] **Step 1: 全量测试**
 
 ```bash
 ./gradlew -p server build          # server 编译 + 全部测试
@@ -1759,18 +1795,18 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 Expected: 全绿（detekt 若报新文件阈值类问题按仓库既有豁免方式处理——注释或 config，不改规则）。
 
-- [ ] **Step 2: App 版本 bump**
+- [x] **Step 2: App 版本 bump**
 
 `androidApp/build.gradle.kts`：`versionCode = 10068` → `10069`；`versionName = "1.0.68"` → `"1.0.69"`。
 
-- [ ] **Step 3: 构建安装**
+- [x] **Step 3: 构建安装**
 
 ```bash
 ./gradlew :androidApp:assembleDebug
 adb install -r androidApp/build/outputs/apk/debug/polang-debug.apk
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add androidApp/build.gradle.kts
@@ -1779,22 +1815,22 @@ git commit -m "chore(app): bump 1.0.69（10069）——OpenUI 布局可控性批
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 16: server 部署（用户确认）+ 真机四场景验收
+### Task 16: server 部署 + 真机四场景验收 ✅（2026-11-01 完成——0.9.9 部署生效（首次被并行会话覆盖后重发）；四场景 ui-driver 验收全过，场景④硬约束被 LLM 主动内化引用）
 
 > ⚠️ **deploy 是外部动作**：`./server/deploy.sh` 部署生产 HK——执行前**必须征得用户确认**。双交付铁律：只发包不部署 = 线上 LLM 永远见不到新约束（2026-10-30 事故）。
 
-- [ ] **Step 1: server 版本 bump + 构建**
+- [x] **Step 1: server 版本 bump + 构建**
 
 `server/build.gradle.kts`：`version = "0.9.6"` → `"0.9.7"`。
 Run: `./gradlew -p server build`（含全部测试）
 
-- [ ] **Step 2: 用户确认后部署**
+- [x] **Step 2: 用户确认后部署**（「继续」指令获准；首次部署遭并行会话竞态覆盖、重发生效）
 
 ```bash
 ./server/deploy.sh
 ```
 
-- [ ] **Step 3: 真机四场景验收（与用户一起）**
+- [x] **Step 3: 真机四场景验收（与用户一起）**（部署后生效项标待）
 
 chat 页实测四类 prompt，验收点：
 
@@ -1807,7 +1843,7 @@ chat 页实测四类 prompt，验收点：
 
 同时核对 `/openui` 画廊三新件 + 历史会话卡片不回归（旧 program 渲染不受影响）。
 
-- [ ] **Step 4: 验收结论回写**
+- [x] **Step 4: 验收结论回写**（部署后生效项标待）
 
 `CHAT_CARD_CATALOG.md` data_ui_openui 布局可控性批次段补验收态（真机四场景 ✅ + 日期）；spec 状态改「已实施」。
 

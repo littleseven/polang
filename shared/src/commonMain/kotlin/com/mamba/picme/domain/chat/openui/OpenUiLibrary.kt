@@ -52,8 +52,8 @@ data class OpenUiProp(
 data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
 
 /**
- * polang OpenUI 组件库（九十五项注册 = 官方 81/82 + 本仓别名与既有 8 项 + 通用布局原语
- * 3 项 + 经典组合版式 3 项）。
+ * polang OpenUI 组件库（一百项注册 = 官方 81/82 + 本仓别名与既有 8 项 + 通用布局原语
+ * 3 项 + 经典组合版式 3 项 + 相册组合 2 项 + 布局可控性 3 项）。
  * M2（2026-10-24，spec《openui-component-library-m2-design》）七扩十四；M3（同日，
  * spec《openui-component-library-m3-design》）十四扩二十一；2026-10-25 全量补全
  * （spec《openui-full-library-design》）：对齐官方 openuiLibrary（thesysdev/openui）
@@ -63,6 +63,10 @@ data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
  * 2026-10-31 经典组合版式批次（spec《2026-10-31-openui-classic-layouts-design》）：
  * +StatRow/StatItem/Banner，ListItem 实渲染化扩展（photo/icon/trailing），
  * VisualCardBlock/VisualCardItem +bgPhoto。
+ * 2026-10-30 通用布局原语批次：+Grid/Box/Spacer，Row +weights。
+ * 2026-10-31 相册 APP 组合方式批次：+PhotoGrid/AvatarRow，CardHeader +actionLabel/action。
+ * 2026-10-31 布局可控性批次（spec《2026-10-31-openui-layout-controllability》）：
+ * +CompareRow/Timeline/ChartGrid。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
  * OpenUiNodeRenderer）共用同一份。
  */
@@ -1455,6 +1459,47 @@ object OpenUiLibrary {
                     ),
                 ),
             ),
+        ),
+
+        // ── 布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》）──
+        // CompareRow：前后对比固化件——左右等宽双图统一帧（显式 aspect > 图真实比例 > 4:3，
+        // 双侧同帧：异比例各自成帧会高低错位破坏对比语义）+ 等比缩放 Crop + 人脸聚焦 +
+        // 图下标签；photo 相册投影优先 / src https 兜底（Banner 双源同款约定）
+        OpenUiComponent(
+            "CompareRow",
+            listOf(
+                OpenUiProp("beforePhoto", OpenUiPropType.NUMBER, required = true),
+                OpenUiProp("afterPhoto", OpenUiPropType.NUMBER, required = true),
+                OpenUiProp("beforeLabel", OpenUiPropType.STRING),
+                OpenUiProp("afterLabel", OpenUiPropType.STRING),
+                OpenUiProp("beforeSrc", OpenUiPropType.STRING),
+                OpenUiProp("afterSrc", OpenUiPropType.STRING),
+                OpenUiProp("aspect", OpenUiPropType.NUMBER),
+            ),
+        ),
+        // Timeline：时间轴固化件——轴线 + 节点圆点 + 内容行（photo 48dp 定尺寸缩略图
+        // Crop，ListItem 同径）；items [{title*, subtitle?, time?, photo?}]
+        OpenUiComponent(
+            "Timeline",
+            listOf(
+                OpenUiProp(
+                    "items",
+                    OpenUiPropType.OBJECT_ARRAY,
+                    required = true,
+                    objectFields = listOf(
+                        OpenUiProp("title", OpenUiPropType.STRING, required = true),
+                        OpenUiProp("subtitle", OpenUiPropType.STRING),
+                        OpenUiProp("time", OpenUiPropType.STRING),
+                        OpenUiProp("photo", OpenUiPropType.NUMBER),
+                    ),
+                ),
+            ),
+        ),
+        // ChartGrid：双图并排图表网格（columns 恒 2）——图表禁横向分栏门禁（R3）的
+        // 合法出口；children 限图表族（server 门禁同条拦截）
+        OpenUiComponent(
+            "ChartGrid",
+            listOf(childrenProp),
         ),
     ).associateBy { component -> component.name }
 }

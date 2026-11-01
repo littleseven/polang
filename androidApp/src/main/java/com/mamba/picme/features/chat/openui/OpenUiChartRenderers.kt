@@ -138,7 +138,12 @@ private fun parseSliceData(node: OpenUiValue.ComponentVal): List<SliceData> =
 @Composable
 private fun OpenUiChartTitle(title: String?) {
     title?.let { text ->
-        Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+        // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
+        Text(
+            text = text,
+            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

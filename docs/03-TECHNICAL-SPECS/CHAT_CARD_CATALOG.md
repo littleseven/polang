@@ -975,13 +975,39 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   比例决策链（均匀裁切即设计语义）；server 计数口径扩 photos 数组括号配对扫描 + lint
   第五条（Grid 内 Image≥2 → 引导 PhotoGrid）；黄金示例 `GOLDEN_PHOTO_PROGRAM`，
   GOLDEN_LAYOUT_PROGRAM 照片墙同步改 PhotoGrid。设计语言文档新增 §4.6 相册构图规则。
+  布局可控性批次（2026-10-31，spec《2026-10-31-openui-layout-controllability》，
+  Ardot OpenUILayouts 页八帧 + 对帧校准 13 项）：
+  保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层——server 无声矫正
+  （OpenUiLayoutNormalizer：图文 Row 自动补 weights/连续 Spacer 合并/单子裸容器
+  解包/stat 数字栏自动居中）+ 结构门禁（OpenUiLayoutValidator：Card 嵌套≤2/容器链≤4/
+  通栏签名件同层去重/图表禁横向分栏/Grid 照片墙升硬，违规 Observation 回灌同轮重试）；
+  矫正经 AgentRunner argsTransformer 改写 Action argsJson，端侧渲染器零改动。
+  新增 CompareRow（前后对比统一帧）/Timeline（时间轴）/ChartGrid（双图并排，R3 合法
+  出口），组件总数 97→100。lint 三条软警告退役（收编进矫正/门禁）。版式范式八帧
+  （统计报告/相册分组/前后对比/时间轴/图文混排双态 + 三新件规格）入
+  refs/ardot/pattern-*、comp-*；既有组件对帧校准 13 项（Card 16dp 圆角/Banner
+  HEADLINE 题字+蒙层参数/图表标题 CAPTION 弱色/Callout 12dp+IconSize.sm 等）。
+  设计语言文档升 v9（§0 原则 4「组合收敛在规则层」+ §4.7 版式范式）。
+  验收态（2026-11-01）：server 全量 554 测试绿 / shared jvmTest + 纯度门绿 /
+  androidApp 单测 + ktlint + detekt 绿 / 真机画廊三新件目检通过（ui-driver）；
+  App 1.0.70（10070）已装测试机；server 0.9.9 **已部署生产**（2026-11-01，
+  healthz 三连验证；首次部署被并行会话 0.9.8 工件覆盖，重发后生效——多会话
+  部署竞态在案）。**真机四场景验收 ✅ 全过（2026-11-01，ui-driver）**：
+  ①统计报告卡（StatRow+柱图+PhotoGrid 全套）②相册分组卡（CardHeader+
+  actionLabel 查看全部 + StatRow + Callout 小结）③CompareRow 前后对比卡
+  ④硬约束内化——模型主动引用 7.5「Card 最多嵌套 2 层」自我合规，门禁零触发。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
-  session 重求值高亮 + viewState `selected=<label>` 持久化（恢复路径经 initialState 种
-  `$selected`）；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值同机制写各自绑定变量
-  （渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入；持久化仍只针对
-  `$selected`，其余交互 state 重开卡回默认值）；@OpenUrl 走系统浏览器；@ToAssistant 自
-  2026-10-31 起上行——以用户消息发进会话（CardHeader「查看全部」缺省动作等同文案兜底），
-  M1 及之前仅记日志不路由。
+  session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
+  同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
+  viewState 线格式 2026-11-01 泛化为 `name=value;…` 键值对（`%`/`=`/`;` percent-编码，旧
+  `selected=<label>` 为一阶子集，旧数据可读），持久化范围扩为当前 store 全部 Str 标量
+  （选择态与表单文本同径恢复；Bool/Num 不持久化回声明默认值），恢复路径经 initialState
+  种 `$name`；宿主 produceState 键收窄为 partId+program，viewState 回流不再重建 session
+  （指纹比对防重复写与回流循环）；@OpenUrl 端侧 scheme 闸只放行 http/https（server 对
+  字面量首参另有 https 同轮纠错）；@Run M1 未实施，宿主显式识别并告警（不静默吞）；
+  @ToAssistant 自 2026-10-31 起上行——以用户消息发进会话（CardHeader/ListItem/ListBlock
+  的 actionLabel 缺省动作由 labeledActionsOrDefault 兜底合成同文案），M1 及之前仅记日志
+  不路由。
 - **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui_openui
   下发 BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"}））→
   端上求值填槽渲染。

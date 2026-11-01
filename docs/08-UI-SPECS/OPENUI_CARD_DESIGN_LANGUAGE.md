@@ -10,6 +10,7 @@
 1. **样式收敛在渲染器**：LLM 只选择组件与数据，不控制任何样式数值。一切颜色/字号/间距/圆角由 token 与组件皮肤定死——这是 OpenUI 与 render_html（H5 线）的本质差异，也是风格一致性的保证。
 2. **A2UI 是对照组，样式冻结**：OpenUI 的一切视觉演进不进 A2UI 线（`A2uiCardTokens`/`A2uiStyleMapper` 只读复用几何尺寸与枚举解析）。没有规范约束的渲染结果就是对照组本身。
 3. **规范即 PARITY 契约**：本文档是 OpenUI 卡片的视觉 SSOT。iOS 跟随实现以本文档 + token 为准，不读 Android 源码；双端截图比对以本文档的组件皮肤小节为验收清单。
+4. **组合收敛在规则层**（2026-10-31 v9）：LLM 自由组合，组合合法性由 server 确定性规则保证（无声矫正 OpenUiLayoutNormalizer + 结构门禁 OpenUiLayoutValidator，spec《2026-10-31-openui-layout-controllability》）；「不奇怪」是规则保证的下限，「最优」仍靠版式范式菜单软引导。版式范式的视觉 SSOT = Ardot OpenUILayouts 页（§4.7）。
 
 ## 1. 色彩系统
 
@@ -143,11 +144,28 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - **CardHeader 尾部动作位**：actionLabel/action 可选——「分组标题 + 查看全部 >」是相册 APP 日期分组头签名形态，actionLabel 缺省不渲染尾部；**有 actionLabel 必配 action**（v8.1 真机回归：只传 actionLabel 曾致点击无效——action 缺省端侧兜底合成 `@ToAssistant("查看全部：<标题>")` 以用户消息上行，显式 `action = @ToAssistant("查看全部 2026年7月的照片")` 语境更准，server lint 会提示）；
 - 网格/头像是刻意裁切件（§4.5 例外），人像构图由人脸聚焦保障。
 
+### 4.7 版式范式（2026-10-31 v9，Ardot OpenUILayouts 页 = 视觉 SSOT）
+
+八帧（`docs/08-UI-SPECS/screens/refs/ardot/pattern-*.png` / `comp-*.png`，Dark 正稿 + Light 模式验证 8/8 过）：
+
+| 帧 | 内容 | 引用 |
+|----|------|------|
+| pattern-stats-report | 统计报告签名骨架：Banner 题图 → StatRow → ChartGrid（柱+环）→ Callout | pattern-stats-report.png |
+| pattern-album-groups | 相册分组：CardHeader+actionLabel → PhotoGrid 3 列 → 人物分组 → AvatarRow | pattern-album-groups.png |
+| pattern-compare | 前后对比：HEADLINE → CompareRow 统一双图帧 → CAPTION 说明 | pattern-compare.png |
+| pattern-timeline | 时间轴：HEADLINE → Timeline（轴线+节点+缩略图行） | pattern-timeline.png |
+| pattern-image-text | 图文混排双态：左图右文 `weights=[1,2]` / 左文右图 `[2,1]`（N1 矫正规则 + GOLDEN_LAYOUT 对应形态） | pattern-image-text.png |
+| comp-comparerow | CompareRow 规格：有标签 / 无标签 | comp-comparerow.png |
+| comp-timeline | Timeline 规格：带图 / 纯文字（卡内语境） | comp-timeline.png |
+| comp-chartgrid | ChartGrid 规格：双图并排（柱+折线）/ 单图末格留空 | comp-chartgrid.png |
+
+**对帧校准（2026-10-31，代码 → 帧 13 项）**：Card 壳 16dp 圆角（画布 chat 卡惯例）、Banner 题字 HEADLINE 20 Bold + 蒙层 62%起 0.55、StatCell 数字/标签 2dp 间隙、CardHeader actionLabel CAPTION、AvatarRow 头像距 md=12、图表标题 CAPTION 弱色（Bar/Pie/共享 helper 三处）、BarChart 轴标签 CAPTION 弱色、Callout 12dp 圆角 + IconSize.sm 图标；帧 → 代码 3 项（柱道 track / 环图中心总值补帧、图例行距对齐 token）。
+
 ## 5. 组件皮肤速查（渲染器现状对齐表）
 
 | 组件 | 皮肤要点 |
 |------|----------|
-| Card | AppShapes.card + Spacing.lg 内边距；嵌套 = L1 surface |
+| Card | 16dp 圆角（2026-10-31 v9 对帧校准：画布 chat 卡惯例，AppShapes.card=8 无此档）+ Spacing.lg 内边距；嵌套 = L1 surface |
 | Row/Column/Card align | 交叉轴五值 start\|center\|end\|stretch\|baseline（官方 align-items 语义，缺省 stretch = 子项铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；baseline = 首行基线对齐，列向兜底 start）；stat tile 数字栏写 `align="center"`、高矮栏顶线对齐写 `align="start"` |
 | Row weights | 按比例分栏（2026-10-30，CSS flex-grow 语义）：数字数组与组件子项一一对应（Divider/Spacer 不占槽位），缺省/个数不符回退全 1 等宽；左图右文 = `weights=[1,2]` 配 `align="center"` |
 | Grid | 通用 N 列网格（2026-10-30）：columns 1..4 缺省 2，children 按序填满各行、cell 等宽 `weight(1f)`，末行缺格补空位保持列对齐；四宫格 = `columns=2`；spacing/align 同 Row 词汇 |
@@ -185,13 +203,17 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | MetricIndicatorInline / MetricIndicatorWithStrikethrough | DISPLAY 大数字 + trend ↑success/↓error；删除线旧值 |
 | **经典组合版式批次（2026-10-31，95 项注册）** | |
 | StatRow / StatItem | 经典统计行（§4.1 固化件）：items [{value*, label?}] 等分 weight，DISPLAY 数字 + CAPTION 弱色标签居中；StatItem 独立 = 单项统计格 |
-| Banner | 通栏题图横幅（§4.2 固化件）：photo 相册投影优先 / src https，底部渐变蒙层 + 左下白字标题副题；帧 = 显式 aspect > 图片真实比例 > 16:9 缺省（§4.5）；无图 = surfaceVariant 纯色底 + 主题色文字；photo 图点击 OpenPhoto 大图 |
+| Banner | 通栏题图横幅（§4.2 固化件）：photo 相册投影优先 / src https，底部渐变蒙层（上 62% 全透明→下缘 Black 0.55，v9 对帧校准）+ 左下白字标题（HEADLINE 20 Bold，v9 对帧校准）副题；帧 = 显式 aspect > 图片真实比例 > 16:9 缺省（§4.5）；无图 = surfaceVariant 纯色底 + 主题色文字；photo 图点击 OpenPhoto 大图 |
 | ListItem | 经典列表行（§4.2.1，实渲染化）：前件 photo 48dp 图 > image https 图 > icon 36dp 圆形徽章三选一 + 标题 BODY（≤2 行）/副题 CAPTION 弱 + trailing 弱色小字 / actionLabel 胶囊；action 整行可点 |
 | 元素形状 18 件（*Item/Series/Slice/Point/ScatterSeries） | 仅作父组件数组元素的对象形状，独立出现渲染空占位（ListItem 2026-10-31 起升格出组） |
 | **相册 APP 组合方式批次（2026-10-31，97 项注册）** | |
 | PhotoGrid | 方形照片网格（§4.6 固化件）：photos* 相册投影 id 数组 + columns 2\|3\|4 缺省 3；cell 恒 1:1 Crop + 人脸聚焦 + 2dp 密缝，整网格 12dp 圆角；≤12 张；点击 OpenPhoto |
-| AvatarRow | 人物圆形头像横滑条（§4.6 固化件）：items [{photo*, label?}]；56dp 圆形 Crop + 人脸聚焦 + CAPTION 名字居下；点击 OpenPhoto |
+| AvatarRow | 人物圆形头像横滑条（§4.6 固化件）：items [{photo*, label?}]；56dp 圆形 Crop + 人脸聚焦 + CAPTION 名字居下，头像间距 md=12（v9 对帧校准）；点击 OpenPhoto |
 | CardHeader+actionLabel/action | 分组标题尾部动作位（§4.6）：「标题/副题 + 查看全部 >」相册 APP 日期分组头签名形态；actionLabel 缺省不渲染尾部 |
+| **布局可控性批次（2026-10-31 v9，100 项注册）** | |
+| CompareRow | 前后对比固化件（§4.7）：左右等宽双图统一帧（显式 aspect > 图真实比例 > 4:3，双侧同帧）+ 等比缩放 Crop + 人脸聚焦 + 图下 CAPTION 标签；photo 投影优先 / src https 兜底；点击 OpenPhoto |
+| Timeline | 时间轴固化件（§4.7）：轴线（2dp outlineVariant）+ 节点圆点（8dp primary）+ 内容行（photo 48dp Crop 前件 + 标题 BODY/副题 CAPTION + 右侧时间 CAPTION），末节点无连线 |
+| ChartGrid | 双图并排图表网格（§4.7，columns 恒 2）：图表禁横向分栏门禁（R3）的合法出口；子项限图表族；单图时末格留空（渲染空位非色块） |
 
 ## 6. 变更记录
 
@@ -206,3 +228,5 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - v8（2026-10-31，无 spec，结论直落本文件 §4.6）：相册 APP 组合方式批次——学习 Google Photos / Apple 照片 / 小米相册签名组合形态固化为组件与构图规则（用户定调「学习主要相册 APP 的 UI 组合方式，实现为布局组件和规则」）。新增 PhotoGrid（相册主视图签名形态：方形 1:1 cell + 人脸聚焦裁切 + 2dp 密缝 + 整网格 12dp 圆角，photos* 数组 ≤12 张，columns 缺省 3）+ AvatarRow（人物区签名形态：56dp 圆形头像横滑条，items [{photo*, label?}]）；CardHeader 扩 `actionLabel`/`action`（「查看全部 >」分组头签名形态）。组件总数 95→97。两组件刻意绕开 §4.5 真实比例链——均匀方形/圆形裁切即设计语义（网格节奏感优先于单图比例保真）。server 图片计数口径扩 photos 数组括号配对扫描（防 `photos[0].id` 嵌套括号截断）；lint 第五条：Grid 内 Image≥2 引导换 PhotoGrid；工具描述 GOLDEN_PHOTO_PROGRAM 黄金示例 + 「相册 APP 构图规则」食谱段；GOLDEN_LAYOUT_PROGRAM 四宫格照片墙同步改 PhotoGrid（Grid 只留图表/混合内容）。
 
 - v8.1（2026-10-31，真机回归修复，无 spec）：「查看全部」点击无效根治——根因 = 黄金示例/食谱只传 actionLabel 不传 action（LLM 照样画瓢）+ 渲染层无动作兜底 + @ToAssistant M1 起仅记日志不路由。三处同修：①@ToAssistant 实路由上行（OpenUiCardHost.onToAssistant → ChatScreen viewModel.sendMessage，以用户消息发进会话）；②渲染层缺省动作兜底（`headerActionsOrDefault`：actionLabel 在场且 action 缺省 → 合成 @ToAssistant("actionLabel：title")，OpenUiHeaderActionTest 钉住）；③server GOLDEN_PHOTO_PROGRAM/食谱/签名段全部改为 actionLabel+action 成对 + lint 第六条（CardHeader 有 actionLabel 缺 action → 引导显式 @ToAssistant）。版本 10069/1.0.69 + server 0.9.7。
+
+- v9（2026-10-31，spec《2026-10-31-openui-layout-controllability》）：布局可控性批次——保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层：server 无声矫正 OpenUiLayoutNormalizer（N1 图文 Row 自动补 weights / N2 连续 Spacer 合并+纵向降档 / N3 单子裸容器解包 / N4 stat 数字栏自动居中）+ 结构门禁 OpenUiLayoutValidator（R1 Card 嵌套≤2 与容器链≤4 / R2 通栏签名件一卡一件 / R3 图表禁横向分栏 / R4 Grid 照片墙引导 PhotoGrid / NODE_CAP ≤60）。新增 CompareRow/Timeline/ChartGrid 三件（97→100）与 Ardot OpenUILayouts 版式范式页八帧（§4.7，Light 验证 8/8）；既有组件对帧校准 13 项（Card 16dp/Banner HEADLINE+蒙层/图表标题 CAPTION 弱色等）；lint 三条软警告退役（stat 居中与图文 weights 收编进矫正、Grid 照片墙升硬 R4）。画布新增 chart/*×4、statusColor/successTonal 变量（sync-ignore 台账，代码 SSOT=OpenUiCardTokens）。
