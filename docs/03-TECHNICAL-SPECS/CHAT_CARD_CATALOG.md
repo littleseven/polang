@@ -871,7 +871,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 - **开关**：设置页「GenUI 协议」单选（DataStore `genui_format`，默认 openui，2026-11-01 起；显式存量 a2ui 不翻）→ Chat 页云端回合
   请求头 `X-GenUI-Format` → server 侧分流：**openui = 回合原生**（2026-11-01 头语义升级，
-  spec《2026-11-01-openui-turn-native-design》——不注册任何 GenUI 发卡工具
+  spec 已随交付清理，git 历史可查——不注册任何 GenUI 发卡工具
   （render_ui_openui 退役、render_html 过滤），LLM 的整个终结回复就是 OpenUI 程序）；
   **缺头/未知值（含 a2ui）= A2UI 工具发卡**（render_ui 照旧注册，回退闸零变化），
   同一回合只走一条线。
@@ -1006,7 +1006,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   refs/ardot/pattern-*、comp-*；既有组件对帧校准 13 项（Card 16dp 圆角/Banner
   HEADLINE 题字+蒙层参数/图表标题 CAPTION 弱色/Callout 12dp+IconSize.sm 等）。
   设计语言文档升 v9（§0 原则 4「组合收敛在规则层」+ §4.7 版式范式）。
-  回合原生批次（2026-11-01，spec《2026-11-01-openui-turn-native-design》）：组件库
+  回合原生批次（2026-11-01，spec 已随交付清理，git 历史可查）：组件库
   100→101 新增 `Html(html*, display?=INLINE|FULLPAGE)`（L2 沙箱卡入树——完整自包含
   HTML 经既有 `HtmlCardSanitizer` 清洗（含 128KB 尺寸闸）→ 复用 `HtmlCard` WebView
   沙箱渲染（零 JS 桥、禁文件访问不变式继承）；`meta` 钉死
