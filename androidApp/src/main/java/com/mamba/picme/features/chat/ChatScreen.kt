@@ -884,16 +884,18 @@ fun ChatScreen(
                                                     viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
                                                 },
                                                 // Image 点击看大图：chat 内预览浮层单页（不跳 PhotoEditor 编辑页）
-                                                onPhotoClick = { uri ->
+                                                onPhotoClick = { uris ->
+                                                    // 集合语义（2026-11-01）：多 URI = 集合组件（PhotoGrid/Timeline）
+                                                    // → 多页横滑翻页预览（Gallery 语义）；单 URI = 单图预览
                                                     imagePreview = ChatImagePreviewState(
-                                                        pages = listOf(
+                                                        pages = uris.map { uri ->
                                                             ImagePreviewPage(
                                                                 messageId = item.message.id,
                                                                 rawUri = uri,
                                                                 isEditableResult = false,
                                                                 isSaved = false,
-                                                            ),
-                                                        ),
+                                                            )
+                                                        },
                                                         initialIndex = 0,
                                                     )
                                                 },

@@ -4,5 +4,11 @@
       "type": "http",
       "url": "http://127.0.0.1:50501/api/v1/mcp"
     }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(ls docs/02-ARCHITECTURE/ADR/*.md 2>/dev/null | grep -v README | wc -l; ls docs/assets/architecture.png docs/02-ARCHITECTURE/polang-architecture-infographic.html 2>&1; grep -n \"archivesBaseName\\\\|namespace \" androidApp/build.gradle.kts | head -3; grep -rn \"minSdk\" androidApp/build.gradle.kts | head -2; grep -n \"kotlin\" gradle/libs.versions.toml | head -3)",
+      "Bash(cd /Users/guoshuai/AndroidStudioProjects/polang && ls docs/02-ARCHITECTURE/ADR/*.md | grep -v README | wc -l && ls docs/assets/architecture.png docs/02-ARCHITECTURE/polang-architecture-infographic.html && grep -n \"archivesBaseName\" androidApp/build.gradle.kts && grep -rn \"minSdk = \" androidApp/build.gradle.kts gradle/libs.versions.toml 2>/dev/null | head -3 && grep -n \"^kotlin\" gradle/libs.versions.toml)"
+    ]
   }
 }

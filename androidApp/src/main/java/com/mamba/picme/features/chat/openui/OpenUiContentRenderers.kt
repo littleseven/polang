@@ -1813,7 +1813,17 @@ private fun OpenUiContentPhotoGrid(
                                 onClickLabel = stringResource(R.string.cd_image_preview),
                                 role = Role.Image,
                             ) {
-                                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
+                                onAction(
+                                    OpenUiAction(
+                                        OpenUiContract.Actions.OPEN_PHOTO,
+                                        run {
+                                            val allUris = ids.mapNotNull { gid -> resolved[gid]?.uri }
+                                            (listOf(photo.uri) + (allUris - photo.uri)).map { uri ->
+                                                OpenUiValue.Str(uri)
+                                            }
+                                        },
+                                    ),
+                                )
                             },
                         )
                     }
@@ -2105,7 +2115,14 @@ private fun OpenUiContentTimeline(
                                 onClickLabel = stringResource(R.string.cd_image_preview),
                                 role = Role.Image,
                             ) {
-                                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
+                                // 集合语义：传全条目缩略图 URI（点击位在前）
+                                val allThumbUris = entries.mapNotNull { e -> e.photoId?.let { pid -> resolved[pid]?.uri } }
+                                onAction(
+                                    OpenUiAction(
+                                        OpenUiContract.Actions.OPEN_PHOTO,
+                                        (listOf(photo.uri) + (allThumbUris - photo.uri)).map { uri -> OpenUiValue.Str(uri) },
+                                    ),
+                                )
                             },
                         )
                     }

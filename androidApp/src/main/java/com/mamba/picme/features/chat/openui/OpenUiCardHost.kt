@@ -55,7 +55,7 @@ fun OpenUiCardHost(
     photoResolver: OpenUiPhotoResolver,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
-    onPhotoClick: (uri: String) -> Unit = {},
+    onPhotoClick: (uris: List<String>) -> Unit = {},
     onToAssistant: (text: String) -> Unit = {},
 ) {
     // 键粒度收窄为 partId+program（2026-11-01 review Y4 修复）：viewState 回流只变
@@ -221,7 +221,7 @@ private fun OpenUiReadyContent(
     photoResolver: OpenUiPhotoResolver,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
-    onPhotoClick: (uri: String) -> Unit = {},
+    onPhotoClick: (uris: List<String>) -> Unit = {},
     onToAssistant: (text: String) -> Unit = {},
     initialViewState: String?,
 ) {
@@ -279,8 +279,12 @@ private fun OpenUiReadyContent(
             }
             // Image 点击看大图（宿主动作，program 不可达——渲染层 resolved uri 直发，
             // 不出端不回落 program；ChatScreen 落 chat 内预览浮层）
-            OpenUiActionRoute.OPEN_PHOTO ->
-                (action.args.firstOrNull() as? OpenUiValue.Str)?.v?.let(onPhotoClick)
+            OpenUiActionRoute.OPEN_PHOTO -> {
+                // 2026-11-01 集合语义：渲染器传该组件全部照片 URI（点击位在前）——
+                // 宿主开多页横滑翻页预览（Gallery 语义，Google Photos 同款交互）
+                val uris = action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
+                if (uris.isNotEmpty()) onPhotoClick(uris)
+            }
             // @ToAssistant 上行（2026-10-31 真机回归修复，原为 M1 只记日志不路由）：
             // 卡内回话入口（CardHeader「查看全部」缺省动作等）以用户消息发进会话。
             // M1 只取首参（review B1）：eval 收第二参（官方 payload 语义）但上行通道未定义，丢弃
