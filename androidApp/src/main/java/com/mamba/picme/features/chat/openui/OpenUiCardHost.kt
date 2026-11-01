@@ -116,6 +116,8 @@ fun OpenUiCardHost(
                     OpenUiReadyContent(
                         session = current.session,
                         photoResolver = photoResolver,
+                        handleLookup = handleLookup,
+                        programText = part.program,
                         onViewStateChange = onViewStateChange,
                         onPhotoClick = onPhotoClick,
                         onToAssistant = onToAssistant,
@@ -131,6 +133,8 @@ fun OpenUiCardHost(
                 OpenUiReadyContent(
                     session = current.session,
                     photoResolver = photoResolver,
+                    handleLookup = handleLookup,
+                    programText = part.program,
                     onViewStateChange = onViewStateChange,
                     modifier = modifier,
                     onPhotoClick = onPhotoClick,
@@ -196,7 +200,8 @@ private suspend fun resolveLocalHandle(
                 }
             )
         )
-        // 图文混排：照片 id 清单投影（[{id, date}]，保持搜索相关度原序，cap 60）
+        // 图文混排：照片 id 清单投影（[{id, date}]，保持搜索相关度原序，cap 60 —— LLM 上下文
+        // 保护；全量浏览走 allPhotoEntries 旁路（2026-11-01 分页修复：300 张也可全量翻看）
         OpenUiContract.FRAGMENT_PHOTOS -> HandleResolution.Ok(
             OpenUiValue.Arr(
                 ScanPhotoProjection.toPhotoRefs(entries).map { ref ->
@@ -219,6 +224,8 @@ private val hostJson = Json { ignoreUnknownKeys = true }
 private fun OpenUiReadyContent(
     session: OpenUiSession,
     photoResolver: OpenUiPhotoResolver,
+    handleLookup: HandleLookup,
+    programText: String,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
     onPhotoClick: (uris: List<String>) -> Unit = {},
@@ -236,15 +243,38 @@ private fun OpenUiReadyContent(
     // 会话全量照片 URI（2026-11-01 浏览完整性）：session.state 中任何含 id 字段的
     // 对象数组（photos 投影形态）全量提取——PhotoGrid 只展示 12 张但 handle 可能
     // 返回 60 张；点击任一照片 → 多页翻页预览展示全量（Google Photos 语义）
+    // 2026-11-01 分页修复：照片浏览走 handle 原始全量 entries（Room 存了完整搜索结果，
+    // 60 cap 只在投影层），不再限于投影 60 张——300 张结果也能全量翻看。
+    // 提取路径：① session.state 投影 id（60 张回退）② handle payload 原始 entries（全量）
     val allSessionPhotoUris by produceState<List<String>>(emptyList(), session) {
-        val ids = session.state.values.flatMap { value ->
+        val projectedIds = session.state.values.flatMap { value ->
             (value as? OpenUiValue.Arr)?.v?.mapNotNull { item ->
                 (item as? OpenUiValue.Obj)?.v?.get("id")?.let { id ->
                     (id as? OpenUiValue.Num)?.v?.toLong()
                 }
             } ?: emptyList()
         }.distinct()
-        value = ids.mapNotNull { photoId -> photoResolver.resolve(photoId)?.uri }
+        // handle 全量 entries：从 part 的 program 文本中提取所有 handle id，
+        // 经 handleLookup 取 payload 原始 entries（不截断）
+        // programText 从参数传入（part 在外层作用域）
+        val handleIds = Regex("local://scan/([0-9a-f]+)#photos").findAll(programText)
+            .map { match -> match.groupValues[1] }
+            .toList()
+        val fullIds: List<Long> = handleIds.flatMap { handleId ->
+            val payload: String? = runCatching<String?> {
+                handleLookup.payloadOf("scan", handleId)
+            }.getOrNull()
+            val entries: List<ScanPhotoEntry> = if (payload != null) {
+                runCatching<List<ScanPhotoEntry>> {
+                    hostJson.decodeFromString<List<ScanPhotoEntry>>(payload)
+                }.getOrNull() ?: emptyList()
+            } else {
+                emptyList()
+            }
+            entries.map { entry -> entry.id }
+        }
+        val allIds = (fullIds + projectedIds).distinct()
+        value = allIds.mapNotNull { photoId -> photoResolver.resolve(photoId)?.uri }
     }
     // 已发射 viewState 指纹（归一化后比对，同值不重复持久化；初值取 part 携带态的归一化，
     // 避免冷启动首轮 Set 同值时多写一次 Room）
