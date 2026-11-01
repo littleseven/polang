@@ -325,6 +325,128 @@ class OpenUiEngineTest {
         assertEquals(OpenUiAction("OpenUrl", listOf(OpenUiValue.Str("https://x"))), action.actions[1])
     }
 
+    // ── 官方 actions 语义（2026-11-01 对齐批次）：自定义动作透传 + @Run 执行 Mutation/重取 Query ──
+
+    @Test
+    fun `custom action passes destination and optional param through`() = runTest {
+        val session = OpenUiSession(
+            "root = Card([Button(\"全部\", @Navigate(\"gallery_search\", \"7月的照片\"))])",
+            noTools,
+        )
+        val result = rendered(session.prepare())
+        val button = childrenOf(result.root).single()
+        assertIs<OpenUiValue.ComponentVal>(button)
+        val action = button.props["action"]
+        assertIs<OpenUiValue.ActionVal>(action)
+        assertEquals(
+            listOf(
+                OpenUiAction(
+                    "Navigate",
+                    listOf(OpenUiValue.Str("gallery_search"), OpenUiValue.Str("7月的照片")),
+                ),
+            ),
+            action.actions,
+        )
+    }
+
+    @Test
+    fun `unregistered at call degrades to unknown function error`() = runTest {
+        val session = OpenUiSession(
+            "root = Card([Button(\"x\", @Teleport(\"gallery\"))])",
+            noTools,
+        )
+        val result = rendered(session.prepare())
+        assertTrue(result.errors.any { error -> error.code == "unknown-function" })
+    }
+
+    @Test
+    fun `run mutation executes tool and rebinds status to success`() = runTest {
+        val tools = FakeTools(result = OpenUiValue.Obj(mapOf("ok" to OpenUiValue.Bool(true))))
+        val program = """
+            photos = [{"id": 42}]
+            fav = Mutation("favorite_media", { id: photos[0].id })
+            root = Card([Button("收藏", Action([@Run(fav), @ToAssistant(fav.status)]))])
+        """.trimIndent()
+        val session = OpenUiSession(program, tools.resolver)
+        rendered(session.prepare())
+
+        assertTrue(session.runToolAction("fav"))
+
+        assertEquals(
+            listOf<Pair<String, Map<String, OpenUiValue>>>(
+                "favorite_media" to mapOf("id" to OpenUiValue.Num(42.0)),
+            ),
+            tools.calls,
+        )
+        // 重求值后动作参数携最新 mutation status（fav.status 可绑定 UI 同机制）
+        val button = childrenOf(session.rootOrNull()!!).single()
+        assertIs<OpenUiValue.ComponentVal>(button)
+        val action = button.props["action"]
+        assertIs<OpenUiValue.ActionVal>(action)
+        assertEquals(OpenUiValue.Str("success"), action.actions[1].args[0])
+    }
+
+    @Test
+    fun `run mutation failure binds error status and returns false`() = runTest {
+        val tools = FakeTools(error = IllegalStateException("boom"))
+        val program = """
+            fav = Mutation("favorite_media", { id: 1 })
+            root = Card([Button("收藏", Action([@Run(fav), @ToAssistant(fav.status)]))])
+        """.trimIndent()
+        val session = OpenUiSession(program, tools.resolver)
+        rendered(session.prepare())
+
+        assertEquals(false, session.runToolAction("fav"))
+
+        assertTrue(
+            session.lastErrors().any { error -> error.code == "tool-error" && error.statementId == "fav" },
+        )
+        val button = childrenOf(session.rootOrNull()!!).single()
+        assertIs<OpenUiValue.ComponentVal>(button)
+        val action = button.props["action"]
+        assertIs<OpenUiValue.ActionVal>(action)
+        assertEquals(OpenUiValue.Str("error"), action.actions[1].args[0])
+    }
+
+    @Test
+    fun `run mutation with missing tool reports tool-not-found`() = runTest {
+        val program = """
+            fav = Mutation("nope", {})
+            root = Card([Button("收藏", @Run(fav))])
+        """.trimIndent()
+        val session = OpenUiSession(program, noTools)
+        rendered(session.prepare())
+
+        assertEquals(false, session.runToolAction("fav"))
+        assertTrue(
+            session.lastErrors().any { error -> error.code == "tool-not-found" && error.statementId == "fav" },
+        )
+    }
+
+    @Test
+    fun `run query refetches through host tool`() = runTest {
+        val tools = FakeTools(result = OpenUiValue.Arr(emptyList()))
+        val program = """
+            buckets = Query("local_handle", {}, [])
+            root = Card([Button("刷新", @Run(buckets))])
+        """.trimIndent()
+        val session = OpenUiSession(program, tools.resolver)
+        rendered(session.prepare())
+        assertEquals(1, tools.calls.size)
+
+        assertTrue(session.runToolAction("buckets"))
+        assertEquals(2, tools.calls.size)
+    }
+
+    @Test
+    fun `run with unknown target reports and returns false`() = runTest {
+        val session = OpenUiSession("root = Card([Text(\"x\")])", noTools)
+        rendered(session.prepare())
+
+        assertEquals(false, session.runToolAction("nope"))
+        assertTrue(session.lastErrors().any { error -> error.code == "run-target-missing" })
+    }
+
     // ── 孤儿与可达性（§2.3） ────────────────────────────────────────
 
     @Test
@@ -503,11 +625,17 @@ class OpenUiEngineTest {
         assertEquals("OpenUrl", OpenUiContract.Actions.OPEN_URL)
         assertEquals("OpenPhoto", OpenUiContract.Actions.OPEN_PHOTO)
         assertEquals("Action", OpenUiContract.Actions.WRAPPER)
-        // eval 可产出的全集（宿主 dispatch 必须穷尽覆盖，androidApp 侧路由清单测试钉住）
+        // 引擎识别闭集 = 官方五动作（宿主 dispatch 必须穷尽覆盖，androidApp 侧路由清单测试钉住）
         assertEquals(
             setOf("Set", "Reset", "Run", "ToAssistant", "OpenUrl"),
             OpenUiContract.ENGINE_ACTIONS,
         )
+        // library 自定义动作注册表（官方 custom action 机制；server 工具描述/校验器持副本）
+        assertEquals(
+            listOf(OpenUiLibrary.OpenUiCustomAction("Navigate", listOf("destination", "param"))),
+            OpenUiLibrary.customActions,
+        )
+        assertEquals(setOf("Navigate"), OpenUiLibrary.customActionNames)
     }
 
     // ── viewState 键值对泛化（2026-11-01 review Y4/Y7） ───────────────

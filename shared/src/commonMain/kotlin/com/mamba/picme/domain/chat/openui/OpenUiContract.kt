@@ -22,6 +22,16 @@ object OpenUiContract {
      * 动作名（§6.3）SSOT：eval 产出（[ENGINE]）与宿主合成（[OPEN_PHOTO]）共用词表。
      * parser 内置名表 / eval / engine `applyAction` / Android 宿主 dispatch 统一引用；
      * server `RenderOpenUiValidator` 持字面量副本，改动须双向同步核对（同 iconNames 惯例）。
+     *
+     * 交互去向对齐官方 actions 语义（2026-11-01 动作体系官方对齐，不新增语法）：
+     * 1. **本地操作**：[SET]/[RESET] 卡内状态写、[OPEN_URL] 外部链接、[OPEN_PHOTO] 大图预览，
+     *    App 内页面跳转 = library 自定义动作（`OpenUiLibrary.customActions`，官方 custom
+     *    action 机制——library 注册、渲染层不执行、事件抛宿主路由）；
+     * 2. **访问 API**：[RUN] 执行 `Mutation`（宿主写工具，toolProvider 同 Query 一条接缝；
+     *    mutation.status 可绑定回 UI；失败中断后续动作链）或重取 Query；
+     * 3. **访问 Agent**：[TO_ASSISTANT] 以用户消息上行（第二参 context 官方语义：任意值
+     *    原样透传 host）。
+     * 组合经 `Action([...])` 顺序执行（渲染层整链交宿主，@Run 失败即中断）。
      */
     object Actions {
         const val SET = "Set"
@@ -37,7 +47,8 @@ object OpenUiContract {
         const val WRAPPER = "Action"
     }
 
-    /** eval 层可产出的动作名全集（宿主 dispatch 必须穷尽覆盖，androidApp 侧清单测试钉住）。 */
+    /** eval 层可产出的内置动作名全集（宿主 dispatch 必须穷尽覆盖，androidApp 侧清单测试钉住；
+     *  library 自定义动作不在此列——经 CUSTOM 路由按注册名分发）。 */
     val ENGINE_ACTIONS: Set<String> = setOf(
         Actions.SET,
         Actions.RESET,

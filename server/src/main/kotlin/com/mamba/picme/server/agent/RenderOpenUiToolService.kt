@@ -436,10 +436,31 @@ class RenderOpenUiToolService {
      排版节奏端侧定死——别堆多个 Text 组件写长文），关键数据/图表用组件嵌入：
      Card([Markdown("## 标题\n导语…"), StatRow([...]), Markdown("**结论**：…")])；
    - 交互分工（卡片内一切「继续/更多/查看/跳转」意图）→ 唯一通路是 Button/CardHeader
-     的 action 参数（@ToAssistant 向对话发消息 / @OpenUrl 打开网页）。Timeline 节点标题、
-     Text、ListItem title 等是**静态文案**，写了动词语义也不可点、无任何响应——
-     「更多 → Button("更多瞬间", @ToAssistant("展示更多瞬间"))」才是正确写法；
-     无 action 的 Button 也渲染为死按钮，禁止。
+     的 action 参数。Timeline 节点标题、Text、ListItem title 等是**静态文案**，写了
+     动词语义也不可点、无任何响应——「更多 → Button("更多瞬间", @ToAssistant("展示更多瞬间"))」
+     才是正确写法；无 action 的 Button 也渲染为死按钮，禁止。
+   动作三通道（2026-11-01 官方 actions 语义对齐；点击后的去向按语义三选一或组合，
+   不是只会发消息）：
+   1. 本地操作 → @Navigate("目的地"[, "参数"])：自定义动作，App 内页面跳转，目的地
+      只用闭集线名——gallery（相册主页）/ gallery_search（第二参=搜索词，跳相册按词
+      搜索，「查看全部某分组照片」首选，比发消息快且不消耗回合）/ organize（第二参
+      可选 "scan" 预选扫描 Tab）/ people（人物页）/ memory（回忆页）/ task_center
+      （任务中心）/ settings（设置）；禁臆造其他页面名；
+   2. 访问 API → Mutation 语句 + @Run(ref)：先声明
+      `fav = Mutation("工具名", { 参数 })` 再 `@Run(fav)` 触发执行，白名单工具——
+      favorite_media { id: 照片id } 收藏 / unfavorite_media { id: 照片id } 取消收藏
+      （照片 id 只许填 photos 数组元素的 id，禁字面量臆造）；fav 求值为
+      {status, data, error} 对象可绑定 UI（如 fav.status == "success" 时换按钮文案
+      或 Callout 提示）；@Run 失败会中断 Action 链后续动作并 toast 兜底；高风险操作
+      （删除等）不在白名单，不要写；
+   3. 访问 Agent → @ToAssistant("文案")：以用户消息发进对话，触发新一轮 Agent 处理——
+      需要 LLM 理解/展开/再取数的意图走这里（如「查看全部」要重新组织内容时）；
+   组合：点击要同时做几件事用 Action([...]) 顺序执行，如
+      fav = Mutation("favorite_media", { id: photos[0].id })
+      Button("收藏并逛相册", Action([@Run(fav), @Navigate("gallery")]))；
+   选择经验：纯跳页/搜索直达用 @Navigate（零回合零延迟）；明确业务写动作用
+   Mutation+@Run（结果可绑定、失败中断链）；需要模型再思考才用 @ToAssistant
+   （@OpenUrl 仍只管打开网页）。
    前后对比黄金示例：
 """ + GOLDEN_COMPARE_PROGRAM + """
    时间轴黄金示例：

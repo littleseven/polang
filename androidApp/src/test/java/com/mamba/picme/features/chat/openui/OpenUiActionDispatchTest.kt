@@ -1,6 +1,7 @@
 package com.mamba.picme.features.chat.openui
 
 import com.mamba.picme.domain.chat.openui.OpenUiContract
+import com.mamba.picme.domain.chat.openui.OpenUiLibrary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -8,9 +9,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * dispatch 路由清单钉住（2026-11-01 review Y1/Y2/Y5/Y7）：
- * eval 产出的动作全集 [OpenUiContract.ENGINE_ACTIONS] 必须全部被宿主路由覆盖
- * （不得落 UNKNOWN 静默吞）；@Run 显式识别为「未实现」路由（告警留痕）；
+ * dispatch 路由清单钉住（2026-11-01 官方对齐批次）：
+ * 官方五动作 [OpenUiContract.ENGINE_ACTIONS] 必须全部被宿主路由覆盖（不得落 UNKNOWN
+ * 静默吞）；library 自定义动作名（[OpenUiLibrary.customActionNames]）落 CUSTOM 事件路由；
  * @OpenUrl scheme 闸只放行 http/https。
  */
 class OpenUiActionDispatchTest {
@@ -27,13 +28,23 @@ class OpenUiActionDispatchTest {
     }
 
     @Test
-    fun `route mapping matches action semantics`() {
+    fun `route mapping matches official action semantics`() {
         assertEquals(OpenUiActionRoute.STATE_WRITE, openUiActionRouteOf(OpenUiContract.Actions.SET))
         assertEquals(OpenUiActionRoute.STATE_WRITE, openUiActionRouteOf(OpenUiContract.Actions.RESET))
         assertEquals(OpenUiActionRoute.OPEN_URL, openUiActionRouteOf(OpenUiContract.Actions.OPEN_URL))
         assertEquals(OpenUiActionRoute.OPEN_PHOTO, openUiActionRouteOf(OpenUiContract.Actions.OPEN_PHOTO))
         assertEquals(OpenUiActionRoute.TO_ASSISTANT, openUiActionRouteOf(OpenUiContract.Actions.TO_ASSISTANT))
-        assertEquals(OpenUiActionRoute.RUN_UNSUPPORTED, openUiActionRouteOf(OpenUiContract.Actions.RUN))
+        // @Run = Mutation 执行/Query 重取（官方语义），engine runToolAction 落点
+        assertEquals(OpenUiActionRoute.RUN, openUiActionRouteOf(OpenUiContract.Actions.RUN))
+    }
+
+    @Test
+    fun `registered custom actions route to custom event channel`() {
+        // 官方 custom action 事件模型：渲染层不执行，整颗 {name, args} 抛宿主
+        OpenUiLibrary.customActionNames.forEach { name ->
+            assertEquals("$name 应落 CUSTOM", OpenUiActionRoute.CUSTOM, openUiActionRouteOf(name))
+        }
+        assertEquals(OpenUiActionRoute.CUSTOM, openUiActionRouteOf(OpenUiLibrary.CUSTOM_ACTION_NAVIGATE))
     }
 
     @Test

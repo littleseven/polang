@@ -132,7 +132,7 @@ internal fun OpenUiFormNode(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (node.type) {
@@ -166,8 +166,8 @@ private fun openUiFormText(value: OpenUiValue?): String? = when (value) {
 }
 
 /** 构造 @Set 动作（target = state 变量名）。 */
-private fun formSetAction(stateKey: String, value: OpenUiValue): OpenUiAction =
-    OpenUiAction(name = OpenUiContract.Actions.SET, args = listOf(value), target = stateKey)
+private fun formSetAction(stateKey: String, value: OpenUiValue): List<OpenUiAction> =
+    listOf(OpenUiAction(name = OpenUiContract.Actions.SET, args = listOf(value), target = stateKey))
 
 /** 逗号串多选值解析（空段剔除）。 */
 private fun parseMultiValues(raw: String?): Set<String> =
@@ -192,7 +192,7 @@ private fun OpenUiFormGroup(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_FORM_ITEMS)
@@ -213,7 +213,7 @@ private fun OpenUiFormControl(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = (node.props["label"] as? OpenUiValue.Str)?.v ?: return
@@ -254,7 +254,7 @@ private fun OpenUiFormControl(
 private fun OpenUiInputField(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
     multiline: Boolean,
 ) {
@@ -324,7 +324,7 @@ private data class OpenUiSelectOption(val value: String, val label: String)
 private fun OpenUiSelectField(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
@@ -388,7 +388,7 @@ private fun formatIsoDate(millis: Long): String {
 private fun OpenUiDatePickerField(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
@@ -490,7 +490,7 @@ private data class OpenUiToggleItem(
 private fun OpenUiToggleGroup(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
     isSwitch: Boolean,
 ) {
@@ -578,7 +578,7 @@ private data class OpenUiRadioOption(
 private fun OpenUiRadioGroup(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
@@ -641,7 +641,7 @@ private data class OpenUiChipOption(val value: String, val label: String, val ic
 private fun OpenUiChips(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
@@ -707,7 +707,7 @@ private data class OpenUiOptionCardItem(val value: String, val title: String, va
 private fun OpenUiOptionCards(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
@@ -816,7 +816,7 @@ private fun buildEditableTableJson(
 @Composable
 private fun OpenUiEditableTable(
     node: OpenUiValue.ComponentVal,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return

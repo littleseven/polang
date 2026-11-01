@@ -47,7 +47,7 @@ import com.mamba.picme.domain.chat.openui.OpenUiValue
  *
  * Block 壳共性：items* OBJECT_ARRAY ≥1（解析后空 → 丢组件不炸卡）、layout?=grid/carousel
  * （缺省 grid → FlowRow 双列，carousel → 横滑定宽条目）、action?（Block 级，点击卡片经
- * `actions.forEach(onAction)` 宿主动作通道）。Item 是对象形状不独立注册，这里直接解析
+ * `onAction(actions)` 宿主动作通道）。Item 是对象形状不独立注册，这里直接解析
  * 字段渲染；组件数组槽（lhs/rhs/top/bottom/header/body/footer，COMPONENT_LIST）递归
  * [OpenUiNodeRenderer]——IconText/ImageText/Text/BoldText 等卡块内构件的样式由各自
  * 渲染分支负责（M4a/M4d 各司其职，渲染器位置无关）。
@@ -79,7 +79,7 @@ internal fun OpenUiCardBlockNode(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (node.type) {
@@ -106,7 +106,7 @@ internal fun OpenUiCardBlockNode(
 private fun <T> OpenUiCardBlockShell(
     node: OpenUiValue.ComponentVal,
     items: List<T>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier,
     itemContent: @Composable (T, Modifier) -> Unit,
 ) {
@@ -114,7 +114,7 @@ private fun <T> OpenUiCardBlockShell(
     val clickModifier = if (actions.isEmpty()) {
         Modifier
     } else {
-        Modifier.clickable { actions.forEach(onAction) }
+        Modifier.clickable { onAction(actions) }
     }
     val carousel = (node.props["layout"] as? OpenUiValue.Str)?.v == "carousel"
     if (carousel) {
@@ -149,7 +149,7 @@ private fun OpenUiCardBlockSlot(
     children: List<OpenUiValue>,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
 ) {
     for (child in children) {
         if (child is OpenUiValue.ComponentVal) {
@@ -175,7 +175,7 @@ private fun OpenUiSnippetCardBlock(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -217,7 +217,7 @@ private fun OpenUiOverviewCardBlock(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -251,7 +251,7 @@ private data class ContextCardItemData(val title: String, val body: String?)
 @Composable
 private fun OpenUiContextCardBlock(
     node: OpenUiValue.ComponentVal,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -304,7 +304,7 @@ private fun OpenUiCompositeCardBlock(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -363,7 +363,7 @@ private data class VisualCardItemData(
 private fun OpenUiVisualCardBlock(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
