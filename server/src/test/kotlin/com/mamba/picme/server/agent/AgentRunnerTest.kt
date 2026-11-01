@@ -670,4 +670,96 @@ class AgentRunnerTest {
             emittedProgram,
         )
     }
+
+    // ── 终结程序纠正回环（ProgramGuard，turn-native T6）─────────────────────
+
+    /**
+     * 回合原生线终结程序非法 → 策略层带错误清单回环纠正（不落首轮坏答复），
+     * 第二轮输出合法程序后正常 Finish。纠正 user 消息只存在于 Koog prompt 内，
+     * 不落事件流（同 correctFakeCardClaim 既有语义）。
+     */
+    @Test
+    fun `invalid final program triggers correction round then finish`() = runBlocking {
+        val session = newSession()
+        val bodies = mutableListOf<String>()
+        val sseServer = RawSseStubServer { body, n ->
+            bodies += body
+            val text = if (n == 1) "这不是程序" else "root = Card([Text(\"修正后\")])"
+            MockLlmSse.streamingText(text) to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val events = mutableListOf<AgentEvent>()
+            // 落地口径（控制方裁决）：turnNative 接线 = forwardContentDeltas 开闸 +
+            // finalMessageTransformer 兜底包装（与 Task 8 将在 AgentRoutes 做的接线等价）
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
+                onEvent = { events += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertEquals("非法终结程序应触发一次纠正回环（共 2 次 LLM 调用）", 2, sseServer.callCount.get())
+            assertTrue(
+                "第二轮 prompt 应携带程序校验错误清单，实际请求数=${bodies.size}",
+                bodies.getOrNull(1)?.contains("你上次的输出未通过校验") == true,
+            )
+            // 纠正消息落 prompt 不落事件流：首轮坏答复与纠正指令都不落流
+            // （过滤 AGENT 侧消息，对齐 correctFakeCardClaim 既有用例口径）
+            val messages = events
+                .filter { it.source == AgentEventSource.AGENT }
+                .map { it.payload }.filterIsInstance<AgentEventPayload.Message>()
+            assertEquals("root = Card([Text(\"修正后\")])", messages.last().content)
+            assertEquals(1, messages.count { it.content != "这不是程序" })
+        } finally {
+            sseServer.close()
+        }
+    }
+
+    /**
+     * 纠正上限（MAX_CORRECTIONS=1）用尽后仍非法：放行落流（防死循环），
+     * 由 finalMessageTransformer 兜底 Markdown 包装——「端上永远收到合法树」双保险。
+     */
+    @Test
+    fun `persistently invalid program falls back to markdown wrap`() = runBlocking {
+        val session = newSession()
+        val sseServer = RawSseStubServer { _, n ->
+            MockLlmSse.streamingText(if (n == 1) "坏程序" else "还是坏程序") to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val events = mutableListOf<AgentEvent>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
+                onEvent = { events += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertEquals("纠正一次后放行（共 2 次 LLM 调用）", 2, sseServer.callCount.get())
+            val final = events.map { it.payload }.filterIsInstance<AgentEventPayload.Message>().last()
+            assertTrue("兜底包装缺失: ${final.content.take(80)}", final.content.startsWith("// summary:"))
+            assertTrue(final.content.contains("root = Markdown("))
+        } finally {
+            sseServer.close()
+        }
+    }
 }

@@ -51,12 +51,20 @@ private suspend fun AIAgentLLMWriteSession.requestLLMStreamingOrOnce(): Message.
  *    内建版是一次性 `requestLLM()`，不产任何 StreamFrame——EventHandler 流式钩子永不触发。
  *    自定义节点改用 [requestLLMStreamingOrOnce]（Koog OpenAI 客户端把工具 args 增量以
  *    ToolCallDelta 逐帧透传），帧流驱动 AgentRunner 的 openui 预览旁路。
+ * 4. correctInvalidProgram 节点（2026-11-01 回合原生 ProgramGuard）：仅 [programGuard]
+ *    非空（forwardContentDeltas 回合原生线）时可触达——终结文本非合法 OpenUI 程序 →
+ *    本节点携带逐条校验错误清单回环重发（上限 [ProgramGuard.MAX_CORRECTIONS] 次）；
+ *    上限用尽放行落流，由 AgentRunner.finalMessageTransformer 兜底包装。A2UI 线
+ *    programGuard=null，新边条件恒 false，既有行为零变化。
  *
  * ⚠️ Koog 1.3.0 `onTextMessage { block }` 的 block 是**分片过滤器**（transform 语义：
  * 过滤后 join 成 String，空串也算命中），不是门控条件——条件必须写在后续级联的
  * `onCondition` 里，否则同一节点两条文本边中先声明者无条件捕获全部文本消息（事故记录）。
  */
-internal fun cloudAgentStrategy(cardGuard: CardClaimGuard): AIAgentGraphStrategy<String, String> =
+internal fun cloudAgentStrategy(
+    cardGuard: CardClaimGuard,
+    programGuard: ProgramGuard? = null,
+): AIAgentGraphStrategy<String, String> =
     strategy("polang_cloud_single_run") {
         val nodeCallLLM by node<String, Message.Assistant> { message ->
             llm.writeSession {
@@ -86,9 +94,26 @@ internal fun cloudAgentStrategy(cardGuard: CardClaimGuard): AIAgentGraphStrategy
                 requestLLMStreamingOrOnce()
             }
         }
+        // turn-native（spec§3.5）：终结程序非法 → 带错误清单回环纠正（仅 programGuard 非空时可触达）
+        val nodeCorrectInvalidProgram by node<String, Message.Assistant>("correctInvalidProgram") { text ->
+            programGuard!!.markCorrected()
+            val error = RenderOpenUiValidator.validateProgramToError(text)
+                ?: "未知校验错误（请检查 root 语句、组件白名单与 Query 形态）"
+            llm.writeSession {
+                appendPrompt {
+                    user(ProgramGuard.correctionPrompt(error))
+                }
+                requestLLMStreamingOrOnce()
+            }
+        }
 
         edge(nodeStart forwardTo nodeCallLLM)
         edge(nodeCallLLM forwardTo nodeExecuteTool onToolCalls { true })
+        edge(
+            nodeCallLLM forwardTo nodeCorrectInvalidProgram
+                onTextMessage { true }
+                onCondition { text -> programGuard?.invalidProgramError(text) != null },
+        )
         edge(
             nodeCallLLM forwardTo nodeCorrectFakeCard
                 onTextMessage { true }
@@ -98,6 +123,12 @@ internal fun cloudAgentStrategy(cardGuard: CardClaimGuard): AIAgentGraphStrategy
         edge(nodeExecuteTool forwardTo nodeSendToolResult)
         // 与内建版相反：先匹配 tool_calls 再兜底文本
         edge(nodeSendToolResult forwardTo nodeExecuteTool onToolCalls { true })
+        // 程序校验边在假发卡边之前（programGuard 为 null 时条件恒 false，A2UI 线零变化）
+        edge(
+            nodeSendToolResult forwardTo nodeCorrectInvalidProgram
+                onTextMessage { true }
+                onCondition { text -> programGuard?.invalidProgramError(text) != null },
+        )
         edge(
             nodeSendToolResult forwardTo nodeCorrectFakeCard
                 onTextMessage { true }
@@ -106,6 +137,9 @@ internal fun cloudAgentStrategy(cardGuard: CardClaimGuard): AIAgentGraphStrategy
         edge(nodeSendToolResult forwardTo nodeFinish onTextMessage { true })
         edge(nodeCorrectFakeCard forwardTo nodeExecuteTool onToolCalls { true })
         edge(nodeCorrectFakeCard forwardTo nodeFinish onTextMessage { true })
+        edge(nodeCorrectInvalidProgram forwardTo nodeExecuteTool onToolCalls { true })
+        // 纠正后再输出仍非法：放行落流（finalMessageTransformer 兜底包装）
+        edge(nodeCorrectInvalidProgram forwardTo nodeFinish onTextMessage { true })
     }
 
 /**

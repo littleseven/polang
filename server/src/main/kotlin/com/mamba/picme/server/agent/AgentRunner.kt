@@ -103,13 +103,16 @@ class AgentRunner(
         val actionIds = mutableMapOf<String, Long>()
         // 假发卡守卫（每轮新实例）：卡工具 Action 过门控 → 标记；终结消息假声称 → 策略层回环纠正
         val cardGuard = CardClaimGuard()
+        // 终结程序守卫（每轮新实例）：仅 forwardContentDeltas 回合原生线启用（两闸同头驱动），
+        // A2UI 线为 null → 策略层程序校验边条件恒 false
+        val programGuard = if (forwardContentDeltas) ProgramGuard() else null
         // OpenUI 流式预览跟踪器（每轮新实例）：ToolCallDelta → program 前缀节流发射
         val openUiStreamTracker = OpenUiToolCallStreamTracker()
         // 回合原生 content 流跟踪器（每轮新实例；仅 forwardContentDeltas 时发射）
         val contentStreamTracker = OpenUiContentStreamTracker()
         try {
             val agent = AIAgent.builder()
-                .graphStrategy(cloudAgentStrategy(cardGuard))
+                .graphStrategy(cloudAgentStrategy(cardGuard, programGuard))
                 .promptExecutor(built.executor)
                 .llmModel(built.model)
                 .toolRegistry(toolRegistry)
