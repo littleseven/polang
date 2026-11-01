@@ -395,10 +395,10 @@ private fun OpenUiReadyContent(
             // 2026-11-01 浏览完整性：优先用会话全量照片（handle 返回的 60 张），
             // 点击位移至首位——300 张结果也能翻完 handle 给出的全部，不再限于网格 12 张
             val clickedUri = (action.args.firstOrNull() as? OpenUiValue.Str)?.v
-            val uris = when {
-                clickedUri != null && allSessionPhotoUris.contains(clickedUri) ->
-                    listOf(clickedUri) + (allSessionPhotoUris - clickedUri)
-                else -> action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
+            val uris = if (clickedUri != null && allSessionPhotoUris.contains(clickedUri)) {
+                listOf(clickedUri) + (allSessionPhotoUris - clickedUri)
+            } else {
+                action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
             }
             if (uris.isNotEmpty()) onPhotoClick(uris)
             true
