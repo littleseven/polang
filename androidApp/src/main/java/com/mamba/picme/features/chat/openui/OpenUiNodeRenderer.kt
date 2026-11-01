@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mamba.picme.R
+import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.AppSliderTokens
@@ -82,6 +83,8 @@ import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
+import com.mamba.picme.features.chat.HtmlCard
+import com.mamba.picme.features.chat.HtmlCardSanitizer
 import com.mamba.picme.features.chat.a2ui.A2uiStyleMapper
 import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_BAR_WIDTH
 import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_THRESHOLD
@@ -390,6 +393,32 @@ fun OpenUiNodeRenderer(
         "Image" -> OpenUiPhotoImage(node, photoResolver, onAction, modifier)
         "Icon" -> OpenUiIcon(node, modifier)
         "Divider" -> OpenUiDivider(node, modifier)
+        // Html（turn-native M1，spec《2026-11-01-openui-turn-native-design》§3.6）：L2 沙箱卡
+        // 入树——完整自包含 HTML 经既有 HtmlCardSanitizer 清洗（含 128KB 尺寸闸，见
+        // HtmlCardSanitizer.MAX_HTML_BYTES）后复用 HtmlCard WebView 沙箱渲染（零 JS 桥接、
+        // 禁文件访问不变式继承）；清洗拒绝 → 降级 CAPTION 文本不炸卡。
+        // 组件内嵌一律 Inline：meta=null（不落 displayMode 持久化）、onDisplayModeResolved
+        // 用默认 no-op（brief 定调，同任务卡 HTML 内嵌口径）。
+        // TODO(turn-native 后续期)：display prop（ENUM INLINE/FULLPAGE，Task 1 已注册）——
+        // FULLPAGE 语义（点击弹全屏查看器）需宿主接 onOpenFullpage 回调，本期未接。
+        "Html" -> run {
+            val rawHtml = (node.props["html"] as? OpenUiValue.Str)?.v.orEmpty()
+            when (val sanitized = HtmlCardSanitizer.sanitize(rawHtml)) {
+                is HtmlCardSanitizer.Result.Ok -> HtmlCard(
+                    html = sanitized.html,
+                    modifier = modifier.fillMaxWidth(),
+                )
+                is HtmlCardSanitizer.Result.Rejected -> {
+                    Logger.w("Chat", "OpenUI Html component rejected: ${sanitized.reason}")
+                    Text(
+                        text = stringResource(R.string.chat_a2ui_card_unavailable),
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = modifier,
+                    )
+                }
+            }
+        }
         "List" -> OpenUiList(node, state, photoResolver, onAction, modifier)
         "Tabs" -> OpenUiTabs(node, state, photoResolver, onAction, modifier)
         "CheckBox" -> OpenUiCheckBox(node, state, onAction, modifier)
