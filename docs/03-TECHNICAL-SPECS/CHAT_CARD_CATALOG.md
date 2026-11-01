@@ -1016,6 +1016,13 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   记忆化（每 rawHtml 只清洗一次、只打一次 WARN）；清洗 Rejected → 降级 CAPTION
   文本 `chat_a2ui_card_unavailable` 不炸卡）。shared `OpenUiLibrary` 注册 +
   server `RenderOpenUiValidator` 白名单同步 +Html（101 项字面量副本同源口径不变）。
+  复审加固（2026-11-01，fix/openui-review-hardening）：DSL_RULES 补 `Html(html*)`
+  签名教学（此前仅尾部裸名单，模型猜必填参数会 missing-required 静默丢组件）+
+  规则 1 修订为「位置参数按签名序、可选参数推荐命名实参」（消除与黄金示例的自相
+  矛盾）；端侧 Row.weights 值域防御（零/负/NaN/Infinity 槽位回退 1f 等宽，防
+  Modifier.weight 抛 IllegalArgumentException 击穿渲染层，`OpenUiRowWeightsTest`
+  钉住）；`OpenUiDispatchCoverageTest` 钉住「端侧分发集合 == 注册表 − 元素形状」
+  （补齐 server 侧 101 项白名单钉住在端侧的缺口）。
   验收态（2026-11-01）：server 全量 554 测试绿 / shared jvmTest + 纯度门绿 /
   androidApp 单测 + ktlint + detekt 绿 / 真机画廊三新件目检通过（ui-driver）；
   App 1.0.70（10070）已装测试机；server 0.9.9 **已部署生产**（2026-11-01，

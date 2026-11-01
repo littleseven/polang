@@ -169,7 +169,8 @@ class RenderOpenUiToolService {
         const val DSL_RULES =
             """约束（必须全部满足，否则端上拒绝渲染或静默丢弃组件）：
 1. program 是 OpenUI Lang 1.0 程序：每行一条语句，形如 `名 = 表达式`；组件调用
-   大写开头、只用位置参数；字符串一律双引号；
+   大写开头——位置参数按签名序填入，可选参数推荐命名实参写法（如
+   photo = photos[0].id、align = "center"）；字符串一律双引号；
 2. 必须有 `root = ...` 语句（root 是整个组件树的入口）；
 3. 可用组件签名（逐字遵守，禁发明属性；* 为必填）：
    - Text(text*, role?, colorRole?)：text 可传 ${'$'}绑定变量（字符串/数字/布尔自动转文本，
@@ -315,6 +316,10 @@ class RenderOpenUiToolService {
      CompositeCardBlock(items*=[{header?=[组件], body*=[组件], footer?=[组件]}]) /
      VisualCardBlock(items*=[{body*, bgPhoto?, bgImageSrc?, tag?}])（题图卡：bgPhoto 相册投影 id
      （photos[0].id，禁字面量数字）与 bgImageSrc https 公网图二选一、bgPhoto 优先）；
+   - Html(html*)：自包含 HTML 沙箱卡（交互小工具/自由排版的逃生舱，端侧 WebView 沙箱渲染）——
+     html 是完整自包含 HTML 字符串：样式内联 <style>，可用内联 <script> 做卡内交互，
+     禁远程 <script src>（端侧清洗剔除）、禁 iframe/object/embed/form 标签；单卡 ≤128KB；
+     Markdown/组件能表达的优先用组件，不要用 Html 包纯文本；
    - 元素形状（仅作父组件数组元素的对象形状，不独立使用——优先用上面对象数组写法，
      组件形仅保底；ListItem 已升格为经典列表行见上方列表段）：TabItem / AccordionItem /
      StepsItem / SelectItem /
