@@ -1713,8 +1713,10 @@ private fun OpenUiMarkdown(
     AgentMarkdown(
         content = text,
         color = MaterialTheme.colorScheme.onSurface,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
+        // 2026-11-01 回复活感批次：正文与对话气泡同字号（SegmentedAgentText 16/24 对齐，
+        // 裸 Markdown 回复不再比提问小一号）
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
         modifier = modifier.fillMaxWidth(),
     )
 }

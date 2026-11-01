@@ -1039,8 +1039,10 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   前）：对话/问答/解释/闲聊类回复 = 裸 `root = Markdown("自然正文")`（可多段/
   加粗/列表，禁表单卡包装）；数据卡 Card 首子级 Markdown 自然导语 + 收尾讲解，
   不做冷报表。新增对话黄金示例 `OpenUiTurnNative.GOLDEN_CHAT_PROGRAM`（测试
-  同源钉住且自身须过校验器）。端上零改动——裸 Markdown 程序经
-  `looksLikeProgram` 嗅探照常落 data_ui_openui、AgentMarkdown 全量渲染无卡壳。
+  同源钉住且自身须过校验器）。端上配套（1.0.77）：裸 Markdown 程序经
+  `looksLikeProgram` 嗅探照常落 data_ui_openui、AgentMarkdown 全量渲染无卡壳，
+  正文字号对齐对话气泡（OpenUiMarkdown/MarkDownRenderer 14/20sp → 16/24sp，
+  与 SegmentedAgentText 同口径——正文不再比提问小一号）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；

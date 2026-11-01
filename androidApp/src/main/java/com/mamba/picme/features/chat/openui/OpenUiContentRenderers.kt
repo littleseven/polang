@@ -578,8 +578,9 @@ private fun OpenUiContentMarkdownRenderer(
     AgentMarkdown(
         content = text,
         color = MaterialTheme.colorScheme.onSurface,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
+        // 2026-11-01 回复活感批次：与对话气泡同字号（OpenUiMarkdown 16/24 对齐）
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
         modifier = modifier.fillMaxWidth(),
     )
 }
