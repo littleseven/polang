@@ -1,6 +1,7 @@
 package com.mamba.picme.server.agent
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class OpenUiLayoutNormalizerTest {
@@ -190,5 +191,45 @@ class OpenUiLayoutNormalizerTest {
         val once = OpenUiLayoutNormalizer.normalize(program)
         assertEquals(once, OpenUiLayoutNormalizer.normalize(once))
         assertEquals("截断", OpenUiLayoutNormalizer.normalize("截断"))
+    }
+
+    // N5（2026-11-01 故宫卡事故）：deepseek-v4-flash 在 turn-native 线生成完程序后，
+    // 把其 DSML 工具调用收尾标记吐在响应尾部（全角｜，实为模型侧污染；偶发，
+    // 同日相册卡干净）——归一化尾部剥离，三条通路（ensureValidProgram /
+    // ProgramGuard / transformArgs）共用本漏斗
+    @Test
+    fun `n5 strips trailing dsml boundary tags`() {
+        val program = "// summary: 故宫一日游\n" +
+            "root = Card([Text(\"故宫一日游 · 行程规划\", \"HEADLINE\")])" +
+            "\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>"
+        assertEquals(
+            "// summary: 故宫一日游\nroot = Card([Text(\"故宫一日游 · 行程规划\", \"HEADLINE\")])",
+            OpenUiLayoutNormalizer.normalize(program),
+        )
+    }
+
+    @Test
+    fun `n5 strip is idempotent and leaves clean program untouched`() {
+        val clean = "root = Card([Text(\"hi\")])"
+        assertEquals(clean, OpenUiLayoutNormalizer.normalize(clean))
+        val once = OpenUiLayoutNormalizer.normalize(clean + "\n</｜｜DSML｜｜ calls>")
+        assertEquals(once, OpenUiLayoutNormalizer.normalize(once))
+    }
+
+    /** 生产原文回归夹具：2026-11-01 21:31 故宫卡（session cc2928c6）逐字载荷。 */
+    @Test
+    fun `n5 cleans the real gugong card payload from production`() {
+        val leaked = "// summary: 故宫一日行程卡片，含时间轴、预约须知与关键提示" + "\n" +
+            "root = Card([Text(\"故宫一日游 · 行程规划\", \"HEADLINE\"), Text(\"中轴线 + 东西六宫 · 约 4–5 小时 · 全程步行 8–10 公里\", \"CAPTION\"), Spacer(\"s\"), Callout(\"故宫周一闭馆（法定节假日除外），且需提前 7 天实名预约，旺季当天基本无票——今晚先确认明天不是周一并查余票。\", \"出发前必确认\", \"WARNING\"), Spacer(\"s\"), CardHeader(\"推荐路线\", subtitle = \"午门进 · 神武门出 · 单向游览\"), Timeline([{title: \"午门安检排队\", subtitle: \"8:30 开门，旺季建议 7:40 到，带身份证原件\", time: \"08:00\"}, {title: \"午门 → 三大殿 → 乾清宫\", subtitle: \"太和门、太和殿、中和殿、保和殿，上午顺光适合拍照\", time: \"08:30–10:00\"}, {title: \"东六宫 · 钟表馆珍宝馆\", subtitle: \"两馆各需另购 10 元门票，馆内禁闪光灯\", time: \"10:00–11:30\"}, {title: \"御花园休息 · 午餐\", subtitle: \"冰窖餐厅或自带简餐，园内餐饮偏贵且排队\", time: \"11:30–12:30\"}, {title: \"西六宫 · 慈宁宫雕塑馆\", subtitle: \"储秀宫、翊坤宫，人相对少，适合细看\", time: \"12:30–14:00\"}, {title: \"神武门出 · 登景山\", subtitle: \"对面景山万春亭俯瞰故宫全景，门票 2 元，日落最佳\", time: \"14:00–15:00\"}])])" + "\n" +
+            "</｜｜DSML｜｜ parameter>" + "\n" +
+            "</｜｜DSML｜｜ invoke>" + "\n" +
+            "</｜｜DSML｜｜ calls>"
+        val cleaned = OpenUiLayoutNormalizer.normalize(leaked)
+        assertFalse(cleaned.contains("DSML"))
+        assertEquals(
+            "// summary: 故宫一日行程卡片，含时间轴、预约须知与关键提示\n" +
+                "root = Card([Text(\"故宫一日游 · 行程规划\", \"HEADLINE\"), Text(\"中轴线 + 东西六宫 · 约 4–5 小时 · 全程步行 8–10 公里\", \"CAPTION\"), Spacer(\"s\"), Callout(\"故宫周一闭馆（法定节假日除外），且需提前 7 天实名预约，旺季当天基本无票——今晚先确认明天不是周一并查余票。\", \"出发前必确认\", \"WARNING\"), Spacer(\"s\"), CardHeader(\"推荐路线\", subtitle = \"午门进 · 神武门出 · 单向游览\"), Timeline([{title: \"午门安检排队\", subtitle: \"8:30 开门，旺季建议 7:40 到，带身份证原件\", time: \"08:00\"}, {title: \"午门 → 三大殿 → 乾清宫\", subtitle: \"太和门、太和殿、中和殿、保和殿，上午顺光适合拍照\", time: \"08:30–10:00\"}, {title: \"东六宫 · 钟表馆珍宝馆\", subtitle: \"两馆各需另购 10 元门票，馆内禁闪光灯\", time: \"10:00–11:30\"}, {title: \"御花园休息 · 午餐\", subtitle: \"冰窖餐厅或自带简餐，园内餐饮偏贵且排队\", time: \"11:30–12:30\"}, {title: \"西六宫 · 慈宁宫雕塑馆\", subtitle: \"储秀宫、翊坤宫，人相对少，适合细看\", time: \"12:30–14:00\"}, {title: \"神武门出 · 登景山\", subtitle: \"对面景山万春亭俯瞰故宫全景，门票 2 元，日落最佳\", time: \"14:00–15:00\"}])])",
+            cleaned,
+        )
     }
 }

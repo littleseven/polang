@@ -13,7 +13,7 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.13
+**版本**：0.9.15
 
 **最后更新**：2026-11-01
 
@@ -254,7 +254,7 @@ App → 后续请求带 X-App-Token: <picme_at_*>
 | 对象存储 | 腾讯 COS（HK，`ap-hongkong`） | 100GB 标准存储包已购，预签名 URL 下发 |
 | LLM 路由 | Cloudflare AI Gateway + TokenHub 双后端 | 按模型自动路由，密钥只在服务端 |
 | 管理后台 | kotlinx.html SSR（零前端构建） | 同二进制部署，运营者友好 |
-| OpenUI 布局可控性（2026-10-31） | 无声矫正 + 结构门禁双层（`OpenUiLayoutNormalizer` N1-N4 / `OpenUiLayoutValidator` R1-R4），经 `AgentRunner.argsTransformer` 改写 Action argsJson、gate/工具体双消费点校验 | 保留 LLM 自由组合，杜绝结构病态出货；spec《2026-10-31-openui-layout-controllability》，登记 CHAT_CARD_CATALOG data_ui_openui |
+| OpenUI 布局可控性（2026-10-31） | 无声矫正 + 结构门禁双层（`OpenUiLayoutNormalizer` N1-N4 / `OpenUiLayoutValidator` R1-R4），经 `AgentRunner.argsTransformer` 改写 Action argsJson、gate/工具体双消费点校验 | 保留 LLM 自由组合，杜绝结构病态出货；spec 已随交付清理（git 历史可查），登记 CHAT_CARD_CATALOG data_ui_openui |
 | OpenUI 回合原生（turn-native，2026-11-01） | `X-GenUI-Format: openui` 线无发卡工具（render_ui_openui 退役、render_html 过滤），响应即程序：SYSTEM_PROMPT 契约 + content delta 流式预览 + ProgramGuard 策略层纠正（上限 1 次）+ ensureValidProgram 终结兜底双保险；缺头/未知值 = A2UI 工具发卡零变化（回退闸） | 消除工具发卡链路的负载错形/假发卡两大约束面，流式预览从首字符开始；spec 已随交付清理，git 历史可查，登记 CHAT_CARD_CATALOG data_ui_openui |
 | OpenUI 间距词汇统一（2026-11-01） | 统一官方七档 t-shirt 刻度 `none\|xs\|s\|m\|l\|xl\|2xl`（→0/4/8/12/16/24/32dp，8pt 网格）+ legacy 别名 COMPACT\|STANDARD\|COMFORTABLE 保存量卡重放；DSL_RULES 新增 7.6 间距与节奏规则段（档位 dp 语义表 + 五条节奏规则），N2 降档改显式映射表（xs→s、xl\|2xl→l，修 `replace("xl","l")` 腐蚀 `2xl` 隐患） | 消灭 prompt 三套间距词汇并存，LLM 可见单词汇单语义；依据官方 thesysdev/openui spec「枚举各档何时用」口径 |
 
