@@ -867,22 +867,40 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ---
 
-## data_ui_openui · OpenUI GenUI 卡（openui P2，与 data_ui 线并行）
+## data_ui_openui · OpenUI GenUI 卡（2026-11-01 起为回合原生 turn-native 形态，与 data_ui 线并行）
 
 - **开关**：设置页「GenUI 协议」单选（DataStore `genui_format`，默认 openui，2026-11-01 起；显式存量 a2ui 不翻）→ Chat 页云端回合
-  请求头 `X-GenUI-Format` → server 侧互斥注册 render_ui（A2UI）/render_ui_openui（OpenUI），
-  同一回合只产一种 GenUI 卡。
+  请求头 `X-GenUI-Format` → server 侧分流：**openui = 回合原生**（2026-11-01 头语义升级，
+  spec《2026-11-01-openui-turn-native-design》——不注册任何 GenUI 发卡工具
+  （render_ui_openui 退役、render_html 过滤），LLM 的整个终结回复就是 OpenUI 程序）；
+  **缺头/未知值（含 a2ui）= A2UI 工具发卡**（render_ui 照旧注册，回退闸零变化），
+  同一回合只走一条线。
 - **协议**：`ChatMessageEntity.type = "data_ui_openui"`，content 列存整颗 `MessagePart.OpenUiCard`
-  part JSON；云端经 render_ui_openui 工具 action 帧下发（OpenUI Lang 1.0 程序），
-  端上 TurnRunner 拦截落库。**流式预览**（P2，2026-10-26，spec《2026-10-26-openui-compose-alignment-design》）：
-  服务端 Koog EventHandler `onLLMStreamingFrameReceived` 捕获 ToolCallDelta →
-  `OpenUiToolCallStreamTracker` 按 id 归组 + `OpenUiProgramStreamExtractor` 解 program
-  前缀（JSON 感知键定位 + 转义断帧容错）→ 节流（≥48 字符且 ≥80ms，首发免时间窗）经
-  SSE `kind=openui_delta` 瞬态帧旁路下行（不落 agent_event；旧端忽略未知 kind 后向兼容）；
-  端侧合成瞬态预览消息（`OPENUI_STREAM_PREVIEW_ID`）挂列表尾，ChatScreen 分流
-  `OpenUiStreamingCard`——每帧前缀新建 session 解析（parser autoClose 流末规则 +
-  dropped 哨兵剔除未到位引用，卡片随流生长，引擎零改动），空 resolver 不取数
-  （Query 组件先渲 defaults 空态），只读不交互；正式 action 帧落库后预览让位。
+  part JSON。**来源（2026-11-01 起）= 云端回合终结 Message 事件**——响应即程序：assistant
+  content 直接是 OpenUI Lang 1.0 程序文本，端上 `CloudAgentTurnRunner` message 分支经
+  `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首声明 / Card 调用，字符串字面量
+  剥离后判定）→ 程序形态落 OpenUiCard 事件入库，非程序形态（理论上已被 server 双保险
+  兜住）按纯文本 AssistantText 降级上屏；`extractFallbackSummary` 提取降级摘要
+  （`// summary:` 首行注释 > 首个 Markdown/Text 字符串字面量，截 80 字）。A2UI 线
+  （含 2026-11-01 前的 openui 工具发卡形态）来源照旧 = render_ui/render_ui_openui 工具
+  action 帧。**流式预览（turn-native）**：服务端 `OpenUiContentStreamTracker` 跟踪 content
+  TextDelta 纯文本累计（响应即程序，无需 JSON 转义剥离——2026-10-26 P2 的
+  `OpenUiToolCallStreamTracker` ToolCallDelta 路径随发卡工具退役不再触发），节流同口径
+  （≥48 字符增量且 ≥80ms，首发免时间窗）经 SSE `kind=openui_delta` 瞬态帧旁路下行
+  （不落 agent_event；旧端忽略未知 kind 后向兼容）；EventHandler `onLLMStreamingStarting`
+  调 `onRoundStart` 轮次重置——回合内多轮 LLM 输出（工具调用后的中间轮 → 终结整树）各自
+  从空累计，端上覆盖式替换预览；端侧合成瞬态预览消息（`OPENUI_STREAM_PREVIEW_ID`）挂
+  列表尾，ChatScreen 分流 `OpenUiStreamingCard`——每帧前缀新建 session 解析（parser
+  autoClose 流末规则 + dropped 哨兵剔除未到位引用，卡片随流生长，引擎零改动），空
+  resolver 不取数（Query 组件先渲 defaults 空态），只读不交互；终结 Message 落库后预览让位。
+  **服务端双保险**（端上永远收到合法树）：① `ProgramGuard` 策略层守卫——终结文本经
+  `RenderOpenUiValidator.validateProgramToError`（结构校验 + 布局门禁，turn-native 口径
+  文案「重新输出完整程序」）判定非法 → cloudAgentStrategy `correctInvalidProgram` 节点
+  携带逐条错误清单回环重发（上限 MAX_CORRECTIONS=1 防死循环）；② 上限用尽放行后由
+  `AgentRunner.finalMessageTransformer = OpenUiTurnNative.ensureValidProgram` 兜底——合法
+  normalize 后原样放行 / 非法包成 `root = Markdown("…")` 程序（复验再失败硬编码错误卡）。
+  turn-native 线假发卡守卫（CardClaimGuard）经 `programGuard == null &&` 门控旁路
+  （该线无发卡工具，纠正文案指向不存在的工具，触发即误导）。
 - **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState)`，
   category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）。
 - **回灌**：不回灌 LLM（data part 分支 emptyList 同 data_ui）；program 只含骨架 + Query
@@ -988,6 +1006,16 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   refs/ardot/pattern-*、comp-*；既有组件对帧校准 13 项（Card 16dp 圆角/Banner
   HEADLINE 题字+蒙层参数/图表标题 CAPTION 弱色/Callout 12dp+IconSize.sm 等）。
   设计语言文档升 v9（§0 原则 4「组合收敛在规则层」+ §4.7 版式范式）。
+  回合原生批次（2026-11-01，spec《2026-11-01-openui-turn-native-design》）：组件库
+  100→101 新增 `Html(html*, display?=INLINE|FULLPAGE)`（L2 沙箱卡入树——完整自包含
+  HTML 经既有 `HtmlCardSanitizer` 清洗（含 128KB 尺寸闸）→ 复用 `HtmlCard` WebView
+  沙箱渲染（零 JS 桥、禁文件访问不变式继承）；`meta` 钉死
+  `HtmlCardMeta(displayMode = INLINE)`——INLINE 跟随内容测高全展开、无限高语义，
+  防混合分流把长 HTML 打成 FULLPAGE 0.5 屏预览而死 CTA（onOpenFullpage 未接，
+  display prop 的 FULLPAGE 语义留后续期）；sanitize + 降级日志 `remember(rawHtml)`
+  记忆化（每 rawHtml 只清洗一次、只打一次 WARN）；清洗 Rejected → 降级 CAPTION
+  文本 `chat_a2ui_card_unavailable` 不炸卡）。shared `OpenUiLibrary` 注册 +
+  server `RenderOpenUiValidator` 白名单同步 +Html（101 项字面量副本同源口径不变）。
   验收态（2026-11-01）：server 全量 554 测试绿 / shared jvmTest + 纯度门绿 /
   androidApp 单测 + ktlint + detekt 绿 / 真机画廊三新件目检通过（ui-driver）；
   App 1.0.70（10070）已装测试机；server 0.9.9 **已部署生产**（2026-11-01，
@@ -1008,9 +1036,14 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   @ToAssistant 自 2026-10-31 起上行——以用户消息发进会话（CardHeader/ListItem/ListBlock
   的 actionLabel 缺省动作由 labeledActionsOrDefault 兜底合成同文案），M1 及之前仅记日志
   不路由。
-- **端到端例子**：「统计我今年的照片」→ search_media 命中注册 handle → 云端 render_ui_openui
-  下发 BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"}））→
-  端上求值填槽渲染。
+- **端到端例子（turn-native 时序，2026-11-01 起）**：「统计我今年的照片」→ 云端回合
+  search_media 取数（display=false）命中注册 handle → LLM 终结回复直接输出整颗
+  BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"})；流式
+  content 增量经 `openui_delta` 前缀预览随流生长，ProgramGuard 门控 + ensureValidProgram
+  兜底保证终结消息恒为合法程序）→ 终结 Message 事件下行 → 端侧 `CloudAgentTurnRunner`
+  message 分支嗅探程序形态 → 落 `data_ui_openui`（fallbackSummary 取自 `// summary:`
+  首行）→ OpenUiCardHost 求值填槽渲染。A2UI 线（回退闸）照旧：render_ui 工具 action
+  帧下发骨架 → HandleResolver 填槽。
 
 ---
 

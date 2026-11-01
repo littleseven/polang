@@ -1465,7 +1465,9 @@ object OpenUiLibrary {
 
         // Html：L2 沙箱卡入树（turn-native，spec《2026-11-01-openui-turn-native-design》§3.6）——
         // 完整自包含 HTML 字符串，端侧 WebView 沙箱渲染（网络默认关死、dispatch 白名单）；
-        // display=INLINE（缺省，限高约 320dp）/ FULLPAGE（点击弹全屏查看器）
+        // display=INLINE（缺省；渲染期钉死 INLINE 形态，跟随内容测高全展开、无限高语义——
+        // 防混合分流把长 HTML 打成 FULLPAGE 0.5 屏预览而死 CTA）/ FULLPAGE（枚举已注册，
+        // 全屏查看器回调 M1 未接，渲染期同 INLINE 处理，后续期接 onOpenFullpage）
         OpenUiComponent(
             "Html",
             listOf(
