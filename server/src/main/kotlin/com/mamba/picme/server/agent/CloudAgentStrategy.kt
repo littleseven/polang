@@ -47,6 +47,8 @@ private suspend fun AIAgentLLMWriteSession.requestLLMStreamingOrOnce(): Message.
  *    [CardClaimGuard]——声称发卡但当轮无卡工具 Action 过门控 → 不 Finish，由本节点追加
  *    user 纠正消息并就地重发 LLM 请求（上限 [CardClaimGuard.MAX_CORRECTIONS] 次，防死循环）。
  *    纠正后 LLM 可能真实发卡（tool_calls 回主循环）或给出改写文本（直接 Finish）。
+ *    turn-native 线（[programGuard] 非空）旁路本边（2026-11-01 T8 控制方裁决）：
+ *    该线无发卡工具，纠正文案指向不存在的工具，触发即误导。
  * 3. LLM 节点全部走流式（openui P2，2026-10-26）：`nodeLLMRequest`/`nodeLLMSendToolResults`
  *    内建版是一次性 `requestLLM()`，不产任何 StreamFrame——EventHandler 流式钩子永不触发。
  *    自定义节点改用 [requestLLMStreamingOrOnce]（Koog OpenAI 客户端把工具 args 增量以
@@ -117,7 +119,9 @@ internal fun cloudAgentStrategy(
         edge(
             nodeCallLLM forwardTo nodeCorrectFakeCard
                 onTextMessage { true }
-                onCondition { cardGuard.needsCorrection(it) },
+                // turn-native 线旁路假发卡纠正（T8 控制方裁决）：programGuard 非空时
+                // 本会话无发卡工具，cardGuard 纠正文案指向不存在的工具，误触即死循环
+                onCondition { programGuard == null && cardGuard.needsCorrection(it) },
         )
         edge(nodeCallLLM forwardTo nodeFinish onTextMessage { true })
         edge(nodeExecuteTool forwardTo nodeSendToolResult)
@@ -132,7 +136,7 @@ internal fun cloudAgentStrategy(
         edge(
             nodeSendToolResult forwardTo nodeCorrectFakeCard
                 onTextMessage { true }
-                onCondition { cardGuard.needsCorrection(it) },
+                onCondition { programGuard == null && cardGuard.needsCorrection(it) },
         )
         edge(nodeSendToolResult forwardTo nodeFinish onTextMessage { true })
         edge(nodeCorrectFakeCard forwardTo nodeExecuteTool onToolCalls { true })

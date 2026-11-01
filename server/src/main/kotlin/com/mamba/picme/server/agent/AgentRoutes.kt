@@ -32,9 +32,9 @@ import kotlinx.serialization.json.putJsonObject
 const val BYOK_API_KEY_HEADER = "X-User-Api-Key"
 
 /**
- * GenUI 线格式选择头（openui P2）：`openui` → 注册 render_ui_openui（OpenUI Lang），
- * 其余（缺头/未知值）一律注册 render_ui（A2UI，向后兼容）。两工具互斥注册，
- * LLM 一轮只见一套描述。
+ * GenUI 线格式选择头（openui turn-native）：`openui` → 回合原生（响应即程序，
+ * 无发卡工具）；其余（缺头/未知值）→ A2UI 工具发卡（默认/回退闸）。
+ * 两条线 GenUI 工具注册互斥，LLM 一轮只见一套描述。
  */
 const val GENUI_FORMAT_HEADER = "X-GenUI-Format"
 
@@ -76,9 +76,9 @@ private const val DEFAULT_SYSTEM_PROMPT =
  *   设备工具调用经工具桥下发给端侧执行（传输层信号，不落事件流）；与 event/done/error
  *   帧共用同一 writer 天然保序。设备工具集每轮在路由层以当轮 writer 构造并合成进
  *   ToolRegistry（服务端工具 + 设备工具），[AgentRunner] 零改动。
- *   openui P2 起新增 `{"kind":"openui_delta","program":"<已到达前缀>"}` 帧——
- *   render_ui_openui 工具 args 流式增量的 program 前缀旁路（瞬态预览，不落事件流）；
- *   端侧新旧版本混跑安全（旧端忽略未知 kind），正式 action 帧仍是唯一权威负载。
+ *   openui turn-native 起新增 `{"kind":"openui_delta","program":"<已到达前缀>"}` 帧——
+ *   响应 content 流式增量的 program 前缀旁路（瞬态预览，不落事件流）；
+ *   端侧新旧版本混跑安全（旧端忽略未知 kind），正式 action/消息帧仍是唯一权威负载。
  *   render_html（服务端工具）同理以当轮 writer 构造 sink：HTML 本体落 HtmlCard 事件
  *   （type=html_card）经 kind=event 帧下行，LLM 上下文只见 summary 回执。
  * - `POST /agent/sessions/{id}/tool-results`：端侧工具结果上行（M2）。body
@@ -293,13 +293,19 @@ fun Route.agentRoute(
                             put("event", eventJson(event))
                         })
                     }
+                    // 回合原生（turn-native，spec§3.1）：openui 头语义升级——
+                    // 不注册 GenUI 发卡工具，响应即程序；缺头/未知值 = A2UI 工具发卡（回退闸）
+                    val turnNativeOpenUi =
+                        call.request.headers[GENUI_FORMAT_HEADER] == GENUI_FORMAT_OPENUI
                     val toolRegistry = ToolRegistry {
                         tools(
-                            ServerToolService(onHtmlCard = htmlCardSink).asToolsByClass() +
+                            ServerToolService(onHtmlCard = htmlCardSink).asToolsByClass()
+                                // turn-native：render_html 退役（Html 组件入树），其余服务端工具保留
+                                .filter { !turnNativeOpenUi || it.descriptor.name != "render_html" } +
                                 deviceTools.asToolsByClass() +
-                                // GenUI 线格式分流（openui P2）：互斥注册，LLM 一轮只见一套描述
-                                if (call.request.headers[GENUI_FORMAT_HEADER] == GENUI_FORMAT_OPENUI) {
-                                    RenderOpenUiToolService().asToolsByClass()
+                                // GenUI 线格式分流（turn-native）：turn-native 线无发卡工具；A2UI 线照旧
+                                if (turnNativeOpenUi) {
+                                    emptyList()
                                 } else {
                                     RenderUiToolService().asToolsByClass()
                                 }
@@ -316,10 +322,22 @@ fun Route.agentRoute(
                                 session = session,
                                 userMessage = content,
                                 target = target,
-                                systemPrompt = DEFAULT_SYSTEM_PROMPT,
+                                systemPrompt = if (turnNativeOpenUi) {
+                                    OpenUiTurnNative.SYSTEM_PROMPT
+                                } else {
+                                    DEFAULT_SYSTEM_PROMPT
+                                },
                                 toolRegistry = toolRegistry,
+                                // 回合原生（turn-native）：content 透传 + 终结程序兜底变换；
+                                // A2UI 线两参取缺省（零行为变化）
+                                forwardContentDeltas = turnNativeOpenUi,
+                                finalMessageTransformer = if (turnNativeOpenUi) {
+                                    OpenUiTurnNative::ensureValidProgram
+                                } else {
+                                    { it }
+                                },
                                 onHtmlCard = htmlCardSink,
-                                // openui P2 流式预览：program 前缀瞬态帧（不落事件流，与
+                                // openui 流式预览：program 前缀瞬态帧（不落事件流，与
                                 // event/done/error 共用同一 writer 保序；旧端忽略未知 kind）
                                 onOpenUiProgramDelta = { prefix ->
                                     writeSseFrame(buildJsonObject {

@@ -762,4 +762,45 @@ class AgentRunnerTest {
             sseServer.close()
         }
     }
+
+    /**
+     * 控制方裁决（T8）：turn-native 线旁路假发卡纠正边——终结回复是合法程序但含发卡
+     * 话术时，cardGuard 纠正不得触发（其纠正文案指向不存在的发卡工具，误触风险），
+     * 不发生第二轮纠正调用。A2UI 线（programGuard=null）照旧，由上方假发卡三用例钉住。
+     */
+    @Test
+    fun `turn-native valid program with card claim rhetoric bypasses fake-card correction`() = runBlocking {
+        val session = newSession()
+        val program = "// summary: 卡片\nroot = Card([Text(\"卡片已下发 ✅\")])"
+        // 测试前置：话术确实命中假发卡模式（否则旁路断言无判别力）
+        assertTrue(CardClaimGuard.isCardClaim(program))
+        val sseServer = RawSseStubServer { _, _ ->
+            MockLlmSse.streamingText(program) to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val events = mutableListOf<AgentEvent>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
+                onEvent = { events += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertEquals("合法程序不得触发假发卡纠正回环", 1, sseServer.callCount.get())
+            val final = events.map { it.payload }.filterIsInstance<AgentEventPayload.Message>().last()
+            assertTrue("终结程序应原样落流，实际：${final.content.take(80)}", final.content.contains("卡片已下发"))
+        } finally {
+            sseServer.close()
+        }
+    }
 }

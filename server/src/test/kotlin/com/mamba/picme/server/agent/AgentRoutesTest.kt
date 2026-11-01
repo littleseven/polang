@@ -613,4 +613,108 @@ class AgentRoutesTest {
         val last = runBlocking { AgentEventRepository.listBySession(sessionId).last() }
         assertTrue((last.payload as AgentEventPayload.Finish).reason.startsWith("error"))
     }
+
+    // ── GenUI 线格式分流：openui 头 = 回合原生（turn-native T8）──────────────
+
+    /** 捕获请求体 JSON 的注册工具名集与 system prompt（messages[0]）。 */
+    private fun toolNamesAndSystemPrompt(requestBody: String): Pair<Set<String>, String> {
+        val root = json.parseToJsonElement(requestBody).jsonObject
+        val toolNames = root["tools"]!!.jsonArray.map {
+            it.jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content
+        }.toSet()
+        val systemMessage = root["messages"]!!.jsonArray.first {
+            it.jsonObject["role"]!!.jsonPrimitive.content == "system"
+        }
+        return toolNames to systemMessage.jsonObject["content"]!!.jsonPrimitive.content
+    }
+
+    /**
+     * openui 头语义升级（回合原生）：不注册任何 GenUI 发卡工具（render_ui_openui 退役）
+     * 且 render_html 从服务端工具中过滤；system prompt 换用 turn-native 契约
+     * （「你的整个回复就是一颗 OpenUI Lang 1.0 程序」）。
+     * 缺头（A2UI 回退闸）：照旧注册 render_ui、prompt 为 DEFAULT_SYSTEM_PROMPT（零回归）。
+     * 经 RawSseStubServer 捕获 LLM 请求体钉住（BYOK 指向本地假 LLM，真实 SSE 链路）。
+     */
+    @Test
+    fun `openui header registers no genui tools and uses turn-native prompt`() = testApplication {
+        TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
+        val account = runBlocking { AccountService.createOrRefresh("openui@x.com", 100) }
+        val capturedBodies = mutableListOf<String>()
+        val sseServer = RawSseStubServer { body, n ->
+            capturedBodies += body
+            // 第 1 轮（openui 头）回合法程序避免程序守卫纠正回环；第 2 轮（缺头）回纯文本
+            val text = if (n == 1) {
+                "// summary: 打招呼\nroot = Markdown(\"你好\")"
+            } else {
+                "好的，已收到"
+            }
+            MockLlmSse.streamingText(text) to "text/event-stream"
+        }
+        try {
+            val runner = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            )
+            installAgentApp(runner)
+
+            val created = client.post("/agent/sessions") {
+                header(APP_TOKEN_HEADER, account.token)
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """{"model":"test-model","channel":"byok",""" +
+                        """"byok_base_url":"http://127.0.0.1:${sseServer.port}"}""",
+                )
+            }
+            assertEquals(HttpStatusCode.OK, created.status)
+            val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
+
+            // ── 断言一：X-GenUI-Format: openui → 回合原生（无发卡工具 + turn-native prompt）
+            val openuiResp = client.post("/agent/sessions/$sessionId/messages") {
+                header(APP_TOKEN_HEADER, account.token)
+                header("X-User-Api-Key", "sk-stub")
+                header(GENUI_FORMAT_HEADER, GENUI_FORMAT_OPENUI)
+                contentType(ContentType.Application.Json)
+                setBody("""{"content":"你好"}""")
+            }
+            assertEquals(HttpStatusCode.OK, openuiResp.status)
+            assertTrue(openuiResp.bodyAsText().contains("\"kind\":\"done\""))
+
+            assertEquals("合法程序零纠正回环，单次 LLM 调用", 1, capturedBodies.size)
+            val (openuiTools, openuiPrompt) = toolNamesAndSystemPrompt(capturedBodies.single())
+            assertFalse("turn-native 不得注册 render_ui_openui", "render_ui_openui" in openuiTools)
+            assertFalse("turn-native 不得注册 render_ui", "render_ui" in openuiTools)
+            assertFalse("turn-native render_html 退役（Html 组件入树）", "render_html" in openuiTools)
+            assertTrue("其余服务端工具保留", "server_time" in openuiTools)
+            assertTrue(
+                "system prompt 应为 turn-native 契约，实际：${openuiPrompt.take(80)}",
+                openuiPrompt.contains("你的整个回复就是一颗 OpenUI Lang 1.0 程序"),
+            )
+
+            // ── 断言二：缺头（A2UI 回退闸）零回归
+            val a2uiResp = client.post("/agent/sessions/$sessionId/messages") {
+                header(APP_TOKEN_HEADER, account.token)
+                header("X-User-Api-Key", "sk-stub")
+                contentType(ContentType.Application.Json)
+                setBody("""{"content":"在吗"}""")
+            }
+            assertEquals(HttpStatusCode.OK, a2uiResp.status)
+            assertTrue(a2uiResp.bodyAsText().contains("\"kind\":\"done\""))
+
+            assertEquals(2, capturedBodies.size)
+            val (a2uiTools, a2uiPrompt) = toolNamesAndSystemPrompt(capturedBodies[1])
+            assertTrue("A2UI 线照旧注册 render_ui", "render_ui" in a2uiTools)
+            assertTrue("A2UI 线 render_html 保留", "render_html" in a2uiTools)
+            assertFalse("A2UI 线不得注册 render_ui_openui", "render_ui_openui" in a2uiTools)
+            assertTrue(
+                "A2UI 线 prompt 应为默认契约（零回归），实际：${a2uiPrompt.take(80)}",
+                a2uiPrompt.startsWith("你是 PoLang 云端 Agent。用中文简洁回答"),
+            )
+            assertFalse(
+                "A2UI 线不得出现 turn-native prompt",
+                a2uiPrompt.contains("你的整个回复就是一颗 OpenUI Lang 1.0 程序"),
+            )
+        } finally {
+            sseServer.close()
+        }
+    }
 }
