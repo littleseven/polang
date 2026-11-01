@@ -48,7 +48,8 @@ class OpenUiLibraryM2Test {
         // 2026-10-30 通用布局原语批次 +Grid/Box/Spacer（本仓扩展）= 92 注册项；
         // 2026-10-31 经典组合版式批次 +StatRow/StatItem/Banner（本仓扩展）= 95 注册项；
         // 2026-10-31 相册 APP 组合方式批次 +PhotoGrid/AvatarRow（本仓扩展）= 97 注册项；
-        // 2026-10-31 布局可控性批次 +CompareRow/Timeline/ChartGrid（本仓扩展）= 100 注册项
+        // 2026-10-31 布局可控性批次 +CompareRow/Timeline/ChartGrid（本仓扩展）= 100 注册项；
+        // 2026-11-01 turn-native T1 +Html（L2 沙箱入树，spec §3.6）= 101 注册项
         assertEquals(
             setOf(
                 // 既有 21（M1~M3）
@@ -84,7 +85,9 @@ class OpenUiLibraryM2Test {
                 "PhotoGrid", "AvatarRow",
                 // 布局可控性批次 3（2026-10-31 本仓扩展）
                 "CompareRow", "Timeline", "ChartGrid",
-            ).also { expected -> assertEquals(100, expected.size) },
+                // turn-native T1（2026-11-01，spec《2026-11-01-openui-turn-native-design》§3.6）
+                "Html",
+            ).also { expected -> assertEquals(101, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }

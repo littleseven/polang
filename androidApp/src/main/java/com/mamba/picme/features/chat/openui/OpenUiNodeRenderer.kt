@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mamba.picme.R
+import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.AppSliderTokens
@@ -78,10 +79,14 @@ import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.core.designsystem.components.AppSlider
 import com.mamba.picme.core.image.faceAwareVerticalAlignment
+import com.mamba.picme.domain.chat.HtmlCardDisplayMode
+import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
+import com.mamba.picme.features.chat.HtmlCard
+import com.mamba.picme.features.chat.HtmlCardSanitizer
 import com.mamba.picme.features.chat.a2ui.A2uiStyleMapper
 import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_BAR_WIDTH
 import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_THRESHOLD
@@ -390,6 +395,55 @@ fun OpenUiNodeRenderer(
         "Image" -> OpenUiPhotoImage(node, photoResolver, onAction, modifier)
         "Icon" -> OpenUiIcon(node, modifier)
         "Divider" -> OpenUiDivider(node, modifier)
+        // Html（turn-native M1，spec《2026-11-01-openui-turn-native-design》§3.6）：L2 沙箱卡
+        // 入树——完整自包含 HTML 经既有 HtmlCardSanitizer 清洗（含 128KB 尺寸闸，见
+        // HtmlCardSanitizer.MAX_HTML_BYTES）后复用 HtmlCard WebView 沙箱渲染（零 JS 桥接、
+        // 禁文件访问不变式继承）；清洗拒绝 → 降级 CAPTION 文本不炸卡。
+        // 组件内嵌钉死 INLINE（审查修复 C1）：meta 初始 displayMode=INLINE 命中后测高只走
+        // INLINE 分支永不重分流——meta=null 是「待测高」而非 inline，长 HTML（>1.0×屏高）
+        // 会被混合分流打成 FULLPAGE 0.5 屏预览，而 onOpenFullpage 未接 → 死 CTA 内容不可达。
+        // 纯组合期内存值，不写 metadata，不触碰「不落 displayMode 持久化」约束。
+        // TODO(turn-native 后续期)：display prop（ENUM INLINE/FULLPAGE，Task 1 已注册）——
+        // FULLPAGE 语义（点击弹全屏查看器）需宿主接 onOpenFullpage 回调，本期未接。
+        "Html" -> run {
+            val rawHtml = (node.props["html"] as? OpenUiValue.Str)?.v.orEmpty()
+            if (rawHtml.isBlank()) {
+                // 空 html 直接降级（2026-11-01 终审修复波）：不构建 HtmlCard 空白 WebView，
+                // 形态与 sanitizer Rejected 降级一致（CAPTION 弱色文案）
+                Text(
+                    text = stringResource(R.string.chat_a2ui_card_unavailable),
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = modifier,
+                )
+                return@run
+            }
+            // 复审修复：sanitize（4 趟正则，输入最大 128KB）按 rawHtml 记忆化避免重组重复执行；
+            // Rejected 降级日志收进同一记忆化块——每个 rawHtml 只清洗一次、只打一次 WARN
+            // （日志留在组合体的 when 分支里会每次重组重打，LazyColumn 回收重进视口即刷屏）
+            val sanitized = remember(rawHtml) {
+                HtmlCardSanitizer.sanitize(rawHtml).also { result ->
+                    if (result is HtmlCardSanitizer.Result.Rejected) {
+                        Logger.w("Chat", "OpenUI Html component rejected: ${result.reason}")
+                    }
+                }
+            }
+            when (sanitized) {
+                is HtmlCardSanitizer.Result.Ok -> HtmlCard(
+                    html = sanitized.html,
+                    meta = HtmlCardMeta(displayMode = HtmlCardDisplayMode.INLINE),
+                    modifier = modifier.fillMaxWidth(),
+                )
+                is HtmlCardSanitizer.Result.Rejected -> {
+                    Text(
+                        text = stringResource(R.string.chat_a2ui_card_unavailable),
+                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = modifier,
+                    )
+                }
+            }
+        }
         "List" -> OpenUiList(node, state, photoResolver, onAction, modifier)
         "Tabs" -> OpenUiTabs(node, state, photoResolver, onAction, modifier)
         "CheckBox" -> OpenUiCheckBox(node, state, onAction, modifier)

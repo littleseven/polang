@@ -427,6 +427,100 @@ class AgentRunnerTest {
         }
     }
 
+    // ── 回合原生 content 透传（turn-native T4）───────────────────────────────
+
+    /**
+     * 回合原生：forwardContentDeltas=true 时 content TextDelta 经 OpenUiContentStreamTracker
+     * 节流为 program 前缀旁路下行（不落事件流），终结消息经 finalMessageTransformer 变换后
+     * 落流。content 全长 60（两等分分片各 30 <minEmitChars=48）——仅尾帧触发首发，
+     * 单帧即全文，对节流间隔零依赖（多帧生长由 T3 tracker 单测覆盖）。
+     */
+    @Test
+    fun `turn-native forwards content deltas as program prefix`() = runBlocking {
+        val session = newSession()
+        val content = "meta = Text(\"${"统计".repeat(10)}\")\nroot = Card([Text(\"hi\")])"
+        assertTrue("测试前置：半片须低于节流首发阈值", content.length / 2 < 48)
+        assertTrue("测试前置：全文须达到节流首发阈值", content.length >= 48)
+        val sseServer = RawSseStubServer { _, _ ->
+            MockLlmSse.streamingText(content) to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val deltas = mutableListOf<String>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = { "TRANSFORMED:$it" },
+                onOpenUiProgramDelta = { deltas += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertTrue("content delta 未透传", deltas.isNotEmpty())
+            deltas.zipWithNext().forEach { (prev, next) ->
+                assertTrue("前缀须单调生长", next.length > prev.length && next.startsWith(prev))
+            }
+            assertTrue("尾帧须携带完整 program", deltas.last().endsWith("Card([Text(\"hi\")])"))
+            assertEquals("尾帧须等于完整 content", content, deltas.last())
+            // 终结消息经 finalMessageTransformer 变换后落流
+            val events = AgentEventRepository.listBySession(session.id)
+            val finalMessage = events
+                .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
+                .map { event -> event.payload as AgentEventPayload.Message }
+                .last()
+            assertTrue(
+                "终结消息应经 finalMessageTransformer 变换，实际：${finalMessage.content}",
+                finalMessage.content.startsWith("TRANSFORMED:"),
+            )
+            assertEquals("TRANSFORMED:$content", finalMessage.content)
+            assertEquals(1, sseServer.callCount.get()) // 纯 content 回合：单次 LLM 调用
+        } finally {
+            sseServer.close()
+        }
+    }
+
+    /**
+     * 默认模式（forwardContentDeltas=false）：content TextDelta 不透传（零行为变化红线）。
+     * content 须 ≥48（tracker minEmitChars）：透传若被误开，尾帧必发射 → 负断言有判别力。
+     */
+    @Test
+    fun `default mode does not forward content deltas`() = runBlocking {
+        val session = newSession()
+        val content = "meta = Text(\"${"统计".repeat(10)}\")\nroot = Card([Text(\"hi\")])"
+        assertTrue("测试前置：content 须超节流首发阈值", content.length >= 48)
+        val sseServer = RawSseStubServer { _, _ ->
+            MockLlmSse.streamingText(content) to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val deltas = mutableListOf<String>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "hi", target, "sys", ServerToolService.defaultRegistry(),
+                onOpenUiProgramDelta = { deltas += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertTrue("默认模式不应透传 content delta", deltas.isEmpty())
+        } finally {
+            sseServer.close()
+        }
+    }
+
     // ── 假发卡纠正回环（CardClaimGuard，2026-10-24 穷举实测事故类）──────────
 
     /**
@@ -575,5 +669,138 @@ class AgentRunnerTest {
             "root = Card([Row([Image(photos[0].id), Text(\"说明\")], weights = [1, 2])])",
             emittedProgram,
         )
+    }
+
+    // ── 终结程序纠正回环（ProgramGuard，turn-native T6）─────────────────────
+
+    /**
+     * 回合原生线终结程序非法 → 策略层带错误清单回环纠正（不落首轮坏答复），
+     * 第二轮输出合法程序后正常 Finish。纠正 user 消息只存在于 Koog prompt 内，
+     * 不落事件流（同 correctFakeCardClaim 既有语义）。
+     */
+    @Test
+    fun `invalid final program triggers correction round then finish`() = runBlocking {
+        val session = newSession()
+        val bodies = mutableListOf<String>()
+        val sseServer = RawSseStubServer { body, n ->
+            bodies += body
+            val text = if (n == 1) "这不是程序" else "root = Card([Text(\"修正后\")])"
+            MockLlmSse.streamingText(text) to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val events = mutableListOf<AgentEvent>()
+            // 落地口径（控制方裁决）：turnNative 接线 = forwardContentDeltas 开闸 +
+            // finalMessageTransformer 兜底包装（与 Task 8 将在 AgentRoutes 做的接线等价）
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
+                onEvent = { events += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertEquals("非法终结程序应触发一次纠正回环（共 2 次 LLM 调用）", 2, sseServer.callCount.get())
+            assertTrue(
+                "第二轮 prompt 应携带程序校验错误清单，实际请求数=${bodies.size}",
+                bodies.getOrNull(1)?.contains("你上次的输出未通过校验") == true,
+            )
+            // 纠正消息落 prompt 不落事件流：首轮坏答复与纠正指令都不落流
+            // （过滤 AGENT 侧消息，对齐 correctFakeCardClaim 既有用例口径）
+            val messages = events
+                .filter { it.source == AgentEventSource.AGENT }
+                .map { it.payload }.filterIsInstance<AgentEventPayload.Message>()
+            assertEquals("root = Card([Text(\"修正后\")])", messages.last().content)
+            assertEquals(1, messages.count { it.content != "这不是程序" })
+        } finally {
+            sseServer.close()
+        }
+    }
+
+    /**
+     * 纠正上限（MAX_CORRECTIONS=1）用尽后仍非法：放行落流（防死循环），
+     * 由 finalMessageTransformer 兜底 Markdown 包装——「端上永远收到合法树」双保险。
+     */
+    @Test
+    fun `persistently invalid program falls back to markdown wrap`() = runBlocking {
+        val session = newSession()
+        val sseServer = RawSseStubServer { _, n ->
+            MockLlmSse.streamingText(if (n == 1) "坏程序" else "还是坏程序") to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val events = mutableListOf<AgentEvent>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
+                onEvent = { events += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertEquals("纠正一次后放行（共 2 次 LLM 调用）", 2, sseServer.callCount.get())
+            val final = events.map { it.payload }.filterIsInstance<AgentEventPayload.Message>().last()
+            assertTrue("兜底包装缺失: ${final.content.take(80)}", final.content.startsWith("// summary:"))
+            assertTrue(final.content.contains("root = Markdown("))
+        } finally {
+            sseServer.close()
+        }
+    }
+
+    /**
+     * 控制方裁决（T8）：turn-native 线旁路假发卡纠正边——终结回复是合法程序但含发卡
+     * 话术时，cardGuard 纠正不得触发（其纠正文案指向不存在的发卡工具，误触风险），
+     * 不发生第二轮纠正调用。A2UI 线（programGuard=null）照旧，由上方假发卡三用例钉住。
+     */
+    @Test
+    fun `turn-native valid program with card claim rhetoric bypasses fake-card correction`() = runBlocking {
+        val session = newSession()
+        val program = "// summary: 卡片\nroot = Card([Text(\"卡片已下发 ✅\")])"
+        // 测试前置：话术确实命中假发卡模式（否则旁路断言无判别力）
+        assertTrue(CardClaimGuard.isCardClaim(program))
+        val sseServer = RawSseStubServer { _, _ ->
+            MockLlmSse.streamingText(program) to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val events = mutableListOf<AgentEvent>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
+                onEvent = { events += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertEquals("合法程序不得触发假发卡纠正回环", 1, sseServer.callCount.get())
+            val final = events.map { it.payload }.filterIsInstance<AgentEventPayload.Message>().last()
+            assertTrue("终结程序应原样落流，实际：${final.content.take(80)}", final.content.contains("卡片已下发"))
+        } finally {
+            sseServer.close()
+        }
     }
 }

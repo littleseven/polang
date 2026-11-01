@@ -22,6 +22,20 @@ object MockLlmSse {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * content 流式响应（无工具调用，turn-native T4 用）：文本两等分分片经
+     * `delta: {"content": "…"}` 下发，finish=stop + [DONE] 收尾。
+     * 复用 [toSseBody] 的 content 路径——两半分片对节流器边界是确定性的
+     * （半片 <minEmitChars 时仅尾帧发射；多帧间隔 <minEmitIntervalMs 不二次发射）。
+     */
+    internal fun streamingText(text: String): String =
+        toSseBody(
+            "{\"id\":\"chatcmpl-t\",\"object\":\"chat.completion\",\"created\":1730000000," +
+                "\"model\":\"test-model\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\"," +
+                "\"content\":${json.encodeToString(text)}},\"finish_reason\":\"stop\"}]," +
+                "\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5,\"total_tokens\":15}}",
+        )
+
     internal fun toSseBody(oneShot: String): String {
         val root = json.parseToJsonElement(oneShot).jsonObject
         val choice = root["choices"]!!.jsonArray[0].jsonObject

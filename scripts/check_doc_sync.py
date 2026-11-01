@@ -294,6 +294,8 @@ REVIEWS_WHITELIST = {
         "AI Coding 方法演进复盘快照（2026-03~10 五阶段 + 里程碑时间线）",
     "2026-11-01-chatgpt-genui-intelligent-ui-research.md":
         "ChatGPT 5→6→GenUI 调研快照（DIL 逆向结论 + 四路线对比 + polang 可吸收设计）",
+    "2026-09-27-muse-calendar-replication-research.md":
+        "Muse 日历能力复刻预研快照（端侧日历 provider 路线评估，供后续日历特性排期决策）",
 }
 
 PROCESS_REF_PATTERN = re.compile(

@@ -44,6 +44,12 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  * 逐帧透传至 EventHandler 钩子——本回调把已到达的 program 前缀（节流后）推向 SSE，
  * **不落 agent_event**（事件溯源只收最终 Action，预览帧是瞬态传输信号，同 tool_request
  * 口径）。正式 action 帧仍是唯一权威负载；端侧新旧版本混跑安全（旧端忽略未知 kind 帧）。
+ *
+ * [forwardContentDeltas] / [finalMessageTransformer]：回合原生（openui turn-native）
+ * 参数，缺省零行为变化。前者开时 content TextDelta 经 OpenUiContentStreamTracker
+ * 节流为 program 前缀复用 [onOpenUiProgramDelta] 旁路下行（响应即程序，工具/文本
+ * 两路共用同一 SSE kind 帧）；后者在终结消息落流前变换（normalize + 兜底包装由
+ * 调用方组合）。轮边界经 onLLMStreamingStarting 重置 content 前缀（端上覆盖式预览）。
  */
 class AgentRunner(
     private val executorFactory: AgentExecutorFactory,
@@ -68,6 +74,10 @@ class AgentRunner(
         target: AgentLlmTarget,
         systemPrompt: String,
         toolRegistry: ToolRegistry,
+        /** 回合原生（openui turn-native）：透传 content TextDelta 为 program 前缀预览。 */
+        forwardContentDeltas: Boolean = false,
+        /** 终结消息落流前变换（openui turn-native：normalize + 兜底 Markdown 包装）。 */
+        finalMessageTransformer: (String) -> String = { it },
         onHtmlCard: suspend (html: String, summary: String) -> Unit = { _, _ -> },
         onOpenUiProgramDelta: suspend (programPrefix: String) -> Unit = {},
         onEvent: suspend (AgentEvent) -> Unit = {},
@@ -93,17 +103,27 @@ class AgentRunner(
         val actionIds = mutableMapOf<String, Long>()
         // 假发卡守卫（每轮新实例）：卡工具 Action 过门控 → 标记；终结消息假声称 → 策略层回环纠正
         val cardGuard = CardClaimGuard()
+        // 终结程序守卫（每轮新实例）：仅 forwardContentDeltas 回合原生线启用（两闸同头驱动），
+        // A2UI 线为 null → 策略层程序校验边条件恒 false
+        val programGuard = if (forwardContentDeltas) ProgramGuard() else null
         // OpenUI 流式预览跟踪器（每轮新实例）：ToolCallDelta → program 前缀节流发射
         val openUiStreamTracker = OpenUiToolCallStreamTracker()
+        // 回合原生 content 流跟踪器（每轮新实例；仅 forwardContentDeltas 时发射）
+        val contentStreamTracker = OpenUiContentStreamTracker()
         try {
             val agent = AIAgent.builder()
-                .graphStrategy(cloudAgentStrategy(cardGuard))
+                .graphStrategy(cloudAgentStrategy(cardGuard, programGuard))
                 .promptExecutor(built.executor)
                 .llmModel(built.model)
                 .toolRegistry(toolRegistry)
                 .prompt(cloudAgentPrompt("polang-cloud-agent", systemPrompt, projected, built.params))
                 .maxIterations(maxIterations)
                 .install(EventHandler.Feature) { events ->
+                    events.onLLMStreamingStarting {
+                        // 新一轮 LLM 流式（工具调用后的下一轮）：前缀从空重新累计
+                        // （shared KoogChatAgent.kt:233 同款钩子，覆盖式预览的轮边界）
+                        contentStreamTracker.onRoundStart()
+                    }
                     events.onLLMStreamingFrameReceived { ctx ->
                         // openui P2 流式预览：render_ui_openui 的 args 增量 → program 前缀旁路
                         // 下行（不落事件流）。同步钩子 → runBlocking 桥（同 onToolCallStarting）
@@ -114,6 +134,8 @@ class AgentRunner(
                             is StreamFrame.ToolCallComplete -> openUiStreamTracker.onComplete(
                                 frame.id, frame.index,
                             )
+                            is StreamFrame.TextDelta ->
+                                if (forwardContentDeltas) contentStreamTracker.onTextDelta(frame.text) else null
                             else -> null
                         }
                         if (prefix != null) {
@@ -188,7 +210,7 @@ class AgentRunner(
                 onEvent,
                 AgentEventRepository.append(
                     session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
-                    payload = AgentEventPayload.Message(result),
+                    payload = AgentEventPayload.Message(finalMessageTransformer(result)),
                 ),
             )
             val finish = AgentEventRepository.append(

@@ -5,6 +5,7 @@ import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
+import com.mamba.picme.features.chat.openui.OpenUiProgramSummary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -77,7 +78,7 @@ class CloudAgentTurnRunner(
         genUiFormat,
     ) { frame ->
         when (frame) {
-            is CloudFrame.Event -> handleEvent(frame.event, onEvent)
+            is CloudFrame.Event -> handleEvent(frame.event, onEvent, genUiFormat)
             is CloudFrame.OpenUiDelta -> onEvent(CloudTurnEvent.OpenUiCardDelta(frame.program))
             is CloudFrame.ToolRequest -> {
                 onEvent(CloudTurnEvent.ToolCall(frame.tool))
@@ -97,12 +98,24 @@ class CloudAgentTurnRunner(
         }
     }
 
-    private fun handleEvent(event: JSONObject, onEvent: (CloudTurnEvent) -> Unit) {
+    private fun handleEvent(event: JSONObject, onEvent: (CloudTurnEvent) -> Unit, genUiFormat: String) {
         val payload = event.optJSONObject("payload") ?: return
         when (event.optString("type")) {
-            // 助手答复（user 回声跳过——本地已先上屏）
+            // 助手答复（user 回声跳过——本地已先上屏）；
+            // turn-native（openui）：assistant content = OpenUI 程序 → OpenUiCard 事件
+            // （spec§3.7）；非程序形态（兜底包装理论上已被 server 兜住）按文本降级
             "message" -> if (event.optString("role") == "assistant") {
-                onEvent(CloudTurnEvent.AssistantText(payload.optString("content")))
+                val content = payload.optString("content")
+                if (genUiFormat == "openui" && OpenUiProgramSummary.looksLikeProgram(content)) {
+                    onEvent(
+                        CloudTurnEvent.OpenUiCard(
+                            program = content,
+                            fallbackSummary = OpenUiProgramSummary.extractFallbackSummary(content),
+                        ),
+                    )
+                } else {
+                    onEvent(CloudTurnEvent.AssistantText(content))
+                }
             }
             // render_html 产物卡（html 为空不上屏空卡）
             "html_card" -> {

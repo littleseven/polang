@@ -4,7 +4,7 @@
 > **调研方式**: 网络调研（Muse 官方博客/TechCrunch/上手实测文 × 多源交叉验证）+ PoLang 代码侧只读探查（工具注册/prompt 组装/定时任务/权限/iOS 桥接/PrivacyGuard 七点摸底）
 > **核心目的**: 评估 PoLang 复刻「连接日历」能力的路线——重点回答：端侧读取与操作（写）日历有没有统一接口；落到 PoLang 现有 Koog + Capability 架构的最短路径
 > **性质**: 外部产品调研 + 技术预研，非承诺性规划；遵循「交付即清理」约定，不需要时可直接删除
-> **关联文档**: `docs/reviews/2026-09-25-meta-muse-feature-research.md`（Muse 全景调研，本文只展开日历线）
+> **关联文档**: Muse 全景调研（2026-09-25 meta-muse-feature-research，已随交付清理，git 历史可查；本文只展开日历线）
 
 ---
 

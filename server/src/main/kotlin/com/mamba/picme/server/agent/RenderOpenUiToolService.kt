@@ -159,12 +159,15 @@ class RenderOpenUiToolService {
                 "settings, share, shoppingCart, skipNext, skipPrevious, star, starHalf, " +
                 "starOff, stop, upload, visibility, visibilityOff, volumeDown, volumeMute, " +
                 "volumeOff, volumeUp, warning"
-    }
 
-    @Tool(customName = "render_ui_openui")
-    @LLMDescription(
-        """向用户下发一张 OpenUI 原生渲染卡（图表/统计可视化首选，优于 render_html）。
-约束（必须全部满足，否则端上拒绝渲染或静默丢弃组件）：
+        /**
+         * OpenUI Lang 1.0 DSL 规则正文（约束规则 → 时间轴黄金示例，逐字剪切自原
+         * @LLMDescription，annotation 可拼接编译期常量——拼接结果逐字节不变，
+         * RenderOpenUiToolServiceTest + 描述探针钉住）；[OpenUiTurnNative.SYSTEM_PROMPT]
+         * 同源复用（工具语境与回合原生响应语境共享同一份规则，零漂移）。
+         */
+        const val DSL_RULES =
+            """约束（必须全部满足，否则端上拒绝渲染或静默丢弃组件）：
 1. program 是 OpenUI Lang 1.0 程序：每行一条语句，形如 `名 = 表达式`；组件调用
    大写开头、只用位置参数；字符串一律双引号；
 2. 必须有 `root = ...` 语句（root 是整个组件树的入口）；
@@ -422,6 +425,12 @@ class RenderOpenUiToolService {
 """ + GOLDEN_COMPARE_PROGRAM + """
    时间轴黄金示例：
 """ + GOLDEN_TIMELINE_PROGRAM
+    }
+
+    @Tool(customName = "render_ui_openui")
+    @LLMDescription(
+        """向用户下发一张 OpenUI 原生渲染卡（图表/统计可视化首选，优于 render_html）。
+""" + DSL_RULES
     )
     suspend fun renderUiOpenUi(
         @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")
