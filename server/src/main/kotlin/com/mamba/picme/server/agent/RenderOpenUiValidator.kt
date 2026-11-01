@@ -352,13 +352,20 @@ object RenderOpenUiValidator {
             ?.let { violations -> errorText(violations, program, turnNative) }
 
     /**
-     * 回合原生（turn-native）校验入口（spec§3.5 ProgramGuard 消费）：对完整响应程序
-     * 做结构校验 + 布局门禁（先 normalize 再 validate，幂等同 validateArgsJson 链路）。
-     * 错误文案指引「重新输出完整程序」（响应即程序，无工具可回调）。
+     * 回合原生（turn-native）校验入口（spec§3.5 ProgramGuard 消费）：先 normalize 再对
+     * normalized 全文做结构校验 + 布局门禁（与 [OpenUiTurnNative.ensureValidProgram]
+     * 完全同口径）。normalize-first（2026-11-01 终审修复波）：raw 结构失败但 normalize
+     * 后合法的程序（分歧面 = 长度——N2 连续 Spacer 合并 / N3 裸容器解包缩文本可把超长
+     * 程序收回限内；normalize 不补 root、不改组件名与字符串字面量，其余结构规则两边
+     * 恒等价）不再白烧 ProgramGuard 唯一纠正机会（ProgramGuard.MAX_CORRECTIONS=1）。
+     * 错误文案指引「重新输出完整程序」（响应即程序，无工具可回调）；errorText 的
+     * program 回显参数仍传原始 program，便于 LLM 对照自己写出的原文。
      */
     fun validateProgramToError(program: String): String? {
-        validateToError(program, turnNative = true)?.let { return it }
-        val layoutViolations = OpenUiLayoutValidator.validate(OpenUiLayoutNormalizer.normalize(program))
+        val normalized = OpenUiLayoutNormalizer.normalize(program)
+        validate(normalized).takeIf { violations -> violations.isNotEmpty() }
+            ?.let { violations -> return errorText(violations, program, turnNative = true) }
+        val layoutViolations = OpenUiLayoutValidator.validate(normalized)
         if (layoutViolations.isNotEmpty()) {
             return OpenUiLayoutValidator.errorText(layoutViolations, program, turnNative = true)
         }

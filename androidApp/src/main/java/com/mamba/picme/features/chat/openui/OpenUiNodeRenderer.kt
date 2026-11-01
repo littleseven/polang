@@ -407,6 +407,17 @@ fun OpenUiNodeRenderer(
         // FULLPAGE 语义（点击弹全屏查看器）需宿主接 onOpenFullpage 回调，本期未接。
         "Html" -> run {
             val rawHtml = (node.props["html"] as? OpenUiValue.Str)?.v.orEmpty()
+            if (rawHtml.isBlank()) {
+                // 空 html 直接降级（2026-11-01 终审修复波）：不构建 HtmlCard 空白 WebView，
+                // 形态与 sanitizer Rejected 降级一致（CAPTION 弱色文案）
+                Text(
+                    text = stringResource(R.string.chat_a2ui_card_unavailable),
+                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = modifier,
+                )
+                return@run
+            }
             // 复审修复：sanitize（4 趟正则，输入最大 128KB）按 rawHtml 记忆化避免重组重复执行；
             // Rejected 降级日志收进同一记忆化块——每个 rawHtml 只清洗一次、只打一次 WARN
             // （日志留在组合体的 when 分支里会每次重组重打，LazyColumn 回收重进视口即刷屏）

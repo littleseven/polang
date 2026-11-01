@@ -7,13 +7,12 @@ package com.mamba.picme.server.agent
  * [SYSTEM_PROMPT]：响应即程序契约——DSL 规则与 [RenderOpenUiToolService.DSL_RULES]
  * 同源复用（零漂移），工具语境改写为响应语境（无工具可回调、// summary 首行、
  * 渲染顺序约定 §3.4、纯文本也必须是程序）。
- * 尾部附组件全量清单（101 个，引用 [RenderOpenUiValidator.ALLOWED_COMPONENTS]
- * 生成而非手抄，与 shared `OpenUiLibrary.components` 同源字面量副本）——白名单
- * 违规文案「组件全量清单见系统提示词」由此兑现。
+ * 尾部附组件全量清单（引用 [RenderOpenUiValidator.ALLOWED_COMPONENTS] 生成而非手抄
+ * ——清单文本与计数（size 插值）都随白名单自动同步，与 shared
+ * `OpenUiLibrary.components` 同源字面量副本）——白名单违规文案「组件全量清单见系统
+ * 提示词」由此兑现。
  */
 object OpenUiTurnNative {
-
-    private const val D = "$"
 
     val SYSTEM_PROMPT: String =
         """你是 PoLang 云端 Agent。你的整个回复就是一颗 OpenUI Lang 1.0 程序——它就是
@@ -29,7 +28,7 @@ object OpenUiTurnNative {
 结果尾部的 handle 按数据禁令绑定进程序。
 """ + RenderOpenUiToolService.DSL_RULES + """
 
-可用组件全量清单（101 个，与校验器白名单同源，逐字使用、禁臆造组件名；另有
+可用组件全量清单（${RenderOpenUiValidator.ALLOWED_COMPONENTS.size} 个，与校验器白名单同源，逐字使用、禁臆造组件名；另有
 Query 取数语句）：
 """ + RenderOpenUiValidator.ALLOWED_COMPONENTS.joinToString(", ")
 

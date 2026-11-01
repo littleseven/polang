@@ -978,4 +978,26 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertTrue("实际：$layoutError", layoutError!!.contains("重新输出完整程序"))
         assertTrue("实际：$layoutError", !layoutError.contains("render_ui_openui"))
     }
+
+    @Test
+    fun `validateProgramToError validates normalize-first so raw-only oversize program passes`() {
+        // 终审修复波（normalize-first 对齐 ensureValidProgram）：raw 超 MAX_PROGRAM_LENGTH
+        // 的程序经 N2 连续 Spacer 合并收回限内后合法——不再白烧 ProgramGuard 唯一纠正机会
+        // （MAX_CORRECTIONS=1）。normalize 不补 root、不改组件名与字符串字面量（「raw 非法
+        // 但 normalize 后合法」的唯一结构分歧面是长度：N2 合并 / N3 解包缩文本），故本用例
+        // 以长度分歧钉住该口径；bare Card(...) 无 root 行本就过结构校验（Card 兜底 entry），
+        // 不构成分歧。
+        val spacers = (1..9_500).joinToString(", ") { "Spacer(\"xs\")" }
+        val raw = "root = Column([$spacers])"
+        assertTrue(raw.length > RenderOpenUiValidator.MAX_PROGRAM_LENGTH)
+        // raw 口径确实结构非法（超长）——钉住分歧真实存在
+        val rawError = RenderOpenUiValidator.validateToError(raw, turnNative = true)
+        assertNotNull(rawError)
+        assertTrue("实际：$rawError", rawError!!.contains("超长"))
+        // normalize 后收回限内 → 回合原生入口放行（结构与布局门禁双过）
+        assertTrue(
+            OpenUiLayoutNormalizer.normalize(raw).length <= RenderOpenUiValidator.MAX_PROGRAM_LENGTH,
+        )
+        assertNull(RenderOpenUiValidator.validateProgramToError(raw))
+    }
 }
