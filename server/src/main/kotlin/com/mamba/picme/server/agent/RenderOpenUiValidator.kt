@@ -449,7 +449,7 @@ object RenderOpenUiValidator {
         ICON_CALL.findAll(program).forEach { match ->
             val iconName = match.groupValues[1]
             if (iconName !in ICON_NAMES) {
-                violations += "Icon name \"$iconName\" 不在预定义图标集（59 枚，如 photo/person/star/check/warning/settings/search 等，禁臆造，全量清单见工具描述）"
+                violations += "Icon name \"$iconName\" 不在预定义图标集（59 枚，如 photo/person/star/check/warning/settings/search 等，禁臆造，全量清单见系统提示词）"
             }
         }
 
