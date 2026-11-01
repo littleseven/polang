@@ -348,14 +348,15 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 100 openui library components`() {
+    fun `whitelist pins all 101 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 逐字一致（100 含三新件——Task 7 落地 shared +3 后生效，当前 shared=97），改动须双向同步核对
+        // OpenUiLibrary.components 逐字一致（101——2026-11-01 turn-native +Html 后双端齐平），改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
         //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
         //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
         //  2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
-        //  2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）
+        //  2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
+        //  2026-11-01 turn-native：+Html（L2 沙箱入树，spec§3.6）
         val expected = setOf(
             // 本仓既有 + M2/M3 扩（原二十一组件）
             "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
@@ -369,6 +370,8 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "PhotoGrid", "AvatarRow",
             // 布局可控性批次（2026-10-31：前后对比/时间轴固化件 + 双图并排图表网格）
             "CompareRow", "Timeline", "ChartGrid",
+            // 回合原生批次（2026-11-01：L2 沙箱 HTML 组件入树，spec§3.6）
+            "Html",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -393,7 +396,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(100, expected.size)
+        assertEquals(101, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 
@@ -942,5 +945,33 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         val error = RenderOpenUiValidator.validateArgsJson(argsJson)
         assertNotNull(error)
         assertTrue("实际：$error", error!!.startsWith("error: render_ui_openui 布局门禁未通过"))
+    }
+
+    // ── 回合原生批次（2026-11-01，Task 2）：Html 白名单 + validateProgramToError ──
+
+    @Test
+    fun `Html component allowed in whitelist`() {
+        val program = "root = Card([Html(\"<p>hi</p>\")])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `validateProgramToError returns violations for invalid program`() {
+        val error = RenderOpenUiValidator.validateProgramToError("这是一段没有 root 的纯文本")
+        assertNotNull(error)
+        assertTrue(error!!.contains("缺 root"))
+        // 回合原生文案：不再指引 LLM 调用工具
+        assertTrue("错误文案仍是工具口径: $error", error!!.contains("重新输出完整程序"))
+    }
+
+    @Test
+    fun `validateProgramToError passes valid program and applies layout gate`() {
+        val valid = "root = Card([Text(\"标题\", \"HEADLINE\")])"
+        assertNull(RenderOpenUiValidator.validateProgramToError(valid))
+        // 布局门禁违规（Grid 内 ≥2 Image，R4）同样被回合原生入口拦截
+        val layoutBad = """
+            root = Card([Grid([Image(photos[0].id), Image(photos[1].id)], columns = 2)])
+        """.trimIndent()
+        assertNotNull(RenderOpenUiValidator.validateProgramToError(layoutBad))
     }
 }

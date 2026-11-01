@@ -37,7 +37,7 @@ object RenderOpenUiValidator {
 
     /**
      * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 字面量
-     * 副本对齐（100 含三新件——Task 7 落地 shared +3 后齐平，当前 shared=97）：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
+     * 副本对齐（101，双端齐平）：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
      * M3（2026-10-24）+Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch；
      * 2026-10-25 官方组件库全量补全（spec《openui-full-library-design》）21→89——
      * 官方 82 组件适配 81（Col 列式 Table 刻意不收，行式为唯一形态）+ 本仓既有 8；
@@ -45,6 +45,7 @@ object RenderOpenUiValidator {
      * 2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
      * 2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
      * 2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
+     * 2026-11-01 turn-native：+Html（L2 沙箱入树，spec§3.6）。
      * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
      * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
@@ -67,6 +68,8 @@ object RenderOpenUiValidator {
         // 布局可控性批次（2026-10-31）：前后对比/时间轴固化件 + 双图并排图表网格
         // （R3 门禁的合法出口；渲染器与工具描述在 App/M4 批次落地）
         "CompareRow", "Timeline", "ChartGrid",
+        // 回合原生批次（2026-11-01）：L2 沙箱 HTML 组件入树（spec§3.6）
+        "Html",
         // 官方内容/布局
         "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
         "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
@@ -344,9 +347,21 @@ object RenderOpenUiValidator {
     }
 
     /** 校验并直接给回错误文本：null = 合法放行。 */
-    fun validateToError(program: String): String? =
+    fun validateToError(program: String, turnNative: Boolean = false): String? =
         validate(program).takeIf { violations -> violations.isNotEmpty() }
-            ?.let { violations -> errorText(violations, program) }
+            ?.let { violations -> errorText(violations, program, turnNative) }
+
+    /**
+     * 回合原生（turn-native）校验入口（spec§3.5 ProgramGuard 消费）：对完整响应程序
+     * 做结构校验 + 布局门禁（先 normalize 再 validate，幂等同 validateArgsJson 链路）。
+     * 错误文案指引「重新输出完整程序」（响应即程序，无工具可回调）。
+     */
+    fun validateProgramToError(program: String): String? {
+        validateToError(program, turnNative = true)?.let { return it }
+        val layoutViolations = OpenUiLayoutValidator.validate(OpenUiLayoutNormalizer.normalize(program))
+        if (layoutViolations.isNotEmpty()) return OpenUiLayoutValidator.errorText(layoutViolations, program)
+        return null
+    }
 
     /** 校验核心：返回全部违规描述（空 = 合法）。 */
     fun validate(program: String): List<String> {
@@ -383,13 +398,13 @@ object RenderOpenUiValidator {
             violations += "缺 root = 语句（root 是组件树入口；无 root 时兜底的首个 Card 语句也缺失）"
         }
 
-        // 2. 组件名白名单：大写开头调用只允许一百组件 + Query
+        // 2. 组件名白名单：大写开头调用只允许 101 组件 + Query
         CALL_NAME.findAll(stripped)
             .map { match -> match.groupValues[1] }
             .toSet()
             .filter { name -> name !in ALLOWED_CALLS }
             .forEach { name ->
-                violations += "组件/调用 \"$name\" 不在白名单（100 组件全量清单见 render_ui_openui 工具描述，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
+                violations += "组件/调用 \"$name\" 不在白名单（组件全量清单见系统提示词，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
             }
 
         // 3. Query 形态：唯一宿主工具 local_handle；handle 必须是 local://scan/<id> 形态
@@ -493,8 +508,16 @@ object RenderOpenUiValidator {
         return violations
     }
 
-    private fun errorText(violations: List<String>, program: String = ""): String = buildString {
-        append("error: render_ui_openui 负载校验未通过，本次未下发端侧。逐条修正后重新调用 render_ui_openui：")
+    private fun errorText(
+        violations: List<String>,
+        program: String = "",
+        turnNative: Boolean = false,
+    ): String = buildString {
+        if (turnNative) {
+            append("error: 你的回复（整颗 OpenUI 程序）校验未通过。逐条修正后重新输出完整程序：")
+        } else {
+            append("error: render_ui_openui 负载校验未通过，本次未下发端侧。逐条修正后重新调用 render_ui_openui：")
+        }
         violations.forEach { violation -> append("\n- ").append(violation) }
         // 回显收到内容开头（2026-10-24 all_years 事故：LLM 连续 4 次「缺 root」却无法从错误文本
         // 自纠——回显可定位 markdown 围栏/单行程序/root 非行首类偏差，program 是 LLM 生成的
