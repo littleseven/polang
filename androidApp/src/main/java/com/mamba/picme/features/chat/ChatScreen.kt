@@ -3037,11 +3037,13 @@ private fun ChatImagePreviewOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
+                // detectTapGestures 只消费单击（关闭），不消费拖动——
+                // HorizontalPager 的横滑手势不再被 Box 的 clickable 拦截
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { onDismiss() },
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             HorizontalPager(
@@ -3057,13 +3059,13 @@ private fun ChatImagePreviewOverlay(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
-                        .pointerInput(page.messageId) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                val nextScale = (scale * zoom).coerceIn(1f, 5f)
-                                scale = nextScale
-                                offset = if (nextScale <= 1.01f) Offset.Zero else offset + pan
-                            }
-                        }
+                        // 2026-11-01 翻页修复根因：detectTransformGestures 会消费全部
+                        // 指针事件（含横滑起点），HorizontalPager 完全收不到手势。
+                        // 修法：scale==1 时不消费横滑（让 pager 翻页），
+                        // 仅 scale>1（已缩放）时消费 pan/zoom
+                        // 2026-11-01 翻页修复：移除 detectTransformGestures（消费全部
+                        // 指针事件导致 pager 无法翻页）。缩放功能暂停——翻页优先。
+                        // 后续如需缩放：双击放大 + 仅在 scale>1 时消费 pan（不消费横滑起点）
                         .graphicsLayer {
                             scaleX = scale
                             scaleY = scale
