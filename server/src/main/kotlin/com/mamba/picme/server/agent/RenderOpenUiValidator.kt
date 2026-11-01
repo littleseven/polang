@@ -359,7 +359,9 @@ object RenderOpenUiValidator {
     fun validateProgramToError(program: String): String? {
         validateToError(program, turnNative = true)?.let { return it }
         val layoutViolations = OpenUiLayoutValidator.validate(OpenUiLayoutNormalizer.normalize(program))
-        if (layoutViolations.isNotEmpty()) return OpenUiLayoutValidator.errorText(layoutViolations, program)
+        if (layoutViolations.isNotEmpty()) {
+            return OpenUiLayoutValidator.errorText(layoutViolations, program, turnNative = true)
+        }
         return null
     }
 

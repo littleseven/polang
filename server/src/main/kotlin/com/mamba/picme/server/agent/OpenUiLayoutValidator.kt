@@ -103,9 +103,15 @@ object OpenUiLayoutValidator {
         return violations
     }
 
-    /** 门禁错误文本（对齐 [RenderOpenUiValidator] errorText 文风：逐条 + 回显开头）。 */
-    fun errorText(violations: List<String>, program: String): String = buildString {
-        append("error: render_ui_openui 布局门禁未通过，本次未下发端侧。逐条修正后重新调用 render_ui_openui：")
+    /** 门禁错误文本（对齐 [RenderOpenUiValidator] errorText 文风：逐条 + 回显开头）。
+     *  turnNative=true 走回合原生口径（2026-11-01 T2 审查修复）：响应即程序无工具可回调，
+     *  指引「重新输出完整程序」，不得出现 render_ui_openui 工具口径文案。 */
+    fun errorText(violations: List<String>, program: String, turnNative: Boolean = false): String = buildString {
+        if (turnNative) {
+            append("error: 你的回复（整颗 OpenUI 程序）布局门禁未通过。逐条修正后重新输出完整程序：")
+        } else {
+            append("error: render_ui_openui 布局门禁未通过，本次未下发端侧。逐条修正后重新调用 render_ui_openui：")
+        }
         violations.forEach { violation -> append("\n- ").append(violation) }
         append("\n本次收到 program 开头：")
         append(program.replace("\n", "\\n").take(120))

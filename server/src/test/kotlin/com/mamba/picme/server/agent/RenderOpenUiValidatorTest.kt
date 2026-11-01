@@ -972,6 +972,10 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         val layoutBad = """
             root = Card([Grid([Image(photos[0].id), Image(photos[1].id)], columns = 2)])
         """.trimIndent()
-        assertNotNull(RenderOpenUiValidator.validateProgramToError(layoutBad))
+        val layoutError = RenderOpenUiValidator.validateProgramToError(layoutBad)
+        assertNotNull(layoutError)
+        // 布局门禁分支同样走回合原生文案（T2 审查修复）：指引重输出完整程序，不得指引工具
+        assertTrue("实际：$layoutError", layoutError!!.contains("重新输出完整程序"))
+        assertTrue("实际：$layoutError", !layoutError.contains("render_ui_openui"))
     }
 }
