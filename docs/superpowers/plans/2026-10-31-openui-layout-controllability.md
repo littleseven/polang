@@ -1815,7 +1815,7 @@ git commit -m "chore(app): bump 1.0.69（10069）——OpenUI 布局可控性批
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
-### Task 16: server 部署 + 真机四场景验收 ⏸（2026-11-01 部分完成——0.9.9 bump+构建绿+AGENTS.md/目录/spec 验收登记毕；**deploy.sh 与四场景留用户**）
+### Task 16: server 部署 + 真机四场景验收 ✅（2026-11-01 完成——0.9.9 部署生效（首次被并行会话覆盖后重发）；四场景 ui-driver 验收全过，场景④硬约束被 LLM 主动内化引用）
 
 > ⚠️ **deploy 是外部动作**：`./server/deploy.sh` 部署生产 HK——执行前**必须征得用户确认**。双交付铁律：只发包不部署 = 线上 LLM 永远见不到新约束（2026-10-30 事故）。
 
@@ -1824,7 +1824,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 `server/build.gradle.kts`：`version = "0.9.6"` → `"0.9.7"`。
 Run: `./gradlew -p server build`（含全部测试）
 
-- [ ] **Step 2: 用户确认后部署**
+- [x] **Step 2: 用户确认后部署**（「继续」指令获准；首次部署遭并行会话竞态覆盖、重发生效）
 
 ```bash
 ./server/deploy.sh

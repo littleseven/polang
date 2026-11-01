@@ -990,8 +990,12 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   设计语言文档升 v9（§0 原则 4「组合收敛在规则层」+ §4.7 版式范式）。
   验收态（2026-11-01）：server 全量 554 测试绿 / shared jvmTest + 纯度门绿 /
   androidApp 单测 + ktlint + detekt 绿 / 真机画廊三新件目检通过（ui-driver）；
-  App 1.0.70（10070）已装测试机；server 0.9.9 构建就绪——**生产部署与
-  真机四场景验收待用户执行**（双交付铁律，部署后 LLM 才见新约束）。
+  App 1.0.70（10070）已装测试机；server 0.9.9 **已部署生产**（2026-11-01，
+  healthz 三连验证；首次部署被并行会话 0.9.8 工件覆盖，重发后生效——多会话
+  部署竞态在案）。**真机四场景验收 ✅ 全过（2026-11-01，ui-driver）**：
+  ①统计报告卡（StatRow+柱图+PhotoGrid 全套）②相册分组卡（CardHeader+
+  actionLabel 查看全部 + StatRow + Callout 小结）③CompareRow 前后对比卡
+  ④硬约束内化——模型主动引用 7.5「Card 最多嵌套 2 层」自我合规，门禁零触发。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
