@@ -181,7 +181,8 @@ class RenderOpenUiToolService {
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
    - Row(children*, spacing?, align?, weights?) / Column(children*, spacing?, align?) /
      Card(children*, spacing?, title?, align?)：
-     children 是组件数组（[组件1, 组件2]），spacing∈COMPACT|STANDARD|COMFORTABLE（默认 STANDARD）；
+     children 是组件数组（[组件1, 组件2]），spacing∈none|xs|s|m|l|xl|2xl（默认 m，
+     各档 dp 值与使用场景见规则 7.6）；
      align 是交叉轴对齐∈start|center|end|stretch|baseline（官方 align-items 语义，缺省
      stretch = 子组件铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；start/center/end
      = 顶/中/底（Row）或左/中/右（Column/Card）对齐，baseline = 子组件首行基线对齐）——
@@ -199,8 +200,8 @@ class RenderOpenUiToolService {
      九值方位∈topStart|topCenter|topEnd|centerStart|center|centerEnd|bottomStart|
      bottomCenter|bottomEnd（默认 topStart）——图上叠文字/角标写法
      Box([Image(photos[0].id), Tag("精选")], align = "bottomStart")；
-   - Spacer(size?)：通用留白件，size∈xs|s|m|l|xl（默认 m）——Row 内占宽、Column/Card
-     内占高，段落间节奏控制写法 Spacer("s")；
+   - Spacer(size?)：通用留白件，size∈xs|s|m|l|xl|2xl（默认 m，语义见规则 7.6）——
+     Row 内占宽、Column/Card 内占高，段落间节奏控制写法 Spacer("s")；
    - Button(label*, action?, variant?, size?)：action 是裸动作表达式、最外层不要加引号，
      形如 Button("查看", @OpenUrl("https://..."))（"@OpenUrl(...)" 包成字符串会被拒）；
      variant∈primary|secondary|tertiary（默认 primary 实心主按钮、占满整行宽度——主 CTA
@@ -244,7 +245,8 @@ class RenderOpenUiToolService {
    - Accordion(items*)：可折叠分区；items 是 [{title: "分区标题", children: [组件...]}]；
    ── 官方组件库扩充（同套语法，数据/绑定/动作写法与上面完全一致）──
    - 布局容器：Stack(children*, direction?=row|column, gap?=none|xs|s|m|l|xl|2xl, align?, justify?, wrap?)
-     （direction=row 同 Row、缺省 column 同 Column，wrap=true 自动换行；align 同上方官方
+     （direction=row 同 Row、缺省 column 同 Column，wrap=true 自动换行；gap 与 spacing
+     同一刻度、语义见规则 7.6；align 同上方官方
      align-items 语义五值、缺省 stretch，justify 是主轴分布∈start|center|end|between|around|evenly）/
      Carousel(children*, variant?=card|sunk)（横滑卡片行）/
      Buttons(buttons*=[Button...], direction?=row|column) /
@@ -356,6 +358,18 @@ class RenderOpenUiToolService {
      未居中、单子容器包裹、连续 Spacer）服务端会自动修正，无需手写；
      签名件与照片网格若经 Column 等容器中转包裹，视觉上同层重复同样会被判违规——
      直接放 Card 下即可；
+   7.6 间距与节奏规则（spacing/Spacer/Stack gap 共用同一刻度，8dp 网格——
+     参考官方 openui Stack gap 与设计系统 t-shirt scale 惯例）：
+     档位 → dp → 使用场景：none=0（仅贴合法定组合件——其内部已自带间距，谨慎使用）、
+     xs=4（行内紧密元素：图标与文字、标签与数值）、s=8（同组内紧凑元素：统计行多项、
+     列表行、chips 行）、m=12（默认组件间距，不写 spacing 即此档——大多数场景用它）、
+     l=16（分区/段落间隔：标题区与内容区、图表与说明文字之间）、xl=24（大卡内大区块
+     分隔，少用）、2xl=32（一张卡最多一处，极少用）；
+     节奏规则：①默认不写 spacing（缺省 m 即最佳基线，写了反而破坏节奏）；
+     ②一张卡内 spacing 档 ≤2 种，全卡节奏一致；③分区间隔大于组内间隔（l 分隔、
+     m 组内——渲染器对分区起头自动 ≥16dp，无需手动加 Spacer）；④连续多个 Spacer
+     服务端会合并为一个，段落留白一处一件；⑤Card 自带 16dp 内边距，内容首尾不要
+     再放 Spacer 贴边；
 8. 完整黄金示例（统计卡标准骨架——照此结构写：root = 语句必须有、独占一行、
    组件引用前面语句的变量名；program 不要包 markdown 代码围栏）：
 """ + GOLDEN_STATS_PROGRAM + """

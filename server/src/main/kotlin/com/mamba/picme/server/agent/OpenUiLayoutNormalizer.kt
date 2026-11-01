@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory
  * OpenUI 布局无声矫正器（2026-10-31 布局可控性批次，spec §2.1）——只做「有唯一
  * 正确解」的机械性改写，不改组件选型与内容（不替 LLM 做语义决策）：
  * - N1 图文 Row 缺 weights：恰好两个组件子项其一为 Image → 按图位补 [1,2]/[2,1]；
- * - N2 节奏归一：连续 Spacer ≥2 合并取最大档；Column/Card 纵向流内 xs/xl 降 s/l；
+ * - N2 节奏归一：连续 Spacer ≥2 合并取最大档；Column/Card 纵向流内 xs 降 s、xl/2xl 降 l；
  * - N3 单子裸容器解包：Row/Column/Grid/Box/Stack 仅一个子项且无命名实参 → 解包；
  * - N4 stat 拼装居中：Row 直接子级 Column 含 DISPLAY 大数字未 align="center" → 补。
  * 自底向上重写（span 锚定原文，非调用区文本原样保留）；幂等。扫描失败/任何意外
@@ -28,11 +28,14 @@ object OpenUiLayoutNormalizer {
 
     private val UNWRAP_CONTAINERS = setOf("Row", "Column", "Grid", "Box", "Stack")
     private val VERTICAL_FLOW_PARENTS = setOf("Column", "Card")
-    private val SPACER_RANK = mapOf("xs" to 0, "s" to 1, "m" to 2, "l" to 3, "xl" to 4)
+    private val SPACER_RANK = mapOf("xs" to 0, "s" to 1, "m" to 2, "l" to 3, "xl" to 4, "2xl" to 5)
+
+    /** 纵向流降档表（2026-11-01 间距词汇统一批次改为显式映射）：xs→s、xl/2xl→l。 */
+    private val DOWNGRADE_VERTICAL = mapOf("xs" to "s", "xl" to "l", "2xl" to "l")
     private val NAMED_ARG = Regex("""[A-Za-z_][A-Za-z0-9_]*\s*=""")
     private val NAMED_WEIGHTS = Regex("""(?<![A-Za-z0-9_])weights\s*=""")
     private val NAMED_ALIGN = Regex("""(?<![A-Za-z0-9_])align\s*=""")
-    private val QUOTED_SIZE = Regex(""""(xs|s|m|l|xl)"""")
+    private val QUOTED_SIZE = Regex(""""(2xl|xs|s|m|l|xl)"""")
     private val STRING_LITERAL = Regex(""""([^"\\]|\\.)*"""")
 
     /** 入口：无需矫正/扫描失败/内部异常 → 原文返回。幂等。 */
@@ -65,11 +68,11 @@ object OpenUiLayoutNormalizer {
             if ("N2" !in DISABLED_RULES && runStart >= 0 && runEndExclusive - runStart >= 2) {
                 val run = comps.subList(runStart, runEndExclusive)
                 val maxSize = run.maxOf { spacer -> spacerSize(spacer, original) }
-                // 合并产出的字面量同样过纵向流降档（xs→s / xl→l）——否则最大档 xl 绕过
-                // 降档子规则在纵向流残留，二次 normalize 才修正（幂等反例）
+                // 合并产出的字面量同样过纵向流降档（xs→s / xl、2xl→l）——否则最大档 xl
+                // 绕过降档子规则在纵向流残留，二次 normalize 才修正（幂等反例）
                 val size = rankToSize(maxSize)
                 val finalSize = if (node.name in VERTICAL_FLOW_PARENTS) {
-                    size.replace("xs", "s").replace("xl", "l")
+                    DOWNGRADE_VERTICAL[size] ?: size
                 } else {
                     size
                 }
@@ -144,11 +147,15 @@ object OpenUiLayoutNormalizer {
         return original.substring(node.spanStart, node.argsStart) + args + ")"
     }
 
-    /** Spacer 单件改写：纵向流 xs→s / xl→l（保留原 size 形态）。 */
+    /** Spacer 单件改写：纵向流降档 xs→s / xl、2xl→l（保留原 size 形态）。 */
     private fun renderSpacer(node: OpenUiCallTree.CallNode, original: String, parentName: String?): String {
         var text = original.substring(node.spanStart, node.spanEnd)
         if ("N2" !in DISABLED_RULES && parentName in VERTICAL_FLOW_PARENTS) {
-            text = text.replace("\"xs\"", "\"s\"").replace("\"xl\"", "\"l\"")
+            val quoted = QUOTED_SIZE.find(text)?.value?.removeSurrounding("\"")
+            val downgraded = quoted?.let { size -> DOWNGRADE_VERTICAL[size] }
+            if (quoted != null && downgraded != null) {
+                text = text.replace("\"$quoted\"", "\"$downgraded\"")
+            }
         }
         return text
     }

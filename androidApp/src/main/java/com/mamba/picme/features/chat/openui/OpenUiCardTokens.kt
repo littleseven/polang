@@ -9,7 +9,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mamba.picme.core.designsystem.Spacing
-import com.mamba.picme.domain.chat.a2ui.A2uiSpacingRole
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 
 /**
@@ -53,11 +52,21 @@ object OpenUiCardTokens {
 
     // ── 间距阶梯（spec §1.1：组件间默认 sm(8)→md(12)；Section 前 md→lg(16)） ──
 
-    fun spacing(role: A2uiSpacingRole?): Dp = when (role) {
-        A2uiSpacingRole.COMPACT -> Spacing.xs
-        A2uiSpacingRole.STANDARD,
-        null -> Spacing.md
-        A2uiSpacingRole.COMFORTABLE -> Spacing.lg
+    /**
+     * 容器间距统一映射（2026-11-01 间距词汇统一批次）：官方 thesysdev/openui 七档
+     * t-shirt scale → Spacing 阶梯（none/xs/s/m/l/xl/2xl → 0/4/8/12/16/24/32dp，8pt
+     * 网格）；Row/Column/Card/Grid/List 的 spacing、Stack.gap、Spacer.size 共用本函数
+     * 单一映射。legacy 别名（A2UI 词汇）COMPACT/STANDARD/COMFORTABLE → xs/m/l 保持
+     * 存量卡视觉不变；未知值回退 m（半信任输入防御）。OpenUIComponentGallery 直读。
+     */
+    fun spacingDpOf(raw: String?): Dp = when (raw) {
+        "none" -> 0.dp
+        "xs", "COMPACT" -> Spacing.xs
+        "s" -> Spacing.sm
+        "l", "COMFORTABLE" -> Spacing.lg
+        "xl" -> Spacing.xl
+        "2xl" -> Spacing.xxl
+        else -> Spacing.md // m / STANDARD / 缺省 / 未知
     }
 
     /** Section（SUBHEAD 标题/图表/表格）起头前间距。 */

@@ -654,9 +654,7 @@ private const val METADATA_ASPECT_MAX = 3.0
 private const val FALLBACK_ASPECT = 4.0 / 3.0
 
 private fun OpenUiValue.ComponentVal.spacingDp() =
-    OpenUiCardTokens.spacing(
-        A2uiStyleMapper.parseSpacingRole((props["spacing"] as? OpenUiValue.Str)?.v)
-    )
+    OpenUiCardTokens.spacingDpOf((props["spacing"] as? OpenUiValue.Str)?.v)
 
 /** 2026-10-30 align 治理：三容器 align prop 原文（schema 已枚举校验五值，缺省 stretch 求值期物化）。 */
 private fun OpenUiValue.ComponentVal.alignRaw() = (props["align"] as? OpenUiValue.Str)?.v
@@ -695,15 +693,9 @@ private fun openUiBoxAlign(raw: String?): Alignment = when (raw) {
     else -> Alignment.TopStart
 }
 
-/** Spacer 留白档位（官方 gap 词汇子集）→ 间距 token（禁魔法数，缺省 m）。 */
+/** Spacer 留白档位 → 统一间距映射（词汇统一批次 2026-11-01 收编，禁魔法数，缺省 m）。 */
 private fun openUiSpacerSize(prop: OpenUiValue?): Dp =
-    when ((prop as? OpenUiValue.Str)?.v) {
-        "xs" -> Spacing.xs
-        "s" -> Spacing.sm
-        "l" -> Spacing.lg
-        "xl" -> Spacing.xl
-        else -> Spacing.md
-    }
+    OpenUiCardTokens.spacingDpOf((prop as? OpenUiValue.Str)?.v)
 
 /**
  * 空绑定兜底（M4 §1.4，M4.1 放宽）：解析结果 trim 后以 `:`/`：` 结尾（绑定值为空只剩

@@ -166,11 +166,12 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | 组件 | 皮肤要点 |
 |------|----------|
 | Card | 16dp 圆角（2026-10-31 v9 对帧校准：画布 chat 卡惯例，AppShapes.card=8 无此档）+ Spacing.lg 内边距；嵌套 = L1 surface |
+| spacing（Row/Column/Card/Grid/List）/ Stack.gap / Spacer.size | 统一官方七档刻度（2026-11-01 v10 间距词汇统一）：none\|xs\|s\|m\|l\|xl\|2xl → 0/4/8/12/16/24/32dp（8pt 网格，映射 SSOT = `OpenUiCardTokens.spacingDpOf`）；缺省 m(12)；legacy 别名 COMPACT→xs / STANDARD→m / COMFORTABLE→l 保持存量卡视觉不变（A2UI 对照组词汇，新程序不教学）；节奏规则 = server DSL_RULES 7.6（默认不写 / 一卡 ≤2 档 / 分区间隔 > 组内间隔 / Card 自带 16dp 内边距边缘不贴 Spacer） |
 | Row/Column/Card align | 交叉轴五值 start\|center\|end\|stretch\|baseline（官方 align-items 语义，缺省 stretch = 子项铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；baseline = 首行基线对齐，列向兜底 start）；stat tile 数字栏写 `align="center"`、高矮栏顶线对齐写 `align="start"` |
 | Row weights | 按比例分栏（2026-10-30，CSS flex-grow 语义）：数字数组与组件子项一一对应（Divider/Spacer 不占槽位），缺省/个数不符回退全 1 等宽；左图右文 = `weights=[1,2]` 配 `align="center"` |
 | Grid | 通用 N 列网格（2026-10-30）：columns 1..4 缺省 2，children 按序填满各行、cell 等宽 `weight(1f)`，末行缺格补空位保持列对齐；四宫格 = `columns=2`；spacing/align 同 Row 词汇 |
 | Box | 通用叠放容器（2026-10-30）：children 按数组序从底到顶叠放；align 九值 contentAlignment（缺省 topStart = Compose 官方缺省）；图上叠文字/角标 = `Box([Image, Tag], align="bottomStart")` |
-| Spacer | 通用留白件（2026-10-30）：size∈xs\|s\|m\|l\|xl → Spacing.xs/sm/md/lg/xl（缺省 m）；Row 内占宽、Column/Card 内占高；不参与 Row 分栏（与 Divider 同口径） |
+| Spacer | 通用留白件（2026-10-30）：size∈xs\|s\|m\|l\|xl\|2xl → 统一间距刻度（见上方 spacing 行，缺省 m）；Row 内占宽、Column/Card 内占高；不参与 Row 分栏（与 Divider 同口径） |
 | Text | §2 字阶；DISPLAY 32B tnum；CAPTION 默认弱色 |
 | Button | M3 Button（primary 行为色，primary 占满整行宽度；stretch 容器内各 variant 均整宽 = 官方主流形态） |
 | BarChart | §3.1 |
@@ -230,3 +231,4 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 - v8.1（2026-10-31，真机回归修复，无 spec）：「查看全部」点击无效根治——根因 = 黄金示例/食谱只传 actionLabel 不传 action（LLM 照样画瓢）+ 渲染层无动作兜底 + @ToAssistant M1 起仅记日志不路由。三处同修：①@ToAssistant 实路由上行（OpenUiCardHost.onToAssistant → ChatScreen viewModel.sendMessage，以用户消息发进会话）；②渲染层缺省动作兜底（`headerActionsOrDefault`：actionLabel 在场且 action 缺省 → 合成 @ToAssistant("actionLabel：title")，OpenUiHeaderActionTest 钉住）；③server GOLDEN_PHOTO_PROGRAM/食谱/签名段全部改为 actionLabel+action 成对 + lint 第六条（CardHeader 有 actionLabel 缺 action → 引导显式 @ToAssistant）。版本 10069/1.0.69 + server 0.9.7。
 
 - v9（2026-10-31，spec《2026-10-31-openui-layout-controllability》）：布局可控性批次——保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层：server 无声矫正 OpenUiLayoutNormalizer（N1 图文 Row 自动补 weights / N2 连续 Spacer 合并+纵向降档 / N3 单子裸容器解包 / N4 stat 数字栏自动居中）+ 结构门禁 OpenUiLayoutValidator（R1 Card 嵌套≤2 与容器链≤4 / R2 通栏签名件一卡一件 / R3 图表禁横向分栏 / R4 Grid 照片墙引导 PhotoGrid / NODE_CAP ≤60）。新增 CompareRow/Timeline/ChartGrid 三件（97→100）与 Ardot OpenUILayouts 版式范式页八帧（§4.7，Light 验证 8/8）；既有组件对帧校准 13 项（Card 16dp/Banner HEADLINE+蒙层/图表标题 CAPTION 弱色等）；lint 三条软警告退役（stat 居中与图文 weights 收编进矫正、Grid 照片墙升硬 R4）。画布新增 chart/*×4、statusColor/successTonal 变量（sync-ignore 台账，代码 SSOT=OpenUiCardTokens）。
+- v10（2026-11-01，无 spec）：间距词汇统一批次——此前提示词有三套间距词汇（Row/Column/Card/Grid/List 的 COMPACT\|STANDARD\|COMFORTABLE、Stack.gap 的 none\|xs\|s\|m\|l\|xl\|2xl、Spacer 的 xs\|s\|m\|l\|xl），且各档无 dp 语义与使用规则（对照官方 spec §5.2「描述应说明单位/范围/各枚举何时用」）。统一为官方七档 t-shirt scale（none\|xs\|s\|m\|l\|xl\|2xl → 0/4/8/12/16/24/32dp，8pt 网格）：shared `OpenUiLibrary.spacings` 扩十值（新七档 + legacy 三别名保存量卡合法）、spacingProp 缺省 STANDARD→m（12dp 等价零视觉变化）、Spacer 扩 2xl 全档对称；渲染层三处映射（容器 spacing / Stack.gap / Spacer.size）收编 `OpenUiCardTokens.spacingDpOf` 单一映射（OpenUiSpacingTokensTest 钉住）；server DSL_RULES 签名改统一词汇 + 新增 7.6 间距与节奏规则（档位 dp 语义表 + 默认不写/一卡 ≤2 档/分区 > 组内/Card 自带内边距五条）；OpenUiLayoutNormalizer N2 降档改显式映射表（修 `replace("xl","l")` 把 "2xl" 腐蚀成 "2l" 隐患）+ SPACER_RANK/QUOTED_SIZE 扩 2xl。数值链闭合：prompt 词汇 ↔ shared schema ↔ spacingDpOf ↔ Spacing ↔ design-tokens.json ↔ Ardot 画布变量（六档值全等）。

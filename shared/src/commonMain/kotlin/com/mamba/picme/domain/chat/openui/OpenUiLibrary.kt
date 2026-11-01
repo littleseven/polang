@@ -79,7 +79,18 @@ object OpenUiLibrary {
 
     private val textRoles = listOf("HEADLINE", "SUBHEAD", "BODY", "CAPTION", "DISPLAY")
     private val colorRoles = listOf("PRIMARY", "SURFACE", "ERROR", "ON_SURFACE")
-    private val spacings = listOf("COMPACT", "STANDARD", "COMFORTABLE")
+
+    /**
+     * 容器间距统一词汇（2026-11-01 间距词汇统一批次）：官方 thesysdev/openui Stack gap
+     * 七档 t-shirt scale（none|xs|s|m|l|xl|2xl → 0/4/8/12/16/24/32dp，8pt 网格），
+     * Row/Column/Card/Grid/List 的 spacing 与 Stack.gap/Spacer.size 自此同一刻度。
+     * 尾部三值是 legacy 别名（COMPACT→xs、STANDARD→m、COMFORTABLE→l）——A2UI 线
+     * 词汇的存量卡向后兼容（持久化 program 重放仍合法），新程序不再教学。
+     */
+    private val spacings = listOf(
+        "none", "xs", "s", "m", "l", "xl", "2xl",
+        "COMPACT", "STANDARD", "COMFORTABLE",
+    )
     private val aligns = listOf("start", "center", "end", "stretch", "baseline")
 
     /** Box 叠放容器的 contentAlignment 九值（Compose 官方词汇，缺省 topStart = Box 官方缺省）。 */
@@ -89,8 +100,8 @@ object OpenUiLibrary {
         "bottomStart", "bottomCenter", "bottomEnd",
     )
 
-    /** Spacer 留白档位（官方 Stack gap 词汇子集）→ Spacing.xs/sm/md/lg/xl。 */
-    private val spacerSizes = listOf("xs", "s", "m", "l", "xl")
+    /** Spacer 留白档位（官方 Stack gap 词汇子集 + 2xl 全档对称）→ Spacing.xs~xxl。 */
+    private val spacerSizes = listOf("xs", "s", "m", "l", "xl", "2xl")
 
     /**
      * Icon.name 的 59 枚预定义图标名（A2UI catalog v1 同口径，禁 svgPath 自由形式）。
@@ -114,10 +125,14 @@ object OpenUiLibrary {
     )
 
     private val childrenProp = OpenUiProp("children", OpenUiPropType.COMPONENT_LIST, required = true)
+    /**
+     * 容器间距 prop（词汇统一批次 2026-11-01）：默认 "m"（12dp，与旧默认 STANDARD
+     * 等价——存量 program 缺省重放视觉零变化，渲染层新旧词汇双映射）。
+     */
     private val spacingProp = OpenUiProp(
         "spacing",
         OpenUiPropType.ENUM,
-        default = OpenUiValue.Str("STANDARD"),
+        default = OpenUiValue.Str("m"),
         enumValues = spacings,
     )
 

@@ -507,16 +507,8 @@ private fun OpenUiContentStack(
     }
 }
 
-/** Stack.gap 枚举 → Spacing 阶梯（最小档 xs；2xl 超阶梯取 32dp）。 */
-private fun stackGapDp(raw: String?): Dp = when (raw) {
-    "none" -> 0.dp
-    "xs" -> Spacing.xs
-    "s" -> Spacing.sm
-    "l" -> Spacing.lg
-    "xl" -> Spacing.xl
-    "2xl" -> 32.dp
-    else -> Spacing.md // m / 缺省
-}
+/** Stack.gap 枚举 → 统一间距映射（词汇统一批次 2026-11-01 收编，含 none→0 档）。 */
+private fun stackGapDp(raw: String?): Dp = OpenUiCardTokens.spacingDpOf(raw)
 
 private fun rowMainAxis(justify: String?, gap: Dp): Arrangement.Horizontal = when (justify) {
     "between" -> Arrangement.SpaceBetween

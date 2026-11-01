@@ -678,11 +678,36 @@ class OpenUiLibraryM2Test {
         // 缺省 topStart = Compose Box 官方缺省
         assertEquals(OpenUiValue.Str("topStart"), boxAlign.default)
         val spacerSize = OpenUiLibrary.components.getValue("Spacer").props.single { prop -> prop.name == "size" }
-        assertEquals(listOf("xs", "s", "m", "l", "xl"), spacerSize.enumValues)
+        // 2026-11-01 间距词汇统一批次：Spacer 补齐 2xl 全档对称
+        assertEquals(listOf("xs", "s", "m", "l", "xl", "2xl"), spacerSize.enumValues)
         assertEquals(OpenUiValue.Str("m"), spacerSize.default)
         val rowWeights = OpenUiLibrary.components.getValue("Row").props.single { prop -> prop.name == "weights" }
         assertEquals(OpenUiPropType.PRIMITIVE_ARRAY, rowWeights.type)
         assertFalse(rowWeights.required)
+    }
+
+    @Test
+    fun `container spacing unified to official seven tier scale with legacy aliases`() {
+        // 2026-11-01 间距词汇统一批次：Row/Column/Card/Grid/List 的 spacing 与 Stack.gap
+        // 同一官方七档刻度；legacy 三别名（COMPACT/STANDARD/COMFORTABLE）保存量卡合法
+        val expected = listOf(
+            "none", "xs", "s", "m", "l", "xl", "2xl",
+            "COMPACT", "STANDARD", "COMFORTABLE",
+        )
+        listOf("Row", "Column", "Card", "Grid", "List").forEach { name ->
+            val prop = OpenUiLibrary.components.getValue(name).props.single { prop -> prop.name == "spacing" }
+            assertEquals(expected, prop.enumValues, "$name.spacing 枚举")
+            assertEquals(OpenUiValue.Str("m"), prop.default, "$name.spacing 缺省")
+        }
+    }
+
+    @Test
+    fun `legacy spacing aliases still evaluate for persisted cards`() = runTest {
+        // 词汇统一批次向后兼容：存量持久化 program（A2UI 词汇）重放仍合法、原样保留
+        val program = """root = Card([Text("a")], spacing = "COMPACT")"""
+        val result = rendered(OpenUiSession(program, noTools).prepare())
+        assertEquals(emptyList(), result.errors)
+        assertEquals(OpenUiValue.Str("COMPACT"), result.root.props["spacing"])
     }
 
     @Test

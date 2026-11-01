@@ -107,6 +107,26 @@ class OpenUiLayoutNormalizerTest {
         )
     }
 
+    // 2026-11-01 间距词汇统一批次：Spacer 扩 2xl 档——降档映射改显式表（旧
+    // replace("xl","l") 会把 "2xl" 腐蚀成非法 "2l"），纵向流 2xl→l、横向 Row 不降
+    @Test
+    fun `n2 downgrades 2xl in vertical flow but keeps it in row`() {
+        val vertical = "root = Card([Text(\"a\"), Spacer(\"2xl\"), Text(\"b\")])"
+        assertEquals(
+            "root = Card([Text(\"a\"), Spacer(\"l\"), Text(\"b\")])",
+            OpenUiLayoutNormalizer.normalize(vertical),
+        )
+        val merged = "root = Card([Column([Spacer(\"m\"), Spacer(\"2xl\")])])"
+        val once = OpenUiLayoutNormalizer.normalize(merged)
+        assertEquals("root = Card([Column([Spacer(\"l\")])])", once)
+        assertEquals(once, OpenUiLayoutNormalizer.normalize(once))
+        val row = "root = Card([Row([Spacer(\"m\"), Spacer(\"2xl\")])])"
+        assertEquals(
+            "root = Card([Row([Spacer(\"2xl\")])])",
+            OpenUiLayoutNormalizer.normalize(row),
+        )
+    }
+
     // 评审修 1：N3 裸判定不得被子项改写注入的命名实参遮蔽——唯一子 Row 被 N1 补
     // weights 后，自身全裸的父容器仍须解包
     @Test

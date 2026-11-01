@@ -64,6 +64,20 @@ class RenderOpenUiToolServiceTest {
     }
 
     @Test
+    fun `description pins unified spacing scale and rhythm rules`() {
+        // 2026-11-01 间距词汇统一批次：spacing/Spacer/Stack gap 同一官方七档刻度，
+        // 各档 dp 语义与节奏规则（7.6）是 LLM 唯一可见的间距文档
+        assertTrue(
+            "签名应为统一七档刻度",
+            descriptor.description.contains("spacing∈none|xs|s|m|l|xl|2xl"),
+        )
+        assertTrue("描述缺 7.6 间距节奏规则", descriptor.description.contains("7.6 间距与节奏规则"))
+        assertTrue("7.6 缺 dp 语义表", descriptor.description.contains("m=12（默认组件间距"))
+        assertTrue("7.6 缺分区间隔规则", descriptor.description.contains("分区间隔大于组内间隔"))
+        assertTrue("Spacer 应扩 2xl", descriptor.description.contains("size∈xs|s|m|l|xl|2xl"))
+    }
+
+    @Test
     fun `receipt for clean program is bare confirmation`() = runBlocking {
         val receipt = service.renderUiOpenUi("""root = Card([Text("ok")])""", "摘要")
         assertEquals("UI 已下发端侧渲染（OpenUI）", receipt)
