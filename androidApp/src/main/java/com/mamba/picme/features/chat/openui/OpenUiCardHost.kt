@@ -233,6 +233,19 @@ private fun OpenUiReadyContent(
         mutableStateMapOf<String, OpenUiValue>().apply { putAll(session.state) }
     }
     var root by remember(session) { mutableStateOf(session.rootOrNull()) }
+    // 会话全量照片 URI（2026-11-01 浏览完整性）：session.state 中任何含 id 字段的
+    // 对象数组（photos 投影形态）全量提取——PhotoGrid 只展示 12 张但 handle 可能
+    // 返回 60 张；点击任一照片 → 多页翻页预览展示全量（Google Photos 语义）
+    val allSessionPhotoUris by produceState<List<String>>(emptyList(), session) {
+        val ids = session.state.values.flatMap { value ->
+            (value as? OpenUiValue.Arr)?.v?.mapNotNull { item ->
+                (item as? OpenUiValue.Obj)?.v?.get("id")?.let { id ->
+                    (id as? OpenUiValue.Num)?.v?.toLong()
+                }
+            } ?: emptyList()
+        }.distinct()
+        value = ids.mapNotNull { photoId -> photoResolver.resolve(photoId)?.uri }
+    }
     // 已发射 viewState 指纹（归一化后比对，同值不重复持久化；初值取 part 携带态的归一化，
     // 避免冷启动首轮 Set 同值时多写一次 Room）
     var lastEmittedViewState by remember(session) {
@@ -280,9 +293,14 @@ private fun OpenUiReadyContent(
             // Image 点击看大图（宿主动作，program 不可达——渲染层 resolved uri 直发，
             // 不出端不回落 program；ChatScreen 落 chat 内预览浮层）
             OpenUiActionRoute.OPEN_PHOTO -> {
-                // 2026-11-01 集合语义：渲染器传该组件全部照片 URI（点击位在前）——
-                // 宿主开多页横滑翻页预览（Gallery 语义，Google Photos 同款交互）
-                val uris = action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
+                // 2026-11-01 浏览完整性：优先用会话全量照片（handle 返回的 60 张），
+                // 点击位移至首位——300 张结果也能翻完 handle 给出的全部，不再限于网格 12 张
+                val clickedUri = (action.args.firstOrNull() as? OpenUiValue.Str)?.v
+                val uris = when {
+                    clickedUri != null && allSessionPhotoUris.contains(clickedUri) ->
+                        listOf(clickedUri) + (allSessionPhotoUris - clickedUri)
+                    else -> action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
+                }
                 if (uris.isNotEmpty()) onPhotoClick(uris)
             }
             // @ToAssistant 上行（2026-10-31 真机回归修复，原为 M1 只记日志不路由）：
