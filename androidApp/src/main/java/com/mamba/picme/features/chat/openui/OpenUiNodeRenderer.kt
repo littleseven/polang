@@ -79,6 +79,8 @@ import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.core.designsystem.components.AppSlider
 import com.mamba.picme.core.image.faceAwareVerticalAlignment
+import com.mamba.picme.domain.chat.HtmlCardDisplayMode
+import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
@@ -397,15 +399,21 @@ fun OpenUiNodeRenderer(
         // 入树——完整自包含 HTML 经既有 HtmlCardSanitizer 清洗（含 128KB 尺寸闸，见
         // HtmlCardSanitizer.MAX_HTML_BYTES）后复用 HtmlCard WebView 沙箱渲染（零 JS 桥接、
         // 禁文件访问不变式继承）；清洗拒绝 → 降级 CAPTION 文本不炸卡。
-        // 组件内嵌一律 Inline：meta=null（不落 displayMode 持久化）、onDisplayModeResolved
-        // 用默认 no-op（brief 定调，同任务卡 HTML 内嵌口径）。
+        // 组件内嵌钉死 INLINE（审查修复 C1）：meta 初始 displayMode=INLINE 命中后测高只走
+        // INLINE 分支永不重分流——meta=null 是「待测高」而非 inline，长 HTML（>1.0×屏高）
+        // 会被混合分流打成 FULLPAGE 0.5 屏预览，而 onOpenFullpage 未接 → 死 CTA 内容不可达。
+        // 纯组合期内存值，不写 metadata，不触碰「不落 displayMode 持久化」约束。
         // TODO(turn-native 后续期)：display prop（ENUM INLINE/FULLPAGE，Task 1 已注册）——
         // FULLPAGE 语义（点击弹全屏查看器）需宿主接 onOpenFullpage 回调，本期未接。
         "Html" -> run {
             val rawHtml = (node.props["html"] as? OpenUiValue.Str)?.v.orEmpty()
-            when (val sanitized = HtmlCardSanitizer.sanitize(rawHtml)) {
+            // 审查修复 I3：sanitize（4 趟正则，输入最大 128KB）按 rawHtml 记忆化，
+            // 避免重组重复执行；Rejected 分支 Logger.w 同理不再每次重组重打
+            val sanitized = remember(rawHtml) { HtmlCardSanitizer.sanitize(rawHtml) }
+            when (sanitized) {
                 is HtmlCardSanitizer.Result.Ok -> HtmlCard(
                     html = sanitized.html,
+                    meta = HtmlCardMeta(displayMode = HtmlCardDisplayMode.INLINE),
                     modifier = modifier.fillMaxWidth(),
                 )
                 is HtmlCardSanitizer.Result.Rejected -> {
