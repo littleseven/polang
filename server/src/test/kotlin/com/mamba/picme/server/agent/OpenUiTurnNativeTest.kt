@@ -27,6 +27,18 @@ class OpenUiTurnNativeTest {
         assertNull(RenderOpenUiValidator.validateProgramToError(wrapped))
     }
 
+    // 2026-11-01 故宫卡事故：模型响应尾部混入 DSML 工具调用边界标记，validate 宽容
+    // 放行致标记载体落流到端上——终结消息兜底必须先剥掉再放行
+    @Test
+    fun `ensureValidProgram strips dsml tool-call tail from valid program`() {
+        val program = "// summary: 行程\nroot = Card([Text(\"行程\", \"HEADLINE\")])" +
+            "\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>"
+        assertEquals(
+            "// summary: 行程\nroot = Card([Text(\"行程\", \"HEADLINE\")])",
+            OpenUiTurnNative.ensureValidProgram(program),
+        )
+    }
+
     @Test
     fun `system prompt contains response-is-program contract and golden examples`() {
         val prompt = OpenUiTurnNative.SYSTEM_PROMPT

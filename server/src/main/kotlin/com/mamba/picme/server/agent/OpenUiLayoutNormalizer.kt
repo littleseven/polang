@@ -9,6 +9,9 @@ import org.slf4j.LoggerFactory
  * - N2 节奏归一：连续 Spacer ≥2 合并取最大档；Column/Card 纵向流内 xs 降 s、xl/2xl 降 l；
  * - N3 单子裸容器解包：Row/Column/Grid/Box/Stack 仅一个子项且无命名实参 → 解包；
  * - N4 stat 拼装居中：Row 直接子级 Column 含 DISPLAY 大数字未 align="center" → 补。
+ * - N5 DSML 尾标剥离（2026-11-01 故宫卡事故）：模型（deepseek-v4-flash）偶发把其
+ *   DSML 工具调用收尾标记（`</｜｜DSML｜｜ parameter>` 等，全角｜）吐在程序尾部——
+ *   turn-native「响应即程序」语境下无工具可收、标记纯属污染——尾部标记行整体剥除。
  * 自底向上重写（span 锚定原文，非调用区文本原样保留）；幂等。扫描失败/任何意外
  * 原文返回（runCatching 安全网：挂生产发射路径，宁可放过不可崩）。
  *
@@ -21,7 +24,7 @@ import org.slf4j.LoggerFactory
  */
 object OpenUiLayoutNormalizer {
 
-    /** 规则开关（spec §2.3：误伤止血——把规则名（"N1"~"N4"）加进集合即关该条，不改代码）。 */
+    /** 规则开关（spec §2.3：误伤止血——把规则名（"N1"~"N5"）加进集合即关该条，不改代码）。 */
     internal val DISABLED_RULES: Set<String> = emptySet()
 
     private val logger = LoggerFactory.getLogger("picme-agent")
@@ -38,15 +41,25 @@ object OpenUiLayoutNormalizer {
     private val QUOTED_SIZE = Regex(""""(2xl|xs|s|m|l|xl)"""")
     private val STRING_LITERAL = Regex(""""([^"\\]|\\.)*"""")
 
+    /**
+     * N5：模型响应尾部的 DSML 工具调用边界标记块（`</｜｜DSML｜｜ parameter>` /
+     * `</｜｜DSML｜｜ invoke>` / `</｜｜DSML｜｜ calls>` 等，全角｜，兼容 ASCII | 变体）。
+     * 尾锚定 + 标签体内不含换行——程序正文里的 DSML 字样（极端文案引用）不受影响。
+     */
+    private val DSML_TAIL_TAGS = Regex("""(?:\s*</?[｜|]{2}DSML[｜|]{2}[^>\n]*>)+\s*$""")
+
     /** 入口：无需矫正/扫描失败/内部异常 → 原文返回。幂等。 */
-    fun normalize(program: String): String =
-        runCatching { normalizeInternal(program) }
+    fun normalize(program: String): String {
+        // N5 前置剥离（try 之前）：DSML 尾标会让 parse/矫正器在垃圾文本上空转
+        val stripped = if ("N5" in DISABLED_RULES) program else program.replace(DSML_TAIL_TAGS, "")
+        return runCatching { normalizeInternal(stripped) }
             // warn 而非 debug：runCatching 只兜矫正器自身 bug（残缺程序走 parse null 不到此）——
             // 稀有 + 高信号；生产 INFO 级下 debug 会让安全网成黑洞（Task 12+13 质量 I-1）
             .onFailure { e ->
                 logger.warn("normalize 静默放行：{} | program 开头：{}", e.toString(), program.take(120))
             }
-            .getOrDefault(program)
+            .getOrDefault(stripped)
+    }
 
     private fun normalizeInternal(program: String): String {
         val roots = OpenUiCallTree.parse(program) ?: return program
