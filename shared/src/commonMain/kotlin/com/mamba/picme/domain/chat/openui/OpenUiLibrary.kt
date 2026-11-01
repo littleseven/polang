@@ -52,8 +52,8 @@ data class OpenUiProp(
 data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
 
 /**
- * polang OpenUI 组件库（一百项注册 = 官方 81/82 + 本仓别名与既有 8 项 + 通用布局原语
- * 3 项 + 经典组合版式 3 项 + 相册组合 2 项 + 布局可控性 3 项）。
+ * polang OpenUI 组件库（一百零一项注册 = 官方 81/82 + 本仓别名与既有 8 项 + 通用布局原语
+ * 3 项 + 经典组合版式 3 项 + 相册组合 2 项 + 布局可控性 3 项 + Html 沙箱叶 1 项）。
  * M2（2026-10-24，spec《openui-component-library-m2-design》）七扩十四；M3（同日，
  * spec《openui-component-library-m3-design》）十四扩二十一；2026-10-25 全量补全
  * （spec《openui-full-library-design》）：对齐官方 openuiLibrary（thesysdev/openui）
@@ -67,6 +67,8 @@ data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
  * 2026-10-31 相册 APP 组合方式批次：+PhotoGrid/AvatarRow，CardHeader +actionLabel/action。
  * 2026-10-31 布局可控性批次（spec《2026-10-31-openui-layout-controllability》）：
  * +CompareRow/Timeline/ChartGrid。
+ * 2026-11-01 turn-native T1（spec《2026-11-01-openui-turn-native-design》§3.6）：+Html
+ * （L2 沙箱卡入树，html* / display?，INLINE 缺省 / FULLPAGE 全屏查看器）。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
  * OpenUiNodeRenderer）共用同一份。
  */
@@ -1457,6 +1459,22 @@ object OpenUiLibrary {
                         OpenUiProp("photo", OpenUiPropType.NUMBER, required = true),
                         OpenUiProp("label", OpenUiPropType.STRING),
                     ),
+                ),
+            ),
+        ),
+
+        // Html：L2 沙箱卡入树（turn-native，spec《2026-11-01-openui-turn-native-design》§3.6）——
+        // 完整自包含 HTML 字符串，端侧 WebView 沙箱渲染（网络默认关死、dispatch 白名单）；
+        // display=INLINE（缺省，限高约 320dp）/ FULLPAGE（点击弹全屏查看器）
+        OpenUiComponent(
+            "Html",
+            listOf(
+                OpenUiProp("html", OpenUiPropType.STRING, required = true),
+                OpenUiProp(
+                    "display",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("INLINE"),
+                    enumValues = listOf("INLINE", "FULLPAGE"),
                 ),
             ),
         ),
