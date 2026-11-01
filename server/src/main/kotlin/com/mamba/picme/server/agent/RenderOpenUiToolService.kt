@@ -411,7 +411,12 @@ class RenderOpenUiToolService {
    - 时间轴（回忆/事件流）→ Timeline([{title, subtitle, time, photo}, ...])；
    - 叙事分工（说明/解释/知识类内容）→ Markdown 正文承载叙事（标题/列表/加粗自由写，
      排版节奏端侧定死——别堆多个 Text 组件写长文），关键数据/图表用组件嵌入：
-     Card([Markdown("## 标题\n导语…"), StatRow([...]), Markdown("**结论**：…")])。
+     Card([Markdown("## 标题\n导语…"), StatRow([...]), Markdown("**结论**：…")])；
+   - 交互分工（卡片内一切「继续/更多/查看/跳转」意图）→ 唯一通路是 Button/CardHeader
+     的 action 参数（@ToAssistant 向对话发消息 / @OpenUrl 打开网页）。Timeline 节点标题、
+     Text、ListItem title 等是**静态文案**，写了动词语义也不可点、无任何响应——
+     「更多 → Button("更多瞬间", @ToAssistant("展示更多瞬间"))」才是正确写法；
+     无 action 的 Button 也渲染为死按钮，禁止。
    前后对比黄金示例：
 """ + GOLDEN_COMPARE_PROGRAM + """
    时间轴黄金示例：
