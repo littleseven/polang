@@ -49,6 +49,21 @@ class OpenUiTurnNativeTest {
         assertTrue(prompt.contains(RenderOpenUiToolService.GOLDEN_STATS_PROGRAM))
     }
 
+    // 2026-11-01 回复活感批次：真机实证模型被卡片示例带偏，一切回复皆表单卡
+    // （「明天穿什么」也回 Card+标题+Callout+Timeline）——提示词须先教「选形态」
+    @Test
+    fun `system prompt pins reply-shape guidance and chat golden example`() {
+        val prompt = OpenUiTurnNative.SYSTEM_PROMPT
+        assertTrue(prompt.contains("回复形态先定位"))
+        // 对话类回复 = 裸 Markdown 正文，禁表单卡包装
+        assertTrue(prompt.contains("禁止包装成 Card + 标题 + Callout + Timeline"))
+        // 数据卡不做冷报表：首子级 Markdown 导语 + 收尾讲解
+        assertTrue(prompt.contains("Markdown 自然导语"))
+        // 对话黄金示例同源内嵌（改示例测试必红），且自身是合法程序
+        assertTrue(prompt.contains(OpenUiTurnNative.GOLDEN_CHAT_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateProgramToError(OpenUiTurnNative.GOLDEN_CHAT_PROGRAM))
+    }
+
     @Test
     fun `system prompt embeds full component allowlist`() {
         val prompt = OpenUiTurnNative.SYSTEM_PROMPT

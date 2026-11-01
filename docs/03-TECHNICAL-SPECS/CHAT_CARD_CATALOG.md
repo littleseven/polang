@@ -1031,6 +1031,16 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   引用「Card 最多嵌套 2 层」自我合规，门禁零触发。（发卡类改动须 App 发包与
   server 部署双交付、多会话部署竞态两条教训已立法 `server/AGENTS.md`
   「发卡类改动双交付铁律」。）
+  回复活感批次（2026-11-01，server 0.9.14）：turn-native 上线当天真机实证回归——
+  提示词契约与全部黄金示例皆为结构化卡片，模型把「明天穿什么」这类问答也包成
+  Card+标题+Callout+Timeline 表单卡，markdown 正文与对话语气消失（对照 A2UI 线
+  同期回复：有先导句/诚实交代能力边界/markdown 混排——真机库 61 张 openui 卡
+  全为表单形态实证）。修复=提示词新增「回复形态先定位」节（契约段后、DSL 规则
+  前）：对话/问答/解释/闲聊类回复 = 裸 `root = Markdown("自然正文")`（可多段/
+  加粗/列表，禁表单卡包装）；数据卡 Card 首子级 Markdown 自然导语 + 收尾讲解，
+  不做冷报表。新增对话黄金示例 `OpenUiTurnNative.GOLDEN_CHAT_PROGRAM`（测试
+  同源钉住且自身须过校验器）。端上零改动——裸 Markdown 程序经
+  `looksLikeProgram` 嗅探照常落 data_ui_openui、AgentMarkdown 全量渲染无卡壳。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
