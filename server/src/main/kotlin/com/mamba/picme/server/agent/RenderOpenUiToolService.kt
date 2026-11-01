@@ -405,8 +405,9 @@ class RenderOpenUiToolService {
    版式范式菜单（2026-10-31 布局可控性批次；标准骨架——结构照此组合）：
    - 统计报告（月度/年度回顾）→ Banner 题图 + StatRow 关键数字 + 图表（单图直排 / 双图
      ChartGrid）+ Callout 结论；
-   - 相册分组浏览 → CardHeader(标题, subtitle = "128 张", actionLabel = "查看全部") +
-     PhotoGrid，多分组拆多卡；
+   - 相册分组浏览 / 看照片（「看看」「最近拍了什么」「找些照片」等一切浏览语义——
+     首选此范式，而非 search_media display='true' 横滑轮播）→ CardHeader(标题,
+     subtitle = "128 张", actionLabel = "查看全部") + PhotoGrid，多分组拆多卡；
    - 前后对比（修图/优化效果）→ CompareRow(beforePhoto, afterPhoto, 前后标签) + 说明文字；
    - 时间轴（回忆/事件流）→ Timeline([{title, subtitle, time, photo}, ...])；
    - 叙事分工（说明/解释/知识类内容）→ Markdown 正文承载叙事（标题/列表/加粗自由写，

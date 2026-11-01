@@ -292,6 +292,8 @@ REVIEWS_WHITELIST = {
         "KMP 路线评估快照（含行动项，AGENTS.md §7 引用）",
     "2026-10-30-ai-coding-methodology-evolution.md":
         "AI Coding 方法演进复盘快照（2026-03~10 五阶段 + 里程碑时间线）",
+    "2026-11-01-chatgpt-genui-intelligent-ui-research.md":
+        "ChatGPT 5→6→GenUI 调研快照（DIL 逆向结论 + 四路线对比 + polang 可吸收设计）",
 }
 
 PROCESS_REF_PATTERN = re.compile(
