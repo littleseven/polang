@@ -427,6 +427,95 @@ class AgentRunnerTest {
         }
     }
 
+    // ── 回合原生 content 透传（turn-native T4）───────────────────────────────
+
+    /**
+     * 回合原生：forwardContentDeltas=true 时 content TextDelta 经 OpenUiContentStreamTracker
+     * 节流为 program 前缀旁路下行（不落事件流），终结消息经 finalMessageTransformer 变换后
+     * 落流。content 全长 60（两等分分片各 30 <minEmitChars=48）——仅尾帧触发首发，
+     * 单帧即全文，对节流间隔零依赖（多帧生长由 T3 tracker 单测覆盖）。
+     */
+    @Test
+    fun `turn-native forwards content deltas as program prefix`() = runBlocking {
+        val session = newSession()
+        val content = "meta = Text(\"${"统计".repeat(10)}\")\nroot = Card([Text(\"hi\")])"
+        assertTrue("测试前置：半片须低于节流首发阈值", content.length / 2 < 48)
+        assertTrue("测试前置：全文须达到节流首发阈值", content.length >= 48)
+        val sseServer = RawSseStubServer { _, _ ->
+            MockLlmSse.streamingText(content) to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val deltas = mutableListOf<String>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
+                forwardContentDeltas = true,
+                finalMessageTransformer = { "TRANSFORMED:$it" },
+                onOpenUiProgramDelta = { deltas += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertTrue("content delta 未透传", deltas.isNotEmpty())
+            deltas.zipWithNext().forEach { (prev, next) ->
+                assertTrue("前缀须单调生长", next.length > prev.length && next.startsWith(prev))
+            }
+            assertTrue("尾帧须携带完整 program", deltas.last().endsWith("Card([Text(\"hi\")])"))
+            assertEquals("尾帧须等于完整 content", content, deltas.last())
+            // 终结消息经 finalMessageTransformer 变换后落流
+            val events = AgentEventRepository.listBySession(session.id)
+            val finalMessage = events
+                .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
+                .map { event -> event.payload as AgentEventPayload.Message }
+                .last()
+            assertTrue(
+                "终结消息应经 finalMessageTransformer 变换，实际：${finalMessage.content}",
+                finalMessage.content.startsWith("TRANSFORMED:"),
+            )
+            assertEquals("TRANSFORMED:$content", finalMessage.content)
+            assertEquals(1, sseServer.callCount.get()) // 纯 content 回合：单次 LLM 调用
+        } finally {
+            sseServer.close()
+        }
+    }
+
+    /** 默认模式（forwardContentDeltas=false）：content TextDelta 不透传（零行为变化红线）。 */
+    @Test
+    fun `default mode does not forward content deltas`() = runBlocking {
+        val session = newSession()
+        val sseServer = RawSseStubServer { _, _ ->
+            MockLlmSse.streamingText("plain answer") to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            val deltas = mutableListOf<String>()
+            val finish = AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(
+                session, "hi", target, "sys", ServerToolService.defaultRegistry(),
+                onOpenUiProgramDelta = { deltas += it },
+            )
+
+            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
+            assertTrue("默认模式不应透传 content delta", deltas.isEmpty())
+        } finally {
+            sseServer.close()
+        }
+    }
+
     // ── 假发卡纠正回环（CardClaimGuard，2026-10-24 穷举实测事故类）──────────
 
     /**
