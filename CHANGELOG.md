@@ -1,0 +1,483 @@
+# Changelog
+
+## [1.0.71] - 2026-11-01
+
+### ✨ Features
+- feat(admin): wire /admin/llm/calls and /admin/agent/sessions routes
+- feat(admin): call stream and agent session replay pages
+- feat(admin): agent session and event replay queries
+- feat(admin): llmCalls paged query with filters for call log stream
+- feat(chat): cloud agent steps timeline — debug page + UI spec freeze
+- feat(chat): render cloud agent steps timeline in streaming bubble
+- feat(server): render_ui_openui 版式范式菜单 + 三新件签名与黄金示例 + lint 措辞换门禁口径
+- feat(chat): wire cloud round step events into streaming bubble state
+- feat(cloudagent): i18n labels for agent step timeline (5 languages)
+- feat(server): 布局矫正+门禁接线——argsTransformer 改写 Action、双消费点过 OpenUiLayoutValidator、观测日志
+- feat(cloudagent): add AgentStepTimeline reducer and step UI model
+- feat(cloudagent): emit StepStarted/StepFinished from action/observation events
+- feat(settings): default GenUI wire format to OpenUI
+- feat(openui): ChartGrid 双图并排渲染器 + 调试画廊三新件 demo
+- feat(openui): Timeline 时间轴渲染器——轴线节点 + 48dp 缩略图前件 + dispatch 挂载
+- feat(openui): CompareRow 前后对比渲染器——双图统一帧 + 等比缩放裁剪
+- feat(shared): OpenUI 布局可控性批次 schema——CompareRow/Timeline/ChartGrid
+- feat(server): OpenUiLayoutValidator 结构门禁 R1-R4 + 白名单 97→100
+- feat(server): OpenUiLayoutNormalizer 无声矫正——weights/Spacer/解包/居中四规则
+- feat(server): OpenUiCallTree 调用树扫描器——布局规则的结构分析基座
+- feat(openui): 相册APP组合方式批次 v8 — PhotoGrid/AvatarRow + CardHeader查看全部 + 构图规则
+- feat(openui): 经典组合版式批次——StatRow/Banner 新增 + ListItem 实渲染化 + VisualCardBlock bgPhoto（92→95）
+- feat(openui): 通用布局原语批次——Grid/Box/Spacer + Row.weights 比例分栏
+- feat(openui): 图文组合组件固化——ImageText/ImageTextLarge 支持相册照片
+- feat(openui): P2 流式预览——ToolCallDelta 旁路 + 端侧前缀渐进渲染
+- feat(a2ui): 补全 Video/AudioPlayer 媒体组件（17→19），播放器落中性包供 OpenUI 复用
+- feat(openui): 全量补全 OpenUI 官方组件库（21 → 89 项注册）
+- feat(openui): Image 真实比例 + 点击看大图——竖屏图不再被横框拦腰、点击落 PhotoEditor
+- feat(openui): 构图软警告 lint + 渲染截图基线——美观下限从 prompt 软约束升级为机制
+- feat(openui): 卡内设计语言第一刀 — 规范文档 + DISPLAY 字阶 + 图表皮肤 + accent 职责分离
+- feat(openui): M4 视觉规范 + M4.2 真机验收修复——卡内设计 token/6 色图表色板/Tabs 胶囊控件/空绑定兜底 + Image 链路三修
+- feat(openui): 组件库 M3——十四扩至二十一（Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch）+ PRIMITIVE_ARRAY
+- feat(openui): 组件库 M2——七组件扩至十四 + 可绑定 Text 与交互 state 写入
+- feat(openui): Image 组件 + #photos 句柄投影——OpenUI 卡图文混排
+- feat(server): cloud agent maxIterations 20→100——复杂 GenUI 排版多轮修正不再撞 20 步上限
+- feat(openui): debug 徽标 overlay——与 A2UI 角标对偶
+- feat(server): render_ui_openui 校验门控对等——结构级校验 + 错误回灌（对齐 1caa81fea 闭环）
+- feat(chat): OpenUI Compose 渲染器 + ChatScreen 接入（openui P2 闭环）
+- feat(chat): render_ui_openui action 帧分流 + OpenUiCard 落库 + Runner 测试
+- feat(settings): GenUI 协议开关 genui_format + 云端请求头注入链
+- feat(server): render_ui_openui 工具 + X-GenUI-Format 请求头互斥分流
+- feat(server): render_ui 负载校验闭环——发射点门控 + 错误回灌 + few-shot 示例
+- feat(chat): MessagePart.OpenUiCard data part + 回灌/分派收口
+- feat(chat): OpenUI Lang 1.0 批量解析/求值引擎 + polang 组件库（commonMain）
+- feat(a2ui): catalogId 可解引用——官网挂 catalog JSON schema + 对账测试防漂移
+- feat(a2ui): 语义样式令牌层——LLM 选层级不选数值，端侧映射 Design Token
+- feat(chat): A2UI 调试徽标+蓝图查看器（DEBUG 门控）——显性观测 data_ui 卡协议驱动
+- feat(server): debug 包免登录——DEBUG_QUOTA_BYPASS 双闸合成访客身份 + Android 调试页放宽登录闸
+- feat(chat): HandleResolver 填槽 + 交互态持久化 + 降级占位卡（hybrid M2 T7，US-6/US-7）
+- feat(chat): androidx.a2ui 集成——polang catalog（material+BarChart）与 A2uiCardHost（hybrid M2 T6，US-4）
+- feat(chat): render_ui action 帧拦截 + data_ui 混合落库（hybrid M2 T5，US-2）
+- feat(server): render_ui 云端发卡工具——action 事件复用下行，零新增通道（hybrid M2 T4）
+- feat(agent): local:// handle 注册——Room local_handle 表 + 投影文本 opaque token（hybrid M2 T3）
+- feat(shared): a2ui 契约抽象层——handle 双形态 + 月桶纯函数（hybrid M2 T2）
+- feat(chat): data_ui part 子类型贯通五个分派点（hybrid M2 T1）
+- feat(chat): 云端 Agent H5 卡渲染——html_card 事件上屏（调试页 + 主聊天云端回合）
+- feat(server): 云端 Agent render_html——HtmlCard 事件载荷 + summary-only 回执
+- feat(agent): render_html 契约入 Catalog——CLOUD 工具 + summary-only 回执语义
+- feat(server): M1 描述对齐——DeviceToolService @LLMDescription 只承诺投影面
+- feat(agent): M1 iOS 接线——IosCloudAgentToolBridge 出端过 CloudToolProjectionGate
+- feat(agent): M1 Android 接线——DeviceToolExecutor 出端过 CloudToolProjectionGate
+- feat(agent): 混合架构 M1——CloudToolProjectionGate 出端投影闸（fail-closed 禁出模式）
+- feat(agent): 混合架构 M1——CloudAgentToolCatalog locality 三声明（executor/resultSchema/projectionSchema）
+- feat(server): debug 包额度豁免——X-App-Channel 头 + DEBUG_QUOTA_BYPASS 总闸
+- feat(chat): 云端 Agent 图集卡恢复——工具透出回调 + 主聊天落库 + 调试页渲染
+- feat(chat): 对话成本治理 M3——意图级工具 schema 裁剪 + server cached_tokens 可观测
+- feat(chat): 云端 Agent 接入 Chat 主页——设置页开关切换云端/本地编排（M2.5）
+- feat(server): 云端 Agent M2.6 加固——per-user 跑轮并发闸 + nginx 配置入册
+- feat(ios): 云端 Agent M2 对等实现——SSE 传输 + 工具桥 + 调试聊天页 + BYOK 授权门
+- feat(android): cloud agent M2 最小聊天页 + 调试入口（开发者选项 DEBUG 组）
+- feat(android): cloud agent M2 聊天页状态机（通道门 + SSE 消费 + 工具桥回传）
+- feat(android): cloud agent M2 BYOK 授权开关（DataStore 默认关 + 通道选择规则 + 五语）
+- feat(android): cloud agent M2 端侧工具执行器（只读三件套映射 + 32K 截断）
+- feat(android): cloud agent M2 客户端 CloudAgentClient（SSE 四型帧 + BYOK 头仅随 messages）
+- feat(server): cloud agent M2 工具桥路由接线——tool-results 上行端点 + SSE 合成注册表
+- feat(server): cloud agent M2 设备工具 Koog 适配器（tool_request 帧 + 挂起等上行）
+- feat(server): cloud agent M2 工具桥挂起表 AgentBridgeRegistry
+- feat(server): 云端 Agent 会话域 M1——Koog JVM 事件溯源落地 ADR-018
+- feat(chat): 分层记忆 M4 主从制——Room 长期轨 SSOT + Koog 短期派生缓存可重建
+- feat(browser): M2.8 接管页手势统一——点击/滑动/缩放免模式切换直达
+- feat(task-center): 用户任务提为第一 Tab，工程师任务 Tab 仅白名单可见
+- feat(browser): M2.6 接管页复刻 Muse 观看窗形态——观看默认/显式接管/停止任务三态
+- feat(chat): browser-vnc 全屏接管页三段布局重构（接管/zoom/暂停/返回/IME 推起）
+- feat(chat): 意图路由新增浏览器捷径 BROWSE_WEB——「用浏览器打开X」不再误路由相册搜索
+- feat(chat): 任务卡对齐 HtmlCard 设计稿 09-27 Muse 两分区改版
+- feat(server+client): 注册验证码邮件按语言渲染、缺省中英双语
+- feat(browser-vnc): M2 WebSocket 推流 + 全屏接管——CDP screencast 帧通道 + clickAt/typeText/scroll/drag
+- feat(app): BrowserLiveCard 直播卡 + 全屏帧预览 + ChatScreen 分发
+- feat(app): ChatViewModel 直播卡 live 态收口——delegate/overlay/定格落库/帧轮询/兜底关闭
+- feat(app): 动作流水格式化器 + browser 卡五语文案
+- feat(app): 注册 BrowserSessionCapability（组合根注入 OkHttp transport）
+- feat(app): BrowserSessionClient——OkHttp transport（配额/不可用结构化降级）
+- feat(shared): tool_browser 占位管线 + live overlay + 拍平/持久化/回灌映射
+- feat(shared): MessagePart.BrowserLive（tool_browser）——type 分类法 8→9
+- feat(shared): 7 个 browser_* @Tool + prompt 规则段（golden 重生成）
+- feat(shared): 7 个 browser 命令 + BrowserSessionCapability（帧策略 + 降级不变式）
+- feat(shared): browser 协议 DTO——状态闭集 + 双响应 + 传输异常（端云同源）
+- feat(server): 管理后台概览加 browser 会话统计（当日/活跃/7日失败率）
+- feat(server): /v1/browser/* 网关——鉴权/配额/并发登记/透传/超时降级
+- feat(server): bridge client + per-user 并发登记 + browser_sessions 统计表
+- feat(server): browser 每日会话配额入 server_setting + 管理后台可配
+- feat(server): browser 配额基础——AppConfig 三项 + RateLimiter peek/provider
+- feat(bridge): HTTP 服务（时序安全 token/结构化错误/加固）+ systemd/rsync 部署件
+- feat(bridge): SessionManager——Playwright 共享 browser/临时 context/串行队列/三模式定位
+- feat(bridge): 骨架 + OpenMuse 级 SSRF 守卫（单播许可名单/端口限制/重定向防线基础）
+- feat(ota): 弹窗移除阻塞下载态 + 前后台感知接线——下载全量转后台
+- feat(ota): controller 重构——DM 后台下载/完成广播/冷启动恢复/前台拉装
+- feat(ota): 系统 DownloadManager 包装 + FileProvider 外部私有目录路径
+- feat(ota): prefs 增加 pending 下载三元组(id/versionCode/updatedAt)
+- feat(ota): 冷启动恢复判定 OtaRecoveryPolicy——pending×DM状态纯函数决策
+- feat(ota): debug 轨 APK 下载切国内镜像——北京轻量分发 + HK 渠道路由
+- feat(aso): 解除标题冻结——zh 三语品牌前置 + 短描述植入品牌词
+- feat(store): FG 横幅采纳画布重设计版——渐变底+光晕+飞卡构图三语上线
+- feat(ios-gallery): 待删标记 DB 持久化 + 任务化执行——杀进程不丢，恢复一次确认
+- feat(ios-gallery): 预览上滑删除改会话批量——退出一次系统框替代每删一张一弹
+- feat(ios-chat): markdown 渲染换代 MarkdownUI + 自研 PolangChat 主题
+- feat(ios-taskcenter): 任务中心双 Tab + Chat 顶栏入口 + 工程师任务卡渲染（ios-follow/taskcenter Stage 3b）——TaskCenterView/UserTaskCardView/EngineerTaskListRow 按 task-center.yaml 元素级实现（审批动作不渲染，台账口径）；IosUserTaskStore（文件持久化+锁内落盘+persist 失败重试语义）+ TagScan/ModelDownload 双适配器（含下载启动对账）；工程师卡复用 shared EngineerTaskHtml + HtmlCardView 双形态只读渲染；i18n +58 keys 五语；ChatHistoryStore 读路径 nonisolated 化
+- feat(ios-gallery): topbar 追齐 Android——标题左对齐 + 扫描原地 toggle + 三态优先级 + 扫描进度条
+- feat(ios-gallery): topbar 追齐 Android——标题左对齐 + 扫描原地 toggle + 三态优先级 + 扫描进度条
+- feat(ios-settings): 设置域全面追齐 Android——主菜单行式重构 + 六页重写 + persona 接通
+- feat(ios-tag): 扫描页 v4.1 追齐 Android——四段骨架重写 + 阶段弹层点选即执行
+- feat(tag): 阶段弹框改增量/全量两选项点选即执行——移除全量二次确认
+- feat(tag): 扫描页 v4.1 成果面板——六格可点成果 + 阶段行改扫描控制
+- feat(tag): 扫描页 v4——照用户 Ardot 重设计稿落码
+- design(ardot)+feat(tag): 暂停态帧落地——琥珀状态条语言,状态帧家族三连成套
+- feat(tag): 运行态显著动画——波纹状态点+进度条流光+圆环旋转彗星弧
+- feat(tag): 扫描页 v3 实现——单锚点 HeroCard+全页可点导航+GPU 迁设置·开发者选项
+- feat(i18n): 扫描页 v3 新增七键五语——覆盖率标签/剩余行/阶段查看提示/重新生成入口/三个相册视图名
+- feat(tag): 扫描进度 UX 单口径锚点重设计——库级完成率唯一百分比四面同源
+- feat(gallery): 后台扫描保活引导弹窗 checklist 化——逐项可点直达设置页 + 返回自动复查 + 全项完成自动续扫
+- feat(gallery): 删除现场一次性引导开启免确认删除——静默快路径不可用时先征询再回落系统框
+- feat(main): 整理页底 bar 落点优化——记住上次 tab，扫描进行中智能落扫描 tab
+- feat(gallery): 图库统计圆环统一 AI 打标完成率口径（与内容标签阶段行同源同舍入）并加中心微标签
+- feat(gallery): TagPassProgress.percentRounded——阶段行与统计圆环统一百分比舍入
+- feat(gallery): 长图缩略图清晰度——Fetcher 放大倍率闸门，超 1.5x 回落 Coil 解码
+- feat(gallery): 长图预览体验优化——Telephoto 底座 + FillWidth 阅读模式
+- feat(ota): 自建双轨 OTA 自更新——/api/app/latest 双轨端点 + App 更新器 + ota-publish.sh 一键发包
+- feat(person-ios): 关系保存静默丢弃修复对等跟随——applyPersonEdit 单次写入+结果透传+引导 toast
+- feat(chat): M5 B4——HTML 卡双形态 iOS 落地（INLINE 测高 / FULLPAGE 预览+查看器）
+- feat(chat-ios): M5 B3 agent.text AST 正文渲染——GFM 分段 + 排版阶梯 + parse gating
+- feat(chat): M5 B2——iOS turn 装配双轨（adapter+reducer）+ 工具状态 + 间距阶梯
+- feat(chat): M5 B1——ChatMessage Swift 消费 parts 模型 + codec 落库 + 拍平列表 item 化
+
+### 🐛 Bug Fixes
+- fix(admin): stalled null fallback to createdAt and forward event paging label
+- fix(m1-task6): review minors — stepLabel 必填、状态措辞、不跨回合 typo
+- fix(server): Task 12+13 评审收口——normalize 放行日志升 warn 带样本/gate 侧复用 validateToError/passthrough 分支补测/端到端断言收紧全等
+- fix(openui): 渲染器三连质量评审五项收口——CompareRow 空护栏+校验二段式/ChartGrid KDoc 口径/画廊三子项 demo 演练末格留空
+- fix(openui): Task 9 评审一行修——time maxLines/Ellipsis + OpenPhoto 字面量换 Actions 常量（含 Task 8 遗留同款）
+- fix(openui): action 体系审查收口（Y1-Y7）——Actions SSOT/viewState 泛化/OpenUrl 闸/兜底泛化
+- fix(server): Task 4 评审文案三处一行修——百项对齐限定语/边界注释 off-by-one/lint 序数
+- fix(server): Task 4 评审文案三处一行修——百项对齐限定语/边界注释 off-by-one/lint 序数；I-1 挂账 Task 14
+- fix(server): Normalizer 尾随逗号分离符归一——堵双逗号致命降级（评审 I-1）+ 三条零成本项
+- fix(openui): 既有组件对帧校准——Card16/Banner HEADLINE+蒙层/图表标题 CAPTION 弱色/Callout 12+18 等十项（OpenUILayouts 帧 SSOT）
+- fix(server): Normalizer 评审修复——N3 裸判定去污染 + 幂等反例封堵 + 非组件单子不解包
+- fix(server): OpenUiCallTree span 锚定修正 + 括号深度守卫（评审 I-1/I-2）+ 夹具补强
+- fix(openui): 「查看全部」点击无效根治 — @ToAssistant 实路由上行 + 缺省动作兜底 + lint 第六条
+- fix(chat): OpenUI 卡图片点击落 chat 内预览浮层，不再跳 PhotoEditor 编辑页
+- fix(openui): align 结构治理——三容器补 align prop 并严格对齐官方 Stack 语义
+- fix(openui): P2 流式预览真机修复——id 缺失帧按 index/单流别名归组
+- fix(a2ui): 交互组件 value 强制数据绑定，修行程卡控件置灰不可用
+- fix(a2ui): 纵向 List 封顶修复行程 Tab 崩溃（无限高测量）
+- fix(openui): M2 review 收口——Divider 本征高/Text 绑定回退/Tabs 键与横滑/Slider 外部回写 + 渲染端数量护栏
+- fix(openui): validator 拦字符串包裹的动作表达式——真机按钮惰性事故
+- fix(openui): Image 特性 review 收口——fragment 白名单 + 单卡图数上限 + 黄金示例同源
+- fix(cloud-agent): display=true 卡透出回执明说「图集卡已展示」——browse_carousel 假失败声称修复
+- fix(openui): validator 剥离顺序反转（先字符串后注释）+ 工具描述黄金示例
+- fix(genui): SURFACE 文字色映射 onSurfaceVariant——surfaceVariant 是填充色，卡面上文字隐形
+- fix(openui): 校验拒绝回执回显 program 开头 + root 位置提示；shared/AGENTS.md 补引擎命名实参/内联 Query 注记
+- fix(a2ui): 抽稀标签加宽 56→68dp 防两端裁剪 + 工具描述禁止正文展示 handle id
+- fix(barchart): 超多桶横滑模式——柱体隐身/标签竖排修复（all_years 二次事故）
+- fix(openui): 引擎支持命名实参 + 内联 Query 提升——all_years 整卡降级根因修复
+- fix(openui): Row 子组件等宽分栏——修复杂排版右栏压成竖条；工具描述禁文字用 SURFACE 色
+- fix(openui): OpenUiBarChart 补齐标签抽稀+柱高公式 + search_media display 描述强化浏览意图
+- fix(cloud-agent): search_media 增 display 意图门控——取数型搜索不再无脑出横滑图集卡
+- fix(a2ui): 真机穷举四项修复——假发卡守卫 + 组件白名单 6→17 + BarChart 标签抽稀 + search_media 空 query 全量
+- fix(openui): validator 剥离顺序反转——先字符串后注释
+- fix(openui): 禁 Query 内联组件参数——真机柱图静默丢弃修复
+- fix(openui): @Sort 字符串改 locale 序近似——a 排在 B 前（§3.4 显式示例）
+- fix(openui): 解析/求值崩溃面兜底——StackOverflowError 不得逃逸（§8.1 MUST）
+- fix(openui): runQuery 穿透 CancellationException——协程取消不得被 tool-error 兜底吞掉
+- fix(openui): 跨行三元 else 分支边界——冒号后换行不再静默丢 else（§1.4 规则 3）
+- fix(a2ui): BarChart 柱高预留标签位——修复满高柱裁掉月份标签
+- fix(a2ui): catalogId 迁至项目自有域 polang.net——原 mamba.com 非项目所有
+- fix(a2ui): 负路径测试订阅时序修复——UNDISPATCHED 注册后再喂消息
+- fix(a2ui): BarChart selected 裸值归一化改绑——修复点柱高亮静默失效
+- fix(a2ui): render_ui 补 action event 包装层契约——禁平写 name
+- fix(a2ui): Button childId → child——对齐 androidx.a2ui alpha01 实际 JSON key
+- fix(agent): 409 round_in_flight UX 双改进——端侧等待提示 + server retry_after
+- fix(agent): M2.7 单轮超时安全网——断线/卡死时租约必定释放
+- fix(a2ui): 收紧 render_ui 线格式契约 + HandleResolver data 批量容错——sf-a2u1c0de 蓝图渲染出错修复
+- fix(server): render_ui action 帧 argsJson 非法 JSON——Koog 私有 JSON 树 toString 零转义
+- fix(chat): M2 终审 Major 收口——信封防护 + 点选即时高亮 + 持久化作用域/帧容错
+- fix(server): debug 访客身份 hash 去前缀——76 字符超长 agent_session.token_hash VARCHAR(64) 落库 400
+- fix(chat): T6 评审 Minor 收口——负数 count 钳制 + collectAsStateWithLifecycle + 错误契约/双向同步注释
+- fix(server): render_ui suspend 对齐 + 工具描述 handle 子句双向同步（hybrid M2 T4 评审 R1）
+- fix(agent): 句柄注册容错降级 + 空命中不注册（hybrid M2 T3 评审 R1）
+- fix(agent): M1 测试名去括号——修复 Kotlin/Native iOS 测试编译
+- fix(android): 云端 Agent 相册工具无头直执——绕过场景注册表修复调用失败
+- fix(ios): EngineerTaskListRow 存量编译错——@ViewBuilder 嵌套 switch 抽静态函数
+- fix(settings): BYOK 授权行溢修复——标题单行省略 + 副标题限两行 + 五语文案缩减
+- fix(server): Agent 上游 URL 两段式拆解——修 /v1/v1/chat/completions 404
+- fix(server): ktor 全族对齐 3.3.3——修生产 default-headers 3.0.3 与 datetime 0.7.1 二进制冲突
+- fix: 终审修复——ViewModel 状态 CAS 化 + error 前缀单态化
+- fix(chat): CloudAgentChatViewModel 评审修复——prepare 竞态 + stop/send 覆盖 + 杂项
+- fix(browser): M2.7 接管交互链路修复——动作通道/WS 保活/IME 布局/生命周期竞态
+- fix(html-card): 测高回调改 rememberUpdatedState 活派发，修任务卡收起后大片空白
+- fix(chat): 任务卡 Light 统一 cell 白卡 + HTML 卡 displayMode 进程级缓存消除滑动高度跳变
+- fix(testing): ui_driver RPC 空根与空包名过滤修复
+- fix(chat): 工程师任务卡对齐 Ardot 设计稿——动作区连体 + 阶段中文化 + 截断原因本地化
+- fix(bridge): type/click 表单填写链路修复——index 模式 ElementHandle 兼容 + click 降级链
+- fix(server): 浏览器网关 busy 自愈 + key action——进程死亡租约泄漏不再锁死 15min
+- fix(chat): HTML 卡滑杆竖直干扰——onTouchEvent 按手势方向分流
+- fix(chat): 浏览器推流挂点自 INLINE 卡移至全屏接管页
+- fix(chat): HTML 卡手势冲突终案——按下即禁 Pager 横滑（确定性替代 consume 竞态）
+- fix(chat): HTML 卡片横滑手势冲突——改用 forEachGesture 从 Initial pass 拦截
+- fix(chat): HTML 卡片横滑手势冲突——Compose 层 consume + scrollBy 转发
+- fix(chat): HTML 卡片横滑手势冲突——Compose 层 consume + scrollBy 转发
+- fix(store): 商店图语言残留根治——zh-TW 六帧真繁体重烘 + en-US 三帧输入栏英文修复
+- fix(chat): HTML 卡片横滑手势与外层 Pager 页面切换冲突消除
+- fix(bridge): systemd unit node 路径对齐 nvm 符号链接（203/EXEC 修复）
+- fix(app): 直播卡步数口径统一——max(本地累计, bridge+open) + settle 兜底口径换算
+- fix(app): live map 原子化（update CAS）+ settle 按快照移除 + CE 穿透
+- fix(app): formatter null-arg 占位符泄漏修复 + 禁 it + 注释/测试加固
+- fix(app): deviceId 预热 launch 异常防护（启动崩溃防线）+ 登出注释措辞校准
+- fix(app): BrowserSessionClient OkHttp 调用挂钩协程取消 + CancellationException 穿透钉桩
+- fix(shared): browser 双显跳过放宽终态 + overlay 归一化短路 + 钉桩补全
+- fix(shared): category 一致性守卫补 BrowserLive + 回灌目录 KDoc 补行
+- fix(shared): 层叠守卫补绝对预算区间断言 + 删除名不副实的超时别名
+- fix(shared): 内层 CommandExecutor 超时对齐 25s + 层叠不变式守卫测试
+- fix(shared): browser_rules 豁免收敛上限 + browser_* dispatch 超时分级 25s
+- fix(shared): capability 兜底 catch 映射降级文本 + 钉住 click wantFrame
+- fix(shared): DTO targetIndex 对齐 bridge wire 字段 index（@SerialName）+ golden 钉桩
+- fix(server): 网关统计写故障隔离 + 计费契约测试钉桩 + session_expired 探测改解析式
+- fix(server): stats 挂起事务化 + client body 所有权契约 + 条件 release/available 修正/索引
+- fix(server): RateLimiter provider 构造开放（private 违背配额热配目的）+ 动态限额测试
+- fix(bridge): deploy.sh 引号嵌套腐蚀 token——改 heredoc（审查实证）
+- fix(bridge): 部署加固——README 冒烟内联/BRIDGE_BIND/healthz fail-with-body/systemd 加固/.env 忽略
+- fix(bridge): 弹窗处理器误杀主页面（real-Chrome 实证）+ stale_element 结构化 + 串行队列测试
+- fix(ota): 审查修复——RECEIVER_EXPORTED 通广播/恢复重试闭环/记账挪安装后/防双入队
+- fix(ota): MIRROR_HOST 全部花括号展开——修复 macOS bash 3.2 全角括号吞字节致 set -u 误杀
+- fix(tag-scan): 总进度改加权工作量口径——任务域/库域拆分 + photo-only 分母
+- fix(store): FG 横幅布局重设计——文字入顶部安全带，根治缩略位裁切
+- fix(release): REQUEST_INSTALL_PACKAGES 剥离改 merge 级 overlay 翻转
+- fix(release): 枚举字段全局 keep 根治 Moshi 反射崩溃——v1.0.46 正式轨发布
+- fix(ios-nav): 悬浮底胶囊与整理页顶导还原 spec/ardot 形态
+- fix(ios-taskcenter): UI 还原——M3 容器色/阴影/进度条 + 历史区渲染修复
+- merge: fix(chat) LLM 流式输出可终止（停止生成按钮）
+- fix(chat): LLM 流式输出可终止——输入区停止按钮 + 取消链路穿透
+- fix(ios-tag): 扫描页统计实时刷新追齐 Android——组合期 1s 轮询 + 统计查询离主线程 + 相等性门控
+- fix(ota): ota-publish.sh 全角括号吞变量名——set -u 下 unbound 崩溃
+- fix(release): Play 产物剥离 REQUEST_INSTALL_PACKAGES——v1.0.45 正式轨发布
+- fix(tag): 重聚类灭名三连修——FULL 标记竞态 + 保名兜底重挂 + KNN_K=4
+- fix(person): 人物页空白修复——先出列表再后台愈合
+- fix(tag): Pass2 聚类 OOM 崩溃循环修复——去装箱 k-NN 图 + 分块聚类 + 熔断
+- fix(tag): 暗黑返工——HeroCard 弃状态洗色容器,全态 surfaceContainer 对齐画布正稿
+- fix(tag): 增量管线饿死修复——pass 覆盖过滤下推候选窗口 SQL
+- fix(tag): 运行态进度可视——圆环/轨道切「本轮会话进度」口径,全库锚点降 caption 行
+- fix(tag): 后台扫描保活引导改为「先检查再提醒」——按项确认落库,已授权不再每次弹
+- fix(gallery): StageActionSheet 虚拟键避让 + 「推荐」徽章 CJK 行盒居中
+- fix(tag): isScanning 收集器加取消守卫防销毁后复活写 + onDestroy 注释时序修正
+- fix(tag): isScanning 服务销毁兜底归零——防中途死亡残留 true 误导整理页落点
+- fix(i18n): fr 打标术语回归 étiquetage 家族（annotées→étiquetées / Annotées IA→Étiquetage IA）+ spec/plan 同步
+- fix(gallery): percentRounded 改 Double 精确路径——真中点四舍五入成立并补 12.5%→13 断言
+- fix(search): 口语缓和词「找下/找一下/看下」泄漏为内容关键词——动词锚定正则剔除
+- fix(search): 人物搜索精度——解析命中转显式收窄维度，杜绝标签并集污染
+- fix(chat): 搜索时间约束兜底——结构化入口漏传 fromMs/toMs 时从原文补解析
+- fix(chat): 搜索「有人脸」过滤失效——结构化搜索路径补齐 hasFace 槽位
+- fix(shared): 修复 compileCommonMainKotlinMetadata 编译断裂——commonMain 无 RegexOption.DOT_MATCHES_ALL
+- fix(person): 聚类维护删除提交前以 DB 现值复查命名——修复命名后分组当场消失
+- fix(ota): COS user metadata 中文 changelog 百分号编码——修复 SignatureDoesNotMatch 上传失败
+- fix(person-ios): 审查修复——引导 toast 防覆盖 + reload 代际守卫 + 测试 target 复绿
+- fix(person): 编辑页关系保存静默丢弃修复——结果透出+引导提示+改名单次写入
+- fix(chat): M5 review 修复——heightCache 复合键 + 双状态行契约 + 失败文案
+
+### ♻️ Refactors
+- refactor(shared): Task 7 评审顺手项——KDoc 补两行批次史/childrenProp 复用/title.required 钉/去死安全调用
+- refactor(server): lint 收编——stat 居中/图文 weights 转 N4/N1 矫正，Grid 照片墙升硬 R4；计数文案 95→100
+- refactor(chat): detekt 零增量收口——runCloudTurn 抽函数 + 参数收拢 + 异常具体化（openui P2）
+- refactor(chat): T7 评审 Nit 修正——键粒度对齐 + parser 复用 + uriHandler 键控
+- refactor(agent): 云端 Agent 工具契约收口 shared CloudAgentToolContract（M3）
+- refactor(shared): UserTask 协议/TaskCenterPartition/EngineerTaskHtml 上提 commonMain（ios-follow/taskcenter Stage 3a）——UserTaskStore 接口抽象 Room 边界（RoomUserTaskStore 适配），UserTaskMapping 纯推导半上提、体系投影留 androidApp 同包扩展，Registry 语义全保留（写节流/HISTORY_KEEP=50/降级不穿透）；37 用例随迁 commonTest，jvmTest+assemble+androidApp 单测全绿，Android 行为零变化
+
+### 🧪 Tests
+- test(server): Task 14 评审 I-1 补钉——两黄金入 ValidatorTest 双钉位 + Normalizer 直通家族
+- test(a2ui): 全组件可用性验证——19 组件引擎+渲染双层覆盖
+- test(shared): a2ui 契约测试补强——乱序输入/时区跨界/空 id 边界（hybrid M2 T2 评审 Minor 修正）
+- test(chat): 补 browser_* 七工具 Capability 覆盖例外登记
+- test(server): settings 测试钉桩补齐——字段名更名 + 表单渲染断言
+- test(bridge): SSRF 守卫测试加固——钉住 URL 规范化绕过向量 + DNS 超时用例
+- test(ios): UI 自动化 launch-arg 直进通路——-openTaskCenter 启动即弹任务中心 cover、-taskCenterTab <0|1> 预选 Tab（对齐既有 -startPage/-openCamera 先例）；真机截图验证双 Tab + 持久化任务历史渲染
+
+### 📚 Documentation
+- docs: 布局可控性批次终态——0.9.9 部署生效 + 四场景验收全过（场景④硬约束被 LLM 主动内化）
+- docs: README 状态收编——M1+M2 已合 main
+- docs(m2): plan 接口块收编 seq/payloadRaw（Task 2 review 裁定）
+- docs(superpowers): 批次收口——Task 15 ✅ / Task 16 ⏸（部署与四场景留用户）
+- docs: 布局可控性批次验收登记（全测试绿/装机毕）+ spec 状态已实施
+- docs(server): AGENTS.md 登记布局可控性批次设计决策
+- docs(superpowers): Task 14 收口 + M4 封板
+- docs(superpowers): Task 12/13 收口
+- docs(superpowers): Task 8-11 收口 + M3 封板标注
+- docs(superpowers): agent step timeline + admin trace spec and plans
+- docs(openui): action 体系审查收口同步——viewState 泛化/Actions SSOT/OpenUrl 闸/lint 扩 ListItem+ListBlock（CHAT_CARD_CATALOG + shared/server AGENTS）
+- docs(superpowers): 修 Task 8 spec 评审 🟡 计划漂移——Task 9/10 各补 dispatch 步骤防静默空渲染
+- docs(superpowers): Task 7 收口
+- docs(superpowers): Task 4 收口 + M1 封板标注
+- docs(superpowers): Task 3 收口 + 评审顺手清单沉淀至 Task 13/14
+- docs(ui): 设计语言 v9 + 卡片目录登记布局可控性批次——§0 原则4/§4.7 版式范式八帧/速查表三新件/对帧校准 13 项
+- docs(ui): OpenUILayouts 版式范式页八帧快照入库——OpenUI 布局可控性批次 M2 收口
+- docs(superpowers): Task 2 复审 Approved 收口记录
+- docs(superpowers): Task 13 补 M-5 延后项——normalize runCatching 观测日志
+- docs(superpowers): Task 1 复审 Approved 收口记录
+- docs(superpowers): 计划 Task 1 完成回执——步骤勾选 + 落地勘误两条
+- docs(superpowers): 版式菜单补叙事分工条目——Markdown 承载叙事、组件承载结构（食谱档）
+- docs(superpowers): OpenUI 布局可控性批次实施计划——16 任务五阶段（规则引擎/Ardot 设计/新件/接线/验收）
+- docs(superpowers): 布局可控性 spec 补图片语义——新件统一等比缩放+裁剪，CompareRow 双图统一帧
+- docs(superpowers): OpenUI 布局可控性设计 spec——Ardot 版式范式 + 矫正/门禁混合约束
+- docs(reviews): 时间统计可视化——24h/月度双柱状图，节假日弱化为一行注脚
+- docs(reviews): 演进复盘快照增补——ui-driver 闭环里程碑 + 提交时间统计（好奇心量化）
+- docs(reviews): AI Coding 方法演进复盘快照——五阶段 + 里程碑时间线 + 三条专项主线
+- docs(superpowers): openui-layout-primitives spec 交付沉淀
+- docs(superpowers): 图文组合固化 spec 交付沉淀——结论落活文档后移除过程文档
+- docs(superpowers): align 治理 spec 交付沉淀——结论落活文档后移除过程文档
+- docs(superpowers): 白名单状态修正——browser-vnc M1/M2 已合 main、chat-parts M1~M4 已合 main（M5 待排期）
+- docs(sync): 十月激进迭代文档收口——GenUI/OpenUI 落三层 + 7 篇已交付 spec 沉淀
+- docs(superpowers): openui-compose-alignment spec 状态更新——P2 流式预览已合 main
+- docs(superpowers): 白名单登记 openui-compose-alignment spec（P1 交付，P2~P4 在途）
+- docs(chat): CHAT_CARD_CATALOG 登记 data_ui_openui 卡（协议/parts/回灌/渲染三要素 + 端到端例子）
+- docs(spec): OpenUI 线格式并行接入 + GenUI 协议开关设计定稿
+- docs(chat): CHAT_CARD_CATALOG 登记 data_ui A2UI 卡（hybrid M2 交付沉淀）
+- docs(agent): 清除注释中的评审轮次引用（hybrid M2 T3 re-review Minor）
+- docs(chat): wire 分类法计数注释同步 9 值（hybrid M2 T1 评审 Minor 修正）
+- docs(agent): 云端 Agent render_html H5 卡通道——模块文档同步
+- docs(agent): 混合架构 M2 A2UI 实施计划入库
+- docs(agent): M1 投影通路交付——plan 按沉淀管线移除，README 索引同步
+- docs(agent): 混合架构 M1 投影通路——模块 AGENTS 同步
+- docs(agent): A2UI 混合架构 spec 入库 + M1 投影通路实施计划登记
+- docs: cloud agent M2 文档同步（server/androidApp AGENTS + ADR-018 §6 状态）
+- docs(plan): 云端 Agent M2 实施计划——9 任务 TDD 拆解（server 桥 3 + android 5 + 文档 1）
+- docs(spec): 云端 Agent M2 设计——端侧工具桥 + BYOK 授权 + 最小聊天页
+- docs(adr): ADR-017 后端推理体系 + ADR-018 云端 Agent 会话状态模型
+- docs(chat): browser-vnc M2.5 口径固化——chat.yaml §18 接管页契约 + CATALOG §4.8
+- docs(server): nginx location / 补 WS upgrade 透传（browser-vnc M2 实部署修正）
+- test+docs(browser-vnc): M2 交付收口——WS 代理四用例 + 活文档同步 + 门禁排除镜像/vendor 目录
+- docs(plan): Task 20 勾选 + 补勾 Task 2/6/9 遗留 Step 复选框
+- docs(plan): Task 19 勾选
+- docs: 卡片目录 §4.8 归位 + README 风险条去重 + taxonomy 措辞消歧
+- docs: browser 直播卡交付同步——taxonomy 9 值/卡片目录/模块 AGENTS/路由清单
+- docs(plan): Task 18 勾选
+- docs: Task 16 勾选 + onBrowserSessionFailed 无门控意图注释
+- docs(plan): Task 17 勾选（提前于 Task 16 执行）
+- docs(plan): Task 15 勾选
+- docs(plan): Task 14 勾选
+- docs(plan): Task 13 勾选
+- docs(plan): Task 12 勾选 + Task 16 补 Step 0 认领 AgentCommand 穷尽 when 编译红
+- docs(ota): 真机验收通过归档——1.0.47→1.0.48 两跳三场景全过
+- docs(plan/spec): 直播卡借鉴 openmuse 修订——Playwright 单例+临时 context、openmuse 级 SSRF、交互元素清单与三模式定位
+- docs(plan): browser-vnc 直播卡 M1 实施计划——四线五阶段 20 任务（bridge/网关/shared/androidApp/e2e）
+- docs(spec): 直播卡增量——watch 模式走 Page.startScreencast 低频轮询 + 隔离扩容模型记录
+- docs(spec): 直播卡设计修订——headless Chromium 纯 CDP 驱动 + 按需抓帧（Muse 路线），VNC 池转调试/回退
+- docs(spec): Browser-VNC 云端浏览器直播卡设计——M1 定稿（bridge+网关+工具闭环+INLINE 直播卡）
+- docs(spec): OTA 后台下载+完成自动安装设计——系统 DownloadManager + 前台自动拉安装器
+- docs(chat): iOS markdown 渲染组件登记（MarkdownUI 定案）+ 差距台账三项
+- docs(ui-spec): task-center.yaml 契约固化（ios-follow/taskcenter Stage 2）——双 Tab/分区/卡片元素级反向提取 + platform_differences 台账；chat.yaml task_card ios_status 与 topbar.yaml 变体 D 图标漂移校准；06-QA 验收 gap analysis 登记
+- docs(ui-spec): gallery topbar 契约校准——选择态顶栏 morph（删 selection_bottom_bar 反写）+ state_priority 选择>搜索、scan_toggle 原地 toggle（play/pause+tint primary+恒 indeterminate 进度条）、model_center 图标 cloud_download、分组菜单 NONE 起头带 string_key、allowed_differences 补 scan_guard 台账；topbar.yaml 标题字重 Medium→SemiBold（对齐双端代码真值）
+- docs(plan): 扫描页 v3 实现计划——SSOT=tag-control.yaml,六任务(五语/DAO+过滤通道/页面重写/宿主导线/GPU迁设置/验证)
+- docs(spec): ios-chat-rich-features 验收项勾选——流式/11type/Markdown/JS 沙盒/CHART 等完成标记
+- docs(spec): 扫描进度 UX 重设计 spec 随交付沉淀清理——结论已落 08-UI-SPECS/FEATURES/AGENTS
+- docs(spec): 扫描进度 UX 重设计——单口径锚点+分层披露（方案 A 定稿）
+- docs(spec): 圆环口径机制描述同步落地实现——percentRounded() Double 精确路径
+- docs(ui-spec): tag-control.yaml 审查修正——caption 补 EN 原值前缀/圆环具体尺寸/metric_tiles 对齐实码/公式自包含
+- docs(ui-spec): tag-control.yaml 同步统计圆环 AI 打标口径与中心微标签
+- docs(gallery): StatsCard 注释口径同步——语义覆盖率圆环→AI 打标完成率圆环
+- docs(plan): 扫描页入口便捷化+图库统计圆环口径澄清实现计划
+- docs(spec): 扫描页入口便捷化+图库统计圆环口径澄清设计稿
+- docs(ios): iOS 文档基线刷新 v1.0.41/2026-09-29——M5 parts + person 保存流契约登记
+- docs(person): person.yaml 保存流契约定稿——applyPersonEdit 单次写入+结果透传+错误引导
+- docs(shared): M5 落地状态登记——iosMain/commonMain 新文件 + ios_todo 五项清零 + SKIE KotlinInt 实证
+- docs(chat): M5 契约固化——§5 agent_markdown 能力契约反向提取 + §16 台账增补
+
+### 🔧 Others
+- merge: OpenUI 布局可控性批次——矫正+门禁混合约束、Ardot 版式范式八帧、三新件（CompareRow/Timeline/ChartGrid，97→100）、四场景验收通过
+- chore(ota): bump versionCode 10070 / 1.0.70（agent 时间线+后台追溯遛狗包）
+- chore(admin): doc sync and version bump for llm trace pages
+- chore: bump 1.0.70（10070）/ server 0.9.9——OpenUI 布局可控性批次
+- chore(server): bump 0.9.8 —— OpenUI action 校验器收口（QUOTED_ACTION 补 Run|Action / @OpenUrl 字面量 https / lint 扩 ListItem+ListBlock / viewState Str 标量持久化）
+- merge: OpenUI action 体系审查收口（Actions SSOT/viewState 泛化/OpenUrl 闸/ListItem 兜底）
+- merge: OpenUI「查看全部」动作修复（ToAssistant 上行 + 缺省兜底 + lint 6）
+- merge: OpenUI「查看全部」动作修复（ToAssistant 上行 + 缺省兜底 + lint 6）
+- merge: OpenUI 相册APP组合方式批次 v8（PhotoGrid/AvatarRow/CardHeader 动作，95→97）
+- Merge branch 'feat/openui-image-aspect'——OpenUI 图片帧比例治理（帧随图片真实比例：元数据/intrinsic，ImageGallery 定高变宽，v1.0.67）
+- OpenUI 图片帧比例治理（v1.0.67）：帧宽高比决策链全组件统一
+- Merge branch 'feat/openui-classic-layouts'——OpenUI 经典组合版式批次（StatRow/Banner/ListItem 实渲染化/VisualCard bgPhoto，92→95）
+- chore(server): bump version 0.9.3 → 0.9.4——OpenUI 三轮布局治理服务端部署版
+- merge: docs/ai-coding-evolution-charts——时间统计柱状图化
+- merge: docs/ai-coding-evolution-uidriver-timestats——复盘快照增补（ui-driver 闭环 + 时间统计）
+- merge: docs/ai-coding-evolution-review——AI Coding 方法演进复盘快照入 docs/reviews
+- merge: feat/openui-layout-primitives——OpenUI 通用布局原语批次（Grid/Box/Spacer/Row.weights）
+- build: versionCode 递增守卫——发遛狗包前校验版本号递增
+- merge: fix/chat-photo-preview——OpenUI 卡图片点击进预览页而非编辑页
+- merge: feat/openui-photo-text——OpenUI 图文组合组件固化（相册照片 + 排版食谱 + lint 引导）
+- merge: feat/openui-align-spacing——OpenUI 卡 align 结构治理（官方 Stack 语义严格对齐）
+- chore(release): bump versionCode 10063 / v1.0.63——OpenUI P2 流式预览遛狗包
+- merge: OpenUI P2 流式预览 + 全组件画廊页（68 组件）
+- chore(release): bump versionCode 10062 / v1.0.62——OpenUI P1 粒度重组遛狗包
+- merge: OpenUI P1 响应式状态对齐 Compose 适配层（粒度重组）
+- perf(openui): P1 响应式状态对齐 androidx 适配层——粒度重组替代全量刷新
+- chore: 交付沉淀——删 a2ui-media spec 本体（结论已落 server/AGENTS.md + CHAT_CARD_CATALOG）
+- Merge branch 'fix/a2ui-fakecard-barchart-searchmedia'——A2UI/OpenUI 真机穷举修复批次
+- Merge branch 'fix/openui-surface-text-color'——SURFACE 文字色映射修复
+- Merge branch 'fix/openui-row-weight'——OpenUI Row 等宽分栏修复 + 工具描述 SURFACE 禁令
+- obs(cloudagent): postMessage 打 genUiFormat 日志——GenUI 头分流可观测
+- Merge branch 'feat/openui-debug-badge'——OpenUI debug 徽标 overlay（与 A2UI 对偶）
+- Merge branch 'fix/openui-inline-query'——validator 剥离顺序修复（缺 root 误报死循环）
+- Merge branch 'fix/openui-inline-query'——OpenUI Query 内联禁令（真机柱图静默丢弃修复）
+- Merge branch 'feat/openui-genui'——OpenUI 线格式并行接入 + GenUI 协议开关（A2UI/OpenUI 对比实验）
+- Merge branch 'main' into feat/openui-genui
+- Merge branch 'fix/a2ui-barchart-label'
+- chore(release): bump versionCode 10061 / v1.0.61——A2UI 点柱高亮修复遛狗包
+- Merge branch 'fix/a2ui-style-tokens'
+- chore(release): bump versionCode 10060 / v1.0.60——A2UI 语义样式令牌遛狗包
+- style(a2ui): A2UI 渲染层 design token 化——消除硬编码对齐全局体系
+- chore(release): bump versionCode 10059 / v1.0.59——409 UX 双改进遛狗包
+- chore(release): bump versionCode 10058 / v1.0.58——A2UI 契约修复遛狗包
+- chore(release): bump versionCode 10057 / v1.0.57——A2UI 调试徽标遛狗包
+- Merge branch 'feat/a2ui-debug-badge'
+- Merge branch 'feat/hybrid-m2-a2ui'（终审 Major 收口）
+- Merge branch 'feat/hybrid-m2-a2ui'
+- Merge branch 'feat/cloud-render-html'
+- merge: 对话成本治理 M3（意图级工具裁剪 + cached_tokens 可观测）
+- merge: 云端 Agent 接入 Chat 主页（M2.5 设置页开关）
+- merge: 云端 Agent M2.6 服务端加固（并发闸 + nginx 入册）
+- Merge remote-tracking branch 'origin/main'
+- chore: bump versionCode 10056 / versionName 1.0.56（browser-vnc M2.7+M2.8 遛狗包）
+- chore: bump versionCode 10054 / versionName 1.0.54（任务卡白卡+高度跳变修复遛狗包）
+- Merge branch 'feat/browser-takeover-muse'
+- chore(release): bump v1.0.53 (10053)——任务卡设计稿对齐修复遛狗包
+- merge: browser-vnc M2.6 Muse 观看窗形态（observing/in_control/ended 三态）
+- chore(build): 修复既有门禁——ktlint 超长行拆分 + detekt baseline 漂移重建
+- spike(chat): 全屏接管页 noVNC WebView 推流实验（throwaway，不合 main）
+- Merge branch 'feat/email-i18n'
+- merge: 浏览器推流挂点移至全屏接管页（fix/browser-fullscreen-live）
+- chore(version): v1.0.50 (10050) OTA 遛狗包
+- chore(version): v1.0.49 (10049) OTA 遛狗包
+- merge: browser-vnc M2——WebSocket 推流 + 全屏接管（CDP screencast 帧通道 + clickAt/typeText/scroll/drag 坐标动作）
+- merge: browser-vnc 直播卡 M1 全量——bridge/网关/shared/app 四线 + 端到端真机验收 8/8
+- chore(app): compose-stability 台账同步 MessagePart 9 子类 + BrowserActionEntry
+- chore(release): bump 1.0.48——后台下载真机验收轮
+- merge: browser-vnc 直播卡 bridge 线——SSRF 守卫 + SessionManager + 串行队列（M1 前四提交，仅 infra/browser-bridge）
+- chore(release): bump 1.0.47——OTA 后台下载+完成自动安装上线
+- chore(infra): 三机 COS 加密周备份上线——HK 单点编排器 + 组网实施计划
+- chore(ota): 终审收尾——spec/plan 同步终态、延期决策归档、清 detekt 净增项
+- i18n(ota): 后台下载五语文案——toast/完成通知/DM标题/渠道名，ready_to_install 去版本占位
+- merge: 扫描总进度加权工作量口径（任务域/库域拆分 + photo-only 分母）
+- merge: iOS 相册 topbar 追齐 Android（标题左对齐 + 扫描原地 toggle + 三态优先级 + 进度条）
+- merge: iOS 任务中心 UI 还原（M3 容器色/阴影/进度条 + 历史区渲染修复）
+- merge: iOS 待删标记 DB 持久化 + 任务化执行（杀进程不丢，恢复一次确认）
+- merge: iOS 预览上滑删除会话批量（退出一次系统框替代逐张弹框）
+- merge: iOS 悬浮底胶囊 + 整理页顶导形态还原（内容包裹居中 / primary 选中态）
+- merge: iOS markdown 渲染换代 MarkdownUI（GFM 全量 + 主题 + 表格/代码块增强）
+- build(ios): SPM 接入 MarkdownUI 2.4.1（exactVersion 钉版）——chat.yaml §5 agent_markdown GFM 渲染底座
+- chore(version): bump 1.0.45(10045)——正式轨发布（人物搜索精度修复 + 扫描页 v4 等 41 提交）
+- design(ardot): 运行帧补钉住状态条(ScanStrip)——绿点+阶段名+计数+全宽底缘进度条;health 归零
+- design(ardot): v3 帧去 top_bar 随真机空白修复——胶囊即唯一页头;refs/yaml/csv 同步
+- design(ardot): 扫描页 v3 晋升正典——单锚点主卡+全页可点导航+家族换肤收口
+- Merge feat/scan-progress-ux-redesign: 扫描进度 UX 单口径锚点——库级完成率唯一百分比四面同源
+- design(ardot): tag_control 帧文案同步 AI 打标口径——caption 变量三语改值+新增圆环微标签变量与节点+语言台账/refs 跟新
+- Merge fix/bg-scan-guard-dialog: 后台扫描引导弹窗 checklist 化（与 silent-trash-guidance 集成遛狗）
+- i18n(gallery): stats_hero_caption 改 AI 打标口径 + 新增圆环微标签 tag_stats_ring_label（五语）
+- chore(version): bump 1.0.44(10044)
+- chore(version): bump 1.0.43(10043)——人物搜索精度修复 OTA 验证版
+- Merge branch 'feat/long-image-preview'
+- chore(version): bump 1.0.42(10042)——OTA 首弹冒烟验证版
+- Merge branch 'fix/person-relation-save-silent-drop'
+- Merge branch 'feat/chat-parts-m5'
+All notable changes to this project will be documented in this file.
+
