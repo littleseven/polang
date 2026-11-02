@@ -2247,10 +2247,13 @@ class ChatViewModel(
                 }
             }
 
-            // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）
+            // SSE 结束后在挂起上下文统一收尾落库（onEvent 回调非挂起，不能直接写 Room）。
+            // done 帧性能数据统一装配（映射同 DeepSeek 先例：prefill=0 隐藏、decode=回合耗时）；
+            // 旧服务端无 usage（tokens 全 0）不装配，避免渲染全 0 指标行。
             _streamingMessage.value = null
-            flushCloudTurnCards(sessionId, cards)
-            finishCloudTurn(sessionId, result, serverError, answer)
+            val performance = cards.doneUsage.toLlmPerformanceOrNull()
+            flushCloudTurnCards(sessionId, cards, performance)
+            finishCloudTurn(sessionId, result, serverError, answer, performance)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -2285,9 +2288,13 @@ class ChatViewModel(
         val a2uiFlushes: MutableList<Pair<String, CloudTurnEvent.A2uiCard>> = mutableListOf(),
         val openUiFlushes: MutableList<Pair<String, CloudTurnEvent.OpenUiCard>> = mutableListOf(),
     ) {
+        /** done 帧回合性能数据（2026-11-01）：随卡队列走同一回合级瞬态通道，重试/清空一并复位。 */
+        var doneUsage: CloudTurnEvent.Done? = null
+
         fun clear() {
             a2uiFlushes.clear()
             openUiFlushes.clear()
+            doneUsage = null
         }
     }
 
@@ -2352,14 +2359,18 @@ class ChatViewModel(
     }
 
     /** SSE 结束后按序落库两线 GenUI 卡：先落卡前已累积文本（text 行），再落卡行。 */
-    private suspend fun flushCloudTurnCards(sessionId: String, cards: CloudTurnCardFlush) {
+    private suspend fun flushCloudTurnCards(
+        sessionId: String,
+        cards: CloudTurnCardFlush,
+        performance: LlmPerformance? = null,
+    ) {
         for ((pendingText, card) in cards.a2uiFlushes) {
-            if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
-            insertA2uiCardMessage(sessionId, card)
+            if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL, performance)
+            insertA2uiCardMessage(sessionId, card, performance)
         }
         for ((pendingText, card) in cards.openUiFlushes) {
-            if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL)
-            insertOpenUiCardMessage(sessionId, card)
+            if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL, performance)
+            insertOpenUiCardMessage(sessionId, card, performance)
             // 正式卡落库后流式预览让位（Room Flow 重放前的空窗仅一帧量级，无双显）
             _openUiStreamProgram.value = null
         }
@@ -2371,6 +2382,7 @@ class ChatViewModel(
         result: Result<Unit>,
         serverError: String?,
         answer: StringBuilder,
+        performance: LlmPerformance? = null,
     ) {
         when {
             result.isFailure && isCloudRoundInFlight(result.exceptionOrNull()) -> insertAgentMessage(
@@ -2388,7 +2400,7 @@ class ChatViewModel(
                 "error"
             )
             serverError != null -> insertAgentMessage(sessionId, serverError, "error")
-            answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL)
+            answer.isNotBlank() -> insertAgentMessage(sessionId, answer.toString(), CLOUD_MODEL_LABEL, performance)
             else -> Unit // Done 但无文本（纯工具回合且服务端无总结）：静默收场
         }
     }
@@ -2492,7 +2504,7 @@ class ChatViewModel(
                 }
                 _streamingMessage.update { msg -> msg?.copy(agentSteps = cloudStepTimeline.steps) }
             }
-            CloudTurnEvent.Done -> Unit // 收尾统一在 runCloudTurn 挂起上下文处理
+            is CloudTurnEvent.Done -> cards.doneUsage = event // 性能数据收尾时统一装配（flush/finish）
         }
     }
 
@@ -3770,6 +3782,7 @@ class ChatViewModel(
     private suspend fun insertA2uiCardMessage(
         sessionId: String,
         event: CloudTurnEvent.A2uiCard,
+        performance: LlmPerformance? = null,
     ) {
         val part = MessagePart.A2uiCard(
             partId = "p0",
@@ -3786,6 +3799,7 @@ class ChatViewModel(
                 content = a2uiCardJson.encodeToString(MessagePart.A2uiCard.serializer(), part),
                 timestamp = System.currentTimeMillis(),
                 modelUsed = "cloud_agent",
+                metadata = performanceMetadataJson(performance),
             )
         )
         chatSessionDao.touchSession(sessionId)
@@ -3823,6 +3837,7 @@ class ChatViewModel(
     private suspend fun insertOpenUiCardMessage(
         sessionId: String,
         event: CloudTurnEvent.OpenUiCard,
+        performance: LlmPerformance? = null,
     ) {
         val part = MessagePart.OpenUiCard(
             partId = "p0",
@@ -3838,6 +3853,7 @@ class ChatViewModel(
                 content = a2uiCardJson.encodeToString(MessagePart.OpenUiCard.serializer(), part),
                 timestamp = System.currentTimeMillis(),
                 modelUsed = "cloud_agent",
+                metadata = performanceMetadataJson(performance),
             )
         )
         chatSessionDao.touchSession(sessionId)
@@ -3923,7 +3939,23 @@ class ChatViewModel(
         modelUsed: String,
         performance: LlmPerformance? = null
     ) {
-        val metadata = performance?.let {
+        chatMessageDao.insertMessageWithParts(
+            ChatMessageEntity(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                type = "text",
+                role = "agent",
+                content = content,
+                modelUsed = modelUsed,
+                metadata = performanceMetadataJson(performance)
+            )
+        )
+        chatSessionDao.touchSession(sessionId)
+    }
+
+    /** 性能指标 → metadata JSON 字段（落库格式 SSOT：parsePerformanceMetadata 的逆变换）。 */
+    private fun performanceMetadataJson(performance: LlmPerformance?): String? {
+        return performance?.let {
             JSONObject().apply {
                 put("prompt_len", it.promptLen)
                 put("decode_len", it.decodeLen)
@@ -3934,18 +3966,6 @@ class ChatViewModel(
                 put("used_sandbox", it.usedSandbox)
             }.toString()
         }
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                type = "text",
-                role = "agent",
-                content = content,
-                modelUsed = modelUsed,
-                metadata = metadata
-            )
-        )
-        chatSessionDao.touchSession(sessionId)
     }
 
     /**
@@ -4601,6 +4621,28 @@ class ChatViewModel(
     /**
      * 从 metadata JSON 解析本地 LLM 性能指标
      */
+    /**
+     * 云端回合 done 帧性能数据 → [LlmPerformance]（映射同 DeepSeek streamResult 先例：
+     * prefill=0 隐藏、decode=回合端到端耗时、speed=completion/耗时）。旧服务端无 usage
+     * （tokens 双 0）返回 null——不落全 0 指标行（对齐 parsePerformanceMetadata 的护栏语义）。
+     */
+    private fun CloudTurnEvent.Done?.toLlmPerformanceOrNull(): LlmPerformance? {
+        val done = this ?: return null
+        val prompt = done.promptTokens ?: 0
+        val completion = done.completionTokens ?: 0
+        if (prompt <= 0 && completion <= 0) return null
+        val elapsed = done.elapsedMs ?: 0
+        return LlmPerformance(
+            promptLen = prompt,
+            decodeLen = completion,
+            prefillTimeMs = 0,
+            decodeTimeMs = elapsed,
+            prefillSpeed = 0f,
+            decodeSpeed = if (elapsed > 0 && completion > 0) completion.toFloat() / elapsed * 1000 else 0f,
+            usedSandbox = false
+        )
+    }
+
     private fun parsePerformanceMetadata(metadata: String): LlmPerformance? {
         return try {
             val json = JSONObject(metadata)

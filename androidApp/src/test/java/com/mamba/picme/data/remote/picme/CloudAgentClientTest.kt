@@ -43,6 +43,23 @@ class CloudAgentClientTest {
     }
 
     @Test
+    fun `parseBlock parses done frame usage fields and tolerates legacy done`() {
+        // 2026-11-01 起 done 帧携带回合性能数据（usage/elapsed_ms）
+        val done = CloudSseParser.parseBlock(
+            """data: {"kind":"done","session_status":"running","elapsed_ms":8432,"usage":{"prompt_tokens":1280,"completion_tokens":96}}""",
+        ) as CloudFrame.Done
+        assertEquals("running", done.sessionStatus)
+        assertEquals(1280L, done.promptTokens)
+        assertEquals(96L, done.completionTokens)
+        assertEquals(8432L, done.elapsedMs)
+        // 旧服务端 done 帧（无 usage）：字段全 null 容错
+        val legacy = CloudSseParser.parseBlock("""data: {"kind":"done","session_status":"running"}""") as CloudFrame.Done
+        assertEquals(null, legacy.promptTokens)
+        assertEquals(null, legacy.completionTokens)
+        assertEquals(null, legacy.elapsedMs)
+    }
+
+    @Test
     fun `createSession posts channel fields and returns session json`() = runTest {
         val server = MockWebServer()
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"session_id":"s_1","status":"running","channel":"byok","model":"kimi-k2.6"}"""))

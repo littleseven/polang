@@ -851,16 +851,24 @@ fun ChatScreen(
                                     // onViewStateChange 持久化）；handle 缺失等 → 降级占位卡（US-6）
                                     val part = item.part as? MessagePart.A2uiCard
                                     if (part != null) {
-                                        A2uiCardHost(
-                                            part = part,
-                                            resolver = a2uiHandleResolver,
-                                            catalog = polangA2uiCatalog,
-                                            onViewStateChange = { viewState ->
-                                                // 终审 m2：走 viewModelScope 包装，页面离开不丢持久化
-                                                viewModel.persistA2uiViewStateAsync(item.message.id, viewState)
-                                            },
-                                            degradedContent = { summary -> A2uiCardDegraded(summary) },
-                                        )
+                                        Column {
+                                            A2uiCardHost(
+                                                part = part,
+                                                resolver = a2uiHandleResolver,
+                                                catalog = polangA2uiCatalog,
+                                                onViewStateChange = { viewState ->
+                                                    // 终审 m2：走 viewModelScope 包装，页面离开不丢持久化
+                                                    viewModel.persistA2uiViewStateAsync(item.message.id, viewState)
+                                                },
+                                                degradedContent = { summary -> A2uiCardDegraded(summary) },
+                                            )
+                                            // 性能指标行（2026-11-01 云端 done 帧回补，同 Text part 口径）
+                                            if (item.isLastPartOfMessage) {
+                                                item.message.performance?.let { perf ->
+                                                    MessagePerformanceRow(perf, isUser = false)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 ChatListItem.TYPE_OPENUI_CARD -> {
@@ -868,41 +876,50 @@ fun ChatScreen(
                                     // 交互态经 onViewStateChange 持久化）；handle 缺失等 → 降级占位卡
                                     val part = item.part as? MessagePart.OpenUiCard
                                     if (part != null) {
-                                        if (item.message.id == OPENUI_STREAM_PREVIEW_ID) {
-                                            // openui P2 流式预览：只读、空 resolver（Query 不取数），
-                                            // 正式卡帧落库后由下方 OpenUiCardHost 接管
-                                            OpenUiStreamingCard(
-                                                program = part.program,
-                                                photoResolver = openUiPhotoResolver,
-                                            )
-                                        } else {
-                                            OpenUiCardHost(
-                                                part = part,
-                                                handleLookup = openUiHandleLookup,
-                                                photoResolver = openUiPhotoResolver,
-                                                onViewStateChange = { viewState ->
-                                                    viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
-                                                },
-                                                // Image 点击看大图：chat 内预览浮层单页（不跳 PhotoEditor 编辑页）
-                                                onPhotoClick = { uris ->
-                                                    // 集合语义（2026-11-01）：多 URI = 集合组件（PhotoGrid/Timeline）
-                                                    // → 多页横滑翻页预览（Gallery 语义）；单 URI = 单图预览
-                                                    imagePreview = ChatImagePreviewState(
-                                                        pages = uris.map { uri ->
-                                                            ImagePreviewPage(
-                                                                messageId = item.message.id,
-                                                                rawUri = uri,
-                                                                isEditableResult = false,
-                                                                isSaved = false,
-                                                            )
-                                                        },
-                                                        initialIndex = 0,
-                                                    )
-                                                },
-                                                // 卡内回话入口（CardHeader「查看全部」等）：
-                                                // @ToAssistant 以用户消息发进会话
-                                                onToAssistant = { text -> viewModel.sendMessage(text) },
-                                            )
+                                        Column {
+                                            if (item.message.id == OPENUI_STREAM_PREVIEW_ID) {
+                                                // openui P2 流式预览：只读、空 resolver（Query 不取数），
+                                                // 正式卡帧落库后由下方 OpenUiCardHost 接管
+                                                OpenUiStreamingCard(
+                                                    program = part.program,
+                                                    photoResolver = openUiPhotoResolver,
+                                                )
+                                            } else {
+                                                OpenUiCardHost(
+                                                    part = part,
+                                                    handleLookup = openUiHandleLookup,
+                                                    photoResolver = openUiPhotoResolver,
+                                                    onViewStateChange = { viewState ->
+                                                        viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
+                                                    },
+                                                    // Image 点击看大图：chat 内预览浮层单页（不跳 PhotoEditor 编辑页）
+                                                    onPhotoClick = { uris ->
+                                                        // 集合语义（2026-11-01）：多 URI = 集合组件（PhotoGrid/Timeline）
+                                                        // → 多页横滑翻页预览（Gallery 语义）；单 URI = 单图预览
+                                                        imagePreview = ChatImagePreviewState(
+                                                            pages = uris.map { uri ->
+                                                                ImagePreviewPage(
+                                                                    messageId = item.message.id,
+                                                                    rawUri = uri,
+                                                                    isEditableResult = false,
+                                                                    isSaved = false,
+                                                                )
+                                                            },
+                                                            initialIndex = 0,
+                                                        )
+                                                    },
+                                                    // 卡内回话入口（CardHeader「查看全部」等）：
+                                                    // @ToAssistant 以用户消息发进会话
+                                                    onToAssistant = { text -> viewModel.sendMessage(text) },
+                                                )
+                                            }
+                                            // 性能指标行（2026-11-01 云端 done 帧回补，同 Text part 口径）；
+                                            // 流式预览合成消息无 performance，null 检查天然放行边界
+                                            if (item.isLastPartOfMessage) {
+                                                item.message.performance?.let { perf ->
+                                                    MessagePerformanceRow(perf, isUser = false)
+                                                }
+                                            }
                                         }
                                     }
                                 }

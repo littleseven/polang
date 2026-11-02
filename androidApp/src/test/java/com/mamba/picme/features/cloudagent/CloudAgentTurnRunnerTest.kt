@@ -80,9 +80,20 @@ class CloudAgentTurnRunnerTest {
         val result = newRunner(api).runTurn("token", "s_1", "相册多少张", null) { events.add(it) }
         assertTrue(result.isSuccess)
         assertEquals(
-            listOf(CloudTurnEvent.AssistantText("你有 42 张照片"), CloudTurnEvent.Done),
+            listOf(CloudTurnEvent.AssistantText("你有 42 张照片"), CloudTurnEvent.Done()),
             events,
         )
+    }
+
+    @Test
+    fun `done frame carries turn usage for performance row`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(CloudFrame.Done("running", promptTokens = 1280, completionTokens = 96, elapsedMs = 8432))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
+        assertEquals(listOf(CloudTurnEvent.Done(promptTokens = 1280, completionTokens = 96, elapsedMs = 8432)), events)
     }
 
     @Test
@@ -98,7 +109,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.Done()), events)
     }
 
     @Test
@@ -110,7 +121,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "相册多少张", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.ToolCall("get_gallery_summary"), CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.ToolCall("get_gallery_summary"), CloudTurnEvent.Done()), events)
         assertEquals(listOf(Triple("tr_1", true, "相册 42 张")), api.toolResults)
     }
 
@@ -139,7 +150,7 @@ class CloudAgentTurnRunnerTest {
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "画张卡片", null) { events.add(it) }
         assertEquals(
-            listOf(CloudTurnEvent.HtmlCard("<p>hello</p>", "一张问候卡"), CloudTurnEvent.Done),
+            listOf(CloudTurnEvent.HtmlCard("<p>hello</p>", "一张问候卡"), CloudTurnEvent.Done()),
             events,
         )
     }
@@ -157,7 +168,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "画张卡片", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.Done()), events)
     }
 
     @Test
@@ -226,7 +237,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.StepStarted(3L, "search_media"), CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.StepStarted(3L, "search_media"), CloudTurnEvent.Done()), events)
     }
 
     @Test
@@ -265,7 +276,7 @@ class CloudAgentTurnRunnerTest {
             listOf(
                 CloudTurnEvent.OpenUiCardDelta("root = Card(["),
                 CloudTurnEvent.OpenUiCardDelta("root = Card([header])"),
-                CloudTurnEvent.Done,
+                CloudTurnEvent.Done(),
             ),
             events,
         )
@@ -284,7 +295,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.StepStarted(5L, "render_ui_openui"), CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.StepStarted(5L, "render_ui_openui"), CloudTurnEvent.Done()), events)
     }
 
     @Test
@@ -309,7 +320,7 @@ class CloudAgentTurnRunnerTest {
             listOf(
                 CloudTurnEvent.StepStarted(11L, "search_media"),
                 CloudTurnEvent.StepFinished(11L, true),
-                CloudTurnEvent.Done,
+                CloudTurnEvent.Done(),
             ),
             events,
         )
@@ -328,7 +339,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.StepFinished(20L, false), CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.StepFinished(20L, false), CloudTurnEvent.Done()), events)
     }
 
     @Test
@@ -345,7 +356,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "hi", null) { events.add(it) }
-        assertEquals(listOf(CloudTurnEvent.Done), events)
+        assertEquals(listOf(CloudTurnEvent.Done()), events)
     }
 
     @Test
@@ -368,7 +379,7 @@ class CloudAgentTurnRunnerTest {
             listOf(
                 CloudTurnEvent.StepStarted(2L, "render_ui"),
                 CloudTurnEvent.A2uiCard("sf-1", "[{}]", "327 张"),
-                CloudTurnEvent.Done,
+                CloudTurnEvent.Done(),
             ),
             events,
         )

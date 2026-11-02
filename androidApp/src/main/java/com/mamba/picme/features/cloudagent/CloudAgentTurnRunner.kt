@@ -45,8 +45,12 @@ sealed interface CloudTurnEvent {
     /** render_ui_openui 流式预览（openui P2）：已到达的 program 前缀，正式卡帧前渐进上屏。 */
     data class OpenUiCardDelta(val program: String) : CloudTurnEvent
 
-    /** 本轮 SSE 正常收尾（done 帧）。 */
-    data object Done : CloudTurnEvent
+    /** 本轮 SSE 正常收尾（done 帧；携带回合性能数据，旧服务端为 null）。 */
+    data class Done(
+        val promptTokens: Long? = null,
+        val completionTokens: Long? = null,
+        val elapsedMs: Long? = null,
+    ) : CloudTurnEvent
 }
 
 /**
@@ -93,7 +97,13 @@ class CloudAgentTurnRunner(
                     ).onFailure { e -> Logger.w(TAG, "postToolResult failed: ${e.message}") }
                 }
             }
-            is CloudFrame.Done -> onEvent(CloudTurnEvent.Done)
+            is CloudFrame.Done -> onEvent(
+                CloudTurnEvent.Done(
+                    promptTokens = frame.promptTokens,
+                    completionTokens = frame.completionTokens,
+                    elapsedMs = frame.elapsedMs,
+                ),
+            )
             is CloudFrame.Error -> onEvent(CloudTurnEvent.Error(frame.message))
         }
     }

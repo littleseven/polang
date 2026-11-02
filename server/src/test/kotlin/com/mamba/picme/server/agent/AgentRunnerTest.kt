@@ -103,6 +103,18 @@ class AgentRunnerTest {
     }
 
     @Test
+    fun `turn usage accumulates llm tokens and fills elapsed on success`() = runBlocking {
+        val session = newSession()
+        val usage = TurnUsage()
+        // 普通回合 = 单次 LLM 调用；假响应 usage 为 10/5
+        runnerWith(HttpStatusCode.OK to chatResponse("你好"))
+            .runTurn(session, "你好", gatewayTarget, "sys", ServerToolService.defaultRegistry(), turnUsage = usage)
+        assertEquals(10L, usage.promptTokens)
+        assertEquals(5L, usage.completionTokens)
+        assertTrue("elapsed 应已回填非负值", usage.elapsedMs >= 0)
+    }
+
+    @Test
     fun `tool turn closes action with observation and leaves no pending`() = runBlocking {
         val session = newSession()
         runnerWith(

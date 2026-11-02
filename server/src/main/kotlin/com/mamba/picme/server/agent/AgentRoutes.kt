@@ -312,6 +312,8 @@ fun Route.agentRoute(
                         )
                     }
                     try {
+                        // 回合用量累计（done 帧性能数据源；见 AgentRunner.turnUsage KDoc）
+                        val turnUsage = TurnUsage()
                         // M2.7 安全网：Koog 1.3.0 EventHandler 同步钩子内 runBlocking 阻断
                         // 协程取消传递——客户端断开后 loop 可能继续空转、finally 不执行，
                         // 导致租约永不释放（2026-10-22 生产事故）。withTimeoutOrNull 确保
@@ -319,6 +321,7 @@ fun Route.agentRoute(
                         // （20 迭代 × ~45s）足够宽裕。
                         val finishEvent = withTimeoutOrNull(ROUND_TIMEOUT_MS) {
                             runner.runTurn(
+                                turnUsage = turnUsage,
                                 session = session,
                                 userMessage = content,
                                 target = target,
@@ -357,6 +360,12 @@ fun Route.agentRoute(
                             writeSseFrame(buildJsonObject {
                                 put("kind", "done")
                                 put("session_status", AgentSessionStatus.RUNNING.wire)
+                                // 回合性能数据（端侧 LlmPerformance 数据源）：旧端忽略未知字段
+                                put("elapsed_ms", turnUsage.elapsedMs)
+                                put("usage", buildJsonObject {
+                                    put("prompt_tokens", turnUsage.promptTokens)
+                                    put("completion_tokens", turnUsage.completionTokens)
+                                })
                             })
                         } else {
                             // 超时取消：会话仍可用（不置 ERROR），配额已消耗（LLM 调用已发生，不回退）

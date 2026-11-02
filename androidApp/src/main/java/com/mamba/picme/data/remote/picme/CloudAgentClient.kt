@@ -31,7 +31,14 @@ sealed interface CloudFrame {
     /** OpenUI program 流式预览帧（openui P2；瞬态传输信号，不落事件流，同 tool_request 口径）。 */
     data class OpenUiDelta(val program: String) : CloudFrame
 
-    data class Done(val sessionStatus: String) : CloudFrame
+    /** done 帧（2026-11-01 起带回合性能数据；旧服务端无这些字段 = null 容错）。 */
+    data class Done(
+        val sessionStatus: String,
+        val promptTokens: Long? = null,
+        val completionTokens: Long? = null,
+        val elapsedMs: Long? = null,
+    ) : CloudFrame
+
     data class Error(val message: String) : CloudFrame
 }
 
@@ -55,7 +62,15 @@ object CloudSseParser {
                     timeoutMs = json.optLong("timeout_ms", 120_000L),
                 )
             }
-            "done" -> CloudFrame.Done(json.optString("session_status"))
+            "done" -> {
+                val usage = json.optJSONObject("usage")
+                CloudFrame.Done(
+                    sessionStatus = json.optString("session_status"),
+                    promptTokens = usage?.takeIf { u -> u.has("prompt_tokens") }?.optLong("prompt_tokens"),
+                    completionTokens = usage?.takeIf { u -> u.has("completion_tokens") }?.optLong("completion_tokens"),
+                    elapsedMs = if (json.has("elapsed_ms")) json.optLong("elapsed_ms") else null,
+                )
+            }
             "error" -> CloudFrame.Error(json.optString("message"))
             // openui P2 流式预览帧；空前缀无意义直接忽略
             "openui_delta" -> json.optString("program").takeIf { it.isNotEmpty() }

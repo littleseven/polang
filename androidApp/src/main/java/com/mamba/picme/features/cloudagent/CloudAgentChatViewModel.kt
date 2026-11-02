@@ -226,7 +226,7 @@ class CloudAgentChatViewModel(
                             append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, event.message))
                             setInFlight(false)
                         }
-                        CloudTurnEvent.Done -> setInFlight(false)
+                        is CloudTurnEvent.Done -> setInFlight(false)
                     }
                 }
                 // 流干净结束但无 Done 帧的兜底（Done 已清则为幂等 no-op）

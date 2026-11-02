@@ -50,6 +50,10 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  * 节流为 program 前缀复用 [onOpenUiProgramDelta] 旁路下行（响应即程序，工具/文本
  * 两路共用同一 SSE kind 帧）；后者在终结消息落流前变换（normalize + 兜底包装由
  * 调用方组合）。轮边界经 onLLMStreamingStarting 重置 content 前缀（端上覆盖式预览）。
+ *
+ * [turnUsage]（runTurn 参数）：回合用量累计出参（done 帧 usage/elapsed_ms 数据源）——
+ * onLLMCallCompleted 逐次累加 input/output tokens，成功收尾回填 elapsedMs。
+ * 缺省独立实例 = 无人观测，零副作用；本类无状态，多回合并发各自传入互不串扰。
  */
 class AgentRunner(
     private val executorFactory: AgentExecutorFactory,
@@ -80,6 +84,8 @@ class AgentRunner(
         finalMessageTransformer: (String) -> String = { it },
         onHtmlCard: suspend (html: String, summary: String) -> Unit = { _, _ -> },
         onOpenUiProgramDelta: suspend (programPrefix: String) -> Unit = {},
+        /** 回合用量累计出参（done 帧性能数据源）：逐次累加 tokens、成功收尾回填耗时；缺省独立实例 = 无人观测。 */
+        turnUsage: TurnUsage = TurnUsage(),
         onEvent: suspend (AgentEvent) -> Unit = {},
     ): AgentEvent {
         // 1. 投影（先于本轮用户消息落流）
@@ -110,6 +116,7 @@ class AgentRunner(
         val openUiStreamTracker = OpenUiToolCallStreamTracker()
         // 回合原生 content 流跟踪器（每轮新实例；仅 forwardContentDeltas 时发射）
         val contentStreamTracker = OpenUiContentStreamTracker()
+        val startedAt = System.currentTimeMillis()
         try {
             val agent = AIAgent.builder()
                 .graphStrategy(cloudAgentStrategy(cardGuard, programGuard))
@@ -187,6 +194,11 @@ class AgentRunner(
                             )
                         }
                     }
+                    events.onLLMCallCompleted { ctx ->
+                        // 回合用量累计（done 帧性能数据源）：metaInfo 可能缺计数，null 容错跳过
+                        val meta = ctx.response?.metaInfo
+                        turnUsage.add(meta?.inputTokensCount?.toLong(), meta?.outputTokensCount?.toLong())
+                    }
                     events.onToolCallFailed { ctx ->
                         runBlocking {
                             val actionId = ctx.toolCallId?.let { actionIds[it] } ?: 0L
@@ -218,6 +230,7 @@ class AgentRunner(
                 payload = AgentEventPayload.Finish("done"),
             )
             emit(onEvent, finish)
+            turnUsage.finish(System.currentTimeMillis() - startedAt)
             return finish
         } catch (e: CancellationException) {
             emit(

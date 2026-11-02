@@ -90,7 +90,7 @@ network:
   sse_frames:                                # `\n\n` 分块，取 data: 行 JSON，按 kind 分发，未知 kind 容错忽略
     event:        "下行 | {id, type, source, role, payload, created_at} | 只上屏 type==message && role==assistant 的 payload.content"
     tool_request: "下行 | {request_id, tool, args, timeout_ms=120000} | 端执行不阻塞收帧（并发执行，完成即上行）"
-    done:         "下行 | {session_status} | 清 inFlight"
+    done:         "下行 | {session_status, elapsed_ms, usage{prompt_tokens, completion_tokens}} | 清 inFlight；usage/elapsed_ms 为回合性能数据（2026-11-01 起，旧服务端无此字段端侧 null 容错）"
     error:        "下行 | {message} | 追加 ERROR 消息 + 清 inFlight"
   tool_execution:                            # 端侧工具三件套——本体在 shared commonMain ChatToolService，iOS 经 SKIE 直调
     tools:
