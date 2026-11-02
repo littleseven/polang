@@ -173,11 +173,12 @@ class RenderOpenUiToolService {
    photo = photos[0].id、align = "center"）；字符串一律双引号；
 2. 必须有 `root = ...` 语句（root 是整个组件树的入口）；
 3. 可用组件签名（逐字遵守，禁发明属性；* 为必填）：
-   - Text(text*, role?, colorRole?)：text 可传 ${'$'}绑定变量（字符串/数字/布尔自动转文本，
+   - Text(text*, role?, colorRole?, maxLines?)：text 可传 ${'$'}绑定变量（字符串/数字/布尔自动转文本，
      如 Text(${'$'}selected) 显示柱图点选月份），随 state 回写联动刷新（见规则 6）；
      role∈HEADLINE|SUBHEAD|BODY|CAPTION|DISPLAY（默认 BODY；DISPLAY 是统计大数字 32sp
      加粗等宽数字，stat tile 专用，形如 Text("7,120", "DISPLAY")，一屏 ≤4 个），
-     colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE）；
+     colorRole∈PRIMARY|SURFACE|ERROR|ON_SURFACE（默认 ON_SURFACE），
+     maxLines 是行数上限（超行省略号截断，单行长标题写 maxLines = 1；缺省不限）；
      ⚠️ SURFACE 是卡面背景色，文字上使用会隐形——文字颜色只用 PRIMARY/ON_SURFACE/ERROR；
    - Row(children*, spacing?, align?, weights?) / Column(children*, spacing?, align?) /
      Card(children*, spacing?, title?, align?)：
@@ -189,7 +190,8 @@ class RenderOpenUiToolService {
      stat tile 数字栏写 align = "center"，高矮不一的栏顶线对齐写 align = "start"；
      正文/表单缺省 stretch 即为官方形态无需显式传；
      Row 的子组件默认等宽分栏；weights 是数字数组、与子组件一一对应按比例分栏（CSS
-     flex-grow 语义）——按比例左图右文写法 Row([Image(photos[0].id), Column([...])],
+     flex-grow 语义，0 = 不自撑、按内容自尺寸——「固定图标 + 弹性标题 + 贴边 chip」
+     写法 weights = [0, 1, 0]）——按比例左图右文写法 Row([Image(photos[0].id), Column([...])],
      weights = [1, 2], align = "center")（Divider/Spacer 分隔件不占 weights 槽位）；
      Card 有 title 时渲染头部标题区；
    - Grid(children*, columns?, spacing?, align?)：通用 N 列网格（写法
@@ -217,9 +219,11 @@ class RenderOpenUiToolService {
      （竖屏图不再被横框拦腰，推荐省略），只有要强制造型（统一方块拼图/横幅封面）才显式传
      （横图 1.5~1.78，竖图 0.75）；Row([Image(...), Image(...)]) 可多张并排等宽；
      单卡图片≤12 张（内存上限）；
-   - Icon(name*, colorRole?)：name 只用预定义图标名（59 枚清单见规则 6 末），禁臆造；
-     装饰性图标省略 colorRole（自动弱色），PRIMARY 只留强调性图标；
+   - Icon(name*, colorRole?, container?)：name 只用预定义图标名（59 枚清单见规则 6 末），禁臆造；
+     装饰性图标省略 colorRole（自动弱色），PRIMARY 只留强调性图标；container?=none|tonal
+     （默认 none 裸图标；tonal = 图标嵌浅底圆角容器块，头部图标位形态）；
    - Divider(axis?=HORIZONTAL|VERTICAL) / Separator(orientation?=horizontal|vertical)：分隔线（同义别名）；
+   - Progress(value*)：通用进度条——4dp 圆角轨道 + 主色填充，value∈0..100（超出端上截断）；
    - List(children*, direction?, spacing?)：direction∈VERTICAL|HORIZONTAL（默认 VERTICAL
      限高纵向滚动，HORIZONTAL 横滑行）；
    - Tabs(tabs*)：tabs 是 [{title: "页签标题", children: [组件...]}]，至少一个页签；
@@ -255,7 +259,9 @@ class RenderOpenUiToolService {
      TextContent(text*, size?=small|default|large|small-heavy|large-heavy) /
      Label(text*)（弱色小标签）/ BoldText(value*, subtext?, size?=xs|sm|md|lg)（value 可传 ${'$'}绑定）；
    - 高亮与标签：TextCallout(title*, description?, variant?=neutral|info|success|warning|danger)
-     （走 Callout 渲染）/ Tag(text*, icon?, size?=sm|md|lg, variant?=neutral|info|success|warning|danger) /
+     （走 Callout 渲染）/ Tag(text*, icon?, size?=sm|md|lg, variant?=neutral|info|success|warning|danger,
+     tone?=primary|error|neutral——tone 是实心状态 chip 档：实心底+对应前景色，带 tone 时
+     覆盖 variant 外观，状态徽标语义专用) /
      TagBlock(tags*=["标签", ...]) / CodeBlock(codeString*, language?)（等宽代码块）；
    - 图文项：IconText(title*, icon?, subtitle?, bold?, layout?=horizontal|vertical) /
      ImageText(title*, photo?, src?, subtitle?, imageSize?) / ImageTextLarge(title*, photo?, src?, subtitle?) /

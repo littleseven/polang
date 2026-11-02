@@ -70,6 +70,9 @@ object RenderOpenUiValidator {
         "CompareRow", "Timeline", "ChartGrid",
         // 回合原生批次（2026-11-01）：L2 沙箱 HTML 组件入树（spec§3.6）
         "Html",
+        // 任务卡 OpenUI 化批次（2026-11-02）：通用进度条（端侧合成任务卡首用，
+        // LLM 卡同权可用）
+        "Progress",
         // 官方内容/布局
         "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
         "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",

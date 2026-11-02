@@ -348,9 +348,9 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 101 openui library components`() {
+    fun `whitelist pins all 102 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 逐字一致（101——2026-11-01 turn-native +Html 后双端齐平），改动须双向同步核对
+        // OpenUiLibrary.components 逐字一致（102——2026-11-02 任务卡批次 +Progress 后双端齐平），改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
         //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
         //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
@@ -372,6 +372,8 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "CompareRow", "Timeline", "ChartGrid",
             // 回合原生批次（2026-11-01：L2 沙箱 HTML 组件入树，spec§3.6）
             "Html",
+            // 任务卡 OpenUI 化批次（2026-11-02：通用进度条）
+            "Progress",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -396,7 +398,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(101, expected.size)
+        assertEquals(102, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 
@@ -952,6 +954,14 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     @Test
     fun `Html component allowed in whitelist`() {
         val program = "root = Card([Html(\"<p>hi</p>\")])"
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    // ── 任务卡 OpenUI 化批次（2026-11-02）：Progress 白名单 ──
+
+    @Test
+    fun `Progress component allowed in whitelist`() {
+        val program = "root = Card([Progress(40)])"
         assertNull(RenderOpenUiValidator.validateToError(program))
     }
 
