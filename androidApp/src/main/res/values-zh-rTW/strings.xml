@@ -1684,6 +1684,7 @@
     <string name="chat_cmd_browser_extract">擷取網頁內文</string>
     <string name="chat_cmd_browser_screenshot">網頁截圖</string>
     <string name="chat_cmd_browser_close">關閉瀏覽器</string>
+    <string name="chat_cmd_web_search">網頁搜尋</string>
     <string name="chat_write_no_valid_ids">沒有有效的媒體 ID</string>
     <string name="chat_delete_started_pending">已發起刪除 %1$d 項，等待系統授權</string>
     <string name="chat_deleted_n">已刪除 %1$d 項</string>

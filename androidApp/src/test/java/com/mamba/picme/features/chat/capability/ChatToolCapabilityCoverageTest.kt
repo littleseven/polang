@@ -48,7 +48,8 @@ class ChatToolCapabilityCoverageTest {
         "browser_type" to "BrowserSessionCapability（BrowserTransport 容器注入）",
         "browser_extract" to "BrowserSessionCapability（BrowserTransport 容器注入）",
         "browser_screenshot" to "BrowserSessionCapability（BrowserTransport 容器注入）",
-        "browser_close" to "BrowserSessionCapability（BrowserTransport 容器注入）"
+        "browser_close" to "BrowserSessionCapability（BrowserTransport 容器注入）",
+        "web_search" to "WebSearchCapability（WebSearchTransport 容器注入）"
     )
 
     private val covered: Set<String> = (

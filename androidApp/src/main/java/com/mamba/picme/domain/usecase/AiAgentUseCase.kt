@@ -249,6 +249,7 @@ class AiAgentUseCase(
             is AgentCommand.BrowserExtract -> AiAgentCommand.TextReply("提取网页正文")
             is AgentCommand.BrowserScreenshot -> AiAgentCommand.TextReply("网页截图")
             is AgentCommand.BrowserClose -> AiAgentCommand.TextReply("关闭浏览器")
+            is AgentCommand.WebSearch -> AiAgentCommand.TextReply("网页搜索: ${command.query}")
         }
     }
 

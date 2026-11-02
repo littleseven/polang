@@ -1693,6 +1693,7 @@
     <string name="chat_cmd_browser_extract">Extract page text</string>
     <string name="chat_cmd_browser_screenshot">Screenshot page</string>
     <string name="chat_cmd_browser_close">Close browser</string>
+    <string name="chat_cmd_web_search">Web search</string>
     <string name="chat_write_no_valid_ids">No valid media IDs</string>
     <string name="chat_delete_started_pending">Deletion of %1$d item(s) initiated, awaiting system authorization</string>
     <string name="chat_deleted_n">Deleted %1$d item(s)</string>

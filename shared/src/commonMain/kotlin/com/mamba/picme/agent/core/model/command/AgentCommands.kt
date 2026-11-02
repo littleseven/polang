@@ -522,6 +522,17 @@ sealed class AgentCommand {
         val sessionId: String
     ) : AgentCommand()
 
+    // ==================== 网页搜索（DeepSeek Search，经 picme-server /v1/web-search） ====================
+
+    /**
+     * 搜索互联网获取实时信息与网页资源（新闻/攻略/配图等）。结果含标题/链接/摘要/配图 URL，
+     * 模型可直接把配图 URL 以 Markdown 图片语法嵌入回复。需要深度阅读某页面时改用 browser_* 工具链。
+     */
+    data class WebSearch(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val query: String
+    ) : AgentCommand()
+
     // ==================== 记忆命令（人物关系 + 事实记忆） ====================
 
     /**
@@ -663,6 +674,7 @@ sealed class AgentCommand {
             is BrowserExtract -> "browser_extract"
             is BrowserScreenshot -> "browser_screenshot"
             is BrowserClose -> "browser_close"
+            is WebSearch -> "web_search"
             is RememberPersonRelation -> "remember_person_relation"
             is ForgetPersonRelation -> "forget_person_relation"
             is QueryPersonRelation -> "query_person_relation"

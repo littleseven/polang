@@ -1,4 +1,4 @@
-可用工具（42）：
+可用工具（43）：
 - adjust_image: 按显式参数调整图片亮度/对比度/饱和度/色温，返回调整后的图片。
 - ai_optimize: AI 一键优化图片。
 - browser_click: 点击云端浏览器当前页面中的元素。
@@ -41,3 +41,4 @@
 - switch_face_engine: 切换人脸检测引擎。
 - switch_view_mode: 切换相册视图。
 - toggle_setting: 切换开关型设置。
+- web_search: 搜索互联网获取实时信息与网页资源（新闻/攻略/教程/配图等）。
