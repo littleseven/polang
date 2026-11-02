@@ -8,6 +8,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -58,27 +60,33 @@ class WebSearchService(
 ) : SearchExecutor {
 
     override suspend fun search(query: String, count: Int): SearchOutcome = try {
-        val resp = http.post("$baseUrl/v1/tools/search") {
-            header("Authorization", "Bearer $apiKey")
-            contentType(ContentType.Application.Json)
-            // 手写序列化（TextContent）：共享 httpClient 未装 ContentNegotiation，直接塞 JsonObject 会炸
-            setBody(
-                io.ktor.http.content.TextContent(
-                    buildJsonObject {
-                        put("query", query)
-                        put("count", count.coerceIn(1, MAX_UPSTREAM_COUNT))
-                        put("need_content", true)
-                    }.toString(),
-                    ContentType.Application.Json,
-                ),
-            )
+        // 服务端必须先于端侧放弃（端侧 dispatch 超时 15s）：否则客户端已回降级文案，
+        // 服务端继续等满 httpClient 60s 并可能照付一次计费成功（review #2）。
+        withTimeout(UPSTREAM_TIMEOUT_MS) {
+            val resp = http.post("$baseUrl/v1/tools/search") {
+                header("Authorization", "Bearer $apiKey")
+                contentType(ContentType.Application.Json)
+                // 手写序列化（TextContent）：共享 httpClient 未装 ContentNegotiation，直接塞 JsonObject 会炸
+                setBody(
+                    io.ktor.http.content.TextContent(
+                        buildJsonObject {
+                            put("query", query)
+                            put("count", count.coerceIn(1, MAX_UPSTREAM_COUNT))
+                            put("need_content", true)
+                        }.toString(),
+                        ContentType.Application.Json,
+                    ),
+                )
+            }
+            when (resp.status.value) {
+                200 -> SearchOutcome.Success(parseResults(resp.bodyAsText()))
+                402 -> SearchOutcome.Unavailable("insufficient_balance")
+                429 -> SearchOutcome.Unavailable("rate_limited")
+                else -> SearchOutcome.Unavailable("upstream_${resp.status.value}")
+            }
         }
-        when (resp.status.value) {
-            200 -> SearchOutcome.Success(parseResults(resp.bodyAsText()))
-            402 -> SearchOutcome.Unavailable("insufficient_balance")
-            429 -> SearchOutcome.Unavailable("rate_limited")
-            else -> SearchOutcome.Unavailable("upstream_${resp.status.value}")
-        }
+    } catch (e: TimeoutCancellationException) {
+        SearchOutcome.Unavailable("upstream_timeout")
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -90,6 +98,9 @@ class WebSearchService(
 
         /** 上行 count 上限（官方 1~50；服务侧收敛，省 token 也控出图噪音）。 */
         const val MAX_UPSTREAM_COUNT = 10
+
+        /** 上游调用超时：必须 < 端侧 dispatch 超时（15s），先于客户端放弃（review #2）。 */
+        internal const val UPSTREAM_TIMEOUT_MS = 12_000L
 
         /** 回给端侧的结果条数上限。 */
         internal const val MAX_RESULTS = 5

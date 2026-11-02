@@ -5,6 +5,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -146,5 +147,17 @@ class WebSearchServiceTest {
         )
         val outcome = service.search("q", 5)
         assertTrue(outcome is SearchOutcome.Unavailable)
+    }
+
+    @Test
+    fun `service 上游慢于 UPSTREAM_TIMEOUT_MS 映射 upstream_timeout（先于端侧 15s 放弃）`() = runTest {
+        val service = WebSearchService(
+            HttpClient(MockEngine {
+                kotlinx.coroutines.delay(WebSearchService.UPSTREAM_TIMEOUT_MS + 60_000L)
+                respond("""{"results":[]}""", HttpStatusCode.OK)
+            }),
+            apiKey = "k",
+        )
+        assertEquals(SearchOutcome.Unavailable("upstream_timeout"), service.search("q", 5))
     }
 }
