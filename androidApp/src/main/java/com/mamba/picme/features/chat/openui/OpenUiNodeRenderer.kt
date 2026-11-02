@@ -233,23 +233,23 @@ fun OpenUiNodeRenderer(
                     for (child in children) {
                         if (child is OpenUiValue.ComponentVal) {
                             val isSeparator = child.type == "Divider" || child.type == "Spacer"
-                            val slotWeight = if (isSeparator) {
-                                1f
+                            // 任务卡 OpenUI 化（2026-11-02）：weights 槽位值 0 = hug（CSS
+                            // flex-grow:0 语义，子项按内容自尺寸）——解锁「固定图标 + 弹性
+                            // 标题 + 贴边 chip」类排版；负值/NaN 仍走值域防御回退 1f 等宽
+                            // （2026-11-01 review 🔴1：直通 Modifier.weight() 会抛
+                            // IllegalArgumentException（require(weight > 0)）击穿渲染层）
+                            val declaredWeight = if (isSeparator) {
+                                null
                             } else {
-                                // 值域防御（2026-11-01 review 🔴1）：weights 经 schema 只保证
-                                // 「数字数组」，零/负值/NaN 直通 Modifier.weight() 会抛
-                                // IllegalArgumentException（require(weight > 0)）击穿渲染层——
-                                // 非法槽位回退 1f 等宽
-                                val w = openUiSafeWeight(effectiveWeights?.getOrNull(weightSlot) ?: 1f)
+                                val w = effectiveWeights?.getOrNull(weightSlot)
                                 weightSlot++
                                 w
                             }
-                            val weightMod =
-                                if (isSeparator || !weightsUsable) {
-                                    Modifier
-                                } else {
-                                    Modifier.weight(slotWeight)
-                                }
+                            val weightMod = when {
+                                isSeparator || !weightsUsable -> Modifier
+                                declaredWeight == 0f -> Modifier
+                                else -> Modifier.weight(openUiSafeWeight(declaredWeight ?: 1f))
+                            }
                             val childModifier = when {
                                 // 分隔件自带竖向尺寸管理，不参与交叉轴语义
                                 isSeparator -> weightMod
@@ -354,12 +354,17 @@ fun OpenUiNodeRenderer(
             if (isEmptyBindingFallback(text)) return
             val roleStr = (node.props["role"] as? OpenUiValue.Str)?.v
             val colorRole = A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
+            // 任务卡 OpenUI 化（2026-11-02）：可选行数上限（Ellipsis）——通用长文本截断；
+            // 缺省不限制（Int.MAX_VALUE = Compose 无限行口径）
+            val maxLinesRaw = (node.props["maxLines"] as? OpenUiValue.Num)?.v?.toInt()
             // DISPLAY（设计规范 §2：stat tile 大数字）：OpenUI 专属 role，A2uiTextRole 之外
             if (roleStr == "DISPLAY") {
                 Text(
                     text = text,
                     style = OpenUiCardTokens.displayStyle,
                     color = A2uiStyleMapper.color(colorRole),
+                    maxLines = maxLinesRaw ?: Int.MAX_VALUE,
+                    overflow = if (maxLinesRaw != null) TextOverflow.Ellipsis else TextOverflow.Clip,
                     modifier = modifier,
                 )
                 return
@@ -374,6 +379,8 @@ fun OpenUiNodeRenderer(
                 } else {
                     A2uiStyleMapper.color(colorRole)
                 },
+                maxLines = maxLinesRaw ?: Int.MAX_VALUE,
+                overflow = if (maxLinesRaw != null) TextOverflow.Ellipsis else TextOverflow.Clip,
                 modifier = modifier,
             )
         }
@@ -724,11 +731,24 @@ private fun OpenUiIcon(node: OpenUiValue.ComponentVal, modifier: Modifier = Modi
     // 设计规范 §1.1 职责分离：装饰 Icon 无 colorRole 时弱色（onSurfaceVariant），
     // primary 只留强调性图标（行为色面积收敛）
     val colorRole = A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
+    val tint = colorRole?.let { role -> A2uiStyleMapper.color(role) }
+        ?: MaterialTheme.colorScheme.onSurfaceVariant
+    // 任务卡 OpenUI 化（2026-11-02）：tonal = 图标嵌 surfaceContainerHigh 圆角容器块
+    // （28dp r7 + 15dp 图标，通用「图标块」形态，对齐任务卡 ⚙ 块设计）
+    if ((node.props["container"] as? OpenUiValue.Str)?.v == "tonal") {
+        Box(
+            modifier = modifier.size(28.dp).clip(RoundedCornerShape(7.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = image, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+        }
+        return
+    }
     Icon(
         imageVector = image,
         contentDescription = null,
-        tint = colorRole?.let { role -> A2uiStyleMapper.color(role) }
-            ?: MaterialTheme.colorScheme.onSurfaceVariant,
+        tint = tint,
         modifier = modifier,
     )
 }

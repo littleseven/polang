@@ -28,6 +28,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -92,6 +93,8 @@ internal val openUiContentComponentNames: Set<String> = setOf(
     "PhotoGrid", "AvatarRow",
     // 布局可控性批次（2026-10-31）：CompareRow/Timeline/ChartGrid 新增（dispatch 分支随各任务落地）
     "CompareRow", "Timeline", "ChartGrid",
+    // 任务卡 OpenUI 化批次（2026-11-02）：Progress 通用进度条
+    "Progress",
 )
 
 /** 单组件数组/子项上限（MAX_LIST_CHILDREN=50 同口径：LLM 生成面无界，渲染端 take 兜底）。 */
@@ -142,6 +145,7 @@ internal fun OpenUiContentNode(
         "ImageBlock" -> OpenUiContentImageBlock(node, modifier)
         "ImageGallery" -> OpenUiContentImageGallery(node, modifier)
         "Tag" -> OpenUiContentTagNode(node, modifier)
+        "Progress" -> OpenUiContentProgress(node, modifier)
         "TagBlock" -> OpenUiContentTagBlock(node, modifier)
         "Label" -> {
             val text = (node.props["text"] as? OpenUiValue.Str)?.v ?: return
@@ -828,7 +832,59 @@ private fun OpenUiContentTagNode(node: OpenUiValue.ComponentVal, modifier: Modif
     val icon = (node.props["icon"] as? OpenUiValue.Str)?.v
     val size = (node.props["size"] as? OpenUiValue.Str)?.v
     val variant = (node.props["variant"] as? OpenUiValue.Str)?.v
-    OpenUiContentTagChip(text = text, icon = icon, size = size, variant = variant, modifier = modifier)
+    // 任务卡 OpenUI 化（2026-11-02）：tone 实心档（状态 chip 语义）——带 tone 走实心皮肤，
+    // 与存量 variant 皮肤正交（缺省不带 tone = 存量外观不变）
+    val tone = (node.props["tone"] as? OpenUiValue.Str)?.v
+    if (tone != null) {
+        OpenUiSolidTagChip(text = text, tone = tone, modifier = modifier)
+    } else {
+        OpenUiContentTagChip(text = text, icon = icon, size = size, variant = variant, modifier = modifier)
+    }
+}
+
+/** 实心状态 chip（任务卡 OpenUI 化 2026-11-02）：r6 + 10sp SemiBold + tone 实心底/前景。 */
+@Composable
+private fun OpenUiSolidTagChip(text: String, tone: String, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val (bg, fg) = when (tone) {
+        "primary" -> scheme.primary to scheme.onPrimary
+        "error" -> scheme.error to scheme.onError
+        else -> scheme.surfaceContainerHigh to scheme.onSurfaceVariant
+    }
+    Surface(color = bg, shape = RoundedCornerShape(6.dp), modifier = modifier) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+        )
+    }
+}
+
+/**
+ * Progress：通用进度条（任务卡 OpenUI 化 2026-11-02）——4dp 圆角轨道（surfaceVariant）
+ * + primary 填充；value 渲染期 clamp [0,100]（schema 只保证数字）。
+ */
+@Composable
+private fun OpenUiContentProgress(node: OpenUiValue.ComponentVal, modifier: Modifier = Modifier) {
+    val raw = (node.props["value"] as? OpenUiValue.Num)?.v ?: return
+    val fraction = ((raw.coerceIn(0.0, 100.0)) / 100.0).toFloat()
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(fraction)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.primary),
+        )
+    }
 }
 
 /** Tag 胶囊本体（Tag / TagBlock 共用）。 */
