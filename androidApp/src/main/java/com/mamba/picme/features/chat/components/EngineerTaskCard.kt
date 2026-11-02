@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -38,25 +42,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.mamba.picme.R
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
+import com.mamba.picme.domain.chat.openui.OpenUiResult
+import com.mamba.picme.domain.chat.openui.OpenUiSession
+import com.mamba.picme.domain.chat.openui.OpenUiToolNotFoundException
+import com.mamba.picme.domain.chat.openui.OpenUiToolResolver
+import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.features.chat.HtmlCard
 import com.mamba.picme.core.designsystem.cell
 import com.mamba.picme.domain.chat.taskcenter.EngineerTaskHtml
 import com.mamba.picme.domain.chat.taskcenter.EngineerTaskPalette
+import com.mamba.picme.domain.chat.taskcenter.EngineerTaskProgram
 import com.mamba.picme.domain.chat.taskcenter.EngineerTaskTexts
 import com.mamba.picme.domain.chat.taskcenter.EngineerTaskThrottle
+import com.mamba.picme.features.chat.openui.OpenUiNodeRenderer
+import com.mamba.picme.features.chat.openui.OpenUiPhotoResolver
 import java.util.Locale
 import kotlinx.coroutines.delay
 
 /**
- * 工程师任务卡（2026-09-27 H2 HTML 化，spec《HTML 卡双形态》§7 对 9-25 spec D2 的渲染层修订）：
- * **L1 模板 HTML**（[EngineerTaskHtml] 组装，端侧模板 + 状态 JSON，样式权威在 App）经 [HtmlCard]
- * 双形态渲染——折叠/展开为 INLINE（点击整卡切换），展开超 1.0 屏自动升格 FULLPAGE 预览 → 全屏查看器。
+ * 工程师任务卡（2026-09-27 H2 HTML 化 → **2026-11-02 H3 OpenUI 化**，spec《2026-11-02
+ * engineer-taskcard-openui》）：信息区默认走 [EngineerTaskProgram] 端侧程序合成 +
+ * [EngineerTaskOpenUiInfoZone] 原生渲染（[USE_OPENUI_TASKCARD_RENDER] 回滚闸可回退
+ * H2 WebView 路径——L1 模板 HTML 经 [EngineerTaskHtml] 组装、[HtmlCard] 双形态渲染，
+ * iOS 双轨期保留）；双形态语义两路径一致（折叠/展开 INLINE + 展开超 1.0 屏升格
+ * FULLPAGE → 全屏查看器）。
  *
  * 卡片为**上下两分区单卡容器**（2026-09-27 Muse 修订，外置动作条方案作废；design taskcard 四帧）：
  * 上半 = HTML 信息区（r16 卡容器内），下半 = **原生 Compose 动作区**（与卡面统一 cell 底 + hairline
@@ -73,6 +89,14 @@ import kotlinx.coroutines.delay
  * 纯渲染无状态；动作回调由 ChatScreen 接到 ChatViewModel（[actionsEnabled] 门控对齐 VM 侧守卫）。
  * 任务中心列表项继续用原生紧凑形态（同页多卡并存，WebView 实例成本不划算，spec §7）。
  */
+/**
+ * 任务卡信息区渲染引擎开关（spec《2026-11-02-engineer-taskcard-openui》§3.2 回滚闸）：
+ * true = OpenUI 程序端侧合成 + 原生渲染（H3，本轮交付）；false = 回退 H2 WebView 路径。
+ * iOS 双轨期 [EngineerTaskHtml] 保留编译（WKWebView 消费），两路径并存成本≈0；
+ * iOS OpenUI 渲染器落地统一后一并删除（届时连同本开关与 legacy 分支）。
+ */
+internal const val USE_OPENUI_TASKCARD_RENDER = true
+
 @Suppress("LongParameterList")
 @Composable
 fun EngineerTaskCard(
@@ -116,7 +140,18 @@ fun EngineerTaskCard(
             .semantics { contentDescription = cd },
     ) {
         Column {
-            if (html == null) {
+            if (USE_OPENUI_TASKCARD_RENDER) {
+                EngineerTaskOpenUiInfoZone(
+                    task = throttled,
+                    expanded = expanded,
+                    viewportHeightDp = viewportHeightDp,
+                    texts = texts,
+                    fullpageSticky = resolvedMode == HtmlCardDisplayMode.FULLPAGE,
+                    onDisplayModeResolved = { mode -> resolvedMode = mode },
+                    onToggleExpand = onToggleExpand,
+                    onOpenFullpage = onOpenFullpage,
+                )
+            } else if (html == null) {
                 EngineerTaskFallbackCard(throttled)
             } else {
                 HtmlCard(
@@ -476,6 +511,174 @@ private fun EngineerTaskFallbackCard(task: EngineerTaskState) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * OpenUI 信息区宿主（spec《2026-11-02-engineer-taskcard-openui》§3.2，H3）：
+ * 节流态经 [EngineerTaskProgram] 合成程序文本 → [OpenUiSession] 全管线（无
+ * local_handle/无 viewState）→ **解包根 Card 渲染 children**——卡壳由外层两分区
+ * 原生 Surface 提供（对齐 H2 期 HtmlCard cardColor/contentPadding=0 中和手法）。
+ *
+ * - 500ms 合帧语义不变（跃迁即时/微更新合帧在 [rememberThrottledTask]）；
+ * - 重合成零闪烁：保留旧根直至新根 prepare 就绪（程序小、无工具调用，毫秒级）；
+ * - 组装/prepare 失败 → [EngineerTaskFallbackCard]（spec §9.3 口径，动作区照常）；
+ * - 双形态复刻（spec D5）：折叠/展开 = 程序带 showExpanded 重合成；展开态
+ *   `onSizeChanged` 原生量高超 [viewportHeightDp] 升格 FULLPAGE（方向粘滞仅内存，
+ *   spec §10 口径）——升格后内联回落折叠形态，点击整卡开 [EngineerTaskFullpageDialog]；
+ *   WebView 测高缓存/防抖机制此路径天然不需要（原生布局同步完成）。
+ */
+@Suppress("LongParameterList")
+@Composable
+internal fun EngineerTaskOpenUiInfoZone(
+    task: EngineerTaskState,
+    expanded: Boolean,
+    viewportHeightDp: Int,
+    texts: EngineerTaskTexts,
+    fullpageSticky: Boolean,
+    onDisplayModeResolved: (HtmlCardDisplayMode) -> Unit,
+    onToggleExpand: () -> Unit,
+    onOpenFullpage: (program: String, title: String) -> Unit,
+) {
+    val showExpanded = expanded && !fullpageSticky
+    val program = remember(task, showExpanded, texts) {
+        runCatching { EngineerTaskProgram.assemble(task, showExpanded, texts) }.getOrNull()
+    }
+    if (program == null) {
+        EngineerTaskFallbackCard(task)
+        return
+    }
+    // 保留旧根直至新根就绪（同 taskId 跨 500ms 合帧不闪兜底卡；无 Query → prepare 毫秒级）
+    var root by remember(task.taskId) { mutableStateOf<OpenUiValue.ComponentVal?>(null) }
+    var prepareFailed by remember(task.taskId) { mutableStateOf(false) }
+    LaunchedEffect(program) {
+        val session = OpenUiSession(program, noOpTaskTools())
+        val rendered = session.prepare() as? OpenUiResult.Rendered
+        root = if (rendered != null) session.rootOrNull() else null
+        prepareFailed = rendered == null
+    }
+    if (prepareFailed) {
+        EngineerTaskFallbackCard(task)
+        return
+    }
+    val resolvedRoot = root
+    if (resolvedRoot == null) {
+        // 首帧占位（prepare 极快，肉眼不可见的一帧空盒）
+        Box(modifier = Modifier.fillMaxWidth())
+        return
+    }
+    val density = LocalDensity.current
+    val clickLabel = stringResource(
+        if (expanded) R.string.chat_card_collapse_hint else R.string.chat_card_expand_hint,
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onSizeChanged { size ->
+                val heightDp = with(density) { size.height.toDp().value }
+                if (!fullpageSticky && showExpanded && viewportHeightDp > 0 && heightDp > viewportHeightDp) {
+                    onDisplayModeResolved(HtmlCardDisplayMode.FULLPAGE)
+                }
+            }
+            .clickable(onClickLabel = clickLabel) {
+                if (fullpageSticky) {
+                    val expandedProgram = runCatching {
+                        EngineerTaskProgram.assemble(task, true, texts)
+                    }.getOrNull() ?: program
+                    onOpenFullpage(expandedProgram, task.sourceText)
+                } else {
+                    onToggleExpand()
+                }
+            },
+    ) {
+        OpenUiUnwrappedCardChildren(root = resolvedRoot)
+    }
+}
+
+/** 根 Card 解包：children 直渲（卡壳/内边距 12/16/14 由宿主提供，对齐 H2 HTML body 口径）。 */
+@Composable
+private fun OpenUiUnwrappedCardChildren(root: OpenUiValue.ComponentVal) {
+    val children = (root.props["children"] as? OpenUiValue.Arr)?.v
+        ?.filterIsInstance<OpenUiValue.ComponentVal>()
+        .orEmpty()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        children.forEach { child ->
+            OpenUiNodeRenderer(
+                node = child,
+                state = emptyMap(),
+                photoResolver = noOpPhotoResolver(),
+                onAction = { },
+            )
+        }
+    }
+}
+
+/** 任务卡程序无 Query/local_handle——工具解析恒 not-found（防御性，不触达）。 */
+private fun noOpTaskTools(): OpenUiToolResolver = OpenUiToolResolver { name, _ ->
+    throw OpenUiToolNotFoundException(name)
+}
+
+/** 任务卡程序无 Image(photo)——解析器恒 null（防御性，不触达）。 */
+private fun noOpPhotoResolver(): OpenUiPhotoResolver = OpenUiPhotoResolver { null }
+
+/**
+ * 任务卡全屏查看器（复刻 H2 全屏 WebView 查看器交互）：标题 + 同一展开程序可滚动
+ * 原生渲染；由 ChatScreen 浮层槽驱动（对齐 HtmlFullpageViewer 挂载位）。
+ */
+@Composable
+internal fun EngineerTaskFullpageDialog(
+    program: String,
+    title: String,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.cell,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
+                )
+                var root by remember(program) { mutableStateOf<OpenUiValue.ComponentVal?>(null) }
+                LaunchedEffect(program) {
+                    val session = OpenUiSession(program, noOpTaskTools())
+                    root = if (session.prepare() is OpenUiResult.Rendered) session.rootOrNull() else null
+                }
+                root?.let { resolved ->
+                    val children = (resolved.props["children"] as? OpenUiValue.Arr)?.v
+                        ?.filterIsInstance<OpenUiValue.ComponentVal>()
+                        .orEmpty()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        children.forEach { child ->
+                            OpenUiNodeRenderer(
+                                node = child,
+                                state = emptyMap(),
+                                photoResolver = noOpPhotoResolver(),
+                                onAction = { },
+                            )
+                        }
+                    }
+                }
             }
         }
     }

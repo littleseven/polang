@@ -1403,7 +1403,7 @@
     <string name="chat_task_skip_deliver">Ahora no</string>
     <string name="chat_task_retry">Reintentar</string>
     <string name="chat_task_stop">Detener tarea</string>
-    <string name="chat_task_badge">TASK · HTML</string>
+    <string name="chat_task_badge">TASK · OPENUI</string>
     <string name="chat_task_choose_next">Elige el siguiente paso</string>
     <string name="chat_task_option_continue">Continuar</string>
     <string name="chat_task_option_continue_desc">Seguir con el plan actual hasta terminar la tarea</string>

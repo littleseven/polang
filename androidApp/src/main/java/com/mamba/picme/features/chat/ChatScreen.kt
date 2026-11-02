@@ -210,6 +210,8 @@ import com.mamba.picme.features.chat.components.ChatEmptyState
 import com.mamba.picme.features.chat.components.ChatPhotoPickerSheet
 import com.mamba.picme.features.chat.components.ChatRegistrationSheet
 import com.mamba.picme.features.chat.components.EngineerTaskCard
+import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
+import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
 import com.mamba.picme.features.chat.components.GuestNudgeBanner
 import com.mamba.picme.features.chat.components.GachaCandidateStrip
 import com.mamba.picme.features.chat.components.MediaResultsCarousel
@@ -366,6 +368,8 @@ fun ChatScreen(
     var previewLinkUrl by remember { mutableStateOf<String?>(null) }
     // HTML 卡全屏查看器状态（点击 fullpage 预览卡/兜底封面打开；与 HtmlLinkPreviewOverlay 同级）
     var fullpageHtmlCard by remember { mutableStateOf<HtmlFullpageContent?>(null) }
+    // 任务卡 OpenUI 全屏查看器内容（program to title；H3，对齐 fullpageHtmlCard 挂载位）
+    var fullpageTaskProgram by remember { mutableStateOf<Pair<String, String>?>(null) }
     // 表格全屏预览状态（点击气泡内表格打开）
     var expandedTable by remember { mutableStateOf<MarkdownTable?>(null) }
     // 相册搜索结果预览状态
@@ -563,6 +567,7 @@ fun ChatScreen(
             expandedTable != null -> expandedTable = null
             // 落地页叠在全屏查看器之上，返回键先关落地页再关查看器
             previewLinkUrl != null -> previewLinkUrl = null
+            fullpageTaskProgram != null -> fullpageTaskProgram = null
             fullpageHtmlCard != null -> fullpageHtmlCard = null
         }
     }
@@ -774,7 +779,8 @@ fun ChatScreen(
                                     // 原位覆写，500ms 节流在 displayMessages 管线）
                                     val task = (item.part as MessagePart.TaskCard).task
                                     var taskExpanded by rememberSaveable(item.key) { mutableStateOf(false) }
-                                    // H2 HTML 化（2026-09-27）：L1 模板经 HtmlCard 双形态渲染 + 原生动作条；
+                                    // H3 OpenUI 化（2026-11-02）：信息区默认 OpenUI 程序原生渲染
+                                    //（USE_OPENUI_TASKCARD_RENDER 回滚闸可回退 H2 WebView）+ 原生动作条；
                                     // viewportHeightDp 用 IME 稳定值（对齐 HTML_CARD 分支，防键盘态误升格 FULLPAGE）
                                     EngineerTaskCard(
                                         task = task,
@@ -784,8 +790,13 @@ fun ChatScreen(
                                         isListScrolling = isListScrolling,
                                         actionsEnabled = !isProcessing && task.taskId !in engineerActionInFlight,
                                         onToggleExpand = { taskExpanded = !taskExpanded },
-                                        onOpenFullpage = { html, title ->
-                                            fullpageHtmlCard = HtmlFullpageContent(html = html, title = title)
+                                        onOpenFullpage = { content, title ->
+                                            // H3 OpenUI 路径传 program 文本；legacy 路径传 html
+                                            if (USE_OPENUI_TASKCARD_RENDER) {
+                                                fullpageTaskProgram = content to title
+                                            } else {
+                                                fullpageHtmlCard = HtmlFullpageContent(html = content, title = title)
+                                            }
                                         },
                                         onStop = { viewModel.stopEngineerTask(task.taskId) },
                                         onContinue = { viewModel.continueEngineerTask(task.taskId) },
@@ -1084,6 +1095,15 @@ fun ChatScreen(
                 onOpenLink = { url -> previewLinkUrl = url },
                 onDismiss = { fullpageHtmlCard = null }
             )
+
+            // 任务卡 OpenUI 全屏查看器（H3：升格预览态点击进入，同一展开程序原生渲染）
+            fullpageTaskProgram?.let { (program, title) ->
+                EngineerTaskFullpageDialog(
+                    program = program,
+                    title = title,
+                    onDismiss = { fullpageTaskProgram = null },
+                )
+            }
 
             // HTML 卡片外链落地页（全屏内置浏览器）
             HtmlLinkPreviewOverlay(
