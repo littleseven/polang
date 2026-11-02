@@ -82,7 +82,7 @@ class CloudAgentTurnRunner(
         genUiFormat,
     ) { frame ->
         when (frame) {
-            is CloudFrame.Event -> handleEvent(frame.event, onEvent, genUiFormat)
+            is CloudFrame.Event -> handleEvent(frame.event, onEvent)
             is CloudFrame.OpenUiDelta -> onEvent(CloudTurnEvent.OpenUiCardDelta(frame.program))
             is CloudFrame.ToolRequest -> {
                 onEvent(CloudTurnEvent.ToolCall(frame.tool))
@@ -108,15 +108,19 @@ class CloudAgentTurnRunner(
         }
     }
 
-    private fun handleEvent(event: JSONObject, onEvent: (CloudTurnEvent) -> Unit, genUiFormat: String) {
+    private fun handleEvent(event: JSONObject, onEvent: (CloudTurnEvent) -> Unit) {
         val payload = event.optJSONObject("payload") ?: return
         when (event.optString("type")) {
             // 助手答复（user 回声跳过——本地已先上屏）；
             // turn-native（openui）：assistant content = OpenUI 程序 → OpenUiCard 事件
-            // （spec§3.7）；非程序形态（兜底包装理论上已被 server 兜住）按文本降级
+            // （spec§3.7）；非程序形态（兜底包装理论上已被 server 兜住）按文本降级。
+            // 门判纯按内容嗅探、不以 genUiFormat 为前提（2026-11-02 跨线污染修复）：
+            // A2UI 线无 ProgramGuard/兜底包装，LLM 可能模仿会话历史里的程序格式把
+            // OpenUI 程序当纯文本输出——若还按 genUiFormat 放行文本路径，程序原文会
+            // 经 AgentMarkdown 直接糊上屏（真机事故：调试页白气泡显示整颗程序源码）
             "message" -> if (event.optString("role") == "assistant") {
                 val content = payload.optString("content")
-                if (genUiFormat == "openui" && OpenUiProgramSummary.looksLikeProgram(content)) {
+                if (OpenUiProgramSummary.looksLikeProgram(content)) {
                     onEvent(
                         CloudTurnEvent.OpenUiCard(
                             program = content,
