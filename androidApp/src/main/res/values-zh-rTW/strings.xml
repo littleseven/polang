@@ -1126,6 +1126,7 @@
     <string name="chat_inference_error">推論錯誤：%1$s</string>
     <string name="chat_calling_tool">正在呼叫工具…</string>
     <string name="chat_card_generate_failed">生成失敗</string>
+    <string name="openui_action_failed">操作失敗</string>
     <string name="chat_example_group_search">找照片</string>
     <string name="chat_example_group_ask">問相簿</string>
     <string-array name="chat_example_prompts_search">

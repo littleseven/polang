@@ -114,8 +114,9 @@ object RenderOpenUiValidator {
         "volumeUp", "warning",
     )
 
-    /** 组件外唯一允许的大写调用：Query（宿主取数语句）。 */
-    private val ALLOWED_CALLS = ALLOWED_COMPONENTS + "Query"
+    /** 组件外允许的大写调用：Query（宿主取数语句）/ Mutation（写工具语句，@Run 执行，
+     *  2026-11-01 官方对齐）/ Action（官方多动作包装语法）。 */
+    private val ALLOWED_CALLS = ALLOWED_COMPONENTS + listOf("Query", "Mutation", "Action")
 
     private val STRING_LITERAL = Regex(""""([^"\\]|\\.)*"""")
     private val LINE_COMMENT = Regex("""//[^\n]*|#[^\n]*""")
@@ -191,9 +192,10 @@ object RenderOpenUiValidator {
 
     /** 动作表达式被包成字符串（2026-10-24 真机事故：LLM 写 "@OpenUrl(...)" 致端侧
      *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。
-     *  词表 = shared `OpenUiContract.Actions` 字面量副本（含 WRAPPER "Action"），
-     *  改动须双向同步核对。 */
-    private val QUOTED_ACTION = Regex(""""@(OpenUrl|Set|Reset|ToAssistant|Run|Action)\s*\(""")
+     *  词表 = shared `OpenUiContract.Actions`（含 WRAPPER "Action"）+ library 自定义动作名
+     *  （`OpenUiLibrary.customActions`，M1 = Navigate）字面量副本，改动须双向同步核对。 */
+    private val QUOTED_ACTION =
+        Regex(""""@(OpenUrl|Set|Reset|ToAssistant|Run|Navigate|Action)\s*\(""")
 
     /** @OpenUrl 字符串字面量首参抽取（2026-11-01 review Y5：与 Image src 的 https 硬校验
      *  同族——外链动作此前零闸，`@OpenUrl("file://…")` 等非法 scheme 直达端侧）。
@@ -416,7 +418,7 @@ object RenderOpenUiValidator {
             .toSet()
             .filter { name -> name !in ALLOWED_CALLS }
             .forEach { name ->
-                violations += "组件/调用 \"$name\" 不在白名单（组件全量清单见系统提示词，另有 Query 取数；官方 Col 列式组件刻意不收，表格用行式 Table）"
+                violations += "组件/调用 \"$name\" 不在白名单（组件全量清单见系统提示词，另有 Query 取数、Mutation 写工具、Action 多动作包装；官方 Col 列式组件刻意不收，表格用行式 Table）"
             }
 
         // 3. Query 形态：唯一宿主工具 local_handle；handle 必须是 local://scan/<id> 形态

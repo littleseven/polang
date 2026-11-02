@@ -30,6 +30,7 @@ class OpenUiEvalTest {
                 .also { map -> parsed.statements.forEach { stmt -> map[stmt.name] = stmt } },
             store = store.toMutableMap(),
             queryResults = mutableMapOf(),
+            mutationResults = emptyMap(),
         )
         val value = runtime.evalStatement(name)
         return EvalOutcome(value, runtime.errors.toList(), runtime.unresolved.toSet())

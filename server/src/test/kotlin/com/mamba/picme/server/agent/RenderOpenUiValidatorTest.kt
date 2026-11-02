@@ -872,6 +872,37 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     }
 
     @Test
+    fun `quoted navigate action string is rejected`() {
+        // 自定义动作词表（2026-11-01 官方对齐）：@Navigate 是 library 注册自定义动作，
+        // 包成字符串端侧 ACTION 槽位 type-mismatch 静默惰性，服务端同轮纠错
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([Button("b", "@Navigate(\"task_center\")")])""",
+        )
+        assertNotNull("应拒绝", error)
+        assertTrue(error!!.contains("动作表达式被包成了字符串"))
+        // 裸形态不误伤
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """root = Card([Button("b", @Navigate("task_center"))])""",
+            ),
+        )
+    }
+
+    @Test
+    fun `mutation plus run chain passes structural validation`() {
+        // 访问 API 官方形态（2026-11-01）：Mutation 语句 + @Run(ref)，组合 Action([...])
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                """
+                photos = Query("local_handle", { handle: "local://scan/7f3a#photos" }, [])
+                fav = Mutation("favorite_media", { id: photos[0].id })
+                root = Card([Button("收藏并逛相册", Action([@Run(fav), @Navigate("gallery")]))])
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
     fun `open url literal gate rejects non https and passes https`() {
         // review Y5：@OpenUrl 字面量首参限 https（与图片 src https 硬校验同族，外链零闸补齐）
         assertNull(

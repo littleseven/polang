@@ -21,6 +21,7 @@ import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.chat.ChatScreen
 import com.mamba.picme.features.chat.ChatTaskAnchor
 import com.mamba.picme.features.chat.ChatViewModel
+import com.mamba.picme.features.chat.openui.OpenUiNavigateTarget
 import com.mamba.picme.features.gallery.GalleryScreen
 import com.mamba.picme.features.gallery.GalleryViewRequest
 import com.mamba.picme.features.gallery.MediaViewModel
@@ -208,6 +209,29 @@ fun MainPagerHost(
                 },
                 onNavigateToTaskCenter = {
                     navController.navigate(Screen.TaskCenter.route, navOptions { launchSingleTop = true })
+                },
+                // OpenUI 卡 @Navigate 出口（2026-11-01 动作三通道）：闭集目的地 →
+                // Pager 切页 / gallerySearchRequest / organizeTab / NavHost 路由四通道先例
+                onOpenUiNavigate = { target, param ->
+                    when (target) {
+                        OpenUiNavigateTarget.GALLERY -> onSwitchPage(MAIN_PAGE_GALLERY)
+                        OpenUiNavigateTarget.GALLERY_SEARCH ->
+                            onRequestGallerySearch(param.orEmpty(), 0L)
+                        OpenUiNavigateTarget.ORGANIZE -> {
+                            organizeTab = if (param == "scan") OrganizeTab.SCAN else OrganizeTab.ORGANIZE
+                            onSwitchPage(MAIN_PAGE_DEDUP)
+                        }
+                        OpenUiNavigateTarget.PEOPLE -> onSwitchPage(MAIN_PAGE_PEOPLE)
+                        OpenUiNavigateTarget.MEMORY -> onSwitchPage(MAIN_PAGE_MEMORY)
+                        OpenUiNavigateTarget.TASK_CENTER -> navController.navigate(
+                            Screen.TaskCenter.route,
+                            navOptions { launchSingleTop = true },
+                        )
+                        OpenUiNavigateTarget.SETTINGS -> navController.navigate(
+                            Screen.Settings.route,
+                            navOptions { launchSingleTop = true },
+                        )
+                    }
                 },
                 taskAnchor = taskAnchor,
                 onTaskAnchorConsumed = onTaskAnchorConsumed,

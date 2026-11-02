@@ -126,6 +126,28 @@ object OpenUiLibrary {
         "volumeUp", "warning",
     )
 
+    /**
+     * 自定义动作定义（官方 custom action 机制）：library 注册动作名与参数形状，渲染层
+     * 不执行、eval 参数全量求值后以 `{type, params}` 事件抛宿主，语义裁定在宿主侧。
+     */
+    data class OpenUiCustomAction(val name: String, val params: List<String>)
+
+    /** 自定义动作名·页面跳转（注册表与宿主路由同源引用，禁散落字面量）。 */
+    const val CUSTOM_ACTION_NAVIGATE = "Navigate"
+
+    /**
+     * polang 库自定义动作注册表（2026-11-01 动作三通道官方对齐批次）：
+     * M1 = `Navigate`（App 内页面跳转，destination 线名闭集收口 androidApp
+     * `OpenUiActionChannels.kt` `OpenUiNavigateTarget`）。server `RenderOpenUiToolService`
+     * 工具描述与 `RenderOpenUiValidator.QUOTED_ACTION` 持字面量副本，改动须双向同步。
+     */
+    val customActions: List<OpenUiCustomAction> = listOf(
+        OpenUiCustomAction(CUSTOM_ACTION_NAVIGATE, listOf("destination", "param")),
+    )
+
+    /** 自定义动作名闭集（eval 透传判定用，未注册名仍按未知 @调用告警）。 */
+    val customActionNames: Set<String> = customActions.map { it.name }.toSet()
+
     private val childrenProp = OpenUiProp("children", OpenUiPropType.COMPONENT_LIST, required = true)
     /**
      * 容器间距 prop（词汇统一批次 2026-11-01）：默认 "m"（12dp，与旧默认 STANDARD

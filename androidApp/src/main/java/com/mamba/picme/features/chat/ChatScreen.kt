@@ -8,6 +8,10 @@ import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.domain.chat.ChatMessageType
 import com.mamba.picme.domain.chat.ChatListItem
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.openui.OpenUiLibrary
+import com.mamba.picme.domain.chat.openui.OpenUiToolNotFoundException
+import com.mamba.picme.domain.chat.openui.OpenUiToolResolver
+import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.ToolPartState
 import com.mamba.picme.domain.chat.flattenChatItems
@@ -51,7 +55,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -169,7 +172,10 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.features.chat.a2ui.A2uiCardDegraded
 import com.mamba.picme.features.chat.a2ui.A2uiCardHost
 import com.mamba.picme.features.chat.openui.OpenUiCardHost
+import com.mamba.picme.features.chat.openui.OpenUiNavigateTarget
 import com.mamba.picme.features.chat.openui.OpenUiStreamingCard
+import com.mamba.picme.features.chat.openui.OpenUiWriteTools
+import com.mamba.picme.features.chat.openui.resolveOpenUiNavigate
 import com.mamba.picme.features.chat.a2ui.polangA2uiCatalog
 import androidx.a2ui.model.catalog.functions.A2uiUrlOpener
 import androidx.compose.material.icons.outlined.Menu
@@ -263,6 +269,8 @@ fun ChatScreen(
     onNavigateToIDPhoto: (uri: String) -> Unit = {},
     /** 任务中心入口（US-12 顶栏任务图标） */
     onNavigateToTaskCenter: () -> Unit = {},
+    /** OpenUI 卡 @Navigate 出口（2026-11-01 动作三通道）：目的地闭集 + 可选参数，业务映射在外层 */
+    onOpenUiNavigate: (target: OpenUiNavigateTarget, param: String?) -> Unit = { _, _ -> },
     /** 任务中心回锚请求（US-15）；非 null 时切会话并滚动锚定对应任务卡 */
     taskAnchor: ChatTaskAnchor? = null,
     onTaskAnchorConsumed: () -> Unit = {},
@@ -335,6 +343,31 @@ fun ChatScreen(
     // 图文混排：OpenUI Image 组件 photoId → uri 端侧解析接缝（[PRIVACY] uri 不出端）
     val openUiPhotoResolver = remember {
         (context.applicationContext as PoLangApplication).container.openUiPhotoResolver
+    }
+    // 动作三通道之访问 API（2026-11-01 官方对齐）：Mutation 写工具白名单——program 写
+    // `fav = Mutation("favorite_media", { id: ... })` + @Run(fav)，engine 经本 resolver 执行，
+    // 结果 {status,data,error} 可绑定 UI（失败中断动作链 + 宿主 toast 兜底）；
+    // 低风险媒体写直落 ChatViewModel（favorite 为 chat 会话级口径，同 ChatMediaWriteCapability）；
+    // 未注册工具抛 OpenUiToolNotFoundException（engine 置 status=error），参数非法同径
+    val openUiWriteTools = remember {
+        OpenUiToolResolver { name, args ->
+            when (name) {
+                OpenUiWriteTools.FAVORITE_MEDIA, OpenUiWriteTools.UNFAVORITE_MEDIA -> {
+                    val mediaId = (args["id"] as? OpenUiValue.Num)?.v?.toLong()
+                        ?: throw IllegalArgumentException("$name 缺 id 参数")
+                    val favorite = name == OpenUiWriteTools.FAVORITE_MEDIA
+                    val message = viewModel.onFavoriteMedia(mediaId.toString(), favorite)
+                    OpenUiValue.Obj(
+                        mapOf(
+                            "ok" to OpenUiValue.Bool(true),
+                            "favorite" to OpenUiValue.Bool(favorite),
+                            "text" to OpenUiValue.Str(message),
+                        ),
+                    )
+                }
+                else -> throw OpenUiToolNotFoundException(name)
+            }
+        }
     }
     val uriHandler = LocalUriHandler.current
     val polangA2uiCatalog = remember(uriHandler) {
@@ -920,8 +953,29 @@ fun ChatScreen(
                                                         )
                                                     },
                                                     // 卡内回话入口（CardHeader「查看全部」等）：
-                                                    // @ToAssistant 以用户消息发进会话
-                                                    onToAssistant = { text -> viewModel.sendMessage(text) },
+                                                    // @ToAssistant 以用户消息发进会话（context 暂不上行）
+                                                    onToAssistant = { text, _ -> viewModel.sendMessage(text) },
+                                                    // 官方 custom action：library 注册名整颗事件抛宿主，
+                                                    // M1 = @Navigate 页面跳转（目的地闭集 → 外层业务路由）
+                                                    onCustomAction = { name, args ->
+                                                        val navigate =
+                                                            if (name == OpenUiLibrary.CUSTOM_ACTION_NAVIGATE) {
+                                                                resolveOpenUiNavigate(args)
+                                                            } else {
+                                                                null
+                                                            }
+                                                        if (navigate != null) {
+                                                            onOpenUiNavigate(navigate.first, navigate.second)
+                                                        } else {
+                                                            Logger.w(
+                                                                "Chat",
+                                                                "OpenUI 自定义动作不可路由: $name args=${args.size}",
+                                                            )
+                                                        }
+                                                    },
+                                                    // 动作三通道之访问 API：Mutation 写工具白名单
+                                                    // （低风险直写；高风险需授权的不收）
+                                                    writeTools = openUiWriteTools,
                                                 )
                                             }
                                             // 性能指标行（2026-11-01 云端 done 帧回补，同 Text part 口径）；

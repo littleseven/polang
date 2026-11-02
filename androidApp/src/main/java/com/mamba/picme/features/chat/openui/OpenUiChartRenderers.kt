@@ -69,7 +69,7 @@ internal fun OpenUiChartNode(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (node.type) {

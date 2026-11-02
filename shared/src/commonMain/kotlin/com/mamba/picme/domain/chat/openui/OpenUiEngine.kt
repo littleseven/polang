@@ -28,6 +28,11 @@ sealed interface OpenUiResult {
  *
  * [applyAction] 是 @Set/@Reset 落点：写 state store 并重求值组件树（程序微小，全量重求值，
  * 不建增量依赖图）；Query 结果缓存不因重求值重跑（§6.1 仅 args 内字面 $var 变更才重取，M1 从简）。
+ *
+ * [runToolAction] 是 @Run 落点（官方 actions 语义）：target 为 Mutation 语句时执行其工具调用，
+ * 结果以 `{status, data, error}` 对象入 mutation 缓存（可绑定 UI，如 `fav.status == "success"`）；
+ * target 为 Query 语句时按当前 store 重取。返回值供宿主链式分发——Mutation 失败返回 false，
+ * 宿主应中断后续动作链（官方：renderer 执行、失败中断后续 actions）。
  */
 class OpenUiSession(
     private val program: String,
@@ -36,12 +41,16 @@ class OpenUiSession(
 ) {
     private val store = mutableMapOf<String, OpenUiValue>()
     private val queryResults = mutableMapOf<String, OpenUiValue>()
+    private val mutationResults = mutableMapOf<String, OpenUiValue>()
     private var statements: Map<String, OpenUiStatement> = emptyMap()
     private var orderedStatements: List<OpenUiStatement> = emptyList()
     private var entryName: String? = null
     private var fallbackEntryUsed = false
     private var prepared = false
     private var lastResult: OpenUiResult? = null
+
+    /** action 期错误史（@Run 工具失败/目标非法等）：reevaluate 重建 lastResult 时并入，不被冲掉。 */
+    private val actionErrors = mutableListOf<OpenUiError>()
 
     init {
         // 宿主持久化 state 覆盖默认值（§5.1），先于 prepare 落 store
@@ -146,7 +155,7 @@ class OpenUiSession(
         statements = byName
         orderedStatements = byName.values.toList()
 
-        val runtime = OpenUiRuntime(statements, store, queryResults)
+        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
 
         // state 声明默认值：仅当变量还没有值（宿主持久化 state 已先入 store）
         orderedStatements
@@ -224,9 +233,112 @@ class OpenUiSession(
                     .ifEmpty { listOfNotNull(action.target) }
                 targets.forEach { target -> store[target] = declaredDefault(target) }
             }
-            else -> return // @ToAssistant/@OpenUrl 由渲染层消费，不动 store
+            else -> return // @Run 走 runToolAction；@ToAssistant/@OpenUrl/自定义动作由宿主消费，不动 store
         }
         reevaluateSafely()
+    }
+
+    /**
+     * @Run 落点：执行 Mutation 工具调用或重取 Query（官方 actions 语义）。
+     *
+     * - Mutation：args 按当前 store 求值后调宿主工具，结果写 mutation 缓存
+     *   （`{status: success|error, data, error}`，引用该语句的绑定随重求值刷新）；
+     *   失败返回 false——宿主链式分发应中断后续动作。
+     * - Query：按当前 store 重取并刷新缓存；失败记错误、保留旧缓存，不中断链（返回 true）。
+     * - 其他/未知 target：记告警返回 false（链不可继续）。
+     */
+    suspend fun runToolAction(target: String): Boolean {
+        if (!prepared) return false
+        val statement = statements[target]
+        if (statement == null) {
+            appendActionError(OpenUiError("run-target-missing", target, "@Run 目标语句不存在：$target"))
+            return false
+        }
+        return when (statement.kind) {
+            OpenUiStatementKind.MUTATION -> runMutation(statement)
+            OpenUiStatementKind.QUERY -> {
+                val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
+                runQuery(statement, runtime)
+                runtime.errors.forEach { error -> appendActionError(error) }
+                reevaluateSafely()
+                true
+            }
+            else -> {
+                appendActionError(
+                    OpenUiError("run-target-invalid", target, "@Run 目标非 Query/Mutation：$target"),
+                )
+                false
+            }
+        }
+    }
+
+    private suspend fun runMutation(statement: OpenUiStatement): Boolean {
+        val call = statement.expr as? OpenUiExpr.MutationCall
+        if (call == null) {
+            appendActionError(
+                OpenUiError("run-target-invalid", statement.name, "Mutation 语句右值非 Mutation 调用"),
+            )
+            return false
+        }
+        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
+        val stack = setOf(statement.name)
+        val toolName =
+            (call.args.getOrNull(0)?.let { expr ->
+                runtime.evalExpr(expr, stack, statement.name, valuePosition = false)
+            } as? OpenUiValue.Str)?.v ?: ""
+        val argsValue = call.args.getOrNull(1)?.let { expr ->
+            runtime.evalExpr(expr, stack, statement.name, valuePosition = false)
+        }
+        val argsMap = (argsValue as? OpenUiValue.Obj)?.v ?: emptyMap()
+        runtime.errors.forEach { error -> appendActionError(error) }
+        mutationResults[statement.name] = OpenUiValue.Obj(
+            mapOf(
+                "status" to OpenUiValue.Str("pending"),
+                "data" to OpenUiValue.Null,
+                "error" to OpenUiValue.Null,
+            ),
+        )
+        val result = try {
+            val data = tools.call(toolName, argsMap)
+            OpenUiValue.Obj(
+                mapOf(
+                    "status" to OpenUiValue.Str("success"),
+                    "data" to data,
+                    "error" to OpenUiValue.Null,
+                ),
+            )
+        } catch (e: OpenUiToolNotFoundException) {
+            mutationFailure(statement.name, "tool-not-found", e.message ?: "工具缺失：$toolName")
+        } catch (e: CancellationException) {
+            mutationResults.remove(statement.name)
+            throw e // 协程取消穿透（同 runQuery 口径），不留 pending 假相
+        } catch (e: Exception) {
+            mutationFailure(statement.name, "tool-error", "工具 $toolName 调用失败：${e.message}")
+        }
+        mutationResults[statement.name] = result
+        reevaluateSafely()
+        return (result.v["status"] as? OpenUiValue.Str)?.v == "success"
+    }
+
+    private fun mutationFailure(name: String, code: String, message: String): OpenUiValue.Obj {
+        appendActionError(OpenUiError(code, name, message))
+        return OpenUiValue.Obj(
+            mapOf(
+                "status" to OpenUiValue.Str("error"),
+                "data" to OpenUiValue.Null,
+                "error" to OpenUiValue.Str(message),
+            ),
+        )
+    }
+
+    /** action 期错误入史并并入当前 lastResult（重求值重建 lastResult 时由 actionErrors 回填）。 */
+    private fun appendActionError(error: OpenUiError) {
+        actionErrors += error
+        lastResult = when (val current = lastResult) {
+            is OpenUiResult.Rendered -> current.copy(errors = current.errors + error)
+            is OpenUiResult.Failed -> current.copy(errors = current.errors + error)
+            null -> OpenUiResult.Failed(listOf(error))
+        }
     }
 
     /**
@@ -242,15 +354,12 @@ class OpenUiSession(
         } catch (e: CancellationException) {
             throw e // 协程取消穿透（与 prepare 口径对齐）
         } catch (t: Throwable) {
-            val error = OpenUiError(
-                "action-exception",
-                message = "动作重求值崩溃兜底：${t.message ?: t::class.simpleName}",
+            appendActionError(
+                OpenUiError(
+                    "action-exception",
+                    message = "动作重求值崩溃兜底：${t.message ?: t::class.simpleName}",
+                ),
             )
-            lastResult = when (val current = lastResult) {
-                is OpenUiResult.Rendered -> current.copy(errors = current.errors + error)
-                is OpenUiResult.Failed -> current.copy(errors = current.errors + error)
-                null -> OpenUiResult.Failed(listOf(error))
-            }
         }
     }
 
@@ -310,16 +419,17 @@ class OpenUiSession(
     private fun declaredDefault(name: String): OpenUiValue {
         val statement = statements[name] ?: return OpenUiValue.Null
         if (statement.kind != OpenUiStatementKind.STATE) return OpenUiValue.Null
-        val runtime = OpenUiRuntime(statements, store, queryResults)
+        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
         return runtime.evalExpr(statement.expr, setOf(name), name, valuePosition = false) ?: OpenUiValue.Null
     }
 
     private fun reevaluate() {
         val entry = entryName ?: return
-        val runtime = OpenUiRuntime(statements, store, queryResults)
+        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
         val rootValue = runtime.evalStatement(entry)
         unresolved = runtime.unresolved
-        val errors = runtime.errors.distinct().let { list ->
+        // action 期错误史回填：@Run 工具失败等不被重求值重建冲掉（重复条目 distinct 收敛）
+        val errors = (runtime.errors + actionErrors).distinct().let { list ->
             if (fallbackEntryUsed) {
                 list + OpenUiError("no-root", entry, "无 root 语句，fallback 到首个 Card 语句")
             } else {

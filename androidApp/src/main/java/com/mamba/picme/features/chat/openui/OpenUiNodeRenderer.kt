@@ -166,7 +166,7 @@ fun OpenUiNodeRenderer(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (node.type) {
@@ -389,15 +389,15 @@ fun OpenUiNodeRenderer(
             val actions = openUiActionsOf(node.props["action"])
             // M5 官方对齐：variant → Filled/Tonal/Text 三态（size 收而不用，卡内统一触控尺寸）
             when ((node.props["variant"] as? OpenUiValue.Str)?.v) {
-                "secondary" -> FilledTonalButton(onClick = { actions.forEach(onAction) }, modifier = modifier) {
+                "secondary" -> FilledTonalButton(onClick = { onAction(actions) }, modifier = modifier) {
                     Text(text = label)
                 }
-                "tertiary" -> TextButton(onClick = { actions.forEach(onAction) }, modifier = modifier) {
+                "tertiary" -> TextButton(onClick = { onAction(actions) }, modifier = modifier) {
                     Text(text = label)
                 }
                 // 2026-10-30 align 治理：主按钮 full-width（卡底主 CTA 独占一行，
                 // Row weight 栏内填满所在栏）；secondary/tertiary 保持内容宽
-                else -> Button(onClick = { actions.forEach(onAction) }, modifier = modifier.fillMaxWidth()) {
+                else -> Button(onClick = { onAction(actions) }, modifier = modifier.fillMaxWidth()) {
                     Text(text = label)
                 }
             }
@@ -489,7 +489,7 @@ private fun OpenUiGappedChildren(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     // 2026-10-30 align 治理：stretch 语义由父容器传入（fillMaxWidth 撑满整宽），其余对齐缺省
     childModifier: Modifier = Modifier,
 ) {
@@ -543,7 +543,7 @@ private fun OpenUiChildList(
     children: List<OpenUiValue>,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
 ) {
     for (child in children) {
         if (child is OpenUiValue.ComponentVal) {
@@ -559,7 +559,7 @@ private fun OpenUiChildList(
 private fun OpenUiPhotoImage(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
@@ -619,7 +619,7 @@ private fun OpenUiPhotoImage(
                     onClickLabel = stringResource(R.string.cd_image_preview),
                     role = Role.Image,
                 ) {
-                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
+                    onAction(listOf(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri)))))
                 },
             )
         }
@@ -778,7 +778,7 @@ private fun OpenUiList(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_LIST_CHILDREN)
@@ -815,7 +815,7 @@ private fun OpenUiTabs(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tabs = (node.props["tabs"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -904,7 +904,7 @@ private fun OpenUiTabsCapsuleRow(
 private fun OpenUiCheckBox(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = (node.props["label"] as? OpenUiValue.Str)?.v ?: return
@@ -918,10 +918,12 @@ private fun OpenUiCheckBox(
     val toggle: (Boolean) -> Unit = { newValue ->
         bindingName?.let { name ->
             onAction(
-                OpenUiAction(
-                    name = OpenUiContract.Actions.SET,
-                    args = listOf(OpenUiValue.Bool(newValue)),
-                    target = name,
+                listOf(
+                    OpenUiAction(
+                        name = OpenUiContract.Actions.SET,
+                        args = listOf(OpenUiValue.Bool(newValue)),
+                        target = name,
+                    )
                 )
             )
         }
@@ -945,7 +947,7 @@ private fun OpenUiCheckBox(
 private fun OpenUiChoicePicker(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val options = (node.props["options"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -977,10 +979,12 @@ private fun OpenUiChoicePicker(
                     onClick = {
                         bindingName?.let { name ->
                             onAction(
-                                OpenUiAction(
-                                    name = OpenUiContract.Actions.SET,
-                                    args = listOf(OpenUiValue.Str(optionValue)),
-                                    target = name,
+                                listOf(
+                                    OpenUiAction(
+                                        name = OpenUiContract.Actions.SET,
+                                        args = listOf(OpenUiValue.Str(optionValue)),
+                                        target = name,
+                                    )
                                 )
                             )
                         }
@@ -1000,7 +1004,7 @@ private fun OpenUiChoicePicker(
 private fun OpenUiSlider(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = (node.props["label"] as? OpenUiValue.Str)?.v
@@ -1029,10 +1033,12 @@ private fun OpenUiSlider(
             onValueChangeFinished = {
                 bindingName?.let { name ->
                     onAction(
-                        OpenUiAction(
-                            name = OpenUiContract.Actions.SET,
-                            args = listOf(OpenUiValue.Num(dragValue.toDouble())),
-                            target = name,
+                        listOf(
+                            OpenUiAction(
+                                name = OpenUiContract.Actions.SET,
+                                args = listOf(OpenUiValue.Num(dragValue.toDouble())),
+                                target = name,
+                            )
                         )
                     )
                 }
@@ -1048,7 +1054,7 @@ private data class Bucket(val label: String, val count: Int)
 private fun OpenUiBarChart(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v
@@ -1146,10 +1152,12 @@ private fun OpenUiBarChart(
                                 )
                                 .clickable {
                                     onAction(
-                                        OpenUiAction(
-                                            name = OpenUiContract.Actions.SET,
-                                            args = listOf(OpenUiValue.Str(bucket.label)),
-                                            target = selectedTarget,
+                                        listOf(
+                                            OpenUiAction(
+                                                name = OpenUiContract.Actions.SET,
+                                                args = listOf(OpenUiValue.Str(bucket.label)),
+                                                target = selectedTarget,
+                                            )
                                         )
                                     )
                                 }
@@ -1755,7 +1763,7 @@ private fun OpenUiAccordion(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -1813,7 +1821,7 @@ private fun OpenUiAccordion(
 private fun OpenUiSwitch(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = (node.props["label"] as? OpenUiValue.Str)?.v ?: return
@@ -1827,10 +1835,12 @@ private fun OpenUiSwitch(
     val toggle: (Boolean) -> Unit = { newValue ->
         bindingName?.let { name ->
             onAction(
-                OpenUiAction(
-                    name = OpenUiContract.Actions.SET,
-                    args = listOf(OpenUiValue.Bool(newValue)),
-                    target = name,
+                listOf(
+                    OpenUiAction(
+                        name = OpenUiContract.Actions.SET,
+                        args = listOf(OpenUiValue.Bool(newValue)),
+                        target = name,
+                    )
                 )
             )
         }

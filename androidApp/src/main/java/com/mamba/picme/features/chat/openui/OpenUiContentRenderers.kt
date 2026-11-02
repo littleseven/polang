@@ -110,7 +110,7 @@ internal fun OpenUiContentNode(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (node.type) {
@@ -302,7 +302,7 @@ private fun OpenUiContentNetworkImage(
 private fun OpenUiContentPhotoImage(
     photoId: Long?,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val photo by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
@@ -325,7 +325,7 @@ private fun OpenUiContentPhotoImage(
                 onClickLabel = stringResource(R.string.cd_image_preview),
                 role = Role.Image,
             ) {
-                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
+                onAction(listOf(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri)))))
             },
         )
     }
@@ -343,7 +343,7 @@ private fun OpenUiContentPhotoImage(
 private fun OpenUiAdaptivePhotoImage(
     photoId: Long,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     propAspect: Double?,
     fallbackAspect: Float,
     modifier: Modifier = Modifier,
@@ -369,7 +369,7 @@ private fun OpenUiAdaptivePhotoImage(
                 onClickLabel = stringResource(R.string.cd_image_preview),
                 role = Role.Image,
             ) {
-                onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
+                onAction(listOf(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri)))))
             },
         )
     }
@@ -441,7 +441,7 @@ private fun OpenUiContentStack(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_CONTENT_ITEMS)
@@ -538,7 +538,7 @@ private fun OpenUiContentChildren(
     children: List<OpenUiValue>,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     // 2026-10-30 官方语义对齐：Stack stretch/baseline 由父容器传入的交叉轴子项修饰符
     childModifier: Modifier = Modifier,
 ) {
@@ -599,7 +599,7 @@ private fun OpenUiContentHeader(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     actions: List<OpenUiAction> = emptyList(),
-    onAction: (OpenUiAction) -> Unit = {},
+    onAction: (List<OpenUiAction>) -> Unit = {},
 ) {
     if (title == null) return
     // 2026-10-31 相册 APP 组合方式批次：actionLabel 在场 → 分组标题行（相册 APP 日期
@@ -643,7 +643,7 @@ private fun OpenUiContentHeader(
                 onClickLabel = actionLabel,
                 role = Role.Button,
             ) {
-                actions.forEach(onAction)
+                onAction(actions)
             },
         )
     }
@@ -1052,7 +1052,7 @@ private fun OpenUiContentIconText(node: OpenUiValue.ComponentVal, modifier: Modi
 private fun OpenUiContentImageText(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
@@ -1099,7 +1099,7 @@ private fun OpenUiContentImageText(
 private fun OpenUiContentImageTextLarge(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
@@ -1224,7 +1224,7 @@ private data class ContentListItem(
 @Composable
 private fun OpenUiContentListBlock(
     node: OpenUiValue.ComponentVal,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -1255,7 +1255,7 @@ private fun OpenUiContentListBlock(
                     .fillMaxWidth()
                     .then(
                         if (item.actions.isNotEmpty()) {
-                            Modifier.clickable { item.actions.forEach(onAction) }
+                            Modifier.clickable { onAction(item.actions) }
                         } else {
                             Modifier
                         }
@@ -1371,7 +1371,7 @@ private fun OpenUiContentCarousel(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_CONTENT_ITEMS)
@@ -1399,7 +1399,7 @@ private fun OpenUiContentButtons(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val buttons = (node.props["buttons"] as? OpenUiValue.Arr)?.v.orEmpty().take(MAX_CONTENT_ITEMS)
@@ -1428,14 +1428,14 @@ private fun OpenUiContentButtons(
 @Composable
 private fun OpenUiContentIconButton(
     node: OpenUiValue.ComponentVal,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val name = (node.props["name"] as? OpenUiValue.Str)?.v ?: return
     val image = (node.props["icon"] as? OpenUiValue.Str)?.v?.let { icon -> openUiIcon(icon) } ?: return
     val actions = contentActions(node.props["action"])
     IconButton(
-        onClick = { actions.forEach(onAction) },
+        onClick = { onAction(actions) },
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
     ) {
         Icon(
@@ -1457,7 +1457,7 @@ private fun OpenUiContentModal(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
@@ -1479,10 +1479,12 @@ private fun OpenUiContentModal(
     val close: () -> Unit = {
         if (bindingName != null) {
             onAction(
-                OpenUiAction(
-                    name = OpenUiContract.Actions.SET,
-                    args = listOf(OpenUiValue.Bool(false)),
-                    target = bindingName,
+                listOf(
+                    OpenUiAction(
+                        name = OpenUiContract.Actions.SET,
+                        args = listOf(OpenUiValue.Bool(false)),
+                        target = bindingName,
+                    )
                 )
             )
         } else {
@@ -1589,7 +1591,7 @@ private const val BANNER_FALLBACK_ASPECT = 16f / 9f
 private fun OpenUiContentBanner(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
@@ -1625,7 +1627,7 @@ private fun OpenUiContentBanner(
                     onClickLabel = stringResource(R.string.cd_image_preview),
                     role = Role.Image,
                 ) {
-                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri))))
+                    onAction(listOf(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(resolved.uri)))))
                 },
             )
         } else if (photoId == null && httpsSrc != null) {
@@ -1697,7 +1699,7 @@ private fun OpenUiContentBanner(
 private fun OpenUiContentListItem(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = (node.props["title"] as? OpenUiValue.Str)?.v ?: return
@@ -1714,7 +1716,7 @@ private fun OpenUiContentListItem(
             .fillMaxWidth()
             .then(
                 if (actions.isNotEmpty()) {
-                    Modifier.clickable { actions.forEach(onAction) }
+                    Modifier.clickable { onAction(actions) }
                 } else {
                     Modifier
                 }
@@ -1821,7 +1823,7 @@ private val PHOTO_GRID_GAP = 2.dp
 private fun OpenUiContentPhotoGrid(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val ids = (node.props["photos"] as? OpenUiValue.Arr)?.v.orEmpty()
@@ -1863,15 +1865,17 @@ private fun OpenUiContentPhotoGrid(
                                 role = Role.Image,
                             ) {
                                 onAction(
-                                    OpenUiAction(
-                                        OpenUiContract.Actions.OPEN_PHOTO,
-                                        run {
-                                            val allUris = ids.mapNotNull { gid -> resolved[gid]?.uri }
-                                            (listOf(photo.uri) + (allUris - photo.uri)).map { uri ->
-                                                OpenUiValue.Str(uri)
-                                            }
-                                        },
-                                    ),
+                                    listOf(
+                                        OpenUiAction(
+                                            OpenUiContract.Actions.OPEN_PHOTO,
+                                            run {
+                                                val allUris = ids.mapNotNull { gid -> resolved[gid]?.uri }
+                                                (listOf(photo.uri) + (allUris - photo.uri)).map { uri ->
+                                                    OpenUiValue.Str(uri)
+                                                }
+                                            },
+                                        ),
+                                    )
                                 )
                             },
                         )
@@ -1897,7 +1901,7 @@ private val AVATAR_SIZE = 56.dp
 private fun OpenUiContentAvatarRow(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -1941,7 +1945,7 @@ private fun OpenUiContentAvatarRow(
                             onClickLabel = stringResource(R.string.cd_image_preview),
                             role = Role.Image,
                         ) {
-                            onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
+                            onAction(listOf(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri)))))
                         },
                     )
                 }
@@ -1977,7 +1981,7 @@ private const val COMPARE_ROW_FALLBACK_ASPECT = 4.0 / 3.0
 private fun OpenUiContentCompareRow(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val beforeId = (node.props["beforePhoto"] as? OpenUiValue.Num)?.v?.toLong()
@@ -2028,7 +2032,7 @@ private fun OpenUiCompareSide(
     src: String?,
     label: String?,
     frameAspect: Float,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -2047,7 +2051,7 @@ private fun OpenUiCompareSide(
                     onClickLabel = stringResource(R.string.cd_image_preview),
                     role = Role.Image,
                 ) {
-                    onAction(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri))))
+                    onAction(listOf(OpenUiAction(OpenUiContract.Actions.OPEN_PHOTO, listOf(OpenUiValue.Str(photo.uri)))))
                 },
             )
             src != null -> AsyncImage(
@@ -2094,7 +2098,7 @@ private data class TimelineEntry(
 private fun OpenUiContentTimeline(
     node: OpenUiValue.ComponentVal,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val entries = (node.props["items"] as? OpenUiValue.Arr)?.v.orEmpty().mapNotNull { item ->
@@ -2167,10 +2171,14 @@ private fun OpenUiContentTimeline(
                                 // 集合语义：传全条目缩略图 URI（点击位在前）
                                 val allThumbUris = entries.mapNotNull { e -> e.photoId?.let { pid -> resolved[pid]?.uri } }
                                 onAction(
-                                    OpenUiAction(
-                                        OpenUiContract.Actions.OPEN_PHOTO,
-                                        (listOf(photo.uri) + (allThumbUris - photo.uri)).map { uri -> OpenUiValue.Str(uri) },
-                                    ),
+                                    listOf(
+                                        OpenUiAction(
+                                            OpenUiContract.Actions.OPEN_PHOTO,
+                                            (listOf(photo.uri) + (allThumbUris - photo.uri)).map { uri ->
+                                                OpenUiValue.Str(uri)
+                                            },
+                                        ),
+                                    )
                                 )
                             },
                         )
@@ -2217,7 +2225,7 @@ private fun OpenUiContentChartGrid(
     node: OpenUiValue.ComponentVal,
     state: Map<String, OpenUiValue>,
     photoResolver: OpenUiPhotoResolver,
-    onAction: (OpenUiAction) -> Unit,
+    onAction: (List<OpenUiAction>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val children = (node.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()

@@ -23,6 +23,7 @@ class OpenUiParserTest {
                 .also { map -> parsed.statements.forEach { stmt -> map[stmt.name] = stmt } },
             store = mutableMapOf(),
             queryResults = mutableMapOf(),
+            mutationResults = emptyMap(),
         )
         return runtime.evalStatement(name)
     }
@@ -183,6 +184,7 @@ class OpenUiParserTest {
             statements = parsed.statements.associateBy { stmt -> stmt.name },
             store = mutableMapOf(),
             queryResults = mutableMapOf(),
+            mutationResults = emptyMap(),
         )
         assertNull(runtime.evalStatement("a"))
         assertTrue("Count" in runtime.unresolved)

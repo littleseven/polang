@@ -128,10 +128,20 @@ private val BINDABLE_PROP_TYPES = setOf(
     OpenUiPropType.BINDABLE_NUMBER,
 )
 
+/** Mutation 未执行时的引用形态（官方 actions 语义：`{status, data, error}` 对象，可绑定 UI）。 */
+internal val OPEN_UI_MUTATION_IDLE: OpenUiValue.Obj = OpenUiValue.Obj(
+    mapOf(
+        "status" to OpenUiValue.Str("idle"),
+        "data" to OpenUiValue.Null,
+        "error" to OpenUiValue.Null,
+    ),
+)
+
 internal class OpenUiRuntime(
     private val statements: Map<String, OpenUiStatement>,
     val store: MutableMap<String, OpenUiValue>,
     private val queryResults: Map<String, OpenUiValue>,
+    private val mutationResults: Map<String, OpenUiValue>,
 ) {
     val errors = mutableListOf<OpenUiError>()
     val unresolved = linkedSetOf<String>()
@@ -148,14 +158,9 @@ internal class OpenUiRuntime(
         return when (statement.kind) {
             OpenUiStatementKind.STATE -> store[name] ?: OpenUiValue.Null
             OpenUiStatementKind.QUERY -> queryResults[name] ?: OpenUiValue.Null
-            // M1 不执行 Mutation（spec §4.5）：引用解析为 idle 形态
-            OpenUiStatementKind.MUTATION -> OpenUiValue.Obj(
-                mapOf(
-                    "status" to OpenUiValue.Str("idle"),
-                    "data" to OpenUiValue.Null,
-                    "error" to OpenUiValue.Null,
-                ),
-            )
+            // Mutation 引用解析为最近一次 @Run 执行结果（官方 {status, data, error} 形态），
+            // 未执行过回 idle
+            OpenUiStatementKind.MUTATION -> mutationResults[name] ?: OPEN_UI_MUTATION_IDLE
             OpenUiStatementKind.VALUE ->
                 evalExpr(statement.expr, stack + name, statement.name, valuePosition = false)
         }
@@ -388,9 +393,14 @@ internal class OpenUiRuntime(
                 listOf(OpenUiAction(OpenUiContract.Actions.OPEN_URL, listOf(arg(expr.args, 0, stack, statementId)))),
             )
             else -> {
-                // M1 无 library 自定义 function/action 注册（spec §4.5）
-                errors += OpenUiError("unknown-function", statementId, "未知 @调用 ${expr.name}")
-                OpenUiValue.Null
+                // 官方 custom action 机制：library 注册名参数全量求值后以 action 事件抛宿主，
+                // 语义裁定在宿主侧；未注册名仍按未知 @调用告警
+                if (expr.name in OpenUiLibrary.customActionNames) {
+                    evalPassthroughAction(expr.name, expr, stack, statementId)
+                } else {
+                    errors += OpenUiError("unknown-function", statementId, "未知 @调用 ${expr.name}")
+                    OpenUiValue.Null
+                }
             }
         }
 
@@ -486,6 +496,21 @@ internal class OpenUiRuntime(
             ),
         )
     }
+
+    /** 透传型自定义动作（官方 custom action）：全部参数求值后原样随 action 上行，语义裁定在宿主侧。 */
+    private fun evalPassthroughAction(
+        name: String,
+        expr: OpenUiExpr.AtCall,
+        stack: Set<String>,
+        statementId: String?,
+    ): OpenUiValue = OpenUiValue.ActionVal(
+        listOf(
+            OpenUiAction(
+                name,
+                expr.args.indices.map { index -> arg(expr.args, index, stack, statementId) },
+            ),
+        ),
+    )
 
     /** Action([...])：拍平数组元素中的 ActionVal；非数组/非动作元素丢弃。 */
     private fun evalActionWrapper(
