@@ -69,6 +69,8 @@ data class OpenUiComponent(val name: String, val props: List<OpenUiProp>)
  * +CompareRow/Timeline/ChartGrid。
  * 2026-11-01 turn-native T1（spec《2026-11-01-openui-turn-native-design》§3.6）：+Html
  * （L2 沙箱卡入树，html* / display?，INLINE 缺省 / FULLPAGE 全屏查看器）。
+ * 2026-11-02 任务卡 OpenUI 化批次：+Progress；Tag +tone（实心档）、Icon +container、
+ * Text +maxLines；Row weights 0=hug 语义（渲染层）。
  * 数据声明式：组件名 → 位置参数列表；验证（[OpenUiRuntime]）与渲染（androidApp
  * OpenUiNodeRenderer）共用同一份。
  */
@@ -150,6 +152,9 @@ object OpenUiLibrary {
                     default = OpenUiValue.Str("ON_SURFACE"),
                     enumValues = colorRoles,
                 ),
+                // 任务卡 OpenUI 化（2026-11-02）：可选行数上限（渲染期 Ellipsis）——
+                // 通用长文本截断能力；缺省不落 props，存量外观不变
+                OpenUiProp("maxLines", OpenUiPropType.NUMBER),
             ),
         ),
         // 2026-10-30 align 结构治理：三容器补 align——词汇/语义/缺省严格对齐官方
@@ -299,6 +304,14 @@ object OpenUiLibrary {
                     default = OpenUiValue.Str("ON_SURFACE"),
                     enumValues = colorRoles,
                 ),
+                // 任务卡 OpenUI 化（2026-11-02）：tonal = 图标嵌 surfaceContainerHigh
+                // 圆角容器块（28dp r7，通用「图标块」形态）；缺省 none = 裸图标
+                OpenUiProp(
+                    "container",
+                    OpenUiPropType.ENUM,
+                    default = OpenUiValue.Str("none"),
+                    enumValues = listOf("none", "tonal"),
+                ),
             ),
         ),
         OpenUiComponent(
@@ -310,6 +323,14 @@ object OpenUiLibrary {
                     default = OpenUiValue.Str("HORIZONTAL"),
                     enumValues = listOf("HORIZONTAL", "VERTICAL"),
                 ),
+            ),
+        ),
+        // 任务卡 OpenUI 化（2026-11-02）：通用进度条——4dp 轨道 + primary 填充，
+        // value 0-100（渲染期 clamp）；LLM 卡与端侧合成卡共用
+        OpenUiComponent(
+            "Progress",
+            listOf(
+                OpenUiProp("value", OpenUiPropType.NUMBER, required = true),
             ),
         ),
         // List：VERTICAL = 限高纵向滚动列（渲染期 maxHeight 约 320dp，规避聊天 LazyColumn
@@ -665,6 +686,13 @@ object OpenUiLibrary {
                     OpenUiPropType.ENUM,
                     default = OpenUiValue.Str("neutral"),
                     enumValues = listOf("neutral", "info", "success", "warning", "danger"),
+                ),
+                // 任务卡 OpenUI 化（2026-11-02）：实心档（状态 chip 语义）——primary/error/
+                // neutral 实心底 + 对应前景；缺省不带 tone = 存量 variant 外观不变（正交）
+                OpenUiProp(
+                    "tone",
+                    OpenUiPropType.ENUM,
+                    enumValues = listOf("primary", "error", "neutral"),
                 ),
             ),
         ),

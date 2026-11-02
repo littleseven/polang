@@ -133,7 +133,9 @@ class OpenUiEngineTest {
 
     @Test
     fun `excess args are dropped and component still renders`() = runTest {
-        val session = OpenUiSession("t = Text(\"a\", \"BODY\", \"ON_SURFACE\", 99)\nroot = Card([t])", noTools)
+        // 2026-11-02 Text +maxLines（第 4 参）后，超额位顺移到第 5 参——意图不变：
+        // 位置实参超 schema 位数 → excess-args + 组件照渲染
+        val session = OpenUiSession("t = Text(\"a\", \"BODY\", \"ON_SURFACE\", 1, 99)\nroot = Card([t])", noTools)
         val result = rendered(session.prepare())
         assertEquals(1, childrenOf(result.root).size)
         assertTrue(result.errors.any { error -> error.code == "excess-args" })

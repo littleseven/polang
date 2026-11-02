@@ -50,6 +50,7 @@ class OpenUiLibraryM2Test {
         // 2026-10-31 相册 APP 组合方式批次 +PhotoGrid/AvatarRow（本仓扩展）= 97 注册项；
         // 2026-10-31 布局可控性批次 +CompareRow/Timeline/ChartGrid（本仓扩展）= 100 注册项；
         // 2026-11-01 turn-native T1 +Html（L2 沙箱入树，spec §3.6）= 101 注册项
+        // 2026-11-02 任务卡 OpenUI 化批次 +Progress（通用进度条）= 102 注册项
         assertEquals(
             setOf(
                 // 既有 21（M1~M3）
@@ -87,7 +88,9 @@ class OpenUiLibraryM2Test {
                 "CompareRow", "Timeline", "ChartGrid",
                 // turn-native T1（2026-11-01，spec《2026-11-01-openui-turn-native-design》§3.6）
                 "Html",
-            ).also { expected -> assertEquals(101, expected.size) },
+                // 任务卡 OpenUI 化批次 1（2026-11-02 本仓扩展）
+                "Progress",
+            ).also { expected -> assertEquals(102, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }
