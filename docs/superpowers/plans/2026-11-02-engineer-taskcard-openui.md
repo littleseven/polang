@@ -27,7 +27,7 @@
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibraryExtTest.kt`（新建）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 package com.mamba.picme.domain.chat.openui
@@ -94,12 +94,12 @@ class OpenUiLibraryExtTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew :shared:jvmTest --tests '*OpenUiLibraryExtTest*'`
 Expected: FAIL（`Progress` 组件未注册 → 丢组件/`tone` 非法枚举值报错）
 
-- [ ] **Step 3: 改 OpenUiLibrary.kt**
+- [x] **Step 3: 改 OpenUiLibrary.kt**
 
 ① `Text` 组件 props 列表（现 `text/role/colorRole`）追加：
 
@@ -154,12 +154,12 @@ Expected: FAIL（`Progress` 组件未注册 → 丢组件/`tone` 非法枚举值
  * Text +maxLines；Row weights 0=hug 语义（渲染层）。
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `./gradlew :shared:jvmTest --tests '*OpenUiLibraryExtTest*'`
 Expected: PASS（5 用例全绿）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibrary.kt shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/openui/OpenUiLibraryExtTest.kt
@@ -175,7 +175,7 @@ git commit -m "feat(openui): 词汇扩展——Progress 组件 + Tag.tone/Icon.c
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/openui/OpenUiContentRenderers.kt`（dispatch 名单 + Tag tone 皮肤 + Progress 渲染）
 - Test: 既有「组件注册=渲染器 dispatch」清单测试（执行时 `grep -rn 'contentRenderComponents\|dispatch' androidApp/src/test --include='*.kt'` 定位，把 `Progress` 加进期望集）
 
-- [ ] **Step 1: Row weight 0 = hug**
+- [x] **Step 1: Row weight 0 = hug**
 
 `OpenUiNodeRenderer.kt` Row 分支内（现 236-252 行区域），把：
 
@@ -222,7 +222,7 @@ git commit -m "feat(openui): 词汇扩展——Progress 组件 + Tag.tone/Icon.c
 
 （注意保持缩进层级与原文件一致；`slotWeight` 变量删除后确认分支内无残余引用。）
 
-- [ ] **Step 2: Text maxLines**
+- [x] **Step 2: Text maxLines**
 
 `OpenUiNodeRenderer.kt` 的 `"Text"` 渲染分支（`grep -n '"Text" ->' OpenUiNodeRenderer.kt` 定位），在既有 `Text(...)` 组合上调叠加 maxLines：
 
@@ -243,7 +243,7 @@ git commit -m "feat(openui): 词汇扩展——Progress 组件 + Tag.tone/Icon.c
 
 （按该分支实际代码形态合并——若既有 Text 调用已带 maxLines/overflow 参数则按上表改值。）
 
-- [ ] **Step 3: Icon container 块**
+- [x] **Step 3: Icon container 块**
 
 `OpenUiNodeRenderer.kt` 的 `"Icon"` 分支：包一层条件容器——
 
@@ -270,7 +270,7 @@ git commit -m "feat(openui): 词汇扩展——Progress 组件 + Tag.tone/Icon.c
         }
 ```
 
-- [ ] **Step 4: Tag 实心 tone + Progress 渲染（OpenUiContentRenderers.kt）**
+- [x] **Step 4: Tag 实心 tone + Progress 渲染（OpenUiContentRenderers.kt）**
 
 ① dispatch 名单（`CONTENT_*` 集合常量，85-92 行区域）加 `"Progress",`（带注释 `// 任务卡 OpenUI 化（2026-11-02）`）；`when` 分支加：
 
@@ -344,19 +344,19 @@ private fun OpenUiSolidTagChip(text: String, tone: String, modifier: Modifier = 
 }
 ```
 
-- [ ] **Step 5: 清单测试同步**
+- [x] **Step 5: 清单测试同步**
 
 `grep -rn 'Progress\|compareRow\|Timeline' androidApp/src/test --include='*.kt' -l` 找到组件覆盖清单测试，期望集加 `"Progress"`。
 
 Run: `./gradlew :androidApp:testDebugUnitTest`
 Expected: PASS（含既有全部 OpenUI 渲染测试）
 
-- [ ] **Step 6: 编译 + lint 门禁**
+- [x] **Step 6: 编译 + lint 门禁**
 
 Run: `./gradlew :androidApp:compileDebugKotlin ktlintCheck :androidApp:detektMain`
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/openui/ androidApp/src/test/
@@ -371,7 +371,7 @@ git commit -m "feat(openui): 渲染器补齐——Row weights 0=hug + Progress/T
 - Create: `shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/taskcenter/EngineerTaskProgram.kt`
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/taskcenter/EngineerTaskProgramTest.kt`
 
-- [ ] **Step 1: 写失败测试**（fixture 风格对齐 `EngineerTaskHtmlTest.kt` 既有夹具）
+- [x] **Step 1: 写失败测试**（fixture 风格对齐 `EngineerTaskHtmlTest.kt` 既有夹具）
 
 ```kotlin
 package com.mamba.picme.domain.chat.taskcenter
@@ -511,12 +511,12 @@ class EngineerTaskProgramTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew :shared:jvmTest --tests '*EngineerTaskProgramTest*'`
 Expected: FAIL（`EngineerTaskProgram` 未定义）
 
-- [ ] **Step 3: 实现 EngineerTaskProgram.kt**
+- [x] **Step 3: 实现 EngineerTaskProgram.kt**
 
 ```kotlin
 package com.mamba.picme.domain.chat.taskcenter
@@ -680,17 +680,17 @@ object EngineerTaskProgram {
 
 （注意：`sections += expr?.let{}` 的 nullable 模式——`metaLine`/`errorBlock`/`usedLine` 返回 nullable，Kotlin `+=` 不收 null，用 `metaLine(task, texts)?.let { sections += it }` 形态；上面 when 分支内已按此写。）
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `./gradlew :shared:jvmTest --tests '*EngineerTaskProgramTest*'`
 Expected: PASS（8 用例全绿；golden 逐字符一致）
 
-- [ ] **Step 5: 全量 shared 测试回归**
+- [x] **Step 5: 全量 shared 测试回归**
 
 Run: `./gradlew :shared:jvmTest`
 Expected: PASS（含既有 OpenUi*/EngineerTaskHtml* 全部）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/domain/chat/taskcenter/EngineerTaskProgram.kt shared/src/commonTest/kotlin/com/mamba/picme/domain/chat/taskcenter/EngineerTaskProgramTest.kt
@@ -706,7 +706,7 @@ git commit -m "feat(taskcard): EngineerTaskProgram——任务卡 OpenUI 程序�
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/ChatScreen.kt`（约 368/738/788/1083 行区域：fullpage 状态与浮层）
 - Modify: `androidApp/src/main/res/values/strings.xml` + `values-zh-rCN/` + `values-zh-rTW/` + `values-es/` + `values-fr/`（`chat_task_badge` 值）
 
-- [ ] **Step 1: EngineerTaskCard.kt 加 OpenUI 渲染路径**
+- [x] **Step 1: EngineerTaskCard.kt 加 OpenUI 渲染路径**
 
 在文件顶部（imports 后）加：
 
@@ -743,7 +743,7 @@ internal const val USE_OPENUI_TASKCARD_RENDER = true
 
 （`onOpenFullpage` 旧签名 `(html, title)` 改名透传：组合参数改为 `onOpenFullpage: (program: String, title: String) -> Unit` ——OpenUI 路径传 program 文本，legacy 路径传 html，ChatScreen 侧按内容开对应浮层；见 Step 3。）
 
-- [ ] **Step 2: 同文件实现 OpenUI 信息区宿主 + 全屏对话框**
+- [x] **Step 2: 同文件实现 OpenUI 信息区宿主 + 全屏对话框**
 
 ```kotlin
 /**
@@ -897,7 +897,7 @@ internal fun EngineerTaskFullpageDialog(
 
 （**执行注**：上面 InfoZone 里「折叠形态第二实例」的同步求值简化——实现时直接用一个 `produceState(inlineProgram)` 承载两种形态的根（键=inlineProgram），删去 `inlineRoot` 占位三元组，避免双轨状态。最终形态：`val inlineProgram = if (inlineExpanded) program else collapsedProgram`；`val root by produceState(null, inlineProgram)`；`onSizeChanged` 只量 inline 实际内容。实现以简为准，行为以测试为准。）
 
-- [ ] **Step 3: ChatScreen 接线**
+- [x] **Step 3: ChatScreen 接线**
 
 ① 状态区（~368 行旁）加：
 
@@ -931,16 +931,16 @@ internal fun EngineerTaskFullpageDialog(
 
 （back 处理 566 行区域同步置空 `fullpageTaskProgram = null`。）
 
-- [ ] **Step 4: 徽章文案五语同步**
+- [x] **Step 4: 徽章文案五语同步**
 
 `chat_task_badge` 值 `TASK · HTML` → `TASK · OPENUI`（五文件同键同改；该键五语本就同形技术标签）。
 
-- [ ] **Step 5: 编译 + 测试 + 门禁**
+- [x] **Step 5: 编译 + 测试 + 门禁**
 
 Run: `./gradlew :androidApp:compileDebugKotlin :androidApp:testDebugUnitTest ktlintCheck :androidApp:detektMain`
 Expected: 全绿（既有 EngineerTaskCard 相关单测如有引用 onOpenFullpage 语义需同步——先跑测试看失败清单）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add androidApp/src/main/java/com/mamba/picme/features/chat/ androidApp/src/main/res/
@@ -956,7 +956,7 @@ git commit -m "feat(taskcard): 任务卡信息区切换 OpenUI 原生渲染—�
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/RenderOpenUiToolService.kt`（`@LLMDescription` 组件说明：Progress 新条目；Tag tone / Icon container / Text maxLines / Row weights 0=hug 措辞）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/RenderOpenUiValidatorTest.kt`（Progress 放行用例）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在 `RenderOpenUiValidatorTest` 加：
 
@@ -970,16 +970,16 @@ git commit -m "feat(taskcard): 任务卡信息区切换 OpenUI 原生渲染—�
 
 （对齐该测试文件既有 `validate` 帮助函数签名——执行时按实际函数名调整。）
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `./gradlew :server:test --tests '*RenderOpenUiValidatorTest*'`
 Expected: FAIL（Progress 不在白名单）
 
-- [ ] **Step 3: 同步两处字面量副本 + 跑绿**
+- [x] **Step 3: 同步两处字面量副本 + 跑绿**
 
 `ALLOWED_COMPONENTS` 集合加 `"Progress",`；`@LLMDescription` 组件清单文本补 Progress 行（`Progress(value: 0-100) 进度条`），并在 Tag/Icon/Text/Row 描述句尾补新 prop 语义（tone 实心档 / container tonal / maxLines / weights 0=不自撑）。Run: `./gradlew :server:test`。Expected: PASS。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add server/src/main/kotlin/com/mamba/picme/server/agent/ server/src/test/kotlin/com/mamba/picme/server/agent/
@@ -999,16 +999,16 @@ git commit -m "feat(server): openui 词汇副本同步——Progress/Tag.tone/Ic
 - Modify: `shared/AGENTS.md`（若列有 taskcenter 包清单，加 EngineerTaskProgram 一行指针）
 - Modify: `androidApp/build.gradle.kts`（versionName 1.0.77→1.0.78，versionCode 10077→10078——以文件实际值为准）
 
-- [ ] **Step 1: 目录文档改写**（按既有行文风格，替换「WebView L1 模板」为「OpenUI 端侧合成 + 原生渲染（EngineerTaskProgram → OpenUiSession → OpenUiNodeRenderer，根 Card 解包）」；机制段保留 500ms 合帧/跃迁即时/粘滞 FULLPAGE/兜底卡语义，注明测高缓存仅 legacy 路径；已知偏差段新增：事件列暂非等宽字体、时间线标记列自然宽、标题 SUBHEAD 字号）
-- [ ] **Step 2: 设计语言文档 §5/§6 条目**
-- [ ] **Step 3: spec 修订 + AGENTS 指针**
-- [ ] **Step 4: 版本 bump**
-- [ ] **Step 5: 全量门禁**
+- [x] **Step 1: 目录文档改写**（按既有行文风格，替换「WebView L1 模板」为「OpenUI 端侧合成 + 原生渲染（EngineerTaskProgram → OpenUiSession → OpenUiNodeRenderer，根 Card 解包）」；机制段保留 500ms 合帧/跃迁即时/粘滞 FULLPAGE/兜底卡语义，注明测高缓存仅 legacy 路径；已知偏差段新增：事件列暂非等宽字体、时间线标记列自然宽、标题 SUBHEAD 字号）
+- [x] **Step 2: 设计语言文档 §5/§6 条目**
+- [x] **Step 3: spec 修订 + AGENTS 指针**
+- [x] **Step 4: 版本 bump**
+- [x] **Step 5: 全量门禁**
 
 Run: `./gradlew :shared:jvmTest :androidApp:testDebugUnitTest :server:test ktlintCheck detekt :androidApp:assembleDebug`
 Expected: 全绿
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add docs/ androidApp/build.gradle.kts shared/AGENTS.md
