@@ -45,7 +45,7 @@ root 节点树 → OpenUiNodeRenderer（原生 Compose）                 [andro
 - `EngineerTaskCard` 信息区换渲染路径：`produceState(programText) { OpenUiSession(program).prepare() }` → `Rendered.rootOrNull()` → `OpenUiNodeRenderer`；`Failed`/组装异常 → 既有 `EngineerTaskFallbackCard`。
 - `rememberThrottledTask`（500ms 合帧 + 跃迁即时）**原样保留**；program 以节流后 state + expanded 为键重合成。
 - **双形态**：`onSizeChanged` 原生量高 → 展开态超 `viewportHeightDp` 升格 FULLPAGE 预览（折叠形态 + 点击开全屏），FULLPAGE 方向粘滞仅内存（spec §10 口径不变）；全屏查看器 = 新 `OpenUiFullpageDialog`（标题 + 同一程序可滚动原生渲染，对齐 HtmlFullpageContent 交互）。测高 LruCache 的 `taskcard:*` 形态域 key 仅 legacy 路径继续用。
-- **回滚闸**：开发者选项新增「任务卡渲染引擎」开关（默认 OpenUI；关 = 旧 HtmlCard 路径）。两条路径并存成本≈0（HTML 模板与 HtmlCard 因 iOS 双轨本就要保留）。iOS 退役 HTML 模板时一并清理开关。
+- **回滚闸（2026-11-02 实现期修订）**：原设计为开发者选项开关，落地改为**代码内开关** `USE_OPENUI_TASKCARD_RENDER`（`EngineerTaskCard.kt`，默认 true；false = 回退旧 HtmlCard 路径）。理由（YAGNI）：iOS 双轨期 HTML 模板与 HtmlCard 本就保留编译，两路径并存成本≈0，设置项/DataStore/五语文案维护成本大于收益；真机验证期翻转走 debug OTA 重建，iOS OpenUI 渲染器落地时随 legacy 分支一并删除。
 
 ### 3.3 词汇映射与扩展（shared `OpenUiLibrary` + androidApp 渲染器）
 

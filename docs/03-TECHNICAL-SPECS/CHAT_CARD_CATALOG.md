@@ -284,7 +284,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 ### 1.2 横切机制（多卡片共用）
 
 - **零 JS 桥沙箱**（ADR-016 D3）：WebView 禁文件/DOM Storage、远程 script 剔除、`HtmlCardSanitizer` 清洗（128KB 上限）；`<a>` 外链一律 `HtmlLinkPreviewOverlay` 落地页。
-- **测高防抖三件套**（HTML 卡族）：测高 LruCache（**M4 起 key = 拍平 item key `"messageId:partId"`**——ChatScreen 调用点 `cacheKey = item.key`；任务卡保留形态域 key `taskcard:<taskId>:exp|col`，状态重生成不失效缓存）+ 滑动冻结滚停应用 + <2px 抖动忽略；布局前虚高拦截。
+- **测高防抖三件套**（HTML 卡族）：测高 LruCache（**M4 起 key = 拍平 item key `"messageId:partId"`**——ChatScreen 调用点 `cacheKey = item.key`；任务卡 H3 OpenUI 路径原生布局不需要测高，形态域 key `taskcard:<taskId>:exp|col` 仅 H2 WebView 回滚路径使用）+ 滑动冻结滚停应用 + <2px 抖动忽略；布局前虚高拦截。
 - **双形态分流**（`HtmlCardDisplay` 纯函数）：display 声明 × 测高 → INLINE/FULLPAGE，终判随消息 metadata 持久化。
 - **样式权威**：design-tokens.json → codegen 双端镜像（ADR-016 D5）；HTML/L1 模板 CSS 变量走 MaterialTheme tokens，Light/Dark 随主题。
 - **媒体红线**（ADR-008）：相册图/编辑结果走原生消息（MEDIA_RESULTS/AGENT_IMAGE），不经 LLM 排版、不上传远程。
@@ -312,7 +312,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 图表卡 | `tool_chart` | `ChartSvgCard` / `ChartSvgImage` | SVG 栅格化 | —（生成物无固定帧） | ✅ |
 | HTML 卡（双形态） | `tool_html` | `HtmlCard` / `HtmlFullpageViewer` | WebView | `htmlcard/inline` 438:3 · `preview` 438:60 · `fullpage` 438:98 | ✅ |
 | 云端 Agent H5 卡 | `tool_html`（主聊天云端回合）/ 调试页内存消息（不落 Room） | `HtmlCard`（复用 §4.2 同族） | WebView | —（同 HTML 卡族） | ✅ Android（2026-10-22）；iOS 挂账（§4.9） |
-| 工程师任务卡 | `tool_task` | `EngineerTaskCard` + 原生动作条 | WebView L1 模板 | `taskcard/*` 438:181/208/264/444:31 | ✅（两分区改版待实现迁移） |
+| 工程师任务卡 | `tool_task` | `EngineerTaskCard` + 原生动作条 | OpenUI 端侧合成 + 原生渲染（H3；回滚闸可退 WebView L1 模板，iOS 双轨仍走 HTML） | `taskcard/*` 438:181/208/264/444:31 | ✅（两分区改版待实现迁移） |
 | 搜索结果卡 | `data_media_results` | `MediaResultsCarousel` | 原生 | `chat_photo_card` 387:143 | ✅ |
 | 抽卡候选条 | `data_optimize_candidates` | `GachaCandidateStrip` | 原生 | —（设计稿已随交付清理） | ✅ |
 | Agent 图片结果卡 | `image`（+ role=agent） | `ChatMessageItem` isImage 分支 | 原生 | —（跟随会话帧） | ✅ |
@@ -574,7 +574,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ![collapsed](../assets/chat-cards/taskcard-collapsed.png?v=20260927-4) ![expanded](../assets/chat-cards/taskcard-expanded.png?v=20260927-4) ![approval](../assets/chat-cards/taskcard-approval.png?v=20260927-4) ![done](../assets/chat-cards/taskcard-done.png?v=20260927-4)
 
-**渲染组件**：`EngineerTaskCard`（两分区单卡：HTML 信息区 + 卡内原生动作区 `EngineerTaskActionZone`，外层 r16；整卡统一 **cell 底**（Light 纯白 / Dark #1A1A1A）——2026-10-11 Light 连体定稿（design taskcard/light-\*）：上下两区同色、分区仅靠动作区顶 hairline（outlineVariant），白卡从微信灰列表底自然浮起，无描边）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。机制：`EngineerTaskHtml`（L1 端侧模板 + 状态 JSON 组装完整 HTML，CSS 变量走 tokens）经 `HtmlCard` 双形态渲染；displayMode 粘滞不落库；500ms 合帧节流（`EngineerTaskThrottle`）；状态文本 HTML escape（唯一注入面）；阶段串格式「工具名␣␣细节」/「file_change:path」（reducer `stageLabel` 产出），渲染期经 `parseStage`/`stageMaps` 本地化为「中文阶段名 · 细节」（时间线）与「工具名 · 正在X 细节」（当前阶段行）；停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
+**渲染组件**：`EngineerTaskCard`（两分区单卡：信息区 + 卡内原生动作区 `EngineerTaskActionZone`，外层 r16；整卡统一 **cell 底**（Light 纯白 / Dark #1A1A1A）——2026-10-11 Light 连体定稿（design taskcard/light-\*）：上下两区同色、分区仅靠动作区顶 hairline（outlineVariant），白卡从微信灰列表底自然浮起，无描边）+ `EngineerTaskFallbackCard`（`components/EngineerTaskCard.kt`）。**信息区机制（2026-11-02 H3 OpenUI 化，spec `2026-11-02-engineer-taskcard-openui`）**：`EngineerTaskProgram`（shared 纯函数组装器，段落逻辑与 H2 HTML 模板逐条对偶）把 `EngineerTaskState`+`EngineerTaskTexts` 合成为 OpenUI 程序文本 → `OpenUiSession` 全管线（parse→eval）→ `EngineerTaskOpenUiInfoZone` 解包根 Card 原生渲染 children（无 WebView/无 local_handle/无 viewState，重合成保留旧根零闪烁）；双形态复刻（折叠/展开 = 程序重合成；展开 `onSizeChanged` 原生量高超一屏升格 FULLPAGE 粘滞，内联回落折叠、点击开 `EngineerTaskFullpageDialog` 全屏原生查看器——测高缓存/防抖机制此路径不需要）；`escapeProgramString` 程序字面量转义（唯一注入面）；500ms 合帧节流（`EngineerTaskThrottle`）与阶段串本地化（`parseStage`/`stageMaps`）不变。**回滚闸**：`USE_OPENUI_TASKCARD_RENDER = false` 回退 H2 路径（`EngineerTaskHtml` L1 模板经 `HtmlCard` 渲染——iOS 双轨期 WKWebView 仍消费该模板，两路径并存）；iOS SwiftUI OpenUI 渲染器落地后统一删除。已知偏差（继承 H2 三条 + 新增两条）：进度 % 启发式封顶 80、时间线无 ○ 待办行、diff 行无 +a/−b；事件列暂非等宽字体（Text CAPTION，CodeBlock 皮肤不合）、时间线标记列自然宽（✓/● 字宽差数 px）。停止 = resolve ABANDONED + 取消 SSE。任务中心列表项保持原生紧凑形态（`taskcenter/`）。
 **parts 协议（✅ M1/M2 已落地）**：`MessagePart.TaskCard`——
 
 | 字段 | 类型 | 含义 |
@@ -586,7 +586,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 **M2 overlay**：`TaskCardOverlay.overlayLiveTaskState`——SSE live 态对消息内首个 TaskCard part **同 id 原位覆写**，legacy `engineerTask` 渲染字段自 part 投影（同源防漂移；500ms 节流在 displayMessages 管线，首帧直通）；`toUiModel` 对 TASK_CARD 已恢复 parts 双读填充。**错误双轨的持久化轨**：FAILED 的 `errorSummary` 经 M1 双写落库、回灌 `isError=true`（Chart/HtmlCard/脚本错误为瞬态轨不落库，spec §5.3）。**M4 渲染源已切 part**：item contentType `task_card`，`EngineerTaskCard` 组件与 H2 HTML 化路线不变，**状态源改 `ToolPartState`**（part.state 七态投影，五态经 `toToolPartState()` 映射；live 态仍走 overlay 同 id 覆写）——spec §7.4 复用清单落地。
 
-**测试**：`EngineerTaskHtmlTest` / `EngineerTaskReducerTest` / `EngineerTaskStateSerdeTest` / `ChatViewModelEngineerTaskTest`；冒烟 `/task`（`EngineerTaskSmokeSamples`）。
+**测试**：`EngineerTaskProgramTest`（程序 golden + prepare 零错误自证 + 转义敌对用例）/ `EngineerTaskHtmlTest`（H2 回滚路径）/ `EngineerTaskReducerTest` / `EngineerTaskStateSerdeTest` / `ChatViewModelEngineerTaskTest`；冒烟 `/task`（`EngineerTaskSmokeSamples`）。
 
 **回灌** → `ToolCall(taskId, "engineer_task", argsSummary = sourceText)` + `ToolResult(taskId, "engineer_task", errorSummary ?: resultSummary ?: "Task status: <status>", isError = state==OUTPUT_ERROR)`；`toHistoryPair` 逐字：
 
@@ -877,6 +877,8 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   **缺头/未知值（含 a2ui）= A2UI 工具发卡**（render_ui 照旧注册，回退闸零变化），
   同一回合只走一条线。
 - **协议**：`ChatMessageEntity.type = "data_ui_openui"`，content 列存整颗 `MessagePart.OpenUiCard`
+
+> 端侧合成消费者（2026-11-02）：工程师任务卡信息区（`tool_task` part）同走 OpenUI 运行时渲染（`EngineerTaskProgram` 端侧确定性合成程序文本 → `OpenUiSession` → 解包根 Card 原生渲染）——openui 渲染器的第二个消费者，程序不出端、非 turn-native 产物；详见「工程师任务卡」节。
   part JSON。**来源（2026-11-01 起）= 云端回合终结 Message 事件**——响应即程序：assistant
   content 直接是 OpenUI Lang 1.0 程序文本，端上 `CloudAgentTurnRunner` message 分支经
   `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首声明 / Card 调用，字符串字面量

@@ -168,18 +168,19 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | Card | 16dp 圆角（2026-10-31 v9 对帧校准：画布 chat 卡惯例，AppShapes.card=8 无此档）+ Spacing.lg 内边距；嵌套 = L1 surface |
 | spacing（Row/Column/Card/Grid/List）/ Stack.gap / Spacer.size | 统一官方七档刻度（2026-11-01 v10 间距词汇统一）：none\|xs\|s\|m\|l\|xl\|2xl → 0/4/8/12/16/24/32dp（8pt 网格，映射 SSOT = `OpenUiCardTokens.spacingDpOf`）；缺省 m(12)；legacy 别名 COMPACT→xs / STANDARD→m / COMFORTABLE→l 保持存量卡视觉不变（A2UI 对照组词汇，新程序不教学）；节奏规则 = server DSL_RULES 7.6（默认不写 / 一卡 ≤2 档 / 分区间隔 > 组内间隔 / Card 自带 16dp 内边距边缘不贴 Spacer） |
 | Row/Column/Card align | 交叉轴五值 start\|center\|end\|stretch\|baseline（官方 align-items 语义，缺省 stretch = 子项铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；baseline = 首行基线对齐，列向兜底 start）；stat tile 数字栏写 `align="center"`、高矮栏顶线对齐写 `align="start"` |
-| Row weights | 按比例分栏（2026-10-30，CSS flex-grow 语义）：数字数组与组件子项一一对应（Divider/Spacer 不占槽位），缺省/个数不符回退全 1 等宽；左图右文 = `weights=[1,2]` 配 `align="center"` |
+| Row weights | 按比例分栏（2026-10-30，CSS flex-grow 语义）：数字数组与组件子项一一对应（Divider/Spacer 不占槽位），缺省/个数不符回退全 1 等宽，负值/NaN 回退 1f（值域防御）；**0 = hug**（2026-11-02 v11，CSS flex-grow:0 子项按内容自尺寸）——「固定图标 + 弹性标题 + 贴边 chip」= `weights=[0,1,0]`；左图右文 = `weights=[1,2]` 配 `align="center"` |
 | Grid | 通用 N 列网格（2026-10-30）：columns 1..4 缺省 2，children 按序填满各行、cell 等宽 `weight(1f)`，末行缺格补空位保持列对齐；四宫格 = `columns=2`；spacing/align 同 Row 词汇 |
 | Box | 通用叠放容器（2026-10-30）：children 按数组序从底到顶叠放；align 九值 contentAlignment（缺省 topStart = Compose 官方缺省）；图上叠文字/角标 = `Box([Image, Tag], align="bottomStart")` |
 | Spacer | 通用留白件（2026-10-30）：size∈xs\|s\|m\|l\|xl\|2xl → 统一间距刻度（见上方 spacing 行，缺省 m）；Row 内占宽、Column/Card 内占高；不参与 Row 分栏（与 Divider 同口径） |
-| Text | §2 字阶；DISPLAY 32B tnum；CAPTION 默认弱色 |
+| Text | §2 字阶；DISPLAY 32B tnum；CAPTION 默认弱色；`maxLines`（2026-11-02 v11）行数上限超行省略号截断，缺省不限 |
 | Button | M3 Button（primary 行为色，primary 占满整行宽度；stretch 容器内各 variant 均整宽 = 官方主流形态） |
 | BarChart | §3.1 |
 | PieChart | §3.2 |
 | LineChart | §3.3 |
 | Image | 12dp 圆角；占位同形 surfaceVariant；横滑 List 内固定条目宽 200dp；aspect 缺省按图片真实比例（§4.5：相册元数据 / 网络图 intrinsic 同径，宽 sanity 界 [0.3, 3.0]，界外极长图轻微裁切），显式传 = 强制造型（clamp [0.5, 2.5]）；点击看大图（宿主动作 OpenPhoto → chat 内预览浮层单页，2026-10-30 由 PhotoEditor 编辑页改为预览页） |
-| Icon | 无 colorRole → onSurfaceVariant 弱色；PRIMARY 仅强调性图标 |
+| Icon | 无 colorRole → onSurfaceVariant 弱色；PRIMARY 仅强调性图标；`container="tonal"`（2026-11-02 v11）= 28dp r7 surfaceContainerHigh 容器块 + 15dp 图标（头部图标位形态） |
 | Divider | 0.5dp，onSurface × 0.08 |
+| Progress | 通用进度条（2026-11-02 v11）：4dp 圆角轨道 surfaceVariant + primary 填充；value∈0..100 渲染期截断 |
 | Tabs | 胶囊分段控件（surfaceVariant 容器 + primary 选中胶囊），>4 横滑 |
 | CheckBox/ChoicePicker/Slider/Switch | M3 控件 + token 色；整行 toggleable 大热区 |
 | Table | 等宽列，超宽横滑；表头 Bold |
@@ -193,7 +194,7 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | TextCallout | variant 小写→tone 色（danger→error、neutral→弱色），Callout 同款色块 |
 | CodeBlock | 等宽字体 + surfaceVariant 圆角块 + 横滑，language 弱色标注 |
 | ImageBlock / ImageGallery | https src（[PRIVACY] 正则硬校验）；Gallery 横滑定宽 200dp，仅展示无大图页 |
-| Tag / TagBlock | 胶囊（tonal 0.12 + variant→tone 色），TagBlock FlowRow 平铺 |
+| Tag / TagBlock | 胶囊（tonal 0.12 + variant→tone 色），TagBlock FlowRow 平铺；`tone`（2026-11-02 v11）实心状态 chip 档——primary/error/neutral 实心底+对应前景（r6 + 10sp SemiBold），带 tone 覆盖 variant 外观，状态徽标专用 |
 | IconText / ImageText / ImageTextLarge | 徽章/缩略图 + 标题副题列；Large=通栏 16:9 图 + 粗标题。ImageText/ImageTextLarge 图双源（2026-10-30）：`photo` 相册投影 id（photos[i].id，人脸聚焦 + 点击 OpenPhoto 大图，Image 同径）优先，`src` https 公网图兜底；未解析/非法 → 同形占位 |
 | EntityList / ListBlock / Steps | 双列 key/value 行；序号圆点/缩略图列表（action 走宿主动作）；纵向步骤条（序号圆点 + 连接线） |
 | Carousel / Buttons / IconButton | 横滑定宽条目；按钮组 Row/Column 平铺；M3 IconButton + surfaceVariant 圆底 |
@@ -232,3 +233,4 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 
 - v9（2026-10-31，spec 已随交付清理，git 历史可查）：布局可控性批次——保留 LLM 自由组合，杜绝奇怪组合改走确定性规则层：server 无声矫正 OpenUiLayoutNormalizer（N1 图文 Row 自动补 weights / N2 连续 Spacer 合并+纵向降档 / N3 单子裸容器解包 / N4 stat 数字栏自动居中）+ 结构门禁 OpenUiLayoutValidator（R1 Card 嵌套≤2 与容器链≤4 / R2 通栏签名件一卡一件 / R3 图表禁横向分栏 / R4 Grid 照片墙引导 PhotoGrid / NODE_CAP ≤60）。新增 CompareRow/Timeline/ChartGrid 三件（97→100）与 Ardot OpenUILayouts 版式范式页八帧（§4.7，Light 验证 8/8）；既有组件对帧校准 13 项（Card 16dp/Banner HEADLINE+蒙层/图表标题 CAPTION 弱色等）；lint 三条软警告退役（stat 居中与图文 weights 收编进矫正、Grid 照片墙升硬 R4）。画布新增 chart/*×4、statusColor/successTonal 变量（sync-ignore 台账，代码 SSOT=OpenUiCardTokens）。
 - v10（2026-11-01，无 spec）：间距词汇统一批次——此前提示词有三套间距词汇（Row/Column/Card/Grid/List 的 COMPACT\|STANDARD\|COMFORTABLE、Stack.gap 的 none\|xs\|s\|m\|l\|xl\|2xl、Spacer 的 xs\|s\|m\|l\|xl），且各档无 dp 语义与使用规则（对照官方 spec §5.2「描述应说明单位/范围/各枚举何时用」）。统一为官方七档 t-shirt scale（none\|xs\|s\|m\|l\|xl\|2xl → 0/4/8/12/16/24/32dp，8pt 网格）：shared `OpenUiLibrary.spacings` 扩十值（新七档 + legacy 三别名保存量卡合法）、spacingProp 缺省 STANDARD→m（12dp 等价零视觉变化）、Spacer 扩 2xl 全档对称；渲染层三处映射（容器 spacing / Stack.gap / Spacer.size）收编 `OpenUiCardTokens.spacingDpOf` 单一映射（OpenUiSpacingTokensTest 钉住）；server DSL_RULES 签名改统一词汇 + 新增 7.6 间距与节奏规则（档位 dp 语义表 + 默认不写/一卡 ≤2 档/分区 > 组内/Card 自带内边距五条）；OpenUiLayoutNormalizer N2 降档改显式映射表（修 `replace("xl","l")` 把 "2xl" 腐蚀成 "2l" 隐患）+ SPACER_RANK/QUOTED_SIZE 扩 2xl。数值链闭合：prompt 词汇 ↔ shared schema ↔ spacingDpOf ↔ Spacing ↔ design-tokens.json ↔ Ardot 画布变量（六档值全等）。
+- v11（2026-11-02，spec《2026-11-02-engineer-taskcard-openui》）：任务卡 OpenUI 化批次——工程师任务卡信息区升级为 OpenUI 程序描述 + 原生渲染（端侧确定性合成 `EngineerTaskProgram` → `OpenUiSession` 全管线 → 宿主解包根 Card 渲染，WebView/测高缓存路径退役为 `USE_OPENUI_TASKCARD_RENDER` 回滚闸；iOS 双轨仍走 H2 HTML 模板）。词汇四扩一修（100→102 注册项之外的能力扩）：+**Progress** 通用进度条（4dp 轨道）；**Tag +tone** 实心状态 chip 档（primary/error/neutral 实心底，与 variant 正交）；**Icon +container**（tonal 28dp r7 容器块）；**Text +maxLines**（超行省略号截断）；**Row weights 0=hug**（CSS flex-grow:0，值域防御保留负值/NaN→1f）。server ALLOWED_COMPONENTS + DSL_RULES 签名同步（随在途 0.9.15）。首用方 = 任务卡端侧合成（非 turn-native 产物，openui 运行时的第二个消费者）。
