@@ -410,15 +410,32 @@ class CloudAgentTurnRunnerTest {
     }
 
     @Test
-    fun `a2ui mode keeps assistant message as text`() = runTest {
+    fun `a2ui mode still parses program-shaped message as OpenUiCard`() = runTest {
+        // 跨线污染回归（2026-11-02 真机事故）：A2UI 线无 ProgramGuard，LLM 可能模仿历史
+        // 程序格式把 OpenUI 程序当纯文本输出——门判纯按内容嗅探，程序形态一律落卡，
+        // 绝不把程序原文当文本上屏
         val api = FakeApi()
-        val text = "root = Card([Text(\"hi\")])" // a2ui 线下即使是程序形态也不解析
+        val program = "// summary: 统计\nroot = Card([Text(\"hi\")])"
         api.framesScript = { onFrame ->
-            onFrame(assistantMessageFrame(text))
+            onFrame(assistantMessageFrame(program))
             onFrame(CloudFrame.Done("running"))
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "a2ui") { events.add(it) }
-        assertEquals(text, events.filterIsInstance<CloudTurnEvent.AssistantText>().single().text)
+        val card = events.filterIsInstance<CloudTurnEvent.OpenUiCard>().single()
+        assertEquals(program, card.program)
+        assertTrue(events.filterIsInstance<CloudTurnEvent.AssistantText>().isEmpty())
+    }
+
+    @Test
+    fun `a2ui mode keeps plain text message as AssistantText`() = runTest {
+        val api = FakeApi()
+        api.framesScript = { onFrame ->
+            onFrame(assistantMessageFrame("这是普通文本答复"))
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "a2ui") { events.add(it) }
+        assertEquals("这是普通文本答复", events.filterIsInstance<CloudTurnEvent.AssistantText>().single().text)
     }
 }
