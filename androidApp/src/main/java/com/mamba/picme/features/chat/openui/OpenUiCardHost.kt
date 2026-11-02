@@ -1,5 +1,6 @@
 package com.mamba.picme.features.chat.openui
 
+import android.util.LruCache
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
@@ -62,7 +63,15 @@ fun OpenUiCardHost(
     // viewState 字段，不再重建 session——此前以整颗 part 为键，卡内任意 $selected 写入
     // 都会触发 Room 回流→session 重建→其他交互 state（表单文本/开关）全丢。
     // viewState 仅在首次构建时解码为 initialState 填槽（恢复语义不变）。
-    val resolution by produceState<OpenUiResolution?>(initialValue = null, part.partId, part.program) {
+    val cacheKey = preparedCardCacheKey(part.partId, part.program)
+    val resolution by produceState<OpenUiResolution?>(
+        initialValue = preparedCardCache.get(cacheKey),
+        part.partId,
+        part.program,
+    ) {
+        // LazyColumn 回收重回：缓存命中即终态呈现，不重付 prepare（解析 + handle 取数），
+        // 也不再经过 null → LoadingIndicator → 卡片的塌缩-撑开跳变
+        if (value is OpenUiResolution.Ready) return@produceState
         var handleFailed = false
         val tools = OpenUiToolResolver { name, args ->
             if (name != OpenUiContract.TOOL_LOCAL_HANDLE) throw OpenUiToolNotFoundException(name)
@@ -103,6 +112,9 @@ fun OpenUiCardHost(
             handleFailed -> OpenUiResolution.Degraded
             result is OpenUiResult.Rendered -> OpenUiResolution.Ready(session)
             else -> OpenUiResolution.Degraded
+        }.also { resolved ->
+            // 仅缓存 Ready：Degraded（handle 缺失）每次重查，数据恢复后可自愈
+            if (resolved is OpenUiResolution.Ready) preparedCardCache.put(cacheKey, resolved)
         }
     }
     when (val current = resolution) {
@@ -150,6 +162,18 @@ private sealed interface OpenUiResolution {
     data object Degraded : OpenUiResolution
     data class Ready(val session: OpenUiSession) : OpenUiResolution
 }
+
+/**
+ * 进程级已备卡缓存（对齐 HtmlCard measuredHeightCache 先例）：LazyColumn 回收只销毁组合态
+ * 不杀缓存，卡片重回视口时 produceState 初值即 Ready，首帧直接以终态高度出现——
+ * 高度不必单独记忆，缓存住决定高度的产物（session）即可；附带保住卡内交互态
+ *（表单文本/点选不随回收丢失）。仅缓存 Ready（16 条 LRU），Degraded 每次重查可自愈。
+ */
+private val preparedCardCache = LruCache<String, OpenUiResolution>(16)
+
+/** 缓存键：partId 唯一但同 partId 内容可被 REPLACE 覆写，拼 program 哈希防陈旧命中。 */
+private fun preparedCardCacheKey(partId: String, program: String): String =
+    "$partId:${program.hashCode()}"
 
 /** local_handle 取数结果（密封结果替代多 throw，detekt ThrowsCount）。 */
 private sealed interface HandleResolution {
