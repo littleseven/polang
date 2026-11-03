@@ -118,12 +118,16 @@ object RenderOpenUiValidator {
      *  2026-11-01 官方对齐）/ Action（官方多动作包装语法）。 */
     private val ALLOWED_CALLS = ALLOWED_COMPONENTS + listOf("Query", "Mutation", "Action")
 
-    private val STRING_LITERAL = Regex(""""([^"\\]|\\.)*"""")
+    // 字符串字面量一律走 OpenUiStringScan 字符级扫描（2026-11-04 SOE 修复：
+    // "([^"\\]|\\.)*" 交替-星号正则的 GroupCurly 对每个字符递归一层栈帧，
+    // 512KB 栈实测 2288 字符字面量即 StackOverflowError——turn-native 线
+    // Html("…") 内嵌整页 HTML 必崩）；此处正则只定位到开引号，字面量本体
+    // 由 OpenUiStringScan.literalAt 扫描。
     private val LINE_COMMENT = Regex("""//[^\n]*|#[^\n]*""")
     private val CALL_NAME = Regex("""(?<![@${'$'}A-Za-z0-9_])([A-Z][A-Za-z0-9]*)\s*\(""")
     private val ROOT_STATEMENT = Regex("""(?m)^\s*root\s*=""")
     private val CARD_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Card\s*\(""")
-    private val QUERY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(\s*"((?:[^"\\]|\\.)*)"""")
+    private val QUERY_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Query\s*\(\s*"""")
 
     /** Image 调用实参抽取（2026-10-25 官方对齐：photo 降可选 + src https 公网图）。
      *  实参全是标量无嵌套调用，`[^()]*` 足够；剥离字符串会丢 src 判定信息，扫原文
@@ -135,7 +139,7 @@ object RenderOpenUiValidator {
      *  全组件生效——键名闭集 src / bgImageSrc（VisualCardBlock）/ image（ListBlock 缩略图）
      *  三种，词边界防误伤 images/imageSize 等近名键）。分组 1 = 键名，分组 2 = 地址。 */
     private val SRC_STRING =
-        Regex("""(?<![A-Za-z0-9_])(bgImageSrc|src|image)\s*[:=]\s*"((?:[^"\\]|\\.)*)"""")
+        Regex("""(?<![A-Za-z0-9_])(bgImageSrc|src|image)\s*[:=]\s*"""")
 
     private val NAMED_ARG = Regex("""^[A-Za-z_][A-Za-z0-9_]*\s*=""")
     /** photo 类键（2026-10-31 扩 bgPhoto + 对象字段冒号形态：VisualCardBlock items 的
@@ -204,7 +208,7 @@ object RenderOpenUiValidator {
      *  近似边界（同 IMAGE_CALL_ARGS 既有口径）：Markdown 文案/单引号串内写 @OpenUrl("…")
      *  字样会被一并分析——单引号串剥离阶段不识别，文案里的非 https 示例会以违规误伤，
      *  漏判/误判优先保放行好负载。 */
-    private val OPEN_URL_LITERAL = Regex("""(?<![A-Za-z0-9_"])@OpenUrl\s*\(\s*"((?:[^"\\]|\\.)*)"""")
+    private val OPEN_URL_LITERAL = Regex("""(?<![A-Za-z0-9_"])@OpenUrl\s*\(\s*"""")
 
     /** 单卡图片总数上限（2026-10-24 review 🟡3 OOM 护栏；2026-10-25 口径从 Image 调用数
      *  扩为整卡位图总数——Image 调用 + ImageGallery images / ImageBlock / ImageText /
@@ -217,13 +221,27 @@ object RenderOpenUiValidator {
     const val MAX_DISPLAY_TEXTS = 4
     const val MAX_BUTTONS = 3
 
-    /** DISPLAY role Text 计数（扫原文——role 在字符串字面量里，剥离后不可见）。
-     *  括号只允许出现在字符串字面量内（stat 增量写法 `Text("1,234 (+56)", "DISPLAY")`
-     *  不误判）；残留漏判：首参含括号表达式（Text(String($x), …)）与跨行调用。
-     *  误伤面（lint 级可接受）：`Text("DISPLAY")` 首参恰为该词的极端写法、注释内
-     *  死代码（raw 扫描不剥注释——先剥注释会踩 2026-10-24 local:// 截断事故）。 */
-    private val TEXT_DISPLAY_CALL =
-        Regex("""(?<![@${'$'}A-Za-z0-9_])Text\s*\((?:[^()"\\]|"(?:[^"\\]|\\.)*")*"DISPLAY"""")
+    /** DISPLAY role Text 计数：组件树递归（Text 节点 span 内含 `"DISPLAY"` 字面量）——
+     *  替代旧交替-星号正则扫描（2026-11-04 SOE 修复：Text 长文案触发 GroupCurly
+     *  逐字符递归爆栈；顺带根治旧漏判——首参含括号表达式 `Text(String($x), "DISPLAY")`
+     *  现正确计数，注释内死代码不再误伤）。残缺程序 parse 失败 → 0：lint 软警告
+     *  宁可漏报，残缺程序由硬校验先行拦截。 */
+    private fun countDisplayTexts(program: String): Int {
+        val roots = OpenUiCallTree.parse(program) ?: return 0
+        var count = 0
+        fun walk(nodes: List<OpenUiCallTree.CallNode>) {
+            nodes.forEach { node ->
+                if (node.name == "Text" &&
+                    program.substring(node.spanStart, node.spanEnd).contains("\"DISPLAY\"")
+                ) {
+                    count++
+                }
+                walk(node.children)
+            }
+        }
+        walk(roots)
+        return count
+    }
 
     private val BUTTON_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Button\s*\(""")
 
@@ -260,11 +278,11 @@ object RenderOpenUiValidator {
      */
     fun lintComposition(program: String): List<String> {
         val warnings = mutableListOf<String>()
-        val displayCount = TEXT_DISPLAY_CALL.findAll(program).count()
+        val displayCount = countDisplayTexts(program)
         if (displayCount > MAX_DISPLAY_TEXTS) {
             warnings += "DISPLAY 大数字 $displayCount 个超建议上限（一屏 ≤$MAX_DISPLAY_TEXTS 个，stat tile 只放最关键指标，其余改 BODY/CAPTION 或收进 Table）"
         }
-        val stripped = LINE_COMMENT.replace(STRING_LITERAL.replace(program, "\"\""), "")
+        val stripped = LINE_COMMENT.replace(OpenUiStringScan.stripLiterals(program), "")
         val buttonCount = BUTTON_CALL.findAll(stripped).count()
         if (buttonCount > MAX_BUTTONS) {
             warnings += "Button $buttonCount 个超建议上限（一卡 primary 大色块 ≤$MAX_BUTTONS 处，行为色面积收敛；次要动作并入一个主 Button 或改 Markdown 文本链接）"
@@ -396,7 +414,8 @@ object RenderOpenUiValidator {
         // 2026-11-01 review Y5：@OpenUrl 字面量首参限 https（与图片 src https 硬校验同族，
         // [PRIVACY] 外链零闸补齐）；表达式形态端侧 dispatch scheme 闸兜底
         OPEN_URL_LITERAL.findAll(program).forEach { match ->
-            val url = match.groupValues[1]
+            val url = OpenUiStringScan.literalAt(program, match.range.last)?.content
+                ?: return@forEach
             if (!url.startsWith("https://")) {
                 violations += "@OpenUrl 只接受 https:// 公网地址（实际 \"$url\"）——外链动作禁本地路径/file 协议；相册照片用 Image(photo = photos[i].id) / PhotoGrid(photos = […]) 展示，Button 外链只用于 https 公网页"
             }
@@ -405,7 +424,7 @@ object RenderOpenUiValidator {
         // 顺序必须是先字符串后注释：handle 里的 local:// 含 //，先剥注释会把
         // 字符串内部截断留下奇数引号，后续字符串全局配对跨行吞掉 root 语句
         // （2026-10-24 真机事故：合法两步写法被误报「缺 root」死循环烧光 20 迭代）
-        val stripped = LINE_COMMENT.replace(STRING_LITERAL.replace(program, "\"\""), "")
+        val stripped = LINE_COMMENT.replace(OpenUiStringScan.stripLiterals(program), "")
 
         // 1. root 入口：root = 语句存在，或存在 Card 调用兜底 entry（spec §2.2）
         if (!ROOT_STATEMENT.containsMatchIn(stripped) && !CARD_CALL.containsMatchIn(stripped)) {
@@ -424,7 +443,8 @@ object RenderOpenUiValidator {
         // 3. Query 形态：唯一宿主工具 local_handle；handle 必须是 local://scan/<id> 形态
         var hasLocalHandleQuery = false
         QUERY_CALL.findAll(program).forEach { match ->
-            val tool = match.groupValues[1]
+            val tool = OpenUiStringScan.literalAt(program, match.range.last)?.content
+                ?: return@forEach
             if (tool != "local_handle") {
                 violations += "Query 唯一允许的宿主工具是 \"local_handle\"（实际 \"$tool\"）"
             } else {
@@ -447,8 +467,14 @@ object RenderOpenUiValidator {
         //    src 与 Image(photo=…) 的 photo 落在 Image 调用区间内，只计一次不双计
         val imageCalls = IMAGE_CALL_ARGS.findAll(program).toList()
         val imageCallRanges = imageCalls.map { match -> match.range }
-        val srcOutsideImage = SRC_STRING.findAll(program)
-            .count { match -> imageCallRanges.none { range -> match.range.first in range } }
+        // src 类键前缀正则只定位到开引号，字面量本体字符级扫描（SOE 修复，同上）；
+        // 三元组 = (键起始下标, 键名, 字面量原文)；未闭合字面量不计（与旧正则同口径）
+        val srcLiterals = SRC_STRING.findAll(program).mapNotNull { match ->
+            OpenUiStringScan.literalAt(program, match.range.last)
+                ?.let { literal -> Triple(match.range.first, match.groupValues[1], literal.content) }
+        }.toList()
+        val srcOutsideImage = srcLiterals
+            .count { (start, _, _) -> imageCallRanges.none { range -> start in range } }
         val photoOutsideImage = NAMED_PHOTO.findAll(program)
             .count { match -> imageCallRanges.none { range -> match.range.first in range } }
         val imageCount = imageCalls.size + srcOutsideImage + photoOutsideImage +
@@ -468,9 +494,7 @@ object RenderOpenUiValidator {
         // 6. 图片地址 https 硬校验（2026-10-25 官方对齐，[PRIVACY] 同 A2UI Image.url
         //    口径）：任意组件的 src/bgImageSrc/image 键（`键 = "…"` 或 `{键: "…"}` 形态）
         //    字符串字面量都必须 https 公网地址
-        SRC_STRING.findAll(program).forEach { match ->
-            val key = match.groupValues[1]
-            val url = match.groupValues[2]
+        srcLiterals.forEach { (_, key, url) ->
             if (!url.startsWith("https://")) {
                 violations += "$key 只接受 https:// 公网图片地址（实际 \"$url\"）——相册照片走 Image(photo) 投影 id，禁本地路径/uri"
             }
@@ -481,7 +505,7 @@ object RenderOpenUiValidator {
         //    字符串字面量）同样限 https
         IMAGE_CALL_ARGS.findAll(program).forEach { match ->
             val args = match.groupValues[1]
-            val tokenized = STRING_LITERAL.replace(args, STR_PLACEHOLDER)
+            val tokenized = OpenUiStringScan.stripLiterals(args, STR_PLACEHOLDER)
             val parts = tokenized.split(',')
                 .map { part -> part.trim() }
                 .filter { part -> part.isNotEmpty() }
@@ -507,11 +531,8 @@ object RenderOpenUiValidator {
                     literalOrdinal += part.split(STR_PLACEHOLDER).size - 1
                     if (!isNamed) positionalIndex++
                 }
-                // STRING_LITERAL 的分组只覆盖最后一个重复单元（量词在分组外），
-                // 取完整字面量须用 match.value 去首尾引号
-                val srcLiteral = STRING_LITERAL.findAll(args)
-                    .map { literal -> literal.value.removeSurrounding("\"") }
-                    .toList()
+                val srcLiteral = OpenUiStringScan.literals(args)
+                    .map { literal -> literal.content }
                     .getOrNull(srcLiteralOrdinal)
                 if (srcLiteral != null && !srcLiteral.startsWith("https://")) {
                     violations += "Image.src 只接受 https:// 公网图片地址（实际 \"$srcLiteral\"）——相册照片走 photo 投影 id，禁本地路径/uri"

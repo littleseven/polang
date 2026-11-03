@@ -232,4 +232,21 @@ class OpenUiLayoutNormalizerTest {
             cleaned,
         )
     }
+
+    @Test
+    fun `normalize survives huge Html literal args`() {
+        // 2026-11-04 SOE 回归：Html 节点 args = 整页 HTML，旧 stripStrings 的
+        // 交替-星号字面量正则逐字符递归必爆栈；改 OpenUiStringScan 字符扫描后幂等放行
+        val body = buildString {
+            append("<html><body>")
+            var i = 0
+            while (length < 60_000) {
+                append("<div class=\\\"r\\\" data-i=\\\"").append(i % 10).append("\\\">x</div>")
+                i++
+            }
+            append("</body></html>")
+        }
+        val program = "// summary: 演示\nroot = Html(\"$body\")"
+        assertEquals(program, OpenUiLayoutNormalizer.normalize(program))
+    }
 }

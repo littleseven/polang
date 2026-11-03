@@ -1041,4 +1041,47 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         )
         assertNull(RenderOpenUiValidator.validateProgramToError(raw))
     }
+
+    // ── 2026-11-04 SOE 修复：Html 内嵌整页 HTML（转义密集大字面量）校验不爆栈 ──
+    // 事故原型：勾股定理演示卡——终结 ProgramGuard → validate 全程序正则剥离字符串，
+    // 交替-星号字面量正则 GroupCurly 逐字符递归 StackOverflowError，回合中途崩掉
+    // （Finish error，无 assistant 落库）。修复 = OpenUiStringScan 字符级扫描。
+
+    /** 模拟勾股定理演示卡：Html 字面量内含密集 \" 转义属性。 */
+    private fun hugeHtmlProgram(htmlChars: Int): String {
+        val body = buildString {
+            append("<html><body>")
+            var i = 0
+            while (length < htmlChars) {
+                append("<div class=\\\"row\\\" data-i=\\\"").append(i % 10).append("\\\">x</div>")
+                i++
+            }
+            append("</body></html>")
+        }
+        return "// summary: 演示\nroot = Html(\"$body\")"
+    }
+
+    @Test
+    fun `huge Html literal program passes validation without stack overflow`() {
+        val program = hugeHtmlProgram(60_000)
+        assertNull(RenderOpenUiValidator.validateToError(program))
+        assertNull(RenderOpenUiValidator.validateProgramToError(program))
+    }
+
+    @Test
+    fun `violations are still detected alongside huge Html literal`() {
+        val program = hugeHtmlProgram(40_000) + "\nicon = Icon(\"notAnIcon\")"
+        val error = RenderOpenUiValidator.validateToError(program)
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.contains("notAnIcon"))
+    }
+
+    @Test
+    fun `lintComposition survives huge Text literals and still counts DISPLAY`() {
+        // TEXT_DISPLAY_CALL 旧正则同样交替-星号逐字符递归；修复后改组件树递归计数
+        val bigText = "长".repeat(20_000)
+        val texts = (1..5).joinToString(", ") { "Text(\"$bigText\", \"DISPLAY\")" }
+        val warnings = RenderOpenUiValidator.lintComposition("root = Card([$texts])")
+        assertTrue(warnings.any { warning -> warning.contains("DISPLAY") })
+    }
 }

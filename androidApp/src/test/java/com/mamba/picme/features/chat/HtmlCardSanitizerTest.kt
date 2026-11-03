@@ -63,4 +63,41 @@ class HtmlCardSanitizerTest {
         val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
         assertEquals(html, out)
     }
+
+    // ── 2026-11-04 SOE 修复：懒惰点星整段剔除改手动扫描，大 tag 体/缺闭合不爆栈 ──
+
+    @Test
+    fun `external script with huge body is stripped without stack overflow`() {
+        // 旧 .*?</script> 懒惰量词逐字符递归：带 src 且 tag 体数万字符时爆栈
+        val body = "var x = 1;".repeat(10_000)
+        val html = "<p>a</p><script src=\"https://cdn.example.com/lib.js>$body</script><p>b</p>"
+        val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
+        assertEquals("<p>a</p><p>b</p>", out)
+    }
+
+    @Test
+    fun `unclosed external script opener is kept (regex parity) and survives`() {
+        // 无闭合 </script>：旧正则「无闭合不匹配」保留语义不变，且懒惰量词扫到全文尾不再爆栈
+        val html = "<p>a</p><script src=\"https://cdn.example.com/lib.js>" + "x".repeat(60_000)
+        val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
+        assertEquals(html, out)
+    }
+
+    @Test
+    fun `dangerous blocks with huge body are stripped without stack overflow`() {
+        // ASCII 填料控字节数（上限 128KB）：110KB 规模旧懒惰点星正则递归必爆栈
+        val body = "<div>ab</div>".repeat(5_000)
+        val html = "<p>a</p><iframe src=\"https://evil.com\">$body</iframe>" +
+            "<form action=\"https://evil.com\">$body</form><p>b</p>"
+        val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
+        assertEquals("<p>a</p><p>b</p>", out)
+    }
+
+    @Test
+    fun `frameset matches its own closing tag not frame`() {
+        // 长名优先：旧正则靠交替回溯命中 frameset，手动扫描须同口径
+        val html = "<p>a</p><frameset><frame src=\"https://evil.com\"></frameset><p>b</p>"
+        val out = (HtmlCardSanitizer.sanitize(html) as HtmlCardSanitizer.Result.Ok).html
+        assertEquals("<p>a</p><p>b</p>", out)
+    }
 }
