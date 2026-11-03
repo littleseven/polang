@@ -107,11 +107,46 @@ class AgentRunnerTest {
         val session = newSession()
         val usage = TurnUsage()
         // 普通回合 = 单次 LLM 调用；假响应 usage 为 10/5
+        // （MockEngine 不支持 SSE → 策略层回退一次性请求，本条钉的是非流式回退路径）
         runnerWith(HttpStatusCode.OK to chatResponse("你好"))
             .runTurn(session, "你好", gatewayTarget, "sys", ServerToolService.defaultRegistry(), turnUsage = usage)
         assertEquals(10L, usage.promptTokens)
         assertEquals(5L, usage.completionTokens)
         assertTrue("elapsed 应已回填非负值", usage.elapsedMs >= 0)
+    }
+
+    /**
+     * 流式路径的回合用量来自 End 帧 metaInfo——Koog 1.3.0 流式只触发 onLLMStreaming* 事件、
+     * 不触发 onLLMCallCompleted（仅非流式 execute 路径发射），usage 只能在
+     * onLLMStreamingFrameReceived 的 End 帧分支累加。回归 2026-11-03 云端回合性能行缺失
+     * 事故（TurnUsage 恒 0 → done 帧 usage{0,0} → 端侧全 0 护栏丢弃）。
+     */
+    @Test
+    fun `streaming turn accumulates usage from end frame metainfo`() = runBlocking {
+        val session = newSession()
+        val usage = TurnUsage()
+        val sseServer = RawSseStubServer { _, _ ->
+            MockLlmSse.streamingText("你好") to "text/event-stream"
+        }
+        try {
+            val target = AgentLlmTarget(
+                baseUrl = "http://127.0.0.1:${sseServer.port}",
+                apiKey = "k",
+                model = "test-model",
+                authStyle = AuthStyle.BEARER,
+            )
+            AgentRunner(
+                executorFactory = AgentExecutorFactory(),
+                dispatcher = ServerToolDispatcher.default(),
+            ).runTurn(session, "hi", target, "sys", ServerToolService.defaultRegistry(), turnUsage = usage)
+
+            assertEquals("流式 usage 应从 End 帧 metaInfo 累加", 10L, usage.promptTokens)
+            assertEquals(5L, usage.completionTokens)
+            assertTrue("elapsed 应已回填非负值", usage.elapsedMs >= 0)
+            assertEquals(1, sseServer.callCount.get())
+        } finally {
+            sseServer.close()
+        }
     }
 
     @Test

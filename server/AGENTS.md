@@ -13,7 +13,7 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.16
+**版本**：0.9.17
 
 **最后更新**：2026-11-03
 
@@ -109,7 +109,7 @@ server/
 │   │   ├── AgentRoundGate.kt     # per-user 跑轮并发=1 内存租约（M2.6；故意无 TTL，一轮最长 20 迭代×(LLM+120s 工具)，重启即清）
 │   │   ├── DeviceToolService.kt  # 端侧只读三件套 Koog 适配（tool_request 帧 + 120s 挂起；M1 起 @LLMDescription 只承诺投影面，对齐 shared CloudAgentToolCatalog.projectionSchema；search_media 增 display 参数（2026-10-24）：'true'=端侧透出横滑图集卡（用户明确想浏览照片时），取数/统计一律 'false'）
 │   │   ├── CloudAgentStrategy.kt # 单跑 ReAct 策略（自 :shared poLangSingleRunStrategy 移植；2026-11-01 +correctInvalidProgram 节点——turn-native ProgramGuard 门控，出边顺序 = 程序校验 → 假发卡 → finish）
-│   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish（2026-11-01 增 forwardContentDeltas/finalMessageTransformer 两参，缺省零行为变化）
+│   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish（2026-11-01 增 forwardContentDeltas/finalMessageTransformer 两参，缺省零行为变化；2026-11-03 回合用量改从流式 End 帧 metaInfo 累加——Koog 1.3.0 流式不触发 onLLMCallCompleted）
 │   │   └── AgentRoutes.kt        # /agent/** REST + SSE（BYOK X-User-Api-Key 零留存）
 │   ├── recommend/RuleEngine.kt   # 规则查询 + 参数组装
 │   ├── cos/CosService.kt         # COS 预签名 URL
