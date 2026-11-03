@@ -39,7 +39,8 @@ object OpenUiLayoutNormalizer {
     private val NAMED_WEIGHTS = Regex("""(?<![A-Za-z0-9_])weights\s*=""")
     private val NAMED_ALIGN = Regex("""(?<![A-Za-z0-9_])align\s*=""")
     private val QUOTED_SIZE = Regex(""""(2xl|xs|s|m|l|xl)"""")
-    private val STRING_LITERAL = Regex(""""([^"\\]|\\.)*"""")
+    // 字符串剥离走 OpenUiStringScan 字符级扫描（2026-11-04 SOE 修复——
+    // Html 节点 args 内含整页 HTML，旧交替-星号字面量正则逐字符递归必爆栈）
 
     /**
      * N5：模型响应尾部的 DSML 工具调用边界标记块（`</｜｜DSML｜｜ parameter>` /
@@ -197,7 +198,7 @@ object OpenUiLayoutNormalizer {
         original.substring(node.spanStart, node.spanEnd).contains("\"DISPLAY\"")
 
     private fun stripStrings(text: String): String =
-        text.replace(STRING_LITERAL, "\"\"")
+        OpenUiStringScan.stripLiterals(text)
 
     private fun spacerSize(node: OpenUiCallTree.CallNode, original: String): Int {
         val text = original.substring(node.spanStart, node.spanEnd)

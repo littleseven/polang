@@ -76,4 +76,21 @@ class OpenUiTurnNativeTest {
             assertTrue("系统提示词缺组件 $name", prompt.contains(name))
         }
     }
+
+    @Test
+    fun `ensureValidProgram survives huge Html literal`() {
+        // 2026-11-04 SOE 回归：终结兜底变换（normalize + validate + 兜底包装复验）
+        // 对整页 HTML 大字面量不爆栈，合法程序原样放行
+        val body = buildString {
+            append("<html><body>")
+            var i = 0
+            while (length < 60_000) {
+                append("<div class=\\\"r\\\" data-i=\\\"").append(i % 10).append("\\\">x</div>")
+                i++
+            }
+            append("</body></html>")
+        }
+        val program = "// summary: 演示\nroot = Html(\"$body\")"
+        assertEquals(program, OpenUiTurnNative.ensureValidProgram(program))
+    }
 }
