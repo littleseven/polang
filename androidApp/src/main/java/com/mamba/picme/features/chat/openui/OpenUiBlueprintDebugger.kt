@@ -37,7 +37,7 @@ import com.mamba.picme.core.designsystem.Spacing
  * 查看器经 [OpenUiProgramFormatter] 缩进重排 + 语法高亮展示；复制按钮复制 program 原文。
  */
 
-/** Debug 徽标 overlay：右上角胶囊 `OpenUI v1.0 · <partId>`，点击开程序查看器。 */
+/** Debug 徽标 overlay：右下角胶囊 `OpenUI v1.0 · <partId>`，点击开程序查看器；右下角避让卡片首行内容。 */
 @Composable
 fun OpenUiDebugBadge(
     partId: String,

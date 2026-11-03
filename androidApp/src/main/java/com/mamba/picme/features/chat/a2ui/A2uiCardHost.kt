@@ -120,7 +120,7 @@ fun A2uiCardHost(
                         A2uiDebugBadge(
                             surfaceId = part.surfaceId,
                             messagesJson = part.messagesJson,
-                            modifier = Modifier.align(Alignment.TopEnd),
+                            modifier = Modifier.align(Alignment.BottomEnd),
                         )
                     }
                 } else {
