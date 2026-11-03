@@ -355,6 +355,10 @@ message_bubble:
       inline_code: { family: monospace, size: same_as_body }   # 行内代码同字号仅换等宽
       quote: { style: italic }
       link: { color: primary, decoration: underline }
+    image:                          # 网络图片（web_search 图文并茂，2026-11-02 定稿；表现对等契约）
+      source_gate: "仅 https:// 公网地址（与 render_ui Image url 同口径）；http/本地路径一律不渲染"
+      sizing: "通栏宽、限高 320dp、圆角 12dp、ContentScale.Fit 不裁剪"
+      failure: "加载失败静默（Coil 默认空白），不得影响正文渲染"
     color_derivation:               # 全部派生自正文色 → 深/浅两宿主对比度一致
       code_block_bg: "text α0.08"
       inline_code_bg: "text α0.12"
@@ -859,13 +863,14 @@ platform_differences:
       - { feature: "AI 工程师(claude)", android: supported, ios: "TODO(B3) SSE 客户端+渲染" }
       - { feature: "AI 优化抽卡",     android: supported, ios: "supported(2026-08-16 §17 追齐；多轮编辑态 ChatEditStateHolder 缺失见 §17 confirm 注)" }
       - { feature: "记忆/人物关系",    android: supported, ios: "未纳入本轮（留技术债）" }
+      - { feature: "web_search 网页搜索", android: "supported(2026-11-02：WebSearchClient → server /v1/web-search → DeepSeek Search；结果配图 URL 经 agent_markdown.image 渲染)", ios: "TODO manifest 暴露 + WebSearchTransport iOS 实现 + MarkdownUI 网络图片渲染（同 source_gate/sizing 契约）" }
   privacy_disclosure:
     android: "Manifest 权限 + Play Data Safety；chat 推理 STRICT（图不上传）"
     ios: "purpose string + PrivacyInfo.xcprivacy；附件用 PHPicker(AddOnly)；VLM 端侧"
   implementation_paths:             # 2026-09-28 M5 iOS 跟随登记：同一 shared 契约，双端实现载体差异
     markdown_rendering:
-      android: "mikepenz multiplatform-markdown-renderer 0.41.0（AST→Compose）+ 白名单内联 HTML annotator；TABLE/CODE 段自研组件承接"
-      ios: "MarkdownUI 2.4.1（SPM gonzalezreal/swift-markdown-ui，cmark-gfm 全量 AST→SwiftUI）+ Theme.polangChat 落地 §5 契约；TABLE/CODE 段自研组件承接（2026-10-03 定案，原 AttributedString 方案废弃）"
+      android: "mikepenz multiplatform-markdown-renderer 0.41.0（AST→Compose）+ 白名单内联 HTML annotator；TABLE/CODE 段自研组件承接；网络图片 NetworkImageTransformer（LocalImageTransformer + Coil，https 门控/限高 320dp，2026-11-02）"
+      ios: "MarkdownUI 2.4.1（SPM gonzalezreal/swift-markdown-ui，cmark-gfm 全量 AST→SwiftUI）+ Theme.polangChat 落地 §5 契约；TABLE/CODE 段自研组件承接（2026-10-03 定案，原 AttributedString 方案废弃）；网络图片渲染 TODO（随 web_search 跟随，契约见 agent_markdown.image）"
     html_card:
       android: "WebView 沙盒（loadHTMLString + about:blank，禁外链脚本）+ 测高分流 + 全屏查看器"
       ios: "WKWebView 同构（html-card-two-tier spec §12：照搬同款沙箱/测高/渐隐预览/链接落地页）"

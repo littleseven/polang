@@ -44,6 +44,9 @@ data class AppConfig(
     val browserBridgeUrl: String,
     val browserBridgeToken: String,
     val browserDailyQuota: Int,
+    // DeepSeek 网页搜索（/v1/web-search 上游；key 空 = 未配置，路由 503 降级 web_search_unavailable）
+    val deepseekSearchApiKey: String,
+    val deepseekSearchBaseUrl: String,
     // debug 包额度豁免总闸（默认关）：开时 X-App-Channel: debug 请求跳过三处额度扣减
     // （/v1/chat/completions 账号+访客、/agent 网关回合、/v1/browser/open 每日配额），用量照记
     val debugQuotaBypass: Boolean = false,
@@ -87,6 +90,9 @@ data class AppConfig(
             browserBridgeUrl = env("BROWSER_BRIDGE_URL", ""),
             browserBridgeToken = env("BROWSER_BRIDGE_TOKEN", ""),
             browserDailyQuota = envInt("BROWSER_DAILY_QUOTA", 20),
+            // DeepSeek 网页搜索（主聊天 web_search 工具上游）
+            deepseekSearchApiKey = env("DEEPSEEK_SEARCH_API_KEY", ""),
+            deepseekSearchBaseUrl = env("DEEPSEEK_SEARCH_BASE_URL", "https://api.deepseek.com"),
             debugQuotaBypass = parseEnvBool(System.getenv("DEBUG_QUOTA_BYPASS")),
         )
 

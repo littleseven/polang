@@ -49,7 +49,7 @@
 | **ModelSelector** | `features/chat/components/ModelSelector.kt` | 模型切换组件；2026-08-22 起输入区不再展示模型胶囊（仅远程模型） |
 | **ChatInputArea** | `features/chat/ChatScreen.kt`（私有 Composable） | 输入框 + 功能胶囊 + 发送；语音入口为默认关闭的实验能力（见 §8） |
 | **MessageRepository** | `data/repository/MessageRepository.kt` | Room 数据库读写，对话持久化 |
-| **AgentMarkdown** | `features/common/chat/AgentMarkdown.kt` | Agent 正文 Markdown 唯一渲染入口（ADR-016 M3，mikepenz 0.41.0）：Chat 正文 MARKDOWN 段、AiChatScreen 浮动面板、悬浮气泡、MediaPager 视觉结果共用；retainState+immediate 流式参数、白名单内联 HTML（u/mark/sup/sub）annotator、高亮+折叠 codeFence |
+| **AgentMarkdown** | `features/common/chat/AgentMarkdown.kt` | Agent 正文 Markdown 唯一渲染入口（ADR-016 M3，mikepenz 0.41.0）：Chat 正文 MARKDOWN 段、AiChatScreen 浮动面板、悬浮气泡、MediaPager 视觉结果共用；retainState+immediate 流式参数、白名单内联 HTML（u/mark/sup/sub）annotator、高亮+折叠 codeFence；`![alt](https://图片URL)` 网络图片经 `NetworkImageTransformer`（mikepenz `LocalImageTransformer` 扩展点 + Coil，仅 https、限高 320dp、失败静默，2026-11-02 web_search 图文并茂） |
 | **OpenUI 卡宿主** | `features/chat/openui/` | OpenUI GenUI 卡渲染宿主（2026-10-24 起）：`OpenUiCardHost` 入口（shared `OpenUiSession` 批量求值 + P1 响应式状态粒度重组——per-key 读追踪，action 后仅订阅变更键的节点重组；debug 徽标 overlay 与 A2UI 对偶）、`OpenUiStreamingCard`（P2 流式预览：`OPENUI_STREAM_PREVIEW_ID` 瞬态消息挂列表尾，每帧 program 前缀新建 session 解析渲染，正式 action 帧到达后让位）、分族渲染器 `OpenUiNodeRenderer`/`OpenUiContentRenderers`/`OpenUiCardBlockRenderers`/`OpenUiChartRenderers`/`OpenUiFormRenderers`、`OpenUiCardTokens`（样式令牌只读复用 `A2uiStyleMapper`）、`OpenUiIconMap`（59 枚 name→Material 枚举，四处字面量副本同源钉住）、`OpenUiPhotoResolver`（Image photo id→uri 端侧解析，[PRIVACY] uri 不出端）、`OpenUiBlueprintDebugger`（结构调试）；对偶 A2UI 宿主在 `features/chat/a2ui/`（`A2uiCardHost` 等） |
 
 > 注：Chat 页暂不提供底部快捷入口或右下角展开菜单，相机/模型中心等能力统一从相册首页进入。

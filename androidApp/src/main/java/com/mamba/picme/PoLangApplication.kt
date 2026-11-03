@@ -30,6 +30,7 @@ import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
+import com.mamba.picme.data.remote.picme.WebSearchClient
 import com.mamba.picme.di.AppContainer
 import com.mamba.picme.di.AppContainerImpl
 import com.mamba.picme.domain.memory.MemoryContextProviderImpl
@@ -41,6 +42,7 @@ import com.mamba.picme.agent.core.model.config.AiAgentMode
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.AndroidAgentComposition
 import com.mamba.picme.agent.core.capability.BrowserSessionCapability
+import com.mamba.picme.agent.core.capability.WebSearchCapability
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.agent.core.intent.IntentRouter
 import com.mamba.picme.agent.core.js.JsRuntime
@@ -830,6 +832,14 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         )
         orchestrator.registerCapability(BrowserSessionCapability(browserTransport))
         Logger.i(TAG, "- BrowserSessionCapability: ALL-scene cloud browser (live card)")
+
+        // web_search 网页搜索（DeepSeek Search，经 server /v1/web-search；未配置时服务端 503，能力层降级）
+        val webSearchTransport = WebSearchClient(
+            tokenProvider = { cachedServerAuthToken },
+            deviceIdProvider = { cachedDeviceId },
+        )
+        orchestrator.registerCapability(WebSearchCapability(webSearchTransport))
+        Logger.i(TAG, "- WebSearchCapability: chat web_search via /v1/web-search")
     }
 
     /** 构建 HTML 卡片渲染环境（CSS px ≈ dp：渲染层已注入 viewport meta width=device-width）。 */

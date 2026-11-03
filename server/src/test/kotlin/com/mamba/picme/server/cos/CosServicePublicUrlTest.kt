@@ -40,6 +40,8 @@ class CosServicePublicUrlTest {
         browserBridgeUrl = "",
         browserBridgeToken = "",
         browserDailyQuota = 20,
+        deepseekSearchApiKey = "",
+        deepseekSearchBaseUrl = "",
     )
 
     @Test

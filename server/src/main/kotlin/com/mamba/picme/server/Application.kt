@@ -29,6 +29,7 @@ import com.mamba.picme.server.llm.LlmProxy
 import com.mamba.picme.server.llm.ChannelRegistry
 import com.mamba.picme.server.llm.ChannelBalanceService
 import com.mamba.picme.server.llm.llmRoute
+import com.mamba.picme.server.websearch.WebSearchService
 import com.mamba.picme.server.ratelimit.RateLimiter
 import com.mamba.picme.server.routes.DebugQuotaBypassKey
 import com.mamba.picme.server.routes.DeviceIdKey
@@ -49,6 +50,7 @@ import com.mamba.picme.server.routes.downloadRoute
 import com.mamba.picme.server.routes.healthzRoute
 import com.mamba.picme.server.routes.iosDownloadRoute
 import com.mamba.picme.server.routes.quotaRoute
+import com.mamba.picme.server.routes.webSearchRoute
 import com.mamba.picme.server.routes.recommendRoute
 import com.mamba.picme.server.routes.telemetryRoute
 import io.ktor.client.HttpClient
@@ -150,7 +152,8 @@ fun Application.module(config: AppConfig) {
         }
 
         // 无有效账号 token → 仅在 LLM 代理路径上允许设备级访客试用
-        val isLlmPath = uri == "/chat/completions" || uri == "/v1/chat/completions"
+        // （/v1/web-search 是主聊天 web_search 工具的上游，与聊天同口径放行访客）
+        val isLlmPath = uri == "/chat/completions" || uri == "/v1/chat/completions" || uri == "/v1/web-search"
         val deviceId = call.request.headers[DEVICE_ID_HEADER]
         if (isLlmPath && !deviceId.isNullOrBlank()) {
             call.attributes.put(DeviceIdKey, deviceId)
@@ -207,6 +210,11 @@ fun Application.module(config: AppConfig) {
     val browserDailyLimiter = RateLimiter({ SettingsService.snapshot().browserDailyQuota }, 24 * 60 * 60_000L)
     val browserStats = BrowserSessionStats()
 
+    // DeepSeek 网页搜索（主聊天 web_search 工具上游；未配置 key 时路由 503 降级）
+    val webSearchService = config.deepseekSearchApiKey.takeIf { it.isNotBlank() }?.let {
+        WebSearchService(httpClient, it, config.deepseekSearchBaseUrl)
+    }
+
     // 云端 Agent 运行器（ADR-018）：Koog JVM loop + 事件溯源落流 + BYOK 透传（零留存）
     // actionGate：render_ui 负载发射点校验（非法不落 Action 不下行，LLM 收错误文本同轮修正）
     // argsTransformer：render_ui_openui program 发射点无声归一化（布局可控性批次）
@@ -236,6 +244,7 @@ fun Application.module(config: AppConfig) {
         accountDeletionRoute()
         guestDeletionRoute()
         llmRoute(llmProxy, rateLimiter, config.llmPrices)
+        webSearchRoute(webSearchService, rateLimiter)
         claudeEngineerAvailabilityRoute()
         claudeChatRoute(claudeClient, rateLimiter)
         claudeDeliverRoute(claudeClient, rateLimiter)

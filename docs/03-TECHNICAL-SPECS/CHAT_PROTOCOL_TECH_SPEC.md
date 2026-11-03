@@ -110,7 +110,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 ### 1.4 工具集（ChatToolService，43 个 @Tool）
 
-全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 5s（browser_* 族 25s）。
+全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 5s（browser_* 族 25s、web_search 15s）。
 
 **意图级工具子集（M3 分支化落地，2026-10-17，成本治理）**：契约表 `ChatIntentContract.allowedTools` 从声明转为执行——路由判定为单一意图且路径可靠（LLM_ROUTER / PATTERN_SHORTCUT / BROWSER_SHORTCUT）时，`ChatRoutingPolicy.toolSubsetFor` 产出「契约白名单 + 通用工具（finish/delay）」子集，经 `RouteDecision.FullAgentLoop.toolNames` 传到引擎层；`RemoteChatEngine.resolveToolSetOverride` 自同一份 `chatTools`（组合根新增注入，与 registry/descriptors 同源）过滤派生子集 registry + 子集 prompt 清单段（不变式 8 不破坏），以 `KoogChatAgent.ChatToolSetOverride` 按轮覆写——AIAgent 重建键加 toolSetKey（与记忆快照/摘要版本同级），**KoogChatAgent 单实例单 executor 不为子集多建**。**保守全量（null）场景**：OPEN_QA / 一切降级路径 / secondary 双产出物 / 直执失败回退 / 平台未注入 chatTools / 子集过滤为空——路由器永不拦截能力的语义不变。子集 base prompt 按 key 缓存逐字节复用（保前缀稳定）。**权衡**：不同意图的相邻回合 system prompt/tools 前缀不同，会碎片化上游前缀缓存——用缓存碎片换 ~40 条 schema（约 2-4k token/轮 × ReAct 轮数）的确定削减。iOS 经 `ChatToolManifest.tools` 同路径注入（8 工具手工清单）。
 
@@ -121,6 +121,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 | 打标修图 | start_tag_scan / ai_optimize / adjust_image / edit_image |
 | 脚本/卡片 | run_gallery_script / draw_chart / render_html |
 | 云端浏览器 | browser_open / browser_navigate / browser_click / browser_type / browser_extract / browser_screenshot / browser_close |
+| 网页搜索 | web_search（2026-11-02：DeepSeek Search 经 server `/v1/web-search` 代理——服务端持 key 调 `/v1/tools/search` 并做配图 URL 提取/瘦身（≤5 结果、≤3 图/结果、400 字符摘录），端侧 `WebSearchClient`（WebSearchTransport）转发；结果 images 字段供 LLM 以 `![描述](https://图片URL)` 嵌回正文，AgentMarkdown 经 `NetworkImageTransformer`（Coil，仅 https、限高 320dp）渲染——「图文并茂」闭环；失败回 `[WEB_SEARCH_UNAVAILABLE]`/`[WEB_SEARCH_FAILED]` 结构化降级文本） |
 | 记忆 | remember_person_relation / forget_person_relation / list_person_relations / remember_fact / forget_fact / recall_memory |
 | 设置 | change_theme / change_language / toggle_setting / download_model / switch_face_engine |
 | 导航/系统 | navigate_to / go_back / launch_app / open_system_settings |

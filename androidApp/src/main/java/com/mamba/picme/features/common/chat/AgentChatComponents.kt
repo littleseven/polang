@@ -314,6 +314,7 @@ private fun getAgentCommandDisplayName(context: Context, command: AgentCommand):
         is AgentCommand.BrowserExtract -> context.getString(R.string.chat_cmd_browser_extract)
         is AgentCommand.BrowserScreenshot -> context.getString(R.string.chat_cmd_browser_screenshot)
         is AgentCommand.BrowserClose -> context.getString(R.string.chat_cmd_browser_close)
+        is AgentCommand.WebSearch -> context.getString(R.string.chat_cmd_web_search)
     }
 
 /**
@@ -377,6 +378,7 @@ private fun resolveCommandIcon(command: AgentCommand): ImageVector = when (comma
     is AgentCommand.BrowserExtract -> Icons.Rounded.Article
     is AgentCommand.BrowserScreenshot -> Icons.Rounded.Screenshot
     is AgentCommand.BrowserClose -> Icons.Rounded.Close
+    is AgentCommand.WebSearch -> Icons.Rounded.TravelExplore
 }
 
 private fun getAgentCommandDetail(context: Context, command: AgentCommand): String =

@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.rememberAsyncImagePainter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.mamba.picme.R
 import com.mamba.picme.core.designsystem.appColors
+import com.mikepenz.markdown.compose.LocalImageTransformer
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.components.MarkdownComponent
 import com.mikepenz.markdown.compose.components.markdownComponents
@@ -55,6 +59,8 @@ import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCode
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.ImageData
+import com.mikepenz.markdown.model.ImageTransformer
 import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
@@ -103,17 +109,41 @@ fun AgentMarkdown(
         retainState = true,
         immediate = content.length <= IMMEDIATE_PARSE_MAX_CHARS,
     )
-    Markdown(
-        markdownState = markdownState,
-        colors = agentMarkdownColors(textColor = color),
-        typography = agentMarkdownTypography(fontSize = fontSize, lineHeight = lineHeight),
-        components = markdownComponents(
-            codeFence = CollapsibleHighlightedCodeFence,
-            codeBlock = CollapsibleHighlightedCodeBlock,
-        ),
-        annotator = rememberInlineHtmlAnnotator(),
-        modifier = modifier,
-    )
+    CompositionLocalProvider(LocalImageTransformer provides NetworkImageTransformer) {
+        Markdown(
+            markdownState = markdownState,
+            colors = agentMarkdownColors(textColor = color),
+            typography = agentMarkdownTypography(fontSize = fontSize, lineHeight = lineHeight),
+            components = markdownComponents(
+                codeFence = CollapsibleHighlightedCodeFence,
+                codeBlock = CollapsibleHighlightedCodeBlock,
+            ),
+            annotator = rememberInlineHtmlAnnotator(),
+            modifier = modifier,
+        )
+    }
+}
+
+/**
+ * Markdown 网络图片渲染（web_search 图文并茂，2026-11-02）：经 mikepenz
+ * [LocalImageTransformer] 扩展点把 `![alt](url)` 交给 Coil 加载。
+ * 仅 https（与 render_ui Image url 同口径）；http/本地路径一律不渲染（transform 返 null）。
+ * 高度限 320dp 防超长图刷屏；加载失败走 Coil 默认（空白），不炸正文。
+ */
+private object NetworkImageTransformer : ImageTransformer {
+    @Composable
+    override fun transform(link: String): ImageData? {
+        if (!link.startsWith("https://")) return null
+        return ImageData(
+            painter = rememberAsyncImagePainter(model = link),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 320.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clipToBounds(),
+            contentScale = ContentScale.Fit,
+        )
+    }
 }
 
 /** 颜色全部派生自调用方正文色，保证深色气泡（白字）与常规表面（onSurface）两种宿主下对比度一致。 */

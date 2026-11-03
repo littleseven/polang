@@ -75,6 +75,12 @@ class ChatToolService private constructor() : TraceIdAware {
          */
         internal const val BROWSER_DISPATCH_TIMEOUT_MS = CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS
 
+        /**
+         * web_search 的外层 dispatch 等待超时（毫秒）：单次 HTTP 搜索（端 → 网关 → DeepSeek
+         * Search API），正常 1~5s，留足慢网余量取 15s（< registry 内层 25s，层叠不变式不破）。
+         */
+        internal const val WEB_SEARCH_DISPATCH_TIMEOUT_MS = 15_000L
+
         // KMP commonMain 无 synchronized，lazy 默认 SYNCHRONIZED 模式保证同款线程安全单例语义
         private val singleton: ChatToolService by lazy { ChatToolService() }
         fun getInstance(): ChatToolService = singleton
@@ -397,6 +403,16 @@ class ChatToolService private constructor() : TraceIdAware {
         sessionId: String,
     ): String =
         dispatchCommand(AgentCommand.BrowserClose(sessionId = sessionId), timeoutMillis = BROWSER_DISPATCH_TIMEOUT_MS)
+
+    // ── 网页搜索（DeepSeek Search，经 picme-server /v1/web-search） ──
+
+    @Tool(customName = "web_search")
+    @LLMDescription("搜索互联网获取实时信息与网页资源（新闻/攻略/教程/配图等）。返回结构化结果（标题/链接/摘要/配图URL列表）。回答涉及时效性、最新信息或用户想看网络图片时使用；结果中的配图 URL 可直接以 Markdown 图片语法嵌入回复（![描述](图片URL)，只用结果里给出的真实 URL，禁止编造）。需要打开并深度阅读某个网页时改用 browser_open 工具链。")
+    suspend fun webSearch(
+        @LLMDescription("搜索词，1~128 字符，可带 site:/lang: 等搜索语法")
+        query: String,
+    ): String =
+        dispatchCommand(AgentCommand.WebSearch(query = query), timeoutMillis = WEB_SEARCH_DISPATCH_TIMEOUT_MS)
 
     // ── 记忆（人物关系 + 事实） ─────────────────────────────────────
 
