@@ -166,7 +166,7 @@ fun OpenUiCardHost(
                     OpenUiDebugBadge(
                         partId = part.partId,
                         program = part.program,
-                        modifier = Modifier.align(Alignment.TopEnd),
+                        modifier = Modifier.align(Alignment.BottomEnd),
                     )
                 }
             } else {

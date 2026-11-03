@@ -79,7 +79,8 @@ fun parseBlueprintMessages(messagesJson: String): BlueprintParse {
 }
 
 /**
- * Debug 徽标 overlay：右上角胶囊 `A2UI v0.9 · sf-xxxxxxxx`（surfaceId 截前 8 位），点击开蓝图查看器。
+ * Debug 徽标 overlay：右下角胶囊 `A2UI v0.9 · sf-xxxxxxxx`（surfaceId 截前 8 位），点击开蓝图查看器。
+ * 右下角避让卡片首行内容（标题/导语）。
  * 版本取首条消息的 version（catalogId 由查看器详情展示）。
  */
 @Composable
