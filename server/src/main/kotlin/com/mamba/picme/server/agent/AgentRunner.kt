@@ -52,7 +52,8 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  * 调用方组合）。轮边界经 onLLMStreamingStarting 重置 content 前缀（端上覆盖式预览）。
  *
  * [turnUsage]（runTurn 参数）：回合用量累计出参（done 帧 usage/elapsed_ms 数据源）——
- * onLLMCallCompleted 逐次累加 input/output tokens，成功收尾回填 elapsedMs。
+ * 流式路径经 onLLMStreamingFrameReceived 的 End 帧 metaInfo 累加（Koog 1.3.0 流式不触发
+ * onLLMCallCompleted），非流式回退路径经 onLLMCallCompleted 累加，成功收尾回填 elapsedMs。
  * 缺省独立实例 = 无人观测，零副作用；本类无状态，多回合并发各自传入互不串扰。
  */
 class AgentRunner(
@@ -143,6 +144,18 @@ class AgentRunner(
                             )
                             is StreamFrame.TextDelta ->
                                 if (forwardContentDeltas) contentStreamTracker.onTextDelta(frame.text) else null
+                            is StreamFrame.End -> {
+                                // 回合用量（done 帧性能数据源）：Koog 1.3.0 流式路径只触发
+                                // onLLMStreaming* 事件、不触发 onLLMCallCompleted（后者仅非流式
+                                // execute 路径发射，javap 核实 ContextualPromptExecutor 是唯一调用点），
+                                // 故流式调用的 usage 只能从 End 帧 metaInfo 拿——它由 Koog OpenAI
+                                // 客户端从上游 usage chunk 构建（include_usage 由客户端自行携带）。
+                                turnUsage.add(
+                                    frame.metaInfo?.inputTokensCount?.toLong(),
+                                    frame.metaInfo?.outputTokensCount?.toLong(),
+                                )
+                                null
+                            }
                             else -> null
                         }
                         if (prefix != null) {
@@ -195,7 +208,9 @@ class AgentRunner(
                         }
                     }
                     events.onLLMCallCompleted { ctx ->
-                        // 回合用量累计（done 帧性能数据源）：metaInfo 可能缺计数，null 容错跳过
+                        // 非流式回退路径（requestLLMStreamingOrOnce 流式失败回退 requestLLM）的
+                        // 用量累加——Koog 1.3.0 仅非流式 execute 触发本事件，流式路径的用量
+                        // 在 onLLMStreamingFrameReceived 的 End 帧分支累加（两路互斥无双计）
                         val meta = ctx.response?.metaInfo
                         turnUsage.add(meta?.inputTokensCount?.toLong(), meta?.outputTokensCount?.toLong())
                     }

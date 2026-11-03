@@ -3,7 +3,8 @@ package com.mamba.picme.server.agent
 /**
  * 回合级 LLM 用量累计（done 帧性能数据源）。
  *
- * Koog EventHandler `onLLMCallCompleted` 的 metaInfo 携带单次调用 input/output tokens，
+ * Koog EventHandler `onLLMStreamingFrameReceived` 的 End 帧（流式路径）与
+ * `onLLMCallCompleted`（非流式回退路径）各携带单次调用 input/output tokens，
  * 回合内多轮 LLM 调用（工具循环）逐次累加；elapsedMs 由 [AgentRunner] 在回合成功收尾时
  * 回填。旧端忽略 done 帧未知字段，协议向后兼容。
  */

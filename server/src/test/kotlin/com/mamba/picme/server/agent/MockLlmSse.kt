@@ -86,6 +86,14 @@ object MockLlmSse {
         }
 
         emitChunk("{}", finishReason)
+        // 上游 usage chunk（OpenAI 流式规范：choices 空、usage 对象独占末帧）——
+        // Koog OpenAI 客户端据此构建 End 帧 metaInfo（回合用量数据源）
+        root["usage"]?.let { usage ->
+            sb.append("data: {\"id\":\"chatcmpl-s\",\"object\":\"chat.completion.chunk\",\"created\":1730000000,")
+                .append("\"model\":\"test-model\",\"choices\":[],\"usage\":")
+                .append(usage.toString())
+                .append("}\n\n")
+        }
         sb.append("data: [DONE]\n\n")
         return sb.toString()
     }
