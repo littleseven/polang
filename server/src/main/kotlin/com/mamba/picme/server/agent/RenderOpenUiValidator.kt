@@ -70,6 +70,9 @@ object RenderOpenUiValidator {
         "CompareRow", "Timeline", "ChartGrid",
         // 回合原生批次（2026-11-01）：L2 沙箱 HTML 组件入树（spec§3.6）
         "Html",
+        // 视频组件批次（2026-11-04）：本地视频播放（photo = #videos 投影 id / src https
+        // 公网视频，二缺一；签名对齐 Image）
+        "Video",
         // 任务卡 OpenUI 化批次（2026-11-02）：通用进度条（端侧合成任务卡首用，
         // LLM 卡同权可用）
         "Progress",
@@ -135,6 +138,10 @@ object RenderOpenUiValidator {
      *  属已记录的近似边界，漏判/误判优先保放行好负载）。 */
     private val IMAGE_CALL_ARGS = Regex("""(?<![@${'$'}A-Za-z0-9_])Image\s*\(([^()]*)\)""")
 
+    /** Video 调用实参抽取（2026-11-04 视频组件批次，同 [IMAGE_CALL_ARGS] 口径：实参全是
+     *  标量无嵌套调用，`[^()]*` 足够）。 */
+    private val VIDEO_CALL_ARGS = Regex("""(?<![@${'$'}A-Za-z0-9_])Video\s*\(([^()]*)\)""")
+
     /** 图片地址键字符串字面量抽取（命名 `src = "…"` 与对象字段 `{src: "…"}` 两种形态；
      *  全组件生效——键名闭集 src / bgImageSrc（VisualCardBlock）/ image（ListBlock 缩略图）
      *  三种，词边界防误伤 images/imageSize 等近名键）。分组 1 = 键名，分组 2 = 地址。 */
@@ -190,8 +197,9 @@ object RenderOpenUiValidator {
     private val LOCAL_HANDLE_REF = Regex("""local://[^\s"}\],)]*""")
 
     /** fragment 闭集白名单（2026-10-24 review 🟡4）：typo（如 #photo）在服务端同轮纠错，
-     *  不放行到端侧整卡降级。新增 fragment 须同步 shared OpenUiContract + OpenUiCardHost。 */
-    private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#(histogram|photos))?""")
+     *  不放行到端侧整卡降级。新增 fragment 须同步 shared OpenUiContract + OpenUiCardHost。
+     *  2026-11-04 +videos（Video 组件取数）。 */
+    private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#(histogram|photos|videos))?""")
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
 
     /** 动作表达式被包成字符串（2026-10-24 真机事故：LLM 写 "@OpenUrl(...)" 致端侧
@@ -216,6 +224,10 @@ object RenderOpenUiValidator {
      *  每张约 3.5MB 位图，整卡同屏组合存活，60 张投影上限是 token 保护而非内存保护——
      *  超过即同轮纠错。 */
     const val MAX_IMAGE_COMPONENTS = 12
+
+    /** 单卡视频组件上限（2026-11-04）：ExoPlayer 实例远比位图重，独立限额，
+     *  不计入 [MAX_IMAGE_COMPONENTS] 位图口径（Video 的 photo 投影不产生位图）。 */
+    const val MAX_VIDEO_COMPONENTS = 4
 
     /** 构图软警告阈值（2026-10-25，设计规范 §1.1/§4.1）：与工具描述规则同源。 */
     const val MAX_DISPLAY_TEXTS = 4
@@ -431,7 +443,7 @@ object RenderOpenUiValidator {
             violations += "缺 root = 语句（root 是组件树入口；无 root 时兜底的首个 Card 语句也缺失）"
         }
 
-        // 2. 组件名白名单：大写开头调用只允许 101 组件 + Query
+        // 2. 组件名白名单：大写开头调用只允许 103 组件 + Query
         CALL_NAME.findAll(stripped)
             .map { match -> match.groupValues[1] }
             .toSet()
@@ -453,11 +465,11 @@ object RenderOpenUiValidator {
         }
         LOCAL_HANDLE_REF.findAll(program).forEach { match ->
             if (!LOCAL_HANDLE_FORM.matches(match.value)) {
-                violations += "handle \"${match.value}\" 必须是 local://scan/<handleId> 形态（fragment 只许 #histogram/#photos 或省略）；handleId 只许来自 search_media/refine_media_search 结果尾部，禁止臆造"
+                violations += "handle \"${match.value}\" 必须是 local://scan/<handleId> 形态（fragment 只许 #histogram/#photos/#videos 或省略）；handleId 只许来自 search_media/refine_media_search 结果尾部，禁止臆造"
             }
         }
         if (hasLocalHandleQuery && !program.contains("local://scan/")) {
-            violations += "Query(\"local_handle\", …) 缺 handle 参数：args 对象须含 { handle: \"local://scan/<id>#histogram\" }（取照片清单用 #photos）"
+            violations += "Query(\"local_handle\", …) 缺 handle 参数：args 对象须含 { handle: \"local://scan/<id>#histogram\" }（取照片清单用 #photos，取视频清单用 #videos）"
         }
 
         // 4. 图片数量上限（OOM 护栏，见 MAX_IMAGE_COMPONENTS KDoc；2026-10-25 口径扩为
@@ -467,6 +479,9 @@ object RenderOpenUiValidator {
         //    src 与 Image(photo=…) 的 photo 落在 Image 调用区间内，只计一次不双计
         val imageCalls = IMAGE_CALL_ARGS.findAll(program).toList()
         val imageCallRanges = imageCalls.map { match -> match.range }
+        // Video 调用区间（2026-11-04）：Video(photo=…) 的 photo 是视频投影不产生位图，
+        // 须从位图计数排除；Video(src=…) 的 https 校验走规则 6/7 的视频文案分支
+        val videoCallRanges = VIDEO_CALL_ARGS.findAll(program).map { match -> match.range }.toList()
         // src 类键前缀正则只定位到开引号，字面量本体字符级扫描（SOE 修复，同上）；
         // 三元组 = (键起始下标, 键名, 字面量原文)；未闭合字面量不计（与旧正则同口径）
         val srcLiterals = SRC_STRING.findAll(program).mapNotNull { match ->
@@ -474,13 +489,25 @@ object RenderOpenUiValidator {
                 ?.let { literal -> Triple(match.range.first, match.groupValues[1], literal.content) }
         }.toList()
         val srcOutsideImage = srcLiterals
-            .count { (start, _, _) -> imageCallRanges.none { range -> start in range } }
+            .count { (start, _, _) ->
+                imageCallRanges.none { range -> start in range } &&
+                    videoCallRanges.none { range -> start in range }
+            }
         val photoOutsideImage = NAMED_PHOTO.findAll(program)
-            .count { match -> imageCallRanges.none { range -> match.range.first in range } }
+            .count { match ->
+                imageCallRanges.none { range -> match.range.first in range } &&
+                    videoCallRanges.none { range -> match.range.first in range }
+            }
         val imageCount = imageCalls.size + srcOutsideImage + photoOutsideImage +
             countPhotosArrayBitmaps(program)
         if (imageCount > MAX_IMAGE_COMPONENTS) {
             violations += "图片 $imageCount 张超上限（单卡最多 $MAX_IMAGE_COMPONENTS 张——Image 组件与 ImageGallery/ImageBlock/ImageText 等 src 类图片地址、ImageText/ImageTextLarge 的 photo 投影及 PhotoGrid photos 数组元素合计，防整卡同屏位图 OOM；精简到最关键的几张）"
+        }
+
+        // 4b. 视频数量上限（2026-11-04，ExoPlayer 实例内存护栏，见 MAX_VIDEO_COMPONENTS）
+        val videoCount = videoCallRanges.size
+        if (videoCount > MAX_VIDEO_COMPONENTS) {
+            violations += "视频 $videoCount 个超上限（单卡最多 $MAX_VIDEO_COMPONENTS 个 Video 组件——每个实例一个播放器，防整卡同屏播放器 OOM；精简到最关键的几段）"
         }
 
         // 5. Icon name 白名单（M2，正则级）：禁臆造图标名在服务端同轮纠错
@@ -494,9 +521,13 @@ object RenderOpenUiValidator {
         // 6. 图片地址 https 硬校验（2026-10-25 官方对齐，[PRIVACY] 同 A2UI Image.url
         //    口径）：任意组件的 src/bgImageSrc/image 键（`键 = "…"` 或 `{键: "…"}` 形态）
         //    字符串字面量都必须 https 公网地址
-        srcLiterals.forEach { (_, key, url) ->
+        srcLiterals.forEach { (start, key, url) ->
             if (!url.startsWith("https://")) {
-                violations += "$key 只接受 https:// 公网图片地址（实际 \"$url\"）——相册照片走 Image(photo) 投影 id，禁本地路径/uri"
+                if (videoCallRanges.any { range -> start in range }) {
+                    violations += "$key 只接受 https:// 公网视频地址（实际 \"$url\"）——相册视频走 Video(photo) 投影 id，禁本地路径/uri"
+                } else {
+                    violations += "$key 只接受 https:// 公网图片地址（实际 \"$url\"）——相册照片走 Image(photo) 投影 id，禁本地路径/uri"
+                }
             }
         }
 
@@ -536,6 +567,44 @@ object RenderOpenUiValidator {
                     .getOrNull(srcLiteralOrdinal)
                 if (srcLiteral != null && !srcLiteral.startsWith("https://")) {
                     violations += "Image.src 只接受 https:// 公网图片地址（实际 \"$srcLiteral\"）——相册照片走 photo 投影 id，禁本地路径/uri"
+                }
+            }
+        }
+
+        // 8. Video 视频来源（photo/src 二缺一，2026-11-04）：与规则 7 Image 同构——
+        //    位置序同为 photo, aspect, src（位置参数 src 同样在第三位），命名 src 的
+        //    https 已由规则 6 视频文案分支覆盖
+        VIDEO_CALL_ARGS.findAll(program).forEach { match ->
+            val args = match.groupValues[1]
+            val tokenized = OpenUiStringScan.stripLiterals(args, STR_PLACEHOLDER)
+            val parts = tokenized.split(',')
+                .map { part -> part.trim() }
+                .filter { part -> part.isNotEmpty() }
+            val positional = parts.filter { part -> !NAMED_ARG.containsMatchIn(part) }
+            val hasPhoto = NAMED_PHOTO.containsMatchIn(args) ||
+                (positional.isNotEmpty() && positional[0] != STR_PLACEHOLDER)
+            val hasSrc = NAMED_SRC.containsMatchIn(args) ||
+                positional.getOrNull(2) == STR_PLACEHOLDER
+            if (!hasPhoto && !hasSrc) {
+                violations += "Video 缺视频来源：photo（相册投影 id，如 videos[0].id）与 src（\"https://…\" 公网视频）必须给其一"
+            }
+            if (positional.getOrNull(2) == STR_PLACEHOLDER) {
+                var literalOrdinal = 0
+                var positionalIndex = 0
+                var srcLiteralOrdinal = -1
+                parts.forEach { part ->
+                    val isNamed = NAMED_ARG.containsMatchIn(part)
+                    if (!isNamed && part == STR_PLACEHOLDER && positionalIndex == 2 && srcLiteralOrdinal < 0) {
+                        srcLiteralOrdinal = literalOrdinal
+                    }
+                    literalOrdinal += part.split(STR_PLACEHOLDER).size - 1
+                    if (!isNamed) positionalIndex++
+                }
+                val srcLiteral = OpenUiStringScan.literals(args)
+                    .map { literal -> literal.content }
+                    .getOrNull(srcLiteralOrdinal)
+                if (srcLiteral != null && !srcLiteral.startsWith("https://")) {
+                    violations += "Video.src 只接受 https:// 公网视频地址（实际 \"$srcLiteral\"）——相册视频走 photo 投影 id，禁本地路径/uri"
                 }
             }
         }

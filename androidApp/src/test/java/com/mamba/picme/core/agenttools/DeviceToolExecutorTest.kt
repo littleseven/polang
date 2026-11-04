@@ -11,7 +11,7 @@ class DeviceToolExecutorTest {
 
     private fun executor(
         gallery: suspend () -> String = { "相册 1000 张" },
-        search: suspend (String, String, String, String, String, String) -> String = { q, _, _, _, _, _ -> "搜索[$q] → 3 张" },
+        search: suspend (String, String, String, String, String, String, String) -> String = { q, _, _, _, _, _, _ -> "搜索[$q] → 3 张" },
         refine: suspend (String, String, String) -> String = { c, _, _ -> "细化[$c] → 1 张" },
     ) = DeviceToolExecutor(gallerySummary = gallery, searchMedia = search, refineSearch = refine)
 
@@ -44,28 +44,37 @@ class DeviceToolExecutorTest {
     }
 
     @Test
-    fun `search_media passes all six args`() = runTest {
+    fun `search_media passes all seven args`() = runTest {
         var captured: List<String>? = null
-        val exec = executor(search = { q, p, f, t, h, d -> captured = listOf(q, p, f, t, h, d); "ok" })
+        val exec = executor(search = { q, p, f, t, h, d, m -> captured = listOf(q, p, f, t, h, d, m); "ok" })
         exec.execute(
             "search_media",
-            JSONObject().put("query", "猫").put("person", "儿子").put("fromMs", "100").put("toMs", "200").put("hasFace", "true").put("display", "true"),
+            JSONObject().put("query", "猫").put("person", "儿子").put("fromMs", "100").put("toMs", "200").put("hasFace", "true").put("display", "true").put("mediaType", "video"),
         )
-        assertEquals(listOf("猫", "儿子", "100", "200", "true", "true"), captured)
+        assertEquals(listOf("猫", "儿子", "100", "200", "true", "true", "video"), captured)
     }
 
     @Test
     fun `search_media display defaults to false when absent`() = runTest {
         // 旧版 server 不下发 display 参数时的兼容缺省：不出卡（安全侧）
         var capturedDisplay: String? = null
-        val exec = executor(search = { _, _, _, _, _, d -> capturedDisplay = d; "ok" })
+        val exec = executor(search = { _, _, _, _, _, d, _ -> capturedDisplay = d; "ok" })
         exec.execute("search_media", JSONObject().put("query", "猫"))
         assertEquals("false", capturedDisplay)
     }
 
     @Test
+    fun `search_media mediaType defaults to photo when absent`() = runTest {
+        // 旧版 server 不下发 mediaType 参数时的兼容缺省：只搜照片（安全侧）
+        var capturedMediaType: String? = null
+        val exec = executor(search = { _, _, _, _, _, _, m -> capturedMediaType = m; "ok" })
+        exec.execute("search_media", JSONObject().put("query", "猫"))
+        assertEquals("photo", capturedMediaType)
+    }
+
+    @Test
     fun `handler result containing content uri is blocked by projection gate`() = runTest {
-        val exec = executor(search = { _, _, _, _, _, _ -> "找到 2 张 content://media/external/images/1" })
+        val exec = executor(search = { _, _, _, _, _, _, _ -> "找到 2 张 content://media/external/images/1" })
         assertEquals(
             "error: projection_blocked:search_media",
             exec.execute("search_media", JSONObject().put("query", "x")),

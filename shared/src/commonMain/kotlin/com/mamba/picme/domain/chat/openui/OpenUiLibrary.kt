@@ -313,6 +313,18 @@ object OpenUiLibrary {
                 OpenUiProp("alt", OpenUiPropType.STRING),
             ),
         ),
+        // Video（2026-11-04）：本地视频播放组件，签名对齐 Image——photo = #videos 投影
+        // 元素的 id（求值为 Num，渲染期端侧 id→uri，uri 不进 program/payload，[PRIVACY]
+        // 同 Image）；src = https 公网视频；photo/src 二缺一；aspect 宽高比（宽/高），
+        // 缺省 16:9。卡片语境不自动播放，点击播放，离组即释放播放器。
+        OpenUiComponent(
+            "Video",
+            listOf(
+                OpenUiProp("photo", OpenUiPropType.NUMBER),
+                OpenUiProp("aspect", OpenUiPropType.NUMBER),
+                OpenUiProp("src", OpenUiPropType.STRING),
+            ),
+        ),
         // ── M2 六组件（spec《openui-component-library-m2-design》§2） ──────────
         // Icon.name 59 枚举（iconNames 字面量副本，三方同步见 iconNames KDoc）；
         // colorRole 复用色板（SURFACE 在文字语义上是弱化色，图标同理可用）

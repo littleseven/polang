@@ -65,6 +65,13 @@ object OpenUiContract {
     const val FRAGMENT_PHOTOS = "photos"
 
     /**
+     * scan 句柄的 #videos fragment（2026-11-04 Video 组件）：
+     * `local://scan/<id>#videos` → 端侧投影 [{id, date, durationSec}]（cap 60）。
+     * server `RenderOpenUiToolService` 描述文本持字面量副本，改动须双向同步核对。
+     */
+    const val FRAGMENT_VIDEOS = "videos"
+
+    /**
      * viewState 线格式（2026-11-01 泛化，review Y4）：`name=value;name=value` 键值对序列——
      * name 为 state 变量名（不含 `$`，恢复时映射回 `$name` → Str），`%`/`=`/`;` 三字符
      * percent-编码。历史单值形态 `selected=<label>` 是其一阶子集，旧数据可读。

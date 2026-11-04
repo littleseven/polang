@@ -51,6 +51,7 @@ class OpenUiLibraryM2Test {
         // 2026-10-31 布局可控性批次 +CompareRow/Timeline/ChartGrid（本仓扩展）= 100 注册项；
         // 2026-11-01 turn-native T1 +Html（L2 沙箱入树，spec §3.6）= 101 注册项
         // 2026-11-02 任务卡 OpenUI 化批次 +Progress（通用进度条）= 102 注册项
+        // 2026-11-04 本地视频批次 +Video（本地视频播放，#videos 投影）= 103 注册项
         assertEquals(
             setOf(
                 // 既有 21（M1~M3）
@@ -90,7 +91,9 @@ class OpenUiLibraryM2Test {
                 "Html",
                 // 任务卡 OpenUI 化批次 1（2026-11-02 本仓扩展）
                 "Progress",
-            ).also { expected -> assertEquals(102, expected.size) },
+                // 本地视频批次 1（2026-11-04 本仓扩展）
+                "Video",
+            ).also { expected -> assertEquals(103, expected.size) },
             OpenUiLibrary.components.keys,
         )
     }

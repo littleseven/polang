@@ -219,6 +219,11 @@ class RenderOpenUiToolService {
      （竖屏图不再被横框拦腰，推荐省略），只有要强制造型（统一方块拼图/横幅封面）才显式传
      （横图 1.5~1.78，竖图 0.75）；Row([Image(...), Image(...)]) 可多张并排等宽；
      单卡图片≤12 张（内存上限）；
+   - Video(photo?, aspect?, src?)：本地/公网视频播放卡——photo 与 src 二缺一必给：
+     photo 只许填 videos 数组元素的 id（如 videos[0].id，来自 #videos 取数，禁止写
+     字面量数字 id 防臆造）；src 是 https:// 公网视频地址（禁本地路径/uri）；
+     aspect 是宽高比（宽/高，缺省 16:9）；卡片内不自动播放，用户点击播放；
+     单卡视频 ≤4 个（播放器实例内存上限）；
    - Icon(name*, colorRole?, container?)：name 只用预定义图标名（59 枚清单见规则 6 末），禁臆造；
      装饰性图标省略 colorRole（自动弱色），PRIMARY 只留强调性图标；container?=none|tonal
      （默认 none 裸图标；tonal = 图标嵌浅底圆角容器块，头部图标位形态）；
@@ -342,6 +347,10 @@ class RenderOpenUiToolService {
    `photos = Query("local_handle", { handle: "local://scan/<id>#photos" }, [])`，
    得到 [{id, date}]（按搜索相关度排序，最多 60 张，date 是 "yyyy-MM-dd"
    拍摄日期可直接给 Text 用）；
+   视频清单取数写法逐字为
+   `videos = Query("local_handle", { handle: "local://scan/<id>#videos" }, [])`，
+   得到 [{id, date}]（最多 60 段，供 Video(photo = videos[0].id) 用）——
+   前提是 search_media 已用 media_type = "video" 或 "all" 搜到视频；
    禁止臆造 handleId，禁止把路径/uri/媒体清单写进 program 任何位置；
    handle id 只在 program 里引用，回复正文禁止向用户展示 handle id；
 5. Query 推荐独占整条语句右侧（先 `buckets = Query("local_handle", …, [])` 单独成行，

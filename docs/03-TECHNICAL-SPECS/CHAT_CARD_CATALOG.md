@@ -319,7 +319,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
 | 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay`（M2 全屏接管） | 原生（帧位图：M2 WS binary 推流 / HTTP base64） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
 | A2UI GenUI 卡 | `data_ui` | `A2uiCardHost`（androidx.a2ui 官方渲染器，polang catalog = material + BarChart） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ✅（hybrid M2，2026-10-21；2026-11-01 起为回退闸——默认线为 OpenUI） |
-| OpenUI GenUI 卡 | `data_ui_openui` | `OpenUiCardHost`（自研 Compose 渲染器，101 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生，默认线） |
+| OpenUI GenUI 卡 | `data_ui_openui` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生，默认线） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
 | 流式卡片占位/工具状态/失败 item | （流式瞬态，不落 Room） | 占位骨架 / `ToolStatusChip` / 失败态（i18n `chat_card_generate_failed`） | 原生 | — | ✅（M4 拍平三分流，见 §1.3） |
 | 日期分隔 | （列表装饰，非消息） | `ChatDateChip` | 原生 | `chat_date_chip` 438:335 | ✅ |
@@ -921,7 +921,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   objectFields（LineChart.series[].values），Tabs COMPONENT_LIST 递归同机制），
   schema 见 shared OpenUiLibrary）；Query("local_handle") 经 AppContainer `localHandleLookup` 端侧补全
   （scan domain → `#histogram`/省略 = GalleryHistogramBuilder 月桶；`#photos`（2026-10-24）= ScanPhotoProjection 照片清单 [{id,date}] cap 60
-  保持搜索相关度原序），handle 失败/prepare Failed 降级占位卡
+  保持搜索相关度原序；`#videos`（2026-11-04）= ScanPhotoProjection.toVideoRefs 视频清单同形），handle 失败/prepare Failed 降级占位卡
   （复用 A2uiCardDegraded，US-6 同口径）；样式令牌只读复用 A2uiStyleMapper，BarChart 视觉
   与 PolangBarChartComponent 逐项对齐（A2uiCardTokens + primary 色 + 选中 45% alpha 规则）；
   Image（图文混排）渲染期经 AppContainer `openUiPhotoResolver` 端侧 id→uri 解析
@@ -1045,6 +1045,23 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   `looksLikeProgram` 嗅探照常落 data_ui_openui、AgentMarkdown 全量渲染无卡壳，
   正文字号对齐对话气泡（OpenUiMarkdown/MarkDownRenderer 14/20sp → 16/24sp，
   与 SegmentedAgentText 同口径——正文不再比提问小一号）。
+  本地视频批次（2026-11-04，feat/openui-video-component）：组件库 102→103
+  新增 `Video(photo?, aspect?, src?)`——签名对齐 Image：photo 填 `#videos`
+  投影 id（禁字面量数字防臆造）/ src 仅 https 公网视频，二缺一必给，aspect
+  缺省 16:9。取数通道：`search_media` 增 `mediaType` 参数（'photo' 默认 /
+  'video' / 'all'，未知值保守回落 photo；refine_media_search 跟随上一轮基数
+  类型），handle 新增 `#videos` fragment（`ScanPhotoProjection.toVideoRefs`
+  → [{id,date}] cap 60；`ScanPhotoEntry` 增 `mediaType` 字段区分 PHOTO/VIDEO，
+  旧 payload null 视为 PHOTO，`toPhotoRefs` 同步排除 VIDEO 防视频混入照片投影）。
+  渲染：`OpenUiVideoPlayer` 复用 `ChatVideoPlayer`（Media3/ExoPlayer，卡内
+  不自动播、离开组合即释放），photo 经 `openUiPhotoResolver` 端侧 id→uri
+  解析（[PRIVACY] uri 不出端），解析不到 = 同形 surfaceVariant 占位。
+  server 校验：`RenderOpenUiValidator` 白名单 +Video（103 项字面量副本同源）
+  + 单卡视频上限 MAX_VIDEO_COMPONENTS=4（ExoPlayer 内存护栏，独立于图片
+  位图口径，Video 的 photo/src 均不计入位图数）+ 规则 6 src https 校验按
+  调用区间分流视频/图片文案 + 规则 8 Video 二缺一与位置参数 src https（与
+  Image 同构，位置序同为 photo, aspect, src）；DSL_RULES 增 Video 签名 +
+  §4 增 `#videos` 取数写法段。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
