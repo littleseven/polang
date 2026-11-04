@@ -267,6 +267,20 @@ private suspend fun resolveLocalHandle(
                 }
             )
         )
+        // 视频清单投影（2026-11-04 Video 组件批次）：[{id, date}] 同照片形态，
+        // 只取 mediaType=VIDEO 元素，渲染期经 photoResolver 双 id 空间解析 uri
+        OpenUiContract.FRAGMENT_VIDEOS -> HandleResolution.Ok(
+            OpenUiValue.Arr(
+                ScanPhotoProjection.toVideoRefs(entries).map { ref ->
+                    OpenUiValue.Obj(
+                        mapOf(
+                            "id" to OpenUiValue.Num(ref.id.toDouble()),
+                            "date" to OpenUiValue.Str(ref.date),
+                        )
+                    )
+                }
+            )
+        )
         else -> HandleResolution.Err("未知 fragment：$fragment")
     }
 }

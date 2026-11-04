@@ -56,7 +56,7 @@ class DeviceToolService(
         executeOnDevice("get_gallery_summary", buildJsonObject {})
 
     @Tool(customName = "search_media")
-    @LLMDescription("在用户手机相册搜索照片，结果以文本摘要回传（投影：仅数量+命中说明+尾部 opaque 数据句柄「handle: scan/<id>」（供 render_ui 数据绑定，禁止臆造 handleId），不含文件路径与媒体清单）。query 自然语言搜索词（留空=全相册所有照片，统计全库时直接留空即可）；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）。【display 判定——浏览/看照片（「看看」「给我看看」「最近拍了什么」「找些…的照片」等）一律 'false' 取数 + render_ui_openui PhotoGrid 卡展示（照片网格 + 统计 + 分组头 = 更好的浏览体验）；仅纯计数/取数（统计、为发卡取数）也传 'false'。'true'（横滑图集卡）仅限快速单次查询（如精确找某一张、快速核对存在性），不是默认展示方式。】")
+    @LLMDescription("在用户手机相册搜索照片/视频，结果以文本摘要回传（投影：仅数量+命中说明+尾部 opaque 数据句柄「handle: scan/<id>」（供 render_ui 数据绑定，禁止臆造 handleId），不含文件路径与媒体清单）。query 自然语言搜索词（留空=全相册所有媒体，统计全库时直接留空即可）；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）；mediaType 媒体类型：'photo'=只搜照片（默认）、'video'=只搜视频（用户提到视频/录像/vlog 时必传）、'all'=照片+视频。【display 判定——浏览/看照片（「看看」「给我看看」「最近拍了什么」「找些…的照片」等）一律 'false' 取数 + render_ui_openui PhotoGrid 卡展示（照片网格 + 统计 + 分组头 = 更好的浏览体验）；仅纯计数/取数（统计、为发卡取数）也传 'false'。'true'（横滑图集卡）仅限快速单次查询（如精确找某一张、快速核对存在性），不是默认展示方式。】")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓，无则空串") person: String,
@@ -64,6 +64,7 @@ class DeviceToolService(
         @LLMDescription("时间终点毫秒串，空串=不限") toMs: String,
         @LLMDescription("'true'=只要含人脸；空串=不限") hasFace: String,
         @LLMDescription("浏览照片='false'+render_ui_openui PhotoGrid 卡；仅快速单查='true'。默认 'false'") display: String,
+        @LLMDescription("'photo'=只搜照片（默认）；'video'=只搜视频；'all'=照片+视频") mediaType: String,
     ): String = executeOnDevice(
         "search_media",
         buildJsonObject {
@@ -73,6 +74,7 @@ class DeviceToolService(
             put("toMs", toMs)
             put("hasFace", hasFace)
             put("display", display)
+            put("mediaType", mediaType)
         },
     )
 

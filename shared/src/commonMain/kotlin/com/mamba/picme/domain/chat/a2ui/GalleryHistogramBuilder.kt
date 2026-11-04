@@ -11,6 +11,9 @@ data class ScanPhotoEntry(
     val id: Long,
     /** 拍摄时刻，epoch milliseconds。 */
     val captureDate: Long,
+    /** 媒体类型（MediaType 枚举名："PHOTO"/"VIDEO"；2026-11-04 Video 组件批次新增，
+     *  null = 旧版 payload 一律按 PHOTO 处理）。 */
+    val mediaType: String? = null,
 )
 
 /** 月桶（A2UI BarChart buckets 槽位的数据形态）。 */

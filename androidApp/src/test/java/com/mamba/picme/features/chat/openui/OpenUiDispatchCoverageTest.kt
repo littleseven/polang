@@ -18,7 +18,7 @@ class OpenUiDispatchCoverageTest {
      */
     private val mainBranchNames = setOf(
         "Card", "Row", "Column", "Grid", "Box", "Spacer", "Text", "Button",
-        "BarChart", "Image", "Icon", "Divider", "Html",
+        "BarChart", "Image", "Video", "Icon", "Divider", "Html",
         "List", "Tabs", "CheckBox", "ChoicePicker", "Slider", "Table",
         "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
     )

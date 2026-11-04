@@ -292,4 +292,64 @@ class CloudAgentGalleryToolsTest {
         // 搜索成功但 Room 写失败 → 降级为无 token 前缀，不走 error: 协议
         assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", "", "false"))
     }
+
+    // ── mediaType 媒体类型过滤（2026-11-04 Video 组件批次）────────────────
+
+    @Test
+    fun `mediaType video keeps only videos and reports video wording`() = runTest {
+        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO), asset(3, MediaType.VIDEO)) })
+        assertTrue(
+            handleTextOf("找到 2 段「旅行」的视频").matches(t.searchMedia("旅行", "", "", "", "", "false", "video")),
+        )
+    }
+
+    @Test
+    fun `mediaType all keeps photos and videos with media wording`() = runTest {
+        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO)) })
+        assertTrue(
+            handleTextOf("找到 2 个「旅行」的媒体").matches(t.searchMedia("旅行", "", "", "", "", "false", "all")),
+        )
+    }
+
+    @Test
+    fun `mediaType unknown falls back to photo only`() = runTest {
+        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO)) })
+        assertTrue(
+            handleTextOf("找到 1 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "", "false", "bogus")),
+        )
+    }
+
+    @Test
+    fun `handle payload carries mediaType for projection split`() = runTest {
+        val dao = FakeLocalHandleDao()
+        val t = tools(
+            byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO)) },
+            handleStore = LocalHandleStore(dao),
+        )
+        val out = t.searchMedia("旅行", "", "", "", "", "false", "all")
+        val handleId = Regex("handle: scan/([0-9a-f]{12})").find(out)!!.groupValues[1]
+        val entries = Json.decodeFromString<List<ScanPhotoEntry>>(dao.rows.getValue(handleId).payloadJson)
+        assertEquals(listOf("PHOTO", "VIDEO"), entries.map { entry -> entry.mediaType })
+    }
+
+    @Test
+    fun `refine follows base search mediaType`() = runTest {
+        val t = tools(
+            byQuery = { _, _ ->
+                listOf(asset(1, MediaType.VIDEO), asset(2, MediaType.VIDEO), asset(3))
+            },
+        )
+        t.searchMedia("旅行", "", "", "", "", "false", "video")
+        // 视频基数上的细化：照片 asset(3) 不得混回结果集
+        assertTrue(
+            handleTextOf("在上一轮结果内找到 2 段「夜景」的视频")
+                .matches(t.refineMediaSearch("夜景", "", "")),
+        )
+    }
+
+    @Test
+    fun `video search empty hit reports zero videos`() = runTest {
+        val t = tools(byQuery = { _, _ -> listOf(asset(1)) })
+        assertEquals("找到 0 段「旅行」的视频", t.searchMedia("旅行", "", "", "", "", "false", "video"))
+    }
 }

@@ -60,4 +60,39 @@ class ScanPhotoProjectionTest {
         )
         assertEquals("1969-12-31", refs.single().date)
     }
+
+    // ── 2026-11-04 Video 组件批次：mediaType 类型分流 ──
+
+    @Test
+    fun toPhotoRefs_excludesVideoEntries() {
+        // media_type=all 混合命中集：#photos 投影只取照片；mediaType=null 旧 payload 视为照片
+        val entries = listOf(
+            ScanPhotoEntry(id = 1, captureDate = 0L),
+            ScanPhotoEntry(id = 2, captureDate = 0L, mediaType = "VIDEO"),
+            ScanPhotoEntry(id = 3, captureDate = 0L, mediaType = "PHOTO"),
+        )
+        val refs = ScanPhotoProjection.toPhotoRefs(entries, timeZone = utc)
+        assertEquals(listOf(1L, 3L), refs.map { ref -> ref.id })
+    }
+
+    @Test
+    fun toVideoRefs_keepsOnlyVideoEntries() {
+        val entries = listOf(
+            ScanPhotoEntry(id = 1, captureDate = 0L, mediaType = "PHOTO"),
+            ScanPhotoEntry(id = 2, captureDate = 0L, mediaType = "VIDEO"),
+            ScanPhotoEntry(id = 3, captureDate = 0L),
+            ScanPhotoEntry(id = 4, captureDate = 0L, mediaType = "VIDEO"),
+        )
+        val refs = ScanPhotoProjection.toVideoRefs(entries, timeZone = utc)
+        assertEquals(listOf(2L, 4L), refs.map { ref -> ref.id })
+        assertEquals("1970-01-01", refs.first().date)
+    }
+
+    @Test
+    fun toVideoRefs_truncatesAtCap() {
+        val entries = (1L..(ScanPhotoProjection.PHOTOS_CAP + 5)).map { id ->
+            ScanPhotoEntry(id = id, captureDate = 0L, mediaType = "VIDEO")
+        }
+        assertEquals(ScanPhotoProjection.PHOTOS_CAP, ScanPhotoProjection.toVideoRefs(entries, timeZone = utc).size)
+    }
 }

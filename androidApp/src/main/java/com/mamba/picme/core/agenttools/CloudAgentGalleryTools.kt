@@ -67,9 +67,34 @@ class CloudAgentGalleryTools(
     /** refine 的图集卡透出跟随产生基数的 search_media 的 display 意图（同 mutex 保护）。 */
     private var refineDisplay = false
 
-    /** 命中集注册本地句柄，返回 opaque token（无 uri——D2 结构保证）。 */
+    /** refine 的媒体类型过滤跟随产生基数的 search_media 的 mediaType（同 mutex 保护，
+     *  2026-11-04 Video 组件批次——视频搜索的细化不把照片混回结果集）。 */
+    private var refineMediaType = "photo"
+
+    /** mediaType 参数 → 类型谓词（"video"=只视频 / "all"=全部 / 其余=只照片，
+     *  未知值保守回落 photo 口径与旧行为一致）。 */
+    private fun typeFilterOf(mediaType: String): (MediaAsset) -> Boolean =
+        when (mediaType.lowercase()) {
+            "video" -> { asset -> asset.type == MediaType.VIDEO }
+            "all" -> { _ -> true }
+            else -> { asset -> asset.type == MediaType.PHOTO }
+        }
+
+    /** 回执文案的量词与名词（照片=张/照片，视频=段/视频，混合=个/媒体）。 */
+    private fun unitNounOf(mediaType: String): Pair<String, String> =
+        when (mediaType.lowercase()) {
+            "video" -> "段" to "视频"
+            "all" -> "个" to "媒体"
+            else -> "张" to "照片"
+        }
+
+    /** 命中集注册本地句柄，返回 opaque token（无 uri——D2 结构保证）。
+     *  mediaType 随 entry 落 payload（2026-11-04 Video 组件批次）：media_type=all
+     *  混合命中集供 #photos/#videos 投影按类型分流。 */
     private suspend fun registerScanHandle(photos: List<MediaAsset>): String {
-        val entries = photos.map { asset -> ScanPhotoEntry(id = asset.id, captureDate = asset.captureDate) }
+        val entries = photos.map { asset ->
+            ScanPhotoEntry(id = asset.id, captureDate = asset.captureDate, mediaType = asset.type.name)
+        }
         val handleId = localHandleStore.put(
             A2uiCardContract.DOMAIN_SCAN,
             handleJson.encodeToString(entries),
@@ -117,7 +142,10 @@ class CloudAgentGalleryTools(
         toMs: String,
         hasFace: String,
         display: String,
+        mediaType: String = "photo",
     ): String {
+        val typeFilter = typeFilterOf(mediaType)
+        val (unit, noun) = unitNounOf(mediaType)
         val intent = GallerySearchIntents.structuredSearchIntent(query, person, fromMs, toMs, hasFace)
         val photos = try {
             when {
@@ -128,7 +156,7 @@ class CloudAgentGalleryTools(
                 // 全集必须走独立取数通道——否则 LLM 只能拿 fromMs=0 撞大运（2026-10-24 all_years 实测）
                 query.isBlank() -> allPhotos()
                 else -> searchByQuery(query, null)
-            }.filter { it.type == MediaType.PHOTO }
+            }.filter(typeFilter)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -136,12 +164,16 @@ class CloudAgentGalleryTools(
             return "error: ${e.message ?: "search failed"}"
         }
         val showCard = display == "true"
-        refineBaseMutex.withLock { refineBase = photos; refineDisplay = showCard }
-        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size} display=$showCard")
+        refineBaseMutex.withLock {
+            refineBase = photos
+            refineDisplay = showCard
+            refineMediaType = mediaType
+        }
+        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size} display=$showCard mediaType=$mediaType")
         // 空命中不注册句柄：空集句柄是无意义锚点 + 垃圾行，与 refine 空分支同口径
         val displayQuery = query.ifBlank { "全部" }
         if (photos.isEmpty()) {
-            return "找到 0 张「$displayQuery」的照片"
+            return "找到 0 $unit「$displayQuery」的$noun"
         }
         // 卡实际透出（display=true 且监听器在位）时回执必须明说：LLM 只看得见文本回执，
         // 不说它会认为「没有照片清单」继续 refine 甚至声称发卡失败——
@@ -149,11 +181,12 @@ class CloudAgentGalleryTools(
         val cardShown = showCard && mediaResultsListener != null
         if (cardShown) mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
         val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
-        return appendHandleSuffix("找到 ${photos.size} 张「$displayQuery」的照片$cardNote", photos)
+        return appendHandleSuffix("找到 ${photos.size} $unit「$displayQuery」的$noun$cardNote", photos)
     }
 
     suspend fun refineMediaSearch(constraint: String, fromMs: String, toMs: String): String {
-        val prior = refineBaseMutex.withLock { refineBase }
+        val (prior, baseMediaType) = refineBaseMutex.withLock { refineBase to refineMediaType }
+        val (unit, noun) = unitNounOf(baseMediaType)
         // 与 chat 链路同一回合护栏（spec §3.5-c）：无搜索基数时返回明确错误引导模型改用 search_media，
         // 不静默退化为全局重搜。
         if (prior.isEmpty()) {
@@ -169,7 +202,7 @@ class CloudAgentGalleryTools(
                 val cleaned = ChatGallerySearch.cleanConstraint(constraint)
                 val hits = searchByQuery(cleaned, priorIds)
                 ChatGallerySearch.resolveRefine(prior, hits, cleaned)
-            }.filter { it.type == MediaType.PHOTO }
+            }.filter(typeFilterOf(baseMediaType))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -178,7 +211,7 @@ class CloudAgentGalleryTools(
         }
         // in-set 空 → 保留上一轮结果集不变（与 chat 链路同口径，不覆盖基数）
         if (refined.isEmpty()) {
-            return "在上一轮 ${prior.size} 张结果内没有找到「$constraint」的照片"
+            return "在上一轮 ${prior.size} ${unit}结果内没有找到「$constraint」的$noun"
         }
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
@@ -186,6 +219,6 @@ class CloudAgentGalleryTools(
         val cardShown = refineDisplay && mediaResultsListener != null
         if (cardShown) mediaResultsListener?.invoke(constraint, refined, refined.size, true)
         val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
-        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} 张「$constraint」的照片$cardNote", refined)
+        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} $unit「$constraint」的$noun$cardNote", refined)
     }
 }

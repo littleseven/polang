@@ -348,9 +348,9 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 102 openui library components`() {
+    fun `whitelist pins all 103 openui library components`() {
         // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 逐字一致（102——2026-11-02 任务卡批次 +Progress 后双端齐平），改动须双向同步核对
+        // OpenUiLibrary.components 逐字一致（103——2026-11-04 视频组件批次 +Video 后双端齐平），改动须双向同步核对
         // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
         //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
         //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
@@ -374,6 +374,8 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "Html",
             // 任务卡 OpenUI 化批次（2026-11-02：通用进度条）
             "Progress",
+            // 视频组件批次（2026-11-04：本地/公网视频播放）
+            "Video",
             // 官方别名
             "Stack", "Separator", "MarkDownRenderer",
             // 官方内容/布局
@@ -398,7 +400,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
             "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
             "CompositeCardItem", "VisualCardItem",
         )
-        assertEquals(102, expected.size)
+        assertEquals(103, expected.size)
         assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
     }
 
@@ -1083,5 +1085,79 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         val texts = (1..5).joinToString(", ") { "Text(\"$bigText\", \"DISPLAY\")" }
         val warnings = RenderOpenUiValidator.lintComposition("root = Card([$texts])")
         assertTrue(warnings.any { warning -> warning.contains("DISPLAY") })
+    }
+
+    // ── 视频组件批次（2026-11-04：Video + #videos fragment） ──
+
+    @Test
+    fun `video component with photo projection passes`() {
+        val program = """
+            videos = Query("local_handle", { handle: "local://scan/f9d33db29ed6#videos" }, [])
+            root = Card([Video(photo = videos[0].id)])
+        """.trimIndent()
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `video component with https src passes`() {
+        val program = """root = Card([Video(src = "https://cos.polang.net/demo.mp4")])"""
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `video without photo or src is rejected`() {
+        val error = RenderOpenUiValidator.validateToError("""root = Card([Video(aspect = 1.5)])""")
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.contains("Video 缺视频来源"))
+    }
+
+    @Test
+    fun `video non-https named src is rejected with video wording`() {
+        val error = RenderOpenUiValidator.validateToError("""root = Card([Video(src = "http://x.com/a.mp4")])""")
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.contains("公网视频地址"))
+    }
+
+    @Test
+    fun `video positional non-https src is rejected`() {
+        // 位置序 photo, aspect, src——第三位字符串字面量同样限 https
+        val error = RenderOpenUiValidator.validateToError(
+            "videos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#videos\" }, [])\n" +
+                "root = Card([Video(videos[0].id, 1.5, \"ftp://x.com/a.mp4\")])",
+        )
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.contains("Video.src 只接受 https://"))
+    }
+
+    @Test
+    fun `video photo does not count into image bitmap cap`() {
+        // 12 张图 + 4 段视频：旧口径会把 Video(photo=…) 误计为位图超限
+        val images = (1..12).joinToString(", ") { "Image(src = \"https://cos.polang.net/$it.png\")" }
+        val videos = (1..4).joinToString(", ") { "Video(src = \"https://cos.polang.net/$it.mp4\")" }
+        assertNull(RenderOpenUiValidator.validateToError("root = Card([$images, $videos])"))
+    }
+
+    @Test
+    fun `video count over cap is rejected`() {
+        val videos = (1..5).joinToString(", ") { "Video(src = \"https://cos.polang.net/$it.mp4\")" }
+        val error = RenderOpenUiValidator.validateToError("root = Card([$videos])")
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.contains("视频 5 个超上限"))
+    }
+
+    @Test
+    fun `videos fragment handle passes and typo fragment still rejected`() {
+        assertNull(
+            RenderOpenUiValidator.validateToError(
+                "videos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#videos\" }, [])\n" +
+                    "root = Card([Text(\"x\")])",
+            ),
+        )
+        val error = RenderOpenUiValidator.validateToError(
+            "videos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#video\" }, [])\n" +
+                "root = Card([Text(\"x\")])",
+        )
+        assertNotNull(error)
+        assertTrue("实际：$error", error!!.contains("#videos"))
     }
 }

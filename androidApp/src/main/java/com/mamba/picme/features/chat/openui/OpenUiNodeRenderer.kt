@@ -93,6 +93,7 @@ import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_THRESHOLD
 import com.mamba.picme.features.chat.a2ui.BarChartBucketLabel
 import com.mamba.picme.features.chat.a2ui.barChartBarHeight
 import com.mamba.picme.features.chat.a2ui.barChartLabelInterval
+import com.mamba.picme.features.chat.media.ChatVideoPlayer
 import com.mamba.picme.features.common.chat.AgentMarkdown
 
 /**
@@ -404,6 +405,7 @@ fun OpenUiNodeRenderer(
         }
         "BarChart" -> OpenUiBarChart(node, state, onAction, modifier)
         "Image" -> OpenUiPhotoImage(node, photoResolver, onAction, modifier)
+        "Video" -> OpenUiVideoPlayer(node, photoResolver, modifier)
         "Icon" -> OpenUiIcon(node, modifier)
         "Divider" -> OpenUiDivider(node, modifier)
         // Html（turn-native M1，spec《2026-11-01-openui-turn-native-design》§3.6）：L2 沙箱卡
@@ -625,6 +627,59 @@ private fun OpenUiPhotoImage(
         }
     }
 }
+
+/**
+ * Video（2026-11-04 视频组件批次）：photo = #videos 投影元素的 id（渲染期端侧 id→uri，
+ * 与 Image 同一 [OpenUiPhotoResolver] 双 id 空间接缝，uri 不出端 [PRIVACY]）；src = https
+ * 公网视频（server 正则硬校验 + 端侧前缀防御双闸，同 Image 口径）。播放复用
+ * [ChatVideoPlayer]（卡片语境不自动播、离组即释放）；photo/src 皆无 → 同形占位不炸整卡。
+ */
+@Composable
+private fun OpenUiVideoPlayer(
+    node: OpenUiValue.ComponentVal,
+    photoResolver: OpenUiPhotoResolver,
+    modifier: Modifier = Modifier,
+) {
+    val photoId = (node.props["photo"] as? OpenUiValue.Num)?.v?.toLong()
+    val propAspect = (node.props["aspect"] as? OpenUiValue.Num)?.v
+    val frameBackground = MaterialTheme.colorScheme.surfaceVariant
+    BoxWithConstraints(modifier = modifier) {
+        fun frameFor(aspect: Double) = (
+            if (maxWidth != Dp.Infinity) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier.width(OpenUiCardTokens.horizontalImageWidth)
+            }
+            )
+            .aspectRatio(aspect.toFloat())
+            .clip(RoundedCornerShape(OpenUiCardTokens.imageCornerRadius))
+            .background(frameBackground)
+        // 视频真实比例首帧前不可得，帧决策链与 Image 同源、缺省框 16:9
+        val frame = frameFor(frameAspectOf(propAspect, null, fallback = VIDEO_FALLBACK_ASPECT))
+        if (photoId == null) {
+            val src = (node.props["src"] as? OpenUiValue.Str)?.v?.takeIf { it.startsWith("https://") }
+            if (src == null) {
+                Box(modifier = frame)
+            } else {
+                ChatVideoPlayer(url = src, modifier = frame)
+            }
+            return@BoxWithConstraints
+        }
+        val media by produceState<OpenUiPhoto?>(initialValue = null, photoId) {
+            value = photoResolver.resolve(photoId)
+        }
+        val uri = media?.uri
+        if (uri == null) {
+            // 解析中/解析失败（已删除/未索引）：同形同参 surfaceVariant 占位
+            Box(modifier = frame)
+        } else {
+            ChatVideoPlayer(url = uri, modifier = frame)
+        }
+    }
+}
+
+/** Video 组件缺省框宽高比（16:9，主流拍摄视频比例）。 */
+private const val VIDEO_FALLBACK_ASPECT = 16.0 / 9.0
 
 /**
  * Image 框宽高比（宽/高）决策链（纯函数，OpenUiFrameAspectTest 钉住）：
