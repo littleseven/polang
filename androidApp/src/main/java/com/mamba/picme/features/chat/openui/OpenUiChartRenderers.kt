@@ -32,10 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.core.designsystem.A2uiCardTokens
 import com.mamba.picme.core.designsystem.Spacing
-import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
+import com.mamba.picme.domain.chat.openui.OpenUiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiValue
-import com.mamba.picme.features.chat.a2ui.barChartLabelInterval
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -141,7 +140,7 @@ private fun OpenUiChartTitle(title: String?) {
         // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
         Text(
             text = text,
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

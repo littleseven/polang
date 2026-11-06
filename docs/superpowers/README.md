@@ -104,7 +104,7 @@ docs/superpowers/
   - `2026-09-28-chat-type-taxonomy-design.md` — chat type 分类法（content/tool/data 三分类 + 命名规则 + role 上提；chat-parts 线配套 spec）
   - `2026-10-06-browser-vnc-live-card-design.md` — Browser-VNC 云端浏览器直播卡（M1/M2 已合 main：bridge + 服务端网关 + 工具闭环 + INLINE 直播卡 + WS 推流 + 全屏接管 Muse 三态交互 M2.5~M2.8）
   - `2026-10-17-cloud-agent-tool-bridge-design.md` — 云端 Agent M2 工具桥 + BYOK 授权 UI + 最小聊天页（ADR-018 实施 spec，已定稿待评审）
-  - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×GenUI 混合架构（投影出端 + local:// handle；M1 投影通路 + M2 A2UI L1 卡已合 main，M3 沙箱交互态/iOS 待排期；D4 选型已被 OpenUI 翻转——OpenUI 现为默认线格式（回合原生），A2UI 为回退闸）
+  - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×GenUI 混合架构（投影出端 + local:// handle；M1 投影通路 + M2 A2UI L1 卡已合 main，M3 沙箱交互态/iOS 待排期；D4 选型已被 OpenUI 翻转——OpenUI 为唯一线格式（回合原生），A2UI 线已于 2026-11-05 决策退役、2026-11-06 实施）
   - `2026-10-26-openui-compose-alignment-design.md` — OpenUI 客户端对齐官方 A2UI Compose 适配层（P1 响应式状态粒度重组、P2 流式预览均已合 main；P3 逐节点兜底 / P4 组件契约化在途）
   - `2026-11-01-agent-step-timeline-and-admin-trace-design.md` — Agent 步骤时间线（用户可见）+ 管理后台推理追溯（M1 Android 时间线 + M2 后台追溯已合 main；M3 iOS 条件跟随在途）
 - **plans（3 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）

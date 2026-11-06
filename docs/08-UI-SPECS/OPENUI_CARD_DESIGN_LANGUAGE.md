@@ -8,7 +8,7 @@
 ## 0. 定位与三条架构原则
 
 1. **样式收敛在渲染器**：LLM 只选择组件与数据，不控制任何样式数值。一切颜色/字号/间距/圆角由 token 与组件皮肤定死——这是 OpenUI 与 render_html（H5 线）的本质差异，也是风格一致性的保证。
-2. **A2UI 是对照组，样式冻结**：OpenUI 的一切视觉演进不进 A2UI 线（`A2uiCardTokens`/`A2uiStyleMapper` 只读复用几何尺寸与枚举解析）。没有规范约束的渲染结果就是对照组本身。
+2. **~~A2UI 是对照组，样式冻结~~（对照组已退役 2026-11-05）**：OpenUI 的一切视觉演进不进 A2UI 线——A2UI 对照线已于 2026-11-05 全量退役（OpenUI 唯一化），本原则使命完成；生成物 `A2uiCardTokens` 仅余几何尺寸只读复用（命名债，更名须走 token SSOT + codegen 管线）。没有规范约束的渲染结果就是对照组本身。
 3. **规范即 PARITY 契约**：本文档是 OpenUI 卡片的视觉 SSOT。iOS 跟随实现以本文档 + token 为准，不读 Android 源码；双端截图比对以本文档的组件皮肤小节为验收清单。
 4. **组合收敛在规则层**（2026-10-31 v9）：LLM 自由组合，组合合法性由 server 确定性规则保证（无声矫正 OpenUiLayoutNormalizer + 结构门禁 OpenUiLayoutValidator；spec 已随交付清理，git 历史可查）；「不奇怪」是规则保证的下限，「最优」仍靠版式范式菜单软引导。版式范式的视觉 SSOT = Ardot OpenUILayouts 页（§4.7）。
 
@@ -52,7 +52,7 @@ DISPLAY 与其他 role 的差异不仅是字号：tnum 让多栏 stat tile 的�
 - 单系列柱色 = 数据板首色（蓝 `#64B5F6`）；选中柱 = primary；
 - 柱端圆角：topStart/topEnd 4dp（`barCornerRadius`）；
 - 柱道（track）：每柱背后满高圆角柱道，`onSurface` × 0.06（`barTrackAlpha`）——给稀疏数据以结构感；
-- 标签抽稀沿用 `barChartLabelInterval`（A2UI 只读复用）。
+- 标签抽稀沿用 `barChartLabelInterval`（自 A2UI 时代实现沿用，A2UI 线 2026-11-05 退役后归 OpenUI 渲染层自维护）。
 
 ### 3.2 PieChart
 
@@ -166,7 +166,7 @@ List([ListItem("海边日落", photo = photos[0].id, subtitle = "2026-07-18 · �
 | 组件 | 皮肤要点 |
 |------|----------|
 | Card | 16dp 圆角（2026-10-31 v9 对帧校准：画布 chat 卡惯例，AppShapes.card=8 无此档）+ Spacing.lg 内边距；嵌套 = L1 surface |
-| spacing（Row/Column/Card/Grid/List）/ Stack.gap / Spacer.size | 统一官方七档刻度（2026-11-01 v10 间距词汇统一）：none\|xs\|s\|m\|l\|xl\|2xl → 0/4/8/12/16/24/32dp（8pt 网格，映射 SSOT = `OpenUiCardTokens.spacingDpOf`）；缺省 m(12)；legacy 别名 COMPACT→xs / STANDARD→m / COMFORTABLE→l 保持存量卡视觉不变（A2UI 对照组词汇，新程序不教学）；节奏规则 = server DSL_RULES 7.6（默认不写 / 一卡 ≤2 档 / 分区间隔 > 组内间隔 / Card 自带 16dp 内边距边缘不贴 Spacer） |
+| spacing（Row/Column/Card/Grid/List）/ Stack.gap / Spacer.size | 统一官方七档刻度（2026-11-01 v10 间距词汇统一）：none\|xs\|s\|m\|l\|xl\|2xl → 0/4/8/12/16/24/32dp（8pt 网格，映射 SSOT = `OpenUiCardTokens.spacingDpOf`）；缺省 m(12)；legacy 别名 COMPACT→xs / STANDARD→m / COMFORTABLE→l 保持存量卡视觉不变（A2UI 时代词汇，仅存为存量卡兼容，新程序不教学）；节奏规则 = server DSL_RULES 7.6（默认不写 / 一卡 ≤2 档 / 分区间隔 > 组内间隔 / Card 自带 16dp 内边距边缘不贴 Spacer） |
 | Row/Column/Card align | 交叉轴五值 start\|center\|end\|stretch\|baseline（官方 align-items 语义，缺省 stretch = 子项铺满交叉轴：Row 子栏撑满行高、Column/Card 内容撑满整宽；baseline = 首行基线对齐，列向兜底 start）；stat tile 数字栏写 `align="center"`、高矮栏顶线对齐写 `align="start"` |
 | Row weights | 按比例分栏（2026-10-30，CSS flex-grow 语义）：数字数组与组件子项一一对应（Divider/Spacer 不占槽位），缺省/个数不符回退全 1 等宽，负值/NaN 回退 1f（值域防御）；**0 = hug**（2026-11-02 v12，CSS flex-grow:0 子项按内容自尺寸）——「固定图标 + 弹性标题 + 贴边 chip」= `weights=[0,1,0]`；左图右文 = `weights=[1,2]` 配 `align="center"` |
 | Grid | 通用 N 列网格（2026-10-30）：columns 1..4 缺省 2，children 按序填满各行、cell 等宽 `weight(1f)`，末行缺格补空位保持列对齐；四宫格 = `columns=2`；spacing/align 同 Row 词汇 |

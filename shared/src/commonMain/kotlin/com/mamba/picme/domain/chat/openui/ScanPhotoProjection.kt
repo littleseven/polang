@@ -1,4 +1,4 @@
-package com.mamba.picme.domain.chat.a2ui
+package com.mamba.picme.domain.chat.openui
 
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone

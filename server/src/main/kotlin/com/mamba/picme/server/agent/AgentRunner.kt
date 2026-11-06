@@ -24,32 +24,24 @@ private val logger = LoggerFactory.getLogger("picme-agent")
  *   （路由层据此置会话 ERROR + 回退配额）。
  *
  * 每个事件落流后回调 [onEvent]（SSE 发射点），顺序与事件序一致。
- * render_html 的 HTML 本体不走 Observation（LLM 只见 summary 回执），经 [onHtmlCard]
- * sink 侧路落 HtmlCard 事件——活轮由路由层把它注入 ToolRegistry 的 ServerToolService，
- * pending 重放由本类经 [ServerToolDispatcher.withHtmlCardSink] 绑定当轮 sink。
  *
  * ⚠️ Koog 1.3.0 EventHandler 的 Interceptor 是**同步非 suspend** 接口（javap 核实），
  * 钩子内落库只能 runBlocking 桥到 Dispatchers.IO。Koog 事件在自身执行线程触发、
  * DB 在 IO 池，无同池死锁；M1 规模下可接受。若 Koog 后续开放 suspend 钩子应迁回。
  *
- * [actionGate]：Action 事件发射点门控（2026-10-24 render_ui 校验）。Action 事件在
- * onToolCallStarting（工具体执行**之前**）落流+下行，工具体内的校验拦不住坏负载到端，
- * 故校验必须挂在这里——返回非 null 错误文本时该次调用**不落 Action、不 SSE 下行**
- * （端侧永远见不到坏卡；工具体独立校验同源规则，回错误文本给 LLM 同轮修正）。
- * 被拒调用无 Action 落库，天然不进入 pending 重放。
+ * GenUI 唯一化（2026-11-06）：/agent 路由面恒走 OpenUI 回合原生（turn-native）——
+ * 无发卡工具、无 A2UI 回退线。终结程序守卫 [ProgramGuard] 每轮无条件创建
+ * （策略层 correctInvalidProgram 节点纠正，上限 1 次）；终结消息落流前无条件经
+ * [OpenUiTurnNative.ensureValidProgram] 兜底变换（「端上永远收到合法树」双保险）。
+ * 该线无发卡工具，「声称发卡」话术由程序校验与兜底包装天然管辖。
  *
- * [onOpenUiProgramDelta]：render_ui_openui 流式预览旁路（openui P2）。策略层 LLM 节点经
- * `requestLLMStreaming()` 逐帧收集（见 cloudAgentStrategy 差异 3；内建 nodeLLMRequest 是
- * 一次性请求，不产 StreamFrame），Koog OpenAI 客户端把工具 args JSON 增量以 ToolCallDelta
- * 逐帧透传至 EventHandler 钩子——本回调把已到达的 program 前缀（节流后）推向 SSE，
- * **不落 agent_event**（事件溯源只收最终 Action，预览帧是瞬态传输信号，同 tool_request
- * 口径）。正式 action 帧仍是唯一权威负载；端侧新旧版本混跑安全（旧端忽略未知 kind 帧）。
- *
- * [forwardContentDeltas] / [finalMessageTransformer]：回合原生（openui turn-native）
- * 参数，缺省零行为变化。前者开时 content TextDelta 经 OpenUiContentStreamTracker
- * 节流为 program 前缀复用 [onOpenUiProgramDelta] 旁路下行（响应即程序，工具/文本
- * 两路共用同一 SSE kind 帧）；后者在终结消息落流前变换（normalize + 兜底包装由
- * 调用方组合）。轮边界经 onLLMStreamingStarting 重置 content 前缀（端上覆盖式预览）。
+ * [onOpenUiProgramDelta]：program 前缀流式预览旁路。策略层 LLM 节点经
+ * `requestLLMStreaming()` 逐帧收集（内建 nodeLLMRequest 是一次性请求，不产
+ * StreamFrame），content TextDelta 无条件经 OpenUiContentStreamTracker 节流为
+ * program 前缀推向 SSE（响应即程序），**不落 agent_event**（事件溯源只收最终
+ * Action/消息，预览帧是瞬态传输信号，同 tool_request 口径）。正式消息帧仍是
+ * 唯一权威负载；端侧新旧版本混跑安全（旧端忽略未知 kind 帧）。
+ * 轮边界经 onLLMStreamingStarting 重置 content 前缀（端上覆盖式预览）。
  *
  * [turnUsage]（runTurn 参数）：回合用量累计出参（done 帧 usage/elapsed_ms 数据源）——
  * 流式路径经 onLLMStreamingFrameReceived 的 End 帧 metaInfo 累加（Koog 1.3.0 流式不触发
@@ -61,12 +53,6 @@ class AgentRunner(
     private val dispatcher: ServerToolDispatcher,
     private val reversibleTools: Set<String> = ServerToolService.REVERSIBLE_TOOLS,
     private val maxIterations: Int = 100,
-    private val actionGate: (toolName: String, argsJson: String) -> String? = { _, _ -> null },
-
-    /** 发射点矫正（2026-10-31 布局可控性批次）：Action 落流前的 argsJson 改写钩子
-     *  （render_ui_openui 的 program 无声归一化）；缺省 identity。改写发生在
-     *  [actionGate] 校验之前——门禁见到的是矫正后的 program。 */
-    private val argsTransformer: (toolName: String, argsJson: String) -> String = { _, argsJson -> argsJson },
 ) {
 
     /**
@@ -79,11 +65,6 @@ class AgentRunner(
         target: AgentLlmTarget,
         systemPrompt: String,
         toolRegistry: ToolRegistry,
-        /** 回合原生（openui turn-native）：透传 content TextDelta 为 program 前缀预览。 */
-        forwardContentDeltas: Boolean = false,
-        /** 终结消息落流前变换（openui turn-native：normalize + 兜底 Markdown 包装）。 */
-        finalMessageTransformer: (String) -> String = { it },
-        onHtmlCard: suspend (html: String, summary: String) -> Unit = { _, _ -> },
         onOpenUiProgramDelta: suspend (programPrefix: String) -> Unit = {},
         /** 回合用量累计出参（done 帧性能数据源）：逐次累加 tokens、成功收尾回填耗时；缺省独立实例 = 无人观测。 */
         turnUsage: TurnUsage = TurnUsage(),
@@ -103,24 +84,20 @@ class AgentRunner(
         )
 
         // 3. pending 重放
-        replayPending(session.id, onEvent, onHtmlCard)
+        replayPending(session.id, onEvent)
 
         // 4-5. Koog loop + 收尾
         val built = executorFactory.create(target)
         val actionIds = mutableMapOf<String, Long>()
-        // 假发卡守卫（每轮新实例）：卡工具 Action 过门控 → 标记；终结消息假声称 → 策略层回环纠正
-        val cardGuard = CardClaimGuard()
-        // 终结程序守卫（每轮新实例）：仅 forwardContentDeltas 回合原生线启用（两闸同头驱动），
-        // A2UI 线为 null → 策略层程序校验边条件恒 false
-        val programGuard = if (forwardContentDeltas) ProgramGuard() else null
-        // OpenUI 流式预览跟踪器（每轮新实例）：ToolCallDelta → program 前缀节流发射
-        val openUiStreamTracker = OpenUiToolCallStreamTracker()
-        // 回合原生 content 流跟踪器（每轮新实例；仅 forwardContentDeltas 时发射）
+        // 终结程序守卫（每轮新实例）：GenUI 唯一化后无条件启用——终结文本非合法
+        // OpenUI 程序 → 策略层 correctInvalidProgram 节点携带错误清单回环纠正
+        val programGuard = ProgramGuard()
+        // content 流跟踪器（每轮新实例）：TextDelta 无条件透传为 program 前缀预览
         val contentStreamTracker = OpenUiContentStreamTracker()
         val startedAt = System.currentTimeMillis()
         try {
             val agent = AIAgent.builder()
-                .graphStrategy(cloudAgentStrategy(cardGuard, programGuard))
+                .graphStrategy(cloudAgentStrategy(programGuard))
                 .promptExecutor(built.executor)
                 .llmModel(built.model)
                 .toolRegistry(toolRegistry)
@@ -133,17 +110,9 @@ class AgentRunner(
                         contentStreamTracker.onRoundStart()
                     }
                     events.onLLMStreamingFrameReceived { ctx ->
-                        // openui P2 流式预览：render_ui_openui 的 args 增量 → program 前缀旁路
-                        // 下行（不落事件流）。同步钩子 → runBlocking 桥（同 onToolCallStarting）
+                        // 流式预览旁路（不落事件流）。同步钩子 → runBlocking 桥
                         val prefix = when (val frame = ctx.streamFrame) {
-                            is StreamFrame.ToolCallDelta -> openUiStreamTracker.onDelta(
-                                frame.id, frame.name, frame.content, frame.index,
-                            )
-                            is StreamFrame.ToolCallComplete -> openUiStreamTracker.onComplete(
-                                frame.id, frame.index,
-                            )
-                            is StreamFrame.TextDelta ->
-                                if (forwardContentDeltas) contentStreamTracker.onTextDelta(frame.text) else null
+                            is StreamFrame.TextDelta -> contentStreamTracker.onTextDelta(frame.text)
                             is StreamFrame.End -> {
                                 // 回合用量（done 帧性能数据源）：Koog 1.3.0 流式路径只触发
                                 // onLLMStreaming* 事件、不触发 onLLMCallCompleted（后者仅非流式
@@ -166,11 +135,7 @@ class AgentRunner(
                         // 同步钩子 → runBlocking 桥（见类 KDoc ⚠️）
                         runBlocking {
                             // Koog 私有 JSON 树 toString 零转义，必须走 kotlinx 映射（见 ToolArgsWireJson.kt）
-                            val rawArgsJson = toolArgsWireJson(ctx.toolArgs)
-                            // 发射点矫正：render_ui_openui program 先归一化再校验/落流
-                            val argsJson = argsTransformer(ctx.toolName, rawArgsJson)
-                            // 发射点门控：被拒负载不落 Action、不下行（见类 KDoc actionGate 段）
-                            if (actionGate(ctx.toolName, argsJson) != null) return@runBlocking
+                            val argsJson = toolArgsWireJson(ctx.toolArgs)
                             val action = AgentEventRepository.append(
                                 session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
                                 payload = AgentEventPayload.Action(
@@ -185,14 +150,6 @@ class AgentRunner(
                     }
                     events.onToolCallCompleted { ctx ->
                         runBlocking {
-                            // 卡工具成功回执 = 卡真实落流下行，假发卡守卫据此放行终结消息。
-                            // 挂在 completed 而非 starting：render_html 无发射点门控（html_too_large
-                            // 在工具体内才判定），过门控≠送达；工具体校验失败统一回 "error: …" 文本
-                            if (ctx.toolName in CardClaimGuard.CARD_TOOLS &&
-                                ctx.toolResult?.toString()?.trim('"')?.startsWith("error:") != true
-                            ) {
-                                cardGuard.markCardSent()
-                            }
                             val actionId = ctx.toolCallId?.let { actionIds[it] } ?: 0L
                             emit(
                                 onEvent,
@@ -237,7 +194,8 @@ class AgentRunner(
                 onEvent,
                 AgentEventRepository.append(
                     session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
-                    payload = AgentEventPayload.Message(finalMessageTransformer(result)),
+                    // 终结兜底（GenUI 唯一化）：合法 normalize 放行 / 非法兜底 Markdown 包装
+                    payload = AgentEventPayload.Message(OpenUiTurnNative.ensureValidProgram(result)),
                 ),
             )
             val finish = AgentEventRepository.append(
@@ -273,14 +231,13 @@ class AgentRunner(
     private suspend fun replayPending(
         sessionId: String,
         onEvent: suspend (AgentEvent) -> Unit,
-        onHtmlCard: suspend (html: String, summary: String) -> Unit,
     ) {
-        // render_html 重放须绑定当轮 sink：卡片重新落 HtmlCard 事件并随 SSE 下行
-        val scopedDispatcher = dispatcher.withHtmlCardSink(onHtmlCard)
+        // 历史遗留的退役工具（如 render_html）pending：dispatcher 无此 handler，
+        // 以 error Observation 闭环（不变式不受退役影响）
         AgentEventRepository.pendingActions(sessionId).forEach { pending ->
             val action = pending.payload as AgentEventPayload.Action
             val content = try {
-                scopedDispatcher.dispatch(action.tool, action.argsJson)
+                dispatcher.dispatch(action.tool, action.argsJson)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

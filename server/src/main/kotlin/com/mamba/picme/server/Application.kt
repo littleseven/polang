@@ -5,8 +5,6 @@ import com.mamba.picme.server.agent.AgentBridgeRegistry
 import com.mamba.picme.server.agent.AgentExecutorFactory
 import com.mamba.picme.server.agent.AgentRoundGate
 import com.mamba.picme.server.agent.AgentRunner
-import com.mamba.picme.server.agent.RenderOpenUiValidator
-import com.mamba.picme.server.agent.RenderUiValidator
 import com.mamba.picme.server.agent.ServerToolDispatcher
 import com.mamba.picme.server.agent.agentRoute
 import com.mamba.picme.server.auth.AccountService
@@ -216,13 +214,10 @@ fun Application.module(config: AppConfig) {
     }
 
     // 云端 Agent 运行器（ADR-018）：Koog JVM loop + 事件溯源落流 + BYOK 透传（零留存）
-    // actionGate：render_ui 负载发射点校验（非法不落 Action 不下行，LLM 收错误文本同轮修正）
-    // argsTransformer：render_ui_openui program 发射点无声归一化（布局可控性批次）
+    // GenUI 唯一化（2026-11-06）：恒 turn-native，无 actionGate/argsTransformer 接线
     val agentRunner = AgentRunner(
         executorFactory = AgentExecutorFactory(),
         dispatcher = ServerToolDispatcher.default(),
-        actionGate = RenderUiValidator::gate,
-        argsTransformer = RenderOpenUiValidator::transformArgs,
     )
     // 工具桥挂起表（M2）：设备工具 requestId → Deferred；/agent 路由与 tool-results 上行共享
     val agentBridge = AgentBridgeRegistry()

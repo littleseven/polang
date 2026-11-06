@@ -127,7 +127,7 @@ fun AgentMarkdown(
 /**
  * Markdown 网络图片渲染（web_search 图文并茂，2026-11-02）：经 mikepenz
  * [LocalImageTransformer] 扩展点把 `![alt](url)` 交给 Coil 加载。
- * 仅 https（与 render_ui Image url 同口径）；http/本地路径一律不渲染（transform 返 null）。
+ * 仅 https（与 OpenUI Image src https 规则同口径）；http/本地路径一律不渲染（transform 返 null）。
  * 高度限 320dp 防超长图刷屏；加载失败走 Coil 默认（空白），不炸正文。
  */
 private object NetworkImageTransformer : ImageTransformer {

@@ -1,19 +1,13 @@
 package com.mamba.picme.server.agent
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-
 /**
- * render_ui_openui 负载校验器（openui P2 review 🟡4，与 [RenderUiValidator] 对偶）——
- * 把「LLM 写错 OpenUI 线格式」从端侧静默降级提前为服务端同轮纠错。
+ * OpenUI 程序负载校验器——把「LLM 写错 OpenUI 线格式」从端侧静默降级提前为
+ * 服务端同轮纠错。
  *
- * 两个消费点（同源规则，零漂移，同 render_ui 闭环口径）：
- * 1. [AgentRunner] 发射点门控（[RenderUiValidator.gate] 按 toolName 分发到本校验器）：
- *    非法负载不落 Action 事件、不 SSE 下行；
- * 2. [RenderOpenUiToolService.renderUiOpenUi] 工具体：非法时回逐条违规的 `error: …` 文本，
- *    Koog 作为 Observation 回灌，LLM 同轮修正重试（对比实验口径对齐：两条 GenUI 线的
- *    LLM 书写成功率都有同轮修正机会）。
+ * 消费点（GenUI 唯一化后收编为终结链路，同源规则零漂移）：
+ * 1. [ProgramGuard] 策略层纠正回环（[validateProgramToError]：先 normalize 再
+ *    结构校验 + 布局门禁，非法 → correctInvalidProgram 节点携带错误清单回环）；
+ * 2. [OpenUiTurnNative.ensureValidProgram] 终结落流前兜底校验。
  *
  * 结构级轻量校验（server 不依赖 :shared，DeviceToolService 字面量副本先例）：
  * 不跑完整 parser，只做正则级——root 入口存在性 / 组件名白名单 /
@@ -29,8 +23,6 @@ import kotlinx.serialization.json.JsonPrimitive
  * 漏判（放行坏负载）由端侧 engine 降级兜底，误判（错杀好负载）优先避免。
  */
 object RenderOpenUiValidator {
-
-    const val TOOL_NAME = "render_ui_openui"
 
     /** program 长度上限（对齐 render_html 128_000 字符先例）。 */
     const val MAX_PROGRAM_LENGTH = 128_000
@@ -100,10 +92,9 @@ object RenderOpenUiValidator {
     )
 
     /**
-     * Icon.name 59 枚预定义图标名白名单（M2，禁 svgPath 同口径）——字面量副本三方同步：
-     * [RenderUiValidator.ICON_NAMES]（副本源，A2UI catalog v1）↔ 本清单 ↔ shared
-     * `OpenUiLibrary.iconNames` ENUM 域 ↔ `RenderOpenUiToolService.ICON_NAMES_TEXT`
-     * 描述内嵌清单，改动须四处核对（测试钉住同源）。
+     * Icon.name 59 枚预定义图标名白名单（M2，禁 svgPath 同口径）——字面量副本三处同步：
+     * 本清单 ↔ shared `OpenUiLibrary.iconNames` ENUM 域 ↔
+     * `OpenUiPromptAssets.ICON_NAMES_TEXT` 描述内嵌清单，改动须三处核对（测试钉住同源）。
      */
     internal val ICON_NAMES = setOf(
         "accountCircle", "add", "arrowBack", "arrowForward", "attachFile", "calendarToday",
@@ -345,40 +336,6 @@ object RenderOpenUiValidator {
             }
         }
         return spans
-    }
-
-    /** 校验工具调用参数（wire JSON：{"program","fallbackSummary"}）。null = 合法放行。 */
-    fun validateArgsJson(argsJson: String): String? {
-        val args = try {
-            Json.parseToJsonElement(argsJson) as? JsonObject
-        } catch (e: Exception) {
-            null
-        } ?: return errorText(listOf("工具参数不是合法 JSON 对象"))
-        val program = (args["program"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-            ?: return errorText(listOf("工具参数缺 program 字符串"))
-        validateToError(program)?.let { error -> return error }
-        // 布局门禁（2026-10-31）：对矫正后程序做结构校验（transformer 已归一化则此处幂等）；
-        // 门禁必须对 normalize 后文本重 parse（矫正 span 已失效，勿与矫正共享树）
-        val layoutViolations = OpenUiLayoutValidator.validate(OpenUiLayoutNormalizer.normalize(program))
-        if (layoutViolations.isNotEmpty()) return OpenUiLayoutValidator.errorText(layoutViolations, program)
-        return null
-    }
-
-    /**
-     * 发射点矫正入口（[AgentRunner.argsTransformer] 消费，2026-10-31 布局可控性批次）：
-     * render_ui_openui 的 program 经 [OpenUiLayoutNormalizer] 无声归一化后重组 argsJson；
-     * 其余工具 / argsJson 非 JSON / 缺 program → 原样返回。幂等（gate 内二次调用无变化）。
-     */
-    fun transformArgs(toolName: String, argsJson: String): String {
-        if (toolName != TOOL_NAME) return argsJson
-        val args = runCatching { Json.parseToJsonElement(argsJson) }.getOrNull() as? JsonObject
-            ?: return argsJson
-        val program = (args["program"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-            ?: return argsJson
-        val normalized = OpenUiLayoutNormalizer.normalize(program)
-        if (normalized == program) return argsJson
-        val rewritten = JsonObject(args.toMutableMap().apply { put("program", JsonPrimitive(normalized)) })
-        return rewritten.toString()
     }
 
     /** 校验并直接给回错误文本：null = 合法放行。 */

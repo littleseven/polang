@@ -15,8 +15,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 
 /**
- * 聊天卡片媒体播放器（A2UI Video/AudioPlayer 渲染器与 OpenUI 未来媒体组件的共用件，
- * 中性包不绑定任一线格式；尺寸 token 由各线调用点传入）。
+ * 聊天卡片媒体播放器（OpenUI Video/AudioPlayer 渲染器使用；原为 A2UI/OpenUI 两线共用件，
+ * A2UI 2026-11-05 退役后归 OpenUI 线独有，中性包不绑定线格式；尺寸 token 由调用点传入）。
  *
  * 行为约定：卡片语境不自动播放（playWhenReady=false，用户点控制器才播），
  * 离开组合即释放播放器；播放/加载错误经 [onError] 上抛给线格式渲染器。

@@ -38,15 +38,16 @@ class CloudAgentToolCatalogTest {
     }
 
     @Test
-    fun `render_html is CLOUD executor with summary-only receipt`() {
-        val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_HTML)
-        assertNotNull(spec, "missing spec for render_html")
+    fun `retired CLOUD tools - constants pinned for history replay - no catalog spec`() {
+        // render_ui(A2UI)/render_ui_openui/render_html 云端工具已退役（2026-11 GenUI 唯一化）：
+        // 常量字面值必须稳定（server 存量 action 帧按工具名回放），目录不再声明——
+        // [PRIVACY] 闸审计面收口 LOCAL 工具
+        assertEquals("render_ui", CloudAgentToolContract.TOOL_RENDER_UI)
+        assertEquals("render_ui_openui", CloudAgentToolContract.TOOL_RENDER_UI_OPENUI)
         assertEquals("render_html", CloudAgentToolContract.TOOL_RENDER_HTML)
-        assertEquals(ToolExecutor.CLOUD, spec.executor)
-        assertTrue(
-            spec.projectionSchema.contains("summary"),
-            "render_html projection must declare summary-only receipt",
-        )
+        assertNull(CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_UI))
+        assertNull(CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_UI_OPENUI))
+        assertNull(CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_HTML))
     }
 
     @Test
@@ -64,23 +65,6 @@ class CloudAgentToolCatalogTest {
             val projection = CloudAgentToolCatalog.specFor(name)!!.projectionSchema
             assertTrue(projection.contains("不含"), "$name projection must state exclusion clause")
         }
-    }
-
-    @Test
-    fun renderUi_isCloudToolWithNoProjectionSurface() {
-        val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_UI)
-        assertNotNull(spec)
-        assertEquals(ToolExecutor.CLOUD, spec.executor)
-        assertTrue(spec.projectionSchema.contains("不适用"), "CLOUD 工具 projectionSchema 须显式声明不适用")
-    }
-
-    @Test
-    fun renderUiOpenUi_isCloudToolWithNoProjectionSurface() {
-        val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RENDER_UI_OPENUI)
-        assertNotNull(spec, "missing spec for render_ui_openui")
-        assertEquals("render_ui_openui", CloudAgentToolContract.TOOL_RENDER_UI_OPENUI)
-        assertEquals(ToolExecutor.CLOUD, spec.executor)
-        assertTrue(spec.projectionSchema.contains("不适用"), "CLOUD 工具 projectionSchema 须显式声明不适用")
     }
 
     @Test

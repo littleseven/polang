@@ -2,8 +2,9 @@ package com.mamba.picme.server.agent
 
 /**
  * OpenUI 布局结构门禁（2026-10-31 布局可控性批次，spec §2.2）——只判结构合法性，
- * 不判好坏/最优（语义错配仍归食谱软引导）。违规经工具体回 error 文本作 Observation
- * 回灌，LLM 同轮修正重试（A2UI RenderUiValidator 闭环口径）。
+ * 不判好坏/最优（语义错配仍归食谱软引导）。GenUI 唯一化后经终结链路消费
+ * （ProgramGuard 纠正回环 / ensureValidProgram 兜底），违规回 error 文本，
+ * LLM 同轮修正重试。
  *
  * 规则数值初值由 spec §2.2 给出，Ardot 范式帧定稿后可调（常量一处改）。
  */

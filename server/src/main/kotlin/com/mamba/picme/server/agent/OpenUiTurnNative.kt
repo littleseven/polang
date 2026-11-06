@@ -4,7 +4,7 @@ package com.mamba.picme.server.agent
  * OpenUI 回合原生（turn-native，spec《2026-11-01-openui-turn-native-design》）：
  * 系统提示词契约 + 终结消息兜底变换。
  *
- * [SYSTEM_PROMPT]：响应即程序契约——DSL 规则与 [RenderOpenUiToolService.DSL_RULES]
+ * [SYSTEM_PROMPT]：响应即程序契约——DSL 规则与 [OpenUiPromptAssets.DSL_RULES]
  * 同源复用（零漂移），工具语境改写为响应语境（无工具可回调、// summary 首行、
  * 渲染顺序约定 §3.4、纯文本也必须是程序）。契约后紧跟「回复形态先定位」
  * （2026-11-01 回复活感批次：对话类回复 = 裸 Markdown 程序、禁表单卡包装；数据卡
@@ -52,14 +52,14 @@ object OpenUiTurnNative {
 4. Query 取数语句殿后（程序末尾），组件参数引用其变量名。
 需要服务器时间时调用 server_time 工具；相册数据查询照旧调用搜索工具，
 结果尾部的 handle 按数据禁令绑定进程序。
-""" + RenderOpenUiToolService.DSL_RULES + """
+""" + OpenUiPromptAssets.DSL_RULES + """
 
 可用组件全量清单（${RenderOpenUiValidator.ALLOWED_COMPONENTS.size} 个，与校验器白名单同源，逐字使用、禁臆造组件名；另有
 Query 取数语句）：
 """ + RenderOpenUiValidator.ALLOWED_COMPONENTS.joinToString(", ")
 
     /**
-     * 终结消息兜底变换（AgentRunner.finalMessageTransformer 消费，spec§3.2 双保险）：
+     * 终结消息兜底变换（AgentRunner 终结落流前无条件内联调用，spec§3.2 双保险）：
      * 合法 → normalize 后原样放行；非法（ProgramGuard 纠正用尽）→ 兜底包成
      * Markdown 程序，端上永远收到合法树。
      */

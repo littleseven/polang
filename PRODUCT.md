@@ -325,7 +325,7 @@ PoLang 以技术探索与能力验证为核心目标，**聚焦 Gallery/Editor +
 | **相册摘要** | ✅ 已落地 | P1 | `GetGallerySummaryUseCase` / `ChatGallerySummaryCapability` |
 | **标签扫描（对话触发）** | ✅ 已落地 | P1 | Florence-2 / Qwen3-VL-2B 3-Pass，`ChatStartTagScanCapability` |
 | **JS 沙盒脚本** | ✅ 已落地 | P2 | QuickJS + JSBridge，`run_gallery_script` 运行相册分析脚本 |
-| **GenUI 生成式 UI 卡** | ✅ 已落地（Android，2026-10） | P1 | 云端 Agent 按回答内容生成结构化信息卡（图表/表格/表单/图文混排）：A2UI/OpenUI 双协议并行对比（`X-GenUI-Format` 头分流），OpenUI 组件库 89 项 + 端侧流式预览；渲染宿主 `features/chat/openui/`，卡内设计规范 `docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md` |
+| **GenUI 生成式 UI 卡** | ✅ 已落地（Android，2026-10） | P1 | 云端 Agent 按回答内容生成结构化信息卡（图表/表格/表单/图文混排）：OpenUI 单协议回合原生（响应即程序；A2UI 对照线 2026-11-05 决策退役（2026-11-06 实施），OpenUI 唯一化），OpenUI 组件库 103 项 + 端侧流式预览；渲染宿主 `features/chat/openui/`，卡内设计规范 `docs/08-UI-SPECS/OPENUI_CARD_DESIGN_LANGUAGE.md`；后续方向：端侧推理直产 OpenUI 程序（离线兜底 / 省云端成本，模型选型与约束解码 spike 待单独 spec 立项） |
 | **语音输入** | ✅ 默认关闭 | P2 | 2026-09-20 产品定性「无语音输入需求」：VoiceButton 已从设计稿移除；Android 代码中输入框语音按钮仍由语音模式开关门控（默认 DISABLED，即入口默认关闭），语音链路（ASR/KWS）与设置页开关保留为实验能力；iOS 不实现 |
 | **快捷入口栏** | ❌ 已取消 | 聊天页不再提供底部快捷入口栏，统一从相册首页进入 |
 

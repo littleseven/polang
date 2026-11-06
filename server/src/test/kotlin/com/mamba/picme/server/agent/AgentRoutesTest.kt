@@ -71,6 +71,14 @@ class AgentRoutesTest {
          "usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}
     """.trimIndent()
 
+    /**
+     * 合法 OpenUI 程序作为终结文本的响应（JSON 内嵌引号转义）。
+     * GenUI 唯一化（2026-11-06）后恒 turn-native：非合法程序终结文本会触发
+     * ProgramGuard 纠正回环多打 LLM，普通用例一律给合法程序。
+     */
+    private fun programResponse(program: String) =
+        chatResponse(program.replace("\\", "\\\\").replace("\"", "\\\""))
+
     private fun mockRunner(vararg responses: Pair<HttpStatusCode, String>): AgentRunner {
         val queue = ArrayDeque(responses.toList())
         val engine = MockEngine {
@@ -163,7 +171,7 @@ class AgentRoutesTest {
         TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
         val account = runBlocking { AccountService.createOrRefresh("sse@x.com", 100) }
         activateGateway()
-        installAgentApp(mockRunner(HttpStatusCode.OK to chatResponse("你好")))
+        installAgentApp(mockRunner(HttpStatusCode.OK to programResponse("root = Markdown(\"你好\")")))
 
         val created = client.post("/agent/sessions") {
             header(APP_TOKEN_HEADER, account.token)
@@ -204,7 +212,7 @@ class AgentRoutesTest {
         val mine = runBlocking { AccountService.createOrRefresh("me@x.com", 100) }
         val other = runBlocking { AccountService.createOrRefresh("other@x.com", 100) }
         activateGateway()
-        installAgentApp(mockRunner(HttpStatusCode.OK to chatResponse("hi")))
+        installAgentApp(mockRunner(HttpStatusCode.OK to programResponse("root = Markdown(\"hi\")")))
 
         val created = client.post("/agent/sessions") {
             header(APP_TOKEN_HEADER, mine.token)
@@ -302,7 +310,7 @@ class AgentRoutesTest {
         val account = runBlocking { AccountService.createOrRefresh("dbg@x.com", 0) } // 额度已尽
         activateGateway()
         val engine = MockEngine {
-            respond(chatResponse("ok"), HttpStatusCode.OK, headersOf("Content-Type", ContentType.Application.Json.toString()))
+            respond(programResponse("root = Markdown(\"ok\")"), HttpStatusCode.OK, headersOf("Content-Type", ContentType.Application.Json.toString()))
         }
         val runner = AgentRunner(
             executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
@@ -357,7 +365,7 @@ class AgentRoutesTest {
         val capturedAuth = mutableListOf<String?>()
         val engine = MockEngine { request ->
             capturedAuth += request.headers["Authorization"]
-            respond(chatResponse("ok"), HttpStatusCode.OK, headersOf("Content-Type", ContentType.Application.Json.toString()))
+            respond(programResponse("root = Markdown(\"ok\")"), HttpStatusCode.OK, headersOf("Content-Type", ContentType.Application.Json.toString()))
         }
         val runner = AgentRunner(
             executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
@@ -483,8 +491,8 @@ class AgentRoutesTest {
         activateGateway()
         installAgentApp(
             mockRunner(
-                HttpStatusCode.OK to chatResponse("第一轮"),
-                HttpStatusCode.OK to chatResponse("第二轮"),
+                HttpStatusCode.OK to programResponse("root = Markdown(\"第一轮\")"),
+                HttpStatusCode.OK to programResponse("root = Markdown(\"第二轮\")"),
             ),
         )
 
@@ -614,7 +622,7 @@ class AgentRoutesTest {
         assertTrue((last.payload as AgentEventPayload.Finish).reason.startsWith("error"))
     }
 
-    // ── GenUI 线格式分流：openui 头 = 回合原生（turn-native T8）──────────────
+    // ── GenUI 唯一化：turn-native only（2026-11-06）──────────────────────────
 
     /** 捕获请求体 JSON 的注册工具名集与 system prompt（messages[0]）。 */
     private fun toolNamesAndSystemPrompt(requestBody: String): Pair<Set<String>, String> {
@@ -629,26 +637,21 @@ class AgentRoutesTest {
     }
 
     /**
-     * openui 头语义升级（回合原生）：不注册任何 GenUI 发卡工具（render_ui_openui 退役）
-     * 且 render_html 从服务端工具中过滤；system prompt 换用 turn-native 契约
-     * （「你的整个回复就是一颗 OpenUI Lang 1.0 程序」）。
-     * 缺头（A2UI 回退闸）：照旧注册 render_ui、prompt 为 DEFAULT_SYSTEM_PROMPT（零回归）。
-     * 经 RawSseStubServer 捕获 LLM 请求体钉住（BYOK 指向本地假 LLM，真实 SSE 链路）。
+     * GenUI 唯一化（2026-11-06）：/agent 路由面恒走 OpenUI 回合原生——不再按
+     * `X-GenUI-Format` 分流（旧头被忽略），不注册任何 GenUI 发卡工具
+     * （render_ui/render_ui_openui/render_html 全退役），system prompt 恒为
+     * turn-native 契约（「你的整个回复就是一颗 OpenUI Lang 1.0 程序」）。
+     * 两轮（缺头 / 带旧头）经 RawSseStubServer 捕获 LLM 请求体钉住同一形态
+     * （BYOK 指向本地假 LLM，真实 SSE 链路）。
      */
     @Test
-    fun `openui header registers no genui tools and uses turn-native prompt`() = testApplication {
+    fun `messages always run turn-native regardless of legacy genui header`() = testApplication {
         TestDb.init(Accounts, AgentSessions, AgentEvents, LlmCallLogs)
         val account = runBlocking { AccountService.createOrRefresh("openui@x.com", 100) }
         val capturedBodies = mutableListOf<String>()
-        val sseServer = RawSseStubServer { body, n ->
+        val sseServer = RawSseStubServer { body, _ ->
             capturedBodies += body
-            // 第 1 轮（openui 头）回合法程序避免程序守卫纠正回环；第 2 轮（缺头）回纯文本
-            val text = if (n == 1) {
-                "// summary: 打招呼\nroot = Markdown(\"你好\")"
-            } else {
-                "好的，已收到"
-            }
-            MockLlmSse.streamingText(text) to "text/event-stream"
+            MockLlmSse.streamingText("// summary: 打招呼\nroot = Markdown(\"你好\")") to "text/event-stream"
         }
         try {
             val runner = AgentRunner(
@@ -668,51 +671,39 @@ class AgentRoutesTest {
             assertEquals(HttpStatusCode.OK, created.status)
             val sessionId = json.parseToJsonElement(created.bodyAsText()).jsonObject["session_id"]!!.jsonPrimitive.content
 
-            // ── 断言一：X-GenUI-Format: openui → 回合原生（无发卡工具 + turn-native prompt）
-            val openuiResp = client.post("/agent/sessions/$sessionId/messages") {
+            // ── 第一轮：缺头 → 同样走 turn-native（无 A2UI 回退线）
+            val noHeaderResp = client.post("/agent/sessions/$sessionId/messages") {
                 header(APP_TOKEN_HEADER, account.token)
                 header("X-User-Api-Key", "sk-stub")
-                header(GENUI_FORMAT_HEADER, GENUI_FORMAT_OPENUI)
                 contentType(ContentType.Application.Json)
                 setBody("""{"content":"你好"}""")
             }
-            assertEquals(HttpStatusCode.OK, openuiResp.status)
-            assertTrue(openuiResp.bodyAsText().contains("\"kind\":\"done\""))
+            assertEquals(HttpStatusCode.OK, noHeaderResp.status)
+            assertTrue(noHeaderResp.bodyAsText().contains("\"kind\":\"done\""))
 
-            assertEquals("合法程序零纠正回环，单次 LLM 调用", 1, capturedBodies.size)
-            val (openuiTools, openuiPrompt) = toolNamesAndSystemPrompt(capturedBodies.single())
-            assertFalse("turn-native 不得注册 render_ui_openui", "render_ui_openui" in openuiTools)
-            assertFalse("turn-native 不得注册 render_ui", "render_ui" in openuiTools)
-            assertFalse("turn-native render_html 退役（Html 组件入树）", "render_html" in openuiTools)
-            assertTrue("其余服务端工具保留", "server_time" in openuiTools)
-            assertTrue(
-                "system prompt 应为 turn-native 契约，实际：${openuiPrompt.take(80)}",
-                openuiPrompt.contains("你的整个回复就是一颗 OpenUI Lang 1.0 程序"),
-            )
-
-            // ── 断言二：缺头（A2UI 回退闸）零回归
-            val a2uiResp = client.post("/agent/sessions/$sessionId/messages") {
+            // ── 第二轮：带旧版 X-GenUI-Format: openui 头 → 被忽略，同一 turn-native 形态
+            val legacyHeaderResp = client.post("/agent/sessions/$sessionId/messages") {
                 header(APP_TOKEN_HEADER, account.token)
                 header("X-User-Api-Key", "sk-stub")
+                header("X-GenUI-Format", "openui")
                 contentType(ContentType.Application.Json)
                 setBody("""{"content":"在吗"}""")
             }
-            assertEquals(HttpStatusCode.OK, a2uiResp.status)
-            assertTrue(a2uiResp.bodyAsText().contains("\"kind\":\"done\""))
+            assertEquals(HttpStatusCode.OK, legacyHeaderResp.status)
+            assertTrue(legacyHeaderResp.bodyAsText().contains("\"kind\":\"done\""))
 
-            assertEquals(2, capturedBodies.size)
-            val (a2uiTools, a2uiPrompt) = toolNamesAndSystemPrompt(capturedBodies[1])
-            assertTrue("A2UI 线照旧注册 render_ui", "render_ui" in a2uiTools)
-            assertTrue("A2UI 线 render_html 保留", "render_html" in a2uiTools)
-            assertFalse("A2UI 线不得注册 render_ui_openui", "render_ui_openui" in a2uiTools)
-            assertTrue(
-                "A2UI 线 prompt 应为默认契约（零回归），实际：${a2uiPrompt.take(80)}",
-                a2uiPrompt.startsWith("你是 PoLang 云端 Agent。用中文简洁回答"),
-            )
-            assertFalse(
-                "A2UI 线不得出现 turn-native prompt",
-                a2uiPrompt.contains("你的整个回复就是一颗 OpenUI Lang 1.0 程序"),
-            )
+            assertEquals("两轮各一次 LLM 调用（合法程序零纠正回环）", 2, capturedBodies.size)
+            capturedBodies.forEachIndexed { index, body ->
+                val (tools, prompt) = toolNamesAndSystemPrompt(body)
+                assertFalse("第 ${index + 1} 轮不得注册 render_ui", "render_ui" in tools)
+                assertFalse("第 ${index + 1} 轮不得注册 render_ui_openui", "render_ui_openui" in tools)
+                assertFalse("第 ${index + 1} 轮 render_html 已退役（Html 组件入树）", "render_html" in tools)
+                assertTrue("第 ${index + 1} 轮其余服务端工具保留", "server_time" in tools)
+                assertTrue(
+                    "第 ${index + 1} 轮 system prompt 应为 turn-native 契约，实际：${prompt.take(80)}",
+                    prompt.contains("你的整个回复就是一颗 OpenUI Lang 1.0 程序"),
+                )
+            }
         } finally {
             sseServer.close()
         }

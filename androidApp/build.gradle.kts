@@ -100,7 +100,6 @@ play {
 android {
     ndkVersion = "28.2.13676358"
     namespace = "com.mamba.picme"
-    // androidx.a2ui 1.0.0-alpha01 要求 compileSdk >= 37（AAR metadata 硬校验）
     compileSdk = 37
 
     defaultConfig {
@@ -137,7 +136,7 @@ android {
         unitTests {
             // 让 android.util.Log 等 Android stub 方法在 JVM 单测中返回默认值，而非抛 "not mocked"。
             isReturnDefaultValues = true
-            // Robolectric Compose 渲染测试（a2ui 组件冒烟）需要合并后的资源与 manifest。
+            // Robolectric Compose 渲染测试需要合并后的资源与 manifest。
             isIncludeAndroidResources = true
         }
     }
@@ -306,9 +305,6 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.mockwebserver)
     testImplementation(libs.robolectric)
-    // Robolectric Compose 渲染冒烟（A2UI 组件可用性验证）
-    testImplementation(platform(libs.androidx.compose.bom))
-    testImplementation(libs.androidx.compose.ui.test.junit4)
     // 让 JVM 单元测试能使用真实的 org.json 实现，而非 Android stub
     testImplementation("org.json:json:20231013")
     androidTestImplementation(libs.androidx.junit)
@@ -334,11 +330,6 @@ dependencies {
 
     // KMP shared 模块（Phase 4：原 runtime-core 引擎无关逻辑已全部迁入；模块已删）
     implementation(project(":shared"))
-    // androidx.a2ui（hybrid M2：云端 Agent 下发 A2UI 信封骨架，端上渲染 data_ui 卡）
-    implementation(libs.androidx.a2ui.model)
-    implementation(libs.androidx.a2ui.engine)
-    implementation(libs.androidx.a2ui.compose.ui)
-    implementation(libs.androidx.compose.material3.a2ui)
     // Koog agent 框架：androidApp 侧直接使用（RemoteControlToolService 的 @Tool/@LLMDescription、
     // AndroidAgentComposition 的 ToolRegistry/asToolsByClass）；原 :runtime-core 已删除，
     // 改直接依赖。serialization-jackson 排除理由同 :shared（minSdk 24 D8 限制）。

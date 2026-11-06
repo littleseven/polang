@@ -3,15 +3,14 @@ package com.mamba.picme.server.agent
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 终结程序守卫（turn-native，spec§3.5——[CardClaimGuard] 的回合原生泛化）。
+ * 终结程序守卫（turn-native，spec§3.5——原假发卡守卫的回合原生泛化；
+ * 2026-11-06 GenUI 唯一化后无条件启用，每轮一个新实例）。
  *
- * OpenUI 回合原生线下，LLM 的整个终结回复必须是一颗合法 OpenUI 程序。策略层
- * onTextMessage 出边经 [invalidProgramError] 门控：非法 → correctInvalidProgram
+ * /agent 路由面恒走 OpenUI 回合原生：LLM 的整个终结回复必须是一颗合法 OpenUI 程序。
+ * 策略层 onTextMessage 出边经 [invalidProgramError] 门控：非法 → correctInvalidProgram
  * 节点携带具体错误清单回环重发（上限 [MAX_CORRECTIONS] 次防死循环）；上限用尽
- * 放行，由 AgentRunner.finalMessageTransformer 兜底 Markdown 包装——
- * 「端上永远收到合法树」的双保险。
- *
- * 每轮一个新实例（[AgentRunner.runTurn] 内创建），无跨轮状态。
+ * 放行，由 AgentRunner 终结落流的 [OpenUiTurnNative.ensureValidProgram] 兜底
+ * Markdown 包装——「端上永远收到合法树」的双保险。
  */
 internal class ProgramGuard {
 
@@ -28,7 +27,7 @@ internal class ProgramGuard {
     }
 
     companion object {
-        /** 单轮纠正上限（对齐 CardClaimGuard 口径，防 LLM 坚持己见死循环）。 */
+        /** 单轮纠正上限（防 LLM 坚持己见死循环）。 */
         const val MAX_CORRECTIONS = 1
 
         fun correctionPrompt(error: String): String =

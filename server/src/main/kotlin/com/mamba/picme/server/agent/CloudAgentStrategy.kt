@@ -43,29 +43,23 @@ private suspend fun AIAgentLLMWriteSession.requestLLMStreamingOrOnce(): Message.
  * 1. nodeSendToolResult 出边把 onToolCalls 声明在 onTextMessage **之前**——内建版先匹配文本，
  *    DeepSeek 惯用的「叙述文本 + tool_calls 同帧」响应会被静默丢弃工具调用（表现为「只说不做」）。
  *    1.3.0 未修，本策略继续必要。细节见 :shared 同名策略 KDoc。
- * 2. correctFakeCardClaim 节点（2026-10-24 假发卡修复）：LLM 以文本收尾时先过
- *    [CardClaimGuard]——声称发卡但当轮无卡工具 Action 过门控 → 不 Finish，由本节点追加
- *    user 纠正消息并就地重发 LLM 请求（上限 [CardClaimGuard.MAX_CORRECTIONS] 次，防死循环）。
- *    纠正后 LLM 可能真实发卡（tool_calls 回主循环）或给出改写文本（直接 Finish）。
- *    turn-native 线（[programGuard] 非空）旁路本边（2026-11-01 T8 控制方裁决）：
- *    该线无发卡工具，纠正文案指向不存在的工具，触发即误导。
- * 3. LLM 节点全部走流式（openui P2，2026-10-26）：`nodeLLMRequest`/`nodeLLMSendToolResults`
+ * 2. LLM 节点全部走流式（openui P2，2026-10-26）：`nodeLLMRequest`/`nodeLLMSendToolResults`
  *    内建版是一次性 `requestLLM()`，不产任何 StreamFrame——EventHandler 流式钩子永不触发。
  *    自定义节点改用 [requestLLMStreamingOrOnce]（Koog OpenAI 客户端把工具 args 增量以
  *    ToolCallDelta 逐帧透传），帧流驱动 AgentRunner 的 openui 预览旁路。
- * 4. correctInvalidProgram 节点（2026-11-01 回合原生 ProgramGuard）：仅 [programGuard]
- *    非空（forwardContentDeltas 回合原生线）时可触达——终结文本非合法 OpenUI 程序 →
- *    本节点携带逐条校验错误清单回环重发（上限 [ProgramGuard.MAX_CORRECTIONS] 次）；
- *    上限用尽放行落流，由 AgentRunner.finalMessageTransformer 兜底包装。A2UI 线
- *    programGuard=null，新边条件恒 false，既有行为零变化。
+ * 3. correctInvalidProgram 节点（2026-11-01 回合原生 ProgramGuard；2026-11-06 GenUI 唯一化后
+ *    无条件启用）：终结文本非合法 OpenUI 程序 → 本节点携带逐条校验错误清单回环重发
+ *    （上限 [ProgramGuard.MAX_CORRECTIONS] 次）；上限用尽放行落流，由 AgentRunner 终结
+ *    落流的 [OpenUiTurnNative.ensureValidProgram] 兜底包装。假发卡纠正节点
+ *    correctFakeCardClaim 已随发卡工具全退役一并摘除（该线无发卡工具，
+ *    纠正文案指向不存在的工具，触发即误导）。
  *
  * ⚠️ Koog 1.3.0 `onTextMessage { block }` 的 block 是**分片过滤器**（transform 语义：
  * 过滤后 join 成 String，空串也算命中），不是门控条件——条件必须写在后续级联的
  * `onCondition` 里，否则同一节点两条文本边中先声明者无条件捕获全部文本消息（事故记录）。
  */
 internal fun cloudAgentStrategy(
-    cardGuard: CardClaimGuard,
-    programGuard: ProgramGuard? = null,
+    programGuard: ProgramGuard,
 ): AIAgentGraphStrategy<String, String> =
     strategy("polang_cloud_single_run") {
         val nodeCallLLM by node<String, Message.Assistant> { message ->
@@ -87,18 +81,9 @@ internal fun cloudAgentStrategy(
                 requestLLMStreamingOrOnce()
             }
         }
-        val nodeCorrectFakeCard by node<String, Message.Assistant>("correctFakeCardClaim") {
-            cardGuard.markCorrected()
-            llm.writeSession {
-                appendPrompt {
-                    user(CardClaimGuard.CORRECTION_PROMPT)
-                }
-                requestLLMStreamingOrOnce()
-            }
-        }
-        // turn-native（spec§3.5）：终结程序非法 → 带错误清单回环纠正（仅 programGuard 非空时可触达）
+        // turn-native：终结程序非法 → 带错误清单回环纠正（上限 MAX_CORRECTIONS 防死循环）
         val nodeCorrectInvalidProgram by node<String, Message.Assistant>("correctInvalidProgram") { text ->
-            programGuard!!.markCorrected()
+            programGuard.markCorrected()
             val error = RenderOpenUiValidator.validateProgramToError(text)
                 ?: "未知校验错误（请检查 root 语句、组件白名单与 Query 形态）"
             llm.writeSession {
@@ -114,35 +99,21 @@ internal fun cloudAgentStrategy(
         edge(
             nodeCallLLM forwardTo nodeCorrectInvalidProgram
                 onTextMessage { true }
-                onCondition { text -> programGuard?.invalidProgramError(text) != null },
-        )
-        edge(
-            nodeCallLLM forwardTo nodeCorrectFakeCard
-                onTextMessage { true }
-                // turn-native 线旁路假发卡纠正（T8 控制方裁决）：programGuard 非空时
-                // 本会话无发卡工具，cardGuard 纠正文案指向不存在的工具，误触即死循环
-                onCondition { programGuard == null && cardGuard.needsCorrection(it) },
+                onCondition { text -> programGuard.invalidProgramError(text) != null },
         )
         edge(nodeCallLLM forwardTo nodeFinish onTextMessage { true })
         edge(nodeExecuteTool forwardTo nodeSendToolResult)
         // 与内建版相反：先匹配 tool_calls 再兜底文本
         edge(nodeSendToolResult forwardTo nodeExecuteTool onToolCalls { true })
-        // 程序校验边在假发卡边之前（programGuard 为 null 时条件恒 false，A2UI 线零变化）
+        // 程序校验边在 finish 边之前声明（先匹配者胜）
         edge(
             nodeSendToolResult forwardTo nodeCorrectInvalidProgram
                 onTextMessage { true }
-                onCondition { text -> programGuard?.invalidProgramError(text) != null },
-        )
-        edge(
-            nodeSendToolResult forwardTo nodeCorrectFakeCard
-                onTextMessage { true }
-                onCondition { programGuard == null && cardGuard.needsCorrection(it) },
+                onCondition { text -> programGuard.invalidProgramError(text) != null },
         )
         edge(nodeSendToolResult forwardTo nodeFinish onTextMessage { true })
-        edge(nodeCorrectFakeCard forwardTo nodeExecuteTool onToolCalls { true })
-        edge(nodeCorrectFakeCard forwardTo nodeFinish onTextMessage { true })
         edge(nodeCorrectInvalidProgram forwardTo nodeExecuteTool onToolCalls { true })
-        // 纠正后再输出仍非法：放行落流（finalMessageTransformer 兜底包装）
+        // 纠正后再输出仍非法：放行落流（ensureValidProgram 兜底包装）
         edge(nodeCorrectInvalidProgram forwardTo nodeFinish onTextMessage { true })
     }
 

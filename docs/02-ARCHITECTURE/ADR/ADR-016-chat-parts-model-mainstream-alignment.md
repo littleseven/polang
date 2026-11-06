@@ -6,6 +6,8 @@
 **依赖**: ADR-008（隐私红线）、ADR-011（ui-driver 测试体系）、ADR-013（KMP 契约）、[PARITY] 红线
 **实施 spec**: `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md`（parts 模型/流式/状态机/渲染，M1~M5 分期）；HTML 卡实现 SSOT：`JS_ENGINE_TECH_SPEC.md` §7/§7.1；双形态 + 任务卡 HTML 化：`2026-09-26-html-card-two-tier-design.md`
 
+> 2026-11-05 修订：A2UI GenUI 线退役（对照组使命完成，OpenUI 已经生产验证；消灭双线校验/提示词执法成本），`data_ui` 值与 `MessagePart.A2uiCard` 删除，存量消息经 codec/converter 墓碑兜底为 Text（不丢消息）；外部 androidx.a2ui 成熟后可重评估。实施 spec/plan：2026-11-05-openui-sole-genui-protocol。
+
 ---
 
 ## 1. 背景（两轮调研）
@@ -36,7 +38,7 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：**(a
 - 流式对齐 **chunk 三段式语义**（start/delta/end，块级 id）——对齐的是事件语义，不是 SSE 线协议（传输仍走 Koog 内部循环）
 - 工具调用状态机对齐 Vercel 四态 + 审批态；工程师任务卡五态（RUNNING/AWAITING_CONTINUE/AWAITING_DELIVER/COMPLETED/FAILED）映射为该状态机的渲染投影
 - **双层分离**：渲染/持久层保存富 parts 文档（防信息丢失）；回灌 LLM 时显式转换（工具结果拆为 tool 角色消息、UI 专有 part 不进上下文）——对应 Vercel UIMessage↔ModelMessage
-- **type 分类法（2026-09-28 重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`）**：Room `type` 列值域 = 3 分类 8 值——content（`text`/`image`，免前缀）· tool（`tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`）· data（`data_media_results`/`data_optimize_candidates`，回灌剥离）；命名规则 `^{category}_{kind}$`，`tool_`/`data_` 为保留前缀，禁 UI 容器词（card/bubble/strip/viewer）进协议值；`MessagePart` 挂 `PartCategory` 分类载体（getter-only，不进线格式）；`role` 上提为消息级独立列（Room v26，"user"/"agent"）取代 user_/agent_ type 前缀；legacy 13 值经 `LegacyChatTypeMigration` 一次性转正（MIGRATION_25_26 + 备份恢复），运行时转换器 `MessagePartsConverter` 只认新值
+- **type 分类法（2026-09-28 重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`）**：Room `type` 列值域 = 3 分类 8 值——content（`text`/`image`，免前缀）· tool（`tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`）· data（`data_media_results`/`data_optimize_candidates`，回灌剥离）；命名规则 `^{category}_{kind}$`，`tool_`/`data_` 为保留前缀，禁 UI 容器词（card/bubble/strip/viewer）进协议值；`MessagePart` 挂 `PartCategory` 分类载体（getter-only，不进线格式）；`role` 上提为消息级独立列（Room v26，"user"/"agent"）取代 user_/agent_ type 前缀；legacy 13 值经 `LegacyChatTypeMigration` 一次性转正（MIGRATION_25_26 + 备份恢复），运行时转换器 `MessagePartsConverter` 只认新值；值域后经 2026-10 扩 `tool_browser`/`data_ui`/`data_ui_openui` 至 11 值，2026-11-05 A2UI 退役删 `data_ui`（`MessagePart.A2uiCard` 同步删除，存量行级墓碑兜底不丢消息）回落 **10 值**
 
 ### D2 渲染层：对齐 ChatGPT——markdown AST → 原生受控组件 + 卡片独立 block
 

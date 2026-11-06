@@ -549,8 +549,6 @@
     <string name="cloud_agent_byok_consent_subtitle">Key 隨請求透傳，伺服器不儲存、不記錄</string>
     <string name="cloud_agent_entry_title">雲端 Agent（實驗）</string>
     <string name="cloud_agent_chat_toggle_subtitle">開啟後聊天走雲端編排：僅相簿唯讀問答，回覆不出卡片；附圖訊息降級為純文字</string>
-    <string name="settings_genui_format_title">GenUI 協議</string>
-    <string name="settings_genui_format_subtitle">OpenUI 將每則回覆渲染為原生互動介面（推薦）；A2UI 為相容回退線格式</string>
     <string name="cloud_agent_login_required">使用雲端 Agent 前請先在設定頁登入帳號</string>
     <string name="cloud_agent_consent_required">已選擇自帶 Key 的供應商但尚未授權：請到「設定 → 遠端模型」開啟「雲端 Agent 使用我的 Key」</string>
     <string name="cloud_agent_title">雲端 Agent</string>
@@ -1640,8 +1638,8 @@
     <string name="chat_result_executed">✅ 已執行 %1$s</string>
     <string name="chat_chart_generated">已生成圖表</string>
     <string name="chat_html_card_generated">已生成卡片</string>
-    <string name="chat_a2ui_card_unavailable">卡片資料不可用</string>
-    <string name="chat_a2ui_card_data_elsewhere">%1$s（資料在原裝置）</string>
+    <string name="chat_openui_card_unavailable">卡片資料不可用</string>
+    <string name="chat_openui_card_data_elsewhere">%1$s（資料在原裝置）</string>
     <string name="html_card_view_full">點擊查看完整內容</string>
     <string name="html_card_preview_failed">預覽渲染失敗</string>
     <string name="html_fullpage_title_default">卡片詳情</string>

@@ -26,7 +26,6 @@ import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.DedupHashDao
 import com.mamba.picme.data.local.HandleLookup
 import com.mamba.picme.data.local.LocalHandleStore
-import com.mamba.picme.features.chat.a2ui.HandleResolver
 import com.mamba.picme.features.chat.openui.OpenUiPhoto
 import com.mamba.picme.features.chat.openui.OpenUiPhotoResolver
 import com.mamba.picme.data.local.MediaDao
@@ -428,10 +427,7 @@ interface AppContainer {
     /** 创建 MediaStoreObserver（需要 ContentResolver，按需创建） */
     fun createMediaStoreObserver(onChange: (List<MediaChangeEvent>) -> Unit): MediaStoreObserver
 
-    /** A2UI 卡 local:// handle 填槽解析器（hybrid M2 T7；与 gallery 工具共用同一 LocalHandleStore 实例） */
-    val a2uiHandleResolver: HandleResolver
-
-    /** OpenUI 卡 Query("local_handle") 的端侧取数接缝（openui P2；与 A2UI 共用同一 LocalHandleStore 实例） */
+    /** OpenUI 卡 Query("local_handle") 的端侧取数接缝（openui P2；与 gallery 工具共用同一 LocalHandleStore 实例） */
     val localHandleLookup: HandleLookup
 
     /**
@@ -1160,15 +1156,11 @@ class AppContainerImpl(
     }
 
     /**
-     * local:// handle 存储（T3）：gallery 工具（handle 注册）与 A2UI HandleResolver（填槽查取）
-     * 共用同一实例，保证注册/解析看到同一份数据。
+     * local:// handle 存储（T3）：gallery 工具（handle 注册）与 OpenUI 卡 local_handle
+     * 取数接缝（填槽查取）共用同一实例，保证注册/解析看到同一份数据。
      */
     private val localHandleStore: LocalHandleStore by lazy {
         LocalHandleStore(database.localHandleDao())
-    }
-
-    override val a2uiHandleResolver: HandleResolver by lazy {
-        HandleResolver(localHandleStore)
     }
 
     override val localHandleLookup: HandleLookup get() = localHandleStore

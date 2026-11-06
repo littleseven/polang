@@ -11,7 +11,6 @@ import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.MessagePart
-import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
@@ -411,8 +410,8 @@ class ChatViewModel(
     /** 直播卡持久化 JSON（读侧 [decodePartsOrLegacy] 同款契约：未知字段忽略、默认值省略）。 */
     private val browserPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
-    /** A2UI 卡持久化 JSON（与 converter 同配置，防 roundtrip 漂移；encodeDefaults=true 固定线格式五键）。 */
-    private val a2uiCardJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    /** OpenUI 卡持久化 JSON（与 converter 同配置，防 roundtrip 漂移；encodeDefaults=true 固定线格式）。 */
+    private val cardPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /**
      * Task 15 组合根注册的云端浏览器能力单例（capability 未注册时 null → 直播卡链路整体静默降级）。
@@ -2218,7 +2217,7 @@ class ChatViewModel(
         }
         try {
             val answer = StringBuilder()
-            val cards = CloudTurnCardFlush(prepared.genUiFormat)
+            val cards = CloudTurnCardFlush()
             var serverError: String? = null
             _openUiStreamProgram.value = null // 防上回合异常残留（openui P2 流式预览）
             cloudStepTimeline.clear() // 步骤时间线同为回合级瞬态，开局清空
@@ -2273,26 +2272,20 @@ class ChatViewModel(
         val token: String,
         val session: CloudSession,
         val choice: CloudAgentChannelChoice,
-        val genUiFormat: String,
     )
 
     /**
-     * 两线 GenUI 卡落库队列 + 线格式（runCloudTurnOnce 参数收拢，detekt LongParameterList）。
+     * OpenUI 卡落库队列（runCloudTurnOnce 参数收拢，detekt LongParameterList）。
      * onEvent 回调非挂起不能直接写 Room，先快照「卡前文本 + 卡事件」，SSE 结束后在挂起上下文
-     * 按序落库（保证云端文本、工具结果卡、GenUI 图表卡按序渲染，US-2）。两队列并列不合并的
-     * 前提：server 按 X-GenUI-Format 头互斥注册 render_ui/render_ui_openui，一回合只会产
-     * 一种卡，跨队列交错序不可能出现。
+     * 按序落库（保证云端文本、工具结果卡、GenUI 图表卡按序渲染，US-2）。
      */
     private class CloudTurnCardFlush(
-        val genUiFormat: String,
-        val a2uiFlushes: MutableList<Pair<String, CloudTurnEvent.A2uiCard>> = mutableListOf(),
         val openUiFlushes: MutableList<Pair<String, CloudTurnEvent.OpenUiCard>> = mutableListOf(),
     ) {
         /** done 帧回合性能数据（2026-11-01）：随卡队列走同一回合级瞬态通道，重试/清空一并复位。 */
         var doneUsage: CloudTurnEvent.Done? = null
 
         fun clear() {
-            a2uiFlushes.clear()
             openUiFlushes.clear()
             doneUsage = null
         }
@@ -2300,8 +2293,8 @@ class ChatViewModel(
 
     /**
      * 云端回合前置准备：依赖/登录态（/agent 会话需服务端账号 token，访客设备级额度仅覆盖
-     * /llm 链路）/通道解析（网关 / BYOK / 未授权引导，与调试页 prepare() 同一套规则）/
-     * GenUI 线格式读取/会话懒建。任一闸不过则就地报错上屏并返回 null。
+     * /llm 链路）/通道解析（网关 / BYOK / 未授权引导，与调试页 prepare() 同一套规则）/会话懒建。
+     * 任一闸不过则就地报错上屏并返回 null。
      */
     private suspend fun prepareCloudTurn(sessionId: String): CloudTurnPrepared? {
         val api = cloudAgentApi ?: return null
@@ -2328,8 +2321,6 @@ class ChatViewModel(
                 ?: configs.getConfigByModelId(selectedKey)
         }
         val consent = userSettingsRepository.cloudAgentByokConsentFlow.first()
-        // GenUI 线格式（openui P2）：随请求头 X-GenUI-Format 透传 server 工具分流
-        val genUiFormat = userSettingsRepository.genUiFormatFlow.first()
         val choice = CloudAgentChannelResolver.resolve(config, consent)
         if (choice is CloudAgentChannelChoice.NeedConsent) {
             _streamingMessage.value = null
@@ -2355,19 +2346,15 @@ class ChatViewModel(
             )
             return null
         }
-        return CloudTurnPrepared(api, runner, token, session, choice, genUiFormat)
+        return CloudTurnPrepared(api, runner, token, session, choice)
     }
 
-    /** SSE 结束后按序落库两线 GenUI 卡：先落卡前已累积文本（text 行），再落卡行。 */
+    /** SSE 结束后按序落库 OpenUI 卡：先落卡前已累积文本（text 行），再落卡行。 */
     private suspend fun flushCloudTurnCards(
         sessionId: String,
         cards: CloudTurnCardFlush,
         performance: LlmPerformance? = null,
     ) {
-        for ((pendingText, card) in cards.a2uiFlushes) {
-            if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL, performance)
-            insertA2uiCardMessage(sessionId, card, performance)
-        }
         for ((pendingText, card) in cards.openUiFlushes) {
             if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL, performance)
             insertOpenUiCardMessage(sessionId, card, performance)
@@ -2434,7 +2421,7 @@ class ChatViewModel(
         answer: StringBuilder,
         cards: CloudTurnCardFlush,
         onServerError: (String) -> Unit,
-    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey, cards.genUiFormat) { event ->
+    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey) { event ->
         when (event) {
             is CloudTurnEvent.AssistantText -> {
                 if (answer.isNotEmpty()) answer.append("\n\n")
@@ -2468,13 +2455,8 @@ class ChatViewModel(
                     }
                 }
             }
-            is CloudTurnEvent.A2uiCard -> {
-                // onEvent 回调非挂起不能直接写 Room：快照卡前已累积文本并清空，SSE 结束后按序落库
-                cards.a2uiFlushes += answer.toString() to event
-                answer.clear()
-            }
             is CloudTurnEvent.OpenUiCard -> {
-                // A2uiCard 同款快照（openui P2）
+                // 卡前文本同款快照：onEvent 非挂起，SSE 结束后按序落库
                 cards.openUiFlushes += answer.toString() to event
                 answer.clear()
             }
@@ -3776,61 +3758,6 @@ class ChatViewModel(
     }
 
     /**
-     * 插入 A2UI 卡消息（type=data_ui + role=agent）。走 tool_browser 先例：
-     * content 列存整颗 part JSON，insertMessageWithParts 内部经 converter 双写 partsJson。
-     */
-    private suspend fun insertA2uiCardMessage(
-        sessionId: String,
-        event: CloudTurnEvent.A2uiCard,
-        performance: LlmPerformance? = null,
-    ) {
-        val part = MessagePart.A2uiCard(
-            partId = "p0",
-            surfaceId = event.surfaceId,
-            messagesJson = event.messagesJson,
-            fallbackSummary = event.fallbackSummary,
-        )
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                type = A2uiCardContract.PART_TYPE,
-                role = "agent",
-                content = a2uiCardJson.encodeToString(MessagePart.A2uiCard.serializer(), part),
-                timestamp = System.currentTimeMillis(),
-                modelUsed = "cloud_agent",
-                metadata = performanceMetadataJson(performance),
-            )
-        )
-        chatSessionDao.touchSession(sessionId)
-    }
-
-    /**
-     * A2UI 卡交互态持久化（US-7）：viewState 写回 part（同 message id REPLACE upsert，
-     * insertMessageWithParts 重算 partsJson 防漂移）。重建时作为初始填槽恢复。
-     */
-    suspend fun persistA2uiViewState(messageId: String, viewState: String) {
-        val entity = chatMessageDao.getMessageById(messageId) ?: return
-        val part = runCatching {
-            a2uiCardJson.decodeFromString(MessagePart.A2uiCard.serializer(), entity.content)
-        }.getOrNull() ?: return
-        val updated = part.copy(viewState = viewState)
-        chatMessageDao.insertMessageWithParts(
-            entity.copy(
-                content = a2uiCardJson.encodeToString(MessagePart.A2uiCard.serializer(), updated)
-            )
-        )
-    }
-
-    /**
-     * 非挂起包装（终审 m2）：组合作用域随页面离开即取消会丢选择态，
-     * 统一改由 viewModelScope 承载，UI 层无需自带 launch。
-     */
-    fun persistA2uiViewStateAsync(messageId: String, viewState: String) {
-        viewModelScope.launch { persistA2uiViewState(messageId, viewState) }
-    }
-
-    /**
      * 插入 OpenUI 卡消息（type=data_ui_openui + role=agent，openui P2）。走 tool_browser 先例：
      * content 列存整颗 part JSON，insertMessageWithParts 内部经 converter 双写 partsJson。
      */
@@ -3850,7 +3777,7 @@ class ChatViewModel(
                 sessionId = sessionId,
                 type = OpenUiContract.PART_TYPE,
                 role = "agent",
-                content = a2uiCardJson.encodeToString(MessagePart.OpenUiCard.serializer(), part),
+                content = cardPartJson.encodeToString(MessagePart.OpenUiCard.serializer(), part),
                 timestamp = System.currentTimeMillis(),
                 modelUsed = "cloud_agent",
                 metadata = performanceMetadataJson(performance),
@@ -3863,17 +3790,17 @@ class ChatViewModel(
     suspend fun persistOpenUiViewState(messageId: String, viewState: String) {
         val entity = chatMessageDao.getMessageById(messageId) ?: return
         val part = runCatching {
-            a2uiCardJson.decodeFromString(MessagePart.OpenUiCard.serializer(), entity.content)
+            cardPartJson.decodeFromString(MessagePart.OpenUiCard.serializer(), entity.content)
         }.getOrNull() ?: return
         val updated = part.copy(viewState = viewState)
         chatMessageDao.insertMessageWithParts(
             entity.copy(
-                content = a2uiCardJson.encodeToString(MessagePart.OpenUiCard.serializer(), updated)
+                content = cardPartJson.encodeToString(MessagePart.OpenUiCard.serializer(), updated)
             )
         )
     }
 
-    /** 非挂起包装（同 persistA2uiViewStateAsync 终审 m2 口径）。 */
+    /** 非挂起包装：组合作用域随页面离开即取消会丢选择态，统一改由 viewModelScope 承载。 */
     fun persistOpenUiViewStateAsync(messageId: String, viewState: String) {
         viewModelScope.launch { persistOpenUiViewState(messageId, viewState) }
     }
@@ -4575,7 +4502,6 @@ class ChatViewModel(
                 is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
                 is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
                 is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
-                is MessagePart.A2uiCard -> ChatMessageType.A2UI_CARD
                 is MessagePart.OpenUiCard -> ChatMessageType.OPENUI_CARD
                 // BrowserLive 直播卡 UI 映射属 browser-vnc 直播卡后续 Task；此前防御性落文本
                 //（此间管线未产此类 part，分支不可达）

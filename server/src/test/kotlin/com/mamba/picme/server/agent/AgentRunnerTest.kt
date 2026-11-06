@@ -11,13 +11,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.http.fullPath
 import ai.koog.http.client.ktor.KtorKoogHttpClient
-import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.core.tools.reflect.asToolsByClass
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -26,6 +21,12 @@ import org.junit.Test
 /**
  * AgentRunner 端到端（Koog loop × 事件流 × MockEngine 假 LLM）。
  * 钉死：事件序列、Action↔Observation 配对、pending 重放、BYOK/CF_AIG 鉴权头形态。
+ *
+ * GenUI 唯一化（2026-11-06）：恒 turn-native——终结消息落流前无条件经
+ * [OpenUiTurnNative.ensureValidProgram]（非合法程序兜底 Markdown 包装），
+ * content TextDelta 无条件透传为 program 前缀预览，ProgramGuard 无条件启用
+ * （非法终结程序触发纠正回环）。故普通用例的终结文本一律给合法程序，
+ * 避免误触纠正回环多打一次 LLM。
  */
 class AgentRunnerTest {
 
@@ -43,6 +44,10 @@ class AgentRunnerTest {
          "usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}
     """.trimIndent()
 
+    /** 合法 OpenUI 程序作为终结文本的响应（JSON 内嵌引号转义），防误触程序守卫纠正回环。 */
+    private fun programResponse(program: String) =
+        chatResponse(program.replace("\\", "\\\\").replace("\"", "\\\""))
+
     private fun toolCallResponse(callId: String, tool: String, args: String) = """
         {"id":"chatcmpl-2","object":"chat.completion","created":1730000000,"model":"test-model",
          "choices":[{"index":0,"message":{"role":"assistant","content":null,
@@ -53,8 +58,6 @@ class AgentRunnerTest {
 
     private fun runnerWith(
         vararg responses: Pair<HttpStatusCode, String>,
-        actionGate: (String, String) -> String? = { _, _ -> null },
-        argsTransformer: (toolName: String, argsJson: String) -> String = { _, argsJson -> argsJson },
     ): AgentRunner {
         val queue = ArrayDeque(responses.toList())
         val engine = MockEngine { request ->
@@ -65,8 +68,6 @@ class AgentRunnerTest {
         return AgentRunner(
             executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
             dispatcher = ServerToolDispatcher.default(),
-            actionGate = actionGate,
-            argsTransformer = argsTransformer,
         )
     }
 
@@ -84,7 +85,7 @@ class AgentRunnerTest {
     fun `plain turn appends user message assistant message and finish in order`() = runBlocking {
         val session = newSession()
         val emitted = mutableListOf<AgentEvent>()
-        val finish = runnerWith(HttpStatusCode.OK to chatResponse("你好，我是云端 Agent"))
+        val finish = runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"你好，我是云端 Agent\")"))
             .runTurn(session, "你好", gatewayTarget, "sys", ServerToolService.defaultRegistry()) { emitted += it }
 
         assertEquals(AgentEventType.FINISH, finish.type)
@@ -96,10 +97,32 @@ class AgentRunnerTest {
         assertEquals(AgentEventSource.USER, events[0].source)
         assertEquals(AgentEventPayload.Message("你好"), events[0].payload)
         assertEquals(AgentEventSource.AGENT, events[1].source)
-        assertEquals(AgentEventPayload.Message("你好，我是云端 Agent"), events[1].payload)
+        // 合法程序经 ensureValidProgram（normalize 恒等于此类形态）原样落流
+        assertEquals(AgentEventPayload.Message("root = Markdown(\"你好，我是云端 Agent\")"), events[1].payload)
         assertEquals(AgentEventPayload.Finish("done"), events[2].payload)
         // SSE 发射顺序 = 落流顺序
         assertEquals(events.map { it.id }, emitted.map { it.id })
+    }
+
+    @Test
+    fun `final plain text is wrapped into markdown program before persist`() = runBlocking {
+        val session = newSession()
+        // 纯文本终结（非合法程序）：ProgramGuard 纠正一次后 MockEngine 队列给第二条纯文本，
+        // 上限用尽放行 → ensureValidProgram 兜底 Markdown 包装（「端上永远收到合法树」）
+        runnerWith(
+            HttpStatusCode.OK to chatResponse("你好，我是云端 Agent"),
+            HttpStatusCode.OK to chatResponse("你好，我是云端 Agent"),
+        ).runTurn(session, "你好", gatewayTarget, "sys", ServerToolService.defaultRegistry())
+
+        val events = AgentEventRepository.listBySession(session.id)
+        val finalMessage = events
+            .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
+            .map { event -> event.payload as AgentEventPayload.Message }
+            .last()
+        assertEquals(
+            "// summary: 文本回复\nroot = Markdown(\"你好，我是云端 Agent\")",
+            finalMessage.content,
+        )
     }
 
     @Test
@@ -108,7 +131,7 @@ class AgentRunnerTest {
         val usage = TurnUsage()
         // 普通回合 = 单次 LLM 调用；假响应 usage 为 10/5
         // （MockEngine 不支持 SSE → 策略层回退一次性请求，本条钉的是非流式回退路径）
-        runnerWith(HttpStatusCode.OK to chatResponse("你好"))
+        runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"你好\")"))
             .runTurn(session, "你好", gatewayTarget, "sys", ServerToolService.defaultRegistry(), turnUsage = usage)
         assertEquals(10L, usage.promptTokens)
         assertEquals(5L, usage.completionTokens)
@@ -126,7 +149,7 @@ class AgentRunnerTest {
         val session = newSession()
         val usage = TurnUsage()
         val sseServer = RawSseStubServer { _, _ ->
-            MockLlmSse.streamingText("你好") to "text/event-stream"
+            MockLlmSse.streamingText("root = Markdown(\"你好\")") to "text/event-stream"
         }
         try {
             val target = AgentLlmTarget(
@@ -154,7 +177,7 @@ class AgentRunnerTest {
         val session = newSession()
         runnerWith(
             HttpStatusCode.OK to toolCallResponse("call_1", "server_time", "{}"),
-            HttpStatusCode.OK to chatResponse("现在是中午"),
+            HttpStatusCode.OK to programResponse("root = Markdown(\"现在是中午\")"),
         ).runTurn(session, "几点了", gatewayTarget, "sys", ServerToolService.defaultRegistry())
 
         val events = AgentEventRepository.listBySession(session.id)
@@ -175,83 +198,7 @@ class AgentRunnerTest {
         assertTrue(observation.content.isNotBlank())
         // pending 不变式：工具闭环后无 pending
         assertTrue(AgentEventRepository.pendingActions(session.id).isEmpty())
-        assertEquals(AgentEventPayload.Message("现在是中午"), events[3].payload)
-    }
-
-    @Test
-    fun `render html turn appends html card event between action and observation`() = runBlocking {
-        val session = newSession()
-        val cards = mutableListOf<Pair<String, String>>()
-        val emitted = mutableListOf<AgentEvent>()
-        // 与生产接线同形态：sink 落 HtmlCard 事件并经同一 SSE 通道下行（AgentRoutes 写 kind=event 帧）
-        val sink: suspend (String, String) -> Unit = { html, summary ->
-            cards += html to summary
-            val event = AgentEventRepository.append(
-                session.id, AgentEventSource.ENVIRONMENT, AgentEventRole.TOOL,
-                payload = AgentEventPayload.HtmlCard(html, summary),
-            )
-            emitted += event
-        }
-        val registry = ServerToolService.defaultRegistry(onHtmlCard = sink)
-        // arguments 在外层 JSON 内是字符串值，内层引号须反斜杠转义（OpenAI wire 形态）
-        val args = """{\"html\":\"<html>卡</html>\",\"summary\":\"周报\"}"""
-        runnerWith(
-            HttpStatusCode.OK to toolCallResponse("call_1", "render_html", args),
-            HttpStatusCode.OK to chatResponse("已为你生成周报卡片"),
-        ).runTurn(session, "出个周报卡", gatewayTarget, "sys", registry) { emitted += it }
-
-        val events = AgentEventRepository.listBySession(session.id)
-        assertEquals(
-            listOf(
-                AgentEventType.MESSAGE, AgentEventType.ACTION, AgentEventType.HTML_CARD,
-                AgentEventType.OBSERVATION, AgentEventType.MESSAGE, AgentEventType.FINISH,
-            ),
-            events.map { it.type },
-        )
-        assertEquals(events.map { it.id }, emitted.map { it.id })
-        val card = events[2].payload as AgentEventPayload.HtmlCard
-        assertEquals("<html>卡</html>", card.html)
-        assertEquals("周报", card.summary)
-        assertEquals(AgentEventSource.ENVIRONMENT, events[2].source)
-        assertEquals(AgentEventRole.TOOL, events[2].role)
-        val observation = events[3].payload as AgentEventPayload.Observation
-        // LLM 只见 summary 回执，HTML 本体不进上下文（Koog 字符串结果以 JsonPrimitive 带引号，既有约定）
-        assertTrue(observation.content.contains("已渲染 HTML 卡片：周报"))
-        assertFalse(observation.content.contains("<html>"))
-        assertEquals(listOf("<html>卡</html>" to "周报"), cards)
-    }
-
-    @Test
-    fun `pending render html action replay re-emits html card event`() = runBlocking {
-        val session = newSession()
-        val orphaned = AgentEventRepository.append(
-            session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
-            payload = AgentEventPayload.Action(
-                "render_html", """{"html":"<p>重播</p>","summary":"旧卡"}""", reversible = false,
-            ),
-        )
-        val cards = mutableListOf<Pair<String, String>>()
-        runnerWith(HttpStatusCode.OK to chatResponse("继续"))
-            .runTurn(
-                session, "继续", gatewayTarget, "sys", ServerToolService.defaultRegistry(),
-                onHtmlCard = { html, summary ->
-                    cards += html to summary
-                    AgentEventRepository.append(
-                        session.id, AgentEventSource.ENVIRONMENT, AgentEventRole.TOOL,
-                        payload = AgentEventPayload.HtmlCard(html, summary),
-                    )
-                },
-            )
-
-        // 崩溃恢复重放：卡片重新出现在事件流
-        assertEquals(listOf("<p>重播</p>" to "旧卡"), cards)
-        val events = AgentEventRepository.listBySession(session.id)
-        val card = events.mapNotNull { it.payload as? AgentEventPayload.HtmlCard }.single()
-        assertEquals("<p>重播</p>", card.html)
-        val obs = events.mapNotNull { it.payload as? AgentEventPayload.Observation }
-            .single { o -> o.actionEventId == orphaned.id }
-        assertEquals("已渲染 HTML 卡片：旧卡", obs.content)
-        assertTrue(AgentEventRepository.pendingActions(session.id).isEmpty())
+        assertEquals(AgentEventPayload.Message("root = Markdown(\"现在是中午\")"), events[3].payload)
     }
 
     @Test
@@ -280,7 +227,7 @@ class AgentRunnerTest {
         )
         assertEquals(listOf(orphaned.id), AgentEventRepository.pendingActions(session.id).map { it.id })
 
-        runnerWith(HttpStatusCode.OK to chatResponse("好的"))
+        runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"好的\")"))
             .runTurn(session, "继续", gatewayTarget, "sys", ServerToolService.defaultRegistry())
 
         // pending 被重放闭环
@@ -298,11 +245,36 @@ class AgentRunnerTest {
             session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
             payload = AgentEventPayload.Action("ghost_tool", "{}", reversible = false),
         )
-        runnerWith(HttpStatusCode.OK to chatResponse("好的"))
+        runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"好的\")"))
             .runTurn(session, "继续", gatewayTarget, "sys", ServerToolService.defaultRegistry())
         val obs = AgentEventRepository.listBySession(session.id)
             .mapNotNull { it.payload as? AgentEventPayload.Observation }.single()
         assertTrue(obs.content.startsWith("error"))
+        assertTrue(AgentEventRepository.pendingActions(session.id).isEmpty())
+    }
+
+    /**
+     * 退役工具的 pending 重放（GenUI 唯一化）：历史遗留 render_html pending 不再派发
+     * （dispatcher 无 handler），以 error Observation 闭环，pending 不变式不受退役影响。
+     */
+    @Test
+    fun `pending replay of retired render_html tool closes with error observation`() = runBlocking {
+        val session = newSession()
+        AgentEventRepository.append(
+            session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
+            payload = AgentEventPayload.Action(
+                "render_html", """{"html":"<p>旧卡</p>","summary":"旧卡"}""", reversible = false,
+            ),
+        )
+        runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"继续\")"))
+            .runTurn(session, "继续", gatewayTarget, "sys", ServerToolService.defaultRegistry())
+
+        val obs = AgentEventRepository.listBySession(session.id)
+            .mapNotNull { it.payload as? AgentEventPayload.Observation }.single()
+        assertTrue(
+            "退役工具应以 error 闭环，实际：${obs.content}",
+            obs.content.contains("unknown server tool: render_html"),
+        )
         assertTrue(AgentEventRepository.pendingActions(session.id).isEmpty())
     }
 
@@ -315,7 +287,7 @@ class AgentRunnerTest {
             model = "user-model",
             authStyle = AuthStyle.BEARER,
         )
-        runnerWith(HttpStatusCode.OK to chatResponse("ok"))
+        runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"ok\")"))
             .runTurn(session, "hi", byok, "sys", ServerToolService.defaultRegistry())
 
         val (path, headers) = capturedRequests.single()
@@ -327,7 +299,7 @@ class AgentRunnerTest {
     fun `cf_aig target replaces authorization with cf-aig-authorization`() = runBlocking {
         val session = newSession()
         val cfTarget = gatewayTarget.copy(apiKey = "cf-token-123", authStyle = AuthStyle.CF_AIG)
-        runnerWith(HttpStatusCode.OK to chatResponse("ok"))
+        runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"ok\")"))
             .runTurn(session, "hi", cfTarget, "sys", ServerToolService.defaultRegistry())
 
         val (_, headers) = capturedRequests.single()
@@ -344,148 +316,24 @@ class AgentRunnerTest {
             AuthStyle.BEARER, "tok-abc", emptyMap(), "test-model",
         )
         val target = AgentTargetResolver.fromChannel(channel, "test-model")!!
-        runnerWith(HttpStatusCode.OK to chatResponse("ok"))
+        runnerWith(HttpStatusCode.OK to programResponse("root = Markdown(\"ok\")"))
             .runTurn(session, "hi", target, "sys", ServerToolService.defaultRegistry())
 
         assertEquals("/v1/chat/completions", capturedRequests.single().first)
     }
 
-    // ── render_ui 发射点门控（actionGate，2026-10-24）─────────────────────
+    // ── content 流式预览（turn-native；真 CIO 回环：MockEngine 不支持 SSE）────────
 
     /**
-     * 非法 render_ui 负载：不落 Action 事件（坏卡永不到端侧），工具体回 error 文本
-     * 经 Observation 回灌 LLM，同轮可修正重试。
+     * GenUI 唯一化后 content TextDelta 无条件透传：经 OpenUiContentStreamTracker
+     * 节流为 program 前缀旁路下行（不落事件流）。content 全长 49（两等分分片各 24
+     * <minEmitChars=48）——仅尾帧触发首发，单帧即全文，对节流间隔零依赖
+     * （多帧生长由 tracker 单测覆盖）。
      */
     @Test
-    fun `invalid render_ui payload is gated - no action event, error observation fed back`() = runBlocking {
+    fun `content deltas are forwarded as program prefix unconditionally`() = runBlocking {
         val session = newSession()
-        val badArgs = buildJsonObject {
-            put("surfaceId", "sf-bad00001")
-            put(
-                "messagesJson",
-                "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-bad00001\",\"catalogId\":\"https://wrong.example/x\"}}]",
-            )
-            put("fallbackSummary", "摘要")
-        }.toString()
-        val registry = ToolRegistry { tools(RenderUiToolService().asToolsByClass()) }
-
-        runnerWith(
-            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui", jsonArgsEscape(badArgs)),
-            HttpStatusCode.OK to chatResponse("收到错误，已修正"),
-            actionGate = RenderUiValidator::gate,
-        ).runTurn(session, "发张统计卡", gatewayTarget, "sys", registry)
-
-        val events = AgentEventRepository.listBySession(session.id)
-        assertFalse("被拒负载不得落 Action 事件", events.any { event -> event.type == AgentEventType.ACTION })
-        val observation = events.single { event -> event.type == AgentEventType.OBSERVATION }
-        val content = (observation.payload as AgentEventPayload.Observation).content
-        // ctx.toolResult.toString() 对字符串结果带引号包装，不断言 startsWith
-        assertTrue("Observation 应携带校验错误回灌 LLM，实际：$content", content.contains("error: render_ui 负载校验未通过"))
-        assertTrue(content.contains("catalogId"))
-    }
-
-    /** 合法 render_ui 负载：门控放行，Action 事件正常落流下行。 */
-    @Test
-    fun `valid render_ui payload passes gate and emits action event`() = runBlocking {
-        val session = newSession()
-        val goodArgs = buildJsonObject {
-            put("surfaceId", "sf-ok000001")
-            put(
-                "messagesJson",
-                "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-ok000001\",\"catalogId\":\"${RenderUiValidator.CATALOG_ID}\"}}," +
-                    "{\"version\":\"v0.9\",\"updateComponents\":{\"surfaceId\":\"sf-ok000001\",\"components\":[{\"id\":\"root\",\"component\":\"Text\",\"text\":\"hi\"}]}}]",
-            )
-            put("fallbackSummary", "摘要")
-        }.toString()
-        val registry = ToolRegistry { tools(RenderUiToolService().asToolsByClass()) }
-
-        runnerWith(
-            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui", jsonArgsEscape(goodArgs)),
-            HttpStatusCode.OK to chatResponse("卡已发"),
-            actionGate = RenderUiValidator::gate,
-        ).runTurn(session, "发张统计卡", gatewayTarget, "sys", registry)
-
-        val events = AgentEventRepository.listBySession(session.id)
-        val action = events.single { event -> event.type == AgentEventType.ACTION }
-        assertEquals("render_ui", (action.payload as AgentEventPayload.Action).tool)
-        // Observation 与 Action 正常配对闭环
-        val observation = events.single { event -> event.type == AgentEventType.OBSERVATION }
-        assertEquals(action.id, (observation.payload as AgentEventPayload.Observation).actionEventId)
-    }
-
-    /** toolCallResponse 把 args 平铺进 JSON 字符串字段，内嵌引号/反斜杠须预转义。 */
-    private fun jsonArgsEscape(raw: String): String =
-        raw.replace("\\", "\\\\").replace("\"", "\\\"")
-
-    // ── openui P2 流式预览（真 CIO 回环：MockEngine 不支持 SSECapability）──────────
-
-    /**
-     * render_ui_openui 工具调用的 args 增量经 SSE chunk 流下行：Koog OpenAI 客户端解析 →
-     * ToolCallDelta 逐帧 → EventHandler 钩子 → OpenUiToolCallStreamTracker →
-     * onOpenUiProgramDelta 收到单调生长的 program 前缀，尾帧 = 完整 program；
-     * 正式 Action 落流不受影响（权威负载）。MockEngine 不支持 SSE，须真 CIO 服务器回环。
-     */
-    @Test
-    fun `openui tool call streams program prefixes via delta callback`() = runBlocking {
-        val session = newSession()
-        val program = RenderOpenUiToolService.GOLDEN_STATS_PROGRAM
-        val argsJson = buildJsonObject {
-            put("program", program)
-            put("fallbackSummary", "统计卡")
-        }.toString()
-        val toolCallOneShot = toolCallResponse("call_1", "render_ui_openui", jsonArgsEscape(argsJson))
-
-        val callCount = java.util.concurrent.atomic.AtomicInteger(0)
-        val sseServer = RawSseStubServer { body, n ->
-            val oneShot = if (n == 1) toolCallOneShot else chatResponse("卡已发")
-            if (body.contains("\"stream\":true")) {
-                MockLlmSse.toSseBody(oneShot) to "text/event-stream"
-            } else {
-                oneShot to "application/json"
-            }
-        }
-        try {
-            val target = AgentLlmTarget(
-                baseUrl = "http://127.0.0.1:${sseServer.port}",
-                apiKey = "k",
-                model = "test-model",
-                authStyle = AuthStyle.BEARER,
-            )
-            val deltas = mutableListOf<String>()
-            val registry = ToolRegistry { tools(RenderOpenUiToolService().asToolsByClass()) }
-            val finish = AgentRunner(
-                executorFactory = AgentExecutorFactory(),
-                dispatcher = ServerToolDispatcher.default(),
-                actionGate = RenderUiValidator::gate,
-            ).runTurn(session, "发卡", target, "sys", registry, onOpenUiProgramDelta = { deltas += it })
-
-            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
-            assertTrue("流式预览应至少产生首发+补尾两帧，实际 ${deltas.size} 帧", deltas.size >= 2)
-            deltas.zipWithNext().forEach { (prev, next) ->
-                assertTrue("前缀须单调生长", next.length > prev.length && next.startsWith(prev))
-            }
-            assertEquals("尾帧须等于完整 program", program, deltas.last())
-            // 正式卡照常落 Action（权威负载不受预览旁路影响）
-            val events = AgentEventRepository.listBySession(session.id)
-            assertTrue(events.any { event -> event.type == AgentEventType.ACTION })
-            assertEquals(2, sseServer.callCount.get()) // 发卡 + 收尾文本各一次，无回退重试
-        } finally {
-            sseServer.close()
-        }
-    }
-
-    // ── 回合原生 content 透传（turn-native T4）───────────────────────────────
-
-    /**
-     * 回合原生：forwardContentDeltas=true 时 content TextDelta 经 OpenUiContentStreamTracker
-     * 节流为 program 前缀旁路下行（不落事件流），终结消息经 finalMessageTransformer 变换后
-     * 落流。content 全长 60（两等分分片各 30 <minEmitChars=48）——仅尾帧触发首发，
-     * 单帧即全文，对节流间隔零依赖（多帧生长由 T3 tracker 单测覆盖）。
-     */
-    @Test
-    fun `turn-native forwards content deltas as program prefix`() = runBlocking {
-        val session = newSession()
-        val content = "meta = Text(\"${"统计".repeat(10)}\")\nroot = Card([Text(\"hi\")])"
+        val content = "root = Card([Text(\"${"统计".repeat(13)}\")])"
         assertTrue("测试前置：半片须低于节流首发阈值", content.length / 2 < 48)
         assertTrue("测试前置：全文须达到节流首发阈值", content.length >= 48)
         val sseServer = RawSseStubServer { _, _ ->
@@ -504,8 +352,6 @@ class AgentRunnerTest {
                 dispatcher = ServerToolDispatcher.default(),
             ).runTurn(
                 session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
-                forwardContentDeltas = true,
-                finalMessageTransformer = { "TRANSFORMED:$it" },
                 onOpenUiProgramDelta = { deltas += it },
             )
 
@@ -514,216 +360,25 @@ class AgentRunnerTest {
             deltas.zipWithNext().forEach { (prev, next) ->
                 assertTrue("前缀须单调生长", next.length > prev.length && next.startsWith(prev))
             }
-            assertTrue("尾帧须携带完整 program", deltas.last().endsWith("Card([Text(\"hi\")])"))
             assertEquals("尾帧须等于完整 content", content, deltas.last())
-            // 终结消息经 finalMessageTransformer 变换后落流
+            // 合法程序经 ensureValidProgram 原样落流
             val events = AgentEventRepository.listBySession(session.id)
             val finalMessage = events
                 .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
                 .map { event -> event.payload as AgentEventPayload.Message }
                 .last()
-            assertTrue(
-                "终结消息应经 finalMessageTransformer 变换，实际：${finalMessage.content}",
-                finalMessage.content.startsWith("TRANSFORMED:"),
-            )
-            assertEquals("TRANSFORMED:$content", finalMessage.content)
+            assertEquals(content, finalMessage.content)
             assertEquals(1, sseServer.callCount.get()) // 纯 content 回合：单次 LLM 调用
         } finally {
             sseServer.close()
         }
     }
 
-    /**
-     * 默认模式（forwardContentDeltas=false）：content TextDelta 不透传（零行为变化红线）。
-     * content 须 ≥48（tracker minEmitChars）：透传若被误开，尾帧必发射 → 负断言有判别力。
-     */
-    @Test
-    fun `default mode does not forward content deltas`() = runBlocking {
-        val session = newSession()
-        val content = "meta = Text(\"${"统计".repeat(10)}\")\nroot = Card([Text(\"hi\")])"
-        assertTrue("测试前置：content 须超节流首发阈值", content.length >= 48)
-        val sseServer = RawSseStubServer { _, _ ->
-            MockLlmSse.streamingText(content) to "text/event-stream"
-        }
-        try {
-            val target = AgentLlmTarget(
-                baseUrl = "http://127.0.0.1:${sseServer.port}",
-                apiKey = "k",
-                model = "test-model",
-                authStyle = AuthStyle.BEARER,
-            )
-            val deltas = mutableListOf<String>()
-            val finish = AgentRunner(
-                executorFactory = AgentExecutorFactory(),
-                dispatcher = ServerToolDispatcher.default(),
-            ).runTurn(
-                session, "hi", target, "sys", ServerToolService.defaultRegistry(),
-                onOpenUiProgramDelta = { deltas += it },
-            )
-
-            assertEquals(AgentEventPayload.Finish("done"), finish.payload)
-            assertTrue("默认模式不应透传 content delta", deltas.isEmpty())
-        } finally {
-            sseServer.close()
-        }
-    }
-
-    // ── 假发卡纠正回环（CardClaimGuard，2026-10-24 穷举实测事故类）──────────
+    // ── 终结程序纠正回环（ProgramGuard，GenUI 唯一化后无条件启用）─────────────────
 
     /**
-     * 终结消息声称发卡但当轮无卡工具 Action：策略层不落该答复，追加纠正消息回环重答，
-     * 最终落流的只有改写后的答复；第二轮 LLM 请求的 prompt 必须携带纠正指令。
-     */
-    @Test
-    fun `fake card claim is intercepted and re-answered with correction prompt`() = runBlocking {
-        val session = newSession()
-        val bodies = mutableListOf<String>()
-        val responses = ArrayDeque(
-            listOf(
-                chatResponse("三种按钮样式卡片已下发 ✅"),
-                chatResponse("三种按钮样式分别为 primary/default/borderless，请告诉我要生成哪种。"),
-            ),
-        )
-        val engine = MockEngine { request ->
-            bodies += (request.body as io.ktor.http.content.TextContent).text
-            respond(
-                content = responses.removeFirst(),
-                status = HttpStatusCode.OK,
-                headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
-            )
-        }
-        val runner = AgentRunner(
-            executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
-            dispatcher = ServerToolDispatcher.default(),
-        )
-        val finish = runner.runTurn(session, "生成三个按钮的卡", gatewayTarget, "sys", ServerToolService.defaultRegistry())
-
-        assertEquals(AgentEventPayload.Finish("done"), finish.payload)
-        assertEquals("假声称应触发一次回环重答（共 2 次 LLM 调用）", 2, bodies.size)
-        assertTrue("第二轮 prompt 应携带纠正指令", bodies[1].contains("并未成功调用"))
-        val events = AgentEventRepository.listBySession(session.id)
-        val assistantTexts = events
-            .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
-            .map { event -> (event.payload as AgentEventPayload.Message).content }
-        assertEquals(
-            "假声称的那条答复不得落流（用户不可见）",
-            listOf("三种按钮样式分别为 primary/default/borderless，请告诉我要生成哪种。"),
-            assistantTexts,
-        )
-    }
-
-    /** 真发过卡的终结消息不误伤：单轮一次 LLM 调用直接收尾。 */
-    @Test
-    fun `card claim after real render_ui action is not intercepted`() = runBlocking {
-        val session = newSession()
-        val goodArgs = buildJsonObject {
-            put("surfaceId", "sf-ok000002")
-            put(
-                "messagesJson",
-                "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-ok000002\",\"catalogId\":\"${RenderUiValidator.CATALOG_ID}\"}}," +
-                    "{\"version\":\"v0.9\",\"updateComponents\":{\"surfaceId\":\"sf-ok000002\",\"components\":[{\"id\":\"root\",\"component\":\"Text\",\"text\":\"hi\"}]}}]",
-            )
-            put("fallbackSummary", "摘要")
-        }.toString()
-        val registry = ToolRegistry { tools(RenderUiToolService().asToolsByClass()) }
-
-        runnerWith(
-            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui", jsonArgsEscape(goodArgs)),
-            HttpStatusCode.OK to chatResponse("卡片已下发 ✅"),
-            actionGate = RenderUiValidator::gate,
-        ).runTurn(session, "发张统计卡", gatewayTarget, "sys", registry)
-
-        val events = AgentEventRepository.listBySession(session.id)
-        val assistantTexts = events
-            .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
-            .map { event -> (event.payload as AgentEventPayload.Message).content }
-        assertEquals(listOf("卡片已下发 ✅"), assistantTexts)
-    }
-
-    /**
-     * 门控拒绝后的假声称仍触发纠正（review 补洞）：render_ui 坏负载被发射点门控拦下
-     * （不落 Action），工具体 error 回灌后 LLM 若仍声称「卡片已下发」，守卫不得因
-     * 「调用过工具」而放行——标记只认工具成功回执。
-     */
-    @Test
-    fun `fake claim after gated render_ui rejection is still corrected`() = runBlocking {
-        val session = newSession()
-        val bodies = mutableListOf<String>()
-        val badArgs = jsonArgsEscape("""{"surfaceId":"sf-bad","messagesJson":"[]"}""")
-        val responses = ArrayDeque(
-            listOf(
-                toolCallResponse("call_1", "render_ui", badArgs),
-                chatResponse("卡片已下发 ✅"),
-                chatResponse("抱歉，卡片参数有误未能生成，请换个描述再试。"),
-            ),
-        )
-        val engine = MockEngine { request ->
-            bodies += (request.body as io.ktor.http.content.TextContent).text
-            respond(
-                content = responses.removeFirst(),
-                status = HttpStatusCode.OK,
-                headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
-            )
-        }
-        val runner = AgentRunner(
-            executorFactory = AgentExecutorFactory(KtorKoogHttpClient.Factory(HttpClient(engine))),
-            dispatcher = ServerToolDispatcher.default(),
-            actionGate = RenderUiValidator::gate,
-        )
-        runner.runTurn(session, "发卡", gatewayTarget, "sys", ToolRegistry { tools(RenderUiToolService().asToolsByClass()) })
-
-        assertEquals("被拒卡 + 假声称 + 纠正重答 = 3 次 LLM 调用", 3, bodies.size)
-        assertTrue("第三轮 prompt 应携带纠正指令", bodies[2].contains("并未成功调用"))
-        val events = AgentEventRepository.listBySession(session.id)
-        assertEquals(
-            "被拒负载不落 Action",
-            0,
-            events.count { event -> event.type == AgentEventType.ACTION },
-        )
-        val assistantTexts = events
-            .filter { event -> event.type == AgentEventType.MESSAGE && event.source == AgentEventSource.AGENT }
-            .map { event -> (event.payload as AgentEventPayload.Message).content }
-        assertEquals(listOf("抱歉，卡片参数有误未能生成，请换个描述再试。"), assistantTexts)
-    }
-
-    // ── 发射点矫正（argsTransformer，2026-10-31 布局可控性批次）─────────────────
-
-    /** 发射点矫正：render_ui_openui 的反模式 program 经 argsTransformer 归一化后落 Action。 */
-    @Test
-    fun `argsTransformer rewrites action argsJson for render_ui_openui`() = runBlocking {
-        val session = newSession()
-        val args = buildJsonObject {
-            put("program", "root = Card([Row([Image(photos[0].id), Text(\"说明\")])])")
-            put("fallbackSummary", "摘要")
-        }.toString()
-        val registry = ToolRegistry { tools(RenderOpenUiToolService().asToolsByClass()) }
-
-        runnerWith(
-            HttpStatusCode.OK to toolCallResponse("call_1", "render_ui_openui", jsonArgsEscape(args)),
-            HttpStatusCode.OK to chatResponse("卡已发"),
-            actionGate = RenderUiValidator::gate,
-            argsTransformer = RenderOpenUiValidator::transformArgs,
-        ).runTurn(session, "发张卡", gatewayTarget, "sys", registry)
-
-        val events = AgentEventRepository.listBySession(session.id)
-        val action = events.single { event -> event.type == AgentEventType.ACTION }
-        val actionArgs = (action.payload as AgentEventPayload.Action).argsJson
-        // 断全等（normalizer 输出确定）：捕多改/漏改，不只证「补了 weights」
-        val emittedProgram = kotlinx.serialization.json.Json.parseToJsonElement(actionArgs)
-            .let { root -> (root as kotlinx.serialization.json.JsonObject)["program"] }
-            ?.let { prim -> (prim as kotlinx.serialization.json.JsonPrimitive).content }
-        assertEquals(
-            "root = Card([Row([Image(photos[0].id), Text(\"说明\")], weights = [1, 2])])",
-            emittedProgram,
-        )
-    }
-
-    // ── 终结程序纠正回环（ProgramGuard，turn-native T6）─────────────────────
-
-    /**
-     * 回合原生线终结程序非法 → 策略层带错误清单回环纠正（不落首轮坏答复），
-     * 第二轮输出合法程序后正常 Finish。纠正 user 消息只存在于 Koog prompt 内，
-     * 不落事件流（同 correctFakeCardClaim 既有语义）。
+     * 终结程序非法 → 策略层带错误清单回环纠正（不落首轮坏答复），第二轮输出合法程序后
+     * 正常 Finish。纠正 user 消息只存在于 Koog prompt 内，不落事件流。
      */
     @Test
     fun `invalid final program triggers correction round then finish`() = runBlocking {
@@ -742,15 +397,11 @@ class AgentRunnerTest {
                 authStyle = AuthStyle.BEARER,
             )
             val events = mutableListOf<AgentEvent>()
-            // 落地口径（控制方裁决）：turnNative 接线 = forwardContentDeltas 开闸 +
-            // finalMessageTransformer 兜底包装（与 Task 8 将在 AgentRoutes 做的接线等价）
             val finish = AgentRunner(
                 executorFactory = AgentExecutorFactory(),
                 dispatcher = ServerToolDispatcher.default(),
             ).runTurn(
                 session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
-                forwardContentDeltas = true,
-                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
                 onEvent = { events += it },
             )
 
@@ -761,7 +412,6 @@ class AgentRunnerTest {
                 bodies.getOrNull(1)?.contains("你上次的输出未通过校验") == true,
             )
             // 纠正消息落 prompt 不落事件流：首轮坏答复与纠正指令都不落流
-            // （过滤 AGENT 侧消息，对齐 correctFakeCardClaim 既有用例口径）
             val messages = events
                 .filter { it.source == AgentEventSource.AGENT }
                 .map { it.payload }.filterIsInstance<AgentEventPayload.Message>()
@@ -774,7 +424,7 @@ class AgentRunnerTest {
 
     /**
      * 纠正上限（MAX_CORRECTIONS=1）用尽后仍非法：放行落流（防死循环），
-     * 由 finalMessageTransformer 兜底 Markdown 包装——「端上永远收到合法树」双保险。
+     * 由 ensureValidProgram 兜底 Markdown 包装——「端上永远收到合法树」双保险。
      */
     @Test
     fun `persistently invalid program falls back to markdown wrap`() = runBlocking {
@@ -795,8 +445,6 @@ class AgentRunnerTest {
                 dispatcher = ServerToolDispatcher.default(),
             ).runTurn(
                 session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
-                forwardContentDeltas = true,
-                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
                 onEvent = { events += it },
             )
 
@@ -811,16 +459,14 @@ class AgentRunnerTest {
     }
 
     /**
-     * 控制方裁决（T8）：turn-native 线旁路假发卡纠正边——终结回复是合法程序但含发卡
-     * 话术时，cardGuard 纠正不得触发（其纠正文案指向不存在的发卡工具，误触风险），
-     * 不发生第二轮纠正调用。A2UI 线（programGuard=null）照旧，由上方假发卡三用例钉住。
+     * 合法程序含「卡片已下发」话术不受干扰：程序校验通过即直接 Finish，单次 LLM 调用
+     * 无纠正回环（GenUI 唯一化后假发卡守卫已退役——该线无发卡工具，
+     * 发卡话术只是程序文本的一部分，不再单列纠正）。
      */
     @Test
-    fun `turn-native valid program with card claim rhetoric bypasses fake-card correction`() = runBlocking {
+    fun `valid program with card claim rhetoric finishes without correction round`() = runBlocking {
         val session = newSession()
         val program = "// summary: 卡片\nroot = Card([Text(\"卡片已下发 ✅\")])"
-        // 测试前置：话术确实命中假发卡模式（否则旁路断言无判别力）
-        assertTrue(CardClaimGuard.isCardClaim(program))
         val sseServer = RawSseStubServer { _, _ ->
             MockLlmSse.streamingText(program) to "text/event-stream"
         }
@@ -837,13 +483,11 @@ class AgentRunnerTest {
                 dispatcher = ServerToolDispatcher.default(),
             ).runTurn(
                 session, "出卡", target, "sys", ServerToolService.defaultRegistry(),
-                forwardContentDeltas = true,
-                finalMessageTransformer = OpenUiTurnNative::ensureValidProgram,
                 onEvent = { events += it },
             )
 
             assertEquals(AgentEventPayload.Finish("done"), finish.payload)
-            assertEquals("合法程序不得触发假发卡纠正回环", 1, sseServer.callCount.get())
+            assertEquals("合法程序不得触发纠正回环", 1, sseServer.callCount.get())
             val final = events.map { it.payload }.filterIsInstance<AgentEventPayload.Message>().last()
             assertTrue("终结程序应原样落流，实际：${final.content.take(80)}", final.content.contains("卡片已下发"))
         } finally {

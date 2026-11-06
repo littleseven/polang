@@ -19,8 +19,9 @@ import com.mamba.picme.domain.chat.openui.OpenUiValue
 
 /**
  * @Navigate 目的地闭集（线名 → 业务页面）。
- * wireName 即 program 写法（`@Navigate("task_center")`）；增删须同步
- * server `RenderOpenUiToolService` 工具描述（字面量副本口径同组件清单）。
+ * wireName 即 program 写法（`@Navigate("task_center")`）；增删须同步 server
+ * `OpenUiPromptAssets`（DSL_RULES 动作三通道段）/`OpenUiTurnNative.SYSTEM_PROMPT`
+ * （字面量副本口径同组件清单）。
  * @param takesParam 是否消费第二参（如 gallery_search 的搜索词、organize 的 tab 名）。
  */
 enum class OpenUiNavigateTarget(val wireName: String, val takesParam: Boolean) {

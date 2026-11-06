@@ -7,14 +7,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * OpenAI SSE chunk 流构造器（openui P2 起策略层 LLM 节点全走 requestLLMStreaming）。
+ * OpenAI SSE chunk 流构造器（策略层 LLM 节点全走 requestLLMStreaming）。
  *
  * 把一次性 chat.completion 响应转成 SSE chunk 流：文本分两片、工具 args 按 [ARGS_CHUNK]
- * 字符切片逐帧下发，真实演练 Koog ToolCallDelta 逐帧累积 → OpenUiToolCallStreamTracker 链路。
+ * 字符切片逐帧下发，真实演练 Koog 流式帧逐帧累积 → content 流 program 前缀预览链路。
  *
  * ⚠️ MockEngine 不支持 SSECapability——流式请求在客户端侧即抛（不消耗响应队列），
  * 走策略层一次性回退；故 SSE 链路测试必须用真 CIO 服务器（见 AgentRunnerTest
- * `openui tool call streams program prefixes via delta callback`）。
+ * `content deltas are forwarded as program prefix unconditionally`）。
  */
 object MockLlmSse {
 
@@ -66,8 +66,8 @@ object MockLlmSse {
             val name = fn["name"]!!.jsonPrimitive.content
             val args = fn["arguments"]!!.jsonPrimitive.content
             // 模拟真实提供商形态（2026-10-26 真机日志实证：DeepSeek 仅首 chunk 带 id/name，
-            // 后续 chunk 只有 index + arguments 增量）——回归 OpenUiToolCallStreamTracker
-            // 对 id 缺失帧的 index 别名归组；旧版 mock 每帧全量带 id/name 掩盖了该 bug
+            // 后续 chunk 只有 index + arguments 增量）——真实演练 Koog 客户端对 id 缺失帧
+            // 按 index 重组 tool_call 的行为；旧版 mock 每帧全量带 id/name 掩盖了该形态
             var pos = 0
             var first = true
             while (first || pos < args.length) {

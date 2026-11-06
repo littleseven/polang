@@ -1,7 +1,7 @@
 # 云端编排 × 端侧执行 × A2UI GenUI 混合架构 — 设计 Spec
 
 > **日期**：2026-10-21
-> **状态**：M1（投影通路）+ M2（A2UI L1 卡）已合 main；M3（L2 沙箱交互态 + iOS 渲染器）待排期。**D4 选型已被后续修订翻转**：2026-10-24 起并行接入 OpenUI（spec 已随交付清理，git 历史可查），2026-11-01 起 OpenUI 为客户端默认线格式并升级回合原生（turn-native），A2UI 线保留为回退闸。本 spec 的 D1/D2/D3/§3.4 投影闸与 handle 体系不变式不受影响，仍为现行机制。
+> **状态**：M1（投影通路）+ M2（A2UI L1 卡）已合 main；M3（L2 沙箱交互态 + iOS 渲染器）待排期。**D4 选型已被后续修订翻转**：2026-10-24 起并行接入 OpenUI（spec 已随交付清理，git 历史可查），2026-11-01 起 OpenUI 为客户端默认线格式并升级回合原生（turn-native），2026-11-05 决策退役 A2UI 线、2026-11-06 全量实施（spec 2026-11-05-openui-sole-genui-protocol）——OpenUI 现为唯一 GenUI 协议，回退闸不复存在。本 spec 的 D1/D2/D3/§3.4 投影闸与 handle 体系不变式不受影响，仍为现行机制。
 > **上位约束**：ADR-016（Chat parts 模型与渲染宪法）/ ADR-017（推理后端域）/ ADR-018（云端 Agent 会话状态：工具桥、事件溯源）；[PRIVACY] / [PARITY] / [I18N] 红线
 > **前置交付**：云端 Agent M1~M3（工具桥已上生产，`2026-10-17-cloud-agent-tool-bridge-design.md`）；chat parts M1~M5 已合 main
 > **对齐记录**：2026-10-21 会话内逐项确认——① parts 协议零改动，本地性全部压进 tool-result 内容投影；② 出端只过 projectionSchema 白名单投影，全量靠 `local://` handle 端上补全；③ GenUI 选型 A2UI（弃 OpenUI——其为开发期原型工具，非运行期协议）；④ L1 = A2UI 组件卡（首选），L2 = 现有 HTML 沙箱卡（长尾兜底）；⑤ 分期 M1 投影通路 → M2 A2UI 槽位填充 → M3 沙箱卡交互态

@@ -21,7 +21,7 @@
 {
   "id": "uuid 或 taskId", // 任务卡特例：id = taskId，REPLACE upsert
   "sessionId": "default",
-  "type": "…", // 新分类法 11 值之一（3 分类，见下）
+  "type": "…", // 新分类法 10 值之一（3 分类，见下）
   "role": "agent", // 消息角色 "user"/"agent"（v26 新列，取代 user_/agent_ type 前缀）
   "content": "…", // 按 type 语义不同，见各卡
   "timestamp": 1790000000000,
@@ -31,11 +31,11 @@
 }
 ```
 
-`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`；2026-10-06 扩 `tool_browser`（browser-vnc 直播卡 spec §4）；2026-10-22/24 扩 GenUI 卡 `data_ui`/`data_ui_openui`）——**3 分类 11 值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 免前缀，协议值禁 UI 容器词）：
+`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`；2026-10-06 扩 `tool_browser`（browser-vnc 直播卡 spec §4）；2026-10-22/24 扩 GenUI 卡 `data_ui`/`data_ui_openui`；2026-11-05 A2UI 退役删 `data_ui`）——**3 分类 10 值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 免前缀，协议值禁 UI 容器词）：
 
 - **content**：`text` · `image`
 - **tool**：`tool_chart` · `tool_html` · `tool_task` · `tool_image_edit` · `tool_browser`
-- **data**：`data_media_results` · `data_optimize_candidates` · `data_ui`（A2UI GenUI 卡） · `data_ui_openui`（OpenUI GenUI 卡，2026-11-01 起回合原生）
+- **data**：`data_media_results` · `data_optimize_candidates` · `data_ui_openui`（OpenUI GenUI 卡，2026-11-01 起回合原生；2026-11-05 A2UI 退役起为唯一 GenUI 线）——`data_ui`（A2UI GenUI 卡）已随 2026-11-05 退役删除，存量行墓碑兜底为可读 Text
 
 多 part 消息的 type 取首 part 值；role 由独立列承载。legacy 13 值（`user_text`/`agent_text`/`user_image`/`user_image_text`/`agent_image`/`command`/`plan_preview`/`media_results`/`chart`/`html_card`/`agent_edit_result`/`optimize_candidates`/`task_card`）仅存于迁移源，经 `LegacyChatTypeMigration` 一次性转正（映射见 §0.2 末表）。
 
@@ -43,7 +43,7 @@
 
 ### 0.1 协议一致性现状与 parts 重构（2026-09-27）
 
-**legacy 13-type 协议本身不统一**——这正是 ADR-016 parts 重构的动机，盘点如下（其中「僵尸类型」「type 值域混杂」两项已随 2026-09-28 分类法重构根治；下文各卡「落库协议」示例均为**新分类法形态**——type 为 11 值之一 + 独立 `role` 列，legacy 13 值仅存于迁移源）：
+**legacy 13-type 协议本身不统一**——这正是 ADR-016 parts 重构的动机，盘点如下（其中「僵尸类型」「type 值域混杂」两项已随 2026-09-28 分类法重构根治；下文各卡「落库协议」示例均为**新分类法形态**——type 为 10 值之一 + 独立 `role` 列，legacy 13 值仅存于迁移源）：
 
 | 不统一点 | 现状 |
 |---|---|
@@ -52,9 +52,9 @@
 | `id` / `timestamp` 语义特例 | tool_task：id=taskId（REPLACE upsert）、timestamp=startedAtMs（锚定提交位置） |
 | serde 位置 | org.json 扩展在 androidApp shim（`ChatModelCommonMainShim.kt`），非 commonMain 纯 Kotlin |
 | 僵尸类型 | ✅ 已根治（2026-09-28 分类法重构）：~~`command` / `plan_preview` 主聊天流无专属渲染分支（真正消费者在平行浮动面板体系，§6）~~——两值删除并入 `text`，存量行经 MIGRATION_25_26 转正 |
-| type 值域混杂 | ✅ 已根治（2026-09-28 分类法重构）：~~13 值扁平混杂，content/tool/data 不分，role 靠 user_/agent_ 前缀~~——3 分类（现 11 值）+ `role` 升格独立列（见 §0 type 全集） |
+| type 值域混杂 | ✅ 已根治（2026-09-28 分类法重构）：~~13 值扁平混杂，content/tool/data 不分，role 靠 user_/agent_ 前缀~~——3 分类（现 10 值）+ `role` 升格独立列（见 §0 type 全集） |
 
-**parts 重构（✅ M1-M4 已合 main）**：按 ADR-016 对齐 OpenAI Responses / Vercel parts 协议——Room 增 `partsJson` 列（v24→v25 迁移全量回填），一条消息 = 有序 parts 数组，kotlinx JSON 鉴别字段 `type`（2026-09-28 分类法重构改 3 分类值集，后续扩至 11 值：serialName 改值 + `PartCategory` 分类载体 getter，不进线格式），`ignoreUnknownKeys` 前向兼容 + `encodeDefaults=false` 紧凑落库；legacy 三列经转换器全枚举迁移，**行级 Text 兜底不允许丢消息**。转换器现为 `MessagePartsConverter`（原 `LegacyMessagePartsConverter` 已改名——仅认新分类法值 + `role` 入参，`tool_browser`/`data_ui`/`data_ui_openui` 为直通解码分支）；legacy 13→8 映射知识单点收编 `LegacyChatTypeMigration`（仅供 Room MIGRATION_25_26 与备份恢复，运行时不双吃）。M2 流式三件套（`domain/chat/streaming/`：TurnStreamEvent / ChatStreamTurnAdapter / TurnPartsReducer + `TaskCardOverlay`）已落地：占位契约（`ToolInputStart` 即插占位 part，`draw_chart`/`render_html` 类型化占位）→ 产物原位填充；错误双轨（持久化错误轨 = TaskCard，Chart/HtmlCard/脚本错误瞬态不落库，详见 §4.3）。M3 正文换 `AgentMarkdown`（§3.2）；M4 渲染源切 parts + Turn 聚合（§1.3）。落库线格式实例：
+**parts 重构（✅ M1-M4 已合 main）**：按 ADR-016 对齐 OpenAI Responses / Vercel parts 协议——Room 增 `partsJson` 列（v24→v25 迁移全量回填），一条消息 = 有序 parts 数组，kotlinx JSON 鉴别字段 `type`（2026-09-28 分类法重构改 3 分类值集，后续扩至 11 值、2026-11-05 A2UI 退役删 `data_ui` 回落 10 值：serialName 改值 + `PartCategory` 分类载体 getter，不进线格式），`ignoreUnknownKeys` 前向兼容 + `encodeDefaults=false` 紧凑落库；legacy 三列经转换器全枚举迁移，**行级 Text 兜底不允许丢消息**。转换器现为 `MessagePartsConverter`（原 `LegacyMessagePartsConverter` 已改名——仅认新分类法值 + `role` 入参，`tool_browser`/`data_ui_openui` 为直通解码分支；legacy `data_ui`（A2UI 2026-11-05 退役）为墓碑兜底分支——提升 fallbackSummary 为可读 Text、缺失落 `LEGACY_CARD_TOMBSTONE` 标记，codec 解码侧同口径显式 type 拦截，不丢消息）；legacy 13→8 映射知识单点收编 `LegacyChatTypeMigration`（仅供 Room MIGRATION_25_26 与备份恢复，运行时不双吃）。M2 流式三件套（`domain/chat/streaming/`：TurnStreamEvent / ChatStreamTurnAdapter / TurnPartsReducer + `TaskCardOverlay`）已落地：占位契约（`ToolInputStart` 即插占位 part，`draw_chart`/`render_html` 类型化占位）→ 产物原位填充；错误双轨（持久化错误轨 = TaskCard，Chart/HtmlCard/脚本错误瞬态不落库，详见 §4.3）。M3 正文换 `AgentMarkdown`（§3.2）；M4 渲染源切 parts + Turn 聚合（§1.3）。落库线格式实例：
 
 ```jsonc
 // partsJson 列（M1/M2 已落地；encodeDefaults=false → state="DONE"/saved=false 等缺省字段不写出）
@@ -77,7 +77,7 @@
 ]
 ```
 
-M1 期 partsJson 为 legacy 三列的纯函数双写（写接缝 `data/local/ChatMessageParts.kt`）；M2 起流式以 parts 为权威装配（占位/瞬态不落 Room），legacy 三列仍为持久化写面；**M4 起渲染源已切 parts**（`ChatListFlattener` 拍平，UI 不再读 legacy 字段选卡——见 §1.3）。各卡「落库协议」示例为新分类法形态（type 11 值 + `role` 列；标量列持久化写面不变），parts 形态见 §0.2 与各卡「parts 协议」小节。
+M1 期 partsJson 为 legacy 三列的纯函数双写（写接缝 `data/local/ChatMessageParts.kt`）；M2 起流式以 parts 为权威装配（占位/瞬态不落 Room），legacy 三列仍为持久化写面；**M4 起渲染源已切 parts**（`ChatListFlattener` 拍平，UI 不再读 legacy 字段选卡——见 §1.3）。各卡「落库协议」示例为新分类法形态（type 10 值 + `role` 列；标量列持久化写面不变），parts 形态见 §0.2 与各卡「parts 协议」小节。
 
 ### 0.2 目标协议（parts 形态）逐类型示例
 
@@ -291,7 +291,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 
 ### 1.3 ADR-016 parts 模型（✅ M1-M4 已合 main；M4 真机验收待补）
 
-一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates/BrowserLive/A2uiCard/OpenUiCard），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2，type 值域（3 分类 11 值 + role 列）见 `2026-09-28-chat-type-taxonomy-design.md`。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；M3 = 正文 `AgentMarkdown`（§3.2）。
+一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/MediaResults/Image/EditResult/OptimizeCandidates/BrowserLive/OpenUiCard（A2uiCard 已随 2026-11-05 A2UI 退役删除）），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2，type 值域（3 分类 10 值 + role 列）见 `2026-09-28-chat-type-taxonomy-design.md`。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；M3 = 正文 `AgentMarkdown`（§3.2）。
 
 **M4 渲染源切 parts + Turn 聚合**（spec §7.2/§7.3/§8）：
 
@@ -318,8 +318,8 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | Agent 图片结果卡 | `image`（+ role=agent） | `ChatMessageItem` isImage 分支 | 原生 | —（跟随会话帧） | ✅ |
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
 | 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay`（M2 全屏接管） | 原生（帧位图：M2 WS binary 推流 / HTTP base64） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
-| A2UI GenUI 卡 | `data_ui` | `A2uiCardHost`（androidx.a2ui 官方渲染器，polang catalog = material + BarChart） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ✅（hybrid M2，2026-10-21；2026-11-01 起为回退闸——默认线为 OpenUI） |
-| OpenUI GenUI 卡 | `data_ui_openui` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生，默认线） |
+| ~~A2UI GenUI 卡~~（已退役 2026-11-05） | `data_ui`（已退役） | ~~`A2uiCardHost`~~（androidx.a2ui 官方渲染器，polang catalog = material + BarChart；已随退役拆除） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ❌ 已退役（2026-11-05 OpenUI 唯一化；存量消息墓碑兜底为可读 Text，详见 data_ui 节） |
+| OpenUI GenUI 卡 | `data_ui_openui` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生；2026-11-05 起唯一 GenUI 线） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
 | 流式卡片占位/工具状态/失败 item | （流式瞬态，不落 Room） | 占位骨架 / `ToolStatusChip` / 失败态（i18n `chat_card_generate_failed`） | 原生 | — | ✅（M4 拍平三分流，见 §1.3） |
 | 日期分隔 | （列表装饰，非消息） | `ChatDateChip` | 原生 | `chat_date_chip` 438:335 | ✅ |
@@ -804,7 +804,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ---
 
-## data_ui · A2UI GenUI 卡（hybrid M2）
+## data_ui · A2UI GenUI 卡（hybrid M2）（已退役 2026-11-05）
+
+> **退役标注（2026-11-05，OpenUI 唯一化）**：A2UI 对照线全量退役——server 发卡工具 render_ui 与校验闭环、端侧渲染线 `features/chat/a2ui/`、shared `MessagePart.A2uiCard` 与 `data_ui` type 值、androidx.a2ui 依赖均已删除；存量 `data_ui` 消息经 codec/converter 墓碑兜底为可读 Text（不丢消息）。决策与实施记录见 spec 2026-11-05-openui-sole-genui-protocol；外部 androidx.a2ui 成熟后可重评估。本节正文保留作历史登记。
 
 - **协议**：`ChatMessageEntity.type = "data_ui"`，content 列存整颗 `MessagePart.A2uiCard` part JSON
   （tool_browser 先例）；云端经 render_ui 工具 action 帧下发，端上 TurnRunner 拦截落库。
@@ -835,10 +837,8 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **回灌**：不回灌 LLM（ChatModelInput data part 分支 emptyList）；messagesJson 只含骨架+local://
   绑定，handle id 对云 opaque（D2）。
 - **渲染**：ChatScreen TYPE_A2UI_CARD → A2uiCardHost（androidx.a2ui 官方渲染器，
-  polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract，
-  为可解引用 URL——GET 返回官网静态 catalog JSON schema
-  `docs-site/a2ui/catalog/v1.json`，由 `A2uiCatalogDescriptorSyncTest` 从运行态 catalog
-  序列化生成并对账（regen 方式见测试类头注释），deploy-docs-site.sh 发布）；
+  polang catalog = material 基础目录 + BarChart，catalogId 见 shared A2uiCardContract
+  （官网静态 catalog JSON schema 与对账测试已随退役一并删除）；
   HandleResolver 填槽，缺失降级占位卡（US-6）。BarChart 柱高公式 = (barAreaHeight −
   barLabelHeight) × count/maxCount（`barChartBarHeight` 纯函数，2026-10-24 修复：
   满高柱顶满定高 Row 会把柱下月份标签挤出裁掉，单桶图退化为无标签纯色块）；
@@ -858,24 +858,25 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   updateDataModel pretty JSON + 复制全部；messagesJson 非法时降级显示原文+原因，永不崩聊天页）；
   解析纯函数 `parseBlueprintMessages`（`A2uiBlueprintDebugger.kt`），徽标内容为协议标识符无自然语言，
   [I18N] 豁免，release 包 `BuildConfig.DEBUG` 门控零痕迹。
-- **测试**：`A2uiComponentAvailabilityTest`（引擎层：19 组件注册清单 + v0.9 必填属性契约 +
+- **测试**（以下均已随 2026-11-05 退役删除，仅作历史登记）：`A2uiComponentAvailabilityTest`（引擎层：19 组件注册清单 + v0.9 必填属性契约 +
   逐组件蓝图落成 active surface + 数据绑定落位 + 负路径降级）/ `A2uiComponentRenderSmokeTest`
   （渲染层：19 组件同框 Compose 实渲冒烟，Robolectric native graphics）/ `HandleResolverTest` /
   `BarChartSelectedBindingNormalizationTest` / `A2uiBlueprintDebuggerTest` / `PolangA2uiCatalogTest` /
-  `A2uiCatalogDescriptorSyncTest`（官网 catalog 描述文件对账 + `REGEN_A2UI_CATALOG=true` 再生成）。
+  `A2uiCatalogDescriptorSyncTest`（官网 catalog 描述文件对账 + `REGEN_A2UI_CATALOG=true` 再生成——已随退役删除，勿照单 regen）。
   测试夹具注意：surface actor 生命周期挂在收集协程 scope 上，scope 取消即回收数据模型，
   承载 scope 必须活到断言结束。
 
 ---
 
-## data_ui_openui · OpenUI GenUI 卡（2026-11-01 起为回合原生 turn-native 形态，与 data_ui 线并行）
+## data_ui_openui · OpenUI GenUI 卡（2026-11-01 起为回合原生 turn-native 形态；2026-11-05 起为唯一 GenUI 线）
 
-- **开关**：设置页「GenUI 协议」单选（DataStore `genui_format`，默认 openui，2026-11-01 起；显式存量 a2ui 不翻）→ Chat 页云端回合
-  请求头 `X-GenUI-Format` → server 侧分流：**openui = 回合原生**（2026-11-01 头语义升级，
-  spec 已随交付清理，git 历史可查——不注册任何 GenUI 发卡工具
-  （render_ui_openui 退役、render_html 过滤），LLM 的整个终结回复就是 OpenUI 程序）；
-  **缺头/未知值（含 a2ui）= A2UI 工具发卡**（render_ui 照旧注册，回退闸零变化），
-  同一回合只走一条线。
+- **分流（已退役 2026-11-06，OpenUI 唯一化）**：原设置页「GenUI 协议」单选（DataStore `genui_format`，
+  默认 openui）→ Chat 页云端回合请求头 `X-GenUI-Format` → server 侧分流（openui = 回合原生 /
+  缺头·未知值 = A2UI 工具发卡回退闸）已整体拆除——server 0.9.20 起 /agent 路由面恒走
+  turn-native（旧头被忽略不报错，后向兼容旧客户端），render_ui/render_ui_openui/render_html
+  发卡工具全退役（不注册任何 GenUI 发卡工具，LLM 的整个终结回复就是 OpenUI 程序）；端侧设置项
+  同步拆除，DataStore 存量 `genui_format` 值自然失效不做迁移。同一回合只走一条线（现恒为
+  turn-native）。
 - **协议**：`ChatMessageEntity.type = "data_ui_openui"`，content 列存整颗 `MessagePart.OpenUiCard`
 
 > 端侧合成消费者（2026-11-02）：工程师任务卡信息区（`tool_task` part）同走 OpenUI 运行时渲染（`EngineerTaskProgram` 端侧确定性合成程序文本 → `OpenUiSession` → 解包根 Card 原生渲染）——openui 渲染器的第二个消费者，程序不出端、非 turn-native 产物；详见「工程师任务卡」节。
@@ -884,11 +885,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首声明 / Card 调用，字符串字面量
   剥离后判定）→ 程序形态落 OpenUiCard 事件入库，非程序形态（理论上已被 server 双保险
   兜住）按纯文本 AssistantText 降级上屏；`extractFallbackSummary` 提取降级摘要
-  （`// summary:` 首行注释 > 首个 Markdown/Text 字符串字面量，截 80 字）。A2UI 线
-  （含 2026-11-01 前的 openui 工具发卡形态）来源照旧 = render_ui/render_ui_openui 工具
-  action 帧。**流式预览（turn-native）**：服务端 `OpenUiContentStreamTracker` 跟踪 content
+  （`// summary:` 首行注释 > 首个 Markdown/Text 字符串字面量，截 80 字）。**流式预览（turn-native）**：服务端 `OpenUiContentStreamTracker` 跟踪 content
   TextDelta 纯文本累计（响应即程序，无需 JSON 转义剥离——2026-10-26 P2 的
-  `OpenUiToolCallStreamTracker` ToolCallDelta 路径随发卡工具退役不再触发），节流同口径
+  ToolCallDelta 路径已随发卡工具退役物理删除，2026-11-06，server 0.9.20），节流同口径
   （≥48 字符增量且 ≥80ms，首发免时间窗）经 SSE `kind=openui_delta` 瞬态帧旁路下行
   （不落 agent_event；旧端忽略未知 kind 后向兼容）；EventHandler `onLLMStreamingStarting`
   调 `onRoundStart` 轮次重置——回合内多轮 LLM 输出（工具调用后的中间轮 → 终结整树）各自
@@ -900,13 +899,13 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   `RenderOpenUiValidator.validateProgramToError`（结构校验 + 布局门禁，turn-native 口径
   文案「重新输出完整程序」）判定非法 → cloudAgentStrategy `correctInvalidProgram` 节点
   携带逐条错误清单回环重发（上限 MAX_CORRECTIONS=1 防死循环）；② 上限用尽放行后由
-  `AgentRunner.finalMessageTransformer = OpenUiTurnNative.ensureValidProgram` 兜底——合法
+  终结落流前内联调用的 `OpenUiTurnNative.ensureValidProgram` 兜底——合法
   normalize 后原样放行 / 非法包成 `root = Markdown("…")` 程序（复验再失败硬编码错误卡）。
-  turn-native 线假发卡守卫（CardClaimGuard）经 `programGuard == null &&` 门控旁路
-  （该线无发卡工具，纠正文案指向不存在的工具，触发即误导）。
+  turn-native 线假发卡守卫（CardClaimGuard）已随 2026-11-06 唯一化与发卡工具一并物理删除
+  （该线无发卡工具，纠正文案指向不存在的工具会误导——此前经 `programGuard == null &&` 门控旁路）。
 - **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState)`，
   category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）。
-- **回灌**：不回灌 LLM（data part 分支 emptyList 同 data_ui）；program 只含骨架 + Query
+- **回灌**：不回灌 LLM（data part 分支 emptyList）；program 只含骨架 + Query
   local_handle 绑定，handle id 对云 opaque（D2 对偶）。
 - **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，
   宿主侧 P1 响应式状态（2026-10-26，spec《2026-10-26-openui-compose-alignment-design》，
@@ -922,13 +921,15 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   schema 见 shared OpenUiLibrary）；Query("local_handle") 经 AppContainer `localHandleLookup` 端侧补全
   （scan domain → `#histogram`/省略 = GalleryHistogramBuilder 月桶；`#photos`（2026-10-24）= ScanPhotoProjection 照片清单 [{id,date}] cap 60
   保持搜索相关度原序；`#videos`（2026-11-04）= ScanPhotoProjection.toVideoRefs 视频清单同形），handle 失败/prepare Failed 降级占位卡
-  （复用 A2uiCardDegraded，US-6 同口径）；样式令牌只读复用 A2uiStyleMapper，BarChart 视觉
-  与 PolangBarChartComponent 逐项对齐（A2uiCardTokens + primary 色 + 选中 45% alpha 规则）；
+  （`OpenUiCardDegraded`，US-6 同口径）；样式令牌经 `OpenUiStyleMapper`（2026-11-05 自 A2uiStyleMapper
+  迁移更名，配色枚举 `OpenUiColorRole` 词表 SSOT 在 shared `OpenUiLibrary.colorRoles`），BarChart 视觉
+  与 PolangBarChartComponent 逐项对齐（A2uiCardTokens + primary 色 + 选中 45% alpha 规则——
+  `A2uiCardTokens` 为 token 生成物命名债，更名须走 token SSOT + codegen 管线）；
   Image（图文混排）渲染期经 AppContainer `openUiPhotoResolver` 端侧 id→uri 解析
   （[PRIVACY] uri 不出端），Coil AsyncImage + faceAwareVerticalAlignment(faceFocusY)，
   aspect 渲染期缺省 4:3 clamp [0.5,2.5]，解析不到/加载中 = 同形 surfaceVariant 占位；
   M2 渲染细则：Text.text BINDABLE_STRING（Binding 从 state 读，解析不出丢该 Text 不炸卡）；
-  Icon name→Material 图标映射 `OpenUiIconMap`（59 枚枚举，schema/A2UI 副本源/server 白名单/描述四处同源，跨 build 残余漂移风险见 `OpenUiLibrary.iconNames` KDoc）；
+  Icon name→Material 图标映射 `OpenUiIconMap`（59 枚枚举，shared schema/server 白名单/prompt 清单三处同源，跨 build 残余漂移风险见 `OpenUiLibrary.iconNames` KDoc）；
   List VERTICAL 限高 320dp 纵向滚动（嵌套滚动规避）、HORIZONTAL 横滑行；Tabs 选中页签 =
   渲染期 remember 本地态不进 state；Slider 用 AppSlider（全 app 滑杆红线）。
   M3 渲染细则：Table 表头+数据行（take 50 护栏、等宽列、超宽横滑、缺 cell 补空串）；
@@ -1017,7 +1018,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   防混合分流把长 HTML 打成 FULLPAGE 0.5 屏预览而死 CTA（onOpenFullpage 未接，
   display prop 的 FULLPAGE 语义留后续期）；sanitize + 降级日志 `remember(rawHtml)`
   记忆化（每 rawHtml 只清洗一次、只打一次 WARN）；清洗 Rejected → 降级 CAPTION
-  文本 `chat_a2ui_card_unavailable` 不炸卡）。shared `OpenUiLibrary` 注册 +
+  文本 `chat_openui_card_unavailable` 不炸卡）。shared `OpenUiLibrary` 注册 +
   server `RenderOpenUiValidator` 白名单同步 +Html（101 项字面量副本同源口径不变）。
   复审加固（2026-11-01，fix/openui-review-hardening）：DSL_RULES 补 `Html(html*)`
   签名教学（此前仅尾部裸名单，模型猜必填参数会 missing-required 静默丢组件）+
@@ -1035,9 +1036,8 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   「发卡类改动双交付铁律」。）
   回复活感批次（2026-11-01，server 0.9.14）：turn-native 上线当天真机实证回归——
   提示词契约与全部黄金示例皆为结构化卡片，模型把「明天穿什么」这类问答也包成
-  Card+标题+Callout+Timeline 表单卡，markdown 正文与对话语气消失（对照 A2UI 线
-  同期回复：有先导句/诚实交代能力边界/markdown 混排——真机库 61 张 openui 卡
-  全为表单形态实证）。修复=提示词新增「回复形态先定位」节（契约段后、DSL 规则
+  Card+标题+Callout+Timeline 表单卡，markdown 正文与对话语气消失（真机库 61 张
+  openui 卡全为表单形态实证）。修复=提示词新增「回复形态先定位」节（契约段后、DSL 规则
   前）：对话/问答/解释/闲聊类回复 = 裸 `root = Markdown("自然正文")`（可多段/
   加粗/列表，禁表单卡包装）；数据卡 Card 首子级 Markdown 自然导语 + 收尾讲解，
   不做冷报表。新增对话黄金示例 `OpenUiTurnNative.GOLDEN_CHAT_PROGRAM`（测试
@@ -1080,8 +1080,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   content 增量经 `openui_delta` 前缀预览随流生长，ProgramGuard 门控 + ensureValidProgram
   兜底保证终结消息恒为合法程序）→ 终结 Message 事件下行 → 端侧 `CloudAgentTurnRunner`
   message 分支嗅探程序形态 → 落 `data_ui_openui`（fallbackSummary 取自 `// summary:`
-  首行）→ OpenUiCardHost 求值填槽渲染。A2UI 线（回退闸）照旧：render_ui 工具 action
-  帧下发骨架 → HandleResolver 填槽。
+  首行）→ OpenUiCardHost 求值填槽渲染。
 
 ---
 
@@ -1093,7 +1092,7 @@ DESTRUCTIVE 批量删除的聚合确认卡：数量 + 珍贵信号（收藏/老�
 
 ### 5.2 ADR-016 parts 模型现状（M1-M4 已合 main；真机验收待补）
 
-一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线换代。卡片 UI/渲染形态**不变**（ADR-016 D2）。已落地：M1（`MessagePart.kt` sealed + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt`（已改名 `MessagePartsConverter.kt`，仅认新分类法值；legacy 映射收编 `LegacyChatTypeMigration.kt`——2026-09-28 分类法重构）全枚举迁移/行级兜底 + Room v24→v25 回填 + 回灌转换）、M2（`domain/chat/streaming/` 三件套 + `TaskCardOverlay` 任务卡迁入 parts + Chart/HtmlCard `state` 字段 + 回灌 `"<messageId>:<partId>"` 命名空间 id + `RoundStarted` 显式轮边界）、M3（`AgentMarkdown` AST 正文，jeziellago 移除）、M4（渲染源切 parts：`ChatListFlattener` 拍平 + Turn 聚合视觉层 + §8 性能收口；验收 `M4_CHAT_FLATTEN_ACCEPTANCE.md`，**真机冒烟/重组实测/截图基线待补**）。M5 = 瞬态 parts 落 Room（待排期）；iOS 跟随走 ios-follow 管线。**2026-09-28 分类法重构**（spec `2026-09-28-chat-type-taxonomy-design.md`）：6 个 part serialName 改值为 3 分类值集（时点 8 值，后续扩至 11 值） + `PartCategory` 分类载体（getter-only，不进线格式）；`role` 升格消息级独立列（Room v25→v26，MIGRATION_25_26 单事务加列 + 全量改写）；运行时转换器纯净化（legacy 13→8 映射仅存 `LegacyChatTypeMigration`，服务迁移与备份恢复）。线格式实例见 §0.1/§0.2，各卡 parts 协议见 §3/§4 各节，渲染矩阵见 §1.3 + chat.yaml §3.2。数据形态（spec §3，已按实现校准）：
+一条回复 = parts 文档，卡片 = 独立 block；Turn 聚合渲染；markdown AST 管线换代。卡片 UI/渲染形态**不变**（ADR-016 D2）。已落地：M1（`MessagePart.kt` sealed + `MessagePartsCodec.kt` partsJson 线格式 + `LegacyMessagePartsConverter.kt`（已改名 `MessagePartsConverter.kt`，仅认新分类法值；legacy 映射收编 `LegacyChatTypeMigration.kt`——2026-09-28 分类法重构）全枚举迁移/行级兜底 + Room v24→v25 回填 + 回灌转换）、M2（`domain/chat/streaming/` 三件套 + `TaskCardOverlay` 任务卡迁入 parts + Chart/HtmlCard `state` 字段 + 回灌 `"<messageId>:<partId>"` 命名空间 id + `RoundStarted` 显式轮边界）、M3（`AgentMarkdown` AST 正文，jeziellago 移除）、M4（渲染源切 parts：`ChatListFlattener` 拍平 + Turn 聚合视觉层 + §8 性能收口；验收 `M4_CHAT_FLATTEN_ACCEPTANCE.md`，**真机冒烟/重组实测/截图基线待补**）。M5 = 瞬态 parts 落 Room（待排期）；iOS 跟随走 ios-follow 管线。**2026-09-28 分类法重构**（spec `2026-09-28-chat-type-taxonomy-design.md`）：6 个 part serialName 改值为 3 分类值集（时点 8 值，后续扩至 11 值，2026-11-05 A2UI 退役删 `data_ui` 回落 10 值） + `PartCategory` 分类载体（getter-only，不进线格式）；`role` 升格消息级独立列（Room v25→v26，MIGRATION_25_26 单事务加列 + 全量改写）；运行时转换器纯净化（legacy 13→8 映射仅存 `LegacyChatTypeMigration`，服务迁移与备份恢复）。线格式实例见 §0.1/§0.2，各卡 parts 协议见 §3/§4 各节，渲染矩阵见 §1.3 + chat.yaml §3.2。数据形态（spec §3，已按实现校准）：
 
 ```kotlin
 // shared commonMain（M1-M4 已合 main）
@@ -1129,7 +1128,7 @@ legacy 13 值 → 新 type（+role）迁移映射见 §0.2 末表（`LegacyChatT
 |---|---|
 | 渲染架构宪法 | `docs/02-ARCHITECTURE/ADR/ADR-016-chat-parts-model-mainstream-alignment.md`（+ 实施 spec 2026-09-27-chat-parts-rendering-design） |
 | 请求/回复全链路协议 | `docs/03-TECHNICAL-SPECS/CHAT_PROTOCOL_TECH_SPEC.md`（路由→组装→流式→落库→历史双轨；本目录管逐卡实例，链路级归该文档） |
-| type 分类法（3 分类 11 值 + role 列） | `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`（2026-09-28 重构：serialName 改值 + `PartCategory` + role 升格 Room v26） |
+| type 分类法（3 分类 10 值 + role 列） | `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`（2026-09-28 重构：serialName 改值 + `PartCategory` + role 升格 Room v26；2026-11-05 A2UI 退役删 `data_ui` 回落至 10 值） |
 | 富内容渲染决策（原 ADR-014 D1~D6） | 已并入 ADR-016（D2 渲染 / D3 沙箱 / D4 iOS / D5 样式 / D6 不做；编号 014 永久留空） |
 | HTML/图表/脚本实现 SSOT | `docs/03-TECHNICAL-SPECS/JS_ENGINE_TECH_SPEC.md` §5/§7/§7.1 |
 | Turn 聚合 + 拍平渲染矩阵（视觉 SSOT） | `docs/08-UI-SPECS/screens/chat.yaml` §3.1 turn_aggregation / §3.2 parts_rendering（M4 已落地 ✅，iOS TODO 口径） |

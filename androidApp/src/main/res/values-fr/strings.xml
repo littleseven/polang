@@ -546,8 +546,6 @@
     <string name="cloud_agent_byok_consent_subtitle">Envoyée à chaque requête, jamais stockée ni journalisée</string>
     <string name="cloud_agent_entry_title">Agent cloud (expérimental)</string>
     <string name="cloud_agent_chat_toggle_subtitle">Le chat passe par l\'agent cloud : galerie en lecture seule, sans cartes ; les messages avec photo sont envoyés en texte</string>
-    <string name="settings_genui_format_title">Protocole GenUI</string>
-    <string name="settings_genui_format_subtitle">OpenUI rend chaque réponse comme une interface interactive native (recommandé) ; A2UI est le format de repli hérité</string>
     <string name="cloud_agent_login_required">Connectez-vous dans les Réglages avant d\'utiliser l\'agent cloud</string>
     <string name="cloud_agent_consent_required">Le fournisseur choisi utilise votre propre clé API : activez l\'option dans Réglages → Modèle distant d\'abord</string>
     <string name="cloud_agent_title">Agent cloud</string>
@@ -1600,8 +1598,8 @@
     <string name="chat_result_executed">✅ Exécuté : %1$s</string>
     <string name="chat_chart_generated">Graphique généré</string>
     <string name="chat_html_card_generated">Carte générée</string>
-    <string name="chat_a2ui_card_unavailable">Données de la carte indisponibles</string>
-    <string name="chat_a2ui_card_data_elsewhere">%1$s (données sur l\'appareil d\'origine)</string>
+    <string name="chat_openui_card_unavailable">Données de la carte indisponibles</string>
+    <string name="chat_openui_card_data_elsewhere">%1$s (données sur l\'appareil d\'origine)</string>
     <string name="html_card_view_full">Appuyez pour voir tout le contenu</string>
     <string name="html_card_preview_failed">Échec du rendu de l\'aperçu</string>
     <string name="html_fullpage_title_default">Détail de la carte</string>

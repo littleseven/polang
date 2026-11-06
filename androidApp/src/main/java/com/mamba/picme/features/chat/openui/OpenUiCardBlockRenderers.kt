@@ -38,7 +38,7 @@ import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
 import com.mamba.picme.core.image.faceAwareVerticalAlignment
-import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
+import com.mamba.picme.domain.chat.openui.OpenUiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 
@@ -275,14 +275,14 @@ private fun OpenUiContextCardBlock(
             ) {
                 Text(
                     text = item.title,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
                     fontWeight = FontWeight.SemiBold,
                     color = contentColor,
                 )
                 item.body?.let { body ->
                     Text(
                         text = body,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                         color = contentColor,
                     )
                 }
@@ -447,7 +447,7 @@ private fun OpenUiVisualCardItem(
             ) {
                 Text(
                     text = tag,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -456,7 +456,7 @@ private fun OpenUiVisualCardItem(
         }
         Text(
             text = item.body,
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD).copy(fontWeight = FontWeight.Bold),
+            style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD).copy(fontWeight = FontWeight.Bold),
             // 有图（photo/https）：白字压渐变蒙层；纯色底：跟随主题 onSurface（浅底白字不可读）
             color = if (hasImage) Color.White else MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
@@ -502,7 +502,7 @@ private fun OpenUiMetricIndicator(
         if (previousValue != null) {
             Text(
                 text = previousValue,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textDecoration = TextDecoration.LineThrough,
                 maxLines = 1,
@@ -518,7 +518,7 @@ private fun OpenUiMetricIndicator(
         if (subtext != null) {
             Text(
                 text = subtext,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -534,7 +534,7 @@ private fun OpenUiMetricIndicator(
                         append(openUiCardBlockNumberText(number))
                     }
                 },
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = trendColor,
                 maxLines = 1,
                 modifier = Modifier.alignByBaseline().padding(start = Spacing.xs),

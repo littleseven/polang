@@ -32,16 +32,6 @@ import kotlinx.serialization.json.putJsonObject
 const val BYOK_API_KEY_HEADER = "X-User-Api-Key"
 
 /**
- * GenUI 线格式选择头（openui turn-native）：`openui` → 回合原生（响应即程序，
- * 无发卡工具）；其余（缺头/未知值）→ A2UI 工具发卡（默认/回退闸）。
- * 两条线 GenUI 工具注册互斥，LLM 一轮只见一套描述。
- */
-const val GENUI_FORMAT_HEADER = "X-GenUI-Format"
-
-/** [GENUI_FORMAT_HEADER] 的 OpenUI 取值。 */
-const val GENUI_FORMAT_OPENUI = "openui"
-
-/**
  * 单轮跑轮超时上限（M2.7 安全网）：15 分钟。
  *
  * 合法长轮上界 = 20 迭代 × (LLM 延迟 ~30s + 工具执行 ~15s) ≈ 15 分钟。
@@ -57,11 +47,6 @@ private const val ROUND_TIMEOUT_MS: Long = 15 * 60 * 1000L
  */
 private const val ROUND_RETRY_AFTER_S: Long = 15L
 
-private const val DEFAULT_SYSTEM_PROMPT =
-    "你是 PoLang 云端 Agent。用中文简洁回答。需要服务器时间时调用 server_time 工具。" +
-        "向用户展示卡片必须实际调用当前会话可用的发卡工具（render_ui / render_ui_openui / render_html）且未被拒绝；" +
-        "未调用工具时禁止声称卡片已下发/已生成，改用文字直接回答。"
-
 /**
  * 云端 Agent 路由面（ADR-018 决策 3：独立会话域；决策 4：BYOK 透传）。
  *
@@ -76,11 +61,13 @@ private const val DEFAULT_SYSTEM_PROMPT =
  *   设备工具调用经工具桥下发给端侧执行（传输层信号，不落事件流）；与 event/done/error
  *   帧共用同一 writer 天然保序。设备工具集每轮在路由层以当轮 writer 构造并合成进
  *   ToolRegistry（服务端工具 + 设备工具），[AgentRunner] 零改动。
- *   openui turn-native 起新增 `{"kind":"openui_delta","program":"<已到达前缀>"}` 帧——
- *   响应 content 流式增量的 program 前缀旁路（瞬态预览，不落事件流）；
- *   端侧新旧版本混跑安全（旧端忽略未知 kind），正式 action/消息帧仍是唯一权威负载。
- *   render_html（服务端工具）同理以当轮 writer 构造 sink：HTML 本体落 HtmlCard 事件
- *   （type=html_card）经 kind=event 帧下行，LLM 上下文只见 summary 回执。
+ *   GenUI 唯一化（2026-11-06）：/agent 路由面恒走 OpenUI 回合原生（turn-native）——
+ *   不再按 `X-GenUI-Format` 分流（旧头被忽略），不注册任何 GenUI 发卡工具
+ *   （render_ui/render_ui_openui/render_html 全退役），system prompt 恒为
+ *   [OpenUiTurnNative.SYSTEM_PROMPT]（响应即程序契约）。
+ *   `{"kind":"openui_delta","program":"<已到达前缀>"}` 帧——响应 content 流式增量的
+ *   program 前缀旁路（瞬态预览，不落事件流）；端侧新旧版本混跑安全（旧端忽略未知
+ *   kind），正式消息帧仍是唯一权威负载。
  * - `POST /agent/sessions/{id}/tool-results`：端侧工具结果上行（M2）。body
  *   `{"request_id","ok","result"}` → `200 {"accepted":true}` / `400 request_id_required` /
  *   `404 session_not_found`（他人会话同口径，不泄露存在性）/ `409 tool_request_not_pending`
@@ -280,36 +267,9 @@ fun Route.agentRoute(
                     val deviceTools = DeviceToolService(session.id, bridge, deviceTimeoutMs) { frame ->
                         writeSseFrame(frame.toJson())
                     }
-                    // render_html 侧路（summary-only 回执）：HTML 本体落 HtmlCard 事件并经同一
-                    // SSE kind=event 帧下行；source/role 对齐工具类事件约定（Observation 同款）。
-                    // sink 在工具体内执行，先于 onToolCallCompleted 的 Observation 落流，保事件序。
-                    val htmlCardSink: suspend (html: String, summary: String) -> Unit = { html, summary ->
-                        val event = AgentEventRepository.append(
-                            session.id, AgentEventSource.ENVIRONMENT, AgentEventRole.TOOL,
-                            payload = AgentEventPayload.HtmlCard(html, summary),
-                        )
-                        writeSseFrame(buildJsonObject {
-                            put("kind", "event")
-                            put("event", eventJson(event))
-                        })
-                    }
-                    // 回合原生（turn-native，spec§3.1）：openui 头语义升级——
-                    // 不注册 GenUI 发卡工具，响应即程序；缺头/未知值 = A2UI 工具发卡（回退闸）
-                    val turnNativeOpenUi =
-                        call.request.headers[GENUI_FORMAT_HEADER] == GENUI_FORMAT_OPENUI
+                    // GenUI 唯一化（2026-11-06）：恒 turn-native，无发卡工具注册
                     val toolRegistry = ToolRegistry {
-                        tools(
-                            ServerToolService(onHtmlCard = htmlCardSink).asToolsByClass()
-                                // turn-native：render_html 退役（Html 组件入树），其余服务端工具保留
-                                .filter { !turnNativeOpenUi || it.descriptor.name != "render_html" } +
-                                deviceTools.asToolsByClass() +
-                                // GenUI 线格式分流（turn-native）：turn-native 线无发卡工具；A2UI 线照旧
-                                if (turnNativeOpenUi) {
-                                    emptyList()
-                                } else {
-                                    RenderUiToolService().asToolsByClass()
-                                }
-                        )
+                        tools(ServerToolService().asToolsByClass() + deviceTools.asToolsByClass())
                     }
                     try {
                         // 回合用量累计（done 帧性能数据源；见 AgentRunner.turnUsage KDoc）
@@ -325,21 +285,8 @@ fun Route.agentRoute(
                                 session = session,
                                 userMessage = content,
                                 target = target,
-                                systemPrompt = if (turnNativeOpenUi) {
-                                    OpenUiTurnNative.SYSTEM_PROMPT
-                                } else {
-                                    DEFAULT_SYSTEM_PROMPT
-                                },
+                                systemPrompt = OpenUiTurnNative.SYSTEM_PROMPT,
                                 toolRegistry = toolRegistry,
-                                // 回合原生（turn-native）：content 透传 + 终结程序兜底变换；
-                                // A2UI 线两参取缺省（零行为变化）
-                                forwardContentDeltas = turnNativeOpenUi,
-                                finalMessageTransformer = if (turnNativeOpenUi) {
-                                    OpenUiTurnNative::ensureValidProgram
-                                } else {
-                                    { it }
-                                },
-                                onHtmlCard = htmlCardSink,
                                 // openui 流式预览：program 前缀瞬态帧（不落事件流，与
                                 // event/done/error 共用同一 writer 保序；旧端忽略未知 kind）
                                 onOpenUiProgramDelta = { prefix ->

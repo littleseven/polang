@@ -171,15 +171,15 @@ class OpenUiLayoutNormalizerTest {
     @Test
     fun `golden programs pass through unchanged`() {
         listOf(
-            RenderOpenUiToolService.GOLDEN_STATS_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_STATS_PROGRAM,
             // 三图 Row = N1 多图跳过的教学示例
-            RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_MIXED_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_LAYOUT_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_STAT_TILE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_CLASSIC_PROGRAM,
             // 布局可控性批次两黄金（Task 14 I-1 补钉）
-            RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_COMPARE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_TIMELINE_PROGRAM,
         ).forEach { golden ->
             assertEquals(golden, golden, OpenUiLayoutNormalizer.normalize(golden))
         }
@@ -195,8 +195,8 @@ class OpenUiLayoutNormalizerTest {
 
     // N5（2026-11-01 故宫卡事故）：deepseek-v4-flash 在 turn-native 线生成完程序后，
     // 把其 DSML 工具调用收尾标记吐在响应尾部（全角｜，实为模型侧污染；偶发，
-    // 同日相册卡干净）——归一化尾部剥离，三条通路（ensureValidProgram /
-    // ProgramGuard / transformArgs）共用本漏斗
+    // 同日相册卡干净）——归一化尾部剥离，两条通路（ensureValidProgram /
+    // ProgramGuard）共用本漏斗
     @Test
     fun `n5 strips trailing dsml boundary tags`() {
         val program = "// summary: 故宫一日游\n" +

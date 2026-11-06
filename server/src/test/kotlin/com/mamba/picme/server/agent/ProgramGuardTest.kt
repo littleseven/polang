@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 终结程序守卫测试（turn-native T5，CardClaimGuard 的回合原生泛化）：
+ * 终结程序守卫测试（turn-native T5，原假发卡守卫的回合原生泛化）：
  * 非法终结程序触发纠正回环（携带错误清单），上限 [ProgramGuard.MAX_CORRECTIONS]
  * 用尽后放行（由终结消息变换兜底包装）。
  */

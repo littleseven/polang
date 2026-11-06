@@ -7,13 +7,13 @@ import kotlinx.serialization.json.Json
 /**
  * iOS 聊天历史文件编解码器（`chat_history_<sessionId>.json` 整包线格式，ADR-016 M5 B1）。
  *
- * 与 Android [MessagePartsCodec] 共用同一 parts 嵌套数组线格式（鉴别值 = 8 值分类法
+ * 与 Android [MessagePartsCodec] 共用同一 parts 嵌套数组线格式（鉴别值 = 10 值分类法
  * `type` taxonomy spec §1），但落点不同：iOS 是整文件 JSON 而非 SQLite 行，无
  * `partsJson` 字符串列 / metadata blob 必要——采用**结构化平铺字段 + parts 数组双
  * payload**（平铺字段 = 旧 SwiftUI 渲染器的直读源，切换期等价性的锚；parts = M5
  * 拍平渲染的 SSOT）。
  *
- * - **encode**：`ChatMessageType` 11 值 UI 枚举 → wire 8 值分类法反向映射（UI 枚举
+ * - **encode**：`ChatMessageType` 12 值 UI 枚举 → wire 10 值分类法反向映射（UI 枚举
  *   含 role 前缀变体，role 已独立列承载）；平铺字段缺失时自 parts 补齐，保证文件
  *   内双 payload 一致；
  * - **decode**：parts-first 投影（对齐 androidApp toUiModel M4 口径）——primary part
@@ -55,7 +55,7 @@ object ChatHistoryStoreCodec {
     @Serializable
     private data class ChatMessageDto(
         val id: String,
-        /** wire 8 值分类法（type taxonomy spec §1），role 信息由 [role] 列承载。 */
+        /** wire 10 值分类法（type taxonomy spec §1），role 信息由 [role] 列承载。 */
         val type: String,
         /** "user" / "agent"（[roleOf] 的反向值域）。 */
         val role: String,
@@ -70,7 +70,7 @@ object ChatHistoryStoreCodec {
         val mediaResults: MediaResultsUi? = null,
         val optimizeCandidates: OptimizeCandidateGroup? = null,
         val engineerTask: EngineerTaskState? = null,
-        /** parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 8 值分类法）。 */
+        /** parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 10 值分类法）。 */
         val parts: List<MessagePart> = emptyList(),
     )
 
@@ -104,7 +104,7 @@ object ChatHistoryStoreCodec {
         )
     }
 
-    /** ChatMessageType 13 值 UI 枚举 → wire 11 值分类法（role 变体归并，role 列承载）。 */
+    /** ChatMessageType 12 值 UI 枚举 → wire 10 值分类法（role 变体归并，role 列承载）。 */
     private fun wireTypeOf(type: ChatMessageType): String = when (type) {
         ChatMessageType.USER_TEXT, ChatMessageType.AGENT_TEXT -> "text"
         ChatMessageType.USER_IMAGE, ChatMessageType.USER_IMAGE_TEXT, ChatMessageType.AGENT_IMAGE -> "image"
@@ -114,7 +114,6 @@ object ChatHistoryStoreCodec {
         ChatMessageType.AGENT_EDIT_RESULT -> "tool_image_edit"
         ChatMessageType.MEDIA_RESULTS -> "data_media_results"
         ChatMessageType.OPTIMIZE_CANDIDATES -> "data_optimize_candidates"
-        ChatMessageType.A2UI_CARD -> "data_ui"
         ChatMessageType.OPENUI_CARD -> "data_ui_openui"
     }
 
@@ -168,8 +167,6 @@ object ChatHistoryStoreCodec {
         is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
         is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
         is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
-        // 对齐 androidApp toUiModel：A2UI GenUI 卡（hybrid-m2-a2ui M2）
-        is MessagePart.A2uiCard -> ChatMessageType.A2UI_CARD
         // OpenUI 卡 M1 Android-only（openui P1）：iOS 未落地，防御性落文本，正式映射随 iOS 跟随任务
         is MessagePart.OpenUiCard -> ChatMessageType.AGENT_TEXT
         // iOS 浏览器直播卡未落地（M1 Android-only）：防御性落文本，正式映射随 iOS 跟随任务
@@ -191,7 +188,7 @@ object ChatHistoryStoreCodec {
     private fun fallbackText(content: String): List<MessagePart> =
         listOf(MessagePart.Text(partId = "p0", markdown = content, state = PartState.DONE))
 
-    @Suppress("CyclomaticComplexMethod") // 8 wire 值全枚举映射表，单点收口
+    @Suppress("CyclomaticComplexMethod") // wire 值全枚举映射表，单点收口
     private fun ChatMessageDto.rebuildParts(role: ModelInputRole): List<MessagePart> = when (type) {
         "text" -> listOf(MessagePart.Text("p0", content, PartState.DONE))
 

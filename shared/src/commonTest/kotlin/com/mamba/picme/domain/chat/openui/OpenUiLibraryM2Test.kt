@@ -100,8 +100,8 @@ class OpenUiLibraryM2Test {
 
     @Test
     fun `icon name enum domain is the 59 predefined a2ui catalog names`() {
-        // 字面量副本三方同步（spec §5）：server RenderUiValidator.ICON_NAMES（副本源）↔
-        // server RenderOpenUiValidator.ICON_NAMES ↔ 本 ENUM 域 ↔ 工具描述清单
+        // 字面量副本三处同步（spec §5）：server RenderOpenUiValidator.ICON_NAMES ↔
+        // 本 ENUM 域 ↔ server OpenUiPromptAssets 描述内嵌清单
         val expected = listOf(
             "accountCircle", "add", "arrowBack", "arrowForward", "attachFile", "calendarToday",
             "call", "camera", "check", "close", "delete", "download", "edit", "error", "event",

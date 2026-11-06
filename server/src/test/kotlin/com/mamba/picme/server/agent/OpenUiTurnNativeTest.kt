@@ -46,7 +46,7 @@ class OpenUiTurnNativeTest {
         assertTrue(prompt.contains("// summary:"))
         assertTrue(prompt.contains("root = "))
         // 黄金示例同源（改示例测试必红，防 prompt 与校验器脱节）
-        assertTrue(prompt.contains(RenderOpenUiToolService.GOLDEN_STATS_PROGRAM))
+        assertTrue(prompt.contains(OpenUiPromptAssets.GOLDEN_STATS_PROGRAM))
     }
 
     // 2026-11-01 回复活感批次：真机实证模型被卡片示例带偏，一切回复皆表单卡

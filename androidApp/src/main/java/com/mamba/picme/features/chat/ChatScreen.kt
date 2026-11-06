@@ -169,15 +169,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mamba.picme.PoLangApplication
 import com.mamba.picme.R
 import com.mamba.picme.core.common.Logger
-import com.mamba.picme.features.chat.a2ui.A2uiCardDegraded
-import com.mamba.picme.features.chat.a2ui.A2uiCardHost
 import com.mamba.picme.features.chat.openui.OpenUiCardHost
 import com.mamba.picme.features.chat.openui.OpenUiNavigateTarget
 import com.mamba.picme.features.chat.openui.OpenUiStreamingCard
 import com.mamba.picme.features.chat.openui.OpenUiWriteTools
 import com.mamba.picme.features.chat.openui.resolveOpenUiNavigate
-import com.mamba.picme.features.chat.a2ui.polangA2uiCatalog
-import androidx.a2ui.model.catalog.functions.A2uiUrlOpener
 import androidx.compose.material.icons.outlined.Menu
 import androidx.activity.compose.BackHandler
 import androidx.core.net.toUri
@@ -191,7 +187,6 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -331,12 +326,7 @@ fun ChatScreen(
     val gachaConfirmFailedText = stringResource(R.string.chat_gacha_confirm_failed)
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    // hybrid M2 T7：A2UI 卡渲染依赖——resolver 经 AppContainer（与 gallery 工具共用 LocalHandleStore）；
-    // catalog 的 urlOpener 桥到 Compose uriHandler（卡内链接经系统浏览器打开）
-    val a2uiHandleResolver = remember {
-        (context.applicationContext as PoLangApplication).container.a2uiHandleResolver
-    }
-    // openui P2：OpenUI 卡 local_handle Query 取数接缝（与 A2UI 共用同一 LocalHandleStore）
+    // openui P2：OpenUI 卡 local_handle Query 取数接缝（LocalHandleStore 与 gallery 工具共用同一实例）
     val openUiHandleLookup = remember {
         (context.applicationContext as PoLangApplication).container.localHandleLookup
     }
@@ -368,10 +358,6 @@ fun ChatScreen(
                 else -> throw OpenUiToolNotFoundException(name)
             }
         }
-    }
-    val uriHandler = LocalUriHandler.current
-    val polangA2uiCatalog = remember(uriHandler) {
-        polangA2uiCatalog(A2uiUrlOpener { url -> uriHandler.openUri(url) })
     }
     // 任务中心回锚（US-15）两阶段自动滚底抑制：pending（等待锚定）+ hold（锚定后防流式
     // delta 拉走——条数增长（新回合/新消息）或用户主动拖拽才解除）
@@ -889,31 +875,6 @@ fun ChatScreen(
                                 }
                                 ChatListItem.TYPE_TOOL_ERROR -> {
                                     ToolStatusChip(text = stringResource(R.string.chat_card_generate_failed), isError = true)
-                                }
-                                ChatListItem.TYPE_A2UI_CARD -> {
-                                    // hybrid M2 T7：data_ui 卡——resolver 填槽（US-7 交互态经
-                                    // onViewStateChange 持久化）；handle 缺失等 → 降级占位卡（US-6）
-                                    val part = item.part as? MessagePart.A2uiCard
-                                    if (part != null) {
-                                        Column {
-                                            A2uiCardHost(
-                                                part = part,
-                                                resolver = a2uiHandleResolver,
-                                                catalog = polangA2uiCatalog,
-                                                onViewStateChange = { viewState ->
-                                                    // 终审 m2：走 viewModelScope 包装，页面离开不丢持久化
-                                                    viewModel.persistA2uiViewStateAsync(item.message.id, viewState)
-                                                },
-                                                degradedContent = { summary -> A2uiCardDegraded(summary) },
-                                            )
-                                            // 性能指标行（2026-11-01 云端 done 帧回补，同 Text part 口径）
-                                            if (item.isLastPartOfMessage) {
-                                                item.message.performance?.let { perf ->
-                                                    MessagePerformanceRow(perf, isUser = false)
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
                                 ChatListItem.TYPE_OPENUI_CARD -> {
                                     // openui P2：data_ui_openui 卡——session 求值渲染（US-7 对偶：

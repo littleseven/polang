@@ -6,8 +6,8 @@ import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.LocalHandleStore
-import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
-import com.mamba.picme.domain.chat.a2ui.ScanPhotoEntry
+import com.mamba.picme.domain.chat.openui.OpenUiContract
+import com.mamba.picme.domain.chat.openui.ScanPhotoEntry
 import com.mamba.picme.domain.model.StructuredFilter
 import com.mamba.picme.features.chat.ChatGallerySearch
 import com.mamba.picme.features.chat.capability.GALLERY_SUMMARY_UNAVAILABLE_HINT
@@ -96,10 +96,10 @@ class CloudAgentGalleryTools(
             ScanPhotoEntry(id = asset.id, captureDate = asset.captureDate, mediaType = asset.type.name)
         }
         val handleId = localHandleStore.put(
-            A2uiCardContract.DOMAIN_SCAN,
+            OpenUiContract.DOMAIN_SCAN,
             handleJson.encodeToString(entries),
         )
-        return A2uiCardContract.formatHandleToken(A2uiCardContract.DOMAIN_SCAN, handleId)
+        return OpenUiContract.formatHandleToken(OpenUiContract.DOMAIN_SCAN, handleId)
     }
 
     /**
@@ -132,7 +132,7 @@ class CloudAgentGalleryTools(
 
     /**
      * @param display "true" = 用户明确想浏览/挑选照片本身，命中集透出为横滑图集卡；
-     * 其余（统计/计数/为 render_ui 发卡取数）一律 "false"，卡片不打扰（2026-10-24
+     * 其余（统计/计数/为 OpenUI 卡取数）一律 "false"，卡片不打扰（2026-10-24
      * 真机实测事故类：取数型搜索无脑出图集卡刷屏）。
      */
     suspend fun searchMedia(

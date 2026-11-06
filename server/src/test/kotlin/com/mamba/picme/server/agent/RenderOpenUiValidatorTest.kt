@@ -7,8 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * render_ui_openui 负载校验器测试（review 🟡4，照 RenderUiValidatorTest 先例）：
- * 每个违规类一例 + 合法夹具放行 + gate 按 toolName 分发。
+ * OpenUI 程序负载校验器测试：每个违规类一例 + 合法夹具放行 + 布局门禁。
  */
 class RenderOpenUiValidatorTest {
 
@@ -24,14 +23,6 @@ class RenderOpenUiValidatorTest {
         chart = BarChart("月桶", buckets, ${'$'}selected)
         buckets = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#histogram" }, [])
     """.trimIndent()
-
-    private fun argsJson(program: String): String {
-        val escaped = program
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-        return """{"program":"$escaped","fallbackSummary":"摘要"}"""
-    }
 
     // ── 放行形态 ────────────────────────────────────────────────────
 
@@ -63,7 +54,7 @@ class RenderOpenUiValidatorTest {
     fun `tool description golden example passes validation`() {
         // 黄金示例与 @LLMDescription 同源引用同一常量（RENDER_UI_EXAMPLE 先例）：
         // 改示例或收紧校验器都会红此测试——防描述与校验器脱节
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_STATS_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_STATS_PROGRAM))
     }
 
     @Test
@@ -109,7 +100,7 @@ root = Card([Image(photos[0].id, 1.5)])""",
     @Test
     fun `tool description image golden example passes validation`() {
         // 图文混排黄金示例同图源引用（同 GOLDEN_STATS_PROGRAM 钉法）
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_MIXED_PROGRAM))
     }
 
     @Test
@@ -293,28 +284,18 @@ root = Card([Image(photos[0].id, 1.5)])""",
     }
 
     @Test
-    fun `icon names match a2ui validator whitelist`() {
-        // 字面量副本同源钉住：RenderUiValidator.ICON_NAMES 是副本源（spec §5）
-        assertEquals(59, RenderOpenUiValidator.ICON_NAMES.size)
-        assertEquals(
-            RenderUiValidator.ICON_NAMES,
-            RenderOpenUiValidator.ICON_NAMES,
-        )
-    }
-
-    @Test
     fun `tool description icon list matches validator whitelist`() {
         // 工具描述内嵌清单 ↔ 校验器白名单同源钉住（spec §5 三处字面量副本）
         assertEquals(
             RenderOpenUiValidator.ICON_NAMES.sorted().joinToString(", "),
-            RenderOpenUiToolService.ICON_NAMES_TEXT,
+            OpenUiPromptAssets.ICON_NAMES_TEXT,
         )
     }
 
     @Test
     fun `tool description interactive golden example passes validation`() {
         // 交互黄金示例同源引用同一常量（GOLDEN_STATS_PROGRAM 钉法先例）
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_INTERACTIVE_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_INTERACTIVE_PROGRAM))
     }
 
     // ── M3 七新组件（2026-10-24，spec《openui-component-library-m3-design》） ──
@@ -597,13 +578,13 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     @Test
     fun `tool description report golden example passes validation`() {
         // 图文报表黄金示例（Table + PieChart + Callout）同源引用同一常量（GOLDEN_* 钉法先例）
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_REPORT_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_REPORT_PROGRAM))
     }
 
     @Test
     fun `tool description stat tile golden example passes validation`() {
         // stat tile 黄金示例（DISPLAY 大数字 + CAPTION 标签，设计规范 §4.1）同源钉住
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_STAT_TILE_PROGRAM))
     }
 
     // ── 构图软警告（2026-10-25，设计规范第一刀配套） ──────────────────
@@ -657,10 +638,10 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     @Test
     fun `tool description photo text golden example passes validation and lint`() {
         // 图文排版黄金示例（ImageTextLarge/ImageText 组合 + photo 投影键）同源钉住
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_PHOTO_TEXT_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_PHOTO_TEXT_PROGRAM))
         assertEquals(
             emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_PHOTO_TEXT_PROGRAM),
+            RenderOpenUiValidator.lintComposition(OpenUiPromptAssets.GOLDEN_PHOTO_TEXT_PROGRAM),
         )
     }
 
@@ -691,10 +672,10 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     @Test
     fun `tool description layout golden example passes validation and lint`() {
         // 通用布局黄金示例（PhotoGrid 照片墙 + 1:2 左图右文 Row weights）同源钉住
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_LAYOUT_PROGRAM))
         assertEquals(
             emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM),
+            RenderOpenUiValidator.lintComposition(OpenUiPromptAssets.GOLDEN_LAYOUT_PROGRAM),
         )
     }
 
@@ -703,10 +684,10 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     @Test
     fun `tool description classic golden example passes validation and lint`() {
         // 经典组合版式黄金示例（Banner + StatRow + ListItem）同源钉住（GOLDEN_* 钉法先例）
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_CLASSIC_PROGRAM))
         assertEquals(
             emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM),
+            RenderOpenUiValidator.lintComposition(OpenUiPromptAssets.GOLDEN_CLASSIC_PROGRAM),
         )
     }
 
@@ -745,22 +726,22 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
     @Test
     fun `tool description photo pattern golden example passes validation and lint`() {
         // 相册 APP 构图黄金示例（CardHeader + PhotoGrid + AvatarRow）同源钉住（GOLDEN_* 钉法先例）
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_PHOTO_PROGRAM))
         assertEquals(
             emptyList<String>(),
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM),
+            RenderOpenUiValidator.lintComposition(OpenUiPromptAssets.GOLDEN_PHOTO_PROGRAM),
         )
     }
     @Test
     fun `tool description layout batch golden examples pass validation and lint`() {
         // Task 14 I-1 补钉：companion KDoc「与 RenderOpenUiValidatorTest 同源引用」SSOT 位
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_COMPARE_PROGRAM))
         assertTrue(
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM).isEmpty(),
+            RenderOpenUiValidator.lintComposition(OpenUiPromptAssets.GOLDEN_COMPARE_PROGRAM).isEmpty(),
         )
-        assertNull(RenderOpenUiValidator.validateToError(RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_TIMELINE_PROGRAM))
         assertTrue(
-            RenderOpenUiValidator.lintComposition(RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM).isEmpty(),
+            RenderOpenUiValidator.lintComposition(OpenUiPromptAssets.GOLDEN_TIMELINE_PROGRAM).isEmpty(),
         )
     }
 
@@ -812,42 +793,6 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             "root = Card([CardHeader(\"最近月份\", actionLabel = \"查看全部\", " +
                 "action = @ToAssistant(\"查看全部 最近月份\"))])"
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wired))
-    }
-
-    // ── argsJson 与 gate 分发 ───────────────────────────────────────
-
-    @Test
-    fun `argsJson not an object is rejected`() {
-        assertNotNull(RenderOpenUiValidator.validateArgsJson("not json"))
-    }
-
-    @Test
-    fun `argsJson missing program is rejected`() {
-        assertNotNull(RenderOpenUiValidator.validateArgsJson("""{"fallbackSummary":"s"}"""))
-    }
-
-    @Test
-    fun `gate dispatches render_ui_openui to openui validator`() {
-        assertNotNull(
-            RenderUiValidator.gate("render_ui_openui", argsJson("""x = Video(1)""")),
-        )
-        assertNull(
-            RenderUiValidator.gate("render_ui_openui", argsJson(validWithQuery)),
-        )
-    }
-
-    @Test
-    fun `gate never blocks lint-overflow card - soft warnings are not hard rejects`() {
-        // lint 超限（10 个 DISPLAY）只是构图建议，发射点门控必须放行（防 lint 误接进 gate 的回归）
-        val tiles = (1..10).joinToString(", ") { i -> "Text(\"$i\", \"DISPLAY\")" }
-        assertNull(RenderUiValidator.gate("render_ui_openui", argsJson("root = Card([$tiles])")))
-    }
-
-    @Test
-    fun `gate keeps render_ui on a2ui validator and passes other tools through`() {
-        // render_ui 仍走 A2UI 信封校验（openui program 不是合法 A2UI 负载）
-        assertNotNull(RenderUiValidator.gate("render_ui", argsJson(validMinimal)))
-        assertNull(RenderUiValidator.gate("search_media", " whatever "))
     }
 
     // ── 动作契约批次（2026-11-01 review Y2/Y5/Y6） ─────────────────────
@@ -942,44 +887,6 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
             "root = Card([ListBlock([{title: \"行\", actionLabel: \"查看\", " +
                 "action: @ToAssistant(\"查看 行\")}])])"
         assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(wiredBlock))
-    }
-
-    // ── 布局可控性批次接线（2026-10-31）：transformArgs 发射点矫正 + 布局门禁 ──
-
-    @Test
-    fun `transformArgs normalizes program in argsJson`() {
-        val argsJson = """{"program":"root = Card([Row([Image(photos[0].id), Text(\"说明\")])])","fallbackSummary":"摘要"}"""
-        val transformed = RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, argsJson)
-        assertTrue("transformArgs 应补 weights 分栏，实际：$transformed", transformed.contains("weights = [1, 2]"))
-        // 幂等：再过一遍无变化
-        assertEquals(transformed, RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, transformed))
-    }
-
-    @Test
-    fun `transformArgs passthrough for other tools and malformed json`() {
-        assertEquals("x", RenderOpenUiValidator.transformArgs("other_tool", "x"))
-        assertEquals("not json", RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, "not json"))
-        // 合法 JSON 但缺 program / 非对象 → 原样透传
-        assertEquals(
-            """{"fallbackSummary":"s"}""",
-            RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, """{"fallbackSummary":"s"}"""),
-        )
-        assertEquals("[1]", RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, "[1]"))
-    }
-
-    @Test
-    fun `transformArgs identity shortcut keeps wire bytes intact`() {
-        // 黄金程序（无需矫正）恒等短路：原 argsJson 字节级返回，不被 JsonObject 重序列化改写
-        val argsJson = """{"program":"${RenderOpenUiToolService.GOLDEN_STATS_PROGRAM}","fallbackSummary":"s"}"""
-        assertEquals(argsJson, RenderOpenUiValidator.transformArgs(RenderOpenUiValidator.TOOL_NAME, argsJson))
-    }
-
-    @Test
-    fun `validateArgsJson rejects layout violations`() {
-        val argsJson = """{"program":"root = Card([Text(\"a\"), Card([Text(\"b\"), Card([Text(\"c\")])])])","fallbackSummary":"s"}"""
-        val error = RenderOpenUiValidator.validateArgsJson(argsJson)
-        assertNotNull(error)
-        assertTrue("实际：$error", error!!.startsWith("error: render_ui_openui 布局门禁未通过"))
     }
 
     // ── 回合原生批次（2026-11-01，Task 2）：Html 白名单 + validateProgramToError ──

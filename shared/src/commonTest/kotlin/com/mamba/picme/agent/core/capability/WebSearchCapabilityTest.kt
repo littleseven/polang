@@ -54,7 +54,7 @@ class WebSearchCapabilityTest {
 
     @Test
     fun `generic exception maps to WEB_SEARCH_FAILED degradation`() = runTest {
-        val transport = FakeTransport(failWith = java.net.SocketTimeoutException("timeout"))
+        val transport = FakeTransport(failWith = IllegalStateException("timeout"))
         val cap = WebSearchCapability(transport)
         val result = cap.execute(AgentCommand.WebSearch(query = "q"), context, null)
         val action = assertIs<AgentAction.TextReply>(result.getOrThrow())

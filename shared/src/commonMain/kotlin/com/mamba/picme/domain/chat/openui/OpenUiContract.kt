@@ -3,14 +3,23 @@ package com.mamba.picme.domain.chat.openui
 /**
  * OpenUI 线格式契约（字面量 SSOT）。
  *
- * 三方消费：androidApp（渲染/落库/工具注册）、server `RenderOpenUiToolService`
- * （@LLMDescription 字面量副本，改动须双向同步核对）、云端 LLM 行为约定。
- * 与 [com.mamba.picme.domain.chat.a2ui.A2uiCardContract] 对偶（两条 GenUI 线格式并存）。
+ * 三方消费：androidApp（渲染/落库/工具注册）、server `OpenUiPromptAssets`
+ * （prompt 资产/描述文本字面量副本，改动须双向同步核对）、云端 LLM 行为约定。
+ *
+ * local:// handle 契约唯一出处（2026-11-05 A2UI 退役后自 A2uiCardContract 并入）：
+ * - 上行投影文本只带 opaque token（[formatHandleToken]，无 scheme，过 CloudToolProjectionGate）；
+ * - 下行 OpenUI Query("local_handle") 绑定写完整 `local://` 句柄（下行不经闸）；
+ * - 端上宿主用 [parseLocalHandle] 解析填槽。
  */
 object OpenUiContract {
 
     /** ChatMessageEntity.type / converter 分支键 / MessagePart serialName。 */
     const val PART_TYPE = "data_ui_openui"
+
+    const val HANDLE_SCHEME = "local://"
+
+    /** 相册扫描结果域（search_media / refine_media_search 命中集）。 */
+    const val DOMAIN_SCAN = "scan"
 
     /** 端上宿主工具名（Query("local_handle", ...) → HandleLookup 端侧补全，隐私闸对偶）。 */
     const val TOOL_LOCAL_HANDLE = "local_handle"
@@ -60,14 +69,14 @@ object OpenUiContract {
     /**
      * scan 句柄的 #photos fragment（spec《openui-image-component-design》D2）：
      * `local://scan/<id>#photos` → 端侧投影 [{id, date}]（ScanPhotoProjection，cap 60）。
-     * server `RenderOpenUiToolService` 描述文本持字面量副本，改动须双向同步核对。
+     * server `OpenUiPromptAssets` 描述文本持字面量副本，改动须双向同步核对。
      */
     const val FRAGMENT_PHOTOS = "photos"
 
     /**
      * scan 句柄的 #videos fragment（2026-11-04 Video 组件）：
      * `local://scan/<id>#videos` → 端侧投影 [{id, date, durationSec}]（cap 60）。
-     * server `RenderOpenUiToolService` 描述文本持字面量副本，改动须双向同步核对。
+     * server `OpenUiPromptAssets` 描述文本持字面量副本，改动须双向同步核对。
      */
     const val FRAGMENT_VIDEOS = "videos"
 
@@ -115,10 +124,39 @@ object OpenUiContract {
         .replace("%3D", "=")
         .replace("%25", "%")
 
-    /** 历史单值便捷方法（与 A2UI 线同约定）：encodeViewState 的 selected 单键形式（label 转义同轨）。 */
+    /** 上行 opaque token：`handle: scan/<id>`（无 scheme，过投影闸）。 */
+    fun formatHandleToken(domain: String, id: String): String = "handle: $domain/$id"
+
+    /**
+     * 解析 `local://<domain>/<id>[#<fragment>]`；非 local:// 或缺 domain/id 返 null。
+     * fragment 允许为空字符串以外的任意非空片段（交互态编码由消费方自定）。
+     */
+    fun parseLocalHandle(value: String): LocalHandle? {
+        if (!value.startsWith(HANDLE_SCHEME)) return null
+        val rest = value.removePrefix(HANDLE_SCHEME)
+        val hashIndex = rest.indexOf('#')
+        val pathPart = if (hashIndex >= 0) rest.substring(0, hashIndex) else rest
+        val fragment = if (hashIndex >= 0) rest.substring(hashIndex + 1) else null
+        val slashIndex = pathPart.indexOf('/')
+        if (slashIndex <= 0 || slashIndex == pathPart.length - 1) return null
+        return LocalHandle(
+            domain = pathPart.substring(0, slashIndex),
+            id = pathPart.substring(slashIndex + 1),
+            fragment = fragment?.takeIf { frag -> frag.isNotEmpty() },
+        )
+    }
+
+    /** 历史单值便捷方法：encodeViewState 的 selected 单键形式（label 转义同轨）。 */
     fun viewStateOfSelected(label: String): String = encodeViewState(mapOf("selected" to label))
 
     /** 历史单值读取：等价于 decodeViewState(viewState)["selected"] 取非空。 */
     fun selectedOfViewState(viewState: String?): String? =
         decodeViewState(viewState)["selected"]?.takeIf { it.isNotEmpty() }
 }
+
+/** local:// handle 的结构化形态。 */
+data class LocalHandle(
+    val domain: String,
+    val id: String,
+    val fragment: String? = null,
+)

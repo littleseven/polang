@@ -95,7 +95,7 @@ object EngineerTaskProgram {
                 ch == '\n' -> append("\\n")
                 ch == '\t' -> append("\\t")
                 ch == '\r' -> append("\\r")
-                ch.code < 0x20 -> append("\\u%04x".format(ch.code))
+                ch.code < 0x20 -> append("\\u").append(ch.code.toString(16).padStart(4, '0'))
                 else -> append(ch)
             }
         }

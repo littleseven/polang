@@ -6,6 +6,7 @@ import com.mamba.picme.agent.core.model.context.MediaType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -188,6 +189,44 @@ class MessagePartsCodecTest {
     }
 
     @Test
+    fun `legacy data_ui part tombstones to readable text`() {
+        // A2UI 已退役（openui-sole-genui，MessagePart.A2uiCard 已删除）：显式 type 拦截——
+        // data_ui 已非合法鉴别值，正常解码必失败；墓碑提升 fallbackSummary 为可读文本，不丢消息
+        val partsJson = """
+            [
+              {"type":"text","partId":"p0","markdown":"前后的文本","state":"DONE"},
+              {"type":"data_ui","partId":"p1","surfaceId":"s1","messagesJson":"[]","fallbackSummary":"3 月的照片统计"},
+              {"type":"data_ui_openui","partId":"p2","program":"root = Markdown(\"hi\")","fallbackSummary":"卡"}
+            ]
+        """.trimIndent()
+        val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
+        assertEquals(3, parts.size)
+        assertEquals(MessagePart.Text("p1", "3 月的照片统计", PartState.DONE), parts[1])
+        assertIs<MessagePart.OpenUiCard>(parts[2])
+    }
+
+    @Test
+    fun `legacy data_ui without summary falls back to tombstone marker`() {
+        val partsJson =
+            """[{"type":"data_ui","partId":"p1","surfaceId":"s","messagesJson":"[]","fallbackSummary":""}]"""
+        val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
+        assertEquals(
+            MessagePart.Text("p1", MessagePartsConverter.LEGACY_CARD_TOMBSTONE, PartState.DONE),
+            parts.single(),
+        )
+    }
+
+    @Test
+    fun `legacy data_ui without partId defaults to p0`() {
+        val partsJson = """[{"type":"data_ui","fallbackSummary":"x"}]"""
+        val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
+        assertEquals(
+            MessagePart.Text("p0", "x", PartState.DONE),
+            parts.single(),
+        )
+    }
+
+    @Test
     fun `encode uses category taxonomy type discriminator`() {
         val encoded = encode(listOf(MessagePart.Chart("p0", "<svg/>")))
         assertTrue(""""type":"tool_chart"""" in encoded, encoded)
@@ -195,12 +234,12 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `sealed descriptor locks the 11-value taxonomy`() {
+    fun `sealed descriptor locks the 10-value taxonomy`() {
         // kotlinx.serialization 1.10.0 起 sealed 描述符为 {type, value} 两元素包装，
         // 子类描述符收纳在 "value"（CONTEXTUAL kotlinx.serialization.Sealed<...>）内层——
         // 外层 elementsCount 恒为 2，须下沉一层枚举子类 @SerialName。
         val sealed = MessagePart.serializer().descriptor.getElementDescriptor(1)
-        assertEquals(11, sealed.elementsCount)
+        assertEquals(10, sealed.elementsCount)
         val serialNames = (0 until sealed.elementsCount)
             .map { sealed.getElementDescriptor(it).serialName }
             .toSet()
@@ -208,7 +247,7 @@ class MessagePartsCodecTest {
             setOf(
                 "text", "image",
                 "tool_chart", "tool_html", "tool_task", "tool_image_edit", "tool_browser",
-                "data_media_results", "data_optimize_candidates", "data_ui", "data_ui_openui",
+                "data_media_results", "data_optimize_candidates", "data_ui_openui",
             ),
             serialNames,
         )

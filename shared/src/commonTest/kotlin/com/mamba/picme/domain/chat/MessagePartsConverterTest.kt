@@ -118,29 +118,38 @@ class MessagePartsConverterTest {
         assertEquals(5, EngineerTaskStatus.entries.size)
     }
 
-    // ── A2UI GenUI 卡（hybrid-m2-a2ui M2 T1） ────────────────────
+    // ── legacy data_ui 墓碑（A2UI 2026-11-05 退役，openui-sole-genui） ──
 
     @Test
-    fun dataUiRow_decodesToA2uiCardPart() {
-        val part = MessagePart.A2uiCard(
-            partId = "p0",
-            surfaceId = "sf-1",
-            messagesJson = "[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"sf-1\",\"catalogId\":\"https://polang.net/a2ui/catalog/v1.json\"}}]",
-            fallbackSummary = "327 张，数据在原设备",
-            viewState = null,
-        )
-        val content = kotlinx.serialization.json.Json.encodeToString(MessagePart.A2uiCard.serializer(), part)
+    fun toParts_legacyDataUi_liftsFallbackSummary() {
+        val content =
+            """{"type":"data_ui","partId":"p1","surfaceId":"s","messagesJson":"[]","fallbackSummary":"3 月的照片统计"}"""
         val parts = MessagePartsConverter.toParts("data_ui", content, null, ModelInputRole.ASSISTANT)
-        assertEquals(1, parts.size)
-        assertEquals(part, parts[0])
+        assertEquals(
+            listOf(MessagePart.Text("p1", "3 月的照片统计", PartState.DONE)),
+            parts,
+        )
+    }
+
+    @Test
+    fun toParts_legacyDataUi_blankSummary_tombstoneMarker() {
+        val content =
+            """{"type":"data_ui","partId":"p1","surfaceId":"s","messagesJson":"[]","fallbackSummary":""}"""
+        val parts = MessagePartsConverter.toParts("data_ui", content, null, ModelInputRole.ASSISTANT)
+        assertEquals(
+            listOf(MessagePart.Text("p1", MessagePartsConverter.LEGACY_CARD_TOMBSTONE, PartState.DONE)),
+            parts,
+        )
     }
 
     @Test
     fun dataUiRow_corruptContent_fallsBackToText() {
-        // 行级兜底（spec §4.2）：data_ui 解析异常 → 原文 Text part，不允许丢消息
+        // data_ui 内容损坏 → 墓碑 Text（LEGACY_CARD_TOMBSTONE 标记 + partId 默认 p0），不允许丢消息
         val parts = MessagePartsConverter.toParts("data_ui", "{broken", null, ModelInputRole.ASSISTANT)
-        assertEquals(1, parts.size)
-        assertTrue(parts[0] is MessagePart.Text)
+        assertEquals(
+            MessagePart.Text("p0", MessagePartsConverter.LEGACY_CARD_TOMBSTONE, PartState.DONE),
+            parts.single(),
+        )
     }
 
     // ── OpenUI GenUI 卡（openui P1） ────────────────────────────────

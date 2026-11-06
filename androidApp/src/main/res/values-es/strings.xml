@@ -546,8 +546,6 @@
     <string name="cloud_agent_byok_consent_subtitle">Se envía con cada solicitud; nunca se guarda</string>
     <string name="cloud_agent_entry_title">Agente en la nube (experimental)</string>
     <string name="cloud_agent_chat_toggle_subtitle">El chat usa el agente en la nube: solo consultas de lectura de la galería, sin tarjetas; los mensajes con fotos se envían como texto</string>
-    <string name="settings_genui_format_title">Protocolo GenUI</string>
-    <string name="settings_genui_format_subtitle">OpenUI renderiza cada respuesta como interfaz interactiva nativa (recomendado); A2UI es el formato heredado de reserva</string>
     <string name="cloud_agent_login_required">Inicia sesión en Ajustes antes de usar el agente en la nube</string>
     <string name="cloud_agent_consent_required">El proveedor elegido usa tu propia clave API: actívalo en Ajustes → Modelo remoto primero</string>
     <string name="cloud_agent_title">Agente en la nube</string>
@@ -1600,8 +1598,8 @@
     <string name="chat_result_executed">✅ Se ejecutó %1$s</string>
     <string name="chat_chart_generated">Gráfico generado</string>
     <string name="chat_html_card_generated">Tarjeta generada</string>
-    <string name="chat_a2ui_card_unavailable">Tarjeta de datos no disponible</string>
-    <string name="chat_a2ui_card_data_elsewhere">%1$s (datos en el dispositivo original)</string>
+    <string name="chat_openui_card_unavailable">Tarjeta de datos no disponible</string>
+    <string name="chat_openui_card_data_elsewhere">%1$s (datos en el dispositivo original)</string>
     <string name="html_card_view_full">Toca para ver el contenido completo</string>
     <string name="html_card_preview_failed">No se pudo renderizar la vista previa</string>
     <string name="html_fullpage_title_default">Detalle de la tarjeta</string>

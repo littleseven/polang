@@ -109,6 +109,9 @@ sealed class AgentEventPayload {
     /**
      * render_html 产出的 H5 卡本体（summary-only 回执语义：HTML 不进 LLM 上下文，
      * 只经事件流下行端上渲染）。投影层只消费 Message，本载荷天然不进模型视图。
+     *
+     * 发射路径已随 render_html 退役（2026-11-06 GenUI 唯一化，HTML 改以 Html 组件
+     * 形态入程序树），类保留供历史 agent_event 回放解码。
      */
     @Serializable
     @SerialName("html_card")

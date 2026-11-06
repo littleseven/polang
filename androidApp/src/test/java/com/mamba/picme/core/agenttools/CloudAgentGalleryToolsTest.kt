@@ -7,7 +7,7 @@ import com.mamba.picme.data.local.FakeLocalHandleDao
 import com.mamba.picme.data.local.LocalHandleDao
 import com.mamba.picme.data.local.LocalHandleEntity
 import com.mamba.picme.data.local.LocalHandleStore
-import com.mamba.picme.domain.chat.a2ui.ScanPhotoEntry
+import com.mamba.picme.domain.chat.openui.ScanPhotoEntry
 import com.mamba.picme.domain.model.StructuredFilter
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromString

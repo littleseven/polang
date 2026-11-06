@@ -3,7 +3,6 @@ package com.mamba.picme.features.chat.openui
 import android.util.LruCache
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -25,10 +24,7 @@ import com.mamba.picme.R
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.HandleLookup
 import com.mamba.picme.domain.chat.MessagePart
-import com.mamba.picme.domain.chat.a2ui.A2uiCardContract
-import com.mamba.picme.domain.chat.a2ui.GalleryHistogramBuilder
-import com.mamba.picme.domain.chat.a2ui.ScanPhotoEntry
-import com.mamba.picme.domain.chat.a2ui.ScanPhotoProjection
+import com.mamba.picme.domain.chat.openui.GalleryHistogramBuilder
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiLibrary
@@ -37,7 +33,8 @@ import com.mamba.picme.domain.chat.openui.OpenUiSession
 import com.mamba.picme.domain.chat.openui.OpenUiToolNotFoundException
 import com.mamba.picme.domain.chat.openui.OpenUiToolResolver
 import com.mamba.picme.domain.chat.openui.OpenUiValue
-import com.mamba.picme.features.chat.a2ui.A2uiCardDegraded
+import com.mamba.picme.domain.chat.openui.ScanPhotoEntry
+import com.mamba.picme.domain.chat.openui.ScanPhotoProjection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -45,9 +42,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 /**
- * data_ui_openui 卡的渲染宿主（openui P2，与 A2uiCardHost 对偶）：一颗 session 一张卡。
+ * data_ui_openui 卡的渲染宿主（openui P2）：一颗 session 一张卡。
  *
- * 三态：解析中 → LoadingIndicator；handle 失败/prepare Failed → A2uiCardDegraded(fallbackSummary)
+ * 三态：解析中 → OpenUiCardLoading；handle 失败/prepare Failed → OpenUiCardDegraded(fallbackSummary)
  * （US-6 宁缺毋滥同口径）；Rendered → OpenUiNodeRenderer 递归渲染。
  *
  * Query("local_handle", ...) 经 [HandleLookup] 端侧补全数据（隐私闸对偶：GenUI 只生成骨架
@@ -145,11 +142,11 @@ fun OpenUiCardHost(
         }
     }
     when (val current = resolution) {
-        null -> A2uiSurfaceDefaults.LoadingIndicator()
-        OpenUiResolution.Degraded -> A2uiCardDegraded(part.fallbackSummary, modifier)
+        null -> OpenUiCardLoading()
+        OpenUiResolution.Degraded -> OpenUiCardDegraded(part.fallbackSummary, modifier)
         is OpenUiResolution.Ready -> key(part.partId) {
             if (BuildConfig.DEBUG) {
-                // debug 徽标 overlay（与 A2uiCardHost 对偶）：显性标注此卡由 OpenUI 协议驱动，
+                // debug 徽标 overlay：显性标注此卡由 OpenUI 协议驱动，
                 // 点击开程序原文查看器
                 Box(modifier = modifier) {
                     OpenUiReadyContent(
@@ -226,11 +223,11 @@ private suspend fun resolveLocalHandle(
 ): HandleResolution {
     val handle = (args["handle"] as? OpenUiValue.Str)?.v
         ?: return HandleResolution.Err("local_handle 缺 handle 参数")
-    val parsed = A2uiCardContract.parseLocalHandle(handle)
+    val parsed = OpenUiContract.parseLocalHandle(handle)
         ?: return HandleResolution.Err("handle 不可解析：$handle")
     val payload = handleLookup.payloadOf(parsed.domain, parsed.id)
         ?: return HandleResolution.Err("handle 缺失：$handle")
-    if (parsed.domain != A2uiCardContract.DOMAIN_SCAN) {
+    if (parsed.domain != OpenUiContract.DOMAIN_SCAN) {
         return HandleResolution.Err("未知 domain：${parsed.domain}")
     }
     val entries = runCatching { hostJson.decodeFromString<List<ScanPhotoEntry>>(payload) }

@@ -66,7 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.core.designsystem.AppSliderTokens
 import com.mamba.picme.core.designsystem.Spacing
-import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
+import com.mamba.picme.domain.chat.openui.OpenUiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
@@ -222,7 +222,7 @@ private fun OpenUiFormControl(
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(
             text = label,
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY).copy(fontWeight = FontWeight.SemiBold),
+            style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY).copy(fontWeight = FontWeight.SemiBold),
         )
         for (child in inputs) {
             if (child is OpenUiValue.ComponentVal) {
@@ -234,7 +234,7 @@ private fun OpenUiFormControl(
         hint?.let { hintText ->
             Text(
                 text = hintText,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -533,7 +533,7 @@ private fun OpenUiToggleGroup(
                         item.description?.let { desc ->
                             Text(
                                 text = desc,
-                                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -554,7 +554,7 @@ private fun OpenUiToggleGroup(
                         item.description?.let { desc ->
                             Text(
                                 text = desc,
-                                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -618,7 +618,7 @@ private fun OpenUiRadioGroup(
                     item.description?.let { desc ->
                         Text(
                             text = desc,
-                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -754,13 +754,13 @@ private fun OpenUiOptionCards(
                 ) {
                     Text(
                         text = item.title,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY)
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY)
                             .copy(fontWeight = FontWeight.SemiBold),
                     )
                     item.subtitle?.let { sub ->
                         Text(
                             text = sub,
-                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

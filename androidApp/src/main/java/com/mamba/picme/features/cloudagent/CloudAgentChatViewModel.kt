@@ -176,7 +176,6 @@ class CloudAgentChatViewModel(
                     chat.sessionId,
                     text,
                     byokApiKey,
-                    settingsRepository.genUiFormatFlow.first(),
                 ) { event ->
                     when (event) {
                         is CloudTurnEvent.AssistantText ->
@@ -192,9 +191,6 @@ class CloudAgentChatViewModel(
                                     htmlCard = HtmlCardUi(event.html, event.summary),
                                 ),
                             )
-                        is CloudTurnEvent.A2uiCard -> append(
-                            UiMessage(msgSeq.incrementAndGet(), Role.TOOL, "render_ui(surface=${event.surfaceId})")
-                        )
                         is CloudTurnEvent.OpenUiCard -> append(
                             UiMessage(
                                 msgSeq.incrementAndGet(),

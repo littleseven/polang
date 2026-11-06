@@ -12,9 +12,11 @@ package com.mamba.picme.agent.core.inference.remote.tool
  * 完整结果（resultSchema 描述的结构，如 search_media 的 List<MediaAsset>）永不离开设备；
  * M2 起经 local:// handle 端上补全引用。本表是 [PRIVACY] 闸的审计入口。
  *
- * CLOUD 条目（如 render_html）语义相反：执行位在 server，不存在「出端」数据面，
- * projectionSchema 描述的是「回给 LLM 的面」（summary-only 回执）而非出端白名单，
- * 不经 [CloudToolProjectionGate]（该闸只管端→云方向）。
+ * CLOUD 条目（render_ui/render_ui_openui/render_html）已随 2026-11 GenUI 唯一化全退役
+ * 删除（工具名常量保留于 [CloudAgentToolContract]，仅供历史回放展示）；本表现仅声明
+ * LOCAL 工具。CLOUD 工具的 projectionSchema 语义与 LOCAL 相反（描述「回给 LLM 的面」
+ * 而非出端白名单，不经 [CloudToolProjectionGate]，该闸只管端→云方向）——后续若新增
+ * CLOUD 条目须沿用此口径。
  */
 
 /** 工具执行位。 */
@@ -50,24 +52,6 @@ object CloudAgentToolCatalog {
             executor = ToolExecutor.LOCAL,
             resultSchema = "List<MediaAsset> 细化后完整资产列表（含 uri）+ 基数/命中数",
             projectionSchema = "计数文本「在上一轮结果内找到 N 张」+ 尾部 opaque 数据句柄「handle: scan/<id>」：仅数量+句柄 id，不含文件路径/uri/媒体清单",
-        ),
-        CloudToolSpec(
-            name = CloudAgentToolContract.TOOL_RENDER_UI,
-            executor = ToolExecutor.CLOUD,
-            resultSchema = "A2UI v0.9 信封 JSON 数组（骨架+绑定槽位），经 action 事件下行端侧渲染",
-            projectionSchema = "不适用：CLOUD 工具无端侧数据出端；确认文本仅含 surfaceId，不含媒体数据",
-        ),
-        CloudToolSpec(
-            name = CloudAgentToolContract.TOOL_RENDER_UI_OPENUI,
-            executor = ToolExecutor.CLOUD,
-            resultSchema = "OpenUI Lang 1.0 程序（骨架+Query 绑定，无数据），经 action 事件下行端侧渲染",
-            projectionSchema = "不适用：CLOUD 工具无端侧数据出端；确认文本为固定回执，不含媒体数据",
-        ),
-        CloudToolSpec(
-            name = CloudAgentToolContract.TOOL_RENDER_HTML,
-            executor = ToolExecutor.CLOUD,
-            resultSchema = "无（HTML 不入 LLM 上下文；卡本体经 AgentEvent HtmlCard 载荷下行端上）",
-            projectionSchema = "LLM 仅见 summary 回执文本；HTML 为模型生成物下行端上渲染，方向为出云入端，不经 CloudToolProjectionGate（该闸只管端→云）",
         ),
     ).associateBy { spec -> spec.name }
 

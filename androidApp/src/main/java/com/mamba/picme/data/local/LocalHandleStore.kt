@@ -2,7 +2,7 @@ package com.mamba.picme.data.local
 
 import java.security.SecureRandom
 
-/** HandleResolver 的取数接缝（Task 7 单测 fake 此接口）。 */
+/** OpenUI 卡 local_handle Query 的端侧取数接缝（Host 侧单测 fake 此接口）。 */
 interface HandleLookup {
     suspend fun payloadOf(domain: String, handleId: String): String?
 }

@@ -16,19 +16,26 @@ object CloudAgentToolContract {
     const val TOOL_GET_GALLERY_SUMMARY = "get_gallery_summary"
     const val TOOL_SEARCH_MEDIA = "search_media"
     const val TOOL_REFINE_MEDIA_SEARCH = "refine_media_search"
+
+    /**
+     * ⚠️ 已退役（2026-11-05 A2UI 退役/GenUI 唯一化）——发射端（server）不再注册此工具，
+     * 端侧解析分支已随 A2UI 渲染线删除。常量保留仅供步骤时间线（AgentStepTimeline）
+     * 展示历史 action 帧；CLOUD 目录条目已随退役自 [CloudAgentToolCatalog] 删除。
+     */
     const val TOOL_RENDER_UI = "render_ui"
 
     /**
-     * OpenUI 线格式发卡工具（server 侧执行，CLOUD；openui P2）：与 render_ui 互斥注册
-     * （X-GenUI-Format 头分流），模型产出 OpenUI Lang 1.0 program + fallbackSummary，
-     * program 经 action 事件下行端侧解析渲染，数据仍经 local_handle 端上补全。
+     * ⚠️ 已退役（2026-11-01 turn-native only）——发射端（server）不再注册此工具。
+     * 常量保留供步骤时间线（AgentStepTimeline）展示历史 action 帧，与
+     * CloudAgentTurnRunner 历史帧解析（服务端回滚兼容：旧服务端仍可能下发 render_ui_openui）。
      */
     const val TOOL_RENDER_UI_OPENUI = "render_ui_openui"
 
     /**
-     * H5 卡片渲染工具（server 侧执行，CLOUD）：模型产出 HTML + summary，HTML 本体不进 LLM
-     * 上下文——模型只得到 summary 回执（省 token，对齐主聊天 render_html 语义）；HTML 卡
-     * 本体经 AgentEvent HtmlCard 载荷下行端上渲染。
+     * ⚠️ 已退役（2026-11-05 GenUI 唯一化，云端 render_html 工具随 H5 线退役）——
+     * 发射端（server）不再注册此工具。常量保留仅供 androidApp 步骤时间线
+     * （AgentStepTimeline）展示历史 action 帧；CLOUD 目录条目已随退役自
+     * [CloudAgentToolCatalog] 删除。
      */
     const val TOOL_RENDER_HTML = "render_html"
 

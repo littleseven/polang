@@ -13,17 +13,17 @@ class OpenUiLayoutValidatorTest {
     @Test
     fun `all golden programs pass layout gate`() {
         listOf(
-            RenderOpenUiToolService.GOLDEN_STATS_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_MIXED_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_INTERACTIVE_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_REPORT_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_STAT_TILE_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_LAYOUT_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_PHOTO_TEXT_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_CLASSIC_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_PHOTO_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_COMPARE_PROGRAM,
-            RenderOpenUiToolService.GOLDEN_TIMELINE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_STATS_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_MIXED_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_INTERACTIVE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_REPORT_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_STAT_TILE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_LAYOUT_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_PHOTO_TEXT_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_CLASSIC_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_PHOTO_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_COMPARE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_TIMELINE_PROGRAM,
         ).forEach { golden ->
             assertEquals(golden, emptyList<String>(), OpenUiLayoutValidator.validate(golden))
         }

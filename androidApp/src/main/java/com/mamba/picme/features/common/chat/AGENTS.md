@@ -50,7 +50,7 @@
 | **ChatInputArea** | `features/chat/ChatScreen.kt`（私有 Composable） | 输入框 + 功能胶囊 + 发送；语音入口为默认关闭的实验能力（见 §8） |
 | **MessageRepository** | `data/repository/MessageRepository.kt` | Room 数据库读写，对话持久化 |
 | **AgentMarkdown** | `features/common/chat/AgentMarkdown.kt` | Agent 正文 Markdown 唯一渲染入口（ADR-016 M3，mikepenz 0.41.0）：Chat 正文 MARKDOWN 段、AiChatScreen 浮动面板、悬浮气泡、MediaPager 视觉结果共用；retainState+immediate 流式参数、白名单内联 HTML（u/mark/sup/sub）annotator、高亮+折叠 codeFence；`![alt](https://图片URL)` 网络图片经 `NetworkImageTransformer`（mikepenz `LocalImageTransformer` 扩展点 + Coil，仅 https、限高 320dp、失败静默，2026-11-02 web_search 图文并茂） |
-| **OpenUI 卡宿主** | `features/chat/openui/` | OpenUI GenUI 卡渲染宿主（2026-10-24 起）：`OpenUiCardHost` 入口（shared `OpenUiSession` 批量求值 + P1 响应式状态粒度重组——per-key 读追踪，action 后仅订阅变更键的节点重组；debug 徽标 overlay 与 A2UI 对偶）、`OpenUiStreamingCard`（P2 流式预览：`OPENUI_STREAM_PREVIEW_ID` 瞬态消息挂列表尾，每帧 program 前缀新建 session 解析渲染，正式 action 帧到达后让位）、分族渲染器 `OpenUiNodeRenderer`/`OpenUiContentRenderers`/`OpenUiCardBlockRenderers`/`OpenUiChartRenderers`/`OpenUiFormRenderers`、`OpenUiCardTokens`（样式令牌只读复用 `A2uiStyleMapper`）、`OpenUiIconMap`（59 枚 name→Material 枚举，四处字面量副本同源钉住）、`OpenUiPhotoResolver`（Image photo id→uri 端侧解析，[PRIVACY] uri 不出端）、`OpenUiBlueprintDebugger`（结构调试）；对偶 A2UI 宿主在 `features/chat/a2ui/`（`A2uiCardHost` 等） |
+| **OpenUI 卡宿主** | `features/chat/openui/` | OpenUI GenUI 卡渲染宿主（2026-10-24 起）：`OpenUiCardHost` 入口（shared `OpenUiSession` 批量求值 + P1 响应式状态粒度重组——per-key 读追踪，action 后仅订阅变更键的节点重组；debug 徽标 overlay（对偶设计自 A2UI 时代沿用））、`OpenUiStreamingCard`（P2 流式预览：`OPENUI_STREAM_PREVIEW_ID` 瞬态消息挂列表尾，每帧 program 前缀新建 session 解析渲染，正式 action 帧到达后让位）、分族渲染器 `OpenUiNodeRenderer`/`OpenUiContentRenderers`/`OpenUiCardBlockRenderers`/`OpenUiChartRenderers`/`OpenUiFormRenderers`、`OpenUiCardTokens`（样式令牌经 `OpenUiStyleMapper` 映射，2026-11-05 自 A2uiStyleMapper 迁移更名）、`OpenUiIconMap`（59 枚 name→Material 枚举，三处字面量副本同源钉住）、`OpenUiPhotoResolver`（Image photo id→uri 端侧解析，[PRIVACY] uri 不出端）、`OpenUiBlueprintDebugger`（结构调试）；对偶 A2UI 宿主（`features/chat/a2ui/`）已随 2026-11-05 A2UI 退役物理删除 |
 
 > 注：Chat 页暂不提供底部快捷入口或右下角展开菜单，相机/模型中心等能力统一从相册首页进入。
 
@@ -103,7 +103,7 @@ fun getDefaultModel(): ChatModelOption {
 data class ChatMessageEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val sessionId: String = "default", // 后续支持多会话
-    val type: String, // 新分类法 11 值：text, image, tool_chart, tool_html, tool_task, tool_image_edit, tool_browser, data_media_results, data_optimize_candidates, data_ui, data_ui_openui（2026-09-28 重构；tool_browser 2026-10-06、data_ui/data_ui_openui 2026-10 GenUI 扩值）
+    val type: String, // 新分类法 10 值：text, image, tool_chart, tool_html, tool_task, tool_image_edit, tool_browser, data_media_results, data_optimize_candidates, data_ui_openui（2026-09-28 重构；tool_browser 2026-10-06、data_ui/data_ui_openui 2026-10 GenUI 扩值；2026-11-05 A2UI 退役删 data_ui，存量消息墓碑兜底为 Text）
     val role: String = "agent", // 消息角色 "user"/"agent"（Room v26 新列，取代 user_/agent_ type 前缀）
     val content: String, // 文本内容或图片路径
     val timestamp: Long = System.currentTimeMillis(),
@@ -136,10 +136,10 @@ data class ChatMessageEntity(
 | MEDIA_RESULTS | `data_media_results` | 媒体检索结果 |
 | OPTIMIZE_CANDIDATES | `data_optimize_candidates` | 优化候选卡组 |
 | BROWSER_LIVE | `tool_browser` | 云端浏览器直播/定格卡（BrowserLive 整颗 JSON，2026-10-06） |
-| A2UI_CARD | `data_ui` | A2UI GenUI 卡（A2uiCard part JSON） |
 | OPENUI_CARD | `data_ui_openui` | OpenUI GenUI 卡（OpenUiCard 整颗 part JSON，2026-10-24；流式预览帧不落库） |
 
 > 2026-09-28 分类法重构：`command`/`plan_preview` 已删除（并入 `text`，存量行经 Room MIGRATION_25_26 转正）；浮动面板 sealed AgentMessage 平行体系不受影响。详见 spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`。
+> 2026-11-05 A2UI 退役：`A2UI_CARD`（`data_ui`）行已随退役删除——`ChatMessageType.A2UI_CARD` 与 `MessagePart.A2uiCard` 物理删除，存量 `data_ui` 消息经 codec/converter 墓碑兜底为可读 Text（不丢消息，详见 CHAT_CARD_CATALOG data_ui 节退役标注）。
 
 ## 5. 快捷入口实现 (QuickActionBar)
 

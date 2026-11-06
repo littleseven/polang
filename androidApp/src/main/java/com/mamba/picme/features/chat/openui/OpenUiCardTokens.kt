@@ -9,13 +9,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mamba.picme.core.designsystem.Spacing
-import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
+import com.mamba.picme.domain.chat.openui.OpenUiTextRole
 
 /**
  * OpenUI 卡内视觉 token（M4，spec《2026-10-25-openui-visual-m4-design》§1.1/§1.2）。
  *
  * A2UI 线是对比实验对照组、样式冻结——本组 token 是 OpenUI 渲染器专属样式面，
- * 与 A2uiStyleMapper/A2uiCardTokens 零样式共享（后者仅只读复用几何尺寸与枚举解析）。
+ * 与 OpenUiStyleMapper/A2uiCardTokens 零样式共享（后者仅只读复用几何尺寸与枚举解析）。
  */
 object OpenUiCardTokens {
 
@@ -23,7 +23,7 @@ object OpenUiCardTokens {
 
     /**
      * DISPLAY 大数字（设计规范 §2：stat tile 统计数值专用，32sp Bold + tnum 等宽数字
-     * 让多栏数字纵向对齐）。OpenUI 专属 role（A2uiTextRole 四值之外，A2UI 对照组冻结）。
+     * 让多栏数字纵向对齐）。OpenUI 专属 role（OpenUiTextRole 四值之外，A2UI 对照组冻结）。
      */
     val displayStyle: TextStyle
         @Composable get() = MaterialTheme.typography.displaySmall.copy(
@@ -34,20 +34,20 @@ object OpenUiCardTokens {
         )
 
     @Composable
-    fun textStyle(role: A2uiTextRole?): TextStyle = when (role) {
-        A2uiTextRole.HEADLINE -> MaterialTheme.typography.titleLarge.copy(
+    fun textStyle(role: OpenUiTextRole?): TextStyle = when (role) {
+        OpenUiTextRole.HEADLINE -> MaterialTheme.typography.titleLarge.copy(
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             lineHeight = 26.sp,
         )
-        A2uiTextRole.SUBHEAD -> MaterialTheme.typography.titleSmall.copy(
+        OpenUiTextRole.SUBHEAD -> MaterialTheme.typography.titleSmall.copy(
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             lineHeight = 21.sp,
         )
-        A2uiTextRole.BODY,
+        OpenUiTextRole.BODY,
         null -> MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp)
-        A2uiTextRole.CAPTION -> MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 16.sp)
+        OpenUiTextRole.CAPTION -> MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, lineHeight = 16.sp)
     }
 
     // ── 间距阶梯（spec §1.1：组件间默认 sm(8)→md(12)；Section 前 md→lg(16)） ──

@@ -29,13 +29,6 @@ sealed interface CloudTurnEvent {
 
     data class Error(val message: String) : CloudTurnEvent
 
-    /** render_ui 云端发卡（A2UI 骨架+绑定槽位；数据端上补全）。 */
-    data class A2uiCard(
-        val surfaceId: String,
-        val messagesJson: String,
-        val fallbackSummary: String,
-    ) : CloudTurnEvent
-
     /** render_ui_openui 云端发卡（OpenUI Lang 1.0 程序；数据端上 local_handle 补全）。 */
     data class OpenUiCard(
         val program: String,
@@ -72,14 +65,12 @@ class CloudAgentTurnRunner(
         sessionId: String,
         text: String,
         byokApiKey: String?,
-        genUiFormat: String = "openui",
         onEvent: (CloudTurnEvent) -> Unit,
     ): Result<Unit> = api.postMessage(
         appToken,
         sessionId,
         text,
         byokApiKey?.takeIf { key -> key.isNotBlank() },
-        genUiFormat,
     ) { frame ->
         when (frame) {
             is CloudFrame.Event -> handleEvent(frame.event, onEvent)
@@ -114,10 +105,9 @@ class CloudAgentTurnRunner(
             // 助手答复（user 回声跳过——本地已先上屏）；
             // turn-native（openui）：assistant content = OpenUI 程序 → OpenUiCard 事件
             // （spec§3.7）；非程序形态（兜底包装理论上已被 server 兜住）按文本降级。
-            // 门判纯按内容嗅探、不以 genUiFormat 为前提（2026-11-02 跨线污染修复）：
-            // A2UI 线无 ProgramGuard/兜底包装，LLM 可能模仿会话历史里的程序格式把
-            // OpenUI 程序当纯文本输出——若还按 genUiFormat 放行文本路径，程序原文会
-            // 经 AgentMarkdown 直接糊上屏（真机事故：调试页白气泡显示整颗程序源码）
+            // 门判纯按内容嗅探（2026-11-02 跨线污染修复；A2UI 线 2026-11-05 退役后仍保留）：
+            // LLM 可能模仿会话历史里的程序格式把 OpenUI 程序当纯文本输出——若放行文本路径，
+            // 程序原文会经 AgentMarkdown 直接糊上屏（真机事故：调试页白气泡显示整颗程序源码）
             "message" -> if (event.optString("role") == "assistant") {
                 val content = payload.optString("content")
                 if (OpenUiProgramSummary.looksLikeProgram(content)) {
@@ -141,19 +131,8 @@ class CloudAgentTurnRunner(
             "action" -> {
                 // 步骤时间线：所有 action 帧先发 StepStarted（含发卡工具），再做卡解析
                 onEvent(CloudTurnEvent.StepStarted(event.optLong("id"), payload.optString("tool")))
-                if (payload.optString("tool") == CloudAgentToolContract.TOOL_RENDER_UI) {
-                    // 终审 m5：render_ui 参数解析容错——坏帧记日志忽略，不拖垮整回合
-                    runCatching {
-                        val args = JSONObject(payload.optString("argsJson"))
-                        CloudTurnEvent.A2uiCard(
-                            surfaceId = args.getString("surfaceId"),
-                            messagesJson = args.getString("messagesJson"),
-                            fallbackSummary = args.optString("fallbackSummary"),
-                        )
-                    }.onSuccess { card -> onEvent(card) }
-                        .onFailure { e -> Logger.w(TAG, "render_ui action frame ignored: ${e.message}") }
-                } else if (payload.optString("tool") == CloudAgentToolContract.TOOL_RENDER_UI_OPENUI) {
-                    // render_ui_openui 同款容错（openui P2）：坏帧记日志忽略
+                if (payload.optString("tool") == CloudAgentToolContract.TOOL_RENDER_UI_OPENUI) {
+                    // render_ui_openui 参数解析容错：坏帧记日志忽略，不拖垮整回合
                     runCatching {
                         val args = JSONObject(payload.optString("argsJson"))
                         CloudTurnEvent.OpenUiCard(

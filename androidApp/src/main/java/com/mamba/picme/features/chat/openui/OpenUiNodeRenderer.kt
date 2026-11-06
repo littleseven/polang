@@ -81,18 +81,12 @@ import com.mamba.picme.core.designsystem.components.AppSlider
 import com.mamba.picme.core.image.faceAwareVerticalAlignment
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
-import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
+import com.mamba.picme.domain.chat.openui.OpenUiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.features.chat.HtmlCard
 import com.mamba.picme.features.chat.HtmlCardSanitizer
-import com.mamba.picme.features.chat.a2ui.A2uiStyleMapper
-import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_BAR_WIDTH
-import com.mamba.picme.features.chat.a2ui.BAR_CHART_SCROLL_THRESHOLD
-import com.mamba.picme.features.chat.a2ui.BarChartBucketLabel
-import com.mamba.picme.features.chat.a2ui.barChartBarHeight
-import com.mamba.picme.features.chat.a2ui.barChartLabelInterval
 import com.mamba.picme.features.chat.media.ChatVideoPlayer
 import com.mamba.picme.features.common.chat.AgentMarkdown
 
@@ -100,7 +94,7 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
  * OpenUI 组件树 → Compose 递归渲染（openui P2 + M2/M3 二十一组件；与 OpenUiLibrary 一一对应）。
  *
  * 语义样式令牌（role/colorRole/spacing）：枚举解析与 colorRole 颜色映射只读复用
- * [A2uiStyleMapper]；字阶/间距阶梯自 M4 起走 OpenUI 专属 [OpenUiCardTokens]（A2UI 是
+ * [OpenUiStyleMapper]；字阶/间距阶梯自 M4 起走 OpenUI 专属 [OpenUiCardTokens]（A2UI 是
  * 对比实验对照组，样式冻结）。BarChart 几何与 PolangBarChartComponent 逐项对齐（同一
  * A2uiCardTokens + 柱高公式 barChartBarHeight + 标签抽稀 barChartLabelInterval + 选中高亮规则，
  * M4 起单系列柱色换色板首色）；Image 经 [photoResolver]
@@ -185,7 +179,7 @@ fun OpenUiNodeRenderer(
                 (node.props["title"] as? OpenUiValue.Str)?.v?.let { cardTitle ->
                     Text(
                         text = cardTitle,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(modifier = Modifier.height(OpenUiCardTokens.sectionGap))
@@ -354,31 +348,31 @@ fun OpenUiNodeRenderer(
             } ?: return
             if (isEmptyBindingFallback(text)) return
             val roleStr = (node.props["role"] as? OpenUiValue.Str)?.v
-            val colorRole = A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
+            val colorRole = OpenUiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
             // 任务卡 OpenUI 化（2026-11-02）：可选行数上限（Ellipsis）——通用长文本截断；
             // 缺省不限制（Int.MAX_VALUE = Compose 无限行口径）
             val maxLinesRaw = (node.props["maxLines"] as? OpenUiValue.Num)?.v?.toInt()
-            // DISPLAY（设计规范 §2：stat tile 大数字）：OpenUI 专属 role，A2uiTextRole 之外
+            // DISPLAY（设计规范 §2：stat tile 大数字）：OpenUI 专属 role，OpenUiTextRole 之外
             if (roleStr == "DISPLAY") {
                 Text(
                     text = text,
                     style = OpenUiCardTokens.displayStyle,
-                    color = A2uiStyleMapper.color(colorRole),
+                    color = OpenUiStyleMapper.color(colorRole),
                     maxLines = maxLinesRaw ?: Int.MAX_VALUE,
                     overflow = if (maxLinesRaw != null) TextOverflow.Ellipsis else TextOverflow.Clip,
                     modifier = modifier,
                 )
                 return
             }
-            val role = A2uiStyleMapper.parseTextRole(roleStr)
+            val role = OpenUiStyleMapper.parseTextRole(roleStr)
             Text(
                 text = text,
                 style = OpenUiCardTokens.textStyle(role),
                 // CAPTION 未显式声明 colorRole 时弱色（M4 §1.1 字阶：CAPTION 12sp 弱色）
-                color = if (role == A2uiTextRole.CAPTION && colorRole == null) {
+                color = if (role == OpenUiTextRole.CAPTION && colorRole == null) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
-                    A2uiStyleMapper.color(colorRole)
+                    OpenUiStyleMapper.color(colorRole)
                 },
                 maxLines = maxLinesRaw ?: Int.MAX_VALUE,
                 overflow = if (maxLinesRaw != null) TextOverflow.Ellipsis else TextOverflow.Clip,
@@ -424,8 +418,8 @@ fun OpenUiNodeRenderer(
                 // 空 html 直接降级（2026-11-01 终审修复波）：不构建 HtmlCard 空白 WebView，
                 // 形态与 sanitizer Rejected 降级一致（CAPTION 弱色文案）
                 Text(
-                    text = stringResource(R.string.chat_a2ui_card_unavailable),
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    text = stringResource(R.string.chat_openui_card_unavailable),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = modifier,
                 )
@@ -449,8 +443,8 @@ fun OpenUiNodeRenderer(
                 )
                 is HtmlCardSanitizer.Result.Rejected -> {
                     Text(
-                        text = stringResource(R.string.chat_a2ui_card_unavailable),
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        text = stringResource(R.string.chat_openui_card_unavailable),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = modifier,
                     )
@@ -537,7 +531,7 @@ private fun OpenUiValue.ComponentVal.isSectionStart(): Boolean =
     type == "BarChart" || type == "PieChart" || type == "LineChart" || type == "Table" ||
         type in openUiChartComponentNames ||
         (type == "Text" &&
-            A2uiStyleMapper.parseTextRole((props["role"] as? OpenUiValue.Str)?.v) == A2uiTextRole.SUBHEAD)
+            OpenUiStyleMapper.parseTextRole((props["role"] as? OpenUiValue.Str)?.v) == OpenUiTextRole.SUBHEAD)
 
 /** 渲染任意组件数组槽（children / Tabs 页签内容）：非组件元素（null 字面量/被剔除）空占位。 */
 @Composable
@@ -785,8 +779,8 @@ private fun OpenUiIcon(node: OpenUiValue.ComponentVal, modifier: Modifier = Modi
     val image = openUiIcon(name) ?: return
     // 设计规范 §1.1 职责分离：装饰 Icon 无 colorRole 时弱色（onSurfaceVariant），
     // primary 只留强调性图标（行为色面积收敛）
-    val colorRole = A2uiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
-    val tint = colorRole?.let { role -> A2uiStyleMapper.color(role) }
+    val colorRole = OpenUiStyleMapper.parseColorRole((node.props["colorRole"] as? OpenUiValue.Str)?.v)
+    val tint = colorRole?.let { role -> OpenUiStyleMapper.color(role) }
         ?: MaterialTheme.colorScheme.onSurfaceVariant
     // 任务卡 OpenUI 化（2026-11-02）：tonal = 图标嵌 surfaceContainerHigh 圆角容器块
     // （28dp r7 + 15dp 图标，通用「图标块」形态，对齐任务卡 ⚙ 块设计）
@@ -937,7 +931,7 @@ private fun OpenUiTabsCapsuleRow(
             ) {
                 Text(
                     text = title,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
                     color = if (selected) {
                         MaterialTheme.colorScheme.onPrimary
                     } else {
@@ -1149,7 +1143,7 @@ private fun OpenUiBarChart(
             // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1226,7 +1220,7 @@ private fun OpenUiBarChart(
                             // 2026-10-31 对帧校准（OpenUILayouts）：轴标签 CAPTION 弱色
                             Text(
                                 text = bucket.label,
-                                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -1285,7 +1279,7 @@ private fun OpenUiSeriesBarChart(node: OpenUiValue.ComponentVal, modifier: Modif
             // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1515,7 +1509,7 @@ private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = 
             // 2026-10-31 对帧校准（OpenUILayouts）：图表标题 CAPTION 12 弱色（帧 SSOT）
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1572,7 +1566,7 @@ private fun OpenUiPieChart(node: OpenUiValue.ComponentVal, modifier: Modifier = 
                 if (!solidPie) {
                     Text(
                         text = openUiPrimitiveText(OpenUiValue.Num(total)) ?: "",
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD),
                         maxLines = 1,
                         overflow = TextOverflow.Clip,
                     )
@@ -1646,7 +1640,7 @@ private fun OpenUiLineChart(node: OpenUiValue.ComponentVal, modifier: Modifier =
     val labelInterval = barChartLabelInterval(labels.size)
     Column(modifier = modifier.fillMaxWidth()) {
         title?.let { text ->
-            Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            Text(text = text, style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD))
         }
         Canvas(
             modifier = Modifier

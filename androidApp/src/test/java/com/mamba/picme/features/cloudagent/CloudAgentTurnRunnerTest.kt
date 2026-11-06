@@ -19,7 +19,6 @@ class CloudAgentTurnRunnerTest {
     /** 假客户端：frames 脚本化，记录 postMessage/postToolResult 调用。 */
     private class FakeApi : CloudAgentApi {
         var sentByokKey: String? = null
-        var sentGenUiFormat: String? = null
         var failMessage: Throwable? = null
         val toolResults = mutableListOf<Triple<String, Boolean, String>>()
         var framesScript: ((CloudFrame) -> Unit) -> Unit = { onFrame -> onFrame(CloudFrame.Done("running")) }
@@ -34,11 +33,9 @@ class CloudAgentTurnRunnerTest {
             sessionId: String,
             content: String,
             byokApiKey: String?,
-            genUiFormat: String,
             onFrame: (CloudFrame) -> Unit,
         ): Result<Unit> {
             sentByokKey = byokApiKey
-            sentGenUiFormat = genUiFormat
             failMessage?.let { return Result.failure(it) }
             framesScript(onFrame)
             return Result.success(Unit)
@@ -204,7 +201,8 @@ class CloudAgentTurnRunnerTest {
     }
 
     @Test
-    fun `render_ui action frame emits a2ui card event`() = runTest {
+    fun `render_ui action frame emits StepStarted without card`() = runTest {
+        // A2UI 退役（2026-11-05）：render_ui 历史 action 帧只上步骤时间线，不再产卡事件
         val api = FakeApi()
         api.framesScript = { onFrame ->
             onFrame(
@@ -218,10 +216,7 @@ class CloudAgentTurnRunnerTest {
         }
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
-        val card = events.filterIsInstance<CloudTurnEvent.A2uiCard>().single()
-        assertEquals("sf-1", card.surfaceId)
-        assertEquals("[{}]", card.messagesJson)
-        assertEquals("327 张", card.fallbackSummary)
+        assertEquals(listOf(CloudTurnEvent.StepStarted(2L, "render_ui"), CloudTurnEvent.Done()), events)
     }
 
     @Test
@@ -360,14 +355,15 @@ class CloudAgentTurnRunnerTest {
     }
 
     @Test
-    fun `render_ui action emits both StepStarted and A2uiCard`() = runTest {
-        // 发卡工具同样先发 StepStarted（在卡事件之前），A2uiCard 行为不回归
+    fun `render_ui_openui action emits both StepStarted and OpenUiCard`() = runTest {
+        // 发卡工具同样先发 StepStarted（在卡事件之前），OpenUiCard 行为不回归
         val api = FakeApi()
         api.framesScript = { onFrame ->
             onFrame(
                 CloudFrame.Event(
                     JSONObject(
-                        """{"id":2,"type":"action","source":"agent","role":"assistant","payload":{"tool":"render_ui","argsJson":"{\"surfaceId\":\"sf-1\",\"messagesJson\":\"[{}]\",\"fallbackSummary\":\"327 张\"}"}}"""
+                        """{"id":2,"type":"action","source":"agent","role":"assistant",""" +
+                            """"payload":{"tool":"render_ui_openui","argsJson":"{\"program\":\"root = Card([])\",\"fallbackSummary\":\"327 张\"}"}}"""
                     ),
                 ),
             )
@@ -377,19 +373,12 @@ class CloudAgentTurnRunnerTest {
         newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
         assertEquals(
             listOf(
-                CloudTurnEvent.StepStarted(2L, "render_ui"),
-                CloudTurnEvent.A2uiCard("sf-1", "[{}]", "327 张"),
+                CloudTurnEvent.StepStarted(2L, "render_ui_openui"),
+                CloudTurnEvent.OpenUiCard("root = Card([])", "327 张"),
                 CloudTurnEvent.Done(),
             ),
             events,
         )
-    }
-
-    @Test
-    fun `genui format is passed through to postMessage`() = runTest {
-        val api = FakeApi()
-        newRunner(api).runTurn("token", "s_1", "hi", null, genUiFormat = "openui") {}
-        assertEquals("openui", api.sentGenUiFormat)
     }
 
     @Test
@@ -401,7 +390,7 @@ class CloudAgentTurnRunnerTest {
             onFrame(CloudFrame.Done("running"))
         }
         val events = mutableListOf<CloudTurnEvent>()
-        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "openui") { events.add(it) }
+        newRunner(api).runTurn("token", "s_1", "text", null) { events.add(it) }
         val card = events.filterIsInstance<CloudTurnEvent.OpenUiCard>().single()
         assertEquals(program, card.program)
         assertEquals("统计", card.fallbackSummary)
@@ -416,37 +405,7 @@ class CloudAgentTurnRunnerTest {
             onFrame(CloudFrame.Done("running"))
         }
         val events = mutableListOf<CloudTurnEvent>()
-        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "openui") { events.add(it) }
+        newRunner(api).runTurn("token", "s_1", "text", null) { events.add(it) }
         assertEquals("兜底文本", events.filterIsInstance<CloudTurnEvent.AssistantText>().single().text)
-    }
-
-    @Test
-    fun `a2ui mode still parses program-shaped message as OpenUiCard`() = runTest {
-        // 跨线污染回归（2026-11-02 真机事故）：A2UI 线无 ProgramGuard，LLM 可能模仿历史
-        // 程序格式把 OpenUI 程序当纯文本输出——门判纯按内容嗅探，程序形态一律落卡，
-        // 绝不把程序原文当文本上屏
-        val api = FakeApi()
-        val program = "// summary: 统计\nroot = Card([Text(\"hi\")])"
-        api.framesScript = { onFrame ->
-            onFrame(assistantMessageFrame(program))
-            onFrame(CloudFrame.Done("running"))
-        }
-        val events = mutableListOf<CloudTurnEvent>()
-        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "a2ui") { events.add(it) }
-        val card = events.filterIsInstance<CloudTurnEvent.OpenUiCard>().single()
-        assertEquals(program, card.program)
-        assertTrue(events.filterIsInstance<CloudTurnEvent.AssistantText>().isEmpty())
-    }
-
-    @Test
-    fun `a2ui mode keeps plain text message as AssistantText`() = runTest {
-        val api = FakeApi()
-        api.framesScript = { onFrame ->
-            onFrame(assistantMessageFrame("这是普通文本答复"))
-            onFrame(CloudFrame.Done("running"))
-        }
-        val events = mutableListOf<CloudTurnEvent>()
-        newRunner(api).runTurn("token", "s_1", "text", null, genUiFormat = "a2ui") { events.add(it) }
-        assertEquals("这是普通文本答复", events.filterIsInstance<CloudTurnEvent.AssistantText>().single().text)
     }
 }

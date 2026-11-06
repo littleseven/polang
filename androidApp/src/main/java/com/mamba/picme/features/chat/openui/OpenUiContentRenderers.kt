@@ -61,7 +61,7 @@ import com.mamba.picme.core.designsystem.BadgeTokens
 import com.mamba.picme.core.designsystem.IconSize
 import com.mamba.picme.core.designsystem.Spacing
 import com.mamba.picme.core.designsystem.StatusColor
-import com.mamba.picme.domain.chat.a2ui.A2uiTextRole
+import com.mamba.picme.domain.chat.openui.OpenUiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
@@ -151,7 +151,7 @@ internal fun OpenUiContentNode(
             val text = (node.props["text"] as? OpenUiValue.Str)?.v ?: return
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = modifier,
             )
@@ -607,11 +607,11 @@ private fun OpenUiContentHeader(
     // 合成 @ToAssistant 上行（点击即回话展开分组，不再渲染无效按钮）
     if (actionLabel == null) {
         Column(modifier = modifier) {
-            Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            Text(text = title, style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD))
             subtitle?.let { text ->
                 Text(
                     text = text,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -623,11 +623,11 @@ private fun OpenUiContentHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+            Text(text = title, style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD))
             subtitle?.let { text ->
                 Text(
                     text = text,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -636,7 +636,7 @@ private fun OpenUiContentHeader(
             text = actionLabel,
             // 2026-10-31 对帧校准（OpenUILayouts pattern-album-groups）：尾部动作位
             // CAPTION 12 弱一档（帧 SSOT；原 BODY 14）
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.clickable(
                 enabled = actions.isNotEmpty(),
@@ -650,11 +650,11 @@ private fun OpenUiContentHeader(
 }
 
 /** TextContent 字阶映射（spec §3.2）：small→CAPTION、default→BODY、large/small-heavy→SUBHEAD、large-heavy→HEADLINE。 */
-private fun textContentRole(raw: String?): A2uiTextRole = when (raw) {
-    "small" -> A2uiTextRole.CAPTION
-    "large", "small-heavy" -> A2uiTextRole.SUBHEAD
-    "large-heavy" -> A2uiTextRole.HEADLINE
-    else -> A2uiTextRole.BODY
+private fun textContentRole(raw: String?): OpenUiTextRole = when (raw) {
+    "small" -> OpenUiTextRole.CAPTION
+    "large", "small-heavy" -> OpenUiTextRole.SUBHEAD
+    "large-heavy" -> OpenUiTextRole.HEADLINE
+    else -> OpenUiTextRole.BODY
 }
 
 /** TextContent：text BINDABLE_STRING + size→字阶（绑定解析不出/冒号尾丢组件，Text 同口径）。 */
@@ -670,7 +670,7 @@ private fun OpenUiContentTextContent(
     Text(
         text = text,
         style = OpenUiCardTokens.textStyle(role),
-        color = if (role == A2uiTextRole.CAPTION) {
+        color = if (role == OpenUiTextRole.CAPTION) {
             MaterialTheme.colorScheme.onSurfaceVariant
         } else {
             MaterialTheme.colorScheme.onSurface
@@ -729,7 +729,7 @@ private fun OpenUiContentCodeBlock(node: OpenUiValue.ComponentVal, modifier: Mod
         language?.let { lang ->
             Text(
                 text = lang,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -813,7 +813,7 @@ private fun OpenUiContentImageGallery(node: OpenUiValue.ComponentVal, modifier: 
                 details?.let { text ->
                     Text(
                         text = text,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -903,9 +903,9 @@ private fun OpenUiContentTagChip(
         else -> 14.dp
     }
     val textRole = when (size) {
-        "sm" -> A2uiTextRole.CAPTION
-        "lg" -> A2uiTextRole.SUBHEAD
-        else -> A2uiTextRole.BODY
+        "sm" -> OpenUiTextRole.CAPTION
+        "lg" -> OpenUiTextRole.SUBHEAD
+        else -> OpenUiTextRole.BODY
     }
     Row(
         modifier = modifier
@@ -966,10 +966,10 @@ private fun OpenUiContentBoldText(
     if (isEmptyBindingFallback(value)) return
     val subtext = (node.props["subtext"] as? OpenUiValue.Str)?.v
     val role = when ((node.props["size"] as? OpenUiValue.Str)?.v) {
-        "xs" -> A2uiTextRole.CAPTION
-        "md" -> A2uiTextRole.SUBHEAD
-        "lg" -> A2uiTextRole.HEADLINE
-        else -> A2uiTextRole.BODY
+        "xs" -> OpenUiTextRole.CAPTION
+        "md" -> OpenUiTextRole.SUBHEAD
+        "lg" -> OpenUiTextRole.HEADLINE
+        else -> OpenUiTextRole.BODY
     }
     Column(modifier = modifier) {
         Text(
@@ -979,7 +979,7 @@ private fun OpenUiContentBoldText(
         subtext?.let { text ->
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1015,13 +1015,13 @@ private fun OpenUiContentIconText(node: OpenUiValue.ComponentVal, modifier: Modi
     val texts: @Composable () -> Unit = {
         Text(
             text = title,
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+            style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
             fontWeight = if (bold) FontWeight.Bold else null,
         )
         subtitle?.let { text ->
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1081,11 +1081,11 @@ private fun OpenUiContentImageText(
             )
         }
         Column {
-            Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+            Text(text = title, style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY))
             subtitle?.let { text ->
                 Text(
                     text = text,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -1125,14 +1125,14 @@ private fun OpenUiContentImageTextLarge(
         }
         Text(
             text = title,
-            style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+            style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD),
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = Spacing.sm),
         )
         subtitle?.let { text ->
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -1163,12 +1163,12 @@ private fun OpenUiContentEntityList(node: OpenUiValue.ComponentVal, modifier: Mo
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 headerLeft?.let { text ->
-                    Text(text = text, style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD))
+                    Text(text = text, style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD))
                 }
                 headerRight?.let { text ->
                     Text(
                         text = text,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -1180,10 +1180,10 @@ private fun OpenUiContentEntityList(node: OpenUiValue.ComponentVal, modifier: Mo
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = left, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+                Text(text = left, style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY))
                 Text(
                     text = right,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -1196,14 +1196,14 @@ private fun OpenUiContentEntityList(node: OpenUiValue.ComponentVal, modifier: Mo
                 footerLeft?.let { text ->
                     Text(
                         text = text,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 footerRight?.let { text ->
                     Text(
                         text = text,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -1275,14 +1275,14 @@ private fun OpenUiContentListBlock(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.title,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     item.subtitle?.let { text ->
                         Text(
                             text = text,
-                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1304,7 +1304,7 @@ private fun OpenUiContentListBlock(
                     ) {
                         Text(
                             text = label,
-                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1,
                         )
@@ -1351,11 +1351,11 @@ private fun OpenUiContentSteps(node: OpenUiValue.ComponentVal, modifier: Modifie
                     }
                 }
                 Column(modifier = Modifier.padding(bottom = Spacing.sm)) {
-                    Text(text = title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+                    Text(text = title, style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY))
                     details?.let { text ->
                         Text(
                             text = text,
-                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -1501,7 +1501,7 @@ private fun OpenUiContentModal(
                 ) {
                     Text(
                         text = title,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.SUBHEAD),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.SUBHEAD),
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = close, modifier = Modifier.size(IconSize.lg)) {
@@ -1548,7 +1548,7 @@ private fun OpenUiContentStatCell(value: String, label: String?, modifier: Modif
         label?.let { text ->
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1671,7 +1671,7 @@ private fun OpenUiContentBanner(
                 text = title,
                 // 2026-10-31 对帧校准（OpenUILayouts pattern-stats-report）：题字升 HEADLINE
                 // 20 Bold（帧 SSOT；原 SUBHEAD 15+Bold 覆写）
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.HEADLINE),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.HEADLINE),
                 color = textColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1679,7 +1679,7 @@ private fun OpenUiContentBanner(
             subtitle?.let { text ->
                 Text(
                     text = text,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = subColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1754,14 +1754,14 @@ private fun OpenUiContentListItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             subtitle?.let { text ->
                 Text(
                     text = text,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1771,7 +1771,7 @@ private fun OpenUiContentListItem(
         trailing?.let { text ->
             Text(
                 text = text,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1792,7 +1792,7 @@ private fun OpenUiContentListItem(
             ) {
                 Text(
                     text = label,
-                    style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                    style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                 )
@@ -1952,7 +1952,7 @@ private fun OpenUiContentAvatarRow(
                 label?.let { text ->
                     Text(
                         text = text,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -2065,7 +2065,7 @@ private fun OpenUiCompareSide(
         if (!label.isNullOrBlank()) {
             Text(
                 text = label,
-                style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -2185,11 +2185,11 @@ private fun OpenUiContentTimeline(
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = entry.title, style = OpenUiCardTokens.textStyle(A2uiTextRole.BODY))
+                    Text(text = entry.title, style = OpenUiCardTokens.textStyle(OpenUiTextRole.BODY))
                     if (!entry.subtitle.isNullOrBlank()) {
                         Text(
                             text = entry.subtitle,
-                            style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                            style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -2197,7 +2197,7 @@ private fun OpenUiContentTimeline(
                 if (!entry.time.isNullOrBlank()) {
                     Text(
                         text = entry.time,
-                        style = OpenUiCardTokens.textStyle(A2uiTextRole.CAPTION),
+                        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

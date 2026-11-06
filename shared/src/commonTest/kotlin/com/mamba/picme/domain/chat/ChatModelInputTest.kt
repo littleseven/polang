@@ -176,28 +176,8 @@ class ChatModelInputTest {
     }
 
     @Test
-    fun `a2ui card data part never enters the model context`() {
-        // hybrid-m2-a2ui M2 T1：data part 默认不回灌 LLM，对齐 MediaResults/OptimizeCandidates
-        val message = ChatMessage(
-            id = "m-a2ui",
-            type = ChatMessageType.A2UI_CARD,
-            content = "",
-            role = ModelInputRole.ASSISTANT,
-            parts = listOf(
-                MessagePart.A2uiCard(
-                    partId = "p0",
-                    surfaceId = "sf-1",
-                    messagesJson = "[]",
-                    fallbackSummary = "327 张，数据在原设备",
-                ),
-            ),
-        )
-        assertEquals(emptyList(), message.toModelInput())
-    }
-
-    @Test
     fun `openui card data part never enters the model context`() {
-        // openui P1：data part 默认不回灌 LLM，对齐 A2uiCard/MediaResults/OptimizeCandidates
+        // openui P1：data part 默认不回灌 LLM，对齐 MediaResults/OptimizeCandidates
         val message = ChatMessage(
             id = "m-openui",
             type = ChatMessageType.OPENUI_CARD,

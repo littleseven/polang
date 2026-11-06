@@ -1,173 +1,162 @@
 package com.mamba.picme.server.agent
 
-import ai.koog.agents.core.tools.annotations.LLMDescription
-import ai.koog.agents.core.tools.annotations.Tool
-
 /**
- * render_ui_openui——云端 Agent 的 OpenUI 发卡工具（openui P2，spec《openui-wire-format-toggle》§5）。
- *
- * 与 [RenderUiToolService]（A2UI 线）互斥注册：AgentRoutes 按请求头 X-GenUI-Format
- * 二选一（缺头/未知值默认 A2UI，向后兼容），LLM 一轮只见其中一套工具描述。
- *
- * 工具体是 CLOUD 侧空执行：OpenUI 程序不经 tool-result 回环，而是经
- * AgentRunner.onToolCallStarting 落的 action 事件（tool+argsJson）随 SSE 下行，
- * 端侧 CloudAgentTurnRunner "action" 分支拦截渲染。工具只回确认文本。
- *
- * ⚠️ @LLMDescription 与 shared `OpenUiContract`/`OpenUiLibrary` 的字面量
- * （data_ui_openui/local_handle/组件签名/$selected 约定）是字面量副本关系
- * （server 不依赖 :shared），改动须双向同步核对。
+ * OpenUI prompt 资产（原 render_ui_openui 工具描述常量，2026-11-05 A2UI 退役/
+ * OpenUI 唯一化时迁入本对象）：DSL 规则 + Icon 词表 + 黄金示例，
+ * [OpenUiTurnNative.SYSTEM_PROMPT] 与校验器/测试同源引用。
  */
-class RenderOpenUiToolService {
+object OpenUiPromptAssets {
+    // 字符串模板插值只许引用 const（编译期常量约束），$selected 的 $ 由此而来
+    private const val D = "$"
 
-    companion object {
-        // 字符串模板插值只许引用 const（编译期常量约束），$selected 的 $ 由此而来
-        private const val D = "$"
+    /**
+     * 黄金示例（program 骨架 SSOT）：@LLMDescription 内嵌文本与
+     * RenderOpenUiValidatorTest 同源引用（A2UI 线 RENDER_UI_EXAMPLE 先例），
+     * 改示例测试必红——防描述与校验器脱节。handleId 用合法形态的样例值
+     * （<id> 占位过不了 LOCAL_HANDLE_FORM 形态校验，示例必须自身合法）。
+     */
+    const val GOLDEN_STATS_PROGRAM =
+        D + "selected = \"\"\n" +
+            "buckets = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#histogram\" }, [])\n" +
+            "root = Card([Text(\"相册按月分布\", \"HEADLINE\"), Text(\"按月统计\", \"CAPTION\"), " +
+            "BarChart(\"每月照片数\", buckets, " + D + "selected)])"
 
-        /**
-         * 黄金示例（program 骨架 SSOT）：@LLMDescription 内嵌文本与
-         * RenderOpenUiValidatorTest 同源引用（A2UI 线 RENDER_UI_EXAMPLE 先例），
-         * 改示例测试必红——防描述与校验器脱节。handleId 用合法形态的样例值
-         * （<id> 占位过不了 LOCAL_HANDLE_FORM 形态校验，示例必须自身合法）。
-         */
-        const val GOLDEN_STATS_PROGRAM =
-            D + "selected = \"\"\n" +
-                "buckets = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#histogram\" }, [])\n" +
-                "root = Card([Text(\"相册按月分布\", \"HEADLINE\"), Text(\"按月统计\", \"CAPTION\"), " +
-                "BarChart(\"每月照片数\", buckets, " + D + "selected)])"
+    /** 图文混排黄金示例（搜索拿 handle 后，照片与文字同卡混排）。 */
+    const val GOLDEN_MIXED_PROGRAM =
+        "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+            "root = Card([Text(\"海边之旅\", \"HEADLINE\"), " +
+            "Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), " +
+            "Text(photos[0].date, \"CAPTION\")])"
 
-        /** 图文混排黄金示例（搜索拿 handle 后，照片与文字同卡混排）。 */
-        const val GOLDEN_MIXED_PROGRAM =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([Text(\"海边之旅\", \"HEADLINE\"), " +
-                "Row([Image(photos[0].id), Image(photos[1].id), Image(photos[2].id)]), " +
-                "Text(photos[0].date, \"CAPTION\")])"
+    /**
+     * 交互黄金示例（M2，spec《openui-component-library-m2-design》§5）：
+     * BarChart 点选 + Text($selected) 联动文案 + CheckBox 勾选回写。
+     */
+    const val GOLDEN_INTERACTIVE_PROGRAM =
+        D + "selected = \"\"\n" +
+            D + "onlyFavorites = false\n" +
+            "buckets = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#histogram\" }, [])\n" +
+            "root = Card([Text(\"我的相册\", \"HEADLINE\"), " +
+            "BarChart(\"每月照片数\", buckets, " + D + "selected), " +
+            "Text(\"当前选中: \" + " + D + "selected, \"CAPTION\"), " +
+            "CheckBox(\"只看精选\", " + D + "onlyFavorites)])"
 
-        /**
-         * 交互黄金示例（M2，spec《openui-component-library-m2-design》§5）：
-         * BarChart 点选 + Text($selected) 联动文案 + CheckBox 勾选回写。
-         */
-        const val GOLDEN_INTERACTIVE_PROGRAM =
-            D + "selected = \"\"\n" +
-                D + "onlyFavorites = false\n" +
-                "buckets = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#histogram\" }, [])\n" +
-                "root = Card([Text(\"我的相册\", \"HEADLINE\"), " +
-                "BarChart(\"每月照片数\", buckets, " + D + "selected), " +
-                "Text(\"当前选中: \" + " + D + "selected, \"CAPTION\"), " +
-                "CheckBox(\"只看精选\", " + D + "onlyFavorites)])"
+    /**
+     * 图文报表黄金示例（M3，spec《openui-component-library-m3-design》§4.2）：
+     * Table + PieChart + Callout 组合（纯骨架无 Query 绑定亦可发卡）。
+     */
+    const val GOLDEN_REPORT_PROGRAM =
+        "root = Card([Text(\"相册健康报告\", \"HEADLINE\"), " +
+            "Callout(\"本月新增 328 张，存储占用健康\", \"结论\", \"SUCCESS\"), " +
+            "PieChart(\"类目占比\", [{label: \"人像\", value: 142}, {label: \"风景\", value: 98}]), " +
+            "Table([{label: \"月份\"}, {label: \"数量\"}], " +
+            "[[\"2026-01\", 128], [\"2026-02\", 200]])])"
 
-        /**
-         * 图文报表黄金示例（M3，spec《openui-component-library-m3-design》§4.2）：
-         * Table + PieChart + Callout 组合（纯骨架无 Query 绑定亦可发卡）。
-         */
-        const val GOLDEN_REPORT_PROGRAM =
-            "root = Card([Text(\"相册健康报告\", \"HEADLINE\"), " +
-                "Callout(\"本月新增 328 张，存储占用健康\", \"结论\", \"SUCCESS\"), " +
-                "PieChart(\"类目占比\", [{label: \"人像\", value: 142}, {label: \"风景\", value: 98}]), " +
-                "Table([{label: \"月份\"}, {label: \"数量\"}], " +
-                "[[\"2026-01\", 128], [\"2026-02\", 200]])])"
+    /**
+     * 统计大数字黄金示例（stat tile 构图，设计规范 §4.1）：DISPLAY 数字 + CAPTION 弱色
+     * 标签，Row 等宽分栏放 2~4 个。反模式：Text("7894 张照片") 纯文本统计行。
+     */
+    const val GOLDEN_STAT_TILE_PROGRAM =
+        "root = Card([Text(\"相册年度统计\", \"HEADLINE\"), " +
+            "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片总数\", \"CAPTION\")], align = \"center\"), " +
+            "Column([Text(\"771\", \"DISPLAY\"), Text(\"视频总数\", \"CAPTION\")], align = \"center\"), " +
+            "Column([Text(\"12\", \"DISPLAY\"), Text(\"覆盖月份\", \"CAPTION\")], align = \"center\")])])"
 
-        /**
-         * 统计大数字黄金示例（stat tile 构图，设计规范 §4.1）：DISPLAY 数字 + CAPTION 弱色
-         * 标签，Row 等宽分栏放 2~4 个。反模式：Text("7894 张照片") 纯文本统计行。
-         */
-        const val GOLDEN_STAT_TILE_PROGRAM =
-            "root = Card([Text(\"相册年度统计\", \"HEADLINE\"), " +
-                "Row([Column([Text(\"7,120\", \"DISPLAY\"), Text(\"照片总数\", \"CAPTION\")], align = \"center\"), " +
-                "Column([Text(\"771\", \"DISPLAY\"), Text(\"视频总数\", \"CAPTION\")], align = \"center\"), " +
-                "Column([Text(\"12\", \"DISPLAY\"), Text(\"覆盖月份\", \"CAPTION\")], align = \"center\")])])"
+    /**
+     * 图文排版黄金示例（2026-10-30 图文组合固化）：相册照片走 ImageTextLarge/ImageText
+     * 组合组件的 photo 键（版式结构性锁死），不再 Row 裸拼 Image+Text。
+     */
+    const val GOLDEN_PHOTO_TEXT_PROGRAM =
+        "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+            "root = Card([Text(\"本周精选\", \"HEADLINE\"), " +
+            "ImageTextLarge(\"海边日落\", photo = photos[0].id, subtitle = \"2026-07-18\"), " +
+            "ImageText(\"山顶云海\", photo = photos[1].id, subtitle = \"2026-07-19\"), " +
+            "ImageText(\"城市夜景\", photo = photos[2].id, subtitle = \"2026-07-20\")])"
 
-        /**
-         * 图文排版黄金示例（2026-10-30 图文组合固化）：相册照片走 ImageTextLarge/ImageText
-         * 组合组件的 photo 键（版式结构性锁死），不再 Row 裸拼 Image+Text。
-         */
-        const val GOLDEN_PHOTO_TEXT_PROGRAM =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([Text(\"本周精选\", \"HEADLINE\"), " +
-                "ImageTextLarge(\"海边日落\", photo = photos[0].id, subtitle = \"2026-07-18\"), " +
-                "ImageText(\"山顶云海\", photo = photos[1].id, subtitle = \"2026-07-19\"), " +
-                "ImageText(\"城市夜景\", photo = photos[2].id, subtitle = \"2026-07-20\")])"
+    /**
+     * 通用布局黄金示例（2026-10-30 通用布局原语批次；2026-10-31 相册批次修订）：
+     * 照片墙走 PhotoGrid 固化件（Grid 装 Image 会被布局门禁退回），
+     * Grid/Row weights 留给图表与混合内容的比例分栏（1:2 按比例左图右文）。
+     */
+    const val GOLDEN_LAYOUT_PROGRAM =
+        "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+            "root = Card([Text(\"本周精选\", \"HEADLINE\"), " +
+            "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id], columns = 2), " +
+            "Spacer(\"s\"), " +
+            "Row([Image(photos[4].id), " +
+            "Column([Text(\"海边日落\"), Text(\"2026-07-18 · 三亚\", \"CAPTION\")])], " +
+            "weights = [1, 2], align = \"center\")])"
 
-        /**
-         * 通用布局黄金示例（2026-10-30 通用布局原语批次；2026-10-31 相册批次修订）：
-         * 照片墙走 PhotoGrid 固化件（Grid 装 Image 会被布局门禁退回），
-         * Grid/Row weights 留给图表与混合内容的比例分栏（1:2 按比例左图右文）。
-         */
-        const val GOLDEN_LAYOUT_PROGRAM =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([Text(\"本周精选\", \"HEADLINE\"), " +
-                "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id], columns = 2), " +
-                "Spacer(\"s\"), " +
-                "Row([Image(photos[4].id), " +
-                "Column([Text(\"海边日落\"), Text(\"2026-07-18 · 三亚\", \"CAPTION\")])], " +
-                "weights = [1, 2], align = \"center\")])"
+    /**
+     * 经典组合版式黄金示例（2026-10-31 经典组合版式批次）：Banner 题图横幅 +
+     * StatRow 统计行 + List([ListItem...]) 经典列表——固化构图一行调用，
+     * 不再 Row+Column+Text(DISPLAY) 拼装。
+     */
+    const val GOLDEN_CLASSIC_PROGRAM =
+        "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+            "root = Card([Banner(\"本周精选\", photo = photos[0].id, subtitle = \"2026-07-18 · 三亚\"), " +
+            "StatRow([{value: \"7,120\", label: \"照片总数\"}, {value: \"128\", label: \"本周新增\"}, " +
+            "{value: \"12\", label: \"覆盖月份\"}]), " +
+            "ListItem(\"海边日落\", photo = photos[1].id, trailing = \"07-18\"), " +
+            "ListItem(\"山顶云海\", photo = photos[2].id, trailing = \"07-19\")])"
 
-        /**
-         * 经典组合版式黄金示例（2026-10-31 经典组合版式批次）：Banner 题图横幅 +
-         * StatRow 统计行 + List([ListItem...]) 经典列表——固化构图一行调用，
-         * 不再 Row+Column+Text(DISPLAY) 拼装。
-         */
-        const val GOLDEN_CLASSIC_PROGRAM =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([Banner(\"本周精选\", photo = photos[0].id, subtitle = \"2026-07-18 · 三亚\"), " +
-                "StatRow([{value: \"7,120\", label: \"照片总数\"}, {value: \"128\", label: \"本周新增\"}, " +
-                "{value: \"12\", label: \"覆盖月份\"}]), " +
-                "ListItem(\"海边日落\", photo = photos[1].id, trailing = \"07-18\"), " +
-                "ListItem(\"山顶云海\", photo = photos[2].id, trailing = \"07-19\")])"
+    /**
+     * 相册 APP 构图黄金示例（2026-10-31 相册 APP 组合方式批次）：CardHeader 时间分组
+     * 标题 + PhotoGrid 方形照片网格 + AvatarRow 人物头像条——相册 APP 签名形态一行调用，
+     * 不再 Grid+Image / Row 拼装。actionLabel 必配 action（2026-10-31 真机回归补：
+     * 只传 actionLabel 不传 action 曾致「查看全部」点击无效；@ToAssistant 以用户消息
+     * 上行回话，端侧有同文案兜底但显式文案语境更准）。
+     */
+    const val GOLDEN_PHOTO_PROGRAM =
+        "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+            "root = Card([CardHeader(\"2026年7月\", subtitle = \"128 张\", " +
+            "actionLabel = \"查看全部\", action = @ToAssistant(\"查看全部 2026年7月的照片\")), " +
+            "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id, " +
+            "photos[4].id, photos[5].id], columns = 3), " +
+            "AvatarRow([{photo: photos[0].id, label: \"妈妈\"}, {photo: photos[1].id, label: \"宝宝\"}])])"
 
-        /**
-         * 相册 APP 构图黄金示例（2026-10-31 相册 APP 组合方式批次）：CardHeader 时间分组
-         * 标题 + PhotoGrid 方形照片网格 + AvatarRow 人物头像条——相册 APP 签名形态一行调用，
-         * 不再 Grid+Image / Row 拼装。actionLabel 必配 action（2026-10-31 真机回归补：
-         * 只传 actionLabel 不传 action 曾致「查看全部」点击无效；@ToAssistant 以用户消息
-         * 上行回话，端侧有同文案兜底但显式文案语境更准）。
-         */
-        const val GOLDEN_PHOTO_PROGRAM =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([CardHeader(\"2026年7月\", subtitle = \"128 张\", " +
-                "actionLabel = \"查看全部\", action = @ToAssistant(\"查看全部 2026年7月的照片\")), " +
-                "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id, " +
-                "photos[4].id, photos[5].id], columns = 3), " +
-                "AvatarRow([{photo: photos[0].id, label: \"妈妈\"}, {photo: photos[1].id, label: \"宝宝\"}])])"
+    /** 前后对比黄金示例（2026-10-31 布局可控性批次）：CompareRow 统一双图帧。 */
+    const val GOLDEN_COMPARE_PROGRAM =
+        "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+            "root = Card([Text(\"背景替换效果\", \"HEADLINE\"), " +
+            "CompareRow(beforePhoto = photos[0].id, afterPhoto = photos[1].id, " +
+            "beforeLabel = \"替换前\", afterLabel = \"替换后\"), " +
+            "Text(\"已保留人物主体，背景换成海边黄昏\", \"CAPTION\")])"
 
-        /** 前后对比黄金示例（2026-10-31 布局可控性批次）：CompareRow 统一双图帧。 */
-        const val GOLDEN_COMPARE_PROGRAM =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([Text(\"背景替换效果\", \"HEADLINE\"), " +
-                "CompareRow(beforePhoto = photos[0].id, afterPhoto = photos[1].id, " +
-                "beforeLabel = \"替换前\", afterLabel = \"替换后\"), " +
-                "Text(\"已保留人物主体，背景换成海边黄昏\", \"CAPTION\")])"
+    /** 时间轴黄金示例（2026-10-31 布局可控性批次）：回忆/事件流。 */
+    const val GOLDEN_TIMELINE_PROGRAM =
+        "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
+            "root = Card([Text(\"海边之旅\", \"HEADLINE\"), " +
+            "Timeline([{title: \"三亚日落\", subtitle: \"海边散步两小时\", time: \"2026-07-18\", photo: photos[0].id}, " +
+            "{title: \"山顶云海\", subtitle: \"清晨登山\", time: \"2026-07-19\", photo: photos[1].id}, " +
+            "{title: \"返程\", time: \"2026-07-20\"}])])"
 
-        /** 时间轴黄金示例（2026-10-31 布局可控性批次）：回忆/事件流。 */
-        const val GOLDEN_TIMELINE_PROGRAM =
-            "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
-                "root = Card([Text(\"海边之旅\", \"HEADLINE\"), " +
-                "Timeline([{title: \"三亚日落\", subtitle: \"海边散步两小时\", time: \"2026-07-18\", photo: photos[0].id}, " +
-                "{title: \"山顶云海\", subtitle: \"清晨登山\", time: \"2026-07-19\", photo: photos[1].id}, " +
-                "{title: \"返程\", time: \"2026-07-20\"}])])"
+    /**
+     * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
+     * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
+     * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
+     */
+    const val ICON_NAMES_TEXT =
+        "accountCircle, add, arrowBack, arrowForward, attachFile, calendarToday, call, " +
+            "camera, check, close, delete, download, edit, error, event, fastForward, " +
+            "favorite, favoriteOff, folder, help, home, info, locationOn, lock, lockOpen, " +
+            "mail, menu, moreHoriz, moreVert, notifications, notificationsOff, pause, " +
+            "payment, person, phone, photo, play, print, refresh, rewind, search, send, " +
+            "settings, share, shoppingCart, skipNext, skipPrevious, star, starHalf, " +
+            "starOff, stop, upload, visibility, visibilityOff, volumeDown, volumeMute, " +
+            "volumeOff, volumeUp, warning"
 
-        /**
-         * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
-         * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
-         * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
-         */
-        const val ICON_NAMES_TEXT =
-            "accountCircle, add, arrowBack, arrowForward, attachFile, calendarToday, call, " +
-                "camera, check, close, delete, download, edit, error, event, fastForward, " +
-                "favorite, favoriteOff, folder, help, home, info, locationOn, lock, lockOpen, " +
-                "mail, menu, moreHoriz, moreVert, notifications, notificationsOff, pause, " +
-                "payment, person, phone, photo, play, print, refresh, rewind, search, send, " +
-                "settings, share, shoppingCart, skipNext, skipPrevious, star, starHalf, " +
-                "starOff, stop, upload, visibility, visibilityOff, volumeDown, volumeMute, " +
-                "volumeOff, volumeUp, warning"
-
-        /**
-         * OpenUI Lang 1.0 DSL 规则正文（约束规则 → 时间轴黄金示例，逐字剪切自原
-         * @LLMDescription，annotation 可拼接编译期常量——拼接结果逐字节不变，
-         * RenderOpenUiToolServiceTest + 描述探针钉住）；[OpenUiTurnNative.SYSTEM_PROMPT]
-         * 同源复用（工具语境与回合原生响应语境共享同一份规则，零漂移）。
-         */
-        const val DSL_RULES =
-            """约束（必须全部满足，否则端上拒绝渲染或静默丢弃组件）：
+    /**
+     * OpenUI Lang 1.0 DSL 规则正文（约束规则 → 时间轴黄金示例，逐字剪切自原
+     * @LLMDescription，annotation 可拼接编译期常量——拼接结果逐字节不变，
+     * OpenUiPromptAssetsTest 钉住）；[OpenUiTurnNative.SYSTEM_PROMPT]
+     * 同源复用（工具语境与回合原生响应语境共享同一份规则，零漂移）。
+     *
+     * ⚠️ 守卫：raw string 正文顶格为保持提示词字节，禁 re-indent——Kotlin raw
+     * string 的前导空白是字符串值的一部分（曾因脚本 dedent 被腐蚀过）。
+     */
+    const val DSL_RULES =
+        """约束（必须全部满足，否则端上拒绝渲染或静默丢弃组件）：
 1. program 是 OpenUI Lang 1.0 程序：每行一条语句，形如 `名 = 表达式`；组件调用
    大写开头——位置参数按签名序填入，可选参数推荐命名实参写法（如
    photo = photos[0].id、align = "center"）；字符串一律双引号；
@@ -480,38 +469,4 @@ class RenderOpenUiToolService {
 """ + GOLDEN_COMPARE_PROGRAM + """
    时间轴黄金示例：
 """ + GOLDEN_TIMELINE_PROGRAM
-    }
-
-    @Tool(customName = "render_ui_openui")
-    @LLMDescription(
-        """向用户下发一张 OpenUI 原生渲染卡（图表/统计可视化首选，优于 render_html）。
-""" + DSL_RULES
-    )
-    suspend fun renderUiOpenUi(
-        @LLMDescription("OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据）")
-        program: String,
-        @LLMDescription("投影级降级摘要（数据缺失时端上展示的占位文案）")
-        fallbackSummary: String,
-    ): String {
-        // 与发射点门控同源校验（review 🟡4 对偶）：非法回 error 文本作 Observation
-        // 回灌，LLM 同轮修正重试（同 RenderUiToolService 闭环口径）
-        RenderOpenUiValidator.validateToError(program)?.let { error -> return error }
-        // 布局门禁（2026-10-31 布局可控性批次）：矫正后程序过结构校验，违规同轮退回；
-        // 机械性问题已被 normalize 无声修复，此处见到的都是结构反模式
-        val normalized = OpenUiLayoutNormalizer.normalize(program)
-        val layoutViolations = OpenUiLayoutValidator.validate(normalized)
-        if (layoutViolations.isNotEmpty()) {
-            // 回显用 LLM 原始 program（非 normalized）——保留 2026-10-24 自纠定位能力
-            return OpenUiLayoutValidator.errorText(layoutViolations, program)
-        }
-        // 构图软警告（DISPLAY≤4 / Button≤3 / CardHeader 配对提醒）：卡照发，建议附在回执里供下次发卡改进
-        val warnings = RenderOpenUiValidator.lintComposition(normalized)
-        return buildString {
-            append("UI 已下发端侧渲染（OpenUI）")
-            if (warnings.isNotEmpty()) {
-                append("。构图建议（本卡已下发、无需重发，下次发卡请改进）：")
-                warnings.forEach { warning -> append("\n- ").append(warning) }
-            }
-        }
-    }
 }

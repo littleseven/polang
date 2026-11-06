@@ -1,6 +1,5 @@
 package com.mamba.picme.features.chat.openui
 
-import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -48,7 +47,7 @@ fun OpenUiStreamingCard(
     }
     val current = preview
     if (current == null) {
-        A2uiSurfaceDefaults.LoadingIndicator()
+        OpenUiCardLoading()
     } else {
         OpenUiNodeRenderer(
             node = current.root,

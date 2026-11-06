@@ -29,7 +29,7 @@ enum class PartCategory {
  * `@Immutable` 注解不进 commonMain（ADR-013 纯度守卫禁 androidx.compose import），
  * Compose 稳定性注解属 M4 性能清单的 androidApp 侧收口。
  *
- * 序列化：kotlinx JSON（[MessagePartsCodec]），`type` 鉴别字段值遵循 9 值分类法
+ * 序列化：kotlinx JSON（[MessagePartsCodec]），`type` 鉴别字段值遵循 10 值分类法
  * （type taxonomy spec §1），`ignoreUnknownKeys` 保证前向兼容（新版本 part 字段旧版本可读）。
  */
 @Serializable
@@ -116,26 +116,6 @@ sealed interface MessagePart {
     data class MediaResults(
         override val partId: String,
         val results: MediaResultsUi,
-    ) : MessagePart {
-        override val category: PartCategory get() = PartCategory.DATA
-    }
-
-    /**
-     * A2UI GenUI 卡（data part：默认不回灌 LLM，M2 hybrid-m2-a2ui）。
-     *
-     * [messagesJson] 为 A2UI v0.9 信封 JSON 数组的线格式原文（createSurface/updateComponents/
-     * updateDataModel…），只含骨架与绑定槽位，数据经 local:// handle 端上补全（D2/D6）。
-     * [fallbackSummary] 为投影级降级摘要（US-6 占位卡文案，云端可持有）。
-     * [viewState] 为交互态 fragment（local://…#view 的 view 部分；同 part id 覆写持久化，US-7）。
-     */
-    @Serializable
-    @SerialName("data_ui")
-    data class A2uiCard(
-        override val partId: String,
-        val surfaceId: String,
-        val messagesJson: String,
-        val fallbackSummary: String,
-        val viewState: String? = null,
     ) : MessagePart {
         override val category: PartCategory get() = PartCategory.DATA
     }

@@ -1,4 +1,4 @@
-package com.mamba.picme.domain.chat.a2ui
+package com.mamba.picme.domain.chat.openui
 
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -16,7 +16,7 @@ data class ScanPhotoEntry(
     val mediaType: String? = null,
 )
 
-/** 月桶（A2UI BarChart buckets 槽位的数据形态）。 */
+/** 月桶（OpenUI BarChart buckets 槽位的数据形态）。 */
 @Serializable
 data class HistogramBucket(
     /** yyyy-MM */
@@ -25,7 +25,7 @@ data class HistogramBucket(
 )
 
 /**
- * 命中集 → 月度直方图（HandleResolver 填槽用纯函数，spec §7 接缝 3）。
+ * 命中集 → 月度直方图（OpenUI 卡 local_handle 取数用纯函数，spec §7 接缝 3）。
  * GenUI 只生成骨架不生成数据：桶计算永远在端上发生。
  */
 object GalleryHistogramBuilder {
