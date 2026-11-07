@@ -1,6 +1,6 @@
 # 分层 Agent Runtime M1（端云同构：消灭契约/策略/执行器三份双写）实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** server 经 composite build 依赖 `:shared` jvm 变体，`DeviceToolService`/`CloudAgentStrategy`/`AgentExecutorFactory` 三处双写改为真引用 shared SSOT，端侧行为零变化。
 
@@ -27,7 +27,7 @@
 - Modify: `server/build.gradle.kts`（dependencies 块）
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/SharedModuleSmokeTest.kt`（新建）
 
-- [ ] **Step 1: 写冒烟测试（红：编译期 unresolved reference）**
+- [x] **Step 1: 写冒烟测试（红：编译期 unresolved reference）**
 
 ```kotlin
 package com.mamba.picme.server.agent
@@ -48,7 +48,7 @@ class SharedModuleSmokeTest {
 }
 ```
 
-- [ ] **Step 2: shared 设 composite 替换坐标**
+- [x] **Step 2: shared 设 composite 替换坐标**
 
 `shared/build.gradle.kts` 末尾追加：
 
@@ -60,7 +60,7 @@ group = "com.mamba.picme"
 version = "1.0.0"
 ```
 
-- [ ] **Step 3: server 挂复合构建 + 声明依赖**
+- [x] **Step 3: server 挂复合构建 + 声明依赖**
 
 `server/settings.gradle.kts` 末尾追加：
 
@@ -81,12 +81,12 @@ includeBuild("..")
     implementation("com.mamba.picme:shared:1.0.0")
 ```
 
-- [ ] **Step 4: 构建验证（绿）**
+- [x] **Step 4: 构建验证（绿）**
 
 Run: `./gradlew -p server build`
 Expected: BUILD SUCCESSFUL，`SharedModuleSmokeTest` 通过。若 Koog metadata 404，重跑加 `JITPACK=true`（根构建 settings 读此环境变量切仓库序）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/build.gradle.kts server/settings.gradle.kts server/build.gradle.kts server/src/test/kotlin/com/mamba/picme/server/agent/SharedModuleSmokeTest.kt
@@ -102,7 +102,7 @@ git commit -m "build(server): composite build 消费 :shared jvm 变体（分层
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/DeviceToolService.kt`
 - Test: `server/src/test/kotlin/com/mamba/picme/server/agent/DeviceToolDescriptionTest.kt`（追加用例）
 
-- [ ] **Step 1: shared 契约新增描述常量区（逐字自 server 迁入）**
+- [x] **Step 1: shared 契约新增描述常量区（逐字自 server 迁入）**
 
 `CloudAgentToolContract.kt` object 内末尾追加：
 
@@ -133,7 +133,7 @@ git commit -m "build(server): composite build 消费 :shared jvm 变体（分层
 
 同时把类 KDoc 中「server `DeviceToolService`（Ktor，`@Tool(customName=…)` 注解需编译期常量且 server 不依赖 :shared，持字面量副本——改动本文件任一常量必须同步核对 server 侧）」改写为「server `DeviceToolService`（分层 runtime M1 起经 composite build 真引用本对象 const，含工具名与 DESC_* 描述）」；Swift 副本注记保留不动。
 
-- [ ] **Step 2: server 描述钉住测试（先红后绿意义上的等价断言）**
+- [x] **Step 2: server 描述钉住测试（先红后绿意义上的等价断言）**
 
 `DeviceToolDescriptionTest.kt` 追加（import 增 `com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract`）：
 
@@ -155,16 +155,16 @@ git commit -m "build(server): composite build 消费 :shared jvm 变体（分层
     }
 ```
 
-- [ ] **Step 3: DeviceToolService 改真引用**
+- [x] **Step 3: DeviceToolService 改真引用**
 
 三处 `@Tool(customName = "…")` 改 `@Tool(customName = CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY)` 等；全部 `@LLMDescription("…")` 字面量改对应 `CloudAgentToolContract.DESC_*`；`executeOnDevice("get_gallery_summary", …)` 等工具名实参同步改常量；`"error: device_offline"`/`"error: device_tool_timeout"` 改 `CloudAgentToolContract.ERROR_PREFIX + " device_offline"` / `+ " device_tool_timeout"`（两处 complete 调用与两处 return，共 4 个点）；文件 import 增 `com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract`。类 KDoc 中「工具名/`error:` 前缀/32_000 字符截断的 SSOT = shared commonMain `CloudAgentToolContract`（M3 收口；server 不依赖 :shared，本类持字面量副本——改契约常量须双向同步核对）。@LLMDescription 的投影承诺面与 shared CloudAgentToolCatalog.projectionSchema 逐字对齐（混合架构 M1），改动须双向同步核对。」整段改写为「工具名/描述/`error:` 前缀全部真引用 shared `CloudAgentToolContract`（分层 runtime M1，composite build）；投影承诺面与 shared `CloudAgentToolCatalog.projectionSchema` 同源。」
 
-- [ ] **Step 4: 测试验证**
+- [x] **Step 4: 测试验证**
 
 Run: `./gradlew -p server test --tests "com.mamba.picme.server.agent.DeviceToolDescriptionTest" --tests "com.mamba.picme.server.agent.DeviceToolServiceTest"`
 Expected: 全绿（描述逐字等价，存量断言不受影响）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/tool/CloudAgentToolContract.kt server/src/main/kotlin/com/mamba/picme/server/agent/DeviceToolService.kt server/src/test/kotlin/com/mamba/picme/server/agent/DeviceToolDescriptionTest.kt
@@ -181,7 +181,7 @@ git commit -m "refactor(agent): 云端设备工具名与描述收口 shared Clou
 - Test: `shared/src/commonTest/kotlin/com/mamba/picme/agent/core/remote/config/RemoteModelFactoryTest.kt`（追加用例）
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/AgentExecutorFactory.kt`（重写 create）
 
-- [ ] **Step 1: shared 测试先行（红）**
+- [x] **Step 1: shared 测试先行（红）**
 
 `RemoteModelFactoryTest.kt` 追加：
 
@@ -237,12 +237,12 @@ git commit -m "refactor(agent): 云端设备工具名与描述收口 shared Clou
     }
 ```
 
-- [ ] **Step 2: 跑测试确认前两个红**
+- [x] **Step 2: 跑测试确认前两个红**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "com.mamba.picme.agent.core.remote.config.RemoteModelFactoryTest"`
 Expected: `host marker rule injects …` 与 `custom chatCompletionsPath …` FAIL（前者 example.com 外 host 不命中旧 providerId 规则；后者 `chatCompletionsPath` 参数不存在编译失败——编译失败等同红）。
 
-- [ ] **Step 3: RemoteModelConfig 增字段**
+- [x] **Step 3: RemoteModelConfig 增字段**
 
 `RemoteModelConfig` 主构造 `deviceId` 之后追加：
 
@@ -256,7 +256,7 @@ Expected: `host marker rule injects …` 与 `custom chatCompletionsPath …` FA
     val chatCompletionsPath: String = "",
 ```
 
-- [ ] **Step 4: RemoteModelFactory 参数化**
+- [x] **Step 4: RemoteModelFactory 参数化**
 
 `createKoogExecutor` 签名改：
 
@@ -318,12 +318,12 @@ thinking 规则改并集（KDoc 同步说明）：
     private val THINKING_DISABLED_HOST_MARKERS = listOf("tokenhub", "moonshot", "deepseek")
 ```
 
-- [ ] **Step 5: shared 测试验证（绿）+ 全量回归**
+- [x] **Step 5: shared 测试验证（绿）+ 全量回归**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest`
 Expected: 全绿（含存量 5 用例——端侧路径口径不变）。
 
-- [ ] **Step 6: server AgentExecutorFactory 重写为适配器**
+- [x] **Step 6: server AgentExecutorFactory 重写为适配器**
 
 整个 class 体替换为（`BuiltExecutor` 与构造签名不变；删 `clampTemperature`/`shouldInjectThinkingDisabled`/`THINKING_DISABLED_HOSTS`/`MAX_TOKENS` 及 companion；`CfAigKoogHttpClientFactory` 保留不动）：
 
@@ -375,12 +375,12 @@ import 改为：`ai.koog.http.client.KoogHttpClient` / `ai.koog.http.client.ktor
 
 行为差说明（钉在 commit message）：shared 工厂 `apiKey.ifEmpty { "gateway-auth" }` 兜底对 server 不可达（target.apiKey 恒非空）；`OpenAIClientSettings` 显式传 `chatCompletionsPath`（target 默认 `v1/chat/completions`，与 Koog 客户端默认值相同，BEARER 裸目标 URL 不变）。
 
-- [ ] **Step 7: server 全量测试验证**
+- [x] **Step 7: server 全量测试验证**
 
 Run: `./gradlew -p server build`
 Expected: 全绿（AgentRunnerTest/AgentRoutesTest/AgentRoutesBridgeTest 经 MockEngine 真跑工厂，钉住 URL 拼接/headers/流式行为等价）。
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/agent/core/remote/config/ shared/src/commonTest/kotlin/com/mamba/picme/agent/core/remote/config/ server/src/main/kotlin/com/mamba/picme/server/agent/AgentExecutorFactory.kt
@@ -397,7 +397,7 @@ git commit -m "refactor(agent): 云端执行器收口 shared RemoteModelFactory�
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/ProgramGuard.kt`（增 `asCorrector`）
 - Modify: `server/src/main/kotlin/com/mamba/picme/server/agent/CloudAgentStrategy.kt`（重写策略函数，保留 `cloudAgentPrompt`）
 
-- [ ] **Step 1: shared 测试先行（红）**
+- [x] **Step 1: shared 测试先行（红）**
 
 新建 `PoLangReActStrategyTest.kt`：
 
@@ -449,12 +449,12 @@ class PoLangReActStrategyTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认红**
+- [x] **Step 2: 跑测试确认红**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest --tests "com.mamba.picme.agent.core.inference.remote.koog.PoLangReActStrategyTest"`
 Expected: 编译失败（`PoLangReActStrategyConfig`/`FinalOutputCorrector` 不存在）。
 
-- [ ] **Step 3: KoogReActStrategy.kt 重写**
+- [x] **Step 3: KoogReActStrategy.kt 重写**
 
 文件全量替换为：
 
@@ -645,12 +645,12 @@ private suspend fun AIAgentLLMWriteSession.requestLLMMaybeStreaming(
 }
 ```
 
-- [ ] **Step 4: shared 测试验证（绿）**
+- [x] **Step 4: shared 测试验证（绿）**
 
 Run: `JITPACK=true ./gradlew :shared:jvmTest`
 Expected: 全绿（新增 4 用例 + 存量）。
 
-- [ ] **Step 5: ProgramGuard 增适配 + CloudAgentStrategy 重写**
+- [x] **Step 5: ProgramGuard 增适配 + CloudAgentStrategy 重写**
 
 `ProgramGuard.kt` class 内追加（import 增 `com.mamba.picme.agent.core.inference.remote.koog.FinalOutputCorrector`）：
 
@@ -693,12 +693,12 @@ internal fun cloudAgentStrategy(
 
 保留 import：`AIAgentGraphStrategy` / `com.mamba.picme.agent.core.inference.remote.koog.PoLangReActStrategyConfig` / `com.mamba.picme.agent.core.inference.remote.koog.poLangSingleRunStrategy` / `org.slf4j.LoggerFactory` / `strategyLogger` 定义；`cloudAgentPrompt` 函数与其 import（`Prompt`/`prompt`/`Message`→不需要/`LLMParams`）原样保留。
 
-- [ ] **Step 6: server 全量测试验证**
+- [x] **Step 6: server 全量测试验证**
 
 Run: `./gradlew -p server build`
 Expected: 全绿（AgentRunnerTest 中 ProgramGuard 纠正链路用例钉住行为等价）。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/koog/ shared/src/commonTest/kotlin/com/mamba/picme/agent/core/inference/remote/koog/ server/src/main/kotlin/com/mamba/picme/server/agent/ProgramGuard.kt server/src/main/kotlin/com/mamba/picme/server/agent/CloudAgentStrategy.kt
@@ -715,25 +715,25 @@ git commit -m "refactor(agent): 云端策略收口 shared poLangSingleRunStrateg
 - Modify: `docs/superpowers/README.md`（§6 白名单登记 spec+plan，§7 变更记录）
 - Modify: `AGENTS.md`（§7 索引加一行在途 spec 指针）
 
-- [ ] **Step 1: server/AGENTS.md 同步**
+- [x] **Step 1: server/AGENTS.md 同步**
 
 - `AgentExecutorFactory.kt` 行改：「Koog 执行器组装（分层 runtime M1 起委托 shared `RemoteModelFactory.createKoogExecutor`，本类仅剩 CF_AIG 鉴权包装与目标映射）」
 - `CloudAgentStrategy.kt` 行改：「单跑 ReAct 策略的云端配置组装（分层 runtime M1 起图结构收口 shared `poLangSingleRunStrategy` 配置化工厂；流式节点 + ProgramGuard 纠正）」
 - `DeviceToolService.kt` 行改：「端侧只读三件套 Koog 适配（tool_request 帧 + 120s 挂起；工具名/描述真引用 shared `CloudAgentToolContract`，分层 runtime M1）」
 - §6 构建与部署节加：「构建依赖（2026-11-07 起）：server 经 composite build（`includeBuild("..")`）消费 `:shared` jvm 变体（`com.mamba.picme:shared:1.0.0`）——**构建 server 需要本机 Android SDK**（:shared 配置含 android target）；部署构建在开发机执行、VPS 只跑 jar，不受影响。」
 
-- [ ] **Step 2: shared/AGENTS.md 同步**
+- [x] **Step 2: shared/AGENTS.md 同步**
 
 - §2 `inference/remote/` 行：`poLangSingleRunStrategy` 描述改「配置化工厂（`PoLangReActStrategyConfig`：name/streaming/finalOutputCorrector/onStreamingFallback；默认路径=端侧现行内建节点实现，云端=流式+纠正节点；server `cloudAgentStrategy` 同源消费）」；`CloudAgentToolContract` 描述改「三工具名/error: 前缀/截断/纯函数 + DESC_* 云端 LLM 可见描述 SSOT（server DeviceToolService 经 composite build 真引用）」。
 - §2 `remote/config/` 行改：「`RemoteModelFactory`/`RemoteModelConfig`/`KoogHttpClientFactoryProvider`（按 `RemoteProtocol` 分流；`createKoogExecutor` 增 `httpClientFactory` 注入缝与 `chatCompletionsPath` 透传，thinking 注入 = providerId 白名单 ‖ 空 providerId 历史行为 ‖ baseUrl host 标记并集；server `AgentExecutorFactory` 同源消费）」。
 - §3 依赖方向图加一行：`server（独立构建，composite includeBuild）──→ :shared（jvm 变体，com.mamba.picme:shared:1.0.0）`。
 
-- [ ] **Step 3: 白名单登记 + 根索引**
+- [x] **Step 3: 白名单登记 + 根索引**
 
 `docs/superpowers/README.md` §6 specs 列表加：「`2026-11-07-layered-agent-runtime-design.md` — 分层 Agent runtime（One Agent, Two Runtimes：七层模型，M1 契约/策略/执行器同源在途，M2~M6 见 spec §2）」；plans 行加 `2026-11-07-layered-agent-runtime-m1.md`；§7 变更记录加一行。
 根 `AGENTS.md` §7 索引加一行：「**分层 Agent runtime（M1 在途）** | `docs/superpowers/specs/2026-11-07-layered-agent-runtime-design.md`（端云同构七层模型 + 开关=TurnRunner 选择；M1=server 依赖 :shared 消灭三份双写）」。
 
-- [ ] **Step 4: 全量验收**
+- [x] **Step 4: 全量验收**
 
 Run（顺序）:
 1. `JITPACK=true ./gradlew :shared:jvmTest` — 绿
@@ -742,7 +742,7 @@ Run（顺序）:
 4. `./gradlew :androidApp:compileDebugKotlinAndroid` — 绿（KMP android 插件任务名以实际为准，失败时 `:androidApp:assembleDebug` 兜底）
 5. `python3 scripts/check_doc_sync.py` — 绿（若存在且 ai-gate 覆盖则跑 `./scripts/ai-gate.sh`）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/AGENTS.md shared/AGENTS.md docs/superpowers/README.md AGENTS.md
