@@ -1,8 +1,10 @@
 package com.mamba.picme.server.agent
 
-import ai.koog.agents.core.tools.annotations.LLMDescription
-import ai.koog.agents.core.tools.annotations.Tool
+import ai.koog.agents.core.tools.Tool
+import ai.koog.serialization.typeToken
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolCatalog
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
+import com.mamba.picme.agent.core.inference.remote.tool.CloudToolSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -31,18 +33,35 @@ data class ToolRequestFrame(
 }
 
 /**
- * 端侧设备工具的云端 Koog 适配器（ADR-018 决策 2 工具桥，spec §3.3）：
+ * 目录驱动的端侧桥工具（分层 runtime M2）：shared `CloudAgentToolCatalog` 的一个
+ * LOCAL 条目 = 一件编程式 Koog 工具。LLM 可见 schema（名称/描述/参数集）自
+ * [CloudAgentToolCatalog.descriptorFor] 派生，桥层零工具知识——execute 把 LLM 给的
+ * args JsonObject 原样入帧下行（参数缺省补齐在端侧 executor，目录 defaultFor 同源）。
+ */
+class CatalogBridgeTool(
+    private val spec: CloudToolSpec,
+    private val executor: suspend (tool: String, args: JsonObject) -> String,
+) : Tool<JsonObject, String>(
+    argsType = typeToken<JsonObject>(),
+    resultType = typeToken<String>(),
+    descriptor = CloudAgentToolCatalog.descriptorFor(spec.name),
+) {
+    override suspend fun execute(args: JsonObject): String = executor(spec.name, args)
+}
+
+/**
+ * 端侧设备工具的云端桥（ADR-018 决策 2 工具桥，spec §3.3）：
  * execute = 注册挂起 → 经 [onToolRequest] 向 SSE 写 tool_request 帧 → withTimeout 等上行结果。
  * 写帧失败 = 端已断线，立即 `error: device_offline` 不挂起；超时 = `error: device_tool_timeout`。
  * 两者都以文本返回（Observation 照常落流，pending 不变式不被桥破坏）。
  *
  * 每轮由路由层以当轮 SSE writer 构造新实例（onToolRequest 捕获 writer），不进单例。
- * @Tool 参数全部必填无默认值（Koog 反射派发约束，对齐端侧 ChatToolService 先例）。
  * M2 只读三件套；写类工具等决策 1a 逆操作执行链（M3）。
  *
- * 工具名/LLM 可见描述/`error:` 前缀全部真引用 shared `CloudAgentToolContract`
- *（分层 runtime M1，composite build）；投影承诺面与 shared
- * `CloudAgentToolCatalog.projectionSchema` 同源。
+ * 分层 runtime M2 起工具集目录驱动：[tools] 按 shared `CloudAgentToolCatalog.localTools()`
+ * 循环生成 [CatalogBridgeTool]（原 @Tool 反射方法已退役）；工具名/LLM 可见描述/
+ * 参数声明/`error:` 前缀全部真引用 shared `CloudAgentToolContract`/目录（M1 起
+ * composite build）；投影承诺面与目录 projectionSchema 同源。
  */
 class DeviceToolService(
     private val sessionId: String,
@@ -51,48 +70,11 @@ class DeviceToolService(
     private val onToolRequest: suspend (ToolRequestFrame) -> Unit,
 ) {
 
-    @Tool(customName = CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY)
-    @LLMDescription(CloudAgentToolContract.DESC_GET_GALLERY_SUMMARY)
-    suspend fun getGallerySummary(): String =
-        executeOnDevice(CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY, buildJsonObject {})
-
-    @Tool(customName = CloudAgentToolContract.TOOL_SEARCH_MEDIA)
-    @LLMDescription(CloudAgentToolContract.DESC_SEARCH_MEDIA)
-    suspend fun searchMedia(
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_QUERY) query: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_PERSON) person: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_FROM_MS) fromMs: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_TO_MS) toMs: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_HAS_FACE) hasFace: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_DISPLAY) display: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_MEDIA_TYPE) mediaType: String,
-    ): String = executeOnDevice(
-        CloudAgentToolContract.TOOL_SEARCH_MEDIA,
-        buildJsonObject {
-            put("query", query)
-            put("person", person)
-            put("fromMs", fromMs)
-            put("toMs", toMs)
-            put("hasFace", hasFace)
-            put("display", display)
-            put("mediaType", mediaType)
-        },
-    )
-
-    @Tool(customName = CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH)
-    @LLMDescription(CloudAgentToolContract.DESC_REFINE_MEDIA_SEARCH)
-    suspend fun refineMediaSearch(
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_CONSTRAINT) constraint: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_FROM_MS) fromMs: String,
-        @LLMDescription(CloudAgentToolContract.DESC_PARAM_TO_MS) toMs: String,
-    ): String = executeOnDevice(
-        CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
-        buildJsonObject {
-            put("constraint", constraint)
-            put("fromMs", fromMs)
-            put("toMs", toMs)
-        },
-    )
+    /** 目录声明的全部 LOCAL 工具（每件 = 一条桥通路，descriptor 自目录派生）。 */
+    fun tools(): List<CatalogBridgeTool> =
+        CloudAgentToolCatalog.localTools().map { spec ->
+            CatalogBridgeTool(spec, ::executeOnDevice)
+        }
 
     private suspend fun executeOnDevice(tool: String, args: JsonObject): String {
         val requestId = "tr_" + UUID.randomUUID().toString().replace("-", "").take(8)

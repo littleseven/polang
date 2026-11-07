@@ -268,8 +268,9 @@ fun Route.agentRoute(
                         writeSseFrame(frame.toJson())
                     }
                     // GenUI 唯一化（2026-11-06）：恒 turn-native，无发卡工具注册
+                    // 分层 runtime M2：端侧工具集目录驱动（CloudAgentToolCatalog → CatalogBridgeTool）
                     val toolRegistry = ToolRegistry {
-                        tools(ServerToolService().asToolsByClass() + deviceTools.asToolsByClass())
+                        tools(ServerToolService().asToolsByClass() + deviceTools.tools())
                     }
                     try {
                         // 回合用量累计（done 帧性能数据源；见 AgentRunner.turnUsage KDoc）

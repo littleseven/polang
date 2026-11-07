@@ -1,6 +1,6 @@
 package com.mamba.picme.server.agent
 
-import ai.koog.agents.core.tools.reflect.asToolsByClass
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolCatalog
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -9,11 +9,12 @@ import org.junit.Test
 /**
  * LLM 可见描述只许承诺 projectionSchema 面（混合架构 M1，spec §3.1③）：
  * 三设备工具描述必须显式声明「不含文件路径/媒体清单」，防止描述漂移暗示全量数据可得。
+ * 分层 runtime M2：工具集自 shared `CloudAgentToolCatalog` 目录生成，descriptor 与目录逐项等价。
  */
 class DeviceToolDescriptionTest {
 
     private val descriptors = DeviceToolService("s", AgentBridgeRegistry()) { _ -> }
-        .asToolsByClass()
+        .tools()
         .associateBy { tool -> tool.descriptor.name }
 
     @Test
@@ -56,5 +57,17 @@ class DeviceToolDescriptionTest {
             CloudAgentToolContract.DESC_REFINE_MEDIA_SEARCH,
             descriptors.getValue("refine_media_search").descriptor.description,
         )
+    }
+
+    @Test
+    fun `descriptors equal catalog-generated descriptors`() {
+        // 目录即工具声明唯一源头（分层 runtime M2）：注册进 ToolRegistry 的 descriptor
+        // 必须与 CloudAgentToolCatalog.descriptorFor 逐项相等（名称/描述/参数集）
+        CloudAgentToolCatalog.localTools().forEach { spec ->
+            assertEquals(
+                CloudAgentToolCatalog.descriptorFor(spec.name),
+                descriptors.getValue(spec.name).descriptor,
+            )
+        }
     }
 }
