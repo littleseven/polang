@@ -545,10 +545,12 @@ class AdminViewsTest {
         assertTrue(html.contains("4000ms"))
         assertTrue(html.contains("/admin/skills/debug/result/abcd1234-0000-0000-0000-000000000000"))
         assertTrue(html.contains("/admin/agent/sessions/bbbb2222-0000-0000-0000-000000000000"))
-        // 扫码网格（0.9.38）：有最终程序的会话出二维码（三列网格），无最终程序的不出
+        // 一行三列 case 卡（0.9.39）：每轮一卡，二维码在上、case 信息在下
         assertTrue(html.contains("qr-grid"))
-        assertEquals(1, html.split("class=\"qr-cell\"").size - 1) // done 出、running 不出
-        assertTrue(html.contains("手机扫码预览（端上真实渲染器）"))
+        assertEquals(2, html.split("class=\"qr-cell\"").size - 1) // 两轮各一卡
+        // 二维码门控：有最终程序的 done 出码（SVG 图形），无最终程序的 running 占位明示
+        assertEquals(1, html.split("shape-rendering=\"crispEdges\"").size - 1)
+        assertTrue(html.contains("无最终程序"))
     }
 
     @Test

@@ -1016,59 +1016,44 @@ object AdminViews {
                 section("settings-section") {
                     div("section-head") {
                         h2("section-title") { +"调试历史（${history.size}）" }
-                        p("section-desc") { +"每轮调试会话留底（model=skill-debug，最新 20 条）；事件与完整回放页共享，结果页带手机壳可视化预览。" }
+                        p("section-desc") { +"每轮调试会话留底（model=skill-debug，最新 20 条），一行三列卡片：扫码上真机渲染，码下为本轮 case 信息；结果页带手机壳可视化预览。" }
                     }
                     if (history.isEmpty()) {
                         p("meta") { +"（尚无调试记录——跑一轮后此处留底）" }
                     } else {
-                        table {
-                            tr {
-                                th { +"时间" }
-                                th { +"技能" }
-                                th { +"测试消息" }
-                                th { +"状态" }
-                                th { +"耗时" }
-                                th { +"事件" }
-                                th { +"操作" }
-                            }
+                        // 一行三列 case 卡（0.9.39）：二维码在上、case 信息在下，一卡一轮。
+                        // 二维码门控与 final-program 取数端点同口径（hasFinalProgram），
+                        // 无最终程序的会话扫码必 404 → 不出码，占位框明示。
+                        div("qr-grid") {
                             history.forEach { h ->
-                                tr {
-                                    td { +fmtTs(h.session.createdAt) }
-                                    td { +(h.skillName ?: "（未触发）") }
-                                    td { +((h.testMessage ?: "—").take(80)) }
-                                    td {
-                                        when {
-                                            h.finishReason == null -> span("badge") { +"运行中" }
-                                            h.finishReason == "done" -> span("badge badge-active") { +"完成" }
-                                            else -> span("st-badge st-blocked") { +"异常" }
-                                        }
-                                    }
-                                    td { +(h.elapsedMs?.let { "${it}ms" } ?: "—") }
-                                    td { +h.session.eventCount.toString() }
-                                    td {
-                                        a("/admin/skills/debug/result/${h.session.id}", classes = "btn-sm") { +"结果" }
-                                        +" "
-                                        a("/admin/agent/sessions/${h.session.id}", classes = "btn-sm") { +"回放" }
-                                    }
-                                }
-                            }
-                        }
-                        // 手机扫码预览网格（0.9.38）：有最终程序的会话直接扫码上真机渲染，
-                        // 一行三列；门控与 final-program 取数端点同口径（hasFinalProgram）
-                        val qrRows = history.filter { it.hasFinalProgram }
-                        if (qrRows.isNotEmpty()) {
-                            p("block-label") { +"手机扫码预览（端上真实渲染器）" }
-                            p("meta") { +"PoLang 调试包云端 Agent 页扫码，按会话拉取最终程序渲染。" }
-                            div("qr-grid") {
-                                qrRows.forEach { h ->
-                                    div("qr-cell") {
+                                div("qr-cell") {
+                                    if (h.hasFinalProgram) {
                                         unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(h.session.id))) }
-                                        div("qr-meta") {
-                                            +"${h.skillName ?: "（未触发）"} · ${fmtTs(h.session.createdAt)}"
-                                            br
-                                            +h.session.id.take(8)
+                                    } else {
+                                        div("qr-none") { +"无最终程序" }
+                                    }
+                                    div("qr-info") {
+                                        div("qr-line qr-head") {
+                                            span("qr-skill") { +(h.skillName ?: "（未触发）") }
+                                            when {
+                                                h.finishReason == null -> span("badge") { +"运行中" }
+                                                h.finishReason == "done" -> span("badge badge-active") { +"完成" }
+                                                else -> span("st-badge st-blocked") { +"异常" }
+                                            }
                                         }
-                                        a("/admin/skills/debug/result/${h.session.id}", classes = "btn-sm") { +"结果" }
+                                        div("qr-msg") { +((h.testMessage ?: "—").take(60)) }
+                                        div("qr-line") {
+                                            span { +fmtTs(h.session.createdAt) }
+                                            span { +h.session.id.take(8) }
+                                        }
+                                        div("qr-line") {
+                                            span { +"耗时 ${h.elapsedMs?.let { "${it}ms" } ?: "—"}" }
+                                            span { +"事件 ${h.session.eventCount}" }
+                                        }
+                                        div("qr-actions") {
+                                            a("/admin/skills/debug/result/${h.session.id}", classes = "btn-sm") { +"结果" }
+                                            a("/admin/agent/sessions/${h.session.id}", classes = "btn-sm") { +"回放" }
+                                        }
                                     }
                                 }
                             }
@@ -2575,11 +2560,16 @@ object AdminViews {
                         .qr-row{display:flex;gap:18px;align-items:center;padding:14px 16px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md);margin-bottom:14px}
                         .qr-row svg{flex-shrink:0;border:1px solid var(--c-border);border-radius:var(--r-sm)}
                         .qr-row .meta{word-break:break-all}
-                        /* 调试历史扫码网格（0.9.38）：一行三列，每列一个会话二维码 */
+                        /* 调试历史 case 卡网格（0.9.38 起三列；0.9.39 起二维码+信息合一卡） */
                         .qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:10px}
-                        .qr-cell{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md)}
+                        .qr-cell{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md)}
                         .qr-cell svg{border:1px solid var(--c-border);border-radius:var(--r-sm)}
-                        .qr-cell .qr-meta{text-align:center;word-break:break-all;font-size:var(--fs-xs);color:var(--c-text-3);line-height:1.6}
+                        .qr-none{width:168px;height:168px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--c-border);border-radius:var(--r-sm);color:var(--c-text-3);font-size:var(--fs-xs)}
+                        .qr-info{width:100%;display:flex;flex-direction:column;gap:4px;font-size:var(--fs-xs);color:var(--c-text-3);line-height:1.6}
+                        .qr-info .qr-line{display:flex;justify-content:space-between;align-items:center;gap:8px}
+                        .qr-info .qr-head .qr-skill{font-weight:600;color:var(--c-text)}
+                        .qr-info .qr-msg{color:var(--c-text-2);word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+                        .qr-info .qr-actions{display:flex;gap:8px;margin-top:2px}
                         /* 发包管理 v2（依 Ardot 设计稿：双轨版本卡 + 双栏上传 + 分轨历史） */
                         .track-row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
                         .track-card{flex:1;min-width:320px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:16px 20px}
