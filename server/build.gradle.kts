@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.mamba.picme"
-version = "0.9.20"
+version = "0.9.21"
 
 repositories { mavenCentral() }
 
@@ -71,6 +71,18 @@ dependencies {
 
 application {
     mainClass.set("com.mamba.picme.server.ApplicationKt")
+}
+
+// skill 资产进分发包（Skill 中心，2026-11-07）：installDist 输出 skills/ 目录，
+// systemd WorkingDirectory=/home/ubuntu/picme-server 下 SkillCenter 缺省相对路径
+// "skills" 即解析命中，VPS 零 env 改动。⚠️ 仓库 server/skills/ 是生产 skill 的 SSOT
+// ——deploy.sh rsync --delete 语义下，后台直改 VPS 的 skill 会被下次部署覆盖。
+distributions {
+    main {
+        contents {
+            from("skills") { into("skills") }
+        }
+    }
 }
 
 // 把 gradle version 注入 jar manifest，HealthzRoute 运行时读取，避免版本号硬编码漂移
