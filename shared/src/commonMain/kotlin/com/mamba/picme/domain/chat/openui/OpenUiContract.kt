@@ -24,6 +24,12 @@ object OpenUiContract {
     /** 端上宿主工具名（Query("local_handle", ...) → HandleLookup 端侧补全，隐私闸对偶）。 */
     const val TOOL_LOCAL_HANDLE = "local_handle"
 
+    /** 组件外允许的大写调用：取数语句关键字（语言级，与 [Actions.WRAPPER] 同族）。 */
+    const val CALL_QUERY = "Query"
+
+    /** 组件外允许的大写调用：写工具语句关键字（@Run 执行，2026-11-01 官方对齐）。 */
+    const val CALL_MUTATION = "Mutation"
+
     /** BarChart 选中桶的绑定 state 变量名。 */
     const val STATE_SELECTED = "\$selected"
 
@@ -76,9 +82,16 @@ object OpenUiContract {
     /**
      * scan 句柄的 #videos fragment（2026-11-04 Video 组件）：
      * `local://scan/<id>#videos` → 端侧投影 [{id, date, durationSec}]（cap 60）。
-     * server `OpenUiPromptAssets` 描述文本持字面量副本，改动须双向同步核对。
+     * server 校验器 fragment 闭集自此真引用（分层 runtime M1.5）。
      */
     const val FRAGMENT_VIDEOS = "videos"
+
+    /**
+     * scan 句柄的 #histogram fragment（柱状图分桶投影，GalleryHistogramBuilder）：
+     * `local://scan/<id>#histogram` → 端侧投影 [{label, count}]。
+     * server 校验器 fragment 闭集自此真引用（分层 runtime M1.5）。
+     */
+    const val FRAGMENT_HISTOGRAM = "histogram"
 
     /**
      * viewState 线格式（2026-11-01 泛化，review Y4）：`name=value;name=value` 键值对序列——

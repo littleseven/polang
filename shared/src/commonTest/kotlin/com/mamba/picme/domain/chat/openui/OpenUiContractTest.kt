@@ -67,4 +67,19 @@ class OpenUiContractTest {
             OpenUiContract.parseLocalHandle("local://scan/7f3a#"),
         )
     }
+
+    @Test
+    fun fragmentConstants_pinWireValues() {
+        // fragment 闭集 SSOT（分层 runtime M1.5：server LOCAL_HANDLE_FORM 自此真引用）
+        assertEquals("histogram", OpenUiContract.FRAGMENT_HISTOGRAM)
+        assertEquals("photos", OpenUiContract.FRAGMENT_PHOTOS)
+        assertEquals("videos", OpenUiContract.FRAGMENT_VIDEOS)
+    }
+
+    @Test
+    fun callNameConstants_pinLanguageKeywords() {
+        // 组件外允许的大写调用关键字（Query 取数 / Mutation 写工具语句）
+        assertEquals("Query", OpenUiContract.CALL_QUERY)
+        assertEquals("Mutation", OpenUiContract.CALL_MUTATION)
+    }
 }

@@ -126,6 +126,16 @@ class OpenUiLibraryM2Test {
         assertEquals(OpenUiPropType.BINDABLE_STRING, textProp.type)
     }
 
+    @Test
+    fun `componentNames derives from components map`() {
+        // 分层 runtime M1.5：componentNames 是 server 校验器/prompt 生成的消费面，
+        // 必须与 components 注册表同源（派生而非平行清单）
+        assertEquals(OpenUiLibrary.components.keys, OpenUiLibrary.componentNames)
+        assertEquals(103, OpenUiLibrary.componentNames.size)
+        assertTrue("Card" in OpenUiLibrary.componentNames)
+        assertTrue("Video" in OpenUiLibrary.componentNames)
+    }
+
     // ── BINDABLE_BOOLEAN（CheckBox.checked） ─────────────────────────
 
     @Test

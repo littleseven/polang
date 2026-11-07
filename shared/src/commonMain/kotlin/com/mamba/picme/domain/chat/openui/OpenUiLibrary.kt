@@ -1598,4 +1598,12 @@ object OpenUiLibrary {
             listOf(childrenProp),
         ),
     ).associateBy { component -> component.name }
+
+    /**
+     * 组件名闭集（自 [components] 派生，非平行清单）——server 校验器白名单
+     * （`RenderOpenUiValidator.ALLOWED_COMPONENTS`）与 prompt 组件清单生成
+     * （`OpenUiTurnNative.SYSTEM_PROMPT`）自此真引用（分层 runtime M1.5），
+     * 不再持字面量副本。
+     */
+    val componentNames: Set<String> = components.keys
 }
