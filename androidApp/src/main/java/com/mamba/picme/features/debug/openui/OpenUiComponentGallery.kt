@@ -2,12 +2,9 @@ package com.mamba.picme.features.debug.openui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,9 +24,13 @@ import com.mamba.picme.features.chat.openui.OpenUiCardHost
 import com.mamba.picme.features.chat.openui.OpenUiPhotoResolver
 
 /**
- * OpenUI 全组件画廊（debug 专用，参照 AGenUI demo 的 load-all 页）：枚举
+ * OpenUI 全组件画廊数据与单卡渲染件（debug 专用，参照 AGenUI demo 的 load-all 页）：枚举
  * `OpenUiLibrary` 全部可独立渲染组件，每个组件一条独立 OpenUI Lang 程序、
  * 经真实发卡路径（[OpenUiCardHost]：prepare → 渲染 → 交互回写）渲染。
+ *
+ * 2026-11-07 起宿主自 Debug 页 Tab 迁入云端 Agent 调试页的 OpenUiDebugOverlay
+ * （features/cloudagent/），本文件只留演示数据（[openUiDemoGroups]）与单卡渲染件
+ * （[OpenUiDemoItem]）供 Overlay 嵌入，不再自持独立页面。
  *
  * 单组件单卡隔离：任一组件 prepare 失败/静默丢弃不影响其他卡；每条卡上方标注
  * 组件协议名 + prepare 错误计数（✗=Failed 降级 / ⚠=Rendered 带非致命错误），
@@ -47,11 +48,11 @@ import com.mamba.picme.features.chat.openui.OpenUiPhotoResolver
 /** 单个组件演示：name = 组件协议名，program = 独立 OpenUI Lang 1.0 程序（含 root 语句）。 */
 data class OpenUiComponentDemo(val name: String, val program: String)
 
-private data class OpenUiDemoGroup(val title: String, val demos: List<OpenUiComponentDemo>)
+internal data class OpenUiDemoGroup(val title: String, val demos: List<OpenUiComponentDemo>)
 
 private val D = '$'
 
-private val demoGroups: List<OpenUiDemoGroup> = listOf(
+internal val openUiDemoGroups: List<OpenUiDemoGroup> = listOf(
     OpenUiDemoGroup(
         "Layout 布局容器",
         listOf(
@@ -402,7 +403,7 @@ private val demoGroups: List<OpenUiDemoGroup> = listOf(
     ),
 )
 
-private val elementShapeNote =
+internal val openUiElementShapeNote =
     "元素形状组件（仅在父组件槽内有语义，独立渲染为空占位，不单独演示）：TabItem / AccordionItem / " +
         "ListItem / StepsItem / SelectItem / CheckBoxItem / RadioItem / SwitchItem / ChipItem / OptionCard / " +
         "Series / Slice / ScatterSeries / Point / SnippetCardItem / OverviewCardItem / ContextCardItem / " +
@@ -420,49 +421,9 @@ private val galleryHandleLookup = object : HandleLookup {
 /** 照片解析 stub：演示程序不用 photo 通道（Image 全走 https src），恒 null 落占位。 */
 private val galleryPhotoResolver = OpenUiPhotoResolver { null }
 
-@Composable
-fun OpenUiComponentGallery(modifier: Modifier = Modifier) {
-    val total = demoGroups.sumOf { it.demos.size }
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        item {
-            Text(
-                text = "OpenUI Load All · $total components · ${demoGroups.size} groups",
-                style = MaterialTheme.typography.titleSmall,
-                fontFamily = FontFamily.Monospace,
-            )
-        }
-        demoGroups.forEach { group ->
-            item(key = "group-${group.title}") {
-                Text(
-                    text = group.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = Spacing.sm),
-                )
-            }
-            group.demos.forEach { demo ->
-                item(key = "demo-${demo.name}") {
-                    OpenUiDemoItem(demo)
-                }
-            }
-        }
-        item {
-            Text(
-                text = elementShapeNote,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 /** 单组件卡：组件名 + prepare 错误标记（✗ 降级 / ⚠ 非致命错误数+明细）+ 真实路径渲染。 */
 @Composable
-private fun OpenUiDemoItem(demo: OpenUiComponentDemo) {
+internal fun OpenUiDemoItem(demo: OpenUiComponentDemo) {
     // 并行 prepare 一次专取错误明细（画廊程序无 Query，纯解析开销可忽略）；
     // 渲染仍走 OpenUiCardHost 真实路径（它内部再建 session）
     val prep by produceState<OpenUiResult?>(initialValue = null, demo.program) {

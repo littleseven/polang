@@ -42,19 +42,23 @@ class CloudAgentChatViewModel(
     private val stepLabel: (Int) -> String,
 ) : ViewModel() {
 
-    /** 媒体卡消息经 [media] 携带渲染数据、H5 卡消息经 [htmlCard] 携带；其余 role 恒为 null。 */
+    /** 媒体卡消息经 [media] 携带、H5 卡经 [htmlCard] 携带、OpenUI 预览卡经 [openUiCard] 携带；其余 role 恒为 null。 */
     data class UiMessage(
         val id: Long,
         val role: Role,
         val text: String,
         val media: MediaResultsUi? = null,
         val htmlCard: HtmlCardUi? = null,
+        val openUiCard: OpenUiCardUi? = null,
     )
 
     /** 云端 render_html 产物卡的 UI 数据（HTML 渲染前由 Screen 过 HtmlCardSanitizer）。 */
     data class HtmlCardUi(val html: String, val summary: String)
 
-    enum class Role { USER, ASSISTANT, TOOL, ERROR, MEDIA, HTML_CARD }
+    /** OpenUI 调试预览卡（扫码/会话加载/画廊注入；label = 来源标注，如会话短 id·model 或组件名）。 */
+    data class OpenUiCardUi(val program: String, val label: String)
+
+    enum class Role { USER, ASSISTANT, TOOL, ERROR, MEDIA, HTML_CARD, OPENUI_CARD }
 
     sealed interface UiState {
         data object Preparing : UiState
@@ -255,6 +259,22 @@ class CloudAgentChatViewModel(
     fun stop() {
         turnJob?.cancel()
         setInFlight(false)
+    }
+
+    /**
+     * OpenUI 调试注入（扫码/会话加载/画廊点选的最终程序上屏预览）：插一条 OPENUI_CARD
+     * 内存消息，纯本地、不经网络、与云端回合无关；非 Chat 态 no-op。
+     */
+    fun injectOpenUiPreview(label: String, program: String) {
+        if (program.isBlank()) return
+        append(
+            UiMessage(
+                msgSeq.incrementAndGet(),
+                Role.OPENUI_CARD,
+                text = label,
+                openUiCard = OpenUiCardUi(program = program, label = label),
+            ),
+        )
     }
 
     override fun onCleared() {

@@ -213,6 +213,24 @@ class CloudAgentChatViewModelTest {
     }
 
     @Test
+    fun `injectOpenUiPreview appends openui card message and ignores blank program`() = runTest {
+        val api = FakeApi()
+        val vm = newVm(api)
+        vm.prepare()
+        vm.injectOpenUiPreview("abc12345 · kimi-k2.6", "root = Card([Text(\"hi\")])")
+        vm.injectOpenUiPreview("blank", "")
+        val s = vm.state.value as CloudAgentChatViewModel.UiState.Chat
+        assertEquals(1, s.messages.size)
+        val card = s.messages.last()
+        assertEquals(CloudAgentChatViewModel.Role.OPENUI_CARD, card.role)
+        assertEquals(
+            CloudAgentChatViewModel.OpenUiCardUi("root = Card([Text(\"hi\")])", "abc12345 · kimi-k2.6"),
+            card.openUiCard,
+        )
+        assertEquals("abc12345 · kimi-k2.6", card.text)
+    }
+
+    @Test
     fun `error frame appends error message`() = runTest {
         val api = FakeApi()
         api.framesScript = { _, onFrame -> onFrame(CloudFrame.Error("quota exhausted")) }
