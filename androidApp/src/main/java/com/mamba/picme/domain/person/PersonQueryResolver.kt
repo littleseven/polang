@@ -21,7 +21,10 @@ data class ResolvedPersons(
  *
  * 解析全部在端侧确定性完成（理由是确定性与查询性能），按优先级：
  * 1. 自定义称呼：query 包含某关系的 customLabel（"二儿子""发小"）→ 精确命中对应人物
- * 2. 已命名人物：query 包含某人名 → 命中
+ * 2. 已命名人物：query 包含某人名 → 命中。
+ *    self 人物（isSelf，通常命名为"我"）除外——否则物主代词"我"（"我儿子"）会被当作
+ *    人名命中，与真实人物凑成 ≥2 人触发共现查询导致 0 结果（2026-11-07 真机实证）；
+ *    self 只能经第 4 步合拍 Pattern 计入
  * 3. 亲属称谓：[KinshipLexicon] 命中 → 经 [PersonRepository.resolveByKinship] 解到人物；
  *    一个称谓命中多条关系取并集并标记歧义。
  *    已被更长自定义称呼覆盖的称谓跳过（"二儿子"命中后不再用"儿子"取并集）
@@ -50,11 +53,12 @@ class PersonQueryResolver(
             descriptions.add("${hit.label} → ${hit.person.name ?: "#${hit.person.personId}"}")
         }
 
-        // 2. 已命名人物命中（同名多人物取并集并标记歧义）
+        // 2. 已命名人物命中（同名多人物取并集并标记歧义）；
+        //    self 人物除外（"我"只经合拍 Pattern 计入，见类注释）
         val namedPersons = personRepository.getNamedPersons()
         val nameHits = namedPersons.filter { person ->
             val name = person.name
-            !name.isNullOrBlank() && query.contains(name)
+            !person.isSelf && !name.isNullOrBlank() && query.contains(name)
         }
         nameHits.groupBy { person -> person.name }.forEach { (name, persons) ->
             personIds.addAll(persons.map { person -> person.personId })

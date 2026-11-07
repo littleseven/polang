@@ -223,6 +223,34 @@ class PersonQueryResolverTest {
     }
 
     @Test
+    fun `self person named 我 is not matched as named person without join pattern`() = runTest {
+        // 生产实证（2026-11-07）：self 人物被命名为"我"后进入 getNamedPersons，
+        // "看看我儿子照片"里作物主代词的"我"被当成人名命中，与"大宝"凑成 ≥2 人
+        // 触发共现查询 → 0 结果。self 只能经合拍 Pattern（第 4 步）计入。
+        stubDefaults(
+            named = listOf(person(4, "大宝"), person(129, "我", isSelf = true)),
+            kinship = mapOf("儿子" to listOf(person(4, "大宝"))),
+            self = person(129, "我", isSelf = true)
+        )
+
+        val result = resolver.resolve("看看我儿子照片")
+
+        assertEquals("物主代词「我」不得升级为共现维度", setOf(4L), result.personIds)
+    }
+
+    @Test
+    fun `self named 我 still joins via co-occurrence pattern`() = runTest {
+        stubDefaults(
+            named = listOf(person(4, "大宝"), person(129, "我", isSelf = true)),
+            self = person(129, "我", isSelf = true)
+        )
+
+        val result = resolver.resolve("我和大宝的合照")
+
+        assertEquals(setOf(4L, 129L), result.personIds)
+    }
+
+    @Test
     fun `kinship term without declared relation falls back to named person whose name contains term`() = runTest {
         // 用户未声明 SON 关系，但把人物簇命名为"大儿子"：称谓解析空手而归时
         // 应回退到"簇名包含称谓"的命名簇，而不是返回空
