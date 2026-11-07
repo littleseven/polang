@@ -368,7 +368,7 @@
 
 ### 12.2 关键设计
 
-- 构造注入 `PersonRepository`（数据收口在 `domain/person`，不直调 DAO）；"我"端取 `persons.is_self` 全局唯一标记，未标记返回引导性 Error（先去人物分组打开"这是我"）。
+- 构造注入 `PersonRepository`（数据收口在 `data/repository`，不直调 DAO）；"我"端取 `persons.is_self` 全局唯一标记，未标记返回引导性 Error（先去人物分组打开"这是我"）。
 - 人名未解析（`persons.name` LIKE 无命中）返回引导性 Error："还没有叫「X」的人物，请先在相册人物分组里给 TA 命名"——LLM 须如实转告，不得假装已记住。
 - **谓词枚举**（两层关系模型的粗谓词层）：SPOUSE / PARTNER / SON / DAUGHTER / CHILD / FATHER / MOTHER / PARENT / ELDER_BROTHER / ELDER_SISTER / YOUNGER_BROTHER / YOUNGER_SISTER / SIBLING / GRANDFATHER / GRANDMOTHER / GRANDPARENT / GRANDCHILD / OTHER_FAMILY / FRIEND / CLASSMATE / COLLEAGUE / OTHER；其中 CHILD/PARENT/SIBLING/GRANDPARENT 为"未指定桶"。归一失败的原话走 `customLabel` 自定义称呼（用户语言层），展示与查询解析优先于谓词。
 - **确认文本文案规则**：称谓归一到谓词时用谓词中文标签（"已记住：小宝是你的女儿"）；回退 customLabel 时用用户原话（"已记住：大宝是你的发小"）。

@@ -35,6 +35,7 @@
 - **位置**：所有 Repository 实现必须位于 `data/repository/`
 - **接口暴露**：必须实现 `domain/repository/` 定义的接口
 - **线程管理**：所有数据库查询必须在 `Dispatchers.IO` 执行
+- **过渡红线（2026-11-07 分层止血期）**：`domain/` 禁止新增对 `data/repository/` 具体实现的 import。现存例外（`domain/person/PersonQueryResolver`、`domain/memory/MemoryContextProviderImpl`、`domain/tag/TagGenerationScheduler` → `PersonRepository`）为迁层试点过渡态，后续批次以 `domain/repository/` 接口抽象消解；新代码一律走接口，不得效仿。
 
 ## 3. Agent 执行规约 (Execution Rules)
 
