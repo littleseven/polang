@@ -38,6 +38,13 @@ data class RemoteModelConfig(
     val baseUrl: String = "",
     val gatewayToken: String = "",
     val deviceId: String = "",
+    /**
+     * OpenAI 兼容端点的 chat completions 路径（相对 baseUrl；分层 runtime M1）。
+     * 空串 = Koog 客户端默认 `v1/chat/completions`（端侧存量路径行为不变）；
+     * server 云端 Agent 经 `AgentTargetResolver.splitEndpoint` 两段式拆分后显式传入
+     *（Cloudflare AIG 等带前缀路径的上游必须显式，默认路径会拼出 404）。
+     */
+    val chatCompletionsPath: String = "",
 ) {
     /**
      * 是否已配置

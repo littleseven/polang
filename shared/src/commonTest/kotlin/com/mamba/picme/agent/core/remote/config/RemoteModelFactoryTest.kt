@@ -88,4 +88,54 @@ class RemoteModelFactoryTest {
         assertEquals("https://api.anthropic.com", anthropic.baseUrl)
         assertTrue(anthropic.models.isNotEmpty())
     }
+
+    @Test
+    fun `host marker rule injects thinking disabled for deepseek family regardless of providerId`() {
+        for (baseUrl in listOf(
+            "https://tokenhub.tencentmaas.com",
+            "https://api.moonshot.cn",
+            "https://api.deepseek.com",
+        )) {
+            val bundle = RemoteModelFactory.createKoogExecutor(
+                RemoteModelConfig(
+                    modelId = "test-model",
+                    providerId = "server-cloud-agent", // 非空：不走旧配置空串兜底
+                    protocol = RemoteProtocol.OPENAI,
+                    apiKey = "test-key",
+                    baseUrl = baseUrl,
+                )
+            )
+            assertNotNull(bundle.baseParams.additionalProperties, "thinking injection missing for $baseUrl")
+        }
+    }
+
+    @Test
+    fun `host marker rule does not inject for openai official host`() {
+        val bundle = RemoteModelFactory.createKoogExecutor(
+            RemoteModelConfig(
+                modelId = "gpt-5",
+                providerId = "server-cloud-agent",
+                protocol = RemoteProtocol.OPENAI,
+                apiKey = "test-key",
+                baseUrl = "https://api.openai.com",
+            )
+        )
+        assertNull(bundle.baseParams.additionalProperties)
+    }
+
+    @Test
+    fun `custom chatCompletionsPath builds executor bundle`() {
+        val bundle = RemoteModelFactory.createKoogExecutor(
+            RemoteModelConfig(
+                modelId = "test-model",
+                providerId = "server-cloud-agent",
+                protocol = RemoteProtocol.OPENAI,
+                apiKey = "test-key",
+                baseUrl = "https://gateway.ai.cloudflare.com",
+                chatCompletionsPath = "v1/acc/picme/compat/chat/completions",
+            )
+        )
+        assertEquals("test-model", bundle.model.id)
+        assertEquals(LLMProvider.OpenAI, bundle.model.provider)
+    }
 }

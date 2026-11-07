@@ -2,30 +2,29 @@ package com.mamba.picme.server.agent
 
 import ai.koog.http.client.KoogHttpClient
 import ai.koog.http.client.ktor.KtorKoogHttpClient
-import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
-import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
-import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.executor.model.PromptExecutor
-import ai.koog.prompt.llm.LLMCapability
-import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.params.LLMParams
-import ai.koog.prompt.params.additionalPropertiesOf
+import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
+import com.mamba.picme.agent.core.remote.config.RemoteModelFactory
+import com.mamba.picme.agent.core.remote.config.RemoteProtocol
 import com.mamba.picme.server.llm.AuthStyle
 import kotlinx.serialization.json.Json
 
 /**
- * 云端 Agent 的 Koog 执行器工厂（:shared RemoteModelFactory.createKoogExecutor 的服务端对映）。
+ * 云端 Agent 的 Koog 执行器工厂（分层 runtime M1 起为 shared `RemoteModelFactory` 的
+ * 适配器：capabilities 三件套/temperature 钳制/thinking=disabled 注入/maxTokens
+ * 全部端云同源，本类只剩两个云端关切）。
  *
- * - M1 仅 OpenAI 兼容协议（网关渠道与 BYOK 直连的 DeepSeek/Kimi/OpenAI 通用）；
- *   CLAUDE 原生协议为后续里程碑。
- * - capabilities 三件套（Completion/Tools/OpenAIEndpoint.Completions）：Koog capability gate
- *   逐个 require，缺一直接抛错（:shared 真机踩坑记录，勿减）。
  * - CF_AIG 渠道：Koog 标准路径会把 apiKey 塞进 Authorization 头，与 Cloudflare AIG 的
  *   cf-aig-authorization 约定不符——经 [CfAigKoogHttpClientFactory] 逐请求改写
  * （对齐 LlmProxy 的 CF_AIG 行为：只发 cf-aig-authorization，不发 Authorization）。
- * - temperature 钳制（kimi-k2.6 只收 1.0）与 thinking=disabled 注入（DeepSeek 系定制），
- *   规则与 :shared RemoteModelFactory 同源。
+ * - 目标映射：`AgentLlmTarget`（渠道托管密钥/BYOK 透传）→ shared `RemoteModelConfig`。
+ *   providerId 恒非空：shared 对空 providerId 保留「旧配置注入 thinking=disabled」的
+ *   历史行为，云端判定改由 baseUrl host 标记规则精确接管（与原
+ *   THINKING_DISABLED_HOSTS 口径一致）。
+ * - M1 仅 OpenAI 兼容协议（网关渠道与 BYOK 直连的 DeepSeek/Kimi/OpenAI 通用）；
+ *   CLAUDE 原生协议为后续里程碑（shared 工厂已支持，接入即得）。
  */
 class AgentExecutorFactory(
     private val httpClientFactory: KoogHttpClient.Factory = KtorKoogHttpClient.Factory(),
@@ -38,47 +37,26 @@ class AgentExecutorFactory(
     )
 
     fun create(target: AgentLlmTarget): BuiltExecutor {
-        val model = LLModel(
-            provider = LLMProvider.OpenAI,
-            id = target.model,
-            capabilities = listOf(
-                LLMCapability.Completion,
-                LLMCapability.Tools,
-                LLMCapability.OpenAIEndpoint.Completions,
-            ),
-            maxOutputTokens = MAX_TOKENS.toLong(),
-        )
         val factory = when (target.authStyle) {
             AuthStyle.BEARER -> httpClientFactory
             AuthStyle.CF_AIG -> CfAigKoogHttpClientFactory(httpClientFactory)
         }
-        val client = OpenAILLMClient(
-            target.apiKey,
-            OpenAIClientSettings(baseUrl = target.baseUrl, chatCompletionsPath = target.chatCompletionsPath),
-            factory,
+        val bundle = RemoteModelFactory.createKoogExecutor(
+            RemoteModelConfig(
+                modelId = target.model,
+                providerId = PROVIDER_ID,
+                protocol = RemoteProtocol.OPENAI,
+                apiKey = target.apiKey,
+                baseUrl = target.baseUrl,
+                chatCompletionsPath = target.chatCompletionsPath,
+            ),
+            httpClientFactory = factory,
         )
-        val params = LLMParams(
-            temperature = clampTemperature(target.model),
-            maxTokens = MAX_TOKENS,
-            additionalProperties = if (shouldInjectThinkingDisabled(target.baseUrl)) {
-                additionalPropertiesOf("thinking" to mapOf("type" to "disabled"))
-            } else {
-                null
-            },
-        )
-        return BuiltExecutor(MultiLLMPromptExecutor(client), model, params)
+        return BuiltExecutor(bundle.executor, bundle.model, bundle.baseParams)
     }
 
-    private fun clampTemperature(modelId: String): Double =
-        if (modelId.contains("kimi-k2.6", ignoreCase = true)) 1.0 else 0.7
-
-    /** DeepSeek 系定制参数只注入已知兼容供应商（OpenAI 官方收到未知参数 400）。 */
-    private fun shouldInjectThinkingDisabled(baseUrl: String): Boolean =
-        THINKING_DISABLED_HOSTS.any { baseUrl.contains(it) }
-
     private companion object {
-        const val MAX_TOKENS: Int = 4096
-        val THINKING_DISABLED_HOSTS = listOf("tokenhub", "moonshot", "deepseek")
+        const val PROVIDER_ID = "server-cloud-agent"
     }
 }
 
