@@ -1067,6 +1067,7 @@ object AdminViews {
     fun skillDebugResultPage(
         session: AgentSessionRow,
         events: List<AgentEventRow>,
+        preview: OpenUiTreePreview? = null,
     ): String = createHTML().html {
         val finish = events.lastOrNull { it.payload is AgentEventPayload.Finish }
         val running = finish == null
@@ -1157,63 +1158,61 @@ object AdminViews {
                 section("settings-section") {
                     div("section-head") {
                         h2("section-title") { +"最终回复（OpenUI 程序）" }
-                        p("section-desc") { +"端上收到的终结程序；Html/Markdown 根节点直接可视化预览，程序原文在下方。" }
+                        p("section-desc") { +"端上收到的终结程序；组件树经 shared OpenUiSession 求值后整树可视化预览（服务端无宿主工具，Query 恒回 Null 骨架渲染），程序原文在下方。" }
                     }
                     if (finalMsg == null) {
                         p("meta") { +"（尚未产出）" }
                     } else {
                         val program = (finalMsg.payload as AgentEventPayload.Message).content
-                        // ── 可视化预览：手机壳（9:19.5 屏幕）内真渲染——
-                        //    Html 组件走沙箱 iframe（与端上 WebView 同文档），Markdown 根走 commonmark ──
-                        val htmlDocs = extractHtmlDocuments(program)
-                        val mdRoot = extractMarkdownRoot(program)
+                        // ── 可视化预览（0.9.37）：组件树整树渲染进手机壳；prepare 失败回落
+                        //    Html 组件沙箱 iframe / Markdown 根 commonmark 旧提取链 ──
                         // 手机扫码预览（0.9.35）：调试包「OpenUI 调试」页扫码 →
                         // GET /agent/sessions/{id}/final-program 拉本程序 → 端上真实渲染器
-                        if (htmlDocs.isNotEmpty() || mdRoot != null) {
-                            div("qr-row") {
-                                unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(session.id))) }
-                                div {
-                                    p("block-label") { +"手机扫码预览（端上真实渲染器）" }
-                                    p("meta") { +"PoLang 调试包「OpenUI 调试」页扫码，按会话拉取本程序渲染；浏览器内预览见下方手机壳。" }
-                                    p("meta") { +openUiPreviewDeepLink(session.id) }
+                        div("preview-split") {
+                            div("qr-side") {
+                                div("qr-row") {
+                                    unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(session.id))) }
+                                    div {
+                                        p("block-label") { +"手机扫码预览（端上真实渲染器）" }
+                                        p("meta") { +"PoLang 调试包「OpenUI 调试」页扫码，按会话拉取本程序渲染；浏览器内预览见右侧手机壳。" }
+                                        p("meta") { +openUiPreviewDeepLink(session.id) }
+                                    }
                                 }
                             }
-                        }
-                        if (htmlDocs.isNotEmpty() || mdRoot != null) {
-                            div("phone-stage") {
-                                htmlDocs.forEachIndexed { i, doc ->
-                                    div("phone-item") {
-                                        p("block-label") { +"可视化预览 · Html 组件${if (htmlDocs.size > 1) " #${i + 1}" else ""}（沙箱 iframe，与端上 WebView 同文档）" }
-                                        div("phone-frame") {
-                                            div("phone-screen") {
-                                                phoneStatusBar()
-                                                // kotlinx.html DSL 无 iframe builder（3.x 未生成）——手写标签，
-                                                // srcdoc 值经 attrEscape 属性转义（& 须最先）
-                                                unsafe {
-                                                    raw(
-                                                        "<iframe sandbox=\"allow-scripts\" loading=\"lazy\" " +
-                                                            "srcdoc=\"${attrEscape(doc)}\"></iframe>",
-                                                    )
+                            when (preview) {
+                                is OpenUiTreePreview.Rendered -> {
+                                    div("phone-stage") {
+                                        div("phone-item") {
+                                            p("block-label") { +"可视化预览 · 组件树（shared OpenUiSession 求值）" }
+                                            div("phone-frame") {
+                                                div("phone-screen") {
+                                                    phoneStatusBar()
+                                                    div("openui-root") { unsafe { raw(preview.bodyHtml) } }
+                                                }
+                                            }
+                                            if (preview.errors.isNotEmpty()) {
+                                                p("meta") {
+                                                    +(
+                                                        "求值告警 ${preview.errors.size} 条：" +
+                                                            preview.errors.take(3).joinToString("；") { err -> "${err.code}${err.statementId?.let { sid -> "($sid)" } ?: ""}" }
+                                                        )
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                if (mdRoot != null) {
-                                    div("phone-item") {
-                                        p("block-label") { +"可视化预览 · Markdown 根（commonmark 渲染）" }
-                                        div("phone-frame") {
-                                            div("phone-screen") {
-                                                phoneStatusBar()
-                                                div("md-preview") { unsafe { raw(renderMarkdown(mdRoot)) } }
-                                            }
+                                else -> {
+                                    if (preview is OpenUiTreePreview.Failed) {
+                                        p("meta") {
+                                            +(
+                                                "程序求值失败：" +
+                                                    preview.errors.take(5).joinToString("；") { err -> "${err.code} ${err.message}" }
+                                                )
                                         }
                                     }
+                                    legacyPreview(program)
                                 }
                             }
-                        }
-                        if (htmlDocs.isEmpty() && mdRoot == null) {
-                            p("meta") { +"本程序无可视化预览形态（暂支持 Html 组件与 Markdown 根）；组件树浏览器预览为后续里程碑。" }
                         }
                         p("block-label") { +"程序原文" }
                         pre("mono-block") { +program }
@@ -1228,6 +1227,50 @@ object AdminViews {
 
     /** 端侧 OpenUI 调试页 deep link（扫码载荷；App 内扫码解析 session 参数 → final-program 端点拉取）。 */
     internal fun openUiPreviewDeepLink(sessionId: String) = "polang://openui-preview?session=$sessionId"
+
+    /**
+     * 旧提取链预览（0.9.30-0.9.36 形态）：Html 组件沙箱 iframe + Markdown 根 commonmark。
+     * 0.9.37 起为 prepare 失败（或路由未求值）时的回落路径——程序语法崩了也尽量给出可视化。
+     */
+    private fun kotlinx.html.FlowContent.legacyPreview(program: String) {
+        val htmlDocs = extractHtmlDocuments(program)
+        val mdRoot = extractMarkdownRoot(program)
+        if (htmlDocs.isEmpty() && mdRoot == null) {
+            p("meta") { +"本程序无可视化预览形态。" }
+            return
+        }
+        div("phone-stage") {
+            htmlDocs.forEachIndexed { i, doc ->
+                div("phone-item") {
+                    p("block-label") { +"可视化预览 · Html 组件${if (htmlDocs.size > 1) " #${i + 1}" else ""}（沙箱 iframe，与端上 WebView 同文档）" }
+                    div("phone-frame") {
+                        div("phone-screen") {
+                            phoneStatusBar()
+                            // kotlinx.html DSL 无 iframe builder（3.x 未生成）——手写标签，
+                            // srcdoc 值经 attrEscape 属性转义（& 须最先）
+                            unsafe {
+                                raw(
+                                    "<iframe sandbox=\"allow-scripts\" loading=\"lazy\" " +
+                                        "srcdoc=\"${attrEscape(doc)}\"></iframe>",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (mdRoot != null) {
+                div("phone-item") {
+                    p("block-label") { +"可视化预览 · Markdown 根（commonmark 渲染）" }
+                    div("phone-frame") {
+                        div("phone-screen") {
+                            phoneStatusBar()
+                            div("md-preview") { unsafe { raw(renderMarkdown(mdRoot)) } }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /** 手机壳仿真状态栏（9:41 + 信号/WiFi/电池 SVG），占位 44px 安全区使内容避开刘海。 */
     private fun kotlinx.html.FlowContent.phoneStatusBar() {
@@ -2533,6 +2576,12 @@ object AdminViews {
                            （iPhone 15/16 逻辑宽 393pt、Android 主流 360~412dp 的代表值； iframe 内
                            H5 的 px 布局/百分比宽/媒体查询断点与端上 WebView 同口径，消除按钮过宽失真） */
                         .phone-stage{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;padding:24px;background:#ececf0;border-radius:var(--r-md);margin-bottom:12px}
+                        .preview-split{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+                        .preview-split>.qr-side{flex:0 0 auto;max-width:340px}
+                        .preview-split>.qr-side .qr-row{margin-bottom:0;flex-direction:column;align-items:flex-start}
+                        .preview-split>.phone-stage{flex:1 1 340px;margin-bottom:0;min-width:0}
+                        .phone-screen .openui-root{padding:12px 12px 36px;flex:1;min-height:0;overflow-y:auto;box-sizing:border-box;font-size:14px;color:#1a1a1a;background:#f6f6f8}
+                        .phone-screen .openui-root>div{margin-bottom:0}
                         .phone-item{margin:0}
                         .phone-item .block-label{margin-bottom:10px}
                         .phone-frame{width:412px;aspect-ratio:9/19.5;background:#1b1b1f;border-radius:44px;padding:11px;box-sizing:border-box;box-shadow:0 14px 34px rgba(0,0,0,.28),inset 0 0 0 2px #3a3a40;position:relative;flex-shrink:0}

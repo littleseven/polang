@@ -5,6 +5,7 @@ import ai.koog.agents.core.tools.reflect.asToolsByClass
 import com.mamba.picme.server.analytics.Price
 import com.mamba.picme.server.analytics.defaultPrices
 import com.mamba.picme.server.agent.AgentBridgeRegistry
+import com.mamba.picme.server.agent.AgentEventPayload
 import com.mamba.picme.server.agent.AgentChannelKind
 import com.mamba.picme.server.agent.AgentRunner
 import com.mamba.picme.server.agent.AgentSessionRepository
@@ -765,7 +766,12 @@ fun Route.adminRoute(
             val session = AdminQueries.agentSessionSummary(id)
                 ?: return@get call.respondText("session_not_found: $id", ContentType.Text.Html, HttpStatusCode.NotFound)
             val events = AdminQueries.agentSessionEvents(id, after = 0, limit = 200)
-            call.respondText(AdminViews.skillDebugResultPage(session, events), ContentType.Text.Html)
+            // 0.9.37：组件树可视化——终态程序经 shared OpenUiSession 求值（Query 恒 Null 骨架）
+            // 后整树渲染；跑轮中/无程序则不求值（视图回落旧 Html/Markdown 提取链）
+            val program = events.lastOrNull { it.payload is AgentEventPayload.Message && it.role != "user" }
+                ?.let { (it.payload as AgentEventPayload.Message).content }
+            val preview = program?.let { OpenUiHtmlRenderer.preview(it) }
+            call.respondText(AdminViews.skillDebugResultPage(session, events, preview), ContentType.Text.Html)
         }
 
         // ── 问题诊断页（用户上报问题；AI 工程师白名单已迁至 /admin/settings）──
