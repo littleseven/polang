@@ -575,15 +575,29 @@ fun Route.adminRoute(
 
         post("/skills/{name}") {
             if (!call.adminGuard(adminToken)) return@post
-            val name = call.parameters["name"].orEmpty()
+            val oldName = call.parameters["name"].orEmpty()
             val params = call.receiveParameters()
+            val newName = params["name"].orEmpty().trim()
             val description = params["description"].orEmpty()
             val body = params["body"].orEmpty()
-            val error = if (skillCenter == null) "skill center 未启用"
-            else skillCenter.upsert(name, description, body)
+            // 重命名（目录迁移）：表单名 ≠ 路由名时，先防覆盖再写新目录、删旧目录
+            val sc = skillCenter ?: return@post call.respondText(
+                "skill center 未启用", ContentType.Text.Html, HttpStatusCode.ServiceUnavailable,
+            )
+            val renaming = newName != oldName
+            var error: String? = when {
+                newName.isBlank() -> "名称不能为空"
+                renaming && sc.detail(newName) != null ->
+                    "重命名失败：技能 $newName 已存在（写入会覆盖，已拒绝——先删除或换名）"
+                else -> sc.upsert(newName, description, body)
+            }
+            if (error == null && renaming && !sc.delete(oldName)) {
+                // 旧目录删除失败不回滚新写入（少见；提示人工清理，避免静默双技能）
+                error = "已写入 $newName，但旧目录 $oldName 删除失败——请在服务器手动清理（当前两技能并存）"
+            }
             if (error != null) {
                 val draft = SkillCenter.SkillDetail(
-                    meta = SkillCenter.SkillMeta(name, description.trim()),
+                    meta = SkillCenter.SkillMeta(newName, description.trim()),
                     body = body.trim(), updatedAtMs = 0L, rawChars = body.length,
                 )
                 call.respondText(
@@ -593,7 +607,9 @@ fun Route.adminRoute(
                 )
                 return@post
             }
-            call.respondRedirect("/admin/skills?msg=已保存 $name")
+            call.respondRedirect(
+                "/admin/skills?msg=" + if (renaming) "已重命名 $oldName → $newName" else "已保存 $newName",
+            )
         }
 
         post("/skills/{name}/delete") {

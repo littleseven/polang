@@ -403,8 +403,8 @@ class AdminViewsTest {
         // 双栏 + 左表单
         assertTrue(html.contains("skills-layout"))
         assertTrue(html.contains("SKILL.md 表单"))
-        assertTrue(html.contains("readonly"))
-        assertTrue(html.contains("只读"))
+        assertTrue(html.contains("修改即重命名")) // 名称可改（目录迁移），不再锁定
+        assertTrue(!html.contains("readonly=\"readonly\""))
         // 右栏实时预览：清单行 + markdown 渲染初值（commonmark 服务端渲染）
         assertTrue(html.contains("实时预览 · LLM 视角"))
         assertTrue(html.contains("id=\"manifest-line\""))

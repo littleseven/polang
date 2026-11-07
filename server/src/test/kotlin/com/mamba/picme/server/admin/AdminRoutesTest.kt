@@ -757,4 +757,62 @@ class AdminRoutesTest {
             dir.deleteRecursively()
         }
     }
+
+    // ── Skill 重命名（目录迁移，2026-11-07 v3）──
+
+    @Test
+    fun `skills rename migrates directory and rejects blank and collision names`() {
+        val dir = kotlin.io.path.createTempDirectory(prefix = "skill-rename-test").toFile()
+        try {
+            val sc = SkillCenter(dir)
+            assertNull(sc.upsert("html-card", "desc-a", "# A\n"))
+            assertNull(sc.upsert("tag-report", "desc-b", "# B\n"))
+            testApplication {
+                application { routing { adminRoute(token, cos, balance, skillCenter = sc) } }
+                val c = createClient { followRedirects = false }
+
+                // 1. 重命名成功：html-card → html-card-v2，目录迁移（旧不可见、新可加载）
+                val r1 = c.post("/admin/skills/html-card") {
+                    cookie(AdminAuth.COOKIE_NAME, cookieVal)
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody("name=html-card-v2&description=desc-a&body=%23+A%0A")
+                }
+                assertEquals(HttpStatusCode.Found, r1.status)
+                assertEquals("/admin/skills?msg=已重命名 html-card → html-card-v2", r1.headers[HttpHeaders.Location])
+                assertNull(sc.detail("html-card"))
+                assertEquals("# A", sc.detail("html-card-v2")?.body)
+
+                // 2. 撞名拒绝：改成已存在的 tag-report → 400 + 不覆盖原内容
+                val r2 = c.post("/admin/skills/html-card-v2") {
+                    cookie(AdminAuth.COOKIE_NAME, cookieVal)
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody("name=tag-report&description=evil&body=%23+evil%0A")
+                }
+                assertEquals(HttpStatusCode.BadRequest, r2.status)
+                assertTrue(r2.bodyAsText().contains("已存在"))
+                assertEquals("# B", sc.detail("tag-report")?.body) // 原内容未被覆盖
+
+                // 3. 空名拒绝
+                val r3 = c.post("/admin/skills/html-card-v2") {
+                    cookie(AdminAuth.COOKIE_NAME, cookieVal)
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody("name=&description=d&body=b")
+                }
+                assertEquals(HttpStatusCode.BadRequest, r3.status)
+                assertTrue(r3.bodyAsText().contains("名称不能为空"))
+
+                // 4. 同名保存不触发重命名分支
+                val r4 = c.post("/admin/skills/html-card-v2") {
+                    cookie(AdminAuth.COOKIE_NAME, cookieVal)
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody("name=html-card-v2&description=desc-a2&body=%23+A2%0A")
+                }
+                assertEquals(HttpStatusCode.Found, r4.status)
+                assertEquals("/admin/skills?msg=已保存 html-card-v2", r4.headers[HttpHeaders.Location])
+                assertEquals("# A2", sc.detail("html-card-v2")?.body)
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

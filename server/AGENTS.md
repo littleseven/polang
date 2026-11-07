@@ -199,7 +199,7 @@ server/
 | POST | `/v1/report-issue` | P1 | ✅ | X-App-Token | 用户问题上报（脱敏 + 自动 GitHub issue） |
 | GET | `/v1/skills` | P1 | ✅ | X-App-Token | Skill 中心清单（name+description，2026-11-07） |
 | GET | `/v1/skills/{name}` | P1 | ✅ | X-App-Token | Skill 正文下载（≤32K 字符；404 skill_not_found） |
-| GET/POST | `/admin/skills*` | P1 | ✅ | ADMIN_TOKEN | Skill 中心后台（v2 同日依 Ardot 设计稿重排）：列表（统计行+表格+prompt 清单段）/双栏编辑（LLM 视角实时预览+字符计数）/预览页 `GET /admin/skills/{name}/preview?tab=llm\|raw\|rendered`（三 Tab，rendered=commonmark 服务端渲染 markdown；编辑页正文实时渲染为内联 vanilla JS，零外部依赖），保存即热更新 |
+| GET/POST | `/admin/skills*` | P1 | ✅ | ADMIN_TOKEN | Skill 中心后台（v2 同日依 Ardot 设计稿重排）：列表（统计行+表格+prompt 清单段）/双栏编辑（LLM 视角实时预览+字符计数）/预览页 `GET /admin/skills/{name}/preview?tab=llm\|raw\|rendered`（三 Tab，rendered=commonmark 服务端渲染 markdown；编辑页正文实时渲染为内联 vanilla JS，零外部依赖），保存即热更新；v3 支持重命名（表单名≠路由名即迁移目录：写新目录→删旧目录，撞名/空名 400 拒绝不覆盖） |
 | POST | `/v1/claude-chat` | P1 | ✅ | X-App-Token | AI 工程师模式 SSE 对话（只读诊断） |
 | POST | `/v1/claude-tool-result` | P1 | ✅ | X-App-Token | AI 工程师 App tool 结果回传 |
 | POST | `/v1/claude-deliver` | P1 | ✅ | X-App-Token + 白名单 | AI 工程师代码交付 |

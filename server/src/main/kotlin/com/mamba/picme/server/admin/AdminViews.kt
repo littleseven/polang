@@ -728,12 +728,10 @@ object AdminViews {
                         }
                         div("skill-field") {
                             label {
-                                +"名称（小写字母/数字/连字符；目录名，创建后不可改）"
-                                if (!isNew) span("ro-tag") { +"只读" }
+                                +"名称（小写字母/数字/连字符；修改即重命名，技能目录随之迁移）"
                             }
                             textInput(name = "name") {
                                 value = existing?.meta?.name.orEmpty()
-                                if (!isNew) attributes["readonly"] = "readonly"
                                 placeholder = "html-card"
                                 attributes["id"] = "skill-name"
                             }
@@ -2058,7 +2056,7 @@ object AdminViews {
                         .skill-stat-sub{font-size:var(--fs-xs);color:var(--c-text-3);margin-top:4px}
                         td.skill-name{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
                         .skill-row-actions{display:flex;gap:8px;align-items:center;white-space:nowrap}
-                        .btn-sm.btn-danger{color:var(--c-danger)}
+                        .btn-sm.btn-danger{background:var(--c-danger-bg);color:var(--c-danger);border-color:var(--c-danger-border)}
                         .btn-danger-ghost{padding:8px 16px;background:var(--c-danger-bg);color:var(--c-danger);border:1px solid var(--c-danger-border);border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;transition:all .2s;height:32px;line-height:16px}
                         .btn-danger-ghost:hover{background:var(--c-danger);color:var(--c-surface)}
                         .skills-layout{display:grid;grid-template-columns:minmax(0,1fr) 460px;gap:16px;margin:16px 0;align-items:start}
