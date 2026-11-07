@@ -138,7 +138,7 @@ python3 scripts/ui_driver.py find --content-description "关闭搜索"
 | Mistake | Fix |
 |---------|-----|
 | `ConnectionRefusedError` / `RPC error` | Re-run `adb forward tcp:27183 tcp:27183`; check that AccessibilityService is enabled and PoLang is in foreground |
-| `Target node not found` | Run `dump` first; the app may already be in a different state; press back if needed |
+| `Target node not found` | Run `dump` first; the app may already be in a different state; press back if needed. Note: `text=` zero-hit falls back to matching `contentDescription` server-side (v2.2.0+), so dump-visible labels are clickable via `--text`; use `--content-description` only to disambiguate |
 | Input fails silently | Target the `EditText` node itself, not a parent container; use `bounds` if `text`/`contentDescription` are ambiguous |
 | Using `client._call(...)` | Prefer public helpers; `input_text` now accepts `bounds` |
 | Click returns true but nothing happens | The target may be decorative; try a parent with `contentDescription` or use `bounds` of a `Button` |
@@ -180,6 +180,7 @@ Expected output: `✅ Integration test passed: search mode entered`
 
 | Version | Date | Change |
 |---------|------|--------|
+| 2.2.0 | 2026-11-07 | Server-side `text` matching falls back to `contentDescription` on zero hits (bottom-nav/icon labels visible in dump are now clickable via `--text`) |
 | 2.1.0 | 2026-07-02 | Renamed directory and skill name from `accessibility-ui-driver` to `ui-driver` |
 | 2.0.0 | 2026-07-02 | Merged `ui-automation-expert` content; renamed title to UI Driver |
 | 1.0.0 | 2026-07-02 | Initial Accessibility UI Driver skill |
