@@ -13,7 +13,7 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.30
+**版本**：0.9.31
 
 **最后更新**：2026-11-07
 
@@ -202,7 +202,7 @@ server/
 | GET/POST | `/admin/skills*` | P1 | ✅ | ADMIN_TOKEN | Skill 中心后台（v2 同日依 Ardot 设计稿重排）：列表（统计行+表格+prompt 清单段）/双栏编辑（LLM 视角实时预览+字符计数）/预览页 `GET /admin/skills/{name}/preview?tab=llm\|raw\|rendered`（三 Tab，rendered=commonmark 服务端渲染 markdown；编辑页正文实时渲染为内联 vanilla JS，零外部依赖），保存即热更新；v3 支持重命名（表单名≠路由名即迁移目录：写新目录→删旧目录，撞名/空名 400 拒绝不覆盖） |
 | GET | `/admin/skills/debug` | P1 | ✅ | ADMIN_TOKEN | 技能调试 playground 表单页（0.9.28）：草稿三字段（`?name=` 预填磁盘版）+ 测试消息 |
 | POST | `/admin/skills/debug/run` | P1 | ✅ | ADMIN_TOKEN | 跑一轮调试（0.9.28）：OverlaySkillCenter 内存草稿 + 合成会话（model=skill-debug、免配额）异步跑轮 → 302 到 `/admin/skills/debug/result/{id}` 结果页（0.9.30 起；此前到 `/admin/agent/sessions/{id}` 回放页）；校验失败 400 回填 |
-| GET | `/admin/skills/debug/result/{id}` | P1 | ✅ | ADMIN_TOKEN | 调试结果页（0.9.30）：跑轮中 3s 自动刷新，完成后聚合展示测试消息/load_skill 调用与返回/其他工具/最终程序/终态耗时；最终程序的可视化预览——`Html("…")` 文档沙箱 iframe（`sandbox=allow-scripts` srcdoc 属性转义）+ `root = Markdown` 根 commonmark 渲染（提取走 `OpenUiStringScan` 字符级扫描 + DSL 反转义，上限 4 个 iframe）；通用组件树预览为后续里程碑 |
+| GET | `/admin/skills/debug/result/{id}` | P1 | ✅ | ADMIN_TOKEN | 调试结果页（0.9.30）：跑轮中 3s 自动刷新，完成后聚合展示测试消息/load_skill 调用与返回/其他工具/最终程序/终态耗时；最终程序的可视化预览——`Html("…")` 文档沙箱 iframe（`sandbox=allow-scripts` srcdoc 属性转义）+ `root = Markdown` 根 commonmark 渲染（提取走 `OpenUiStringScan` 字符级扫描 + DSL 反转义，上限 4 个 iframe），预览装进手机壳（0.9.31：`.phone-stage/.phone-frame/.phone-screen` 工作台+机身 bezel+Dynamic Island，9:19.5 aspect-ratio 屏幕，iframe/markdown 同壳并排）；通用组件树预览为后续里程碑 |
 | POST | `/v1/claude-chat` | P1 | ✅ | X-App-Token | AI 工程师模式 SSE 对话（只读诊断） |
 | POST | `/v1/claude-tool-result` | P1 | ✅ | X-App-Token | AI 工程师 App tool 结果回传 |
 | POST | `/v1/claude-deliver` | P1 | ✅ | X-App-Token + 白名单 | AI 工程师代码交付 |

@@ -602,6 +602,11 @@ class AdminViewsTest {
         assertTrue(html.contains("sandbox=\"allow-scripts\""))
         assertTrue(html.contains("srcdoc=\"&lt;!DOCTYPE html&gt;"))
         assertTrue(html.contains("var a=&quot;x&quot;;")) // DSL 反转义 \" → "，再经属性转义
+        // 手机壳：iframe 装进 9:19.5 屏幕，机身样式进 style 块
+        assertTrue(html.contains("phone-stage"))
+        assertTrue(html.contains("phone-frame"))
+        assertTrue(html.contains("phone-screen"))
+        assertTrue(html.contains("aspect-ratio:9/19.5"))
         // 程序原文仍在
         assertTrue(html.contains("程序原文"))
     }
@@ -613,6 +618,9 @@ class AdminViewsTest {
         assertTrue(html.contains("可视化预览 · Markdown 根"))
         assertTrue(html.contains("<h1>标题</h1>"))
         assertTrue(html.contains("<strong>加粗</strong>"))
+        // Markdown 预览同样装进手机壳屏幕
+        assertTrue(html.contains("phone-screen"))
+        assertTrue(html.contains("md-preview"))
         assertTrue(!html.contains("无可视化预览形态"))
     }
 
@@ -631,7 +639,7 @@ class AdminViewsTest {
         val program = "root = Column(spacing = \"m\") { Text(\"你好\") }"
         val html = AdminViews.skillDebugResultPage(sessionFixture(), finishedEvents(program))
         assertTrue(html.contains("无可视化预览形态"))
-        assertTrue(!html.contains("iframe"))
+        assertTrue(!html.contains("<iframe")) // CSS 选择器含 iframe 字样，断言标签本身不出现
     }
 
 }
