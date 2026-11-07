@@ -66,6 +66,7 @@ class CloudAgentChatViewModelTest {
             return Result.success(JSONObject().put("session_id", "s_1"))
         }
         override suspend fun getEvents(token: String, sessionId: String, after: Long, limit: Int) = Result.success(emptyList<JSONObject>())
+        override suspend fun getFinalProgram(token: String, sessionId: String) = Result.success(JSONObject())
         override suspend fun finish(token: String, sessionId: String): Result<Unit> {
             finishedSessions.add(sessionId)
             finishSignal?.complete(sessionId)

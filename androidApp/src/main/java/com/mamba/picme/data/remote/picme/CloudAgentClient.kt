@@ -84,6 +84,9 @@ object CloudSseParser {
 interface CloudAgentApi {
     suspend fun createSession(token: String, channel: String, model: String, byokBaseUrl: String): Result<JSONObject>
     suspend fun getEvents(token: String, sessionId: String, after: Long = 0L, limit: Int = 500): Result<List<JSONObject>>
+
+    /** OpenUI 扫码预览取数（0.9.35）：会话最终 assistant 程序（session_id/model/program/created_at）。 */
+    suspend fun getFinalProgram(token: String, sessionId: String): Result<JSONObject>
     suspend fun finish(token: String, sessionId: String): Result<Unit>
     suspend fun postMessage(
         token: String,
@@ -164,6 +167,23 @@ class CloudAgentClient(
                 }
                 val arr = JSONObject(text).getJSONArray("events")
                 (0 until arr.length()).map { idx -> arr.getJSONObject(idx) }
+            }
+        }
+
+    override suspend fun getFinalProgram(token: String, sessionId: String): Result<JSONObject> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val req = Request.Builder()
+                    .url("$baseUrl/agent/sessions/$sessionId/final-program")
+                    .header("X-App-Token", token)
+                    .get()
+                    .build()
+                val text = apiClient.newCall(req).execute().use { resp ->
+                    val t = resp.body?.string().orEmpty()
+                    if (!resp.isSuccessful) throw RuntimeException("HTTP ${resp.code}: $t")
+                    t
+                }
+                JSONObject(text)
             }
         }
 
