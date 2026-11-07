@@ -1,6 +1,7 @@
 package com.mamba.picme.server.agent
 
 import ai.koog.agents.core.tools.reflect.asToolsByClass
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,5 +40,21 @@ class DeviceToolDescriptionTest {
             val description = descriptors.getValue(name).descriptor.description
             assertTrue("$name description must declare handle", description.contains("handle: scan/"))
         }
+    }
+
+    @Test
+    fun `descriptions are the shared contract constants verbatim`() {
+        assertEquals(
+            CloudAgentToolContract.DESC_GET_GALLERY_SUMMARY,
+            descriptors.getValue("get_gallery_summary").descriptor.description,
+        )
+        assertEquals(
+            CloudAgentToolContract.DESC_SEARCH_MEDIA,
+            descriptors.getValue("search_media").descriptor.description,
+        )
+        assertEquals(
+            CloudAgentToolContract.DESC_REFINE_MEDIA_SEARCH,
+            descriptors.getValue("refine_media_search").descriptor.description,
+        )
     }
 }
