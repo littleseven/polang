@@ -55,6 +55,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.mamba.picme.PoLangApplication
 import com.mamba.picme.R
 import com.mamba.picme.domain.chat.AgentStepStatus
 import com.mamba.picme.domain.chat.AgentStepUi
@@ -69,8 +70,6 @@ import com.mamba.picme.features.chat.components.MediaResultsCarousel
 import com.mamba.picme.features.chat.openui.OpenUiCardHost
 import com.mamba.picme.features.common.chat.AgentMarkdown
 import com.mamba.picme.features.debug.openui.QrCodeScanner
-import com.mamba.picme.features.debug.openui.previewHandleLookup
-import com.mamba.picme.features.debug.openui.previewPhotoResolver
 import kotlinx.coroutines.launch
 
 /**
@@ -225,6 +224,16 @@ fun CloudAgentChatScreen(
 private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: CloudAgentChatViewModel) {
     val listState = rememberLazyListState()
     val steps by viewModel.steps.collectAsState()
+    val context = LocalContext.current
+    // 扫码预览卡取数接缝：真实 LocalHandleStore / PhotoResolver——本机产生的
+    // local://scan/... handle 可解析出真实照片（扫码相册预览核心诉求）；跨设备会话的
+    // handle 本机不存在 → 解析 null 自然走既有降级（[PRIVACY] uri 不出端，同主聊天页口径）
+    val openUiHandleLookup = remember {
+        (context.applicationContext as PoLangApplication).container.localHandleLookup
+    }
+    val openUiPhotoResolver = remember {
+        (context.applicationContext as PoLangApplication).container.openUiPhotoResolver
+    }
     LaunchedEffect(chat.messages.size) {
         if (chat.messages.isNotEmpty()) listState.animateScrollToItem(chat.messages.size - 1)
     }
@@ -286,7 +295,7 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
                     }
                     CloudAgentChatViewModel.Role.OPENUI_CARD -> message.openUiCard?.let { card ->
                         // OpenUI 调试预览卡：扫码/画廊注入的最终程序，走与 Chat 同管线真实渲染器；
-                        // 句柄/照片 stub 恒 null 走既有降级（调试会话投影跨设备无意义，画廊同口径）
+                        // 取数接缝用真实实现——本机 handle 直出照片，跨设备 handle 解析 null 走降级
                         Column {
                             Text(
                                 text = card.label,
@@ -300,8 +309,8 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
                                     program = card.program,
                                     fallbackSummary = "OpenUI preview degraded",
                                 ),
-                                handleLookup = previewHandleLookup,
-                                photoResolver = previewPhotoResolver,
+                                handleLookup = openUiHandleLookup,
+                                photoResolver = openUiPhotoResolver,
                                 onViewStateChange = {},
                                 modifier = Modifier.fillMaxWidth(),
                             )

@@ -1,8 +1,6 @@
 package com.mamba.picme.features.debug.openui
 
 import android.content.Context
-import com.mamba.picme.data.local.HandleLookup
-import com.mamba.picme.features.chat.openui.OpenUiPhotoResolver
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -15,8 +13,10 @@ import java.util.Locale
  * 端上真实渲染器预览（Skill 调试产物与 Agent 直接输出同口径）。
  *
  * 2026-11-07 起 UI 宿主自 Debug 页 Tab 迁入云端 Agent 调试页（OpenUiDebugOverlay，
- * features/cloudagent/），本文件只留数据/解析/stub 供 Overlay 与渲染点共用。
- * 渲染依赖用 stub：调试会话的相册投影句柄跨设备无意义（handle 缺失走既有降级路径）。
+ * features/cloudagent/），本文件只留数据/解析辅助供 Overlay 与渲染点共用。
+ * 渲染取数接缝在宿主侧接真实实现（AppContainer.localHandleLookup / openUiPhotoResolver）：
+ * 本机产生的 local://scan/... handle 可解析出真实照片；跨设备会话 handle 本机不存在 →
+ * 解析 null 走既有降级路径。
  * 每次成功加载留底（SharedPreferences JSON，上限 20 条）。
  */
 
@@ -79,12 +79,6 @@ internal fun parsePreviewSessionId(raw: String): String? {
     val candidate = fromLink ?: text
     return candidate.takeIf { it.matches(Regex("""[A-Za-z0-9-]{8,64}""")) }
 }
-
-/** 句柄/照片 stub：调试会话投影跨设备无意义，恒 null 走既有降级（画廊同口径）。 */
-internal val previewHandleLookup = object : HandleLookup {
-    override suspend fun payloadOf(domain: String, handleId: String): String? = null
-}
-internal val previewPhotoResolver = OpenUiPhotoResolver { null }
 
 internal fun formatQrPreviewTs(ms: Long): String =
     SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(ms))
