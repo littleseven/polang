@@ -61,7 +61,8 @@ final class ModelConfigStore: ObservableObject {
             protocol: provider.protocol,
             apiKey: apiKey,
             baseUrl: provider.baseUrl,
-            gatewayToken: "", deviceId: ""
+            gatewayToken: "", deviceId: "",
+            chatCompletionsPath: ""
         )
         // RemoteModelConfigs.addConfig 是 immutable（返回新实例），这里直接操作数组
         let uniqueKey = config.uniqueKey
@@ -101,7 +102,8 @@ final class ModelConfigStore: ObservableObject {
             apiKey: apiKey,
             baseUrl: old.baseUrl,
             gatewayToken: old.gatewayToken,
-            deviceId: old.deviceId
+            deviceId: old.deviceId,
+            chatCompletionsPath: old.chatCompletionsPath
         )
         save()
         applyToOrchestrator()
