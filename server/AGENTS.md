@@ -15,7 +15,7 @@
 
 **版本**：0.9.20
 
-**最后更新**：2026-11-06
+**最后更新**：2026-11-07
 
 **状态**：生效中 / 已上线
 
@@ -94,7 +94,7 @@ server/
 │   │   ├── AgentSessionRepository.kt # 会话生命周期状态机（running/…/finished/error）
 │   │   ├── AgentEventRepository.kt   # 追加/回放/pending action 不变式查询
 │   │   ├── AgentProjection.kt    # 事件流 → LLM 视图投影（Condenser 最小实现，策略可替换）
-│   │   ├── AgentExecutorFactory.kt # Koog 执行器组装（OpenAI 兼容；CF_AIG 改写 cf-aig-authorization）
+│   │   ├── AgentExecutorFactory.kt # Koog 执行器组装（2026-11-07 分层 runtime M1 起委托 shared `RemoteModelFactory.createKoogExecutor`——capabilities/钳制/thinking/maxTokens 端云同源；本类仅剩 CF_AIG 改写 cf-aig-authorization 与 AgentLlmTarget→RemoteModelConfig 映射）
 │   │   ├── AgentLlmTarget.kt     # 运行目标解析（网关渠道 modelMap 映射 / BYOK 透传）
 │   │   ├── ServerTools.kt        # 服务端工具（server_time；render_html H5 卡通道已退役 2026-11-06 GenUI 唯一化）+ pending 重放派器
 │   │   ├── ProgramGuard.kt       # turn-native 终结程序守卫（2026-11-06 起无条件启用）：终结文本非合法 OpenUI 程序（validateProgramToError）→ 策略层 correctInvalidProgram 节点纠正（上限 MAX_CORRECTIONS=1）
@@ -108,8 +108,8 @@ server/
 │   │   ├── OpenUiStringScan.kt   # 字符串字面量字符级扫描（2026-11-04 SOE 修复：O(n) 零递归替代 GroupCurly 递归正则，validator/normalizer 共用）
 │   │   ├── AgentBridgeRegistry.kt # 工具桥挂起表（requestId→Deferred，断线 failAll 清理）
 │   │   ├── AgentRoundGate.kt     # per-user 跑轮并发=1 内存租约（M2.6；故意无 TTL，一轮最长 20 迭代×(LLM+120s 工具)，重启即清）
-│   │   ├── DeviceToolService.kt  # 端侧只读三件套 Koog 适配（tool_request 帧 + 120s 挂起；M1 起 @LLMDescription 只承诺投影面，对齐 shared CloudAgentToolCatalog.projectionSchema；search_media 增 display 参数（2026-10-24）：'true'=端侧透出横滑图集卡（用户明确想浏览照片时），取数/统计一律 'false'）
-│   │   ├── CloudAgentStrategy.kt # 单跑 ReAct 策略（自 :shared poLangSingleRunStrategy 移植；correctInvalidProgram 节点——2026-11-06 起 ProgramGuard 无条件启用，出边 = 程序校验 → finish；假发卡节点已摘除）
+│   │   ├── DeviceToolService.kt  # 端侧只读三件套 Koog 适配（tool_request 帧 + 120s 挂起；M1 起 @LLMDescription 只承诺投影面，对齐 shared CloudAgentToolCatalog.projectionSchema；2026-11-07 分层 runtime M1 起工具名/描述/error: 前缀真引用 shared CloudAgentToolContract const，无字面量副本；search_media 增 display 参数（2026-10-24）：'true'=端侧透出横滑图集卡（用户明确想浏览照片时），取数/统计一律 'false'）
+│   │   ├── CloudAgentStrategy.kt # 单跑 ReAct 策略的云端配置组装（2026-11-07 分层 runtime M1 起图结构收口 shared `poLangSingleRunStrategy` 配置化工厂：流式节点 + correctInvalidProgram 节点——2026-11-06 起 ProgramGuard 无条件启用，出边 = 程序校验 → finish；假发卡节点已摘除）
 │   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish（2026-11-06 GenUI 唯一化收编：删 forwardContentDeltas/finalMessageTransformer/onHtmlCard/actionGate/argsTransformer 接线，content delta 无条件透传 + ensureValidProgram 终结落流内联 + ProgramGuard 无条件；2026-11-03 回合用量改从流式 End 帧 metaInfo 累加）
 │   │   ├── TurnUsage.kt          # 回合级 LLM 用量累计（done 帧 elapsed_ms/usage 数据源；流式 End 帧 metaInfo 与非流式 onLLMCallCompleted 两路互斥累加）
 │   │   ├── ToolArgsWireJson.kt   # 工具参数 wire JSON 合规转义（Koog 1.3.0 私有 JSON 树 toString 零转义缺陷修复，replayPending 回放同径）
@@ -279,6 +279,8 @@ App → 后续请求带 X-App-Token: <picme_at_*>
 deploy.sh                          # 开发机构建 → rsync → ssh 触发切换
 deploy-switch.sh                   # 服务器端蓝绿：备份 → 切换 → restart → healthz → 失败回滚
 ```
+
+> **构建依赖（2026-11-07 起，分层 runtime M1）**：server 经 composite build（settings `includeBuild("..")`）消费 `:shared` jvm 变体（`com.mamba.picme:shared:1.0.0`）——**构建 server 需要本机 Android SDK**（`:shared` 配置含 android target）；部署构建在开发机执行（`deploy.sh` 开发机构建→rsync）、VPS 只跑 jar，不受影响。
 
 > **发卡类改动双交付铁律（2026-10-31 定；2026-11-06 唯一化后适用范围更新）**：OpenUI prompt 资产（`OpenUiPromptAssets` DSL_RULES/黄金示例、`OpenUiTurnNative.SYSTEM_PROMPT`）与校验器等改动只存在于服务端——LLM 读的是线上 jar。此类改动交付 = ① App 发包（端侧渲染器）+ ② `./server/deploy.sh` 部署（先 bump `server/build.gradle.kts` version），缺一不可（2026-10-30 三轮布局治理曾只发包不部署，线上 LLM 从未见过新约束，布局问题「依旧没解决」；原 render_ui/render_ui_openui 工具链已随唯一化退役，铁律对 OpenUI 提示词/校验资产继续生效）。
 ```
