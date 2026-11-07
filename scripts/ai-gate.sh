@@ -86,6 +86,15 @@ fi
 # 2. 静态代码分析 (detekt)
 run_check "Detekt Static Analysis" "./gradlew detekt > '$OUTPUT_DIR/detekt.log' 2>&1"
 
+# 2.5 detekt baseline 只减不增门禁（架构健康审计 P1：冻结新增、鼓励消化存量）
+if [ -f "scripts/check_detekt_baseline.py" ]; then
+    if git rev-parse --verify origin/main > /dev/null 2>&1; then
+        run_check "Detekt Baseline 只减不增" "python3 scripts/check_detekt_baseline.py origin/main > '$OUTPUT_DIR/detekt_baseline.log' 2>&1"
+    else
+        run_warn "Detekt Baseline 只减不增" "origin/main 不存在（离线？），跳过——CI PR 上强制执行"
+    fi
+fi
+
 # 3. JVM 单元测试
 run_check "JVM Unit Tests" "./gradlew testDebugUnitTest > '$OUTPUT_DIR/unit_test.log' 2>&1"
 

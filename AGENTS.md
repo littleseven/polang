@@ -141,6 +141,7 @@ Logger.log(AgentCommandParsedEvent(...))
 | `./scripts/auto-dev-loop.sh` | 编译→安装→启动→截屏→日志 |
 | `./scripts/impact-analyzer.sh` | 变更影响分析 |
 | `./scripts/doc-sync-guardian.sh` | 文档同步检查 |
+| `./scripts/check_detekt_baseline.py` | detekt baseline 只减不增门禁（冻结新增豁免，CI PR 强制 + 本地 ai-gate 同步） |
 | `./scripts/test-generator.py` | 基于 public 方法生成测试骨架 |
 | `./scripts/screenshot-diff.py` | UI 回归检测 |
 | `./scripts/play-publish.sh` | Google Play 自动发布（GPP 封装：上传 AAB / 同步文案 / 轨道晋升），手册见 `docs/05-DEVELOPMENT/GOOGLE_PLAY_RELEASE_AUTOMATION.md` |
