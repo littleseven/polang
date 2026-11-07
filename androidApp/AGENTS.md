@@ -194,6 +194,8 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 
 `agent/AndroidAgentComposition.kt` 是所有 Agent 平台实现的**唯一直构点**：`Application.onCreate` 调 `initialize(context)`，构建 DataStore 存储（`KoogMessageMemoryStore`/`MemoryManager`）、端侧 VLM 引擎（`LocalLlmEngine`）、chat/相机工具集（`asToolsByClass()` 反射展开为 ToolDescriptor 清单 + ToolRegistry 同源派生，保 prompt 与工具零漂移）、飞书 RPA 工具集（`RemoteControlToolService` 懒构建，取 WindowManager），经 `AgentOrchestrator.initialize(AgentDependencies)` 一次性注入。commonMain 侧 `AgentOrchestrator` 只暴露无参 `getInstance()`。
 
+端侧 skill 执行器（2026-11-08）：`PoLangApplication.onCreate` 构建 shared `SkillRepository`（`SkillClient` 拉 `GET /v1/skills[/{name}]` + `FileSkillCacheStore` 落 filesDir/skill_cache，两者均不入 AppContainer，同 WebSearchClient 先例）经 `initialize(context, skillRepository)` 注入组合根；`LoadSkillCapability` 在 `initializeCapabilities` 末尾注册，`load_skill` 工具描述/清单段/error 前缀收口 shared `AgentSkillContract`（端云 LLM 可见面 SSOT）。
+
 ### 3.1.2 Agent 平台组件迁入（Phase 4 Task 13，自 runtime-core）
 
 `agent/core/` 子树承载依赖 Android 平台、无法进 shared commonMain 的 Agent 组件：

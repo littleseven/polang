@@ -66,6 +66,39 @@ class RemoteChatEngineToolSubsetTest {
     }
 
     @Test
+    fun `load_skill is unioned into subset when platform provides it`() {
+        // 技能是跨意图元能力（2026-11-08）：契约子集不含 load_skill，平台具备时恒并入
+        val resolution = RemoteChatEngine.resolveToolSubset(
+            available = setOf("search_media", "refine_media_search", "load_skill"),
+            toolNames = setOf("search_media", "refine_media_search"),
+        )
+        requireNotNull(resolution)
+        assertEquals(setOf("search_media", "refine_media_search", "load_skill"), resolution.names)
+        assertTrue(resolution.key.contains("load_skill"))
+    }
+
+    @Test
+    fun `load_skill not unioned when platform lacks it`() {
+        // iOS 窄工具面（未接 skill 执行器）：不凭空造工具名
+        val resolution = RemoteChatEngine.resolveToolSubset(
+            available = setOf("search_media", "refine_media_search"),
+            toolNames = setOf("search_media", "refine_media_search"),
+        )
+        requireNotNull(resolution)
+        assertEquals(setOf("search_media", "refine_media_search"), resolution.names)
+    }
+
+    @Test
+    fun `load_skill alone does not prevent empty-intersection fallback`() {
+        // 空交集判定在 union 之前：契约全数腐烂时保守全量，load_skill 不构成「命中」
+        val resolution = RemoteChatEngine.resolveToolSubset(
+            available = setOf("load_skill", "search_media"),
+            toolNames = setOf("finish", "delay"),
+        )
+        assertNull(resolution)
+    }
+
+    @Test
     fun `key is sorted and order-independent`() {
         val a = RemoteChatEngine.resolveToolSubset(
             available = setOf("b_tool", "a_tool", "c_tool"),

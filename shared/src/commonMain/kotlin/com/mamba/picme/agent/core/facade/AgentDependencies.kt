@@ -8,6 +8,7 @@ import com.mamba.picme.agent.core.inference.remote.RemoteChatEngine
 import com.mamba.picme.agent.core.platform.storage.ChatHistoryCleaner
 import com.mamba.picme.agent.core.platform.storage.ChatMemoryStore
 import com.mamba.picme.agent.core.platform.thread.DispatcherProvider
+import com.mamba.picme.agent.core.skill.SkillRepository
 
 /**
  * [AgentOrchestrator] 的全部平台注入项（Phase 4 KMP 抽取，组合根模式）。
@@ -66,4 +67,11 @@ data class AgentDependencies(
      * `IosChatPrompt.build`（精简版——iOS v1 无 JS/修图/记忆工具，沿用全量 prompt 会诱使 LLM 幻觉调用）。
      */
     val chatPromptBuilder: (List<ToolDescriptor>) -> String = RemoteChatEngine::buildChatSystemPrompt,
+
+    /**
+     * 端侧 skill 资产仓库（2026-11-08 端侧 load_skill 执行器）：组合根以平台实现
+     *（transport = picme-server `/v1/skills` 客户端，store = 本地 JSON 缓存）构建注入；
+     * null = 平台未接线——load_skill 工具仍在工具面但恒回 unknown_skill、prompt 无技能段。
+     */
+    val skillRepository: SkillRepository? = null,
 )

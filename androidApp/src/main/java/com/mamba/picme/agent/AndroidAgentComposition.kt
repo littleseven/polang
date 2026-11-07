@@ -14,6 +14,7 @@ import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.platform.storage.KoogMessageMemoryStore
 import com.mamba.picme.agent.core.platform.storage.MemoryManager
 import com.mamba.picme.agent.core.platform.thread.SharedDispatcherProvider
+import com.mamba.picme.agent.core.skill.SkillRepository
 
 /**
  * Android 组合根（Phase 4 KMP 抽取）：所有平台实现的**唯一直构点**。
@@ -46,9 +47,15 @@ object AndroidAgentComposition {
     @Volatile
     private var initialized = false
 
-    /** 应用启动接线入口（幂等：重复调用直接跳过，单例语义与 AgentOrchestrator.initialize 对齐）。 */
+    /**
+     * 应用启动接线入口（幂等：重复调用直接跳过，单例语义与 AgentOrchestrator.initialize 对齐）。
+     *
+     * @param skillRepository 端侧 skill 资产仓库（2026-11-08 端侧 load_skill 执行器）：
+     *   由调用方（PoLangApplication）构建——transport 需 token/deviceId 供给者（app 层状态），
+     *   本组合根只负责注入；null = 不接线（load_skill 恒回 unknown_skill、prompt 无技能段）。
+     */
     @Synchronized
-    fun initialize(context: Context) {
+    fun initialize(context: Context, skillRepository: SkillRepository? = null) {
         if (initialized) {
             Logger.w(TAG, "initialize called twice, skipping")
             return
@@ -82,6 +89,7 @@ object AndroidAgentComposition {
                     val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
                     ToolRegistry { tools(RemoteControlToolService(wm)) }
                 },
+                skillRepository = skillRepository,
             ),
         )
         initialized = true

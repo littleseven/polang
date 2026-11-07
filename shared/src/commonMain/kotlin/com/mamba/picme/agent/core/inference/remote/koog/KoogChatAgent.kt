@@ -105,11 +105,16 @@ class KoogChatAgent(
     @Volatile private var running = false
     private var currentSessionId: String = "default"
 
-    // 记忆快照 + 摘要版本 + 工具子集驱动的懒重建（三者任一变更才重建 AIAgent；executor/store/provider 复用）。
+    // 记忆快照 + 摘要版本 + 工具子集 + 技能清单段驱动的懒重建（四者任一变更才重建 AIAgent；
+    // executor/store/provider 复用）。
     // 摘要每轮新鲜渲染（US-2.4），但其变化经 version 反映——压缩后 version 变 → 重建 → 新摘要烘焙。
+    // 技能清单段（2026-11-08）：内容随 SkillRepository 同步变化，段文本比对入键——
+    // 技能新增/删除/描述变更即重建烘焙新清单，正文更新（version 变、name/description 不变）
+    // 不触发重建（清单段无变化，load_skill 拉的是最新缓存正文，无需重建）。
     private var builtSnapshot: String? = null
     private var builtSummaryVersion: Int = -1
     private var builtToolSetKey: String? = null
+    private var builtSkillSection: String? = null
     private var builtAgent: AIAgent<String, String>? = null
 
     fun setSessionId(sessionId: String) {
@@ -185,24 +190,26 @@ class KoogChatAgent(
      */
     private fun agent(summaryText: String?, summaryVersion: Int, toolSet: ChatToolSetOverride?): AIAgent<String, String> {
         val snapshot = config.memoryContextProvider?.snapshot()?.trim()?.ifEmpty { null }
+        val skillSection = config.skillPromptProvider?.invoke()?.trim()?.ifEmpty { null }
         val cached = builtAgent
         if (cached != null && snapshot == builtSnapshot && summaryVersion == builtSummaryVersion &&
-            toolSet?.key == builtToolSetKey
+            toolSet?.key == builtToolSetKey && skillSection == builtSkillSection
         ) {
             return cached
         }
         val agent = buildAgent(
-            systemPrompt = composeSystemPrompt(snapshot, summaryText, toolSet),
+            systemPrompt = composeSystemPrompt(snapshot, summaryText, toolSet, skillSection),
             registry = toolSet?.registry ?: toolRegistry,
         )
         builtAgent = agent
         builtSnapshot = snapshot
         builtSummaryVersion = summaryVersion
         builtToolSetKey = toolSet?.key
+        builtSkillSection = skillSection
         Logger.i(
             tag,
             "Built Koog AIAgent: model=${config.modelName}, snapshotLen=${snapshot?.length ?: 0}, " +
-                "summaryV=$summaryVersion, toolSet=${toolSet?.key ?: "full"}",
+                "summaryV=$summaryVersion, toolSet=${toolSet?.key ?: "full"}, skills=${skillSection != null}",
         )
         return agent
     }
@@ -281,13 +288,20 @@ class KoogChatAgent(
             .build()
 
     /**
-     * base system prompt + 【关于用户】记忆快照 + 【会话摘要】段（M2，US-2.4）。
+     * base system prompt + 【关于用户】记忆快照 + 【会话摘要】段（M2，US-2.4）+ 技能清单段。
      * 摘要段拼在快照后；空则跳过（零开销）。每轮新鲜渲染（[CompactionSlots.render]），
      * 与 system prompt 同样不落盘——摘要记录落盘，渲染文本现算（不变式①语义）。
      * M3：意图子集覆写时 base 取子集 prompt（清单段与覆写 registry 同源），否则取 config 全量。
+     * 技能清单段（[skillSection]，2026-11-08）恒拼在最末（全量/子集 base 共用）——
+     * 技能是跨意图的元能力，子集裁剪不裁技能披露面。
      */
-    private fun composeSystemPrompt(snapshot: String?, summaryText: String?, toolSet: ChatToolSetOverride?): String =
-        composeChatSystemPrompt(toolSet?.systemPrompt ?: config.systemPrompt, snapshot, summaryText)
+    private fun composeSystemPrompt(
+        snapshot: String?,
+        summaryText: String?,
+        toolSet: ChatToolSetOverride?,
+        skillSection: String?,
+    ): String =
+        composeChatSystemPrompt(toolSet?.systemPrompt ?: config.systemPrompt, snapshot, summaryText, skillSection)
 
     /**
      * 网关鉴权 header（与 RemoteReActAgent 经 MambaAgentFactory.customHeader 注入的等价）：
@@ -310,10 +324,17 @@ class KoogChatAgent(
 }
 
 /**
- * chat system prompt 三段组装（base + 记忆快照 + 会话摘要），纯函数便于 commonTest 直测（US-2.4）。
- * 任一段空则跳过；摘要恒在快照后（快照是用户级长期事实，摘要是会话级近期情节）。
+ * chat system prompt 四段组装（base + 记忆快照 + 会话摘要 + 技能清单段），纯函数便于
+ * commonTest 直测（US-2.4）。任一段空则跳过；摘要恒在快照后（快照是用户级长期事实，
+ * 摘要是会话级近期情节）；技能清单段恒在最末（跨意图元能力，随技能同步变化触发重建）。
  */
-internal fun composeChatSystemPrompt(base: String, snapshot: String?, summaryText: String?): String {
+internal fun composeChatSystemPrompt(
+    base: String,
+    snapshot: String?,
+    summaryText: String?,
+    skillSection: String? = null,
+): String {
     val withSnapshot = if (snapshot.isNullOrBlank()) base else "$base\n\n$snapshot"
-    return if (summaryText.isNullOrBlank()) withSnapshot else "$withSnapshot\n\n【会话摘要】\n$summaryText"
+    val withSummary = if (summaryText.isNullOrBlank()) withSnapshot else "$withSnapshot\n\n【会话摘要】\n$summaryText"
+    return if (skillSection.isNullOrBlank()) withSummary else "$withSummary\n$skillSection"
 }

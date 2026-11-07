@@ -24,11 +24,13 @@ fun Route.skillRoute(center: SkillCenter) {
         call.respond(
             buildJsonObject {
                 putJsonArray("skills") {
-                    center.manifest().forEach { meta ->
+                    // version（2026-11-08）：内容哈希，端侧增量同步的比对依据；旧端忽略该字段。
+                    center.versionedManifest().forEach { meta ->
                         add(
                             buildJsonObject {
                                 put("name", meta.name)
                                 put("description", meta.description)
+                                put("version", meta.version)
                             },
                         )
                     }
@@ -45,6 +47,7 @@ fun Route.skillRoute(center: SkillCenter) {
             buildJsonObject {
                 put("name", name)
                 put("content", content)
+                put("version", center.versionOf(name).orEmpty())
             },
         )
     }

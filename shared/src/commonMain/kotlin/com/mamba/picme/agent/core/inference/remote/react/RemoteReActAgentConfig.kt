@@ -18,6 +18,12 @@ data class RemoteReActAgentConfig(
     // OpenAI/Anthropic 客户端与 thinking 参数注入，缺失会导致 CLAUDE 配置静默走 OpenAI 协议。
     val protocol: RemoteProtocol = RemoteProtocol.OPENAI,
     val providerId: String = "",
+    /**
+     * 技能清单段供给者（2026-11-08 端侧 skill 落地）：每次 AIAgent 构建/重建键求值时调用，
+     * 返回 system prompt 的技能清单段（空串 = 无技能段）。非挂起——实现只读内存缓存
+     *（SkillRepository.cachedPromptSection），资产同步由引擎层在跑轮前完成。
+     */
+    val skillPromptProvider: (() -> String)? = null,
 ) {
     companion object {
         const val DEFAULT_SYSTEM_PROMPT = """
@@ -177,6 +183,7 @@ data class RemoteReActAgentConfig(
         private var memoryContextProvider: MemoryContextProvider? = null
         private var protocol: RemoteProtocol = RemoteProtocol.OPENAI
         private var providerId: String = ""
+        private var skillPromptProvider: (() -> String)? = null
 
         fun apiKey(apiKey: String) = apply {
             this.apiKey = apiKey
@@ -192,10 +199,11 @@ data class RemoteReActAgentConfig(
         fun memoryContextProvider(provider: MemoryContextProvider) = apply { this.memoryContextProvider = provider }
         fun protocol(protocol: RemoteProtocol) = apply { this.protocol = protocol }
         fun providerId(providerId: String) = apply { this.providerId = providerId }
+        fun skillPromptProvider(provider: (() -> String)?) = apply { this.skillPromptProvider = provider }
 
         fun build(): RemoteReActAgentConfig {
             require(apiKey.isNotEmpty() || gatewayToken != null) { "API key or gateway token is required" }
-            return RemoteReActAgentConfig(apiKey, baseUrl, modelName, systemPrompt, maxIterations, temperature, streaming, gatewayToken, deviceId, memoryContextProvider, protocol, providerId)
+            return RemoteReActAgentConfig(apiKey, baseUrl, modelName, systemPrompt, maxIterations, temperature, streaming, gatewayToken, deviceId, memoryContextProvider, protocol, providerId, skillPromptProvider)
         }
     }
 }

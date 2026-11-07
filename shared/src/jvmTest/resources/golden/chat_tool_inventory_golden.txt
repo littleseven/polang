@@ -1,4 +1,4 @@
-可用工具（43）：
+可用工具（44）：
 - adjust_image: 按显式参数调整图片亮度/对比度/饱和度/色温，返回调整后的图片。
 - ai_optimize: AI 一键优化图片。
 - browser_click: 点击云端浏览器当前页面中的元素。
@@ -24,6 +24,7 @@
 - go_back: 返回上一页。
 - launch_app: 打开外部应用。
 - list_person_relations: 查询已记住的人物关系。
+- load_skill: 按名称加载技能（SKILL）的完整指令。
 - more_like_this: 基于指定图片推荐更多相似照片。
 - navigate_to: 导航到页面。
 - open_system_settings: 打开系统设置页。

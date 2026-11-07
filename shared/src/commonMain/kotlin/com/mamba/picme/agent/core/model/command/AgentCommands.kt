@@ -533,6 +533,17 @@ sealed class AgentCommand {
         val query: String
     ) : AgentCommand()
 
+    // ==================== 技能加载（Skill 中心，经 picme-server /v1/skills） ====================
+
+    /**
+     * 按名称加载技能（SKILL）的完整指令（2026-11-08 端侧 load_skill 执行器）。
+     * 技能清单在 system prompt 技能段；正文经 SkillRepository 缓存优先 + 单点穿透获取。
+     */
+    data class LoadSkill(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val name: String
+    ) : AgentCommand()
+
     // ==================== 记忆命令（人物关系 + 事实记忆） ====================
 
     /**
@@ -675,6 +686,7 @@ sealed class AgentCommand {
             is BrowserScreenshot -> "browser_screenshot"
             is BrowserClose -> "browser_close"
             is WebSearch -> "web_search"
+            is LoadSkill -> "load_skill"
             is RememberPersonRelation -> "remember_person_relation"
             is ForgetPersonRelation -> "forget_person_relation"
             is QueryPersonRelation -> "query_person_relation"
