@@ -129,6 +129,18 @@ data class LlmCallListRow(
     val createdAt: Long,
 )
 
+/** 技能调试合成会话 model 标记（AdminRoutes 建会话 / AdminQueries 历史查询同源）。 */
+internal const val SKILL_DEBUG_MODEL = "skill-debug"
+
+/** 技能调试历史行（0.9.32）：会话摘要 + 首条测试消息 + 首个 load_skill 技能名 + 终态/耗时。 */
+data class SkillDebugHistoryRow(
+    val session: AgentSessionRow,
+    val testMessage: String?,     // 首条 user message 原文（截断归视图层）
+    val skillName: String?,       // 首个 load_skill 调用的 name 参数（未触发 = null）
+    val finishReason: String?,    // null = 运行中
+    val elapsedMs: Long?,         // finish - 首条 user message（与结果页同口径）
+)
+
 /** M2 管理后台 Agent 会话列表行。stalled 判定（lastEventAt >30min）归视图层。 */
 data class AgentSessionRow(
     val id: String,                 // 对外 uuid
@@ -731,6 +743,61 @@ object AdminQueries {
                 .toList()
             buildSessionRows(rows)
         }
+
+    /**
+     * 技能调试历史（0.9.32）：model=skill-debug 合成会话 seq 倒序留底。
+     * 每行聚合首条测试消息 / 首个 load_skill 技能名 / 终态耗时——事件列只取小 payload
+     * 类型（message/action/finish；observation 正文、html_card 大文档不进本查询）。
+     */
+    suspend fun skillDebugHistory(limit: Int = 20): List<SkillDebugHistoryRow> =
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            val rows = AgentSessions.selectAll()
+                .where { AgentSessions.model eq SKILL_DEBUG_MODEL }
+                .orderBy(AgentSessions.seq to SortOrder.DESC)
+                .limit(limit)
+                .toList()
+            val sessions = buildSessionRows(rows)
+            if (sessions.isEmpty()) return@newSuspendedTransaction emptyList()
+            val events = AgentEvents.selectAll()
+                .where {
+                    (AgentEvents.sessionId inList sessions.map { it.id }) and
+                        (AgentEvents.type inList listOf("user_message", "action", "finish"))
+                }
+                .orderBy(AgentEvents.id to SortOrder.ASC)
+                .map { r ->
+                    DebugEv(
+                        sessionId = r[AgentEvents.sessionId],
+                        role = r[AgentEvents.role],
+                        payload = runCatching { AgentEventPayloadCodec.decode(r[AgentEvents.payloadJson]) }.getOrNull(),
+                        createdAt = r[AgentEvents.createdAt],
+                    )
+                }
+                .groupBy { it.sessionId }
+            sessions.map { s ->
+                val evs = events[s.id].orEmpty()
+                val userMsg = evs.firstOrNull { it.role == "user" && it.payload is AgentEventPayload.Message }
+                val loadSkillArgs = evs.mapNotNull { it.payload as? AgentEventPayload.Action }
+                    .firstOrNull { it.tool == "load_skill" }?.argsJson
+                val finish = evs.lastOrNull { it.payload is AgentEventPayload.Finish }
+                SkillDebugHistoryRow(
+                    session = s,
+                    testMessage = (userMsg?.payload as? AgentEventPayload.Message)?.content,
+                    skillName = loadSkillArgs?.let { SKILL_NAME_IN_ARGS.find(it)?.groupValues?.get(1) },
+                    finishReason = (finish?.payload as? AgentEventPayload.Finish)?.reason,
+                    elapsedMs = if (finish != null && userMsg != null) finish.createdAt - userMsg.createdAt else null,
+                )
+            }
+        }
+
+    /** load_skill argsJson（`{"name":"html-card"}`）的技能名提取。 */
+    private val SKILL_NAME_IN_ARGS = Regex(""""name"\s*:\s*"([^"]+)"""")
+
+    private data class DebugEv(
+        val sessionId: String,
+        val role: String,
+        val payload: AgentEventPayload?,
+        val createdAt: Long,
+    )
 
     /** 单会话摘要（详情页头部）；未知 sessionId → null。 */
     suspend fun agentSessionSummary(sessionId: String): AgentSessionRow? =

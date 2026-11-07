@@ -516,6 +516,41 @@ class AdminViewsTest {
         assertTrue(!html.contains("载入草稿")) // 空清单无载入链接行
     }
 
+    @Test
+    fun `skill debug page renders history rows with result links and statuses`() {
+        val done = SkillDebugHistoryRow(
+            session = sessionFixture(),
+            testMessage = "帮我生成一个 HTML 投票卡片",
+            skillName = "html-card",
+            finishReason = "done",
+            elapsedMs = 4000L,
+        )
+        val running = SkillDebugHistoryRow(
+            session = sessionFixture().copy(id = "bbbb2222-0000-0000-0000-000000000000"),
+            testMessage = "再试一次",
+            skillName = null,
+            finishReason = null,
+            elapsedMs = null,
+        )
+        val html = AdminViews.skillDebugPage(skills = emptyList(), history = listOf(done, running))
+        assertTrue(html.contains("调试历史（2）"))
+        assertTrue(html.contains("html-card"))
+        assertTrue(html.contains("帮我生成一个 HTML 投票卡片"))
+        assertTrue(html.contains("（未触发）")) // 未触发 load_skill 的技能列
+        assertTrue(html.contains("完成"))
+        assertTrue(html.contains("运行中"))
+        assertTrue(html.contains("4000ms"))
+        assertTrue(html.contains("/admin/skills/debug/result/abcd1234-0000-0000-0000-000000000000"))
+        assertTrue(html.contains("/admin/agent/sessions/bbbb2222-0000-0000-0000-000000000000"))
+    }
+
+    @Test
+    fun `skill debug page empty history shows placeholder`() {
+        val html = AdminViews.skillDebugPage(skills = emptyList())
+        assertTrue(html.contains("调试历史（0）"))
+        assertTrue(html.contains("尚无调试记录"))
+    }
+
     // ── 发包管理 v2（2026-11-07：双轨卡 + 双栏上传 + 分轨历史）──
 
     @Test
