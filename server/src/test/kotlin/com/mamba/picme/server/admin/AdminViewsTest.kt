@@ -1,6 +1,7 @@
 package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.agent.AgentEventPayload
+import com.mamba.picme.server.agent.SkillCenter
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -340,6 +341,119 @@ class AdminViewsTest {
         val html = AdminViews.userDetailPage(d, emptyList())
         assertTrue(html.contains("href=\"/admin/llm/calls?account_id=42\""))
         assertTrue(html.contains("href=\"/admin/agent/sessions?account_id=42\""))
+    }
+
+    // ── Skill 中心（2026-11-07 v2：统计行 / 双栏编辑 / 预览页三 Tab + markdown 渲染）──
+
+    private fun skillFixture(
+        name: String = "html-card",
+        description: String = "当需要生成任务卡/结果卡 HTML 时，先加载本技能",
+        body: String = "# html-card 任务卡生成\n\n## 何时使用\n用户需要生成任务卡 HTML 时。\n\n## 步骤\n1. 取 UserTask JSON\n2. 套模板\n",
+        updatedAtMs: Long = 1_760_000_000_000L,
+        rawChars: Int = 1204,
+    ) = SkillCenter.SkillDetail(
+        meta = SkillCenter.SkillMeta(name, description),
+        body = body, updatedAtMs = updatedAtMs, rawChars = rawChars,
+    )
+
+    @Test
+    fun `skills list page renders stats row table with preview link and prompt section`() {
+        val html = AdminViews.skillsPage(
+            skills = listOf(skillFixture(), skillFixture("tag-report", rawChars = 862)),
+            promptSection = "可用技能（SKILL）清单……\n- html-card: 当需要生成任务卡…",
+        )
+        // 统计行
+        assertTrue(html.contains("技能数"))
+        assertTrue(html.contains("2"))
+        assertTrue(html.contains("总字符"))
+        assertTrue(html.contains("2,066")) // 1204 + 862 千分位
+        assertTrue(html.contains("最近更新"))
+        // 表格 + 预览入口
+        assertTrue(html.contains("html-card"))
+        assertTrue(html.contains("href=\"/admin/skills/html-card/preview\""))
+        assertTrue(html.contains("预览"))
+        assertTrue(html.contains("共 2 个技能"))
+        // LLM 视角清单段
+        assertTrue(html.contains("system prompt 技能清单段"))
+        assertTrue(html.contains("- html-card: 当需要生成任务卡…"))
+    }
+
+    @Test
+    fun `skills edit page renders two-column layout with live preview hooks and delete button`() {
+        val html = AdminViews.skillEditPage(existing = skillFixture())
+        // 双栏 + 左表单
+        assertTrue(html.contains("skills-layout"))
+        assertTrue(html.contains("SKILL.md 表单"))
+        assertTrue(html.contains("readonly"))
+        assertTrue(html.contains("只读"))
+        // 右栏实时预览：清单行 + markdown 渲染初值（commonmark 服务端渲染）
+        assertTrue(html.contains("实时预览 · LLM 视角"))
+        assertTrue(html.contains("id=\"manifest-line\""))
+        assertTrue(html.contains("id=\"md-live\""))
+        assertTrue(html.contains("<h1>")) // body 的 # 标题已渲染
+        assertTrue(html.contains("<h2>"))
+        // JS：计数 + 联动
+        assertTrue(html.contains("id=\"char-counter\""))
+        assertTrue(html.contains("32,000")) // MAX_CONTENT_CHARS 注入
+        // 编辑态删除按钮
+        assertTrue(html.contains("删除技能"))
+        assertTrue(html.contains("/admin/skills/html-card/delete"))
+    }
+
+    @Test
+    fun `skills edit page for new skill has no delete and renders default body preview`() {
+        val html = AdminViews.skillEditPage(existing = null)
+        assertTrue(html.contains("新增技能"))
+        assertTrue(!html.contains("删除技能"))
+        assertTrue(html.contains("# 技能标题")) // 默认正文模板进 textarea
+    }
+
+    @Test
+    fun `skills preview page llm tab shows both layers`() {
+        val html = AdminViews.skillPreviewPage(skillFixture(), tab = "llm")
+        assertTrue(html.contains("预览技能 · html-card"))
+        assertTrue(html.contains("热更新已生效"))
+        assertTrue(html.contains("① system prompt 清单段"))
+        assertTrue(html.contains("- html-card: 当需要生成任务卡"))
+        assertTrue(html.contains("② load_skill"))
+        assertTrue(html.contains("取 UserTask JSON"))
+        // 三 Tab 链接
+        assertTrue(html.contains("?tab=llm"))
+        assertTrue(html.contains("?tab=raw"))
+        assertTrue(html.contains("?tab=rendered"))
+    }
+
+    @Test
+    fun `skills preview page raw tab reconstructs skill md source`() {
+        val html = AdminViews.skillPreviewPage(skillFixture(), tab = "raw")
+        assertTrue(html.contains("原文 · SKILL.md"))
+        assertTrue(html.contains("---"))
+        assertTrue(html.contains("name: html-card"))
+        assertTrue(html.contains("description: 当需要生成任务卡"))
+    }
+
+    @Test
+    fun `skills preview page rendered tab renders markdown to html`() {
+        val html = AdminViews.skillPreviewPage(skillFixture(), tab = "rendered")
+        assertTrue(html.contains("渲染预览"))
+        assertTrue(html.contains("<h1>html-card 任务卡生成</h1>"))
+        assertTrue(html.contains("<ol>")) // 有序列表 1. 2.
+    }
+
+    @Test
+    fun `renderMarkdown escapes raw html in skill body`() {
+        val rendered = AdminViews.renderMarkdown("# t\n\n<script>alert(1)</script>")
+        assertTrue(!rendered.contains("<script>"))
+        assertTrue(rendered.contains("&lt;script&gt;"))
+    }
+
+    @Test
+    fun `skills preview page falls back to llm tab on unknown tab`() {
+        val html = AdminViews.skillPreviewPage(skillFixture(), tab = "evil")
+        // 属性序不保证，拆两条断言：llm 高亮 + 无 evil 透传
+        assertTrue(html.contains("subtab active"))
+        assertTrue(html.contains("\"/admin/skills/html-card/preview?tab=llm\""))
+        assertTrue(!html.contains("?tab=evil"))
     }
 
 }

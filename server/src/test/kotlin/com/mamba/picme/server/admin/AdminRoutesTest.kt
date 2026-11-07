@@ -4,6 +4,7 @@ import com.mamba.picme.server.agent.AgentEventPayload
 import com.mamba.picme.server.agent.AgentEventPayloadCodec
 import com.mamba.picme.server.agent.AgentEvents
 import com.mamba.picme.server.agent.AgentSessions
+import com.mamba.picme.server.agent.SkillCenter
 import com.mamba.picme.server.config.AppConfig
 import com.mamba.picme.server.config.SettingsService
 import com.mamba.picme.server.cos.CosService
@@ -717,5 +718,43 @@ class AdminRoutesTest {
 
         val r = c.get("/admin/agent/sessions/sess-no-such-id") { cookie(AdminAuth.COOKIE_NAME, cookieVal) }
         assertEquals(HttpStatusCode.NotFound, r.status)
+    }
+
+    // ── Skill 中心预览页路由（2026-11-07 v2）──
+
+    @Test
+    fun `skills preview route serves llm and rendered tabs and 404s unknown skill`() {
+        val dir = kotlin.io.path.createTempDirectory(prefix = "skill-admin-test").toFile()
+        try {
+            val sc = SkillCenter(dir)
+            assertNull(sc.upsert("html-card", "当需要生成任务卡 HTML 时，先加载本技能", "# 标题\n\n1. 取 JSON\n"))
+            testApplication {
+                application { routing { adminRoute(token, cos, balance, skillCenter = sc) } }
+                val c = createClient { followRedirects = false }
+
+                // 未登录 → 跳登录
+                assertEquals(HttpStatusCode.Found, c.get("/admin/skills/html-card/preview").status)
+
+                // LLM 视角 Tab（默认）
+                val llm = c.get("/admin/skills/html-card/preview") { cookie(AdminAuth.COOKIE_NAME, cookieVal) }
+                assertEquals(HttpStatusCode.OK, llm.status)
+                val llmText = llm.bodyAsText()
+                assertTrue(llmText.contains("预览技能 · html-card"))
+                assertTrue(llmText.contains("- html-card: 当需要生成任务卡 HTML 时，先加载本技能"))
+
+                // 渲染预览 Tab：commonmark 服务端渲染
+                val rendered = c.get("/admin/skills/html-card/preview?tab=rendered") { cookie(AdminAuth.COOKIE_NAME, cookieVal) }
+                assertEquals(HttpStatusCode.OK, rendered.status)
+                assertTrue(rendered.bodyAsText().contains("<h1>标题</h1>"))
+
+                // 未知技能 → 404（与编辑页同口径）
+                assertEquals(
+                    HttpStatusCode.NotFound,
+                    c.get("/admin/skills/no-such/preview") { cookie(AdminAuth.COOKIE_NAME, cookieVal) }.status,
+                )
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 }

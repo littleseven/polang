@@ -531,11 +531,21 @@ fun Route.adminRoute(
             call.respondText(AdminViews.skillEditPage(existing = null), ContentType.Text.Html)
         }
 
+        // 预览页（2026-11-07 v2）：三 Tab = LLM 视角 / 原文 SKILL.md / 渲染预览（commonmark 服务端渲染）
+        get("/skills/{name}/preview") {
+            if (!call.adminGuard(adminToken)) return@get
+            val name = call.parameters["name"].orEmpty()
+            val tab = call.request.queryParameters["tab"] ?: "llm"
+            val detail = skillCenter?.detail(name)
+                ?: return@get call.respondText("skill_not_found: $name", ContentType.Text.Html, HttpStatusCode.NotFound)
+            call.respondText(AdminViews.skillPreviewPage(detail, tab), ContentType.Text.Html)
+        }
+
         get("/skills/{name}") {
             if (!call.adminGuard(adminToken)) return@get
             val name = call.parameters["name"].orEmpty()
             val detail = skillCenter?.detail(name)
-                ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "skill_not_found"))
+                ?: return@get call.respondText("skill_not_found: $name", ContentType.Text.Html, HttpStatusCode.NotFound)
             call.respondText(AdminViews.skillEditPage(existing = detail), ContentType.Text.Html)
         }
 
