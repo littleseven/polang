@@ -3,8 +3,8 @@ package com.mamba.picme.domain.chat.openui
 /**
  * OpenUI 线格式契约（字面量 SSOT）。
  *
- * 三方消费：androidApp（渲染/落库/工具注册）、server `OpenUiPromptAssets`
- * （prompt 资产/描述文本字面量副本，改动须双向同步核对）、云端 LLM 行为约定。
+ * 三方消费：androidApp（渲染/落库/工具注册）、server（校验器白名单/prompt 资产
+ * 真引用本契约，分层 runtime M1.5 起无字面量副本）、云端 LLM 行为约定。
  *
  * local:// handle 契约唯一出处（2026-11-05 A2UI 退役后自 A2uiCardContract 并入）：
  * - 上行投影文本只带 opaque token（[formatHandleToken]，无 scheme，过 CloudToolProjectionGate）；
@@ -36,7 +36,7 @@ object OpenUiContract {
     /**
      * 动作名（§6.3）SSOT：eval 产出（[ENGINE]）与宿主合成（[OPEN_PHOTO]）共用词表。
      * parser 内置名表 / eval / engine `applyAction` / Android 宿主 dispatch 统一引用；
-     * server `RenderOpenUiValidator` 持字面量副本，改动须双向同步核对（同 iconNames 惯例）。
+     * server `RenderOpenUiValidator` 真引用本表（分层 runtime M1.5，原字面量副本已收口）。
      *
      * 交互去向对齐官方 actions 语义（2026-11-01 动作体系官方对齐，不新增语法）：
      * 1. **本地操作**：[SET]/[RESET] 卡内状态写、[OPEN_URL] 外部链接、[OPEN_PHOTO] 大图预览，
@@ -75,7 +75,7 @@ object OpenUiContract {
     /**
      * scan 句柄的 #photos fragment（spec《openui-image-component-design》D2）：
      * `local://scan/<id>#photos` → 端侧投影 [{id, date}]（ScanPhotoProjection，cap 60）。
-     * server `OpenUiPromptAssets` 描述文本持字面量副本，改动须双向同步核对。
+     * server 校验器 fragment 闭集自此真引用（分层 runtime M1.5）。
      */
     const val FRAGMENT_PHOTOS = "photos"
 

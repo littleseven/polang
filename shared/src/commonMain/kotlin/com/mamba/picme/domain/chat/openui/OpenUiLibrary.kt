@@ -107,11 +107,10 @@ object OpenUiLibrary {
 
     /**
      * Icon.name 的 59 枚预定义图标名（A2UI catalog v1 同口径，禁 svgPath 自由形式）。
-     * 字面量副本三处同步：server `RenderOpenUiValidator.ICON_NAMES` ↔ 本清单 ↔
-     * server `OpenUiPromptAssets` 描述内嵌清单，改动须三处核对（测试钉住同源）。
-     * ⚠️ 残余风险（review 🟡5 记录在案）：server 与 :shared 是两个独立 Gradle build，
-     * 「本清单 ↔ server 副本」无直接程序性比对——shared 测试持自己的字面量、server 测试
-     * 比对 server 内两份，跨模块漂移时两边各自全绿。改动图标清单时人工三处核对。
+     * 唯一出处：server `RenderOpenUiValidator.ICON_NAMES` 与 `OpenUiPromptAssets`
+     * 描述内嵌清单纯真引用本清单（分层 runtime M1.5，原三处字面量副本与
+     * 「跨模块漂移各自全绿」残余风险（review 🟡5）一并消除）；内容钉住在
+     * `OpenUiLibraryM2Test`。
      */
     val iconNames = listOf(
         "accountCircle", "add", "arrowBack", "arrowForward", "attachFile", "calendarToday",
@@ -137,8 +136,9 @@ object OpenUiLibrary {
     /**
      * polang 库自定义动作注册表（2026-11-01 动作三通道官方对齐批次）：
      * M1 = `Navigate`（App 内页面跳转，destination 线名闭集收口 androidApp
-     * `OpenUiActionChannels.kt` `OpenUiNavigateTarget`）。server `OpenUiPromptAssets`
-     * 工具描述与 `RenderOpenUiValidator.QUOTED_ACTION` 持字面量副本，改动须双向同步。
+     * `OpenUiActionChannels.kt` `OpenUiNavigateTarget`）。server
+     * `RenderOpenUiValidator.QUOTED_ACTION` 词表真引用本注册表（分层 runtime M1.5，
+     * 原字面量副本已收口）。
      */
     val customActions: List<OpenUiCustomAction> = listOf(
         OpenUiCustomAction(CUSTOM_ACTION_NAVIGATE, listOf("destination", "param")),
