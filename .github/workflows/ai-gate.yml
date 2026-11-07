@@ -38,6 +38,14 @@ jobs:
       - name: Detekt Analysis
         run: ./gradlew detekt
 
+      # baseline 只减不增（架构健康审计 P1）：PR 不得新增豁免条目，消化存量鼓励。
+      # 仅 PR 触发——push 到 main 时 origin/main 即自身，对比恒空。
+      - name: Detekt Baseline 只减不增门禁
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          python3 scripts/check_detekt_baseline.py "origin/${{ github.event.pull_request.base.ref }}"
+
       - name: JVM Unit Tests
         run: ./gradlew testDebugUnitTest
 

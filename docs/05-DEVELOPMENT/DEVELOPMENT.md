@@ -153,6 +153,11 @@ doc-sync-check:
 ./gradlew :androidApp:compileDebugKotlin :androidApp:testDebugUnitTest ktlintCheck detekt
 ```
 
+**detekt baseline 只减不增（2026-11-07 起，架构健康审计 P1）**：`androidApp/detekt-baseline.xml`
+的 1194 条存量豁免冻结——新代码不得靠向 baseline 追加条目绕过 detekt（CI PR 门禁
+`scripts/check_detekt_baseline.py` 强制执行，本地 ai-gate 同步检查）；要么修复问题，要么在
+代码上用 `@Suppress` 并注明理由（可见、可审）。消化存量条目（修复后从 baseline 移除）永远欢迎。
+
 ### 3.3 性能基线检查（Performance Baseline）
 
 ```bash
