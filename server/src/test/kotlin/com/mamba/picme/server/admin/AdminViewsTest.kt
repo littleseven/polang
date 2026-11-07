@@ -425,6 +425,11 @@ class AdminViewsTest {
         assertTrue(html.contains("新增技能"))
         assertTrue(!html.contains("删除技能"))
         assertTrue(html.contains("# 技能标题")) // 默认正文模板进 textarea
+        // v4：描述改可折行 textarea（JS 拦回车+清洗换行，数据保持单行）+ 右栏加宽
+        assertTrue(html.contains("desc-area"))
+        assertTrue(html.contains("单行，可折行显示"))
+        assertTrue(html.contains("e.key === 'Enter'"))
+        assertTrue(html.contains("minmax(480px,48%)"))
     }
 
     @Test
