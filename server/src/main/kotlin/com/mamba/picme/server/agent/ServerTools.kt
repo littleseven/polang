@@ -16,8 +16,8 @@ import java.time.Instant
  * OpenUI 回合原生，HTML 以 Html 组件形态入程序树，不再有发卡工具。历史 HtmlCard 事件
  * 仍可由事件流回放解码（见 [AgentEventPayload.HtmlCard]）。
  *
- * 工具名/`error:` 前缀的 SSOT = shared commonMain `CloudAgentToolContract`
- *（server 不依赖 :shared，本类持字面量副本——改契约常量须双向同步核对）。
+ * server_time 是服务端本地工具（不进端侧工具契约，无桥层帧）；端侧三件套的
+ * 工具名/描述契约见 shared `CloudAgentToolContract`（DeviceToolService 真引用）。
  *
  * 决策 1a 可逆性元数据：[REVERSIBLE_TOOLS]——server_time 只读（无副作用可逆语义
  * 管辖），故集合为空。

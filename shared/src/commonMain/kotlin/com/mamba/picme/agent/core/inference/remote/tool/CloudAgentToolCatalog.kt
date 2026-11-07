@@ -6,8 +6,8 @@ package com.mamba.picme.agent.core.inference.remote.tool
  *
  * projectionSchema 是出端白名单的人类可读描述；机器可校验的禁出校验由
  * [CloudToolProjectionGate] 承载（同一文件族）。云端 LLM 可见描述只许承诺 projectionSchema
- * 这个面——server `DeviceToolService` 的 @LLMDescription 与之逐字对齐（字面量副本模式，
- * 改动须双向同步核对）。
+ * 这个面——server `DeviceToolService` 的 @LLMDescription 真引用
+ * [CloudAgentToolContract].DESC_*（分层 runtime M1，composite build），与本表同源。
  *
  * 完整结果（resultSchema 描述的结构，如 search_media 的 List<MediaAsset>）永不离开设备；
  * M2 起经 local:// handle 端上补全引用。本表是 [PRIVACY] 闸的审计入口。
