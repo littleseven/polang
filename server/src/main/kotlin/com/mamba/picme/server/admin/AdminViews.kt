@@ -644,8 +644,10 @@ object AdminViews {
                     p("meta") {
                         +"技能 = 按需加载的指令包（SKILL.md），云端 Agent 经 load_skill 加载；保存即热更新（下一轮跑轮生效，无需部署）。"
                     }
-                    a("/admin/skills/debug", classes = "btn btn-ghost") { +"调试" }
-                    a("/admin/skills/new", classes = "btn") { +"＋ 新增技能" }
+                    div("skill-head-actions") {
+                        a("/admin/skills/debug", classes = "btn btn-ghost") { +"调试" }
+                        a("/admin/skills/new", classes = "btn") { +"＋ 新增技能" }
+                    }
                 }
                 div("skill-stats") {
                     skillStatCard("技能数", "${skills.size}", "frontmatter 合法才进清单")
@@ -656,7 +658,7 @@ object AdminViews {
                         "磁盘直读 · rsync 即热更新",
                     )
                 }
-                table {
+                table(classes = "skills-table") {
                     tr {
                         th { +"名称" }
                         th { +"描述（LLM 相关性判断依据）" }
@@ -666,8 +668,11 @@ object AdminViews {
                     }
                     skills.forEach { s ->
                         tr {
-                            td("skill-name") { a("/admin/skills/${s.meta.name}") { +s.meta.name } }
-                            td { +s.meta.description }
+                            td("skill-name") {
+                                attributes["title"] = s.meta.name
+                                a("/admin/skills/${s.meta.name}") { +s.meta.name }
+                            }
+                            td("skill-desc-cell") { +s.meta.description }
                             td { +s.rawChars.toString() }
                             td { +fmtTs(s.updatedAtMs) }
                             td {
@@ -2542,13 +2547,24 @@ object AdminViews {
                         .ev summary{cursor:pointer;color:var(--c-text-3);font-size:var(--fs-xs)}
                         /* Skill 中心（2026-11-07 v2，Ardot 设计稿结构落地） */
                         .skill-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
-                        .skill-head .meta{margin:0}
+                        .skill-head .meta{margin:0;flex:1;min-width:260px}
+                        .skill-head-actions{display:flex;gap:10px;flex-shrink:0}
+                        .skill-head-actions .btn{white-space:nowrap}
                         .skill-stats{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 16px}
                         .skill-stat{flex:1;min-width:180px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);padding:14px 20px;box-shadow:var(--shadow-sm)}
                         .skill-stat-label{font-size:var(--fs-sm);color:var(--c-text-2)}
                         .skill-stat-value{font-size:var(--fs-xl);font-weight:600;color:var(--c-primary);margin-top:4px;font-variant-numeric:tabular-nums}
                         .skill-stat-sub{font-size:var(--fs-xs);color:var(--c-text-3);margin-top:4px}
+                        /* 技能列表（0.9.40 布局修复）：fixed 布局定列宽——名称整行不折行
+                           （超长省略号+title 悬浮），描述占余量自适应折行，字符/时间/操作定宽 */
+                        .skills-table{table-layout:fixed}
+                        .skills-table th:nth-child(1),.skills-table td:nth-child(1){width:200px}
+                        .skills-table th:nth-child(3),.skills-table td:nth-child(3){width:64px;text-align:right}
+                        .skills-table th:nth-child(4),.skills-table td:nth-child(4){width:150px;white-space:nowrap}
+                        .skills-table th:nth-child(5),.skills-table td:nth-child(5){width:200px}
                         td.skill-name{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+                        .skills-table td.skill-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                        .skills-table td.skill-desc-cell{word-break:break-word;color:var(--c-text-2)}
                         .skill-row-actions{display:flex;gap:8px;align-items:center;white-space:nowrap}
                         .btn-sm.btn-danger{background:var(--c-danger-bg);color:var(--c-danger);border-color:var(--c-danger-border)}
                         .btn-danger-ghost{padding:8px 16px;background:var(--c-danger-bg);color:var(--c-danger);border:1px solid var(--c-danger-border);border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;transition:all .2s;height:32px;line-height:16px}
