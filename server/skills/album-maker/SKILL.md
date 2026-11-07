@@ -59,19 +59,19 @@ tags = ["湖景", "湖景", "公园", "古刹", "溪谷", "山野", "江景", "�
 root = Card([
   CardHeader("杭州精选", subtitle = "11 张 · 第 " + ($page + 1) + " / 2 页"),
   Row([
-    Column([Box([Image(photos[$page * 9 + 0].id, aspect = 1), Tag(tags[$page * 9 + 0])], align = "bottomStart"), Text(names[$page * 9 + 0], maxLines = 1)], spacing = "xs"),
-    Column([Box([Image(photos[$page * 9 + 1].id, aspect = 1), Tag(tags[$page * 9 + 1])], align = "bottomStart"), Text(names[$page * 9 + 1], maxLines = 1)], spacing = "xs"),
-    ($page * 9 + 2 < 11) ? Column([Box([Image(photos[$page * 9 + 2].id, aspect = 1), Tag(tags[$page * 9 + 2])], align = "bottomStart"), Text(names[$page * 9 + 2], maxLines = 1)], spacing = "xs") : null
+    Column([Box([Image(photos[$page * 9 + 0].id, aspect = 0.75), Tag(tags[$page * 9 + 0])], align = "bottomStart"), Text(names[$page * 9 + 0], maxLines = 1)], spacing = "xs"),
+    Column([Box([Image(photos[$page * 9 + 1].id, aspect = 0.75), Tag(tags[$page * 9 + 1])], align = "bottomStart"), Text(names[$page * 9 + 1], maxLines = 1)], spacing = "xs"),
+    ($page * 9 + 2 < 11) ? Column([Box([Image(photos[$page * 9 + 2].id, aspect = 0.75), Tag(tags[$page * 9 + 2])], align = "bottomStart"), Text(names[$page * 9 + 2], maxLines = 1)], spacing = "xs") : null
   ], align = "start"),
   Row([
-    Column([Box([Image(photos[$page * 9 + 3].id, aspect = 1), Tag(tags[$page * 9 + 3])], align = "bottomStart"), Text(names[$page * 9 + 3], maxLines = 1)], spacing = "xs"),
-    Column([Box([Image(photos[$page * 9 + 4].id, aspect = 1), Tag(tags[$page * 9 + 4])], align = "bottomStart"), Text(names[$page * 9 + 4], maxLines = 1)], spacing = "xs"),
-    ($page * 9 + 5 < 11) ? Column([Box([Image(photos[$page * 9 + 5].id, aspect = 1), Tag(tags[$page * 9 + 5])], align = "bottomStart"), Text(names[$page * 9 + 5], maxLines = 1)], spacing = "xs") : null
+    Column([Box([Image(photos[$page * 9 + 3].id, aspect = 0.75), Tag(tags[$page * 9 + 3])], align = "bottomStart"), Text(names[$page * 9 + 3], maxLines = 1)], spacing = "xs"),
+    Column([Box([Image(photos[$page * 9 + 4].id, aspect = 0.75), Tag(tags[$page * 9 + 4])], align = "bottomStart"), Text(names[$page * 9 + 4], maxLines = 1)], spacing = "xs"),
+    ($page * 9 + 5 < 11) ? Column([Box([Image(photos[$page * 9 + 5].id, aspect = 0.75), Tag(tags[$page * 9 + 5])], align = "bottomStart"), Text(names[$page * 9 + 5], maxLines = 1)], spacing = "xs") : null
   ], align = "start"),
   Row([
-    Column([Box([Image(photos[$page * 9 + 6].id, aspect = 1), Tag(tags[$page * 9 + 6])], align = "bottomStart"), Text(names[$page * 9 + 6], maxLines = 1)], spacing = "xs"),
-    Column([Box([Image(photos[$page * 9 + 7].id, aspect = 1), Tag(tags[$page * 9 + 7])], align = "bottomStart"), Text(names[$page * 9 + 7], maxLines = 1)], spacing = "xs"),
-    ($page * 9 + 8 < 11) ? Column([Box([Image(photos[$page * 9 + 8].id, aspect = 1), Tag(tags[$page * 9 + 8])], align = "bottomStart"), Text(names[$page * 9 + 8], maxLines = 1)], spacing = "xs") : null
+    Column([Box([Image(photos[$page * 9 + 6].id, aspect = 0.75), Tag(tags[$page * 9 + 6])], align = "bottomStart"), Text(names[$page * 9 + 6], maxLines = 1)], spacing = "xs"),
+    Column([Box([Image(photos[$page * 9 + 7].id, aspect = 0.75), Tag(tags[$page * 9 + 7])], align = "bottomStart"), Text(names[$page * 9 + 7], maxLines = 1)], spacing = "xs"),
+    ($page * 9 + 8 < 11) ? Column([Box([Image(photos[$page * 9 + 8].id, aspect = 0.75), Tag(tags[$page * 9 + 8])], align = "bottomStart"), Text(names[$page * 9 + 8], maxLines = 1)], spacing = "xs") : null
   ], align = "start"),
   Row([
     $page > 0 ? Button("← 上一页", @Set($page, $page - 1), "secondary") : null,
@@ -86,7 +86,7 @@ fallbackSummary = "11 张精选，数据在原设备"
 - **三行九格，格 = Column([Box([Image, Tag]), Text(名字)])**：
   Box 把标签以角标形式叠在照片左下（`align = "bottomStart"`，官方「图上叠角标」形态），
   名字在照片下方 maxLines = 1 防撑破网格；Column 用 `spacing = "xs"` 收紧图文间距；
-  `Image(…, aspect = 1)` 方形统一造型，3×3 才整齐。
+  `Image(…, aspect = 0.75)` 统一 3:4 竖幅缩略图造型（aspect = 宽/高 = 3/4，在 clamp 界内），3×3 才整齐。
 - **越界守卫**：只给「最后一页可能越界」的格子包三元——条件写字面量 M
   （`($page * 9 + 8 < 11) ? Column(…) : null`），数组里 null 会被端上丢弃，
   最后一页少几张就少几格，不留空位不报错。越界下标本身求值为 null 也不崩，
@@ -118,6 +118,7 @@ get_gallery_summary / search_media / refine_media_search 三个只读工具，
 ## 发卡前自检清单
 
 - [ ] 每页恰好 9 个 Image 调用位（位图计数 9 ≤ 12）
+- [ ] Image 全部 `aspect = 0.75`（3:4 竖幅缩略图统一造型，不写 aspect = 1 方形）
 - [ ] photo 全部是 `photos[$page * 9 + i].id`，无字面量数字 id
 - [ ] `names` / `tags` 数组长度 = M，与投影顺序一一对应，下标写法与照片一致
 - [ ] 越界格都包了三元守卫（条件用字面量 M），按钮显示条件用字面量 P

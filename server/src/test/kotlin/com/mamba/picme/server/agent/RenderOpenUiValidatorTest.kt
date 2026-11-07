@@ -81,9 +81,9 @@ class RenderOpenUiValidatorTest {
             root = Card([
               CardHeader("杭州精选", subtitle = "11 张 · 第 " + (${'$'}page + 1) + " / 2 页"),
               Row([
-                Column([Box([Image(photos[${'$'}page * 9 + 0].id, aspect = 1), Tag(tags[${'$'}page * 9 + 0])], align = "bottomStart"), Text(names[${'$'}page * 9 + 0], maxLines = 1)], spacing = "xs"),
-                Column([Box([Image(photos[${'$'}page * 9 + 1].id, aspect = 1), Tag(tags[${'$'}page * 9 + 1])], align = "bottomStart"), Text(names[${'$'}page * 9 + 1], maxLines = 1)], spacing = "xs"),
-                (${'$'}page * 9 + 2 < photos.length) ? Column([Box([Image(photos[${'$'}page * 9 + 2].id, aspect = 1), Tag(tags[${'$'}page * 9 + 2])], align = "bottomStart"), Text(names[${'$'}page * 9 + 2], maxLines = 1)], spacing = "xs") : null
+                Column([Box([Image(photos[${'$'}page * 9 + 0].id, aspect = 0.75), Tag(tags[${'$'}page * 9 + 0])], align = "bottomStart"), Text(names[${'$'}page * 9 + 0], maxLines = 1)], spacing = "xs"),
+                Column([Box([Image(photos[${'$'}page * 9 + 1].id, aspect = 0.75), Tag(tags[${'$'}page * 9 + 1])], align = "bottomStart"), Text(names[${'$'}page * 9 + 1], maxLines = 1)], spacing = "xs"),
+                (${'$'}page * 9 + 2 < photos.length) ? Column([Box([Image(photos[${'$'}page * 9 + 2].id, aspect = 0.75), Tag(tags[${'$'}page * 9 + 2])], align = "bottomStart"), Text(names[${'$'}page * 9 + 2], maxLines = 1)], spacing = "xs") : null
               ], align = "start"),
               Row([
                 ${'$'}page > 0 ? Button("← 上一页", @Set(${'$'}page, ${'$'}page - 1), "secondary") : null,
