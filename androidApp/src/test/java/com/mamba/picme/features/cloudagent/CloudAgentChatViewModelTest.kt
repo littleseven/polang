@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -54,6 +55,9 @@ class CloudAgentChatViewModelTest {
         /** 非空时 postMessage 先挂起等闸门，供 inFlight 确定性测试。 */
         var gate: CompletableDeferred<Unit>? = null
         val toolResults = mutableListOf<Triple<String, Boolean, String>>()
+        val finishedSessions = mutableListOf<String>()
+        /** 非空时 finish 完成即 complete，供 onCleared 独立协程确定性等待。 */
+        var finishSignal: CompletableDeferred<String>? = null
         var framesScript: suspend (CloudAgentChatViewModelTest.FakeApi, (CloudFrame) -> Unit) -> Unit =
             { _, onFrame -> onFrame(CloudFrame.Done("running")) }
 
@@ -62,7 +66,11 @@ class CloudAgentChatViewModelTest {
             return Result.success(JSONObject().put("session_id", "s_1"))
         }
         override suspend fun getEvents(token: String, sessionId: String, after: Long, limit: Int) = Result.success(emptyList<JSONObject>())
-        override suspend fun finish(token: String, sessionId: String) = Result.success(Unit)
+        override suspend fun finish(token: String, sessionId: String): Result<Unit> {
+            finishedSessions.add(sessionId)
+            finishSignal?.complete(sessionId)
+            return Result.success(Unit)
+        }
         override suspend fun postMessage(
             token: String,
             sessionId: String,
@@ -335,5 +343,27 @@ class CloudAgentChatViewModelTest {
         val s = vm.state.value as CloudAgentChatViewModel.UiState.Chat
         assertEquals(false, s.inFlight)
         assertTrue(vm.steps.value.isEmpty())
+    }
+
+    @Test
+    fun `onCleared finishes cloud session best effort`() = runTest {
+        val api = FakeApi()
+        val signal = CompletableDeferred<String>()
+        api.finishSignal = signal
+        val vm = newVm(api)
+        vm.prepare()
+        assertTrue(vm.state.value is CloudAgentChatViewModel.UiState.Chat)
+        vm.finishSessionBestEffort() // onCleared 是 protected，直调 internal 出口
+        // finish 走独立 IO 协程（viewModelScope 已取消）：等真实完成信号
+        assertEquals("s_1", withTimeout(2_000) { signal.await() })
+    }
+
+    @Test
+    fun `onCleared without chat state does not finish`() = runTest {
+        val api = FakeApi()
+        val vm = newVm(api)
+        // 未 prepare：仍处于 Preparing，无会话可终结
+        vm.finishSessionBestEffort()
+        assertTrue(api.finishedSessions.isEmpty())
     }
 }

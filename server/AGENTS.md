@@ -95,7 +95,7 @@ server/
 │   ├── agent/                    # 云端 Agent 会话域（ADR-017/018，Koog JVM + 事件溯源）
 │   │   ├── AgentEvent.kt         # 事件模型：六型载荷（HtmlCard 发射路径已随 render_html 退役 2026-11-06，类保留供历史回放解码）+ source/role/parentId 三维 + payload 编解码
 │   │   ├── AgentTables.kt        # agent_session / agent_event 表（事件只追加，id 即事件序）
-│   │   ├── AgentSessionRepository.kt # 会话生命周期状态机（running/…/finished/error）
+│   │   ├── AgentSessionRepository.kt # 会话生命周期状态机（running/…/finished/error；无自动终结——终态仅 /finish 与跑轮非取消异常，端断线刻意留 running，2026-11-07 语义注记见 ADR-018 §6）
 │   │   ├── AgentEventRepository.kt   # 追加/回放/pending action 不变式查询
 │   │   ├── AgentProjection.kt    # 事件流 → LLM 视图投影（Condenser 最小实现，策略可替换）
 │   │   ├── AgentExecutorFactory.kt # Koog 执行器组装（2026-11-07 分层 runtime M1 起委托 shared `RemoteModelFactory.createKoogExecutor`——capabilities/钳制/thinking/maxTokens 端云同源；本类仅剩 CF_AIG 改写 cf-aig-authorization 与 AgentLlmTarget→RemoteModelConfig 映射）
@@ -190,7 +190,7 @@ server/
 | POST | `/admin/settings/whitelist/revoke` | P1 | ✅ | ADMIN_TOKEN | 移除 AI 工程师白名单邮箱 |
 | GET | `/admin/diagnosis` | P1 | ✅ | ADMIN_TOKEN | 用户上报问题列表（状态流转 / 手动同步 GitHub） |
 | GET | `/admin/llm/calls` | P1 | ✅ | ADMIN_TOKEN | 调用流水（llm_call_log id 倒序游标 `before`，单页 50，满页才给下一页链接防末页死循环；`status`/`provider`/`model`/`account_id` 筛选；非法 `before`/`account_id` 回 400） |
-| GET | `/admin/agent/sessions` | P1 | ✅ | ADMIN_TOKEN | Agent 会话列表（seq 倒序游标 `before_seq`，单页 50；`account_id` 筛选；非法游标/参数回 400） |
+| GET | `/admin/agent/sessions` | P1 | ✅ | ADMIN_TOKEN | Agent 会话列表（seq 倒序游标 `before_seq`，单页 50；`account_id` 筛选；非法游标/参数回 400；stalled = running 且最后事件 >30min，状态列直显 stalled 不显示 running 徽标，2026-11-07） |
 | GET | `/admin/agent/sessions/{id}` | P1 | ✅ | ADMIN_TOKEN | 会话事件回放（事件 id 升序 `after` 游标，单页 200；未知 sessionId 回 404） |
 | POST | `/admin/users/{id}/reset-quota` | P1 | ✅ | ADMIN_TOKEN | 清零单账号已用额度（保留 llm_call_log 历史） |
 | POST | `/admin/users/{id}/limit` | P1 | ✅ | ADMIN_TOKEN | 改单账号调用上限（0=禁用但保留 token） |

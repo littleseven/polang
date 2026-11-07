@@ -237,6 +237,10 @@ class AdminViewsTest {
         assertTrue(html.contains("glm-5.2"))
         // stalled 仅出现在假 running（>30min 无事件）那一行
         assertTrue("stalled badge expected exactly once", html.split("stalled").size - 1 == 1)
+        // 有效状态直显（2026-11-07）：stalled 行状态列直显 stalled、不再显示 running 徽标文本；
+        // running 文本仅属真实活跃行（≤30min 有事件）
+        assertTrue("stalled replaces running in status cell", html.split(">stalled<").size - 1 == 1)
+        assertTrue("running badge only for the active row", html.split(">running<").size - 1 == 1)
         assertTrue(html.contains("href=\"/admin/agent/sessions?before_seq=97\""))
     }
 
@@ -251,6 +255,21 @@ class AdminViewsTest {
         )
         val html = AdminViews.agentSessionsPage(rows, accountId = null, nextBeforeSeq = null)
         assertTrue("stalled badge expected exactly once (abandoned only)", html.split("stalled").size - 1 == 1)
+    }
+
+    @Test
+    fun `agent session detail shows stalled as effective status`() {
+        val now = System.currentTimeMillis()
+        val stalled = AdminViews.agentSessionDetailPage(
+            sessionRow(status = "running", lastEventAt = now - 31 * 60_000L), emptyList(), nextAfter = null,
+        )
+        assertTrue(stalled.contains(">stalled<"))
+        assertFalse(stalled.contains(">running<"))
+        val active = AdminViews.agentSessionDetailPage(
+            sessionRow(status = "running", lastEventAt = now - 60_000L), emptyList(), nextAfter = null,
+        )
+        assertTrue(active.contains(">running<"))
+        assertFalse(active.contains(">stalled<"))
     }
 
     @Test

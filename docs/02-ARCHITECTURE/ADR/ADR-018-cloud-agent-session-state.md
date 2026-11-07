@@ -89,5 +89,8 @@ ADR-008 红线不变：媒体文件不上云；端侧工具回传的 Observation
 | 架构决策（本文档） | ✅ 生效中（用户评审通过） | 2026-10-14 |
 | 服务端实现 M1（`server/agent/` 包 + `agent_session`/`agent_event` 两表 + `/agent/**` REST/SSE + BYOK 透传零留存守卫测试；事件溯源/pending 不变式/投影/决策 1a 元数据落地） | ✅ 完成（299 测试全绿） | 2026-10-17 |
 | 端侧工具桥 + BYOK 授权 UI（+ 最小聊天页，调试入口实验页） | ✅ 完成 | 2026-10-17 |
+| 会话卫生收口：管理后台 stalled 状态列直显（假 running 不再显示 running 徽标）+ 端侧 finish 传播（主聊天 deleteSession/clearChat、调试页 onCleared → `POST /agent/sessions/{id}/finish`） | ✅ 完成 | 2026-11-07 |
+
+> **running 语义注记（2026-11-07）**：`running` = 「会话未被显式关闭」，**不**等于「有回合在跑」。状态机无自动终结——终态仅两个入口：客户端 `/finish`、跑轮非取消异常置 `error`；端断线刻意不置终态（会话可恢复，残留 RUNNING 由下轮 pending 重放兜底）。端侧 cloud sessionId 是内存态（进程重启即丢、无 resume 通路），遗留 running 事实上不可复用；管理后台以 stalled（最后事件 >30min）标注此类假 running。
 
 > M1 已录边界（详见 `server/AGENTS.md` §2 agent/ 包注释与 AgentRoutes KDoc）：SSE 帧为持久化事件级（无 token delta）；投影仅 Message 直映射 + 最新 Condensation 作 system；服务端工具仅 server_time（闭环验证用，可逆集合为空）；~~同会话并发轮无互斥~~（M2.6 已由 `AgentRoundGate` per-user 并发=1 消除，占用回 409 `round_in_flight`）；Agent 轮次不写 llm_call_log（审计即事件流）。
