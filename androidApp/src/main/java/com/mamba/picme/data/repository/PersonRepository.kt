@@ -1,4 +1,4 @@
-package com.mamba.picme.domain.person
+package com.mamba.picme.data.repository
 
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
@@ -6,15 +6,22 @@ import com.mamba.picme.data.local.dao.PersonRelationDao
 import com.mamba.picme.data.local.entity.PersonEntity
 import com.mamba.picme.data.local.entity.PersonRelationEntity
 import com.mamba.picme.data.model.MediaEntity
+import com.mamba.picme.domain.person.KinshipLexicon
+import com.mamba.picme.domain.person.RelationPredicate
+import com.mamba.picme.domain.person.RelationSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /**
- * 人物领域仓库 —— 人物命名、"我"标记、人物关系图谱的唯一收口
+ * 人物仓库实现 —— 人物命名、"我"标记、人物关系图谱的唯一收口
  *
  * 命名对话框与聊天声明工具都必须走这里，不直调 DAO。
  * 关系声明幂等：同一对人物重复声明即覆盖（纠错通路 = 重新声明）。
+ *
+ * 2026-11-07 分层止血试点：自 `domain/person/` 迁回 data 层（架构健康审计 P1）。
+ * 签名暂透出 Room Entity（PersonEntity/MediaEntity/PersonRelationEntity），
+ * 领域模型 + 接口抽象的完整收口随后续批次进行。
  */
 class PersonRepository(
     private val personDao: PersonDao,

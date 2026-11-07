@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.data.local.entity.MemoryFactEntity
+import com.mamba.picme.data.repository.PersonRepository
+import com.mamba.picme.data.repository.RelationDisplayItem
 import com.mamba.picme.domain.memory.MemoryRepository
-import com.mamba.picme.domain.person.PersonRepository
-import com.mamba.picme.domain.person.RelationDisplayItem
 import com.mamba.picme.domain.person.RelationPredicate
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

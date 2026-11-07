@@ -1,4 +1,4 @@
-package com.mamba.picme.domain.person
+package com.mamba.picme.data.repository
 
 import android.content.Context
 import androidx.room.Room
@@ -7,6 +7,8 @@ import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.entity.PersonEntity
 import com.mamba.picme.data.model.MediaEntity
+import com.mamba.picme.domain.person.RelationPredicate
+import com.mamba.picme.domain.person.RelationSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first

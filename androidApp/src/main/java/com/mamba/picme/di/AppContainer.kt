@@ -111,7 +111,7 @@ import com.mamba.picme.domain.matting.MattingEngine
 import com.mamba.picme.domain.matting.MattingEngineImpl
 import com.mamba.picme.domain.memory.MemoryRepository
 import com.mamba.picme.domain.person.PersonQueryResolver
-import com.mamba.picme.domain.person.PersonRepository
+import com.mamba.picme.data.repository.PersonRepository
 import com.mamba.picme.features.editor.PhotoEditorViewModelFactory
 import com.mamba.picme.features.editor.RecipeApplier
 import com.mamba.picme.features.idphoto.IDPhotoViewModelFactory

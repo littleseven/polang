@@ -83,8 +83,8 @@ import androidx.navigation.navOptions
 import com.mamba.picme.domain.model.GroupTitleType
 import com.mamba.picme.domain.model.GroupedMedia
 import com.mamba.picme.domain.model.GroupingMode
-import com.mamba.picme.domain.person.PersonEditSnapshot
-import com.mamba.picme.domain.person.PersonRepository
+import com.mamba.picme.data.repository.PersonEditSnapshot
+import com.mamba.picme.data.repository.PersonRepository
 import com.mamba.picme.domain.person.RelationSource
 import com.mamba.picme.domain.trash.TrashOutcome
 import com.mamba.picme.R

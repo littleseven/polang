@@ -37,8 +37,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
 import com.mamba.picme.data.local.entity.MemoryFactEntity
+import com.mamba.picme.data.repository.RelationDisplayItem
 import com.mamba.picme.domain.memory.MemorySource
-import com.mamba.picme.domain.person.RelationDisplayItem
 import com.mamba.picme.domain.person.RelationPredicate
 import com.mamba.picme.features.common.PersonRelationPicker
 import com.mamba.picme.features.common.personRelationLabelRes

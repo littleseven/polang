@@ -1,5 +1,7 @@
 package com.mamba.picme.domain.person
 
+import com.mamba.picme.data.repository.PersonRepository
+
 /**
  * 人物查询解析结果
  *

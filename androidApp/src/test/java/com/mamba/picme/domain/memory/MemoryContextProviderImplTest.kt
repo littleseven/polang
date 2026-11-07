@@ -1,7 +1,7 @@
 package com.mamba.picme.domain.memory
 
 import com.mamba.picme.data.local.entity.MemoryFactEntity
-import com.mamba.picme.domain.person.RelationDisplayItem
+import com.mamba.picme.data.repository.RelationDisplayItem
 import com.mamba.picme.domain.person.RelationPredicate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

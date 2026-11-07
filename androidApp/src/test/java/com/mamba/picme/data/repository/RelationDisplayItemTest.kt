@@ -1,7 +1,8 @@
-package com.mamba.picme.domain.person
+package com.mamba.picme.data.repository
 
 import com.mamba.picme.data.local.entity.PersonEntity
 import com.mamba.picme.data.local.entity.PersonRelationEntity
+import com.mamba.picme.domain.person.RelationPredicate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

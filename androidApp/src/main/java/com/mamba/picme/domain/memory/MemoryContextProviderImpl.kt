@@ -3,8 +3,8 @@ package com.mamba.picme.domain.memory
 import com.mamba.picme.agent.core.inference.remote.tool.MemoryContextProvider
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.entity.MemoryFactEntity
-import com.mamba.picme.domain.person.PersonRepository
-import com.mamba.picme.domain.person.RelationDisplayItem
+import com.mamba.picme.data.repository.PersonRepository
+import com.mamba.picme.data.repository.RelationDisplayItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine

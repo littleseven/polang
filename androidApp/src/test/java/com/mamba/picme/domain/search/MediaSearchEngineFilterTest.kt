@@ -5,10 +5,10 @@ import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.dao.PersonDao
 import com.mamba.picme.data.local.entity.PersonEntity
 import com.mamba.picme.data.model.MediaEntity
+import com.mamba.picme.data.repository.PersonRepository
 import com.mamba.picme.domain.model.StructuredFilter
 import com.mamba.picme.domain.model.TimeRange
 import com.mamba.picme.domain.person.PersonQueryResolver
-import com.mamba.picme.domain.person.PersonRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

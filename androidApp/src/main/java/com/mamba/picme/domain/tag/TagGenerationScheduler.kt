@@ -19,8 +19,8 @@ import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.entity.FaceEmbeddingEntity
 import com.mamba.picme.data.local.entity.PersonRelationEntity
 import com.mamba.picme.data.preferences.UserPreferencesRepository
+import com.mamba.picme.data.repository.PersonRepository
 import com.mamba.picme.domain.model.AppLanguage
-import com.mamba.picme.domain.person.PersonRepository
 import com.mamba.picme.domain.person.RelationSnapshotEntry
 import com.mamba.picme.domain.person.RelationSnapshotRestorer
 import com.mamba.picme.domain.repository.UserSettingsRepository

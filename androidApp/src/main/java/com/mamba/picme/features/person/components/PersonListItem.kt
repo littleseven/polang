@@ -52,7 +52,7 @@ import coil.compose.AsyncImage
 import com.mamba.picme.R
 import com.mamba.picme.core.image.faceAwareVerticalAlignment
 import com.mamba.picme.data.local.entity.PersonEntity
-import com.mamba.picme.domain.person.RelationDisplayItem
+import com.mamba.picme.data.repository.RelationDisplayItem
 import com.mamba.picme.features.common.isFamilyRelation
 import com.mamba.picme.features.common.personRelationLabelRes
 import com.mamba.picme.features.person.PersonCover
