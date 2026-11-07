@@ -643,6 +643,9 @@ class AdminViewsTest {
         assertTrue(html.contains("phone-screen"))
         assertTrue(html.contains("aspect-ratio:9/19.5"))
         assertTrue(html.contains("width:412px")) // 屏幕视口 1:1 = 390px（iPhone 逻辑宽）
+        // 状态栏安全区：内容自状态栏下缘起排，不被刘海遮挡
+        assertTrue(html.contains("phone-statusbar"))
+        assertTrue(html.contains("9:41"))
         // 程序原文仍在
         assertTrue(html.contains("程序原文"))
     }
