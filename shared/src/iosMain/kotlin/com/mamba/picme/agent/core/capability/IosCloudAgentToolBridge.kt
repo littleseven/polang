@@ -1,6 +1,7 @@
 package com.mamba.picme.agent.core.capability
 
 import com.mamba.picme.agent.core.inference.remote.tool.ChatToolService
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolCatalog
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import com.mamba.picme.agent.core.inference.remote.tool.CloudToolProjectionGate
 import com.mamba.picme.agent.core.model.command.AgentCommand
@@ -53,18 +54,27 @@ class IosCloudAgentToolBridge(
         val result = try {
             when (tool) {
                 CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> getGallerySummary()
-                CloudAgentToolContract.TOOL_SEARCH_MEDIA -> searchMedia(
-                    query = args["query"].orEmpty(),
-                    person = args["person"].orEmpty(),
-                    fromMs = args["fromMs"].orEmpty(),
-                    toMs = args["toMs"].orEmpty(),
-                    hasFace = args["hasFace"].orEmpty(),
-                )
-                CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> refineMediaSearch(
-                    constraint = args["constraint"].orEmpty(),
-                    fromMs = args["fromMs"].orEmpty(),
-                    toMs = args["toMs"].orEmpty(),
-                )
+                CloudAgentToolContract.TOOL_SEARCH_MEDIA -> {
+                    // 参数名自 shared 目录读取（分层 runtime M2；键序 = 目录声明序，
+                    // CloudAgentToolCatalogTest 钉住）。iOS 只消费前 5 参——
+                    // display/mediaType 是 Android 出卡特性，iOS 无此维度故不读。
+                    val names = CloudAgentToolCatalog.paramNames(tool)
+                    searchMedia(
+                        query = args[names[0]].orEmpty(),
+                        person = args[names[1]].orEmpty(),
+                        fromMs = args[names[2]].orEmpty(),
+                        toMs = args[names[3]].orEmpty(),
+                        hasFace = args[names[4]].orEmpty(),
+                    )
+                }
+                CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> {
+                    val names = CloudAgentToolCatalog.paramNames(tool)
+                    refineMediaSearch(
+                        constraint = args[names[0]].orEmpty(),
+                        fromMs = args[names[1]].orEmpty(),
+                        toMs = args[names[2]].orEmpty(),
+                    )
+                }
                 else -> return CloudAgentToolContract.unknownTool(tool)
             }
         } catch (e: CancellationException) {

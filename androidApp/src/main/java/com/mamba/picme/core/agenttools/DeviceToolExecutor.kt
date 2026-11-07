@@ -1,5 +1,6 @@
 package com.mamba.picme.core.agenttools
 
+import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolCatalog
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
 import com.mamba.picme.agent.core.inference.remote.tool.CloudToolProjectionGate
 import kotlinx.coroutines.CancellationException
@@ -28,22 +29,18 @@ class DeviceToolExecutor(
         val result = try {
             when (tool) {
                 CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> gallerySummary()
-                CloudAgentToolContract.TOOL_SEARCH_MEDIA -> searchMedia(
-                    args.optString("query"),
-                    args.optString("person"),
-                    args.optString("fromMs"),
-                    args.optString("toMs"),
-                    args.optString("hasFace"),
-                    // 旧版 server 不下发该参数时缺省 "false"（不出卡），安全侧缺省
-                    args.optString("display", "false"),
-                    // 旧版 server 不下发该参数时缺省 "photo"（只搜照片），与旧行为一致
-                    args.optString("mediaType", "photo"),
-                )
-                CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> refineSearch(
-                    args.optString("constraint"),
-                    args.optString("fromMs"),
-                    args.optString("toMs"),
-                )
+                CloudAgentToolContract.TOOL_SEARCH_MEDIA -> {
+                    // 参数名/键序/兼容缺省全部自 shared 目录读取（分层 runtime M2；
+                    // 键序 = 目录声明序，CloudAgentToolCatalogTest 钉住 7 参序）。
+                    // display 缺省 "false"（不出卡）/mediaType 缺省 "photo" 为目录
+                    // default——旧版 server 不下发时的安全侧缺省，语义不变。
+                    val values = catalogArgs(tool, args)
+                    searchMedia(values[0], values[1], values[2], values[3], values[4], values[5], values[6])
+                }
+                CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> {
+                    val values = catalogArgs(tool, args)
+                    refineSearch(values[0], values[1], values[2])
+                }
                 else -> return CloudAgentToolContract.unknownTool(tool)
             }
         } catch (e: CancellationException) {
@@ -53,4 +50,10 @@ class DeviceToolExecutor(
         }
         return CloudAgentToolContract.truncate(CloudToolProjectionGate.gate(tool, result))
     }
+
+    /** 按目录声明序取值：参数名自 [CloudAgentToolCatalog.paramNames]、缺省自 defaultFor。 */
+    private fun catalogArgs(tool: String, args: JSONObject): List<String> =
+        CloudAgentToolCatalog.paramNames(tool).map { name ->
+            args.optString(name, CloudAgentToolCatalog.defaultFor(tool, name))
+        }
 }
