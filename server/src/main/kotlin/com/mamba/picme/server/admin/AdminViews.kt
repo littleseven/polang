@@ -1863,6 +1863,8 @@ object AdminViews {
                           --fs-lg:16px;
                           --fs-xl:20px;
                           --fs-xxl:24px;
+                          /* 内容列自适应宽度：1200 → 1680 封顶（宽屏利用空间，超宽屏防行长失控） */
+                          --page-max:1680px;
                           --r-sm:4px;
                           --r-md:8px;
                           --r-lg:12px;
@@ -1871,7 +1873,7 @@ object AdminViews {
                         }
                         *{box-sizing:border-box}
                         body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;background:var(--c-bg);color:var(--c-text);padding-bottom:40px}
-                        body>h1,body>h2,body>.cards,body>table,body>p{max-width:1200px;margin-left:auto;margin-right:auto;padding-left:24px;padding-right:24px}
+                        body>h1,body>h2,body>.cards,body>table,body>p{max-width:var(--page-max);margin-left:auto;margin-right:auto;padding-left:24px;padding-right:24px}
                         body>h1{font-size:var(--fs-xxl);font-weight:600;margin-top:24px;margin-bottom:16px;color:var(--c-text)}
                         body>h2{font-size:var(--fs-lg);font-weight:600;color:var(--c-text);margin-top:24px;margin-bottom:12px}
                         .meta{font-size:var(--fs-sm);color:var(--c-text-3);margin-top:-8px;margin-bottom:16px}
@@ -1927,8 +1929,8 @@ object AdminViews {
                         .col-balance{width:120px}
                         .meta-inline{font-size:var(--fs-xs);color:var(--c-text-3)}
                         .col-actions{width:140px}
-                        .actions-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:1200px;margin:16px auto;padding:0 24px}
-                        .limit-card{max-width:1200px;margin:16px auto;padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+                        .actions-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:var(--page-max);margin:16px auto;padding:0 24px}
+                        .limit-card{max-width:var(--page-max);margin:16px auto;padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
                         .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:var(--fs-xs);font-weight:500}
                         .badge-active{color:var(--c-success);background:var(--c-success-bg);border:1px solid var(--c-success-border)}
                         .badge-revoked{color:var(--c-warning);background:var(--c-warning-bg);border:1px solid var(--c-warning-border)}
@@ -1940,10 +1942,10 @@ object AdminViews {
                         .btn-ghost{padding:10px 16px;color:var(--c-text-2);text-decoration:none;font-size:var(--fs-md);border-radius:var(--r-sm);border:1px solid #d9d9d9;background:var(--c-surface);transition:all .2s}
                         .btn-ghost:hover{color:var(--c-text);background:#f5f5f5;border-color:#b0b8c4}
                         /* APK 页面专用样式 */
-                        .toast{max-width:1200px;margin:16px auto;padding:12px 20px;border-radius:6px;font-size:var(--fs-md)}
+                        .toast{max-width:var(--page-max);margin:16px auto;padding:12px 20px;border-radius:6px;font-size:var(--fs-md)}
                         .toast-ok{color:var(--c-success);background:var(--c-success-bg);border:1px solid var(--c-success-border)}
                         .toast-err{color:var(--c-danger);background:var(--c-danger-bg);border:1px solid var(--c-danger-border)}
-                        .apk-info-card{max-width:1200px;margin:16px auto;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
+                        .apk-info-card{max-width:var(--page-max);margin:16px auto;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
                         .apk-empty{text-align:center;padding:40px 24px;justify-content:center;flex-direction:column}
                         .apk-empty-icon{font-size:48px;margin-bottom:12px}
                         .apk-empty-text{color:var(--c-text-3);font-size:var(--fs-md)}
@@ -1953,7 +1955,7 @@ object AdminViews {
                         .apk-info-meta{color:var(--c-text-3);font-size:var(--fs-sm);margin-top:6px;display:flex;align-items:center;gap:8px}
                         .apk-meta-sep{color:#ccc}
                         .apk-info-actions{display:flex;gap:10px;align-items:center}
-                        .upload-card{max-width:1200px;margin:16px auto;padding:24px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
+                        .upload-card{max-width:var(--page-max);margin:16px auto;padding:24px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
                         .form-row{margin-bottom:16px}
                         .form-row label{display:block;font-size:var(--fs-sm);color:var(--c-text-2);margin-bottom:6px;font-weight:500}
                         .form-input{padding:10px 12px;border:1px solid #d9d9d9;border-radius:var(--r-sm);width:100%;max-width:300px;font-size:var(--fs-md);transition:border-color .2s}
@@ -1981,7 +1983,7 @@ object AdminViews {
                         .upload-actions{margin-top:20px;text-align:right}
                         .btn-upload{min-width:140px}
                         .btn-upload:disabled{background:#b0b8c4;cursor:not-allowed;transform:none;box-shadow:none}
-                        .subtabs{display:flex;gap:4px;max-width:1200px;margin:16px auto 0;padding:0 24px;border-bottom:1px solid var(--c-border)}
+                        .subtabs{display:flex;gap:4px;max-width:var(--page-max);margin:16px auto 0;padding:0 24px;border-bottom:1px solid var(--c-border)}
                         .subtab{color:var(--c-text-2);text-decoration:none;padding:10px 16px;font-size:var(--fs-md);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
                         .subtab:hover{color:var(--c-primary)}
                         .subtab.active{color:var(--c-primary);border-bottom-color:var(--c-primary);font-weight:500}
@@ -2003,14 +2005,14 @@ object AdminViews {
                         .top-list{font-size:var(--fs-xs);margin-top:8px}
                         .top-list th,.top-list td{padding:6px 8px}
                         tr.total-row td{font-weight:700;background:#fafafa}
-                        .page-controls{display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:16px auto 0;padding:0 24px;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--c-border)}
+                        .page-controls{display:flex;align-items:center;justify-content:space-between;max-width:var(--page-max);margin:16px auto 0;padding:0 24px;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--c-border)}
                         .ctrl-group{display:flex;gap:2px}
                         .ctrl{color:var(--c-text-2);text-decoration:none;padding:8px 14px;font-size:var(--fs-md);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s}
                         .ctrl:hover{color:var(--c-primary)}
                         .ctrl.active{color:var(--c-primary);border-bottom-color:var(--c-primary);font-weight:500}
-                        .model-top{max-width:1200px;margin:16px auto;padding:16px 24px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
+                        .model-top{max-width:var(--page-max);margin:16px auto;padding:16px 24px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
                         /* 设置页新结构 */
-                        .page{max-width:1200px;margin:0 auto;padding:0 24px}
+                        .page{max-width:var(--page-max);margin:0 auto;padding:0 24px}
                         .page-title{font-size:var(--fs-xxl);font-weight:600;margin:24px 0 16px}
                         .settings-section{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);padding:20px 24px;margin:16px 0}
                         .section-head{margin-bottom:16px}
@@ -2031,13 +2033,13 @@ object AdminViews {
                         .st-error{color:var(--c-danger);background:var(--c-danger-bg);border:1px solid var(--c-danger-border)}
                         .st-blocked{color:var(--c-warning);background:var(--c-warning-bg);border:1px solid var(--c-warning-border)}
                         .st-muted{color:var(--c-text-3);background:#f5f5f5;border:1px solid #d9d9d9}
-                        .trace-filter{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:1200px;margin:8px auto 16px;padding:0 24px;font-size:var(--fs-sm)}
+                        .trace-filter{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:var(--page-max);margin:8px auto 16px;padding:0 24px;font-size:var(--fs-sm)}
                         .trace-filter select,.trace-filter input[type=text]{padding:6px 10px;border:1px solid #d9d9d9;border-radius:var(--r-sm);font-size:var(--fs-sm);font-family:inherit}
                         .trace-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:var(--c-warning-bg);border:1px solid var(--c-warning-border);border-radius:12px;font-size:var(--fs-xs);color:var(--c-text-2)}
                         .trace-chip a{color:var(--c-primary);text-decoration:none;font-weight:500}
-                        .trace-more{max-width:1200px;margin:16px auto;padding:0 24px}
+                        .trace-more{max-width:var(--page-max);margin:16px auto;padding:0 24px}
                         .trace-more a{color:var(--c-primary);text-decoration:none;font-weight:500}
-                        .ev-list{max-width:1200px;margin:16px auto;padding:0 24px}
+                        .ev-list{max-width:var(--page-max);margin:16px auto;padding:0 24px}
                         .ev{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);padding:12px 16px;margin-bottom:8px;box-shadow:var(--shadow-sm);font-size:var(--fs-sm)}
                         .ev-meta{font-size:var(--fs-xs);color:var(--c-text-3);margin-bottom:6px;font-variant-numeric:tabular-nums}
                         .ev-user{border-left:4px solid var(--c-primary)}
