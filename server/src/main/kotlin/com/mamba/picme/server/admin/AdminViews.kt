@@ -1883,15 +1883,23 @@ object AdminViews {
                         .card:hover{transform:translateY(-2px)}
                         .card-label{font-size:var(--fs-sm);color:var(--c-text-2);margin-bottom:4px}
                         .card-value{font-size:var(--fs-xxl);font-weight:600;color:var(--c-primary);font-variant-numeric:tabular-nums}
-                        .nav{background:var(--c-text);color:var(--c-surface);padding:0 24px;display:flex;align-items:center;gap:4px;height:56px;box-shadow:var(--shadow-sm);position:sticky;top:0;z-index:100}
-                        .nav-brand{font-weight:600;font-size:var(--fs-lg);margin-right:32px;white-space:nowrap;color:var(--c-surface)}
-                        .nav-links{display:flex;gap:4px}
-                        .nav-link{color:#b0b8c4;text-decoration:none;padding:8px 16px;border-radius:var(--r-sm);font-size:var(--fs-md);transition:all .2s}
-                        .nav-link:hover{background:rgba(255,255,255,.1);color:var(--c-surface)}
-                        .nav-link.active{background:var(--c-primary);color:var(--c-surface)}
-                        .nav-spacer{flex:1}
-                        .nav-logout{color:var(--c-warning)}
-                        .nav-logout:hover{background:rgba(255,156,0,.1);color:var(--c-warning)}
+                        /* 左侧边栏（依 Ardot 设计稿 Sidebar 232：Logo/菜单/弹性位/分隔线/用户区） */
+                        .sidebar{position:fixed;left:0;top:0;bottom:0;width:232px;background:var(--c-surface);border-right:1px solid var(--c-border);display:flex;flex-direction:column;z-index:100}
+                        .side-logo{height:64px;display:flex;align-items:center;gap:10px;padding:0 20px;flex-shrink:0}
+                        .side-logo-mark{width:30px;height:30px;border-radius:6px;background:var(--c-primary);color:var(--c-surface);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+                        .side-logo-text{font-size:15px;font-weight:600;color:var(--c-text);white-space:nowrap}
+                        .side-menu{display:flex;flex-direction:column;gap:4px;padding:12px;overflow-y:auto}
+                        .side-item{display:flex;align-items:center;gap:10px;height:38px;padding:0 12px;border-radius:3px;color:var(--c-text);text-decoration:none;font-size:var(--fs-md);white-space:nowrap;transition:all .2s}
+                        .side-item:hover{background:#f5f7fa;color:var(--c-primary)}
+                        .side-item.active{background:#eaf1fd;color:var(--c-primary);font-weight:500}
+                        .side-item .side-ico{display:flex;align-items:center;flex-shrink:0}
+                        .side-spacer{flex:1}
+                        .side-divider{height:1px;background:var(--c-border);margin:0 12px;flex-shrink:0}
+                        .side-user{height:60px;display:flex;align-items:center;gap:10px;padding:0 20px;flex-shrink:0}
+                        .side-avatar{width:28px;height:28px;border-radius:50%;background:var(--c-primary);color:var(--c-surface);font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+                        .side-user-name{font-size:var(--fs-md);color:var(--c-text);flex:1;white-space:nowrap}
+                        .side-logout{font-size:13px;color:var(--c-danger);text-decoration:none}
+                        .side-logout:hover{text-decoration:underline}
                         table{border-collapse:collapse;width:100%;background:var(--c-surface);font-size:var(--fs-sm);border:1px solid var(--c-border);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-sm)}
                         th,td{border-bottom:1px solid #f0f0f0;padding:12px 16px;text-align:left}
                         th{background:#fafafa;font-weight:600;color:var(--c-text-2);font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.5px}
@@ -2100,11 +2108,20 @@ object AdminViews {
                         .md-preview blockquote{border-left:3px solid var(--c-primary);margin:8px 0;padding:4px 12px;color:var(--c-text-2);background:#fafafa}
                         .md-preview a{color:var(--c-primary)}
                         @media (max-width:640px){
+                        @media (max-width:900px){
+                        .sidebar{position:static;width:auto;height:auto;flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--c-border);overflow:visible}
+                        .side-logo{height:50px;padding:0 16px}
+                        .side-logo-text{font-size:14px}
+                        .side-menu{flex-direction:row;overflow-x:auto;padding:6px 8px;gap:2px;flex:1}
+                        .side-item{height:34px;padding:0 10px;font-size:13px}
+                        .side-item .side-ico{display:none}
+                        .side-spacer,.side-divider{display:none}
+                        .side-user{height:auto;padding:0 16px;gap:8px}
+                        .side-avatar{display:none}
+                        }
+                        @media (max-width:640px){
                         body>h1{font-size:20px}
                         body>h2{font-size:14px}
-                        .nav{padding:0 16px;height:50px}
-                        .nav-brand{font-size:14px;margin-right:16px}
-                        .nav-link{padding:6px 10px;font-size:13px;white-space:nowrap}
                         .cards{padding:12px;gap:12px}
                         .card{min-width:0;flex:1 1 calc(50% - 8px);padding:12px 14px}
                         .card-value{font-size:20px}
@@ -2289,28 +2306,68 @@ object AdminViews {
         }
     }
 
+    /** 侧边栏导航图标（16px 线性 stroke，currentColor 跟随文字色/选中态）。 */
+    private val sideIcons = mapOf(
+        "overview" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>""",
+        "users" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5" r="3"/><path d="M2.5 13.5c1-2.8 3-4 5.5-4s4.5 1.2 5.5 4"/></svg>""",
+        "traffic" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 13V8M8 13V3M13 13V6"/></svg>""",
+        "calls" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h10M3 8h10M3 12h7"/></svg>""",
+        "agent" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="5" width="10" height="7" rx="2"/><path d="M8 5V3"/><circle cx="6" cy="8.5" r=".9" fill="currentColor" stroke="none"/><circle cx="10" cy="8.5" r=".9" fill="currentColor" stroke="none"/></svg>""",
+        "channels" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="4" r="1.8"/><circle cx="8" cy="12" r="1.8"/><path d="M5.3 5.2l1.7 5M10.7 5.2l-1.7 5M5.8 4h4.4"/></svg>""",
+        "skills" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M9 1.5 3.5 9H7.5L6.5 14.5 12.5 7H8.5z"/></svg>""",
+        "diagnosis" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2.5 3.5h11v7h-6l-3 3v-3h-2z"/></svg>""",
+        "release" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 2l5.5 3v6L8 14 2.5 11V5z"/><path d="M2.5 5 8 8l5.5-3M8 8v6"/></svg>""",
+        "settings" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 5h10M3 11h10"/><circle cx="6" cy="5" r="1.6" fill="var(--c-surface)"/><circle cx="10.5" cy="11" r="1.6" fill="var(--c-surface)"/></svg>""",
+    )
+
+    /** 侧边栏导航项（href, 图标 key, 文案）——顺序对齐 Ardot 设计稿 Sidebar 组件。 */
+    private val sideItems = listOf(
+        Triple("/admin", "overview", "数据概览"),
+        Triple("/admin/users", "users", "用户管理"),
+        Triple("/admin/traffic", "traffic", "流量分析"),
+        Triple("/admin/llm/calls", "calls", "调用流水"),
+        Triple("/admin/agent/sessions", "agent", "Agent 会话"),
+        Triple("/admin/channels", "channels", "渠道管理"),
+        Triple("/admin/skills", "skills", "技能中心"),
+        Triple("/admin/diagnosis", "diagnosis", "问题诊断"),
+        Triple("/admin/release", "release", "发包管理"),
+        Triple("/admin/settings", "settings", "系统设置"),
+    )
+
+    /** 左侧边栏（依 Ardot 设计稿 Sidebar 232：Logo 区/菜单/弹性位/分隔线/用户区）。
+     *  固定定位 + 正文左让 232px（随导航内联下发，登录页等无侧栏页零影响）；
+     *  选中态走最长前缀匹配（详情页如 /admin/skills/x 也亮「技能中心」）。 */
     private fun FlowContent.navBar() {
-        div("nav") {
-            div("nav-brand") { +"PoLang 管理后台" }
-            div("nav-links") {
-                a("/admin", classes = "nav-link") { +"概览" }
-                a("/admin/users", classes = "nav-link") { +"用户" }
-                a("/admin/traffic", classes = "nav-link") { +"流量" }
-                a("/admin/llm/calls", classes = "nav-link") { +"调用" }
-                a("/admin/agent/sessions", classes = "nav-link") { +"Agent" }
-                a("/admin/channels", classes = "nav-link") { +"渠道" }
-                a("/admin/skills", classes = "nav-link") { +"技能" }
-                a("/admin/settings", classes = "nav-link") { +"设置" }
-                a("/admin/diagnosis", classes = "nav-link") { +"问题诊断" }
-                a("/admin/release", classes = "nav-link") { +"发包" }
+        div("sidebar") {
+            div("side-logo") {
+                div("side-logo-mark") { +"破" }
+                div("side-logo-text") { +"PoLang 管理后台" }
             }
-            div("nav-spacer") {}
-            a("/admin/logout", classes = "nav-link nav-logout") { +"退出" }
+            div("side-menu") {
+                sideItems.forEach { (href, icon, label) ->
+                    a(href, classes = "side-item") {
+                        span("side-ico") { unsafe { raw(sideIcons.getValue(icon)) } }
+                        +label
+                    }
+                }
+            }
+            div("side-spacer") {}
+            div("side-divider") {}
+            div("side-user") {
+                div("side-avatar") { +"A" }
+                div("side-user-name") { +"admin" }
+                a("/admin/logout", classes = "side-logout") { +"退出" }
+            }
+        }
+        style {
+            unsafe {
+                raw("body{padding-left:232px}@media(max-width:900px){body{padding-left:0}}")
+            }
         }
         script {
             unsafe {
                 raw(
-                    """document.addEventListener('DOMContentLoaded',function(){var path=window.location.pathname;var links=document.querySelectorAll('.nav-link');links.forEach(function(link){if(link.getAttribute('href')===path){link.classList.add('active');}});});""",
+                    """document.addEventListener('DOMContentLoaded',function(){var path=window.location.pathname;var best=null,len=-1;document.querySelectorAll('.side-item').forEach(function(link){var href=link.getAttribute('href')||'';if(href==='/admin/logout')return;if(path===href||path.indexOf(href+'/')===0){if(href.length>len){len=href.length;best=link;}}});if(best){best.classList.add('active');}});""",
                 )
             }
         }
