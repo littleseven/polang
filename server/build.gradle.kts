@@ -50,6 +50,8 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.12")
     // QR code generation (server-side, no CDN dependency)
     implementation("com.google.zxing:core:3.5.3")
+    // Skill 中心 markdown 渲染（预览页「渲染预览」Tab + 编辑页实时预览初值；零传递依赖）
+    implementation("org.commonmark:commonmark:0.24.0")
 
     // Koog 云端 Agent 运行时（ADR-017/018：Koog JVM 定向）。
     // 版本与 :shared 对齐（1.3.0，勿各自漂移——两端事件/协议语义需同版互认）。

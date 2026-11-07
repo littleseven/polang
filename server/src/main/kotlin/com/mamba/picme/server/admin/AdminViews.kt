@@ -27,6 +27,7 @@ import kotlinx.html.form
 import kotlinx.html.h1
 import kotlinx.html.h2
 import kotlinx.html.head
+import kotlinx.html.hr
 import kotlinx.html.html
 import kotlinx.html.input
 import kotlinx.html.label
@@ -593,7 +594,24 @@ object AdminViews {
         }
     }
 
-    // ── Skill 中心（spike 2026-11-07）──
+    // ── Skill 中心（spike 2026-11-07；v2 同日依 Ardot 设计稿重排：统计行 + 双栏编辑 + 预览页三 Tab）──
+
+    /** markdown → HTML（Skill 中心渲染预览/编辑页实时预览初值；escapeHtml 兜底防注入）。 */
+    private val mdParser = org.commonmark.parser.Parser.builder().build()
+    private val mdRenderer = org.commonmark.renderer.html.HtmlRenderer.builder()
+        .escapeHtml(true)
+        .sanitizeUrls(true)
+        .build()
+
+    fun renderMarkdown(source: String): String = mdRenderer.render(mdParser.parse(source)).trim()
+
+    private fun FlowContent.skillStatCard(labelText: String, value: String, sub: String) {
+        div("skill-stat") {
+            div("skill-stat-label") { +labelText }
+            div("skill-stat-value") { +value }
+            div("skill-stat-sub") { +sub }
+        }
+    }
 
     fun skillsPage(
         skills: List<SkillCenter.SkillDetail>,
@@ -608,113 +626,287 @@ object AdminViews {
                 if (message != null) {
                     div("toast ${if (message.startsWith("已") || message.startsWith("成功")) "toast-ok" else "toast-err"}") { +message }
                 }
-                p { a("/admin/skills/new", classes = "btn") { +"新增技能" } }
+                div("skill-head") {
+                    p("meta") {
+                        +"技能 = 按需加载的指令包（SKILL.md），云端 Agent 经 load_skill 加载；保存即热更新（下一轮跑轮生效，无需部署）。"
+                    }
+                    a("/admin/skills/new", classes = "btn") { +"＋ 新增技能" }
+                }
+                div("skill-stats") {
+                    skillStatCard("技能数", "${skills.size}", "frontmatter 合法才进清单")
+                    skillStatCard("总字符", "%,d".format(skills.sumOf { it.rawChars }), "单技能上限 ${SkillCenter.MAX_CONTENT_CHARS} 字符")
+                    skillStatCard(
+                        "最近更新",
+                        skills.maxByOrNull { it.updatedAtMs }?.let { fmtTs(it.updatedAtMs) } ?: "—",
+                        "磁盘直读 · rsync 即热更新",
+                    )
+                }
                 table {
                     tr {
                         th { +"名称" }
                         th { +"描述（LLM 相关性判断依据）" }
-                        th { +"大小" }
+                        th { +"字符" }
                         th { +"更新时间（UTC+8）" }
                         th { +"操作" }
                     }
                     skills.forEach { s ->
                         tr {
-                            td { a("/admin/skills/${s.meta.name}") { +s.meta.name } }
+                            td("skill-name") { a("/admin/skills/${s.meta.name}") { +s.meta.name } }
                             td { +s.meta.description }
-                            td { +"${s.rawChars} 字符" }
+                            td { +s.rawChars.toString() }
                             td { +fmtTs(s.updatedAtMs) }
                             td {
-                                form(action = "/admin/skills/${s.meta.name}/delete", method = FormMethod.post) {
-                                    attributes["style"] = "display:inline"
-                                    attributes["onsubmit"] = "return confirm('确认删除技能 ${s.meta.name}？云端下一轮跑轮即不再可见')"
-                                    input(type = InputType.submit, classes = "btn btn-danger") { value = "删除" }
+                                div("skill-row-actions") {
+                                    a("/admin/skills/${s.meta.name}/preview", classes = "btn-sm") { +"预览" }
+                                    a("/admin/skills/${s.meta.name}", classes = "btn-sm") { +"编辑" }
+                                    form(action = "/admin/skills/${s.meta.name}/delete", method = FormMethod.post) {
+                                        attributes["style"] = "display:inline"
+                                        attributes["onsubmit"] =
+                                            "return confirm('确认删除技能 ${s.meta.name}？云端下一轮跑轮即不再可见')"
+                                        input(type = InputType.submit, classes = "btn-sm btn-danger") { value = "删除" }
+                                    }
                                 }
                             }
                         }
                     }
                 }
                 if (skills.isEmpty()) {
-                    p("meta") { +"暂无技能。技能 = 按需加载的指令包（SKILL.md），云端 Agent 经 load_skill 工具加载。" }
+                    div("empty-state") { +"暂无技能。技能 = 按需加载的指令包（SKILL.md），云端 Agent 经 load_skill 工具按需加载。" }
+                } else {
+                    p("meta") { +"共 ${skills.size} 个技能 · frontmatter 非法的目录不进清单不可加载 · 磁盘直读 rsync 即热更新" }
                 }
                 section("settings-section") {
                     div("section-head") {
                         h2("section-title") { +"LLM 视角 · system prompt 技能清单段（实时）" }
-                        p("section-desc") { +"云端 Agent 每轮跑轮注入的内容；空清单时段落整段不出现。" }
+                        p("section-desc") { +"云端 Agent 每轮跑轮注入的内容；空清单时段落整段不出现（prompt 零变化）。" }
                     }
-                    pre { +(promptSection.ifBlank { "（空清单——prompt 零变化）" }) }
+                    pre("mono-block") { +(promptSection.ifBlank { "（空清单——prompt 零变化）" }) }
                 }
             }
         }
     }
 
+    /** 编辑页（双栏）：左 SKILL.md 表单，右 LLM 视角实时预览（清单行 + markdown 渲染，纯前端零依赖）。 */
     fun skillEditPage(
         existing: SkillCenter.SkillDetail?,
         error: String? = null,
     ): String = createHTML().html {
         val isNew = existing == null
+        val defaultBody = "# 技能标题\n\n## 何时使用\n\n## 步骤\n\n## 约束\n"
         adminHead("${if (isNew) "新增" else "编辑"}技能 · PoLang 管理后台")
         body {
             navBar()
             div("page") {
-                h1("page-title") { +"${if (isNew) "新增" else "编辑"}技能" }
+                h1("page-title") { +buildString { append(if (isNew) "新增" else "编辑"); append("技能"); if (!isNew) append(" · ").append(existing!!.meta.name) } }
                 if (error != null) div("toast toast-err") { +error }
-                section("settings-section") {
-                    div("section-head") {
-                        h2("section-title") { +"SKILL.md" }
-                        p("section-desc") {
-                            +"保存即热更新（云端下一轮跑轮生效，无需部署）；frontmatter 由表单组装。"
+                if (!isNew) {
+                    div("skill-previewbar") {
+                        p("meta") {
+                            +"更新于 ${fmtTs(existing!!.updatedAtMs)} · ${existing.rawChars} / ${SkillCenter.MAX_CONTENT_CHARS} 字符 · 保存即热更新（下一轮跑轮生效）"
+                        }
+                        span("push") {
+                            form(action = "/admin/skills/${existing.meta.name}/delete", method = FormMethod.post) {
+                                attributes["style"] = "display:inline"
+                                attributes["onsubmit"] = "return confirm('确认删除技能 ${existing.meta.name}？云端下一轮跑轮即不再可见')"
+                                input(type = InputType.submit, classes = "btn-danger-ghost") { value = "删除技能" }
+                            }
                         }
                     }
+                }
+                div("skills-layout") {
+                    // ── 左栏：表单 ──
                     form(
                         action = if (isNew) "/admin/skills" else "/admin/skills/${existing!!.meta.name}",
                         method = FormMethod.post,
-                        classes = "form-grid",
+                        classes = "settings-section",
                     ) {
-                        div("field") {
-                            label { +"名称（小写字母/数字/连字符；目录名，创建后不可改）" }
+                        div("section-head") {
+                            h2("section-title") { +"SKILL.md 表单" }
+                            p("section-desc") { +"frontmatter（name / description）由表单组装；正文为 markdown 指令。" }
+                        }
+                        div("skill-field") {
+                            label {
+                                +"名称（小写字母/数字/连字符；目录名，创建后不可改）"
+                                if (!isNew) span("ro-tag") { +"只读" }
+                            }
                             textInput(name = "name") {
                                 value = existing?.meta?.name.orEmpty()
                                 if (!isNew) attributes["readonly"] = "readonly"
                                 placeholder = "html-card"
+                                attributes["id"] = "skill-name"
                             }
                         }
-                        div("field") {
+                        div("skill-field") {
                             label { +"描述（单行；LLM 判断是否加载本技能的唯一依据，写清「何时该用」）" }
                             textInput(name = "description") {
                                 value = existing?.meta?.description.orEmpty()
                                 placeholder = "当需要……时，先加载本技能。"
+                                attributes["id"] = "skill-desc"
                             }
                         }
-                        div("field") {
-                            label { +"正文（markdown 指令；load_skill 返回的内容，上限 ${SkillCenter.MAX_CONTENT_CHARS} 字符）" }
-                            textArea(classes = "mono") {
+                        div("skill-field") {
+                            label { +"正文（markdown 指令；load_skill 返回的内容，上限 ${"%,d".format(SkillCenter.MAX_CONTENT_CHARS)} 字符）" }
+                            textArea {
                                 attributes["name"] = "body"
-                                attributes["rows"] = "24"
-                                attributes["style"] = "width:100%;font-family:monospace"
-                                +(existing?.body ?: "# 技能标题\n\n## 何时使用\n\n## 步骤\n\n## 约束\n")
+                                attributes["id"] = "skill-body"
+                                attributes["rows"] = "18"
+                                +(existing?.body ?: defaultBody)
                             }
+                            div("char-counter") { attributes["id"] = "char-counter" }
                         }
                         div("form-actions") {
+                            a("/admin/skills", classes = "btn btn-ghost") { +"返回" }
                             input(type = InputType.submit, classes = "btn") { value = if (isNew) "创建" else "保存" }
-                            +" "
-                            a("/admin/skills", classes = "btn") { +"返回" }
                         }
                     }
-                }
-                if (existing != null) {
+                    // ── 右栏：实时预览（LLM 视角）──
                     section("settings-section") {
                         div("section-head") {
-                            h2("section-title") { +"预览 · LLM 视角" }
-                            p("section-desc") {
-                                +"左：prompt 清单段中本技能的行（披露层）；右：load_skill(\"${existing.meta.name}\") 的返回（正文层）。"
-                            }
+                            h2("section-title") { +"实时预览 · LLM 视角" }
+                            p("section-desc") { +"左栏内容在云端跑轮中的实际形态；清单行随描述实时联动，正文按 markdown 渲染。" }
                         }
-                        h2 { +"清单行" }
-                        pre { +"- ${existing.meta.name}: ${existing.meta.description}" }
-                        h2 { +"load_skill 返回" }
-                        pre { +(existing.body.take(SkillCenter.MAX_CONTENT_CHARS)) }
+                        p("block-label") { +"① 清单行 · 披露层（system prompt 注入）" }
+                        pre("manifest-block") {
+                            attributes["id"] = "manifest-line"
+                            +"- ${existing?.meta?.name.orEmpty()}: ${existing?.meta?.description.orEmpty()}"
+                        }
+                        hr("skill-divider")
+                        p("block-label") { +"② load_skill 返回 · 正文层（markdown 渲染）" }
+                        div("md-preview") {
+                            attributes["id"] = "md-live"
+                            unsafe { raw(renderMarkdown(existing?.body ?: defaultBody)) }
+                        }
+                        hr("skill-divider")
+                        p("section-desc") { +"渐进披露：不匹配时禁止加载；正文仅按需进上下文。" }
                     }
                 }
+            }
+            script {
+                unsafe { raw(skillEditPageJs(existing?.meta?.name.orEmpty().ifBlank { "skill-name" })) }
+            }
+        }
+    }
+
+    /** 编辑页内联 JS：字符计数 + 清单行联动 + markdown 实时渲染（先转义后变换，无外部依赖）。 */
+    private fun skillEditPageJs(fallbackName: String): String = """
+        (function () {
+            var MAX = ${SkillCenter.MAX_CONTENT_CHARS};
+            var nameEl = document.getElementById('skill-name');
+            var descEl = document.getElementById('skill-desc');
+            var bodyEl = document.getElementById('skill-body');
+            var counterEl = document.getElementById('char-counter');
+            var manifestEl = document.getElementById('manifest-line');
+            var liveEl = document.getElementById('md-live');
+            function esc(s) {
+                return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+            function inline(s) {
+                s = esc(s);
+                s = s.replace(/`([^`]+)`/g, '<code>' + '$1' + '</code>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>' + '$1' + '</strong>');
+                return s;
+            }
+            function renderMd(src) {
+                var lines = src.split('\n');
+                var out = [], para = [], listType = null, inCode = false, codeBuf = [];
+                function flushPara() { if (para.length) { out.push('<p>' + para.map(inline).join('<br>') + '</p>'); para = []; } }
+                function flushList() { if (listType) { out.push('</' + listType + '>'); listType = null; } }
+                for (var i = 0; i < lines.length; i++) {
+                    var l = lines[i];
+                    if (/^```/.test(l)) {
+                        if (inCode) { out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>'); codeBuf = []; inCode = false; }
+                        else { flushPara(); flushList(); inCode = true; }
+                        continue;
+                    }
+                    if (inCode) { codeBuf.push(esc(l)); continue; }
+                    var h = /^(#{1,4})\s+(.*)$/.exec(l);
+                    if (h) { flushPara(); flushList(); out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>'); continue; }
+                    if (/^\s*[-*]\s+/.test(l)) { flushPara(); if (listType !== 'ul') { flushList(); out.push('<ul>'); listType = 'ul'; } out.push('<li>' + inline(l.replace(/^\s*[-*]\s+/, '')) + '</li>'); continue; }
+                    var ol = /^\s*(\d+)\.\s+(.*)$/.exec(l);
+                    if (ol) { flushPara(); if (listType !== 'ol') { flushList(); out.push('<ol>'); listType = 'ol'; } out.push('<li>' + inline(ol[2]) + '</li>'); continue; }
+                    if (/^\s*>/.test(l)) { flushPara(); flushList(); out.push('<blockquote>' + inline(l.replace(/^\s*>\s?/, '')) + '</blockquote>'); continue; }
+                    if (l.trim() === '') { flushPara(); flushList(); continue; }
+                    para.push(l);
+                }
+                if (inCode && codeBuf.length) { out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>'); }
+                flushPara(); flushList();
+                return out.join('\n') || '<p style="color:#999">（空正文）</p>';
+            }
+            function refresh() {
+                var len = bodyEl.value.length;
+                counterEl.textContent = len.toLocaleString() + ' / ' + MAX.toLocaleString() + ' 字符';
+                counterEl.className = 'char-counter' + (len > MAX ? ' over' : '');
+                manifestEl.textContent = '- ' + (nameEl.value || '$fallbackName') + ': ' + descEl.value;
+                liveEl.innerHTML = renderMd(bodyEl.value);
+            }
+            [nameEl, descEl, bodyEl].forEach(function (el) {
+                el.addEventListener('input', refresh);
+            });
+            refresh();
+        })();
+    """.trimIndent()
+
+    /** 预览页：三 Tab（LLM 视角 / 原文 SKILL.md / 渲染预览），服务端渲染，tab 走 query 参数可分享。 */
+    fun skillPreviewPage(
+        detail: SkillCenter.SkillDetail,
+        tab: String = "llm",
+    ): String = createHTML().html {
+        val name = detail.meta.name
+        val safeTab = if (tab in setOf("llm", "raw", "rendered")) tab else "llm"
+        adminHead("预览技能 · $name · PoLang 管理后台")
+        body {
+            navBar()
+            div("page") {
+                h1("page-title") { +"预览技能 · $name" }
+                div("skill-previewbar") {
+                    span("badge badge-active") { +"热更新已生效" }
+                    p("meta") { +"更新于 ${fmtTs(detail.updatedAtMs)} · ${detail.rawChars} / ${SkillCenter.MAX_CONTENT_CHARS} 字符" }
+                    span("push") {
+                        a("/admin/skills/$name", classes = "btn") { +"编辑" }
+                        a("/admin/skills", classes = "btn btn-ghost") { +"返回列表" }
+                    }
+                }
+                div("subtabs") {
+                    a("/admin/skills/$name/preview?tab=llm", classes = if (safeTab == "llm") "subtab active" else "subtab") { +"LLM 视角" }
+                    a("/admin/skills/$name/preview?tab=raw", classes = if (safeTab == "raw") "subtab active" else "subtab") { +"原文 SKILL.md" }
+                    a("/admin/skills/$name/preview?tab=rendered", classes = if (safeTab == "rendered") "subtab active" else "subtab") { +"渲染预览" }
+                }
+                section("settings-section") {
+                    when (safeTab) {
+                        "raw" -> {
+                            div("section-head") {
+                                h2("section-title") { +"原文 · SKILL.md" }
+                                p("section-desc") { +"磁盘上的完整文件（frontmatter + 正文）；rsync 到 VPS 即热更新。" }
+                            }
+                            pre("mono-block") {
+                                +"---\nname: $name\ndescription: ${detail.meta.description}\n---\n${detail.body}"
+                            }
+                        }
+                        "rendered" -> {
+                            div("section-head") {
+                                h2("section-title") { +"渲染预览 · load_skill 返回的 markdown" }
+                                p("section-desc") { +"正文层按 commonmark 渲染的视觉效果（与编辑页实时预览同源）。" }
+                            }
+                            div("md-preview") {
+                                unsafe { raw(renderMarkdown(detail.body)) }
+                            }
+                        }
+                        else -> {
+                            div("section-head") {
+                                h2("section-title") { +"LLM 视角" }
+                                p("section-desc") { +"云端 Agent 看到的两层：清单行（每轮注入）与 load_skill 返回（按需进上下文）。" }
+                            }
+                            p("block-label") { +"① system prompt 清单段 · 披露层（本技能呈现为这一行）" }
+                            pre("manifest-block") { +"- $name: ${detail.meta.description}" }
+                            hr("skill-divider")
+                            p("block-label") { +"② load_skill(\"$name\") 返回 · 正文层（Observation 进上下文的 markdown 原文）" }
+                            pre("mono-block") { +detail.body.take(SkillCenter.MAX_CONTENT_CHARS) }
+                            hr("skill-divider")
+                            p("section-desc") { +"渐进披露：不匹配时禁止加载（正文占上下文，按需取用）。" }
+                        }
+                    }
+                }
+                p("meta") { +"同名目录磁盘直读 · rsync 即热更新 · frontmatter 非法则整体不进清单" }
             }
         }
     }
@@ -1854,6 +2046,50 @@ object AdminViews {
                         .ev pre{background:#f5f5f5;padding:8px;border-radius:var(--r-sm);overflow-x:auto;font-size:var(--fs-xs);margin:8px 0 0;white-space:pre-wrap;word-break:break-all}
                         .ev details{margin-top:8px}
                         .ev summary{cursor:pointer;color:var(--c-text-3);font-size:var(--fs-xs)}
+                        /* Skill 中心（2026-11-07 v2，Ardot 设计稿结构落地） */
+                        .skill-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+                        .skill-head .meta{margin:0}
+                        .skill-stats{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 16px}
+                        .skill-stat{flex:1;min-width:180px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);padding:14px 20px;box-shadow:var(--shadow-sm)}
+                        .skill-stat-label{font-size:var(--fs-sm);color:var(--c-text-2)}
+                        .skill-stat-value{font-size:var(--fs-xl);font-weight:600;color:var(--c-primary);margin-top:4px;font-variant-numeric:tabular-nums}
+                        .skill-stat-sub{font-size:var(--fs-xs);color:var(--c-text-3);margin-top:4px}
+                        td.skill-name{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+                        .skill-row-actions{display:flex;gap:8px;align-items:center;white-space:nowrap}
+                        .btn-sm.btn-danger{color:var(--c-danger)}
+                        .btn-danger-ghost{padding:8px 16px;background:var(--c-danger-bg);color:var(--c-danger);border:1px solid var(--c-danger-border);border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;transition:all .2s;height:32px;line-height:16px}
+                        .btn-danger-ghost:hover{background:var(--c-danger);color:var(--c-surface)}
+                        .skills-layout{display:grid;grid-template-columns:minmax(0,1fr) 460px;gap:16px;margin:16px 0;align-items:start}
+                        .skills-layout .settings-section{margin:0}
+                        .skill-field{margin-bottom:16px}
+                        .skill-field label{display:block;font-size:var(--fs-sm);color:var(--c-text-2);font-weight:500;margin-bottom:6px}
+                        .skill-field input[type=text]{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:var(--r-sm);font-size:var(--fs-md);font-family:inherit;transition:border-color .2s;box-sizing:border-box}
+                        .skill-field input[type=text]:focus{outline:none;border-color:var(--c-primary);box-shadow:0 0 0 3px var(--c-primary-ring)}
+                        .skill-field input[readonly]{background:#f5f5f5;color:var(--c-text-2)}
+                        .skill-field textarea{width:100%;min-height:320px;padding:12px;border:1px solid #d9d9d9;border-radius:var(--r-sm);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--fs-sm);line-height:1.6;resize:vertical;transition:border-color .2s;box-sizing:border-box}
+                        .skill-field textarea:focus{outline:none;border-color:var(--c-primary);box-shadow:0 0 0 3px var(--c-primary-ring)}
+                        .ro-tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:var(--fs-xs);color:var(--c-text-3);background:#f5f5f5;border:1px solid #d9d9d9;margin-left:8px;font-weight:400}
+                        .char-counter{font-size:var(--fs-xs);color:var(--c-text-3);text-align:right;margin-top:4px;font-variant-numeric:tabular-nums}
+                        .char-counter.over{color:var(--c-danger);font-weight:600}
+                        .mono-block{background:#f5f5f5;border-radius:var(--r-sm);padding:12px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--fs-sm);color:var(--c-text-2);white-space:pre-wrap;word-break:break-word;margin:0;overflow-x:auto}
+                        .manifest-block{background:#e6f2ff;border:1px solid #b8d9ff;border-radius:var(--r-sm);padding:10px 16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--fs-sm);color:var(--c-text);white-space:pre-wrap;word-break:break-word;margin:0;overflow-x:auto}
+                        .block-label{font-size:var(--fs-sm);color:var(--c-text-2);font-weight:500;margin:0 0 6px}
+                        .skill-divider{border:none;border-top:1px solid var(--c-border);margin:16px 0}
+                        .skill-previewbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+                        .skill-previewbar .meta{margin:0}
+                        .skill-previewbar .push{margin-left:auto;display:flex;gap:8px;align-items:center}
+                        .md-preview{line-height:1.7;color:var(--c-text);font-size:var(--fs-md)}
+                        .md-preview h1{font-size:20px;margin:16px 0 8px;font-weight:600}
+                        .md-preview h2{font-size:17px;margin:14px 0 6px;font-weight:600}
+                        .md-preview h3,.md-preview h4{font-size:15px;margin:12px 0 6px;font-weight:600}
+                        .md-preview p{margin:8px 0}
+                        .md-preview ul,.md-preview ol{margin:8px 0;padding-left:24px}
+                        .md-preview li{margin:4px 0}
+                        .md-preview code{background:#f5f5f5;padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+                        .md-preview pre{background:#f5f5f5;padding:12px;border-radius:var(--r-sm);overflow-x:auto}
+                        .md-preview pre code{background:none;padding:0}
+                        .md-preview blockquote{border-left:3px solid var(--c-primary);margin:8px 0;padding:4px 12px;color:var(--c-text-2);background:#fafafa}
+                        .md-preview a{color:var(--c-primary)}
                         @media (max-width:640px){
                         body>h1{font-size:20px}
                         body>h2{font-size:14px}
@@ -1875,6 +2111,8 @@ object AdminViews {
                         .form-grid{flex-direction:column;align-items:stretch;gap:12px}
                         .field input,.whitelist-add input{width:100%}
                         .whitelist-add{flex-direction:column;align-items:stretch}
+                        .skills-layout{grid-template-columns:1fr}
+                        .skill-previewbar .push{margin-left:0;width:100%}
                         }
                         """.trimIndent(),
                     )
