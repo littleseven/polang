@@ -532,6 +532,17 @@ object AdminViews {
                 statCard("事件数", session.eventCount.toString())
             }
             p("meta") { +"创建于 ${fmtTs(session.createdAt)} · 更新于 ${fmtTs(session.updatedAt)}" }
+            // 手机扫码预览（0.9.35）：最终程序存在即可扫码——Skill 调试产物 / Agent 直接输出同口径
+            val finalProgram = events.lastOrNull { it.payload is AgentEventPayload.Message && it.role != "user" }
+            if (finalProgram != null) {
+                div("qr-row") {
+                    unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(session.id))) }
+                    div {
+                        p("block-label") { +"手机扫码预览（端上真实渲染器）" }
+                        p("meta") { +"PoLang 调试包「OpenUI 调试」页扫码，按会话拉取最终程序渲染。" }
+                    }
+                }
+            }
             // Observation 配对锚点：页内 action 事件 id 集合
             val actionIds = events.filter { it.type == "action" }.map { it.id }.toHashSet()
             div("ev-list") {
@@ -1156,6 +1167,18 @@ object AdminViews {
                         //    Html 组件走沙箱 iframe（与端上 WebView 同文档），Markdown 根走 commonmark ──
                         val htmlDocs = extractHtmlDocuments(program)
                         val mdRoot = extractMarkdownRoot(program)
+                        // 手机扫码预览（0.9.35）：调试包「OpenUI 调试」页扫码 →
+                        // GET /agent/sessions/{id}/final-program 拉本程序 → 端上真实渲染器
+                        if (htmlDocs.isNotEmpty() || mdRoot != null) {
+                            div("qr-row") {
+                                unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(session.id))) }
+                                div {
+                                    p("block-label") { +"手机扫码预览（端上真实渲染器）" }
+                                    p("meta") { +"PoLang 调试包「OpenUI 调试」页扫码，按会话拉取本程序渲染；浏览器内预览见下方手机壳。" }
+                                    p("meta") { +openUiPreviewDeepLink(session.id) }
+                                }
+                            }
+                        }
                         if (htmlDocs.isNotEmpty() || mdRoot != null) {
                             div("phone-stage") {
                                 htmlDocs.forEachIndexed { i, doc ->
@@ -1202,6 +1225,9 @@ object AdminViews {
             }
         }
     }
+
+    /** 端侧 OpenUI 调试页 deep link（扫码载荷；App 内扫码解析 session 参数 → final-program 端点拉取）。 */
+    internal fun openUiPreviewDeepLink(sessionId: String) = "polang://openui-preview?session=$sessionId"
 
     /** 手机壳仿真状态栏（9:41 + 信号/WiFi/电池 SVG），占位 44px 安全区使内容避开刘海。 */
     private fun kotlinx.html.FlowContent.phoneStatusBar() {
@@ -2515,6 +2541,10 @@ object AdminViews {
                         .phone-statusbar svg{display:block}
                         .phone-screen iframe{display:block;width:100%;flex:1;min-height:0;border:0;background:#fff}
                         .phone-screen .md-preview{padding:12px 16px 36px;flex:1;min-height:0;overflow-y:auto;box-sizing:border-box;font-size:13px;line-height:1.6}
+                        /* 扫码预览行（0.9.35）：二维码 + 说明 */
+                        .qr-row{display:flex;gap:18px;align-items:center;padding:14px 16px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md);margin-bottom:14px}
+                        .qr-row svg{flex-shrink:0;border:1px solid var(--c-border);border-radius:var(--r-sm)}
+                        .qr-row .meta{word-break:break-all}
                         /* 发包管理 v2（依 Ardot 设计稿：双轨版本卡 + 双栏上传 + 分轨历史） */
                         .track-row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
                         .track-card{flex:1;min-width:320px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:16px 20px}

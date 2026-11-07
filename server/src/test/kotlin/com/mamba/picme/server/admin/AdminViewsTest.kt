@@ -646,6 +646,10 @@ class AdminViewsTest {
         // 状态栏安全区：内容自状态栏下缘起排，不被刘海遮挡
         assertTrue(html.contains("phone-statusbar"))
         assertTrue(html.contains("9:41"))
+        // 手机扫码预览：二维码 SVG + deep link（0.9.35）
+        assertTrue(html.contains("手机扫码预览"))
+        assertTrue(html.contains("polang://openui-preview?session=abcd1234-0000-0000-0000-000000000000"))
+        assertTrue(html.contains("shape-rendering=\"crispEdges\""))
         // 程序原文仍在
         assertTrue(html.contains("程序原文"))
     }
