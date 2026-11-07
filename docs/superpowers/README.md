@@ -107,8 +107,8 @@ docs/superpowers/
   - `2026-10-21-cloud-local-hybrid-a2ui-genui-design.md` — 云端编排×端侧执行×GenUI 混合架构（投影出端 + local:// handle；M1 投影通路 + M2 A2UI L1 卡已合 main，M3 沙箱交互态/iOS 待排期；D4 选型已被 OpenUI 翻转——OpenUI 为唯一线格式（回合原生），A2UI 线已于 2026-11-05 决策退役、2026-11-06 实施）
   - `2026-10-26-openui-compose-alignment-design.md` — OpenUI 客户端对齐官方 A2UI Compose 适配层（P1 响应式状态粒度重组、P2 流式预览均已合 main；P3 逐节点兜底 / P4 组件契约化在途）
   - `2026-11-01-agent-step-timeline-and-admin-trace-design.md` — Agent 步骤时间线（用户可见）+ 管理后台推理追溯（M1 Android 时间线 + M2 后台追溯已合 main；M3 iOS 条件跟随在途）
-  - `2026-11-07-layered-agent-runtime-design.md` — 分层 Agent runtime（One Agent, Two Runtimes 七层模型；M1 契约/策略/执行器端云同源在途，M2~M6 路线见 spec §2）
-- **plans（4 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）；`2026-11-07-layered-agent-runtime-m1.md`（分层 runtime M1 实施计划，与同名 spec 配套）
+  - `2026-11-07-layered-agent-runtime-design.md` — 分层 Agent runtime（One Agent, Two Runtimes 七层模型；M1 已合 main，M1.5 OpenUI 资产收口 + M2 工具目录化在途，M3~M6 路线见 spec §2）
+- **plans（5 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）；`2026-11-07-layered-agent-runtime-m1.md`（分层 runtime M1 实施计划，与同名 spec 配套，已交付）；`2026-11-07-layered-agent-runtime-m15-m2.md`（分层 runtime M1.5+M2 实施计划，与同名 spec 配套，在途）
 
 ---
 
@@ -136,3 +136,4 @@ docs/superpowers/
 | 2026-11-01 | 交付沉淀：spec `2026-11-01-openui-turn-native-design.md` + plan `2026-11-01-openui-turn-native.md` 按沉淀管线移除（OpenUI 回合原生 M1——结论已落 CHAT_CARD_CATALOG data_ui_openui 节 / CHAT_PROTOCOL_TECH_SPEC §2.9 / server·shared AGENTS.md，git 历史可查）；真机遛狗六场景待执行 |
 | 2026-11-01 | OpenUI/协议线交付沉淀第三轮（12 篇）：specs 2——`openui-wire-format-toggle`（双格式对比实验已收口：OpenUI 转正默认线并于同日升级回合原生，开关现行语义落 CHAT_PROTOCOL §2.9 + 目录 data_ui_openui 节）/ `openui-layout-controllability`（批次已合 main + 四场景验收全过，结论落设计语言 v9 + 目录）；plans 10——`agent-step-timeline`/`admin-llm-trace`（M1/M2 已合 main，spec 留 M3 在途）/ `hybrid-m2-a2ui`（M2 已合 main）/ `cloud-agent-observability`（被 admin-llm-trace 线取代）/ `chat-type-taxonomy`（重构已转正）/ scan×2、`cos-backup-and-tailscale`、`ota-background-download`（均已上线，配套 spec 前轮已清理）。同步：三篇在途 spec 状态头刷新（hybrid D4 翻转注记 / compose-alignment P2 已合 / step-timeline M1+M2 已合）；活文档过时口径修正（目录 type 全集 9→11 值 + 总表补 data_ui_openui 行 + M4 已合 main；shared/AGENTS openui 批次编年压缩为机制要点+指针；设计语言状态头 v1→v10） |
 | 2026-11-07 | 索引补录 `2026-11-07-layered-agent-runtime-design.md` + plan `2026-11-07-layered-agent-runtime-m1.md`（分层 Agent runtime：One Agent, Two Runtimes 七层模型，M1 契约/策略/执行器端云同源在途） |
+| 2026-11-07 | M1 已合 main（`40eafd36e`）；索引补录 plan `2026-11-07-layered-agent-runtime-m15-m2.md`（M1.5 OpenUI 白名单/prompt 资产真引用化 + M2 工具目录化，spec 状态行与里程碑表同步） |

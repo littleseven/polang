@@ -1,8 +1,8 @@
 # 分层 Agent Runtime（One Agent, Two Runtimes）设计 spec
 
 > **日期**：2026-11-07
-> **状态**：在途活跃 spec（M1 实施中）
-> **分支**：`feat/layered-agent-runtime`（`.worktrees/layered-agent-runtime`）
+> **状态**：在途活跃 spec（M1 已合 main `40eafd36e`；M1.5/M2 实施中）
+> **分支**：M1 = `feat/layered-agent-runtime`（已合）；M1.5/M2 = `feat/layered-runtime-m2`（`.worktrees/layered-runtime-m2`）
 > **起因**：用户要求统一本地 Agent 与远程（云端）Agent 的代码——「出于成本考虑仍在端上跑 Agent，但差异仅在一个开关；从原理上同构，仅仅是 runtime 在云上或端上的区别」。用户补充关键修正：**Agent 架构是分层的，开关控制各层跑在端上还是服务端**（不是整体两态）。
 
 ---
@@ -33,8 +33,9 @@ Agent 栈拆为七层。每一层有**端/云两个实现**（或天然同构一
 
 | 里程碑 | 内容 | 状态 |
 |--------|------|------|
-| **M1** | server 经 composite build 依赖 `:shared` jvm 变体；消灭 L1/L2/L3 三份双写（契约字面量/策略移植/执行器规则） | **本 spec 实施范围** |
-| M2 | 工具 locality 泛化：目录驱动 executor 解析，端云工具同一声明源 | 未开始 |
+| **M1** | server 经 composite build 依赖 `:shared` jvm 变体；消灭 L1/L2/L3 三份双写（契约字面量/策略移植/执行器规则） | ✅ 已合 main（`40eafd36e`） |
+| **M1.5** | OpenUI 白名单/prompt 资产（组件/Icon 名/动作词表/fragment 闭集/ICON_NAMES_TEXT）server↔shared 字面量副本收口为真引用 | 实施中（plan `2026-11-07-layered-agent-runtime-m15-m2.md`） |
+| M2 | 工具 locality 泛化：目录驱动 executor 解析，端云工具同一声明源 | 实施中（同 M1.5 plan） |
 | M3 | MemoryStore 抽象：记忆组装/压缩（已在 shared）两侧复用，store 实现各端自理 | 未开始 |
 | M4 | 流式协议合一：`ChatStreamEvent`/`TurnStreamEvent` 与 SSE 事件帧同源 | 未开始 |
 | M5 | ViewModel/TurnRunner 合一：端侧开关选择 Local/Cloud TurnRunner | 未开始 |
