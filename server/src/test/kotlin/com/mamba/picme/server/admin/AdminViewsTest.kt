@@ -2,6 +2,7 @@ package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.agent.AgentEventPayload
 import com.mamba.picme.server.agent.SkillCenter
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -524,6 +525,7 @@ class AdminViewsTest {
             skillName = "html-card",
             finishReason = "done",
             elapsedMs = 4000L,
+            hasFinalProgram = true,
         )
         val running = SkillDebugHistoryRow(
             session = sessionFixture().copy(id = "bbbb2222-0000-0000-0000-000000000000"),
@@ -531,6 +533,7 @@ class AdminViewsTest {
             skillName = null,
             finishReason = null,
             elapsedMs = null,
+            hasFinalProgram = false,
         )
         val html = AdminViews.skillDebugPage(skills = emptyList(), history = listOf(done, running))
         assertTrue(html.contains("调试历史（2）"))
@@ -542,6 +545,12 @@ class AdminViewsTest {
         assertTrue(html.contains("4000ms"))
         assertTrue(html.contains("/admin/skills/debug/result/abcd1234-0000-0000-0000-000000000000"))
         assertTrue(html.contains("/admin/agent/sessions/bbbb2222-0000-0000-0000-000000000000"))
+        // 一行三列 case 卡（0.9.39）：每轮一卡，二维码在上、case 信息在下
+        assertTrue(html.contains("qr-grid"))
+        assertEquals(2, html.split("class=\"qr-cell\"").size - 1) // 两轮各一卡
+        // 二维码门控：有最终程序的 done 出码（SVG 图形），无最终程序的 running 占位明示
+        assertEquals(1, html.split("shape-rendering=\"crispEdges\"").size - 1)
+        assertTrue(html.contains("无最终程序"))
     }
 
     @Test
@@ -678,11 +687,16 @@ class AdminViewsTest {
     }
 
     @Test
-    fun `skill debug result page plain program shows no-preview hint`() {
+    fun `skill debug result page plain program shows qr and no-preview hint`() {
         val program = "root = Column(spacing = \"m\") { Text(\"你好\") }"
         val html = AdminViews.skillDebugResultPage(sessionFixture(), finishedEvents(program))
         assertTrue(html.contains("无可视化预览形态"))
         assertTrue(!html.contains("<iframe")) // CSS 选择器含 iframe 字样，断言标签本身不出现
+        // 二维码与浏览器预览能力解耦：原生组件树程序（Card/Column 根）浏览器暂不可预览，
+        // 但端上真实渲染器可渲染，二维码照常展示（album-maker 相册卡无二维码事故修复）
+        assertTrue(html.contains("手机扫码预览"))
+        assertTrue(html.contains("polang://openui-preview?session=abcd1234-0000-0000-0000-000000000000"))
+        assertTrue(!html.contains("浏览器内预览见下方手机壳"))
     }
 
 }

@@ -1016,39 +1016,44 @@ object AdminViews {
                 section("settings-section") {
                     div("section-head") {
                         h2("section-title") { +"调试历史（${history.size}）" }
-                        p("section-desc") { +"每轮调试会话留底（model=skill-debug，最新 20 条）；事件与完整回放页共享，结果页带手机壳可视化预览。" }
+                        p("section-desc") { +"每轮调试会话留底（model=skill-debug，最新 20 条），一行三列卡片：扫码上真机渲染，码下为本轮 case 信息；结果页带手机壳可视化预览。" }
                     }
                     if (history.isEmpty()) {
                         p("meta") { +"（尚无调试记录——跑一轮后此处留底）" }
                     } else {
-                        table {
-                            tr {
-                                th { +"时间" }
-                                th { +"技能" }
-                                th { +"测试消息" }
-                                th { +"状态" }
-                                th { +"耗时" }
-                                th { +"事件" }
-                                th { +"操作" }
-                            }
+                        // 一行三列 case 卡（0.9.39）：二维码在上、case 信息在下，一卡一轮。
+                        // 二维码门控与 final-program 取数端点同口径（hasFinalProgram），
+                        // 无最终程序的会话扫码必 404 → 不出码，占位框明示。
+                        div("qr-grid") {
                             history.forEach { h ->
-                                tr {
-                                    td { +fmtTs(h.session.createdAt) }
-                                    td { +(h.skillName ?: "（未触发）") }
-                                    td { +((h.testMessage ?: "—").take(80)) }
-                                    td {
-                                        when {
-                                            h.finishReason == null -> span("badge") { +"运行中" }
-                                            h.finishReason == "done" -> span("badge badge-active") { +"完成" }
-                                            else -> span("st-badge st-blocked") { +"异常" }
-                                        }
+                                div("qr-cell") {
+                                    if (h.hasFinalProgram) {
+                                        unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(h.session.id))) }
+                                    } else {
+                                        div("qr-none") { +"无最终程序" }
                                     }
-                                    td { +(h.elapsedMs?.let { "${it}ms" } ?: "—") }
-                                    td { +h.session.eventCount.toString() }
-                                    td {
-                                        a("/admin/skills/debug/result/${h.session.id}", classes = "btn-sm") { +"结果" }
-                                        +" "
-                                        a("/admin/agent/sessions/${h.session.id}", classes = "btn-sm") { +"回放" }
+                                    div("qr-info") {
+                                        div("qr-line qr-head") {
+                                            span("qr-skill") { +(h.skillName ?: "（未触发）") }
+                                            when {
+                                                h.finishReason == null -> span("badge") { +"运行中" }
+                                                h.finishReason == "done" -> span("badge badge-active") { +"完成" }
+                                                else -> span("st-badge st-blocked") { +"异常" }
+                                            }
+                                        }
+                                        div("qr-msg") { +((h.testMessage ?: "—").take(60)) }
+                                        div("qr-line") {
+                                            span { +fmtTs(h.session.createdAt) }
+                                            span { +h.session.id.take(8) }
+                                        }
+                                        div("qr-line") {
+                                            span { +"耗时 ${h.elapsedMs?.let { "${it}ms" } ?: "—"}" }
+                                            span { +"事件 ${h.session.eventCount}" }
+                                        }
+                                        div("qr-actions") {
+                                            a("/admin/skills/debug/result/${h.session.id}", classes = "btn-sm") { +"结果" }
+                                            a("/admin/agent/sessions/${h.session.id}", classes = "btn-sm") { +"回放" }
+                                        }
                                     }
                                 }
                             }
@@ -1167,14 +1172,23 @@ object AdminViews {
                         // ── 可视化预览（0.9.37）：组件树整树渲染进手机壳；prepare 失败回落
                         //    Html 组件沙箱 iframe / Markdown 根 commonmark 旧提取链 ──
                         // 手机扫码预览（0.9.35）：调试包「OpenUI 调试」页扫码 →
-                        // GET /agent/sessions/{id}/final-program 拉本程序 → 端上真实渲染器
+                        // GET /agent/sessions/{id}/final-program 拉本程序 → 端上真实渲染器。
+                        // 二维码与浏览器预览能力解耦（0.9.36）：原生组件树程序浏览器暂不可
+                        // 预览时二维码照常展示（finalMsg != null 即渲染），仅提示语条件化。
+                        val hasBrowserPreview = preview is OpenUiTreePreview.Rendered ||
+                            extractHtmlDocuments(program).isNotEmpty() || extractMarkdownRoot(program) != null
                         div("preview-split") {
                             div("qr-side") {
                                 div("qr-row") {
                                     unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(session.id))) }
                                     div {
                                         p("block-label") { +"手机扫码预览（端上真实渲染器）" }
-                                        p("meta") { +"PoLang 调试包「OpenUI 调试」页扫码，按会话拉取本程序渲染；浏览器内预览见右侧手机壳。" }
+                                        p("meta") {
+                                            +(
+                                                "PoLang 调试包「OpenUI 调试」页扫码，按会话拉取本程序渲染" +
+                                                    if (hasBrowserPreview) "；浏览器内预览见右侧手机壳。" else "。"
+                                                )
+                                        }
                                         p("meta") { +openUiPreviewDeepLink(session.id) }
                                     }
                                 }
@@ -2598,6 +2612,16 @@ object AdminViews {
                         .qr-row{display:flex;gap:18px;align-items:center;padding:14px 16px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md);margin-bottom:14px}
                         .qr-row svg{flex-shrink:0;border:1px solid var(--c-border);border-radius:var(--r-sm)}
                         .qr-row .meta{word-break:break-all}
+                        /* 调试历史 case 卡网格（0.9.38 起三列；0.9.39 起二维码+信息合一卡） */
+                        .qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:10px}
+                        .qr-cell{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md)}
+                        .qr-cell svg{border:1px solid var(--c-border);border-radius:var(--r-sm)}
+                        .qr-none{width:168px;height:168px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--c-border);border-radius:var(--r-sm);color:var(--c-text-3);font-size:var(--fs-xs)}
+                        .qr-info{width:100%;display:flex;flex-direction:column;gap:4px;font-size:var(--fs-xs);color:var(--c-text-3);line-height:1.6}
+                        .qr-info .qr-line{display:flex;justify-content:space-between;align-items:center;gap:8px}
+                        .qr-info .qr-head .qr-skill{font-weight:600;color:var(--c-text)}
+                        .qr-info .qr-msg{color:var(--c-text-2);word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+                        .qr-info .qr-actions{display:flex;gap:8px;margin-top:2px}
                         /* 发包管理 v2（依 Ardot 设计稿：双轨版本卡 + 双栏上传 + 分轨历史） */
                         .track-row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
                         .track-card{flex:1;min-width:320px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:16px 20px}
