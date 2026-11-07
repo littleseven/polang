@@ -678,11 +678,16 @@ class AdminViewsTest {
     }
 
     @Test
-    fun `skill debug result page plain program shows no-preview hint`() {
+    fun `skill debug result page plain program shows qr and no-preview hint`() {
         val program = "root = Column(spacing = \"m\") { Text(\"你好\") }"
         val html = AdminViews.skillDebugResultPage(sessionFixture(), finishedEvents(program))
         assertTrue(html.contains("无可视化预览形态"))
         assertTrue(!html.contains("<iframe")) // CSS 选择器含 iframe 字样，断言标签本身不出现
+        // 二维码与浏览器预览能力解耦：原生组件树程序（Card/Column 根）浏览器暂不可预览，
+        // 但端上真实渲染器可渲染，二维码照常展示（album-maker 相册卡无二维码事故修复）
+        assertTrue(html.contains("手机扫码预览"))
+        assertTrue(html.contains("polang://openui-preview?session=abcd1234-0000-0000-0000-000000000000"))
+        assertTrue(!html.contains("浏览器内预览见下方手机壳"))
     }
 
 }

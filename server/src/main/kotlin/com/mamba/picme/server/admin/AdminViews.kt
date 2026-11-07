@@ -1168,15 +1168,21 @@ object AdminViews {
                         val htmlDocs = extractHtmlDocuments(program)
                         val mdRoot = extractMarkdownRoot(program)
                         // 手机扫码预览（0.9.35）：调试包「OpenUI 调试」页扫码 →
-                        // GET /agent/sessions/{id}/final-program 拉本程序 → 端上真实渲染器
-                        if (htmlDocs.isNotEmpty() || mdRoot != null) {
-                            div("qr-row") {
-                                unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(session.id))) }
-                                div {
-                                    p("block-label") { +"手机扫码预览（端上真实渲染器）" }
-                                    p("meta") { +"PoLang 调试包「OpenUI 调试」页扫码，按会话拉取本程序渲染；浏览器内预览见下方手机壳。" }
-                                    p("meta") { +openUiPreviewDeepLink(session.id) }
+                        // GET /agent/sessions/{id}/final-program 拉本程序 → 端上真实渲染器。
+                        // 0.9.36 起与浏览器预览能力解耦：原生组件树程序（Card/Column 根）浏览器
+                        // 暂不可预览，但端上渲染器可完整渲染，二维码照常展示（此前 QR 复用
+                        // htmlDocs/mdRoot 门控，相册卡等原生程序扫码入口丢失）。
+                        div("qr-row") {
+                            unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(session.id))) }
+                            div {
+                                p("block-label") { +"手机扫码预览（端上真实渲染器）" }
+                                p("meta") {
+                                    +(
+                                        "PoLang 调试包「OpenUI 调试」页扫码，按会话拉取本程序渲染" +
+                                            if (htmlDocs.isNotEmpty() || mdRoot != null) "；浏览器内预览见下方手机壳。" else "。"
+                                        )
                                 }
+                                p("meta") { +openUiPreviewDeepLink(session.id) }
                             }
                         }
                         if (htmlDocs.isNotEmpty() || mdRoot != null) {
