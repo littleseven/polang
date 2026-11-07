@@ -642,6 +642,7 @@ class AdminViewsTest {
         assertTrue(html.contains("phone-frame"))
         assertTrue(html.contains("phone-screen"))
         assertTrue(html.contains("aspect-ratio:9/19.5"))
+        assertTrue(html.contains("width:412px")) // 屏幕视口 1:1 = 390px（iPhone 逻辑宽）
         // 程序原文仍在
         assertTrue(html.contains("程序原文"))
     }

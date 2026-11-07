@@ -2474,11 +2474,14 @@ object AdminViews {
                         .md-preview pre code{background:none;padding:0}
                         .md-preview blockquote{border-left:3px solid var(--c-primary);margin:8px 0;padding:4px 12px;color:var(--c-text-2);background:#fafafa}
                         .md-preview a{color:var(--c-primary)}
-                        /* 调试结果页手机壳预览（0.9.31）：9:19.5 屏幕 + 机身 bezel + Dynamic Island */
+                        /* 调试结果页手机壳预览（0.9.31）：9:19.5 屏幕 + 机身 bezel + Dynamic Island；
+                           0.9.33 起屏幕视口 1:1 还原真机逻辑宽度——壳 412px - bezel 11px×2 = 390px 屏幕
+                           （iPhone 15/16 逻辑宽 393pt、Android 主流 360~412dp 的代表值； iframe 内
+                           H5 的 px 布局/百分比宽/媒体查询断点与端上 WebView 同口径，消除按钮过宽失真） */
                         .phone-stage{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;padding:24px;background:#ececf0;border-radius:var(--r-md);margin-bottom:12px}
                         .phone-item{margin:0}
                         .phone-item .block-label{margin-bottom:10px}
-                        .phone-frame{width:300px;aspect-ratio:9/19.5;background:#1b1b1f;border-radius:44px;padding:11px;box-sizing:border-box;box-shadow:0 14px 34px rgba(0,0,0,.28),inset 0 0 0 2px #3a3a40;position:relative;flex-shrink:0}
+                        .phone-frame{width:412px;aspect-ratio:9/19.5;background:#1b1b1f;border-radius:44px;padding:11px;box-sizing:border-box;box-shadow:0 14px 34px rgba(0,0,0,.28),inset 0 0 0 2px #3a3a40;position:relative;flex-shrink:0}
                         .phone-frame::before{content:"";position:absolute;top:11px;left:50%;transform:translateX(-50%);width:86px;height:24px;background:#1b1b1f;border-radius:13px;z-index:2;pointer-events:none}
                         .phone-frame::after{content:"";position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:96px;height:4px;border-radius:2px;background:rgba(255,255,255,.35);z-index:2;pointer-events:none}
                         .phone-screen{width:100%;height:100%;background:#fff;border-radius:34px;overflow:hidden}
