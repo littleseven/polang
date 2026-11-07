@@ -1,5 +1,6 @@
 package com.mamba.picme.agent.core.remote.config
 
+import ai.koog.http.client.KoogHttpClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
@@ -91,6 +92,11 @@ object RemoteModelFactory {
     public fun createKoogExecutor(
         config: RemoteModelConfig,
         extraHeaders: Map<String, String> = emptyMap(),
+        /**
+         * 自定义 Koog HTTP 工厂（分层 runtime M1：server 传 CF_AIG 鉴权改写包装或裸
+         * Ktor 工厂）。null = 默认路径 `createKoogHttpClientFactory(extraHeaders)`。
+         */
+        httpClientFactory: KoogHttpClient.Factory? = null,
     ): KoogExecutorBundle {
         val effectiveApiKey = config.apiKey.ifEmpty { "gateway-auth" }
         // ⚠️ 不能用 HttpClientFactoryResolver.resolve()——它经 java.util.ServiceLoader 找
@@ -101,7 +107,7 @@ object RemoteModelFactory {
         // createKoogHttpClientFactory（同包）内部显式构造 KtorKoogHttpClient.Factory()
         // 绕过（显式构造也更利于 R8：无需为 ServiceLoader provider 加 keep），并按需包
         // HeaderInjectingHttpClientFactory 注入网关 header。Anthropic client 同理必须显式传工厂。
-        val factory = createKoogHttpClientFactory(extraHeaders)
+        val factory = httpClientFactory ?: createKoogHttpClientFactory(extraHeaders)
         val model: LLModel
         val client = when (config.protocol) {
             RemoteProtocol.CLAUDE -> {
@@ -147,9 +153,17 @@ object RemoteModelFactory {
                     ),
                     maxOutputTokens = MAX_TOKENS.toLong(),
                 )
+                val settings = if (config.chatCompletionsPath.isBlank()) {
+                    OpenAIClientSettings(baseUrl = config.baseUrl)
+                } else {
+                    OpenAIClientSettings(
+                        baseUrl = config.baseUrl,
+                        chatCompletionsPath = config.chatCompletionsPath,
+                    )
+                }
                 OpenAILLMClient(
                     effectiveApiKey,
-                    OpenAIClientSettings(baseUrl = config.baseUrl),
+                    settings,
                     factory,
                 )
             }
@@ -170,12 +184,16 @@ object RemoteModelFactory {
     /**
      * 是否注入 DeepSeek 系定制参数 `thinking.type=disabled`。
      *
-     * 仅已知兼容的 OpenAI 协议供应商注入；OpenAI 官方（收到未知参数 400）与
-     * Anthropic 原生协议（无此参数语义）不注入。无 providerId 的旧配置保持历史行为（注入）。
+     * 并集规则（分层 runtime M1）：providerId 白名单 ‖ 空 providerId 旧配置历史行为 ‖
+     * baseUrl host 标记。OpenAI 官方（收到未知参数 400）与 Anthropic 原生协议
+     *（无此参数语义）不注入。云端 Agent 的 providerId 恒非空（"server-cloud-agent"），
+     * 注入判定由 host 标记精确接管；端侧存量路径不受影响。
      */
     private fun shouldInjectThinkingDisabled(config: RemoteModelConfig): Boolean {
         if (config.protocol != RemoteProtocol.OPENAI) return false
-        return config.providerId.isBlank() || config.providerId in THINKING_DISABLED_PROVIDERS
+        return config.providerId.isBlank() ||
+            config.providerId in THINKING_DISABLED_PROVIDERS ||
+            THINKING_DISABLED_HOST_MARKERS.any { config.baseUrl.contains(it, ignoreCase = true) }
     }
 
     private val THINKING_DISABLED_PROVIDERS = setOf(
@@ -183,6 +201,12 @@ object RemoteModelFactory {
         "kimi-official",
         "deepseek-official",
     )
+
+    /**
+     * DeepSeek 系上游的 baseUrl host 标记（分层 runtime M1 自 server
+     * AgentExecutorFactory.THINKING_DISABLED_HOSTS 收口，两表口径一致）。
+     */
+    private val THINKING_DISABLED_HOST_MARKERS = listOf("tokenhub", "moonshot", "deepseek")
 
     // object 内可直接声明 const val（companion 仅在 class 内需要；standalone object 内
     // 嵌套 companion 非法——曾踩此编译错）。createKoogExecutor 引用此常量。

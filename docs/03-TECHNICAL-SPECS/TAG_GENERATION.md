@@ -850,7 +850,7 @@ for (i in 0 until n)          // n = 所有 face embedding 数量
 |------|------|------|
 | 英文界面搜索无结果 | `media_assets.labels` 中存储的是中文 JSON（如 `["猫","户外"]`），`LIKE '%cat%'` 无法命中 | 英文用户无法通过自然语言检索照片 |
 | TAG 重生成成本高 | 三阶段生成涉及 InsightFace 人脸检测、Glint360K R100 Embedding、DBSCAN 聚类、Qwen 视觉推理，全量重跑耗时耗电 | 不能因为切换语言就要求用户重新扫描所有照片 |
-| Prompt 与提示词中文硬编码 | `TagGenerationPipeline.stage3SystemPrompt`、`AutoTagCapability` 描述、`MediaSearchEngine` 的 LLM prompt、搜索停用词/城市词均为中文 | Agent 在英文界面仍用中文与用户交互 |
+| Prompt 与提示词中文硬编码 | `TagGenerationPipeline.stage3SystemPrompt`、`MediaSearchEngine` 的 LLM prompt、搜索停用词/城市词均为中文 | Agent 在英文界面仍用中文与用户交互 |
 | UI 直接展示中文 TAG | `MediaPager` 等详情页把 `labels` 原样显示 | 英文用户看到 “男/女/户外” 体验割裂 |
 
 红线约束：

@@ -114,3 +114,9 @@ tasks.register("checkCommonMainPurity") {
 tasks.matching { it.name in setOf("compileKotlinMetadata", "check") }.configureEach {
     dependsOn("checkCommonMainPurity")
 }
+
+// 分层 Agent runtime M1（2026-11-07）：server 经 composite build（includeBuild("..")）
+// 以模块坐标替换方式消费本模块 jvm 变体——group/name 即替换键，缺失则替换不生效。
+// project(":shared") 消费方（androidApp/engines）不受 group/version 影响。
+group = "com.mamba.picme"
+version = "1.0.0"

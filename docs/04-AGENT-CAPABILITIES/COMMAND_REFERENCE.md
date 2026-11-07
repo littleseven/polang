@@ -261,7 +261,7 @@ Agent: ✅ 已为你拍照
 
 ## 4. 标签生成命令
 
-**Capability**: `auto_tag`（⚠️ 2026-08-03 核实：`AutoTagCapability` 代码存在但未注册到 `CapabilityRegistry`；CHAT 场景实际生效路径为 `ChatStartTagScanCapability` 的 `start_tag_scan`，详见 CAPABILITY_REGISTRY.md §8）  
+**Capability**: `auto_tag`（`AutoTagCapability` 已于 2026-11-07 删除；实际生效路径为 CHAT 场景 `ChatStartTagScanCapability` 的 `start_tag_scan`）  
 **活跃场景**: `GALLERY`
 
 | 自然语言 | 解析命令 | 说明 |

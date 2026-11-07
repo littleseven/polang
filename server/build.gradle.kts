@@ -59,6 +59,10 @@ dependencies {
         exclude(group = "ai.koog", module = "serialization-jackson")
     }
 
+    // :shared jvm 变体（composite build 替换；分层 Agent runtime M1：契约/策略/执行器同源）。
+    // Kotlin("jvm") 消费方经 Gradle Module Metadata 自动选中 jvm 变体。
+    implementation("com.mamba.picme:shared:1.0.0")
+
     // 测试（server 首次引入测试基建）
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")

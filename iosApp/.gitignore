@@ -1,7 +1,7 @@
 xcuserdata/
 *.xcuserstate
 DerivedData/
-Frameworks/MNN.framework
+# Frameworks/MNN.framework 已入库（CI 可复现，2026-11-07；更新须双端同步重提）
 Frameworks/SharedKit.xcframework/
 !Frameworks/.gitkeep
 *.task

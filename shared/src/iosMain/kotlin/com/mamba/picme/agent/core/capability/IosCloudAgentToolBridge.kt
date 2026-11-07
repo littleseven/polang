@@ -29,7 +29,8 @@ import kotlinx.coroutines.CancellationException
  * - 写类工具（delete/share/select 等）不在映射表——云端会话里即未知工具（M2 只读三件套）。
  *
  * 工具名/错误前缀/截断常量的 SSOT = commonMain [CloudAgentToolContract]（M3 收口，
- * Android DeviceToolExecutor 同源；server 与 Swift 侧持字面量副本，改动须同步核对）。
+ * Android DeviceToolExecutor 与 server DeviceToolService（分层 runtime M1，composite
+ * build 真引用）同源；仅 Swift 侧持字面量副本，改动须同步核对）。
  * 出端结果一律过 [CloudToolProjectionGate] 投影闸（混合架构 M1，fail-closed），与 Android DeviceToolExecutor 同闸。
  *
  * 信号 6 铁律：一切异常（除 [CancellationException] 透传）在 Kotlin 侧兜底为 error 前缀字符串，

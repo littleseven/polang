@@ -5,26 +5,9 @@ import android.net.Uri
 sealed class Screen(val route: String) {
     /** 主页面容器：内部以 HorizontalPager 承载 相册/相册整理/聊天/人物 4 页 */
     data object Main : Screen("main")
-    data object Chat : Screen("chat")
     /** 任务中心（工程师任务跨会话集中管理，spec US-12~16）：进行中/历史分区 + 审批动作；入口在 Chat 顶栏任务图标 */
     data object TaskCenter : Screen("task_center")
     data object Camera : Screen("camera")
-    data object Gallery : Screen("gallery") {
-        const val ROUTE_WITH_ARGS = "gallery?query={query}&personId={personId}"
-        const val ARG_QUERY = "query"
-        const val ARG_PERSON_ID = "personId"
-        fun createRoute(query: String = "", personId: Long = 0L): String {
-            val params = buildList {
-                if (query.isNotBlank()) {
-                    add("$ARG_QUERY=${java.net.URLEncoder.encode(query, "UTF-8")}")
-                }
-                if (personId > 0L) {
-                    add("$ARG_PERSON_ID=$personId")
-                }
-            }
-            return if (params.isEmpty()) route else "$route?${params.joinToString("&")}"
-        }
-    }
     // 注：原 tag_control 路由已于 2026-09-06 并入整理+扫描合并页（Pager 页 1 SCAN Tab）
     data object Settings : Screen("settings")
     data object SettingsCategory : Screen("settings/{category}") {

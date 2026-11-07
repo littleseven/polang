@@ -9,7 +9,8 @@ package com.mamba.picme.server.agent
  *    结构校验 + 布局门禁，非法 → correctInvalidProgram 节点携带错误清单回环）；
  * 2. [OpenUiTurnNative.ensureValidProgram] 终结落流前兜底校验。
  *
- * 结构级轻量校验（server 不依赖 :shared，DeviceToolService 字面量副本先例）：
+ * 结构级轻量校验（OpenUI 白名单资产与 shared 字面量副本同源——L7 产出协议层资产，
+ * 分层 runtime M1 未收口；真引用化属后续里程碑）：
  * 不跑完整 parser，只做正则级——root 入口存在性 / 组件名白名单 /
  * Query local_handle 形态 / program 长度上限
  * （对齐 render_html 128_000 先例）+ 隐私投影禁令（媒体路径禁入 program）+
