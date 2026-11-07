@@ -1334,29 +1334,31 @@ object AdminViews {
                             br(); +"已注册账号的上限按行独立，请在「用户详情」页单独调整。"
                         }
                     }
-                    form(action = "/admin/settings", method = FormMethod.post, classes = "form-grid") {
-                        div("field") {
-                            label { +"新注册账号上限（free，>0）" }
-                            input(type = InputType.number, name = "free_llm_quota") {
-                                value = snap.freeLlmQuota.toString()
-                                attributes["min"] = "1"
+                    form(action = "/admin/settings", method = FormMethod.post, classes = "quota-form") {
+                        div("quota-row") {
+                            div("quota-field") {
+                                label { +"新注册账号上限"; span("label-hint") { +"free · >0" } }
+                                input(type = InputType.number, name = "free_llm_quota") {
+                                    value = snap.freeLlmQuota.toString()
+                                    attributes["min"] = "1"
+                                }
+                            }
+                            div("quota-field") {
+                                label { +"访客设备上限"; span("label-hint") { +"guest · >0" } }
+                                input(type = InputType.number, name = "guest_llm_quota") {
+                                    value = snap.guestLlmQuota.toString()
+                                    attributes["min"] = "1"
+                                }
+                            }
+                            div("quota-field") {
+                                label { +"Browser 每日会话配额"; span("label-hint") { +"browser · >0" } }
+                                input(type = InputType.number, name = "browser_daily_quota") {
+                                    value = snap.browserDailyQuota.toString()
+                                    attributes["min"] = "1"
+                                }
                             }
                         }
-                        div("field") {
-                            label { +"访客设备上限（guest，>0）" }
-                            input(type = InputType.number, name = "guest_llm_quota") {
-                                value = snap.guestLlmQuota.toString()
-                                attributes["min"] = "1"
-                            }
-                        }
-                        div("field") {
-                            label { +"Browser 每日会话配额（browser，>0）" }
-                            input(type = InputType.number, name = "browser_daily_quota") {
-                                value = snap.browserDailyQuota.toString()
-                                attributes["min"] = "1"
-                            }
-                        }
-                        div("form-actions") {
+                        div("quota-actions") {
                             input(type = InputType.submit, classes = "btn") { value = "保存" }
                         }
                     }
@@ -2448,7 +2450,9 @@ object AdminViews {
                         .field input,.whitelist-add input{width:160px;padding:10px 12px;border:1px solid #d9d9d9;border-radius:var(--r-sm);font-size:var(--fs-md);transition:border-color .2s}
                         .field input:focus,.whitelist-add input:focus{outline:none;border-color:var(--c-primary);box-shadow:0 0 0 3px var(--c-primary-ring)}
                         .whitelist-add{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
-                        .whitelist-add input{width:280px}
+                        /* 只放宽邮箱框——此前 input 选择器把提交钮也拉到 280px（绿扁钮 bug） */
+                        .whitelist-add input[type=email]{width:280px;padding:8px 12px}
+                        .whitelist-add input[type=submit]{width:auto}
                         .empty-state{text-align:center;padding:32px 24px;color:var(--c-text-3);font-size:var(--fs-md);border:1px dashed var(--c-border);border-radius:var(--r-md)}
                         .settings-section table{border-radius:var(--r-md)}
                         .settings-section .form-actions{border-top:none;margin-top:0;padding-top:0;justify-content:flex-end}
@@ -2574,6 +2578,15 @@ object AdminViews {
                         .th-head{display:flex;align-items:center;gap:8px;padding:12px 16px 8px}
                         .th-title{font-size:var(--fs-md);font-weight:600;color:var(--c-text)}
                         .th-empty{color:var(--c-text-3);font-size:var(--fs-sm);padding:16px;text-align:center;border-top:1px solid #f0f0f0}
+                        /* 系统设置 v2（2026-11-07）：额度表单标签上置 + 按钮右对齐带分隔线 */
+                        .quota-form{display:flex;flex-direction:column;gap:14px}
+                        .quota-row{display:flex;gap:16px;flex-wrap:wrap}
+                        .quota-field{flex:1;min-width:220px}
+                        .quota-field label{display:block;font-size:var(--fs-sm);color:var(--c-text-2);font-weight:500;margin-bottom:6px}
+                        .quota-field .label-hint{color:var(--c-text-3);font-weight:400;margin-left:4px;font-size:var(--fs-xs)}
+                        .quota-field input{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:var(--r-sm);font-size:var(--fs-md);box-sizing:border-box;transition:border-color .2s}
+                        .quota-field input:focus{outline:none;border-color:var(--c-primary);box-shadow:0 0 0 3px var(--c-primary-ring)}
+                        .quota-actions{display:flex;justify-content:flex-end;padding-top:12px;border-top:1px solid #f0f0f0}
                         @media (max-width:640px){
                         @media (max-width:900px){
                         .sidebar{position:static;width:auto;height:auto;flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--c-border);overflow:visible}
@@ -2668,9 +2681,9 @@ object AdminViews {
                 form(action = "/admin/settings/whitelist", method = FormMethod.post, classes = "inline") {
                     input(type = InputType.email, name = "email") {
                         placeholder = "user@example.com"
+                        attributes["aria-label"] = "白名单邮箱"
                     }
-                    +" "
-                    input(type = InputType.submit, classes = "btn-sm btn-go") { value = "添加" }
+                    input(type = InputType.submit, classes = "btn-sm btn-primary") { value = "添加" }
                 }
             }
             if (entries.isEmpty()) {
