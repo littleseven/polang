@@ -60,7 +60,9 @@ server/
 │   │   ├── ClaudeToolResultRoute.kt # POST /v1/claude-tool-result — App tool 结果回传
 │   │   ├── IssueReportRoute.kt   # POST /v1/report-issue — 用户问题上报
 │   │   ├── BrowserRoute.kt       # /v1/browser/{open,action,close} + GET /v1/browser/frame + WS /v1/browser/ws — 云端浏览器网关
-│   │   └── DownloadRoute.kt      # GET /download — 资源下载 + iOS 安装（/download/ios、manifest.plist、udid 注册）
+│   │   ├── DownloadRoute.kt      # GET /download — 资源下载 + iOS 安装（/download/ios、manifest.plist、udid 注册）
+│   │   ├── AppLatestRoute.kt     # GET /api/app/latest — OTA 版本查询（COS metadata 通道）
+│   │   └── WebSearchRoute.kt     # POST /v1/web-search — 网页搜索网关（DeepSeek Search API）
 │   ├── browser/
 │   │   ├── BrowserBridgeClient.kt    # xuxing bridge HTTP/WS 客户端（X-Bridge-Token，available 探测 + wsUrl 拼 WS 地址）
 │   │   ├── BrowserConcurrencyRegistry.kt # per-user 并发=1 内存租约（默认 15min，不变式：> bridge hardCap 10min 防活跃会话被 sweep 双活；重启即清，条件释放防误删新租约）
@@ -140,7 +142,7 @@ server/
 │   ├── 012_agent_session.sql     # 云端 Agent 会话域（ADR-018）
 │   ├── 013_llm_call_log_cached_tokens.sql  # prompt 前缀缓存命中列（2026-10-17）
 │   └── seed_rules.sql            # 初始推荐规则
-├── src/test/kotlin/              # 测试基建（下列为示意，实际 40 个 *Test.kt + 2 个辅助类）
+├── src/test/kotlin/              # 测试基建（下列为示意，实际 75 个 *Test.kt + 4 个辅助类）
 │   ├── ChannelRepositoryTest.kt
 │   ├── AdminRoutesTest.kt
 │   └── TokenUsageTest.kt

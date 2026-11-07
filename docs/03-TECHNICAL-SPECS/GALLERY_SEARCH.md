@@ -261,7 +261,7 @@ data class TimeRange(
 | **命令定义** | `shared/.../model/command/AgentCommands.kt`（commonMain） | `SearchMedia` / `RefineMediaSearch` 等 |
 | ~~**本地 Prompt**~~ | ~~`inference/local/prompt/LocalPromptBuilder.kt`~~ | 已随端侧文本 LLM 移除（2026-08-02） |
 | ~~**本地解析器**~~ | ~~`inference/local/parser/LocalCommandParser.kt`~~ | 已随端侧文本 LLM 移除（2026-08-02） |
-| **远程 Prompt** | `shared/.../inference/remote/prompt/RemotePromptBuilder.kt`（commonMain） | Tool Spec 中定义 `intent` 参数 |
+| **远程 Prompt** | `shared/.../inference/remote/prompt/ChatPromptRules.kt`（commonMain，chat system prompt 规则段）+ `agent/core/remote/config/RemoteModelFactory`（协议分流/工具注入） | 原 `RemotePromptBuilder` 已于 2026-11-07 删除，prompt 由上述两者组装 |
 | ~~**远程解析器**~~ | ~~`inference/remote/parser/ToolCallCommandParser.kt`~~ | 已随 Phase 5 删除（tool_calls 由 Koog agent 循环内直接 `CapabilityRegistry.dispatch`） |
 | **Chat 搜索能力** | `features/chat/capability/ChatSearchCapability.kt` | CHAT 场景搜索命令分发 |
 | **Chat 执行层** | `features/chat/ChatViewModel.kt` | `SearchIntent` → `StructuredFilter` → `MediaSearchEngine.search(filter)` |

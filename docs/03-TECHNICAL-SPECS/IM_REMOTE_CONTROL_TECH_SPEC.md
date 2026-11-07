@@ -57,7 +57,7 @@
 |------|------|------|----------|
 | **FeishuChannelHandler** | Android 端 (`domain/agent/remote/`) | 飞书 WebSocket 连接、消息接收/回复、图片上传 | 飞书 OAPI SDK (`com.larksuite.oapi:oapi-sdk:2.5.3`) |
 | **RemoteCommandDispatcher** | Android 端 (`domain/agent/remote/`) | 命令解析、LLM 意图理解、Capability 分派 | Kotlin + 现有 LLM 链路 |
-| **RemoteControlCapability** | Android 端 (`domain/agent/capability/`) | 设备绑定状态管理、操作审计 | Kotlin + Capability 接口 |
+| ~~**RemoteControlCapability**~~ | ~~Android 端 (`domain/agent/capability/`)~~ | 已于 2026-11-07 删除；设备绑定状态管理、操作审计由 RemoteChannel 路径承担 | — |
 | **RemoteChatEngine / RemoteReActAgent** | Android 端（复用现有） | 复杂意图的 LLM 解析 | 现有远程推理链路（经 AgentOrchestrator） |
 
 ---
@@ -187,9 +187,9 @@ class RemoteCommandDispatcher(
 | **自然语言** | LLM 解析 | `"帮我优化这张照片"` → LLM → `edit_image / ai_optimize` |
 | **组合命令** | LLM 分解 | `"裁剪成1:1再调亮"` → LLM → `[crop(1:1), brightness(+20)]` |
 
-### 3.3 RemoteControlCapability
+### 3.3 RemoteControlCapability（已删除）
 
-与现有实现一致（见 `RemoteControlCapability.kt`），管理设备绑定状态、自动确认模式，不通过 AgentCommand 密封类分发。
+该 Capability 类已于 2026-11-07 删除（此前即未注册到 `CapabilityRegistry`，无代码引用）；设备绑定状态管理与操作审计现由 RemoteChannel 多通道路径承担。
 
 ### 3.4 图片回传流程
 
@@ -205,8 +205,8 @@ class RemoteCommandDispatcher(
 ## 4. 设备绑定流程
 
 1. App 内生成绑定码 → 在飞书 Bot 中输入绑定码（或扫码）
-2. `FeishuChannelHandler` 收到绑定消息 → `RemoteControlCapability.updateBinding()`
-3. `RemoteControlCapability` 记录绑定状态
+2. `FeishuChannelHandler` 收到绑定消息 → RemoteChannel 路径更新绑定状态（原 `RemoteControlCapability.updateBinding()` 所属类已于 2026-11-07 删除）
+3. 绑定状态由 RemoteChannel 路径记录
 4. 通过飞书回复「设备 Xiaomi 15 Ultra 已绑定成功 ✅」
 
 **首次绑定的安全性**：
@@ -410,7 +410,6 @@ class RemoteCommandDispatcher(
 | `../../docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md` | Agent 架构详细设计 |
 | `../../docs/02-ARCHITECTURE/AGENT_ARCHITECTURE.md` | 远程推理架构（LLM 复用层） |
 | `../../app/.../domain/agent/remote/FeishuChannelHandler.kt` | 飞书通道实现（待实现） |
-| `../../app/.../domain/agent/capability/RemoteControlCapability.kt` | 远程控制管理 Capability |
 
 ---
 

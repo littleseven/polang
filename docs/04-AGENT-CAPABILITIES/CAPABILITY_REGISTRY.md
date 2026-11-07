@@ -22,10 +22,7 @@
 5. [SettingsCapability](#5-settingscapability)
 6. [NavigationCapability](#6-navigationcapability)
 7. [SystemCapability](#7-systemcapability)
-8. [AutoTagCapability](#8-autotagcapability)
 9. [AiOptimizeCapability](#9-aioptimizecapability)
-10. [RemoteControlCapability](#10-remotecontrolcapability)
-11. [BeautyCapability（非 Agent 编排）](#11-beautycapability非-agent-编排)
 12. [PersonRelationCapability](#12-personrelationcapability)
 13. [MemoryCapability](#13-memorycapability)
 14. [ImageEditCapability](#14-imageeditcapability)
@@ -44,7 +41,6 @@
 | **SettingsCapability** | `settings` | SETTINGS | 5 | ✅ 已落地 | 应用级单例 + 页面 delegate |
 | **NavigationCapability** | `navigation` | ALL | 2 | ✅ 已落地 | Activity 级（MainActivity） |
 | **SystemCapability** | `system` | ALL | 2 | ✅ 已落地 | Activity/Service 级 |
-| **AutoTagCapability** | `auto_tag` | GALLERY | 4 | ⚠️ 代码存在但未注册 | 应用级（实际生效路径为 CHAT 场景的 ChatStartTagScanCapability） |
 | **AiOptimizeCapability** | `ai_optimize` | GALLERY, CHAT | 1 | ✅ 已落地 | 应用级 |
 | **PersonRelationCapability** | `person_relation` | CHAT | 3 | ✅ 已落地 | 应用级（AppContainer 注入 PersonRepository） |
 | **MemoryCapability** | `memory_facts` | CHAT | 3 | ✅ 已落地 | 应用级（AppContainer 注入 MemoryRepository） |
@@ -53,11 +49,9 @@
 | **ChatRunScriptCapability** | `chat_run_script` | CHAT | 3 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（端侧 QuickJS 沙箱，命令 `run_gallery_script` / `draw_chart` / `render_html`） |
 | **ChatMediaWriteCapability** | `chat_media_write` | CHAT | 3 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（CHAT 场景媒体写执行汇聚点：`delete_media` / `favorite_media` / `select_media`） |
 | **ImageEditCapability** | `image_edit` | CHAT | 1 | ✅ 已落地 | 应用级（AppContainer 注入 ChatEditProcessor / ChatEditStateHolder，对话式图片编辑 `edit_image`） |
-| **RemoteControlCapability** | `remote_control` | ALL | 0 | ⚠️ 代码存在但未注册 | 应用级单例，不走 AgentCommand 路由；IM 远程控制实际走 RemoteChannel 多通道路径（未 Capability 化） |
-| **BeautyCapability** | — | — | — | ✅ 已落地 | 测试/程序化 API，不注册到 Agent 编排 |
 
 > **变更说明（2026-07-06）**：
-> - 新增 `AutoTagCapability`、`AiOptimizeCapability`、`RemoteControlCapability`
+> - 新增 `AutoTagCapability`、`AiOptimizeCapability`、`RemoteControlCapability`（其中 `AutoTagCapability` / `RemoteControlCapability` 已于 2026-11-07 删除代码）
 > - 移除 `AccessibilityCapability`（当前代码库中不存在对应实现）
 > - 移除 `EditCapability`（编辑页独立路由的 Capability，非 CHAT 场景；注意不要与后来新增的 `ImageEditCapability` 混淆——后者是 CHAT 场景对话式编辑、已注册生效，见 2026-08-03 变更说明）
 > - `CameraCapability` 命令从 11 个增加到 12 个（新增 `delay`）
@@ -89,8 +83,8 @@
 > - 补登 `ImageEditCapability`（`image_edit`，CHAT 场景对话式图片编辑，`edit_image` 命令）：在 `PoLangApplication.initializeCapabilities()` 注册（`container.imageEditCapability`），由 `ChatToolService.editImage()` @Tool 暴露，**已在 §1 表与 §1.1 CHAT 场景映射中补列，并新增 §14 章节**。它与 2026-07-06 移除的 `EditCapability`（编辑页独立路由方向）不是同一个能力，不跳编辑页
 > - 登记 `adjust_image` 工具表面：`ChatToolService.adjustImage()` @Tool（brightness / contrast / saturation / temperature 显式参数调整）是 CHAT 场景真实可用工具，但为 **inline handler，不经 CapabilityRegistry 分发**，无对应 AgentCommand/Capability，故不列入能力表，详见 §14.3
 > - `PersonRelationCapability` 命令数 2 → 3：补登 `query_person_relation`（`ChatToolService.list_person_relations` @Tool 分发 `AgentCommand.QueryPersonRelation`）
-> - `AutoTagCapability` 状态由「✅ 已落地」更正为「⚠️ 代码存在但未注册」：全工程无 `registerCapability` 调用点，其命令在 GALLERY 场景实际不可达；实际生效路径为 CHAT 场景的 `ChatStartTagScanCapability`（`start_tag_scan`）
-> - `RemoteControlCapability` 状态由「✅ 已落地」更正为「⚠️ 代码存在但未注册」：IM 远程控制实际走 RemoteChannel 多通道路径（2026-07-27 重新激活），未按 Capability 化设计落地
+> - `AutoTagCapability` 状态由「✅ 已落地」更正为「⚠️ 代码存在但未注册」：全工程无 `registerCapability` 调用点，其命令在 GALLERY 场景实际不可达；实际生效路径为 CHAT 场景的 `ChatStartTagScanCapability`（`start_tag_scan`）（2026-11-07 已删除代码）
+> - `RemoteControlCapability` 状态由「✅ 已落地」更正为「⚠️ 代码存在但未注册」：IM 远程控制实际走 RemoteChannel 多通道路径（2026-07-27 重新激活），未按 Capability 化设计落地（2026-11-07 已删除代码）
 >
 > **变更说明（2026-09-26，意图路由 M1/M2 工具面对齐，spec《意图路由契约与意图路由器》）**：
 > - chat **工具面**移除 `view_media`（ChatToolService/ChatToolManifest 同步删除）：chat 场景 view_media 无 delegate 必败，属工具陷阱；**`GalleryCapability.view_media` 命令保留不动**（GALLERY 场景 capability 层与 iOS 侧不变）
@@ -110,7 +104,7 @@
 | `DEBUG` | NavigationCapability, SystemCapability |
 | `UNKNOWN` | NavigationCapability, SystemCapability |
 
-> **注**：`AutoTagCapability`（代码存在但未注册，见 §8）与 `RemoteControlCapability`（代码存在但未注册，IM 远程控制走 RemoteChannel 多通道路径，见 §10）均未注册到 `CapabilityRegistry`，不参与任何场景的实际分发，故未列入上表。
+> **注**：`AutoTagCapability`、`RemoteControlCapability`、`BeautyCapability` 三个类已于 2026-11-07 作为死代码从代码中删除。历史上前两者均未注册到 `CapabilityRegistry`（AutoTag 实际生效路径为 CHAT 场景的 `ChatStartTagScanCapability`，IM 远程控制实际走 RemoteChannel 多通道路径），`BeautyCapability` 本就不注册到 Agent 编排，故三者均不在上表。
 
 ### 1.2 JS 沙箱能力表面（`gallery.*` handler ↔ AgentCommand 映射）
 
@@ -354,31 +348,6 @@
 
 - **应用级**：在 `Application.onCreate()` 中注册
 - 实际优化逻辑委托给 `AiOptimizeUseCase`
-
----
-
-## 11. BeautyCapability（非 Agent 编排）
-
-**职责**: 提供美颜调节的标准化程序化能力，支持生产代码和测试直接调用  
-**文件**: `androidApp/src/main/java/com/mamba/picme/capability/BeautyCapability.kt`  
-**状态**: ✅ 已落地
-
-### 10.1 支持操作
-
-| 操作 | 参数 | 描述 |
-|------|------|------|
-| `adjustSmoothing` | `smoothness: Float` | 调整磨皮 |
-| `adjustWhitening` | `whitening: Float` | 调整美白 |
-| `adjustSlimFace` | `slimFace: Float` | 调整瘦脸 |
-| `adjustBigEyes` | `bigEyes: Float` | 调整大眼 |
-| `applyAllEffects` | `settings: BeautySettings` | 应用所有美颜效果 |
-| `batchTest` | `paramSets: List<BeautySettings>` | 批量测试多组参数 |
-
-### 10.2 说明
-
-- `BeautyCapability` **不注册到 `CapabilityRegistry`**，不作为 Agent 可编排能力
-- 供测试引擎、自动化测试或业务代码直接调用
-- 若未来需要 Agent 控制美颜参数，应通过 `CameraCapability.adjust_beauty` 命令
 
 ---
 

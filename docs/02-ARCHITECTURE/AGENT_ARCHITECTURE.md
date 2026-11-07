@@ -86,7 +86,7 @@
 - `InferenceRouter` — 拆分为 `LocalInferencePipeline` + `RemoteReActAgent` 两条独立链路（前者已于 2026-08-02 随端侧文本 LLM 移除）
 - `ToolCallingChatLanguageModel` — 远程直接使用 langchain4j 原生 `OpenAiChatModel`
 - `ToolCallingOutputParser` — 远程使用标准 OpenAI `tool_calls` 响应格式
-- `ToolPromptBuilder` — 拆分为 `LocalPromptBuilder` + `RemotePromptBuilder`
+- `ToolPromptBuilder` — 拆分为 `LocalPromptBuilder` + `RemotePromptBuilder`（均已删除）
 - `AdaptiveStrategySelector` — 本地不再需要策略分级
 - `ToolOrchestrator` — 编排逻辑合并入 `RemoteReActAgent`
 - `SherpaMnnAsrEngine` + `com.k2fsa.sherpa.mnn.*` — 已迁移至 Sherpa-ONNX（`SherpaOnnxAsrEngine`）
@@ -273,7 +273,7 @@ class SceneManager {
 
 ### 3.2 Prompt 构建器（远程）
 
-端侧文本 LLM 移除后（2026-08-02），`LocalPromptBuilder` 已删除，仅保留远程 Prompt 构建（ADR-005 的本地/远程双构建器划分成为历史）：
+端侧文本 LLM 移除后（2026-08-02），`LocalPromptBuilder` 已删除；`RemotePromptBuilder` 亦已于 2026-11-07 删除——远程 prompt 现由 `RemoteModelFactory`（协议分流/工具注入）与 `ChatPromptRules`（chat system prompt 规则段，`inference/remote/prompt/`）组装（ADR-005 的本地/远程双构建器划分成为历史）。以下为 langchain4j 时期的历史设计：
 
 ```kotlin
 // 远程 Prompt — 标准 OpenAI 协议格式
@@ -608,7 +608,7 @@ suspend fun switchFilter(filter: String): String =
 | strict 模式兼容 | ToolSpec 自动添加 `additionalProperties: false` | `OpenAiChatModel` 内部处理 |
 | tool_choice 修复 | `REQUIRED` 正确映射为 `"required"`（非 `"auto"`） | `OpenAiChatModel` 内部处理 |
 | thinking 禁用（避免 content 回退） | DeepSeek 开启 thinking 会使 content 为空、tool_calls 缺失；请求自动附加 `thinking.type=disabled` 使模型直接返回标准 tool_calls，无需 content 回退解析 | `RemoteModelFactory` |
-| Prompt 规范 | 禁止在 Prompt 中提供具体 tool_calls JSON 示例，避免模型输出到 content | `RemotePromptBuilder` |
+| Prompt 规范 | 禁止在 Prompt 中提供具体 tool_calls JSON 示例，避免模型输出到 content | `ChatPromptRules`（原 `RemotePromptBuilder`，已删除） |
 
 ### 4.6 性能与成本考量
 
@@ -725,7 +725,7 @@ sealed class AgentCommand {
 | **对话** | 文本回复/聊天 | `TextReply` | CameraCapability | 已验证 |
 | **相册搜索** | 自然语言搜照片（含 LLM 意图标准化） | `SearchMedia` | GalleryCapability / ChatSearchCapability | 已验证 |
 | **相册搜索** | 多轮结果细化（in-set 过滤） | `RefineMediaSearch` | ChatSearchCapability | 已验证 |
-| **远程控制** | 飞书/Telegram 消息处理 | 多种 | RemoteChannelManager（RemoteControlCapability 存在但未注册） | ✅ 已落地 |
+| **远程控制** | 飞书/Telegram 消息处理 | 多种 | RemoteChannelManager（RemoteControlCapability 已于 2026-11-07 删除，IM 走 RemoteChannel 路径） | ✅ 已落地 |
 
 #### V2 新增功能（开发中）
 
@@ -894,7 +894,7 @@ class AiAgentUseCase(
 
 ### Phase 2: L2 Batch 模式 (RD) — 已完成
 - [x] `agent-task:remote-l2-001` 实现 `RemoteOrchestrator.processBatch()`（tool_calls 解析）
-- [x] `agent-task:remote-l2-002` 设计 `RemotePromptBuilder`（ToolSpecification 格式）
+- [x] `agent-task:remote-l2-002` 设计 `RemotePromptBuilder`（ToolSpecification 格式；已删除）
 - [x] `agent-task:remote-l2-003` UI 层适配批量命令串行执行
 
 ### Phase 3: L3 Plan 模式 (RD) — 已完成
@@ -924,7 +924,7 @@ class AiAgentUseCase(
 **P0（已完成）**
 
 1. JSON 解析改用 kotlinx.serialization
-2. System Prompt 提取为 LocalPromptBuilder / RemotePromptBuilder
+2. System Prompt 提取为 LocalPromptBuilder / RemotePromptBuilder（均已删除）
 3. MemoryManager 引入内存缓存 + 批量刷盘
 4. 本地/远程协议彻底分离（ADR-005）
 5. 远程推理引入 langchain4j 标准化（2026-08 已迁移 Koog）
