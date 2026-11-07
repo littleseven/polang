@@ -1,5 +1,6 @@
 # 分层 Agent runtime M1.5 + M2 实施计划
 
+> **状态**：✅ 已交付（Task 1~7 全绿，合 main）
 > **Spec**：`docs/superpowers/specs/2026-11-07-layered-agent-runtime-design.md`
 > **前置**：M1 已合 main（composite build + L1 契约描述 / L2 策略 / L3 执行器三份双写消灭）
 > **目标**：

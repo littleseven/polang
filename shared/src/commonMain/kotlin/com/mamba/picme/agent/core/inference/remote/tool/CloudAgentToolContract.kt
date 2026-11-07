@@ -60,9 +60,9 @@ object CloudAgentToolContract {
         else text.take(MAX_RESULT_CHARS) + TRUNCATED_SUFFIX
 
     // ── 云端 LLM 可见描述 SSOT（2026-11-07 分层 runtime M1，自 server DeviceToolService
-    // 逐字收口）── server @Tool/@LLMDescription 注解直接引用下列 const（编译期常量，
-    // 跨模块可作注解实参）。投影承诺面与 CloudAgentToolCatalog.projectionSchema 同源；
-    // 改描述只改本区，禁止任何一侧持有字面量副本。
+    // 逐字收口）── M2 起由 CloudAgentToolCatalog 条目字段真引用（server 工具桥已改
+    // 目录驱动的编程式工具，@Tool/@LLMDescription 注解消费方退役）。投影承诺面与
+    // CloudAgentToolCatalog.projectionSchema 同源；改描述只改本区，禁止任何一侧持有字面量副本。
 
     const val DESC_GET_GALLERY_SUMMARY =
         "获取用户手机相册摘要（照片/视频总数、人物聚类数、已打标数等）。工具在用户设备上执行，结果以文本摘要回传（投影：仅计数与文本元数据，不含文件路径与媒体清单）。"
