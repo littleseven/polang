@@ -2,7 +2,6 @@ package com.mamba.picme.features.chat
 
 import com.mamba.picme.domain.chat.ClaudeAgentState
 import com.mamba.picme.domain.chat.ClaudeDeliverUi
-import com.mamba.picme.domain.chat.BrowserActionEntry
 import com.mamba.picme.domain.chat.EngineerTaskResolution
 import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
@@ -15,7 +14,6 @@ import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
-import com.mamba.picme.domain.chat.ToolPartState
 import com.mamba.picme.domain.chat.overlayLiveBrowserState
 import com.mamba.picme.domain.chat.overlayLiveTaskState
 import com.mamba.picme.domain.chat.roleOf
@@ -40,7 +38,6 @@ import com.mamba.picme.agent.core.model.context.toReplyLanguage
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.agent.core.capability.BrowserSessionCapability
-import com.mamba.picme.agent.core.capability.BrowserSessionDelegate
 import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
 import com.mamba.picme.agent.core.intent.IntentGuard
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
@@ -63,7 +60,6 @@ import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.decodePartsOrLegacy
 import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.data.local.toModelInputItems
-import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.ClaudeEvent
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.local.ChatMessageEntity
@@ -84,6 +80,7 @@ import com.mamba.picme.agent.core.inference.remote.tool.ChatToolService
 import com.mamba.picme.agent.core.model.context.GallerySummary
 import com.mamba.picme.agent.core.runtime.capability.CapabilityRegistry
 import com.mamba.picme.domain.repository.AndroidMediaRepository
+import com.mamba.picme.features.chat.browser.BrowserLiveSessionController
 import com.mamba.picme.features.chat.capability.ChatGallerySummaryCapability
 import com.mamba.picme.features.chat.capability.ChatMediaWriteCapability
 import com.mamba.picme.features.chat.capability.ChatRunScriptCapability
@@ -94,7 +91,6 @@ import com.mamba.picme.features.chat.engineer.EngineerTaskReducer
 import com.mamba.picme.features.chat.engineer.EngineerTaskSid
 import com.mamba.picme.features.chat.engineer.EngineerTaskSmokeSamples
 import com.mamba.picme.domain.chat.taskcenter.TaskCenterPartition
-import com.mamba.picme.domain.browser.BrowserStatus
 import com.mamba.picme.features.chat.js.CapabilityDispatchHandler
 import com.mamba.picme.features.chat.js.loadChartBootstrapJs
 import com.mamba.picme.features.chat.js.QuickJsEngine
@@ -150,11 +146,6 @@ internal const val OPENUI_STREAM_PREVIEW_ID = "openui_stream_preview_msg"
 private const val MEMORY_REBUILD_MESSAGE_LIMIT = 50
 /** ADR-016 M2：任务卡 live 态 overlay 节流（SSE 高频事件不直接驱动全列表重组）。 */
 private const val ENGINEER_TASK_OVERLAY_THROTTLE_MS = 500L
-/** browser-vnc 直播卡 live 态 overlay 节流（与任务卡同 500ms 节拍；帧高频不直接驱动全列表重组）。 */
-private const val BROWSER_LIVE_OVERLAY_THROTTLE_MS = 500L
-/** turn 结束兜底 close 宽限期（M2.7 竞态修复）：给用户「事后进直播卡接管」的机会窗；
- * 须 < bridge idleTimeout 120s，保证宽限 close 先于 idle reap 触发（卡片拿得到 lastGoodFrame）。 */
-private const val BROWSER_SETTLE_GRACE_MS = 90_000L
 /** 直播卡工具族（spec §4）：动作进度由直播卡表达，不再出非卡片工具状态 chip。 */
 private val BROWSER_CARD_TOOL_NAMES = setOf(
     "browser_open", "browser_navigate", "browser_click", "browser_type",
@@ -214,9 +205,9 @@ private const val CLOUD_MODEL_LABEL = "cloud"
  * 本类 4697 行 + 26 字段依赖容器已到达 God class 临界点，**冻结膨胀**——
  * 新增能力禁止在本类增加字段/依赖/方法，一律走独立 delegate（既有先例
  * `WriteConfirmationController`）；向 `ChatViewModelDependencies` 加字段视同破坏冻结。
- * 允许的修改仅两类：既有行为修复、向 delegate 迁出（streaming/browser/cloud 三接缝
- * 拆分按审计排期推进）。`ChatScreen.kt`（3191 行）同样冻结：新 UI 区块一律进
- * `components/` 独立文件。
+ * 允许的修改仅两类：既有行为修复、向 delegate 迁出（browser 接缝已拆
+ * `browser/BrowserLiveSessionController`，streaming/cloud 按审计排期推进）。
+ * `ChatScreen.kt`（3191 行）同样冻结：新 UI 区块一律进 `components/` 独立文件。
  */
 @Suppress("TooManyFunctions", "LargeClass") // 膨胀冻结中：delegate 拆分排期见架构健康审计快照 P1
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -227,8 +218,7 @@ class ChatViewModel(
     ChatGallerySummaryCapability.Delegate,
     ChatRunScriptCapability.Delegate,
     ChatStartTagScanCapability.Delegate,
-    ChatMediaWriteCapability.Delegate,
-    BrowserSessionDelegate {
+    ChatMediaWriteCapability.Delegate {
 
     private val context = dependencies.context.applicationContext
 
@@ -298,6 +288,23 @@ class ChatViewModel(
 
     private val mediaFeedbackUseCase = MediaFeedbackUseCase(mediaFeedbackRepository)
     private val authClient = dependencies.picMeAuthClient
+
+    /**
+     * 浏览器直播卡会话控制器（P1-3b 拆出，实现见 [BrowserLiveSessionController]）。
+     * 冻结期新规：新能力一律照此模式走独立 delegate，回本类加字段视同破坏冻结。
+     */
+    private val browserLiveController = BrowserLiveSessionController(
+        scope = viewModelScope,
+        browserWebSocketClient = browserWebSocketClient,
+        capabilityProvider = ::browserSessionCapability,
+        chatMessageDao = chatMessageDao,
+        currentSessionId = { _currentSessionId.value },
+        stringContext = ::stringContext,
+        isTurnInFlight = { activeChatJob != null },
+        stopGeneration = ::stopGeneration,
+        feedToolOutput = ::feedToolOutput,
+        feedToolError = ::feedToolError,
+    )
 
     /** 本条回复是否走了 JS 动态沙箱（onRunScript 被调过）；每次 sendMessage 重置。 */
     @Volatile
@@ -409,15 +416,6 @@ class ChatViewModel(
     private val _engineerActionInFlight = MutableStateFlow<Set<String>>(emptySet())
     val engineerActionInFlight: StateFlow<Set<String>> = _engineerActionInFlight.asStateFlow()
 
-    /** 浏览器直播卡内存态：sessionId → 最新 live 态（Room 为持久层，此处为会话期间的 live 覆盖）。 */
-    private val _browserLiveSessions = MutableStateFlow<Map<String, MessagePart.BrowserLive>>(emptyMap())
-
-    /** 直播卡消息 id 序号兜底（同 [htmlMessageSeq] 先例：同毫秒多次定格防主键碰撞被 REPLACE 覆盖）。 */
-    private val browserMessageSeq = AtomicInteger(0)
-
-    /** 直播卡持久化 JSON（读侧 [decodePartsOrLegacy] 同款契约：未知字段忽略、默认值省略）。 */
-    private val browserPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
-
     /** OpenUI 卡持久化 JSON（与 converter 同配置，防 roundtrip 漂移；encodeDefaults=true 固定线格式）。 */
     private val cardPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -454,7 +452,7 @@ class ChatViewModel(
     private fun launchChatRound(block: suspend kotlinx.coroutines.CoroutineScope.() -> Unit) {
         // 新回合开始：flush 上个 turn 结束留下的宽限期 close（立即判定，防 per-user 并发=1
         // 席位被宽限期会话占住导致本回合 browser_open 撞 pool_exhausted，M2.7）
-        flushBrowserSettleCloses()
+        browserLiveController.flushBrowserSettleCloses()
         activeChatJob = viewModelScope.launch {
             val selfJob = coroutineContext[Job]
             try {
@@ -1218,12 +1216,12 @@ class ChatViewModel(
         _engineerTasks.sample(ENGINEER_TASK_OVERLAY_THROTTLE_MS).onStart { emit(_engineerTasks.value) }
 
     /**
-     * 直播卡 live 态的节流视图：帧/动作流水高频更新不直接驱动全列表重组。
-     * 首值直通 + 周期节流的语义同 [throttledEngineerTasks]。
+     * 直播卡 live 态的节流视图：实现已迁 [BrowserLiveSessionController.throttledLiveSessions]，
+     * 此为首值直通 + 周期节流语义的转发（UI 调用面不变）。
      */
     @VisibleForTesting
-    internal val throttledBrowserLiveSessions: Flow<Map<String, MessagePart.BrowserLive>> =
-        _browserLiveSessions.sample(BROWSER_LIVE_OVERLAY_THROTTLE_MS).onStart { emit(_browserLiveSessions.value) }
+    internal val throttledBrowserLiveSessions: Flow<Map<String, MessagePart.BrowserLive>>
+        get() = browserLiveController.throttledLiveSessions
 
     /**
      * UI 实际展示的消息列表：已持久化消息 + 流式临时消息；TASK_CARD 叠加工程师任务 live 态，
@@ -1361,24 +1359,8 @@ class ChatViewModel(
                 _guestMessageCount.value = count
             }
         }
-        // browser-vnc 直播卡：VM 作为会话事件出口（帧/动作流水只走 delegate 通道，不回灌 LLM）
-        browserSessionCapability()?.setDelegate(this)
-        // M2 WS 推流：帧事件 → _browserLiveSessions 原位覆写
-        browserWebSocketClient?.let { wsClient ->
-            viewModelScope.launch {
-                wsClient.frameEvents.collect { event ->
-                    onBrowserSessionFrame(event.sessionId, "", "", event.frameJpegBase64)
-                }
-            }
-            viewModelScope.launch {
-                wsClient.disconnectEvents.collect { event ->
-                    // 非主动断开（网络抖动/bridge 重启）：仅降级——卡片保留最后一帧，
-                    // 后续 HTTP 动作帧（delegate 通道）仍会更新；不把整条会话标失败
-                    // （WS 只是 watch 增强层，标失败会误伤进行中的会话并污染 reducer 终态）
-                    Log.w(TAG, "browser WS disconnected: session=${event.sessionId}, reason=${event.reason}")
-                }
-            }
-        }
+        // browser-vnc 直播卡：会话事件出口 + WS 帧/断连事件收集已拆 BrowserLiveSessionController（P1-3b）
+        browserLiveController.start()
     }
 
     private fun refreshClaudeAvailability(token: String) {
@@ -2175,7 +2157,7 @@ class ChatViewModel(
                 _isProcessing.value = false
                 _pendingNonCardTool.value = null
                 // browser 直播卡 turn 结束兜底：非终态会话 close + 定格落库，随后清空 live 态
-                settleBrowserSessionsAtTurnEnd()
+                browserLiveController.settleBrowserSessionsAtTurnEnd()
             }
         }
     }
@@ -3120,28 +3102,6 @@ class ChatViewModel(
     }
 
     /**
-     * 浏览器会话定格卡**落库**（type=tool_browser，content=BrowserLive JSON；partsJson 由
-     * [insertMessageWithParts] 自标量列现算——MessagePartsConverter 认 tool_browser 解回 BrowserLive）。
-     * 与 [emitChartMessage]/[emitHtmlCardMessage] 同理：消息列表由 DB Flow 驱动，卡片必须落库
-     * 才能跨重载持久。双显跳过（流式占位卡 vs 产物行）由 ChatScreen 的 persistedBrowserSessionIds
-     * 提取式自动生效（自非流式消息 parts 提取 sessionId 集合）。
-     */
-    private suspend fun emitBrowserCardMessage(finalPart: MessagePart.BrowserLive) {
-        val persisted = finalPart.copy(partId = "p0")
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = "browser_" + System.currentTimeMillis() + "_" + browserMessageSeq.incrementAndGet(),
-                sessionId = _currentSessionId.value,
-                type = "tool_browser",
-                role = "agent",
-                content = browserPartJson.encodeToString(MessagePart.BrowserLive.serializer(), persisted),
-                timestamp = System.currentTimeMillis(),
-                modelUsed = "browser"
-            )
-        )
-    }
-
-    /**
      * 端侧终判回写（HtmlCard 首次分流判定回调）：displayMode + 测高合并进 metadata `html_card`
      * 子对象（其余 key 不动），幂等——已持久化同值时跳过写库（重组重复回调不产 DB churn）。
      * 持久化后会话重开/列表回收后卡片形态不跳变（spec §4 稳定性）。
@@ -3268,298 +3228,24 @@ class ChatViewModel(
         persistentJsRuntime = null
         // adjustImageHandler 闭包捕获 this：ViewModel 销毁后必须摘除，否则进程级单例 ChatToolService 长期持有
         ChatToolService.getInstance().adjustImageHandler = null
-        // browser 直播卡 delegate 反注册（capability 是组合根单例，VM 销毁后不得继续持有）
-        browserSessionCapability()?.setDelegate(null)
-        // M2 WS 推流：断开所有活跃连接
-        browserWebSocketClient?.disconnectAll()
+        // browser 直播卡 delegate 反注册 + WS 全断（P1-3b 迁入 controller）
+        browserLiveController.shutdown()
     }
 
-    // ── BrowserSessionDelegate：云端浏览器直播卡 live 态（browser-vnc spec §4）─────────
+    // ── 浏览器直播卡（P1-3b 拆出，实现见 BrowserLiveSessionController；以下为 UI/turn 调用面转发）──
 
-    override fun onBrowserSessionStarted(sessionId: String, url: String, title: String, frameJpegBase64: String?) {
-        val entry = MessagePart.BrowserLive(
-            partId = "", // 以流式占位为准（overlay 归一化保留占位 partId，见 BrowserLiveOverlay）
-            sessionId = sessionId,
-            state = ToolPartState.INPUT_AVAILABLE,
-            currentUrl = url,
-            pageTitle = title,
-            frameJpegBase64 = frameJpegBase64,
-            actions = listOf(
-                BrowserActionEntry(description = formatBrowserAction(stringContext(), "open", null, url), ok = true)
-            ),
-            actionCount = 1,
-        )
-        _browserLiveSessions.update { it + (sessionId to entry) }
-        // browser_open 占位原位填充（拿到 sessionId；无在途调用时 feedToolOutput 内部 no-op）
-        viewModelScope.launch {
-            feedToolOutput(TurnPartsReducer.TOOL_BROWSER_OPEN) { toolCallId -> entry.copy(partId = toolCallId) }
-        }
-    }
+    fun watchBrowserSession(sessionId: String) = browserLiveController.watchBrowserSession(sessionId)
 
-    override fun onBrowserSessionAction(sessionId: String, action: String, selector: String?, text: String?, url: String, title: String, frameJpegBase64: String?) {
-        // delegate 回调来自能力执行线程，与 pollBrowserFrame(IO) 并发：RMW 必须走 update 原子 CAS，
-        // 否则旧快照回退会丢更新（最严重：帧回退终态写入 → settle 误判非终态重复 close/落卡）
-        _browserLiveSessions.update { sessions ->
-            val current = sessions[sessionId] ?: return@update sessions
-            sessions + (sessionId to current.copy(
-                currentUrl = url.ifBlank { current.currentUrl },
-                pageTitle = title.ifBlank { current.pageTitle },
-                frameJpegBase64 = frameJpegBase64 ?: current.frameJpegBase64,
-                actions = (current.actions + BrowserActionEntry(
-                    description = formatBrowserAction(stringContext(), action, selector, text ?: url)
-                )).takeLast(3),
-                actionCount = current.actionCount + 1,
-            ))
-        }
-    }
+    fun unwatchBrowserSession(sessionId: String) = browserLiveController.unwatchBrowserSession(sessionId)
 
-    override fun onBrowserSessionFrame(sessionId: String, url: String, title: String, frameJpegBase64: String) {
-        _browserLiveSessions.update { sessions ->
-            val current = sessions[sessionId] ?: return@update sessions
-            sessions + (sessionId to current.copy(
-                currentUrl = url.ifBlank { current.currentUrl },
-                pageTitle = title.ifBlank { current.pageTitle },
-                frameJpegBase64 = frameJpegBase64,
-            ))
-        }
-    }
+    fun sendBrowserAction(sessionId: String, action: String, params: JSONObject) =
+        browserLiveController.sendBrowserAction(sessionId, action, params)
 
-    override fun onBrowserSessionFailed(sessionId: String, reason: String) {
-        _browserLiveSessions.update { sessions ->
-            val current = sessions[sessionId] ?: return@update sessions
-            sessions + (sessionId to current.copy(state = ToolPartState.OUTPUT_ERROR, errorReason = reason))
-        }
-        // 有意不做门控：unknown session（live 态已被 settle 移除）时错误仍进流式轨，
-        // 让失败在工具调用链上留痕（对 oldest pending 通常 no-op，无视觉副作用）。
-        viewModelScope.launch { feedToolError(TurnPartsReducer.TOOL_BROWSER_OPEN, reason) }
-    }
+    fun takeControlBrowserSession(sessionId: String) = browserLiveController.takeControlBrowserSession(sessionId)
 
-    override fun onBrowserSessionClosed(sessionId: String, finalFrameJpegBase64: String?, actionCount: Int) {
-        browserUserControlledSessions -= sessionId // 会话关闭后受控豁免失效（防泄漏）
-        var finalPart: MessagePart.BrowserLive? = null
-        _browserLiveSessions.update { sessions ->
-            val current = sessions[sessionId] ?: return@update sessions
-            // 步数口径统一：bridge actionCount 只计 navigate/click/type/extract/screenshot（不含 open/close），
-            // 本地 current.actionCount 从 open=1 起累计。定格取 max(本地累计, bridge + open 1 步)，
-            // 防「流水 2 行却显示共 1 步」「纯 open 会话显示共 0 步」的口径漂移（Task 20 验收观察项 1/2）。
-            val displayCount = maxOf(current.actionCount, actionCount + 1)
-            val part = current.copy(
-                state = if (current.state == ToolPartState.OUTPUT_ERROR) ToolPartState.OUTPUT_ERROR else ToolPartState.OUTPUT_AVAILABLE,
-                frameJpegBase64 = finalFrameJpegBase64 ?: current.frameJpegBase64,
-                actionCount = displayCount,
-                resultSummary = if (current.errorReason == null) {
-                    stringContext().getString(R.string.browser_live_done_summary, displayCount)
-                } else {
-                    null
-                },
-            )
-            finalPart = part
-            sessions + (sessionId to part)
-        }
-        // 定格后保留在 map：overlay 持续把流式占位覆写为终态，Task 13 双显跳过依赖该状态；
-        // 清理统一在 turn 结束兜底（settleBrowserSessionsAtTurnEnd）
-        val persisted = finalPart ?: return
-        viewModelScope.launch { emitBrowserCardMessage(persisted) }
-    }
+    fun releaseBrowserSessionControl(sessionId: String) = browserLiveController.releaseBrowserSessionControl(sessionId)
 
-    /**
-     * 启动 WS 推流 watch（M2）：连接 bridge WebSocket，帧经 [BrowserWebSocketClient.frameEvents]
-     * 推送到 [_browserLiveSessions]。WS 不可用时回退 HTTP 轮询（spec §6 降级）。
-     */
-    fun watchBrowserSession(sessionId: String) {
-        browserWatchedSessions += sessionId
-        browserSettleJobs.remove(sessionId)?.cancel() // 观看中豁免宽限 close（竞态修复 M2.7）
-        val wsClient = browserWebSocketClient
-        if (wsClient != null) {
-            wsClient.connect(sessionId)
-        } else {
-            // 回退：WS 客户端未接线时走 HTTP 轮询（单测/降级场景）
-            pollBrowserFrame(sessionId)
-        }
-    }
-
-    /**
-     * 停止 WS 推流 watch（卡片离开组合/会话终态/暂停时调用）。
-     * 观看页退出且无回合在跑、未被接管：会话留着只会等 bridge idle reap 徒占并发席位——
-     * 立即 close 定格（turn 仍在跑则保留，用户可从卡片重进，M2.7）。
-     */
-    fun unwatchBrowserSession(sessionId: String) {
-        browserWatchedSessions -= sessionId
-        browserWebSocketClient?.disconnect(sessionId)
-        if (activeChatJob == null && sessionId !in browserUserControlledSessions) {
-            viewModelScope.launch(Dispatchers.IO) { closeBrowserSessionIfIdle(sessionId) }
-        }
-    }
-
-    /**
-     * 发送 takeover 动作到云端浏览器（HTTP 原文透传，M2.7 起不再走 WS）。
-     * action 为 bridge 动作名（clickAt / typeText / scroll / drag / key），params 为动作参数 JSON。
-     *
-     * 为什么不走 WS：推帧洪泛时 WS 下行被二进制帧占满，动作回执排队在帧后（真机实测 >13s 不到，
-     * 经代理空载实测 0.10s）——动作看似发出实则卡死。HTTP 通道独立于帧流，响应同步携带结果。
-     * 顺序保证：HTTP 无单通道顺序语义，按会话串行（scroll/typeText 乱序即事故）。
-     */
-    private val browserActionJobs = HashMap<String, Job>()
-
-    fun sendBrowserAction(sessionId: String, action: String, params: JSONObject) {
-        // bridge sessions.js 从动作体顶层读参数（body.x/body.y/...），params 必须平铺进动作对象
-        val payload = JSONObject().put("action", action)
-        val keys = params.keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            payload.put(key, params.get(key))
-        }
-        val prev = browserActionJobs[sessionId]
-        browserActionJobs[sessionId] = viewModelScope.launch {
-            prev?.join()
-            val client = browserSessionCapability()?.transport as? BrowserSessionClient
-            if (client == null) {
-                Log.w(TAG, "browser action dropped (no http client): $action session=$sessionId")
-                return@launch
-            }
-            try {
-                val result = client.rawAction(sessionId, payload)
-                if (result.status == BrowserStatus.OK) {
-                    Log.d(TAG, "browser action ok: $action session=$sessionId url=${result.currentUrl} ms=${result.actionMs} params=$payload")
-                } else {
-                    Log.w(TAG, "browser action failed: $action session=$sessionId status=${result.status} reason=${result.reason}")
-                    // 会话已被云端回收（idle reap 等）：静默吞掉会让用户对着死画面操作——
-                    // 走统一失败通路，live 态转 OUTPUT_ERROR，接管页呈现「会话已结束」
-                    if (result.status == BrowserStatus.SESSION_EXPIRED) {
-                        onBrowserSessionFailed(sessionId, result.reason ?: "session expired")
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "browser action error: $action session=$sessionId ${e.message}")
-            }
-        }
-    }
-
-    /**
-     * 用户接管中的浏览器会话 id（M2.6 Muse 形态）：turn 结束兜底 close 豁免——接管已停 agent，
-     * 但会话须存活供用户继续操作。主线程写、[settleBrowserSessionsAtTurnEnd] IO 线程读，用同步集合。
-     */
-    private val browserUserControlledSessions = java.util.Collections.synchronizedSet(mutableSetOf<String>())
-
-    /**
-     * Muse「接管浏览器」：登记受控豁免（[settleBrowserSessionsAtTurnEnd] 跳过该会话）后取消
-     * 当前生成回合 ≈ Muse「接管即暂停 agent」。无真暂停/续跑基建：交还控制不续跑 agent。
-     */
-    fun takeControlBrowserSession(sessionId: String) {
-        browserUserControlledSessions += sessionId
-        browserSettleJobs.remove(sessionId)?.cancel() // 接管豁免宽限 close（竞态修复 M2.7）
-        stopGeneration()
-    }
-
-    /** Muse「交还控制」：解除受控豁免（agent 不续跑；会话由 bridge 空闲回收或下轮兜底 close 善后）。 */
-    fun releaseBrowserSessionControl(sessionId: String) {
-        browserUserControlledSessions -= sessionId
-    }
-
-    /**
-     * Muse「停止任务」：显式 close 会话，按 [onBrowserSessionClosed] 同路径定格落库。
-     * close 失败静默：服务端 2 分钟空闲回收兜底（spec §6）。
-     */
-    fun stopBrowserSession(sessionId: String) {
-        browserUserControlledSessions -= sessionId
-        val part = _browserLiveSessions.value[sessionId] ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            val result = try {
-                browserSessionCapability()?.transport?.close(sessionId)
-            } catch (e: CancellationException) {
-                // 结构化并发：VM 清理/协程取消原样上抛，不折叠为静默失败
-                throw e
-            } catch (e: Exception) {
-                null // 失败静默：会话由服务端 2 分钟空闲回收兜底（spec §6）
-            }
-            // actionCount 换算同 settleBrowserSessionsAtTurnEnd（bridge 口径不含 open）
-            onBrowserSessionClosed(sessionId, result?.lastGoodFrame, result?.actionCount ?: (part.actionCount - 1))
-            _browserLiveSessions.update { it - sessionId }
-        }
-    }
-
-    /** HTTP 轮询回退（WS 未接线或连接失败时）。 */
-    private fun pollBrowserFrame(sessionId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val transport = browserSessionCapability()?.transport ?: return@launch
-            runCatching { transport.frame(sessionId) }
-                .onSuccess { r ->
-                    val frame = r.frameJpegBase64
-                    if (r.status == BrowserStatus.OK && frame != null) {
-                        onBrowserSessionFrame(sessionId, r.currentUrl ?: "", r.pageTitle ?: "", frame)
-                    }
-                }
-            // 失败静默：轮询下个节拍自愈（spec §6 不穿透）
-        }
-    }
-
-    /**
-     * turn 结束兜底（spec §6）：仍为非终态的会话调度宽限期 close（LLM 忘调 browser_close 时防服务器
-     * 会话泄漏 + 卡片有终态）。M2.7 竞态修复：turn 结束立即 close 与「用户事后进直播卡接管」存在
-     * 固有竞态——close HTTP 在途的 1-3s 窗口内卡片仍显示 running，用户进卡接管后全部动作
-     * session_expired（真机实测）。改为宽限期调度：[BROWSER_SETTLE_GRACE_MS] 后仍非终态且未被
-     * 接管（[browserUserControlledSessions]）/观看（[browserWatchedSessions]）才 close 定格；
-     * 宽限期内用户进卡（watch）或接管即豁免。新回合开始（[launchChatRound]）立即 flush 待决
-     * close（per-user 并发=1，须为下个 browser_open 腾出席位）。
-     */
-    private fun settleBrowserSessionsAtTurnEnd() {
-        val sessions = _browserLiveSessions.value
-        if (sessions.isEmpty()) return
-        sessions.values
-            .filter { it.state != ToolPartState.OUTPUT_AVAILABLE && it.state != ToolPartState.OUTPUT_ERROR }
-            .filter { it.sessionId !in browserUserControlledSessions }
-            .forEach { part -> scheduleBrowserSettleClose(part.sessionId) }
-    }
-
-    /** 宽限期 close 待决任务（main 线程读写）。 */
-    private val browserSettleJobs = HashMap<String, Job>()
-
-    /** 正在被全屏接管页观看的会话 id（overlay watch 期间豁免兜底 close）。主线程写、IO 读，同步集合。 */
-    private val browserWatchedSessions = java.util.Collections.synchronizedSet(mutableSetOf<String>())
-
-    private fun scheduleBrowserSettleClose(sessionId: String) {
-        browserSettleJobs[sessionId]?.cancel()
-        browserSettleJobs[sessionId] = viewModelScope.launch {
-            delay(BROWSER_SETTLE_GRACE_MS)
-            browserSettleJobs.remove(sessionId)
-            withContext(Dispatchers.IO) { closeBrowserSessionIfIdle(sessionId) }
-        }
-    }
-
-    /** 新回合开始 flush 待决宽限 close（取消延迟立即判定，为下个 browser_open 腾出并发席位）。 */
-    private fun flushBrowserSettleCloses() {
-        browserSettleJobs.keys.toList().forEach { sessionId ->
-            browserSettleJobs.remove(sessionId)?.cancel()
-            viewModelScope.launch(Dispatchers.IO) { closeBrowserSessionIfIdle(sessionId) }
-        }
-    }
-
-    /**
-     * 宽限期满/观看页退出/新回合 flush 的统一 close 判定：仍非终态且未被接管/观看才 close，
-     * 按 [onBrowserSessionClosed] 同路径定格落库并从 live 态移除。close 失败静默：
-     * 服务端 2 分钟空闲回收兜底（spec §6）。
-     */
-    private suspend fun closeBrowserSessionIfIdle(sessionId: String) {
-        val part = _browserLiveSessions.value[sessionId] ?: return
-        if (part.state == ToolPartState.OUTPUT_AVAILABLE || part.state == ToolPartState.OUTPUT_ERROR) return
-        if (sessionId in browserUserControlledSessions || sessionId in browserWatchedSessions) return
-        val transport = browserSessionCapability()?.transport
-        val result = try {
-            transport?.close(sessionId)
-        } catch (e: CancellationException) {
-            // 结构化并发：VM 清理/协程取消原样上抛，不折叠为静默失败
-            throw e
-        } catch (e: Exception) {
-            null
-        }
-        // actionCount 为 bridge 语义（不含 open）；close 失败回退时把本地口径
-        // （open=1 起累计）减 1 换算成 bridge 口径，经 onBrowserSessionClosed 的
-        // +1 还原为本地值，避免兜底路径虚增一步。
-        onBrowserSessionClosed(sessionId, result?.lastGoodFrame, result?.actionCount ?: (part.actionCount - 1))
-        _browserLiveSessions.update { current -> current - sessionId }
-    }
+    fun stopBrowserSession(sessionId: String) = browserLiveController.stopBrowserSession(sessionId)
 
     // ── ChatStartTagScanCapability.Delegate：TAG 扫描控制 ─────────────
 
