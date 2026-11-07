@@ -1163,6 +1163,7 @@ object AdminViews {
                                         p("block-label") { +"可视化预览 · Html 组件${if (htmlDocs.size > 1) " #${i + 1}" else ""}（沙箱 iframe，与端上 WebView 同文档）" }
                                         div("phone-frame") {
                                             div("phone-screen") {
+                                                phoneStatusBar()
                                                 // kotlinx.html DSL 无 iframe builder（3.x 未生成）——手写标签，
                                                 // srcdoc 值经 attrEscape 属性转义（& 须最先）
                                                 unsafe {
@@ -1180,6 +1181,7 @@ object AdminViews {
                                         p("block-label") { +"可视化预览 · Markdown 根（commonmark 渲染）" }
                                         div("phone-frame") {
                                             div("phone-screen") {
+                                                phoneStatusBar()
                                                 div("md-preview") { unsafe { raw(renderMarkdown(mdRoot)) } }
                                             }
                                         }
@@ -1197,6 +1199,28 @@ object AdminViews {
             }
             if (running) {
                 script { unsafe { raw("setTimeout(function(){ location.reload(); }, 3000);") } }
+            }
+        }
+    }
+
+    /** 手机壳仿真状态栏（9:41 + 信号/WiFi/电池 SVG），占位 44px 安全区使内容避开刘海。 */
+    private fun kotlinx.html.FlowContent.phoneStatusBar() {
+        div("phone-statusbar") {
+            span { +"9:41" }
+            unsafe {
+                raw(
+                    "<svg width=\"58\" height=\"12\" viewBox=\"0 0 58 12\" fill=\"currentColor\" aria-hidden=\"true\">" +
+                        "<rect x=\"0\" y=\"7\" width=\"3\" height=\"5\" rx=\"1\"/>" +
+                        "<rect x=\"4.5\" y=\"5.5\" width=\"3\" height=\"6.5\" rx=\"1\"/>" +
+                        "<rect x=\"9\" y=\"3.5\" width=\"3\" height=\"8.5\" rx=\"1\"/>" +
+                        "<rect x=\"13.5\" y=\"1.5\" width=\"3\" height=\"10.5\" rx=\"1\"/>" +
+                        "<path d=\"M22.5 5.4a6.4 6.4 0 0 1 8.6 0l-1.6 1.9a4.2 4.2 0 0 0-5.4 0z\"/>" +
+                        "<path d=\"M24.9 8.2a3 3 0 0 1 3.8 0l-1.9 2.2z\"/>" +
+                        "<rect x=\"37\" y=\"1\" width=\"17\" height=\"10\" rx=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-opacity=\".4\"/>" +
+                        "<rect x=\"38.5\" y=\"2.5\" width=\"11\" height=\"7\" rx=\"1.8\"/>" +
+                        "<rect x=\"55.5\" y=\"4\" width=\"2\" height=\"4\" rx=\"1\" fill-opacity=\".4\"/>" +
+                        "</svg>",
+                )
             }
         }
     }
@@ -2474,16 +2498,23 @@ object AdminViews {
                         .md-preview pre code{background:none;padding:0}
                         .md-preview blockquote{border-left:3px solid var(--c-primary);margin:8px 0;padding:4px 12px;color:var(--c-text-2);background:#fafafa}
                         .md-preview a{color:var(--c-primary)}
-                        /* 调试结果页手机壳预览（0.9.31）：9:19.5 屏幕 + 机身 bezel + Dynamic Island */
+                        /* 调试结果页手机壳预览（0.9.31）：9:19.5 屏幕 + 机身 bezel + Dynamic Island；
+                           0.9.33 起屏幕视口 1:1 还原真机逻辑宽度——壳 412px - bezel 11px×2 = 390px 屏幕
+                           （iPhone 15/16 逻辑宽 393pt、Android 主流 360~412dp 的代表值； iframe 内
+                           H5 的 px 布局/百分比宽/媒体查询断点与端上 WebView 同口径，消除按钮过宽失真） */
                         .phone-stage{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;padding:24px;background:#ececf0;border-radius:var(--r-md);margin-bottom:12px}
                         .phone-item{margin:0}
                         .phone-item .block-label{margin-bottom:10px}
-                        .phone-frame{width:300px;aspect-ratio:9/19.5;background:#1b1b1f;border-radius:44px;padding:11px;box-sizing:border-box;box-shadow:0 14px 34px rgba(0,0,0,.28),inset 0 0 0 2px #3a3a40;position:relative;flex-shrink:0}
+                        .phone-frame{width:412px;aspect-ratio:9/19.5;background:#1b1b1f;border-radius:44px;padding:11px;box-sizing:border-box;box-shadow:0 14px 34px rgba(0,0,0,.28),inset 0 0 0 2px #3a3a40;position:relative;flex-shrink:0}
                         .phone-frame::before{content:"";position:absolute;top:11px;left:50%;transform:translateX(-50%);width:86px;height:24px;background:#1b1b1f;border-radius:13px;z-index:2;pointer-events:none}
                         .phone-frame::after{content:"";position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:96px;height:4px;border-radius:2px;background:rgba(255,255,255,.35);z-index:2;pointer-events:none}
-                        .phone-screen{width:100%;height:100%;background:#fff;border-radius:34px;overflow:hidden}
-                        .phone-screen iframe{display:block;width:100%;height:100%;border:0;background:#fff}
-                        .phone-screen .md-preview{padding:20px 16px 36px;height:100%;overflow-y:auto;box-sizing:border-box;font-size:13px;line-height:1.6}
+                        .phone-screen{width:100%;height:100%;background:#fff;border-radius:34px;overflow:hidden;display:flex;flex-direction:column}
+                        /* 状态栏安全区（0.9.34）：内容自状态栏下缘起排，Dynamic Island 只盖状态栏背景——
+                           与真机 WebView 安全区行为一致，H5 顶部不再被刘海遮挡 */
+                        .phone-statusbar{height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 30px 0 34px;font-size:13px;font-weight:600;color:#1a1a1a;background:#fff}
+                        .phone-statusbar svg{display:block}
+                        .phone-screen iframe{display:block;width:100%;flex:1;min-height:0;border:0;background:#fff}
+                        .phone-screen .md-preview{padding:12px 16px 36px;flex:1;min-height:0;overflow-y:auto;box-sizing:border-box;font-size:13px;line-height:1.6}
                         /* 发包管理 v2（依 Ardot 设计稿：双轨版本卡 + 双栏上传 + 分轨历史） */
                         .track-row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
                         .track-card{flex:1;min-width:320px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:16px 20px}
