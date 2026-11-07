@@ -13,7 +13,7 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.34
+**版本**：0.9.35
 
 **最后更新**：2026-11-07
 
@@ -175,6 +175,7 @@ server/
 | POST | `/agent/sessions` | P1 | ✅ | X-App-Token | 云端 Agent 建会话（channel=gateway\|byok，ADR-018） |
 | GET | `/agent/sessions` | P1 | ✅ | X-App-Token | 我的云端会话列表 |
 | GET | `/agent/sessions/{id}/events` | P1 | ✅ | X-App-Token | 事件流分页回放（after/limit） |
+| GET | `/agent/sessions/{id}/final-program` | P1 | ✅ | X-App-Token | OpenUI 扫码预览取数（0.9.35）：返回会话最终 assistant 程序文本；owner 会话同 /events 口径，skill-debug 合成会话对任意有效 token 放行（程序文本无隐私，照片句柄 id 跨设备无意义）；无最终程序 404 `no_final_program` |
 | POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存；per-user 并发=1，占用回 409 `round_in_flight` 不耗配额） |
 | POST | `/agent/sessions/{id}/tool-results` | P1 | ✅ | X-App-Token | 端侧工具结果上行（409 tool_request_not_pending；ADR-018 工具桥） |
 | POST | `/agent/sessions/{id}/finish` | P1 | ✅ | X-App-Token | 关闭会话（终态） |
@@ -202,7 +203,7 @@ server/
 | GET/POST | `/admin/skills*` | P1 | ✅ | ADMIN_TOKEN | Skill 中心后台（v2 同日依 Ardot 设计稿重排）：列表（统计行+表格+prompt 清单段）/双栏编辑（LLM 视角实时预览+字符计数）/预览页 `GET /admin/skills/{name}/preview?tab=llm\|raw\|rendered`（三 Tab，rendered=commonmark 服务端渲染 markdown；编辑页正文实时渲染为内联 vanilla JS，零外部依赖），保存即热更新；v3 支持重命名（表单名≠路由名即迁移目录：写新目录→删旧目录，撞名/空名 400 拒绝不覆盖） |
 | GET | `/admin/skills/debug` | P1 | ✅ | ADMIN_TOKEN | 技能调试 playground 表单页（0.9.28）：草稿三字段（`?name=` 预填磁盘版）+ 测试消息；调试历史留底（0.9.32）：`AdminQueries.skillDebugHistory` 按 model=skill-debug（常量收编同包顶层，建会话/查询同源）取最新 20 轮，聚合首条测试消息/首个 load_skill 技能名/终态耗时（事件列只取 message/action/finish 小 payload 类型），表格行直达结果页/回放页 |
 | POST | `/admin/skills/debug/run` | P1 | ✅ | ADMIN_TOKEN | 跑一轮调试（0.9.28）：OverlaySkillCenter 内存草稿 + 合成会话（model=skill-debug、免配额）异步跑轮 → 302 到 `/admin/skills/debug/result/{id}` 结果页（0.9.30 起；此前到 `/admin/agent/sessions/{id}` 回放页）；校验失败 400 回填 |
-| GET | `/admin/skills/debug/result/{id}` | P1 | ✅ | ADMIN_TOKEN | 调试结果页（0.9.30）：跑轮中 3s 自动刷新，完成后聚合展示测试消息/load_skill 调用与返回/其他工具/最终程序/终态耗时；最终程序的可视化预览——`Html("…")` 文档沙箱 iframe（`sandbox=allow-scripts` srcdoc 属性转义）+ `root = Markdown` 根 commonmark 渲染（提取走 `OpenUiStringScan` 字符级扫描 + DSL 反转义，上限 4 个 iframe），预览装进手机壳（0.9.31：`.phone-stage/.phone-frame/.phone-screen` 工作台+机身 bezel+Dynamic Island，9:19.5 aspect-ratio 屏幕，iframe/markdown 同壳并排；0.9.33 起屏幕视口 1:1 还原真机逻辑宽度——壳 412px 减 bezel 22px = 390px 屏幕，对齐 iPhone 15/16 393pt / Android 主流 360~412dp，消除 278px 窄视口下按钮过宽/媒体查询断点失真；0.9.34 起屏幕顶部加 44px 仿真状态栏安全区（9:41 + 信号/WiFi/电池 SVG），内容自状态栏下缘起排，Dynamic Island 只盖状态栏背景（与真机 WebView 安全区行为一致），修复 H5 顶部被刘海遮挡）；通用组件树预览为后续里程碑 |
+| GET | `/admin/skills/debug/result/{id}` | P1 | ✅ | ADMIN_TOKEN | 调试结果页（0.9.30）：跑轮中 3s 自动刷新，完成后聚合展示测试消息/load_skill 调用与返回/其他工具/最终程序/终态耗时；最终程序的可视化预览——`Html("…")` 文档沙箱 iframe（`sandbox=allow-scripts` srcdoc 属性转义）+ `root = Markdown` 根 commonmark 渲染（提取走 `OpenUiStringScan` 字符级扫描 + DSL 反转义，上限 4 个 iframe），预览装进手机壳（0.9.31：`.phone-stage/.phone-frame/.phone-screen` 工作台+机身 bezel+Dynamic Island，9:19.5 aspect-ratio 屏幕，iframe/markdown 同壳并排；0.9.33 起屏幕视口 1:1 还原真机逻辑宽度——壳 412px 减 bezel 22px = 390px 屏幕，对齐 iPhone 15/16 393pt / Android 主流 360~412dp，消除 278px 窄视口下按钮过宽/媒体查询断点失真；0.9.34 起屏幕顶部加 44px 仿真状态栏安全区（9:41 + 信号/WiFi/电池 SVG），内容自状态栏下缘起排，Dynamic Island 只盖状态栏背景（与真机 WebView 安全区行为一致），修复 H5 顶部被刘海遮挡）；结果页与回放页内嵌扫码预览二维码（0.9.35：`QrCodeSvg` zxing core→内联 SVG 零 raster 依赖，载荷 `polang://openui-preview?session={id}` deep link——调试包「OpenUI 调试」页扫码 → final-program 端点拉取 → 端上真实渲染器，Skill 产物/Agent 直接输出同口径）；通用组件树预览为后续里程碑 |
 | POST | `/v1/claude-chat` | P1 | ✅ | X-App-Token | AI 工程师模式 SSE 对话（只读诊断） |
 | POST | `/v1/claude-tool-result` | P1 | ✅ | X-App-Token | AI 工程师 App tool 结果回传 |
 | POST | `/v1/claude-deliver` | P1 | ✅ | X-App-Token + 白名单 | AI 工程师代码交付 |

@@ -3,6 +3,7 @@ package com.mamba.picme.server.agent
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.reflect.asToolsByClass
 import com.mamba.picme.server.auth.AccountService
+import com.mamba.picme.server.admin.SKILL_DEBUG_MODEL
 import com.mamba.picme.server.llm.ChannelRegistry
 import com.mamba.picme.server.routes.TokenHashKey
 import com.mamba.picme.server.routes.isDebugQuotaBypass
@@ -165,6 +166,36 @@ fun Route.agentRoute(
                     putJsonArray("events") {
                         events.forEach { e -> add(eventJson(e)) }
                     }
+                },
+            )
+        }
+
+        // OpenUI 二维码预览取数端点（0.9.35）：端侧调试页扫码后拉最终程序，用端上真实
+        // 渲染器预览（Skill 调试产物 / Agent 直接输出同口径）。owner 会话同 /events 口径；
+        // skill-debug 合成会话（owner 为合成 hash，永不匹配真实 token）对任意有效 token
+        // 放行——返回物仅程序文本，照片投影句柄 id 跨设备本无意义。
+        get("/sessions/{id}/final-program") {
+            val tokenHash = call.attributes.getOrNull(TokenHashKey)
+                ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "unauthorized"))
+            val session = AgentSessionRepository.find(call.parameters["id"].orEmpty())
+                ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "session_not_found"))
+            if (session.tokenHash != tokenHash && session.model != SKILL_DEBUG_MODEL) {
+                // 他人会话同 404 口径，不泄露存在性
+                return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "session_not_found"))
+            }
+            val events = AgentEventRepository.listBySession(session.id, afterId = 0, limit = 500)
+            val finalMsg = events.lastOrNull {
+                it.role == AgentEventRole.ASSISTANT && it.payload is AgentEventPayload.Message
+            } ?: return@get call.respond(
+                HttpStatusCode.NotFound,
+                mapOf("error" to "no_final_program"),
+            )
+            call.respond(
+                buildJsonObject {
+                    put("session_id", session.id)
+                    put("model", session.model)
+                    put("program", (finalMsg.payload as AgentEventPayload.Message).content)
+                    put("created_at", finalMsg.createdAt)
                 },
             )
         }
