@@ -75,6 +75,49 @@ class SkillCenterTest {
     }
 
     @Test
+    fun `upsert creates loadable skill and overwrites`() {
+        val center = SkillCenter(root)
+        assertNull(center.upsert("vote-card", "投票卡撰写规范", "正文 v1"))
+        assertEquals("正文 v1", center.content("vote-card"))
+        assertEquals(listOf("vote-card"), center.manifest().map { it.name })
+        assertNull(center.upsert("vote-card", "投票卡撰写规范 v2", "正文 v2"))
+        assertEquals("正文 v2", center.content("vote-card"))
+        assertEquals("投票卡撰写规范 v2", center.manifest().single().description)
+    }
+
+    @Test
+    fun `upsert rejects invalid input`() {
+        val center = SkillCenter(root)
+        assertNotNull(center.upsert("Bad_Name", "d", "b"))
+        assertNotNull(center.upsert("../escape", "d", "b"))
+        assertNotNull(center.upsert("ok-name", "", "b"))
+        assertNotNull(center.upsert("ok-name", "多行\n描述", "b"))
+        assertNotNull(center.upsert("ok-name", "d", "  "))
+        assertTrue(center.manifest().isEmpty())
+    }
+
+    @Test
+    fun `delete removes skill and rejects bad names`() {
+        val center = SkillCenter(root)
+        assertNull(center.upsert("vote-card", "d", "b"))
+        assertTrue(center.delete("vote-card"))
+        assertTrue(center.manifest().isEmpty())
+        assertTrue(!center.delete("vote-card"))
+        assertTrue(!center.delete("../x"))
+    }
+
+    @Test
+    fun `listDetailed exposes body and metadata`() {
+        val center = SkillCenter(root)
+        assertNull(center.upsert("html-card", "HTML 规范", "第一段"))
+        val detail = center.detail("html-card")
+        assertNotNull(detail)
+        assertEquals("第一段", detail!!.body)
+        assertTrue(detail.rawChars > 0)
+        assertNull(center.detail("missing"))
+    }
+
+    @Test
     fun `promptSection is empty without skills and lists name plus description`() {
         val empty = SkillCenter(root)
         assertEquals("", empty.promptSection())

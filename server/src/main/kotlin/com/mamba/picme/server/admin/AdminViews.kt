@@ -2,6 +2,7 @@ package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.appJson
 import com.mamba.picme.server.agent.AgentEventPayload
+import com.mamba.picme.server.agent.SkillCenter
 import com.mamba.picme.server.analytics.formatCostCny
 import com.mamba.picme.server.auth.AiEngineerWhitelistService
 import com.mamba.picme.server.config.SettingsService
@@ -589,6 +590,132 @@ object AdminViews {
             dailyDetailTable(range)
             h2 { +"异常 Top（近 $days 天）" }
             topLists(range)
+        }
+    }
+
+    // ── Skill 中心（spike 2026-11-07）──
+
+    fun skillsPage(
+        skills: List<SkillCenter.SkillDetail>,
+        promptSection: String,
+        message: String? = null,
+    ): String = createHTML().html {
+        adminHead("技能 · PoLang 管理后台")
+        body {
+            navBar()
+            div("page") {
+                h1("page-title") { +"Skill 中心" }
+                if (message != null) {
+                    div("toast ${if (message.startsWith("已") || message.startsWith("成功")) "toast-ok" else "toast-err"}") { +message }
+                }
+                p { a("/admin/skills/new", classes = "btn") { +"新增技能" } }
+                table {
+                    tr {
+                        th { +"名称" }
+                        th { +"描述（LLM 相关性判断依据）" }
+                        th { +"大小" }
+                        th { +"更新时间（UTC+8）" }
+                        th { +"操作" }
+                    }
+                    skills.forEach { s ->
+                        tr {
+                            td { a("/admin/skills/${s.meta.name}") { +s.meta.name } }
+                            td { +s.meta.description }
+                            td { +"${s.rawChars} 字符" }
+                            td { +fmtTs(s.updatedAtMs) }
+                            td {
+                                form(action = "/admin/skills/${s.meta.name}/delete", method = FormMethod.post) {
+                                    attributes["style"] = "display:inline"
+                                    attributes["onsubmit"] = "return confirm('确认删除技能 ${s.meta.name}？云端下一轮跑轮即不再可见')"
+                                    input(type = InputType.submit, classes = "btn btn-danger") { value = "删除" }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (skills.isEmpty()) {
+                    p("meta") { +"暂无技能。技能 = 按需加载的指令包（SKILL.md），云端 Agent 经 load_skill 工具加载。" }
+                }
+                section("settings-section") {
+                    div("section-head") {
+                        h2("section-title") { +"LLM 视角 · system prompt 技能清单段（实时）" }
+                        p("section-desc") { +"云端 Agent 每轮跑轮注入的内容；空清单时段落整段不出现。" }
+                    }
+                    pre { +(promptSection.ifBlank { "（空清单——prompt 零变化）" }) }
+                }
+            }
+        }
+    }
+
+    fun skillEditPage(
+        existing: SkillCenter.SkillDetail?,
+        error: String? = null,
+    ): String = createHTML().html {
+        val isNew = existing == null
+        adminHead("${if (isNew) "新增" else "编辑"}技能 · PoLang 管理后台")
+        body {
+            navBar()
+            div("page") {
+                h1("page-title") { +"${if (isNew) "新增" else "编辑"}技能" }
+                if (error != null) div("toast toast-err") { +error }
+                section("settings-section") {
+                    div("section-head") {
+                        h2("section-title") { +"SKILL.md" }
+                        p("section-desc") {
+                            +"保存即热更新（云端下一轮跑轮生效，无需部署）；frontmatter 由表单组装。"
+                        }
+                    }
+                    form(
+                        action = if (isNew) "/admin/skills" else "/admin/skills/${existing!!.meta.name}",
+                        method = FormMethod.post,
+                        classes = "form-grid",
+                    ) {
+                        div("field") {
+                            label { +"名称（小写字母/数字/连字符；目录名，创建后不可改）" }
+                            textInput(name = "name") {
+                                value = existing?.meta?.name.orEmpty()
+                                if (!isNew) attributes["readonly"] = "readonly"
+                                placeholder = "html-card"
+                            }
+                        }
+                        div("field") {
+                            label { +"描述（单行；LLM 判断是否加载本技能的唯一依据，写清「何时该用」）" }
+                            textInput(name = "description") {
+                                value = existing?.meta?.description.orEmpty()
+                                placeholder = "当需要……时，先加载本技能。"
+                            }
+                        }
+                        div("field") {
+                            label { +"正文（markdown 指令；load_skill 返回的内容，上限 ${SkillCenter.MAX_CONTENT_CHARS} 字符）" }
+                            textArea(classes = "mono") {
+                                attributes["name"] = "body"
+                                attributes["rows"] = "24"
+                                attributes["style"] = "width:100%;font-family:monospace"
+                                +(existing?.body ?: "# 技能标题\n\n## 何时使用\n\n## 步骤\n\n## 约束\n")
+                            }
+                        }
+                        div("form-actions") {
+                            input(type = InputType.submit, classes = "btn") { value = if (isNew) "创建" else "保存" }
+                            +" "
+                            a("/admin/skills", classes = "btn") { +"返回" }
+                        }
+                    }
+                }
+                if (existing != null) {
+                    section("settings-section") {
+                        div("section-head") {
+                            h2("section-title") { +"预览 · LLM 视角" }
+                            p("section-desc") {
+                                +"左：prompt 清单段中本技能的行（披露层）；右：load_skill(\"${existing.meta.name}\") 的返回（正文层）。"
+                            }
+                        }
+                        h2 { +"清单行" }
+                        pre { +"- ${existing.meta.name}: ${existing.meta.description}" }
+                        h2 { +"load_skill 返回" }
+                        pre { +(existing.body.take(SkillCenter.MAX_CONTENT_CHARS)) }
+                    }
+                }
+            }
         }
     }
 
@@ -1925,6 +2052,7 @@ object AdminViews {
                 a("/admin/llm/calls", classes = "nav-link") { +"调用" }
                 a("/admin/agent/sessions", classes = "nav-link") { +"Agent" }
                 a("/admin/channels", classes = "nav-link") { +"渠道" }
+                a("/admin/skills", classes = "nav-link") { +"技能" }
                 a("/admin/settings", classes = "nav-link") { +"设置" }
                 a("/admin/diagnosis", classes = "nav-link") { +"问题诊断" }
                 a("/admin/release", classes = "nav-link") { +"发包" }

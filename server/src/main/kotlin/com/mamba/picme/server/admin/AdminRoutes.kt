@@ -2,6 +2,7 @@ package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.analytics.Price
 import com.mamba.picme.server.analytics.defaultPrices
+import com.mamba.picme.server.agent.SkillCenter
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.auth.AiEngineerWhitelistService
 import com.mamba.picme.server.auth.GuestService
@@ -52,6 +53,7 @@ fun Route.adminRoute(
     balanceService: ChannelBalanceService,
     prices: Map<String, Price> = defaultPrices(),
     issueReportService: IssueReportService = IssueReportService(GitHubIssueClient(HttpClient(CIO), "", "")),
+    skillCenter: SkillCenter? = null,
 ) {
     route("/admin") {
         get("/login") {
@@ -507,6 +509,88 @@ fun Route.adminRoute(
                 ChannelRegistry.reload()
             }
             call.respondRedirect("/admin/channels")
+        }
+
+        // ── Skill 中心（spike 2026-11-07）：技能资产管理与 LLM 视角预览。
+        // 保存/删除即热更新（SkillCenter 磁盘直读、每轮重扫），无需重新部署。
+        get("/skills") {
+            if (!call.adminGuard(adminToken)) return@get
+            val msg = call.request.queryParameters["msg"]
+            call.respondText(
+                AdminViews.skillsPage(
+                    skills = skillCenter?.listDetailed() ?: emptyList(),
+                    promptSection = skillCenter?.promptSection() ?: "",
+                    message = msg,
+                ),
+                ContentType.Text.Html,
+            )
+        }
+
+        get("/skills/new") {
+            if (!call.adminGuard(adminToken)) return@get
+            call.respondText(AdminViews.skillEditPage(existing = null), ContentType.Text.Html)
+        }
+
+        get("/skills/{name}") {
+            if (!call.adminGuard(adminToken)) return@get
+            val name = call.parameters["name"].orEmpty()
+            val detail = skillCenter?.detail(name)
+                ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "skill_not_found"))
+            call.respondText(AdminViews.skillEditPage(existing = detail), ContentType.Text.Html)
+        }
+
+        post("/skills") {
+            if (!call.adminGuard(adminToken)) return@post
+            val params = call.receiveParameters()
+            val name = params["name"].orEmpty()
+            val description = params["description"].orEmpty()
+            val body = params["body"].orEmpty()
+            val error = if (skillCenter == null) "skill center 未启用"
+            else skillCenter.upsert(name, description, body)
+            if (error != null) {
+                // 校验失败原样回填（SkillDetail 临时投影，不落盘）
+                val draft = SkillCenter.SkillDetail(
+                    meta = SkillCenter.SkillMeta(name.trim(), description.trim()),
+                    body = body.trim(), updatedAtMs = 0L, rawChars = body.length,
+                )
+                call.respondText(
+                    AdminViews.skillEditPage(existing = draft, error = error),
+                    ContentType.Text.Html,
+                    HttpStatusCode.BadRequest,
+                )
+                return@post
+            }
+            call.respondRedirect("/admin/skills?msg=已创建 ${name.trim()}")
+        }
+
+        post("/skills/{name}") {
+            if (!call.adminGuard(adminToken)) return@post
+            val name = call.parameters["name"].orEmpty()
+            val params = call.receiveParameters()
+            val description = params["description"].orEmpty()
+            val body = params["body"].orEmpty()
+            val error = if (skillCenter == null) "skill center 未启用"
+            else skillCenter.upsert(name, description, body)
+            if (error != null) {
+                val draft = SkillCenter.SkillDetail(
+                    meta = SkillCenter.SkillMeta(name, description.trim()),
+                    body = body.trim(), updatedAtMs = 0L, rawChars = body.length,
+                )
+                call.respondText(
+                    AdminViews.skillEditPage(existing = draft, error = error),
+                    ContentType.Text.Html,
+                    HttpStatusCode.BadRequest,
+                )
+                return@post
+            }
+            call.respondRedirect("/admin/skills?msg=已保存 $name")
+        }
+
+        post("/skills/{name}/delete") {
+            if (!call.adminGuard(adminToken)) return@post
+            val name = call.parameters["name"].orEmpty()
+            val ok = skillCenter?.delete(name) == true
+            call.respondRedirect("/admin/skills?msg=" + (if (ok) "已删除 $name" else "删除失败 $name"))
         }
 
         // ── 问题诊断页（用户上报问题；AI 工程师白名单已迁至 /admin/settings）──

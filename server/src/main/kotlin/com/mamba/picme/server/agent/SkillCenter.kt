@@ -31,6 +31,14 @@ class SkillCenter(
 
     data class SkillMeta(val name: String, val description: String)
 
+    /** 管理后台详情视图模型：元信息 + 正文 + 文件状态（列表/预览页数据源）。 */
+    data class SkillDetail(
+        val meta: SkillMeta,
+        val body: String,
+        val updatedAtMs: Long,
+        val rawChars: Int,
+    )
+
     /** 当前可用技能清单（每次重新扫盘 = 热更新即时生效）。 */
     fun manifest(): List<SkillMeta> {
         val dirs = rootDir.listFiles { f -> f.isDirectory } ?: return emptyList()
@@ -74,6 +82,62 @@ class SkillCenter(
             append("然后严格按指令执行；不匹配时禁止加载（正文占上下文，按需取用）：\n")
             skills.forEach { append("- ${it.name}: ${it.description}\n") }
         }
+    }
+
+    // ── 管理后台写通路（spike 2026-11-07）──
+
+    /** 后台列表/预览：含正文与文件状态的完整清单（跳过非法目录，与 [manifest] 同口径）。 */
+    fun listDetailed(): List<SkillDetail> {
+        val dirs = rootDir.listFiles { f -> f.isDirectory } ?: return emptyList()
+        return dirs.mapNotNull { dir ->
+            val file = File(dir, SKILL_FILE).takeIf { it.isFile } ?: return@mapNotNull null
+            val raw = file.readText()
+            val meta = parseFrontmatter(raw, expectedName = dir.name) ?: return@mapNotNull null
+            SkillDetail(
+                meta = meta,
+                body = raw.substringAfter(FRONTMATTER_END, missingDelimiterValue = "").trim(),
+                updatedAtMs = file.lastModified(),
+                rawChars = raw.length,
+            )
+        }.sortedBy { it.meta.name }
+    }
+
+    /** 单个技能详情（后台预览页）；非法/不存在返回 null。 */
+    fun detail(name: String): SkillDetail? = listDetailed().firstOrNull { it.meta.name == name }
+
+    /**
+     * 新建/覆盖技能（写 `rootDir/<name>/SKILL.md`，frontmatter 由参数组装）。
+     * 校验失败返回错误文案（直接给后台表单展示），成功返回 null。
+     */
+    fun upsert(name: String, description: String, body: String): String? {
+        val trimmedName = name.trim()
+        if (!NAME_REGEX.matches(trimmedName)) {
+            return "技能名非法：只允许小写字母/数字/连字符（1~64 位，字母或数字开头）"
+        }
+        if (description.isBlank()) return "description 不能为空（LLM 判断相关性的唯一依据）"
+        if (body.isBlank()) return "正文不能为空"
+        if (description.contains('\n') || description.contains('\r')) return "description 必须单行"
+        val dir = File(rootDir, trimmedName)
+        if (dir.exists() && !dir.isDirectory) return "已存在同名文件，无法创建技能目录"
+        dir.mkdirs()
+        File(dir, SKILL_FILE).writeText(
+            buildString {
+                append("---\n")
+                append("name: ").append(trimmedName).append('\n')
+                append("description: ").append(description.trim()).append('\n')
+                append("---\n")
+                append(body.trim()).append('\n')
+            },
+        )
+        return null
+    }
+
+    /** 删除技能（整目录递归删除）；不存在/非法名返回 false。 */
+    fun delete(name: String): Boolean {
+        if (!NAME_REGEX.matches(name)) return false
+        val dir = File(rootDir, name)
+        if (dir.canonicalFile.parentFile != rootDir.canonicalFile) return false
+        return dir.isDirectory && dir.deleteRecursively()
     }
 
     private fun parseFrontmatter(raw: String, expectedName: String): SkillMeta? {
