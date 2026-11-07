@@ -737,11 +737,12 @@ object AdminViews {
                             }
                         }
                         div("skill-field") {
-                            label { +"描述（单行；LLM 判断是否加载本技能的唯一依据，写清「何时该用」）" }
-                            textInput(name = "description") {
-                                value = existing?.meta?.description.orEmpty()
-                                placeholder = "当需要……时，先加载本技能。"
+                            label { +"描述（单行，可折行显示；LLM 判断是否加载本技能的唯一依据，写清「何时该用」）" }
+                            textArea(classes = "desc-area") {
+                                attributes["name"] = "description"
                                 attributes["id"] = "skill-desc"
+                                attributes["rows"] = "2"
+                                +existing?.meta?.description.orEmpty()
                             }
                         }
                         div("skill-field") {
@@ -833,12 +834,17 @@ object AdminViews {
                 return out.join('\n') || '<p style="color:#999">（空正文）</p>';
             }
             function refresh() {
+                // 描述保持单行语义：折行仅是显示层，输入/粘贴的换行即时清洗为空格
+                if (/[\r\n]/.test(descEl.value)) { descEl.value = descEl.value.replace(/[\r\n]+/g, ' '); }
                 var len = bodyEl.value.length;
                 counterEl.textContent = len.toLocaleString() + ' / ' + MAX.toLocaleString() + ' 字符';
                 counterEl.className = 'char-counter' + (len > MAX ? ' over' : '');
                 manifestEl.textContent = '- ' + (nameEl.value || '$fallbackName') + ': ' + descEl.value;
                 liveEl.innerHTML = renderMd(bodyEl.value);
             }
+            descEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); } // 单行：回车不落字
+            });
             [nameEl, descEl, bodyEl].forEach(function (el) {
                 el.addEventListener('input', refresh);
             });
@@ -2059,7 +2065,7 @@ object AdminViews {
                         .btn-sm.btn-danger{background:var(--c-danger-bg);color:var(--c-danger);border-color:var(--c-danger-border)}
                         .btn-danger-ghost{padding:8px 16px;background:var(--c-danger-bg);color:var(--c-danger);border:1px solid var(--c-danger-border);border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;transition:all .2s;height:32px;line-height:16px}
                         .btn-danger-ghost:hover{background:var(--c-danger);color:var(--c-surface)}
-                        .skills-layout{display:grid;grid-template-columns:minmax(0,1fr) 460px;gap:16px;margin:16px 0;align-items:start}
+                        .skills-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(480px,48%);gap:16px;margin:16px 0;align-items:start}
                         .skills-layout .settings-section{margin:0}
                         .skill-field{margin-bottom:16px}
                         .skill-field label{display:block;font-size:var(--fs-sm);color:var(--c-text-2);font-weight:500;margin-bottom:6px}
@@ -2068,6 +2074,7 @@ object AdminViews {
                         .skill-field input[readonly]{background:#f5f5f5;color:var(--c-text-2)}
                         .skill-field textarea{width:100%;min-height:320px;padding:12px;border:1px solid #d9d9d9;border-radius:var(--r-sm);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--fs-sm);line-height:1.6;resize:vertical;transition:border-color .2s;box-sizing:border-box}
                         .skill-field textarea:focus{outline:none;border-color:var(--c-primary);box-shadow:0 0 0 3px var(--c-primary-ring)}
+                        .skill-field textarea.desc-area{min-height:60px;max-height:120px;font-family:inherit;font-size:var(--fs-md);resize:none}
                         .ro-tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:var(--fs-xs);color:var(--c-text-3);background:#f5f5f5;border:1px solid #d9d9d9;margin-left:8px;font-weight:400}
                         .char-counter{font-size:var(--fs-xs);color:var(--c-text-3);text-align:right;margin-top:4px;font-variant-numeric:tabular-nums}
                         .char-counter.over{color:var(--c-danger);font-weight:600}
