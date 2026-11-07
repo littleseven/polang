@@ -480,4 +480,40 @@ class AdminViewsTest {
         assertTrue(!html.contains("?tab=evil"))
     }
 
+    @Test
+    fun `skill debug page renders draft form with load links and test message`() {
+        val html = AdminViews.skillDebugPage(
+            skills = listOf(skillFixture(), skillFixture("tag-report", rawChars = 862)),
+            name = "html-card",
+            description = "草稿描述",
+            body = "草稿正文",
+            testMessage = "生成一个投票卡片",
+        )
+        // 表单四字段 + 提交到 run 路由
+        assertTrue(html.contains("技能调试"))
+        assertTrue(html.contains("/admin/skills/debug/run"))
+        assertTrue(html.contains("name=\"name\""))
+        assertTrue(html.contains("name=\"description\""))
+        assertTrue(html.contains("name=\"body\""))
+        assertTrue(html.contains("name=\"test_message\""))
+        // 预填值回填
+        assertTrue(html.contains("草稿描述"))
+        assertTrue(html.contains("草稿正文"))
+        assertTrue(html.contains("生成一个投票卡片"))
+        // 磁盘技能载入链接
+        assertTrue(html.contains("/admin/skills/debug?name=html-card"))
+        assertTrue(html.contains("/admin/skills/debug?name=tag-report"))
+        // 安全口径声明
+        assertTrue(html.contains("不落盘、不耗配额、不碰生产资产"))
+    }
+
+    @Test
+    fun `skill debug page blank body falls back to template and shows error toast`() {
+        val html = AdminViews.skillDebugPage(skills = emptyList(), error = "正文不能为空")
+        assertTrue(html.contains("toast-err"))
+        assertTrue(html.contains("正文不能为空"))
+        assertTrue(html.contains("# 技能标题")) // 默认模板进 textarea
+        assertTrue(!html.contains("载入草稿")) // 空清单无载入链接行
+    }
+
 }

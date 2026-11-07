@@ -25,8 +25,8 @@ import java.io.File
  * frontmatter 非法（缺 --- 块/缺 name/缺 description/name 与目录名不一致）的目录
  * 整体跳过，不进清单、不可加载——宁缺毋滥，坏资产不暴露给 LLM。
  */
-class SkillCenter(
-    private val rootDir: File,
+open class SkillCenter(
+    internal val rootDir: File,
 ) {
 
     data class SkillMeta(val name: String, val description: String)
@@ -40,7 +40,7 @@ class SkillCenter(
     )
 
     /** 当前可用技能清单（每次重新扫盘 = 热更新即时生效）。 */
-    fun manifest(): List<SkillMeta> {
+    open fun manifest(): List<SkillMeta> {
         val dirs = rootDir.listFiles { f -> f.isDirectory } ?: return emptyList()
         return dirs.mapNotNull { dir ->
             val file = File(dir, SKILL_FILE).takeIf { it.isFile } ?: return@mapNotNull null
@@ -52,7 +52,7 @@ class SkillCenter(
      * 加载技能正文（frontmatter 之后的 markdown 指令部分）。
      * @return 正文（超 [MAX_CONTENT_CHARS] 截断）；技能不存在/非法返回 null
      */
-    fun content(name: String): String? {
+    open fun content(name: String): String? {
         if (!NAME_REGEX.matches(name)) return null
         val dir = File(rootDir, name)
         // 路径穿越防御：正则已限死字符集，canonical 校验双保险
@@ -171,5 +171,32 @@ class SkillCenter(
         /** 技能根目录：env POLANG_SKILLS_DIR，缺省工作目录下 `skills/`。 */
         fun fromEnv(): SkillCenter =
             SkillCenter(File(System.getenv("POLANG_SKILLS_DIR")?.takeIf { it.isNotBlank() } ?: "skills"))
+    }
+}
+
+/**
+ * 调试 overlay（技能调试 playground，2026-11-07）：草稿在内存中覆盖磁盘同名技能
+ * （或新增一个磁盘上不存在的技能），其余技能透传。纯内存、不落盘、不改生产资产。
+ *
+ * 只覆写 [manifest]/[content]——[promptSection] 基类实现经 [manifest] 取数，
+ * 虚分派自动生效；后台 CRUD（listDetailed/detail/upsert/delete）不覆写，
+ * 仍指磁盘真相（playground 不走这些入口）。
+ */
+class OverlaySkillCenter(
+    private val base: SkillCenter,
+    private val draft: SkillDetail,
+) : SkillCenter(base.rootDir) {
+
+    override fun manifest(): List<SkillMeta> =
+        (base.manifest().filter { it.name != draft.meta.name } + draft.meta).sortedBy { it.name }
+
+    override fun content(name: String): String? {
+        if (name != draft.meta.name) return base.content(name)
+        val body = draft.body
+        return if (body.length > MAX_CONTENT_CHARS) {
+            body.take(MAX_CONTENT_CHARS) + "\n\n[truncated: skill ${draft.meta.name} exceeds $MAX_CONTENT_CHARS chars]"
+        } else {
+            body
+        }
     }
 }
