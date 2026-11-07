@@ -209,8 +209,16 @@ private const val CLOUD_MODEL_LABEL = "cloud"
  * - 管理模型切换状态（本地/远程）
  * - 提供处理中状态（isProcessing）
  * - 管理会话列表和当前会话切换
+ *
+ * 🔴 膨胀冻结（2026-11-07，架构健康审计 P1，快照 `docs/reviews/2026-11-07-architecture-health-review.md`）：
+ * 本类 4697 行 + 26 字段依赖容器已到达 God class 临界点，**冻结膨胀**——
+ * 新增能力禁止在本类增加字段/依赖/方法，一律走独立 delegate（既有先例
+ * `WriteConfirmationController`）；向 `ChatViewModelDependencies` 加字段视同破坏冻结。
+ * 允许的修改仅两类：既有行为修复、向 delegate 迁出（streaming/browser/cloud 三接缝
+ * 拆分按审计排期推进）。`ChatScreen.kt`（3191 行）同样冻结：新 UI 区块一律进
+ * `components/` 独立文件。
  */
-@Suppress("TooManyFunctions", "LargeClass") // 待重构：UI 状态协调器，按职责拆分为多个 ViewModel/Delegate
+@Suppress("TooManyFunctions", "LargeClass") // 膨胀冻结中：delegate 拆分排期见架构健康审计快照 P1
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ChatViewModel(
     dependencies: ChatViewModelDependencies
