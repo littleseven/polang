@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+env:
+  # 阿里云镜像对部分产物（Koog iOS metadata 等）间歇 404 且不穿透 mavenCentral，
+  # 解析失败会被 Gradle #36284 的 NPE 掩盖真实错误；JITPACK=true 走 google/mavenCentral/jitpack
+  JITPACK: "true"
+
 jobs:
   build:
     name: Build & Verify
@@ -16,10 +21,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      # 与 gradle/gradle-daemon-jvm.properties 的 toolchainVersion=21 对齐，免去 foojay 自动下载
+      - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: gradle
 
@@ -36,7 +42,7 @@ jobs:
         run: ./gradlew testDebugUnitTest
 
       - name: Debug Build
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload Detekt Report
         if: failure()
@@ -61,6 +67,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      # 全新 checkout 上 Xcode 会在构建图校验阶段因 SharedKit.xcframework 不存在直接失败
+      # （本地靠存量产物掩盖），必须先显式构建 XCFramework；构建后 Xcode 脚本阶段按 hash 跳过
+      - name: Build SharedKit XCFramework (debug)
+        run: ./gradlew :shared:assembleSharedKitDebugXCFramework
 
       - name: Install XcodeGen
         run: brew install xcodegen

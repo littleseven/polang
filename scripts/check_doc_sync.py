@@ -41,6 +41,12 @@ def is_excluded(rel_path: Path) -> bool:
     s = str(rel_path) + "/"
     return any(s.startswith(d) or f"/{d}" in s for d in EXCLUDED_DIRS)
 
+# 派生物目录（构建/导出产物，不入 VCS）：其中的图片链接跳过存在性检查——
+# 本地生成后存在、CI checkout 不存在，存在性检查对 CI 必然误报
+DERIVED_ARTIFACT_DIRS = (
+    "docs/02-ARCHITECTURE/c4/exported/",   # c4 三视图 Chrome headless 导出 PNG
+)
+
 # 已删除但仍可能被引用的文档
 DELETED_FILES = {
     "Analysis_Report.md",
@@ -192,6 +198,11 @@ def check_broken_links() -> list:
             img_path = img_target.split("#")[0].split("?")[0]
             if not img_path:
                 continue
+            img_repo_rel = os.path.relpath(
+                os.path.normpath(str(base_dir / img_path)), str(PROJECT_ROOT)
+            ).replace(os.sep, "/")
+            if any(img_repo_rel.startswith(d) for d in DERIVED_ARTIFACT_DIRS):
+                continue
             img_file_rel_ok = (base_dir / img_path).exists()
             img_root_rel = img_path.strip("./").lstrip("/")
             img_docs_rel_ok = (PROJECT_ROOT / "docs" / img_root_rel).exists()
@@ -296,6 +307,8 @@ REVIEWS_WHITELIST = {
         "ChatGPT 5→6→GenUI 调研快照（DIL 逆向结论 + 四路线对比 + polang 可吸收设计）",
     "2026-09-27-muse-calendar-replication-research.md":
         "Muse 日历能力复刻预研快照（端侧日历 provider 路线评估，供后续日历特性排期决策）",
+    "2026-11-07-architecture-health-review.md":
+        "架构健康审计快照（分层/God class/CI 门禁/技术债全景 + 行动项台账，P0 修复同轮落地）",
 }
 
 PROCESS_REF_PATTERN = re.compile(
