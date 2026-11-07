@@ -147,7 +147,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `usertask/` | `UserTaskMapping`（体系状态投影扩展：fromTagScanState/fromDownloadStatus）, `TagScanTaskAdapter`, `ModelDownloadTaskAdapter` | 用户任务协议 M1（2026-09-26，spec `docs/superpowers/specs/2026-09-26-user-task-protocol-design.md`）：扫描/下载等 app 级长耗时操作统一生命周期（观察+控制）。**协议模型/注册表核心已上提 shared commonMain `domain/usertask/`**（UserTask+5 枚举/UserTaskMapping 纯推导/UserTaskStore+UserTaskRow 存储抽象/UserTaskRegistry 混合注册表/UserTaskAdapter 接口，包名不变经 shared api 透出，供 iOS SKIE 消费；Registry 构造改 `store=` 注入，Android 实现 = `data/local/RoomUserTaskStore` 包装 UserTaskDao）；本目录仅留平台接缝：适配器实现与体系状态投影扩展（挂 shared object，调用形态不变）。元数据落 Room `user_task` 表 + 进度走内存快照，合并流 `tasks`/`activeCount` 直供任务中心后台 Tab；统一动词（START/PAUSE/RESUME/CANCEL/RETRY）按 kind 分发适配器，全链路异常降级不穿透；引擎零侵入，经组合根 `startUserTaskAdapters()` 接缝 |
 | `aesthetic/` | `NimaScorer`, `EdiffiqaScorer`, `CoverSelector`, `FaceAligner`, `AestheticScoreWorker` | 美学打分（NIMA + eDifFIQA）：NNAPI 推理、会话跨调用复用、人脸对齐与质量分；非会话制附属打分器（`runUntilDone` 循环排空 + `progress` StateFlow 上报），触发=扫描完成后自动补分 + 打标页手动（Service `ACTION_SCORE_AESTHETIC[_FULL]`），与扫描会话互斥（复用 RetinaFace 无同步保护）；待人脸画质分口径 gate 在 `hasFace=1` |
 | `backup/` | `TagDataBackup`（model/）, `TagDataBackupRepository`, `BackupTagDataUseCase`, `RestoreTagDataUseCase` | 标签数据备份/恢复（备份模型 v5：标签、人脸聚类、人物关系、记忆事实、编辑配方等本地数据导出导入；v5 增补 mediaTagMetadata 三列 `blurScore`/`exposureScore`/`lastViewedAt`（整理中心 v2 信号），恢复侧 `MediaDao.updateTagMetadataFromBackup` 走 COALESCE——旧备份缺字段（null）不冲掉本机已算值，lastViewedAt 为保护信号不可再生） |
-| `person/` | `RelationPredicate`, `KinshipLexicon`, `PersonRepository`, `PersonQueryResolver`, `RelationSnapshotRestorer` | 人物关系图谱（两层模型）：谓词封闭枚举（粗谓词机器逻辑，性别/长幼细分 + 中/英/日标签）+ `customLabel` 自定义称呼（用户语言，展示/查询优先）；称谓词表（声明归一具体谓词 + 谓词族查询扩展）；关系与"我"标记收口仓库（`observeSelfAvatar` 同时是设置页账户头像的数据源）；查询串→personId 解析器；重聚快照恢复纯函数 |
+| `person/` | `RelationPredicate`（shared commonMain）, `KinshipLexicon`, `PersonQueryResolver`, `RelationSnapshotRestorer` | 人物关系图谱（两层模型）：谓词封闭枚举（粗谓词机器逻辑，性别/长幼细分 + 中/英/日标签）+ `customLabel` 自定义称呼（用户语言，展示/查询优先）；称谓词表（声明归一具体谓词 + 谓词族查询扩展）；查询串→personId 解析器；重聚快照恢复纯函数。**2026-11-07 分层止血试点**：`PersonRepository` 实现已迁回 `data/repository/`（架构健康审计 P1；签名暂透出 Room Entity，领域模型+接口抽象收口随后续批次） |
 | `memory/` | `MemoryRepository` | 通用事实记忆仓库（"帮我记住…"收口，remember/update/forget/唯一匹配删/observeAll） |
 | `preview/` | `BeautyPreviewProvider` | 美颜预览提供者接口 |
 
@@ -161,7 +161,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `remote/openai/` | OpenAI API 客户端（Retrofit） | 远程 LLM 网络层 |
 | `remote/anthropic/` | Anthropic/Claude API 客户端（Retrofit） | 备用远程 LLM |
 | `download/` | `LlmModelDownloadManager`、`ModelDownloadForegroundService` | LLM 模型下载管理 + 前台服务 |
-| `repository/` | 仓储接口的 Room/DataStore/Network 实现 | 数据源实现 |
+| `repository/` | 仓储接口的 Room/DataStore/Network 实现；`PersonRepository`（人物命名/"我"标记/关系图谱收口，2026-11-07 自 `domain/person/` 迁回——分层止血试点） | 数据源实现 |
 | `preferences/` | DataStore Preferences | 用户偏好持久化 |
 
 ### 2.4 基础设施 (`core/`、`di/`、`service/`)

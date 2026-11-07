@@ -8,8 +8,8 @@ import com.mamba.picme.agent.core.model.context.AgentErrorCode
 import com.mamba.picme.agent.core.model.context.PageContext
 import com.mamba.picme.agent.core.runtime.state.SceneManager
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.data.repository.PersonRepository
 import com.mamba.picme.domain.person.KinshipLexicon
-import com.mamba.picme.domain.person.PersonRepository
 import com.mamba.picme.domain.person.RelationPredicate
 import com.mamba.picme.domain.person.RelationSource
 

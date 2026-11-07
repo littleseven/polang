@@ -1,6 +1,8 @@
 package com.mamba.picme.domain.person
 
 import com.mamba.picme.data.local.entity.PersonEntity
+import com.mamba.picme.data.repository.CustomLabelHit
+import com.mamba.picme.data.repository.PersonRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest

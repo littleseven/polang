@@ -7,8 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.entity.PersonEntity
 import com.mamba.picme.data.model.MediaEntity
-import com.mamba.picme.domain.person.PersonRepository
-import com.mamba.picme.domain.person.RelationDisplayItem
+import com.mamba.picme.data.repository.PersonRepository
+import com.mamba.picme.data.repository.RelationDisplayItem
 import com.mamba.picme.domain.person.RelationPredicate
 import com.mamba.picme.domain.tag.FaceClusterEngine
 import kotlinx.coroutines.Dispatchers
