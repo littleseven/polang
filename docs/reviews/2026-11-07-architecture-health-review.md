@@ -35,6 +35,7 @@
 - iOS 桥债 10 个回调桥 + 1 FlowWatcher（已知冻结至 iOS 1.0，需登记收口触发条件）
 - `domain/backup` 是唯一无测试的核心 domain 包（备份恢复最怕回归）
 - infra/ 三 Node 服务无 CI；GRDB.swift 未锁版本；iOS 仅挂 debug XCFramework
+- MNN.framework 仅 device-arm64 slice（本轮为 CI 可复现已入库）：模拟器目标无法链接，iOS CI Test 步骤（PoLangTests 48 文件）暂撤，恢复条件 = MNN XCFramework 化（补 simulator slice，需 MNN 源码树构建）
 - 工作区卫生：15 worktree（3 个 Qoder 残留）、23 本地分支 17% 陈旧
 
 ## 五、行动项状态（本快照登记时点）

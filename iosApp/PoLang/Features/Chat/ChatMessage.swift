@@ -41,6 +41,7 @@ extension ChatMessage {
         isStreaming: Bool = false,
         showCursor: Bool = false,
         isThinking: Bool = false,
+        agentSteps: [AgentStepUi] = [],
         claudeAgent: ClaudeAgentState? = nil,
         claudeDeliver: ClaudeDeliverUi? = nil,
         optimizeCandidates: OptimizeCandidateGroup? = nil,
@@ -55,6 +56,7 @@ extension ChatMessage {
             mediaResults: mediaResults, imageUri: imageUri, chartSvg: chartSvg,
             htmlContent: htmlContent, imageSaved: imageSaved,
             isStreaming: isStreaming, showCursor: showCursor, isThinking: isThinking,
+            agentSteps: agentSteps,
             claudeAgent: claudeAgent, claudeDeliver: claudeDeliver,
             optimizeCandidates: optimizeCandidates, engineerTask: engineerTask,
             gachaInteractive: gachaInteractive, htmlCardMeta: htmlCardMeta, parts: parts
@@ -87,6 +89,7 @@ extension ChatMessage {
             isStreaming: isStreaming ?? self.isStreaming,
             showCursor: showCursor ?? self.showCursor,
             isThinking: isThinking ?? self.isThinking,
+            agentSteps: agentSteps,
             claudeAgent: claudeAgent, claudeDeliver: claudeDeliver,
             optimizeCandidates: optimizeCandidates ?? self.optimizeCandidates,
             engineerTask: engineerTask,

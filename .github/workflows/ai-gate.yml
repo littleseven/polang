@@ -89,15 +89,15 @@ jobs:
       - name: Pod install
         run: cd iosApp && pod install --repo-update
 
-      - name: Build (Simulator)
+      # 设备目标编译验证（不签名）：MNN.framework 仅 device-arm64 slice，
+      # 模拟器目标无法链接（无 simulator slice），故 Build 走 generic iOS 设备目标。
+      # Swift 单测（PoLangTests 48 文件）需模拟器运行，待 MNN XCFramework 化
+      # （补 simulator slice）后恢复 Test 步骤——技术债登记 docs/reviews/2026-11-07-architecture-health-review.md
+      - name: Build (Device, unsigned)
         run: |
           xcodebuild -workspace iosApp/PoLang.xcworkspace -scheme PoLang \
-            -destination 'generic/platform=iOS Simulator' build
-
-      - name: Test (Simulator)
-        run: |
-          xcodebuild -workspace iosApp/PoLang.xcworkspace -scheme PoLang \
-            -destination 'platform=iOS Simulator,name=iPhone 16' test
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO build
 
   doc-sync:
     name: Doc Consistency (links / deleted-refs / status markers)
