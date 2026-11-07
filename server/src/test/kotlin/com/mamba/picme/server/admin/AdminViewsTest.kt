@@ -516,4 +516,48 @@ class AdminViewsTest {
         assertTrue(!html.contains("载入草稿")) // 空清单无载入链接行
     }
 
+    // ── 发包管理 v2（2026-11-07：双轨卡 + 双栏上传 + 分轨历史）──
+
+    @Test
+    fun `release page renders dual track cards split history and preserved upload ids`() {
+        val debugTrack = AdminViews.AndroidTrackInfo(
+            fileExists = true, fileSize = "86.4 MB", lastModified = "11-06 22:18",
+            version = "1.0.84", versionCode = 10084, cosUrl = "https://cos/debug.apk",
+        )
+        val releaseTrack = debugTrack.copy(
+            version = "1.0.83", versionCode = 10083, fileSize = "91.2 MB",
+            lastModified = "11-05 18:02", cosUrl = "https://cos/rel.apk",
+        )
+        val history = listOf(
+            AdminQueries.ApkUploadRow(1, "debug", "1.0.84", "polang-debug-1.0.84.apk", 86_400_000L, "success", null, 1_760_000_000_000L),
+            AdminQueries.ApkUploadRow(2, "release", "1.0.83", "polang-release-1.0.83.apk", 91_200_000L, "success", null, 1_759_900_000_000L),
+            AdminQueries.ApkUploadRow(3, "debug", "1.0.83", "polang-debug-1.0.83.apk", 86_200_000L, "failed", "COS 签名失败", 1_759_800_000_000L),
+        )
+        val html = AdminViews.releasePage(
+            tab = "android",
+            android = AdminViews.AndroidReleaseData(debug = debugTrack, release = releaseTrack, cosConfigured = true, history = history),
+        )
+        // 双轨版本卡：轨道身份 + versionCode 显性化
+        assertTrue(html.contains("debug · 日常自测轨"))
+        assertTrue(html.contains("release · Play 对齐轨"))
+        assertTrue(html.contains("versionCode 10084"))
+        assertTrue(html.contains("versionCode 10083"))
+        assertTrue(html.contains("debug.keystore"))
+        assertTrue(html.contains("picme-release.jks"))
+        assertTrue(html.contains("COS 直链"))
+        // 分轨历史：debug 2 行（含失败信息）/ release 1 行，卡即渠道无渠道列
+        assertTrue(html.contains("上传历史（2）"))
+        assertTrue(html.contains("上传历史（1）"))
+        assertTrue(html.contains("COS 签名失败"))
+        assertTrue(!html.contains("<th>渠道</th>"))
+        // 双栏上传 + JS 依赖 ID 全保真
+        assertTrue(html.contains("upload-layout"))
+        assertTrue(html.contains("OTA 北京镜像约 10 分钟内跟随"))
+        assertTrue(html.contains("上传到 COS"))
+        listOf(
+            "apk-channel", "apk-version", "apk-version-code", "apk-changelog",
+            "drop-zone", "apk-file", "file-preview", "progress-wrap", "upload-btn",
+        ).forEach { assertTrue("missing id $it", html.contains("\"$it\"")) }
+    }
+
 }

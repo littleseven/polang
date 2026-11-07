@@ -1298,21 +1298,24 @@ object AdminViews {
         adminHead("发包 · PoLang 管理后台")
         body {
             navBar()
-            h1 { +"发包" }
-            releaseTabs(tab)
-            if (message != null) {
-                div("toast ${if (message.startsWith("成功")) "toast-ok" else "toast-err"}") { +message }
-            }
-            val cosConfigured = android?.cosConfigured ?: ios?.cosConfigured ?: true
-            if (!cosConfigured) {
-                div("toast toast-err") {
-                    +"COS 未配置（COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET 为空），请在 /etc/picme/server.env 中填写后重启服务"
+            div("page") {
+                h1("page-title") { +"发包管理" }
+                p("meta") { +"双端包管理 · COS 直链 · OTA versionCode 比较" }
+                releaseTabs(tab)
+                if (message != null) {
+                    div("toast ${if (message.startsWith("成功")) "toast-ok" else "toast-err"}") { +message }
                 }
-            }
-            if (tab == "ios" && ios != null) {
-                iosReleasePanel(ios)
-            } else if (android != null) {
-                androidReleasePanel(android)
+                val cosConfigured = android?.cosConfigured ?: ios?.cosConfigured ?: true
+                if (!cosConfigured) {
+                    div("toast toast-err") {
+                        +"COS 未配置（COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET 为空），请在 /etc/picme/server.env 中填写后重启服务"
+                    }
+                }
+                if (tab == "ios" && ios != null) {
+                    iosReleasePanel(ios)
+                } else if (android != null) {
+                    androidReleasePanel(android)
+                }
             }
         }
     }
@@ -1328,185 +1331,165 @@ object AdminViews {
         }
     }
 
-    private fun FlowContent.androidTrackCard(channelLabel: String, info: AndroidTrackInfo) {
-        if (info.fileExists) {
-            div("card apk-info-card") {
-                div("apk-info-header") {
-                    div("apk-info-title") {
-                        span("apk-badge") { +"当前 $channelLabel" }
-                        +"${info.version.ifBlank { "未命名版本" }}（versionCode ${info.versionCode}）"
-                    }
-                    div("apk-info-meta") {
-                        span { +info.fileSize }
-                        span("apk-meta-sep") { +"·" }
-                        span { +info.lastModified }
-                    }
-                }
-                div("apk-info-actions") {
-                    a(href = info.cosUrl, target = "_blank", classes = "btn btn-sm btn-primary") { +"COS 直链" }
-                }
+    /** 双轨版本卡（v2 依 Ardot 设计稿）：轨道 Tag + 版本大字 + versionCode + 签名 meta + 直链。 */
+    private fun FlowContent.androidTrackCard(track: String, info: AndroidTrackInfo) {
+        val isDebug = track == "debug"
+        val tagCls = if (isDebug) "tag-debug" else "tag-release"
+        val tagText = if (isDebug) "debug · 日常自测轨" else "release · Play 对齐轨"
+        div("track-card") {
+            div("track-head") {
+                span("track-tag $tagCls") { +tagText }
+                a(href = info.cosUrl, target = "_blank", classes = "btn btn-sm btn-ghost") { +"COS 直链" }
             }
-        } else {
-            div("card apk-info-card apk-empty") {
-                div("apk-empty-icon") { +"📦" }
-                div("apk-empty-text") { +"COS 上暂无 $channelLabel 包" }
+            if (info.fileExists) {
+                div("track-version") {
+                    span("track-ver") { +info.version.ifBlank { "未命名版本" } }
+                    span("track-code") { +"versionCode ${info.versionCode}" }
+                }
+                div("track-meta") {
+                    +"${info.fileSize} · 更新于 ${info.lastModified} · ${if (isDebug) "debug.keystore" else "picme-release.jks"} 签名"
+                }
+            } else {
+                div("track-empty-text") { +"COS 上暂无 $track 包（上传后此处展示当前版本）" }
             }
         }
     }
 
     private fun FlowContent.androidReleasePanel(data: AndroidReleaseData) {
-        val history = data.history
-        // 双轨当前版本信息卡片
-        androidTrackCard("debug", data.debug)
-        androidTrackCard("release", data.release)
-
-        // 上传区域
-        h2 { +"上传新版本" }
-        div("card upload-card") {
-            // 渠道选择（默认 debug：唯一开发者日常遛狗主轨）
-            div("form-row") {
-                label { +"渠道" }
-                select {
-                    attributes["id"] = "apk-channel"
-                    attributes["class"] = "form-input"
-                    option {
-                        value = "debug"
-                        selected = true
-                        +"debug（debug.keystore，日常自测）"
-                    }
-                    option {
-                        value = "release"
-                        +"release（picme-release.jks，Play 对齐）"
-                    }
-                }
-            }
-            // 版本号输入
-            div("form-row") {
-                label { +"版本号" }
-                input(type = InputType.text, name = "version", classes = "form-input") {
-                    attributes["id"] = "apk-version"
-                    placeholder = "如 1.0.11"
-                }
-            }
-            // versionCode 输入（OTA 更新比较依据）
-            div("form-row") {
-                label { +"versionCode" }
-                input(type = InputType.number, name = "versionCode", classes = "form-input") {
-                    attributes["id"] = "apk-version-code"
-                    placeholder = "如 10042（OTA 更新判定依据）"
-                }
-            }
-            // 更新说明
-            div("form-row") {
-                label { +"更新说明" }
-                textArea(classes = "form-input") {
-                    attributes["id"] = "apk-changelog"
-                    attributes["rows"] = "3"
-                    attributes["placeholder"] = "可选，App 更新弹窗中展示"
-                }
-            }
-
-            // 拖拽上传区
-            div("drop-zone") {
-                attributes["id"] = "drop-zone"
-                div("drop-zone-inner") {
-                    div("drop-zone-icon") { +"☁" }
-                    div("drop-zone-text") {
-                        +"拖拽 APK 文件到此处，或 "
-                        span("drop-zone-link") {
-                            attributes["onclick"] = "document.getElementById('apk-file').click()"
-                            +"点击选择"
-                        }
-                    }
-                    div("drop-zone-hint") { +"支持 .apk 格式，最大 200MB" }
-                }
-                input(type = InputType.file, name = "apkfile") {
-                    attributes["id"] = "apk-file"
-                    accept = ".apk"
-                    style = "display:none"
-                }
-            }
-
-            // 文件信息预览
-            div("file-preview") {
-                attributes["id"] = "file-preview"
-                style = "display:none"
-                div("file-preview-icon") { +"📱" }
-                div("file-preview-info") {
-                    div("file-preview-name") { attributes["id"] = "file-name"; +"" }
-                    div("file-preview-size") { attributes["id"] = "file-size"; +"" }
-                }
-                button(type = ButtonType.button, classes = "btn-sm file-preview-remove") {
-                    attributes["onclick"] = "clearFile()"
-                    attributes["title"] = "移除文件"
-                    +"×"
-                }
-            }
-
-            // 进度条
-            div("progress-wrap") {
-                attributes["id"] = "progress-wrap"
-                style = "display:none"
-                div("progress-track") {
-                    div("progress-fill") {
-                        attributes["id"] = "progress-fill"
-                        +""
-                    }
-                }
-                div("progress-meta") {
-                    span {
-                        attributes["id"] = "progress-pct"
-                        +"0%"
-                    }
-                    span {
-                        attributes["id"] = "progress-size"
-                        +""
-                    }
-                }
-            }
-
-            // 上传按钮
-            div("upload-actions") {
-                button(type = ButtonType.button, classes = "btn btn-primary btn-upload") {
-                    attributes["id"] = "upload-btn"
-                    attributes["onclick"] = "uploadApk()"
-                    +"上传"
-                }
-            }
+        // 双轨当前版本行（v2：轨道身份 + versionCode 显性化）
+        div("track-row") {
+            androidTrackCard("debug", data.debug)
+            androidTrackCard("release", data.release)
         }
 
-        // 上传历史
-        h2 { +"上传历史（最近 ${history.size} 条）" }
-        if (history.isEmpty()) {
-            div("card apk-empty") {
-                div("apk-empty-text") { +"暂无上传记录" }
-            }
-        } else {
-            table {
-                tr {
-                    th { +"时间" }
-                    th { +"渠道" }
-                    th { +"版本号" }
-                    th { +"文件名" }
-                    th { +"大小" }
-                    th { +"状态" }
+        // 上传区域（v2：左表单右拖拽双栏）
+        div("card upload-card") {
+            div("upload-head") {
+                div("section-title") { +"上传新版本" }
+                p("section-desc") {
+                    +"双轨独立：debug 日常自测 · release 与 Play 对齐；上传即写 COS 并记录对应轨历史"
                 }
-                history.forEach { h ->
-                    tr {
-                        td { +fmtTs(h.createdAt) }
-                        td { +(h.channel.ifBlank { "release" }) }
-                        td { +(h.version.ifBlank { "—" }) }
-                        td { +(h.fileName.ifBlank { "—" }) }
-                        td { +formatBytes(h.fileSize) }
-                        td {
-                            when (h.status) {
-                                "success" -> span("active-badge") { +"成功" }
-                                else -> span("err") { +(h.message ?: "失败") }
+            }
+            div("upload-layout") {
+                div("upload-form") {
+                    div("form-grid-2") {
+                        div("form-row") {
+                            label { +"渠道" }
+                            select {
+                                attributes["id"] = "apk-channel"
+                                attributes["class"] = "form-input"
+                                option {
+                                    value = "debug"
+                                    selected = true
+                                    +"debug（日常自测）"
+                                }
+                                option {
+                                    value = "release"
+                                    +"release（Play 对齐）"
+                                }
+                            }
+                        }
+                        div("form-row") {
+                            label { +"版本号" }
+                            input(type = InputType.text, name = "version", classes = "form-input") {
+                                attributes["id"] = "apk-version"
+                                placeholder = "如 1.0.11"
+                            }
+                        }
+                    }
+                    div("form-row") {
+                        label { +"versionCode（OTA 更新判定依据，必须递增）" }
+                        input(type = InputType.number, name = "versionCode", classes = "form-input") {
+                            attributes["id"] = "apk-version-code"
+                            placeholder = "如 10042"
+                        }
+                    }
+                    div("form-row") {
+                        label { +"更新说明（App 更新弹窗展示）" }
+                        textArea(classes = "form-input") {
+                            attributes["id"] = "apk-changelog"
+                            attributes["rows"] = "3"
+                            attributes["placeholder"] = "可选"
+                        }
+                    }
+                }
+                div("upload-side") {
+                    // 拖拽上传区（文件选定后 JS 将其隐藏、显示 file-preview）
+                    div("drop-zone") {
+                        attributes["id"] = "drop-zone"
+                        div("drop-zone-inner") {
+                            div("drop-zone-icon") { +"☁" }
+                            div("drop-zone-text") {
+                                +"拖拽 APK 文件到此处，或 "
+                                span("drop-zone-link") {
+                                    attributes["onclick"] = "document.getElementById('apk-file').click()"
+                                    +"点击选择"
+                                }
+                            }
+                            div("drop-zone-hint") { +"支持 .apk 格式，最大 200MB" }
+                        }
+                        input(type = InputType.file, name = "apkfile") {
+                            attributes["id"] = "apk-file"
+                            accept = ".apk"
+                            style = "display:none"
+                        }
+                    }
+
+                    // 文件信息预览
+                    div("file-preview") {
+                        attributes["id"] = "file-preview"
+                        style = "display:none"
+                        div("file-preview-icon") { +"📱" }
+                        div("file-preview-info") {
+                            div("file-preview-name") { attributes["id"] = "file-name"; +"" }
+                            div("file-preview-size") { attributes["id"] = "file-size"; +"" }
+                        }
+                        button(type = ButtonType.button, classes = "btn-sm file-preview-remove") {
+                            attributes["onclick"] = "clearFile()"
+                            attributes["title"] = "移除文件"
+                            +"×"
+                        }
+                    }
+
+                    // 进度条
+                    div("progress-wrap") {
+                        attributes["id"] = "progress-wrap"
+                        style = "display:none"
+                        div("progress-track") {
+                            div("progress-fill") {
+                                attributes["id"] = "progress-fill"
+                                +""
+                            }
+                        }
+                        div("progress-meta") {
+                            span {
+                                attributes["id"] = "progress-pct"
+                                +"0%"
+                            }
+                            span {
+                                attributes["id"] = "progress-size"
+                                +""
                             }
                         }
                     }
                 }
             }
+
+            // 底行：OTA 提示 + 上传按钮
+            div("upload-footer") {
+                span("hint") { +"OTA 北京镜像约 10 分钟内跟随 · App 端按 versionCode 递增判定更新" }
+                button(type = ButtonType.button, classes = "btn btn-primary btn-upload") {
+                    attributes["id"] = "upload-btn"
+                    attributes["onclick"] = "uploadApk()"
+                    +"上传到 COS"
+                }
+            }
+        }
+
+        // 上传历史（v2：按轨分卡——debug / release 各一张，卡即渠道故无渠道列）
+        div("history-split") {
+            trackHistoryCard("debug", data.history.filter { it.channel == "debug" })
+            trackHistoryCard("release", data.history.filter { it.channel != "debug" })
         }
 
         script {
@@ -1614,6 +1597,44 @@ object AdminViews {
                     uploadBtn.disabled=true;
                     """.trimIndent(),
                 )
+            }
+        }
+    }
+
+    /** 单轨上传历史卡。 */
+    private fun FlowContent.trackHistoryCard(track: String, rows: List<AdminQueries.ApkUploadRow>) {
+        val isDebug = track == "debug"
+        div("track-history") {
+            div("th-head") {
+                span("track-tag ${if (isDebug) "tag-debug" else "tag-release"}") { +track }
+                span("th-title") { +"上传历史（${rows.size}）" }
+            }
+            if (rows.isEmpty()) {
+                div("th-empty") { +"暂无 $track 轨上传记录" }
+            } else {
+                table {
+                    tr {
+                        th { +"时间" }
+                        th { +"版本" }
+                        th { +"文件名" }
+                        th { +"大小" }
+                        th { +"状态" }
+                    }
+                    rows.forEach { h ->
+                        tr {
+                            td { +fmtTs(h.createdAt) }
+                            td { +(h.version.ifBlank { "—" }) }
+                            td { +(h.fileName.ifBlank { "—" }) }
+                            td { +formatBytes(h.fileSize) }
+                            td {
+                                when (h.status) {
+                                    "success" -> span("active-badge") { +"成功" }
+                                    else -> span("err") { +(h.message ?: "失败") }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -2192,6 +2213,35 @@ object AdminViews {
                         .md-preview pre code{background:none;padding:0}
                         .md-preview blockquote{border-left:3px solid var(--c-primary);margin:8px 0;padding:4px 12px;color:var(--c-text-2);background:#fafafa}
                         .md-preview a{color:var(--c-primary)}
+                        /* 发包管理 v2（依 Ardot 设计稿：双轨版本卡 + 双栏上传 + 分轨历史） */
+                        .track-row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
+                        .track-card{flex:1;min-width:320px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:16px 20px}
+                        .track-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+                        .track-head .btn-ghost{margin-left:auto;height:28px;padding:4px 12px;font-size:var(--fs-xs)}
+                        .track-tag{display:inline-block;padding:2px 10px;border-radius:var(--r-sm);font-size:var(--fs-xs);font-weight:500;white-space:nowrap}
+                        .tag-debug{color:var(--c-success);background:var(--c-success-bg);border:1px solid var(--c-success-border)}
+                        .tag-release{color:var(--c-primary);background:#e6f2ff;border:1px solid #b8d9ff}
+                        .track-version{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+                        .track-ver{font-size:24px;font-weight:600;color:var(--c-text)}
+                        .track-code{font-size:var(--fs-sm);color:var(--c-text-2)}
+                        .track-meta{font-size:var(--fs-xs);color:var(--c-text-3)}
+                        .track-empty-text{color:var(--c-text-3);font-size:var(--fs-md);padding:16px 0;text-align:center}
+                        .upload-head{margin-bottom:14px}
+                        .upload-layout{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap}
+                        .upload-form{flex:1;min-width:320px;display:flex;flex-direction:column;gap:12px}
+                        .form-grid-2{display:flex;gap:12px;flex-wrap:wrap}
+                        .form-grid-2 .form-row{flex:1;min-width:180px}
+                        .upload-side{width:380px;display:flex;flex-direction:column;gap:12px}
+                        .upload-side .drop-zone{margin:0;flex:1;min-height:220px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+                        .upload-side .file-preview{margin:0;flex:1;align-items:flex-start}
+                        .upload-side .progress-wrap{margin:0}
+                        .upload-footer{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+                        .upload-footer .hint{flex:1;min-width:240px;font-size:var(--fs-xs);color:var(--c-text-3)}
+                        .history-split{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:24px}
+                        .track-history{flex:1;min-width:340px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);overflow:hidden}
+                        .th-head{display:flex;align-items:center;gap:8px;padding:12px 16px 8px}
+                        .th-title{font-size:var(--fs-md);font-weight:600;color:var(--c-text)}
+                        .th-empty{color:var(--c-text-3);font-size:var(--fs-sm);padding:16px;text-align:center;border-top:1px solid #f0f0f0}
                         @media (max-width:640px){
                         @media (max-width:900px){
                         .sidebar{position:static;width:auto;height:auto;flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--c-border);overflow:visible}
@@ -2224,6 +2274,9 @@ object AdminViews {
                         .whitelist-add{flex-direction:column;align-items:stretch}
                         .skills-layout{grid-template-columns:1fr}
                         .skill-previewbar .push{margin-left:0;width:100%}
+                        .track-card{min-width:100%}
+                        .track-history{min-width:100%}
+                        .upload-side{width:100%}
                         }
                         """.trimIndent(),
                     )
