@@ -1,5 +1,6 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.agent.core.inference.remote.koog.FinalOutputCorrector
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -24,6 +25,15 @@ internal class ProgramGuard {
 
     fun markCorrected() {
         corrections.incrementAndGet()
+    }
+
+    /** 分层 runtime M1：适配 shared 策略工厂的终结纠正钩子（每轮新实例，与本类同生命周期）。 */
+    fun asCorrector(): FinalOutputCorrector = object : FinalOutputCorrector {
+        override fun correctionGateError(assistantText: String): String? = invalidProgramError(assistantText)
+        override fun rawValidationError(assistantText: String): String? =
+            RenderOpenUiValidator.validateProgramToError(assistantText)
+        override fun markCorrected() = this@ProgramGuard.markCorrected()
+        override fun correctionPrompt(error: String): String = ProgramGuard.correctionPrompt(error)
     }
 
     companion object {
