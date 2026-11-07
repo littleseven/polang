@@ -931,6 +931,7 @@ object AdminViews {
         body: String = "",
         testMessage: String = "",
         error: String? = null,
+        history: List<SkillDebugHistoryRow> = emptyList(),
     ): String = createHTML().html {
         adminHead("技能调试 · PoLang 管理后台")
         body {
@@ -997,6 +998,50 @@ object AdminViews {
                     div("form-actions") {
                         a("/admin/skills", classes = "btn btn-ghost") { +"返回" }
                         input(type = InputType.submit, classes = "btn") { value = "跑一轮调试" }
+                    }
+                }
+
+                // ── 调试历史留底（0.9.32）：每轮合成会话落库即留底，点「结果」直达可视化预览页 ──
+                section("settings-section") {
+                    div("section-head") {
+                        h2("section-title") { +"调试历史（${history.size}）" }
+                        p("section-desc") { +"每轮调试会话留底（model=skill-debug，最新 20 条）；事件与完整回放页共享，结果页带手机壳可视化预览。" }
+                    }
+                    if (history.isEmpty()) {
+                        p("meta") { +"（尚无调试记录——跑一轮后此处留底）" }
+                    } else {
+                        table {
+                            tr {
+                                th { +"时间" }
+                                th { +"技能" }
+                                th { +"测试消息" }
+                                th { +"状态" }
+                                th { +"耗时" }
+                                th { +"事件" }
+                                th { +"操作" }
+                            }
+                            history.forEach { h ->
+                                tr {
+                                    td { +fmtTs(h.session.createdAt) }
+                                    td { +(h.skillName ?: "（未触发）") }
+                                    td { +((h.testMessage ?: "—").take(80)) }
+                                    td {
+                                        when {
+                                            h.finishReason == null -> span("badge") { +"运行中" }
+                                            h.finishReason == "done" -> span("badge badge-active") { +"完成" }
+                                            else -> span("st-badge st-blocked") { +"异常" }
+                                        }
+                                    }
+                                    td { +(h.elapsedMs?.let { "${it}ms" } ?: "—") }
+                                    td { +h.session.eventCount.toString() }
+                                    td {
+                                        a("/admin/skills/debug/result/${h.session.id}", classes = "btn-sm") { +"结果" }
+                                        +" "
+                                        a("/admin/agent/sessions/${h.session.id}", classes = "btn-sm") { +"回放" }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -65,8 +65,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 /** 技能调试 playground：合成会话 owner（64 hex 与真实 token_hash 同形；输入域隔离，零碰撞，绝不落 account 表）。 */
 private val SKILL_DEBUG_OWNER_HASH = AccountService.sha256("admin-skill-debug")
 
-/** 技能调试会话的 model 标记：modelMap 未命中回退渠道 defaultModel；回放列表据此辨识调试会话。 */
-private const val SKILL_DEBUG_MODEL = "skill-debug"
+// 技能调试会话的 model 标记（modelMap 未命中回退渠道 defaultModel；回放列表据此辨识调试会话）
+// 已收编 AdminQueries.SKILL_DEBUG_MODEL（同包顶层 internal const）——建会话与历史查询同源。
 
 /** 技能调试单轮超时（与 /agent 路由 ROUND_TIMEOUT_MS 同口径：合法长轮上界 20 迭代 × ~45s）。 */
 private const val SKILL_DEBUG_ROUND_TIMEOUT_MS: Long = 15 * 60 * 1000L
@@ -665,6 +665,7 @@ fun Route.adminRoute(
                     name = prefill?.meta?.name ?: name,
                     description = prefill?.meta?.description.orEmpty(),
                     body = prefill?.body.orEmpty(),
+                    history = AdminQueries.skillDebugHistory(),
                 ),
                 ContentType.Text.Html,
             )
@@ -683,6 +684,7 @@ fun Route.adminRoute(
                         skills = skillCenter?.listDetailed() ?: emptyList(),
                         name = name, description = description, body = body,
                         testMessage = testMessage, error = error,
+                        history = AdminQueries.skillDebugHistory(),
                     ),
                     ContentType.Text.Html,
                     HttpStatusCode.BadRequest,
