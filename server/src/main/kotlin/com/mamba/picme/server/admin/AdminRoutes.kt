@@ -1,7 +1,20 @@
 package com.mamba.picme.server.admin
 
+import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.agents.core.tools.reflect.asToolsByClass
 import com.mamba.picme.server.analytics.Price
 import com.mamba.picme.server.analytics.defaultPrices
+import com.mamba.picme.server.agent.AgentBridgeRegistry
+import com.mamba.picme.server.agent.AgentChannelKind
+import com.mamba.picme.server.agent.AgentRunner
+import com.mamba.picme.server.agent.AgentSessionRepository
+import com.mamba.picme.server.agent.AgentSessionStatus
+import com.mamba.picme.server.agent.AgentTargetResolver
+import com.mamba.picme.server.agent.DeviceToolService
+import com.mamba.picme.server.agent.LoadSkillToolService
+import com.mamba.picme.server.agent.OpenUiTurnNative
+import com.mamba.picme.server.agent.OverlaySkillCenter
+import com.mamba.picme.server.agent.ServerToolService
 import com.mamba.picme.server.agent.SkillCenter
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.auth.AiEngineerWhitelistService
@@ -40,8 +53,23 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.util.date.GMTDate
 import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+
+/** 技能调试 playground：合成会话 owner（64 hex 与真实 token_hash 同形；输入域隔离，零碰撞，绝不落 account 表）。 */
+private val SKILL_DEBUG_OWNER_HASH = AccountService.sha256("admin-skill-debug")
+
+/** 技能调试会话的 model 标记：modelMap 未命中回退渠道 defaultModel；回放列表据此辨识调试会话。 */
+private const val SKILL_DEBUG_MODEL = "skill-debug"
+
+/** 技能调试单轮超时（与 /agent 路由 ROUND_TIMEOUT_MS 同口径：合法长轮上界 20 迭代 × ~45s）。 */
+private const val SKILL_DEBUG_ROUND_TIMEOUT_MS: Long = 15 * 60 * 1000L
 
 /**
  * 管理后台路由：/admin 下全部页面。主 app-token 拦截器（Application.module）对 /admin 前缀放行，
@@ -54,7 +82,11 @@ fun Route.adminRoute(
     prices: Map<String, Price> = defaultPrices(),
     issueReportService: IssueReportService = IssueReportService(GitHubIssueClient(HttpClient(CIO), "", "")),
     skillCenter: SkillCenter? = null,
+    agentRunner: AgentRunner? = null,
+    agentBridge: AgentBridgeRegistry? = null,
 ) {
+    // 技能调试 playground 跑轮协程域：模块级长存（SupervisorJob 单轮失败不连坐）
+    val skillDebugScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     route("/admin") {
         get("/login") {
             if (adminToken.isBlank()) {
@@ -617,6 +649,111 @@ fun Route.adminRoute(
             val name = call.parameters["name"].orEmpty()
             val ok = skillCenter?.delete(name) == true
             call.respondRedirect("/admin/skills?msg=" + (if (ok) "已删除 $name" else "删除失败 $name"))
+        }
+
+        // ── 技能调试 playground（2026-11-07）：草稿内存 overlay 跑一轮真实云端 Agent。
+        // 草稿不落盘（OverlaySkillCenter 内存覆盖同名磁盘项，其余透传）、不耗配额（admin
+        // 限定）、不碰生产资产；设备工具无真机——写帧即抛，立即 error: device_offline
+        // 结构化降级（模型看到的工具清单与生产一致）。跑轮异步进行，立即跳事件回放页。
+        get("/skills/debug") {
+            if (!call.adminGuard(adminToken)) return@get
+            val name = call.request.queryParameters["name"].orEmpty()
+            val prefill = skillCenter?.detail(name)
+            call.respondText(
+                AdminViews.skillDebugPage(
+                    skills = skillCenter?.listDetailed() ?: emptyList(),
+                    name = prefill?.meta?.name ?: name,
+                    description = prefill?.meta?.description.orEmpty(),
+                    body = prefill?.body.orEmpty(),
+                ),
+                ContentType.Text.Html,
+            )
+        }
+
+        post("/skills/debug/run") {
+            if (!call.adminGuard(adminToken)) return@post
+            val params = call.receiveParameters()
+            val name = params["name"].orEmpty().trim()
+            val description = params["description"].orEmpty().trim()
+            val body = params["body"].orEmpty().trim()
+            val testMessage = params["test_message"].orEmpty().trim()
+            suspend fun fail(error: String) {
+                call.respondText(
+                    AdminViews.skillDebugPage(
+                        skills = skillCenter?.listDetailed() ?: emptyList(),
+                        name = name, description = description, body = body,
+                        testMessage = testMessage, error = error,
+                    ),
+                    ContentType.Text.Html,
+                    HttpStatusCode.BadRequest,
+                )
+            }
+            // 校验与 upsert 同口径（但不落盘——草稿只活在本轮内存）
+            if (!SkillCenter.NAME_REGEX.matches(name)) {
+                fail("技能名非法：只允许小写字母/数字/连字符（1~64 位，字母或数字开头）")
+                return@post
+            }
+            if (description.isEmpty()) {
+                fail("description 不能为空（LLM 判断相关性的唯一依据）")
+                return@post
+            }
+            if (description.contains('\n') || description.contains('\r')) {
+                fail("description 必须单行")
+                return@post
+            }
+            if (body.isEmpty()) {
+                fail("正文不能为空")
+                return@post
+            }
+            if (testMessage.isEmpty()) {
+                fail("测试消息不能为空")
+                return@post
+            }
+            val center = skillCenter ?: run { fail("skill center 未启用"); return@post }
+            val runner = agentRunner ?: run { fail("agent runner 未启用"); return@post }
+            val channel = ChannelRegistry.active() ?: run { fail("无活跃 LLM 渠道，请先在「渠道」页配置"); return@post }
+            val target = AgentTargetResolver.fromChannel(channel, SKILL_DEBUG_MODEL)
+                ?: run { fail("渠道 ${channel.name} 不可用（缺上游 token 或默认模型）"); return@post }
+
+            val draft = SkillCenter.SkillDetail(
+                meta = SkillCenter.SkillMeta(name, description),
+                body = body, updatedAtMs = 0L, rawChars = body.length,
+            )
+            val overlay = OverlaySkillCenter(center, draft)
+            val session = AgentSessionRepository.create(SKILL_DEBUG_OWNER_HASH, AgentChannelKind.GATEWAY, SKILL_DEBUG_MODEL)
+            skillDebugScope.launch {
+                val deviceTools = agentBridge?.let { bridge ->
+                    DeviceToolService(session.id, bridge, DeviceToolService.DEFAULT_TIMEOUT_MS) {
+                        throw IllegalStateException("skill debug: device writer absent")
+                    }
+                }
+                // 与 /agent messages 路由同装配：服务端工具 + load_skill + 设备目录工具
+                val toolRegistry = ToolRegistry {
+                    tools(
+                        ServerToolService().asToolsByClass() +
+                            LoadSkillToolService(overlay).asToolsByClass() +
+                            (deviceTools?.tools() ?: emptyList()),
+                    )
+                }
+                try {
+                    withTimeoutOrNull(SKILL_DEBUG_ROUND_TIMEOUT_MS) {
+                        runner.runTurn(
+                            session = session,
+                            userMessage = testMessage,
+                            target = target,
+                            // system prompt 与生产同构：OpenUI 回合原生 + 技能清单段（overlay 版）
+                            systemPrompt = OpenUiTurnNative.SYSTEM_PROMPT + overlay.promptSection(),
+                            toolRegistry = toolRegistry,
+                        )
+                    }
+                } catch (e: Throwable) {
+                    // 与 /agent 路由同口径：异常置 ERROR；事件已落库，回放页可见全程
+                    if (e !is CancellationException) {
+                        AgentSessionRepository.updateStatus(session.id, AgentSessionStatus.ERROR)
+                    }
+                }
+            }
+            call.respondRedirect("/admin/agent/sessions/${session.id}")
         }
 
         // ── 问题诊断页（用户上报问题；AI 工程师白名单已迁至 /admin/settings）──

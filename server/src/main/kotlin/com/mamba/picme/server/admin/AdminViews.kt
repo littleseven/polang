@@ -632,6 +632,7 @@ object AdminViews {
                     p("meta") {
                         +"技能 = 按需加载的指令包（SKILL.md），云端 Agent 经 load_skill 加载；保存即热更新（下一轮跑轮生效，无需部署）。"
                     }
+                    a("/admin/skills/debug", classes = "btn btn-ghost") { +"调试" }
                     a("/admin/skills/new", classes = "btn") { +"＋ 新增技能" }
                 }
                 div("skill-stats") {
@@ -913,6 +914,90 @@ object AdminViews {
                     }
                 }
                 p("meta") { +"同名目录磁盘直读 · rsync 即热更新 · frontmatter 非法则整体不进清单" }
+            }
+        }
+    }
+
+    /**
+     * 技能调试 playground（2026-11-07）：草稿表单 + 测试消息，提交后服务端建合成会话
+     * 异步跑一轮真实云端 Agent（草稿经 OverlaySkillCenter 内存覆盖同名磁盘技能），
+     * 立即跳事件回放页。草稿不落盘、不耗配额、不碰生产资产。
+     */
+    fun skillDebugPage(
+        skills: List<SkillCenter.SkillDetail>,
+        name: String = "",
+        description: String = "",
+        body: String = "",
+        testMessage: String = "",
+        error: String? = null,
+    ): String = createHTML().html {
+        adminHead("技能调试 · PoLang 管理后台")
+        body {
+            navBar()
+            div("page") {
+                h1("page-title") { +"技能调试" }
+                if (error != null) div("toast toast-err") { +error }
+                div("skill-previewbar") {
+                    p("meta") {
+                        +"草稿只在内存覆盖本轮（同名技能被草稿替换，其余透传磁盘版）；不落盘、不耗配额、不碰生产资产。"
+                    }
+                    span("push") {
+                        a("/admin/skills", classes = "btn btn-ghost") { +"返回列表" }
+                    }
+                }
+                if (skills.isNotEmpty()) {
+                    p("meta") {
+                        +"从磁盘技能载入草稿： "
+                        skills.forEach { s ->
+                            a("/admin/skills/debug?name=${s.meta.name}", classes = "btn-sm") { +s.meta.name }
+                            +" "
+                        }
+                    }
+                }
+                form(action = "/admin/skills/debug/run", method = FormMethod.post, classes = "settings-section") {
+                    div("section-head") {
+                        h2("section-title") { +"技能草稿 + 测试消息" }
+                        p("section-desc") {
+                            +"与生产同一 system prompt 与工具清单（设备工具无真机，调用即得 device_offline 降级）；"
+                            +"提交后建合成调试会话（model=skill-debug）异步跑一轮，自动跳转事件回放页。"
+                        }
+                    }
+                    div("skill-field") {
+                        label { +"名称（同名 = 草稿覆盖磁盘版；新名 = 草稿新增）" }
+                        textInput(name = "name") {
+                            value = name
+                            placeholder = "html-card"
+                        }
+                    }
+                    div("skill-field") {
+                        label { +"描述（单行；system prompt 清单段注入）" }
+                        textInput(name = "description") {
+                            value = description
+                            placeholder = "当需要……时，先加载本技能。"
+                        }
+                    }
+                    div("skill-field") {
+                        label { +"正文（markdown 指令；load_skill 返回，上限 ${"%,d".format(SkillCenter.MAX_CONTENT_CHARS)} 字符）" }
+                        textArea {
+                            attributes["name"] = "body"
+                            attributes["rows"] = "14"
+                            +(body.ifBlank { "# 技能标题\n\n## 何时使用\n\n## 步骤\n\n## 约束\n" })
+                        }
+                    }
+                    div("skill-field") {
+                        label { +"测试消息（作为用户消息跑一轮）" }
+                        textArea {
+                            attributes["name"] = "test_message"
+                            attributes["rows"] = "3"
+                            attributes["placeholder"] = "帮我生成一个 HTML 投票卡片"
+                            +testMessage
+                        }
+                    }
+                    div("form-actions") {
+                        a("/admin/skills", classes = "btn btn-ghost") { +"返回" }
+                        input(type = InputType.submit, classes = "btn") { value = "跑一轮调试" }
+                    }
+                }
             }
         }
     }

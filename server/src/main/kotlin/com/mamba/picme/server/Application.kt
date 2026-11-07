@@ -256,7 +256,11 @@ fun Application.module(config: AppConfig) {
         // Skill 中心下载端点（spike）：端侧 Agent 的 skill 资产来源
         skillRoute(skillCenter)
         // 管理后台（/admin/**，独立 cookie 认证）
-        adminRoute(config.adminToken, cosService, balanceService, config.llmPrices, issueReportService, skillCenter = skillCenter)
+        // 技能调试 playground 需要 agentRunner（跑轮）与 agentBridge（设备工具降级注册）
+        adminRoute(
+            config.adminToken, cosService, balanceService, config.llmPrices, issueReportService,
+            skillCenter = skillCenter, agentRunner = agentRunner, agentBridge = agentBridge,
+        )
     }
 }
 

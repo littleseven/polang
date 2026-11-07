@@ -126,4 +126,52 @@ class SkillCenterTest {
         assertTrue(section.contains("load_skill"))
         assertTrue(section.contains("- html-card: HTML 沙箱卡撰写规范"))
     }
+
+    // ── OverlaySkillCenter（技能调试 playground 草稿覆盖）──
+
+    private fun draft(name: String, description: String = "草稿 $name", body: String = "草稿正文") =
+        SkillCenter.SkillDetail(
+            meta = SkillCenter.SkillMeta(name, description),
+            body = body, updatedAtMs = 0L, rawChars = body.length,
+        )
+
+    @Test
+    fun `overlay replaces same-name disk skill in manifest and content`() {
+        writeSkill("html-card", validSkill("html-card", description = "磁盘版描述", body = "磁盘版正文"))
+        val overlay = OverlaySkillCenter(SkillCenter(root), draft("html-card", description = "草稿版描述", body = "草稿版正文"))
+        val manifest = overlay.manifest()
+        assertEquals(listOf("html-card"), manifest.map { it.name })
+        assertEquals("草稿版描述", manifest.single().description)
+        assertEquals("草稿版正文", overlay.content("html-card"))
+        // promptSection 经 manifest 虚分派自动生效
+        assertTrue(overlay.promptSection().contains("- html-card: 草稿版描述"))
+    }
+
+    @Test
+    fun `overlay adds brand-new skill and passes through disk skills`() {
+        writeSkill("html-card", validSkill("html-card", body = "磁盘版正文"))
+        val overlay = OverlaySkillCenter(SkillCenter(root), draft("vote-card"))
+        assertEquals(listOf("html-card", "vote-card"), overlay.manifest().map { it.name })
+        assertEquals("磁盘版正文", overlay.content("html-card"))
+        assertEquals("草稿正文", overlay.content("vote-card"))
+    }
+
+    @Test
+    fun `overlay does not touch disk assets`() {
+        writeSkill("html-card", validSkill("html-card", body = "磁盘版正文"))
+        val base = SkillCenter(root)
+        OverlaySkillCenter(base, draft("html-card", body = "草稿版正文")).content("html-card")
+        // 磁盘真相不变
+        assertEquals("磁盘版正文", base.content("html-card"))
+        assertEquals("磁盘版正文", base.detail("html-card")!!.body)
+    }
+
+    @Test
+    fun `overlay truncates oversized draft body`() {
+        val big = draft("big-skill", body = "x".repeat(SkillCenter.MAX_CONTENT_CHARS + 100))
+        val content = OverlaySkillCenter(SkillCenter(root), big).content("big-skill")
+        assertNotNull(content)
+        assertTrue(content!!.length < SkillCenter.MAX_CONTENT_CHARS + 100)
+        assertTrue(content.endsWith("[truncated: skill big-skill exceeds ${SkillCenter.MAX_CONTENT_CHARS} chars]"))
+    }
 }
