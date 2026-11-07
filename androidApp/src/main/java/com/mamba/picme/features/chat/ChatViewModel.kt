@@ -1719,6 +1719,8 @@ class ChatViewModel(
                 pendingScriptMediaIds.remove(sessionId)
                 sessionSearchSnapshots.remove(sessionId)
                 sessionExcludes.remove(sessionId)
+                // 云端会话终结传播（2026-11-07 会话卫生）：本地会话删除即通知服务端 close
+                finishCloudSession(sessionId)
                 // 选中态是纯 UI 内存态，会话删除后整体清理，回退到推荐卡高亮即可
                 _gachaSelections.value = emptyMap()
                 // 删除的是工程师上下文所属会话 → 清掉持久化记录，避免 prefs 残留
@@ -2504,6 +2506,20 @@ class ChatViewModel(
         val sessionId = api.createSession(token, channel, model, baseUrl).getOrNull()
             ?.optString("session_id")?.takeIf { it.isNotBlank() } ?: return null
         return CloudSession(sessionId, channel, key).also { cloudSessions[localSessionId] = it }
+    }
+
+    /**
+     * 终结本地会话对应的云端会话（若有）并从缓存摘除（2026-11-07 会话卫生）：
+     * 尽力而为通知服务端 close，防 agent_session 表 running 僵尸堆积；失败仅记日志不阻断本地流程。
+     * 进程重启后云端 sessionId 随内存缓存丢失，遗留会话由服务端 stalled 语义兜底。
+     */
+    private suspend fun finishCloudSession(localSessionId: String) {
+        val cloud = cloudSessions.remove(localSessionId) ?: return
+        val api = cloudAgentApi ?: return
+        val token = userSettingsRepository.serverAuthTokenFlow.first()
+        if (token.isBlank()) return
+        runCatching { api.finish(token, cloud.sessionId) }
+            .onFailure { error -> Logger.w(TAG, "Failed to finish cloud session: ${error.message}") }
     }
 
     /** 会话失效判定：HTTP 404 / 服务端 session_not_found 语义（403 配额类不重试）。 */
@@ -4149,6 +4165,9 @@ class ChatViewModel(
                 lastResultAssets.remove(sessionId)
                 sessionSearchSnapshots.remove(sessionId)
                 pendingScriptMediaIds.remove(sessionId)
+                // 云端会话终结传播（2026-11-07 会话卫生）：清空 = 语境重置，云端会话同步终结
+                // （服务端事件流仍持旧上下文），下回合经 ensureCloudSession 懒建新会话
+                finishCloudSession(sessionId)
                 Logger.i(TAG, "Chat cleared for session: $sessionId")
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to clear chat", e)

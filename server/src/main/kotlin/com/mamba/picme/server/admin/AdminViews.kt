@@ -484,10 +484,12 @@ object AdminViews {
                         td { a("/admin/agent/sessions/${s.id}") { +s.id.take(8) } }
                         td { +s.userLabel }
                         td {
-                            span("st-badge ${sessionStatusClass(s.status)}") { +s.status }
+                            // 假 running 收口（2026-11-07）：stalled 会话状态列直显 stalled，
+                            // running 徽标只保留给真实活跃会话（≤30min 有事件）
                             if (isStalled(s)) {
-                                +" "
                                 span("st-badge st-muted") { +"stalled" }
+                            } else {
+                                span("st-badge ${sessionStatusClass(s.status)}") { +s.status }
                             }
                         }
                         td { +s.channelKind }
@@ -522,7 +524,7 @@ object AdminViews {
             h1 { +"会话回放 ${session.id.take(8)}" }
             div("cards") {
                 statCard("用户", session.userLabel)
-                statCard("状态", session.status)
+                statCard("状态", if (isStalled(session)) "stalled" else session.status)
                 statCard("渠道", session.channelKind)
                 statCard("模型", session.model)
                 statCard("事件数", session.eventCount.toString())

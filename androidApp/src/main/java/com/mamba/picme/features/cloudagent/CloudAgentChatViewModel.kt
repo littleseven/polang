@@ -12,7 +12,10 @@ import com.mamba.picme.domain.chat.AgentStepUi
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -252,6 +255,25 @@ class CloudAgentChatViewModel(
     fun stop() {
         turnJob?.cancel()
         setInFlight(false)
+    }
+
+    override fun onCleared() {
+        finishSessionBestEffort()
+    }
+
+    /**
+     * 终结云端会话（2026-11-07 会话卫生）：尽力而为通知服务端 close，
+     * 防 agent_session 表 running 僵尸堆积。viewModelScope 已随 onCleared 取消，
+     * finish 走一次性独立协程（一个往返即终，完成即回收）；失败仅记日志，
+     * 服务端 stalled 语义兜底。internal 供单测直调（onCleared 是 protected）。
+     */
+    internal fun finishSessionBestEffort() {
+        val chat = _state.value as? UiState.Chat ?: return
+        val token = appToken
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { api.finish(token, chat.sessionId) }
+                .onFailure { error -> Logger.w(TAG, "finish cloud session failed: ${error.message}") }
+        }
     }
 
     /**
