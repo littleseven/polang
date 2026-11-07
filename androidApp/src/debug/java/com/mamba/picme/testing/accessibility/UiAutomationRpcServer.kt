@@ -180,6 +180,24 @@ class UiAutomationRpcServer(
         clickable: Boolean?,
         scrollable: Boolean?
     ): List<AccessibilityNodeInfo> {
+        val result = collectMatches(root, text, contentDescription, className, clickable, scrollable)
+        // text 零命中时回退匹配 contentDescription：dump 展示的 label 是 text ?: contentDescription，
+        // 严格字段分离导致「dump 里看得到、click --text 点不到」（底部导航等标签全写在 CD 上）；
+        // 仅在零命中时回退，不改变存在 text 命中时的旧行为与优先级
+        if (result.isEmpty() && text != null && contentDescription == null) {
+            return collectMatches(root, null, text, className, clickable, scrollable)
+        }
+        return result
+    }
+
+    private fun collectMatches(
+        root: AccessibilityNodeInfo,
+        text: String?,
+        contentDescription: String?,
+        className: String?,
+        clickable: Boolean?,
+        scrollable: Boolean?
+    ): List<AccessibilityNodeInfo> {
         val result = mutableListOf<AccessibilityNodeInfo>()
         val stack = ArrayDeque<AccessibilityNodeInfo>()
         stack.add(root)
