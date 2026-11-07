@@ -2,6 +2,7 @@ package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.agent.AgentEventPayload
 import com.mamba.picme.server.agent.SkillCenter
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -524,6 +525,7 @@ class AdminViewsTest {
             skillName = "html-card",
             finishReason = "done",
             elapsedMs = 4000L,
+            hasFinalProgram = true,
         )
         val running = SkillDebugHistoryRow(
             session = sessionFixture().copy(id = "bbbb2222-0000-0000-0000-000000000000"),
@@ -531,6 +533,7 @@ class AdminViewsTest {
             skillName = null,
             finishReason = null,
             elapsedMs = null,
+            hasFinalProgram = false,
         )
         val html = AdminViews.skillDebugPage(skills = emptyList(), history = listOf(done, running))
         assertTrue(html.contains("调试历史（2）"))
@@ -542,6 +545,10 @@ class AdminViewsTest {
         assertTrue(html.contains("4000ms"))
         assertTrue(html.contains("/admin/skills/debug/result/abcd1234-0000-0000-0000-000000000000"))
         assertTrue(html.contains("/admin/agent/sessions/bbbb2222-0000-0000-0000-000000000000"))
+        // 扫码网格（0.9.38）：有最终程序的会话出二维码（三列网格），无最终程序的不出
+        assertTrue(html.contains("qr-grid"))
+        assertEquals(1, html.split("class=\"qr-cell\"").size - 1) // done 出、running 不出
+        assertTrue(html.contains("手机扫码预览（端上真实渲染器）"))
     }
 
     @Test

@@ -139,6 +139,7 @@ data class SkillDebugHistoryRow(
     val skillName: String?,       // 首个 load_skill 调用的 name 参数（未触发 = null）
     val finishReason: String?,    // null = 运行中
     val elapsedMs: Long?,         // finish - 首条 user message（与结果页同口径）
+    val hasFinalProgram: Boolean, // 有最终 assistant 消息 = final-program 端点可取数（扫码预览门控）
 )
 
 /** M2 管理后台 Agent 会话列表行。stalled 判定（lastEventAt >30min）归视图层。 */
@@ -761,7 +762,7 @@ object AdminQueries {
             val events = AgentEvents.selectAll()
                 .where {
                     (AgentEvents.sessionId inList sessions.map { it.id }) and
-                        (AgentEvents.type inList listOf("user_message", "action", "finish"))
+                        (AgentEvents.type inList listOf("message", "action", "finish"))
                 }
                 .orderBy(AgentEvents.id to SortOrder.ASC)
                 .map { r ->
@@ -773,6 +774,18 @@ object AdminQueries {
                     )
                 }
                 .groupBy { it.sessionId }
+            // 扫码预览门控（0.9.38）：有最终 assistant 消息的会话才可被 final-program 端点
+            // 取数（与 AgentRoutes final-program 判定同口径 type=message & role=assistant）。
+            // 只取 sessionId 不取 payload，保持本查询轻量。
+            val finalProgramSessionIds = AgentEvents.select(AgentEvents.sessionId)
+                .where {
+                    (AgentEvents.sessionId inList sessions.map { it.id }) and
+                        (AgentEvents.type eq "message") and
+                        (AgentEvents.role eq "assistant")
+                }
+                .withDistinct()
+                .map { it[AgentEvents.sessionId] }
+                .toSet()
             sessions.map { s ->
                 val evs = events[s.id].orEmpty()
                 val userMsg = evs.firstOrNull { it.role == "user" && it.payload is AgentEventPayload.Message }
@@ -785,6 +798,7 @@ object AdminQueries {
                     skillName = loadSkillArgs?.let { SKILL_NAME_IN_ARGS.find(it)?.groupValues?.get(1) },
                     finishReason = (finish?.payload as? AgentEventPayload.Finish)?.reason,
                     elapsedMs = if (finish != null && userMsg != null) finish.createdAt - userMsg.createdAt else null,
+                    hasFinalProgram = s.id in finalProgramSessionIds,
                 )
             }
         }

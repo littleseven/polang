@@ -1053,6 +1053,26 @@ object AdminViews {
                                 }
                             }
                         }
+                        // 手机扫码预览网格（0.9.38）：有最终程序的会话直接扫码上真机渲染，
+                        // 一行三列；门控与 final-program 取数端点同口径（hasFinalProgram）
+                        val qrRows = history.filter { it.hasFinalProgram }
+                        if (qrRows.isNotEmpty()) {
+                            p("block-label") { +"手机扫码预览（端上真实渲染器）" }
+                            p("meta") { +"PoLang 调试包云端 Agent 页扫码，按会话拉取最终程序渲染。" }
+                            div("qr-grid") {
+                                qrRows.forEach { h ->
+                                    div("qr-cell") {
+                                        unsafe { raw(QrCodeSvg.svg(openUiPreviewDeepLink(h.session.id))) }
+                                        div("qr-meta") {
+                                            +"${h.skillName ?: "（未触发）"} · ${fmtTs(h.session.createdAt)}"
+                                            br
+                                            +h.session.id.take(8)
+                                        }
+                                        a("/admin/skills/debug/result/${h.session.id}", classes = "btn-sm") { +"结果" }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2555,6 +2575,11 @@ object AdminViews {
                         .qr-row{display:flex;gap:18px;align-items:center;padding:14px 16px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md);margin-bottom:14px}
                         .qr-row svg{flex-shrink:0;border:1px solid var(--c-border);border-radius:var(--r-sm)}
                         .qr-row .meta{word-break:break-all}
+                        /* 调试历史扫码网格（0.9.38）：一行三列，每列一个会话二维码 */
+                        .qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:10px}
+                        .qr-cell{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;background:#fafafc;border:1px solid var(--c-border);border-radius:var(--r-md)}
+                        .qr-cell svg{border:1px solid var(--c-border);border-radius:var(--r-sm)}
+                        .qr-cell .qr-meta{text-align:center;word-break:break-all;font-size:var(--fs-xs);color:var(--c-text-3);line-height:1.6}
                         /* 发包管理 v2（依 Ardot 设计稿：双轨版本卡 + 双栏上传 + 分轨历史） */
                         .track-row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
                         .track-card{flex:1;min-width:320px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:16px 20px}
