@@ -1,5 +1,8 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.domain.chat.openui.OpenUiContract
+import com.mamba.picme.domain.chat.openui.OpenUiLibrary
+
 /**
  * OpenUI 程序负载校验器——把「LLM 写错 OpenUI 线格式」从端侧静默降级提前为
  * 服务端同轮纠错。
@@ -9,14 +12,15 @@ package com.mamba.picme.server.agent
  *    结构校验 + 布局门禁，非法 → correctInvalidProgram 节点携带错误清单回环）；
  * 2. [OpenUiTurnNative.ensureValidProgram] 终结落流前兜底校验。
  *
- * 结构级轻量校验（OpenUI 白名单资产与 shared 字面量副本同源——L7 产出协议层资产，
- * 分层 runtime M1 未收口；真引用化属后续里程碑）：
+ * 结构级轻量校验（OpenUI 白名单资产真引用 shared——分层 runtime M1.5 起
+ * `OpenUiLibrary.componentNames`/`iconNames` 与 `OpenUiContract` 常量为唯一出处，
+ * 原字面量副本已收口）：
  * 不跑完整 parser，只做正则级——root 入口存在性 / 组件名白名单 /
  * Query local_handle 形态 / program 长度上限
  * （对齐 render_html 128_000 先例）+ 隐私投影禁令（媒体路径禁入 program）+
  * Image 图片来源校验（photo/src 二缺一）+ 图片地址键 https 限（src/bgImageSrc/image，
  * [PRIVACY] 同 A2UI Image.url 口径）。规则与 shared
- * `OpenUiContract`/`OpenUiLibrary` 字面量副本对齐，改动须双向同步核对。
+ * `OpenUiContract`/`OpenUiLibrary` 同源。
  * （2026-10-24 起不再禁内联 Query：端侧引擎已支持内联提升（fix/a2ui 0e5856b10），
  * 原「内联判 inline-reserved 静默丢弃」根因已根治，服务端不再误杀合法负载。）
  *
@@ -29,89 +33,31 @@ object RenderOpenUiValidator {
     const val MAX_PROGRAM_LENGTH = 128_000
 
     /**
-     * 组件白名单（生成引导面，与 shared `OpenUiLibrary.components` 字面量
-     * 副本对齐（101，双端齐平）：M2（2026-10-24）+Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider；
-     * M3（2026-10-24）+Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch；
-     * 2026-10-25 官方组件库全量补全（spec《openui-full-library-design》）21→89——
-     * 官方 82 组件适配 81（Col 列式 Table 刻意不收，行式为唯一形态）+ 本仓既有 8；
-     * 2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
-     * 2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
-     * 2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
-     * 2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
-     * 2026-11-01 turn-native：+Html（L2 沙箱入树，spec§3.6）。
+     * 组件白名单（生成引导面）——真引用 shared `OpenUiLibrary.componentNames`
+     * （分层 runtime M1.5，原 103 项字面量副本已收口；逐项治理史见 shared 侧
+     * `OpenUiLibrary` KDoc 与 `OpenUiLibraryM2Test`）。
      * 元素形状组件（TabItem/Series/Slice/… 仅作父组件数组元素的对象形状）同收白名单，
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
      * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
      * 实渲染化，独立/列表内皆可）。
-     * internal 供测试钉住全清单（字面量副本同源核对）。
+     * internal 供测试钉住派生关系。
      */
-    internal val ALLOWED_COMPONENTS = setOf(
-        // 本仓既有 + M2/M3 扩（原二十一组件）
-        "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
-        "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
-        "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
-        // 官方别名（schema 注册官方名，渲染复用既有实现）
-        "Stack", "Separator", "MarkDownRenderer",
-        // 通用布局原语批次（2026-10-30 本仓扩展：四宫格/比例分栏/叠放/留白经典版式）
-        "Grid", "Box", "Spacer",
-        // 经典组合版式批次（2026-10-31 本仓扩展：统计行/题图横幅固化构图）
-        "StatRow", "StatItem", "Banner",
-        // 相册 APP 组合方式批次（2026-10-31 本仓扩展：方形照片网格/人物头像条签名形态）
-        "PhotoGrid", "AvatarRow",
-        // 布局可控性批次（2026-10-31）：前后对比/时间轴固化件 + 双图并排图表网格
-        // （R3 门禁的合法出口；渲染器与工具描述在 App/M4 批次落地）
-        "CompareRow", "Timeline", "ChartGrid",
-        // 回合原生批次（2026-11-01）：L2 沙箱 HTML 组件入树（spec§3.6）
-        "Html",
-        // 视频组件批次（2026-11-04）：本地视频播放（photo = #videos 投影 id / src https
-        // 公网视频，二缺一；签名对齐 Image）
-        "Video",
-        // 任务卡 OpenUI 化批次（2026-11-02）：通用进度条（端侧合成任务卡首用，
-        // LLM 卡同权可用）
-        "Progress",
-        // 官方内容/布局
-        "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
-        "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
-        "BoldText", "IconText", "ImageText", "ImageTextLarge", "EntityList",
-        "ListBlock", "Steps", "Carousel", "Buttons", "IconButton", "Modal",
-        // 官方表单（name 键控 → 交互即 @Set($<name>, 值) 直写 state）
-        "Form", "FormControl", "Input", "TextArea", "Select", "DatePicker",
-        "CheckBoxGroup", "RadioGroup", "SwitchGroup", "Chips", "OptionCards", "EditableTable",
-        // 官方图表
-        "AreaChart", "HorizontalBarChart", "RadarChart", "RadialChart",
-        "SingleStackedBarChart", "ScatterChart",
-        // 官方卡块（items* + layout?=grid|carousel + action?）
-        "MetricIndicatorInline", "MetricIndicatorWithStrikethrough",
-        "SnippetCardBlock", "OverviewCardBlock", "ContextCardBlock",
-        "CompositeCardBlock", "VisualCardBlock",
-        // 元素形状（仅作父组件数组元素，独立出现渲染空占位）
-        "TabItem", "AccordionItem", "ListItem", "StepsItem", "SelectItem",
-        "CheckBoxItem", "RadioItem", "SwitchItem", "ChipItem", "OptionCard",
-        "Series", "Slice", "ScatterSeries", "Point",
-        "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
-        "CompositeCardItem", "VisualCardItem",
-    )
+    internal val ALLOWED_COMPONENTS: Set<String> = OpenUiLibrary.componentNames
 
     /**
-     * Icon.name 59 枚预定义图标名白名单（M2，禁 svgPath 同口径）——字面量副本三处同步：
-     * 本清单 ↔ shared `OpenUiLibrary.iconNames` ENUM 域 ↔
-     * `OpenUiPromptAssets.ICON_NAMES_TEXT` 描述内嵌清单，改动须三处核对（测试钉住同源）。
+     * Icon.name 预定义图标名白名单（M2，禁 svgPath 同口径）——真引用 shared
+     * `OpenUiLibrary.iconNames`（分层 runtime M1.5，原三处字面量副本已收口：
+     * 本清单 ↔ shared ENUM 域 ↔ `OpenUiPromptAssets.ICON_NAMES_TEXT`）。
      */
-    internal val ICON_NAMES = setOf(
-        "accountCircle", "add", "arrowBack", "arrowForward", "attachFile", "calendarToday",
-        "call", "camera", "check", "close", "delete", "download", "edit", "error", "event",
-        "fastForward", "favorite", "favoriteOff", "folder", "help", "home", "info",
-        "locationOn", "lock", "lockOpen", "mail", "menu", "moreHoriz", "moreVert",
-        "notifications", "notificationsOff", "pause", "payment", "person", "phone", "photo",
-        "play", "print", "refresh", "rewind", "search", "send", "settings", "share",
-        "shoppingCart", "skipNext", "skipPrevious", "star", "starHalf", "starOff", "stop",
-        "upload", "visibility", "visibilityOff", "volumeDown", "volumeMute", "volumeOff",
-        "volumeUp", "warning",
-    )
+    internal val ICON_NAMES: Set<String> = OpenUiLibrary.iconNames.toSet()
 
     /** 组件外允许的大写调用：Query（宿主取数语句）/ Mutation（写工具语句，@Run 执行，
      *  2026-11-01 官方对齐）/ Action（官方多动作包装语法）。 */
-    private val ALLOWED_CALLS = ALLOWED_COMPONENTS + listOf("Query", "Mutation", "Action")
+    private val ALLOWED_CALLS = ALLOWED_COMPONENTS + listOf(
+        OpenUiContract.CALL_QUERY,
+        OpenUiContract.CALL_MUTATION,
+        OpenUiContract.Actions.WRAPPER,
+    )
 
     // 字符串字面量一律走 OpenUiStringScan 字符级扫描（2026-11-04 SOE 修复：
     // "([^"\\]|\\.)*" 交替-星号正则的 GroupCurly 对每个字符递归一层栈帧，
@@ -189,17 +135,38 @@ object RenderOpenUiValidator {
     private val LOCAL_HANDLE_REF = Regex("""local://[^\s"}\],)]*""")
 
     /** fragment 闭集白名单（2026-10-24 review 🟡4）：typo（如 #photo）在服务端同轮纠错，
-     *  不放行到端侧整卡降级。新增 fragment 须同步 shared OpenUiContract + OpenUiCardHost。
+     *  不放行到端侧整卡降级。fragment 词表真引用 shared `OpenUiContract.FRAGMENT_*`
+     * （分层 runtime M1.5；新增 fragment 只改 shared 常量 + OpenUiCardHost 端侧解析）。
      *  2026-11-04 +videos（Video 组件取数）。 */
-    private val LOCAL_HANDLE_FORM = Regex("""local://scan/[0-9A-Za-z]+(#(histogram|photos|videos))?""")
+    /** fragment 词表（顺序钉住 = 历史正则逐字节等价：histogram|photos|videos）。 */
+    private val LOCAL_HANDLE_FRAGMENTS = listOf(
+        OpenUiContract.FRAGMENT_HISTOGRAM,
+        OpenUiContract.FRAGMENT_PHOTOS,
+        OpenUiContract.FRAGMENT_VIDEOS,
+    )
+
+    private val LOCAL_HANDLE_FORM =
+        Regex("""local://scan/[0-9A-Za-z]+(#(${LOCAL_HANDLE_FRAGMENTS.joinToString("|")}))?""")
     private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
+
+    /** QUOTED_ACTION 词表（顺序钉住 = 历史正则逐字节等价）：官方可 dispatch 动作
+     *  （`OpenUiContract.Actions`，OPEN_PHOTO 为宿主合成不入 program 故不在列）
+     *  + library 自定义动作名 + WRAPPER。 */
+    private val QUOTED_ACTION_WORDS = listOf(
+        OpenUiContract.Actions.OPEN_URL,
+        OpenUiContract.Actions.SET,
+        OpenUiContract.Actions.RESET,
+        OpenUiContract.Actions.TO_ASSISTANT,
+        OpenUiContract.Actions.RUN,
+    ) + OpenUiLibrary.customActions.map { action -> action.name } +
+        OpenUiContract.Actions.WRAPPER
 
     /** 动作表达式被包成字符串（2026-10-24 真机事故：LLM 写 "@OpenUrl(...)" 致端侧
      *  ACTION 校验 type-mismatch、按钮静默惰性）——须在字符串剥离前扫原文。
-     *  词表 = shared `OpenUiContract.Actions`（含 WRAPPER "Action"）+ library 自定义动作名
-     *  （`OpenUiLibrary.customActions`，M1 = Navigate）字面量副本，改动须双向同步核对。 */
+     *  词表真引用 shared `OpenUiContract.Actions` + `OpenUiLibrary.customActions`
+     * （分层 runtime M1.5，原字面量副本已收口）。 */
     private val QUOTED_ACTION =
-        Regex(""""@(OpenUrl|Set|Reset|ToAssistant|Run|Navigate|Action)\s*\(""")
+        Regex(""""@(${QUOTED_ACTION_WORDS.joinToString("|")})\s*\(""")
 
     /** @OpenUrl 字符串字面量首参抽取（2026-11-01 review Y5：与 Image src 的 https 硬校验
      *  同族——外链动作此前零闸，`@OpenUrl("file://…")` 等非法 scheme 直达端侧）。

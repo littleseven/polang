@@ -1,5 +1,7 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.domain.chat.openui.OpenUiLibrary
+
 /**
  * OpenUI prompt 资产（原 render_ui_openui 工具描述常量，2026-11-05 A2UI 退役/
  * OpenUI 唯一化时迁入本对象）：DSL 规则 + Icon 词表 + 黄金示例，
@@ -132,19 +134,11 @@ object OpenUiPromptAssets {
             "{title: \"返程\", time: \"2026-07-20\"}])])"
 
     /**
-     * Icon 预定义图标名清单（59 枚，描述内嵌用）——字面量副本与
-     * [RenderOpenUiValidator.ICON_NAMES] 同源，测试钉住（改动须四处核对，
-     * 见 RenderOpenUiValidator.ICON_NAMES KDoc）。
+     * Icon 预定义图标名清单（描述内嵌用）——真引用 shared [OpenUiLibrary.iconNames]
+     * （分层 runtime M1.5，原字面量副本已收口，与 [RenderOpenUiValidator.ICON_NAMES]
+     * 同源；非 const 因运行期派生，无 annotation 消费方）。
      */
-    const val ICON_NAMES_TEXT =
-        "accountCircle, add, arrowBack, arrowForward, attachFile, calendarToday, call, " +
-            "camera, check, close, delete, download, edit, error, event, fastForward, " +
-            "favorite, favoriteOff, folder, help, home, info, locationOn, lock, lockOpen, " +
-            "mail, menu, moreHoriz, moreVert, notifications, notificationsOff, pause, " +
-            "payment, person, phone, photo, play, print, refresh, rewind, search, send, " +
-            "settings, share, shoppingCart, skipNext, skipPrevious, star, starHalf, " +
-            "starOff, stop, upload, visibility, visibilityOff, volumeDown, volumeMute, " +
-            "volumeOff, volumeUp, warning"
+    val ICON_NAMES_TEXT: String = OpenUiLibrary.iconNames.joinToString(", ")
 
     /**
      * OpenUI Lang 1.0 DSL 规则正文（约束规则 → 时间轴黄金示例，逐字剪切自原
@@ -154,8 +148,10 @@ object OpenUiPromptAssets {
      *
      * ⚠️ 守卫：raw string 正文顶格为保持提示词字节，禁 re-indent——Kotlin raw
      * string 的前导空白是字符串值的一部分（曾因脚本 dedent 被腐蚀过）。
+     * 非 const：内嵌 [ICON_NAMES_TEXT] 运行期派生（分层 runtime M1.5；GenUI 发卡
+     * 工具退役后已无 annotation 消费方，拼接结果逐字节不变由测试钉住）。
      */
-    const val DSL_RULES =
+    val DSL_RULES: String =
         """约束（必须全部满足，否则端上拒绝渲染或静默丢弃组件）：
 1. program 是 OpenUI Lang 1.0 程序：每行一条语句，形如 `名 = 表达式`；组件调用
    大写开头——位置参数按签名序填入，可选参数推荐命名实参写法（如

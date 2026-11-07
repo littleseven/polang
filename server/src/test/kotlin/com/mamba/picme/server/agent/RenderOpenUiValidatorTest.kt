@@ -1,5 +1,6 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.domain.chat.openui.OpenUiLibrary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -285,11 +286,13 @@ root = Card([Image(photos[0].id, 1.5)])""",
 
     @Test
     fun `tool description icon list matches validator whitelist`() {
-        // 工具描述内嵌清单 ↔ 校验器白名单同源钉住（spec §5 三处字面量副本）
+        // 分层 runtime M1.5：三处字面量副本已收口——校验器白名单与描述内嵌清单
+        // 均真引用 shared OpenUiLibrary.iconNames，本测试钉派生关系而非副本相等
         assertEquals(
-            RenderOpenUiValidator.ICON_NAMES.sorted().joinToString(", "),
+            OpenUiLibrary.iconNames.joinToString(", "),
             OpenUiPromptAssets.ICON_NAMES_TEXT,
         )
+        assertEquals(OpenUiLibrary.iconNames.toSet(), RenderOpenUiValidator.ICON_NAMES)
     }
 
     @Test
@@ -329,60 +332,12 @@ root = Card([Image(photos[0].id, 1.5)])""",
     // ── 官方全量补全（2026-10-25，spec《openui-full-library-design》21→89） ──
 
     @Test
-    fun `whitelist pins all 103 openui library components`() {
-        // 字面量副本同源钉住：server 不依赖 :shared，本清单与 shared
-        // OpenUiLibrary.components 逐字一致（103——2026-11-04 视频组件批次 +Video 后双端齐平），改动须双向同步核对
-        // （跨模块漂移风险与 iconNames 同口径——两边测试各自全绿不代表同源，
-        //  改组件清单时人工双端核对）；2026-10-30 通用布局原语批次 89→92（+Grid/Box/Spacer）；
-        //  2026-10-31 经典组合版式批次 92→95（+StatRow/StatItem/Banner）；
-        //  2026-10-31 相册 APP 组合方式批次 95→97（+PhotoGrid/AvatarRow）；
-        //  2026-10-31 布局可控性批次 97→100（+CompareRow/Timeline/ChartGrid）；
-        //  2026-11-01 turn-native：+Html（L2 沙箱入树，spec§3.6）
-        val expected = setOf(
-            // 本仓既有 + M2/M3 扩（原二十一组件）
-            "Text", "Row", "Column", "Card", "Button", "BarChart", "Image",
-            "Icon", "Divider", "List", "Tabs", "CheckBox", "ChoicePicker", "Slider",
-            "Table", "PieChart", "LineChart", "Callout", "Markdown", "Accordion", "Switch",
-            // 通用布局原语批次（2026-10-30 本仓扩展）
-            "Grid", "Box", "Spacer",
-            // 经典组合版式批次（2026-10-31 本仓扩展）
-            "StatRow", "StatItem", "Banner",
-            // 相册 APP 组合方式批次（2026-10-31 本仓扩展）
-            "PhotoGrid", "AvatarRow",
-            // 布局可控性批次（2026-10-31：前后对比/时间轴固化件 + 双图并排图表网格）
-            "CompareRow", "Timeline", "ChartGrid",
-            // 回合原生批次（2026-11-01：L2 沙箱 HTML 组件入树，spec§3.6）
-            "Html",
-            // 任务卡 OpenUI 化批次（2026-11-02：通用进度条）
-            "Progress",
-            // 视频组件批次（2026-11-04：本地/公网视频播放）
-            "Video",
-            // 官方别名
-            "Stack", "Separator", "MarkDownRenderer",
-            // 官方内容/布局
-            "CardHeader", "InlineHeader", "TextContent", "TextCallout", "CodeBlock",
-            "ImageBlock", "ImageGallery", "Tag", "TagBlock", "Label",
-            "BoldText", "IconText", "ImageText", "ImageTextLarge", "EntityList",
-            "ListBlock", "Steps", "Carousel", "Buttons", "IconButton", "Modal",
-            // 官方表单
-            "Form", "FormControl", "Input", "TextArea", "Select", "DatePicker",
-            "CheckBoxGroup", "RadioGroup", "SwitchGroup", "Chips", "OptionCards", "EditableTable",
-            // 官方图表
-            "AreaChart", "HorizontalBarChart", "RadarChart", "RadialChart",
-            "SingleStackedBarChart", "ScatterChart",
-            // 官方卡块
-            "MetricIndicatorInline", "MetricIndicatorWithStrikethrough",
-            "SnippetCardBlock", "OverviewCardBlock", "ContextCardBlock",
-            "CompositeCardBlock", "VisualCardBlock",
-            // 元素形状（ListItem 2026-10-31 起升格为可独立渲染的经典列表行，仍在白名单）
-            "TabItem", "AccordionItem", "ListItem", "StepsItem", "SelectItem",
-            "CheckBoxItem", "RadioItem", "SwitchItem", "ChipItem", "OptionCard",
-            "Series", "Slice", "ScatterSeries", "Point",
-            "SnippetCardItem", "OverviewCardItem", "ContextCardItem",
-            "CompositeCardItem", "VisualCardItem",
-        )
-        assertEquals(103, expected.size)
-        assertEquals(expected, RenderOpenUiValidator.ALLOWED_COMPONENTS)
+    fun `whitelist derives from shared openui library`() {
+        // 分层 runtime M1.5：103 项字面量副本已收口——白名单真引用 shared
+        // OpenUiLibrary.componentNames（composite build），跨模块漂移风险自此消除；
+        // 逐项内容与治理史由 shared 侧 OpenUiLibraryM2Test 钉住
+        assertEquals(OpenUiLibrary.componentNames, RenderOpenUiValidator.ALLOWED_COMPONENTS)
+        assertEquals(103, RenderOpenUiValidator.ALLOWED_COMPONENTS.size)
     }
 
     @Test
