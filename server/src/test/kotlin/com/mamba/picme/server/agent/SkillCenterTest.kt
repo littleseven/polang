@@ -127,6 +127,37 @@ class SkillCenterTest {
         assertTrue(section.contains("- html-card: HTML 沙箱卡撰写规范"))
     }
 
+    // ── 内容版本（端侧增量同步，2026-11-08）──
+
+    @Test
+    fun `versionedManifest exposes content hash and skips invalid dirs`() {
+        writeSkill("beta-skill", validSkill("beta-skill"))
+        writeSkill("alpha-skill", validSkill("alpha-skill"))
+        writeSkill("bad-skill", "无 frontmatter")
+        val versioned = SkillCenter(root).versionedManifest()
+        assertEquals(listOf("alpha-skill", "beta-skill"), versioned.map { it.name })
+        assertTrue(versioned.all { it.version.length == 16 })
+    }
+
+    @Test
+    fun `version changes on any edit and is stable for identical content`() {
+        writeSkill("html-card", validSkill("html-card", body = "正文 v1"))
+        val center = SkillCenter(root)
+        val v1 = center.versionedManifest().single().version
+        assertEquals(v1, center.versionOf("html-card"))
+        // 同内容重写：版本不变（内容寻址，与文件 mtime 无关）
+        writeSkill("html-card", validSkill("html-card", body = "正文 v1"))
+        assertEquals(v1, center.versionedManifest().single().version)
+        // 正文编辑：版本变
+        writeSkill("html-card", validSkill("html-card", body = "正文 v2"))
+        assertTrue(v1 != center.versionedManifest().single().version)
+        // description 微调同样计为新版本
+        writeSkill("html-card", validSkill("html-card", description = "新描述", body = "正文 v2"))
+        assertTrue(v1 != center.versionedManifest().single().version)
+        assertNull(center.versionOf("no-such-skill"))
+        assertNull(center.versionOf("../etc"))
+    }
+
     // ── OverlaySkillCenter（技能调试 playground 草稿覆盖）──
 
     private fun draft(name: String, description: String = "草稿 $name", body: String = "草稿正文") =

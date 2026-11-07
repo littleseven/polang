@@ -1,6 +1,8 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.agent.core.skill.AgentSkillContract
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * Skill 中心（spike：2026-11-07，云端 Skill 热更新实验线）。
@@ -72,16 +74,39 @@ open class SkillCenter(
     /**
      * system prompt 技能清单段（空清单 = 空串，prompt 零变化）。
      * 只注入 name + description（渐进披露：正文按需经 load_skill 加载，不全文常驻）。
+     * 模板自 2026-11-08 收口 shared `AgentSkillContract.buildPromptSection`（端云逐字节一致）。
      */
-    fun promptSection(): String {
-        val skills = manifest()
-        if (skills.isEmpty()) return ""
-        return buildString {
-            append("\n可用技能（SKILL）清单——技能是按需加载的指令包，回答「怎么做」：")
-            append("当用户请求与某技能的描述匹配时，先调用 load_skill 工具获取完整指令，")
-            append("然后严格按指令执行；不匹配时禁止加载（正文占上下文，按需取用）：\n")
-            skills.forEach { append("- ${it.name}: ${it.description}\n") }
-        }
+    fun promptSection(): String =
+        AgentSkillContract.buildPromptSection(manifest().map { it.name to it.description })
+
+    // ── 内容版本（端侧同步用，2026-11-08）──
+
+    /**
+     * 含内容版本的清单条目（`GET /v1/skills` 响应模型）：version = SKILL.md **原文**
+     * sha256 前 16 位（内容寻址——任何编辑（含 description 微调）即新版，无需手工维护
+     * 版本号；端侧按版本串比对决定重下载，见 shared `SkillRepository`）。
+     */
+    data class VersionedSkillMeta(val name: String, val description: String, val version: String)
+
+    /** 带内容版本的清单（与 [manifest] 同口径：非法目录跳过、按名排序）。 */
+    open fun versionedManifest(): List<VersionedSkillMeta> {
+        val dirs = rootDir.listFiles { f -> f.isDirectory } ?: return emptyList()
+        return dirs.mapNotNull { dir ->
+            val file = File(dir, SKILL_FILE).takeIf { it.isFile } ?: return@mapNotNull null
+            val raw = file.readText()
+            val meta = parseFrontmatter(raw, expectedName = dir.name) ?: return@mapNotNull null
+            VersionedSkillMeta(meta.name, meta.description, contentHash(raw))
+        }.sortedBy { it.name }
+    }
+
+    /** 单技能内容版本（`GET /v1/skills/{name}` 响应字段）；技能不存在/非法返回 null。 */
+    fun versionOf(name: String): String? {
+        if (!NAME_REGEX.matches(name)) return null
+        val dir = File(rootDir, name)
+        if (dir.canonicalFile.parentFile != rootDir.canonicalFile) return null
+        val file = File(dir, SKILL_FILE).takeIf { it.isFile } ?: return null
+        val raw = file.readText()
+        return parseFrontmatter(raw, expectedName = name)?.let { contentHash(raw) }
     }
 
     // ── 管理后台写通路（spike 2026-11-07）──
@@ -167,6 +192,12 @@ open class SkillCenter(
 
         private const val FRONTMATTER_START = "---\n"
         private const val FRONTMATTER_END = "\n---"
+
+        /** 内容哈希（sha256 前 16 位 hex）：skill 的版本串，端侧同步比对用。 */
+        fun contentHash(raw: String): String {
+            val digest = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+            return digest.joinToString("") { "%02x".format(it) }.take(16)
+        }
 
         /** 技能根目录：env POLANG_SKILLS_DIR，缺省工作目录下 `skills/`。 */
         fun fromEnv(): SkillCenter =

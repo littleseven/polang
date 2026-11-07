@@ -47,4 +47,24 @@ class ComposeChatSystemPromptTest {
         assertTrue(result.contains("- A"))
         assertTrue(result.contains("- B"))
     }
+
+    // ── 技能清单段（2026-11-08 端侧 skill 落地，第四段）──
+
+    @Test
+    fun `技能段空则不拼接`() {
+        assertEquals(base, composeChatSystemPrompt(base, null, null, null))
+        assertEquals(base, composeChatSystemPrompt(base, null, null, ""))
+        assertEquals(base, composeChatSystemPrompt(base, null, null, "  "))
+    }
+
+    @Test
+    fun `技能段恒拼在最末`() {
+        val section = "\n可用技能（SKILL）清单……\n- html-card: 规范\n"
+        val result = composeChatSystemPrompt(base, "快照", "摘要", section)
+        assertTrue(result.endsWith(section))
+        // 四段序：base → 快照 → 摘要 → 技能
+        val summaryIdx = result.indexOf("【会话摘要】")
+        val skillIdx = result.indexOf("可用技能（SKILL）清单")
+        assertTrue(summaryIdx > 0 && skillIdx > summaryIdx, "技能段必须在摘要后")
+    }
 }

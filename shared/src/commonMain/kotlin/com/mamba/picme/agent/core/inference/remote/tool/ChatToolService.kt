@@ -14,6 +14,7 @@ import com.mamba.picme.agent.core.inference.remote.log.TraceIdAware
 import com.mamba.picme.agent.core.inference.remote.log.TraceIdHolder
 import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.runtime.capability.CapabilityRegistry
+import com.mamba.picme.agent.core.skill.AgentSkillContract
 import com.mamba.picme.agent.core.runtime.capability.CommandExecutor
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CancellationException
@@ -80,6 +81,12 @@ class ChatToolService private constructor() : TraceIdAware {
          * Search API），正常 1~5s，留足慢网余量取 15s（< registry 内层 25s，层叠不变式不破）。
          */
         internal const val WEB_SEARCH_DISPATCH_TIMEOUT_MS = 15_000L
+
+        /**
+         * load_skill 的外层 dispatch 等待超时（毫秒）：缓存命中为内存/磁盘读（毫秒级），
+         * 缓存未命中单点穿透一次 HTTP 拉取（同 web_search 量級取 15s，< registry 内层 25s）。
+         */
+        internal const val SKILL_DISPATCH_TIMEOUT_MS = 15_000L
 
         // KMP commonMain 无 synchronized，lazy 默认 SYNCHRONIZED 模式保证同款线程安全单例语义
         private val singleton: ChatToolService by lazy { ChatToolService() }
@@ -413,6 +420,16 @@ class ChatToolService private constructor() : TraceIdAware {
         query: String,
     ): String =
         dispatchCommand(AgentCommand.WebSearch(query = query), timeoutMillis = WEB_SEARCH_DISPATCH_TIMEOUT_MS)
+
+    // ── 技能（Skill 中心，经 picme-server /v1/skills 同步本地缓存） ──
+
+    @Tool(customName = AgentSkillContract.TOOL_LOAD_SKILL)
+    @LLMDescription(AgentSkillContract.DESC_LOAD_SKILL)
+    suspend fun loadSkill(
+        @LLMDescription(AgentSkillContract.DESC_PARAM_SKILL_NAME)
+        name: String,
+    ): String =
+        dispatchCommand(AgentCommand.LoadSkill(name = name), timeoutMillis = SKILL_DISPATCH_TIMEOUT_MS)
 
     // ── 记忆（人物关系 + 事实） ─────────────────────────────────────
 

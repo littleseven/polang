@@ -132,6 +132,7 @@ class AgentOrchestrator private constructor(
         chatToolRegistry = deps.chatToolRegistry,
         chatPromptBuilder = deps.chatPromptBuilder,
         chatTools = deps.chatTools,
+        skillRepository = deps.skillRepository,
     )
 
     /** 端侧 VLM 模型加载服务（TAG 打标 Worker / 图像理解专用，经 `getLlmEngine()` 取引擎）。 */

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.PhotoFilter
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
@@ -315,6 +316,7 @@ private fun getAgentCommandDisplayName(context: Context, command: AgentCommand):
         is AgentCommand.BrowserScreenshot -> context.getString(R.string.chat_cmd_browser_screenshot)
         is AgentCommand.BrowserClose -> context.getString(R.string.chat_cmd_browser_close)
         is AgentCommand.WebSearch -> context.getString(R.string.chat_cmd_web_search)
+        is AgentCommand.LoadSkill -> context.getString(R.string.chat_cmd_load_skill)
     }
 
 /**
@@ -379,6 +381,7 @@ private fun resolveCommandIcon(command: AgentCommand): ImageVector = when (comma
     is AgentCommand.BrowserScreenshot -> Icons.Rounded.Screenshot
     is AgentCommand.BrowserClose -> Icons.Rounded.Close
     is AgentCommand.WebSearch -> Icons.Rounded.TravelExplore
+    is AgentCommand.LoadSkill -> Icons.Rounded.Psychology
 }
 
 private fun getAgentCommandDetail(context: Context, command: AgentCommand): String =

@@ -27,6 +27,8 @@ import com.mamba.picme.agent.core.model.context.RenderEnvironment
 import com.mamba.picme.agent.core.model.context.replyLanguageRuleSegment
 import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
+import com.mamba.picme.agent.core.skill.AgentSkillContract
+import com.mamba.picme.agent.core.skill.SkillRepository
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -35,6 +37,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 远程 chat 推理引擎（决策3 / ADR-010 链路隔离 step 2）。
@@ -59,6 +62,13 @@ class RemoteChatEngine internal constructor(
     private val chatToolRegistry: ToolRegistry,
     private val chatPromptBuilder: (List<ToolDescriptor>) -> String = ::buildChatSystemPrompt,
     private val chatTools: List<ToolBase<*, *>>? = null,
+    /**
+     * 端侧 skill 资产仓库（2026-11-08 端侧 load_skill 执行器；null = 平台未接线，
+     * 技能工具仍注册但 load_skill 恒回 unknown_skill，prompt 无技能段——优雅降级）。
+     * 非 null 时：每轮跑 agent 前 [SkillRepository.syncIfStale]（短超时包裹，慢网不阻塞），
+     * 技能清单段经 config.skillPromptProvider 注入 system prompt 并入 AIAgent 重建键。
+     */
+    private val skillRepository: SkillRepository? = null,
 ) {
 
     private val tag = "RemoteChatEngine"
@@ -106,6 +116,12 @@ class RemoteChatEngine internal constructor(
             "\n\n【本轮工具范围】本轮仅提供上方清单所列工具；规则中提及但清单未列的工具本轮不可用，禁止调用。"
 
         /**
+         * 技能同步超时（毫秒，2026-11-08）：每轮跑 agent 前的 syncIfStale 上限。
+         * skill 是低频变更资产且 stale 缓存可照常服务，慢网宁放弃本次同步不阻塞 chat。
+         */
+        private const val SKILL_SYNC_TIMEOUT_MS = 5_000L
+
+        /**
          * 意图工具子集的纯计算部分（M3，可单测）：契约子集 ∩ 平台可用工具名。
          *
          * 返回 null = 保守回退全量工具面，两种触发：
@@ -123,11 +139,14 @@ class RemoteChatEngine internal constructor(
         ): ToolSubsetResolution? {
             val hits = toolNames.intersect(available)
             if (hits.isEmpty()) return null
+            // 技能是跨意图元能力（2026-11-08）：load_skill 恒并入子集（平台具备时）——
+            // 技能匹配不依赖意图分类，任何分支都可能需要先加载技能指令。
+            val withSkill = hits + (setOf(AgentSkillContract.TOOL_LOAD_SKILL) intersect available)
             val missing = toolNames - available
             if (missing.size * 2 > toolNames.size) return null
             return ToolSubsetResolution(
-                names = hits,
-                key = hits.sorted().joinToString(","),
+                names = withSkill,
+                key = withSkill.sorted().joinToString(","),
                 missing = missing,
             )
         }
@@ -390,6 +409,13 @@ class RemoteChatEngine internal constructor(
         }
 
         agent.setSessionId(sessionId)
+        // skill 资产同步（2026-11-08）：TTL 到期才打网，短超时包裹——慢网放弃本次同步、
+        // 下轮再试，stale 缓存照常服务；同步完成后技能清单段经 AIAgent 重建键生效。
+        skillRepository?.let { repo ->
+            runCatching {
+                withTimeoutOrNull(SKILL_SYNC_TIMEOUT_MS) { repo.syncIfStale() }
+            }.onFailure { Logger.d(tag, "skill sync skipped: ${it.message}") }
+        }
         // M3 意图级工具裁剪：路由契约子集 → 覆写 registry + prompt 清单段（同源过滤，零漂移）；
         // 未注入 chatTools（裁剪不可用的平台）或判定不可靠（null）时恒为全量默认。
         val toolSetOverride = resolveToolSetOverride(toolNames, persona, replyLanguage)
@@ -527,6 +553,10 @@ class RemoteChatEngine internal constructor(
                     )
                 )
                 .apply { if (memProvider != null) memoryContextProvider(memProvider) }
+                .apply {
+                    // 技能清单段注入（非挂起读内存缓存；同步在 processChatReAct 跑轮前完成）
+                    skillRepository?.let { repo -> skillPromptProvider { repo.cachedPromptSection() } }
+                }
                 .build()
         } catch (e: Exception) {
             Logger.w(tag, "Failed to build ChatAgent config", e)

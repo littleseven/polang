@@ -250,6 +250,7 @@ class AiAgentUseCase(
             is AgentCommand.BrowserScreenshot -> AiAgentCommand.TextReply("网页截图")
             is AgentCommand.BrowserClose -> AiAgentCommand.TextReply("关闭浏览器")
             is AgentCommand.WebSearch -> AiAgentCommand.TextReply("网页搜索: ${command.query}")
+            is AgentCommand.LoadSkill -> AiAgentCommand.TextReply("加载技能: ${command.name}")
         }
     }
 

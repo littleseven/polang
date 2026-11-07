@@ -28,8 +28,10 @@ import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.download.RecommendedModelAutoDownloader
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
+import com.mamba.picme.data.local.FileSkillCacheStore
 import com.mamba.picme.data.local.insertMessageWithParts
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
+import com.mamba.picme.data.remote.picme.SkillClient
 import com.mamba.picme.data.remote.picme.WebSearchClient
 import com.mamba.picme.di.AppContainer
 import com.mamba.picme.di.AppContainerImpl
@@ -37,6 +39,8 @@ import com.mamba.picme.domain.memory.MemoryContextProviderImpl
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.agent.core.remote.config.RemoteModelFactory
+import com.mamba.picme.agent.core.skill.LoadSkillCapability
+import com.mamba.picme.agent.core.skill.SkillRepository
 import com.mamba.picme.core.identity.DeviceIdProvider
 import com.mamba.picme.agent.core.model.config.AiAgentMode
 import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
@@ -190,6 +194,12 @@ class PoLangApplication : Application(), ImageLoaderFactory {
     /** 供 AppContainer 读取的 deviceId provider（browser WS 客户端 DI 用）。 */
     fun cachedDeviceIdProvider(): String? = cachedDeviceId
 
+    /**
+     * 端侧 skill 资产仓库（2026-11-08 端侧 load_skill 执行器）：onCreate 期构建，
+     * 组合根注入 AgentDependencies + initializeCapabilities 注册 LoadSkillCapability 两处消费。
+     */
+    private lateinit var skillRepository: SkillRepository
+
     override fun onCreate() {
         super.onCreate()
 
@@ -246,7 +256,17 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         }
 
         // Android 组合根：构建全部平台实现并注入 AgentOrchestrator（须早于一切 getInstance() 调用）
-        AndroidAgentComposition.initialize(this)
+        // skill 资产仓库（2026-11-08 端侧 load_skill 执行器）：transport 走 /v1/skills（鉴权
+        // provider 同 web_search），store 为 filesDir JSON 缓存；token/deviceId 预热前 provider
+        // 返回 null 仅少带 header，server 对 LLM 系路径放行访客不受影响。
+        skillRepository = SkillRepository(
+            transport = SkillClient(
+                tokenProvider = { cachedServerAuthToken },
+                deviceIdProvider = { cachedDeviceId },
+            ),
+            store = FileSkillCacheStore(this),
+        )
+        AndroidAgentComposition.initialize(this, skillRepository = skillRepository)
 
         // 注册应用级 Capability（只注册一次，永不注销）
         initializeCapabilities()
@@ -840,6 +860,11 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         )
         orchestrator.registerCapability(WebSearchCapability(webSearchTransport))
         Logger.i(TAG, "- WebSearchCapability: chat web_search via /v1/web-search")
+
+        // load_skill 技能加载（2026-11-08 端侧执行器）：正文来自 SkillRepository 本地缓存 +
+        // 单点穿透；资产同步由 RemoteChatEngine 每轮跑 agent 前按 TTL 触发
+        orchestrator.registerCapability(LoadSkillCapability(skillRepository))
+        Logger.i(TAG, "- LoadSkillCapability: chat load_skill via /v1/skills cache")
     }
 
     /** 构建 HTML 卡片渲染环境（CSS px ≈ dp：渲染层已注入 viewport meta width=device-width）。 */
