@@ -69,6 +69,33 @@ class RenderOpenUiValidatorTest {
     }
 
     @Test
+    fun `paginated album program with state computed index and ternary passes`() {
+        // album-maker 技能卡内分页骨架（2026-11-07）：$page state + 计算下标 photos[$page*9+i].id
+        // + 名字/标签平行字面量数组 + 越界格三元置 null + @Set 翻页——9 个 Image 调用位 = 9 位图
+        // （计算下标不改变静态计数），全程序应合法放行，防校验器误杀卡内分页形态。
+        val program = """
+            ${'$'}page = 0
+            photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
+            names = ["西湖晨光", "断桥残影", "柳浪闻莺", "灵隐午后", "九溪烟树", "龙井茶山", "钱塘暮色", "河坊夜市", "满陇桂雨", "北高峰远眺", "吴山天风"]
+            tags = ["湖景", "湖景", "公园", "古刹", "溪谷", "山野", "江景", "夜景", "花事", "山景", "城景"]
+            root = Card([
+              CardHeader("杭州精选", subtitle = "11 张 · 第 " + (${'$'}page + 1) + " / 2 页"),
+              Row([
+                Column([Box([Image(photos[${'$'}page * 9 + 0].id, aspect = 1), Tag(tags[${'$'}page * 9 + 0])], align = "bottomStart"), Text(names[${'$'}page * 9 + 0], maxLines = 1)], spacing = "xs"),
+                Column([Box([Image(photos[${'$'}page * 9 + 1].id, aspect = 1), Tag(tags[${'$'}page * 9 + 1])], align = "bottomStart"), Text(names[${'$'}page * 9 + 1], maxLines = 1)], spacing = "xs"),
+                (${'$'}page * 9 + 2 < photos.length) ? Column([Box([Image(photos[${'$'}page * 9 + 2].id, aspect = 1), Tag(tags[${'$'}page * 9 + 2])], align = "bottomStart"), Text(names[${'$'}page * 9 + 2], maxLines = 1)], spacing = "xs") : null
+              ], align = "start"),
+              Row([
+                ${'$'}page > 0 ? Button("← 上一页", @Set(${'$'}page, ${'$'}page - 1), "secondary") : null,
+                ${'$'}page < 1 ? Button("下一页 →", @Set(${'$'}page, ${'$'}page + 1), "secondary") : null
+              ], align = "center")
+            ])
+            fallbackSummary = "11 张精选，数据在原设备"
+        """.trimIndent()
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
     fun `image with literal aspect number passes`() {
         assertNull(
             RenderOpenUiValidator.validateToError(
