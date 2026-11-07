@@ -71,8 +71,6 @@ import com.mamba.picme.features.debug.pexels.PexelsImageSaver
 import com.mamba.picme.features.debug.pexels.PexelsKeyStore
 import com.mamba.picme.features.debug.pexels.PexelsSection
 import com.mamba.picme.features.debug.pexels.PexelsViewModel
-import com.mamba.picme.features.debug.openui.OpenUiComponentGallery
-import com.mamba.picme.features.debug.openui.OpenUiQrPreviewTab
 import com.mamba.picme.features.gallery.MediaViewModel
 import kotlinx.coroutines.launch
 
@@ -213,17 +211,8 @@ private fun DebugContent(
                     onClick = { selectedTab = 1 },
                     text = { Text(stringResource(R.string.debug_tab_pexels)) }
                 )
-                Tab(
-                    // "OpenUI" 是协议标识符（OpenUiBlueprintDebugger 徽标同口径），[I18N] 豁免
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("OpenUI") }
-                )
-                Tab(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    text = { Text(stringResource(R.string.debug_tab_qr_preview)) }
-                )
+                // OpenUI 画廊 / 扫码预览两个调试入口 2026-11-07 迁入云端 Agent 页
+                // （OpenUiDebugOverlay，features/cloudagent/），本页不再设 Tab
             }
             when (selectedTab) {
                 0 -> GenerateTabContent(
@@ -243,11 +232,7 @@ private fun DebugContent(
                     onScreenshot = onScreenshot
                 )
 
-                1 -> PexelsSection(viewModel = pexelsViewModel)
-
-                2 -> OpenUiComponentGallery()
-
-                3 -> OpenUiQrPreviewTab()
+                else -> PexelsSection(viewModel = pexelsViewModel)
             }
         }
     }

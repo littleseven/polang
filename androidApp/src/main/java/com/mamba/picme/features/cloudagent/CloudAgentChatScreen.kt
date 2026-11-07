@@ -1,5 +1,7 @@
 package com.mamba.picme.features.cloudagent
 
+import android.Manifest
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,8 +9,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,7 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -33,29 +40,46 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import com.mamba.picme.R
 import com.mamba.picme.domain.chat.AgentStepStatus
 import com.mamba.picme.domain.chat.AgentStepUi
 import com.mamba.picme.domain.chat.HtmlCardMeta
+import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.features.chat.HtmlCard
 import com.mamba.picme.features.chat.HtmlCardSanitizer
 import com.mamba.picme.features.chat.HtmlFullpageContent
 import com.mamba.picme.features.chat.HtmlFullpageViewer
 import com.mamba.picme.features.chat.HtmlLinkPreviewOverlay
 import com.mamba.picme.features.chat.components.MediaResultsCarousel
+import com.mamba.picme.features.chat.openui.OpenUiCardHost
 import com.mamba.picme.features.common.chat.AgentMarkdown
+import com.mamba.picme.features.debug.openui.QrCodeScanner
+import com.mamba.picme.features.debug.openui.previewHandleLookup
+import com.mamba.picme.features.debug.openui.previewPhotoResolver
+import kotlinx.coroutines.launch
 
 /**
  * 云端 Agent 最小聊天页（spec §5，调试入口实验页——豁免 PARITY 固化，转正时再入 08-UI-SPECS）。
  * 顶栏通道标记（网关/BYOK）+ 消息气泡列表 + 输入框 + 发送/停止。
+ * 顶栏右侧两个 OpenUI 调试入口（2026-11-07 自 Debug 页迁入）：扫码直达加载、合一调试页
+ * （[OpenUiDebugOverlay]：手输/历史/全组件画廊）；加载产物以 OPENUI_CARD 内存消息上屏。
  */
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CloudAgentChatScreen(
     viewModel: CloudAgentChatViewModel,
@@ -65,10 +89,35 @@ fun CloudAgentChatScreen(
     val state by viewModel.state.collectAsState()
     LaunchedEffect(Unit) { viewModel.prepare() }
 
+    // OpenUI 调试入口态：扫码直达（成功注入消息流，失败 Toast）+ 合一调试页 Overlay
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val openUiLoader = rememberOpenUiPreviewLoader()
+    var showScanner by remember { mutableStateOf(false) }
+    var showOpenUiOverlay by remember { mutableStateOf(false) }
+    val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+    val parseErrorText = stringResource(R.string.debug_qr_error_parse)
+    val noTokenText = stringResource(R.string.debug_qr_error_no_token)
+
+    fun handleQuickScan(raw: String) {
+        scope.launch {
+            val toastText = when (val result = openUiLoader.load(raw)) {
+                is OpenUiLoadResult.Ok -> {
+                    viewModel.injectOpenUiPreview(openUiPreviewLabel(result.entry), result.entry.program)
+                    null
+                }
+                OpenUiLoadResult.ParseError -> parseErrorText
+                OpenUiLoadResult.NoToken -> noTokenText
+                is OpenUiLoadResult.Failure -> result.message
+            }
+            toastText?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // 顶栏：返回 + 标题 + 通道胶囊
+        // 顶栏（statusBarsPadding 适配状态栏/刘海）：返回 + 标题 + 通道胶囊 + OpenUI 调试入口
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onNavigateBack) {
@@ -93,6 +142,24 @@ fun CloudAgentChatScreen(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     )
                 }
+            }
+            IconButton(
+                onClick = {
+                    if (cameraPermission.status.isGranted) {
+                        showScanner = true
+                    } else {
+                        cameraPermission.launchPermissionRequest()
+                    }
+                },
+            ) {
+                Icon(
+                    Icons.Rounded.QrCodeScanner,
+                    contentDescription = stringResource(R.string.debug_qr_scan),
+                )
+            }
+            // contentDescription 用协议标识符（OpenUI 豁免口径同调试页徽标）
+            IconButton(onClick = { showOpenUiOverlay = true }) {
+                Icon(Icons.Rounded.Widgets, contentDescription = "OpenUI")
             }
         }
 
@@ -127,6 +194,30 @@ fun CloudAgentChatScreen(
                 }
             is CloudAgentChatViewModel.UiState.Chat -> ChatContent(s, viewModel)
         }
+    }
+
+    // 扫码直达加载（成功注入 OPENUI_CARD 消息流；失败 Toast 提示）
+    if (showScanner) {
+        Dialog(
+            onDismissRequest = { showScanner = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            QrCodeScanner(
+                onResult = { text ->
+                    showScanner = false
+                    handleQuickScan(text)
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    // OpenUI 合一调试页（手输加载 / 预览历史 / 全组件画廊）
+    if (showOpenUiOverlay) {
+        OpenUiDebugOverlay(
+            onLoaded = { label, program -> viewModel.injectOpenUiPreview(label, program) },
+            onDismiss = { showOpenUiOverlay = false },
+        )
     }
 }
 
@@ -193,6 +284,29 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
                             )
                         }
                     }
+                    CloudAgentChatViewModel.Role.OPENUI_CARD -> message.openUiCard?.let { card ->
+                        // OpenUI 调试预览卡：扫码/画廊注入的最终程序，走与 Chat 同管线真实渲染器；
+                        // 句柄/照片 stub 恒 null 走既有降级（调试会话投影跨设备无意义，画廊同口径）
+                        Column {
+                            Text(
+                                text = card.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OpenUiCardHost(
+                                part = MessagePart.OpenUiCard(
+                                    partId = "cloud-preview-${message.id}",
+                                    program = card.program,
+                                    fallbackSummary = "OpenUI preview degraded",
+                                ),
+                                handleLookup = previewHandleLookup,
+                                photoResolver = previewPhotoResolver,
+                                onViewStateChange = {},
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
                 }
             }
             if (chat.inFlight) {
@@ -211,8 +325,9 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
             }
         }
         var input by remember { mutableStateOf("") }
+        // 输入行：navigationBarsPadding + imePadding 适配手势导航条与键盘推起
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
