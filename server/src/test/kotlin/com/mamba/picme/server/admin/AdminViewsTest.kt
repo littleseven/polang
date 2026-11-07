@@ -560,4 +560,78 @@ class AdminViewsTest {
         ).forEach { assertTrue("missing id $it", html.contains("\"$it\"")) }
     }
 
+    // ── 调试结果页（skillDebugResultPage）──
+
+    private fun sessionFixture() = AgentSessionRow(
+        id = "abcd1234-0000-0000-0000-000000000000",
+        userLabel = "admin",
+        status = "running",
+        channelKind = "gateway",
+        model = "skill-debug",
+        eventCount = 5,
+        lastEventAt = 1_760_000_005_000L,
+        createdAt = 1_760_000_000_000L,
+        updatedAt = 1_760_000_005_000L,
+        seq = 1L,
+    )
+
+    private fun ev(id: Long, type: String, source: String, role: String, payload: AgentEventPayload?, at: Long) =
+        AgentEventRow(id = id, type = type, source = source, role = role, parentId = null, payload = payload, createdAt = at)
+
+    private fun finishedEvents(finalProgram: String) = listOf(
+        ev(1, "message", "user", "user", AgentEventPayload.Message("帮我生成一个投票卡片"), 1_760_000_001_000L),
+        ev(2, "action", "agent", "assistant", AgentEventPayload.Action("load_skill", "{\"name\":\"html-card\"}", false), 1_760_000_002_000L),
+        ev(3, "observation", "environment", "tool", AgentEventPayload.Observation(2, "# 草稿版 html-card\n\n正文指令"), 1_760_000_003_000L),
+        ev(4, "message", "agent", "assistant", AgentEventPayload.Message(finalProgram), 1_760_000_004_000L),
+        ev(5, "finish", "agent", "assistant", AgentEventPayload.Finish("done"), 1_760_000_005_000L),
+    )
+
+    @Test
+    fun `skill debug result page renders html visual preview in sandboxed iframe`() {
+        val program = "// summary: 投票卡\nroot = Html(\"<!DOCTYPE html><html><body><h1>投票</h1><script>var a=\\\"x\\\";</script></body></html>\")"
+        val html = AdminViews.skillDebugResultPage(sessionFixture(), finishedEvents(program))
+        // 状态与耗时
+        assertTrue(html.contains("完成"))
+        assertTrue(html.contains("耗时 4000ms"))
+        // 测试消息与 load_skill 聚合
+        assertTrue(html.contains("帮我生成一个投票卡片"))
+        assertTrue(html.contains("load_skill"))
+        assertTrue(html.contains("草稿版 html-card"))
+        // 可视化预览：沙箱 iframe + srcdoc（属性转义形态上屏，反转义已还原 \"）
+        assertTrue(html.contains("可视化预览 · Html 组件"))
+        assertTrue(html.contains("sandbox=\"allow-scripts\""))
+        assertTrue(html.contains("srcdoc=\"&lt;!DOCTYPE html&gt;"))
+        assertTrue(html.contains("var a=&quot;x&quot;;")) // DSL 反转义 \" → "，再经属性转义
+        // 程序原文仍在
+        assertTrue(html.contains("程序原文"))
+    }
+
+    @Test
+    fun `skill debug result page renders markdown root with commonmark`() {
+        val program = "root = Markdown(\"# 标题\\n\\n正文 **加粗**\")"
+        val html = AdminViews.skillDebugResultPage(sessionFixture(), finishedEvents(program))
+        assertTrue(html.contains("可视化预览 · Markdown 根"))
+        assertTrue(html.contains("<h1>标题</h1>"))
+        assertTrue(html.contains("<strong>加粗</strong>"))
+        assertTrue(!html.contains("无可视化预览形态"))
+    }
+
+    @Test
+    fun `skill debug result page running state auto-refreshes and hides finish sections`() {
+        val events = finishedEvents("root = Markdown(\"x\")").dropLast(2) // 去掉最终消息与 finish
+        val html = AdminViews.skillDebugResultPage(sessionFixture(), events)
+        assertTrue(html.contains("运行中"))
+        assertTrue(html.contains("location.reload()")) // 3 秒自动刷新
+        assertTrue(html.contains("（尚未产出）"))
+        assertTrue(!html.contains("耗时"))
+    }
+
+    @Test
+    fun `skill debug result page plain program shows no-preview hint`() {
+        val program = "root = Column(spacing = \"m\") { Text(\"你好\") }"
+        val html = AdminViews.skillDebugResultPage(sessionFixture(), finishedEvents(program))
+        assertTrue(html.contains("无可视化预览形态"))
+        assertTrue(!html.contains("iframe"))
+    }
+
 }

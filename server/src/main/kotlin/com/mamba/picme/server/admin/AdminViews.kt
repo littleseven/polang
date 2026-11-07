@@ -2,6 +2,7 @@ package com.mamba.picme.server.admin
 
 import com.mamba.picme.server.appJson
 import com.mamba.picme.server.agent.AgentEventPayload
+import com.mamba.picme.server.agent.OpenUiStringScan
 import com.mamba.picme.server.agent.SkillCenter
 import com.mamba.picme.server.analytics.formatCostCny
 import com.mamba.picme.server.auth.AiEngineerWhitelistService
@@ -1000,6 +1001,205 @@ object AdminViews {
                 }
             }
         }
+    }
+
+    /**
+     * 调试结果页（2026-11-07）：跑轮进行中每 3 秒自动刷新；完成后聚合展示
+     * 测试消息 / load_skill 调用与返回 / 其他工具调用 / 最终回复程序 / 终态耗时。
+     * 数据源 = 事件流（与完整回放页同查询），此处只做调试视角的聚合呈现。
+     */
+    fun skillDebugResultPage(
+        session: AgentSessionRow,
+        events: List<AgentEventRow>,
+    ): String = createHTML().html {
+        val finish = events.lastOrNull { it.payload is AgentEventPayload.Finish }
+        val running = finish == null
+        val userMsg = events.firstOrNull { it.payload is AgentEventPayload.Message && it.role == "user" }
+        val skillActions = events.filter { (it.payload as? AgentEventPayload.Action)?.tool == "load_skill" }
+        val otherActions = events.filter {
+            val a = it.payload as? AgentEventPayload.Action
+            a != null && a.tool != "load_skill"
+        }
+        val finalMsg = events.lastOrNull { it.payload is AgentEventPayload.Message && it.role != "user" }
+        fun observationOf(actionId: Long): AgentEventPayload.Observation? =
+            events.firstOrNull { (it.payload as? AgentEventPayload.Observation)?.actionEventId == actionId }
+                ?.payload as? AgentEventPayload.Observation
+
+        adminHead("调试结果 ${session.id.take(8)} · PoLang 管理后台")
+        body {
+            navBar()
+            div("page") {
+                h1("page-title") { +"调试结果" }
+                div("skill-previewbar") {
+                    if (running) {
+                        span("badge") { +"运行中" }
+                    } else {
+                        val reason = (finish!!.payload as AgentEventPayload.Finish).reason
+                        if (reason == "done") span("badge badge-active") { +"完成" }
+                        else span("st-badge st-blocked") { +"异常：$reason" }
+                    }
+                    p("meta") {
+                        +"会话 ${session.id.take(8)} · ${session.channelKind}/${session.model} · ${events.size} 事件"
+                        if (finish != null && userMsg != null) {
+                            +" · 耗时 ${finish.createdAt - userMsg.createdAt}ms"
+                        }
+                    }
+                    span("push") {
+                        a("/admin/agent/sessions/${session.id}", classes = "btn btn-ghost") { +"完整回放" }
+                        a("/admin/skills/debug", classes = "btn") { +"再跑一轮" }
+                    }
+                }
+                if (running) {
+                    p("meta") { +"跑轮进行中，页面每 3 秒自动刷新；设备工具在本环境恒返回 device_offline。" }
+                }
+
+                section("settings-section") {
+                    div("section-head") {
+                        h2("section-title") { +"测试消息" }
+                    }
+                    pre("mono-block") { +(userMsg?.let { (it.payload as AgentEventPayload.Message).content } ?: "（尚未落流）") }
+                }
+
+                section("settings-section") {
+                    div("section-head") {
+                        h2("section-title") { +"技能加载（load_skill）" }
+                        p("section-desc") { +"草稿是否被触发、返回给 LLM 的正文——验证 overlay 是否按预期生效。" }
+                    }
+                    if (skillActions.isEmpty()) {
+                        p("meta") {
+                            +(if (running) "（等待中……）" else "本轮未触发 load_skill——若预期触发，检查草稿描述与测试消息的匹配度（描述是 LLM 判断加载的唯一依据）。")
+                        }
+                    }
+                    skillActions.forEach { ev ->
+                        val action = ev.payload as AgentEventPayload.Action
+                        p("block-label") { +"调用 · ${action.argsJson}" }
+                        val obs = observationOf(ev.id)
+                        if (obs == null) {
+                            p("meta") { +"（Observation 尚未落流）" }
+                        } else {
+                            pre("mono-block") { +obs.content }
+                        }
+                    }
+                }
+
+                if (otherActions.isNotEmpty()) {
+                    section("settings-section") {
+                        div("section-head") {
+                            h2("section-title") { +"其他工具调用" }
+                        }
+                        otherActions.forEach { ev ->
+                            val action = ev.payload as AgentEventPayload.Action
+                            val obs = observationOf(ev.id)
+                            p("meta") {
+                                b { +action.tool }
+                                +" → ${obs?.content?.take(200) ?: "（等待中）"}"
+                            }
+                        }
+                    }
+                }
+
+                section("settings-section") {
+                    div("section-head") {
+                        h2("section-title") { +"最终回复（OpenUI 程序）" }
+                        p("section-desc") { +"端上收到的终结程序；Html/Markdown 根节点直接可视化预览，程序原文在下方。" }
+                    }
+                    if (finalMsg == null) {
+                        p("meta") { +"（尚未产出）" }
+                    } else {
+                        val program = (finalMsg.payload as AgentEventPayload.Message).content
+                        // ── 可视化预览：Html 组件（沙箱 iframe 真渲染）+ Markdown 根（commonmark）──
+                        val htmlDocs = extractHtmlDocuments(program)
+                        htmlDocs.forEachIndexed { i, doc ->
+                            p("block-label") { +"可视化预览 · Html 组件${if (htmlDocs.size > 1) " #${i + 1}" else ""}（沙箱 iframe，与端上 WebView 同文档）" }
+                            // kotlinx.html DSL 无 iframe builder（3.x 未生成）——手写标签，
+                            // srcdoc 值经 attrEscape 属性转义（& 须最先）
+                            unsafe {
+                                raw(
+                                    "<iframe sandbox=\"allow-scripts\" loading=\"lazy\" " +
+                                        "style=\"width:100%;height:480px;border:1px solid #e0e0e0;border-radius:8px;background:#fff\" " +
+                                        "srcdoc=\"${attrEscape(doc)}\"></iframe>",
+                                )
+                            }
+                        }
+                        val mdRoot = extractMarkdownRoot(program)
+                        if (mdRoot != null) {
+                            p("block-label") { +"可视化预览 · Markdown 根（commonmark 渲染）" }
+                            div("md-preview") { unsafe { raw(renderMarkdown(mdRoot)) } }
+                        }
+                        if (htmlDocs.isEmpty() && mdRoot == null) {
+                            p("meta") { +"本程序无可视化预览形态（暂支持 Html 组件与 Markdown 根）；组件树浏览器预览为后续里程碑。" }
+                        }
+                        p("block-label") { +"程序原文" }
+                        pre("mono-block") { +program }
+                    }
+                }
+            }
+            if (running) {
+                script { unsafe { raw("setTimeout(function(){ location.reload(); }, 3000);") } }
+            }
+        }
+    }
+
+    // ── 调试结果页可视化预览提取（2026-11-07）──
+    // 正则只定位开引号（无嵌套量词，零爆栈面），字面量本体走 OpenUiStringScan 字符级扫描。
+
+    /** Html( 调用开引号定位（位置参数或 html= 命名参数）。 */
+    private val HTML_CALL_OPEN_QUOTE = Regex("""\bHtml\s*\(\s*(?:html\s*=\s*)?"""")
+
+    /** root = Markdown( 开引号定位（整程序锚定根节点，防误抓嵌套 Markdown 组件）。 */
+    private val MARKDOWN_ROOT_OPEN_QUOTE = Regex("""^\s*root\s*=\s*Markdown\s*\(\s*(?:text\s*=\s*)?"""")
+
+    /** 单页 iframe 预览上限（防异常程序刷屏）。 */
+    private const val MAX_HTML_PREVIEW_DOCS = 4
+
+    private fun literalAtOpenQuote(program: String, match: MatchResult): String? {
+        val literal = OpenUiStringScan.literalAt(program, match.range.last) ?: return null
+        return unescapeDslString(literal.content)
+    }
+
+    /** 程序中全部 Html("…") 文档（反转义后可直接进 iframe srcdoc）。 */
+    private fun extractHtmlDocuments(program: String): List<String> =
+        HTML_CALL_OPEN_QUOTE.findAll(program)
+            .mapNotNull { literalAtOpenQuote(program, it) }
+            .take(MAX_HTML_PREVIEW_DOCS)
+            .toList()
+
+    /** root = Markdown("…") 根节点的 markdown 原文（反转义）；非 Markdown 根返回 null。 */
+    private fun extractMarkdownRoot(program: String): String? =
+        MARKDOWN_ROOT_OPEN_QUOTE.find(program)?.let { literalAtOpenQuote(program, it) }
+
+    /** HTML 属性值转义（iframe srcdoc 用；& 须最先替换）。 */
+    private fun attrEscape(s: String): String =
+        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+
+    /** DSL 字符串反转义（OpenUiStringScan 只配对不反转义；覆盖 LLM 实写转义集）。 */
+    private fun unescapeDslString(raw: String): String {
+        if (raw.indexOf('\\') < 0) return raw
+        val out = StringBuilder(raw.length)
+        var i = 0
+        while (i < raw.length) {
+            val c = raw[i]
+            if (c == '\\' && i + 1 < raw.length) {
+                when (raw[i + 1]) {
+                    'n' -> { out.append('\n'); i += 2 }
+                    't' -> { out.append('\t'); i += 2 }
+                    'r' -> { out.append('\r'); i += 2 }
+                    '"' -> { out.append('"'); i += 2 }
+                    '\'' -> { out.append('\''); i += 2 }
+                    '\\' -> { out.append('\\'); i += 2 }
+                    'u' -> {
+                        val hexEnd = i + 6
+                        val code = if (hexEnd <= raw.length) raw.substring(i + 2, hexEnd).toIntOrNull(16) else null
+                        if (code != null) { out.append(code.toChar()); i = hexEnd } else { out.append(c); i++ }
+                    }
+                    else -> { out.append(raw[i + 1]); i += 2 }
+                }
+            } else {
+                out.append(c)
+                i++
+            }
+        }
+        return out.toString()
     }
 
     fun settingsPage(

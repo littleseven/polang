@@ -753,7 +753,17 @@ fun Route.adminRoute(
                     }
                 }
             }
-            call.respondRedirect("/admin/agent/sessions/${session.id}")
+            call.respondRedirect("/admin/skills/debug/result/${session.id}")
+        }
+
+        // 调试结果页：跑轮中自动刷新，完成后聚合展示（load_skill/最终程序/终态耗时）
+        get("/skills/debug/result/{id}") {
+            if (!call.adminGuard(adminToken)) return@get
+            val id = call.parameters["id"].orEmpty()
+            val session = AdminQueries.agentSessionSummary(id)
+                ?: return@get call.respondText("session_not_found: $id", ContentType.Text.Html, HttpStatusCode.NotFound)
+            val events = AdminQueries.agentSessionEvents(id, after = 0, limit = 200)
+            call.respondText(AdminViews.skillDebugResultPage(session, events), ContentType.Text.Html)
         }
 
         // ── 问题诊断页（用户上报问题；AI 工程师白名单已迁至 /admin/settings）──
