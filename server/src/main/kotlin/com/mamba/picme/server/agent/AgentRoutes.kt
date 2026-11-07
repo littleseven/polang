@@ -94,6 +94,7 @@ fun Route.agentRoute(
     bridge: AgentBridgeRegistry,
     deviceTimeoutMs: Long = DeviceToolService.DEFAULT_TIMEOUT_MS,
     roundGate: AgentRoundGate = AgentRoundGate(),
+    skillCenter: SkillCenter? = null,
 ) {
     route("/agent") {
         post("/sessions") {
@@ -269,8 +270,11 @@ fun Route.agentRoute(
                     }
                     // GenUI 唯一化（2026-11-06）：恒 turn-native，无发卡工具注册
                     // 分层 runtime M2：端侧工具集目录驱动（CloudAgentToolCatalog → CatalogBridgeTool）
+                    // skill 加载（spike 2026-11-07）：load_skill 走 Koog 官方 Tool 扩展点
+                    // （Koog 1.3.0 无框架级 Skill 抽象），skill 正文经 Observation 进上下文
+                    val skillTools = skillCenter?.let { LoadSkillToolService(it).asToolsByClass() } ?: emptyList()
                     val toolRegistry = ToolRegistry {
-                        tools(ServerToolService().asToolsByClass() + deviceTools.tools())
+                        tools(ServerToolService().asToolsByClass() + skillTools + deviceTools.tools())
                     }
                     try {
                         // 回合用量累计（done 帧性能数据源；见 AgentRunner.turnUsage KDoc）
@@ -286,7 +290,10 @@ fun Route.agentRoute(
                                 session = session,
                                 userMessage = content,
                                 target = target,
-                                systemPrompt = OpenUiTurnNative.SYSTEM_PROMPT,
+                                // skill 清单段（spike）：渐进披露——只注 name+description，
+                                // 正文经 load_skill 按需加载；空清单 = 空串，prompt 零变化
+                                systemPrompt = OpenUiTurnNative.SYSTEM_PROMPT +
+                                    (skillCenter?.promptSection() ?: ""),
                                 toolRegistry = toolRegistry,
                                 // openui 流式预览：program 前缀瞬态帧（不落事件流，与
                                 // event/done/error 共用同一 writer 保序；旧端忽略未知 kind）

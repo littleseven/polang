@@ -6,6 +6,7 @@ import com.mamba.picme.server.agent.AgentExecutorFactory
 import com.mamba.picme.server.agent.AgentRoundGate
 import com.mamba.picme.server.agent.AgentRunner
 import com.mamba.picme.server.agent.ServerToolDispatcher
+import com.mamba.picme.server.agent.SkillCenter
 import com.mamba.picme.server.agent.agentRoute
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.auth.APP_CHANNEL_HEADER
@@ -38,6 +39,7 @@ import com.mamba.picme.server.routes.accountDeletionRoute
 import com.mamba.picme.server.routes.appLatestRoute
 import com.mamba.picme.server.routes.guestDeletionRoute
 import com.mamba.picme.server.routes.authRoute
+import com.mamba.picme.server.routes.skillRoute
 import com.mamba.picme.server.routes.browserRoute
 import com.mamba.picme.server.routes.claudeChatRoute
 import com.mamba.picme.server.routes.claudeDeliverRoute
@@ -213,11 +215,14 @@ fun Application.module(config: AppConfig) {
         WebSearchService(httpClient, it, config.deepseekSearchBaseUrl)
     }
 
+    // Skill 中心（spike 2026-11-07）：磁盘技能资产（POLANG_SKILLS_DIR，缺省 skills/），
+    // 云端 Agent 直读、端侧经 /v1/skills 下载；改 skill 无需重新部署（热更新）
+    val skillCenter = SkillCenter.fromEnv()
     // 云端 Agent 运行器（ADR-018）：Koog JVM loop + 事件溯源落流 + BYOK 透传（零留存）
     // GenUI 唯一化（2026-11-06）：恒 turn-native，无 actionGate/argsTransformer 接线
     val agentRunner = AgentRunner(
         executorFactory = AgentExecutorFactory(),
-        dispatcher = ServerToolDispatcher.default(),
+        dispatcher = ServerToolDispatcher.default(skillCenter = skillCenter),
     )
     // 工具桥挂起表（M2）：设备工具 requestId → Deferred；/agent 路由与 tool-results 上行共享
     val agentBridge = AgentBridgeRegistry()
@@ -247,7 +252,9 @@ fun Application.module(config: AppConfig) {
         issueReportRoute(issueReportService, issueReportRateLimiter)
         browserRoute(browserBridge, browserDailyLimiter, browserConcurrency, browserStats)
         // 云端 Agent 会话域（ADR-017/018）：/agent/** 走上方 app-token 拦截器，M1 仅注册账号
-        agentRoute(agentRunner, agentBridge, roundGate = agentRoundGate)
+        agentRoute(agentRunner, agentBridge, roundGate = agentRoundGate, skillCenter = skillCenter)
+        // Skill 中心下载端点（spike）：端侧 Agent 的 skill 资产来源
+        skillRoute(skillCenter)
         // 管理后台（/admin/**，独立 cookie 认证）
         adminRoute(config.adminToken, cosService, balanceService, config.llmPrices, issueReportService)
     }

@@ -4,6 +4,10 @@ import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.agents.core.tools.annotations.Tool
 import ai.koog.agents.core.tools.reflect.asToolsByClass
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 
 /**
@@ -68,10 +72,21 @@ class ServerToolDispatcher {
         /** 与 [ServerToolService.defaultRegistry] 同源：同一 clock、同一实现。 */
         fun default(
             clock: () -> Long = { System.currentTimeMillis() },
+            skillCenter: SkillCenter? = null,
         ): ServerToolDispatcher {
             val service = ServerToolService(clock)
-            return ServerToolDispatcher()
+            val dispatcher = ServerToolDispatcher()
                 .register("server_time") { service.serverTime() }
+            // load_skill（spike）：pending 重放同源注册，与 ToolRegistry 中的实现零漂移
+            skillCenter?.let { center ->
+                val skills = LoadSkillToolService(center)
+                dispatcher.register("load_skill") { argsJson ->
+                    val name = (Json.parseToJsonElement(argsJson) as? JsonObject)
+                        ?.get("name")?.jsonPrimitive?.contentOrNull.orEmpty()
+                    skills.loadSkill(name)
+                }
+            }
+            return dispatcher
         }
     }
 }
