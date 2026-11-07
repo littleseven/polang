@@ -1107,24 +1107,40 @@ object AdminViews {
                         p("meta") { +"（尚未产出）" }
                     } else {
                         val program = (finalMsg.payload as AgentEventPayload.Message).content
-                        // ── 可视化预览：Html 组件（沙箱 iframe 真渲染）+ Markdown 根（commonmark）──
+                        // ── 可视化预览：手机壳（9:19.5 屏幕）内真渲染——
+                        //    Html 组件走沙箱 iframe（与端上 WebView 同文档），Markdown 根走 commonmark ──
                         val htmlDocs = extractHtmlDocuments(program)
-                        htmlDocs.forEachIndexed { i, doc ->
-                            p("block-label") { +"可视化预览 · Html 组件${if (htmlDocs.size > 1) " #${i + 1}" else ""}（沙箱 iframe，与端上 WebView 同文档）" }
-                            // kotlinx.html DSL 无 iframe builder（3.x 未生成）——手写标签，
-                            // srcdoc 值经 attrEscape 属性转义（& 须最先）
-                            unsafe {
-                                raw(
-                                    "<iframe sandbox=\"allow-scripts\" loading=\"lazy\" " +
-                                        "style=\"width:100%;height:480px;border:1px solid #e0e0e0;border-radius:8px;background:#fff\" " +
-                                        "srcdoc=\"${attrEscape(doc)}\"></iframe>",
-                                )
-                            }
-                        }
                         val mdRoot = extractMarkdownRoot(program)
-                        if (mdRoot != null) {
-                            p("block-label") { +"可视化预览 · Markdown 根（commonmark 渲染）" }
-                            div("md-preview") { unsafe { raw(renderMarkdown(mdRoot)) } }
+                        if (htmlDocs.isNotEmpty() || mdRoot != null) {
+                            div("phone-stage") {
+                                htmlDocs.forEachIndexed { i, doc ->
+                                    div("phone-item") {
+                                        p("block-label") { +"可视化预览 · Html 组件${if (htmlDocs.size > 1) " #${i + 1}" else ""}（沙箱 iframe，与端上 WebView 同文档）" }
+                                        div("phone-frame") {
+                                            div("phone-screen") {
+                                                // kotlinx.html DSL 无 iframe builder（3.x 未生成）——手写标签，
+                                                // srcdoc 值经 attrEscape 属性转义（& 须最先）
+                                                unsafe {
+                                                    raw(
+                                                        "<iframe sandbox=\"allow-scripts\" loading=\"lazy\" " +
+                                                            "srcdoc=\"${attrEscape(doc)}\"></iframe>",
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (mdRoot != null) {
+                                    div("phone-item") {
+                                        p("block-label") { +"可视化预览 · Markdown 根（commonmark 渲染）" }
+                                        div("phone-frame") {
+                                            div("phone-screen") {
+                                                div("md-preview") { unsafe { raw(renderMarkdown(mdRoot)) } }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                         if (htmlDocs.isEmpty() && mdRoot == null) {
                             p("meta") { +"本程序无可视化预览形态（暂支持 Html 组件与 Markdown 根）；组件树浏览器预览为后续里程碑。" }
@@ -2413,6 +2429,16 @@ object AdminViews {
                         .md-preview pre code{background:none;padding:0}
                         .md-preview blockquote{border-left:3px solid var(--c-primary);margin:8px 0;padding:4px 12px;color:var(--c-text-2);background:#fafafa}
                         .md-preview a{color:var(--c-primary)}
+                        /* 调试结果页手机壳预览（0.9.31）：9:19.5 屏幕 + 机身 bezel + Dynamic Island */
+                        .phone-stage{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;padding:24px;background:#ececf0;border-radius:var(--r-md);margin-bottom:12px}
+                        .phone-item{margin:0}
+                        .phone-item .block-label{margin-bottom:10px}
+                        .phone-frame{width:300px;aspect-ratio:9/19.5;background:#1b1b1f;border-radius:44px;padding:11px;box-sizing:border-box;box-shadow:0 14px 34px rgba(0,0,0,.28),inset 0 0 0 2px #3a3a40;position:relative;flex-shrink:0}
+                        .phone-frame::before{content:"";position:absolute;top:11px;left:50%;transform:translateX(-50%);width:86px;height:24px;background:#1b1b1f;border-radius:13px;z-index:2;pointer-events:none}
+                        .phone-frame::after{content:"";position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:96px;height:4px;border-radius:2px;background:rgba(255,255,255,.35);z-index:2;pointer-events:none}
+                        .phone-screen{width:100%;height:100%;background:#fff;border-radius:34px;overflow:hidden}
+                        .phone-screen iframe{display:block;width:100%;height:100%;border:0;background:#fff}
+                        .phone-screen .md-preview{padding:20px 16px 36px;height:100%;overflow-y:auto;box-sizing:border-box;font-size:13px;line-height:1.6}
                         /* 发包管理 v2（依 Ardot 设计稿：双轨版本卡 + 双栏上传 + 分轨历史） */
                         .track-row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
                         .track-card{flex:1;min-width:320px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:16px 20px}
