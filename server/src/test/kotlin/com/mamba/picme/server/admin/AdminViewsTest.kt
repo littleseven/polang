@@ -393,6 +393,11 @@ class AdminViewsTest {
         assertTrue(html.contains("href=\"/admin/skills/html-card/preview\""))
         assertTrue(html.contains("预览"))
         assertTrue(html.contains("共 2 个技能"))
+        // 布局修复（0.9.40）：fixed 布局定列宽——名称整行不折行（省略号+title），头部按钮成组不挤压
+        assertTrue(html.contains("skills-table"))
+        assertTrue(html.contains("skill-head-actions"))
+        assertTrue(html.contains("td class=\"skill-name\" title=\"html-card\""))
+        assertTrue(html.contains("td class=\"skill-desc-cell\""))
         // LLM 视角清单段
         assertTrue(html.contains("system prompt 技能清单段"))
         assertTrue(html.contains("- html-card: 当需要生成任务卡…"))
