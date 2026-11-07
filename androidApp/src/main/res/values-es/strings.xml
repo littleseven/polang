@@ -186,6 +186,17 @@
     <string name="data_generation">Generación de datos</string>
     <string name="debug_tab_generate">Generación por lotes</string>
     <string name="debug_tab_pexels">Galería de Pexels</string>
+    <string name="debug_tab_qr_preview">Vista QR</string>
+    <string name="debug_qr_title">Vista previa OpenUI por QR</string>
+    <string name="debug_qr_desc">Escanea el código QR de la página de resultados/reproducción de depuración, o pega un ID de sesión, para renderizar el programa final con el renderizador del dispositivo.</string>
+    <string name="debug_qr_input_hint">ID de sesión o enlace polang://</string>
+    <string name="debug_qr_load">Cargar</string>
+    <string name="debug_qr_scan">Escanear</string>
+    <string name="debug_qr_loading">Cargando…</string>
+    <string name="debug_qr_history">Historial de vistas (%1$d)</string>
+    <string name="debug_qr_clear">Limpiar</string>
+    <string name="debug_qr_error_parse">No se pudo extraer un ID de sesión de la entrada</string>
+    <string name="debug_qr_error_no_token">No has iniciado sesión en el servidor. Inicia sesión en Ajustes primero.</string>
     <string name="pexels_api_key_hint">Introduce la clave API de Pexels</string>
     <string name="pexels_api_key_save">Guardar</string>
     <string name="pexels_api_key_configured">Clave API configurada</string>

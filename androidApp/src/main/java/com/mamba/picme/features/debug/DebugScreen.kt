@@ -72,6 +72,7 @@ import com.mamba.picme.features.debug.pexels.PexelsKeyStore
 import com.mamba.picme.features.debug.pexels.PexelsSection
 import com.mamba.picme.features.debug.pexels.PexelsViewModel
 import com.mamba.picme.features.debug.openui.OpenUiComponentGallery
+import com.mamba.picme.features.debug.openui.OpenUiQrPreviewTab
 import com.mamba.picme.features.gallery.MediaViewModel
 import kotlinx.coroutines.launch
 
@@ -218,6 +219,11 @@ private fun DebugContent(
                     onClick = { selectedTab = 2 },
                     text = { Text("OpenUI") }
                 )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text(stringResource(R.string.debug_tab_qr_preview)) }
+                )
             }
             when (selectedTab) {
                 0 -> GenerateTabContent(
@@ -240,6 +246,8 @@ private fun DebugContent(
                 1 -> PexelsSection(viewModel = pexelsViewModel)
 
                 2 -> OpenUiComponentGallery()
+
+                3 -> OpenUiQrPreviewTab()
             }
         }
     }

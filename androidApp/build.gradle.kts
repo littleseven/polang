@@ -278,6 +278,7 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.video)
+    implementation(libs.zxing.core)
     implementation(libs.logging.interceptor)
     implementation(libs.okhttp)
     implementation(libs.moshi.kotlin)

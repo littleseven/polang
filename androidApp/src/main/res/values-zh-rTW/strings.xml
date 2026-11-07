@@ -186,6 +186,17 @@
     <string name="data_generation">數據生成</string>
     <string name="debug_tab_generate">批量產生</string>
     <string name="debug_tab_pexels">Pexels 圖庫</string>
+    <string name="debug_tab_qr_preview">QR 預覽</string>
+    <string name="debug_qr_title">OpenUI 掃碼預覽</string>
+    <string name="debug_qr_desc">掃管理後台調試結果頁/回放頁的二維碼，或貼上會話 ID，用裝置端真實渲染器預覽最終程式。</string>
+    <string name="debug_qr_input_hint">會話 ID 或 polang:// 連結</string>
+    <string name="debug_qr_load">載入</string>
+    <string name="debug_qr_scan">掃碼</string>
+    <string name="debug_qr_loading">載入中…</string>
+    <string name="debug_qr_history">預覽歷史（%1$d）</string>
+    <string name="debug_qr_clear">清空</string>
+    <string name="debug_qr_error_parse">無法從輸入解析會話 ID</string>
+    <string name="debug_qr_error_no_token">未登入伺服器帳號，請先在設定中登入。</string>
     <string name="pexels_api_key_hint">輸入 Pexels API Key</string>
     <string name="pexels_api_key_save">儲存</string>
     <string name="pexels_api_key_configured">API Key 已配置</string>

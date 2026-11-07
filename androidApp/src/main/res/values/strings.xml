@@ -189,6 +189,17 @@
     <string name="data_generation">Data Generation</string>
     <string name="debug_tab_generate">Batch Generate</string>
     <string name="debug_tab_pexels">Pexels Gallery</string>
+    <string name="debug_tab_qr_preview">QR Preview</string>
+    <string name="debug_qr_title">OpenUI QR Preview</string>
+    <string name="debug_qr_desc">Scan the QR code on the admin debug result / replay page, or paste a session ID, to render the final program with the on-device renderer.</string>
+    <string name="debug_qr_input_hint">Session ID or polang:// link</string>
+    <string name="debug_qr_load">Load</string>
+    <string name="debug_qr_scan">Scan</string>
+    <string name="debug_qr_loading">Loading…</string>
+    <string name="debug_qr_history">Preview history (%1$d)</string>
+    <string name="debug_qr_clear">Clear</string>
+    <string name="debug_qr_error_parse">Cannot parse a session ID from the input</string>
+    <string name="debug_qr_error_no_token">Not signed in to the server account. Sign in from Settings first.</string>
     <string name="pexels_api_key_hint">Enter Pexels API Key</string>
     <string name="pexels_api_key_save">Save</string>
     <string name="pexels_api_key_configured">API Key configured</string>
