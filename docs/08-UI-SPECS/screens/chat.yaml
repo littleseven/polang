@@ -137,7 +137,7 @@ parts_rendering:
   granularity:
     rule: "每个 MessagePart = LazyColumn 独立 item（一条回复的多 part 拍平为连续 items）"
     key: '"${messageId}:${partId}"'  # 块级稳定 key（流式三段式与回收锚点；分轨命名空间：瞬态 txt-N/call-N、持久 p0/p1，见 spec §3 注记）
-    content_type: "按 part 鉴别 type（text/chart/html_card/task_card/image/edit_result/optimize_candidates/browser_live + user_message/legacy_message/tool_placeholder/tool_error/tool_status）——LazyColumn 复用桶，禁无 contentType（性能红线 ADR-016 §4）；media_results 桶已随 2026-11-08 横滑图集卡退役删除"
+    content_type: "按 part 鉴别 type（text/reasoning/source_chips/chart/html_card/task_card/image/edit_result/optimize_candidates/openui_card/browser_live/tombstone + user_message/legacy_message/tool_placeholder/tool_error/tool_status；source_chips 为连续 source parts 聚合单 item）——LazyColumn 复用桶，禁无 contentType（性能红线 ADR-016 §4）"
     anti_pattern: "禁止「一条回复一个巨型 item 内部 Column 排段」（回收粒度/重组隔离/测高防抖全面劣化）"
     user_note: "USER 消息（含图文 user_image_text = Image+Text 两 part）整颗单 item 渲染（2026-09-27 M4 定稿：§5 上图下文同气泡不拆 part）；claude 气泡/COMMAND/PLAN_PREVIEW/图片类消息同为整消息 legacy 渲染"
     streaming_note: "流式消息卡 part 三分流：已填充（OUTPUT_AVAILABLE）跳过（产物已落库独立消息行渲染，禁双显）；未完成渲染占位状态行；OUTPUT_ERROR 渲染失败状态行（瞬态不落库）；开放文本块以 paced 内容+光标渲染（打字机节拍保留）"
@@ -157,10 +157,19 @@ parts_rendering:
       change: "状态源改 ToolPartState（parts 投影）"
     media_results:                      # ❌ 已退役（2026-11-08 横滑图集卡退役，§9 墓碑）
       component: "（已拆除，原 MediaResultsCarousel）"
-      change: "search/refine 回执改 text 计数文案；存量行 RETIRED 闭集整行跳过"
+      change: "search/refine 回执改 text 计数文案；v28 重置后零存量行，v5 备份恢复落 tombstone"
+    reasoning:                          # ✅ 2026-11-08 值域终态新增（思考链折叠块）
+      component: "ReasoningPartBlock（chevron + chat_reasoning_title 五语，展开 13sp onSurfaceVariant，animateContentSize 150ms；iOS reasoningItem 13pt secondaryLabel 对等）"
+      change: "默认折叠（rememberSaveable 保态）；生产开关默认关（thinking=disabled）；永不作 type 投影源，恒排主区 part 前"
+    source_chips:                       # ✅ 2026-11-08 值域终态新增（web_search 引用 chips 行）
+      component: "SourceChipsRow（FlowRow 序号 11sp semibold + 域名 12sp，surfaceVariant 胶囊 16dp 圆角；iOS sourceChipsItem 对等）"
+      change: "连续 SourceUrl/SourceDocument parts 聚合单 item（多段 run 追加序号防 key 重复）；URL chip 点击 Intent.ACTION_VIEW（http/https 白名单），恒排 parts 尾区；回灌剥离"
+    tombstone:                          # ✅ 2026-11-08 Unsupported 转正改名（前向兼容兜底卡，§0.4 CATALOG）
+      component: "TombstonePartCard（图标 + 「内容暂不支持」+ 升级提示，五语 chat_unsupported_part_*；iOS tombstoneItem 同款）"
+      change: "读时合成永不写库（例外 = 备份恢复退役卡行）；codec 未知鉴别值原位占位"
     image:
       component: "ChatMessageItem isImage/isUser 分支（Coil 原生）"
-      change: none                  # 媒体红线：原生 block，不经 LLM 排版
+      change: none                  # 媒体红线：原生 block，不经 LLM 排版；agent 结果图语义 = IMAGE + role 守卫（D2a 合并）
     edit_result:
       component: "isEditResult 分支（§5 image_content.edit_result）"
       change: none
@@ -176,7 +185,7 @@ parts_rendering:
     - "turn 聚合：§3.1 视觉规则 SwiftUI 等价（turn 内段落间距档 + 回合分隔档，token 同源）"
     - "AST 正文渲染：解析层 commonMain，SwiftUI 渲染自绘（M3 管线 iOS 对等）"
     - "HTML 卡双形态：现为零实现，gap 最大（HtmlCard WKWebView + 沙盒/测高/分流/全屏查看器/链接落地页）"
-    - "type 分类法（2026-09-28 重构，spec 2026-09-28-chat-type-taxonomy-design.md）：iOS M5 直接按新 3 分类 7 值实现（text/image + tool_chart/tool_html/tool_task/tool_image_edit + data_optimize_candidates；data_media_results 已随 2026-11-08 横滑图集卡退役剔除，存量行 RETIRED 闭集跳过），role 为消息级独立字段——零 legacy 迁移包袱"
+    - "type 值域（2026-11-08 终态，4+1 分类 13 值 + role 独立字段；iOS 判型经 shared primaryPartOf 同源——envelope v6 门禁后零 legacy 迁移包袱）"
 
 # ============================================================================
 # 4. 空状态（ChatEmptyState）
@@ -854,8 +863,8 @@ platform_differences:
       android: "WebView 沙盒（loadHTMLString + about:blank，禁外链脚本）+ 测高分流 + 全屏查看器"
       ios: "WKWebView 同构（html-card-two-tier spec §12：照搬同款沙箱/测高/渐隐预览/链接落地页）"
     persistence:
-      android: "Room：type 列（分类法 8 值）+ parts 列（codec JSON）+ 双写迁移"
-      ios: "ChatHistoryStore Codable 直按同一线格式（无 Room，零迁移；旧 type 行按 §3.2 legacy 兜底）"
+      android: "Room v28：partsJson 权威列（codec JSON，非空）+ type/content/metadata 派生投影（projectChatRow）；写路径 insertPartsMessage/replacePartsMessage（parts-first）；legacy 迁移机器已随 v28 聊天表重置出清"
+      ios: "ChatHistoryStore codec 同一线格式 + envelope v6 版本门禁（无 Room；version<6 旧文件整体忽略，对齐 Android 重置语义；差异注记：会话索引 chat_sessions.json 不随门禁重置——旧线程条目可能残留为指向已忽略文件的空会话，低风险不处理）"
     svg_chart:
       android: "WebView 栅格化 SVG"
       ios: "WKWebView 栅格化或 CoreGraphics/SwiftUI 路径（同源 SVG 输入，表现对等）"

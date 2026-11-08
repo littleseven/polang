@@ -106,7 +106,7 @@
 ## 6. 新 part 落地点
 
 ### 6.1 `reasoning`
-- 模型：`MessagePart.Reasoning(partId, text, state: PartState)`；Room 消息 type 列取值规则随 D1 决策落地（若 parts-first：type 投影 = 首个 content/tool 类 part 的 kind，reasoning 永不作投影源；排序规则：reasoning 排在 text 前）。**builder-check 修正**：现行代码**没有**「多 part 消息取首 part 值」规则（Android 写路径全走标量列；首 part→type 推导仅存在于 iOS decode `uiTypeOf`）——该规则是本设计要新建的行为，不是既有行为
+- 模型：`MessagePart.Reasoning(partId, text, state: PartState)`；Room 消息 type 列取值规则随 D1 决策落地（若 parts-first：type 投影 = `primaryPartOf` 判型锚，**排除清单语义**——首个 content/tool/data 类 part 的鉴别值，reasoning/source/tombstone 三值永不作投影源（注意 Tombstone category 归 DATA，按 category 过滤挡不住，须显式类型排除）；排序规则：reasoning 排在 text 前）。**builder-check 修正**：现行代码**没有**「多 part 消息取首 part 值」规则（Android 写路径全走标量列；首 part→type 推导仅存在于 iOS decode `uiTypeOf`）——该规则是本设计要新建的行为，不是既有行为
 - 渲染：Android `ChatReasoningPart`（可折叠「思考过程」块，样式参照 Vercel/ChatGPT reasoning UI）；iOS SwiftUI 对等
 - 流式：TurnStreamEvent 增 reasoning delta 族；生产者接线点预留（Koog 1.3.0 reasoning 流式支持**实施期验证**——若 Koog 不透出 reasoning_content，则生产者挂账，part 类型/渲染/编解码照常落地）
 - 回灌：剥离（不回灌 LLM）
