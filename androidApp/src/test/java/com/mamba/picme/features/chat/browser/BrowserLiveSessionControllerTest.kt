@@ -7,7 +7,7 @@ import com.mamba.picme.R
 import com.mamba.picme.agent.core.capability.BrowserSessionCapability
 import com.mamba.picme.agent.core.capability.BrowserTransport
 import com.mamba.picme.data.local.AppDatabase
-import com.mamba.picme.data.local.decodePartsOrLegacy
+import com.mamba.picme.data.local.decodeParts
 import com.mamba.picme.domain.browser.BrowserActionRequest
 import com.mamba.picme.domain.browser.BrowserActionResult
 import com.mamba.picme.domain.browser.BrowserFrameResult
@@ -164,7 +164,7 @@ class BrowserLiveSessionControllerTest {
     private suspend fun persistedBrowserCard(): MessagePart.BrowserLive =
         db.chatMessageDao().getRecentMessages(SESSION_ID, limit = 1)
             .single()
-            .decodePartsOrLegacy()
+            .decodeParts()
             .filterIsInstance<MessagePart.BrowserLive>()
             .single()
 

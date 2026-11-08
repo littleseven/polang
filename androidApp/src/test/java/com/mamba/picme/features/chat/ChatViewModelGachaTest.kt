@@ -3,6 +3,9 @@ package com.mamba.picme.features.chat
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 
 import com.mamba.picme.data.local.ChatMessageEntity
+import com.mamba.picme.data.local.chatMessageEntity
+import com.mamba.picme.data.local.decodeParts
+import com.mamba.picme.domain.chat.MessagePart
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -13,6 +16,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,17 +40,16 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         drawIndex = 1
     )
 
+    private fun candidatesMessage(group: OptimizeCandidateGroup = group()) = chatMessageEntity(
+        id = "msg1", sessionId = "default", role = "agent",
+        parts = listOf(MessagePart.OptimizeCandidates("p0", group)),
+    )
+
     @Test
     fun `loadMessages restores gacha selection for pending candidates message`() = runTest {
         every { gachaController.hasPending("msg1") } returns true
         every { chatMessageDao.getMessagesBySession(any()) } returns flowOf(
-            listOf(
-                ChatMessageEntity(
-                    id = "msg1", sessionId = "default",
-                    type = OptimizeCandidateGroup.MESSAGE_TYPE,
-                    content = "expl", metadata = group().toJson()
-                )
-            )
+            listOf(candidatesMessage())
         )
 
         val vm = newViewModel()
@@ -59,14 +63,16 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         val vm = newViewModel()
         advanceUntilIdle()
 
-        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "expl", "remote_deepseek")
+        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "remote_deepseek")
         advanceUntilIdle()
 
         val slot = slot<ChatMessageEntity>()
         coVerify { chatMessageDao.insertMessage(capture(slot)) }
         assertEquals(OptimizeCandidateGroup.MESSAGE_TYPE, slot.captured.type)
         assertEquals("msg1", slot.captured.id)
-        assertEquals(group().toJson(), slot.captured.metadata)
+        val persisted = slot.captured.decodeParts()
+            .filterIsInstance<MessagePart.OptimizeCandidates>().single()
+        assertEquals(group(), persisted.group)
         assertEquals(1, vm.gachaSelections.value["msg1"])
     }
 
@@ -76,11 +82,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         advanceUntilIdle()
         coEvery { gachaController.confirm("msg1", 1) } returns
             ChatOptimizeGachaController.ConfirmResult("file:///full.jpg", mockk())
-        coEvery { chatMessageDao.getMessageById("msg1") } returns ChatMessageEntity(
-            id = "msg1", sessionId = "default",
-            type = OptimizeCandidateGroup.MESSAGE_TYPE,
-            content = "expl", metadata = group().toJson()
-        )
+        coEvery { chatMessageDao.getMessageById("msg1") } returns candidatesMessage()
 
         vm.onOptimizeGachaConfirm("msg1", 1) { }
         advanceUntilIdle()
@@ -90,8 +92,10 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         assertEquals("image", slot.captured.type)
         assertEquals("agent", slot.captured.role)
         assertEquals("msg1", slot.captured.id)
-        assertTrue(slot.captured.metadata!!.contains("file:///full.jpg"))
-        assertEquals("expl", slot.captured.content)
+        val image = slot.captured.decodeParts().filterIsInstance<MessagePart.Image>().single()
+        assertEquals("file:///full.jpg", image.ref)
+        assertFalse(image.saved)
+        assertNull(slot.captured.metadata)
     }
 
     @Test
@@ -109,25 +113,22 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
     }
 
     @Test
-    fun `onOptimizeGachaReroll rewrites message metadata and resets selection`() = runTest {
+    fun `onOptimizeGachaReroll rewrites message parts and resets selection`() = runTest {
         val vm = newViewModel()
         advanceUntilIdle()
         val newGroup = group().copy(drawIndex = 2, recommendedIndex = 0)
         coEvery { gachaController.reroll("msg1") } returns
-            ChatOptimizeGachaController.RerollOutcome.Rerolled(newGroup, "new expl")
-        coEvery { chatMessageDao.getMessageById("msg1") } returns ChatMessageEntity(
-            id = "msg1", sessionId = "default",
-            type = OptimizeCandidateGroup.MESSAGE_TYPE,
-            content = "expl", metadata = group().toJson()
-        )
+            ChatOptimizeGachaController.RerollOutcome.Rerolled(newGroup)
+        coEvery { chatMessageDao.getMessageById("msg1") } returns candidatesMessage()
 
         vm.onOptimizeGachaReroll("msg1") { }
         advanceUntilIdle()
 
         val slot = slot<ChatMessageEntity>()
         coVerify { chatMessageDao.insertMessage(capture(slot)) }
-        assertEquals(newGroup.toJson(), slot.captured.metadata)
-        assertEquals("new expl", slot.captured.content)
+        val persisted = slot.captured.decodeParts()
+            .filterIsInstance<MessagePart.OptimizeCandidates>().single()
+        assertEquals(newGroup, persisted.group)
         assertEquals(0, vm.gachaSelections.value["msg1"])
     }
 
@@ -142,7 +143,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         vm.onOptimizeGachaReroll("msg1") { results++ }
         vm.onOptimizeGachaReroll("msg1") { results++ } // 应被防抖忽略
         gate.complete(
-            ChatOptimizeGachaController.RerollOutcome.Rerolled(group().copy(drawIndex = 2), "new")
+            ChatOptimizeGachaController.RerollOutcome.Rerolled(group().copy(drawIndex = 2))
         )
         advanceUntilIdle()
 
@@ -167,7 +168,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         val vm = newViewModel()
         advanceUntilIdle()
 
-        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "expl", "remote_deepseek")
+        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "remote_deepseek")
         advanceUntilIdle()
         assertEquals(1, vm.gachaSelections.value["msg1"])
 

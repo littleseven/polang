@@ -2,6 +2,7 @@ package com.mamba.picme.features.chat
 
 import com.mamba.picme.R
 import com.mamba.picme.data.local.ChatMessageEntity
+import com.mamba.picme.data.local.taskCardStateOrNull
 import com.mamba.picme.data.remote.picme.ClaudeChatClient
 import com.mamba.picme.data.remote.picme.ClaudeEvent
 import com.mamba.picme.domain.chat.EngineerTaskResolution
@@ -99,7 +100,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
         val cards = taskCards()
         // 提交插卡 + Session 事件 + FAILED terminal，至少 3 次 upsert
         assert(cards.size >= 3) { "expected >= 3 task_card upserts, got ${cards.size}" }
-        val terminal = parseEngineerTaskState(cards.last().metadata)
+        val terminal = cards.last().taskCardStateOrNull()
         assertNotNull(terminal)
         assertEquals(EngineerTaskStatus.FAILED, terminal!!.status)
         assertEquals("boom", terminal.errorSummary)
@@ -120,7 +121,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
         vm.sendClaudeMessage("修一下崩溃")
         advanceUntilIdle()
 
-        val terminal = parseEngineerTaskState(taskCards().last().metadata)
+        val terminal = taskCards().last().taskCardStateOrNull()
         assertNotNull(terminal)
         assertEquals(EngineerTaskStatus.COMPLETED, terminal!!.status)
         assertEquals(2, terminal.turns)
@@ -156,7 +157,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
         advanceUntilIdle()
 
         // live entry 存活 ⇒ Done 正常推进终态落库
-        val terminal = parseEngineerTaskState(taskCards().last().metadata)
+        val terminal = taskCards().last().taskCardStateOrNull()
         assertEquals(EngineerTaskStatus.COMPLETED, terminal?.status)
     }
 
@@ -188,7 +189,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
         vm.deliverEngineerTask(taskId)
         advanceUntilIdle()
 
-        val terminal = parseEngineerTaskState(taskCards().last().metadata)
+        val terminal = taskCards().last().taskCardStateOrNull()
         assertEquals(EngineerTaskResolution.DELIVERED, terminal?.resolution)
         assertEquals("fix/x", terminal?.deliverBranch)
         assertEquals(EngineerTaskStatus.COMPLETED, terminal?.status)
@@ -216,7 +217,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
         vm.deliverEngineerTask(taskId)
         advanceUntilIdle()
 
-        val failed = parseEngineerTaskState(taskCards().last().metadata)
+        val failed = taskCards().last().taskCardStateOrNull()
         // 失败保持待审批态（可重试），错误摘要上卡；不裁决
         assertEquals(EngineerTaskStatus.AWAITING_DELIVER, failed?.status)
         assertEquals("deliver failed: conflict", failed?.errorSummary)
@@ -228,7 +229,7 @@ class ChatViewModelEngineerTaskTest : ChatViewModelTestBase() {
         vm.deliverEngineerTask(taskId)
         advanceUntilIdle()
 
-        val retried = parseEngineerTaskState(taskCards().last().metadata)
+        val retried = taskCards().last().taskCardStateOrNull()
         assertEquals(EngineerTaskResolution.DELIVERED, retried?.resolution)
         assertEquals("fix/y", retried?.deliverBranch)
     }

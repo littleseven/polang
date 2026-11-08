@@ -307,10 +307,9 @@ fun ChatScreen(
             messages,
             pendingNonCardTool,
             // browser 直播卡双显跳过的产物行锚（Task 13 新签名）：持久化 tool_browser
-            // 产物行的 sessionId 集合。读侧 decodePartsOrLegacy 自 M4 起对全部行恢复
-            // parts，故自非流式消息的 parts 提取即可；Task 16 Step 3 落
-            // emitBrowserCardMessage 前无 tool_browser 行写入方，集合恒空（行为等价
-            // 传空集合），emit 接线后本提取式自动生效，flattener 契约不变。
+            // 产物行的 sessionId 集合。读侧 decodeParts 直读 partsJson（v28 唯一权威），
+            // 故自非流式消息的 parts 提取即可；集合随 browser 卡落库自动生效，
+            // flattener 契约不变。
             persistedBrowserSessionIds = messages.asSequence()
                 .filter { !it.isStreaming }
                 .flatMap { it.parts.asSequence() }
