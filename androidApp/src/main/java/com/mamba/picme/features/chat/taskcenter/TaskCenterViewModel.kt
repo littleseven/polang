@@ -4,13 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
+import com.mamba.picme.data.local.taskCardStateOrNull
 import com.mamba.picme.domain.usertask.UserTask
 import com.mamba.picme.domain.usertask.UserTaskAction
 import com.mamba.picme.domain.usertask.UserTaskRegistry
 import com.mamba.picme.domain.chat.taskcenter.TaskCenterItem
 import com.mamba.picme.domain.chat.taskcenter.TaskCenterList
 import com.mamba.picme.domain.chat.taskcenter.TaskCenterPartition
-import com.mamba.picme.features.chat.parseEngineerTaskState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -37,10 +37,10 @@ class TaskCenterViewModel(
         ) { messages, sessions ->
             val sessionTitles = sessions.associate { session -> session.sessionId to session.title }
             val items = messages.mapNotNull { entity ->
-                val task = parseEngineerTaskState(entity.metadata) ?: return@mapNotNull null
+                val task = entity.taskCardStateOrNull() ?: return@mapNotNull null
                 TaskCenterItem(
                     sessionId = entity.sessionId,
-                    title = entity.content.ifBlank { task.sourceText },
+                    title = task.sourceText.take(50),
                     sessionTitle = sessionTitles[entity.sessionId],
                     task = task,
                 )

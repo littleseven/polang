@@ -436,7 +436,7 @@ class ChatViewModel(
         chatMessageDao.getTaskCardMessages()
             .map { messages ->
                 messages.count { entity ->
-                    parseEngineerTaskState(entity.metadata)
+                    entity.taskCardStateOrNull()
                         ?.let { task -> TaskCenterPartition.isActive(task) } == true
                 }
             }
@@ -955,7 +955,7 @@ class ChatViewModel(
     private suspend fun primeEngineerTask(taskId: String) {
         if (_engineerTasks.value.containsKey(taskId)) return
         val entity = chatMessageDao.getMessageById(taskId) ?: return
-        val task = parseEngineerTaskState(entity.metadata) ?: return
+        val task = entity.taskCardStateOrNull() ?: return
         _engineerTasks.update { tasks ->
             if (tasks.containsKey(taskId)) tasks else tasks + (taskId to task)
         }
@@ -1576,7 +1576,7 @@ class ChatViewModel(
                         chatMessageDao.getMessagesBySession(sessionId)
                     }
                     .collect { entities ->
-                        // M4 review 🟡2：M4 起 toUiModel 每条必经 decodePartsOrLegacy（kotlinx
+                        // M4 review 🟡2：M4 起 toUiModel 每条必经 decodeParts（kotlinx
                         // decode），Room invalidation（任务卡 SSE 高频/测高回写/图卡落库）会触发
                         // 全列表（上限 500）重 decode——挪出主线程防掉帧。仅纯 decode 段下移；
                         // 共享态（claudeDeliverOverrides 普通 mutableMap / engineerTasks /
@@ -1610,7 +1610,10 @@ class ChatViewModel(
                             .filter { it.type == OptimizeCandidateGroup.MESSAGE_TYPE }
                             .filter { optimizeGachaController?.hasPending(it.id) == true }
                             .mapNotNull { entity ->
-                                OptimizeCandidateGroup.fromJson(entity.metadata)?.let { entity.id to it.recommendedIndex }
+                                entity.decodeParts()
+                                    .filterIsInstance<MessagePart.OptimizeCandidates>()
+                                    .firstOrNull()
+                                    ?.let { part -> entity.id to part.group.recommendedIndex }
                             }
                             .toMap()
                         if (restored.isNotEmpty()) {
@@ -1633,7 +1636,9 @@ class ChatViewModel(
                             ChatThreadUi(
                                 sessionId = session.sessionId,
                                 title = resolveThreadTitle(session),
-                                lastMessagePreview = lastMessage?.content?.take(MAX_PREVIEW_LENGTH) ?: "",
+                                lastMessagePreview = lastMessage
+                                    ?.let { MessagePartsProjection.contentPreviewOf(it.decodeParts()) }
+                                    ?.take(MAX_PREVIEW_LENGTH) ?: "",
                                 updatedAt = session.updatedAt,
                                 isSelected = session.sessionId == _currentSessionId.value
                             )
@@ -4195,11 +4200,11 @@ class ChatViewModel(
 
     @Suppress("CyclomaticComplexMethod") // 待重构：toUiModel 按消息类型映射抽表
     private fun ChatMessageEntity.toUiModel(): ChatMessageUi {
-        // ADR-016 M4 + spec §4：parts 优先投影——primary part 定 [ChatMessageType]，
-        // role 列区分 USER_TEXT/AGENT_TEXT 与用户图文（type 前缀不再承载角色信息）；
-        // 平铺字段（chartSvg/htmlContent/…/engineerTask）一律自 parts 提取，
-        // 不再按 type 字符串守卫；performance/claudeAgent 仍从 metadata 解析（现状不变）。
-        val parts = decodePartsOrLegacy()
+        // ADR-016 持久化接缝反转：parts 为唯一内容权威——primary part 定 [ChatMessageType]，
+        // role 列区分 USER_TEXT/AGENT_TEXT 与用户图文；平铺字段（chartSvg/htmlContent/…/
+        // engineerTask）一律自 parts 提取；content 为 Text parts 投影；performance/
+        // claudeAgent 仍从消息级 metadata（白名单）解析。
+        val parts = decodeParts()
         val primary = parts.firstOrNull()
         val role = roleOf(this.role)
         return ChatMessageUi(
@@ -4227,7 +4232,7 @@ class ChatViewModel(
                 null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
             },
             role = role,
-            content = content,
+            content = MessagePartsProjection.contentPreviewOf(parts),
             chartSvg = (primary as? MessagePart.Chart)?.svg,
             htmlContent = (primary as? MessagePart.HtmlCard)?.html,
             htmlCardMeta = (primary as? MessagePart.HtmlCard)?.meta,
@@ -4247,9 +4252,8 @@ class ChatViewModel(
             gachaInteractive = primary is MessagePart.OptimizeCandidates &&
                 optimizeGachaController?.hasPending(id) == true,
             engineerTask = (primary as? MessagePart.TaskCard)?.task,
-            // ADR-016 M4：全量恢复双读填充（decodePartsOrLegacy：优先 partsJson，缺失/损坏
-            // 回 legacy 列现算）——UI 渲染源切到 parts（flattenChatItems 拍平），每条消息
-            // 都需要 parts 在场；M2 期仅 TASK_CARD 填充是「无消费方省 decode」的过渡口径。
+            // ADR-016 反转后 parts 即唯一权威（decodeParts 直解 partsJson）——UI 渲染源
+            // 切到 parts（flattenChatItems 拍平），每条消息都需要 parts 在场。
             parts = parts,
         )
     }

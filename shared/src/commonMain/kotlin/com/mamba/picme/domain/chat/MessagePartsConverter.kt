@@ -15,7 +15,9 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 
 /**
- * (type, content, metadata, role) → parts 的运行时转换器（M1 双写接缝的写侧纯函数）。
+ * (type, content, metadata, role) → parts 的转换器。**迁移/旧备份恢复专用**（2026-11-08
+ * parts 单一权威后，运行时读写路径不再经过本转换器——写侧 `chatMessageEntity` 直收 parts，
+ * 读侧 `decodeParts` 直读 partsJson）。
  *
  * 纯净化口径（spec §4.2）：只认新 10 值分类法；legacy 13→8 映射知识在
  * [LegacyChatTypeMigration]，本转换器不双吃。行级兜底不变：任何异常/空结果 → 原文 Text part。
