@@ -25,7 +25,7 @@ description: 把一批照片做成「可翻页精选相册卡」的完整流程�
     （拿不准当前日期先调 `server_time`）；
   - 人物精确查询用 person 参数（如「大宝」「儿子」），不要只拼进 query；
   - 只要人像/自拍/合照类传 hasFace = "true"；
-  - display 传 "false"——相册卡自己排版，不要横滑轮播卡。
+  - 用户提到视频/录像/vlog 时 mediaType 传 "video"（或 "all"）。
 - 工具只回「找到 N 张」+ 尾部 handle。N = 0 → 不发卡，用 Markdown 告知并建议放宽条件；
   N 过大可用 `refine_media_search` 收窄（收窄后 handle 会换新，用最新的）。
 - **你看不到照片内容**（隐私设计：出端只有计数 + 句柄 + 每张的拍摄日期）。

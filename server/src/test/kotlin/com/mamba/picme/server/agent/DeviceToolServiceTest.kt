@@ -50,7 +50,6 @@ class DeviceToolServiceTest {
                 put("fromMs", "")
                 put("toMs", "")
                 put("hasFace", "")
-                put("display", "false")
                 put("mediaType", "photo")
             },
         )
@@ -59,7 +58,6 @@ class DeviceToolServiceTest {
         val frame = frames.single()
         assertEquals("search_media", frame.tool)
         assertEquals("猫", frame.args["query"]!!.jsonPrimitive.content)
-        assertEquals("false", frame.args["display"]!!.jsonPrimitive.content)
         assertEquals("photo", frame.args["mediaType"]!!.jsonPrimitive.content)
         assertTrue(frame.requestId.startsWith("tr_"))
         assertEquals(DeviceToolService.DEFAULT_TIMEOUT_MS, frame.timeoutMs)
