@@ -48,8 +48,7 @@ class ChatOptimizeGachaController(
     sealed interface DrawOutcome {
         /** 候选卡组（Selected / KeepOriginal 均发卡组，区别在 recommendedIndex） */
         data class Candidates(
-            val group: OptimizeCandidateGroup,
-            val explanation: String
+            val group: OptimizeCandidateGroup
         ) : DrawOutcome
 
         /** 抽卡不可用 / 缩略图全部落盘失败：退回现有单发结果（imageUri=null 时按错误文本处理） */
@@ -58,7 +57,7 @@ class ChatOptimizeGachaController(
 
     /** 换一组结果 */
     sealed interface RerollOutcome {
-        data class Rerolled(val group: OptimizeCandidateGroup, val explanation: String) : RerollOutcome
+        data class Rerolled(val group: OptimizeCandidateGroup) : RerollOutcome
 
         /** 内存态丢失（进程重建后）；UI 已降级只读时不会触发 */
         data object Expired : RerollOutcome
@@ -95,7 +94,6 @@ class ChatOptimizeGachaController(
             scored = scored,
             recommendedIndex = recommendedIndex,
             drawIndex = 1,
-            explanation = outcome.explanation
         ) ?: fallback(imageUri, sessionId)
     }
 
@@ -120,9 +118,8 @@ class ChatOptimizeGachaController(
             scored = scored,
             recommendedIndex = recommendedIndex,
             drawIndex = pending.drawIndex + 1,
-            explanation = outcome.explanation
         ) ?: return RerollOutcome.Unavailable
-        return RerollOutcome.Rerolled(built.group, built.explanation)
+        return RerollOutcome.Rerolled(built.group)
     }
 
     /**
@@ -191,7 +188,6 @@ class ChatOptimizeGachaController(
         scored: List<ScoredCandidate>,
         recommendedIndex: Int,
         drawIndex: Int,
-        explanation: String
     ): DrawOutcome.Candidates? {
         val uiCandidates = scored.map { sc ->
             val thumbPath = sc.thumbnail?.let { bmp ->
@@ -228,7 +224,7 @@ class ChatOptimizeGachaController(
             usedFingerprints = usedFingerprints,
             drawIndex = drawIndex
         )
-        return DrawOutcome.Candidates(group = group, explanation = explanation)
+        return DrawOutcome.Candidates(group = group)
     }
 
     /** 退回现有单发路径（与抽卡接入前行为完全一致）。 */
