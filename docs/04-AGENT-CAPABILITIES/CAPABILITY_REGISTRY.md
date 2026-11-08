@@ -47,7 +47,7 @@
 | **ChatGallerySummaryCapability** | `chat_gallery_summary` | CHAT | 1 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate |
 | **ChatStartTagScanCapability** | `chat_start_tag_scan` | CHAT | 1 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate |
 | **ChatRunScriptCapability** | `chat_run_script` | CHAT | 3 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（端侧 QuickJS 沙箱，命令 `run_gallery_script` / `draw_chart` / `render_html`） |
-| **ChatMediaWriteCapability** | `chat_media_write` | CHAT | 3 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（CHAT 场景媒体写执行汇聚点：`delete_media` / `favorite_media` / `select_media`） |
+| **ChatMediaWriteCapability** | `chat_media_write` | CHAT | 4 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（CHAT 场景媒体写执行汇聚点：`delete_media` / `favorite_media` / `select_media` / `share_media`） |
 | **ImageEditCapability** | `image_edit` | CHAT | 1 | ✅ 已落地 | 应用级（AppContainer 注入 ChatEditProcessor / ChatEditStateHolder，对话式图片编辑 `edit_image`） |
 
 > **变更说明（2026-07-06）**：
@@ -92,6 +92,12 @@
 > - `run_gallery_script` / `refine_media_search` 描述补 UI 效果契约（脚本 return 对象含 ids 数组时端侧自动补横滑卡片；refine 无基数返回明确错误而非静默全局重搜）
 > - `ChatSearchCapability.SearchOutcome` 新增 `errorMessage` 字段：无基数 refine 映射为 `AgentAction.Error(INVALID_PARAMS)` 如实告知 LLM
 > - 新增意图路由层（`agent/core/intent/`：ChatIntentContract / IntentRouter / ChatRoutingPolicy），VIEW_PHOTOS/REFINE_RESULTS 意图可绕过全量 agent loop 直执 search/refine 命令，详见 `AGENT_ARCHITECTURE.md` §2.4.4 与 ADR-015
+>
+> **变更说明（2026-11-08，chat 工具面治理）**：
+> - `switch_view_mode` 移出 chat 工具面（`ChatToolService` 删除该 @Tool）：CHAT 场景无执行体（GalleryCapability 属 GALLERY 场景），dispatch 必落跨页队列回「正在为您切换到对应页面执行操作…」但页面不跳转，与 `view_media`（2026-09-26 移除）同类工具陷阱；`GalleryCapability.switch_view_mode` 命令保留不动
+> - `share_media` 反向补全：入 `ChatMediaWriteCapability`（命令数 3→4），`ChatViewModel.onShareMedia` 解析 id → `shareMediaAssets` 直接拉系统分享面板——此前 CHAT 场景 dispatch 只能命中 GalleryCapability 落跨页队列（同类陷阱），iOS 侧本有执行体（`IosChatGalleryCapability.handleShare` → Swift 弹分享面板），本补全对齐 iOS（[PARITY]）并消除 Android 陷阱
+> - `start_tag_scan` 工具更名 `query_tag_scan_status`：旧名说谎——@Tool 实现硬编码 `action="query"` 永不启动扫描，LLM 按名理解会误导用户；命令层 `AgentCommand.StartTagScan` / `ChatStartTagScanCapability`（命令本身支持 start|pause|resume|cancel|query）不动
+> - `run_gallery_script` 描述瘦身：完整 handler 目录/写操作清单/示例抽到 `gallery-script` skill（`server/skills/gallery-script`，端云经 load_skill 按需加载），@LLMDescription 只留硬约束（await bridge.callAsync / return 契约 / ids→卡片）与 skill 指针，常驻 prompt 每轮省约 1.5k 字符；§1.2 表 A/表 B 仍是 handler 契约 SSOT
 
 ### 1.1 场景 - 能力映射
 

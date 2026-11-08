@@ -1660,6 +1660,7 @@
     <string name="chat_write_no_valid_ids">Aucun identifiant de média valide</string>
     <string name="chat_delete_started_pending">Suppression de %1$d élément(s) initiée, en attente de l\'autorisation du système</string>
     <string name="chat_deleted_n">%1$d élément(s) supprimé(s)</string>
+    <string name="chat_share_opened_n">Panneau de partage ouvert (%1$d élément(s))</string>
     <string name="chat_favorited_one">1 élément ajouté aux favoris</string>
     <string name="chat_unfavorited_one">1 favori retiré</string>
     <string name="chat_selected_one">1 élément sélectionné</string>

@@ -1660,6 +1660,7 @@
     <string name="chat_write_no_valid_ids">No hay IDs de medios válidos</string>
     <string name="chat_delete_started_pending">Eliminación de %1$d elemento(s) iniciada, esperando autorización del sistema</string>
     <string name="chat_deleted_n">Se eliminaron %1$d elemento(s)</string>
+    <string name="chat_share_opened_n">Se abrió el panel para compartir (%1$d elemento(s))</string>
     <string name="chat_favorited_one">1 elemento añadido a favoritos</string>
     <string name="chat_unfavorited_one">Se quitó 1 favorito</string>
     <string name="chat_selected_one">1 elemento seleccionado</string>

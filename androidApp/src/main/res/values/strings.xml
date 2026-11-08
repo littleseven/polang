@@ -1709,6 +1709,7 @@
     <string name="chat_write_no_valid_ids">No valid media IDs</string>
     <string name="chat_delete_started_pending">Deletion of %1$d item(s) initiated, awaiting system authorization</string>
     <string name="chat_deleted_n">Deleted %1$d item(s)</string>
+    <string name="chat_share_opened_n">Opened the share sheet with %1$d item(s)</string>
     <string name="chat_favorited_one">Favorited 1 item</string>
     <string name="chat_unfavorited_one">Removed 1 favorite</string>
     <string name="chat_selected_one">Selected 1 item</string>

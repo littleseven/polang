@@ -193,11 +193,9 @@ class ChatToolService private constructor() : TraceIdAware {
         @LLMDescription("true 收藏 / false 取消") favorite: Boolean
     ): String = dispatchCommand(AgentCommand.FavoriteMedia(mediaId = mediaId, favorite = favorite))
 
-    @Tool(customName = "switch_view_mode")
-    @LLMDescription("切换相册视图。mode: grid(网格)/list(列表)。")
-    suspend fun switchViewMode(
-        @LLMDescription("视图模式：grid/list") mode: String
-    ): String = dispatchCommand(AgentCommand.SwitchViewMode(mode = mode))
+    // 注：switch_view_mode 已移出 chat 工具面（2026-11-08）——CHAT 场景无执行体
+    //（GalleryCapability 属 GALLERY 场景），dispatch 必落跨页队列回「正在切换页面」
+    // 但页面不跳转，与 view_media 同类的工具陷阱；命令本身在 GalleryCapability 保留。
 
     // ── 反馈 ──────────────────────────────────────────────────────
 
@@ -227,9 +225,13 @@ class ChatToolService private constructor() : TraceIdAware {
 
     // ── 打标 / 修图 ───────────────────────────────────────────────
 
-    @Tool(customName = "start_tag_scan")
-    @LLMDescription("查询 TAG 扫描状态（人脸/标签/语义索引进度）。无需参数。")
-    suspend fun startTagScan(): String =
+    // 工具名 2026-11-08 由 start_tag_scan 更名 query_tag_scan_status：旧名说谎——
+    // 实现硬编码 action="query"，永不启动扫描，LLM 按名理解会误导用户「扫描已开始」。
+    // 命令层 AgentCommand.StartTagScan / ChatStartTagScanCapability 不动（命令本身
+    // 支持 start|pause|resume|cancel|query，仅本工具面只暴露查询）。
+    @Tool(customName = "query_tag_scan_status")
+    @LLMDescription("查询 TAG 扫描状态（人脸/标签/语义索引进度）。只读查询，不会启动或控制扫描。无需参数。")
+    suspend fun queryTagScanStatus(): String =
         dispatchCommand(AgentCommand.StartTagScan(action = "query", taskType = null, mode = null))
 
     @Tool(customName = "ai_optimize")
@@ -277,10 +279,13 @@ class ChatToolService private constructor() : TraceIdAware {
         )
     }
 
+    // 描述 2026-11-08 瘦身：完整 handler 目录/写操作清单/示例抽到 gallery-script
+    // skill（server/skills/gallery-script，端云经 load_skill 按需加载），此处只留
+    // 硬约束与指针——渐进披露，常驻 prompt 每轮省约 1.5k 字符。
     @Tool(customName = "run_gallery_script")
-    @LLMDescription("在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数类 handler 只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。所有 handler 均为异步，**必须用 await bridge.callAsync(name, args) 调用**（bridge.call 已禁用，调用会报错）。可用 handler： gallery.summary → 相册聚合统计（totalPhotos/totalVideos/totalMedia/hasFaceCount/personClusterCount/namedPersonCount/labeledCount/unlabeledCount/semanticEncodedCount/remainingPass1/remainingPass3/isScanning/currentPass/recommendation）； gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,person?,limit?}) → 结构化过滤命中，返回 {ids:[...], total:N}（多维 AND，全可选；ids 已截断到 limit，total 为未截断真实数）； gallery.tags → 实际打标标签分布 {标签:照片数}（按计数降序 top 50）； gallery.timeline({fromMs?,toMs?,bucketMs?}) → 按时间分桶统计 {\"桶起始时间戳\":照片数}（默认按月，bucketMs=2592000000=月/31536000000=年）； gallery.intersect({idsA:[...],idsB:[...],op:\"intersect|union|diff\"}) → 集合交并差，返回 {ids:[...],total:N}（用于多次 query 结果交叉，如旅行+人脸）； media.meta(id) → 单张元数据 {id,type,captureMs,fileName,labels:[...],locationName,city,hasFace,faceId,aestheticScore,faceQualityScore}（不含路径/GPS/OCR/向量）； media.batch_meta([id1,id2,...]) → 批量元数据 [{...},...]（上限 50，避免循环调 media.meta）； gallery.stats_by_tag({label?,hasFace?,fromMs?,toMs?}) → 条件过滤后的标签分布（如人像照片内的场景标签）； face.cluster({topN?}) → 人脸聚类盘点 {clusterCount,namedCount,totalEmbeddings,unassignedEmbeddings,topPersons:[{personId,name,faceCount,coverMediaId}]}（topN 默认 10 上限 50，不含 embedding 原始数据）； tag.audit({topN?}) → 打标覆盖审计 {totalMedia,unlabeledCount,neverScannedCount,lastScanAt,outOfVocabTags:{标签:照片数}}（词表外标签 topN 默认 10 上限 50）； gallery.stats_by_city({topN?}) → 按城市分组的媒体计数分布 {城市:照片数}（topN 默认 10 上限 50）； tag.scan_status({}) → TAG 扫描会话状态快照 {active,state,sessionId,currentPass,processed,total,pending,failed,estimatedRemainingMs}（只读查询，绝不触发扫描；无会话时仅回 {active:false,state:null}）。 可并发取数：var r=await Promise.all([bridge.callAsync('gallery.summary',{}),bridge.callAsync('gallery.tags',{})]); var s=r[0],t=r[1]; 在 JS 内组合计算（如某标签占比 = query.total / summary.totalMedia；环比 = 本月/上月-1），return 结果对象回传给你做总结。 示例：var s=await bridge.callAsync('gallery.summary',{}); var t=await bridge.callAsync('gallery.tags',{}); return {total:s.totalMedia, topTags:t}; 写操作（删除/收藏/选中）：用 await bridge.callAsync('capability.dispatch',{method,params})，写操作会在端侧弹窗等用户确认（拒绝或超时 Promise 会 reject，必须 try/catch）。支持的 method： delete_media {ids:[数字id,...]}（删除，不可恢复）、favorite_media {id:数字id, favorite:true/false}、select_media {id:数字id, selected:true/false}、remember_fact {content:文本, category?:文本}、forget_fact {fact_id?:数字id, query?:文本}、remember_person_relation {name:人物名, relation:关系称谓}、forget_person_relation {name:人物名}、get_gallery_summary {}、recall_memory {query:文本}、query_person_relation {name?:人物名}（后三者只读直通）；其余 method 会报错。 完整示例（找出截图标签照片并批量删除）：var q=await bridge.callAsync('gallery.query',{label:'截图',limit:200}); if(q.ids.length===0){return {deleted:0};} try{var r=await bridge.callAsync('capability.dispatch',{method:'delete_media',params:{ids:q.ids}}); return {deleted:q.total, result:r};}catch(e){return {deleted:0, cancelled:true, reason:String(e)};} UI 效果：本工具自身只回传数据/文本给你总结，不直接产生界面；但 return 的对象若含 ids 数组（gallery.query/intersect 的命中），端侧会自动把这些照片补展示为横滑卡片——纯统计/盘点脚本不要 return ids，需要给用户看图时优先用 search_media（直接出卡片）。")
+    @LLMDescription("在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。**调用前必须先 load_skill('gallery-script') 获取 handler 清单与调用约定，未加载不得凭空编造 handler 名**。硬约束：所有 handler 均为异步，必须用 await bridge.callAsync(name, args) 调用（bridge.call 已禁用，调用会报错）；return 结果对象回传给你总结；return 的对象若含 ids 数组，端侧会自动补横滑照片卡片——纯统计/盘点脚本不要 return ids，需要给用户看图时优先用 search_media（直接出卡片）。")
     suspend fun runGalleryScript(
-        @LLMDescription("JS 源码；用 await bridge.callAsync 取数据（gallery.summary/tags/timeline/query/stats_by_tag/stats_by_city/intersect, media.meta/batch_meta, face.cluster, tag.audit, tag.scan_status）；写操作（删除/收藏/选中/记忆）用 await bridge.callAsync('capability.dispatch',{method,params})（会弹窗等用户确认，需 try/catch 处理拒绝），return 结果对象") code: String
+        @LLMDescription("JS 源码；handler 清单与示例见 gallery-script 技能（先 load_skill），return 结果对象") code: String
     ): String = dispatchCommand(AgentCommand.ExecuteScript(code = code))
 
     @Tool(customName = "draw_chart")
