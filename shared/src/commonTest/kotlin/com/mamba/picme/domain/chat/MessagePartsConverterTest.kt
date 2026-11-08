@@ -70,6 +70,35 @@ class MessagePartsConverterTest {
     }
 
     @Test
+    fun `unknown type with json blob content falls back to Unsupported part`() {
+        // 前向兼容兜底（2026-11-08）：新协议整颗 payload 存 content 列的先例
+        // （tool_browser/data_ui_openui）——旧版本不识 → Unsupported 占位卡，
+        // 防 JSON 原文裸渲染；payload 携带可读摘要字段时提升
+        val blob = """{"type":"tool_video_edit","partId":"p0","videoUri":"v.mp4","fallbackSummary":"视频编辑结果"}"""
+        assertEquals(
+            listOf(MessagePart.Unsupported("p0", originalType = "tool_video_edit", summary = "视频编辑结果")),
+            MessagePartsConverter.toParts("tool_video_edit", blob, null, ModelInputRole.ASSISTANT),
+        )
+    }
+
+    @Test
+    fun `unknown type with json array content falls back to Unsupported part`() {
+        assertEquals(
+            listOf(MessagePart.Unsupported("p0", originalType = "data_future_list")),
+            MessagePartsConverter.toParts("data_future_list", """[{"a":1}]""", null, ModelInputRole.ASSISTANT),
+        )
+    }
+
+    @Test
+    fun `unknown type with json scalar content stays plain text`() {
+        // "123"/"true" 等可解析为 JSON 标量的文本：可读，不降级
+        assertEquals(
+            listOf(MessagePart.Text("p0", "123", PartState.DONE)),
+            MessagePartsConverter.toParts("mystery", "123", null, ModelInputRole.ASSISTANT),
+        )
+    }
+
+    @Test
     fun `malformed payloads fall back to plain text keeping content`() {
         // 行级兜底（spec §4.2）：任何解析异常 → 原文 Text part，不允许丢消息
         assertEquals(

@@ -200,6 +200,39 @@ class IosChatHistoryStoreCodecTest {
     }
 
     @Test
+    fun decodeToleratesUnknownPartInsidePartsArray() {
+        // 前向兼容兜底（2026-11-08）：parts 数组含新版本未知 part → 原位 Unsupported
+        // 占位（可读摘要提升），整包 decode 不再失败丢历史
+        val json = """
+            [{"id":"m6","type":"text","role":"agent","content":"hi","timestamp":1,
+              "parts":[{"type":"text","partId":"p0","markdown":"hi","state":"DONE"},
+                       {"type":"tool_video_edit","partId":"p1","fallbackSummary":"视频结果"}]}]
+        """.trimIndent()
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
+        val message = decoded.single()
+        assertEquals(2, message.parts.size)
+        assertIs<MessagePart.Text>(message.parts[0])
+        assertEquals(
+            MessagePart.Unsupported("p1", originalType = "tool_video_edit", summary = "视频结果"),
+            message.parts[1],
+        )
+    }
+
+    @Test
+    fun decodeUnknownWireTypeWithJsonBlobFallsBackToUnsupported() {
+        // content 为 JSON blob 的未知 wire type（对齐 Android converter 口径）→ Unsupported 占位
+        val json = """
+            [{"id":"m7","type":"tool_future","role":"agent",
+              "content":"{\"type\":\"tool_future\",\"partId\":\"p0\",\"fallbackSummary\":\"摘要\"}","timestamp":1}]
+        """.trimIndent()
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
+        assertEquals(
+            MessagePart.Unsupported("p0", originalType = "tool_future", summary = "摘要"),
+            decoded.single().parts.single(),
+        )
+    }
+
+    @Test
     fun decodeReturnsNullOnBlankOrCorrupted() {
         assertNull(ChatHistoryStoreCodec.decode(null))
         assertNull(ChatHistoryStoreCodec.decode(""))

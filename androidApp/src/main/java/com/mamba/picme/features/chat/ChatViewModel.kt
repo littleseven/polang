@@ -4250,6 +4250,9 @@ class ChatViewModel(
                 // BrowserLive 直播卡 UI 映射属 browser-vnc 直播卡后续 Task；此前防御性落文本
                 //（此间管线未产此类 part，分支不可达）
                 is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
+                // 前向兼容兜底（未知/损坏 part）：整消息判型防御性落文本，
+                // 实际渲染走拍平 item（TYPE_UNSUPPORTED 占位卡）
+                is MessagePart.Unsupported -> ChatMessageType.AGENT_TEXT
                 null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
             },
             role = role,

@@ -4,10 +4,10 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * [MessagePart] 列表的 kotlinx JSON 编解码（Room `partsJson` 列的线格式，ADR-016 D1）。
@@ -32,27 +32,53 @@ object MessagePartsCodec {
     fun encode(parts: List<MessagePart>): String = json.encodeToString(listSerializer, parts)
 
     /**
-     * 解码 parts JSON；空串/结构损坏/未知 part 类型返回 null，
-     * 调用方按 legacy 列兜底（[MessagePartsConverter]），**不允许丢消息**。
+     * 解码 parts JSON；空串/整体结构损坏（非 JSON 数组）返回 null，调用方按 legacy
+     * 列兜底（[MessagePartsConverter]），**不允许丢消息**。
      *
-     * 例外：legacy `data_ui`（A2UI 已退役，A2uiCard part 类已删除）——
-     * **先判 type 再解码**：data_ui 已非合法鉴别值，正常解码必失败；显式拦截提升
-     * fallbackSummary 为可读 Text（ADR-016 降级口径，不丢消息）。
+     * part 级兜底（2026-11-08 Unsupported 兜底）：逐元素独立解码——未知 part 类型
+     * （新版本写入、旧版本不识）或已知类型字段损坏 → 原位合成 [MessagePart.Unsupported]
+     * 占位，块序与其余 part 不受影响；原始 payload 保留在 partsJson 原文中，升级
+     * 新版本后自动恢复为正式卡片。
+     *
+     * 例外：legacy `data_ui`（A2UI 已退役，A2uiCard part 类已删除）——**先判 type
+     * 再解码**：显式拦截提升 fallbackSummary 为可读 Text（ADR-016 降级口径，不丢消息）。
      */
     fun decode(partsJson: String?): List<MessagePart>? {
         if (partsJson.isNullOrBlank()) return null
-        return runCatching {
-            json.parseToJsonElement(partsJson).jsonArray.map { element ->
-                legacyDataUiTombstoneOrNull(element)
-                    ?: json.decodeFromJsonElement(MessagePart.serializer(), element)
-            }
-        }.getOrNull()
+        val array = runCatching { json.parseToJsonElement(partsJson).jsonArray }.getOrNull() ?: return null
+        return array.mapIndexed { index, element -> decodePartOrUnsupported(element, index) }
     }
 
-    /** legacy data_ui（A2UI 已退役）→ Text 墓碑：fallbackSummary 提升，不丢消息；非 data_ui 返回 null 走正常解码。 */
-    private fun legacyDataUiTombstoneOrNull(element: JsonElement): MessagePart? {
-        val obj = element as? JsonObject ?: return null
-        if (obj["type"]?.jsonPrimitive?.contentOrNull != "data_ui") return null
-        return MessagePartsConverter.legacyCardTombstone(obj)
+    /**
+     * 单 part 解码（行级隔离，iOS `ChatHistoryStoreCodec` 复用同一口径）：legacy data_ui
+     * 墓碑拦截 → 正常解码 → 失败合成 [MessagePart.Unsupported]（unknown/损坏不穿透、
+     * 不拖垮同消息其它 part）。
+     */
+    internal fun decodePartOrUnsupported(element: JsonElement, index: Int): MessagePart {
+        val obj = element as? JsonObject
+        // as? JsonPrimitive 安全形态：病态非 primitive type 值（数组/对象）不抛，落 Unsupported
+        val type = (obj?.get("type") as? JsonPrimitive)?.contentOrNull
+        if (type == "data_ui") return MessagePartsConverter.legacyCardTombstone(obj)
+        return runCatching { json.decodeFromJsonElement(MessagePart.serializer(), element) }
+            .getOrElse { unsupportedPartOf(obj, type, index) }
     }
+
+    /**
+     * 未知/损坏 part → [MessagePart.Unsupported] 合成（codec 与 converter 共用）：
+     * partId 取 payload 原值（缺失按数组序号合成 `p<index>`）；payload 携带可读摘要
+     * 字段（fallbackSummary/summary/text/markdown，对齐 legacy 墓碑先例）时提升为
+     * [MessagePart.Unsupported.summary]，给用户可读的降级内容。
+     */
+    internal fun unsupportedPartOf(obj: JsonObject?, type: String?, index: Int): MessagePart.Unsupported {
+        val partId = (obj?.get("partId") as? JsonPrimitive)?.contentOrNull
+            ?.takeIf { it.isNotBlank() }
+            ?: "p$index"
+        val summary = SUMMARY_KEYS.firstNotNullOfOrNull { key ->
+            (obj?.get(key) as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        }
+        return MessagePart.Unsupported(partId, originalType = type ?: "unknown", summary = summary)
+    }
+
+    /** Unsupported 摘要提升的候选字段（优先级序）。 */
+    private val SUMMARY_KEYS = listOf("fallbackSummary", "summary", "text", "markdown")
 }

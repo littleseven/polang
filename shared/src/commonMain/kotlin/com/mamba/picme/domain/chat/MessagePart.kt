@@ -198,6 +198,30 @@ sealed interface MessagePart {
     ) : MessagePart {
         override val category: PartCategory get() = PartCategory.DATA
     }
+
+    /**
+     * 前向兼容兜底 part（2026-11-08）：**读时投影，永不出现于生产写路径**。
+     *
+     * 协议频繁演进下，旧版本读到新版本写入的未知 part 类型（或已知类型但字段损坏）时，
+     * 解码层原位合成本 part 占位——块序保住、其余 part 正常渲染、UI 落「内容不支持
+     * 请升级」默认卡（ADR-016 降级口径的广义化：不丢消息、不崩、可感知）。
+     *
+     * [originalType] 为原始鉴别值（如未来的 `tool_video_edit`），仅作调试/日志；
+     * [summary] 在 payload 携带可读摘要字段（fallbackSummary/summary/text）时提升。
+     * 分类归 DATA：不回灌 LLM（与 data part 默认口径一致）。
+     *
+     * 注意：本 part 是读侧合成物，原始 payload 始终保留在 partsJson 原文中，
+     * 升级新版本后同一行自动恢复为正式卡片（解码路径幂等）。
+     */
+    @Serializable
+    @SerialName("unsupported")
+    data class Unsupported(
+        override val partId: String,
+        val originalType: String,
+        val summary: String? = null,
+    ) : MessagePart {
+        override val category: PartCategory get() = PartCategory.DATA
+    }
 }
 
 /** 直播卡动作流水条目（description 已本地化——由 UI 侧组装，模型只搬运）。 */

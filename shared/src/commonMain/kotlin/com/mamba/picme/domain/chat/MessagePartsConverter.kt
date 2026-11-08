@@ -120,7 +120,25 @@ object MessagePartsConverter {
             OptimizeCandidateGroup.MESSAGE_TYPE ->
                 listOf(MessagePart.OptimizeCandidates("p0", parseOptimizeGroup(metadata)))
 
-            else -> fallbackText(content)
+            // 未知 type（前向兼容兜底）：content 为 JSON blob（新协议整颗 payload 存
+            // content 列的先例：tool_browser/data_ui_openui）→ Unsupported 占位卡，
+            // 防 JSON 原文裸渲染；纯文本（老协议可读消息）→ 保留 Text 不降级
+            else -> listOf(unknownTypeFallback(type, content))
+        }
+    }
+
+    /** 未知 Room type 的行级兜底：JSON blob → [MessagePart.Unsupported]；可读文本 → Text 保留。 */
+    private fun unknownTypeFallback(type: String, content: String): MessagePart {
+        val element = runCatching { json.parseToJsonElement(content) }.getOrNull()
+        return when (element) {
+            is JsonObject -> MessagePartsCodec.unsupportedPartOf(
+                element,
+                (element["type"] as? JsonPrimitive)?.contentOrNull ?: type,
+                index = 0,
+            )
+            is JsonArray -> MessagePart.Unsupported("p0", originalType = type)
+            // 纯文本/标量（含 "123"/"true" 等可解析为 JSON 标量的文本）：可读，不降级
+            else -> MessagePart.Text("p0", content, PartState.DONE)
         }
     }
 

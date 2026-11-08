@@ -122,10 +122,12 @@ private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): L
         ),
     )
 
-    // data part：默认不进上下文（spec §6）
+    // data part：默认不进上下文（spec §6）；Unsupported（前向兼容占位）同口径——
+    // 模型从未见过的占位类型进上下文只会引入噪声
     is MessagePart.MediaResults,
     is MessagePart.OptimizeCandidates,
     is MessagePart.OpenUiCard,
+    is MessagePart.Unsupported,
     -> emptyList()
 }
 

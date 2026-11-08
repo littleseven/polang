@@ -211,6 +211,8 @@ private fun contentTypeOf(message: ChatMessage, part: MessagePart): String = whe
     is MessagePart.Image, is MessagePart.EditResult -> ChatListItem.TYPE_LEGACY_MESSAGE
     // 直播卡全状态自渲染（占位/运行/定格/错误都由卡片处理，不走通用 placeholder chip）
     is MessagePart.BrowserLive -> ChatListItem.TYPE_BROWSER_LIVE
+    // 前向兼容兜底卡（读时投影：未知/损坏 part → 「内容不支持请升级」占位）
+    is MessagePart.Unsupported -> ChatListItem.TYPE_UNSUPPORTED
 }
 
 private fun cardContentType(state: ToolPartState, doneType: String): String = when (state) {
@@ -267,5 +269,8 @@ data class ChatListItem(
 
         /** 非卡片工具进行中的合成状态 item。 */
         const val TYPE_TOOL_STATUS = "tool_status"
+
+        /** 前向兼容兜底卡（MessagePart.Unsupported：未知/损坏 part 的占位渲染）。 */
+        const val TYPE_UNSUPPORTED = "unsupported"
     }
 }
