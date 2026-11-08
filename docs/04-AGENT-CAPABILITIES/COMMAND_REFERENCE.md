@@ -219,16 +219,14 @@ Agent: ✅ 已为你拍照
 **Capability**: `chat_gallery_search`  
 **活跃场景**: `CHAT`
 
-用于在 Chat 页对上一轮相册搜索结果进行多轮追加、收窄或反馈。
+用于在 Chat 页对上一轮相册搜索结果进行多轮追加、收窄。
 
 | 自然语言 | 解析命令 | 说明 |
 |---------|---------|------|
 | "只要近半年的" | `RefineMediaSearch("只要近半年的", SearchIntent(timeRange=近半年))` | 在上一轮结果内按时间过滤 |
 | "其中的日落" | `RefineMediaSearch("日落", SearchIntent(keywords=["日落"]))` | 在上一轮结果内追加关键词 |
-| "第三张不错" | `RecordMediaFeedback(Ordinal(3), LIKE)` | 记录正反馈 |
-| "不喜欢这张" | `RecordMediaFeedback(LastShown, DISLIKE)` | 记录负反馈 |
-| "再来点这种" | `MoreLikeThis(LastShown)` | 基于上一张推荐相似照片 |
-| "不要夜景" | `ExcludeConstraint("夜景")` | 在后续搜索中排除夜景 |
+
+> 反馈三件套（`RecordMediaFeedback` / `MoreLikeThis` / `ExcludeConstraint`）已于 2026-11-08 随横滑图集卡退役删除。
 
 ### 3.7 批量选择
 

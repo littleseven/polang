@@ -55,10 +55,8 @@ chat_layout:
       assistant: { align: leading,  background: "surfaceVariant",   text: "markdown 渲染（iOS 复用 AgentTextView AST 渲染，与 chat 正文同源）", corner: 16, max_width: 300 }
       tool:      { align: leading,  text: "12pt onSurfaceVariant，文案 cloud_agent_tool_call（含工具名 %@ 占位）", mono_exempt: true }
       error:     { align: leading,  text: "13pt error 色" }
-      media:                                # 图集卡（2026-10-21 增补）：search_media/refine_media_search 命中时插入
-        render: "复用主聊天页同款图集横滑卡（Android MediaResultsCarousel / iOS 对应组件），资产上限 20 张"
-        data_source: "🔴 CloudAgentGalleryTools.mediaResultsListener 端侧回调（数据不出设备，回传服务器的仍是纯文本计数）；调试页纯内存态不落库，主聊天页云端回合经同一回调落 Room（data_media_results，同用户回合 upsert 去重留最新卡）"
-        interaction: "调试页点击动作从简（实验页豁免）；主聊天页点击行为与本地链路一致"
+      # 图集卡气泡已随 2026-11-08 横滑卡退役删除：search_media/refine_media_search
+      # 回执为纯文本计数（assistant 气泡），图集展示走技能驱动出卡（OpenUI/render_html）
     thinking_row: "inFlight 时列表尾部显示 cloud_agent_thinking 行"
   input_bar:
     field: { placeholder: cloud_agent_input_hint, max_lines: 3 }

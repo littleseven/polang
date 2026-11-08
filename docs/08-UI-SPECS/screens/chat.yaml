@@ -2,7 +2,8 @@
 # 聊天屏完整产品规格书（Chat Screen Spec）
 # ============================================================================
 # 基准端：Android ChatScreen.kt / ChatEmptyState.kt / BlinkCursor.kt
-#        / MediaResultsCarousel.kt / ModelSelector.kt / Color.kt / Typography.kt
+#        / ModelSelector.kt / Color.kt / Typography.kt
+#        （MediaResultsCarousel.kt 已随 2026-11-08 横滑图集卡退役删除，§9/§15 墓碑）
 # 用途：iOS 重做的唯一输入，不读 Android 源码
 # 值引用：尺寸引用 design-tokens.json 的 token 名
 # M4 修订（2026-09-27，spec §13 先行修订）：§3.1 Turn 聚合 + §3.2 parts 拍平渲染矩阵（M4 已落地 ✅，Android 基准；iOS 跟随 TODO 见 §3.2 ios_todo）
@@ -136,7 +137,7 @@ parts_rendering:
   granularity:
     rule: "每个 MessagePart = LazyColumn 独立 item（一条回复的多 part 拍平为连续 items）"
     key: '"${messageId}:${partId}"'  # 块级稳定 key（流式三段式与回收锚点；分轨命名空间：瞬态 txt-N/call-N、持久 p0/p1，见 spec §3 注记）
-    content_type: "按 part 鉴别 type（text/chart/html_card/task_card/media_results/image/edit_result/optimize_candidates/browser_live + user_message/legacy_message/tool_placeholder/tool_error/tool_status）——LazyColumn 复用桶，禁无 contentType（性能红线 ADR-016 §4）"
+    content_type: "按 part 鉴别 type（text/chart/html_card/task_card/image/edit_result/optimize_candidates/browser_live + user_message/legacy_message/tool_placeholder/tool_error/tool_status）——LazyColumn 复用桶，禁无 contentType（性能红线 ADR-016 §4）；media_results 桶已随 2026-11-08 横滑图集卡退役删除"
     anti_pattern: "禁止「一条回复一个巨型 item 内部 Column 排段」（回收粒度/重组隔离/测高防抖全面劣化）"
     user_note: "USER 消息（含图文 user_image_text = Image+Text 两 part）整颗单 item 渲染（2026-09-27 M4 定稿：§5 上图下文同气泡不拆 part）；claude 气泡/COMMAND/PLAN_PREVIEW/图片类消息同为整消息 legacy 渲染"
     streaming_note: "流式消息卡 part 三分流：已填充（OUTPUT_AVAILABLE）跳过（产物已落库独立消息行渲染，禁双显）；未完成渲染占位状态行；OUTPUT_ERROR 渲染失败状态行（瞬态不落库）；开放文本块以 paced 内容+光标渲染（打字机节拍保留）"
@@ -154,9 +155,9 @@ parts_rendering:
     task_card:
       component: "EngineerTaskCard（H2 HTML 化路线不变，§13）"
       change: "状态源改 ToolPartState（parts 投影）"
-    media_results:
-      component: "MediaResultsCarousel（§9）"
-      change: none
+    media_results:                      # ❌ 已退役（2026-11-08 横滑图集卡退役，§9 墓碑）
+      component: "（已拆除，原 MediaResultsCarousel）"
+      change: "search/refine 回执改 text 计数文案；存量行 RETIRED 闭集整行跳过"
     image:
       component: "ChatMessageItem isImage/isUser 分支（Coil 原生）"
       change: none                  # 媒体红线：原生 block，不经 LLM 排版
@@ -175,7 +176,7 @@ parts_rendering:
     - "turn 聚合：§3.1 视觉规则 SwiftUI 等价（turn 内段落间距档 + 回合分隔档，token 同源）"
     - "AST 正文渲染：解析层 commonMain，SwiftUI 渲染自绘（M3 管线 iOS 对等）"
     - "HTML 卡双形态：现为零实现，gap 最大（HtmlCard WKWebView + 沙盒/测高/分流/全屏查看器/链接落地页）"
-    - "type 分类法（2026-09-28 重构，spec 2026-09-28-chat-type-taxonomy-design.md）：iOS M5 直接按新 3 分类 8 值实现（text/image + tool_chart/tool_html/tool_task/tool_image_edit + data_media_results/data_optimize_candidates），role 为消息级独立字段——零 legacy 迁移包袱"
+    - "type 分类法（2026-09-28 重构，spec 2026-09-28-chat-type-taxonomy-design.md）：iOS M5 直接按新 3 分类 7 值实现（text/image + tool_chart/tool_html/tool_task/tool_image_edit + data_optimize_candidates；data_media_results 已随 2026-11-08 横滑图集卡退役剔除，存量行 RETIRED 闭集跳过），role 为消息级独立字段——零 legacy 迁移包袱"
 
 # ============================================================================
 # 4. 空状态（ChatEmptyState）
@@ -530,35 +531,17 @@ input_bar:
 # capsule_style / circular_button 锚点定义已前移至 §7 button_bar 之前（YAML 锚点必须先定义后引用）。
 
 # ============================================================================
-# 9. 媒体结果轮播（MediaResultsCarousel）
+# 9. ~~媒体结果轮播（MediaResultsCarousel）~~ ❌ 已退役（2026-11-08）
 # ============================================================================
-media_results:
-  container:
-    padding: { horizontal: 12, vertical: 4 }
-  title:
-    found_template: "Found {N} photos for '{query}'"  # 找到 N 张「query」的照片
-    refine_template: "Refined: {query} ({N})"          # 细化：query（N 张）
-    empty_template: "No photos found for '{query}', try another word"
-    font: { found: titleSmall_primary, empty: bodySmall_onSurfaceVariant }
-  carousel:
-    layout: lazy_row
-    spacing: 8
-    card_size: { width: 120, height: 150 }
-    card_radius: 12
-    card_image_scale: crop
-    card_feedback_buttons: [thumb_up, thumb_down, refresh]
-    card_date_label: "yyyy-MM-dd"
-
-  # 回合内 upsert 去重（c4cea4995，2026-09-13；Android ChatViewModel.insertMediaResultsMessage 定稿口径）
-  per_turn_upsert:
-    rule: "同一用户回合（最后一条 user 消息之后）至多一张横滑卡片"
-    trigger: "ReAct 多轮 search_media / refine_media_search / 拒绝措辞回退直搜均可能同回合多次产出"
-    upsert_semantics: "replacePreviousInTurn=true（默认）：查本回合上一张卡片行，复用其 id 与 timestamp 原位替换（卡片位置不移动）"
-    append_exception: "以图搜图（FIND_SIMILAR）自成新回合，replacePreviousInTurn=false 追加新卡，不覆盖上一回合结果"
-    refused_search_guard: "LLM 拒绝措辞回退直搜前须先查本回合是否已出卡；已出卡则跳过回退（避免重复卡片）"
-    empty_result: "空结果不出卡（回退路径改为插入 agent 文本消息）"
-    concurrency: "Android 用 mutex 串行化；iOS 单 actor 天然满足，无需额外锁"
-    ios_note: "iOS 内存态实现须为原位替换（禁 remove+append 把卡移到回合底部）；以图搜图引擎 iOS 未落地，追加分支随引擎落地补齐"
+# 原生横滑图集卡整体退役拆除（spec：2026-11-08-media-results-carousel-retirement-design.md，
+# 交付后 spec 本体按沉淀管线清理，结论已落 CHAT_CARD_CATALOG.md §4.4 墓碑与本文各处注记）：
+# - search_media / refine_media_search 回执 = agent 文本计数文案（「找到 N 张「q」的照片」），无卡落库；
+# - 图集浏览展示一律由 AI 走技能出卡（photo-browse 等，render_html / OpenUI 程序）；
+# - 卡面反馈三件套（👍👎🔄 = record_feedback / more_like_this / exclude_constraint）随卡删除；
+# - 回合内 upsert 去重、查看全部尾卡、全屏预览挂载、意图误拒补卡等机制全部下线；
+# - 存量 data_media_results / media_results 历史行：双端回放整行跳过、不回灌 LLM（RETIRED 闭集）。
+# 退役前完整规格（卡片尺寸/反馈钮/尾卡/upsert 语义）见 git 历史本节。
+media_results_retired: true
 
 # ============================================================================
 # 9.1 交互模型（Interaction Model）
@@ -601,13 +584,13 @@ interaction_model:
   message_type_rendering:
     USER_TEXT: "right bubble, userBubbleBg bg, userBubbleOn text"
     AGENT_TEXT: "通栏无气泡（§5 background.agent_text=none，2026-08-18 定稿）+ segmented Markdown (text+table+code)"
-    MEDIA_RESULTS: "⚠️ separate full-width message (MediaResultsCarousel), NOT inline in text bubble"
+    MEDIA_RESULTS: "❌ 已退役（2026-11-08 横滑图集卡退役；存量行回放整行跳过）"
     CHART: "separate full-width message (SVG card)"
     OPTIMIZE_CANDIDATES: "separate full-width message (GachaCandidateStrip §17)，伴随 agent 文本气泡（content=场景解释句）"
     error: "⚠️ 同 agent 正常气泡（无特殊错误色），content='推理出错：...'"
 
   # 媒体结果：独立消息项
-  media_results_as_separate_message: true  # 不嵌入文本气泡
+  media_results_as_separate_message: false  # ❌ 已退役（2026-11-08 横滑图集卡删除，无媒体结果卡消息形态）
 
   # 长按 = 复制（无右键菜单）
   long_press: copy_to_clipboard
@@ -684,7 +667,7 @@ allowed_differences:
 #   - 上下文附件（photo picker + 意图 chip）→ §12
 #   - JS 工具调用（run_gallery_script / draw_chart / 写确认 / chart 卡 / 沙箱徽章）→ §13
 #   - AI 工程师模式（claude 胶囊 + 步骤列表 + 截断继续 + 交付按钮）→ §14
-#   - 媒体轮播反馈按钮（👍👎🔄）+ 查看全部尾卡 → §9（已规格，iOS 须实现）+ §15
+#   - ~~媒体轮播反馈按钮（👍👎🔄）+ 查看全部尾卡~~ → 已随 2026-11-08 横滑图集卡退役整体删除（§9/§15 墓碑），iOS 不再跟随
 
 # ============================================================================
 # 12. 上下文附件（Context Attachment）— 2026-08-12 新增（B1 对齐）
@@ -723,7 +706,7 @@ context_attachment:
       action: on_device_vlm                  # 端侧 Qwen3-VL-2B 图像理解
       privacy: "图片不离开设备；仅文本结论走远程"
     FIND_SIMILAR:
-      action: on_device_image_search         # 端侧以图搜图 → MediaResultsCarousel
+      action: on_device_image_search         # 端侧以图搜图 → 命中集写搜索基数 + 触发 LLM 回合经 render_html 出图集卡（2026-11-08 横滑卡退役后改道，原直挂 MediaResultsCarousel）
       privacy: "纯端侧"
     EDIT:
       action: navigate_photo_editor          # 直跳编辑器，不发推理
@@ -826,16 +809,12 @@ ai_engineer:
       buttons: [push, pr, auto]              # 三 OutlinedButton
 
 # ============================================================================
-# 15. 媒体轮播补全（§9 已规格，本节登记 iOS 须实现的缺口）
+# 15. ~~媒体轮播补全~~ ❌ 已退役（2026-11-08，随 §9 横滑图集卡整体删除）
 # ============================================================================
-media_results_ios_gaps:
-  - "计数头文案：找到 N 张「query」的照片 / 细化：query（N 张）/ 无结果提示"
-  - "卡片反馈按钮：👍 thumb_up / 👎 thumb_down / 🔄 refresh（卡片右侧竖排叠层，白字黑底 40%）"
-  - "查看全部尾卡：totalCount > 显示数时，同尺寸 ViewAllCard → 跳相册"
-  - "manifest 须暴露 record_feedback（+ more_like_this）以支撑反馈回路"
-  - "全屏预览 HorizontalPager：tap 卡 → pinch-zoom 预览（iOS 缺整层）"
-  - "refine_template 未接线：ChatUiActionDto 丢 isRefinement 字段，upsert 后标题恒用 found 模板（2026-09-15 审查登记；Android MediaResultsCarousel 按 isRefinement 切换）"
-  # 已对齐（ios-follow-batch-20260915，b914f62e3）：用户气泡接 token（userBubbleBg/userBubbleOn）；回合内原位 upsert（§9 per_turn_upsert）
+# 本节原登记 iOS 须实现的媒体轮播缺口（计数头/反馈钮/查看全部尾卡/record_feedback manifest/
+# 全屏预览/refine_template 接线）——功能本体已退役，gap 清单作废，iOS 不再跟随。
+# 退役前内容见 git 历史。
+media_results_ios_gaps_retired: true
 
 # ============================================================================
 # 16. 平台差异台账（platform_differences）— 契约层
@@ -853,7 +832,7 @@ platform_differences:
       - { feature: "相册搜索",        android: supported, ios: supported }
       - { feature: "相册摘要",        android: supported, ios: supported }
       - { feature: "媒体写(删/藏/选)", android: supported, ios: "supported(经 IosChatGalleryCapability)" }
-      - { feature: "图反馈/找相似",    android: supported, ios: "TODO(A2) manifest 暴露" }
+      - { feature: "图反馈/找相似",    android: "❌ 已退役（2026-11-08 反馈三件套 record_feedback/more_like_this/exclude_constraint 随横滑图集卡下线）", ios: "—（功能退役，不再跟随）" }
       - { feature: "上下文选图",      android: supported, ios: "TODO(B1) 新建" }
       - { feature: "端侧 VLM 理解",   android: supported, ios: "TODO(B1) MNN.framework 已有" }
       - { feature: "JS 沙箱脚本",     android: supported, ios: "TODO(B2) 引擎选型+handler 移植" }

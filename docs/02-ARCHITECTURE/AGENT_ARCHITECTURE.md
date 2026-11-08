@@ -156,13 +156,13 @@ chat 入口（`RemoteChatEngine.streamChat`）在 agent loop 之前挂 **IntentR
 2. **pattern 捷径**：「看/找/搜…照片」最热句式零延迟短路；负面语素（有没有/多少/画/糊…）显式排除，防捷径劫持分析/计数/画图语义。
 3. **LLM 闭集分类**：专用小 prompt（~1k token、temperature=0、JSON 强校验）输出 `RouterOutput`（deliverable 意图 + confidence + isRefinement + 槽位），1.5s 硬超时 + schema 重试 1 次 + 低置信（<0.6）降级——一切失败同路回落完整 agent loop，**路由器永不拦截能力**。
 
-路由策略层 **ChatRoutingPolicy**（纯函数查表）：仅 VIEW_PHOTOS / REFINE_RESULTS 直执——经 `ChatToolService.dispatchCommandDetailed` 直发 `SearchMedia`/`RefineMediaSearch`（与 LLM tool_calls 同一 dispatch 链路，uiActions/observation/5s 超时同源）；dispatch 失败/业务错误回落完整 agent loop；直执不产 LLM 总结，结果以 `DirectRouteReply` 结构化回执返回、用户气泡由平台层本地化渲染（observation 模型侧文案不直达用户），该轮 user+observation 补写 Koog 会话记忆防多轮指代断裂；refine 基数缺失自动退化为 fresh SearchMedia；secondary 双产出物与其余意图一律回落完整 agent。意图→工具/UI 的声明式契约表为 **ChatIntentContract**（allowed∩forbidden=∅ 由 commonTest 机器校验，VIEW_PHOTOS 显式禁 `run_gallery_script`——消除「脚本拿 ids 谎称已展示」事故链）。
+路由策略层 **ChatRoutingPolicy**（纯函数查表）：~~仅 VIEW_PHOTOS / REFINE_RESULTS 直执~~——**直执路径已随 2026-11-08 横滑图集卡退役整体删除**（直执的产出锚点 = 原生横滑卡，卡退役后直执失去意义；两意图重指 `RICH_HTML_CARD`+`render_html` 全 Agent 环，`DirectRouteReply`/RoutingGate 同步删除，ADR-015 已加修订注记）；现一切意图恒返完整 agent loop（FullAgentLoop，M3 工具子集随 `toolNames` 下传）。意图→工具/UI 的声明式契约表为 **ChatIntentContract**（allowed∩forbidden=∅ 由 commonTest 机器校验，VIEW_PHOTOS 显式禁 `run_gallery_script`——消除「脚本拿 ids 谎称已展示」事故链）。
 
 每回合路由判定（含门控直通/降级）落 `polang_llm_log.db` 的 `routing_audit_log` 表（`RoomRoutingAuditRecorder`，仅路由维度指标、不含用户 query 原文），路由器 LLM 调用落 `llm_call_log`（source=`chat-intent-router`）。
 
 LLM 之外的确定性护栏仍收口在 `agent/core/intent/IntentGuard`（纯函数、可单测、双端可复用），只做保守的误伤修正、不替代语义理解：
 
-- **误拒回退**：`isRefusedSearchRequest` 检测 LLM 安全对齐误拒相册搜索 → 调用方回退直搜本地相册（Android 接线：`ChatViewModel`）。
+- ~~**误拒回退**：`isRefusedSearchRequest` 检测 LLM 安全对齐误拒相册搜索 → 调用方回退直搜本地相册~~（已随 2026-11-08 直执路由退役删除——误拒回退服务于直执补卡链，直执下线后无生产调用点）。
 - **模糊跳转拦截**：`sanitizeNavigationCommands` 在 chat 页把非明确口令（`isExplicitNavigationRequest`）触发的 navigate_to / go_back 替换为文本提示，拦截文案由平台侧按 i18n 注入。
 
 #### 2.4.5 写操作确认两层策略

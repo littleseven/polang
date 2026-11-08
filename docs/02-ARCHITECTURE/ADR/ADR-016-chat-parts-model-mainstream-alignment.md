@@ -34,11 +34,17 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：**(a
 
 ### D1 数据/协议层：对齐 Vercel AI SDK parts 模型
 
-- 一条回复 = 一条消息 = **有序 parts 数组**（`MessagePart` sealed：`Text`/`Chart`/`HtmlCard`/`TaskCard`/`MediaResults`/`Image` 等），取代 13 值 `ChatMessageType` 平铺单类型 payload
+- 一条回复 = 一条消息 = **有序 parts 数组**（`MessagePart` sealed：`Text`/`Chart`/`HtmlCard`/`TaskCard`/`MediaResults`/`Image` 等——`MediaResults` 2026-11-08 随横滑图集卡退役删除），取代 13 值 `ChatMessageType` 平铺单类型 payload
 - 流式对齐 **chunk 三段式语义**（start/delta/end，块级 id）——对齐的是事件语义，不是 SSE 线协议（传输仍走 Koog 内部循环）
 - 工具调用状态机对齐 Vercel 四态 + 审批态；工程师任务卡五态（RUNNING/AWAITING_CONTINUE/AWAITING_DELIVER/COMPLETED/FAILED）映射为该状态机的渲染投影
 - **双层分离**：渲染/持久层保存富 parts 文档（防信息丢失）；回灌 LLM 时显式转换（工具结果拆为 tool 角色消息、UI 专有 part 不进上下文）——对应 Vercel UIMessage↔ModelMessage
-- **type 分类法（2026-09-28 重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`）**：Room `type` 列值域 = 3 分类 8 值——content（`text`/`image`，免前缀）· tool（`tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`）· data（`data_media_results`/`data_optimize_candidates`，回灌剥离）；命名规则 `^{category}_{kind}$`，`tool_`/`data_` 为保留前缀，禁 UI 容器词（card/bubble/strip/viewer）进协议值；`MessagePart` 挂 `PartCategory` 分类载体（getter-only，不进线格式）；`role` 上提为消息级独立列（Room v26，"user"/"agent"）取代 user_/agent_ type 前缀；legacy 13 值经 `LegacyChatTypeMigration` 一次性转正（MIGRATION_25_26 + 备份恢复），运行时转换器 `MessagePartsConverter` 只认新值；值域后经 2026-10 扩 `tool_browser`/`data_ui`/`data_ui_openui` 至 11 值，2026-11-05 A2UI 退役删 `data_ui`（`MessagePart.A2uiCard` 同步删除，存量行级墓碑兜底不丢消息）回落 **10 值**
+- **type 分类法（2026-09-28 重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`）**：Room `type` 列值域 = 3 分类 8 值——content（`text`/`image`，免前缀）· tool（`tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`）· data（`data_media_results`/`data_optimize_candidates`，回灌剥离）；命名规则 `^{category}_{kind}$`，`tool_`/`data_` 为保留前缀，禁 UI 容器词（card/bubble/strip/viewer）进协议值；`MessagePart` 挂 `PartCategory` 分类载体（getter-only，不进线格式）；`role` 上提为消息级独立列（Room v26，"user"/"agent"）取代 user_/agent_ type 前缀；legacy 13 值经 `LegacyChatTypeMigration` 一次性转正（MIGRATION_25_26 + 备份恢复），运行时转换器 `MessagePartsConverter` 只认新值；值域后经 2026-10 扩 `tool_browser`/`data_ui`/`data_ui_openui` 至 11 值，2026-11-05 A2UI 退役删 `data_ui`（`MessagePart.A2uiCard` 同步删除，存量行级墓碑兜底不丢消息）回落 **10 值**；2026-11-08 横滑图集卡退役删 `data_media_results`（`MessagePart.MediaResults`/`MediaResultsUi`/`ChatMessageType.MEDIA_RESULTS` 同步删除，存量行命中 `LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES` 闭集，双端回放整行跳过、不回灌）回落 **9 值**
+- **新增值命名规约（2026-11-08 立法，约束未来扩值；存量值冻结不为美学改名）**：
+  1. kind = 单数 snake_case **语义名**——描述内容语义，禁嵌实现技术/厂商名（反例 `data_ui_openui` 嵌 OpenUI 技术名；A2UI 的 `data_ui` 已按此模式腐烂过一次——技术换代即值作废；该值语义化改名另立专项任务）；已知历史例外 `optimize_candidates`（复数）冻结不改
+  2. `tool_`/`data_` 前缀强制；**content 类级免前缀**（bare = content：无前缀值即 content 类，`PartCategory` 推导同口径）——`text`/`image` 是该类首批实例而非封闭清单，未来新增 content 值（video/audio/voice/file 等正文/附件语义）同规则免前缀
+  3. 禁 UI 容器词（card/bubble/strip/viewer/item/row）进协议值（既有规则）
+  4. `data_` 前缀 = 回灌剥离的机械声明（既有规则）
+  5. 改名/新增值走线格式迁移全链（Room 迁移 + iOS codec + 备份恢复 + golden + PARITY spec），新增值须过本规约符合性审查再落地
 
 ### D2 渲染层：对齐 ChatGPT——markdown AST → 原生受控组件 + 卡片独立 block
 

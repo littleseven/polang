@@ -1,6 +1,6 @@
 # ADR-015: 意图路由契约与意图路由器——理解归 LLM、策略归代码
 
-**状态**: 已实施（M1 止血 + M2 路由器主干，2026-09-26）
+**状态**: 已实施（M1 止血 + M2 路由器主干，2026-09-26；2026-11-08 修订：VIEW_PHOTOS/REFINE_RESULTS 直执路径随横滑图集卡退役拆除，全部意图走全量 agent loop）
 **日期**: 2026-09-25（spec 定稿）/ 2026-09-26（M1/M2 实施）
 **决策**: 用户（spec 逐节评审认可）
 **依赖**: ADR-005（远程推理协议）、ADR-007（自然语言搜索）、ADR-008（隐私红线）、ADR-013（KMP 契约）
@@ -24,7 +24,7 @@
 
 1. **意图契约表**（`ChatIntentContract`）：11 意图闭集（2026-10-11 增 `BROWSE_WEB`：云端浏览器打开网页，直落全量 agent loop，绝不 DirectSearch）× UI 产出物契约 × 工具白/黑名单的声明式纯数据，allowed∩forbidden=∅ 由测试机器校验——规则矛盾在设计上不可能再发生。
 2. **意图路由器**（`IntentRouter`）：浏览器捷径（URL 或浏览器/网页/网站关键词零延迟短路，负面语素「打不开/无法/为什么/怎么/如何」+ 媒体名词防劫持，执行序先于一切门控）→ 本地信号门控（寒暄直通零延迟）→ pattern 捷径（最热句式短路，负面语素防劫持）→ 专用 LLM 闭集分类（~1k token prompt、temperature=0、JSON 强校验、1.5s 硬超时 + schema 重试 1 次 + 低置信降级）。一切失败同路回落完整 agent loop——**路由器永不拦截能力**。
-3. **确定性策略层**（`ChatRoutingPolicy`）：意图→命令查表执行。M2 仅 VIEW_PHOTOS/REFINE_RESULTS 直执（经 `ChatToolService.dispatchCommandWithTrace` 与 tool_calls 同一 dispatch 链路）；其余意图与 secondary 双产出物回落全量 agent（M3 分支化再逐个接管）。
+3. **确定性策略层**（`ChatRoutingPolicy`）：意图→命令查表执行。M2 仅 VIEW_PHOTOS/REFINE_RESULTS 直执（经 `ChatToolService.dispatchCommandWithTrace` 与 tool_calls 同一 dispatch 链路）；其余意图与 secondary 双产出物回落全量 agent（M3 分支化再逐个接管）。**（2026-11-08 修订：直执分支已随横滑图集卡退役拆除——search_media 回执改为计数文本、图集展示走技能驱动出卡，`ChatRoutingPolicy` 直返 FullAgentLoop，所有意图一律全量 agent loop）**
 4. **路由可观测**：每回合判定落 `routing_audit_log`（仅路由维度指标、不含用户 query 原文，守 ADR-008），路由器 LLM 调用落 `llm_call_log`（source=`chat-intent-router`）——「护栏前路由正确率」可度量，为 M3 裁剪提供数据。
 
 ## 3. 为什么不选替代方案
@@ -36,5 +36,5 @@
 ## 4. 影响面
 
 - 路由器挂在 `RemoteChatEngine.streamChat`，覆盖 **Android chat 页与 iOS ChatAgentBridge 两个入口**；飞书 `processRemoteImInput` 走 `KoogReActAgent` 独立链路、**不经 streamChat，行为不变**（M2 验收观测口径以此为准）；
-- 直执路径跳过全量 agent loop：最热意图（看照片/细化）时延 ≈ 路由 LLM 一跳（≤1.5s 超时兜底）+ 端侧搜索，不再走多轮 tool_calls；直执不产 LLM 总结，用户气泡由平台层按 `DirectRouteReply` 本地化渲染（I18N 红线），该轮 user+observation 补写 Koog 会话记忆防多轮指代断裂；
+- 直执路径跳过全量 agent loop（**2026-11-08 已退役拆除**，留存作历史决策记录）：最热意图（看照片/细化）时延 ≈ 路由 LLM 一跳（≤1.5s 超时兜底）+ 端侧搜索，不再走多轮 tool_calls；直执不产 LLM 总结，用户气泡由平台层按 `DirectRouteReply` 本地化渲染（I18N 红线），该轮 user+observation 补写 Koog 会话记忆防多轮指代断裂；
 - iOS 侧自动生效（shared commonMain），工具清单 `ChatToolManifest` 已同步（view_media 移除、search_media 参数对齐）；搜索基数存在性经 `IosChatGalleryCapability.hasSearchBase` 透传进路由状态。

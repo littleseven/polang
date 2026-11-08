@@ -91,7 +91,12 @@
 > - `search_media` 工具面新增结构化参数 `person: String`、`fromMs: String`、`toMs: String`（必传、空串=无），组装 `SearchIntent`（query/timeRange/personName）直发——人物∩时间精确搜索不再依赖 `run_gallery_script` 绕行；`ChatToolManifest`（iOS 手工清单）逐字节对齐，工具数 9→8
 > - `run_gallery_script` / `refine_media_search` 描述补 UI 效果契约（脚本 return 对象含 ids 数组时端侧自动补横滑卡片；refine 无基数返回明确错误而非静默全局重搜）
 > - `ChatSearchCapability.SearchOutcome` 新增 `errorMessage` 字段：无基数 refine 映射为 `AgentAction.Error(INVALID_PARAMS)` 如实告知 LLM
-> - 新增意图路由层（`agent/core/intent/`：ChatIntentContract / IntentRouter / ChatRoutingPolicy），VIEW_PHOTOS/REFINE_RESULTS 意图可绕过全量 agent loop 直执 search/refine 命令，详见 `AGENT_ARCHITECTURE.md` §2.4.4 与 ADR-015
+>
+> **变更说明（2026-11-08，横滑图集卡退役）**：
+> - chat 工具面移除 `record_feedback` / `more_like_this` / `exclude_constraint` 三反馈工具（`FeedbackTarget`/`FeedbackAction`/`AgentAction.MediaResults` 同步删除）；`search_media` 的 `display` 参数下线（现 6 参：query/person/fromMs/toMs/hasFace/mediaType）
+> - search/refine 回执统一为 `TextReply` 计数文案（上文「脚本 ids 自动补横滑卡片」机制一并删除）；图集展示改走技能驱动出卡（端侧 render_html / 云端 OpenUI photo-browse、album-maker）
+> - iOS 对等：`IosChatGalleryCapability` 同步删除 feedback/more/exclude 三命令，`IosChatSearchBridge.recordFeedback` 桥方法下线（media_feedback 写路径整删，存量分数仍供搜索排序读路径消费）
+> - 新增意图路由层（`agent/core/intent/`：ChatIntentContract / IntentRouter / ChatRoutingPolicy），详见 `AGENT_ARCHITECTURE.md` §2.4.4 与 ADR-015（~~VIEW_PHOTOS/REFINE_RESULTS 直执~~已随 2026-11-08 横滑图集卡退役删除，一切意图恒走完整 agent loop）
 
 ### 1.1 场景 - 能力映射
 
