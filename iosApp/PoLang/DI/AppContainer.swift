@@ -83,6 +83,12 @@ final class AppContainer: ObservableObject {
             runScriptBridge: runScriptBridge,
             aiOptimizeBridge: aiOptimizeBridge,
             navigationBridge: navigationBridge,
+            // skill 资产双桥（2026-11-08 端侧 load_skill 执行器 iOS 接线）：
+            // transport = /v1/skills 鉴权 GET（token 调用时读 server_auth_token），
+            // cache = Documents/skill_cache/snapshot.json；两者经 iosMain 工厂组装成
+            // SkillRepository 注入 AgentDependencies，并注册 LoadSkillCapability
+            skillTransportBridge: SkillTransportBridge(deviceId: deviceId),
+            skillCacheBridge: SkillCacheBridge(),
             debugBuild: isDebugBuild   // 诊断日志 captureContent：DEBUG 记全文 / Release 仅指标
         )
         chatBridge = IosAgentComposition.shared.chatBridge

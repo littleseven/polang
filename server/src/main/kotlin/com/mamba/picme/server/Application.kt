@@ -152,8 +152,13 @@ fun Application.module(config: AppConfig) {
         }
 
         // 无有效账号 token → 仅在 LLM 代理路径上允许设备级访客试用
-        // （/v1/web-search 是主聊天 web_search 工具的上游，与聊天同口径放行访客）
-        val isLlmPath = uri == "/chat/completions" || uri == "/v1/chat/completions" || uri == "/v1/web-search"
+        // （/v1/web-search 是主聊天 web_search 工具的上游，与聊天同口径放行访客；
+        //  /v1/skills 是端侧 load_skill 执行器的资产源（0.9.44 放行）——skill 是全局公共资产
+        //  （SkillRoute 无 per-user 判定），不放行则未登录端侧技能同步恒 401 = 技能面整体降级，
+        //  2026-11-08 iOS 真机实证访客 load_skill 恒 unknown_skill；与 Android SkillClient
+        //  「LLM 系路径放行访客」注释的设计意图对齐）
+        val isLlmPath = uri == "/chat/completions" || uri == "/v1/chat/completions" || uri == "/v1/web-search" ||
+            uri == "/v1/skills" || uri.startsWith("/v1/skills/")
         val deviceId = call.request.headers[DEVICE_ID_HEADER]
         if (isLlmPath && !deviceId.isNullOrBlank()) {
             call.attributes.put(DeviceIdKey, deviceId)
