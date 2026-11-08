@@ -47,7 +47,8 @@ class ChatToolCapabilityCoverageTest {
         "browser_screenshot" to "BrowserSessionCapability（BrowserTransport 容器注入）",
         "browser_close" to "BrowserSessionCapability（BrowserTransport 容器注入）",
         "web_search" to "WebSearchCapability（WebSearchTransport 容器注入）",
-        "load_skill" to "LoadSkillCapability（SkillRepository 容器注入，2026-11-08 端侧 skill 执行器）"
+        "load_skill" to "LoadSkillCapability（SkillRepository 容器注入，2026-11-08 端侧 skill 执行器）",
+        "query_tag_scan_status" to "别名→start_tag_scan（ChatStartTagScanCapability；2026-11-08 工具面更名，命令层不动）"
     )
 
     private val covered: Set<String> = (
