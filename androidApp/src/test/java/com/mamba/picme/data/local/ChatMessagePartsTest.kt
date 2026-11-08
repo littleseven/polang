@@ -1,193 +1,101 @@
 package com.mamba.picme.data.local
 
+import com.mamba.picme.domain.chat.EngineerTaskState
+import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.MessagePart
-import com.mamba.picme.domain.chat.MessagePartsCodec
-import com.mamba.picme.domain.chat.ModelInputItem
-import com.mamba.picme.domain.chat.ModelInputRole
+import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
-import java.io.File
+import com.mamba.picme.domain.chat.toToolPartState
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * M1 双写/双读接缝（[withPartsJson] / [decodePartsOrLegacy] / [toModelInputItems]）JVM 单测
- * + 全仓双写守卫（所有 chat_messages 写入必须走 WithParts 入口）。
- *
- * Room v26 起 type 为新 8 值分类法、role 独立列（"user"/"agent"），接缝现算均以两列为准。
+ * parts 单一权威接缝单测（v28）：构造投影、parts 更新重投影、读取容错。
  */
 class ChatMessagePartsTest {
 
-    // ── 双写 ───────────────────────────────────────────────────
+    private fun textPart(id: String = "p0", md: String = "hi") =
+        MessagePart.Text(id, md, PartState.DONE)
 
     @Test
-    fun `withPartsJson fills partsJson derived from type and role columns`() {
-        val entity = ChatMessageEntity(
-            id = "m1",
-            sessionId = "s",
-            type = "text",
-            role = "agent",
-            content = "你好",
-            timestamp = 1L,
+    fun `chatMessageEntity derives type projection and encodes partsJson at construction`() {
+        val entity = chatMessageEntity(
+            id = "m1", sessionId = "s1", role = "user",
+            parts = listOf(MessagePart.Image("p0", "file://a"), textPart("p1", "看图")),
         )
-        val written = entity.withPartsJson()
+        assertEquals("image", entity.type)
+        assertEquals("user", entity.role)
         assertEquals(
-            listOf(MessagePart.Text("p0", "你好", PartState.DONE)),
-            MessagePartsCodec.decode(written.partsJson),
+            listOf(MessagePart.Image("p0", "file://a"), textPart("p1", "看图")),
+            entity.decodeParts(),
         )
     }
 
     @Test
-    fun `withPartsJson recomputes on metadata rewrite so parts never go stale`() {
-        val original = ChatMessageEntity(
-            id = "m2",
-            sessionId = "s",
-            type = "tool_html",
-            role = "agent",
-            content = "<html/>",
-            timestamp = 1L,
-            metadata = """{"html_card":{"display":"inline"}}""",
-        ).withPartsJson()
-
-        // 端侧终判回写（displayMode/measuredHeightPx 合并进 metadata）后 parts 必须随迁
-        val updated = original
-            .copy(metadata = """{"html_card":{"display":"inline","displayMode":"INLINE","measuredHeightPx":320}}""")
-            .withPartsJson()
-
-        val part = decode(updated).single() as MessagePart.HtmlCard
-        assertEquals(HtmlCardDisplayMode.INLINE, part.meta.displayMode)
-        assertEquals(320, part.meta.measuredHeightPx)
+    fun `withUpdatedParts re-derives type projection when primary part changes`() {
+        val entity = chatMessageEntity(
+            id = "m1", sessionId = "s1", role = "agent",
+            parts = listOf(MessagePart.OptimizeCandidates("p0", gachaGroup())),
+        )
+        assertEquals("data_optimize_candidates", entity.type)
+        val confirmed = entity.withUpdatedParts {
+            listOf(MessagePart.Image("p0", ref = "content://x", saved = false))
+        }
+        assertEquals("image", confirmed.type)
+        assertEquals(listOf(MessagePart.Image("p0", ref = "content://x", saved = false)), confirmed.decodeParts())
     }
 
     @Test
-    fun `deriveParts splits user image with uri into image and text parts by role`() {
-        // user 图文在场：图上文下双 part（ref 取 metadata.imageUri）
-        val user = ChatMessageEntity(
-            id = "iu",
-            sessionId = "s",
-            type = "image",
-            role = "user",
-            content = "看这张",
-            timestamp = 1L,
-            metadata = """{"imageUri":"file://img"}""",
+    fun `withUpdatedParts transforms in place and preserves message fields`() {
+        val entity = chatMessageEntity(
+            id = "m1", sessionId = "s1", role = "agent", modelUsed = "html_card",
+            metadata = """{"claude_agent_state":{}}""",
+            parts = listOf(MessagePart.HtmlCard("p0", "<p/>")),
         )
-        assertEquals(
-            listOf(
-                MessagePart.Image("p0", ref = "file://img"),
-                MessagePart.Text("p1", "看这张", PartState.DONE),
-            ),
-            user.deriveParts(),
-        )
-
-        // agent 图：单 Image part，ref 取 metadata.imageUri ?: content
-        val agent = user.copy(id = "ia", role = "agent")
-        assertEquals(
-            listOf(MessagePart.Image("p0", ref = "file://img", saved = false)),
-            agent.deriveParts(),
-        )
-    }
-
-    // ── 双读 ───────────────────────────────────────────────────
-
-    @Test
-    fun `decodePartsOrLegacy prefers partsJson when present`() {
-        val entity = ChatMessageEntity(
-            id = "m3",
-            sessionId = "s",
-            type = "text",
-            role = "agent",
-            content = "legacy 原文",
-            timestamp = 1L,
-            partsJson = MessagePartsCodec.encode(
-                listOf(MessagePart.Text("p0", "parts 原文", PartState.DONE)),
-            ),
-        )
-        assertEquals(
-            listOf(MessagePart.Text("p0", "parts 原文", PartState.DONE)),
-            entity.decodePartsOrLegacy(),
-        )
-    }
-
-    @Test
-    fun `decodePartsOrLegacy falls back to legacy columns when partsJson missing or corrupt`() {
-        val missing = ChatMessageEntity(
-            id = "m4",
-            sessionId = "s",
-            type = "tool_chart",
-            role = "agent",
-            content = "<svg/>",
-            timestamp = 1L,
-        )
-        assertEquals(listOf(MessagePart.Chart("p0", "<svg/>")), missing.decodePartsOrLegacy())
-
-        val corrupt = missing.copy(partsJson = "{broken")
-        assertEquals(listOf(MessagePart.Chart("p0", "<svg/>")), corrupt.decodePartsOrLegacy())
-    }
-
-    // ── 回灌桥（实体 → ModelInputItem） ─────────────────────────
-
-    @Test
-    fun `toModelInputItems derives role from role column`() {
-        val user = ChatMessageEntity(
-            id = "u", sessionId = "s", type = "text", role = "user", content = "问", timestamp = 1L,
-        )
-        val agent = ChatMessageEntity(
-            id = "a", sessionId = "s", type = "text", role = "agent", content = "答", timestamp = 2L,
-        )
-        assertEquals(listOf(ModelInputItem.TextMessage(ModelInputRole.USER, "问")), user.toModelInputItems())
-        assertEquals(listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "答")), agent.toModelInputItems())
-    }
-
-    @Test
-    fun `toModelInputItems drops media results from context`() {
-        val entity = ChatMessageEntity(
-            id = "m5",
-            sessionId = "s",
-            type = "data_media_results",
-            role = "agent",
-            content = """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""",
-            timestamp = 1L,
-            metadata = """{"query":"q","totalCount":1,"isRefinement":false}""",
-        )
-        assertEquals(emptyList<ModelInputItem>(), entity.toModelInputItems())
-    }
-
-    // ── 全仓双写守卫 ────────────────────────────────────────────
-
-    /**
-     * 守卫：chat_messages 的一切写入（Room insert）必须走 insertMessageWithParts /
-     * insertMessagesWithParts 接缝（partsJson 双写）。直接调用 DAO 原生 insert 即违规。
-     * 豁免：DAO 接口声明（ChatMessageDao.kt）与接缝实现（ChatMessageParts.kt）。
-     */
-    @Test
-    fun `all chat message writes go through the WithParts seam`() {
-        val mainSrc = File("src/main/java/com/mamba/picme")
-        assertTrue("守卫需在 :androidApp 模块根目录运行", mainSrc.isDirectory)
-        val offenders = mutableListOf<String>()
-        mainSrc.walkTopDown()
-            .filter { file -> file.isFile && file.extension == "kt" }
-            .filter { file -> file.name != "ChatMessageDao.kt" && file.name != "ChatMessageParts.kt" }
-            .forEach { file ->
-                file.readText().lineSequence().forEachIndexed { index, line ->
-                    if (".insertMessage(" in line || ".insertMessages(" in line) {
-                        offenders += "${file.relativeTo(mainSrc)}:${index + 1} → ${line.trim()}"
-                    }
+        val updated = entity.withUpdatedParts { parts ->
+            parts.map { part ->
+                if (part is MessagePart.HtmlCard) {
+                    part.copy(meta = part.meta.copy(displayMode = HtmlCardDisplayMode.FULLPAGE, measuredHeightPx = 900))
+                } else {
+                    part
                 }
             }
-        if (offenders.isNotEmpty()) {
-            fail(
-                "chat_messages 写入绕过 parts 双写接缝（ADR-016 M1）：\n" +
-                    offenders.joinToString("\n") + "\n" +
-                    "请改用 insertMessageWithParts / insertMessagesWithParts。",
-            )
         }
+        assertEquals("tool_html", updated.type)
+        assertEquals("html_card", updated.modelUsed)
+        assertEquals("""{"claude_agent_state":{}}""", updated.metadata)
+        val card = updated.decodeParts().filterIsInstance<MessagePart.HtmlCard>().single()
+        assertEquals(HtmlCardDisplayMode.FULLPAGE, card.meta.displayMode)
+        assertEquals(900, card.meta.measuredHeightPx)
     }
 
-    private fun decode(entity: ChatMessageEntity): List<MessagePart> =
-        entity.decodePartsOrLegacy().also { parts ->
-            assertNotNull(parts)
-        }
+    @Test
+    fun `decodeParts falls back to Unsupported on corrupt partsJson`() {
+        val entity = chatMessageEntity(
+            id = "m1", sessionId = "s1", role = "agent", parts = listOf(textPart()),
+        ).copy(partsJson = "{{{")
+        val parts = entity.decodeParts()
+        assertEquals(1, parts.size)
+        assertTrue(parts[0] is MessagePart.Unsupported)
+    }
+
+    @Test
+    fun `taskCardStateOrNull reads task from TaskCard part`() {
+        val state = EngineerTaskState(
+            taskId = "t1", sourceText = "src", status = EngineerTaskStatus.RUNNING,
+            startedAtMs = 0L, updatedAtMs = 0L,
+        )
+        val entity = chatMessageEntity(
+            id = "t1", sessionId = "s1", role = "agent",
+            parts = listOf(MessagePart.TaskCard("p0", "t1", state.status.toToolPartState(), state)),
+        )
+        assertEquals(state, entity.taskCardStateOrNull())
+        assertEquals("tool_task", entity.type)
+        assertNull(chatMessageEntity(id = "m", sessionId = "s1", role = "agent", parts = listOf(textPart())).taskCardStateOrNull())
+    }
+
+    private fun gachaGroup() = OptimizeCandidateGroup("u", "scene", 0, emptyList(), emptyList(), 0)
 }

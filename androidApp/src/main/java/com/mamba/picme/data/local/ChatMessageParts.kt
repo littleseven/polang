@@ -2,57 +2,79 @@ package com.mamba.picme.data.local
 
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.LegacyChatTypeMigration
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.MessagePartsCodec
 import com.mamba.picme.domain.chat.MessagePartsConverter
+import com.mamba.picme.domain.chat.MessagePartsProjection
 import com.mamba.picme.domain.chat.ModelInputItem
 import com.mamba.picme.domain.chat.PartState
 import com.mamba.picme.domain.chat.roleOf
 import com.mamba.picme.domain.chat.toModelInput
 
 /**
- * chat_messages 表的 parts 双写/双读接缝（ADR-016 M1，spec §6）。
+ * chat_messages 表的 parts 单一权威接缝（持久化接缝反转，ADR-016 收口，v28）。
  *
- * M1 期 parts 是 (type, content, metadata, role) 列的**纯函数**（转换收口
- * [MessagePartsConverter]，仅认新 8 值分类法；legacy 13→8 映射知识单点收口
- * [LegacyChatTypeMigration]，只服务迁移）：
- * - 写侧：所有插入统一走 [insertMessageWithParts] / [insertMessagesWithParts]，
- *   [withPartsJson] 每次从标量列现算重填（含 metadata 回写型 update，防 parts 漂移）；
- * - 读侧：[decodePartsOrLegacy] 优先 partsJson，缺失/损坏回标量列现算（不丢消息）；
- * - 迁移：[backfillChatMessageParts] 对存量行全量回填。
+ * 反转后不变量：partsJson 是唯一内容权威；type 为写时投影列（[MessagePartsProjection]）。
+ * 全部写入经 [chatMessageEntity] 构造或 [withUpdatedParts] 更新——投影与 partsJson 同点
+ * 派生，物理上不存在漂移面；DAO 裸 insertMessage/insertMessages 仅供本文件两个入口调用。
  *
- * M2 起流式管线在内存轨装配 parts（TurnPartsReducer，瞬态不落 Room，UI 仍读标量列）；
- * 持久化接缝反转（parts 为权威源、标量列投影）属 M4 渲染切换一并收口。
+ * 读侧：[decodeParts] 直解 partsJson（part 级容错：未知/损坏原位 Unsupported，见
+ * [MessagePartsCodec]）；legacy 列回退已随 content 列退役删除。
+ * legacy 转换知识（[MessagePartsConverter]/[LegacyChatTypeMigration]）
+ * 仅存用于 MIGRATION_27_28 修复回填与旧备份（v5-）恢复。
  */
 
-/** 由新 8 值列现算 parts（纯函数，行失败转换器内部已兜底）。 */
-fun ChatMessageEntity.deriveParts(): List<MessagePart> =
-    MessagePartsConverter.toParts(type, content, metadata, roleOf(role))
+/** 由 parts 构造实体（唯一构造入口：type 投影与 partsJson 同点派生，不可漂移）。 */
+fun chatMessageEntity(
+    id: String,
+    sessionId: String,
+    role: String,
+    parts: List<MessagePart>,
+    timestamp: Long = System.currentTimeMillis(),
+    modelUsed: String? = null,
+    metadata: String? = null,
+): ChatMessageEntity = ChatMessageEntity(
+    id = id,
+    sessionId = sessionId,
+    type = MessagePartsProjection.roomTypeOf(parts),
+    role = role,
+    timestamp = timestamp,
+    modelUsed = modelUsed,
+    metadata = metadata,
+    partsJson = MessagePartsCodec.encode(parts),
+)
 
-/** 双写填充 partsJson（每次现算重填：metadata 回写型 update 不会让 parts 滞留旧值）。 */
-fun ChatMessageEntity.withPartsJson(): ChatMessageEntity =
-    copy(partsJson = MessagePartsCodec.encode(deriveParts()))
+/** 读侧：解 partsJson；空/整体损坏（迁移兜底后不应出现）合成 Unsupported 占位，不丢消息位。 */
+fun ChatMessageEntity.decodeParts(): List<MessagePart> =
+    MessagePartsCodec.decode(partsJson)
+        ?: listOf(MessagePart.Unsupported(partId = "p0", originalType = type, summary = null))
 
-/** 读侧：优先 partsJson 解码；缺失/损坏回标量列现算（不丢消息）。 */
-fun ChatMessageEntity.decodePartsOrLegacy(): List<MessagePart> =
-    MessagePartsCodec.decode(partsJson) ?: deriveParts()
+/** 更新 parts（转换后投影重算；任务卡/HTML 卡测高/抽卡/OpenUI 交互态等回写统一入口）。 */
+fun ChatMessageEntity.withUpdatedParts(transform: (List<MessagePart>) -> List<MessagePart>): ChatMessageEntity {
+    val updated = transform(decodeParts())
+    return copy(partsJson = MessagePartsCodec.encode(updated), type = MessagePartsProjection.roomTypeOf(updated))
+}
+
+/** 任务卡状态读取（任务中心列表/审批回放/交付入口的统一读取口）。 */
+fun ChatMessageEntity.taskCardStateOrNull(): EngineerTaskState? =
+    decodeParts().filterIsInstance<MessagePart.TaskCard>().firstOrNull()?.task
 
 /**
  * 实体 → LLM 回灌项序列（spec §6：UIMessage→ModelMessage 显式转换）。
- * 角色取自 Room v26 `role` 列，经 commonMain 单点 [roleOf] 派生（精确匹配 "user" → USER，
- * 其余 ASSISTANT）；data part 不进上下文（转换规则见 commonMain `toModelInput`）。
+ * data part 不进上下文（转换规则见 commonMain `toModelInput`）。
  */
 fun ChatMessageEntity.toModelInputItems(): List<ModelInputItem> =
-    decodePartsOrLegacy().toModelInput(roleOf(role), id)
+    decodeParts().toModelInput(roleOf(role), id)
 
-/** 插入单条消息（M1 起统一入口：标量列 + partsJson 双写）。 */
-suspend fun ChatMessageDao.insertMessageWithParts(message: ChatMessageEntity) =
-    insertMessage(message.withPartsJson())
+/** 插入单条消息（统一入口；实体须经 [chatMessageEntity]/[withUpdatedParts] 产出）。 */
+suspend fun ChatMessageDao.insertPartsMessage(message: ChatMessageEntity) =
+    insertMessage(message)
 
-/** 批量插入消息（备份恢复路径；逐条双写）。 */
-suspend fun ChatMessageDao.insertMessagesWithParts(messages: List<ChatMessageEntity>) =
-    insertMessages(messages.map { it.withPartsJson() })
+/** 批量插入（备份恢复路径）。 */
+suspend fun ChatMessageDao.insertPartsMessages(messages: List<ChatMessageEntity>) =
+    insertMessages(messages)
 
 /**
  * v24→v25 迁移回填：逐行把 legacy (type, content, metadata) 转为 parts JSON 写入 partsJson。

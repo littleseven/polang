@@ -6,7 +6,8 @@ import androidx.room.PrimaryKey
 /**
  * Room 数据库实体：聊天消息
  *
- * 对应表：chat_messages
+ * 对应表：chat_messages（v28 起 parts 单一权威：ADR-016 持久化接缝反转，
+ * 对齐 Vercel「UIMessage JSON 整包落库」——content 列已退役）。
  */
 @Entity(tableName = "chat_messages")
 data class ChatMessageEntity(
@@ -19,22 +20,16 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
 
     /**
-     * 新分类法 8 值（spec §1）：text, image, tool_chart, tool_html, tool_task,
-     * tool_image_edit, data_media_results, data_optimize_candidates。
-     * 降级定位：索引冗余 + 迁移源；读面权威是 partsJson。
+     * 投影列（写时自 parts 经 [com.mamba.picme.domain.chat.MessagePartsProjection.roomTypeOf]
+     * 派生，构造/更新接缝同点完成）：服务 DAO 查询/索引面（任务中心 type='tool_task'、
+     * 回灌窗口 role 子查询）。读面权威是 partsJson，本列永不作为内容源。
      */
     val type: String,
 
     /**
-     * 消息角色："user" / "agent"（spec §2 升格列；默认值 'agent' 仅为迁移安全网，
-     * 所有写路径必须显式赋值）。
+     * 消息角色："user" / "agent"
      */
     val role: String = "agent",
-
-    /**
-     * 文本内容或图片路径（图片消息存储本地文件路径）
-     */
-    val content: String,
 
     /**
      * 消息时间戳
@@ -42,21 +37,20 @@ data class ChatMessageEntity(
     val timestamp: Long = System.currentTimeMillis(),
 
     /**
-     * 生成该消息的模型标识：local_qwen3.5_2b / remote_deepseek 等
+     * 生成该消息的模型标识：remote_deepseek / cloud / chart 等
      */
     val modelUsed: String? = null,
 
     /**
-     * 扩展 JSON 字段，用于存储额外元数据
+     * 消息级元数据 JSON（白名单住户：claude_agent_state / LLM 性能指标 / savedAt）。
+     * part 级键（html_card/engineer_task/imageUri/suggestions 等）已迁入 parts，禁止回写。
      */
     val metadata: String? = null,
 
     /**
-     * 消息内容块数组 JSON（ADR-016 M1 parts 模型；[com.mamba.picme.domain.chat.MessagePartsCodec] 线格式）。
-     *
-     * M1 双写过渡：写入侧由 `ChatMessageDao.insertMessageWithParts` 从 (type, content, metadata)
-     * 现算填充；读侧优先本列、缺失时回 legacy 列现算（`decodePartsOrLegacy`），旧列保留不删，
-     * 回退安全。v24→v25 迁移对存量行全量回填（失败行降级 Text part 原文兜底，不丢消息）。
+     * 消息内容**唯一权威**：有序 parts 数组 JSON（ADR-016 D1 parts 模型；
+     * [com.mamba.picme.domain.chat.MessagePartsCodec] 线格式）。v28 起 NOT NULL——
+     * MIGRATION_27_28 对存量行一次性转正（损坏行降级 Text 原文兜底，不丢消息）。
      */
-    val partsJson: String? = null
+    val partsJson: String,
 )
