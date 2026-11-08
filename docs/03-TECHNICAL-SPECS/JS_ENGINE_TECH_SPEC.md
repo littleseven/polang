@@ -188,7 +188,7 @@ LLM 感知 handler 的唯一渠道是 `@Tool` 描述文本（`ChatToolService` /
 - `remember_fact` / `forget_fact`：`MemoryCapability`（CHAT 场景）→ `MemoryRepository` 落 `memory_facts` 表（source=JS_DISPATCH，设置页「AI 记忆」可见来源标签）；
 - `recall_memory`：`MemoryCapability` READ_ONLY 直通，返回含 factId 的事实列表文本；
 - `remember_person_relation` / `forget_person_relation` / `query_person_relation`：`PersonRelationCapability`（CHAT 场景）→ `PersonRepository` 人物关系声明/遗忘/查询（remember/forget 需确认，query 只读直通）；
-- `share_media` 不在本 Capability（ChatToolService 已有通路，避免重复注册冲突）；
+- `share_media`：`ChatMediaWriteCapability`（2026-11-08 补入）→ `ChatViewModel.onShareMedia` 解析 id → `shareMediaAssets` 直接拉系统分享面板（无需相册页在场，对齐 iOS `IosChatGalleryCapability.handleShare` 通路）；此前 CHAT 场景 dispatch 只能命中 GalleryCapability 落跨页队列，是工具陷阱；
 - ChatViewModel 未激活（chat 页不在前台）时 Capability 报 `CAPABILITY_UNAVAILABLE`，Promise reject。
 
 ---

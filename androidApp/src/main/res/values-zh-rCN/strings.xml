@@ -1699,6 +1699,7 @@
     <string name="chat_write_no_valid_ids">没有有效的媒体 id</string>
     <string name="chat_delete_started_pending">已发起删除 %1$d 项，等待系统授权</string>
     <string name="chat_deleted_n">已删除 %1$d 项</string>
+    <string name="chat_share_opened_n">已打开分享面板（%1$d 项）</string>
     <string name="chat_favorited_one">已收藏 1 项</string>
     <string name="chat_unfavorited_one">已取消收藏 1 项</string>
     <string name="chat_selected_one">已选中 1 项</string>

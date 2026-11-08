@@ -107,6 +107,7 @@ import com.mamba.picme.features.cloudagent.CloudAgentTurnRunner
 import com.mamba.picme.features.cloudagent.CloudTurnEvent
 import com.mamba.picme.features.cloudagent.agentStepLabelRes
 import com.mamba.picme.features.gallery.MediaViewModel
+import com.mamba.picme.features.gallery.components.shareMediaAssets
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.serialization.json.Json
@@ -3316,6 +3317,15 @@ class ChatViewModel(
         } else {
             stringContext().getString(R.string.chat_unselected_one)
         }
+    }
+
+    /** 分享：解析 id → MediaAsset 后直接拉系统分享面板（无需相册页在场）。 */
+    override suspend fun onShareMedia(mediaIds: List<String>): String {
+        val assets = mediaIds.mapNotNull { it.toLongOrNull() }
+            .mapNotNull { id -> runCatching { mediaRepository.getMediaById(id) }.getOrNull() }
+        if (assets.isEmpty()) return stringContext().getString(R.string.chat_write_no_valid_ids)
+        shareMediaAssets(context, assets)
+        return stringContext().getString(R.string.chat_share_opened_n, assets.size)
     }
 
     private fun reapplyFiltersToCurrentResults(sessionId: String) {

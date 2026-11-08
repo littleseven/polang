@@ -108,7 +108,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 **params 烘焙**：`polangSystemPrompt(...)`（koog/KoogPromptFactory.kt）——🔴 必须走 Koog prompt DSL 传 params，否则 temperature/maxTokens/thinking 丢失。AIAgent 按「记忆快照内容 + 摘要 version」新鲜度懒重建。
 
-### 1.4 工具集（ChatToolService，43 个 @Tool）
+### 1.4 工具集（ChatToolService，43 个 @Tool；2026-11-08 起 44→43：`switch_view_mode` 移出 chat 工具面）
 
 全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 5s（browser_* 族 25s、web_search 15s）。
 
@@ -116,10 +116,11 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 | 分组 | 工具 |
 |---|---|
-| 相册 | get_gallery_summary / search_media / refine_media_search / delete_media / share_media / select_media / favorite_media / switch_view_mode |
+| 相册 | get_gallery_summary / search_media / refine_media_search / delete_media / share_media / select_media / favorite_media（2026-11-08：`switch_view_mode` 移出 chat 工具面——CHAT 场景无执行体，dispatch 必落跨页队列回「正在切换页面」但页面不跳转，与 view_media 同类工具陷阱；`share_media` 反向补全 Android 执行体入 `ChatMediaWriteCapability`，对齐 iOS 既有通路，消除跨页队列陷阱） |
 | 反馈 | record_feedback / more_like_this / exclude_constraint |
-| 打标修图 | start_tag_scan / ai_optimize / adjust_image / edit_image |
-| 脚本/卡片 | run_gallery_script / draw_chart / render_html |
+| 打标修图 | query_tag_scan_status / ai_optimize / adjust_image / edit_image（2026-11-08：`start_tag_scan` 更名 `query_tag_scan_status`——旧名说谎：实现硬编码 action="query" 永不启动扫描；命令层 `AgentCommand.StartTagScan`/`ChatStartTagScanCapability` 不动） |
+| 脚本/卡片 | run_gallery_script / draw_chart / render_html（2026-11-08：run_gallery_script 描述瘦身——handler 目录/写操作清单/示例抽到 `gallery-script` skill 经 load_skill 按需加载，描述只留硬约束与指针，常驻 prompt 每轮省约 1.5k 字符） |
+| 技能 | load_skill（2026-11-08：Skill 中心端云同构，见 `AgentSkillContract`） |
 | 云端浏览器 | browser_open / browser_navigate / browser_click / browser_type / browser_extract / browser_screenshot / browser_close |
 | 网页搜索 | web_search（2026-11-02：DeepSeek Search 经 server `/v1/web-search` 代理——服务端持 key 调 `/v1/tools/search` 并做配图 URL 提取/瘦身（≤5 结果、≤3 图/结果、400 字符摘录），端侧 `WebSearchClient`（WebSearchTransport）转发；结果 images 字段供 LLM 以 `![描述](https://图片URL)` 嵌回正文，AgentMarkdown 经 `NetworkImageTransformer`（Coil，仅 https、限高 320dp）渲染——「图文并茂」闭环；失败回 `[WEB_SEARCH_UNAVAILABLE]`/`[WEB_SEARCH_FAILED]` 结构化降级文本） |
 | 记忆 | remember_person_relation / forget_person_relation / list_person_relations / remember_fact / forget_fact / recall_memory |
