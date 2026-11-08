@@ -76,19 +76,22 @@ class ChatMessagePartsTest {
     }
 
     @Test
-    fun `toModelInputItems drops media results from context`() {
-        // 退役横滑卡行整行跳过（RETIRED 过滤保留至 Task 4 v28 重置收口）
+    fun `toModelInputItems derives context from parts only`() {
+        // v28 重置后回放整行过滤（RETIRED 闭集）已删：type 列只是投影，回灌只看 parts——
+        // 投影 type 与 parts 判型不一致时以 parts 为准，不再按 type 丢行
         val entity = ChatMessageEntity(
             id = "m5",
             sessionId = "s",
-            type = "data_media_results",
+            type = "text",
             role = "agent",
-            content = """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""",
+            content = "正文",
             timestamp = 1L,
-            metadata = """{"query":"q","totalCount":1,"isRefinement":false}""",
-            partsJson = "[]",
+            partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "正文", PartState.DONE))),
         )
-        assertEquals(emptyList<ModelInputItem>(), entity.toModelInputItems())
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "正文")),
+            entity.toModelInputItems(),
+        )
     }
 
     // ── 全仓写接缝守卫 ──────────────────────────────────────────

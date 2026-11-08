@@ -108,23 +108,6 @@ class ChatMessagePartsProjectionTest {
         )
         messageDao.insertPartsMessages(rows)
 
-        // 退役横滑卡行（parts 物化为 Tombstone）：typeOverride 保住原 type（回放过滤依赖）
-        messageDao.insertPartsMessages(
-            listOf(
-                PartsMessageRow(
-                    id = "b3", sessionId = "s1", role = ModelInputRole.ASSISTANT,
-                    parts = listOf(MessagePart.Tombstone("p0", "data_media_results")),
-                    timestamp = 3L,
-                    typeOverride = "data_media_results",
-                ),
-            ),
-        )
-        assertEquals("data_media_results", messageDao.getMessageById("b3")!!.type)
-        assertEquals(
-            emptyList<com.mamba.picme.domain.chat.ModelInputItem>(),
-            messageDao.getMessageById("b3")!!.toModelInputItems(),
-        )
-
         val user = messageDao.getMessageById("b1")!!
         assertEquals(rows[0].parts, user.decodeParts())
         assertEquals("image", user.type)

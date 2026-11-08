@@ -6,8 +6,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * [MessagePartsConverter] 新 9 值分类法映射 + `image` 角色双分支 + 未知/异常兜底
- * （type taxonomy spec §4.2；legacy 13 值 → 新分类法的收编映射见 [LegacyChatTypeMigrationTest]）。
+ * [MessagePartsConverter] 终态值域映射 + `image` 角色双分支 + 未知/异常兜底
+ * （type taxonomy spec §4.2；legacy 13 值映射知识已随 Room v28 聊天表重置删除）。
  */
 class MessagePartsConverterTest {
 
@@ -102,7 +102,7 @@ class MessagePartsConverterTest {
         // 行级兜底（spec §4.2）：任何解析异常 → 原文 Text part，不允许丢消息
         assertEquals(
             listOf(MessagePart.Text("p0", "not-a-json-array", PartState.DONE)),
-            MessagePartsConverter.toParts("data_media_results", "not-a-json-array", null, ModelInputRole.ASSISTANT),
+            MessagePartsConverter.toParts("data_retired_blob", "not-a-json-array", null, ModelInputRole.ASSISTANT),
         )
         assertEquals(
             listOf(MessagePart.Text("p0", "任务摘要", PartState.DONE)),
@@ -144,40 +144,6 @@ class MessagePartsConverterTest {
         assertEquals(ToolPartState.OUTPUT_ERROR, EngineerTaskStatus.FAILED.toToolPartState())
         // 编译期穷尽性：新增 EngineerTaskStatus 枚举值会让 when 编译失败，此断言同步兜底
         assertEquals(5, EngineerTaskStatus.entries.size)
-    }
-
-    // ── legacy data_ui 墓碑（A2UI 2026-11-05 退役，openui-sole-genui） ──
-
-    @Test
-    fun toParts_legacyDataUi_liftsFallbackSummary() {
-        val content =
-            """{"type":"data_ui","partId":"p1","surfaceId":"s","messagesJson":"[]","fallbackSummary":"3 月的照片统计"}"""
-        val parts = MessagePartsConverter.toParts("data_ui", content, null, ModelInputRole.ASSISTANT)
-        assertEquals(
-            listOf(MessagePart.Text("p1", "3 月的照片统计", PartState.DONE)),
-            parts,
-        )
-    }
-
-    @Test
-    fun toParts_legacyDataUi_blankSummary_tombstoneMarker() {
-        val content =
-            """{"type":"data_ui","partId":"p1","surfaceId":"s","messagesJson":"[]","fallbackSummary":""}"""
-        val parts = MessagePartsConverter.toParts("data_ui", content, null, ModelInputRole.ASSISTANT)
-        assertEquals(
-            listOf(MessagePart.Text("p1", MessagePartsConverter.LEGACY_CARD_TOMBSTONE, PartState.DONE)),
-            parts,
-        )
-    }
-
-    @Test
-    fun dataUiRow_corruptContent_fallsBackToText() {
-        // data_ui 内容损坏 → 墓碑 Text（LEGACY_CARD_TOMBSTONE 标记 + partId 默认 p0），不允许丢消息
-        val parts = MessagePartsConverter.toParts("data_ui", "{broken", null, ModelInputRole.ASSISTANT)
-        assertEquals(
-            MessagePart.Text("p0", MessagePartsConverter.LEGACY_CARD_TOMBSTONE, PartState.DONE),
-            parts.single(),
-        )
     }
 
     // ── OpenUI GenUI 卡（openui P1） ────────────────────────────────

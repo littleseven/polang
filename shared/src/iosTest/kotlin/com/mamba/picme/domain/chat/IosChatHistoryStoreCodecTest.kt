@@ -241,10 +241,12 @@ class IosChatHistoryStoreCodecTest {
     }
 
     @Test
-    fun decodeSkipsRetiredMediaResultsRowsWithoutCollapsingFile() {
-        // 终审回归（2026-11-08）：旧版 app 写出的文件里，横滑卡行 parts 含已删除的
-        // data_media_results 鉴别值——整包强类型解码会抛异常塌成 null（Swift 兜底误配
-        // legacy → 空历史 → persist 覆写丢数据）。两段式 decode 必须先按 type 滤行。
+    fun decodeDegradesRetiredDiscriminatorRowToTombstoneWithoutCollapsingFile() {
+        // 旧版 app 写出的文件里，横滑卡行 parts 含已删除的 data_media_results 鉴别值——
+        // parts 以 JsonElement 惰性承载（逐元素 Tombstone 兜底）保证整包强类型解码不塌成
+        // null（Swift 兜底误配 legacy → 空历史 → persist 覆写丢数据）。行级过滤已随
+        // 2026-11-08 值域终态出清（Room v28 重置后存量行不复存在）：退役鉴别值行降级为
+        // Tombstone 占位行保留，正常行不受影响。
         val json = """
             [
               {"id":"a","type":"text","role":"user","content":"找猫的照片","timestamp":1,
@@ -255,10 +257,15 @@ class IosChatHistoryStoreCodecTest {
                "parts":[{"type":"text","partId":"p0","markdown":"找到 3 张「猫」的照片","state":"DONE"}]}
             ]
         """.trimIndent()
-        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json), "退役行不得塌掉整包解码")
-        assertEquals(listOf("a", "c"), decoded.map { it.id }, "退役行整行跳过、正常行保留")
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json), "退役鉴别值不得塌掉整包解码")
+        assertEquals(listOf("a", "b", "c"), decoded.map { it.id }, "三行全保留（b 降级 Tombstone 占位）")
         assertEquals(ChatMessageType.TEXT, decoded[0].type)
-        assertEquals(ChatMessageType.TEXT, decoded[1].type)
+        assertEquals(
+            MessagePart.Tombstone("p0", originalType = "data_media_results"),
+            decoded[1].parts.single(),
+        )
+        assertEquals(ChatMessageType.TEXT, decoded[1].type, "Tombstone 行判型防御性落文本")
+        assertEquals(ChatMessageType.TEXT, decoded[2].type)
     }
 
     @Test

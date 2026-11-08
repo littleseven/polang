@@ -16,10 +16,9 @@ import kotlinx.serialization.json.jsonArray
  * 13 值」终态**（spec《chat-value-domain-ideal》§3）：text/image（content）+ reasoning +
  * tool_chart/tool_html/tool_task/tool_image_edit/tool_browser（tool）+
  * data_optimize_candidates/data_genui_program（data）+ source_url/source_document
- * （source）+ tombstone 兜底值。已出清的 legacy 鉴别值（A2UI `data_ui` 等）无显式
- * 分支——解码失败统一落 [MessagePart.Tombstone] 占位（2026-11-08 墓碑拦截机器出清）；
- * `data_media_results`（横滑相册卡退役）存量行另由回放路径按
- * `LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES` 整行跳过。
+ * （source）+ tombstone 兜底值。已出清的 legacy 鉴别值（A2UI `data_ui`、横滑卡
+ * `data_media_results` 等）无显式分支——Room v28 聊天表重置后存量行不复存在，
+ * 解码侧遇未知值统一落 [MessagePart.Tombstone] 占位（2026-11-08 墓碑拦截机器出清）。
  */
 object MessagePartsCodec {
 

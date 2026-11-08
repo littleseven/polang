@@ -13,20 +13,16 @@ import kotlinx.serialization.json.longOrNull
 /**
  * (type, content, metadata, role) → parts 的标量→parts 转换器。
  *
- * **D1a parts-first 接缝反转后（2026-11-08）职责收窄**：运行时写路径已直建
- * `List<MessagePart>`（[projectChatRow] 为其逆投影），本转换器不再服务 Room 写侧；
- * 现存正当调用只剩两处（Task 8 备份 v6 粗映射落地后收编）：
- * 1. 备份恢复（androidApp `TagDataBackupRepository`）——v5 备份只存标量列，
- *    恢复时经本转换器把 (type, content, metadata) 物化为 parts 再走 parts-first 接缝落库；
- * 2. [LegacyChatTypeMigration.map] 内部——legacy 13 值映射后的 parts 派生。
+ * **D1a parts-first 接缝反转后（2026-11-08）职责收窄为备份恢复单点**：运行时 Room
+ * 读写路径零调用（写侧直建 parts 经 [projectChatRow] 投影，读侧 `decodeParts` 直读
+ * partsJson）。现存唯一正当消费方 = androidApp 备份恢复（`TagDataBackupRepository`）：
+ * v5 备份只存标量列，恢复时经本转换器把 (type, content, metadata) 物化为 parts 再走
+ * parts-first 接缝落库；Task 8 备份 v6 粗映射落地后整体收编退役。
  *
- * 纯净化口径（spec §4.2）：只认新 10 值分类法；legacy 13→8 映射知识在
- * [LegacyChatTypeMigration]，本转换器不双吃。行级兜底不变：任何异常/空结果 → 原文 Text part。
+ * 只认终态值域（legacy 13 值映射知识已随 Room v28 聊天表重置 + legacy 机器出清删除，
+ * 运行时零 legacy 知识）。行级兜底不变：任何异常/空结果 → 原文 Text part。
  */
 object MessagePartsConverter {
-
-    /** legacy GenUI 卡（A2UI，2026-11-05 退役）墓碑占位符：fallbackSummary 缺失时的技术标记，非文案。 */
-    const val LEGACY_CARD_TOMBSTONE = "[data_ui]"
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -42,25 +38,6 @@ object MessagePartsConverter {
     /** 行级兜底：保留原文（content），UI 与回灌均有可读内容，消息不丢。 */
     private fun fallbackText(content: String): List<MessagePart> =
         listOf(MessagePart.Text(partId = "p0", markdown = content, state = PartState.DONE))
-
-    /** A2UI 已退役：存量行提升 fallbackSummary 为可读文本，不丢消息（ADR-016 降级口径）。 */
-    private fun legacyA2uiTombstone(content: String): MessagePart.Text {
-        val obj = runCatching { json.parseToJsonElement(content) as? JsonObject }.getOrNull()
-        return legacyCardTombstone(obj)
-    }
-
-    /**
-     * legacy GenUI 卡墓碑提取（codec 的 `data_ui` 显式拦截调用点已随 2026-11-08
-     * 值域终态出清——codec 未知值统一走 Tombstone；本函数现仅供本类 `data_ui`
-     * 分支与测试使用，整体随 converter 退役线清理）：
-     * fallbackSummary 提升为可读文本；as? JsonPrimitive 安全形态——病态非 primitive
-     * 字段（数组/对象）不抛，落墓碑标记；partId 缺失默认 "p0"。
-     */
-    internal fun legacyCardTombstone(obj: JsonObject?): MessagePart.Text {
-        val summary = (obj?.get("fallbackSummary") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
-        val partId = (obj?.get("partId") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: "p0"
-        return MessagePart.Text(partId, summary ?: LEGACY_CARD_TOMBSTONE, PartState.DONE)
-    }
 
     @Suppress("CyclomaticComplexMethod", "LongMethod") // 类型全枚举映射表，单点收口
     private fun convert(type: String, content: String, metadata: String?, role: ModelInputRole): List<MessagePart> {
@@ -96,10 +73,6 @@ object MessagePartsConverter {
             // 损坏行抛异常 → 行级 Text 兜底（对齐 toParts 的 runCatching 收口）
             "tool_browser" ->
                 listOf(json.decodeFromString(MessagePart.BrowserLive.serializer(), content))
-
-            // A2UI 已退役（2026-11-05 spec《openui-sole-genui-protocol》）：存量行提升
-            // fallbackSummary 为可读文本；损坏行落墓碑标记 Text（LEGACY_CARD_TOMBSTONE）
-            "data_ui" -> listOf(legacyA2uiTombstone(content))
 
             // OpenUI GenUI 卡（openui P1）：content 列存 OpenUiCard 整颗 JSON，同 tool_browser 先例
             //（2026-11-08 值域终态：鉴别值随 OpenUiContract.PART_TYPE 自 data_ui_openui 改名）

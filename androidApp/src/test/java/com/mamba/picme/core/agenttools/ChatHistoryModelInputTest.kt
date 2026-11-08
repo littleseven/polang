@@ -95,9 +95,9 @@ class ChatHistoryModelInputTest {
 
     @Test
     fun `legacy stray types fall back to text part and label by role column`() {
-        // 防御路径：未经迁移的 legacy 残留 type（如旧 command）行级兜底为原文 Text part，
-        // 回灌标签取 role 列（旧 13 值里 command/plan_preview 均为 agent 侧）——
-        // 正常链路下 Room v26 迁移已把它们改写为 text+agent
+        // 防御路径：未知/退役残留 type（如备份旧值 command）行级兜底为可读 Text part
+        // （content 非 JSON blob 不降级 Tombstone），回灌标签取 role 列——Room v28
+        // 重置后运行时行不再出现此类 type，此处只钉 converter 兜底行为
         val pairs = newPairs(
             listOf(
                 entity("command", "search:猫", id = "r1"),
@@ -117,14 +117,15 @@ class ChatHistoryModelInputTest {
                 entity("text", "看图", role = "user", id = "d1"),
                 entity("image", "/data/img.jpg", role = "user", id = "d2"),
                 entity(
-                    "data_media_results",
-                    """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""",
+                    "data_future_blob",
+                    """{"type":"data_future_blob","partId":"p0","fallbackSummary":"未来卡"}""",
                     id = "d3",
                 ),
                 entity("tool_image_edit", "已提亮", """{"imageUri":"/i.jpg"}""", id = "d4"),
             ),
         )
-        // data part 不进上下文；用户图片回灌占位文本、编辑结果回灌文字说明
+        // data part 不进上下文（未知 JSON blob → Tombstone 占位，回灌剥离）；用户图片
+        // 回灌占位文本、编辑结果回灌文字说明
         assertEquals(
             listOf(
                 "user" to "看图",

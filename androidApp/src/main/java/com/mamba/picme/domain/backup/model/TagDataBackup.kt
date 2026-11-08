@@ -203,9 +203,9 @@ data class BackupChatSession(
 /**
  * 聊天消息。
  *
- * [role] 为 Room v26 起的消息级角色列（"user"/"agent"）；nullable——旧分类法时期导出的
- * 备份无此字段（容器版本不校验，恢复按 type 内容分流），恢复时经
- * [com.mamba.picme.domain.chat.LegacyChatTypeMigration] 转正补齐。
+ * [role] 为消息级角色列（"user"/"agent"）；nullable——旧分类法时期导出的备份无此字段
+ * （容器版本不校验），恢复时缺省按 agent 安全网补齐；type 不在终态投影线值集
+ * （见恢复侧 `CHAT_RESTORE_TYPES`）的行整行跳过——legacy 粗映射表属后续备份版本改造。
  *
  * 已知限制：图片消息的 [content] 为旧安装的本地文件路径，
  * 跨安装恢复后图片文件可能不存在，仅保留消息记录本身。

@@ -24,6 +24,22 @@ import kotlinx.coroutines.withTimeout
 private val Context.koogChatMemoryDataStore: DataStore<Preferences> by preferencesDataStore(name = "chat_memory")
 
 /**
+ * 一次性清空 Koog 短期轨全部持久化键（`koog_memory_*` 历史行 + `koog_summary_*` 摘要）。
+ *
+ * Chat 值域终态 Room v28 聊天表重置（2026-11-08）的配套出清：短期轨是 Room 长期轨的
+ * 派生缓存（分层记忆 M4），聊天行清零后缓存一并失效。Room Migration 拿不到 DataStore，
+ * 由 androidApp `PoLangApplication.onCreate` 版本哨兵（SharedPreferences
+ * `chat_value_domain_v28_done`）一次性调用，不在任何运行时路径常驻。
+ */
+public suspend fun Context.clearKoogMemoryKeys() {
+    koogChatMemoryDataStore.edit { prefs ->
+        prefs.asMap().keys
+            .filter { it.name.startsWith("koog_memory_") || it.name.startsWith("koog_summary_") }
+            .forEach { key -> prefs.remove(key) }
+    }
+}
+
+/**
  * Koog 版对话历史持久化（原 :agent-core 已删除，Koog 接管）。
  *
  * 把 Koog [Message] 列表序列化到 Android DataStore，复用 [KoogMessageMemory] 的三不变式

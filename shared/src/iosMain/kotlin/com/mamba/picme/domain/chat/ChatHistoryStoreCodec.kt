@@ -26,9 +26,6 @@ import kotlinx.serialization.json.encodeToJsonElement
  *   定 [ChatMessageType]、平铺字段以 parts 提取优先；parts 数组整体缺失时自结构化
  *   平铺字段重建（belt-and-braces，语义对齐 [MessagePartsConverter] 但数据源为结构
  *   化字段而非 metadata blob）；重建失败回原文 Text 兜底，**不允许丢消息**；
- * - **退役行**：`type` 命中 [LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]
- *   （横滑相册卡 `media_results`/`data_media_results`，2026-11 退役）的 DTO 整行跳过——
- *   对齐 Android 回放过滤语义，横滑卡不回放、不回灌；
  * - **不持久化**：performance / claudeAgent / claudeDeliver / isStreaming / showCursor /
  *   isThinking（瞬态，对齐 Android Room 行不落库）；gachaInteractive（计算值，对齐
  *   Android `controller.hasPending(id)` 运行时查询语义，防 restart 后死交互条）。
@@ -52,18 +49,14 @@ object ChatHistoryStoreCodec {
      * 整包解码：JSON 文件字符串 → 消息列表。null = 空文件/结构损坏，调用方按
      * legacy 格式兜底（Swift 侧 `LegacyChatMessage` 迁移），**不允许丢消息**。
      *
-     * 退役行过滤（2026-11-08 终审修复）：`type` 命中
-     * [LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES] 的行整行跳过——退役行的
-     * parts 含已删除的 `data_media_results` 鉴别值；parts 以 [JsonElement] 惰性承载
-     * （Unsupported 兜底，见 DTO 注释）已保证整包强类型解码不被其炸塌，本过滤在此
-     * 之上做行级语义剔除（横滑卡不回放、不回灌，对齐 Android 回放过滤）。
+     * 退役横滑卡行级过滤已随 2026-11-08 值域终态出清（Room v28 聊天表重置后
+     * 存量行不复存在；文件内偶现的未知/退役鉴别值由 parts 惰性承载的 Tombstone
+     * 兜底占位，不再整行剔除）。
      */
     fun decode(text: String?): List<ChatMessage>? {
         if (text.isNullOrBlank()) return null
         val dtos = runCatching { json.decodeFromString(listSerializer, text) }.getOrNull() ?: return null
-        return dtos
-            .filter { it.type !in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES }
-            .map { it.toDomain() }
+        return dtos.map { it.toDomain() }
     }
 
     // ── wire DTO（ChatMessage 本体非 @Serializable——LlmPerformance 等瞬态载荷无

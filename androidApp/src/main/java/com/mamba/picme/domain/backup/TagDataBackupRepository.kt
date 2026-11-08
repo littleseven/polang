@@ -59,7 +59,6 @@ import com.mamba.picme.domain.backup.model.BackupPreferences
 import com.mamba.picme.domain.backup.model.BackupTag
 import com.mamba.picme.domain.backup.model.BackupTagScanTask
 import com.mamba.picme.domain.backup.model.TagDataBackup
-import com.mamba.picme.domain.chat.LegacyChatTypeMigration
 import com.mamba.picme.domain.chat.MessagePartsConverter
 import com.mamba.picme.domain.chat.roleOf
 import com.mamba.picme.data.local.PartsMessageRow
@@ -74,6 +73,18 @@ import okio.sink
 import okio.source
 import java.io.File
 import java.io.IOException
+
+/**
+ * v5 备份 chat 段恢复直通信道：type ∈ Room `chat_messages.type` 终态投影线值集（9 值，
+ * spec《chat-value-domain-ideal》§3——reasoning/source/tombstone 永不作投影源故不在列）。
+ * 值域外（legacy 13 值 / data_ui / data_media_results 等退役值）的行恢复时整行跳过；
+ * 旧值粗映射表属 Task 8 备份 v6 恢复改造，只活在备份模块。
+ */
+private val CHAT_RESTORE_TYPES: Set<String> = setOf(
+    "text", "image",
+    "tool_chart", "tool_html", "tool_task", "tool_image_edit", "tool_browser",
+    "data_optimize_candidates", "data_genui_program",
+)
 
 /**
  * TAG 数据库备份/还原仓库。
@@ -735,36 +746,24 @@ class TagDataBackupRepository(
             }
             if (backup.chatMessages.isNotEmpty()) {
                 backup.chatMessages.chunked(500).forEach { chunk ->
-                    // 备份恢复双分支（spec §6 消费者表）：新备份（type 已是新值）经
-                    // [MessagePartsConverter] 物化 parts（v5 备份只存标量列，parts-first
-                    // 落库需要 parts），role 缺省补 agent 安全网；旧备份（legacy 13 值）经
-                    // 唯一映射知识库 [LegacyChatTypeMigration] 转正。统一走 insertPartsMessages
-                    // （parts 直建 + 投影落列）；原 metadata 作为附加负载随行（performance 等
-                    // 非 parts 派生键存活，投影键由 parts 重新派生）。
+                    // Task 4 最小跟随（v5 备份恢复）：type ∈ 终态投影线值集（9 值）→ 经
+                    // [MessagePartsConverter] 物化 parts 直通落库（v5 备份只存标量列，
+                    // parts-first 落库需要 parts；原 metadata 作附加负载随行）；未知/退役
+                    // 旧值（legacy 13 值 / data_ui / data_media_results 等）**整行跳过**——
+                    // legacy 映射机器已随 Room v28 聊天表重置出清，粗映射表（旧卡行降级
+                    // tombstone / 文本直通）属 Task 8 备份 v6 恢复改造。
                     chatMessageDao.insertPartsMessages(
-                        chunk.map { msg ->
-                            val row = if (msg.type in LegacyChatTypeMigration.NEW_TYPES) {
-                                LegacyChatTypeMigration.MigratedRow(
-                                    msg.type,
-                                    msg.role ?: "agent",
-                                    MessagePartsConverter.toParts(
-                                        msg.type, msg.content, msg.metadata,
-                                        roleOf(msg.role ?: "agent"),
-                                    ),
-                                )
-                            } else {
-                                LegacyChatTypeMigration.map(msg.type, msg.content, msg.metadata)
-                            }
+                        chunk.mapNotNull { msg ->
+                            if (msg.type !in CHAT_RESTORE_TYPES) return@mapNotNull null
+                            val role = roleOf(msg.role ?: "agent")
                             PartsMessageRow(
                                 id = msg.id,
                                 sessionId = msg.sessionId,
-                                role = roleOf(row.role),
-                                parts = row.parts,
+                                role = role,
+                                parts = MessagePartsConverter.toParts(msg.type, msg.content, msg.metadata, role),
                                 modelUsed = msg.modelUsed,
                                 timestamp = msg.timestamp,
                                 extraMetadataJson = msg.metadata,
-                                // 退役横滑卡行保住原 type（回放过滤按 type 整行跳过；Task 4/8 出清）
-                                typeOverride = row.type.takeIf { it in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES },
                             )
                         }
                     )

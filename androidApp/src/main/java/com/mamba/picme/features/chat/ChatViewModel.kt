@@ -7,7 +7,6 @@ import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
-import com.mamba.picme.domain.chat.LegacyChatTypeMigration
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.ModelInputRole
@@ -1525,11 +1524,6 @@ class ChatViewModel(
                         chatMessageDao.getMessagesBySession(sessionId)
                     }
                     .collect { entities ->
-                        // 横滑卡退役（2026-11-08）：存量 media_results/data_media_results 行整行跳过，
-                        // 不回放不迁移（闭集见 LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES）。
-                        val liveEntities = entities.filterNot { e ->
-                            e.type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES
-                        }
                         // M4 review 🟡2：M4 起 toUiModel 每条必经 decodeParts（kotlinx
                         // decode），Room invalidation（任务卡 SSE 高频/测高回写/图卡落库）会触发
                         // 全列表（上限 500）重 decode——挪出主线程防掉帧。仅纯 decode 段下移；
@@ -1537,7 +1531,7 @@ class ChatViewModel(
                         // gacha controller）仍在主线程读写，防数据竞争。
                         // 调度器经 dependencies 显式注入（单测传测试调度器保 runTest 确定性）
                         val decoded = withContext(messageDecodeDispatcher) {
-                            liveEntities.map { e -> e.toUiModel() }
+                            entities.map { e -> e.toUiModel() }
                         }
                         val uiMessages = decoded.map { ui ->
                             val deliver = claudeDeliverOverrides[ui.id]
@@ -1903,8 +1897,6 @@ class ChatViewModel(
                     orchestrator.rebuildChatMemoryIfEmpty(sessionId) { sid ->
                         chatMessageDao.getRecentMessages(sid, MEMORY_REBUILD_MESSAGE_LIMIT)
                             .asReversed()
-                            // 退役横滑卡行不进模型记忆（content 是资产 JSON，墓碑文本会污染上下文）
-                            .filterNot { it.type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES }
                             .flatMap { entity -> entity.toModelInputItems() }
                     }
                 }.onFailure { error ->

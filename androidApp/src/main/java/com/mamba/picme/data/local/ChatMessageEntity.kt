@@ -6,7 +6,8 @@ import androidx.room.PrimaryKey
 /**
  * Room 数据库实体：聊天消息
  *
- * 对应表：chat_messages
+ * 对应表：chat_messages（Room v28 起即为本形态——parts-first 权威列 + 派生投影列，
+ * 2026-11-08 值域终态重置重建）。
  */
 @Entity(tableName = "chat_messages")
 data class ChatMessageEntity(
@@ -28,8 +29,8 @@ data class ChatMessageEntity(
     val type: String,
 
     /**
-     * 消息角色："user" / "agent"（spec §2 升格列；默认值 'agent' 仅为迁移安全网，
-     * 所有写路径必须显式赋值）。
+     * 消息角色："user" / "agent"（消息级独立列，role 前缀类型值已随纯 kind 化删除）；
+     * 构造默认值仅为 Kotlin 侧便利默认，parts-first 接缝写路径均显式赋值。
      */
     val role: String = "agent",
 

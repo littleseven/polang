@@ -18,11 +18,23 @@ class ChatModelInputTest {
     private fun legacyReplay(rows: List<Triple<String, String, String?>>): List<Pair<String, String>> =
         rows.map { (type, content, _) -> type to content }
 
+    /**
+     * fixture：从标量行 (type, content, metadata) 构造 [ChatMessage]——parts 经
+     * [MessagePartsConverter] 物化（对齐备份恢复路径，converter 现存唯一正当消费）；
+     * type 入参是 fixture 标签（含 user_/agent_ 前缀的历史命名），role/线值在本地换算。
+     */
     private fun legacyMessage(type: String, content: String, metadata: String? = null): ChatMessage {
-        // 经迁移单点构造：role + parts 一次到位（与 Room v26 迁移同源，防测试私搭派生逻辑）
-        val migrated = LegacyChatTypeMigration.map(type, content, metadata)
+        val role = if (type.startsWith("user_")) ModelInputRole.USER else ModelInputRole.ASSISTANT
+        val wireType = when (type) {
+            "user_image", "user_image_text", "agent_image" -> "image"
+            "chart" -> "tool_chart"
+            "html_card" -> "tool_html"
+            "task_card" -> "tool_task"
+            "agent_edit_result" -> "tool_image_edit"
+            "optimize_candidates" -> "data_optimize_candidates"
+            else -> "text"
+        }
         val uiType = when (type) {
-            "user_text" -> ChatMessageType.TEXT
             "user_image" -> ChatMessageType.IMAGE
             "user_image_text" -> ChatMessageType.IMAGE_TEXT
             else -> ChatMessageType.TEXT
@@ -31,8 +43,8 @@ class ChatModelInputTest {
             id = "m-$type",
             type = uiType,
             content = content,
-            role = roleOf(migrated.role),
-            parts = migrated.parts,
+            role = role,
+            parts = MessagePartsConverter.toParts(wireType, content, metadata, role),
         )
     }
 
