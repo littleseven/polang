@@ -43,7 +43,9 @@ object MessagePartsConverter {
     }
 
     /**
-     * legacy GenUI 卡墓碑提取（[MessagePartsCodec] 的显式 type 拦截分支复用本函数）：
+     * legacy GenUI 卡墓碑提取（codec 的 `data_ui` 显式拦截调用点已随 2026-11-08
+     * 值域终态出清——codec 未知值统一走 Tombstone；本函数现仅供本类 `data_ui`
+     * 分支与测试使用，整体随 converter 退役线清理）：
      * fallbackSummary 提升为可读文本；as? JsonPrimitive 安全形态——病态非 primitive
      * 字段（数组/对象）不抛，落墓碑标记；partId 缺失默认 "p0"。
      */
@@ -93,7 +95,8 @@ object MessagePartsConverter {
             "data_ui" -> listOf(legacyA2uiTombstone(content))
 
             // OpenUI GenUI 卡（openui P1）：content 列存 OpenUiCard 整颗 JSON，同 tool_browser 先例
-            "data_ui_openui" ->
+            //（2026-11-08 值域终态：鉴别值随 OpenUiContract.PART_TYPE 自 data_ui_openui 改名）
+            "data_genui_program" ->
                 listOf(json.decodeFromString(MessagePart.OpenUiCard.serializer(), content))
 
             EngineerTaskState.ROOM_TYPE ->
@@ -114,22 +117,22 @@ object MessagePartsConverter {
                 listOf(MessagePart.OptimizeCandidates("p0", parseOptimizeGroup(metadata)))
 
             // 未知 type（前向兼容兜底）：content 为 JSON blob（新协议整颗 payload 存
-            // content 列的先例：tool_browser/data_ui_openui）→ Unsupported 占位卡，
+            // content 列的先例：tool_browser/data_genui_program）→ Tombstone 占位卡，
             // 防 JSON 原文裸渲染；纯文本（老协议可读消息）→ 保留 Text 不降级
             else -> listOf(unknownTypeFallback(type, content))
         }
     }
 
-    /** 未知 Room type 的行级兜底：JSON blob → [MessagePart.Unsupported]；可读文本 → Text 保留。 */
+    /** 未知 Room type 的行级兜底：JSON blob → [MessagePart.Tombstone]；可读文本 → Text 保留。 */
     private fun unknownTypeFallback(type: String, content: String): MessagePart {
         val element = runCatching { json.parseToJsonElement(content) }.getOrNull()
         return when (element) {
-            is JsonObject -> MessagePartsCodec.unsupportedPartOf(
+            is JsonObject -> MessagePartsCodec.tombstonePartOf(
                 element,
                 (element["type"] as? JsonPrimitive)?.contentOrNull ?: type,
                 index = 0,
             )
-            is JsonArray -> MessagePart.Unsupported("p0", originalType = type)
+            is JsonArray -> MessagePart.Tombstone("p0", originalType = type)
             // 纯文本/标量（含 "123"/"true" 等可解析为 JSON 标量的文本）：可读，不降级
             else -> MessagePart.Text("p0", content, PartState.DONE)
         }

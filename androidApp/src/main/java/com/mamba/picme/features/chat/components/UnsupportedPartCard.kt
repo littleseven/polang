@@ -22,7 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
 
 /**
- * 前向兼容兜底卡（MessagePart.Unsupported 的渲染，2026-11-08）：
+ * 前向兼容/退役兜底卡（MessagePart.Tombstone 的渲染，2026-11-08；文件改名
+ * TombstonePartCard 随渲染批次处理）：
  * 旧版本读到新版本写入的未知 part 类型（或字段损坏）时原位显示——
  * 块序与消息其余 part 不受影响，升级新版本后同一消息自动恢复为正式卡片。
  * [summary] 为 payload 携带的可读摘要（存在时优先展示），缺省落升级提示。

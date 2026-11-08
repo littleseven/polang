@@ -3041,7 +3041,7 @@ class ChatViewModel(
     }
 
     /**
-     * 插入 OpenUI 卡消息（type=data_ui_openui + role=agent，openui P2）。走 tool_browser 先例：
+     * 插入 OpenUI 卡消息（type=data_genui_program + role=agent，openui P2）。走 tool_browser 先例：
      * content 列存整颗 part JSON，insertMessageWithParts 内部经 converter 双写 partsJson。
      */
     private suspend fun insertOpenUiCardMessage(
@@ -3705,9 +3705,15 @@ class ChatViewModel(
                 // BrowserLive 直播卡 UI 映射属 browser-vnc 直播卡后续 Task；此前防御性落文本
                 //（此间管线未产此类 part，分支不可达）
                 is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
-                // 前向兼容兜底（未知/损坏 part）：整消息判型防御性落文本，
+                // 值域终态三新 part（reasoning/source，2026-11-08）：渲染/判型对等随后续
+                // 任务落地，防御性落文本（同上先例；生产者接线前分支不可达）
+                is MessagePart.Reasoning,
+                is MessagePart.SourceUrl,
+                is MessagePart.SourceDocument,
+                -> ChatMessageType.AGENT_TEXT
+                // 前向兼容/退役兜底（未知/损坏 part）：整消息判型防御性落文本，
                 // 实际渲染走拍平 item（TYPE_UNSUPPORTED 占位卡）
-                is MessagePart.Unsupported -> ChatMessageType.AGENT_TEXT
+                is MessagePart.Tombstone -> ChatMessageType.AGENT_TEXT
                 null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
             },
             role = role,

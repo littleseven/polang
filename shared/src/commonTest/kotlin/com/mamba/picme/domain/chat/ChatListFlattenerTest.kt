@@ -255,7 +255,7 @@ class ChatListFlattenerTest {
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
                 MessagePart.Text("p0", "前文", PartState.DONE),
-                MessagePart.Unsupported("p1", originalType = "tool_video_edit"),
+                MessagePart.Tombstone("p1", originalType = "tool_video_edit"),
                 MessagePart.Text("p2", "后文", PartState.DONE),
             ),
         )

@@ -69,21 +69,21 @@ class MessagePartsConverterTest {
     }
 
     @Test
-    fun `unknown type with json blob content falls back to Unsupported part`() {
+    fun `unknown type with json blob content falls back to Tombstone part`() {
         // 前向兼容兜底（2026-11-08）：新协议整颗 payload 存 content 列的先例
-        // （tool_browser/data_ui_openui）——旧版本不识 → Unsupported 占位卡，
+        // （tool_browser/data_genui_program）——旧版本不识 → Tombstone 占位卡，
         // 防 JSON 原文裸渲染；payload 携带可读摘要字段时提升
         val blob = """{"type":"tool_video_edit","partId":"p0","videoUri":"v.mp4","fallbackSummary":"视频编辑结果"}"""
         assertEquals(
-            listOf(MessagePart.Unsupported("p0", originalType = "tool_video_edit", summary = "视频编辑结果")),
+            listOf(MessagePart.Tombstone("p0", originalType = "tool_video_edit", summary = "视频编辑结果")),
             MessagePartsConverter.toParts("tool_video_edit", blob, null, ModelInputRole.ASSISTANT),
         )
     }
 
     @Test
-    fun `unknown type with json array content falls back to Unsupported part`() {
+    fun `unknown type with json array content falls back to Tombstone part`() {
         assertEquals(
-            listOf(MessagePart.Unsupported("p0", originalType = "data_future_list")),
+            listOf(MessagePart.Tombstone("p0", originalType = "data_future_list")),
             MessagePartsConverter.toParts("data_future_list", """[{"a":1}]""", null, ModelInputRole.ASSISTANT),
         )
     }
@@ -191,15 +191,15 @@ class MessagePartsConverterTest {
             viewState = "selected=2026-09",
         )
         val content = kotlinx.serialization.json.Json.encodeToString(MessagePart.OpenUiCard.serializer(), part)
-        val parts = MessagePartsConverter.toParts("data_ui_openui", content, null, ModelInputRole.ASSISTANT)
+        val parts = MessagePartsConverter.toParts("data_genui_program", content, null, ModelInputRole.ASSISTANT)
         assertEquals(1, parts.size)
         assertEquals(part, parts[0])
     }
 
     @Test
     fun dataUiOpenUiRow_corruptContent_fallsBackToText() {
-        // 行级兜底（spec §4.2）：data_ui_openui 解析异常 → 原文 Text part，不允许丢消息
-        val parts = MessagePartsConverter.toParts("data_ui_openui", "{broken", null, ModelInputRole.ASSISTANT)
+        // 行级兜底（spec §4.2）：data_genui_program 解析异常 → 原文 Text part，不允许丢消息
+        val parts = MessagePartsConverter.toParts("data_genui_program", "{broken", null, ModelInputRole.ASSISTANT)
         assertEquals(1, parts.size)
         assertTrue(parts[0] is MessagePart.Text)
     }

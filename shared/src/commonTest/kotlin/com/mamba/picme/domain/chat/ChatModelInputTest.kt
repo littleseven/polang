@@ -190,19 +190,66 @@ class ChatModelInputTest {
     }
 
     @Test
-    fun `unsupported fallback part never enters the model context`() {
-        // 前向兼容兜底 part（2026-11-08）：模型从未见过的占位类型不回灌，
-        // 对齐 data part 丢弃口径（spec §6）
+    fun `tombstone fallback part never enters the model context`() {
+        // 前向兼容/退役兜底 part（2026-11-08 值域终态转正 Tombstone）：模型从未见过的
+        // 占位类型不回灌，对齐 data part 丢弃口径（spec §6）
         val message = ChatMessage(
-            id = "m-unsupported",
+            id = "m-tombstone",
             type = ChatMessageType.AGENT_TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
-                MessagePart.Unsupported(partId = "p0", originalType = "tool_video_edit", summary = "视频结果"),
+                MessagePart.Tombstone(partId = "p0", originalType = "tool_video_edit", summary = "视频结果"),
             ),
         )
         assertEquals(emptyList(), message.toModelInput())
+    }
+
+    @Test
+    fun `reasoning part is stripped from model context`() {
+        // 值域终态（2026-11-08）：思考链回灌剥离——对齐 Vercel convertToModelMessages
+        // 丢弃规则（spec §3/§6），reasoning 永不回灌 LLM
+        val message = ChatMessage(
+            id = "m-reasoning",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Reasoning(partId = "p0", text = "先按月份分组再统计", state = PartState.DONE),
+                MessagePart.Text(partId = "p1", markdown = "3 月共 42 张", state = PartState.DONE),
+            ),
+        )
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "3 月共 42 张")),
+            message.toModelInput(),
+        )
+    }
+
+    @Test
+    fun `source parts are stripped from model context`() {
+        // 值域终态（2026-11-08）：source_url/source_document 回灌剥离（引用来源不回灌
+        // LLM，对齐 Vercel convertToModelMessages 丢弃规则，spec §3/§6）
+        val message = ChatMessage(
+            id = "m-source",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Text(partId = "p0", markdown = "引用了两处来源", state = PartState.DONE),
+                MessagePart.SourceUrl(partId = "p1", sourceId = "s1", url = "https://a.com", title = "A"),
+                MessagePart.SourceDocument(
+                    partId = "p2",
+                    sourceId = "d1",
+                    mediaType = "application/pdf",
+                    title = "报告",
+                    filename = "r.pdf",
+                ),
+            ),
+        )
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "引用了两处来源")),
+            message.toModelInput(),
+        )
     }
 
     @Test

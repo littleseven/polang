@@ -210,8 +210,15 @@ private fun contentTypeOf(message: ChatMessage, part: MessagePart): String = whe
     is MessagePart.Image, is MessagePart.EditResult -> ChatListItem.TYPE_LEGACY_MESSAGE
     // 直播卡全状态自渲染（占位/运行/定格/错误都由卡片处理，不走通用 placeholder chip）
     is MessagePart.BrowserLive -> ChatListItem.TYPE_BROWSER_LIVE
-    // 前向兼容兜底卡（读时投影：未知/损坏 part → 「内容不支持请升级」占位）
-    is MessagePart.Unsupported -> ChatListItem.TYPE_UNSUPPORTED
+    // 前向兼容/退役兜底卡（读时投影：未知/损坏/退役 part → 「此内容需新版本 App 查看」占位）
+    is MessagePart.Tombstone -> ChatListItem.TYPE_UNSUPPORTED
+    // 值域终态三新 part（reasoning/source）：正式渲染桶（TYPE_REASONING 折叠块 /
+    // TYPE_SOURCE_CHIPS 引用行）随后续任务落地；生产者接线前无数据流经此分支，
+    // 编译级跟随先归兜底卡（reasoning 不落正文桶，防思考链以正文形态双显）
+    is MessagePart.Reasoning,
+    is MessagePart.SourceUrl,
+    is MessagePart.SourceDocument,
+    -> ChatListItem.TYPE_UNSUPPORTED
 }
 
 private fun cardContentType(state: ToolPartState, doneType: String): String = when (state) {
@@ -256,7 +263,7 @@ data class ChatListItem(
         /** 浏览器直播卡（tool_browser，全状态自渲染：占位/运行/定格/错误一卡到底）。 */
         const val TYPE_BROWSER_LIVE = "browser_live"
 
-        /** OpenUI GenUI 卡（data_ui_openui，openui P1）。 */
+        /** OpenUI GenUI 卡（data_genui_program，openui P1）。 */
         const val TYPE_OPENUI_CARD = "openui_card"
 
         /** 卡片工具占位（INPUT_STREAMING/INPUT_AVAILABLE，spec §4 占位契约）。 */
@@ -268,7 +275,7 @@ data class ChatListItem(
         /** 非卡片工具进行中的合成状态 item。 */
         const val TYPE_TOOL_STATUS = "tool_status"
 
-        /** 前向兼容兜底卡（MessagePart.Unsupported：未知/损坏 part 的占位渲染）。 */
+        /** 前向兼容/退役兜底卡（MessagePart.Tombstone：未知/损坏/退役 part 的占位渲染；常量值 `tombstone` 化随后续任务连同新桶处理）。 */
         const val TYPE_UNSUPPORTED = "unsupported"
     }
 }

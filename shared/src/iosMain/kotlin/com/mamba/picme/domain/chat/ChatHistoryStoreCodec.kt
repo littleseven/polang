@@ -87,10 +87,10 @@ object ChatHistoryStoreCodec {
         val optimizeCandidates: OptimizeCandidateGroup? = null,
         val engineerTask: EngineerTaskState? = null,
         /**
-         * parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 10 值分类法——9 值 +
-         * Unsupported 占位）。以 [JsonElement] 承载、逐元素
-         * [MessagePartsCodec.decodePartOrUnsupported] 解码（2026-11-08 Unsupported 兜底）：
-         * 未知 part 类型原位落 Unsupported 占位，不再整包 decode 失败丢历史。
+         * parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 13 值终态——12 正式值 +
+         * Tombstone 兜底）。以 [JsonElement] 承载、逐元素
+         * [MessagePartsCodec.decodePartOrTombstone] 解码（2026-11-08 Tombstone 兜底）：
+         * 未知/退役 part 类型原位落 Tombstone 占位，不再整包 decode 失败丢历史。
          */
         val parts: List<JsonElement> = emptyList(),
     )
@@ -133,7 +133,7 @@ object ChatHistoryStoreCodec {
         ChatMessageType.TASK_CARD -> "tool_task"
         ChatMessageType.AGENT_EDIT_RESULT -> "tool_image_edit"
         ChatMessageType.OPTIMIZE_CANDIDATES -> "data_optimize_candidates"
-        ChatMessageType.OPENUI_CARD -> "data_ui_openui"
+        ChatMessageType.OPENUI_CARD -> "data_genui_program"
     }
 
     // ── decode：DTO → domain（parts-first 投影，对齐 androidApp toUiModel M4） ──
@@ -188,20 +188,26 @@ object ChatHistoryStoreCodec {
         is MessagePart.OpenUiCard -> ChatMessageType.AGENT_TEXT
         // iOS 浏览器直播卡未落地（M1 Android-only）：防御性落文本，正式映射随 iOS 跟随任务
         is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
-        // 前向兼容兜底（未知/损坏 part）：整消息判型防御性落文本；
+        // 值域终态三新 part（reasoning/source，2026-11-08）：iOS 渲染对等随后续任务落地，
+        // 防御性落文本（同上先例；此间管线未产此类 part，分支不可达）
+        is MessagePart.Reasoning,
+        is MessagePart.SourceUrl,
+        is MessagePart.SourceDocument,
+        -> ChatMessageType.AGENT_TEXT
+        // 前向兼容/退役兜底（未知/损坏 part）：整消息判型防御性落文本；
         // 实际渲染走拍平 item（TYPE_UNSUPPORTED 占位卡）
-        is MessagePart.Unsupported -> ChatMessageType.AGENT_TEXT
+        is MessagePart.Tombstone -> ChatMessageType.AGENT_TEXT
         null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
     }
 
     /**
-     * parts 数组在场直用（逐元素 tolerant 解码：未知/损坏 part → Unsupported 占位，
+     * parts 数组在场直用（逐元素 tolerant 解码：未知/损坏/退役 part → Tombstone 占位，
      * 对齐 [MessagePartsCodec] 口径）；缺失时自结构化平铺字段重建（belt-and-braces）；
      * 重建失败回原文 Text 兜底（行级语义对齐 [MessagePartsConverter.toParts]，不丢消息）。
      */
     private fun ChatMessageDto.partsOrRebuild(role: ModelInputRole): List<MessagePart> {
         if (parts.isNotEmpty()) {
-            return parts.mapIndexed { index, element -> MessagePartsCodec.decodePartOrUnsupported(element, index) }
+            return parts.mapIndexed { index, element -> MessagePartsCodec.decodePartOrTombstone(element, index) }
         }
         return runCatching { rebuildParts(role) }
             .getOrElse { fallbackText(content) }
@@ -265,12 +271,12 @@ object ChatHistoryStoreCodec {
     private fun unknownTypeFallback(type: String, content: String): MessagePart {
         val element = runCatching { json.parseToJsonElement(content) }.getOrNull()
         return when (element) {
-            is JsonObject -> MessagePartsCodec.unsupportedPartOf(
+            is JsonObject -> MessagePartsCodec.tombstonePartOf(
                 element,
                 (element["type"] as? JsonPrimitive)?.contentOrNull ?: type,
                 index = 0,
             )
-            is JsonArray -> MessagePart.Unsupported("p0", originalType = type)
+            is JsonArray -> MessagePart.Tombstone("p0", originalType = type)
             else -> MessagePart.Text("p0", content, PartState.DONE)
         }
     }

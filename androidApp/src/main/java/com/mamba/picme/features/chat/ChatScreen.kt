@@ -802,7 +802,7 @@ fun ChatScreen(
                                     ToolStatusChip(text = stringResource(R.string.chat_card_generate_failed), isError = true)
                                 }
                                 ChatListItem.TYPE_OPENUI_CARD -> {
-                                    // openui P2：data_ui_openui 卡——session 求值渲染（US-7 对偶：
+                                    // openui P2：data_genui_program 卡——session 求值渲染（US-7 对偶：
                                     // 交互态经 onViewStateChange 持久化）；handle 缺失等 → 降级占位卡
                                     val part = item.part as? MessagePart.OpenUiCard
                                     if (part != null) {
@@ -875,10 +875,10 @@ fun ChatScreen(
                                     }
                                 }
                                 ChatListItem.TYPE_UNSUPPORTED -> {
-                                    // 前向兼容兜底卡（未知/损坏 part 原位占位：块序保住，
+                                    // 前向兼容/退役兜底卡（未知/损坏/退役 part 原位占位：块序保住，
                                     // 升级新版本后同一消息自动恢复为正式卡片）
-                                    val unsupported = item.part as? MessagePart.Unsupported
-                                    UnsupportedPartCard(summary = unsupported?.summary)
+                                    val tombstone = item.part as? MessagePart.Tombstone
+                                    UnsupportedPartCard(summary = tombstone?.summary)
                                 }
                                 else -> {
                                     // TYPE_USER_MESSAGE / TYPE_LEGACY_MESSAGE：整消息渲染（§5 用户气泡
