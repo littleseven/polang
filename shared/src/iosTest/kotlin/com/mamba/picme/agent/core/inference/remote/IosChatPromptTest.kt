@@ -15,14 +15,16 @@ class IosChatPromptTest {
 
     @Test
     fun `prompt contains tool inventory for the 9 registered tools`() {
-        // 2026-08-16 抽卡追齐：8 相册工具 + ai_optimize；2026-09-26 意图路由 M1：view_media 移出 chat 工具面（9aacc1fa4）；
-        // 2026-11-08 横滑卡退役追齐（终审 🔴2）：补登 render_html（search/refine 描述指引的出卡工具必须在场）
-        assertTrue(prompt.contains("可用工具（9）"), "应含 9 工具清单头，实际 prompt 头部：${prompt.take(200)}")
+        // 2026-08-16 抽卡追齐：8 相册工具 + ai_optimize；2026-09-26 意图路由 M1：view_media 移出 chat 工具面（9aacc1fa4），现 7 相册工具 + ai_optimize；
+        // 2026-11-08 横滑卡退役追齐（终审 🔴2）：补登 render_html（search/refine 描述指引的出卡工具必须在场）；
+        // 同日端侧 load_skill iOS 接线：+load_skill（跨意图元能力，技能清单段由 KoogChatAgent 恒拼最末）
+        assertTrue(prompt.contains("可用工具（10）"), "应含 10 工具清单头，实际 prompt 头部：${prompt.take(200)}")
         assertTrue(prompt.contains("search_media"))
         assertTrue(prompt.contains("refine_media_search"))
         assertTrue(prompt.contains("delete_media"))
         assertTrue(prompt.contains("ai_optimize"))
         assertTrue(prompt.contains("render_html"))
+        assertTrue(prompt.contains("load_skill"))
     }
 
     @Test

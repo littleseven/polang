@@ -8,6 +8,8 @@ import com.mamba.picme.agent.core.inference.remote.tool.ChatToolService
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.runtime.capability.CapabilityRegistry
+import com.mamba.picme.agent.core.skill.IosSkillCacheBridge
+import com.mamba.picme.agent.core.skill.IosSkillTransportBridge
 import com.mamba.picme.data.IosMediaItem
 import com.mamba.picme.data.IosMediaRepositoryBridge
 import com.mamba.picme.domain.repository.AccessState
@@ -33,6 +35,23 @@ private class FakeBridge : IosMediaRepositoryBridge {
     override fun setFavorite(localIdentifier: String, favorite: Boolean): Boolean = true
 }
 
+/** skill 传输 fake：同步回调（Swift 桥的异步语义在适配器视角等价——resume 恰一次即可）。 */
+private class FakeSkillTransportBridge : IosSkillTransportBridge {
+    override fun fetch(path: String, callback: (String?) -> Unit) {
+        callback("""{"skills":[{"name":"html-card","description":"HTML 卡","version":"abc123"}]}""")
+    }
+}
+
+/** skill 缓存 fake：内存读写，语义同 Documents JSON 文件桥。 */
+private class FakeSkillCacheBridge : IosSkillCacheBridge {
+    var stored: String? = null
+    override fun read(): String? = stored
+    override fun write(snapshotJson: String): Boolean {
+        stored = snapshotJson
+        return true
+    }
+}
+
 /**
  * T5 组合根/桥测试。注意 [IosAgentComposition] 为进程级幂等单例（AtomicBoolean 守卫），
  * 同一测试进程内只有首个 initialize 真正接线，后续调用跳过——各用例共享首个接线结果。
@@ -40,7 +59,14 @@ private class FakeBridge : IosMediaRepositoryBridge {
 class IosAgentCompositionTest {
 
     private fun ensureInitialized() {
-        IosAgentComposition.initialize(FakeBridge(), deviceId = "test-device-id")
+        // 双桥恒传（2026-11-08 端侧 load_skill 接线）：首个 initialize 即接线路径——
+        // skillRepository 装配 + LoadSkillCapability 注册；进程级单例，后续用例共享
+        IosAgentComposition.initialize(
+            FakeBridge(),
+            deviceId = "test-device-id",
+            skillTransportBridge = FakeSkillTransportBridge(),
+            skillCacheBridge = FakeSkillCacheBridge(),
+        )
     }
 
     @Test
@@ -58,6 +84,20 @@ class IosAgentCompositionTest {
             "应覆盖 chat 相册命令"
         )
         assertTrue(capability.supportsCommand(AgentCommand.GetGallerySummary()))
+    }
+
+    @Test
+    fun initializeWiresLoadSkillCapability() {
+        ensureInitialized()
+        // 双桥接线路径（2026-11-08）：skillRepository 装配 → LoadSkillCapability 注册，
+        // load_skill dispatch 可达（未接线时 get 恒 null——降级路径由 initializeIsIdempotent
+        // 之前的默认参数语义保证）
+        val capability = CapabilityRegistry.getInstance().get("load_skill")
+        assertNotNull(capability, "双桥注入后 load_skill capability 应已注册")
+        assertTrue(
+            capability.supportedCommands().contains("load_skill"),
+            "load_skill capability 应声明支持 load_skill 命令",
+        )
     }
 
     @Test

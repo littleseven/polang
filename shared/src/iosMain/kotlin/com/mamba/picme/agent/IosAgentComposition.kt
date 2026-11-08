@@ -18,6 +18,10 @@ import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.platform.storage.ChatHistoryCleaner
 import com.mamba.picme.agent.core.platform.thread.DispatcherProvider
 import com.mamba.picme.agent.core.runtime.state.SceneManager
+import com.mamba.picme.agent.core.skill.IosSkillCacheBridge
+import com.mamba.picme.agent.core.skill.IosSkillTransportBridge
+import com.mamba.picme.agent.core.skill.LoadSkillCapability
+import com.mamba.picme.agent.core.skill.createSkillRepository
 import com.mamba.picme.data.IosAiOptimizeBridge
 import com.mamba.picme.data.IosChartBridge
 import com.mamba.picme.data.IosChatSearchBridge
@@ -99,6 +103,13 @@ object IosAgentComposition {
      *                         null 时 ai_optimize 命令不可用（IosAiOptimizeCapability.isAvailable=false）
      * @param navigationBridge Swift 侧导航桥（2026-09-16 主导航统一）→ 真实切页/弹出；
      *                         null 时 navigate_to 命令不可用（IosNavigationCapability.isAvailable=false）
+     * @param skillTransportBridge Swift 侧 skill 资产传输桥（URLSession → picme-server /v1/skills，
+     *                             2026-11-08 端侧 load_skill 执行器 iOS 接线）；null 时不接线
+     *                             （prompt 无技能段；load_skill 工具仍在清单但无执行端，dispatch
+     *                             回 METHOD_NOT_FOUND error 文本——对齐 Android
+     *                             `AgentDependencies.skillRepository=null` 降级语义）
+     * @param skillCacheBridge Swift 侧 skill 缓存桥（Documents/skill_cache/snapshot.json）；
+     *                         null 时同上不接线
      * @param debugBuild Swift `#if DEBUG` 传入；true 时诊断日志记全文（captureContent），
      *                   false 仅纯指标（隐私红线，对标 Android BuildConfig.DEBUG 注入）
      */
@@ -111,6 +122,8 @@ object IosAgentComposition {
         runScriptBridge: IosRunScriptBridge? = null,
         aiOptimizeBridge: IosAiOptimizeBridge? = null,
         navigationBridge: IosNavigationBridge? = null,
+        skillTransportBridge: IosSkillTransportBridge? = null,
+        skillCacheBridge: IosSkillCacheBridge? = null,
         debugBuild: Boolean = false
     ) {
         if (!initialized.compareAndSet(false, true)) {
@@ -127,6 +140,15 @@ object IosAgentComposition {
         // T2 手工清单（替代 Android 的 asToolsByClass 反射展开）
         val chatTools = ChatToolManifest.tools
 
+        // skill 资产仓库（2026-11-08 端侧 load_skill 执行器 iOS 接线）：Swift 双桥
+        //（URLSession transport + Documents 缓存）经 iosMain 工厂组装；任一桥缺位 = 不接线
+        //（load_skill 工具仍在清单但恒回 unknown_skill、prompt 无技能段——优雅降级）
+        val skillRepository = if (skillTransportBridge != null && skillCacheBridge != null) {
+            createSkillRepository(skillTransportBridge, skillCacheBridge)
+        } else {
+            null
+        }
+
         AgentOrchestrator.initialize(
             AgentDependencies(
                 dispatcherProvider = dispatcherProvider,
@@ -141,6 +163,7 @@ object IosAgentComposition {
                 cameraToolRegistry = ToolRegistry { },
                 remoteImToolRegistryProvider = { ToolRegistry { } }, // 飞书 RPA 不在 iOS 范围
                 chatPromptBuilder = IosChatPrompt::build,
+                skillRepository = skillRepository,
             )
         )
 
@@ -177,6 +200,14 @@ object IosAgentComposition {
 
         // 注册 iOS 导航能力（2026-09-16 主导航统一：navigate_to 执行端 → Swift 真实切页/弹出）
         orchestrator.registerCapability(IosNavigationCapability(navigationBridge))
+
+        // 注册 skill 加载能力（2026-11-08 端侧执行器）：chat load_skill 执行端 →
+        // SkillRepository 本地缓存 + 单点穿透；资产同步由 RemoteChatEngine 每轮跑 agent 前按 TTL 触发。
+        // 未接线（skillRepository=null）时不注册——load_skill dispatch 回 METHOD_NOT_FOUND error 文本。
+        skillRepository?.let { repo ->
+            orchestrator.registerCapability(LoadSkillCapability(repo))
+            Logger.i(TAG, "- LoadSkillCapability: chat load_skill via /v1/skills cache")
+        }
 
         // 创建 chat 桥（searchBaseProvider：意图路由器紧凑状态 hasSearchBase 的 iOS 数据源）
         chatBridge = ChatAgentBridge(orchestrator, searchBaseProvider = { chatGalleryCapability.hasSearchBase })

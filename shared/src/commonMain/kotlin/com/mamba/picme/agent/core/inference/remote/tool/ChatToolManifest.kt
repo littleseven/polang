@@ -5,6 +5,7 @@ import ai.koog.agents.core.tools.ToolBase
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
+import com.mamba.picme.agent.core.skill.AgentSkillContract
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
@@ -15,6 +16,9 @@ import kotlinx.serialization.Serializable
  * `search_media` 增补 person/fromMs/toMs 结构化参数透传；2026-09-29 再增补 hasFace；
  * 2026-11-08 横滑相册卡退役：search/refine 描述去「自动出卡」，改为取数 + render_html
  * 出图集卡；同日终审补登 `render_html` 本体——描述指向的工具必须在工具面物理存在）。
+ * 2026-11-08 端侧 load_skill 执行器 iOS 接线：+`load_skill`（技能是跨意图元能力，
+ * 名字/描述/参数描述直接引用 [AgentSkillContract] const——端云 LLM 可见面 SSOT，
+ * 天然与 @Tool 真源逐字节一致，无双写漂移面）。
  *
  * 一致性纪律：name/description/参数名/参数描述**逐字节**照抄 @Tool(customName) 与
  * @LLMDescription 原文（改任何一侧都会触发 jvmTest `ChatToolManifestConsistencyTest`
@@ -77,6 +81,11 @@ object ChatToolManifest {
         @property:LLMDescription("HTML 源码：CSS/JS 内联；可用远程 <img>/<video>/<audio>/CSS 与 <a> 外链；禁远程 script/iframe/fetch/XHR") val html: String,
         @property:LLMDescription("对卡片内容的一句话文字总结") val summary: String,
         @property:LLMDescription("展示形态：inline（默认，聊天内完全撑开直接交互，内容高度建议 ≤2/3 屏）或 fullpage（长报告/多屏图文/为全屏设计的交互页，聊天内显示固定高预览、点击进全屏）；空串 = inline") val display: String,
+    )
+
+    @Serializable
+    class LoadSkillArgs(
+        @property:LLMDescription(AgentSkillContract.DESC_PARAM_SKILL_NAME) val name: String,
     )
 
     // ── 工具实现（委托 ChatToolService 同名 suspend 方法）─────────────────────────
@@ -193,7 +202,21 @@ object ChatToolManifest {
             ChatToolService.getInstance().renderHtml(args.html, args.summary, args.display)
     }
 
-    /** 9 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
+    /**
+     * load_skill（2026-11-08 端侧执行器 iOS 接线）：name/description/参数描述引用
+     * [AgentSkillContract] const（与 @Tool 真源同源，零漂移面）；执行端 =
+     * [LoadSkillCapability]（组合根注册），正文来自 SkillRepository 缓存 + 单点穿透。
+     */
+    private class LoadSkillTool : SimpleTool<LoadSkillArgs>(
+        argsType = typeToken<LoadSkillArgs>(),
+        name = AgentSkillContract.TOOL_LOAD_SKILL,
+        description = AgentSkillContract.DESC_LOAD_SKILL,
+    ) {
+        override suspend fun execute(args: LoadSkillArgs): String =
+            ChatToolService.getInstance().loadSkill(args.name)
+    }
+
+    /** 10 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
     val tools: List<ToolBase<*, *>> by lazy {
         listOf(
             GetGallerySummaryTool(),
@@ -205,6 +228,7 @@ object ChatToolManifest {
             ShareMediaTool(),
             AiOptimizeTool(),
             RenderHtmlTool(),
+            LoadSkillTool(),
         )
     }
 
