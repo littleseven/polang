@@ -821,7 +821,7 @@ private fun OpenUiDivider(node: OpenUiValue.ComponentVal, modifier: Modifier = M
     }
 }
 
-/** List：VERTICAL（默认）限高纵向滚动列；HORIZONTAL 横滑行（MediaResultsCarousel 先例）。 */
+/** List：VERTICAL（默认）限高纵向滚动列；HORIZONTAL 横滑行。 */
 @Composable
 private fun OpenUiList(
     node: OpenUiValue.ComponentVal,

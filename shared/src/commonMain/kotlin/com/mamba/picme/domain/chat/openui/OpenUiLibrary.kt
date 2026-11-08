@@ -367,7 +367,7 @@ object OpenUiLibrary {
             ),
         ),
         // List：VERTICAL = 限高纵向滚动列（渲染期 maxHeight 约 320dp，规避聊天 LazyColumn
-        // 嵌套滚动事故）；HORIZONTAL = 横滑行（MediaResultsCarousel 先例）
+        // 嵌套滚动事故）；HORIZONTAL = 横滑行
         OpenUiComponent(
             "List",
             listOf(

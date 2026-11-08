@@ -193,17 +193,10 @@ fun MainPagerHost(
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route, navOptions { launchSingleTop = true })
                 },
-                onNavigateToGallery = { query -> onRequestGallerySearch(query, 0L) },
                 mediaViewModel = mediaViewModel,
                 onNavigateToPhotoEditor = { uri, autoOptimize ->
                     navController.navigate(
                         Screen.PhotoEditor.createRoute(sourceUri = uri, autoOptimize = autoOptimize),
-                        navOptions { launchSingleTop = true }
-                    )
-                },
-                onNavigateToIDPhoto = { uri ->
-                    navController.navigate(
-                        Screen.IDPhoto.createRoute(sourceUri = uri),
                         navOptions { launchSingleTop = true }
                     )
                 },

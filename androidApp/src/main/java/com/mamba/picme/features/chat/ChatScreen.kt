@@ -198,7 +198,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
-import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.features.chat.capability.ChatGallerySummaryCapability
 import com.mamba.picme.features.chat.capability.ChatRunScriptCapability
 import com.mamba.picme.features.chat.capability.ChatMediaWriteCapability
@@ -215,14 +214,7 @@ import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
 import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
 import com.mamba.picme.features.chat.components.GuestNudgeBanner
 import com.mamba.picme.features.chat.components.GachaCandidateStrip
-import androidx.core.net.toUri
 import com.mamba.picme.features.gallery.MediaViewModel
-import com.mamba.picme.features.gallery.components.MediaPager
-import com.mamba.picme.features.gallery.components.TRASH_TAG_PREVIEW_CHAT
-import com.mamba.picme.features.gallery.components.TrashAuthEffects
-import com.mamba.picme.domain.trash.PreviewTrashRouting
-import com.mamba.picme.domain.trash.TrashOutcome
-import com.mamba.picme.service.tag.TagGenerationService
 import com.mamba.picme.agent.core.platform.voice.AsrEngine
 import androidx.compose.runtime.mutableIntStateOf
 import com.mamba.picme.agent.core.platform.voice.SherpaOnnxAsrEngine
@@ -257,10 +249,8 @@ fun ChatScreen(
     settingsViewModel: SettingsViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToGallery: (String) -> Unit = {},
     mediaViewModel: MediaViewModel,
     onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -> Unit = { _, _ -> },
-    onNavigateToIDPhoto: (uri: String) -> Unit = {},
     /** 任务中心入口（US-12 顶栏任务图标） */
     onNavigateToTaskCenter: () -> Unit = {},
     /** OpenUI 卡 @Navigate 出口（2026-11-01 动作三通道）：目的地闭集 + 可选参数，业务映射在外层 */
@@ -390,14 +380,9 @@ fun ChatScreen(
     var fullpageTaskProgram by remember { mutableStateOf<Pair<String, String>?>(null) }
     // 表格全屏预览状态（点击气泡内表格打开）
     var expandedTable by remember { mutableStateOf<MarkdownTable?>(null) }
-    // 相册搜索结果预览状态
-    var previewAssets by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
-    var previewIndex by remember { mutableIntStateOf(0) }
-    // 已点删除但等待媒体库刷新确认的图片 ID
-    var pendingDeletedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
-    // 任一全屏预览打开（照片轮播/图片/图表/直播帧/表格/HTML 外链落地页/HTML 卡全屏查看器）：禁外层横滑 + 隐藏顶栏 + 拦截返回键
-    val anyPreviewOpen = previewAssets.isNotEmpty() || imagePreview != null ||
+    // 任一全屏预览打开（图片/图表/直播帧/表格/HTML 外链落地页/HTML 卡全屏查看器）：禁外层横滑 + 隐藏顶栏 + 拦截返回键
+    val anyPreviewOpen = imagePreview != null ||
         previewChartSvg != null || browserFramePreview != null || expandedTable != null ||
         previewLinkUrl != null || fullpageHtmlCard != null
 
@@ -410,8 +395,6 @@ fun ChatScreen(
         onHorizontalSwipeEnabledChange(!anyPreviewOpen && !htmlCardGestureActive)
     }
 
-    // 媒体库全量数据：用于感知删除完成并同步清理 preview/chat 消息
-    val allMedia by mediaViewModel.allMedia.collectAsStateWithLifecycle()
     val deleteAuthRequest by mediaViewModel.deleteAuthRequest.collectAsStateWithLifecycle()
 
     // Android 10 (API 29) 恢复性删除权限请求 launcher
@@ -495,43 +478,6 @@ fun ChatScreen(
         }
     }
 
-    // ── 预览页上滑删除（回收站 30 天可恢复）：授权拉起 + Trashed outcome 后收缩预览列表 ──
-    TrashAuthEffects(controller = mediaViewModel.trashController, tag = TRASH_TAG_PREVIEW_CHAT)
-    LaunchedEffect(Unit) {
-        mediaViewModel.trashController.outcomes.collect { outcome ->
-            if (outcome is TrashOutcome.Trashed && outcome.tag == TRASH_TAG_PREVIEW_CHAT) {
-                val trashed = outcome.trashedUris.toSet()
-                // 预览列表同步收缩，防死图（同 pendingDeletedIds 确认管线口径）
-                previewAssets = previewAssets.filter { it.uri !in trashed }
-            }
-        }
-    }
-
-    // 当媒体库刷新后发现 preview 中的某张图已被物理删除，同步清理 preview 列表
-    LaunchedEffect(allMedia) {
-        if (allMedia.isEmpty()) return@LaunchedEffect
-        val existingIds = allMedia.map { it.id }.toSet()
-
-        // 确认 pending 删除已实际生效（物理文件 + Room 记录已清理）
-        if (pendingDeletedIds.isNotEmpty()) {
-            val confirmedRemoved = pendingDeletedIds.filter { it != 0L && it !in existingIds }.toSet()
-            if (confirmedRemoved.isNotEmpty()) {
-                pendingDeletedIds = pendingDeletedIds - confirmedRemoved
-            }
-        }
-
-        // 兜底：其他途径导致 previewAssets 中的图片已不在媒体库时，也清理 preview
-        if (previewAssets.isNotEmpty()) {
-            val removedIds = previewAssets
-                .map { it.id }
-                .filter { it != 0L && it !in existingIds }
-                .toSet()
-            if (removedIds.isNotEmpty()) {
-                previewAssets = previewAssets.filter { it.id in existingIds }
-            }
-        }
-    }
-
     // chat 系 Capability 已在 PoLangApplication 注册到全局 CapabilityRegistry（唯一注册表），
     // 本页只负责 delegate 绑定/解绑（2026-07-29 单轨收敛，Compose CapabilityHost 已退役）
 
@@ -569,12 +515,11 @@ fun ChatScreen(
         isSidebarOpen = false
     }
 
-    // 预览打开时拦截系统返回键：关闭预览并回到 chat 页（保留横滑卡片），
+    // 预览打开时拦截系统返回键：关闭预览并回到 chat 页，
     // 而非直接 pop 到相册（Gallery 为 startDestination，栈底为 [Gallery, Chat]）。
     // 与 GalleryScreen 的预览 BackHandler 行为对齐。
     BackHandler(enabled = isActivePage && anyPreviewOpen) {
         when {
-            previewAssets.isNotEmpty() -> previewAssets = emptyList()
             imagePreview != null -> imagePreview = null
             previewChartSvg != null -> previewChartSvg = null
             browserFramePreview != null -> browserFramePreview = null
@@ -656,7 +601,7 @@ fun ChatScreen(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 预览（照片轮播 / 图片 / 图表 / HTML 卡片 / 表格全屏）打开时隐藏 chat 顶栏，让覆盖层占满整屏
+            // 预览（图片 / 图表 / HTML 卡片 / 表格全屏）打开时隐藏 chat 顶栏，让覆盖层占满整屏
             if (!anyPreviewOpen) {
                 ChatTopBar(
                     onNavigateBack = onNavigateBack,
@@ -1122,42 +1067,6 @@ fun ChatScreen(
                     },
                     sendCode = viewModel::sendVerificationCode,
                     verifyCode = viewModel::verifyCode,
-                )
-            }
-
-            // 相册搜索结果全屏预览（覆盖整屏；预览期间隐藏 chat 顶栏，避免顶栏透出）
-            if (previewAssets.isNotEmpty()) {
-                MediaPager(
-                    assets = previewAssets,
-                    initialIndex = previewIndex,
-                    onClose = { previewAssets = emptyList() },
-                    onPageViewed = { uri -> mediaViewModel.markMediaViewed(uri) },
-                    onSwipeUpDelete = { asset ->
-                        val route = mediaViewModel.requestTrash(asset, TRASH_TAG_PREVIEW_CHAT)
-                        if (route == PreviewTrashRouting.Route.LEGACY_DELETE) {
-                            // API<30 降级永久删除：记入 pendingDeletedIds，复用既有确认管线清理聊天内联图
-                            pendingDeletedIds = pendingDeletedIds + asset.id
-                        }
-                    },
-                    isTrashSupported = mediaViewModel.isTrashSupported,
-                    onDelete = { asset ->
-                        previewAssets = previewAssets.filter { it.id != asset.id }
-                        pendingDeletedIds = pendingDeletedIds + asset.id
-                        mediaViewModel.deleteMediaByIds(listOf(asset.id))
-                    },
-                    onStartOcr = { uriString ->
-                        mediaViewModel.recognizeTextFromCurrentImage(context, uriString.toUri())
-                    },
-                    onDismissOcr = { mediaViewModel.clearOcrResult() },
-                    ocrState = mediaViewModel.ocrState,
-                    onNavigateToEditor = { asset -> onNavigateToPhotoEditor(asset.uri, false) },
-                    onAiOptimize = { asset -> onNavigateToPhotoEditor(asset.uri, true) },
-                    onIdPhoto = { asset -> onNavigateToIDPhoto(asset.uri) },
-                    onReTag = { _ ->
-                        // chat 页 photo info 暂用全量扫描(无 container 直拿 worker);相册页走单张 processSingleSync
-                        context.startForegroundService(TagGenerationService.intentScanPass3Full(context))
-                        null
-                    }
                 )
             }
         }
@@ -2895,7 +2804,7 @@ fun indexOfPage(pages: List<ImagePreviewPage>, messageId: String): Int {
 }
 
 // ChatMessageUi（→ typealias commonMain ChatMessage）/ ClaudeAgentState / OptimizeCandidateGroup /
-// LlmPerformance / MediaResultsUi / ClaudeDeliverUi / ClaudeStepUi 等已下沉 commonMain
+// LlmPerformance / ClaudeDeliverUi / ClaudeStepUi 等已下沉 commonMain
 // （com.mamba.picme.domain.chat）；本文件经 ChatModelCommonMainShim typealias + 顶部 import 引用。
 
 /**

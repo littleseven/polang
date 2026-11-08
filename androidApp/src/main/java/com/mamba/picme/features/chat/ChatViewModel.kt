@@ -2481,12 +2481,7 @@ class ChatViewModel(
                 }
             }
             is AgentAction.Error -> {
-                val message = if (action.message == "feedback_resolve_failure") {
-                    stringContext().getString(R.string.feedback_resolve_failure)
-                } else {
-                    action.message
-                }
-                insertAgentMessage(sessionId, "❌ $message", "error", performance)
+                insertAgentMessage(sessionId, "❌ ${action.message}", "error", performance)
             }
             is AgentAction.BatchResult -> {
                 // 取词 context 提到循环外复用：逐命令重读语言设置会在主线程累积 runBlocking 开销

@@ -1131,7 +1131,6 @@
     <ID>UnusedPrivateProperty:ImageProcessor.kt$ImageProcessorImpl$private val beautyProcessor: BeautyProcessor</ID>
     <ID>UnusedPrivateProperty:KeywordSpotterEngineTest.kt$KeywordSpotterEngineTest$/** * KWS 模型必需文件列表（与 KeywordSpotterEngine 内部保持一致） */ private val requiredKwsFiles = listOf( "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx", "tokens.txt", "keywords.txt" )</ID>
     <ID>UnusedPrivateProperty:KwakeWordKwsEngine.kt$private const val KWS_FEATURE_DIM = 80 // 特征维度</ID>
-    <ID>UnusedPrivateProperty:MediaResultsCarousel.kt$val backgroundColor = if (isSelected) { MaterialTheme.colorScheme.primary } else { Color.Black.copy(alpha = 0.4f) }</ID>
     <ID>UnusedPrivateProperty:MediaViewModel.kt$MediaViewModel$private val photoProcessor: PhotoProcessor</ID>
     <ID>UnusedPrivateProperty:MobileClipOnnxBackend.kt$MobileClipOnnxBackend.Companion$private const val TEXT_OUTPUT_NAME = "text_embeds"</ID>
     <ID>UnusedPrivateProperty:MobileClipOnnxBackend.kt$MobileClipOnnxBackend.Companion$private const val VISION_OUTPUT_NAME = "image_embeds"</ID>

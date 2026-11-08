@@ -54,8 +54,6 @@ struct MainTabView: View {
     @StateObject private var router = MainNavigationRouter()
     @EnvironmentObject private var container: AppContainer
     @Environment(\.scenePhase) private var scenePhase
-    /// chat「查看全部」回相册时带入的搜索词（消费后清 nil）
-    @State private var pendingGalleryQuery: String? = nil
     /// chat EDIT 意图：跳 PhotoEditorScreen 的目标 localIdentifier
     @State private var editingImage: String? = nil
     /// 相册多选态（main-nav.yaml §0 hide_bar_when：页面自身底部 UI 激活时隐藏悬浮底 bar）
@@ -74,7 +72,6 @@ struct MainTabView: View {
             TabView(selection: $router.currentPage) {
                 GalleryGridView(
                     repository: container.mediaRepository,
-                    pendingQuery: $pendingGalleryQuery,
                     onSelectionModeChanged: { gallerySelecting = $0 }
                 )
                     .environmentObject(container)
@@ -86,10 +83,6 @@ struct MainTabView: View {
                     .tag(1)
                 ChatView(
                     onBack: { switchPage(0) },
-                    onNavigateToGallery: { query in
-                        pendingGalleryQuery = query
-                        switchPage(0)
-                    },
                     onEditImage: { lid in editingImage = lid },
                     onOpenTaskCenter: { router.showTaskCenter = true }
                 )
