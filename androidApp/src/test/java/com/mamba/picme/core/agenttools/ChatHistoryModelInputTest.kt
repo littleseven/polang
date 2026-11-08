@@ -2,8 +2,11 @@ package com.mamba.picme.core.agenttools
 
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.toModelInputItems
+import com.mamba.picme.domain.chat.MessagePartsCodec
+import com.mamba.picme.domain.chat.MessagePartsConverter
 import com.mamba.picme.domain.chat.ModelInputItem
 import com.mamba.picme.domain.chat.ModelInputRole
+import com.mamba.picme.domain.chat.roleOf
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -12,7 +15,9 @@ import org.junit.Test
  * 文本消息按消息级 role 标注 user/agent；卡片/数据块按 §6 显式转换——语义差为
  * spec 显式决策，逐条钉在本测试里）。
  *
- * Room v26 起 type 为新 8 值、role 独立列；此处直接构造新分类法行。
+ * D1a（2026-11-08）parts-first：行构造携带 partsJson（权威列）；parts 经
+ * [MessagePartsConverter] 自标量列物化，镜像历史写路径产物（converter 逆投影等价性
+ * 由 commonTest `ChatMessageProjectionTest` 钉住）。
  */
 class ChatHistoryModelInputTest {
 
@@ -34,6 +39,9 @@ class ChatHistoryModelInputTest {
         content = content,
         timestamp = 1L,
         metadata = metadata,
+        partsJson = MessagePartsCodec.encode(
+            MessagePartsConverter.toParts(type, content, metadata, roleOf(role)),
+        ),
     )
 
     @Test

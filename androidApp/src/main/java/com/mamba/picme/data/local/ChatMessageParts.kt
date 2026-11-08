@@ -5,60 +5,177 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.domain.chat.LegacyChatTypeMigration
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.MessagePartsCodec
-import com.mamba.picme.domain.chat.MessagePartsConverter
 import com.mamba.picme.domain.chat.ModelInputItem
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.PartState
+import com.mamba.picme.domain.chat.projectChatRow
 import com.mamba.picme.domain.chat.roleOf
 import com.mamba.picme.domain.chat.toModelInput
+import java.util.UUID
+import org.json.JSONObject
 
 /**
- * chat_messages 表的 parts 双写/双读接缝（ADR-016 M1，spec §6）。
+ * chat_messages 表的 parts-first 持久接缝（D1a，spec《chat-value-domain-ideal》§4.1
+ * 裁决 (a)，2026-11-08 自 M1 标量主写接缝反转）。
  *
- * M1 期 parts 是 (type, content, metadata, role) 列的**纯函数**（转换收口
- * [MessagePartsConverter]，仅认新 8 值分类法；legacy 13→8 映射知识单点收口
- * [LegacyChatTypeMigration]，只服务迁移）：
- * - 写侧：所有插入统一走 [insertMessageWithParts] / [insertMessagesWithParts]，
- *   [withPartsJson] 每次从标量列现算重填（含 metadata 回写型 update，防 parts 漂移）；
- * - 读侧：[decodePartsOrLegacy] 优先 partsJson，缺失/损坏回标量列现算（不丢消息）；
- * - 迁移：[backfillChatMessageParts] 对存量行全量回填。
- *
- * M2 起流式管线在内存轨装配 parts（TurnPartsReducer，瞬态不落 Room，UI 仍读标量列）；
- * 持久化接缝反转（parts 为权威源、标量列投影）属 M4 渲染切换一并收口。
+ * - **写侧**：所有插入统一走 [insertPartsMessage] / [insertPartsMessages] /
+ *   [replacePartsMessage]——persist 点直建 `List<MessagePart>` 落 partsJson（权威列），
+ *   type/content/metadata 经 [projectChatRow] 投影派生；
+ * - **读侧**：[decodeParts] 直读 partsJson，损坏/空行降级原文 Text part（不丢消息）；
+ * - **迁移**：[backfillChatMessageParts] / [migrateChatMessageTypes] 供
+ *   MIGRATION_24_25 / 25_26（v28 聊天表重置后随 Task 4 出清）。
  */
 
-/** 由新 8 值列现算 parts（纯函数，行失败转换器内部已兜底）。 */
-fun ChatMessageEntity.deriveParts(): List<MessagePart> =
-    MessagePartsConverter.toParts(type, content, metadata, roleOf(role))
+/** 读侧：partsJson（权威列）直读；损坏/空行降级原文 Text part（fallbackText 语义，不丢消息）。 */
+fun ChatMessageEntity.decodeParts(): List<MessagePart> =
+    MessagePartsCodec.decode(partsJson) ?: fallbackText(content)
 
-/** 双写填充 partsJson（每次现算重填：metadata 回写型 update 不会让 parts 滞留旧值）。 */
-fun ChatMessageEntity.withPartsJson(): ChatMessageEntity =
-    copy(partsJson = MessagePartsCodec.encode(deriveParts()))
-
-/** 读侧：优先 partsJson 解码；缺失/损坏回标量列现算（不丢消息）。 */
-fun ChatMessageEntity.decodePartsOrLegacy(): List<MessagePart> =
-    MessagePartsCodec.decode(partsJson) ?: deriveParts()
+/** 行级兜底：保留 content 原文，UI 与回灌均有可读内容，消息不丢。 */
+private fun fallbackText(content: String): List<MessagePart> =
+    listOf(MessagePart.Text(partId = "p0", markdown = content, state = PartState.DONE))
 
 /**
  * 实体 → LLM 回灌项序列（spec §6：UIMessage→ModelMessage 显式转换）。
  * 角色取自 Room v26 `role` 列，经 commonMain 单点 [roleOf] 派生（精确匹配 "user" → USER，
  * 其余 ASSISTANT）；data part 不进上下文（转换规则见 commonMain `toModelInput`）。
  * 退役横滑卡行（[LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]，2026-11-08 横滑卡
- * 整体下线）不回灌：历史负载是资产 JSON 数组，进上下文只有 token 噪音。
+ * 整体下线）不回灌：历史负载是资产 JSON 数组，进上下文只有 token 噪音（v28 重置后随 Task 4 删）。
  */
 fun ChatMessageEntity.toModelInputItems(): List<ModelInputItem> =
     if (type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES) {
         emptyList()
     } else {
-        decodePartsOrLegacy().toModelInput(roleOf(role), id)
+        decodeParts().toModelInput(roleOf(role), id)
     }
 
-/** 插入单条消息（M1 起统一入口：标量列 + partsJson 双写）。 */
-suspend fun ChatMessageDao.insertMessageWithParts(message: ChatMessageEntity) =
-    insertMessage(message.withPartsJson())
+/**
+ * parts-first 单条插入（统一入口）：parts 直建落 partsJson（权威列），type/content/metadata
+ * 经 [projectChatRow] 投影派生。REPLACE 语义：同 id 重插 = 事实上的覆写通道。
+ *
+ * @param extraMetadataJson 非 parts 派生的附加 metadata 键值（performance /
+ *   claude_agent_state 等随行负载），与投影 metadata 合并（键冲突时投影值胜出）。
+ * @return messageId
+ */
+suspend fun ChatMessageDao.insertPartsMessage(
+    sessionId: String,
+    role: ModelInputRole,
+    parts: List<MessagePart>,
+    modelUsed: String? = null,
+    timestamp: Long = System.currentTimeMillis(),
+    id: String = UUID.randomUUID().toString(),
+    extraMetadataJson: String? = null,
+): String {
+    val projected = projectChatRow(parts, role)
+    insertMessage(
+        ChatMessageEntity(
+            id = id,
+            sessionId = sessionId,
+            type = projected.type,
+            role = role.roomValue(),
+            content = projected.content,
+            timestamp = timestamp,
+            modelUsed = modelUsed,
+            metadata = mergeMetadataJson(projected.metadata, extraMetadataJson),
+            partsJson = MessagePartsCodec.encode(parts),
+        ),
+    )
+    return id
+}
 
-/** 批量插入消息（备份恢复路径；逐条双写）。 */
-suspend fun ChatMessageDao.insertMessagesWithParts(messages: List<ChatMessageEntity>) =
-    insertMessages(messages.map { it.withPartsJson() })
+/** parts-first 批量插入行（备份恢复路径：保 id/timestamp/modelUsed 原值逐行落库）。 */
+data class PartsMessageRow(
+    val id: String,
+    val sessionId: String,
+    val role: ModelInputRole,
+    val parts: List<MessagePart>,
+    val modelUsed: String? = null,
+    val timestamp: Long,
+    val extraMetadataJson: String? = null,
+    /**
+     * 行 type 覆写（投影值胜出的例外通道）：退役横滑卡行（data_media_results）parts
+     * 物化为 Tombstone、投影 type 落 "text"，但回放过滤
+     * （[LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]，保留至 Task 4 v28 重置）
+     * 按原 type 整行跳过——恢复路径显式覆写保住过滤语义。
+     */
+    val typeOverride: String? = null,
+)
+
+/** 批量插入（备份恢复 chunked 落库）。 */
+suspend fun ChatMessageDao.insertPartsMessages(rows: List<PartsMessageRow>) =
+    insertMessages(
+        rows.map { row ->
+            val projected = projectChatRow(row.parts, row.role)
+            ChatMessageEntity(
+                id = row.id,
+                sessionId = row.sessionId,
+                type = row.typeOverride ?: projected.type,
+                role = row.role.roomValue(),
+                content = projected.content,
+                timestamp = row.timestamp,
+                modelUsed = row.modelUsed,
+                metadata = mergeMetadataJson(projected.metadata, row.extraMetadataJson),
+                partsJson = MessagePartsCodec.encode(row.parts),
+            )
+        },
+    )
+
+/**
+ * 覆写型 upsert（REPLACE 同 id 语义）：以 [parts] 重建行，保留原行 id/sessionId/role/
+ * modelUsed/timestamp。metadata = 新投影 ∪ 原行非投影残留键——performance /
+ * claude_agent_state 等随行负载存活，原 parts 投影出的键（旧 group / html_card /
+ * engineer_task 等）随旧 parts 一并出清。
+ */
+suspend fun ChatMessageDao.replacePartsMessage(
+    existing: ChatMessageEntity,
+    parts: List<MessagePart>,
+): String {
+    val projected = projectChatRow(parts, roleOf(existing.role))
+    insertMessage(
+        ChatMessageEntity(
+            id = existing.id,
+            sessionId = existing.sessionId,
+            type = projected.type,
+            role = existing.role,
+            content = projected.content,
+            timestamp = existing.timestamp,
+            modelUsed = existing.modelUsed,
+            metadata = mergeMetadataJson(projected.metadata, survivingExtraMetadata(existing)),
+            partsJson = MessagePartsCodec.encode(parts),
+        ),
+    )
+    return existing.id
+}
+
+/** 原行 metadata 中不属于旧 parts 投影的残留键（附加负载随行存活）。 */
+private fun survivingExtraMetadata(existing: ChatMessageEntity): String? {
+    if (existing.metadata.isNullOrBlank()) return null
+    val oldProjectionKeys = projectChatRow(existing.decodeParts(), roleOf(existing.role)).metadata
+        ?.let { metadata -> runCatching { JSONObject(metadata).keys().asSequence().toList() } }
+        ?.getOrNull()
+        .orEmpty()
+        .toSet()
+    return runCatching {
+        val survivors = JSONObject(existing.metadata)
+        oldProjectionKeys.forEach(survivors::remove)
+        if (survivors.length() == 0) null else survivors.toString()
+    }.getOrNull()
+}
+
+/** 投影 metadata 与附加 metadata 合并（键冲突时投影值胜出；任一为空直返另一者）。 */
+private fun mergeMetadataJson(projected: String?, extra: String?): String? {
+    if (projected == null) return extra?.takeIf { it.isNotBlank() }
+    if (extra.isNullOrBlank()) return projected
+    return runCatching {
+        val projectedJson = JSONObject(projected)
+        val merged = JSONObject(extra)
+        projectedJson.keys().forEach { key -> merged.put(key, projectedJson.get(key)) }
+        merged.toString()
+    }.getOrDefault(projected)
+}
+
+/** Room role 列线值（"user"/"agent"，[roleOf] 的逆）。 */
+private fun ModelInputRole.roomValue(): String =
+    if (this == ModelInputRole.USER) "user" else "agent"
 
 /**
  * v24→v25 迁移回填：逐行把 legacy (type, content, metadata) 转为 parts JSON 写入 partsJson。

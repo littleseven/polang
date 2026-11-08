@@ -13,8 +13,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.ChatMessageDao
-import com.mamba.picme.data.local.ChatMessageEntity
-import com.mamba.picme.data.local.insertMessagesWithParts
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.MediaDao
@@ -62,6 +60,10 @@ import com.mamba.picme.domain.backup.model.BackupTag
 import com.mamba.picme.domain.backup.model.BackupTagScanTask
 import com.mamba.picme.domain.backup.model.TagDataBackup
 import com.mamba.picme.domain.chat.LegacyChatTypeMigration
+import com.mamba.picme.domain.chat.MessagePartsConverter
+import com.mamba.picme.domain.chat.roleOf
+import com.mamba.picme.data.local.PartsMessageRow
+import com.mamba.picme.data.local.insertPartsMessages
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
@@ -733,27 +735,36 @@ class TagDataBackupRepository(
             }
             if (backup.chatMessages.isNotEmpty()) {
                 backup.chatMessages.chunked(500).forEach { chunk ->
-                    // 备份恢复双分支（spec §6 消费者表）：新备份（type 已是新 8 值）直通，
-                    // role 缺省补 agent 安全网；旧备份（旧分类法导出，type 为 legacy 13 值）
-                    // 经唯一映射知识库 [LegacyChatTypeMigration] 转正。随后统一走 insertMessagesWithParts：
-                    // withPartsJson 用纯净化转换器在新 (type, role) 上现算 partsJson，
-                    // 与迁移产物零逻辑重复（旧备份不含 partsJson：从 legacy 列现算回填）。
-                    chatMessageDao.insertMessagesWithParts(
+                    // 备份恢复双分支（spec §6 消费者表）：新备份（type 已是新值）经
+                    // [MessagePartsConverter] 物化 parts（v5 备份只存标量列，parts-first
+                    // 落库需要 parts），role 缺省补 agent 安全网；旧备份（legacy 13 值）经
+                    // 唯一映射知识库 [LegacyChatTypeMigration] 转正。统一走 insertPartsMessages
+                    // （parts 直建 + 投影落列）；原 metadata 作为附加负载随行（performance 等
+                    // 非 parts 派生键存活，投影键由 parts 重新派生）。
+                    chatMessageDao.insertPartsMessages(
                         chunk.map { msg ->
                             val row = if (msg.type in LegacyChatTypeMigration.NEW_TYPES) {
-                                LegacyChatTypeMigration.MigratedRow(msg.type, msg.role ?: "agent", emptyList())
+                                LegacyChatTypeMigration.MigratedRow(
+                                    msg.type,
+                                    msg.role ?: "agent",
+                                    MessagePartsConverter.toParts(
+                                        msg.type, msg.content, msg.metadata,
+                                        roleOf(msg.role ?: "agent"),
+                                    ),
+                                )
                             } else {
                                 LegacyChatTypeMigration.map(msg.type, msg.content, msg.metadata)
                             }
-                            ChatMessageEntity(
+                            PartsMessageRow(
                                 id = msg.id,
                                 sessionId = msg.sessionId,
-                                type = row.type,
-                                role = row.role,
-                                content = msg.content,
-                                timestamp = msg.timestamp,
+                                role = roleOf(row.role),
+                                parts = row.parts,
                                 modelUsed = msg.modelUsed,
-                                metadata = msg.metadata
+                                timestamp = msg.timestamp,
+                                extraMetadataJson = msg.metadata,
+                                // 退役横滑卡行保住原 type（回放过滤按 type 整行跳过；Task 4/8 出清）
+                                typeOverride = row.type.takeIf { it in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES },
                             )
                         }
                     )

@@ -54,7 +54,7 @@ class ChatViewModelDependencies(
     val tagGenerationScheduler: TagGenerationScheduler? = null,
     /**
      * 消息列表 decode 段调度器（M4 review 🟡2）：loadMessages 的全量
-     * `decodePartsOrLegacy`（kotlinx decode）在此调度器上执行，默认 Default。
+     * `decodeParts`（kotlinx decode）在此调度器上执行，默认 Default。
      * 显式注入（Agent First 显式优于隐式）：单测传测试调度器保 runTest 确定性
      * （直接写死 Dispatchers.Default 会逃出 runTest 调度器，advanceUntilIdle 等不到）。
      */

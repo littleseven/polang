@@ -11,7 +11,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
- * (type, content, metadata, role) → parts 的运行时转换器（M1 双写接缝的写侧纯函数）。
+ * (type, content, metadata, role) → parts 的标量→parts 转换器。
+ *
+ * **D1a parts-first 接缝反转后（2026-11-08）职责收窄**：运行时写路径已直建
+ * `List<MessagePart>`（[projectChatRow] 为其逆投影），本转换器不再服务 Room 写侧；
+ * 现存正当调用只剩两处（Task 8 备份 v6 粗映射落地后收编）：
+ * 1. 备份恢复（androidApp `TagDataBackupRepository`）——v5 备份只存标量列，
+ *    恢复时经本转换器把 (type, content, metadata) 物化为 parts 再走 parts-first 接缝落库；
+ * 2. [LegacyChatTypeMigration.map] 内部——legacy 13 值映射后的 parts 派生。
  *
  * 纯净化口径（spec §4.2）：只认新 10 值分类法；legacy 13→8 映射知识在
  * [LegacyChatTypeMigration]，本转换器不双吃。行级兜底不变：任何异常/空结果 → 原文 Text part。

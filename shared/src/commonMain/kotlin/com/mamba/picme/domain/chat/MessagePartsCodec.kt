@@ -35,6 +35,12 @@ object MessagePartsCodec {
     fun encode(parts: List<MessagePart>): String = json.encodeToString(listSerializer, parts)
 
     /**
+     * 单 part 编码（配置同 [encode]，紧凑线格式）：投影 content 列「整颗 part JSON」
+     * 直通先例（tool_browser / data_genui_program）的唯一编码出口。
+     */
+    fun encodePart(part: MessagePart): String = json.encodeToString(MessagePart.serializer(), part)
+
+    /**
      * 解码 parts JSON；空串/整体结构损坏（非 JSON 数组）返回 null，调用方按 legacy
      * 列兜底（[MessagePartsConverter]），**不允许丢消息**。
      *

@@ -7,13 +7,13 @@ import com.mamba.picme.R
 import com.mamba.picme.agent.core.capability.BrowserSessionCapability
 import com.mamba.picme.agent.core.capability.BrowserSessionDelegate
 import com.mamba.picme.data.local.ChatMessageDao
-import com.mamba.picme.data.local.ChatMessageEntity
-import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.local.insertPartsMessage
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
 import com.mamba.picme.domain.browser.BrowserStatus
 import com.mamba.picme.domain.chat.BrowserActionEntry
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.ToolPartState
 import com.mamba.picme.domain.chat.streaming.TurnPartsReducer
 import com.mamba.picme.features.chat.formatBrowserAction
@@ -33,7 +33,6 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import org.json.JSONObject
 
 /** browser-vnc 直播卡 live 态 overlay 节流（与任务卡同 500ms 节拍；帧高频不直接驱动全列表重组）。 */
@@ -88,8 +87,6 @@ class BrowserLiveSessionController(
         _liveSessions.sample(BROWSER_LIVE_OVERLAY_THROTTLE_MS).onStart { emit(_liveSessions.value) }
 
     private val messageSeq = AtomicInteger(0)
-
-    private val partJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
     /** takeover 动作按会话串行保序的任务链（scroll/typeText 乱序即事故）。 */
     private val actionJobs = HashMap<String, Job>()
@@ -227,24 +224,18 @@ class BrowserLiveSessionController(
     }
 
     /**
-     * 浏览器会话定格卡**落库**（type=tool_browser，content=BrowserLive JSON；partsJson 由
-     * insertMessageWithParts 自标量列现算——MessagePartsConverter 认 tool_browser 解回 BrowserLive）。
-     * 与图表/HTML 卡同理：消息列表由 DB Flow 驱动，卡片必须落库才能跨重载持久。
+     * 浏览器会话定格卡**落库**（parts-first：BrowserLive part 直建，投影 content 列 =
+     * 整颗 part JSON）。与图表/HTML 卡同理：消息列表由 DB Flow 驱动，卡片必须落库才能跨重载持久。
      * 双显跳过（流式占位卡 vs 产物行）由 ChatScreen 的 persistedBrowserSessionIds
      * 提取式自动生效（自非流式消息 parts 提取 sessionId 集合）。
      */
     private suspend fun emitBrowserCardMessage(finalPart: MessagePart.BrowserLive) {
-        val persisted = finalPart.copy(partId = "p0")
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = "browser_" + System.currentTimeMillis() + "_" + messageSeq.incrementAndGet(),
-                sessionId = currentSessionId(),
-                type = "tool_browser",
-                role = "agent",
-                content = partJson.encodeToString(MessagePart.BrowserLive.serializer(), persisted),
-                timestamp = System.currentTimeMillis(),
-                modelUsed = "browser"
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = currentSessionId(),
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(finalPart.copy(partId = "p0")),
+            id = "browser_" + System.currentTimeMillis() + "_" + messageSeq.incrementAndGet(),
+            modelUsed = "browser",
         )
     }
 

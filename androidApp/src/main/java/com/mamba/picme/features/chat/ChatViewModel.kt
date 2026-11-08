@@ -10,13 +10,14 @@ import com.mamba.picme.domain.chat.HtmlCardMeta
 import com.mamba.picme.domain.chat.LegacyChatTypeMigration
 import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MessagePart
-import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
 import com.mamba.picme.domain.chat.overlayLiveBrowserState
 import com.mamba.picme.domain.chat.overlayLiveTaskState
+import com.mamba.picme.domain.chat.projectChatRow
 import com.mamba.picme.domain.chat.roleOf
+import com.mamba.picme.domain.chat.toToolPartState
 
 import android.content.Context
 import android.content.res.Configuration
@@ -58,8 +59,9 @@ import com.mamba.picme.core.image.BitmapSampling
 import com.mamba.picme.BuildConfig
 import android.os.Build
 import com.mamba.picme.data.local.ChatMessageDao
-import com.mamba.picme.data.local.decodePartsOrLegacy
-import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.local.decodeParts
+import com.mamba.picme.data.local.insertPartsMessage
+import com.mamba.picme.data.local.replacePartsMessage
 import com.mamba.picme.data.local.toModelInputItems
 import com.mamba.picme.data.remote.picme.ClaudeEvent
 import com.mamba.picme.data.remote.picme.CloudAgentApi
@@ -108,7 +110,6 @@ import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.shareMediaAssets
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -412,9 +413,6 @@ class ChatViewModel(
     private val _engineerActionInFlight = MutableStateFlow<Set<String>>(emptySet())
     val engineerActionInFlight: StateFlow<Set<String>> = _engineerActionInFlight.asStateFlow()
 
-    /** OpenUI 卡持久化 JSON（与 converter 同配置，防 roundtrip 漂移；encodeDefaults=true 固定线格式）。 */
-    private val cardPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-
     /**
      * Task 15 组合根注册的云端浏览器能力单例（capability 未注册时 null → 直播卡链路整体静默降级）。
      */
@@ -531,15 +529,10 @@ class ChatViewModel(
             var taskId: String? = null
             try {
                 ensureSessionExists(sessionId)
-                chatMessageDao.insertMessageWithParts(
-                    ChatMessageEntity(
-                        id = UUID.randomUUID().toString(),
-                        sessionId = sessionId,
-                        type = "text",
-                        role = "user",
-                        content = text,
-                        modelUsed = null,
-                    ),
+                chatMessageDao.insertPartsMessage(
+                    sessionId = sessionId,
+                    role = ModelInputRole.USER,
+                    parts = listOf(MessagePart.Text(partId = "p0", markdown = text)),
                 )
                 chatSessionDao.touchSession(sessionId)
 
@@ -715,7 +708,7 @@ class ChatViewModel(
     }
 
     /**
-     * 把折叠后的 agent 气泡落 Room（type=text + role=agent + metadata.claude_agent_state）。
+     * 把折叠后的 agent 气泡落 Room（parts-first：Text part + metadata 附加键 claude_agent_state）。
      * loadMessages 重放时由 [parseClaudeAgentState] 还原 [ChatMessageUi.claudeAgent]。
      */
     private suspend fun persistClaudeBubble(sessionId: String, state: ClaudeAgentState) {
@@ -727,17 +720,13 @@ class ChatViewModel(
         val msgId = UUID.randomUUID().toString()
         // 任务卡时代（2026-09-25 起）：交付审批收口到 TASK_CARD（US-2 审批唯一入口），
         // 新气泡不再登记 claudeDeliverOverrides；confirmClaudeDeliver 仅供 legacy 内存 override 使用。
-        val metadata = JSONObject().put("claude_agent_state", state.toJson()).toString()
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = msgId,
-                sessionId = sessionId,
-                type = "text",
-                role = "agent",
-                content = state.text,
-                modelUsed = currentModelLabel(),
-                metadata = metadata,
-            ),
+        chatMessageDao.insertPartsMessage(
+            sessionId = sessionId,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(MessagePart.Text(partId = "p0", markdown = state.text)),
+            modelUsed = currentModelLabel(),
+            id = msgId,
+            extraMetadataJson = JSONObject().put("claude_agent_state", state.toJson()).toString(),
         )
         chatSessionDao.touchSession(sessionId)
     }
@@ -746,16 +735,19 @@ class ChatViewModel(
     private suspend fun persistEngineerTask(sessionId: String, state: EngineerTaskState) {
         // 展示层 overlay 的持久化失败不应中止推理（launch 内异常直接崩溃，故就地吞掉只记日志）
         runCatching {
-            chatMessageDao.insertMessageWithParts(
-                ChatMessageEntity(
-                    id = state.taskId,
-                    sessionId = sessionId,
-                    type = EngineerTaskState.ROOM_TYPE,
-                    role = "agent",
-                    content = state.sourceText.take(50),
-                    timestamp = state.startedAtMs,
-                    metadata = JSONObject().put("engineer_task", state.toJson()).toString(),
-                )
+            chatMessageDao.insertPartsMessage(
+                sessionId = sessionId,
+                role = ModelInputRole.ASSISTANT,
+                parts = listOf(
+                    MessagePart.TaskCard(
+                        partId = "p0",
+                        toolCallId = state.taskId,
+                        state = state.status.toToolPartState(),
+                        task = state,
+                    ),
+                ),
+                id = state.taskId,
+                timestamp = state.startedAtMs,
             )
         }.onFailure { e ->
             if (e is CancellationException) throw e
@@ -1460,7 +1452,6 @@ class ChatViewModel(
                     insertAgentImageMessage(
                         sessionId = sid,
                         imageUri = outcome.imageUri,
-                        content = outcome.explanation,
                         modelUsed = currentModelLabel()
                     )
                     outcome.explanation
@@ -1539,7 +1530,7 @@ class ChatViewModel(
                         val liveEntities = entities.filterNot { e ->
                             e.type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES
                         }
-                        // M4 review 🟡2：M4 起 toUiModel 每条必经 decodePartsOrLegacy（kotlinx
+                        // M4 review 🟡2：M4 起 toUiModel 每条必经 decodeParts（kotlinx
                         // decode），Room invalidation（任务卡 SSE 高频/测高回写/图卡落库）会触发
                         // 全列表（上限 500）重 decode——挪出主线程防掉帧。仅纯 decode 段下移；
                         // 共享态（claudeDeliverOverrides 普通 mutableMap / engineerTasks /
@@ -1801,17 +1792,20 @@ class ChatViewModel(
                     _lastUserImageUri.value = imageUri
                 }
 
-                // 1. 保存用户消息
-                val userMessage = ChatMessageEntity(
-                    id = UUID.randomUUID().toString(),
+                // 1. 保存用户消息（parts-first：纯文本 / 图文双 part 图上文下）
+                val userParts = if (imageUri != null) {
+                    listOf(
+                        MessagePart.Image(partId = "p0", ref = imageUri),
+                        MessagePart.Text(partId = "p1", markdown = text),
+                    )
+                } else {
+                    listOf(MessagePart.Text(partId = "p0", markdown = text))
+                }
+                chatMessageDao.insertPartsMessage(
                     sessionId = sessionId,
-                    type = if (imageUri != null) "image" else "text",
-                    role = "user",
-                    content = text,
-                    modelUsed = null,
-                    metadata = imageUri?.let { """{"imageUri":"$it"}""" }
+                    role = ModelInputRole.USER,
+                    parts = userParts,
                 )
-                chatMessageDao.insertMessageWithParts(userMessage)
                 chatSessionDao.touchSession(sessionId)
 
                 // 1.2 访客渐进引导：仅未注册时计数；恰好跨阈值当次插入提示消息并弹出双选项引导（>阈值不再弹）
@@ -1834,7 +1828,7 @@ class ChatViewModel(
                 // 1.5 自动命名：根据用户的第一条消息生成会话标题
                 val messageCount = chatMessageDao.getMessageCount(sessionId)
                 if (messageCount == 1) {
-                    updateSessionTitleIfDefault(sessionId, generateAutoTitle(userMessage))
+                    updateSessionTitleIfDefault(sessionId, generateAutoTitle(userParts))
                 }
 
                 // 2. 触发处理状态
@@ -2089,15 +2083,7 @@ class ChatViewModel(
                         e.message ?: stringContext().getString(R.string.chat_unknown_error),
                     )
                 }
-                val errorMessage = ChatMessageEntity(
-                    id = UUID.randomUUID().toString(),
-                    sessionId = sessionId,
-                    type = "text",
-                    role = "agent",
-                    content = errorContent,
-                    modelUsed = "error"
-                )
-                chatMessageDao.insertMessageWithParts(errorMessage)
+                insertAgentMessage(sessionId, errorContent, "error")
                 chatSessionDao.touchSession(sessionId)
             } finally {
                 _isProcessing.value = false
@@ -2488,7 +2474,7 @@ class ChatViewModel(
                                 performance
                             )
                         } else {
-                            handleAiOptimize(sessionId, targetUri, cmd.explanation, currentModelLabel(), performance)
+                            handleAiOptimize(sessionId, targetUri, currentModelLabel(), performance)
                         }
                     }
                     is AgentCommand.EditImage -> {
@@ -2531,13 +2517,12 @@ class ChatViewModel(
     private suspend fun handleAiOptimize(
         sessionId: String,
         targetUri: String,
-        explanationOverride: String?,
         modelUsed: String,
         performance: LlmPerformance?
     ) {
         val controller = optimizeGachaController
         if (controller == null) {
-            legacyAiOptimize(sessionId, targetUri, explanationOverride, modelUsed, performance)
+            legacyAiOptimize(sessionId, targetUri, modelUsed, performance)
             return
         }
         val messageId = UUID.randomUUID().toString()
@@ -2547,7 +2532,6 @@ class ChatViewModel(
                     sessionId = sessionId,
                     messageId = messageId,
                     group = outcome.group,
-                    content = explanationOverride ?: outcome.explanation,
                     modelUsed = modelUsed
                 )
             }
@@ -2556,7 +2540,6 @@ class ChatViewModel(
                     insertAgentImageMessage(
                         sessionId = sessionId,
                         imageUri = outcome.imageUri,
-                        content = explanationOverride ?: outcome.explanation,
                         modelUsed = modelUsed,
                         performance = performance
                     )
@@ -2571,7 +2554,6 @@ class ChatViewModel(
     private suspend fun legacyAiOptimize(
         sessionId: String,
         targetUri: String,
-        explanationOverride: String?,
         modelUsed: String,
         performance: LlmPerformance?
     ) {
@@ -2583,7 +2565,7 @@ class ChatViewModel(
         val outcome = renderer.aiOptimize(targetUri, sessionId)
         Logger.i(TAG, "AiOptimize outcome (legacy): imageUri=${outcome.imageUri}, explanation=${outcome.explanation}")
         if (outcome.imageUri != null) {
-            insertAgentImageMessage(sessionId, outcome.imageUri, explanationOverride ?: outcome.explanation, modelUsed, performance)
+            insertAgentImageMessage(sessionId, outcome.imageUri, modelUsed, performance)
         } else {
             insertAgentMessage(sessionId, outcome.explanation, modelUsed, performance)
         }
@@ -2778,16 +2760,12 @@ class ChatViewModel(
      * 的重载冲掉（表现为“图先出现又消失”）。落库后图卡随会话持久，跨重载/重启均保留。
      */
     private suspend fun emitChartMessage(svg: String) {
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = "chart_" + System.currentTimeMillis(),
-                sessionId = _currentSessionId.value,
-                type = "tool_chart",
-                role = "agent",
-                content = svg,
-                timestamp = System.currentTimeMillis(),
-                modelUsed = "chart"
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = _currentSessionId.value,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(MessagePart.Chart(partId = "p0", svg = svg)),
+            id = "chart_" + System.currentTimeMillis(),
+            modelUsed = "chart",
         )
         // ADR-016 M2：产物回填 turn 装配器（占位原位填充；无待关联调用时 no-op）
         feedToolOutput(TurnPartsReducer.TOOL_DRAW_CHART) { toolCallId ->
@@ -2802,27 +2780,21 @@ class ChatViewModel(
      * 把清洗后的自包含 HTML 作为一条 [ChatMessageType.HTML_CARD] 消息**落库**。
      * 与 [emitChartMessage] 同理：消息列表由 DB Flow 驱动，卡片必须落库才能跨重载持久。
      *
-     * 双形态元数据（spec §10）：metadata `html_card` key 记 LLM display 声明与 summary
-     * （端侧终判 displayMode/测高由 [persistHtmlCardDisplayMode] 在测高后回填）。
+     * 双形态元数据（spec §10）：part [MessagePart.HtmlCard.meta] 记 LLM display 声明与
+     * summary（端侧终判 displayMode/测高由 [persistHtmlCardDisplayMode] 在测高后回填）。
      */
     private suspend fun emitHtmlCardMessage(html: String, summary: String? = null, display: String? = null) {
         val meta = HtmlCardMeta(
             display = display?.trim()?.lowercase()?.ifBlank { null },
             summary = summary?.ifBlank { null }
         )
-        val metadata = JSONObject().put("html_card", meta.toJson()).toString()
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                // 同毫秒多张卡（/html 冒烟集连发）需序号兜底，否则主键相同被 REPLACE 覆盖丢卡
-                id = "html_" + System.currentTimeMillis() + "_" + htmlMessageSeq.incrementAndGet(),
-                sessionId = _currentSessionId.value,
-                type = "tool_html",
-                role = "agent",
-                content = html,
-                timestamp = System.currentTimeMillis(),
-                modelUsed = "html_card",
-                metadata = metadata
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = _currentSessionId.value,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(MessagePart.HtmlCard(partId = "p0", html = html, meta = meta)),
+            // 同毫秒多张卡（/html 冒烟集连发）需序号兜底，否则主键相同被 REPLACE 覆盖丢卡
+            id = "html_" + System.currentTimeMillis() + "_" + htmlMessageSeq.incrementAndGet(),
+            modelUsed = "html_card",
         )
         // ADR-016 M2：产物回填 turn 装配器（同 emitChartMessage）
         feedToolOutput(TurnPartsReducer.TOOL_RENDER_HTML) { toolCallId ->
@@ -2831,23 +2803,26 @@ class ChatViewModel(
     }
 
     /**
-     * 端侧终判回写（HtmlCard 首次分流判定回调）：displayMode + 测高合并进 metadata `html_card`
-     * 子对象（其余 key 不动），幂等——已持久化同值时跳过写库（重组重复回调不产 DB churn）。
+     * 端侧终判回写（HtmlCard 首次分流判定回调）：displayMode + 测高合并进 HtmlCard part 的
+     * [HtmlCardMeta]（parts-first：part 原位 copy 后经 [replacePartsMessage] 覆写同 id 行），
+     * 幂等——已持久化同值时跳过写库（重组重复回调不产 DB churn）。
      * 持久化后会话重开/列表回收后卡片形态不跳变（spec §4 稳定性）。
      */
     fun persistHtmlCardDisplayMode(messageId: String, mode: HtmlCardDisplayMode, measuredHeightPx: Int?) {
         viewModelScope.launch(Dispatchers.Default) {
             val entity = chatMessageDao.getMessageById(messageId) ?: return@launch
             if (entity.type != "tool_html") return@launch
-            val root = entity.metadata
-                ?.let { raw -> runCatching { JSONObject(raw) }.getOrNull() }
-                ?: JSONObject()
-            val card = root.optJSONObject("html_card") ?: JSONObject()
-            if (card.optString("displayMode").ifBlank { null } == mode.name) return@launch
-            card.put("displayMode", mode.name)
-            if (measuredHeightPx != null && measuredHeightPx > 0) card.put("measuredHeightPx", measuredHeightPx)
-            root.put("html_card", card)
-            chatMessageDao.insertMessageWithParts(entity.copy(metadata = root.toString()))
+            val parts = entity.decodeParts()
+            val htmlPart = parts.firstOrNull() as? MessagePart.HtmlCard ?: return@launch
+            if (htmlPart.meta.displayMode == mode) return@launch
+            val nextMeta = htmlPart.meta.copy(
+                displayMode = mode,
+                measuredHeightPx = measuredHeightPx?.takeIf { it > 0 } ?: htmlPart.meta.measuredHeightPx,
+            )
+            chatMessageDao.replacePartsMessage(
+                entity,
+                parts.map { part -> if (part === htmlPart) htmlPart.copy(meta = nextMeta) else part },
+            )
         }
     }
 
@@ -3041,30 +3016,26 @@ class ChatViewModel(
     }
 
     /**
-     * 插入 OpenUI 卡消息（type=data_genui_program + role=agent，openui P2）。走 tool_browser 先例：
-     * content 列存整颗 part JSON，insertMessageWithParts 内部经 converter 双写 partsJson。
+     * 插入 OpenUI 卡消息（data_genui_program + role=agent，openui P2，parts-first：
+     * OpenUiCard part 直建，投影 content 列 = 整颗 part JSON 沿 tool_browser 先例）。
      */
     private suspend fun insertOpenUiCardMessage(
         sessionId: String,
         event: CloudTurnEvent.OpenUiCard,
         performance: LlmPerformance? = null,
     ) {
-        val part = MessagePart.OpenUiCard(
-            partId = "p0",
-            program = event.program,
-            fallbackSummary = event.fallbackSummary,
-        )
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                type = OpenUiContract.PART_TYPE,
-                role = "agent",
-                content = cardPartJson.encodeToString(MessagePart.OpenUiCard.serializer(), part),
-                timestamp = System.currentTimeMillis(),
-                modelUsed = "cloud_agent",
-                metadata = performanceMetadataJson(performance),
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = sessionId,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.OpenUiCard(
+                    partId = "p0",
+                    program = event.program,
+                    fallbackSummary = event.fallbackSummary,
+                ),
+            ),
+            modelUsed = "cloud_agent",
+            extraMetadataJson = performanceMetadataJson(performance),
         )
         chatSessionDao.touchSession(sessionId)
     }
@@ -3072,14 +3043,12 @@ class ChatViewModel(
     /** OpenUI 卡交互态持久化（US-7 对偶，openui P2）：同 part id 覆写，重建时作初始 state。 */
     suspend fun persistOpenUiViewState(messageId: String, viewState: String) {
         val entity = chatMessageDao.getMessageById(messageId) ?: return
-        val part = runCatching {
-            cardPartJson.decodeFromString(MessagePart.OpenUiCard.serializer(), entity.content)
-        }.getOrNull() ?: return
+        val parts = entity.decodeParts()
+        val part = parts.filterIsInstance<MessagePart.OpenUiCard>().firstOrNull() ?: return
         val updated = part.copy(viewState = viewState)
-        chatMessageDao.insertMessageWithParts(
-            entity.copy(
-                content = cardPartJson.encodeToString(MessagePart.OpenUiCard.serializer(), updated)
-            )
+        chatMessageDao.replacePartsMessage(
+            entity,
+            parts.map { p -> if (p === part) updated else p },
         )
     }
 
@@ -3101,15 +3070,14 @@ class ChatViewModel(
     }
 
     /**
-     * 根据用户的第一条消息自动生成会话标题。
-     *
-     * - 文本消息：取内容前 [ChatTitleGenerator.MAX_AUTO_TITLE_LENGTH] 个字符，去除首尾标点，合并换行/连续空白。
-     * - 图片消息：统一显示为图片对话标题。
+     * 根据用户的第一条消息自动生成会话标题（parts-first：经 [projectChatRow] 取首条
+     * 用户消息的投影口径——图主导取固定图片标题，文本取投影正文）。
      */
-    private fun generateAutoTitle(firstUserMessage: ChatMessageEntity): String {
+    private fun generateAutoTitle(firstUserParts: List<MessagePart>): String {
+        val projection = projectChatRow(firstUserParts, ModelInputRole.USER)
         return ChatTitleGenerator.generateTitle(
-            firstUserMessageType = firstUserMessage.type,
-            textContent = firstUserMessage.content,
+            firstUserMessageType = projection.type,
+            textContent = projection.content,
             imageTitle = stringContext().getString(R.string.chat_title_image_first),
             fallbackTitle = stringContext().getString(R.string.new_chat)
         )
@@ -3141,7 +3109,7 @@ class ChatViewModel(
     }
 
     /**
-     * 插入 AI 回复/命令结果到 Room
+     * 插入 AI 回复/命令结果到 Room（parts-first：Text part 直建，performance 走附加 metadata）。
      */
     private suspend fun insertAgentMessage(
         sessionId: String,
@@ -3149,16 +3117,12 @@ class ChatViewModel(
         modelUsed: String,
         performance: LlmPerformance? = null
     ) {
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                type = "text",
-                role = "agent",
-                content = content,
-                modelUsed = modelUsed,
-                metadata = performanceMetadataJson(performance)
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = sessionId,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(MessagePart.Text(partId = "p0", markdown = content)),
+            modelUsed = modelUsed,
+            extraMetadataJson = performanceMetadataJson(performance),
         )
         chatSessionDao.touchSession(sessionId)
     }
@@ -3179,48 +3143,28 @@ class ChatViewModel(
     }
 
     /**
-     * 插入一条带结果图的 AI 消息（type=image + role=agent）。用于 chat 内执行图像编辑后直接返回结果。
+     * 插入一条带结果图的 AI 消息（parts-first：agent Image part 直建，ref/saved 由 part
+     * 承载；原 content 列 caption 从未上屏——isImage 气泡只显图，不再落列）。
      */
     private suspend fun insertAgentImageMessage(
         sessionId: String,
         imageUri: String,
-        content: String,
         modelUsed: String,
         performance: LlmPerformance? = null
     ) {
-        val metadata = JSONObject().apply {
-            put("imageUri", imageUri)
-            put("saved", false)
-            performance?.let { p ->
-                put("prompt_len", p.promptLen)
-                put("decode_len", p.decodeLen)
-                put("prefill_time_ms", p.prefillTimeMs)
-                put("decode_time_ms", p.decodeTimeMs)
-                put("prefill_speed", p.prefillSpeed.toDouble())
-                put("decode_speed", p.decodeSpeed.toDouble())
-                put("used_sandbox", p.usedSandbox)
-            }
-        }.toString()
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                type = "image",
-                role = "agent",
-                content = content,
-                modelUsed = modelUsed,
-                metadata = metadata
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = sessionId,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(MessagePart.Image(partId = "p0", ref = imageUri)),
+            modelUsed = modelUsed,
+            extraMetadataJson = performanceMetadataJson(performance),
         )
         chatSessionDao.touchSession(sessionId)
     }
 
     /**
-     * 插入对话式图片编辑结果消息。
-     *
-     * - content：给用户的说明文本
-     * - metadata.imageUri：编辑后的结果图 URI
-     * - metadata.suggestions：可继续执行的推荐话术
+     * 插入对话式图片编辑结果消息（parts-first：EditResult part 直建——description 即
+     * 气泡说明、ref 即结果图、suggestions 为可继续执行的推荐话术）。
      */
     @VisibleForTesting
     internal suspend fun insertEditResultMessage(
@@ -3230,56 +3174,40 @@ class ChatViewModel(
         modelUsed: String,
         performance: LlmPerformance? = null
     ) {
-        val metadata = JSONObject().apply {
-            put("imageUri", imageUri)
-            put("saved", false)
-            put("explanation", explanation)
-            put("suggestions", JSONArray(listOf(
-                stringContext().getString(R.string.chat_edit_suggestion_brighter),
-                stringContext().getString(R.string.chat_edit_suggestion_fine_tune)
-            )))
-            performance?.let {
-                put("prompt_len", it.promptLen)
-                put("decode_len", it.decodeLen)
-                put("prefill_time_ms", it.prefillTimeMs)
-                put("decode_time_ms", it.decodeTimeMs)
-                put("prefill_speed", it.prefillSpeed.toDouble())
-                put("decode_speed", it.decodeSpeed.toDouble())
-            }
-        }.toString()
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                type = "tool_image_edit",
-                role = "agent",
-                content = explanation,
-                modelUsed = modelUsed,
-                metadata = metadata
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = sessionId,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.EditResult(
+                    partId = "p0",
+                    ref = imageUri,
+                    description = explanation,
+                    suggestions = listOf(
+                        stringContext().getString(R.string.chat_edit_suggestion_brighter),
+                        stringContext().getString(R.string.chat_edit_suggestion_fine_tune)
+                    ),
+                ),
+            ),
+            modelUsed = modelUsed,
+            extraMetadataJson = performanceMetadataJson(performance),
         )
         chatSessionDao.touchSession(sessionId)
     }
 
-    /** 插入候选卡组消息（type=data_optimize_candidates（OptimizeCandidateGroup.MESSAGE_TYPE）），并按推荐卡初始化选中态。 */
+    /** 插入候选卡组消息（parts-first：OptimizeCandidates part 直建），并按推荐卡初始化选中态。 */
     @VisibleForTesting
     internal suspend fun insertOptimizeCandidatesMessage(
         sessionId: String,
         messageId: String,
         group: OptimizeCandidateGroup,
-        content: String,
         modelUsed: String
     ) {
-        chatMessageDao.insertMessageWithParts(
-            ChatMessageEntity(
-                id = messageId,
-                sessionId = sessionId,
-                type = OptimizeCandidateGroup.MESSAGE_TYPE,
-                role = "agent",
-                content = content,
-                modelUsed = modelUsed,
-                metadata = group.toJson()
-            )
+        chatMessageDao.insertPartsMessage(
+            sessionId = sessionId,
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(MessagePart.OptimizeCandidates(partId = "p0", group = group)),
+            id = messageId,
+            modelUsed = modelUsed,
         )
         chatSessionDao.touchSession(sessionId)
         _gachaSelections.value = _gachaSelections.value + (messageId to group.recommendedIndex)
@@ -3304,8 +3232,9 @@ class ChatViewModel(
                 when (val outcome = controller.reroll(messageId)) {
                     is ChatOptimizeGachaController.RerollOutcome.Rerolled -> {
                         chatMessageDao.getMessageById(messageId)?.let { entity ->
-                            chatMessageDao.insertMessageWithParts(
-                                entity.copy(content = outcome.explanation, metadata = outcome.group.toJson())
+                            chatMessageDao.replacePartsMessage(
+                                entity,
+                                listOf(MessagePart.OptimizeCandidates(partId = "p0", group = outcome.group)),
                             )
                         }
                         _gachaSelections.value = _gachaSelections.value + (messageId to outcome.group.recommendedIndex)
@@ -3321,7 +3250,8 @@ class ChatViewModel(
     }
 
     /**
-     * 就用这张：全尺寸渲染 → 该条消息改写为 image（role=agent）结果消息（复用 insert-replace 模式）。
+     * 就用这张：全尺寸渲染 → 该条消息 parts 整体改写为 agent Image 结果消息
+     * （[replacePartsMessage] 同 id 覆写，复用 insert-replace 模式）。
      *
      * @param onResult true=成功；false=失败（UI toast，卡条保持可重试）
      */
@@ -3334,12 +3264,9 @@ class ChatViewModel(
                 return@launch
             }
             chatMessageDao.getMessageById(messageId)?.let { entity ->
-                val metadata = JSONObject().apply {
-                    put("imageUri", result.imageUri)
-                    put("saved", false)
-                }.toString()
-                chatMessageDao.insertMessageWithParts(
-                    entity.copy(type = "image", role = "agent", metadata = metadata)
+                chatMessageDao.replacePartsMessage(
+                    entity,
+                    listOf(MessagePart.Image(partId = "p0", ref = result.imageUri)),
                 )
             }
             _gachaSelections.value = _gachaSelections.value - messageId
@@ -3435,23 +3362,20 @@ class ChatViewModel(
                     return@launchChatRound
                 }
 
-                // 1. 保存用户图片消息到 Room（使用内部存储路径）
-                val userMessage = ChatMessageEntity(
-                    id = UUID.randomUUID().toString(),
+                // 1. 保存用户图片消息到 Room（parts-first：user 纯图单 Image part，ref = 内部存储路径）
+                val userParts = listOf(MessagePart.Image(partId = "p0", ref = persistedUri))
+                chatMessageDao.insertPartsMessage(
                     sessionId = sessionId,
-                    type = "image",
-                    role = "user",
-                    content = persistedUri,
-                    modelUsed = null
+                    role = ModelInputRole.USER,
+                    parts = userParts,
                 )
-                chatMessageDao.insertMessageWithParts(userMessage)
                 _lastUserImageUri.value = persistedUri
                 chatSessionDao.touchSession(sessionId)
 
                 // 1.5 自动命名：根据用户的第一条消息生成会话标题
                 val messageCount = chatMessageDao.getMessageCount(sessionId)
                 if (messageCount == 1) {
-                    updateSessionTitleIfDefault(sessionId, generateAutoTitle(userMessage))
+                    updateSessionTitleIfDefault(sessionId, generateAutoTitle(userParts))
                 }
 
                 // 1.6 按设置页打标模型解析图像理解引擎（与打标同源，AUTO 由 TaggerModelSelector 兜底）
@@ -3685,7 +3609,7 @@ class ChatViewModel(
         // USER_/AGENT_ 前缀变体）；平铺字段（chartSvg/htmlContent/…/engineerTask）
         // 一律自 parts 提取，不再按 type 字符串守卫；performance/claudeAgent 仍从
         // metadata 解析（现状不变）。
-        val parts = decodePartsOrLegacy()
+        val parts = decodeParts()
         val primary = parts.firstOrNull()
         val role = roleOf(this.role)
         return ChatMessageUi(
@@ -3738,8 +3662,8 @@ class ChatViewModel(
             gachaInteractive = primary is MessagePart.OptimizeCandidates &&
                 optimizeGachaController?.hasPending(id) == true,
             engineerTask = (primary as? MessagePart.TaskCard)?.task,
-            // ADR-016 M4：全量恢复双读填充（decodePartsOrLegacy：优先 partsJson，缺失/损坏
-            // 回 legacy 列现算）——UI 渲染源切到 parts（flattenChatItems 拍平），每条消息
+            // ADR-016 M4 + D1a：全量恢复填充（decodeParts：partsJson 权威直读，损坏行
+            // 降级原文 Text part）——UI 渲染源切到 parts（flattenChatItems 拍平），每条消息
             // 都需要 parts 在场；M2 期仅 TASK_CARD 填充是「无消费方省 decode」的过渡口径。
             parts = parts,
         )

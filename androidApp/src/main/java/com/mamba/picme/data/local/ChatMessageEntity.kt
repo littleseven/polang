@@ -19,10 +19,11 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
 
     /**
-     * 新分类法（spec §1）：text, image, tool_chart, tool_html, tool_task,
-     * tool_image_edit, data_optimize_candidates 等（data_media_results 已随横滑卡
-     * 退役，存量行为历史残留，回放路径整行跳过，见 LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES）。
-     * 降级定位：索引冗余 + 迁移源；读面权威是 partsJson。
+     * 消息 kind 投影列（派生，权威源 = partsJson）：首个 content/tool 类 part 的线格式
+     * 鉴别值——text/image + tool_chart/tool_html/tool_task/tool_image_edit/tool_browser +
+     * data_optimize_candidates/data_genui_program（投影规则见
+     * `domain/chat/ChatMessageProjection.kt`；reasoning/source/tombstone 永不作投影源）。
+     * 消费方：列表气泡判型、跨会话任务卡查询（`type='tool_task'`）、备份导出可读性。
      */
     val type: String,
 
@@ -33,7 +34,8 @@ data class ChatMessageEntity(
     val role: String = "agent",
 
     /**
-     * 文本内容或图片路径（图片消息存储本地文件路径）
+     * 消息正文/图片 ref 投影列（派生，权威源 = partsJson；投影规则见
+     * `domain/chat/ChatMessageProjection.kt`，列表气泡可读性优先）。
      */
     val content: String,
 
@@ -48,16 +50,19 @@ data class ChatMessageEntity(
     val modelUsed: String? = null,
 
     /**
-     * 扩展 JSON 字段，用于存储额外元数据
+     * 附加负载投影列（派生 + 附加，权威源 = partsJson）：parts 派生的结构化负载
+     * （html_card / engineer_task / optimize group / imageUri 等，见
+     * `domain/chat/ChatMessageProjection.kt`）合并非 parts 派生的随行键
+     * （performance / claude_agent_state）。
      */
     val metadata: String? = null,
 
     /**
-     * 消息内容块数组 JSON（ADR-016 M1 parts 模型；[com.mamba.picme.domain.chat.MessagePartsCodec] 线格式）。
-     *
-     * M1 双写过渡：写入侧由 `ChatMessageDao.insertMessageWithParts` 从 (type, content, metadata)
-     * 现算填充；读侧优先本列、缺失时回 legacy 列现算（`decodePartsOrLegacy`），旧列保留不删，
-     * 回退安全。v24→v25 迁移对存量行全量回填（失败行降级 Text part 原文兜底，不丢消息）。
+     * 消息内容块数组 JSON（ADR-016 parts 模型；[com.mamba.picme.domain.chat.MessagePartsCodec]
+     * 线格式）——**权威列（D1a，2026-11-08 parts-first 接缝反转）**：写入侧由
+     * `ChatMessageParts.insertPartsMessage` 等接缝直建 parts 落库，type/content/metadata
+     * 反向由 [com.mamba.picme.domain.chat.projectChatRow] 投影派生；读侧
+     * [com.mamba.picme.data.local.decodeParts] 直读本列，损坏行降级原文 Text part（不丢消息）。
      */
-    val partsJson: String? = null
+    val partsJson: String
 )

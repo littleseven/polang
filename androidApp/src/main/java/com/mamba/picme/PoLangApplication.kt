@@ -26,10 +26,9 @@ import com.mamba.picme.data.local.llmlog.RoomRoutingAuditRecorder
 import com.mamba.picme.data.local.llmlog.RoomToolCallRecorder
 import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.download.RecommendedModelAutoDownloader
-import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.FileSkillCacheStore
-import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.local.insertPartsMessage
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.SkillClient
 import com.mamba.picme.data.remote.picme.WebSearchClient
@@ -71,6 +70,8 @@ import com.mamba.picme.domain.agent.remote.RemoteChannelManager
 import com.mamba.picme.domain.agent.remote.RemoteCommandDispatcher
 import com.mamba.picme.domain.agent.remote.RemotePhotoTracker
 import com.mamba.picme.domain.agent.remote.TelegramChannelHandler
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.model.RemoteChannelType
 import com.mamba.picme.domain.repository.MediaRepository
 import com.mamba.picme.beauty.internal.facedetect.adapter.FaceLandmarkAdapterRegistry
@@ -672,7 +673,7 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                     lastRemotePhotoSentCaptureDate = photosToSend.maxOf { it.captureDate }
 
                     photosToSend.forEach { photo ->
-                        // 1. 写入聊天记录（image 类型 + role=agent）
+                        // 1. 写入聊天记录（parts-first：agent Image part 直建）
                         try {
                             if (chatSessionDao.getSession(sessionId) == null) {
                                 chatSessionDao.insertSession(
@@ -682,15 +683,11 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                                     )
                                 )
                             }
-                            chatMessageDao.insertMessageWithParts(
-                                ChatMessageEntity(
-                                    id = UUID.randomUUID().toString(),
-                                    sessionId = sessionId,
-                                    type = "image",
-                                    role = "agent",
-                                    content = photo.uri,
-                                    modelUsed = sourceTag
-                                )
+                            chatMessageDao.insertPartsMessage(
+                                sessionId = sessionId,
+                                role = ModelInputRole.ASSISTANT,
+                                parts = listOf(MessagePart.Image(partId = "p0", ref = photo.uri)),
+                                modelUsed = sourceTag,
                             )
                             chatSessionDao.touchSession(sessionId)
                         } catch (e: Exception) {

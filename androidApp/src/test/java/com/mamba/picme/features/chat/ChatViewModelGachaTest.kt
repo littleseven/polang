@@ -1,8 +1,11 @@
 package com.mamba.picme.features.chat
 
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.MessagePartsCodec
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 
 import com.mamba.picme.data.local.ChatMessageEntity
+import com.mamba.picme.data.local.decodeParts
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -35,18 +38,18 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         drawIndex = 1
     )
 
+    /** gacha 行实体（parts-first：OptimizeCandidates part 落 partsJson，metadata 为投影 group JSON）。 */
+    private fun gachaEntity(id: String = "msg1", group: OptimizeCandidateGroup = group()) = ChatMessageEntity(
+        id = id, sessionId = "default",
+        type = OptimizeCandidateGroup.MESSAGE_TYPE, role = "agent",
+        content = "expl", metadata = group.toJson(), timestamp = 1L,
+        partsJson = MessagePartsCodec.encode(listOf(MessagePart.OptimizeCandidates("p0", group))),
+    )
+
     @Test
     fun `loadMessages restores gacha selection for pending candidates message`() = runTest {
         every { gachaController.hasPending("msg1") } returns true
-        every { chatMessageDao.getMessagesBySession(any()) } returns flowOf(
-            listOf(
-                ChatMessageEntity(
-                    id = "msg1", sessionId = "default",
-                    type = OptimizeCandidateGroup.MESSAGE_TYPE,
-                    content = "expl", metadata = group().toJson()
-                )
-            )
-        )
+        every { chatMessageDao.getMessagesBySession(any()) } returns flowOf(listOf(gachaEntity()))
 
         val vm = newViewModel()
         advanceUntilIdle()
@@ -59,14 +62,17 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         val vm = newViewModel()
         advanceUntilIdle()
 
-        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "expl", "remote_deepseek")
+        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "remote_deepseek")
         advanceUntilIdle()
 
         val slot = slot<ChatMessageEntity>()
         coVerify { chatMessageDao.insertMessage(capture(slot)) }
         assertEquals(OptimizeCandidateGroup.MESSAGE_TYPE, slot.captured.type)
         assertEquals("msg1", slot.captured.id)
-        assertEquals(group().toJson(), slot.captured.metadata)
+        // 投影 metadata = group JSON（kotlinx 线格式；经语义读取器 fromJson 断言等值——
+        // 数字字面量 6.0/6 与缺省键 rejected 不构成内容差异，读侧均有默认值兜底）
+        assertEquals(group(), OptimizeCandidateGroup.fromJson(slot.captured.metadata))
+        assertEquals(listOf(MessagePart.OptimizeCandidates("p0", group())), slot.captured.decodeParts())
         assertEquals(1, vm.gachaSelections.value["msg1"])
     }
 
@@ -76,11 +82,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         advanceUntilIdle()
         coEvery { gachaController.confirm("msg1", 1) } returns
             ChatOptimizeGachaController.ConfirmResult("file:///full.jpg", mockk())
-        coEvery { chatMessageDao.getMessageById("msg1") } returns ChatMessageEntity(
-            id = "msg1", sessionId = "default",
-            type = OptimizeCandidateGroup.MESSAGE_TYPE,
-            content = "expl", metadata = group().toJson()
-        )
+        coEvery { chatMessageDao.getMessageById("msg1") } returns gachaEntity()
 
         vm.onOptimizeGachaConfirm("msg1", 1) { }
         advanceUntilIdle()
@@ -91,7 +93,9 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         assertEquals("agent", slot.captured.role)
         assertEquals("msg1", slot.captured.id)
         assertTrue(slot.captured.metadata!!.contains("file:///full.jpg"))
-        assertEquals("expl", slot.captured.content)
+        assertEquals("file:///full.jpg", slot.captured.content)
+        // 旧 gacha 投影键随旧 parts 出清
+        assertTrue(!slot.captured.metadata!!.contains("sourceImageUri"))
     }
 
     @Test
@@ -109,25 +113,21 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
     }
 
     @Test
-    fun `onOptimizeGachaReroll rewrites message metadata and resets selection`() = runTest {
+    fun `onOptimizeGachaReroll rewrites message parts and resets selection`() = runTest {
         val vm = newViewModel()
         advanceUntilIdle()
         val newGroup = group().copy(drawIndex = 2, recommendedIndex = 0)
         coEvery { gachaController.reroll("msg1") } returns
             ChatOptimizeGachaController.RerollOutcome.Rerolled(newGroup, "new expl")
-        coEvery { chatMessageDao.getMessageById("msg1") } returns ChatMessageEntity(
-            id = "msg1", sessionId = "default",
-            type = OptimizeCandidateGroup.MESSAGE_TYPE,
-            content = "expl", metadata = group().toJson()
-        )
+        coEvery { chatMessageDao.getMessageById("msg1") } returns gachaEntity()
 
         vm.onOptimizeGachaReroll("msg1") { }
         advanceUntilIdle()
 
         val slot = slot<ChatMessageEntity>()
         coVerify { chatMessageDao.insertMessage(capture(slot)) }
-        assertEquals(newGroup.toJson(), slot.captured.metadata)
-        assertEquals("new expl", slot.captured.content)
+        assertEquals(newGroup, OptimizeCandidateGroup.fromJson(slot.captured.metadata))
+        assertEquals(listOf(MessagePart.OptimizeCandidates("p0", newGroup)), slot.captured.decodeParts())
         assertEquals(0, vm.gachaSelections.value["msg1"])
     }
 
@@ -167,7 +167,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         val vm = newViewModel()
         advanceUntilIdle()
 
-        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "expl", "remote_deepseek")
+        vm.insertOptimizeCandidatesMessage("default", "msg1", group(), "remote_deepseek")
         advanceUntilIdle()
         assertEquals(1, vm.gachaSelections.value["msg1"])
 
