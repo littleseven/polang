@@ -20,6 +20,9 @@
     <uses-permission android:name="android.permission.MANAGE_MEDIA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- TAG 扫描前台服务（2026-11-08 dataSync→specialUse 换型：Android 15 dataSync 6h/24h 窗口
+         耗尽后重启 startForeground 必抛 ForegroundServiceStartNotAllowedException crash） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- onTimeout 兜底:AlarmManager 精确闹钟唤醒扫描续跑(API 31+) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -84,11 +87,18 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
+        <!-- specialUse（2026-11-08 自 dataSync 换型）：长扫描无时长上限（dataSync 6h 窗口耗尽
+             crash，见 TagGenerationService.enterForegroundSafely 注释）；PROPERTY 子类型供
+             Play 审查说明用途（端侧媒体索引/推理，不上传） -->
         <service
             android:name=".service.tag.TagGenerationService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="on_device_media_indexing" />
+        </service>
 
         <!-- onTimeout 兜底:闹钟唤醒后重启扫描服务 -->
         <receiver

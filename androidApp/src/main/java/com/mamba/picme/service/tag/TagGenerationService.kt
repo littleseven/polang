@@ -8,9 +8,10 @@ import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.content.IntentFilter
 import android.os.BatteryManager
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
@@ -71,8 +72,11 @@ import kotlin.math.roundToInt
  * 3. (MIUI/HyperOS)允许自启动
  * 扫描启动入口已通过 BackgroundScanGuard 引导用户完成上述配置。
  *
- * 另:Android 14+ 对 dataSync 类型 FGS 有运行时长上限,超时走 [onTimeout],
- * 由 [TagScanRescheduleReceiver] 闹钟兜底续跑(前提:已加电池白名单)。
+ * 另:本服务曾用 dataSync 型 FGS,Android 15 起 dataSync 有 6h/24h 运行窗口——窗口耗尽后
+ * 重启服务再 startForeground 会抛 ForegroundServiceStartNotAllowedException 直接 crash
+ * （2026-11-08 真机实证,原 onTimeout 闹钟续跑机制反成触发器）。已换 **specialUse** 型
+ * （无时长上限,长扫描一跑到底）;[onTimeout]/[TagScanRescheduleReceiver] 兜底链保留
+ * （specialUse 不触发 onTimeout,纯防御性遗留——若未来回退 dataSync 型仍有效）。
  */
 class TagGenerationService : Service() {
 
@@ -401,12 +405,12 @@ class TagGenerationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null || intent.action == null) {
             // 首次启动，仅显示前台通知
-            startForeground(NOTIFICATION_ID, buildNotification(null))
+            if (!enterForegroundSafely()) return START_STICKY
             return START_STICKY
         }
 
         // 启动前台通知（任何首次 Intent 都需要）
-        startForeground(NOTIFICATION_ID, buildNotification(null))
+        if (!enterForegroundSafely()) return START_STICKY
 
         val orch = orchestrator ?: return START_STICKY
 
@@ -557,7 +561,35 @@ class TagGenerationService : Service() {
     }
 
     /**
+     * 进入前台（specialUse 型显式声明 + 失败降级）。
+     *
+     * startForeground 失败（FGS 窗口耗尽 ForegroundServiceStartNotAllowedException /
+     * 通知权限被拒等）时立即停止服务,避免「未及时进前台 5s 被系统强杀」闪退——
+     * 对齐 ModelDownloadForegroundService 先例。specialUse 无时长上限,此路径为
+     * 最后防线（权限被拒/极端 ROM 限制）。
+     *
+     * @return true = 已进入前台可继续;false = 已 stopSelf,调用方应直接返回
+     */
+    private fun enterForegroundSafely(): Boolean = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, buildNotification(null), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, buildNotification(null))
+        }
+        true
+    } catch (e: Exception) {
+        android.util.Log.w(TAG, "startForeground failed (FGS window/permission?), stopping: ${e.message}")
+        stopSelf()
+        false
+    }
+
+    /**
      * Android 14+ dataSync 前台服务超时回调(API 35+,低版本系统不调用)。
+     *
+     * **已换 specialUse 型（2026-11-08）,本回调不再触发**——保留作防御性遗留:
+     * 若未来回退 dataSync 型,窗口耗尽走此兜底而非直接 crash。注意窗口真耗尽时
+     * 「闹钟重启 → 再 startForeground」仍会抛 ForegroundServiceStartNotAllowedException
+     * （原 crash 触发路径）,由 [enterForegroundSafely] 降级兜住。
      *
      * 超时后系统要求停止服务,且 START_STICKY 不保证重启。此处安排一个
      * [TagScanRescheduleReceiver] 闹钟,到点重新拉起本 Service,由 Orchestrator.init 的
