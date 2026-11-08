@@ -41,4 +41,13 @@ class KoogReActAgentErrorMessageTest {
         )
         assertTrue(buildFriendlyErrorMessage(RuntimeException()).endsWith("未知错误"))
     }
+
+    @Test
+    fun `agent loop stuck maps to loop stopped message`() {
+        val expected = "任务在工具调用中陷入循环（或超出步数上限），已自动停止。请换个说法，或把任务拆小一点重试。"
+        assertEquals(expected, buildFriendlyErrorMessage(AgentLoopStuckException("tool loop guard tripped")))
+        // 包装在 cause 链深处也要命中（agent 包装层可能再包一层）
+        val wrapped = RuntimeException("run failed", AgentLoopStuckException("max iterations reached: 30"))
+        assertEquals(expected, buildFriendlyErrorMessage(wrapped))
+    }
 }

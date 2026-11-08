@@ -1133,6 +1133,7 @@
     <string name="chat_guest_banner_own_key">自己的 Token</string>
     <string name="chat_guest_quota_used_up">試用額度已用完，註冊即可獲得 1000 次免費額度。</string>
     <string name="chat_inference_error">推論錯誤：%1$s</string>
+    <string name="chat_agent_loop_stuck">這次請求陷入了工具呼叫迴圈，已自動停止。請換個問法，或把任務拆小一點再試。</string>
     <string name="chat_calling_tool">正在呼叫工具…</string>
     <string name="chat_card_generate_failed">生成失敗</string>
     <string name="openui_action_failed">操作失敗</string>

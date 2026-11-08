@@ -46,8 +46,8 @@ import kotlinx.coroutines.withTimeout
  *
  * **并发模型（KMP 抽取 Task 7 suspend 化）**：@Tool 方法为 suspend（Koog 1.1.1 支持 suspend
  * 工具函数），dispatch 从 `future{}.get(5s)` 阻塞桥改写为 `withTimeout` 结构化等待
- *（默认 5s；browser_* 远程慢工具族分级为 25s，与 registry 内层 CommandExecutor 25s 同源，
- * 见 [BROWSER_DISPATCH_TIMEOUT_MS]），
+ *（默认 15s（[DISPATCH_TIMEOUT_MS]，2026-11-08 自 5s 放宽，冷搜索预算）；browser_* 远程慢
+ * 工具族分级为 25s，与 registry 内层 CommandExecutor 25s 同源，见 [BROWSER_DISPATCH_TIMEOUT_MS]），
  * 超时抛 `TimeoutCancellationException`（语义对齐旧 `java.util.concurrent.TimeoutException` 分支）；
  * `adjust_image` 的 `runBlocking` 桥同步删除（handler 本就 suspend）。
  *
@@ -63,13 +63,19 @@ import kotlinx.coroutines.withTimeout
 class ChatToolService private constructor() : TraceIdAware {
 
     companion object {
-        /** dispatch 等待超时（毫秒），语义对齐旧 `future{}.get(5, SECONDS)`。 */
-        private const val DISPATCH_TIMEOUT_MS = 5000L
+        /**
+         * dispatch 等待超时（毫秒）。原 5s 对齐旧 `future{}.get(5, SECONDS)`，但真机实测
+         * 冷搜索（MediaStore 首查 + 索引冷启动）需 ~8s，直执路径（意图路由 DirectSearch）
+         * 必超时回落全量 agent loop——把确定性快路径变成掷骰子（2026-11-08 循环事故一环）。
+         * 放宽到 15s：覆盖冷搜索预算，仍 < registry 内层 25s（层叠不变式不破，
+         * 与 WEB_SEARCH/SKILL 同量级），由 `CommandTimeoutLayeringTest` 钉住。
+         */
+        internal const val DISPATCH_TIMEOUT_MS = 15_000L
 
         /**
          * browser_* 工具族的外层 dispatch 等待超时（毫秒）：与 registry 内层命令执行超时同源
          *（[CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS]，两处不漂移）。两层语义——
-         * 外层（本类，browser 工具 25s / 其余工具 5s）+ 内层（registry CommandExecutor 25s）；
+         * 外层（本类，browser 工具 25s / 其余工具 15s）+ 内层（registry CommandExecutor 25s）；
          * 25s > 服务端 navTimeout 15s、< 网关 30s，慢页面（domcontentloaded 5~15s 常见）
          * 不被客户端 withTimeout 级联取消必杀（那会酿成「远端 open 成功但卡不出现 + 会话泄漏 +
          * LLM 重试开重复会话」）。层叠不变式（内层 ≥ 本值）由 `CommandTimeoutLayeringTest` 钉住。
@@ -589,7 +595,7 @@ class ChatToolService private constructor() : TraceIdAware {
     /**
      * [dispatchCommandWithTrace] 的结构化变体：除 observation 外返回真实 [AgentAction]，
      * 供路由直执路径判定成功/失败（失败回落完整 agent loop）并提取结果基数（totalCount）。
-     * [timeoutMillis] 默认 5s；browser_* 远程慢工具族显式传 [BROWSER_DISPATCH_TIMEOUT_MS]
+     * [timeoutMillis] 默认 15s（[DISPATCH_TIMEOUT_MS]，冷搜索预算）；browser_* 远程慢工具族显式传 [BROWSER_DISPATCH_TIMEOUT_MS]
      *（外层 25s ≤ registry 内层 CommandExecutor 25s，层叠关系见 CommandTimeoutLayeringTest）。
      */
     internal suspend fun dispatchCommandDetailed(

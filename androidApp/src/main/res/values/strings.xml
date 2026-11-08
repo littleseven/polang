@@ -1142,6 +1142,7 @@
     <string name="chat_guest_banner_own_key">My own Token</string>
     <string name="chat_guest_quota_used_up">Trial quota used up. Register to get 1000 free calls.</string>
     <string name="chat_inference_error">Inference error: %1$s</string>
+    <string name="chat_agent_loop_stuck">I got stuck in a tool loop and stopped automatically. Please rephrase your request or break it into smaller steps.</string>
     <string name="chat_calling_tool">Calling tool…</string>
     <string name="chat_card_generate_failed">Generation failed</string>
     <string name="openui_action_failed">Action failed</string>
