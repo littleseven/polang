@@ -207,8 +207,8 @@ struct LegacyChatMessage: Codable {
 }
 
 extension LegacyChatMessage {
-    /// legacy → commonMain 一次性迁移（type 8→11 同名映射；media/chart/gacha 补 parts
-    /// 双写 p0）。瞬态（isStreaming/isThinking/showCursor/isToolCalling）与
+    /// legacy → commonMain 一次性迁移（type 8 值 legacy → 9 值 kind 映射；media/chart/gacha
+    /// 补 parts 双写 p0）。瞬态（isStreaming/isThinking/showCursor/isToolCalling）与
     /// gachaInteractive 不迁移——落库数据本就无流式中间态，交互态运行时查 controller。
     func toShared() -> ChatMessage {
         let sharedRole: ModelInputRole = role == .user ? .user : .assistant
@@ -218,20 +218,19 @@ extension LegacyChatMessage {
         var parts: [MessagePart] = []
 
         switch type {
-        case .userText:
-            sharedType = ChatMessageType.userText
-        case .agentText:
-            sharedType = ChatMessageType.agentText
+        case .userText, .agentText:
+            // 纯 kind（D2a）：角色由 sharedRole 承载，文本归并 text
+            sharedType = ChatMessageType.text
         case .userImageText:
-            sharedType = ChatMessageType.userImageText
+            sharedType = ChatMessageType.imageText
         case .agentImage:
-            sharedType = ChatMessageType.agentImage
+            sharedType = ChatMessageType.image
         case .agentEditResult:
-            sharedType = ChatMessageType.agentEditResult
+            sharedType = ChatMessageType.editResult
         case .mediaResults:
             // 横滑卡已退役：mediaResults 行在 ChatHistoryStore.loadMessages 已整行滤除，
             // 本分支仅为防御兜底（枚举位保留防老文件 decode 炸，永不应到达）
-            sharedType = ChatMessageType.agentText
+            sharedType = ChatMessageType.text
         case .chart:
             sharedType = ChatMessageType.chart
             // chartSvg 老线格式不持久化（CodingKeys 排除，LegacyChatMessage 无此存储）——

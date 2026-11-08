@@ -19,9 +19,9 @@ import kotlinx.serialization.json.encodeToJsonElement
  * payload**（平铺字段 = 旧 SwiftUI 渲染器的直读源，切换期等价性的锚；parts = M5
  * 拍平渲染的 SSOT）。
  *
- * - **encode**：`ChatMessageType` 11 值 UI 枚举 → wire 9 值分类法反向映射（UI 枚举
- *   含 role 前缀变体，role 已独立列承载）；平铺字段缺失时自 parts 补齐，保证文件
- *   内双 payload 一致；
+ * - **encode**：`ChatMessageType` 9 值 kind 枚举 → wire 分类法反向映射（role 变体
+ *   已归并——角色由 role 独立列承载，IMAGE_TEXT 归并 wire `image`）；平铺字段缺失时
+ *   自 parts 补齐，保证文件内双 payload 一致；
  * - **decode**：parts-first 投影（对齐 androidApp toUiModel M4 口径）——primary part
  *   定 [ChatMessageType]、平铺字段以 parts 提取优先；parts 数组整体缺失时自结构化
  *   平铺字段重建（belt-and-braces，语义对齐 [MessagePartsConverter] 但数据源为结构
@@ -124,14 +124,14 @@ object ChatHistoryStoreCodec {
         )
     }
 
-    /** ChatMessageType 11 值 UI 枚举 → wire 9 值分类法（role 变体归并，role 列承载）。 */
+    /** ChatMessageType 9 值 kind 枚举 → wire 分类法（role 变体归并，role 列承载；IMAGE_TEXT 归并 `image`）。 */
     private fun wireTypeOf(type: ChatMessageType): String = when (type) {
-        ChatMessageType.USER_TEXT, ChatMessageType.AGENT_TEXT -> "text"
-        ChatMessageType.USER_IMAGE, ChatMessageType.USER_IMAGE_TEXT, ChatMessageType.AGENT_IMAGE -> "image"
+        ChatMessageType.TEXT -> "text"
+        ChatMessageType.IMAGE, ChatMessageType.IMAGE_TEXT -> "image"
         ChatMessageType.CHART -> "tool_chart"
         ChatMessageType.HTML_CARD -> "tool_html"
         ChatMessageType.TASK_CARD -> "tool_task"
-        ChatMessageType.AGENT_EDIT_RESULT -> "tool_image_edit"
+        ChatMessageType.EDIT_RESULT -> "tool_image_edit"
         ChatMessageType.OPTIMIZE_CANDIDATES -> "data_optimize_candidates"
         ChatMessageType.OPENUI_CARD -> "data_genui_program"
     }
@@ -166,38 +166,37 @@ object ChatHistoryStoreCodec {
         )
     }
 
-    /** primary part → UI 枚举（对齐 androidApp toUiModel 的 parts-first 判型）。 */
+    /** primary part → kind 枚举（对齐 androidApp toUiModel 的 parts-first 判型；role 仅用于 IMAGE_TEXT 分流）。 */
     private fun uiTypeOf(
         primary: MessagePart?,
         role: ModelInputRole,
         parts: List<MessagePart>,
     ): ChatMessageType = when (primary) {
-        is MessagePart.Text ->
-            if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
+        is MessagePart.Text -> ChatMessageType.TEXT
         is MessagePart.Image -> when {
-            role == ModelInputRole.USER && parts.any { it is MessagePart.Text } -> ChatMessageType.USER_IMAGE_TEXT
-            role == ModelInputRole.USER -> ChatMessageType.USER_IMAGE
-            else -> ChatMessageType.AGENT_IMAGE
+            role == ModelInputRole.USER && parts.any { it is MessagePart.Text } -> ChatMessageType.IMAGE_TEXT
+            else -> ChatMessageType.IMAGE
         }
         is MessagePart.Chart -> ChatMessageType.CHART
         is MessagePart.HtmlCard -> ChatMessageType.HTML_CARD
         is MessagePart.TaskCard -> ChatMessageType.TASK_CARD
-        is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
+        is MessagePart.EditResult -> ChatMessageType.EDIT_RESULT
         is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
         // OpenUI 卡 M1 Android-only（openui P1）：iOS 未落地，防御性落文本，正式映射随 iOS 跟随任务
-        is MessagePart.OpenUiCard -> ChatMessageType.AGENT_TEXT
+        is MessagePart.OpenUiCard -> ChatMessageType.TEXT
         // iOS 浏览器直播卡未落地（M1 Android-only）：防御性落文本，正式映射随 iOS 跟随任务
-        is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
-        // 值域终态三新 part（reasoning/source，2026-11-08）：iOS 渲染对等随后续任务落地，
-        // 防御性落文本（同上先例；此间管线未产此类 part，分支不可达）
+        is MessagePart.BrowserLive -> ChatMessageType.TEXT
+        // 值域终态三新 part（reasoning/source，2026-11-08）：均不主导消息 kind（reasoning
+        // 折叠块 / source chips 由拍平 item 渲染），判型防御性落文本；iOS 渲染对等随后续
+        // 任务落地（此间管线未产此类 part，分支不可达）
         is MessagePart.Reasoning,
         is MessagePart.SourceUrl,
         is MessagePart.SourceDocument,
-        -> ChatMessageType.AGENT_TEXT
+        -> ChatMessageType.TEXT
         // 前向兼容/退役兜底（未知/损坏 part）：整消息判型防御性落文本；
-        // 实际渲染走拍平 item（TYPE_UNSUPPORTED 占位卡）
-        is MessagePart.Tombstone -> ChatMessageType.AGENT_TEXT
-        null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
+        // 实际渲染走拍平 item（TYPE_TOMBSTONE 占位卡）
+        is MessagePart.Tombstone -> ChatMessageType.TEXT
+        null -> ChatMessageType.TEXT
     }
 
     /**

@@ -636,21 +636,21 @@ private struct MessageBubble: View {
                     // 思考态：3 点动画（首 token 前）
                     ThinkingIndicator()
                 } else if !message.content.isEmpty || message.imageUri != nil {
-                    // USER_IMAGE_TEXT：上图下文（图在文本上方，对齐 Android）
-                    if message.type == .userImageText, let uri = message.imageUri {
+                    // IMAGE_TEXT：上图下文（图在文本上方，对齐 Android）
+                    if message.type == .imageText, let uri = message.imageUri {
                         UserImageAttachment(localIdentifier: uri, onTap: { onImageTap?($0) })
                             .padding(.bottom, 6)
                     }
 
-                    // AGENT_IMAGE：agent 单发结果图（gacha 确认/降级；FillWidth 240 完整显示，
-                    // chat.yaml §5 image_content.agent_image）
-                    if message.type == .agentImage, let path = message.imageUri {
+                    // IMAGE（agent 单发结果图，gacha 确认/降级；FillWidth 240 完整显示，
+                    // chat.yaml §5 image_content.agent_image——role 守卫保 agent 口径）
+                    if message.type == .image && message.role != .user, let path = message.imageUri {
                         AgentImageAttachment(imagePath: path, onTap: { onImageTap?($0) })
                             .padding(.bottom, 6)
                     }
 
-                    // AGENT_EDIT_RESULT：编辑结果图卡（文件路径 + 失效占位），说明文字走下方文本渲染
-                    if message.type == .agentEditResult, let path = message.imageUri {
+                    // EDIT_RESULT：编辑结果图卡（文件路径 + 失效占位），说明文字走下方文本渲染
+                    if message.type == .editResult, let path = message.imageUri {
                         ChatEditImageCard(imagePath: path, onTap: { onImageTap?($0) })
                             .padding(.bottom, 6)
                     }
@@ -685,13 +685,13 @@ private struct MessageBubble: View {
             // 图类气泡（用户图+文 / agent 单发图）：240 上限 + padding 6/6
             // （Android isImage||isImageText 分支）；文本/编辑结果 360 上限 + 16/12。
             // 常量未入 DesignTokens（生成物，门禁修复前禁手改——技术债：待 tokens JSON 统一）
-            .widthCap((message.type == .userImageText || message.type == .agentImage)
+            .widthCap((message.type == .imageText || (message.type == .image && message.role != .user))
                 ? ChatBubbleTokens.imageMaxWidth
                 : ChatBubbleTokens.bubbleMaxWidth)
             .padding(.horizontal,
-                     (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingH)
+                     (message.type == .imageText || (message.type == .image && message.role != .user)) ? 6 : ChatBubbleTokens.paddingH)
             .padding(.vertical,
-                     (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingV)
+                     (message.type == .imageText || (message.type == .image && message.role != .user)) ? 6 : ChatBubbleTokens.paddingV)
             .background(bubbleBackground)
             .clipShape(bubbleShape)
             .contentShape(Rectangle())
@@ -705,11 +705,11 @@ private struct MessageBubble: View {
     }
 
     // §5 text：用户正文 userBubbleOn（v2.2.3 对比度契约 946a36db4：亮绿底白字 ~1.9:1 → 深字 ~8:1）；
-    // 图文说明（USER_IMAGE_TEXT text_below）保持 onSurface——底虽随 Android 定稿转绿
+    // 图文说明（IMAGE_TEXT text_below）保持 onSurface——底虽随 Android 定稿转绿
     // （bubbleBackground），图上说明文字对比度契约不变
     private var textColor: Color {
         if message.role == .user {
-            return message.type == .userImageText ? s.onSurface : ChatBubbleTokens.userBubbleOn
+            return message.type == .imageText ? s.onSurface : ChatBubbleTokens.userBubbleOn
         }
         return Color(.label)
     }
@@ -730,12 +730,12 @@ private struct MessageBubble: View {
     }
 
     private var bubbleBackground: Color {
-        // 纯图气泡（agent 单发图；userImage 未接入，接入时同口径）→ surfaceVariant 0.4
-        // （chat.yaml §5 background.image）；用户气泡（USER_IMAGE_TEXT 含图+文）→
-        // userBubbleBg 实色（Android ChatScreen.kt isUser 含 USER_IMAGE_TEXT → 绿底，
+        // 纯图气泡（agent 单发图；user 纯图未接入，接入时同口径）→ surfaceVariant 0.4
+        // （chat.yaml §5 background.image）；用户气泡（IMAGE_TEXT 含图+文）→
+        // userBubbleBg 实色（Android ChatScreen.kt isUser 含 IMAGE_TEXT → 绿底，
         // text_below 仍走 onSurface）；用户纯文本 → userBubbleBg（§5 background.user_text，
         // v2.2.3：去 0.9 alpha，双模式一致）
-        if message.type == .agentImage {
+        if message.type == .image && message.role != .user {
             return s.surfaceVariant.opacity(0.4)
         }
         if message.role == .user {
@@ -789,7 +789,7 @@ private struct ChatListItemView: View {
         case t.TYPE_HTML_CARD: htmlCardItem
         case t.TYPE_TASK_CARD: taskCardItem
         case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
-        case t.TYPE_UNSUPPORTED: unsupportedItem
+        case t.TYPE_TOMBSTONE: unsupportedItem
         default: EmptyView()
         }
     }
@@ -895,11 +895,11 @@ private struct ChatListItemView: View {
         }
     }
 
-    /// UNSUPPORTED part（前向兼容兜底，2026-11-08）：未知/损坏 part 原位占位卡——
+    /// TOMBSTONE part（前向兼容兜底，2026-11-08）：未知/损坏 part 原位占位卡——
     /// 「内容暂不支持 + 升级提示」（payload 携带可读摘要时优先展示）。
     /// 块序与消息其余 part 不受影响，升级新版本后同一消息自动恢复为正式卡片。
     private var unsupportedItem: some View {
-        let summary = (item.part as? MessagePartUnsupported)?.summary
+        let summary = (item.part as? MessagePartTombstone)?.summary
         return HStack(alignment: .center, spacing: 10) {
             Image(systemName: "info.circle")
                 .font(.system(size: 15))

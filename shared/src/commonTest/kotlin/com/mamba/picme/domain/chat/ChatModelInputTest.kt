@@ -22,10 +22,10 @@ class ChatModelInputTest {
         // 经迁移单点构造：role + parts 一次到位（与 Room v26 迁移同源，防测试私搭派生逻辑）
         val migrated = LegacyChatTypeMigration.map(type, content, metadata)
         val uiType = when (type) {
-            "user_text" -> ChatMessageType.USER_TEXT
-            "user_image" -> ChatMessageType.USER_IMAGE
-            "user_image_text" -> ChatMessageType.USER_IMAGE_TEXT
-            else -> ChatMessageType.AGENT_TEXT
+            "user_text" -> ChatMessageType.TEXT
+            "user_image" -> ChatMessageType.IMAGE
+            "user_image_text" -> ChatMessageType.IMAGE_TEXT
+            else -> ChatMessageType.TEXT
         }
         return ChatMessage(
             id = "m-$type",
@@ -195,7 +195,7 @@ class ChatModelInputTest {
         // 占位类型不回灌，对齐 data part 丢弃口径（spec §6）
         val message = ChatMessage(
             id = "m-tombstone",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -211,7 +211,7 @@ class ChatModelInputTest {
         // 丢弃规则（spec §3/§6），reasoning 永不回灌 LLM
         val message = ChatMessage(
             id = "m-reasoning",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -231,7 +231,7 @@ class ChatModelInputTest {
         // LLM，对齐 Vercel convertToModelMessages 丢弃规则，spec §3/§6）
         val message = ChatMessage(
             id = "m-source",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -286,7 +286,7 @@ class ChatModelInputTest {
     fun `blank text parts are dropped from context`() {
         val message = ChatMessage(
             id = "m",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.Text("p0", "  ", PartState.DONE)),
@@ -299,7 +299,7 @@ class ChatModelInputTest {
         // 一回合多 part：文本-卡片-文本的交错顺序在回灌中保持（数组顺序即锚点）
         val message = ChatMessage(
             id = "m",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "前",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -326,7 +326,7 @@ class ChatModelInputTest {
         // browser-vnc 直播卡 Task 13：tool-call/tool-result 配对，结果侧只含文本摘要
         val message = ChatMessage(
             id = "m-b",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -368,7 +368,7 @@ class ChatModelInputTest {
     fun `failed browser session replays error reason as tool result`() {
         val message = ChatMessage(
             id = "m-berr",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(

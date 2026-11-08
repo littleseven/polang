@@ -874,9 +874,10 @@ fun ChatScreen(
                                         }
                                     }
                                 }
-                                ChatListItem.TYPE_UNSUPPORTED -> {
+                                ChatListItem.TYPE_TOMBSTONE -> {
                                     // 前向兼容/退役兜底卡（未知/损坏/退役 part 原位占位：块序保住，
-                                    // 升级新版本后同一消息自动恢复为正式卡片）
+                                    // 升级新版本后同一消息自动恢复为正式卡片）；
+                                    // 渲染件改名 TombstonePartCard 属后续渲染任务（Task 6），暂落既有组件
                                     val tombstone = item.part as? MessagePart.Tombstone
                                     UnsupportedPartCard(summary = tombstone?.summary)
                                 }
@@ -889,8 +890,9 @@ fun ChatScreen(
                                         onImageClick = { msg ->
                                             val pages = buildImagePreviewPages(messages)
                                             if (pages.isNotEmpty()) {
-                                                val isEdit = msg.type == ChatMessageType.AGENT_IMAGE ||
-                                                    msg.type == ChatMessageType.AGENT_EDIT_RESULT
+                                                val isEdit = (msg.type == ChatMessageType.IMAGE &&
+                                                    msg.role != ModelInputRole.USER) ||
+                                                    msg.type == ChatMessageType.EDIT_RESULT
                                                 if (isEdit) viewModel.touchEditImage(msg.imageUri)
                                                 imagePreview = ChatImagePreviewState(
                                                     pages = pages,
@@ -1676,9 +1678,9 @@ private fun ChatMessageItem(
     // 🔵7（M4 review）+ spec §2：user 角色判定直接读消息级 `role` 字段
     // （Room 行经 roleOf 解析，内存构造显式给值），不再枚举 user 类型——与 turn 边界/回灌角色同口径
     val isUser = message.role == ModelInputRole.USER
-    val isImage = message.type == ChatMessageType.AGENT_IMAGE || message.type == ChatMessageType.USER_IMAGE
-    val isImageText = message.type == ChatMessageType.USER_IMAGE_TEXT
-    val isEditResult = message.type == ChatMessageType.AGENT_EDIT_RESULT
+    val isImage = message.type == ChatMessageType.IMAGE
+    val isImageText = message.type == ChatMessageType.IMAGE_TEXT
+    val isEditResult = message.type == ChatMessageType.EDIT_RESULT
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val copySuccess = stringResource(R.string.copy_success)
@@ -1794,7 +1796,10 @@ private fun ChatMessageItem(
                     isImage -> {
                         // 显示图片（可点击进入全屏预览）；agent 生成的结果图过期则显示占位
                         val imgSrc = message.imageUri ?: message.content
-                        if (message.type == ChatMessageType.AGENT_IMAGE && !rememberChatImageIsLive(imgSrc)) {
+                        if (message.type == ChatMessageType.IMAGE &&
+                            message.role != ModelInputRole.USER &&
+                            !rememberChatImageIsLive(imgSrc)
+                        ) {
                             ExpiredImagePlaceholder()
                         } else {
                             AsyncImage(
@@ -2778,7 +2783,7 @@ data class BrowserFramePreviewState(
 data class ImagePreviewPage(
     val messageId: String,
     val rawUri: String,
-    val isEditableResult: Boolean, // AGENT_IMAGE / AGENT_EDIT_RESULT
+    val isEditableResult: Boolean, // IMAGE (agent) / EDIT_RESULT
     val isSaved: Boolean
 )
 
@@ -2792,8 +2797,8 @@ fun buildImagePreviewPages(messages: List<ChatMessageUi>): List<ImagePreviewPage
         ImagePreviewPage(
             messageId = msg.id,
             rawUri = raw,
-            isEditableResult = msg.type == ChatMessageType.AGENT_IMAGE ||
-                msg.type == ChatMessageType.AGENT_EDIT_RESULT,
+            isEditableResult = (msg.type == ChatMessageType.IMAGE && msg.role != ModelInputRole.USER) ||
+                msg.type == ChatMessageType.EDIT_RESULT,
             isSaved = msg.imageSaved
         )
     }

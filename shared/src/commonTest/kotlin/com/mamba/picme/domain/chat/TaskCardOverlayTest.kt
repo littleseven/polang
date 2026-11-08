@@ -38,7 +38,7 @@ class TaskCardOverlayTest {
 
     @Test
     fun `message without task card part is returned as-is`() {
-        val message = ChatMessage(id = "m", type = ChatMessageType.AGENT_TEXT, content = "x", role = ModelInputRole.ASSISTANT)
+        val message = ChatMessage(id = "m", type = ChatMessageType.TEXT, content = "x", role = ModelInputRole.ASSISTANT)
         assertSame(message, message.overlayLiveTaskState(mapOf("t-1" to task())))
     }
 

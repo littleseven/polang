@@ -17,7 +17,7 @@ class ChatListFlattenerTest {
 
     private fun agentText(id: String, text: String, parts: List<MessagePart>? = null) = ChatMessage(
         id = id,
-        type = ChatMessageType.AGENT_TEXT,
+        type = ChatMessageType.TEXT,
         content = text,
         role = ModelInputRole.ASSISTANT,
         parts = parts ?: listOf(textPart("p0", text)),
@@ -27,7 +27,7 @@ class ChatListFlattenerTest {
     fun `user message flattens to a single whole item and opens a turn`() {
         val items = flattenChatItems(
             listOf(
-                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "你好", role = ModelInputRole.USER),
+                ChatMessage(id = "u1", type = ChatMessageType.TEXT, content = "你好", role = ModelInputRole.USER),
                 agentText("a1", "你好呀"),
             ),
         )
@@ -48,9 +48,9 @@ class ChatListFlattenerTest {
     fun `second user message starts a new turn`() {
         val items = flattenChatItems(
             listOf(
-                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "一", role = ModelInputRole.USER),
+                ChatMessage(id = "u1", type = ChatMessageType.TEXT, content = "一", role = ModelInputRole.USER),
                 agentText("a1", "答一"),
-                ChatMessage(id = "u2", type = ChatMessageType.USER_TEXT, content = "二", role = ModelInputRole.USER),
+                ChatMessage(id = "u2", type = ChatMessageType.TEXT, content = "二", role = ModelInputRole.USER),
                 agentText("a2", "答二"),
             ),
         )
@@ -63,7 +63,7 @@ class ChatListFlattenerTest {
         val items = flattenChatItems(
             listOf(
                 agentText("a0", "欢迎"),
-                ChatMessage(id = "u1", type = ChatMessageType.USER_TEXT, content = "问", role = ModelInputRole.USER),
+                ChatMessage(id = "u1", type = ChatMessageType.TEXT, content = "问", role = ModelInputRole.USER),
             ),
         )
         assertEquals(listOf(0, 1), items.map { it.turnIndex })
@@ -75,7 +75,7 @@ class ChatListFlattenerTest {
     fun `agent message with multiple parts flattens to per part items`() {
         val message = ChatMessage(
             id = "a1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -99,7 +99,7 @@ class ChatListFlattenerTest {
     fun `adjacent agent text items in one turn merge`() {
         val streaming = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "paced",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -118,7 +118,7 @@ class ChatListFlattenerTest {
     fun `streaming open text part renders paced content with cursor`() {
         val streaming = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "打字中",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -134,7 +134,7 @@ class ChatListFlattenerTest {
     fun `done text part has no override and no cursor`() {
         val streaming = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "正在调用工具",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -150,7 +150,7 @@ class ChatListFlattenerTest {
     fun `filled streaming card parts are skipped only after persisted row arrives`() {
         val streaming = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -187,7 +187,7 @@ class ChatListFlattenerTest {
         // 不得提前跳过造成窗口期卡片闪失
         val streaming = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -217,7 +217,7 @@ class ChatListFlattenerTest {
         )
         val streaming = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -246,11 +246,11 @@ class ChatListFlattenerTest {
     // ── OpenUI GenUI 卡分派（openui P1） ────────────────────────────
 
     @Test
-    fun `unsupported part flattens to unsupported content type`() {
+    fun `tombstone part flattens to tombstone content type`() {
         // 前向兼容兜底（2026-11-08）：未知/损坏 part 原位渲染占位卡，块序保住
         val message = ChatMessage(
             id = "u1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -262,9 +262,82 @@ class ChatListFlattenerTest {
         val items = flattenChatItems(listOf(message))
         assertEquals(3, items.size)
         assertEquals(ChatListItem.TYPE_AGENT_TEXT, items[0].contentType)
-        assertEquals(ChatListItem.TYPE_UNSUPPORTED, items[1].contentType)
+        assertEquals(ChatListItem.TYPE_TOMBSTONE, items[1].contentType)
         assertEquals("u1:p1", items[1].key)
         assertEquals(ChatListItem.TYPE_AGENT_TEXT, items[2].contentType)
+    }
+
+    // ── 值域终态三新桶（reasoning / source chips / tombstone，spec §6.1/§6.2） ──
+
+    @Test
+    fun `reasoning part flattens to reasoning bucket`() {
+        // 思考链独立折叠块：不落正文桶（防思考链以正文形态双显），排序保 part 序
+        val message = ChatMessage(
+            id = "r1",
+            type = ChatMessageType.TEXT,
+            content = "答案",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Reasoning("p0", text = "先想再答"),
+                textPart("p1", "答案"),
+            ),
+        )
+        val items = flattenChatItems(listOf(message))
+        assertEquals(listOf(ChatListItem.TYPE_REASONING, ChatListItem.TYPE_AGENT_TEXT), items.map { it.contentType })
+        assertEquals(listOf("r1:p0", "r1:p1"), items.map { it.key })
+        assertEquals(listOf(true, false), items.map { it.isTurnStart })
+        assertEquals(listOf(false, true), items.map { it.isLastPartOfMessage })
+    }
+
+    @Test
+    fun `consecutive source parts aggregate into one chips item`() {
+        // spec §6.2：连续 SourceUrl/SourceDocument parts 聚合单条 chips item
+        //（key = messageId:source_chips，part 锚首个 source part）
+        val message = ChatMessage(
+            id = "s1",
+            type = ChatMessageType.TEXT,
+            content = "结果如下",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                textPart("p0", "结果如下"),
+                MessagePart.SourceUrl("p1", sourceId = "s0", url = "https://a.com", title = "A"),
+                MessagePart.SourceUrl("p2", sourceId = "s1", url = "https://b.com"),
+                MessagePart.SourceDocument("p3", sourceId = "s2", mediaType = "text/html", title = "Doc"),
+            ),
+        )
+        val items = flattenChatItems(listOf(message))
+        assertEquals(2, items.size)
+        assertEquals(
+            listOf(ChatListItem.TYPE_AGENT_TEXT, ChatListItem.TYPE_SOURCE_CHIPS),
+            items.map { it.contentType },
+        )
+        assertEquals("s1:source_chips", items[1].key)
+        assertEquals("p1", items[1].part?.partId)
+        assertFalse(items[0].isLastPartOfMessage)
+        assertTrue(items[1].isLastPartOfMessage)
+    }
+
+    @Test
+    fun `multiple source runs get unique chip keys`() {
+        // 防御钉：多段 run（parts-first 自由构造）不得产出重复 LazyColumn key
+        val message = ChatMessage(
+            id = "m1",
+            type = ChatMessageType.TEXT,
+            content = "中",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.SourceUrl("p0", sourceId = "s0", url = "https://a.com"),
+                textPart("p1", "中"),
+                MessagePart.SourceDocument("p2", sourceId = "s2", mediaType = "text/html", title = "Doc"),
+            ),
+        )
+        val items = flattenChatItems(listOf(message))
+        assertEquals(3, items.size)
+        assertEquals(listOf("m1:source_chips", "m1:p1", "m1:source_chips1"), items.map { it.key })
+        assertEquals(
+            listOf(ChatListItem.TYPE_SOURCE_CHIPS, ChatListItem.TYPE_AGENT_TEXT, ChatListItem.TYPE_SOURCE_CHIPS),
+            items.map { it.contentType },
+        )
     }
 
     @Test
@@ -292,7 +365,7 @@ class ChatListFlattenerTest {
 
     private fun streamingBrowser(state: ToolPartState, sessionId: String = "s-1") = ChatMessage(
         id = "s1",
-        type = ChatMessageType.AGENT_TEXT,
+        type = ChatMessageType.TEXT,
         content = "",
         role = ModelInputRole.ASSISTANT,
         isStreaming = true,
@@ -302,7 +375,7 @@ class ChatListFlattenerTest {
     private fun persistedBrowserRow(sessionId: String = "s-1", state: ToolPartState = ToolPartState.OUTPUT_AVAILABLE) =
         ChatMessage(
             id = "browser_1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "{}",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.BrowserLive(partId = "p0", sessionId = sessionId, state = state)),
@@ -362,7 +435,7 @@ class ChatListFlattenerTest {
     fun `claude agent messages render as whole legacy items`() {
         val claude = ChatMessage(
             id = "cl1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             claudeAgent = ClaudeAgentState(text = "工作中"),
@@ -380,7 +453,7 @@ class ChatListFlattenerTest {
         // 常规 Text part 按部分渲染，不再走 whole-message legacy 分支
         val command = ChatMessage(
             id = "cmd1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "/task x",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(textPart("p0", "/task x")),
@@ -395,7 +468,7 @@ class ChatListFlattenerTest {
     fun `message without parts falls back to whole legacy item`() {
         val thinking = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "思考中",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -410,7 +483,7 @@ class ChatListFlattenerTest {
     fun `pending non card tool appends status item after streaming message`() {
         val streaming = ChatMessage(
             id = "s1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "正在调用工具",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,

@@ -562,7 +562,7 @@ class ChatViewModel(
                 val streamingId = "claude_streaming_${System.currentTimeMillis()}"
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
-                    type = ChatMessageType.AGENT_TEXT,
+                    type = ChatMessageType.TEXT,
                     role = ModelInputRole.ASSISTANT,
                     content = "",
                     modelUsed = currentModelLabel(),
@@ -1245,7 +1245,7 @@ class ChatViewModel(
                     .map { part ->
                         ChatMessageUi(
                             id = "browser_live_anchor_${part.sessionId}",
-                            type = ChatMessageType.AGENT_TEXT,
+                            type = ChatMessageType.TEXT,
                             role = ModelInputRole.ASSISTANT,
                             content = "",
                             parts = listOf(part),
@@ -1260,7 +1260,7 @@ class ChatViewModel(
             } else {
                 anchored + ChatMessageUi(
                     id = OPENUI_STREAM_PREVIEW_ID,
-                    type = ChatMessageType.AGENT_TEXT,
+                    type = ChatMessageType.TEXT,
                     role = ModelInputRole.ASSISTANT,
                     content = "",
                     parts = listOf(
@@ -1848,7 +1848,7 @@ class ChatViewModel(
                 _pendingNonCardTool.value = null
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
-                    type = ChatMessageType.AGENT_TEXT,
+                    type = ChatMessageType.TEXT,
                     role = ModelInputRole.ASSISTANT,
                     content = stringContext().getString(STREAMING_THINKING_HINT_RES),
                     modelUsed = currentModelLabel(),
@@ -3464,7 +3464,7 @@ class ChatViewModel(
                 val streamingId = "streaming_${System.currentTimeMillis()}"
                 _streamingMessage.value = ChatMessageUi(
                     id = streamingId,
-                    type = ChatMessageType.AGENT_TEXT,
+                    type = ChatMessageType.TEXT,
                     role = ModelInputRole.ASSISTANT,
                     content = stringContext().getString(R.string.chat_analyzing_image),
                     modelUsed = modelKey,
@@ -3511,7 +3511,7 @@ class ChatViewModel(
                 if (!orchestrator.localModelService.isModelLoaded) {
                     _streamingMessage.value = ChatMessageUi(
                         id = streamingId,
-                        type = ChatMessageType.AGENT_TEXT,
+                        type = ChatMessageType.TEXT,
                         role = ModelInputRole.ASSISTANT,
                         content = stringContext().getString(R.string.chat_loading_model),
                         modelUsed = modelKey
@@ -3680,41 +3680,43 @@ class ChatViewModel(
 
     @Suppress("CyclomaticComplexMethod") // 待重构：toUiModel 按消息类型映射抽表
     private fun ChatMessageEntity.toUiModel(): ChatMessageUi {
-        // ADR-016 M4 + spec §4：parts 优先投影——primary part 定 [ChatMessageType]，
-        // role 列区分 USER_TEXT/AGENT_TEXT 与用户图文（type 前缀不再承载角色信息）；
-        // 平铺字段（chartSvg/htmlContent/…/engineerTask）一律自 parts 提取，
-        // 不再按 type 字符串守卫；performance/claudeAgent 仍从 metadata 解析（现状不变）。
+        // ADR-016 M4 + spec §4：parts 优先投影——primary part 定 [ChatMessageType]
+        // （纯 kind 枚举，D2a 9 值；role 由消息级 role 列独立承载，type 不再有
+        // USER_/AGENT_ 前缀变体）；平铺字段（chartSvg/htmlContent/…/engineerTask）
+        // 一律自 parts 提取，不再按 type 字符串守卫；performance/claudeAgent 仍从
+        // metadata 解析（现状不变）。
         val parts = decodePartsOrLegacy()
         val primary = parts.firstOrNull()
         val role = roleOf(this.role)
         return ChatMessageUi(
             id = id,
             type = when (primary) {
-                is MessagePart.Text -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
-                is MessagePart.Image -> when {
-                    role == ModelInputRole.USER && parts.any { it is MessagePart.Text } -> ChatMessageType.USER_IMAGE_TEXT
-                    role == ModelInputRole.USER -> ChatMessageType.USER_IMAGE
-                    else -> ChatMessageType.AGENT_IMAGE
+                is MessagePart.Text -> ChatMessageType.TEXT
+                is MessagePart.Image -> if (role == ModelInputRole.USER && parts.any { it is MessagePart.Text }) {
+                    ChatMessageType.IMAGE_TEXT
+                } else {
+                    ChatMessageType.IMAGE
                 }
                 is MessagePart.Chart -> ChatMessageType.CHART
                 is MessagePart.HtmlCard -> ChatMessageType.HTML_CARD
                 is MessagePart.TaskCard -> ChatMessageType.TASK_CARD
-                is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
+                is MessagePart.EditResult -> ChatMessageType.EDIT_RESULT
                 is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
                 is MessagePart.OpenUiCard -> ChatMessageType.OPENUI_CARD
                 // BrowserLive 直播卡 UI 映射属 browser-vnc 直播卡后续 Task；此前防御性落文本
                 //（此间管线未产此类 part，分支不可达）
-                is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
-                // 值域终态三新 part（reasoning/source，2026-11-08）：渲染/判型对等随后续
-                // 任务落地，防御性落文本（同上先例；生产者接线前分支不可达）
+                is MessagePart.BrowserLive -> ChatMessageType.TEXT
+                // 值域终态三新 part（reasoning/source，2026-11-08）：均不主导消息 kind
+                //（reasoning 折叠块 / source chips 由拍平 item 渲染），判型防御性落文本
+                //（同上先例；生产者接线前分支不可达）
                 is MessagePart.Reasoning,
                 is MessagePart.SourceUrl,
                 is MessagePart.SourceDocument,
-                -> ChatMessageType.AGENT_TEXT
+                -> ChatMessageType.TEXT
                 // 前向兼容/退役兜底（未知/损坏 part）：整消息判型防御性落文本，
-                // 实际渲染走拍平 item（TYPE_UNSUPPORTED 占位卡）
-                is MessagePart.Tombstone -> ChatMessageType.AGENT_TEXT
-                null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
+                // 实际渲染走拍平 item（TYPE_TOMBSTONE 占位卡）
+                is MessagePart.Tombstone -> ChatMessageType.TEXT
+                null -> ChatMessageType.TEXT
             },
             role = role,
             content = content,

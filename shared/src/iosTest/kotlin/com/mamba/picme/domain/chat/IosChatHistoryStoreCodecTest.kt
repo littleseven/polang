@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 /**
  * ChatHistoryStoreCodec 契约测试（ADR-016 M5 B1）：
- * round-trip 等值 / 11→8 wire 反向映射 / parts-first 投影 / 结构化字段重建 /
+ * round-trip 等值 / 9 值 kind↔wire 映射 / parts-first 投影 / 结构化字段重建 /
  * 损坏兜底不丢消息 / 瞬态与计算值不持久化。
  */
 class IosChatHistoryStoreCodecTest {
@@ -18,7 +18,7 @@ class IosChatHistoryStoreCodecTest {
     fun roundTripTextMessagePreservesDomain() {
         val original = ChatMessage(
             id = "m1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "hello",
             role = ModelInputRole.ASSISTANT,
             modelUsed = "test-model",
@@ -32,7 +32,7 @@ class IosChatHistoryStoreCodecTest {
     fun roundTripUserImageTextFlattensWireType() {
         val original = ChatMessage(
             id = "m2",
-            type = ChatMessageType.USER_IMAGE_TEXT,
+            type = ChatMessageType.IMAGE_TEXT,
             content = "看这张",
             role = ModelInputRole.USER,
             imageUri = "file:///img.jpg",
@@ -43,8 +43,8 @@ class IosChatHistoryStoreCodecTest {
             ),
         )
         val encoded = ChatHistoryStoreCodec.encode(listOf(original))
-        // 11 值 UI 枚举归并为 wire 8 值 + role 独立列
-        assertTrue("\"type\":\"image\"" in encoded, "USER_IMAGE_TEXT 应归并 wire type=image: $encoded")
+        // 9 值 kind 枚举归并 wire 分类法 + role 独立列
+        assertTrue("\"type\":\"image\"" in encoded, "IMAGE_TEXT 应归并 wire type=image: $encoded")
         assertTrue("\"role\":\"user\"" in encoded)
         val decoded = ChatHistoryStoreCodec.decode(encoded)
         assertEquals(listOf(original), decoded)
@@ -129,7 +129,7 @@ class IosChatHistoryStoreCodecTest {
     fun transientAndComputedFieldsNotPersisted() {
         val original = ChatMessage(
             id = "m3",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "streaming",
             role = ModelInputRole.ASSISTANT,
             isStreaming = true,
@@ -169,7 +169,7 @@ class IosChatHistoryStoreCodecTest {
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         val message = decoded.single()
-        assertEquals(ChatMessageType.USER_IMAGE_TEXT, message.type, "重建后 parts-first 判型")
+        assertEquals(ChatMessageType.IMAGE_TEXT, message.type, "重建后 parts-first 判型")
         assertEquals(2, message.parts.size)
         assertIs<MessagePart.Image>(message.parts[0])
         assertIs<MessagePart.Text>(message.parts[1])
@@ -195,7 +195,7 @@ class IosChatHistoryStoreCodecTest {
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         val message = decoded.single()
-        assertEquals(ChatMessageType.AGENT_TEXT, message.type)
+        assertEquals(ChatMessageType.TEXT, message.type)
         assertEquals("原文", (message.parts.single() as MessagePart.Text).markdown)
     }
 
@@ -257,8 +257,8 @@ class IosChatHistoryStoreCodecTest {
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json), "退役行不得塌掉整包解码")
         assertEquals(listOf("a", "c"), decoded.map { it.id }, "退役行整行跳过、正常行保留")
-        assertEquals(ChatMessageType.USER_TEXT, decoded[0].type)
-        assertEquals(ChatMessageType.AGENT_TEXT, decoded[1].type)
+        assertEquals(ChatMessageType.TEXT, decoded[0].type)
+        assertEquals(ChatMessageType.TEXT, decoded[1].type)
     }
 
     @Test
@@ -273,7 +273,7 @@ class IosChatHistoryStoreCodecTest {
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         assertEquals(listOf("a", "b", "c"), decoded.map { it.id })
-        assertEquals(ChatMessageType.AGENT_TEXT, decoded[1].type, "损坏行降级纯文本")
+        assertEquals(ChatMessageType.TEXT, decoded[1].type, "损坏行降级纯文本")
         assertEquals("任务卡缺 engineerTask", decoded[1].content)
     }
 
