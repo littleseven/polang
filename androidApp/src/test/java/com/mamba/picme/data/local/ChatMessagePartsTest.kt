@@ -7,9 +7,11 @@ import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
 import com.mamba.picme.domain.chat.toToolPartState
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 /**
@@ -95,6 +97,43 @@ class ChatMessagePartsTest {
         assertEquals(state, entity.taskCardStateOrNull())
         assertEquals("tool_task", entity.type)
         assertNull(chatMessageEntity(id = "m", sessionId = "s1", role = "agent", parts = listOf(textPart())).taskCardStateOrNull())
+    }
+
+    @Test
+    fun `no bypass of the parts seam in main sources`() {
+        // 双写守卫（v28 口径，2026-11-08 终审补回）：partsJson 唯一权威后，投影漂移的
+        // 唯一旁路是绕过接缝直接构造 ChatMessageEntity 或直调 DAO 裸 insert——本扫描冻结两类
+        val mainSrc = File("src/main/java/com/mamba/picme")
+        assertTrue("守卫需在 :androidApp 模块根目录运行", mainSrc.isDirectory)
+        val allowedConstruction = setOf(
+            "ChatMessageEntity.kt", // 实体定义
+            "ChatMessageParts.kt", // 接缝本体（chatMessageEntity 工厂）
+            "TagDataBackupRepository.kt", // 备份恢复「原文保留」分支
+        )
+        val offenders = mutableListOf<String>()
+        mainSrc.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .forEach { file ->
+                file.readText().lineSequence().forEachIndexed { index, line ->
+                    val trimmed = line.trim()
+                    val isComment = trimmed.startsWith("//") || trimmed.startsWith("*")
+                    if (!isComment && "ChatMessageEntity(" in trimmed && file.name !in allowedConstruction) {
+                        offenders += "${file.relativeTo(mainSrc)}:${index + 1} → $trimmed"
+                    }
+                    if (file.name != "ChatMessageParts.kt" && file.name != "ChatMessageDao.kt" &&
+                        (".insertMessage(" in trimmed || ".insertMessages(" in trimmed)
+                    ) {
+                        offenders += "${file.relativeTo(mainSrc)}:${index + 1} → $trimmed"
+                    }
+                }
+            }
+        if (offenders.isNotEmpty()) {
+            fail(
+                "chat_messages 写入绕过 parts 单一权威接缝（v28）：\n" +
+                    offenders.joinToString("\n") + "\n" +
+                    "请改用 chatMessageEntity/withUpdatedParts 构造 + insertPartsMessage(s) 落库。",
+            )
+        }
     }
 
     private fun gachaGroup() = OptimizeCandidateGroup("u", "scene", 0, emptyList(), emptyList(), 0)

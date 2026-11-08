@@ -1502,7 +1502,6 @@ class ChatViewModel(
                     insertAgentImageMessage(
                         sessionId = sid,
                         imageUri = outcome.imageUri,
-                        content = outcome.explanation,
                         modelUsed = currentModelLabel()
                     )
                     outcome.explanation
@@ -2607,7 +2606,7 @@ class ChatViewModel(
                                 performance
                             )
                         } else {
-                            handleAiOptimize(sessionId, targetUri, cmd.explanation, currentModelLabel(), performance)
+                            handleAiOptimize(sessionId, targetUri, currentModelLabel(), performance)
                         }
                     }
                     is AgentCommand.EditImage -> {
@@ -2655,13 +2654,12 @@ class ChatViewModel(
     private suspend fun handleAiOptimize(
         sessionId: String,
         targetUri: String,
-        explanationOverride: String?,
         modelUsed: String,
         performance: LlmPerformance?
     ) {
         val controller = optimizeGachaController
         if (controller == null) {
-            legacyAiOptimize(sessionId, targetUri, explanationOverride, modelUsed, performance)
+            legacyAiOptimize(sessionId, targetUri, modelUsed, performance)
             return
         }
         val messageId = UUID.randomUUID().toString()
@@ -2679,7 +2677,6 @@ class ChatViewModel(
                     insertAgentImageMessage(
                         sessionId = sessionId,
                         imageUri = outcome.imageUri,
-                        content = explanationOverride ?: outcome.explanation,
                         modelUsed = modelUsed,
                         performance = performance
                     )
@@ -2694,7 +2691,6 @@ class ChatViewModel(
     private suspend fun legacyAiOptimize(
         sessionId: String,
         targetUri: String,
-        explanationOverride: String?,
         modelUsed: String,
         performance: LlmPerformance?
     ) {
@@ -2706,7 +2702,7 @@ class ChatViewModel(
         val outcome = renderer.aiOptimize(targetUri, sessionId)
         Logger.i(TAG, "AiOptimize outcome (legacy): imageUri=${outcome.imageUri}, explanation=${outcome.explanation}")
         if (outcome.imageUri != null) {
-            insertAgentImageMessage(sessionId, outcome.imageUri, explanationOverride ?: outcome.explanation, modelUsed, performance)
+            insertAgentImageMessage(sessionId, outcome.imageUri, modelUsed, performance)
         } else {
             insertAgentMessage(sessionId, outcome.explanation, modelUsed, performance)
         }
@@ -3642,7 +3638,6 @@ class ChatViewModel(
     private suspend fun insertAgentImageMessage(
         sessionId: String,
         imageUri: String,
-        content: String,
         modelUsed: String,
         performance: LlmPerformance? = null
     ) {

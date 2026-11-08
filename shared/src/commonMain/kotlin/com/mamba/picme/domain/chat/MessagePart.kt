@@ -2,6 +2,7 @@ package com.mamba.picme.domain.chat
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * part 三分类（spec §1.2）：内容物 / 工具产物 / 数据载荷。
@@ -221,6 +222,14 @@ sealed interface MessagePart {
         val summary: String? = null,
     ) : MessagePart {
         override val category: PartCategory get() = PartCategory.DATA
+
+        /**
+         * 原始 payload 原文（解码侧 [MessagePartsCodec] 回填，不进线格式、不参与相等性）：
+         * 行被 [withUpdatedParts] 等更新路径重编码时，encode 原位回写原文——未知 payload
+         * 不因占位重编码销毁，「升级新版本后同一行自动恢复」的承诺对更新路径同样成立。
+         */
+        @Transient
+        var rawPayload: String? = null
     }
 }
 

@@ -1,12 +1,13 @@
 package com.mamba.picme.domain.chat
 
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 
 /**
@@ -27,9 +28,16 @@ object MessagePartsCodec {
         encodeDefaults = false
     }
 
-    private val listSerializer = ListSerializer(MessagePart.serializer())
-
-    fun encode(parts: List<MessagePart>): String = json.encodeToString(listSerializer, parts)
+    fun encode(parts: List<MessagePart>): String {
+        // Unsupported 携带解码回填的 rawPayload 时原位回写原文（行更新重编码不销毁
+        // 未知 payload）；其余 part 正常序列化（encodeDefaults=false 紧凑落库）
+        val elements = parts.map { part ->
+            val raw = (part as? MessagePart.Unsupported)?.rawPayload
+            raw?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() }
+                ?: json.encodeToJsonElement(MessagePart.serializer(), part)
+        }
+        return JsonArray(elements).toString()
+    }
 
     /**
      * 解码 parts JSON；空串/整体结构损坏（非 JSON 数组）返回 null，调用方按 legacy
@@ -77,6 +85,7 @@ object MessagePartsCodec {
             (obj?.get(key) as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
         }
         return MessagePart.Unsupported(partId, originalType = type ?: "unknown", summary = summary)
+            .apply { rawPayload = obj?.toString() }
     }
 
     /** Unsupported 摘要提升的候选字段（优先级序）。 */

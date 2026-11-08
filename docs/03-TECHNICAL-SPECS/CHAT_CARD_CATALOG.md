@@ -12,22 +12,21 @@
 **两级协议形态**：
 
 1. **入口协议**（LLM → App）：OpenAI 兼容 tool_calls，`name` + `arguments`（JSON 字符串，定义在 `shared/.../inference/remote/tool/ChatToolService.kt` `@Tool`）。
-2. **落库协议**（App → Room → 渲染）：`chat_messages` 表一行（`androidApp/.../data/local/ChatMessageEntity.kt`），卡片差异化负载全部收在 `content` + `metadata`（JSON 字符串）两列。
+2. **落库协议**（App → Room → 渲染）：`chat_messages` 表一行（`androidApp/.../data/local/ChatMessageEntity.kt`）。**v28（2026-11-08 持久化接缝反转）起卡片差异化负载全部收在 `partsJson` 列（parts 数组 JSON 字符串，唯一内容权威，NOT NULL）**；`type` 为投影列（自 parts 经 `roomTypeOf` 派生，服务索引/查询）；`metadata` 白名单瘦身（claude_agent_state / 性能七键 / savedAt）；`content` 列退役删除。
 
 > 📌 **读例约定**：下文所有 `metadata` / `tool_call.arguments` / `content` 内嵌 JSON 一律**展开为对象/数组示意**（带注释）；实际 Room 存储为其序列化字符串。
 
 ```jsonc
-// chat_messages 表结构（Room v26 实体，逐列）
+// chat_messages 表结构（Room v28 实体，逐列；v28 = 2026-11-08 持久化接缝反转）
 {
   "id": "uuid 或 taskId", // 任务卡特例：id = taskId，REPLACE upsert
   "sessionId": "default",
-  "type": "…", // 新分类法 10 值之一（3 分类，见下）
+  "type": "…", // 新分类法 10 值之一（3 分类，见下）——v28 起为投影列（自 partsJson 经 roomTypeOf 派生）
   "role": "agent", // 消息角色 "user"/"agent"（v26 新列，取代 user_/agent_ type 前缀）
-  "content": "…", // 按 type 语义不同，见各卡
   "timestamp": 1790000000000,
   "modelUsed": "deepseek-chat", // 可空
-  "metadata": { "…": "…" }, // 卡片专属负载包（实际存储为 JSON 字符串）
-  "partsJson": [ "…" ] // parts 数组 JSON（读面权威源，实际存储为 JSON 字符串）
+  "metadata": { "…": "…" }, // v28 白名单：claude_agent_state / 性能七键 / savedAt（实际存储为 JSON 字符串）
+  "partsJson": [ "…" ] // parts 数组 JSON——v28 起唯一内容权威（NOT NULL；读侧 decodeParts 直读，无 legacy 回退）
 }
 ```
 
@@ -352,21 +351,22 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 // 纯文本（← user_text）
 {
   "id": "8f3a…",
-  "type": "text",
+  "type": "text", // v28 起为投影列（自 parts 派生，下同）
   "role": "user",
-  "content": "修复相册扫描时的崩溃",
-  "metadata": null
+  "partsJson": [
+    { "type": "text", "partId": "p0", "markdown": "修复相册扫描时的崩溃" }
+  ]
 }
 
-// 图文（← user_image / user_image_text，metadata 携带图片 uri）
+// 图文（← user_image / user_image_text）
 {
   "id": "8f3b…",
-  "type": "image",
+  "type": "image", // 投影列
   "role": "user",
-  "content": "把这张图的背景换成海边",
-  "metadata": {
-    "imageUri": "content://media/external/images/media/1024"
-  }
+  "partsJson": [
+    { "type": "image", "partId": "p0", "ref": "content://media/external/images/media/1024" },
+    { "type": "text", "partId": "p1", "markdown": "把这张图的背景换成海边" }
+  ]
 }
 ```
 
@@ -380,12 +380,11 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 **协议**（落库）：
 
 ```jsonc
-// 纯文本回复（性能指标直挂 metadata 顶层；← agent_text）
+// 纯文本回复（性能指标直挂 metadata 顶层——v28 白名单七键；← agent_text）
 {
   "id": "a1…",
-  "type": "text",
+  "type": "text", // 投影列
   "role": "agent",
-  "content": "已定位崩溃根因：\n\n**TagScanOrchestrator** 空指针…",
   "modelUsed": "deepseek-chat",
   "metadata": {
     "prompt_len": 3210,
@@ -394,15 +393,17 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
     "decode_time_ms": 1830,
     "prefill_speed": 7.8,
     "decode_speed": 48.6
-  }
+  },
+  "partsJson": [
+    { "type": "text", "partId": "p0", "markdown": "已定位崩溃根因：\n\n**TagScanOrchestrator** 空指针…" }
+  ]
 }
 
-// AI 工程师回合（metadata 换挂 claude_agent_state；性能字段缺省 → 不渲染性能行）
+// AI 工程师回合（metadata 换挂 claude_agent_state——v28 白名单键；性能字段缺省 → 不渲染性能行）
 {
   "id": "a2…",
-  "type": "text",
+  "type": "text", // 投影列
   "role": "agent",
-  "content": "",
   "metadata": {
     "claude_agent_state": {
       "text": "正在修复…",
@@ -414,7 +415,10 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
       "hasFileChange": true,
       "truncatedReason": null
     }
-  }
+  },
+  "partsJson": [
+    { "type": "text", "partId": "p0", "markdown": "正在修复…" } // claude 气泡正文入 part；步骤流仍挂 metadata 白名单键
+  ]
 }
 ```
 
@@ -449,12 +453,13 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
   }
 }
 
-// ② 落库：content = 端侧 QuickJS 生成的 SVG 串
+// ② 落库：Chart part 直写 partsJson（svg = 端侧 QuickJS 生成的 SVG 串）
 {
   "id": "c7…",
-  "type": "tool_chart",
-  "content": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 240'>…柱状图元素…</svg>",
-  "metadata": null
+  "type": "tool_chart", // v28 投影列
+  "partsJson": [
+    { "type": "tool_chart", "partId": "p0", "svg": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 240'>…柱状图元素…</svg>" }
+  ]
 }
 ```
 
@@ -493,19 +498,21 @@ partsJson 实例见 §0.2 `tool_chart`。**回灌**（`toModelInput`，M2 起 to
   }
 }
 
-// ② 落库：content = 清洗后 HTML；metadata.html_card = 双形态终判
+// ② 落库：HtmlCard part 直写 partsJson（html = 清洗后 HTML；meta = 双形态终判四字段）
 {
   "id": "h9…",
-  "type": "tool_html",
-  "content": "<div style='width:100%…'>…</div>",
-  "metadata": {
-    "html_card": {
+  "type": "tool_html", // v28 投影列
+  "partsJson": [{
+    "type": "tool_html",
+    "partId": "p0",
+    "html": "<div style='width:100%…'>…</div>",
+    "meta": {
       "display": "fullpage", // LLM 声明原值；null = 未声明（按 inline）
       "displayMode": "FULLPAGE", // 端侧终判；null = 尚未判定（待测高）
       "measuredHeightPx": null, // 终判测高（CSS px ≈ dp）；fullpage 直判时可为 null
       "summary": "NVIDIA 2026 Q3 业绩概览"
     }
-  }
+  }]
 }
 ```
 
@@ -545,14 +552,17 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 **协议**（无 tool_call 入口——工程师模式任务创建经 `persistEngineerTask` upsert；SSE 事件流驱动 `EngineerTaskReducer` 状态机，结构性事件才落库）：
 
 ```jsonc
-// 落库：content = sourceText 前 50 字；metadata.engineer_task = 全量状态
+// 落库：TaskCard part 直写 partsJson（task = 全量状态快照；v28 起 content/metadata.engineer_task 退役）
 {
   "id": "task-01JD2Z…", // = taskId（REPLACE 同 id 重插）
-  "type": "tool_task",
-  "content": "修复相册扫描时的崩溃",
+  "type": "tool_task", // v28 投影列
   "timestamp": 1790000000000, // = startedAtMs（卡片锚定提交位置）
-  "metadata": {
-    "engineer_task": {
+  "partsJson": [{
+    "type": "tool_task",
+    "partId": "p0",
+    "toolCallId": "task-01JD2Z…",
+    "state": "APPROVAL_REQUESTED", // 五态投影（RUNNING→INPUT_AVAILABLE / AWAITING_*→APPROVAL_REQUESTED / COMPLETED→OUTPUT_AVAILABLE / FAILED→OUTPUT_ERROR）
+    "task": {
       "taskId": "task-01JD2Z…",
       "sourceText": "修复相册扫描时的崩溃",
       "sid": "claude-9a…",
@@ -570,7 +580,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
       "resolution": null, // CONTINUED | ABANDONED | DELIVERED | DELIVER_SKIPPED（审批动作回填）
       "deliverBranch": null
     }
-  }
+  }]
 }
 ```
 
@@ -614,25 +624,29 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 **协议**（content=资产数组、metadata=查询上下文，两列分担）：
 
 ```jsonc
-// 落库（来源：search_media 工具 / 脚本 return ids 自动补卡）
+// 落库（来源：search_media 工具 / 脚本 return ids 自动补卡；v28 起 content/metadata 退役，MediaResults part 直写 partsJson）
 {
   "id": "m5…",
-  "type": "data_media_results",
-  "content": [
-    {
-      "id": 1024,
-      "uri": "content://media/external/images/media/1024",
-      "type": "PHOTO",
-      "captureDate": 1757000000000,
-      "fileName": "IMG_20260805.jpg",
-      "faceFocusY": 0.42
+  "type": "data_media_results", // v28 投影列
+  "partsJson": [{
+    "type": "data_media_results",
+    "partId": "p0",
+    "results": {
+      "query": "去年夏天的海边",
+      "totalCount": 87, // 未截断真实命中数
+      "isRefinement": false,
+      "assets": [
+        {
+          "id": 1024,
+          "uri": "content://media/external/images/media/1024",
+          "type": "PHOTO",
+          "captureDate": 1757000000000,
+          "fileName": "IMG_20260805.jpg",
+          "faceFocusY": 0.42
+        }
+      ] // 已截到展示上限
     }
-  ], // 已截到展示上限
-  "metadata": {
-    "query": "去年夏天的海边",
-    "totalCount": 87, // 未截断真实命中数
-    "isRefinement": false
-  }
+  }]
 }
 ```
 
@@ -644,28 +658,31 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ### 4.5 AI 优化抽卡候选条 `GachaCandidateStrip`
 
-**协议**（落库；metadata 全量负载）：
+**协议**（落库；group 全量入 part——v28 起 content/metadata 退役）：
 
 ```jsonc
 {
   "id": "g8…",
-  "type": "data_optimize_candidates",
-  "content": "",
-  "metadata": {
-    "sourceImageUri": "file://…/edit_tmp.jpg",
-    "scene": "portait_enhance",
-    "recommendedIndex": 2, // NIMA 最优卡；-1 = KeepOriginal 不预选
-    "drawIndex": 1, // 第几组（换一组 +1）
-    "candidates": [
-      {
-        "direction": "自然",
-        "thumbPath": "/data/…/c0.webp", // 空串 = 落盘失败（UI 占位）
-        "nimaScore": 5.82, // null = 未评分
-        "rejected": false
-      }
-    ],
-    "usedFingerprints": ["a3f1…"] // 「换一组」回传 exclude 的去重指纹
-  }
+  "type": "data_optimize_candidates", // v28 投影列
+  "partsJson": [{
+    "type": "data_optimize_candidates",
+    "partId": "p0",
+    "group": {
+      "sourceImageUri": "file://…/edit_tmp.jpg",
+      "scene": "portait_enhance",
+      "recommendedIndex": 2, // NIMA 最优卡；-1 = KeepOriginal 不预选
+      "drawIndex": 1, // 第几组（换一组 +1）
+      "candidates": [
+        {
+          "direction": "自然",
+          "thumbPath": "/data/…/c0.webp", // 空串 = 落盘失败（UI 占位）
+          "nimaScore": 5.82, // null = 未评分
+          "rejected": false
+        }
+      ],
+      "usedFingerprints": ["a3f1…"] // 「换一组」回传 exclude 的去重指纹
+    }
+  }]
 }
 ```
 
@@ -679,27 +696,27 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 **协议**（落库）：
 
 ```jsonc
-// image + role=agent（生成/优化结果图；← agent_image）
+// image + role=agent（生成/优化结果图；← agent_image；v28 起 explanation 不落库）
 {
   "id": "r2…",
-  "type": "image",
+  "type": "image", // v28 投影列
   "role": "agent",
-  "content": "已生成修复后的照片",
-  "metadata": {
-    "imageUri": "file:///data/…/result.webp",
-    "saved": true
-  }
+  "partsJson": [
+    { "type": "image", "partId": "p0", "ref": "file:///data/…/result.webp", "saved": true }
+  ]
 }
 
 // tool_image_edit（对话式编辑结果：图 + 说明；← agent_edit_result）
 {
   "id": "r3…",
-  "type": "tool_image_edit",
-  "content": "已完成背景替换：海边 · 保留人物主体",
-  "metadata": {
-    "imageUri": "file:///data/…/edit.webp",
+  "type": "tool_image_edit", // v28 投影列
+  "partsJson": [{
+    "type": "tool_image_edit",
+    "partId": "p0",
+    "ref": "file:///data/…/edit.webp",
+    "description": "已完成背景替换：海边 · 保留人物主体",
     "saved": false
-  }
+  }]
 }
 ```
 
@@ -744,12 +761,12 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 // 后续动作：browser_navigate / browser_click / browser_type / browser_extract /
 // browser_screenshot / browser_close（均带 sessionId；click/type 三模式定位 index>targetText>selector）
 
-// ② 落库：会话结束定格卡——content = BrowserLive part 整颗 JSON（metadata 留空）
+// ② 落库：会话结束定格卡——BrowserLive part 直写 partsJson（v28 起唯一权威）
 {
   "id": "browser_1790000000000_1",
-  "type": "tool_browser",
+  "type": "tool_browser", // v28 投影列
   "role": "agent",
-  "content": {
+  "partsJson": [{
     "type": "tool_browser",
     "partId": "p0",
     "sessionId": "9f3a…",
@@ -762,7 +779,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
     ],
     "actionCount": 7,
     "resultSummary": "浏览器会话已结束，共 7 个动作"
-  },
+  }],
   "modelUsed": "browser"
 }
 ```

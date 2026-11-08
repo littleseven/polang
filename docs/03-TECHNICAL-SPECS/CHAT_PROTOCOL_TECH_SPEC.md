@@ -198,24 +198,24 @@ TurnPartsReducer 规则：
 
 统一入口 `chatMessageDao.insertPartsMessage`（REPLACE upsert；实体须经 `chatMessageEntity` 构造或 `withUpdatedParts` 更新产出）。**v28（2026-11-08 持久化接缝反转）起 partsJson 为唯一内容权威（NOT NULL）**：type 为写时投影列（`MessagePartsProjection.roomTypeOf`），content 列退役，metadata 白名单瘦身（claude_agent_state/性能指标/savedAt）——投影与 partsJson 同点派生，不可漂移。读侧 `decodeParts`：直解 partsJson，空/整体损坏合成 Unsupported 占位（不丢消息位）。v27- 为 M1 双写过渡形态（partsJson 是标量列的现算纯函数），迁移见 MIGRATION_27_28。
 
-| 工具/来源 | 链路 | 落库行 |
+| 工具/来源 | 链路 | 落库行（v28：partsJson 直写，type 为投影列） |
 |---|---|---|
-| draw_chart | onDrawChart → QuickJS `Chart.bar/line/pie` 生成 SVG → `emitChartMessage` + feedToolOutput | `tool_chart`，content=SVG |
-| render_html | onRenderHtml → `HtmlCardSanitizer.sanitize` → `emitHtmlCardMessage` + feedToolOutput | `tool_html`，content=清洗后 HTML，metadata.html_card={display,summary} |
+| draw_chart | onDrawChart → QuickJS `Chart.bar/line/pie` 生成 SVG → `emitChartMessage` + feedToolOutput | `tool_chart`，Chart part（svg=SVG） |
+| render_html | onRenderHtml → `HtmlCardSanitizer.sanitize` → `emitHtmlCardMessage` + feedToolOutput | `tool_html`，HtmlCard part（html=清洗后 HTML，meta={display,summary,…}） |
 | run_gallery_script 直出 | onRunScript 拦截 return：`{chart}`→emitChartMessage；`{html}`→sanitize→emitHtmlCardMessage；含 `ids`→登记，回合末 `settleScriptMediaIds` 补横滑卡 | 同上 + `data_media_results` |
-| search_media / refine | uiActions(MediaResults) → `insertMediaResultsMessage`；一回合至多一卡（REPLACE 复用上一张卡 id） | `data_media_results`，content=assets 数组，metadata=query/totalCount/isRefinement |
-| edit_image | ImageEditCapability → uiActions → `insertEditResultMessage` | `tool_image_edit`，content=explanation，metadata={imageUri,saved,suggestions} |
-| ai_optimize | handleAiOptimize → `insertOptimizeCandidatesMessage`；换一组/落选同 id REPLACE | `data_optimize_candidates`，metadata=group JSON |
-| browser_* | 会话定格 `emitBrowserCardMessage`（turn 结束 `settleBrowserSessionsAtTurnEnd` 兜底强制 close+定格） | `tool_browser`，content=BrowserLive 整颗 JSON（partId 归一 "p0"） |
-| 纯文本/错误 | `insertAgentMessage`（性能 metadata 直挂顶层） | `text`（role=agent） |
-| 工程师气泡 | `persistClaudeBubble` | `text` + metadata.claude_agent_state |
+| search_media / refine | uiActions(MediaResults) → `insertMediaResultsMessage`；一回合至多一卡（REPLACE 复用上一张卡 id） | `data_media_results`，MediaResults part（results=query/totalCount/isRefinement/assets 合一） |
+| edit_image | ImageEditCapability → uiActions → `insertEditResultMessage` | `tool_image_edit`，EditResult part（ref/description/suggestions/saved） |
+| ai_optimize | handleAiOptimize → `insertOptimizeCandidatesMessage`；换一组/落选同 id REPLACE | `data_optimize_candidates`，OptimizeCandidates part（group 全量） |
+| browser_* | 会话定格 `emitBrowserCardMessage`（turn 结束 `settleBrowserSessionsAtTurnEnd` 兜底强制 close+定格） | `tool_browser`，BrowserLive part 直写（partId 归一 "p0"） |
+| 纯文本/错误 | `insertAgentMessage`（性能 metadata 直挂顶层——白名单七键） | `text`（role=agent） |
+| 工程师气泡 | `persistClaudeBubble` | `text` + metadata.claude_agent_state（白名单键） |
 
 ### 2.5 live 态覆写与落库后回写
 
 - **覆写挂载点**：`displayMessages` = `_messages + _streamingMessage` → `.overlayLiveTaskState(liveTasks).overlayLiveBrowserState(liveBrowser)`；两条 live 流各经 `sample(500ms)` + 首值直通节流。
 - **TaskCardOverlay**：消息内首个 TaskCard part 按 taskId 同 id 原位覆写（legacy engineerTask 字段自 part 投影，同源防漂移）；live 源 = SSE 驱动的内存 map，本身不落库。
 - **BrowserLiveOverlay**：同构，按 sessionId 覆写；帧/动作流水只走 WS/HTTP UI 通道不落 Room，会话结束才落定格卡。
-- **测高回写**：`persistHtmlCardDisplayMode`——合并 metadata.html_card.displayMode/measuredHeightPx，**幂等**（同值跳过写库）。
+- **测高回写**：`persistHtmlCardDisplayMode`——经 `withUpdatedParts` 合并 HtmlCard part 的 meta.displayMode/measuredHeightPx（v28 起 partsJson 权威；v27- 形态为合并 metadata.html_card），**幂等**（同值跳过写库）。
 - **任务卡 SSE upsert**：ClaudeChatClient SSE 解析 → EngineerTaskReducer 五态迁移 → **仅结构性事件落库**（`isStructural = event !is AssistantText`，文本 delta 不触发 Room churn）→ `persistEngineerTask`：id=taskId REPLACE、timestamp 恒为 startedAtMs 锚定提交位置。重启恢复：Room 态与内存 live 态按 updatedAtMs 较大者合并。
 
 ### 2.6 渲染源（M4 拍平，要点）

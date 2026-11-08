@@ -238,6 +238,26 @@ class MessagePartsCodecTest {
     }
 
     @Test
+    fun `encode preserves raw payload of unsupported parts on row update`() {
+        // 更新路径不销毁未知 payload（2026-11-08 终审修复）：行被 withUpdatedParts 等
+        // 更新路径重编码时，Unsupported 携带的 rawPayload 原位回写原文——若退化为
+        // 占位重编码，新版本独有字段（如此处的 videoUri）将永久丢失
+        val original = """
+            [
+              {"type":"tool_video_edit","partId":"p1","videoUri":"v.mp4","fallbackSummary":"视频编辑结果"},
+              {"type":"text","partId":"p2","markdown":"后文"}
+            ]
+        """.trimIndent()
+        val decoded = assertNotNull(MessagePartsCodec.decode(original))
+        // 模拟更新：往行尾追加一个 part 后整体重编码
+        val reEncoded = MessagePartsCodec.encode(decoded + MessagePart.Text("p3", "新追加"))
+        assertTrue(reEncoded.contains("\"type\":\"tool_video_edit\""))
+        assertTrue(reEncoded.contains("\"videoUri\":\"v.mp4\""))
+        // 再解码仍得到等值 parts 结构（rawPayload 不参与相等性）
+        assertEquals(decoded + MessagePart.Text("p3", "新追加"), MessagePartsCodec.decode(reEncoded))
+    }
+
+    @Test
     fun `decode tolerates unknown fields on known part`() {
         // 前向兼容：新版本字段被忽略，其余字段正常还原
         val decoded = MessagePartsCodec.decode(
