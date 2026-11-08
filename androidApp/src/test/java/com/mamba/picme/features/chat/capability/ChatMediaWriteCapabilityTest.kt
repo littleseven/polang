@@ -34,6 +34,7 @@ class ChatMediaWriteCapabilityTest {
         val deleted = mutableListOf<List<String>>()
         val favorited = mutableListOf<Pair<String, Boolean>>()
         val selected = mutableListOf<Pair<String, Boolean>>()
+        val shared = mutableListOf<List<String>>()
 
         override suspend fun onDeleteMedia(mediaIds: List<String>): String {
             deleted.add(mediaIds)
@@ -49,13 +50,18 @@ class ChatMediaWriteCapabilityTest {
             this.selected.add(mediaId to selected)
             return "ok"
         }
+
+        override suspend fun onShareMedia(mediaIds: List<String>): String {
+            shared.add(mediaIds)
+            return "ok"
+        }
     }
 
     @Test
-    fun `declares CHAT scene and three write commands`() {
+    fun `declares CHAT scene and four write commands`() {
         assertEquals(listOf(SceneManager.Scene.CHAT), capability.activeScenes())
         assertEquals(
-            listOf("delete_media", "favorite_media", "select_media"),
+            listOf("delete_media", "favorite_media", "select_media", "share_media"),
             capability.supportedCommands(),
         )
     }
