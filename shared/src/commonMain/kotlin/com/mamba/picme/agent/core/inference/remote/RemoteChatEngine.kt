@@ -3,9 +3,6 @@ package com.mamba.picme.agent.core.inference.remote
 import ai.koog.agents.core.tools.ToolBase
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.prompt.message.Message
-import ai.koog.prompt.message.RequestMetaInfo
-import ai.koog.prompt.message.ResponseMetaInfo
 import com.mamba.picme.agent.core.facade.AgentConfigurator
 import com.mamba.picme.agent.core.inference.remote.koog.KoogChatAgent
 import com.mamba.picme.agent.core.inference.remote.prompt.ChatPromptRules
@@ -18,7 +15,6 @@ import com.mamba.picme.agent.core.intent.CompactChatState
 import com.mamba.picme.agent.core.intent.IntentRouter
 import com.mamba.picme.agent.core.intent.UiArtifact
 import com.mamba.picme.agent.core.model.command.AgentCommand
-import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.config.AssistantPersona
 import com.mamba.picme.agent.core.model.config.personaPromptSegment
 import com.mamba.picme.agent.core.model.context.AgentContext
@@ -184,15 +180,6 @@ class RemoteChatEngine internal constructor(
     private val toolSetPromptCacheLock = Mutex()
 
     /**
-     * 路由闸门结果（M3 意图级工具裁剪）：直执已处理 / 回落 agent loop（携带契约工具子集，
-     * null = 完整工具面——降级路径、直执失败回退、secondary 双产出物等判定不可靠场景保守全量）。
-     */
-    private sealed interface RoutingGate {
-        class Handled(val result: Result<StreamChatResult>) : RoutingGate
-        class FallThrough(val toolNames: Set<String>?) : RoutingGate
-    }
-
-    /**
      * 流式自由聊天（chat 远程 ReAct）。流式期间经 [onEvent] 实时上报：
      * 模型逐 token 增量以 [ChatStreamEvent.TextSnapshot]（本轮累计全文）下发，
      * 进入工具调用轮时下发 [ChatStreamEvent.ToolCallStarted]；多轮记忆由 DataStoreChatMemory 承担。
@@ -203,52 +190,39 @@ class RemoteChatEngine internal constructor(
         onEvent: (ChatStreamEvent) -> Unit
     ): Result<StreamChatResult> {
         Logger.d(tag, "streamChat: input='$input'")
-        // 意图路由（spec《意图路由契约与意图路由器》M2）：LLM 管意图、代码管策略。
-        // 命中最热意图（看照片/细化结果）时直执确定性命令、跳过全量 agent loop；
-        // 其余回落 chat 远程 ReAct（ADR-005 协议分离）——M3 起回落携带契约工具子集，
-        // 引擎按子集裁剪 tool schema 与 prompt 清单段（成本治理：不再每轮全量 43 个 schema）。
-        when (val gate = routeAndMaybeExecute(input, agentContext, onEvent)) {
-            is RoutingGate.Handled -> return gate.result
-            is RoutingGate.FallThrough -> {
-                Logger.i(tag, "streamChat routing to Chat ReAct (toolSet=${gate.toolNames?.size ?: "full"})")
-                return streamChatReAct(input, agentContext, onEvent, gate.toolNames)
-            }
-        }
+        // 意图路由（spec《意图路由契约与意图路由器》）：LLM 管意图、代码管策略。
+        // 直执路径已随原生横滑卡退役（2026-11-08）——全意图回落 chat 远程 ReAct
+        //（ADR-005 协议分离），路由产出契约工具子集供 M3 裁剪：引擎按子集裁剪
+        // tool schema 与 prompt 清单段（成本治理：不再每轮全量 43 个 schema）。
+        val toolNames = routeForToolSubset(input, agentContext)
+        Logger.i(tag, "streamChat routing to Chat ReAct (toolSet=${toolNames?.size ?: "full"})")
+        return streamChatReAct(input, agentContext, onEvent, toolNames)
     }
 
     /**
-     * 意图路由入口：门控/pattern/LLM 闭集分类 → [ChatRoutingPolicy] 查表 → 直执或回落。
+     * 意图路由入口：门控/pattern/LLM 闭集分类 → [ChatRoutingPolicy] 查表 → 契约工具子集。
      *
-     * 返回 [RoutingGate.FallThrough] = 回落完整 agent loop（携带决策给出的工具子集，null = 全量）；
-     * [RoutingGate.Handled] = 已直执（DirectSearch/DirectRefine）。
-     * 直执语义（review 决议）：
-     * - 复用 [ChatToolService.dispatchCommandDetailed]（uiActions 发射 + observation + 5s 超时
-     *   与 LLM tool_calls 路径同源）；dispatch 失败/业务错误（非 MediaResults）→ FallThrough(null)
-     *   回落完整 agent loop 且**保守用全量工具面**（偏离剧本的恢复场景给模型完整自由度）。
-     * - 成功时不产 LLM 总结：结果以 [StreamChatResult.directReply] 结构化回执返回，
-     *   用户气泡由平台层本地化渲染（observation 硬编码中文模板只进记忆/审计，I18N 红线）；
-     *   该轮 user+observation 补写 Koog 会话记忆（直执跳过 agent loop，否则多轮指代断裂）。
-     * - 整体在 orchestratorDispatcher 执行（与 processChatReAct 同一线程上下文，
-     *   避免 lastResultAssets 等非线程安全状态的写入线程扩散）。
+     * 返回本轮工具子集（null = 全量工具面：降级路径、secondary 双产出物等判定不可靠
+     * 场景保守全量）。直执语义已随横滑卡退役删除（2026-11-08）——看照片/细化结果
+     * 同样回落 agent loop，由 LLM 回合内 search_media 取数 + render_html 出图集卡。
      *
      * 路由器 executor 与 chat agent 同源（[getChatAgent] 缓存复用，含网关 header/协议分流）；
      * agent 构建失败（远程未配置等）时路由器内部降级为直通，不影响主链路。
+     * 整体在 orchestratorDispatcher 执行（与 processChatReAct 同一线程上下文）。
      */
-    private suspend fun routeAndMaybeExecute(
+    private suspend fun routeForToolSubset(
         input: String,
         agentContext: AgentContext,
-        onEvent: (ChatStreamEvent) -> Unit
-    ): RoutingGate = withContext(configurator.dispatcherProvider.orchestratorDispatcher) {
-        val persona = agentContext.persona
-        val replyLanguage = agentContext.replyLanguage
+    ): Set<String>? = withContext(configurator.dispatcherProvider.orchestratorDispatcher) {
         // 路由器实例无状态（审计口在 companion），按回合构造、provider 闭包捕获本轮配置
         val router = IntentRouter {
-            getChatAgent(persona, replyLanguage)?.executorBundle
+            getChatAgent(agentContext.persona, agentContext.replyLanguage)?.executorBundle
         }
         // 紧凑对话状态（spec §3.2 初值）：搜索基数存在性 + 上轮 artifact
+        //（横滑卡退役后 lastArtifact 语义 = 上轮出过图集卡，供 refine 指代判定）
         val hasSearchBase = agentContext.recentSearchResults.isNotEmpty()
         val state = CompactChatState(
-            lastArtifact = if (hasSearchBase) UiArtifact.MEDIA_RESULTS_CARD else null,
+            lastArtifact = if (hasSearchBase) UiArtifact.RICH_HTML_CARD else null,
             hasSearchBase = hasSearchBase,
         )
         val routing = router.route(
@@ -257,79 +231,9 @@ class RemoteChatEngine internal constructor(
             today = today(),
             traceId = agentContext.traceId,
         )
-        when (val decision = ChatRoutingPolicy.decide(routing, state, input)) {
-            is ChatRoutingPolicy.RouteDecision.FullAgentLoop -> {
-                Logger.d(tag, "router fallback to agent loop: ${decision.reason} (toolSet=${decision.toolNames?.size ?: "full"})")
-                RoutingGate.FallThrough(decision.toolNames)
-            }
-            is ChatRoutingPolicy.RouteDecision.DirectSearch -> executeDirect(
-                command = AgentCommand.SearchMedia(query = decision.query, intent = decision.intent),
-                kind = DirectRouteReply.Kind.SEARCH,
-                input = input,
-                agentContext = agentContext,
-                onEvent = onEvent,
-            ).toGate()
-            is ChatRoutingPolicy.RouteDecision.DirectRefine -> executeDirect(
-                command = AgentCommand.RefineMediaSearch(constraint = decision.constraint, intent = decision.intent),
-                kind = DirectRouteReply.Kind.REFINE,
-                input = input,
-                agentContext = agentContext,
-                onEvent = onEvent,
-            ).toGate()
-        }
-    }
-
-    /** 直执结果 → 闸门：成功 Handled；失败 FallThrough(null)——回退场景保守全量工具面。 */
-    private fun Result<StreamChatResult>?.toGate(): RoutingGate =
-        this?.let { RoutingGate.Handled(it) } ?: RoutingGate.FallThrough(null)
-
-    /**
-     * 直执一条搜索/细化命令：成功 → [DirectRouteReply] 结构化回执 + 补写会话记忆；
-     * 失败（dispatch 超时/业务错误/非 MediaResults action）→ null（调用方回落 agent loop）。
-     */
-    private suspend fun executeDirect(
-        command: AgentCommand,
-        kind: DirectRouteReply.Kind,
-        input: String,
-        agentContext: AgentContext,
-        onEvent: (ChatStreamEvent) -> Unit,
-    ): Result<StreamChatResult>? {
-        // 占位文案切换到「搜集中」语义（与 tool_calls 路径的 ToolCallStarted 一致）；
-        // M2 起携带工具名（直执命令 → 对应 @Tool customName）供 turn 装配器登记。
-        val toolName = when (command) {
-            is AgentCommand.RefineMediaSearch -> "refine_media_search"
-            else -> "search_media"
-        }
-        onEvent(ChatStreamEvent.ToolCallStarted(toolName = toolName))
-        val detailed = ChatToolService.getInstance().dispatchCommandDetailed(command, agentContext.traceId)
-        val results = detailed.action as? AgentAction.MediaResults
-        if (results == null) {
-            Logger.w(tag, "direct dispatch failed (${detailed.observation.take(80)}), fallback to agent loop")
-            return null
-        }
-        // 补写 Koog 会话记忆（直执跳过 agent loop，ChatMemory 不会记录本轮）：
-        // user 原文 + 模型侧 observation，使下一轮追问（"他多大了"类 OPEN_QA）能看到上下文。
-        runCatching {
-            val store = configurator.chatMemoryStore
-            val sessionId = agentContext.memorySessionId
-            store.save(
-                sessionId,
-                store.load(sessionId) + listOf(
-                    Message.User(input, RequestMetaInfo.Empty),
-                    Message.Assistant(detailed.observation, ResponseMetaInfo.Empty),
-                )
-            )
-        }.onFailure { Logger.w(tag, "direct turn memory write failed: ${it.message}") }
-        return Result.success(
-            StreamChatResult(
-                fullResponse = "",
-                directReply = DirectRouteReply(
-                    kind = kind,
-                    query = results.query,
-                    totalCount = results.totalCount,
-                ),
-            )
-        )
+        val decision = ChatRoutingPolicy.decide(routing)
+        Logger.d(tag, "router decision: ${decision.reason} (toolSet=${decision.toolNames?.size ?: "full"})")
+        decision.toolNames
     }
 
     /** chat 远程 ReAct：调 [processChatReAct] 拿 summary，包成 TextReply 命令回 chat。 */

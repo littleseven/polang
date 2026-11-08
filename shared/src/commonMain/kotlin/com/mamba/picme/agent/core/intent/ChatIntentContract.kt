@@ -18,7 +18,7 @@ package com.mamba.picme.agent.core.intent
 
 /** 意图闭集（路由器输出的 deliverable 只能取这些值）。 */
 enum class IntentId {
-    /** 看/找照片、图片（交付物 = 照片横滑卡片）。 */
+    /** 看/找照片、图片（交付物 = 图集卡：search_media 取数 + render_html 出卡）。 */
     VIEW_PHOTOS,
 
     /** 在上一轮搜索结果上加条件窄化（"只要4月的""换成夜景"）。 */
@@ -54,7 +54,6 @@ enum class IntentId {
 
 /** 意图的 UI 产出物契约（回合终态护栏据此校验「应产而未产」）。 */
 enum class UiArtifact {
-    MEDIA_RESULTS_CARD,
     CHART,
     EDITED_IMAGE,
     RICH_HTML_CARD,
@@ -86,23 +85,25 @@ object ChatIntentContract {
     val intents: List<IntentDef> = listOf(
         IntentDef(
             id = IntentId.VIEW_PHOTOS,
-            uiContract = UiArtifact.MEDIA_RESULTS_CARD,
-            allowedTools = listOf("search_media", "refine_media_search", "list_person_relations"),
+            uiContract = UiArtifact.RICH_HTML_CARD,
+            allowedTools = listOf("search_media", "refine_media_search", "list_person_relations", "render_html"),
             forbiddenTools = listOf("run_gallery_script"),
-            ruleText = "看/找照片一律 search_media 出横滑卡片（人物/时间/人脸走 person/fromMs/toMs/hasFace " +
-                "结构化参数）；禁止绕脚本路径拿 ids 假装已展示",
+            ruleText = "看/找照片：search_media 取数（人物/时间/人脸走 person/fromMs/toMs/hasFace 结构化参数）" +
+                "→ render_html 出图集卡（media://{id} 引用）；可先 load_skill photo-browse 取版式技能；" +
+                "禁止绕脚本路径拿 ids 假装已展示",
         ),
         IntentDef(
             id = IntentId.REFINE_RESULTS,
-            uiContract = UiArtifact.MEDIA_RESULTS_CARD,
-            allowedTools = listOf("refine_media_search", "search_media"),
-            ruleText = "在上一轮结果内窄化用 refine_media_search 取交集；无基数时改 search_media 重搜",
+            uiContract = UiArtifact.RICH_HTML_CARD,
+            allowedTools = listOf("refine_media_search", "search_media", "render_html"),
+            ruleText = "在上一轮结果内窄化用 refine_media_search 取交集（无基数改 search_media 重搜）" +
+                "→ render_html 重出图集卡",
         ),
         IntentDef(
             id = IntentId.ANALYZE_STATS,
             uiContract = UiArtifact.TEXT_ONLY,
             allowedTools = listOf("run_gallery_script", "get_gallery_summary"),
-            ruleText = "盘点/统计默认纯文字总结，不主动画图；脚本纯统计不要 return ids（否则会触发补卡）",
+            ruleText = "盘点/统计默认纯文字总结，不主动画图；脚本纯统计不要 return ids",
         ),
         IntentDef(
             id = IntentId.DRAW_CHART,

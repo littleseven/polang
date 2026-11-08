@@ -7,7 +7,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * 确定性路由策略层测试（spec §3.3）：直执判定、refine 基数规则、回落规则。
+ * 确定性路由策略层测试（spec §3.3）：回落规则与契约工具子集。
+ *
+ * 2026-11-08 原生横滑相册卡退役（spec《media-results-carousel-retirement》）：
+ * VIEW_PHOTOS/REFINE_RESULTS 直执路径（DirectSearch/DirectRefine）整体删除，
+ * 全意图一律回落 [ChatRoutingPolicy.RouteDecision.FullAgentLoop] 携带契约工具子集——
+ * 看照片交付物改为 LLM 回合内 search_media 取数 + render_html 出图集卡。
  */
 class ChatRoutingPolicyTest {
 
@@ -37,97 +42,42 @@ class ChatRoutingPolicyTest {
         path: RoutePath = RoutePath.LLM_ROUTER,
     ) = RoutingResult(output, path, latencyMs = 10)
 
-    private val noBase = CompactChatState(lastArtifact = null, hasSearchBase = false)
-    private val withBase = CompactChatState(lastArtifact = UiArtifact.MEDIA_RESULTS_CARD, hasSearchBase = true)
-
-    // ── 直执判定 ────────────────────────────────────────────────────
+    // ── 全意图回落 agent loop（直执已退役）───────────────────────────────
 
     @Test
-    fun `view photos routes to direct search with original query`() {
+    fun `view photos falls back to agent loop carrying gallery card subset`() {
+        // 直执退役后的替代覆盖：看照片不再直执 search_media，回落 agent loop
+        // 由 LLM 回合内取数 + render_html 出卡；子集带齐取数/出卡工具。
         val decision = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.VIEW_PHOTOS, person = "儿子")),
-            noBase,
-            originalQuery = "看下我儿子的照片",
         )
-        val direct = assertIs<ChatRoutingPolicy.RouteDecision.DirectSearch>(decision)
-        // query 一律用用户原文（引擎层 PersonQueryResolver 从原文兜底解析称谓）
-        assertEquals("看下我儿子的照片", direct.query)
-        // person 槽位补结构化精度
-        assertEquals("儿子", direct.intent?.personName)
+        val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
+        assertEquals("intent:VIEW_PHOTOS", loop.reason)
+        assertEquals(
+            setOf("search_media", "refine_media_search", "list_person_relations", "render_html", "finish", "delay"),
+            loop.toolNames,
+        )
     }
 
     @Test
-    fun `pattern shortcut result also direct-executes`() {
+    fun `refine results falls back to agent loop carrying refine subset`() {
+        val decision = ChatRoutingPolicy.decide(
+            result(routerOutput(IntentId.REFINE_RESULTS, isRefinement = true, constraint = "4月的")),
+        )
+        val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
+        assertEquals(
+            setOf("refine_media_search", "search_media", "render_html", "finish", "delay"),
+            loop.toolNames,
+        )
+    }
+
+    @Test
+    fun `pattern shortcut view photos also falls back to agent loop`() {
+        // pattern 捷径命中 VIEW_PHOTOS 同样不直执（捷径只产意图，策略层无差别回落）
         val decision = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.VIEW_PHOTOS, confidence = 1.0), RoutePath.PATTERN_SHORTCUT),
-            noBase,
-            originalQuery = "给我看去年夏天的照片",
         )
-        val direct = assertIs<ChatRoutingPolicy.RouteDecision.DirectSearch>(decision)
-        assertEquals("给我看去年夏天的照片", direct.query)
-        // pattern 捷径无槽位 → intent 为 null
-        assertNull(direct.intent)
-    }
-
-    // ── hasFace 槽位（2026-09-29：人脸约束不再被结构化路径丢弃）────────────────
-
-    @Test
-    fun `face slot flows into search intent`() {
-        val decision = ChatRoutingPolicy.decide(
-            result(routerOutput(IntentId.VIEW_PHOTOS, hasFace = true)),
-            noBase,
-            originalQuery = "去年夏天有人脸的照片",
-        )
-        val direct = assertIs<ChatRoutingPolicy.RouteDecision.DirectSearch>(decision)
-        assertEquals(true, direct.intent?.hasFaces)
-    }
-
-    @Test
-    fun `face-only output still produces structured intent`() {
-        // 其余槽位全空、仅 hasFace=true 时也必须产出 intent（否则会退化到字符串路径之外的无约束搜索）
-        val decision = ChatRoutingPolicy.decide(
-            result(routerOutput(IntentId.VIEW_PHOTOS, hasFace = true)),
-            withBase,
-            originalQuery = "找有人脸的照片",
-        )
-        val direct = assertIs<ChatRoutingPolicy.RouteDecision.DirectSearch>(decision)
-        assertEquals(true, direct.intent?.hasFaces)
-        assertNull(direct.intent?.timeRange)
-        assertNull(direct.intent?.personName)
-    }
-
-    // ── refine 基数规则 ─────────────────────────────────────────────
-
-    @Test
-    fun `refine intent with search base routes to direct refine`() {
-        val decision = ChatRoutingPolicy.decide(
-            result(routerOutput(IntentId.REFINE_RESULTS, isRefinement = true, constraint = "4月的")),
-            withBase,
-            originalQuery = "只要4月的",
-        )
-        val direct = assertIs<ChatRoutingPolicy.RouteDecision.DirectRefine>(decision)
-        assertEquals("4月的", direct.constraint)
-    }
-
-    @Test
-    fun `refine intent without search base degrades to fresh search`() {
-        // 基数缺失 → refine 退化为 SearchMedia（spec §3.3：不再依赖模型记住上一轮）
-        val decision = ChatRoutingPolicy.decide(
-            result(routerOutput(IntentId.REFINE_RESULTS, isRefinement = true, constraint = "4月的")),
-            noBase,
-            originalQuery = "只要4月的",
-        )
-        assertIs<ChatRoutingPolicy.RouteDecision.DirectSearch>(decision)
-    }
-
-    @Test
-    fun `view photos marked refinement with base routes to direct refine`() {
-        val decision = ChatRoutingPolicy.decide(
-            result(routerOutput(IntentId.VIEW_PHOTOS, isRefinement = true)),
-            withBase,
-            originalQuery = "换成夜景的",
-        )
-        assertIs<ChatRoutingPolicy.RouteDecision.DirectRefine>(decision)
+        assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
     }
 
     // ── 回落规则 ────────────────────────────────────────────────────
@@ -136,8 +86,6 @@ class ChatRoutingPolicyTest {
     fun `secondary output falls back to full agent loop`() {
         val decision = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.VIEW_PHOTOS, secondary = IntentId.DRAW_CHART)),
-            noBase,
-            originalQuery = "找照片并画图",
         )
         assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
     }
@@ -154,15 +102,13 @@ class ChatRoutingPolicyTest {
         ).forEach { path ->
             val decision = ChatRoutingPolicy.decide(
                 result(routerOutput(IntentId.VIEW_PHOTOS), path),
-                withBase,
-                originalQuery = "看照片",
             )
             assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision, "path=$path 应回落")
         }
     }
 
     @Test
-    fun `non-direct intents fall back to full agent loop`() {
+    fun `non-gallery intents fall back to full agent loop`() {
         listOf(
             IntentId.ANALYZE_STATS, IntentId.DRAW_CHART, IntentId.EDIT_IMAGE,
             IntentId.RENDER_RICH_HTML, IntentId.MEMORY, IntentId.NAVIGATE,
@@ -170,21 +116,17 @@ class ChatRoutingPolicyTest {
         ).forEach { intent ->
             val decision = ChatRoutingPolicy.decide(
                 result(routerOutput(intent)),
-                withBase,
-                originalQuery = "任意输入",
             )
             assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision, "intent=$intent 应回落")
         }
     }
 
-    // ── BROWSE_WEB（浏览器任务走 agent loop，绝不落 DirectSearch）────────────
+    // ── BROWSE_WEB（浏览器任务走 agent loop，绝不落相册工具子集）────────────
 
     @Test
     fun `browse web routes to full agent loop with intent reason`() {
         val decision = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.BROWSE_WEB)),
-            noBase,
-            originalQuery = "用浏览器打开新浪体育",
         )
         val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
         assertTrue("BROWSE_WEB" in loop.reason, "reason 应含 BROWSE_WEB: ${loop.reason}")
@@ -196,8 +138,6 @@ class ChatRoutingPolicyTest {
         // 审计不失真，未来直执扩展不被 path 检查挡
         val decision = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.BROWSE_WEB, confidence = 1.0), RoutePath.BROWSER_SHORTCUT),
-            noBase,
-            originalQuery = "打开 https://example.com 看看",
         )
         val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
         assertEquals("intent:BROWSE_WEB", loop.reason)
@@ -209,8 +149,6 @@ class ChatRoutingPolicyTest {
     fun `browse web loop carries browser tool subset plus universal tools`() {
         val decision = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.BROWSE_WEB)),
-            noBase,
-            originalQuery = "用浏览器打开新浪体育",
         )
         val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
         assertEquals(
@@ -229,6 +167,11 @@ class ChatRoutingPolicyTest {
     @Test
     fun `single-intent fallbacks carry contract subset`() {
         val expected = mapOf(
+            // 看照片/窄化：横滑卡退役后的新子集（取数 + render_html 出图集卡）
+            IntentId.VIEW_PHOTOS to setOf(
+                "search_media", "refine_media_search", "list_person_relations", "render_html",
+            ),
+            IntentId.REFINE_RESULTS to setOf("refine_media_search", "search_media", "render_html"),
             IntentId.ANALYZE_STATS to setOf("run_gallery_script", "get_gallery_summary"),
             IntentId.DRAW_CHART to setOf("run_gallery_script", "draw_chart", "get_gallery_summary"),
             IntentId.EDIT_IMAGE to setOf("adjust_image", "edit_image", "ai_optimize"),
@@ -245,8 +188,6 @@ class ChatRoutingPolicyTest {
         expected.forEach { (intent, tools) ->
             val decision = ChatRoutingPolicy.decide(
                 result(routerOutput(intent)),
-                withBase,
-                originalQuery = "任意输入",
             )
             val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision, "intent=$intent")
             assertEquals(tools + setOf("finish", "delay"), loop.toolNames, "intent=$intent 子集")
@@ -258,8 +199,6 @@ class ChatRoutingPolicyTest {
         // OPEN_QA allowedTools 为空（契约：M3 再按使用率裁剪）→ null = 完整工具面
         val decision = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.OPEN_QA)),
-            noBase,
-            originalQuery = "随便聊聊",
         )
         val loop = assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(decision)
         assertNull(loop.toolNames)
@@ -270,15 +209,11 @@ class ChatRoutingPolicyTest {
         // secondary 双产出物：判定不可靠，保守全量
         val secondary = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.VIEW_PHOTOS, secondary = IntentId.DRAW_CHART)),
-            noBase,
-            originalQuery = "找照片并画图",
         )
         assertNull(assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(secondary).toolNames)
         // 降级路径：无可靠意图，保守全量
         val degraded = ChatRoutingPolicy.decide(
             result(routerOutput(IntentId.BROWSE_WEB), RoutePath.DEGRADED_TIMEOUT),
-            noBase,
-            originalQuery = "打开网页",
         )
         assertNull(assertIs<ChatRoutingPolicy.RouteDecision.FullAgentLoop>(degraded).toolNames)
     }
