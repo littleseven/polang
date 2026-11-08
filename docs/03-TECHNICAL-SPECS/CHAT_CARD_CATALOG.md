@@ -43,13 +43,13 @@
 
 协议频繁演进下旧版本读新版本数据的兜底机制，三铁律：**不崩溃、不丢消息、可感知（升级提示）**。
 
-- **`unsupported` 保留降级鉴别值**：`MessagePart.Unsupported`（sealed 第 11 子类型，category=DATA 不回灌 LLM，不携 `tool_`/`data_` 前缀——同 `data_ui` 墓碑先例的约定外保留值）。**读时投影，永不出现于生产写路径**（`withPartsJson` 自标量列重算、流式瞬态不落库，均无 Unsupported 来源）；原始 payload 保留在 `partsJson` 原文，升级新版本后同一行自动恢复为正式卡片（解码幂等）。
-- **part 级细粒度解码**（`MessagePartsCodec.decode`）：逐元素独立解码——未知 part 类型 / 已知类型字段损坏 → 原位合成 `Unsupported` 占位（块序保住，同消息其余 part 正常渲染）；payload 携带可读摘要字段（`fallbackSummary`/`summary`/`text`/`markdown`）时提升为 `summary`；仅整体结构损坏（非 JSON 数组）才返回 null 回退 legacy 标量列。
-- **Room 标量列未知 type**（`MessagePartsConverter.unknownTypeFallback`）：content 判定为 JSON blob（对象/数组，新协议整颗 payload 存 content 列的先例）→ `Unsupported`，防 JSON 原文裸渲染；纯文本/JSON 标量 → 保留 Text 不降级。
+- **`unsupported` 保留降级鉴别值**：`MessagePart.Unsupported`（sealed 第 11 子类型，category=DATA 不回灌 LLM，不携 `tool_`/`data_` 前缀——同 `data_ui` 墓碑先例的约定外保留值）。**读时投影，永不出现于生产写路径**（写路径统一 `chatMessageEntity`/`withUpdatedParts` 自已知 part 类型装配、流式瞬态不落库，均无 Unsupported 来源）；原始 payload 保留在 `partsJson` 原文，升级新版本后同一行自动恢复为正式卡片（解码幂等）。
+- **part 级细粒度解码**（`MessagePartsCodec.decode`）：逐元素独立解码——未知 part 类型 / 已知类型字段损坏 → 原位合成 `Unsupported` 占位（块序保住，同消息其余 part 正常渲染）；payload 携带可读摘要字段（`fallbackSummary`/`summary`/`text`/`markdown`）时提升为 `summary`；仅整体结构损坏（非 JSON 数组）才返回 null——读侧 `decodeParts` 对此合成 Unsupported 占位（v28 起无 legacy 标量列回退，content 列已退役）。
+- **Room 未知 type 行**（`MessagePartsConverter.unknownTypeFallback`；v28 起仅服务 MIGRATION_27_28 与旧备份恢复，运行时写读不再经过）：content 判定为 JSON blob（对象/数组，v27- 协议整颗 payload 存 content 列的先例）→ `Unsupported`，防 JSON 原文裸渲染；纯文本/JSON 标量 → 保留 Text 不降级。
 - **iOS 同口径**：`ChatHistoryStoreCodec` parts 数组改 `JsonElement` 逐元素 `decodePartOrUnsupported`；`rebuildParts` 未知 wire type 同 JSON blob 判定。
 - **渲染**：`ChatListItem.TYPE_UNSUPPORTED` → Android `UnsupportedPartCard` / iOS `unsupportedItem`（图标 + 「内容暂不支持」标题 + summary 或升级提示，五语 `chat_unsupported_part_*` / `chat.unsupported_part_*`）；整消息判型（`toUiModel`/`uiTypeOf`）防御性落 AGENT_TEXT。回灌：`toModelInput` 空列表（data part 丢弃口径）。
 
-**渲染路由（M4 已切 parts）**：`ChatViewModel.toUiModel()` 全量 `decodePartsOrLegacy` 填充 `ChatMessage.parts`（内存快路径 parts 同源双写）→ shared `domain/chat/ChatListFlattener` 拍平为 item 序列（`ChatScreen.kt` LazyColumn 按 `ChatListItem.contentType` 分发；key/三分流规则见 §1.3）。legacy「按 type 取 content/metadata → if/else 链」为 M1-M3 形态，仅余整消息 legacy 渲染类型沿用（清单见 §1.3）。
+**渲染路由（M4 已切 parts）**：`ChatViewModel.toUiModel()` 全量 `decodeParts` 填充 `ChatMessage.parts`（v28 起 partsJson 唯一权威直读）→ shared `domain/chat/ChatListFlattener` 拍平为 item 序列（`ChatScreen.kt` LazyColumn 按 `ChatListItem.contentType` 分发；key/三分流规则见 §1.3）。legacy「按 type 取 content/metadata → if/else 链」为 M1-M3 形态，仅余整消息 legacy 渲染类型沿用（清单见 §1.3）。
 
 ### 0.1 协议一致性现状与 parts 重构（2026-09-27）
 
@@ -87,7 +87,7 @@
 ]
 ```
 
-M1 期 partsJson 为 legacy 三列的纯函数双写（写接缝 `data/local/ChatMessageParts.kt`）；M2 起流式以 parts 为权威装配（占位/瞬态不落 Room），legacy 三列仍为持久化写面；**M4 起渲染源已切 parts**（`ChatListFlattener` 拍平，UI 不再读 legacy 字段选卡——见 §1.3）。各卡「落库协议」示例为新分类法形态（type 10 值 + `role` 列；标量列持久化写面不变），parts 形态见 §0.2 与各卡「parts 协议」小节。
+**v28（2026-11-08）起持久化接缝反转**：partsJson 为唯一内容权威列（NOT NULL），`type` 降为投影列（`roomTypeOf` 派生，服务于索引/查询），`content` 列退役，`metadata` 白名单瘦身（claude_agent_state / 性能七键 / savedAt）；写面统一为 `chatMessageEntity` / `withUpdatedParts` + `insertPartsMessage(s)`（接缝 `data/local/ChatMessageParts.kt`）。v27- 为 M1 双写过渡形态（partsJson 为 legacy 三列的纯函数双写，由迁移器回填）。渲染源自 M4 起已切 parts（`ChatListFlattener` 拍平）。各卡「落库协议」示例为新分类法形态（type 10 值 + `role` 列），parts 形态见 §0.2 与各卡「parts 协议」小节。
 
 ### 0.2 目标协议（parts 形态）逐类型示例
 
@@ -466,7 +466,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 字段 | 类型 | 含义 |
 |---|---|---|
 | `partId` | String | 块级 id（M1 迁移 `p0`…；M2 流式产物 = `call-N` 合成 id） |
-| `svg` | String | 端侧 JS 生成的自包含 SVG（= content 列） |
+| `svg` | String | 端侧 JS 生成的自包含 SVG（= 原 content 列；v28 起 part.svg 即权威） |
 | `state` | ToolPartState | M2 增；持久化恒缺省 `OUTPUT_AVAILABLE`（JSON 不写出），流式占位 `INPUT_STREAMING` 瞬态不落库 |
 
 partsJson 实例见 §0.2 `tool_chart`。**回灌**（`toModelInput`，M2 起 toolCallId = `"<messageId>:<partId>"` 命名空间锚防跨消息碰撞）→ `ToolCall(…, "draw_chart", argsSummary="")` + `ToolResult(…, "Chart card (SVG, ${svg.length} chars)", isError = state==OUTPUT_ERROR)`；经 `toHistoryPair` 进 GET_CHAT_HISTORY 的现行线格式逐字：
@@ -476,7 +476,7 @@ partsJson 实例见 §0.2 `tool_chart`。**回灌**（`toModelInput`，M2 起 to
 ("tool_result", "draw_chart → Chart card (SVG, 2831 chars)")
 ```
 
-（SVG 本体不回灌，省 token；OpenAI 线格式目标形态见 §0.3③。）**端到端**：①②（上）→ `emitChartMessage` 落库行经 `withPartsJson` 双写 `[{"type":"tool_chart","partId":"p0","svg":"…"}]` → `summary` 作 observation 回传 LLM → `ChartSvgCard` 栅格化。M2 流式轨：`ToolInputStart(draw_chart)` 即插 `Chart(svg="", INPUT_STREAMING)` 占位（骨架/进度），产物落库后 `ToolOutputAvailable` 原位填充。**M4 渲染源已切 part**：item contentType `chart`，组件原样复用仅换数据源（`part.svg`）；流式中已填充（OUTPUT_AVAILABLE）的 Chart part 拍平时**跳过**——产物已落库为独立消息行，双显禁止（§1.3 三分流）。**红线**：无交互位图（交互图表走 render_html）；SVG 只由端侧模板生成（prompt 禁 LLM 手写 SVG/markdown 表格画图）。
+（SVG 本体不回灌，省 token；OpenAI 线格式目标形态见 §0.3③。）**端到端**：①②（上）→ `emitChartMessage` 落库行经 `chatMessageEntity`+`insertPartsMessage` 直写 Chart part（`[{"type":"tool_chart","partId":"p0","svg":"…"}]`） → `summary` 作 observation 回传 LLM → `ChartSvgCard` 栅格化。M2 流式轨：`ToolInputStart(draw_chart)` 即插 `Chart(svg="", INPUT_STREAMING)` 占位（骨架/进度），产物落库后 `ToolOutputAvailable` 原位填充。**M4 渲染源已切 part**：item contentType `chart`，组件原样复用仅换数据源（`part.svg`）；流式中已填充（OUTPUT_AVAILABLE）的 Chart part 拍平时**跳过**——产物已落库为独立消息行，双显禁止（§1.3 三分流）。**红线**：无交互位图（交互图表走 render_html）；SVG 只由端侧模板生成（prompt 禁 LLM 手写 SVG/markdown 表格画图）。
 
 ### 4.2 HTML 卡 `HtmlCard`（双形态）+ 全屏查看器
 
@@ -527,7 +527,7 @@ partsJson 实例见 §0.2 `tool_chart`。**回灌**（`toModelInput`，M2 起 to
 | 字段 | 类型 | 含义 |
 |---|---|---|
 | `partId` | String | 块级 id（M2 流式 = `call-N` 合成 id） |
-| `html` | String | 清洗后 HTML（= content 列） |
+| `html` | String | 清洗后 HTML（= 原 content 列） |
 | `meta` | HtmlCardMeta | `display`/`displayMode`/`measuredHeightPx`/`summary` 四字段（键名与 legacy metadata.html_card 一致，随迁；全空时整体缺省不写出） |
 | `state` | ToolPartState | M2 增；语义同 Chart.state——清洗 Rejected 时补喂 `feedToolError` → 瞬态 OUTPUT_ERROR（不落库，reason 回传 LLM 引导重生成） |
 
@@ -538,7 +538,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 ("tool_result", "render_html → NVIDIA 2026 Q3 业绩概览")
 ```
 
-（HTML 本体不回灌，只有 summary/长度。）**端到端**：① tool_call → `HtmlCardSanitizer`（空白/超 128KB Rejected：不落库 + reason 回传 + M2 瞬态标错）→ ② 落库 + metadata.html_card → 测高后 `persistHtmlCardDisplayMode` 幂等回写终判 → `withPartsJson` 重算 parts → 双形态渲染；M2 流式轨同 Chart（`INPUT_STREAMING` 占位 → 原位填充）。**M4 渲染源已切 part**：item contentType `html_card`，`HtmlCard` 全套组件原样复用，数据源消息 payload → part（`part.html`/`part.meta`）；**测高 LruCache key 由消息 id 改拍平 item key `"messageId:partId"`**（调用点 `cacheKey = item.key`，§1.2）；流式 OUTPUT_AVAILABLE 跳过防双显同 Chart（§1.3）。**红线**：零 JS 桥；128KB 硬限（@Tool 软引导 100KB，两级口径）；正文禁嵌渲染级 HTML。
+（HTML 本体不回灌，只有 summary/长度。）**端到端**：① tool_call → `HtmlCardSanitizer`（空白/超 128KB Rejected：不落库 + reason 回传 + M2 瞬态标错）→ ② 落库（HtmlCard part 直写 partsJson）→ 测高后 `persistHtmlCardDisplayMode` 经 `withUpdatedParts` 幂等回写终判 → 双形态渲染；M2 流式轨同 Chart（`INPUT_STREAMING` 占位 → 原位填充）。**M4 渲染源已切 part**：item contentType `html_card`，`HtmlCard` 全套组件原样复用，数据源消息 payload → part（`part.html`/`part.meta`）；**测高 LruCache key 由消息 id 改拍平 item key `"messageId:partId"`**（调用点 `cacheKey = item.key`，§1.2）；流式 OUTPUT_AVAILABLE 跳过防双显同 Chart（§1.3）。**红线**：零 JS 桥；128KB 硬限（@Tool 软引导 100KB，两级口径）；正文禁嵌渲染级 HTML。
 
 ### 4.3 工程师任务卡（tool_task）
 
@@ -595,7 +595,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 | `state` | ToolPartState | 五态投影（`toToolPartState()`）：RUNNING→`INPUT_AVAILABLE`；AWAITING_CONTINUE/AWAITING_DELIVER→`APPROVAL_REQUESTED`；COMPLETED→`OUTPUT_AVAILABLE`；FAILED→`OUTPUT_ERROR` |
 | `task` | EngineerTaskState | 完整状态快照（16 字段，键名与 legacy metadata.engineer_task 一致） |
 
-**M2 overlay**：`TaskCardOverlay.overlayLiveTaskState`——SSE live 态对消息内首个 TaskCard part **同 id 原位覆写**，legacy `engineerTask` 渲染字段自 part 投影（同源防漂移；500ms 节流在 displayMessages 管线，首帧直通）；`toUiModel` 对 TASK_CARD 已恢复 parts 双读填充。**错误双轨的持久化轨**：FAILED 的 `errorSummary` 经 M1 双写落库、回灌 `isError=true`（Chart/HtmlCard/脚本错误为瞬态轨不落库，spec §5.3）。**M4 渲染源已切 part**：item contentType `task_card`，`EngineerTaskCard` 组件与 H2 HTML 化路线不变，**状态源改 `ToolPartState`**（part.state 七态投影，五态经 `toToolPartState()` 映射；live 态仍走 overlay 同 id 覆写）——spec §7.4 复用清单落地。
+**M2 overlay**：`TaskCardOverlay.overlayLiveTaskState`——SSE live 态对消息内首个 TaskCard part **同 id 原位覆写**，legacy `engineerTask` 渲染字段自 part 投影（同源防漂移；500ms 节流在 displayMessages 管线，首帧直通）；`toUiModel` 对 TASK_CARD 已恢复 parts 双读填充。**错误双轨的持久化轨**：FAILED 的 `errorSummary` 经 TaskCard part 落库（v28 partsJson 权威）、回灌 `isError=true`（Chart/HtmlCard/脚本错误为瞬态轨不落库，spec §5.3）。**M4 渲染源已切 part**：item contentType `task_card`，`EngineerTaskCard` 组件与 H2 HTML 化路线不变，**状态源改 `ToolPartState`**（part.state 七态投影，五态经 `toToolPartState()` 映射；live 态仍走 overlay 同 id 覆写）——spec §7.4 复用清单落地。
 
 **测试**：`EngineerTaskProgramTest`（程序 golden + prepare 零错误自证 + 转义敌对用例）/ `EngineerTaskHtmlTest`（H2 回滚路径）/ `EngineerTaskReducerTest` / `EngineerTaskStateSerdeTest` / `ChatViewModelEngineerTaskTest`；冒烟 `/task`（`EngineerTaskSmokeSamples`）。
 
@@ -607,7 +607,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 // FAILED：("tool_result", "engineer_task → SSE connection lost (failed)")——错误进上下文，模型可自我修正
 ```
 
-**端到端**：工程师模式提交 → `task_<uuid>` 行 upsert（RUNNING）→ SSE 结构性事件经 `EngineerTaskReducer` 五态迁移逐次 upsert（parts 随 `withPartsJson` 重算）→ 审批 `resolved()` terminal 化（resolution 粘滞）→ `EngineerTaskCard` 渲染。partsJson 实例见 §0.2 `tool_task`。
+**端到端**：工程师模式提交 → `task_<uuid>` 行 upsert（RUNNING）→ SSE 结构性事件经 `EngineerTaskReducer` 五态迁移逐次 upsert（parts 经 `withUpdatedParts` 原位更新）→ 审批 `resolved()` terminal 化（resolution 粘滞）→ `EngineerTaskCard` 渲染。partsJson 实例见 §0.2 `tool_task`。
 
 ### 4.4 相册搜索结果卡 `MediaResultsCarousel`
 
@@ -640,7 +640,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 ![chat_photo_card](../assets/chat-cards/chat_photo_card-dark.png?v=20260927-4)
 **渲染组件**：`MediaResultsCarousel`（`components/MediaResultsCarousel.kt`）——原生 Compose（LazyRow + Coil）；媒体被删后同步收缩。
 **测试**：`ChatGallerySearchTest` / `SearchSnapshotBuilderTest`。
-**parts 协议（✅ M1 已落地）**：`MessagePart.MediaResults(partId, results: MediaResultsUi)`——`results` 合一 legacy 两列：`query`/`totalCount`/`isRefinement`（← metadata 三字段）+ `assets`（← content 数组，含 `faceFocusY`）；`feedbackState` 会话内 👍/👎 反馈态（空 Map 缺省不写出）。partsJson 实例见 §0.2 `data_media_results`。**回灌：丢弃**（data part 不进上下文，对齐 Vercel 丢弃规则；LLM 对结果的感知来自 `search_media` 即时 observation，非历史回灌）。**端到端**：`search_media` tool_call → `SearchIntent`→`StructuredFilter`→`MediaSearchEngine` → **同一用户回合至多一张卡**（`getLatestMediaResultsSinceLastUserMessage` 定位行 id 做 REPLACE upsert；以图搜图等自成新回合追加新卡）→ 落库行双写 parts → `MediaResultsCarousel`。**M4**：item contentType `media_results`，组件无改动（spec §7.4 复用清单）。**红线**：资产字段白名单（重建最小 MediaAsset，不含 GPS/OCR/标签明细）。
+**parts 协议（✅ M1 已落地）**：`MessagePart.MediaResults(partId, results: MediaResultsUi)`——`results` 合一 legacy 两列：`query`/`totalCount`/`isRefinement`（← metadata 三字段）+ `assets`（← content 数组，含 `faceFocusY`）；`feedbackState` 会话内 👍/👎 反馈态（空 Map 缺省不写出）。partsJson 实例见 §0.2 `data_media_results`。**回灌：丢弃**（data part 不进上下文，对齐 Vercel 丢弃规则；LLM 对结果的感知来自 `search_media` 即时 observation，非历史回灌）。**端到端**：`search_media` tool_call → `SearchIntent`→`StructuredFilter`→`MediaSearchEngine` → **同一用户回合至多一张卡**（`getLatestMediaResultsSinceLastUserMessage` 定位行 id 做 REPLACE upsert；以图搜图等自成新回合追加新卡）→ 落库行 parts 直写（partsJson 权威）→ `MediaResultsCarousel`。**M4**：item contentType `media_results`，组件无改动（spec §7.4 复用清单）。**红线**：资产字段白名单（重建最小 MediaAsset，不含 GPS/OCR/标签明细）。
 
 ### 4.5 AI 优化抽卡候选条 `GachaCandidateStrip`
 
@@ -672,7 +672,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 **UI**：设计稿已随交付清理（git 历史可查）；选中高亮 / 换一组 loading / 护栏 rejected / 进程重建只读态；确认后消息改写为 `image`（+role=agent）。
 **渲染组件**：`GachaCandidateStrip`（`components/GachaCandidateStrip.kt`）+ `ChatOptimizeGachaController`（内存态 `hasPending(id)` 驱动 `gachaInteractive`）。
 **测试**：`ChatViewModelGachaTest` / `OptimizeCandidateGroupTest` / `ChatOptimizeGachaControllerTest`。
-**parts 协议（✅ M1 已落地）**：`MessagePart.OptimizeCandidates(partId, group: OptimizeCandidateGroup)`——group 六字段全量入 part（键名与 legacy metadata 一致；kotlinx 与 org.json 双 serde 线格式互不干扰）；单条消息 parts 只有此一块（content 列的 explanation **不成** Text part，仅行级兜底时出现）。partsJson 实例见 §0.2 `data_optimize_candidates`。**回灌：丢弃**（data part）。**端到端**：AI 一键优化 → `ChatOptimizeGachaController.draw` 端侧并行出 N 候选 → `data_optimize_candidates` 行（metadata = group JSON）→「换一组」同 id 覆写（drawIndex+1、usedFingerprints 排重）/「就用这张」行改写为 `image`（+role=agent，parts 随之重算为 image part）→ `GachaCandidateStrip`。**M4**：item contentType `optimize_candidates`，组件无改动（spec §7.4 复用清单）。**红线**：交互态（controller `hasPending`）是进程内存，进程重建后卡条降级只读。
+**parts 协议（✅ M1 已落地）**：`MessagePart.OptimizeCandidates(partId, group: OptimizeCandidateGroup)`——group 六字段全量入 part（键名沿袭 legacy metadata；org.json serde 已随 v28 删除，kotlinx 为唯一线格式）；单条消息 parts 只有此一块（v28 起 explanation 随 content 列退役不落库）。partsJson 实例见 §0.2 `data_optimize_candidates`。**回灌：丢弃**（data part）。**端到端**：AI 一键优化 → `ChatOptimizeGachaController.draw` 端侧并行出 N 候选 → `data_optimize_candidates` 行（partsJson 直存 group）→「换一组」同 id 覆写（drawIndex+1、usedFingerprints 排重）/「就用这张」行改写为 `image`（+role=agent，parts 随之重算为 image part）→ `GachaCandidateStrip`。**M4**：item contentType `optimize_candidates`，组件无改动（spec §7.4 复用清单）。**红线**：交互态（controller `hasPending`）是进程内存，进程重建后卡条降级只读。
 
 ### 4.6 Agent 图片结果卡 / 编辑结果卡
 
@@ -706,7 +706,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 **UI**：通栏结果图；LRU 清理后 → `ExpiredImagePlaceholder` 灰框过期占位；点击进 `ChatImagePreviewOverlay`（保存/删除/OCR）。
 **渲染组件**：`ChatMessageItem` isImage / isEditResult 分支（原生 Compose，Coil；`ChatImageLive` 判定存活）。媒体红线：不经 LLM 排版。
 **测试**：`ChatImageLiveTest` / `ChatImageRenderer*Test` / `ChatViewModelEditResultTest`。
-**parts 协议（✅ M1 已落地）**：`MessagePart.Image(partId, ref, saved=false)` 与 `MessagePart.EditResult(partId, ref?, description, suggestions?, saved?)`——Image 的 `ref`：user 图 = 内部存储路径（saved 恒缺省）、agent 图 = 结果图 URI（保存后 `"saved": true` 写出）；EditResult 的 `description` = content 列（**回灌唯一通道**），`ref` 为 null 时整键不写出（UI 落 legacy 兜底）。partsJson 实例见 §0.2 `image` / `tool_image_edit`。**回灌**（[PRIVACY] 媒体红线：图片本体不进上下文）——Image → 英文中性占位：user `[user sent an image]` / agent `[assistant generated an image]`（`toHistoryPair` 落 `("user"|"agent", 占位)`——role 升格后标注自消息级 role 列，保多轮回合结构）；EditResult → `TextMessage(ASSISTANT, description)`（只回灌文字说明，防多轮编辑上下文断裂；结果图/ref/suggestions 均不进）。**端到端**（EditResult）：`edit_image` tool_call（`*_delta` 相对调整带步进截断：美颜 ±10/亮度 ±15 等，绝对值不限幅）→ `ChatEditProcessor` Recipe 渲染 → `tool_image_edit` 行（图 + 说明 + suggestions）→ 气泡内结果图 + 建议条；agent Image 三来源：`adjust_image` / AI 优化 fallback / 抽卡「就用这张」行改写（见 §4.5）。**M4**：AGENT_IMAGE / AGENT_EDIT_RESULT 拍平走**整消息 legacy 直通**（contentType `legacy_message`，part=null——渲染器读 legacy 字段，见 §1.3 直通清单；user 图走 USER 整颗单 item，见 §3.1）。
+**parts 协议（✅ M1 已落地）**：`MessagePart.Image(partId, ref, saved=false)` 与 `MessagePart.EditResult(partId, ref?, description, suggestions?, saved?)`——Image 的 `ref`：user 图 = 内部存储路径（saved 恒缺省）、agent 图 = 结果图 URI（保存后 `"saved": true` 写出）；EditResult 的 `description` = 原 content 列（v28 退役；**回灌唯一通道**），`ref` 为 null 时整键不写出（UI 落 legacy 兜底）。partsJson 实例见 §0.2 `image` / `tool_image_edit`。**回灌**（[PRIVACY] 媒体红线：图片本体不进上下文）——Image → 英文中性占位：user `[user sent an image]` / agent `[assistant generated an image]`（`toHistoryPair` 落 `("user"|"agent", 占位)`——role 升格后标注自消息级 role 列，保多轮回合结构）；EditResult → `TextMessage(ASSISTANT, description)`（只回灌文字说明，防多轮编辑上下文断裂；结果图/ref/suggestions 均不进）。**端到端**（EditResult）：`edit_image` tool_call（`*_delta` 相对调整带步进截断：美颜 ±10/亮度 ±15 等，绝对值不限幅）→ `ChatEditProcessor` Recipe 渲染 → `tool_image_edit` 行（图 + 说明 + suggestions）→ 气泡内结果图 + 建议条；agent Image 三来源：`adjust_image` / AI 优化 fallback / 抽卡「就用这张」行改写（见 §4.5）。**M4**：AGENT_IMAGE / AGENT_EDIT_RESULT 拍平走**整消息 legacy 直通**（contentType `legacy_message`，part=null——渲染器读 legacy 字段，见 §1.3 直通清单；user 图走 USER 整颗单 item，见 §3.1）。
 
 ### 4.7 流程卡：清理确认/完成 · 游客引导 · 写操作确认
 
@@ -781,7 +781,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 | `actions` | List\<BrowserActionEntry\> | 最近动作流水（至多 3 条，新在尾；`description`+`ok`） |
 | `actionCount` / `resultSummary` / `errorReason` | Int / String? / String? | 定格统计与摘要 |
 
-**回灌**（`toModelInput`，toolCallId = `"<messageId>:<partId>"` 命名空间锚）→ `ToolCall(…, "browser_session", argsSummary="")` + `ToolResult(…, resultSummary ?: 失败原因 ?: 会话概览, isError = state==OUTPUT_ERROR)`——只回灌文本摘要，帧与动作流水不进上下文（token 保护；§0.3 硬约束①②④过线）。**端到端**：`browser_open` tool_call → `BrowserSessionCapability` → 网关 `/v1/browser/open`（wantFrame=true）→ xuxing bridge → 占位 part（`INPUT_STREAMING`）经 `BrowserLiveOverlay` 逐动作原位覆写 → `browser_close`/超时定格 → `emitBrowserCardMessage` 落 `tool_browser` 行（partsJson 由 `insertMessageWithParts` 自 content 现算，`MessagePartsConverter` 认 `tool_browser` 直通解码）→ 冷启动从 Room 恢复定格卡；降级不变式：任何一环失败退化为纯文本回答，不白屏。
+**回灌**（`toModelInput`，toolCallId = `"<messageId>:<partId>"` 命名空间锚）→ `ToolCall(…, "browser_session", argsSummary="")` + `ToolResult(…, resultSummary ?: 失败原因 ?: 会话概览, isError = state==OUTPUT_ERROR)`——只回灌文本摘要，帧与动作流水不进上下文（token 保护；§0.3 硬约束①②④过线）。**端到端**：`browser_open` tool_call → `BrowserSessionCapability` → 网关 `/v1/browser/open`（wantFrame=true）→ xuxing bridge → 占位 part（`INPUT_STREAMING`）经 `BrowserLiveOverlay` 逐动作原位覆写 → `browser_close`/超时定格 → `emitBrowserCardMessage` 落 `tool_browser` 行（BrowserLive part 直写 partsJson，v28 起唯一权威）→ 冷启动从 Room 恢复定格卡；降级不变式：任何一环失败退化为纯文本回答，不白屏。
 
 ### 4.9 云端 Agent H5 卡（render_html 云→端，2026-10-22）
 
@@ -819,7 +819,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 > **退役标注（2026-11-05，OpenUI 唯一化）**：A2UI 对照线全量退役——server 发卡工具 render_ui 与校验闭环、端侧渲染线 `features/chat/a2ui/`、shared `MessagePart.A2uiCard` 与 `data_ui` type 值、androidx.a2ui 依赖均已删除；存量 `data_ui` 消息经 codec/converter 墓碑兜底为可读 Text（不丢消息）。决策与实施记录见 spec 2026-11-05-openui-sole-genui-protocol；外部 androidx.a2ui 成熟后可重评估。本节正文保留作历史登记。
 
-- **协议**：`ChatMessageEntity.type = "data_ui"`，content 列存整颗 `MessagePart.A2uiCard` part JSON
+- **协议**（v27- 历史协议形态）：`ChatMessageEntity.type = "data_ui"`，content 列存整颗 `MessagePart.A2uiCard` part JSON
   （tool_browser 先例）；云端经 render_ui 工具 action 帧下发，端上 TurnRunner 拦截落库。
   **服务端校验闭环**（2026-10-24，sf-012a0/sf-a2u1c0de 事故修复）：render_ui 负载在服务端
   `RenderUiValidator` 过发射点门控（Action 事件先于工具体落流，校验必须挂在
@@ -888,10 +888,10 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   发卡工具全退役（不注册任何 GenUI 发卡工具，LLM 的整个终结回复就是 OpenUI 程序）；端侧设置项
   同步拆除，DataStore 存量 `genui_format` 值自然失效不做迁移。同一回合只走一条线（现恒为
   turn-native）。
-- **协议**：`ChatMessageEntity.type = "data_ui_openui"`，content 列存整颗 `MessagePart.OpenUiCard`
+- **协议**（v28 起）：`type = "data_ui_openui"` 为投影列，OpenUiCard part 直写 partsJson（v27- 形态：content 列存整颗 `MessagePart.OpenUiCard` part JSON）
 
 > 端侧合成消费者（2026-11-02）：工程师任务卡信息区（`tool_task` part）同走 OpenUI 运行时渲染（`EngineerTaskProgram` 端侧确定性合成程序文本 → `OpenUiSession` → 解包根 Card 原生渲染）——openui 渲染器的第二个消费者，程序不出端、非 turn-native 产物；详见「工程师任务卡」节。
-  part JSON。**来源（2026-11-01 起）= 云端回合终结 Message 事件**——响应即程序：assistant
+  **来源（2026-11-01 起）= 云端回合终结 Message 事件**——响应即程序：assistant
   content 直接是 OpenUI Lang 1.0 程序文本，端上 `CloudAgentTurnRunner` message 分支经
   `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首声明 / Card 调用，字符串字面量
   剥离后判定）→ 程序形态落 OpenUiCard 事件入库，非程序形态（理论上已被 server 双保险

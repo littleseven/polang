@@ -8,6 +8,8 @@
 
 > 2026-11-05 修订：A2UI GenUI 线退役（对照组使命完成，OpenUI 已经生产验证；消灭双线校验/提示词执法成本），`data_ui` 值与 `MessagePart.A2uiCard` 删除，存量消息经 codec/converter 墓碑兜底为 Text（不丢消息）；外部 androidx.a2ui 成熟后可重评估。实施 spec/plan：2026-11-05-openui-sole-genui-protocol。
 
+> 2026-11-08 修订：持久化接缝反转落地（写面权威移交）——chat_messages v28 起 partsJson 为唯一内容权威（NOT NULL），content 列退役，type 降级写时投影列（`MessagePartsProjection`），metadata 白名单瘦身（消息级住户 claude_agent_state/性能指标/savedAt）；对齐 Vercel「UIMessage 整包落库 + 用时投影」（v5 删 content string 同款收口）。写侧接缝 `chatMessageEntity`/`withUpdatedParts`，legacy 转换知识退居迁移/旧备份恢复专用。备份格式 v5→v6（partsJson 直出直进）。
+
 ---
 
 ## 1. 背景（两轮调研）

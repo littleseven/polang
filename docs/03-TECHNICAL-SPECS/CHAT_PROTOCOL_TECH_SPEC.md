@@ -13,7 +13,7 @@
 ```
 用户输入 (ChatViewModel.sendMessage)
   │
-  ├─ 0. 落库用户消息（Room，insertMessageWithParts）
+  ├─ 0. 落库用户消息（Room，insertPartsMessage）
   ├─ 1. 意图路由 IntentRouter（ADR-015 前置闸门）
   │      ├─ 直执命中（VIEW_PHOTOS/REFINE）→ 直接 dispatch → 产卡落库，不走 LLM
   │      └─ 其余（含 BROWSE_WEB/OPEN_QA）→ 完整 agent loop
@@ -196,7 +196,7 @@ TurnPartsReducer 规则：
 
 ### 2.4 产物落库路径（emit* 全清单）
 
-统一入口 `chatMessageDao.insertMessageWithParts`（REPLACE upsert）。**`withPartsJson` 每次从标量列（type/content/metadata/role）经 `MessagePartsConverter.toParts` 现算重填 partsJson**——M1 期 parts 是标量列的纯函数，故 metadata 回写型 update 也走 insertMessageWithParts 防漂移。读侧 `decodePartsOrLegacy`：优先 partsJson 解码，缺失/损坏回标量列现算。
+统一入口 `chatMessageDao.insertPartsMessage`（REPLACE upsert；实体须经 `chatMessageEntity` 构造或 `withUpdatedParts` 更新产出）。**v28（2026-11-08 持久化接缝反转）起 partsJson 为唯一内容权威（NOT NULL）**：type 为写时投影列（`MessagePartsProjection.roomTypeOf`），content 列退役，metadata 白名单瘦身（claude_agent_state/性能指标/savedAt）——投影与 partsJson 同点派生，不可漂移。读侧 `decodeParts`：直解 partsJson，空/整体损坏合成 Unsupported 占位（不丢消息位）。v27- 为 M1 双写过渡形态（partsJson 是标量列的现算纯函数），迁移见 MIGRATION_27_28。
 
 | 工具/来源 | 链路 | 落库行 |
 |---|---|---|
@@ -220,7 +220,7 @@ TurnPartsReducer 规则：
 
 ### 2.6 渲染源（M4 拍平，要点）
 
-- `toUiModel` 双读：`decodePartsOrLegacy()`（快路径 partsJson 解码，回退标量列现算）；全列表重 decode 挪出主线程（messageDecodeDispatcher）。
+- `toUiModel` 直读：`decodeParts()`（v28 起 partsJson 唯一权威，无 legacy 回退）；全列表重 decode 挪出主线程（messageDecodeDispatcher）。
 - ChatListFlattener：key=`"messageId:partId"`；USER 整颗单 item；claude 气泡/AGENT_IMAGE/AGENT_EDIT_RESULT 整消息 legacy 直通；流式三分流（已填充跳过防双显 / 未完成占位 / 失败瞬态）；Turn 聚合纯视觉层。详见 `CHAT_CARD_CATALOG.md` §1.3。
 
 ### 2.7 异常与降级矩阵
@@ -314,7 +314,7 @@ data: [DONE]                                             ← 字面量哨兵
 
 - **链路**：`CloudAgentClient`（androidApp `data/remote/picme/`）→ picme-server `/agent/**` REST + SSE；端侧工具经 SSE `tool_request` 帧下行 + `POST /agent/sessions/{id}/tool-results` 上行回传（工具桥双通道）；端侧结果出端统一过 shared `CloudToolProjectionGate` 投影闸（fail-closed，[PRIVACY]）。
 - **GenUI 唯一化（2026-11-06，turn-native only，server 0.9.20）**：/agent 路由面**不再按 `X-GenUI-Format` 分流**（旧头被忽略，A2UI 回退闸废弃），恒走 **OpenUI 回合原生（turn-native，spec 已随交付清理，git 历史可查）**——不注册任何 GenUI 发卡工具（render_ui/render_ui_openui/render_html 全退役，HTML 以 Html 组件形态入程序树），系统提示词恒为 `OpenUiTurnNative.SYSTEM_PROMPT`（响应即程序契约：整个终结回复必须是一颗 OpenUI Lang 1.0 程序，纯文本也写 `root = Markdown("…")`；契约段后紧跟「回复形态先定位」（2026-11-01 回复活感批次）——对话/问答/闲聊类回复为裸 Markdown 自然正文、禁表单卡包装，数据卡 Card 首子级 Markdown 导语不做冷报表（对话黄金示例 `GOLDEN_CHAT_PROGRAM` 测试同源钉住）；DSL 规则与 `OpenUiPromptAssets.DSL_RULES` 同源复用，尾部内嵌组件全量清单——引用 `RenderOpenUiValidator.ALLOWED_COMPONENTS` 生成而非手抄）。A2UI 时代的 `render_ui` 发射点门控（`RenderUiValidator`，挂 Koog onToolCallStarting）、假发卡守卫与 actionGate/argsTransformer 接线已随发卡工具一并退役，退役类六件（RenderUiToolService/RenderUiValidator/RenderOpenUiToolService/CardClaimGuard/OpenUiToolCallStreamTracker/OpenUiProgramStreamExtractor）2026-11-06 已物理删除。
-- **卡下发与落库**：A2UI 通道已退役（2026-11-06 唯一化，存量 data_ui 历史卡按 legacy 墓碑降级）；**turn-native 经终结 Message 事件下行**——assistant content 即整颗程序，端侧 `CloudAgentTurnRunner` message 分支经 `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首/Card 调用形态；**纯内容嗅探**——LLM 可能模仿会话历史里的程序格式把程序当纯文本输出，兜底落卡，2026-11-02 真机事故修复）→ 程序形态落 `data_ui_openui`（OpenUiCard 整颗 part JSON 存 content 列，fallbackSummary 经 `extractFallbackSummary` 提取：`// summary:` 首行注释 > 首个 Markdown/Text 字面量，截 80 字），非程序形态按纯文本 AssistantText 降级；data part 不回灌 LLM。**服务端「端上永远收到合法树」双保险**：① 策略层 `ProgramGuard`（每轮新实例，MAX_CORRECTIONS=1，GenUI 唯一化后无条件启用）——终结文本经 `RenderOpenUiValidator.validateProgramToError`（结构校验 + `OpenUiLayoutValidator` 布局门禁，先 normalize 再 validate；错误文案 turn-native 口径「逐条修正后重新输出完整程序」）判定非法 → `cloudAgentStrategy` `correctInvalidProgram` 节点携带错误清单回环重发（出边顺序 = 程序校验 → finish，假发卡节点已随发卡工具退役摘除）；② 纠正上限用尽放行，由终结落流前内联调用的 `OpenUiTurnNative.ensureValidProgram` 兜底——合法 normalize 后原样放行 / 非法包成 `root = Markdown("…")` 程序（包装自身复验失败再退硬编码错误卡）。
+- **卡下发与落库**：A2UI 通道已退役（2026-11-06 唯一化，存量 data_ui 历史卡按 legacy 墓碑降级）；**turn-native 经终结 Message 事件下行**——assistant content 即整颗程序，端侧 `CloudAgentTurnRunner` message 分支经 `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首/Card 调用形态；**纯内容嗅探**——LLM 可能模仿会话历史里的程序格式把程序当纯文本输出，兜底落卡，2026-11-02 真机事故修复）→ 程序形态落 `data_ui_openui`（OpenUiCard part 直写 partsJson——v28 起 partsJson 唯一权威（v27- 为 content 列存整颗 part JSON），fallbackSummary 经 `extractFallbackSummary` 提取：`// summary:` 首行注释 > 首个 Markdown/Text 字面量，截 80 字），非程序形态按纯文本 AssistantText 降级；data part 不回灌 LLM。**服务端「端上永远收到合法树」双保险**：① 策略层 `ProgramGuard`（每轮新实例，MAX_CORRECTIONS=1，GenUI 唯一化后无条件启用）——终结文本经 `RenderOpenUiValidator.validateProgramToError`（结构校验 + `OpenUiLayoutValidator` 布局门禁，先 normalize 再 validate；错误文案 turn-native 口径「逐条修正后重新输出完整程序」）判定非法 → `cloudAgentStrategy` `correctInvalidProgram` 节点携带错误清单回环重发（出边顺序 = 程序校验 → finish，假发卡节点已随发卡工具退役摘除）；② 纠正上限用尽放行，由终结落流前内联调用的 `OpenUiTurnNative.ensureValidProgram` 兜底——合法 normalize 后原样放行 / 非法包成 `root = Markdown("…")` 程序（包装自身复验失败再退硬编码错误卡）。
 - **OpenUI 流式预览（turn-native 形态，2026-11-01）**：响应即程序后预览跟踪对象从「工具 args JSON 增量」换成「content TextDelta 纯文本累计」——server `AgentRunner.runTurn` content delta 无条件透传（GenUI 唯一化收编，forwardContentDeltas 参数已删），`OpenUiContentStreamTracker` 节流（≥48 字符增量且 ≥80ms，首发免时间窗）后经 SSE `kind=openui_delta` **瞬态帧旁路下行**（不落 agent_event，终结 Message 帧唯一权威；旧端忽略未知 kind 后向兼容）；EventHandler `onLLMStreamingStarting` 调 `onRoundStart` 轮次重置——回合内多轮 LLM 输出（工具调用后的中间轮 → 终结整树）各自从空累计，端上覆盖式替换预览。端侧照旧合成 `OPENUI_STREAM_PREVIEW_ID` 瞬态预览消息挂列表尾，`OpenUiStreamingCard` 每帧前缀新建 session 解析渐进渲染；终结 Message 落库后预览让位。（2026-10-26 P2 的 ToolCallDelta 路径 `OpenUiToolCallStreamTracker` + `OpenUiProgramStreamExtractor` 已随 render_ui_openui 退役物理删除，2026-11-06，server 0.9.20。）
 - **图集卡透出（2026-10-21/24）**：云端回合 search_media 命中经 `CloudAgentGalleryTools.mediaResultsListener` 端侧回调本地渲染媒体卡（媒体不出设备，回传仅文本计数）；`display="true"` 意图门控——仅当 LLM 判用户明确想浏览/挑选才出卡。
 - **done 帧回合性能数据（2026-11-01，server 0.9.15 起）**：done 帧新增 `elapsed_ms` + `usage{prompt_tokens, completion_tokens}`——server `AgentRunner.runTurn` 逐次累计（`TurnUsage` 出参，回合级实例互不串扰），成功收尾回填耗时；端侧 `CloudFrame.Done` 解析 → `ChatViewModel.toLlmPerformanceOrNull` 装配 `LlmPerformance`（映射同 DeepSeek 先例：prefill=0 隐藏、decode=回合端到端耗时）→ 经 metadata 落库（`performanceMetadataJson`，格式与本地路径同源），文本气泡（`ChatAgentTextPart` 既有行）与 OpenUI 卡（TYPE_OPENUI_CARD 分支新增行）下方统一渲染性能指标行。回补背景：性能行原属本地 Koog 路径（`streamResult.metrics`），云端链路（含 turn-native 程序卡）此前无数据源不渲染。旧服务端（无 usage 字段）→ tokens 双 0 → 不装配不渲染（对齐 parsePerformanceMetadata 全 0 护栏）；旧端忽略 done 帧未知字段，双向兼容。**0.9.17 修复（2026-11-03）**：usage 数据源从 `onLLMCallCompleted` 改为流式 End 帧——Koog 1.3.0 流式路径只触发 `onLLMStreaming*` 事件、**不触发** `onLLMCallCompleted`（javap 核实后者唯一调用点是 `ContextualPromptExecutor` 包非流式 `execute`），策略层 LLM 节点全走 `requestLLMStreaming()` 导致 TurnUsage 恒 0、性能行整体缺失；现于 `onLLMStreamingFrameReceived` 的 `StreamFrame.End` 分支累加 `metaInfo`（OpenAI 客户端请求自带 `stream_options.include_usage`、从上游 usage chunk 构建 End metaInfo），非流式回退路径仍由 `onLLMCallCompleted` 覆盖，两路互斥无双计。
@@ -364,7 +364,7 @@ Room `chat_messages`（partsJson 富归档）是聊天历史的唯一事实源�
 2. **零 JS 桥**：HTML 卡无任何卡内→原生指令通道；清洗器 128KB 上限 + 远程 script/iframe/form 剔除。
 3. **observation 与用户文案分离**：模型侧 observation 是硬编码中文，用户可见文案一律走平台层本地化（I18N）。
 4. **流式不落 Room**：流式消息纯内存态；落库只发生在产物 emit*、回合结束、用户停止半截落库三个时点。
-5. **parts 双写同源**：partsJson 恒为标量列的现算纯函数（M1 期），metadata 回写必须走 insertMessageWithParts 防漂移。
+5. **parts 单一权威**：v28 起 partsJson 为唯一内容权威，type/metadata 为其投影/白名单子集；写面统一走 `chatMessageEntity`/`withUpdatedParts` + `insertPartsMessage(s)`，metadata 回写型 update 同样经 `withUpdatedParts` 防漂移（v27- 双写期口径：partsJson 恒为标量列现算纯函数）。
 6. **迁移不丢消息**：Room 迁移行级 runCatching + Text 兜底。
 7. **一回合至多一张媒体卡**：search/refine REPLACE 复用本回合上一张卡 id。
 8. **tool schema 单一来源**：ToolRegistry 与 system prompt 工具清单同自 ChatToolService 反射展开，禁手写漂移。
