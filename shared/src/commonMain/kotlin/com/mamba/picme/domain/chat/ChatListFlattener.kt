@@ -9,9 +9,11 @@ package com.mamba.picme.domain.chat
  * 拍平规则：
  * - **key** = `"${messageId}:${partId}"`（块级稳定锚，分轨命名空间见 [MessagePart.partId]）；
  * - **USER 消息整颗单 item**（§5 图文同气泡不拆）；agent 消息按 part 拍平；
- * - **整消息 legacy 渲染**（part = null）：claude 气泡 / AGENT_IMAGE /
- *   AGENT_EDIT_RESULT（message 形渲染器）与 parts 为空的瞬态消息
- *   （流式占位「思考中」）；
+ * - **整消息 legacy 渲染**（part = null）：claude 气泡 / IMAGE / EDIT_RESULT
+ *   （message 形渲染器）与 parts 为空的瞬态消息（流式占位「思考中」）；
+ * - **source parts 聚合**（spec §6.2）：消息内**连续**的 SourceUrl/SourceDocument
+ *   parts 聚合为单条引用 chips item（key = `messageId:source_chips`，part 锚首个
+ *   source part，渲染件自 message.parts 聚合取数）；
  * - **流式消息卡 part 三分流**（spec §4 占位契约 + M2 双轨口径）：已填充
  *   （OUTPUT_AVAILABLE）的 Chart/HtmlCard 在其**产物行已在列表中**时跳过——
  *   产物落库为独立消息行渲染，双显禁止；产物行未达的窗口期（Room invalidation
@@ -117,11 +119,34 @@ private fun flattenMessage(
         )
         return
     }
-    // agent 消息按 part 拍平（跳过产物行已渲染的已填充卡 part）
+    // agent 消息按 part 拍平（跳过产物行已渲染的已填充卡 part）；连续 source parts
+    // 聚合为单条 chips item（spec §6.2 引用列表渲染粒度）
     val visible = message.parts.filterNot { part ->
         part.isPersistedStreamingOutput(message, persistedChartPayloads, persistedHtmlPayloads, persistedBrowserSessionIds)
     }
-    visible.forEachIndexed { index, part ->
+    var index = 0
+    var sourceRunOrdinal = 0
+    while (index < visible.size) {
+        val part = visible[index]
+        if (part.isSourcePart()) {
+            var runEnd = index + 1
+            while (runEnd < visible.size && visible[runEnd].isSourcePart()) runEnd++
+            // 首段 run 用 messageId:source_chips（spec §6.2 指定锚）；多段 run 追加序号
+            // 防 LazyColumn key 重复（web_search 产出恒单段尾随，多段为自由构造防御）
+            val runSuffix = if (sourceRunOrdinal == 0) "" else "$sourceRunOrdinal"
+            out += ChatListItem(
+                key = "${message.id}:source_chips$runSuffix",
+                contentType = ChatListItem.TYPE_SOURCE_CHIPS,
+                message = message,
+                part = part,
+                turnIndex = turn,
+                isTurnStart = turnStart && index == 0,
+                isLastPartOfMessage = runEnd - 1 == visible.lastIndex,
+            )
+            sourceRunOrdinal++
+            index = runEnd
+            continue
+        }
         out += ChatListItem(
             key = "${message.id}:${part.partId}",
             contentType = contentTypeOf(message, part),
@@ -134,6 +159,7 @@ private fun flattenMessage(
             showCursor = message.isStreaming && message.showCursor &&
                 part is MessagePart.Text && part.state == PartState.STREAMING,
         )
+        index++
     }
     // 全部 part 被跳过（如 turn 仅产出一张已落库卡）：不留空消息位
 }
@@ -142,8 +168,8 @@ private fun flattenMessage(
 private fun ChatMessage.rendersAsWholeMessage(): Boolean =
     parts.isEmpty() ||
         claudeAgent != null ||
-        type == ChatMessageType.AGENT_IMAGE ||
-        type == ChatMessageType.AGENT_EDIT_RESULT
+        type == ChatMessageType.IMAGE ||
+        type == ChatMessageType.EDIT_RESULT
 
 private fun wholeMessageKey(message: ChatMessage): String =
     "${message.id}:${message.parts.firstOrNull()?.partId ?: "whole"}"
@@ -191,6 +217,9 @@ private fun MessagePart.toolStateOrNull(): ToolPartState? = when (this) {
     else -> null
 }
 
+private fun MessagePart.isSourcePart(): Boolean =
+    this is MessagePart.SourceUrl || this is MessagePart.SourceDocument
+
 /** 流式开放文本块以 paced content 渲染（节奏器打字机节拍保留）；其余读 part 自身负载。 */
 private fun streamingTextOverride(message: ChatMessage, part: MessagePart): String? =
     if (message.isStreaming && part is MessagePart.Text && part.state == PartState.STREAMING) {
@@ -210,8 +239,13 @@ private fun contentTypeOf(message: ChatMessage, part: MessagePart): String = whe
     is MessagePart.Image, is MessagePart.EditResult -> ChatListItem.TYPE_LEGACY_MESSAGE
     // 直播卡全状态自渲染（占位/运行/定格/错误都由卡片处理，不走通用 placeholder chip）
     is MessagePart.BrowserLive -> ChatListItem.TYPE_BROWSER_LIVE
-    // 前向兼容兜底卡（读时投影：未知/损坏 part → 「内容不支持请升级」占位）
-    is MessagePart.Unsupported -> ChatListItem.TYPE_UNSUPPORTED
+    // 思考链独立折叠块（值域终态 reasoning 桶；不落正文桶，防思考链以正文形态双显）
+    is MessagePart.Reasoning -> ChatListItem.TYPE_REASONING
+    // source parts 由 flattenMessage 聚合为 TYPE_SOURCE_CHIPS item，正常不到达；
+    // 防御性落同桶（保 sealed when 穷尽）
+    is MessagePart.SourceUrl, is MessagePart.SourceDocument -> ChatListItem.TYPE_SOURCE_CHIPS
+    // 前向兼容/退役兜底卡（读时投影：未知/损坏/退役 part → 「此内容需新版本 App 查看」占位）
+    is MessagePart.Tombstone -> ChatListItem.TYPE_TOMBSTONE
 }
 
 private fun cardContentType(state: ToolPartState, doneType: String): String = when (state) {
@@ -256,7 +290,7 @@ data class ChatListItem(
         /** 浏览器直播卡（tool_browser，全状态自渲染：占位/运行/定格/错误一卡到底）。 */
         const val TYPE_BROWSER_LIVE = "browser_live"
 
-        /** OpenUI GenUI 卡（data_ui_openui，openui P1）。 */
+        /** OpenUI GenUI 卡（data_genui_program，openui P1）。 */
         const val TYPE_OPENUI_CARD = "openui_card"
 
         /** 卡片工具占位（INPUT_STREAMING/INPUT_AVAILABLE，spec §4 占位契约）。 */
@@ -268,7 +302,13 @@ data class ChatListItem(
         /** 非卡片工具进行中的合成状态 item。 */
         const val TYPE_TOOL_STATUS = "tool_status"
 
-        /** 前向兼容兜底卡（MessagePart.Unsupported：未知/损坏 part 的占位渲染）。 */
-        const val TYPE_UNSUPPORTED = "unsupported"
+        /** 思考链折叠块（MessagePart.Reasoning，可折叠「思考过程」）。 */
+        const val TYPE_REASONING = "reasoning"
+
+        /** 引用 chips 行（连续 SourceUrl/SourceDocument parts 聚合的单 item，spec §6.2）。 */
+        const val TYPE_SOURCE_CHIPS = "source_chips"
+
+        /** 前向兼容/退役兜底卡（MessagePart.Tombstone：未知/损坏/退役 part 的占位渲染；2026-11-08 自 TYPE_UNSUPPORTED/"unsupported" 改名）。 */
+        const val TYPE_TOMBSTONE = "tombstone"
     }
 }

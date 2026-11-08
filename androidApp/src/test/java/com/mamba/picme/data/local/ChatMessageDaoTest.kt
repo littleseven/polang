@@ -3,10 +3,9 @@ package com.mamba.picme.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.MessagePartsCodec
 import com.mamba.picme.domain.chat.PartState
-import com.mamba.picme.domain.chat.ToolPartState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -40,26 +39,10 @@ class ChatMessageDaoTest {
         type: String,
         role: String = "agent",
         timestamp: Long,
-    ): ChatMessageEntity {
-        // v28 起 type 为 parts 投影：按目标投影值构造对应 part
-        val parts: List<MessagePart> = when (type) {
-            "text" -> listOf(MessagePart.Text("p0", "x", PartState.DONE))
-            "image" -> listOf(MessagePart.Image("p0", ref = "file:///x.jpg"))
-            "tool_task" -> listOf(
-                MessagePart.TaskCard(
-                    partId = "p0",
-                    toolCallId = id,
-                    state = ToolPartState.OUTPUT_AVAILABLE,
-                    task = EngineerTaskState(
-                        taskId = id, sourceText = "x",
-                        startedAtMs = timestamp, updatedAtMs = timestamp,
-                    ),
-                ),
-            )
-            else -> error("unexpected type $type")
-        }
-        return chatMessageEntity(id = id, sessionId = sessionId, role = role, parts = parts, timestamp = timestamp)
-    }
+    ) = ChatMessageEntity(
+        id = id, sessionId = sessionId, type = type, role = role, content = "x", timestamp = timestamp,
+        partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "x", PartState.DONE))),
+    )
 
     @Test
     fun `getTaskCardMessages returns only tool_task rows newest first`() = runTest {

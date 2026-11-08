@@ -1,5 +1,8 @@
 package com.mamba.picme.domain.chat
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -18,22 +21,98 @@ class ChatModelInputTest {
     private fun legacyReplay(rows: List<Triple<String, String, String?>>): List<Pair<String, String>> =
         rows.map { (type, content, _) -> type to content }
 
+    /**
+     * fixture：从标量行 (type, content, metadata) 构造 [ChatMessage]——parts 按
+     * v5 备份粗映射口径手建（对齐 androidApp `BackupChatRestoreMapper` 的物化分支，
+     * converter 退役后 commonTest 侧不复用其实现）；type 入参是 fixture 标签
+     * （含 user_/agent_ 前缀的历史命名），role/线值在本地换算。
+     */
     private fun legacyMessage(type: String, content: String, metadata: String? = null): ChatMessage {
-        // 经迁移单点构造：role + parts 一次到位（与 Room v26 迁移同源，防测试私搭派生逻辑）
-        val migrated = LegacyChatTypeMigration.map(type, content, metadata)
+        val role = if (type.startsWith("user_")) ModelInputRole.USER else ModelInputRole.ASSISTANT
+        fun meta(): kotlinx.serialization.json.JsonObject? = metadata
+            ?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
+        fun metaImageUri(): String? = meta()?.get("imageUri")?.jsonPrimitive?.content
+        val parts = when (type) {
+            "user_image" -> listOf(MessagePart.Image("p0", ref = content))
+            "user_image_text" -> listOf(
+                MessagePart.Image("p0", ref = metaImageUri() ?: content),
+                MessagePart.Text("p1", content, PartState.DONE),
+            )
+            "agent_image" -> listOf(MessagePart.Image("p0", ref = metaImageUri() ?: content))
+            "chart" -> listOf(MessagePart.Chart("p0", svg = content))
+            "html_card" -> {
+                val sub = meta()?.get("html_card")?.jsonObject
+                listOf(
+                    MessagePart.HtmlCard(
+                        "p0",
+                        html = content,
+                        meta = HtmlCardMeta(
+                            display = sub?.get("display")?.jsonPrimitive?.content,
+                            summary = sub?.get("summary")?.jsonPrimitive?.content,
+                        ),
+                    ),
+                )
+            }
+            "task_card" -> {
+                val task = taskFixture(metadata)
+                listOf(
+                    MessagePart.TaskCard(
+                        "p0",
+                        toolCallId = task.taskId,
+                        state = task.status.toToolPartState(),
+                        task = task,
+                    ),
+                )
+            }
+            "agent_edit_result" -> listOf(
+                MessagePart.EditResult("p0", ref = metaImageUri(), description = content),
+            )
+            "optimize_candidates" -> listOf(
+                MessagePart.OptimizeCandidates(
+                    "p0",
+                    OptimizeCandidateGroup(
+                        sourceImageUri = "u",
+                        scene = "s",
+                        recommendedIndex = 0,
+                        candidates = emptyList(),
+                        usedFingerprints = emptyList(),
+                        drawIndex = 1,
+                    ),
+                ),
+            )
+            else -> listOf(MessagePart.Text("p0", content, PartState.DONE))
+        }
         val uiType = when (type) {
-            "user_text" -> ChatMessageType.USER_TEXT
-            "user_image" -> ChatMessageType.USER_IMAGE
-            "user_image_text" -> ChatMessageType.USER_IMAGE_TEXT
-            else -> ChatMessageType.AGENT_TEXT
+            "user_image" -> ChatMessageType.IMAGE
+            "user_image_text" -> ChatMessageType.IMAGE_TEXT
+            else -> ChatMessageType.TEXT
         }
         return ChatMessage(
             id = "m-$type",
             type = uiType,
             content = content,
-            role = roleOf(migrated.role),
-            parts = migrated.parts,
+            role = role,
+            parts = parts,
         )
+    }
+
+    /** task_card fixture：metadata `engineer_task` 子对象 → 状态（口径对齐读侧解析）。 */
+    private fun taskFixture(metadata: String?): EngineerTaskState {
+        val root = metadata
+            ?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
+            ?.get("engineer_task")?.jsonObject
+        val task = EngineerTaskState(
+            taskId = root?.get("taskId")?.jsonPrimitive?.content ?: "t-x",
+            sourceText = root?.get("sourceText")?.jsonPrimitive?.content ?: "",
+            status = root?.get("status")?.jsonPrimitive?.content
+                ?.let { name -> runCatching { EngineerTaskStatus.valueOf(name) }.getOrDefault(EngineerTaskStatus.FAILED) }
+                ?: EngineerTaskStatus.FAILED,
+            errorSummary = root?.get("errorSummary")?.jsonPrimitive?.content,
+            resultSummary = root?.get("resultSummary")?.jsonPrimitive?.content,
+            startedAtMs = 1L,
+            updatedAtMs = 2L,
+        )
+        return task
     }
 
     @Test
@@ -190,19 +269,66 @@ class ChatModelInputTest {
     }
 
     @Test
-    fun `unsupported fallback part never enters the model context`() {
-        // 前向兼容兜底 part（2026-11-08）：模型从未见过的占位类型不回灌，
-        // 对齐 data part 丢弃口径（spec §6）
+    fun `tombstone fallback part never enters the model context`() {
+        // 前向兼容/退役兜底 part（2026-11-08 值域终态转正 Tombstone）：模型从未见过的
+        // 占位类型不回灌，对齐 data part 丢弃口径（spec §6）
         val message = ChatMessage(
-            id = "m-unsupported",
-            type = ChatMessageType.AGENT_TEXT,
+            id = "m-tombstone",
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
-                MessagePart.Unsupported(partId = "p0", originalType = "tool_video_edit", summary = "视频结果"),
+                MessagePart.Tombstone(partId = "p0", originalType = "tool_video_edit", summary = "视频结果"),
             ),
         )
         assertEquals(emptyList(), message.toModelInput())
+    }
+
+    @Test
+    fun `reasoning part is stripped from model context`() {
+        // 值域终态（2026-11-08）：思考链回灌剥离——对齐 Vercel convertToModelMessages
+        // 丢弃规则（spec §3/§6），reasoning 永不回灌 LLM
+        val message = ChatMessage(
+            id = "m-reasoning",
+            type = ChatMessageType.TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Reasoning(partId = "p0", text = "先按月份分组再统计", state = PartState.DONE),
+                MessagePart.Text(partId = "p1", markdown = "3 月共 42 张", state = PartState.DONE),
+            ),
+        )
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "3 月共 42 张")),
+            message.toModelInput(),
+        )
+    }
+
+    @Test
+    fun `source parts are stripped from model context`() {
+        // 值域终态（2026-11-08）：source_url/source_document 回灌剥离（引用来源不回灌
+        // LLM，对齐 Vercel convertToModelMessages 丢弃规则，spec §3/§6）
+        val message = ChatMessage(
+            id = "m-source",
+            type = ChatMessageType.TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Text(partId = "p0", markdown = "引用了两处来源", state = PartState.DONE),
+                MessagePart.SourceUrl(partId = "p1", sourceId = "s1", url = "https://a.com", title = "A"),
+                MessagePart.SourceDocument(
+                    partId = "p2",
+                    sourceId = "d1",
+                    mediaType = "application/pdf",
+                    title = "报告",
+                    filename = "r.pdf",
+                ),
+            ),
+        )
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "引用了两处来源")),
+            message.toModelInput(),
+        )
     }
 
     @Test
@@ -239,7 +365,7 @@ class ChatModelInputTest {
     fun `blank text parts are dropped from context`() {
         val message = ChatMessage(
             id = "m",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(MessagePart.Text("p0", "  ", PartState.DONE)),
@@ -252,7 +378,7 @@ class ChatModelInputTest {
         // 一回合多 part：文本-卡片-文本的交错顺序在回灌中保持（数组顺序即锚点）
         val message = ChatMessage(
             id = "m",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "前",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -279,7 +405,7 @@ class ChatModelInputTest {
         // browser-vnc 直播卡 Task 13：tool-call/tool-result 配对，结果侧只含文本摘要
         val message = ChatMessage(
             id = "m-b",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(
@@ -321,7 +447,7 @@ class ChatModelInputTest {
     fun `failed browser session replays error reason as tool result`() {
         val message = ChatMessage(
             id = "m-berr",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             parts = listOf(

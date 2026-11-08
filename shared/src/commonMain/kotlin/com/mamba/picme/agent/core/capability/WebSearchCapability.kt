@@ -5,7 +5,13 @@ import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentErrorCode
 import com.mamba.picme.agent.core.model.context.PageContext
+import com.mamba.picme.domain.chat.MessagePart
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 /**
  * 网页搜索传输层（commonMain 无 HTTP 手段，组合根注入平台实现；测试注入 fake）。
@@ -58,3 +64,38 @@ class WebSearchCapability(
         return Result.success(AgentAction.TextReply(commandId = command.commandId, message = reply))
     }
 }
+
+private val json = Json { ignoreUnknownKeys = true }
+
+/**
+ * web_search 结构化引用抽取（capability 层，值域终态 source_url spec §6.2）：自服务端
+ * 紧凑 JSON（`{"status":"ok","results":[{title,url,snippet,images,…}]}`）取前 ≤5 条
+ * url 非空结果 → [MessagePart.SourceUrl]（sourceId = url 稳定身份；partId 置空占位，
+ * 由装配方 `TurnPartsReducer` 统一重编 `src-N` 保唯一）。抽取只读 title/url，snippet 与
+ * images 不进 chip（图链由 LLM 按工具描述嵌正文 markdown，双显职责分工：图=配图，
+ * chip=来源列表）。降级文本（`[WEB_SEARCH_*]` 前缀）与损坏 payload 解析失败得空列表，
+ * 不抛——抽取是纯增益通道，绝不影响 tool-result 原文回 LLM 路径。
+ *
+ * 消费点：`ChatToolService.webSearch` @Tool 面（成功路径 observation = 本函数入参原文）。
+ */
+internal fun extractWebSearchSources(payload: String): List<MessagePart.SourceUrl> {
+    val results = runCatching {
+        json.parseToJsonElement(payload).jsonObject["results"]?.jsonArray
+    }.getOrNull() ?: return emptyList()
+    return results.asSequence()
+        .mapNotNull { element ->
+            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val url = (obj["url"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            MessagePart.SourceUrl(
+                partId = "",
+                sourceId = url,
+                url = url,
+                title = (obj["title"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() },
+            )
+        }
+        .take(MAX_SOURCES)
+        .toList()
+}
+
+private const val MAX_SOURCES = 5

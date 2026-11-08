@@ -42,7 +42,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 /**
- * data_ui_openui 卡的渲染宿主（openui P2）：一颗 session 一张卡。
+ * data_genui_program 卡的渲染宿主（openui P2）：一颗 session 一张卡。
  *
  * 三态：解析中 → OpenUiCardLoading；handle 失败/prepare Failed → OpenUiCardDegraded(fallbackSummary)
  * （US-6 宁缺毋滥同口径）；Rendered → OpenUiNodeRenderer 递归渲染。

@@ -1,11 +1,11 @@
 import SwiftUI
 import UIKit
 
-// MARK: - USER_IMAGE_TEXT 上图下文缩略图（PHAsset，对齐 Android AsyncImage 气泡）
+// MARK: - IMAGE_TEXT 上图下文缩略图（PHAsset，对齐 Android AsyncImage 气泡）
 
 /// 用户气泡顶部图片：localIdentifier → ThumbnailLoader 缩略图（async），缺图给占位图标。
 ///
-/// 尺寸契约（Android ChatScreen.kt USER_IMAGE_TEXT，chat.yaml §5 user_image_bubble）：
+/// 尺寸契约（Android ChatScreen.kt IMAGE_TEXT，chat.yaml §5 user_image_bubble）：
 /// `ContentScale.FillWidth` + fillMaxWidth —— 宽撑满图类气泡（240 上限 - 2×6 padding），
 /// **高随原始宽高比，不裁切**（修复 2026-08-16 真机反馈：固定高 150 + fill 中心裁切
 /// 导致「砍头 2」与大小不对齐）。圆角 12（Android 12dp）。
@@ -43,9 +43,9 @@ struct UserImageAttachment: View {
     }
 }
 
-// MARK: - AGENT_IMAGE 单发结果图（gacha 确认/降级，FillWidth 240 完整显示）
+// MARK: - IMAGE 单发结果图（gacha 确认/降级，FillWidth 240 完整显示）
 
-/// agent 单发结果图（Android AGENT_IMAGE，chat.yaml §5 image_content.agent_image）：
+/// agent 单发结果图（Android IMAGE（agent），chat.yaml §5 image_content.agent_image）：
 /// `ContentScale.FillWidth`——宽撑满图类气泡（240 上限 - 2×6 padding），高随原始宽高比，
 /// 零裁切；文件缺失显示失效占位（chatImageIsLive 语义）。圆角 12。
 struct AgentImageAttachment: View {
@@ -91,12 +91,12 @@ struct AgentImageAttachment: View {
     }
 }
 
-// MARK: - AGENT_EDIT_RESULT 编辑结果图卡（文件加载 + 失效占位，对齐 Android chatImageIsLive）
+// MARK: - EDIT_RESULT 编辑结果图卡（文件加载 + 失效占位，对齐 Android chatImageIsLive）
 
 /// 编辑结果图：Documents/chat_edits 文件路径 → UIImage；文件缺失显示失效占位
 /// （Android 语义：编辑产物文件可能被清理，显示「图片已失效」而非空白）。
 ///
-/// 尺寸契约（Android ChatScreen.kt AGENT_EDIT_RESULT，chat.yaml §5 image_content.edit_result）：
+/// 尺寸契约（Android ChatScreen.kt EDIT_RESULT，chat.yaml §5 image_content.edit_result）：
 /// `ContentScale.FillHeight` + height(200) + widthIn(max 260)——**高定 200、宽=200×宽高比
 /// 完整显示**；仅超宽图（宽高比>1.3）横向居中裁到 260。圆角 12。
 /// （⚠️ 竖图不得纵向裁切：scaledToFill+固定 frame 会把竖图上下裁掉——2026-08-16

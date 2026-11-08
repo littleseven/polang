@@ -7,13 +7,13 @@ import com.mamba.picme.R
 import com.mamba.picme.agent.core.capability.BrowserSessionCapability
 import com.mamba.picme.agent.core.capability.BrowserSessionDelegate
 import com.mamba.picme.data.local.ChatMessageDao
-import com.mamba.picme.data.local.chatMessageEntity
 import com.mamba.picme.data.local.insertPartsMessage
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
 import com.mamba.picme.domain.browser.BrowserStatus
 import com.mamba.picme.domain.chat.BrowserActionEntry
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.ToolPartState
 import com.mamba.picme.domain.chat.streaming.TurnPartsReducer
 import com.mamba.picme.features.chat.formatBrowserAction
@@ -224,20 +224,18 @@ class BrowserLiveSessionController(
     }
 
     /**
-     * 浏览器会话定格卡**落库**（type 投影 = tool_browser，parts 唯一权威）。
-     * 与图表/HTML 卡同理：消息列表由 DB Flow 驱动，卡片必须落库才能跨重载持久。
+     * 浏览器会话定格卡**落库**（parts-first：BrowserLive part 直建，投影 content 列 =
+     * 整颗 part JSON）。与图表/HTML 卡同理：消息列表由 DB Flow 驱动，卡片必须落库才能跨重载持久。
      * 双显跳过（流式占位卡 vs 产物行）由 ChatScreen 的 persistedBrowserSessionIds
      * 提取式自动生效（自非流式消息 parts 提取 sessionId 集合）。
      */
     private suspend fun emitBrowserCardMessage(finalPart: MessagePart.BrowserLive) {
         chatMessageDao.insertPartsMessage(
-            chatMessageEntity(
-                id = "browser_" + System.currentTimeMillis() + "_" + messageSeq.incrementAndGet(),
-                sessionId = currentSessionId(),
-                role = "agent",
-                parts = listOf(finalPart.copy(partId = "p0")),
-                modelUsed = "browser",
-            ),
+            sessionId = currentSessionId(),
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(finalPart.copy(partId = "p0")),
+            id = "browser_" + System.currentTimeMillis() + "_" + messageSeq.incrementAndGet(),
+            modelUsed = "browser",
         )
     }
 

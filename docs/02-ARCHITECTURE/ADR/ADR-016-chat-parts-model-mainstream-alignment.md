@@ -4,9 +4,10 @@
 **日期**: 2026-09-25（原 ADR-014 方案 B 选定）→ 2026-09-27（parts 主流对齐定稿；**整合吸收 ADR-014 全部仍有效决策，编号 014 永久留空**）
 **决策**: 用户（2026-09-25 方案 B 选定、D1 措辞/D2 呈现/D5 约束框架逐节认可；2026-09-27 三方组合选型逐条确认，JS 桥/消息树明确排除；2026-09-27 指示两篇整合）
 **依赖**: ADR-008（隐私红线）、ADR-011（ui-driver 测试体系）、ADR-013（KMP 契约）、[PARITY] 红线
-**实施 spec**: `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md`（parts 模型/流式/状态机/渲染，M1~M5 分期）；HTML 卡实现 SSOT：`JS_ENGINE_TECH_SPEC.md` §7/§7.1；双形态 + 任务卡 HTML 化：`2026-09-26-html-card-two-tier-design.md`
+**实施 spec**: `docs/superpowers/specs/2026-09-27-chat-parts-rendering-design.md`（parts 模型/流式/状态机/渲染，M1~M5 分期）；值域终态：`2026-11-08-chat-value-domain-ideal-design.md`（13 值 + parts-first + legacy 出清，已实施）；HTML 卡实现 SSOT：`JS_ENGINE_TECH_SPEC.md` §7/§7.1；双形态 + 任务卡 HTML 化：`2026-09-26-html-card-two-tier-design.md`
 
-> 2026-11-05 修订：A2UI GenUI 线退役（对照组使命完成，OpenUI 已经生产验证；消灭双线校验/提示词执法成本），`data_ui` 值与 `MessagePart.A2uiCard` 删除，存量消息经 codec/converter 墓碑兜底为 Text（不丢消息）；外部 androidx.a2ui 成熟后可重评估。实施 spec/plan：2026-11-05-openui-sole-genui-protocol。
+> 2026-11-08 修订：Chat 值域一步到位终态（spec `2026-11-08-chat-value-domain-ideal-design.md`，D1=(a) parts-first / D2=(a) 纯 kind 枚举，用户裁决）——part 值域 **4+1 分类 13 值**（新增 reasoning/source 分类与 `tombstone` 前向兼容兜底值）；`data_ui_openui` 语义化改名 `data_genui_program`（命名规约第 2 条首次执行）；命名规约升格为立法全文（D1 末条）；持久层反转 parts-first（partsJson 权威，Room 标量列降级派生投影）；legacy 兼容机器全删（Room v28 聊天表重置 + iOS history envelope v6 + 备份 v6 粗映射）。值域演进编年（2026-09-28 分类法重构 8 值 → 2026-10 扩值 11 → A2UI/横滑卡退役 9 → 终态 13）自正文移除，git 历史可查。
+> 2026-11-05 修订：A2UI GenUI 线退役（对照组使命完成，OpenUI 已生产验证；消灭双线校验/提示词执法成本），`data_ui` 值与 `MessagePart.A2uiCard` 删除；外部 androidx.a2ui 成熟后可重评估。
 
 > 2026-11-08 修订：持久化接缝反转落地（写面权威移交）——chat_messages v28 起 partsJson 为唯一内容权威（NOT NULL），content 列退役，type 降级写时投影列（`MessagePartsProjection`），metadata 白名单瘦身（消息级住户 claude_agent_state/性能指标/savedAt）；对齐 Vercel「UIMessage 整包落库 + 用时投影」（v5 删 content string 同款收口）。写侧接缝 `chatMessageEntity`/`withUpdatedParts`，legacy 转换知识退居迁移/旧备份恢复专用。备份格式 v5→v6（partsJson 直出直进）。
 
@@ -36,17 +37,17 @@ Chat 是主入口（2026-08 产品重心迁移后），两类渲染诉求：**(a
 
 ### D1 数据/协议层：对齐 Vercel AI SDK parts 模型
 
-- 一条回复 = 一条消息 = **有序 parts 数组**（`MessagePart` sealed：`Text`/`Chart`/`HtmlCard`/`TaskCard`/`MediaResults`/`Image` 等——`MediaResults` 2026-11-08 随横滑图集卡退役删除），取代 13 值 `ChatMessageType` 平铺单类型 payload
+- 一条回复 = 一条消息 = **有序 parts 数组**（`MessagePart` sealed 13 子类型：content `Text`/`Image` · reasoning `Reasoning` · tool `Chart`/`HtmlCard`/`TaskCard`/`EditResult`/`BrowserLive` · data `OptimizeCandidates`/`OpenUiCard` · source `SourceUrl`/`SourceDocument` · tombstone `Tombstone`），取代旧 13 值 `ChatMessageType` 平铺单类型 payload（`ChatMessageType` 现收敛为 9 值纯 kind 渲染枚举，role 由消息级独立列表达，D2a）
 - 流式对齐 **chunk 三段式语义**（start/delta/end，块级 id）——对齐的是事件语义，不是 SSE 线协议（传输仍走 Koog 内部循环）
 - 工具调用状态机对齐 Vercel 四态 + 审批态；工程师任务卡五态（RUNNING/AWAITING_CONTINUE/AWAITING_DELIVER/COMPLETED/FAILED）映射为该状态机的渲染投影
-- **双层分离**：渲染/持久层保存富 parts 文档（防信息丢失）；回灌 LLM 时显式转换（工具结果拆为 tool 角色消息、UI 专有 part 不进上下文）——对应 Vercel UIMessage↔ModelMessage
-- **type 分类法（2026-09-28 重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`）**：Room `type` 列值域 = 3 分类 8 值——content（`text`/`image`，免前缀）· tool（`tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`）· data（`data_media_results`/`data_optimize_candidates`，回灌剥离）；命名规则 `^{category}_{kind}$`，`tool_`/`data_` 为保留前缀，禁 UI 容器词（card/bubble/strip/viewer）进协议值；`MessagePart` 挂 `PartCategory` 分类载体（getter-only，不进线格式）；`role` 上提为消息级独立列（Room v26，"user"/"agent"）取代 user_/agent_ type 前缀；legacy 13 值经 `LegacyChatTypeMigration` 一次性转正（MIGRATION_25_26 + 备份恢复），运行时转换器 `MessagePartsConverter` 只认新值；值域后经 2026-10 扩 `tool_browser`/`data_ui`/`data_ui_openui` 至 11 值，2026-11-05 A2UI 退役删 `data_ui`（`MessagePart.A2uiCard` 同步删除，存量行级墓碑兜底不丢消息）回落 **10 值**；2026-11-08 横滑图集卡退役删 `data_media_results`（`MessagePart.MediaResults`/`MediaResultsUi`/`ChatMessageType.MEDIA_RESULTS` 同步删除，存量行命中 `LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES` 闭集，双端回放整行跳过、不回灌）回落 **9 值**
-- **新增值命名规约（2026-11-08 立法，约束未来扩值；存量值冻结不为美学改名）**：
-  1. kind = 单数 snake_case **语义名**——描述内容语义，禁嵌实现技术/厂商名（反例 `data_ui_openui` 嵌 OpenUI 技术名；A2UI 的 `data_ui` 已按此模式腐烂过一次——技术换代即值作废；该值语义化改名另立专项任务）；已知历史例外 `optimize_candidates`（复数）冻结不改
-  2. `tool_`/`data_` 前缀强制；**content 类级免前缀**（bare = content：无前缀值即 content 类，`PartCategory` 推导同口径）——`text`/`image` 是该类首批实例而非封闭清单，未来新增 content 值（video/audio/voice/file 等正文/附件语义）同规则免前缀
-  3. 禁 UI 容器词（card/bubble/strip/viewer/item/row）进协议值（既有规则）
-  4. `data_` 前缀 = 回灌剥离的机械声明（既有规则）
-  5. 改名/新增值走线格式迁移全链（Room 迁移 + iOS codec + 备份恢复 + golden + PARITY spec），新增值须过本规约符合性审查再落地
+- **双层分离**：渲染/持久层保存富 parts 文档（防信息丢失）；回灌 LLM 时显式转换（工具结果拆为 tool 角色消息、UI 专有 part 不进上下文——`data_`/`source_` 前缀 part 与 reasoning/tombstone 一律剥离，对齐 Vercel convertToModelMessages 丢弃规则）——对应 Vercel UIMessage↔ModelMessage
+- **type 值域分类法（2026-11-08 终态）**：part 鉴别值域 = **4+1 分类 13 值**——content（bare：`text`/`image`）· reasoning（bare：`reasoning`，思考链可折叠渲染、回灌剥离）· tool（`tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`/`tool_browser`）· data（`data_optimize_candidates`/`data_genui_program`）· source（`source_url`/`source_document`，web_search/文档引用 chips，回灌剥离）+ tombstone（bare：`tombstone`——未知/退役 part 的可读占位，codec 前向兼容兜底，详见 ADR §D1 末条与 `CHAT_CARD_CATALOG.md` §0）；`MessagePart` 挂 `PartCategory` 五分类载体（content/reasoning/tool/data/source，getter-only，不进线格式）；`role` 为消息级独立列（"user"/"agent"）。**持久化 parts-first（D1a）**：`partsJson` 为权威列（Room v28 非空），`type`/`content`/`metadata` 标量列降级为派生投影（`projectChatRow` 唯一派生点；type = `primaryPartOf` 判型锚——首个 content/tool/data 类 part 的鉴别值，reasoning/source/tombstone 永不作投影源），写路径统一 `insertPartsMessage`/`replacePartsMessage`。legacy 转正机器（`LegacyChatTypeMigration`、`MessagePartsConverter`、双端回放过滤）已随 Room v28 聊天表重置全数删除；v5 备份恢复走备份模块内一次性粗映射（v6 备份 partsJson 直通），运行时零 legacy 知识；iOS 会话文件 envelope v6 门禁（旧文件整体忽略，与 Android 重置语义对齐）。
+- **新增值命名规约（2026-11-08 立法全文，约束未来扩值）**：
+  1. kind = 单数 snake_case **语义名**；**集合型负载可用复数**（`data_optimize_candidates` 自此合规，不再算历史例外）
+  2. 禁嵌实现技术/厂商/协议版本名（`data_ui_openui` → `data_genui_program` 即本条首次执行；`genui` 为范式名非技术实现名）
+  3. 禁 UI 容器词（card/bubble/strip/viewer/item/row）进协议值
+  4. 前缀即分类声明：`tool_`/`data_`/`source_` 强制；bare = content/reasoning/tombstone（高频正文与结构占位）；`data_`/`source_` = 回灌剥离机械声明
+  5. 新增值过本规约审查 + codec Tombstone 兜底测试钉住（未知鉴别值编解码往返落 `Tombstone(originalType)`，commonTest/iosTest 双钉）
 
 ### D2 渲染层：对齐 ChatGPT——markdown AST → 原生受控组件 + 卡片独立 block
 

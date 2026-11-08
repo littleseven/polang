@@ -1,8 +1,6 @@
 package com.mamba.picme.features.chat
 
 import com.mamba.picme.R
-import com.mamba.picme.data.local.decodeParts
-import com.mamba.picme.domain.chat.MessagePartsProjection
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -66,9 +64,7 @@ class ChatViewModelGuestModeTest : ChatViewModelTestBase() {
 
         assertTrue("访客配额耗尽应弹注册 sheet", vm.showRegistrationSheet.value)
         coVerify {
-            chatMessageDao.insertMessage(match { entity ->
-                MessagePartsProjection.contentPreviewOf(entity.decodeParts()) == "QUOTA_USED_UP"
-            })
+            chatMessageDao.insertMessage(match { entity -> entity.content == "QUOTA_USED_UP" })
         }
     }
 

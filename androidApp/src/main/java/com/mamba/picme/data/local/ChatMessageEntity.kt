@@ -6,8 +6,8 @@ import androidx.room.PrimaryKey
 /**
  * Room 数据库实体：聊天消息
  *
- * 对应表：chat_messages（v28 起 parts 单一权威：ADR-016 持久化接缝反转，
- * 对齐 Vercel「UIMessage JSON 整包落库」——content 列已退役）。
+ * 对应表：chat_messages（Room v28 起即为本形态——parts-first 权威列 + 派生投影列，
+ * 2026-11-08 值域终态重置重建）。
  */
 @Entity(tableName = "chat_messages")
 data class ChatMessageEntity(
@@ -20,19 +20,25 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
 
     /**
-     * 投影列（写时自 parts 经 [com.mamba.picme.domain.chat.MessagePartsProjection.roomTypeOf]
-     * 派生，构造/更新接缝同点完成）：服务 DAO 查询/索引面（任务中心 type='tool_task'、
-     * 回灌窗口 role 子查询）。读面权威是 partsJson，本列永不作为内容源。
-     * 新分类法（spec §1）：text, image, tool_chart, tool_html, tool_task,
-     * tool_image_edit, data_optimize_candidates 等（data_media_results 已随横滑卡
-     * 退役，存量行为历史残留，回放路径整行跳过，见 LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES）。
+     * 消息 kind 投影列（派生，权威源 = partsJson）：首个 content/tool 类 part 的线格式
+     * 鉴别值——text/image + tool_chart/tool_html/tool_task/tool_image_edit/tool_browser +
+     * data_optimize_candidates/data_genui_program（投影规则见
+     * `domain/chat/ChatMessageProjection.kt`；reasoning/source/tombstone 永不作投影源）。
+     * 消费方：列表气泡判型、跨会话任务卡查询（`type='tool_task'`）、备份导出可读性。
      */
     val type: String,
 
     /**
-     * 消息角色："user" / "agent"
+     * 消息角色："user" / "agent"（消息级独立列，role 前缀类型值已随纯 kind 化删除）；
+     * 构造默认值仅为 Kotlin 侧便利默认，parts-first 接缝写路径均显式赋值。
      */
     val role: String = "agent",
+
+    /**
+     * 消息正文/图片 ref 投影列（派生，权威源 = partsJson；投影规则见
+     * `domain/chat/ChatMessageProjection.kt`，列表气泡可读性优先）。
+     */
+    val content: String,
 
     /**
      * 消息时间戳
@@ -40,20 +46,24 @@ data class ChatMessageEntity(
     val timestamp: Long = System.currentTimeMillis(),
 
     /**
-     * 生成该消息的模型标识：remote_deepseek / cloud / chart 等
+     * 生成该消息的模型标识：local_qwen3.5_2b / remote_deepseek 等
      */
     val modelUsed: String? = null,
 
     /**
-     * 消息级元数据 JSON（白名单住户：claude_agent_state / LLM 性能指标 / savedAt）。
-     * part 级键（html_card/engineer_task/imageUri/suggestions 等）已迁入 parts，禁止回写。
+     * 附加负载投影列（派生 + 附加，权威源 = partsJson）：parts 派生的结构化负载
+     * （html_card / engineer_task / optimize group / imageUri 等，见
+     * `domain/chat/ChatMessageProjection.kt`）合并非 parts 派生的随行键
+     * （performance / claude_agent_state）。
      */
     val metadata: String? = null,
 
     /**
-     * 消息内容**唯一权威**：有序 parts 数组 JSON（ADR-016 D1 parts 模型；
-     * [com.mamba.picme.domain.chat.MessagePartsCodec] 线格式）。v28 起 NOT NULL——
-     * MIGRATION_27_28 对存量行一次性转正（损坏行降级 Text 原文兜底，不丢消息）。
+     * 消息内容块数组 JSON（ADR-016 parts 模型；[com.mamba.picme.domain.chat.MessagePartsCodec]
+     * 线格式）——**权威列（D1a，2026-11-08 parts-first 接缝反转）**：写入侧由
+     * `ChatMessageParts.insertPartsMessage` 等接缝直建 parts 落库，type/content/metadata
+     * 反向由 [com.mamba.picme.domain.chat.projectChatRow] 投影派生；读侧
+     * [com.mamba.picme.data.local.decodeParts] 直读本列，损坏行降级原文 Text part（不丢消息）。
      */
-    val partsJson: String,
+    val partsJson: String
 )

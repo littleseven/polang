@@ -14,8 +14,10 @@ package com.mamba.picme.domain.chat
  *   防多轮编辑上下文断裂）；
  * - [MessagePart.BrowserLive] → tool-call/tool-result 语义对（帧永不回灌，结果侧只含
  *   文本摘要：resultSummary / 失败原因 / 会话概览兜底）；
- * - [MessagePart.OptimizeCandidates] 等 data part
- *   **不进上下文**（对齐 Vercel convertToModelMessages 丢弃规则）。
+ * - [MessagePart.OptimizeCandidates] 等 data part 与 [MessagePart.Reasoning] /
+ *   [MessagePart.SourceUrl] / [MessagePart.SourceDocument] / [MessagePart.Tombstone]
+ *   **不进上下文**（对齐 Vercel convertToModelMessages 丢弃规则——思考链、引用来源、
+ *   data 载荷与前向兼容占位均回灌剥离）。
  *
  * 引擎无关：不引用 Koog 类型；Koog Message 组装是上层（inference/remote）关注点。
  */
@@ -122,11 +124,18 @@ private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): L
         ),
     )
 
-    // data part：默认不进上下文（spec §6）；Unsupported（前向兼容占位）同口径——
+    // reasoning / source part：回灌剥离（值域终态 spec §3/§6，对齐 Vercel
+    // convertToModelMessages 丢弃规则——思考链与引用来源不回灌 LLM）
+    is MessagePart.Reasoning,
+    is MessagePart.SourceUrl,
+    is MessagePart.SourceDocument,
+    -> emptyList()
+
+    // data part：默认不进上下文（spec §6）；Tombstone（前向兼容/退役占位）同口径——
     // 模型从未见过的占位类型进上下文只会引入噪声
     is MessagePart.OptimizeCandidates,
     is MessagePart.OpenUiCard,
-    is MessagePart.Unsupported,
+    is MessagePart.Tombstone,
     -> emptyList()
 }
 

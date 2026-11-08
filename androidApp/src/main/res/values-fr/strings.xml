@@ -1095,6 +1095,7 @@
     <string name="chat_agent_loop_stuck">La requête est entrée dans une boucle d\'appels d\'outils et a été arrêtée automatiquement. Reformulez votre demande ou découpez-la en étapes plus petites.</string>
     <string name="chat_calling_tool">Appel de l\'outil…</string>
     <string name="chat_card_generate_failed">Échec de la génération</string>
+    <string name="chat_reasoning_title">Processus de raisonnement</string>
     <string name="chat_unsupported_part_title">Contenu non pris en charge</string>
     <string name="chat_unsupported_part_upgrade">Mettez à jour vers la dernière version pour voir ce contenu</string>
     <string name="openui_action_failed">Échec de l\'action</string>

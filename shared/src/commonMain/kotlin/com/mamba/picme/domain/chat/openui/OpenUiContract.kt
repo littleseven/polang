@@ -13,8 +13,12 @@ package com.mamba.picme.domain.chat.openui
  */
 object OpenUiContract {
 
-    /** ChatMessageEntity.type / converter 分支键 / MessagePart serialName。 */
-    const val PART_TYPE = "data_ui_openui"
+    /**
+     * ChatMessageEntity.type / converter 分支键 / MessagePart serialName。
+     * 2026-11-08 值域终态自 `data_ui_openui` 改名（命名规约第 2 条「禁嵌实现技术名」
+     * 首次执行：`genui` 为范式名，OpenUI 是其技术实现）。
+     */
+    const val PART_TYPE = "data_genui_program"
 
     const val HANDLE_SCHEME = "local://"
 

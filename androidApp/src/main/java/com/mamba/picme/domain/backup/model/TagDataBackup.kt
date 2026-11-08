@@ -16,11 +16,13 @@ import com.squareup.moshi.JsonClass
  * - v4：新增媒体反馈（media_feedback，用户 like/dislike 训练数据）
  * - v5：新增聊天会话/消息、人物关系、事实记忆、编辑配方，
  *   媒体 TAG 元数据补 city/faceFocusY/aestheticScore/faceQualityScore
- * - v6：chat 消息 partsJson 直出直进（parts 单一权威），content 退役为空串占位
+ * - v6：聊天消息携带 parts-first 值域终态（[BackupChatMessage.partsJson] 权威，
+ *   标量列为投影）；恢复侧版本门禁——v6 包 partsJson 直通，v5 及以下旧包经
+ *   备份模块内一次性粗映射表转正（spec《chat-value-domain-ideal》§4 第 3 条）
  */
 @JsonClass(generateAdapter = true)
 data class TagDataBackup(
-    val version: Int = 6,
+    val version: Int = CURRENT_VERSION,
     val exportedAt: Long,
     val tags: List<BackupTag>,
     val mediaTagMetadata: List<BackupMediaTagMetadata>,
@@ -39,7 +41,12 @@ data class TagDataBackup(
     val personRelations: List<BackupPersonRelation> = emptyList(),
     val memoryFacts: List<BackupMemoryFact> = emptyList(),
     val photoEditRecipes: List<BackupPhotoEditRecipe> = emptyList()
-)
+) {
+    companion object {
+        /** 当前备份格式版本（恢复侧版本门禁阈值：≥ 此值走 partsJson 直通道）。 */
+        const val CURRENT_VERSION: Int = 6
+    }
+}
 
 /**
  * DataStore 用户偏好备份。
@@ -204,15 +211,14 @@ data class BackupChatSession(
 /**
  * 聊天消息。
  *
- * [role] 为 Room v26 起的消息级角色列（"user"/"agent"）；nullable——旧分类法时期导出的
- * 备份无此字段（容器版本不校验，恢复按 type 内容分流），恢复时经
- * [com.mamba.picme.domain.chat.LegacyChatTypeMigration] 转正补齐。
+ * [role] 为消息级角色列（"user"/"agent"）；nullable——旧分类法时期导出的备份无此字段
+ * （容器版本不校验），恢复时缺省按 type 前缀推断（user_* → user，其余 agent）。
  *
- * v6（2026-11-08，parts 单一权威）：新增 [partsJson]（内容唯一权威直出）；
- * [content] 退役为空串占位（仅为旧版本可读性保留字段位；恢复以 partsJson 为准）。
- * v5- 备份无 partsJson，恢复走 legacy 列经 [com.mamba.picme.domain.chat.LegacyChatTypeMigration] 转正。
+ * v6（2026-11-08 值域终态）起 [partsJson] 为消息权威负载（Room parts-first 列原值），
+ * 导出恒有值；v5 及以下旧包无此字段（null），恢复时经备份模块内一次性粗映射表自
+ * 标量列物化（终态值直通、legacy 旧值映射、退役卡落 Tombstone、不可识别跳过行）。
  *
- * 已知限制：图片消息（v6 起为 parts 内 ref）为旧安装的本地文件路径，
+ * 已知限制：图片消息的 [content] 为旧安装的本地文件路径，
  * 跨安装恢复后图片文件可能不存在，仅保留消息记录本身。
  */
 @JsonClass(generateAdapter = true)
@@ -220,12 +226,12 @@ data class BackupChatMessage(
     val id: String,
     val sessionId: String,
     val type: String,
-    val content: String = "",
+    val content: String,
     val timestamp: Long,
     val modelUsed: String? = null,
     val metadata: String? = null,
     val role: String? = null,
-    val partsJson: String? = null,
+    val partsJson: String? = null
 )
 
 /**

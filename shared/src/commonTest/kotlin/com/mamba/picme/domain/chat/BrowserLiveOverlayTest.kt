@@ -14,7 +14,7 @@ class BrowserLiveOverlayTest {
     private fun msgWith(part: MessagePart): ChatMessage =
         ChatMessage(
             id = "m-1",
-            type = ChatMessageType.AGENT_TEXT,
+            type = ChatMessageType.TEXT,
             content = "",
             role = ModelInputRole.ASSISTANT,
             timestamp = 0L,

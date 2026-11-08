@@ -1125,6 +1125,7 @@
     <string name="chat_agent_loop_stuck">这次请求陷入了工具调用循环，已自动停止。请换个问法，或把任务拆小一点再试。</string>
     <string name="chat_calling_tool">正在调用工具…</string>
     <string name="chat_card_generate_failed">生成失败</string>
+    <string name="chat_reasoning_title">思考过程</string>
     <string name="chat_unsupported_part_title">此内容暂不支持显示</string>
     <string name="chat_unsupported_part_upgrade">升级到最新版本后可查看完整内容</string>
     <string name="openui_action_failed">操作失败</string>

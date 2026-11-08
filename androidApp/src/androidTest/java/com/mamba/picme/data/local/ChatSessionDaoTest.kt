@@ -5,7 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mamba.picme.domain.chat.MessagePart
-import com.mamba.picme.domain.chat.PartState
+import com.mamba.picme.domain.chat.MessagePartsCodec
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -60,11 +60,12 @@ class ChatSessionDaoTest {
         sessionDao.insertSession(ChatSessionEntity(sessionId = "s1", title = "A"))
         sessionDao.insertSession(ChatSessionEntity(sessionId = "s2", title = "B"))
         messageDao.insertMessage(
-            chatMessageEntity(
+            ChatMessageEntity(
                 id = UUID.randomUUID().toString(),
                 sessionId = "s1",
-                role = "user",
-                parts = listOf(MessagePart.Text("p0", "hello", PartState.DONE)),
+                type = "user_text",
+                content = "hello",
+                partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "hello")))
             )
         )
 
@@ -79,26 +80,27 @@ class ChatSessionDaoTest {
     fun getLastMessageForSessionReturnsMostRecent() = runBlocking {
         val sessionId = "s1"
         messageDao.insertMessage(
-            chatMessageEntity(
+            ChatMessageEntity(
                 id = "m1",
                 sessionId = sessionId,
-                role = "user",
-                parts = listOf(MessagePart.Text("p0", "first", PartState.DONE)),
+                type = "user_text",
+                content = "first",
                 timestamp = 1000,
+                partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "first")))
             )
         )
         messageDao.insertMessage(
-            chatMessageEntity(
+            ChatMessageEntity(
                 id = "m2",
                 sessionId = sessionId,
-                role = "agent",
-                parts = listOf(MessagePart.Text("p0", "last", PartState.DONE)),
+                type = "agent_text",
+                content = "last",
                 timestamp = 2000,
+                partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "last")))
             )
         )
 
         val last = messageDao.getLastMessageForSession(sessionId)
-        val lastText = last?.decodeParts()?.filterIsInstance<MessagePart.Text>()?.singleOrNull()?.markdown
-        assertEquals("last", lastText)
+        assertEquals("last", last?.content)
     }
 }

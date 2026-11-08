@@ -107,30 +107,20 @@ final class ChatHistoryStore {
 
     // MARK: - 消息（每会话文件）
 
-    /// 读取消息：新线格式（ChatHistoryStoreCodec，parts 双 payload）优先；
-    /// 结构损坏/空文件 → 老 JSON（LegacyChatMessage）兜底迁移，迁移成功即回写新线格式
-    /// （下次读取走 codec 快路径），**不允许丢消息**。nonisolated：全会话扫描离主线程消费。
+    /// 读取消息：envelope v6（ChatHistoryStoreCodec）——`version` 缺失（envelope 前的
+    /// 裸数组格式 / legacy Swift Codable 格式）或 <6 的旧文件**整体忽略**返回空
+    /// （与 Android Room v28 聊天表重置语义对齐——聊天历史属已批准的可重置范围，
+    /// 无迁移路径）；当前版本内行级容错由 codec 承载（未知 part 原位 Tombstone、
+    /// 损坏行降级 Text，不丢消息）。nonisolated：全会话扫描离主线程消费。
     nonisolated func loadMessages(sessionId: String) -> [ChatMessage] {
         guard let data = try? Data(contentsOf: messagesFileURL(sessionId: sessionId)),
               let text = String(data: data, encoding: .utf8) else { return [] }
-        if let decoded = ChatHistoryStoreCodec.shared.decode(text: text) {
-            return decoded
-        }
-        if let legacy = try? JSONDecoder().decode([LegacyChatMessage].self, from: data) {
-            // 横滑卡已退役：legacy mediaResults 行整行丢弃（对齐 Android 回放过滤口径，
-            // 不降级空气泡）
-            let migrated = legacy.filter { $0.type != .mediaResults }.map { $0.toShared() }
-            if !migrated.isEmpty {
-                saveMessages(sessionId: sessionId, messages: migrated)
-            }
-            return migrated
-        }
-        return []
+        return ChatHistoryStoreCodec.shared.decode(text: text) ?? []
     }
 
-    /// 落盘消息：ChatHistoryStoreCodec 整包编码（wire 8 值分类法 + parts 嵌套数组，
-    /// 与 Android MessagePartsCodec 同一线格式；瞬态字段不落库）。nonisolated：供
-    /// loadMessages 兜底迁移在后台线程回写（原子整文件替换）。
+    /// 落盘消息：ChatHistoryStoreCodec 整包编码（envelope v6 信封 + 9 值 kind→wire +
+    /// parts 嵌套数组，与 Android MessagePartsCodec 同一线格式；瞬态字段不落库）。
+    /// nonisolated：供后台线程消费（原子整文件替换）。
     nonisolated func saveMessages(sessionId: String, messages: [ChatMessage]) {
         do {
             let text = ChatHistoryStoreCodec.shared.encode(messages: messages)

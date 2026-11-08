@@ -2,8 +2,6 @@ package com.mamba.picme.features.chat
 
 import android.content.Context
 import com.mamba.picme.R
-import com.mamba.picme.data.local.decodeParts
-import com.mamba.picme.domain.chat.MessagePartsProjection
 import com.mamba.picme.domain.model.AppLanguage
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -57,9 +55,7 @@ class ChatViewModelStringContextTest : ChatViewModelTestBase() {
 
         // 取词来源钉住：配额气泡内容必须来自 localizedContext（可辨识值 "LOCALIZED"）
         coVerify {
-            chatMessageDao.insertMessage(match { entity ->
-                MessagePartsProjection.contentPreviewOf(entity.decodeParts()) == "LOCALIZED"
-            })
+            chatMessageDao.insertMessage(match { entity -> entity.content == "LOCALIZED" })
         }
         verify { localizedContext.getString(R.string.chat_guest_quota_used_up) }
         // 缓存断言：sendMessage 路径多次取词（thinking hint / 配额气泡 / 自动标题等），
@@ -87,9 +83,7 @@ class ChatViewModelStringContextTest : ChatViewModelTestBase() {
 
         // 取词落在 applicationContext（可辨识值 "SYSTEM_RES"）
         coVerify {
-            chatMessageDao.insertMessage(match { entity ->
-                MessagePartsProjection.contentPreviewOf(entity.decodeParts()) == "SYSTEM_RES"
-            })
+            chatMessageDao.insertMessage(match { entity -> entity.content == "SYSTEM_RES" })
         }
         // SYSTEM 档绝不创建 configuration override context
         verify(exactly = 0) { context.createConfigurationContext(any()) }

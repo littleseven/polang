@@ -28,9 +28,7 @@ import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.download.RecommendedModelAutoDownloader
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.FileSkillCacheStore
-import com.mamba.picme.data.local.chatMessageEntity
 import com.mamba.picme.data.local.insertPartsMessage
-import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.SkillClient
 import com.mamba.picme.data.remote.picme.WebSearchClient
@@ -51,6 +49,7 @@ import com.mamba.picme.agent.core.capability.WebSearchCapability
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.agent.core.intent.IntentRouter
 import com.mamba.picme.agent.core.js.JsRuntime
+import com.mamba.picme.agent.core.platform.storage.clearKoogMemoryKeys
 import com.mamba.picme.agent.core.runtime.capability.CommandExecutor
 import com.mamba.picme.agent.core.platform.logging.Logger as AgentCoreLogger
 import com.mamba.picme.mnn.MnnResourceManager
@@ -72,6 +71,8 @@ import com.mamba.picme.domain.agent.remote.RemoteChannelManager
 import com.mamba.picme.domain.agent.remote.RemoteCommandDispatcher
 import com.mamba.picme.domain.agent.remote.RemotePhotoTracker
 import com.mamba.picme.domain.agent.remote.TelegramChannelHandler
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.model.RemoteChannelType
 import com.mamba.picme.domain.repository.MediaRepository
 import com.mamba.picme.beauty.internal.facedetect.adapter.FaceLandmarkAdapterRegistry
@@ -116,6 +117,11 @@ class PoLangApplication : Application(), ImageLoaderFactory {
          * 内 startForeground 超时 → ForegroundServiceDidNotStartInTimeException。延迟到主线程空闲后触发。
          */
         private const val RECOMMENDED_AUTO_DOWNLOAD_STARTUP_DELAY_MS = 5_000L
+
+        /** Chat 值域终态 v28 一次性出清哨兵（SharedPreferences 文件 / 键）。 */
+        private const val CHAT_VALUE_DOMAIN_PREFS = "chat_value_domain"
+
+        private const val CHAT_VALUE_DOMAIN_V28_DONE = "chat_value_domain_v28_done"
     }
 
     val applicationScope = CoroutineScope(SupervisorJob())
@@ -254,6 +260,25 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         applicationScope.launch {
             val config = container.userPreferencesRepository.logModuleConfigFlow.first()
             Logger.setModuleConfig(config)
+        }
+
+        // Chat 值域终态 v28 一次性出清（spec《chat-value-domain-ideal》§4）：Room v28 已
+        // DROP 重建 chat 两表；Koog 短期轨 DataStore 键（koog_memory_*/koog_summary_*）与
+        // Room 不同存储域、Migration 拿不到 DataStore——onCreate 版本哨兵一次性清空。
+        // 失败不置位，下次启动重试；清空先于任何对话回合（分层记忆冷启动重建会从空 Room
+        // 投影，无失忆断裂）。
+        val v28Sentinel = getSharedPreferences(CHAT_VALUE_DOMAIN_PREFS, MODE_PRIVATE)
+        if (!v28Sentinel.getBoolean(CHAT_VALUE_DOMAIN_V28_DONE, false)) {
+            applicationScope.launch {
+                runCatching { this@PoLangApplication.clearKoogMemoryKeys() }
+                    .onSuccess {
+                        v28Sentinel.edit().putBoolean(CHAT_VALUE_DOMAIN_V28_DONE, true).apply()
+                        Logger.i(TAG, "chat value domain v28: koog memory keys cleared")
+                    }
+                    .onFailure { error ->
+                        Logger.w(TAG, "chat value domain v28 koog clear failed: ${error.message}")
+                    }
+            }
         }
 
         // Android 组合根：构建全部平台实现并注入 AgentOrchestrator（须早于一切 getInstance() 调用）
@@ -673,7 +698,7 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                     lastRemotePhotoSentCaptureDate = photosToSend.maxOf { it.captureDate }
 
                     photosToSend.forEach { photo ->
-                        // 1. 写入聊天记录（image 类型 + role=agent）
+                        // 1. 写入聊天记录（parts-first：agent Image part 直建）
                         try {
                             if (chatSessionDao.getSession(sessionId) == null) {
                                 chatSessionDao.insertSession(
@@ -684,13 +709,10 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                                 )
                             }
                             chatMessageDao.insertPartsMessage(
-                                chatMessageEntity(
-                                    id = UUID.randomUUID().toString(),
-                                    sessionId = sessionId,
-                                    role = "agent",
-                                    parts = listOf(MessagePart.Image("p0", ref = photo.uri)),
-                                    modelUsed = sourceTag
-                                )
+                                sessionId = sessionId,
+                                role = ModelInputRole.ASSISTANT,
+                                parts = listOf(MessagePart.Image(partId = "p0", ref = photo.uri)),
+                                modelUsed = sourceTag,
                             )
                             chatSessionDao.touchSession(sessionId)
                         } catch (e: Exception) {

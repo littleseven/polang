@@ -1,140 +1,128 @@
 package com.mamba.picme.data.local
 
-import com.mamba.picme.domain.chat.EngineerTaskState
-import com.mamba.picme.domain.chat.EngineerTaskStatus
-import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.MessagePart
-import com.mamba.picme.domain.chat.OptimizeCandidateGroup
+import com.mamba.picme.domain.chat.MessagePartsCodec
+import com.mamba.picme.domain.chat.ModelInputItem
+import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.PartState
-import com.mamba.picme.domain.chat.toToolPartState
 import java.io.File
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * parts 单一权威接缝单测（v28）：构造投影、parts 更新重投影、读取容错。
+ * parts-first 持久接缝（[decodeParts] / [toModelInputItems]）JVM 单测 + 全仓写接缝守卫
+ * （所有 chat_messages 写入必须走 Parts 入口）。
+ *
+ * D1a（2026-11-08）：partsJson 为权威列（非空），type/content/metadata 为
+ * [com.mamba.picme.domain.chat.projectChatRow] 派生投影列。
  */
 class ChatMessagePartsTest {
 
-    private fun textPart(id: String = "p0", md: String = "hi") =
-        MessagePart.Text(id, md, PartState.DONE)
+    // ── 读侧（partsJson 权威直读） ──────────────────────────────
 
     @Test
-    fun `chatMessageEntity derives type projection and encodes partsJson at construction`() {
-        val entity = chatMessageEntity(
-            id = "m1", sessionId = "s1", role = "user",
-            parts = listOf(MessagePart.Image("p0", "file://a"), textPart("p1", "看图")),
+    fun `decodeParts returns parts from authoritative partsJson`() {
+        val entity = ChatMessageEntity(
+            id = "m1",
+            sessionId = "s",
+            type = "text",
+            role = "agent",
+            content = "投影正文",
+            timestamp = 1L,
+            partsJson = MessagePartsCodec.encode(
+                listOf(MessagePart.Text("p0", "parts 原文", PartState.DONE)),
+            ),
         )
-        assertEquals("image", entity.type)
-        assertEquals("user", entity.role)
         assertEquals(
-            listOf(MessagePart.Image("p0", "file://a"), textPart("p1", "看图")),
+            listOf(MessagePart.Text("p0", "parts 原文", PartState.DONE)),
             entity.decodeParts(),
         )
     }
 
     @Test
-    fun `withUpdatedParts re-derives type projection when primary part changes`() {
-        val entity = chatMessageEntity(
-            id = "m1", sessionId = "s1", role = "agent",
-            parts = listOf(MessagePart.OptimizeCandidates("p0", gachaGroup())),
+    fun `decodeParts falls back to content text when partsJson corrupt`() {
+        // partsJson 非空列：唯一兜底路径 = 损坏/空行降级原文 Text part（不丢消息）
+        val corrupt = ChatMessageEntity(
+            id = "m2",
+            sessionId = "s",
+            type = "tool_chart",
+            role = "agent",
+            content = "<svg/>",
+            timestamp = 1L,
+            partsJson = "{broken",
         )
-        assertEquals("data_optimize_candidates", entity.type)
-        val confirmed = entity.withUpdatedParts {
-            listOf(MessagePart.Image("p0", ref = "content://x", saved = false))
-        }
-        assertEquals("image", confirmed.type)
-        assertEquals(listOf(MessagePart.Image("p0", ref = "content://x", saved = false)), confirmed.decodeParts())
+        assertEquals(listOf(MessagePart.Text("p0", "<svg/>", PartState.DONE)), corrupt.decodeParts())
+
+        val blank = corrupt.copy(partsJson = "  ")
+        assertEquals(listOf(MessagePart.Text("p0", "<svg/>", PartState.DONE)), blank.decodeParts())
+    }
+
+    // ── 回灌桥（实体 → ModelInputItem） ─────────────────────────
+
+    @Test
+    fun `toModelInputItems derives role from role column`() {
+        val user = ChatMessageEntity(
+            id = "u", sessionId = "s", type = "text", role = "user", content = "问", timestamp = 1L,
+            partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "问", PartState.DONE))),
+        )
+        val agent = ChatMessageEntity(
+            id = "a", sessionId = "s", type = "text", role = "agent", content = "答", timestamp = 2L,
+            partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "答", PartState.DONE))),
+        )
+        assertEquals(listOf(ModelInputItem.TextMessage(ModelInputRole.USER, "问")), user.toModelInputItems())
+        assertEquals(listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "答")), agent.toModelInputItems())
     }
 
     @Test
-    fun `withUpdatedParts transforms in place and preserves message fields`() {
-        val entity = chatMessageEntity(
-            id = "m1", sessionId = "s1", role = "agent", modelUsed = "html_card",
-            metadata = """{"claude_agent_state":{}}""",
-            parts = listOf(MessagePart.HtmlCard("p0", "<p/>")),
+    fun `toModelInputItems derives context from parts only`() {
+        // v28 重置后回放整行过滤（RETIRED 闭集）已删：type 列只是投影，回灌只看 parts——
+        // 投影 type 与 parts 判型不一致时以 parts 为准，不再按 type 丢行
+        val entity = ChatMessageEntity(
+            id = "m5",
+            sessionId = "s",
+            type = "text",
+            role = "agent",
+            content = "正文",
+            timestamp = 1L,
+            partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "正文", PartState.DONE))),
         )
-        val updated = entity.withUpdatedParts { parts ->
-            parts.map { part ->
-                if (part is MessagePart.HtmlCard) {
-                    part.copy(meta = part.meta.copy(displayMode = HtmlCardDisplayMode.FULLPAGE, measuredHeightPx = 900))
-                } else {
-                    part
-                }
-            }
-        }
-        assertEquals("tool_html", updated.type)
-        assertEquals("html_card", updated.modelUsed)
-        assertEquals("""{"claude_agent_state":{}}""", updated.metadata)
-        val card = updated.decodeParts().filterIsInstance<MessagePart.HtmlCard>().single()
-        assertEquals(HtmlCardDisplayMode.FULLPAGE, card.meta.displayMode)
-        assertEquals(900, card.meta.measuredHeightPx)
+        assertEquals(
+            listOf(ModelInputItem.TextMessage(ModelInputRole.ASSISTANT, "正文")),
+            entity.toModelInputItems(),
+        )
     }
 
-    @Test
-    fun `decodeParts falls back to Unsupported on corrupt partsJson`() {
-        val entity = chatMessageEntity(
-            id = "m1", sessionId = "s1", role = "agent", parts = listOf(textPart()),
-        ).copy(partsJson = "{{{")
-        val parts = entity.decodeParts()
-        assertEquals(1, parts.size)
-        assertTrue(parts[0] is MessagePart.Unsupported)
-    }
+    // ── 全仓写接缝守卫 ──────────────────────────────────────────
 
+    /**
+     * 守卫：chat_messages 的一切写入（Room insert）必须走 parts-first 接缝
+     * （insertPartsMessage / insertPartsMessages / replacePartsMessage——parts 直建 +
+     * 投影落列）。直接调用 DAO 原生 insert 即违规。
+     * 豁免：DAO 接口声明（ChatMessageDao.kt）与接缝实现（ChatMessageParts.kt）。
+     */
     @Test
-    fun `taskCardStateOrNull reads task from TaskCard part`() {
-        val state = EngineerTaskState(
-            taskId = "t1", sourceText = "src", status = EngineerTaskStatus.RUNNING,
-            startedAtMs = 0L, updatedAtMs = 0L,
-        )
-        val entity = chatMessageEntity(
-            id = "t1", sessionId = "s1", role = "agent",
-            parts = listOf(MessagePart.TaskCard("p0", "t1", state.status.toToolPartState(), state)),
-        )
-        assertEquals(state, entity.taskCardStateOrNull())
-        assertEquals("tool_task", entity.type)
-        assertNull(chatMessageEntity(id = "m", sessionId = "s1", role = "agent", parts = listOf(textPart())).taskCardStateOrNull())
-    }
-
-    @Test
-    fun `no bypass of the parts seam in main sources`() {
-        // 双写守卫（v28 口径，2026-11-08 终审补回）：partsJson 唯一权威后，投影漂移的
-        // 唯一旁路是绕过接缝直接构造 ChatMessageEntity 或直调 DAO 裸 insert——本扫描冻结两类
+    fun `all chat message writes go through the parts-first seam`() {
         val mainSrc = File("src/main/java/com/mamba/picme")
         assertTrue("守卫需在 :androidApp 模块根目录运行", mainSrc.isDirectory)
-        val allowedConstruction = setOf(
-            "ChatMessageEntity.kt", // 实体定义
-            "ChatMessageParts.kt", // 接缝本体（chatMessageEntity 工厂）
-            "TagDataBackupRepository.kt", // 备份恢复「原文保留」分支
-        )
         val offenders = mutableListOf<String>()
         mainSrc.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
+            .filter { file -> file.isFile && file.extension == "kt" }
+            .filter { file -> file.name != "ChatMessageDao.kt" && file.name != "ChatMessageParts.kt" }
             .forEach { file ->
                 file.readText().lineSequence().forEachIndexed { index, line ->
-                    val trimmed = line.trim()
-                    val isComment = trimmed.startsWith("//") || trimmed.startsWith("*")
-                    if (!isComment && "ChatMessageEntity(" in trimmed && file.name !in allowedConstruction) {
-                        offenders += "${file.relativeTo(mainSrc)}:${index + 1} → $trimmed"
-                    }
-                    if (file.name != "ChatMessageParts.kt" && file.name != "ChatMessageDao.kt" &&
-                        (".insertMessage(" in trimmed || ".insertMessages(" in trimmed)
-                    ) {
-                        offenders += "${file.relativeTo(mainSrc)}:${index + 1} → $trimmed"
+                    if (".insertMessage(" in line || ".insertMessages(" in line) {
+                        offenders += "${file.relativeTo(mainSrc)}:${index + 1} → ${line.trim()}"
                     }
                 }
             }
         if (offenders.isNotEmpty()) {
             fail(
-                "chat_messages 写入绕过 parts 单一权威接缝（v28）：\n" +
+                "chat_messages 写入绕过 parts-first 接缝（D1a）：\n" +
                     offenders.joinToString("\n") + "\n" +
-                    "请改用 chatMessageEntity/withUpdatedParts 构造 + insertPartsMessage(s) 落库。",
+                    "请改用 insertPartsMessage / insertPartsMessages / replacePartsMessage。",
             )
         }
     }
-
-    private fun gachaGroup() = OptimizeCandidateGroup("u", "scene", 0, emptyList(), emptyList(), 0)
 }

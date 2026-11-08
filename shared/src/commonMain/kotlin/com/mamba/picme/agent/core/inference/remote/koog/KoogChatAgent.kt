@@ -34,7 +34,9 @@ import kotlin.time.Clock
  *   auth 仍走 apiKey 标准路径。
  * - **流式**：onLLMStreamingFrameReceived 把 TextDelta 累积成本轮快照（[com.mamba.picme.agent.core.inference.remote.ChatStreamEvent.TextSnapshot]
  *   语义=累计全文非 delta），onLLMStreamingStarting 重置（新一轮从空累计）并发射显式轮边界
- *   [com.mamba.picme.agent.core.inference.remote.ChatStreamEvent.RoundStarted]（M4，spec §10）；onToolCallStarted 发 ToolCallStarted。
+ *   [com.mamba.picme.agent.core.inference.remote.ChatStreamEvent.RoundStarted]（M4，spec §10）；onToolCallStarted 发 ToolCallStarted；
+ *   ReasoningDelta 同构累积为 [com.mamba.picme.agent.core.inference.remote.ChatStreamEvent.ReasoningSnapshot]
+ *   （值域终态 §6.1，生产开关默认关——thinking=disabled）。
  * - **指标**：onLLMCallCompleted 累加 token + 录制 [LlmCallRecord]（DEBUG 全文 / release 纯指标，双模式隐私）。
  *
  * **不可变契约**：[runChat] 返回 `(summary, AgentExecutionMetrics)`，由 RemoteChatEngine 包成冻结的
@@ -93,6 +95,14 @@ class KoogChatAgent(
     // 单 run 累计状态（runs 串行：processChatReAct 的 isRunning 互斥）。StringBuilder/Atomic 线程安全，
     // 因 EventHandler 可能在 Koog 内部调度线程触发（非调用 runChat 的线程）。
     private val snapshotBuffer = StringBuilder()
+
+    /**
+     * 思考链累计缓冲（值域终态 spec §6.1）：Koog `StreamFrame.ReasoningDelta` 逐帧累积为
+     * 本轮累计快照（与 [snapshotBuffer] 同构语义）。**生产开关默认关**——模型配置层
+     * thinking=disabled（RemoteModelFactory）且 Koog Thinking capability 未声明，缓冲
+     * 恒空零开销；上游启用 extended thinking 后自动透出。
+     */
+    private val reasoningBuffer = StringBuilder()
     private val promptTokens = AtomicInt(0)
     private val completionTokens = AtomicInt(0)
 
@@ -102,6 +112,9 @@ class KoogChatAgent(
 
     /** M4：显式轮边界回调（[ChatStreamEvent.RoundStarted] 的发射源）。 */
     @Volatile private var currentRoundStarted: (() -> Unit)? = null
+
+    /** 思考链累计快照回调（[ChatStreamEvent.ReasoningSnapshot] 的发射源；生产开关默认关）。 */
+    @Volatile private var currentReasoning: ((snapshot: String) -> Unit)? = null
 
     @Volatile private var running = false
     private var currentSessionId: String = "default"
@@ -156,15 +169,18 @@ class KoogChatAgent(
         onToolCall: (toolName: String, args: String) -> Unit,
         onRoundStarted: () -> Unit = {},
         toolSetOverride: ChatToolSetOverride? = null,
+        onReasoning: (snapshot: String) -> Unit = {},
     ): Pair<String, AgentExecutionMetrics> {
         running = true
         traceIdHolder.value = traceId
         snapshotBuffer.setLength(0)
+        reasoningBuffer.setLength(0)
         promptTokens.store(0)
         completionTokens.store(0)
         currentPartialText = onPartialText
         currentToolCall = onToolCall
         currentRoundStarted = onRoundStarted
+        currentReasoning = onReasoning
         val started = Clock.System.now().toEpochMilliseconds()
         return try {
             // M2：跑 agent 前判定并执行滚动压缩（超预算才触发；失败静默跳过，决策 9）。
@@ -198,6 +214,7 @@ class KoogChatAgent(
             currentPartialText = null
             currentToolCall = null
             currentRoundStarted = null
+            currentReasoning = null
         }
     }
 
@@ -259,14 +276,27 @@ class KoogChatAgent(
                     // 新一轮 LLM 流式开始（如工具调用后的下一轮）：本轮快照从空重新累计
                     Logger.d(tag, "streaming round start: model=${ctx.model?.id}")
                     snapshotBuffer.setLength(0)
+                    reasoningBuffer.setLength(0)
                     // M4：显式轮边界信号（spec §10 收口），turn 装配器据此闭合上一轮文本块
                     currentRoundStarted?.invoke()
                 }
                 events.onLLMStreamingFrameReceived { ctx ->
                     val frame = ctx.streamFrame
-                    if (frame is StreamFrame.TextDelta) {
-                        snapshotBuffer.append(frame.text)
-                        currentPartialText?.invoke(snapshotBuffer.toString())
+                    when (frame) {
+                        is StreamFrame.TextDelta -> {
+                            snapshotBuffer.append(frame.text)
+                            currentPartialText?.invoke(snapshotBuffer.toString())
+                        }
+                        // reasoning 生产者接线（值域终态 spec §6.1；探针实证 2026-11-08：Koog
+                        // 1.3.0 StreamFrame 透出 ReasoningDelta/ReasoningComplete）。逐帧累积
+                        // 为本轮累计快照（与 TextDelta 同构）；ReasoningComplete 不单独消费——
+                        // 块闭合由轮边界信号统一承担（与 TextComplete 同口径）。生产开关默认关
+                        //（thinking=disabled + Thinking capability 未声明），帧不产出零开销。
+                        is StreamFrame.ReasoningDelta -> {
+                            reasoningBuffer.append(frame.text)
+                            currentReasoning?.invoke(reasoningBuffer.toString())
+                        }
+                        else -> Unit
                     }
                 }
                 events.onToolCallStarting { ctx ->
