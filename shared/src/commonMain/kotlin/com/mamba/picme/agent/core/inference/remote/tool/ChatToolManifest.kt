@@ -11,9 +11,9 @@ import kotlinx.serialization.Serializable
 /**
  * iOS chat 工具手工清单（Phase 6.2 T2）：K/N 无反射，`asToolsByClass()` 不可用，
  * 用 [SimpleTool] 子类逐字面对齐 [ChatToolService] 的 7 个相册工具 + ai_optimize
- * （2026-08-16 抽卡追齐新增；2026-09-26 意图路由 M1：`view_media` 移出 chat 工具面
- *（chat 内看图 = 点横滑卡片，消除 chat 必败工具陷阱），`search_media` 增补
- * person/fromMs/toMs 结构化参数透传；2026-09-29 `search_media` 再增补 hasFace 参数）。
+ * （2026-08-16 抽卡追齐新增；2026-09-26 意图路由 M1：`view_media` 移出 chat 工具面；
+ * `search_media` 增补 person/fromMs/toMs 结构化参数透传；2026-09-29 再增补 hasFace；
+ * 2026-11-08 横滑相册卡退役：search/refine 描述去「自动出卡」，改为取数 + render_html 出图集卡）。
  *
  * 一致性纪律：name/description/参数名/参数描述**逐字节**照抄 @Tool(customName) 与
  * @LLMDescription 原文（改任何一侧都会触发 jvmTest `ChatToolManifestConsistencyTest`
@@ -85,7 +85,7 @@ object ChatToolManifest {
     private class SearchMediaTool : SimpleTool<SearchMediaArgs>(
         argsType = typeToken<SearchMediaArgs>(),
         name = "search_media",
-        description = "搜索本地相册，**结果以横滑卡片直接展示给用户**（调用后无需再调其它工具展示，如实总结数量即可）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。",
+        description = "搜索本地相册，返回命中总数与媒体 id 列表（结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。",
     ) {
         override suspend fun execute(args: SearchMediaArgs): String =
             ChatToolService.getInstance().searchMedia(args.query, args.person, args.fromMs, args.toMs, args.hasFace)
@@ -94,7 +94,7 @@ object ChatToolManifest {
     private class RefineMediaSearchTool : SimpleTool<RefineMediaSearchArgs>(
         argsType = typeToken<RefineMediaSearchArgs>(),
         name = "refine_media_search",
-        description = "在上一轮搜索结果内细化过滤，**结果以横滑卡片更新展示**。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。",
+        description = "在上一轮搜索结果内细化过滤，返回命中总数与媒体 id 列表（并更新搜索基数；展示用 render_html 重出图集卡）。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。",
     ) {
         override suspend fun execute(args: RefineMediaSearchArgs): String =
             ChatToolService.getInstance().refineMediaSearch(args.constraint, args.fromMs, args.toMs)

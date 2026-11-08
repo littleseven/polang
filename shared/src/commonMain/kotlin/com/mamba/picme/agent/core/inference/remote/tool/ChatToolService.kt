@@ -4,8 +4,6 @@ import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.agents.core.tools.annotations.Tool
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.command.EditParams
-import com.mamba.picme.agent.core.model.command.FeedbackAction
-import com.mamba.picme.agent.core.model.command.FeedbackTarget
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentScene
@@ -27,7 +25,7 @@ import kotlinx.coroutines.withTimeout
  * chat 场景专用 ToolService（远程 ReAct，Koog 驱动）。
  *
  * 与 [RemoteControlToolService]（飞书远程控制 RPA：UI 操作 + 相机）区分：本类只暴露 **chat 场景可用**
- * 的能力命令（相册搜索/摘要、打标、AI 修图、反馈、设置、导航、JS 脚本），不含 UI 自动化与
+ * 的能力命令（相册搜索/摘要、打标、AI 修图、设置、导航、JS 脚本），不含 UI 自动化与
  * 相机控制（相机 Capability 属 CAMERA 场景，chat 场景下 dispatch 不可用）。
  *
  * 每个 @Tool 是 [dispatchCommand] 的薄封装：命令统一进 [CapabilityRegistry]（scene=CHAT），
@@ -129,7 +127,7 @@ class ChatToolService private constructor() : TraceIdAware {
         dispatchCommand(AgentCommand.GetGallerySummary(includeDetails = false))
 
     @Tool(customName = "search_media")
-    @LLMDescription("搜索本地相册，**结果以横滑卡片直接展示给用户**（调用后无需再调其它工具展示，如实总结数量即可）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。")
+    @LLMDescription("搜索本地相册，返回命中总数与媒体 id 列表（结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") person: String,
@@ -142,7 +140,7 @@ class ChatToolService private constructor() : TraceIdAware {
     }
 
     @Tool(customName = "refine_media_search")
-    @LLMDescription("在上一轮搜索结果内细化过滤，**结果以横滑卡片更新展示**。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
+    @LLMDescription("在上一轮搜索结果内细化过滤，返回命中总数与媒体 id 列表（并更新搜索基数；展示用 render_html 重出图集卡）。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
     suspend fun refineMediaSearch(
         @LLMDescription("细化条件") constraint: String,
         @LLMDescription("时间起点（毫秒），如某月起始；空串=不限") fromMs: String,
@@ -192,32 +190,6 @@ class ChatToolService private constructor() : TraceIdAware {
     suspend fun switchViewMode(
         @LLMDescription("视图模式：grid/list") mode: String
     ): String = dispatchCommand(AgentCommand.SwitchViewMode(mode = mode))
-
-    // ── 反馈 ──────────────────────────────────────────────────────
-
-    @Tool(customName = "record_feedback")
-    @LLMDescription("记录用户对搜索结果的反馈。action: like/dislike。target: last(上次结果)/ordinal:N(第N张)/desc:描述/mediaId:id。")
-    suspend fun recordFeedback(
-        @LLMDescription("反馈目标：last / ordinal:N / desc:文本 / mediaId:id") target: String,
-        @LLMDescription("like 或 dislike") action: String
-    ): String = dispatchCommand(
-        AgentCommand.RecordMediaFeedback(
-            target = parseFeedbackTarget(target),
-            action = parseFeedbackAction(action)
-        )
-    )
-
-    @Tool(customName = "more_like_this")
-    @LLMDescription("基于指定图片推荐更多相似照片。target 同 record_feedback。")
-    suspend fun moreLikeThis(
-        @LLMDescription("目标：last / ordinal:N / desc:文本 / mediaId:id") target: String
-    ): String = dispatchCommand(AgentCommand.MoreLikeThis(target = parseFeedbackTarget(target)))
-
-    @Tool(customName = "exclude_constraint")
-    @LLMDescription("在后续搜索中排除某类约束，如'不要夜景'。constraint 为排除条件。")
-    suspend fun excludeConstraint(
-        @LLMDescription("排除条件") constraint: String
-    ): String = dispatchCommand(AgentCommand.ExcludeConstraint(constraint = constraint))
 
     // ── 打标 / 修图 ───────────────────────────────────────────────
 
@@ -272,7 +244,7 @@ class ChatToolService private constructor() : TraceIdAware {
     }
 
     @Tool(customName = "run_gallery_script")
-    @LLMDescription("在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数类 handler 只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。所有 handler 均为异步，**必须用 await bridge.callAsync(name, args) 调用**（bridge.call 已禁用，调用会报错）。可用 handler： gallery.summary → 相册聚合统计（totalPhotos/totalVideos/totalMedia/hasFaceCount/personClusterCount/namedPersonCount/labeledCount/unlabeledCount/semanticEncodedCount/remainingPass1/remainingPass3/isScanning/currentPass/recommendation）； gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,person?,limit?}) → 结构化过滤命中，返回 {ids:[...], total:N}（多维 AND，全可选；ids 已截断到 limit，total 为未截断真实数）； gallery.tags → 实际打标标签分布 {标签:照片数}（按计数降序 top 50）； gallery.timeline({fromMs?,toMs?,bucketMs?}) → 按时间分桶统计 {\"桶起始时间戳\":照片数}（默认按月，bucketMs=2592000000=月/31536000000=年）； gallery.intersect({idsA:[...],idsB:[...],op:\"intersect|union|diff\"}) → 集合交并差，返回 {ids:[...],total:N}（用于多次 query 结果交叉，如旅行+人脸）； media.meta(id) → 单张元数据 {id,type,captureMs,fileName,labels:[...],locationName,city,hasFace,faceId,aestheticScore,faceQualityScore}（不含路径/GPS/OCR/向量）； media.batch_meta([id1,id2,...]) → 批量元数据 [{...},...]（上限 50，避免循环调 media.meta）； gallery.stats_by_tag({label?,hasFace?,fromMs?,toMs?}) → 条件过滤后的标签分布（如人像照片内的场景标签）； face.cluster({topN?}) → 人脸聚类盘点 {clusterCount,namedCount,totalEmbeddings,unassignedEmbeddings,topPersons:[{personId,name,faceCount,coverMediaId}]}（topN 默认 10 上限 50，不含 embedding 原始数据）； tag.audit({topN?}) → 打标覆盖审计 {totalMedia,unlabeledCount,neverScannedCount,lastScanAt,outOfVocabTags:{标签:照片数}}（词表外标签 topN 默认 10 上限 50）； gallery.stats_by_city({topN?}) → 按城市分组的媒体计数分布 {城市:照片数}（topN 默认 10 上限 50）； tag.scan_status({}) → TAG 扫描会话状态快照 {active,state,sessionId,currentPass,processed,total,pending,failed,estimatedRemainingMs}（只读查询，绝不触发扫描；无会话时仅回 {active:false,state:null}）。 可并发取数：var r=await Promise.all([bridge.callAsync('gallery.summary',{}),bridge.callAsync('gallery.tags',{})]); var s=r[0],t=r[1]; 在 JS 内组合计算（如某标签占比 = query.total / summary.totalMedia；环比 = 本月/上月-1），return 结果对象回传给你做总结。 示例：var s=await bridge.callAsync('gallery.summary',{}); var t=await bridge.callAsync('gallery.tags',{}); return {total:s.totalMedia, topTags:t}; 写操作（删除/收藏/选中）：用 await bridge.callAsync('capability.dispatch',{method,params})，写操作会在端侧弹窗等用户确认（拒绝或超时 Promise 会 reject，必须 try/catch）。支持的 method： delete_media {ids:[数字id,...]}（删除，不可恢复）、favorite_media {id:数字id, favorite:true/false}、select_media {id:数字id, selected:true/false}、remember_fact {content:文本, category?:文本}、forget_fact {fact_id?:数字id, query?:文本}、remember_person_relation {name:人物名, relation:关系称谓}、forget_person_relation {name:人物名}、get_gallery_summary {}、recall_memory {query:文本}、query_person_relation {name?:人物名}（后三者只读直通）；其余 method 会报错。 完整示例（找出截图标签照片并批量删除）：var q=await bridge.callAsync('gallery.query',{label:'截图',limit:200}); if(q.ids.length===0){return {deleted:0};} try{var r=await bridge.callAsync('capability.dispatch',{method:'delete_media',params:{ids:q.ids}}); return {deleted:q.total, result:r};}catch(e){return {deleted:0, cancelled:true, reason:String(e)};} UI 效果：本工具自身只回传数据/文本给你总结，不直接产生界面；但 return 的对象若含 ids 数组（gallery.query/intersect 的命中），端侧会自动把这些照片补展示为横滑卡片——纯统计/盘点脚本不要 return ids，需要给用户看图时优先用 search_media（直接出卡片）。")
+    @LLMDescription("在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数类 handler 只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。所有 handler 均为异步，**必须用 await bridge.callAsync(name, args) 调用**（bridge.call 已禁用，调用会报错）。可用 handler： gallery.summary → 相册聚合统计（totalPhotos/totalVideos/totalMedia/hasFaceCount/personClusterCount/namedPersonCount/labeledCount/unlabeledCount/semanticEncodedCount/remainingPass1/remainingPass3/isScanning/currentPass/recommendation）； gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,person?,limit?}) → 结构化过滤命中，返回 {ids:[...], total:N}（多维 AND，全可选；ids 已截断到 limit，total 为未截断真实数）； gallery.tags → 实际打标标签分布 {标签:照片数}（按计数降序 top 50）； gallery.timeline({fromMs?,toMs?,bucketMs?}) → 按时间分桶统计 {\"桶起始时间戳\":照片数}（默认按月，bucketMs=2592000000=月/31536000000=年）； gallery.intersect({idsA:[...],idsB:[...],op:\"intersect|union|diff\"}) → 集合交并差，返回 {ids:[...],total:N}（用于多次 query 结果交叉，如旅行+人脸）； media.meta(id) → 单张元数据 {id,type,captureMs,fileName,labels:[...],locationName,city,hasFace,faceId,aestheticScore,faceQualityScore}（不含路径/GPS/OCR/向量）； media.batch_meta([id1,id2,...]) → 批量元数据 [{...},...]（上限 50，避免循环调 media.meta）； gallery.stats_by_tag({label?,hasFace?,fromMs?,toMs?}) → 条件过滤后的标签分布（如人像照片内的场景标签）； face.cluster({topN?}) → 人脸聚类盘点 {clusterCount,namedCount,totalEmbeddings,unassignedEmbeddings,topPersons:[{personId,name,faceCount,coverMediaId}]}（topN 默认 10 上限 50，不含 embedding 原始数据）； tag.audit({topN?}) → 打标覆盖审计 {totalMedia,unlabeledCount,neverScannedCount,lastScanAt,outOfVocabTags:{标签:照片数}}（词表外标签 topN 默认 10 上限 50）； gallery.stats_by_city({topN?}) → 按城市分组的媒体计数分布 {城市:照片数}（topN 默认 10 上限 50）； tag.scan_status({}) → TAG 扫描会话状态快照 {active,state,sessionId,currentPass,processed,total,pending,failed,estimatedRemainingMs}（只读查询，绝不触发扫描；无会话时仅回 {active:false,state:null}）。 可并发取数：var r=await Promise.all([bridge.callAsync('gallery.summary',{}),bridge.callAsync('gallery.tags',{})]); var s=r[0],t=r[1]; 在 JS 内组合计算（如某标签占比 = query.total / summary.totalMedia；环比 = 本月/上月-1），return 结果对象回传给你做总结。 示例：var s=await bridge.callAsync('gallery.summary',{}); var t=await bridge.callAsync('gallery.tags',{}); return {total:s.totalMedia, topTags:t}; 写操作（删除/收藏/选中）：用 await bridge.callAsync('capability.dispatch',{method,params})，写操作会在端侧弹窗等用户确认（拒绝或超时 Promise 会 reject，必须 try/catch）。支持的 method： delete_media {ids:[数字id,...]}（删除，不可恢复）、favorite_media {id:数字id, favorite:true/false}、select_media {id:数字id, selected:true/false}、remember_fact {content:文本, category?:文本}、forget_fact {fact_id?:数字id, query?:文本}、remember_person_relation {name:人物名, relation:关系称谓}、forget_person_relation {name:人物名}、get_gallery_summary {}、recall_memory {query:文本}、query_person_relation {name?:人物名}（后三者只读直通）；其余 method 会报错。 完整示例（找出截图标签照片并批量删除）：var q=await bridge.callAsync('gallery.query',{label:'截图',limit:200}); if(q.ids.length===0){return {deleted:0};} try{var r=await bridge.callAsync('capability.dispatch',{method:'delete_media',params:{ids:q.ids}}); return {deleted:q.total, result:r};}catch(e){return {deleted:0, cancelled:true, reason:String(e)};} UI 效果：本工具自身只回传数据/文本给你总结，不产生界面；需要给用户看图集时调 render_html + media://{id} 出卡。纯统计/盘点脚本 return 只回统计摘要。")
     suspend fun runGalleryScript(
         @LLMDescription("JS 源码；用 await bridge.callAsync 取数据（gallery.summary/tags/timeline/query/stats_by_tag/stats_by_city/intersect, media.meta/batch_meta, face.cluster, tag.audit, tag.scan_status）；写操作（删除/收藏/选中/记忆）用 await bridge.callAsync('capability.dispatch',{method,params})（会弹窗等用户确认，需 try/catch 处理拒绝），return 结果对象") code: String
     ): String = dispatchCommand(AgentCommand.ExecuteScript(code = code))
@@ -312,8 +284,7 @@ class ChatToolService private constructor() : TraceIdAware {
             "引用用户相册本地图片/视频：图片用 <img src=\"media://媒体id\">、视频用 <video src=\"media://媒体id\">（id 只能来自 run_gallery_script 取数" +
             "（gallery.query/media.meta 等）或 search_media 的结果，禁止虚构 id；" +
             "禁止 file://、content:// 路径——端侧会把 media:// 重写为白名单通道注入）。" +
-            "取数脚本若仅为本卡取数，return 不要带 ids 数组（端侧会把 return 的 ids 自动补成横滑照片卡片，" +
-            "与本卡重复展示）——ids 只用于拼接 media:// 引用内联进 html，return 只回统计摘要。" +
+            "取数脚本 return 只回统计摘要——ids 只用于拼接 media:// 引用内联进 html。" +
             "宽度自适应容器（width:100%，不写死超过卡片宽度的固定 px）；总大小不超过 100KB。" +
             "卡片有两种展示形态（display 参数）：inline（默认）在聊天流内完全撑开、卡内直接交互，" +
             "内容高度建议不超过【HTML 卡片渲染环境】段的建议值；" +
@@ -572,9 +543,8 @@ class ChatToolService private constructor() : TraceIdAware {
         dispatchCommandWithTrace(command, traceIdHolder?.value, timeoutMillis)
 
     /**
-     * 带显式 traceId 的命令分发入口（internal）：供意图路由器直执路径（RemoteChatEngine）
-     * 复用同一条「dispatch → uiActions 发射 → observation 文本 → 超时等待」链路，
-     * 保证路由直执与 LLM tool_calls 的执行语义完全一致（含审计 traceId 串联）。
+     * 带显式 traceId 的命令分发入口（internal）：供 iosMain 工具桥等需要当轮 traceId
+     * 串联审计的调用方复用同一条「dispatch → uiActions 发射 → observation 文本 → 超时等待」链路。
      */
     internal suspend fun dispatchCommandWithTrace(
         command: AgentCommand,
@@ -583,12 +553,11 @@ class ChatToolService private constructor() : TraceIdAware {
     ): String =
         dispatchCommandDetailed(command, traceId, timeoutMillis).observation
 
-    /** 直执路径的结构化分发结果：[action] 为 null 表示 dispatch 失败/超时（observation 为 Error 文本）。 */
+    /** 结构化分发结果：[action] 为 null 表示 dispatch 失败/超时（observation 为 Error 文本）。 */
     internal data class DetailedDispatch(val observation: String, val action: AgentAction?)
 
     /**
-     * [dispatchCommandWithTrace] 的结构化变体：除 observation 外返回真实 [AgentAction]，
-     * 供路由直执路径判定成功/失败（失败回落完整 agent loop）并提取结果基数（totalCount）。
+     * [dispatchCommandWithTrace] 的结构化变体：除 observation 外返回真实 [AgentAction]。
      * [timeoutMillis] 默认 5s；browser_* 远程慢工具族显式传 [BROWSER_DISPATCH_TIMEOUT_MS]
      *（外层 25s ≤ registry 内层 CommandExecutor 25s，层叠关系见 CommandTimeoutLayeringTest）。
      */
@@ -605,14 +574,12 @@ class ChatToolService private constructor() : TraceIdAware {
             }
             result.fold(
                 onSuccess = { action ->
-                    // UI 通道：把原始 AgentAction 发给 ChatViewModel 渲染（卡片/跳转等）
+                    // UI 通道：把原始 AgentAction 发给 ChatViewModel 渲染（修图结果图/跳转等）
                     uiActions.tryEmit(action)
                     // LLM observation：基于真实执行结果生成（而非 "OK"）。
-                    // ⚠️ 该文本是模型侧观测（硬编码中文模板），直执路径下绝不可直达用户气泡（I18N）。
+                    // ⚠️ 该文本是模型侧观测（硬编码中文模板），绝不可直达用户气泡（I18N）。
                     DetailedDispatch(
                         observation = when (action) {
-                            is AgentAction.MediaResults ->
-                                "找到 ${action.totalCount} 张「${action.query}」的照片，已展示在卡片中"
                             is AgentAction.TextReply -> action.message
                             is AgentAction.Success -> when (action.command) {
                                 is AgentCommand.AiOptimize -> "图片已优化，结果已展示在聊天中"
@@ -649,20 +616,6 @@ class ChatToolService private constructor() : TraceIdAware {
             DetailedDispatch("Error: ${e.message}", null)
         }
     }
-
-    private fun parseFeedbackTarget(target: String): FeedbackTarget = when {
-        target == "last" -> FeedbackTarget.LastShown
-        target.startsWith("ordinal:") ->
-            runCatching { FeedbackTarget.Ordinal(target.removePrefix("ordinal:").toInt()) }
-                .getOrDefault(FeedbackTarget.LastShown)
-        target.startsWith("desc:") -> FeedbackTarget.Description(target.removePrefix("desc:"))
-        target.startsWith("mediaId:") -> FeedbackTarget.MediaId(target.removePrefix("mediaId:"))
-        else -> FeedbackTarget.Description(target)
-    }
-
-    private fun parseFeedbackAction(action: String): FeedbackAction =
-        runCatching { FeedbackAction.valueOf(action.trim().uppercase()) }
-            .getOrDefault(FeedbackAction.LIKE)
 
     /**
      * 把 search_media 的 person/fromMs/toMs/hasFace 组装成 [SearchIntent]。

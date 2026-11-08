@@ -185,23 +185,6 @@ sealed class AgentAction {
     ) : AgentAction()
 
     /**
-     * 相册搜索结果（媒体 id 列表）。只带 id，避免 :shared 依赖 app Room 实体；
-     * 调用方（ChatViewModel）按 id 从 session 持有的 List<MediaAsset> 取展示数据。
-     *
-     * @property query 搜索/细化关键词
-     * @property mediaIds 全量命中 id（供持有做下一轮细化）
-     * @property totalCount 命中总数
-     * @property isRefinement 是否为对上一轮结果的细化
-     */
-    data class MediaResults(
-        val commandId: Int,
-        val query: String,
-        val mediaIds: List<Long>,
-        val totalCount: Int,
-        val isRefinement: Boolean
-    ) : AgentAction()
-
-    /**
      * 是否执行成功
      */
     val isSuccess: Boolean
@@ -210,7 +193,6 @@ sealed class AgentAction {
             is TextReply -> true
             is Error -> false
             is BatchResult -> results.all { it.isSuccess }
-            is MediaResults -> true
         }
 
     companion object {
@@ -222,7 +204,6 @@ sealed class AgentAction {
             is TextReply -> action.commandId
             is Error -> action.commandId
             is BatchResult -> action.commandId
-            is MediaResults -> action.commandId
         }
     }
 }
