@@ -7,7 +7,6 @@ import com.mamba.picme.agent.core.model.config.AssistantPersona
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
-import com.mamba.picme.data.repository.MediaFeedbackRepository
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import com.mamba.picme.domain.search.MediaSearchEngine
@@ -57,7 +56,6 @@ abstract class ChatViewModelTestBase {
 
     // Dep-specific mocks（多数子类使用部分）
     protected val mediaSearchEngine: MediaSearchEngine = mockk(relaxed = true)
-    protected val mediaFeedbackRepository: MediaFeedbackRepository = mockk(relaxed = true)
     protected val picMeAuthClient: PoLangAuthClient = mockk(relaxed = true)
     protected val getGallerySummaryUseCase: GetGallerySummaryUseCase = mockk(relaxed = true)
 
@@ -131,7 +129,6 @@ abstract class ChatViewModelTestBase {
             chatSessionDao = chatSessionDao,
             userSettingsRepository = userSettingsRepository,
             mediaSearchEngine = mediaSearchEngine,
-            mediaFeedbackRepository = mediaFeedbackRepository,
             mediaRepository = mockk(relaxed = true),
             picMeAuthClient = picMeAuthClient,
             getGallerySummaryUseCase = getGallerySummaryUseCase,

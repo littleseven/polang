@@ -1,9 +1,7 @@
 package com.mamba.picme.domain.search
 
-import com.mamba.picme.agent.core.model.command.FeedbackAction
 import com.mamba.picme.data.repository.MediaFeedbackRepository
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -13,15 +11,6 @@ class MediaFeedbackUseCaseTest {
 
     private val repository: MediaFeedbackRepository = mockk(relaxed = true)
     private val useCase = MediaFeedbackUseCase(repository)
-
-    @Test
-    fun `record should call repository with mapped action`() = runTest {
-        useCase.record("media_1", "海边日落", "session_1", FeedbackAction.LIKE)
-
-        coVerify {
-            repository.recordFeedback("media_1", "海边日落", "session_1", FeedbackAction.LIKE)
-        }
-    }
 
     @Test
     fun `calculateScoreDelta returns bonus for likes only`() {

@@ -67,14 +67,14 @@ class CloudAgentGalleryToolsTest {
             assertEquals("猫", q); assertEquals(null, ids)
             listOf(asset(1), asset(2, MediaType.VIDEO), asset(3))
         })
-        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "", "false")))
+        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "")))
     }
 
     @Test
     fun `structured params go to filter path`() = runTest {
         var capturedFilter: StructuredFilter? = null
         val t = tools(byFilter = { f, _ -> capturedFilter = f; listOf(asset(1)) })
-        val out = t.searchMedia("去年夏天海边", "", "", "", "true", "false")
+        val out = t.searchMedia("去年夏天海边", "", "", "", "true")
         assertEquals(true, capturedFilter?.hasFaces)
         assertTrue(handleTextOf("找到 1 张「去年夏天海边」的照片").matches(out))
     }
@@ -86,7 +86,7 @@ class CloudAgentGalleryToolsTest {
             byQuery = { _, _ -> queryPathUsed = true; emptyList() },
             allPhotos = { listOf(asset(1), asset(2, MediaType.VIDEO), asset(3)) },
         )
-        val out = t.searchMedia("", "", "", "", "", "false")
+        val out = t.searchMedia("", "", "", "", "")
         assertFalse("空 query 不得走语义搜索路径（blank 短路返回空）", queryPathUsed)
         // VIDEO 仍被过滤，展示名兜底为「全部」
         assertTrue(handleTextOf("找到 2 张「全部」的照片").matches(out))
@@ -99,14 +99,14 @@ class CloudAgentGalleryToolsTest {
             byFilter = { f, _ -> capturedFilter = f; listOf(asset(1)) },
             allPhotos = { error("有结构化约束时不得走全量通道") },
         )
-        t.searchMedia("", "", "100", "200", "", "false")
+        t.searchMedia("", "", "100", "200", "")
         assertEquals(100L, capturedFilter?.timeRange?.startMs)
     }
 
     @Test
     fun `search failure returns error prefix`() = runTest {
         val t = tools(byQuery = { _, _ -> throw IllegalStateException("db locked") })
-        assertEquals("error: db locked", t.searchMedia("猫", "", "", "", "", "false"))
+        assertEquals("error: db locked", t.searchMedia("猫", "", "", "", ""))
     }
 
     @Test
@@ -123,7 +123,7 @@ class CloudAgentGalleryToolsTest {
             // ids == null：全局搜索（search_media）；非 null：refine 的 in-set 召回
             if (ids == null) base else base.filter { it.id in ids }
         })
-        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "", "false")))
+        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "")))
         assertTrue(handleTextOf("在上一轮结果内找到 1 张「夜景」的照片").matches(t.refineMediaSearch("夜景", "", "")))
     }
 
@@ -134,7 +134,7 @@ class CloudAgentGalleryToolsTest {
             queryCount++
             if (ids == null) listOf(asset(1, labels = "夜景"), asset(2, labels = "白天")) else emptyList()
         })
-        t.searchMedia("猫", "", "", "", "", "false")
+        t.searchMedia("猫", "", "", "", "")
         val out = t.refineMediaSearch("不存在的东西", "", "")
         assertTrue(out.contains("没有找到"))
         // 基数保留：再次细化仍走 in-set（limitToIds 非空）
@@ -149,98 +149,12 @@ class CloudAgentGalleryToolsTest {
             byQuery = { _, _ -> listOf(asset(7), asset(8)) },
             byFilter = { _, ids -> capturedIds = ids; listOf(asset(7)) },
         )
-        t.searchMedia("猫", "", "", "", "", "false")
+        t.searchMedia("猫", "", "", "", "")
         val out = t.refineMediaSearch("4月的", "100", "200")
         assertEquals(setOf(7L, 8L), capturedIds)
         assertTrue(handleTextOf("在上一轮结果内找到 1 张「4月的」的照片").matches(out))
     }
 
-    // ── mediaResultsListener 透出（云端图集卡恢复 + display 意图门控）────────
-
-    @Test
-    fun `search hit emits listener with photo assets when display true`() = runTest {
-        val hits = mutableListOf<Triple<String, List<MediaAsset>, Boolean>>()
-        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO), asset(3)) })
-        t.mediaResultsListener = { query, assets, _, isRefinement ->
-            hits.add(Triple(query, assets, isRefinement))
-        }
-        val out = t.searchMedia("猫", "", "", "", "", "true")
-        assertEquals(1, hits.size)
-        assertEquals("猫", hits[0].first)
-        assertEquals(false, hits[0].third)
-        // 只透出 PHOTO（与回传文本的计数口径一致），VIDEO 被过滤
-        assertEquals(listOf(1L, 3L), hits[0].second.map { it.id })
-        // 卡已透出必须写进回执：LLM 只看得见文本，不知卡已展示会继续 refine/声称失败
-        // （2026-10-24 browse_carousel 事故：卡已出却回复「没能把照片图集发给你」）
-        assertTrue("display=true 且卡透出时回执须明说：$out", out.contains("横滑图集卡已在聊天中展示"))
-    }
-
-    @Test
-    fun `display true without listener does not claim card shown`() = runTest {
-        // 无头场景（监听器未挂）卡未透出，回执不得声称已展示（诚实口径）
-        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2)) })
-        val out = t.searchMedia("猫", "", "", "", "", "true")
-        assertFalse(out.contains("图集卡已在聊天中展示"))
-        assertTrue(handleTextOf("找到 2 张「猫」的照片").matches(out))
-    }
-
-    @Test
-    fun `data gathering search does not emit listener`() = runTest {
-        // 2026-10-24 无脑出卡事故类：统计/取数型搜索（display=false）不得透出图集卡
-        var calls = 0
-        val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2)) })
-        t.mediaResultsListener = { _, _, _, _ -> calls++ }
-        t.searchMedia("猫", "", "", "", "", "false")
-        assertEquals(0, calls)
-    }
-
-    @Test
-    fun `refine hit emits listener with refinement flag`() = runTest {
-        val hits = mutableListOf<Pair<String, Boolean>>()
-        val base = listOf(asset(1, labels = "夜景"), asset(2, labels = "白天"))
-        val t = tools(byQuery = { _, ids ->
-            if (ids == null) base else base.filter { it.id in ids && it.labels == "夜景" }
-        })
-        t.mediaResultsListener = { query, _, _, isRefinement -> hits.add(query to isRefinement) }
-        t.searchMedia("猫", "", "", "", "", "true")
-        t.refineMediaSearch("夜景", "", "")
-        assertEquals(listOf("猫" to false, "夜景" to true), hits)
-    }
-
-    @Test
-    fun `refine display intent inherits from base search`() = runTest {
-        // 取数型搜索（display=false）的细化同样不出卡
-        var calls = 0
-        val base = listOf(asset(1, labels = "夜景"), asset(2, labels = "白天"))
-        val t = tools(byQuery = { _, ids ->
-            if (ids == null) base else base.filter { it.id in ids && it.labels == "夜景" }
-        })
-        t.mediaResultsListener = { _, _, _, _ -> calls++ }
-        t.searchMedia("猫", "", "", "", "", "false")
-        t.refineMediaSearch("夜景", "", "")
-        assertEquals(0, calls)
-    }
-
-    @Test
-    fun `empty result does not emit listener`() = runTest {
-        var calls = 0
-        val t = tools(byQuery = { _, _ -> emptyList() })
-        t.mediaResultsListener = { _, _, _, _ -> calls++ }
-        t.searchMedia("没有的东西", "", "", "", "", "true")
-        assertEquals(0, calls)
-    }
-
-    @Test
-    fun `refine empty in-set does not emit listener and keeps base`() = runTest {
-        var calls = 0
-        val t = tools(byQuery = { _, ids ->
-            if (ids == null) listOf(asset(1)) else emptyList()
-        })
-        t.mediaResultsListener = { _, _, _, _ -> calls++ }
-        t.searchMedia("猫", "", "", "", "", "true")
-        t.refineMediaSearch("不存在", "", "")
-        assertEquals(1, calls) // 仅 search 那次
-    }
 
     // ── opaque handle 注册（D2：命中集引用式不上云）────────────────
 
@@ -251,7 +165,7 @@ class CloudAgentGalleryToolsTest {
             byQuery = { _, _ -> listOf(asset(1), asset(2)) },
             handleStore = LocalHandleStore(dao),
         )
-        val out = t.searchMedia("猫", "", "", "", "", "false")
+        val out = t.searchMedia("猫", "", "", "", "")
         val match = Regex(".*（数据句柄 handle: scan/([0-9a-f]{12})）$").find(out)
         assertTrue("返回文本须以 opaque token 收尾：$out", match != null)
         val handleId = match!!.groupValues[1]
@@ -270,7 +184,7 @@ class CloudAgentGalleryToolsTest {
             byQuery = { _, _ -> emptyList() },
             handleStore = LocalHandleStore(dao),
         )
-        val out = t.searchMedia("没有的东西", "", "", "", "", "false")
+        val out = t.searchMedia("没有的东西", "", "", "", "")
         // 空命中不注册句柄、不带 token（与 refine 空分支同口径）
         assertFalse(out.contains("数据句柄"))
         assertTrue(dao.rows.isEmpty())
@@ -290,7 +204,7 @@ class CloudAgentGalleryToolsTest {
             handleStore = LocalHandleStore(failingDao),
         )
         // 搜索成功但 Room 写失败 → 降级为无 token 前缀，不走 error: 协议
-        assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", "", "false"))
+        assertEquals("找到 2 张「猫」的照片", t.searchMedia("猫", "", "", "", ""))
     }
 
     // ── mediaType 媒体类型过滤（2026-11-04 Video 组件批次）────────────────
@@ -299,7 +213,7 @@ class CloudAgentGalleryToolsTest {
     fun `mediaType video keeps only videos and reports video wording`() = runTest {
         val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO), asset(3, MediaType.VIDEO)) })
         assertTrue(
-            handleTextOf("找到 2 段「旅行」的视频").matches(t.searchMedia("旅行", "", "", "", "", "false", "video")),
+            handleTextOf("找到 2 段「旅行」的视频").matches(t.searchMedia("旅行", "", "", "", "", "video")),
         )
     }
 
@@ -307,7 +221,7 @@ class CloudAgentGalleryToolsTest {
     fun `mediaType all keeps photos and videos with media wording`() = runTest {
         val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO)) })
         assertTrue(
-            handleTextOf("找到 2 个「旅行」的媒体").matches(t.searchMedia("旅行", "", "", "", "", "false", "all")),
+            handleTextOf("找到 2 个「旅行」的媒体").matches(t.searchMedia("旅行", "", "", "", "", "all")),
         )
     }
 
@@ -315,7 +229,7 @@ class CloudAgentGalleryToolsTest {
     fun `mediaType unknown falls back to photo only`() = runTest {
         val t = tools(byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO)) })
         assertTrue(
-            handleTextOf("找到 1 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "", "false", "bogus")),
+            handleTextOf("找到 1 张「猫」的照片").matches(t.searchMedia("猫", "", "", "", "", "bogus")),
         )
     }
 
@@ -326,7 +240,7 @@ class CloudAgentGalleryToolsTest {
             byQuery = { _, _ -> listOf(asset(1), asset(2, MediaType.VIDEO)) },
             handleStore = LocalHandleStore(dao),
         )
-        val out = t.searchMedia("旅行", "", "", "", "", "false", "all")
+        val out = t.searchMedia("旅行", "", "", "", "", "all")
         val handleId = Regex("handle: scan/([0-9a-f]{12})").find(out)!!.groupValues[1]
         val entries = Json.decodeFromString<List<ScanPhotoEntry>>(dao.rows.getValue(handleId).payloadJson)
         assertEquals(listOf("PHOTO", "VIDEO"), entries.map { entry -> entry.mediaType })
@@ -339,7 +253,7 @@ class CloudAgentGalleryToolsTest {
                 listOf(asset(1, MediaType.VIDEO), asset(2, MediaType.VIDEO), asset(3))
             },
         )
-        t.searchMedia("旅行", "", "", "", "", "false", "video")
+        t.searchMedia("旅行", "", "", "", "", "video")
         // 视频基数上的细化：照片 asset(3) 不得混回结果集
         assertTrue(
             handleTextOf("在上一轮结果内找到 2 段「夜景」的视频")
@@ -350,6 +264,6 @@ class CloudAgentGalleryToolsTest {
     @Test
     fun `video search empty hit reports zero videos`() = runTest {
         val t = tools(byQuery = { _, _ -> listOf(asset(1)) })
-        assertEquals("找到 0 段「旅行」的视频", t.searchMedia("旅行", "", "", "", "", "false", "video"))
+        assertEquals("找到 0 段「旅行」的视频", t.searchMedia("旅行", "", "", "", "", "video"))
     }
 }

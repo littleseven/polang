@@ -2,10 +2,7 @@ package com.mamba.picme.features.cloudagent
 
 import com.mamba.picme.BuildConfig
 import com.mamba.picme.R
-import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
-import com.mamba.picme.data.local.FakeLocalHandleDao
-import com.mamba.picme.data.local.LocalHandleStore
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
 import com.mamba.picme.domain.chat.AgentStepStatus
@@ -102,17 +99,10 @@ class CloudAgentChatViewModelTest {
             api,
             DeviceToolExecutor(
                 gallerySummary = { "相册 42 张" },
-                searchMedia = { _, _, _, _, _, _, _ -> "找到 0 张" },
+                searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
                 refineSearch = { _, _, _ -> "error: no base" },
             ),
             repository,
-            CloudAgentGalleryTools(
-                searchByQuery = { _, _ -> emptyList() },
-                searchByFilter = { _, _ -> emptyList() },
-                allPhotos = { emptyList() },
-                gallerySummary = { null },
-                localHandleStore = LocalHandleStore(FakeLocalHandleDao()),
-            ),
             roundInFlightHint = { "上一轮还在跑，请稍候" },
             stepLabel = { resId -> "label:$resId" },
         )
