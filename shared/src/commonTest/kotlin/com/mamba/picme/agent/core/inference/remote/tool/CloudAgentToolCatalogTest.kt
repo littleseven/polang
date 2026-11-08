@@ -105,12 +105,13 @@ class CloudAgentToolCatalogTest {
     }
 
     @Test
-    fun `search media declares seven params in bridge order`() {
+    fun `search media declares six params in bridge order`() {
         // 与 server DeviceToolService.searchMedia 桥帧键序逐项等价（M1 真引用化前的
-        // @Tool 签名）；全部 required（Koog 反射期即全必填，LLM 可见 schema 零漂移）
+        // @Tool 签名）；全部 required（Koog 反射期即全必填，LLM 可见 schema 零漂移）。
+        // 2026-11-08 横滑相册卡退役：display 参数下线（端侧不再透出原生横滑卡）。
         val params = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_SEARCH_MEDIA)!!.params
         assertEquals(
-            listOf("query", "person", "fromMs", "toMs", "hasFace", "display", "mediaType"),
+            listOf("query", "person", "fromMs", "toMs", "hasFace", "mediaType"),
             params.map { it.name },
         )
         assertTrue(params.all { it.required }, "桥工具参数全 required（端侧以空串表达不限）")
@@ -121,7 +122,6 @@ class CloudAgentToolCatalogTest {
                 CloudAgentToolContract.DESC_PARAM_FROM_MS,
                 CloudAgentToolContract.DESC_PARAM_TO_MS,
                 CloudAgentToolContract.DESC_PARAM_HAS_FACE,
-                CloudAgentToolContract.DESC_PARAM_DISPLAY,
                 CloudAgentToolContract.DESC_PARAM_MEDIA_TYPE,
             ),
             params.map { it.description },
@@ -144,19 +144,19 @@ class CloudAgentToolCatalogTest {
     }
 
     @Test
-    fun `device-side defaults declared for display and mediaType`() {
+    fun `device-side default declared for mediaType`() {
         // default 是端侧 executor 兼容缺省（旧服务端不下发该键时的兜底），非 LLM schema 可选标记
         val tool = CloudAgentToolContract.TOOL_SEARCH_MEDIA
-        assertEquals("false", CloudAgentToolCatalog.defaultFor(tool, "display"))
         assertEquals("photo", CloudAgentToolCatalog.defaultFor(tool, "mediaType"))
         assertEquals("", CloudAgentToolCatalog.defaultFor(tool, "query"))
+        assertEquals("", CloudAgentToolCatalog.defaultFor(tool, "display"), "display 已随横滑卡退役下线")
         assertEquals("", CloudAgentToolCatalog.defaultFor("unknown_tool", "query"))
     }
 
     @Test
     fun `paramNames returns declared order`() {
         assertEquals(
-            listOf("query", "person", "fromMs", "toMs", "hasFace", "display", "mediaType"),
+            listOf("query", "person", "fromMs", "toMs", "hasFace", "mediaType"),
             CloudAgentToolCatalog.paramNames(CloudAgentToolContract.TOOL_SEARCH_MEDIA),
         )
         assertEquals(emptyList(), CloudAgentToolCatalog.paramNames("unknown_tool"))
@@ -168,7 +168,7 @@ class CloudAgentToolCatalogTest {
         assertEquals(CloudAgentToolContract.TOOL_SEARCH_MEDIA, descriptor.name)
         assertEquals(CloudAgentToolContract.DESC_SEARCH_MEDIA, descriptor.description)
         assertEquals(
-            listOf("query", "person", "fromMs", "toMs", "hasFace", "display", "mediaType"),
+            listOf("query", "person", "fromMs", "toMs", "hasFace", "mediaType"),
             descriptor.requiredParameters.map { it.name },
         )
         assertTrue(descriptor.optionalParameters.isEmpty())
@@ -177,8 +177,8 @@ class CloudAgentToolCatalogTest {
             "桥工具参数全 String（端侧空串语义）",
         )
         assertEquals(
-            CloudAgentToolContract.DESC_PARAM_DISPLAY,
-            descriptor.requiredParameters.single { it.name == "display" }.description,
+            CloudAgentToolContract.DESC_PARAM_MEDIA_TYPE,
+            descriptor.requiredParameters.single { it.name == "mediaType" }.description,
         )
     }
 

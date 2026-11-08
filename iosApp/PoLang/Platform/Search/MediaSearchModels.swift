@@ -39,19 +39,3 @@ struct ScoredMedia<M>: Sendable where M: Sendable {
     let media: M
     var score: Float
 }
-
-// MARK: - 反馈命令模型（契约 §1.4，Chat 搜索族）
-
-enum FeedbackTarget: Equatable, Sendable {
-    /// 1-based 序号
-    case ordinal(Int)
-    case description(String)
-    case mediaId(String)
-    case lastShown
-}
-
-enum FeedbackAction: String, Sendable {
-    case like = "LIKE"
-    case dislike = "DISLIKE"
-    case moreLikeThis = "MORE_LIKE_THIS"
-}

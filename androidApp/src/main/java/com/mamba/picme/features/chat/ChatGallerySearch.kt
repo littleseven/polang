@@ -11,8 +11,8 @@ import com.mamba.picme.domain.search.QueryParser
  *
  * 抽离自 ChatViewModel 以便 JVM 单测（避免加载 Android 依赖）。
  * 全部基于 :shared 的 [MediaAsset]（与 MediaSearchEngine / MediaPager 一致）。
- * （Room 持久化编解码已随 content 列退役删除——v28 起媒体结果负载在
- *  [com.mamba.picme.domain.chat.MessagePart.MediaResults] part 内。）
+ * （Room 持久化编解码已删除——v28 起 content 列退役；
+ *  横滑卡 2026-11-08 退役，卡片消息不再产出，MessagePart.MediaResults 同删。）
  */
 object ChatGallerySearch {
 

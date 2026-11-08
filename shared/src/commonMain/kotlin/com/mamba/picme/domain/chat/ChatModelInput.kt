@@ -14,7 +14,7 @@ package com.mamba.picme.domain.chat
  *   防多轮编辑上下文断裂）；
  * - [MessagePart.BrowserLive] → tool-call/tool-result 语义对（帧永不回灌，结果侧只含
  *   文本摘要：resultSummary / 失败原因 / 会话概览兜底）；
- * - [MessagePart.MediaResults] / [MessagePart.OptimizeCandidates] 等 data part
+ * - [MessagePart.OptimizeCandidates] 等 data part
  *   **不进上下文**（对齐 Vercel convertToModelMessages 丢弃规则）。
  *
  * 引擎无关：不引用 Koog 类型；Koog Message 组装是上层（inference/remote）关注点。
@@ -124,7 +124,6 @@ private fun MessagePart.toModelInput(role: ModelInputRole, messageId: String): L
 
     // data part：默认不进上下文（spec §6）；Unsupported（前向兼容占位）同口径——
     // 模型从未见过的占位类型进上下文只会引入噪声
-    is MessagePart.MediaResults,
     is MessagePart.OptimizeCandidates,
     is MessagePart.OpenUiCard,
     is MessagePart.Unsupported,

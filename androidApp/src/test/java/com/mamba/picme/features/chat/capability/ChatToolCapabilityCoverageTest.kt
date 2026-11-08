@@ -24,9 +24,6 @@ class ChatToolCapabilityCoverageTest {
      * - 特例：不经 Capability 的工具。
      */
     private val exceptions = mapOf(
-        "record_feedback" to "别名→feedback（ChatSearchCapability）",
-        "more_like_this" to "别名→more（ChatSearchCapability）",
-        "exclude_constraint" to "别名→exclude（ChatSearchCapability）",
         "list_person_relations" to "别名→query_person_relation（PersonRelationCapability，容器注入）",
         "remember_person_relation" to "PersonRelationCapability（容器注入）",
         "forget_person_relation" to "PersonRelationCapability（容器注入）",
@@ -49,7 +46,9 @@ class ChatToolCapabilityCoverageTest {
         "browser_extract" to "BrowserSessionCapability（BrowserTransport 容器注入）",
         "browser_screenshot" to "BrowserSessionCapability（BrowserTransport 容器注入）",
         "browser_close" to "BrowserSessionCapability（BrowserTransport 容器注入）",
-        "web_search" to "WebSearchCapability（WebSearchTransport 容器注入）"
+        "web_search" to "WebSearchCapability（WebSearchTransport 容器注入）",
+        "load_skill" to "LoadSkillCapability（SkillRepository 容器注入，2026-11-08 端侧 skill 执行器）",
+        "query_tag_scan_status" to "别名→start_tag_scan（ChatStartTagScanCapability；2026-11-08 工具面更名，命令层不动）"
     )
 
     private val covered: Set<String> = (
@@ -80,13 +79,5 @@ class ChatToolCapabilityCoverageTest {
             .toSet()
         val stale = exceptions.keys - toolNames
         assertTrue("例外表含已不存在的工具名：$stale", stale.isEmpty())
-    }
-
-    @Test
-    fun `alias targets are actually covered`() {
-        // 别名工具的命令 method 名必须真实存在于 Capability 覆盖集
-        listOf("feedback", "more", "exclude").forEach { alias ->
-            assertTrue("别名目标 $alias 未被任何 Capability 覆盖", alias in covered)
-        }
     }
 }

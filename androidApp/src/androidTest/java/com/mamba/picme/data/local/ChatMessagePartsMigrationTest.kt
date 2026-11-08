@@ -380,10 +380,13 @@ class ChatMessagePartsMigrationTest {
         assertEquals("file:///z.jpg", edit.ref)
         assertEquals(listOf("微调"), edit.suggestions)
 
-        val media = readParts(db, "m-media").single() as MessagePart.MediaResults
-        assertEquals("海边", media.results.query)
-        assertEquals(99, media.results.totalCount)
-        assertEquals(1, media.results.assets.size)
+        // 退役横滑卡行（2026-11-08）：type 仍归一到退役正型 data_media_results（行保留不丢），
+        // parts 落 Unsupported 兜底（converter 已不识该 type，content 为资产 JSON 数组 →
+        // unknownTypeFallback JsonArray 分支；main 侧此断言曾误写 Text，为无设备 latent red）
+        // ——回放路径按 RETIRED 闭集整行跳过，此处只断言行存续与 partsJson 可解码，不断言内容语义
+        val media = readParts(db, "m-media")
+        assertEquals(1, media.size)
+        assertTrue(media.single() is MessagePart.Unsupported)
 
         assertEquals("<svg/>", (readParts(db, "m-chart").single() as MessagePart.Chart).svg)
 

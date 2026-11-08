@@ -9,15 +9,13 @@ import MarkdownUI
 struct ChatView: View {
     /// 返回动作（pager 场景 = 回相册页）；nil 时返回键占位
     var onBack: (() -> Void)? = nil
-    /// 媒体结果「查看全部」回相册并带入搜索词（MainTabView 接线：切 tab 1 + 注入 query）
-    var onNavigateToGallery: ((String) -> Void)? = nil
     /// EDIT 意图：跳 PhotoEditorScreen(localIdentifier:)（MainTabView 接线）
     var onEditImage: ((String) -> Void)? = nil
     /// 任务中心入口（task-center.yaml §6：顶栏 trailing 首枚 → MainNavigationRouter.showTaskCenter）
     var onOpenTaskCenter: (() -> Void)? = nil
 
     @StateObject private var viewModel = ChatViewModel()
-    /// 全屏图片预览（chat 图/媒体卡点击打开）
+    /// 全屏图片预览（chat 内联图点击打开）
     @State private var previewImage: UIImage?
     @EnvironmentObject private var container: AppContainer
     @State private var inputText = ""
@@ -295,11 +293,9 @@ struct ChatView: View {
                     ForEach(items, id: \.key) { item in
                         ChatListItemView(
                             item: item,
-                            onNavigateToGallery: onNavigateToGallery,
                             onImageTap: { img in
                                 if let img { previewImage = img }
                             },
-                            onMediaTap: { lid in openPreview(localIdentifier: lid) },
                             gachaInteractive: viewModel.isGachaInteractive(item.message.id),
                             gachaSelectedIndex: viewModel.gachaSelections[item.message.id],
                             gachaRerolling: viewModel.gachaRerolling.contains(item.message.id),
@@ -363,14 +359,6 @@ struct ChatView: View {
                 }
             }
             #endif
-        }
-    }
-
-    /// 媒体卡全屏：localIdentifier → 原图 async 载入后打开预览。
-    private func openPreview(localIdentifier: String) {
-        Task {
-            let image = await ThumbnailLoader.shared.fullResolution(for: localIdentifier)
-            await MainActor.run { if let image { previewImage = image } }
         }
     }
 
@@ -769,9 +757,7 @@ private struct MessageBubble: View {
 
 private struct ChatListItemView: View {
     let item: ChatListItem
-    var onNavigateToGallery: ((String) -> Void)? = nil
     var onImageTap: ((UIImage?) -> Void)? = nil
-    var onMediaTap: ((String) -> Void)? = nil
     var gachaInteractive: Bool = false
     var gachaSelectedIndex: Int? = nil
     var gachaRerolling: Bool = false
@@ -799,7 +785,6 @@ private struct ChatListItemView: View {
         switch item.contentType {
         case t.TYPE_AGENT_TEXT: agentTextItem
         case t.TYPE_CHART: chartItem
-        case t.TYPE_MEDIA_RESULTS: mediaResultsItem
         case t.TYPE_OPTIMIZE_CANDIDATES: gachaItem
         case t.TYPE_HTML_CARD: htmlCardItem
         case t.TYPE_TASK_CARD: taskCardItem
@@ -844,32 +829,6 @@ private struct ChatListItemView: View {
         }
         .frame(maxWidth: ChatBubbleTokens.bubbleMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// MEDIA_RESULTS part：场景解释句（消息 content）+ 媒体卡行同 item 渲染
-    /// （flattener 单 item 消息，对齐 chat.yaml §6 防视觉回归）。
-    private var mediaResultsItem: some View {
-        let results = (item.part as? MessagePartMediaResults)?.results
-        return HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                if !item.message.content.isEmpty {
-                    AgentTextView(content: item.message.content)
-                }
-                if let results {
-                    MediaCardRow(
-                        mediaIds: results.assets.map { $0.id },
-                        totalCount: Int(results.totalCount),
-                        onViewAll: { onNavigateToGallery?(results.query) },
-                        onMediaTap: { lid in onMediaTap?(lid) }
-                    )
-                }
-            }
-            .agentBubbleChrome()
-            .onLongPressGesture {
-                UIPasteboard.general.string = item.message.content
-            }
-            Spacer(minLength: 40)
-        }
     }
 
     /// OPTIMIZE_CANDIDATES part：场景解释句气泡 + 候选卡条（chat.yaml §17；单 item 消息）。
@@ -1073,170 +1032,6 @@ private struct BlinkCursor: View {
                     visible = false
                 }
             }
-    }
-}
-
-// MARK: - Media Card Row (spec §9：120×150 卡片 + 日期标签)
-
-private struct MediaCardRow: View {
-    let mediaIds: [Int64]
-    var totalCount: Int = 0
-    var onViewAll: () -> Void = {}
-    var onMediaTap: ((String) -> Void)? = nil
-    @State private var idToIdentifier: [Int64: String] = [:]
-    @State private var idToDate: [Int64: Date] = [:]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: ChatCarouselTokens.cardSpacing) {
-                ForEach(mediaIds, id: \.self) { id in
-                    MediaThumbnail(
-                        localIdentifier: idToIdentifier[id],
-                        date: idToDate[id],
-                        onTap: { if let lid = idToIdentifier[id] { onMediaTap?(lid) } }
-                    )
-                    .frame(width: ChatCarouselTokens.cardWidth, height: ChatCarouselTokens.cardHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: ChatCarouselTokens.cardCornerRadius))
-                }
-                // 「查看全部」尾卡：全量命中数 > 显示数时附在末尾（对齐 Android ViewAllCard）
-                if totalCount > mediaIds.count {
-                    ViewAllCard(onTap: onViewAll)
-                        .frame(width: ChatCarouselTokens.cardWidth, height: ChatCarouselTokens.cardHeight)
-                        .clipShape(RoundedRectangle(cornerRadius: ChatCarouselTokens.viewAllCornerRadius))
-                }
-            }
-            .padding(.vertical, 4)
-        }
-        .accessibilityIdentifier("chat_media_card")
-        .task(id: mediaIds) {
-            // mediaIds = localIdentifier.hashCode().toLong()（Kotlin String.hashCode，见
-            // IosChatGalleryCapability.toDomain id 口径）。反查须用同一 32-bit Java hash。
-            guard !mediaIds.isEmpty else { return }
-            var idMap: [Int64: String] = [:]
-            var dateMap: [Int64: Date] = [:]
-            PHAsset.fetchAssets(with: nil).enumerateObjects { asset, _, _ in
-                let key = Self.javaHashCode(asset.localIdentifier)
-                idMap[key] = asset.localIdentifier
-                dateMap[key] = asset.creationDate
-            }
-            let resolved = mediaIds.filter { idMap[$0] != nil }.count
-            #if DEBUG
-            DebugBypass.log("Chat", "carousel mediaIds=[\(mediaIds.map(String.init).joined(separator: ","))] resolved=\(resolved)/\(mediaIds.count)")
-            #endif
-            idToIdentifier = idMap
-            idToDate = dateMap
-        }
-    }
-
-    /// Kotlin `String.hashCode().toLong()` 等价：**Int32** 溢出运算（31 &* / &+ 在 Int32 上 wrap，
-    /// 对齐 Kotlin Int 的 32-bit 回绕），再符号扩展到 Int64。早期用 Int64 累加 → wrap 模 2^63 ≠
-    /// Kotlin 的模 2^32 → 永远匹配不上 → 卡片空白。
-    static func javaHashCode(_ s: String) -> Int64 {
-        var h: Int32 = 0
-        for u in s.utf16 {
-            h = 31 &* h &+ Int32(u)
-        }
-        return Int64(h)
-    }
-}
-
-/// 「查看全部」尾卡（对齐 Android ViewAllCard）：与媒体卡同尺寸，tap → onViewAll（跳相册带搜索词）。
-private struct ViewAllCard: View {
-    let onTap: () -> Void
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 6) {
-                MatIcon(name: "mat_photo_library", size: 22)
-                    .foregroundColor(.accentColor)
-                Text(String(localized: "View All"))
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(.label).opacity(0.6))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.secondarySystemBackground))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("chat_media_view_all")
-    }
-}
-
-private struct MediaThumbnail: View {
-    let localIdentifier: String?
-    let date: Date?
-    var onTap: () -> Void = {}
-    @State private var image: UIImage?
-    /// 媒体反馈（对齐 Android FeedbackIconButton 👍👎🔄；本批本地态选中，上报/持久留后续）
-    enum FeedbackType: Hashable { case thumbUp, thumbDown, refresh }
-    @State private var feedback: FeedbackType?
-
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            Color(.tertiarySystemBackground)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Image(matIcon: "photo")
-                    .font(.system(size: 20))
-                    .foregroundColor(.secondary.opacity(0.3))
-            }
-            // 日期标签（对齐 spec §9 card_date_label：yyyy-MM-dd，底部渐变 scrim 上白字）
-            if let date, let label = Self.dateFormatter.string(for: date) {
-                Text(label)
-                    .font(.system(size: 11))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.5)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    )
-            }
-        }
-        .overlay(alignment: .topTrailing) { mediaFeedbackButtons }
-        .contentShape(Rectangle())
-        .onTapGesture { onTap() }
-        .task(id: localIdentifier) {
-            guard let localIdentifier, image == nil else { return }
-            image = await ThumbnailLoader.shared.thumbnail(
-                for: localIdentifier, size: CGSize(width: 360, height: 450))
-        }
-    }
-
-    private var mediaFeedbackButtons: some View {
-        HStack(spacing: 6) {
-            ForEach([FeedbackType.thumbUp, .thumbDown, .refresh], id: \.self) { t in
-                Button { feedback = (feedback == t ? nil : t) } label: {
-                    Image(systemName: Self.iconName(t))
-                        .font(.system(size: 11))
-                        .foregroundColor(feedback == t ? .accentColor : .white)
-                }
-                .accessibilityIdentifier("chat_media_feedback_\(t == .thumbUp ? "up" : t == .thumbDown ? "down" : "refresh")")
-            }
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(Color.black.opacity(0.45)))
-        .padding(4)
-    }
-
-    private static func iconName(_ t: FeedbackType) -> String {
-        switch t {
-        case .thumbUp: return "hand.thumbsup.fill"
-        case .thumbDown: return "hand.thumbsdown.fill"
-        case .refresh: return "arrow.clockwise"
-        }
     }
 }
 

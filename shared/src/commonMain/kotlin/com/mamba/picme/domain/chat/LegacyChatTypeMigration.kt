@@ -12,12 +12,26 @@ package com.mamba.picme.domain.chat
  */
 object LegacyChatTypeMigration {
 
-    /** 新分类法 8 值全集（备份恢复据此判断行是新值还是 legacy）。 */
+    /**
+     * 备份恢复的「新值」allowlist——承重语义（2026-11-08 终审注）：恢复时据此判断行
+     * 是新值（直通）还是 legacy（走 map()）。**刻意含已退役的 `data_media_results`**：
+     * 若被剔除，老行会走 map() 的 else→text 兜底，把媒体资产机器 JSON 渲染成可见气泡。
+     * 值域以 9 值分类法为准（本集合不含 tool_browser/data_ui_openui——两卡行走 parts
+     * 通道，恢复路径不经本表判型；本表只服务备份文本行分类，不是值域 SSOT）。
+     */
     val NEW_TYPES: Set<String> = setOf(
         "text", "image",
         "tool_chart", "tool_html", "tool_task", "tool_image_edit",
         "data_media_results", "data_optimize_candidates",
     )
+
+    /**
+     * 已退役的横滑相册卡 type 闭集（2026-11-08 退役，spec《media-results-carousel-retirement》D2）：
+     * 双端回放路径遇此闭集的 Room 行**整行跳过**（不渲染、不迁移、不回灌）。
+     * legacy `media_results` → `data_media_results` 映射项刻意保留——老备份恢复经 map()
+     * 归一到退役正型后由回放过滤跳过；删映射会让 else→text 兜底把机器 JSON 渲染成可见气泡。
+     */
+    val RETIRED_MEDIA_RESULTS_TYPES: Set<String> = setOf("media_results", "data_media_results")
 
     data class MigratedRow(val type: String, val role: String, val parts: List<MessagePart>)
 

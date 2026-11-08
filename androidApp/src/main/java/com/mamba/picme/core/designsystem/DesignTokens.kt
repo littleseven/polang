@@ -266,18 +266,6 @@ object ChatBubbleTokens {
     val messageGap = 14.dp
 }
 
-/** 聊天媒体结果轮播（MediaResultsCarousel）。ios-follow chat 2026-08-12 自 Android MediaResultsCarousel.kt 反向提取。卡片右侧竖排反馈按钮叠层。 */
-object ChatCarouselTokens {
-    val cardWidth = 120.dp
-    val cardHeight = 150.dp
-    val cardCornerRadius = 12.dp
-    val cardSpacing = 8.dp
-    val feedbackButtonSize = 24.dp
-    val feedbackIconColor = Color.White
-    val feedbackBgColor = Color(0xFF0F2B1B)
-    val viewAllCornerRadius = 12.dp
-}
-
 /** Memory 独立页（2026-09-06，对标小米相册时光大卡）：竖版 3:4 大卡横滑行。 */
 object MemoryPageTokens {
     val cardWidth = 168.dp

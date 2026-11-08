@@ -22,8 +22,8 @@ import kotlinx.coroutines.CancellationException
  * 自己的 [IosChatGalleryCapability] 实例直接 `execute`（业务语义相同：相册摘要/搜索/细化），
  * intent 组装同源复用 [ChatToolService] 的 internal 构建器，零复制。
  *
- * 结果契约（与 Android DeviceToolExecutor 语义对齐；MediaResults 摘要文案按云端无卡场景裁剪——
- * Android 带「，已展示在卡片中」尾巴，本桥无卡片故不含）：
+ * 结果契约（与 Android DeviceToolExecutor 语义对齐；横滑卡退役后 search/refine 回执 =
+ * 能力层 [AgentAction.TextReply] 计数文案，本桥原样透传）：
  * - 文本结果；失败以 `error: <message>` 前缀判定 ok=false（[AgentAction.Error] → error 前缀）；
  * - 超 [CloudAgentToolContract.MAX_RESULT_CHARS] **字符**截断 + `\n…[truncated]`（字符非字节——不切半 UTF-8）；
  * - 未知工具 → `error: unknown_tool:<tool>`；
@@ -57,7 +57,7 @@ class IosCloudAgentToolBridge(
                 CloudAgentToolContract.TOOL_SEARCH_MEDIA -> {
                     // 参数名自 shared 目录读取（分层 runtime M2；键序 = 目录声明序，
                     // CloudAgentToolCatalogTest 钉住）。iOS 只消费前 5 参——
-                    // display/mediaType 是 Android 出卡特性，iOS 无此维度故不读。
+                    // mediaType 过滤维度 iOS 搜索桥未接线，暂不读。
                     val names = CloudAgentToolCatalog.paramNames(tool)
                     searchMedia(
                         query = args[names[0]].orEmpty(),
@@ -114,7 +114,7 @@ class IosCloudAgentToolBridge(
 
     /**
      * 直调能力执行（绕过 CapabilityRegistry 场景门，见类头注释）并把 [AgentAction] 映射为
-     * 工具结果文本：TextReply→原文；MediaResults→计数摘要；Error→`error: ` 前缀。
+     * 工具结果文本：TextReply→原文；Error→`error: ` 前缀。
      */
     private suspend fun executeCommand(command: AgentCommand): String {
         val result = capability.execute(
@@ -130,7 +130,6 @@ class IosCloudAgentToolBridge(
 
     private fun actionToText(action: AgentAction): String = when (action) {
         is AgentAction.TextReply -> action.message
-        is AgentAction.MediaResults -> "找到 ${action.totalCount} 张「${action.query}」的照片"
         is AgentAction.Error -> "${CloudAgentToolContract.ERROR_PREFIX} ${action.message}"
         else -> "ok"
     }

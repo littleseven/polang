@@ -67,7 +67,7 @@ ENUM_NAMES = {
     "color": "AppColors", "alpha": "AppAlpha", "statusColor": "StatusColor",
     "elevation": "AppElevation", "appSlider": "AppSliderTokens", "bottomTab": "BottomTabTokens",
     "bottomSheet": "BottomSheetTokens", "chip": "ChipTokens", "badge": "BadgeTokens",
-    "camera": "CameraTokens", "chatBubble": "ChatBubbleTokens", "chatCarousel": "ChatCarouselTokens",
+    "camera": "CameraTokens", "chatBubble": "ChatBubbleTokens",
     "memoryPage": "MemoryPageTokens",
     "chatContext": "ChatContextTokens", "chatSidebar": "ChatSidebarTokens", "settings": "SettingsTokens",
     "editor": "EditorTokens", "gallery": "GalleryTokens",
@@ -78,12 +78,12 @@ ENUM_NAMES = {
 IOS_ORDER = ["spacing", "radius", "icon", "color", "typography", "colorScheme", "alpha",
              "statusColor", "motion", "elevation", "topBar", "shutter", "beautyPanel",
              "appSlider", "bottomTab", "bottomSheet", "chip", "badge", "camera",
-             "chatBubble", "chatCarousel", "memoryPage", "chatContext", "chatSidebar", "settings", "editor",
+             "chatBubble", "memoryPage", "chatContext", "chatSidebar", "settings", "editor",
              "grid", "gallery", "searchField", "pager", "modelCenter", "person", "idphoto", "a2uiCard"]
 # Android 组件 token 文件的 object 顺序（spacing/radius/color/typography/colorScheme 有独立文件，不重复）
 ANDROID_TOKENS_ORDER = ["icon", "alpha", "statusColor", "motion", "elevation", "topBar",
                         "shutter", "beautyPanel", "appSlider", "bottomTab", "bottomSheet",
-                        "chip", "badge", "camera", "chatBubble", "chatCarousel", "memoryPage", "chatContext",
+                        "chip", "badge", "camera", "chatBubble", "memoryPage", "chatContext",
                         "chatSidebar", "settings", "editor", "grid", "gallery", "searchField", "pager",
                         "modelCenter", "person", "idphoto", "a2uiCard"]
 
@@ -330,7 +330,7 @@ MARK_NAMES = {
     "appSlider": "App Slider（全 app 统一滑杆）", "bottomTab": "Bottom Tab（悬浮胶囊导航）",
     "bottomSheet": "Bottom Sheet（相机/编辑器共享面板外壳）", "chip": "Chip", "badge": "Badge",
     "camera": "Camera（强制深色 overlay）", "chatBubble": "Chat Bubble",
-    "chatCarousel": "Chat Carousel（媒体结果横滑卡）", "memoryPage": "Memory Page（回忆独立页分区大卡）", "chatContext": "Chat Context（上下文附件暂存区）",
+    "memoryPage": "Memory Page（回忆独立页分区大卡）", "chatContext": "Chat Context（上下文附件暂存区）",
     "chatSidebar": "Chat Sidebar（侧栏抽屉）",
     "settings": "Settings", "editor": "Editor", "grid": "Grid", "gallery": "Gallery（相册页结构）",
     "searchField": "SearchField（SearchTopBar 内嵌胶囊搜索框）", "pager": "Pager",

@@ -33,7 +33,6 @@ extension ChatMessage {
         modelUsed: String? = nil,
         timestamp: Int64 = Int64(Date().timeIntervalSince1970 * 1000),
         performance: LlmPerformance? = nil,
-        mediaResults: MediaResultsUi? = nil,
         imageUri: String? = nil,
         chartSvg: String? = nil,
         htmlContent: String? = nil,
@@ -53,7 +52,7 @@ extension ChatMessage {
         ChatMessage(
             id: id, type: type, content: content, role: role,
             modelUsed: modelUsed, timestamp: timestamp, performance: performance,
-            mediaResults: mediaResults, imageUri: imageUri, chartSvg: chartSvg,
+            imageUri: imageUri, chartSvg: chartSvg,
             htmlContent: htmlContent, imageSaved: imageSaved,
             isStreaming: isStreaming, showCursor: showCursor, isThinking: isThinking,
             agentSteps: agentSteps,
@@ -73,7 +72,6 @@ extension ChatMessage {
         isThinking: Bool? = nil,
         imageSaved: Bool? = nil,
         gachaInteractive: Bool? = nil,
-        mediaResults: MediaResultsUi? = nil,
         chartSvg: String? = nil,
         htmlContent: String? = nil,
         optimizeCandidates: OptimizeCandidateGroup? = nil,
@@ -82,7 +80,7 @@ extension ChatMessage {
         doCopy(
             id: id, type: type, content: content ?? self.content, role: role,
             modelUsed: modelUsed, timestamp: timestamp, performance: performance,
-            mediaResults: mediaResults ?? self.mediaResults, imageUri: imageUri,
+            imageUri: imageUri,
             chartSvg: chartSvg ?? self.chartSvg,
             htmlContent: htmlContent ?? self.htmlContent,
             imageSaved: imageSaved ?? self.imageSaved,
@@ -133,7 +131,10 @@ struct LegacyChatMessage: Codable {
     }
 
     enum MessageType: String, Codable {
-        case userText, agentText, userImageText, mediaResults, chart, agentEditResult
+        case userText, agentText, userImageText, chart, agentEditResult
+        /// 退役横滑相册卡（2026-11-08 横滑卡整体下线）：老 JSON 可能仍带此值，
+        /// 保留枚举位防 decode 炸，迁移时降级为纯文本气泡
+        case mediaResults
         case optimizeCandidates
         case agentImage
     }
@@ -196,8 +197,8 @@ struct LegacyChatMessage: Codable {
         mediaTotalCount = try c.decodeIfPresent(Int.self, forKey: .mediaTotalCount)
         let decodedType = try c.decodeIfPresent(MessageType.self, forKey: .type)
         imageUri = try c.decodeIfPresent(String.self, forKey: .imageUri)
-        // 老数据推断：user → userText；assistant + mediaIds → mediaResults；否则 agentText
-        type = decodedType ?? (role == .user ? .userText : (!mediaIds.isEmpty ? .mediaResults : .agentText))
+        // 老数据推断：user → userText；否则 agentText（横滑卡退役后 mediaIds 不再推断 mediaResults）
+        type = decodedType ?? (role == .user ? .userText : .agentText)
         // gacha：结构漂移时静默丢弃（nil）——消息退化为纯文本气泡，不崩
         gacha = (try? c.decodeIfPresent(GachaPayload.self, forKey: .gacha)) ?? nil
     }
@@ -213,7 +214,6 @@ extension LegacyChatMessage {
         let sharedRole: ModelInputRole = role == .user ? .user : .assistant
         let sharedType: ChatMessageType
         let content = !text.isEmpty ? text : (error ?? "")
-        var mediaResults: MediaResultsUi? = nil
         var optimizeCandidates: OptimizeCandidateGroup? = nil
         var parts: [MessagePart] = []
 
@@ -229,25 +229,9 @@ extension LegacyChatMessage {
         case .agentEditResult:
             sharedType = ChatMessageType.agentEditResult
         case .mediaResults:
-            sharedType = ChatMessageType.mediaResults
-            // uri 空 stub（老线格式只存 id）；渲染侧按 assets[].id 反查媒体库
-            let ui = MediaResultsUi(
-                query: mediaQuery ?? "",
-                assets: mediaIds.map {
-                    MediaAsset(
-                        id: $0, uri: "", type: .photo, captureDate: 0, fileName: "",
-                        duration: nil, hasFace: false, faceId: nil, source: nil,
-                        labels: nil, ocrText: nil, latitude: nil, longitude: nil,
-                        locationName: nil, city: nil, indexedAt: nil,
-                        faceFocusY: nil, aestheticScore: nil, faceQualityScore: nil
-                    )
-                },
-                totalCount: Int32(mediaTotalCount ?? mediaIds.count),
-                isRefinement: false,
-                feedbackState: [:]
-            )
-            mediaResults = ui
-            parts = [MessagePartMediaResults(partId: "p0", results: ui)]
+            // 横滑卡已退役：mediaResults 行在 ChatHistoryStore.loadMessages 已整行滤除，
+            // 本分支仅为防御兜底（枚举位保留防老文件 decode 炸，永不应到达）
+            sharedType = ChatMessageType.agentText
         case .chart:
             sharedType = ChatMessageType.chart
             // chartSvg 老线格式不持久化（CodingKeys 排除，LegacyChatMessage 无此存储）——
@@ -281,7 +265,6 @@ extension LegacyChatMessage {
             content: content,
             role: sharedRole,
             timestamp: Int64(timestamp.timeIntervalSince1970 * 1000),
-            mediaResults: mediaResults,
             imageUri: imageUri,
             optimizeCandidates: optimizeCandidates,
             parts: parts

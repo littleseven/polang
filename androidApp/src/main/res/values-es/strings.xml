@@ -689,16 +689,6 @@
     <string name="delete_chat">Eliminar chat</string>
     <string name="delete_chat_title">Eliminar chat</string>
     <string name="delete_chat_confirm">¿Eliminar "%1$s"? Esta acción no se puede deshacer.</string>
-    <string name="feedback_like">Me gusta</string>
-    <string name="feedback_dislike">No me gusta</string>
-    <string name="feedback_more_like_this">Más como esto</string>
-    <string name="feedback_confirmed_like">Te gusta</string>
-    <string name="feedback_confirmed_dislike">No te gusta</string>
-    <string name="feedback_excluded">Se excluyó "%1$s"</string>
-    <string name="feedback_resolve_failure">No se encontró la foto que querías</string>
-    <string name="feedback_resolve_failure_ordinal">No se encontró la foto #%1$d</string>
-    <string name="feedback_resolve_failure_description">No se encontró ninguna foto que coincida con "%1$s"</string>
-    <string name="feedback_no_more_results">No se encontraron más fotos similares</string>
     <string name="chat_edit_result_default">✅ Foto editada para ti</string>
     <string name="chat_edit_save_to_gallery">Guardar en la galería</string>
     <string name="chat_edit_saved_to_gallery">✓ Guardada en la galería</string>
@@ -869,7 +859,6 @@
     <string name="gallery_search_hint">Buscar por contenido, ubicación, texto…</string>
     <string name="gallery_search_no_results">No se encontraron fotos</string>
     <!-- 意图路由直执回合的气泡（找到结果时；卡片已经 uiActions 渲染） -->
-    <string name="chat_direct_results_shown">Resultados mostrados en la tarjeta de arriba</string>
     <string name="gallery_tag_category_scene">Escena</string>
     <string name="gallery_tag_category_animal">Animal</string>
     <string name="gallery_tag_category_food">Comida</string>
@@ -1231,8 +1220,6 @@
     <string name="a11y_release_face">Liberar detección facial</string>
     <string name="a11y_filter">Filtro</string>
     <string name="a11y_switch_camera">Cambiar de cámara</string>
-    <string name="a11y_photo_desc">Foto</string>
-    <string name="a11y_video_desc">Vídeo</string>
     <!-- 人物信息编辑（命名 + 关系声明） -->
     <string name="person_relation_label">Esta persona es mi…</string>
     <string name="person_relation_none">Sin establecer</string>
@@ -1608,7 +1595,6 @@
     <string name="chat_result_ai_optimize_done">✅ Optimización con IA aplicada</string>
     <string name="chat_result_tag_scan_done">✅ Escaneo de etiquetas ejecutado</string>
     <string name="chat_result_batch_executed">✅ Operación por lotes ejecutada</string>
-    <string name="chat_result_feedback_recorded">✅ Comentario registrado</string>
     <string name="chat_result_executed">✅ Se ejecutó %1$s</string>
     <string name="chat_chart_generated">Gráfico generado</string>
     <string name="chat_html_card_generated">Tarjeta generada</string>
@@ -1682,11 +1668,6 @@
     <string name="chat_claude_tool_uploaded_truncated">Subido (%1$d B, truncado)</string>
     <string name="chat_claude_tool_collect_failed">Error al recopilar: %1$s</string>
     <string name="chat_thread_feishu">Control remoto de Feishu</string>
-    <string name="chat_results_photo_deleted">Se eliminaron las fotos de los resultados</string>
-    <string name="chat_results_refined">Refinado: %1$s (%2$d fotos)</string>
-    <string name="chat_results_found">Se encontraron %2$d fotos que coinciden con "%1$s"</string>
-    <string name="chat_results_empty_hint">No se encontraron fotos para "%1$s", prueba con otra palabra clave</string>
-    <string name="chat_results_view_all">Ver todo</string>
     <string name="chat_chart_rendering">Renderizando gráfico…</string>
     <string name="chat_adjust_brightness">Brillo %1$s%2$d</string>
     <string name="chat_adjust_contrast">Contraste %1$d</string>
@@ -1734,9 +1715,6 @@
     <string name="chat_cmd_open_system_settings">Abrir ajustes</string>
     <string name="chat_cmd_unknown_command">Comando desconocido</string>
     <string name="chat_cmd_execution_error">Error de ejecución</string>
-    <string name="chat_cmd_media_feedback">Comentarios sobre fotos</string>
-    <string name="chat_cmd_more_like_this">Más como esto</string>
-    <string name="chat_cmd_exclude_constraint">Excluir restricción</string>
     <string name="chat_cmd_execute_script">Ejecutar script</string>
     <string name="chat_cmd_draw_chart">Dibujar gráfico</string>
     <string name="chat_cmd_render_html">Renderizar tarjeta HTML</string>
@@ -1769,8 +1747,6 @@
     <string name="chat_cmd_detail_plan">Plan: %1$s</string>
     <string name="chat_cmd_detail_delay">Retraso: %1$dms</string>
     <string name="chat_claude_continue">Continuar</string>
-    <string name="chat_more_like_this">Más como esto</string>
-    <string name="chat_more_like_this_with_tags">Más como esto: %1$s</string>
     <string name="task_center_tab_engineer">Ingeniero</string>
     <string name="task_center_tab_background">En segundo plano</string>
     <string name="task_center_empty_user_tasks">Sin tareas en segundo plano</string>

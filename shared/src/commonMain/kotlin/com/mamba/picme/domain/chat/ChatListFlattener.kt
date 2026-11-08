@@ -204,7 +204,6 @@ private fun contentTypeOf(message: ChatMessage, part: MessagePart): String = whe
     is MessagePart.Chart -> cardContentType(part.state, ChatListItem.TYPE_CHART)
     is MessagePart.HtmlCard -> cardContentType(part.state, ChatListItem.TYPE_HTML_CARD)
     is MessagePart.TaskCard -> ChatListItem.TYPE_TASK_CARD
-    is MessagePart.MediaResults -> ChatListItem.TYPE_MEDIA_RESULTS
     is MessagePart.OptimizeCandidates -> ChatListItem.TYPE_OPTIMIZE_CANDIDATES
     is MessagePart.OpenUiCard -> ChatListItem.TYPE_OPENUI_CARD
     // Image/EditResult 按消息类型已整消息路由，到不了这里；防御性落 legacy 整消息
@@ -252,7 +251,6 @@ data class ChatListItem(
         const val TYPE_CHART = "chart"
         const val TYPE_HTML_CARD = "html_card"
         const val TYPE_TASK_CARD = "task_card"
-        const val TYPE_MEDIA_RESULTS = "media_results"
         const val TYPE_OPTIMIZE_CANDIDATES = "optimize_candidates"
 
         /** 浏览器直播卡（tool_browser，全状态自渲染：占位/运行/定格/错误一卡到底）。 */

@@ -4,12 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.BuildConfig
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
-import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.domain.chat.AgentStepUi
-import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -35,19 +33,17 @@ class CloudAgentChatViewModel(
     private val api: CloudAgentApi,
     private val deviceToolExecutor: DeviceToolExecutor,
     private val settingsRepository: UserSettingsRepository,
-    private val cloudAgentGalleryTools: CloudAgentGalleryTools,
     /** 409 round_in_flight 上屏提示文案（生产注入走资源文件，VM 不持 Context 保持纯 JVM 可测）。 */
     private val roundInFlightHint: () -> String = { "Previous round still running, please wait" },
     /** 步骤时间线文案解析（resId → 本地化文案；必填——生产注入 context.getString，测试注入桩，省略即编译错误以防英文兜底漂移）。 */
     private val stepLabel: (Int) -> String,
 ) : ViewModel() {
 
-    /** 媒体卡消息经 [media] 携带、H5 卡经 [htmlCard] 携带、OpenUI 预览卡经 [openUiCard] 携带；其余 role 恒为 null。 */
+    /** H5 卡经 [htmlCard] 携带、OpenUI 预览卡经 [openUiCard] 携带；其余 role 恒为 null。 */
     data class UiMessage(
         val id: Long,
         val role: Role,
         val text: String,
-        val media: MediaResultsUi? = null,
         val htmlCard: HtmlCardUi? = null,
         val openUiCard: OpenUiCardUi? = null,
     )
@@ -58,7 +54,7 @@ class CloudAgentChatViewModel(
     /** OpenUI 调试预览卡（扫码/会话加载/画廊注入；label = 来源标注，如会话短 id·model 或组件名）。 */
     data class OpenUiCardUi(val program: String, val label: String)
 
-    enum class Role { USER, ASSISTANT, TOOL, ERROR, MEDIA, HTML_CARD, OPENUI_CARD }
+    enum class Role { USER, ASSISTANT, TOOL, ERROR, HTML_CARD, OPENUI_CARD }
 
     sealed interface UiState {
         data object Preparing : UiState
@@ -160,23 +156,6 @@ class CloudAgentChatViewModel(
             // 回合开始清空步骤时间线（上回合残留不跨回合）
             stepTimeline.clear()
             _steps.value = emptyList()
-            // 图集卡透出：工具命中时把资产列表插为媒体卡消息（数据不出设备，回传服务器仍是
-            // 纯文本计数）；回合结束 finally 摘除，避免跨回合残留（stop() 取消路径也走 finally）。
-            cloudAgentGalleryTools.mediaResultsListener = { query, assets, totalCount, isRefinement ->
-                append(
-                    UiMessage(
-                        msgSeq.incrementAndGet(),
-                        Role.MEDIA,
-                        text = query,
-                        media = MediaResultsUi(
-                            query = query,
-                            assets = assets.take(MAX_MEDIA_CARDS),
-                            totalCount = totalCount,
-                            isRefinement = isRefinement,
-                        ),
-                    )
-                )
-            }
             try {
                 val result = turnRunner.runTurn(
                     appToken,
@@ -247,7 +226,6 @@ class CloudAgentChatViewModel(
                 append(UiMessage(msgSeq.incrementAndGet(), Role.ERROR, msg))
                 setInFlight(false)
             } finally {
-                cloudAgentGalleryTools.mediaResultsListener = null
                 // 回合结束（含 stop() 取消穿透路径）瞬态步骤清空
                 stepTimeline.clear()
                 _steps.value = emptyList()
@@ -318,8 +296,5 @@ class CloudAgentChatViewModel(
         }
     }
 }
-
-/** 媒体卡横滑展示上限（与主聊天页 ChatViewModel.MAX_CARDS 同约定）。 */
-private const val MAX_MEDIA_CARDS = 20
 
 private const val TAG = "PoLang:CloudAgent"

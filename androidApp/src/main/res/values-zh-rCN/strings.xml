@@ -851,7 +851,6 @@
     <string name="gallery_search_hint">按内容、地点、文字搜索…</string>
     <string name="gallery_search_no_results">未找到相关照片</string>
     <!-- 意图路由直执回合的气泡（找到结果时；卡片已经 uiActions 渲染） -->
-    <string name="chat_direct_results_shown">已在上方卡片展示搜索结果</string>
     <string name="gallery_tag_category_scene">场景</string>
     <string name="gallery_tag_category_animal">动物</string>
     <string name="gallery_tag_category_food">食物</string>
@@ -872,16 +871,6 @@
     <string name="delete_chat">删除聊天</string>
     <string name="delete_chat_title">删除聊天</string>
     <string name="delete_chat_confirm">删除「%1$s」？此操作不可撤销。</string>
-    <string name="feedback_like">喜欢</string>
-    <string name="feedback_dislike">不喜欢</string>
-    <string name="feedback_more_like_this">更多类似</string>
-    <string name="feedback_confirmed_like">已标记为喜欢</string>
-    <string name="feedback_confirmed_dislike">已标记为不喜欢</string>
-    <string name="feedback_excluded">已排除「%1$s」</string>
-    <string name="feedback_resolve_failure">没找准你想反馈的照片</string>
-    <string name="feedback_resolve_failure_ordinal">找不到第 %1$d 张</string>
-    <string name="feedback_resolve_failure_description">找不到符合「%1$s」的照片</string>
-    <string name="feedback_no_more_results">没有找到更多类似的照片</string>
     <string name="chat_edit_result_default">✅ 已为你编辑这张照片</string>
     <string name="chat_edit_save_to_gallery">保存到相册</string>
     <string name="chat_edit_saved_to_gallery">✓ 已保存到相册</string>
@@ -1264,8 +1253,6 @@
     <string name="a11y_release_face">释放人脸检测</string>
     <string name="a11y_filter">滤镜</string>
     <string name="a11y_switch_camera">切换镜头</string>
-    <string name="a11y_photo_desc">照片</string>
-    <string name="a11y_video_desc">视频</string>
 
     <!-- 人物信息编辑（命名 + 关系声明） -->
     <string name="person_relation_label">TA 是我的…</string>
@@ -1648,7 +1635,6 @@
     <string name="chat_result_ai_optimize_done">✅ 已执行 AI 一键优化</string>
     <string name="chat_result_tag_scan_done">✅ 已执行 TAG 扫描控制</string>
     <string name="chat_result_batch_executed">✅ 已执行批量操作</string>
-    <string name="chat_result_feedback_recorded">✅ 已记录反馈</string>
     <string name="chat_result_executed">✅ 已执行 %1$s</string>
     <string name="chat_chart_generated">已生成图表</string>
     <string name="chat_html_card_generated">已生成卡片</string>
@@ -1722,11 +1708,6 @@
     <string name="chat_claude_tool_uploaded_truncated">已回传（%1$dB，已截断）</string>
     <string name="chat_claude_tool_collect_failed">采集失败：%1$s</string>
     <string name="chat_thread_feishu">飞书远程控制</string>
-    <string name="chat_results_photo_deleted">结果中的照片已被删除</string>
-    <string name="chat_results_refined">细化：%1$s（%2$d 张）</string>
-    <string name="chat_results_found">找到 %2$d 张「%1$s」的照片</string>
-    <string name="chat_results_empty_hint">未找到「%1$s」的照片，换个词试试</string>
-    <string name="chat_results_view_all">查看全部</string>
     <string name="chat_chart_rendering">图表渲染中…</string>
     <string name="chat_adjust_brightness">亮度%1$s%2$d</string>
     <string name="chat_adjust_contrast">对比度%1$d</string>
@@ -1774,9 +1755,6 @@
     <string name="chat_cmd_open_system_settings">打开设置</string>
     <string name="chat_cmd_unknown_command">未知命令</string>
     <string name="chat_cmd_execution_error">执行错误</string>
-    <string name="chat_cmd_media_feedback">媒体反馈</string>
-    <string name="chat_cmd_more_like_this">更多相似</string>
-    <string name="chat_cmd_exclude_constraint">排除约束</string>
     <string name="chat_cmd_execute_script">执行脚本</string>
     <string name="chat_cmd_draw_chart">画图表</string>
     <string name="chat_cmd_render_html">渲染 HTML 卡片</string>
@@ -1809,8 +1787,6 @@
     <string name="chat_cmd_detail_plan">计划: %1$s</string>
     <string name="chat_cmd_detail_delay">延迟: %1$dms</string>
     <string name="chat_claude_continue">继续</string>
-    <string name="chat_more_like_this">更多类似这张照片的</string>
-    <string name="chat_more_like_this_with_tags">和这张照片类似的：%1$s</string>
     <string name="task_center_tab_engineer">工程师任务</string>
     <string name="task_center_tab_background">后台任务</string>
     <string name="task_center_empty_user_tasks">暂无后台任务</string>

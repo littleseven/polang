@@ -63,10 +63,17 @@ fun ChatMessageEntity.taskCardStateOrNull(): EngineerTaskState? =
 
 /**
  * 实体 → LLM 回灌项序列（spec §6：UIMessage→ModelMessage 显式转换）。
- * data part 不进上下文（转换规则见 commonMain `toModelInput`）。
+ * 角色取自 Room v26 `role` 列，经 commonMain 单点 [roleOf] 派生（精确匹配 "user" → USER，
+ * 其余 ASSISTANT）；data part 不进上下文（转换规则见 commonMain `toModelInput`）。
+ * 退役横滑卡行（[LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]，2026-11-08 横滑卡
+ * 整体下线）不回灌：历史负载是资产 JSON 数组，进上下文只有 token 噪音。
  */
 fun ChatMessageEntity.toModelInputItems(): List<ModelInputItem> =
-    decodeParts().toModelInput(roleOf(role), id)
+    if (type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES) {
+        emptyList()
+    } else {
+        decodeParts().toModelInput(roleOf(role), id)
+    }
 
 /** 插入单条消息（统一入口；实体须经 [chatMessageEntity]/[withUpdatedParts] 产出）。 */
 suspend fun ChatMessageDao.insertPartsMessage(message: ChatMessageEntity) =

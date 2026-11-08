@@ -21,10 +21,7 @@ class MemorySummaryTest {
     fun `media commands return null to fall back to raw JSON`() {
         assertNull(summarizeCommandsForMemory(listOf(AgentCommand.SearchMedia(query = "海边"))))
         assertNull(summarizeCommandsForMemory(listOf(AgentCommand.RefineMediaSearch(constraint = "日落"))))
-        assertNull(summarizeCommandsForMemory(listOf(AgentCommand.ExcludeConstraint(constraint = "夜景"))))
-        assertNull(
-            summarizeCommandsForMemory(listOf(AgentCommand.MoreLikeThis(target = FeedbackTarget.LastShown)))
-        )
+        assertNull(summarizeCommandsForMemory(listOf(AgentCommand.GetGallerySummary(includeDetails = false))))
     }
 
     @Test

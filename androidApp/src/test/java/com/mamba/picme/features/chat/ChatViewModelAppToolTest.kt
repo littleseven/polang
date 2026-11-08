@@ -49,7 +49,6 @@ class ChatViewModelAppToolTest : ChatViewModelTestBase() {
             chatSessionDao = chatSessionDao,
             userSettingsRepository = userSettingsRepository,
             mediaSearchEngine = mediaSearchEngine,
-            mediaFeedbackRepository = mediaFeedbackRepository,
             mediaRepository = mockk(relaxed = true),
             picMeAuthClient = picMeAuthClient,
             claudeChatClient = claudeChatClient,

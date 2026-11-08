@@ -79,7 +79,7 @@ class ChatAgentBridge(
         persona: String,
         replyLanguage: String,
         onStreamEvent: (ChatStreamEvent) -> Unit,
-        onComplete: (summary: String, errorMessage: String?, directReply: DirectRouteReply?) -> Unit
+        onComplete: (summary: String, errorMessage: String?) -> Unit
     ) {
         val personaEnum = runCatching { AssistantPersona.valueOf(persona) }
             .getOrDefault(AssistantPersona.DEFAULT)
@@ -115,19 +115,18 @@ class ChatAgentBridge(
                 )
                 result.fold(
                     onSuccess = { streamResult ->
-                        // directReply 非空 = 意图路由直执回合：summary 为空，Swift 据此渲染本地化气泡
-                        onComplete(streamResult.fullResponse, null, streamResult.directReply)
+                        onComplete(streamResult.fullResponse, null)
                     },
                     onFailure = { e ->
                         Logger.e(tag, "sendMessage failed", e)
-                        onComplete("", e.message ?: "未知错误", null)
+                        onComplete("", e.message ?: "未知错误")
                     }
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 Logger.e(tag, "sendMessage exception", e)
-                onComplete("", e.message ?: "未知错误", null)
+                onComplete("", e.message ?: "未知错误")
             }
         }
     }

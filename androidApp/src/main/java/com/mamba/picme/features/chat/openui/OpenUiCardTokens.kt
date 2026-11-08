@@ -81,7 +81,7 @@ object OpenUiCardTokens {
 
     val imageCornerRadius: Dp = 12.dp
 
-    /** HORIZONTAL List 内 Image 条目宽（无界宽上下文兜底尺寸，MediaResultsCarousel 横滑条目先例）。 */
+    /** HORIZONTAL List 内 Image 条目宽（无界宽上下文兜底尺寸）。 */
     val horizontalImageWidth: Dp = 200.dp
 
     // ── 图表细节（设计规范 §3：柱端圆角/柱道/环形饼图） ──

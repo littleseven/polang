@@ -1,6 +1,6 @@
 ---
 name: photo-browse
-description: 把「看看照片」类浏览诉求组织成分组网格浏览卡的完整流程——search_media 取数（display='false'）→ CardHeader 分组头 + PhotoGrid 方形照片网格出卡 → refine_media_search 收窄换卡。当用户说「看看 / 给我看看 / 最近拍了什么 / 找些…的照片 / 翻翻…」等浏览语义时，先加载本技能。
+description: 把「看看照片」类浏览诉求组织成分组网格浏览卡的完整流程——search_media 取数 → CardHeader 分组头 + PhotoGrid 方形照片网格出卡 → refine_media_search 收窄换卡。当用户说「看看 / 给我看看 / 最近拍了什么 / 找些…的照片 / 翻翻…」等浏览语义时，先加载本技能。
 ---
 
 # 照片浏览（分组网格浏览卡）
@@ -8,11 +8,12 @@ description: 把「看看照片」类浏览诉求组织成分组网格浏览卡�
 ## 何时用 / 不用
 
 - **用**：浏览语义——「看看」「给我看看」「最近拍了什么」「找些…的照片」「翻翻海边的」。
-  一律走本流程：search_media `display = 'false'` 取数，自己出 OpenUI 浏览卡
-  （分组头 + 照片网格 + 统计，比横滑轮播信息密度高、可继续交互）。
+  一律走本流程：search_media 取数，自己出 OpenUI 浏览卡
+  （分组头 + 照片网格 + 统计，信息密度高、可继续交互）。
 - **不用**：
-  - 精确找某一张 / 快速核对存在性（「有没有那张…」）→ search_media `display = 'true'`
-    让端上直接透出横滑图集卡，本技能不需要；
+  - 精确找某一张 / 快速核对存在性（「有没有那张…」）→ 同样 search_media 取数；
+    N ≤ 3 时可精简出卡（单组 PhotoGrid，CardHeader 可省 actionLabel/action），
+    或纯 Markdown 报数，不必套完整骨架；
   - 做成可翻页精选相册（「做成相册 / 精选集 / 纪念册」）→ 改用 album-maker 技能；
   - 纯统计 / 盘点（「今年拍了多少」）→ 取数后出图表/统计卡，不出浏览卡。
 
@@ -20,13 +21,13 @@ description: 把「看看照片」类浏览诉求组织成分组网格浏览卡�
 
 ### 1. 取数
 
-- 调 `search_media`，**display 恒传 'false'**：
+- 调 `search_media`（工具只回「找到 N 张」+ 尾部 handle，展示一律自己出卡）：
   - query 含时间词（「上周」「去年夏天」「3 月」）**必须**换算 fromMs/toMs
     （拿不准当前日期先调 `server_time`）；
   - 人物精确查询用 person 参数（如「大宝」「儿子」），不要只拼进 query；
   - 只要人像/自拍/合照类传 hasFace = "true"；
   - 用户提到视频/录像/vlog 时 mediaType 传 "video"（或 "all"）。
-- 工具只回「找到 N 张」+ 尾部 handle。N = 0 → 不出卡，用 Markdown 告知并建议放宽条件；
+- N = 0 → 不出卡，用 Markdown 告知并建议放宽条件；
   N 过大可用 `refine_media_search` 收窄（收窄后 handle 会换新，用最新的）。
 - **你看不到照片内容**（隐私设计：出端只有计数 + 句柄 + 每张的拍摄日期）。
   「相关度最高的一组」= 信任搜索相关度序，不做视觉挑选。
@@ -69,7 +70,7 @@ fallbackSummary = "37 张海边照片，数据在原设备"
 
 ## 发卡前自检清单
 
-- [ ] search_media 的 display 传了 'false'，没有依赖横滑图集卡做浏览
+- [ ] 照片展示全部走本技能的浏览卡（原生横滑图集卡已退役，没有可透出的系统卡）
 - [ ] PhotoGrid 的 photos 数组 ≤12 项（多分组时全卡合计 ≤12），全部 `photos[i].id` 投影，无字面量数字 id
 - [ ] N < 12 时数组长度 = N，没有越界下标
 - [ ] CardHeader 有 actionLabel 就配了 action（@ToAssistant，文案带分组语境）

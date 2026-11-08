@@ -1,7 +1,5 @@
 package com.mamba.picme.domain.chat
 
-import com.mamba.picme.agent.core.model.command.FeedbackAction
-import com.mamba.picme.agent.core.model.context.MediaAsset
 import kotlinx.serialization.Serializable
 
 /**
@@ -32,7 +30,6 @@ data class ChatMessage(
     val modelUsed: String? = null,
     val timestamp: Long = nowEpochMillis(),
     val performance: LlmPerformance? = null,
-    val mediaResults: MediaResultsUi? = null,
     /** 图文混排（USER_IMAGE_TEXT）时携带的图片 uri；其余类型为 null。 */
     val imageUri: String? = null,
     /** CHART 类型：端侧生成的 SVG 字符串。 */
@@ -69,19 +66,6 @@ data class ChatMessage(
      * M4 切渲染源时全量恢复。直接构造的瞬态消息默认空表。
      */
     val parts: List<MessagePart> = emptyList(),
-)
-
-/**
- * 相册搜索结果 carousel 的 UI 数据。
- * assets 已截到展示上限；totalCount 为全量命中数。
- */
-@Serializable
-data class MediaResultsUi(
-    val query: String,
-    val assets: List<MediaAsset>,
-    val totalCount: Int,
-    val isRefinement: Boolean,
-    val feedbackState: Map<String, FeedbackAction> = emptyMap()
 )
 
 /** HTML 卡展示形态终判（端侧；spec §4 分流判定结果，随消息 metadata 持久化）。 */

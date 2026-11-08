@@ -498,19 +498,6 @@ enum ChatBubbleTokens {
     static let messageGap: CGFloat = 14
 }
 
-// MARK: - Chat Carousel（媒体结果横滑卡）
-
-enum ChatCarouselTokens {
-    static let cardWidth: CGFloat = 120
-    static let cardHeight: CGFloat = 150
-    static let cardCornerRadius: CGFloat = 12
-    static let cardSpacing: CGFloat = 8
-    static let feedbackButtonSize: CGFloat = 24
-    static let feedbackIconColor = Color.white
-    static let feedbackBgColor = Color(hex: "FF0F2B1B")
-    static let viewAllCornerRadius: CGFloat = 12
-}
-
 // MARK: - Memory Page（回忆独立页分区大卡）
 
 enum MemoryPageTokens {

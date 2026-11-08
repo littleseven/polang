@@ -28,10 +28,20 @@ object MessagePartsProjection {
         is MessagePart.TaskCard -> "tool_task"
         is MessagePart.EditResult -> "tool_image_edit"
         is MessagePart.BrowserLive -> "tool_browser"
-        is MessagePart.MediaResults -> "data_media_results"
         is MessagePart.OptimizeCandidates -> "data_optimize_candidates"
         is MessagePart.OpenUiCard -> "data_ui_openui"
-        is MessagePart.Unsupported, null -> "text"
+        // 退役横滑卡（2026-11-08）：converter/codec 已不识 data_media_results，存量行
+        // parts 落 Unsupported 兜底——投影仍归一退役正型，回放路径按 type 整行跳过
+        // （RETIRED_MEDIA_RESULTS_TYPES 闭集）；若投影落 text 会把机器 JSON 渲染成可见气泡
+        is MessagePart.Unsupported ->
+            if ((parts.first() as MessagePart.Unsupported).originalType in
+                LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES
+            ) {
+                "data_media_results"
+            } else {
+                "text"
+            }
+        null -> "text"
     }
 
     /** UI content 字段投影：Text parts 的 markdown 按 "\n\n" 拼接；无 Text part 为空串。 */

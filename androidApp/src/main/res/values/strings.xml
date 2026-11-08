@@ -706,16 +706,6 @@
     <string name="delete_chat">Delete chat</string>
     <string name="delete_chat_title">Delete Chat</string>
     <string name="delete_chat_confirm">Delete "%1$s"? This cannot be undone.</string>
-    <string name="feedback_like">Like</string>
-    <string name="feedback_dislike">Dislike</string>
-    <string name="feedback_more_like_this">More like this</string>
-    <string name="feedback_confirmed_like">Liked</string>
-    <string name="feedback_confirmed_dislike">Disliked</string>
-    <string name="feedback_excluded">Excluded "%1$s"</string>
-    <string name="feedback_resolve_failure">Couldn\'t find the photo you meant</string>
-    <string name="feedback_resolve_failure_ordinal">Couldn\'t find photo #%1$d</string>
-    <string name="feedback_resolve_failure_description">Couldn\'t find a photo matching "%1$s"</string>
-    <string name="feedback_no_more_results">No more similar photos found</string>
     <string name="chat_edit_result_default">✅ Edited this photo for you</string>
     <string name="chat_edit_save_to_gallery">Save to gallery</string>
     <string name="chat_edit_saved_to_gallery">✓ Saved to gallery</string>
@@ -899,7 +889,6 @@
     <string name="gallery_search_hint">Search by content, location, text…</string>
     <string name="gallery_search_no_results">No photos found</string>
     <!-- 意图路由直执回合的气泡（找到结果时；卡片已经 uiActions 渲染） -->
-    <string name="chat_direct_results_shown">Search results are shown in the card above</string>
     <string name="gallery_tag_category_scene">Scene</string>
     <string name="gallery_tag_category_animal">Animal</string>
     <string name="gallery_tag_category_food">Food</string>
@@ -1273,8 +1262,6 @@
     <string name="a11y_release_face">Release face detection</string>
     <string name="a11y_filter">Filter</string>
     <string name="a11y_switch_camera">Switch camera</string>
-    <string name="a11y_photo_desc">Photo</string>
-    <string name="a11y_video_desc">Video</string>
 
     <!-- 人物信息编辑（命名 + 关系声明） -->
     <string name="person_relation_label">This person is my…</string>
@@ -1657,7 +1644,6 @@
     <string name="chat_result_ai_optimize_done">✅ AI optimization applied</string>
     <string name="chat_result_tag_scan_done">✅ TAG scan executed</string>
     <string name="chat_result_batch_executed">✅ Batch operation executed</string>
-    <string name="chat_result_feedback_recorded">✅ Feedback recorded</string>
     <string name="chat_result_executed">✅ Executed %1$s</string>
     <string name="chat_chart_generated">Chart generated</string>
     <string name="chat_html_card_generated">Card rendered</string>
@@ -1731,11 +1717,6 @@
     <string name="chat_claude_tool_uploaded_truncated">Uploaded (%1$d B, truncated)</string>
     <string name="chat_claude_tool_collect_failed">Collection failed: %1$s</string>
     <string name="chat_thread_feishu">Feishu Remote Control</string>
-    <string name="chat_results_photo_deleted">Photos in the results have been deleted</string>
-    <string name="chat_results_refined">Refined: %1$s (%2$d photos)</string>
-    <string name="chat_results_found">Found %2$d photos matching \"%1$s\"</string>
-    <string name="chat_results_empty_hint">No photos found for \"%1$s\", try another keyword</string>
-    <string name="chat_results_view_all">View all</string>
     <string name="chat_chart_rendering">Rendering chart…</string>
     <string name="chat_adjust_brightness">Brightness %1$s%2$d</string>
     <string name="chat_adjust_contrast">Contrast %1$d</string>
@@ -1783,9 +1764,6 @@
     <string name="chat_cmd_open_system_settings">Open settings</string>
     <string name="chat_cmd_unknown_command">Unknown command</string>
     <string name="chat_cmd_execution_error">Execution error</string>
-    <string name="chat_cmd_media_feedback">Media feedback</string>
-    <string name="chat_cmd_more_like_this">More like this</string>
-    <string name="chat_cmd_exclude_constraint">Exclude constraint</string>
     <string name="chat_cmd_execute_script">Run script</string>
     <string name="chat_cmd_draw_chart">Draw chart</string>
     <string name="chat_cmd_render_html">Render HTML card</string>
@@ -1818,8 +1796,6 @@
     <string name="chat_cmd_detail_plan">Plan: %1$s</string>
     <string name="chat_cmd_detail_delay">Delay: %1$dms</string>
     <string name="chat_claude_continue">Continue</string>
-    <string name="chat_more_like_this">More like this</string>
-    <string name="chat_more_like_this_with_tags">More like this: %1$s</string>
     <string name="task_center_tab_engineer">Engineer</string>
     <string name="task_center_tab_background">Background</string>
     <string name="task_center_empty_user_tasks">No background tasks</string>

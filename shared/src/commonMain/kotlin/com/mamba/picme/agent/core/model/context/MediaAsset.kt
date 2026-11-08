@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 /**
  * 媒体资源基础模型
  *
- * `@Serializable`：供 chat parts 模型（`MessagePart.MediaResults`，ADR-016 M1）经
- * kotlinx JSON 落入 Room partsJson 列；不改变任何既有读写路径。
+ * `@Serializable`：供搜索/投影链路（`local://scan/<id>` 句柄、OpenUI 卡数据绑定）经
+ * kotlinx JSON 传输；不改变任何既有读写路径。
  */
 @Serializable
 data class MediaAsset(

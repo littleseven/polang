@@ -9,21 +9,6 @@ import com.mamba.picme.beauty.api.FilterType
 import com.mamba.picme.beauty.api.StyleFilter
 
 /**
- * 反馈目标指代。
- *
- * @property Ordinal 按展示序号指代，如“第三张”
- * @property Description 按内容描述指代，如“海边的”
- * @property MediaId 精确媒体 ID
- * @property LastShown 最近展示的第一张，如“这张”
- */
-sealed interface FeedbackTarget {
-    data class Ordinal(val index: Int) : FeedbackTarget
-    data class Description(val text: String) : FeedbackTarget
-    data class MediaId(val id: String) : FeedbackTarget
-    data object LastShown : FeedbackTarget
-}
-
-/**
  * Agent 命令 V2 —— 精简 JSON 风格
  *
  * 每个命令携带唯一 commandId（32位自增整型），支持请求-响应关联。
@@ -201,39 +186,6 @@ sealed class AgentCommand {
         override val commandId: Int = AgentIdGenerator.nextId(),
         val constraint: String,
         val intent: SearchIntent? = null
-    ) : AgentCommand()
-
-    /**
-     * 记录用户对搜索结果的反馈（喜欢/不喜欢）。
-     *
-     * 由 LLM 在识别到自然语言反馈时发出，如“第三张不错”“不喜欢有人物的”。
-     */
-    data class RecordMediaFeedback(
-        override val commandId: Int = AgentIdGenerator.nextId(),
-        val target: FeedbackTarget,
-        val action: FeedbackAction,
-        val queryHint: String? = null
-    ) : AgentCommand()
-
-    /**
-     * 基于指定图片推荐更多相似照片。
-     *
-     * 由 LLM 在识别到“再来点这种”/“类似的”时发出。
-     */
-    data class MoreLikeThis(
-        override val commandId: Int = AgentIdGenerator.nextId(),
-        val target: FeedbackTarget,
-        val queryHint: String? = null
-    ) : AgentCommand()
-
-    /**
-     * 在后续搜索中排除某类约束。
-     *
-     * 由 LLM 在识别到“排除夜景”/“不要室内的”时发出。
-     */
-    data class ExcludeConstraint(
-        override val commandId: Int = AgentIdGenerator.nextId(),
-        val constraint: String
     ) : AgentCommand()
 
     /**
@@ -659,9 +611,6 @@ sealed class AgentCommand {
             is SelectMedia -> "select_media"
             is SearchMedia -> "search_media"
             is RefineMediaSearch -> "refine_media_search"
-            is RecordMediaFeedback -> "feedback"
-            is MoreLikeThis -> "more"
-            is ExcludeConstraint -> "exclude"
             is SwitchViewMode -> "switch_view_mode"
             is FavoriteMedia -> "favorite_media"
             is ChangeTheme -> "change_theme"

@@ -240,6 +240,43 @@ class IosChatHistoryStoreCodecTest {
         assertNull(ChatHistoryStoreCodec.decode("{\"partial\":"))
     }
 
+    @Test
+    fun decodeSkipsRetiredMediaResultsRowsWithoutCollapsingFile() {
+        // 终审回归（2026-11-08）：旧版 app 写出的文件里，横滑卡行 parts 含已删除的
+        // data_media_results 鉴别值——整包强类型解码会抛异常塌成 null（Swift 兜底误配
+        // legacy → 空历史 → persist 覆写丢数据）。两段式 decode 必须先按 type 滤行。
+        val json = """
+            [
+              {"id":"a","type":"text","role":"user","content":"找猫的照片","timestamp":1,
+               "parts":[{"type":"text","partId":"p0","markdown":"找猫的照片","state":"DONE"}]},
+              {"id":"b","type":"data_media_results","role":"agent","content":"找到 3 张","timestamp":2,
+               "parts":[{"type":"data_media_results","partId":"p0","mediaIds":[1,2,3],"total":3}]},
+              {"id":"c","type":"text","role":"agent","content":"找到 3 张「猫」的照片","timestamp":3,
+               "parts":[{"type":"text","partId":"p0","markdown":"找到 3 张「猫」的照片","state":"DONE"}]}
+            ]
+        """.trimIndent()
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json), "退役行不得塌掉整包解码")
+        assertEquals(listOf("a", "c"), decoded.map { it.id }, "退役行整行跳过、正常行保留")
+        assertEquals(ChatMessageType.USER_TEXT, decoded[0].type)
+        assertEquals(ChatMessageType.AGENT_TEXT, decoded[1].type)
+    }
+
+    @Test
+    fun decodeRowLevelFallbackOnPartiallyCorruptedRow() {
+        // 行级容错：单行字段损坏只影响该行（content 打捞为 text），其余行不丢
+        val json = """
+            [
+              {"id":"a","type":"text","role":"agent","content":"正常行","timestamp":1},
+              {"id":"b","type":"tool_task","role":"agent","content":"任务卡缺 engineerTask","timestamp":2},
+              {"id":"c","type":"text","role":"user","content":"尾行","timestamp":3}
+            ]
+        """.trimIndent()
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
+        assertEquals(listOf("a", "b", "c"), decoded.map { it.id })
+        assertEquals(ChatMessageType.AGENT_TEXT, decoded[1].type, "损坏行降级纯文本")
+        assertEquals("任务卡缺 engineerTask", decoded[1].content)
+    }
+
     private fun testGachaGroup(): OptimizeCandidateGroup = OptimizeCandidateGroup(
         sourceImageUri = "file:///src.jpg",
         scene = "portrait",

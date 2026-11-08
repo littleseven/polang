@@ -1,31 +1,14 @@
 package com.mamba.picme.domain.search
 
-import com.mamba.picme.agent.core.model.command.FeedbackAction
 import com.mamba.picme.data.repository.MediaFeedbackRepository
 
+/**
+ * 媒体反馈读路径（横滑卡退役后写路径随卡片反馈按钮一并删除）：
+ * 存量 like/dislike 分数继续参与 [MediaSearchEngine] 排序加权。
+ */
 class MediaFeedbackUseCase(
     private val repository: MediaFeedbackRepository
 ) {
-    suspend fun record(
-        mediaId: String,
-        queryText: String,
-        sessionId: String,
-        action: FeedbackAction
-    ) {
-        repository.recordFeedback(mediaId, queryText, sessionId, action)
-    }
-
-    /**
-     * 记录用户主动排除的约束（如“不要夜景”）。
-     *
-     * 当前版本为内存/空实现，不写入数据库，避免 DB migration；
-     * 排除状态由 [ChatViewModel] 在会话内维护。
-     */
-    @Suppress("UNUSED_PARAMETER")
-    suspend fun recordExclude(constraint: String, sessionId: String) {
-        // 空实现占位；后续如需持久化再接入 repository。
-    }
-
     suspend fun getScoresForQuery(queryText: String): Map<String, FeedbackScore> {
         return repository.getFeedbackScores(queryText).associateBy { it.mediaId }
     }

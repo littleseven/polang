@@ -7,8 +7,8 @@ import com.mamba.picme.domain.chat.EngineerTaskState
 import com.mamba.picme.domain.chat.EngineerTaskStatus
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
 import com.mamba.picme.domain.chat.HtmlCardMeta
+import com.mamba.picme.domain.chat.LegacyChatTypeMigration
 import com.mamba.picme.domain.chat.LlmPerformance
-import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.MessagePartsProjection
 import com.mamba.picme.domain.chat.ModelInputRole
@@ -72,10 +72,7 @@ import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import com.mamba.picme.domain.tag.ImageDescriptionStrategyResolver
 import com.mamba.picme.domain.tag.TaggerModelSelector
-import com.mamba.picme.agent.core.model.command.FeedbackAction
-import com.mamba.picme.agent.core.model.command.FeedbackTarget
 import com.mamba.picme.domain.model.AppLanguage
-import com.mamba.picme.domain.search.MediaFeedbackUseCase
 import com.mamba.picme.domain.usecase.StartTagScanResult
 import com.mamba.picme.service.tag.TagGenerationService
 import android.util.Log
@@ -158,7 +155,6 @@ private val BROWSER_CARD_TOOL_NAMES = setOf(
 )
 private const val GUEST_REGISTER_NUDGE_THRESHOLD = 20
 private const val MAX_PREVIEW_LENGTH = 60
-private const val MAX_CARDS = 20
 private const val CHAT_IMAGE_MAX_PX = 1024
 
 /** cause chain 上是否存在工具循环熔断/迭代硬顶异常——Koog 英文原文不上屏的判定依据（映射到本地化文案）。 */
@@ -271,7 +267,6 @@ class ChatViewModel(
     private val chatSessionDao = dependencies.chatSessionDao
     private val userSettingsRepository = dependencies.userSettingsRepository
     private val mediaSearchEngine = dependencies.mediaSearchEngine
-    private val mediaFeedbackRepository = dependencies.mediaFeedbackRepository
     private val getGallerySummaryUseCase = dependencies.getGallerySummaryUseCase
     private val queryGalleryMediaUseCase = dependencies.queryGalleryMediaUseCase
     private val personDao = dependencies.personDao
@@ -289,13 +284,11 @@ class ChatViewModel(
     private val browserWebSocketClient = dependencies.browserWebSocketClient
     private val cloudAgentApi = dependencies.cloudAgentApi
     private val deviceToolExecutor = dependencies.deviceToolExecutor
-    private val cloudAgentGalleryTools = dependencies.cloudAgentGalleryTools
 
     /** 已建立 WS 推流连接的浏览器会话集合（无 WS 客户端时恒空集，UI 侧按未连接降级展示）。 */
     val browserStreamConnected: StateFlow<Set<String>> =
         browserWebSocketClient?.connectedSessions ?: MutableStateFlow(emptySet())
 
-    private val mediaFeedbackUseCase = MediaFeedbackUseCase(mediaFeedbackRepository)
     private val authClient = dependencies.picMeAuthClient
 
     /**
@@ -325,9 +318,6 @@ class ChatViewModel(
 
     /** JS eval 互斥锁（QuickJS 非线程安全，需串行化 eval）。 */
     private val jsEvalMutex = Mutex()
-
-    /** media_results 卡片读-改-写（查上一张 + upsert）互斥锁，防并发双查 null 产生重复行 */
-    private val mediaResultsMutex = Mutex()
 
     // ── capability.dispatch（JS → CapabilityRegistry 写通路）─────────────────
 
@@ -1090,21 +1080,8 @@ class ChatViewModel(
     /** session -> 上一轮搜索全量命中（供 in-set 细化）。 */
     private val lastResultAssets = mutableMapOf<String, List<MediaAsset>>()
 
-    /**
-     * session -> 脚本路径（run_gallery_script return 含 ids）产出的媒体 id 集合与总数，
-     * 待回合收尾护栏消费（spec §3.5-a/c）：水合成 MediaAsset 后收口 refine 基数
-     *（写 [lastResultAssets]），且本回合未出横滑卡片时端侧补卡。
-     */
-    private val pendingScriptMediaIds = mutableMapOf<String, Pair<List<Long>, Int>>()
-
     /** session -> 最近搜索快照（多轮对话指代用）。 */
     private val sessionSearchSnapshots = mutableMapOf<String, MutableList<SearchResultSnapshot>>()
-
-    /** session -> 当前生效的排除约束（内存实现，跟随当前搜索结果）。 */
-    private val sessionExcludes = mutableMapOf<String, MutableSet<String>>()
-
-    /** 防止用户快速重复点击同一反馈按钮。 */
-    private val pendingFeedbackActions = mutableSetOf<String>()
 
     /** 当前会话最近一条用户图片消息的持久化 URI，供 ai_optimize 指代「这张照片】。 */
     private val _lastUserImageUri = MutableStateFlow<String?>(null)
@@ -1452,28 +1429,11 @@ class ChatViewModel(
     init {
         // 冷启对账：修复缺失/孤儿文件、prune 终态行、重新约束 LRU 容量
         viewModelScope.launch { runCatching { chatImageStore.reconcileColdStart() } }
-        // chat ReAct tool 双通道：collect ChatToolService.uiActions → 渲染搜索卡片/编辑跳转
+        // chat ReAct tool 双通道：collect ChatToolService.uiActions → AiOptimize/EditImage
+        // 结果图进聊天（横滑卡透出已随 2026-11-08 退役删除）
         viewModelScope.launch {
             ChatToolService.getInstance().uiActions.collect { action ->
                 when (action) {
-                    is AgentAction.MediaResults -> {
-                        val sid = _currentSessionId.value
-                        val assets = lastResultAssets[sid].orEmpty()
-                            .filter { it.id in action.mediaIds }
-                            .take(MAX_CARDS)
-                        if (assets.isNotEmpty()) {
-                            // 同一用户回合多轮搜索由 insertMediaResultsMessage 内部 upsert 去重，仅保留最新卡片
-                            insertMediaResultsMessage(
-                                sid,
-                                MediaResultsUi(
-                                    query = action.query,
-                                    assets = assets,
-                                    totalCount = action.totalCount,
-                                    isRefinement = action.isRefinement
-                                )
-                            )
-                        }
-                    }
                     is AgentAction.Success -> {
                         when (action.command) {
                             is AgentCommand.AiOptimize -> {
@@ -1575,6 +1535,11 @@ class ChatViewModel(
                         chatMessageDao.getMessagesBySession(sessionId)
                     }
                     .collect { entities ->
+                        // 横滑卡退役（2026-11-08）：存量 media_results/data_media_results 行整行跳过，
+                        // 不回放不迁移（闭集见 LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES）。
+                        val liveEntities = entities.filterNot { e ->
+                            e.type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES
+                        }
                         // M4 review 🟡2：M4 起 toUiModel 每条必经 decodeParts（kotlinx
                         // decode），Room invalidation（任务卡 SSE 高频/测高回写/图卡落库）会触发
                         // 全列表（上限 500）重 decode——挪出主线程防掉帧。仅纯 decode 段下移；
@@ -1582,7 +1547,7 @@ class ChatViewModel(
                         // gacha controller）仍在主线程读写，防数据竞争。
                         // 调度器经 dependencies 显式注入（单测传测试调度器保 runTest 确定性）
                         val decoded = withContext(messageDecodeDispatcher) {
-                            entities.map { e -> e.toUiModel() }
+                            liveEntities.map { e -> e.toUiModel() }
                         }
                         val uiMessages = decoded.map { ui ->
                             val deliver = claudeDeliverOverrides[ui.id]
@@ -1726,11 +1691,9 @@ class ChatViewModel(
                 // 分层记忆 M4 删除传播：Room 长期轨已删，短期轨（Koog 记忆）同步清除，防已删会话记忆泄漏
                 runCatching { orchestrator.clearChatMemory(sessionId) }
                     .onFailure { error -> Logger.w(TAG, "Failed to clear session memory: ${error.message}") }
-                // 会话级内存缓存同步清理，避免已删会话的搜索结果/快照/排除集残留
+                // 会话级内存缓存同步清理，避免已删会话的搜索结果/快照残留
                 lastResultAssets.remove(sessionId)
-                pendingScriptMediaIds.remove(sessionId)
                 sessionSearchSnapshots.remove(sessionId)
-                sessionExcludes.remove(sessionId)
                 // 云端会话终结传播（2026-11-07 会话卫生）：本地会话删除即通知服务端 close
                 finishCloudSession(sessionId)
                 // 选中态是纯 UI 内存态，会话删除后整体清理，回退到推荐卡高亮即可
@@ -1833,8 +1796,6 @@ class ChatViewModel(
         launchChatRound {
             val sessionId = _currentSessionId.value
             replyUsedSandbox = false
-            // 新回合开始：清掉上一回合可能残留的脚本待补卡 ids（防跨回合泄漏）
-            pendingScriptMediaIds.remove(sessionId)
             // 用户发新消息即放弃未确认的抽卡（落库 dismiss）
             discardPendingOptimizeGacha()
             try {
@@ -1958,6 +1919,8 @@ class ChatViewModel(
                     orchestrator.rebuildChatMemoryIfEmpty(sessionId) { sid ->
                         chatMessageDao.getRecentMessages(sid, MEMORY_REBUILD_MESSAGE_LIMIT)
                             .asReversed()
+                            // 退役横滑卡行不进模型记忆（content 是资产 JSON，墓碑文本会污染上下文）
+                            .filterNot { it.type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES }
                             .flatMap { entity -> entity.toModelInputItems() }
                     }
                 }.onFailure { error ->
@@ -2016,12 +1979,6 @@ class ChatViewModel(
                         // 清除流式占位
                         _streamingMessage.value = null
 
-                        // 回合终态护栏 a/c（spec §3.5，意图路由 M1）：脚本路径 return 含 ids
-                        // 而本回合未出横滑卡片 → 端侧水合 ids 直接补卡 + 收口 refine 搜索基数。
-                        // 须在误拒回退检测之前执行：补上的卡片让后续 getLatestMediaResultsSinceLastUserMessage
-                        // 判定一致（避免重复卡）。
-                        settleScriptMediaIds(sessionId, text)
-
                         // 性能数据统一在此计算并透传给所有回复路径（文本/命令），
                         // 让 remote(DeepSeek) 响应气泡也展示 prompt/decode tokens、延迟、速度。
                         // 此前仅纯文本路径填 performance，命令路径（remote ReAct 常走）传 null。
@@ -2038,42 +1995,7 @@ class ChatViewModel(
                             )
                         }
 
-                        // 检测 LLM 安全对齐误触发：用户想搜相册但 LLM 拒绝了
-                        val replyText = (streamResult.commands.firstOrNull() as? AgentCommand.TextReply)?.message
-                            ?: streamResult.fullResponse
-                        val directReply = streamResult.directReply
-                        if (directReply != null) {
-                            // 意图路由直执回合：用户气泡由平台层本地化渲染（模型侧 observation
-                            // 是硬编码中文模板，不可直达用户——I18N 红线）；卡片已经 uiActions 渲染
-                            insertAgentMessage(
-                                sessionId,
-                                if (directReply.totalCount > 0) {
-                                    stringContext().getString(R.string.chat_direct_results_shown)
-                                } else {
-                                    stringContext().getString(R.string.gallery_search_no_results)
-                                },
-                                currentModelLabel(),
-                                performance
-                            )
-                        } else if (IntentGuard.isRefusedSearchRequest(text, replyText) &&
-                            chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId) == null
-                        ) {
-                            Logger.w(TAG, "LLM refused search request, falling back to direct gallery search")
-                            val outcome = onSearchMedia(text)
-                            val assets = lastResultAssets[sessionId].orEmpty().take(MAX_CARDS)
-                            if (assets.isNotEmpty()) {
-                                insertMediaResultsMessage(
-                                    sessionId,
-                                    MediaResultsUi(outcome.query, assets, outcome.totalCount, isRefinement = false)
-                                )
-                            } else {
-                                insertAgentMessage(
-                                    sessionId,
-                                    stringContext().getString(R.string.gallery_search_no_results),
-                                    currentModelLabel()
-                                )
-                            }
-                        } else if (streamResult.commands.isNotEmpty()) {
+                        if (streamResult.commands.isNotEmpty()) {
                             // 有命令需要执行：通过 CapabilityRegistry 分发
                             Logger.i(TAG, "Executing ${streamResult.commands.size} commands from streaming response")
                             // 聊天页拦截模糊跳转：只有明确说"去相机/去相册/去设置/返回"等口令时才放行
@@ -2222,22 +2144,6 @@ class ChatViewModel(
     private suspend fun runCloudTurn(sessionId: String, text: String) {
         val prepared = prepareCloudTurn(sessionId) ?: return
 
-        // 图集卡透出：工具命中时经 listener 把资产列表本地落卡（数据不出设备，回传服务器的
-        // 仍是纯文本计数）；Room upsert 去重保证同一用户回合只留最新卡。回合结束 finally 摘除，
-        // 避免跨回合残留（取消路径也走 finally）。
-        cloudAgentGalleryTools?.mediaResultsListener = { query, assets, totalCount, isRefinement ->
-            viewModelScope.launch {
-                insertMediaResultsMessage(
-                    sessionId,
-                    MediaResultsUi(
-                        query = query,
-                        assets = assets.take(MAX_CARDS),
-                        totalCount = totalCount,
-                        isRefinement = isRefinement
-                    )
-                )
-            }
-        }
         try {
             val answer = StringBuilder()
             val cards = CloudTurnCardFlush()
@@ -2283,7 +2189,6 @@ class ChatViewModel(
             _streamingMessage.value = null
             handleCloudTurnException(sessionId, e)
         } finally {
-            cloudAgentGalleryTools?.mediaResultsListener = null
             _openUiStreamProgram.value = null // 取消/异常路径兜底（openui P2）
         }
     }
@@ -2579,20 +2484,6 @@ class ChatViewModel(
             is AgentAction.TextReply -> {
                 insertAgentMessage(sessionId, action.message, modelLabel, performance)
             }
-            is AgentAction.MediaResults -> {
-                val assets = lastResultAssets[sessionId].orEmpty()
-                    .filter { it.id in action.mediaIds }
-                    .take(MAX_CARDS)
-                insertMediaResultsMessage(
-                    sessionId,
-                    MediaResultsUi(
-                        query = action.query,
-                        assets = assets,
-                        totalCount = action.totalCount,
-                        isRefinement = action.isRefinement
-                    )
-                )
-            }
             is AgentAction.Success -> {
                 when (val cmd = action.command) {
                     is AgentCommand.AiOptimize -> {
@@ -2621,12 +2512,7 @@ class ChatViewModel(
                 }
             }
             is AgentAction.Error -> {
-                val message = if (action.message == "feedback_resolve_failure") {
-                    stringContext().getString(R.string.feedback_resolve_failure)
-                } else {
-                    action.message
-                }
-                insertAgentMessage(sessionId, "❌ $message", "error", performance)
+                insertAgentMessage(sessionId, "❌ ${action.message}", "error", performance)
             }
             is AgentAction.BatchResult -> {
                 // 取词 context 提到循环外复用：逐命令重读语言设置会在主线程累积 runBlocking 开销
@@ -2728,160 +2614,7 @@ class ChatViewModel(
                 ?: strings.getString(R.string.chat_result_ai_optimize_done)
             is AgentCommand.StartTagScan -> strings.getString(R.string.chat_result_tag_scan_done)
             is AgentCommand.BatchExecute -> strings.getString(R.string.chat_result_batch_executed)
-            is AgentCommand.RecordMediaFeedback -> when (command.action) {
-                FeedbackAction.LIKE -> "✅ ${strings.getString(R.string.feedback_confirmed_like)}"
-                FeedbackAction.DISLIKE -> "✅ ${strings.getString(R.string.feedback_confirmed_dislike)}"
-                else -> strings.getString(R.string.chat_result_feedback_recorded)
-            }
-            is AgentCommand.ExcludeConstraint -> "✅ ${strings.getString(R.string.feedback_excluded, command.constraint)}"
             else -> strings.getString(R.string.chat_result_executed, AgentCommand.getMethodName(command))
-        }
-    }
-
-    /**
-     * 用户点击搜索结果卡片上的反馈按钮。
-     */
-    fun onMediaFeedback(mediaId: String, query: String, action: FeedbackAction) {
-        val key = "$mediaId-$query-${action.name}"
-        if (pendingFeedbackActions.contains(key)) return
-        pendingFeedbackActions.add(key)
-
-        viewModelScope.launch {
-            try {
-                when (action) {
-                    FeedbackAction.LIKE, FeedbackAction.DISLIKE -> {
-                        mediaFeedbackUseCase.record(
-                            mediaId = mediaId,
-                            queryText = query,
-                            sessionId = _currentSessionId.value,
-                            action = action
-                        )
-                        updateCurrentResultsFeedback(mediaId, action, query)
-                    }
-                    FeedbackAction.MORE_LIKE_THIS -> {
-                        triggerMoreLikeThis(mediaId, query)
-                    }
-                }
-            } catch (e: Exception) {
-                Logger.e(TAG, "Failed to record media feedback", e)
-            } finally {
-                pendingFeedbackActions.remove(key)
-            }
-        }
-    }
-
-    private suspend fun updateCurrentResultsFeedback(mediaId: String, action: FeedbackAction, query: String) {
-        val currentMessages = _messages.value
-        val updatedMessages = currentMessages.map { message ->
-            val mr = message.mediaResults
-            if (message.type == ChatMessageType.MEDIA_RESULTS && mr != null && mr.query == query) {
-                val updatedState = mr.feedbackState.toMutableMap().apply {
-                    when (action) {
-                        FeedbackAction.LIKE -> put(mediaId, FeedbackAction.LIKE)
-                        FeedbackAction.DISLIKE -> put(mediaId, FeedbackAction.DISLIKE)
-                        else -> { /* no-op */ }
-                    }
-                }
-                val reorderedAssets = reorderAssetsByFeedback(mr.assets, updatedState, query)
-                val updatedResults = mr.copy(
-                    assets = reorderedAssets,
-                    feedbackState = updatedState
-                )
-                message.copy(
-                    mediaResults = updatedResults,
-                    // ADR-016 M4：渲染源已切 parts——part 负载与 legacy 字段同源双写防漂移
-                    // （同 overlayLiveTaskState 先例；本更新为内存态，Room 重载后两者一致回落空表）
-                    parts = message.parts.map { part ->
-                        if (part is MessagePart.MediaResults && part.results.query == query) {
-                            part.copy(results = updatedResults)
-                        } else {
-                            part
-                        }
-                    },
-                )
-            } else {
-                message
-            }
-        }
-        _messages.value = updatedMessages
-    }
-
-    private suspend fun reorderAssetsByFeedback(
-        assets: List<MediaAsset>,
-        feedbackState: Map<String, FeedbackAction>,
-        query: String
-    ): List<MediaAsset> {
-        val scores = mediaFeedbackUseCase.getScoresForQuery(query)
-        return assets.sortedByDescending { asset ->
-            val score = scores[asset.id.toString()]
-            val delta = mediaFeedbackUseCase.calculateScoreDelta(score)
-            val baseIndex = assets.indexOf(asset)
-            val baseScore = (assets.size - baseIndex).toFloat()
-            baseScore + delta * 100f
-        }
-    }
-
-    private suspend fun triggerMoreLikeThis(mediaId: String, query: String) {
-        val sessionId = _currentSessionId.value
-        val asset = lastResultAssets[sessionId]?.find { it.id.toString() == mediaId }
-            ?: return
-        val tags = asset.labels?.let { parseLabels(it) }?.take(3) ?: emptyList()
-        val constraint = if (tags.isNotEmpty()) {
-            stringContext().getString(R.string.chat_more_like_this_with_tags, tags.joinToString("、"))
-        } else {
-            stringContext().getString(R.string.chat_more_like_this)
-        }
-        val outcome = onRefineMediaSearch(constraint)
-        if (outcome.mediaIds.isNotEmpty()) {
-            val refinedAssets = lastResultAssets[sessionId].orEmpty().take(MAX_CARDS)
-            insertMediaResultsMessage(
-                sessionId,
-                MediaResultsUi(
-                    query = constraint,
-                    assets = refinedAssets,
-                    totalCount = outcome.totalCount,
-                    isRefinement = true
-                )
-            )
-        } else {
-            insertAgentMessage(
-                sessionId,
-                stringContext().getString(R.string.feedback_no_more_results),
-                "gallery_search"
-            )
-        }
-    }
-
-    private fun parseLabels(labelsJson: String): List<String> {
-        return try {
-            val json = org.json.JSONObject(labelsJson)
-            val tags = json.optJSONArray("tags")
-            (0 until (tags?.length() ?: 0)).map { tags!!.getString(it) }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    @VisibleForTesting
-    internal fun resolveTarget(target: FeedbackTarget, sessionId: String? = null): MediaAsset? {
-        val sid = sessionId ?: _currentSessionId.value
-        val assets = lastResultAssets[sid].orEmpty()
-        if (assets.isEmpty()) return null
-        return when (target) {
-            is FeedbackTarget.LastShown -> assets.firstOrNull()
-            is FeedbackTarget.Ordinal -> assets.getOrNull((target.index - 1).coerceAtLeast(0))
-            is FeedbackTarget.MediaId -> assets.find { it.id.toString() == target.id }
-            is FeedbackTarget.Description -> assets.find { matchesTags(it, target.text) }
-        }
-    }
-
-    private fun matchesTags(asset: MediaAsset, description: String): Boolean {
-        val labels = asset.labels?.let { parseLabels(it) } ?: emptyList()
-        val terms = description.split(Regex("\\s+")).filter { it.isNotBlank() }
-        if (terms.isEmpty()) return false
-        return terms.any { term ->
-            labels.any { label -> label.contains(term, ignoreCase = true) } ||
-                asset.fileName.contains(term, ignoreCase = true)
         }
     }
 
@@ -2965,7 +2698,7 @@ class ChatViewModel(
         totalCount: Int,
         isRefinement: Boolean
     ) {
-        val assets = lastResultAssets[sessionId].orEmpty().take(MAX_CARDS)
+        val assets = lastResultAssets[sessionId].orEmpty().take(SearchSnapshotBuilder.MAX_ITEMS)
         if (assets.isEmpty()) return
         val snapshot = SearchSnapshotBuilder.build(assets, query, totalCount, isRefinement)
         val list = sessionSearchSnapshots.getOrPut(sessionId) { mutableListOf() }
@@ -2973,44 +2706,6 @@ class ChatViewModel(
         if (list.size > SearchSnapshotBuilder.MAX_ROUNDS) {
             list.removeAt(0)
         }
-    }
-
-    override suspend fun onRecordMediaFeedback(target: FeedbackTarget, action: FeedbackAction): Boolean {
-        val sessionId = _currentSessionId.value
-        val asset = resolveTarget(target, sessionId) ?: return false
-        val mediaId = asset.id.toString()
-        val query = sessionSearchSnapshots[sessionId]?.lastOrNull()?.query ?: ""
-        mediaFeedbackUseCase.record(
-            mediaId = mediaId,
-            queryText = query,
-            sessionId = sessionId,
-            action = action
-        )
-        updateCurrentResultsFeedback(mediaId, action, query)
-        return true
-    }
-
-    override suspend fun onMoreLikeThis(target: FeedbackTarget): SearchOutcome {
-        val sessionId = _currentSessionId.value
-        val asset = resolveTarget(target, sessionId)
-            ?: return SearchOutcome("", emptyList(), 0, isRefinement = false)
-        val tags = asset.labels?.let { parseLabels(it) }?.take(3) ?: emptyList()
-        val constraint = if (tags.isNotEmpty()) {
-            stringContext().getString(R.string.chat_more_like_this_with_tags, tags.joinToString("、"))
-        } else {
-            stringContext().getString(R.string.chat_more_like_this)
-        }
-        return onRefineMediaSearch(constraint)
-    }
-
-    override suspend fun onExcludeConstraint(constraint: String): Boolean {
-        if (constraint.isBlank()) return false
-        val sessionId = _currentSessionId.value
-        if (lastResultAssets[sessionId].isNullOrEmpty()) return false
-        sessionExcludes.getOrPut(sessionId) { mutableSetOf() }.add(constraint)
-        reapplyFiltersToCurrentResults(sessionId)
-        mediaFeedbackUseCase.recordExclude(constraint, sessionId)
-        return true
     }
 
     // ── ChatGallerySummaryCapability.Delegate：相册摘要 ─────────────
@@ -3074,10 +2769,6 @@ class ChatViewModel(
                         }
                     }
                     else -> {
-                        // 回合护栏数据源（spec §3.5-a/c）：脚本 return 对象含 ids 数组
-                        //（gallery.query/intersect 命中集合）→ 登记待回合收尾补卡/收口 refine 基数
-                        //（M1 阶段无条件触发，不依赖意图判定；纯统计脚本不 return ids 即可规避）。
-                        captureScriptMediaIds(result)
                         result.toJson()
                     }
                 }
@@ -3352,151 +3043,6 @@ class ChatViewModel(
         if (assets.isEmpty()) return stringContext().getString(R.string.chat_write_no_valid_ids)
         shareMediaAssets(context, assets)
         return stringContext().getString(R.string.chat_share_opened_n, assets.size)
-    }
-
-    private fun reapplyFiltersToCurrentResults(sessionId: String) {
-        val current = lastResultAssets[sessionId] ?: return
-        val excludes = sessionExcludes[sessionId] ?: return
-        if (excludes.isEmpty()) return
-        val filtered = current.filter { asset ->
-            val labels = asset.labels?.let { parseLabels(it) } ?: emptyList()
-            val text = (labels + asset.fileName).joinToString(" ")
-            excludes.none { constraint -> text.contains(constraint, ignoreCase = true) }
-        }
-        lastResultAssets[sessionId] = filtered
-        recordSearchSnapshot(
-            sessionId = sessionId,
-            query = sessionSearchSnapshots[sessionId]?.lastOrNull()?.query ?: "",
-            totalCount = filtered.size,
-            isRefinement = true
-        )
-    }
-
-    /**
-     * 回退直连：不经 Agent，直接把文本喂 MediaSearchEngine（LLM 不可用时可用）。单轮。
-     */
-    fun searchGalleryDirectly(text: String) {
-        if (text.isBlank()) return
-        viewModelScope.launch {
-            val sessionId = _currentSessionId.value
-            try {
-                ensureSessionExists(sessionId)
-                _isProcessing.value = true
-                chatMessageDao.insertPartsMessage(
-                    chatMessageEntity(
-                        id = UUID.randomUUID().toString(),
-                        sessionId = sessionId,
-                        role = "user",
-                        parts = listOf(MessagePart.Text("p0", text, PartState.DONE)),
-                    )
-                )
-                chatSessionDao.touchSession(sessionId)
-                val outcome = onSearchMedia(text)
-                val assets = lastResultAssets[sessionId].orEmpty().take(MAX_CARDS)
-                insertMediaResultsMessage(
-                    sessionId,
-                    MediaResultsUi(outcome.query, assets, outcome.totalCount, isRefinement = false)
-                )
-                cleanupIfNeeded(sessionId)
-            } catch (e: Exception) {
-                Logger.e(TAG, "Direct gallery search failed", e)
-                insertAgentMessage(
-                    sessionId,
-                    stringContext().getString(
-                        R.string.chat_search_failed,
-                        e.message ?: stringContext().getString(R.string.chat_unknown_error),
-                    ),
-                    "error"
-                )
-            } finally {
-                _isProcessing.value = false
-            }
-        }
-    }
-
-    /**
-     * 回合护栏数据采集（spec §3.5-a/c）：脚本 return 对象含 `ids` 数组时登记到
-     * [pendingScriptMediaIds]，等回合收尾统一水合/补卡（onRunScript 内不做 IO，
-     * 避免拉长 JS eval 临界区）。
-     */
-    private fun captureScriptMediaIds(result: JsValue) {
-        val obj = result as? JsValue.Obj ?: return
-        val arr = obj.entries["ids"] as? JsValue.Arr ?: return
-        val ids = arr.items.mapNotNull { item -> (item as? JsValue.Num)?.value?.toLong() }
-        if (ids.isEmpty()) return
-        val total = (obj.entries["total"] as? JsValue.Num)?.value?.toInt() ?: ids.size
-        pendingScriptMediaIds[_currentSessionId.value] = ids to total
-    }
-
-    /**
-     * 回合终态护栏 a/c（spec §3.5，意图路由 M1）：
-     * - c（refine 基数收口）：脚本路径产出的媒体 id 集合水合后写入 [lastResultAssets]，
-     *   后续 refine_media_search 不再因基数缺失而空转；
-     * - a（补卡）：本回合未产出 media_results 卡片时，端侧用水合结果直接补渲染横滑卡片，
-     *   消除「脚本拿到 ids 却谎称已展示」的幻觉土壤。
-     *
-     * 水合走 [MediaRepository.allMedia] 快照过滤（与 resolvePreviewUris 同一既有范式），
-     * 与搜索路径同一资产源。
-     */
-    private suspend fun settleScriptMediaIds(sessionId: String, userText: String) {
-        val pending = pendingScriptMediaIds.remove(sessionId) ?: return
-        val (ids, total) = pending
-        val idSet = ids.toSet()
-        val assets = runCatching {
-            mediaRepository.allMedia.first().filter { asset -> asset.id in idSet }
-        }.getOrElse {
-            Logger.w(TAG, "settleScriptMediaIds hydrate failed (${ids.size} ids)", it)
-            return
-        }
-        if (assets.isEmpty()) return
-        lastResultAssets[sessionId] = assets
-        // 搜索基数快照（spec §3.2 紧凑状态源）：脚本路径同样让 hasSearchBase 为真，
-        // 使意图路由器/细化链路能识别「上一轮有结果可细化」。
-        recordSearchSnapshot(sessionId, userText, total, isRefinement = false)
-        if (chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId) == null) {
-            Logger.i(TAG, "settleScriptMediaIds: 补卡 ${assets.size} 张（脚本路径未出卡）")
-            insertMediaResultsMessage(
-                sessionId,
-                MediaResultsUi(
-                    query = userText,
-                    assets = assets.take(MAX_CARDS),
-                    totalCount = total,
-                    isRefinement = false
-                )
-            )
-        }
-    }
-
-    /**
-     * 插入搜索结果卡片。
-     * 同一用户回合内可能多次产出 MediaResults（ReAct 多轮 search_media/refine_media_search、
-     * 拒绝措辞回退直搜等）：[replacePreviousInTurn] 为 true 时复用本回合上一张卡片行的 id
-     * 做 REPLACE upsert，保证一个用户回合至多一张横滑卡片；以图搜图等自成新回合的入口传
-     * false，追加新卡而非覆盖上一回合的结果。
-     */
-    private suspend fun insertMediaResultsMessage(
-        sessionId: String,
-        ui: MediaResultsUi,
-        replacePreviousInTurn: Boolean = true
-    ) {
-        mediaResultsMutex.withLock {
-            val previousCard = if (replacePreviousInTurn) {
-                chatMessageDao.getLatestMediaResultsSinceLastUserMessage(sessionId)
-            } else {
-                null
-            }
-            chatMessageDao.insertPartsMessage(
-                chatMessageEntity(
-                    id = previousCard?.id ?: UUID.randomUUID().toString(),
-                    sessionId = sessionId,
-                    role = "agent",
-                    parts = listOf(MessagePart.MediaResults("p0", results = ui)),
-                    timestamp = previousCard?.timestamp ?: System.currentTimeMillis(),
-                    modelUsed = "gallery_search",
-                )
-            )
-            chatSessionDao.touchSession(sessionId)
-        }
     }
 
     /**
@@ -3793,7 +3339,7 @@ class ChatViewModel(
     /**
      * 按 [intent] 发送「图 + 意图/文字」。`uri` 为已通过 [stageImage] 持久化的内部存储路径。
      * - 文字非空：作为 Agent 指令，图片经 [_lastUserImageUri] 作为上下文（[sendMessage]）。
-     * - [ImageIntent.FIND_SIMILAR]：以图搜图，命中则插 media-results 轮播，否则提示无结果。
+     * - [ImageIntent.FIND_SIMILAR]：以图搜图，命中集写入搜索基数后触发 LLM 回合出图集卡，否则提示无结果。
      * - [ImageIntent.UNDERSTAND]（默认）：复用 [sendImageMessage] 的图像理解链路。
      * 注意：[ImageIntent.EDIT] 由 UI 直接跳 PhotoEditor，不应进入本方法。
      */
@@ -3805,6 +3351,9 @@ class ChatViewModel(
                 when {
                     !text.isNullOrBlank() -> sendMessage(text, uri)
                     intent == ImageIntent.FIND_SIMILAR -> {
+                        // 横滑卡退役（2026-11-08）改道：不再端侧直插横滑卡；命中集写入搜索基数
+                        //（lastResultAssets + 快照，ids 经 recentSearchResults 进模型上下文），
+                        // 随后触发正常 LLM 回合，由模型经 render_html 出图集卡（media://{id}）。
                         _isProcessing.value = true
                         val bitmap = BitmapSampling.decodeFile(uri, CHAT_IMAGE_MAX_PX)
                         val assets = if (bitmap != null) {
@@ -3814,17 +3363,10 @@ class ChatViewModel(
                         }
                         _isProcessing.value = false
                         if (assets.isNotEmpty()) {
-                            // 以图搜图不插 user 消息、自成新回合：追加新卡，不覆盖上一回合的搜索结果
-                            insertMediaResultsMessage(
-                                sessionId,
-                                MediaResultsUi(
-                                    query = stringContext().getString(R.string.chat_intent_find_similar),
-                                    assets = assets.take(MAX_CARDS),
-                                    totalCount = assets.size,
-                                    isRefinement = false
-                                ),
-                                replacePreviousInTurn = false
-                            )
+                            lastResultAssets[sessionId] = assets
+                            val query = stringContext().getString(R.string.chat_intent_find_similar)
+                            recordSearchSnapshot(sessionId, query, assets.size, isRefinement = false)
+                            sendMessage(query, uri)
                         } else {
                             insertAgentMessage(
                                 sessionId,
@@ -4063,90 +3605,6 @@ class ChatViewModel(
     }
 
     /**
-     * 当图片从媒体库中被删除后，同步把对应 media_results 消息里的该图片移除。
-     * 如果某条 media_results 消息的所有图片都被删光，则整条消息一起删掉。
-     */
-    fun removeMediaResultAsset(mediaId: Long) {
-        viewModelScope.launch {
-            try {
-                val currentMessages = _messages.value
-                val updatedMessages = currentMessages.mapNotNull { message ->
-                    val mr = message.mediaResults
-                    if (message.type == ChatMessageType.MEDIA_RESULTS && mr != null &&
-                        mr.assets.any { it.id == mediaId }
-                    ) {
-                        val newAssets = mr.assets.filter { it.id != mediaId }
-                        if (newAssets.isEmpty()) {
-                            val deletedText = stringContext().getString(R.string.chat_results_photo_deleted)
-                            chatMessageDao.getMessageById(message.id)?.let { entity ->
-                                chatMessageDao.insertPartsMessage(
-                                    entity.copy(metadata = null).withUpdatedParts {
-                                        listOf(MessagePart.Text("p0", deletedText, PartState.DONE))
-                                    },
-                                )
-                            }
-                            return@mapNotNull message.copy(
-                                type = ChatMessageType.AGENT_TEXT,
-                                content = deletedText,
-                                mediaResults = null,
-                                // M4：渲染源切 parts——内存快路径与落库重导出的 parts 同构
-                                //（text → Text p0 DONE，Room 重载后口径一致）
-                                parts = listOf(
-                                    MessagePart.Text(
-                                        partId = "p0",
-                                        markdown = deletedText,
-                                        state = PartState.DONE,
-                                    ),
-                                ),
-                            )
-                        }
-                        val newTotal = (mr.totalCount - 1).coerceAtLeast(newAssets.size)
-                        chatMessageDao.getMessageById(message.id)?.let { entity ->
-                            chatMessageDao.insertPartsMessage(
-                                entity.withUpdatedParts { parts ->
-                                    parts.map { part ->
-                                        if (part is MessagePart.MediaResults) {
-                                            part.copy(
-                                                results = part.results.copy(
-                                                    assets = newAssets,
-                                                    totalCount = newTotal,
-                                                ),
-                                            )
-                                        } else {
-                                            part
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                        val updatedResults = mr.copy(
-                            assets = newAssets,
-                            totalCount = newTotal
-                        )
-                        message.copy(
-                            mediaResults = updatedResults,
-                            // M4：part 负载与 legacy 字段同源双写（防渲染漂移）
-                            parts = message.parts.map { part ->
-                                if (part is MessagePart.MediaResults) {
-                                    part.copy(results = updatedResults)
-                                } else {
-                                    part
-                                }
-                            },
-                        )
-                    } else {
-                        message
-                    }
-                }
-                _messages.value = updatedMessages
-                Logger.i(TAG, "Removed media result asset $mediaId from chat UI")
-            } catch (e: Exception) {
-                Logger.e(TAG, "Failed to remove media result asset $mediaId", e)
-            }
-        }
-    }
-
-    /**
      * 清空当前会话
      */
     fun clearChat() {
@@ -4162,11 +3620,10 @@ class ChatViewModel(
                 _messages.value = emptyList()
                 // 选中态是纯 UI 内存态，消息删光后整体清理，回退到推荐卡高亮即可
                 _gachaSelections.value = emptyMap()
-                // 搜索/路由状态同步清理：消息已删，旧搜索基数不应再驱动 refine 直执（路由层
-                // hasSearchBase 派生自 recentSearchResults）与卡片水合
+                // 搜索/路由状态同步清理：消息已删，旧搜索基数不应再驱动 refine（路由层
+                // hasSearchBase 派生自 recentSearchResults）
                 lastResultAssets.remove(sessionId)
                 sessionSearchSnapshots.remove(sessionId)
-                pendingScriptMediaIds.remove(sessionId)
                 // 云端会话终结传播（2026-11-07 会话卫生）：清空 = 语境重置，云端会话同步终结
                 // （服务端事件流仍持旧上下文），下回合经 ensureCloudSession 懒建新会话
                 finishCloudSession(sessionId)
@@ -4215,7 +3672,6 @@ class ChatViewModel(
                 is MessagePart.HtmlCard -> ChatMessageType.HTML_CARD
                 is MessagePart.TaskCard -> ChatMessageType.TASK_CARD
                 is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
-                is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
                 is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
                 is MessagePart.OpenUiCard -> ChatMessageType.OPENUI_CARD
                 // BrowserLive 直播卡 UI 映射属 browser-vnc 直播卡后续 Task；此前防御性落文本
@@ -4240,8 +3696,7 @@ class ChatViewModel(
             },
             modelUsed = modelUsed,
             timestamp = timestamp,
-            performance = if (primary is MessagePart.MediaResults) null else metadata?.let { parsePerformanceMetadata(it) },
-            mediaResults = (primary as? MessagePart.MediaResults)?.results,
+            performance = metadata?.let { parsePerformanceMetadata(it) },
             claudeAgent = parseClaudeAgentState(metadata),
             optimizeCandidates = (primary as? MessagePart.OptimizeCandidates)?.group,
             gachaInteractive = primary is MessagePart.OptimizeCandidates &&

@@ -34,7 +34,18 @@ class ChatIntentContractTest {
         val def = ChatIntentContract.of(IntentId.VIEW_PHOTOS)
         assertTrue("run_gallery_script" in def.forbiddenTools)
         assertTrue("search_media" in def.allowedTools)
-        assertEquals(UiArtifact.MEDIA_RESULTS_CARD, def.uiContract)
+        // 原生横滑卡退役（2026-11-08）：交付物 = render_html 图集卡（media://{id} 引用）
+        assertTrue("render_html" in def.allowedTools)
+        assertEquals(UiArtifact.RICH_HTML_CARD, def.uiContract)
+    }
+
+    @Test
+    fun `refine results delivers rich html card`() {
+        // 窄化后重出图集卡：refine 取交集 → render_html 重渲染（横滑卡时代 MEDIA_RESULTS_CARD 已删）
+        val def = ChatIntentContract.of(IntentId.REFINE_RESULTS)
+        assertEquals(UiArtifact.RICH_HTML_CARD, def.uiContract)
+        assertTrue("refine_media_search" in def.allowedTools)
+        assertTrue("render_html" in def.allowedTools)
     }
 
     @Test

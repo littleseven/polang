@@ -7462,41 +7462,6 @@
         }
       }
     },
-    "Found %lld results for「%@」": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Found %lld results for「%@」"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se encontraron %lld resultados para「%@」"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld résultats trouvés pour「%@」"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "找到 %lld 张「%@」的照片"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "找到 %lld 項「%@」的結果"
-          }
-        }
-      }
-    },
     "Free": {
       "localizations": {
         "en": {
@@ -16447,40 +16412,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "影片"
-          }
-        }
-      }
-    },
-    "View All": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "View All"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ver todo"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tout voir"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "查看全部"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "查看全部"
           }
         }
       }
@@ -26798,41 +26729,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "xAI"
-          }
-        }
-      }
-    },
-    "Search results are shown in the card above": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Search results are shown in the card above"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resultados mostrados en la tarjeta de arriba"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Résultats affichés dans la carte ci-dessus"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已在上方卡片展示搜索结果"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已在上方卡片顯示搜尋結果"
           }
         }
       }

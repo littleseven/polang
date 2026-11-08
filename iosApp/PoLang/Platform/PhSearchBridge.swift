@@ -36,15 +36,6 @@ import SharedKit
         }
     }
 
-    /// 反馈落库（契约 §8）：逐条 insert media_feedback。
-    /// 与 Swift `MediaFeedbackUseCase.record` 同一落点（`TagDatabase.insertMediaFeedback`）；
-    /// resolveTarget 在 Kotlin capability 侧完成（其持有上一轮结果集），此处只负责写入。
-    /// ⚠️ query_text 精确等值匹配（R10），调用方传最近一轮搜索 query 原样。
-    func recordFeedback(mediaId: String, feedbackType: String, query: String, sessionId: String) {
-        TagDatabase.shared.insertMediaFeedback(
-            mediaId: mediaId, feedbackType: feedbackType, queryText: query, sessionId: sessionId)
-    }
-
     /// 搜索语言（与 MediaSearchEngine.shared 的 langProvider 同规则）：
     /// 显式英文 → "en"；其余（含中文两档与跟随系统）→ "zh"。
     static func currentSearchLang() -> String {

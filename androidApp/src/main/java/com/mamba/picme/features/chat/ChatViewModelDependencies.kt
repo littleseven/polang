@@ -2,7 +2,6 @@ package com.mamba.picme.features.chat
 
 import android.content.Context
 import com.mamba.picme.core.agenttools.AppToolExecutor
-import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatSessionDao
@@ -11,7 +10,6 @@ import com.mamba.picme.data.remote.picme.BrowserWebSocketClient
 import com.mamba.picme.data.remote.picme.ClaudeChatClient
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.PoLangAuthClient
-import com.mamba.picme.data.repository.MediaFeedbackRepository
 import com.mamba.picme.domain.repository.ChatImageStore
 import com.mamba.picme.domain.repository.AndroidMediaRepository
 import com.mamba.picme.domain.repository.UserSettingsRepository
@@ -33,7 +31,6 @@ class ChatViewModelDependencies(
     val chatSessionDao: ChatSessionDao,
     val userSettingsRepository: UserSettingsRepository,
     val mediaSearchEngine: MediaSearchEngine,
-    val mediaFeedbackRepository: MediaFeedbackRepository,
     val mediaRepository: AndroidMediaRepository,
     val picMeAuthClient: PoLangAuthClient,
     val claudeChatClient: ClaudeChatClient = ClaudeChatClient(),
@@ -67,13 +64,7 @@ class ChatViewModelDependencies(
     /** 云端 Agent SSE 客户端（ADR-018 实验线）；null = 未接线（单测默认），云端开关视为关。 */
     val cloudAgentApi: CloudAgentApi? = null,
     /** 云端工具桥端侧执行器；null = 未接线（单测默认），云端开关视为关。 */
-    val deviceToolExecutor: DeviceToolExecutor? = null,
-    /**
-     * 云端图集工具（图集卡透出回调的宿主）：云端回合命中媒体结果时经其
-     * [CloudAgentGalleryTools.mediaResultsListener] 透给 UI 层本地渲染卡片（数据不出设备）。
-     * null = 未接线（单测默认），云端回合不渲染图集卡。
-     */
-    val cloudAgentGalleryTools: CloudAgentGalleryTools? = null
+    val deviceToolExecutor: DeviceToolExecutor? = null
 ) {
     /**
      * app_tool_request 采集执行器（spec §3.1）。null = 未接线（单测默认不注入则功能关闭）。

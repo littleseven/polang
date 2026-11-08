@@ -360,10 +360,10 @@ final class ChatViewModel: ObservableObject {
                     self?.handleStreamEvent(event, placeholderId: placeholderId)
                 }
             },
-            onComplete: { [weak self] summary, errorMessage, directReply in
+            onComplete: { [weak self] summary, errorMessage in
                 Task { @MainActor in
                     self?.pacing?.finish()
-                    self?.completeMessage(id: placeholderId, summary: summary, errorMessage: errorMessage, directReply: directReply)
+                    self?.completeMessage(id: placeholderId, summary: summary, errorMessage: errorMessage)
                     self?.isProcessing = false
                 }
             }
@@ -499,7 +499,7 @@ final class ChatViewModel: ObservableObject {
 
     /// 推理完成：一次 with 定稿正文 + 瞬态 parts 转持久轨——
     /// item key 由 whole 重建为 part 级，流式光标随之消失
-    private func completeMessage(id: String, summary: String, errorMessage: String?, directReply: DirectRouteReply? = nil) {
+    private func completeMessage(id: String, summary: String, errorMessage: String?) {
         guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
         let finalText: String
         if let errorMessage, !errorMessage.isEmpty {
@@ -510,12 +510,6 @@ final class ChatViewModel: ObservableObject {
             if isGuestMode, errorMessage.localizedCaseInsensitiveContains("quota_exceeded") {
                 showGuestQuotaExhaustedNudge()
             }
-        } else if let directReply {
-            // 意图路由直执回合：本地化气泡（模型侧 observation 是硬编码中文模板，不可直达用户）；
-            // 卡片已经 watchUiActions 渲染（对齐 Android directReply 分支口径）
-            finalText = directReply.totalCount > 0
-                ? String(localized: "Search results are shown in the card above")
-                : String(localized: "No results")
         } else {
             finalText = summary.isEmpty ? String(localized: "(No response)") : summary
         }
@@ -534,7 +528,7 @@ final class ChatViewModel: ObservableObject {
     /// - 卡 part（OUTPUT_AVAILABLE）剔除——产物已/将由独立消息行承载，落库后 flattener
     ///   等值跳过仅对流式期生效，持久轨保留必双显；
     /// - INPUT_*/OUTPUT_ERROR 等瞬态态剔除（产物行或失败 item 不落库）；
-    /// - 空产物兜底单 Text p0（直执/错误路径无 reducer 活动）。
+    /// - 空产物兜底单 Text p0（错误路径无 reducer 活动）。
     private func persistedParts(fallbackText: String) -> [MessagePart] {
         let texts = turnReducer.parts.compactMap { part -> MessagePart? in
             guard let text = part as? MessagePartText, !text.markdown.isEmpty else { return nil }
@@ -546,55 +540,10 @@ final class ChatViewModel: ObservableObject {
         return texts
     }
 
-    // MARK: - UI Actions（媒体结果 = 独立消息）
+    // MARK: - UI Actions
 
     private func handleUiAction(_ dto: ChatUiActionDto) {
         switch dto.kind {
-        case "media_results":
-            // 空结果不出卡片：Android uiActions 收集器以 assets.isNotEmpty() 为门，
-            // 空结果由 LLM 在最终回复里说明（避免多轮空搜索刷出多条「未找到」气泡）
-            guard dto.totalCount > 0, !dto.mediaIds.isEmpty else { return }
-            // MediaResultsUi 负载（uri 空 stub，渲染侧按 assets[].id 反查媒体库——同 legacy 迁移口径）
-            let ui = MediaResultsUi(
-                query: dto.query,
-                assets: dto.mediaIds.map {
-                    MediaAsset(
-                        id: $0.int64Value, uri: "", type: .photo, captureDate: 0, fileName: "",
-                        duration: nil, hasFace: false, faceId: nil, source: nil,
-                        labels: nil, ocrText: nil, latitude: nil, longitude: nil,
-                        locationName: nil, city: nil, indexedAt: nil,
-                        faceFocusY: nil, aestheticScore: nil, faceQualityScore: nil
-                    )
-                },
-                totalCount: Int32(truncatingIfNeeded: dto.totalCount),
-                isRefinement: false,
-                feedbackState: [:]
-            )
-            let header = String(localized: "Found \(dto.totalCount) results for「\(dto.query)」")
-            // 回合内 upsert 去重（chat.yaml §9 per_turn_upsert，c4cea4995 定稿口径）：
-            // 同一用户回合（最后一条 user 消息之后）至多一张横滑卡——查本回合上一张卡，
-            // 复用其 id/timestamp 原位替换，卡片位置不动（禁 remove+append 把卡移到回合底部）。
-            // TODO(ios-follow): FIND_SIMILAR 以图搜图自成新回合（replacePreviousInTurn=false，
-            // 追加新卡不覆盖上一回合结果）；iOS 引擎为 stub（send() 直接出不可用提示），
-            // 追加分支随引擎落地补齐。
-            // 注：LLM 拒绝措辞回退直搜 iOS 无此路径（media_results 仅本入口单一来源），
-            // 「本回合已出卡则跳过回退」守卫无从挂载；后续引入回退直搜时须补。
-            if let lastUser = messages.lastIndex(where: { $0.role == .user }),
-               let prevCard = messages[lastUser...].lastIndex(where: { $0.type == .mediaResults }) {
-                let previous = messages[prevCard]
-                messages[prevCard] = ChatMessage.make(
-                    id: previous.id, type: .mediaResults, content: header,
-                    role: .assistant, timestamp: previous.timestamp,
-                    mediaResults: ui,
-                    parts: [MessagePartMediaResults(partId: "p0", results: ui)])
-            } else {
-                messages.append(ChatMessage.make(
-                    type: .mediaResults, content: header, role: .assistant,
-                    mediaResults: ui,
-                    parts: [MessagePartMediaResults(partId: "p0", results: ui)]))
-            }
-            touchThread(preview: header)
-            persist()
         case "text_reply":
             // 工具文本已作为 observation 回传 LLM（ChatToolService.dispatchCommand），
             // 最终答复经 onComplete 写入同一气泡；不追加独立气泡

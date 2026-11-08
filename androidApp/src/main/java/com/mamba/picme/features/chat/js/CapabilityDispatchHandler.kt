@@ -221,13 +221,6 @@ class CapabilityDispatchHandler(
                 "message" to JsValue.Str(action.message),
             )
         )
-        is AgentAction.MediaResults -> JsValue.Obj(
-            linkedMapOf(
-                "ok" to JsValue.Bool(true),
-                "totalCount" to JsValue.Num(action.totalCount.toDouble()),
-                "mediaIds" to JsValue.Arr(action.mediaIds.map { JsValue.Num(it.toDouble()) }),
-            )
-        )
         is AgentAction.BatchResult -> JsValue.Obj(
             linkedMapOf(
                 "ok" to JsValue.Bool(action.results.all { it.isSuccess }),

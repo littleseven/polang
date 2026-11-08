@@ -14,9 +14,8 @@
 用户输入 (ChatViewModel.sendMessage)
   │
   ├─ 0. 落库用户消息（Room，insertPartsMessage）
-  ├─ 1. 意图路由 IntentRouter（ADR-015 前置闸门）
-  │      ├─ 直执命中（VIEW_PHOTOS/REFINE）→ 直接 dispatch → 产卡落库，不走 LLM
-  │      └─ 其余（含 BROWSE_WEB/OPEN_QA）→ 完整 agent loop
+  ├─ 1. 意图路由 IntentRouter（ADR-015 前置闸门；直执路径已随 2026-11-08 横滑图集卡退役删除）
+  │      └─ 一切意图 → 完整 agent loop（VIEW_PHOTOS/REFINE 重指 RICH_HTML_CARD+render_html）
   │
   ▼
 Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
@@ -67,7 +66,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 | 跳 | 位置 | 语义 |
 |---|---|---|
 | 1 | `ChatViewModel.sendMessage(text, imageUri)`（androidApp features/chat/ChatViewModel.kt） | DEV 捷径（`/html` `/task`）拦截；用户消息落 Room；构建 `AgentContext`（scene=CHAT、memorySessionId、recentSearchResults、lastUserImageUri、gallerySummary、traceId、persona、replyLanguage） |
-| 2 | `RemoteChatEngine.streamChat(input, agentContext, onEvent)`（shared agent/core/inference/remote/RemoteChatEngine.kt） | 先走意图路由 `routeAndMaybeExecute`，命中直执则短路返回 |
+| 2 | `RemoteChatEngine.streamChat(input, agentContext, onEvent)`（shared agent/core/inference/remote/RemoteChatEngine.kt） | 先走意图路由判定意图（直执短路已随 2026-11-08 横滑图集卡退役删除，恒进 agent loop；M3 工具子集随路由结果下传） |
 | 3 | `streamChatReAct → processChatReAct` | `getChatAgent` 懒建/缓存 → `withTimeout(120s) { agent.runChat(...) }` |
 | 4 | `KoogChatAgent.runChat`（shared .../remote/koog/KoogChatAgent.kt） | `SessionCompactor.maybeCompact` → 载会话摘要 → Koog `AIAgent.run(input, sessionId)` |
 
@@ -84,9 +83,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 3. **pattern 捷径**：「看/找/搜+…+照片」最热句式（≤40 字）→ `VIEW_PHOTOS` 短路；
 4. **LLM 闭集分类**：11 意图闭集，temperature=0、maxTokens=256、**1.5s 硬超时** + schema 失败重试 1 次；超时/低置信（<0.6）一律降级 `OPEN_QA`。路由器调用是**非流式单发**。
 
-策略层 `ChatRoutingPolicy.decide`：`VIEW_PHOTOS` → DirectSearch（有基数时 DirectRefine）；`REFINE_RESULTS` → DirectRefine；**`BROWSE_WEB` → FullAgentLoop**（走完整 agent loop 执行 browser_* 工具链，契约限定 allowedTools=browser_* 七件套，forbiddenTools 排除相册工具防误路由）；其余一律 FullAgentLoop。
-
-直执语义（`executeDirect`）：复用 `ChatToolService.dispatchCommandDetailed`（与 LLM tool_calls **同源 dispatch**）；失败回落完整 agent loop；成功不产 LLM 总结，由平台层本地化渲染回执气泡；并**补写 Koog 会话记忆**（user 原文 + observation），防多轮指代断裂。每次判定落 `routing_audit_log` 审计。
+策略层 `ChatRoutingPolicy.decide`：**一切意图恒返 `FullAgentLoop`**（走完整 agent loop；BROWSE_WEB 契约限定 allowedTools=browser_* 七件套，forbiddenTools 排除相册工具防误路由；VIEW_PHOTOS/REFINE_RESULTS 重指 `RICH_HTML_CARD`+`render_html` 出图集卡）。~~VIEW_PHOTOS/REFINE_RESULTS 直执~~已随 2026-11-08 横滑图集卡退役删除（直执产出锚点 = 原生横滑卡，卡退役后直执失去意义，`executeDirect`/`DirectRouteReply`/RoutingGate 同步物理删除）。每次判定落 `routing_audit_log` 审计。
 
 ### 1.3 system prompt 三段式组装
 
@@ -108,16 +105,15 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 **params 烘焙**：`polangSystemPrompt(...)`（koog/KoogPromptFactory.kt）——🔴 必须走 Koog prompt DSL 传 params，否则 temperature/maxTokens/thinking 丢失。AIAgent 按「记忆快照内容 + 摘要 version」新鲜度懒重建。
 
-### 1.4 工具集（ChatToolService，43 个 @Tool；2026-11-08 起 44→43：`switch_view_mode` 移出 chat 工具面）
+### 1.4 工具集（ChatToolService，40 个 @Tool；2026-11-08 起 44→40：`switch_view_mode` 移出 chat 工具面 + 反馈三件套（record_feedback/more_like_this/exclude_constraint）随横滑图集卡退役删除）
 
 全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 15s（browser_* 族 25s、web_search 15s；2026-11-08 由 5s 上调——直执链路搜图 5~12s 常态超 5s 误回落 agent loop 引发空结果打转）。
 
-**意图级工具子集（M3 分支化落地，2026-10-17，成本治理）**：契约表 `ChatIntentContract.allowedTools` 从声明转为执行——路由判定为单一意图且路径可靠（LLM_ROUTER / PATTERN_SHORTCUT / BROWSER_SHORTCUT）时，`ChatRoutingPolicy.toolSubsetFor` 产出「契约白名单 + 通用工具（finish/delay）」子集，经 `RouteDecision.FullAgentLoop.toolNames` 传到引擎层；`RemoteChatEngine.resolveToolSetOverride` 自同一份 `chatTools`（组合根新增注入，与 registry/descriptors 同源）过滤派生子集 registry + 子集 prompt 清单段（不变式 8 不破坏），以 `KoogChatAgent.ChatToolSetOverride` 按轮覆写——AIAgent 重建键加 toolSetKey（与记忆快照/摘要版本同级），**KoogChatAgent 单实例单 executor 不为子集多建**。**保守全量（null）场景**：OPEN_QA / 一切降级路径 / secondary 双产出物 / 直执失败回退 / 平台未注入 chatTools / 子集过滤为空——路由器永不拦截能力的语义不变。子集 base prompt 按 key 缓存逐字节复用（保前缀稳定）。**权衡**：不同意图的相邻回合 system prompt/tools 前缀不同，会碎片化上游前缀缓存——用缓存碎片换 ~40 条 schema（约 2-4k token/轮 × ReAct 轮数）的确定削减。iOS 经 `ChatToolManifest.tools` 同路径注入（8 工具手工清单）。
+**意图级工具子集（M3 分支化落地，2026-10-17，成本治理）**：契约表 `ChatIntentContract.allowedTools` 从声明转为执行——路由判定为单一意图且路径可靠（LLM_ROUTER / PATTERN_SHORTCUT / BROWSER_SHORTCUT）时，`ChatRoutingPolicy.toolSubsetFor` 产出「契约白名单 + 通用工具（finish/delay）」子集，经 `RouteDecision.FullAgentLoop.toolNames` 传到引擎层；`RemoteChatEngine.resolveToolSetOverride` 自同一份 `chatTools`（组合根新增注入，与 registry/descriptors 同源）过滤派生子集 registry + 子集 prompt 清单段（不变式 8 不破坏），以 `KoogChatAgent.ChatToolSetOverride` 按轮覆写——AIAgent 重建键加 toolSetKey（与记忆快照/摘要版本同级），**KoogChatAgent 单实例单 executor 不为子集多建**。**保守全量（null）场景**：OPEN_QA / 一切降级路径 / secondary 双产出物 / 平台未注入 chatTools / 子集过滤为空——路由器永不拦截能力的语义不变。子集 base prompt 按 key 缓存逐字节复用（保前缀稳定）。**权衡**：不同意图的相邻回合 system prompt/tools 前缀不同，会碎片化上游前缀缓存——用缓存碎片换 ~40 条 schema（约 2-4k token/轮 × ReAct 轮数）的确定削减。iOS 经 `ChatToolManifest.tools` 同路径注入（9 工具手工清单：8 相册/优化 + render_html，2026-11-08 横滑卡退役追齐）。
 
 | 分组 | 工具 |
 |---|---|
-| 相册 | get_gallery_summary / search_media / refine_media_search / delete_media / share_media / select_media / favorite_media（2026-11-08：`switch_view_mode` 移出 chat 工具面——CHAT 场景无执行体，dispatch 必落跨页队列回「正在切换页面」但页面不跳转，与 view_media 同类工具陷阱；`share_media` 反向补全 Android 执行体入 `ChatMediaWriteCapability`，对齐 iOS 既有通路，消除跨页队列陷阱） |
-| 反馈 | record_feedback / more_like_this / exclude_constraint |
+| 相册 | get_gallery_summary / search_media / refine_media_search / delete_media / share_media / select_media / favorite_media（2026-11-08：`switch_view_mode` 移出 chat 工具面——CHAT 场景无执行体，dispatch 必落跨页队列回「正在切换页面」但页面不跳转；`share_media` 反向补全 Android 执行体入 `ChatMediaWriteCapability`，对齐 iOS 既有通路） |
 | 打标修图 | query_tag_scan_status / ai_optimize / adjust_image / edit_image（2026-11-08：`start_tag_scan` 更名 `query_tag_scan_status`——旧名说谎：实现硬编码 action="query" 永不启动扫描；命令层 `AgentCommand.StartTagScan`/`ChatStartTagScanCapability` 不动） |
 | 脚本/卡片 | run_gallery_script / draw_chart / render_html（2026-11-08：run_gallery_script 描述瘦身——handler 目录/写操作清单/示例抽到 `gallery-script` skill 经 load_skill 按需加载，描述只留硬约束与指针，常驻 prompt 每轮省约 1.5k 字符） |
 | 技能 | load_skill（2026-11-08：Skill 中心端云同构，见 `AgentSkillContract`） |
@@ -127,6 +123,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 | 设置 | change_theme / change_language / toggle_setting / download_model / switch_face_engine |
 | 导航/系统 | navigate_to / go_back / launch_app / open_system_settings |
 | 通用 | delay / finish |
+| 技能 | load_skill（端侧 Skill 中心：经 server `/v1/skills` 同步本地缓存后按需加载技能包，扩展 Agent 专长；2026-11 端侧执行器落地） |
 
 **tool schema → OpenAI `tools[]` 转换由 Koog 框架内部完成**（`AbstractOpenAILLMClient`，外部依赖，本仓库无手写转换层）。本地只做：组合根 `AndroidAgentComposition.initialize` 用 Koog JVM-only 反射 `ChatToolService.getInstance().asToolsByClass()` 展开注入 `ToolRegistry`；同名 descriptor 清单喂 system prompt「可用工具」段，**两者同源**。`@Tool(customName=…)` 保 LLM-facing 名字确定性，`@LLMDescription` 供描述。
 
@@ -202,8 +199,8 @@ TurnPartsReducer 规则：
 |---|---|---|
 | draw_chart | onDrawChart → QuickJS `Chart.bar/line/pie` 生成 SVG → `emitChartMessage` + feedToolOutput | `tool_chart`，Chart part（svg=SVG） |
 | render_html | onRenderHtml → `HtmlCardSanitizer.sanitize` → `emitHtmlCardMessage` + feedToolOutput | `tool_html`，HtmlCard part（html=清洗后 HTML，meta={display,summary,…}） |
-| run_gallery_script 直出 | onRunScript 拦截 return：`{chart}`→emitChartMessage；`{html}`→sanitize→emitHtmlCardMessage；含 `ids`→登记，回合末 `settleScriptMediaIds` 补横滑卡 | 同上 + `data_media_results` |
-| search_media / refine | uiActions(MediaResults) → `insertMediaResultsMessage`；一回合至多一卡（REPLACE 复用上一张卡 id） | `data_media_results`，MediaResults part（results=query/totalCount/isRefinement/assets 合一） |
+| run_gallery_script 直出 | onRunScript 拦截 return：`{chart}`→emitChartMessage；`{html}`→sanitize→emitHtmlCardMessage | 同上 |
+| search_media / refine | uiActions(TextReply) → 纯文本回执落库（2026-11-08 横滑图集卡退役：不再产 `data_media_results` 行） | `text`（role=agent），Text part（计数文案，如「找到 N 张「q」的照片」） |
 | edit_image | ImageEditCapability → uiActions → `insertEditResultMessage` | `tool_image_edit`，EditResult part（ref/description/suggestions/saved） |
 | ai_optimize | handleAiOptimize → `insertOptimizeCandidatesMessage`；换一组/落选同 id REPLACE | `data_optimize_candidates`，OptimizeCandidates part（group 全量） |
 | browser_* | 会话定格 `emitBrowserCardMessage`（turn 结束 `settleBrowserSessionsAtTurnEnd` 兜底强制 close+定格） | `tool_browser`，BrowserLive part 直写（partId 归一 "p0"） |
@@ -271,7 +268,7 @@ data: [DONE]                                             ← 字面量哨兵
   }],
   usage: { prompt_tokens: 3210, completion_tokens: 64, total_tokens: 3274 }
 }
-→ App：执行 search_media → data_media_results 卡落库 → observation "找到 87 张去年夏天的海边照片" 回喂
+→ App：执行 search_media → 计数回执 "找到 87 张去年夏天的海边照片" 落库并回喂 observation
 
 第 2 轮请求 messages = 第 1 轮全量 + [
   assistant(content="找到了！去年夏天海边共 87 张。", tool_calls=[call_7f2a/search_media]),   // 调用声明
@@ -295,7 +292,7 @@ data: [DONE]                                             ← 字面量哨兵
   tool(tool_call_id="call_91d4", content="已生成柱状图：每月新增照片（6月:128, 7月:96, 8月:214 张）")
 ]
 第 3 轮响应（合并后）= {
-  choices: [{ message: { role: "assistant", content: "点击卡片可横滑浏览全部照片。" },
+  choices: [{ message: { role: "assistant", content: "这 87 张已为你找齐，想看分布或导出随时说。" },
               finish_reason: "stop" }],                                  // 纯文本 = 终止
   usage: { prompt_tokens: 3720, completion_tokens: 18, total_tokens: 3738 }
 }
@@ -316,7 +313,7 @@ data: [DONE]                                             ← 字面量哨兵
 - **GenUI 唯一化（2026-11-06，turn-native only，server 0.9.20）**：/agent 路由面**不再按 `X-GenUI-Format` 分流**（旧头被忽略，A2UI 回退闸废弃），恒走 **OpenUI 回合原生（turn-native，spec 已随交付清理，git 历史可查）**——不注册任何 GenUI 发卡工具（render_ui/render_ui_openui/render_html 全退役，HTML 以 Html 组件形态入程序树），系统提示词恒为 `OpenUiTurnNative.SYSTEM_PROMPT`（响应即程序契约：整个终结回复必须是一颗 OpenUI Lang 1.0 程序，纯文本也写 `root = Markdown("…")`；契约段后紧跟「回复形态先定位」（2026-11-01 回复活感批次）——对话/问答/闲聊类回复为裸 Markdown 自然正文、禁表单卡包装，数据卡 Card 首子级 Markdown 导语不做冷报表（对话黄金示例 `GOLDEN_CHAT_PROGRAM` 测试同源钉住）；DSL 规则与 `OpenUiPromptAssets.DSL_RULES` 同源复用，尾部内嵌组件全量清单——引用 `RenderOpenUiValidator.ALLOWED_COMPONENTS` 生成而非手抄）。A2UI 时代的 `render_ui` 发射点门控（`RenderUiValidator`，挂 Koog onToolCallStarting）、假发卡守卫与 actionGate/argsTransformer 接线已随发卡工具一并退役，退役类六件（RenderUiToolService/RenderUiValidator/RenderOpenUiToolService/CardClaimGuard/OpenUiToolCallStreamTracker/OpenUiProgramStreamExtractor）2026-11-06 已物理删除。
 - **卡下发与落库**：A2UI 通道已退役（2026-11-06 唯一化，存量 data_ui 历史卡按 legacy 墓碑降级）；**turn-native 经终结 Message 事件下行**——assistant content 即整颗程序，端侧 `CloudAgentTurnRunner` message 分支经 `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首/Card 调用形态；**纯内容嗅探**——LLM 可能模仿会话历史里的程序格式把程序当纯文本输出，兜底落卡，2026-11-02 真机事故修复）→ 程序形态落 `data_ui_openui`（OpenUiCard part 直写 partsJson——v28 起 partsJson 唯一权威（v27- 为 content 列存整颗 part JSON），fallbackSummary 经 `extractFallbackSummary` 提取：`// summary:` 首行注释 > 首个 Markdown/Text 字面量，截 80 字），非程序形态按纯文本 AssistantText 降级；data part 不回灌 LLM。**服务端「端上永远收到合法树」双保险**：① 策略层 `ProgramGuard`（每轮新实例，MAX_CORRECTIONS=1，GenUI 唯一化后无条件启用）——终结文本经 `RenderOpenUiValidator.validateProgramToError`（结构校验 + `OpenUiLayoutValidator` 布局门禁，先 normalize 再 validate；错误文案 turn-native 口径「逐条修正后重新输出完整程序」）判定非法 → `cloudAgentStrategy` `correctInvalidProgram` 节点携带错误清单回环重发（出边顺序 = 程序校验 → finish，假发卡节点已随发卡工具退役摘除）；② 纠正上限用尽放行，由终结落流前内联调用的 `OpenUiTurnNative.ensureValidProgram` 兜底——合法 normalize 后原样放行 / 非法包成 `root = Markdown("…")` 程序（包装自身复验失败再退硬编码错误卡）。
 - **OpenUI 流式预览（turn-native 形态，2026-11-01）**：响应即程序后预览跟踪对象从「工具 args JSON 增量」换成「content TextDelta 纯文本累计」——server `AgentRunner.runTurn` content delta 无条件透传（GenUI 唯一化收编，forwardContentDeltas 参数已删），`OpenUiContentStreamTracker` 节流（≥48 字符增量且 ≥80ms，首发免时间窗）后经 SSE `kind=openui_delta` **瞬态帧旁路下行**（不落 agent_event，终结 Message 帧唯一权威；旧端忽略未知 kind 后向兼容）；EventHandler `onLLMStreamingStarting` 调 `onRoundStart` 轮次重置——回合内多轮 LLM 输出（工具调用后的中间轮 → 终结整树）各自从空累计，端上覆盖式替换预览。端侧照旧合成 `OPENUI_STREAM_PREVIEW_ID` 瞬态预览消息挂列表尾，`OpenUiStreamingCard` 每帧前缀新建 session 解析渐进渲染；终结 Message 落库后预览让位。（2026-10-26 P2 的 ToolCallDelta 路径 `OpenUiToolCallStreamTracker` + `OpenUiProgramStreamExtractor` 已随 render_ui_openui 退役物理删除，2026-11-06，server 0.9.20。）
-- **图集卡透出（2026-10-21/24）**：云端回合 search_media 命中经 `CloudAgentGalleryTools.mediaResultsListener` 端侧回调本地渲染媒体卡（媒体不出设备，回传仅文本计数）；`display="true"` 意图门控——仅当 LLM 判用户明确想浏览/挑选才出卡。
+- **图集展示（2026-11-08 横滑卡退役修订）**：原 `CloudAgentGalleryTools.mediaResultsListener` 端侧透出媒体卡 + `display="true"` 意图门控机制已整体退役删除——云端回合 search_media 命中现回执为 TextReply 纯计数文本（媒体不出设备，回传仅文本计数）；图集展示一律由 LLM 走技能出卡（photo-browse 等，`render_html`/OpenUI 程序），不再有原生横滑图集卡通道。
 - **done 帧回合性能数据（2026-11-01，server 0.9.15 起）**：done 帧新增 `elapsed_ms` + `usage{prompt_tokens, completion_tokens}`——server `AgentRunner.runTurn` 逐次累计（`TurnUsage` 出参，回合级实例互不串扰），成功收尾回填耗时；端侧 `CloudFrame.Done` 解析 → `ChatViewModel.toLlmPerformanceOrNull` 装配 `LlmPerformance`（映射同 DeepSeek 先例：prefill=0 隐藏、decode=回合端到端耗时）→ 经 metadata 落库（`performanceMetadataJson`，格式与本地路径同源），文本气泡（`ChatAgentTextPart` 既有行）与 OpenUI 卡（TYPE_OPENUI_CARD 分支新增行）下方统一渲染性能指标行。回补背景：性能行原属本地 Koog 路径（`streamResult.metrics`），云端链路（含 turn-native 程序卡）此前无数据源不渲染。旧服务端（无 usage 字段）→ tokens 双 0 → 不装配不渲染（对齐 parsePerformanceMetadata 全 0 护栏）；旧端忽略 done 帧未知字段，双向兼容。**0.9.17 修复（2026-11-03）**：usage 数据源从 `onLLMCallCompleted` 改为流式 End 帧——Koog 1.3.0 流式路径只触发 `onLLMStreaming*` 事件、**不触发** `onLLMCallCompleted`（javap 核实后者唯一调用点是 `ContextualPromptExecutor` 包非流式 `execute`），策略层 LLM 节点全走 `requestLLMStreaming()` 导致 TurnUsage 恒 0、性能行整体缺失；现于 `onLLMStreamingFrameReceived` 的 `StreamFrame.End` 分支累加 `metaInfo`（OpenAI 客户端请求自带 `stream_options.include_usage`、从上游 usage chunk 构建 End metaInfo），非流式回退路径仍由 `onLLMCallCompleted` 覆盖，两路互斥无双计。
 
 ---
@@ -327,7 +324,7 @@ data: [DONE]                                             ← 字面量哨兵
 
 ### 3.1 长期轨（SSOT）= Room chat_messages
 
-Room `chat_messages`（partsJson 富归档）是聊天历史的唯一事实源：全量、不裁剪、含卡片 parts 全字段。屏幕上用户看到的历史就是这一轨。`ChatMessage.toModelInput()`（shared domain/chat/ChatModelInput.kt）是其唯一的回灌显式转换（UIMessage→ModelMessage，ADR-016 D1）：Text→TextMessage；Chart/HtmlCard/TaskCard/BrowserLive→ToolCall+ToolResult 对（toolCallId=`"messageId:partId"` 命名空间锚）；Image→占位 `[user sent an image]`（PRIVACY）；EditResult→只回灌 description；MediaResults/OptimizeCandidates **丢弃**（data part 不进上下文，对齐 Vercel 丢弃规则）。
+Room `chat_messages`（partsJson 富归档）是聊天历史的唯一事实源：全量、不裁剪、含卡片 parts 全字段。屏幕上用户看到的历史就是这一轨。`ChatMessage.toModelInput()`（shared domain/chat/ChatModelInput.kt）是其唯一的回灌显式转换（UIMessage→ModelMessage，ADR-016 D1）：Text→TextMessage；Chart/HtmlCard/TaskCard/BrowserLive→ToolCall+ToolResult 对（toolCallId=`"messageId:partId"` 命名空间锚）；Image→占位 `[user sent an image]`（PRIVACY）；EditResult→只回灌 description；OptimizeCandidates **丢弃**（data part 不进上下文，对齐 Vercel 丢弃规则）；`type ∈ RETIRED_MEDIA_RESULTS_TYPES`（`media_results`/`data_media_results`，2026-11-08 横滑图集卡退役闭集）的存量历史行**整行跳过**（UI 回放与回灌双侧同规则，MediaResults part 类型已物理删除）。
 
 ### 3.2 短期轨（派生缓存）= Koog ChatMemory
 
@@ -352,9 +349,9 @@ Room `chat_messages`（partsJson 富归档）是聊天历史的唯一事实源�
 
 > ⚠️ **文档口径澄清（2026-10-11 M4 更新）**：`CHAT_CARD_CATALOG.md` §0.3 及各卡「回灌」小节描述的是 Room→模型的投影语义，其消费者现为**两处**：工程师隧道 + 主链路冷启动重建。稳态运行时主链路上下文仍以 Koog 短期轨为准（预算/老化语义与长期轨全量投影不同）。`recall_chat_history` 主动召回工具（按需拉取长期轨任意段）明确未做，留后续。
 
-### 3.4 直执回合的记忆补写
+### 3.4 ~~直执回合的记忆补写~~（已退役 2026-11-08）
 
-意图路由直执（不走 LLM）成功后，user 原文 + observation **补写 Koog 会话记忆**——否则下一轮「再看第 3 张」式指代会断裂。
+直执路径已随横滑图集卡退役整体删除，本节机制（直执成功后 user 原文 + observation 补写 Koog 会话记忆）同步下线——现一切意图恒走完整 agent loop，user/assistant/tool 消息由 ReAct 账本自然入记忆，无补写需求。
 
 ---
 

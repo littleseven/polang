@@ -23,6 +23,9 @@ data class ChatMessageEntity(
      * 投影列（写时自 parts 经 [com.mamba.picme.domain.chat.MessagePartsProjection.roomTypeOf]
      * 派生，构造/更新接缝同点完成）：服务 DAO 查询/索引面（任务中心 type='tool_task'、
      * 回灌窗口 role 子查询）。读面权威是 partsJson，本列永不作为内容源。
+     * 新分类法（spec §1）：text, image, tool_chart, tool_html, tool_task,
+     * tool_image_edit, data_optimize_candidates 等（data_media_results 已随横滑卡
+     * 退役，存量行为历史残留，回放路径整行跳过，见 LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES）。
      */
     val type: String,
 

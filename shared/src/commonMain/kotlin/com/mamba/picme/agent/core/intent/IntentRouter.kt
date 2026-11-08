@@ -208,7 +208,7 @@ object IntentRouterCore {
     /** 路由器 system prompt（闭集分类契约；~1k token 级，非 34k 全量规则）。 */
     const val ROUTER_SYSTEM_PROMPT: String = """你是意图路由器。把用户的话分类到唯一「最终交付物」意图并抽取槽位，只输出 JSON，不要输出任何其它文字。
 意图闭集（deliverable 只能取其一）：
-- VIEW_PHOTOS：看/找/搜索照片或图片（交付物=照片横滑卡片）
+- VIEW_PHOTOS：看/找/搜索照片或图片（交付物=图集卡，助手回合内取数出卡）
 - REFINE_RESULTS：在上一轮搜索结果上加条件窄化（"只要4月的""换成夜景""再去掉截图"）
 - ANALYZE_STATS：统计/盘点/数量/质量分析类（"有多少照片""盘点一下""有没有糊的"），交付物=文字结论
 - DRAW_CHART：明确要求画图/图表/趋势图
@@ -228,7 +228,7 @@ object IntentRouterCore {
 示例：
 用户"看下我儿子的照片" → {"deliverable":"VIEW_PHOTOS","confidence":0.95,"isRefinement":false,"secondary":null,"person":"儿子","fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}
 用户"去年夏天有人脸的照片" → {"deliverable":"VIEW_PHOTOS","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":true}
-用户"只要4月的"（上一轮有搜索卡片） → {"deliverable":"REFINE_RESULTS","confidence":0.9,"isRefinement":true,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":"4月的","hasFace":null}
+用户"只要4月的"（上一轮有搜索结果） → {"deliverable":"REFINE_RESULTS","confidence":0.9,"isRefinement":true,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":"4月的","hasFace":null}
 用户"看看照片里有没有糊的" → {"deliverable":"ANALYZE_STATS","confidence":0.8,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":"糊","constraint":null,"hasFace":null}
 用户"今天天气怎么样" → {"deliverable":"OPEN_QA","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}
 用户"用浏览器打开新浪体育" → {"deliverable":"BROWSE_WEB","confidence":0.95,"isRefinement":false,"secondary":null,"person":null,"fromMs":null,"toMs":null,"label":null,"constraint":null,"hasFace":null}

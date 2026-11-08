@@ -37,8 +37,8 @@ enum class ToolExecutor { CLOUD, LOCAL }
  *
  * @property required LLM 可见 schema 的 required/optional 分流。桥工具现行全必填
  *   （Koog 反射期即全必填，端侧以空串表达「不限」），声明仅供未来演进。
- * @property default **端侧 executor 兼容缺省**（旧服务端不下发该键时的兜底，如 display
- *   "false"/mediaType "photo"）——不进 LLM schema、不改变 required 语义。
+ * @property default **端侧 executor 兼容缺省**（旧服务端不下发该键时的兜底，如 mediaType
+ *   "photo"）——不进 LLM schema、不改变 required 语义。
  */
 data class CloudToolParam(
     val name: String,
@@ -81,7 +81,6 @@ object CloudAgentToolCatalog {
                 CloudToolParam("fromMs", CloudAgentToolContract.DESC_PARAM_FROM_MS),
                 CloudToolParam("toMs", CloudAgentToolContract.DESC_PARAM_TO_MS),
                 CloudToolParam("hasFace", CloudAgentToolContract.DESC_PARAM_HAS_FACE),
-                CloudToolParam("display", CloudAgentToolContract.DESC_PARAM_DISPLAY, default = "false"),
                 CloudToolParam("mediaType", CloudAgentToolContract.DESC_PARAM_MEDIA_TYPE, default = "photo"),
             ),
             resultSchema = "List<MediaAsset> 完整资产列表（含 uri）+ 总数",

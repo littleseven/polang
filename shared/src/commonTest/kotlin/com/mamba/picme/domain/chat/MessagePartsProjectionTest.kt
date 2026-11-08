@@ -24,10 +24,11 @@ class MessagePartsProjectionTest {
             MessagePart.TaskCard("p0", "t1", ToolPartState.INPUT_AVAILABLE, task) to "tool_task",
             MessagePart.EditResult("p0", "file://a", "d") to "tool_image_edit",
             MessagePart.BrowserLive("p0", "s1") to "tool_browser",
-            MessagePart.MediaResults("p0", MediaResultsUi("q", emptyList(), 0, false)) to "data_media_results",
             MessagePart.OptimizeCandidates("p0", group) to "data_optimize_candidates",
             MessagePart.OpenUiCard("p0", "prog", "sum") to "data_ui_openui",
             MessagePart.Unsupported("p0", "tool_future") to "text",
+            // 退役横滑卡行（parts 兜底为 Unsupported）：投影仍归一退役正型供回放整行跳过
+            MessagePart.Unsupported("p0", "data_media_results") to "data_media_results",
         )
         cases.forEach { (part, expected) ->
             assertEquals(expected, MessagePartsProjection.roomTypeOf(listOf(part)), "type of ${part::class.simpleName}")

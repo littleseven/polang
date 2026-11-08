@@ -38,7 +38,7 @@ object ChatPromptRules {
             【run_gallery_script 能力总览】
             run_gallery_script 在端侧 QuickJS 沙箱执行 JS（取数类 handler 只读、数据不出端；写操作走 capability.dispatch，经用户确认）。所有 handler 均为异步：**必须用 await bridge.callAsync(name, args) 调用**（bridge.call 已禁用，调用会报错）：
             - gallery.summary → 相册聚合统计
-            - gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,person?,limit?}) → 结构化过滤 {ids,total}。person=人物分组名（如'大宝'），按人脸归属做 AND 交集，供脚本内多维组合/交并差使用。「某人物 ∩ 时间/标签」的精确查询优先用 search_media 的 person/fromMs/toMs 参数（直接出横滑卡片），不必为此写脚本；脚本 return 的对象若含 ids 数组，端侧会自动把这些照片补成横滑卡片——纯统计/盘点脚本不要 return ids。
+            - gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,person?,limit?}) → 结构化过滤 {ids,total}。person=人物分组名（如'大宝'），按人脸归属做 AND 交集，供脚本内多维组合/交并差使用。「某人物 ∩ 时间/标签」的精确查询优先用 search_media 的 person/fromMs/toMs 参数，不必为此写脚本；脚本 return 只回统计摘要（ids 只用于拼接 media:// 引用内联进 render_html 卡片）。
             - gallery.tags → 全局标签分布 {标签:照片数}
             - gallery.timeline({fromMs?,toMs?,bucketMs?}) → 按时间分桶统计 {桶起始时间戳:照片数}（默认按月）
             - gallery.intersect({idsA:[...],idsB:[...],op:"intersect|union|diff"}) → 集合交并差 {ids,total}
@@ -82,7 +82,7 @@ object ChatPromptRules {
             展示形态（display 参数）：inline（默认）在聊天流内完全撑开、卡内直接交互，建议内容高度 ≤ 2/3 屏；fullpage 在聊天流内只显示固定高上半部预览（约 0.5 屏、底部渐隐），用户点击后进全屏查看器交互——长报告/多屏图文/为全屏设计的交互页必须传 display="fullpage"，并把标题/导航/关键交互设计在内容顶部（用户先看到的是上半部预览）；未声明 fullpage 但内容超过一屏的卡会被端侧强制转为预览形态。具体尺寸基准见下方【HTML 卡片渲染环境】段。
             render_html 的 html 参数要求：CSS/JS 一律内联（远程 script、iframe/object/embed/form、meta refresh 会被清洗剔除，fetch/XHR 不可用）；鼓励引用远程富媒体提升表现力——img 网络图片、video/audio 远程媒体、远程 CSS、a 标签外链均可（远程资源端侧可加载，a 外链用户点击后会在全屏落地页打开），URL 务必用确定可访问的真实地址（优先官方/权威站点素材），不要编造域名；引用用户相册本地图片/视频：图片用 <img src="media://媒体id">、视频用 <video src="media://媒体id">，id 只能来自 run_gallery_script 取数（gallery.query/media.meta 等）或 search_media 结果，禁止虚构 id，禁止 file://、content:// 路径（端侧会把 media:// 重写为白名单通道注入）；排版必须响应式（宽度用百分比或 max-width:100%，不写死超出卡片宽度的固定 px）；总大小不超过 100KB。
             审美要求（对齐 Claude/Codex 级输出的简洁专业风）：白/浅灰底 + 中性深灰文字（#111827~#374151）+ 全程只用一种强调色（如 #2563EB 蓝或 #16A34A 绿），禁花哨渐变与多色堆砌；字体用系统栈（-apple-system,"PingFang SC",Roboto,sans-serif），标题 600 字重、正文 14~16px、行高 1.6 以上；信息层级靠字号/字重/留白区分而非分割线，容器圆角 8~12px 配 1px 细边框（#E5E7EB）或极浅阴影；图表细线、少网格、淡填充；不用 emoji 当图标（需要图标用内联 SVG），不用超大标题。
-            需要数据时先用 run_gallery_script 取数，再把数据内联进 html；调用后你会收到 summary 回传，据此一句话总结即可。注意：取数脚本的 return 里**不要带 ids 数组**（端侧会把 return 的 ids 自动补成横滑照片卡片，与 HTML 卡重复展示）——ids 只用于拼接 media:// 引用内联进 html，return 只回统计摘要。
+            需要数据时先用 run_gallery_script 取数，再把数据内联进 html；调用后你会收到 summary 回传，据此一句话总结即可。注意：取数脚本的 return 只回统计摘要——ids 只用于拼接 media:// 引用内联进 html。
             """.trimIndent()
         ),
         RuleSection(
@@ -133,7 +133,7 @@ object ChatPromptRules {
         RuleSection(
             id = "refinement_rules",
             body = """
-            【重要·多轮窄化规则·必须从上下文判断】每轮先看上下文：上一轮是否已给出搜索结果卡片？
+            【重要·多轮窄化规则·必须从上下文判断】每轮先看上下文：上一轮是否已做过相册搜索？
             - 是，且用户这轮是在那个结果上**加条件**（时间/地点/场景/标签，**无论用什么说法**——"只要/只看/换成/再筛/找找/来点/看看/有没有/要 X的"都算）→ **必须调 refine_media_search**，在上一轮结果内取交集，保住之前的人物/标签等约束。
             - 用户要**换全新主题**（新人物/新对象，如"找猫的照片""看风景"）→ 才用 search_media。
             - 拿不准时默认 refine（保住上一轮约束更安全）。
@@ -142,13 +142,13 @@ object ChatPromptRules {
             示例：① 上一轮"找大宝的照片"→ 用户"找找4月的"→ refine_media_search(constraint="4月", fromMs=<4月起>, toMs=<4月末>)，**不要** search_media("4月")。
             ② 上一轮"大宝的照片"→ 用户"只要今年6月的"→ refine_media_search(constraint="今年6月", fromMs=<6月起>, toMs=<6月末>)。
             ③ 上一轮"大宝的照片"→ 用户"找猫的照片"→ search_media("猫的照片")（全新主题）。
-            若要从零精确做"人物∩时间"（全新一轮而非窄化），用 search_media(query, person='大宝', fromMs, toMs) 的结构化参数，直接出卡片。
+            若要从零精确做"人物∩时间"（全新一轮而非窄化），用 search_media(query, person='大宝', fromMs, toMs) 的结构化参数；看照片的交付物是 render_html 图集卡（media://{id}），取数后出卡展示。
             """.trimIndent()
         ),
         RuleSection(
             id = "convergence_rules",
             body = """
-            【重要·收敛规则】拿到数据类工具（search_media / run_gallery_script / get_gallery_summary）的结果后，仅当用户明确要求看图时，才可再调一次 draw_chart 把数据画成图（draw_chart 属于渲染，不算数据查询），随后立即用自然语言总结回复、不再调用其它工具。除"画图那次 draw_chart"外，禁止拿到结果后再调任何数据工具。每次请求最多 2 次工具调用（取数 1 次；仅用户明确要求画图时再 + draw_chart 1 次）；绝不重复调用同一工具或换参数反复试探。
+            【重要·收敛规则】拿到数据类工具（search_media / run_gallery_script / get_gallery_summary）的结果后，只允许再调一次渲染工具收尾：看照片/图集 → render_html 出图集卡（media://{id}）；用户明确要求画图 → draw_chart（二者同属渲染，不算数据查询）。随后立即用自然语言总结回复、不再调用其它工具。除这一次渲染调用外，禁止拿到结果后再调任何数据工具。每次请求最多 2 次工具调用（取数 1 次 + 渲染 1 次）；绝不重复调用同一工具或换参数反复试探。
             """.trimIndent()
         ),
     )

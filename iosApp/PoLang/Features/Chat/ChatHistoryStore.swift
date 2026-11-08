@@ -117,7 +117,9 @@ final class ChatHistoryStore {
             return decoded
         }
         if let legacy = try? JSONDecoder().decode([LegacyChatMessage].self, from: data) {
-            let migrated = legacy.map { $0.toShared() }
+            // 横滑卡已退役：legacy mediaResults 行整行丢弃（对齐 Android 回放过滤口径，
+            // 不降级空气泡）
+            let migrated = legacy.filter { $0.type != .mediaResults }.map { $0.toShared() }
             if !migrated.isEmpty {
                 saveMessages(sessionId: sessionId, messages: migrated)
             }

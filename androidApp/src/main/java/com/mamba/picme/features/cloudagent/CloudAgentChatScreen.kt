@@ -66,7 +66,6 @@ import com.mamba.picme.features.chat.HtmlCardSanitizer
 import com.mamba.picme.features.chat.HtmlFullpageContent
 import com.mamba.picme.features.chat.HtmlFullpageViewer
 import com.mamba.picme.features.chat.HtmlLinkPreviewOverlay
-import com.mamba.picme.features.chat.components.MediaResultsCarousel
 import com.mamba.picme.features.chat.openui.OpenUiCardHost
 import com.mamba.picme.features.common.chat.AgentMarkdown
 import com.mamba.picme.features.debug.openui.QrCodeScanner
@@ -262,13 +261,6 @@ private fun ChatContent(chat: CloudAgentChatViewModel.UiState.Chat, viewModel: C
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.error,
                     )
-                    CloudAgentChatViewModel.Role.MEDIA -> message.media?.let { media ->
-                        // 调试页图集卡：复用主聊天页同款横滑卡组件；点击动作从简（实验页豁免 PARITY）
-                        MediaResultsCarousel(
-                            mediaResults = media,
-                            onCardClick = { },
-                        )
-                    }
                     CloudAgentChatViewModel.Role.HTML_CARD -> message.htmlCard?.let { card ->
                         // 渲染对象是不可信云端产物：渲染前过清洗器；Rejected 降级纯文本，不白屏不崩溃
                         when (val sanitized = remember(message.id) { HtmlCardSanitizer.sanitize(card.html) }) {
