@@ -1296,6 +1296,8 @@
     <string name="tag_scan_full">Tout réanalyser</string>
     <string name="tag_scan_incremental">Analyser les nouveaux</string>
     <string name="tag_scan_pausing">Mise en pause…</string>
+    <string name="tag_scan_window_paused_title">Analyse en pause</string>
+    <string name="tag_scan_window_paused_text">Les limites du système sur le temps d\'exécution en arrière-plan ont mis l\'analyse de balisage en pause ; elle reprendra automatiquement plus tard</string>
     <string name="tag_scan_state_pausing">Mise en pause</string>
     <string name="tag_scan_state_cancelling">Annulation</string>
     <string name="tag_scan_preparing">Préparation</string>

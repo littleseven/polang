@@ -1331,6 +1331,8 @@
     <string name="tag_scan_full">全量重扫</string>
     <string name="tag_scan_incremental">扫描新增</string>
     <string name="tag_scan_pausing">暂停中…</string>
+    <string name="tag_scan_window_paused_title">扫描已暂停</string>
+    <string name="tag_scan_window_paused_text">系统对后台运行时长的限制使打标扫描暂停，稍后将自动继续</string>
     <string name="tag_scan_state_pausing">暂停中</string>
     <string name="tag_scan_state_cancelling">取消中</string>
     <string name="tag_scan_preparing">准备中</string>

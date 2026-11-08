@@ -1296,6 +1296,8 @@
     <string name="tag_scan_full">Reescanear todo</string>
     <string name="tag_scan_incremental">Escanear nuevas</string>
     <string name="tag_scan_pausing">Pausando…</string>
+    <string name="tag_scan_window_paused_title">Escaneo en pausa</string>
+    <string name="tag_scan_window_paused_text">Los límites del sistema sobre el tiempo de ejecución en segundo plano pausaron el escaneo de etiquetado; se reanudará automáticamente más tarde</string>
     <string name="tag_scan_state_pausing">Pausando</string>
     <string name="tag_scan_state_cancelling">Cancelando</string>
     <string name="tag_scan_preparing">Preparando</string>

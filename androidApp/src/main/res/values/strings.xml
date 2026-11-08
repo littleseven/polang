@@ -1340,6 +1340,8 @@
     <string name="tag_scan_full">Rescan all</string>
     <string name="tag_scan_incremental">Scan new</string>
     <string name="tag_scan_pausing">Pausing…</string>
+    <string name="tag_scan_window_paused_title">Scan paused</string>
+    <string name="tag_scan_window_paused_text">System limits on background running time paused the tag scan; it will resume automatically later</string>
     <string name="tag_scan_state_pausing">Pausing</string>
     <string name="tag_scan_state_cancelling">Cancelling</string>
     <string name="tag_scan_preparing">Preparing</string>

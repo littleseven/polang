@@ -603,6 +603,7 @@ class TagGenerationService : Service() {
                     TAG,
                     "startForeground rejected: dataSync FGS window exhausted, retry in ${WINDOW_EXHAUSTED_RETRY_MS / 3_600_000}h"
                 )
+                notifyWindowPaused()
                 TagScanRescheduleReceiver.scheduleResume(applicationContext, WINDOW_EXHAUSTED_RETRY_MS)
             } else {
                 android.util.Log.w(TAG, "startForeground failed (notification permission?), stopping: ${e.message}")
@@ -612,11 +613,41 @@ class TagGenerationService : Service() {
         }
     }
 
+    /**
+     * 窗口耗尽停摆的用户可见通知：前台通知随服务停止消失，若无一告知用户会以为扫描
+     * 无声消失。同 [NOTIFICATION_ID] 覆盖（接管前台通知位）+ setOnlyAlertOnce 静默——
+     * 长退避重试仍失败时再触发只静默更新，不重复打扰；非 ongoing 可滑掉，点击进 app。
+     * 通知权限被拒时 notify 静默失败（不 crash），与前台服务通知同一依赖面。
+     */
+    private fun notifyWindowPaused() {
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = getString(R.string.tag_scan_window_paused_text)
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(getString(R.string.tag_scan_window_paused_title))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(pendingIntent)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
+    }
+
     override fun onTimeout(startId: Int, fgsType: Int) {
         android.util.Log.w(
             TAG,
             "onTimeout: dataSync FGS timed out after long run, scheduling resume in ${RESUME_DELAY_MS}ms"
         )
+        // Android 15+ 的 onTimeout 即窗口耗尽信号（15min 短退避重试多半仍耗尽）——
+        // 停摆立即可见，不等重试失败才告知
+        notifyWindowPaused()
         TagScanRescheduleReceiver.scheduleResume(applicationContext, RESUME_DELAY_MS)
         stopSelf()
     }
