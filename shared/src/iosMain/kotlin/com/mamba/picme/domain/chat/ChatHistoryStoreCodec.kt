@@ -7,19 +7,22 @@ import kotlinx.serialization.json.Json
 /**
  * iOS 聊天历史文件编解码器（`chat_history_<sessionId>.json` 整包线格式，ADR-016 M5 B1）。
  *
- * 与 Android [MessagePartsCodec] 共用同一 parts 嵌套数组线格式（鉴别值 = 10 值分类法
+ * 与 Android [MessagePartsCodec] 共用同一 parts 嵌套数组线格式（鉴别值 = 9 值分类法
  * `type` taxonomy spec §1），但落点不同：iOS 是整文件 JSON 而非 SQLite 行，无
  * `partsJson` 字符串列 / metadata blob 必要——采用**结构化平铺字段 + parts 数组双
  * payload**（平铺字段 = 旧 SwiftUI 渲染器的直读源，切换期等价性的锚；parts = M5
  * 拍平渲染的 SSOT）。
  *
- * - **encode**：`ChatMessageType` 12 值 UI 枚举 → wire 10 值分类法反向映射（UI 枚举
+ * - **encode**：`ChatMessageType` 11 值 UI 枚举 → wire 9 值分类法反向映射（UI 枚举
  *   含 role 前缀变体，role 已独立列承载）；平铺字段缺失时自 parts 补齐，保证文件
  *   内双 payload 一致；
  * - **decode**：parts-first 投影（对齐 androidApp toUiModel M4 口径）——primary part
  *   定 [ChatMessageType]、平铺字段以 parts 提取优先；parts 数组整体缺失时自结构化
  *   平铺字段重建（belt-and-braces，语义对齐 [MessagePartsConverter] 但数据源为结构
  *   化字段而非 metadata blob）；重建失败回原文 Text 兜底，**不允许丢消息**；
+ * - **退役行**：`type` 命中 [LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]
+ *   （横滑相册卡 `media_results`/`data_media_results`，2026-11 退役）的 DTO 整行跳过——
+ *   对齐 Android 回放过滤语义，横滑卡不回放、不回灌；
  * - **不持久化**：performance / claudeAgent / claudeDeliver / isStreaming / showCursor /
  *   isThinking（瞬态，对齐 Android Room 行不落库）；gachaInteractive（计算值，对齐
  *   Android `controller.hasPending(id)` 运行时查询语义，防 restart 后死交互条）。
@@ -42,11 +45,14 @@ object ChatHistoryStoreCodec {
     /**
      * 整包解码：JSON 文件字符串 → 消息列表。null = 空文件/结构损坏，调用方按
      * legacy 格式兜底（Swift 侧 `LegacyChatMessage` 迁移），**不允许丢消息**。
+     * 退役横滑卡行（[LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]）整行跳过。
      */
     fun decode(text: String?): List<ChatMessage>? {
         if (text.isNullOrBlank()) return null
         val dtos = runCatching { json.decodeFromString(listSerializer, text) }.getOrNull() ?: return null
-        return dtos.map { it.toDomain() }
+        return dtos
+            .filter { it.type !in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES }
+            .map { it.toDomain() }
     }
 
     // ── wire DTO（ChatMessage 本体非 @Serializable——LlmPerformance 等瞬态载荷无
@@ -55,7 +61,7 @@ object ChatHistoryStoreCodec {
     @Serializable
     private data class ChatMessageDto(
         val id: String,
-        /** wire 10 值分类法（type taxonomy spec §1），role 信息由 [role] 列承载。 */
+        /** wire 9 值分类法（type taxonomy spec §1），role 信息由 [role] 列承载。 */
         val type: String,
         /** "user" / "agent"（[roleOf] 的反向值域）。 */
         val role: String,
@@ -67,10 +73,9 @@ object ChatHistoryStoreCodec {
         val htmlContent: String? = null,
         val htmlCardMeta: HtmlCardMeta? = null,
         val imageSaved: Boolean = false,
-        val mediaResults: MediaResultsUi? = null,
         val optimizeCandidates: OptimizeCandidateGroup? = null,
         val engineerTask: EngineerTaskState? = null,
-        /** parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 10 值分类法）。 */
+        /** parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 9 值分类法）。 */
         val parts: List<MessagePart> = emptyList(),
     )
 
@@ -97,14 +102,13 @@ object ChatHistoryStoreCodec {
                 is MessagePart.EditResult -> primary.saved
                 else -> false
             },
-            mediaResults = mediaResults ?: (primary as? MessagePart.MediaResults)?.results,
             optimizeCandidates = optimizeCandidates ?: (primary as? MessagePart.OptimizeCandidates)?.group,
             engineerTask = engineerTask ?: (primary as? MessagePart.TaskCard)?.task,
             parts = parts,
         )
     }
 
-    /** ChatMessageType 12 值 UI 枚举 → wire 10 值分类法（role 变体归并，role 列承载）。 */
+    /** ChatMessageType 11 值 UI 枚举 → wire 9 值分类法（role 变体归并，role 列承载）。 */
     private fun wireTypeOf(type: ChatMessageType): String = when (type) {
         ChatMessageType.USER_TEXT, ChatMessageType.AGENT_TEXT -> "text"
         ChatMessageType.USER_IMAGE, ChatMessageType.USER_IMAGE_TEXT, ChatMessageType.AGENT_IMAGE -> "image"
@@ -112,7 +116,6 @@ object ChatHistoryStoreCodec {
         ChatMessageType.HTML_CARD -> "tool_html"
         ChatMessageType.TASK_CARD -> "tool_task"
         ChatMessageType.AGENT_EDIT_RESULT -> "tool_image_edit"
-        ChatMessageType.MEDIA_RESULTS -> "data_media_results"
         ChatMessageType.OPTIMIZE_CANDIDATES -> "data_optimize_candidates"
         ChatMessageType.OPENUI_CARD -> "data_ui_openui"
     }
@@ -130,7 +133,6 @@ object ChatHistoryStoreCodec {
             content = content,
             modelUsed = modelUsed,
             timestamp = timestamp,
-            mediaResults = (primary as? MessagePart.MediaResults)?.results ?: mediaResults,
             imageUri = (primary as? MessagePart.Image)?.ref
                 ?: (primary as? MessagePart.EditResult)?.ref
                 ?: imageUri,
@@ -165,7 +167,6 @@ object ChatHistoryStoreCodec {
         is MessagePart.HtmlCard -> ChatMessageType.HTML_CARD
         is MessagePart.TaskCard -> ChatMessageType.TASK_CARD
         is MessagePart.EditResult -> ChatMessageType.AGENT_EDIT_RESULT
-        is MessagePart.MediaResults -> ChatMessageType.MEDIA_RESULTS
         is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
         // OpenUI 卡 M1 Android-only（openui P1）：iOS 未落地，防御性落文本，正式映射随 iOS 跟随任务
         is MessagePart.OpenUiCard -> ChatMessageType.AGENT_TEXT
@@ -223,14 +224,6 @@ object ChatHistoryStoreCodec {
                 description = content,
                 suggestions = emptyList(), // suggestions 仅随 parts 数组持久化，重建路径不回填
                 saved = imageSaved,
-            ),
-        )
-
-        "data_media_results" -> listOf(
-            MessagePart.MediaResults(
-                "p0",
-                results = mediaResults
-                    ?: throw IllegalArgumentException("data_media_results rebuild missing mediaResults"),
             ),
         )
 

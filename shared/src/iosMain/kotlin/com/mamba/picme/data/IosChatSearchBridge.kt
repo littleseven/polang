@@ -6,14 +6,13 @@ import com.mamba.picme.agent.core.model.context.SearchIntent
  * Swift 搜索引擎（MediaSearchEngine）→ Kotlin 的结果行 DTO：字段全原始类型，K/N → ObjC 导出友好。
  *
  * 双 id 口径（勿混淆）：
- * - [dbId]：iOS TagDatabase `media_assets` 主键。反馈落库（media_feedback.media_id，
- *   对齐 Android `MediaAsset.id.toString()`）与 refine in-set（limitToIds）用此口径；
+ * - [dbId]：iOS TagDatabase `media_assets` 主键。refine in-set（limitToIds）用此口径；
  * - [localIdentifier]：PHAsset localIdentifier = `MediaAsset.uri`；`MediaAsset.id` 由 Kotlin 侧
- *   用 `localIdentifier.hashCode()` 派生（与 [IosMediaRepository] / Chat MediaCardRow 的
- *   javaHashCode 映射同一 id 空间，仅进程内稳定、用于展示定位）。
+ *   用 `localIdentifier.hashCode()` 派生（与 [IosMediaRepository] 同一 id 空间，
+ *   仅进程内稳定、用于媒体定位）。
  */
 data class IosSearchResultItem(
-    /** media_assets 主键（feedback / limitToIds 口径）。 */
+    /** media_assets 主键（limitToIds 口径）。 */
     val dbId: Long,
     /** PHAsset.localIdentifier，同时作 MediaAsset.uri（对齐 IosMediaRepository 语义）。 */
     val localIdentifier: String,
@@ -39,6 +38,8 @@ data class IosSearchResultItem(
  *   否则 Kotlin 侧 suspendCancellableCoroutine 永久挂起。
  *
  * 行为契约 SSOT：`tmp/ios-follow/gallery-search/contracts.md` §9（Chat 搜索链路）。
+ * 横滑卡退役（2026-11）：`recordFeedback` 随 feedback/more/exclude 三命令一并下线
+ * （media_feedback 写路径整删，存量分数仍由 MediaSearchEngine 读路径消费）。
  */
 interface IosChatSearchBridge {
 
@@ -58,14 +59,4 @@ interface IosChatSearchBridge {
         limitToDbIds: List<Long>?,
         completion: (List<IosSearchResultItem>) -> Unit
     )
-
-    /**
-     * 反馈落库（media_feedback 表，契约 §8；同步调用）。
-     *
-     * @param mediaId media_assets 主键字符串（[IosSearchResultItem.dbId]）
-     * @param feedbackType `FeedbackAction.name.lowercase()`（"like"/"dislike"/"more_like_this"）
-     * @param query 最近一轮搜索 query（⚠️ query_text 精确等值匹配，契约 §8/R10）
-     * @param sessionId 会话 id（AgentContext.memorySessionId）
-     */
-    fun recordFeedback(mediaId: String, feedbackType: String, query: String, sessionId: String)
 }

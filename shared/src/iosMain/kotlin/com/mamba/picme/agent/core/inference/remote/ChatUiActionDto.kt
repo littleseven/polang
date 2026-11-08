@@ -10,31 +10,25 @@ import com.mamba.picme.agent.core.model.context.AgentAction
  * 失效（Swift 只看到 ObjC 协议，不能 switch sealed）。本 DTO 将 iOS chat 关心的 4 种
  * action 扁平为单一 data class + kind 标记，Swift 直接按 `kind` 字段 switch。
  *
- * [PRIVACY] 红线：只携带计数、查询词、mediaIds（与 Android 同口径）；
- * **不含**GPS、base64、缩略图数据——Swift 侧用 mediaIds 经
- * `IosMediaRepositoryBridge.fetchAllMedia()` 本地取图，纯端侧渲染。
+ * [PRIVACY] 红线：只携带文本与图片标识字符串；**不含**GPS、base64、缩略图数据。
  * 例外：ai_optimize 的 [imageUri]（图片标识字符串）经进程内桥传递——与 Android
  * AgentCommand 进程内流转同口径，红线针对远程上传，此路径不触网。
  *
- * @property kind 动作类型："media_results" | "text_reply" | "success" | "ai_optimize" | "error"
+ * 横滑卡退役（2026-11）：`media_results` kind 随原生图集卡一并下线——search/refine
+ * 回执已改 [AgentAction.TextReply] 纯计数文案，图集展示走 render_html HTML 卡。
+ *
+ * @property kind 动作类型："text_reply" | "success" | "ai_optimize" | "error"
  * @property message 文本内容（TextReply.message / Error.message / Success.command 的 method 名 /
  *   ai_optimize 的场景解释句 / 空串）
- * @property query 搜索关键词（仅 media_results 有值）
- * @property totalCount 命中数量（仅 media_results）
- * @property mediaIds 命中媒体 id 列表（仅 media_results，用于 Swift 取缩略图）
  * @property imageUri 优化目标图片标识（仅 ai_optimize；LLM 传入的 PHAsset id / file:// 路径 / 媒体 URI）
  */
 data class ChatUiActionDto(
     val kind: String,
     val message: String = "",
-    val query: String = "",
-    val totalCount: Long = 0,
-    val mediaIds: List<Long> = emptyList(),
     val imageUri: String = ""
 ) {
 
     companion object {
-        private const val KIND_MEDIA_RESULTS = "media_results"
         private const val KIND_TEXT_REPLY = "text_reply"
         private const val KIND_SUCCESS = "success"
         private const val KIND_AI_OPTIMIZE = "ai_optimize"
@@ -45,12 +39,6 @@ data class ChatUiActionDto(
          * 不关心的 action 子类型返回 null（Swift 不消费）。
          */
         fun from(action: AgentAction): ChatUiActionDto? = when (action) {
-            is AgentAction.MediaResults -> ChatUiActionDto(
-                kind = KIND_MEDIA_RESULTS,
-                query = action.query,
-                totalCount = action.totalCount.toLong(),
-                mediaIds = action.mediaIds
-            )
             is AgentAction.TextReply -> ChatUiActionDto(
                 kind = KIND_TEXT_REPLY,
                 message = action.message

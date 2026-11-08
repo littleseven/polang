@@ -81,7 +81,7 @@ class IosAgentCompositionTest {
     }
 
     @Test
-    fun watchUiActionsMapsTextReplyAndMediaResults() = runBlocking {
+    fun watchUiActionsMapsTextReply() = runBlocking {
         ensureInitialized()
         val bridge = ChatAgentBridge(AgentOrchestrator.getInstance())
         val received = mutableListOf<ChatUiActionDto>()
@@ -91,20 +91,11 @@ class IosAgentCompositionTest {
             val uiActions = ChatToolService.getInstance().uiActions
             withTimeout(3000) { while (uiActions.subscriptionCount.value == 0) delay(50) }
             uiActions.emit(AgentAction.TextReply(1, "你好"))
-            uiActions.emit(
-                AgentAction.MediaResults(2, query = "cat", mediaIds = listOf(11L, 22L), totalCount = 2, isRefinement = false)
-            )
-            withTimeout(3000) { while (received.size < 2) delay(50) }
+            withTimeout(3000) { while (received.isEmpty()) delay(50) }
 
             val textReply = received[0]
             assertEquals("text_reply", textReply.kind)
             assertEquals("你好", textReply.message)
-
-            val mediaResults = received[1]
-            assertEquals("media_results", mediaResults.kind)
-            assertEquals("cat", mediaResults.query)
-            assertEquals(2L, mediaResults.totalCount)
-            assertEquals(listOf(11L, 22L), mediaResults.mediaIds)
         } finally {
             watcher.cancel()
         }

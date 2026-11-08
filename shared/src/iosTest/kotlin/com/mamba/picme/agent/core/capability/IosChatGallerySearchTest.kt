@@ -100,24 +100,4 @@ class IosChatGallerySearchTest {
         // 非性别词不改动
         assertEquals("夜景", IosChatGallerySearch.cleanConstraint("夜景"))
     }
-
-    // ── parseLabelTags / matchesDescription（契约 §4.6/§9.6）───────────────────
-
-    @Test
-    fun parseLabelTagsReadsTagsArrayAndToleratesBadJson() {
-        assertEquals(listOf("猫", "宠物"), IosChatGallerySearch.parseLabelTags("""{"tags":["猫","宠物"]}"""))
-        assertEquals(emptyList(), IosChatGallerySearch.parseLabelTags("not json"))
-        assertEquals(emptyList(), IosChatGallerySearch.parseLabelTags("""{"other":1}"""))
-    }
-
-    @Test
-    fun matchesDescriptionMatchesAnyTermOnTagsOrFileName() {
-        val a = asset(1, fileName = "party.jpg", labels = """{"tags":["生日","蛋糕"]}""")
-        // 任一词命中 tags 子串或 fileName 子串（ignoreCase）即 true
-        assertEquals(true, IosChatGallerySearch.matchesDescription(a, "蛋糕"))
-        assertEquals(true, IosChatGallerySearch.matchesDescription(a, "风景 蛋糕"))
-        assertEquals(true, IosChatGallerySearch.matchesDescription(a, "PARTY"))
-        assertEquals(false, IosChatGallerySearch.matchesDescription(a, "风景"))
-        assertEquals(false, IosChatGallerySearch.matchesDescription(a, "   "))
-    }
 }

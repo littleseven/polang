@@ -9,27 +9,15 @@ import com.mamba.picme.agent.core.model.command.AgentCommand
  * 本对象只承载「补偿 LLM 路由失误」的确定性规则，原为 ChatViewModel 内的私有
  * 防御性逻辑，收口到 shared commonMain 以便复用（含 iOS）与单测覆盖：
  *
- * - [isRefusedSearchRequest]：检测 LLM 安全对齐误拒相册搜索 → 调用方回退直搜本地相册。
  * - [isExplicitNavigationRequest] / [sanitizeNavigationCommands]：chat 页拦截 LLM
  *   误判的模糊跳转命令（navigate_to / go_back），非明确口令时替换为文本提示。
+ *
+ * （isRefusedSearchRequest 误拒回退判定已随 2026-11-08 直执路由退役删除——
+ *  直执路径整体下线后无生产调用点。）
  *
  * 红线：本层只做保守的误伤修正，不替代 LLM 的开放语义理解；新增规则必须配单测。
  */
 object IntentGuard {
-
-    /**
-     * 检测 LLM 是否拒绝了用户的相册搜索意图（安全对齐误触发）。
-     *
-     * 当用户输入包含搜索关键词（照片/图片/搜/找…）且 LLM 回复同时包含拒绝关键词
-     * （不能/无法/抱歉…）与拒绝对象（搜索/推荐/内容…）时，判定为误拒，
-     * 调用方应回退到直接搜索本地相册。
-     */
-    fun isRefusedSearchRequest(userInput: String, replyText: String): Boolean {
-        val hasSearchIntent = SEARCH_KEYWORDS.any { keyword -> userInput.contains(keyword) }
-        val hasRefusal = REFUSAL_KEYWORDS.any { keyword -> replyText.contains(keyword) } &&
-            REFUSAL_TARGETS.any { keyword -> replyText.contains(keyword) }
-        return hasSearchIntent && hasRefusal
-    }
 
     /**
      * 判断用户输入是否包含明确的页面跳转口令。
@@ -74,10 +62,6 @@ object IntentGuard {
             }
         }
     }
-
-    private val SEARCH_KEYWORDS = listOf("照片", "图片", "照", "搜", "找")
-    private val REFUSAL_KEYWORDS = listOf("不能", "无法", "抱歉", "不合适", "不当", "拒绝")
-    private val REFUSAL_TARGETS = listOf("搜索", "推荐", "此类", "内容", "提供")
 
     private val EXPLICIT_NAVIGATION_PATTERNS = listOf(
         Regex("""(去|回|打开)\s*(相机|相册|设置|调试|模型中心|model_center)"""),

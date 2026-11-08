@@ -1,17 +1,16 @@
 package com.mamba.picme.agent.core.capability
 
 import com.mamba.picme.agent.core.model.context.MediaAsset
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * iOS chat 相册搜索纯逻辑（in-set 过滤 / refine 解析 / 约束清洗 / 标签解析）。
+ * iOS chat 相册搜索纯逻辑（in-set 过滤 / refine 解析 / 约束清洗）。
  *
  * 逐字对齐 Android `app/features/chat/ChatGallerySearch.kt`（契约 §9.4 SSOT：
  * `tmp/ios-follow/gallery-search/contracts.md`）——同一规则双端各一份实现，
  * Android 在 androidApp、iOS 在 shared iosMain（commonMain 不承载，零改动红线）。
+ *
+ * 横滑卡退役（2026-11）：feedback/more/exclude 下线后，`parseLabelTags` /
+ * `matchesDescription`（Description 目标匹配专用）一并删除。
  */
 object IosChatGallerySearch {
 
@@ -78,28 +77,5 @@ object IosChatGallerySearch {
         )
         genderMap[cleaned]?.let { normalized -> cleaned = normalized }
         return cleaned
-    }
-
-    private val labelsJson = Json { ignoreUnknownKeys = true }
-
-    /**
-     * 解析 labels 字段的 `tags` 数组（契约 §4.6：labels 为 JSON 对象字符串，
-     * `JSONObject(labels).optJSONArray("tags")`；非法 JSON → 空表，与 Android parseLabels 同语义）。
-     */
-    fun parseLabelTags(labels: String): List<String> = runCatching {
-        labelsJson.parseToJsonElement(labels).jsonObject["tags"]
-            ?.jsonArray?.map { it.jsonPrimitive.content }
-            ?: emptyList()
-    }.getOrDefault(emptyList())
-
-    /** feedback/more 的 Description 目标匹配：描述按空白切词，任一词命中 tags 或 fileName。 */
-    fun matchesDescription(asset: MediaAsset, description: String): Boolean {
-        val labels = asset.labels?.let { parseLabelTags(it) } ?: emptyList()
-        val terms = description.split(Regex("\\s+")).filter { it.isNotBlank() }
-        if (terms.isEmpty()) return false
-        return terms.any { term ->
-            labels.any { label -> label.contains(term, ignoreCase = true) } ||
-                asset.fileName.contains(term, ignoreCase = true)
-        }
     }
 }

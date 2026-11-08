@@ -8,54 +8,12 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * [IntentGuard] 单测：锁死两条意图守卫规则的判定边界。
+ * [IntentGuard] 单测：锁死导航守卫规则的判定边界。
  *
  * 规则自 ChatViewModel 私有逻辑收口而来，行为须与迁移前逐处等价。
+ *（isRefusedSearchRequest 测试组已随该函数 2026-11-08 退役删除一并移除。）
  */
 class IntentGuardTest {
-
-    // ── isRefusedSearchRequest ──────────────────────────────────
-
-    @Test
-    fun `refused search - search intent plus refusal reply is detected`() {
-        assertTrue(
-            IntentGuard.isRefusedSearchRequest(
-                userInput = "帮我找找去年的照片",
-                replyText = "抱歉，我无法搜索此类内容。"
-            )
-        )
-    }
-
-    @Test
-    fun `refused search - reply without refusal keywords is not detected`() {
-        assertFalse(
-            IntentGuard.isRefusedSearchRequest(
-                userInput = "帮我找找去年的照片",
-                replyText = "为你找到 42 张照片"
-            )
-        )
-    }
-
-    @Test
-    fun `refused search - input without search intent is not detected`() {
-        assertFalse(
-            IntentGuard.isRefusedSearchRequest(
-                userInput = "今天天气怎么样",
-                replyText = "抱歉，我无法提供此类内容。"
-            )
-        )
-    }
-
-    @Test
-    fun `refused search - refusal keyword without target is not detected`() {
-        // 只有拒绝词、没有拒绝对象（搜索/推荐/内容…）时，可能是正常拒绝，不误伤
-        assertFalse(
-            IntentGuard.isRefusedSearchRequest(
-                userInput = "帮我找找照片",
-                replyText = "这个操作我无法完成。"
-            )
-        )
-    }
 
     // ── isExplicitNavigationRequest ─────────────────────────────
 

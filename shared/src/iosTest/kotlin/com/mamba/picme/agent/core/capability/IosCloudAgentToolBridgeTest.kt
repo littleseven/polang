@@ -51,8 +51,6 @@ class IosCloudAgentToolBridgeTest {
             limitToDbIds: List<Long>?,
             completion: (List<IosSearchResultItem>) -> Unit
         ) = completion(results)
-
-        override fun recordFeedback(mediaId: String, feedbackType: String, query: String, sessionId: String) = Unit
     }
 
     private fun newBridge(
@@ -118,11 +116,13 @@ class IosCloudAgentToolBridgeTest {
     }
 
     @Test
-    fun refineWithoutBaseFallsBackToFreshSearch() = runTest {
+    fun refineWithoutBaseReturnsErrorGuidance() = runTest {
+        // 回合护栏 c（对齐 Android）：无搜索基数 → error 引导改用 search_media，不静默全局重搜
         val result = newBridge().execute(
             CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
             mapOf("constraint" to "夜景", "fromMs" to "", "toMs" to ""),
         )
-        assertTrue(!result.startsWith("error:"), "unexpected error: $result")
+        assertTrue(result.startsWith(CloudAgentToolContract.ERROR_PREFIX), "expected error guidance, got: $result")
+        assertTrue(result.contains("search_media"), "expected re-search guidance, got: $result")
     }
 }

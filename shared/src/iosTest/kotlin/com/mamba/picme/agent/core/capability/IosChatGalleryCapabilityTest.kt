@@ -1,8 +1,6 @@
 package com.mamba.picme.agent.core.capability
 
 import com.mamba.picme.agent.core.model.command.AgentCommand
-import com.mamba.picme.agent.core.model.command.FeedbackAction
-import com.mamba.picme.agent.core.model.command.FeedbackTarget
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentErrorCode
@@ -53,15 +51,13 @@ private val ITEMS = listOf(
 
 private fun idOf(localIdentifier: String): Long = localIdentifier.hashCode().toLong()
 
-/** 搜索引擎桥 fake：同步回调 completion，记录调用与反馈落库。 */
+/** 搜索引擎桥 fake：同步回调 completion，记录调用。 */
 private class FakeSearchBridge(
     var results: List<IosSearchResultItem> = emptyList()
 ) : IosChatSearchBridge {
     data class SearchCall(val query: String, val intent: SearchIntent?, val limitToDbIds: List<Long>?)
-    data class FeedbackCall(val mediaId: String, val feedbackType: String, val query: String, val sessionId: String)
 
     val searchCalls = mutableListOf<SearchCall>()
-    val feedbackCalls = mutableListOf<FeedbackCall>()
 
     override fun search(
         query: String,
@@ -71,10 +67,6 @@ private class FakeSearchBridge(
     ) {
         searchCalls += SearchCall(query, intent, limitToDbIds)
         completion(results)
-    }
-
-    override fun recordFeedback(mediaId: String, feedbackType: String, query: String, sessionId: String) {
-        feedbackCalls += FeedbackCall(mediaId, feedbackType, query, sessionId)
     }
 }
 
@@ -120,25 +112,20 @@ class IosChatGalleryCapabilityTest {
         assertTrue(reply.message.contains("1 个视频"), "应含视频数：${reply.message}")
     }
 
-    // ── 搜索 / 细化 ─────────────────────────────────────────────────────────
+    // ── 搜索 / 细化（降级路径；横滑卡退役后回执 = TextReply 计数文案）────────────
 
     @Test
     fun searchMatchesFileNameIgnoreCase() = runTest {
         val (cap, _) = newCapability()
         val action = cap.execute(AgentCommand.SearchMedia(query = "CAT"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(listOf(idOf("L-1")), results.mediaIds)
-        assertEquals(1, results.totalCount)
-        assertEquals(false, results.isRefinement)
+        assertEquals("找到 1 张「CAT」的照片", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
     fun searchNoMatchReturnsZeroResults() = runTest {
         val (cap, _) = newCapability()
         val action = cap.execute(AgentCommand.SearchMedia(query = "zzz"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(0, results.totalCount)
-        assertTrue(results.mediaIds.isEmpty())
+        assertEquals("找到 0 张「zzz」的照片", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
@@ -149,8 +136,7 @@ class IosChatGalleryCapabilityTest {
             intent = SearchIntent(query = "", timeRange = TimeRange(1500L, 2500L))
         )
         val action = cap.execute(command, context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(listOf(idOf("L-2")), results.mediaIds)
+        assertEquals("找到 1 张「」的照片", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
@@ -159,18 +145,25 @@ class IosChatGalleryCapabilityTest {
         // 空关键词搜索 = 「看看最近的」，种子为全部 3 条
         cap.execute(AgentCommand.SearchMedia(query = ""), context, null).getOrThrow()
         val action = cap.execute(AgentCommand.RefineMediaSearch(constraint = "cat"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(listOf(idOf("L-1")), results.mediaIds)
-        assertEquals(true, results.isRefinement)
+        assertEquals("在上一轮结果内找到 1 张「cat」的照片", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
     fun refineWithoutPreviousSearchFallsBackToGlobal() = runTest {
         val (cap, _) = newCapability()
         val action = cap.execute(AgentCommand.RefineMediaSearch(constraint = "dog"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(listOf(idOf("L-2")), results.mediaIds)
-        assertEquals(false, results.isRefinement)
+        assertEquals("找到 1 张「dog」的照片", assertIs<AgentAction.TextReply>(action).message)
+    }
+
+    @Test
+    fun refineEmptyKeepsPriorRoundUnchanged() = runTest {
+        val (cap, _) = newCapability()
+        cap.execute(AgentCommand.SearchMedia(query = ""), context, null).getOrThrow()
+        // 细化无命中 → 计数 0，上一轮集合保留（再细化仍基于原集合）
+        val empty = cap.execute(AgentCommand.RefineMediaSearch(constraint = "不存在"), context, null).getOrThrow()
+        assertEquals("在上一轮结果内找到 0 张「不存在」的照片", assertIs<AgentAction.TextReply>(empty).message)
+        val again = cap.execute(AgentCommand.RefineMediaSearch(constraint = "dog"), context, null).getOrThrow()
+        assertEquals("在上一轮结果内找到 1 张「dog」的照片", assertIs<AgentAction.TextReply>(again).message)
     }
 
     // ── 写命令 ──────────────────────────────────────────────────────────────
@@ -206,7 +199,7 @@ class IosChatGalleryCapabilityTest {
         assertEquals(listOf("L-1"), bridge.deleted)
 
         val refine = cap.execute(AgentCommand.RefineMediaSearch(constraint = "dog"), context, null).getOrThrow()
-        assertEquals(false, assertIs<AgentAction.MediaResults>(refine).isRefinement)
+        assertEquals("找到 1 张「dog」的照片", assertIs<AgentAction.TextReply>(refine).message)
     }
 
     @Test
@@ -257,7 +250,6 @@ class IosChatGalleryCapabilityTest {
         assertEquals(
             listOf(
                 "get_gallery_summary", "search_media", "refine_media_search",
-                "feedback", "more", "exclude",
                 "view_media", "select_media", "favorite_media", "delete_media", "share_media"
             ),
             cap.supportedCommands()
@@ -290,21 +282,18 @@ class IosChatGalleryCapabilityEngineTest {
         val search = FakeSearchBridge(twoPhotos + searchItem(103L, "S-3", mediaType = "VIDEO"))
         val cap = newCapability(search)
         val action = cap.execute(AgentCommand.SearchMedia(query = "海边"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(listOf(idOf("S-1"), idOf("S-2")), results.mediaIds)
-        assertEquals(2, results.totalCount)
-        assertEquals(false, results.isRefinement)
+        // 回执 = TextReply 计数文案（横滑卡退役，逐字对齐 Android toTextReply）；VIDEO 已过滤
+        assertEquals("找到 2 张「海边」的照片", assertIs<AgentAction.TextReply>(action).message)
         assertEquals(FakeSearchBridge.SearchCall("海边", null, null), search.searchCalls.single())
     }
 
     @Test
-    fun searchTruncatesCardsToTwentyButKeepsFullTotalCount() = runTest {
+    fun searchReportsFullHitCountInReply() = runTest {
         val many = (1L..30L).map { searchItem(it, "S-$it") }
         val cap = newCapability(FakeSearchBridge(many))
         val action = cap.execute(AgentCommand.SearchMedia(query = "全部"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(20, results.mediaIds.size, "卡片只取前 20 项（契约 §9.6 MAX_CARDS）")
-        assertEquals(30, results.totalCount)
+        // 无卡片截断概念：回执文案承载全量命中数
+        assertEquals("找到 30 张「全部」的照片", assertIs<AgentAction.TextReply>(action).message)
     }
 
     // ── refine_media_search（契约 §9.2/§9.4）──────────────────────────────────
@@ -324,9 +313,7 @@ class IosChatGalleryCapabilityEngineTest {
             FakeSearchBridge.SearchCall("4月", intent, listOf(101L, 102L)),
             search.searchCalls.last()
         )
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(listOf(idOf("S-2")), results.mediaIds)
-        assertEquals(true, results.isRefinement)
+        assertEquals("在上一轮结果内找到 1 张「4月」的照片", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
@@ -337,9 +324,7 @@ class IosChatGalleryCapabilityEngineTest {
 
         // 「只要夜景」→ 清洗为「夜景」；filterInSet 按 labels 命中 S-2（不走引擎语义并集）
         val action = cap.execute(AgentCommand.RefineMediaSearch(constraint = "只要夜景"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(listOf(idOf("S-2")), results.mediaIds)
-        assertEquals(true, results.isRefinement)
+        assertEquals("在上一轮结果内找到 1 张「只要夜景」的照片", assertIs<AgentAction.TextReply>(action).message)
         assertEquals("夜景", search.searchCalls.last().query, "constraint 应被清洗")
         assertEquals(listOf(101L, 102L), search.searchCalls.last().limitToDbIds)
     }
@@ -350,145 +335,27 @@ class IosChatGalleryCapabilityEngineTest {
         val cap = newCapability(search)
         cap.execute(AgentCommand.SearchMedia(query = "照片"), context, null).getOrThrow()
 
-        // 细化无命中（filterInSet 空 + 引擎 hits 空）→ 返回空细化结果，上一轮集合不变
+        // 细化无命中（filterInSet 空 + 引擎 hits 空）→ 计数 0，上一轮集合不变
         search.results = emptyList()
         val empty = cap.execute(AgentCommand.RefineMediaSearch(constraint = "不存在"), context, null).getOrThrow()
-        val emptyResults = assertIs<AgentAction.MediaResults>(empty)
-        assertEquals(0, emptyResults.totalCount)
-        assertEquals(true, emptyResults.isRefinement)
+        assertEquals("在上一轮结果内找到 0 张「不存在」的照片", assertIs<AgentAction.TextReply>(empty).message)
 
         // 再细化仍基于上一轮 2 条（状态未被空结果覆盖）
         search.results = twoPhotos
         val again = cap.execute(AgentCommand.RefineMediaSearch(constraint = "夜景"), context, null).getOrThrow()
-        assertEquals(listOf(idOf("S-2")), assertIs<AgentAction.MediaResults>(again).mediaIds)
+        assertEquals("在上一轮结果内找到 1 张「夜景」的照片", assertIs<AgentAction.TextReply>(again).message)
     }
 
     @Test
-    fun refineWithoutPriorFallsBackToGlobalSearch() = runTest {
+    fun refineWithoutPriorReturnsGuardError() = runTest {
         val search = FakeSearchBridge(twoPhotos)
         val cap = newCapability(search)
+        // 回合护栏 c（对齐 Android）：无搜索基数 → 明确错误引导改用 search_media，
+        // 不静默全局重搜、不调引擎、不动状态
         val action = cap.execute(AgentCommand.RefineMediaSearch(constraint = "海边"), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals(false, results.isRefinement, "无上一轮 → 当 fresh 全局搜")
-        assertEquals(listOf(idOf("S-1"), idOf("S-2")), results.mediaIds)
-        assertEquals(null, search.searchCalls.single().limitToDbIds)
-    }
-
-    // ── feedback（契约 §9.6/§8）───────────────────────────────────────────────
-
-    @Test
-    fun feedbackRecordsWithDbIdAndLastRoundQuery() = runTest {
-        val search = FakeSearchBridge(twoPhotos)
-        val cap = newCapability(search)
-        cap.execute(AgentCommand.SearchMedia(query = "海边"), context, null).getOrThrow()
-
-        val command = AgentCommand.RecordMediaFeedback(
-            target = FeedbackTarget.LastShown, action = FeedbackAction.LIKE
-        )
-        val action = cap.execute(command, context, null).getOrThrow()
-        assertIs<AgentAction.Success>(action)
-        assertEquals(
-            listOf(FakeSearchBridge.FeedbackCall("101", "like", "海边", "s1")),
-            search.feedbackCalls
-        )
-    }
-
-    @Test
-    fun feedbackByOrdinalResolvesOneBasedIndex() = runTest {
-        val search = FakeSearchBridge(twoPhotos)
-        val cap = newCapability(search)
-        cap.execute(AgentCommand.SearchMedia(query = "照片"), context, null).getOrThrow()
-
-        val command = AgentCommand.RecordMediaFeedback(
-            target = FeedbackTarget.Ordinal(2), action = FeedbackAction.DISLIKE
-        )
-        cap.execute(command, context, null).getOrThrow()
-        assertEquals("102", search.feedbackCalls.single().mediaId)
-        assertEquals("dislike", search.feedbackCalls.single().feedbackType)
-    }
-
-    @Test
-    fun feedbackWithoutPriorResultsFailsResolve() = runTest {
-        val cap = newCapability(FakeSearchBridge(twoPhotos))
-        val command = AgentCommand.RecordMediaFeedback(
-            target = FeedbackTarget.LastShown, action = FeedbackAction.LIKE
-        )
-        val action = cap.execute(command, context, null).getOrThrow()
         val error = assertIs<AgentAction.Error>(action)
         assertEquals(AgentErrorCode.INVALID_PARAMS, error.errorCode)
-        assertEquals("feedback_resolve_failure", error.message)
-    }
-
-    // ── more（契约 §9.6）──────────────────────────────────────────────────────
-
-    @Test
-    fun moreLikeThisBuildsConstraintFromTopThreeTags() = runTest {
-        val search = FakeSearchBridge(twoPhotos)
-        val cap = newCapability(search)
-        cap.execute(AgentCommand.SearchMedia(query = "照片"), context, null).getOrThrow()
-
-        // 引擎对「和这张照片类似的：海边、沙滩」返回 S-1（filterInSet 字面不中，走 hits ∩ prior）
-        search.results = listOf(twoPhotos[0])
-        val action = cap.execute(AgentCommand.MoreLikeThis(target = FeedbackTarget.LastShown), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals("和这张照片类似的：海边、沙滩", results.query)
-        assertEquals(false, results.isRefinement, "MoreLikeThis 结果 isRefinement 强制 false（Android 特化）")
-        assertEquals(listOf(idOf("S-1")), results.mediaIds)
-    }
-
-    @Test
-    fun moreLikeThisWithoutTagsUsesFallbackConstraint() = runTest {
-        val noTags = listOf(searchItem(101L, "S-1", labels = null))
-        val search = FakeSearchBridge(noTags)
-        val cap = newCapability(search)
-        cap.execute(AgentCommand.SearchMedia(query = "照片"), context, null).getOrThrow()
-
-        val action = cap.execute(AgentCommand.MoreLikeThis(target = FeedbackTarget.Ordinal(1)), context, null).getOrThrow()
-        assertEquals("更多类似这张照片的", assertIs<AgentAction.MediaResults>(action).query)
-    }
-
-    @Test
-    fun moreLikeThisWithoutPriorReturnsEmptyOutcome() = runTest {
-        val cap = newCapability(FakeSearchBridge(twoPhotos))
-        val action = cap.execute(AgentCommand.MoreLikeThis(target = FeedbackTarget.LastShown), context, null).getOrThrow()
-        val results = assertIs<AgentAction.MediaResults>(action)
-        assertEquals("", results.query)
-        assertEquals(0, results.totalCount)
-    }
-
-    // ── exclude（契约 §9.6）───────────────────────────────────────────────────
-
-    @Test
-    fun excludePrunesCurrentResultsInMemory() = runTest {
-        val search = FakeSearchBridge(twoPhotos)
-        val cap = newCapability(search)
-        cap.execute(AgentCommand.SearchMedia(query = "照片"), context, null).getOrThrow()
-
-        val action = cap.execute(AgentCommand.ExcludeConstraint(constraint = "夜景"), context, null).getOrThrow()
-        assertIs<AgentAction.Success>(action)
-
-        // 排除后结果集只剩 S-1：Ordinal(2) 解析失败，Ordinal(1) 仍命中
-        val fail = cap.execute(
-            AgentCommand.RecordMediaFeedback(target = FeedbackTarget.Ordinal(2), action = FeedbackAction.LIKE),
-            context, null
-        ).getOrThrow()
-        assertEquals("feedback_resolve_failure", assertIs<AgentAction.Error>(fail).message)
-
-        cap.execute(
-            AgentCommand.RecordMediaFeedback(target = FeedbackTarget.Ordinal(1), action = FeedbackAction.LIKE),
-            context, null
-        ).getOrThrow()
-        assertEquals("101", search.feedbackCalls.single().mediaId)
-    }
-
-    @Test
-    fun excludeBlankOrWithoutResultsFailsResolve() = runTest {
-        val search = FakeSearchBridge(twoPhotos)
-        val cap = newCapability(search)
-        val blank = cap.execute(AgentCommand.ExcludeConstraint(constraint = "  "), context, null).getOrThrow()
-        assertEquals(AgentErrorCode.INVALID_PARAMS, assertIs<AgentAction.Error>(blank).errorCode)
-
-        val noResults = cap.execute(AgentCommand.ExcludeConstraint(constraint = "夜景"), context, null).getOrThrow()
-        assertEquals(AgentErrorCode.INVALID_PARAMS, assertIs<AgentAction.Error>(noResults).errorCode)
+        assertTrue(error.message.contains("没有上一轮搜索结果可细化"), "应引导改用 search_media：${error.message}")
+        assertTrue(search.searchCalls.isEmpty(), "无基数时不得调引擎")
     }
 }
