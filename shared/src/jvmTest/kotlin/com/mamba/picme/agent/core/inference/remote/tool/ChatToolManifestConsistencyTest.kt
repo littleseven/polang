@@ -11,7 +11,7 @@ import org.junit.Test
  *
  * iOS 侧无反射，chat 工具表面由 commonMain `ChatToolManifest` 手工维护；本测试用
  * Koog JVM 反射（`asToolsByClass()`，与 Android 组合根同一扫描函数）展开
- * [ChatToolService]，对 9 个 iOS 工具（8 相册 + ai_optimize）逐项比对：name / description / 必需参数
+ * [ChatToolService]，对 9 个 iOS 工具（7 相册 + ai_optimize + load_skill）逐项比对：name / description / 必需参数
  * （名称+描述+类型）/ 可选参数。任一侧改动（@LLMDescription 文案、参数增减）
  * 而另一侧未同步，本测试即红。
  *
@@ -25,10 +25,11 @@ class ChatToolManifestConsistencyTest {
             .associateBy { it.name }
 
     @Test
-    fun `manifest covers exactly the 8 ios chat tools`() {
+    fun `manifest covers exactly the 9 ios chat tools`() {
         val expected = setOf(
             "get_gallery_summary", "search_media", "refine_media_search",
             "select_media", "favorite_media", "delete_media", "share_media", "ai_optimize",
+            "load_skill",
         )
         assertEquals(expected, ChatToolManifest.buildDescriptors().map { it.name }.toSet())
     }

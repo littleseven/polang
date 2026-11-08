@@ -1,5 +1,6 @@
 package com.mamba.picme.agent.core.inference.remote.tool
 
+import com.mamba.picme.agent.core.skill.AgentSkillContract
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,11 +19,12 @@ class ChatToolManifestDescriptorTest {
     private val descriptors = ChatToolManifest.buildDescriptors()
 
     @Test
-    fun `exactly 8 tools with deterministic names`() {
+    fun `exactly 9 tools with deterministic names`() {
         assertEquals(
             listOf(
                 "get_gallery_summary", "search_media", "refine_media_search",
                 "select_media", "favorite_media", "delete_media", "share_media", "ai_optimize",
+                "load_skill",
             ),
             descriptors.map { it.name },
         )
@@ -65,5 +67,14 @@ class ChatToolManifestDescriptorTest {
         val optimize = descriptors.single { it.name == "ai_optimize" }
         assertEquals("AI 一键优化图片。imageUri 为图片 URI。", optimize.description)
         assertEquals("图片 URI", optimize.requiredParameters.single { it.name == "imageUri" }.description)
+
+        // load_skill（2026-11-08 端侧执行器 iOS 接线）：manifest 与 @Tool 真源同引
+        // AgentSkillContract const，description/参数描述与契约 SSOT 逐字节一致
+        val loadSkill = descriptors.single { it.name == AgentSkillContract.TOOL_LOAD_SKILL }
+        assertEquals(AgentSkillContract.DESC_LOAD_SKILL, loadSkill.description)
+        assertEquals(
+            AgentSkillContract.DESC_PARAM_SKILL_NAME,
+            loadSkill.requiredParameters.single { it.name == "name" }.description,
+        )
     }
 }

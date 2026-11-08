@@ -8,8 +8,9 @@ import com.mamba.picme.agent.core.inference.remote.tool.ToolInventory
  *
  * 背景：Android `RemoteChatEngine.buildChatSystemPrompt` 大量引用 JS 沙箱
  * （run_gallery_script/draw_chart/capability.dispatch）、修图、记忆、设置工具——
- * iOS v1 只注册 8 个相册工具 + ai_optimize（见 ChatToolManifest），沿用全量 prompt
- * 会诱使 LLM 幻觉调用不存在的工具。本 prompt 只保留与已注册工具匹配的规则段：
+ * iOS 注册 7 个相册工具 + ai_optimize + load_skill（见 ChatToolManifest，2026-11-08
+ * 端侧 load_skill 接线 +load_skill），沿用全量 prompt 会诱使 LLM 幻觉调用不存在的
+ * 工具。本 prompt 只保留与已注册工具匹配的规则段：
  * - 角色一句 + ToolInventory 确定性清单段（与 Android 同生成器、同格式）；
  * - 多轮窄化规则（refine vs search）逐字保留（去掉 JS 的 gallery.query 指引行）；
  * - 收敛规则（无画图场景版：取数 1 次即总结）；

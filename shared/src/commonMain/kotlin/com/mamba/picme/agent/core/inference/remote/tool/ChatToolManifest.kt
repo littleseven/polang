@@ -5,6 +5,7 @@ import ai.koog.agents.core.tools.ToolBase
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
+import com.mamba.picme.agent.core.skill.AgentSkillContract
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
@@ -13,7 +14,10 @@ import kotlinx.serialization.Serializable
  * 用 [SimpleTool] 子类逐字面对齐 [ChatToolService] 的 7 个相册工具 + ai_optimize
  * （2026-08-16 抽卡追齐新增；2026-09-26 意图路由 M1：`view_media` 移出 chat 工具面
  *（chat 内看图 = 点横滑卡片，消除 chat 必败工具陷阱），`search_media` 增补
- * person/fromMs/toMs 结构化参数透传；2026-09-29 `search_media` 再增补 hasFace 参数）。
+ * person/fromMs/toMs 结构化参数透传；2026-09-29 `search_media` 再增补 hasFace 参数）；
+ * 2026-11-08 端侧 load_skill 执行器 iOS 接线：+`load_skill`（技能是跨意图元能力，
+ * 名字/描述/参数描述直接引用 [AgentSkillContract] const——端云 LLM 可见面 SSOT，
+ * 天然与 @Tool 真源逐字节一致，无双写漂移面）。
  *
  * 一致性纪律：name/description/参数名/参数描述**逐字节**照抄 @Tool(customName) 与
  * @LLMDescription 原文（改任何一侧都会触发 jvmTest `ChatToolManifestConsistencyTest`
@@ -69,6 +73,11 @@ object ChatToolManifest {
     @Serializable
     class AiOptimizeArgs(
         @property:LLMDescription("图片 URI") val imageUri: String,
+    )
+
+    @Serializable
+    class LoadSkillArgs(
+        @property:LLMDescription(AgentSkillContract.DESC_PARAM_SKILL_NAME) val name: String,
     )
 
     // ── 工具实现（委托 ChatToolService 同名 suspend 方法）─────────────────────────
@@ -146,7 +155,21 @@ object ChatToolManifest {
             ChatToolService.getInstance().aiOptimize(args.imageUri)
     }
 
-    /** 8 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
+    /**
+     * load_skill（2026-11-08 端侧执行器 iOS 接线）：name/description/参数描述引用
+     * [AgentSkillContract] const（与 @Tool 真源同源，零漂移面）；执行端 =
+     * [LoadSkillCapability]（组合根注册），正文来自 SkillRepository 缓存 + 单点穿透。
+     */
+    private class LoadSkillTool : SimpleTool<LoadSkillArgs>(
+        argsType = typeToken<LoadSkillArgs>(),
+        name = AgentSkillContract.TOOL_LOAD_SKILL,
+        description = AgentSkillContract.DESC_LOAD_SKILL,
+    ) {
+        override suspend fun execute(args: LoadSkillArgs): String =
+            ChatToolService.getInstance().loadSkill(args.name)
+    }
+
+    /** 9 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
     val tools: List<ToolBase<*, *>> by lazy {
         listOf(
             GetGallerySummaryTool(),
@@ -157,6 +180,7 @@ object ChatToolManifest {
             DeleteMediaTool(),
             ShareMediaTool(),
             AiOptimizeTool(),
+            LoadSkillTool(),
         )
     }
 
