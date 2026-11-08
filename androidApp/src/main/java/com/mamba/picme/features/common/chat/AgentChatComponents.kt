@@ -296,9 +296,6 @@ private fun getAgentCommandDisplayName(context: Context, command: AgentCommand):
         is AgentCommand.OpenSystemSettings -> context.getString(R.string.chat_cmd_open_system_settings)
         is AgentCommand.Unknown -> context.getString(R.string.chat_cmd_unknown_command)
         is AgentCommand.Error -> context.getString(R.string.chat_cmd_execution_error)
-        is AgentCommand.RecordMediaFeedback -> context.getString(R.string.chat_cmd_media_feedback)
-        is AgentCommand.MoreLikeThis -> context.getString(R.string.chat_cmd_more_like_this)
-        is AgentCommand.ExcludeConstraint -> context.getString(R.string.chat_cmd_exclude_constraint)
         is AgentCommand.ExecuteScript -> context.getString(R.string.chat_cmd_execute_script)
         is AgentCommand.DrawChart -> context.getString(R.string.chat_cmd_draw_chart)
         is AgentCommand.RenderHtml -> context.getString(R.string.chat_cmd_render_html)
@@ -361,9 +358,6 @@ private fun resolveCommandIcon(command: AgentCommand): ImageVector = when (comma
     is AgentCommand.OpenSystemSettings -> Icons.Rounded.Settings
     is AgentCommand.Unknown -> Icons.AutoMirrored.Rounded.Help
     is AgentCommand.Error -> Icons.Rounded.Error
-    is AgentCommand.RecordMediaFeedback -> Icons.Rounded.Favorite
-    is AgentCommand.MoreLikeThis -> Icons.Rounded.Search
-    is AgentCommand.ExcludeConstraint -> Icons.Rounded.Delete
     is AgentCommand.ExecuteScript -> Icons.Rounded.Code
     is AgentCommand.DrawChart -> Icons.Rounded.Code
     is AgentCommand.RenderHtml -> Icons.Rounded.Web

@@ -19,8 +19,9 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
 
     /**
-     * 新分类法 8 值（spec §1）：text, image, tool_chart, tool_html, tool_task,
-     * tool_image_edit, data_media_results, data_optimize_candidates。
+     * 新分类法（spec §1）：text, image, tool_chart, tool_html, tool_task,
+     * tool_image_edit, data_optimize_candidates 等（data_media_results 已随横滑卡
+     * 退役，存量行为历史残留，回放路径整行跳过，见 LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES）。
      * 降级定位：索引冗余 + 迁移源；读面权威是 partsJson。
      */
     val type: String,

@@ -1067,7 +1067,6 @@ class AppContainerImpl(
             chatSessionDao = database.chatSessionDao(),
             userSettingsRepository = userPreferencesRepository,
             mediaSearchEngine = mediaSearchEngine,
-            mediaFeedbackRepository = mediaFeedbackRepository,
             mediaRepository = repository,
             picMeAuthClient = picMeAuthClient,
             getGallerySummaryUseCase = getGallerySummaryUseCase,
@@ -1084,8 +1083,7 @@ class AppContainerImpl(
             tagGenerationScheduler = tagGenerationScheduler,
             browserWebSocketClient = browserWebSocketClient,
             cloudAgentApi = cloudAgentApi,
-            deviceToolExecutor = deviceToolExecutor,
-            cloudAgentGalleryTools = cloudAgentGalleryTools
+            deviceToolExecutor = deviceToolExecutor
         ).also { deps ->
             // app_tool_request 采集执行器：工厂依赖容器内数据源，构造后回填（先于 ChatViewModel 创建）
             deps.appToolExecutor = buildAppToolExecutor(deps)
@@ -1255,8 +1253,8 @@ class AppContainerImpl(
     private val deviceToolExecutor: DeviceToolExecutor by lazy {
         DeviceToolExecutor(
             gallerySummary = { cloudAgentGalleryTools.getGallerySummary() },
-            searchMedia = { query, person, fromMs, toMs, hasFace, display, mediaType ->
-                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace, display, mediaType)
+            searchMedia = { query, person, fromMs, toMs, hasFace, mediaType ->
+                cloudAgentGalleryTools.searchMedia(query, person, fromMs, toMs, hasFace, mediaType)
             },
             refineSearch = { constraint, fromMs, toMs ->
                 cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)
@@ -1270,7 +1268,6 @@ class AppContainerImpl(
                 api = cloudAgentApi,
                 deviceToolExecutor = deviceToolExecutor,
                 settingsRepository = userPreferencesRepository,
-                cloudAgentGalleryTools = cloudAgentGalleryTools,
                 roundInFlightHint = { context.getString(R.string.cloud_agent_round_in_flight) },
                 stepLabel = { resId -> context.getString(resId) },
             )

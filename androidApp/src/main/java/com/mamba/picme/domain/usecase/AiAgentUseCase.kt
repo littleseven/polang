@@ -225,10 +225,6 @@ class AiAgentUseCase(
             // 错误/未知命令 —— 明确报告，不允许掩盖
             is AgentCommand.Error -> AiAgentCommand.TextReply("命令错误: ${command.reason}")
             is AgentCommand.Unknown -> AiAgentCommand.TextReply("未知命令: ${command.raw}")
-            // Feedback 命令无 legacy 对应，统一转文本提示
-            is AgentCommand.RecordMediaFeedback -> AiAgentCommand.TextReply("记录媒体反馈")
-            is AgentCommand.MoreLikeThis -> AiAgentCommand.TextReply("查找更多相似")
-            is AgentCommand.ExcludeConstraint -> AiAgentCommand.TextReply("排除约束")
             is AgentCommand.ExecuteScript -> AiAgentCommand.TextReply("执行脚本")
             is AgentCommand.DrawChart -> AiAgentCommand.TextReply("画图表")
             is AgentCommand.RenderHtml -> AiAgentCommand.TextReply("渲染 HTML 卡片")

@@ -2,8 +2,6 @@ package com.mamba.picme.features.chat.capability
 
 import com.mamba.picme.agent.core.capability.BaseCapability
 import com.mamba.picme.agent.core.model.command.AgentCommand
-import com.mamba.picme.agent.core.model.command.FeedbackAction
-import com.mamba.picme.agent.core.model.command.FeedbackTarget
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentErrorCode
@@ -19,6 +17,10 @@ import java.lang.ref.WeakReference
  * 职责：在 CHAT 场景把 search_media / refine_media_search 暴露为可用工具，
  * 并把命令回调给 [Delegate]（由 ChatViewModel 实现）执行。
  * 镜像 GalleryCapability 的 WeakReference Delegate 套路。
+ *
+ * 横滑卡退役（2026-11-08）：搜索/细化结果不再产出卡片 action，统一回 [AgentAction.TextReply]
+ * 计数文本；展示由 LLM 经 render_html 图集卡完成。反馈三件套（record_feedback /
+ * more_like_this / exclude_constraint）同步删除。
  */
 class ChatSearchCapability private constructor() : BaseCapability() {
 
@@ -34,7 +36,7 @@ class ChatSearchCapability private constructor() : BaseCapability() {
     private val tag = "ChatSearchCapability"
 
     override val name: String = "chat_gallery_search"
-    override val description: String = "在聊天中搜索相册照片，结果以卡片展示；支持多轮细化筛选"
+    override val description: String = "在聊天中搜索相册照片；支持多轮细化筛选"
 
     /**
      * 执行委托：由 ChatViewModel 实现并绑定。返回 [SearchOutcome]（全量命中 id）。
@@ -42,9 +44,6 @@ class ChatSearchCapability private constructor() : BaseCapability() {
     interface Delegate {
         suspend fun onSearchMedia(query: String, intent: SearchIntent? = null): SearchOutcome
         suspend fun onRefineMediaSearch(constraint: String, intent: SearchIntent? = null): SearchOutcome
-        suspend fun onRecordMediaFeedback(target: FeedbackTarget, action: FeedbackAction): Boolean
-        suspend fun onMoreLikeThis(target: FeedbackTarget): SearchOutcome
-        suspend fun onExcludeConstraint(constraint: String): Boolean
     }
 
     private var delegateRef: WeakReference<Delegate>? = null
@@ -65,18 +64,12 @@ class ChatSearchCapability private constructor() : BaseCapability() {
 
     override fun supportedCommands(): List<String> = listOf(
         "search_media",
-        "refine_media_search",
-        "feedback",
-        "more",
-        "exclude"
+        "refine_media_search"
     )
 
     override fun getCommandDescription(command: String): String = when (command) {
         "search_media" -> "搜索相册照片，参数: query (自然语言，如'去年夏天'、'海边的')"
         "refine_media_search" -> "在上一轮相册搜索结果中细化筛选，参数: constraint (如'海边的'、'夜景')"
-        "feedback" -> "记录用户对某张图片的反馈，参数: target (last/ordinal:N/desc:xxx/mediaId:xxx), action (like/dislike)"
-        "more" -> "基于指定图片推荐更多相似照片，参数: target (last/ordinal:N/desc:xxx/mediaId:xxx)"
-        "exclude" -> "在后续搜索中排除某类约束，参数: constraint (如'夜景'、'室内')"
         else -> "未知命令"
     }
 
@@ -96,40 +89,9 @@ class ChatSearchCapability private constructor() : BaseCapability() {
         return try {
             when (command) {
                 is AgentCommand.SearchMedia -> d.onSearchMedia(command.query, command.intent)
-                    .toMediaResults(command.commandId)
+                    .toTextReply(command.commandId)
                 is AgentCommand.RefineMediaSearch -> d.onRefineMediaSearch(command.constraint, command.intent)
-                    .toMediaResults(command.commandId)
-                is AgentCommand.RecordMediaFeedback -> {
-                    val success = d.onRecordMediaFeedback(command.target, command.action)
-                    if (success) {
-                        Result.success(AgentAction.Success(commandId = command.commandId, command = command))
-                    } else {
-                        Result.success(
-                            AgentAction.Error(
-                                commandId = command.commandId,
-                                errorCode = AgentErrorCode.INVALID_PARAMS,
-                                message = "feedback_resolve_failure"
-                            )
-                        )
-                    }
-                }
-                is AgentCommand.MoreLikeThis -> d.onMoreLikeThis(command.target)
-                    .copy(isRefinement = false)
-                    .toMediaResults(command.commandId)
-                is AgentCommand.ExcludeConstraint -> {
-                    val success = d.onExcludeConstraint(command.constraint)
-                    if (success) {
-                        Result.success(AgentAction.Success(commandId = command.commandId, command = command))
-                    } else {
-                        Result.success(
-                            AgentAction.Error(
-                                commandId = command.commandId,
-                                errorCode = AgentErrorCode.INVALID_PARAMS,
-                                message = "feedback_resolve_failure"
-                            )
-                        )
-                    }
-                }
+                    .toTextReply(command.commandId)
                 else -> Result.success(
                     AgentAction.Error(
                         commandId = command.commandId,
@@ -164,7 +126,12 @@ data class SearchOutcome(
     val isRefinement: Boolean,
     val errorMessage: String? = null
 ) {
-    fun toMediaResults(commandId: Int): Result<AgentAction> {
+    /**
+     * 横滑卡退役后的产出形态：计数文本（LLM 观测与用户可见消息共用）。
+     * 命中 id 清单由 ChatViewModel 搜索基数（lastResultAssets / 快照）承载，
+     * LLM 出图集卡经 render_html + media://{id} 引用。
+     */
+    fun toTextReply(commandId: Int): Result<AgentAction> {
         if (errorMessage != null) {
             return Result.success(
                 AgentAction.Error(
@@ -174,14 +141,11 @@ data class SearchOutcome(
                 )
             )
         }
-        return Result.success(
-            AgentAction.MediaResults(
-                commandId = commandId,
-                query = query,
-                mediaIds = mediaIds,
-                totalCount = totalCount,
-                isRefinement = isRefinement
-            )
-        )
+        val message = if (isRefinement) {
+            "在上一轮结果内找到 $totalCount 张「$query」的照片"
+        } else {
+            "找到 $totalCount 张「$query」的照片"
+        }
+        return Result.success(AgentAction.TextReply(commandId = commandId, message = message))
     }
 }

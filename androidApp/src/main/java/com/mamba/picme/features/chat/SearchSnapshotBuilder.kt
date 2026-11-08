@@ -17,6 +17,9 @@ internal object SearchSnapshotBuilder {
     /** 保留最近几轮搜索快照用于多轮对话上下文。 */
     internal const val MAX_ROUNDS = 3
 
+    /** 快照项上限（横滑卡退役后承接原卡片展示上限语义：快照服务 LLM 指代与出卡取数，前 20 项足够）。 */
+    internal const val MAX_ITEMS = 20
+
     /** 每张图片取前几个标签用于自然语言指代。 */
     internal const val MAX_TAGS_PER_ITEM = 3
 

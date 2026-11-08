@@ -215,7 +215,6 @@ import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
 import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
 import com.mamba.picme.features.chat.components.GuestNudgeBanner
 import com.mamba.picme.features.chat.components.GachaCandidateStrip
-import com.mamba.picme.features.chat.components.MediaResultsCarousel
 import androidx.core.net.toUri
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.MediaPager
@@ -502,16 +501,13 @@ fun ChatScreen(
         mediaViewModel.trashController.outcomes.collect { outcome ->
             if (outcome is TrashOutcome.Trashed && outcome.tag == TRASH_TAG_PREVIEW_CHAT) {
                 val trashed = outcome.trashedUris.toSet()
-                // 聊天流内联结果图同步清理，防死图（同 pendingDeletedIds 确认管线口径）
-                previewAssets.filter { it.uri in trashed }.forEach { asset ->
-                    viewModel.removeMediaResultAsset(asset.id)
-                }
+                // 预览列表同步收缩，防死图（同 pendingDeletedIds 确认管线口径）
                 previewAssets = previewAssets.filter { it.uri !in trashed }
             }
         }
     }
 
-    // 当媒体库刷新后发现 preview 中的某张图已被物理删除，同步清理 preview 列表和 chat 消息
+    // 当媒体库刷新后发现 preview 中的某张图已被物理删除，同步清理 preview 列表
     LaunchedEffect(allMedia) {
         if (allMedia.isEmpty()) return@LaunchedEffect
         val existingIds = allMedia.map { it.id }.toSet()
@@ -520,7 +516,6 @@ fun ChatScreen(
         if (pendingDeletedIds.isNotEmpty()) {
             val confirmedRemoved = pendingDeletedIds.filter { it != 0L && it !in existingIds }.toSet()
             if (confirmedRemoved.isNotEmpty()) {
-                confirmedRemoved.forEach { viewModel.removeMediaResultAsset(it) }
                 pendingDeletedIds = pendingDeletedIds - confirmedRemoved
             }
         }
@@ -724,22 +719,6 @@ fun ChatScreen(
                             }
                             Box(modifier = Modifier.padding(top = topGap)) {
                             when (item.contentType) {
-                                ChatListItem.TYPE_MEDIA_RESULTS -> {
-                                    val results = (item.part as MessagePart.MediaResults).results
-                                    MediaResultsCarousel(
-                                        mediaResults = results,
-                                        onCardClick = { index ->
-                                            previewAssets = results.assets
-                                            previewIndex = index
-                                        },
-                                        onViewAll = {
-                                            onNavigateToGallery(results.query)
-                                        },
-                                        onFeedback = { mediaId, action ->
-                                            viewModel.onMediaFeedback(mediaId, results.query, action)
-                                        }
-                                    )
-                                }
                                 ChatListItem.TYPE_CHART -> {
                                     val chartSvg = (item.part as MessagePart.Chart).svg
                                     ChartSvgCard(svg = chartSvg, onClick = { previewChartSvg = chartSvg })

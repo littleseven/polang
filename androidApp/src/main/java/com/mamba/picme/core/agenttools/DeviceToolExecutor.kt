@@ -21,7 +21,7 @@ import org.json.JSONObject
  */
 class DeviceToolExecutor(
     private val gallerySummary: suspend () -> String,
-    private val searchMedia: suspend (String, String, String, String, String, String, String) -> String,
+    private val searchMedia: suspend (String, String, String, String, String, String) -> String,
     private val refineSearch: suspend (String, String, String) -> String,
 ) {
 
@@ -31,11 +31,11 @@ class DeviceToolExecutor(
                 CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> gallerySummary()
                 CloudAgentToolContract.TOOL_SEARCH_MEDIA -> {
                     // 参数名/键序/兼容缺省全部自 shared 目录读取（分层 runtime M2；
-                    // 键序 = 目录声明序，CloudAgentToolCatalogTest 钉住 7 参序）。
-                    // display 缺省 "false"（不出卡）/mediaType 缺省 "photo" 为目录
-                    // default——旧版 server 不下发时的安全侧缺省，语义不变。
+                    // 键序 = 目录声明序，CloudAgentToolCatalogTest 钉住 6 参序）。
+                    // mediaType 缺省 "photo" 为目录 default——旧版 server 不下发时的
+                    // 安全侧缺省，语义不变（display 参数已随横滑卡退役从目录删除）。
                     val values = catalogArgs(tool, args)
-                    searchMedia(values[0], values[1], values[2], values[3], values[4], values[5], values[6])
+                    searchMedia(values[0], values[1], values[2], values[3], values[4], values[5])
                 }
                 CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> {
                     val values = catalogArgs(tool, args)

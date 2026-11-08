@@ -31,6 +31,10 @@ import kotlinx.serialization.json.Json
  * 服务端识别）。意图组装（[GallerySearchIntents]）与意图→过滤转换（[ChatGallerySearch]）
  * 均与 chat 链路同源。
  *
+ * 横滑卡退役（2026-11-08）：`display` 参数与 `mediaResultsListener` 透出回调一并删除——
+ * 云端回合不再透出原生横滑卡，图集展示由 LLM 经 render_html（media://{id}）完成；
+ * 命中集仍注册 local:// 数据句柄供 OpenUI 卡取数。
+ *
  * 依赖以函数注入（[DeviceToolExecutor]/[AppToolExecutor] 范式），纯 JVM 可测；
  * 生产接线在 AppContainer（mediaSearchEngine / getGallerySummaryUseCase）。
  */
@@ -46,26 +50,9 @@ class CloudAgentGalleryTools(
 
     private val handleJson = Json { encodeDefaults = true }
 
-    /** display=true 且图集卡实际透出时的回执尾注（search/refine 共用，见 searchMedia 内注释）。 */
-    private val CARD_SHOWN_NOTE =
-        "，横滑图集卡已在聊天中展示（用户可直接翻看；回复时告知照片已在上方卡片展示即可，无需再搜索/细化/发卡）"
-
-    /**
-     * 图集卡透出回调（云端 Agent 图集卡恢复，2026-10-20）：搜索/细化命中非空时回调完整的
-     * PHOTO 资产列表（query、资产、总数、是否细化）。**数据不出设备**——回传服务器的仍是
-     * 纯文本计数；资产列表仅经本回调给 UI 层本地渲染卡片（BrowserSessionDelegate 同款
-     * delegate 先例）。由发起云端回合的 ViewModel 挂接、回合结束摘除；串行成立的前提 =
-     * server per-user 跑轮并发闸 = 1（M2.6）+ 调试页/主聊天页不会同时发回合。
-     */
-    var mediaResultsListener: ((query: String, assets: List<MediaAsset>, totalCount: Int, isRefinement: Boolean) -> Unit)? =
-        null
-
     /** refine_media_search 的搜索基数（chat 链路 lastResultAssets 的无头等价物，单槽位即可——云端会话串行）。 */
     private val refineBaseMutex = Mutex()
     private var refineBase: List<MediaAsset> = emptyList()
-
-    /** refine 的图集卡透出跟随产生基数的 search_media 的 display 意图（同 mutex 保护）。 */
-    private var refineDisplay = false
 
     /** refine 的媒体类型过滤跟随产生基数的 search_media 的 mediaType（同 mutex 保护，
      *  2026-11-04 Video 组件批次——视频搜索的细化不把照片混回结果集）。 */
@@ -131,9 +118,8 @@ class CloudAgentGalleryTools(
     }
 
     /**
-     * @param display "true" = 用户明确想浏览/挑选照片本身，命中集透出为横滑图集卡；
-     * 其余（统计/计数/为 OpenUI 卡取数）一律 "false"，卡片不打扰（2026-10-24
-     * 真机实测事故类：取数型搜索无脑出图集卡刷屏）。
+     * 搜索相册。回执为纯文本计数 + 数据句柄（展示交给 render_html 图集卡，
+     * 端侧不再透出原生横滑卡）。
      */
     suspend fun searchMedia(
         query: String,
@@ -141,7 +127,6 @@ class CloudAgentGalleryTools(
         fromMs: String,
         toMs: String,
         hasFace: String,
-        display: String,
         mediaType: String = "photo",
     ): String {
         val typeFilter = typeFilterOf(mediaType)
@@ -163,25 +148,17 @@ class CloudAgentGalleryTools(
             Logger.w(tag, "searchMedia failed for '$query'", e)
             return "error: ${e.message ?: "search failed"}"
         }
-        val showCard = display == "true"
         refineBaseMutex.withLock {
             refineBase = photos
-            refineDisplay = showCard
             refineMediaType = mediaType
         }
-        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size} display=$showCard mediaType=$mediaType")
+        Logger.i(tag, "searchMedia query='$query' intent=$intent total=${photos.size} mediaType=$mediaType")
         // 空命中不注册句柄：空集句柄是无意义锚点 + 垃圾行，与 refine 空分支同口径
         val displayQuery = query.ifBlank { "全部" }
         if (photos.isEmpty()) {
             return "找到 0 $unit「$displayQuery」的$noun"
         }
-        // 卡实际透出（display=true 且监听器在位）时回执必须明说：LLM 只看得见文本回执，
-        // 不说它会认为「没有照片清单」继续 refine 甚至声称发卡失败——
-        // 2026-10-24 browse_carousel 事故：卡已出，终结消息却写「没能把照片图集发给你」
-        val cardShown = showCard && mediaResultsListener != null
-        if (cardShown) mediaResultsListener?.invoke(displayQuery, photos, photos.size, false)
-        val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
-        return appendHandleSuffix("找到 ${photos.size} $unit「$displayQuery」的$noun$cardNote", photos)
+        return appendHandleSuffix("找到 ${photos.size} $unit「$displayQuery」的$noun", photos)
     }
 
     suspend fun refineMediaSearch(constraint: String, fromMs: String, toMs: String): String {
@@ -215,10 +192,6 @@ class CloudAgentGalleryTools(
         }
         refineBaseMutex.withLock { refineBase = refined }
         Logger.i(tag, "refineMediaSearch constraint='$constraint' prior=${prior.size} refined=${refined.size}")
-        // 透出跟随基数搜索的 display 意图：取数型搜索的细化同样不出卡
-        val cardShown = refineDisplay && mediaResultsListener != null
-        if (cardShown) mediaResultsListener?.invoke(constraint, refined, refined.size, true)
-        val cardNote = if (cardShown) CARD_SHOWN_NOTE else ""
-        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} $unit「$constraint」的$noun$cardNote", refined)
+        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} $unit「$constraint」的$noun", refined)
     }
 }
