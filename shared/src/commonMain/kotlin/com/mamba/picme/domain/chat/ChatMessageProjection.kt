@@ -21,8 +21,8 @@ import kotlinx.serialization.json.putJsonArray
  *   Chart.svg / HtmlCard.html / BrowserLive 与 OpenUiCard 整颗 part JSON（沿 M1 content 列
  *   直通先例）；TaskCard 与 OptimizeCandidates → `""`（结构化负载由 metadata 承载）。
  *   user 图文（Image+Text 双 part）取 Text.markdown——正文列即用户文字，图 ref 走
- *   metadata.imageUri（与读侧 [MessagePartsConverter] 的 user 分图分支互逆）。
- * - **metadata** = 结构化查询/恢复负载，键名与 [MessagePartsConverter] 各分支的解析键
+ *   metadata.imageUri（与备份 v5 粗映射物化器的 user 分图分支互逆，见 androidApp BackupChatRestoreMapper）。
+ * - **metadata** = 结构化查询/恢复负载，键名与 androidApp 读侧（parseEngineerTaskState/parseHtmlCardMeta/OptimizeCandidateGroup.fromJson）及备份粗映射物化器的解析键
  *   一致（它是现存读侧真相，投影即其逆）：HtmlCard → `{"html_card":{…}}`；TaskCard →
  *   `{"engineer_task":{…}}`；OptimizeCandidates → group JSON（顶层）；agent Image →
  *   `{"imageUri","saved"}`；EditResult → `{"imageUri","saved","suggestions"}`（缺省不写）；
@@ -140,7 +140,7 @@ private fun editResultMetadata(ref: String?, saved: Boolean, suggestions: List<S
 /**
  * html_card 投影 metadata：`{"html_card":{…}}`，键 display/displayMode(name)/
  * measuredHeightPx/summary（缺省不写）——与读侧 `parseHtmlCardMeta` /
- * [MessagePartsConverter.parseHtmlCardMeta] 的解析键对齐，形态对齐旧 org.json 写出
+ * androidApp 读侧 parseHtmlCardMeta 的解析键对齐（备份粗映射物化器同口径），形态对齐旧 org.json 写出
  * （nullable 字段不写显式 null：org.json 读侧 `has()`+`getInt` 对显式 null 会抛）。
  */
 private fun htmlCardMetadata(meta: HtmlCardMeta): String? {

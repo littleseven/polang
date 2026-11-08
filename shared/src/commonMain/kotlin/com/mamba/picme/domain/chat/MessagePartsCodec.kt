@@ -41,7 +41,7 @@ object MessagePartsCodec {
 
     /**
      * 解码 parts JSON；空串/整体结构损坏（非 JSON 数组）返回 null，调用方按 legacy
-     * 列兜底（[MessagePartsConverter]），**不允许丢消息**。
+     * 列行级兜底（Text part / 备份恢复降级），**不允许丢消息**。
      *
      * part 级兜底（Tombstone）：逐元素独立解码——未知 part 类型（新版本写入、旧版本
      * 不识，含已退役鉴别值）或已知类型字段损坏 → 原位合成 [MessagePart.Tombstone]

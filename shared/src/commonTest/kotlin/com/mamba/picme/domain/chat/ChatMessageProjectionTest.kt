@@ -11,27 +11,16 @@ import kotlin.test.assertTrue
  * [projectChatRow] 全值域投影规则测试（D1a parts-first 终态立法，spec
  * 《chat-value-domain-ideal》§4.1 裁决 (a)：partsJson 权威，标量列为派生投影）。
  *
- * 两组核心不变式：
- * 1. **type 与线格式鉴别值零漂移**——对全部 13 值 part，投影 type 必须等于 codec
- *    编码出的 `type` 鉴别字段（钉住 when 字面量与 @SerialName 的同步）；
- * 2. **投影是 [MessagePartsConverter] 的逆**——单 part 规范形态下，
- *    `toParts(投影.type, 投影.content, 投影.metadata, role)` 还原原 parts
- *    （converter 是现存读侧真相，备份恢复/存量行兜底依赖此等价性）。
+ * 核心不变式：**type 与线格式鉴别值零漂移**——对全部 13 值 part，投影 type 必须等于
+ * codec 编码出的 `type` 鉴别字段（钉住 when 字面量与 @SerialName 的同步）。
+ * （标量→parts 反向物化已收编 androidApp 备份粗映射 `BackupChatRestoreMapper`，
+ * 其行为由 androidApp `BackupChatRestoreTest` 覆盖，不在 commonTest 侧钉。）
  */
 class ChatMessageProjectionTest {
 
     private fun wireTypeOf(part: MessagePart): String {
         val element = kotlinx.serialization.json.Json.parseToJsonElement(MessagePartsCodec.encodePart(part))
         return element.jsonObject["type"]!!.jsonPrimitive.content
-    }
-
-    private fun assertRoundTripsThroughConverter(parts: List<MessagePart>, role: ModelInputRole) {
-        val projection = projectChatRow(parts, role)
-        assertEquals(
-            parts,
-            MessagePartsConverter.toParts(projection.type, projection.content, projection.metadata, role),
-            "投影应是 converter 的逆：$parts / $role",
-        )
     }
 
     // ── type 投影源规则 ─────────────────────────────────────────
@@ -172,7 +161,6 @@ class ChatMessageProjectionTest {
     fun `text part projects content only`() {
         val projection = projectChatRow(listOf(MessagePart.Text("p0", "你好", PartState.DONE)), ModelInputRole.USER)
         assertEquals(ChatRowProjection("text", "你好", null), projection)
-        assertRoundTripsThroughConverter(listOf(MessagePart.Text("p0", "你好")), ModelInputRole.USER)
     }
 
     @Test
@@ -182,7 +170,6 @@ class ChatMessageProjectionTest {
             ChatRowProjection("image", "file://img", null),
             projectChatRow(parts, ModelInputRole.USER),
         )
-        assertRoundTripsThroughConverter(parts, ModelInputRole.USER)
     }
 
     @Test
@@ -195,7 +182,6 @@ class ChatMessageProjectionTest {
         assertEquals("image", projection.type)
         assertEquals("看这张", projection.content)
         assertTrue(projection.metadata!!.contains("\"imageUri\":\"file://img\""))
-        assertRoundTripsThroughConverter(parts, ModelInputRole.USER)
     }
 
     @Test
@@ -206,7 +192,6 @@ class ChatMessageProjectionTest {
         assertEquals("file://img", projection.content)
         assertTrue(projection.metadata!!.contains("\"imageUri\":\"file://img\""))
         assertTrue(projection.metadata.contains("\"saved\":true"))
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
@@ -216,7 +201,6 @@ class ChatMessageProjectionTest {
             ChatRowProjection("tool_chart", "<svg/>", null),
             projectChatRow(parts, ModelInputRole.ASSISTANT),
         )
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
@@ -231,12 +215,11 @@ class ChatMessageProjectionTest {
         val projection = projectChatRow(parts, ModelInputRole.ASSISTANT)
         assertEquals("tool_html", projection.type)
         assertEquals("<html/>", projection.content)
-        // 键与 converter.parseHtmlCardMeta 对齐：display/displayMode(name)/measuredHeightPx/summary
+        // 键与读侧 parseHtmlCardMeta 对齐：display/displayMode(name)/measuredHeightPx/summary
         assertTrue(projection.metadata!!.contains("\"html_card\""))
         assertTrue(projection.metadata.contains("\"displayMode\":\"INLINE\""))
         assertTrue(projection.metadata.contains("\"measuredHeightPx\":320"))
         assertTrue(projection.metadata.contains("\"summary\":\"周报\""))
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
@@ -252,7 +235,6 @@ class ChatMessageProjectionTest {
         // RUNNING 是非空默认枚举：缺失会被读侧还原成 FAILED，投影必须恒写出 status
         assertTrue(projection.metadata.contains("\"status\":\"RUNNING\""))
         assertTrue(projection.metadata.contains("\"taskId\":\"t1\""))
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
@@ -273,14 +255,12 @@ class ChatMessageProjectionTest {
         assertTrue(metadata.contains("\"imageUri\":\"file://out\""))
         assertTrue(metadata.contains("\"saved\":true"))
         assertTrue(metadata.contains("\"suggestions\""))
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
     fun `edit result with empty payload projects null metadata`() {
         val parts = listOf(MessagePart.EditResult("p0", ref = null, description = "说明"))
         assertEquals(null, projectChatRow(parts, ModelInputRole.ASSISTANT).metadata)
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
@@ -297,7 +277,6 @@ class ChatMessageProjectionTest {
         assertEquals("tool_browser", projection.type)
         assertEquals(MessagePartsCodec.encodePart(part), projection.content)
         assertNull(projection.metadata)
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
@@ -308,7 +287,6 @@ class ChatMessageProjectionTest {
         assertEquals("data_genui_program", projection.type)
         assertEquals(MessagePartsCodec.encodePart(part), projection.content)
         assertNull(projection.metadata)
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     @Test
@@ -321,7 +299,6 @@ class ChatMessageProjectionTest {
         // metadata 顶层即 group JSON（键与 OptimizeCandidateGroup 线格式一致）
         assertTrue(projection.metadata!!.contains("\"sourceImageUri\":\"content://media/1\""))
         assertTrue(projection.metadata.contains("\"recommendedIndex\":1"))
-        assertRoundTripsThroughConverter(parts, ModelInputRole.ASSISTANT)
     }
 
     // ── fixtures ────────────────────────────────────────────────

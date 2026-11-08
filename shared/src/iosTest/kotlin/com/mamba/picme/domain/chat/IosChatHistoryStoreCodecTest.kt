@@ -213,7 +213,7 @@ class IosChatHistoryStoreCodecTest {
 
     @Test
     fun decodeRebuildsBrowserLiveAndOpenUiFromWholePartJsonContent() {
-        // 口径对齐 Android MessagePartsConverter（Task 1/4 后）：tool_browser /
+        // 口径对齐 Android 备份粗映射物化器（BackupChatRestoreMapper）：tool_browser /
         // data_genui_program 的 content 承载整颗 part JSON，重建路径直通解码
         //（不再落 unknownTypeFallback 的 Tombstone 降级）
         val json = """

@@ -1,5 +1,8 @@
 package com.mamba.picme.domain.chat
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -19,20 +22,65 @@ class ChatModelInputTest {
         rows.map { (type, content, _) -> type to content }
 
     /**
-     * fixture：从标量行 (type, content, metadata) 构造 [ChatMessage]——parts 经
-     * [MessagePartsConverter] 物化（对齐备份恢复路径，converter 现存唯一正当消费）；
-     * type 入参是 fixture 标签（含 user_/agent_ 前缀的历史命名），role/线值在本地换算。
+     * fixture：从标量行 (type, content, metadata) 构造 [ChatMessage]——parts 按
+     * v5 备份粗映射口径手建（对齐 androidApp `BackupChatRestoreMapper` 的物化分支，
+     * converter 退役后 commonTest 侧不复用其实现）；type 入参是 fixture 标签
+     * （含 user_/agent_ 前缀的历史命名），role/线值在本地换算。
      */
     private fun legacyMessage(type: String, content: String, metadata: String? = null): ChatMessage {
         val role = if (type.startsWith("user_")) ModelInputRole.USER else ModelInputRole.ASSISTANT
-        val wireType = when (type) {
-            "user_image", "user_image_text", "agent_image" -> "image"
-            "chart" -> "tool_chart"
-            "html_card" -> "tool_html"
-            "task_card" -> "tool_task"
-            "agent_edit_result" -> "tool_image_edit"
-            "optimize_candidates" -> "data_optimize_candidates"
-            else -> "text"
+        fun meta(): kotlinx.serialization.json.JsonObject? = metadata
+            ?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
+        fun metaImageUri(): String? = meta()?.get("imageUri")?.jsonPrimitive?.content
+        val parts = when (type) {
+            "user_image" -> listOf(MessagePart.Image("p0", ref = content))
+            "user_image_text" -> listOf(
+                MessagePart.Image("p0", ref = metaImageUri() ?: content),
+                MessagePart.Text("p1", content, PartState.DONE),
+            )
+            "agent_image" -> listOf(MessagePart.Image("p0", ref = metaImageUri() ?: content))
+            "chart" -> listOf(MessagePart.Chart("p0", svg = content))
+            "html_card" -> {
+                val sub = meta()?.get("html_card")?.jsonObject
+                listOf(
+                    MessagePart.HtmlCard(
+                        "p0",
+                        html = content,
+                        meta = HtmlCardMeta(
+                            display = sub?.get("display")?.jsonPrimitive?.content,
+                            summary = sub?.get("summary")?.jsonPrimitive?.content,
+                        ),
+                    ),
+                )
+            }
+            "task_card" -> {
+                val task = taskFixture(metadata)
+                listOf(
+                    MessagePart.TaskCard(
+                        "p0",
+                        toolCallId = task.taskId,
+                        state = task.status.toToolPartState(),
+                        task = task,
+                    ),
+                )
+            }
+            "agent_edit_result" -> listOf(
+                MessagePart.EditResult("p0", ref = metaImageUri(), description = content),
+            )
+            "optimize_candidates" -> listOf(
+                MessagePart.OptimizeCandidates(
+                    "p0",
+                    OptimizeCandidateGroup(
+                        sourceImageUri = "u",
+                        scene = "s",
+                        recommendedIndex = 0,
+                        candidates = emptyList(),
+                        usedFingerprints = emptyList(),
+                        drawIndex = 1,
+                    ),
+                ),
+            )
+            else -> listOf(MessagePart.Text("p0", content, PartState.DONE))
         }
         val uiType = when (type) {
             "user_image" -> ChatMessageType.IMAGE
@@ -44,8 +92,27 @@ class ChatModelInputTest {
             type = uiType,
             content = content,
             role = role,
-            parts = MessagePartsConverter.toParts(wireType, content, metadata, role),
+            parts = parts,
         )
+    }
+
+    /** task_card fixture：metadata `engineer_task` 子对象 → 状态（口径对齐读侧解析）。 */
+    private fun taskFixture(metadata: String?): EngineerTaskState {
+        val root = metadata
+            ?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
+            ?.get("engineer_task")?.jsonObject
+        val task = EngineerTaskState(
+            taskId = root?.get("taskId")?.jsonPrimitive?.content ?: "t-x",
+            sourceText = root?.get("sourceText")?.jsonPrimitive?.content ?: "",
+            status = root?.get("status")?.jsonPrimitive?.content
+                ?.let { name -> runCatching { EngineerTaskStatus.valueOf(name) }.getOrDefault(EngineerTaskStatus.FAILED) }
+                ?: EngineerTaskStatus.FAILED,
+            errorSummary = root?.get("errorSummary")?.jsonPrimitive?.content,
+            resultSummary = root?.get("resultSummary")?.jsonPrimitive?.content,
+            startedAtMs = 1L,
+            updatedAtMs = 2L,
+        )
+        return task
     }
 
     @Test

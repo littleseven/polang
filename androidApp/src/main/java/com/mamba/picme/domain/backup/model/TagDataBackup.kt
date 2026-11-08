@@ -16,10 +16,13 @@ import com.squareup.moshi.JsonClass
  * - v4：新增媒体反馈（media_feedback，用户 like/dislike 训练数据）
  * - v5：新增聊天会话/消息、人物关系、事实记忆、编辑配方，
  *   媒体 TAG 元数据补 city/faceFocusY/aestheticScore/faceQualityScore
+ * - v6：聊天消息携带 parts-first 值域终态（[BackupChatMessage.partsJson] 权威，
+ *   标量列为投影）；恢复侧版本门禁——v6 包 partsJson 直通，v5 及以下旧包经
+ *   备份模块内一次性粗映射表转正（spec《chat-value-domain-ideal》§4 第 3 条）
  */
 @JsonClass(generateAdapter = true)
 data class TagDataBackup(
-    val version: Int = 5,
+    val version: Int = CURRENT_VERSION,
     val exportedAt: Long,
     val tags: List<BackupTag>,
     val mediaTagMetadata: List<BackupMediaTagMetadata>,
@@ -38,7 +41,12 @@ data class TagDataBackup(
     val personRelations: List<BackupPersonRelation> = emptyList(),
     val memoryFacts: List<BackupMemoryFact> = emptyList(),
     val photoEditRecipes: List<BackupPhotoEditRecipe> = emptyList()
-)
+) {
+    companion object {
+        /** 当前备份格式版本（恢复侧版本门禁阈值：≥ 此值走 partsJson 直通道）。 */
+        const val CURRENT_VERSION: Int = 6
+    }
+}
 
 /**
  * DataStore 用户偏好备份。
@@ -204,8 +212,11 @@ data class BackupChatSession(
  * 聊天消息。
  *
  * [role] 为消息级角色列（"user"/"agent"）；nullable——旧分类法时期导出的备份无此字段
- * （容器版本不校验），恢复时缺省按 agent 安全网补齐；type 不在终态投影线值集
- * （见恢复侧 `CHAT_RESTORE_TYPES`）的行整行跳过——legacy 粗映射表属后续备份版本改造。
+ * （容器版本不校验），恢复时缺省按 type 前缀推断（user_* → user，其余 agent）。
+ *
+ * v6（2026-11-08 值域终态）起 [partsJson] 为消息权威负载（Room parts-first 列原值），
+ * 导出恒有值；v5 及以下旧包无此字段（null），恢复时经备份模块内一次性粗映射表自
+ * 标量列物化（终态值直通、legacy 旧值映射、退役卡落 Tombstone、不可识别跳过行）。
  *
  * 已知限制：图片消息的 [content] 为旧安装的本地文件路径，
  * 跨安装恢复后图片文件可能不存在，仅保留消息记录本身。
@@ -219,7 +230,8 @@ data class BackupChatMessage(
     val timestamp: Long,
     val modelUsed: String? = null,
     val metadata: String? = null,
-    val role: String? = null
+    val role: String? = null,
+    val partsJson: String? = null
 )
 
 /**

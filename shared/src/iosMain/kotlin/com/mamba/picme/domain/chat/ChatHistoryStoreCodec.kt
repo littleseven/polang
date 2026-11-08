@@ -27,7 +27,7 @@ import kotlinx.serialization.json.encodeToJsonElement
  *   Room v28 聊天表重置语义对齐：老历史文件属已批准的可重置范围，无迁移路径）；
  *   当前版本内 parts-first 投影（对齐 androidApp toUiModel M4 口径）——primary part
  *   定 [ChatMessageType]、平铺字段以 parts 提取优先；parts 数组整体缺失时自结构化
- *   平铺字段重建（belt-and-braces，重建口径对齐 [MessagePartsConverter]——含
+ *   平铺字段重建（belt-and-braces，重建口径对齐 Android 备份 v5 粗映射物化器（BackupChatRestoreMapper）——含
  *   `tool_browser`/`data_genui_program` 整颗 part JSON 直通分支，数据源为结构化
  *   字段而非 metadata blob）；重建失败回原文 Text 兜底，**不允许丢消息**；
  * - **不持久化**：performance / claudeAgent / claudeDeliver / isStreaming / showCursor /
@@ -215,7 +215,7 @@ object ChatHistoryStoreCodec {
     /**
      * parts 数组在场直用（逐元素 tolerant 解码：未知/损坏/退役 part → Tombstone 占位，
      * 对齐 [MessagePartsCodec] 口径）；缺失时自结构化平铺字段重建（belt-and-braces）；
-     * 重建失败回原文 Text 兜底（行级语义对齐 [MessagePartsConverter.toParts]，不丢消息）。
+     * 重建失败回原文 Text 兜底（行级语义对齐 Android 侧行级兜底，不丢消息）。
      */
     private fun ChatMessageDto.partsOrRebuild(role: ModelInputRole): List<MessagePart> {
         if (parts.isNotEmpty()) {
@@ -233,7 +233,7 @@ object ChatHistoryStoreCodec {
     private fun ChatMessageDto.rebuildParts(role: ModelInputRole): List<MessagePart> = when (type) {
         "text" -> listOf(MessagePart.Text("p0", content, PartState.DONE))
 
-        // image 按角色分流（语义对齐 MessagePartsConverter，数据源为结构化字段）
+        // image 按角色分流（语义对齐投影规则，数据源为结构化字段）
         "image" -> when {
             role == ModelInputRole.USER && imageUri != null ->
                 listOf(MessagePart.Image("p0", ref = imageUri!!), MessagePart.Text("p1", content, PartState.DONE))
@@ -248,7 +248,7 @@ object ChatHistoryStoreCodec {
         )
 
         // browser 直播卡 / OpenUI GenUI 卡：content 承载整颗 part JSON（口径对齐
-        // MessagePartsConverter——Android 侧同两分支直通解码）；损坏行抛异常 →
+        // Android 备份粗映射物化器——同两分支直通解码）；损坏行抛异常 →
         // partsOrRebuild runCatching 落原文 Text 兜底
         "tool_browser" ->
             listOf(json.decodeFromString(MessagePart.BrowserLive.serializer(), content))
@@ -284,7 +284,7 @@ object ChatHistoryStoreCodec {
             ),
         )
 
-        // 未知 wire type（前向兼容兜底，对齐 MessagePartsConverter.unknownTypeFallback）：
+        // 未知 wire type（前向兼容兜底，语义对齐 Android 备份粗映射的降级分支）：
         // content 为 JSON blob → Unsupported 占位卡，防 JSON 原文裸渲染；纯文本 → 保留 Text
         else -> listOf(unknownTypeFallback(type, content))
     }
