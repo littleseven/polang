@@ -107,7 +107,9 @@ object ChatHistoryStoreCodec {
     // ── encode：domain → DTO ────────────────────────────────────
 
     private fun ChatMessage.toDto(): ChatMessageDto {
-        val primary = parts.firstOrNull()
+        // 判型锚单点立法：排除 reasoning/source/tombstone（与写侧 projectChatRow、
+        // androidApp toUiModel 同源），平铺字段补齐同样不取伴随载荷 part
+        val primary = primaryPartOf(parts)
         return ChatMessageDto(
             id = id,
             type = wireTypeOf(type),
@@ -150,7 +152,9 @@ object ChatHistoryStoreCodec {
     private fun ChatMessageDto.toDomain(): ChatMessage {
         val role = roleOf(role)
         val parts = partsOrRebuild(role)
-        val primary = parts.firstOrNull()
+        // 判型锚单点立法（值域终态 🟡2）：uiTypeOf 取 primaryPartOf——[Reasoning, Chart]
+        // 形态行判型落 CHART 而非 TEXT，与写侧投影零漂移
+        val primary = primaryPartOf(parts)
         return ChatMessage(
             id = id,
             type = uiTypeOf(primary, role, parts),

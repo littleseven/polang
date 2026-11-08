@@ -127,6 +127,28 @@ class IosChatHistoryStoreCodecTest {
     }
 
     @Test
+    fun decodeTypingAnchorsOnFirstContentPartPastReasoning() {
+        // 判型锚单点立法（值域终态 🟡2，与写侧 projectChatRow 同源 primaryPartOf）：
+        // [Reasoning, Chart] 形态行判型落 CHART 而非 TEXT——uiTypeOf 排除 reasoning 后
+        // 取首个 content part；平铺字段同样自 Chart 回填
+        val message = ChatMessage(
+            id = "rc1",
+            type = ChatMessageType.CHART,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Reasoning("p0", "先想"),
+                MessagePart.Chart("p1", svg = "<svg rc/>"),
+            ),
+        )
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(ChatHistoryStoreCodec.encode(listOf(message))))
+        val restored = decoded.single()
+        assertEquals(ChatMessageType.CHART, restored.type, "reasoning 不主导消息 kind")
+        assertEquals("<svg rc/>", restored.chartSvg)
+        assertEquals(2, restored.parts.size, "reasoning part 原位保留（折叠块渲染）")
+    }
+
+    @Test
     fun transientAndComputedFieldsNotPersisted() {
         val original = ChatMessage(
             id = "m3",

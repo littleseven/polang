@@ -18,6 +18,17 @@ sealed interface ChatStreamEvent {
     data class TextSnapshot(val text: String) : ChatStreamEvent
 
     /**
+     * 模型本轮累计思考链快照（extended thinking 段，**非 delta**；值域终态 spec §6.1）。
+     * 语义与 [TextSnapshot] 同构（本轮累计全文），经 turn 装配器差分为 Reasoning 三段式，
+     * 装配恒排在正文 text 前；不进气泡 content 轨（reasoning 折叠块由 parts 轨渲染）。
+     *
+     * **生产开关默认关**：发射源 = Koog `StreamFrame.ReasoningDelta`（1.3.0 已透出），
+     * 但模型配置层 thinking=disabled + Koog Thinking capability 未声明——上游启用
+     * extended thinking 后本事件自动产出，事件族/渲染无需再改。
+     */
+    data class ReasoningSnapshot(val text: String) : ChatStreamEvent
+
+    /**
      * 模型本轮产出 tool_calls，进入端侧工具执行。
      * UI 可将气泡内容切换为"正在调用工具"类状态文案（文案由 app 层按语言本地化）。
      *

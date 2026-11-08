@@ -14,6 +14,7 @@ import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
 import com.mamba.picme.domain.chat.overlayLiveBrowserState
 import com.mamba.picme.domain.chat.overlayLiveTaskState
+import com.mamba.picme.domain.chat.primaryPartOf
 import com.mamba.picme.domain.chat.projectChatRow
 import com.mamba.picme.domain.chat.roleOf
 import com.mamba.picme.domain.chat.toToolPartState
@@ -1438,6 +1439,17 @@ class ChatViewModel(
                 }
             }
         }
+        // 值域终态 §6.2：web_search 引用 → 当轮 assistant 消息 SourceUrl parts（正文下方
+        // chips 行）。通道同 uiActions 先例（ChatToolService 单例流），装配参照
+        // ToolOutputAvailable 的直喂 reducer 形态（不经引擎事件流）；source 排序立法
+        //（chips 恒在正文下方）由 TurnPartsReducer 保证。viewModelScope = Main.immediate，
+        // 与 feedTurn 的 reducer 单线程契约同线。
+        viewModelScope.launch {
+            ChatToolService.getInstance().webSearchSources.collect { sources ->
+                turnReducer.apply(TurnStreamEvent.SourcesAvailable(sources))
+                _streamingMessage.update { current -> current?.copy(parts = turnReducer.parts) }
+            }
+        }
         // adjust_image handler：ChatToolService → ChatImageRenderer.adjustImage → chat 内渲染
         ChatToolService.getInstance().adjustImageHandler = { uri, brightness, contrast, saturation, temperature ->
             val renderer = chatImageRenderer
@@ -1940,6 +1952,10 @@ class ChatViewModel(
                             // M4 显式轮边界：气泡态无需响应（文本快照/工具事件已驱动），
                             // 仅经 feedTurn 喂装配器闭合上一轮文本块
                             is ChatStreamEvent.RoundStarted -> Unit
+                            // 值域终态 §6.1：思考链快照不进气泡 content 轨（正文仍由
+                            // TextSnapshot 驱动），parts 轨经 feedTurn 装配 reasoning 折叠块；
+                            // 生产开关默认关（thinking=disabled，事件不产出）
+                            is ChatStreamEvent.ReasoningSnapshot -> Unit
                         }
                         // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）
                         feedTurn(event)
@@ -1948,6 +1964,16 @@ class ChatViewModel(
 
                 // 流式已结束（streamChat 返回 = onCompleteResponse 已触发）：节奏器追平收尾
                 pacingController.finish()
+
+                // 值域终态 §6.1/§6.2：本回合 reasoning/source parts 随终稿文本一并落库
+                //（流式瞬态轨收编持久化——reasoning 可回放、chips 不随流式消息清除消失）。
+                // reasoning 落库前统一置 DONE（流式中断未闭合的块收口）；tool 卡 parts 不
+                // 随行（图卡/HTML 卡各有独立产物行，emitChart/emitHtmlCard 落库）。
+                // 读 reducer 在 Main 线程（与 feedTurn 的 Main.immediate 漏斗同线，
+                // streamChat 返回前的 feedTurn launch 均已出队）。
+                val turnReasoning = turnReducer.parts.filterIsInstance<MessagePart.Reasoning>()
+                    .map { if (it.state == PartState.DONE) it else it.copy(state = PartState.DONE) }
+                val turnSources = turnReducer.parts.filterIsInstance<MessagePart.SourceUrl>().toList()
 
                 // 6. 处理结果
                 result.fold(
@@ -1991,9 +2017,12 @@ class ChatViewModel(
                             if (actionValue is AgentAction.Error) {
                                 // 聊天页命令分发失败时，优先展示模型原始回复，避免把"暂不支持此操作"抛给用户
                                 Logger.w(TAG, "Capability dispatch failed in chat, falling back to full response. error=${actionValue.message}, detail=${actionValue.detail}")
-                                insertAgentMessage(sessionId, streamResult.fullResponse.ifBlank { actionValue.message }, currentModelLabel(), performance)
+                                insertAgentMessage(
+                                    sessionId, streamResult.fullResponse.ifBlank { actionValue.message },
+                                    currentModelLabel(), performance, turnReasoning, turnSources,
+                                )
                             } else {
-                                handleAgentAction(actionValue, sessionId, currentModelLabel(), performance)
+                                handleAgentAction(actionValue, sessionId, currentModelLabel(), performance, turnReasoning, turnSources)
                             }
                         } else {
                             // 纯文本回复：保存到 Room（REMOTE 场景或 LOCAL 的 text_reply）
@@ -2001,7 +2030,9 @@ class ChatViewModel(
                                 sessionId = sessionId,
                                 content = streamResult.fullResponse,
                                 modelUsed = currentModelLabel(),
-                                performance = performance
+                                performance = performance,
+                                reasoningParts = turnReasoning,
+                                sourceParts = turnSources,
                             )
                         }
                     },
@@ -2447,11 +2478,14 @@ class ChatViewModel(
         action: AgentAction?,
         sessionId: String,
         modelLabel: String,
-        performance: LlmPerformance? = null
+        performance: LlmPerformance? = null,
+        reasoningParts: List<MessagePart.Reasoning> = emptyList(),
+        sourceParts: List<MessagePart.SourceUrl> = emptyList(),
     ) {
         when (action) {
             is AgentAction.TextReply -> {
-                insertAgentMessage(sessionId, action.message, modelLabel, performance)
+                // 流式 turn 终稿（remote ReAct 恒走此分支）：reasoning/source 随行落库
+                insertAgentMessage(sessionId, action.message, modelLabel, performance, reasoningParts, sourceParts)
             }
             is AgentAction.Success -> {
                 when (val cmd = action.command) {
@@ -3102,17 +3136,22 @@ class ChatViewModel(
 
     /**
      * 插入 AI 回复/命令结果到 Room（parts-first：Text part 直建，performance 走附加 metadata）。
+     * [reasoningParts]/[sourceParts]（值域终态 §6.1/§6.2）：流式 turn 的思考链与 web_search
+     * 引用随终稿文本一并落库（终态 parts = reasoning… + Text + source…，排序立法同
+     * TurnPartsReducer）；缺省空 = 纯文本行（既有全部非流式调用点行为不变）。
      */
     private suspend fun insertAgentMessage(
         sessionId: String,
         content: String,
         modelUsed: String,
-        performance: LlmPerformance? = null
+        performance: LlmPerformance? = null,
+        reasoningParts: List<MessagePart.Reasoning> = emptyList(),
+        sourceParts: List<MessagePart.SourceUrl> = emptyList(),
     ) {
         chatMessageDao.insertPartsMessage(
             sessionId = sessionId,
             role = ModelInputRole.ASSISTANT,
-            parts = listOf(MessagePart.Text(partId = "p0", markdown = content)),
+            parts = reasoningParts + MessagePart.Text(partId = "p0", markdown = content) + sourceParts,
             modelUsed = modelUsed,
             extraMetadataJson = performanceMetadataJson(performance),
         )
@@ -3602,7 +3641,9 @@ class ChatViewModel(
         // 一律自 parts 提取，不再按 type 字符串守卫；performance/claudeAgent 仍从
         // metadata 解析（现状不变）。
         val parts = decodeParts()
-        val primary = parts.firstOrNull()
+        // 判型锚单点立法（值域终态 🟡2）：primaryPartOf 排除 reasoning/source/tombstone，
+        // 与写侧投影 projectChatRow 同源——防 [Reasoning, Chart] 形态行读侧判型落 TEXT
+        val primary = primaryPartOf(parts)
         val role = roleOf(this.role)
         return ChatMessageUi(
             id = id,

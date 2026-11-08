@@ -2,6 +2,7 @@ package com.mamba.picme.domain.chat.streaming
 
 import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
 import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.PartState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -135,11 +136,110 @@ class ChatStreamTurnAdapterTest {
         assertEquals("txt-1", parts[2].partId)
     }
 
+    // ── 值域终态 §6.1：Reasoning 快照差分（与文本块同构独立状态机）─────
+
+    @Test
+    fun `reasoning snapshots diff into deltas on one reasoning block`() {
+        val adapter = ChatStreamTurnAdapter()
+        val first = adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("先分析"))
+        assertEquals(
+            listOf(
+                TurnStreamEvent.ReasoningStart("rsn-0"),
+                TurnStreamEvent.ReasoningDelta("rsn-0", "先分析"),
+            ),
+            first,
+        )
+        assertEquals(
+            listOf(TurnStreamEvent.ReasoningDelta("rsn-0", "需求")),
+            adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("先分析需求")),
+        )
+        // 快照未变（重复帧）：零事件
+        assertEquals(emptyList(), adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("先分析需求")))
+    }
+
+    @Test
+    fun `reasoning and text blocks are independent state machines`() {
+        // extended thinking 轮内形态：reasoning 先流、text 后流，两块独立差分互不串扰
+        val adapter = ChatStreamTurnAdapter()
+        adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("思考"))
+        adapter.onEvent(ChatStreamEvent.TextSnapshot("回答"))
+        val reasoningGrow = adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("思考加深"))
+        assertEquals(listOf(TurnStreamEvent.ReasoningDelta("rsn-0", "加深")), reasoningGrow)
+        val textGrow = adapter.onEvent(ChatStreamEvent.TextSnapshot("回答完毕"))
+        assertEquals(listOf(TurnStreamEvent.TextDelta("txt-0", "完毕")), textGrow)
+    }
+
+    @Test
+    fun `round started closes both reasoning and text blocks`() {
+        val adapter = ChatStreamTurnAdapter()
+        adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("思考"))
+        adapter.onEvent(ChatStreamEvent.TextSnapshot("回答"))
+        val events = adapter.onEvent(ChatStreamEvent.RoundStarted)
+        assertEquals(
+            listOf(
+                TurnStreamEvent.TextEnd("txt-0"),
+                TurnStreamEvent.ReasoningEnd("rsn-0"),
+                TurnStreamEvent.RoundStarted(0),
+            ),
+            events,
+        )
+        // 新一轮 reasoning 开新块
+        assertEquals(
+            listOf(
+                TurnStreamEvent.ReasoningStart("rsn-1"),
+                TurnStreamEvent.ReasoningDelta("rsn-1", "再想"),
+            ),
+            adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("再想")),
+        )
+    }
+
+    @Test
+    fun `tool call started closes reasoning block`() {
+        val adapter = ChatStreamTurnAdapter()
+        adapter.onEvent(ChatStreamEvent.ReasoningSnapshot("要搜索"))
+        val events = adapter.onEvent(ChatStreamEvent.ToolCallStarted(toolName = "web_search", args = "{}"))
+        assertEquals(
+            listOf(
+                TurnStreamEvent.ReasoningEnd("rsn-0"),
+                TurnStreamEvent.ToolInputStart("call-0", "web_search"),
+                TurnStreamEvent.ToolInputAvailable("call-0", "{}"),
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun `adapter plus reducer assemble reasoning text sources turn`() {
+        // 端到端钉桩（值域终态 §6.1/§6.2）：思考链 → 正文 → web_search 引用，
+        // 终态 parts = [reasoning][text][source] 三分区
+        val adapter = ChatStreamTurnAdapter()
+        val reducer = TurnPartsReducer()
+        fun feed(event: ChatStreamEvent) = adapter.onEvent(event).forEach(reducer::apply)
+
+        feed(ChatStreamEvent.ReasoningSnapshot("查一下最新版本"))
+        feed(ChatStreamEvent.ToolCallStarted(toolName = "web_search", args = "{}"))
+        reducer.apply(
+            TurnStreamEvent.SourcesAvailable(
+                listOf(MessagePart.SourceUrl("", "https://a.com", "https://a.com", "A")),
+            ),
+        )
+        feed(ChatStreamEvent.TextSnapshot("最新版本是 2.0"))
+
+        val parts = reducer.parts
+        assertEquals(
+            listOf(
+                MessagePart.Reasoning("rsn-0", "查一下最新版本", PartState.DONE),
+                MessagePart.Text("txt-0", "最新版本是 2.0", PartState.STREAMING),
+                MessagePart.SourceUrl("src-0", "https://a.com", "https://a.com", "A"),
+            ),
+            parts,
+        )
+    }
+
     // ── M4：显式 RoundStarted 轮边界（spec §10 收口）─────────────────
 
     @Test
-    fun `round started closes open text block and emits round event`() {
-        val adapter = ChatStreamTurnAdapter()
+    fun `round started closes open text block and emits round event`() {        val adapter = ChatStreamTurnAdapter()
         adapter.onEvent(ChatStreamEvent.TextSnapshot("第一轮"))
         val events = adapter.onEvent(ChatStreamEvent.RoundStarted)
         assertEquals(

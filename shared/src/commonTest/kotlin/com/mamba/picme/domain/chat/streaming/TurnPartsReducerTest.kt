@@ -62,6 +62,161 @@ class TurnPartsReducerTest {
         )
     }
 
+    // ── 思考链块（值域终态 spec §6.1）──────────────────────────
+
+    @Test
+    fun `reasoning start delta end lifecycle builds one done block`() {
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.ReasoningStart("rsn-0"))
+        reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "用户想要"))
+        val parts = reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "最新海报"))
+        assertEquals(listOf(MessagePart.Reasoning("rsn-0", "用户想要最新海报", PartState.STREAMING)), parts)
+        val done = reducer.apply(TurnStreamEvent.ReasoningEnd("rsn-0"))
+        assertEquals(listOf(MessagePart.Reasoning("rsn-0", "用户想要最新海报", PartState.DONE)), done)
+    }
+
+    @Test
+    fun `reasoning assembles before text in natural order`() {
+        // extended thinking 模型先流 reasoning 再流 text：到达序即立法序
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "思考"))
+        reducer.apply(TurnStreamEvent.TextDelta("txt-0", "回答"))
+        assertEquals(
+            listOf(
+                MessagePart.Reasoning("rsn-0", "思考", PartState.STREAMING),
+                MessagePart.Text("txt-0", "回答", PartState.STREAMING),
+            ),
+            reducer.parts,
+        )
+    }
+
+    @Test
+    fun `reasoning arriving after text is still ordered before it`() {
+        // 排序立法（spec §6.1）：无论到达序，reasoning 恒插主区首 part 之前
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.TextDelta("txt-0", "先到正文"))
+        reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "后到思考"))
+        assertEquals(
+            listOf(
+                MessagePart.Reasoning("rsn-0", "后到思考", PartState.STREAMING),
+                MessagePart.Text("txt-0", "先到正文", PartState.STREAMING),
+            ),
+            reducer.parts,
+        )
+    }
+
+    @Test
+    fun `done reasoning block rejects further deltas`() {
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.ReasoningStart("rsn-0"))
+        reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "定稿思考"))
+        reducer.apply(TurnStreamEvent.ReasoningEnd("rsn-0"))
+        val parts = reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "篡改"))
+        assertEquals(listOf(MessagePart.Reasoning("rsn-0", "定稿思考", PartState.DONE)), parts)
+    }
+
+    @Test
+    fun `reasoning delta before start auto-opens the block`() {
+        val reducer = TurnPartsReducer()
+        val parts = reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "孤儿 delta"))
+        assertEquals(listOf(MessagePart.Reasoning("rsn-0", "孤儿 delta", PartState.STREAMING)), parts)
+    }
+
+    @Test
+    fun `repeated reasoning start is idempotent`() {
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.ReasoningStart("rsn-0"))
+        reducer.apply(TurnStreamEvent.ReasoningDelta("rsn-0", "a"))
+        val parts = reducer.apply(TurnStreamEvent.ReasoningStart("rsn-0"))
+        assertEquals(1, parts.size)
+        assertEquals("a", (parts[0] as MessagePart.Reasoning).text)
+    }
+
+    // ── source 区（值域终态 spec §6.2：chips 恒在正文下方）──────
+
+    @Test
+    fun `sources append after text as tail zone`() {
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.TextDelta("txt-0", "搜索结果如下"))
+        val parts = reducer.apply(
+            TurnStreamEvent.SourcesAvailable(
+                listOf(
+                    MessagePart.SourceUrl("", "https://a.com", "https://a.com", "A"),
+                    MessagePart.SourceUrl("", "https://b.com", "https://b.com", null),
+                ),
+            ),
+        )
+        assertEquals(
+            listOf(
+                MessagePart.Text("txt-0", "搜索结果如下", PartState.STREAMING),
+                MessagePart.SourceUrl("src-0", "https://a.com", "https://a.com", "A"),
+                MessagePart.SourceUrl("src-1", "https://b.com", "https://b.com"),
+            ),
+            parts,
+        )
+    }
+
+    @Test
+    fun `text arriving after sources inserts before the source run`() {
+        // 异常序自愈：sources 先到（web_search 工具先于终稿 text 执行），正文后到仍落在
+        // chips 上方（spec §6.2 渲染「文本气泡下引用 chips 行」）
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.SourcesAvailable(listOf(MessagePart.SourceUrl("", "u", "https://a.com"))))
+        reducer.apply(TurnStreamEvent.TextDelta("txt-0", "终稿正文"))
+        assertEquals(
+            listOf(
+                MessagePart.Text("txt-0", "终稿正文", PartState.STREAMING),
+                MessagePart.SourceUrl("src-0", "u", "https://a.com"),
+            ),
+            reducer.parts,
+        )
+    }
+
+    @Test
+    fun `tool placeholder and output keep source zone at tail`() {
+        // web_search 之后同回合再调 draw_chart：占位/产物落主区（source 区之前），
+        // chips 恒在尾部
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.SourcesAvailable(listOf(MessagePart.SourceUrl("", "u", "https://a.com"))))
+        reducer.apply(TurnStreamEvent.ToolInputStart("call-0", TurnPartsReducer.TOOL_DRAW_CHART))
+        val parts = reducer.apply(
+            TurnStreamEvent.ToolOutputAvailable("call-0", MessagePart.Chart("call-0", "<svg/>")),
+        )
+        assertEquals(
+            listOf(
+                MessagePart.Chart("call-0", "<svg/>"),
+                MessagePart.SourceUrl("src-0", "u", "https://a.com"),
+            ),
+            parts,
+        )
+    }
+
+    @Test
+    fun `sources are re-stamped with unique part ids across emissions`() {
+        // 发射方 partId 只作占位；reducer 统一重编 src-N（LazyColumn key = messageId:partId
+        // 需 turn 内唯一，跨多次 web_search 调用也不撞）
+        val reducer = TurnPartsReducer()
+        reducer.apply(
+            TurnStreamEvent.SourcesAvailable(
+                listOf(MessagePart.SourceUrl("dup", "u1", "https://a.com")),
+            ),
+        )
+        val parts = reducer.apply(
+            TurnStreamEvent.SourcesAvailable(
+                listOf(MessagePart.SourceUrl("dup", "u2", "https://b.com")),
+            ),
+        )
+        assertEquals(listOf("src-0", "src-1"), parts.map { it.partId })
+    }
+
+    @Test
+    fun `empty sources emission is a no-op`() {
+        val reducer = TurnPartsReducer()
+        reducer.apply(TurnStreamEvent.TextDelta("txt-0", "x"))
+        val parts = reducer.apply(TurnStreamEvent.SourcesAvailable(emptyList()))
+        assertEquals(listOf(MessagePart.Text("txt-0", "x", PartState.STREAMING)), parts)
+    }
+
     // ── 工具占位契约 ────────────────────────────────────────────
 
     @Test

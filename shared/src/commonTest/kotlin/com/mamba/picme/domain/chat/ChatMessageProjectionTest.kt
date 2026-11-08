@@ -80,6 +80,58 @@ class ChatMessageProjectionTest {
         assertNull(leading.metadata)
     }
 
+    // ── primaryPartOf 判型锚单点立法（中点审查 🟡2） ─────────────
+
+    @Test
+    fun `primaryPartOf skips reasoning source and tombstone and takes first content part`() {
+        // [Reasoning, Chart] 失锚形态钉桩：判型锚是 Chart 而非 parts 首元素 Reasoning
+        assertEquals(
+            MessagePart.Chart("p1", "<svg/>"),
+            primaryPartOf(listOf(MessagePart.Reasoning("p0", "思考"), MessagePart.Chart("p1", "<svg/>"))),
+        )
+        // source/tombstone 同为伴随载荷，跳过后取首个 content part
+        assertEquals(
+            MessagePart.Text("p2", "正文"),
+            primaryPartOf(
+                listOf(
+                    MessagePart.SourceUrl("p0", "s1", "https://a.com"),
+                    MessagePart.Tombstone("p1", "data_future_x"),
+                    MessagePart.Text("p2", "正文"),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `primaryPartOf returns null for pure companion parts`() {
+        assertNull(primaryPartOf(listOf(MessagePart.Reasoning("p0", "思考"))))
+        assertNull(
+            primaryPartOf(
+                listOf(
+                    MessagePart.SourceUrl("p0", "s1", "https://a.com"),
+                    MessagePart.SourceDocument("p1", "s2", "text/html", "文档"),
+                    MessagePart.Tombstone("p2", "data_future_x"),
+                ),
+            ),
+        )
+        assertNull(primaryPartOf(emptyList()))
+    }
+
+    @Test
+    fun `project reasoning chart row keeps tool_chart kind`() {
+        // 写侧投影与判型锚同源：[Reasoning, Chart] 行 type 仍取 tool_chart（读侧 uiTypeOf
+        // 双端同调 primaryPartOf，见 IosChatHistoryStoreCodecTest 对应用例）
+        val projection = projectChatRow(
+            listOf(
+                MessagePart.Reasoning("p0", "先想"),
+                MessagePart.Chart("p1", "<svg/>"),
+            ),
+            ModelInputRole.ASSISTANT,
+        )
+        assertEquals("tool_chart", projection.type)
+        assertEquals("<svg/>", projection.content)
+    }
+
     @Test
     fun `source and tombstone parts never serve as projection source`() {
         val pureSource = projectChatRow(

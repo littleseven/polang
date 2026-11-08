@@ -32,12 +32,26 @@ import kotlinx.serialization.json.putJsonArray
  */
 data class ChatRowProjection(val type: String, val content: String, val metadata: String?)
 
-fun projectChatRow(parts: List<MessagePart>, role: ModelInputRole): ChatRowProjection {
-    val primary = parts.firstOrNull { part ->
-        part.category == PartCategory.CONTENT ||
-            part.category == PartCategory.TOOL ||
-            part.category == PartCategory.DATA
+/**
+ * 判型锚 part（单点立法，值域终态中点审查 🟡2）：首个 content/tool/data 类 part；
+ * reasoning / source / tombstone 永不作锚（伴随载荷不主导消息 kind，spec §3/§6.1——
+ * reasoning 排序恒在 text 前也不改变判型）。写侧投影（[projectChatRow]）与双端读侧
+ * 判型（androidApp `ChatViewModel.toUiModel` / iOS `ChatHistoryStoreCodec.uiTypeOf`，
+ * iOS 经 SharedKit 消费本函数）唯一同源实现，消除「写侧投影 type=tool_chart、读侧按
+ * parts 首元素判型落 TEXT」的失锚风险。
+ */
+fun primaryPartOf(parts: List<MessagePart>): MessagePart? =
+    parts.firstOrNull { part ->
+        // Tombstone 显式排除：其 category 归 DATA（Task 1 终态分类），但它是读侧合成占位
+        //（未知/退役 part 的可读投影），不主导消息 kind
+        part !is MessagePart.Tombstone &&
+            (part.category == PartCategory.CONTENT ||
+                part.category == PartCategory.TOOL ||
+                part.category == PartCategory.DATA)
     }
+
+fun projectChatRow(parts: List<MessagePart>, role: ModelInputRole): ChatRowProjection {
+    val primary = primaryPartOf(parts)
     return when (primary) {
         null -> ChatRowProjection(TYPE_TEXT, "", null)
         is MessagePart.Text -> ChatRowProjection(TYPE_TEXT, primary.markdown, null)
@@ -65,8 +79,8 @@ fun projectChatRow(parts: List<MessagePart>, role: ModelInputRole): ChatRowProje
             metadata = metadataJson.encodeToString(OptimizeCandidateGroup.serializer(), primary.group),
         )
         is MessagePart.OpenUiCard -> ChatRowProjection(OpenUiContract.PART_TYPE, MessagePartsCodec.encodePart(primary), null)
-        // reasoning/source 已被 primary 过滤排除，分支不可达；Tombstone（DATA 类）是
-        // 读侧合成物、生产写路径不产生，若经接缝写入则防御性投影空 text 行
+        // reasoning/source/tombstone 已被 primaryPartOf（判型锚单点立法）过滤排除，分支
+        // 不可达；保留满足 sealed 穷尽性
         is MessagePart.Reasoning,
         is MessagePart.SourceUrl,
         is MessagePart.SourceDocument,
