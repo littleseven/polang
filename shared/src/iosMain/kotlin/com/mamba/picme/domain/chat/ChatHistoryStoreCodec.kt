@@ -1,7 +1,6 @@
 package com.mamba.picme.domain.chat
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -13,24 +12,32 @@ import kotlinx.serialization.json.encodeToJsonElement
 /**
  * iOS 聊天历史文件编解码器（`chat_history_<sessionId>.json` 整包线格式，ADR-016 M5 B1）。
  *
- * 与 Android [MessagePartsCodec] 共用同一 parts 嵌套数组线格式（鉴别值 = 9 值分类法
- * `type` taxonomy spec §1），但落点不同：iOS 是整文件 JSON 而非 SQLite 行，无
- * `partsJson` 字符串列 / metadata blob 必要——采用**结构化平铺字段 + parts 数组双
- * payload**（平铺字段 = 旧 SwiftUI 渲染器的直读源，切换期等价性的锚；parts = M5
- * 拍平渲染的 SSOT）。
+ * 与 Android [MessagePartsCodec] 共用同一 parts 嵌套数组线格式（鉴别值 = 13 值终态
+ * 分类法，spec《chat-value-domain-ideal》§3），但落点不同：iOS 是整文件 JSON 而非
+ * SQLite 行，无 `partsJson` 字符串列 / metadata blob 必要——采用**结构化平铺字段 +
+ * parts 数组双 payload**（平铺字段 = 旧 SwiftUI 渲染器的直读源，切换期等价性的锚；
+ * parts = M5 拍平渲染的 SSOT）。文件顶层带 **envelope 版本信封**
+ * （`{"version":6,"messages":[...]}`，2026-11-08 值域终态）。
  *
  * - **encode**：`ChatMessageType` 9 值 kind 枚举 → wire 分类法反向映射（role 变体
  *   已归并——角色由 role 独立列承载，IMAGE_TEXT 归并 wire `image`）；平铺字段缺失时
- *   自 parts 补齐，保证文件内双 payload 一致；
- * - **decode**：parts-first 投影（对齐 androidApp toUiModel M4 口径）——primary part
+ *   自 parts 补齐，保证文件内双 payload 一致；恒写当前 [FILE_VERSION]；
+ * - **decode**：`version` 缺失（envelope 前的裸数组格式 / legacy Swift Codable 格式）
+ *   或 < [FILE_VERSION] → **整体忽略**（返回 null，调用方落空列表——与 Android
+ *   Room v28 聊天表重置语义对齐：老历史文件属已批准的可重置范围，无迁移路径）；
+ *   当前版本内 parts-first 投影（对齐 androidApp toUiModel M4 口径）——primary part
  *   定 [ChatMessageType]、平铺字段以 parts 提取优先；parts 数组整体缺失时自结构化
- *   平铺字段重建（belt-and-braces，语义对齐 [MessagePartsConverter] 但数据源为结构
- *   化字段而非 metadata blob）；重建失败回原文 Text 兜底，**不允许丢消息**；
+ *   平铺字段重建（belt-and-braces，重建口径对齐 [MessagePartsConverter]——含
+ *   `tool_browser`/`data_genui_program` 整颗 part JSON 直通分支，数据源为结构化
+ *   字段而非 metadata blob）；重建失败回原文 Text 兜底，**不允许丢消息**；
  * - **不持久化**：performance / claudeAgent / claudeDeliver / isStreaming / showCursor /
  *   isThinking（瞬态，对齐 Android Room 行不落库）；gachaInteractive（计算值，对齐
  *   Android `controller.hasPending(id)` 运行时查询语义，防 restart 后死交互条）。
  */
 object ChatHistoryStoreCodec {
+
+    /** 历史文件线格式版本（envelope 信封，2026-11-08 值域终态）：低于本版的文件整体忽略。 */
+    const val FILE_VERSION = 6
 
     private val json = Json {
         // 前向兼容：新版本字段旧版本解码时忽略
@@ -39,28 +46,37 @@ object ChatHistoryStoreCodec {
         encodeDefaults = false
     }
 
-    private val listSerializer = ListSerializer(ChatMessageDto.serializer())
-
-    /** 整包编码：消息列表 → JSON 文件字符串（写侧，Swift `ChatHistoryStore.persist` 消费）。 */
+    /** 整包编码：消息列表 → envelope v6 文件字符串（写侧，Swift `ChatHistoryStore.saveMessages` 消费）。 */
     fun encode(messages: List<ChatMessage>): String =
-        json.encodeToString(listSerializer, messages.map { it.toDto() })
+        json.encodeToString(
+            ChatHistoryFileEnvelope.serializer(),
+            ChatHistoryFileEnvelope(version = FILE_VERSION, messages = messages.map { it.toDto() }),
+        )
 
     /**
-     * 整包解码：JSON 文件字符串 → 消息列表。null = 空文件/结构损坏，调用方按
-     * legacy 格式兜底（Swift 侧 `LegacyChatMessage` 迁移），**不允许丢消息**。
-     *
-     * 退役横滑卡行级过滤已随 2026-11-08 值域终态出清（Room v28 聊天表重置后
-     * 存量行不复存在；文件内偶现的未知/退役鉴别值由 parts 惰性承载的 Tombstone
-     * 兜底占位，不再整行剔除）。
+     * 整包解码：envelope 文件字符串 → 消息列表。null = 忽略——空文件 / 结构损坏 /
+     * `version` 缺失（envelope 前的裸数组格式、legacy Swift Codable 格式解析不出信封）
+     * 或 < [FILE_VERSION]，调用方返回空列表（与 Android 聊天表重置语义对齐，不迁移）。
+     * 当前版本内行级容错（未知 part 原位 Tombstone、损坏行降级 Text）保证不丢消息。
      */
     fun decode(text: String?): List<ChatMessage>? {
         if (text.isNullOrBlank()) return null
-        val dtos = runCatching { json.decodeFromString(listSerializer, text) }.getOrNull() ?: return null
-        return dtos.map { it.toDomain() }
+        val envelope = runCatching {
+            json.decodeFromString(ChatHistoryFileEnvelope.serializer(), text)
+        }.getOrNull() ?: return null
+        if (envelope.version < FILE_VERSION) return null
+        return envelope.messages.map { it.toDomain() }
     }
 
     // ── wire DTO（ChatMessage 本体非 @Serializable——LlmPerformance 等瞬态载荷无
     //    线格式；持久化子集独立成 DTO，字段类型全部 @Serializable） ──
+
+    /** 文件顶层信封：版本门禁 + 消息数组（v6 起取代裸数组落盘）。 */
+    @Serializable
+    private data class ChatHistoryFileEnvelope(
+        val version: Int,
+        val messages: List<ChatMessageDto>,
+    )
 
     @Serializable
     private data class ChatMessageDto(
@@ -226,6 +242,15 @@ object ChatHistoryStoreCodec {
         "tool_html" -> listOf(
             MessagePart.HtmlCard("p0", html = htmlContent ?: content, meta = htmlCardMeta ?: HtmlCardMeta()),
         )
+
+        // browser 直播卡 / OpenUI GenUI 卡：content 承载整颗 part JSON（口径对齐
+        // MessagePartsConverter——Android 侧同两分支直通解码）；损坏行抛异常 →
+        // partsOrRebuild runCatching 落原文 Text 兜底
+        "tool_browser" ->
+            listOf(json.decodeFromString(MessagePart.BrowserLive.serializer(), content))
+
+        "data_genui_program" ->
+            listOf(json.decodeFromString(MessagePart.OpenUiCard.serializer(), content))
 
         "tool_task" -> listOf(
             MessagePart.TaskCard(

@@ -784,12 +784,16 @@ private struct ChatListItemView: View {
         let t = ChatListItem.companion
         switch item.contentType {
         case t.TYPE_AGENT_TEXT: agentTextItem
+        case t.TYPE_REASONING: reasoningItem
+        case t.TYPE_SOURCE_CHIPS: sourceChipsItem
         case t.TYPE_CHART: chartItem
         case t.TYPE_OPTIMIZE_CANDIDATES: gachaItem
         case t.TYPE_HTML_CARD: htmlCardItem
         case t.TYPE_TASK_CARD: taskCardItem
         case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
-        case t.TYPE_TOMBSTONE: unsupportedItem
+        case t.TYPE_TOMBSTONE: tombstoneItem
+        // TYPE_BROWSER_LIVE / TYPE_OPENUI_CARD：iOS 渲染未落地（值域终态 D3 边界——
+        // 降级缺口维持独立跟踪于 PARITY 台账，本批不补渲染），落 default 空渲染
         default: EmptyView()
         }
     }
@@ -895,10 +899,122 @@ private struct ChatListItemView: View {
         }
     }
 
-    /// TOMBSTONE part（前向兼容兜底，2026-11-08）：未知/损坏 part 原位占位卡——
-    /// 「内容暂不支持 + 升级提示」（payload 携带可读摘要时优先展示）。
-    /// 块序与消息其余 part 不受影响，升级新版本后同一消息自动恢复为正式卡片。
-    private var unsupportedItem: some View {
+    /// REASONING part（值域终态 2026-11-08，spec《chat-value-domain-ideal》§6.1）：
+    /// 可折叠「思考过程」块——默认折叠，展开后浅灰次要文字（样式参照 Vercel/ChatGPT
+    /// reasoning UI）。独立折叠块不进正文桶（flattener TYPE_REASONING 桶），防思考链
+    /// 以正文形态双显；生产开关默认关，本渲染件随历史回放/后续接线生效。
+    @State private var reasoningExpanded = false
+
+    private var reasoningItem: some View {
+        let text = (item.part as? MessagePartReasoning)?.text ?? ""
+        return VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { reasoningExpanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: reasoningExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(String(localized: "chat.reasoning_title"))
+                        .font(.system(size: 13))
+                }
+                .foregroundColor(Color(.secondaryLabel))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chat_reasoning_toggle")
+
+            if reasoningExpanded, !text.isEmpty {
+                Text(text)
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: ChatBubbleTokens.bubbleMaxWidth, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// SOURCE_CHIPS item（值域终态 2026-11-08，spec §6.2）：flattener 把消息内连续
+    /// SourceUrl/SourceDocument parts 聚合为单条引用 chips 行——序号 + 域名（文档引用
+    /// 无 URL，显示文件名/标题且不可点）；点击经系统浏览器打开落地页。正文 markdown
+    /// 图链行为不变（图=配图，chip=来源列表，职责不同）。
+    @Environment(\.openURL) private var openURL
+
+    private struct SourceChip: Identifiable {
+        let id: String
+        let ordinal: Int
+        let label: String
+        let url: URL?
+    }
+
+    /// 自 item.part（run 首个 source part 锚）起取**连续** source parts（flattener
+    /// 聚合口径——多段 run 各自成 item，渲染只取本段，防御性 break 于首个非 source part）。
+    private var sourceChips: [SourceChip] {
+        guard let anchor = item.part else { return [] }
+        let parts = item.message.parts
+        guard let start = parts.firstIndex(where: { $0 === anchor }) else { return [] }
+        var chips: [SourceChip] = []
+        for part in parts[start...] {
+            if let source = part as? MessagePartSourceUrl {
+                chips.append(SourceChip(
+                    id: source.partId,
+                    ordinal: chips.count + 1,
+                    label: URL(string: source.url)?.host ?? source.url,
+                    url: URL(string: source.url)))
+            } else if let doc = part as? MessagePartSourceDocument {
+                chips.append(SourceChip(
+                    id: doc.partId,
+                    ordinal: chips.count + 1,
+                    label: doc.filename ?? doc.title,
+                    url: nil))
+            } else {
+                break
+            }
+        }
+        return chips
+    }
+
+    private var sourceChipsItem: some View {
+        FlowLayout(horizontal: 8, vertical: 6) {
+            ForEach(sourceChips) { chip in
+                sourceChipView(chip)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func sourceChipView(_ chip: SourceChip) -> some View {
+        let content = HStack(spacing: 5) {
+            Text("\(chip.ordinal)")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Color(.secondaryLabel))
+            Text(chip.label)
+                .font(.system(size: 12))
+                .foregroundColor(Color(.label).opacity(0.8))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: ChatBubbleTokens.capsuleCornerRadius))
+
+        return Group {
+            if let url = chip.url {
+                Button { openURL(url) } label: { content }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("chat_source_chip")
+            } else {
+                content
+            }
+        }
+    }
+
+    /// TOMBSTONE part（前向兼容兜底，2026-11-08 值域终态自 unsupported 改名转正）：
+    /// 未知/损坏/退役 part 原位占位卡——「内容暂不支持 + 升级提示」（payload 携带
+    /// 可读摘要时优先展示）。块序与消息其余 part 不受影响，升级新版本后同一消息
+    /// 自动恢复为正式卡片。
+    private var tombstoneItem: some View {
         let summary = (item.part as? MessagePartTombstone)?.summary
         return HStack(alignment: .center, spacing: 10) {
             Image(systemName: "info.circle")

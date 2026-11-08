@@ -9,21 +9,22 @@ import kotlin.test.assertTrue
 
 /**
  * ChatHistoryStoreCodec 契约测试（ADR-016 M5 B1）：
- * round-trip 等值 / 9 值 kind↔wire 映射 / parts-first 投影 / 结构化字段重建 /
- * 损坏兜底不丢消息 / 瞬态与计算值不持久化。
+ * envelope v6 版本门禁 / round-trip 等值 / 9 值 kind↔wire 映射 / parts-first 投影 /
+ * 结构化字段重建 / 损坏兜底不丢消息 / 瞬态与计算值不持久化。
  */
 class IosChatHistoryStoreCodecTest {
 
     @Test
+    fun encodeWrapsMessagesInVersionEnvelope() {
+        // 写侧恒写当前版本信封（2026-11-08 值域终态）：顶层 {"version":6,"messages":[...]}
+        val encoded = ChatHistoryStoreCodec.encode(listOf(testTextMessage()))
+        assertTrue("\"version\":${ChatHistoryStoreCodec.FILE_VERSION}" in encoded, "应带版本信封: $encoded")
+        assertTrue("\"messages\":[" in encoded, "信封内应为消息数组: $encoded")
+    }
+
+    @Test
     fun roundTripTextMessagePreservesDomain() {
-        val original = ChatMessage(
-            id = "m1",
-            type = ChatMessageType.TEXT,
-            content = "hello",
-            role = ModelInputRole.ASSISTANT,
-            modelUsed = "test-model",
-            parts = listOf(MessagePart.Text("p0", "hello", PartState.DONE)),
-        )
+        val original = testTextMessage()
         val decoded = ChatHistoryStoreCodec.decode(ChatHistoryStoreCodec.encode(listOf(original)))
         assertEquals(listOf(original), decoded)
     }
@@ -164,8 +165,8 @@ class IosChatHistoryStoreCodecTest {
     fun decodeRebuildsPartsFromFlatFieldsWhenPartsMissing() {
         // belt-and-braces：parts 数组整体缺失（手改文件/半损坏），自结构化字段重建
         val json = """
-            [{"id":"m4","type":"image","role":"user","content":"说明文字",
-              "timestamp":1,"imageUri":"file:///a.jpg"}]
+            {"version":6,"messages":[{"id":"m4","type":"image","role":"user","content":"说明文字",
+              "timestamp":1,"imageUri":"file:///a.jpg"}]}
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         val message = decoded.single()
@@ -178,8 +179,8 @@ class IosChatHistoryStoreCodecTest {
     @Test
     fun decodeRebuildsChartFromFlatSvg() {
         val json = """
-            [{"id":"c3","type":"tool_chart","role":"agent","content":"","timestamp":1,
-              "chartSvg":"<svg y/>"}]
+            {"version":6,"messages":[{"id":"c3","type":"tool_chart","role":"agent","content":"","timestamp":1,
+              "chartSvg":"<svg y/>"}]}
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         val message = decoded.single()
@@ -189,9 +190,31 @@ class IosChatHistoryStoreCodecTest {
     }
 
     @Test
+    fun decodeRebuildsBrowserLiveAndOpenUiFromWholePartJsonContent() {
+        // 口径对齐 Android MessagePartsConverter（Task 1/4 后）：tool_browser /
+        // data_genui_program 的 content 承载整颗 part JSON，重建路径直通解码
+        //（不再落 unknownTypeFallback 的 Tombstone 降级）
+        val json = """
+            {"version":6,"messages":[
+              {"id":"b1","type":"tool_browser","role":"agent",
+               "content":"{\"type\":\"tool_browser\",\"partId\":\"p0\",\"sessionId\":\"s1\",\"currentUrl\":\"https://example.com\",\"pageTitle\":\"Example\"}",
+               "timestamp":1},
+              {"id":"o1","type":"data_genui_program","role":"agent",
+               "content":"{\"type\":\"data_genui_program\",\"partId\":\"p0\",\"program\":\"Page(){}\",\"fallbackSummary\":\"摘要\"}",
+               "timestamp":2}
+            ]}
+        """.trimIndent()
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
+        val browser = assertIs<MessagePart.BrowserLive>(decoded[0].parts.single())
+        assertEquals("s1", browser.sessionId)
+        val openui = assertIs<MessagePart.OpenUiCard>(decoded[1].parts.single())
+        assertEquals("Page(){}", openui.program)
+    }
+
+    @Test
     fun decodeFallsBackToTextOnUnknownWireType() {
         val json = """
-            [{"id":"m5","type":"future_type","role":"agent","content":"原文","timestamp":1}]
+            {"version":6,"messages":[{"id":"m5","type":"future_type","role":"agent","content":"原文","timestamp":1}]}
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         val message = decoded.single()
@@ -204,9 +227,9 @@ class IosChatHistoryStoreCodecTest {
         // 前向兼容兜底（2026-11-08）：parts 数组含新版本未知 part → 原位 Tombstone
         // 占位（可读摘要提升），整包 decode 不再失败丢历史
         val json = """
-            [{"id":"m6","type":"text","role":"agent","content":"hi","timestamp":1,
+            {"version":6,"messages":[{"id":"m6","type":"text","role":"agent","content":"hi","timestamp":1,
               "parts":[{"type":"text","partId":"p0","markdown":"hi","state":"DONE"},
-                       {"type":"tool_video_edit","partId":"p1","fallbackSummary":"视频结果"}]}]
+                       {"type":"tool_video_edit","partId":"p1","fallbackSummary":"视频结果"}]}]}
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         val message = decoded.single()
@@ -222,8 +245,8 @@ class IosChatHistoryStoreCodecTest {
     fun decodeUnknownWireTypeWithJsonBlobFallsBackToTombstone() {
         // content 为 JSON blob 的未知 wire type（对齐 Android converter 口径）→ Tombstone 占位
         val json = """
-            [{"id":"m7","type":"tool_future","role":"agent",
-              "content":"{\"type\":\"tool_future\",\"partId\":\"p0\",\"fallbackSummary\":\"摘要\"}","timestamp":1}]
+            {"version":6,"messages":[{"id":"m7","type":"tool_future","role":"agent",
+              "content":"{\"type\":\"tool_future\",\"partId\":\"p0\",\"fallbackSummary\":\"摘要\"}","timestamp":1}]}
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         assertEquals(
@@ -241,21 +264,46 @@ class IosChatHistoryStoreCodecTest {
     }
 
     @Test
-    fun decodeDegradesRetiredDiscriminatorRowToTombstoneWithoutCollapsingFile() {
-        // 旧版 app 写出的文件里，横滑卡行 parts 含已删除的 data_media_results 鉴别值——
-        // parts 以 JsonElement 惰性承载（逐元素 Tombstone 兜底）保证整包强类型解码不塌成
-        // null（Swift 兜底误配 legacy → 空历史 → persist 覆写丢数据）。行级过滤已随
-        // 2026-11-08 值域终态出清（Room v28 重置后存量行不复存在）：退役鉴别值行降级为
-        // Tombstone 占位行保留，正常行不受影响。
+    fun decodeIgnoresLegacyFileWithoutVersionEnvelope() {
+        // envelope 前的裸数组格式（旧 codec 写出）→ 整体忽略（Android 聊天表重置对齐，不迁移）
+        val bareArray = """
+            [{"id":"m1","type":"text","role":"agent","content":"hi","timestamp":1,
+              "parts":[{"type":"text","partId":"p0","markdown":"hi","state":"DONE"}]}]
+        """.trimIndent()
+        assertNull(ChatHistoryStoreCodec.decode(bareArray))
+
+        // legacy Swift Codable 格式（role/text 字段族）→ 同样解析不出信封，整体忽略
+        val legacySwift = """
+            [{"id":"123","role":"user","text":"老格式","timestamp":"2026-01-01T00:00:00Z",
+              "isStreaming":false,"isThinking":false,"isToolCalling":false,"mediaIds":[]}]
+        """.trimIndent()
+        assertNull(ChatHistoryStoreCodec.decode(legacySwift))
+    }
+
+    @Test
+    fun decodeIgnoresEnvelopeBelowCurrentVersion() {
+        // 未来信封结构假设回溯兼容：低版本文件整体忽略（与 Android 聊天表重置语义对齐）
         val json = """
-            [
+            {"version":5,"messages":[{"id":"m1","type":"text","role":"agent","content":"hi","timestamp":1}]}
+        """.trimIndent()
+        assertNull(ChatHistoryStoreCodec.decode(json))
+    }
+
+    @Test
+    fun decodeDegradesRetiredDiscriminatorRowToTombstoneWithoutCollapsingFile() {
+        // 文件内偶现的退役/未知鉴别值由 parts 惰性承载（逐元素 Tombstone 兜底）保证整包
+        // 强类型解码不塌成 null（空历史 → persist 覆写丢数据）。行级过滤已随 2026-11-08
+        // 值域终态出清（Room v28 重置后存量行不复存在）：退役鉴别值行降级为 Tombstone
+        // 占位行保留，正常行不受影响。
+        val json = """
+            {"version":6,"messages":[
               {"id":"a","type":"text","role":"user","content":"找猫的照片","timestamp":1,
                "parts":[{"type":"text","partId":"p0","markdown":"找猫的照片","state":"DONE"}]},
               {"id":"b","type":"data_media_results","role":"agent","content":"找到 3 张","timestamp":2,
                "parts":[{"type":"data_media_results","partId":"p0","mediaIds":[1,2,3],"total":3}]},
               {"id":"c","type":"text","role":"agent","content":"找到 3 张「猫」的照片","timestamp":3,
                "parts":[{"type":"text","partId":"p0","markdown":"找到 3 张「猫」的照片","state":"DONE"}]}
-            ]
+            ]}
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json), "退役鉴别值不得塌掉整包解码")
         assertEquals(listOf("a", "b", "c"), decoded.map { it.id }, "三行全保留（b 降级 Tombstone 占位）")
@@ -272,17 +320,26 @@ class IosChatHistoryStoreCodecTest {
     fun decodeRowLevelFallbackOnPartiallyCorruptedRow() {
         // 行级容错：单行字段损坏只影响该行（content 打捞为 text），其余行不丢
         val json = """
-            [
+            {"version":6,"messages":[
               {"id":"a","type":"text","role":"agent","content":"正常行","timestamp":1},
               {"id":"b","type":"tool_task","role":"agent","content":"任务卡缺 engineerTask","timestamp":2},
               {"id":"c","type":"text","role":"user","content":"尾行","timestamp":3}
-            ]
+            ]}
         """.trimIndent()
         val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
         assertEquals(listOf("a", "b", "c"), decoded.map { it.id })
         assertEquals(ChatMessageType.TEXT, decoded[1].type, "损坏行降级纯文本")
         assertEquals("任务卡缺 engineerTask", decoded[1].content)
     }
+
+    private fun testTextMessage(): ChatMessage = ChatMessage(
+        id = "m1",
+        type = ChatMessageType.TEXT,
+        content = "hello",
+        role = ModelInputRole.ASSISTANT,
+        modelUsed = "test-model",
+        parts = listOf(MessagePart.Text("p0", "hello", PartState.DONE)),
+    )
 
     private fun testGachaGroup(): OptimizeCandidateGroup = OptimizeCandidateGroup(
         sourceImageUri = "file:///src.jpg",
