@@ -275,10 +275,11 @@ final class ChatSpecUITests: XCTestCase {
 
     // MARK: - 用例 6：工具轮渲染策略（对齐 Android uiActions 收集器）
 
-    /// 两轮搜索（search → refine）后：媒体卡只保留最后一张（替换不叠加）；
+    /// 两轮搜索（search → refine）后：媒体卡不再渲染（2026-11-08 横滑图集卡退役，
+    /// search_media/refine 回执为计数文本）——断言 chat_media_card 恒 0 钉住退役；
     /// 工具 text_reply 不追加独立气泡——修复「回复切成多条」「连续多条未找到」。
-    /// 新建会话保证基线为 0；新增气泡上界：2 轮最终回复 + 1 张卡 header ≤ 3。
-    func testChatToolRoundSingleCardNoSplit() throws {
+    /// 新建会话保证基线为 0；新增气泡上界：2 轮最终回复 + 1 条计数回执 ≤ 3。
+    func testChatToolRoundNoMediaCardNoSplit() throws {
         try navigateToChat()
 
         // 新建会话：历史消息清零，断言不被往轮污染
@@ -301,7 +302,7 @@ final class ChatSpecUITests: XCTestCase {
             return aiBubbleCount() > baseline
         }
 
-        // 第一轮：宽泛搜索（建立上下文 + 期待媒体卡）
+        // 第一轮：宽泛搜索（建立上下文；退役后回执为计数文本，无媒体卡）
         inputField.tap()
         inputField.typeText("Show me photos from this month")
         app.buttons["chat_send"].tap()
@@ -309,7 +310,7 @@ final class ChatSpecUITests: XCTestCase {
         waitForProcessingComplete(timeout: 40)
         attachScreenshot(name: "chat_single_card_round1")
 
-        // 第二轮：窄化（refine_media_search → 替换上一张卡片）
+        // 第二轮：窄化（refine_media_search → 计数文本回执）
         inputField.tap()
         inputField.typeText("Only today's")
         // 等发送按钮出现（canSend = 有文本 && 非处理中；第一轮处理未结束时不显示）
@@ -321,10 +322,10 @@ final class ChatSpecUITests: XCTestCase {
         waitForProcessingComplete(timeout: 40)
         attachScreenshot(name: "chat_single_card_round2")
 
-        // 断言 1：媒体卡至多 1 张（多轮替换，不叠加）
+        // 断言 1：媒体卡恒 0（横滑图集卡 2026-11-08 退役，搜索回合不应再渲染）
         let cardCount = app.descendants(matching: .any).matching(identifier: "chat_media_card").count
         print("CHAT_TOOL_CARD_COUNT: \(cardCount)")
-        XCTAssertLessThanOrEqual(cardCount, 1, "多轮搜索的媒体卡应只保留最后一张")
+        XCTAssertEqual(cardCount, 0, "横滑媒体卡已退役，搜索回合不应再渲染 chat_media_card")
 
         // 断言 2：无工具中间文本气泡（text_reply 已忽略，最终回复单气泡呈现）
         let bubbleCount = aiBubbleCount()

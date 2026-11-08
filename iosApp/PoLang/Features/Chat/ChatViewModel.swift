@@ -360,10 +360,10 @@ final class ChatViewModel: ObservableObject {
                     self?.handleStreamEvent(event, placeholderId: placeholderId)
                 }
             },
-            onComplete: { [weak self] summary, errorMessage, directReply in
+            onComplete: { [weak self] summary, errorMessage in
                 Task { @MainActor in
                     self?.pacing?.finish()
-                    self?.completeMessage(id: placeholderId, summary: summary, errorMessage: errorMessage, directReply: directReply)
+                    self?.completeMessage(id: placeholderId, summary: summary, errorMessage: errorMessage)
                     self?.isProcessing = false
                 }
             }
@@ -499,7 +499,7 @@ final class ChatViewModel: ObservableObject {
 
     /// 推理完成：一次 with 定稿正文 + 瞬态 parts 转持久轨——
     /// item key 由 whole 重建为 part 级，流式光标随之消失
-    private func completeMessage(id: String, summary: String, errorMessage: String?, directReply: DirectRouteReply? = nil) {
+    private func completeMessage(id: String, summary: String, errorMessage: String?) {
         guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
         let finalText: String
         if let errorMessage, !errorMessage.isEmpty {
@@ -510,12 +510,6 @@ final class ChatViewModel: ObservableObject {
             if isGuestMode, errorMessage.localizedCaseInsensitiveContains("quota_exceeded") {
                 showGuestQuotaExhaustedNudge()
             }
-        } else if let directReply {
-            // 意图路由直执回合：本地化气泡（模型侧 observation 是硬编码中文模板，不可直达用户）；
-            // 卡片已经 watchUiActions 渲染（对齐 Android directReply 分支口径）
-            finalText = directReply.totalCount > 0
-                ? String(localized: "Search results are shown in the card above")
-                : String(localized: "No results")
         } else {
             finalText = summary.isEmpty ? String(localized: "(No response)") : summary
         }
@@ -534,7 +528,7 @@ final class ChatViewModel: ObservableObject {
     /// - 卡 part（OUTPUT_AVAILABLE）剔除——产物已/将由独立消息行承载，落库后 flattener
     ///   等值跳过仅对流式期生效，持久轨保留必双显；
     /// - INPUT_*/OUTPUT_ERROR 等瞬态态剔除（产物行或失败 item 不落库）；
-    /// - 空产物兜底单 Text p0（直执/错误路径无 reducer 活动）。
+    /// - 空产物兜底单 Text p0（错误路径无 reducer 活动）。
     private func persistedParts(fallbackText: String) -> [MessagePart] {
         let texts = turnReducer.parts.compactMap { part -> MessagePart? in
             guard let text = part as? MessagePartText, !text.markdown.isEmpty else { return nil }
