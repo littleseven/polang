@@ -10,6 +10,7 @@ import ai.koog.agents.core.dsl.extension.nodeLLMRequest
 import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResults
 import ai.koog.agents.core.dsl.extension.onTextMessage
 import ai.koog.agents.core.dsl.extension.onToolCalls
+import ai.koog.agents.core.environment.ToolResultKind
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.streaming.toMessageResponse
 import kotlin.coroutines.cancellation.CancellationException
@@ -42,12 +43,16 @@ interface FinalOutputCorrector {
  * @param finalOutputCorrector 非 null 时挂 correctInvalidProgram 纠正节点
  *   （先匹配者胜，纠正边声明在 finish 边之前）
  * @param onStreamingFallback 流式失败回退一次性请求时的告警出口（server=slf4j；null=静默）
+ * @param toolLoopGuard 非 null 时挂工具循环熔断边（nodeExecuteTool 出边、声明在回落边之前），
+ *   命中携 [ToolLoopGuard.TRIPPED_SENTINEL] 直达 nodeFinish；server 传 null（云端 ProgramGuard
+ *   回合原生，且 maxIterations=100 语义不同）
  */
 data class PoLangReActStrategyConfig(
     val name: String = "polang_single_run",
     val streaming: Boolean = false,
     val finalOutputCorrector: FinalOutputCorrector? = null,
     val onStreamingFallback: ((Throwable) -> Unit)? = null,
+    val toolLoopGuard: ToolLoopGuard? = null,
 )
 
 /**
@@ -81,13 +86,13 @@ fun poLangSingleRunStrategy(
     config: PoLangReActStrategyConfig = PoLangReActStrategyConfig(),
 ): AIAgentGraphStrategy<String, String> {
     if (!config.streaming && config.finalOutputCorrector == null) {
-        return builtinOneShotStrategy(config.name)
+        return builtinOneShotStrategy(config.name, config.toolLoopGuard)
     }
     return configurableStrategy(config)
 }
 
-/** 端侧现行路径：内建节点 + 修复后的边序（与 M1 前实现逐字节一致）。 */
-private fun builtinOneShotStrategy(name: String): AIAgentGraphStrategy<String, String> =
+/** 端侧现行路径：内建节点 + 修复后的边序（与 M1 前实现逐字节一致）+ 可选循环熔断边。 */
+private fun builtinOneShotStrategy(name: String, loopGuard: ToolLoopGuard?): AIAgentGraphStrategy<String, String> =
     strategy(name) {
         val nodeCallLLM by nodeLLMRequest()
         val nodeExecuteTool by nodeExecuteTools()
@@ -96,6 +101,25 @@ private fun builtinOneShotStrategy(name: String): AIAgentGraphStrategy<String, S
         edge(nodeStart forwardTo nodeCallLLM)
         edge(nodeCallLLM forwardTo nodeExecuteTool onToolCalls { true })
         edge(nodeCallLLM forwardTo nodeFinish onTextMessage { true })
+        // 循环熔断边：声明在回落边之前（先匹配者胜）。命中时本轮工具结果不再回灌 LLM，
+        // 直接携哨兵文本落终点——由 agent 包装层识别并抛 AgentLoopStuckException。
+        if (loopGuard != null) {
+            edge(
+                nodeExecuteTool forwardTo nodeFinish
+                    onCondition { results ->
+                        loopGuard.checkAndRecord(
+                            results.toolResults.map {
+                                ToolLoopGuard.RoundSignal(
+                                    tool = it.tool,
+                                    output = it.output,
+                                    isError = it.resultKind !is ToolResultKind.Success,
+                                )
+                            },
+                        )
+                    }
+                    transformed { ToolLoopGuard.TRIPPED_SENTINEL },
+            )
+        }
         edge(nodeExecuteTool forwardTo nodeSendToolResult)
         // 🔧 修复点：与内建版相反，先匹配 tool_calls 再兜底文本（见上方 KDoc）。
         edge(nodeSendToolResult forwardTo nodeExecuteTool onToolCalls { true })

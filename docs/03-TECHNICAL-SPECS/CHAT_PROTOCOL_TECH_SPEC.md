@@ -110,7 +110,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 ### 1.4 工具集（ChatToolService，43 个 @Tool）
 
-全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 5s（browser_* 族 25s、web_search 15s）。
+全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 15s（browser_* 族 25s、web_search 15s；2026-11-08 由 5s 上调——直执链路搜图 5~12s 常态超 5s 误回落 agent loop 引发空结果打转）。
 
 **意图级工具子集（M3 分支化落地，2026-10-17，成本治理）**：契约表 `ChatIntentContract.allowedTools` 从声明转为执行——路由判定为单一意图且路径可靠（LLM_ROUTER / PATTERN_SHORTCUT / BROWSER_SHORTCUT）时，`ChatRoutingPolicy.toolSubsetFor` 产出「契约白名单 + 通用工具（finish/delay）」子集，经 `RouteDecision.FullAgentLoop.toolNames` 传到引擎层；`RemoteChatEngine.resolveToolSetOverride` 自同一份 `chatTools`（组合根新增注入，与 registry/descriptors 同源）过滤派生子集 registry + 子集 prompt 清单段（不变式 8 不破坏），以 `KoogChatAgent.ChatToolSetOverride` 按轮覆写——AIAgent 重建键加 toolSetKey（与记忆快照/摘要版本同级），**KoogChatAgent 单实例单 executor 不为子集多建**。**保守全量（null）场景**：OPEN_QA / 一切降级路径 / secondary 双产出物 / 直执失败回退 / 平台未注入 chatTools / 子集过滤为空——路由器永不拦截能力的语义不变。子集 base prompt 按 key 缓存逐字节复用（保前缀稳定）。**权衡**：不同意图的相邻回合 system prompt/tools 前缀不同，会碎片化上游前缀缓存——用缓存碎片换 ~40 条 schema（约 2-4k token/轮 × ReAct 轮数）的确定削减。iOS 经 `ChatToolManifest.tools` 同路径注入（8 工具手工清单）。
 
@@ -142,7 +142,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 `poLangSingleRunStrategy`（koog/KoogReActStrategy.kt）：start → callLLM → executeTool → sendToolResult 循环图，**与 Koog 内建 singleRunStrategy 唯一差异** = nodeSendToolResult 出边把 `onToolCalls` 声明在 `onTextMessage` 之前——修复 Koog（≤1.3.0）对「叙述文本+tool_calls 同帧」响应静默丢弃工具调用的缺陷。
 
-tool 结果作为 `Message.User` 内嵌 `MessagePart.Tool.Result` 追加进 prompt 进入下一轮。**终止条件**：① LLM 返回纯文本（onTextMessage → nodeFinish，文本作回合 summary）；② `maxIterations`=10（×3 换算 Koog 节点步数 30）；③ 外层 120s 超时。
+tool 结果作为 `Message.User` 内嵌 `MessagePart.Tool.Result` 追加进 prompt 进入下一轮。**终止条件**：① LLM 返回纯文本（onTextMessage → nodeFinish，文本作回合 summary）；② `maxIterations`=10（×3 换算 Koog 节点步数 30）；③ 外层 120s 超时；④ **ToolLoopGuard 循环熔断**（koog/ToolLoopGuard.kt，2026-11-08）——尾部窗口同一签名（工具名+输出采样）连续重复 3 次，或连续 6 轮全错，携哨兵直达 nodeFinish，双 agent 统一映射 `AgentLoopStuckException` → 五语友好文案 `chat_agent_loop_stuck`，杜绝「空/错工具结果打转撞 30 步上限、Koog 英文原文上屏」事故。
 
 ---
 

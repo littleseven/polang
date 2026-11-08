@@ -39,6 +39,7 @@ import com.mamba.picme.agent.core.model.config.AiAgentPrivacyLevel
 import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.agent.core.capability.BrowserSessionCapability
 import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
+import com.mamba.picme.agent.core.inference.remote.koog.AgentLoopStuckException
 import com.mamba.picme.agent.core.intent.IntentGuard
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
@@ -155,6 +156,10 @@ private const val GUEST_REGISTER_NUDGE_THRESHOLD = 20
 private const val MAX_PREVIEW_LENGTH = 60
 private const val MAX_CARDS = 20
 private const val CHAT_IMAGE_MAX_PX = 1024
+
+/** cause chain 上是否存在工具循环熔断/迭代硬顶异常——Koog 英文原文不上屏的判定依据（映射到本地化文案）。 */
+private fun Throwable?.containsAgentLoopStuck(): Boolean =
+    generateSequence(this) { it.cause }.any { it is AgentLoopStuckException }
 
 /** 网关 sid 格式：uuid4().hex[:12]（12 位小写 hex）；claude init 的 session_id 是带连字符 UUID，不匹配。 */
 private val GATEWAY_SID_PATTERN = EngineerTaskSid.GATEWAY_PATTERN
@@ -2099,23 +2104,34 @@ class ChatViewModel(
                         val errorBody = error.message.orEmpty()
                         val isGuestQuota = isGuestMode.value &&
                             errorBody.contains("quota_exceeded", ignoreCase = true)
-                        if (isGuestQuota) {
-                            // 访客试用额度用完 → 友好提示 + 打开注册引导（软引导，非硬阻断）
-                            insertAgentMessage(
-                                sessionId = sessionId,
-                                content = stringContext().getString(R.string.chat_guest_quota_used_up),
-                                modelUsed = currentModelLabel(),
-                            )
-                            _showRegistrationSheet.value = true
-                        } else {
-                            insertAgentMessage(
-                                sessionId = sessionId,
-                                content = stringContext().getString(
-                                    R.string.chat_inference_error,
-                                    error.message ?: stringContext().getString(R.string.chat_unknown_error),
-                                ),
-                                modelUsed = "error",
-                            )
+                        when {
+                            isGuestQuota -> {
+                                // 访客试用额度用完 → 友好提示 + 打开注册引导（软引导，非硬阻断）
+                                insertAgentMessage(
+                                    sessionId = sessionId,
+                                    content = stringContext().getString(R.string.chat_guest_quota_used_up),
+                                    modelUsed = currentModelLabel(),
+                                )
+                                _showRegistrationSheet.value = true
+                            }
+                            error.containsAgentLoopStuck() -> {
+                                // 工具循环熔断 / Koog 步数硬顶：本地化文案，不再透传 Koog 英文原文
+                                insertAgentMessage(
+                                    sessionId = sessionId,
+                                    content = stringContext().getString(R.string.chat_agent_loop_stuck),
+                                    modelUsed = "error",
+                                )
+                            }
+                            else -> {
+                                insertAgentMessage(
+                                    sessionId = sessionId,
+                                    content = stringContext().getString(
+                                        R.string.chat_inference_error,
+                                        error.message ?: stringContext().getString(R.string.chat_unknown_error),
+                                    ),
+                                    modelUsed = "error",
+                                )
+                            }
                         }
                     }
                 )
@@ -2141,16 +2157,21 @@ class ChatViewModel(
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to send message", e)
                 _streamingMessage.value = null
-                // 保存错误提示
+                // 保存错误提示；工具循环熔断/迭代硬顶走本地化文案，不透传 Koog 英文原文
+                val errorContent = if (e.containsAgentLoopStuck()) {
+                    stringContext().getString(R.string.chat_agent_loop_stuck)
+                } else {
+                    stringContext().getString(
+                        R.string.chat_inference_error,
+                        e.message ?: stringContext().getString(R.string.chat_unknown_error),
+                    )
+                }
                 val errorMessage = ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
                     type = "text",
                     role = "agent",
-                    content = stringContext().getString(
-                        R.string.chat_inference_error,
-                        e.message ?: stringContext().getString(R.string.chat_unknown_error),
-                    ),
+                    content = errorContent,
                     modelUsed = "error"
                 )
                 chatMessageDao.insertMessageWithParts(errorMessage)

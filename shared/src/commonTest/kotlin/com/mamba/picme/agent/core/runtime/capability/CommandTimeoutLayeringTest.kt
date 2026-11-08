@@ -40,4 +40,15 @@ class CommandTimeoutLayeringTest {
             "REGISTRY_COMMAND_TIMEOUT_MS=${CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS}ms 必须 < 网关超时 30000ms"
         )
     }
+
+    @Test
+    fun `default dispatch timeout must be tighter than registry inner timeout`() {
+        // 2026-11-08：直执派发 5s→15s（冷搜索实测 ~8s）；放宽后仍须 < registry 内层，
+        // 否则内层先必杀、外层超时永不生效（与 browser 25s 同一条层叠不变式）。
+        assertTrue(
+            ChatToolService.DISPATCH_TIMEOUT_MS < CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS,
+            "层叠不变式破坏：默认 dispatch 超时 ${ChatToolService.DISPATCH_TIMEOUT_MS}ms >= " +
+                "registry 内层 ${CommandExecutor.REGISTRY_COMMAND_TIMEOUT_MS}ms"
+        )
+    }
 }

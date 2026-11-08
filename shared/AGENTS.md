@@ -56,6 +56,7 @@ Gradle target：`android`（KMP android library 插件）+ `jvm()` + `iosX64()` 
 - 自定义模型名须在 `LLModel.capabilities` 显式声明 `Completion, Tools, OpenAIEndpoint.Completions`——🔴 不加 Responses/Thinking，否则 Koog 选错端点。
 - `RemoteProtocol.CLAUDE` 经 `AnthropicLLMClient`（Messages 协议）：自建 LLModel 须映射进 `AnthropicClientSettings.modelVersionsMap` 为模型 id 字符串（Koog 默认版本表只认其预定义实例）。
 - 自定义 `poLangSingleRunStrategy` 修复 Koog 1.1.1 内建策略丢「文本+tool_calls 同帧」工具调用的缺陷。
+- **工具循环熔断（2026-11-08，`ToolLoopGuard`，真机事故回填）**：模型在空/错工具结果上打转时 Koog maxIterations 只是兜底（30 步撞顶 = 英文开发者文案裸上屏）。`PoLangReActStrategyConfig.toolLoopGuard` 非空时在 nodeExecuteTool 出边挂熔断边（先匹配者胜，声明在回落边之前），双判据 = 尾部窗口周期 ≤3 连续重复 3 次（轮签名=工具名+输出 120 字符采样，翻页式推进不误判）‖ 连续 6 轮全错；命中携 `TRIPPED_SENTINEL` 直达 nodeFinish，agent 包装层（`KoogChatAgent.runChat`/`KoogReActAgent.runTask`，per-agent guard 字段、每回合 reset）识别哨兵与 `AIAgentMaxNumberOfIterationsReachedException` 统一抛 `AgentLoopStuckException`，Android chat UI 按类型映射五语文案（`chat_agent_loop_stuck`），飞书/相机链路走 `buildFriendlyErrorMessage` 循环分支。server 云端路径不传 guard（ProgramGuard 回合原生、maxIterations 语义不同）。同步补盲：`llm_call_log.responseJson` 改记 `summarizeResponseForLog`（正文 + `toolCalls: name(args≤300字符)` 双记，原仅 `textContent()` 导致纯工具调用轮全记 null，事故后无法还原模型在调什么）。
 - 协议分流收口在 `RemoteModelFactory.createKoogExecutor`。
 - **Koog 实际版本 = 1.3.0**（`gradle/libs.versions.toml`；本文其余 1.1.1 表述为历史实证记录）。1.3.0 起消息模型变化：`MessagePart.Tool.Result` 内容为 `parts: List<ContentPart>`（读全文用 `output`，改写用 `copy(parts = …)`，String content 仅是便捷构造）；`MessagePart.Tool.Call` 参数字段为 `args`（非 arguments）。
 
