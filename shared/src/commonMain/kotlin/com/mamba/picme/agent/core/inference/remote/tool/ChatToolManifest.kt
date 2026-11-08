@@ -13,7 +13,8 @@ import kotlinx.serialization.Serializable
  * 用 [SimpleTool] 子类逐字面对齐 [ChatToolService] 的 7 个相册工具 + ai_optimize
  * （2026-08-16 抽卡追齐新增；2026-09-26 意图路由 M1：`view_media` 移出 chat 工具面；
  * `search_media` 增补 person/fromMs/toMs 结构化参数透传；2026-09-29 再增补 hasFace；
- * 2026-11-08 横滑相册卡退役：search/refine 描述去「自动出卡」，改为取数 + render_html 出图集卡）。
+ * 2026-11-08 横滑相册卡退役：search/refine 描述去「自动出卡」，改为取数 + render_html
+ * 出图集卡；同日终审补登 `render_html` 本体——描述指向的工具必须在工具面物理存在）。
  *
  * 一致性纪律：name/description/参数名/参数描述**逐字节**照抄 @Tool(customName) 与
  * @LLMDescription 原文（改任何一侧都会触发 jvmTest `ChatToolManifestConsistencyTest`
@@ -69,6 +70,13 @@ object ChatToolManifest {
     @Serializable
     class AiOptimizeArgs(
         @property:LLMDescription("图片 URI") val imageUri: String,
+    )
+
+    @Serializable
+    class RenderHtmlArgs(
+        @property:LLMDescription("HTML 源码：CSS/JS 内联；可用远程 <img>/<video>/<audio>/CSS 与 <a> 外链；禁远程 script/iframe/fetch/XHR") val html: String,
+        @property:LLMDescription("对卡片内容的一句话文字总结") val summary: String,
+        @property:LLMDescription("展示形态：inline（默认，聊天内完全撑开直接交互，内容高度建议 ≤2/3 屏）或 fullpage（长报告/多屏图文/为全屏设计的交互页，聊天内显示固定高预览、点击进全屏）；空串 = inline") val display: String,
     )
 
     // ── 工具实现（委托 ChatToolService 同名 suspend 方法）─────────────────────────
@@ -146,7 +154,46 @@ object ChatToolManifest {
             ChatToolService.getInstance().aiOptimize(args.imageUri)
     }
 
-    /** 8 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
+    /**
+     * render_html（2026-11-08 横滑卡退役追齐，终审 🔴2 修复）：浏览展示的出卡工具——
+     * 退役后 search/refine 描述指引模型「展示用 render_html 出图集卡」，iOS 工具面缺它
+     * 就是教模型调不存在的工具（幻觉诱导）。执行走 ChatToolService.renderHtml →
+     * dispatchCommand → IosRenderHtmlCapability（组合根已注册，bridge=null 时能力自报
+     * 不可用回 Error）。描述/参数逐字节对齐 ChatToolService.renderHtml（含 draw_chart /
+     * run_gallery_script 提及——二者不在 iOS chat 工具面，但一致性测试要求零漂移；
+     * 模型误调会被未知工具拒绝并自恢复，IosChatPrompt 收敛规则只引 render_html）。
+     */
+    private class RenderHtmlTool : SimpleTool<RenderHtmlArgs>(
+        argsType = typeToken<RenderHtmlArgs>(),
+        name = "render_html",
+        description = "渲染一个 HTML 组件卡片插入聊天（端侧 WebView 渲染，支持内联 CSS/JS 动画与交互）。" +
+            "仅当用户明确要求更丰富的展示或交互组件（如可交互图表、动画演示、自定义布局卡片）时才调用；" +
+            "柱/折/饼统计图一律仍用 draw_chart，不要用本工具替代。" +
+            "html 的 CSS/JS 一律内联；远程 script、iframe/object/embed/form、meta refresh 会被清洗剔除，" +
+            "fetch/XHR 也不可用（离线沙箱）。" +
+            "鼓励引用远程富媒体提升表现力：<img> 网络图片、<video>/<audio> 远程媒体、远程 CSS 样式、" +
+            "<a> 外链均可使用（a 外链用户点击后在全屏落地页打开）；" +
+            "URL 务必用确定可访问的真实地址（优先官方/权威站点素材），不要编造域名。" +
+            "引用用户相册本地图片/视频：图片用 <img src=\"media://媒体id\">、视频用 <video src=\"media://媒体id\">（id 只能来自 run_gallery_script 取数" +
+            "（gallery.query/media.meta 等）或 search_media 的结果，禁止虚构 id；" +
+            "禁止 file://、content:// 路径——端侧会把 media:// 重写为白名单通道注入）。" +
+            "取数脚本 return 只回统计摘要——ids 只用于拼接 media:// 引用内联进 html。" +
+            "宽度自适应容器（width:100%，不写死超过卡片宽度的固定 px）；总大小不超过 100KB。" +
+            "卡片有两种展示形态（display 参数）：inline（默认）在聊天流内完全撑开、卡内直接交互，" +
+            "内容高度建议不超过【HTML 卡片渲染环境】段的建议值；" +
+            "fullpage 在聊天流内只显示固定高上半部预览（底部渐隐），用户点击后进全屏查看器交互——" +
+            "长报告/多屏图文/为全屏设计的交互页必须传 display=\"fullpage\"，" +
+            "并把标题/导航/关键交互设计在内容顶部（用户先看到的是上半部预览）；" +
+            "未声明 fullpage 但内容超过一屏的卡会被端侧强制转为预览形态。" +
+            "风格要求：简洁专业（白/浅灰底 + 中性深灰文字 + 单一强调色，系统字体栈，留白充足，" +
+            "圆角 8~12px 配细边框/浅阴影，图表细线少网格，不用 emoji 当图标、不用花哨渐变）。" +
+            "summary 填你对卡片内容的一句话文字总结（会回传给你组织回复，并用作全屏查看器标题）。",
+    ) {
+        override suspend fun execute(args: RenderHtmlArgs): String =
+            ChatToolService.getInstance().renderHtml(args.html, args.summary, args.display)
+    }
+
+    /** 9 个工具实例（stateless，共享一份即可；registry 与 descriptors 同源派生）。 */
     val tools: List<ToolBase<*, *>> by lazy {
         listOf(
             GetGallerySummaryTool(),
@@ -157,6 +204,7 @@ object ChatToolManifest {
             DeleteMediaTool(),
             ShareMediaTool(),
             AiOptimizeTool(),
+            RenderHtmlTool(),
         )
     }
 

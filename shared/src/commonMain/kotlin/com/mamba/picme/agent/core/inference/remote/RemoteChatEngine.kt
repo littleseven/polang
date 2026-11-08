@@ -193,7 +193,7 @@ class RemoteChatEngine internal constructor(
         // 意图路由（spec《意图路由契约与意图路由器》）：LLM 管意图、代码管策略。
         // 直执路径已随原生横滑卡退役（2026-11-08）——全意图回落 chat 远程 ReAct
         //（ADR-005 协议分离），路由产出契约工具子集供 M3 裁剪：引擎按子集裁剪
-        // tool schema 与 prompt 清单段（成本治理：不再每轮全量 43 个 schema）。
+        // tool schema 与 prompt 清单段（成本治理：不再每轮全量 41 个 schema）。
         val toolNames = routeForToolSubset(input, agentContext)
         Logger.i(tag, "streamChat routing to Chat ReAct (toolSet=${toolNames?.size ?: "full"})")
         return streamChatReAct(input, agentContext, onEvent, toolNames)

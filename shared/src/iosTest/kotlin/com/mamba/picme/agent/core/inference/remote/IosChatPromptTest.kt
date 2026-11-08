@@ -14,17 +14,23 @@ class IosChatPromptTest {
     private val prompt = IosChatPrompt.build(ChatToolManifest.buildDescriptors())
 
     @Test
-    fun `prompt contains tool inventory for the 8 registered tools`() {
-        // 2026-08-16 抽卡追齐：8 相册工具 + ai_optimize；2026-09-26 意图路由 M1：view_media 移出 chat 工具面（9aacc1fa4），现 7 相册工具 + ai_optimize
-        assertTrue(prompt.contains("可用工具（8）"), "应含 8 工具清单头，实际 prompt 头部：${prompt.take(200)}")
+    fun `prompt contains tool inventory for the 9 registered tools`() {
+        // 2026-08-16 抽卡追齐：8 相册工具 + ai_optimize；2026-09-26 意图路由 M1：view_media 移出 chat 工具面（9aacc1fa4）；
+        // 2026-11-08 横滑卡退役追齐（终审 🔴2）：补登 render_html（search/refine 描述指引的出卡工具必须在场）
+        assertTrue(prompt.contains("可用工具（9）"), "应含 9 工具清单头，实际 prompt 头部：${prompt.take(200)}")
         assertTrue(prompt.contains("search_media"))
         assertTrue(prompt.contains("refine_media_search"))
         assertTrue(prompt.contains("delete_media"))
         assertTrue(prompt.contains("ai_optimize"))
+        assertTrue(prompt.contains("render_html"))
     }
 
     @Test
-    fun `prompt does not reference unregistered capabilities`() {
+    fun `prompt rules do not reference unregistered capabilities`() {
+        // 只校验规则段（空清单 = 无工具描述混入）：render_html 的注册描述里合法提及
+        // draw_chart/run_gallery_script（逐字节对齐 Android，一致性测试锁定），那是
+        // 工具自身文档而非 prompt 规则教学，不在本守卫射程内
+        val rulesOnly = IosChatPrompt.build(emptyList())
         val banned = listOf(
             // ai_optimize 已注册（2026-08-16 抽卡追齐），从禁用清单移除
             "run_gallery_script", "draw_chart", "capability.dispatch",
@@ -33,7 +39,7 @@ class IosChatPromptTest {
             "start_tag_scan", "bridge.callAsync",
         )
         for (token in banned) {
-            assertFalse(prompt.contains(token), "iOS prompt 不应引用未注册能力：$token")
+            assertFalse(rulesOnly.contains(token), "iOS prompt 规则段不应引用未注册能力：$token")
         }
     }
 

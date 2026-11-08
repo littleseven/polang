@@ -127,7 +127,9 @@ data class SearchOutcome(
     val errorMessage: String? = null
 ) {
     /**
-     * 横滑卡退役后的产出形态：计数文本（LLM 观测与用户可见消息共用）。
+     * 横滑卡退役后的产出形态：计数文本（**仅 LLM 观测，不直达用户气泡**——Android
+     * uiActions 收集器与 iOS text_reply 均忽略 TextReply；中文硬编码文案若直达用户
+     * 会触 [I18N] 红线，复用者注意）。
      * 命中 id 清单由 ChatViewModel 搜索基数（lastResultAssets / 快照）承载，
      * LLM 出图集卡经 render_html + media://{id} 引用。
      */

@@ -229,8 +229,8 @@ extension LegacyChatMessage {
         case .agentEditResult:
             sharedType = ChatMessageType.agentEditResult
         case .mediaResults:
-            // 横滑卡已退役：老媒体结果行降级为纯文本气泡（mediaIds 负载丢弃，
-            // 对齐 Android LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES 回放过滤口径）
+            // 横滑卡已退役：mediaResults 行在 ChatHistoryStore.loadMessages 已整行滤除，
+            // 本分支仅为防御兜底（枚举位保留防老文件 decode 炸，永不应到达）
             sharedType = ChatMessageType.agentText
         case .chart:
             sharedType = ChatMessageType.chart

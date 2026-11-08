@@ -18,11 +18,12 @@ class ChatToolManifestDescriptorTest {
     private val descriptors = ChatToolManifest.buildDescriptors()
 
     @Test
-    fun `exactly 8 tools with deterministic names`() {
+    fun `exactly 9 tools with deterministic names`() {
         assertEquals(
             listOf(
                 "get_gallery_summary", "search_media", "refine_media_search",
                 "select_media", "favorite_media", "delete_media", "share_media", "ai_optimize",
+                "render_html", // 2026-11-08 横滑卡退役追齐（终审 🔴2）：浏览展示出卡工具
             ),
             descriptors.map { it.name },
         )

@@ -3,6 +3,11 @@ package com.mamba.picme.domain.chat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * iOS 聊天历史文件编解码器（`chat_history_<sessionId>.json` 整包线格式，ADR-016 M5 B1）。
@@ -45,14 +50,41 @@ object ChatHistoryStoreCodec {
     /**
      * 整包解码：JSON 文件字符串 → 消息列表。null = 空文件/结构损坏，调用方按
      * legacy 格式兜底（Swift 侧 `LegacyChatMessage` 迁移），**不允许丢消息**。
-     * 退役横滑卡行（[LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]）整行跳过。
+     *
+     * 两段式（2026-11-08 终审修复）：先 parseToJsonElement 按 `type` **滤掉退役行**
+     * （[LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]），再逐元素独立解码——
+     * 退役行的 parts 含已删除的 `data_media_results` 鉴别值，若整包强类型解码，
+     * sealed 多态反序列化抛异常会把**整个文件**塌成 null（过滤永远执行不到），
+     * Swift 兜底误配 legacy 格式 → 空历史 → persist 覆写 = 用户数据丢失（A2UI 同型坑）。
+     * 行级 runCatching：单行损坏只丢该行（content 尚存则降级 text 行），不塌整包。
      */
     fun decode(text: String?): List<ChatMessage>? {
         if (text.isNullOrBlank()) return null
-        val dtos = runCatching { json.decodeFromString(listSerializer, text) }.getOrNull() ?: return null
-        return dtos
-            .filter { it.type !in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES }
-            .map { it.toDomain() }
+        val array = runCatching { json.parseToJsonElement(text).jsonArray }.getOrNull() ?: return null
+        return array.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            val wireType = obj["type"]?.jsonPrimitive?.contentOrNull
+            if (wireType in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES) return@mapNotNull null
+            runCatching { json.decodeFromJsonElement(ChatMessageDto.serializer(), element).toDomain() }
+                .getOrElse { rowFallback(obj) }
+        }
+    }
+
+    /** 单行解码失败的最低限度打捞：id/role/content/timestamp 俱在则降级纯文本行，否则丢行。 */
+    private fun rowFallback(obj: JsonObject): ChatMessage? {
+        val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return null
+        val content = obj["content"]?.jsonPrimitive?.contentOrNull ?: return null
+        val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: "agent"
+        val timestamp = obj["timestamp"]?.jsonPrimitive?.longOrNull ?: 0L
+        val domainRole = roleOf(role)
+        return ChatMessage(
+            id = id,
+            type = if (domainRole == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT,
+            role = domainRole,
+            content = content,
+            timestamp = timestamp,
+            parts = fallbackText(content),
+        )
     }
 
     // ── wire DTO（ChatMessage 本体非 @Serializable——LlmPerformance 等瞬态载荷无

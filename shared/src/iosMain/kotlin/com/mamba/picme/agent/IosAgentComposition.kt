@@ -41,7 +41,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * - `chatMemoryStore` → [IosKoogMessageMemoryStore]（T1，NSUserDefaults）
  * - `chatHistoryCleaner` → no-op lambda（iOS 无旧 `memory_` 键空间需清理）
  * - `imageEngineProvider` → [IosUnavailableImageInferenceEngine]（T1 stub，AgentConfigurator 构造期 eager 调用）
- * - `chatToolDescriptors/Registry` → [ChatToolManifest]（T2，手工 8 工具）
+ * - `chatToolDescriptors/Registry` → [ChatToolManifest]（T2，手工 9 工具：8 相册/优化 + render_html）
  * - `cameraToolDescriptors/Registry` → 空（相机 AI 指令不在 Chat 范围，plan §1 不进第一版）
  * - `remoteImToolRegistryProvider` → 空 ToolRegistry（飞书 RPA 不在 iOS 范围）
  * - `chatPromptBuilder` → [IosChatPrompt.build]（T3，精简版 prompt）

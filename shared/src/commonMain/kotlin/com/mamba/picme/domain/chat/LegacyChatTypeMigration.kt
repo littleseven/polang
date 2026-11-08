@@ -12,7 +12,13 @@ package com.mamba.picme.domain.chat
  */
 object LegacyChatTypeMigration {
 
-    /** 新分类法 8 值全集（备份恢复据此判断行是新值还是 legacy）。 */
+    /**
+     * 备份恢复的「新值」allowlist——承重语义（2026-11-08 终审注）：恢复时据此判断行
+     * 是新值（直通）还是 legacy（走 map()）。**刻意含已退役的 `data_media_results`**：
+     * 若被剔除，老行会走 map() 的 else→text 兜底，把媒体资产机器 JSON 渲染成可见气泡。
+     * 值域以 9 值分类法为准（本集合不含 tool_browser/data_ui_openui——两卡行走 parts
+     * 通道，恢复路径不经本表判型；本表只服务备份文本行分类，不是值域 SSOT）。
+     */
     val NEW_TYPES: Set<String> = setOf(
         "text", "image",
         "tool_chart", "tool_html", "tool_task", "tool_image_edit",
