@@ -2,6 +2,7 @@ package com.mamba.picme.agent.core.inference.remote.koog
 
 import ai.koog.agents.chatMemory.feature.ChatMemory
 import ai.koog.agents.core.agent.AIAgent
+import ai.koog.agents.core.agent.exception.AIAgentMaxNumberOfIterationsReachedException
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.features.eventHandler.feature.EventHandler
 import ai.koog.prompt.streaming.StreamFrame
@@ -114,6 +115,9 @@ class KoogReActAgent(
     private val running = AtomicBoolean(false)
     private val cancelled = AtomicBoolean(false)
 
+    /** 工具循环熔断（2026-11-08，与 KoogChatAgent 同款）：runs 串行（running 互斥），每任务 reset。 */
+    private val toolLoopGuard = ToolLoopGuard()
+
     /** 任务执行作用域：SupervisorJob 隔离单任务失败；orchestratorDispatcher 承载网络/工具等待。 */
     private val scope = CoroutineScope(SupervisorJob() + dispatcherProvider.orchestratorDispatcher)
 
@@ -213,7 +217,16 @@ class KoogReActAgent(
         try {
             // Koog agent.run 自动驱动 ReAct 循环（工具调用 → 结果回填 → 继续），
             // maxIterations 上限对齐旧 AiServices 行为。
-            val summary = agent().run(userPrompt, sessionId)
+            toolLoopGuard.reset()
+            val summary = try {
+                agent().run(userPrompt, sessionId)
+            } catch (e: AIAgentMaxNumberOfIterationsReachedException) {
+                // 步数硬顶折叠为熔断语义（friendly 文案统一走 buildFriendlyErrorMessage 循环分支）
+                throw AgentLoopStuckException("max iterations reached: ${e.message}")
+            }
+            if (summary == ToolLoopGuard.TRIPPED_SENTINEL) {
+                throw AgentLoopStuckException("tool loop guard tripped (session=$sessionId)")
+            }
 
             val metrics = buildMetrics(startTime)
             lastExecutionMetrics = metrics
@@ -274,7 +287,7 @@ class KoogReActAgent(
         AIAgent.builder()
             // 直接传策略实例（命名 lambda 重载 graphStrategy(name){...} 是 Koog 1.1.1 JVM-only
             // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。
-            .graphStrategy(poLangSingleRunStrategy())
+            .graphStrategy(poLangSingleRunStrategy(PoLangReActStrategyConfig(toolLoopGuard = toolLoopGuard)))
             .promptExecutor(executorBundle.executor)
             .llmModel(executorBundle.model)
             .toolRegistry(effectiveToolRegistry)
@@ -327,8 +340,9 @@ class KoogReActAgent(
                                 totalTokens = meta?.totalTokensCount,
                                 // Koog EventHandler 不暴露原始请求 JSON；DEBUG 全文 body 需 Ktor Logging（后续）。
                                 requestJson = "",
+                                // 正文 + 工具调用清单双记（原仅 textContent，纯工具轮记成 null 的观测盲区）
                                 responseJson = if (RemoteModelFactory.captureContent) {
-                                    LlmCallRecord.cap(ctx.response?.textContent())
+                                    LlmCallRecord.cap(summarizeResponseForLog(ctx.response))
                                 } else {
                                     null
                                 },
@@ -382,8 +396,16 @@ internal fun buildFriendlyErrorMessage(original: Throwable): String {
     val causeChain = generateSequence<Throwable>(original) { it.cause }
     val hasUpstream = causeChain.any { it.message?.contains("upstream_error", ignoreCase = true) == true }
     val hasToolSequence = original.message?.contains("tool_calls", ignoreCase = true) == true
+    // 工具循环熔断 / Koog 步数硬顶（后者已在两 agent 内折叠为 AgentLoopStuckException，
+    // 此处防御性双检覆盖未来未折叠的调用方）
+    val isLoopStuck = causeChain.any {
+        it is AgentLoopStuckException || it is AIAgentMaxNumberOfIterationsReachedException
+    }
 
     return when {
+        isLoopStuck -> {
+            "任务在工具调用中陷入循环（或超出步数上限），已自动停止。请换个说法，或把任务拆小一点重试。"
+        }
         hasUpstream -> {
             "远程模型服务暂时不可用（upstream error），请稍后重试，或到设置切换其他模型供应商。"
         }

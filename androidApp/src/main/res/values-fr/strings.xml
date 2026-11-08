@@ -1092,8 +1092,11 @@
     <string name="chat_guest_banner_own_key">Mon propre Token</string>
     <string name="chat_guest_quota_used_up">Quota d\'essai épuisé. Inscrivez-vous pour obtenir 1000 appels gratuits.</string>
     <string name="chat_inference_error">Erreur d\'inférence : %1$s</string>
+    <string name="chat_agent_loop_stuck">La requête est entrée dans une boucle d\'appels d\'outils et a été arrêtée automatiquement. Reformulez votre demande ou découpez-la en étapes plus petites.</string>
     <string name="chat_calling_tool">Appel de l\'outil…</string>
     <string name="chat_card_generate_failed">Échec de la génération</string>
+    <string name="chat_unsupported_part_title">Contenu non pris en charge</string>
+    <string name="chat_unsupported_part_upgrade">Mettez à jour vers la dernière version pour voir ce contenu</string>
     <string name="openui_action_failed">Échec de l\'action</string>
     <string name="chat_example_group_search">Trouver des photos</string>
     <string name="chat_example_group_ask">Questions sur votre galerie</string>
@@ -1645,6 +1648,7 @@
     <string name="chat_write_no_valid_ids">Aucun identifiant de média valide</string>
     <string name="chat_delete_started_pending">Suppression de %1$d élément(s) initiée, en attente de l\'autorisation du système</string>
     <string name="chat_deleted_n">%1$d élément(s) supprimé(s)</string>
+    <string name="chat_share_opened_n">Panneau de partage ouvert (%1$d élément(s))</string>
     <string name="chat_favorited_one">1 élément ajouté aux favoris</string>
     <string name="chat_unfavorited_one">1 favori retiré</string>
     <string name="chat_selected_one">1 élément sélectionné</string>

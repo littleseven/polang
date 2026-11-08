@@ -147,9 +147,68 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `decode returns null for unknown part discriminator`() {
-        // 未来新版本 part 类型：旧版本整条解码失败 → 调用方走 legacy 列兜底（不丢消息）
-        assertNull(MessagePartsCodec.decode("""[{"type":"future_part","partId":"p0"}]"""))
+    fun `decode falls back to Unsupported part for unknown discriminator`() {
+        // 前向兼容兜底（2026-11-08）：未知 part 类型原位落 Unsupported 占位——
+        // 不再整条 null 拖垮同消息其它 part；原始 payload 留在 partsJson 原文，
+        // 升级新版本后同一行自动恢复为正式卡片
+        val parts = assertNotNull(MessagePartsCodec.decode("""[{"type":"future_part","partId":"p0"}]"""))
+        assertEquals(listOf(MessagePart.Unsupported("p0", originalType = "future_part")), parts)
+    }
+
+    @Test
+    fun `decode isolates unknown part without dropping siblings`() {
+        // part 级细粒度兜底：未知/损坏 part 不穿透、不拖垮同消息其它 part，块序保住
+        val partsJson = """
+            [
+              {"type":"text","partId":"p0","markdown":"前文","state":"DONE"},
+              {"type":"tool_video_edit","partId":"p1","videoUri":"v.mp4","fallbackSummary":"视频编辑结果"},
+              {"type":"text","partId":"p2","markdown":"后文","state":"DONE"}
+            ]
+        """.trimIndent()
+        val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
+        assertEquals(3, parts.size)
+        assertEquals(MessagePart.Text("p0", "前文", PartState.DONE), parts[0])
+        assertEquals(
+            MessagePart.Unsupported("p1", originalType = "tool_video_edit", summary = "视频编辑结果"),
+            parts[1],
+        )
+        assertEquals(MessagePart.Text("p2", "后文", PartState.DONE), parts[2])
+    }
+
+    @Test
+    fun `decode falls back to Unsupported for corrupted known part`() {
+        // 已知类型字段损坏（markdown 缺失）：同样原位 Unsupported，不拖垮整条消息
+        val partsJson = """
+            [
+              {"type":"text","partId":"p0","state":"DONE"},
+              {"type":"text","partId":"p1","markdown":"存活","state":"DONE"}
+            ]
+        """.trimIndent()
+        val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
+        assertEquals(2, parts.size)
+        assertEquals(MessagePart.Unsupported("p0", originalType = "text"), parts[0])
+        assertEquals(MessagePart.Text("p1", "存活", PartState.DONE), parts[1])
+    }
+
+    @Test
+    fun `unsupported part synthesizes partId from index when missing`() {
+        val parts = assertNotNull(MessagePartsCodec.decode("""[{"type":"future_part"}]"""))
+        assertEquals(MessagePart.Unsupported("p0", originalType = "future_part"), parts.single())
+    }
+
+    @Test
+    fun `decode tolerates pathological non-primitive type value`() {
+        // 病态 payload（type 为数组/对象）：as? 安全形态不抛，落 Unsupported
+        val parts = assertNotNull(MessagePartsCodec.decode("""[{"type":["x"],"partId":"p0"}]"""))
+        assertEquals(MessagePart.Unsupported("p0", originalType = "unknown"), parts.single())
+    }
+
+    @Test
+    fun `unsupported part round-trips through encode`() {
+        // 幂等：Unsupported 自身是合法鉴别值（防意外持久化后再读炸）；
+        // 生产写路径永不产生 Unsupported（读时投影，原始 payload 保留）
+        val parts = listOf(MessagePart.Unsupported("p0", originalType = "tool_future", summary = "摘要"))
+        assertEquals(parts, decode(encode(parts)))
     }
 
     @Test
@@ -208,14 +267,15 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `sealed descriptor locks the 9-value taxonomy`() {
+    fun `sealed descriptor locks the 10-value taxonomy`() {
         // kotlinx.serialization 1.10.0 起 sealed 描述符为 {type, value} 两元素包装，
         // 子类描述符收纳在 "value"（CONTEXTUAL kotlinx.serialization.Sealed<...>）内层——
         // 外层 elementsCount 恒为 2，须下沉一层枚举子类 @SerialName。
-        // 10→9（2026-11-08）：data_media_results 横滑相册卡退役（spec D2）；存量行由
-        // LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES 行级过滤，不进 codec。
+        // 11→10（2026-11-08 两线合并）：data_media_results 横滑相册卡退役 -1（存量行由
+        // LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES 行级过滤，不进 codec）；
+        // Unsupported 前向兼容占位 +1（main f1b80163e）。
         val sealed = MessagePart.serializer().descriptor.getElementDescriptor(1)
-        assertEquals(9, sealed.elementsCount)
+        assertEquals(10, sealed.elementsCount)
         val serialNames = (0 until sealed.elementsCount)
             .map { sealed.getElementDescriptor(it).serialName }
             .toSet()
@@ -224,6 +284,9 @@ class MessagePartsCodecTest {
                 "text", "image",
                 "tool_chart", "tool_html", "tool_task", "tool_image_edit", "tool_browser",
                 "data_optimize_candidates", "data_ui_openui",
+                // 保留降级鉴别值（2026-11-08）：读时投影兜底，永不出现于生产写路径，
+                // 不携 content/tool/data 前缀（同 data_ui 墓碑先例的约定外保留值）
+                "unsupported",
             ),
             serialNames,
         )

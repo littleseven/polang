@@ -1092,8 +1092,11 @@
     <string name="chat_guest_banner_own_key">Mi propio Token</string>
     <string name="chat_guest_quota_used_up">Cuota de prueba agotada. Regístrate para obtener 1000 llamadas gratuitas.</string>
     <string name="chat_inference_error">Error de inferencia: %1$s</string>
+    <string name="chat_agent_loop_stuck">La solicitud entró en un bucle de llamadas a herramientas y se detuvo automáticamente. Inténtalo con otra formulación o divide la tarea en pasos más pequeños.</string>
     <string name="chat_calling_tool">Llamando a la herramienta…</string>
     <string name="chat_card_generate_failed">Error al generar</string>
+    <string name="chat_unsupported_part_title">Contenido no compatible</string>
+    <string name="chat_unsupported_part_upgrade">Actualiza a la última versión para ver este contenido</string>
     <string name="openui_action_failed">Error en la acción</string>
     <string name="chat_example_group_search">Buscar fotos</string>
     <string name="chat_example_group_ask">Pregunta sobre tu galería</string>
@@ -1645,6 +1648,7 @@
     <string name="chat_write_no_valid_ids">No hay IDs de medios válidos</string>
     <string name="chat_delete_started_pending">Eliminación de %1$d elemento(s) iniciada, esperando autorización del sistema</string>
     <string name="chat_deleted_n">Se eliminaron %1$d elemento(s)</string>
+    <string name="chat_share_opened_n">Se abrió el panel para compartir (%1$d elemento(s))</string>
     <string name="chat_favorited_one">1 elemento añadido a favoritos</string>
     <string name="chat_unfavorited_one">Se quitó 1 favorito</string>
     <string name="chat_selected_one">1 elemento seleccionado</string>

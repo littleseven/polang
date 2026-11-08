@@ -1122,8 +1122,11 @@
     <string name="chat_guest_banner_own_key">自己的 Token</string>
     <string name="chat_guest_quota_used_up">試用額度已用完，註冊即可獲得 1000 次免費額度。</string>
     <string name="chat_inference_error">推論錯誤：%1$s</string>
+    <string name="chat_agent_loop_stuck">這次請求陷入了工具呼叫迴圈，已自動停止。請換個問法，或把任務拆小一點再試。</string>
     <string name="chat_calling_tool">正在呼叫工具…</string>
     <string name="chat_card_generate_failed">生成失敗</string>
+    <string name="chat_unsupported_part_title">此內容暫不支援顯示</string>
+    <string name="chat_unsupported_part_upgrade">升級到最新版本後可檢視完整內容</string>
     <string name="openui_action_failed">操作失敗</string>
     <string name="chat_example_group_search">找照片</string>
     <string name="chat_example_group_ask">問相簿</string>
@@ -1685,6 +1688,7 @@
     <string name="chat_write_no_valid_ids">沒有有效的媒體 ID</string>
     <string name="chat_delete_started_pending">已發起刪除 %1$d 項，等待系統授權</string>
     <string name="chat_deleted_n">已刪除 %1$d 項</string>
+    <string name="chat_share_opened_n">已開啟分享面板（%1$d 項）</string>
     <string name="chat_favorited_one">已收藏 1 項</string>
     <string name="chat_unfavorited_one">已取消收藏 1 項</string>
     <string name="chat_selected_one">已選中 1 項</string>

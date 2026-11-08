@@ -1131,8 +1131,11 @@
     <string name="chat_guest_banner_own_key">My own Token</string>
     <string name="chat_guest_quota_used_up">Trial quota used up. Register to get 1000 free calls.</string>
     <string name="chat_inference_error">Inference error: %1$s</string>
+    <string name="chat_agent_loop_stuck">I got stuck in a tool loop and stopped automatically. Please rephrase your request or break it into smaller steps.</string>
     <string name="chat_calling_tool">Calling tool…</string>
     <string name="chat_card_generate_failed">Generation failed</string>
+    <string name="chat_unsupported_part_title">Content not supported</string>
+    <string name="chat_unsupported_part_upgrade">Update to the latest version to view this content</string>
     <string name="openui_action_failed">Action failed</string>
     <string name="chat_example_group_search">Find photos</string>
     <string name="chat_example_group_ask">Ask about your gallery</string>
@@ -1694,6 +1697,7 @@
     <string name="chat_write_no_valid_ids">No valid media IDs</string>
     <string name="chat_delete_started_pending">Deletion of %1$d item(s) initiated, awaiting system authorization</string>
     <string name="chat_deleted_n">Deleted %1$d item(s)</string>
+    <string name="chat_share_opened_n">Opened the share sheet with %1$d item(s)</string>
     <string name="chat_favorited_one">Favorited 1 item</string>
     <string name="chat_unfavorited_one">Removed 1 favorite</string>
     <string name="chat_selected_one">Selected 1 item</string>

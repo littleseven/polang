@@ -31,13 +31,23 @@
 }
 ```
 
-`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`；2026-10-06 扩 `tool_browser`（browser-vnc 直播卡 spec §4）；2026-10-22/24 扩 GenUI 卡 `data_ui`/`data_ui_openui`；2026-11-05 A2UI 退役删 `data_ui`；2026-11-08 横滑图集卡退役删 `data_media_results`）——**3 分类 9 值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 类级免前缀（bare = content），协议值禁 UI 容器词；新增值命名规约全文——单数 snake_case 语义名/禁嵌技术名/前缀强制/存量冻结——见 ADR-016 D1 末条，2026-11-08 立法）：
+`type` 全集（2026-09-28 分类法重构，spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`；2026-10-06 扩 `tool_browser`（browser-vnc 直播卡 spec §4）；2026-10-22/24 扩 GenUI 卡 `data_ui`/`data_ui_openui`；2026-11-05 A2UI 退役删 `data_ui`；2026-11-08 横滑图集卡退役删 `data_media_results` + 增保留降级值 `unsupported`）——**3 分类 9 值 + 1 保留降级值**，命名规则 `^{category}_{kind}$`（`tool_`/`data_` 为保留前缀，content 类级免前缀（bare = content），协议值禁 UI 容器词；`unsupported` 为约定外保留值——前向兼容读时投影，永不出现于生产写路径，见 §0.4；新增值命名规约全文——单数 snake_case 语义名/禁嵌技术名/前缀强制/存量冻结——见 ADR-016 D1 末条，2026-11-08 立法）：
 
 - **content**：`text` · `image`
 - **tool**：`tool_chart` · `tool_html` · `tool_task` · `tool_image_edit` · `tool_browser`
 - **data**：`data_optimize_candidates` · `data_ui_openui`（OpenUI GenUI 卡，2026-11-01 起回合原生；2026-11-05 A2UI 退役起为唯一 GenUI 线）——`data_ui`（A2UI GenUI 卡）已随 2026-11-05 退役删除，存量行墓碑兜底为可读 Text；`data_media_results`（横滑图集卡）已随 2026-11-08 退役删除，存量行经 `RETIRED_MEDIA_RESULTS_TYPES` 闭集回放/回灌整行跳过
 
 多 part 消息的 type 取首 part 值；role 由独立列承载。legacy 13 值（`user_text`/`agent_text`/`user_image`/`user_image_text`/`agent_image`/`command`/`plan_preview`/`media_results`/`chart`/`html_card`/`agent_edit_result`/`optimize_candidates`/`task_card`）仅存于迁移源，经 `LegacyChatTypeMigration` 一次性转正（映射见 §0.2 末表）。
+
+### 0.4 前向兼容兜底（2026-11-08，Unsupported part）
+
+协议频繁演进下旧版本读新版本数据的兜底机制，三铁律：**不崩溃、不丢消息、可感知（升级提示）**。
+
+- **`unsupported` 保留降级鉴别值**：`MessagePart.Unsupported`（sealed 第 11 子类型，category=DATA 不回灌 LLM，不携 `tool_`/`data_` 前缀——同 `data_ui` 墓碑先例的约定外保留值）。**读时投影，永不出现于生产写路径**（`withPartsJson` 自标量列重算、流式瞬态不落库，均无 Unsupported 来源）；原始 payload 保留在 `partsJson` 原文，升级新版本后同一行自动恢复为正式卡片（解码幂等）。
+- **part 级细粒度解码**（`MessagePartsCodec.decode`）：逐元素独立解码——未知 part 类型 / 已知类型字段损坏 → 原位合成 `Unsupported` 占位（块序保住，同消息其余 part 正常渲染）；payload 携带可读摘要字段（`fallbackSummary`/`summary`/`text`/`markdown`）时提升为 `summary`；仅整体结构损坏（非 JSON 数组）才返回 null 回退 legacy 标量列。
+- **Room 标量列未知 type**（`MessagePartsConverter.unknownTypeFallback`）：content 判定为 JSON blob（对象/数组，新协议整颗 payload 存 content 列的先例）→ `Unsupported`，防 JSON 原文裸渲染；纯文本/JSON 标量 → 保留 Text 不降级。
+- **iOS 同口径**：`ChatHistoryStoreCodec` parts 数组改 `JsonElement` 逐元素 `decodePartOrUnsupported`；`rebuildParts` 未知 wire type 同 JSON blob 判定。
+- **渲染**：`ChatListItem.TYPE_UNSUPPORTED` → Android `UnsupportedPartCard` / iOS `unsupportedItem`（图标 + 「内容暂不支持」标题 + summary 或升级提示，五语 `chat_unsupported_part_*` / `chat.unsupported_part_*`）；整消息判型（`toUiModel`/`uiTypeOf`）防御性落 AGENT_TEXT。回灌：`toModelInput` 空列表（data part 丢弃口径）。
 
 **渲染路由（M4 已切 parts）**：`ChatViewModel.toUiModel()` 全量 `decodePartsOrLegacy` 填充 `ChatMessage.parts`（内存快路径 parts 同源双写）→ shared `domain/chat/ChatListFlattener` 拍平为 item 序列（`ChatScreen.kt` LazyColumn 按 `ChatListItem.contentType` 分发；key/三分流规则见 §1.3）。legacy「按 type 取 content/metadata → if/else 链」为 M1-M3 形态，仅余整消息 legacy 渲染类型沿用（清单见 §1.3）。
 
@@ -272,11 +282,11 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 
 ### 1.3 ADR-016 parts 模型（✅ M1-M4 已合 main；M4 真机验收待补）
 
-一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/Image/EditResult/OptimizeCandidates/BrowserLive/OpenUiCard（A2uiCard 已随 2026-11-05 A2UI 退役删除；MediaResults 已随 2026-11-08 横滑图集卡退役删除）），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2，type 值域（3 分类 9 值 + role 列）见 `2026-09-28-chat-type-taxonomy-design.md`。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；M3 = 正文 `AgentMarkdown`（§3.2）。
+一条回复 = 有序 parts 数组（`MessagePart` sealed：Text/Chart/HtmlCard/TaskCard/Image/EditResult/OptimizeCandidates/BrowserLive/OpenUiCard/Unsupported（A2uiCard 已随 2026-11-05 A2UI 退役删除；MediaResults 已随 2026-11-08 横滑图集卡退役删除；Unsupported 为 2026-11-08 前向兼容兜底，读时投影永不写库，见 §0.4）），本目录卡片即 parts 的独立 block 清单；映射表见 `2026-09-27-chat-parts-rendering-design.md` §2，type 值域（3 分类 9 值 + role 列 + 保留降级值 `unsupported`）见 `2026-09-28-chat-type-taxonomy-design.md`。M1 = Room `partsJson` 双写 + v24→v25 迁移回填 + 回灌转换；M2 = 流式三件套（类型化占位/原位填充/OUTPUT_ERROR 双轨）+ 任务卡 overlay 迁入 parts；M3 = 正文 `AgentMarkdown`（§3.2）。
 
 **M4 渲染源切 parts + Turn 聚合**（spec §7.2/§7.3/§8）：
 
-- **拍平粒度**：shared `domain/chat/ChatListFlattener` 纯函数——每个 MessagePart = LazyColumn 独立 item，**key = `"${messageId}:${partId}"`** + **contentType 复用桶**（`ChatListItem.TYPE_*`：user_message / legacy_message / agent_text / chart / html_card / task_card / optimize_candidates / tool_placeholder / tool_error / tool_status；media_results 桶已随 2026-11-08 横滑图集卡退役删除）。禁止「一条回复一个巨型 item 内部 Column 排段」（性能红线 ADR-016 §4）。
+- **拍平粒度**：shared `domain/chat/ChatListFlattener` 纯函数——每个 MessagePart = LazyColumn 独立 item，**key = `"${messageId}:${partId}"`** + **contentType 复用桶**（`ChatListItem.TYPE_*`：user_message / legacy_message / agent_text / chart / html_card / task_card / optimize_candidates / openui_card / browser_live / tool_placeholder / tool_error / tool_status / unsupported（media_results 桶已随 2026-11-08 横滑图集卡退役删除；unsupported 为 2026-11-08 前向兼容兜底卡，见 §0.4））。禁止「一条回复一个巨型 item 内部 Column 排段」（性能红线 ADR-016 §4）。
 - **拍平三分流/直通清单**：USER 消息整颗单 item（§5 图文同气泡不拆）；claude 气泡 / AGENT_IMAGE / AGENT_EDIT_RESULT 整消息 legacy 渲染（part=null，渲染器读 legacy 字段；原 COMMAND / PLAN_PREVIEW 已并入 `text` 随分类法重构转正，2026-09-28）；流式卡 part 三分流——已填充（OUTPUT_AVAILABLE）的 Chart/HtmlCard **跳过**（产物已落库为独立行，双显禁止）、未完成（INPUT_*）渲染占位 item、失败（OUTPUT_ERROR 瞬态轨）渲染失败 item；非卡片工具进行中合成 `ToolStatusChip` 状态 item（key `messageId:tool_status`）。
 - **Turn 聚合（纯视觉层）**：USER 消息开启新 turn（首条 AGENT 独立成 turn）；逐 item 顶距阶梯（无 spacedBy/嵌套容器）——turn 间回合分隔 `Spacing.lg`（16）· 同 turn 相邻 agent 文本 `Spacing.xs`（4，`mergeWithPrevious` 标记）· 卡片与相邻 part `Spacing.sm`（8）；token 阶梯取最近档，design-tokens.json 零变更。本屏无头像/无时间戳（2026-08-18 去头像定稿），回合分隔以间距承担。视觉规范 SSOT：`docs/08-UI-SPECS/screens/chat.yaml` §3.1/§3.2（渲染矩阵口径一致）。
 - **§8 性能收口**：`compose-stability.conf` 稳定性白名单（domain.chat 整包，shared 无 compose-runtime 依赖）、滚底/回锚改 flatItems item 粒度 + effect key 收窄、`rememberChatImageIsLive`（File.exists 移出组合期）、`collectAsStateWithLifecycle` 全量、isScrollInProgress 上移列表层。
@@ -303,6 +313,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | OpenUI GenUI 卡 | `data_ui_openui` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生；2026-11-05 起唯一 GenUI 线） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
 | 流式卡片占位/工具状态/失败 item | （流式瞬态，不落 Room） | 占位骨架 / `ToolStatusChip` / 失败态（i18n `chat_card_generate_failed`） | 原生 | — | ✅（M4 拍平三分流，见 §1.3） |
+| 前向兼容兜底卡 | `unsupported`（保留降级鉴别值，**读时投影永不写库**） | `UnsupportedPartCard`（Android `features/chat/components/`）/ Swift `ChatListItemView.unsupportedItem` | 原生 | —（兜底卡无固定帧） | ✅（2026-11-08，见 §0.4） |
 | 日期分隔 | （列表装饰，非消息） | `ChatDateChip` | 原生 | `chat_date_chip` 438:335 | ✅ |
 | 游客引导卡 | （sheet，非消息） | `ChatRegistrationSheet` | 原生 | `chat_nudge_card` 438:357 | ✅ |
 | 清理确认/完成卡 | （流程 UI，非消息） | 写确认 AlertDialog 管线 | 原生 | `chat_cleanup_card` 438:397 · `done` 438:409 | ✅（三要素升级待实施） |

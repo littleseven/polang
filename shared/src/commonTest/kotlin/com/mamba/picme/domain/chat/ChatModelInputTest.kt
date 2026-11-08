@@ -190,6 +190,22 @@ class ChatModelInputTest {
     }
 
     @Test
+    fun `unsupported fallback part never enters the model context`() {
+        // 前向兼容兜底 part（2026-11-08）：模型从未见过的占位类型不回灌，
+        // 对齐 data part 丢弃口径（spec §6）
+        val message = ChatMessage(
+            id = "m-unsupported",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Unsupported(partId = "p0", originalType = "tool_video_edit", summary = "视频结果"),
+            ),
+        )
+        assertEquals(emptyList(), message.toModelInput())
+    }
+
+    @Test
     fun `images replay as neutral placeholders keeping turn structure`() {
         // 图片本体不进上下文（[PRIVACY]）；英文中性占位保住多轮会话的回合结构（spec §6）
         assertEquals(

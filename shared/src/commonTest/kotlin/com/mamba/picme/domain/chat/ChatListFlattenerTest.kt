@@ -246,6 +246,28 @@ class ChatListFlattenerTest {
     // ── OpenUI GenUI 卡分派（openui P1） ────────────────────────────
 
     @Test
+    fun `unsupported part flattens to unsupported content type`() {
+        // 前向兼容兜底（2026-11-08）：未知/损坏 part 原位渲染占位卡，块序保住
+        val message = ChatMessage(
+            id = "u1",
+            type = ChatMessageType.AGENT_TEXT,
+            content = "",
+            role = ModelInputRole.ASSISTANT,
+            parts = listOf(
+                MessagePart.Text("p0", "前文", PartState.DONE),
+                MessagePart.Unsupported("p1", originalType = "tool_video_edit"),
+                MessagePart.Text("p2", "后文", PartState.DONE),
+            ),
+        )
+        val items = flattenChatItems(listOf(message))
+        assertEquals(3, items.size)
+        assertEquals(ChatListItem.TYPE_AGENT_TEXT, items[0].contentType)
+        assertEquals(ChatListItem.TYPE_UNSUPPORTED, items[1].contentType)
+        assertEquals("u1:p1", items[1].key)
+        assertEquals(ChatListItem.TYPE_AGENT_TEXT, items[2].contentType)
+    }
+
+    @Test
     fun `openui card part flattens to openui card content type`() {
         val message = ChatMessage(
             id = "o1",

@@ -2,6 +2,7 @@ package com.mamba.picme.agent.core.inference.remote.koog
 
 import ai.koog.agents.chatMemory.feature.ChatMemory
 import ai.koog.agents.core.agent.AIAgent
+import ai.koog.agents.core.agent.exception.AIAgentMaxNumberOfIterationsReachedException
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.features.eventHandler.feature.EventHandler
 import ai.koog.prompt.streaming.StreamFrame
@@ -105,6 +106,13 @@ class KoogChatAgent(
     @Volatile private var running = false
     private var currentSessionId: String = "default"
 
+    /**
+     * 工具循环熔断（2026-11-08，真机事故：模型在空/错工具结果上打转 15 轮撞 30 步硬顶）。
+     * per-agent 单实例：runs 串行（isRunning 互斥），每回合 [ToolLoopGuard.reset]；
+     * 熔断命中时策略携哨兵落终点，runChat 识别后抛 [AgentLoopStuckException]。
+     */
+    private val toolLoopGuard = ToolLoopGuard()
+
     // 记忆快照 + 摘要版本 + 工具子集 + 技能清单段驱动的懒重建（四者任一变更才重建 AIAgent；
     // executor/store/provider 复用）。
     // 摘要每轮新鲜渲染（US-2.4），但其变化经 version 反映——压缩后 version 变 → 重建 → 新摘要烘焙。
@@ -166,7 +174,17 @@ class KoogChatAgent(
             // M2：加载会话摘要（US-2.4），作为 system 段注入 + 版本纳入 agent 重建键。
             val summary = runCatching { memoryStoreRef.loadSummary(currentSessionId) }.getOrNull()
             val summaryText = summary?.slots?.render()?.ifBlank { null }
-            val summaryResult = agent(summaryText, summary?.version ?: 0, toolSetOverride).run(input, currentSessionId)
+            toolLoopGuard.reset()
+            val summaryResult = try {
+                agent(summaryText, summary?.version ?: 0, toolSetOverride).run(input, currentSessionId)
+            } catch (e: AIAgentMaxNumberOfIterationsReachedException) {
+                // Koog 步数硬顶（30 步）统一折叠为熔断语义：UI 按类型映射本地化文案，
+                // 不再把 Koog 英文开发者文案（"consider increasing maxAgentIterations"）原样上屏。
+                throw AgentLoopStuckException("max iterations reached: ${e.message}")
+            }
+            if (summaryResult == ToolLoopGuard.TRIPPED_SENTINEL) {
+                throw AgentLoopStuckException("tool loop guard tripped (session=$currentSessionId)")
+            }
             val latencyMs = Clock.System.now().toEpochMilliseconds() - started
             summaryResult to AgentExecutionMetrics(
                 latencyMs = latencyMs,
@@ -220,8 +238,8 @@ class KoogChatAgent(
         //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
         AIAgent.builder()
             // 直接传策略实例（命名 lambda 重载 graphStrategy(name){...} 是 Koog 1.1.1 JVM-only
-            // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。
-            .graphStrategy(poLangSingleRunStrategy())
+            // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。挂工具循环熔断边。
+            .graphStrategy(poLangSingleRunStrategy(PoLangReActStrategyConfig(toolLoopGuard = toolLoopGuard)))
             .promptExecutor(executorBundle.executor)
             .llmModel(executorBundle.model)
             .toolRegistry(registry)
@@ -273,8 +291,9 @@ class KoogChatAgent(
                                 totalTokens = meta?.totalTokensCount,
                                 // Koog EventHandler 不暴露原始请求 JSON；DEBUG 全文 body 需 Ktor Logging（后续）。
                                 requestJson = "",
+                                // 正文 + 工具调用清单双记（原仅 textContent，纯工具轮记成 null 的观测盲区）
                                 responseJson = if (RemoteModelFactory.captureContent) {
-                                    LlmCallRecord.cap(ctx.response?.textContent())
+                                    LlmCallRecord.cap(summarizeResponseForLog(ctx.response))
                                 } else {
                                     null
                                 },

@@ -209,6 +209,7 @@ import com.mamba.picme.features.chat.components.BrowserLiveCard
 import com.mamba.picme.features.chat.components.ChatEmptyState
 import com.mamba.picme.features.chat.components.ChatPhotoPickerSheet
 import com.mamba.picme.features.chat.components.ChatRegistrationSheet
+import com.mamba.picme.features.chat.components.UnsupportedPartCard
 import com.mamba.picme.features.chat.components.EngineerTaskCard
 import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
 import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
@@ -872,6 +873,12 @@ fun ChatScreen(
                                             }
                                         }
                                     }
+                                }
+                                ChatListItem.TYPE_UNSUPPORTED -> {
+                                    // 前向兼容兜底卡（未知/损坏 part 原位占位：块序保住，
+                                    // 升级新版本后同一消息自动恢复为正式卡片）
+                                    val unsupported = item.part as? MessagePart.Unsupported
+                                    UnsupportedPartCard(summary = unsupported?.summary)
                                 }
                                 else -> {
                                     // TYPE_USER_MESSAGE / TYPE_LEGACY_MESSAGE：整消息渲染（§5 用户气泡

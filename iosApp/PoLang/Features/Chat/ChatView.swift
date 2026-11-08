@@ -789,6 +789,7 @@ private struct ChatListItemView: View {
         case t.TYPE_HTML_CARD: htmlCardItem
         case t.TYPE_TASK_CARD: taskCardItem
         case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
+        case t.TYPE_UNSUPPORTED: unsupportedItem
         default: EmptyView()
         }
     }
@@ -892,6 +893,31 @@ private struct ChatListItemView: View {
                     onOpenLink: onOpenHtmlLink)
             }
         }
+    }
+
+    /// UNSUPPORTED part（前向兼容兜底，2026-11-08）：未知/损坏 part 原位占位卡——
+    /// 「内容暂不支持 + 升级提示」（payload 携带可读摘要时优先展示）。
+    /// 块序与消息其余 part 不受影响，升级新版本后同一消息自动恢复为正式卡片。
+    private var unsupportedItem: some View {
+        let summary = (item.part as? MessagePartUnsupported)?.summary
+        return HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 15))
+                .foregroundColor(Color(.secondaryLabel))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "chat.unsupported_part_title"))
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+                Text(summary ?? String(localized: "chat.unsupported_part_upgrade"))
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.tertiaryLabel))
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemFill))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     /// 工具态（B1 极简）：placeholder/status = spinner；error = 三角警示。文案复用

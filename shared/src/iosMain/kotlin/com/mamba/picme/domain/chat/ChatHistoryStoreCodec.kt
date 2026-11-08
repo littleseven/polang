@@ -3,11 +3,12 @@ package com.mamba.picme.domain.chat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * iOS 聊天历史文件编解码器（`chat_history_<sessionId>.json` 整包线格式，ADR-016 M5 B1）。
@@ -51,40 +52,18 @@ object ChatHistoryStoreCodec {
      * 整包解码：JSON 文件字符串 → 消息列表。null = 空文件/结构损坏，调用方按
      * legacy 格式兜底（Swift 侧 `LegacyChatMessage` 迁移），**不允许丢消息**。
      *
-     * 两段式（2026-11-08 终审修复）：先 parseToJsonElement 按 `type` **滤掉退役行**
-     * （[LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES]），再逐元素独立解码——
-     * 退役行的 parts 含已删除的 `data_media_results` 鉴别值，若整包强类型解码，
-     * sealed 多态反序列化抛异常会把**整个文件**塌成 null（过滤永远执行不到），
-     * Swift 兜底误配 legacy 格式 → 空历史 → persist 覆写 = 用户数据丢失（A2UI 同型坑）。
-     * 行级 runCatching：单行损坏只丢该行（content 尚存则降级 text 行），不塌整包。
+     * 退役行过滤（2026-11-08 终审修复）：`type` 命中
+     * [LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES] 的行整行跳过——退役行的
+     * parts 含已删除的 `data_media_results` 鉴别值；parts 以 [JsonElement] 惰性承载
+     * （Unsupported 兜底，见 DTO 注释）已保证整包强类型解码不被其炸塌，本过滤在此
+     * 之上做行级语义剔除（横滑卡不回放、不回灌，对齐 Android 回放过滤）。
      */
     fun decode(text: String?): List<ChatMessage>? {
         if (text.isNullOrBlank()) return null
-        val array = runCatching { json.parseToJsonElement(text).jsonArray }.getOrNull() ?: return null
-        return array.mapNotNull { element ->
-            val obj = element as? JsonObject ?: return@mapNotNull null
-            val wireType = obj["type"]?.jsonPrimitive?.contentOrNull
-            if (wireType in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES) return@mapNotNull null
-            runCatching { json.decodeFromJsonElement(ChatMessageDto.serializer(), element).toDomain() }
-                .getOrElse { rowFallback(obj) }
-        }
-    }
-
-    /** 单行解码失败的最低限度打捞：id/role/content/timestamp 俱在则降级纯文本行，否则丢行。 */
-    private fun rowFallback(obj: JsonObject): ChatMessage? {
-        val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return null
-        val content = obj["content"]?.jsonPrimitive?.contentOrNull ?: return null
-        val role = obj["role"]?.jsonPrimitive?.contentOrNull ?: "agent"
-        val timestamp = obj["timestamp"]?.jsonPrimitive?.longOrNull ?: 0L
-        val domainRole = roleOf(role)
-        return ChatMessage(
-            id = id,
-            type = if (domainRole == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT,
-            role = domainRole,
-            content = content,
-            timestamp = timestamp,
-            parts = fallbackText(content),
-        )
+        val dtos = runCatching { json.decodeFromString(listSerializer, text) }.getOrNull() ?: return null
+        return dtos
+            .filter { it.type !in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES }
+            .map { it.toDomain() }
     }
 
     // ── wire DTO（ChatMessage 本体非 @Serializable——LlmPerformance 等瞬态载荷无
@@ -107,8 +86,13 @@ object ChatHistoryStoreCodec {
         val imageSaved: Boolean = false,
         val optimizeCandidates: OptimizeCandidateGroup? = null,
         val engineerTask: EngineerTaskState? = null,
-        /** parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 9 值分类法）。 */
-        val parts: List<MessagePart> = emptyList(),
+        /**
+         * parts 嵌套数组（线格式同 [MessagePartsCodec]，鉴别值 = 10 值分类法——9 值 +
+         * Unsupported 占位）。以 [JsonElement] 承载、逐元素
+         * [MessagePartsCodec.decodePartOrUnsupported] 解码（2026-11-08 Unsupported 兜底）：
+         * 未知 part 类型原位落 Unsupported 占位，不再整包 decode 失败丢历史。
+         */
+        val parts: List<JsonElement> = emptyList(),
     )
 
     // ── encode：domain → DTO ────────────────────────────────────
@@ -136,7 +120,7 @@ object ChatHistoryStoreCodec {
             },
             optimizeCandidates = optimizeCandidates ?: (primary as? MessagePart.OptimizeCandidates)?.group,
             engineerTask = engineerTask ?: (primary as? MessagePart.TaskCard)?.task,
-            parts = parts,
+            parts = parts.map { json.encodeToJsonElement(MessagePart.serializer(), it) },
         )
     }
 
@@ -204,15 +188,21 @@ object ChatHistoryStoreCodec {
         is MessagePart.OpenUiCard -> ChatMessageType.AGENT_TEXT
         // iOS 浏览器直播卡未落地（M1 Android-only）：防御性落文本，正式映射随 iOS 跟随任务
         is MessagePart.BrowserLive -> ChatMessageType.AGENT_TEXT
+        // 前向兼容兜底（未知/损坏 part）：整消息判型防御性落文本；
+        // 实际渲染走拍平 item（TYPE_UNSUPPORTED 占位卡）
+        is MessagePart.Unsupported -> ChatMessageType.AGENT_TEXT
         null -> if (role == ModelInputRole.USER) ChatMessageType.USER_TEXT else ChatMessageType.AGENT_TEXT
     }
 
     /**
-     * parts 数组在场直用；缺失时自结构化平铺字段重建（belt-and-braces）；重建失败
-     * 回原文 Text 兜底（行级语义对齐 [MessagePartsConverter.toParts]，不丢消息）。
+     * parts 数组在场直用（逐元素 tolerant 解码：未知/损坏 part → Unsupported 占位，
+     * 对齐 [MessagePartsCodec] 口径）；缺失时自结构化平铺字段重建（belt-and-braces）；
+     * 重建失败回原文 Text 兜底（行级语义对齐 [MessagePartsConverter.toParts]，不丢消息）。
      */
     private fun ChatMessageDto.partsOrRebuild(role: ModelInputRole): List<MessagePart> {
-        if (parts.isNotEmpty()) return parts
+        if (parts.isNotEmpty()) {
+            return parts.mapIndexed { index, element -> MessagePartsCodec.decodePartOrUnsupported(element, index) }
+        }
         return runCatching { rebuildParts(role) }
             .getOrElse { fallbackText(content) }
             .ifEmpty { fallbackText(content) }
@@ -267,6 +257,21 @@ object ChatHistoryStoreCodec {
             ),
         )
 
-        else -> fallbackText(content)
+        // 未知 wire type（前向兼容兜底，对齐 MessagePartsConverter.unknownTypeFallback）：
+        // content 为 JSON blob → Unsupported 占位卡，防 JSON 原文裸渲染；纯文本 → 保留 Text
+        else -> listOf(unknownTypeFallback(type, content))
+    }
+
+    private fun unknownTypeFallback(type: String, content: String): MessagePart {
+        val element = runCatching { json.parseToJsonElement(content) }.getOrNull()
+        return when (element) {
+            is JsonObject -> MessagePartsCodec.unsupportedPartOf(
+                element,
+                (element["type"] as? JsonPrimitive)?.contentOrNull ?: type,
+                index = 0,
+            )
+            is JsonArray -> MessagePart.Unsupported("p0", originalType = type)
+            else -> MessagePart.Text("p0", content, PartState.DONE)
+        }
     }
 }
