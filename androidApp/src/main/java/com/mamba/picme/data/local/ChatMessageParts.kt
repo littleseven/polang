@@ -171,4 +171,72 @@ internal fun migrateChatMessageTypes(database: SupportSQLiteDatabase) {
     Logger.i(TAG, "MIGRATION_25_26 rewrite finished: $rows rows in ${System.currentTimeMillis() - startedAt}ms")
 }
 
+/**
+ * MIGRATION_27_28：逐行把 (legacy 列, partsJson) 双表示转正为 parts 单一权威行，
+ * 写入重建后的 chat_messages_new。
+ *
+ * - 解码成功行：**partsJson 原文保留**（Unsupported 占位行的未知 payload 不随重编码丢失，
+ *   codec 契约），只重算 type 投影 + 瘦身 metadata；
+ * - 解码失败行（partsJson null/损坏）：经 [MessagePartsConverter] 自 legacy 列现算合成
+ *   （行级兜底链与 24→25/25→26 同款：任何异常 → Text 原文，迁移绝不丢消息）；
+ * - type 全量重算为投影（顺带消除双写期漂移行，如抽卡确认留下的 type=image 但
+ *   content 滞留旧抽卡文案行——content 随列退役消失，漂移一并清算）。
+ *
+ * 游标遍历中 INSERT 异表安全：扫描只读旧表，写入新表，无自写并发问题。
+ */
+internal fun migrateChatMessagesToPartsSsot(database: SupportSQLiteDatabase) {
+    val startedAt = System.currentTimeMillis()
+    var rows = 0
+    Logger.i(TAG, "MIGRATION_27_28 rewrite chat_messages to parts SSOT started")
+    val insert = database.compileStatement(
+        "INSERT INTO `chat_messages_new` (`id`, `sessionId`, `type`, `role`, `timestamp`, `modelUsed`, `metadata`, `partsJson`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    insert.use {
+        val cursor = database.query(
+            "SELECT `id`, `sessionId`, `type`, `role`, `timestamp`, `modelUsed`, `metadata`, `content`, `partsJson` FROM `chat_messages`",
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                val id = it.getString(0)
+                val sessionId = it.getString(1)
+                val legacyType = it.getString(2)
+                val role = it.getString(3)
+                val timestamp = it.getLong(4)
+                val modelUsed = if (it.isNull(5)) null else it.getString(5)
+                val metadata = if (it.isNull(6)) null else it.getString(6)
+                val content = it.getString(7)
+                val partsJson = if (it.isNull(8)) null else it.getString(8)
+                val decoded = MessagePartsCodec.decode(partsJson)
+                val newType: String
+                val newPartsJson: String
+                if (decoded != null) {
+                    newType = MessagePartsProjection.roomTypeOf(decoded)
+                    newPartsJson = partsJson!! // 原文保留（decoded != null 蕴含 partsJson 非空）
+                } else {
+                    val parts = runCatching {
+                        MessagePartsConverter.toParts(legacyType, content, metadata, roleOf(role))
+                    }.getOrElse {
+                        listOf(MessagePart.Text("p0", content, PartState.DONE))
+                    }
+                    newType = MessagePartsProjection.roomTypeOf(parts)
+                    newPartsJson = MessagePartsCodec.encode(parts)
+                }
+                insert.clearBindings()
+                insert.bindString(1, id)
+                insert.bindString(2, sessionId)
+                insert.bindString(3, newType)
+                insert.bindString(4, role)
+                insert.bindLong(5, timestamp)
+                if (modelUsed == null) insert.bindNull(6) else insert.bindString(6, modelUsed)
+                val slim = MessagePartsProjection.slimMetadataJson(metadata)
+                if (slim == null) insert.bindNull(7) else insert.bindString(7, slim)
+                insert.bindString(8, newPartsJson)
+                insert.executeInsert()
+                rows++
+            }
+        }
+    }
+    Logger.i(TAG, "MIGRATION_27_28 rewrite finished: $rows rows in ${System.currentTimeMillis() - startedAt}ms")
+}
+
 private const val TAG = "PoLang:Chat"

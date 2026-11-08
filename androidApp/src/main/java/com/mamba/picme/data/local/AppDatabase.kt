@@ -60,7 +60,7 @@ import com.mamba.picme.data.model.MediaEntity
         UserTaskEntity::class,
         LocalHandleEntity::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -103,7 +103,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
                         MIGRATION_23_24, MIGRATION_24_25,
-                        MIGRATION_25_26, MIGRATION_26_27
+                        MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28
                     )
                     .build()
                 INSTANCE = instance
@@ -568,6 +568,35 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        /**
+         * Migration 27 → 28：chat_messages 持久化接缝反转（ADR-016 收口）——
+         * partsJson 升格唯一内容权威（NOT NULL），content 列退役，type 降级投影列，
+         * metadata 白名单瘦身（part 级键已迁入 parts）。
+         * 重建表删 content：逐行转正收口 [migrateChatMessagesToPartsSsot]（原文保留 +
+         * 损坏行 Text 兜底，不丢消息）；单 migrate() = Room 单事务。
+         */
+        internal val MIGRATION_27_28 = object : Migration(27, 28) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `chat_messages_new` (
+                        `id` TEXT NOT NULL PRIMARY KEY,
+                        `sessionId` TEXT NOT NULL DEFAULT 'default',
+                        `type` TEXT NOT NULL,
+                        `role` TEXT NOT NULL DEFAULT 'agent',
+                        `timestamp` INTEGER NOT NULL,
+                        `modelUsed` TEXT,
+                        `metadata` TEXT,
+                        `partsJson` TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                migrateChatMessagesToPartsSsot(database)
+                database.execSQL("DROP TABLE `chat_messages`")
+                database.execSQL("ALTER TABLE `chat_messages_new` RENAME TO `chat_messages`")
             }
         }
     }
