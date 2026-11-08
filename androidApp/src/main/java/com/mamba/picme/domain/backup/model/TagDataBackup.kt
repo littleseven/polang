@@ -16,10 +16,11 @@ import com.squareup.moshi.JsonClass
  * - v4：新增媒体反馈（media_feedback，用户 like/dislike 训练数据）
  * - v5：新增聊天会话/消息、人物关系、事实记忆、编辑配方，
  *   媒体 TAG 元数据补 city/faceFocusY/aestheticScore/faceQualityScore
+ * - v6：chat 消息 partsJson 直出直进（parts 单一权威），content 退役为空串占位
  */
 @JsonClass(generateAdapter = true)
 data class TagDataBackup(
-    val version: Int = 5,
+    val version: Int = 6,
     val exportedAt: Long,
     val tags: List<BackupTag>,
     val mediaTagMetadata: List<BackupMediaTagMetadata>,
@@ -207,7 +208,11 @@ data class BackupChatSession(
  * 备份无此字段（容器版本不校验，恢复按 type 内容分流），恢复时经
  * [com.mamba.picme.domain.chat.LegacyChatTypeMigration] 转正补齐。
  *
- * 已知限制：图片消息的 [content] 为旧安装的本地文件路径，
+ * v6（2026-11-08，parts 单一权威）：新增 [partsJson]（内容唯一权威直出）；
+ * [content] 退役为空串占位（仅为旧版本可读性保留字段位；恢复以 partsJson 为准）。
+ * v5- 备份无 partsJson，恢复走 legacy 列经 [com.mamba.picme.domain.chat.LegacyChatTypeMigration] 转正。
+ *
+ * 已知限制：图片消息（v6 起为 parts 内 ref）为旧安装的本地文件路径，
  * 跨安装恢复后图片文件可能不存在，仅保留消息记录本身。
  */
 @JsonClass(generateAdapter = true)
@@ -215,11 +220,12 @@ data class BackupChatMessage(
     val id: String,
     val sessionId: String,
     val type: String,
-    val content: String,
+    val content: String = "",
     val timestamp: Long,
     val modelUsed: String? = null,
     val metadata: String? = null,
-    val role: String? = null
+    val role: String? = null,
+    val partsJson: String? = null,
 )
 
 /**

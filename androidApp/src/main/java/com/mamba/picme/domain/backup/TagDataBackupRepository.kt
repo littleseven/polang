@@ -14,7 +14,8 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.ChatMessageDao
 import com.mamba.picme.data.local.ChatMessageEntity
-import com.mamba.picme.data.local.insertMessagesWithParts
+import com.mamba.picme.data.local.chatMessageEntity
+import com.mamba.picme.data.local.insertPartsMessages
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.MediaDao
@@ -62,6 +63,10 @@ import com.mamba.picme.domain.backup.model.BackupTag
 import com.mamba.picme.domain.backup.model.BackupTagScanTask
 import com.mamba.picme.domain.backup.model.TagDataBackup
 import com.mamba.picme.domain.chat.LegacyChatTypeMigration
+import com.mamba.picme.domain.chat.MessagePartsCodec
+import com.mamba.picme.domain.chat.MessagePartsConverter
+import com.mamba.picme.domain.chat.MessagePartsProjection
+import com.mamba.picme.domain.chat.roleOf
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
@@ -300,11 +305,12 @@ class TagDataBackupRepository(
                 id = it.id,
                 sessionId = it.sessionId,
                 type = it.type,
-                content = it.content,
+                content = "",
                 timestamp = it.timestamp,
                 modelUsed = it.modelUsed,
-                metadata = it.metadata,
-                role = it.role
+                metadata = it.metadata, // DB 内已是白名单瘦身形态
+                role = it.role,
+                partsJson = it.partsJson,
             )
         }
 
@@ -733,29 +739,43 @@ class TagDataBackupRepository(
             }
             if (backup.chatMessages.isNotEmpty()) {
                 backup.chatMessages.chunked(500).forEach { chunk ->
-                    // 备份恢复双分支（spec §6 消费者表）：新备份（type 已是新 8 值）直通，
-                    // role 缺省补 agent 安全网；旧备份（旧分类法导出，type 为 legacy 13 值）
-                    // 经唯一映射知识库 [LegacyChatTypeMigration] 转正。随后统一走 insertMessagesWithParts：
-                    // withPartsJson 用纯净化转换器在新 (type, role) 上现算 partsJson，
-                    // 与迁移产物零逻辑重复（旧备份不含 partsJson：从 legacy 列现算回填）。
-                    chatMessageDao.insertMessagesWithParts(
+                    // 恢复双路径：v6 备份（partsJson 在场）→ 原文直进 + 投影重算；
+                    // v5- 备份（无 partsJson）→ legacy 列经唯一映射知识库
+                    // [LegacyChatTypeMigration] 转正后 converter 现算 parts。
+                    chatMessageDao.insertPartsMessages(
                         chunk.map { msg ->
-                            val row = if (msg.type in LegacyChatTypeMigration.NEW_TYPES) {
-                                LegacyChatTypeMigration.MigratedRow(msg.type, msg.role ?: "agent", emptyList())
+                            val decoded = MessagePartsCodec.decode(msg.partsJson)
+                            if (decoded != null) {
+                                ChatMessageEntity(
+                                    id = msg.id,
+                                    sessionId = msg.sessionId,
+                                    type = MessagePartsProjection.roomTypeOf(decoded),
+                                    role = msg.role ?: "agent",
+                                    timestamp = msg.timestamp,
+                                    modelUsed = msg.modelUsed,
+                                    metadata = MessagePartsProjection.slimMetadataJson(msg.metadata),
+                                    partsJson = msg.partsJson!!, // 原文保留（Unsupported 占位 payload 不随重编码丢失）
+                                )
                             } else {
-                                LegacyChatTypeMigration.map(msg.type, msg.content, msg.metadata)
+                                val row = if (msg.type in LegacyChatTypeMigration.NEW_TYPES) {
+                                    LegacyChatTypeMigration.MigratedRow(msg.type, msg.role ?: "agent", emptyList())
+                                } else {
+                                    LegacyChatTypeMigration.map(msg.type, msg.content, msg.metadata)
+                                }
+                                val parts = MessagePartsConverter.toParts(
+                                    row.type, msg.content, msg.metadata, roleOf(row.role),
+                                )
+                                chatMessageEntity(
+                                    id = msg.id,
+                                    sessionId = msg.sessionId,
+                                    role = row.role,
+                                    parts = parts,
+                                    timestamp = msg.timestamp,
+                                    modelUsed = msg.modelUsed,
+                                    metadata = MessagePartsProjection.slimMetadataJson(msg.metadata),
+                                )
                             }
-                            ChatMessageEntity(
-                                id = msg.id,
-                                sessionId = msg.sessionId,
-                                type = row.type,
-                                role = row.role,
-                                content = msg.content,
-                                timestamp = msg.timestamp,
-                                modelUsed = msg.modelUsed,
-                                metadata = msg.metadata
-                            )
-                        }
+                        },
                     )
                 }
             }
