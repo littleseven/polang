@@ -1134,6 +1134,7 @@
     <string name="chat_agent_loop_stuck">I got stuck in a tool loop and stopped automatically. Please rephrase your request or break it into smaller steps.</string>
     <string name="chat_calling_tool">Calling tool…</string>
     <string name="chat_card_generate_failed">Generation failed</string>
+    <string name="chat_reasoning_title">Thought process</string>
     <string name="chat_unsupported_part_title">Content not supported</string>
     <string name="chat_unsupported_part_upgrade">Update to the latest version to view this content</string>
     <string name="openui_action_failed">Action failed</string>

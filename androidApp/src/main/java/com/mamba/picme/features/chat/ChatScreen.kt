@@ -29,6 +29,7 @@ import com.mamba.picme.domain.chat.markdown.parseMarkdownTable
 import com.mamba.picme.domain.chat.markdown.previewCode
 import com.mamba.picme.domain.chat.markdown.segmentMarkdown
 import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -209,7 +210,9 @@ import com.mamba.picme.features.chat.components.BrowserLiveCard
 import com.mamba.picme.features.chat.components.ChatEmptyState
 import com.mamba.picme.features.chat.components.ChatPhotoPickerSheet
 import com.mamba.picme.features.chat.components.ChatRegistrationSheet
-import com.mamba.picme.features.chat.components.UnsupportedPartCard
+import com.mamba.picme.features.chat.components.ReasoningPartBlock
+import com.mamba.picme.features.chat.components.SourceChipsRow
+import com.mamba.picme.features.chat.components.TombstonePartCard
 import com.mamba.picme.features.chat.components.EngineerTaskCard
 import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
 import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
@@ -792,6 +795,25 @@ fun ChatScreen(
                                 ChatListItem.TYPE_AGENT_TEXT -> {
                                     ChatAgentTextPart(item = item, onTableClick = { table -> expandedTable = table })
                                 }
+                                ChatListItem.TYPE_REASONING -> {
+                                    // 思考链独立折叠块（值域终态 §6.1）：不进正文桶防双显；
+                                    // 生产开关默认关，本分支随历史回放/后续接线生效
+                                    val reasoning = item.part as? MessagePart.Reasoning ?: return@itemsIndexed
+                                    ReasoningPartBlock(key = item.key, text = reasoning.text)
+                                }
+                                ChatListItem.TYPE_SOURCE_CHIPS -> {
+                                    // 连续 source parts 聚合 item（值域终态 §6.2）：锚 = run 首个
+                                    // source part，组件自 message.parts 取连续段；点击系统浏览器打开落地页
+                                    val anchor = item.part ?: return@itemsIndexed
+                                    SourceChipsRow(
+                                        anchor = anchor,
+                                        parts = item.message.parts,
+                                        onOpenUrl = { url ->
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                            runCatching { context.startActivity(intent) }
+                                        },
+                                    )
+                                }
                                 ChatListItem.TYPE_TOOL_PLACEHOLDER -> {
                                     ToolStatusChip(text = stringResource(R.string.generating), isError = false)
                                 }
@@ -876,10 +898,9 @@ fun ChatScreen(
                                 }
                                 ChatListItem.TYPE_TOMBSTONE -> {
                                     // 前向兼容/退役兜底卡（未知/损坏/退役 part 原位占位：块序保住，
-                                    // 升级新版本后同一消息自动恢复为正式卡片）；
-                                    // 渲染件改名 TombstonePartCard 属后续渲染任务（Task 6），暂落既有组件
+                                    // 升级新版本后同一消息自动恢复为正式卡片）
                                     val tombstone = item.part as? MessagePart.Tombstone
-                                    UnsupportedPartCard(summary = tombstone?.summary)
+                                    TombstonePartCard(summary = tombstone?.summary)
                                 }
                                 else -> {
                                     // TYPE_USER_MESSAGE / TYPE_LEGACY_MESSAGE：整消息渲染（§5 用户气泡
