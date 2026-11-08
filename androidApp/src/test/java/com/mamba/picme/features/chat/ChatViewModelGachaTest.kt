@@ -118,7 +118,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         advanceUntilIdle()
         val newGroup = group().copy(drawIndex = 2, recommendedIndex = 0)
         coEvery { gachaController.reroll("msg1") } returns
-            ChatOptimizeGachaController.RerollOutcome.Rerolled(newGroup, "new expl")
+            ChatOptimizeGachaController.RerollOutcome.Rerolled(newGroup)
         coEvery { chatMessageDao.getMessageById("msg1") } returns gachaEntity()
 
         vm.onOptimizeGachaReroll("msg1") { }
@@ -142,7 +142,7 @@ class ChatViewModelGachaTest : ChatViewModelTestBase() {
         vm.onOptimizeGachaReroll("msg1") { results++ }
         vm.onOptimizeGachaReroll("msg1") { results++ } // 应被防抖忽略
         gate.complete(
-            ChatOptimizeGachaController.RerollOutcome.Rerolled(group().copy(drawIndex = 2), "new")
+            ChatOptimizeGachaController.RerollOutcome.Rerolled(group().copy(drawIndex = 2))
         )
         advanceUntilIdle()
 
