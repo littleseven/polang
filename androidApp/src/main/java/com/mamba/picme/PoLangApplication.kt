@@ -26,10 +26,11 @@ import com.mamba.picme.data.local.llmlog.RoomRoutingAuditRecorder
 import com.mamba.picme.data.local.llmlog.RoomToolCallRecorder
 import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.data.download.RecommendedModelAutoDownloader
-import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.FileSkillCacheStore
-import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.local.chatMessageEntity
+import com.mamba.picme.data.local.insertPartsMessage
+import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.SkillClient
 import com.mamba.picme.data.remote.picme.WebSearchClient
@@ -682,13 +683,12 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                                     )
                                 )
                             }
-                            chatMessageDao.insertMessageWithParts(
-                                ChatMessageEntity(
+                            chatMessageDao.insertPartsMessage(
+                                chatMessageEntity(
                                     id = UUID.randomUUID().toString(),
                                     sessionId = sessionId,
-                                    type = "image",
                                     role = "agent",
-                                    content = photo.uri,
+                                    parts = listOf(MessagePart.Image("p0", ref = photo.uri)),
                                     modelUsed = sourceTag
                                 )
                             )
