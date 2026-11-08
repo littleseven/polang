@@ -12,11 +12,12 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * [MessagePart] 列表的 kotlinx JSON 编解码（Room `partsJson` 列的线格式，ADR-016 D1）。
  *
- * 对齐 Vercel「UIMessage JSON 整包落库」实践：鉴别字段 `type`，值遵循 10 值分类法
+ * 对齐 Vercel「UIMessage JSON 整包落库」实践：鉴别字段 `type`，值遵循 9 值分类法
  * （type taxonomy spec §1）：text/image 为内容物，tool_chart/tool_html/tool_task/
- * tool_image_edit/tool_browser 为工具产物，data_media_results/data_optimize_candidates/
- * data_ui_openui 为数据载荷。legacy `data_ui`（A2UI 已退役）不在鉴别值域内，
- * 仅作墓碑拦截值显式处理（见 [decode]）。
+ * tool_image_edit/tool_browser 为工具产物，data_optimize_candidates/
+ * data_ui_openui 为数据载荷。legacy `data_ui`（A2UI 已退役）与 `data_media_results`
+ * （横滑相册卡 2026-11-08 退役）不在鉴别值域内——前者作墓碑拦截值显式处理（见 [decode]），
+ * 后者由回放路径按 `LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES` 整行跳过。
  */
 object MessagePartsCodec {
 

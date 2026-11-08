@@ -159,11 +159,6 @@ class ChatModelInputTest {
     fun `data parts never enter the model context`() {
         val dropped = listOf(
             Triple(
-                "media_results",
-                """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""",
-                null,
-            ),
-            Triple(
                 "optimize_candidates",
                 "挑一张",
                 """{"sourceImageUri":"u","scene":"s","recommendedIndex":0,"drawIndex":1,"candidates":[],"usedFingerprints":[]}""",
@@ -177,7 +172,7 @@ class ChatModelInputTest {
 
     @Test
     fun `openui card data part never enters the model context`() {
-        // openui P1：data part 默认不回灌 LLM，对齐 MediaResults/OptimizeCandidates
+        // openui P1：data part 默认不回灌 LLM，对齐 OptimizeCandidates
         val message = ChatMessage(
             id = "m-openui",
             type = ChatMessageType.OPENUI_CARD,

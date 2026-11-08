@@ -56,7 +56,6 @@ class MessagePartsConverterTest {
         assertIs<MessagePart.TaskCard>(MessagePartsConverter.toParts("tool_task", "做", taskMeta, ModelInputRole.ASSISTANT).single())
         val editMeta = """{"imageUri":"/i.jpg"}"""
         assertIs<MessagePart.EditResult>(MessagePartsConverter.toParts("tool_image_edit", "已提亮", editMeta, ModelInputRole.ASSISTANT).single())
-        assertIs<MessagePart.MediaResults>(MessagePartsConverter.toParts("data_media_results", """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""", null, ModelInputRole.ASSISTANT).single())
         val optMeta = """{"sourceImageUri":"u","scene":"s","recommendedIndex":0,"drawIndex":1,"candidates":[],"usedFingerprints":[]}"""
         assertIs<MessagePart.OptimizeCandidates>(MessagePartsConverter.toParts("data_optimize_candidates", "挑一张", optMeta, ModelInputRole.ASSISTANT).single())
     }

@@ -1,17 +1,13 @@
 package com.mamba.picme.domain.chat
 
-import com.mamba.picme.agent.core.model.context.MediaAsset
-import com.mamba.picme.agent.core.model.context.MediaType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 
 /**
@@ -114,9 +110,6 @@ object MessagePartsConverter {
                     ),
                 )
 
-            "data_media_results" ->
-                listOf(MessagePart.MediaResults("p0", parseMediaResults(content, meta)))
-
             OptimizeCandidateGroup.MESSAGE_TYPE ->
                 listOf(MessagePart.OptimizeCandidates("p0", parseOptimizeGroup(metadata)))
 
@@ -144,34 +137,6 @@ object MessagePartsConverter {
         (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
 
     // ── 各类型 payload 解析 ─────────────────────────────────────
-
-    /** media_results：content = 展示资产 JSON 数组（id/uri/type/captureDate/fileName/faceFocusY）。 */
-    private fun parseMediaResults(content: String, meta: JsonObject?): MediaResultsUi {
-        val arr = json.parseToJsonElement(content) as? JsonArray
-            ?: throw IllegalArgumentException("media_results content is not a JSON array")
-        val assets = arr.map { element ->
-            val obj = element as? JsonObject
-                ?: throw IllegalArgumentException("media_results asset is not a JSON object")
-            MediaAsset(
-                id = obj["id"]?.jsonPrimitive?.long
-                    ?: throw IllegalArgumentException("media_results asset missing id"),
-                uri = obj["uri"]?.jsonPrimitive?.contentOrNull
-                    ?: throw IllegalArgumentException("media_results asset missing uri"),
-                type = obj["type"]?.jsonPrimitive?.contentOrNull
-                    ?.let { name -> runCatching { MediaType.valueOf(name) }.getOrDefault(MediaType.PHOTO) }
-                    ?: MediaType.PHOTO,
-                captureDate = obj["captureDate"]?.jsonPrimitive?.longOrNull ?: 0L,
-                fileName = obj["fileName"]?.jsonPrimitive?.contentOrNull ?: "",
-                faceFocusY = obj["faceFocusY"]?.jsonPrimitive?.doubleOrNull?.toFloat(),
-            )
-        }
-        return MediaResultsUi(
-            query = meta?.str("query") ?: "",
-            assets = assets,
-            totalCount = meta?.int("totalCount") ?: assets.size,
-            isRefinement = meta?.bool("isRefinement") ?: false,
-        )
-    }
 
     /** html_card 双形态元数据（metadata `html_card` 子对象；缺失 = 未声明 inline 待测高）。 */
     private fun parseHtmlCardMeta(meta: JsonObject?): HtmlCardMeta {

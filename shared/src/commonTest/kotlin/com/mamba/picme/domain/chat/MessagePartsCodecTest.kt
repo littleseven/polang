@@ -1,8 +1,5 @@
 package com.mamba.picme.domain.chat
 
-import com.mamba.picme.agent.core.model.command.FeedbackAction
-import com.mamba.picme.agent.core.model.context.MediaAsset
-import com.mamba.picme.agent.core.model.context.MediaType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -87,29 +84,6 @@ class MessagePartsCodecTest {
                 task = task,
             ),
         )
-        assertEquals(parts, decode(encode(parts)))
-    }
-
-    @Test
-    fun `media results part round-trips with assets and feedback`() {
-        val results = MediaResultsUi(
-            query = "海边",
-            assets = listOf(
-                MediaAsset(
-                    id = 7L,
-                    uri = "content://m/7",
-                    type = MediaType.PHOTO,
-                    captureDate = 123L,
-                    fileName = "a.jpg",
-                    faceFocusY = 0.5f,
-                    aestheticScore = 8.1f,
-                ),
-            ),
-            totalCount = 99,
-            isRefinement = true,
-            feedbackState = mapOf("7" to FeedbackAction.LIKE),
-        )
-        val parts = listOf(MessagePart.MediaResults("p0", results))
         assertEquals(parts, decode(encode(parts)))
     }
 
@@ -234,12 +208,14 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `sealed descriptor locks the 10-value taxonomy`() {
+    fun `sealed descriptor locks the 9-value taxonomy`() {
         // kotlinx.serialization 1.10.0 起 sealed 描述符为 {type, value} 两元素包装，
         // 子类描述符收纳在 "value"（CONTEXTUAL kotlinx.serialization.Sealed<...>）内层——
         // 外层 elementsCount 恒为 2，须下沉一层枚举子类 @SerialName。
+        // 10→9（2026-11-08）：data_media_results 横滑相册卡退役（spec D2）；存量行由
+        // LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES 行级过滤，不进 codec。
         val sealed = MessagePart.serializer().descriptor.getElementDescriptor(1)
-        assertEquals(10, sealed.elementsCount)
+        assertEquals(9, sealed.elementsCount)
         val serialNames = (0 until sealed.elementsCount)
             .map { sealed.getElementDescriptor(it).serialName }
             .toSet()
@@ -247,7 +223,7 @@ class MessagePartsCodecTest {
             setOf(
                 "text", "image",
                 "tool_chart", "tool_html", "tool_task", "tool_image_edit", "tool_browser",
-                "data_media_results", "data_optimize_candidates", "data_ui_openui",
+                "data_optimize_candidates", "data_ui_openui",
             ),
             serialNames,
         )
@@ -270,10 +246,6 @@ class MessagePartsCodecTest {
             ),
             MessagePart.EditResult("p0", description = "已提亮"),
             MessagePart.BrowserLive("p0", sessionId = "s"),
-            MessagePart.MediaResults(
-                "p0",
-                MediaResultsUi(query = "q", assets = emptyList(), totalCount = 0, isRefinement = false),
-            ),
             MessagePart.OptimizeCandidates(
                 "p0",
                 OptimizeCandidateGroup(

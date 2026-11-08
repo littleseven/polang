@@ -19,6 +19,14 @@ object LegacyChatTypeMigration {
         "data_media_results", "data_optimize_candidates",
     )
 
+    /**
+     * 已退役的横滑相册卡 type 闭集（2026-11-08 退役，spec《media-results-carousel-retirement》D2）：
+     * 双端回放路径遇此闭集的 Room 行**整行跳过**（不渲染、不迁移、不回灌）。
+     * legacy `media_results` → `data_media_results` 映射项刻意保留——老备份恢复经 map()
+     * 归一到退役正型后由回放过滤跳过；删映射会让 else→text 兜底把机器 JSON 渲染成可见气泡。
+     */
+    val RETIRED_MEDIA_RESULTS_TYPES: Set<String> = setOf("media_results", "data_media_results")
+
     data class MigratedRow(val type: String, val role: String, val parts: List<MessagePart>)
 
     fun map(legacyType: String, content: String, metadata: String?): MigratedRow {

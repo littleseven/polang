@@ -110,16 +110,6 @@ sealed interface MessagePart {
         override val category: PartCategory get() = PartCategory.TOOL
     }
 
-    /** 相册搜索结果 carousel（data part：默认不回灌 LLM）。 */
-    @Serializable
-    @SerialName("data_media_results")
-    data class MediaResults(
-        override val partId: String,
-        val results: MediaResultsUi,
-    ) : MessagePart {
-        override val category: PartCategory get() = PartCategory.DATA
-    }
-
     /**
      * OpenUI GenUI 卡（data part：默认不回灌 LLM，openui P1）。
      *

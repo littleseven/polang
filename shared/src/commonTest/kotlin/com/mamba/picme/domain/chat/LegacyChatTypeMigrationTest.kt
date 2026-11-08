@@ -55,8 +55,25 @@ class LegacyChatTypeMigrationTest {
     }
 
     @Test
-    fun `new types set covers exactly the eight taxonomy values`() {
+    fun `retired media results types are the exact two historical wire values`() {
         assertEquals(
+            setOf("media_results", "data_media_results"),
+            LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES,
+        )
+    }
+
+    @Test
+    fun `legacy media_results still normalizes to its retired canonical type`() {
+        // 映射项刻意保留：老备份恢复行经 map() 归一到退役正型，回放路径按
+        // RETIRED_MEDIA_RESULTS_TYPES 整行跳过——删映射会让 else→text 兜底把
+        // 机器 JSON 渲染成可见文本气泡。
+        val row = LegacyChatTypeMigration.map("media_results", "[]", null)
+        assertEquals("data_media_results", row.type)
+        assertTrue(row.type in LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES)
+    }
+
+    @Test
+    fun `new types set covers exactly the eight taxonomy values`() {        assertEquals(
             setOf(
                 "text", "image",
                 "tool_chart", "tool_html", "tool_task", "tool_image_edit",
