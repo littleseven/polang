@@ -49,37 +49,6 @@ class ChatGallerySearchTest {
         assertEquals(4, ChatGallerySearch.filterInSet(set, "").size)
     }
 
-    // ── 编解码往返 ───────────────────────────────────────────────
-
-    private val assets = listOf(
-        asset(1, name = "a.jpg"),
-        asset(2, name = "b.jpg")
-    )
-
-    @Test
-    fun `serialize then deserialize round-trips assets and metadata`() {
-        val content = ChatGallerySearch.serializeContent(assets)
-        val metadata = ChatGallerySearch.serializeMetadata(query = "海边", totalCount = 5, isRefinement = true)
-        val parsed = ChatGallerySearch.deserialize(content, metadata)
-
-        assertEquals("海边", parsed.query)
-        assertEquals(5, parsed.totalCount)
-        assertTrue(parsed.isRefinement)
-        assertEquals(2, parsed.assets.size)
-        assertEquals(1L, parsed.assets[0].id)
-        assertEquals("u1", parsed.assets[0].uri)
-        assertEquals(MediaType.PHOTO, parsed.assets[1].type)
-    }
-
-    @Test
-    fun `missing metadata yields empty-query non-refinement result`() {
-        val content = ChatGallerySearch.serializeContent(assets)
-        val parsed = ChatGallerySearch.deserialize(content, metadata = null)
-        assertEquals("", parsed.query)
-        assertEquals(false, parsed.isRefinement)
-        assertEquals(2, parsed.assets.size)
-    }
-
     // ── 人脸意图：用 hasFace 结构化字段，不依赖标签子串 ─────────
 
     @Test

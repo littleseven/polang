@@ -11,7 +11,6 @@ import com.mamba.picme.domain.chat.LlmPerformance
 import com.mamba.picme.domain.chat.MediaResultsUi
 import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.domain.chat.MessagePartsProjection
-import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.ModelInputRole
 import com.mamba.picme.domain.chat.OptimizeCandidateGroup
 import com.mamba.picme.domain.chat.PartState
@@ -116,7 +115,6 @@ import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.features.gallery.components.shareMediaAssets
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -426,9 +424,6 @@ class ChatViewModel(
     /** 任务卡动作（交付/继续/重试）在途的 taskId 集合（双击防护；UI 据此禁用审批按钮）。 */
     private val _engineerActionInFlight = MutableStateFlow<Set<String>>(emptySet())
     val engineerActionInFlight: StateFlow<Set<String>> = _engineerActionInFlight.asStateFlow()
-
-    /** OpenUI 卡持久化 JSON（与 converter 同配置，防 roundtrip 漂移；encodeDefaults=true 固定线格式）。 */
-    private val cardPartJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /**
      * Task 15 组合根注册的云端浏览器能力单例（capability 未注册时 null → 直播卡链路整体静默降级）。
@@ -3145,23 +3140,27 @@ class ChatViewModel(
     }
 
     /**
-     * 端侧终判回写（HtmlCard 首次分流判定回调）：displayMode + 测高合并进 metadata `html_card`
-     * 子对象（其余 key 不动），幂等——已持久化同值时跳过写库（重组重复回调不产 DB churn）。
+     * 端侧终判回写（HtmlCard 首次分流判定回调）：displayMode + 测高原位更新
+     * [MessagePart.HtmlCard] 的 meta，幂等——已持久化同值时跳过写库（重组重复回调不产 DB churn）。
      * 持久化后会话重开/列表回收后卡片形态不跳变（spec §4 稳定性）。
      */
     fun persistHtmlCardDisplayMode(messageId: String, mode: HtmlCardDisplayMode, measuredHeightPx: Int?) {
         viewModelScope.launch(Dispatchers.Default) {
             val entity = chatMessageDao.getMessageById(messageId) ?: return@launch
             if (entity.type != "tool_html") return@launch
-            val root = entity.metadata
-                ?.let { raw -> runCatching { JSONObject(raw) }.getOrNull() }
-                ?: JSONObject()
-            val card = root.optJSONObject("html_card") ?: JSONObject()
-            if (card.optString("displayMode").ifBlank { null } == mode.name) return@launch
-            card.put("displayMode", mode.name)
-            if (measuredHeightPx != null && measuredHeightPx > 0) card.put("measuredHeightPx", measuredHeightPx)
-            root.put("html_card", card)
-            chatMessageDao.insertMessageWithParts(entity.copy(metadata = root.toString()))
+            val card = entity.decodeParts().filterIsInstance<MessagePart.HtmlCard>().firstOrNull()
+                ?: return@launch
+            // 幂等——已持久化同值时跳过写库（重组重复回调不产 DB churn）
+            if (card.meta.displayMode == mode) return@launch
+            val newMeta = card.meta.copy(
+                displayMode = mode,
+                measuredHeightPx = measuredHeightPx?.takeIf { it > 0 } ?: card.meta.measuredHeightPx,
+            )
+            chatMessageDao.insertPartsMessage(
+                entity.withUpdatedParts { parts ->
+                    parts.map { part -> if (part is MessagePart.HtmlCard) part.copy(meta = newMeta) else part }
+                },
+            )
         }
     }
 
@@ -3530,15 +3529,11 @@ class ChatViewModel(
     /** OpenUI 卡交互态持久化（US-7 对偶，openui P2）：同 part id 覆写，重建时作初始 state。 */
     suspend fun persistOpenUiViewState(messageId: String, viewState: String) {
         val entity = chatMessageDao.getMessageById(messageId) ?: return
-        val part = runCatching {
-            cardPartJson.decodeFromString(MessagePart.OpenUiCard.serializer(), entity.content)
-        }.getOrNull() ?: return
-        val updated = part.copy(viewState = viewState)
-        chatMessageDao.insertMessageWithParts(
-            entity.copy(
-                content = cardPartJson.encodeToString(MessagePart.OpenUiCard.serializer(), updated)
-            )
-        )
+        val updated = entity.withUpdatedParts { parts ->
+            parts.map { part -> if (part is MessagePart.OpenUiCard) part.copy(viewState = viewState) else part }
+        }
+        if (updated.partsJson == entity.partsJson) return
+        chatMessageDao.insertPartsMessage(updated)
     }
 
     /** 非挂起包装：组合作用域随页面离开即取消会丢选择态，统一改由 viewModelScope 承载。 */
@@ -3734,8 +3729,12 @@ class ChatViewModel(
                 when (val outcome = controller.reroll(messageId)) {
                     is ChatOptimizeGachaController.RerollOutcome.Rerolled -> {
                         chatMessageDao.getMessageById(messageId)?.let { entity ->
-                            chatMessageDao.insertMessageWithParts(
-                                entity.copy(content = outcome.explanation, metadata = outcome.group.toJson())
+                            chatMessageDao.insertPartsMessage(
+                                entity.copy(metadata = null).withUpdatedParts { parts ->
+                                    parts.map { part ->
+                                        if (part is MessagePart.OptimizeCandidates) part.copy(group = outcome.group) else part
+                                    }
+                                },
                             )
                         }
                         _gachaSelections.value = _gachaSelections.value + (messageId to outcome.group.recommendedIndex)
@@ -3752,6 +3751,7 @@ class ChatViewModel(
 
     /**
      * 就用这张：全尺寸渲染 → 该条消息改写为 image（role=agent）结果消息（复用 insert-replace 模式）。
+     * type 投影自动落 "image"；旧实现 content 滞留抽卡文案的漂移随列退役清算。
      *
      * @param onResult true=成功；false=失败（UI toast，卡条保持可重试）
      */
@@ -3764,12 +3764,10 @@ class ChatViewModel(
                 return@launch
             }
             chatMessageDao.getMessageById(messageId)?.let { entity ->
-                val metadata = JSONObject().apply {
-                    put("imageUri", result.imageUri)
-                    put("saved", false)
-                }.toString()
-                chatMessageDao.insertMessageWithParts(
-                    entity.copy(type = "image", role = "agent", metadata = metadata)
+                chatMessageDao.insertPartsMessage(
+                    entity.copy(metadata = null).withUpdatedParts {
+                        listOf(MessagePart.Image("p0", ref = result.imageUri, saved = false))
+                    },
                 )
             }
             _gachaSelections.value = _gachaSelections.value - messageId
@@ -4081,13 +4079,10 @@ class ChatViewModel(
                         if (newAssets.isEmpty()) {
                             val deletedText = stringContext().getString(R.string.chat_results_photo_deleted)
                             chatMessageDao.getMessageById(message.id)?.let { entity ->
-                                chatMessageDao.insertMessageWithParts(
-                                    entity.copy(
-                                        type = "text",
-                                        role = "agent",
-                                        content = deletedText,
-                                        metadata = null
-                                    )
+                                chatMessageDao.insertPartsMessage(
+                                    entity.copy(metadata = null).withUpdatedParts {
+                                        listOf(MessagePart.Text("p0", deletedText, PartState.DONE))
+                                    },
                                 )
                             }
                             return@mapNotNull message.copy(
@@ -4107,15 +4102,21 @@ class ChatViewModel(
                         }
                         val newTotal = (mr.totalCount - 1).coerceAtLeast(newAssets.size)
                         chatMessageDao.getMessageById(message.id)?.let { entity ->
-                            chatMessageDao.insertMessageWithParts(
-                                entity.copy(
-                                    content = ChatGallerySearch.serializeContent(newAssets),
-                                    metadata = ChatGallerySearch.serializeMetadata(
-                                        mr.query,
-                                        newTotal,
-                                        mr.isRefinement
-                                    )
-                                )
+                            chatMessageDao.insertPartsMessage(
+                                entity.withUpdatedParts { parts ->
+                                    parts.map { part ->
+                                        if (part is MessagePart.MediaResults) {
+                                            part.copy(
+                                                results = part.results.copy(
+                                                    assets = newAssets,
+                                                    totalCount = newTotal,
+                                                ),
+                                            )
+                                        } else {
+                                            part
+                                        }
+                                    }
+                                },
                             )
                         }
                         val updatedResults = mr.copy(
