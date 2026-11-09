@@ -38,6 +38,10 @@ return Chart.echarts({
 - ⚠️ **图卡已经自动上屏，你的最终回复严禁再出现任何 Html 组件、严禁重复发卡**——
   回复 = `root = Markdown("分析文字")` 一条组件语句（// summary 首行照写）。
   真机事故：LLM 把模板图卡又手写一遍进 DSL，屏幕出现两张卡、手写那张空白。
+- ⚠️ **「再画一张 / 换主题 / 换样式 / 调参数」也必须重新调用工具重新发卡**——
+  没有本轮 `Chart.echarts` 调用就没有新卡上屏，禁止凭上一轮 summary 记忆宣称
+  「已重画」。真机事故：LLM 空口说「已换 #FF6B6B、高度 300」，实际零工具调用，
+  屏幕还是旧卡。
 - 严禁手写任何 HTML/ECharts 代码；严禁 SVG（Chart.bar/line/pie/timeline 云端不渲染，会报错引导）。
 
 模板已内置（不用你操心）：polang-lib 预制 ECharts 声明、`confine: true` 防遮挡、
