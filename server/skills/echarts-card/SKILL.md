@@ -8,7 +8,7 @@ description: 交互图表（ECharts）双通路契约——默认 Chart.echarts 
 ## 默认通路：Chart.echarts 固定模板（优先，零手写 HTML）
 
 **绝大多数图表诉求不需要本技能正文**——`run_gallery_script` 的工具描述已含完整用法，
-在脚本末尾一行 return 即可：
+**调用即发卡**（2026-11-09 注册制：不必再 return 模板结果）：
 
 ```js
 // 例：月度趋势（数据必须来自 bridge.callAsync 真实聚合）
@@ -18,12 +18,15 @@ var x = keys.map(function (k) {
   var d = new Date(Number(k));
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
 });
-return Chart.echarts({
+var vals = keys.map(function (k) { return tl[k]; });
+Chart.echarts({  // ← 调用即发卡，自动渲染上屏
   title: '相册月度趋势',
   x: x,
-  series: [{name: '媒体数', data: keys.map(function (k) { return tl[k]; })}],
+  series: [{name: '媒体数', data: vals}],
   unit: '个'
 });
+// return 只写统计小对象（禁止含 html；Chart.echarts 的返回对象不要塞进来）
+return { total: vals.reduce(function (a, b) { return a + b; }, 0), months: x.length };
 ```
 
 - `Chart.echarts(cfg)`：`{title?, x:[类目标签], series:[{name, data, type?: 'bar'|'line', color?}], unit?, tip?, theme?, style?}`。
@@ -33,8 +36,9 @@ return Chart.echarts({
   `series[].color` 单系列覆盖最优先。拿不准就全用默认。
 - 兜底文案（读数行默认提示/默认系列名）自动按用户应用语言五语本地化，不用你管；
   `title`/`tip`/`unit`/系列名用对话语言撰写即可。
-- 固定模板自动渲染成交互图卡上屏（tooltip / 读数行联动 / 防遮挡 / 清新配色全内置），
-  **HTML 不回传给你**——你只收到 summary 文字（峰值/合计），据此撰写分析。
+- **调用即发卡**：`Chart.echarts(...)` 一执行就登记产物，固定模板自动渲染成交互图卡上屏
+  （tooltip / 读数行联动 / 防遮挡 / 清新配色全内置），**HTML 不回传给你**——你只收到
+  summary 文字（峰值/合计）+ 你 return 的统计对象，据此撰写分析。
 - ⚠️ **图卡已经自动上屏，你的最终回复严禁再出现任何 Html 组件、严禁重复发卡**——
   回复 = `root = Markdown("分析文字")` 一条组件语句（// summary 首行照写）。
   真机事故：LLM 把模板图卡又手写一遍进 DSL，屏幕出现两张卡、手写那张空白。
@@ -42,6 +46,9 @@ return Chart.echarts({
   没有本轮 `Chart.echarts` 调用就没有新卡上屏，禁止凭上一轮 summary 记忆宣称
   「已重画」。真机事故：LLM 空口说「已换 #FF6B6B、高度 300」，实际零工具调用，
   屏幕还是旧卡。
+- ⚠️ **return 里禁止携带 html**（含把 `Chart.echarts` 的返回对象包进 `{chart: ..., total: ...}`
+  这类信封）——卡由调用登记产出，return 只写统计小对象。真机事故：LLM 把图卡结果包进
+  大对象 return，完整 HTML 被上行回传（单轮 4 万+ token）且卡片没落库。
 - 严禁手写任何 HTML/ECharts 代码；严禁 SVG（Chart.bar/line/pie/timeline 云端不渲染，会报错引导）。
 
 模板已内置（不用你操心）：polang-lib 预制 ECharts 声明、`confine: true` 防遮挡、

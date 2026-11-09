@@ -414,15 +414,18 @@ class CloudAgentTurnRunnerTest {
 
     @Test
     fun `script html artifact emits HtmlCard and uploads summary only`() = runTest {
-        // 产物拦截：run_gallery_script 的 {html, summary} 信封 → HtmlCard 本地事件，
-        // 上行 postToolResult 只带 summary（HTML 不出端、不进 LLM 上下文）
+        // 产物拦截（注册制）：run_gallery_script 的图卡信封 → HtmlCard 本地事件，
+        // 上行 postToolResult 只带 summary+stats（HTML 不出端、不进 LLM 上下文）
         val api = FakeApi()
         val executor = DeviceToolExecutor(
             gallerySummary = { "相册 42 张" },
             searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
             refineSearch = { _, _, _ -> "error: no base" },
             runGalleryScript = { _ ->
-                CloudAgentScriptTools.wrapHtmlArtifact("<div id=\"c\"></div>", "共12个区间；峰值 2022-03=1531")
+                CloudAgentScriptTools.wrapHtmlArtifact(
+                    listOf("<div id=\"c\"></div>" to "共12个区间；峰值 2022-03=1531"),
+                    stats = "{\"total\":8146.0}",
+                )
             },
         )
         api.framesScript = { onFrame ->
@@ -446,5 +449,8 @@ class CloudAgentTurnRunnerTest {
         assertTrue(posted.second)
         assertTrue(!posted.third.contains("<div"))
         assertTrue(posted.third.contains("共12个区间"))
+        // stats（原 return 剥除 html 后的统计）随信封上行，供 LLM 写分析
+        assertTrue(posted.third.contains("\"stats\""))
+        assertTrue(posted.third.contains("8146"))
     }
 }

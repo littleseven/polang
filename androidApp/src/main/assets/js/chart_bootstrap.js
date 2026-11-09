@@ -172,8 +172,10 @@
 
   /**
    * ECharts 交互图卡（云端 run_gallery_script 产物通路，2026-11-08）：
-   * return Chart.echarts(cfg) → {html: <自包含 HTML>, summary: <给 LLM 的文字>}。
-   * html 由端侧直接渲染成 HTML 卡（不进 LLM 上下文），summary 回传 LLM 写分析——
+   * 调用 Chart.echarts(cfg) 即登记发卡（产物推入 globalThis.__polangArtifacts，
+   * 端侧执行后统一回收渲染成 HTML 卡，HTML 不出端、不进 LLM 上下文）；
+   * 返回值 {html, summary} 仅供脚本内链式使用——脚本 return 只应写统计小对象，
+   * summary 随产物信封回传 LLM 写分析。
    * LLM 零 HTML 编写，模板一次到位（polang-lib 预制 echarts、confine 防遮挡、
    * 读数行联动、主题配色），彻底消灭手写 HTML 的 DSL 嵌套事故面。
    *
@@ -189,8 +191,10 @@
    *   var tl = await bridge.callAsync('gallery.timeline', {bucketMs: 2592000000});
    *   var keys = Object.keys(tl).sort();
    *   var x = keys.map(function (k) { var d = new Date(Number(k)); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); });
-   *   return Chart.echarts({ title: '相册月度趋势', x: x, theme: 'ocean',
-   *     series: [{name: '媒体数', data: keys.map(function (k) { return tl[k]; })}], unit: '个' });
+   *   var vals = keys.map(function (k) { return tl[k]; });
+   *   Chart.echarts({ title: '相册月度趋势', x: x, theme: 'ocean',
+   *     series: [{name: '媒体数', data: vals}], unit: '个' });   // 调用即发卡
+   *   return { total: vals.reduce(function (a, b) { return a + b; }, 0), months: x.length };  // 只回统计
    * 注意：gallery.timeline 不分照片/视频（无 mediaType 参数），多序列需自行用 gallery.query 聚合。
    */
   var ECHARTS_BASE_STYLE = {
@@ -333,8 +337,14 @@
         '，合计 ' + fmt(sum) + unit;
     });
     var summary = (cfg.title ? cfg.title + '——' : '') + '共' + x.length + '个区间；' + parts.join('；');
-    return { html: html, summary: summary };
+    // 注册制产物（2026-11-09 真机事故修复）：调用即登记发卡，与脚本 return 形状彻底解耦——
+    // LLM 把本结果包进别的对象返回也不丢卡（端侧执行后统一 drain __polangArtifacts 上屏）。
+    var artifact = { html: html, summary: summary };
+    globalThis.__polangArtifacts.push(artifact);
+    return artifact;
   }
 
+  // 产物注册表：每次脚本执行前端侧重置为空数组，执行后统一回收（见 CloudAgentScriptTools）。
+  globalThis.__polangArtifacts = globalThis.__polangArtifacts || [];
   globalThis.Chart = { bar: bar, line: line, pie: pie, timeline: timelineChart, echarts: echartsCard, echartsThemes: Object.keys(ECHARTS_THEMES) };
 })();

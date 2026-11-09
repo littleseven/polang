@@ -21,9 +21,11 @@ import org.json.JSONObject
  * 与 chat 链路持久 JsRuntime 的差异（保持云端面只读）：
  * - handler 集 = `registerGalleryHandlers`（gallery/media/face/tag 只读 12 件，唯一注册点同源）；
  * - **不注册** `capability.dispatch` 写通路；
- * - 加载 Chart bootstrap（含 `Chart.echarts` 固定模板）——产物拦截同款 chat 链路：
- *   `return {html, summary}` 包装为产物信封（[wrapHtmlArtifact]），由 CloudAgentTurnRunner
- *   剥离上屏（HTML 不出端、不进 LLM 上下文），summary 回传云端 LLM 写分析；
+ * - 加载 Chart bootstrap（含 `Chart.echarts` 固定模板）——产物为**注册制**（2026-11-09）：
+ *   JS 侧 `Chart.echarts` 调用即把 {html, summary} 推入 `globalThis.__polangArtifacts`，
+ *   本类每次执行前清空、执行后统一回收（[drainArtifacts]），与脚本 return 形状彻底解耦
+ *   （LLM 把图卡结果包进别的对象返回也不丢卡；原 return 递归剥除 html 后作为 stats
+ *   随信封上行 LLM，HTML 不出端、不进 LLM 上下文）；
  * - 普通 eval 结果不喂 UI——`return` 值整体 JSON 化回传云端 LLM（字符串原样返回），
  *   出端仍过 [DeviceToolExecutor] 的投影闸 + 32K 截断。
  *
@@ -68,8 +70,9 @@ class CloudAgentScriptTools(
         }
 
     /**
-     * 执行云端下发的相册聚合脚本。evalAsync 按「async 函数体」语义执行（顶层 return/await 合法），
-     * 返回 JS return 值：字符串原样、其余类型 JSON 化（JsValue.toJson）。
+     * 执行云端下发的相册聚合脚本。evalAsync 按「async 函数体」语义执行（顶层 return/await 合法）。
+     * 分发优先级：注册表产物（[drainArtifacts] 非空）→ 顶层 {html} 兜底（bootstrap 未加载的
+     * 兼容路径）→ 顶层 {chart} SVG 拦截引导 → 原样回传（字符串原样、其余 JsValue.toJson）。
      * 失败回 `error: <msg>` 契约串（`error:` 前缀由 shared CloudAgentToolContract 收口），不抛业务异常。
      */
     suspend fun runScript(code: String): String {
@@ -77,24 +80,34 @@ class CloudAgentScriptTools(
         val rt = getOrCreate()
         return try {
             evalMutex.withLock {
-                // 每次执行前刷新语言标签（应用内切语言后新图即新文案；失败不阻断脚本）
-                runCatching { rt.eval("globalThis.__polangLang=${JSONObject.quote(appLanguageTag())};") }
-                    .onFailure { Logger.w(tag, "locale tag inject failed", it) }
+                // 每次执行前刷新语言标签 + 清空产物注册表（应用内切语言后新图即新文案；
+                // 注册表清空保证 drain 只回收本轮产物。失败不阻断脚本）
+                runCatching {
+                    rt.eval(
+                        "globalThis.__polangLang=${JSONObject.quote(appLanguageTag())};" +
+                            "globalThis.__polangArtifacts=[];",
+                    )
+                }.onFailure { Logger.w(tag, "pre-run inject failed", it) }
                 when (val result = rt.evalAsync(code, evalTimeoutMs, traceId = null)) {
                     is JsValue.Str -> result.value
                     else -> {
+                        val cards = drainArtifacts(rt)
                         val obj = result as? JsValue.Obj
-                        val html = obj?.entries?.get("html") as? JsValue.Str
-                        val chart = obj?.entries?.get("chart") as? JsValue.Str
                         when {
-                            // 产物拦截：{html, summary} → 信封（HTML 不出端，summary 回传 LLM）
-                            html != null -> {
+                            // 注册制产物：调用即发卡，与 return 形状解耦；
+                            // 原 return 剥除 html 后作为 stats 随信封上行（保住 LLM 要的统计）
+                            cards.isNotEmpty() ->
+                                wrapHtmlArtifact(cards, statsJsonOf(result))
+                            // 兼容兜底：bootstrap 未加载时脚本自组 {html, summary} 仍发卡
+                            obj?.entries?.get("html") is JsValue.Str -> {
+                                val html = obj.entries.getValue("html") as JsValue.Str
                                 val summary = (obj.entries["summary"] as? JsValue.Str)?.value ?: ""
-                                wrapHtmlArtifact(html.value, summary)
+                                wrapHtmlArtifact(listOf(html.value to summary), stats = null)
                             }
                             // SVG 图卡云端无渲染通路：拦截省 token（SVG 不回传）并引导改用 Chart.echarts
-                            chart != null -> "${CloudAgentToolContract.ERROR_PREFIX} SVG chart 不支持云端渲染，" +
-                                "请改用 Chart.echarts(cfg) 返回 {html, summary}"
+                            obj?.entries?.get("chart") is JsValue.Str ->
+                                "${CloudAgentToolContract.ERROR_PREFIX} SVG chart 不支持云端渲染，" +
+                                    "请改用 Chart.echarts(cfg) 返回 {html, summary}"
                             else -> result.toJson()
                         }
                     }
@@ -108,6 +121,47 @@ class CloudAgentScriptTools(
         }
     }
 
+    /** 回收本轮注册的图卡产物（html, summary）；注册表缺失/异常按无产物处理。 */
+    private fun drainArtifacts(rt: JsRuntime): List<Pair<String, String>> =
+        runCatching {
+            val raw = rt.eval("JSON.stringify(globalThis.__polangArtifacts||[])")
+            val arr = org.json.JSONArray((raw as? JsValue.Str)?.value ?: "[]")
+            (0 until arr.length()).mapNotNull { i ->
+                val item = arr.optJSONObject(i) ?: return@mapNotNull null
+                val html = item.optString("html")
+                if (html.isBlank()) null else html to item.optString("summary")
+            }
+        }.onFailure { Logger.w(tag, "drain artifacts failed", it) }
+            .getOrDefault(emptyList())
+
+    /**
+     * 原 return 值递归剥除 html 后的 JSON（stats 上行用）：剥掉 `html` 键、及值为「含 html
+     * 的 Obj」的 `chart` 键（2026-11-09 真机事故形状：{chart: {html, summary}, total...}），
+     * 保证完整 HTML 绝不随 stats 上行 LLM。清洗后为空对象/非容器则返回 null。
+     */
+    private fun statsJsonOf(result: JsValue): String? =
+        when (val cleaned = result.stripHtml()) {
+            is JsValue.Obj -> cleaned.toJson().takeIf { it != "{}" }
+            JsValue.Null -> null
+            else -> cleaned.toJson()
+        }
+
+    private fun JsValue.stripHtml(): JsValue = when (this) {
+        is JsValue.Obj -> {
+            val kept = entries.mapNotNull { (key, value) ->
+                when {
+                    key == "html" -> null
+                    key == "chart" && value is JsValue.Obj &&
+                        value.entries["html"] is JsValue.Str -> null
+                    else -> key to value.stripHtml()
+                }
+            }
+            if (kept.size == entries.size) this else JsValue.Obj(kept.toMap())
+        }
+        is JsValue.Arr -> JsValue.Arr(items.map { it.stripHtml() })
+        else -> this
+    }
+
     companion object {
         /** 云端聚合脚本超时（chat 链路只读脚本 5s；月度/年度聚合计量更大放宽到 10s）。 */
         const val DEFAULT_EVAL_TIMEOUT_MS = 10_000L
@@ -117,21 +171,56 @@ class CloudAgentScriptTools(
 
         const val ARTIFACT_HTML_CARD = "html_card"
 
-        fun wrapHtmlArtifact(html: String, summary: String): String =
+        /**
+         * 产物信封（注册制，2026-11-09）：`cards` 数组承载本轮全部图卡（调用即发卡，一稿可多卡）；
+         * 兼容单字段 `html`/`summary`（取最后一卡）保留给旧解析方；
+         * `stats` = 原 return 剥除 html 后的统计小对象，随信封上行 LLM 写分析。
+         */
+        fun wrapHtmlArtifact(cards: List<Pair<String, String>>, stats: String?): String =
             JSONObject()
                 .put(ARTIFACT_KEY, ARTIFACT_HTML_CARD)
-                .put("html", html)
-                .put("summary", summary)
+                .put(
+                    "cards",
+                    org.json.JSONArray(
+                        cards.map { (html, summary) ->
+                            JSONObject().put("html", html).put("summary", summary)
+                        },
+                    ),
+                )
+                .put("html", cards.last().first)
+                .put("summary", cards.last().second)
+                .apply {
+                    if (!stats.isNullOrBlank() && stats != "{}" && stats != "null") {
+                        put("stats", runCatching { JSONObject(stats) }.getOrElse { stats })
+                    }
+                }
                 .toString()
 
-        /** 解析产物信封（html, summary）；非信封（普通 JSON/字符串结果）返回 null。 */
-        fun parseHtmlArtifact(result: String): Pair<String, String>? =
+        /** 解析后的产物信封：cards = 本轮全部图卡（html, summary）；stats = 清洗后的统计 JSON。 */
+        data class HtmlArtifactResult(
+            val cards: List<Pair<String, String>>,
+            val stats: String?,
+        )
+
+        /** 解析产物信封；非信封（普通 JSON/字符串结果）或空卡返回 null。兼容无 cards 数组的旧信封。 */
+        fun parseHtmlArtifact(result: String): HtmlArtifactResult? =
             runCatching {
                 val obj = JSONObject(result)
                 if (obj.optString(ARTIFACT_KEY) != ARTIFACT_HTML_CARD) return null
-                val html = obj.optString("html")
-                if (html.isBlank()) return null
-                html to obj.optString("summary")
+                val cardsArray = obj.optJSONArray("cards")
+                val cards = if (cardsArray != null) {
+                    (0 until cardsArray.length()).mapNotNull { i ->
+                        val item = cardsArray.optJSONObject(i) ?: return@mapNotNull null
+                        val html = item.optString("html")
+                        if (html.isBlank()) null else html to item.optString("summary")
+                    }
+                } else {
+                    val html = obj.optString("html")
+                    if (html.isBlank()) emptyList() else listOf(html to obj.optString("summary"))
+                }
+                if (cards.isEmpty()) return null
+                val stats = obj.opt("stats")?.takeIf { it != JSONObject.NULL }?.toString()
+                HtmlArtifactResult(cards, stats)
             }.getOrNull()
     }
 }
