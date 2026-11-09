@@ -66,6 +66,8 @@ import com.mamba.picme.domain.chat.openui.OpenUiAction
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.features.common.chat.AgentMarkdown
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * OpenUI 官方组件库全量补全·内容/布局批次（M4a，2026-10-25，spec《openui-full-library-design》§3.1/§3.2）。
@@ -222,6 +224,24 @@ private fun isEmptyBindingFallback(resolved: String): Boolean {
 /** https 公网图白名单（[PRIVACY]：server validator 正则硬校验，渲染层仍防御；非 https → null 落占位）。 */
 private fun httpsSrcOrNull(raw: String?): String? =
     raw?.takeIf { src -> src.startsWith("https://") }
+
+/**
+ * 批量 photoId 并行解析，单张完成即回调上屏（渐进填充）。
+ * 替代整批串行解析后一次性 set——12 张串行在扫描负载下灰格窗口秒级且无渐进反馈
+ * （2026-11-09 真机实测 PhotoGrid 卡片完成后 2.5–4.5s 全灰）。
+ */
+private suspend fun OpenUiPhotoResolver.resolveAllProgressively(
+    ids: List<Long>,
+    onPhotoResolved: (id: Long, photo: OpenUiPhoto) -> Unit,
+) {
+    coroutineScope {
+        ids.forEach { id ->
+            launch {
+                resolve(id)?.let { photo -> onPhotoResolved(id, photo) }
+            }
+        }
+    }
+}
 
 /** variant 小写（neutral/info/success/warning/danger）→ StatusColor；neutral/缺省 → 弱色。 */
 @Composable
@@ -1835,8 +1855,9 @@ private fun OpenUiContentPhotoGrid(
     }
     val columns = ((node.props["columns"] as? OpenUiValue.Num)?.v?.toInt() ?: 3).coerceIn(2, 4)
     val resolved by produceState<Map<Long, OpenUiPhoto>>(initialValue = emptyMap(), ids) {
-        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }
-            .toMap()
+        photoResolver.resolveAllProgressively(ids) { id, photo ->
+            value = value + (id to photo)
+        }
     }
     Column(
         modifier = modifier
@@ -1915,8 +1936,9 @@ private fun OpenUiContentAvatarRow(
     }
     val ids = items.map { item -> item.first }
     val resolved by produceState<Map<Long, OpenUiPhoto>>(initialValue = emptyMap(), ids) {
-        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }
-            .toMap()
+        photoResolver.resolveAllProgressively(ids) { id, photo ->
+            value = value + (id to photo)
+        }
     }
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
@@ -1996,7 +2018,9 @@ private fun OpenUiContentCompareRow(
     }
     val ids = listOfNotNull(beforeId, afterId)
     val resolved by produceState(initialValue = emptyMap<Long, OpenUiPhoto>(), ids) {
-        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
+        photoResolver.resolveAllProgressively(ids) { id, photo ->
+            value = value + (id to photo)
+        }
     }
     val frameAspect = frameAspectOf(
         (node.props["aspect"] as? OpenUiValue.Num)?.v,
@@ -2117,7 +2141,9 @@ private fun OpenUiContentTimeline(
     }
     val ids = entries.mapNotNull { entry -> entry.photoId }
     val resolved by produceState(initialValue = emptyMap<Long, OpenUiPhoto>(), ids) {
-        value = ids.mapNotNull { id -> photoResolver.resolve(id)?.let { photo -> id to photo } }.toMap()
+        photoResolver.resolveAllProgressively(ids) { id, photo ->
+            value = value + (id to photo)
+        }
     }
     Column(
         modifier = modifier.fillMaxWidth(),
