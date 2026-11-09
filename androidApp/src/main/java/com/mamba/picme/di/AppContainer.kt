@@ -49,6 +49,7 @@ import com.mamba.picme.data.repository.MediaRepositoryImpl
 import com.mamba.picme.data.repository.OrganizeRepositoryImpl
 import com.mamba.picme.data.repository.PhotoEditRecipeRepository
 import com.mamba.picme.domain.aesthetic.AestheticScoreWorker
+import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.repository.ChatImageStore
 import com.mamba.picme.domain.repository.AndroidMediaRepository
 import com.mamba.picme.domain.repository.OrganizeRepository
@@ -150,6 +151,7 @@ import com.mamba.picme.domain.tag.TagScanProgress
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.data.indexing.MediaChangeEvent
 import com.mamba.picme.service.tag.TagGenerationService
+import java.util.Locale
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -1256,7 +1258,10 @@ class AppContainerImpl(
     /**
      * 云端 run_gallery_script 的无头 JS 执行器（2026-11-08 补录真实聚合通路）。
      * 只读 handler 与 chat 链路同源（registerGalleryHandlers 唯一注册点）；
-     * 不注册 capability.dispatch 写通路、不加载 Chart bootstrap，保持云端面只读。
+     * 不注册 capability.dispatch 写通路，保持云端面只读；
+     * 加载 Chart bootstrap（Chart.echarts 固定模板产物通路，HTML 信封不出端）。
+     * [I18N] appLanguageTag 每次脚本执行前注入 JS 全局 __polangLang，
+     * 图表卡兜底文案（读数行提示/默认系列名）按应用语言五语本地化。
      */
     private val cloudAgentScriptTools: CloudAgentScriptTools by lazy {
         CloudAgentScriptTools(
@@ -1274,7 +1279,32 @@ class AppContainerImpl(
                 )
             },
             chartBootstrapJs = { loadChartBootstrapJs(context) },
+            appLanguageTag = { resolveChartLanguageTag() },
         )
+    }
+
+    /**
+     * 图表卡兜底文案语言标签（[I18N] 五语）：应用语言设置 → BCP47 tag。
+     * SYSTEM 跟随系统语言映射到最近支持语言，非支持语言回落 "en"（与 values/ 基线文案同口径）；
+     * zh-HK/MO 等繁体地区归 zh-TW（对齐 Android zh-rTW 资源解析习惯）。
+     */
+    private fun resolveChartLanguageTag(): String {
+        val lang = runCatching { userPreferencesRepository.getAppLanguageBlocking() }
+            .getOrDefault(AppLanguage.SYSTEM)
+        val systemLocale: Locale = when (lang) {
+            AppLanguage.ENGLISH -> return "en"
+            AppLanguage.CHINESE -> return "zh-CN"
+            AppLanguage.TRADITIONAL_CHINESE -> return "zh-TW"
+            AppLanguage.SPANISH -> return "es"
+            AppLanguage.FRENCH -> return "fr"
+            AppLanguage.SYSTEM -> Locale.getDefault()
+        }
+        return when (systemLocale.language) {
+            "zh" -> if (systemLocale.country.uppercase(Locale.ROOT) in setOf("TW", "HK", "MO")) "zh-TW" else "zh-CN"
+            "es" -> "es"
+            "fr" -> "fr"
+            else -> "en"
+        }
     }
 
     /** 云端工具桥端侧执行器（调试页与 Chat 页云端模式共用实例）。 */

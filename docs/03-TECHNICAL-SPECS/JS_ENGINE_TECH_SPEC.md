@@ -97,7 +97,7 @@
 
 ### 4.1 取数 handler（12 个，全部 async、只读）
 
-唯一注册入口：`GalleryScriptHandlers.registerGalleryHandlers`（`features/chat/js/GalleryScriptHandlers.kt`），**ChatViewModel 持久 JsRuntime、Debug 页 JsBridgeDemo 临时 JsRuntime 与云端 `run_gallery_script` 无头执行器（`core/agenttools/CloudAgentScriptTools`，2026-11-08）三处共用**，保证三条链路 handler 集合一致。新增/修改 handler 只改这里。云端面无头差异：不注册 §4.2 写通路；加载 Chart bootstrap 但仅 `Chart.echarts` 有产物通路——`return {html, summary}` 包装为产物信封（`CloudAgentScriptTools.wrapHtmlArtifact`），由 `CloudAgentTurnRunner` 剥离上屏（HTML 不出端、不进 LLM 上下文，summary 回传云端 LLM 写分析）；SVG 系 Chart API（bar/line/pie/timeline）云端无渲染通路，返回 error 引导改用 Chart.echarts；普通 return 值 JSON 化经投影闸 + 32K 截断回传（详见 CHAT_CARD_CATALOG.md §4.2「真实数据通路」）。
+唯一注册入口：`GalleryScriptHandlers.registerGalleryHandlers`（`features/chat/js/GalleryScriptHandlers.kt`），**ChatViewModel 持久 JsRuntime、Debug 页 JsBridgeDemo 临时 JsRuntime 与云端 `run_gallery_script` 无头执行器（`core/agenttools/CloudAgentScriptTools`，2026-11-08）三处共用**，保证三条链路 handler 集合一致。新增/修改 handler 只改这里。云端面无头差异：不注册 §4.2 写通路；加载 Chart bootstrap（每次脚本执行前端侧注入 `__polangLang` 语言标签，图表兜底文案按应用语言五语本地化，2026-11-09）但仅 `Chart.echarts` 有产物通路——`return {html, summary}` 包装为产物信封（`CloudAgentScriptTools.wrapHtmlArtifact`），由 `CloudAgentTurnRunner` 剥离上屏（HTML 不出端、不进 LLM 上下文，summary 回传云端 LLM 写分析）；SVG 系 Chart API（bar/line/pie/timeline）云端无渲染通路，返回 error 引导改用 Chart.echarts；普通 return 值 JSON 化经投影闸 + 32K 截断回传（详见 CHAT_CARD_CATALOG.md §4.2「真实数据通路」）。
 
 | Handler | 参数 | 返回 | 说明 |
 |---------|------|------|------|

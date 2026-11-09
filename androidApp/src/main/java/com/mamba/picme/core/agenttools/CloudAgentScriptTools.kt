@@ -31,6 +31,10 @@ import org.json.JSONObject
  * 生产接线在 AppContainer（QuickJsEngine + applicationScope + registerGalleryHandlers）。
  * runtime 懒建后进程级常驻（AppContainer 单例语义），[evalMutex] 串行化 eval——
  * QuickJS 单上下文非线程安全，与 ChatViewModel.jsEvalMutex 同一护栏。
+ *
+ * [I18N]：图表卡兜底文案（读数行提示/默认系列名/读数分隔符）按应用语言五语本地化——
+ * 每次 [runScript] 前把 [appLanguageTag] 写入 JS 侧 `globalThis.__polangLang`，
+ * chart_bootstrap 的 CHART_STRINGS 表在每次发卡时解析，语言切换即时生效、runtime 无需重建。
  */
 class CloudAgentScriptTools(
     private val engineFactory: () -> JsEngine,
@@ -38,6 +42,7 @@ class CloudAgentScriptTools(
     private val registerHandlers: (JsRuntime) -> Unit,
     private val chartBootstrapJs: () -> String = { "" },
     private val evalTimeoutMs: Long = DEFAULT_EVAL_TIMEOUT_MS,
+    private val appLanguageTag: () -> String = { "zh-CN" },
 ) {
 
     private val tag = "CloudAgentScriptTools"
@@ -72,6 +77,9 @@ class CloudAgentScriptTools(
         val rt = getOrCreate()
         return try {
             evalMutex.withLock {
+                // 每次执行前刷新语言标签（应用内切语言后新图即新文案；失败不阻断脚本）
+                runCatching { rt.eval("globalThis.__polangLang=${JSONObject.quote(appLanguageTag())};") }
+                    .onFailure { Logger.w(tag, "locale tag inject failed", it) }
                 when (val result = rt.evalAsync(code, evalTimeoutMs, traceId = null)) {
                     is JsValue.Str -> result.value
                     else -> {

@@ -145,6 +145,34 @@ class CloudAgentScriptToolsTest {
             chartBootstrapJs = { "globalThis.Chart = {};" },
         )
         t.runScript("return null")
-        assertEquals(listOf("globalThis.Chart = {};"), evaled)
+        assertEquals(listOf("globalThis.Chart = {};", "globalThis.__polangLang=\"zh-CN\";"), evaled)
+    }
+
+    @Test
+    fun `app language tag is injected as js global before each script eval`() = runTest {
+        val evaled = mutableListOf<String>()
+        val engine = object : JsEngine {
+            override fun eval(script: String): JsValue {
+                evaled.add(script)
+                return JsValue.Null
+            }
+            override fun evalAsync(code: String, timeoutMs: Long): JsValue = JsValue.Null
+            override fun callFunction(name: String, vararg args: JsValue): JsValue = JsValue.Null
+            override fun installBridge(bridge: JsBridge) {}
+        }
+        var tag = "zh-CN"
+        val t = CloudAgentScriptTools(
+            engineFactory = { engine },
+            scope = CoroutineScope(UnconfinedTestDispatcher()),
+            registerHandlers = {},
+            appLanguageTag = { tag },
+        )
+        t.runScript("return 1")
+        t.runScript("return 2")
+        assertEquals(listOf("globalThis.__polangLang=\"zh-CN\";", "globalThis.__polangLang=\"zh-CN\";"), evaled)
+        // 应用内切换语言后下一次脚本即生效（进程级常驻 runtime 无需重建）
+        tag = "fr"
+        t.runScript("return 3")
+        assertEquals("globalThis.__polangLang=\"fr\";", evaled.last())
     }
 }

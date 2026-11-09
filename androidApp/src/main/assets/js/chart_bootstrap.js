@@ -219,6 +219,26 @@
     forest: { palette: ['#10B981', '#34D399', '#84CC16', '#059669', '#4ADE80', '#A3E635'] }
   };
 
+  /**
+   * 图表卡兜底文案五语表（[I18N] 红线，2026-11-09）：端侧每次脚本执行前把当前应用语言
+   * 写入 globalThis.__polangLang（BCP47：zh-CN/zh-TW/en/es/fr），本函数在每次发卡时解析——
+   * 用户切换应用语言后新图即新语言，进程级常驻 runtime 无需重建。
+   * 仅覆盖「模板兜底」文案（读数行默认提示/默认系列名/读数分隔符）；
+   * title/tip/unit 由 LLM 按对话语言提供，不在此表。
+   */
+  var CHART_STRINGS = {
+    'zh-CN': { tipDefault: '点按图表查看数值', seriesDefault: '系列', readoutSep: '：' },
+    'zh-TW': { tipDefault: '點按圖表查看數值', seriesDefault: '系列', readoutSep: '：' },
+    'en': { tipDefault: 'Tap the chart to see values', seriesDefault: 'Series ', readoutSep: ': ' },
+    'es': { tipDefault: 'Toca el gráfico para ver los valores', seriesDefault: 'Serie ', readoutSep: ': ' },
+    'fr': { tipDefault: 'Touchez le graphique pour voir les valeurs', seriesDefault: 'Série ', readoutSep: ': ' }
+  };
+
+  function chartStrings() {
+    var tag = String(globalThis.__polangLang || 'zh-CN');
+    return CHART_STRINGS[tag] || CHART_STRINGS[tag.split('-')[0]] || CHART_STRINGS['zh-CN'];
+  }
+
   function echartsCard(cfg) {
     cfg = cfg || {};
     // 样式解析：base < theme < cfg.style；数值字段钳制范围防脏值打爆布局。
@@ -243,9 +263,10 @@
     var smooth = !(t.smooth === false || t.smooth === 'false' || t.smooth === 0);
     var x = cfg.x || [];
     var unit = cfg.unit || '';
+    var strs = chartStrings();
     var sers = (cfg.series || []).map(function (s, i) {
       var ser = {
-        name: String(s.name == null ? ('系列' + (i + 1)) : s.name),
+        name: String(s.name == null ? (strs.seriesDefault + (i + 1)) : s.name),
         type: s.type === 'line' ? 'line' : 'bar',
         data: s.data || [],
         itemStyle: { color: s.color || palette[i % palette.length] }
@@ -293,13 +314,13 @@
       '<div style="font-family:-apple-system,\'PingFang SC\',sans-serif;background:transparent">' +
       titleHtml +
       '<div id="tip" style="font-size:12px;color:' + t.tip + ';min-height:18px;padding:0 4px 4px">' +
-      esc(cfg.tip || '点按图表查看数值') + '</div>' +
+      esc(cfg.tip || strs.tipDefault) + '</div>' +
       '<div id="c" style="width:100%;height:' + height + 'px"></div></div>' +
       '<script>(function(){var c=echarts.init(document.getElementById("c"));c.setOption(' + JSON.stringify(option) + ');' +
       'var tip=document.getElementById("tip"),def=tip.textContent,xs=' + JSON.stringify(x) + ',u=' + JSON.stringify(unit) + ';' +
       'c.on("updateAxisPointer",function(e){var i=e.dataIndexInside;if(i==null||i<0||i>=xs.length)return;' +
       'var ps=c.getOption().series.map(function(s){return s.name+" "+(s.data[i]==null?0:s.data[i])+u;});' +
-      'tip.textContent=xs[i]+"："+ps.join(" · ");});' +
+      'tip.textContent=xs[i]+' + JSON.stringify(strs.readoutSep) + '+ps.join(" · ");});' +
       'c.on("globalout",function(){tip.textContent=def;});' +
       'window.addEventListener("resize",function(){c.resize();});})();</scr' + 'ipt>';
     var parts = sers.map(function (s) {
