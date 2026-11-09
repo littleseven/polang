@@ -11,7 +11,8 @@ import com.mamba.picme.domain.search.QueryParser
  *
  * 抽离自 ChatViewModel 以便 JVM 单测（避免加载 Android 依赖）。
  * 全部基于 :shared 的 [MediaAsset]（与 MediaSearchEngine / MediaPager 一致）。
- * （Room 持久化编解码已随横滑卡退役删除——卡片消息不再产出。）
+ * （Room 持久化编解码已删除——v28 起 content 列退役；
+ *  横滑卡 2026-11-08 退役，卡片消息不再产出，MessagePart.MediaResults 同删。）
  */
 object ChatGallerySearch {
 
@@ -172,5 +173,4 @@ object ChatGallerySearch {
             locationKeywords = intent.locationKeywords.filterNot(::isTimeOnly)
         )
     }
-
 }

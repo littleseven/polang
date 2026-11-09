@@ -5,6 +5,17 @@ struct PoLangApp: App {
     @StateObject private var container = AppContainer.shared
     @StateObject private var settings = AppSettings.shared
 
+    init() {
+        // -serverAuthToken <token>：测试注入登录态（DEBUG-only；邮箱验证码流程无法全自动，
+        // token 复用生产 account 表 token_plain——test@polang.net，Android 端 debug 同源）
+        #if DEBUG
+        let launchArgs = ProcessInfo.processInfo.arguments
+        if let idx = launchArgs.firstIndex(of: "-serverAuthToken"), idx + 1 < launchArgs.count {
+            UserDefaults.standard.set(launchArgs[idx + 1], forKey: "server_auth_token")
+        }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             MainTabView()

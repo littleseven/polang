@@ -6,10 +6,11 @@ import com.mamba.picme.agent.core.facade.AgentOrchestrator
 import com.mamba.picme.agent.core.inference.remote.tool.RemoteControlToolService
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.ChatMessageDao
-import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.ChatSessionEntity
-import com.mamba.picme.data.local.insertMessageWithParts
+import com.mamba.picme.data.local.insertPartsMessage
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.ModelInputRole
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
@@ -199,15 +200,10 @@ class RemoteCommandDispatcher(
 
     private suspend fun saveUserMessage(content: String) {
         try {
-            chatMessageDao.insertMessageWithParts(
-                ChatMessageEntity(
-                    id = UUID.randomUUID().toString(),
-                    sessionId = sessionId(),
-                    type = "text",
-                    role = "user",
-                    content = content,
-                    modelUsed = null
-                )
+            chatMessageDao.insertPartsMessage(
+                sessionId = sessionId(),
+                role = ModelInputRole.USER,
+                parts = listOf(MessagePart.Text(partId = "p0", markdown = content)),
             )
             chatSessionDao.touchSession(sessionId())
         } catch (e: Exception) {
@@ -217,15 +213,11 @@ class RemoteCommandDispatcher(
 
     private suspend fun saveAgentMessage(content: String) {
         try {
-            chatMessageDao.insertMessageWithParts(
-                ChatMessageEntity(
-                    id = UUID.randomUUID().toString(),
-                    sessionId = sessionId(),
-                    type = "text",
-                    role = "agent",
-                    content = content,
-                    modelUsed = "feishu_remote"
-                )
+            chatMessageDao.insertPartsMessage(
+                sessionId = sessionId(),
+                role = ModelInputRole.ASSISTANT,
+                parts = listOf(MessagePart.Text(partId = "p0", markdown = content)),
+                modelUsed = "feishu_remote",
             )
             chatSessionDao.touchSession(sessionId())
         } catch (e: Exception) {

@@ -4,17 +4,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * part 三分类（spec §1.2）：内容物 / 工具产物 / 数据载荷。
+ * part 五分类（值域终态，spec《chat-value-domain-ideal》§3）：内容物 / 思考链 /
+ * 工具产物 / 数据载荷 / 引用来源。
  * 由子类型携带（[MessagePart.category]），代码面永不解析字符串前缀——
- * `tool_`/`data_` 前缀只是线格式设计约定 + 测试锁定。
+ * `tool_`/`data_`/`source_` 前缀只是线格式设计约定 + 测试锁定。
  */
 enum class PartCategory {
     CONTENT,
+    REASONING,
     TOOL,
     DATA,
+    SOURCE,
     ;
 
-    /** 分类的线格式名（content/tool/data），与 type 值前缀约定对应（content 类无前缀）。 */
+    /** 分类的线格式名（content/reasoning/tool/data/source），与 type 值前缀约定对应（content/reasoning 类无前缀）。 */
     val wireName: String get() = name.lowercase()
 }
 
@@ -29,8 +32,12 @@ enum class PartCategory {
  * `@Immutable` 注解不进 commonMain（ADR-013 纯度守卫禁 androidx.compose import），
  * Compose 稳定性注解属 M4 性能清单的 androidApp 侧收口。
  *
- * 序列化：kotlinx JSON（[MessagePartsCodec]），`type` 鉴别字段值遵循 10 值分类法
- * （type taxonomy spec §1），`ignoreUnknownKeys` 保证前向兼容（新版本 part 字段旧版本可读）。
+ * 序列化：kotlinx JSON（[MessagePartsCodec]），`type` 鉴别字段值遵循「4+1 分类 13 值」
+ * 终态（spec《chat-value-domain-ideal》§3）：content（text/image）+ reasoning +
+ * tool_（tool_chart/tool_html/tool_task/tool_image_edit/tool_browser）+ data_
+ * （data_optimize_candidates/data_genui_program）+ source_（source_url/source_document）
+ * 五分类，另含 tombstone 兜底值（归类 DATA）——未知/退役鉴别值解码原位落 [Tombstone]
+ * 占位（part 级前向兼容）；`ignoreUnknownKeys` 保证字段级前向兼容（新版本 part 字段旧版本可读）。
  */
 @Serializable
 sealed interface MessagePart {
@@ -39,7 +46,7 @@ sealed interface MessagePart {
      * 块级 id：消息内唯一。M4 定稿的**分轨命名空间**方案（spec §3/§10）：
      * - 瞬态轨（流式 turn，TurnPartsReducer 合成）：`txt-N`（文本块）/ `call-N`（工具块，
      *   占位原位填充 partId 不变）；
-     * - 持久轨（Room partsJson，MessagePartsConverter 合成）：`p0`/`p1`… 消息内序号。
+     * - 持久轨（Room partsJson，持久点直建）：`p0`/`p1`… 消息内序号。
      * 两轨不交叉：流式消息不落 Room，落库消息不经 reducer——同一条消息任一时刻只属于一轨，
      * 故各生命周期内 LazyColumn key（`messageId:partId`）恒定。流式→落库边界 messageId
      * 必然变更（一 turn 拆多行的持久模型使然，spec §11 不做消息树），该边界 item 重建与
@@ -48,7 +55,7 @@ sealed interface MessagePart {
     val partId: String
 
     /**
-     * part 三分类（[PartCategory]，spec §1.2）。子类 getter-only 覆盖，无后备字段 →
+     * part 五分类（[PartCategory]，值域终态 spec §3）。子类 getter-only 覆盖，无后备字段 →
      * kotlinx.serialization 不序列化本属性，线格式零变化。
      */
     val category: PartCategory
@@ -62,6 +69,23 @@ sealed interface MessagePart {
         val state: PartState = PartState.DONE,
     ) : MessagePart {
         override val category: PartCategory get() = PartCategory.CONTENT
+    }
+
+    /**
+     * 思考链文本（一等 part，2026-11-08 值域终态新增——对齐 OpenAI Responses
+     * `reasoning` item / Vercel `reasoning` part）。可折叠渲染；回灌剥离
+     * （[ChatModelInput] 丢弃规则）；生产开关默认关（extended thinking 成本/延迟
+     * 属产品决策，本值域只落类型与编解码）。[state] 沿 [Text] 两态流式口径；
+     * 排序约定：reasoning 排在 text 前。partId 分轨约定同 [partId]。
+     */
+    @Serializable
+    @SerialName("reasoning")
+    data class Reasoning(
+        override val partId: String,
+        val text: String,
+        val state: PartState = PartState.DONE,
+    ) : MessagePart {
+        override val category: PartCategory get() = PartCategory.REASONING
     }
 
     /**
@@ -113,13 +137,17 @@ sealed interface MessagePart {
     /**
      * OpenUI GenUI 卡（data part：默认不回灌 LLM，openui P1）。
      *
+     * 鉴别值 `data_genui_program`——自 `data_ui_openui` 改名（2026-11-08 值域终态，
+     * 命名规约第 2 条「禁嵌实现技术名」首次执行：OpenUI 是 GenUI 范式的技术实现，
+     * kind 用范式名 `genui`；聊天表随 v28 重置，改名零迁移成本）。
+     *
      * [program] 为 OpenUI Lang 1.0 程序原文（骨架 + Query 绑定，无数据），
      * 数据经 Query("local_handle") 端上补全（隐私闸对偶 D2/D6）。
      * [fallbackSummary] 为投影级降级摘要（云端可持有）。
      * [viewState] 为交互态（"selected=<label>"，同 part id 覆写持久化，对偶 US-7）。
      */
     @Serializable
-    @SerialName("data_ui_openui")
+    @SerialName("data_genui_program")
     data class OpenUiCard(
         override val partId: String,
         val program: String,
@@ -190,22 +218,59 @@ sealed interface MessagePart {
     }
 
     /**
-     * 前向兼容兜底 part（2026-11-08）：**读时投影，永不出现于生产写路径**。
+     * web_search 引用来源（source part，2026-11-08 值域终态新增——对齐 Vercel
+     * `source-url`）。引擎层自搜索代理结果抽取（≤5 条）挂当轮 assistant 消息；
+     * 渲染为引用 chips 行（序号 + 域名 + 落地页）；回灌剥离。正文 markdown 图链
+     * 行为不变（图=配图，chip=来源列表，职责不同）。
+     */
+    @Serializable
+    @SerialName("source_url")
+    data class SourceUrl(
+        override val partId: String,
+        val sourceId: String,
+        val url: String,
+        val title: String? = null,
+    ) : MessagePart {
+        override val category: PartCategory get() = PartCategory.SOURCE
+    }
+
+    /**
+     * 文档引用来源（source part，2026-11-08 值域终态预留——对齐 Vercel
+     * `source-document`，暂无生产者；命名规约先行占位）。
+     */
+    @Serializable
+    @SerialName("source_document")
+    data class SourceDocument(
+        override val partId: String,
+        val sourceId: String,
+        val mediaType: String,
+        val title: String,
+        val filename: String? = null,
+    ) : MessagePart {
+        override val category: PartCategory get() = PartCategory.SOURCE
+    }
+
+    /**
+     * 墓碑占位 part（2026-11-08 值域终态转正改名：前名 `Unsupported` / 鉴别值
+     * `unsupported`）：**前向兼容 + 退役 part 的可读占位——读时投影，永不出现于
+     * 生产写路径**。
      *
-     * 协议频繁演进下，旧版本读到新版本写入的未知 part 类型（或已知类型但字段损坏）时，
-     * 解码层原位合成本 part 占位——块序保住、其余 part 正常渲染、UI 落「内容不支持
-     * 请升级」默认卡（ADR-016 降级口径的广义化：不丢消息、不崩、可感知）。
+     * 两类场景解码原位落本 part：① 前向兼容——旧版本读到新版本写入的未知 part 类型
+     * （或已知类型字段损坏），块序保住、其余 part 正常渲染、UI 落「此内容需新版本
+     * App 查看」默认卡（ADR-016 降级口径的广义化：不丢消息、不崩、可感知）；② 退役
+     * 占位——已出清值域的 legacy 鉴别值（如 A2UI `data_ui`）不再单值显式拦截，
+     * 解码失败统一走本兜底。本 part 读时投影、改名零数据成本。
      *
-     * [originalType] 为原始鉴别值（如未来的 `tool_video_edit`），仅作调试/日志；
-     * [summary] 在 payload 携带可读摘要字段（fallbackSummary/summary/text）时提升。
-     * 分类归 DATA：不回灌 LLM（与 data part 默认口径一致）。
+     * [originalType] 为原始鉴别值（如未来的 `tool_video_edit` 或退役的 `data_ui`），
+     * 仅作调试/日志；[summary] 在 payload 携带可读摘要字段（fallbackSummary/summary/
+     * text/markdown）时提升。分类归 DATA：不回灌 LLM（与 data part 默认口径一致）。
      *
      * 注意：本 part 是读侧合成物，原始 payload 始终保留在 partsJson 原文中，
      * 升级新版本后同一行自动恢复为正式卡片（解码路径幂等）。
      */
     @Serializable
-    @SerialName("unsupported")
-    data class Unsupported(
+    @SerialName("tombstone")
+    data class Tombstone(
         override val partId: String,
         val originalType: String,
         val summary: String? = null,

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.MessagePartsCodec
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -62,7 +64,8 @@ class ChatSessionDaoTest {
                 id = UUID.randomUUID().toString(),
                 sessionId = "s1",
                 type = "user_text",
-                content = "hello"
+                content = "hello",
+                partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "hello")))
             )
         )
 
@@ -82,7 +85,8 @@ class ChatSessionDaoTest {
                 sessionId = sessionId,
                 type = "user_text",
                 content = "first",
-                timestamp = 1000
+                timestamp = 1000,
+                partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "first")))
             )
         )
         messageDao.insertMessage(
@@ -91,7 +95,8 @@ class ChatSessionDaoTest {
                 sessionId = sessionId,
                 type = "agent_text",
                 content = "last",
-                timestamp = 2000
+                timestamp = 2000,
+                partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "last")))
             )
         )
 

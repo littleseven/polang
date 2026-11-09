@@ -683,7 +683,7 @@ private fun ModelIndicatorChip(currentModel: ChatModelOption) {
 @Composable
 private fun FloatingChatMessageItem(message: ChatMessageUi) {
     // 🔵7（M4 review）+ spec §2：user 角色判定直接读消息级 `role` 字段——
-    // 顺带修正 USER_IMAGE_TEXT 此前被枚举遗漏而渲染为 agent 配色的漂移（对齐 ChatScreen 口径）
+    // 顺带修正 IMAGE_TEXT 此前被枚举遗漏而渲染为 agent 配色的漂移（对齐 ChatScreen 口径）
     val isUser = message.role == ModelInputRole.USER
     val bubbleColor = if (isUser) {
         MaterialTheme.colorScheme.primaryContainer

@@ -29,6 +29,7 @@ import com.mamba.picme.domain.chat.markdown.parseMarkdownTable
 import com.mamba.picme.domain.chat.markdown.previewCode
 import com.mamba.picme.domain.chat.markdown.segmentMarkdown
 import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -209,7 +210,9 @@ import com.mamba.picme.features.chat.components.BrowserLiveCard
 import com.mamba.picme.features.chat.components.ChatEmptyState
 import com.mamba.picme.features.chat.components.ChatPhotoPickerSheet
 import com.mamba.picme.features.chat.components.ChatRegistrationSheet
-import com.mamba.picme.features.chat.components.UnsupportedPartCard
+import com.mamba.picme.features.chat.components.ReasoningPartBlock
+import com.mamba.picme.features.chat.components.SourceChipsRow
+import com.mamba.picme.features.chat.components.TombstonePartCard
 import com.mamba.picme.features.chat.components.EngineerTaskCard
 import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
 import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
@@ -296,7 +299,7 @@ fun ChatScreen(
             messages,
             pendingNonCardTool,
             // browser 直播卡双显跳过的产物行锚（Task 13 新签名）：持久化 tool_browser
-            // 产物行的 sessionId 集合。读侧 decodePartsOrLegacy 自 M4 起对全部行恢复
+            // 产物行的 sessionId 集合。读侧 decodeParts 自 M4 起对全部行恢复
             // parts，故自非流式消息的 parts 提取即可；Task 16 Step 3 落
             // emitBrowserCardMessage 前无 tool_browser 行写入方，集合恒空（行为等价
             // 传空集合），emit 接线后本提取式自动生效，flattener 契约不变。
@@ -792,6 +795,25 @@ fun ChatScreen(
                                 ChatListItem.TYPE_AGENT_TEXT -> {
                                     ChatAgentTextPart(item = item, onTableClick = { table -> expandedTable = table })
                                 }
+                                ChatListItem.TYPE_REASONING -> {
+                                    // 思考链独立折叠块（值域终态 §6.1）：不进正文桶防双显；
+                                    // 生产开关默认关，本分支随历史回放/后续接线生效
+                                    val reasoning = item.part as? MessagePart.Reasoning ?: return@itemsIndexed
+                                    ReasoningPartBlock(key = item.key, text = reasoning.text)
+                                }
+                                ChatListItem.TYPE_SOURCE_CHIPS -> {
+                                    // 连续 source parts 聚合 item（值域终态 §6.2）：锚 = run 首个
+                                    // source part，组件自 message.parts 取连续段；点击系统浏览器打开落地页
+                                    val anchor = item.part ?: return@itemsIndexed
+                                    SourceChipsRow(
+                                        anchor = anchor,
+                                        parts = item.message.parts,
+                                        onOpenUrl = { url ->
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                            runCatching { context.startActivity(intent) }
+                                        },
+                                    )
+                                }
                                 ChatListItem.TYPE_TOOL_PLACEHOLDER -> {
                                     ToolStatusChip(text = stringResource(R.string.generating), isError = false)
                                 }
@@ -802,7 +824,7 @@ fun ChatScreen(
                                     ToolStatusChip(text = stringResource(R.string.chat_card_generate_failed), isError = true)
                                 }
                                 ChatListItem.TYPE_OPENUI_CARD -> {
-                                    // openui P2：data_ui_openui 卡——session 求值渲染（US-7 对偶：
+                                    // openui P2：data_genui_program 卡——session 求值渲染（US-7 对偶：
                                     // 交互态经 onViewStateChange 持久化）；handle 缺失等 → 降级占位卡
                                     val part = item.part as? MessagePart.OpenUiCard
                                     if (part != null) {
@@ -874,11 +896,11 @@ fun ChatScreen(
                                         }
                                     }
                                 }
-                                ChatListItem.TYPE_UNSUPPORTED -> {
-                                    // 前向兼容兜底卡（未知/损坏 part 原位占位：块序保住，
+                                ChatListItem.TYPE_TOMBSTONE -> {
+                                    // 前向兼容/退役兜底卡（未知/损坏/退役 part 原位占位：块序保住，
                                     // 升级新版本后同一消息自动恢复为正式卡片）
-                                    val unsupported = item.part as? MessagePart.Unsupported
-                                    UnsupportedPartCard(summary = unsupported?.summary)
+                                    val tombstone = item.part as? MessagePart.Tombstone
+                                    TombstonePartCard(summary = tombstone?.summary)
                                 }
                                 else -> {
                                     // TYPE_USER_MESSAGE / TYPE_LEGACY_MESSAGE：整消息渲染（§5 用户气泡
@@ -889,8 +911,9 @@ fun ChatScreen(
                                         onImageClick = { msg ->
                                             val pages = buildImagePreviewPages(messages)
                                             if (pages.isNotEmpty()) {
-                                                val isEdit = msg.type == ChatMessageType.AGENT_IMAGE ||
-                                                    msg.type == ChatMessageType.AGENT_EDIT_RESULT
+                                                val isEdit = (msg.type == ChatMessageType.IMAGE &&
+                                                    msg.role != ModelInputRole.USER) ||
+                                                    msg.type == ChatMessageType.EDIT_RESULT
                                                 if (isEdit) viewModel.touchEditImage(msg.imageUri)
                                                 imagePreview = ChatImagePreviewState(
                                                     pages = pages,
@@ -1676,9 +1699,9 @@ private fun ChatMessageItem(
     // 🔵7（M4 review）+ spec §2：user 角色判定直接读消息级 `role` 字段
     // （Room 行经 roleOf 解析，内存构造显式给值），不再枚举 user 类型——与 turn 边界/回灌角色同口径
     val isUser = message.role == ModelInputRole.USER
-    val isImage = message.type == ChatMessageType.AGENT_IMAGE || message.type == ChatMessageType.USER_IMAGE
-    val isImageText = message.type == ChatMessageType.USER_IMAGE_TEXT
-    val isEditResult = message.type == ChatMessageType.AGENT_EDIT_RESULT
+    val isImage = message.type == ChatMessageType.IMAGE
+    val isImageText = message.type == ChatMessageType.IMAGE_TEXT
+    val isEditResult = message.type == ChatMessageType.EDIT_RESULT
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val copySuccess = stringResource(R.string.copy_success)
@@ -1794,7 +1817,10 @@ private fun ChatMessageItem(
                     isImage -> {
                         // 显示图片（可点击进入全屏预览）；agent 生成的结果图过期则显示占位
                         val imgSrc = message.imageUri ?: message.content
-                        if (message.type == ChatMessageType.AGENT_IMAGE && !rememberChatImageIsLive(imgSrc)) {
+                        if (message.type == ChatMessageType.IMAGE &&
+                            message.role != ModelInputRole.USER &&
+                            !rememberChatImageIsLive(imgSrc)
+                        ) {
                             ExpiredImagePlaceholder()
                         } else {
                             AsyncImage(
@@ -2778,7 +2804,7 @@ data class BrowserFramePreviewState(
 data class ImagePreviewPage(
     val messageId: String,
     val rawUri: String,
-    val isEditableResult: Boolean, // AGENT_IMAGE / AGENT_EDIT_RESULT
+    val isEditableResult: Boolean, // IMAGE (agent) / EDIT_RESULT
     val isSaved: Boolean
 )
 
@@ -2792,8 +2818,8 @@ fun buildImagePreviewPages(messages: List<ChatMessageUi>): List<ImagePreviewPage
         ImagePreviewPage(
             messageId = msg.id,
             rawUri = raw,
-            isEditableResult = msg.type == ChatMessageType.AGENT_IMAGE ||
-                msg.type == ChatMessageType.AGENT_EDIT_RESULT,
+            isEditableResult = (msg.type == ChatMessageType.IMAGE && msg.role != ModelInputRole.USER) ||
+                msg.type == ChatMessageType.EDIT_RESULT,
             isSaved = msg.imageSaved
         )
     }

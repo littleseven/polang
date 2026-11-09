@@ -11,7 +11,9 @@ import com.mamba.picme.agent.core.model.context.SearchIntent
 import com.mamba.picme.agent.core.inference.remote.log.TraceIdAware
 import com.mamba.picme.agent.core.inference.remote.log.TraceIdHolder
 import com.mamba.picme.agent.core.platform.logging.Logger
+import com.mamba.picme.agent.core.capability.extractWebSearchSources
 import com.mamba.picme.agent.core.runtime.capability.CapabilityRegistry
+import com.mamba.picme.domain.chat.MessagePart
 import com.mamba.picme.agent.core.skill.AgentSkillContract
 import com.mamba.picme.agent.core.runtime.capability.CommandExecutor
 import kotlin.concurrent.Volatile
@@ -108,6 +110,17 @@ class ChatToolService private constructor() : TraceIdAware {
      * Swift 侧订阅一律用此属性；`uiActions` 保留为 Kotlin 内部发射口。
      */
     val uiActionsReadOnly: SharedFlow<AgentAction> get() = uiActions
+
+    /**
+     * web_search 结构化引用流（值域终态 source_url，spec《chat-value-domain-ideal》§6.2）：
+     * [webSearch] @Tool 成功路径自 observation（服务端紧凑 JSON）抽取 ≤5 条 (url/title)
+     * `MessagePart.SourceUrl` 发射；Android ChatViewModel collect 后喂
+     * `TurnStreamEvent.SourcesAvailable` 挂当轮 assistant 消息（正文下方 chips 行，
+     * 参照 ToolOutputAvailable 的能力执行点直喂先例，不经引擎事件流）。LLM observation
+     * 原文不变——正文 markdown 图链行为不变（图=配图，chip=来源列表）。iOS 未接
+     * web_search 工具，通道天然无发射。
+     */
+    val webSearchSources = MutableSharedFlow<List<MessagePart.SourceUrl>>(extraBufferCapacity = 4)
 
     /**
      * 当轮 traceId 持有器：由组合根自 [com.mamba.picme.agent.core.inference.remote.koog.KoogChatAgent]
@@ -400,8 +413,13 @@ class ChatToolService private constructor() : TraceIdAware {
     suspend fun webSearch(
         @LLMDescription("搜索词，1~128 字符，可带 site:/lang: 等搜索语法")
         query: String,
-    ): String =
-        dispatchCommand(AgentCommand.WebSearch(query = query), timeoutMillis = WEB_SEARCH_DISPATCH_TIMEOUT_MS)
+    ): String {
+        val observation = dispatchCommand(AgentCommand.WebSearch(query = query), timeoutMillis = WEB_SEARCH_DISPATCH_TIMEOUT_MS)
+        // source 抽取（值域终态 §6.2）：成功路径 observation = 服务端紧凑 JSON；降级文本
+        //（[WEB_SEARCH_*] 前缀）解析失败自然得空列表不发。observation 原文照返 LLM 不变。
+        extractWebSearchSources(observation).takeIf { it.isNotEmpty() }?.let(webSearchSources::tryEmit)
+        return observation
+    }
 
     // ── 技能（Skill 中心，经 picme-server /v1/skills 同步本地缓存） ──
 

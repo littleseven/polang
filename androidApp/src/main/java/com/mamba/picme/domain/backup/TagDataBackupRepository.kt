@@ -13,8 +13,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.mamba.picme.data.local.AppDatabase
 import com.mamba.picme.data.local.ChatMessageDao
-import com.mamba.picme.data.local.ChatMessageEntity
-import com.mamba.picme.data.local.insertMessagesWithParts
 import com.mamba.picme.data.local.ChatSessionDao
 import com.mamba.picme.data.local.ChatSessionEntity
 import com.mamba.picme.data.local.MediaDao
@@ -61,7 +59,7 @@ import com.mamba.picme.domain.backup.model.BackupPreferences
 import com.mamba.picme.domain.backup.model.BackupTag
 import com.mamba.picme.domain.backup.model.BackupTagScanTask
 import com.mamba.picme.domain.backup.model.TagDataBackup
-import com.mamba.picme.domain.chat.LegacyChatTypeMigration
+import com.mamba.picme.data.local.insertPartsMessages
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
@@ -304,7 +302,8 @@ class TagDataBackupRepository(
                 timestamp = it.timestamp,
                 modelUsed = it.modelUsed,
                 metadata = it.metadata,
-                role = it.role
+                role = it.role,
+                partsJson = it.partsJson
             )
         }
 
@@ -731,32 +730,18 @@ class TagDataBackupRepository(
                     )
                 )
             }
+            var restoredChatMessageCount = 0
             if (backup.chatMessages.isNotEmpty()) {
+                // 版本门禁分流（备份 v6，spec《chat-value-domain-ideal》§4 第 3 条）：
+                // v6+ 包 partsJson 直通（Room parts-first 列原值，缺失/损坏行降级兜底）；
+                // v5 及以下旧包经备份模块内一次性粗映射表自标量列物化（终态值直通 /
+                // legacy 映射 / 退役卡 Tombstone / 不可识别跳过行）——粗映射只活在
+                // [BackupChatRestoreMapper]，运行时零 legacy 知识。
+                val v6OrLater = backup.version >= TagDataBackup.CURRENT_VERSION
                 backup.chatMessages.chunked(500).forEach { chunk ->
-                    // 备份恢复双分支（spec §6 消费者表）：新备份（type 已是新 8 值）直通，
-                    // role 缺省补 agent 安全网；旧备份（旧分类法导出，type 为 legacy 13 值）
-                    // 经唯一映射知识库 [LegacyChatTypeMigration] 转正。随后统一走 insertMessagesWithParts：
-                    // withPartsJson 用纯净化转换器在新 (type, role) 上现算 partsJson，
-                    // 与迁移产物零逻辑重复（旧备份不含 partsJson：从 legacy 列现算回填）。
-                    chatMessageDao.insertMessagesWithParts(
-                        chunk.map { msg ->
-                            val row = if (msg.type in LegacyChatTypeMigration.NEW_TYPES) {
-                                LegacyChatTypeMigration.MigratedRow(msg.type, msg.role ?: "agent", emptyList())
-                            } else {
-                                LegacyChatTypeMigration.map(msg.type, msg.content, msg.metadata)
-                            }
-                            ChatMessageEntity(
-                                id = msg.id,
-                                sessionId = msg.sessionId,
-                                type = row.type,
-                                role = row.role,
-                                content = msg.content,
-                                timestamp = msg.timestamp,
-                                modelUsed = msg.modelUsed,
-                                metadata = msg.metadata
-                            )
-                        }
-                    )
+                    val rows = chunk.mapNotNull { msg -> BackupChatRestoreMapper.mapRow(msg, v6OrLater) }
+                    chatMessageDao.insertPartsMessages(rows)
+                    restoredChatMessageCount += rows.size
                 }
             }
 
@@ -804,7 +789,7 @@ class TagDataBackupRepository(
                 restoredMediaFeedbackCount = restoredMediaFeedbackCount,
                 restoredPreferenceCount = 0, // 在 SQLite 事务外恢复
                 restoredChatSessionCount = backup.chatSessions.size,
-                restoredChatMessageCount = backup.chatMessages.size,
+                restoredChatMessageCount = restoredChatMessageCount,
                 restoredPersonRelationCount = restoredPersonRelationCount,
                 restoredMemoryFactCount = restoredMemoryFactCount,
                 restoredPhotoEditRecipeCount = backup.photoEditRecipes.size

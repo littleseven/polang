@@ -138,6 +138,38 @@ class MessagePartsCodecTest {
     }
 
     @Test
+    fun `reasoning part round-trips`() {
+        // 值域终态新增（2026-11-08）：思考链一等 part，两态流式口径同 Text
+        val parts = listOf(
+            MessagePart.Reasoning("p0", "先查时间范围再过滤人脸", PartState.DONE),
+            MessagePart.Reasoning("p1", "流式思考中", PartState.STREAMING),
+        )
+        assertEquals(parts, decode(encode(parts)))
+    }
+
+    @Test
+    fun `source parts round-trip`() {
+        // 值域终态新增（2026-11-08）：web_search 引用 + 文档引用（预留）
+        val parts = listOf(
+            MessagePart.SourceUrl(
+                partId = "p0",
+                sourceId = "src-1",
+                url = "https://example.com/article",
+                title = "示例文章",
+            ),
+            MessagePart.SourceUrl(partId = "p1", sourceId = "src-2", url = "https://example.com", title = null),
+            MessagePart.SourceDocument(
+                partId = "p2",
+                sourceId = "doc-1",
+                mediaType = "application/pdf",
+                title = "季度报告",
+                filename = "report.pdf",
+            ),
+        )
+        assertEquals(parts, decode(encode(parts)))
+    }
+
+    @Test
     fun `decode returns null for blank or malformed json`() {
         assertNull(MessagePartsCodec.decode(null))
         assertNull(MessagePartsCodec.decode(""))
@@ -147,12 +179,12 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `decode falls back to Unsupported part for unknown discriminator`() {
-        // 前向兼容兜底（2026-11-08）：未知 part 类型原位落 Unsupported 占位——
-        // 不再整条 null 拖垮同消息其它 part；原始 payload 留在 partsJson 原文，
-        // 升级新版本后同一行自动恢复为正式卡片
-        val parts = assertNotNull(MessagePartsCodec.decode("""[{"type":"future_part","partId":"p0"}]"""))
-        assertEquals(listOf(MessagePart.Unsupported("p0", originalType = "future_part")), parts)
+    fun `decode falls back to Tombstone part for future discriminator`() {
+        // 前向兼容兜底钉（值域终态 spec §5）：伪造未来鉴别值 data_future_x 原位落
+        // Tombstone 占位（originalType 保留原值）——不再整条 null 拖垮同消息其它
+        // part；原始 payload 留在 partsJson 原文，升级新版本后同一行自动恢复为正式卡片
+        val parts = assertNotNull(MessagePartsCodec.decode("""[{"type":"data_future_x","partId":"p0"}]"""))
+        assertEquals(listOf(MessagePart.Tombstone("p0", originalType = "data_future_x")), parts)
     }
 
     @Test
@@ -169,15 +201,15 @@ class MessagePartsCodecTest {
         assertEquals(3, parts.size)
         assertEquals(MessagePart.Text("p0", "前文", PartState.DONE), parts[0])
         assertEquals(
-            MessagePart.Unsupported("p1", originalType = "tool_video_edit", summary = "视频编辑结果"),
+            MessagePart.Tombstone("p1", originalType = "tool_video_edit", summary = "视频编辑结果"),
             parts[1],
         )
         assertEquals(MessagePart.Text("p2", "后文", PartState.DONE), parts[2])
     }
 
     @Test
-    fun `decode falls back to Unsupported for corrupted known part`() {
-        // 已知类型字段损坏（markdown 缺失）：同样原位 Unsupported，不拖垮整条消息
+    fun `decode falls back to Tombstone for corrupted known part`() {
+        // 已知类型字段损坏（markdown 缺失）：同样原位 Tombstone，不拖垮整条消息
         val partsJson = """
             [
               {"type":"text","partId":"p0","state":"DONE"},
@@ -186,28 +218,28 @@ class MessagePartsCodecTest {
         """.trimIndent()
         val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
         assertEquals(2, parts.size)
-        assertEquals(MessagePart.Unsupported("p0", originalType = "text"), parts[0])
+        assertEquals(MessagePart.Tombstone("p0", originalType = "text"), parts[0])
         assertEquals(MessagePart.Text("p1", "存活", PartState.DONE), parts[1])
     }
 
     @Test
-    fun `unsupported part synthesizes partId from index when missing`() {
+    fun `tombstone part synthesizes partId from index when missing`() {
         val parts = assertNotNull(MessagePartsCodec.decode("""[{"type":"future_part"}]"""))
-        assertEquals(MessagePart.Unsupported("p0", originalType = "future_part"), parts.single())
+        assertEquals(MessagePart.Tombstone("p0", originalType = "future_part"), parts.single())
     }
 
     @Test
     fun `decode tolerates pathological non-primitive type value`() {
-        // 病态 payload（type 为数组/对象）：as? 安全形态不抛，落 Unsupported
+        // 病态 payload（type 为数组/对象）：as? 安全形态不抛，落 Tombstone
         val parts = assertNotNull(MessagePartsCodec.decode("""[{"type":["x"],"partId":"p0"}]"""))
-        assertEquals(MessagePart.Unsupported("p0", originalType = "unknown"), parts.single())
+        assertEquals(MessagePart.Tombstone("p0", originalType = "unknown"), parts.single())
     }
 
     @Test
-    fun `unsupported part round-trips through encode`() {
-        // 幂等：Unsupported 自身是合法鉴别值（防意外持久化后再读炸）；
-        // 生产写路径永不产生 Unsupported（读时投影，原始 payload 保留）
-        val parts = listOf(MessagePart.Unsupported("p0", originalType = "tool_future", summary = "摘要"))
+    fun `tombstone part round-trips through encode`() {
+        // 幂等：Tombstone 自身是合法鉴别值（防意外持久化后再读炸）；
+        // 生产写路径永不产生 Tombstone（读时投影，原始 payload 保留）
+        val parts = listOf(MessagePart.Tombstone("p0", originalType = "tool_future", summary = "摘要"))
         assertEquals(parts, decode(encode(parts)))
     }
 
@@ -222,29 +254,31 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `legacy data_ui part tombstones to readable text`() {
-        // A2UI 已退役（openui-sole-genui，MessagePart.A2uiCard 已删除）：显式 type 拦截——
-        // data_ui 已非合法鉴别值，正常解码必失败；墓碑提升 fallbackSummary 为可读文本，不丢消息
+    fun `legacy data_ui value falls to Tombstone without text promotion`() {
+        // A2UI legacy 机器出清（2026-11-08 值域终态）：`data_ui` 不再显式拦截提升
+        // fallbackSummary 为 Text——未知/退役鉴别值统一走 Tombstone 兜底
+        //（可读摘要仍提升进 summary 字段）
         val partsJson = """
             [
               {"type":"text","partId":"p0","markdown":"前后的文本","state":"DONE"},
               {"type":"data_ui","partId":"p1","surfaceId":"s1","messagesJson":"[]","fallbackSummary":"3 月的照片统计"},
-              {"type":"data_ui_openui","partId":"p2","program":"root = Markdown(\"hi\")","fallbackSummary":"卡"}
+              {"type":"data_genui_program","partId":"p2","program":"root = Markdown(\"hi\")","fallbackSummary":"卡"}
             ]
         """.trimIndent()
         val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
         assertEquals(3, parts.size)
-        assertEquals(MessagePart.Text("p1", "3 月的照片统计", PartState.DONE), parts[1])
+        assertEquals(MessagePart.Tombstone("p1", originalType = "data_ui", summary = "3 月的照片统计"), parts[1])
         assertIs<MessagePart.OpenUiCard>(parts[2])
     }
 
     @Test
-    fun `legacy data_ui without summary falls back to tombstone marker`() {
+    fun `legacy data_ui without summary falls to bare Tombstone`() {
+        // 旧断言（提升 fallbackSummary → Text）随墓碑拦截删除改写：摘要缺失落裸 Tombstone
         val partsJson =
             """[{"type":"data_ui","partId":"p1","surfaceId":"s","messagesJson":"[]","fallbackSummary":""}]"""
         val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
         assertEquals(
-            MessagePart.Text("p1", MessagePartsConverter.LEGACY_CARD_TOMBSTONE, PartState.DONE),
+            MessagePart.Tombstone("p1", originalType = "data_ui", summary = null),
             parts.single(),
         )
     }
@@ -254,7 +288,7 @@ class MessagePartsCodecTest {
         val partsJson = """[{"type":"data_ui","fallbackSummary":"x"}]"""
         val parts = assertNotNull(MessagePartsCodec.decode(partsJson))
         assertEquals(
-            MessagePart.Text("p0", "x", PartState.DONE),
+            MessagePart.Tombstone("p0", originalType = "data_ui", summary = "x"),
             parts.single(),
         )
     }
@@ -267,26 +301,28 @@ class MessagePartsCodecTest {
     }
 
     @Test
-    fun `sealed descriptor locks the 10-value taxonomy`() {
+    fun `sealed descriptor locks the 13-value terminal taxonomy`() {
         // kotlinx.serialization 1.10.0 起 sealed 描述符为 {type, value} 两元素包装，
         // 子类描述符收纳在 "value"（CONTEXTUAL kotlinx.serialization.Sealed<...>）内层——
         // 外层 elementsCount 恒为 2，须下沉一层枚举子类 @SerialName。
-        // 11→10（2026-11-08 两线合并）：data_media_results 横滑相册卡退役 -1（存量行由
-        // LegacyChatTypeMigration.RETIRED_MEDIA_RESULTS_TYPES 行级过滤，不进 codec）；
-        // Unsupported 前向兼容占位 +1（main f1b80163e）。
+        // 10→13（2026-11-08 值域终态）：+reasoning/source_url/source_document 三新 part；
+        // `unsupported` 随转正改名 `tombstone`；`data_ui_openui` 改名 `data_genui_program`
+        //（命名规约第 2 条「禁嵌实现技术名」首次执行）。
         val sealed = MessagePart.serializer().descriptor.getElementDescriptor(1)
-        assertEquals(10, sealed.elementsCount)
+        assertEquals(13, sealed.elementsCount)
         val serialNames = (0 until sealed.elementsCount)
             .map { sealed.getElementDescriptor(it).serialName }
             .toSet()
         assertEquals(
             setOf(
                 "text", "image",
+                "reasoning",
                 "tool_chart", "tool_html", "tool_task", "tool_image_edit", "tool_browser",
-                "data_optimize_candidates", "data_ui_openui",
-                // 保留降级鉴别值（2026-11-08）：读时投影兜底，永不出现于生产写路径，
-                // 不携 content/tool/data 前缀（同 data_ui 墓碑先例的约定外保留值）
-                "unsupported",
+                "data_optimize_candidates", "data_genui_program",
+                "source_url", "source_document",
+                // 兜底鉴别值（读时投影，永不出现于生产写路径；归类 DATA 但不携前缀——
+                // 同旧 `unsupported` 先例的约定外保留值）
+                "tombstone",
             ),
             serialNames,
         )
@@ -294,10 +330,15 @@ class MessagePartsCodecTest {
 
     @Test
     fun `serial name prefix matches declared category`() {
-        // wireName 钉桩：category → 线格式命名空间（content/tool/data），与 type 前缀约定对应
-        assertEquals(listOf("content", "tool", "data"), PartCategory.entries.map { it.wireName })
+        // wireName 钉桩：category → 线格式命名空间（content/reasoning/tool/data/source），
+        // 与 type 前缀约定对应（content/reasoning 类 bare 无前缀）
+        assertEquals(
+            listOf("content", "reasoning", "tool", "data", "source"),
+            PartCategory.entries.map { it.wireName },
+        )
         val parts: List<MessagePart> = listOf(
             MessagePart.Text("p0", "hi"),
+            MessagePart.Reasoning("p0", "思考"),
             MessagePart.Image("p0", ref = "u"),
             MessagePart.Chart("p0", svg = "<svg/>"),
             MessagePart.HtmlCard("p0", html = "<html/>"),
@@ -320,18 +361,25 @@ class MessagePartsCodecTest {
                     usedFingerprints = emptyList(),
                 ),
             ),
+            MessagePart.SourceUrl("p0", sourceId = "src-1", url = "https://example.com"),
+            MessagePart.SourceDocument("p0", sourceId = "doc-1", mediaType = "application/pdf", title = "报告"),
         )
         parts.forEach { part ->
             val json = MessagePartsCodec.encode(listOf(part))
             val expectedPrefix = when (part.category) {
-                PartCategory.CONTENT -> null
+                PartCategory.CONTENT, PartCategory.REASONING -> null
                 PartCategory.TOOL -> "\"type\":\"tool_"
                 PartCategory.DATA -> "\"type\":\"data_"
+                PartCategory.SOURCE -> "\"type\":\"source_"
             }
             if (expectedPrefix != null) assertTrue(json.contains(expectedPrefix), "$json should carry prefix for $part")
-            // content 类反锁：不得带保留前缀
-            if (part.category == PartCategory.CONTENT) {
-                assertTrue(!json.contains("\"type\":\"tool_") && !json.contains("\"type\":\"data_"))
+            // bare 类（content/reasoning）反锁：不得带保留前缀
+            if (part.category == PartCategory.CONTENT || part.category == PartCategory.REASONING) {
+                assertTrue(
+                    !json.contains("\"type\":\"tool_") &&
+                        !json.contains("\"type\":\"data_") &&
+                        !json.contains("\"type\":\"source_"),
+                )
             }
             // category 是纯代码面属性：getter-only 无后备字段，不得泄漏进线格式
             assertFalse(json.contains("category"), "$json must not carry category field")

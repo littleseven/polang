@@ -33,6 +33,28 @@ sealed interface TurnStreamEvent {
     /** 文本块完结（state → DONE）。DONE 后的块不再接受 Delta（reducer 忽略）。 */
     data class TextEnd(val partId: String) : TurnStreamEvent
 
+    /**
+     * 思考链块开始（一轮 LLM 的 extended thinking 段，先于正文 text 流出；值域终态
+     * spec §6.1）。块 id 命名 `rsn-N`（[ChatStreamTurnAdapter] 合成）；同 partId 重复
+     * Start 幂等。**生产开关默认关**——事件族先行落地，Koog 链路接线就位后由模型配置
+     * 决定是否实际产出（RemoteModelFactory thinking=disabled 注入不变）。
+     */
+    data class ReasoningStart(val partId: String) : TurnStreamEvent
+
+    /** 思考链增量（追加到 [partId] 块尾部；装配恒排在 text 前，spec §6.1 排序规则）。 */
+    data class ReasoningDelta(val partId: String, val delta: String) : TurnStreamEvent
+
+    /** 思考链块完结（state → DONE）。DONE 后的块不再接受 Delta（reducer 忽略）。 */
+    data class ReasoningEnd(val partId: String) : TurnStreamEvent
+
+    /**
+     * web_search 引用就绪（值域终态 spec §6.2）：SourceUrl parts 挂当轮 assistant
+     * 消息尾部（正文下方 chips 行）。partId 由 reducer 统一重编（`src-N`）；发射方
+     * 只保证 sourceId/url/title 语义。不经引擎事件流——参照 [ToolOutputAvailable]
+     * 的能力执行点直喂先例（ChatToolService.webSearchSources 通道）。
+     */
+    data class SourcesAvailable(val sources: List<MessagePart.SourceUrl>) : TurnStreamEvent
+
     /** 工具调用开始：即插入占位 part（骨架/进度，spec §4 卡片占位契约）。 */
     data class ToolInputStart(val toolCallId: String, val toolName: String) : TurnStreamEvent
 

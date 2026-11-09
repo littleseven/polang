@@ -3,6 +3,9 @@ package com.mamba.picme.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.MessagePartsCodec
+import com.mamba.picme.domain.chat.PartState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -36,7 +39,10 @@ class ChatMessageDaoTest {
         type: String,
         role: String = "agent",
         timestamp: Long,
-    ) = ChatMessageEntity(id = id, sessionId = sessionId, type = type, role = role, content = "x", timestamp = timestamp)
+    ) = ChatMessageEntity(
+        id = id, sessionId = sessionId, type = type, role = role, content = "x", timestamp = timestamp,
+        partsJson = MessagePartsCodec.encode(listOf(MessagePart.Text("p0", "x", PartState.DONE))),
+    )
 
     @Test
     fun `getTaskCardMessages returns only tool_task rows newest first`() = runTest {

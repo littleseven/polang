@@ -341,6 +341,11 @@ class RemoteChatEngine internal constructor(
                         // M4：显式轮边界（spec §10 收口），turn 装配器替代快照差分猜测
                         onEvent?.invoke(ChatStreamEvent.RoundStarted)
                     },
+                    // 值域终态 §6.1：思考链累计快照 → turn 装配器差分为 Reasoning 三段式
+                    //（生产开关默认关：thinking=disabled，模型不产出 reasoning 帧）
+                    onReasoning = { snapshot ->
+                        onEvent?.invoke(ChatStreamEvent.ReasoningSnapshot(snapshot))
+                    },
                     toolSetOverride = toolSetOverride,
                 )
             }

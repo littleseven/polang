@@ -2,6 +2,10 @@ package com.mamba.picme.core.agenttools
 
 import com.mamba.picme.data.local.ChatMessageEntity
 import com.mamba.picme.data.local.toModelInputItems
+import com.mamba.picme.domain.backup.BackupChatRestoreMapper
+import com.mamba.picme.domain.backup.model.BackupChatMessage
+import com.mamba.picme.domain.chat.MessagePart
+import com.mamba.picme.domain.chat.MessagePartsCodec
 import com.mamba.picme.domain.chat.ModelInputItem
 import com.mamba.picme.domain.chat.ModelInputRole
 import org.junit.Assert.assertEquals
@@ -12,7 +16,9 @@ import org.junit.Test
  * 文本消息按消息级 role 标注 user/agent；卡片/数据块按 §6 显式转换——语义差为
  * spec 显式决策，逐条钉在本测试里）。
  *
- * Room v26 起 type 为新 8 值、role 独立列；此处直接构造新分类法行。
+ * D1a（2026-11-08）parts-first：行构造携带 partsJson（权威列）；parts 经
+ * [BackupChatRestoreMapper]（v5 备份粗映射，converter 退役后的唯一标量→parts
+ * 物化点）自标量列物化，镜像备份恢复路径产物。
  */
 class ChatHistoryModelInputTest {
 
@@ -26,6 +32,7 @@ class ChatHistoryModelInputTest {
         metadata: String? = null,
         role: String = "agent",
         id: String = "m-$type",
+        parts: List<MessagePart>? = null,
     ) = ChatMessageEntity(
         id = id,
         sessionId = "s",
@@ -34,7 +41,31 @@ class ChatHistoryModelInputTest {
         content = content,
         timestamp = 1L,
         metadata = metadata,
+        partsJson = MessagePartsCodec.encode(
+            parts ?: materializedParts(id, type, content, metadata, role),
+        ),
     )
+
+    /** 标量行 → parts：走 v5 备份粗映射物化（不可识别旧值会跳过，fixture 须可物化）。 */
+    private fun materializedParts(
+        id: String,
+        type: String,
+        content: String,
+        metadata: String?,
+        role: String,
+    ): List<MessagePart> =
+        BackupChatRestoreMapper.mapRow(
+            BackupChatMessage(
+                id = id,
+                sessionId = "s",
+                type = type,
+                content = content,
+                timestamp = 1L,
+                metadata = metadata,
+                role = role,
+            ),
+            v6OrLater = false,
+        )?.parts ?: error("fixture row not materializable: $type")
 
     @Test
     fun `text rows replay as user or agent by role column`() {
@@ -86,10 +117,10 @@ class ChatHistoryModelInputTest {
     }
 
     @Test
-    fun `legacy stray types fall back to text part and label by role column`() {
-        // 防御路径：未经迁移的 legacy 残留 type（如旧 command）行级兜底为原文 Text part，
-        // 回灌标签取 role 列（旧 13 值里 command/plan_preview 均为 agent 侧）——
-        // 正常链路下 Room v26 迁移已把它们改写为 text+agent
+    fun `legacy stray types alias to text part and label by role column`() {
+        // 备份粗映射路径：legacy 杂值（command/plan_preview）经别名表直通 text part，
+        // 回灌标签取 role 列——运行时 Room v28 重置后不再产生此类行，此断言钉
+        // 备份 v5 恢复的文本类直通分支
         val pairs = newPairs(
             listOf(
                 entity("command", "search:猫", id = "r1"),
@@ -108,15 +139,19 @@ class ChatHistoryModelInputTest {
             listOf(
                 entity("text", "看图", role = "user", id = "d1"),
                 entity("image", "/data/img.jpg", role = "user", id = "d2"),
+                // 未知 part 的前向兼容兜底在 codec 解码侧（partsJson 逐 part Tombstone，
+                // 摘要提升），回灌剥离——v5 粗映射遇未知 type 整行跳过，不经此分支
                 entity(
-                    "data_media_results",
-                    """[{"id":1,"uri":"u","type":"PHOTO","captureDate":1,"fileName":"f"}]""",
+                    "data_future_blob",
+                    """{"type":"data_future_blob","partId":"p0","fallbackSummary":"未来卡"}""",
                     id = "d3",
+                    parts = listOf(MessagePart.Tombstone("p0", originalType = "data_future_blob", summary = "未来卡")),
                 ),
                 entity("tool_image_edit", "已提亮", """{"imageUri":"/i.jpg"}""", id = "d4"),
             ),
         )
-        // data part 不进上下文；用户图片回灌占位文本、编辑结果回灌文字说明
+        // data part 不进上下文（Tombstone 占位，回灌剥离）；用户图片回灌占位文本、
+        // 编辑结果回灌文字说明
         assertEquals(
             listOf(
                 "user" to "看图",

@@ -12,16 +12,13 @@ class ImagePreviewPagesBuilderTest {
     private fun msg(
         id: String,
         imageUri: String? = null,
-        type: ChatMessageType = ChatMessageType.AGENT_IMAGE,
-        saved: Boolean = false
+        type: ChatMessageType = ChatMessageType.IMAGE,
+        saved: Boolean = false,
+        role: ModelInputRole = ModelInputRole.ASSISTANT
     ) = ChatMessageUi(
         id = id,
         type = type,
-        role = if (type == ChatMessageType.USER_IMAGE || type == ChatMessageType.USER_IMAGE_TEXT) {
-            ModelInputRole.USER
-        } else {
-            ModelInputRole.ASSISTANT
-        },
+        role = role,
         content = "",
         imageUri = imageUri,
         imageSaved = saved
@@ -30,10 +27,10 @@ class ImagePreviewPagesBuilderTest {
     @Test
     fun `filters to image-bearing messages and preserves order`() {
         val messages = listOf(
-            msg("t1", type = ChatMessageType.USER_TEXT),
-            msg("u1", imageUri = "content://a", type = ChatMessageType.USER_IMAGE),
-            msg("a1", imageUri = "file://edited1", type = ChatMessageType.AGENT_EDIT_RESULT),
-            msg("t2", type = ChatMessageType.AGENT_TEXT)
+            msg("t1", type = ChatMessageType.TEXT, role = ModelInputRole.USER),
+            msg("u1", imageUri = "content://a", type = ChatMessageType.IMAGE, role = ModelInputRole.USER),
+            msg("a1", imageUri = "file://edited1", type = ChatMessageType.EDIT_RESULT),
+            msg("t2", type = ChatMessageType.TEXT)
         )
         val pages = buildImagePreviewPages(messages)
         assertEquals(2, pages.size)
@@ -42,12 +39,14 @@ class ImagePreviewPagesBuilderTest {
     }
 
     @Test
-    fun `editable result flag only for agent_image and agent_edit_result`() {
+    fun `editable result flag only for agent image and edit result`() {
+        // 纯 kind 口径（D2a）：agent 结果图（IMAGE + role=agent）与 EDIT_RESULT 可编辑，
+        // 用户自己发的图（IMAGE + role=user）不算结果图
         val pages = buildImagePreviewPages(
             listOf(
-                msg("u1", imageUri = "content://a", type = ChatMessageType.USER_IMAGE),
-                msg("a1", imageUri = "file://e1", type = ChatMessageType.AGENT_EDIT_RESULT),
-                msg("a2", imageUri = "file://e2", type = ChatMessageType.AGENT_IMAGE)
+                msg("u1", imageUri = "content://a", type = ChatMessageType.IMAGE, role = ModelInputRole.USER),
+                msg("a1", imageUri = "file://e1", type = ChatMessageType.EDIT_RESULT),
+                msg("a2", imageUri = "file://e2", type = ChatMessageType.IMAGE)
             )
         )
         assertEquals(false, pages[0].isEditableResult)
@@ -58,7 +57,7 @@ class ImagePreviewPagesBuilderTest {
     @Test
     fun `isSaved carried from message`() {
         val pages = buildImagePreviewPages(
-            listOf(msg("a1", imageUri = "file://e1", type = ChatMessageType.AGENT_EDIT_RESULT, saved = true))
+            listOf(msg("a1", imageUri = "file://e1", type = ChatMessageType.EDIT_RESULT, saved = true))
         )
         assertTrue(pages[0].isSaved)
     }
@@ -67,9 +66,9 @@ class ImagePreviewPagesBuilderTest {
     fun `clicked index resolved within filtered list`() {
         val pages = buildImagePreviewPages(
             listOf(
-                msg("u1", imageUri = "content://a", type = ChatMessageType.USER_IMAGE),
-                msg("a1", imageUri = "file://e1", type = ChatMessageType.AGENT_EDIT_RESULT),
-                msg("a2", imageUri = "file://e2", type = ChatMessageType.AGENT_IMAGE)
+                msg("u1", imageUri = "content://a", type = ChatMessageType.IMAGE, role = ModelInputRole.USER),
+                msg("a1", imageUri = "file://e1", type = ChatMessageType.EDIT_RESULT),
+                msg("a2", imageUri = "file://e2", type = ChatMessageType.IMAGE)
             )
         )
         assertEquals(1, indexOfPage(pages, "a1"))
@@ -77,13 +76,15 @@ class ImagePreviewPagesBuilderTest {
 
     @Test
     fun `clicked id not found yields index zero`() {
-        val pages = buildImagePreviewPages(listOf(msg("u1", imageUri = "content://a", type = ChatMessageType.USER_IMAGE)))
+        val pages = buildImagePreviewPages(
+            listOf(msg("u1", imageUri = "content://a", type = ChatMessageType.IMAGE, role = ModelInputRole.USER))
+        )
         assertEquals(0, indexOfPage(pages, "missing"))
     }
 
     @Test
     fun `empty when no image messages`() {
-        val pages = buildImagePreviewPages(listOf(msg("t1", type = ChatMessageType.USER_TEXT)))
+        val pages = buildImagePreviewPages(listOf(msg("t1", type = ChatMessageType.TEXT, role = ModelInputRole.USER)))
         assertTrue(pages.isEmpty())
     }
 }

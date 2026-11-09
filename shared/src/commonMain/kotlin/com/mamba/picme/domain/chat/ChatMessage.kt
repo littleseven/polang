@@ -19,6 +19,7 @@ import kotlinx.serialization.Serializable
  */
 data class ChatMessage(
     val id: String,
+    /** 渲染 kind（纯 kind 枚举，D2a 9 值）；role 由 [role] 独立承载，Room `type` 列写 wire 字符串不经 [ChatMessageType]。 */
     val type: ChatMessageType,
     val content: String,
     /**
@@ -30,13 +31,13 @@ data class ChatMessage(
     val modelUsed: String? = null,
     val timestamp: Long = nowEpochMillis(),
     val performance: LlmPerformance? = null,
-    /** 图文混排（USER_IMAGE_TEXT）时携带的图片 uri；其余类型为 null。 */
+    /** 图文混排（IMAGE_TEXT）时携带的图片 uri；其余类型为 null。 */
     val imageUri: String? = null,
     /** CHART 类型：端侧生成的 SVG 字符串。 */
     val chartSvg: String? = null,
     /** HTML_CARD 类型：自包含 HTML 字符串（已清洗，离线 WebView 渲染）。 */
     val htmlContent: String? = null,
-    /** agent_image / agent_edit_result 是否已保存到相册。 */
+    /** 图片类消息（IMAGE / EDIT_RESULT）是否已保存到相册。 */
     val imageSaved: Boolean = false,
     /** 流式输出中的瞬态消息（不落库）。 */
     val isStreaming: Boolean = false,

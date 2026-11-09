@@ -60,7 +60,7 @@ import com.mamba.picme.data.model.MediaEntity
         UserTaskEntity::class,
         LocalHandleEntity::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -103,7 +103,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
                         MIGRATION_23_24, MIGRATION_24_25,
-                        MIGRATION_25_26, MIGRATION_26_27
+                        MIGRATION_25_26, MIGRATION_26_27,
+                        MIGRATION_27_28
                     )
                     .build()
                 INSTANCE = instance
@@ -526,29 +527,27 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * Migration 24 → 25：chat_messages 新增 partsJson 列（ADR-016 M1 parts 模型双写过渡）。
+         * Migration 24 → 25：chat_messages 新增 partsJson 列（ADR-016 M1 parts 模型）。
          *
-         * 列名随 Room 属性名（本表列均为 camelCase：sessionId/modelUsed/metadata）。
-         * 存量行逐行回填 parts JSON（legacy type+content+metadata → parts 文档，
-         * 转换逻辑收口 [backfillChatMessageParts]，单行失败降级 Text 原文兜底，不丢消息）；
-         * 旧列保留不删（双读双写过渡，回退安全）。
+         * 仅保留 ADD COLUMN DDL 保证升级链不断——原存量回填（legacy 标量 → parts）数据工作
+         * 已随 v28 聊天表重置出清（2026-11-08 值域终态）：老聊天行在 27→28 即被丢弃，
+         * 中间版本的 partsJson 内容不再有任何读者。
          */
         internal val MIGRATION_24_25 = object : Migration(24, 25) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `chat_messages` ADD COLUMN `partsJson` TEXT")
-                backfillChatMessageParts(database)
             }
         }
 
         /**
-         * Migration 25 → 26：chat_messages 新增 role 列 + 存量行 type/role/partsJson 一次改写
-         * （spec §2 role 升格；legacy 13 值 → 新 8 值）。两段在同一 migrate() 内 = Room 单事务。
-         * DEFAULT 'agent' 仅为 ALTER TABLE 安全网，写路径均显式赋值（Task 6 接线）。
+         * Migration 25 → 26：chat_messages 新增 role 列（spec §2 role 升格）。
+         *
+         * 仅保留 ADD COLUMN DDL——原存量 type/role/partsJson 全量改写（legacy 13 值映射）
+         * 已随 v28 聊天表重置出清。DEFAULT 'agent' 仅为 ALTER TABLE 安全网。
          */
         internal val MIGRATION_25_26 = object : Migration(25, 26) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `chat_messages` ADD COLUMN `role` TEXT NOT NULL DEFAULT 'agent'")
-                migrateChatMessageTypes(database)
             }
         }
 
@@ -565,6 +564,55 @@ abstract class AppDatabase : RoomDatabase() {
                         `domain` TEXT NOT NULL,
                         `payloadJson` TEXT NOT NULL,
                         `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /**
+         * Migration 27 → 28：chat 值域终态聊天表重置（spec《chat-value-domain-ideal》§4，
+         * 2026-11-08 用户裁决「不在乎聊天历史债」）。
+         *
+         * - `chat_sessions` / `chat_messages` **DROP + 按 v28 Entity 现状重建**（partsJson
+         *   非空、type/content/metadata 为派生投影列）——聊天历史清零，legacy 13 值行、
+         *   退役横滑卡行、A2UI 墓碑行随表消亡，双端回放过滤与 legacy 类型映射机器自此
+         *   无数据可消费（源码随本迁移出清）；
+         * - **其余表一律不动**：media_assets / tags / face_embeddings / persons /
+         *   memory_facts / photo_edit_recipes 等昂贵数据原样保留；`chat_image_cache`
+         *   显式保留不清（键独立于聊天表、孤儿缓存无害且按 LRU 自然淘汰）；
+         * - Koog 短期轨 DataStore 键（`koog_memory_*` / `koog_summary_*`）与 Room 不同
+         *   存储域、Migration 拿不到 DataStore——由 PoLangApplication.onCreate 版本哨兵
+         *   一次性清空（SharedPreferences `chat_value_domain_v28_done`）。
+         */
+        internal val MIGRATION_27_28 = object : Migration(27, 28) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `chat_sessions`")
+                db.execSQL("DROP TABLE IF EXISTS `chat_messages`")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `chat_sessions` (
+                        `sessionId` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`sessionId`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `chat_messages` (
+                        `id` TEXT NOT NULL,
+                        `sessionId` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `role` TEXT NOT NULL,
+                        `content` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `modelUsed` TEXT,
+                        `metadata` TEXT,
+                        `partsJson` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
                     )
                     """.trimIndent()
                 )

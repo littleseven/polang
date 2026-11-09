@@ -109,6 +109,14 @@ adb shell am start -n com.mamba.picme/.MainActivity
 - 检查 FBO 状态：`GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)`
 - 检查 Shader 编译日志：`GLES20.glGetShaderInfoLog(shaderId)`
 
+## 真机 androidTest 红线（2026-11-08 血泪教训）
+
+`./gradlew connectedDebugAndroidTest` 跑完后会**自动卸载 app 与测试包，卸载即清空应用私有数据（数据库/标签/聊天记录全丢）**。
+
+- 设备上有值钱数据（聊天历史、VLM 标签、人脸聚类）时，**先用 android-tag-data-backup-restore 快照**再跑
+- 或绕开 Gradle 任务：`adb install` 两个 APK 后手动 `adb shell am instrument`，测试完不卸载
+- 迁移验证类测试拉取的 DB 副本（/tmp/*.db）在确认前**不要删**
+
 ## 项目特定路径
 
 - APK 输出：`androidApp/build/outputs/apk/debug/polang-debug.apk`
@@ -127,5 +135,6 @@ adb shell am start -n com.mamba.picme/.MainActivity
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 1.2.0 | 2026-11-08 | 新增「真机 androidTest 红线」：connectedDebugAndroidTest 测完自动卸载 app 清数据 |
 | 1.1.0 | 2026-05-31 | 统一格式规范，添加定位块 |
 | 1.0.0 | 2026-05-03 | 初始版本 |

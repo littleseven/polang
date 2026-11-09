@@ -1126,6 +1126,7 @@
     <string name="chat_agent_loop_stuck">這次請求陷入了工具呼叫迴圈，已自動停止。請換個問法，或把任務拆小一點再試。</string>
     <string name="chat_calling_tool">正在呼叫工具…</string>
     <string name="chat_card_generate_failed">生成失敗</string>
+    <string name="chat_reasoning_title">思考過程</string>
     <string name="chat_unsupported_part_title">此內容暫不支援顯示</string>
     <string name="chat_unsupported_part_upgrade">升級到最新版本後可檢視完整內容</string>
     <string name="openui_action_failed">操作失敗</string>
@@ -1332,6 +1333,8 @@
     <string name="tag_scan_full">全量重掃</string>
     <string name="tag_scan_incremental">掃描新增</string>
     <string name="tag_scan_pausing">暫停中…</string>
+    <string name="tag_scan_window_paused_title">掃描已暫停</string>
+    <string name="tag_scan_window_paused_text">系統對背景執行時長的限制使打標掃描暫停，稍後將自動繼續</string>
     <string name="tag_scan_state_pausing">暫停中</string>
     <string name="tag_scan_state_cancelling">取消中</string>
     <string name="tag_scan_preparing">準備中</string>

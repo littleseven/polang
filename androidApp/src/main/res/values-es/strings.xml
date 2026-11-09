@@ -1096,6 +1096,7 @@
     <string name="chat_agent_loop_stuck">La solicitud entró en un bucle de llamadas a herramientas y se detuvo automáticamente. Inténtalo con otra formulación o divide la tarea en pasos más pequeños.</string>
     <string name="chat_calling_tool">Llamando a la herramienta…</string>
     <string name="chat_card_generate_failed">Error al generar</string>
+    <string name="chat_reasoning_title">Proceso de razonamiento</string>
     <string name="chat_unsupported_part_title">Contenido no compatible</string>
     <string name="chat_unsupported_part_upgrade">Actualiza a la última versión para ver este contenido</string>
     <string name="openui_action_failed">Error en la acción</string>
@@ -1297,6 +1298,8 @@
     <string name="tag_scan_full">Reescanear todo</string>
     <string name="tag_scan_incremental">Escanear nuevas</string>
     <string name="tag_scan_pausing">Pausando…</string>
+    <string name="tag_scan_window_paused_title">Escaneo en pausa</string>
+    <string name="tag_scan_window_paused_text">Los límites del sistema sobre el tiempo de ejecución en segundo plano pausaron el escaneo de etiquetado; se reanudará automáticamente más tarde</string>
     <string name="tag_scan_state_pausing">Pausando</string>
     <string name="tag_scan_state_cancelling">Cancelando</string>
     <string name="tag_scan_preparing">Preparando</string>

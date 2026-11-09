@@ -1,16 +1,14 @@
 package com.mamba.picme.features.chat
 
 import com.mamba.picme.domain.chat.HtmlCardDisplayMode
-import com.mamba.picme.domain.chat.HtmlCardMeta
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
-import org.json.JSONObject
 
 /**
- * HTML 卡双形态分流判定（[HtmlCardDisplay]）与 metadata serde（[HtmlCardMeta.toJson] /
- * [parseHtmlCardMeta]）单测。对齐 spec《HTML 卡双形态》§4 混合判定 / §9.4 测高异常降级 /
- * §10 持久化；判定函数为纯 Kotlin，覆盖 LLM 误判两方向与 = 阈值边界。
+ * HTML 卡双形态分流判定（[HtmlCardDisplay]）单测。对齐 spec《HTML 卡双形态》§4 混合判定 /
+ * §9.4 测高异常降级；判定函数为纯 Kotlin，覆盖 LLM 误判两方向与 = 阈值边界。
+ * （2026-11-08 parts 单一权威：HtmlCardMeta 持久化迁入 partsJson，kotlinx codec 覆盖见
+ * shared MessagePartsCodecTest，原 org.json metadata serde 段随函数删除移除。）
  */
 class HtmlCardDisplayTest {
 
@@ -119,66 +117,5 @@ class HtmlCardDisplayTest {
         assertEquals(true, HtmlCardDisplay.isDeclaredFullpage(" FULLPAGE"))
         assertEquals(false, HtmlCardDisplay.isDeclaredFullpage("inline"))
         assertEquals(false, HtmlCardDisplay.isDeclaredFullpage(null))
-    }
-
-    // ---- metadata serde（Room metadata `html_card` key）----
-
-    @Test
-    fun `meta json roundtrip preserves all fields`() {
-        val meta = HtmlCardMeta(
-            display = "fullpage",
-            displayMode = HtmlCardDisplayMode.FULLPAGE,
-            measuredHeightPx = 2048,
-            summary = "月度相册报告"
-        )
-        val metadata = JSONObject().put("html_card", meta.toJson()).toString()
-        assertEquals(meta, parseHtmlCardMeta(metadata))
-    }
-
-    @Test
-    fun `meta json roundtrip with defaults omits absent fields`() {
-        val meta = HtmlCardMeta()
-        val metadata = JSONObject().put("html_card", meta.toJson()).toString()
-        assertEquals(meta, parseHtmlCardMeta(metadata))
-        // 缺省字段不写入（紧凑 JSON）
-        assertEquals("{}", JSONObject(metadata).getJSONObject("html_card").toString())
-    }
-
-    @Test
-    fun `parse returns null for blank or corrupted metadata`() {
-        assertNull(parseHtmlCardMeta(null))
-        assertNull(parseHtmlCardMeta(""))
-        assertNull(parseHtmlCardMeta("not json"))
-        assertNull(parseHtmlCardMeta("""{"other":{}}"""))
-    }
-
-    @Test
-    fun `unknown displayMode enum value degrades to undecided`() {
-        // 旧版本读到未来新枚举值：回退 null（待重新判定），不崩溃不锁死形态
-        val metadata = """{"html_card":{"display":"inline","displayMode":"FUTURE_MODE","measuredHeightPx":100}}"""
-        val meta = parseHtmlCardMeta(metadata)
-        assertEquals("inline", meta?.display)
-        assertNull(meta?.displayMode)
-        assertEquals(100, meta?.measuredHeightPx)
-    }
-
-    @Test
-    fun `persisted merge keeps sibling keys intact`() {
-        // 模拟 persistHtmlCardDisplayMode 的合并语义：html_card 之外的 metadata key 不受影响
-        val root = JSONObject("""{"claude_agent_state":{"text":"x"},"html_card":{"display":"inline","summary":"s"}}""")
-        val card = root.getJSONObject("html_card")
-        card.put("displayMode", HtmlCardDisplayMode.INLINE.name)
-        card.put("measuredHeightPx", 320)
-        val meta = parseHtmlCardMeta(root.toString())
-        assertEquals(
-            HtmlCardMeta(
-                display = "inline",
-                displayMode = HtmlCardDisplayMode.INLINE,
-                measuredHeightPx = 320,
-                summary = "s"
-            ),
-            meta
-        )
-        assertEquals("x", root.getJSONObject("claude_agent_state").getString("text"))
     }
 }

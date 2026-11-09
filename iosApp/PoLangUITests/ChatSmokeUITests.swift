@@ -245,7 +245,7 @@ final class ChatSmokeUITests: XCTestCase {
         )
     }
 
-    /// AGENT_EDIT_RESULT 渲染 E2E（确定性）：/editdemo → 生成图落盘 → 编辑结果图卡出现。
+    /// EDIT_RESULT 渲染 E2E（确定性）：/editdemo → 生成图落盘 → 编辑结果图卡出现。
     func testEditResultDemo() throws {
         navigateToChat()
         let input = app.textFields["chat_input"].exists

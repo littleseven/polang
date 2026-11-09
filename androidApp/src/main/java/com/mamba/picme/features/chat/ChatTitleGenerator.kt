@@ -22,7 +22,7 @@ internal object ChatTitleGenerator {
     /**
      * 根据第一条用户消息生成会话标题。
      *
-     * @param firstUserMessageType 消息类型，如 [USER_TEXT] 或 [USER_IMAGE]
+     * @param firstUserMessageType 消息类型（Room wire type 口径，如 "text" 或 "image"）
      * @param textContent 文本消息内容；图片消息时该值可为空
      * @param imageTitle 图片消息对应的固定标题
      * @param fallbackTitle 无法生成有意义标题时的兜底文案

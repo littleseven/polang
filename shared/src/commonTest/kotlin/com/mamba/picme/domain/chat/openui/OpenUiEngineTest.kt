@@ -610,7 +610,7 @@ class OpenUiEngineTest {
         assertEquals("一月", OpenUiContract.selectedOfViewState("selected=一月"))
         assertNull(OpenUiContract.selectedOfViewState("other"))
         assertNull(OpenUiContract.selectedOfViewState(null))
-        assertEquals("data_ui_openui", OpenUiContract.PART_TYPE)
+        assertEquals("data_genui_program", OpenUiContract.PART_TYPE)
         assertEquals("local_handle", OpenUiContract.TOOL_LOCAL_HANDLE)
         assertEquals("photos", OpenUiContract.FRAGMENT_PHOTOS)
     }

@@ -8,9 +8,10 @@ import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.content.IntentFilter
 import android.os.BatteryManager
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
@@ -88,6 +89,14 @@ class TagGenerationService : Service() {
 
         /** onTimeout 后多久重新拉起扫描服务续跑(Android 14+ dataSync FGS 超时兜底) */
         const val RESUME_DELAY_MS = 15 * 60 * 1000L
+
+        /**
+         * dataSync FGS 窗口耗尽（Android 15+ 6h/24h）后 [enterForegroundSafely] 的重试间隔：
+         * 窗口未重置前任何 startForeground 必抛 ForegroundServiceStartNotAllowedException，
+         * onTimeout 的 15min 短退避在耗尽态必空转一轮——此路径直接长退避（每天最多 ~4 次
+         * 尝试，成本可忽略），待 24h 滚动窗口重置后续跑。
+         */
+        const val WINDOW_EXHAUSTED_RETRY_MS = 6 * 60 * 60 * 1000L
 
         /** 电池电量阈值：低于此值暂停扫描 */
         private const val BATTERY_LOW_THRESHOLD = 15
@@ -401,12 +410,12 @@ class TagGenerationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null || intent.action == null) {
             // 首次启动，仅显示前台通知
-            startForeground(NOTIFICATION_ID, buildNotification(null))
+            if (!enterForegroundSafely()) return START_STICKY
             return START_STICKY
         }
 
         // 启动前台通知（任何首次 Intent 都需要）
-        startForeground(NOTIFICATION_ID, buildNotification(null))
+        if (!enterForegroundSafely()) return START_STICKY
 
         val orch = orchestrator ?: return START_STICKY
 
@@ -564,11 +573,81 @@ class TagGenerationService : Service() {
      * `resetRunningToPending()` + `maybeResumeOnStartup()` 自动接续被中断的会话。
      * 前提:用户已加电池优化白名单(BackgroundScanGuard 引导),否则后台启动 FGS 受限。
      */
+    /**
+     * 进入前台（含失败降级，2026-11-08 FGS 窗口耗尽 crash 修复）。
+     *
+     * Android 15+ dataSync 型 FGS 有 6h/24h 运行窗口——窗口耗尽后（含 onTimeout 闹钟
+     * 重启路径）startForeground 抛 ForegroundServiceStartNotAllowedException，此前
+     * 未捕获直接 crash。降级策略：
+     * - 窗口耗尽类（ForegroundServiceStartNotAllowedException）：stopSelf +
+     *   [WINDOW_EXHAUSTED_RETRY_MS] 长退避闹钟，待 24h 滚动窗口重置后续跑；
+     * - 其他失败（通知权限被拒等）：对齐 ModelDownloadForegroundService 先例，
+     *   stopSelf 放弃本次（闹钟续跑也会因同类原因失败，无意义）。
+     *
+     * @return true = 已进入前台可继续;false = 已 stopSelf,调用方应直接返回 START_STICKY
+     */
+    private fun enterForegroundSafely(): Boolean {
+        val notification = buildNotification(null)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            return true
+        } catch (e: Exception) {
+            val windowExhausted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                e is android.app.ForegroundServiceStartNotAllowedException
+            if (windowExhausted) {
+                android.util.Log.w(
+                    TAG,
+                    "startForeground rejected: dataSync FGS window exhausted, retry in ${WINDOW_EXHAUSTED_RETRY_MS / 3_600_000}h"
+                )
+                notifyWindowPaused()
+                TagScanRescheduleReceiver.scheduleResume(applicationContext, WINDOW_EXHAUSTED_RETRY_MS)
+            } else {
+                android.util.Log.w(TAG, "startForeground failed (notification permission?), stopping: ${e.message}")
+            }
+            stopSelf()
+            return false
+        }
+    }
+
+    /**
+     * 窗口耗尽停摆的用户可见通知：前台通知随服务停止消失，若无一告知用户会以为扫描
+     * 无声消失。同 [NOTIFICATION_ID] 覆盖（接管前台通知位）+ setOnlyAlertOnce 静默——
+     * 长退避重试仍失败时再触发只静默更新，不重复打扰；非 ongoing 可滑掉，点击进 app。
+     * 通知权限被拒时 notify 静默失败（不 crash），与前台服务通知同一依赖面。
+     */
+    private fun notifyWindowPaused() {
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = getString(R.string.tag_scan_window_paused_text)
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(getString(R.string.tag_scan_window_paused_title))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(pendingIntent)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
+    }
+
     override fun onTimeout(startId: Int, fgsType: Int) {
         android.util.Log.w(
             TAG,
             "onTimeout: dataSync FGS timed out after long run, scheduling resume in ${RESUME_DELAY_MS}ms"
         )
+        // Android 15+ 的 onTimeout 即窗口耗尽信号（15min 短退避重试多半仍耗尽）——
+        // 停摆立即可见，不等重试失败才告知
+        notifyWindowPaused()
         TagScanRescheduleReceiver.scheduleResume(applicationContext, RESUME_DELAY_MS)
         stopSelf()
     }

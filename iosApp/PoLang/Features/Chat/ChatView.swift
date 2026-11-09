@@ -636,21 +636,21 @@ private struct MessageBubble: View {
                     // 思考态：3 点动画（首 token 前）
                     ThinkingIndicator()
                 } else if !message.content.isEmpty || message.imageUri != nil {
-                    // USER_IMAGE_TEXT：上图下文（图在文本上方，对齐 Android）
-                    if message.type == .userImageText, let uri = message.imageUri {
+                    // IMAGE_TEXT：上图下文（图在文本上方，对齐 Android）
+                    if message.type == .imageText, let uri = message.imageUri {
                         UserImageAttachment(localIdentifier: uri, onTap: { onImageTap?($0) })
                             .padding(.bottom, 6)
                     }
 
-                    // AGENT_IMAGE：agent 单发结果图（gacha 确认/降级；FillWidth 240 完整显示，
-                    // chat.yaml §5 image_content.agent_image）
-                    if message.type == .agentImage, let path = message.imageUri {
+                    // IMAGE（agent 单发结果图，gacha 确认/降级；FillWidth 240 完整显示，
+                    // chat.yaml §5 image_content.agent_image——role 守卫保 agent 口径）
+                    if message.type == .image && message.role != .user, let path = message.imageUri {
                         AgentImageAttachment(imagePath: path, onTap: { onImageTap?($0) })
                             .padding(.bottom, 6)
                     }
 
-                    // AGENT_EDIT_RESULT：编辑结果图卡（文件路径 + 失效占位），说明文字走下方文本渲染
-                    if message.type == .agentEditResult, let path = message.imageUri {
+                    // EDIT_RESULT：编辑结果图卡（文件路径 + 失效占位），说明文字走下方文本渲染
+                    if message.type == .editResult, let path = message.imageUri {
                         ChatEditImageCard(imagePath: path, onTap: { onImageTap?($0) })
                             .padding(.bottom, 6)
                     }
@@ -685,13 +685,13 @@ private struct MessageBubble: View {
             // 图类气泡（用户图+文 / agent 单发图）：240 上限 + padding 6/6
             // （Android isImage||isImageText 分支）；文本/编辑结果 360 上限 + 16/12。
             // 常量未入 DesignTokens（生成物，门禁修复前禁手改——技术债：待 tokens JSON 统一）
-            .widthCap((message.type == .userImageText || message.type == .agentImage)
+            .widthCap((message.type == .imageText || (message.type == .image && message.role != .user))
                 ? ChatBubbleTokens.imageMaxWidth
                 : ChatBubbleTokens.bubbleMaxWidth)
             .padding(.horizontal,
-                     (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingH)
+                     (message.type == .imageText || (message.type == .image && message.role != .user)) ? 6 : ChatBubbleTokens.paddingH)
             .padding(.vertical,
-                     (message.type == .userImageText || message.type == .agentImage) ? 6 : ChatBubbleTokens.paddingV)
+                     (message.type == .imageText || (message.type == .image && message.role != .user)) ? 6 : ChatBubbleTokens.paddingV)
             .background(bubbleBackground)
             .clipShape(bubbleShape)
             .contentShape(Rectangle())
@@ -705,11 +705,11 @@ private struct MessageBubble: View {
     }
 
     // §5 text：用户正文 userBubbleOn（v2.2.3 对比度契约 946a36db4：亮绿底白字 ~1.9:1 → 深字 ~8:1）；
-    // 图文说明（USER_IMAGE_TEXT text_below）保持 onSurface——底虽随 Android 定稿转绿
+    // 图文说明（IMAGE_TEXT text_below）保持 onSurface——底虽随 Android 定稿转绿
     // （bubbleBackground），图上说明文字对比度契约不变
     private var textColor: Color {
         if message.role == .user {
-            return message.type == .userImageText ? s.onSurface : ChatBubbleTokens.userBubbleOn
+            return message.type == .imageText ? s.onSurface : ChatBubbleTokens.userBubbleOn
         }
         return Color(.label)
     }
@@ -730,12 +730,12 @@ private struct MessageBubble: View {
     }
 
     private var bubbleBackground: Color {
-        // 纯图气泡（agent 单发图；userImage 未接入，接入时同口径）→ surfaceVariant 0.4
-        // （chat.yaml §5 background.image）；用户气泡（USER_IMAGE_TEXT 含图+文）→
-        // userBubbleBg 实色（Android ChatScreen.kt isUser 含 USER_IMAGE_TEXT → 绿底，
+        // 纯图气泡（agent 单发图；user 纯图未接入，接入时同口径）→ surfaceVariant 0.4
+        // （chat.yaml §5 background.image）；用户气泡（IMAGE_TEXT 含图+文）→
+        // userBubbleBg 实色（Android ChatScreen.kt isUser 含 IMAGE_TEXT → 绿底，
         // text_below 仍走 onSurface）；用户纯文本 → userBubbleBg（§5 background.user_text，
         // v2.2.3：去 0.9 alpha，双模式一致）
-        if message.type == .agentImage {
+        if message.type == .image && message.role != .user {
             return s.surfaceVariant.opacity(0.4)
         }
         if message.role == .user {
@@ -784,12 +784,16 @@ private struct ChatListItemView: View {
         let t = ChatListItem.companion
         switch item.contentType {
         case t.TYPE_AGENT_TEXT: agentTextItem
+        case t.TYPE_REASONING: reasoningItem
+        case t.TYPE_SOURCE_CHIPS: sourceChipsItem
         case t.TYPE_CHART: chartItem
         case t.TYPE_OPTIMIZE_CANDIDATES: gachaItem
         case t.TYPE_HTML_CARD: htmlCardItem
         case t.TYPE_TASK_CARD: taskCardItem
         case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
-        case t.TYPE_UNSUPPORTED: unsupportedItem
+        case t.TYPE_TOMBSTONE: tombstoneItem
+        // TYPE_BROWSER_LIVE / TYPE_OPENUI_CARD：iOS 渲染未落地（值域终态 D3 边界——
+        // 降级缺口维持独立跟踪于 PARITY 台账，本批不补渲染），落 default 空渲染
         default: EmptyView()
         }
     }
@@ -895,11 +899,123 @@ private struct ChatListItemView: View {
         }
     }
 
-    /// UNSUPPORTED part（前向兼容兜底，2026-11-08）：未知/损坏 part 原位占位卡——
-    /// 「内容暂不支持 + 升级提示」（payload 携带可读摘要时优先展示）。
-    /// 块序与消息其余 part 不受影响，升级新版本后同一消息自动恢复为正式卡片。
-    private var unsupportedItem: some View {
-        let summary = (item.part as? MessagePartUnsupported)?.summary
+    /// REASONING part（值域终态 2026-11-08，spec《chat-value-domain-ideal》§6.1）：
+    /// 可折叠「思考过程」块——默认折叠，展开后浅灰次要文字（样式参照 Vercel/ChatGPT
+    /// reasoning UI）。独立折叠块不进正文桶（flattener TYPE_REASONING 桶），防思考链
+    /// 以正文形态双显；生产开关默认关，本渲染件随历史回放/后续接线生效。
+    @State private var reasoningExpanded = false
+
+    private var reasoningItem: some View {
+        let text = (item.part as? MessagePartReasoning)?.text ?? ""
+        return VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { reasoningExpanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: reasoningExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(String(localized: "chat.reasoning_title"))
+                        .font(.system(size: 13))
+                }
+                .foregroundColor(Color(.secondaryLabel))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chat_reasoning_toggle")
+
+            if reasoningExpanded, !text.isEmpty {
+                Text(text)
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(.secondaryLabel))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: ChatBubbleTokens.bubbleMaxWidth, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// SOURCE_CHIPS item（值域终态 2026-11-08，spec §6.2）：flattener 把消息内连续
+    /// SourceUrl/SourceDocument parts 聚合为单条引用 chips 行——序号 + 域名（文档引用
+    /// 无 URL，显示文件名/标题且不可点）；点击经系统浏览器打开落地页。正文 markdown
+    /// 图链行为不变（图=配图，chip=来源列表，职责不同）。
+    @Environment(\.openURL) private var openURL
+
+    private struct SourceChip: Identifiable {
+        let id: String
+        let ordinal: Int
+        let label: String
+        let url: URL?
+    }
+
+    /// 自 item.part（run 首个 source part 锚）起取**连续** source parts（flattener
+    /// 聚合口径——多段 run 各自成 item，渲染只取本段，防御性 break 于首个非 source part）。
+    private var sourceChips: [SourceChip] {
+        guard let anchor = item.part else { return [] }
+        let parts = item.message.parts
+        guard let start = parts.firstIndex(where: { $0 === anchor }) else { return [] }
+        var chips: [SourceChip] = []
+        for part in parts[start...] {
+            if let source = part as? MessagePartSourceUrl {
+                chips.append(SourceChip(
+                    id: source.partId,
+                    ordinal: chips.count + 1,
+                    label: URL(string: source.url)?.host ?? source.url,
+                    url: URL(string: source.url)))
+            } else if let doc = part as? MessagePartSourceDocument {
+                chips.append(SourceChip(
+                    id: doc.partId,
+                    ordinal: chips.count + 1,
+                    label: doc.filename ?? doc.title,
+                    url: nil))
+            } else {
+                break
+            }
+        }
+        return chips
+    }
+
+    private var sourceChipsItem: some View {
+        FlowLayout(horizontal: 8, vertical: 6) {
+            ForEach(sourceChips) { chip in
+                sourceChipView(chip)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func sourceChipView(_ chip: SourceChip) -> some View {
+        let content = HStack(spacing: 5) {
+            Text("\(chip.ordinal)")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Color(.secondaryLabel))
+            Text(chip.label)
+                .font(.system(size: 12))
+                .foregroundColor(Color(.label).opacity(0.8))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: ChatBubbleTokens.capsuleCornerRadius))
+
+        return Group {
+            if let url = chip.url {
+                Button { openURL(url) } label: { content }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("chat_source_chip")
+            } else {
+                content
+            }
+        }
+    }
+
+    /// TOMBSTONE part（前向兼容兜底，2026-11-08 值域终态自 unsupported 改名转正）：
+    /// 未知/损坏/退役 part 原位占位卡——「内容暂不支持 + 升级提示」（payload 携带
+    /// 可读摘要时优先展示）。块序与消息其余 part 不受影响，升级新版本后同一消息
+    /// 自动恢复为正式卡片。
+    private var tombstoneItem: some View {
+        let summary = (item.part as? MessagePartTombstone)?.summary
         return HStack(alignment: .center, spacing: 10) {
             Image(systemName: "info.circle")
                 .font(.system(size: 15))

@@ -1,7 +1,7 @@
 # OpenUI 卡内设计语言（OpenUI Card Design Language）
 
 > **状态**：生效中（v10，2026-11-01；批次史见 §6 变更记录）
-> **适用**：OpenUI 协议渲染的全部聊天卡片（`data_ui_openui`），Android 先行，iOS 跟随
+> **适用**：OpenUI 协议渲染的全部聊天卡片（`data_genui_program`，2026-11-08 自 `data_ui_openui` 语义化改名），Android 先行，iOS 跟随
 > **上位约束**：根 `AGENTS.md`（[PARITY]/[I18N] 红线）、`docs/08-UI-SPECS/PARITY_MASTER_PLAN.md`
 > **实现锚点**：`androidApp/.../openui/OpenUiCardTokens.kt`（token SSOT）、`OpenUiNodeRenderer.kt`（组件皮肤）、server `RenderOpenUiToolService`（LLM 构图引导）
 

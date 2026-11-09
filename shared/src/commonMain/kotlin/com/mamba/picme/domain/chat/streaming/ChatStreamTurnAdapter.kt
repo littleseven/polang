@@ -9,12 +9,15 @@ import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
  * 状态机口径：
  * - 一轮 LLM 文本 = 一个 Text 块（`txt-N`）：快照差分出 delta（Koog 语义是本轮累计全文，
  *   非 delta）；
+ * - 一轮 LLM 思考链 = 一个 Reasoning 块（`rsn-N`，值域终态 spec §6.1）：与 Text 块独立
+ *   的同构差分状态机——extended thinking 模型先流 reasoning 再流 text，两块同轮并存、
+ *   轮边界一并闭合；**生产开关默认关**（Koog 链路 thinking=disabled，事件不产出）；
  * - **轮边界（M4 收口，spec §10）= 显式 [ChatStreamEvent.RoundStarted] 信号**：闭合当前
- *   文本块（TextEnd）并透传 [TurnStreamEvent.RoundStarted]（turn 内 0 起轮次序号）；
- *   差分启发式（快照不再是前值的连续扩展 ⇒ 轮边界）降级为**兜底**——仅在上游未发
- *   RoundStarted 的路径（如直执/旧引擎）生效，与显式信号并存时不重复闭合（RoundStarted
+ *   文本/思考链块（TextEnd/ReasoningEnd）并透传 [TurnStreamEvent.RoundStarted]（turn 内
+ *   0 起轮次序号）；差分启发式（快照不再是前值的连续扩展 ⇒ 轮边界）降级为**兜底**——仅在
+ *   上游未发 RoundStarted 的路径（如直执/旧引擎）生效，与显式信号并存时不重复闭合（RoundStarted
  *   已闭合旧块并重置差分基准，后续快照必开新块，兜底分支自然不再命中）；
- * - [ChatStreamEvent.ToolCallStarted] = 轮内工具边界：闭合当前文本块，合成 `call-N`
+ * - [ChatStreamEvent.ToolCallStarted] = 轮内工具边界：闭合当前文本/思考链块，合成 `call-N`
  *   toolCallId，发 ToolInputStart + ToolInputAvailable（Koog 在调用开始即给全量 args，无增量）；
  * - 工具的产出/失败不由本适配器产出——payload 在能力执行点（如图表 SVG 落库处），
  *   由调用方直接喂 [TurnPartsReducer] 的 ToolOutputAvailable/ToolOutputError。
@@ -30,41 +33,51 @@ import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
 class ChatStreamTurnAdapter {
 
     private var textSeq = 0
+    private var reasoningSeq = 0
     private var toolSeq = 0
     private var roundSeq = 0
 
     /** 当前未闭合的文本块 partId（null = 不在文本轮）。 */
     private var openTextPartId: String? = null
 
-    /** 本轮上一次累计快照（差分基准）。 */
+    /** 当前未闭合的思考链块 partId（null = 不在思考链流；与文本块独立并存）。 */
+    private var openReasoningPartId: String? = null
+
+    /** 本轮上一次文本累计快照（差分基准）。 */
     private var prevSnapshot = ""
+
+    /** 本轮上一次思考链累计快照（差分基准）。 */
+    private var prevReasoningSnapshot = ""
 
     fun reset() {
         textSeq = 0
+        reasoningSeq = 0
         toolSeq = 0
         roundSeq = 0
         openTextPartId = null
+        openReasoningPartId = null
         prevSnapshot = ""
+        prevReasoningSnapshot = ""
     }
 
     /** 翻译一个引擎事件为 0..N 个 turn 事件（保到达顺序）。 */
     fun onEvent(event: ChatStreamEvent): List<TurnStreamEvent> = when (event) {
         is ChatStreamEvent.TextSnapshot -> onTextSnapshot(event.text)
+        is ChatStreamEvent.ReasoningSnapshot -> onReasoningSnapshot(event.text)
         is ChatStreamEvent.ToolCallStarted -> onToolCallStarted(event)
         is ChatStreamEvent.RoundStarted -> onRoundStarted()
     }
 
     /**
-     * 显式轮边界（M4 主路径）：闭合未完结文本块、清空差分基准（下一轮快照从空累计，
+     * 显式轮边界（M4 主路径）：闭合未完结文本/思考链块、清空差分基准（下一轮快照从空累计，
      * 必走「开新块」分支），透传轮次序号。
      */
     private fun onRoundStarted(): List<TurnStreamEvent> {
         val events = mutableListOf<TurnStreamEvent>()
-        openTextPartId?.let { open ->
-            events += TurnStreamEvent.TextEnd(open)
-            openTextPartId = null
-        }
+        closeOpenTextBlock(events)
+        closeOpenReasoningBlock(events)
         prevSnapshot = ""
+        prevReasoningSnapshot = ""
         events += TurnStreamEvent.RoundStarted(roundSeq++)
         return events
     }
@@ -84,7 +97,7 @@ class ChatStreamTurnAdapter {
         // 兜底路径（M4 起显式 RoundStarted 为主）：新一轮快照从空重新累计且 RoundStarted
         // 未到达（直执/旧引擎路径），或首块——闭合旧块、开新块、全量作首个 delta
         val events = mutableListOf<TurnStreamEvent>()
-        if (open != null) events += TurnStreamEvent.TextEnd(open)
+        closeOpenTextBlock(events)
         val partId = "txt-${textSeq++}"
         openTextPartId = partId
         prevSnapshot = snapshot
@@ -93,17 +106,50 @@ class ChatStreamTurnAdapter {
         return events
     }
 
+    /** 思考链快照差分（与 [onTextSnapshot] 同构，块命名 `rsn-N`；生产开关默认关）。 */
+    private fun onReasoningSnapshot(snapshot: String): List<TurnStreamEvent> {
+        val open = openReasoningPartId
+        if (open != null && snapshot.length >= prevReasoningSnapshot.length && snapshot.startsWith(prevReasoningSnapshot)) {
+            val delta = snapshot.substring(prevReasoningSnapshot.length)
+            prevReasoningSnapshot = snapshot
+            return if (delta.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(TurnStreamEvent.ReasoningDelta(open, delta))
+            }
+        }
+        val events = mutableListOf<TurnStreamEvent>()
+        closeOpenReasoningBlock(events)
+        val partId = "rsn-${reasoningSeq++}"
+        openReasoningPartId = partId
+        prevReasoningSnapshot = snapshot
+        events += TurnStreamEvent.ReasoningStart(partId)
+        if (snapshot.isNotEmpty()) events += TurnStreamEvent.ReasoningDelta(partId, snapshot)
+        return events
+    }
+
     private fun onToolCallStarted(event: ChatStreamEvent.ToolCallStarted): List<TurnStreamEvent> {
         val events = mutableListOf<TurnStreamEvent>()
-        // 工具调用 = 轮边界：闭合当前文本块（下一轮文本另开新块）
-        openTextPartId?.let { open ->
-            events += TurnStreamEvent.TextEnd(open)
-            openTextPartId = null
-            prevSnapshot = ""
-        }
+        // 工具调用 = 轮边界：闭合当前文本/思考链块（下一轮文本另开新块）
+        closeOpenTextBlock(events)
+        closeOpenReasoningBlock(events)
         val toolCallId = "call-${toolSeq++}"
         events += TurnStreamEvent.ToolInputStart(toolCallId, event.toolName)
         events += TurnStreamEvent.ToolInputAvailable(toolCallId, event.args)
         return events
+    }
+
+    private fun closeOpenTextBlock(events: MutableList<TurnStreamEvent>) {
+        openTextPartId?.let { open ->
+            events += TurnStreamEvent.TextEnd(open)
+            openTextPartId = null
+        }
+    }
+
+    private fun closeOpenReasoningBlock(events: MutableList<TurnStreamEvent>) {
+        openReasoningPartId?.let { open ->
+            events += TurnStreamEvent.ReasoningEnd(open)
+            openReasoningPartId = null
+        }
     }
 }

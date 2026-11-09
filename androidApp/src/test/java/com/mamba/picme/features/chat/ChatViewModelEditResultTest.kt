@@ -1,12 +1,14 @@
 package com.mamba.picme.features.chat
 
+import com.mamba.picme.data.local.decodeParts
+import com.mamba.picme.domain.chat.MessagePart
 import io.mockk.coVerify
 import io.mockk.slot
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -34,12 +36,16 @@ class ChatViewModelEditResultTest : ChatViewModelTestBase() {
         assertEquals(sessionId, entity.sessionId)
         assertEquals("remote_deepseek", entity.modelUsed)
 
-        val metadata = entity.metadata
-        assertNotNull(metadata)
-        val json = JSONObject(metadata!!)
+        // parts-first：EditResult part 直建（description/ref/suggestions 由 part 承载）
+        val part = entity.decodeParts().single() as MessagePart.EditResult
+        assertEquals(imageUri, part.ref)
+        assertEquals(explanation, part.description)
+        assertEquals(2, part.suggestions.size)
+
+        // 投影 metadata 键与 converter 解析键对齐（explanation 由 content 列承载，不再冗余落键）
+        val json = JSONObject(entity.metadata!!)
         assertEquals(imageUri, json.getString("imageUri"))
-        assertEquals(explanation, json.getString("explanation"))
-        assertNotNull(json.getJSONArray("suggestions"))
+        assertTrue(json.getJSONArray("suggestions").length() == 2)
 
         coVerify { chatSessionDao.touchSession(eq(sessionId), any()) }
     }
