@@ -26,8 +26,11 @@ return Chart.echarts({
 });
 ```
 
-- `Chart.echarts(cfg)`：`{title?, x:[类目标签], series:[{name, data, type?: 'bar'|'line'}], unit?, tip?}`。
+- `Chart.echarts(cfg)`：`{title?, x:[类目标签], series:[{name, data, type?: 'bar'|'line', color?}], unit?, tip?, theme?, style?}`。
   多序列直接给多个 series（柱线混合：各 series 自声明 type）。
+- 主题配色：`theme` 选预置主题 `'fresh'(默认)/'ocean'/'sunset'/'violet'/'forest'`；
+  `style` 按字段覆盖（`palette` 色板 / `height`(120~600) / `barRadius` / `lineWidth` / `smooth` 等），
+  `series[].color` 单系列覆盖最优先。拿不准就全用默认。
 - 固定模板自动渲染成交互图卡上屏（tooltip / 读数行联动 / 防遮挡 / 清新配色全内置），
   **HTML 不回传给你**——你只收到 summary 文字（峰值/合计），据此撰写分析。
 - ⚠️ **图卡已经自动上屏，你的最终回复严禁再出现任何 Html 组件、严禁重复发卡**——

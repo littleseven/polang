@@ -175,22 +175,72 @@
    * return Chart.echarts(cfg) → {html: <自包含 HTML>, summary: <给 LLM 的文字>}。
    * html 由端侧直接渲染成 HTML 卡（不进 LLM 上下文），summary 回传 LLM 写分析——
    * LLM 零 HTML 编写，模板一次到位（polang-lib 预制 echarts、confine 防遮挡、
-   * 读数行联动、清新色板），彻底消灭手写 HTML 的 DSL 嵌套事故面。
+   * 读数行联动、主题配色），彻底消灭手写 HTML 的 DSL 嵌套事故面。
    *
-   * cfg: { title?, x: [类目标签...], series: [{name, data, type?: 'bar'|'line'}],
-   *        unit?: 数值单位, tip?: 读数行提示文案 }
+   * cfg: { title?, x: [类目标签...], series: [{name, data, type?: 'bar'|'line', color?}],
+   *        unit?: 数值单位, tip?: 读数行提示文案,
+   *        theme?: 预置主题名（见 Chart.echartsThemes，默认 'fresh'）,
+   *        style?: { 按字段覆盖主题样式 } }
+   * 样式优先级：ECHARTS_BASE_STYLE < 预置主题 < cfg.style < series[].color（最高）。
+   * style 可覆盖字段：palette（颜色数组）/ title / tip / axis / axisSoft / axisLine /
+   *   splitLine / tooltipBg / tooltipText / height(120~600) / barMaxWidth / barRadius /
+   *   lineWidth / smooth。
    * 典型用法（月度趋势；gallery.timeline 返回 {桶起始时间戳:数量}，标签需自行格式化）：
    *   var tl = await bridge.callAsync('gallery.timeline', {bucketMs: 2592000000});
    *   var keys = Object.keys(tl).sort();
    *   var x = keys.map(function (k) { var d = new Date(Number(k)); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); });
-   *   return Chart.echarts({ title: '相册月度趋势', x: x,
+   *   return Chart.echarts({ title: '相册月度趋势', x: x, theme: 'ocean',
    *     series: [{name: '媒体数', data: keys.map(function (k) { return tl[k]; })}], unit: '个' });
    * 注意：gallery.timeline 不分照片/视频（无 mediaType 参数），多序列需自行用 gallery.query 聚合。
    */
-  var ECHARTS_PALETTE = ['#38BDF8', '#34D399', '#FBBF24', '#F472B6', '#A78BFA', '#F87171'];
+  var ECHARTS_BASE_STYLE = {
+    palette: ['#38BDF8', '#34D399', '#FBBF24', '#F472B6', '#A78BFA', '#F87171'],
+    title: '#0F172A',
+    tip: '#94A3B8',
+    axis: '#64748B',
+    axisSoft: '#94A3B8',
+    axisLine: '#CBD5E1',
+    splitLine: '#EEF2F7',
+    tooltipBg: 'rgba(15,23,42,0.88)',
+    tooltipText: '#F1F5F9',
+    height: 240,
+    barMaxWidth: 26,
+    barRadius: 4,
+    lineWidth: 2.5,
+    smooth: true
+  };
+
+  /** 预置主题（2026-11-09）：只声明与 base 不同的字段，未知主题名静默回落 base。 */
+  var ECHARTS_THEMES = {
+    fresh: {},
+    ocean: { palette: ['#0EA5E9', '#2563EB', '#06B6D4', '#6366F1', '#22D3EE', '#93C5FD'] },
+    sunset: { palette: ['#FB923C', '#F59E0B', '#F97316', '#EF4444', '#FBBF24', '#FDBA74'] },
+    violet: { palette: ['#8B5CF6', '#A78BFA', '#C084FC', '#7C3AED', '#F472B6', '#DDD6FE'] },
+    forest: { palette: ['#10B981', '#34D399', '#84CC16', '#059669', '#4ADE80', '#A3E635'] }
+  };
 
   function echartsCard(cfg) {
     cfg = cfg || {};
+    // 样式解析：base < theme < cfg.style；数值字段钳制范围防脏值打爆布局。
+    var t = {}, k;
+    for (k in ECHARTS_BASE_STYLE) t[k] = ECHARTS_BASE_STYLE[k];
+    var themeOverride = ECHARTS_THEMES[cfg.theme] || {};
+    for (k in themeOverride) t[k] = themeOverride[k];
+    var styleOverride = cfg.style || {};
+    for (k in styleOverride) {
+      if (styleOverride[k] !== null && styleOverride[k] !== undefined) t[k] = styleOverride[k];
+    }
+    var palette = (Object.prototype.toString.call(t.palette) === '[object Array]' && t.palette.length)
+      ? t.palette : ECHARTS_BASE_STYLE.palette;
+    var height = parseInt(t.height, 10);
+    if (!(height >= 120 && height <= 600)) height = 240;
+    var barMaxWidth = parseInt(t.barMaxWidth, 10);
+    if (!(barMaxWidth > 0 && barMaxWidth <= 200)) barMaxWidth = 26;
+    var barRadius = parseInt(t.barRadius, 10);
+    if (!(barRadius >= 0 && barRadius <= 50)) barRadius = 4;
+    var lineWidth = Number(t.lineWidth);
+    if (!(lineWidth > 0 && lineWidth <= 10)) lineWidth = 2.5;
+    var smooth = !(t.smooth === false || t.smooth === 'false' || t.smooth === 0);
     var x = cfg.x || [];
     var unit = cfg.unit || '';
     var sers = (cfg.series || []).map(function (s, i) {
@@ -198,15 +248,15 @@
         name: String(s.name == null ? ('系列' + (i + 1)) : s.name),
         type: s.type === 'line' ? 'line' : 'bar',
         data: s.data || [],
-        itemStyle: { color: s.color || ECHARTS_PALETTE[i % ECHARTS_PALETTE.length] }
+        itemStyle: { color: s.color || palette[i % palette.length] }
       };
       if (ser.type === 'line') {
-        ser.smooth = true;
+        ser.smooth = smooth;
         ser.symbolSize = 6;
-        ser.lineStyle = { width: 2.5 };
+        ser.lineStyle = { width: lineWidth };
       } else {
-        ser.barMaxWidth = 26;
-        ser.itemStyle.borderRadius = [4, 4, 0, 0];
+        ser.barMaxWidth = barMaxWidth;
+        ser.itemStyle.borderRadius = [barRadius, barRadius, 0, 0];
       }
       return ser;
     });
@@ -216,35 +266,35 @@
       tooltip: {
         trigger: 'axis',
         confine: true,
-        backgroundColor: 'rgba(15,23,42,0.88)',
+        backgroundColor: t.tooltipBg,
         borderWidth: 0,
-        textStyle: { color: '#F1F5F9', fontSize: 12 }
+        textStyle: { color: t.tooltipText, fontSize: 12 }
       },
       grid: { left: 8, right: 16, top: multi ? 34 : 12, bottom: 4, containLabel: true },
       xAxis: {
         type: 'category', data: x,
-        axisLine: { lineStyle: { color: '#CBD5E1' } },
+        axisLine: { lineStyle: { color: t.axisLine } },
         axisTick: { show: false },
-        axisLabel: { color: '#64748B', fontSize: 11 }
+        axisLabel: { color: t.axis, fontSize: 11 }
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: '#94A3B8', fontSize: 11 },
-        splitLine: { lineStyle: { color: '#EEF2F7' } }
+        axisLabel: { color: t.axisSoft, fontSize: 11 },
+        splitLine: { lineStyle: { color: t.splitLine } }
       },
       series: sers
     };
     if (multi) {
-      option.legend = { top: 2, right: 8, itemWidth: 14, itemHeight: 8, textStyle: { color: '#64748B', fontSize: 11 } };
+      option.legend = { top: 2, right: 8, itemWidth: 14, itemHeight: 8, textStyle: { color: t.axis, fontSize: 11 } };
     }
     var titleHtml = cfg.title
-      ? '<div style="font-size:15px;font-weight:600;color:#0F172A;padding:2px 4px 6px">' + esc(cfg.title) + '</div>' : '';
+      ? '<div style="font-size:15px;font-weight:600;color:' + t.title + ';padding:2px 4px 6px">' + esc(cfg.title) + '</div>' : '';
     var html = '<meta name="polang-lib" content="echarts">' +
       '<div style="font-family:-apple-system,\'PingFang SC\',sans-serif;background:transparent">' +
       titleHtml +
-      '<div id="tip" style="font-size:12px;color:#94A3B8;min-height:18px;padding:0 4px 4px">' +
+      '<div id="tip" style="font-size:12px;color:' + t.tip + ';min-height:18px;padding:0 4px 4px">' +
       esc(cfg.tip || '点按图表查看数值') + '</div>' +
-      '<div id="c" style="width:100%;height:240px"></div></div>' +
+      '<div id="c" style="width:100%;height:' + height + 'px"></div></div>' +
       '<script>(function(){var c=echarts.init(document.getElementById("c"));c.setOption(' + JSON.stringify(option) + ');' +
       'var tip=document.getElementById("tip"),def=tip.textContent,xs=' + JSON.stringify(x) + ',u=' + JSON.stringify(unit) + ';' +
       'c.on("updateAxisPointer",function(e){var i=e.dataIndexInside;if(i==null||i<0||i>=xs.length)return;' +
@@ -265,5 +315,5 @@
     return { html: html, summary: summary };
   }
 
-  globalThis.Chart = { bar: bar, line: line, pie: pie, timeline: timelineChart, echarts: echartsCard };
+  globalThis.Chart = { bar: bar, line: line, pie: pie, timeline: timelineChart, echarts: echartsCard, echartsThemes: Object.keys(ECHARTS_THEMES) };
 })();
