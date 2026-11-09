@@ -1,5 +1,6 @@
 package com.mamba.picme.features.cloudagent
 
+import com.mamba.picme.core.agenttools.CloudAgentScriptTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
@@ -65,6 +66,7 @@ class CloudAgentTurnRunnerTest {
         gallerySummary = { "相册 42 张" },
         searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
         refineSearch = { _, _, _ -> "error: no base" },
+        runGalleryScript = { _ -> "{}" },
     )) = CloudAgentTurnRunner(api, executor, CoroutineScope(UnconfinedTestDispatcher()))
 
     @Test
@@ -408,5 +410,41 @@ class CloudAgentTurnRunnerTest {
         val events = mutableListOf<CloudTurnEvent>()
         newRunner(api).runTurn("token", "s_1", "text", null) { events.add(it) }
         assertEquals("兜底文本", events.filterIsInstance<CloudTurnEvent.AssistantText>().single().text)
+    }
+
+    @Test
+    fun `script html artifact emits HtmlCard and uploads summary only`() = runTest {
+        // 产物拦截：run_gallery_script 的 {html, summary} 信封 → HtmlCard 本地事件，
+        // 上行 postToolResult 只带 summary（HTML 不出端、不进 LLM 上下文）
+        val api = FakeApi()
+        val executor = DeviceToolExecutor(
+            gallerySummary = { "相册 42 张" },
+            searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
+            refineSearch = { _, _, _ -> "error: no base" },
+            runGalleryScript = { _ ->
+                CloudAgentScriptTools.wrapHtmlArtifact("<div id=\"c\"></div>", "共12个区间；峰值 2022-03=1531")
+            },
+        )
+        api.framesScript = { onFrame ->
+            onFrame(
+                CloudFrame.ToolRequest(
+                    "tr_9",
+                    "run_gallery_script",
+                    JSONObject().put("code", "return Chart.echarts({x:[],series:[]})"),
+                    120_000L,
+                ),
+            )
+            onFrame(CloudFrame.Done("running"))
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        CloudAgentTurnRunner(api, executor, CoroutineScope(UnconfinedTestDispatcher()))
+            .runTurn("token", "s_1", "画月度趋势", null) { events.add(it) }
+        assertTrue(events.contains(CloudTurnEvent.ToolCall("run_gallery_script")))
+        assertTrue(events.contains(CloudTurnEvent.HtmlCard("<div id=\"c\"></div>", "共12个区间；峰值 2022-03=1531")))
+        val posted = api.toolResults.single()
+        assertEquals("tr_9", posted.first)
+        assertTrue(posted.second)
+        assertTrue(!posted.third.contains("<div"))
+        assertTrue(posted.third.contains("共12个区间"))
     }
 }

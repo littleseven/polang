@@ -16,6 +16,7 @@ object CloudAgentToolContract {
     const val TOOL_GET_GALLERY_SUMMARY = "get_gallery_summary"
     const val TOOL_SEARCH_MEDIA = "search_media"
     const val TOOL_REFINE_MEDIA_SEARCH = "refine_media_search"
+    const val TOOL_RUN_GALLERY_SCRIPT = "run_gallery_script"
 
     /**
      * ⚠️ 已退役（2026-11-05 A2UI 退役/GenUI 唯一化）——发射端（server）不再注册此工具，
@@ -80,4 +81,16 @@ object CloudAgentToolContract {
     const val DESC_PARAM_HAS_FACE = "'true'=只要含人脸；空串=不限"
     const val DESC_PARAM_MEDIA_TYPE = "'photo'=只搜照片（默认）；'video'=只搜视频；'all'=照片+视频"
     const val DESC_PARAM_CONSTRAINT = "细化条件"
+
+    /**
+     * 云端面 run_gallery_script（2026-11-08 补录）：只读取数面——月度趋势/标签分布等
+     * 明细聚合此前云端无取数通路（2026-11-08 真机事故：LLM 被迫臆造月度数组画 ECharts
+     * 趋势卡）。描述与端侧 chat 面（ChatToolService/RemoteControlToolService）按 agent
+     * 故意差异化：云端不写 capability.dispatch（写通路不暴露给云端会话）。
+     */
+    const val DESC_RUN_GALLERY_SCRIPT =
+        "在用户设备的端侧 JS 沙箱执行只读取数脚本做相册统计聚合，仅 return 的聚合结果回传（投影：仅聚合后小结果对象，不含文件路径/uri 与媒体清单——命中即被隐私闸拦截）。所有 handler 均为异步：必须用 await bridge.callAsync(name, args) 调用（bridge.call 已禁用）。可用 handler：gallery.summary({}) → 相册聚合统计（totalPhotos/totalVideos/totalMedia/hasFaceCount/personClusterCount/labeledCount 等）；gallery.timeline({fromMs?,toMs?,bucketMs?}) → 按时间分桶计数 {桶起始时间戳:数量}（默认按月，bucketMs=2592000000=月/31536000000=年——月度/年度趋势的唯一真实取数通路）；gallery.query({label?,ocr?,location?,fromMs?,toMs?,hasFace?,limit?}) → 结构化过滤命中 {ids,total}；gallery.tags({}) → 标签分布 {标签:数量}（top 50）；gallery.stats_by_city({topN?}) → 城市分布；gallery.stats_by_tag({label?,hasFace?,fromMs?,toMs?}) → 条件过滤后标签分布。在 JS 内完成聚合计算（如月度计数、占比、环比），return 小结果对象（计数/分布/opaque id，非原始清单）。画 ECharts 图表前必须用本工具取真实数据，禁止臆造数值。画交互图表（ECharts）的唯一方式：脚本末尾 return Chart.echarts({title?, x:[类目标签], series:[{name,data,type?'bar'|'line'}], unit?, tip?})——固定模板自动渲染成图卡上屏（HTML 不回传给你，勿手写任何 HTML/ECharts 代码），你只收到 summary 文字用于撰写分析。注意：图卡已自动上屏，你的回复不得再包含 Html 组件或重复图卡，只写分析文字。完整 handler 参考见 gallery-script 技能。"
+
+    const val DESC_PARAM_CODE =
+        "JS 源码；用 await bridge.callAsync 取数，return 聚合后的小结果对象（计数/分布，非原始清单）"
 }

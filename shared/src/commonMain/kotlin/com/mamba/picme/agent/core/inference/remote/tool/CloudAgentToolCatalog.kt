@@ -98,6 +98,18 @@ object CloudAgentToolCatalog {
             resultSchema = "List<MediaAsset> 细化后完整资产列表（含 uri）+ 基数/命中数",
             projectionSchema = "计数文本「在上一轮结果内找到 N 张」+ 尾部 opaque 数据句柄「handle: scan/<id>」：仅数量+句柄 id，不含文件路径/uri/媒体清单",
         ),
+        // 2026-11-08 补录（ECharts 真实数据通路）：端侧 JS 沙箱只读取数——月度趋势等明细
+        // 聚合此前云端无通路，LLM 被迫臆造数组。写通路（capability.dispatch）不暴露。
+        CloudToolSpec(
+            name = CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT,
+            executor = ToolExecutor.LOCAL,
+            description = CloudAgentToolContract.DESC_RUN_GALLERY_SCRIPT,
+            params = listOf(
+                CloudToolParam("code", CloudAgentToolContract.DESC_PARAM_CODE),
+            ),
+            resultSchema = "JS return 的任意 JSON 值（聚合统计对象/数组/opaque 媒体 id）",
+            projectionSchema = "脚本 return 的聚合结果：计数/分布/opaque id 清单，不含文件路径/uri（CloudToolProjectionGate 机器校验，命中即 fail-closed）",
+        ),
     ).associateBy { spec -> spec.name }
 
     fun specFor(tool: String): CloudToolSpec? = specs[tool]

@@ -30,6 +30,9 @@ package com.mamba.picme.features.chat
  * 11. [LOCAL_MEDIA]：本地相册媒体引用（`media://{id}` 契约 → 白名单域注入，
  *    2026-09-27）——id 为占位符 [LOCAL_MEDIA_ID_PLACEHOLDER]，注入时替换为本机
  *    首张照片的真实 chat 媒体 id；显示兜底文案 = 通道未生效或相册为空。
+ * 12. [ECHARTS]：预制 ECharts 库图表卡（`<meta name="polang-lib" content="echarts">`
+ *    声明 → [LocalWebViewLibs] 渲染期注入 assets 预制库，2026-11-08）——应渲染柱线
+ *    复合图；显示兜底文案 = 预制库注入未生效。
  *
  * 形态速查：inline 卡完全撑开（≥120dp）、自身不滚动、卡内直接交互、滚动条隐藏；
  * fullpage 预览卡固定高 ≈0.5 屏、禁交互、点击进全屏查看器（竖滚 + 滚动条）。
@@ -575,6 +578,40 @@ object HtmlCardSmokeSamples {
     /** [LOCAL_MEDIA] 样本中的媒体 id 占位符，/html 注入时替换为本机真实首条媒体 id。 */
     const val LOCAL_MEDIA_ID_PLACEHOLDER = "__LOCAL_MEDIA_ID__"
 
+    /**
+     * 预制 ECharts 库用例（2026-11-08，`<meta name="polang-lib" content="echarts">` 声明 →
+     * LocalWebViewLibs 渲染期注入 assets 预制库）。肉眼验收：应渲染柱线复合图（可 hover 出
+     * tooltip）；显示兜底文案 = 注入通道未生效。离线可用（库随 APK 预制）。
+     */
+    private const val ECHARTS = """
+        <meta name="polang-lib" content="echarts">
+        <div style="font-family:-apple-system,'PingFang SC',sans-serif;padding:16px;background:#fff">
+          <div style="font-size:15px;font-weight:600;color:#222;margin-bottom:4px">相册月度趋势（ECharts 预制库）</div>
+          <div id="c" style="width:100%;height:260px"></div>
+        </div>
+        <script>
+        (function(){
+          var el = document.getElementById('c');
+          if (typeof echarts === 'undefined') {
+            el.innerHTML = '<div style="color:#999;font-size:13px;padding:24px;text-align:center;border:1px dashed #ccc;border-radius:10px">ECharts 未加载（polang-lib 预制库注入未生效）</div>';
+            return;
+          }
+          var chart = echarts.init(el);
+          chart.setOption({
+            grid: {left: 40, right: 16, top: 32, bottom: 24},
+            legend: {top: 0, textStyle: {fontSize: 11}},
+            tooltip: {trigger: 'axis'},
+            xAxis: {type: 'category', data: ['6月','7月','8月','9月','10月','11月'], axisLabel: {fontSize: 11}},
+            yAxis: {type: 'value', axisLabel: {fontSize: 11}, splitLine: {lineStyle: {color: '#eee'}}},
+            series: [
+              {name: '照片', type: 'bar', data: [320, 452, 601, 534, 720, 386], itemStyle: {color: '#ff7a45', borderRadius: [4,4,0,0]}, barMaxWidth: 24},
+              {name: '视频', type: 'line', smooth: true, data: [24, 31, 46, 28, 52, 19], itemStyle: {color: '#1a73e8'}, lineStyle: {width: 2}}
+            ]
+          });
+        })();
+        </script>
+    """
+
     val all: List<SmokeSample> = listOf(
         SmokeSample(STATIC, "纯 HTML/CSS 排版卡"),
         SmokeSample(RICH_MEDIA, "图文混排（内联 SVG）"),
@@ -588,5 +625,6 @@ object HtmlCardSmokeSamples {
         SmokeSample(LONG_ARTICLE, "长文卡：超一屏，应自动转预览形态"),
         SmokeSample(FULLPAGE_DECLARED, "display=fullpage 声明卡：应直接预览形态", display = "fullpage"),
         SmokeSample(LOCAL_MEDIA, "本地相册图引用（media:// 契约）"),
+        SmokeSample(ECHARTS, "ECharts 预制库图表卡（polang-lib 契约）"),
     )
 }

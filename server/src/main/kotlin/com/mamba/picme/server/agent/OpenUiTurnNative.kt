@@ -1,5 +1,9 @@
 package com.mamba.picme.server.agent
 
+import org.slf4j.LoggerFactory
+
+private val turnNativeLogger = LoggerFactory.getLogger("picme-agent")
+
 /**
  * OpenUI 回合原生（turn-native，spec《2026-11-01-openui-turn-native-design》）：
  * 系统提示词契约 + 终结消息兜底变换。
@@ -71,10 +75,26 @@ Query 取数语句）：
             return normalized
         }
         val wrapped = "// summary: 文本回复\nroot = Markdown(\"${escapeOpenUiString(text)}\")"
-        // 防御分支：兜底包装自身复验（极端超长等），仍失败则硬编码保底
-        if (RenderOpenUiValidator.validateProgramToError(wrapped) != null) {
+        // 防御分支：兜底包装自身复验（整程序扫描的违规——媒体路径/非法 handle/quoted
+        // action 等——在字符串包装后仍存活时命中），仍失败则硬编码保底。
+        // 2026-11-08 真机事故：该分支曾静默吞掉 ECharts 卡回复，无从定位——
+        // 必须留可观测性（违规清单 + 原文长度 + 预览，对齐 errorText 回显口径无隐私面）。
+        val wrapError = RenderOpenUiValidator.validateProgramToError(wrapped)
+        if (wrapError != null) {
+            turnNativeLogger.warn(
+                "终结兜底硬降级：原始输出含 Markdown 包装后仍存活的违规，整回复被硬编码替换。" +
+                    "rawLen={}, wrapError={}, rawPreview={}",
+                text.length,
+                wrapError,
+                text.replace("\n", "\\n").take(500),
+            )
             return "// summary: 错误\nroot = Markdown(\"回复生成失败，请重试\")"
         }
+        turnNativeLogger.info(
+            "终结兜底：原始输出非合法程序，Markdown 包装放行。rawLen={}, rawPreview={}",
+            text.length,
+            text.replace("\n", "\\n").take(200),
+        )
         return wrapped
     }
 

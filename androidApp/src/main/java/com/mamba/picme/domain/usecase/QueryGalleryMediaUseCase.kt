@@ -98,13 +98,15 @@ class QueryGalleryMediaUseCase(
      * - 将 [fromMs, toMs] 范围内的媒体按 [bucketMs] 分桶，每桶统计计数。
      * - 桶 key = 桶起始时间戳（毫秒），value = 该桶内媒体数量。
      * - 默认按月分桶（[BUCKET_MONTH_MS]），全量时间范围。
-     * - 最多 [maxBuckets] 个桶（防返回数据过大）。
+     * - 最多 [maxBuckets] 个桶（防返回数据过大）；超限时保留**最近** N 桶
+     *   （2026-11-09 修复：原为升序取最早 N 桶——老相册 2020 年后数据被整体砍没，
+     *   月度趋势卡「60 个月合计 896」对全库 8152 的严重低估即此缺陷）。
      */
     suspend fun timeline(
         fromMs: Long? = null,
         toMs: Long? = null,
         bucketMs: Long = BUCKET_MONTH_MS,
-        maxBuckets: Int = 60,
+        maxBuckets: Int = 240,
     ): Map<Long, Int> = withContext(Dispatchers.IO) {
         val start = fromMs ?: 0L
         val end = toMs ?: Long.MAX_VALUE
@@ -114,8 +116,9 @@ class QueryGalleryMediaUseCase(
             val bucketKey = m.captureDate / bucketMs * bucketMs
             buckets[bucketKey] = (buckets[bucketKey] ?: 0) + 1
         }
-        // 按桶 key（时间）升序，限制桶数量
-        buckets.entries.sortedBy { it.key }.take(maxBuckets)
+        // 超上限保留最近 N 桶，输出仍按时间升序
+        buckets.entries.sortedByDescending { it.key }.take(maxBuckets)
+            .sortedBy { it.key }
             .associate { it.key to it.value }
     }
 

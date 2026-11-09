@@ -10,6 +10,7 @@ description: run_gallery_script 端侧 JS 沙箱的完整 handler 参考与调�
 - 所有 handler 均为异步，**必须用 `await bridge.callAsync(name, args)` 调用**（`bridge.call` 已禁用，调用会报错）。
 - 取数类 handler 只读、数据不出端；删除/收藏等写操作走 `capability.dispatch`，会在端侧弹窗等用户确认。
 - 用 `return` 把结果对象回传给你做总结；在 JS 内完成组合计算（如某标签占比 = query.total / summary.totalMedia；环比 = 本月/上月-1）。
+- **画交互图表（ECharts）**：脚本末尾 `return Chart.echarts({title?, x:[类目标签], series:[{name, data, type?: 'bar'|'line'}], unit?, tip?})`——固定模板自动渲染成图卡上屏（HTML 不回传，你收到 summary 文字用于撰写分析）；勿手写任何 HTML/ECharts/SVG（SVG 的 Chart.bar/line/pie/timeline 云端不渲染）。
 - 可并发取数：
 
 ```js

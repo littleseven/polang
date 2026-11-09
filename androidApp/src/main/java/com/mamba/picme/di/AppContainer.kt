@@ -17,6 +17,7 @@ import com.mamba.picme.core.image.GpuBeautyProcessor
 import com.mamba.picme.core.image.ImageProcessor
 import com.mamba.picme.core.image.ImageProcessorImpl
 import com.mamba.picme.core.agenttools.CloudAgentGalleryTools
+import com.mamba.picme.core.agenttools.CloudAgentScriptTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.core.image.ThumbnailCache
@@ -105,6 +106,9 @@ import com.mamba.picme.features.chat.PrefsClaudeSidStore
 import com.mamba.picme.features.chat.buildAppToolExecutor
 import com.mamba.picme.features.chat.capability.MemoryCapability
 import com.mamba.picme.features.chat.capability.PersonRelationCapability
+import com.mamba.picme.features.chat.js.QuickJsEngine
+import com.mamba.picme.features.chat.js.loadChartBootstrapJs
+import com.mamba.picme.features.chat.js.registerGalleryHandlers
 import com.mamba.picme.features.chat.taskcenter.TaskCenterViewModel
 import com.mamba.picme.features.cloudagent.CloudAgentChatViewModel
 import com.mamba.picme.domain.matting.MattingEngine
@@ -1249,6 +1253,30 @@ class AppContainerImpl(
         )
     }
 
+    /**
+     * 云端 run_gallery_script 的无头 JS 执行器（2026-11-08 补录真实聚合通路）。
+     * 只读 handler 与 chat 链路同源（registerGalleryHandlers 唯一注册点）；
+     * 不注册 capability.dispatch 写通路、不加载 Chart bootstrap，保持云端面只读。
+     */
+    private val cloudAgentScriptTools: CloudAgentScriptTools by lazy {
+        CloudAgentScriptTools(
+            engineFactory = {
+                QuickJsEngine(
+                    onLog = { msg -> Logger.i("CloudAgentScriptTools", msg) },
+                    evalTimeoutMs = CloudAgentScriptTools.DEFAULT_EVAL_TIMEOUT_MS,
+                )
+            },
+            scope = (context.applicationContext as com.mamba.picme.PoLangApplication).applicationScope,
+            registerHandlers = { rt ->
+                registerGalleryHandlers(
+                    rt, getGallerySummaryUseCase, queryGalleryMediaUseCase, personDao, controlledVocab,
+                    scanProgressProvider = { TagGenerationService.sessionProgress.value },
+                )
+            },
+            chartBootstrapJs = { loadChartBootstrapJs(context) },
+        )
+    }
+
     /** 云端工具桥端侧执行器（调试页与 Chat 页云端模式共用实例）。 */
     private val deviceToolExecutor: DeviceToolExecutor by lazy {
         DeviceToolExecutor(
@@ -1259,6 +1287,7 @@ class AppContainerImpl(
             refineSearch = { constraint, fromMs, toMs ->
                 cloudAgentGalleryTools.refineMediaSearch(constraint, fromMs, toMs)
             },
+            runGalleryScript = { code -> cloudAgentScriptTools.runScript(code) },
         )
     }
 

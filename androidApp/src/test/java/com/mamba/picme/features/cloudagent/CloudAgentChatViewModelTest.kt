@@ -101,6 +101,7 @@ class CloudAgentChatViewModelTest {
                 gallerySummary = { "相册 42 张" },
                 searchMedia = { _, _, _, _, _, _ -> "找到 0 张" },
                 refineSearch = { _, _, _ -> "error: no base" },
+                runGalleryScript = { _ -> "{}" },
             ),
             repository,
             roundInFlightHint = { "上一轮还在跑，请稍候" },

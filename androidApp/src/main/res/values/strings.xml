@@ -592,6 +592,7 @@
     <string name="cloud_agent_step_gallery_summary">Looking through your gallery…</string>
     <string name="cloud_agent_step_search_media">Searching your photos…</string>
     <string name="cloud_agent_step_refine_search">Refining the search…</string>
+    <string name="cloud_agent_step_run_script">Analyzing your gallery…</string>
     <string name="cloud_agent_step_compose_card">Composing a card…</string>
     <string name="cloud_agent_step_build_page">Building a page…</string>
     <string name="cloud_agent_step_failed_hint">didn\'t work, trying another way…</string>

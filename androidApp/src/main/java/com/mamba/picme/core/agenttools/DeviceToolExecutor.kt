@@ -9,13 +9,15 @@ import org.json.JSONObject
 /**
  * 云端 Agent 工具桥的端侧执行器（spec §5）：tool_request 帧的 tool 名 → 注入的相册工具 handler。
  *
- * 三个 handler **无默认实现、必须显式注入**：生产接线（AppContainer）走
+ * 四个 handler **无默认实现、必须显式注入**：生产接线（AppContainer）走
  * [CloudAgentGalleryTools] 无头直执（绕过场景注册表，对齐 iOS IosCloudAgentToolBridge）。
  * 历史上默认委托 ChatToolService 的 @Tool 方法（经 CapabilityRegistry scene=CHAT dispatch），
  * 因 chat 能力 Delegate 仅 ChatScreen 存活期绑定 + 云端 Agent 页非 CHAT 场景，命令被注册表
  * 入队并立即回「正在切换页面」占位文案，永不真正执行——defaults 即该故障的温床，已移除。
  *
- * M2 只读三件套；写类工具（delete/share/select）不在映射表——云端会话里它们即未知工具。
+ * M2 只读三件套 + 2026-11-08 补录 run_gallery_script（端侧 JS 沙盒聚合取数，[CloudAgentScriptTools]
+ * 无头执行——只读 handler 同源 chat 链路、写通路不注册）；写类工具（delete/share/select）
+ * 不在映射表——云端会话里它们即未知工具。
  * 工具名/错误前缀/截断契约收口 shared [CloudAgentToolContract]（M3，双端 + server 同源）。
  * 出端结果一律过 shared [CloudToolProjectionGate] 投影闸（混合架构 M1，fail-closed）。
  */
@@ -23,6 +25,7 @@ class DeviceToolExecutor(
     private val gallerySummary: suspend () -> String,
     private val searchMedia: suspend (String, String, String, String, String, String) -> String,
     private val refineSearch: suspend (String, String, String) -> String,
+    private val runGalleryScript: suspend (String) -> String,
 ) {
 
     suspend fun execute(tool: String, args: JSONObject): String {
@@ -40,6 +43,10 @@ class DeviceToolExecutor(
                 CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> {
                     val values = catalogArgs(tool, args)
                     refineSearch(values[0], values[1], values[2])
+                }
+                CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT -> {
+                    val values = catalogArgs(tool, args)
+                    runGalleryScript(values[0])
                 }
                 else -> return CloudAgentToolContract.unknownTool(tool)
             }

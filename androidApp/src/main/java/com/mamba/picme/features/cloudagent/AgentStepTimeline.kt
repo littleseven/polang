@@ -2,6 +2,7 @@ package com.mamba.picme.features.cloudagent
 
 import com.mamba.picme.R
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
+import com.mamba.picme.agent.core.skill.AgentSkillContract
 import com.mamba.picme.domain.chat.AgentStepStatus
 import com.mamba.picme.domain.chat.AgentStepUi
 
@@ -62,10 +63,14 @@ fun agentStepLabelRes(tool: String): Int? = when (tool) {
     CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> R.string.cloud_agent_step_gallery_summary
     CloudAgentToolContract.TOOL_SEARCH_MEDIA -> R.string.cloud_agent_step_search_media
     CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> R.string.cloud_agent_step_refine_search
+    CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT -> R.string.cloud_agent_step_run_script
     CloudAgentToolContract.TOOL_RENDER_UI,
     CloudAgentToolContract.TOOL_RENDER_UI_OPENUI,
     -> R.string.cloud_agent_step_compose_card
     CloudAgentToolContract.TOOL_RENDER_HTML -> R.string.cloud_agent_step_build_page
-    "server_time" -> null
+    // server 侧工具不上时间线（server_time 契约无常量用字面量；load_skill 常量在 AgentSkillContract）
+    "server_time",
+    AgentSkillContract.TOOL_LOAD_SKILL,
+    -> null
     else -> null
 }

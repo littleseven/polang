@@ -125,7 +125,9 @@ fun HtmlFullpageViewer(
                             tag = content.html.hashCode()
                             loadDataWithBaseURL(
                                 null,
-                                wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(content.html)),
+                                LocalWebViewLibs.injectDeclaredLibs(
+                                    wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(content.html))
+                                ),
                                 "text/html",
                                 "utf-8",
                                 null
@@ -139,7 +141,9 @@ fun HtmlFullpageViewer(
                             webView.tag = content.html.hashCode()
                             webView.loadDataWithBaseURL(
                                 null,
-                                wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(content.html)),
+                                LocalWebViewLibs.injectDeclaredLibs(
+                                    wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(content.html))
+                                ),
                                 "text/html",
                                 "utf-8",
                                 null
@@ -186,9 +190,10 @@ private fun WebView.applyFullpageSandbox(
             return true
         }
 
-        /** 本地媒体白名单注入（同卡片沙箱，见 [LocalMediaWebViewAssets]）；其余子资源放行。 */
+        /** 本地白名单注入（同卡片沙箱）：预制 JS 库（[LocalWebViewLibs]）+ 本地媒体（[LocalMediaWebViewAssets]）；其余子资源放行。 */
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-            LocalMediaWebViewAssets.intercept(view.context, request)
+            LocalWebViewLibs.intercept(view.context, request)
+                ?: LocalMediaWebViewAssets.intercept(view.context, request)
                 ?: super.shouldInterceptRequest(view, request)
 
         @RequiresApi(Build.VERSION_CODES.O)

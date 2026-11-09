@@ -1,6 +1,7 @@
 package com.mamba.picme.features.cloudagent
 
 import com.mamba.picme.agent.core.inference.remote.tool.CloudAgentToolContract
+import com.mamba.picme.core.agenttools.CloudAgentScriptTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
@@ -79,12 +80,24 @@ class CloudAgentTurnRunner(
                 onEvent(CloudTurnEvent.ToolCall(frame.tool))
                 toolScope.launch {
                     val result = deviceToolExecutor.execute(frame.tool, frame.args)
+                    // 产物拦截：run_gallery_script 的 {html, summary} 信封 → 本地 HTML 卡
+                    // 直接上屏（复用 ChatViewModel 的 html_card 落库管线），上行只带 summary——
+                    // HTML 不出端、不进 LLM 上下文（对齐 chat 链路产物拦截的省 token 语义）。
+                    val artifact = CloudAgentScriptTools.parseHtmlArtifact(result)
+                    if (artifact != null) {
+                        onEvent(CloudTurnEvent.HtmlCard(artifact.first, artifact.second))
+                    }
                     api.postToolResult(
                         appToken,
                         sessionId,
                         frame.requestId,
                         ok = !CloudAgentToolContract.isError(result),
-                        result = result,
+                        result = artifact?.let {
+                            JSONObject()
+                                .put("html_card", "emitted")
+                                .put("summary", it.second)
+                                .toString()
+                        } ?: result,
                     ).onFailure { e -> Logger.w(TAG, "postToolResult failed: ${e.message}") }
                 }
             }

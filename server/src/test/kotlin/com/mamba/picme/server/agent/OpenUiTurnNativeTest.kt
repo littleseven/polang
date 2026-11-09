@@ -77,6 +77,64 @@ class OpenUiTurnNativeTest {
         }
     }
 
+    // 2026-11-08 真机事故：云端回合 LLM 产出 ECharts HTML 卡后，终结落流变成硬编码
+    // 「回复生成失败，请重试」——整程序扫描（含字符串字面量内部）的违规模式在 Markdown
+    // 兜底包装后仍然存活，wrap 复验失败即硬降级。以下四例钉住三态分布与典型踩坑面。
+
+    private val echartsBody =
+        "<meta name='polang-lib' content='echarts'>" +
+            "<div id='c' style='width:100%;height:260px'></div>" +
+            "<script>(function(){var el=document.getElementById('c');" +
+            "if(typeof echarts==='undefined'){el.innerHTML='图表库未加载';return;}" +
+            "var chart=echarts.init(el);chart.setOption({tooltip:{trigger:'axis'}," +
+            "xAxis:{type:'category',data:['6月','7月','8月']},yAxis:{type:'value'}," +
+            "series:[{name:'照片',type:'bar',data:[320,452,601]}]});})();</script>"
+
+    @Test
+    fun `ensureValidProgram passes echarts polang-lib meta program through`() {
+        // echarts-card 技能契约正确形态：meta 声明 + 内联脚本，整程序过校验原样放行
+        val program = "// summary: 相册月度趋势\n" +
+            "root = Card([Text(\"相册月度趋势\", \"HEADLINE\"), " +
+            "Text(\"点柱子看每月数值\", \"CAPTION\"), " +
+            "Html(html = \"$echartsBody\")])"
+        assertEquals(program, OpenUiTurnNative.ensureValidProgram(program))
+    }
+
+    @Test
+    fun `ensureValidProgram hard-fails on file uri script src`() {
+        // LLM 习惯性写 file:///android_asset 引脚本：MEDIA_PATH 是整程序扫描，
+        // Markdown 包装后违规仍存活 → 硬编码保底（观测走 picme-agent WARN 日志）
+        val bad = echartsBody.replace(
+            "<meta name='polang-lib' content='echarts'>",
+            "<script src='file:///android_asset/polang-lib/echarts.min.js'></script>",
+        )
+        val out = OpenUiTurnNative.ensureValidProgram(
+            "// summary: 相册月度趋势\nroot = Card([Html(html = \"$bad\")])",
+        )
+        assertEquals("// summary: 错误\nroot = Markdown(\"回复生成失败，请重试\")", out)
+    }
+
+    @Test
+    fun `ensureValidProgram hard-fails on content uri in html`() {
+        val bad = echartsBody + "<img src='content://media/external/images/12345'>"
+        val out = OpenUiTurnNative.ensureValidProgram(
+            "// summary: 相册月度趋势\nroot = Card([Html(html = \"$bad\")])",
+        )
+        assertEquals("// summary: 错误\nroot = Markdown(\"回复生成失败，请重试\")", out)
+    }
+
+    @Test
+    fun `ensureValidProgram passes cdn script src through for client sanitizer`() {
+        // CDN 远程脚本不是服务端违规面（无媒体路径）：程序放行，由端侧 sanitizer
+        // 剔除远程 script、卡内兜底文案外显——软失败语义钉住，防两端职责漂移
+        val cdn = echartsBody.replace(
+            "<meta name='polang-lib' content='echarts'>",
+            "<script src='https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js'></script>",
+        )
+        val program = "// summary: 相册月度趋势\nroot = Card([Html(html = \"$cdn\")])"
+        assertEquals(program, OpenUiTurnNative.ensureValidProgram(program))
+    }
+
     @Test
     fun `ensureValidProgram survives huge Html literal`() {
         // 2026-11-04 SOE 回归：终结兜底变换（normalize + validate + 兜底包装复验）

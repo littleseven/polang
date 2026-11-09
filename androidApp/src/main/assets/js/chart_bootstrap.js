@@ -170,5 +170,100 @@
     return (opts.type === 'bar' ? bar : line)(s);
   }
 
-  globalThis.Chart = { bar: bar, line: line, pie: pie, timeline: timelineChart };
+  /**
+   * ECharts 交互图卡（云端 run_gallery_script 产物通路，2026-11-08）：
+   * return Chart.echarts(cfg) → {html: <自包含 HTML>, summary: <给 LLM 的文字>}。
+   * html 由端侧直接渲染成 HTML 卡（不进 LLM 上下文），summary 回传 LLM 写分析——
+   * LLM 零 HTML 编写，模板一次到位（polang-lib 预制 echarts、confine 防遮挡、
+   * 读数行联动、清新色板），彻底消灭手写 HTML 的 DSL 嵌套事故面。
+   *
+   * cfg: { title?, x: [类目标签...], series: [{name, data, type?: 'bar'|'line'}],
+   *        unit?: 数值单位, tip?: 读数行提示文案 }
+   * 典型用法（月度趋势；gallery.timeline 返回 {桶起始时间戳:数量}，标签需自行格式化）：
+   *   var tl = await bridge.callAsync('gallery.timeline', {bucketMs: 2592000000});
+   *   var keys = Object.keys(tl).sort();
+   *   var x = keys.map(function (k) { var d = new Date(Number(k)); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); });
+   *   return Chart.echarts({ title: '相册月度趋势', x: x,
+   *     series: [{name: '媒体数', data: keys.map(function (k) { return tl[k]; })}], unit: '个' });
+   * 注意：gallery.timeline 不分照片/视频（无 mediaType 参数），多序列需自行用 gallery.query 聚合。
+   */
+  var ECHARTS_PALETTE = ['#38BDF8', '#34D399', '#FBBF24', '#F472B6', '#A78BFA', '#F87171'];
+
+  function echartsCard(cfg) {
+    cfg = cfg || {};
+    var x = cfg.x || [];
+    var unit = cfg.unit || '';
+    var sers = (cfg.series || []).map(function (s, i) {
+      var ser = {
+        name: String(s.name == null ? ('系列' + (i + 1)) : s.name),
+        type: s.type === 'line' ? 'line' : 'bar',
+        data: s.data || [],
+        itemStyle: { color: s.color || ECHARTS_PALETTE[i % ECHARTS_PALETTE.length] }
+      };
+      if (ser.type === 'line') {
+        ser.smooth = true;
+        ser.symbolSize = 6;
+        ser.lineStyle = { width: 2.5 };
+      } else {
+        ser.barMaxWidth = 26;
+        ser.itemStyle.borderRadius = [4, 4, 0, 0];
+      }
+      return ser;
+    });
+    var multi = sers.length > 1;
+    var option = {
+      animation: false,
+      tooltip: {
+        trigger: 'axis',
+        confine: true,
+        backgroundColor: 'rgba(15,23,42,0.88)',
+        borderWidth: 0,
+        textStyle: { color: '#F1F5F9', fontSize: 12 }
+      },
+      grid: { left: 8, right: 16, top: multi ? 34 : 12, bottom: 4, containLabel: true },
+      xAxis: {
+        type: 'category', data: x,
+        axisLine: { lineStyle: { color: '#CBD5E1' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#64748B', fontSize: 11 }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: '#94A3B8', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#EEF2F7' } }
+      },
+      series: sers
+    };
+    if (multi) {
+      option.legend = { top: 2, right: 8, itemWidth: 14, itemHeight: 8, textStyle: { color: '#64748B', fontSize: 11 } };
+    }
+    var titleHtml = cfg.title
+      ? '<div style="font-size:15px;font-weight:600;color:#0F172A;padding:2px 4px 6px">' + esc(cfg.title) + '</div>' : '';
+    var html = '<meta name="polang-lib" content="echarts">' +
+      '<div style="font-family:-apple-system,\'PingFang SC\',sans-serif;background:transparent">' +
+      titleHtml +
+      '<div id="tip" style="font-size:12px;color:#94A3B8;min-height:18px;padding:0 4px 4px">' +
+      esc(cfg.tip || '点按图表查看数值') + '</div>' +
+      '<div id="c" style="width:100%;height:240px"></div></div>' +
+      '<script>(function(){var c=echarts.init(document.getElementById("c"));c.setOption(' + JSON.stringify(option) + ');' +
+      'var tip=document.getElementById("tip"),def=tip.textContent,xs=' + JSON.stringify(x) + ',u=' + JSON.stringify(unit) + ';' +
+      'c.on("updateAxisPointer",function(e){var i=e.dataIndexInside;if(i==null||i<0||i>=xs.length)return;' +
+      'var ps=c.getOption().series.map(function(s){return s.name+" "+(s.data[i]==null?0:s.data[i])+u;});' +
+      'tip.textContent=xs[i]+"："+ps.join(" · ");});' +
+      'c.on("globalout",function(){tip.textContent=def;});' +
+      'window.addEventListener("resize",function(){c.resize();});})();</scr' + 'ipt>';
+    var parts = sers.map(function (s) {
+      var maxI = 0, sum = 0;
+      for (var i = 0; i < s.data.length; i++) {
+        if (Number(s.data[i]) > Number(s.data[maxI])) maxI = i;
+        sum += Number(s.data[i]) || 0;
+      }
+      return s.name + '：峰值 ' + (x[maxI] == null ? '-' : x[maxI]) + '=' + fmt(s.data[maxI] || 0) + unit +
+        '，合计 ' + fmt(sum) + unit;
+    });
+    var summary = (cfg.title ? cfg.title + '——' : '') + '共' + x.length + '个区间；' + parts.join('；');
+    return { html: html, summary: summary };
+  }
+
+  globalThis.Chart = { bar: bar, line: line, pie: pie, timeline: timelineChart, echarts: echartsCard };
 })();

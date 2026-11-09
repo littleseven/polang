@@ -14,6 +14,10 @@ description: 在 OpenUI 程序的 Html(...) 组件里撰写自包含 HTML 沙箱
 
 1. **自包含**：单个完整 HTML 字符串，样式写在 `<style>` 内，不引外部 CSS。
 2. **脚本**：允许内联 `<script>` 做卡内交互；**禁止远程 `<script src=...>`**（端侧直接剔除）。
+   更严禁令：HTML 里任何位置出现 `file://` / `content://` / `/storage/` 子串
+   （如 `file:///android_asset/...`），会命中服务端隐私校验整程序扫描，
+   **整条回复被硬降级为「回复生成失败，请重试」**（2026-11-08 真机事故）——
+   端侧预制库（如 ECharts）一律走 `<meta name='polang-lib'>` 声明，见 echarts-card 技能。
 3. **禁用标签**：iframe / object / embed / form；禁 `<meta http-equiv="refresh">`。
 4. **体积上限 128KB**（UTF-8 字节数，超限整卡被拒）——注意写在 OpenUi 字符串里
    转义后的体积也算，控制 HTML 规模，别内嵌大段数据或 base64 图片。

@@ -13,14 +13,32 @@ class DeviceToolExecutorTest {
         gallery: suspend () -> String = { "相册 1000 张" },
         search: suspend (String, String, String, String, String, String) -> String = { q, _, _, _, _, _ -> "搜索[$q] → 3 张" },
         refine: suspend (String, String, String) -> String = { c, _, _ -> "细化[$c] → 1 张" },
-    ) = DeviceToolExecutor(gallerySummary = gallery, searchMedia = search, refineSearch = refine)
+        script: suspend (String) -> String = { _ -> "{\"months\":12}" },
+    ) = DeviceToolExecutor(
+        gallerySummary = gallery,
+        searchMedia = search,
+        refineSearch = refine,
+        runGalleryScript = script,
+    )
 
     @Test
-    fun `maps three tool names to handlers`() = runTest {
+    fun `maps four tool names to handlers`() = runTest {
         val exec = executor()
         assertEquals("相册 1000 张", exec.execute("get_gallery_summary", JSONObject()))
         assertEquals("搜索[猫] → 3 张", exec.execute("search_media", JSONObject().put("query", "猫")))
         assertEquals("细化[夜景] → 1 张", exec.execute("refine_media_search", JSONObject().put("constraint", "夜景")))
+        assertEquals(
+            "{\"months\":12}",
+            exec.execute("run_gallery_script", JSONObject().put("code", "return {}")),
+        )
+    }
+
+    @Test
+    fun `run_gallery_script passes code arg`() = runTest {
+        var captured: String? = null
+        val exec = executor(script = { code -> captured = code; "ok" })
+        exec.execute("run_gallery_script", JSONObject().put("code", "return 1 + 1"))
+        assertEquals("return 1 + 1", captured)
     }
 
     @Test

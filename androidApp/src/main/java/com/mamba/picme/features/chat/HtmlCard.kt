@@ -84,6 +84,8 @@ import kotlin.math.roundToInt
  * - **零 JS 桥接**（不 addJavascriptInterface）——JS 拿不到任何原生对象，最高防线不动；
  * - 禁文件/内容访问、禁 DOM Storage、无缓存；本地相册媒体只经 [LocalMediaWebViewAssets]
  *   白名单域注入（`media://{id}` 契约，媒体域与页面跨源——JS 可显示图片但读不到字节）；
+ *   预制 JS 库（ECharts 等）只经 [LocalWebViewLibs] 声明式注入——卡内写
+ *   `<meta name="polang-lib" content="echarts">`，渲染期展开为白名单域 script 从 assets 开流；
  * - 远程资源（img/CSS 等）放行加载（2026-09-25 起暂时放开安全限制，表现力优先）；
  * - `<a>` 外链点击**不在卡片内导航**：回调 `onOpenLink` 由宿主打开全屏落地页
  *   （[HtmlLinkPreviewOverlay]）查看；卡片内其余元素（按钮/Tab/手风琴等 JS 交互）
@@ -538,10 +540,13 @@ private fun HtmlWebView(
 private fun WebView.loadHtmlOnce(html: String) {
     // tag 直接持有 html 全文做重载判等（曾用 hashCode，32 位哈希碰撞会漏重载/串卡）
     tag = html
-    // media://{id} 本地媒体引用 → 白名单拦截域 URL（渲染期重写，落库 HTML 保持契约形态）
+    // media://{id} 本地媒体引用 → 白名单拦截域 URL（渲染期重写，落库 HTML 保持契约形态）；
+    // <meta name="polang-lib"> 预制库声明 → 白名单域 script（渲染期注入，同源契约）
     loadDataWithBaseURL(
         null,
-        wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(html)),
+        LocalWebViewLibs.injectDeclaredLibs(
+            wrapHtmlDocument(LocalMediaWebViewAssets.rewriteMediaRefs(html))
+        ),
         "text/html",
         "utf-8",
         null
@@ -710,11 +715,14 @@ private fun WebView.applyCardSandbox(
         // 零 JS 桥接 + 禁文件访问防线不变。
 
         /**
-         * 本地媒体白名单注入（ADR-016 D3 落地）：`media://{id}` 引用已重写为白名单域 URL，
-         * 命中 → MediaStore 开流（见 [LocalMediaWebViewAssets]）；其余子资源返回 null 放行。
+         * 本地白名单注入：预制 JS 库（`<meta name="polang-lib">` 声明展开的白名单域 script，
+         * 见 [LocalWebViewLibs]）→ assets 开流；本地媒体（ADR-016 D3 落地，`media://{id}` 引用
+         * 已重写为白名单域 URL，见 [LocalMediaWebViewAssets]）→ MediaStore 开流；
+         * 其余子资源返回 null 放行。
          */
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-            LocalMediaWebViewAssets.intercept(view.context, request)
+            LocalWebViewLibs.intercept(view.context, request)
+                ?: LocalMediaWebViewAssets.intercept(view.context, request)
                 ?: super.shouldInterceptRequest(view, request)
 
         @RequiresApi(Build.VERSION_CODES.O)

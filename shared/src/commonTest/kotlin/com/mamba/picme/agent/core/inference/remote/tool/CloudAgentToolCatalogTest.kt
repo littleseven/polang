@@ -10,11 +10,12 @@ import kotlin.test.assertTrue
 class CloudAgentToolCatalogTest {
 
     @Test
-    fun `all three bridge tools are declared`() {
+    fun `all four bridge tools are declared`() {
         listOf(
             CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY,
             CloudAgentToolContract.TOOL_SEARCH_MEDIA,
             CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
+            CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT,
         ).forEach { name ->
             assertNotNull(CloudAgentToolCatalog.specFor(name), "missing spec for $name")
         }
@@ -26,6 +27,7 @@ class CloudAgentToolCatalogTest {
             CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY,
             CloudAgentToolContract.TOOL_SEARCH_MEDIA,
             CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
+            CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT,
         ).forEach { name ->
             assertEquals(ToolExecutor.LOCAL, CloudAgentToolCatalog.specFor(name)?.executor)
         }
@@ -36,6 +38,7 @@ class CloudAgentToolCatalogTest {
         assertEquals("get_gallery_summary", CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY)
         assertEquals("search_media", CloudAgentToolContract.TOOL_SEARCH_MEDIA)
         assertEquals("refine_media_search", CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH)
+        assertEquals("run_gallery_script", CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT)
     }
 
     @Test
@@ -62,10 +65,23 @@ class CloudAgentToolCatalogTest {
             CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY,
             CloudAgentToolContract.TOOL_SEARCH_MEDIA,
             CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
+            CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT,
         ).forEach { name ->
             val projection = CloudAgentToolCatalog.specFor(name)!!.projectionSchema
             assertTrue(projection.contains("不含"), "$name projection must state exclusion clause")
         }
+    }
+
+    @Test
+    fun `run gallery script declares single code param`() {
+        // 2026-11-08 补录：云端面只读取数（月度趋势真实数据通路），写通路不暴露
+        val spec = CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT)!!
+        assertEquals(listOf("code"), spec.params.map { it.name })
+        assertTrue(spec.params.all { it.required })
+        assertEquals(
+            CloudAgentToolContract.DESC_PARAM_CODE,
+            spec.params.single().description,
+        )
     }
 
     @Test
@@ -95,6 +111,10 @@ class CloudAgentToolCatalogTest {
         assertEquals(
             CloudAgentToolContract.DESC_REFINE_MEDIA_SEARCH,
             CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH)!!.description,
+        )
+        assertEquals(
+            CloudAgentToolContract.DESC_RUN_GALLERY_SCRIPT,
+            CloudAgentToolCatalog.specFor(CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT)!!.description,
         )
     }
 
@@ -197,6 +217,7 @@ class CloudAgentToolCatalogTest {
                 CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY,
                 CloudAgentToolContract.TOOL_SEARCH_MEDIA,
                 CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
+                CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT,
             ),
             CloudAgentToolCatalog.localTools().map { it.name }.toSet(),
         )

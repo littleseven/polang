@@ -580,6 +580,7 @@
     <string name="cloud_agent_step_gallery_summary">正在浏览相册概况…</string>
     <string name="cloud_agent_step_search_media">正在搜索照片…</string>
     <string name="cloud_agent_step_refine_search">正在细化搜索…</string>
+    <string name="cloud_agent_step_run_script">正在分析相册…</string>
     <string name="cloud_agent_step_compose_card">正在生成卡片…</string>
     <string name="cloud_agent_step_build_page">正在生成页面…</string>
     <string name="cloud_agent_step_failed_hint">未成功，换个方式试试…</string>

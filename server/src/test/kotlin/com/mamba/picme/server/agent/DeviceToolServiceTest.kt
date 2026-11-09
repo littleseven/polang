@@ -22,13 +22,14 @@ class DeviceToolServiceTest {
         tools().single { tool -> tool.descriptor.name == name }
 
     @Test
-    fun `catalog drives the exact three bridge tools`() {
+    fun `catalog drives the exact four bridge tools`() {
         val service = DeviceToolService("s1", AgentBridgeRegistry()) { }
         assertEquals(
             setOf(
                 CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY,
                 CloudAgentToolContract.TOOL_SEARCH_MEDIA,
                 CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
+                CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT,
             ),
             service.tools().map { tool -> tool.descriptor.name }.toSet(),
         )

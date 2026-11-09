@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * LLM 可见描述只许承诺 projectionSchema 面（混合架构 M1，spec §3.1③）：
- * 三设备工具描述必须显式声明「不含文件路径/媒体清单」，防止描述漂移暗示全量数据可得。
+ * 四设备工具描述必须显式声明「不含文件路径/媒体清单」，防止描述漂移暗示全量数据可得。
  * 分层 runtime M2：工具集自 shared `CloudAgentToolCatalog` 目录生成，descriptor 与目录逐项等价。
  */
 class DeviceToolDescriptionTest {
@@ -18,9 +18,9 @@ class DeviceToolDescriptionTest {
         .associateBy { tool -> tool.descriptor.name }
 
     @Test
-    fun `three device tools present`() {
+    fun `four device tools present`() {
         assertEquals(
-            setOf("get_gallery_summary", "search_media", "refine_media_search"),
+            setOf("get_gallery_summary", "search_media", "refine_media_search", "run_gallery_script"),
             descriptors.keys,
         )
     }
@@ -56,6 +56,10 @@ class DeviceToolDescriptionTest {
         assertEquals(
             CloudAgentToolContract.DESC_REFINE_MEDIA_SEARCH,
             descriptors.getValue("refine_media_search").descriptor.description,
+        )
+        assertEquals(
+            CloudAgentToolContract.DESC_RUN_GALLERY_SCRIPT,
+            descriptors.getValue("run_gallery_script").descriptor.description,
         )
     }
 

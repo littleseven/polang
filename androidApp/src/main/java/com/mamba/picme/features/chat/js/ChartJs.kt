@@ -11,8 +11,11 @@ import android.content.Context
  * - Chart.line({title, labels, values, unit?})
  * - Chart.pie({title, labels, values})
  * - Chart.timeline(timelineObj, {title, unit?, type?})
+ * - Chart.echarts({title?, x, series, unit?, tip?})——ECharts 交互图卡固定模板
+ *   （云端 run_gallery_script 产物通路：返回 {html, summary}，端侧渲染 HTML 卡，
+ *   HTML 不进 LLM 上下文；SVG 系 API 云端不渲染）
  *
- * 每个 API 返回 `{chart: <svg 字符串>, summary: <给 LLM 的精简文字>}`。
+ * SVG 系 API 返回 `{chart: <svg 字符串>, summary: <给 LLM 的精简文字>}`。
  *
  * @see com.mamba.picme.features.chat.js.QuickJsEngine
  */
