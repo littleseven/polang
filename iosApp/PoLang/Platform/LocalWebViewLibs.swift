@@ -28,7 +28,8 @@ enum LocalWebViewLibs {
     private static let metaName = "polang-lib"
 
     /// 预制库定义：urlPath = scheme URL 路径段，resource = bundle 内资产名（polang-lib/ 子目录或 bundle 根双路径查找）。
-    private struct LibDef {
+    /// （fileprivate：scheme handler 类经 libsForPath 消费，私有签名不可跨声明暴露）
+    fileprivate struct LibDef {
         let urlPath: String
         let resourceName: String
         let resourceExtension: String
@@ -192,7 +193,7 @@ final class LocalLibSchemeHandler: NSObject, WKURLSchemeHandler {
 
 private extension LocalWebViewLibs {
     /// URL path → 闭集库名（urlPath 精确匹配；path 形如 "/echarts/echarts.min.js"）。
-    static func libsForPath(_ path: String) -> [(name: String, def: LibDef)] {
+    fileprivate static func libsForPath(_ path: String) -> [(name: String, def: LibDef)] {
         libs.filter { $0.value.urlPath == path }.map { ($0.key, $0.value) }
     }
 }

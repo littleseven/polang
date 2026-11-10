@@ -752,14 +752,19 @@ struct DataPrivacyView: View {
                     }
                 }
 
-                // 操作行（spec §5 rows：备份恢复 iOS Coming Soon 占位 + 清除访客数据带确认）
+                // 操作行（spec §5 rows：备份恢复 v6 已实装（NavigationLink 进备份页，
+                // 对齐 Android BackupRestoreActivity 入口）+ 清除访客数据带确认）
                 SettingsListSection {
-                    SettingsListRow(
-                        title: L("Backup & Restore"),
-                        valueText: L("Coming Soon"),
-                        icon: .sf("externaldrive.badge.timemachine")
-                    )
-                    .modifier(GrayedOut())
+                    NavigationLink {
+                        BackupRestoreView()
+                    } label: {
+                        SettingsListRow(
+                            title: L("Backup & Restore"),
+                            icon: .sf("externaldrive.badge.timemachine"),
+                            showChevron: true
+                        )
+                    }
+                    .buttonStyle(.plain)
                     SettingsListDivider()
                     SettingsListRow(
                         title: L("Clear Guest Data"),
@@ -794,15 +799,6 @@ struct DataPrivacyView: View {
     private func clearGuestData() async {
         clearingGuest = true; defer { clearingGuest = false }
         guestClearToast = await performClearGuestData()
-    }
-}
-
-/// 能力缺口灰显注记（spec §9 允许平台差异层）：禁用交互并压暗整行/整组。
-private struct GrayedOut: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .environment(\.isEnabled, false)
-            .opacity(0.55)
     }
 }
 

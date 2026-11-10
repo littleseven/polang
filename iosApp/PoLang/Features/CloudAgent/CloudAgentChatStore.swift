@@ -24,7 +24,7 @@ final class CloudAgentChatStore: ObservableObject {
         let role: Role
         let text: String
         /// htmlCard 角色专属：HtmlCardSanitizer 清洗后的 HTML 本体（其余角色恒 nil）
-        let html: String? = nil
+        var html: String? = nil
     }
 
     /// UiState 四态闭集（穷举渲染）。
