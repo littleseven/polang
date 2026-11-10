@@ -80,22 +80,29 @@ class CloudAgentTurnRunner(
                 onEvent(CloudTurnEvent.ToolCall(frame.tool))
                 toolScope.launch {
                     val result = deviceToolExecutor.execute(frame.tool, frame.args)
-                    // 产物拦截：run_gallery_script 的 {html, summary} 信封 → 本地 HTML 卡
-                    // 直接上屏（复用 ChatViewModel 的 html_card 落库管线），上行只带 summary——
+                    // 产物拦截（注册制）：run_gallery_script 的图卡信封 → 本地 HTML 卡逐张
+                    // 直接上屏（复用 ChatViewModel 的 html_card 落库管线），上行只带 summary+stats——
                     // HTML 不出端、不进 LLM 上下文（对齐 chat 链路产物拦截的省 token 语义）。
                     val artifact = CloudAgentScriptTools.parseHtmlArtifact(result)
                     if (artifact != null) {
-                        onEvent(CloudTurnEvent.HtmlCard(artifact.first, artifact.second))
+                        artifact.cards.forEach { (html, summary) ->
+                            onEvent(CloudTurnEvent.HtmlCard(html, summary))
+                        }
                     }
                     api.postToolResult(
                         appToken,
                         sessionId,
                         frame.requestId,
                         ok = !CloudAgentToolContract.isError(result),
-                        result = artifact?.let {
+                        result = artifact?.let { parsed ->
                             JSONObject()
                                 .put("html_card", "emitted")
-                                .put("summary", it.second)
+                                .put("summary", parsed.cards.joinToString("；") { it.second })
+                                .apply {
+                                    parsed.stats?.let { s ->
+                                        put("stats", runCatching { JSONObject(s) }.getOrElse { s })
+                                    }
+                                }
                                 .toString()
                         } ?: result,
                     ).onFailure { e -> Logger.w(TAG, "postToolResult failed: ${e.message}") }
