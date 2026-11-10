@@ -30,7 +30,9 @@ final class CloudAgentScriptRunner {
     /// run_gallery_script 的 code 参数名（SSOT = shared CloudAgentToolCatalog paramNames 首参）。
     static let codeParam = "code"
 
-    /// 云端聚合脚本超时（chat 链路只读 5s；月度/年度聚合计量更大放宽到 10s，对齐 Android）。
+    /// 云端聚合脚本求值。注：timeoutMs 仅为 API 形态对齐保留——JSCore evaluateScript
+    /// 无中断机制（见 JsCoreEngine 类注释「超时」节），死循环脚本无硬超时（登记技术债，
+    /// 与 Android QuickJs interrupt 语义差异）；协作式脚本（bridge 调用 + return）不受影响。
     private static let evalTimeoutMs: Int64 = 10_000
 
     /// 脚本错误标记（JsCoreEngine evalAsync 异常路径的返回前缀；转 error 契约串上行）。

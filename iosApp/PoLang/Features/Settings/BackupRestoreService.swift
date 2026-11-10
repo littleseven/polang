@@ -182,20 +182,21 @@ final class BackupRestoreService {
     /// 逐会话重建 envelope v6 文件（经 shared ChatHistoryStoreCodec decode/encode 归一化：
     /// 未知 part → Tombstone 占位、损坏行降级 Text，不丢消息）+ 索引合并
     /// （同 id 会话覆盖，对齐 Android「REPLACE 幂等」语义）。
+    /// 两阶段（审查 🟡-2 修复）：先全量 decode 预校验（任一会话损坏即失败，零写入），
+    /// 再逐会话落盘（写盘失败上抛，不吞错）——避免「DB 已恢复 + 部分会话文件已覆盖」撕裂态。
     private func restoreChatSegments(sessions: [BackupChatSession], messages: [BackupChatMessage]) throws -> (sessions: Int, messages: Int) {
         guard !sessions.isEmpty else { return (0, 0) }
         let messagesBySession = Dictionary(grouping: messages, by: \.sessionId)
-        let store = ChatHistoryStore.shared
-        var threads = store.loadThreads()
 
-        var restoredSessions = 0
-        var restoredMessages = 0
+        // 阶段一：全量预校验（decode 失败 = 会话数据损坏 → 整体失败，不落任何文件）
+        struct ValidatedSession {
+            let session: BackupChatSession
+            let messages: [ChatMessage]
+            let preview: String?
+        }
+        var validated: [ValidatedSession] = []
         for session in sessions {
             let rows = messagesBySession[session.sessionId] ?? []
-
-            // 重建 envelope v6：partsJson 解回 parts 数组直通；role 缺失按 type 前缀推断
-            // （codec DTO 的 role 为必填列）；partsJson 缺失/空数组时省略键，交 codec
-            // 自平铺字段重建（belt-and-braces 路径，与 Android v5 物化器同口径）。
             let messageDicts: [[String: Any]] = rows.compactMap { row in
                 var dict: [String: Any] = [
                     "id": row.id,
@@ -219,39 +220,58 @@ final class BackupRestoreService {
                   let decoded = ChatHistoryStoreCodec.shared.decode(text: text) else {
                 throw BackupRestoreError.chatSessionDecodeFailed(session.sessionId)
             }
-            store.saveMessages(sessionId: session.sessionId, messages: decoded)
-
-            // 索引 upsert（updatedAt 以备份为准；预览取末条消息内容前缀）
-            let updatedAt = Date(timeIntervalSince1970: Double(session.updatedAt) / 1000)
-            let preview = rows.last.map { Self.previewText($0.content) }
-            if let idx = threads.firstIndex(where: { $0.sessionId == session.sessionId }) {
-                threads[idx].title = session.title
-                threads[idx].updatedAt = updatedAt
-                if let preview { threads[idx].lastMessagePreview = preview }
-            } else {
-                threads.append(ChatThread(
-                    sessionId: session.sessionId,
-                    title: session.title,
-                    updatedAt: updatedAt,
-                    lastMessagePreview: preview ?? ""))
-            }
-            restoredSessions += 1
-            restoredMessages += decoded.count
+            validated.append(ValidatedSession(
+                session: session,
+                messages: decoded,
+                preview: rows.last.map { Self.previewText($0.content) }))
         }
-        saveThreadsFile(threads)
-        return (restoredSessions, restoredMessages)
-    }
 
-    /// chat_sessions.json 索引落盘（ChatHistoryStore.saveThreads 为 private，此处同口径重写；
-    /// 读侧 loadThreads 自行排序，存储顺序无关紧要）。
-    private func saveThreadsFile(_ threads: [ChatThread]) {
-        let url = Self.documentsDirectory.appendingPathComponent("chat_sessions.json")
-        if let data = try? JSONEncoder().encode(threads) {
+        // 阶段二：落盘（codec 归一化后写 envelope v6 文件；失败上抛不留半成品索引）
+        var threads = ChatHistoryStore.shared.loadThreads()
+        var restoredSessions = 0
+        var restoredMessages = 0
+        for item in validated {
+            let fileText = ChatHistoryStoreCodec.shared.encode(messages: item.messages)
+            guard let data = fileText.data(using: .utf8) else {
+                throw BackupRestoreError.chatSessionDecodeFailed(item.session.sessionId)
+            }
+            let url = Self.documentsDirectory
+                .appendingPathComponent("chat_history_\(item.session.sessionId).json")
             do {
                 try data.write(to: url, options: .atomic)
             } catch {
-                NSLog("[PoLang:BackupRestore] saveThreadsFile failed: \(error)")
+                throw BackupRestoreError.chatSessionDecodeFailed(item.session.sessionId)
             }
+
+            let updatedAt = Date(timeIntervalSince1970: Double(item.session.updatedAt) / 1000)
+            if let idx = threads.firstIndex(where: { $0.sessionId == item.session.sessionId }) {
+                threads[idx].title = item.session.title
+                threads[idx].updatedAt = updatedAt
+                if let preview = item.preview { threads[idx].lastMessagePreview = preview }
+            } else {
+                threads.append(ChatThread(
+                    sessionId: item.session.sessionId,
+                    title: item.session.title,
+                    updatedAt: updatedAt,
+                    lastMessagePreview: item.preview ?? ""))
+            }
+            restoredSessions += 1
+            restoredMessages += item.messages.count
+        }
+        try saveThreadsFile(threads)
+        return (restoredSessions, restoredMessages)
+    }
+
+    /// chat_sessions.json 索引落盘（ChatHistoryStore.saveThreads 为 private 且吞错，此处
+    /// 直写并上抛失败——恢复链路完整性要求，见审查 🟡-2）。
+    private func saveThreadsFile(_ threads: [ChatThread]) throws {
+        let url = Self.documentsDirectory.appendingPathComponent("chat_sessions.json")
+        do {
+            let data = try JSONEncoder().encode(threads)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            NSLog("[PoLang:BackupRestore] saveThreadsFile failed: \(error)")
+            throw BackupRestoreError.sqlFailed("write chat_sessions.json: \(error.localizedDescription)")
         }
     }
 

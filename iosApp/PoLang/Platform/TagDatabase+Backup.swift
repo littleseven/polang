@@ -86,6 +86,24 @@ private func backupBindFloat(_ stmt: OpaquePointer?, _ idx: Int32, _ value: Floa
     backupBindDouble(stmt, idx, value.map(Double.init))
 }
 
+
+/// 逐行读取包装：行回调消费每行；终止步非 SQLITE_DONE（BUSY/CORRUPT/IOERR…）抛错——
+/// 防「静默截断的成功备份」（对齐 Android Room 查询异常语义）。
+@inline(__always)
+private func backupStepRows(
+    _ stmt: OpaquePointer?, _ db: OpaquePointer, _ what: String,
+    _ row: (OpaquePointer?) -> Void
+) throws {
+    while true {
+        let rc = sqlite3_step(stmt)
+        if rc == SQLITE_ROW { row(stmt); continue }
+        guard rc == SQLITE_DONE else {
+            throw BackupRestoreError.sqlFailed("read \(what): \(String(cString: sqlite3_errmsg(db)))")
+        }
+        return
+    }
+}
+
 extension TagDatabase {
 
     // MARK: - 导出（11 段 + personRelations 全量读）
@@ -107,9 +125,9 @@ extension TagDatabase {
                 FROM media_assets;
                 """)
             defer { sqlite3_finalize(metadataStmt) }
-            while sqlite3_step(metadataStmt) == SQLITE_ROW {
+            try backupStepRows(metadataStmt, db, "metadataStmt") { metadataStmt in
                 let id = sqlite3_column_int64(metadataStmt, 0)
-                guard let uri = backupColText(metadataStmt, 1) else { continue }
+                guard let uri = backupColText(metadataStmt, 1) else { return }
                 uriById[id] = uri
                 let meta = BackupMediaTagMetadata(
                     uri: uri,
@@ -143,7 +161,7 @@ extension TagDatabase {
             // ── tags ──
             let tagsStmt = try backupPrepare(db, "SELECT tagId, name, category FROM tags;")
             defer { sqlite3_finalize(tagsStmt) }
-            while sqlite3_step(tagsStmt) == SQLITE_ROW {
+            try backupStepRows(tagsStmt, db, "tagsStmt") { tagsStmt in
                 out.tags.append(BackupTag(
                     tagId: sqlite3_column_int64(tagsStmt, 0),
                     name: backupColText(tagsStmt, 1) ?? "",
@@ -157,7 +175,7 @@ extension TagDatabase {
                 JOIN media_assets ma ON ma.id = mtc.mediaId;
                 """)
             defer { sqlite3_finalize(crossStmt) }
-            while sqlite3_step(crossStmt) == SQLITE_ROW {
+            try backupStepRows(crossStmt, db, "crossStmt") { crossStmt in
                 out.crossRefs.append(BackupMediaTagCrossRef(
                     uri: backupColText(crossStmt, 0) ?? "",
                     tagName: backupColText(crossStmt, 1) ?? "",
@@ -171,7 +189,7 @@ extension TagDatabase {
                 FROM tag_scan_tasks tst LEFT JOIN media_assets ma ON ma.id = tst.mediaId;
                 """)
             defer { sqlite3_finalize(scanStmt) }
-            while sqlite3_step(scanStmt) == SQLITE_ROW {
+            try backupStepRows(scanStmt, db, "scanStmt") { scanStmt in
                 out.scanTasks.append(BackupTagScanTask(
                     sessionId: backupColText(scanStmt, 0) ?? "",
                     uri: backupColText(scanStmt, 1) ?? "",
@@ -193,7 +211,7 @@ extension TagDatabase {
                 FROM persons p LEFT JOIN media_assets ma ON ma.id = p.cover_media_id;
                 """)
             defer { sqlite3_finalize(personStmt) }
-            while sqlite3_step(personStmt) == SQLITE_ROW {
+            try backupStepRows(personStmt, db, "personStmt") { personStmt in
                 out.persons.append(BackupPerson(
                     personId: sqlite3_column_int64(personStmt, 0),
                     name: backupColText(personStmt, 1),
@@ -209,7 +227,7 @@ extension TagDatabase {
                 JOIN media_assets ma ON ma.id = fe.media_id;
                 """)
             defer { sqlite3_finalize(embStmt) }
-            while sqlite3_step(embStmt) == SQLITE_ROW {
+            try backupStepRows(embStmt, db, "embStmt") { embStmt in
                 let blobSize = Int(sqlite3_column_bytes(embStmt, 2))
                 let blob = blobSize > 0
                     ? Data(bytes: sqlite3_column_blob(embStmt, 2), count: blobSize)
@@ -224,7 +242,7 @@ extension TagDatabase {
             // ── ocrWords + occurrences（occurrence 经 word/媒体 join 物化键）──
             let wordStmt = try backupPrepare(db, "SELECT wordId, word, normalizedWord FROM ocr_words;")
             defer { sqlite3_finalize(wordStmt) }
-            while sqlite3_step(wordStmt) == SQLITE_ROW {
+            try backupStepRows(wordStmt, db, "wordStmt") { wordStmt in
                 out.ocrWords.append(BackupOcrWord(
                     wordId: sqlite3_column_int64(wordStmt, 0),
                     word: backupColText(wordStmt, 1) ?? "",
@@ -236,7 +254,7 @@ extension TagDatabase {
                 JOIN media_assets ma ON ma.id = o.mediaId;
                 """)
             defer { sqlite3_finalize(occStmt) }
-            while sqlite3_step(occStmt) == SQLITE_ROW {
+            try backupStepRows(occStmt, db, "occStmt") { occStmt in
                 out.ocrWordOccurrences.append(BackupOcrWordOccurrence(
                     normalizedWord: backupColText(occStmt, 0) ?? "",
                     mediaUri: backupColText(occStmt, 1) ?? "",
@@ -249,7 +267,7 @@ extension TagDatabase {
                 SELECT locationId, country, province, city, district, poi, latitude, longitude FROM location_hierarchy;
                 """)
             defer { sqlite3_finalize(locStmt) }
-            while sqlite3_step(locStmt) == SQLITE_ROW {
+            try backupStepRows(locStmt, db, "locStmt") { locStmt in
                 out.locationHierarchy.append(BackupLocationHierarchy(
                     locationId: sqlite3_column_int64(locStmt, 0),
                     country: backupColText(locStmt, 1),
@@ -266,7 +284,7 @@ extension TagDatabase {
                 JOIN media_assets ma ON ma.id = ml.mediaId;
                 """)
             defer { sqlite3_finalize(mediaLocStmt) }
-            while sqlite3_step(mediaLocStmt) == SQLITE_ROW {
+            try backupStepRows(mediaLocStmt, db, "mediaLocStmt") { mediaLocStmt in
                 out.mediaLocations.append(BackupMediaLocation(
                     mediaUri: backupColText(mediaLocStmt, 0) ?? "",
                     latitude: backupColDoubleOrNil(mediaLocStmt, 1),
@@ -280,7 +298,7 @@ extension TagDatabase {
                 JOIN media_assets ma ON ma.id = CAST(mf.media_id AS INTEGER);
                 """)
             defer { sqlite3_finalize(fbStmt) }
-            while sqlite3_step(fbStmt) == SQLITE_ROW {
+            try backupStepRows(fbStmt, db, "fbStmt") { fbStmt in
                 out.mediaFeedback.append(BackupMediaFeedback(
                     mediaUri: backupColText(fbStmt, 0) ?? "",
                     feedbackType: backupColText(fbStmt, 1) ?? "",
@@ -294,7 +312,7 @@ extension TagDatabase {
                 SELECT subjectPersonId, objectPersonId, predicate, source, customLabel, confidence FROM person_relations;
                 """)
             defer { sqlite3_finalize(relStmt) }
-            while sqlite3_step(relStmt) == SQLITE_ROW {
+            try backupStepRows(relStmt, db, "relStmt") { relStmt in
                 out.personRelations.append(BackupPersonRelation(
                     subjectPersonId: sqlite3_column_int64(relStmt, 0),
                     objectPersonId: sqlite3_column_int64(relStmt, 1),
@@ -341,7 +359,7 @@ extension TagDatabase {
         var uriToMediaId: [String: Int64] = [:]
         let mediaStmt = try backupPrepare(db, "SELECT id, uri FROM media_assets;")
         defer { sqlite3_finalize(mediaStmt) }
-        while sqlite3_step(mediaStmt) == SQLITE_ROW {
+        try backupStepRows(mediaStmt, db, "mediaStmt") { mediaStmt in
             if let uri = backupColText(mediaStmt, 1) {
                 uriToMediaId[uri] = sqlite3_column_int64(mediaStmt, 0)
             }
@@ -361,7 +379,7 @@ extension TagDatabase {
         var nameToTagId: [String: Int64] = [:]
         let existingTagsStmt = try backupPrepare(db, "SELECT tagId, name FROM tags;")
         defer { sqlite3_finalize(existingTagsStmt) }
-        while sqlite3_step(existingTagsStmt) == SQLITE_ROW {
+        try backupStepRows(existingTagsStmt, db, "existingTagsStmt") { existingTagsStmt in
             if let name = backupColText(existingTagsStmt, 1) {
                 nameToTagId[name] = sqlite3_column_int64(existingTagsStmt, 0)
             }
@@ -383,9 +401,10 @@ extension TagDatabase {
             }
         }
 
-        // 3. 恢复媒体-标签关联（uri/tagName 不匹配跳过；复合主键冲突 REPLACE 覆盖）
+        // 3. 恢复媒体-标签关联（uri/tagName 不匹配跳过；复合主键冲突 IGNORE——对齐
+        //    Android TagDao.insertMediaTag 的 OnConflictStrategy.IGNORE，已有关联保留本机 confidence）
         let crossStmt = try backupPrepare(db, """
-            INSERT OR REPLACE INTO media_tag_cross_ref (mediaId, tagId, confidence) VALUES (?, ?, ?);
+            INSERT OR IGNORE INTO media_tag_cross_ref (mediaId, tagId, confidence) VALUES (?, ?, ?);
             """)
         defer { sqlite3_finalize(crossStmt) }
         for ref in backup.crossRefs {
@@ -401,9 +420,15 @@ extension TagDatabase {
             sqlite3_clear_bindings(crossStmt)
         }
 
-        // 4. 恢复扫描任务（状态重置 PENDING / attemptCount=0 / 三时刻与错误清空，防 RUNNING 悬挂）
+        // 4. 恢复扫描任务（状态重置 PENDING / attemptCount=0 / 三时刻与错误清空，防 RUNNING 悬挂）。
+        //    幂等键：Android TagScanTaskEntity 复合主键 + insertAll REPLACE；iOS 表为自增主键，
+        //    补 (sessionId, mediaId, pass) 唯一索引对齐（存量重复行致建索引失败时安全降级——
+        //    OR REPLACE 退化为普通插入，多出的 PENDING 任务扫描一次即消，不炸恢复）。
+        _ = sqlite3_exec(
+            db, "CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_task_dedup ON tag_scan_tasks(sessionId, mediaId, pass);",
+            nil, nil, nil)
         let scanStmt = try backupPrepare(db, """
-            INSERT INTO tag_scan_tasks (sessionId, mediaId, pass, tagCategories, status, priority,
+            INSERT OR REPLACE INTO tag_scan_tasks (sessionId, mediaId, pass, tagCategories, status, priority,
                                         attemptCount, createdAt, scheduledAt, startedAt, completedAt, errorMessage)
             VALUES (?, ?, ?, ?, 'PENDING', ?, 0, ?, NULL, NULL, NULL, NULL);
             """)
