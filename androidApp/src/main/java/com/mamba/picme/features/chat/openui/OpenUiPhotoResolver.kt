@@ -1,5 +1,10 @@
 package com.mamba.picme.features.chat.openui
 
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+
 /**
  * OpenUI Image 组件渲染期解析到的照片（spec《openui-image-component-design》D4）。
  * uri 只在端侧存在——不进 program、不进 handle payload、不回灌 LLM（[PRIVACY]）。
@@ -21,4 +26,25 @@ data class OpenUiPhoto(
  */
 fun interface OpenUiPhotoResolver {
     suspend fun resolve(photoId: Long): OpenUiPhoto?
+}
+
+/** [resolveAllUrisInOrder] 并发上限：会话全量照片实测可达 ~300 张，裸 launch 扇出会瞬间打满解析通道；8 在批量吞吐与 DAO 压力间取平衡。 */
+private const val SESSION_PHOTO_RESOLVE_PARALLELISM = 8
+
+/**
+ * 批量解析照片 id → uri 列表（有界并行，2026-11-11 性能收口）：
+ * `resolveAllProgressively` 并行模式 + Semaphore 限界的整批形态——结果顺序与 [ids]
+ * 对齐（索引槽位），解析失败（null，已删除/未索引）跳过，mapNotNull 语义不变。
+ * 替代 OpenUiCardHost 会话照片的串行 `mapNotNull { resolve(it)?.uri }`：~300 张
+ * 串行在扫描负载下秒级白付，用户不点照片也全量执行（PhotoGrid 串行灰格同病灶）。
+ */
+internal suspend fun OpenUiPhotoResolver.resolveAllUrisInOrder(ids: List<Long>): List<String> = coroutineScope {
+    val slots = arrayOfNulls<OpenUiPhoto?>(ids.size)
+    val gate = Semaphore(SESSION_PHOTO_RESOLVE_PARALLELISM)
+    ids.forEachIndexed { index, photoId ->
+        launch {
+            gate.withPermit { slots[index] = resolve(photoId) }
+        }
+    }
+    slots.filterNotNull().map { photo -> photo.uri }
 }

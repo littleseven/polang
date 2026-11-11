@@ -340,7 +340,10 @@ private fun OpenUiReadyContent(
             entries.map { entry -> entry.id }
         }
         val allIds = (fullIds + projectedIds).distinct()
-        value = allIds.mapNotNull { photoId -> photoResolver.resolve(photoId)?.uri }
+        // 有界并行解析（2026-11-11 性能收口）：串行 mapNotNull ~300 张在扫描负载下秒级
+        // 白付；对齐 resolveAllProgressively 并行模式 + Semaphore 限界，结果顺序对齐
+        // allIds、解析失败跳过（mapNotNull 语义不变）
+        value = photoResolver.resolveAllUrisInOrder(allIds)
     }
     // 已发射 viewState 指纹（归一化后比对，同值不重复持久化；初值取 part 携带态的归一化，
     // 避免冷启动首轮 Set 同值时多写一次 Room）
