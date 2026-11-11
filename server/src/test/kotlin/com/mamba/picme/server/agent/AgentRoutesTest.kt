@@ -1,5 +1,6 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.server.auth.APP_CHANNEL_HEADER
 import com.mamba.picme.server.auth.APP_TOKEN_HEADER
 import com.mamba.picme.server.auth.AccountService
@@ -193,6 +194,8 @@ class AgentRoutesTest {
         assertEquals(4, frames.size)
         assertTrue(frames.take(3).all { it.startsWith("data: {\"kind\":\"event\"") })
         assertTrue(frames[3].contains("\"kind\":\"done\""))
+        // OpenUI 语言协议版本（版本协商，shared 常量同源真引用）：done 帧必带
+        assertTrue(frames[3].contains("\"lang_version\":${OpenUiContract.LANG_VERSION}"))
 
         val events = runBlocking { AgentEventRepository.listBySession(sessionId) }
         assertEquals(
