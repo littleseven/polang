@@ -297,6 +297,10 @@ struct HtmlCardWebView: UIViewRepresentable {
         // 禁 DOM Storage / Cookie / Cache（会话级零持久化）
         config.websiteDataStore = .nonPersistent()
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
+        // 预制 JS 库开流（polang-lib:// → bundle 资产；CHAT_CARD_CATALOG.md §4.2，
+        // 声明式注入是唯一通路，见 LocalWebViewLibs）
+        config.setURLSchemeHandler(
+            LocalLibSchemeHandler.shared, forURLScheme: LocalWebViewLibs.urlScheme)
 
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.scrollView.isScrollEnabled = scrollEnabled
@@ -451,19 +455,24 @@ final class WeakScriptMessageDelegate: NSObject, WKScriptMessageHandler {
 extension HtmlCardWebView {
 
     /// render_template（chat.yaml §13）：完整文档原样加载（向 head 注 viewport +
-    /// 响应式 reset）；片段包完整文档壳。
+    /// 响应式 reset）；片段包完整文档壳。polang-lib 声明在包装产物上展开（head 内
+    /// parser-blocking，卡内 inline script 可直接用 echarts 全局；幂等）。
     static func wrapHtmlDocument(_ raw: String) -> String {
         let inject = """
         <meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden;}img,video,table,pre{max-width:100%;}table{border-collapse:collapse;}td,th{padding:4px 6px;}</style>
         """
+        let wrapped: String
         if raw.lowercased().contains("<html") {
             if let range = raw.range(of: "<head>", options: .caseInsensitive) {
-                return raw.replacingCharacters(in: range, with: "<head>\(inject)")
+                wrapped = raw.replacingCharacters(in: range, with: "<head>\(inject)")
+            } else {
+                // 无 head：注入到文档前（浏览器容错移入 head）
+                wrapped = inject + raw
             }
-            // 无 head：注入到文档前（浏览器容错移入 head）
-            return inject + raw
+        } else {
+            wrapped = "<!DOCTYPE html><html><head>\(inject)</head><body>\(raw)</body></html>"
         }
-        return "<!DOCTYPE html><html><head>\(inject)</head><body>\(raw)</body></html>"
+        return LocalWebViewLibs.injectDeclaredLibs(wrapped)
     }
 
     /// 测高 JS（ResizeObserver + load/timeout 双触发；JS 侧 2px 阈值防抖，

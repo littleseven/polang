@@ -1,4 +1,5 @@
 import SwiftUI
+import SharedKit
 
 // MARK: - Cloud Agent Chat View（ADR-018 M2，spec cloud-agent.yaml §2/§3）
 //
@@ -14,6 +15,10 @@ struct CloudAgentChatView: View {
     @State private var input: String = ""
     @State private var showRemoteModelSettings = false
     @State private var showConsentAlert = false
+    /// HTML 卡浮层层级（对齐主聊天 ChatView zIndex 叠层）：FULLPAGE 查看器压消息列表，
+    /// 外链浮层再压查看器
+    @State private var htmlFullpage: HtmlFullpagePayload? = nil
+    @State private var htmlLinkURL: URL? = nil
 
     var body: some View {
         content
@@ -69,9 +74,23 @@ struct CloudAgentChatView: View {
     // MARK: - Chat 态（§3：消息列表 + 输入栏）
 
     private var chatContent: some View {
-        VStack(spacing: 0) {
-            messageList
-            inputBar
+        ZStack {
+            VStack(spacing: 0) {
+                messageList
+                inputBar
+            }
+            if let payload = htmlFullpage {
+                HtmlFullpageViewer(
+                    payload: payload,
+                    onClose: { htmlFullpage = nil },
+                    onOpenLink: { url in htmlLinkURL = url }
+                )
+                .zIndex(10)
+            }
+            if let url = htmlLinkURL {
+                HtmlLinkPreviewOverlay(url: url, onClose: { htmlLinkURL = nil })
+                    .zIndex(11)
+            }
         }
     }
 
@@ -138,6 +157,31 @@ struct CloudAgentChatView: View {
                 .font(AppTypography.bodySmall.font) // 12pt
                 .foregroundColor(s.onSurfaceVariant)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        case .htmlCard:
+            // 云端图卡 / render_html 产物卡（ios-follow 2026-11-10）：复用主聊天 HtmlCardView
+            // 双形态渲染（INLINE 测高/FULLPAGE 预览），构造范式同 EngineerTaskCardView
+            if let html = message.html {
+                let meta = HtmlCardMeta(
+                    display: nil, displayMode: nil, measuredHeightPx: nil,
+                    summary: message.text.isEmpty ? nil : message.text)
+                HtmlCardView(
+                    messageId: "cloud:\(message.id)",
+                    part: MessagePartHtmlCard(
+                        partId: "p0", html: html, meta: meta, state: .outputAvailable),
+                    meta: meta,
+                    onOpenFullpage: { html, summary in
+                        htmlFullpage = HtmlFullpagePayload(
+                            id: "cloud:\(message.id)", html: html, summary: summary)
+                    },
+                    onOpenLink: { url in htmlLinkURL = url },
+                    onDisplayFinalized: { _, _ in }   // 调试页内存消息不持久化终判
+                )
+            } else {
+                Text(message.text)
+                    .font(AppTypography.bodyMedium.font)
+                    .foregroundColor(s.onSurfaceVariant)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         case .error:
             Text(message.text)
                 .font(.system(size: 13))

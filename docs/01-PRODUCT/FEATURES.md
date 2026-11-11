@@ -268,10 +268,10 @@
   - 渐进式流式扫描（哈希 Room 缓存复用，支持暂停/恢复/取消；实时发现双大图卡片边扫边上屏）
   - 删除走系统回收站（30 天内可撤销恢复，API 30+；API ≤ 29 走旧删除授权流）
 
-**备份与恢复** ✅ 已落地（`features/backuprestore/BackupRestoreActivity`）
+**备份与恢复** ✅ 已落地（`features/backuprestore/BackupRestoreActivity`；iOS ✅ 2026-11-10 `BackupRestoreView`，容器格式 v6 双端同构跨平台互备，恢复前多一道确认弹窗（平台差异台账））
 - 入口：设置 →「备份与恢复」
 - 通过系统文件选择器（SAF）导出/导入备份文件，无需 adb / debug 环境，Release 包可用
-- 备份格式 v5：覆盖 TAG 数据、人物与人脸 embedding、偏好设置、媒体反馈等全量数据
+- 备份格式 v6（聊天段 partsJson 直通；Android 兼容 v5 粗映射导入，iOS 仅收 v6）：覆盖 TAG 数据、人物与人脸 embedding、偏好设置（iOS v1 恒空段）、聊天会话、媒体反馈等全量数据
 - 典型场景：换机迁移、重装 App（不同签名导致数据清空）前保留打标与人脸聚类成果
 
 ### 1.6.1 回忆（Memories）✅ 已落地（`features/gallery/memories/`）

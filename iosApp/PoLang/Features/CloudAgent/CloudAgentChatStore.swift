@@ -15,12 +15,16 @@ final class CloudAgentChatStore: ObservableObject {
 
     enum Role {
         case user, assistant, tool, error
+        /// HTML 卡消息（云端图卡信封产物 / render_html 服务端事件；text = summary，html = 清洗后 HTML）
+        case htmlCard
     }
 
     struct Message: Identifiable, Equatable {
         let id: Int
         let role: Role
         let text: String
+        /// htmlCard 角色专属：HtmlCardSanitizer 清洗后的 HTML 本体（其余角色恒 nil）
+        var html: String? = nil
     }
 
     /// UiState 四态闭集（穷举渲染）。
@@ -183,10 +187,35 @@ final class CloudAgentChatStore: ObservableObject {
             Task { [weak self] in
                 guard let self else { return }
                 let result = await executeTool(tool: tool, args: args)
+                // 产物拦截（注册制，contracts.md C4）：run_gallery_script 图卡信封 →
+                // 本地 HTML 卡逐张上屏，上行只带 summary+stats——HTML 不出端、
+                // 不进 LLM 上下文（对齐 Android CloudAgentTurnRunner）。
+                let artifact = CloudAgentScriptRunner.parseHtmlArtifact(result)
+                if let artifact {
+                    for card in artifact.cards {
+                        self.appendHtmlCard(html: card.html, summary: card.summary)
+                    }
+                }
+                let postResult: String
+                if let artifact {
+                    var up: [String: Any] = [
+                        "html_card": "emitted",
+                        "summary": artifact.cards.map { card in card.summary }
+                            .joined(separator: "；"),
+                    ]
+                    // stats 为 JSON 值串（parseHtmlArtifact 保证），回嵌为原始 JSON 值
+                    if let stats = artifact.stats, let data = stats.data(using: .utf8),
+                       let value = try? JSONSerialization.jsonObject(with: data) {
+                        up["stats"] = value
+                    }
+                    postResult = Self.jsonString(of: up) ?? "{\"html_card\":\"emitted\"}"
+                } else {
+                    postResult = result
+                }
                 do {
                     try await client.postToolResult(
                         token: token, sessionId: sid, requestId: requestId,
-                        ok: !result.hasPrefix(Self.errorPrefix), result: result
+                        ok: !result.hasPrefix(Self.errorPrefix), result: postResult
                     )
                 } catch {
                     // 上行失败只影响本轮工具回路，降级记日志（不含 key）
@@ -203,15 +232,44 @@ final class CloudAgentChatStore: ObservableObject {
 
     private func handleEvent(_ event: [String: Any]) {
         guard let payload = event["payload"] as? [String: Any],
-              let type = event["type"] as? String, type == "message",
-              let role = event["role"] as? String, role == "assistant",
-              let content = payload["content"] as? String
-        else { return } // action/observation/finish 不上屏（tool 行由 tool_request 帧驱动）
-        append(Message(id: nextId(), role: .assistant, text: content))
+              let type = event["type"] as? String else { return }
+        switch type {
+        case "message":
+            guard let role = event["role"] as? String, role == "assistant",
+                  let content = payload["content"] as? String else { return }
+            append(Message(id: nextId(), role: .assistant, text: content))
+        case "html_card":
+            // render_html 服务端工具产物卡（§4.9 挂账清偿；html 为空不上屏空卡）
+            if let html = payload["html"] as? String, !html.isEmpty {
+                appendHtmlCard(html: html, summary: payload["summary"] as? String ?? "")
+            }
+        default:
+            break // action/observation/finish 不上屏（tool 行由 tool_request 帧驱动）
+        }
+    }
+
+    /// HTML 卡上屏（云端图卡信封 + render_html 事件共用）：commonMain HtmlCardSanitizer
+    /// 清洗——Ok → htmlCard 消息（View 侧复用 HtmlCardView 渲染）；Rejected → 纯文本
+    /// 降级（对齐 Android 调试页「Rejected 降级纯文本」口径，§4.9）。
+    private func appendHtmlCard(html: String, summary: String) {
+        let result = HtmlCardSanitizer.shared.sanitize(html: html)
+        if let ok = result as? HtmlCardSanitizerResultOk {
+            append(Message(id: nextId(), role: .htmlCard, text: summary, html: ok.html))
+        } else if let rejected = result as? HtmlCardSanitizerResultRejected {
+            append(Message(id: nextId(), role: .error, text: rejected.reason))
+        }
     }
 
     /// 工具执行（shared iosMain 桥，绕过 CapabilityRegistry 场景门）；异常兜底为 error 前缀。
+    /// run_gallery_script 例外：Swift 侧无头 JS 沙盒（注册制图卡产物信封；工具名 SSOT =
+    /// shared CloudAgentToolContract.TOOL_RUN_GALLERY_SCRIPT，Swift 字面量副本互链）。
     private func executeTool(tool: String, args: [String: String]) async -> String {
+        if tool == "run_gallery_script" {
+            return await CloudAgentScriptRunner.shared.runScript(
+                code: args[CloudAgentScriptRunner.codeParam] ?? "",
+                languageTag: CloudAgentScriptRunner.bcp47LanguageTag()
+            )
+        }
         guard let bridge = IosAgentComposition.shared.cloudAgentToolBridge else {
             return "\(Self.errorPrefix) tool_bridge_unavailable"
         }
@@ -220,6 +278,12 @@ final class CloudAgentChatStore: ObservableObject {
         } catch {
             return "\(Self.errorPrefix) \(error.localizedDescription)"
         }
+    }
+
+    /// 紧凑 JSON 串（上行载荷构造）。
+    private static func jsonString(of object: [String: Any]) -> String? {
+        guard let data = try? JSONSerialization.data(withJSONObject: object) else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     // MARK: - 内部
