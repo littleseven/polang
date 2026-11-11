@@ -44,19 +44,22 @@ class CloudAgentClientTest {
 
     @Test
     fun `parseBlock parses done frame usage fields and tolerates legacy done`() {
-        // 2026-11-01 起 done 帧携带回合性能数据（usage/elapsed_ms）
+        // 2026-11-01 起 done 帧携带回合性能数据（usage/elapsed_ms）；
+        // 2026-11-11 起携带 OpenUI 语言协议版本（lang_version，版本协商）
         val done = CloudSseParser.parseBlock(
-            """data: {"kind":"done","session_status":"running","elapsed_ms":8432,"usage":{"prompt_tokens":1280,"completion_tokens":96}}""",
+            """data: {"kind":"done","session_status":"running","elapsed_ms":8432,"usage":{"prompt_tokens":1280,"completion_tokens":96},"lang_version":2}""",
         ) as CloudFrame.Done
         assertEquals("running", done.sessionStatus)
         assertEquals(1280L, done.promptTokens)
         assertEquals(96L, done.completionTokens)
         assertEquals(8432L, done.elapsedMs)
-        // 旧服务端 done 帧（无 usage）：字段全 null 容错
+        assertEquals(2, done.langVersion)
+        // 旧服务端 done 帧（无 usage / lang_version）：字段全 null 容错，不提示
         val legacy = CloudSseParser.parseBlock("""data: {"kind":"done","session_status":"running"}""") as CloudFrame.Done
         assertEquals(null, legacy.promptTokens)
         assertEquals(null, legacy.completionTokens)
         assertEquals(null, legacy.elapsedMs)
+        assertEquals(null, legacy.langVersion)
     }
 
     @Test

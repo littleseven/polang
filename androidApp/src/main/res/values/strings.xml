@@ -1139,6 +1139,8 @@
     <string name="chat_unsupported_part_title">Content not supported</string>
     <string name="chat_unsupported_part_upgrade">Update to the latest version to view this content</string>
     <string name="openui_action_failed">Action failed</string>
+    <string name="openui_unknown_component_hint">Update the app to view this content</string>
+    <string name="openui_lang_newer_hint">A new content format is available. Update the app to view it in full.</string>
     <string name="chat_example_group_search">Find photos</string>
     <string name="chat_example_group_ask">Ask about your gallery</string>
     <string-array name="chat_example_prompts_search">

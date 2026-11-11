@@ -44,6 +44,8 @@ sealed interface CloudTurnEvent {
         val promptTokens: Long? = null,
         val completionTokens: Long? = null,
         val elapsedMs: Long? = null,
+        /** OpenUI 语言协议版本（版本协商）：落 OpenUiCard part，旧服务端为 null。 */
+        val langVersion: Int? = null,
     ) : CloudTurnEvent
 }
 
@@ -113,6 +115,7 @@ class CloudAgentTurnRunner(
                     promptTokens = frame.promptTokens,
                     completionTokens = frame.completionTokens,
                     elapsedMs = frame.elapsedMs,
+                    langVersion = frame.langVersion,
                 ),
             )
             is CloudFrame.Error -> onEvent(CloudTurnEvent.Error(frame.message))
