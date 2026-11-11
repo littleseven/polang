@@ -20,6 +20,20 @@ object OpenUiContract {
      */
     const val PART_TYPE = "data_genui_program"
 
+    /**
+     * OpenUI 语言协议版本（wire 名 `lang_version`，server done 帧下发，端侧
+     * [com.mamba.picme.domain.chat.MessagePart.OpenUiCard] 持久化）。
+     *
+     * 语义 = 服务端程序所用的语言版本。bump 规则：`OpenUiLibrary` 组件集扩容
+     * （或语句/动作语言面非兼容变更）时 +1，端云同仓同 bump。
+     *
+     * 端侧协商：卡片携带 `langVersion > 本常量` → 卡顶部「新版内容格式」提示行
+     * （旧端可感知，见 Tombstone 前向兼容口径在 OpenUI 程序层的对偶）；未知组件名
+     * → 求值产占位节点可见降级，不再静默丢弃（OpenUiValue.UnknownComponent）。
+     * 旧 server 无此字段 = null，不提示。
+     */
+    const val LANG_VERSION = 1
+
     const val HANDLE_SCHEME = "local://"
 
     /** 相册扫描结果域（search_media / refine_media_search 命中集）。 */

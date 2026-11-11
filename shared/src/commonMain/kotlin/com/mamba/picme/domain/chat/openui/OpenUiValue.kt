@@ -17,6 +17,13 @@ sealed interface OpenUiValue {
     /** 组件实例。props = 位置参数已按库 schema 映射为命名属性。statementId = 定义它的语句名（错误定位用）。 */
     data class ComponentVal(val type: String, val props: Map<String, OpenUiValue>, val statementId: String) : OpenUiValue
 
+    /**
+     * 未知组件占位节点（前向兼容）：服务端先部署新组件而 App 未发包时（协议版本协商
+     * 见 [OpenUiContract.LANG_VERSION]），求值不再静默丢弃，产出本节点携带原始组件名，
+     * 渲染层可见降级（提示块 + 组件名）。`unknown-component` 错误照记（求值日志）。
+     */
+    data class UnknownComponent(val type: String, val statementId: String) : OpenUiValue
+
     /** 动作表达式求值结果：一个或多个动作。 */
     data class ActionVal(val actions: List<OpenUiAction>) : OpenUiValue
 

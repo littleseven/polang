@@ -96,11 +96,42 @@ class OpenUiEngineTest {
     // ── 组件校验恢复（§8.2/§8.4） ────────────────────────────────────
 
     @Test
-    fun `unknown component in value position is dropped and reported`() = runTest {
+    fun `unknown component yields placeholder node and is reported`() = runTest {
+        // 前向兼容（协议版本协商，OpenUiContract.LANG_VERSION）：未知组件不再静默丢弃——
+        // 产出占位节点（携带原始组件名）供渲染层可见降级，错误照记
         val session = OpenUiSession("root = Card([Nope(1), Text(\"ok\")])", noTools)
         val result = rendered(session.prepare())
-        assertEquals(1, childrenOf(result.root).size)
+        val children = childrenOf(result.root)
+        assertEquals(2, children.size)
+        val placeholder = assertIs<OpenUiValue.UnknownComponent>(children[0])
+        assertEquals("Nope", placeholder.type)
+        assertIs<OpenUiValue.ComponentVal>(children[1])
         assertTrue(result.errors.any { error -> error.code == "unknown-component" })
+    }
+
+    @Test
+    fun `unknown component in object array component slot passes validation`() = runTest {
+        // Tabs.tabs.children（对象数组字段内 COMPONENT_LIST 递归校验）：占位节点同组件口径放行
+        val session = OpenUiSession(
+            "root = Tabs([{title: \"T\", children: [FutureThing(\"x\")]}])",
+            noTools,
+        )
+        val result = rendered(session.prepare())
+        assertTrue(result.errors.any { error -> error.code == "unknown-component" })
+        val tabs = (result.root.props["tabs"] as OpenUiValue.Arr).v
+        val tabChildren = (tabs.single() as OpenUiValue.Obj).v["children"] as OpenUiValue.Arr
+        assertIs<OpenUiValue.UnknownComponent>(tabChildren.v.single())
+    }
+
+    @Test
+    fun `unknown root component stays fatal no-root for visible degraded card`() = runTest {
+        // 根本身未知 = 整卡无法按组件树渲染，维持致命 no-root（宿主走 OpenUiCardDegraded
+        // 可见降级，不静默）；非根未知组件才落占位节点
+        val session = OpenUiSession("root = FutureRoot(\"x\")", noTools)
+        val result = session.prepare()
+        assertIs<OpenUiResult.Failed>(result)
+        assertTrue(result.errors.any { error -> error.code == "unknown-component" })
+        assertTrue(result.errors.any { error -> error.code == "no-root" })
     }
 
     @Test

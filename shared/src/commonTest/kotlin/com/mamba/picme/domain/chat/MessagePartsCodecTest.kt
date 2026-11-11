@@ -7,6 +7,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.mamba.picme.domain.chat.openui.OpenUiContract
 
 /**
  * [MessagePartsCodec] round-trip 与容错（spec §12 JVM 单测：序列化 round-trip）。
@@ -117,6 +118,34 @@ class MessagePartsCodecTest {
         )
         val parts = listOf(MessagePart.OptimizeCandidates("p0", group))
         assertEquals(parts, decode(encode(parts)))
+    }
+
+    @Test
+    fun `openui card part round-trips with lang version and null default`() {
+        // 协议版本协商（OpenUiContract.LANG_VERSION）：done 帧 lang_version 落 part 持久化；
+        // null 默认 = 旧 server / 旧 partsJson 双向兼容
+        val withVersion = listOf(
+            MessagePart.OpenUiCard(
+                partId = "p0",
+                program = "root = Card([])",
+                fallbackSummary = "摘要",
+                viewState = "selected=a",
+                langVersion = OpenUiContract.LANG_VERSION,
+            ),
+        )
+        assertEquals(withVersion, decode(encode(withVersion)))
+
+        val withoutVersion = listOf(
+            MessagePart.OpenUiCard(partId = "p0", program = "root = Card([])", fallbackSummary = "摘要"),
+        )
+        assertEquals(withoutVersion, decode(encode(withoutVersion)))
+        assertNull(decode(encode(withoutVersion))!![0].let { part -> (part as MessagePart.OpenUiCard).langVersion })
+
+        // 旧版本写入的 JSON（无 lang_version 字段）解码落默认值 null
+        val legacyJson =
+            """[{"type":"data_genui_program","partId":"p0","program":"root = Card([])","fallbackSummary":"s"}]"""
+        val legacy = decode(legacyJson)!!.single() as MessagePart.OpenUiCard
+        assertNull(legacy.langVersion)
     }
 
     @Test
