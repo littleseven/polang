@@ -180,12 +180,8 @@ parts_rendering:
       component: "BrowserLiveCard + BrowserFramePreviewOverlay（§18）"
       change: "2026-10-06 新增卡（browser-vnc M1）：占位 → BrowserLiveOverlay 原位覆写 → 定格落库；watch 1s 轮询仅 running 态"
   perf_notes: "性能防护清单见 spec §8（@Immutable/contentType/remember 派生态/滚底 key 收窄等，代码侧收口）；WebView 池化与消息分页明确不做"
-  ios_todo:                          # spec §9：M5 走 /ios-follow 一次跟随（渲染矩阵口径登记）
-    - "parts 模型：shared commonMain 直接可得（XCFramework），Swift 侧 parts 解码 + 拍平列表"
-    - "turn 聚合：§3.1 视觉规则 SwiftUI 等价（turn 内段落间距档 + 回合分隔档，token 同源）"
-    - "AST 正文渲染：解析层 commonMain，SwiftUI 渲染自绘（M3 管线 iOS 对等）"
-    - "HTML 卡双形态：现为零实现，gap 最大（HtmlCard WKWebView + 沙盒/测高/分流/全屏查看器/链接落地页）"
-    - "type 值域（2026-11-08 终态，4+1 分类 13 值 + role 独立字段；iOS 判型经 shared primaryPartOf 同源——envelope v6 门禁后零 legacy 迁移包袱）"
+  ios_todo:                          # M5 批次（b99c1e2fd，2026-11）下列五项已清零；剩余 iOS 缺口登记在 §16 capability matrix 与 §18 BrowserLive
+    - "（已清偿）parts 模型 / turn 聚合 / AST 正文 / HTML 卡双形态 / type 值域——envelope v6 门禁 + ChatView.swift 渲染分支（含 reasoning/source chips/tombstone 三新件）+ HtmlCardView.swift（INLINE/FULLPAGE 双形态 + 全屏查看器 + 链接落地页）均已落地进 main"
 
 # ============================================================================
 # 4. 空状态（ChatEmptyState）
@@ -659,7 +655,7 @@ colors:
 #   原「AI 工程师模式（chisel 隧道，iOS Phase 6.3 未实现）」
 #   原「Claude Agent Steps（iOS 无 AI 工程师模式）」
 #   两条豁免**撤回**——AI 工程师模式纳入 iOS 对齐范围，规格见 §14。
-#   撤回依据：tmp/ios-follow/chat/follow-plan.md §5 契约冲突裁决。
+#   撤回依据：/ios-follow chat 批次契约冲突裁决（2026-08-12，记录见 git 历史）。
 allowed_differences:
   - "Markdown 渲染引擎差异（Android MarkDown lib vs iOS AttributedString）"
   - "图标具体形状（Material Icons vs SF Symbols）"
@@ -759,7 +755,7 @@ js_toolcalls:
       layout_context: "组合根注入 RenderEnvironment（设备/屏幕/卡片宽 + 建议 inline 高 + 预览高 0.5 屏 px + 分流阈值 1.0 屏 px）→ prompt 动态尾段，引导 LLM 响应式排版并正确声明 display"
       sanitize: "落库前 HtmlCardSanitizer 清洗（128KB 上限、剔除远程 script/iframe/object/embed/form/meta refresh；2026-09-25 起远程 img/CSS/a 外链放行，表现力优先）"
       lockdown: "禁文件/DOM Storage、零 JS 桥接；远程资源直拉，a 点击经 shouldOverrideUrlLoading 回传 onOpenLink 开落地页，卡片自身永不导航"
-      ios_status: "TODO(ios-follow) HtmlCard.swift 照搬 ChartSvgCard WKWebView 模式 + 同款沙盒/动态测高/双形态（预览卡+全屏查看器+分流判定）/链接落地页"
+      ios_status: "supported（M5 批次落地：HtmlCardView.swift INLINE/FULLPAGE 双形态 + 动态测高 + 终判持久化 + HtmlCardOverlays 全屏查看器/链接落地页；2026-11-10 批次复用至云端调试页 html_card 卡）"
     task_card:                               # AI Engineer 模式每次 claude-chat 提交即产一张（2026-09-25 新增；2026-09-27 H2 HTML 化，Android 先行）
       message_kind: TASK_CARD                # 独立全宽消息项；content=源指令截 50 字，载荷在 metadata.engineer_task
       ui: "EngineerTaskCard（features/chat/components/）= L1 模板 HTML（EngineerTaskHtml 组装：端侧模板+状态 JSON，CSS 变量走 MaterialTheme tokens 双模）经 HtmlCard 双形态渲染 + 原生 Compose 动作条外置卡底（零 JS 桥不动）；点击整卡折叠/展开（INLINE 触控层），展开超 1.0 屏自动升格 FULLPAGE 预览→全屏查看器；500ms 合帧重渲染（状态跃迁即时）；displayMode 粘滞不落库；组装失败→原生兜底卡"
@@ -844,10 +840,10 @@ platform_differences:
       - { feature: "图反馈/找相似",    android: "❌ 已退役（2026-11-08 反馈三件套 record_feedback/more_like_this/exclude_constraint 随横滑图集卡下线）", ios: "—（功能退役，不再跟随）" }
       - { feature: "上下文选图",      android: supported, ios: "TODO(B1) 新建" }
       - { feature: "端侧 VLM 理解",   android: supported, ios: "TODO(B1) MNN.framework 已有" }
-      - { feature: "JS 沙箱脚本",     android: supported, ios: "TODO(B2) 引擎选型+handler 移植" }
-      - { feature: "draw_chart 图表", android: supported, ios: "TODO(B2) ChartSvgCard + chart kind" }
-      - { feature: "render_html HTML 卡片", android: "supported(2026-09；2026-09-26 双形态 H1：inline/fullpage 分流+预览卡+全屏查看器)", ios: "M5 在途（chat-parts-m5 分支）：WKWebView + 同款沙盒/双形态/链接落地页" }
-      - { feature: "parts 拍平 + Turn 聚合渲染", android: "supported(2026-09-27 M4 定稿：ChatListFlattener 拍平 + §3.1/§3.2 契约)", ios: "M5 在途（chat-parts-m5 分支）：parts 模型/turn 聚合/AST 正文/HTML 卡双形态一次跟随" }
+      - { feature: "JS 沙箱脚本",     android: supported, ios: "supported(2026-11-10：CloudAgentScriptRunner JSCore + chart_bootstrap.js/echarts 预制；挂账=JSCore 无中断机制 timeoutMs 不生效，见 CHAT_CARD_CATALOG run_gallery_script 节)" }
+      - { feature: "draw_chart 图表", android: supported, ios: "supported(ChartSvgCard WKWebView 渲染 SVG)" }
+      - { feature: "render_html HTML 卡片", android: "supported(2026-09；2026-09-26 双形态 H1：inline/fullpage 分流+预览卡+全屏查看器)", ios: "supported(M5 批次：WKWebView + 同款沙盒/双形态/链接落地页)" }
+      - { feature: "parts 拍平 + Turn 聚合渲染", android: "supported(2026-09-27 M4 定稿：ChatListFlattener 拍平 + §3.1/§3.2 契约)", ios: "supported(值域终态批次 envelope v6 + M5：parts 解码/拍平渲染分支/turn 聚合)" }
       - { feature: "AI 工程师(claude)", android: supported, ios: "TODO(B3) SSE 客户端+渲染" }
       - { feature: "AI 优化抽卡",     android: supported, ios: "supported(2026-08-16 §17 追齐；多轮编辑态 ChatEditStateHolder 缺失见 §17 confirm 注)" }
       - { feature: "记忆/人物关系",    android: supported, ios: "未纳入本轮（留技术债）" }
