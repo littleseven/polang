@@ -52,6 +52,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -265,6 +270,12 @@ fun OpenUiNodeRenderer(
                                 child.type,
                                 modifier = if (weightsUsable) Modifier.weight(1f) else Modifier,
                             )
+                        } else if (child is OpenUiValue.Skeleton) {
+                            // 流式前向引用骨架：同占一等宽栏，定义流入后原位替换
+                            OpenUiSkeletonPlaceholder(
+                                child.refName,
+                                modifier = if (weightsUsable) Modifier.weight(1f) else Modifier,
+                            )
                         } else {
                             // null 字面量/被剔除元素：等宽空占位
                             Box(modifier = if (weightsUsable) Modifier.weight(1f) else Modifier)
@@ -319,6 +330,11 @@ fun OpenUiNodeRenderer(
                                         child.type,
                                         modifier = if (weightsUsable) Modifier.weight(1f) else Modifier,
                                     )
+                                } else if (child is OpenUiValue.Skeleton) {
+                                    OpenUiSkeletonPlaceholder(
+                                        child.refName,
+                                        modifier = if (weightsUsable) Modifier.weight(1f) else Modifier,
+                                    )
                                 } else {
                                     Box(modifier = if (weightsUsable) Modifier.weight(1f) else Modifier)
                                 }
@@ -344,6 +360,8 @@ fun OpenUiNodeRenderer(
                         OpenUiNodeRenderer(child, state, photoResolver, onAction, Modifier)
                     } else if (child is OpenUiValue.UnknownComponent) {
                         OpenUiUnknownComponentPlaceholder(child.type)
+                    } else if (child is OpenUiValue.Skeleton) {
+                        OpenUiSkeletonPlaceholder(child.refName)
                     }
                 }
             }
@@ -515,6 +533,32 @@ internal fun OpenUiUnknownComponentPlaceholder(type: String, modifier: Modifier 
 }
 
 /**
+ * 前向引用骨架占位（[OpenUiValue.Skeleton]，流式预览瞬态）：被引用但尚未流到的语句槽
+ * 显示 pulse 骨架块（surfaceVariant 圆角块，对齐 [OpenUiUnknownComponentPlaceholder]
+ * 的占位语言），定义流入后下一帧原位替换。contentDescription = 引用名（refName），
+ * 无用户可见文案（瞬态，[I18N] 零面）。
+ */
+@Composable
+internal fun OpenUiSkeletonPlaceholder(refName: String, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "openuiSkeleton")
+    val pulse by transition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(700), repeatMode = RepeatMode.Reverse),
+        label = "openuiSkeletonPulse",
+    )
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = pulse),
+                shape = RoundedCornerShape(8.dp),
+            )
+            .semantics { contentDescription = refName },
+    )
+}
+
+/**
  * Card/Column 内容排布（M4 §1.1 间距阶梯）：组件间默认 [spacingDp]（md），Section 起头
  * （SUBHEAD 标题/图表/表格）前升为 [OpenUiCardTokens.sectionGap]（lg）。null 字面量渲染
  * 零尺寸空占位但不贡献间距；Text/Markdown 的确定性丢弃形态（绑定解析不出/空绑定冒号尾，
@@ -552,6 +596,12 @@ private fun OpenUiGappedChildren(
                 first = false
                 OpenUiUnknownComponentPlaceholder(child.type, childModifier)
             }
+            is OpenUiValue.Skeleton -> {
+                // 流式前向引用骨架：按组件同径贡献间距（children 槽位稳定，dropped→resolved 跳变收敛）
+                if (!first) Spacer(modifier = Modifier.height(gap))
+                first = false
+                OpenUiSkeletonPlaceholder(child.refName, childModifier)
+            }
             else -> Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }
     }
@@ -581,7 +631,7 @@ private fun OpenUiValue.ComponentVal.isSectionStart(): Boolean =
             OpenUiStyleMapper.parseTextRole((props["role"] as? OpenUiValue.Str)?.v) == OpenUiTextRole.SUBHEAD)
 
 /** 渲染任意组件数组槽（children / Tabs 页签内容）：非组件元素（null 字面量/被剔除）空占位；
- * 未知组件占位节点（前向兼容）可见降级。 */
+ * 未知组件占位节点（前向兼容）可见降级；流式前向引用骨架占位（Skeleton）原位骨架块。 */
 @Composable
 private fun OpenUiChildList(
     children: List<OpenUiValue>,
@@ -594,6 +644,8 @@ private fun OpenUiChildList(
             OpenUiNodeRenderer(child, state, photoResolver, onAction)
         } else if (child is OpenUiValue.UnknownComponent) {
             OpenUiUnknownComponentPlaceholder(child.type)
+        } else if (child is OpenUiValue.Skeleton) {
+            OpenUiSkeletonPlaceholder(child.refName)
         } else {
             Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }

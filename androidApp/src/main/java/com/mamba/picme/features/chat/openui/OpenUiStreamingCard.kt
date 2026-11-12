@@ -17,7 +17,9 @@ import kotlinx.coroutines.withContext
  * SSE openui_delta 帧的 program 前缀边收边渲染，对齐官方 A2UI Compose 的流式就绪语义。
  *
  * - 每帧前缀新建 session 做前缀解析：parser 的 autoClose（§4 流末规则）容错截断输入，
- *   未到位引用走 dropped 哨兵在 children/数组处剔除——卡片随流渐进生长，引擎零改动；
+ *   未到位引用走 forwardRefSkeletons 模式产出 Skeleton 骨架占位（top-down reveal，
+ *   2026-11-12 前向引用骨架流式批次）——骨架槽位先立、定义流入后下一帧自然补位，
+ *   children 数不再随帧膨胀收缩（dropped→resolved 布局跳变收敛为原位内容替换）；
  * - 客户端预算（2026-11-11）：累计前缀超 [PREVIEW_PARSE_BUDGET_CHARS] 停逐帧重解析、
  *   清旧帧预览落既有 indeterminate 占位，等终结 Message 落库后由 [OpenUiCardHost]
  *   正式卡路径接管；阈值内（含等于）逐帧行为不变；
@@ -44,6 +46,7 @@ fun OpenUiStreamingCard(
                 val session = OpenUiSession(
                     program = program,
                     tools = OpenUiToolResolver { _, _ -> OpenUiValue.Null },
+                    forwardRefSkeletons = true,
                 )
                 (session.prepare() as? OpenUiResult.Rendered)
                     ?.let { OpenUiPreview(it.root, session.state) }

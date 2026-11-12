@@ -115,6 +115,11 @@ internal fun openUiResolvePath(value: OpenUiValue, path: String): OpenUiValue {
  * 在标量消费点（运算符/成员访问/对象值/内置参数/组件标量 prop）收口为 Null，
  * 在数组元素与组件 children 处剔除（§2.3/§8.4）。
  *
+ * skeletons 模式（流式预览 partial 前缀，默认关）：未解析引用改为产出
+ * [OpenUiValue.Skeleton] 骨架占位（top-down reveal——root 先流出时子件槽位占骨架，
+ * 定义流入后下帧消失），且只在数组/children 槽存活、标量消费点照收口 Null；
+ * unresolved 记录不变（完整程序终态校验语义不动）。
+ *
  * 引用提升：语句任意顺序互引；环在成环点按未解析（§2.3，栈检测）。同一语句被两处
  * 引用分别求值（树复制，state store 共享，Query 结果经 queryResults 共享）。
  */
@@ -137,21 +142,40 @@ internal val OPEN_UI_MUTATION_IDLE: OpenUiValue.Obj = OpenUiValue.Obj(
     ),
 )
 
+/**
+ * 标量消费点收口（skeletons 流式模式）：Skeleton 瞬态占位按 Null 消费（null → Null），
+ * 防「在路上」的骨架节点泄漏进运算/对象值/state 默认值/Query defaults 等标量位置——
+ * 它只在数组元素与组件 children 槽存活。
+ */
+internal fun collapseEvalSkeleton(value: OpenUiValue?): OpenUiValue = when (value) {
+    null, is OpenUiValue.Skeleton -> OpenUiValue.Null
+    else -> value
+}
+
 internal class OpenUiRuntime(
     private val statements: Map<String, OpenUiStatement>,
     val store: MutableMap<String, OpenUiValue>,
     private val queryResults: Map<String, OpenUiValue>,
     private val mutationResults: Map<String, OpenUiValue>,
+    /** 流式预览 partial 模式：未解析引用产出 [OpenUiValue.Skeleton] 占位而非 dropped（默认关 = 完整程序语义）。 */
+    private val skeletons: Boolean = false,
 ) {
     val errors = mutableListOf<OpenUiError>()
     val unresolved = linkedSetOf<String>()
 
-    /** 求值命名语句；未解析/成环/被丢弃 → null（dropped 哨兵）。 */
-    fun evalStatement(name: String): OpenUiValue? = resolveStatement(name, emptySet())
+    /** 求值命名语句；未解析/成环/被丢弃 → null（dropped 哨兵；skeletons 模式下缺失语句为 Skeleton）。 */
+    fun evalStatement(name: String): OpenUiValue? = resolveStatement(name, emptySet(), name)
 
-    private fun resolveStatement(name: String, stack: Set<String>): OpenUiValue? {
+    private fun resolveStatement(name: String, stack: Set<String>, statementId: String?): OpenUiValue? {
         val statement = statements[name]
-        if (statement == null || name in stack) {
+        if (statement == null) {
+            unresolved += name
+            // skeletons 模式（流式 partial 前缀）：缺失语句产出骨架占位（定义流入后下帧消失）；
+            // unresolved 照记——终态完整程序校验语义不变
+            if (skeletons) return OpenUiValue.Skeleton(name, statementId ?: "")
+            return null
+        }
+        if (name in stack) {
             unresolved += name
             return null
         }
@@ -178,7 +202,7 @@ internal class OpenUiRuntime(
             if (!store.containsKey(expr.name)) store[expr.name] = OpenUiValue.Null
             store[expr.name]
         }
-        is OpenUiExpr.Ref -> resolveStatement(expr.name, stack)
+        is OpenUiExpr.Ref -> resolveStatement(expr.name, stack, statementId)
         // M1 不做双向绑定（spec §4.5）：绑定赋值只求值不生效
         is OpenUiExpr.Assign -> OpenUiValue.Null
         is OpenUiExpr.Arr -> OpenUiValue.Arr(
@@ -188,7 +212,8 @@ internal class OpenUiRuntime(
         )
         is OpenUiExpr.Obj -> OpenUiValue.Obj(
             expr.entries.associate { (key, valueExpr) ->
-                key to (evalExpr(valueExpr, stack, statementId, valuePosition = false) ?: OpenUiValue.Null)
+                // 对象值是标量消费点：Skeleton 收口 Null（与 dropped 同径），只在数组/children 槽存活
+                key to collapseEvalSkeleton(evalExpr(valueExpr, stack, statementId, valuePosition = false))
             },
         )
         is OpenUiExpr.QueryCall, is OpenUiExpr.MutationCall ->
@@ -208,7 +233,9 @@ internal class OpenUiRuntime(
         is OpenUiExpr.Unary -> evalUnary(expr, stack, statementId)
         is OpenUiExpr.Binary -> evalBinary(expr, stack, statementId)
         is OpenUiExpr.Ternary -> {
-            val cond = evalExpr(expr.cond, stack, statementId, valuePosition = false) ?: OpenUiValue.Null
+            val cond = collapseEvalSkeleton(
+                evalExpr(expr.cond, stack, statementId, valuePosition = false) ?: OpenUiValue.Null,
+            )
             if (openUiTruthy(cond)) {
                 evalExpr(expr.then, stack, statementId, valuePosition)
             } else {
@@ -220,7 +247,7 @@ internal class OpenUiRuntime(
     // ── 运算符（§3.2） ──────────────────────────────────────────────
 
     private fun operand(expr: OpenUiExpr, stack: Set<String>, statementId: String?): OpenUiValue =
-        evalExpr(expr, stack, statementId, valuePosition = false) ?: OpenUiValue.Null
+        collapseEvalSkeleton(evalExpr(expr, stack, statementId, valuePosition = false))
 
     private fun evalUnary(expr: OpenUiExpr.Unary, stack: Set<String>, statementId: String?): OpenUiValue =
         when (expr.op) {
@@ -314,8 +341,7 @@ internal class OpenUiRuntime(
         stack: Set<String>,
         statementId: String?,
     ): OpenUiValue =
-        args.getOrNull(index)?.let { expr -> evalExpr(expr, stack, statementId, valuePosition = false) }
-            ?: OpenUiValue.Null
+        collapseEvalSkeleton(args.getOrNull(index)?.let { expr -> evalExpr(expr, stack, statementId, valuePosition = false) })
 
     private fun evalAtCall(expr: OpenUiExpr.AtCall, stack: Set<String>, statementId: String?): OpenUiValue? =
         when (expr.name) {
@@ -603,7 +629,7 @@ internal class OpenUiRuntime(
                 props[prop.name] = OpenUiValue.Binding(argExpr.name)
                 continue
             }
-            val value = evalExpr(argExpr, stack, statementId, valuePosition = true) ?: OpenUiValue.Null
+            val value = collapseEvalSkeleton(evalExpr(argExpr, stack, statementId, valuePosition = true))
             if (value is OpenUiValue.Null) {
                 when {
                     // null 跳过可选参数（§1.5），静默取默认
@@ -639,10 +665,12 @@ internal class OpenUiRuntime(
                 if (value !is OpenUiValue.Arr) return typeMismatch(component, prop, statementId)
                 // 组件槽只收组件：数据（对象/数组/字符串/数字/布尔）是 type-mismatch 并剔除；
                 // 显式 null 字面量保留（渲染为空）（§8.4）；UnknownComponent 占位节点
-                // 同组件口径放行（前向兼容，渲染层可见降级）
+                // 同组件口径放行（前向兼容，渲染层可见降级）；Skeleton 骨架占位（流式
+                // partial 前向引用）同口径放行（top-down reveal，渲染层骨架块）
                 val items = value.v.mapNotNull { element ->
                     when (element) {
                         is OpenUiValue.ComponentVal, is OpenUiValue.UnknownComponent,
+                        is OpenUiValue.Skeleton,
                         OpenUiValue.Null,
                         -> element
                         else -> {
@@ -724,6 +752,7 @@ internal class OpenUiRuntime(
                     value.v.all { element ->
                         element is OpenUiValue.ComponentVal ||
                             element is OpenUiValue.UnknownComponent ||
+                            element is OpenUiValue.Skeleton ||
                             element is OpenUiValue.Null
                     }
             // ListItem.action（2026-10-25 全量补全）：对象数组字段内的动作表达式，

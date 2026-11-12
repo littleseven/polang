@@ -42,6 +42,9 @@ sealed interface IosOpenUiVal {
 
     /** 未知组件占位节点（前向兼容可见降级，OpenUiValue.UnknownComponent 镜像）。 */
     class UnknownNodeVal(val type: String, val statementId: String) : IosOpenUiVal
+
+    /** 前向引用骨架占位（流式瞬态，OpenUiValue.Skeleton 镜像）：top-down reveal 的「在路上」槽位。 */
+    class SkeletonNodeVal(val refName: String, val statementId: String) : IosOpenUiVal
 }
 
 /** 组件节点镜像：type + 已按库 schema 归位的命名属性。 */
@@ -65,6 +68,7 @@ internal fun mirrorOf(value: OpenUiValue): IosOpenUiVal = when (value) {
     is OpenUiValue.Binding -> IosOpenUiVal.BindingVal(value.name)
     is OpenUiValue.ComponentVal -> IosOpenUiVal.NodeVal(mirrorOf(value))
     is OpenUiValue.UnknownComponent -> IosOpenUiVal.UnknownNodeVal(value.type, value.statementId)
+    is OpenUiValue.Skeleton -> IosOpenUiVal.SkeletonNodeVal(value.refName, value.statementId)
 }
 
 internal fun mirrorOf(node: OpenUiValue.ComponentVal): IosOpenUiNodeMirror = IosOpenUiNodeMirror(
@@ -389,6 +393,8 @@ internal fun isOpenUrlAllowed(url: String): Boolean {
 /**
  * 流式预览工厂：每帧前缀新建 session 做前缀解析（空 resolver 不取数），预算判定在
  * Swift 侧（24k 对齐 Android PREVIEW_PARSE_BUDGET_CHARS）；解析失败返 null（保留上一帧好预览）。
+ * forwardRefSkeletons = true：被引用但尚未流到的语句名产出 Skeleton 骨架占位
+ * （top-down reveal，Android OpenUiStreamingCard 同口径），定义流入后下帧消失。
  */
 object IosOpenUiPreviewFactory {
 
@@ -397,6 +403,7 @@ object IosOpenUiPreviewFactory {
             val session = OpenUiSession(
                 program = program,
                 tools = OpenUiToolResolver { _, _ -> OpenUiValue.Null },
+                forwardRefSkeletons = true,
             )
             (session.prepare() as? OpenUiResult.Rendered)?.let { rendered ->
                 IosOpenUiCardSnapshot.Ready(
