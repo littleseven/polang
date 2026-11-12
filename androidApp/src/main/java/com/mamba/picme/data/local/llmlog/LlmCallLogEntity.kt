@@ -25,5 +25,10 @@ data class LlmCallLogEntity(
     val responseJson: String?,
     val errorMessage: String?,
     /** 关联 ID：一条用户消息一个 traceId；非 chat 来源/老数据为 null（详情页按无关联处理）。 */
-    val traceId: String? = null
+    val traceId: String? = null,
+    /**
+     * 上游 prompt 前缀缓存命中 token 数（SSE usage 帧 `cached_tokens`，LlmWireTap 采集；
+     * 纯指标，release 也落）。供应商/配置未回传 usage 帧时 null（v6 迁移前老数据同 null）。
+     */
+    val cachedTokens: Int? = null
 )

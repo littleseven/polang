@@ -26,8 +26,9 @@
 12. [PersonRelationCapability](#12-personrelationcapability)
 13. [MemoryCapability](#13-memorycapability)
 14. [ImageEditCapability](#14-imageeditcapability)
-15. [附录 A：新增 Capability 指南](#附录-a新增-capability-指南)
-16. [附录 B：Capability 生命周期规范](#附录-bcapability-生命周期规范)
+15. [ChatHistoryRecallCapability](#15-chathistoryrecallcapability)
+16. [附录 A：新增 Capability 指南](#附录-a新增-capability-指南)
+17. [附录 B：Capability 生命周期规范](#附录-bcapability-生命周期规范)
 
 ---
 
@@ -44,6 +45,7 @@
 | **AiOptimizeCapability** | `ai_optimize` | GALLERY, CHAT | 1 | ✅ 已落地 | 应用级 |
 | **PersonRelationCapability** | `person_relation` | CHAT | 3 | ✅ 已落地 | 应用级（AppContainer 注入 PersonRepository） |
 | **MemoryCapability** | `memory_facts` | CHAT | 3 | ✅ 已落地 | 应用级（AppContainer 注入 MemoryRepository） |
+| **ChatHistoryRecallCapability** | `chat_history` | CHAT | 1 | ✅ 已落地 | 应用级（AppContainer 注入 ChatMessageDao，2026-11-12 recall_chat_history 工具） |
 | **ChatGallerySummaryCapability** | `chat_gallery_summary` | CHAT | 1 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate |
 | **ChatStartTagScanCapability** | `chat_start_tag_scan` | CHAT | 1 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate |
 | **ChatRunScriptCapability** | `chat_run_script` | CHAT | 3 | ✅ 已落地 | 应用级单例 + `ChatViewModel` delegate（端侧 QuickJS 沙箱，命令 `run_gallery_script` / `draw_chart` / `render_html`） |
@@ -111,7 +113,7 @@
 | `CAMERA` | CameraCapability, NavigationCapability, SystemCapability |
 | `GALLERY` | GalleryCapability, AiOptimizeCapability, NavigationCapability, SystemCapability |
 | `SETTINGS` | SettingsCapability, NavigationCapability, SystemCapability |
-| `CHAT` | ChatSearchCapability, ChatGallerySummaryCapability, ChatStartTagScanCapability, ChatRunScriptCapability, ChatMediaWriteCapability, ImageEditCapability, AiOptimizeCapability, PersonRelationCapability, MemoryCapability, NavigationCapability, SystemCapability |
+| `CHAT` | ChatSearchCapability, ChatGallerySummaryCapability, ChatStartTagScanCapability, ChatRunScriptCapability, ChatMediaWriteCapability, ImageEditCapability, AiOptimizeCapability, PersonRelationCapability, MemoryCapability, ChatHistoryRecallCapability, NavigationCapability, SystemCapability |
 | `DEBUG` | NavigationCapability, SystemCapability |
 | `UNKNOWN` | NavigationCapability, SystemCapability |
 
@@ -446,6 +448,30 @@
 ### 14.4 生命周期
 
 - **应用级**：`PoLangApplication.initializeCapabilities()` 注册（`AppContainer.imageEditCapability` lazy 单例），CHAT 场景常驻可用；由 `ChatToolService.editImage()` @Tool 暴露给远程 chat agent。
+
+---
+
+## 15. ChatHistoryRecallCapability
+
+**职责**: 聊天历史主动召回（`recall_chat_history` 工具，2026-11-12）——检索**当前会话** Room 长期轨（chat_messages）`type='text'` 投影行，返回硬编码中文 observation（只进模型不进用户气泡，无 UI 卡）  
+**活跃场景**: `CHAT`  
+**文件**: `androidApp/src/main/java/com/mamba/picme/features/chat/capability/ChatHistoryRecallCapability.kt`  
+**状态**: ✅ 已落地
+
+### 15.1 支持命令
+
+| 命令 | 参数 | 风险级 | 描述 | 示例 |
+|------|------|--------|------|------|
+| `recall_chat_history` | `query: String, limit: Int` | READ_ONLY | 当前会话历史 LIKE 匹配（query 空=不限取最近 N 条；limit @Tool 层与 Capability 双钳 1..50）；会话范围经 `ChatToolService.chatSessionId`（引擎每轮同步）→ `AgentContext.memorySessionId` 下传 | "我们之前聊了什么来着" |
+
+### 15.2 关键设计
+
+- 观测组装 / 钳制收口 shared `ChatHistoryRecall` 纯函数（单行 200 字符、总量 4KB 从最旧侧整行丢弃、时间正序渲染）；`type='text'` 投影列只读消费（不变式 5 只禁绕过 parts 接缝**写**）。
+- iOS 未接入：`ChatToolManifest` 手工清单不含本工具，契约天然降级（平台差异见 `CHAT_PROTOCOL_TECH_SPEC.md` §1.4）。
+
+### 15.3 生命周期
+
+- **应用级**：`PoLangApplication.initializeCapabilities()` 注册（`AppContainer.chatHistoryRecallCapability` lazy 单例），CHAT 场景常驻可用。
 
 ---
 

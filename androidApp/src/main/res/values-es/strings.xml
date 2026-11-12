@@ -1730,6 +1730,7 @@
     <string name="chat_cmd_remember_fact">Recordar dato</string>
     <string name="chat_cmd_forget_fact">Olvidar dato</string>
     <string name="chat_cmd_recall_memory">Recuperar memoria</string>
+    <string name="chat_cmd_recall_chat_history">Recuperar historial de chat</string>
     <string name="chat_cmd_detail_smoothing">Suavizado %1$d%%</string>
     <string name="chat_cmd_detail_whitening">Blanqueamiento %1$d%%</string>
     <string name="chat_cmd_detail_slim_face">Adelgazamiento facial %1$d%%</string>

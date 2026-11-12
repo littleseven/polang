@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FlipCameraAndroid
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.HourglassEmpty
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Language
@@ -305,6 +306,7 @@ private fun getAgentCommandDisplayName(context: Context, command: AgentCommand):
         is AgentCommand.RememberFact -> context.getString(R.string.chat_cmd_remember_fact)
         is AgentCommand.ForgetFact -> context.getString(R.string.chat_cmd_forget_fact)
         is AgentCommand.RecallMemory -> context.getString(R.string.chat_cmd_recall_memory)
+        is AgentCommand.RecallChatHistory -> context.getString(R.string.chat_cmd_recall_chat_history)
         is AgentCommand.BrowserOpen -> context.getString(R.string.chat_cmd_browser_open)
         is AgentCommand.BrowserNavigate -> context.getString(R.string.chat_cmd_browser_navigate)
         is AgentCommand.BrowserClick -> context.getString(R.string.chat_cmd_browser_click)
@@ -367,6 +369,7 @@ private fun resolveCommandIcon(command: AgentCommand): ImageVector = when (comma
     is AgentCommand.RememberFact -> Icons.Rounded.Memory
     is AgentCommand.ForgetFact -> Icons.Rounded.Memory
     is AgentCommand.RecallMemory -> Icons.Rounded.Memory
+    is AgentCommand.RecallChatHistory -> Icons.Rounded.History
     is AgentCommand.BrowserOpen -> Icons.Rounded.OpenInBrowser
     is AgentCommand.BrowserNavigate -> Icons.Rounded.TravelExplore
     is AgentCommand.BrowserClick -> Icons.Rounded.TouchApp

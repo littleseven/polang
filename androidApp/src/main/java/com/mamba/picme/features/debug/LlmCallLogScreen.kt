@@ -593,7 +593,8 @@ private fun LlmCallLogDetail(item: LlmCallLogEntity, modifier: Modifier) {
         Text(
             text = if (item.success) {
                 "$successLabel  ·  ${item.latencyMs ?: 0}ms" +
-                    "  ·  in=${item.promptTokens ?: 0} out=${item.completionTokens ?: 0}"
+                    "  ·  in=${item.promptTokens ?: 0} out=${item.completionTokens ?: 0}" +
+                    (item.cachedTokens?.let { "  ·  cached=$it" } ?: "")
             } else {
                 "$failedLabel  ·  ${item.latencyMs ?: 0}ms"
             },

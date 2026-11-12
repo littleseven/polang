@@ -30,6 +30,7 @@ class ChatToolCapabilityCoverageTest {
         "remember_fact" to "MemoryCapability（容器注入）",
         "forget_fact" to "MemoryCapability（容器注入）",
         "recall_memory" to "MemoryCapability（容器注入）",
+        "recall_chat_history" to "ChatHistoryRecallCapability（ChatMessageDao 容器注入，2026-11-12 Room 长期轨召回）",
         "ai_optimize" to "AiOptimizeCapability（容器注入）",
         "edit_image" to "ImageEditCapability（容器注入）",
         "adjust_image" to "handler-based（adjustImageHandler，不经 Capability）",

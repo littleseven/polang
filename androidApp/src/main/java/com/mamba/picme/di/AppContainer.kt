@@ -105,6 +105,7 @@ import com.mamba.picme.features.chat.ChatOptimizeGachaController
 import com.mamba.picme.features.chat.ChatViewModelDependencies
 import com.mamba.picme.features.chat.PrefsClaudeSidStore
 import com.mamba.picme.features.chat.buildAppToolExecutor
+import com.mamba.picme.features.chat.capability.ChatHistoryRecallCapability
 import com.mamba.picme.features.chat.capability.MemoryCapability
 import com.mamba.picme.features.chat.capability.PersonRelationCapability
 import com.mamba.picme.features.chat.js.QuickJsEngine
@@ -385,6 +386,8 @@ interface AppContainer {
     val personRelationCapability: PersonRelationCapability
     /** 事实记忆 Capability（CHAT 场景，聊天工具直调与 JS dispatch 共用落点） */
     val memoryCapability: MemoryCapability
+    /** 聊天历史召回 Capability（CHAT 场景，recall_chat_history 工具 → Room 长期轨检索） */
+    val chatHistoryRecallCapability: ChatHistoryRecallCapability
     /** 受控词表（chat JS handler tag.audit 词表外标签比对 / Debug 演示共用） */
     val controlledVocab: ControlledVocab
     /** 服务端账号客户端（内含独立 OkHttpClient，进程级单例；设置页账号区与 chat 依赖共用） */
@@ -487,6 +490,10 @@ class AppContainerImpl(
 
     override val memoryCapability: MemoryCapability by lazy {
         MemoryCapability(memoryRepository = memoryRepository)
+    }
+
+    override val chatHistoryRecallCapability: ChatHistoryRecallCapability by lazy {
+        ChatHistoryRecallCapability(chatMessageDao = database.chatMessageDao())
     }
 
     /** OPUS-MT 翻译引擎（SentencePiece + ONNX Runtime） */

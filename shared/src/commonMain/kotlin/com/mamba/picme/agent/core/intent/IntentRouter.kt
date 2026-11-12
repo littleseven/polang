@@ -433,6 +433,7 @@ class IntentRouter(
         error: String?,
     ) {
         runCatching {
+            val tap = RemoteModelFactory.wireTap
             RemoteModelFactory.recorder?.record(
                 LlmCallRecord(
                     createdAt = Clock.System.now().toEpochMilliseconds(),
@@ -443,10 +444,11 @@ class IntentRouter(
                     promptTokens = null,
                     completionTokens = null,
                     totalTokens = null,
-                    requestJson = "",
+                    requestJson = RemoteModelFactory.capturedRequestBody(tap),
                     responseJson = if (RemoteModelFactory.captureContent) text?.take(512) else null,
                     errorMessage = error?.take(200),
                     traceId = traceId,
+                    cachedTokens = tap?.latestCachedTokens(),
                 )
             )
         }
