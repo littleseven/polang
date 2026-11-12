@@ -41,3 +41,23 @@
 - OpenUI `lang_version` 协商为**双交付生效**：server 需部署（done 帧携带）+ App 发包（比对提示）；生产 server 未重新部署前该链路静默兼容（字段缺省=无提示）
 - cached_tokens 依赖供应商流式尾帧回传 usage（DeepSeek/Moonshot 恒带；OpenAI 官方流式需 stream_options，Koog 未传则采集不到——已如实登记 CHAT_PROTOCOL_TECH_SPEC §5）
 - requestJson 录制仅 DEBUG 构建（release 零开销零保留，隐私口径不变）
+
+## 4. iOS 流（feat/ios-cloud-turn-openui，2026-11-12 合入集成分支）
+
+- **交付**：6 原子提交——①SSE 帧全解析（openui_delta + done 五载荷，未知字段忽略不崩）②shared 基座（`OpenUiProgramSummary` 迁 commonMain + `IosLocalHandleStore`/`IosOpenUiCardController`/媒体缝 + 工具桥 mediaType 补线）③codec `uiTypeOf` OpenUiCard→OPENUI_CARD + iosTest ④SwiftUI 渲染器 103 组件全集（UnknownComponent 占位/langVersion 提示行/降级卡/性能行/viewState 持久化/favorite Mutation，Kotlin 侧承载 session 规避 KotlinDictionary/信号 6）⑤主聊天云端回合全链（`cloud_agent_enabled` 开关默认关 + CloudFramePipe 保序 + 会话卫生镜像 Android）⑥测试+文档登记
+- **验证**：分支内 `xcodebuild build` / `build-for-testing` SUCCEEDED；`:shared:jvmTest` / `:shared:iosSimulatorArm64Test` / `:androidApp:compileDebugKotlin` 全绿
+- **已知限制**：iOS XCTest 因 MNN.framework 仅真机 arm64 未实际运行（按 ios-build-debug skill §0.3 先例编译级验证，断言纯逻辑真机可跑）；视觉为 token 级对齐非像素级，未真机回归；残余平台差异四项登记 chat.yaml §3.2（Navigate 路由/Html 叶网络关死/照片多页翻页/faceFocus·aspectRatio 元数据）
+
+## 5. 集成分支终验矩阵（feat/chat-openui-gap-closure @ 96e249076，2026-11-12）
+
+| 门禁 | 结果 |
+|---|---|
+| `:shared:jvmTest`（全量） | BUILD SUCCESSFUL |
+| `:shared:iosSimulatorArm64Test` | BUILD SUCCESSFUL |
+| `:androidApp:compileDebugKotlin` | BUILD SUCCESSFUL |
+| `:androidApp:testDebugUnitTest`（全量） | BUILD SUCCESSFUL |
+| `xcodebuild build`（PoLang，generic/platform=iOS） | **BUILD SUCCEEDED**（worktree 需 `pod install` + `assembleSharedKitDebugXCFramework` + 拷 `face_landmarker.task`，见 ios-build-debug 既有约束） |
+| `-p server test`（lang_version 流内） | BUILD SUCCESSFUL |
+| `check_doc_sync.py` / `check_detekt_baseline.py` | 全过 / 无新增豁免 |
+| 真机冒烟（设备 92a0cfb8） | 见 §2，全过 |
+
