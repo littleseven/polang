@@ -1100,6 +1100,8 @@
     <string name="chat_unsupported_part_title">Contenu non pris en charge</string>
     <string name="chat_unsupported_part_upgrade">Mettez à jour vers la dernière version pour voir ce contenu</string>
     <string name="openui_action_failed">Échec de l\'action</string>
+    <string name="openui_unknown_component_hint">Mettez à jour l\'appli pour voir ce contenu</string>
+    <string name="openui_lang_newer_hint">Un nouveau format de contenu est disponible. Mettez à jour l\'appli pour tout voir.</string>
     <string name="chat_example_group_search">Trouver des photos</string>
     <string name="chat_example_group_ask">Questions sur votre galerie</string>
     <string-array name="chat_example_prompts_search">

@@ -200,6 +200,8 @@ private fun OpenUiFormGroup(
         for (child in children) {
             if (child is OpenUiValue.ComponentVal) {
                 OpenUiNodeRenderer(child, state, photoResolver, onAction)
+            } else if (child is OpenUiValue.UnknownComponent) {
+                OpenUiUnknownComponentPlaceholder(child.type)
             } else {
                 Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
             }
@@ -227,6 +229,8 @@ private fun OpenUiFormControl(
         for (child in inputs) {
             if (child is OpenUiValue.ComponentVal) {
                 OpenUiNodeRenderer(child, state, photoResolver, onAction)
+            } else if (child is OpenUiValue.UnknownComponent) {
+                OpenUiUnknownComponentPlaceholder(child.type)
             } else {
                 Box(modifier = Modifier)
             }

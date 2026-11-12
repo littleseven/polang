@@ -145,6 +145,9 @@ sealed interface MessagePart {
      * 数据经 Query("local_handle") 端上补全（隐私闸对偶 D2/D6）。
      * [fallbackSummary] 为投影级降级摘要（云端可持有）。
      * [viewState] 为交互态（"selected=<label>"，同 part id 覆写持久化，对偶 US-7）。
+     * [langVersion] 为服务端程序的语言版本（done 帧 `lang_version`，见
+     * OpenUiContract.LANG_VERSION；旧 server 无此字段 = null，端侧比对更高版本时
+     * 卡顶部提示升级）。默认值 null 保证旧 partsJson（无此字段）解码兼容。
      */
     @Serializable
     @SerialName("data_genui_program")
@@ -153,6 +156,7 @@ sealed interface MessagePart {
         val program: String,
         val fallbackSummary: String,
         val viewState: String? = null,
+        val langVersion: Int? = null,
     ) : MessagePart {
         override val category: PartCategory get() = PartCategory.DATA
     }

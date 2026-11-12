@@ -951,8 +951,22 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   normalize 后原样放行 / 非法包成 `root = Markdown("…")` 程序（复验再失败硬编码错误卡）。
   turn-native 线假发卡守卫（CardClaimGuard）已随 2026-11-06 唯一化与发卡工具一并物理删除
   （该线无发卡工具，纠正文案指向不存在的工具会误导——此前经 `programGuard == null &&` 门控旁路）。
-- **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState)`，
-  category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）。
+- **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState, langVersion)`，
+  category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）；`langVersion`（2026-11-11）
+  = 服务端 OpenUI 语言协议版本（server done 帧 `lang_version` 真引用 shared
+  `OpenUiContract.LANG_VERSION`），旧 server 无字段/旧 partsJson 解码均落 null（默认值双向兼容）。
+- **协议版本协商 + 未知组件可见降级（2026-11-11）**：服务端先部署新组件而 App 未发包时的
+  前向兼容双保险（chat parts 层 Tombstone 口径在 OpenUI 程序层的对偶）——① done 帧
+  `lang_version`（server `AgentRoutes` 真引用 shared 常量）→ 端侧 `CloudFrame.Done.langVersion`
+  （缺省容忍）→ 落 OpenUiCard part；卡渲染时 `langVersion > OpenUiContract.LANG_VERSION` →
+  `OpenUiCardHost` 卡顶部细提示行（五语 `openui_lang_newer_hint`）引导升级；② shared
+  `OpenUiEval` 遇未知组件名不再记 `unknown-component` 后静默丢弃，产出
+  `OpenUiValue.UnknownComponent(type, statementId)` 占位节点（错误照记）——COMPONENT_LIST
+  槽位（含 Tabs.tabs.children 递归校验）同组件口径放行；Android 渲染器（Node/Content/Form/
+  CardBlock 四文件的组件槽递归点）渲染可见占位块（五语 `openui_unknown_component_hint`，
+  contentDescription 带原始组件名），server `OpenUiHtmlRenderer` 组件树预览落带组件名虚线
+  占位框；根本身未知仍走致命 no-root → 可见降级卡（不静默）。bump 规则见
+  `OpenUiContract.LANG_VERSION` KDoc（OpenUiLibrary 组件集扩容时 +1）。
 - **回灌**：不回灌 LLM（data part 分支 emptyList）；program 只含骨架 + Query
   local_handle 绑定，handle id 对云 opaque（D2 对偶）。
 - **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，

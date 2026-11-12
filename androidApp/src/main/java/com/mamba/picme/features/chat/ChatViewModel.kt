@@ -2285,7 +2285,7 @@ class ChatViewModel(
     ) {
         for ((pendingText, card) in cards.openUiFlushes) {
             if (pendingText.isNotBlank()) insertAgentMessage(sessionId, pendingText, CLOUD_MODEL_LABEL, performance)
-            insertOpenUiCardMessage(sessionId, card, performance)
+            insertOpenUiCardMessage(sessionId, card, performance, langVersion = cards.doneUsage?.langVersion)
             // 正式卡落库后流式预览让位（Room Flow 重放前的空窗仅一帧量级，无双显）
             _openUiStreamProgram.value = null
         }
@@ -3044,11 +3044,14 @@ class ChatViewModel(
     /**
      * 插入 OpenUI 卡消息（data_genui_program + role=agent，openui P2，parts-first：
      * OpenUiCard part 直建，投影 content 列 = 整颗 part JSON 沿 tool_browser 先例）。
+     * [langVersion] 为服务端语言版本（done 帧，版本协商）：高于端侧 OpenUiContract.LANG_VERSION
+     * 时卡顶部提示升级；旧服务端 null 不提示。
      */
     private suspend fun insertOpenUiCardMessage(
         sessionId: String,
         event: CloudTurnEvent.OpenUiCard,
         performance: LlmPerformance? = null,
+        langVersion: Int? = null,
     ) {
         chatMessageDao.insertPartsMessage(
             sessionId = sessionId,
@@ -3058,6 +3061,7 @@ class ChatViewModel(
                     partId = "p0",
                     program = event.program,
                     fallbackSummary = event.fallbackSummary,
+                    langVersion = langVersion,
                 ),
             ),
             modelUsed = "cloud_agent",

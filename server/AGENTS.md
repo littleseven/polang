@@ -119,7 +119,7 @@ server/
 │   │   ├── SkillTools.kt         # load_skill Koog 工具（@Tool annotation 同 server_time 范式；Koog 无框架级 Skill 抽象，走官方 Tool 扩展点；2026-11-08 工具名/描述/参数描述/error 前缀真引用 shared AgentSkillContract，与端侧 ChatToolService.loadSkill 逐字节一致）
 │   │   ├── TurnUsage.kt          # 回合级 LLM 用量累计（done 帧 elapsed_ms/usage 数据源；流式 End 帧 metaInfo 与非流式 onLLMCallCompleted 两路互斥累加）
 │   │   ├── ToolArgsWireJson.kt   # 工具参数 wire JSON 合规转义（Koog 1.3.0 私有 JSON 树 toString 零转义缺陷修复，replayPending 回放同径）
-│   │   └── AgentRoutes.kt        # /agent/** REST + SSE（BYOK X-User-Api-Key 零留存）
+│   │   └── AgentRoutes.kt        # /agent/** REST + SSE（BYOK X-User-Api-Key 零留存）；done 帧自 2026-11-11 起携 `lang_version`（OpenUI 语言协议版本，真引用 shared `OpenUiContract.LANG_VERSION`——端侧落 OpenUiCard part 比对，高于端侧版本时提示升级，旧端忽略未知字段）
 │   ├── recommend/RuleEngine.kt   # 规则查询 + 参数组装
 │   ├── cos/CosService.kt         # COS 预签名 URL
 │   ├── ratelimit/RateLimiter.kt  # 内存令牌桶 + 日预算

@@ -37,6 +37,8 @@ sealed interface CloudFrame {
         val promptTokens: Long? = null,
         val completionTokens: Long? = null,
         val elapsedMs: Long? = null,
+        /** OpenUI 语言协议版本（2026-11-11 版本协商）：旧服务端无此字段 = null 不提示。 */
+        val langVersion: Int? = null,
     ) : CloudFrame
 
     data class Error(val message: String) : CloudFrame
@@ -69,6 +71,7 @@ object CloudSseParser {
                     promptTokens = usage?.takeIf { u -> u.has("prompt_tokens") }?.optLong("prompt_tokens"),
                     completionTokens = usage?.takeIf { u -> u.has("completion_tokens") }?.optLong("completion_tokens"),
                     elapsedMs = if (json.has("elapsed_ms")) json.optLong("elapsed_ms") else null,
+                    langVersion = if (json.has("lang_version")) json.optInt("lang_version") else null,
                 )
             }
             "error" -> CloudFrame.Error(json.optString("message"))

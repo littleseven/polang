@@ -545,8 +545,11 @@ internal class OpenUiRuntime(
     ): OpenUiValue? {
         val spec = OpenUiLibrary.components[call.type]
         if (spec == null) {
+            // 前向兼容（协议版本协商，OpenUiContract.LANG_VERSION）：服务端先部署新组件而
+            // App 未发包时不再静默丢弃——产出占位节点（携带原始组件名）供渲染层可见降级，
+            // 错误照记（求值日志排查用）
             errors += OpenUiError("unknown-component", statementId, "未知组件 ${call.type}")
-            return null
+            return OpenUiValue.UnknownComponent(call.type, statementId ?: "")
         }
         // 命名实参归位（2026-10-24 all_years 事故：LLM 写 name=value 被位置化误配整条卡降级）：
         // Assign 节点按 prop 名绑定（后写覆盖，同语句重复名收口），位置参数按 spec 序填未占用槽位。
@@ -635,10 +638,13 @@ internal class OpenUiRuntime(
             OpenUiPropType.COMPONENT_LIST -> {
                 if (value !is OpenUiValue.Arr) return typeMismatch(component, prop, statementId)
                 // 组件槽只收组件：数据（对象/数组/字符串/数字/布尔）是 type-mismatch 并剔除；
-                // 显式 null 字面量保留（渲染为空）（§8.4）
+                // 显式 null 字面量保留（渲染为空）（§8.4）；UnknownComponent 占位节点
+                // 同组件口径放行（前向兼容，渲染层可见降级）
                 val items = value.v.mapNotNull { element ->
                     when (element) {
-                        is OpenUiValue.ComponentVal, OpenUiValue.Null -> element
+                        is OpenUiValue.ComponentVal, is OpenUiValue.UnknownComponent,
+                        OpenUiValue.Null,
+                        -> element
                         else -> {
                             errors += OpenUiError(
                                 "type-mismatch",
@@ -711,11 +717,14 @@ internal class OpenUiRuntime(
             OpenUiPropType.BOOLEAN -> value is OpenUiValue.Bool
             OpenUiPropType.ENUM -> value is OpenUiValue.Str && value.v in field.enumValues
             // Tabs.tabs.children（M2）：对象数组字段内的组件数组递归校验——
-            // 元素只收组件（显式 null 字面量保留，与 COMPONENT_LIST 槽位同口径）
+            // 元素只收组件（显式 null 字面量保留，与 COMPONENT_LIST 槽位同口径；
+            // UnknownComponent 占位节点同组件口径放行，前向兼容）
             OpenUiPropType.COMPONENT_LIST ->
                 value is OpenUiValue.Arr &&
                     value.v.all { element ->
-                        element is OpenUiValue.ComponentVal || element is OpenUiValue.Null
+                        element is OpenUiValue.ComponentVal ||
+                            element is OpenUiValue.UnknownComponent ||
+                            element is OpenUiValue.Null
                     }
             // ListItem.action（2026-10-25 全量补全）：对象数组字段内的动作表达式，
             // 与 ACTION 槽位同口径（裸动作或 ActionVal 数组）

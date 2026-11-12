@@ -61,6 +61,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -147,7 +149,9 @@ import com.mamba.picme.features.common.chat.AgentMarkdown
  *   LineChart variant=step 阶梯）；6 个新图表（AreaChart/HorizontalBarChart/RadarChart/
  *   RadialChart/SingleStackedBarChart/ScatterChart）在 OpenUiChartRenderers.kt。
  *
- * 半信任输入防御：未知组件/null 字面量 → 空 Box 占位，不炸整卡；BarChart buckets
+ * 半信任输入防御：null 字面量 → 空 Box 占位，不炸整卡；未知组件（新版本服务端
+ * 部署、本端未识别，OpenUiValue.UnknownComponent）→ [OpenUiUnknownComponentPlaceholder]
+ * 可见降级块（2026-11-11 协议版本协商起不再静默丢弃）；BarChart buckets
  * 元素形态不符剔除、count 钳制非负（同 A2UI 侧口径）；Image 解析不到/加载中 →
  * surfaceVariant 占位 Box（同形防跳动）。
  *
@@ -255,6 +259,12 @@ fun OpenUiNodeRenderer(
                                 else -> weightMod
                             }
                             OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
+                        } else if (child is OpenUiValue.UnknownComponent) {
+                            // 未知组件占位（前向兼容）：与组件子项同占一等宽栏，可见降级
+                            OpenUiUnknownComponentPlaceholder(
+                                child.type,
+                                modifier = if (weightsUsable) Modifier.weight(1f) else Modifier,
+                            )
                         } else {
                             // null 字面量/被剔除元素：等宽空占位
                             Box(modifier = if (weightsUsable) Modifier.weight(1f) else Modifier)
@@ -304,6 +314,11 @@ fun OpenUiNodeRenderer(
                                         else -> weightMod
                                     }
                                     OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
+                                } else if (child is OpenUiValue.UnknownComponent) {
+                                    OpenUiUnknownComponentPlaceholder(
+                                        child.type,
+                                        modifier = if (weightsUsable) Modifier.weight(1f) else Modifier,
+                                    )
                                 } else {
                                     Box(modifier = if (weightsUsable) Modifier.weight(1f) else Modifier)
                                 }
@@ -327,6 +342,8 @@ fun OpenUiNodeRenderer(
                 children.forEach { child ->
                     if (child is OpenUiValue.ComponentVal) {
                         OpenUiNodeRenderer(child, state, photoResolver, onAction, Modifier)
+                    } else if (child is OpenUiValue.UnknownComponent) {
+                        OpenUiUnknownComponentPlaceholder(child.type)
                     }
                 }
             }
@@ -470,8 +487,31 @@ fun OpenUiNodeRenderer(
         in openUiFormComponentNames -> OpenUiFormNode(node, state, photoResolver, onAction, modifier)
         in openUiChartComponentNames -> OpenUiChartNode(node, state, photoResolver, onAction, modifier)
         in openUiCardBlockComponentNames -> OpenUiCardBlockNode(node, state, photoResolver, onAction, modifier)
-        else -> Box(modifier = modifier) // 未知组件/元素形状独立出现：空占位，不炸整卡
+        else -> Box(modifier = modifier) // 元素形状组件独立出现：空占位，不炸整卡
     }
+}
+
+/**
+ * 未知组件占位节点（[OpenUiValue.UnknownComponent]，协议版本协商
+ * `OpenUiContract.LANG_VERSION` 的前向兼容兜底）→ 可见降级块：小高度圆角块 +
+ * colorScheme 语义色 + 五语文案；contentDescription 带原始组件名便于排查。
+ * 服务端先部署新组件而 App 未发包时，旧端不再静默丢弃残卡。
+ */
+@Composable
+internal fun OpenUiUnknownComponentPlaceholder(type: String, modifier: Modifier = Modifier) {
+    val hint = stringResource(R.string.openui_unknown_component_hint)
+    Text(
+        text = hint,
+        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(8.dp),
+            )
+            .semantics { contentDescription = "$hint [$type]" }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    )
 }
 
 /**
@@ -494,18 +534,25 @@ private fun OpenUiGappedChildren(
     val gap = node.spacingDp()
     var first = true
     for (child in children) {
-        if (child is OpenUiValue.ComponentVal) {
-            if (!first) {
-                Spacer(
-                    modifier = Modifier.height(
-                        if (child.isSectionStart()) maxOf(gap, OpenUiCardTokens.sectionGap) else gap
+        when (child) {
+            is OpenUiValue.ComponentVal -> {
+                if (!first) {
+                    Spacer(
+                        modifier = Modifier.height(
+                            if (child.isSectionStart()) maxOf(gap, OpenUiCardTokens.sectionGap) else gap
+                        )
                     )
-                )
+                }
+                first = false
+                OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
             }
-            first = false
-            OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
-        } else {
-            Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
+            is OpenUiValue.UnknownComponent -> {
+                // 未知组件占位（前向兼容）：按组件同径贡献间距，可见降级
+                if (!first) Spacer(modifier = Modifier.height(gap))
+                first = false
+                OpenUiUnknownComponentPlaceholder(child.type, childModifier)
+            }
+            else -> Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }
     }
 }
@@ -533,7 +580,8 @@ private fun OpenUiValue.ComponentVal.isSectionStart(): Boolean =
         (type == "Text" &&
             OpenUiStyleMapper.parseTextRole((props["role"] as? OpenUiValue.Str)?.v) == OpenUiTextRole.SUBHEAD)
 
-/** 渲染任意组件数组槽（children / Tabs 页签内容）：非组件元素（null 字面量/被剔除）空占位。 */
+/** 渲染任意组件数组槽（children / Tabs 页签内容）：非组件元素（null 字面量/被剔除）空占位；
+ * 未知组件占位节点（前向兼容）可见降级。 */
 @Composable
 private fun OpenUiChildList(
     children: List<OpenUiValue>,
@@ -544,6 +592,8 @@ private fun OpenUiChildList(
     for (child in children) {
         if (child is OpenUiValue.ComponentVal) {
             OpenUiNodeRenderer(child, state, photoResolver, onAction)
+        } else if (child is OpenUiValue.UnknownComponent) {
+            OpenUiUnknownComponentPlaceholder(child.type)
         } else {
             Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }

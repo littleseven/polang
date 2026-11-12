@@ -1130,6 +1130,8 @@
     <string name="chat_unsupported_part_title">此內容暫不支援顯示</string>
     <string name="chat_unsupported_part_upgrade">升級到最新版本後可檢視完整內容</string>
     <string name="openui_action_failed">操作失敗</string>
+    <string name="openui_unknown_component_hint">此內容需更新應用後查看</string>
+    <string name="openui_lang_newer_hint">已推出新版內容格式，升級應用後可完整查看</string>
     <string name="chat_example_group_search">找照片</string>
     <string name="chat_example_group_ask">問相簿</string>
     <string-array name="chat_example_prompts_search">
