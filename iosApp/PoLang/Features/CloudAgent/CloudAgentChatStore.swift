@@ -222,6 +222,8 @@ final class CloudAgentChatStore: ObservableObject {
                     NSLog("PoLang:CloudAgent postToolResult failed: \(error.localizedDescription)")
                 }
             }
+        case .openUiDelta:
+            break // 主聊天流式预览由 ChatViewModel 消费；调试页 M1 不上屏（帧解析不崩即可）
         case .done:
             inFlight = false
         case .error(let message):
