@@ -25,6 +25,7 @@ struct ModelCenterView: View {
             VStack(spacing: SettingsTokens.listSectionSpacing) {
                 remoteModelsSection
                 AssistantPersonaSection()
+                CloudAgentMainChatSection()
                 CloudAgentByokSection()
             }
             .padding(.horizontal, Spacing.md)
@@ -255,6 +256,26 @@ private struct AssistantPersonaSection: View {
 }
 
 // MARK: - Cloud Agent BYOK 授权（spec §3 remote_model.cloud_agent_byok，ADR-018 M2）
+
+/// 主聊天云端 Agent 开关（2026-11-12 主聊天云端回合接线，对位 Android 设置页
+/// `cloud_agent_enabled` 开关）：开 = Chat 主页 sendMessage 拦截至云端编排回合；
+/// 关 = 本地编排。持久化 UserDefaults `cloud_agent_enabled`（Bool，默认 false）。
+private struct CloudAgentMainChatSection: View {
+    @AppStorage("cloud_agent_enabled") private var enabled = false
+
+    var body: some View {
+        SettingsListSection {
+            SettingsIconToggleRow(
+                title: L("settings.cloud_agent_entry_title"),
+                subtitle: L("settings.cloud_agent_chat_subtitle"),
+                icon: .sf("cloud"),
+                iconBlock: .vibrantBlue,
+                isOn: $enabled
+            )
+        }
+    }
+}
+
 
 /// 云端 Agent BYOK 授权开关行（图标块 + 标题单行省略 + 副题 ≤2 行 + 尾部 Switch）。
 /// 开 = 允许云端 Agent 会话以 BYOK 通道透传用户自己的 API key；关 = 只能走网关通道。
