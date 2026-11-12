@@ -184,8 +184,9 @@ parts_rendering:
     - "parts 模型：shared commonMain 直接可得（XCFramework），Swift 侧 parts 解码 + 拍平列表"
     - "turn 聚合：§3.1 视觉规则 SwiftUI 等价（turn 内段落间距档 + 回合分隔档，token 同源）"
     - "AST 正文渲染：解析层 commonMain，SwiftUI 渲染自绘（M3 管线 iOS 对等）"
-    - "HTML 卡双形态：现为零实现，gap 最大（HtmlCard WKWebView + 沙盒/测高/分流/全屏查看器/链接落地页）"
+    - "HTML 卡双形态：M5 已落地（HtmlCardView INLINE/FULLPAGE + 全屏查看器 + 链接落地页）"
     - "type 值域（2026-11-08 终态，4+1 分类 13 值 + role 独立字段；iOS 判型经 shared primaryPartOf 同源——envelope v6 门禁后零 legacy 迁移包袱）"
+    - "OpenUI GenUI 卡：2026-11-12 已落地——SSE 帧全解析（openui_delta/done 载荷）+ 主聊天云端回合接线（程序嗅探/OpenUI 卡落库 envelope v6/流式预览/性能行）+ OpenUiCardView 原生渲染（103 组件全集、UnknownComponent 占位、langVersion 提示行、降级卡、viewState 持久化、favorite Mutation）；残余登记 PARITY 台账：Navigate 自定义动作路由、Html 叶网络关死、照片多页翻页预览、faceFocus/aspectRatio 元数据"
 
 # ============================================================================
 # 4. 空状态（ChatEmptyState）
