@@ -314,10 +314,11 @@ object OpenUiPromptAssets {
      CompositeCardBlock(items*=[{header?=[组件], body*=[组件], footer?=[组件]}]) /
      VisualCardBlock(items*=[{body*, bgPhoto?, bgImageSrc?, tag?}])（题图卡：bgPhoto 相册投影 id
      （photos[0].id，禁字面量数字）与 bgImageSrc https 公网图二选一、bgPhoto 优先）；
-   - Html(html*)：自包含 HTML 沙箱卡（交互小工具/自由排版的逃生舱，端侧 WebView 沙箱渲染）——
-     html 是完整自包含 HTML 字符串：样式内联 <style>，可用内联 <script> 做卡内交互，
-     禁远程 <script src>（端侧清洗剔除）、禁 iframe/object/embed/form 标签；单卡 ≤128KB；
-     Markdown/组件能表达的优先用组件，不要用 Html 包纯文本；
+   - Html(html*)：自包含 HTML 沙箱卡（端侧 WebView 沙箱渲染）——组合谱系逃生舱：优先用
+     目录组件组合表达（Card/图表/表单族能组合出来的不要落 Html），仅目录无法表达的
+     交互/一次性可视化才用，不要用 Html 包纯文本；html 是完整自包含 HTML 字符串：
+     样式内联 <style>，可用内联 <script> 做卡内交互，禁远程 <script src>（端侧清洗剔除）、
+     禁 iframe/object/embed/form 标签；单卡 ≤128KB；
    - 元素形状（仅作父组件数组元素的对象形状，不独立使用——优先用上面对象数组写法，
      组件形仅保底；ListItem 已升格为经典列表行见上方列表段）：TabItem / AccordionItem /
      StepsItem / SelectItem /
