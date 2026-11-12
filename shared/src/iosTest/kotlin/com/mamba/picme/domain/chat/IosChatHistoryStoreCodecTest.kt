@@ -354,6 +354,56 @@ class IosChatHistoryStoreCodecTest {
         assertEquals("任务卡缺 engineerTask", decoded[1].content)
     }
 
+    // ── OpenUI GenUI 卡（2026-11-12 iOS 渲染落地）：判型/round-trip/rebuild 三口径 ──
+
+    @Test
+    fun roundTripOpenUiCardTypesAsOpenuiCard() {
+        // uiTypeOf：OpenUiCard part → OPENUI_CARD（原防御性落 TEXT 已随渲染落地删除）
+        val original = ChatMessage(
+            id = "ou1",
+            type = ChatMessageType.OPENUI_CARD,
+            content = "part json",
+            role = ModelInputRole.ASSISTANT,
+            modelUsed = "cloud_agent",
+            parts = listOf(
+                MessagePart.OpenUiCard(
+                    partId = "p0",
+                    program = "root = Card([Text(\"hi\")])",
+                    fallbackSummary = "hi",
+                    viewState = "selected=a",
+                    langVersion = 2,
+                )
+            ),
+        )
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(ChatHistoryStoreCodec.encode(listOf(original))))
+        assertEquals(ChatMessageType.OPENUI_CARD, decoded[0].type, "OpenUiCard part 应判型 OPENUI_CARD")
+        val part = assertIs<MessagePart.OpenUiCard>(decoded[0].parts.single())
+        assertEquals("root = Card([Text(\"hi\")])", part.program)
+        assertEquals("selected=a", part.viewState)
+        assertEquals(2, part.langVersion, "langVersion 随 parts 线格式持久化（版本协商）")
+    }
+
+    @Test
+    fun rebuildOpenUiCardFromStructuredWireType() {
+        // parts 缺失时自结构化字段重建：wire data_genui_program + content 承载整颗 part JSON 直通
+        val partJson = """
+            {"partId":"p0","program":"root = Card([Text(\"x\")])","fallbackSummary":"x"}
+        """.trimIndent()
+        val json = """
+            {"version":6,"messages":[
+              {"id":"o","type":"data_genui_program","role":"agent","content":${encodeRawJsonString(partJson)},"timestamp":9}
+            ]}
+        """.trimIndent()
+        val decoded = assertNotNull(ChatHistoryStoreCodec.decode(json))
+        assertEquals(ChatMessageType.OPENUI_CARD, decoded[0].type)
+        val part = assertIs<MessagePart.OpenUiCard>(decoded[0].parts.single())
+        assertEquals("root = Card([Text(\"x\")])", part.program)
+    }
+
+    /** 嵌入 JSON 字符串字面量（content 值转义）。 */
+    private fun encodeRawJsonString(raw: String): String =
+        kotlinx.serialization.json.JsonPrimitive(raw).toString()
+
     private fun testTextMessage(): ChatMessage = ChatMessage(
         id = "m1",
         type = ChatMessageType.TEXT,

@@ -195,8 +195,9 @@ object ChatHistoryStoreCodec {
         is MessagePart.TaskCard -> ChatMessageType.TASK_CARD
         is MessagePart.EditResult -> ChatMessageType.EDIT_RESULT
         is MessagePart.OptimizeCandidates -> ChatMessageType.OPTIMIZE_CANDIDATES
-        // OpenUI 卡 M1 Android-only（openui P1）：iOS 未落地，防御性落文本，正式映射随 iOS 跟随任务
-        is MessagePart.OpenUiCard -> ChatMessageType.TEXT
+        // OpenUI GenUI 卡（2026-11-12 iOS 渲染落地）：parts-first 判型对齐 Android 投影；
+        // 渲染分流 ChatListFlattener TYPE_OPENUI_CARD → OpenUiCardView
+        is MessagePart.OpenUiCard -> ChatMessageType.OPENUI_CARD
         // iOS 浏览器直播卡未落地（M1 Android-only）：防御性落文本，正式映射随 iOS 跟随任务
         is MessagePart.BrowserLive -> ChatMessageType.TEXT
         // 值域终态三新 part（reasoning/source，2026-11-08）：均不主导消息 kind（reasoning

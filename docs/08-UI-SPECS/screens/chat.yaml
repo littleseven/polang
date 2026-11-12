@@ -180,8 +180,9 @@ parts_rendering:
       component: "BrowserLiveCard + BrowserFramePreviewOverlay（§18）"
       change: "2026-10-06 新增卡（browser-vnc M1）：占位 → BrowserLiveOverlay 原位覆写 → 定格落库；watch 1s 轮询仅 running 态"
   perf_notes: "性能防护清单见 spec §8（@Immutable/contentType/remember 派生态/滚底 key 收窄等，代码侧收口）；WebView 池化与消息分页明确不做"
-  ios_todo:                          # M5 批次（b99c1e2fd，2026-11）下列五项已清零；剩余 iOS 缺口登记在 §16 capability matrix 与 §18 BrowserLive
+  ios_todo:                          # M5 批次（b99c1e2fd）五项 + OpenUI GenUI 卡（2026-11-12）均已清零；剩余 iOS 缺口登记在 §16 capability matrix、§18 BrowserLive 与下行残余清单
     - "（已清偿）parts 模型 / turn 聚合 / AST 正文 / HTML 卡双形态 / type 值域——envelope v6 门禁 + ChatView.swift 渲染分支（含 reasoning/source chips/tombstone 三新件）+ HtmlCardView.swift（INLINE/FULLPAGE 双形态 + 全屏查看器 + 链接落地页）均已落地进 main"
+    - "（已清偿 2026-11-12）OpenUI GenUI 卡：SSE 帧全解析（openui_delta/done 载荷）+ 主聊天云端回合接线（程序嗅探/OpenUI 卡落库 envelope v6/流式预览/性能行）+ OpenUiCardView 原生渲染（103 组件全集、UnknownComponent 占位、langVersion 提示行、降级卡、viewState 持久化、favorite Mutation）；残余登记 PARITY 台账：Navigate 自定义动作路由、Html 叶网络关死、照片多页翻页预览、faceFocus/aspectRatio 元数据"
 
 # ============================================================================
 # 4. 空状态（ChatEmptyState）
@@ -844,6 +845,7 @@ platform_differences:
       - { feature: "draw_chart 图表", android: supported, ios: "supported(ChartSvgCard WKWebView 渲染 SVG)" }
       - { feature: "render_html HTML 卡片", android: "supported(2026-09；2026-09-26 双形态 H1：inline/fullpage 分流+预览卡+全屏查看器)", ios: "supported(M5 批次：WKWebView + 同款沙盒/双形态/链接落地页)" }
       - { feature: "parts 拍平 + Turn 聚合渲染", android: "supported(2026-09-27 M4 定稿：ChatListFlattener 拍平 + §3.1/§3.2 契约)", ios: "supported(值域终态批次 envelope v6 + M5：parts 解码/拍平渲染分支/turn 聚合)" }
+      - { feature: "OpenUI GenUI 卡（云端回合）", android: "supported(turn-native + 2026-11-11 lang_version 协商/未知组件降级)", ios: "supported(2026-11-12：SSE 帧全解析 + 主聊天云端回合接线 + OpenUiCardView 103 组件渲染 + 流式预览；残余平台差异见 §3.2 ios_todo 清单)" }
       - { feature: "AI 工程师(claude)", android: supported, ios: "TODO(B3) SSE 客户端+渲染" }
       - { feature: "AI 优化抽卡",     android: supported, ios: "supported(2026-08-16 §17 追齐；多轮编辑态 ChatEditStateHolder 缺失见 §17 confirm 注)" }
       - { feature: "记忆/人物关系",    android: supported, ios: "未纳入本轮（留技术债）" }

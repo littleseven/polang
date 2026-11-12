@@ -334,6 +334,17 @@ final class ChatViewModel: ObservableObject {
         ))
         isProcessing = true
 
+        // 云端 Agent 实验分支（设置页开关，对齐 Android sendMessage 拦截策略）：复用用户消息
+        // 落库与占位消息，跳过本地编排（pacing/记忆/ReAct/能力分发）；带图消息降级为纯文本
+        // （暂存图已随用户消息上屏，云端只收文本——开关副文案声明）。
+        if UserDefaults.standard.bool(forKey: "cloud_agent_enabled"),
+           IosAgentComposition.shared.cloudAgentToolBridge != nil {
+            Task { @MainActor in
+                await runCloudTurn(text: trimmed, placeholderId: placeholderId)
+            }
+            return
+        }
+
         // turn 边界（一次 sendMessage = 一个 turn）：装配器与 reducer 双复位（对齐 Android）
         turnAdapter.reset()
         turnReducer.reset()
@@ -368,6 +379,368 @@ final class ChatViewModel: ObservableObject {
                 }
             }
         )
+    }
+
+    // MARK: - 云端 Agent 主聊天回合（ADR-018 M2.5 对等端，2026-11-12）
+
+    /// OpenUI 流式预览合成消息 id（Android OPENUI_STREAM_PREVIEW_ID 同字面量；
+    /// ChatView 按此分流到 OpenUiStreamingCardView 只读预览）。
+    static let openUiStreamPreviewId = "openui_stream_preview_msg"
+
+    /// openui_delta 流式预览 program 前缀（瞬态内存轨，不落库；正式卡落库后让位）。
+    @Published private(set) var openUiStreamProgram: String? = nil
+
+    /// UI 实际展示消息源：已持久化消息 + 流式预览合成消息（Android displayMessages 同构）。
+    var displayMessages: [ChatMessage] {
+        guard let preview = openUiStreamProgram, !preview.isEmpty else { return messages }
+        return messages + [ChatMessage.make(
+            id: Self.openUiStreamPreviewId,
+            type: .text,
+            role: .assistant,
+            parts: [MessagePartOpenUiCard(partId: "openui_stream_preview", program: preview,
+                                          fallbackSummary: "", viewState: nil, langVersion: nil)]
+        )]
+    }
+
+    /// 云端会话映射（内存态：重启/失效即重建，Android cloudSessions 同构）。
+    private struct CloudSessionMapping {
+        let sessionId: String
+        let channel: String
+        let byokApiKey: String
+    }
+
+    private var cloudSessionsByLocal: [String: CloudSessionMapping] = [:]
+
+    /// 云端回合（对齐 Android runCloudTurn 语义）：占位消息整条粒度更新，SSE 收尾统一落库；
+    /// 取消经 Task 取消穿透断流（半截文本由收尾语义保留/丢弃随错误分支）。
+    private func runCloudTurn(text: String, placeholderId: String) async {
+        defer {
+            isProcessing = false
+            openUiStreamProgram = nil // 取消/异常/收尾路径统一兜底清流（openui P2）
+        }
+        openUiStreamProgram = nil // 防上回合异常残留（openui P2）
+        do {
+            var outcome = try await runCloudTurnOnce(text: text, placeholderId: placeholderId)
+            // 会话失效（404/session_not_found）→ 丢弃映射、重建一次重试
+            if let failure = outcome.failure, isCloudSessionInvalid(failure) {
+                cloudSessionsByLocal.removeValue(forKey: currentSessionId)
+                outcome = try await runCloudTurnOnce(text: text, placeholderId: placeholderId)
+            }
+            finishCloudTurn(outcome: outcome, placeholderId: placeholderId)
+        } catch is CancellationError {
+            // 停止按钮断流：占位气泡保留半截内容（外层 with 不再更新）
+            removeStreamingPlaceholder(placeholderId, keepIfHasContent: true)
+        } catch {
+            let text = (error as? CloudAgentClientError)?.errorDescription
+                ?? error.localizedDescription
+            appendAgentError(cloudErrorText(text))
+            removeStreamingPlaceholder(placeholderId, keepIfHasContent: false)
+        }
+    }
+
+    /// 单趟云端回合产物（SSE 期累积、收尾统一消费）。
+    private struct CloudTurnOutcome {
+        var answer = ""
+        /// (卡前已累积文本, 卡事件) 快照序列（onEvent 非挂起，SSE 结束后按序落库）
+        var cardQueue: [(pendingText: String, program: String, fallbackSummary: String)] = []
+        var donePerformance: LlmPerformance? = nil
+        var doneLangVersion: Int? = nil
+        var serverError: String? = nil
+        var failure: Error? = nil
+    }
+
+    private func runCloudTurnOnce(text: String, placeholderId: String) async throws -> CloudTurnOutcome {
+        let token = UserDefaults.standard.string(forKey: "server_auth_token") ?? ""
+        guard !token.isEmpty else {
+            throw CloudTurnGate.loginRequired
+        }
+        // 通道解析（与调试页 CloudAgentChatStore 同规则）：配置+授权 → BYOK；未授权 → 引导；否则网关
+        let consent = UserDefaults.standard.bool(forKey: "cloud_agent_byok_consent")
+        let store = ModelConfigStore.shared
+        store.load()
+        let config = store.configs.first { $0.modelId == store.selectedModelId }
+        let channel: String
+        let model: String
+        let baseUrl: String
+        let apiKey: String
+        if let config, !config.apiKey.isEmpty, consent {
+            channel = "byok"; model = config.modelId; baseUrl = config.baseUrl; apiKey = config.apiKey
+        } else if let config, !config.apiKey.isEmpty {
+            throw CloudTurnGate.consentRequired
+        } else {
+            channel = "gateway"; model = ""; baseUrl = ""; apiKey = ""
+        }
+        // 会话懒建（每本地会话一条；失效由外层重建）
+        var mapping = cloudSessionsByLocal[currentSessionId]
+        if mapping == nil {
+            let resp = try await CloudAgentClient.shared.createSession(
+                token: token, channel: channel, model: model, byokBaseUrl: baseUrl)
+            guard let sessionId = resp["session_id"] as? String, !sessionId.isEmpty else {
+                throw CloudAgentClientError.badResponse("bad_session_response")
+            }
+            mapping = CloudSessionMapping(sessionId: sessionId, channel: channel, byokApiKey: apiKey)
+            cloudSessionsByLocal[currentSessionId] = mapping
+        }
+        let session = mapping!
+
+        var outcome = CloudTurnOutcome()
+        let sessionId = session.sessionId
+        let byokKey = session.byokApiKey.isEmpty ? nil : session.byokApiKey
+        // 帧序管道：SSE reader 串行产帧 → MainActor 消费任务串行回灌（保序；流结束排空后收尾）
+        let pipe = CloudFramePipe()
+        let consumer = Task { @MainActor [weak self] in
+            while let frame = await pipe.next() {
+                self?.handleCloudFrame(frame, sessionId: sessionId, token: token,
+                                       outcome: &outcome, placeholderId: placeholderId)
+            }
+        }
+        do {
+            try await CloudAgentClient.shared.postMessage(
+                token: token, sessionId: sessionId, content: text, byokApiKey: byokKey
+            ) { frame in
+                pipe.send(frame)
+            }
+            pipe.finish()
+        } catch {
+            pipe.finish() // 断流也排空已缓冲帧（半截内容保留语义）
+            throw error
+        }
+        _ = await consumer.value
+        return outcome
+    }
+
+    /// 单帧处理：事件映射 + 占位气泡更新 + 工具端执行 + 卡快照入队。
+    private func handleCloudFrame(
+        _ frame: CloudAgentFrame,
+        sessionId: String,
+        token: String,
+        outcome: inout CloudTurnOutcome,
+        placeholderId: String
+    ) {
+        for event in CloudTurnEventMapper.map(frame: frame) {
+            switch event {
+            case .assistantText(let text):
+                outcome.answer += outcome.answer.isEmpty ? text : "\n\n\(text)"
+                updateStreamingPlaceholder(placeholderId, content: outcome.answer)
+            case .openUiCard(let program, let fallbackSummary):
+                // 卡前文本同款快照：SSE 结束后按序落库
+                outcome.cardQueue.append((outcome.answer, program, fallbackSummary))
+                outcome.answer = ""
+            case .openUiCardDelta(let program):
+                openUiStreamProgram = program // 瞬态内存轨；正式卡落库后让位
+            case .htmlCard(let html, let summary):
+                emitCloudHtmlCard(html: html, summary: summary)
+            case .error(let message):
+                outcome.serverError = message
+            case .done(let promptTokens, let completionTokens, let elapsedMs, let langVersion):
+                outcome.donePerformance = CloudTurnEventMapper.performance(
+                    promptTokens: promptTokens, completionTokens: completionTokens, elapsedMs: elapsedMs)
+                outcome.doneLangVersion = langVersion
+            }
+        }
+        if case .toolRequest(let requestId, let tool, let args, _) = frame {
+            executeCloudTool(requestId: requestId, tool: tool, args: args,
+                             sessionId: sessionId, token: token)
+        }
+    }
+
+    /// 端执行工具（shared IosCloudAgentToolBridge + run_gallery_script 无头沙盒）+ 上行；
+    /// 图卡信封产物拦截上屏（HTML 不出端，对齐 Android CloudAgentTurnRunner；工具执行
+    /// 不阻塞收帧循环，Android toolScope.launch 同构）。
+    private func executeCloudTool(
+        requestId: String, tool: String, args: [String: String],
+        sessionId: String, token: String
+    ) {
+        Task { @MainActor in
+            let result: String
+            if tool == "run_gallery_script" {
+                result = await CloudAgentScriptRunner.shared.runScript(
+                    code: args[CloudAgentScriptRunner.codeParam] ?? "",
+                    languageTag: CloudAgentScriptRunner.bcp47LanguageTag())
+            } else if let bridge = IosAgentComposition.shared.cloudAgentToolBridge {
+                do {
+                    result = try await bridge.execute(tool: tool, args: args)
+                } catch {
+                    result = "error: \(error.localizedDescription)"
+                }
+            } else {
+                result = "error: tool_bridge_unavailable"
+            }
+            var uplink = result
+            if let artifact = CloudAgentScriptRunner.parseHtmlArtifact(result) {
+                for card in artifact.cards {
+                    emitCloudHtmlCard(html: card.html, summary: card.summary)
+                }
+                var payload: [String: Any] = [
+                    "html_card": "emitted",
+                    "summary": artifact.cards.map { $0.summary }.joined(separator: "；"),
+                ]
+                if let stats = artifact.stats, let data = stats.data(using: .utf8),
+                   let value = try? JSONSerialization.jsonObject(with: data) {
+                    payload["stats"] = value
+                }
+                if let json = try? JSONSerialization.data(withJSONObject: payload),
+                   let text = String(data: json, encoding: .utf8) {
+                    uplink = text
+                }
+            }
+            try? await CloudAgentClient.shared.postToolResult(
+                token: token, sessionId: sessionId, requestId: requestId,
+                ok: !result.hasPrefix("error:"), result: uplink)
+        }
+    }
+
+    /// 云端 HTML 卡：HtmlCardSanitizer 清洗 → ok 落 HTML_CARD 消息 / rejected 降级 summary 纯文本。
+    private func emitCloudHtmlCard(html: String, summary: String) {
+        let sanitized = HtmlCardSanitizer.shared.sanitize(html: html)
+        if let ok = sanitized as? HtmlCardSanitizerResultOk {
+            appendHtmlCardMessage(html: ok.html, summary: summary.isEmpty ? nil : summary, display: nil)
+        } else if !summary.isEmpty {
+            // Rejected：summary 直接上屏纯文本（Android 并入答复文本的 iOS 简化——独立气泡）
+            appendAssistantText(summary, modelUsed: nil, performance: nil)
+        }
+    }
+
+    /// SSE 收尾统一落库：先 flush 卡队列（卡前文本 + OpenUI 卡，携带 done 性能与 langVersion），
+    /// 再终态收尾（失败/服务端错误/正文三态）。
+    private func finishCloudTurn(outcome: CloudTurnOutcome, placeholderId: String) {
+        removeStreamingPlaceholder(placeholderId, keepIfHasContent: false)
+        var performance = outcome.donePerformance
+        for (pendingText, program, fallbackSummary) in outcome.cardQueue {
+            if !pendingText.isEmpty {
+                appendAssistantText(pendingText, modelUsed: "cloud_agent", performance: performance)
+                performance = nil // 性能指标只挂首条（卡前文本或首卡），对齐 Android 逐条装配口径
+            }
+            appendOpenUiCardMessage(program: program, fallbackSummary: fallbackSummary,
+                                    langVersion: outcome.doneLangVersion, performance: performance)
+            performance = nil
+            openUiStreamProgram = nil // 正式卡落库后流式预览让位（无双显）
+        }
+        if let failure = outcome.failure, isCloudRoundInFlight(failure) {
+            appendAgentError(String(localized: "cloud.round_in_flight"))
+        } else if let failure = outcome.failure {
+            appendAgentError(cloudErrorText(
+                (failure as? CloudAgentClientError)?.errorDescription ?? failure.localizedDescription))
+        } else if let serverError = outcome.serverError {
+            appendAgentError(serverError)
+        } else if !outcome.answer.isEmpty {
+            appendAssistantText(outcome.answer, modelUsed: "cloud_agent", performance: performance)
+        }
+        // else：Done 但无文本（纯工具回合且服务端无总结）——静默收场
+        persist()
+    }
+
+    /// 占位气泡整条内容更新（云端无 token 流式，整条消息粒度更新——Android 同构）。
+    private func updateStreamingPlaceholder(_ placeholderId: String, content: String) {
+        guard let idx = messages.firstIndex(where: { $0.id == placeholderId }) else { return }
+        messages[idx] = messages[idx].with(content: content, showCursor: true, isThinking: false)
+    }
+
+    /// 移除流式占位（保留语义：取消路径已有半截内容则保留正文转持久）。
+    private func removeStreamingPlaceholder(_ placeholderId: String, keepIfHasContent: Bool) {
+        guard let idx = messages.firstIndex(where: { $0.id == placeholderId }) else { return }
+        let message = messages[idx]
+        if keepIfHasContent, !message.content.isEmpty {
+            messages[idx] = message.with(
+                content: message.content, isStreaming: false, showCursor: false, isThinking: false,
+                parts: [MessagePartText(partId: "p0", markdown: message.content, state: .done)])
+        } else {
+            messages.remove(at: idx)
+        }
+        if !keepIfHasContent { persist() }
+    }
+
+    private func appendAssistantText(_ text: String, modelUsed: String?, performance: LlmPerformance?) {
+        messages.append(ChatMessage.make(
+            type: .text, content: text, role: .assistant,
+            modelUsed: modelUsed, performance: performance,
+            parts: [MessagePartText(partId: "p0", markdown: text, state: .done)]))
+        touchThread(preview: text)
+    }
+
+    private func appendAgentError(_ text: String) {
+        messages.append(ChatMessage.make(
+            type: .text, content: text, role: .assistant,
+            parts: [MessagePartText(partId: "p0", markdown: text, state: .done)]))
+        touchThread(preview: text)
+        persist()
+    }
+
+    private func cloudErrorText(_ detail: String) -> String {
+        let detail = detail.isEmpty ? String(localized: "cloud.unknown_error") : detail
+        return String(format: String(localized: "cloud.inference_error"), detail)
+    }
+
+    /// OpenUI 卡落库（parts-first：OpenUiCard part 直建；content 承载整颗 part JSON——
+    /// codec rebuild 直通口径，对齐 Android insertOpenUiCardMessage 投影）。
+    private func appendOpenUiCardMessage(
+        program: String, fallbackSummary: String, langVersion: Int?, performance: LlmPerformance?
+    ) {
+        let part = MessagePartOpenUiCard(
+            partId: "p0", program: program, fallbackSummary: fallbackSummary,
+            viewState: nil, langVersion: langVersion.map { KotlinInt(int: Int32($0)) })
+        let partJson = MessagePartsCodec.shared.encodePart(part: part)
+        messages.append(ChatMessage.make(
+            type: .openuiCard, content: partJson, role: .assistant,
+            modelUsed: "cloud_agent", performance: performance, parts: [part]))
+        touchThread(preview: fallbackSummary)
+    }
+
+    /// OpenUI 卡交互态持久化（US-7 对偶）：同消息覆写 part.viewState，重建时作初始 state。
+    func persistOpenUiViewState(messageId: String, viewState: String) {
+        guard let idx = messages.firstIndex(where: { $0.id == messageId }),
+              let part = messages[idx].parts.first(where: { $0 is MessagePartOpenUiCard })
+                as? MessagePartOpenUiCard
+        else { return }
+        let updated = part.doCopy(
+            partId: part.partId, program: part.program, fallbackSummary: part.fallbackSummary,
+            viewState: viewState, langVersion: part.langVersion)
+        let old = messages[idx]
+        messages[idx] = ChatMessage.make(
+            id: old.id, type: old.type, content: old.content, role: old.role,
+            modelUsed: old.modelUsed, timestamp: old.timestamp,
+            performance: old.performance, parts: old.parts.map { $0 === part ? updated : $0 })
+        persist()
+    }
+
+    /// 会话失效判定（HTTP 404 / session_not_found；403 配额类不重试）。
+    private func isCloudSessionInvalid(_ error: Error) -> Bool {
+        let message = (error as? CloudAgentClientError)?.errorDescription ?? ""
+        return message.contains("HTTP 404") || message.localizedCaseInsensitiveContains("session_not_found")
+    }
+
+    /// 终结本地会话对应的云端会话（若有）并摘除映射（会话卫生，Android finishCloudSession 同口径）：
+    /// 尽力而为通知服务端 close，失败仅记日志不阻断本地流程。
+    private func finishCloudSession(localSessionId: String) {
+        guard let mapping = cloudSessionsByLocal.removeValue(forKey: localSessionId) else { return }
+        let token = UserDefaults.standard.string(forKey: "server_auth_token") ?? ""
+        guard !token.isEmpty else { return }
+        Task { @MainActor in
+            do {
+                try await CloudAgentClient.shared.finishSession(token: token, sessionId: mapping.sessionId)
+            } catch {
+                NSLog("PoLang:Chat finishCloudSession failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// 409 round_in_flight 判定（per-user 跑轮互斥闸，双特征匹配防误判）。
+    private func isCloudRoundInFlight(_ error: Error) -> Bool {
+        let message = (error as? CloudAgentClientError)?.errorDescription ?? ""
+        return message.contains("HTTP 409") && message.contains("round_in_flight")
+    }
+
+    /// 前置闸失败（登录/授权引导文案），非网络错误语义。
+    private enum CloudTurnGate: LocalizedError {
+        case loginRequired
+        case consentRequired
+
+        var errorDescription: String? {
+            switch self {
+            case .loginRequired: return String(localized: "cloud.agent_login_required")
+            case .consentRequired: return String(localized: "cloud.agent_consent_required")
+            }
+        }
     }
 
     // MARK: - Turn 流式装配（M5 B2，对齐 Android feedToolOutput 消费形态）
@@ -458,6 +831,7 @@ final class ChatViewModel: ObservableObject {
 
     /// 删除会话：删消息 + 会话记录 + 该会话 LLM 记忆；删除当前会话回退 default
     func deleteSession(_ sessionId: String) {
+        finishCloudSession(localSessionId: sessionId) // 会话卫生：尽力通知服务端 close（防 running 僵尸堆积）
         ChatHistoryStore.shared.deleteThread(sessionId: sessionId)
         bridge?.clearHistory(sessionId: sessionId) { }
         // 删会话：该会话 pending 卡组过期（dismiss 反馈落库）
@@ -477,6 +851,8 @@ final class ChatViewModel: ObservableObject {
     func clearHistory() {
         guard let bridge else { return }
         let sessionId = currentSessionId
+        // 清空 = 语境重置：云端会话一并终结（下回合懒建新会话，Android 同口径）
+        finishCloudSession(localSessionId: sessionId)
         // 清空：本会话 pending 卡组过期（dismiss 反馈落库）
         gachaController.discardPending(sessionId: sessionId)
         // UI 消息与预览同步清（文件操作不依赖异步回调，避免清记忆途中切会话漏清）

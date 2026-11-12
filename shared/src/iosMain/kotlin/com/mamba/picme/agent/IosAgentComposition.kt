@@ -25,11 +25,14 @@ import com.mamba.picme.agent.core.skill.createSkillRepository
 import com.mamba.picme.data.IosAiOptimizeBridge
 import com.mamba.picme.data.IosChartBridge
 import com.mamba.picme.data.IosChatSearchBridge
+import com.mamba.picme.data.IosLocalHandleStore
 import com.mamba.picme.data.IosMediaRepository
 import com.mamba.picme.data.IosMediaRepositoryBridge
 import com.mamba.picme.data.IosNavigationBridge
 import com.mamba.picme.data.IosRenderHtmlBridge
 import com.mamba.picme.data.IosRunScriptBridge
+import com.mamba.picme.domain.chat.openui.IosOpenUiCardController
+import com.mamba.picme.domain.chat.openui.IosOpenUiMediaSeam
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -84,6 +87,37 @@ object IosAgentComposition {
      */
     var cloudAgentToolBridge: IosCloudAgentToolBridge? = null
         private set
+
+    /**
+     * OpenUI 卡端支持件（2026-11-12 主聊天云端回合）：local:// 句柄存储（云端相册工具
+     * 注册 / 卡端 Query 补全共用）+ photoId 解析缝。Swift 侧 OpenUiCardHost 经
+     * [createOpenUiCardController] 组装每卡控制器。
+     */
+    val openUiHandleStore: IosLocalHandleStore = IosLocalHandleStore()
+
+    private var openUiMediaSeamImpl: IosOpenUiMediaSeam? = null
+
+    /** photoId 解析缝（[initialize] 后可用；卡片视图直用）。 */
+    val openUiMediaSeam: IosOpenUiMediaSeam?
+        get() = openUiMediaSeamImpl
+
+    /**
+     * OpenUI 卡控制器工厂（每卡一颗：session + 动作链 + 句柄/媒体缝全注入）；
+     * [initialize] 前调用返回 null（Swift 侧落降级卡）。
+     */
+    fun createOpenUiCardController(
+        program: String,
+        viewState: String?,
+    ): IosOpenUiCardController? {
+        val seam = openUiMediaSeam ?: return null
+        return IosOpenUiCardController(
+            program = program,
+            initialViewState = viewState,
+            handleStore = openUiHandleStore,
+            writeTools = cloudAgentToolBridge?.openUiWriteTools,
+            mediaSeam = seam,
+        )
+    }
 
     /**
      * iOS Agent 接线入口（幂等：重复调用直接跳过）。
@@ -183,8 +217,13 @@ object IosAgentComposition {
         orchestrator.registerCapability(chatGalleryCapability)
 
         // 云端 Agent 工具桥（ADR-018 M2）：自有能力实例，绕过场景注册表（调试页 UNKNOWN 场景
-        // 会被 registry 排队返回占位文本——Android 真机实证，场景解耦挂账 M3）
-        cloudAgentToolBridge = IosCloudAgentToolBridge(mediaRepository, bridge, searchBridge)
+        // 会被 registry 排队返回占位文本——Android 真机实证，场景解耦挂账 M3）；
+        // 2026-11-12 注入句柄存储（search/refine 命中集注册 local://scan 供 OpenUI 卡取数）
+        cloudAgentToolBridge = IosCloudAgentToolBridge(mediaRepository, bridge, searchBridge, openUiHandleStore)
+
+        // OpenUI photoId 解析缝（2026-11-12 主聊天云端回合）：MediaRepository 单实例共享，
+        // 单卡 fetch 一次快照缓存
+        openUiMediaSeamImpl = IosOpenUiMediaSeam(mediaRepository)
 
         // 注册 iOS chat 图表能力（draw_chart 执行端 → ChartJsEngine 端侧渲染）
         orchestrator.registerCapability(IosChartCapability(chartBridge))

@@ -6,7 +6,7 @@ import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
-import com.mamba.picme.features.chat.openui.OpenUiProgramSummary
+import com.mamba.picme.domain.chat.openui.OpenUiProgramSummary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.json.JSONObject

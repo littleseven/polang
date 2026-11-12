@@ -59,6 +59,19 @@ class IosChatGalleryCapability(
     private var lastSearchAssets: List<MediaAsset>? = null
 
     /**
+     * 上一轮搜索的媒体类型口径（云端 Agent 专用，2026-11-12）：refine 的类型过滤跟随
+     * 产生基数的 search 的 mediaType（对齐 Android CloudAgentGalleryTools.refineMediaType
+     * ——视频搜索的细化不把照片混回结果集）。
+     */
+    private var lastSearchMediaType: String = "photo"
+
+    /** 最近一轮搜索基数快照（云端句柄注册消费；已按 mediaType 过滤）。 */
+    fun lastSearchSnapshot(): List<MediaAsset> = lastSearchAssets.orEmpty()
+
+    /** 最近一轮搜索的类型口径（云端 refine 回执文案用）。 */
+    fun lastSearchMediaTypeIdiom(): String = lastSearchMediaType
+
+    /**
      * 搜索基数存在性（只读）：组合根注入 ChatAgentBridge 作意图路由器紧凑状态
      * hasSearchBase 的 iOS 数据源（缺失时 refine 收到明确错误引导，见 [handleRefine]）。
      */
@@ -127,6 +140,62 @@ class IosChatGalleryCapability(
 
     // ── 搜索 / 细化 ─────────────────────────────────────────────────────────
 
+    /**
+     * 云端 Agent 搜索（2026-11-12 主聊天云端回合接线）：mediaType 维度过滤——
+     * "video"=只视频 / "all"=全部 / 其余=只照片（对齐 Android CloudAgentGalleryTools
+     * .typeFilterOf 口径，chat 链路 search_media 无此参数不受影响）。
+     * 结果记录 refine 基数（已过滤集）与 [lastSearchMediaType]，供 refineForCloud 跟随。
+     */
+    suspend fun searchMediaForCloud(query: String, intent: SearchIntent?, mediaType: String): List<MediaAsset> {
+        val typeFilter = typeFilterOf(mediaType)
+        val assets = if (searchBridge != null) {
+            awaitEngineSearch(query, intent, limitToDbIds = null).map(::toDomain).filter(typeFilter)
+        } else {
+            val all = repository.allMedia.first()
+            val hits = filterAssets(all, query, intent?.timeRange)
+            (if (query.isBlank()) hits.take(MAX_RECENT_RESULTS) else hits).filter(typeFilter)
+        }
+        lastSearchAssets = assets
+        lastSearchMediaType = mediaType
+        return assets
+    }
+
+    /**
+     * 云端 Agent 细化：无基数返回 null（调用方回落明确错误引导）；类型过滤跟随基数
+     * mediaType；in-set 空 → 保留上一轮基数不变（返回 null 语义由调用方区分文案）。
+     */
+    suspend fun refineMediaSearchForCloud(constraint: String, intent: SearchIntent?): List<MediaAsset>? {
+        val prior = lastSearchAssets ?: return null
+        val refined = if (searchBridge != null) {
+            if (intent != null) {
+                val priorDbIds = prior.mapNotNull { dbIdByAssetId[it.id] }
+                awaitEngineSearch(constraint, intent, limitToDbIds = priorDbIds)
+                    .map(::toDomain).filter(typeFilterOf(lastSearchMediaType))
+            } else {
+                val cleaned = IosChatGallerySearch.cleanConstraint(constraint)
+                val priorDbIds = prior.mapNotNull { dbIdByAssetId[it.id] }
+                val hits = awaitEngineSearch(cleaned, intent = null, limitToDbIds = priorDbIds.ifEmpty { null })
+                IosChatGallerySearch.resolveRefine(
+                    prior,
+                    hits.map(::toDomain).filter(typeFilterOf(lastSearchMediaType)),
+                    cleaned,
+                )
+            }
+        } else {
+            filterAssets(prior, constraint, intent?.timeRange).filter(typeFilterOf(lastSearchMediaType))
+        }
+        // in-set 空 → 保留上一轮结果集不变（与 chat 链路同口径，不覆盖基数）
+        return refined.ifEmpty { null }
+    }
+
+    /** mediaType 参数 → 类型谓词（"video"=只视频 / "all"=全部 / 其余=只照片，Android 同口径）。 */
+    private fun typeFilterOf(mediaType: String): (MediaAsset) -> Boolean =
+        when (mediaType.lowercase()) {
+            "video" -> { asset -> asset.type == MediaType.VIDEO }
+            "all" -> { _ -> true }
+            else -> { asset -> asset.type == MediaType.PHOTO }
+        }
+
     private suspend fun handleSearch(command: AgentCommand.SearchMedia): Result<AgentAction> {
         if (searchBridge == null) return handleSearchLegacy(command)
         val items = awaitEngineSearch(command.query, command.intent, limitToDbIds = null)
@@ -194,6 +263,7 @@ class IosChatGalleryCapability(
     /** 记录一轮搜索结果（契约 §9.2：命中存入 lastSearchAssets 供 refine in-set）。 */
     private fun recordRound(assets: List<MediaAsset>) {
         lastSearchAssets = assets
+        lastSearchMediaType = "photo"
     }
 
     /**
