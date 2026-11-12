@@ -2,7 +2,7 @@
 
 > **定位**：主聊天流「用户输入 → 远程 LLM → 流式响应 → 渲染/落库 → 历史回灌」全链路协议的**系统描述 SSOT**。ADR-016 管「为什么这么设计」（决策宪法），本文管「现在是怎么跑的」（链路实况）；卡片级协议实例（每张卡的 tool_call 入参 / Room 落库 JSON / parts 形态）见 `CHAT_CARD_CATALOG.md`，本文只到链路级，不重复逐卡登记。
 > **日期**：2026-10-11 建立（基于 main 分支实况勘察，Koog 1.3.0，Room v26）
-> **增补**：2026-10-17 §2.8 线格式实例（SSE 帧骨架 ↔ 合并响应 ↔ 三轮 ReAct walkthrough）；M3 意图级工具裁剪落地（§1.4）+ server 侧 cached_tokens 可观测（§5 缺口两条核销/降级）；2026-11-08 值域终态批次收编（parts-first 落库 §2.4 / 回灌剥离面 §3.1 / 不变式 5-7 重写，Room v28）。
+> **增补**：2026-10-17 §2.8 线格式实例（SSE 帧骨架 ↔ 合并响应 ↔ 三轮 ReAct walkthrough）；M3 意图级工具裁剪落地（§1.4）+ server 侧 cached_tokens 可观测（§5 缺口两条核销/降级）；2026-11-08 值域终态批次收编（parts-first 落库 §2.4 / 回灌剥离面 §3.1 / 不变式 5-7 重写，Room v28）；2026-11-12 老三样缺口清偿（§1.4 +recall_chat_history、§3.3 主动召回消费面、§5 requestJson/cached_tokens 端侧可观测落地）。
 > **上游**：ADR-016（parts 模型/渲染架构）、ADR-015（意图路由契约）、ADR-008（隐私红线）
 > **维护规则**：链路改造（请求组装/流式事件/落库路径/历史管线任一变动）须同一原子提交内同步本文；行号引用会漂移，以文件级锚点为准。
 
@@ -105,7 +105,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 
 **params 烘焙**：`polangSystemPrompt(...)`（koog/KoogPromptFactory.kt）——🔴 必须走 Koog prompt DSL 传 params，否则 temperature/maxTokens/thinking 丢失。AIAgent 按「记忆快照内容 + 摘要 version」新鲜度懒重建。
 
-### 1.4 工具集（ChatToolService，40 个 @Tool；2026-11-08 起 44→40：`switch_view_mode` 移出 chat 工具面 + 反馈三件套（record_feedback/more_like_this/exclude_constraint）随横滑图集卡退役删除）
+### 1.4 工具集（ChatToolService，41 个 @Tool；2026-11-12 起 40→41：+`recall_chat_history`（Room 长期轨主动召回）；2026-11-08 曾 44→40：`switch_view_mode` 移出 chat 工具面 + 反馈三件套（record_feedback/more_like_this/exclude_constraint）随横滑图集卡退役删除）
 
 全部 `suspend`、参数无 Kotlin 默认值（Koog 反射/R8 稳健性）；每个都是 `dispatchCommand(AgentCommand, scene=CHAT)` 薄封装，超时 15s（browser_* 族 25s、web_search 15s；2026-11-08 由 5s 上调——直执链路搜图 5~12s 常态超 5s 误回落 agent loop 引发空结果打转）。
 
@@ -119,7 +119,7 @@ Koog Agent Loop（poLangSingleRunStrategy，ReAct 图循环）
 | 技能 | load_skill（2026-11-08：Skill 中心端云同构，见 `AgentSkillContract`） |
 | 云端浏览器 | browser_open / browser_navigate / browser_click / browser_type / browser_extract / browser_screenshot / browser_close |
 | 网页搜索 | web_search（2026-11-02：DeepSeek Search 经 server `/v1/web-search` 代理——服务端持 key 调 `/v1/tools/search` 并做配图 URL 提取/瘦身（≤5 结果、≤3 图/结果、400 字符摘录），端侧 `WebSearchClient`（WebSearchTransport）转发；结果 images 字段供 LLM 以 `![描述](https://图片URL)` 嵌回正文，AgentMarkdown 经 `NetworkImageTransformer`（Coil，仅 https、限高 320dp）渲染——「图文并茂」闭环；失败回 `[WEB_SEARCH_UNAVAILABLE]`/`[WEB_SEARCH_FAILED]` 结构化降级文本） |
-| 记忆 | remember_person_relation / forget_person_relation / list_person_relations / remember_fact / forget_fact / recall_memory |
+| 记忆 | remember_person_relation / forget_person_relation / list_person_relations / remember_fact / forget_fact / recall_memory / recall_chat_history（2026-11-12：Room 长期轨主动召回——检索**当前会话** `type='text'` 投影行（query LIKE / 空=最近 N 条，limit 钳 1..50），返回硬编码中文 observation（只进模型不进气泡，无 UI 卡）；会话范围经 `ChatToolService.chatSessionId`（引擎每轮与 `setSessionId` 同步）→ `AgentContext.memorySessionId` 下传；MEMORY 意图白名单已收编；iOS `ChatToolManifest` 手工清单不接入，平台差异登记） |
 | 设置 | change_theme / change_language / toggle_setting / download_model / switch_face_engine |
 | 导航/系统 | navigate_to / go_back / launch_app / open_system_settings |
 | 通用 | delay / finish |
@@ -347,7 +347,7 @@ Room `chat_messages`（partsJson 富归档）是聊天历史的唯一事实源�
 
 同一 `toModelInput` 转换器经 `toHistoryPair()` 进 `GET_CHAT_HISTORY` 载荷（工程师隧道 AppToolExecutor.collectChatHistory）——与主链路重建共用转换器，各走各的组装出口。
 
-> ⚠️ **文档口径澄清（2026-10-11 M4 更新）**：`CHAT_CARD_CATALOG.md` §0.3 及各卡「回灌」小节描述的是 Room→模型的投影语义，其消费者现为**两处**：工程师隧道 + 主链路冷启动重建。稳态运行时主链路上下文仍以 Koog 短期轨为准（预算/老化语义与长期轨全量投影不同）。`recall_chat_history` 主动召回工具（按需拉取长期轨任意段）明确未做，留后续。
+> ⚠️ **文档口径更新（2026-11-12，recall_chat_history 落地）**：`CHAT_CARD_CATALOG.md` §0.3 及各卡「回灌」小节描述的 Room→模型投影语义，其消费者现为**三处**：工程师隧道 + 主链路冷启动重建（M4）+ `recall_chat_history` 主动召回工具（§1.4 记忆行——按需拉取当前会话任意段，检索投影 `type='text'` 行而非全量 parts 投影）。稳态运行时主链路上下文仍以 Koog 短期轨为准（预算/老化语义与长期轨全量投影不同）。（原「recall_chat_history 明确未做，留后续」注记就此核销。）
 
 ### 3.4 ~~直执回合的记忆补写~~（已退役 2026-11-08）
 
@@ -372,11 +372,11 @@ Room `chat_messages`（partsJson 富归档）是聊天历史的唯一事实源�
 
 | 缺口 | 现状 | 影响 |
 |---|---|---|
-| 请求体逐字 JSON 无录制 | `LlmCallRecord.requestJson=""`（Koog EventHandler 不暴露原始请求；DEBUG 需 Ktor Logging） | 协议实证靠推断（§2.8 为还原实例非抓包）；排查线格式问题需抓包 |
+| ~~请求体逐字 JSON 无录制~~ ✅ 已落地（2026-11-12，DEBUG-only） | `LlmWireTap`（shared remote/config）注入 `RemoteModelFactory.wireTap`，HttpClient 工厂层（`WireTapHttpClientFactory`）装饰 Koog 客户端：`post`/`sse` 出站请求体（Koog 序列化后的 JSON String）旁路捕获 → `LlmCallRecord.requestJson`（16KB 截断，KoogChatAgent/KoogReActAgent/IntentRouter 三组装点同源 `capturedRequestBody`）。**DEBUG（captureContent=true）才录制**；release 不保留请求体（隐私红线，latestRequest 恒 null → 落空串），原行为不变 | 协议实证不再靠推断；release 口径不变 |
 | ~~主聊天流 tools schema 无意图级裁剪~~ ✅ 已落地（2026-10-17，M3） | 契约 allowedTools 转执行：路由可靠单意图 → 子集 registry + prompt 同源过滤（§1.4）；OPEN_QA/降级/secondary/子集空交集或缺失过半 保守全量 | — |
-| prompt 前缀缓存未显式利用 | ✅ 可观测性已补（2026-10-17）：server 网关解析 `prompt_tokens_details.cached_tokens` 落 `llm_call_log.cached_tokens`（migration 013）+ 管理后台用户详情 Cached 列（依赖 TokenHub/CF 网关原样透传该嵌套对象；DeepSeek 旧版平铺字段 `prompt_cache_hit_tokens` 不采集）；**App 侧仍拿不到**（Koog 1.3.0 `createMetaInfo` 丢弃 cachedTokens，实证字节码 mask=48）；缓存**主动利用**（前缀稳定化之外的命中提升）未做 | 命中率可量化后再评估前缀重排收益；BYOK 直连不经网关无此观测 |
+| prompt 前缀缓存未显式利用 | ✅ 可观测性已补（2026-10-17）：server 网关解析 `prompt_tokens_details.cached_tokens` 落 `llm_call_log.cached_tokens`（migration 013）+ 管理后台用户详情 Cached 列（依赖 TokenHub/CF 网关原样透传该嵌套对象；DeepSeek 旧版平铺字段 `prompt_cache_hit_tokens` 不采集）；✅ **App 侧已补**（2026-11-12）：`LlmWireTap` 在同一 HttpClient 装饰层对 SSE 逐帧 data 做子串扫描（命中 `"cached_tokens"` 才解析，无正则 O(帧长)，**不包装 Flow、只套 decode lambda 前置同步钩子**，生产开销可忽略故未降级 DEBUG-only），`LlmCallRecord.cachedTokens` → 独立库 `llm_call_log.cachedTokens`（Room v6，migration 5→6），全构建落库（纯指标）；每次 onRequest 清零防跨请求误归因。限制：依赖供应商流式尾帧回传 usage（DeepSeek/Moonshot 恒带；OpenAI 官方需 stream_options，Koog 未传则拿不到）；非流式 post 无 SSE 帧不采集；Anthropic Messages 的 `cache_read_input_tokens` 键名不同不采集。缓存**主动利用**（前缀稳定化之外的命中提升）未做 | 命中率可量化后再评估前缀重排收益；OpenAI 官方直连的命中观测依赖 Koog 上游补 stream_options |
 | tool schema 转换在 Koog 内部 | `AbstractOpenAILLMClient` 序列化，仓库外 | schema 问题升级依赖 Koog 版本 |
-| Room 回灌在主链路的消费面 | toModelInput 已服务工程师隧道 + M4 冷启动重建（§3.2）；主动召回工具（recall_chat_history）未做 | 长会话中远期历史仍只能靠短期轨摘要触及，无法按需召回任意段 |
+| ~~Room 回灌在主链路的消费面（主动召回未做）~~ ✅ 已落地（2026-11-12） | toModelInput 已服务工程师隧道 + M4 冷启动重建（§3.2）；`recall_chat_history` 主动召回工具落地（§1.4 记忆行：当前会话 `type='text'` 投影行 LIKE / 最近 N 条，observation 硬编码中文，无 UI 卡）；iOS 未接入（ChatToolManifest 手工清单不动） | 长会话中远期历史可按需召回；跨会话检索仍不做（当前会话 scope） |
 | iOS 链路 | `ChatAgentBridge`（shared iosMain）消费同一 ChatStreamEvent，Swift ChatViewModel 对称实现 | 本文以 Android 主链路为准，iOS 差异走 parity 台账 |
 
 ---
