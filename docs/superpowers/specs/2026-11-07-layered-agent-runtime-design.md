@@ -36,10 +36,10 @@ Agent 栈拆为七层。每一层有**端/云两个实现**（或天然同构一
 | **M1** | server 经 composite build 依赖 `:shared` jvm 变体；消灭 L1/L2/L3 三份双写（契约字面量/策略移植/执行器规则） | ✅ 已合 main（`40eafd36e`） |
 | **M1.5** | OpenUI 白名单/prompt 资产（组件/Icon 名/动作词表/fragment 闭集/ICON_NAMES_TEXT）server↔shared 字面量副本收口为真引用 | ✅ 已交付（plan `2026-11-07-layered-agent-runtime-m15-m2.md`） |
 | **M2** | 工具 locality 泛化：目录驱动 executor 解析，端云工具同一声明源（`CloudAgentToolCatalog` 五声明 + descriptor 生成；server 工具桥 @Tool 反射退役改 `CatalogBridgeTool`，双端 executor 参数目录化；**裁定**：server_time 纯服务端本地工具不入目录，目录保持「端云边界工具」单一语义） | ✅ 已交付（同 M1.5 plan） |
-| M3 | MemoryStore 抽象：记忆组装/压缩（已在 shared）两侧复用，store 实现各端自理 | 未开始 |
-| M4 | 流式协议合一：`ChatStreamEvent`/`TurnStreamEvent` 与 SSE 事件帧同源 | 未开始 |
-| M5 | ViewModel/TurnRunner 合一：端侧开关选择 Local/Cloud TurnRunner | 未开始 |
-| M6 | iOS 经 SKIE 消费同一 AgentCore | 未开始 |
+| M3 | MemoryStore 抽象：记忆组装/压缩（已在 shared）两侧复用，store 实现各端自理 | 未开始（排期见 §6） |
+| M4 | 流式协议合一：`ChatStreamEvent`/`TurnStreamEvent` 与 SSE 事件帧同源 | 未开始（排期见 §6） |
+| M5 | ViewModel/TurnRunner 合一：端侧开关选择 Local/Cloud TurnRunner | 未开始（排期见 §6） |
+| M6 | iOS 经 SKIE 消费同一 AgentCore | 未开始（排期见 §6） |
 
 ## 3. 已拍板决策（与用户对齐，勿重开）
 
@@ -106,3 +106,20 @@ Agent 栈拆为七层。每一层有**端/云两个实现**（或天然同构一
 | thinking 并集规则改变某条端侧存量路径 | 逐路径比对（§4.4 表），矩阵测试钉住 |
 | 策略默认路径重构漂移 | 默认分支保留原内建节点实现原样，不随手「顺手统一」 |
 | Koog `KoogHttpClient.Factory` 的 common expect 与 JVM actual 参数名差异 | 按位置映射（同型 8 参），server 工厂实例传给 shared 函数仅作透传，无语义跨越 |
+
+## 6. M3~M6 排期路线图（2026-11-12 批次定）
+
+> 定位：M1/M1.5/M2 已交付后的后半程排期。顺序依据 = 依赖关系 + 风险递增；每期独立分支、独立可回退，与前半程同规约。
+
+| 序 | 期 | 内容与验收要点 | 依赖 | 预估规模 |
+|---|----|--------------|------|---------|
+| 1 | **M3 MemoryStore 抽象** | shared 立 `MemoryStore` 接口（load/append/replace/clear + 摘要），端侧 DataStore 实现与云侧 `agent_event`+`AgentProjection` 实现各理其身；组装/压缩算法（`KoogMessageMemory` 四步管线）保持 shared 单源。验收：两端行为零变化（既有记忆测试全绿 + server 回放测试绿），接口测试钉住契约 | 无（纯接口抽取，风险最低，先行铺路） | 中 |
+| 2 | **M4 流式协议合一** | 事件模型同源：端内 `ChatStreamEvent`/`TurnStreamEvent` 与 SSE `CloudFrame`/`AgentEvent` 收敛为同一 shared 事件族，传输（Flow vs SSE）只是封装差异；**纳入 2026-11-11 批次新增面**：`openui_delta`、done 帧 `usage/elapsed_ms/lang_version` 进同一事件模型。验收：双端消费方只换传输层不改事件语义；iOS 云端回合（feat/ios-cloud-turn-openui 批次）已把 CloudFrame 消费面铺到双端，合一的第二个消费端已就绪 | M3（记忆事件与流事件同轮改造可共用接缝）；iOS 云端回合批次 | 大 |
+| 3 | **M5 TurnRunner 合一** | `LocalTurnRunner`/`CloudTurnRunner` 同一接口 + 组合根开关（硬两态，决策 2 不变）——「一个开关」愿景兑现点；ViewModel 只面对 TurnRunner。验收：开关切换双态行为与现两条链路逐一对等（回灌/落库/错误降级矩阵测试） | M3 + M4 | 大 |
+| 4 | **M6 iOS SKIE 消费 AgentCore** | iOS 经 SKIE 直接消费 shared AgentCore（Flow→AsyncStream 等互操作铁律见 kmp-ios-interop skill）；前置：iOS 云端链路稳定运行一版 | M4 + iOS 云端回合批次实机验证 | 中 |
+
+**排期原则**：
+- M3 先行的理由：接口抽取不动行为、随时可合，且为 M5 的「记忆层注入差异」准备好接缝。
+- M4 前置 iOS 云端回合批次的理由：合一事件模型需要两个真实消费端校验语义，只改造不新增消费面等于盲改。
+- L7 产出 Profile 维持决策 1（不合线），M5 落地时以组合根配置注入，不在 TurnRunner 内分支。
+- 每期开工前重估：若 Koog 升级（如 reasoning 透出/usage 字段补全）改变 L3/L6 前提，M4 的事件族设计先吸收再动工。
