@@ -307,6 +307,10 @@ class KoogChatAgent(
                     val meta = ctx.response?.metaInfo
                     meta?.inputTokensCount?.let { prompt -> promptTokens.addAndFetch(prompt) }
                     meta?.outputTokensCount?.let { comp -> completionTokens.addAndFetch(comp) }
+                    // wire tap（2026-11-12 缺口清偿）：请求体（DEBUG）与 SSE usage 帧
+                    // cached_tokens（纯指标）自 HttpClient 装饰层旁路捕获——Koog EventHandler
+                    // 不暴露原始请求，metaInfo 亦丢弃 cachedTokens（1.3.0 createMetaInfo）。
+                    val tap = RemoteModelFactory.wireTap
                     val rec = RemoteModelFactory.recorder
                     if (rec != null) {
                         rec.record(
@@ -319,8 +323,7 @@ class KoogChatAgent(
                                 promptTokens = meta?.inputTokensCount,
                                 completionTokens = meta?.outputTokensCount,
                                 totalTokens = meta?.totalTokensCount,
-                                // Koog EventHandler 不暴露原始请求 JSON；DEBUG 全文 body 需 Ktor Logging（后续）。
-                                requestJson = "",
+                                requestJson = RemoteModelFactory.capturedRequestBody(tap),
                                 // 正文 + 工具调用清单双记（原仅 textContent，纯工具轮记成 null 的观测盲区）
                                 responseJson = if (RemoteModelFactory.captureContent) {
                                     LlmCallRecord.cap(summarizeResponseForLog(ctx.response))
@@ -329,6 +332,7 @@ class KoogChatAgent(
                                 },
                                 errorMessage = null,
                                 traceId = traceIdHolder.value,
+                                cachedTokens = tap?.latestCachedTokens(),
                             )
                         )
                     }
