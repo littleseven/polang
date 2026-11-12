@@ -1728,6 +1728,7 @@
     <string name="chat_cmd_remember_fact">Mémoriser le fait</string>
     <string name="chat_cmd_forget_fact">Oublier le fait</string>
     <string name="chat_cmd_recall_memory">Rappeler le souvenir</string>
+    <string name="chat_cmd_recall_chat_history">Rappeler l\'historique</string>
     <string name="chat_cmd_detail_smoothing">Lissage %1$d%%</string>
     <string name="chat_cmd_detail_whitening">Éclaircissement %1$d%%</string>
     <string name="chat_cmd_detail_slim_face">Amincissement du visage %1$d%%</string>

@@ -846,6 +846,8 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         Logger.i(TAG, "- PersonRelationCapability: CHAT-scoped person relation declaration")
         orchestrator.registerCapability(container.memoryCapability)
         Logger.i(TAG, "- MemoryCapability: CHAT-scoped fact memory (chat tool + JS dispatch)")
+        orchestrator.registerCapability(container.chatHistoryRecallCapability)
+        Logger.i(TAG, "- ChatHistoryRecallCapability: CHAT-scoped chat history recall tool")
         val memoryContextProvider = MemoryContextProviderImpl(
             memoryRepository = container.memoryRepository,
             personRepository = container.personRepository,

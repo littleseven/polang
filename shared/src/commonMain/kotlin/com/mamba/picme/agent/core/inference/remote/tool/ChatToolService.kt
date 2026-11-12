@@ -131,6 +131,16 @@ class ChatToolService private constructor() : TraceIdAware {
     override var traceIdHolder: TraceIdHolder? = null
 
     /**
+     * 当前 chat 会话 ID 持有器（recall_chat_history 的检索范围）：由
+     * [com.mamba.picme.agent.core.inference.remote.RemoteChatEngine.processChatReAct]
+     * 与 `agent.setSessionId` 同步点写入（每轮），dispatchCommand 读取后注入
+     * AgentContext.memorySessionId 下传 Capability 层。默认 "default" 对齐 Room
+     * chat_messages 的 sessionId 缺省值；iOS 工具桥不接 recall_chat_history，不受影响。
+     */
+    @Volatile
+    var chatSessionId: String = "default"
+
+    /**
      * 指令驱动图片调整 handler（由 ChatViewModel 注入）。
      *
      * 参数：imageUri, brightness(-100~100), contrast(0~200, 默认50), saturation(0~200, 默认100), temperature(2000~8000, 默认5000)
@@ -483,6 +493,18 @@ class ChatToolService private constructor() : TraceIdAware {
         @LLMDescription("模糊匹配关键词，空串返回全部") query: String
     ): String = dispatchCommand(AgentCommand.RecallMemory(query = query))
 
+    @Tool(customName = "recall_chat_history")
+    @LLMDescription("召回当前会话更早的聊天历史原文（对话长了之后早期内容会被压缩摘要，摘要没细节时用它找回原文）。query 为关键词（在历史消息正文里匹配），空串=不限关键词、直接取最近的历史；limit 建议传 20。返回按时间正序的 user/agent 消息文本，只用于你自己回顾，不要原样刷屏给用户。")
+    suspend fun recallChatHistory(
+        @LLMDescription("关键词，在历史消息正文里模糊匹配；空串=不限") query: String,
+        @LLMDescription("召回条数上限，默认建议 20，最大 50") limit: Int
+    ): String = dispatchCommand(
+        AgentCommand.RecallChatHistory(
+            query = query,
+            limit = ChatHistoryRecall.clampLimit(limit),
+        )
+    )
+
     // ── 设置 ──────────────────────────────────────────────────────
 
     @Tool(customName = "change_theme")
@@ -599,7 +621,17 @@ class ChatToolService private constructor() : TraceIdAware {
             // 结构化等待（替代 future{}.get(5s) 阻塞桥）：超时经协程取消级联终止底层 dispatch。
             val result = withTimeout(timeoutMillis) {
                 CapabilityRegistry.getInstance()
-                    .dispatch(command, AgentContext(scene = AgentScene.CHAT, traceId = traceId), null)
+                    .dispatch(
+                        command,
+                        AgentContext(
+                            scene = AgentScene.CHAT,
+                            traceId = traceId,
+                            // recall_chat_history 的检索范围（会话隔离）：引擎每轮同步的
+                            // chatSessionId（见属性 KDoc）；其余 Capability 不消费该字段。
+                            memorySessionId = chatSessionId,
+                        ),
+                        null,
+                    )
             }
             result.fold(
                 onSuccess = { action ->

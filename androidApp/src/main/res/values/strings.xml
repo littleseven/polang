@@ -1777,6 +1777,7 @@
     <string name="chat_cmd_remember_fact">Remember fact</string>
     <string name="chat_cmd_forget_fact">Forget fact</string>
     <string name="chat_cmd_recall_memory">Recall memory</string>
+    <string name="chat_cmd_recall_chat_history">Recall chat history</string>
     <string name="chat_cmd_detail_smoothing">Smoothing %1$d%%</string>
     <string name="chat_cmd_detail_whitening">Whitening %1$d%%</string>
     <string name="chat_cmd_detail_slim_face">Face slimming %1$d%%</string>

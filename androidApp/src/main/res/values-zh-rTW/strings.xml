@@ -1768,6 +1768,7 @@
     <string name="chat_cmd_remember_fact">記住事實</string>
     <string name="chat_cmd_forget_fact">遺忘事實</string>
     <string name="chat_cmd_recall_memory">檢索記憶</string>
+    <string name="chat_cmd_recall_chat_history">召回聊天歷史</string>
     <string name="chat_cmd_detail_smoothing">磨皮 %1$d%%</string>
     <string name="chat_cmd_detail_whitening">美白 %1$d%%</string>
     <string name="chat_cmd_detail_slim_face">瘦臉 %1$d%%</string>

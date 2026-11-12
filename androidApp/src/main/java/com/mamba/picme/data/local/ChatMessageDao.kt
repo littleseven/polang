@@ -40,6 +40,24 @@ interface ChatMessageDao {
     fun getTaskCardMessages(): Flow<List<ChatMessageEntity>>
 
     /**
+     * recall_chat_history 工具取数（2026-11-12）：当前会话 `type='text'` 投影行 content
+     * LIKE 关键词匹配（query 空串 = 不限），按时间倒序取最近 [limit] 条。
+     * 只读投影列——投影列本就为此类消费而生（不变式 5 只禁绕过 parts 接缝**写**投影列）。
+     * LIKE 通配符（%/_）随 query 原样透传，与 memory_facts 召回同口径。
+     */
+    @Query(
+        """
+        SELECT * FROM chat_messages
+        WHERE sessionId = :sessionId
+          AND type = 'text'
+          AND (:query = '' OR content LIKE '%' || :query || '%')
+        ORDER BY timestamp DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchTextMessages(sessionId: String, query: String, limit: Int): List<ChatMessageEntity>
+
+    /**
      * 获取指定会话的最后一条消息
      */
     @Query("SELECT * FROM chat_messages WHERE sessionId = :sessionId ORDER BY timestamp DESC LIMIT 1")

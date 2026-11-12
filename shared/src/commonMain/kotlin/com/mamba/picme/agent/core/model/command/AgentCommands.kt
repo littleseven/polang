@@ -562,6 +562,22 @@ sealed class AgentCommand {
         val query: String
     ) : AgentCommand()
 
+    /**
+     * 召回当前会话的聊天历史（Room 长期轨文本行检索，2026-11-12 recall_chat_history 工具）。
+     *
+     * 会话范围不经 LLM 参数——由 [ChatToolService] 的 chatSessionId holder（引擎每轮
+     * setSessionId 同步）经 [AgentContext.memorySessionId] 下传，Capability 层据此过滤
+     * chat_messages 行。
+     *
+     * @property query 关键词（content LIKE 匹配）；空串 = 不限，按时间倒序取最近 N 条
+     * @property limit 返回条数上限（Capability 侧经 [com.mamba.picme.agent.core.inference.remote.tool.ChatHistoryRecall.clampLimit] 钳制 1..50）
+     */
+    data class RecallChatHistory(
+        override val commandId: Int = AgentIdGenerator.nextId(),
+        val query: String,
+        val limit: Int
+    ) : AgentCommand()
+
     // ==================== 通用命令 ====================
 
     /**
@@ -642,6 +658,7 @@ sealed class AgentCommand {
             is RememberFact -> "remember_fact"
             is ForgetFact -> "forget_fact"
             is RecallMemory -> "recall_memory"
+            is RecallChatHistory -> "recall_chat_history"
             is LaunchApp -> "launch_app"
             is OpenSystemSettings -> "open_system_settings"
             is BatchExecute -> "batch_execute"

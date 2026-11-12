@@ -131,6 +131,7 @@ object ChatIntentContract {
             allowedTools = listOf(
                 "remember_fact", "forget_fact", "recall_memory",
                 "remember_person_relation", "forget_person_relation", "list_person_relations",
+                "recall_chat_history",
             ),
             ruleText = "记忆类读写走记忆工具，人物关系查询必须 list_person_relations 不凭印象",
         ),

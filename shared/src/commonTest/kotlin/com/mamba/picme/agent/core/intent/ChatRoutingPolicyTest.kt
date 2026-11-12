@@ -179,6 +179,7 @@ class ChatRoutingPolicyTest {
             IntentId.MEMORY to setOf(
                 "remember_fact", "forget_fact", "recall_memory",
                 "remember_person_relation", "forget_person_relation", "list_person_relations",
+                "recall_chat_history",
             ),
             IntentId.NAVIGATE to setOf("navigate_to", "go_back", "launch_app", "open_system_settings"),
             IntentId.SETTINGS to setOf(

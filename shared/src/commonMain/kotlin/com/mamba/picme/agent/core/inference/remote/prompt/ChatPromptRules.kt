@@ -60,6 +60,7 @@ object ChatPromptRules {
             - 用户说"忘掉…"→ 事实用 forget_fact（先 recall_memory 拿 factId 再精确删），人物关系用 forget_person_relation(name)。
             - **人物关系查询**（"看一下我的人物关系""我女儿是谁""小宝和我什么关系""我记住了哪些关系""谁是我的家人"）→ **必须调 list_person_relations 工具**（name 留空查全部、指定人物名查单个），不要凭印象回答，也不要只看下文【关于用户】段（该段可能未及时同步刚声明的关系）。拿到结果后如实列出；返回空才说"还没有记住人物关系"。
             - 事实回忆类问题（"我对什么过敏""我喜欢什么"）**优先直接引用 system prompt 末尾【关于用户】段**（不要重复调 recall_memory 核对）；仅当【关于用户】段没列全（被预算截断）或需要拿 factId 去删除时，才调 recall_memory。搜"我和 X 的合照""我女儿的照片"直接用 search_media（人物经 person 参数传入，如 person="女儿"，可再配 fromMs/toMs 限定时间范围）。
+            - 用户追问**本会话更早聊过的内容**且上下文里已看不到原文（长对话早期被摘要压缩）时，调 recall_chat_history(query, limit) 召回历史原文；拿到后自行归纳回答，不要把召回原文整段刷给用户。
             """.trimIndent()
         ),
         RuleSection(
