@@ -10,7 +10,8 @@ import com.mamba.picme.domain.chat.MessagePart
  * 由 [ChatStreamTurnAdapter] 按到达序合成；Koog hook 不提供稳定 call id）。
  *
  * 事件由 [TurnPartsReducer] 消费拼装 turn 的 parts 快照；全部瞬态（内存轨），
- * 流式消息不落 Room，持久化仍走 legacy 双写（M1 接缝不变）。
+ * 流式消息不落 Room；持久化统一走 parts-first 写路径（`insertPartsMessage`/
+ * `replacePartsMessage`，D1a 接缝，2026-11-08 值域终态）。
  */
 sealed interface TurnStreamEvent {
 

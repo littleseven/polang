@@ -975,7 +975,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   同步（`syncWith`），per-key 读追踪使 action 后仅订阅变更键的节点重组；root 树 data class
   相等门控——绑定全保留的卡在纯交互后零树级重组（真机验证：勾选 CheckBox 时焦点中的
   Input 文本与焦点均不丢）；
-  polang OpenUI 组件库二十一组件（M2+M3，2026-10-24）：
+  polang OpenUI 组件库（SSOT = shared `OpenUiLibrary.componentNames`，server 白名单
+  真引用同一清单，**现 103 项** = 官方全量适配 + 本仓扩展件；2026-10-24 M2+M3 时为
+  二十一组件，早期核心：
   Card/Row/Column/Text/Button/BarChart/Image + Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider
   + Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch（M3 新增 prop 类型 PRIMITIVE_ARRAY：
   元素限 Str/Num/Bool 或一层嵌套 Arr，两层嵌套/类型混杂 → 必填丢组件；可嵌套进 OBJECT_ARRAY
@@ -1140,7 +1142,10 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   （选择态与表单文本同径恢复；Bool/Num 不持久化回声明默认值），恢复路径经 initialState
   种 `$name`；宿主 produceState 键收窄为 partId+program，viewState 回流不再重建 session
   （指纹比对防重复写与回流循环）；@OpenUrl 端侧 scheme 闸只放行 http/https（server 对
-  字面量首参另有 https 同轮纠错）；@Run M1 未实施，宿主显式识别并告警（不静默吞）；
+  字面量首参另有 https 同轮纠错）；@Run 已于 2026-11-01 动作三通道批次实装
+  （`OpenUiSession.runToolAction`：MUTATION 语句经宿主 `OpenUiToolResolver` 执行
+  白名单写工具、结果入 `mutationResults` 缓存可绑定 UI，QUERY 按当前 store 重取，
+  详见 `shared/AGENTS.md` §openui）；
   @ToAssistant 自 2026-10-31 起上行——以用户消息发进会话（CardHeader/ListItem/ListBlock
   的 actionLabel 缺省动作由 labeledActionsOrDefault 兜底合成同文案），M1 及之前仅记日志
   不路由。

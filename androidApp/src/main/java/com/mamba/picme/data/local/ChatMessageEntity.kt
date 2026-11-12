@@ -20,7 +20,7 @@ data class ChatMessageEntity(
     val sessionId: String = "default",
 
     /**
-     * 消息 kind 投影列（派生，权威源 = partsJson）：首个 content/tool 类 part 的线格式
+     * 消息 kind 投影列（派生，权威源 = partsJson）：首个 content/tool/data 类 part 的线格式
      * 鉴别值——text/image + tool_chart/tool_html/tool_task/tool_image_edit/tool_browser +
      * data_optimize_candidates/data_genui_program（投影规则见
      * `domain/chat/ChatMessageProjection.kt`；reasoning/source/tombstone 永不作投影源）。

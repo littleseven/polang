@@ -41,7 +41,7 @@ struct HtmlCardView: View {
     private var fullpageThreshold: CGFloat { UIScreen.main.bounds.height }
 
     /// "messageId:partId" → 测高缓存（LazyVStack 复建时防跳变；iOS 无 Android 滑动冻结
-    /// 直通，以缓存 + 防抖兜底——平台差异，见 M5 gap 报告）。键必须复合 messageId：
+    /// 直通，以缓存 + 防抖兜底——平台差异）。键必须复合 messageId：
     /// 持久轨产物行 partId 恒 "p0"，单以 partId 为键 = 全 App 单槽跨消息互相污染。
     private static var heightCache: [String: CGFloat] = [:]
 
